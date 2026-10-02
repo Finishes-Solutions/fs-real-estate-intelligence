@@ -166,7 +166,7 @@ export function initBuildings(ctx) {
       '<div class="bacts">' + (matchMedia('(pointer: coarse)').matches ? '<button class="btn" id="bMulti" title="Then tap more buildings or parcels">Select Multiple</button>' : '') + '<button class="btn" id="bNear">Filings Within ¼ Mile</button><button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button></div>' +
       '<div id="bPhoto"></div><div id="bSize">' + sizeRows(b) + '<div class="rnote">Measuring height from lidar…</div></div>' +
       '<div class="bsec" id="bParcel"><div class="lt">Parcel</div><div class="rnote">Looking up the appraisal record…</div></div>' +
-      '<div class="bsec" id="bFilings"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses here</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div><div class="bsec" id="bArea"></div>' +
+      '<div class="bsec" id="bFilings"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses here</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div><div class="bsec" id="bRegrid"></div><div class="bsec" id="bArea"></div>' +
       '<div class="rnote bsrc">Footprint: OpenStreetMap. Height: USGS 3DEP lidar (Microsoft Planetary Computer) where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record when mapped, otherwise estimated from height. Parcel: Texas GIO StratMap. Values are appraisal values, not sale prices.</div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
@@ -183,7 +183,7 @@ export function initBuildings(ctx) {
     if (cur !== b || multi.length) return;
     highlight();
     card.querySelector('#bSize').innerHTML = sizeRows(b);
-    renderParcel(d.parcel, d.parcelError); renderFilings(d.parcel?.geometry || null); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo); renderTenants(d.parcel);
+    renderParcel(d.parcel, d.parcelError); renderFilings(d.parcel?.geometry || null); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo); renderTenants(d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel);
   }
   ctx.buildingStats = () => { const list = multi.length ? multi : cur ? [cur] : []; return list.map(b => ({ address: b.parcel?.situs || null, ...stats(b), owner: b.parcel?.owner || null })); };
 
