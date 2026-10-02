@@ -35,6 +35,6 @@ export const METRICS = [
   { k: 'topDev', short: 'Top developer', label: 'Top developer', text: true, fn: l => { const t = topBy(l, f => f.dev || f.owner, f => f.cost); return dash(t?.[0]); }, fmt: v => v }
 ];
 export const BY_KEY = new Map(METRICS.map(m => [m.k, m]));
-export const DEFAULT_KPIS = ['count', 'value', 'new', 'active', 'avg', 'big'];
+export const DEFAULT_KPIS = ['count', 'value', 'new', 'newValue', 'active', 'starting', 'avg', 'big', 'sqft'];
 export const metricValue = (k, list) => { const m = BY_KEY.get(k); return m ? m.fn(list) : null; };
 export const metricText = (k, list) => { const m = BY_KEY.get(k); return m ? m.fmt(m.fn(list)) : ''; };

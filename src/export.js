@@ -133,8 +133,9 @@ export function initExport(ctx) {
     return { d, W, H: d.internal.pageSize.getHeight(), y: ft ? 116 : 106 };
   }
   function kpiRow(p, list) {
-    const keys = ctx.kpiKeys?.() || DEFAULT_KPIS, n = keys.length, gap = 8, w = (p.W - 72 - gap * (n - 1)) / n;
-    keys.forEach((k, i) => { const m = BY_KEY.get(k), x = 36 + i * (w + gap);
+    // Up to 6 tiles fit on one row; 7–9 wrap onto a second row.
+    const keys = ctx.kpiKeys?.() || DEFAULT_KPIS, per = keys.length > 6 ? Math.ceil(keys.length / 2) : keys.length, gap = 8, w = (p.W - 72 - gap * (per - 1)) / per, y0 = p.y;
+    keys.forEach((k, i) => { const m = BY_KEY.get(k), x = 36 + (i % per) * (w + gap); p.y = y0 + Math.floor(i / per) * 54;
       p.d.setDrawColor(...LINE); p.d.setLineWidth(.8); p.d.rect(x, p.y, w, 46); p.d.setFillColor(...GREEN); p.d.rect(x, p.y, 2.5, 46, 'F');
       p.d.setFont('helvetica', 'bold'); p.d.setFontSize(m.text ? 10 : 15); p.d.setTextColor(...INK); p.d.text(p.d.splitTextToSize(String(m.fmt(m.fn(list))), w - 16)[0], x + 10, p.y + 22);
       p.d.setFont('helvetica', 'normal'); p.d.setFontSize(7); p.d.setTextColor(...MUTED); p.d.text(m.label.toUpperCase(), x + 10, p.y + 37, { charSpace: .6 }); });

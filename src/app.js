@@ -48,7 +48,7 @@ document.getElementById('themeBtn').onclick=()=>{ root.dataset.theme=isDark()?'l
 const LAST_RUN=DATA.changes.runs[0], CHANGED=recentChanges(DATA.changes);
 const F=DATA.filings.map(f=>({...f,r:Math.max(2.2,Math.min(15,1.6+Math.sqrt(f.cost/1e6)*1.15)),_chg:CHANGED.get(f.id)||null})).sort((a,b)=>b.cost-a.cost);
 const BY_ID=new Map(F.map(f=>[f.id,f]));
-const state={counties:new Set(COUNTIES),types:new Set(TYPES),min:0,max:0,q:'',uses:null,who:null,d:null,chg:null,month:null,sel:null,shown:150};
+const state={counties:new Set(COUNTIES),types:new Set(TYPES),min:0,max:0,q:'',uses:null,who:null,d:null,chg:null,st:null,sqmin:0,sqmax:0,co:'',exact:0,umin:0,month:null,sel:null,shown:150};
 const sel={kind:null,label:'',feature:null,counties:new Set(),center:null};
 // registration period presets; the default view is the last 12 months of filings
 const PERIODS=[['3m','3 mo',3],['12m','12 mo',12],['2y','2 yr',24],['5y','5 yr',60],['all','All',0]];
@@ -210,6 +210,7 @@ function curSpec(withSel=true){ const s={};
   if(state.types.size<TYPES.length) s.t=TYPES.filter(t=>state.types.has(t));
   if(state.uses) s.u=[...state.uses]; if(state.min) s.min=state.min; if(state.max) s.max=state.max;
   if(state.q.trim()) s.q=state.q.trim(); if(state.who) s.who=state.who; if(state.d) s.d=state.d; if(state.chg) s.chg=state.chg;
+  if(state.st) s.st=[...state.st]; if(state.sqmin) s.sqmin=state.sqmin; if(state.sqmax) s.sqmax=state.sqmax; if(state.co.trim()) s.co=state.co.trim(); if(state.exact) s.exact=1; if(state.umin) s.umin=state.umin;
   if(withSel){ const ss=selSpec(); if(ss) s.sel=ss; } return s; }
 function selSpec(){ if(!sel.feature) return null;
   if(sel.kind==='radius') return {k:'r',c:sel.center,mi:radiusMiles,label:sel.place||''};
@@ -256,12 +257,28 @@ TYPES.forEach(t=>{
   tRow.appendChild(b);
 });
 document.getElementById('minCost').onchange=e=>{state.min=+e.target.value; applyFilters();};
+document.getElementById('maxCost').onchange=e=>{state.max=+e.target.value; applyFilters();};
+// multi-select chip rows (use, status): nothing pressed = no filter
+function chipRow(rowId,values,key,label=v=>v){ const row=document.getElementById(rowId); const n={}; F.forEach(f=>{ const v=key==='uses'?(f.use||'Unclassified'):(f.status||'Unknown'); n[v]=(n[v]||0)+1; });
+  values.filter(v=>n[v]).forEach(v=>{ const b=document.createElement('button'); b.className='chip'; b.type='button'; b.dataset.v=v; b.setAttribute('aria-pressed','false'); b.innerHTML=esc(label(v))+' <span class="n">'+fmtN(n[v])+'</span>';
+    b.onclick=()=>{ const set=new Set(state[key]||[]); set.has(v)?set.delete(v):set.add(v); state[key]=set.size?set:null; applyFilters(); }; row.appendChild(b); });
+  if(row.querySelectorAll('.chip').length<2) row.style.display='none'; }
+chipRow('useRow',[...USES,'Unclassified'],'uses');
+chipRow('statusRow',['Registered','Review complete','Inspection complete','Closed','Unknown'],'st');
+const sqMin=document.getElementById('sqMin'), sqMax=document.getElementById('sqMax'), uMin=document.getElementById('uMin'), coQ=document.getElementById('coQ'), exactBtn=document.getElementById('exactBtn');
+let numT; [sqMin,sqMax].forEach(i=>i.addEventListener('input',()=>{ clearTimeout(numT); numT=setTimeout(()=>{ state.sqmin=Math.max(0,+sqMin.value||0); state.sqmax=Math.max(0,+sqMax.value||0); applyFilters(); },350); }));
+uMin.onchange=()=>{ state.umin=+uMin.value; applyFilters(); };
+let coT; coQ.addEventListener('input',()=>{ clearTimeout(coT); coT=setTimeout(()=>{ state.co=coQ.value; applyFilters(); },250); });
+exactBtn.onclick=()=>{ state.exact=state.exact?0:1; applyFilters(); };
+// collapsible Filters and List sections (remembered in this browser)
+for(const [btnId,bodyId,key] of [['secFilters','filtersBody','fs-sec-filters'],['secList','list','fs-sec-list']]){
+  const b=document.getElementById(btnId), body=document.getElementById(bodyId), set=open=>{ b.setAttribute('aria-expanded',open); body.classList.toggle('collapsed',!open); if(bodyId==='list') document.querySelector('.panel')?.classList.toggle('list-collapsed',!open); };
+  let open=true; try{ open=localStorage.getItem(key)!=='0'; }catch(e){} set(open);
+  b.onclick=()=>{ const o=b.getAttribute('aria-expanded')!=='true'; set(o); try{ localStorage.setItem(key,o?'1':'0'); }catch(e){} };
+}
 // use, dates, updates, active-filter summary
-const useSel=document.getElementById('useSel'), dField=document.getElementById('dField'), dFrom=document.getElementById('dFrom'), dTo=document.getElementById('dTo');
-{ const n={}; F.forEach(f=>{ const u=f.use||'Unclassified'; n[u]=(n[u]||0)+1; });
-  [...USES,'Unclassified'].filter(u=>n[u]).forEach(u=>{ const o=document.createElement('option'); o.value=u; o.textContent=u+' ('+fmtN(n[u])+')'; useSel.appendChild(o); });
-  if(!F.some(f=>f.use)) useSel.style.display='none'; }
-useSel.onchange=()=>{ state.uses=useSel.value&&useSel.value!=='*'?new Set([useSel.value]):null; applyFilters(); };
+const dField=document.getElementById('dField'), dFrom=document.getElementById('dFrom'), dTo=document.getElementById('dTo');
+
 const dPeriod=[DATA.period.start.slice(0,7), ym(new Date(Date.now()+3*365*864e5))];
 [dFrom,dTo].forEach(i=>{ i.min=dPeriod[0].slice(0,4)+'-01'; i.max=dPeriod[1]; });
 function readDates(){ const f=dField.value; dFrom.disabled=dTo.disabled=!f; state.d=f?{f,from:dFrom.value||'',to:dTo.value||''}:{f:'all',from:'',to:''}; applyFilters(); }
@@ -279,19 +296,24 @@ function syncFilterUI(){
   [...chgRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed',state.chg===x.dataset.chg));
   const pk=periodOf(state.d); [...pRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===pk));
   const minEl=document.getElementById('minCost'); if(![...minEl.options].some(o=>+o.value===state.min)){ const o=document.createElement('option'); o.value=state.min; o.textContent=fmtM(state.min)+'+'; minEl.appendChild(o); } minEl.value=String(state.min);
-  useSel.querySelector('option[value="*"]')?.remove();
-  if(state.uses&&state.uses.size>1){ const o=document.createElement('option'); o.value='*'; o.textContent=state.uses.size+' uses'; useSel.appendChild(o); useSel.value='*'; } else useSel.value=state.uses?[...state.uses][0]:'';
+  document.querySelectorAll('#useRow .chip').forEach(x=>x.setAttribute('aria-pressed',!!state.uses&&state.uses.has(x.dataset.v)));
+  document.querySelectorAll('#statusRow .chip').forEach(x=>x.setAttribute('aria-pressed',!!state.st&&state.st.has(x.dataset.v)));
+  const maxEl=document.getElementById('maxCost'); if(state.max&&![...maxEl.options].some(o=>+o.value===state.max)){ const o=document.createElement('option'); o.value=state.max; o.textContent=fmtM(state.max); maxEl.appendChild(o); } maxEl.value=String(state.max||0);
+  if(document.activeElement!==sqMin) sqMin.value=state.sqmin||''; if(document.activeElement!==sqMax) sqMax.value=state.sqmax||'';
+  uMin.value=String(state.umin||0); if(document.activeElement!==coQ) coQ.value=state.co||''; exactBtn.setAttribute('aria-pressed',!!state.exact);
   const dd=state.d&&state.d.f!=='all'?state.d:null; dField.value=dd?dd.f:''; dFrom.value=dd?.from||''; dTo.value=dd?.to||''; dFrom.disabled=dTo.disabled=!dd;
-  const nMore=(state.uses?1:0)+(state.d&&!pk?1:0)+(state.chg?1:0); document.getElementById('moreN').textContent=nMore?'· '+nMore+' on':''; if(nMore) document.getElementById('moreF').open=true;
+  const nMore=(state.uses?1:0)+(state.d&&!pk?1:0)+(state.chg?1:0)+(state.st?1:0)+(state.sqmin||state.sqmax?1:0)+(state.umin?1:0)+(state.co.trim()?1:0)+(state.exact?1:0); document.getElementById('moreN').textContent=nMore?'· '+nMore+' on':''; if(nMore) document.getElementById('moreF').open=true;
+  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); document.getElementById('filtOn').textContent=nAll?nAll+' on':'';
   const t=filterText(); document.getElementById('activeTxt').textContent=t?'Filters: '+t:''; document.getElementById('activeBar').classList.toggle('on',!!t);
 }
-document.getElementById('resetAll').onclick=()=>{ fromSpec(DEFAULT_SPEC()); if(state.month) setMonth(null); };
+document.getElementById('resetAll').onclick=()=>{ ctx.clearPlace?.(); fromSpec(DEFAULT_SPEC()); if(state.month) setMonth(null); };
 // apply a whole filter spec (URL, saved search, AI answer)
 function fromSpec(spec,{fly=true}={}){
   state.counties=new Set(spec.c&&spec.c.length?spec.c.filter(c=>COUNTIES.includes(c)):COUNTIES); if(!state.counties.size) state.counties=new Set(COUNTIES);
   state.types=new Set(spec.t&&spec.t.length?spec.t:TYPES);
   state.uses=spec.u&&spec.u.length?new Set(spec.u):null; state.min=spec.min||0; state.max=spec.max||0; state.q=spec.q||'';
   state.who=spec.who||null; state.d=spec.d||null; state.chg=spec.chg||null;
+  state.st=spec.st&&spec.st.length?new Set(spec.st):null; state.sqmin=spec.sqmin||0; state.sqmax=spec.sqmax||0; state.co=spec.co||''; state.exact=spec.exact?1:0; state.umin=spec.umin||0;
   const s=spec.sel;
   if(s&&s.k==='r'){ setMiles(s.mi,false,true); setRadiusCenter(s.c,s.label||'pin',fly); }
   else if(s&&s.k==='c'){ const set=new Set(s.names.filter(n=>COUNTIES.includes(n))); if(set.size){ setCountySel(set); if(fly) fitGeom(sel.feature); } else clearSelection(); }

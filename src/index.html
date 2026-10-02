@@ -33,22 +33,40 @@
       <p class="sub">Every accessibility registration filed in Waller and the six counties around it over the last two years, placed where it will be built.</p>
       <div class="kpiwrap">
         <div class="kpis" id="kpis" aria-live="polite"></div>
-        <button class="kpi-edit" id="kpiEdit" type="button" aria-label="Choose headline metrics" aria-expanded="false" title="Choose metrics (3 to 6)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg><span>Metrics</span></button>
+        <button class="kpi-edit" id="kpiEdit" type="button" aria-label="Choose headline metrics" aria-expanded="false" title="Choose metrics (3 to 9)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg><span>Metrics</span></button>
         <div class="kpi-pop" id="kpiPop" role="dialog" aria-label="Headline metrics"></div>
       </div>
     </div>
-    <div class="filters">
+    <button class="sechead" id="secFilters" type="button" aria-expanded="true" aria-controls="filtersBody"><svg class="chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg><span>Filters</span><em id="filtOn"></em></button>
+    <div class="filters" id="filtersBody">
       <div class="row" id="periodRow"><span class="lbl">Filed</span></div>
       <div class="row" id="countyRow"><span class="lbl">County</span></div>
       <div class="row" id="typeRow"><span class="lbl">Type</span></div>
       <div class="row"><span class="lbl">Value</span>
         <select class="chip" id="minCost" aria-label="Minimum estimated value">
-          <option value="0">Any value</option><option value="1000000">$1M+</option><option value="5000000">$5M+</option><option value="25000000">$25M+</option>
+          <option value="0">Any min</option><option value="250000">$250K+</option><option value="1000000">$1M+</option><option value="5000000">$5M+</option><option value="25000000">$25M+</option><option value="100000000">$100M+</option>
+        </select>
+        <span class="to">to</span>
+        <select class="chip" id="maxCost" aria-label="Maximum estimated value">
+          <option value="0">Any max</option><option value="250000">$250K</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="25000000">$25M</option><option value="100000000">$100M</option>
         </select>
       </div>
-      <details class="more" id="moreF"><summary>More Filters <span id="moreN"></span></summary>
-      <div class="row"><span class="lbl">Use</span>
-        <select class="chip" id="useSel" aria-label="Real estate use"><option value="">Any use</option></select>
+      <details class="more" id="moreF" open><summary>More Filters <span id="moreN"></span></summary>
+      <div class="row" id="useRow"><span class="lbl">Use</span></div>
+      <div class="row" id="statusRow"><span class="lbl">Status</span></div>
+      <div class="row"><span class="lbl">Sq ft</span>
+        <input class="chip num" type="number" id="sqMin" min="0" step="1000" placeholder="Min" aria-label="Minimum square feet">
+        <span class="to">to</span>
+        <input class="chip num" type="number" id="sqMax" min="0" step="1000" placeholder="Max" aria-label="Maximum square feet">
+      </div>
+      <div class="row"><span class="lbl">Units</span>
+        <select class="chip" id="uMin" aria-label="Housing units"><option value="0">Any</option><option value="1">Has housing units</option><option value="50">50+ units</option><option value="100">100+ units</option><option value="250">250+ units</option></select>
+      </div>
+      <div class="row"><span class="lbl">Company</span>
+        <label class="search sm"><input id="coQ" type="search" placeholder="Developer, owner, architect or GC" aria-label="Company name"></label>
+      </div>
+      <div class="row"><span class="lbl">Location</span>
+        <button class="chip" id="exactBtn" type="button" aria-pressed="false" title="Hide filings placed at a town center or along a street">Exact addresses only</button>
       </div>
       <div class="row"><span class="lbl">Dates</span>
         <select class="chip" id="dField" aria-label="Date filter"><option value="">Any time</option><option value="active">Under construction</option><option value="start">Starting</option><option value="reg">Registered</option></select>
@@ -73,7 +91,7 @@
       </div>
       <details class="saved" id="savedBox"><summary>Saved Searches <span id="savedN"></span></summary><div id="savedList"></div></details>
     </div>
-    <div class="listhead"><span id="listCount"></span></div>
+    <button class="sechead listhead" id="secList" type="button" aria-expanded="true" aria-controls="list"><svg class="chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg><span id="listCount"></span></button>
     <div class="list" id="list" role="list"></div>
     <div class="foot">Source: <a href="https://www.tdlr.texas.gov/TABS/Search" target="_blank" rel="noopener">TDLR TABS</a>, registrations <span id="periodTxt"></span>. Costs and dates are filer estimates; hatched timeline bars are our own estimates. Located with US Census and OpenStreetMap geocoders; hollow markers are city-level approximations. Use, tenant and developer fields are AI-extracted from the filing text and can be wrong. Demographics: US Census ACS 5-year. <span id="missTxt"></span> Basemaps © MapTiler © OpenStreetMap contributors.</div>
   </aside>

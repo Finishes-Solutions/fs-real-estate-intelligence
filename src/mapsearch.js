@@ -1,4 +1,5 @@
 import { pickPlace } from './lib/assist-logic.mjs';
+import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 // Map search (under the map tools): real street addresses, places (counties, towns, neighborhoods, landmarks, roads),
 // projects by name, companies and people (owners, developers, architects, contractors) and filings at matching addresses. Results appear while typing, 10 at a time, with more loading as you
 // scroll. Picking a place outlines it on the map: city / county / neighborhood boundaries and building footprints
@@ -191,7 +192,17 @@ export function initMapSearch(ctx) {
     syncPlace();
   });
   const syncPlace = () => map.getSource && map.getSource('place')?.setData(ctx.fc(place?.geom ? [{ type: 'Feature', properties: {}, geometry: place.geom }] : []));
-  function clearPlace() { place = null; syncPlace(); bar.classList.remove('on'); bar.innerHTML = ''; }
+  // the location marker: an amber pin with the place name, at the address / landmark or the middle of an outline
+  let pin = null;
+  function setPlacePin(c, label) {
+    if (!c) { pin?.remove(); pin = null; return; }
+    if (!pin) { const el = document.createElement('div'); el.className = 'ppin';
+      el.innerHTML = '<svg width="30" height="40" viewBox="0 0 26 34" aria-hidden="true"><path d="M13 33C13 33 2 20.5 2 12.5a11 11 0 0 1 22 0C24 20.5 13 33 13 33z" fill="#d48806" stroke="#fff" stroke-width="2"/><circle cx="13" cy="12.5" r="4.2" fill="#fff"/></svg><span></span>';
+      pin = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(c).addTo(map); }
+    else pin.setLngLat(c);
+    pin.getElement().querySelector('span').textContent = String(label || '').split(',')[0];
+  }
+  function clearPlace() { place = null; syncPlace(); setPlacePin(null); bar.classList.remove('on'); bar.innerHTML = ''; }
   ctx.clearPlace = clearPlace;
 
   const isArea = g => g && /Polygon/.test(g.type);
@@ -218,7 +229,7 @@ export function initMapSearch(ctx) {
 
   async function showPlace(p) {
     ctx.setView('map'); ctx.closeCard?.();
-    place = { label: p.label, kind: p.kind, c: p.c, geom: null };
+    place = { label: p.label, kind: p.kind, c: p.c, geom: null }; setPlacePin(p.c, p.label);
     bar.innerHTML = '<div class="pb-k">' + esc(KIND_LABEL[p.kind] || 'Place') + '</div><div class="pb-t">' + esc(p.label) + '</div><div class="pb-s">Finding the outline…</div>'; bar.classList.add('on');
     let geom = null, note = '';
     if (p.kind === 'county') {
@@ -239,7 +250,7 @@ export function initMapSearch(ctx) {
     if (place?.label !== p.label) return; // a newer pick won
     if (!geom && p.bbox && /area|town|zip|county/.test(p.kind)) { const [w, s2, e, n] = p.bbox; geom = { type: 'Polygon', coordinates: [[[w, s2], [e, s2], [e, n], [w, n], [w, s2]]] }; note = 'Approximate outline (the area’s bounding box): OpenStreetMap has no boundary for it.'; }
     place.geom = geom ? (isArea(geom) ? ctx.fixWinding(geom) : geom) : null; syncPlace();
-    const pt = p.c || (geom && centerOf(geom));
+    const pt = p.c || (geom && centerOf(geom)); setPlacePin(pt, p.label);
     if (geom && isArea(geom) && /address|poi|building/.test(p.kind) || !geom && /address|poi|coords/.test(p.kind)) {
       // a single building: fly in close, then open the building panel (footprint highlight, parcel, businesses)
       map.flyTo({ center: pt, zoom: 18, pitch: 55, duration: ctx.reduceMotion ? 0 : 1600 });
@@ -272,16 +283,45 @@ export function initMapSearch(ctx) {
     const inCmp = ctx.compare?.list().some(a => a.key === 'place:' + place.label);
     bar.innerHTML = '<button class="x" aria-label="Clear" id="pbX">×</button><div class="pb-k">' + esc(KIND_LABEL[place.kind] || 'Place') + '</div><div class="pb-t">' + esc(place.label) + '</div>' +
       '<div class="pb-s">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' ' + how + ' · est. ' + fmtM(v) + (ctx.filterText() ? '<span> (current filters)</span>' : '') + '</div>' + (note ? '<div class="pb-n">' + esc(note) + '</div>' : '') +
-      '<div class="pb-a">' + (area ? '<button class="btn primary" id="pbFilter">Filter to This Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>'
-        : '<button class="btn primary" id="pbNear">Filings Within ¼ Mile</button>') + (list.length ? '<button class="btn" id="pbHl">Highlight ' + (list.length > 50 ? 'Top 50' : 'Them') + '</button>' : '') + '</div>';
+      '<div class="pb-a"><button class="btn primary" id="pbInfo">More Information</button>' + (area ? '<button class="btn" id="pbFilter">Filter to This Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>' : '') +
+        (list.length ? '<button class="btn" id="pbHl">Highlight ' + (list.length > 50 ? 'Top 50' : 'Them') + '</button>' : '') + '</div>';
     bar.classList.add('on');
     bar.querySelector('#pbX').onclick = clearPlace;
     bar.querySelector('#pbFilter')?.addEventListener('click', () => { const pl = place; ctx.setSelection('place', pl.label, pl.geom); clearPlace(); ctx.fitGeom(pl.geom); });
     bar.querySelector('#pbCmp')?.addEventListener('click', () => { if (ctx.compare.add({ key: 'place:' + place.label, label: place.label.split(',')[0], kind: place.kind, geom: place.geom })) placeCard(note); });
-    bar.querySelector('#pbNear')?.addEventListener('click', () => { const pt = place.c || centerOf(place.geom); ctx.setMiles(.25, false, true); ctx.setRadiusCenter(pt, place.label, true); clearPlace(); });
+    bar.querySelector('#pbInfo').addEventListener('click', () => area ? areaCard() : pointInfo());
     bar.querySelector('#pbHl')?.addEventListener('click', () => { ctx.highlight(list.slice().sort((a, b) => b.cost - a.cost).slice(0, 50), place.label); });
   }
   ctx.onChange(() => { if (place && bar.classList.contains('on') && place.geom !== undefined) placeCard(); });
+
+  // "More Information" on an address, landmark, building or coordinates: the location card (parcel, size, lidar height,
+  // filings, businesses, Drive Time, Weather, Site Imagery, News), using the building footprint under the point when there is one
+  function pointInfo() {
+    const pt = place.c || centerOf(place.geom);
+    const fp = place.kind === 'building' && isArea(place.geom) ? place.geom : ctx.buildingAt?.(pt)?.footprint || null;
+    ctx.openBuildingAt(pt, fp);
+  }
+  // "More Information" on a town, county, neighborhood or ZIP: an area summary card with the headline metrics,
+  // top uses and the largest projects inside it
+  function areaCard() {
+    const pl = place, card = ctx.card, { list } = placeHits(), keys = ctx.kpiKeys?.() || DEFAULT_KPIS;
+    const uses = new Map(); list.forEach(f => { const k = f.use || 'Unclassified', u = uses.get(k) || [k, 0, 0]; u[1]++; u[2] += f.cost; uses.set(k, u); });
+    const topUses = [...uses.values()].sort((a, b) => b[2] - a[2]).slice(0, 6), top = list.slice().sort((a, b) => b.cost - a.cost).slice(0, 5), tot = list.reduce((s, f) => s + f.cost, 0) || 1;
+    const inCmp = ctx.compare?.list().some(a => a.key === 'place:' + pl.label);
+    ctx.closeCard();
+    card.innerHTML = '<div class="top"><div><div class="kicker">' + esc(KIND_LABEL[pl.kind] || 'Area') + ' summary</div><h2>' + esc(pl.label) + '</h2><div class="bsub">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' inside' + (ctx.filterText() ? ' (current filters)' : '') + '</div></div>' +
+      '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
+      '<div class="bacts"><button class="btn primary" id="acFilter">Filter to This Area</button><button class="btn" id="acCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button></div>' +
+      '<div class="acm">' + keys.map(k => { const m = BY_KEY.get(k); if (!m) return ''; const v = m.fmt(m.fn(list)); return '<div><b title="' + esc(v) + '">' + esc(v) + '</b><span>' + esc(m.short || m.label) + '</span></div>'; }).join('') + '</div>' +
+      (topUses.length ? '<div class="bsec"><div class="lt">Top uses by value</div>' + topUses.map(u => '<div class="acu"><span>' + esc(u[0]) + '</span><i style="width:' + Math.max(2, Math.round(u[2] / tot * 100)) + '%"></i><b>' + fmtN(u[1]) + ' · ' + fmtM(u[2]) + '</b></div>').join('') + '</div>' : '') +
+      (top.length ? '<div class="bsec"><div class="lt">Largest projects</div>' + top.map((f, i) => '<button class="acp" data-i="' + i + '"><b>' + esc(f.name) + '</b><span>' + esc([f.use || ctx.TYPE_LABEL?.[f.type], f.city, f.reg].filter(Boolean).join(' · ')) + '</span><em>' + fmtM(f.cost) + '</em></button>').join('') + '</div>'
+        : '<div class="bsec"><div class="rnote">No filings inside this area match the current filters.</div></div>');
+    card.classList.add('open');
+    card.querySelector('.x').onclick = () => ctx.closeCard();
+    card.querySelectorAll('.acp').forEach(b => b.onclick = () => ctx.select(top[+b.dataset.i], true));
+    card.querySelector('#acFilter').onclick = () => { ctx.closeCard(); ctx.setSelection('place', pl.label, pl.geom); clearPlace(); ctx.fitGeom(pl.geom); };
+    card.querySelector('#acCmp').onclick = e => { if (ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom })) { e.currentTarget.disabled = true; if (place === pl) placeCard(); } };
+  }
 
   // for the assistant: find a place by name and outline it
   ctx.highlightPlace = async (text, kind) => {
@@ -310,4 +350,6 @@ export function initMapSearch(ctx) {
   };
   ctx.placeSummary = () => { if (!place) return null; const { list, how } = placeHits(); return { place: place.label, kind: place.kind, outlined: !!place.geom, filings: list.length, how, total_value: list.reduce((s, f) => s + f.cost, 0) }; };
   ctx.currentPlace = () => place;
+  // the location card's "Filings Within ¼ Mile": the radius tool takes over from the searched place
+  ctx.nearHere = (pt, label) => { clearPlace(); ctx.setMiles(.25, false, true); ctx.setRadiusCenter(pt, label, true); };
 }

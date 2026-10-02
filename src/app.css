@@ -958,3 +958,36 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 @media (max-width:700px){ .fab-sugs{display:none} }
 /* with a card open, the map buttons (and the Layers panel) move left of it, like Ask AI, so the card never hides them */
 @media (min-width:701px){ .app:has(.card.open) .ctrls{right:var(--fabr,16px)} .app:has(.card.open) .layers{right:calc(var(--fabr,16px) + 46px)} }
+
+/* collapsible Filters and List sections */
+.sechead{display:flex;align-items:center;gap:8px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;padding:12px 24px;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);cursor:pointer;text-align:left}
+.sechead:hover{color:var(--text)}
+.sechead .chev{flex:none;transition:transform 150ms}
+.sechead[aria-expanded="false"] .chev{transform:rotate(-90deg)}
+.sechead em{font-style:normal;color:var(--brand);margin-left:auto;letter-spacing:.06em}
+.sechead.listhead{border-bottom:0;justify-content:flex-start}
+.sechead.listhead[aria-expanded="false"]{border-bottom:1px solid var(--line)}
+.filters.collapsed,.list.collapsed{display:none}
+.panel.list-collapsed .foot{margin-top:auto}
+input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var(--font-mono);font-size:12px}
+.search.sm{flex:1;min-width:160px}
+@media (max-width:760px){.sechead{padding-left:18px;padding-right:18px}}
+
+/* searched-place pin */
+.ppin{display:flex;flex-direction:column;align-items:center;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.ppin span{order:-1;margin-bottom:3px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--panel);color:var(--text);border:1px solid #d48806;border-radius:4px;padding:2px 7px;font-size:12px;font-weight:600}
+.ppin span:empty{display:none}
+/* area summary card */
+.acm{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:12px 0}
+.acm div{background:var(--panel);padding:9px 10px;min-width:0}
+.acm b{display:block;font-family:var(--font-mono);font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acm span{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.acu{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;align-items:center;gap:8px;font-size:12.5px;padding:3px 0}
+.acu span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acu i{display:block;height:6px;border-radius:3px;background:var(--brand);justify-self:start}
+.acu b{font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--text-2)}
+.acp{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;width:100%;text-align:left;background:transparent;border:0;border-top:1px solid var(--line);padding:8px 0;cursor:pointer;color:var(--text)}
+.acp:hover b{color:var(--brand)}
+.acp b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acp span{grid-column:1;font-size:11.5px;color:var(--muted)}
+.acp em{grid-row:1/3;grid-column:2;align-self:center;font-style:normal;font-family:var(--font-mono);font-size:12px}

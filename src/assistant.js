@@ -204,6 +204,12 @@ export function initAssistant(ctx) {
     if (a.period) spec.d = ctx.periodSpec(a.period);
     if (a.date_field && (ym(a.date_from) || ym(a.date_to))) spec.d = { f: a.date_field, from: ym(a.date_from), to: ym(a.date_to) };
     if (a.changed) spec.chg = a.changed;
+    if (a.status?.length) spec.st = a.status;
+    if (a.sqft_min > 0) spec.sqmin = Math.round(a.sqft_min);
+    if (a.sqft_max > 0) spec.sqmax = Math.round(a.sqft_max);
+    if (a.company) spec.co = String(a.company).slice(0, 80);
+    if (a.exact_only) spec.exact = 1;
+    if (a.min_units > 0) spec.umin = Math.round(a.min_units);
     if (a.developer) { const who = developerKey(a.developer, ctx.F); if (who) spec.who = who; else { spec.q = String(a.developer).slice(0, 80); notes.push('No developer key matched “' + a.developer + '”; searched the text instead.'); } }
     if (a.near_place) { const p = await resolvePlace(String(a.near_place)); if (!p.error) spec.sel = { k: 'r', c: p.c, mi: Math.max(0.25, Math.min(60, a.radius_miles || 5)), label: p.label }; else notes.push('Couldn’t find “' + a.near_place + '” on the map.'); }
     return { spec, notes };

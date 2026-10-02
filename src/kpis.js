@@ -1,7 +1,7 @@
-// Headline metrics under the title: 3 to 6 tiles the user picks from METRICS (saved in this browser).
+// Headline metrics under the title: 3 to 9 tiles the user picks from METRICS (saved in this browser).
 import { METRICS, BY_KEY, DEFAULT_KPIS } from './metrics.js';
 
-const MIN = 3, MAX = 6;
+const MIN = 3, MAX = 9;
 export function initKpis(ctx) {
   const box = document.getElementById('kpis'), btn = document.getElementById('kpiEdit'), pop = document.getElementById('kpiPop');
   let keys = DEFAULT_KPIS.slice();

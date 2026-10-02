@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { cleanFilterArgs, pickPlace, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
 import { USES } from '../lib/taxonomy.mjs';
+import { makeMatcher, encode, decode, describe } from '../lib/filter.mjs';
 import { categoryOf, parsePlaces, overpassQuery } from '../lib/nearby.mjs';
 import { roofFromHistogram, floorsFromHeight } from '../lib/height.mjs';
 
@@ -74,4 +75,19 @@ assert.deepEqual(pl.map(p => p.code), ['IAH', 'HOU'], 'private strips dropped, n
 // lidar roof height and floors
 assert.equal(roofFromHistogram([[500, 0, 0], [0, 1, 2, 3]]).height_m, 0, 'flat ground → no building');
 assert.equal(floorsFromHeight(272, 'office'), 70); assert.equal(floorsFromHeight(7, 'house'), 2); assert.equal(floorsFromHeight(1), null);
+// the newer filters: status, sq ft, company, exact address, housing units
+const fs = [
+  { id: 'A', county: 'Harris', type: 'New', cost: 9e6, status: 'Registered', sqft: 40000, units: 120, owner: 'Hines Interests', gc: 'Tellepsen Builders', name: 'Tower' },
+  { id: 'B', county: 'Harris', type: 'Reno', cost: 1e6, status: 'Closed', sqft: 3000, owner: 'H-E-B', approx: 1, name: 'Store' },
+  { id: 'C', county: 'Harris', type: 'New', cost: 2e6, status: '', prec: 'street', owner: 'Smith Family', arch: 'Gensler', name: 'Clinic' }];
+const ids = spec => fs.filter(makeMatcher(spec)).map(f => f.id).join('');
+assert.equal(ids({ st: ['Registered', 'Unknown'] }), 'AC');
+assert.equal(ids({ sqmin: 10000 }), 'A'); assert.equal(ids({ sqmax: 10000 }), 'B', 'no sq ft is not under the max');
+assert.equal(ids({ co: 'tellepsen' }), 'A'); assert.equal(ids({ co: 'gensler' }), 'C'); assert.equal(ids({ co: 'tower' }), '', 'company text skips project names');
+assert.equal(ids({ exact: 1 }), 'A'); assert.equal(ids({ umin: 100 }), 'A');
+const spec = { st: ['Registered', 'Review complete'], sqmin: 5000, sqmax: 90000, co: 'hines', exact: 1, umin: 50 };
+assert.deepEqual(decode(encode(spec)), spec, 'new fields survive a link round trip');
+assert.match(describe(spec), /5,000–90,000 sq ft.*50\+ units.*Company: “hines”.*Exact addresses only/);
+a = cleanFilterArgs({ sqft_min: 0, sqft_max: 5000, status: ['Registered', 'Review complete', 'Inspection complete', 'Closed'], company: ' ', exact_only: false, min_units: -1 });
+assert.deepEqual(a, { sqft_max: 5000 }, 'empty / all-status / false filters dropped');
 console.log('assistant ok');
