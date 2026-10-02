@@ -2,6 +2,8 @@
 // Tool calls from either channel run here, against the filings loaded in the browser (see lib/agent-tools.mjs).
 import { makeMatcher, describe, miles } from './lib/filter.mjs';
 import { entityKey } from './lib/taxonomy.mjs';
+import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
+import { cleanFilterArgs, pickPlace, frame, ZOOM } from './lib/assist-logic.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
@@ -24,6 +26,7 @@ export function initAssistant(ctx) {
     <div class="ai-live" id="aiLive" hidden>
       <div class="ai-orb" id="aiOrb"><i></i><i></i><i></i><i></i><i></i></div>
       <div class="ai-lt"><b id="aiLiveT">Connecting…</b><span id="aiLiveS">Voice conversation</span></div>
+      <button class="btn" id="aiSendNow" type="button" hidden>Send</button>
       <button class="btn" id="aiStop" type="button">End</button>
     </div>
     <form class="ai-f" id="aiForm" autocomplete="off">
@@ -48,7 +51,7 @@ export function initAssistant(ctx) {
     ctx.mapPadding();
   }
   function close() { app.classList.remove('ai-open', 'ai-tall'); el.setAttribute('aria-hidden', 'true'); stopVoice(); ctx.mapPadding(); }
-  $('aiFab').onclick = () => open(); $('aiClose').onclick = close; document.getElementById('askLaunch')?.addEventListener('click', () => open());
+  $('aiFab').onclick = () => open(); $('aiClose').onclick = close;
   $('aiNew').onclick = () => { history = []; thread = null; log.innerHTML = ''; renderEmpty(); ctx.clearHighlight(); };
   document.addEventListener('keydown', e => {
     if (e.key === '/' && !e.target.closest('input,textarea,select,[contenteditable]')) { e.preventDefault(); open(); }
@@ -82,7 +85,7 @@ export function initAssistant(ctx) {
   form.onsubmit = e => { e.preventDefault(); const t = q.value.trim(); if (!t) return; q.value = ''; q.style.height = 'auto'; ask(t); };
 
   // ---------- text chat loop ----------
-  const context = () => ({ coverage: ctx.coverage(), filters: ctx.filterText() || 'none (default view)' });
+  const context = () => ({ coverage: ctx.coverage(), filters: ctx.filterText() || 'none (default view)', screen: ctx.screenContext(), vocab: ctx.vocab() });
   let thread = null; // OpenAI response id that continues this conversation
   async function post(input) {
     const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, previous_response_id: thread, context: context() }) });
@@ -113,7 +116,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', site_imagery: 'Searching NASA imagery…' };
+  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', site_imagery: 'Searching NASA imagery…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -125,17 +128,25 @@ export function initAssistant(ctx) {
     const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
     return best ? { k: 'dev', v: best[0], label: labels.get(best[0]) } : null;
   }
+  // common mishearings / nicknames of local places
+  const ALIAS = [[/\bcyprus\b/i, 'Cypress'], [/\bkaty freeway\b/i, 'I-10 Katy Freeway'], [/\bthe woodland\b(?!s)/i, 'The Woodlands']];
   async function resolvePlace(name) {
+    for (const [re, to] of ALIAS) name = name.replace(re, to);
     const n = name.toLowerCase().replace(/,?\s*(tx|texas)$/, '').trim();
     const town = (ctx.DATA.places || []).find(p => p[0].toLowerCase() === n);
-    if (town) return { c: [town[1], town[2]], label: town[0] + ', TX' };
-    const g = await ctx.geocode(name + (/texas|\btx\b/i.test(name) ? '' : ', Texas'));
-    return g[0] ? { c: g[0].c, label: g[0].t } : null;
+    if (town) return { c: [town[1], town[2]], label: town[0] + ', TX', kind: 'town' };
+    const q = name + (/texas|\btx\b/i.test(name) ? '' : ', Texas');
+    let p = pickPlace(name, await ctx.geocode(q, { exact: true }));
+    if (p.error) { const p2 = pickPlace(name, await ctx.geocode(q)); if (!p2.error) p = p2; }
+    return p;
   }
-  async function specFrom(a) {
-    const base = a.keep_current ? ctx.curSpec() : { d: ctx.curSpec().d };
+  const lastUserText = () => { for (let i = history.length - 1; i >= 0; i--) if (history[i].role === 'user') return history[i].content; return ''; };
+  async function specFrom(raw) {
+    const a = cleanFilterArgs(raw, lastUserText());
+    const base = a.keep_current ? { ...ctx.curSpec() } : { d: ctx.curSpec().d };
+    if (!a.changed) delete base.chg; // "changed this week" only when asked for
     const spec = { ...base }, notes = [];
-    if (a.counties?.length) { const known = a.counties.filter(c => ctx.COUNTIES.includes(c)); if (known.length) spec.c = known; else notes.push('Counties not loaded: ' + a.counties.join(', ')); }
+    if (a.counties?.length && !ctx.COUNTIES.every(c => a.counties.includes(c))) { const known = a.counties.filter(c => ctx.COUNTIES.includes(c)); if (known.length) spec.c = known; else notes.push('Counties not loaded: ' + a.counties.join(', ')); }
     if (a.types?.length) spec.t = a.types;
     if (a.uses?.length) spec.u = a.uses;
     if (a.min_value > 0) spec.min = Math.round(a.min_value);
@@ -145,7 +156,7 @@ export function initAssistant(ctx) {
     if (a.date_field && (ym(a.date_from) || ym(a.date_to))) spec.d = { f: a.date_field, from: ym(a.date_from), to: ym(a.date_to) };
     if (a.changed) spec.chg = a.changed;
     if (a.developer) { const who = developerKey(a.developer, ctx.F); if (who) spec.who = who; else { spec.q = String(a.developer).slice(0, 80); notes.push('No developer key matched “' + a.developer + '”; searched the text instead.'); } }
-    if (a.near_place) { const p = await resolvePlace(String(a.near_place)); if (p) spec.sel = { k: 'r', c: p.c, mi: Math.max(0.25, Math.min(60, a.radius_miles || 5)), label: p.label }; else notes.push('Couldn’t find “' + a.near_place + '” on the map.'); }
+    if (a.near_place) { const p = await resolvePlace(String(a.near_place)); if (!p.error) spec.sel = { k: 'r', c: p.c, mi: Math.max(0.25, Math.min(60, a.radius_miles || 5)), label: p.label }; else notes.push('Couldn’t find “' + a.near_place + '” on the map.'); }
     return { spec, notes };
   }
   function matchList(spec) {
@@ -190,14 +201,46 @@ export function initAssistant(ctx) {
         return { opened: row(f), scope: f.scope || '', summary: f.sum || '', owner: f.owner, address: f.addr, architect: f.arch || null, gc: f.gc || null, approximate_location: !!f.approx };
       }
       if (name === 'fly_to') {
-        let c = null, label = '';
-        if (isFinite(a.lat) && isFinite(a.lon) && a.lat && a.lon) { c = [a.lon, a.lat]; label = a.lat.toFixed(4) + ', ' + a.lon.toFixed(4); }
-        else if (a.place) { const p = await resolvePlace(String(a.place)); if (p) { c = p.c; label = p.label; } }
-        if (!c) return { error: 'Couldn’t find that place.' };
+        let c = null, label = '', kind = 'town', zoom = null, note;
+        const ids = a.ids?.length ? a.ids : a.id ? [a.id] : a.highlighted ? ctx.highlighted() : [];
+        if (ids.length) {
+          const fs = ids.map(id => ctx.BY_ID.get(String(id).trim())).filter(f => f && isFinite(f.lon) && isFinite(f.lat));
+          if (!fs.length) return { error: a.highlighted && !a.ids?.length && !a.id ? 'Nothing is highlighted.' : 'None of those filings are loaded.' };
+          if (fs.length === 1) { c = [fs[0].lon, fs[0].lat]; label = fs[0].name; kind = fs[0].approx ? 'approx' : 'building'; }
+          else { const fr = frame(fs.map(f => [f.lon, f.lat])); c = fr.c; zoom = fr.zoom; label = fs.length + ' filings'; kind = 'group'; }
+          if (fs.some(f => f.approx)) note = 'Some of these filings only have a city-level location, so the camera can’t center on the exact building.';
+        } else if (isFinite(a.lat) && isFinite(a.lon) && a.lat && a.lon) { c = [a.lon, a.lat]; label = a.lat.toFixed(4) + ', ' + a.lon.toFixed(4); kind = 'building'; }
+        else if (a.place) { const p = await resolvePlace(String(a.place)); if (p.error) return { error: p.error }; c = p.c; label = p.label; kind = p.kind; }
+        else if (ctx.state.sel) { const f = ctx.state.sel; c = [f.lon, f.lat]; label = f.name; kind = f.approx ? 'approx' : 'building'; }
+        else if (ctx.currentBuilding?.()) { const b = ctx.currentBuilding(); c = b.center; label = b.title || 'this building'; kind = 'building'; }
+        if (!c) return { error: 'Say a place, an address or which filings to go to.' };
         if (ctx.view !== 'map') ctx.setView('map');
-        const zoom = Math.max(4, Math.min(18, a.zoom || (a.orbit ? 15.5 : 12)));
-        if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt ? 55 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });
-        actionChip((a.orbit ? 'Orbiting ' : 'Moved the map to ') + label); return { moved_to: label, orbiting: !!a.orbit };
+        const def = zoom ?? ZOOM[kind] ?? 12;
+        // a specific building/address/landmark stays close even if the model asks for a wide zoom
+        zoom = a.zoom > 0 ? (['building', 'address', 'poi'].includes(kind) ? Math.max(a.zoom, def) : a.zoom) : def;
+        if (kind === 'approx') zoom = Math.min(zoom, 14);
+        zoom = Math.max(4, Math.min(19, zoom));
+        if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt || zoom >= 16.5 ? 60 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });
+        actionChip((a.orbit ? 'Orbiting ' : 'Moved the map to ') + label); return { moved_to: label, zoom: +zoom.toFixed(1), orbiting: !!a.orbit, ...(note ? { note } : {}) };
+      }
+      if (name === 'highlight_area') {
+        const pl = await ctx.highlightPlace(String(a.place || ''), a.kind);
+        if (!pl) return { error: 'Couldn’t find “' + a.place + '” in OpenStreetMap. Try the official name with its city or county.' };
+        await new Promise(r => setTimeout(r, 50));
+        const out = { ...ctx.placeSummary() };
+        if (!pl.geom) out.note = 'Shown as a point: OpenStreetMap has no outline for it.';
+        if (a.filter && pl.geom && /Polygon/.test(pl.geom.type)) { ctx.setSelection('place', pl.label, pl.geom); ctx.clearPlace(); out.filtered = true; out.filings = ctx.visible.length; }
+        if (a.compare && pl.geom && /Polygon/.test(pl.geom.type)) out.added_to_compare = ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom });
+        actionChip('Outlined ' + pl.label, () => ctx.clearPlace()); return out;
+      }
+      if (name === 'compare_areas') {
+        const names = (a.places || []).map(String).filter(Boolean).slice(0, 4); if (names.length < 2) return { error: 'Give 2 to 4 places.' };
+        if (a.replace !== false) ctx.compare.clear();
+        const done = [], missed = [];
+        for (const n of names) { const pl = await ctx.highlightPlace(n); if (pl?.geom && /Polygon/.test(pl.geom.type)) { ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom }); done.push(pl.label); } else missed.push(n); }
+        ctx.clearPlace(); ctx.setView('compare');
+        const base = ctx.filtered(), areas = ctx.compare.list().map(ar => { const l = base.filter(f => d3.geoContains(ar.geom, [f.lon, f.lat])); return { area: ar.label, filings: l.length, total_value: l.reduce((s, f) => s + f.cost, 0), new_builds: l.filter(f => f.type === 'New').length, largest: l.sort((x, y) => y.cost - x.cost).slice(0, 3).map(row) }; });
+        actionChip('Comparing ' + done.join(', ')); return { compared: areas, ...(missed.length ? { not_found: missed } : {}) };
       }
       if (name === 'stop_orbit') { ctx.stopOrbit(); return { stopped: true }; }
       if (name === 'set_map_options') { const done = ctx.setMapOptions(a); actionChip('Map: ' + done.join(', ')); return { changed: done }; }
@@ -206,7 +249,7 @@ export function initAssistant(ctx) {
       if (name === 'weather_at') { if (!ctx.live) return { error: 'Not available.' }; const d = await ctx.live.weather(a); if (!d.error) actionChip('Weather at ' + d.place + ': ' + Math.round(d.temp_f) + '°F, ' + d.conditions + ', wind ' + Math.round(d.wind_mph) + ' mph'); return d; }
       if (name === 'project_news') { if (!ctx.live) return { error: 'Not available.' }; const d = await ctx.live.news(a); if (!d.error) actionChip('News: ' + d.articles.length + ' article' + (d.articles.length === 1 ? '' : 's') + ' for ' + d.searched); return d; }
       if (name === 'site_imagery') { if (!ctx.live) return { error: 'Not available.' }; if (ctx.view !== 'map') ctx.setView('map'); const d = await ctx.live.imagery(a); if (d.showing) actionChip('NASA imagery: ' + d.showing.name + ' ' + d.showing.day); return d; }
-      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', who: 'Activity', changes: 'Updates' }[a.view] || a.view)); return { view: a.view }; }
+      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates' }[a.view] || a.view)); return { view: a.view }; }
       if (name === 'reset_map') { const before = ctx.snapshot(); ctx.resetAll(); actionChip('Reset the map', () => ctx.restore(before)); return { reset: true, filings: ctx.visible.length }; }
       return { error: 'Unknown tool ' + name };
     } catch (e) { console.error(e); return { error: e.message }; }
@@ -229,7 +272,7 @@ export function initAssistant(ctx) {
       pc.ontrack = e => { audio.srcObject = e.streams[0]; };
       pc.addTrack(mic.getAudioTracks()[0], mic);
       dc = pc.createDataChannel('oai-events'); dc.onmessage = e => { try { onEvent(JSON.parse(e.data)); } catch (err) { console.error(err); } };
-      dc.onopen = () => setLive('Listening', 'Talk naturally. I’ll show things on the map as we go.');
+      dc.onopen = () => { lastCtx = ''; setLive('Listening', 'Talk naturally. I’ll answer when you pause.'); };
       pc.onconnectionstatechange = () => { if (['failed', 'disconnected', 'closed'].includes(pc?.connectionState)) stopVoice('Voice connection ended.'); };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
       const a = await fetch('https://api.openai.com/v1/realtime/calls', { method: 'POST', body: offer.sdp, headers: { Authorization: 'Bearer ' + s.value, 'Content-Type': 'application/sdp' } });
@@ -254,11 +297,26 @@ export function initAssistant(ctx) {
     } catch (e) { /* meter is decoration only */ }
   }
   const sendEv = o => { if (dc && dc.readyState === 'open') dc.send(JSON.stringify(o)); };
+  // keep the voice model's picture of the screen current: refresh its instructions when the map, filters or card change
+  let ctxT = 0, lastCtx = '';
+  function pushContext() {
+    clearTimeout(ctxT); ctxT = setTimeout(() => {
+      if (!dc || dc.readyState !== 'open') return; const c = context(), key = c.screen + c.filters; if (key === lastCtx) return; lastCtx = key;
+      sendEv({ type: 'session.update', session: { type: 'realtime', instructions: systemPrompt({ coverage: c.coverage, filters: c.filters, screen: c.screen }) + VOICE_STYLE } });
+    }, 1500);
+  }
+  ctx.map.on('moveend', pushContext); ctx.onChange(pushContext); ctx.onCardRender(pushContext); ctx.onCardClose(pushContext); ctx.onViewChange(pushContext);
+  const isNoise = t => !t || /[^\u0000-\u024f\u2000-\u206f\s]/.test(t) && !/[a-z]{3}/i.test(t) || t.replace(/[^a-z]/gi, '').length < 2;
   async function onEvent(e) {
     switch (e.type) {
-      case 'input_audio_buffer.speech_started': setLive('Listening…'); break;
-      case 'input_audio_buffer.speech_stopped': setLive('Thinking…'); break;
-      case 'conversation.item.input_audio_transcription.completed': if (e.transcript?.trim()) { bubble('user', esc(e.transcript.trim())); history.push({ role: 'user', content: e.transcript.trim() }); } break;
+      case 'input_audio_buffer.speech_started': setLive('Listening…', 'Pause when you’re done, or tap Send'); $('aiSendNow').hidden = false; break;
+      case 'input_audio_buffer.speech_stopped': setLive('Thinking…', ''); $('aiSendNow').hidden = true; break;
+      case 'conversation.item.input_audio_transcription.completed': {
+        const t = (e.transcript || '').trim();
+        // noise, other languages and background fragments: don't show them and stop any reply they started
+        if (isNoise(t)) { sendEv({ type: 'response.cancel' }); if (e.item_id) sendEv({ type: 'conversation.item.delete', item_id: e.item_id }); setLive('Listening'); break; }
+        bubble('user', esc(t)); history.push({ role: 'user', content: t }); break;
+      }
       case 'response.output_audio_transcript.delta':
         if (!liveBubble) liveBubble = bubble('bot', ''); liveBubble.dataset.t = (liveBubble.dataset.t || '') + e.delta; liveBubble.innerHTML = ctx.richText(liveBubble.dataset.t); scroll(); setLive('Speaking'); break;
       case 'response.output_audio_transcript.done': if (liveBubble) { history.push({ role: 'assistant', content: liveBubble.dataset.t || '' }); ctx.wireCites(log); } liveBubble = null; break;
@@ -280,5 +338,7 @@ export function initAssistant(ctx) {
     }
   }
   $('aiMic').onclick = startVoice; $('aiStop').onclick = () => stopVoice();
+  // send now: end the turn without waiting for the pause detector
+  $('aiSendNow').onclick = () => { sendEv({ type: 'input_audio_buffer.commit' }); sendEv({ type: 'response.create' }); $('aiSendNow').hidden = true; setLive('Thinking…', ''); };
   ctx.assistant = { open, close, ask, startVoice };
 }

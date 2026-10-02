@@ -124,9 +124,9 @@ async function processCounty(c, per, mode, ctx) {
       nChanges += items.length;
     }
 
-    await db.upsert('filings', out.map((f, i) => { const r = rows[i], d = tabsCache[r.ProjectNumber];
+    await upsertFilings(out.map((f, i) => { const r = rows[i], d = tabsCache[r.ProjectNumber];
       return { ...toRow({ ...f, scope: (f.scope || '').slice(0, SCOPE_MAX) }, r, c.fips), ai_key: aiFields(r, aiCache) ? aiKey(r) : null,
-        detail: d ? { ...d, scope: String(d.scope || '').slice(0, SCOPE_MAX) } : null }; }), 'id', 250);
+        detail: d ? { ...d, scope: String(d.scope || '').slice(0, SCOPE_MAX) } : null }; }));
     total += out.length; mapped += out.filter(f => f.lat != null).length; approx += out.filter(f => f.approx).length; enriched += out.filter(f => f.use).length;
   }
   const patch = { updated_at: new Date().toISOString(), error: null };
@@ -134,6 +134,19 @@ async function processCounty(c, per, mode, ctx) {
   await db.update('counties', 'fips=eq.' + c.fips, patch);
   ctx.filings += total;
   log(`${c.name}: done in ${((Date.now() - t) / 6e4).toFixed(1)} min | mapped ${mapped}/${total} (approx ${approx}) | enriched ${enriched} | changes ${nChanges}`);
+}
+
+// filings.cost is numeric(14,2) after migration 20261003000000_cost_cents.sql. On a database that still has the
+// old bigint column, keep loading with whole dollars rather than failing the run.
+let wholeDollars = false;
+async function upsertFilings(rows) {
+  const round = () => rows.map(r => ({ ...r, cost: Math.round(r.cost) }));
+  try { await db.upsert('filings', wholeDollars ? round() : rows, 'id', 250); }
+  catch (e) {
+    if (wholeDollars || !/22P02|type bigint/.test(e.message)) throw e;
+    wholeDollars = true; log('filings.cost is still a whole-dollar column: storing rounded costs. Run supabase/migrations/20261003000000_cost_cents.sql to keep cents.');
+    await db.upsert('filings', round(), 'id', 250);
+  }
 }
 
 async function main() {
