@@ -36,7 +36,10 @@ export function parseGoogleNews(xml, max = 12) {
   return out;
 }
 export async function googleNews(q, near, max = 12) {
-  const a = phrase(q), b = phrase(near), query = [a, b && b !== a ? b : ''].filter(Boolean).join(' ');
+  const a = phrase(q), b = phrase(near);
+  // a lone one-word name ("Hines") matches sports and people; without a city to narrow it, add construction context
+  const ctx = a && !b && !/\s/.test(a.slice(1, -1)) ? '(development OR construction OR "real estate" OR project)' : '';
+  const query = [a, b && b !== a ? b : '', ctx].filter(Boolean).join(' ');
   if (!query) return { query: '', articles: [] };
   const u = 'https://news.google.com/rss/search?' + new URLSearchParams({ q: query + ' when:1y', hl: 'en-US', gl: 'US', ceid: 'US:en' });
   const r = await fetch(u, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FinishesSolutions-RealEstateIntel/1.0)', Accept: 'application/rss+xml, application/xml, text/xml' } });

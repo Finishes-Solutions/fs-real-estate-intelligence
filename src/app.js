@@ -339,6 +339,7 @@ function select(f,fly){
     (f.scope?'<div class="scope">'+esc(f.scope)+'</div>':'')+historyHtml(f)+
     '<div class="brief" id="briefBox"><button class="btn" id="briefBtn">AI Project Brief</button></div>'+
     (f.approx?'<div class="note">Location is approximate: the address didn’t geocode, so this marker sits at the city center (shaded circle), not on the site.</div>':'')+
+    (f.prec==='street'?'<div class="note">The filing names a street but no house number, so this marker sits on that street near town, not at the exact site.</div>':f.prec==='intersection'?'<div class="note">Placed at the intersection named in the filing.</div>':'')+
     (!visible.includes(f)?'<div class="note">Your current filters'+(sel.feature?' and selection (“'+esc(sel.label)+'”)':'')+' hide this filing, so it’s shown on its own. <button class="lnk" id="showAll">Clear Filters</button></div>':'')+
     (f.misfiled?'<div class="note">The filer tagged this to '+esc(f.county)+' County, but the address is outside it.</div>':'')+
     '<a class="go" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener">Open TABS Record <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h7v7M13 3 4 12"/></svg></a>';
@@ -600,7 +601,7 @@ const rowsFor=list=>list.map(f=>({'TABS #':f.id,'Project':f.name,'County':f.coun
   'Use':f.use||'','Subtype':f.sub||'','Tenant':f.ten||'','Units':f.units??'',
   'Est. value (USD)':+(+f.cost).toFixed(2),'Sq ft':f.sqft||'','Owner':f.owner,'Developer':f.dev||'','Architect':f.arch||'','GC':f.gc||'','Registered':f.reg,'Status':f.status,'Est. start':f.start,'Est. end':f.end,
   'Timeline start':f.ts,'Timeline end':f.te,'Timeline dates':f.tsE||f.teE?'Partly estimated':'As filed','Change this week':f._chg||'','AI summary':f.sum||'','Scope':f.scope,
-  ...(sel.kind==='radius'?{'Distance (mi)':Math.round(f._d*100)/100}:{}),'Location':f.approx?'Approximate (city)':'Address','Latitude':f.lat,'Longitude':f.lon,'TABS link':tabsUrl(f.id)}));
+  ...(sel.kind==='radius'?{'Distance (mi)':Math.round(f._d*100)/100}:{}),'Location':f.approx?'Approximate (city)':f.prec==='street'?'Street (no house number)':f.prec==='intersection'?'Intersection':'Address','Latitude':f.lat,'Longitude':f.lon,'TABS link':tabsUrl(f.id)}));
 const csvText=rows=>{ if(!rows.length) return ''; const cols=Object.keys(rows[0]), q=v=>{ const s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
   return '\ufeff'+[cols.join(','),...rows.map(r=>cols.map(c=>q(r[c])).join(','))].join('\r\n'); };
 const fileBase=(kind,label)=>'fs-'+kind+'-'+slug(label||scopeLabel())+'-'+stamp;
