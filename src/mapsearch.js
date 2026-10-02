@@ -101,14 +101,14 @@ export function initMapSearch(ctx) {
     if (addresses.length) { h += sec('Addresses'); addresses.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>Address</i>')); }
     if (places.length) { h += sec('Places'); places.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>' + esc(KIND_LABEL[p.kind] || 'Place') + '</i>')); }
     if (names.length) {
-      h += sec('Projects · ' + fmtN(names.length), '<button class="lnk" data-act="filter" type="button">Show all on map</button>');
+      h += sec('Projects · ' + fmtN(names.length), '<button class="lnk" data-act="filter" type="button">Show All on Map</button>');
       names.slice(0, shown).forEach(f => push({ t: 'filing', f }, filingRow(f)));
       if (names.length > shown) h += '<button class="ms-more" data-act="more" type="button">Showing ' + shown + ' of ' + fmtN(names.length) + ' · show ' + Math.min(PAGE, names.length - shown) + ' more</button>';
     }
     if (ents.length) { h += sec('Companies & people');
       ents.forEach(e => push({ t: 'entity', e }, '<b>' + esc(e.label) + '</b><i>' + fmtN(e.ids.size) + ' project' + (e.ids.size > 1 ? 's' : '') + '</i><span>' + [...e.roles].map(r => ROLE[r]).join(' · ') + ' · est. ' + fmtM(e.v) + '</span>')); }
     if (addrs.length) {
-      h += sec('Filings at matching addresses · ' + fmtN(addrs.length), names.length ? '' : '<button class="lnk" data-act="filter" type="button">Show all on map</button>');
+      h += sec('Filings at matching addresses · ' + fmtN(addrs.length), names.length ? '' : '<button class="lnk" data-act="filter" type="button">Show All on Map</button>');
       addrs.slice(0, shownA).forEach(f => push({ t: 'filing', f }, filingRow(f)));
       if (addrs.length > shownA) h += '<button class="ms-more" data-act="moreA" type="button">Showing ' + shownA + ' of ' + fmtN(addrs.length) + ' · show more</button>';
     }
@@ -248,8 +248,8 @@ export function initMapSearch(ctx) {
     const inCmp = ctx.compare?.list().some(a => a.key === 'place:' + place.label);
     bar.innerHTML = '<button class="x" aria-label="Clear" id="pbX">×</button><div class="pb-k">' + esc(KIND_LABEL[place.kind] || 'Place') + '</div><div class="pb-t">' + esc(place.label) + '</div>' +
       '<div class="pb-s">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' ' + how + ' · est. ' + fmtM(v) + (ctx.filterText() ? '<span> (current filters)</span>' : '') + '</div>' + (note ? '<div class="pb-n">' + esc(note) + '</div>' : '') +
-      '<div class="pb-a">' + (area ? '<button class="btn primary" id="pbFilter">Filter to this area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>'
-        : '<button class="btn primary" id="pbNear">Filings within ¼ mile</button>') + (list.length ? '<button class="btn" id="pbHl">Highlight ' + (list.length > 50 ? 'top 50' : 'them') + '</button>' : '') + '</div>';
+      '<div class="pb-a">' + (area ? '<button class="btn primary" id="pbFilter">Filter to This Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>'
+        : '<button class="btn primary" id="pbNear">Filings Within ¼ Mile</button>') + (list.length ? '<button class="btn" id="pbHl">Highlight ' + (list.length > 50 ? 'Top 50' : 'Them') + '</button>' : '') + '</div>';
     bar.classList.add('on');
     bar.querySelector('#pbX').onclick = clearPlace;
     bar.querySelector('#pbFilter')?.addEventListener('click', () => { const pl = place; ctx.setSelection('place', pl.label, pl.geom); clearPlace(); ctx.fitGeom(pl.geom); });

@@ -163,8 +163,8 @@ export function initLive(ctx) {
   const clearRoute = () => { route = null; map.getSource('live-route')?.setData({ type: 'FeatureCollection', features: [] }); };
 
   // ---------- targets ----------
-  ctx.onCardRender(info => { lastCard = info; renderCardTools(info); });
-  ctx.onCardClose(() => { lastCard = null; });
+  ctx.onCardRender(info => { if (lastCard && lastCard !== info) clearRoute(); lastCard = info; renderCardTools(info); });
+  ctx.onCardClose(() => { lastCard = null; clearRoute(); closeLightbox(); });
   const cardPoint = () => !lastCard || !document.getElementById('card').classList.contains('open') ? null
     : lastCard.kind === 'filing' ? { c: [lastCard.f.lon, lastCard.f.lat], name: lastCard.f.name, f: lastCard.f, approx: !!lastCard.f.approx } : { c: lastCard.center, name: lastCard.label() };
   async function place(name) {
@@ -224,16 +224,16 @@ export function initLive(ctx) {
     const list = await passes([p.c[0] - .01, p.c[1] - .01, p.c[0] + .01, p.c[1] + .01]);
     const pick = (a.date && list.find(x => x.day === a.date)) || clear(list);
     if (!pick) return { place: p.name, passes: [], note: 'No NASA passes found here in the last 60 days.' };
-    showNasa(pick); save();
-    map.flyTo({ center: p.c, zoom: Math.min(Math.max(map.getZoom(), 13.5), 14.5), duration: ctx.reduceMotion ? 0 : 900 });
-    return { place: p.name, showing: pick, passes: list.slice(0, 12), note: '30 m pixels: shows land clearing, pads and big roofs, not fine detail. Cloud % is for the whole ~110 km scene.' };
+    renderCardImagery(p.c, list);
+    if (a.show_on_map) { showNasa(pick); save(); map.flyTo({ center: p.c, zoom: Math.min(Math.max(map.getZoom(), 13.5), 14.5), duration: ctx.reduceMotion ? 0 : 900 }); }
+    return { place: p.name, ...(a.show_on_map ? { showing: pick } : { clearest: pick, shown_as: 'preview images in the property card (map unchanged)' }), passes: list.slice(0, 12), note: '30 m pixels: shows land clearing, pads and big roofs, not fine detail. Cloud % is for the whole ~110 km scene.' };
   }
 
   // ---------- card tools: drive time, weather, site imagery, news ----------
   function renderCardTools(info) {
     const card = document.getElementById('card'); card.querySelector('#liveSec')?.remove();
     const sec = document.createElement('div'); sec.className = 'bsec live-sec'; sec.id = 'liveSec';
-    sec.innerHTML = '<div class="lt">From here</div><div class="btnrow"><button class="btn" data-a="drive">Drive time from me</button><button class="btn" data-a="wx">Weather</button><button class="btn" data-a="img">Site imagery</button><button class="btn" data-a="news">News</button></div><div class="live-out" aria-live="polite"></div>';
+    sec.innerHTML = '<div class="lt">From Here</div><div class="btnrow"><button class="btn" data-a="drive">Drive Time From Me</button><button class="btn" data-a="wx">Weather</button><button class="btn" data-a="img">Site Imagery</button><button class="btn" data-a="news">News</button></div><div class="live-out" aria-live="polite"></div>';
     const brief = card.querySelector('#briefBox'); if (brief) brief.after(sec); else (card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
     const out = sec.querySelector('.live-out'), mine = () => lastCard === info;
     const busy = t => { out.innerHTML = '<div class="rnote">' + esc(t) + '</div>'; };
@@ -248,15 +248,52 @@ export function initLive(ctx) {
     sec.querySelector('[data-a=img]').onclick = async () => { busy('Searching NASA passes over the last 60 days…'); try {
       const c = info.kind === 'filing' ? [info.f.lon, info.f.lat] : info.center, list = await passes([c[0] - .01, c[1] - .01, c[0] + .01, c[1] + .01]); if (!mine()) return;
       if (!list.length) { out.innerHTML = '<div class="rnote">No NASA passes here in the last 60 days.</div>'; return; }
-      const shown = list.filter(p => p.cloud == null || p.cloud <= 60).slice(0, 6);
-      out.innerHTML = '<div class="live-thumbs">' + (shown.length ? shown : list.slice(0, 3)).map((p, i) => '<button type="button" data-i="' + list.indexOf(p) + '" title="Show this pass on the map"><img loading="lazy" alt="" src="' + esc(snapshot(p.product, p.day, c)) + '"><span>' + esc(p.day) + ' · ' + esc(p.name) + (p.cloud != null ? ' · ' + Math.round(p.cloud) + '% cloud' : '') + '</span></button>').join('') + '</div>' +
-        '<div class="rnote">NASA HLS, 30 m pixels (about 2.5 km square shown). Cloud % is for the whole scene; tap one to show it on the map.</div>';
-      out.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { showNasa(list[+b.dataset.i]); save(); map.flyTo({ center: c, zoom: Math.max(map.getZoom(), 13.5), duration: ctx.reduceMotion ? 0 : 700 }); });
+      renderCardImagery(c, list);
     } catch (e) { fail(e); } };
     sec.querySelector('[data-a=news]').onclick = async () => { busy('Searching recent news…'); try {
       const d = info.kind === 'filing' ? await news({ filing_id: info.f.id }) : await news({ query: info.label() }); if (!mine()) return; if (d.error) throw new Error(d.error);
       out.innerHTML = '<div class="rnote">Searched ' + esc(d.searched) + '</div>' + (d.articles.length ? d.articles.slice(0, 8).map(x => '<a class="chitem" target="_blank" rel="noopener" href="' + esc(x.url) + '"><span><b>' + esc(x.title) + '</b><em>' + esc(x.domain) + (x.date ? ' · ' + esc(x.date) : '') + '</em></span></a>').join('') : '<div class="rnote">' + esc(d.note) + '</div>') + '<div class="rnote">News index: GDELT Project</div>';
     } catch (e) { fail(e); } };
+  }
+
+  // ---------- site imagery previews: thumbnails in the card, click for a large preview with download ----------
+  function renderCardImagery(c, list) {
+    const out = document.querySelector('#liveSec .live-out'); if (!out) return;
+    if (!list.length) { out.innerHTML = '<div class="rnote">No NASA passes here in the last 60 days.</div>'; return; }
+    const shown = list.filter(p => p.cloud == null || p.cloud <= 60).slice(0, 6), show = shown.length ? shown : list.slice(0, 3);
+    out.innerHTML = '<div class="live-thumbs">' + show.map((p, i) => '<button type="button" data-i="' + i + '" title="Preview"><img loading="lazy" alt="NASA image ' + esc(p.day) + '" src="' + esc(snapshot(p.product, p.day, c)) + '"><span>' + esc(p.day) + ' · ' + esc(p.name) + (p.cloud != null ? ' · ' + Math.round(p.cloud) + '% cloud' : '') + '</span></button>').join('') + '</div>' +
+      '<div class="rnote">NASA HLS, 30 m pixels (about 2.5 km square). Cloud % is for the whole scene. Click an image to preview or download it.</div>';
+    out.querySelectorAll('[data-i]').forEach(b => b.onclick = () => openLightbox(show, +b.dataset.i, c));
+  }
+  let lb = null;
+  function closeLightbox() { if (lb) { lb.remove(); lb = null; window.removeEventListener('keydown', lbKeys, true); } }
+  // capture phase, so Esc closes only the preview and not the property card under it
+  function lbKeys(e) { if (!lb) return; if (['Escape', 'ArrowLeft', 'ArrowRight'].includes(e.key)) { e.stopImmediatePropagation(); e.preventDefault(); } if (e.key === 'Escape') closeLightbox(); else if (e.key === 'ArrowLeft') lb._step(-1); else if (e.key === 'ArrowRight') lb._step(1); }
+  function openLightbox(list, i, c) {
+    closeLightbox(); let km = 2.5;
+    lb = document.createElement('div'); lb.className = 'lbox'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-modal', 'true'); lb.setAttribute('aria-label', 'Satellite image preview');
+    document.body.appendChild(lb); window.addEventListener('keydown', lbKeys, true);
+    const where = (lastCard?.kind === 'filing' ? lastCard.f.name : lastCard?.label?.()) || 'site';
+    const draw = () => {
+      const p = list[i], big = snapshot(p.product, p.day, c, km, 1024);
+      lb.innerHTML = '<div class="lb-box"><div class="lb-h"><div><b>' + esc(p.day) + ' · ' + esc(p.name) + '</b><span>' + (p.cloud != null ? Math.round(p.cloud) + '% cloud (whole scene) · ' : '') + km + ' km square · NASA HLS 30 m</span></div><button class="x" aria-label="Close">×</button></div>' +
+        '<div class="lb-img">' + (list.length > 1 ? '<button class="lb-nav prev" aria-label="Previous">‹</button>' : '') + '<img alt="NASA satellite image ' + esc(p.day) + '" src="' + esc(big) + '">' + (list.length > 1 ? '<button class="lb-nav next" aria-label="Next">›</button>' : '') + '</div>' +
+        '<div class="lb-f"><span>' + (i + 1) + ' of ' + list.length + '</span><button class="btn" id="lbWide">' + (km > 3 ? 'Closer View' : 'Wider View') + '</button><button class="btn" id="lbMap">Show on Map</button><button class="btn primary" id="lbDl">Download</button></div></div>';
+      lb.querySelector('.x').onclick = closeLightbox;
+      lb.querySelector('.prev')?.addEventListener('click', () => lb._step(-1)); lb.querySelector('.next')?.addEventListener('click', () => lb._step(1));
+      lb.querySelector('#lbWide').onclick = () => { km = km > 3 ? 2.5 : 10; draw(); };
+      lb.querySelector('#lbMap').onclick = () => { showNasa(p); save(); closeLightbox(); map.flyTo({ center: c, zoom: km > 3 ? 12 : Math.max(map.getZoom(), 13.5), duration: ctx.reduceMotion ? 0 : 700 }); };
+      lb.querySelector('#lbDl').onclick = async e => {
+        const name = ('nasa-' + p.day + '-' + p.name + '-' + where).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) + '.jpg';
+        e.target.disabled = true; e.target.textContent = 'Downloading…';
+        try { const r = await fetch(big, { mode: 'cors' }); if (!r.ok) throw new Error('HTTP ' + r.status); await ctx.saveFile(name, await r.blob(), 'image/jpeg'); }
+        catch (err) { window.open(big, '_blank', 'noopener'); ctx.toast('Opened the full image in a new tab. Save it from there.'); }
+        finally { if (lb) { e.target.disabled = false; e.target.textContent = 'Download'; } }
+      };
+    };
+    lb._step = d => { i = (i + d + list.length) % list.length; draw(); };
+    lb.addEventListener('pointerdown', e => { if (e.target === lb) closeLightbox(); });
+    draw(); setTimeout(() => lb?.querySelector('#lbDl')?.focus(), 30);
   }
 
   syncUI();
