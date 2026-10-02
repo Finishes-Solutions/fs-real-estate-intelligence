@@ -5,6 +5,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 6:50 PM CT: Roomier phone layout; routes clear when the card closes (fc2e789)
+- **Phone spacing**:
+  - the map buttons are separate, larger buttons with room between them;
+  - filter labels sit above their chips;
+  - the stats grid is two columns, and the last tile fills the row instead of leaving a gray gap;
+  - property cards, the Layers panel and the assistant have more breathing room;
+  - the assistant's box reads "Ask anything…" so it isn't cut off.
+- **Close button always reachable**: a property card's title, star and × stay pinned at the top while you scroll the card, and the × is a bigger tap target on phones. Before, scrolling down to "Drive Time From Me" pushed the × off-screen.
+- **Routes clear when the card closes**: closing a card with ×, by swiping it down, or by opening another card removes its driving route. This includes closing it while the route is still loading, which used to draw the route anyway.
+- **Route pill**: while a route is showing, a one-line "Route · 41 mi · 46 min ×" pill on the map clears it. An empty pill no longer appears when there's no route.
+- **For whoever runs the database**: the flight-history migration is renamed to `supabase/migrations/20261008000000_air_traffic.sql`, because its old number clashed with the Regrid migration. It hasn't been applied yet, so nothing else changes.
+
 ### 6:40 PM CT: Plane routes on the map; Regrid reads REGRID_API_KEY
 - Selecting a plane now draws its route: the leg already flown as a solid curved line from the origin airport to the plane, the rest dashed to the destination, with both airports labeled. The map zooms to fit the whole trip (unless you're following the plane). The line moves with the plane and clears when you close the card. Planes whose route isn't in the adsb.lol database show no line.
 - Regrid now reads the token from `REGRID_API_KEY` (the name set on Vercel); `REGRID_TOKEN` also works.

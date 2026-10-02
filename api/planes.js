@@ -70,6 +70,6 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error('planes', e.message);
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(502).json({ error: /air_|function|relation|does not exist|PGRST/i.test(e.message) ? 'Flight history isn’t set up in the database yet (apply supabase/migrations/20261007000000_air_traffic.sql).' : 'The aircraft feed didn’t answer. Try again in a few seconds.' });
+    return res.status(502).json({ error: /air_|function|relation|does not exist|PGRST/i.test(e.message) ? 'Flight history isn’t set up in the database yet (apply supabase/migrations/20261008000000_air_traffic.sql).' : 'The aircraft feed didn’t answer. Try again in a few seconds.' });
   }
 }
