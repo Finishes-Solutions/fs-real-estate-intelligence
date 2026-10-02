@@ -28,7 +28,7 @@ globalThis.fetch = async (url, opts = {}) => {
     return json({ choices: [{ message: { content: JSON.stringify({ items: ids.map(id => ({ id, use: 'Medical', subtype: 'urgent care', tenant: 'Memorial Hermann', developer: 'Acme Holdings', architect: '', gc: '', units: null, summary: 'Urgent care clinic.' })) }) } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
   }
   if (u.host === 'api.census.gov') {
-    const vars = u.searchParams.get('get').split(','), c = u.searchParams.getAll('in')[1].split(':')[1];
+    const vars = u.searchParams.get('get').split(','), c = u.searchParams.get('in').split('county:')[1];
     return json([[...vars, 'state', 'county', 'tract'], [...vars.map((v, i) => String(1000 * (i + 1))), '48', c, '000100']]);
   }
   if (u.host === 'tigerweb.geo.census.gov') return json({ features: +u.searchParams.get('resultOffset') ? [] : [{ properties: { GEOID: '48473000100' }, geometry: { type: 'Polygon', coordinates: [[[-96, 30], [-95.9, 30], [-95.9, 30.1], [-96, 30]]] } }] });

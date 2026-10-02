@@ -8,8 +8,11 @@ const num = v => { const n = +v; return Number.isFinite(n) && n > -1e8 ? n : nul
 async function acs(year, fips, vars) {
   const out = {};
   for (const f of fips) {
-    const u = `https://api.census.gov/data/${year}/acs/acs5?get=${vars.join(',')}&for=tract:*&in=state:${f.slice(0, 2)}&in=county:${f.slice(2)}` + (process.env.CENSUS_KEY ? '&key=' + process.env.CENSUS_KEY : '');
-    const rows = await (await fetchRetry(u, {}, 3)).json(); const h = rows[0];
+    // documented form: in=state:48%20county:473 (one "in" with space-separated levels)
+    const u = `https://api.census.gov/data/${year}/acs/acs5?get=${vars.join(',')}&for=tract:*&in=state:${f.slice(0, 2)}%20county:${f.slice(2)}` + (process.env.CENSUS_KEY ? '&key=' + process.env.CENSUS_KEY : '');
+    const txt = await (await fetchRetry(u, {}, 3)).text();
+    let rows; try { rows = JSON.parse(txt); } catch (e) { throw new Error('non-JSON reply: ' + txt.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140)); }
+    const h = rows[0];
     for (const r of rows.slice(1)) { const o = Object.fromEntries(h.map((k, i) => [k, r[i]])); out[o.state + o.county + o.tract] = o; }
   }
   return out;
