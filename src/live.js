@@ -21,7 +21,9 @@ const ymd = d => d.toISOString().slice(0, 10);
 export function initLive(ctx) {
   const { map, esc, toast } = ctx;
   const on = Object.fromEntries(ORDER.map(k => [k, false]));
-  try { const s = JSON.parse(localStorage.getItem(KEY) || '{}'); ORDER.forEach(k => { if (k !== 'nasa' && k !== 'hires' && s[k] === true) on[k] = true; }); } catch (e) {}
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); ORDER.forEach(k => { if (k !== 'nasa' && k !== 'hires' && saved[k] === true) on[k] = true; }); } catch (e) {}
+  // layers other modules add (src/planes.js): { label, set(v) -> false to refuse, add() after a style swap, note(), persist }
+  const EXT = {}, allKeys = () => [...ORDER, ...Object.keys(EXT)];
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(on)); } catch (e) {} };
   let trafficOK = null, windData = null, nasa = null, route = null, lastCard = null;
   const stamp = {};
@@ -41,6 +43,7 @@ export function initLive(ctx) {
     if (on.wind && windData?.time) bits.push('Wind as of ' + new Date(windData.time + ':00').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ' (Open-Meteo).');
     if (on.terrain && map.getZoom() < TERRAIN_Z) bits.push('3D terrain appears once you zoom in to town level.');
     if (on.nasa && nasa) bits.push(nasa.day ? 'NASA ' + nasa.name + ' pass ' + nasa.day + (nasa.cloud != null ? ' · ' + Math.round(nasa.cloud) + '% cloud in the scene' : '') + '.' : 'No clear NASA pass found here in the last 60 days.');
+    for (const [k, x] of Object.entries(EXT)) { const t = on[k] && x.note?.(); if (t) bits.push(t); }
     note.textContent = bits.join(' ');
   }
   fetch('api/tile').then(r => r.ok ? r.json() : { traffic: false }).then(d => { trafficOK = !!d.traffic; if (!trafficOK && on.traffic) { on.traffic = false; removeRaster('traffic'); } syncUI(); }).catch(() => { trafficOK = false; syncUI(); });
@@ -132,15 +135,24 @@ export function initLive(ctx) {
   function addAll() {
     for (const k of Object.keys(RASTER)) if (on[k]) addRaster(k);
     if (on.wind) addWind(); if (on.terrain) addTerrain(); if (on.nasa && nasa?.day) showNasa(nasa); if (on.hires && hires) showHires(hires);
+    for (const [k, x] of Object.entries(EXT)) if (on[k]) x.add?.();
     if (route) drawRoute(route);
   }
   ctx.onOverlays(addAll);
+  function register(k, x) {
+    EXT[k] = x; on[k] = false;
+    const lab = document.createElement('label'); lab.className = 'tg2'; lab.innerHTML = '<input type="checkbox" data-live="' + k + '"><span>' + esc(x.label) + '</span>';
+    lab.querySelector('input').onchange = e => set({ [k]: e.target.checked }); box.insertBefore(lab, note);
+    if (x.persist && saved[k] === true) { const go = () => set({ [k]: true }); map.loaded() ? go() : map.once('load', go); }
+    syncUI();
+  }
   async function set(a) {
     const done = [];
-    if (a.all_off) ORDER.forEach(k => { if (on[k]) a[k] = false; });
-    for (const k of ORDER) {
+    if (a.all_off) allKeys().forEach(k => { if (on[k]) a[k] = false; });
+    for (const k of allKeys()) {
       const v = a[k === 'nasa' ? (k in a ? k : 'nasa_imagery') : k]; if (typeof v !== 'boolean') continue;
       if (k === 'traffic' && v && trafficOK === false) { done.push('traffic unavailable (no TomTom key on the server)'); continue; }
+      if (EXT[k]) { on[k] = v; const r = await EXT[k].set(v); if (r === false || typeof r === 'string') { on[k] = false; done.push(typeof r === 'string' ? r : EXT[k].label + ' unavailable'); } else done.push(EXT[k].label + (v ? ' on' : ' off')); continue; }
       on[k] = v; done.push(LABEL[k].replace(/ \(.*\)$/, '') + (v ? ' on' : ' off'));
       if (RASTER[k]) v ? addRaster(k) : removeRaster(k);
       else if (k === 'wind') { if (v) { addWind(); await loadWind(); } else removeWind(); }
@@ -386,8 +398,8 @@ export function initLive(ctx) {
 
   syncUI();
   // for the Sources tab: what is on, how often it refreshes, and the latest data time we know of
-  const status = () => ({ hires: hires ? { kind: hires.kind, date: hiDate(hires) } : null, on: { ...on }, trafficOK, terrainMesh: !!map.getTerrain?.(), terrainZoom: TERRAIN_Z, windTime: windData?.time || null, nasa: nasa?.day ? { day: nasa.day, name: nasa.name, cloud: nasa.cloud } : null,
+  const status = () => ({ ext: Object.fromEntries(Object.entries(EXT).map(([k, x]) => [k, { on: !!on[k], ...(x.status?.() || {}) }])), hires: hires ? { kind: hires.kind, date: hiDate(hires) } : null, on: { ...on }, trafficOK, terrainMesh: !!map.getTerrain?.(), terrainZoom: TERRAIN_Z, windTime: windData?.time || null, nasa: nasa?.day ? { day: nasa.day, name: nasa.name, cloud: nasa.cloud } : null,
     raster: Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, { every: v.every, requested: stamp[k] != null ? stamp[k] * v.every * 60e3 : null }])) });
-  ctx.live = { set, drive, weather, forecast, forecastHTML, news, imagery, clearRoute, state: () => ({ ...on }), status, driveHTML, weatherHTML, newsHTML,
+  ctx.live = { register, syncUI, set, drive, weather, forecast, forecastHTML, news, imagery, clearRoute, state: () => ({ ...on }), status, driveHTML, weatherHTML, newsHTML,
     imageryInto: el => { if (lastImagery) renderCardImagery(lastImagery.c, lastImagery.list, lastImagery.hi, el); } };
 }

@@ -63,6 +63,10 @@ export function initSources(ctx) {
           detail: 'Active permits only (closed locations drop out), updated by the Comptroller about weekly.' },
         { name: link('Google News', 'https://news.google.com/'), what: 'Market view: local development news per county and town', status: a?.news ? nightlyStatus() : st('off', 'Not built yet'),
           detail: 'Searched nightly for development, construction, rezoning and real estate stories; kept 120 days.' },
+        { name: link('BLS Consumer Expenditure Survey', 'https://www.bls.gov/cex/') + ' × Census ACS', what: 'Consumer spending estimates per tract (total, per household, dining out, home furnishings, apparel…): map layer, Market view, building cards', status: m?.spendYear ? st('fresh', 'CE ' + m.spendYear) : st('off', 'Not built yet'),
+          detail: 'Modeled, not measured: households by income in each tract × what households at that income spend nationally, adjusted to the South. The BLS publishes once a year (September); picked up by the nightly build.' },
+        { name: link('Texas Comptroller sales-tax allocations', 'https://comptroller.texas.gov/transparency/local/allocations/sales-tax/'), what: 'Market view: city sales tax collected per month, a real local spending trend', status: a?.salesTax ? nightlyStatus() : st('off', 'Not built yet'),
+          detail: (a?.salesTax ? a.salesTax.cities + ' cities since ' + a.salesTax.since + '. ' : '') + 'The city\'s share of sales tax, paid monthly about two months after the sales. Picked up by the nightly build.' },
         { name: link('US Census TIGER (us-atlas)', 'https://github.com/topojson/us-atlas'), what: 'County outlines and town names', status: st('off', 'Static'), detail: 'Boundaries change rarely; updated with the app.' },
       ]],
       ['Map layers (fetched live)', [
@@ -74,6 +78,10 @@ export function initSources(ctx) {
         ras('clouds', 'NOAA nowCOAST (GOES infrared)', 'https://nowcoast.noaa.gov/', 'Satellite clouds'),
         ras('storms', 'NOAA National Hurricane Center', 'https://www.nhc.noaa.gov/', 'Hurricanes and tropical storms: cones and tracks'),
         ras('traffic', 'TomTom', 'https://developer.tomtom.com/', 'Live traffic'),
+        { name: link('adsb.lol', 'https://adsb.lol/') + ' · ' + link('airplanes.live', 'https://airplanes.live/'), what: 'Live Planes: aircraft positions, altitude, speed and routes, anywhere', status: live.ext?.planes?.on ? st('live', 'On · live') : st('off', 'Off'),
+          detail: 'Community ADS-B receivers (open data, ODbL). Refreshes every 10 seconds while on' + (live.ext?.planes?.on && live.ext.planes.time ? ' · ' + fmtN(live.ext.planes.count) + ' aircraft as of ' + fmtTime(live.ext.planes.time) : '') + '. Some military and private aircraft are hidden.' },
+        { name: 'Low-flight history (from adsb.lol)', what: 'Low Flight Paths layer and the Air Traffic line on property cards', status: live.ext?.flight_paths?.available === false ? st('stale', 'Not set up yet') : live.ext?.flight_paths?.sampled_days ? st('fresh', live.ext.flight_paths.sampled_days + ' days') : st('live', 'Every 5 min'),
+          detail: 'A snapshot of aircraft below 3,000 ft over the region every 5 minutes, kept in the database for 400 days. Counts are an exposure index (how much low traffic), not a count of distinct flights.' },
         { name: link('Open-Meteo', 'https://open-meteo.com/'), what: 'Wind arrows, weather at a spot', status: liveSt(live.on.wind),
           detail: 'Hourly model data, re-read when the map moves and every 15 min' + (live.on.wind && live.windTime ? ' · showing ' + fmtTime(live.windTime + ':00') : '') + '.' },
         { name: link('Mapterhorn', 'https://mapterhorn.com/'), what: '3D terrain and hillshade', status: live.on.terrain ? (live.terrainMesh ? st('live', 'On') : st('stale', 'On · zoom in')) : st('off', 'Off'),
@@ -100,6 +108,11 @@ export function initSources(ctx) {
       ]],
     ];
   }
+
+  // the Sources tab as plain rows, for the assistant (data_sources): what each source feeds and how fresh it is
+  const plain = h => String(h || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;|&rsquo;/g, '’').replace(/\s+/g, ' ').trim();
+  ctx.sourcesList = () => ({ nightly_refresh: built, next_refresh: nextNightly().toISOString(), page_loaded: new Date(loadedAt).toISOString(),
+    groups: rows().map(([title, list]) => ({ group: title, sources: list.map(r => ({ source: plain(r.name), status: plain(r.status), used_for: plain(r.what), freshness: plain(r.detail) })) })) });
 
   function render() {
     if (ctx.view !== 'sources') return;

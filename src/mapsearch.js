@@ -225,8 +225,8 @@ export function initMapSearch(ctx) {
 
   const isArea = g => g && /Polygon/.test(g.type);
   const isLine = g => g && /LineString/.test(g.type);
-  async function nominatim(text, extra = '') {
-    const u = NOMINATIM + '?format=geojson&polygon_geojson=1&polygon_threshold=0.0002&limit=6&countrycodes=us&viewbox=' + TX_VIEWBOX + '&bounded=1' + extra + '&q=' + encodeURIComponent(text);
+  async function nominatim(text, extra = '', world = false) {
+    const u = NOMINATIM + '?format=geojson&polygon_geojson=1&polygon_threshold=0.0002&limit=6' + (world ? '' : '&countrycodes=us&viewbox=' + TX_VIEWBOX + '&bounded=1') + extra + '&q=' + encodeURIComponent(text);
     try { const r = await fetch(u, { headers: { Accept: 'application/json' } }); if (!r.ok) return []; return (await r.json()).features || []; } catch (e) { return []; }
   }
   // the whole road: every OpenStreetMap way with that name within ~15 miles of the hit
@@ -357,9 +357,11 @@ export function initMapSearch(ctx) {
     if (d) return showPlace({ label: d.name, name: d.name, kind: 'area', c: d.c, geom: d.geom });
     const county = COUNTIES.find(c => t.toLowerCase().replace(/\s+county.*$/, '') === c.toLowerCase());
     if (county && (!k || k === 'county')) return showPlace({ label: county + ' County', name: county, kind: 'county', c: DATA.counties.find(x => x.name === county).label });
-    const q = t + (/texas|\btx\b/i.test(t) ? '' : ', Texas'), areaish = !k || /area|town|county|zip|road/.test(k);
+    // "Lyon, France", "Bavaria, Germany": outline it wherever it is; otherwise Texas
+    const ctxPart = t.split(',').slice(1).join(',').trim(), far = !!ctxPart && !/\b(tx|texas|usa|us|united states)\b/i.test(ctxPart) && !(DATA.places || []).some(p => p[0].toLowerCase() === ctxPart.toLowerCase());
+    const q = far || /texas|\btx\b/i.test(t) ? t : t + ', Texas', areaish = !k || /area|town|county|zip|road/.test(k);
     // "Downtown Houston" must not resolve to a skyscraper in it: area-type asks search places and streets only
-    let feats = await nominatim(q, areaish && k !== null ? '&layer=address' : '');
+    let feats = await nominatim(q, areaish && k !== null ? '&layer=address' : '', far);
     const AT = { area: /suburb|neighbourhood|quarter|city_district|borough|district/, town: /city|town|village|hamlet|municipality/, county: /^county$/, zip: /postcode/ };
     const type = x => x.properties.addresstype || x.properties.type || '';
     const want = x => k === 'road' ? x.properties.category === 'highway' : k === 'building' ? /building|amenity|leisure|shop|tourism|office|man_made/.test(x.properties.category) : AT[k] ? AT[k].test(type(x)) : true;
@@ -367,14 +369,14 @@ export function initMapSearch(ctx) {
     let f = feats.slice().sort((a2, b2) => rank(a2) - rank(b2))[0];
     if (!f || (areaish && k !== 'road' && !isArea(f.geometry))) {
       // no outline in OpenStreetMap: let the geocoder place it (its bounding box becomes an approximate outline)
-      const g = pickPlace(t, await ctx.geocode(q, { exact: true }));
+      const g = pickPlace(t, await ctx.geocode(q, far ? { world: true } : { exact: true }));
       if (!g.error && (!f || /area|town|zip|county/.test(g.kind))) return showPlace({ label: g.label.replace(/, United States$/, ''), name: g.label.split(',')[0], kind: g.kind, c: g.c, bbox: g.bbox });
       if (!f) return null;
     }
     const c = centerOf(f.geometry), pr = f.properties, at = type(f);
     const kk = pr.category === 'highway' ? 'road' : at === 'county' ? 'county' : AT.town.test(at) ? 'town' : AT.area.test(at) ? 'area' : at === 'postcode' ? 'zip' : /building|amenity|shop|office|tourism|leisure/.test(pr.category) ? 'poi' : (k || 'poi');
     const parts = pr.display_name.split(',').map(x => x.trim()), name = pr.name || parts[0];
-    const label = kk === 'county' ? (/county/i.test(name) ? name : name + ' County') : kk === 'town' ? name + ', TX' : [name, parts.find((x, i) => i && /^[A-Za-z .'-]+$/.test(x) && x !== name && !/county|texas|united states/i.test(x))].filter(Boolean).join(', ');
+    const label = far ? [name, parts[parts.length - 1]].filter((x, i, a) => x && a.indexOf(x) === i).join(', ') : kk === 'county' ? (/county/i.test(name) ? name : name + ' County') : kk === 'town' ? name + ', TX' : [name, parts.find((x, i) => i && /^[A-Za-z .'-]+$/.test(x) && x !== name && !/county|texas|united states/i.test(x))].filter(Boolean).join(', ');
     return showPlace({ label, name: kk === 'county' ? name.replace(/\s+county$/i, '') : name, kind: kk, c });
   };
   ctx.placeSummary = () => { if (!place) return null; const { list, how } = placeHits(); return { place: place.label, kind: place.kind, outlined: !!place.geom, filings: list.length, how, total_value: list.reduce((s, f) => s + f.cost, 0) }; };

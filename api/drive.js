@@ -10,8 +10,8 @@ export const MI = 1609.344;
 export function parsePt(s) {
   const m = String(s || '').match(/^\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/); if (!m) return null;
   const lat = +m[1], lon = +m[2];
-  // continental US only: these are drives, not flights
-  return lat > 24 && lat < 50 && lon > -125 && lon < -66 ? [lat, lon] : null;
+  // anywhere on Earth (Open-Meteo, OSRM and TomTom are worldwide); the drive handler refuses trips no car can make
+  return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180 ? [lat, lon] : null;
 }
 // keep the line light: every n-th point, always the last
 const thin = (pts, max = 400) => { const n = Math.max(1, Math.ceil(pts.length / max)); return pts.filter((p, i) => i % n === 0 || i === pts.length - 1).map(p => [+p[0].toFixed(5), +p[1].toFixed(5)]); };
@@ -39,7 +39,10 @@ export async function osrm(a, b) {
 export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 20, perDay: 600 })) return;
   const a = parsePt(req.query?.from), b = parsePt(req.query?.to);
-  if (!a || !b) return res.status(400).json({ error: 'from and to must be lat,lon in the US.' });
+  if (!a || !b) return res.status(400).json({ error: 'from and to must be lat,lon.' });
+  // straight-line over ~2,500 miles (Houston to Paris) is not a drive
+  const R = Math.PI / 180, mi = 7917.5 * Math.asin(Math.sqrt(Math.sin((b[0] - a[0]) * R / 2) ** 2 + Math.cos(a[0] * R) * Math.cos(b[0] * R) * Math.sin((b[1] - a[1]) * R / 2) ** 2));
+  if (mi > 2500) return res.status(400).json({ error: 'Those places are about ' + Math.round(mi).toLocaleString('en-US') + ' miles apart in a straight line, too far for a drive time.' });
   const key = process.env.TOMTOM_API_KEY, errors = [];
   if (key) { try { const out = await tomtom(key, a, b); res.setHeader('Cache-Control', 'private, max-age=60'); return res.json(out); } catch (e) { errors.push(e.message); } }
   try { const out = await osrm(a, b); res.setHeader('Cache-Control', 'private, max-age=600'); return res.json({ ...out, note: errors.length ? 'Live traffic unavailable (' + errors[0] + ')' : undefined }); }

@@ -2,9 +2,10 @@
 // Tool calls from either channel run here, against the filings loaded in the browser (see lib/agent-tools.mjs).
 import { makeMatcher, describe, miles } from './lib/filter.mjs';
 import { entityKey } from './lib/taxonomy.mjs';
+import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
-import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
@@ -100,7 +101,8 @@ export function initAssistant(ctx) {
     const card = !cardOpen || !cardInfo ? null : cardInfo.kind === 'filing' ? { kind: 'filing', name: cardInfo.f.name, dev: cardInfo.f.dev || cardInfo.f.owner, approx: !!cardInfo.f.approx }
       : cardInfo.kind === 'building' ? { kind: 'building', label: cardInfo.label?.() } : null;
     const inView = z >= 8 ? ctx.visible.reduce((n, f) => n + (b.contains([f.lon, f.lat]) ? 1 : 0), 0) : 0;
-    return { card, near: ctx.nearestPlace?.([c.lng, c.lat]) || null, zoom: z, inView, filtered: !!ctx.filterText(), selection: ctx.sel?.feature ? ctx.sel.label || null : null, changed: ctx.CHANGED.size };
+    const near = ctx.nearestPlace?.([c.lng, c.lat]) || null;
+    return { card, near, far: near ? null : ctx.viewPlace?.() || null, zoom: z, inView, filtered: !!ctx.filterText(), selection: ctx.sel?.feature ? ctx.sel.label || null : null, changed: ctx.CHANGED.size };
   }
   function renderSugs() {
     const list = suggestQuestions(onScreen()), key = list.join('|'); if (key === lastSugs) return; lastSugs = key;
@@ -140,7 +142,7 @@ export function initAssistant(ctx) {
     const d = document.createElement('div'); d.className = 'ai-m ' + role; d.innerHTML = html; log.appendChild(d); scroll(); return d;
   }
   // the one project, place or building this turn was about (for the "Tell me more about …" follow-up)
-  let turnSubject = null;
+  let turnSubject = null, turnChoices = null; // turnChoices: places to pick from when a name was ambiguous
   // follow-up suggestions under the latest answer; tapping one asks it
   function pills(list) {
     log.querySelectorAll('.ai-next').forEach(x => x.remove());
@@ -171,7 +173,7 @@ export function initAssistant(ctx) {
   }
   async function ask(text) {
     if (busy) return; open(false); busy = true; $('aiSend').disabled = true;
-    log.querySelectorAll('.ai-next').forEach(x => x.remove()); turnSubject = null;
+    log.querySelectorAll('.ai-next').forEach(x => x.remove()); turnSubject = null; turnChoices = null;
     const mine = bubble('user', esc(text)); history.push({ role: 'user', content: text });
     const thinking = bubble('bot pending', '<span class="dots"><i></i><i></i><i></i></span>'); status('Thinking…');
     try {
@@ -190,14 +192,14 @@ export function initAssistant(ctx) {
         }
         log.appendChild(thinking); scroll(); status('Thinking…');
       }
-      next = withTellMore(next, turnSubject); if (next.length) pills(next);
+      next = turnChoices ? turnChoices.map(c => 'Take me to ' + c.label).slice(0, 5) : withTellMore(next, turnSubject); if (next.length) pills(next);
       // a tall answer with cards: start at the first card rather than the bottom, so its headline numbers are in view
       let c1 = mine.nextElementSibling; while (c1 && !c1.classList.contains('ccard')) c1 = c1.nextElementSibling;
       if (c1 && log.scrollHeight - (c1.offsetTop - log.offsetTop) > log.clientHeight) log.scrollTop = c1.offsetTop - log.offsetTop - 8;
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { air_traffic: 'Checking the air traffic…', market_data: 'Reading the market numbers…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -213,10 +215,16 @@ export function initAssistant(ctx) {
   const ALIAS = [[/\bcyprus\b/i, 'Cypress'], [/\bkaty freeway\b/i, 'I-10 Katy Freeway'], [/\bthe woodland\b(?!s)/i, 'The Woodlands'], [/\bh[- ]?town\b/i, 'Houston'], [/\bminute maid park\b/i, 'Daikin Park']];
   const TOWNS = () => ['Houston', ...(ctx.DATA.places || []).map(p => p[0])];
   // OpenStreetMap knows hotels, venues and other landmarks by name that MapTiler's geocoder often doesn't
-  async function nominatim(q) {
-    try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=us&viewbox=-106.7,36.5,-93.5,25.8&bounded=1&q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } });
+  async function nominatim(q, world = false) {
+    const area = world ? '&addressdetails=1&limit=10' : '&limit=6&countrycodes=us&viewbox=-106.7,36.5,-93.5,25.8&bounded=1';
+    try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2' + area + '&q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } });
       return r.ok ? fromNominatim(await r.json()) : []; } catch (e) { return []; }
   }
+  // the part after the first comma says where ("Lyon, France", "Paris, TX"); Texas, a Texas town or nothing keeps it local
+  const elsewhere = name => { const c = name.split(',').slice(1).join(',').trim().toLowerCase(); if (!c) return false;
+    return !/\b(tx|texas)\b/.test(c) && !TOWNS().some(t => t.toLowerCase() === c) && !/^(usa|us|united states)$/.test(c); };
+  const LOCAL_FINE = new Set(['street', 'area']);
+  const ambiguous = (name, cands) => ({ ambiguous: true, candidates: cands, error: '“' + name + '” could be ' + cands.map(c => c.label).join(' or ') + '. Ask the user which one (offer these as the follow-up options); don’t guess.' });
   // Every lookup must land on the place itself or fail: a wrong guess used to fly the map to e.g. "Houston Avenue, Pasadena"
   // before the model retried with the street address.
   async function resolvePlace(name) {
@@ -225,11 +233,29 @@ export function initAssistant(ctx) {
     const d = districtFor(name); if (d) return { c: d.c, label: d.name, kind: 'district', zoom: d.zoom };
     const town = (ctx.DATA.places || []).find(p => p[0].toLowerCase() === n);
     if (town) return { c: [town[1], town[2]], label: town[0] + ', TX', kind: 'town' };
-    const q = name + (/texas|\btx\b/i.test(name) ? '' : ', Texas'), towns = TOWNS();
+    const towns = TOWNS();
+    // somewhere else on Earth: the whole world, MapTiler first, OpenStreetMap for what it doesn't know
+    if (elsewhere(name)) {
+      const world = await nominatim(name, true), cands = placeCandidates(name, world, towns);
+      if (cands) return ambiguous(name, cands);
+      let w = pickPlace(name, await ctx.geocode(name, { world: true, limit: 8 }), towns);
+      if (w.error) { const w2 = pickPlace(name, world, towns); if (!w2.error) w = w2; }
+      return w;
+    }
+    const q = name + (/texas|\btx\b/i.test(name) ? '' : ', Texas');
     let p = pickPlace(name, await ctx.geocode(q, { exact: true }), towns);
     if (p.error) { const p2 = pickPlace(name, await ctx.geocode(q), towns); if (!p2.error) p = p2; }
     if (p.error) { const p3 = pickPlace(name, await nominatim(q), towns); if (!p3.error) p = p3; }
     if (p.error) { const head = name.split(',')[0].replace(/\s+(hotel|inn|suites)$/i, ''); if (head !== name.split(',')[0]) { const p4 = pickPlace(head, await nominatim(head + ', ' + (name.split(',').slice(1).join(',') || 'Texas')), towns); if (!p4.error) p = p4; } }
+    // a landmark, street or address found in Texas is what a local user means; a bare town or region name may be
+    // somewhere else ("Paris", "Georgia", "Lyon"): check the world, and ask when more than one place fits
+    if (!p.error && ['poi', 'address', 'district'].includes(p.kind) || /texas|\btx\b/i.test(name)) return p;
+    const world = await nominatim(name, true), cands = placeCandidates(name, world, towns);
+    if (cands) return ambiguous(name, cands);
+    // only a local street or neighbourhood shares the name of a well-known place elsewhere ("Lyon" → Lyon St, Houston)
+    const famous = world.find(r => ['place', 'region', 'country'].includes(r.type) && r.imp >= 0.5 && r.name.toLowerCase() === name.split(',')[0].trim().toLowerCase());
+    if (!p.error && LOCAL_FINE.has(p.kind) && famous && !famous.tx) return ambiguous(name, [{ label: famous.short || famous.t, full: famous.t, c: famous.c, kind: famous.type === 'place' ? 'town' : famous.type }, { label: p.label, full: p.label, c: p.c, kind: p.kind }]);
+    if (p.error) { let w = pickPlace(name, world, towns); if (w.error) { const w2 = pickPlace(name, await ctx.geocode(name, { world: true, limit: 8 }), towns); if (!w2.error) w = w2; } return w.error ? p : w; }
     return p;
   }
   const lastUserText = () => { for (let i = history.length - 1; i >= 0; i--) if (history[i].role === 'user') return history[i].content; return ''; };
@@ -378,7 +404,10 @@ export function initAssistant(ctx) {
           else { const fr = frame(fs.map(f => [f.lon, f.lat])); c = fr.c; zoom = fr.zoom; label = fs.length + ' filings'; kind = 'group'; }
           if (fs.some(f => f.approx)) note = 'Some of these filings only have a city-level location, so the camera can’t center on the exact building.';
         } else if (isFinite(a.lat) && isFinite(a.lon) && a.lat && a.lon) { c = [a.lon, a.lat]; label = a.lat.toFixed(4) + ', ' + a.lon.toFixed(4); kind = 'building'; }
-        else if (a.place) { const p = await resolvePlace(String(a.place)); if (p.error) return { error: p.error }; c = p.c; label = p.label; kind = p.kind; if (p.zoom) zoom = p.zoom; }
+        else if (a.place) { const p = await resolvePlace(String(a.place));
+          // several places fit: don't move; the model asks which one and the choices become tappable pills
+          if (p.ambiguous) { turnChoices = p.candidates; return { ambiguous: true, question: 'Which one did you mean?', candidates: p.candidates.map(x => x.label), note: p.error }; }
+          if (p.error) return { error: p.error }; c = p.c; label = p.label; kind = p.kind; if (p.zoom) zoom = p.zoom; }
         else if (ctx.state.sel) { const f = ctx.state.sel; c = [f.lon, f.lat]; label = f.name; kind = f.approx ? 'approx' : 'building'; }
         else if (ctx.currentBuilding?.()) { const b = ctx.currentBuilding(); c = b.center; label = b.title || 'this building'; kind = 'building'; }
         if (!c) return { error: 'Say a place, an address or which filings to go to.' };
@@ -386,9 +415,10 @@ export function initAssistant(ctx) {
         const def = zoom ?? ZOOM[kind] ?? 12;
         // a specific building/address/landmark stays close even if the model asks for a wide zoom
         // the model's zoom may nudge the default, never swap a neighbourhood view for a whole city
-        zoom = a.zoom > 0 ? (['building', 'address', 'poi', 'area'].includes(kind) ? Math.max(a.zoom, def) : Math.min(def + 2.5, Math.max(def - 0.75, a.zoom))) : def;
+        // countries and states: whatever the model asks for (a whole continent is fine)
+        zoom = a.zoom > 0 ? (['building', 'address', 'poi', 'area'].includes(kind) ? Math.max(a.zoom, def) : ['country', 'region'].includes(kind) ? a.zoom : Math.min(def + 2.5, Math.max(def - 0.75, a.zoom))) : def;
         if (kind === 'approx') zoom = Math.min(zoom, 14);
-        zoom = Math.max(4, Math.min(19, zoom));
+        zoom = Math.max(2, Math.min(19, zoom));
         if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt || zoom >= 16.5 ? 60 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });
         if (kind !== 'group' && !/^-?\d+\.\d+, -?\d/.test(label)) turnSubject = label;
         actionChip((a.orbit ? 'Orbiting ' : 'Moved the map to ') + label); return { moved_to: label, zoom: +zoom.toFixed(1), orbiting: !!a.orbit, ...(note ? { note } : {}) };
@@ -438,7 +468,7 @@ export function initAssistant(ctx) {
       if (name === 'project_news') { if (!ctx.live) return { error: 'Not available.' }; return ctx.live.news(a); }
       if (name === 'site_imagery') { if (!ctx.live) return { error: 'Not available.' }; if (ctx.view !== 'map') ctx.setView('map'); const d = await ctx.live.imagery(a); if (d.showing) actionChip('NASA imagery on the map: ' + d.showing.name + ' ' + d.showing.day); else if (d.passes?.length) actionChip('Found ' + d.passes.length + ' NASA passes · previews in the card'); return d; }
       if (name === 'web_search') {
-        const r = await fetch('api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: a.query, near: a.near || turnSubject || '' }) });
+        const r = await fetch('api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: a.query, near: a.near || turnSubject || '', local: !!ctx.nearestPlace?.(ctx.map.getCenter().toArray()) }) });
         const d = await r.json().catch(() => ({})); if (!r.ok) return { error: d.error || 'Web search failed.' };
         // one chip with the cited sites as links (the spoken / written answer comes from the model)
         bubble('act', '<span class="ai-ai">Searched the web' + (d.sources.length ? ': ' : '') + '</span>' + d.sources.slice(0, 5).map(x => '<a class="ai-src" href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc(x.title) + '">' + esc(x.site) + '</a>').join(' · '));
@@ -447,6 +477,46 @@ export function initAssistant(ctx) {
       if (name === 'show_view') {
         if (!VIEW_ASK.test(lastUserText())) return { not_switched: true, note: 'The user did not ask for that tab, so it was not opened. Answer in the chat and offer "Open the ' + ({ who: 'Activity', changes: 'Updates' }[a.view] || a.view[0].toUpperCase() + a.view.slice(1)) + ' tab" as a follow-up option.' };
         ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates', market: 'Market', reports: 'Reports' }[a.view] || a.view)); return { view: a.view }; }
+      if (name === 'air_traffic') {
+        // the open card, a named place or filing, else the map center
+        let p = await pointFor(a);
+        if (p.error && !a.place && !a.id) { const c = ctx.map.getCenter(); p = { c: [c.lng, c.lat], label: ctx.viewPlace?.() || 'the map center' }; }
+        if (p.error) return p;
+        const miles = Math.min(25, Math.max(0.5, a.radius_miles || 3));
+        const [live, hist] = await Promise.all([ctx.planesNear(p.c, miles).catch(e => ({ error: e.message })), a.history === false ? null : ctx.airHistory(p.c, 1)]);
+        const ac = live.aircraft || [];
+        return { place: p.label, radius_miles: miles,
+          live: live.error ? { error: live.error } : { as_of: live.time, source: live.source, count: ac.length, low_count: ac.filter(x => !x.ground && x.alt != null && x.alt < 3000).length,
+            aircraft: ac.slice(0, 12).map(x => ({ callsign: x.flight, type: x.type, registration: x.reg, altitude_ft: x.ground ? 0 : x.alt, on_ground: x.ground, speed_kt: x.gs, heading: x.track, miles_away: x.miles })) },
+          history: !hist ? undefined : hist.history ? { window_days: hist.days, sampled_days: hist.sampled_days, low_sightings_per_day_within_1km: hist.low_per_day, lowest_ft: hist.lowest_ft,
+            note: 'Aircraft below 3,000 ft seen in 5-minute snapshots within ~1 km; an exposure index (more = more low traffic), not a count of flights.' } : { available: false, note: hist.note } };
+      }
+      if (name === 'market_data') {
+        const d = await ctx.marketData?.(a.county || ''); if (!d) return { error: 'The Market view isn’t loaded in this version.' }; if (d.error) return d;
+        const t = a.topic || 'all', SEC = d.jobs?.sec ? d.jobs.sec.map((n, i) => [i, n]).sort((x, y) => y[1] - x[1]).slice(0, 5) : [];
+        const out = { area: d.area, data_built: d.built };
+        if (t === 'all' || t === 'population') out.population = d.pop || 'not available';
+        if (t === 'all' || t === 'jobs') out.jobs = d.jobs ? { jobs: d.jobs.n, growth_pct: d.jobs.gr != null ? Math.round(d.jobs.gr * 10) / 10 : null, year: d.jobs.year, base_year: d.jobs.baseYear, top_industries: SEC.map(([i, n]) => ({ industry: SECTORS[i]?.[1] || i, jobs: n })) } : 'not built yet';
+        if (t === 'all' || t === 'permits') out.housing_permits = d.permits ? { by_year: d.permits.map(r => ({ year: r.y, single_family_units: r.sf, multifamily_units: r.mf, value: r.value })), year_to_date: d.ytd || null } : 'not built yet';
+        if (t === 'all' || t === 'businesses') out.new_businesses = d.biz ? { per_month: d.biz.slice(-24), newest: (d.latest || []).slice(0, 15).map(x => ({ name: x.name, owner: x.owner, address: x.addr, city: x.city, county: x.county, permit_date: x.date, industry: SECTORS[x.sec]?.[1] || null })) } : 'not built yet';
+        if (t === 'all' || t === 'spending') out.consumer_spending_estimate = d.spend ? { per_year: d.spend.total, per_household: d.spend.perHH, by_category: d.spend.cats, ce_year: d.spend.year, note: 'Estimate: Census household incomes × BLS Consumer Expenditure Survey (South region).' } : 'not built yet';
+        if (t === 'all' || t === 'sales_tax') out.city_sales_tax = d.tax ? { monthly_total: d.tax.slice(-24), cities_last_12_months: (d.taxCities || []).slice(0, 15).map(c => ({ city: c.city, county: c.county, last_12_months: c.last12, prior_12_months: c.prior12 })), note: 'Texas Comptroller allocations: the cities\' share of sales tax, about 2 months behind; a measure of taxable local spending.' } : 'not built yet';
+        if (t === 'all' || t === 'news') out.news = d.news ? d.news.slice(0, 12).map(x => ({ title: x.title, source: x.domain, date: x.date, place: x.place, url: x.url })) : 'not built yet';
+        return out;
+      }
+      if (name === 'field_notes') {
+        const db = ctx.field?.db || { notes: [], watch: [] }, words = String(a.query || '').toLowerCase().split(/\s+/).filter(Boolean);
+        let center = null; if (a.near) { const p = await resolvePlace(String(a.near)); if (p.error) return p; center = p.c; }
+        const mi = (x, y) => miles(center, [x, y]), R = Math.min(50, Math.max(0.25, a.radius_miles || 3));
+        const ok = (txt, x, y) => (!words.length || words.every(w => txt.toLowerCase().includes(w))) && (!center || mi(x, y) <= R);
+        const kind = a.kind || 'both';
+        const notes = kind === 'watchlist' ? [] : db.notes.filter(n => ok([n.title, n.text, n.tag].join(' '), n.lng, n.lat))
+          .map(n => ({ title: n.title || 'Untitled', tag: n.tag, text: (n.text || '').slice(0, 300), photos: (n.photos || []).length, added: n.created?.slice(0, 10), by: n.by || n.created_by_email || null, lat: n.lat, lon: n.lng, ...(center ? { miles_away: Math.round(mi(n.lng, n.lat) * 10) / 10 } : {}) }));
+        const watch = kind === 'notes' ? [] : db.watch.filter(w => ok([w.label, w.sub, w.kind].join(' '), w.lng, w.lat))
+          .map(w => ({ kind: w.kind, label: w.label, detail: w.sub, filing_id: w.kind === 'filing' ? w.ref : undefined, added: w.added?.slice(0, 10) }));
+        return { notes_total: db.notes.length, watchlist_total: db.watch.length, notes: notes.slice(0, 25), watchlist: watch.slice(0, 25), note: db.notes.length || db.watch.length ? undefined : 'No field notes or watched items yet.' };
+      }
+      if (name === 'data_sources') return ctx.sourcesList?.() || { error: 'The Sources tab isn’t loaded.' };
       if (name === 'reset_map') { const before = ctx.snapshot(); ctx.resetAll(); actionChip('Reset the map', () => ctx.restore(before)); return { reset: true, filings: ctx.visible.length }; }
       return { error: 'Unknown tool ' + name };
     } catch (e) { console.error(e); return { error: e.message }; }

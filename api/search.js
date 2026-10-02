@@ -17,13 +17,14 @@ export function parseSearch(d) {
   return { answer, sources: sources.slice(0, 8) };
 }
 
-export async function webSearch(key, query, near) {
+export async function webSearch(key, query, near, local = true) {
   let last = '';
   for (const model of MODELS) {
     for (const tool of ['web_search', 'web_search_preview']) {
       const r = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST', signal: AbortSignal.timeout(45000), headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, tools: [{ type: tool, search_context_size: 'low', user_location: { type: 'approximate', country: 'US', region: 'Texas', city: 'Houston' } }],
+        body: JSON.stringify({ model, // Houston bias only while the user is looking at the home region; a question about Lyon gets no US slant
+          tools: [{ type: tool, search_context_size: 'low', ...(local ? { user_location: { type: 'approximate', country: 'US', region: 'Texas', city: 'Houston' } } : {}) }],
           tool_choice: 'required', max_output_tokens: 1200, store: false, ...(/^gpt-5|^o\d/.test(model) ? { reasoning: { effort: 'low' } } : {}),
           instructions: 'Search the web and answer in 2-4 plain sentences (no markdown). Give specific facts with dates and figures when sources have them, and say when sources disagree or a figure is an estimate. Prefer official, news and primary sources.',
           input: query + (near ? ' (context: ' + near + ')' : '') })
@@ -40,11 +41,11 @@ export async function webSearch(key, query, near) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
-  if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 6, perDay: 60 })) return;
+  if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 6, perDay: 120 })) return;
   const key = needKey(res); if (!key) return;
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const query = clip(String(body.query || '').trim(), 300), near = clip(String(body.near || '').trim(), 120);
   if (query.length < 3) return res.status(400).json({ error: 'What should I search for?' });
-  try { return res.json({ query, ...(await webSearch(key, query, near)) }); }
+  try { return res.json({ query, ...(await webSearch(key, query, near, body.local !== false)) }); }
   catch (e) { console.error('search', e.message); return res.status(502).json({ error: 'The web search didn’t work just now. Try again in a moment.' }); }
 }

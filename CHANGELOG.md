@@ -5,11 +5,45 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
-### 6:27 PM CT: Regrid wired in, with hard monthly caps
+### 6:31 PM CT: Regrid wired in, with hard monthly caps
 - New **Parcel Lines (Regrid)** layer in Map Layers: parcel boundaries at street zoom.
 - New **Get Regrid Details** button on the building card: zoning, standardized land use and the full Regrid parcel record. A parcel looked up once is saved and free after that.
 - Hard caps so it never goes into overage: 1,800 parcel records and 180,000 tiles a month (your plan includes 2,000 and 200,000). At the cap the button says so and the parcel lines stop drawing. Usage shows on the Sources tab.
 - The Regrid token is kept on the server only. Turn it on by adding `REGRID_TOKEN` in Vercel (see README).
+
+### 6:27 PM CT: Consumer spending estimates and the city sales-tax trend (043ec80)
+- **Spending on the map**: Map Layers → Demographics adds Consumer Spending, Spending per Household, Dining Out, Home Furnishings and Apparel for every census tract. These are **estimates**: each tract's households by income (Census) × what households at that income spend (Bureau of Labor Statistics spending survey, adjusted to the South). They are not measured locally, and the legend says so.
+- **Market view**:
+  - total consumer spending and spending per household for the county or region;
+  - a spending-by-category chart;
+  - **the sales tax each city receives every month** (Texas Comptroller), a real local-spending trend, with each city's last 12 months against the 12 before.
+- Building cards show spending per household and dining-out spending for their tract.
+- The assistant can answer spending questions for a place ("how much do households in Katy spend dining out?") and show the spending layers.
+- These numbers appear after the next nightly data refresh.
+- Fixed before it shipped: a new file the browser needs wasn't included in the site build, which would have stopped the page from loading. A new automatic check now catches this.
+
+### 6:12 PM CT: Live planes, low-flight history, and the assistant can answer about all the data (852b396)
+- **Live Planes**: turn it on in Layers → Live Conditions (or ask the assistant). Every aircraft in view, anywhere in the world, coloured by altitude, moving smoothly and refreshed every 10 seconds. Hover for a quick look; click for a card with callsign, aircraft type, registration, altitude (climbing or descending), speed, route (e.g. IAH → ORD), a Follow button and links to adsb.lol and FlightAware. Zoom in past state level to see them.
+- **Low Flight Paths (30 Days)**: a new layer showing where aircraft fly below 3,000 ft over the region. Property cards get an **Air Traffic** line ("moderate low air traffic: about 14 sightings a day within ~1 km, lowest 850 ft"). The history is collected every 5 minutes from now on, so it takes a few days to mean much. It's an exposure index, not a count of flights.
+- **Ask about anything**: the assistant can now answer from every dataset in the app:
+  - planes overhead and how much low air traffic a site gets;
+  - the Market view numbers per county: population, jobs, housing permits, new businesses, local news;
+  - your team's field notes and watchlist;
+  - where each dataset comes from and when it was last refreshed.
+- The Sources tab lists the aircraft feed and the flight history.
+
+### 6:09 PM CT: Fewer filings stuck at the town center (65690ec)
+- Diagnosed why about 1,700 filings stayed at a town-center pin. The map services were up, but none of them had a house number for most of those addresses: new subdivisions, new addresses, and filings that list "0 Main St" or just a street.
+- Those filings are now placed on their own street in their own ZIP code when the street name, street type and ZIP all match. The card says it's street-level ("not at the exact site"), and exports mark it "Street (house not found)". In a test sample this placed 15 of 24 that were previously at the town center.
+- Junction addresses ("Spacek Rd and Evergreen Falls Dr") still use OpenStreetMap, now with a time limit. It was timing out and dragging data refreshes to about 2 hours.
+- Freeway frontage addresses (e.g. "26003 Northwest Fwy") can stay at the town center: a whole stretch of freeway is too vague to place them on.
+
+### 5:58 PM CT: The assistant can take you anywhere in the world, and asks when a place is unclear (ae83277)
+- Ask for any place on Earth: "take me to Lyon, France", "show me Germany", "outline Bavaria, Germany". Whole countries and states zoom out to fit.
+- If a name could be more than one place ("take me to Paris", "Springfield", "Georgia"), the assistant no longer guesses. It asks which one and shows the choices as buttons ("Paris, France" / "Paris, Texas"). It also asks when a request is unclear.
+- Ask about places outside Texas (Europe, other states). The filings and census data only cover Texas, so the assistant says so and answers from general knowledge or a quick web search.
+- When the map is somewhere else, the suggested questions above Ask AI are about that place ("Tell me about Lyon").
+- Weather, nearby places and drive time now work anywhere. Drive time refuses trips no car can make (e.g. Houston to Paris).
 
 ### 5:48 PM CT: Sharper radar, 7-day forecast card, roomier filter panel (2f38b18)
 - **Rain radar is much sharper.** Around Houston it now uses the Houston NEXRAD radar's own high-resolution scan (about 250 m detail, versus the 1 km national mosaic before), and the nearest Texas radar elsewhere. It falls back to a 500 m national composite, then the old mosaic, if a radar is down. You can zoom in further before it gets blurry.
@@ -165,7 +199,6 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 ### 12:18 AM CT: Nightly refresh and AI model settings (af5e2fd, 091a477, 96110e4, d698f65)
 - Data refreshes nightly; "this week" covers the last 7 days of runs; 13 months of change history kept.
 - Default OpenAI model and reasoning effort settings; optional cheaper model for bulk tagging.
-
 ## 2026-10-01
 
 ### 11:56 PM CT: Census fix (9a01af1)

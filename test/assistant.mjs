@@ -1,6 +1,6 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks, placeCandidates, kindOf } from '../lib/assist-logic.mjs';
 import { pruneReports, fmtBytes } from '../lib/reports.mjs';
 import { tractsFor, summarizeTracts, inGeom } from '../lib/demographics.mjs';
 import { nameQuery } from '../api/tenants.js';
@@ -68,6 +68,20 @@ assert.ok(sf.every(q => q.length <= 60), 'short enough for a pill: ' + sf.join('
 const sb = suggestQuestions({ card: { kind: 'building', label: '2200 Texas Ave, Houston, TX 77003' } }); assert.equal(sb[0], 'Who owns 2200 Texas Ave?');
 const sm = suggestQuestions({ near: 'Katy', zoom: 12, inView: 41, changed: 3 });
 assert.ok(sm.includes('What is being built near Katy?') && sm.includes('Summarize the 41 filings in view') && sm.length <= 5);
+// anywhere in the world: ask when several places fit a bare name
+const NM = (name, type, lat, lon, imp, cc, state, country, extra = '') => ({ name, addresstype: type, lat: String(lat), lon: String(lon), importance: imp, address: { country_code: cc, state, country },
+  display_name: [name, extra, state, cc === 'us' ? 'United States' : country].filter(Boolean).join(', ') });
+const parisR = fromNominatim([NM('Paris', 'city', 48.85, 2.35, 0.88, 'fr', 'Île-de-France', 'France', 'Paris'), NM('Paris', 'city', 33.66, -95.55, 0.52, 'us', 'Texas', 'United States', 'Lamar County'),
+  NM('Paris', 'town', 43.2, -80.38, 0.41, 'ca', 'Ontario', 'Canada'), NM('Paris', 'city', 36.3, -88.33, 0.45, 'us', 'Tennessee', 'United States')]);
+assert.deepEqual(placeCandidates('Paris', parisR).map(c => c.label), ['Paris, France', 'Paris, Texas'], 'Paris: France or the Texas namesake, not minor ones');
+assert.match(pickPlace('Paris, France', parisR).label, /France$/);
+const lyonR = fromNominatim([NM('Lyon', 'city', 45.76, 4.83, 0.8, 'fr', 'Auvergne-Rhône-Alpes', 'France', 'Métropole de Lyon'), NM('Lyon', 'village', 32.1, -90.2, 0.3, 'us', 'Mississippi', 'United States')]);
+assert.equal(placeCandidates('Lyon', lyonR), null, 'one clear Lyon'); assert.equal(pickPlace('Lyon', lyonR).kind, 'town');
+assert.deepEqual(placeCandidates('Georgia', fromNominatim([NM('Georgia', 'country', 42.3, 43.4, 0.86, 'ge', null, 'Georgia'), NM('Georgia', 'state', 32.6, -83.4, 0.82, 'us', 'Georgia', 'United States')])).map(c => c.label), ['Georgia (country)', 'Georgia (US state)']);
+assert.equal(placeCandidates('Dallas', fromNominatim([NM('Dallas', 'city', 32.78, -96.8, 0.78, 'us', 'Texas', 'United States'), NM('Dallas', 'city', 33.92, -84.84, 0.4, 'us', 'Georgia', 'United States')])), null, 'Dallas is Dallas');
+const de = fromNominatim([NM('Germany', 'country', 51.1, 10.4, 0.92, 'de', null, 'Germany')]); assert.equal(pickPlace('Germany', de).kind, 'country'); assert.ok(ZOOM.country < 6 && ZOOM.region <= 6.5);
+const sfar = suggestQuestions({ far: 'Lyon, Auvergne-Rhône-Alpes, France', zoom: 11, inView: 0 });
+assert.deepEqual(sfar.slice(0, 2), ['Tell me about Lyon', 'What is being built in Lyon?'], 'outside Texas: questions about that place');
 const sw = suggestQuestions({ zoom: 6 }); assert.ok(sw.length >= 1 && sw.length <= 5 && !sw.some(q => /near undefined|in view/.test(q)));
 
 // framing several filings

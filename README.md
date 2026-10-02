@@ -79,9 +79,13 @@ Optional: `SOCRATA_APP_TOKEN` (free at data.texas.gov → Developer Settings) on
 
 Not included, on purpose: sales and lease comps. Texas does not disclose sale prices, and no free source has lease rates; that data needs a licensed provider (CoStar, CompStak and similar) kept behind a sign-in, since this site is public.
 
+- **Consumer spending (estimates)**: Map Layers → Demographics adds Consumer Spending, Spending per Household, Dining Out, Home Furnishings and Apparel per census tract; the Market view adds spending by category and the **city sales tax collected each month** (Texas Comptroller allocations, a real local spending trend). The tract figures are modeled (Census ACS households by income × BLS Consumer Expenditure Survey spending by income, adjusted to the South), not measured; the BLS coefficients are cached in `data/cache/ce.json` and refreshed monthly (optional `BLS_KEY` for the BLS v2 API).
+- **Ask about anything**
+
 ## AI assistant
 
 The **Ask AI** button (or ⌘/ on a Mac, Ctrl+/ elsewhere) opens a chat that works the map through tools: filter, find, highlight, open a filing, fly somewhere, toggle the heatmap or views. Press the mic to talk to it instead (OpenAI Realtime over WebRTC).
+- **Anywhere in the world**: "take me to Lyon", "show me Germany", "what's being built in Munich". Places with a country or state after a comma are looked up worldwide (MapTiler, then OpenStreetMap). Bare names check Texas first, then the world: when several places fit ("Paris", "Springfield", "Georgia") the assistant asks which one and offers them as buttons instead of guessing. The filings, demographics and parcel data cover Texas only; outside it the assistant answers from general knowledge (labelled approximate) or a web search, and says so. Weather, nearby places and drive times work worldwide (drives over ~2,500 miles are refused).
 - `api/chat.js`: text chat (stateless; the browser runs the tool calls and sends results back). Model `OPENAI_CHAT_MODEL` or `OPENAI_MODEL`; `OPENAI_CHAT_REASONING_EFFORT` overrides the effort for chat only.
 - `api/realtime.js`: short-lived voice session. `OPENAI_REALTIME_MODEL` (default `gpt-realtime-2.1`, then `gpt-realtime`), `OPENAI_VOICE` (default `marin`), `VOICE_ENABLED=false` turns voice off. Sessions end after 10 minutes; 30 per IP per day.
 - **Web search, on request only**: say "search the web for…", "look it up" or "Google it" and the assistant calls `api/search.js` (OpenAI Responses API with its built-in web search, low reasoning effort, a few seconds). It answers in a couple of sentences and lists the source sites as links. It never searches on its own. Optional `OPENAI_SEARCH_MODEL` (default `gpt-5-mini`, then `gpt-4.1-mini`). Each search is billed by OpenAI (a search call plus tokens); the endpoint allows 6 a minute and 60 a day per visitor.
@@ -101,6 +105,8 @@ Layers panel → **Live conditions**, the **From here** buttons on every filing 
 | Drive time without a TomTom key | OSRM on the FOSSGIS servers (OpenStreetMap roads), through `api/drive` | none |
 | 3D terrain | Mapterhorn (browser direct) | none |
 | NASA recent imagery, site imagery thumbnails | NASA GIBS + CMR + Worldview Snapshots (HLS Landsat / Sentinel-2, 30 m), browser direct | none |
+| Live Planes (aircraft anywhere: callsign, type, altitude, speed, route), plane card, assistant `air_traffic` | adsb.lol (open data, ODbL), airplanes.live as a fallback, through `api/planes` | none |
+| Low Flight Paths layer, "Air Traffic" on property cards | `api/planes-sample` (Vercel Cron, every 5 min) counts aircraft below 3,000 ft in ~1 km cells into Supabase (`air_cells`, `air_days`; migration `20261007000000_air_traffic.sql`) | `SUPABASE_SECRET_KEY`; set `CRON_SECRET` to lock the cron endpoint |
 | High-res site imagery (dated, sub-metre) | Esri World Imagery Wayback (archived versions, only those where the spot changed) and USDA NAIP (~0.6 m, Texas about every 2 years) from Microsoft Planetary Computer, through `api/imagery` | none |
 | Project news | GDELT Project DOC 2.0, through `api/news` | none |
 | ESRI / Free Map basemaps | Esri World Imagery, OpenFreeMap | none |

@@ -66,6 +66,14 @@ globalThis.fetch = async (url, opts = {}) => {
     if (my) return new Response(BPS('20' + my[1] + my[2], [['48', '473', 50, 10]]));
     return new Response('', { status: 404 });
   }
+  if (u.host === 'api.us.socrata.com') return Response.json({ results: [
+    { resource: { id: 'zzzz-0001', name: 'Sales Tax Allocations, County', columns_field_name: ['county', 'net_payment_this_period'], columns_datatype: ['text', 'number'] } },
+    { resource: { id: 'abcd-1234', name: 'Sales Tax Allocations, City', columns_field_name: ['city', 'allocation_month', 'net_payment_this_period', 'comparable_payment_prior_year'], columns_datatype: ['text', 'calendar_date', 'number', 'number'] } }] });
+  if (u.host === 'data.texas.gov' && u.pathname.includes('abcd-1234')) {
+    if (comptrollerDown) return new Response('{"message":"down"}', { status: 503 });
+    assert.match(u.searchParams.get('$select'), /sum\(net_payment_this_period\)/); assert.match(u.searchParams.get('$where'), /upper\(city\) in \('KATY','BROOKSHIRE','WALLER'\)/);
+    return Response.json([{ city: 'KATY', m: '2026-07-01T00:00:00.000', v: '1250000.5' }, { city: 'KATY', m: '2025-07-01T00:00:00.000', v: '1100000' }, { city: 'BROOKSHIRE', m: '2026-07-01T00:00:00.000', v: '210000' }, { city: 'ELSEWHERE', m: '2026-07-01T00:00:00.000', v: '5' }]);
+  }
   if (u.host === 'data.texas.gov') {
     if (comptrollerDown) return new Response('{"message":"down"}', { status: 503 });
     if (u.searchParams.get('$group')) { const m = ym(new Date()); return Response.json([{ outlet_county_code: '237', m: m + '-01T00:00:00.000', n: '12' }, { outlet_county_code: '101', m: m + '-01T00:00:00.000', n: '900' }, { outlet_county_code: '057', m: m + '-01T00:00:00.000', n: '700' }]); }
@@ -95,6 +103,10 @@ assert.deepEqual(area.news['town:Brookshire'].map(a => a.title), ['Old story'], 
 comptrollerDown = true;
 const again = await buildArea(regions, filings, { ...area, jobs: { year: lodesYear, tracts: {} } });
 assert.deepEqual(again.businesses, area.businesses, 'Comptroller down: previous numbers kept');
+// city sales-tax allocations: dataset found by name (the city one, not the county one), columns read from the catalog
+assert.equal(area.salesTax.dataset.id, 'abcd-1234'); assert.equal(area.salesTax.dataset.cols.amount, 'net_payment_this_period');
+assert.deepEqual(area.salesTax.cities.Katy, { county: 'Harris', months: { '2026-07': 1250001, '2025-07': 1100000 } }); assert.equal(area.salesTax.cities.Brookshire.county, 'Waller'); assert.ok(!area.salesTax.cities.ELSEWHERE);
+assert.deepEqual(again.salesTax, area.salesTax, 'allocations down: previous numbers kept');
 assert.ok(seen.filter(s => s.includes('lehd')).length > 0);
 // ---- api/tenants handler: ZIP filter rejected (400) -> street-only query filtered here ----
 const { default: tenantsApi } = await import('../api/tenants.js');

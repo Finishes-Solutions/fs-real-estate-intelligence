@@ -21,8 +21,14 @@ assert.equal(r.code, 200); assert.deepEqual(sent.map(b => b.tools[0].type), ['we
 mode = 'down'; r = res(); await handler({ method: 'POST', headers: {}, body: { query: 'tower height' } }, r); assert.equal(r.code, 502);
 r = res(); await handler({ method: 'POST', headers: {}, body: { query: 'x' } }, r); assert.equal(r.code, 400);
 r = res(); await handler({ method: 'GET', headers: {} }, r); assert.equal(r.code, 405);
-// the tool is only for explicit requests
+// the Houston location bias only applies while the user is looking at the home region
+assert.ok(sent.some(b => b.tools[0].user_location?.city === 'Houston'), 'local by default');
+mode = 'ok'; sent.length = 0; r = res(); await handler({ method: 'POST', headers: {}, body: { query: 'what is being built in Lyon', local: false } }, r);
+assert.ok(sent.length && sent.every(b => !b.tools[0].user_location), 'no Houston bias for a question about elsewhere');
+// the tool is for explicit requests and for current facts about places the filings don't cover, never for map data
 const { TOOLS, systemPrompt } = await import('../lib/agent-tools.mjs');
-assert.match(TOOLS.find(t => t.name === 'web_search').description, /ONLY call this when the user explicitly asks/);
-assert.match(systemPrompt(), /only when the user asks you to/);
+const wd = TOOLS.find(t => t.name === 'web_search').description;
+assert.match(wd, /ONLY call this when the user explicitly asks/); assert.match(wd, /places outside the filings data/); assert.match(wd, /Never call it for map data/);
+assert.match(systemPrompt(), /when the user asks you to .*or for current facts about places the filings don't cover/);
+assert.match(systemPrompt(), /The map covers the whole world/); assert.match(systemPrompt(), /never pick one yourself/);
 console.log('search tests passed');

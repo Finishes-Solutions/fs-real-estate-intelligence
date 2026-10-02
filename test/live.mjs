@@ -41,7 +41,7 @@ globalThis.fetch = async url => {
 
 // ---- drive ----
 const { default: drive, parsePt } = await import('../api/drive.js');
-assert.deepEqual(parsePt('30.0,-95.9'), [30, -95.9]); assert.equal(parsePt('51,-95'), null); assert.equal(parsePt('x'), null);
+assert.deepEqual(parsePt('30.0,-95.9'), [30, -95.9]); assert.deepEqual(parsePt('51,-95'), [51, -95], 'worldwide now'); assert.equal(parsePt('95,10'), null); assert.equal(parsePt('x'), null);
 let res = mock(); await drive({ query: { from: '30,-95.9', to: '29.8,-95.8' }, headers: { 'x-forwarded-for': '1.1.1.1' } }, res);
 assert.equal(res.code, 200); assert.equal(res.body.traffic, false); assert.equal(res.body.miles, 10); assert.equal(res.body.minutes, 16); assert.equal(res.body.line.length, 3);
 process.env.TOMTOM_API_KEY = 'tt-test';
@@ -50,6 +50,7 @@ assert.equal(res.body.traffic, true); assert.equal(res.body.minutes, 25); assert
 mode = 'tomtom-down'; res = mock(); await drive({ query: { from: '30,-95.9', to: '29.8,-95.8' }, headers: { 'x-forwarded-for': '1.1.1.1' } }, res);
 assert.equal(res.body.traffic, false, 'falls back to OSRM'); assert.match(res.body.note, /TomTom 503/); mode = 'ok';
 res = mock(); await drive({ query: { from: 'nope', to: '29.8,-95.8' }, headers: { 'x-forwarded-for': '1.1.1.1' } }, res); assert.equal(res.code, 400);
+res = mock(); await drive({ query: { from: '29.76,-95.36', to: '48.85,2.35' }, headers: { 'x-forwarded-for': '1.1.1.1' } }, res); assert.equal(res.code, 400); assert.match(res.body.error, /too far for a drive/);
 
 // ---- tile ----
 const { default: tile, bbox3857, tileLonLat } = await import('../api/tile.js');
