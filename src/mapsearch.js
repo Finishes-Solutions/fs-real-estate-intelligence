@@ -157,6 +157,16 @@ export function initMapSearch(ctx) {
     if (it.t === 'entity') { showEntity(it.e); return; }
     showPlace(it.p);
   }
+  // ⌘K (Mac) or Ctrl+K: jump to the map search from anywhere
+  const MOD = /Mac|iPhone|iPad|iPod/.test(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl+';
+  const kbd = document.createElement('kbd'); kbd.className = 'mskbd'; kbd.textContent = MOD + 'K'; kbd.setAttribute('aria-hidden', 'true'); clearB.before(kbd);
+  input.setAttribute('aria-keyshortcuts', MOD === '⌘' ? 'Meta+K' : 'Control+K');
+  document.addEventListener('keydown', e => {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || (e.key || '').toLowerCase() !== 'k') return;
+    e.preventDefault(); if (ctx.view !== 'map') ctx.setView('map');
+    document.querySelector('.app')?.classList.contains('ai-open') && innerWidth <= 700 && document.getElementById('aiClose')?.click();
+    input.focus(); input.select(); if (q) render();
+  });
   let it0 = 0;
   input.addEventListener('input', () => { clearTimeout(it0); it0 = setTimeout(() => run(input.value), 90); });
   input.addEventListener('focus', () => { if (q) render(); });

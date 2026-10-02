@@ -1,6 +1,6 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, fromNominatim, withTellMore, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
 import { USES } from '../lib/taxonomy.mjs';
 import { categoryOf, parsePlaces, overpassQuery } from '../lib/nearby.mjs';
 import { roofFromHistogram, floorsFromHeight } from '../lib/height.mjs';
@@ -47,6 +47,14 @@ assert.deepEqual(withTellMore(['Take me there', 'Show hotels nearby'], 'Daikin P
 assert.equal(withTellMore(['a', 'b', 'c', 'd'], 'X').length, 4);
 assert.deepEqual(withTellMore(['Tell me more about it'], 'X'), ['Tell me more about it']);
 assert.deepEqual(withTellMore(['a'], ''), ['a']);
+// pills above the Ask AI button
+const sf = suggestQuestions({ card: { kind: 'filing', name: 'George R Brown Convention Center Buildout', dev: 'Houston First Corporation' } });
+assert.ok(sf.length >= 3 && sf.length <= 5); assert.match(sf[0], /^Tell me more about George R Brown/); assert.ok(sf.some(q => /Houston First/.test(q)));
+assert.ok(sf.every(q => q.length <= 60), 'short enough for a pill: ' + sf.join(' | '));
+const sb = suggestQuestions({ card: { kind: 'building', label: '2200 Texas Ave, Houston, TX 77003' } }); assert.equal(sb[0], 'Who owns 2200 Texas Ave?');
+const sm = suggestQuestions({ near: 'Katy', zoom: 12, inView: 41, changed: 3 });
+assert.ok(sm.includes('What is being built near Katy?') && sm.includes('Summarize the 41 filings in view') && sm.length <= 5);
+const sw = suggestQuestions({ zoom: 6 }); assert.ok(sw.length >= 1 && sw.length <= 5 && !sw.some(q => /near undefined|in view/.test(q)));
 
 // framing several filings
 const f = frame([[-95.70, 29.97], [-95.701, 29.971]]); assert.ok(f.zoom > 16 && f.zoom <= 17.5, 'close group stays close: ' + f.zoom);

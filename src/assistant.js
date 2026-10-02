@@ -3,13 +3,15 @@
 import { makeMatcher, describe, miles } from './lib/filter.mjs';
 import { entityKey } from './lib/taxonomy.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
-import { cleanFilterArgs, pickPlace, fromNominatim, withTellMore, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
 const SEND = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15V3M4 8l5-5 5 5"/></svg>';
 const X = '<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
 const SUGGEST = ['Show medical projects over $5M filed in the last year', 'Who are the most active developers right now?', 'What’s under construction within 5 miles of Katy?', 'Show a heatmap of new construction by value', 'Take me to downtown Houston and orbit around it', 'Find the biggest multifamily projects and highlight the top 5', 'How far is this property from me, and what’s the drive time?', 'Turn on radar, wind and live traffic'];
+
+const MOD = /Mac|iPhone|iPad|iPod/.test(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl+';
 
 export function initAssistant(ctx) {
   const { esc, fmtM, fmtN } = ctx;
@@ -35,7 +37,8 @@ export function initAssistant(ctx) {
       <button class="ai-send" id="aiSend" type="submit" aria-label="Send">${SEND}</button>
     </form>
   </aside>
-  <button class="ai-fab" id="aiFab" type="button" aria-controls="ai">${SPARK}<span>Ask AI</span></button>`;
+  <div class="fab-sugs" id="fabSugs" aria-label="Suggested questions"></div>
+  <button class="ai-fab" id="aiFab" type="button" aria-controls="ai" aria-keyshortcuts="${MOD === '⌘' ? 'Meta+/' : 'Control+/'}">${SPARK}<span>Ask AI</span><kbd>${MOD}/</kbd></button>`;
   ctx.viewport.append(...wrap.children);
   const $ = id => document.getElementById(id);
   const el = $('ai'), log = $('aiLog'), q = $('aiQ'), form = $('aiForm'), st = $('aiSt'), app = document.querySelector('.app');
@@ -53,10 +56,33 @@ export function initAssistant(ctx) {
   function close() { app.classList.remove('ai-open', 'ai-tall'); el.setAttribute('aria-hidden', 'true'); stopVoice(); ctx.mapPadding(); }
   $('aiFab').onclick = () => open(); $('aiClose').onclick = close;
   $('aiNew').onclick = () => { history = []; thread = null; log.innerHTML = ''; renderEmpty(); ctx.clearHighlight(); };
+  // ⌘/ (Mac) or Ctrl+/ opens the assistant from anywhere, even while typing in another box; again closes it
   document.addEventListener('keydown', e => {
-    if (e.key === '/' && !e.target.closest('input,textarea,select,[contenteditable]')) { e.preventDefault(); open(); }
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === '/' || e.code === 'Slash')) {
+      e.preventDefault(); if (app.classList.contains('ai-open') && document.activeElement === q) close(); else open();
+    }
     if (e.key === 'Escape' && app.classList.contains('ai-open') && document.activeElement === q) close();
   });
+
+  // ---------- suggested questions above the Ask AI button, from what is on screen ----------
+  const sugBox = $('fabSugs'); let cardInfo = null, sugT = 0, lastSugs = '';
+  function onScreen() {
+    const m = ctx.map, z = m.getZoom(), c = m.getCenter(), b = m.getBounds(), cardOpen = document.getElementById('card').classList.contains('open');
+    const card = !cardOpen || !cardInfo ? null : cardInfo.kind === 'filing' ? { kind: 'filing', name: cardInfo.f.name, dev: cardInfo.f.dev || cardInfo.f.owner, approx: !!cardInfo.f.approx }
+      : cardInfo.kind === 'building' ? { kind: 'building', label: cardInfo.label?.() } : null;
+    const inView = z >= 8 ? ctx.visible.reduce((n, f) => n + (b.contains([f.lon, f.lat]) ? 1 : 0), 0) : 0;
+    return { card, near: ctx.nearestPlace?.([c.lng, c.lat]) || null, zoom: z, inView, filtered: !!ctx.filterText(), selection: ctx.sel?.feature ? ctx.sel.label || null : null, changed: ctx.CHANGED.size };
+  }
+  function renderSugs() {
+    const list = suggestQuestions(onScreen()), key = list.join('|'); if (key === lastSugs) return; lastSugs = key;
+    // pills say "it" for the open card; the question sent names it, so the answer can't drift to something else
+    const v = onScreen(), name = v.card?.kind === 'filing' ? v.card.name : v.card?.kind === 'building' && v.card.label ? v.card.label.split(',')[0] : null;
+    sugBox.innerHTML = list.map(t => '<button type="button" data-q="' + esc(name ? t.replace(/\b(of|near|is) it\b|\bwill it\b/, m => m.replace(/\bit\b/, name)) : t) + '">' + esc(t) + '</button>').join('');
+    sugBox.querySelectorAll('button').forEach(b => b.onclick = () => { if (busy) return; open(false); ask(b.dataset.q); });
+  }
+  const sugSoon = () => { clearTimeout(sugT); sugT = setTimeout(renderSugs, 300); };
+  ctx.onCardRender(i => { cardInfo = i; sugSoon(); }); ctx.onCardClose(() => { cardInfo = null; sugSoon(); });
+  ctx.map.on('moveend', sugSoon); ctx.onChange(sugSoon); sugSoon();
   // phone: drag the grab handle to switch between half and tall sheet
   { let y0 = null; const g = $('aiGrab');
     g.addEventListener('pointerdown', e => { y0 = e.clientY; g.setPointerCapture(e.pointerId); });

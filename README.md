@@ -17,6 +17,8 @@ Finishes Solutions real estate intelligence map for Waller County and the six su
 - Exports: HTML report, Excel, CSV (now including use, developer, design team and timeline columns).
 - **Sources** tab: every data source, what it feeds and how fresh it is (last nightly refresh, next one, which live layers are on and when their tiles were requested). It also checks whether a newer nightly refresh has landed since the page loaded.
 - **Map camera**: tilting the map by hand (right-drag, ctrl-drag, two fingers) turns **3D View** on; the compass button under the zoom buttons returns to a flat, north-up view of the same spot. Zoomed out to the globe, the map straightens itself, and the 3D terrain surface only shows from town zoom in (MapLibre doesn't fully support terrain on the globe).
+- Above the Ask AI button, up to five suggested questions follow what you're looking at: the open filing or building, the town in view, your filters. ⌘K / Ctrl+K jumps to the map search.
+- Select several buildings or parcels with Shift-click (on touch screens, the building card's Select Multiple button).
 - The list panel is resizable on tablet and desktop: drag its right edge (or focus it and use the arrow keys); double-click resets it. The width is saved per browser.
 
 ## How the data works
@@ -43,7 +45,7 @@ The first full run takes a few hours (Nominatim allows one request per second); 
 
 ## AI assistant
 
-The **Ask AI** button (or `/`) opens a chat that works the map through tools: filter, find, highlight, open a filing, fly somewhere, toggle the heatmap or views. Press the mic to talk to it instead (OpenAI Realtime over WebRTC).
+The **Ask AI** button (or ⌘/ on a Mac, Ctrl+/ elsewhere) opens a chat that works the map through tools: filter, find, highlight, open a filing, fly somewhere, toggle the heatmap or views. Press the mic to talk to it instead (OpenAI Realtime over WebRTC).
 - `api/chat.js`: text chat (stateless; the browser runs the tool calls and sends results back). Model `OPENAI_CHAT_MODEL` or `OPENAI_MODEL`; `OPENAI_CHAT_REASONING_EFFORT` overrides the effort for chat only.
 - `api/realtime.js`: short-lived voice session. `OPENAI_REALTIME_MODEL` (default `gpt-realtime-2.1`, then `gpt-realtime`), `OPENAI_VOICE` (default `marin`), `VOICE_ENABLED=false` turns voice off. Sessions end after 10 minutes; 30 per IP per day.
 - Tools are defined once in `lib/agent-tools.mjs`, including distance / drive time, live layers, weather, news and site imagery (see Live layers below).
