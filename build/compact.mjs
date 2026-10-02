@@ -31,6 +31,7 @@ export function toFiling(r, loc, ai, countyGeom, { fullScope = false } = {}) {
     const c = loc.c; f.lat = Math.round(c[1] * 1e5) / 1e5; f.lon = Math.round(c[0] * 1e5) / 1e5;
     if (loc.src === 'city') f.approx = true;
     if (loc.via) f.gp = loc.via;
+    if (loc.via === 'street' || loc.via === 'intersection') f.prec = loc.via; // placed on the named street / at the named junction, not a house number
     if (countyGeom && !geoContains(countyGeom, c) && minVertexDist(countyGeom, c) > 0.12) f.misfiled = true;
   }
   ai = ai || {};
