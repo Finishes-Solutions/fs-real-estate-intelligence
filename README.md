@@ -13,7 +13,7 @@ Finishes Solutions real estate intelligence map for Waller County and the six su
 - **Saved searches** (per browser) with "N new" counts, shareable links (all filters live in the URL), and an **RSS feed** for any search (`/api/feed?...`), which works with any reader or Zapier "RSS → email" for alerts.
 - **3D buildings and building panel**: zoom in to see buildings in 3D (OpenStreetMap footprints and heights from the MapTiler tiles). Click one for its appraisal-district parcel (owner, market/land/improvement value, year built, acquisition date, land area) from the free Texas GIO StratMap parcel service, businesses mapped inside it (OpenStreetMap), construction filings on the parcel, the census tract snapshot, an orbit camera, a Google Street View link, and a Mapillary street photo if `MAPILLARY_TOKEN` is set.
 - **Phone and tablet**: on phones the map is full screen with a bottom tab bar (Map, List, Timeline, Players, More), a floating ask bar and swipeable bottom-sheet cards; on tablets the list is a collapsible side panel and details open in a right-hand drawer. The site installs as an app (Add to Home Screen) and the app shell works offline; data refreshes when back online.
-- **Field notes**: drop a site note at the map center or your GPS location with a title, tag, notes and phone photos; star any filing or building to watch it (watched filings are flagged when the nightly refresh sees a change). "Near me" shows filings within 3 miles of your location. Notes and photos are stored on that device only; export/import GeoJSON (optionally with photos), CSV or KML to back up, share or move to another device.
+- **Field notes**: drop a site note at the map center or your GPS location with a title, tag, notes and phone photos; star any filing or building to watch it (watched filings are flagged when the nightly refresh sees a change). "Near me" shows filings within 3 miles of your location. Sign in with your @finishessolutions.com email (a 6-digit code) and notes and photos are shared with the team and your watchlist follows you to any device; signed out, everything stays on the device and syncs at the next sign-in. Works offline.
 - Exports: HTML report, Excel, CSV (now including use, developer, design team and timeline columns).
 
 ## How the data works
@@ -135,6 +135,18 @@ Setup: run `supabase/migrations/20261004000000_live_data.sql` once in the Supaba
 
 Useful queries: `select f.name, n.title, n.published from filing_news l join news_articles n using (url) join filings f on f.id = l.filing_id order by n.published desc limit 50;` and `select filing_id, max(day) filter (where cloud <= 20) as last_clear_pass from imagery_passes group by 1;`
 
+### Team field notes (Supabase Auth)
+
+Field notes, photos and watchlists sync through `src/team.js`. Anyone signed in with an address on a domain in `public.team_domains` (seeded with `finishessolutions.com`) sees the team's notes and photos; the database policies hide everything from other accounts, even if someone outside signs up. Tables: `field_notes` (shared; author and last editor stamped by the database), `watchlist` (per person), and the private `field-photos` storage bucket (photos go in each person's own folder).
+
+One-time setup:
+1. Supabase → SQL Editor: run `supabase/migrations/20261005000000_field_notes.sql`.
+2. Supabase → Authentication → Emails → SMTP Settings: set up custom SMTP (Microsoft 365 / Outlook SMTP, Resend, SendGrid…). Supabase's built-in mailer only delivers to members of your Supabase organization and only a few emails an hour, so teammates won't get codes without it.
+3. Supabase → Authentication → Emails → Templates → **Magic Link**: put the code in the email, e.g. `<p>Your sign-in code: <b>{{ .Token }}</b></p><p>Or <a href="{{ .ConfirmationURL }}">sign in on this device</a>.</p>` The code is what works inside the installed phone app.
+4. Supabase → Authentication → URL Configuration: Site URL = the production address; add it, plus your Vercel preview pattern (`https://*-<your-vercel-team-slug>.vercel.app/**`), to Redirect URLs.
+5. Vercel → Environment Variables: `SUPABASE_PUBLISHABLE_KEY` (Supabase → Project Settings → API Keys → publishable key; it is meant for browsers) and, if the project isn't `ytsxkipkobvcgysylfzc`, `SUPABASE_URL`. Redeploy: the build writes them to `config.json`.
+6. To add another email domain later: `insert into team_domains values ('example.com');`
+
 ## Run locally
 
 ```
@@ -151,6 +163,6 @@ node build.mjs           # real refresh (needs network access to TDLR, Census, O
 - The AI endpoints' per-IP rate limit is per function instance (best effort). The OpenAI budget cap is the real limit; a Vercel Firewall rate-limit rule on `/api/*` adds a second one.
 - The change feed keeps 13 months of history and starts with the second run; "this week" means changes found by any refresh in the last 7 days.
 - Building heights are only as good as OpenStreetMap; unmapped heights get a default. StratMap parcel fields depend on what each appraisal district supplies (year built and acquisition date are often blank), and Texas does not disclose sale prices.
-- Field notes and the watchlist live in the browser's storage on one device (not in Supabase yet: that needs team logins). Clearing site data deletes them unless exported; there is no shared team database yet.
+- Team field notes are last-edit-wins: if two people edit the same note while offline, the later edit (by device clock) keeps. Anyone on the team can edit a note; only its author can delete it. Removing a photo from someone else's note keeps their file in storage.
 - Business listings come from OpenStreetMap and are incomplete, especially in suburban strip centers.
 - Building permits are not included: the City of Houston stopped publishing permit data in December 2025 and the other counties have no open feed.

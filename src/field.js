@@ -1,6 +1,6 @@
 // Field data gathering: site notes (pin + text + tag + phone photos) and a watchlist of filings and buildings.
-// Stored on this device (localStorage for records, IndexedDB for photos). Export/import as GeoJSON (with photos),
-// CSV or KML to move between devices or into other tools.
+// Stored on this device (localStorage for records, IndexedDB for photos) and, once signed in, synced with the team through
+// Supabase by src/team.js (notes and photos shared, watchlist per person). Export/import as GeoJSON (with photos), CSV or KML.
 const KEY = 'fs-field-v1';
 const TAGS = ['Opportunity', 'Competitor project', 'Under construction', 'Vacant land', 'For sale / lease', 'Follow up', 'Other'];
 
@@ -8,7 +8,7 @@ export function initField(ctx) {
   const { map, esc, fmtM, fmtN, F, BY_ID, CHANGED } = ctx, card = ctx.card, root = document.getElementById('view-field');
   let db = load(), photoDB = null, curNote = null;
   function load() { try { const d = JSON.parse(localStorage.getItem(KEY) || '{}'); return { notes: d.notes || [], watch: d.watch || [] }; } catch (e) { return { notes: [], watch: [] }; } }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { ctx.toast('This browser won’t let the page save field data.'); } syncMap(); syncBadges(); if (ctx.view === 'field') render(); }
+  function save(fromSync) { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { ctx.toast('This browser won’t let the page save field data.'); } syncMap(); syncBadges(); if (ctx.view === 'field') render(); if (!fromSync) ctx.team?.changed(); }
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
   // ---- photos in IndexedDB ----
@@ -18,7 +18,12 @@ export function initField(ctx) {
   }
   const tx = async (mode, fn) => { const d = await idb(); return new Promise((res, rej) => { const t = d.transaction('photos', mode), st = t.objectStore('photos'), out = fn(st); t.oncomplete = () => res(out?.result ?? out); t.onerror = () => rej(t.error); }); };
   const putPhoto = (id, blob) => tx('readwrite', st => st.put(blob, id));
-  const getPhoto = id => tx('readonly', st => st.get(id));
+  const localPhoto = id => tx('readonly', st => st.get(id));
+  async function getPhoto(id) {
+    const b = await localPhoto(id).catch(() => null); // a miss comes back as the IDBRequest, not undefined
+    if (b instanceof Blob) return b; if (!String(id).includes('/') || !ctx.team) return null;
+    const r = await ctx.team.download(id); if (r) await putPhoto(id, r).catch(() => {}); return r;
+  }
   const delPhoto = id => tx('readwrite', st => st.delete(id));
   async function shrink(file) { // phone photos are 3-12 MB; store ~1600px JPEGs
     const bmp = await createImageBitmap(file).catch(() => null); if (!bmp) return file;
@@ -65,7 +70,7 @@ export function initField(ctx) {
     const paint = () => { const on = !!find(); b.setAttribute('aria-pressed', on); b.title = on ? 'On your watchlist' : 'Add to watchlist'; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>'; };
     b.onclick = () => {
       const w = find();
-      if (w) db.watch = db.watch.filter(x => x !== w);
+      if (w) { db.watch = db.watch.filter(x => x !== w); ctx.team?.removed({ kind: 'watch', wkind: w.kind, ref: w.ref }); }
       else if (info.kind === 'filing') db.watch.unshift({ id: uid(), kind: 'filing', ref: key, label: info.f.name, sub: (info.f.city || info.f.county) + ' · ' + fmtM(info.f.cost), lng: info.f.lon, lat: info.f.lat, added: new Date().toISOString() });
       else db.watch.unshift({ id: uid(), kind: 'building', ref: key, label: info.label(), sub: info.sub(), lng: info.center[0], lat: info.center[1], added: new Date().toISOString() });
       save(); paint(); ctx.toast(find() ? 'Added to your watchlist (Field notes).' : 'Removed from your watchlist.');
@@ -93,7 +98,7 @@ export function initField(ctx) {
       '<label class="btn nadd">Add photos<input type="file" accept="image/*" capture="environment" multiple hidden id="nFile"></label>' +
       '<div class="btnrow"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="nGps">Move to my location</button>' +
       '<a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=' + n.lat + ',' + n.lng + '">Directions ↗</a>' +
-      (navigator.share ? '<button class="btn" type="button" id="nShare">Share</button>' : '') + '<button class="btn" type="button" id="nDel">Delete</button></div></form>' +
+      (navigator.share ? '<button class="btn" type="button" id="nShare">Share</button>' : '') + (ctx.team?.canDelete(n) === false ? '' : '<button class="btn" type="button" id="nDel">Delete</button>') + '</div></form>' + (n.by ? '<div class="rnote">Added by ' + esc(n.by) + (n.editedBy && n.editedBy !== n.by ? ' · last edited by ' + esc(n.editedBy) : '') + '</div>' : '') +
       (near.length ? '<div class="bsec"><div class="lt">Filings within ~300 m</div>' + near.map(f => '<button class="chitem" data-id="' + esc(f.id) + '"><span><b>' + esc(f.name) + '</b><em>' + esc(f.reg) + '</em></span><span class="m">' + fmtM(f.cost) + '</span></button>').join('') + '</div>' : '') +
       '<div class="rnote bsrc">Saved on this device only. Use Field notes → Export to back up or move to another device.</div>';
     card.classList.add('open');
@@ -101,7 +106,7 @@ export function initField(ctx) {
     card.querySelectorAll('.chitem').forEach(x => x.onclick = () => ctx.select(BY_ID.get(x.dataset.id), false));
     const form = card.querySelector('#nForm');
     form.onsubmit = e => { e.preventDefault(); const fd = new FormData(form); Object.assign(n, { title: String(fd.get('title')).trim(), tag: fd.get('tag'), text: String(fd.get('text')), updated: new Date().toISOString() }); save(); card.querySelector('h2').textContent = n.title || 'Untitled site'; ctx.toast('Note saved on this device.'); };
-    card.querySelector('#nDel').onclick = async () => { if (!confirm('Delete this site note and its photos?')) return; for (const p of n.photos) await delPhoto(p).catch(() => {}); db.notes = db.notes.filter(x => x !== n); save(); ctx.closeCard(); };
+    card.querySelector('#nDel') && (card.querySelector('#nDel').onclick = async () => { if (!confirm('Delete this site note and its photos?')) return; for (const p of n.photos) { await delPhoto(p).catch(() => {}); ctx.team?.removed({ kind: 'photo', path: p }); } ctx.team?.removed({ kind: 'note', id: n.id }); db.notes = db.notes.filter(x => x !== n); save(); ctx.closeCard(); });
     card.querySelector('#nGps').onclick = async () => { try { const c = await ctx.locate(); n.lng = +c[0].toFixed(6); n.lat = +c[1].toFixed(6); save(); map.easeTo({ center: c }); openNote(n); } catch (e) { ctx.toast(e.message); } };
     card.querySelector('#nShare')?.addEventListener('click', () => navigator.share({ title: n.title || 'Site note', text: [n.title, n.tag, n.text].filter(Boolean).join('\n'), url: 'https://www.google.com/maps/search/?api=1&query=' + n.lat + ',' + n.lng }).catch(() => {}));
     card.querySelector('#nFile').onchange = async e => {
@@ -117,7 +122,7 @@ export function initField(ctx) {
       const blob = await getPhoto(id).catch(() => null); if (!blob || curNote !== n) continue;
       const url = URL.createObjectURL(blob), d = document.createElement('div'); d.className = 'nph';
       d.innerHTML = '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" alt="Site photo"></a><button type="button" aria-label="Remove photo">×</button>';
-      d.querySelector('button').onclick = async () => { await delPhoto(id).catch(() => {}); n.photos = n.photos.filter(x => x !== id); save(); renderPhotos(n); };
+      d.querySelector('button').onclick = async () => { await delPhoto(id).catch(() => {}); ctx.team?.removed({ kind: 'photo', path: id }); n.photos = n.photos.filter(x => x !== id); n.updated = new Date().toISOString(); save(); renderPhotos(n); };
       el.appendChild(d);
     }
   }
@@ -129,7 +134,7 @@ export function initField(ctx) {
     const ctr = map.getCenter().toArray();
     const notes = db.notes.slice().sort((a, b) => b.updated.localeCompare(a.updated));
     const watch = db.watch.map(w => ({ ...w, f: w.kind === 'filing' ? BY_ID.get(w.ref) : null }));
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Field notes</div><h2>Your sites &amp; watchlist</h2><div class="vsub">' + fmtN(notes.length) + ' site notes · ' + fmtN(watch.length) + ' watched · stored on this device</div></div>' +
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">Field notes</div><h2>Your sites &amp; watchlist</h2><div class="vsub">' + fmtN(notes.length) + ' site notes · ' + fmtN(watch.length) + ' watched · ' + (ctx.team?.summary() || 'stored on this device') + '</div><div id="fTeam"></div></div>' +
       '<div class="vctl"><button class="btn primary" id="fAdd">+ Site note here</button><button class="btn" id="fGeo">Export GeoJSON</button><button class="btn" id="fCsv">CSV</button><button class="btn" id="fKml">KML</button>' +
       '<label class="btn">Import<input type="file" accept=".geojson,.json,application/geo+json,application/json" hidden id="fImp"></label>' +
       '<label class="tg2"><input type="checkbox" id="fPh" checked><span>Include photos in GeoJSON</span></label></div></div>' +
@@ -140,12 +145,15 @@ export function initField(ctx) {
     root.querySelector('#fAdd').onclick = () => { ctx.setView('map'); ctx.addNote({ gps: true }); };
     root.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { const n = db.notes.find(x => x.id === b.dataset.n); ctx.setView('map'); map.easeTo({ center: [n.lng, n.lat], zoom: Math.max(map.getZoom(), 15) }); openNote(n); });
     root.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { const w = db.watch.find(x => x.id === b.dataset.w); ctx.setView('map'); if (w.kind === 'filing' && BY_ID.get(w.ref)) ctx.select(BY_ID.get(w.ref), true); else { map.easeTo({ center: [w.lng, w.lat], zoom: Math.max(map.getZoom(), 16.5) }); ctx.openBuildingAt([w.lng, w.lat]); } });
-    root.querySelectorAll('[data-unw]').forEach(b => b.onclick = () => { db.watch = db.watch.filter(x => x.id !== b.dataset.unw); save(); });
+    root.querySelectorAll('[data-unw]').forEach(b => b.onclick = () => { const w = db.watch.find(x => x.id === b.dataset.unw); db.watch = db.watch.filter(x => x !== w); if (w) ctx.team?.removed({ kind: 'watch', wkind: w.kind, ref: w.ref }); save(); });
     root.querySelector('#fGeo').onclick = () => exportGeo(root.querySelector('#fPh').checked);
     root.querySelector('#fCsv').onclick = exportCsv; root.querySelector('#fKml').onclick = exportKml;
     root.querySelector('#fImp').onchange = e => importGeo(e.target.files[0]);
+    ctx.team?.mount(root.querySelector('#fTeam'));
   }
   ctx.onView('field', render);
+  // team sync (src/team.js) reads and replaces the store through this
+  ctx.field = { get db() { return db; }, replace(next) { db = next; save(true); }, getPhoto, localPhoto: id => localPhoto(id).then(b => b instanceof Blob ? b : null), putPhoto, delPhoto, TAGS, render: () => { if (ctx.view === 'field') render(); } };
 
   // ---- export / import ----
   const stamp = () => new Date().toISOString().slice(0, 10);
