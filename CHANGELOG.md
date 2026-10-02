@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 5:29 PM CT: Legends no longer hidden behind Ask AI (3f2cfca)
+- The census tract (demographics) legend now sits at the bottom left, next to the Filings legend, instead of behind the Ask AI button and its suggested questions. If there isn't room side by side it stacks above.
+- Both legends move up above the time slider while it's open.
+- On short windows the suggested questions above Ask AI show fewer items rather than running into the map buttons.
+
 ### 5:20 PM CT: Map buttons stay put when a card is open (71a7598)
 - On desktop, with a filing or building card open, the zoom, compass, locate, home, time-lapse, layers and globe buttons now stay in their column at the right edge. The card opens just below them and scrolls if it's long, instead of the buttons jumping left and floating in the middle of the map.
 - On short windows, where a card wouldn't fit under the buttons, they still move left of the card so it never covers them.
