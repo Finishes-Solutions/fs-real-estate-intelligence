@@ -1,5 +1,5 @@
 // Week-over-week change feed: compares the previous filings.json with the new one.
-const KEEP_RUNS = 120; // nightly runs with changes; empty nights are not stored
+const KEEP_DAYS = 400; // keep 13 months of nightly change runs; empty nights are not stored
 const FIELDS = [['status', 'Status'], ['cost', 'Est. value'], ['start', 'Est. start'], ['end', 'Est. end'], ['sqft', 'Sq ft']];
 
 export function diff(prev, next) {
@@ -22,6 +22,7 @@ export function diff(prev, next) {
 
 export function appendRun(feed, run) {
   const old = (feed && feed.runs) || [];
-  const runs = (run.items.length || !old.length ? [run, ...old] : old).slice(0, KEEP_RUNS);
+  const cutoff = new Date(run.built).getTime() - KEEP_DAYS * 864e5;
+  const runs = (run.items.length || !old.length ? [run, ...old] : old).filter(r => new Date(r.built).getTime() >= cutoff);
   return { runs };
 }

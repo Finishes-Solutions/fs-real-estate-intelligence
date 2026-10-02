@@ -74,7 +74,7 @@ node build.mjs           # real refresh (needs network access to TDLR, Census, O
 - Costs and dates are filer estimates; about four in ten filings lack a start or end date and get an estimated span (shown hatched).
 - Use, tenant, developer, architect and GC are extracted by AI from the filing text and can be wrong or missing. Single-asset LLCs often hide the real sponsor.
 - The AI endpoints' per-IP rate limit is per function instance (best effort). The OpenAI budget cap is the real limit; a Vercel Firewall rate-limit rule on `/api/*` adds a second one.
-- The change feed starts with the second run; "this week" means changes found by any refresh in the last 7 days.
+- The change feed keeps 13 months of history and starts with the second run; "this week" means changes found by any refresh in the last 7 days.
 - Building heights are only as good as OpenStreetMap; unmapped heights get a default. StratMap parcel fields depend on what each appraisal district supplies (year built and acquisition date are often blank), and Texas does not disclose sale prices.
 - Field notes live in the browser's storage on one device. Clearing site data deletes them unless exported; there is no shared team database yet.
 - Business listings come from OpenStreetMap and are incomplete, especially in suburban strip centers.

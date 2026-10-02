@@ -14,9 +14,6 @@ on:
       period_end:
         description: "YYYY-MM-DD (blank = yesterday)"
         required: false
-  push:
-    branches: ["claude/**"]
-    paths: ["build.mjs", "build/**", "lib/**", "data/regions.json", ".github/workflows/data.yml"]
 
 permissions:
   contents: write
