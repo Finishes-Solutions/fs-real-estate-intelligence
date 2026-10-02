@@ -7,7 +7,7 @@
   "functions": {
     "api/brief.js": {
       "maxDuration": 60,
-      "includeFiles": "data/{filings,changes,market}.json"
+      "includeFiles": "data/{filings,changes,market,area}.json"
     },
     "api/feed.js": {
       "maxDuration": 10,

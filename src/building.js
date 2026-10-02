@@ -166,7 +166,7 @@ export function initBuildings(ctx) {
       '<div class="bacts"><button class="btn" id="bMulti" title="Then click more buildings or parcels (or Shift-click)">Select Multiple</button><button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button></div>' +
       '<div id="bPhoto"></div><div id="bSize">' + sizeRows(b) + '<div class="rnote">Measuring height from lidar…</div></div>' +
       '<div class="bsec" id="bParcel"><div class="lt">Parcel</div><div class="rnote">Looking up the appraisal record…</div></div>' +
-      '<div class="bsec" id="bFilings"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses here</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bArea"></div>' +
+      '<div class="bsec" id="bFilings"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses here</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div><div class="bsec" id="bArea"></div>' +
       '<div class="rnote bsrc">Footprint: OpenStreetMap. Height: USGS 3DEP lidar (Microsoft Planetary Computer) where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record when mapped, otherwise estimated from height. Parcel: Texas GIO StratMap. Values are appraisal values, not sale prices.</div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
@@ -182,7 +182,7 @@ export function initBuildings(ctx) {
     if (cur !== b || multi.length) return;
     highlight();
     card.querySelector('#bSize').innerHTML = sizeRows(b);
-    renderParcel(d.parcel, d.parcelError); renderFilings(d.parcel?.geometry || null); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo);
+    renderParcel(d.parcel, d.parcelError); renderFilings(d.parcel?.geometry || null); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo); renderTenants(d.parcel);
   }
   ctx.buildingStats = () => { const list = multi.length ? multi : cur ? [cur] : []; return list.map(b => ({ address: b.parcel?.situs || null, ...stats(b), owner: b.parcel?.owner || null })); };
 
@@ -256,6 +256,14 @@ export function initBuildings(ctx) {
     el.innerHTML = '<div class="lt">Businesses here (OpenStreetMap)</div>' + (inside.length ? inside.map(li).join('') : '<div class="rnote">None mapped inside this building.</div>') +
       (other.length ? '<details class="raw"><summary>Nearby (' + other.length + ')</summary>' + other.map(li).join('') + '</details>' : '');
   }
+  // retail and service tenants registered at the parcel's street address (Texas Comptroller, via api/tenants)
+  async function renderTenants(p) {
+    const b = cur, el = card.querySelector('#bTenants'); if (!el || !ctx.tenantsAt) return;
+    if (!p?.situsStreet || !/^\d/.test(p.situsStreet) || !(p.situsZip || p.situsCity)) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div class="lt">Registered businesses (Texas Comptroller)</div><div class="rnote">Looking up…</div>';
+    try { const d = await ctx.tenantsAt(p.situsStreet, p.situsZip, p.situsCity); if (cur === b) ctx.renderTenants(el, d); }
+    catch (e) { if (cur === b) ctx.renderTenants(el, null, e.message); }
+  }
   function renderPhoto(ph) {
     const el = card.querySelector('#bPhoto'); if (!el || !ph) return;
     el.innerHTML = '<a class="bphoto" href="' + esc(ph.link) + '" target="_blank" rel="noopener"><img alt="Street-level photo near this building" loading="lazy" src="' + esc(ph.thumb) + '"><span>Mapillary · ' + esc(ph.captured || '') + '</span></a>';
@@ -266,6 +274,7 @@ export function initBuildings(ctx) {
     const t = market.tracts.find(t => inGeom(b.center, t.geom)); if (!t) return;
     const g = t.gr == null ? '—' : (t.gr > 0 ? '+' : '') + t.gr + '%';
     el.innerHTML = '<div class="lt">Census tract (ACS ' + market.year + ')</div><div class="kgrid"><div><b>' + (t.pop != null ? fmtN(t.pop) : '—') + '</b><span>Population</span></div><div><b>' + g + '</b><span>Growth since ' + (market.baseYear || '') + '</span></div>' +
-      '<div><b>' + (t.inc ? fmtM(t.inc) : '—') + '</b><span>Median income</span></div><div><b>' + (t.val ? fmtM(t.val) : '—') + '</b><span>Median home value</span></div></div>';
+      '<div><b>' + (t.inc ? fmtM(t.inc) : '—') + '</b><span>Median income</span></div><div><b>' + (t.val ? fmtM(t.val) : '—') + '</b><span>Median home value</span></div>' +
+      (market.jobsYear && t.jobs != null ? '<div><b>' + fmtN(t.jobs) + '</b><span>Jobs here (' + market.jobsYear + ')</span></div><div><b>' + (t.jgr == null ? '—' : (t.jgr > 0 ? '+' : '') + t.jgr + '%') + '</b><span>Job growth since ' + (market.jobsBaseYear || '') + '</span></div>' : '') + '</div>';
   }
 }

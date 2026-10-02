@@ -35,6 +35,7 @@ export function normalizeParcel(attrs, geometry) {
   return {
     propId: pick(a, 'PROP_ID', 'GEO_ID'), owner: pick(a, 'OWNER_NAME'), mailing: mail || null,
     situs: situs ? [situs, pick(a, 'SITUS_CITY')].filter(Boolean).join(', ') : null, county: pick(a, 'COUNTY'),
+    situsStreet: situs || null, situsCity: pick(a, 'SITUS_CITY'), situsZip: (String(pick(a, 'SITUS_ZIP') || '').match(/\d{5}/) || [null])[0],
     landUse: pick(a, 'LOC_LAND_USE', 'LAND_USE', 'STATE_CD'), marketValue: num(pick(a, 'MKT_VALUE')), landValue: num(pick(a, 'LAND_VALUE')),
     improvementValue: num(pick(a, 'IMP_VALUE')), yearBuilt: pick(a, 'YEAR_BUILT'), acquired: fmtDate(pick(a, 'DATE_ACQ', 'DEED_DATE')), taxYear: pick(a, 'TAX_YEAR'),
     area: area ? Math.round(area * 100) / 100 + (unit ? ' ' + String(unit).toLowerCase() : '') : null, raw,

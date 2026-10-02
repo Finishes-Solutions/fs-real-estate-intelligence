@@ -49,5 +49,22 @@ await fs.writeFile(OUT + 'regions.json', JSON.stringify(regions));
 await fs.writeFile(OUT + 'geo.json', JSON.stringify(geo));
 await fs.writeFile(OUT + 'filings.json', JSON.stringify({ period: { start: iso(start), end: iso(new Date(now - day)) }, built: new Date().toISOString(), unmapped: 12, filings }));
 await fs.writeFile(OUT + 'changes.json', JSON.stringify(changes));
-await fs.writeFile(OUT + 'market.json', JSON.stringify({ year: 2024, baseYear: 2019, tracts }));
+tracts.forEach(t => { t.jobs = Math.round(rnd() * 9000); t.jgr = Math.round((rnd() * 60 - 10) * 10) / 10; t.jpr = Math.round(t.jobs / t.pop * 100) / 100; t.jtop = [6, 15, 17]; });
+await fs.writeFile(OUT + 'market.json', JSON.stringify({ year: 2024, baseYear: 2019, jobsYear: 2023, jobsBaseYear: 2018, tracts }));
+// area context (build/area.mjs): jobs, permits, new businesses, news
+const counties = regions.counties.map(c => ({ name: c.name, fips: c.fips })), yNow = new Date().getUTCFullYear();
+const sec = () => Array.from({ length: 20 }, () => Math.round(rnd() * 20000));
+const permits = { years: {}, ytd: { year: yNow, month: 8, cur: {}, prior: {} } };
+for (let y = yNow - 7; y < yNow; y++) permits.years[y] = Object.fromEntries(counties.map((c, i) => { const sf = Math.round((i ? 1500 : 900) * (1 + rnd())), mf = Math.round(rnd() * 3000); return [c.fips, { date: String(y), sf, mf, mf5: mf, value: (sf + mf) * 250000 }]; }));
+for (const c of counties) { permits.ytd.cur[c.fips] = { sf: Math.round(800 + rnd() * 500), mf: Math.round(rnd() * 900) }; permits.ytd.prior[c.fips] = { sf: Math.round(800 + rnd() * 500), mf: Math.round(rnd() * 900) }; }
+const months = {}, latest = {}, BIZ = ['Taqueria El Sol', 'Katy Nail Spa', 'Brookshire Feed & Supply', 'Prairie View Coffee', 'Hempstead Auto Parts', 'Lone Star Vape', 'Cypress Dental Supply'];
+for (const c of counties) {
+  months[c.fips] = {}; for (let k = 23; k >= 0; k--) { const d = new Date(Date.UTC(yNow, new Date().getUTCMonth() - k, 1)); months[c.fips][d.toISOString().slice(0, 7)] = Math.round((c.name === 'Harris' ? 2500 : 60) * (0.6 + rnd() * 0.6) * (k === 0 ? 0.3 : 1)); }
+  latest[c.fips] = Array.from({ length: 12 }, (_, k) => ({ name: pick(BIZ), owner: rnd() < .5 ? 'Holdings ' + k + ' LLC' : undefined, addr: (100 + k * 7) + ' Main St', city: pick(places)[0], zip: '77484', sec: pick([6, 17, 18, 15]), date: iso(new Date(now - k * 2 * day)) }));
+}
+const countyJobs = Object.fromEntries(counties.map((c, i) => [c.fips, { jobs: i === 1 ? 2400000 : Math.round(20000 + rnd() * 60000), gr: Math.round((rnd() * 30 - 2) * 10) / 10, sec: sec() }]));
+const newsPlaces = counties.map(c => ({ key: 'county:' + c.name, county: c.name, label: c.name + ' County' })).concat([['Katy', 'Harris'], ['Brookshire', 'Waller']].map(([t, c]) => ({ key: 'town:' + t, county: c, label: t })));
+const HEAD = ['approves new retail center near I-10', 'commissioners weigh rezoning for 400-home subdivision', 'breaks ground on logistics park', 'plans new H-E-B at growing intersection', 'school district buys land for new campus'];
+const news = Object.fromEntries(newsPlaces.map(p => [p.key, HEAD.slice(0, 3 + Math.floor(rnd() * 3)).map((h, k) => ({ title: p.label + ' ' + h, url: 'https://example.com/' + encodeURIComponent(p.key) + '/' + k, domain: pick(['Community Impact', 'Houston Chronicle', 'Bisnow', 'Waller Times']), date: iso(new Date(now - (k * 9 + 1) * day)) }))]));
+await fs.writeFile(OUT + 'area.json', JSON.stringify({ built: new Date().toISOString(), counties, jobs: { year: 2023, baseYear: 2018 }, permits, businesses: { since: iso(new Date(now - 730 * day)), months, latest }, newsPlaces, news, countyJobs }));
 console.log('fixture:', filings.length, 'filings,', items.length, 'changes,', tracts.length, 'tracts');

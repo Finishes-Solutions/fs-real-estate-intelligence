@@ -35,7 +35,7 @@ export function initSources(ctx) {
   }
 
   function rows() {
-    const live = ctx.live?.status?.() || { on: {}, raster: {} }, m = ctx.marketInfo?.(), base = ctx.basemap?.() || 'dots';
+    const live = ctx.live?.status?.() || { on: {}, raster: {} }, m = ctx.marketInfo?.(), a = ctx.areaInfo?.(), base = ctx.basemap?.() || 'dots';
     const runs = DATA.changes?.runs || [], approx = F.filter(f => f.approx).length, unmapped = DATA.unmapped || 0;
     const ras = (k, src, url, what) => {
       const r = live.raster?.[k] || {}, isOn = !!live.on[k];
@@ -55,6 +55,14 @@ export function initSources(ctx) {
           detail: 'Runs on new or changed filings in the nightly build; results cached. AI-extracted, so it can be wrong.' },
         { name: link('US Census ACS 5-year', 'https://www.census.gov/programs-surveys/acs'), what: 'Demographics layer: tract population, growth, income, home value, rent, vacancy', status: st('fresh', 'Annual'),
           detail: (m ? 'ACS 5-year estimates ending ' + m.year + ', growth compared with ' + m.baseYear + ' · ' + fmtN(m.tracts) + ' tracts. ' : 'Loads when you turn on a demographics layer. ') + 'The Census Bureau publishes a new release each December; picked up by the nightly build.' },
+        { name: link('US Census LEHD LODES', 'https://lehd.ces.census.gov/data/'), what: 'Jobs by tract and industry: Jobs layers, Market view, building cards', status: a?.jobs ? st('fresh', 'Annual') : st('off', 'Not built yet'),
+          detail: (a?.jobs ? 'Jobs in ' + a.jobs.year + (a.jobs.baseYear ? ', growth compared with ' + a.jobs.baseYear : '') + '. ' : '') + 'Counted where people work. The Census Bureau publishes about two years after the fact; picked up by the nightly build.' },
+        { name: link('US Census Building Permits Survey', 'https://www.census.gov/construction/bps/'), what: 'Market view: new housing units permitted per county, by year and year to date', status: a?.permits ? nightlyStatus() : st('off', 'Not built yet'),
+          detail: 'Monthly county files, about six weeks after the month ends. Single-family and multifamily units authorized.' },
+        { name: link('Texas Comptroller sales-tax permits', 'https://data.texas.gov/Government-and-Taxes/Active-Sales-Tax-Permit-Holders/jrea-zgmq'), what: 'Market view: new business locations per month and the newest ones', status: a?.businesses ? nightlyStatus() : st('off', 'Not built yet'),
+          detail: 'Active permits only (closed locations drop out), updated by the Comptroller about weekly.' },
+        { name: link('Google News', 'https://news.google.com/'), what: 'Market view: local development news per county and town', status: a?.news ? nightlyStatus() : st('off', 'Not built yet'),
+          detail: 'Searched nightly for development, construction, rezoning and real estate stories; kept 120 days.' },
         { name: link('US Census TIGER (us-atlas)', 'https://github.com/topojson/us-atlas'), what: 'County outlines and town names', status: st('off', 'Static'), detail: 'Boundaries change rarely; updated with the app.' },
       ]],
       ['Map layers (fetched live)', [
@@ -82,7 +90,8 @@ export function initSources(ctx) {
         { name: link('OpenStreetMap (Overpass)', 'https://overpass-api.de/'), what: 'Businesses in a building, nearest airports, restaurants, schools…', status: st('live', 'On demand'), detail: 'Cached up to an hour (nearby places) or a day (building card).' },
         { name: link('TomTom', 'https://developer.tomtom.com/') + ' / ' + link('OSRM', 'https://project-osrm.org/'), what: 'Drive times', status: live.trafficOK ? st('live', 'Live traffic') : live.trafficOK === false ? st('stale', 'No traffic data') : st('live', 'On demand'),
           detail: live.trafficOK === false ? 'No TomTom key on the server, so drive times are free-flow estimates from OpenStreetMap roads.' : 'With traffic from TomTom; OpenStreetMap routing as a fallback.' },
-        { name: link('GDELT Project', 'https://www.gdeltproject.org/'), what: 'Project news', status: st('live', 'On demand'), detail: 'Searches roughly the last three months of online news; cached up to an hour.' },
+        { name: link('Google News', 'https://news.google.com/') + ' · ' + link('GDELT Project', 'https://www.gdeltproject.org/'), what: 'Project news on a card', status: st('live', 'On demand'), detail: 'Google News (about the last year), GDELT as a fallback; cached up to an hour.' },
+        { name: link('Texas Comptroller sales-tax permits', 'https://data.texas.gov/Government-and-Taxes/Active-Sales-Tax-Permit-Holders/jrea-zgmq'), what: 'Registered businesses at a building or filing address', status: st('live', 'On demand'), detail: 'Matched on house number and street; cached up to a day. Retail, restaurant and service tenants; offices and medical often aren’t listed.' },
         { name: link('Mapillary', 'https://www.mapillary.com/') + ' · Google Street View', what: 'Street photos on the building card', status: st('live', 'On demand'), detail: 'Photo dates vary; Mapillary needs a key on the server.' },
         { name: link('OpenAI', 'https://openai.com/'), what: 'Assistant (chat and voice) and project briefs', status: st('live', 'On demand'), detail: 'Answers cite TABS numbers from the loaded filings. Briefs are cached for a week.' },
       ]],

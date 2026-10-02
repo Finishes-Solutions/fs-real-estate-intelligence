@@ -1,5 +1,5 @@
 // Data pipeline for the Finishes Solutions real estate intelligence map.
-//   node build.mjs             full refresh (GitHub Actions): TABS -> geocode -> AI enrichment -> change feed -> market data, then assemble
+//   node build.mjs             full refresh (GitHub Actions): TABS -> geocode -> AI enrichment -> change feed -> market data -> area context, then assemble
 //   node build.mjs --assemble  copy src/ + committed data/ into public/ (Vercel build; no network)
 // Everything slow is cached under data/cache/ and committed, so weekly runs only fetch what changed.
 import fs from 'node:fs/promises';
@@ -11,6 +11,7 @@ import { toFiling, countyCheck } from './build/compact.mjs';
 import { enrich, aiFields, aiKey } from './build/enrich.mjs';
 import { diff, appendRun } from './build/changes.mjs';
 import { buildMarket } from './build/market.mjs';
+import { buildArea, mergeJobs } from './build/area.mjs';
 
 const KEY = process.env.MAPTILER_KEY || 'vA28jXazwpYesC2b1Ccp';
 const D = process.env.DATA_DIR || 'data/', C = D + 'cache/';
@@ -30,8 +31,8 @@ async function assemble() {
   await fs.mkdir('public/data', { recursive: true }); await fs.mkdir('public/lib', { recursive: true });
   for (const f of await fs.readdir('src')) await fs.copyFile('src/' + f, 'public/' + f);
   await fs.writeFile('public/sw.js', (await fs.readFile('src/sw.js', 'utf8')).replace('__BUILD__', Date.now().toString(36)));
-  for (const f of ['geo.json', 'filings.json', 'changes.json', 'market.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
-  for (const f of ['taxonomy.mjs', 'filter.mjs', 'changes.mjs', 'agent-tools.mjs', 'assist-logic.mjs', 'nasa.mjs', 'height.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
+  for (const f of ['geo.json', 'filings.json', 'changes.json', 'market.json', 'area.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
+  for (const f of ['taxonomy.mjs', 'filter.mjs', 'changes.mjs', 'agent-tools.mjs', 'assist-logic.mjs', 'nasa.mjs', 'height.mjs', 'sectors.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
   // public Supabase settings for the browser (read-only publishable key; row level security limits it to public tables)
   const E = process.env, sbUrl = E.SUPABASE_URL || E.NEXT_PUBLIC_SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co';
   const sbKey = E.SUPABASE_PUBLISHABLE_KEY || E.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || E.SUPABASE_ANON_KEY || E.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -92,8 +93,20 @@ async function refresh() {
   log('changes', items.length);
 
   // 7. market context (best effort)
-  try { const m = await buildMarket(regions, await readJSON(D + 'market.json')); await fs.writeFile(D + 'market.json', JSON.stringify(m)); }
-  catch (e) { log('market skipped:', e.message); }
+  let market = null;
+  try { market = await buildMarket(regions, await readJSON(D + 'market.json')); }
+  catch (e) { log('market skipped:', e.message); market = await readJSON(D + 'market.json'); }
+
+  // 8. area context: jobs (LODES), housing permits, new businesses, area news (best effort, see build/area.mjs)
+  if (!ONLY.length || process.env.AREA) {
+    try {
+      const prev = await readJSON(D + 'area.json', {}), prevJobs = await readJSON(C + 'jobs.json');
+      const area = await buildArea(regions, filings, { ...prev, jobs: prevJobs });
+      if (area.jobs) { await fs.writeFile(C + 'jobs.json', JSON.stringify(area.jobs)); market = mergeJobs(market, area.jobs); area.jobs = { year: area.jobs.year, baseYear: area.jobs.baseYear }; }
+      await fs.writeFile(D + 'area.json', JSON.stringify(area));
+    } catch (e) { log('area skipped:', e.message); }
+  }
+  if (market) await fs.writeFile(D + 'market.json', JSON.stringify(market));
 
   // write data + caches (caches pruned to filings still in the window)
   const live = new Set(rows.map(r => r.ProjectNumber)), liveAi = new Set(rows.map(aiKey));

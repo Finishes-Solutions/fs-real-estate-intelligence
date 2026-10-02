@@ -291,7 +291,7 @@ export function initAssistant(ctx) {
       if (name === 'weather_at') { if (!ctx.live) return { error: 'Not available.' }; const d = await ctx.live.weather(a); if (!d.error) actionChip('Weather at ' + d.place + ': ' + Math.round(d.temp_f) + '°F, ' + d.conditions + ', wind ' + Math.round(d.wind_mph) + ' mph'); return d; }
       if (name === 'project_news') { if (!ctx.live) return { error: 'Not available.' }; const d = await ctx.live.news(a); if (!d.error) actionChip('News: ' + d.articles.length + ' article' + (d.articles.length === 1 ? '' : 's') + ' for ' + d.searched); return d; }
       if (name === 'site_imagery') { if (!ctx.live) return { error: 'Not available.' }; if (ctx.view !== 'map') ctx.setView('map'); const d = await ctx.live.imagery(a); if (d.showing) actionChip('NASA imagery on the map: ' + d.showing.name + ' ' + d.showing.day); else if (d.passes?.length) actionChip('Found ' + d.passes.length + ' NASA passes · previews in the card'); return d; }
-      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates' }[a.view] || a.view)); return { view: a.view }; }
+      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates', market: 'Market' }[a.view] || a.view)); return { view: a.view }; }
       if (name === 'reset_map') { const before = ctx.snapshot(); ctx.resetAll(); actionChip('Reset the map', () => ctx.restore(before)); return { reset: true, filings: ctx.visible.length }; }
       return { error: 'Unknown tool ' + name };
     } catch (e) { console.error(e); return { error: e.message }; }

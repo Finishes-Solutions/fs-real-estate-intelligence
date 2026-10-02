@@ -45,6 +45,7 @@ jobs:
           MAPTILER_KEY: ${{ secrets.MAPTILER_KEY }}
           CENSUS_KEY: ${{ secrets.CENSUS_KEY }}
           ZAPIER_DIGEST_WEBHOOK: ${{ secrets.ZAPIER_DIGEST_WEBHOOK }}
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
           ONLY: ${{ inputs.only }}
           PERIOD_START: ${{ inputs.period_start }}
           PERIOD_END: ${{ inputs.period_end }}

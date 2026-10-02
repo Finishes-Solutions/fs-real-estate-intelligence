@@ -17,6 +17,14 @@ function inPoly(pt, geom) {
       if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) ins = !ins; }
     return ins; });
 }
+// county growth signals from data/area.json (housing permits, jobs, new business locations)
+function countyContext(area, fips) {
+  if (!area || !fips) return null;
+  const years = Object.keys(area.permits?.years || {}).sort().slice(-3), j = area.countyJobs?.[fips], m = area.businesses?.months?.[fips];
+  const last12 = m ? Object.keys(m).sort().slice(-13, -1).reduce((s, k) => s + m[k], 0) : null;
+  return { housingUnitsPermitted: years.map(y => ({ year: y, singleFamily: area.permits.years[y][fips]?.sf, multifamily: area.permits.years[y][fips]?.mf })),
+    jobs: j ? { year: area.jobs?.year, total: j.jobs, growthPct: j.gr, since: area.jobs?.baseYear } : null, newBusinessLocationsLast12Months: last12 };
+}
 const brief = f => ({ id: f.id, name: f.name, city: f.city, type: f.type, use: f.use, cost: f.cost, sqft: f.sqft, reg: f.reg, start: f.ts, end: f.te, status: f.status });
 
 export default async function handler(req, res) {
@@ -25,7 +33,7 @@ export default async function handler(req, res) {
   if (!rateLimit(req, res, { perMinute: 6, perDay: 40 })) return;
   const key = needKey(res); if (!key) return;
   try {
-    const [data, market, changes] = await Promise.all([load('filings.json'), load('market.json').catch(() => null), load('changes.json').catch(() => null)]);
+    const [data, market, changes, area] = await Promise.all([load('filings.json'), load('market.json').catch(() => null), load('changes.json').catch(() => null), load('area.json').catch(() => null)]);
     const f = data.filings.find(x => x.id === id); if (!f) return res.status(404).json({ error: 'Not found' });
     const pt = [f.lon, f.lat];
     const near = data.filings.filter(x => x.id !== id && miles(pt, [x.lon, x.lat]) <= 2).sort((a, b) => b.cost - a.cost);
@@ -36,7 +44,9 @@ export default async function handler(req, res) {
       filing: { ...f, lat: undefined, lon: undefined, _hay: undefined, inferredDates: { start: !!f.tsE, end: !!f.teE } },
       nearby2mi: { count: near.length, totalValue: near.reduce((s, x) => s + x.cost, 0), largest: near.slice(0, 8).map(brief) },
       sameDeveloper: { count: same.length, totalValue: same.reduce((s, x) => s + x.cost, 0), largest: same.slice(0, 6).map(brief) },
-      tract: tract ? { acsYear: market.year, population: tract.pop, growthPctSince: market.baseYear, growthPct: tract.gr, medianHouseholdIncome: tract.inc, medianHomeValue: tract.val, medianRent: tract.rent, vacancyPct: tract.vacr, medianAge: tract.age } : null,
+      tract: tract ? { acsYear: market.year, population: tract.pop, growthPctSince: market.baseYear, growthPct: tract.gr, medianHouseholdIncome: tract.inc, medianHomeValue: tract.val, medianRent: tract.rent, vacancyPct: tract.vacr, medianAge: tract.age,
+        ...(market.jobsYear && tract.jobs != null ? { jobsYear: market.jobsYear, jobsLocatedHere: tract.jobs, jobGrowthPct: tract.jgr, jobGrowthSince: market.jobsBaseYear, jobsPerResident: tract.jpr } : {}) } : null,
+      county: countyContext(area, f.fips || area?.counties?.find(c => c.name === f.county)?.fips),
       changeHistory: hist
     };
     const system = `You write short project briefs for a fully integrated real estate developer and operator scouting the Houston-west market.

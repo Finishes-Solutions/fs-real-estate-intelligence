@@ -15,6 +15,9 @@ Finishes Solutions real estate intelligence map for Waller County and the six su
 - **Phone and tablet**: on phones the map is full screen with a bottom tab bar (Map, List, Timeline, Players, More), a floating ask bar and swipeable bottom-sheet cards; on tablets the list is a collapsible side panel and details open in a right-hand drawer. The site installs as an app (Add to Home Screen) and the app shell works offline; data refreshes when back online.
 - **Field notes**: drop a site note at the map center or your GPS location with a title, tag, notes and phone photos; star any filing or building to watch it (watched filings are flagged when the nightly refresh sees a change). "Near me" shows filings within 3 miles of your location. Notes, photos and the watchlist are shared with the team through Supabase (no sign-in; optional team passcode) and work offline.
 - Exports: HTML report, Excel, CSV (now including use, developer, design team and timeline columns).
+- **Market** view: growth signals per county (or the whole region) from free public data: population and growth (ACS), jobs and top industries (Census LEHD LODES), new housing units permitted per year and year to date (Census Building Permits Survey), new business locations per month and the newest ones (Texas Comptroller sales-tax permits), and local development news for each county and its busiest towns (Google News). Every chart has a hover readout and a table.
+- **Jobs layers** on the map (Layers → Demographics): jobs located in each tract, job growth, and jobs per resident (above 1 means more people work there than live there), with the top industries on hover and on the building card.
+- **Registered businesses at an address**: the building card lists the retail, restaurant and service businesses holding a Texas sales-tax permit at the parcel's street address (owner entity, suite, date the location opened); filing cards have a **Look Up Registered Businesses** button for the filing's address.
 - **Sources** tab: every data source, what it feeds and how fresh it is (last nightly refresh, next one, which live layers are on and when their tiles were requested). It also checks whether a newer nightly refresh has landed since the page loaded.
 - **Map camera**: tilting the map by hand (right-drag, ctrl-drag, two fingers) turns **3D View** on; the compass button under the zoom buttons returns to a flat, north-up view of the same spot. Zoomed out to the globe, the map straightens itself, and the 3D terrain surface only shows from town zoom in (MapLibre doesn't fully support terrain on the globe).
 - The list panel is resizable on tablet and desktop: drag its right edge (or focus it and use the arrow keys); double-click resets it. The width is saved per browser.
@@ -30,16 +33,35 @@ GitHub Action (nightly, or manual)          Vercel (every deploy)
    ├ OpenAI enrichment      (cache)            ask.js   question → filters → grounded answer
    ├ change feed vs last run                   brief.js per-project brief (CDN-cached a week)
    ├ ACS tract demographics                    feed.js  RSS for any filter
+   ├ area context: LODES jobs, Census          tenants.js  businesses registered at an address
+   │   housing permits, Comptroller new
+   │   businesses, Google News (area.json)
    └ commits data/  ──────────────push──────▶ deploy
 ```
 
 - `data/regions.json`: counties (TABS id + FIPS), ring counties, bounding box, months of history. Adding a county is a JSON edit.
-- `data/filings.json`, `data/geo.json`, `data/changes.json`, `data/market.json`: what the site loads.
+- `data/filings.json`, `data/geo.json`, `data/changes.json`, `data/market.json`, `data/area.json`: what the site loads.
 - `data/cache/`: TABS details, geocodes and AI results, committed so each nightly run only fetches what's new. Files are written one entry per line so git diffs stay small.
 - The build refuses to overwrite data if TABS suddenly returns less than half of last week's filings (set `ALLOW_SHRINK=1` to force).
 - `lib/`: code shared by the build, the functions and the browser (filter spec, use taxonomy, OpenAI client).
 
 The first full run takes a few hours (Nominatim allows one request per second); later runs take minutes.
+
+## Area context (Market view, jobs layers, registered businesses)
+
+Built nightly by `build/area.mjs` into `data/area.json` (jobs also go onto the tracts in `data/market.json`). All free, no keys. Each source is best effort: if one fails, last night's numbers stay and the log says why.
+
+| Data | Source | Refresh | Notes |
+|---|---|---|---|
+| Jobs by tract and industry | US Census LEHD LODES 8, workplace file (WAC) | Yearly; the newest year is about two years old | Jobs counted where people work, all jobs covered by unemployment insurance. Growth is against the year five earlier. The statewide Texas file is large, so the nightly build only downloads it when a new year appears (a HEAD request checks) (`REBUILD_AREA=1` forces it; the block-level cache is `data/cache/jobs.json`). |
+| Housing units permitted | US Census Building Permits Survey, county files | Monthly, about six weeks after the month | Units authorized (single-family vs 2+ units) and value. Includes Census imputation for places that don't report every month. |
+| New business locations | Texas Comptroller, Active Sales Tax Permit Holders (data.texas.gov `jrea-zgmq`) | About weekly | Counts permits issued per location per month. Only permits that are still active are in the dataset, so older months read low (closed businesses drop out) and a new permit can be a change of owner. Covers sellers of taxable goods and services (retail, restaurants, many services); most offices and medical practices don't hold one. |
+| Local development news | Google News search per county and the 10 busiest towns (`AREA_NEWS_TOWNS`) | Nightly | Development, construction, rezoning and real estate stories; headlines kept 120 days. |
+| Registered businesses at an address | Same Comptroller dataset, live through `api/tenants` | On demand, cached a day | Matched on house number + the main street word, plus ZIP (or city). Suites at a different house number, or addresses written very differently, can be missed. |
+
+Optional: `SOCRATA_APP_TOKEN` (free at data.texas.gov → Developer Settings) on Vercel and as a GitHub secret raises the Comptroller API's rate limit. Not needed at this volume.
+
+Not included, on purpose: sales and lease comps. Texas does not disclose sale prices, and no free source has lease rates; that data needs a licensed provider (CoStar, CompStak and similar) kept behind a sign-in, since this site is public.
 
 ## AI assistant
 
@@ -97,6 +119,10 @@ Limits to know:
 | `PERIOD_START` / `PERIOD_END` | Fixed date range (`YYYY-MM-DD`). Default: 24 months back to yesterday. |
 | `REBUILD_GEO`, `REBUILD_MARKET` | Force a rebuild of base geometry / demographics. |
 | `ZAPIER_DIGEST_WEBHOOK` | POST a nightly digest of new filings (only on nights with changes). |
+| `REBUILD_AREA` | Re-download the LODES jobs file even if the year hasn't changed. |
+| `AREA_NEWS_TOWNS` | How many towns (by filing count) get their own news search (default 10). |
+| `AREA` | Run the area step on an `ONLY=` test run (it's skipped on partial runs by default). |
+| `SOCRATA_APP_TOKEN` | Optional Texas open-data app token (higher rate limit for the Comptroller data). |
 | `ALLOW_SHRINK` | Allow a run with far fewer filings than last time. |
 
 ## Statewide database (Supabase)
@@ -165,5 +191,6 @@ node build.mjs           # real refresh (needs network access to TDLR, Census, O
 - The change feed keeps 13 months of history and starts with the second run; "this week" means changes found by any refresh in the last 7 days.
 - Building heights are only as good as OpenStreetMap; unmapped heights get a default. StratMap parcel fields depend on what each appraisal district supplies (year built and acquisition date are often blank), and Texas does not disclose sale prices.
 - Team field notes are last-edit-wins: if two people edit the same note while offline, the later edit (by device clock) keeps. With no sign-in anyone with the site address can edit or delete shared notes (set FIELD_ACCESS_CODE for a passcode), and names on notes are whatever people type.
-- Business listings come from OpenStreetMap and are incomplete, especially in suburban strip centers.
+- Business listings come from OpenStreetMap and are incomplete, especially in suburban strip centers. The Comptroller list on the building card fills in retail and service tenants but misses offices and medical, and only shows locations whose permit is still active.
+- Market numbers are county-level (permits, new businesses) or tract-level (jobs, demographics) and lag: LODES jobs are about two years old, ACS is a five-year average, permits arrive about six weeks after the month.
 - Building permits are not included: the City of Houston stopped publishing permit data in December 2025 and the other counties have no open feed.
