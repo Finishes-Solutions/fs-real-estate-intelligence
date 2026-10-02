@@ -5,6 +5,16 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 6:40 PM CT: Plane routes on the map; Regrid reads REGRID_API_KEY
+- Selecting a plane now draws its route: the leg already flown as a solid curved line from the origin airport to the plane, the rest dashed to the destination, with both airports labeled. The map zooms to fit the whole trip (unless you're following the plane). The line moves with the plane and clears when you close the card. Planes whose route isn't in the adsb.lol database show no line.
+- Regrid now reads the token from `REGRID_API_KEY` (the name set on Vercel); `REGRID_TOKEN` also works.
+
+### 6:31 PM CT: Regrid wired in, with hard monthly caps (3548070)
+- New **Parcel Lines (Regrid)** layer in Map Layers: parcel boundaries at street zoom.
+- New **Get Regrid Details** button on the building card: zoning, standardized land use and the full Regrid parcel record. A parcel looked up once is saved and free after that.
+- Hard caps so it never goes into overage: 1,800 parcel records and 180,000 tiles a month (your plan includes 2,000 and 200,000). At the cap the button says so and the parcel lines stop drawing. Usage shows on the Sources tab.
+- The Regrid token is kept on the server only. Turn it on by adding `REGRID_TOKEN` in Vercel (see README).
+
 ### 6:27 PM CT: Consumer spending estimates and the city sales-tax trend (043ec80)
 - **Spending on the map**: Map Layers → Demographics adds Consumer Spending, Spending per Household, Dining Out, Home Furnishings and Apparel for every census tract. These are **estimates**: each tract's households by income (Census) × what households at that income spend (Bureau of Labor Statistics spending survey, adjusted to the South). They are not measured locally, and the legend says so.
 - **Market view**:
@@ -49,7 +59,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - More Filters is grouped into Project, Size, People & Place and Timing;
   - Save Search, Copy Link and RSS Alerts are evenly sized buttons.
 
-### 5:45 PM CT: Statewide load no longer rejects Austin County
+### 5:45 PM CT: Statewide load no longer rejects Austin County (e45fcf3)
 - The statewide database load skipped Austin County: 22 of its filings list "Austin" as the city (the county's own name), and the safety check took that for Austin in Travis County and decided the county ID was wrong. A city that's just the county's own name no longer counts in that check (the same would have hit Houston County). Re-run Statewide data with counties = Austin to load it.
 
 ### 5:38 PM CT: Chat cards tidied, demographics answers, tabs only open when asked (2f973eb)

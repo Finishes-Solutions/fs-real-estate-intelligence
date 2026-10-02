@@ -44,7 +44,56 @@ export function initPlanes(ctx) {
         'icon-halo-color': ctx.isDark() ? '#0b0d0c' : '#ffffff', 'icon-halo-width': 1.4,
         'text-color': ctx.isDark() ? '#dde1e2' : '#23282a', 'text-halo-color': ctx.isDark() ? '#16191a' : '#ffffff', 'text-halo-width': 1.5 } });
   }
-  function removeLayers() { if (map.getLayer('live-planes')) map.removeLayer('live-planes'); if (map.getSource('live-planes')) map.removeSource('live-planes'); }
+  // ---------- the selected plane's route: flown leg solid, remaining leg dashed, both airports ----------
+  // great-circle path between two [lon, lat] points (the curve airliners actually fly)
+  function arc(a, b, n = 64) {
+    const R = Math.PI / 180, [l1, p1, l2, p2] = [a[0] * R, a[1] * R, b[0] * R, b[1] * R];
+    const d = 2 * Math.asin(Math.sqrt(Math.sin((p2 - p1) / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin((l2 - l1) / 2) ** 2));
+    if (!(d > 1e-6)) return [a, b];
+    const out = []; let prev = null;
+    for (let i = 0; i <= n; i++) {
+      const f = i / n, A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+      const x = A * Math.cos(p1) * Math.cos(l1) + B * Math.cos(p2) * Math.cos(l2), y = A * Math.cos(p1) * Math.sin(l1) + B * Math.cos(p2) * Math.sin(l2), z = A * Math.sin(p1) + B * Math.sin(p2);
+      let lon = Math.atan2(y, x) / R; const lat = Math.atan2(z, Math.hypot(x, y)) / R;
+      if (prev != null) while (lon - prev > 180) lon -= 360; while (prev != null && lon - prev < -180) lon += 360; // stay continuous across the date line
+      out.push([lon, lat]); prev = lon;
+    }
+    return out;
+  }
+  let routeOn = null; // { hex, o: { code, lon, lat }, d: { … } }
+  const EMPTY = { type: 'FeatureCollection', features: [] };
+  function routeFC() {
+    if (!routeOn) return EMPTY;
+    const me = fc().features.find(f => f.properties.hex === routeOn.hex), o = [routeOn.o.lon, routeOn.o.lat], d = [routeOn.d.lon, routeOn.d.lat];
+    const pos = me ? me.geometry.coordinates : null, feats = [];
+    if (pos) { feats.push({ type: 'Feature', properties: { k: 'flown' }, geometry: { type: 'LineString', coordinates: arc(o, pos) } }, { type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(pos, d) } }); }
+    else feats.push({ type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(o, d) } });
+    for (const a of [routeOn.o, routeOn.d]) feats.push({ type: 'Feature', properties: { k: 'ap', code: a.code || '' }, geometry: { type: 'Point', coordinates: [a.lon, a.lat] } });
+    return { type: 'FeatureCollection', features: feats };
+  }
+  function addRouteLayers() {
+    if (!map.getStyle()) return;
+    const c = ctx.isDark() ? '#6a8fe0' : '#2a78d6', before = map.getLayer('live-planes') ? 'live-planes' : undefined;
+    if (!map.getSource('plane-route')) map.addSource('plane-route', { type: 'geojson', data: routeFC() });
+    if (!map.getLayer('plane-route-flown')) map.addLayer({ id: 'plane-route-flown', type: 'line', source: 'plane-route', filter: ['==', ['get', 'k'], 'flown'], layout: { 'line-cap': 'round' }, paint: { 'line-color': c, 'line-width': 2.5, 'line-opacity': .9 } }, before);
+    if (!map.getLayer('plane-route-left')) map.addLayer({ id: 'plane-route-left', type: 'line', source: 'plane-route', filter: ['==', ['get', 'k'], 'left'], paint: { 'line-color': c, 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': .85 } }, before);
+    if (!map.getLayer('plane-route-ap')) map.addLayer({ id: 'plane-route-ap', type: 'circle', source: 'plane-route', filter: ['==', ['get', 'k'], 'ap'], paint: { 'circle-radius': 5, 'circle-color': ctx.isDark() ? '#16191a' : '#ffffff', 'circle-stroke-color': c, 'circle-stroke-width': 2.5 } }, before);
+    if (!map.getLayer('plane-route-label')) map.addLayer({ id: 'plane-route-label', type: 'symbol', source: 'plane-route', filter: ['==', ['get', 'k'], 'ap'], layout: { 'text-field': ['get', 'code'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-offset': [0, 1.3], 'text-allow-overlap': true },
+      paint: { 'text-color': ctx.isDark() ? '#dde1e2' : '#23282a', 'text-halo-color': ctx.isDark() ? '#16191a' : '#ffffff', 'text-halo-width': 1.6 } });
+  }
+  const syncRoute = () => map.getSource('plane-route')?.setData(routeFC());
+  function clearRoute() { routeOn = null; syncRoute(); }
+  function showRoute(hex, r) {
+    const ok = a => a && Number.isFinite(a.lat) && Number.isFinite(a.lon);
+    if (!ok(r?.origin) || !ok(r?.destination)) { clearRoute(); return false; }
+    routeOn = { hex, o: r.origin, d: r.destination }; addRouteLayers(); syncRoute();
+    // frame the whole trip unless the camera is following the plane
+    if (follow !== hex) { const pts = routeFC().features.flatMap(f => f.geometry.type === 'Point' ? [f.geometry.coordinates] : f.geometry.coordinates);
+      const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+      map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: { top: 80, bottom: 80, left: 80, right: (ctx.card?.offsetWidth || 380) + 60 }, maxZoom: 9, duration: ctx.reduceMotion ? 0 : 1200 }); }
+    return true;
+  }
+  function removeLayers() { ['plane-route-label', 'plane-route-ap', 'plane-route-left', 'plane-route-flown', 'live-planes'].forEach(id => map.getLayer(id) && map.removeLayer(id)); ['plane-route', 'live-planes'].forEach(id => map.getSource(id) && map.removeSource(id)); }
 
   async function load() {
     if (!on() || document.visibilityState === 'hidden') return;
@@ -63,8 +112,8 @@ export function initPlanes(ctx) {
     ctx.live.syncUI();
   }
   function start() { addLayers(); load(); clearInterval(timer); clearInterval(tick); timer = setInterval(load, REFRESH);
-    tick = setInterval(() => { if (list.length && map.getSource('live-planes')) { map.getSource('live-planes').setData(fc()); if (follow) followCam(); } }, 1000); }
-  function stop() { clearInterval(timer); clearInterval(tick); ctl?.abort(); list = []; follow = null; removeLayers(); }
+    tick = setInterval(() => { if (list.length && map.getSource('live-planes')) { map.getSource('live-planes').setData(fc()); if (routeOn) syncRoute(); if (follow) followCam(); } }, 1000); }
+  function stop() { clearInterval(timer); clearInterval(tick); ctl?.abort(); list = []; follow = null; routeOn = null; removeLayers(); }
   map.on('moveend', () => { if (!on()) return; clearTimeout(moveT); moveT = setTimeout(load, 600); });
   document.addEventListener('visibilitychange', () => { if (on() && document.visibilityState === 'visible') load(); });
 
@@ -80,7 +129,7 @@ export function initPlanes(ctx) {
   const ap = a => a ? esc((a.code ? a.code + ' ' : '') + (a.city || a.name || '')) : '?';
   async function renderCard(hex, refresh) {
     const p = find(hex); if (!p) { if (!refresh) toast('That aircraft is no longer in view.'); return; }
-    if (!refresh) { const keep = follow === hex ? hex : null; ctx.closeCard?.(); follow = keep; }
+    if (!refresh) { const keep = follow === hex ? hex : null; ctx.closeCard?.(); follow = keep; if (routeOn?.hex !== hex) clearRoute(); }
     shown = hex;
     const rows = [['Altitude', p.ground ? 'On the ground' : altLabel(p) + (p.vs ? (p.vs > 150 ? ' · climbing ' : p.vs < -150 ? ' · descending ' : ' · level ') + (Math.abs(p.vs) > 150 ? Math.abs(p.vs).toLocaleString('en-US') + ' ft/min' : '') : '')],
       ['Speed', p.gs != null ? p.gs + ' kt (' + Math.round(p.gs * 1.15078) + ' mph)' : '—'], ['Heading', p.track != null ? p.track + '°' : '—'],
@@ -97,8 +146,10 @@ export function initPlanes(ctx) {
     if (!refresh || !card.classList.contains('open')) card.classList.add('open');
     const r = await routeFor(p), el = card.querySelector('#plRoute');
     if (el && shown === hex) el.textContent = r?.origin && r?.destination ? ap(r.origin).replace(/&amp;/g, '&') + ' → ' + ap(r.destination).replace(/&amp;/g, '&') : p.flight ? 'Route not in the database' : 'No callsign';
+    // draw the route the first time the card opens for this plane (not on every 10-second refresh)
+    if (shown === hex && !refresh && r) showRoute(hex, r);
   }
-  ctx.onCardClose?.(() => { shown = null; follow = null; });
+  ctx.onCardClose?.(() => { shown = null; follow = null; clearRoute(); });
   ctx.mapClickHandlers.unshift(e => {
     if (!map.getLayer('live-planes')) return false;
     const hit = map.queryRenderedFeatures([[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]], { layers: ['live-planes'] })[0]; if (!hit) return false;
@@ -114,7 +165,7 @@ export function initPlanes(ctx) {
   ctx.live.register('planes', {
     label: 'Live Planes', persist: true,
     set: v => { v ? start() : stop(); },
-    add: () => { addLayers(); map.getSource('live-planes')?.setData(fc()); },
+    add: () => { addLayers(); map.getSource('live-planes')?.setData(fc()); if (routeOn) { addRouteLayers(); syncRoute(); } },
     note: () => map.getZoom() < MINZ ? 'Zoom in to see planes.' : err ? 'Planes: ' + err : at ? list.length.toLocaleString('en-US') + ' aircraft in view · ' + new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) + ' (' + src + ').' : 'Loading planes…',
     status: () => ({ count: list.length, time: at || null, source: src || null })
   });

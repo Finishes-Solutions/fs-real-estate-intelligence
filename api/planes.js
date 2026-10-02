@@ -38,7 +38,8 @@ export async function route(callsign, lat, lon, fetchImpl = globalThis.fetch) {
     body: JSON.stringify({ planes: [{ callsign, lat: Number.isFinite(lat) ? lat : 0, lng: Number.isFinite(lon) ? lon : 0 }] }) });
   if (!r.ok) throw new Error('route lookup ' + r.status);
   const x = (await r.json())?.[0];
-  let ap = (x?._airports || []).map(a => ({ code: a.iata || a.icao, name: a.name, city: a.location, country: a.countryiso2 }));
+  const ll = v => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 1e4) / 1e4 : null; };
+  let ap = (x?._airports || []).map(a => ({ code: a.iata || a.icao, name: a.name, city: a.location, country: a.countryiso2, lat: ll(a.lat), lon: ll(a.lon ?? a.lng) }));
   if (!ap.length && x?._airport_codes_iata) ap = String(x._airport_codes_iata).split('-').filter(Boolean).map(code => ({ code })); // "IAH-LHR" only
   return { callsign, origin: ap[0] || null, destination: ap[ap.length - 1] && ap.length > 1 ? ap[ap.length - 1] : null, plausible: x?.plausible ?? null };
 }

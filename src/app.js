@@ -22,6 +22,7 @@ import { initSources } from './sources.js';
 import { initPlanes } from './planes.js';
 import { initTeam } from './team.js';
 import { initArea } from './area.js';
+import { initRegrid } from './regrid.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
@@ -773,18 +774,35 @@ function screenContext(){
   else if(ctx.currentBuilding?.()) { const bd=ctx.currentBuilding(); lines.push('Open card: building at '+bd.center[1].toFixed(5)+', '+bd.center[0].toFixed(5)+(bd.title?' ('+bd.title+')':'')+(bd.height?', about '+Math.round(bd.height*3.28)+' ft tall':'')); }
   if(hlIds.length) lines.push('Highlighted on the map: '+hlIds.slice(0,12).join(', '));
   if(sel.feature) lines.push('Selected area: '+sel.label);
+  const lv=ctx.live?.state?.(), on=lv?Object.keys(lv).filter(k=>lv[k]):[]; if(on.length) lines.push('Live layers on: '+on.join(', '));
+  const ps=ctx.placeSummary?.(); if(ps?.place) lines.push('Outlined on the map: '+ps.place+(ps.kind?' ('+ps.kind+')':''));
+  const bs=ctx.buildingStats?.(); if(bs&&bs.length>1) lines.push('Buildings selected: '+bs.length);
+  const nv=(ctx.field?.db?.notes||[]).filter(n=>n.lng>=b.getWest()&&n.lng<=b.getEast()&&n.lat>=b.getSouth()&&n.lat<=b.getNorth()); if(nv.length) lines.push('Team site notes in view: '+nv.length+' ('+nv.slice(0,5).map(n=>n.title||'untitled').join('; ')+')');
   return lines.join('\n');
+}
+// names the basemap draws around the map center (streets, places, businesses) and the building under it, for describe_view
+function viewLabels(radius=140){
+  const p=map.project(map.getCenter()), box=[[p.x-radius,p.y-radius],[p.x+radius,p.y+radius]], out={streets:[],places:[],businesses:[],water:[]}, seen=new Set();
+  let feats=[]; try{ feats=map.queryRenderedFeatures(box); }catch(e){}
+  for(const f of feats){
+    const pr=f.properties||{}, name=pr.name_en||pr['name:en']||pr.name||pr['name:latin']; if(!name||f.layer?.type!=='symbol') continue;
+    const sl=f.sourceLayer||f.layer?.['source-layer']||'', k=sl+'|'+name; if(seen.has(k)) continue; seen.add(k);
+    const bucket=/transportation/.test(sl)?'streets':/place/.test(sl)?'places':/poi/.test(sl)?'businesses':/water/.test(sl)?'water':null;
+    if(bucket&&out[bucket].length<10) out[bucket].push(bucket==='businesses'&&pr.class?name+' ('+String(pr.subclass||pr.class).replace(/_/g,' ')+')':name);
+  }
+  let bld=null; try{ const h=map.getLayer('fs-bldg')&&map.queryRenderedFeatures(p,{layers:['fs-bldg']})[0]; if(h){ const hm=h.properties.render_height??h.properties.height; bld={height_ft:hm?Math.round(hm*3.281):null,name:h.properties.name||null}; } }catch(e){}
+  return { ...out, building_at_center:bld, zoom:+map.getZoom().toFixed(1), note:map.getZoom()<13?'Zoomed out: street and building names appear from about zoom 14.':undefined };
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return COUNTIES.join(', ')+', '+[...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,60).map(x=>x[0]).join(', '); }
-Object.assign(ctx,{ nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap, buildReport,
   exportCsv, exportXlsx, exportGeoJSON, exportHtml, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initSources]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSources]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,

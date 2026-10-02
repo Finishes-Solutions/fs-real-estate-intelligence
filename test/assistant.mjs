@@ -158,3 +158,27 @@ console.log('assistant ok');
   for (const t of ['Take me to the JP Morgan Chase Tower and tell me about it.', 'Show multifamily in Katy', 'Compare Katy, Cypress, Waller.', 'Katy and Cypress, which has more?']) assert.ok(!isPromptEcho(t, v), t);
   assert.ok(!isPromptEcho('Cypress, Katy, Fulshear', ''), 'no hint list, no echo'); }
 console.log('assistant echo ok');
+
+// ---- rulebook and camera ----
+{ const { TOOLS, systemPrompt, VOICE_STYLE } = await import('../lib/agent-tools.mjs'), { RULEBOOK, SECTIONS } = await import('../lib/rulebook.mjs'), { cameraMove } = await import('../lib/assist-logic.mjs');
+  const names = new Set(TOOLS.map(t => t.name));
+  for (const n of names) assert.ok(RULEBOOK.includes(n), 'rulebook mentions tool ' + n);
+  const mentioned = new Set((RULEBOOK.match(/\b[a-z]+(?:_[a-z]+)+\b/g) || []).filter(w => !['start_month', 'finish_month', 'show_on_map', 'nasa_imagery'].includes(w)));
+  for (const n of mentioned) assert.ok(names.has(n), 'rulebook names a tool that does not exist: ' + n);
+  assert.equal(names.size, TOOLS.length, 'tool names are unique');
+  for (const [title, rules] of SECTIONS) { assert.ok(title && rules.length, 'section ' + title); for (const r of rules) assert.ok(r.length < 900, 'rule stays one readable line: ' + r.slice(0, 40)); }
+  const p = systemPrompt({ coverage: 'x', filters: 'none', screen: 'View: map', followups: true });
+  assert.ok(p.includes(RULEBOOK) && /Pick the right tool:/.test(p) && /double square brackets/.test(p)); assert.ok(p.length < 12000, 'prompt stays bounded: ' + p.length);
+  assert.ok(!/double square brackets/.test(systemPrompt({})), 'no pills unless asked'); assert.match(VOICE_STYLE, /confirm what changed/);
+  const c = { center: [-95.7, 30], zoom: 12, bearing: 170, pitch: 60, bounds: [-96, 29.8, -95.4, 30.2] };
+  assert.equal(cameraMove(c, { action: 'zoom_out', amount: 'little' }).zoom, 11.3);
+  assert.equal(cameraMove({ ...c, zoom: 18.5 }, { action: 'zoom_in', amount: 'lot' }).zoom, 19, 'zoom clamped');
+  assert.equal(cameraMove(c, { action: 'rotate', direction: 'right' }).bearing, -145, 'bearing wraps');
+  assert.equal(cameraMove(c, { action: 'tilt_up', amount: 'lot' }).pitch, 70, 'pitch clamped');
+  assert.equal(cameraMove(c, { action: 'tilt_down', amount: 'lot' }).pitch, 25);
+  assert.deepEqual(cameraMove(c, { action: 'pan', direction: 'north' }).center, [-95.7, 30.2]);
+  assert.deepEqual(cameraMove(c, { action: 'pan', direction: 'west', amount: 'lot' }).center, [-96.3, 30]);
+  assert.ok(cameraMove(c, { action: 'rotate' }).error && cameraMove(c, { action: 'pan' }).error && cameraMove(c, { action: 'spin' }).error);
+  assert.ok(cameraMove(c, { action: 'orbit' }).orbit && cameraMove(c, { action: 'stop' }).stop && cameraMove(c, { action: 'region' }).region);
+  assert.equal(cameraMove(c, { action: 'north_up' }).bearing, 0); assert.equal(cameraMove(c, { action: 'flat' }).pitch, 0); }
+console.log('assistant rulebook ok');
