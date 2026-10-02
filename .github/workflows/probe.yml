@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       script:
-        description: "Probe to run: parcels or height"
+        description: "Probe to run: parcels, height, news or geocode"
         required: false
         default: parcels
 permissions:
@@ -12,7 +12,8 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    environment: Production
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,3 +21,5 @@ jobs:
           node-version: 22
       - run: npm ci --no-audit --no-fund
       - run: node build/probe-${{ inputs.script || 'parcels' }}.mjs
+        env:
+          MAPTILER_KEY: ${{ secrets.MAPTILER_KEY }}
