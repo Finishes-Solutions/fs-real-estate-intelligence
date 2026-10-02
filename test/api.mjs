@@ -56,4 +56,6 @@ res = mockRes(); await feed(req({ method: 'GET', url: '/api/feed?c=Harris&u=Medi
 assert.equal(res.code, 200); assert.match(res.headers['Content-Type'], /rss/);
 const items = (res.body.match(/<item>/g) || []).length, expect = data.filings.filter(f => f.county === 'Harris' && f.use === 'Medical' && f.cost >= 1e6).length;
 assert.equal(items, Math.min(100, expect), 'feed matches filter'); assert.ok(!/<script/i.test(res.body));
+const sentBodies = calls.filter(c => c.url.endsWith('/chat/completions')).map(c => c.body);
+assert.ok(sentBodies.every(b => b.reasoning_effort === 'high'), 'reasoning_effort=high sent');
 console.log('api tests passed:', calls.length, 'mocked calls, feed items', items);

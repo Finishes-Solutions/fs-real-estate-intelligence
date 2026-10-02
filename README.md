@@ -40,7 +40,7 @@ The first full run takes a few hours (Nominatim allows one request per second); 
 
 ## Setup
 
-1. **Vercel → Project → Settings → Environment Variables**: `OPENAI_API_KEY` (type Sensitive, Production + Preview). Optional `OPENAI_MODEL` (default `gpt-6-astra`, falling back to `gpt-6-luna`, `gpt-5-mini`, `gpt-4.1-mini` if the key can't use it). Optional `MAPILLARY_TOKEN` (free client token from mapillary.com/dashboard/developers) for street-level photos in the building panel.
+1. **Vercel → Project → Settings → Environment Variables**: `OPENAI_API_KEY` (type Sensitive, Production + Preview). Optional `OPENAI_MODEL` (default `gpt-6-luna`, falling back to `gpt-5-mini` / `gpt-4.1-mini` if the key can't use it) and `OPENAI_REASONING_EFFORT` (default `high`; `none` to omit). Optional `MAPILLARY_TOKEN` (free client token from mapillary.com/dashboard/developers) for street-level photos in the building panel.
 2. **GitHub → Settings → Secrets and variables → Actions**: secret `OPENAI_API_KEY`. Optional: secret `ZAPIER_DIGEST_WEBHOOK` (a Zapier catch hook gets a weekly summary of new filings), secret `MAPTILER_KEY`, secret `CENSUS_KEY`, variable `OPENAI_MODEL`.
 3. **OpenAI dashboard**: set a monthly budget cap on the project that owns the key. The site is public, so the cap is the hard spending limit.
 4. Run **Actions → Refresh data → Run workflow** once (or push a change under `build/`). The nightly schedule only runs on the default branch. The old Zapier monthly deploy hook is no longer needed.
@@ -50,7 +50,8 @@ The first full run takes a few hours (Nominatim allows one request per second); 
 | Variable | Purpose |
 |---|---|
 | `OPENAI_API_KEY` | Enrichment. Without it the build runs and filings simply have no AI fields. |
-| `OPENAI_MODEL` | Preferred model (default `gpt-6-astra`). |
+| `OPENAI_MODEL` | Preferred model (default `gpt-6-luna`). |
+| `OPENAI_REASONING_EFFORT` | Reasoning effort sent with every request (default `high`; `none` to omit). |
 | `OPENAI_ENRICH_MODEL` | Optional cheaper model just for the bulk tagging step (e.g. `gpt-6-luna`). |
 | `AI_MAX_ROWS`, `AI_CONCURRENCY` | Cap filings enriched per run (default 40000) and parallel requests (default 6). |
 | `MAPTILER_KEY` | Geocoding fallback (defaults to the site key). |

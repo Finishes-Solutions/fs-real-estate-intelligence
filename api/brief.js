@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     const system = `You write short project briefs for a fully integrated real estate developer and operator scouting the Houston-west market.
 Use ONLY the facts provided (a Texas TDLR TABS accessibility registration plus derived context). Values and dates are filer estimates; inferred dates are our own estimates and must be called "estimated".
 Format exactly these sections as plain text with the heading on its own line: What it is / Timing / Who's involved / Area context / Why it matters. 2-3 sentences each, under 220 words total. If a fact is missing, say so briefly rather than guessing. Cite related filings by id in square brackets.`;
-    const text = await chatText({ key, model: await model(key), system, user: JSON.stringify(facts), maxTokens: 2500 });
+    const text = await chatText({ key, model: await model(key), system, user: JSON.stringify(facts), maxTokens: 8000 });
     res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
     return res.json({ brief: text, built: data.built });
   } catch (e) {

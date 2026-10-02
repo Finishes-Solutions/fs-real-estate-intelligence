@@ -6,11 +6,11 @@
   "outputDirectory": "public",
   "functions": {
     "api/ask.js": {
-      "maxDuration": 30,
+      "maxDuration": 60,
       "includeFiles": "data/filings.json"
     },
     "api/brief.js": {
-      "maxDuration": 45,
+      "maxDuration": 60,
       "includeFiles": "data/{filings,changes,market}.json"
     },
     "api/feed.js": {

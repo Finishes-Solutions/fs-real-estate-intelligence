@@ -46,7 +46,7 @@ export async function enrich(rows, cache) {
   const stamp = new Date().toISOString().slice(0, 10);
   await pool(chunks, +(process.env.AI_CONCURRENCY || 6), async ch => {
     try {
-      const { data, usage } = await chatJSON({ key, model, system: SYSTEM, user: JSON.stringify(ch.map(inputOf)), name: 'filings', schema: SCHEMA, maxTokens: 8000 });
+      const { data, usage } = await chatJSON({ key, model, system: SYSTEM, user: JSON.stringify(ch.map(inputOf)), name: 'filings', schema: SCHEMA, maxTokens: 24000 });
       tin += usage?.prompt_tokens || 0; tout += usage?.completion_tokens || 0;
       const byId = Object.fromEntries((data.items || []).map(x => [x.id, x]));
       for (const r of ch) { const x = byId[r.ProjectNumber]; if (!x) { failed++; continue; } const { id, ...v } = x; cache[aiKey(r)] = { ...v, at: stamp }; }
