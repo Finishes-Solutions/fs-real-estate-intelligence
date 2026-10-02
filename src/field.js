@@ -60,30 +60,33 @@ export function initField(ctx) {
     document.getElementById('mFieldN').textContent = alerts ? alerts + ' updated' : (n ? fmtN(n) : '');
   }
 
-  // ---- watch star on filing and building cards ----
+  // ---- watch star on filing and building cards (and the assistant's watch tool) ----
+  const watchKey = info => info.kind === 'filing' ? info.f.id : info.center.map(v => v.toFixed(5)).join(',');
+  const findWatch = info => db.watch.find(w => w.kind === info.kind && w.ref === watchKey(info));
+  function setWatch(info, on) {
+    const w = findWatch(info);
+    if (!on && w) { db.watch = db.watch.filter(x => x !== w); ctx.team?.removed({ kind: 'watch', wkind: w.kind, ref: w.ref }); }
+    else if (on && !w && info.kind === 'filing') db.watch.unshift({ id: uid(), kind: 'filing', ref: watchKey(info), label: info.f.name, sub: (info.f.city || info.f.county) + ' · ' + fmtM(info.f.cost), lng: info.f.lon, lat: info.f.lat, added: new Date().toISOString() });
+    else if (on && !w) db.watch.unshift({ id: uid(), kind: 'building', ref: watchKey(info), label: info.label(), sub: info.sub(), lng: info.center[0], lat: info.center[1], added: new Date().toISOString() });
+    else return !!w;
+    save(); card.querySelector('.top .star')?._paint?.(); return on;
+  }
   ctx.onCardRender(info => {
     const top = card.querySelector('.top'), x = top?.querySelector('.x'); if (!x) return;
     top.querySelector('.star')?.remove();
-    const key = info.kind === 'filing' ? info.f.id : info.center.map(v => v.toFixed(5)).join(',');
-    const find = () => db.watch.find(w => w.kind === info.kind && w.ref === key);
     const b = document.createElement('button'); b.className = 'x star'; b.setAttribute('aria-label', 'Add to watchlist');
-    const paint = () => { const on = !!find(); b.setAttribute('aria-pressed', on); b.title = on ? 'On your watchlist' : 'Add to watchlist'; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>'; };
-    b.onclick = () => {
-      const w = find();
-      if (w) { db.watch = db.watch.filter(x => x !== w); ctx.team?.removed({ kind: 'watch', wkind: w.kind, ref: w.ref }); }
-      else if (info.kind === 'filing') db.watch.unshift({ id: uid(), kind: 'filing', ref: key, label: info.f.name, sub: (info.f.city || info.f.county) + ' · ' + fmtM(info.f.cost), lng: info.f.lon, lat: info.f.lat, added: new Date().toISOString() });
-      else db.watch.unshift({ id: uid(), kind: 'building', ref: key, label: info.label(), sub: info.sub(), lng: info.center[0], lat: info.center[1], added: new Date().toISOString() });
-      save(); paint(); ctx.toast(find() ? 'Added to your watchlist (Field notes).' : 'Removed from your watchlist.');
-    };
+    const paint = b._paint = () => { const on = !!findWatch(info); b.setAttribute('aria-pressed', on); b.title = on ? 'On your watchlist' : 'Add to watchlist'; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>'; };
+    b.onclick = () => { const on = setWatch(info, !findWatch(info)); paint(); ctx.toast(on ? 'Added to your watchlist (Field notes).' : 'Removed from your watchlist.'); };
     paint(); x.before(b);
   });
 
   // ---- site notes ----
-  ctx.addNote = async ({ gps = false, at = null } = {}) => {
+  ctx.addNote = async ({ gps = false, at = null, title = '', text = '', tag = '' } = {}) => {
     let c = at || map.getCenter().toArray();
     if (gps && ctx.locate) { try { c = await ctx.locate(); } catch (e) { ctx.toast(e.message + ' Placed the note at the map center instead.'); } }
-    const n = { id: uid(), lng: +c[0].toFixed(6), lat: +c[1].toFixed(6), title: '', text: '', tag: TAGS[0], photos: [], created: new Date().toISOString(), updated: new Date().toISOString() };
-    db.notes.unshift(n); save(); map.easeTo({ center: c, zoom: Math.max(map.getZoom(), 15), duration: ctx.reduceMotion ? 0 : 600 }); openNote(n, true);
+    const n = { id: uid(), lng: +c[0].toFixed(6), lat: +c[1].toFixed(6), title: String(title).slice(0, 120), text: String(text).slice(0, 4000), tag: TAGS.includes(tag) ? tag : TAGS[0], photos: [], created: new Date().toISOString(), updated: new Date().toISOString() };
+    db.notes.unshift(n); save(); map.easeTo({ center: c, zoom: Math.max(map.getZoom(), 15), duration: ctx.reduceMotion ? 0 : 600 }); openNote(n, !title);
+    return n;
   };
 
   async function openNote(n, isNew) {
@@ -153,7 +156,7 @@ export function initField(ctx) {
   }
   ctx.onView('field', render);
   // team sync (src/team.js) reads and replaces the store through this
-  ctx.field = { get db() { return db; }, replace(next) { db = next; save(true); }, getPhoto, localPhoto: id => localPhoto(id).then(b => b instanceof Blob ? b : null), putPhoto, delPhoto, TAGS, render: () => { if (ctx.view === 'field') render(); } };
+  ctx.field = { get db() { return db; }, setWatch, isWatched: info => !!findWatch(info), replace(next) { db = next; save(true); }, getPhoto, localPhoto: id => localPhoto(id).then(b => b instanceof Blob ? b : null), putPhoto, delPhoto, TAGS, render: () => { if (ctx.view === 'field') render(); } };
 
   // ---- export / import ----
   const stamp = () => new Date().toISOString().slice(0, 10);
