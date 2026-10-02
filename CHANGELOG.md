@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 5:20 PM CT: Map buttons stay put when a card is open (71a7598)
+- On desktop, with a filing or building card open, the zoom, compass, locate, home, time-lapse, layers and globe buttons now stay in their column at the right edge. The card opens just below them and scrolls if it's long, instead of the buttons jumping left and floating in the middle of the map.
+- On short windows, where a card wouldn't fit under the buttons, they still move left of the card so it never covers them.
+
 ### 5:15 PM CT: Cards in the AI chat, wider chat, business search, Reports tab (559bb0f)
 - The assistant now shows cards in the chat with its answers:
   - filing summaries with metrics, a filed-by-month chart, uses, places and the largest projects;
