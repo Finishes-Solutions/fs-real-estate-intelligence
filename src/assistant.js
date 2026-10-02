@@ -2,6 +2,7 @@
 // Tool calls from either channel run here, against the filings loaded in the browser (see lib/agent-tools.mjs).
 import { makeMatcher, describe, miles } from './lib/filter.mjs';
 import { entityKey } from './lib/taxonomy.mjs';
+import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
 import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
@@ -198,7 +199,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { air_traffic: 'Checking the air traffic…', market_data: 'Reading the market numbers…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -476,6 +477,44 @@ export function initAssistant(ctx) {
       if (name === 'show_view') {
         if (!VIEW_ASK.test(lastUserText())) return { not_switched: true, note: 'The user did not ask for that tab, so it was not opened. Answer in the chat and offer "Open the ' + ({ who: 'Activity', changes: 'Updates' }[a.view] || a.view[0].toUpperCase() + a.view.slice(1)) + ' tab" as a follow-up option.' };
         ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates', market: 'Market', reports: 'Reports' }[a.view] || a.view)); return { view: a.view }; }
+      if (name === 'air_traffic') {
+        // the open card, a named place or filing, else the map center
+        let p = await pointFor(a);
+        if (p.error && !a.place && !a.id) { const c = ctx.map.getCenter(); p = { c: [c.lng, c.lat], label: ctx.viewPlace?.() || 'the map center' }; }
+        if (p.error) return p;
+        const miles = Math.min(25, Math.max(0.5, a.radius_miles || 3));
+        const [live, hist] = await Promise.all([ctx.planesNear(p.c, miles).catch(e => ({ error: e.message })), a.history === false ? null : ctx.airHistory(p.c, 1)]);
+        const ac = live.aircraft || [];
+        return { place: p.label, radius_miles: miles,
+          live: live.error ? { error: live.error } : { as_of: live.time, source: live.source, count: ac.length, low_count: ac.filter(x => !x.ground && x.alt != null && x.alt < 3000).length,
+            aircraft: ac.slice(0, 12).map(x => ({ callsign: x.flight, type: x.type, registration: x.reg, altitude_ft: x.ground ? 0 : x.alt, on_ground: x.ground, speed_kt: x.gs, heading: x.track, miles_away: x.miles })) },
+          history: !hist ? undefined : hist.history ? { window_days: hist.days, sampled_days: hist.sampled_days, low_sightings_per_day_within_1km: hist.low_per_day, lowest_ft: hist.lowest_ft,
+            note: 'Aircraft below 3,000 ft seen in 5-minute snapshots within ~1 km; an exposure index (more = more low traffic), not a count of flights.' } : { available: false, note: hist.note } };
+      }
+      if (name === 'market_data') {
+        const d = await ctx.marketData?.(a.county || ''); if (!d) return { error: 'The Market view isn’t loaded in this version.' }; if (d.error) return d;
+        const t = a.topic || 'all', SEC = d.jobs?.sec ? d.jobs.sec.map((n, i) => [i, n]).sort((x, y) => y[1] - x[1]).slice(0, 5) : [];
+        const out = { area: d.area, data_built: d.built };
+        if (t === 'all' || t === 'population') out.population = d.pop || 'not available';
+        if (t === 'all' || t === 'jobs') out.jobs = d.jobs ? { jobs: d.jobs.n, growth_pct: d.jobs.gr != null ? Math.round(d.jobs.gr * 10) / 10 : null, year: d.jobs.year, base_year: d.jobs.baseYear, top_industries: SEC.map(([i, n]) => ({ industry: SECTORS[i]?.[1] || i, jobs: n })) } : 'not built yet';
+        if (t === 'all' || t === 'permits') out.housing_permits = d.permits ? { by_year: d.permits.map(r => ({ year: r.y, single_family_units: r.sf, multifamily_units: r.mf, value: r.value })), year_to_date: d.ytd || null } : 'not built yet';
+        if (t === 'all' || t === 'businesses') out.new_businesses = d.biz ? { per_month: d.biz.slice(-24), newest: (d.latest || []).slice(0, 15).map(x => ({ name: x.name, owner: x.owner, address: x.addr, city: x.city, county: x.county, permit_date: x.date, industry: SECTORS[x.sec]?.[1] || null })) } : 'not built yet';
+        if (t === 'all' || t === 'news') out.news = d.news ? d.news.slice(0, 12).map(x => ({ title: x.title, source: x.domain, date: x.date, place: x.place, url: x.url })) : 'not built yet';
+        return out;
+      }
+      if (name === 'field_notes') {
+        const db = ctx.field?.db || { notes: [], watch: [] }, words = String(a.query || '').toLowerCase().split(/\s+/).filter(Boolean);
+        let center = null; if (a.near) { const p = await resolvePlace(String(a.near)); if (p.error) return p; center = p.c; }
+        const mi = (x, y) => miles(center, [x, y]), R = Math.min(50, Math.max(0.25, a.radius_miles || 3));
+        const ok = (txt, x, y) => (!words.length || words.every(w => txt.toLowerCase().includes(w))) && (!center || mi(x, y) <= R);
+        const kind = a.kind || 'both';
+        const notes = kind === 'watchlist' ? [] : db.notes.filter(n => ok([n.title, n.text, n.tag].join(' '), n.lng, n.lat))
+          .map(n => ({ title: n.title || 'Untitled', tag: n.tag, text: (n.text || '').slice(0, 300), photos: (n.photos || []).length, added: n.created?.slice(0, 10), by: n.by || n.created_by_email || null, lat: n.lat, lon: n.lng, ...(center ? { miles_away: Math.round(mi(n.lng, n.lat) * 10) / 10 } : {}) }));
+        const watch = kind === 'notes' ? [] : db.watch.filter(w => ok([w.label, w.sub, w.kind].join(' '), w.lng, w.lat))
+          .map(w => ({ kind: w.kind, label: w.label, detail: w.sub, filing_id: w.kind === 'filing' ? w.ref : undefined, added: w.added?.slice(0, 10) }));
+        return { notes_total: db.notes.length, watchlist_total: db.watch.length, notes: notes.slice(0, 25), watchlist: watch.slice(0, 25), note: db.notes.length || db.watch.length ? undefined : 'No field notes or watched items yet.' };
+      }
+      if (name === 'data_sources') return ctx.sourcesList?.() || { error: 'The Sources tab isn’t loaded.' };
       if (name === 'reset_map') { const before = ctx.snapshot(); ctx.resetAll(); actionChip('Reset the map', () => ctx.restore(before)); return { reset: true, filings: ctx.visible.length }; }
       return { error: 'Unknown tool ' + name };
     } catch (e) { console.error(e); return { error: e.message }; }

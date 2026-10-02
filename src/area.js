@@ -14,6 +14,14 @@ export function initArea(ctx) {
     fetch('data/market.json').then(r => r.ok ? r.json() : null).catch(() => null)
   ]).then(([a, m]) => { area = a; market = m; });
   ctx.areaInfo = () => area ? { built: area.built, jobs: area.jobs, permits: !!area.permits, businesses: !!area.businesses, news: !!area.news } : null;
+  // the Market view's numbers for one county (name or FIPS) or the whole region, for the assistant (market_data)
+  ctx.marketData = async county => {
+    await load(); if (!area) return { error: 'The market data (jobs, permits, new businesses, news) hasn’t been built yet. It fills in after the nightly data refresh.' };
+    const c = county && area.counties.find(x => x.fips === county || x.name.toLowerCase() === String(county).toLowerCase().replace(/\s*county.*$/, ''));
+    if (county && !c) return { error: 'No market data for “' + county + '”. Counties covered: ' + area.counties.map(x => x.name).join(', ') + '.' };
+    const keepSel = sel, keepPlace = newsPlace; sel = c ? c.fips : 'all'; newsPlace = '';
+    try { return { area: c ? c.name + ' County' : 'all ' + area.counties.length + ' counties', built: area.built, ...stats() }; } finally { sel = keepSel; newsPlace = keepPlace; }
+  };
 
   const pct = v => v == null || !Number.isFinite(v) ? '—' : (v > 0 ? '+' : '') + (Math.abs(v) >= 10 ? Math.round(v) : v.toFixed(1)) + '%';
   const chg = (a, b) => a != null && b ? (a - b) / b * 100 : null;

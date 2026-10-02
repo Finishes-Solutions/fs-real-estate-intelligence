@@ -48,8 +48,20 @@
     },
     "api/imagery.js": {
       "maxDuration": 25
+    },
+    "api/planes.js": {
+      "maxDuration": 15
+    },
+    "api/planes-sample.js": {
+      "maxDuration": 30
     }
   },
+  "crons": [
+    {
+      "path": "/api/planes-sample",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/data/(.*)",
