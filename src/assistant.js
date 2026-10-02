@@ -127,7 +127,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', site_imagery: 'Searching NASA imagery…' };
+  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', site_imagery: 'Searching NASA imagery…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -243,6 +243,23 @@ export function initAssistant(ctx) {
         if (a.filter && pl.geom && /Polygon/.test(pl.geom.type)) { ctx.setSelection('place', pl.label, pl.geom); ctx.clearPlace(); out.filtered = true; out.filings = ctx.visible.length; }
         if (a.compare && pl.geom && /Polygon/.test(pl.geom.type)) out.added_to_compare = ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom });
         actionChip('Outlined ' + pl.label, () => ctx.clearPlace()); return out;
+      }
+      if (name === 'nearby_places') {
+        let o = null, from = '';
+        const f = a.id && ctx.BY_ID.get(String(a.id).trim());
+        if (f) { o = [f.lon, f.lat]; from = f.name; }
+        else if (isFinite(a.lat) && isFinite(a.lon) && a.lat && a.lon) { o = [a.lon, a.lat]; from = a.lat.toFixed(4) + ', ' + a.lon.toFixed(4); }
+        else if (/^(me|my location|my position|current location)$/i.test(String(a.near || '').trim())) { try { o = await ctx.locate(); from = 'your location'; } catch (e) { return { error: e.message }; } }
+        else if (a.near && !/^(here|this|this property|this building|the map|map center)$/i.test(String(a.near).trim())) { const p = await resolvePlace(String(a.near)); if (p.error) return { error: p.error }; o = p.c; from = p.label; }
+        else if (ctx.state.sel) { o = [ctx.state.sel.lon, ctx.state.sel.lat]; from = ctx.state.sel.name; }
+        else if (ctx.currentBuilding?.()) { const b = ctx.currentBuilding(); o = b.center; from = b.title || 'this building'; }
+        else { const c = ctx.map.getCenter(); o = [c.lng, c.lat]; from = 'the map center'; }
+        const q = new URLSearchParams({ lat: o[1].toFixed(5), lon: o[0].toFixed(5), what: String(a.what || '').slice(0, 60), limit: String(Math.max(1, Math.min(10, a.limit || 5))) });
+        const r = await fetch('api/nearby?' + q), d = await r.json().catch(() => ({}));
+        if (!r.ok) return { error: d.error || 'Nearby search failed (' + r.status + ').' };
+        if (ctx.view !== 'map') ctx.setView('map');
+        ctx.showNearby(d.places, o); actionChip('Nearest ' + (d.label || a.what).toLowerCase() + ' to ' + from + ': ' + d.places.length + ' found', () => ctx.clearNearby());
+        return { measured_from: from, category: d.label, searched_within_miles: d.searched_miles, places: d.places, note: 'Distances are straight-line miles. Source: OpenStreetMap.' };
       }
       if (name === 'compare_areas') {
         const names = (a.places || []).map(String).filter(Boolean).slice(0, 4); if (names.length < 2) return { error: 'Give 2 to 4 places.' };
