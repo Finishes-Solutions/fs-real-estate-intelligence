@@ -3,7 +3,7 @@
 import { makeMatcher, describe, miles } from './lib/filter.mjs';
 import { entityKey } from './lib/taxonomy.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
-import { cleanFilterArgs, pickPlace, frame, ZOOM } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
@@ -74,6 +74,14 @@ export function initAssistant(ctx) {
     log.querySelector('.ai-empty')?.remove();
     const d = document.createElement('div'); d.className = 'ai-m ' + role; d.innerHTML = html; log.appendChild(d); scroll(); return d;
   }
+  // follow-up suggestions under the latest answer; tapping one asks it
+  function pills(list) {
+    log.querySelectorAll('.ai-next').forEach(x => x.remove());
+    const d = document.createElement('div'); d.className = 'ai-next';
+    d.innerHTML = list.map(p => '<button type="button">' + esc(p) + '</button>').join('');
+    d.querySelectorAll('button').forEach(b => b.onclick = () => { if (busy) return; d.remove(); ask(b.textContent); });
+    log.appendChild(d); scroll();
+  }
   function actionChip(text, undo) {
     const d = bubble('act', '<span class="ai-ai">' + esc(text) + '</span>' + (undo ? '<button class="lnk" type="button">Undo</button>' : ''));
     if (undo) d.querySelector('button').onclick = () => { undo(); d.querySelector('button').remove(); d.classList.add('undone'); };
@@ -96,13 +104,15 @@ export function initAssistant(ctx) {
   }
   async function ask(text) {
     if (busy) return; open(false); busy = true; $('aiSend').disabled = true;
+    log.querySelectorAll('.ai-next').forEach(x => x.remove());
     bubble('user', esc(text)); history.push({ role: 'user', content: text });
     const thinking = bubble('bot pending', '<span class="dots"><i></i><i></i><i></i></span>'); status('Thinking…');
     try {
-      let input = [{ role: 'user', content: text }];
+      let input = [{ role: 'user', content: text }], next = [];
       for (let round = 0; round < 6; round++) {
-        const m = await post(input);
-        if (m.text) { thinking.before(bubble('bot', ctx.richText(m.text))); ctx.wireCites(log); history.push({ role: 'assistant', content: m.text }); }
+        const m = await post(input), fu = splitFollowups(m.text);
+        if (fu.pills.length) next = fu.pills;
+        if (fu.text) { thinking.before(bubble('bot', ctx.richText(fu.text))); ctx.wireCites(log); history.push({ role: 'assistant', content: fu.text }); }
         if (!m.calls?.length) break;
         input = [];
         for (const c of m.calls) {
@@ -113,6 +123,7 @@ export function initAssistant(ctx) {
         }
         log.appendChild(thinking); scroll(); status('Thinking…');
       }
+      if (next.length) pills(next);
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
@@ -318,7 +329,7 @@ export function initAssistant(ctx) {
         bubble('user', esc(t)); history.push({ role: 'user', content: t }); break;
       }
       case 'response.output_audio_transcript.delta':
-        if (!liveBubble) liveBubble = bubble('bot', ''); liveBubble.dataset.t = (liveBubble.dataset.t || '') + e.delta; liveBubble.innerHTML = ctx.richText(liveBubble.dataset.t); scroll(); setLive('Speaking'); break;
+        if (!liveBubble) liveBubble = bubble('bot', ''); liveBubble.dataset.t = (liveBubble.dataset.t || '') + e.delta; liveBubble.innerHTML = ctx.richText(splitFollowups(liveBubble.dataset.t).text); scroll(); setLive('Speaking'); break;
       case 'response.output_audio_transcript.done': if (liveBubble) { history.push({ role: 'assistant', content: liveBubble.dataset.t || '' }); ctx.wireCites(log); } liveBubble = null; break;
       case 'response.function_call_arguments.done': {
         pendingCalls++; setLive(LABEL[e.name] || 'Working…');

@@ -1,6 +1,6 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, frame, ZOOM } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
 import { USES } from '../lib/taxonomy.mjs';
 
 // the model filled every filter: all uses, all types, $5M–$1T, changed this week
@@ -26,4 +26,11 @@ assert.equal(pickPlace('Cypress', [{ t: 'Cypress, Texas', name: 'Cypress', type:
 // framing several filings
 const f = frame([[-95.70, 29.97], [-95.701, 29.971]]); assert.ok(f.zoom > 16 && f.zoom <= 17.5, 'close group stays close: ' + f.zoom);
 assert.ok(frame([[-95.9, 30.0], [-95.3, 29.7]]).zoom < 12, 'spread group zooms out');
+// follow-up pills and plain text
+let fu = splitFollowups('Waller has 37 projects, est. $138M.\n[[Take me to Waller County | Show similar projects | When will IDV Brookshire finish? | a | b]]');
+assert.equal(fu.text, 'Waller has 37 projects, est. $138M.'); assert.deepEqual(fu.pills, ['Take me to Waller County', 'Show similar projects', 'When will IDV Brookshire finish?', 'a']);
+assert.deepEqual(splitFollowups('No pills here.'), { text: 'No pills here.', pills: [] });
+assert.equal(plainText('Waller County has **about est. $138.0M across 37 projects** and (**est. $40.1M**) TABS1'), 'Waller County has about est. $138.0M across 37 projects and (est. $40.1M) TABS1');
+assert.equal(plainText('## Top\n* one\n- two\n1. three'), 'Top\n• one\n• two\n1. three');
+assert.equal(plainText('est. $5M * 2 rooms'), 'est. $5M * 2 rooms', 'a lone asterisk stays');
 console.log('assistant ok');

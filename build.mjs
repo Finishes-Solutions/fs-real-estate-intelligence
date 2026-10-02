@@ -51,7 +51,8 @@ async function refresh() {
   log('period', iso(startD), '→', iso(endD), '|', counties.map(c => c.name).join(', '));
 
   // geometry (rebuilt only when regions change)
-  const rHash = hash(JSON.stringify(regions));
+  const GEO_V = 2; // bump to rebuild geo.json (2: TIGER/Line county outlines)
+  const rHash = hash(JSON.stringify(regions) + GEO_V);
   let geo = await readJSON(D + 'geo.json');
   if (!geo || geo._regions !== rHash || process.env.REBUILD_GEO) { geo = { ...(await buildGeo(regions)), _regions: rHash }; await fs.writeFile(D + 'geo.json', JSON.stringify(geo)); }
 

@@ -35,6 +35,10 @@ globalThis.fetch = async (url, opts = {}) => {
     const vars = u.searchParams.get('get').split(','), c = u.searchParams.get('in').split('county:')[1];
     return json([[...vars, 'state', 'county', 'tract'], [...vars.map((v, i) => String(1000 * (i + 1))), '48', c, '000100']]);
   }
+  if (u.host === 'tigerweb.geo.census.gov' && u.pathname.includes('State_County')) { // county outlines: a box per GEOID
+    const ids = (u.searchParams.get('where').match(/'(\d+)'/g) || []).map(x => x.slice(1, -1));
+    return json({ type: 'FeatureCollection', features: ids.map((id, i) => { const x = -97 + (i % 5) * 0.4, y = 29.4 + Math.floor(i / 5) * 0.4;
+      return { type: 'Feature', properties: { GEOID: id, NAME: 'C' + id }, geometry: { type: 'Polygon', coordinates: [[[x, y], [x + .4, y], [x + .4, y + .4], [x, y + .4], [x, y]]] } }; }) }); }
   if (u.host === 'tigerweb.geo.census.gov') return json({ features: +u.searchParams.get('resultOffset') ? [] : [{ properties: { GEOID: '48473000100' }, geometry: { type: 'Polygon', coordinates: [[[-96, 30], [-95.9, 30], [-95.9, 30.1], [-96, 30]]] } }] });
   return json({ error: 'unmocked ' + u }, 599);
 };

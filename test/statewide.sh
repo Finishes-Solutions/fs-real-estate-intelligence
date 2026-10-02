@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/data/cache"
 echo '{"TABS_seed":{"street":"1 A St","cityLine":"Waller, TX 77484","owner":"x","scope":"","sqft":"","design":"","tenant":"","facility":"","cost":5,"at":"2026-01-01"}}' > "$T/data/cache/tabs.json"
-run() { MOCK_LOG="$T/calls$1.log" MOCK_DB="$T/db.json" DATA_DIR="$T/data/" SUPABASE_URL=http://supa.test SUPABASE_SECRET_KEY=sb_secret_test OPENAI_API_KEY=sk-test GITHUB_OUTPUT="$T/out$1" \
+run() { MOCK_LOG="$T/calls$1.log" MOCK_DB="$T/db.json" DATA_DIR="$T/data/" SKIP_TIGER=1 SUPABASE_URL=http://supa.test SUPABASE_SECRET_KEY=sb_secret_test OPENAI_API_KEY=sk-test GITHUB_OUTPUT="$T/out$1" \
   env "${@:2}" node --import ./test/mock-net.mjs --import ./test/mock-supa.mjs build/backfill.mjs > "$T/log$1" 2>&1 || { cat "$T/log$1"; exit 1; }; }
 run 1 COUNTIES=Waller,Dallas PERIOD_START=2025-01-01 MODE=backfill; cp "$T/db.json" "$T/db1.json"
 run 2 COUNTIES=Waller MODE=recent RECENT_MONTHS=3 BUMP=1

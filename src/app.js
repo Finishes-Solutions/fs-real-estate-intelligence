@@ -15,6 +15,7 @@ import { initCompare } from './compare.js';
 import { initKpis } from './kpis.js';
 import { initExport } from './export.js';
 import { initLive } from './live.js';
+import { plainText } from './lib/assist-logic.mjs';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
 const getJSON=(u,optional)=>fetch(u,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error(u+' '+r.status); return r.json(); }).catch(e=>{ if(optional) return null; throw e; });
@@ -102,7 +103,7 @@ function addOverlays(){
   map.addLayer({id:'land-dots',type:'circle',source:'land',maxzoom:5,layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],1,.7,4,1.1],'circle-color':c.dot,'circle-opacity':['interpolate',['linear'],['zoom'],1,.45,3,.4,4.6,0],'circle-pitch-alignment':'map'}},before);
   map.addLayer({id:'texas-dots',type:'circle',source:'texas',minzoom:2.5,maxzoom:8.5,layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],3,.55,5,.8,7,1.1],'circle-color':c.dot,'circle-opacity':['interpolate',['linear'],['zoom'],2.5,0,3.5,.45,6,.4,7,.2,8,0],'circle-pitch-alignment':'map'}},before);
   map.addLayer({id:'county-dots',type:'circle',source:'cdots',minzoom:5.5,maxzoom:12,layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],6,.5,8,.8,10,1.1,11.5,1.3],'circle-color':['case',['==',['get','w'],1],c.waller,c.dot],'circle-opacity':['interpolate',['linear'],['zoom'],5.5,0,6.5,.35,8.5,.45,10,.3,11.5,0],'circle-pitch-alignment':'map'}},before);
-  map.addLayer({id:'county-line',type:'line',source:'counties',layout:{visibility:layers.counties?'visible':'none'},paint:{'line-color':['case',['==',['get','w'],1],c.waller,c.line],'line-width':['case',['==',['get','w'],1],2,1.2]}},before);
+  map.addLayer({id:'county-line',type:'line',source:'counties',layout:{visibility:layers.counties?'visible':'none','line-join':'round'},paint:{'line-color':['case',['==',['get','w'],1],c.waller,c.line],'line-width':['interpolate',['linear'],['zoom'],6,['case',['==',['get','w'],1],1.8,1],11,['case',['==',['get','w'],1],2.2,1.4],16,['case',['==',['get','w'],1],3,2]]}},before);
   map.addLayer({id:'sel-fill',type:'fill',source:'sel',paint:{'fill-color':c.sel,'fill-opacity':.09}});
   map.addLayer({id:'sel-line',type:'line',source:'sel',paint:{'line-color':c.sel,'line-width':2.2,'line-dasharray':[3,2]}});
   map.addLayer({id:'draft-fill',type:'fill',source:'draft',filter:['==','$type','Polygon'],paint:{'fill-color':c.sel,'fill-opacity':.1}});
@@ -351,7 +352,7 @@ async function loadBrief(f){
   catch(e){ if(state.sel===f) box.innerHTML='<div class="rnote">'+esc(e.message)+'</div><button class="btn" id="briefBtn">Try again</button>', box.querySelector('#briefBtn').onclick=()=>loadBrief(f); }
 }
 // AI text -> safe HTML: escaped, paragraphs, [TABS…] citations become buttons that select the filing
-function richText(t){ return esc(t||'').split(/\n{2,}|\n(?=[A-Z][^\n]{0,40}\n)/).map(p=>'<p>'+p.replace(/\n/g,'<br>')+'</p>').join('').replace(/\[(TABS[0-9A-Za-z-]+)\]/g,(m,id)=>BY_ID.has(id)?'<button class="cite" data-id="'+id+'">'+id+'</button>':id); }
+function richText(t){ return esc(plainText(t||'')).split(/\n{2,}|\n(?=[A-Z][^\n]{0,40}\n)/).map(p=>'<p>'+p.replace(/\n/g,'<br>')+'</p>').join('').replace(/\[(TABS[0-9A-Za-z-]+)\]/g,(m,id)=>BY_ID.has(id)?'<button class="cite" data-id="'+id+'">'+id+'</button>':id); }
 function wireCites(el){ el.querySelectorAll('.cite').forEach(b=>b.onclick=()=>{ const f=BY_ID.get(b.dataset.id); if(f){ setView('map'); select(f,true); } }); }
 const cardCloseHooks=[];
 function clearSel(){ state.sel=null; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
@@ -481,7 +482,7 @@ function localSearch(q){
 async function geocode(q,o={}){
   let ctl; if(!o.exact){ if(geoCtl) geoCtl.abort(); ctl=geoCtl=new AbortController(); }
   const c=map.getCenter(), prox=o.exact?c.lng.toFixed(4)+','+c.lat.toFixed(4):'-95.9,30.0', bbox=o.exact?'-106.7,25.8,-93.5,36.5':'-97.6,28.6,-94.2,31.4';
-  const u='https://api.maptiler.com/geocoding/'+encodeURIComponent(q)+'.json?key='+MAPTILER_KEY+'&country=us&limit=6&proximity='+prox+'&autocomplete='+!o.exact+'&bbox='+bbox;
+  const u='https://api.maptiler.com/geocoding/'+encodeURIComponent(q)+'.json?key='+MAPTILER_KEY+'&country=us&limit='+(o.limit||6)+'&proximity='+prox+'&autocomplete='+!o.exact+'&bbox='+bbox;
   try{ const r=await fetch(u,ctl?{signal:ctl.signal}:{}); if(!r.ok) return []; const d=await r.json();
     return (d.features||[]).map(f=>({t:(f.place_name||f.text||'').replace(/, United States$/,''),name:f.text||'',type:(f.place_type&&f.place_type[0])||'place',k:(f.place_type&&f.place_type[0]==='address')?'Address':((f.place_type&&f.place_type[0])||'Place').replace(/^\w/,c=>c.toUpperCase()),c:f.center,bbox:f.bbox})); }
   catch(e){ return []; }

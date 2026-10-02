@@ -1,5 +1,5 @@
-// Map search (under the map tools): filings by project, owner, address, developer or TABS number, plus places
-// (counties, towns, addresses, landmarks, roads). Results appear while typing, 10 at a time, with more loading as you
+// Map search (under the map tools): real street addresses, places (counties, towns, neighborhoods, landmarks, roads),
+// projects by name, companies and people (owners, developers, architects, contractors) and filings at matching addresses. Results appear while typing, 10 at a time, with more loading as you
 // scroll. Picking a place outlines it on the map: city / county / neighborhood boundaries and building footprints
 // from OpenStreetMap (Nominatim), whole roads from OpenStreetMap (Overpass). The place card can filter to the area
 // or add it to Compare.
@@ -14,7 +14,7 @@ export function initMapSearch(ctx) {
   const { map, esc, fmtM, fmtN, F, COUNTIES, DATA } = ctx;
   const wrap = document.getElementById('msearch'), input = document.getElementById('msq'), res = document.getElementById('msres'), clearB = document.getElementById('msx');
   const bar = document.getElementById('placebar');
-  let items = [], hits = [], shown = 0, active = -1, q = '', geoT = 0, seq = 0, remote = [];
+  let items = [], shown = 0, active = -1, q = '', geoT = 0, seq = 0, remote = [];
 
   // ---------- mount: under the tools (tablet/desktop) or in the floating top bar (phone) ----------
   const phoneMQ = window.matchMedia('(max-width:700px)');
@@ -22,71 +22,119 @@ export function initMapSearch(ctx) {
   phoneMQ.addEventListener('change', mount); mount();
 
   // ---------- local search ----------
-  const hay = f => f._sh ||= [f.name, f.owner, f.addr, f.city, f.dev, f.ten, f.id, f.arch, f.gc].filter(Boolean).join(' · ').toLowerCase();
+  const low = v => (v || '').toLowerCase();
+  const matches = (h, toks) => toks.every(x => h.includes(x));
+  // projects whose name matches, then filings that match only by address / city / TABS number / tenant
   function searchFilings(text) {
-    const t = text.toLowerCase(), toks = t.split(/\s+/).filter(Boolean); if (!toks.length) return [];
-    const vis = new Set(ctx.visible), out = [];
-    for (const f of F) { const h = hay(f); if (!toks.every(x => h.includes(x))) continue;
-      const nm = f.name.toLowerCase(); out.push({ f, s: (nm.startsWith(t) ? 4 : nm.includes(t) ? 2 : 0) + ((f.addr || '').toLowerCase().startsWith(t) ? 2 : 0) + ((f.owner || '').toLowerCase().includes(t) ? 1 : 0) + (vis.has(f) ? 1 : 0) }); }
-    return out.sort((a, b) => b.s - a.s || b.f.cost - a.f.cost).map(x => x.f);
+    const t = low(text), toks = t.split(/\s+/).filter(Boolean); if (!toks.length) return { names: [], addrs: [] };
+    const vis = new Set(ctx.visible), names = [], addrs = [];
+    for (const f of F) {
+      const nm = low(f.name);
+      if (matches(nm, toks)) names.push({ f, s: (nm.startsWith(t) ? 4 : nm.includes(t) ? 2 : 0) + (vis.has(f) ? 1 : 0) });
+      else if (matches(f._ah ||= low([f.addr, f.city, f.id, f.ten].filter(Boolean).join(' · ')), toks)) addrs.push({ f, s: (low(f.addr).startsWith(t) ? 2 : 0) + (vis.has(f) ? 1 : 0) });
+    }
+    const by = (a, b) => b.s - a.s || b.f.cost - a.f.cost;
+    return { names: names.sort(by).map(x => x.f), addrs: addrs.sort(by).map(x => x.f) };
+  }
+  // owners, developers, architects and contractors, LLC/Inc. variants merged
+  const ROLE = { owner: 'Owner', dev: 'Developer', arch: 'Architect', gc: 'Contractor' };
+  let ENT = null;
+  function entities() {
+    if (ENT) return ENT; const m = new Map();
+    for (const f of F) for (const [r, raw] of [['owner', f.owner], ['dev', f.dev], ['arch', f.arch], ['gc', f.gc]]) {
+      const k = ctx.entityKey(raw); if (!k) continue;
+      let e = m.get(k); if (!e) m.set(k, e = { k, names: {}, roles: new Set(), ids: new Set(), v: 0, hay: '' });
+      e.names[raw] = (e.names[raw] || 0) + 1; e.roles.add(r); if (!e.ids.has(f.id)) { e.ids.add(f.id); e.v += f.cost; }
+    }
+    ENT = [...m.values()].map(e => ({ ...e, label: Object.entries(e.names).sort((a, b) => b[1] - a[1])[0][0], hay: low(Object.keys(e.names).join(' · ') + ' ' + e.k) }));
+    return ENT;
+  }
+  function searchEntities(text) {
+    const toks = low(text).split(/\s+/).filter(x => x.length > 1); if (!toks.length || text.trim().length < 3) return [];
+    return entities().filter(e => matches(e.hay, toks)).sort((a, b) => b.v - a.v).slice(0, 8);
   }
   function localPlaces(text) {
-    const t = text.toLowerCase().replace(/\s+county$/, '').trim(); if (t.length < 2) return [];
+    const t = low(text).replace(/\s+county$/, '').trim(); if (t.length < 2) return [];
     const m = text.match(/^\s*(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
     if (m) { let a = +m[1], b = +m[2], lat = a, lon = b; if (Math.abs(a) > 90) { lon = a; lat = b; } return [{ label: lat.toFixed(5) + ', ' + lon.toFixed(5), kind: 'coords', c: [lon, lat] }]; }
-    const cs = COUNTIES.filter(c => c.toLowerCase().startsWith(t)).map(c => ({ label: c + ' County', name: c, kind: 'county', c: DATA.counties.find(x => x.name === c).label }));
-    const ts = (DATA.places || []).filter(p => p[0].toLowerCase().startsWith(t)).slice(0, 4).map(p => ({ label: p[0] + ', TX', name: p[0], kind: 'town', c: [p[1], p[2]] }));
+    const cs = COUNTIES.filter(c => low(c).startsWith(t)).map(c => ({ label: c + ' County', name: c, kind: 'county', c: DATA.counties.find(x => x.name === c).label }));
+    const ts = (DATA.places || []).filter(p => low(p[0]).startsWith(t)).slice(0, 4).map(p => ({ label: p[0] + ', TX', name: p[0], kind: 'town', c: [p[1], p[2]] }));
     return cs.concat(ts);
   }
 
-  // ---------- results ----------
+  // ---------- results: Addresses · Places · Projects · Companies & people · Filings at matching addresses ----------
+  let names = [], addrs = [], ents = [], shownA = 0;
   function run(text) {
     q = text.trim(); clearB.hidden = !q; remote = [];
     if (!q) { close(); return; }
-    hits = searchFilings(q); shown = Math.min(PAGE, hits.length); active = -1; render();
+    ({ names, addrs } = searchFilings(q)); ents = searchEntities(q);
+    shown = Math.min(PAGE, names.length); shownA = Math.min(names.length ? 3 : PAGE, addrs.length); active = -1; render();
     clearTimeout(geoT); const my = ++seq;
     if (q.length >= 3 && !/^\s*-?\d+(\.\d+)?\s*[, ]/.test(q)) geoT = setTimeout(async () => {
-      const g = await ctx.geocode(q); if (my !== seq) return;
-      const have = new Set(localPlaces(q).map(p => p.label.toLowerCase()));
-      remote = g.filter(x => !have.has((x.name || '').toLowerCase() + ', tx')).slice(0, 5).map(x => ({ label: x.t, name: x.name, kind: kindFromMaptiler(x.type), c: x.c, bbox: x.bbox }));
+      const g = await ctx.geocode(q, { limit: 10 }); if (my !== seq) return;
+      const have = new Set(localPlaces(q).map(p => low(p.label)));
+      remote = g.filter(x => !have.has(low(x.name) + ', tx')).map(x => ({ label: x.t, name: x.name, kind: kindFromMaptiler(x.type), c: x.c, bbox: x.bbox }));
       render();
-    }, 240);
+    }, 220);
   }
+  const sec = (title, extra = '') => '<div class="ms-sec"><span>' + title + '</span>' + extra + '</div>';
   function render() {
-    const places = localPlaces(q).concat(remote).slice(0, 7);
+    const addresses = remote.filter(p => p.kind === 'address').slice(0, 5);
+    const places = localPlaces(q).concat(remote.filter(p => p.kind !== 'address')).slice(0, 6);
+    const vis = new Set(ctx.visible), filingRow = f => '<b>' + esc(f.name) + '</b><i>' + fmtM(f.cost) + '</i><span>' + esc([f.addr || f.city, f.owner].filter(Boolean).join(' · ')) + (vis.has(f) ? '' : ' · <em>hidden by filters</em>') + '</span>';
     items = []; let h = '';
-    if (places.length) { h += '<div class="ms-sec">Places</div>'; places.forEach(p => { items.push({ t: 'place', p }); h += btn(items.length - 1, '<b>' + esc(p.label) + '</b><i>' + esc(KIND_LABEL[p.kind] || 'Place') + '</i>'); }); }
-    if (hits.length) {
-      h += '<div class="ms-sec">Filings · ' + fmtN(hits.length) + ' match' + (hits.length > 1 ? 'es' : '') + '<button class="lnk" data-act="filter" type="button">Show all on map</button></div>';
-      const vis = new Set(ctx.visible);
-      hits.slice(0, shown).forEach(f => { items.push({ t: 'filing', f }); h += btn(items.length - 1, '<b>' + esc(f.name) + '</b><i>' + fmtM(f.cost) + '</i><span>' + esc([f.addr || f.city, f.owner].filter(Boolean).join(' · ')) + (vis.has(f) ? '' : ' · <em>hidden by filters</em>') + '</span>'); });
-      if (hits.length > shown) h += '<button class="ms-more" data-act="more" type="button">Showing ' + shown + ' of ' + fmtN(hits.length) + ' · show ' + Math.min(PAGE, hits.length - shown) + ' more</button>';
+    const push = (it, inner) => { items.push(it); h += btn(items.length - 1, inner); };
+    if (addresses.length) { h += sec('Addresses'); addresses.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>Address</i>')); }
+    if (places.length) { h += sec('Places'); places.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>' + esc(KIND_LABEL[p.kind] || 'Place') + '</i>')); }
+    if (names.length) {
+      h += sec('Projects · ' + fmtN(names.length), '<button class="lnk" data-act="filter" type="button">Show all on map</button>');
+      names.slice(0, shown).forEach(f => push({ t: 'filing', f }, filingRow(f)));
+      if (names.length > shown) h += '<button class="ms-more" data-act="more" type="button">Showing ' + shown + ' of ' + fmtN(names.length) + ' · show ' + Math.min(PAGE, names.length - shown) + ' more</button>';
     }
-    if (!h) h = '<div class="ms-none">' + (q.length < 3 ? 'Keep typing…' : 'No filings or places match “' + esc(q) + '”.') + '</div>';
+    if (ents.length) { h += sec('Companies & people');
+      ents.forEach(e => push({ t: 'entity', e }, '<b>' + esc(e.label) + '</b><i>' + fmtN(e.ids.size) + ' project' + (e.ids.size > 1 ? 's' : '') + '</i><span>' + [...e.roles].map(r => ROLE[r]).join(' · ') + ' · est. ' + fmtM(e.v) + '</span>')); }
+    if (addrs.length) {
+      h += sec('Filings at matching addresses · ' + fmtN(addrs.length), names.length ? '' : '<button class="lnk" data-act="filter" type="button">Show all on map</button>');
+      addrs.slice(0, shownA).forEach(f => push({ t: 'filing', f }, filingRow(f)));
+      if (addrs.length > shownA) h += '<button class="ms-more" data-act="moreA" type="button">Showing ' + shownA + ' of ' + fmtN(addrs.length) + ' · show more</button>';
+    }
+    if (!h) h = '<div class="ms-none">' + (q.length < 3 ? 'Keep typing…' : 'Nothing matches “' + esc(q) + '”.') + '</div>';
     const top = res.scrollTop; res.innerHTML = h; res.scrollTop = top; if (document.activeElement === input || res.contains(document.activeElement) || res.classList.contains('on')) open();
     res.querySelectorAll('[data-i]').forEach(b => { b.onclick = () => pick(+b.dataset.i); b.onmouseenter = () => setActive(+b.dataset.i, false); });
-    res.querySelector('[data-act=filter]')?.addEventListener('click', applyKeyword);
+    res.querySelectorAll('[data-act=filter]').forEach(b => b.addEventListener('click', applyKeyword));
     res.querySelector('[data-act=more]')?.addEventListener('click', more);
+    res.querySelector('[data-act=moreA]')?.addEventListener('click', moreA);
   }
   const btn = (i, inner) => '<button type="button" role="option" class="ms-it' + (i === active ? ' on' : '') + '" data-i="' + i + '">' + inner + '</button>';
-  function more() { if (shown >= hits.length) return; shown = Math.min(hits.length, shown + PAGE); render(); }
+  function more() { if (shown < names.length) { shown = Math.min(names.length, shown + PAGE); render(); } else moreA(); }
+  function moreA() { if (shownA >= addrs.length) return; shownA = Math.min(addrs.length, shownA + PAGE); render(); }
   res.addEventListener('scroll', () => { if (res.scrollTop + res.clientHeight > res.scrollHeight - 40) more(); });
   function setActive(i, scroll = true) { active = i; res.querySelectorAll('.ms-it').forEach(b => b.classList.toggle('on', +b.dataset.i === i)); if (scroll) res.querySelector('.ms-it.on')?.scrollIntoView({ block: 'nearest' }); }
   function open() { res.classList.add('on'); input.setAttribute('aria-expanded', 'true'); }
   function close() { res.classList.remove('on'); input.setAttribute('aria-expanded', 'false'); }
   function applyKeyword() { seq++; clearTimeout(geoT); ctx.state.q = q; ctx.applyFilters(); close(); ctx.setView('map'); ctx.fitToVisible(); ctx.toast('Filtered to ' + fmtN(ctx.visible.length) + ' filings matching “' + q + '”.'); }
+  // a company or person: the Activity filter when it covers all their projects, otherwise a keyword search on the name
+  function showEntity(e) {
+    ctx.setView('map'); ctx.state.q = '';
+    const pick = ['dev', 'arch', 'gc'].map(k => ({ k, n: F.filter(f => ctx.entityKey(k === 'dev' ? (f.dev || f.owner) : f[k]) === e.k).length })).sort((a, b) => b.n - a.n)[0];
+    if (pick.n >= e.ids.size) ctx.state.who = { k: pick.k, v: e.k, label: e.label };
+    else { ctx.state.who = null; ctx.state.q = e.label; }
+    ctx.applyFilters(); ctx.fitToVisible(); input.value = e.label; clearB.hidden = false;
+    ctx.toast('Showing ' + fmtN(ctx.visible.length) + ' filings for ' + e.label + (ctx.visible.length < e.ids.size ? ' (some are outside the current date or type filters)' : '') + '.');
+  }
   function pick(i) {
     const it = items[i]; if (!it) return; seq++; clearTimeout(geoT); close(); input.blur();
     if (it.t === 'filing') { ctx.setView('map'); ctx.select(it.f, true); return; }
+    if (it.t === 'entity') { showEntity(it.e); return; }
     showPlace(it.p);
   }
   let it0 = 0;
   input.addEventListener('input', () => { clearTimeout(it0); it0 = setTimeout(() => run(input.value), 90); });
   input.addEventListener('focus', () => { if (q) render(); });
   input.addEventListener('keydown', e => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); if (active >= items.length - 1 && shown < hits.length) more(); setActive(Math.min(items.length - 1, active + 1)); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (active >= items.length - 1) more(); setActive(Math.min(items.length - 1, active + 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(0, active - 1)); }
-    else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0) pick(active); else if (items[0]?.t === 'place' && !hits.length) pick(0); else if (hits.length) applyKeyword(); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0) pick(active); else if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); }
     else if (e.key === 'Escape') { close(); input.blur(); }
   });
   clearB.onclick = () => { input.value = ''; run(''); clearPlace(); if (ctx.state.q) { ctx.state.q = ''; ctx.applyFilters(); } input.focus(); };

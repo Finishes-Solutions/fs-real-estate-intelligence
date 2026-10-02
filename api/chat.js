@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   try {
     const r = await respond({ key, model: await model(key), tools: responseTools(), input, previousResponseId: prev, maxTokens: 8000,
       effort: process.env.OPENAI_CHAT_REASONING_EFFORT || undefined,
-      instructions: systemPrompt({ coverage: clip(ctx.coverage, 600), filters: clip(ctx.filters, 400) }) });
+      instructions: systemPrompt({ coverage: clip(ctx.coverage, 600), filters: clip(ctx.filters, 400), screen: clip(ctx.screen, 2500), followups: true }) });
     return res.json({ id: r.id, text: r.text, calls: r.calls.filter(c => NAMES.has(c.name)) });
   } catch (e) {
     console.error('chat failed', e.message);
