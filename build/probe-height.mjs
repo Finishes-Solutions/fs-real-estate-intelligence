@@ -1,7 +1,7 @@
 // Diagnostic: building heights from 3DEP lidar (Planetary Computer) for known buildings. Run in Actions ("Probe services", script=height).
 import { lidarHeight, floorsFromHeight } from '../lib/height.mjs';
 const box = (lon, lat, dx, dy) => ({ type: 'Polygon', coordinates: [[[lon - dx, lat - dy], [lon + dx, lat - dy], [lon + dx, lat + dy], [lon - dx, lat + dy], [lon - dx, lat - dy]]] });
-const tests = [['JPMorgan Chase Tower (≈305 m, 75 fl)', -95.36338, 29.75993, .0003, .0003], ['Williams Tower (≈275 m, 64 fl)', -95.46155, 29.73727, .00025, .00025],
+const tests = [['JPMorgan Chase Tower (≈305 m, 75 fl)', -95.36338, 29.75993, .00018, .00018], ['Heritage Plaza (≈232 m, 53 fl)', -95.36840, 29.75740, .00015, .00015], ['Williams Tower (≈275 m, 64 fl)', -95.46155, 29.73727, .00025, .00025],
   ['Memorial Hermann Katy (hospital)', -95.80436, 29.78395, .0004, .0003], ['A Katy house', -95.79210, 29.80070, .00008, .00008], ['Waller county courthouse', -96.07763, 30.05665, .0002, .0002]];
 const PC = 'https://planetarycomputer.microsoft.com/api';
 for (const u of [PC + '/stac/v1/collections/3dep-lidar-hag', PC + '/stac/v1/collections/3dep-lidar-dsm']) {
