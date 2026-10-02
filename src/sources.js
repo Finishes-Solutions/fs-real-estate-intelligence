@@ -1,7 +1,7 @@
 // Sources tab: every data source the app uses, what it feeds, and how fresh it is. Filings, changes, geocodes, AI fields and
 // demographics come from the nightly build (last refresh time is in the data files); map layers and lookups are fetched live.
 const NIGHTLY_UTC = [9, 17]; // .github/workflows/data.yml: 09:17 UTC = 4:17 AM Central
-const BASEMAP = { dots: 'MapTiler Dataviz', streets: 'MapTiler Streets', sat: 'MapTiler Satellite', topo: 'MapTiler Topo', esri: 'Esri World Imagery', free: 'OpenFreeMap' };
+const BASEMAP = { dots: 'Default (MapTiler Dataviz)', streets: 'MapTiler Streets', sat: 'MapTiler Satellite', topo: 'MapTiler Topo', esri: 'ESRI (Esri World Imagery)', free: 'OpenFreeMap' };
 
 export function initSources(ctx) {
   const { DATA, F, esc, fmtN } = ctx, root = document.getElementById('view-sources');

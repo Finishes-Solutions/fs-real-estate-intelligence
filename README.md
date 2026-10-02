@@ -87,7 +87,7 @@ Layers panel → **Live conditions**, the **From here** buttons on every filing 
 | NASA recent imagery, site imagery thumbnails | NASA GIBS + CMR + Worldview Snapshots (HLS Landsat / Sentinel-2, 30 m), browser direct | none |
 | High-res site imagery (dated, sub-metre) | Esri World Imagery Wayback (archived versions, only those where the spot changed) and USDA NAIP (~0.6 m, Texas about every 2 years) from Microsoft Planetary Computer, through `api/imagery` | none |
 | Project news | GDELT Project DOC 2.0, through `api/news` | none |
-| Esri sat / Free map basemaps | Esri World Imagery, OpenFreeMap | none |
+| ESRI / Free Map basemaps | Esri World Imagery, OpenFreeMap | none |
 
 Voice and chat understand requests like "how far is this property from me and what's the drive time", "how's traffic getting there", "turn on radar and wind", "show hurricanes", "what's the weather here", "any news on this developer", "has work started on this site". "This" means the card that is open; "me" is the phone or laptop's GPS (the browser asks for permission once). With no card open, distance questions use the filing nearest to you.
 

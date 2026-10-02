@@ -961,3 +961,5 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 @media (max-width:1100px) and (min-width:701px){ .app:has(.card.open){--fabr:calc(min(400px,100% - 24px) + 24px)} }
 @media (max-width:700px){ .fab-sugs,.mskbd{display:none} }
 @media (pointer:coarse){ .ai-fab kbd,.mskbd{display:none} }
+/* with a card open, the map buttons (and the Layers panel) move left of it, like Ask AI, so the card never hides them */
+@media (min-width:701px){ .app:has(.card.open) .ctrls{right:var(--fabr,16px)} .app:has(.card.open) .layers{right:calc(var(--fabr,16px) + 46px)} }
