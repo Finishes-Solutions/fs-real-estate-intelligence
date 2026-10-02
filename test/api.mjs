@@ -39,10 +39,10 @@ let last; for (let i = 0; i < 26; i++) { last = mockRes(); await chat(req({ body
 assert.equal(last.code, 429, 'rate limited');
 
 const rt = (await import('../api/realtime.js')).default;
-res = mockRes(); await rt(req({ body: { context: { coverage: 'c' } }, ip: '7.7.7.7' }), res);
+res = mockRes(); await rt(req({ body: { context: { coverage: 'c', screen: 'View: map; centered near Katy', vocab: 'Katy, Waller' } }, ip: '7.7.7.7' }), res);
 assert.equal(res.code, 200, JSON.stringify(res.body)); assert.equal(res.body.value, 'ek_test'); assert.equal(res.body.model, 'gpt-realtime-2.1');
 const sess = calls.filter(c => c.url.endsWith('/realtime/client_secrets')).pop().body.session;
-assert.equal(sess.type, 'realtime'); assert.ok(sess.tools.every(t => t.type === 'function' && t.name && t.parameters), 'flat realtime tools');
+assert.equal(sess.type, 'realtime'); assert.equal(sess.audio.input.transcription.model, 'gpt-4o-transcribe'); assert.equal(sess.audio.input.turn_detection.eagerness, 'high'); assert.match(sess.audio.input.transcription.prompt, /TDLR/); assert.match(sess.instructions, /looking at right now/); assert.ok(sess.tools.every(t => t.type === 'function' && t.name && t.parameters), 'flat realtime tools');
 
 const pai = (await import('../api/pipeline-ai.js')).default;
 res = mockRes(); await pai(req({ body: { items: [{ id: 'X' }] }, ip: '8.8.8.8' }), res); assert.equal(res.code, 401, 'pipeline-ai needs a GitHub OIDC token');

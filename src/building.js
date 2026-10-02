@@ -94,6 +94,7 @@ export function initBuildings(ctx) {
   });
   map.getCanvas().addEventListener('mouseleave', () => map.getSource('fs-bhov')?.setData({ type: 'FeatureCollection', features: [] }));
 
+  ctx.currentBuilding = () => cur && { center: cur.center, height: cur.height, title: card.querySelector('#bTitle')?.textContent };
   ctx.openBuildingAt = (lngLat, footprint) => open({ footprint: footprint || null, height: null, base: 0, center: lngLat });
 
   async function open(b) {

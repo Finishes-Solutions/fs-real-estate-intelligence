@@ -2,6 +2,7 @@
 // Tool calls from either channel run here, against the filings loaded in the browser (see lib/agent-tools.mjs).
 import { makeMatcher, describe, miles } from './lib/filter.mjs';
 import { entityKey } from './lib/taxonomy.mjs';
+import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
@@ -24,6 +25,7 @@ export function initAssistant(ctx) {
     <div class="ai-live" id="aiLive" hidden>
       <div class="ai-orb" id="aiOrb"><i></i><i></i><i></i><i></i><i></i></div>
       <div class="ai-lt"><b id="aiLiveT">Connecting…</b><span id="aiLiveS">Voice conversation</span></div>
+      <button class="btn" id="aiSendNow" type="button" hidden>Send</button>
       <button class="btn" id="aiStop" type="button">End</button>
     </div>
     <form class="ai-f" id="aiForm" autocomplete="off">
@@ -82,7 +84,7 @@ export function initAssistant(ctx) {
   form.onsubmit = e => { e.preventDefault(); const t = q.value.trim(); if (!t) return; q.value = ''; q.style.height = 'auto'; ask(t); };
 
   // ---------- text chat loop ----------
-  const context = () => ({ coverage: ctx.coverage(), filters: ctx.filterText() || 'none (default view)' });
+  const context = () => ({ coverage: ctx.coverage(), filters: ctx.filterText() || 'none (default view)', screen: ctx.screenContext(), vocab: ctx.vocab() });
   let thread = null; // OpenAI response id that continues this conversation
   async function post(input) {
     const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, previous_response_id: thread, context: context() }) });
@@ -224,7 +226,7 @@ export function initAssistant(ctx) {
       pc.ontrack = e => { audio.srcObject = e.streams[0]; };
       pc.addTrack(mic.getAudioTracks()[0], mic);
       dc = pc.createDataChannel('oai-events'); dc.onmessage = e => { try { onEvent(JSON.parse(e.data)); } catch (err) { console.error(err); } };
-      dc.onopen = () => setLive('Listening', 'Talk naturally. I’ll show things on the map as we go.');
+      dc.onopen = () => { lastCtx = ''; setLive('Listening', 'Talk naturally. I’ll answer when you pause.'); };
       pc.onconnectionstatechange = () => { if (['failed', 'disconnected', 'closed'].includes(pc?.connectionState)) stopVoice('Voice connection ended.'); };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
       const a = await fetch('https://api.openai.com/v1/realtime/calls', { method: 'POST', body: offer.sdp, headers: { Authorization: 'Bearer ' + s.value, 'Content-Type': 'application/sdp' } });
@@ -249,10 +251,19 @@ export function initAssistant(ctx) {
     } catch (e) { /* meter is decoration only */ }
   }
   const sendEv = o => { if (dc && dc.readyState === 'open') dc.send(JSON.stringify(o)); };
+  // keep the voice model's picture of the screen current: refresh its instructions when the map, filters or card change
+  let ctxT = 0, lastCtx = '';
+  function pushContext() {
+    clearTimeout(ctxT); ctxT = setTimeout(() => {
+      if (!dc || dc.readyState !== 'open') return; const c = context(), key = c.screen + c.filters; if (key === lastCtx) return; lastCtx = key;
+      sendEv({ type: 'session.update', session: { type: 'realtime', instructions: systemPrompt({ coverage: c.coverage, filters: c.filters, screen: c.screen }) + VOICE_STYLE } });
+    }, 1500);
+  }
+  ctx.map.on('moveend', pushContext); ctx.onChange(pushContext); ctx.onCardRender(pushContext); ctx.onCardClose(pushContext); ctx.onViewChange(pushContext);
   async function onEvent(e) {
     switch (e.type) {
-      case 'input_audio_buffer.speech_started': setLive('Listening…'); break;
-      case 'input_audio_buffer.speech_stopped': setLive('Thinking…'); break;
+      case 'input_audio_buffer.speech_started': setLive('Listening…', 'Pause when you’re done, or tap Send'); $('aiSendNow').hidden = false; break;
+      case 'input_audio_buffer.speech_stopped': setLive('Thinking…', ''); $('aiSendNow').hidden = true; break;
       case 'conversation.item.input_audio_transcription.completed': if (e.transcript?.trim()) { bubble('user', esc(e.transcript.trim())); history.push({ role: 'user', content: e.transcript.trim() }); } break;
       case 'response.output_audio_transcript.delta':
         if (!liveBubble) liveBubble = bubble('bot', ''); liveBubble.dataset.t = (liveBubble.dataset.t || '') + e.delta; liveBubble.innerHTML = ctx.richText(liveBubble.dataset.t); scroll(); setLive('Speaking'); break;
@@ -275,5 +286,7 @@ export function initAssistant(ctx) {
     }
   }
   $('aiMic').onclick = startVoice; $('aiStop').onclick = () => stopVoice();
+  // send now: end the turn without waiting for the pause detector
+  $('aiSendNow').onclick = () => { sendEv({ type: 'input_audio_buffer.commit' }); sendEv({ type: 'response.create' }); $('aiSendNow').hidden = true; setLive('Thinking…', ''); };
   ctx.assistant = { open, close, ask, startVoice };
 }
