@@ -167,13 +167,17 @@ export function initLive(ctx) {
 
   // ---------- route line ----------
   function drawRoute(r) {
-    route = r; if (!map.getStyle()) return;
+    route = r; showChip(r); if (!map.getStyle()) return;
     const data = { type: 'FeatureCollection', features: r?.line?.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: r.line } }] : [] };
     if (!map.getSource('live-route')) map.addSource('live-route', { type: 'geojson', data }); else map.getSource('live-route').setData(data);
     if (!map.getLayer('live-route-case')) map.addLayer({ id: 'live-route-case', type: 'line', source: 'live-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': .9 } }, below());
     if (!map.getLayer('live-route')) map.addLayer({ id: 'live-route', type: 'line', source: 'live-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#3987e5', 'line-width': 4 } }, below());
   }
-  const clearRoute = () => { route = null; map.getSource('live-route')?.setData({ type: 'FeatureCollection', features: [] }); };
+  // a small "Clear route" chip on the map whenever a route is showing (phone users have no other obvious way)
+  const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'route-chip'; chip.hidden = true; ctx.viewport.appendChild(chip);
+  chip.onclick = () => clearRoute();
+  const showChip = r => { chip.hidden = !(r?.line?.length > 1); if (!chip.hidden) chip.innerHTML = '<span>Route' + (r.miles != null ? ' · ' + r.miles + ' mi' + (r.minutes != null ? ' · ' + r.minutes + ' min' : '') : '') + '</span><b aria-hidden="true">×</b><i class="sr">Clear route</i>'; };
+  const clearRoute = () => { route = null; map.getSource('live-route')?.setData({ type: 'FeatureCollection', features: [] }); showChip(null); };
 
   // ---------- targets ----------
   ctx.onCardRender(info => { if (lastCard && lastCard !== info) clearRoute(); lastCard = info; renderCardTools(info); });
@@ -189,9 +193,12 @@ export function initLive(ctx) {
   async function me() { if (!ctx.locate) throw new Error('This browser can’t share its location.'); return { c: await ctx.locate(), name: 'your location' }; }
 
   async function drive(a = {}) {
-    const from = a.from_place ? await place(a.from_place) : await me(); if (!from) return { error: 'Couldn’t find “' + a.from_place + '”.' };
-    let to = null, note = '';
     const t = a.target || (a.filing_id ? 'filing' : a.to_place ? 'place' : 'selected');
+    // the card this drive belongs to, taken before any waiting (GPS, routing): if it's closed or swapped meanwhile, don't draw
+    const owner = t === 'selected' ? lastCard : null, gone = () => owner && owner !== lastCard;
+    const from = a.from_place ? await place(a.from_place) : await me(); if (!from) return { error: 'Couldn’t find “' + a.from_place + '”.' };
+    if (gone()) return { error: 'The property card was closed, so the drive was cancelled.' };
+    let to = null, note = '';
     if (t === 'filing') { const f = ctx.BY_ID.get(String(a.filing_id || '').trim()); if (!f) return { error: 'That filing isn’t loaded.' }; to = { c: [f.lon, f.lat], name: f.name, f, approx: !!f.approx }; }
     else if (t === 'place') { to = a.to_place && await place(a.to_place); if (!to) return { error: 'Couldn’t find that destination.' }; }
     else if (t === 'selected') to = cardPoint();
@@ -205,7 +212,8 @@ export function initLive(ctx) {
       const r = await fetch('api/drive?' + q), d = await r.json(); if (!r.ok) throw new Error(d.error || 'Error ' + r.status);
       Object.assign(out, { road_miles: d.miles, drive_minutes_now: d.minutes, typical_minutes: d.typical_minutes, traffic_delay_minutes: d.delay_minutes, live_traffic: d.traffic, routing_source: d.source, routing_note: d.note });
       out.summary = to.name + ': ' + d.miles + ' mi by road (' + straight.toFixed(1) + ' mi straight), about ' + d.minutes + ' min' + (d.traffic ? (d.delay_minutes > 1 ? ' with ' + d.delay_minutes + ' min of traffic delay' : ', traffic is light') : ' (no live traffic data)') + '.';
-      if (a.show_route !== false) { drawRoute(d); const xs = d.line.map(p => p[0]), ys = d.line.map(p => p[1]); if (xs.length) map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 70, maxZoom: 15, duration: ctx.reduceMotion ? 0 : 900 }); }
+      if (a.show_route !== false && gone()) out.note = [out.note, 'The card was closed before the route came back, so it isn’t drawn.'].filter(Boolean).join(' ');
+      else if (a.show_route !== false) { drawRoute(d); const xs = d.line.map(p => p[0]), ys = d.line.map(p => p[1]); if (xs.length) map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 70, maxZoom: 15, duration: ctx.reduceMotion ? 0 : 900 }); }
     } catch (e) { out.road_error = e.message; out.summary = to.name + ' is ' + straight.toFixed(1) + ' mi away in a straight line (driving route unavailable: ' + e.message + ').'; }
     out.google_maps = 'https://www.google.com/maps/dir/?api=1&origin=' + from.c[1].toFixed(5) + ',' + from.c[0].toFixed(5) + '&destination=' + to.c[1].toFixed(5) + ',' + to.c[0].toFixed(5) + '&travelmode=driving';
     return out;

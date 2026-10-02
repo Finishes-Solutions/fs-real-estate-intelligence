@@ -98,7 +98,7 @@ select.chip{appearance:none;padding-right:22px;background-image:linear-gradient(
 .tip span{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
 .card{position:absolute;z-index:5;right:16px;bottom:16px;width:min(380px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 10px 30px rgba(11,13,12,.22);display:none;max-height:calc(100% - 32px);overflow:auto}
 .card.open{display:block}
-.card .top{display:flex;justify-content:space-between;gap:10px;padding:16px 16px 10px;border-bottom:1px solid var(--line)}
+.card .top{display:flex;justify-content:space-between;gap:10px;padding:16px 16px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:3;background:var(--panel)}
 .card h2{margin:6px 0 0;font-size:17px;line-height:1.25;letter-spacing:-.01em;font-weight:700}
 .card .x{border:0;background:transparent;cursor:pointer;color:var(--muted);width:28px;height:28px;flex:none;border-radius:4px}
 .card dl{display:grid;grid-template-columns:96px 1fr;gap:6px 12px;margin:0;padding:12px 16px;font-size:12.5px}
@@ -456,6 +456,7 @@ table.who .r,th.r{text-align:right}
   .card.full{max-height:calc(100% - 6px)}
   .card::before{content:"";display:block;width:42px;height:5px;border-radius:3px;background:var(--line-2);margin:8px auto 0}
   .card .top{padding-top:8px}
+  .card .x{width:40px;height:40px;margin:-6px -8px 0 0}
 
   .msheet{display:block;position:fixed;left:0;right:0;bottom:0;z-index:11;background:var(--panel);border-radius:14px 14px 0 0;padding:4px 8px calc(10px + var(--sb));transform:translateY(105%);transition:transform 200ms cubic-bezier(.2,.7,.2,1);box-shadow:0 -10px 30px rgba(11,13,12,.25)}
   .msheet.on{transform:none}
@@ -970,6 +971,7 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 .mk-tbl td{border-bottom:1px solid var(--line);padding:4px 6px}
 .mk-tbl .r{text-align:right} .mk-tbl .m{font-family:var(--font-mono)}
 .mk-box .rnote{margin-top:6px}
+.card .bsec .btn + .rnote,.card .bsec .btnrow + .rnote{margin-top:8px}
 .mk-box table.who .sc{color:var(--muted);font-size:11px}
 .mk-tip{position:absolute;z-index:5;pointer-events:none;opacity:0;background:var(--panel);color:var(--text);border:1px solid var(--line-2);border-radius:6px;padding:6px 9px;font-size:12px;max-width:280px;box-shadow:0 4px 14px rgba(0,0,0,.14);transition:opacity .1s}
 @media (max-width:900px){.mk-grid{grid-template-columns:1fr}.mk-kpis{grid-template-columns:repeat(2,1fr)!important}.mk-kpis .kpi:nth-child(odd){border-left:0}.mk-kpis .kpi:last-child:nth-child(odd){grid-column:1/-1}.mk-kpis .kpi:nth-child(n+3){border-top:1px solid var(--line)}}
@@ -1177,3 +1179,61 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .fc-t u{position:absolute;top:0;bottom:0;border-radius:3px;background:linear-gradient(90deg,#3987e5,#f0b429,#e0663a)}
 .fc-w{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
 
+
+/* ================= phone spacing pass (≤700px) ================= */
+@media (max-width:700px){
+  /* map buttons: separate, evenly spaced 40px buttons on both sides instead of one joined strip */
+  .mapleft{top:calc(108px + var(--st));gap:10px}
+  .mapleft .tools{flex-direction:column;gap:8px;background:transparent;border:0;box-shadow:none;overflow:visible}
+  .mapleft .tools button,.mapleft .tools button+button{width:42px;height:42px;border:1px solid var(--line-2);border-radius:10px;background:var(--panel);box-shadow:0 1px 3px rgba(11,13,12,.12)}
+  .mapleft .tools button[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
+  .ctrls{top:calc(108px + var(--st));right:12px;gap:8px}
+  .ctrls button{width:42px;height:42px;border-radius:10px;box-shadow:0 1px 3px rgba(11,13,12,.12)}
+  .mcount{margin-top:6px}
+  /* the Layers panel sits over the map tools, not under them */
+  .layers{top:calc(108px + var(--st));left:12px;right:64px;z-index:8;padding:16px 16px 18px;gap:12px;border-radius:12px}
+  .app:has(#layers.on) .mapleft{visibility:hidden}
+  .layers .tg2{padding:5px 0}
+  /* list tab: each filter's label above its options, roomier sections, 2-column headline numbers */
+  .head{padding:18px 20px 16px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .kpis>.kpi:last-of-type:nth-of-type(odd){grid-column:1/-1}
+  .layers .lt{margin-top:18px}
+  .layers>.lt:first-child{margin-top:0}
+  .kpi{padding:12px 14px}
+  .filters{padding-top:6px;padding-bottom:10px}
+  .filters .row{flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .filters .row>.lbl{flex:1 0 100%;width:auto;margin:0 0 2px;padding:0}
+  .filters .row .chip{min-height:38px}
+  .selbar{margin-top:14px}
+  .item{padding:13px 12px}
+  /* cards: more breathing room between fields, sections and buttons */
+  .card .top{padding:18px 20px 12px}
+  .card dl{padding:14px 20px;gap:9px 14px}
+  .card .scope,.card .brief{padding-left:20px;padding-right:20px;margin-left:0;margin-right:0}
+  .card .bsec{margin:4px 20px 18px}
+  .card .bacts{padding:12px 20px 4px;gap:8px}
+  .card .btnrow{gap:8px}
+  .card .go{margin:4px 20px 20px}
+  .card .note{margin:0 20px 16px}
+  /* assistant: one-line placeholder, room above the input */
+  .ai-f textarea::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ai-log{padding-bottom:12px}
+  /* tab views */
+  .view{padding:18px 18px 28px}
+  .vhead{margin-bottom:18px}
+  .vctl{gap:10px 14px}
+  #view-who .seg button,.seg.seg3 button{padding:9px 12px}
+  #view-who table.who th:nth-child(4),#view-who table.who td:nth-child(4){display:none}
+  #view-who table.who td,#view-who table.who th{padding-top:12px;padding-bottom:12px}
+  .msheet button{padding:16px 14px}
+}
+
+/* "Route · 12 mi · 18 min ×" chip: clears the drive route */
+.route-chip{position:absolute;white-space:nowrap;left:50%;bottom:24px;transform:translateX(-50%);z-index:5;display:inline-flex;align-items:center;gap:10px;border:1px solid var(--line-2);background:var(--panel);color:var(--text);border-radius:20px;padding:8px 10px 8px 14px;font:600 13px var(--font-display);box-shadow:0 4px 14px rgba(11,13,12,.18);cursor:pointer}
+.route-chip b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--chip);font-size:15px;line-height:1}
+.route-chip:hover b{background:var(--line-2)}
+.route-chip .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.route-chip[hidden],.stage:not([data-view="map"]) .route-chip{display:none}
+.route-chip span{white-space:nowrap}
+@media (max-width:700px){ .route-chip{top:calc(108px + var(--st));bottom:auto;max-width:calc(100% - 140px);font-size:12.5px;padding:7px 8px 7px 12px;gap:8px} .route-chip span{overflow:hidden;text-overflow:ellipsis} .route-chip b{flex:none} }

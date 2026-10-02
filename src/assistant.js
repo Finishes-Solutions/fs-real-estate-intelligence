@@ -46,6 +46,7 @@ export function initAssistant(ctx) {
   ctx.viewport.append(...wrap.children);
   const $ = id => document.getElementById(id);
   const el = $('ai'), log = $('aiLog'), q = $('aiQ'), form = $('aiForm'), st = $('aiSt'), app = document.querySelector('.app');
+  if (matchMedia('(max-width:700px)').matches) q.placeholder = 'Ask anything…'; // the long hint wraps on a phone
   let history = [], busy = false;
 
   // ---------- open / close ----------
