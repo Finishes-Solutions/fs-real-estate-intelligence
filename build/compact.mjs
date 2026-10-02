@@ -45,11 +45,13 @@ export function countyCheck(outlines) {
 }
 
 const d = s => s || null;
+// integer columns: TDLR costs can carry cents ("148711.28") and AI unit counts can be fractional
+const int = (v, max = 2.1e9) => { const n = Math.round(Number(v)); return Number.isFinite(n) && Math.abs(n) < max ? n : null; };
 // compact filing -> public.filings row
 export function toRow(f, r, fips) {
-  return { id: f.id, name: f.name, county: f.county, fips, city: d(f.city), zip: d(r.zip), addr: d(f.addr), type: f.type, cost: f.cost, sqft: f.sqft && f.sqft < 2e9 ? f.sqft : null, owner: d(f.owner), scope: d(f.scope),
+  return { id: f.id, name: f.name, county: f.county, fips, city: d(f.city), zip: d(r.zip), addr: d(f.addr), type: f.type, cost: int(f.cost, 9e15) ?? 0, sqft: f.sqft ? int(f.sqft) : null, owner: d(f.owner), scope: d(f.scope),
     reg: d(f.reg), status: d(f.status), est_start: d(f.start), est_end: d(f.end), ts: d(f.ts), te: d(f.te), ts_est: f.tsE, te_est: f.teE,
     lat: f.lat ?? null, lon: f.lon ?? null, approx: !!f.approx, misfiled: !!f.misfiled, geo_src: f.gp || null,
-    use: d(f.use), subtype: d(f.sub), tenant: d(f.ten), developer: d(f.dev), architect: d(f.arch), gc: d(f.gc), units: f.units ?? null, summary: d(f.sum),
+    use: d(f.use), subtype: d(f.sub), tenant: d(f.ten), developer: d(f.dev), architect: d(f.arch), gc: d(f.gc), units: f.units == null ? null : int(f.units), summary: d(f.sum),
     design_firm: d((r.design || '').trim()), tabs_tenant: d((r.tenant || '').trim()), facility: d((r.facility || '').trim()), updated_at: new Date().toISOString() };
 }

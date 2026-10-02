@@ -45,6 +45,8 @@ globalThis.fetch = async (url, opts = {}) => {
   if (method === 'PATCH') { const patch = JSON.parse(opts.body); t.filter(r => match(r, p)).forEach(r => Object.assign(r, patch)); save(); return json(null, 204); }
   if (method === 'POST') {
     const body = [].concat(JSON.parse(opts.body)), pk = PK[path], up = u.searchParams.get('on_conflict'), out = [];
+    // like Postgres: integer columns refuse decimals
+    if (path === 'filings') for (const row of body) for (const k of ['cost', 'sqft', 'units']) if (row[k] != null && !Number.isInteger(row[k])) return json({ code: '22P02', message: `invalid input syntax for type bigint: "${row[k]}"` }, 400);
     for (const row of body) {
       const ex = up && t.find(r => r[pk] === row[pk]);
       if (ex) { Object.assign(ex, row); out.push(ex); continue; }
