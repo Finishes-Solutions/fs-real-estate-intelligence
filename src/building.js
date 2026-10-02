@@ -161,7 +161,7 @@ export function initBuildings(ctx) {
     const gsv = 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + b.center[1].toFixed(6) + ',' + b.center[0].toFixed(6);
     card.innerHTML = '<div class="top"><div><div class="kicker">' + (b.footprint ? 'Building' : 'Parcel') + '</div><h2 id="bTitle">Loading parcel…</h2><div class="bsub" id="bSub">' + b.center[1].toFixed(5) + ', ' + b.center[0].toFixed(5) + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
-      '<div class="bacts"><button class="btn" id="bMulti" title="Then click more buildings or parcels (or Shift-click)">Select multiple</button><button class="btn" id="bOrbit">Orbit view</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add site note</button></div>' +
+      '<div class="bacts"><button class="btn" id="bMulti" title="Then click more buildings or parcels (or Shift-click)">Select Multiple</button><button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button></div>' +
       '<div id="bPhoto"></div><div id="bSize">' + sizeRows(b) + '<div class="rnote">Measuring height from lidar…</div></div>' +
       '<div class="bsec" id="bParcel"><div class="lt">Parcel</div><div class="rnote">Looking up the appraisal record…</div></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses here</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bArea"></div>' +
@@ -216,7 +216,7 @@ export function initBuildings(ctx) {
       '<div class="bsec"><div class="lt">Selected</div>' + rows.map(({ b, s }, i) => '<div class="mrow"><button class="lnk" data-go="' + i + '"><b>' + esc(b.parcel?.situs || (b.footprint ? 'Building ' : 'Parcel ') + (i + 1)) + '</b><span>' +
         [s.fp ? fmtN(s.fp) + ' sq ft footprint' : (b.footprint ? '' : 'parcel only'), s.fl ? (s.fSrc === 'estimated from height' ? '~' : '') + s.fl + ' fl' : '', s.h ? ft(s.h) : '', b.parcel?.owner || ''].filter(Boolean).map(esc).join(' · ') + (b.err ? ' · lookup failed' : '') + '</span></button><button class="x" data-rm="' + i + '" aria-label="Remove">×</button></div>').join('') + '</div>' +
       (fl.length ? '<div class="bsec"><div class="lt">Construction filings on these parcels</div><div class="rnote">' + fl.length + ' filing' + (fl.length > 1 ? 's' : '') + ' · est. ' + fmtM(fl.reduce((t, f) => t + f.cost, 0)) + '</div></div>' : '') +
-      '<div class="bacts"><button class="btn primary" id="mDone">' + (addMode ? 'Done adding' : 'Add more') + '</button><button class="btn" id="mCsv">Export CSV</button><button class="btn" id="mFit">Zoom to all</button><button class="btn" id="mClear">Clear</button></div>';
+      '<div class="bacts"><button class="btn primary" id="mDone">' + (addMode ? 'Done Adding' : 'Add More') + '</button><button class="btn" id="mCsv">Export CSV</button><button class="btn" id="mFit">Zoom to All</button><button class="btn" id="mClear">Clear</button></div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#mClear').onclick = () => ctx.closeCard();

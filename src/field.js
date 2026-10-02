@@ -96,7 +96,7 @@ export function initField(ctx) {
       '<label>Notes<textarea name="text" rows="4" maxlength="4000" placeholder="What you saw, who to call, signage, asking price…">' + esc(n.text) + '</textarea></label>' +
       '<div class="nphotos" id="nPhotos"></div>' +
       '<label class="btn nadd">Add photos<input type="file" accept="image/*" capture="environment" multiple hidden id="nFile"></label>' +
-      '<div class="btnrow"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="nGps">Move to my location</button>' +
+      '<div class="btnrow"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="nGps">Move to My Location</button>' +
       '<a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=' + n.lat + ',' + n.lng + '">Directions ↗</a>' +
       (navigator.share ? '<button class="btn" type="button" id="nShare">Share</button>' : '') + (ctx.team?.canDelete(n) === false ? '' : '<button class="btn" type="button" id="nDel">Delete</button>') + '</div></form>' + (n.by ? '<div class="rnote">Added by ' + esc(n.by) + (n.editedBy && n.editedBy !== n.by ? ' · last edited by ' + esc(n.editedBy) : '') + '</div>' : '') +
       (near.length ? '<div class="bsec"><div class="lt">Filings within ~300 m</div>' + near.map(f => '<button class="chitem" data-id="' + esc(f.id) + '"><span><b>' + esc(f.name) + '</b><em>' + esc(f.reg) + '</em></span><span class="m">' + fmtM(f.cost) + '</span></button>').join('') + '</div>' : '') +
