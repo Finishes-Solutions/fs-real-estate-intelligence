@@ -3,7 +3,7 @@
 import { makeMatcher, describe, miles } from './lib/filter.mjs';
 import { entityKey } from './lib/taxonomy.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
-import { cleanFilterArgs, pickPlace, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, districtFor, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
@@ -180,6 +180,7 @@ export function initAssistant(ctx) {
   async function resolvePlace(name) {
     for (const [re, to] of ALIAS) name = name.replace(re, to);
     const n = name.toLowerCase().replace(/,?\s*(tx|texas)$/, '').trim();
+    const d = districtFor(name); if (d) return { c: d.c, label: d.name, kind: 'district', zoom: d.zoom };
     const town = (ctx.DATA.places || []).find(p => p[0].toLowerCase() === n);
     if (town) return { c: [town[1], town[2]], label: town[0] + ', TX', kind: 'town' };
     const q = name + (/texas|\btx\b/i.test(name) ? '' : ', Texas'), towns = TOWNS();
@@ -265,7 +266,7 @@ export function initAssistant(ctx) {
           else { const fr = frame(fs.map(f => [f.lon, f.lat])); c = fr.c; zoom = fr.zoom; label = fs.length + ' filings'; kind = 'group'; }
           if (fs.some(f => f.approx)) note = 'Some of these filings only have a city-level location, so the camera can’t center on the exact building.';
         } else if (isFinite(a.lat) && isFinite(a.lon) && a.lat && a.lon) { c = [a.lon, a.lat]; label = a.lat.toFixed(4) + ', ' + a.lon.toFixed(4); kind = 'building'; }
-        else if (a.place) { const p = await resolvePlace(String(a.place)); if (p.error) return { error: p.error }; c = p.c; label = p.label; kind = p.kind; }
+        else if (a.place) { const p = await resolvePlace(String(a.place)); if (p.error) return { error: p.error }; c = p.c; label = p.label; kind = p.kind; if (p.zoom) zoom = p.zoom; }
         else if (ctx.state.sel) { const f = ctx.state.sel; c = [f.lon, f.lat]; label = f.name; kind = f.approx ? 'approx' : 'building'; }
         else if (ctx.currentBuilding?.()) { const b = ctx.currentBuilding(); c = b.center; label = b.title || 'this building'; kind = 'building'; }
         if (!c) return { error: 'Say a place, an address or which filings to go to.' };

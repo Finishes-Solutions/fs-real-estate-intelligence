@@ -1,4 +1,4 @@
-import { pickPlace } from './lib/assist-logic.mjs';
+import { pickPlace, districtFor } from './lib/assist-logic.mjs';
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 // Map search (under the map tools): real street addresses, places (counties, towns, neighborhoods, landmarks, roads),
 // projects by name, companies and people (owners, developers, architects, contractors) and filings at matching addresses. Results appear while typing, 10 at a time, with more loading as you
@@ -232,7 +232,8 @@ export function initMapSearch(ctx) {
     place = { label: p.label, kind: p.kind, c: p.c, geom: null }; setPlacePin(p.c, p.label);
     bar.innerHTML = '<div class="pb-k">' + esc(KIND_LABEL[p.kind] || 'Place') + '</div><div class="pb-t">' + esc(p.label) + '</div><div class="pb-s">Finding the outline…</div>'; bar.classList.add('on');
     let geom = null, note = '';
-    if (p.kind === 'county') {
+    if (p.geom) geom = p.geom;
+    else if (p.kind === 'county') {
       const loaded = DATA.counties.find(x => x.name === p.name);
       if (loaded) geom = { type: 'MultiPolygon', coordinates: loaded.outline };
       else geom = best(await nominatim((p.name || p.label.replace(/ County.*/, '')) + ' County, Texas'), p.c, isArea)?.geometry || null;
@@ -326,6 +327,8 @@ export function initMapSearch(ctx) {
   // for the assistant: find a place by name and outline it
   ctx.highlightPlace = async (text, kind) => {
     const k = kind && kind !== 'auto' ? kind : null, t = String(text).trim();
+    const d = (!k || /area|town/.test(k)) && districtFor(t);
+    if (d) return showPlace({ label: d.name, name: d.name, kind: 'area', c: d.c, geom: d.geom });
     const county = COUNTIES.find(c => t.toLowerCase().replace(/\s+county.*$/, '') === c.toLowerCase());
     if (county && (!k || k === 'county')) return showPlace({ label: county + ' County', name: county, kind: 'county', c: DATA.counties.find(x => x.name === county).label });
     const q = t + (/texas|\btx\b/i.test(t) ? '' : ', Texas'), areaish = !k || /area|town|county|zip|road/.test(k);

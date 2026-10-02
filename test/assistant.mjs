@@ -1,6 +1,6 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, districtFor, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
 import { USES } from '../lib/taxonomy.mjs';
 import { makeMatcher, encode, decode, describe } from '../lib/filter.mjs';
 import { categoryOf, parsePlaces, overpassQuery } from '../lib/nearby.mjs';
@@ -30,6 +30,16 @@ const dt = { t: 'Downtown, Houston, Texas', name: 'Downtown', type: 'neighbourho
 const dtPick = pickPlace('downtown Houston', [dtSplit, dt, houston]);
 assert.equal(dtPick.kind, 'area'); assert.equal(dtPick.label, dt.t); assert.deepEqual(dtPick.bbox, dt.bbox);
 assert.ok(ZOOM.area >= 14, 'a district opens at block level');
+// the geocoders often return no "Downtown" area at all: then the interchange / tower must not stand in for it
+assert.ok(pickPlace('downtown Houston', [dtSplit, houston], ['Houston']).error, 'Downtown Split is not downtown');
+assert.ok(pickPlace('Downtown Houston, TX', [{ t: 'JPMorgan Chase Tower, 600 Travis Street, Downtown, Houston', name: 'JPMorgan Chase Tower', type: 'poi', c: [-95.364, 29.760] }], ['Houston']).error, 'a tower in downtown is not downtown');
+// built-in districts: a real outline and a wide view
+for (const q of ['Downtown Houston', 'downtown Houston, TX', 'Downtown Houston, Texas', 'the downtown houston area', 'Houston downtown', 'Houston CBD']) assert.equal(districtFor(q)?.name, 'Downtown Houston', q);
+for (const q of ['Downtown Katy', 'Downtown Split', 'JPMorgan Chase Tower', 'Houston', 'downtown']) assert.equal(districtFor(q), null, q);
+const D = districtFor('Downtown Houston'); assert.equal(D.geom.type, 'Polygon'); assert.ok(D.zoom < ZOOM.area, 'wider than a neighbourhood default');
+const inPoly = (pt, ring) => { let ins = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) ins = !ins; } return ins; };
+for (const [n, pt] of [['City Hall', [-95.3693, 29.7604]], ['Daikin Park', [-95.3555, 29.7573]], ['George R. Brown', [-95.3597, 29.7520]], ['Toyota Center', [-95.3621, 29.7508]], ['JPMorgan Chase Tower', [-95.3640, 29.7597]]]) assert.ok(inPoly(pt, D.geom.coordinates[0]), n + ' inside the downtown outline');
+assert.ok(!inPoly([-95.39, 29.74], D.geom.coordinates[0]), 'Midtown is outside');
 assert.equal(pickPlace('Daikin Park Houston', [houston, dt, park]).kind, 'poi', 'a landmark named in full still wins');
 assert.equal(pickPlace('Cypress', [{ t: 'Cypress, Texas', name: 'Cypress', type: 'place', c: [-95.69, 29.97] }]).kind, 'town');
 // a street that only shares the city's name is not the place ("C. Baldwin Hotel, Houston" flew to Houston Avenue, Pasadena)
