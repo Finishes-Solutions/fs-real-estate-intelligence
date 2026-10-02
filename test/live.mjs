@@ -13,10 +13,13 @@ globalThis.fetch = async url => {
   }
   if (u.host === 'routing.openstreetmap.de') return json({ code: 'Ok', routes: [{ distance: 16093.44, duration: 960, geometry: { coordinates: [[-95.9, 30], [-95.85, 29.9], [-95.8, 29.8]] } }] });
   if (u.host === 'api.tomtom.com' && u.pathname.includes('/traffic/')) return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'Content-Type': 'image/png' } });
+  if (u.host === 'mesonet.agron.iastate.edu') { if (mode === 'ridge-down' && u.pathname.includes('ridge')) return new Response('no', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+    return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'Content-Type': 'image/png' } }); }
   if (u.host === 'nowcoast.noaa.gov') { assert.equal(u.searchParams.get('crs'), 'EPSG:3857'); return new Response(new Uint8Array([1, 2]), { headers: { 'Content-Type': 'image/png' } }); }
   if (u.host === 'mapservices.weather.noaa.gov') return new Response('<html>error</html>', { headers: { 'Content-Type': 'text/html' } });
   if (u.host === 'api.open-meteo.com') {
     const lats = u.searchParams.get('latitude').split(',');
+    if (!u.searchParams.get('current')) return json({ daily: { time: ['2026-10-02', '2026-10-03', '2026-10-04'], weather_code: [81, 1, 0], temperature_2m_max: [87, 89, 90], temperature_2m_min: [73, 72, 70], precipitation_sum: [1.2, 0, 0], precipitation_probability_max: [86, 22, 5], wind_speed_10m_max: [13, 9, 8], wind_gusts_10m_max: [17, 15, 12] } });
     if (u.searchParams.get('current').includes('temperature_2m')) return json({ current: { time: '2026-10-02T13:00', temperature_2m: 88.2, apparent_temperature: 93, relative_humidity_2m: 60, precipitation: 0, weather_code: 2, wind_speed_10m: 11.4, wind_direction_10m: 160, wind_gusts_10m: 22 },
       daily: { time: ['2026-10-02', '2026-10-03'], temperature_2m_max: [91, 89], temperature_2m_min: [72, 71], precipitation_probability_max: [20, 40], precipitation_sum: [0, .1], wind_speed_10m_max: [14, 12], wind_gusts_10m_max: [25, 20] } });
     const one = { current: { time: '2026-10-02T13:00', wind_speed_10m: 12.4, wind_direction_10m: 180, wind_gusts_10m: 21 } };
@@ -55,6 +58,11 @@ assert.deepEqual(bbox3857(0, 0, 0).map(Math.round), [-20037508, -20037508, 20037
 const b = tileLonLat(10, 239, 422); assert.ok(b[0] < -95.6 && b[2] > -95.8 && b[1] < 30 && b[3] > 29.7, 'z10 tile over Waller');
 res = mock(); await tile({ query: {}, headers: { 'x-forwarded-for': '2.2.2.2' } }, res); assert.deepEqual(res.body, { traffic: true });
 res = mock(); await tile({ query: { l: 'radar', z: '8', x: '59', y: '105' }, headers: { 'x-forwarded-for': '2.2.2.2' } }, res); assert.equal(res.code, 200); assert.equal(res.headers['Content-Type'], 'image/png'); assert.match(res.headers['Cache-Control'], /s-maxage=240/);
+assert.match(res.headers['X-Tile-Source'], /mesonet\.agron\.iastate\.edu GRK-N0B-0/, 'nearest radar to this tile is Fort Hood');
+res = mock(); await tile({ query: { l: 'radar', z: '9', x: '120', y: '211' }, headers: { 'x-forwarded-for': '2.2.2.2' } }, res);
+assert.match(res.headers['X-Tile-Source'], /HGX-N0B-0/, 'Houston tile from the Houston NEXRAD super-res scan');
+mode = 'ridge-down'; res = mock(); await tile({ query: { l: 'radar', z: '9', x: '120', y: '211' }, headers: { 'x-forwarded-for': '2.2.2.2' } }, res); mode = 'ok';
+assert.equal(res.code, 200); assert.match(res.headers['X-Tile-Source'], /n0q/, 'falls back to the national composite');
 res = mock(); await tile({ query: { l: 'traffic', z: '12', x: '958', y: '1690' }, headers: { 'x-forwarded-for': '2.2.2.2' } }, res); assert.equal(res.code, 200);
 assert.ok(seen.some(u => u.pathname.includes('/flow/relative0/12/958/1690.png') && u.searchParams.get('key') === 'tt-test'));
 res = mock(); await tile({ query: { l: 'radar', z: '8', x: '10', y: '10' }, headers: { 'x-forwarded-for': '2.2.2.2' } }, res); assert.equal(res.code, 204, 'outside Texas region skipped');
@@ -71,6 +79,8 @@ assert.ok(windGrid([-95.71, 29.98, -95.70, 29.99]).length >= 4, 'tiny view still
 assert.deepEqual(windGrid([-80, 40, -75, 45]), [], 'outside the region');
 res = mock(); await weather({ query: { kind: 'wind', bbox: '-96.5,29.5,-95,30.5' }, headers: { 'x-forwarded-for': '3.3.3.3' } }, res);
 assert.equal(res.code, 200); assert.equal(res.body.points.length, g.length); assert.equal(res.body.points[0].mph, 12); assert.equal(res.body.points[0].dir, 180);
+res = mock(); await weather({ query: { kind: 'forecast', at: '29.98,-95.72' }, headers: { 'x-forwarded-for': '3.3.3.3' } }, res);
+assert.equal(res.code, 200); assert.equal(res.body.days.length, 3); assert.equal(res.body.days[0].conditions, 'heavy showers'); assert.equal(res.body.days[0].rain_chance_pct, 86);
 res = mock(); await weather({ query: { kind: 'here', at: '29.98,-95.72' }, headers: { 'x-forwarded-for': '3.3.3.3' } }, res);
 assert.equal(res.body.conditions, 'partly cloudy'); assert.equal(res.body.wind_from, 'SSE'); assert.equal(res.body.today.rain_chance_pct, 20);
 res = mock(); await weather({ query: { kind: 'storms' }, headers: { 'x-forwarded-for': '3.3.3.3' } }, res);

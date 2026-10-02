@@ -2,7 +2,9 @@
 // services, and lets the CDN share each tile for a few minutes (the browser adds a time bucket `t` to the URL).
 //   GET ?l=radar|lightning|clouds|storms|traffic&z=&x=&y=   -> 256px PNG
 //   GET (no params)                                        -> { traffic: bool }  (is a TomTom key configured)
-// Sources: NOAA nowCOAST WMS (radar, lightning, GOES infrared), NOAA NHC tropical MapServer (cones, tracks), TomTom flow.
+// Sources: radar from the NWS NEXRAD radars through the Iowa Environmental Mesonet tile cache: the nearest radar's own
+// super-resolution scan (N0B, 250 m gates) within ~200 km, else the national 0.005° composite (N0Q), else NOAA nowCOAST's
+// 1 km MRMS mosaic. NOAA nowCOAST WMS (lightning, GOES infrared), NOAA NHC tropical MapServer (cones, tracks), TomTom flow.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 
 const NOW = 'https://nowcoast.noaa.gov/geoserver/observations/';
@@ -11,7 +13,19 @@ const WMS = { // service / layer / style, from the nowCOAST capabilities
   lightning: ['lightning_detection', 'ldn_lightning_strike_density', 'lightning_density', 9, 600],
   clouds: ['satellite', 'goes_longwave_imagery', 'goes-lir', 9, 600]
 };
-const MAXZ = { ...Object.fromEntries(Object.entries(WMS).map(([k, v]) => [k, v[3]])), storms: 10, traffic: 18 };
+const MAXZ = { ...Object.fromEntries(Object.entries(WMS).map(([k, v]) => [k, v[3]])), radar: 12, storms: 10, traffic: 18 };
+const IEM = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/';
+// NWS NEXRAD sites in and around Texas: [lat, lon]
+export const NEXRAD = { HGX: [29.472, -95.079], GRK: [30.722, -97.383], EWX: [29.704, -98.029], FWS: [32.573, -97.303], DYX: [32.538, -99.254], SJT: [31.371, -100.493],
+  MAF: [31.943, -102.189], LBB: [33.654, -101.814], AMA: [35.233, -101.709], EPZ: [31.873, -106.698], DFX: [29.273, -100.280], CRP: [27.784, -97.511], BRO: [25.916, -97.419],
+  LCH: [30.125, -93.216], SHV: [32.451, -93.841], POE: [31.156, -92.976], FDR: [34.362, -98.976], TLX: [35.333, -97.278], FDX: [34.634, -103.619], HDX: [33.077, -106.120] };
+const km = (a, b) => { const r = Math.PI / 180, h = Math.sin((b[0] - a[0]) * r / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin((b[1] - a[1]) * r / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); };
+export function nearestRadar(lat, lon, maxKm = 200) { let best = null; for (const [id, p] of Object.entries(NEXRAD)) { const d = km([lat, lon], p); if (d <= maxKm && (!best || d < best.km)) best = { id, km: d }; } return best; }
+// where to fetch a radar tile from, best first
+export function radarSources(z, x, y) {
+  const b = tileLonLat(z, x, y), site = z >= 7 ? nearestRadar((b[1] + b[3]) / 2, (b[0] + b[2]) / 2) : null, t = z + '/' + x + '/' + y + '.png';
+  return [site && IEM + 'ridge::' + site.id + '-N0B-0/' + t, IEM + 'nexrad-n0q-900913/' + t, upstream('radar', z, x, y)].filter(Boolean);
+}
 const TTL = { ...Object.fromEntries(Object.entries(WMS).map(([k, v]) => [k, v[4]])), storms: 900, traffic: 120 };
 const HALF = 20037508.342789244;
 
@@ -39,16 +53,20 @@ export default async function handler(req, res) {
   if (!(l in MAXZ) || !(z >= 0 && z <= MAXZ[l]) || !(x >= 0 && x < 2 ** z) || !(y >= 0 && y < 2 ** z)) return res.status(400).json({ error: 'bad tile' });
   const b = tileLonLat(z, x, y);
   if (z >= 4 && (b[2] < REGION[0] || b[0] > REGION[2] || b[3] < REGION[1] || b[1] > REGION[3])) return res.status(204).end();
-  const u = upstream(l, z, x, y); if (!u) return res.status(503).json({ error: 'Traffic needs TOMTOM_API_KEY on the server.' });
-  try {
-    const r = await fetch(u, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' } });
-    const type = r.headers.get('content-type') || '';
-    if (!r.ok || !/^image\//.test(type)) throw new Error(l + ' ' + r.status + ' ' + type);
-    res.setHeader('Content-Type', type);
-    res.setHeader('Cache-Control', 'public, max-age=' + Math.min(120, TTL[l]) + ', s-maxage=' + TTL[l]);
-    return res.status(200).send(Buffer.from(await r.arrayBuffer()));
-  } catch (e) {
-    console.error('tile', e.message);
-    res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ error: 'upstream tile failed' });
+  const list = l === 'radar' ? radarSources(z, x, y) : [upstream(l, z, x, y)].filter(Boolean);
+  if (!list.length) return res.status(503).json({ error: 'Traffic needs TOMTOM_API_KEY on the server.' });
+  let err = '';
+  for (const u of list) {
+    try {
+      const r = await fetch(u, { signal: AbortSignal.timeout(list.length > 1 ? 6000 : 8000), headers: { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' } });
+      const type = r.headers.get('content-type') || '';
+      if (!r.ok || !/^image\//.test(type)) throw new Error(l + ' ' + r.status + ' ' + type);
+      res.setHeader('Content-Type', type);
+      res.setHeader('Cache-Control', 'public, max-age=' + Math.min(120, TTL[l]) + ', s-maxage=' + TTL[l]);
+      res.setHeader('X-Tile-Source', new URL(u).host + (u.includes('ridge::') ? ' ' + u.split('ridge::')[1].split('/')[0] : u.includes('nexrad-n0q') ? ' n0q' : ''));
+      return res.status(200).send(Buffer.from(await r.arrayBuffer()));
+    } catch (e) { err = e.message; }
   }
+  console.error('tile', err);
+  res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ error: 'upstream tile failed' });
 }

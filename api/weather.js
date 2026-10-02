@@ -2,6 +2,7 @@
 //   GET ?kind=wind&bbox=w,s,e,n   -> { time, points: [{ lon, lat, mph, gust, dir }] }  current 10 m wind on a grid (Open-Meteo)
 //   GET ?kind=here&at=lat,lon     -> current conditions + the rest of today at one spot (Open-Meteo)
 //   GET ?kind=storms              -> active Atlantic / East Pacific tropical cyclones (NOAA NHC)
+//   GET ?kind=forecast&at=lat,lon -> { days: [...] } daily forecast for today and the next 6 days (Open-Meteo)
 // Open-Meteo's free API is for non-commercial use; set OPEN_METEO_API_KEY to use their paid endpoint instead.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { parsePt } from './drive.js';
@@ -64,7 +65,12 @@ export default async function handler(req, res) {
       const p = parsePt(q.at); if (!p) return res.status(400).json({ error: 'at=lat,lon' });
       res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=600'); return res.json(await here([+p[0].toFixed(3), +p[1].toFixed(3)]));
     }
+    if (q.kind === 'forecast') {
+      const p = parsePt(q.at); if (!p) return res.status(400).json({ error: 'at=lat,lon' });
+      const [days] = await daily([[+p[1].toFixed(3), +p[0].toFixed(3)]], 0, 7);
+      res.setHeader('Cache-Control', 'public, max-age=900, s-maxage=1800'); return res.json({ days });
+    }
     if (q.kind === 'storms') { res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900'); return res.json(await storms()); }
-    return res.status(400).json({ error: 'kind=wind|here|storms' });
+    return res.status(400).json({ error: 'kind=wind|here|forecast|storms' });
   } catch (e) { console.error('weather', e.message); return res.status(502).json({ error: 'Weather service didn’t answer. Try again shortly.' }); }
 }

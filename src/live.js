@@ -5,7 +5,7 @@
 import { NASA, hlsPasses } from './lib/nasa.mjs';
 const KEY = 'fs-live-v1';
 const RASTER = { // proxied through api/tile; refreshed every few minutes
-  radar: { label: 'Rain Radar', maxzoom: 10, opacity: .7, every: 4, attr: 'Radar: NOAA nowCOAST (MRMS)' },
+  radar: { label: 'Rain Radar', maxzoom: 12, opacity: .7, every: 4, attr: 'Radar: NWS NEXRAD via Iowa Environmental Mesonet' },
   lightning: { label: 'Lightning (15 Min)', maxzoom: 9, opacity: .85, every: 10, attr: 'Lightning: NOAA nowCOAST (Vaisala NLDN/GLD360)' },
   clouds: { label: 'Satellite Clouds (IR)', maxzoom: 9, opacity: .55, every: 10, attr: 'Clouds: NOAA nowCOAST (GOES infrared)' },
   storms: { label: 'Hurricanes & Tropical Storms', maxzoom: 10, opacity: .85, every: 15, attr: 'Tropical cyclones: NOAA National Hurricane Center' },
@@ -52,7 +52,7 @@ export function initLive(ctx) {
   function addRaster(k) {
     if (!map.getStyle()) return; const id = 'live-' + k;
     if (!map.getSource(id)) map.addSource(id, { type: 'raster', tiles: [tileUrl(k)], tileSize: 256, maxzoom: RASTER[k].maxzoom, attribution: RASTER[k].attr });
-    if (!map.getLayer(id)) map.addLayer({ id, type: 'raster', source: id, paint: { 'raster-opacity': RASTER[k].opacity, 'raster-fade-duration': 0 } }, below());
+    if (!map.getLayer(id)) map.addLayer({ id, type: 'raster', source: id, paint: { 'raster-opacity': RASTER[k].opacity, 'raster-fade-duration': 0, 'raster-resampling': 'linear' } }, below());
     stamp[k] = bucket(k);
   }
   function removeRaster(k) { const id = 'live-' + k; if (map.getLayer(id)) map.removeLayer(id); if (map.getSource(id)) map.removeSource(id); }
@@ -209,6 +209,16 @@ export function initLive(ctx) {
     return { place: p.name, ...d, active_tropical_storms: st == null ? 'unavailable' : st.map(x => ({ name: x.name, type: x.classification, wind_mph: x.wind_mph, moving: x.moving, miles_away: Math.round(milesBetween(p.c, [x.lon, x.lat])) })), source: 'Open-Meteo; NOAA NHC' };
   }
 
+  // the next 7 days at the open property, the user's location or a named place
+  async function forecast(a = {}) {
+    const where = a.where || (a.place ? 'place' : cardPoint() ? 'selected' : 'me');
+    const p = where === 'place' ? await place(a.place || '') : where === 'selected' ? cardPoint() : await me();
+    if (!p) return { error: where === 'selected' ? 'No property card is open.' : 'Couldn’t find that place.' };
+    const r = await fetch('api/weather?kind=forecast&at=' + p.c[1].toFixed(4) + ',' + p.c[0].toFixed(4)), d = await r.json();
+    if (!r.ok) return { error: d.error || 'Forecast unavailable.' };
+    return { place: p.name, days: d.days.slice(0, Math.max(1, Math.min(7, a.days || 7))), source: 'Open-Meteo' };
+  }
+
   async function news(a = {}) {
     let q = a.query || '', near = a.near || '';
     const f = a.filing_id ? ctx.BY_ID.get(String(a.filing_id).trim()) : cardPoint()?.f;
@@ -240,6 +250,14 @@ export function initLive(ctx) {
     (d.tomorrow ? '<div class="rnote">Tomorrow ' + Math.round(d.tomorrow.low_f) + '–' + Math.round(d.tomorrow.high_f) + '°F, ' + (d.tomorrow.rain_chance_pct ?? 0) + '% rain</div>' : '') +
     (Array.isArray(d.active_tropical_storms) && d.active_tropical_storms.length ? '<div class="rnote">Active tropical systems: ' + d.active_tropical_storms.map(s => esc(s.type + ' ' + s.name + ' (' + s.miles_away.toLocaleString('en-US') + ' mi away)')).join(', ') + '</div>' : '') +
     '<div class="rnote src">Sources: Open-Meteo forecast · NOAA National Hurricane Center</div>';
+  const dayName = (iso, i) => i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  // one row per day: name, conditions, rain chance and amount, a low–high bar on the week's range, wind
+  const forecastHTML = d => { const lo = Math.min(...d.days.map(x => x.low_f ?? 99)), hi = Math.max(...d.days.map(x => x.high_f ?? -99)), span = Math.max(1, hi - lo);
+    return '<div class="fc">' + d.days.map((x, i) => '<div class="fc-r"><b>' + esc(dayName(x.day, i)) + '</b><span class="fc-c">' + esc(cap(x.conditions || '')) + '</span>' +
+      '<span class="fc-p" title="Chance of rain">' + (x.rain_chance_pct ?? 0) + '%' + (x.rain_in > 0.01 ? ' · ' + x.rain_in.toFixed(2) + '″' : '') + '</span>' +
+      '<span class="fc-t"><i>' + Math.round(x.low_f) + '°</i><s><u style="left:' + ((x.low_f - lo) / span * 100).toFixed(1) + '%;right:' + ((hi - x.high_f) / span * 100).toFixed(1) + '%"></u></s><i>' + Math.round(x.high_f) + '°</i></span>' +
+      '<span class="fc-w" title="Max wind (gusts)">' + Math.round(x.max_wind_mph) + (x.max_gust_mph ? '–' + Math.round(x.max_gust_mph) : '') + ' mph</span></div>').join('') + '</div>' +
+      '<div class="rnote src">Source: Open-Meteo forecast (temperatures °F; rain = chance and expected inches; wind = max sustained–gusts)</div>'; };
   const newsHTML = (d, n = 8) => '<div class="rnote">Searched ' + esc(d.searched) + '</div>' + (d.articles.length ? d.articles.slice(0, n).map(x => '<a class="chitem" target="_blank" rel="noopener" href="' + esc(x.url) + '"><span><b>' + esc(x.title) + '</b><em>' + esc(x.domain) + (x.date ? ' · ' + esc(x.date) : '') + '</em></span></a>').join('') : '<div class="rnote">' + esc(d.note) + '</div>') + '<div class="rnote src">Source: ' + esc(d.source || 'Google News') + '</div>';
 
   // ---------- card tools: drive time, weather, site imagery, news ----------
@@ -370,6 +388,6 @@ export function initLive(ctx) {
   // for the Sources tab: what is on, how often it refreshes, and the latest data time we know of
   const status = () => ({ hires: hires ? { kind: hires.kind, date: hiDate(hires) } : null, on: { ...on }, trafficOK, terrainMesh: !!map.getTerrain?.(), terrainZoom: TERRAIN_Z, windTime: windData?.time || null, nasa: nasa?.day ? { day: nasa.day, name: nasa.name, cloud: nasa.cloud } : null,
     raster: Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, { every: v.every, requested: stamp[k] != null ? stamp[k] * v.every * 60e3 : null }])) });
-  ctx.live = { set, drive, weather, news, imagery, clearRoute, state: () => ({ ...on }), status, driveHTML, weatherHTML, newsHTML,
+  ctx.live = { set, drive, weather, forecast, forecastHTML, news, imagery, clearRoute, state: () => ({ ...on }), status, driveHTML, weatherHTML, newsHTML,
     imageryInto: el => { if (lastImagery) renderCardImagery(lastImagery.c, lastImagery.list, lastImagery.hi, el); } };
 }
