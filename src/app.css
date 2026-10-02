@@ -1128,3 +1128,51 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 /* the time slider sits bottom centre: lift the legends above it while it's showing */
 .stage:has(.tslider.show) .legends{bottom:76px}
 .cc-src,.cc-live .rnote.src{font-size:10.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:6px;margin-top:2px}
+
+/* ================= left panel: roomier filters (label above its options, bigger targets, grouped More Filters) ================= */
+@media (min-width:701px){
+  .filters{padding:20px 24px 22px;gap:20px}
+  .filters .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .filters .lbl{flex:0 0 100%;width:auto;padding:0;margin-bottom:0;font-size:10.5px}
+  .filters .chip{min-height:34px;padding:7px 12px;font-size:13px;border-radius:7px}
+  .filters .chip .n{margin-left:2px}
+  .filters select.chip{min-height:36px;padding:7px 30px 7px 12px}
+  .filters .row .to{padding:0 2px}
+  /* paired inputs (value, sq ft, months) share the row evenly */
+  .filters .row>select.chip,.filters input.chip.num,.filters input.chip.mon{flex:1 1 0;min-width:0;width:auto}
+  .filters #dField{flex:1 1 100%}
+  .filters .search{flex:1 1 100%;min-height:38px}
+  .filters .search.sm input{width:100%;padding:9px 0;font-size:13px}
+  .filters #exactBtn{flex:0 0 auto}
+  .filters .more{border:0;border-top:1px solid var(--line);border-radius:0;padding:16px 0 0;margin:0}
+  .filters .more[open]{gap:18px}
+  .filters .more summary{font-size:13px;color:var(--text)}
+  .filters .fgroup{font-size:11.5px;font-weight:700;color:var(--text);letter-spacing:.01em;padding-top:6px;border-top:1px dashed var(--line);margin-top:2px}
+  .filters .more summary+.fgroup{border-top:0;padding-top:0}
+  .filters .active{padding:10px 12px;background:var(--panel-2);border-radius:8px;font-size:12px;line-height:1.45}
+  .selbar{margin:20px 24px 4px;padding:16px;gap:14px;border-radius:8px}
+  .selbar .s1{align-items:center}
+  .selbar b{font-size:14px}
+  .selbar .btnrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+  .selbar .btnrow .btn{min-height:38px;justify-content:center;text-align:center;display:inline-flex;align-items:center}
+  .selbar .saved summary{padding:4px 0}
+}
+@media (min-width:701px){
+  .filters .more>.row{margin-top:16px}
+  .filters .more>.fgroup{margin-top:26px;padding-top:16px}
+  .filters .more>summary+.fgroup{margin-top:14px;padding-top:0}
+  .filters .more>.fgroup+.row{margin-top:10px}
+}
+/* 7-day forecast (chat card) */
+.fc{display:grid}
+.fc-r{display:grid;grid-template-columns:minmax(72px,1.1fr) minmax(0,1.3fr) auto minmax(110px,1.6fr) auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px}
+.fc-r:first-child{border-top:0}
+.fc-r b{font-weight:700;white-space:nowrap}
+.fc-c{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-p{font-family:var(--font-mono);font-size:11px;color:#2f6fbf;white-space:nowrap}
+.fc-t{display:grid;grid-template-columns:28px 1fr 28px;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11.5px}
+.fc-t i{font-style:normal}.fc-t i:last-child{text-align:right;font-weight:600}
+.fc-t s{position:relative;height:6px;border-radius:3px;background:var(--panel-2);text-decoration:none}
+.fc-t u{position:absolute;top:0;bottom:0;border-radius:3px;background:linear-gradient(90deg,#3987e5,#f0b429,#e0663a)}
+.fc-w{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
+@media (max-width:520px){ .fc-r{grid-template-columns:72px minmax(0,1fr) auto;row-gap:4px} .fc-t{grid-column:1/-1} .fc-w{display:none} }
