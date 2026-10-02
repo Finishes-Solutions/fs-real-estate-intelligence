@@ -40,10 +40,12 @@ export function normalizeParcel(attrs, geometry) {
 }
 
 async function parcel(lat, lon) {
-  const q = new URLSearchParams({ geometry: lon + ',' + lat, geometryType: 'esriGeometryPoint', inSR: '4326', spatialRel: 'esriSpatialRelIntersects', outFields: '*', returnGeometry: 'true', outSR: '4326', f: 'json' });
-  const d = await getJSON(PARCELS + '/query?' + q);
+  // the StratMap service refuses /query; map-click "identify" on the service is what it answers
+  const q = new URLSearchParams({ geometry: lon + ',' + lat, geometryType: 'esriGeometryPoint', sr: '4326', layers: 'all:' + (PARCELS.match(/\/(\d+)$/) || [0, 0])[1], tolerance: '1',
+    mapExtent: [lon - .002, lat - .002, lon + .002, lat + .002].join(','), imageDisplay: '400,400,96', returnGeometry: 'true', f: 'json' });
+  const d = await getJSON(PARCELS.replace(/\/\d+$/, '') + '/identify?' + q);
   if (d.error) throw new Error(d.error.message || 'service error');
-  const f = (d.features || [])[0];
+  const f = (d.results || [])[0];
   return f ? normalizeParcel(f.attributes, f.geometry) : null;
 }
 

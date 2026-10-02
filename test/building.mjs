@@ -5,7 +5,7 @@ const seen = [];
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url); seen.push(url);
   const json = o => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  if (url.includes('/MapServer/0/query')) return json({ features: [{ attributes: { OBJECTID: 1, PROP_ID: '12345', OWNER_NAME: 'ACME HOLDINGS LLC', SITUS_NUM: '100', SITUS_STREET: 'MAIN ST', SITUS_CITY: 'WALLER', COUNTY: 'Waller',
+  if (url.includes('/MapServer/identify')) return json({ results: [{ attributes: { OBJECTID: 1, PROP_ID: '12345', OWNER_NAME: 'ACME HOLDINGS LLC', SITUS_NUM: '100', SITUS_STREET: 'MAIN ST', SITUS_CITY: 'WALLER', COUNTY: 'Waller',
     MKT_VALUE: 2500000, LAND_VALUE: 500000, IMP_VALUE: 2000000, YEAR_BUILT: '2019', DATE_ACQ: 20210615, GIS_AREA: 2.5, GIS_AREA_UNIT: 'ACRES', MAIL_LINE1: 'PO BOX 1', MAIL_CITY: 'HOUSTON', MAIL_STAT: 'TX', MAIL_ZIP: '77001', LOC_LAND_USE: 'Commercial' },
     geometry: { rings: [[[-95.93, 30.05], [-95.92, 30.05], [-95.92, 30.06], [-95.93, 30.05]]] } }] });
   if (url.includes('overpass')) { const q = decodeURIComponent(String(opts.body)); assert.match(q, /around:80,30\.055,-95\.925/); return json({ elements: [{ type: 'node', lat: 30.055, lon: -95.925, tags: { name: 'Chick-fil-A', amenity: 'fast_food', brand: 'Chick-fil-A' } }, { type: 'way', center: { lat: 30.0551, lon: -95.9251 }, tags: { name: 'Clinic', healthcare: 'yes' } }] }); }

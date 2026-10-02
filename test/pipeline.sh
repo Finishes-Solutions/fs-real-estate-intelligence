@@ -18,7 +18,7 @@ const f0=d.filings.find(f=>f.id.endsWith('0')), f2=d.filings.find(f=>f.id.endsWi
 a.ok(!f0.tsE&&!f0.teE,'filed dates kept'); a.ok(f2.tsE&&f2.teE&&f2.te>f2.ts,'inferred dates flagged');
 a.ok(d.filings.some(f=>f.arch==='PGAL'),'design firm captured'); a.ok(d.filings.every(f=>f.owner==='Acme Holdings, L.L.C.'),'owner');
 a.equal(ch.runs.length,2); a.equal(ch.runs[1].items.length,0,'first run has no diff'); a.equal(ch.runs[0].items.filter(x=>x.k==='cost').length,d.filings.filter(f=>f.id.endsWith('0')).length,'cost bumps detected');
-a.ok(d.filings.some(f=>f.gp==='parcel'),'parcel geocoding used');
+a.ok(d.filings.some(f=>f.gp==='txaddr'),'address points used');
 a.ok(m.tracts.length>=1&&m.year,'market built');
 console.log('pipeline ok:',d.filings.length,'filings,',ch.runs[0].items.length,'changes, market',m.year,'vs',m.baseYear);
 "

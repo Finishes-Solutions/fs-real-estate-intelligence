@@ -1,16 +1,16 @@
 // Address geocoding with a persistent cache. Most precise source first, every hit validated:
-//   1. parcel   Texas GIO StratMap parcels, matched on situs house number + street + zip → parcel centroid (the actual lot)
-//   2. census   US Census batch geocoder; Exact matches, or Non_Exact only when the matched zip is the filing's zip
+//   1. census   US Census batch geocoder; Exact matches are accepted as is
+//   2. txaddr   Texas 911 address points (TxGIO) for everything Census couldn't match exactly: the actual site point
+//               (Census Non_Exact matches in the same zip are kept only when no address point is found)
 //   3. osm      Nominatim structured search; only house-level results in the same zip / city
 //   4. maptiler strict address match
 //   5. city     jittered town-center fallback (flagged approximate, not cached)
-// Parcel and Census hits are trusted (they match house number, street and zip). Weaker sources (osm, maptiler, city)
+// Address-point and Census hits are trusted (they match house number, street and zip). Weaker sources (osm, maptiler, city)
 // are rejected when opts.check(row, [lon, lat]) says the point is implausible (e.g. far outside the filed county).
 // Cache entries: { c: [lon, lat] | null, src, at, v }. Entries from older versions are re-geocoded.
 import { fetchRetry, pool, log, sleep } from './util.mjs';
 
-export const GEO_V = 2;
-const PARCELS = process.env.PARCEL_SERVICE || 'https://feature.geographic.texas.gov/arcgis/rest/services/Parcels/stratmap_land_parcels_48_most_recent/MapServer/0';
+export const GEO_V = 3;
 
 export function cleanStreet(s) {
   s = s.split(/;|,|\s#|\s(?:Suite|Ste\.?|STE|Bldg\.?|Building|BLDG|Unit|Level|Lvl)\b/i)[0];
@@ -18,7 +18,7 @@ export function cleanStreet(s) {
 }
 export function parseCity(line) { const m = line.match(/^(.*?),?\s*(?:TX|Texas)\s*(\d{5})?/i); return m ? { city: m[1].trim(), zip: m[2] || '' } : { city: '', zip: '' }; }
 
-// ---- 1. parcels ----
+// ---- street parsing ----
 const DIRS = new Set(['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW', 'NORTH', 'SOUTH', 'EAST', 'WEST']);
 const TYPES = new Set(['RD', 'ROAD', 'ST', 'STREET', 'DR', 'DRIVE', 'AVE', 'AVENUE', 'BLVD', 'LN', 'LANE', 'PKWY', 'PARKWAY', 'HWY', 'HIGHWAY', 'FWY', 'FREEWAY', 'CT', 'CIR', 'WAY', 'TRL', 'PL', 'LOOP', 'EXPY', 'SQ', 'TER', 'PLZ', 'CV', 'XING', 'RUN', 'PASS', 'BND', 'FM', 'CR', 'SH', 'US', 'IH', 'I', 'SPUR', 'RM', 'TX', 'STATE']);
 // "1234 W Little York Rd" -> { num: '1234', core: 'LITTLE YORK' }; numbered highways keep their number ("FM 529" -> "529")
@@ -28,30 +28,23 @@ export function splitStreet(st) {
   if (!core.length) return null;
   return { num: m[1], core: core.slice(0, 2).join(' ') };
 }
-let pfP = null; // parcel layer field names, discovered once
-const parcelFields = () => pfP || (pfP = discoverParcelFields());
-async function discoverParcelFields() {
-  let pf = { ok: false };
-  try {
-    const d = await (await fetchRetry(PARCELS + '?f=json', {}, 2)).json(), names = (d.fields || []).map(f => f.name), find = re => names.find(n => re.test(n));
-    pf = { ok: true, addr: find(/^situs_addr$/i), num: find(/^situs_num/i), street: find(/^situs_(street|stre|st_?name|st_1)$/i), zip: find(/^situs_zip/i), city: find(/^situs_city$/i) };
-    pf.ok = !!((pf.addr || (pf.num && pf.street)) && (pf.zip || pf.city));
-    log('parcel fields:', JSON.stringify(pf));
-  } catch (e) { log('parcel service unavailable:', e.message); }
-  return pf;
-}
+// Texas 911 address points (TxGIO StratMap): site-level points by house number + street name, same zip or city.
+// (The StratMap parcel layer only answers map-click "identify" requests, so it can't be searched by address.)
+const ADDR_PTS = process.env.ADDRESS_POINTS_SERVICE || 'https://feature.geographic.texas.gov/arcgis/rest/services/Address_Points/stratmap_address_points_48_most_recent/MapServer/0';
 const q = s => String(s).replace(/'/g, "''");
-function centroid(rings) { let x = 0, y = 0, n = 0; for (const r of rings || []) for (const p of r) { x += p[0]; y += p[1]; n++; } return n ? [x / n, y / n] : null; }
-async function parcelLookup(r) {
-  const f = await parcelFields(), s = splitStreet(r.st); if (!f.ok || !s) return null;
-  const like = s.core.split(' ').map(w => '%' + q(w)).join('') + '%';
-  const where = [f.addr ? `UPPER(${f.addr}) LIKE '${q(s.num)} ${like}'` : `${f.num} = '${q(s.num)}' AND UPPER(${f.street}) LIKE '${like}'`];
-  if (r.zip && f.zip) where.push(`${f.zip} LIKE '${q(r.zip)}%'`); else if (f.city && r.city) where.push(`UPPER(${f.city}) = '${q(r.city.toUpperCase())}'`); else return null;
-  const p = new URLSearchParams({ where: where.join(' AND '), outFields: 'OBJECTID', returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', maxAllowableOffset: '0.0001', resultRecordCount: '6', f: 'json' });
+let apDown = false;
+async function addressPoint(r) {
+  const s = splitStreet(r.st); if (!s || apDown) return null;
+  const words = s.core.split(' ').filter(w => w.length > 1 || /\d/.test(w)).slice(0, 2); if (!words.length) return null;
+  const where = [`add_number = '${q(s.num)}'`, ...words.map(w => `UPPER(st_name) LIKE '%${q(w)}%'`)];
+  const area = [r.zip && `post_code = '${q(r.zip)}'`, r.city && `UPPER(post_comm) = '${q(r.city.toUpperCase())}'`].filter(Boolean);
+  if (!area.length) return null; where.push('(' + area.join(' OR ') + ')');
+  const p = new URLSearchParams({ where: where.join(' AND '), outFields: 'add_number', returnGeometry: 'true', outSR: '4326', resultRecordCount: '8', f: 'json' });
   try {
-    const d = await (await fetchRetry(PARCELS + '/query?' + p, {}, 2)).json(); if (d.error) return null;
-    const cs = (d.features || []).map(x => centroid(x.geometry && x.geometry.rings)).filter(Boolean); if (!cs.length) return null;
-    // several parcels share the address (condos, split lots): accept only if they sit together (~300 m)
+    const d = await (await fetchRetry(ADDR_PTS + '/query?' + p, {}, 2)).json();
+    if (d.error) { if (/not supported/i.test(d.error.message || '')) { apDown = true; log('address points: service refuses queries; skipping'); } return null; }
+    const cs = (d.features || []).map(x => x.geometry && [x.geometry.x, x.geometry.y]).filter(c => c && isFinite(c[0])); if (!cs.length) return null;
+    // the same address can have several points (units, buildings): accept only when they sit together (~300 m)
     const c = [cs.reduce((a, b) => a + b[0], 0) / cs.length, cs.reduce((a, b) => a + b[1], 0) / cs.length];
     return cs.every(p2 => Math.hypot(p2[0] - c[0], p2[1] - c[1]) < 0.003) ? c : null;
   } catch (e) { return null; }
@@ -102,7 +95,7 @@ export const addrKey = r => (r.st + '|' + r.city + '|' + r.zip).toLowerCase().re
 
 // rows need st, city, zip, ProjectNumber. Returns { [ProjectNumber]: { c:[lon,lat], src:'address'|'city', via } }.
 // budget (optional, shared across calls): { nominatim: max lookups left }. Addresses skipped for budget are not cached as misses.
-export async function geocodeRows(rows, cache, { key, bbox, places, budget, check = () => true, parcels = true }) {
+export async function geocodeRows(rows, cache, { key, bbox, places, budget, check = () => true, addressPoints = true }) {
   const inBox = c => c && c[0] > bbox[0] && c[0] < bbox[2] && c[1] > bbox[1] && c[1] < bbox[3];
   const ok = (r, c) => inBox(c) && check(r, c), strong = (r, c) => inBox(c);
   const today = new Date(), stale = e => !e || e.v !== GEO_V || (!e.c && (!e.at || (today - new Date(e.at)) / 864e5 > RETRY_MISS_DAYS));
@@ -110,19 +103,18 @@ export async function geocodeRows(rows, cache, { key, bbox, places, budget, chec
   for (const r of rows) {
     if (!r.st || !r.city) continue;
     const k = addrKey(r), e = cache[k];
-    if (!stale(e)) { if (e.c && (e.src === 'parcel' || e.src === 'census' || check(r, e.c))) out[r.ProjectNumber] = { c: e.c, src: 'address', via: e.src }; continue; }
+    if (!stale(e)) { if (e.c && (e.src === 'txaddr' || e.src === 'census' || check(r, e.c))) out[r.ProjectNumber] = { c: e.c, src: 'address', via: e.src }; continue; }
     if (!need.has(k)) need.set(k, r);
   }
   const todo = [...need.entries()], stamp = today.toISOString().slice(0, 10), put = (k, c, src) => { cache[k] = { c, src, at: stamp, v: GEO_V }; };
   log('geocode: cached', rows.length - todo.length, 'lookup', todo.length);
   let np = 0, nc = 0, nm = 0, mt = 0; const skipped = new Set();
-  if (parcels && todo.length) {
-    await pool(todo, 6, async ([k, r]) => { const c = await parcelLookup(r); if (c && strong(r, c)) { put(k, c, 'parcel'); np++; } });
-  }
   const fresh = k => cache[k] && cache[k].at === stamp && cache[k].v === GEO_V && cache[k].c;
-  const rest = todo.filter(([k]) => !fresh(k));
-  const census = await censusBatch(rest.map(([k, r], i) => ({ id: String(i), street: r.st, city: r.city, zip: r.zip })));
-  rest.forEach(([k, r], i) => { const m = census[i]; if (m && (m.exact || (r.zip && m.zip === r.zip)) && strong(r, m.c)) { put(k, m.c, 'census'); nc++; } });
+  const census = await censusBatch(todo.map(([k, r], i) => ({ id: String(i), street: r.st, city: r.city, zip: r.zip })));
+  const loose = new Map();
+  todo.forEach(([k, r], i) => { const m = census[i]; if (!m || !strong(r, m.c)) return; if (m.exact) { put(k, m.c, 'census'); nc++; } else if (r.zip && m.zip === r.zip) loose.set(k, m.c); });
+  if (addressPoints) await pool(todo.filter(([k]) => !fresh(k)), 6, async ([k, r]) => { const c = await addressPoint(r); if (c && strong(r, c)) { put(k, c, 'txaddr'); np++; } });
+  for (const [k, c] of loose) if (!fresh(k)) { put(k, c, 'census'); nc++; }
   for (const [k, r] of todo) {
     if (fresh(k)) continue;
     if (budget && budget.nominatim <= 0) { skipped.add(k); continue; }
@@ -131,8 +123,8 @@ export async function geocodeRows(rows, cache, { key, bbox, places, budget, chec
   }
   await pool(todo.filter(([k]) => !fresh(k) && !skipped.has(k)), 4, async ([k, r]) => { const c = await maptiler(key, bbox, `${r.st}, ${r.city}, TX ${r.zip}`, true); if (c && ok(r, c)) { put(k, c, 'maptiler'); mt++; } });
   todo.forEach(([k]) => { if (!fresh(k) && !skipped.has(k)) put(k, null, null); });
-  log('geocode: parcel', np, 'census', nc, 'nominatim', nm, 'maptiler', mt, 'missed', todo.length - np - nc - nm - mt - skipped.size, skipped.size ? '| nominatim budget used up, ' + skipped.size + ' left for a later run' : '');
-  for (const r of rows) { if (out[r.ProjectNumber] || !r.st || !r.city) continue; const e = cache[addrKey(r)]; if (e?.c && (e.src === 'parcel' || e.src === 'census' || check(r, e.c))) out[r.ProjectNumber] = { c: e.c, src: 'address', via: e.src }; }
+  log('geocode: census', nc, 'address points', np, 'nominatim', nm, 'maptiler', mt, 'missed', todo.length - np - nc - nm - mt - skipped.size, skipped.size ? '| nominatim budget used up, ' + skipped.size + ' left for a later run' : '');
+  for (const r of rows) { if (out[r.ProjectNumber] || !r.st || !r.city) continue; const e = cache[addrKey(r)]; if (e?.c && (e.src === 'txaddr' || e.src === 'census' || check(r, e.c))) out[r.ProjectNumber] = { c: e.c, src: 'address', via: e.src }; }
 
   // town-center fallback, jittered by project number so markers don't stack
   const cityCache = {};

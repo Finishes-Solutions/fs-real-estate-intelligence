@@ -33,6 +33,14 @@ const AI_COLS = ['use', 'subtype', 'tenant', 'developer', 'architect', 'gc', 'un
 
 const db = supa();
 if (!db) { console.error('SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) must be set'); process.exit(1); }
+{ // say which kind of key we were given: writes need the secret / service-role key, not the public one
+  const k = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  let kind = k ? 'unknown' : 'none (GitHub OIDC via the pipeline edge function)';
+  if (k.startsWith('sb_secret_')) kind = 'secret key'; else if (k.startsWith('sb_publishable_')) kind = 'PUBLISHABLE key (read-only: writes will fail)';
+  else if (k.startsWith('eyJ')) { try { kind = 'legacy JWT, role ' + JSON.parse(Buffer.from(k.split('.')[1], 'base64url').toString()).role; } catch (e) {} }
+  log('supabase:', process.env.SUPABASE_URL, '| key:', kind);
+  if (/PUBLISHABLE|role anon/.test(kind)) { console.error('The Supabase key in GitHub secrets is the public one. Add the secret key (Project Settings → API Keys → Secret keys) as SUPABASE_SECRET_KEY.'); process.exit(1); }
+}
 
 function period(mode) {
   const now = new Date(), end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1));

@@ -20,10 +20,9 @@ globalThis.fetch = async (url, opts = {}) => {
     const csv = await opts.body.get('addressFile').text();
     return new Response(csv.split('\n').map((l, i) => { const id = l.split(',')[0]; return i % 2 ? `${id},"x","No_Match"` : `${id},"x","Match","Exact","100 MAIN ST, WALLER, TX, 77484","-95.93,30.05","1","L"`; }).join('\n'));
   }
-  if (u.host === 'feature.geographic.texas.gov') {
-    if (!u.pathname.endsWith('/query')) return json({ fields: ['OBJECTID', 'SITUS_ADDR', 'SITUS_CITY', 'SITUS_ZIP', 'OWNER_NAME'].map(name => ({ name })) });
-    const w = u.searchParams.get('where'); // only "101 MAIN" has a parcel
-    return json({ features: /'101 %MAIN%'/.test(w) ? [{ attributes: { OBJECTID: 1 }, geometry: { rings: [[[-95.931, 30.051], [-95.930, 30.051], [-95.930, 30.052], [-95.931, 30.052], [-95.931, 30.051]]] } }] : [] });
+  if (u.host === 'feature.geographic.texas.gov') { // TxGIO 911 address points: only "101 MAIN" exists
+    const w = u.searchParams.get('where') || '';
+    return json({ features: /add_number = '101'/.test(w) && /MAIN/.test(w) ? [{ attributes: { add_number: '101' }, geometry: { x: -95.9305, y: 30.0515 } }] : [] });
   }
   if (u.host === 'nominatim.openstreetmap.org') return json([{ lon: '-95.95', lat: '30.06', address: { house_number: '102', postcode: '77484', city: 'Waller' } }]);
   if (u.host === 'api.maptiler.com') return json({ features: [] });
