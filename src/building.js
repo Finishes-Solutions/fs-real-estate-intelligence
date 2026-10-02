@@ -18,7 +18,10 @@ export function initBuildings(ctx) {
     map.addLayer({ id: 'fs-bldg', type: 'fill-extrusion', source: src, 'source-layer': 'building', minzoom: 13, layout: { visibility: on ? 'visible' : 'none' },
       paint: { 'fill-extrusion-color': c.fill, 'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 13, 0, 14.5, H], 'fill-extrusion-base': B, 'fill-extrusion-opacity': .85 } }, before);
     if (!map.getSource('fs-bsel')) map.addSource('fs-bsel', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addLayer({ id: 'fs-bsel', type: 'fill-extrusion', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'b'], paint: { 'fill-extrusion-color': c.sel, 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-opacity': .9 } }, before);
+    // selected building: drawn a hair wider and taller than the base building so the two never z-fight
+    map.addLayer({ id: 'fs-bsel', type: 'fill-extrusion', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'b'], paint: { 'fill-extrusion-color': c.sel, 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': true } }, before);
+    if (!map.getSource('fs-bhov')) map.addSource('fs-bhov', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'fs-bhov', type: 'line', source: 'fs-bhov', minzoom: 13, paint: { 'line-color': c.sel, 'line-width': 2, 'line-opacity': .9 } }, before);
     map.addLayer({ id: 'fs-psel', type: 'line', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'p'], paint: { 'line-color': c.sel, 'line-width': 2.4, 'line-dasharray': [2, 1.5] } }, before);
     if (cur) highlight();
   }
@@ -33,7 +36,7 @@ export function initBuildings(ctx) {
   function highlight() {
     const s = map.getSource('fs-bsel'); if (!s) return;
     const feats = [];
-    if (cur?.footprint) feats.push({ type: 'Feature', properties: { k: 'b', h: cur.height || 6, b: cur.base || 0 }, geometry: cur.footprint });
+    if (cur?.footprint) feats.push({ type: 'Feature', properties: { k: 'b', h: (cur.height || 6) + 0.6, b: cur.base || 0 }, geometry: grow(cur.footprint, 1.004) });
     if (cur?.parcel?.geometry) feats.push({ type: 'Feature', properties: { k: 'p' }, geometry: cur.parcel.geometry });
     s.setData({ type: 'FeatureCollection', features: feats });
   }
@@ -48,6 +51,19 @@ export function initBuildings(ctx) {
   }
   ctx.onCardClose(() => { stopOrbit(); cur = null; highlight(); });
 
+  // Vector tiles merge neighbouring buildings into one MultiPolygon at lower zooms: keep only the part under the click.
+  function partAt(g, pt) {
+    if (!g || g.type !== 'MultiPolygon') return g;
+    const hit = g.coordinates.find(rings => inGeom(pt, { type: 'Polygon', coordinates: rings }));
+    return hit ? { type: 'Polygon', coordinates: hit } : null;
+  }
+  // scale a footprint about its centroid (a few cm) so the highlight sits just outside the base building's walls
+  function grow(g, k) {
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates; let x = 0, y = 0, n = 0;
+    polys.forEach(p => p[0].forEach(([a, b]) => { x += a; y += b; n++; })); x /= n; y /= n;
+    const sc = r => r.map(([a, b]) => [x + (a - x) * k, y + (b - y) * k]), out = polys.map(p => p.map(sc));
+    return g.type === 'Polygon' ? { type: 'Polygon', coordinates: out[0] } : { type: 'MultiPolygon', coordinates: out };
+  }
   // point-in-polygon on GeoJSON Polygon / MultiPolygon (planar; fine at parcel scale)
   function inGeom(pt, g) {
     if (!g) return false;
@@ -60,9 +76,24 @@ export function initBuildings(ctx) {
   ctx.mapClickHandlers.push(e => {
     if (!on || !map.getLayer('fs-bldg')) return false;
     const hit = map.queryRenderedFeatures(e.point, { layers: ['fs-bldg'] })[0]; if (!hit) return false;
-    open({ footprint: hit.geometry, height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: [e.lngLat.lng, e.lngLat.lat] });
+    open({ footprint: partAt(hit.geometry, [e.lngLat.lng, e.lngLat.lat]), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: [e.lngLat.lng, e.lngLat.lat] });
     return true;
   });
+  // desktop: a building cursor and outline show which building a click will open
+  const CURSOR = 'url("data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><path d="M3 3v7M3 3h7" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M3 3v7M3 3h7" stroke="#006527" stroke-width="2" stroke-linecap="round"/><rect x="11" y="9" width="12" height="15" rx="1.5" fill="#006527" stroke="#fff" stroke-width="1.5"/><path d="M14 13h2M18 13h2M14 17h2M18 17h2M16 24v-3h2v3" stroke="#fff" stroke-width="1.4"/></svg>') + '") 3 3, pointer';
+  let hovT = 0;
+  map.on('mousemove', e => {
+    if (matchMedia('(pointer: coarse)').matches || !on || !map.getLayer('fs-bldg') || ctx.mode() !== 'pan') return;
+    cancelAnimationFrame(hovT); hovT = requestAnimationFrame(() => {
+      const canvas = map.getCanvas(), src = map.getSource('fs-bhov');
+      if (map.queryRenderedFeatures(e.point, { layers: ['filings'] }).length) { src?.setData({ type: 'FeatureCollection', features: [] }); return; }
+      const hit = map.queryRenderedFeatures(e.point, { layers: ['fs-bldg'] })[0], g = hit && partAt(hit.geometry, [e.lngLat.lng, e.lngLat.lat]);
+      canvas.style.cursor = g ? CURSOR : '';
+      src?.setData({ type: 'FeatureCollection', features: g ? [{ type: 'Feature', properties: {}, geometry: g }] : [] });
+    });
+  });
+  map.getCanvas().addEventListener('mouseleave', () => map.getSource('fs-bhov')?.setData({ type: 'FeatureCollection', features: [] }));
+
   ctx.openBuildingAt = (lngLat, footprint) => open({ footprint: footprint || null, height: null, base: 0, center: lngLat });
 
   async function open(b) {
@@ -71,7 +102,7 @@ export function initBuildings(ctx) {
     const gsv = 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + b.center[1].toFixed(6) + ',' + b.center[0].toFixed(6);
     card.innerHTML = '<div class="top"><div><div class="kicker">Building</div><h2 id="bTitle">Loading parcel…</h2><div class="bsub" id="bSub">' + b.center[1].toFixed(5) + ', ' + b.center[0].toFixed(5) + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
-      '<div class="bacts"><button class="btn" id="bOrbit">Orbit view</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a></div>' +
+      '<div class="bacts"><button class="btn" id="bOrbit">Orbit view</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add site note</button></div>' +
       '<div id="bPhoto"></div>' +
       '<dl>' + (b.height ? '<dt>Height</dt><dd class="mono">' + Math.round(b.height * 3.281) + ' ft' + (floors ? ' · ~' + floors + ' floor' + (floors > 1 ? 's' : '') : '') + '</dd>' : '') + '</dl>' +
       '<div class="bsec" id="bParcel"><div class="lt">Parcel</div><div class="rnote">Looking up the appraisal record…</div></div>' +
@@ -80,6 +111,7 @@ export function initBuildings(ctx) {
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#bOrbit').onclick = orbit;
+    card.querySelector('#bNote').onclick = () => ctx.addNote?.({ at: b.center });
     if (ctx.reduceMotion) card.querySelector('#bOrbit').remove();
     renderFilings(null); renderArea();
     ctx.cardRendered({ kind: 'building', center: b.center, label: () => card.querySelector('#bTitle')?.textContent || 'Building', sub: () => card.querySelector('#bSub')?.textContent || '' });

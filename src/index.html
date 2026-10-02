@@ -85,7 +85,7 @@
   <main class="stage" id="stage" data-view="map">
     <nav class="viewbar" id="viewbar" aria-label="Views">
       <button class="ptoggle" id="panelToggle" aria-label="Show or hide the list" title="Show or hide the list"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg></button>
-      <button data-view="map" aria-pressed="true">Map</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="who" aria-pressed="false">Who’s building</button><button data-view="changes" aria-pressed="false">What changed <span class="badge" id="chgBadge"></span></button><button data-view="field" aria-pressed="false">Field notes <span class="badge" id="fieldBadge"></span></button>
+      <button data-view="map" aria-pressed="true">Map</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="who" aria-pressed="false">Activity</button><button data-view="changes" aria-pressed="false">Updates <span class="badge" id="chgBadge"></span></button><button data-view="field" aria-pressed="false">Field Notes <span class="badge" id="fieldBadge"></span></button>
     </nav>
     <div class="viewport" id="viewport">
     <div id="map" aria-label="Interactive map of construction filings"></div>
@@ -110,7 +110,6 @@
       <button id="zout" aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10"/></svg></button>
       <div class="sep"></div>
       <button id="locate" aria-label="Near me" title="Filings near my location"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="4.5"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><path d="M8 1v2.2M8 12.8V15M1 8h2.2M12.8 8H15"/></svg></button>
-      <button id="addNote" aria-label="Add a site note here" title="Add a site note"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14.5s-4.8-4.6-4.8-8.1a4.8 4.8 0 0 1 9.6 0c0 3.5-4.8 8.1-4.8 8.1z"/><path d="M8 4.2v4.2M5.9 6.3h4.2"/></svg></button>
       <button id="home" aria-label="Reset view" title="Reset view"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h8V6.5"/></svg></button>
       <button id="timeBtn" aria-label="Time-lapse by month" title="Time-lapse: play month by month" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.6V8l2.4 1.6"/></svg></button>
       <button id="layersBtn" aria-label="Map layers" title="Map layers" aria-expanded="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 2 14.5 5.5 8 9 1.5 5.5z"/><path d="M2.5 8.2 8 11.2l5.5-3M2.5 10.9 8 13.9l5.5-3"/></svg></button>
@@ -122,6 +121,7 @@
         <button data-style="dots" aria-pressed="true">Dot grid</button><button data-style="streets" aria-pressed="false">Streets</button><button data-style="sat" aria-pressed="false">Satellite</button><button data-style="topo" aria-pressed="false">Topo</button>
       </div>
       <div class="lt">Filing dots</div>
+      <label class="tg2"><input type="checkbox" id="lyFilings" checked><span>Show filings</span></label>
       <div class="seg seg2" id="sizeSeg"><button data-size="uniform" aria-pressed="true">Same size</button><button data-size="value" aria-pressed="false">Sized by value</button></div>
       <div class="lt">Activity heatmap</div>
       <div class="seg" id="heatSeg"><button data-heat="off" aria-pressed="true">Off</button><button data-heat="count" aria-pressed="false">Filings</button><button data-heat="value" aria-pressed="false">Value</button></div>
@@ -153,9 +153,9 @@
       <button class="x" id="tClear" aria-label="Clear month filter" title="Clear">×</button>
     </div>
     <section class="view" id="view-timeline" aria-label="Timeline"></section>
-    <section class="view" id="view-who" aria-label="Who's building"></section>
-    <section class="view" id="view-changes" aria-label="What changed"></section>
-    <section class="view" id="view-field" aria-label="Field notes and watchlist"></section>
+    <section class="view" id="view-who" aria-label="Activity"></section>
+    <section class="view" id="view-changes" aria-label="Updates"></section>
+    <section class="view" id="view-field" aria-label="Field Notes"></section>
     <div class="mtop" id="mtop">
       <div class="mask">
         <button type="button" class="mlaunch" id="mAsk"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/></svg><span>Ask about construction…</span></button>
@@ -171,14 +171,14 @@
     <button data-tab="map" aria-pressed="true"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M2.5 5l5-2 5 2 5-2v12l-5 2-5-2-5 2z"/><path d="M7.5 3v12M12.5 5v12"/></svg><span>Map</span></button>
     <button data-tab="list" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 5h10M6.5 10h10M6.5 15h10"/><circle cx="3.2" cy="5" r=".9" fill="currentColor"/><circle cx="3.2" cy="10" r=".9" fill="currentColor"/><circle cx="3.2" cy="15" r=".9" fill="currentColor"/></svg><span>List</span></button>
     <button data-tab="timeline" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h8M6 10h9M4 15h7"/></svg><span>Timeline</span></button>
-    <button data-tab="who" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 17V8h4v9M8 17V3h4v14M13 17v-6h4v6"/></svg><span>Players</span></button>
+    <button data-tab="who" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 17V8h4v9M8 17V3h4v14M13 17v-6h4v6"/></svg><span>Activity</span></button>
     <button data-tab="more" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg><span>More</span><span class="badge" id="mMoreN"></span></button>
   </nav>
   <div class="msheet" id="msheet" role="dialog" aria-label="More">
     <div class="mgrab"></div>
-    <button data-go="changes">What changed <span class="badge" id="mChgN"></span></button>
-    <button data-go="field">Field notes &amp; watchlist <span class="badge" id="mFieldN"></span></button>
-    <button data-go="note">Add a site note at my location</button>
+    <button data-go="changes">Updates <span class="badge" id="mChgN"></span></button>
+    <button data-go="field">Field Notes &amp; Watchlist <span class="badge" id="mFieldN"></span></button>
+    <button data-go="note">Add a Site Note at My Location</button>
     <button data-go="near">Filings near me</button>
     <button data-go="saved">Saved searches &amp; RSS alerts</button>
     <button data-go="layers">Map layers &amp; demographics</button>

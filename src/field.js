@@ -74,13 +74,12 @@ export function initField(ctx) {
   });
 
   // ---- site notes ----
-  ctx.addNote = async ({ gps = false } = {}) => {
-    let c = map.getCenter().toArray();
+  ctx.addNote = async ({ gps = false, at = null } = {}) => {
+    let c = at || map.getCenter().toArray();
     if (gps && ctx.locate) { try { c = await ctx.locate(); } catch (e) { ctx.toast(e.message + ' Placed the note at the map center instead.'); } }
     const n = { id: uid(), lng: +c[0].toFixed(6), lat: +c[1].toFixed(6), title: '', text: '', tag: TAGS[0], photos: [], created: new Date().toISOString(), updated: new Date().toISOString() };
     db.notes.unshift(n); save(); map.easeTo({ center: c, zoom: Math.max(map.getZoom(), 15), duration: ctx.reduceMotion ? 0 : 600 }); openNote(n, true);
   };
-  document.getElementById('addNote').onclick = () => ctx.addNote({ gps: false });
 
   async function openNote(n, isNew) {
     if (!n) return; ctx.closeCard(); curNote = n;

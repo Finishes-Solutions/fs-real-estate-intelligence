@@ -597,3 +597,47 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 #tlRange{font-size:12.5px;color:var(--text-2)}
 #tlRange b{color:var(--brand)}
 @media (max-width:860px){ .g-row .g-lab,.g-axis .g-lab{width:150px} }
+/* place menu (right-click / long-press) */
+.pmenu{position:absolute;z-index:8;width:220px;background:var(--panel);border:1px solid var(--line-2);border-radius:8px;box-shadow:0 10px 28px rgba(11,13,12,.22);padding:4px;display:none}
+.pmenu.on{display:grid}
+.pmenu .pm-h{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);padding:6px 10px 4px}
+.pmenu button,.pmenu a{border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:5px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;text-decoration:none}
+.pmenu button:hover,.pmenu a:hover{background:var(--chip)}
+
+/* ================= v3: breathing room ================= */
+.panel .list{flex-shrink:0}
+.foot{position:relative;z-index:1;background:var(--panel)}
+@media (min-width:1101px){ .app{grid-template-columns:420px 1fr} }
+.head{padding:22px 24px 18px}
+.head .sub{margin-top:4px}
+.kpis{margin-top:18px}
+.kpi{padding:12px 14px}
+.ask-launch{margin:16px 24px 0;width:calc(100% - 48px);padding:12px 14px}
+.filters{padding:18px 24px 20px;gap:16px}
+.filters .row{gap:8px;row-gap:8px;align-items:center}
+.filters .lbl{width:72px;padding-top:1px}
+.filters .chip{padding:6px 11px;font-size:12.5px;border-radius:6px}
+.filters .search{padding:0 12px;border-radius:6px}
+.filters .search input{padding:11px 0}
+.filters select.chip{padding-right:26px;min-height:32px}
+.filters .more{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.filters .more[open]{gap:14px}
+.filters .more summary{padding:0}
+.filters input.chip.mon{width:132px;padding:5px 8px}
+.active{padding-top:2px}
+.selbar{margin:18px 24px 0;padding:14px 16px;gap:12px}
+.btnrow{gap:8px}
+.btn{padding:7px 12px}
+.listhead{padding:18px 24px 8px}
+.list{padding:0 12px 18px}
+.item{padding:11px 12px}
+.foot{padding:14px 24px 18px}
+.viewbar{gap:4px;padding:10px 14px}
+.viewbar button{padding:8px 14px}
+.legend{gap:7px;padding:12px 14px}
+.ai-fab{bottom:36px}
+@media (max-width:1100px){
+  .head,.filters,.listhead,.foot{padding-left:20px;padding-right:20px}
+  .ask-launch,.selbar{margin-left:20px;margin-right:20px}
+  .ask-launch{width:calc(100% - 40px)}
+}

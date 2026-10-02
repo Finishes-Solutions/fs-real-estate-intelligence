@@ -7,7 +7,7 @@ const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" strok
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
 const SEND = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15V3M4 8l5-5 5 5"/></svg>';
 const X = '<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
-const SUGGEST = ['Show medical projects over $5M filed in the last year', 'Who are the most active developers right now?', 'What’s under construction within 5 miles of Katy?', 'Show a heatmap of new construction by value', 'Find the biggest multifamily projects and highlight the top 5'];
+const SUGGEST = ['Show medical projects over $5M filed in the last year', 'Who are the most active developers right now?', 'What’s under construction within 5 miles of Katy?', 'Show a heatmap of new construction by value', 'Take me to downtown Houston and orbit around it', 'Find the biggest multifamily projects and highlight the top 5'];
 
 export function initAssistant(ctx) {
   const { esc, fmtM, fmtN } = ctx;
@@ -49,7 +49,7 @@ export function initAssistant(ctx) {
   }
   function close() { app.classList.remove('ai-open', 'ai-tall'); el.setAttribute('aria-hidden', 'true'); stopVoice(); ctx.mapPadding(); }
   $('aiFab').onclick = () => open(); $('aiClose').onclick = close; document.getElementById('askLaunch')?.addEventListener('click', () => open());
-  $('aiNew').onclick = () => { history = []; log.innerHTML = ''; renderEmpty(); ctx.clearHighlight(); };
+  $('aiNew').onclick = () => { history = []; thread = null; log.innerHTML = ''; renderEmpty(); ctx.clearHighlight(); };
   document.addEventListener('keydown', e => {
     if (e.key === '/' && !e.target.closest('input,textarea,select,[contenteditable]')) { e.preventDefault(); open(); }
     if (e.key === 'Escape' && app.classList.contains('ai-open') && document.activeElement === q) close();
@@ -83,33 +83,37 @@ export function initAssistant(ctx) {
 
   // ---------- text chat loop ----------
   const context = () => ({ coverage: ctx.coverage(), filters: ctx.filterText() || 'none (default view)' });
-  async function post(messages) {
-    const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, context: context() }) });
+  let thread = null; // OpenAI response id that continues this conversation
+  async function post(input) {
+    const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, previous_response_id: thread, context: context() }) });
     const d = await r.json().catch(() => ({}));
+    if (r.status === 409) thread = null;
     if (!r.ok) throw new Error(d.error || (r.status === 404 ? 'The assistant isn’t deployed here.' : 'Error ' + r.status));
-    return d.message;
+    thread = d.id || thread; return d;
   }
   async function ask(text) {
     if (busy) return; open(false); busy = true; $('aiSend').disabled = true;
     bubble('user', esc(text)); history.push({ role: 'user', content: text });
     const thinking = bubble('bot pending', '<span class="dots"><i></i><i></i><i></i></span>'); status('Thinking…');
     try {
+      let input = [{ role: 'user', content: text }];
       for (let round = 0; round < 6; round++) {
-        const m = await post(history); history.push(m);
-        if (m.content) { thinking.before(bubble('bot', ctx.richText(m.content))); ctx.wireCites(log); }
-        if (!m.tool_calls?.length) break;
-        for (const c of m.tool_calls) {
-          status(LABEL[c.function.name] || 'Working…');
-          let args = {}; try { args = JSON.parse(c.function.arguments || '{}'); } catch (e) {}
-          const result = await runTool(c.function.name, args);
-          history.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(result).slice(0, 11000) });
+        const m = await post(input);
+        if (m.text) { thinking.before(bubble('bot', ctx.richText(m.text))); ctx.wireCites(log); history.push({ role: 'assistant', content: m.text }); }
+        if (!m.calls?.length) break;
+        input = [];
+        for (const c of m.calls) {
+          status(LABEL[c.name] || 'Working…');
+          let args = {}; try { args = JSON.parse(c.arguments || '{}'); } catch (e) {}
+          const result = await runTool(c.name, args);
+          input.push({ type: 'function_call_output', call_id: c.call_id, output: JSON.stringify(result).slice(0, 11000) });
         }
         log.appendChild(thinking); scroll(); status('Thinking…');
       }
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', set_map_options: 'Changing the map…', show_view: 'Switching view…', reset_map: 'Resetting…' };
+  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', show_view: 'Switching view…', reset_map: 'Resetting…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -190,11 +194,14 @@ export function initAssistant(ctx) {
         if (isFinite(a.lat) && isFinite(a.lon) && a.lat && a.lon) { c = [a.lon, a.lat]; label = a.lat.toFixed(4) + ', ' + a.lon.toFixed(4); }
         else if (a.place) { const p = await resolvePlace(String(a.place)); if (p) { c = p.c; label = p.label; } }
         if (!c) return { error: 'Couldn’t find that place.' };
-        if (ctx.view !== 'map') ctx.setView('map'); ctx.map.flyTo({ center: c, zoom: Math.max(4, Math.min(18, a.zoom || 12)), duration: ctx.reduceMotion ? 0 : 1400 });
-        actionChip('Moved the map to ' + label); return { moved_to: label };
+        if (ctx.view !== 'map') ctx.setView('map');
+        const zoom = Math.max(4, Math.min(18, a.zoom || (a.orbit ? 15.5 : 12)));
+        if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt ? 55 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });
+        actionChip((a.orbit ? 'Orbiting ' : 'Moved the map to ') + label); return { moved_to: label, orbiting: !!a.orbit };
       }
+      if (name === 'stop_orbit') { ctx.stopOrbit(); return { stopped: true }; }
       if (name === 'set_map_options') { const done = ctx.setMapOptions(a); actionChip('Map: ' + done.join(', ')); return { changed: done }; }
-      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', who: 'Who’s building', changes: 'What changed' }[a.view] || a.view)); return { view: a.view }; }
+      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', who: 'Activity', changes: 'Updates' }[a.view] || a.view)); return { view: a.view }; }
       if (name === 'reset_map') { const before = ctx.snapshot(); ctx.resetAll(); actionChip('Reset the map', () => ctx.restore(before)); return { reset: true, filings: ctx.visible.length }; }
       return { error: 'Unknown tool ' + name };
     } catch (e) { console.error(e); return { error: e.message }; }

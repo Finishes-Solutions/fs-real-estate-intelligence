@@ -52,9 +52,9 @@ const countyGeo=DATA.counties.map(c=>({name:c.name,geom:{type:'MultiPolygon',coo
 
 // ---------- map ----------
 const STYLES={dots:['dataviz','dataviz-dark'],streets:['streets-v2','streets-v2-dark'],sat:['hybrid','hybrid'],topo:['topo-v2','topo-v2-dark']};
-const layers={style:'dots',roads:true,names:true,counties:true,size:'uniform',heat:'off'};
-try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(['off','count','value'].includes(L.heat)) layers.heat=L.heat; }catch(e){}
-const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({size:layers.size,heat:layers.heat})); }catch(e){} };
+const layers={style:'dots',roads:true,names:true,counties:true,size:'uniform',heat:'off',dots:true};
+try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(['off','count','value'].includes(L.heat)) layers.heat=L.heat; if(L.dots===false) layers.dots=false; }catch(e){}
+const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({size:layers.size,heat:layers.heat,dots:layers.dots})); }catch(e){} };
 const styleUrl=s=>'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl('dots'),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
@@ -123,6 +123,8 @@ function styleFilings(){
   map.setPaintProperty('filings','circle-opacity',heat?['interpolate',['linear'],['zoom'],10,0,12.5,['*',base,1]]:base);
   map.setPaintProperty('filings','circle-stroke-opacity',heat?['interpolate',['linear'],['zoom'],10,0,12.5,1]:1);
   map.setLayoutProperty('heat','visibility',heat?'visible':'none');
+  ['filings','filings-hl'].forEach(id=>map.setLayoutProperty(id,'visibility',layers.dots?'visible':'none'));
+  const lf=document.getElementById('lyFilings'); if(lf) lf.checked=layers.dots;
   map.setPaintProperty('heat','heatmap-weight',layers.heat==='value'?['interpolate',['linear'],['get','lc'],4.7,.04,6,.2,7,.55,8,1,9.5,2]:1);
   syncLegend();
 }
@@ -351,6 +353,29 @@ map.on('mouseleave','filings',()=>{ if(mode==='pan') map.getCanvas().style.curso
 map.on('click','filings',e=>{ if(mode!=='pan') return; e.preventDefault(); select(F[e.features[0].properties.i],false); });
 map.on('click',e=>{ if(mode!=='pan' || e.defaultPrevented || swallowClick) return; if(map.queryRenderedFeatures(e.point,{layers:['filings']}).length) return; if(!ctx.mapClickHandlers.some(h=>h(e))) closeCard(); });
 
+// ---------- place menu: right-click (desktop) or long-press (touch) anywhere on the map ----------
+const pmenu=document.createElement('div'); pmenu.className='pmenu'; pmenu.setAttribute('role','menu'); viewport.appendChild(pmenu);
+function placeMenu(pt,ll){
+  const c=[+ll.lng.toFixed(6),+ll.lat.toFixed(6)];
+  pmenu.innerHTML='<div class="pm-h">'+c[1].toFixed(5)+', '+c[0].toFixed(5)+'</div>'+
+    '<button data-a="note" role="menuitem">Add site note here</button><button data-a="radius" role="menuitem">Filings within 1 mile</button>'+
+    '<button data-a="ask" role="menuitem">Ask AI about this spot</button><a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+c[1]+','+c[0]+'" target="_blank" rel="noopener" role="menuitem">Street View ↗</a>';
+  const w=220, x=Math.min(pt.x, viewport.clientWidth-w-8), y=Math.min(pt.y, viewport.clientHeight-190);
+  pmenu.style.left=Math.max(8,x)+'px'; pmenu.style.top=Math.max(8,y)+'px'; pmenu.classList.add('on');
+  pmenu.querySelector('[data-a=note]').onclick=()=>{ hideMenu(); ctx.addNote?.({at:c}); };
+  pmenu.querySelector('[data-a=radius]').onclick=()=>{ hideMenu(); setMiles(1,false,true); setRadiusCenter(c,'Pin ('+c[1].toFixed(4)+', '+c[0].toFixed(4)+')',true); };
+  pmenu.querySelector('[data-a=ask]').onclick=()=>{ hideMenu(); ctx.assistant?.ask('What is being built within 1 mile of '+c[1].toFixed(5)+', '+c[0].toFixed(5)+'? Show it on the map.'); };
+  pmenu.querySelector('a').onclick=hideMenu;
+}
+const hideMenu=()=>pmenu.classList.remove('on');
+map.on('contextmenu',e=>{ e.preventDefault(); if(mode==='pan') placeMenu(e.point,e.lngLat); });
+{ let lp=0,start=null; // long-press on touch screens
+  map.on('touchstart',e=>{ clearTimeout(lp); if(e.points.length!==1||mode!=='pan') return; start=e.point; lp=setTimeout(()=>{ placeMenu(e.point,e.lngLat); swallowClick=true; },550); });
+  map.on('touchmove',e=>{ if(start&&Math.hypot(e.point.x-start.x,e.point.y-start.y)>10) clearTimeout(lp); });
+  map.on('touchend',()=>clearTimeout(lp)); }
+document.addEventListener('pointerdown',e=>{ if(pmenu.classList.contains('on')&&!pmenu.contains(e.target)) hideMenu(); });
+map.on('movestart',hideMenu);
+
 // ---------- tools ----------
 let mode='pan', draft=[], boxA=null, boxB=null;
 const hintEl=document.getElementById('hint'), radiusEl=document.getElementById('radius');
@@ -484,11 +509,13 @@ document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on'
 document.querySelectorAll('#styleSeg button').forEach(b=>b.onclick=()=>setBasemap(b.dataset.style));
 document.querySelectorAll('#sizeSeg button').forEach(b=>b.onclick=()=>{ layers.size=b.dataset.size; saveLayers(); styleFilings(); });
 document.querySelectorAll('#heatSeg button').forEach(b=>b.onclick=()=>{ layers.heat=b.dataset.heat; saveLayers(); styleFilings(); });
+document.getElementById('lyFilings').onchange=e=>{ layers.dots=e.target.checked; saveLayers(); styleFilings(); };
 syncLegend();
 function setMapOptions(a){ const done=[];
   if(a.heatmap){ layers.heat=a.heatmap; done.push(a.heatmap==='off'?'heatmap off':'heatmap by '+(a.heatmap==='value'?'value':'count')); }
   if(typeof a.size_by_value==='boolean'){ layers.size=a.size_by_value?'value':'uniform'; done.push(a.size_by_value?'dots sized by value':'uniform dots'); }
-  if(a.heatmap||typeof a.size_by_value==='boolean'){ saveLayers(); styleFilings(); }
+  if(typeof a.show_filings==='boolean'){ layers.dots=a.show_filings; done.push(a.show_filings?'filings shown':'filings hidden'); }
+  if(a.heatmap||typeof a.size_by_value==='boolean'||typeof a.show_filings==='boolean'){ saveLayers(); styleFilings(); }
   if(a.basemap&&STYLES[a.basemap]){ setBasemap(a.basemap); done.push(a.basemap+' basemap'); }
   if(typeof a.tilt==='boolean'){ document.getElementById('ly3d').checked=a.tilt; map.easeTo({pitch:a.tilt?55:0,duration:600}); done.push(a.tilt?'tilted 3D':'flat'); }
   if(a.demographics){ const s=document.getElementById('lyDemo'); s.value=a.demographics==='off'?'':a.demographics; s.dispatchEvent(new Event('change')); done.push(a.demographics==='off'?'demographics off':'demographics: '+(s.selectedOptions[0]?.textContent||a.demographics)); }
@@ -627,7 +654,12 @@ const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
   applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), mapClickHandlers:[], setRadiusCenter, setMiles, fitGeom, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
-Object.assign(ctx,{ periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+let orbitRaf=0;
+function stopOrbit(){ cancelAnimationFrame(orbitRaf); orbitRaf=0; }
+function orbitAt(c,zoom){ stopOrbit(); map.flyTo({center:c,zoom,pitch:62,duration:reduceMotion?0:2200});
+  map.once('moveend',()=>{ if(reduceMotion) return; const step=()=>{ map.setBearing((map.getBearing()+0.1)%360); orbitRaf=requestAnimationFrame(step); }; orbitRaf=requestAnimationFrame(step); }); }
+['mousedown','touchstart','wheel'].forEach(ev=>map.on(ev,()=>orbitRaf&&stopOrbit()));
+Object.assign(ctx,{ mode:()=>mode, orbitAt, stopOrbit, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
