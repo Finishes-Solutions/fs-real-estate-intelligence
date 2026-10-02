@@ -38,7 +38,7 @@ export async function enrich(rows, cache) {
   const max = +(process.env.AI_MAX_ROWS || 40000);
   if (!key) { log('enrich: OPENAI_API_KEY not set, skipping', todo.length, 'filings'); return; }
   if (!todo.length) { log('enrich: all', rows.length, 'cached'); return; }
-  const model = await pickModel(key, process.env.OPENAI_MODEL);
+  const model = await pickModel(key, process.env.OPENAI_ENRICH_MODEL || process.env.OPENAI_MODEL);
   const batch = todo.slice(0, max), chunks = [];
   for (let i = 0; i < batch.length; i += CHUNK) chunks.push(batch.slice(i, i + CHUNK));
   log('enrich: model', model, '| cached', rows.length - todo.length, '| sending', batch.length, 'in', chunks.length, 'requests');
