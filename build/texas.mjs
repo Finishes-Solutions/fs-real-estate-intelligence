@@ -2,7 +2,7 @@
 import { createRequire } from 'node:module';
 import { feature } from 'topojson-client';
 import { geoCentroid } from 'd3-geo';
-import { rewind, round } from './geometry.mjs';
+import { rewind, round, tigerCounties } from './geometry.mjs';
 import { fetchRetry, log } from './util.mjs';
 
 export const TX_BBOX = [-106.7, 25.8, -93.5, 36.6];
@@ -35,8 +35,11 @@ export async function texasCounties({ scrape = true } = {}) {
   const derived = deriveTabsIds(names), scraped = scrape ? await scrapeTabsIds(names) : null;
   if (scraped) { const diff = names.filter(n => scraped[n] && scraped[n] !== derived[n]); if (diff.length) log('tabs county ids: TDLR list differs from derived order for', diff.length, 'counties; using TDLR list'); }
   else if (scrape) log('tabs county ids: TDLR drop-down not readable, using derived order');
+  // TIGER/Line outlines (~20 m) where TIGERweb answers; us-atlas 1:10m otherwise
+  const tiger = process.env.SKIP_TIGER ? {} : await tigerCounties(tx.map(f => String(f.id)), { offset: 0.0002, digits: 4, batch: 25 });
+  if (Object.keys(tiger).length) log('county outlines: TIGER/Line for', Object.keys(tiger).length, 'of', tx.length);
   return tx.map(f => {
-    const g = rewind(f.geometry), name = f.properties.name;
+    const g = rewind(tiger[String(f.id)]?.geometry || f.geometry), name = f.properties.name;
     return { fips: String(f.id), name, tabs_id: (scraped && scraped[name]) || derived[name], label: geoCentroid(g).map(v => Math.round(v * 1e3) / 1e3), outline: { type: 'MultiPolygon', coordinates: round(g.coordinates) } };
   }).sort((a, b) => a.name < b.name ? -1 : 1);
 }

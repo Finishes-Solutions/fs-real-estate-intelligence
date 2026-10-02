@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/data"; cp data/regions.json "$T/data/"; node test/fixture.mjs >/dev/null
-node -e "const fs=require('fs');const g=JSON.parse(fs.readFileSync('test/.data/geo.json'));const {createHash}=require('crypto');g._regions=createHash('sha1').update(JSON.stringify(JSON.parse(fs.readFileSync('data/regions.json')))).digest('hex').slice(0,12);fs.writeFileSync('$T/data/geo.json',JSON.stringify(g))"
+node -e "const fs=require('fs');const g=JSON.parse(fs.readFileSync('test/.data/geo.json'));const {createHash}=require('crypto');g._regions=createHash('sha1').update(JSON.stringify(JSON.parse(fs.readFileSync('data/regions.json')))+'2').digest('hex').slice(0,12);fs.writeFileSync('$T/data/geo.json',JSON.stringify(g))"
 run() { MOCK_LOG="$T/calls$1.log" DATA_DIR="$T/data/" OPENAI_API_KEY=sk-test ONLY=Waller,Austin PERIOD_START=2026-06-01 PERIOD_END=2026-08-31 ${2:-} node --import ./test/mock-net.mjs build.mjs > "$T/out$1.log" 2>&1 || { cat "$T/out$1.log"; exit 1; }; }
 run 1; run 2 "env BUMP=1"
 n() { grep -c "$2" "$T/calls$1.log" || true; }
