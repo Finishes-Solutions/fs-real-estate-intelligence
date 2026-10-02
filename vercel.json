@@ -22,6 +22,9 @@
     "api/chat.js": {
       "maxDuration": 120
     },
+    "api/search.js": {
+      "maxDuration": 60
+    },
     "api/realtime.js": {
       "maxDuration": 15
     },

@@ -25,10 +25,12 @@ export default async function handler(req, res) {
         audio: { input: { transcription: { model: process.env.OPENAI_TRANSCRIBE_MODEL || 'gpt-4o-transcribe', language: 'en', prompt: vocab },
           noise_reduction: { type: 'near_field' },
           // reply when the speaker finishes a thought (medium waits out mid-sentence pauses); talking over the reply interrupts it
-          turn_detection: { type: 'semantic_vad', eagerness: 'medium', create_response: true, interrupt_response: true } }, output: { voice: process.env.OPENAI_VOICE || 'marin' } } } })
+          // create_response off: the browser starts the reply once the transcript shows a real request (noise and
+          // echoes of the hint list are dropped instead of answered), and the user's words always show before the reply
+          turn_detection: { type: 'semantic_vad', eagerness: 'medium', create_response: false, interrupt_response: true } }, output: { voice: process.env.OPENAI_VOICE || 'marin' } } } })
     });
     const d = await r.json().catch(() => ({}));
-    if (r.ok && d.value) return res.json({ value: d.value, expires_at: d.expires_at, model });
+    if (r.ok && d.value) return res.json({ value: d.value, expires_at: d.expires_at, model, vocab });
     last = d.error?.message || 'HTTP ' + r.status;
     if (r.status === 401) break;
   }

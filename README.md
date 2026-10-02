@@ -70,6 +70,8 @@ Not included, on purpose: sales and lease comps. Texas does not disclose sale pr
 The **Ask AI** button (or ⌘/ on a Mac, Ctrl+/ elsewhere) opens a chat that works the map through tools: filter, find, highlight, open a filing, fly somewhere, toggle the heatmap or views. Press the mic to talk to it instead (OpenAI Realtime over WebRTC).
 - `api/chat.js`: text chat (stateless; the browser runs the tool calls and sends results back). Model `OPENAI_CHAT_MODEL` or `OPENAI_MODEL`; `OPENAI_CHAT_REASONING_EFFORT` overrides the effort for chat only.
 - `api/realtime.js`: short-lived voice session. `OPENAI_REALTIME_MODEL` (default `gpt-realtime-2.1`, then `gpt-realtime`), `OPENAI_VOICE` (default `marin`), `VOICE_ENABLED=false` turns voice off. Sessions end after 10 minutes; 30 per IP per day.
+- **Web search, on request only**: say "search the web for…", "look it up" or "Google it" and the assistant calls `api/search.js` (OpenAI Responses API with its built-in web search, low reasoning effort, a few seconds). It answers in a couple of sentences and lists the source sites as links. It never searches on its own. Optional `OPENAI_SEARCH_MODEL` (default `gpt-5-mini`, then `gpt-4.1-mini`). Each search is billed by OpenAI (a search call plus tokens); the endpoint allows 6 a minute and 60 a day per visitor.
+- Voice replies start only after the transcript shows a real request: background noise and the transcriber echoing its own hint list of place names are dropped instead of answered, and your words appear above the reply.
 - Tools are defined once in `lib/agent-tools.mjs`, including distance / drive time, live layers, weather, news and site imagery (see Live layers below).
 
 ## Live layers, drive time and field tools

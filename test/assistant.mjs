@@ -1,6 +1,6 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, districtFor, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
 import { USES } from '../lib/taxonomy.mjs';
 import { makeMatcher, encode, decode, describe } from '../lib/filter.mjs';
 import { categoryOf, parsePlaces, overpassQuery } from '../lib/nearby.mjs';
@@ -101,3 +101,11 @@ assert.match(describe(spec), /5,000–90,000 sq ft.*50\+ units.*Company: “hine
 a = cleanFilterArgs({ sqft_min: 0, sqft_max: 5000, status: ['Registered', 'Review complete', 'Inspection complete', 'Closed'], company: ' ', exact_only: false, min_units: -1 });
 assert.deepEqual(a, { sqft_max: 5000 }, 'empty / all-status / false filters dropped');
 console.log('assistant ok');
+
+// voice: the transcriber echoing its own hint list is not something the user said
+{ const v = 'Houston area, Texas. Cypress, Katy, Fulshear, Brookshire, Waller, Hempstead, Prairie View, Hockley, TDLR, TABS, Finishes Solutions, multifamily, Waller, Harris, TxDOT District Houston';
+  assert.ok(isPromptEcho('Houston area, Texas. Cypress, Katy, Fulshear, Brookshire, Waller, Hempstead, Prairie View, Hockley, Tomball, TxDOT District Houston', v), 'echo of the hint list');
+  assert.ok(isPromptEcho('Cypress, Katy, Fulshear, Brookshire.', v));
+  for (const t of ['Take me to the JP Morgan Chase Tower and tell me about it.', 'Show multifamily in Katy', 'Compare Katy, Cypress, Waller.', 'Katy and Cypress, which has more?']) assert.ok(!isPromptEcho(t, v), t);
+  assert.ok(!isPromptEcho('Cypress, Katy, Fulshear', ''), 'no hint list, no echo'); }
+console.log('assistant echo ok');

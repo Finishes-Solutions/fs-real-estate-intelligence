@@ -93,6 +93,7 @@ export function initSources(ctx) {
         { name: link('Google News', 'https://news.google.com/') + ' · ' + link('GDELT Project', 'https://www.gdeltproject.org/'), what: 'Project news on a card', status: st('live', 'On demand'), detail: 'Google News (about the last year), GDELT as a fallback; cached up to an hour.' },
         { name: link('Texas Comptroller sales-tax permits', 'https://data.texas.gov/Government-and-Taxes/Active-Sales-Tax-Permit-Holders/jrea-zgmq'), what: 'Registered businesses at a building or filing address', status: st('live', 'On demand'), detail: 'Matched on house number and street; cached up to a day. Retail, restaurant and service tenants; offices and medical often aren’t listed.' },
         { name: link('Mapillary', 'https://www.mapillary.com/') + ' · Google Street View', what: 'Street photos on the building card', status: st('live', 'On demand'), detail: 'Photo dates vary; Mapillary needs a key on the server.' },
+        { name: link('OpenAI web search', 'https://platform.openai.com/docs/guides/tools-web-search'), what: 'Assistant web lookups, only when you ask it to search', status: st('live', 'On demand'), detail: 'Answers cite the source sites as links. Not cached.' },
         { name: link('OpenAI', 'https://openai.com/'), what: 'Assistant (chat and voice) and project briefs', status: st('live', 'On demand'), detail: 'Answers cite TABS numbers from the loaded filings. Briefs are cached for a week.' },
       ]],
     ];
