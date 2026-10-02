@@ -269,12 +269,23 @@ export function initBuildings(ctx) {
     const el = card.querySelector('#bPhoto'); if (!el || !ph) return;
     el.innerHTML = '<a class="bphoto" href="' + esc(ph.link) + '" target="_blank" rel="noopener"><img alt="Street-level photo near this building" loading="lazy" src="' + esc(ph.thumb) + '"><span>Mapillary · ' + esc(ph.captured || '') + '</span></a>';
   }
+  // area of a tract outline in square miles (equirectangular, fine at tract size) and an equal-area radius, so the
+  // card can say how big an area the numbers describe: tracts follow population, not distance
+  function sqMiles(g) {
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates; let a = 0;
+    for (const rings of polys) rings.forEach((ring, k) => { const lat0 = ring[0][1] * Math.PI / 180, kx = 69.17 * Math.cos(lat0), ky = 69.17; let s = 0;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) s += (ring[j][0] * kx) * (ring[i][1] * ky) - (ring[i][0] * kx) * (ring[j][1] * ky);
+      a += (k ? -1 : 1) * Math.abs(s) / 2; });
+    return Math.max(0, a);
+  }
+  const tractNo = g => { const c = String(g).slice(-6); return String(+c.slice(0, 4)) + (c.slice(4) === '00' ? '' : '.' + c.slice(4)); };
   async function renderArea() {
     const b = cur; await loadMarket(); if (cur !== b) return;
     const el = card.querySelector('#bArea'); if (!el || !market?.tracts) return;
     const t = market.tracts.find(t => inGeom(b.center, t.geom)); if (!t) return;
     const g = t.gr == null ? '—' : (t.gr > 0 ? '+' : '') + t.gr + '%';
-    el.innerHTML = '<div class="lt">Census tract (ACS ' + market.year + ')</div><div class="kgrid"><div><b>' + (t.pop != null ? fmtN(t.pop) : '—') + '</b><span>Population</span></div><div><b>' + g + '</b><span>Growth since ' + (market.baseYear || '') + '</span></div>' +
+    const sq = sqMiles(t.geom), r = Math.sqrt(sq / Math.PI), f1 = v => v < 10 ? v.toFixed(1) : String(Math.round(v));
+    el.innerHTML = '<div class="lt">Demographics</div><div class="rnote">Census tract ' + esc(tractNo(t.g)) + ' around this building: about ' + f1(sq) + ' sq mi (like a ' + f1(r) + '-mile radius). Tracts follow population, so they are small in dense areas and large in rural ones. US Census ACS ' + market.year + ' 5-year.</div><div class="kgrid"><div><b>' + (t.pop != null ? fmtN(t.pop) : '—') + '</b><span>Population</span></div><div><b>' + g + '</b><span>Growth since ' + (market.baseYear || '') + '</span></div>' +
       '<div><b>' + (t.inc ? fmtM(t.inc) : '—') + '</b><span>Median income</span></div><div><b>' + (t.val ? fmtM(t.val) : '—') + '</b><span>Median home value</span></div>' +
       (market.jobsYear && t.jobs != null ? '<div><b>' + fmtN(t.jobs) + '</b><span>Jobs here (' + market.jobsYear + ')</span></div><div><b>' + (t.jgr == null ? '—' : (t.jgr > 0 ? '+' : '') + t.jgr + '%') + '</b><span>Job growth since ' + (market.jobsBaseYear || '') + '</span></div>' : '') + '</div>';
   }

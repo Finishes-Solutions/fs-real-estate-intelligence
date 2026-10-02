@@ -8,6 +8,8 @@ import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, w
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
 const SEND = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15V3M4 8l5-5 5 5"/></svg>';
+// new chat: a speech bubble with a plus
+const NEWCHAT = '<svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 8.6c0 3.4-3 6-6.5 6-.9 0-1.8-.2-2.6-.5L3 15l.9-3A5.8 5.8 0 0 1 2.5 8.6c0-3.4 2.9-6 6.5-6s6.5 2.6 6.5 6z"/><path d="M9 5.9v5.4M6.3 8.6h5.4"/></svg>';
 const X = '<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
 const SUGGEST = ['Show medical projects over $5M filed in the last year', 'Who are the most active developers right now?', 'What’s under construction within 5 miles of Katy?', 'Show a heatmap of new construction by value', 'Take me to downtown Houston and orbit around it', 'Find the biggest multifamily projects and highlight the top 5', 'How far is this property from me, and what’s the drive time?', 'Turn on radar, wind and live traffic'];
 
@@ -21,7 +23,7 @@ export function initAssistant(ctx) {
     <div class="ai-grab" id="aiGrab" aria-hidden="true"></div>
     <header class="ai-h">
       <div class="ai-t">${SPARK}<span>Assistant</span><em id="aiSt"></em></div>
-      <button class="ai-ib" id="aiNew" type="button" title="New conversation">New</button>
+      <button class="ai-ib" id="aiNew" type="button" title="New chat" aria-label="New chat">${NEWCHAT}</button>
       <button class="ai-ib" id="aiClose" type="button" aria-label="Close assistant">${X}</button>
     </header>
     <div class="ai-log" id="aiLog" aria-live="polite"></div>
