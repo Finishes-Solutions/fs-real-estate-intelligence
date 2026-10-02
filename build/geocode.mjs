@@ -5,8 +5,12 @@
 //   3. osm      Nominatim structured search; only house-level results in the same zip / city
 //   4. maptiler strict address match
 //   5. census one-line, with spelling variants of highway names ("Interstate 45" -> "I-45", "Highway 6" -> "State Highway 6")
-//   6. intersection  "A and B" / "Intersection of A and B": the junction node of the two roads in OpenStreetMap (Overpass)
-//   7. street        street named without a house number: a point on that street near the town (flagged prec 'street')
+//   6. street        no source knows the house number (new subdivisions, addresses filed as "0 Main St" or just a street
+//                    name): a point on that street in the filing's ZIP from MapTiler, when the street name and ZIP both
+//                    agree (flagged prec 'street'). Probe 2026-10-02: Census and the Texas address points had no house
+//                    for most of the misses, while MapTiler found the right street in the right ZIP for nearly all.
+//   7. intersection  "A and B" / "Intersection of A and B": the junction node of the two roads in OpenStreetMap (Overpass;
+//                    it often times out from cloud runners, so it is only used for junctions and has a hard timeout)
 //   8. city     jittered town-center fallback (flagged approximate, not cached)
 // A lookup that errored (service down, batch failed) is never cached as a miss, so it is retried on the next run.
 // Address-point and Census hits are trusted (they match house number, street and zip). Weaker sources (osm, maptiler, city)
@@ -16,7 +20,7 @@ import { fetchRetry, pool, log, sleep } from './util.mjs';
 
 export const GEO_V = 3;
 // misses recorded before MISS_V are retried once (v4: smaller Census batches, one-line variants, intersections, streets)
-export const MISS_V = 4;
+export const MISS_V = 5; // v5: street-level placement from MapTiler
 
 export function cleanStreet(s) {
   s = s.split(/;|,|\s#|\s(?:Suite|Ste\.?|STE|Bldg\.?|Building|BLDG|Unit|Level|Lvl|Room|Rm\.?|Floors?|Fl\.?)\b/i)[0];
@@ -92,7 +96,7 @@ function nameRe(st) {
 const OVERPASS = process.env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter';
 async function overpass(ql) {
   await sleep(600);
-  const r = await fetchRetry(OVERPASS, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 3);
+  const r = await fetchRetry(OVERPASS, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(30000) }, 2);
   return (await r.json()).elements || [];
 }
 const box = (c, d) => [c[1] - d, c[0] - d * 1.15, c[1] + d, c[0] + d * 1.15].map(v => v.toFixed(4)).join(',');
@@ -162,6 +166,33 @@ export async function maptiler(key, bbox, q2, strict) {
     if (!f) return null; if (strict && !(f.address && (f.relevance || 0) >= 0.9)) return null; return f.center; } catch (e) { return null; }
 }
 
+// the street part of an address, without the house number ("12907-A Fry Rd" -> "Fry Rd", "0 Mason Road" -> "Mason Road")
+export const streetName = st => String(st || '').replace(/^\s*\d+[a-z]?(?:-\w+)?\s+/i, '').trim();
+const TYPE_OF = { RD: 'ROAD', ROAD: 'ROAD', ST: 'STREET', STREET: 'STREET', DR: 'DRIVE', DRIVE: 'DRIVE', AVE: 'AVENUE', AV: 'AVENUE', AVENUE: 'AVENUE', BLVD: 'BOULEVARD', BOULEVARD: 'BOULEVARD',
+  LN: 'LANE', LANE: 'LANE', PKWY: 'PARKWAY', PARKWAY: 'PARKWAY', CT: 'COURT', COURT: 'COURT', CIR: 'CIRCLE', CIRCLE: 'CIRCLE', WAY: 'WAY', TRL: 'TRAIL', TRAIL: 'TRAIL',
+  PL: 'PLACE', PLACE: 'PLACE', LOOP: 'LOOP', TER: 'TERRACE', TERRACE: 'TERRACE', CV: 'COVE', COVE: 'COVE', XING: 'CROSSING', CROSSING: 'CROSSING', BND: 'BEND', BEND: 'BEND', PASS: 'PASS', RUN: 'RUN' };
+const streetType = st => { const t = String(st || '').toUpperCase().replace(/[.,']/g, ' ').split(/\s+/).filter(Boolean).filter(w => !DIRS.has(w)); return TYPE_OF[t[t.length - 1]] || null; };
+const coreTokens = st => String(st).toUpperCase().replace(/[.,']/g, ' ').split(/\s+/).filter(t => t && !DIRS.has(t) && !TYPES.has(t));
+// a MapTiler result that is the filing's street (every core word of the name) in the filing's ZIP (or town when no ZIP)
+export function streetMatch(f, r, name) {
+  if (!f || !Array.isArray(f.center)) return false;
+  const types = [].concat(f.place_type || []); if (!types.some(t => /address|street|road/.test(t))) return false;
+  const core = coreTokens(name); if (!core.length) return false;
+  const text = String(f.text || '').toUpperCase().replace(/[.,']/g, ' ').split(/\s+/);
+  if (!core.every(w => text.includes(w) || (/^\d+$/.test(w) && text.some(t => t.replace(/\D/g, '') === w)))) return false;
+  // "Jebbia Court" is not "Jebbia Ln": when both name a street type, it has to be the same one
+  const ta = streetType(name), tb = streetType(f.text); if (ta && tb && ta !== tb) return false;
+  const zip = (f.context || []).find(c => /^postal_code/.test(c.id || ''))?.text || (String(f.place_name || '').match(/\b(7\d{4})\b/) || [])[1];
+  if (r.zip) return zip === r.zip;
+  return String(f.place_name || '').toLowerCase().includes(String(r.city || '').toLowerCase());
+}
+export async function maptilerStreet(key, bbox, r) {
+  const name = streetName(r.street && /^\s*0*\s*[a-z]/i.test(r.street) ? r.street.split(/,|;/)[0] : r.st); if (!name || !coreTokens(name).length) return null;
+  const u = 'https://api.maptiler.com/geocoding/' + encodeURIComponent(name + ', ' + r.city + ', TX ' + (r.zip || '')) + '.json?key=' + key + '&country=us&limit=3&bbox=' + bbox.join(',');
+  const d = await (await fetchRetry(u, {}, 2)).json();
+  const f = (d.features || []).find(x => streetMatch(x, r, name)); return f ? f.center : null;
+}
+
 const RETRY_MISS_DAYS = 60;
 export const addrKey = r => (r.st + '|' + r.city + '|' + r.zip).toLowerCase().replace(/\s+/g, ' ');
 
@@ -197,7 +228,12 @@ export async function geocodeRows(rows, cache, { key, bbox, places, budget, chec
     const c = await nominatim(r); if (c && ok(r, c)) { put(k, c, 'osm'); nm++; }
   }
   await pool(todo.filter(([k]) => !fresh(k) && !skipped.has(k)), 4, async ([k, r]) => { const c = await maptiler(key, bbox, `${r.st}, ${r.city}, TX ${r.zip}`, true); if (c && ok(r, c)) { put(k, c, 'maptiler'); mt++; } });
-  // no usable house number: the junction of two named roads, or a point on the one named street, near the town
+  // no source knows the house: a point on the filing's street in its ZIP (street name and ZIP must both match)
+  await pool(todo.filter(([k, r]) => !fresh(k) && !parseCross(r.street || r.st)), 4, async ([k, r]) => {
+    try { const c = await maptilerStreet(key, bbox, r); if (c && ok(r, c)) { put(k, c, 'street'); ns++; errored.delete(k); } } catch (e) { errored.add(k); }
+  });
+  // "A and B": the junction of the two named roads, near the town (OpenStreetMap Overpass); a lone street name it
+  // couldn't place above gets one more try on Overpass too
   const town = r => { const pl = places.find(p => p[0].toLowerCase() === (r.city || '').toLowerCase()); return pl ? [pl[1], pl[2]] : null; };
   await pool(todo.filter(([k]) => !fresh(k)), 2, async ([k, r]) => {
     const center = town(r); if (!center) return;
@@ -206,7 +242,7 @@ export async function geocodeRows(rows, cache, { key, bbox, places, budget, chec
     try {
       const c = cross ? await crossing(cross, center) : await streetPoint(only, center);
       if (c && ok(r, c)) { put(k, c, cross ? 'intersection' : 'street'); cross ? nx++ : ns++; errored.delete(k); }
-    } catch (e) { errored.add(k); }
+    } catch (e) { if (cross) errored.add(k); } // Overpass down: junctions are retried next run; a street it couldn't add to stays a miss
   });
   todo.forEach(([k]) => { if (!fresh(k) && !skipped.has(k) && !errored.has(k)) put(k, null, null); });
   const left = todo.filter(([k]) => !fresh(k)), sk = left.filter(([k]) => skipped.has(k)).length, er = left.filter(([k]) => errored.has(k) && !skipped.has(k)).length;
