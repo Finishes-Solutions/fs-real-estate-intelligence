@@ -34,11 +34,11 @@ async function fetchDetail(num) {
 }
 
 // cache: ProjectNumber -> detail + the list-row cost it was fetched against. A cost change triggers a re-fetch.
-export async function details(rows, cache) {
+export async function details(rows, cache, concurrency = 8) {
   const todo = rows.filter(r => { const c = cache[r.ProjectNumber]; return !c || c.cost !== (r.EstimatedCost || 0); });
   log('tabs details: cached', rows.length - todo.length, 'fetch', todo.length);
   let failed = 0;
-  await pool(todo, 8, async r => {
+  await pool(todo, concurrency, async r => {
     try { cache[r.ProjectNumber] = { ...(await fetchDetail(r.ProjectNumber)), cost: r.EstimatedCost || 0, at: new Date().toISOString().slice(0, 10) }; }
     catch (e) { failed++; }
   });

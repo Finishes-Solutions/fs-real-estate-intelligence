@@ -1,0 +1,64 @@
+name: Statewide data (Supabase)
+
+# Backfills every Texas county into Supabase, then refreshes the recent months nightly.
+# While the backfill has counties left, each run starts the next one itself (~4.5 h of work per run).
+on:
+  schedule:
+    - cron: "47 10 * * *" # nightly 10:47 UTC, after the regional refresh (default branch only)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "auto | backfill | recent"
+        required: false
+        default: auto
+      counties:
+        description: "Comma-separated county names to (re)process (blank = all pending)"
+        required: false
+      period_start:
+        description: "Backfill start YYYY-MM-DD (blank = 5 years back)"
+        required: false
+      max_counties:
+        description: "Stop after this many counties (blank = no limit)"
+        required: false
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: statewide-data
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Load into Supabase
+        id: load
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          OPENAI_ENRICH_MODEL: ${{ vars.OPENAI_ENRICH_MODEL }}
+          OPENAI_REASONING_EFFORT: ${{ vars.OPENAI_REASONING_EFFORT }}
+          MAPTILER_KEY: ${{ secrets.MAPTILER_KEY }}
+          MODE: ${{ inputs.mode || 'auto' }}
+          COUNTIES: ${{ inputs.counties }}
+          PERIOD_START: ${{ inputs.period_start }}
+          MAX_COUNTIES: ${{ inputs.max_counties }}
+          TIME_BUDGET_MIN: "270"
+        run: node build/backfill.mjs
+      - name: Start the next backfill run
+        if: steps.load.outputs.remaining != '' && steps.load.outputs.remaining != '0' && inputs.max_counties == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run statewide.yml --ref "${GITHUB_REF_NAME}" -f mode=backfill -f period_start="${{ inputs.period_start }}"

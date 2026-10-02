@@ -55,18 +55,41 @@ The first full run takes a few hours (Nominatim allows one request per second); 
 | `OPENAI_ENRICH_MODEL` | Optional cheaper model just for the bulk tagging step (e.g. `gpt-6-luna`). |
 | `AI_MAX_ROWS`, `AI_CONCURRENCY` | Cap filings enriched per run (default 40000) and parallel requests (default 6). |
 | `MAPTILER_KEY` | Geocoding fallback (defaults to the site key). |
-| `CENSUS_KEY` | Optional Census API key. |
+| `CENSUS_KEY` | Census API key (free at api.census.gov/data/key_signup.html). The ACS demographics need it. |
 | `ONLY` | County subset for test runs, e.g. `Waller,Austin`. Other counties keep last run's data. |
 | `PERIOD_START` / `PERIOD_END` | Fixed date range (`YYYY-MM-DD`). Default: 24 months back to yesterday. |
 | `REBUILD_GEO`, `REBUILD_MARKET` | Force a rebuild of base geometry / demographics. |
 | `ZAPIER_DIGEST_WEBHOOK` | POST a nightly digest of new filings (only on nights with changes). |
 | `ALLOW_SHRINK` | Allow a run with far fewer filings than last time. |
 
+## Statewide database (Supabase)
+
+All 254 Texas counties, five years back, are loaded into Supabase by `build/backfill.mjs` (workflow **Statewide data (Supabase)**). The site still reads the regional JSON above until the map is switched to query the database.
+
+- **Schema:** `supabase/migrations/`. The tables are `filings` (PostGIS point), `counties` (outline and backfill status), `changes`, `runs`, plus the pipeline caches `tabs_cache`, `geocode_cache` and `ai_cache`. The public can read filings, counties and changes; everything else needs the service-role key.
+- **GitHub secrets:**
+  - `SUPABASE_URL`;
+  - `SUPABASE_SECRET_KEY` (or the legacy `SUPABASE_SERVICE_ROLE_KEY`);
+  - `OPENAI_API_KEY`;
+  - optional `MAPTILER_KEY`.
+- **Modes (`MODE`):**
+  - `backfill`: processes counties not yet done, in priority order (home counties, then metros, then the rest) for about 4.5 hours. Then the workflow starts its next run itself until no county is left.
+  - `recent`: re-lists the last 3 months for every county (24 months on Sundays) and writes what changed to `changes`.
+  - `auto` (nightly): `backfill` while any county is pending, otherwise `recent`.
+- **Manual inputs:**
+  - `counties`: re-run named counties.
+  - `period_start`: backfill start; default is 5 years back.
+  - `max_counties`: stop early, for a test. It also turns off the automatic next run.
+- **Safety:**
+  - If most of a county's geocoded filings fall outside it, the county is marked `error` and isn't stored. This guards against a wrong TDLR county id.
+  - Every step is cached in the database, so an interrupted run resumes where it stopped.
+- **Progress:** `select status, count(*), sum(filings) from counties group by 1;` and `select * from runs order by id desc;`
+
 ## Run locally
 
 ```
 npm install
-npm test                 # synthetic fixture + API tests (mocked OpenAI) + offline pipeline test
+npm test                 # synthetic fixture + API tests (mocked OpenAI) + offline pipeline and statewide tests
 DATA_DIR=test/.data/ node build.mjs --assemble && npx serve public   # UI on synthetic data
 node build.mjs           # real refresh (needs network access to TDLR, Census, OpenAI)
 ```

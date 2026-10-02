@@ -35,7 +35,8 @@ const RETRY_MISS_DAYS = 60;
 export const addrKey = r => (r.st + '|' + r.city + '|' + r.zip).toLowerCase().replace(/\s+/g, ' ');
 
 // rows need st, city, zip, ProjectNumber. Returns { [ProjectNumber]: { c:[lon,lat], src:'address'|'city' } }.
-export async function geocodeRows(rows, cache, { key, bbox, places }) {
+// budget (optional, shared across calls): { nominatim: max lookups left }. Addresses skipped for budget are not cached as misses.
+export async function geocodeRows(rows, cache, { key, bbox, places, budget }) {
   const inBox = c => c && c[0] > bbox[0] && c[0] < bbox[2] && c[1] > bbox[1] && c[1] < bbox[3];
   const today = new Date(), stale = at => !at || (today - new Date(at)) / 864e5 > RETRY_MISS_DAYS;
   const out = {}, need = new Map();
@@ -52,11 +53,16 @@ export async function geocodeRows(rows, cache, { key, bbox, places }) {
   const census = await censusBatch(todo.map(([k, r], i) => ({ id: String(i), street: r.st, city: r.city, zip: r.zip })));
   todo.forEach(([k], i) => { if (inBox(census[i])) cache[k] = { c: census[i], at: stamp }; });
   log('census matched', Object.keys(census).length);
-  let nm = 0, mt = 0;
-  for (const [k, r] of todo) { if (cache[k]?.c) continue; const c = await nominatim(`${r.st}, ${r.city}, Texas`); if (inBox(c)) { cache[k] = { c, at: stamp }; nm++; } }
+  let nm = 0, mt = 0; const skipped = new Set();
+  for (const [k, r] of todo) {
+    if (cache[k]?.c) continue;
+    if (budget && budget.nominatim <= 0) { skipped.add(k); continue; }
+    if (budget) budget.nominatim--;
+    const c = await nominatim(`${r.st}, ${r.city}, Texas`); if (inBox(c)) { cache[k] = { c, at: stamp }; nm++; }
+  }
   await pool(todo.filter(([k]) => !cache[k]?.c), 4, async ([k, r]) => { const c = await maptiler(key, bbox, `${r.st}, ${r.city}, TX ${r.zip}`, true); if (inBox(c)) { cache[k] = { c, at: stamp }; mt++; } });
-  todo.forEach(([k]) => { if (!cache[k]?.c) cache[k] = { c: null, at: stamp }; });
-  log('nominatim matched', nm, 'maptiler matched', mt);
+  todo.forEach(([k]) => { if (!cache[k]?.c && !skipped.has(k)) cache[k] = { c: null, at: stamp }; });
+  log('nominatim matched', nm, 'maptiler matched', mt, skipped.size ? '| nominatim budget used up, ' + skipped.size + ' left for a later run' : '');
   for (const r of rows) { if (out[r.ProjectNumber] || !r.st || !r.city) continue; const c = cache[addrKey(r)]; if (c?.c) out[r.ProjectNumber] = { c: c.c, src: 'address' }; }
 
   // town-center fallback, jittered by project number so markers don't stack

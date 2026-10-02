@@ -2,9 +2,10 @@
 const KEEP_DAYS = 400; // keep 13 months of nightly change runs; empty nights are not stored
 const FIELDS = [['status', 'Status'], ['cost', 'Est. value'], ['start', 'Est. start'], ['end', 'Est. end'], ['sqft', 'Sq ft']];
 
-export function diff(prev, next) {
+// firstRun (default: prev is empty) returns no items, since everything would be "new", which says nothing.
+export function diff(prev, next, { firstRun } = {}) {
   const before = new Map((prev || []).map(f => [f.id, f])), items = [];
-  if (!before.size) return items; // first build: everything would be "new", which says nothing
+  if (firstRun ?? !before.size) return items;
   for (const f of next) {
     const p = before.get(f.id);
     if (!p) { items.push({ id: f.id, k: 'new' }); continue; }

@@ -32,7 +32,8 @@ const inputOf = r => ({ id: r.ProjectNumber, name: r.ProjectName || '', facility
   type: r.TypeOfWork, cost: r.EstimatedCost || 0, sqft: r.sqft || '', scope: (r.scope || '').slice(0, 700) });
 export const aiKey = r => r.ProjectNumber + ':' + hash(JSON.stringify(inputOf(r)));
 
-export async function enrich(rows, cache) {
+// onSave (optional): called with { key: fields } after each answered chunk, so long runs persist progress.
+export async function enrich(rows, cache, { onSave } = {}) {
   const key = process.env.OPENAI_API_KEY;
   const todo = rows.filter(r => !cache[aiKey(r)]);
   const max = +(process.env.AI_MAX_ROWS || 40000);
@@ -49,11 +50,14 @@ export async function enrich(rows, cache) {
       const { data, usage } = await chatJSON({ key, model, system: SYSTEM, user: JSON.stringify(ch.map(inputOf)), name: 'filings', schema: SCHEMA, maxTokens: 24000 });
       tin += usage?.prompt_tokens || 0; tout += usage?.completion_tokens || 0;
       const byId = Object.fromEntries((data.items || []).map(x => [x.id, x]));
-      for (const r of ch) { const x = byId[r.ProjectNumber]; if (!x) { failed++; continue; } const { id, ...v } = x; cache[aiKey(r)] = { ...v, at: stamp }; }
+      const got = {};
+      for (const r of ch) { const x = byId[r.ProjectNumber]; if (!x) { failed++; continue; } const { id, ...v } = x; got[aiKey(r)] = cache[aiKey(r)] = { ...v, at: stamp }; }
+      if (onSave) await onSave(got);
     } catch (e) { failed += ch.length; log('enrich chunk failed:', e.message); if (/401/.test(e.message)) throw e; }
     if (++done % 50 === 0) log('enrich progress', done, '/', chunks.length);
   });
   log('enrich: done, failed', failed, '| tokens in', tin, 'out', tout);
+  return { tokensIn: tin, tokensOut: tout, failed, sent: batch.length };
 }
 
 export function aiFields(r, cache) { return cache[aiKey(r)] || null; }
