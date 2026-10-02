@@ -29,8 +29,17 @@ function timeline(type, cost, reg, start, end) {
 }
 
 async function assemble() {
-  try { await fs.access(D + 'filings.json'); } catch (e) { throw new Error('data/filings.json is missing. Run the "Refresh data" GitHub Action (or `node build.mjs` with network access) first.'); }
   await fs.rm('public', { recursive: true, force: true });
+  let ready = true; try { await fs.access(D + 'filings.json'); } catch (e) { ready = false; }
+  if (!ready) { // first deploy before the data workflow has committed anything: publish a holding page instead of failing
+    log('assemble: data/filings.json missing; publishing a holding page until the "Refresh data" workflow commits data');
+    await fs.mkdir('public', { recursive: true }); await fs.copyFile('src/logo.png', 'public/logo.png');
+    await fs.writeFile('public/index.html', '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Real Estate Intelligence — loading data</title>' +
+      '<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,sans-serif;background:#f8f9f9;color:#23282a}main{max-width:460px;padding:24px;text-align:center}img{height:40px}h1{font-size:22px;margin:18px 0 8px}p{color:#6b7174;line-height:1.5}' +
+      '@media (prefers-color-scheme:dark){body{background:#16191a;color:#fff}img{filter:brightness(0) invert(1)}}</style></head><body><main><img src="logo.png" alt="Finishes Solutions">' +
+      '<h1>Construction data is being prepared</h1><p>The first two-year data refresh is still running. This page updates automatically when it finishes (about 90 minutes after it starts).</p></main></body></html>');
+    return;
+  }
   await fs.mkdir('public/data', { recursive: true }); await fs.mkdir('public/lib', { recursive: true });
   for (const f of await fs.readdir('src')) await fs.copyFile('src/' + f, 'public/' + f);
   for (const f of ['geo.json', 'filings.json', 'changes.json', 'market.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
