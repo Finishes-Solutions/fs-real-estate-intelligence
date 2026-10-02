@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks } from '../lib/assist-logic.mjs';
 import { pruneReports, fmtBytes } from '../lib/reports.mjs';
+import { tractsFor, summarizeTracts, inGeom } from '../lib/demographics.mjs';
 import { nameQuery } from '../api/tenants.js';
 import { USES } from '../lib/taxonomy.mjs';
 import { makeMatcher, encode, decode, describe } from '../lib/filter.mjs';
@@ -121,6 +122,19 @@ const pr = pruneReports(hist);
 assert.equal(pr.keep.filter(r => r.stored).length, 50); assert.deepEqual(pr.drop, ['r50', 'r51', 'r52', 'r53', 'r54']); assert.equal(pr.keep.length, 55);
 assert.deepEqual(pruneReports([{ id: 'a', size: 9e7, stored: true }, { id: 'b', size: 9e7, stored: true }]).drop, ['b'], 'size cap');
 assert.equal(fmtBytes(2.5e6), '2.5 MB'); assert.equal(fmtBytes(800), '800 B');
+// demographics from the tract data: the tract at the point plus tracts within the radius, household-weighted medians
+const sq = (x, y, d = .01) => ({ type: 'Polygon', coordinates: [[[x, y], [x + d, y], [x + d, y + d], [x, y + d], [x, y]]] });
+const tr = [{ g: 'a', pop: 1000, inc: 50000, hu: 400, vac: 0, val: 200000, rent: 1000, age: 30, gr: 25, geom: sq(-96, 30) },
+  { g: 'b', pop: 3000, inc: 100000, hu: 1300, vac: 100, val: 400000, rent: 2000, age: 40, gr: 0, geom: sq(-96.02, 30) },
+  { g: 'c', pop: 9999, inc: 1, hu: 1, vac: 0, geom: sq(-95, 31) }];
+assert.ok(inGeom([-95.995, 30.005], tr[0].geom));
+const near = tractsFor(tr, { c: [-95.995, 30.005], mi: 2 });
+assert.deepEqual(near.map(t => t.g), ['a', 'b'], 'far tract left out');
+const dm = summarizeTracts(near);
+assert.equal(dm.population, 4000); assert.equal(dm.median_household_income_approx, 87500, 'weighted by households 400 : 1200');
+assert.equal(dm.vacancy_rate_pct, 5.9); assert.equal(dm.population_growth_pct, 5.3);
+assert.deepEqual(tractsFor(tr, { geom: { type: 'MultiPolygon', coordinates: [sq(-95.5, 30.5, 1).coordinates] } }).map(t => t.g), ['c'], 'county outline');
+assert.equal(summarizeTracts([]), null);
 console.log('assistant ok');
 
 // voice: the transcriber echoing its own hint list is not something the user said

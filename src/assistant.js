@@ -3,6 +3,7 @@
 import { makeMatcher, describe, miles } from './lib/filter.mjs';
 import { entityKey } from './lib/taxonomy.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
+import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
 import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
@@ -196,7 +197,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -269,7 +270,9 @@ export function initAssistant(ctx) {
   const summary = list => ({ filings: list.length, total_value: list.reduce((s, f) => s + f.cost, 0), new_construction: list.filter(f => f.type === 'New').length,
     by_use: groups(list, f => f.use, 6), by_county: groups(list, f => f.county, 6), largest: list.slice().sort((a, b) => b.cost - a.cost).slice(0, 10).map(row) });
   const GROUP = { county: f => f.county, city: f => f.city, use: f => f.use, type: f => f.type, status: f => f.status, developer: f => f.dev || f.owner, month: f => (f.reg || '').slice(0, 7), year: f => (f.reg || '').slice(0, 4),
-    quarter: f => f.reg ? f.reg.slice(0, 4) + '-Q' + (Math.floor((+f.reg.slice(5, 7) - 1) / 3) + 1) : '' };
+    quarter: f => f.reg ? f.reg.slice(0, 4) + '-Q' + (Math.floor((+f.reg.slice(5, 7) - 1) / 3) + 1) : '', start_month: f => (f.ts || '').slice(0, 7), finish_month: f => (f.te || '').slice(0, 7) };
+  // only switch tabs when the user asked for the tab itself; otherwise the answer stays in the chat and a follow-up offers it
+  const VIEW_ASK = /\b(tab|page)\b|\b(open|switch to|go to|take me to|pull up|bring up)\s+(the\s+)?(timeline|compare|comparison|activity|market|reports?|updates|field notes|sources)\b/i;
   const inBounds = () => { const b = ctx.map.getBounds(); return ctx.visible.filter(f => b.contains([f.lon, f.lat])); };
   // the point a lookup is about: a filing, coordinates, a named place, or what is open on screen
   async function pointFor(a) {
@@ -305,9 +308,27 @@ export function initAssistant(ctx) {
       if (name === 'show_chart') {
         const { spec, notes } = await specFrom({ ...a, keep_current: a.keep_current ?? true }), list = matchList(spec), by = GROUP[a.group_by] ? a.group_by : 'county';
         const time = /month|quarter|year/.test(by), gs = groups(list, GROUP[by], time ? 60 : 12);
+        const BYL = { start_month: 'estimated start month', finish_month: 'estimated finish month', month: 'month filed', quarter: 'quarter filed', year: 'year filed' };
         cardList = list;
-        return { title: (a.metric === 'value' ? 'Est. value' : 'Filings') + ' by ' + by, group_by: by, metric: a.metric === 'value' ? 'value' : 'count', filters: describe(spec) || 'all', notes, filings: list.length, total_value: list.reduce((s, f) => s + f.cost, 0),
+        return { title: (a.metric === 'value' ? 'Est. value' : 'Filings') + ' by ' + (BYL[by] || by), group_by: by, metric: a.metric === 'value' ? 'value' : 'count', filters: describe(spec) || 'all', notes, filings: list.length, total_value: list.reduce((s, f) => s + f.cost, 0),
           groups: time ? gs.filter(g => g.name !== 'Unknown').sort((x, y) => x.name.localeCompare(y.name)) : gs, shown_as: 'a chart card in the chat' };
+      }
+      if (name === 'demographics') {
+        const m = await ctx.loadMarket(); let sel = null, label = '', kind = 'address';
+        const cn = String(a.county || (a.place && /county/i.test(a.place) ? a.place : '') || '').replace(/\s*county.*$/i, '').trim().toLowerCase();
+        const co = cn && ctx.DATA.counties.find(x => x.name.toLowerCase() === cn);
+        if (co) { sel = { geom: { type: 'MultiPolygon', coordinates: co.outline } }; label = co.name + ' County'; kind = 'county'; }
+        else {
+          let p; if (a.place) { p = await resolvePlace(String(a.place)); if (p.error) return p; kind = p.kind; } else { p = await pointFor(a); if (p.error) return p; }
+          label = p.label; sel = { c: p.c, mi: a.radius_miles > 0 ? Math.min(25, a.radius_miles) : ({ town: 3, area: 1.5, county: 15 }[kind] ?? 1) };
+        }
+        const list = tractsFor(m.tracts, sel), s = summarizeTracts(list);
+        if (!s) return { error: 'No census tract data there: it covers the counties loaded on the map.' };
+        const home = sel.c ? m.tracts.find(t => t.geom && inGeom(sel.c, t.geom)) : null;
+        turnSubject = label.split(',')[0];
+        return { place: label, area: sel.geom ? 'all census tracts in the county' : 'census tracts within ' + sel.mi + ' mi', acs_year: m.year, growth_since: m.baseYear, ...s,
+          ...(home ? { tract_at_point: { tract: home.g, population: home.pop, median_household_income: home.inc, median_home_value: home.val, median_gross_rent: home.rent, median_age: home.age } } : {}),
+          note: 'Area medians are household-weighted averages of the tract medians, so they are approximate.', source: 'US Census ACS 5-year ' + m.year + ', by census tract' };
       }
       if (name === 'location_info') {
         const p = await pointFor(a); if (p.error) return p;
@@ -404,7 +425,7 @@ export function initAssistant(ctx) {
         if (a.replace !== false) ctx.compare.clear();
         const done = [], missed = [];
         for (const n of names) { const pl = await ctx.highlightPlace(n); if (pl?.geom && /Polygon/.test(pl.geom.type)) { ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom }); done.push(pl.label); } else missed.push(n); }
-        ctx.clearPlace(); ctx.setView('compare');
+        ctx.clearPlace(); if (VIEW_ASK.test(lastUserText())) ctx.setView('compare');
         const base = ctx.filtered(), areas = ctx.compare.list().map(ar => { const l = base.filter(f => d3.geoContains(ar.geom, [f.lon, f.lat])); return { area: ar.label, filings: l.length, total_value: l.reduce((s, f) => s + f.cost, 0), new_builds: l.filter(f => f.type === 'New').length, largest: l.sort((x, y) => y.cost - x.cost).slice(0, 3).map(row) }; });
         actionChip('Comparing ' + done.join(', ')); return { compared: areas, ...(missed.length ? { not_found: missed } : {}) };
       }
@@ -422,7 +443,9 @@ export function initAssistant(ctx) {
         bubble('act', '<span class="ai-ai">Searched the web' + (d.sources.length ? ': ' : '') + '</span>' + d.sources.slice(0, 5).map(x => '<a class="ai-src" href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc(x.title) + '">' + esc(x.site) + '</a>').join(' · '));
         return { answer: d.answer, sources: d.sources.map(s => ({ site: s.site, title: s.title })) };
       }
-      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates', market: 'Market', reports: 'Reports' }[a.view] || a.view)); return { view: a.view }; }
+      if (name === 'show_view') {
+        if (!VIEW_ASK.test(lastUserText())) return { not_switched: true, note: 'The user did not ask for that tab, so it was not opened. Answer in the chat and offer "Open the ' + ({ who: 'Activity', changes: 'Updates' }[a.view] || a.view[0].toUpperCase() + a.view.slice(1)) + ' tab" as a follow-up option.' };
+        ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates', market: 'Market', reports: 'Reports' }[a.view] || a.view)); return { view: a.view }; }
       if (name === 'reset_map') { const before = ctx.snapshot(); ctx.resetAll(); actionChip('Reset the map', () => ctx.restore(before)); return { reset: true, filings: ctx.visible.length }; }
       return { error: 'Unknown tool ' + name };
     } catch (e) { console.error(e); return { error: e.message }; }

@@ -1127,3 +1127,4 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .legends .legend,.legends .dlegend{position:static;left:auto;right:auto;bottom:auto}
 /* the time slider sits bottom centre: lift the legends above it while it's showing */
 .stage:has(.tslider.show) .legends{bottom:76px}
+.cc-src,.cc-live .rnote.src{font-size:10.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:6px;margin-top:2px}

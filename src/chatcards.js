@@ -1,14 +1,21 @@
 // Cards inside the assistant chat: each tool result can come with a card (summary with charts, a filing, an area,
 // travel, weather, news, nearby places, a location) so answers show the numbers instead of retelling them.
 // ctx.chatCard(name, args, result, list) returns an element (or null); list = the filings the tool worked on.
-import { tiles, hbars, vbars, dataTable } from './charts.js';
+import { tiles, hbars, vbars } from './charts.js';
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 
 export function initChatCards(ctx) {
   const { esc, fmtM, fmtN } = ctx;
   const sum = l => l.reduce((s, f) => s + (f.cost || 0), 0);
   const el = (html, cls = '') => { const d = document.createElement('div'); d.className = 'cc ' + cls; d.innerHTML = html; return d; };
-  const head = (kicker, title, sub) => '<div class="cc-h"><span class="cc-k">' + esc(kicker) + '</span><b>' + esc(title) + '</b>' + (sub ? '<em>' + esc(sub) + '</em>' : '') + '</div>';
+  // Title Case for card titles ("Filings by Developer"); words that already have capitals (names, TxDOT, KATY) stay as they are
+  const SMALL = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'from', 'in', 'of', 'on', 'or', 'per', 'the', 'to', 'vs', 'via', 'with', 'within']);
+  const tc = t => String(t || '').split(/(\s+)/).map((w, i) => /^[a-z][a-z'’-]*$/.test(w) && (i === 0 || !SMALL.has(w)) ? w[0].toUpperCase() + w.slice(1) : w).join('');
+  ctx.titleCase = tc;
+  const head = (kicker, title, sub) => '<div class="cc-h"><span class="cc-k">' + esc(kicker) + '</span><b>' + esc(tc(title)) + '</b>' + (sub ? '<em>' + esc(sub) + '</em>' : '') + '</div>';
+  // where the card's numbers come from, one small line at the bottom
+  const src = t => '<div class="cc-src">' + esc(t) + '</div>';
+  const TABS = 'Source: Texas TDLR TABS registrations · values are filer estimates, uses AI-tagged';
   const sec = (label, body) => body ? '<div class="cc-s"><div class="cc-l">' + esc(label) + '</div>' + body + '</div>' : '';
   const btns = list => '<div class="cc-a">' + list.filter(Boolean).map(([k, t, primary]) => '<button type="button" class="btn' + (primary ? ' primary' : '') + '" data-a="' + k + '">' + esc(t) + '</button>').join('') + '</div>';
   const on = (d, k, fn) => { const b = d.querySelector('[data-a="' + k + '"]'); if (b) b.onclick = fn; };
@@ -30,7 +37,7 @@ export function initChatCards(ctx) {
       (uses.length > 1 ? sec('By use (est. value)', hbars(uses.map(g => ({ label: g.name, value: g.v, text: fmtM(g.v) + ' · ' + g.n })))) : '') +
       (cities.length > 1 ? sec('Where', hbars(cities.map(g => ({ label: g.name, value: g.n, text: fmtN(g.n) })))) : '') +
       (top.length ? sec(rows ? 'Filings' : 'Largest projects', top.map(filingRow).join('')) : '') +
-      btns([['hl', 'Highlight These'], ['exp', 'Export Report']]));
+      btns([['hl', 'Highlight These'], ['exp', 'Export Report']]) + src(TABS));
     wireRows(d);
     on(d, 'hl', () => { ctx.setView('map'); ctx.highlight(list.slice().sort((a, b) => b.cost - a.cost).slice(0, 200), title || ''); });
     on(d, 'exp', () => { ctx.highlight(list.slice(0, 2000), title || ''); ctx.openExport?.('summary', { scope: 'highlight' }); });
@@ -44,8 +51,7 @@ export function initChatCards(ctx) {
     if (timeish) gs.sort((x, y) => String(x.label).localeCompare(String(y.label))).forEach(x => { if (/^\d{4}-\d\d$/.test(x.label)) x.label = monthLbl(x.label); });
     const title = r.title || (metric === 'value' ? 'Est. value' : 'Filings') + ' by ' + by;
     const d = el(head('Chart', title, [r.filters && r.filters !== 'all' ? r.filters : '', fmtN(r.filings) + ' filings · est. ' + fmtM(r.total_value)].filter(Boolean).join(' · ')) +
-      (timeish ? vbars(gs, { line: gs.length > 18 }) : hbars(gs)) +
-      dataTable([by[0].toUpperCase() + by.slice(1), 'Filings', 'Est. value'], gs.map(x => [x.label, fmtN(x.g.filings), fmtM(x.g.value)])));
+      (timeish ? vbars(gs, { line: gs.length > 18 }) : hbars(gs)) + src(TABS));
     return d;
   }
 
@@ -55,7 +61,7 @@ export function initChatCards(ctx) {
       tiles([{ v: fmtM(f.cost), label: 'Est. value' }, { v: f.sqft ? fmtN(f.sqft) : '–', label: 'Sq ft' }, { v: f.status || '–', label: 'Status' }], 'c3') +
       '<dl class="cc-dl">' + [['Registered', f.reg], ['Schedule', (f.ts || '?') + ' → ' + (f.te || '?') + (f.tsE || f.teE ? ' (partly est.)' : '')], ['Owner', f.owner], ['Developer', f.dev && f.dev !== f.owner ? f.dev : ''], ['Architect', f.arch], ['GC', f.gc], ['Tenant', f.ten]]
         .filter(x => x[1]).map(([k, v]) => '<dt>' + k + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
-      (f.sum ? '<p class="cc-p">' + esc(f.sum) + '</p>' : '') + btns([['open', 'Open Filing', true]]));
+      (f.sum ? '<p class="cc-p">' + esc(f.sum) + '</p>' : '') + btns([['open', 'Open Filing', true]]) + src('Source: Texas TDLR TABS ' + f.id + (f.approx ? ' · location approximate (city level)' : '')));
     on(d, 'open', () => { ctx.setView('map'); ctx.select(f, true); });
     return d;
   }
@@ -67,7 +73,7 @@ export function initChatCards(ctx) {
     const d = el(head(r.kind ? r.kind[0].toUpperCase() + r.kind.slice(1) : 'Area', r.place, fmtN(r.filings) + ' filings ' + (r.how || '') + ' · est. ' + fmtM(r.total_value)) +
       (uses.length > 1 ? sec('Top uses', hbars(uses.map(g => ({ label: g.name, value: g.v, text: fmtM(g.v) })))) : '') +
       (list?.length ? sec('Largest projects', list.slice().sort((a, b) => b.cost - a.cost).slice(0, 3).map(filingRow).join('')) : '') +
-      btns([['info', 'More Information', true], list && !r.filtered ? ['filter', 'Filter to This Area'] : null]));
+      btns([['info', 'More Information', true], list && !r.filtered ? ['filter', 'Filter to This Area'] : null]) + src('Sources: OpenStreetMap outline · Texas TDLR TABS filings'));
     wireRows(d);
     on(d, 'info', () => document.getElementById('pbInfo')?.click());
     on(d, 'filter', () => { const p = ctx.currentPlace?.(); if (p?.geom) { ctx.setSelection('place', p.label, p.geom); ctx.clearPlace(); ctx.fitGeom(p.geom); } });
@@ -77,7 +83,7 @@ export function initChatCards(ctx) {
   function compareCard(r) {
     const a = r.compared || []; if (!a.length) return null;
     const metric = (label, k, fmt) => sec(label, hbars(a.map(x => ({ label: x.area, value: x[k], text: fmt(x[k]) }))));
-    const d = el(head('Compare', a.map(x => x.area).join(' vs '), 'Current filters') + metric('Filings', 'filings', fmtN) + metric('Est. value', 'total_value', fmtM) + metric('New builds', 'new_builds', fmtN) + btns([['cmp', 'Open Compare', true]]));
+    const d = el(head('Compare', a.map(x => x.area).join(' vs '), 'Current filters') + metric('Filings', 'filings', fmtN) + metric('Est. value', 'total_value', fmtM) + metric('New builds', 'new_builds', fmtN) + btns([['cmp', 'Open the Compare Tab', true]]) + src('Sources: OpenStreetMap outlines · Texas TDLR TABS filings'));
     on(d, 'cmp', () => ctx.setView('compare'));
     return d;
   }
@@ -86,7 +92,7 @@ export function initChatCards(ctx) {
     const p = r.places || [];
     const d = el(head('Nearby', 'Nearest ' + String(r.category || 'places').toLowerCase(), 'From ' + r.measured_from + ' · straight-line miles') +
       (p.length ? '<ol class="cc-ol">' + p.map((x, i) => '<li><button type="button" class="cc-row" data-i="' + i + '"><span><b>' + esc(x.name) + '</b><em>' + esc([x.kind, x.address].filter(Boolean).join(' · ')) + '</em></span><i>' + (+x.miles).toFixed(1) + ' mi</i></button></li>').join('') + '</ol>' : '<p class="cc-p">Nothing found within ' + r.searched_within_miles + ' mi.</p>') +
-      '<div class="rnote">Source: OpenStreetMap</div>');
+      src('Source: OpenStreetMap'));
     d.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { const x = p[+b.dataset.i]; ctx.setView('map'); ctx.map.flyTo({ center: [x.lon, x.lat], zoom: 16, duration: ctx.reduceMotion ? 0 : 900 }); });
     return d;
   }
@@ -100,9 +106,24 @@ export function initChatCards(ctx) {
       (t.length ? tiles(t, 'c3') : '') +
       (r.businesses?.length ? sec('Businesses here', '<div class="cc-tags">' + r.businesses.slice(0, 12).map(b => '<span>' + esc(b.name) + (b.kind ? ' <em>' + esc(b.kind) + '</em>' : '') + '</span>').join('') + '</div>') : '') +
       (fs.length ? sec('Construction filings here', fs.slice(0, 5).map(filingRow).join('')) : '') +
-      (r.note ? '<div class="rnote">' + esc(r.note) + '</div>' : '') + btns([['info', 'More Information', true]]));
+      (r.note ? '<div class="rnote">' + esc(r.note) + '</div>' : '') + btns([['info', 'More Information', true]]) + src('Sources: ' + (r.source || 'Texas GIO parcels, OpenStreetMap, USGS lidar, TDLR TABS')));
     wireRows(d);
     on(d, 'info', () => { ctx.setView('map'); ctx.map.flyTo({ center: r.center, zoom: 17.5, duration: ctx.reduceMotion ? 0 : 900 }); ctx.map.once('idle', () => { const b = ctx.buildingAt?.(r.center); if (!b) ctx.openBuildingAt(r.center); }); });
+    return d;
+  }
+
+  function demographicsCard(r) {
+    const money = v => v == null ? '–' : '$' + fmtN(v), pct = v => v == null ? '–' : (v > 0 ? '+' : '') + v + '%';
+    const t = [{ v: fmtN(r.population), label: 'Population' }, { v: money(r.median_household_income_approx), label: 'Median income*', title: 'Median household income (approx.)' },
+      { v: money(r.median_home_value_approx), label: 'Home value*', title: 'Median home value (approx.)' }, { v: money(r.median_gross_rent_approx), label: 'Rent*', title: 'Median gross rent (approx.)' },
+      { v: r.vacancy_rate_pct == null ? '–' : r.vacancy_rate_pct + '%', label: 'Vacancy' }, { v: r.median_age_approx ?? '–', label: 'Median age*' },
+      { v: pct(r.population_growth_pct), label: 'Growth ' + r.growth_since + '–' + r.acs_year }, { v: fmtN(r.households), label: 'Households' }, ...(r.jobs != null ? [{ v: fmtN(r.jobs), label: 'Jobs' }] : [])];
+    const h = r.tract_at_point;
+    const d = el(head('Demographics', r.place, fmtN(r.tracts) + ' ' + r.area.replace(/^census tracts/, 'census tract' + (r.tracts === 1 ? '' : 's')) + ' · ACS ' + r.acs_year) + tiles(t, 'c3') +
+      (h && r.tracts > 1 ? '<p class="cc-p">The tract right at this spot: median household income ' + money(h.median_household_income) + ', home value ' + money(h.median_home_value) + ', ' + fmtN(h.population) + ' people.</p>' : '') +
+      btns([['inc', 'Show Income on the Map'], ['gr', 'Show Growth on the Map']]) + src('Source: ' + r.source + '. *Area medians are household-weighted averages of tract medians (approximate).'));
+    on(d, 'inc', () => { ctx.setView('map'); ctx.showDemographic?.('inc'); });
+    on(d, 'gr', () => { ctx.setView('map'); ctx.showDemographic?.('gr'); });
     return d;
   }
 
@@ -121,9 +142,10 @@ export function initChatCards(ctx) {
         case 'compare_areas': return compareCard(r);
         case 'nearby_places': return nearbyCard(r);
         case 'location_info': return locationCard(r);
-        case 'distance_and_drive_time': { if (!ctx.live) return null; const d = liveCard('Drive time', (r.from || 'Start') + ' → ' + (r.to || 'destination'), ctx.live.driveHTML(r) + (r.road_miles != null && a.show_route !== false ? btns([['clr', 'Clear Route']]) : ''));
+        case 'demographics': return demographicsCard(r);
+        case 'distance_and_drive_time': { if (!ctx.live) return null; const d = liveCard('Drive time', (r.from || 'Start') + ' → ' + (r.to || 'destination'), ctx.live.driveHTML(r) + (r.road_miles != null && a.show_route !== false ? btns([['clr', 'Clear Route']]) : '') + src('Routing: ' + (r.routing_source || 'straight-line distance only')));
           on(d, 'clr', e => { ctx.live.clearRoute(); e.currentTarget.remove(); }); return d; }
-        case 'weather_at': return ctx.live ? liveCard('Weather', r.place, ctx.live.weatherHTML(r) + (r.tomorrow ? '<div class="rnote">Tomorrow ' + Math.round(r.tomorrow.low_f) + '–' + Math.round(r.tomorrow.high_f) + '°F, ' + (r.tomorrow.rain_chance_pct ?? 0) + '% rain</div>' : '')) : null;
+        case 'weather_at': return ctx.live ? liveCard('Weather', r.place, ctx.live.weatherHTML(r)) : null;
         case 'project_news': return ctx.live ? liveCard('News', r.searched, ctx.live.newsHTML(r, 5)) : null;
         case 'site_imagery': { if (!ctx.live) return null; const d = liveCard('Site imagery', r.place, '<div class="live-out"></div>'); ctx.live.imageryInto(d.querySelector('.live-out')); return d; }
       }
