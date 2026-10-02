@@ -1,6 +1,12 @@
 name: Probe services
 # Manual diagnostics for external data services (parcel query shapes and speed).
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: "Probe to run: parcels or height"
+        required: false
+        default: parcels
 permissions:
   contents: read
 jobs:
@@ -13,4 +19,4 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --no-audit --no-fund
-      - run: node build/probe-parcels.mjs
+      - run: node build/probe-${{ inputs.script || 'parcels' }}.mjs
