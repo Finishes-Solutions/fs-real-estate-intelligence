@@ -38,6 +38,13 @@ GitHub Action (nightly, or manual)          Vercel (every deploy)
 
 The first full run takes a few hours (Nominatim allows one request per second); later runs take minutes.
 
+## AI assistant
+
+The **Ask AI** button (or `/`) opens a chat that works the map through tools: filter, find, highlight, open a filing, fly somewhere, toggle the heatmap or views. Press the mic to talk to it instead (OpenAI Realtime over WebRTC).
+- `api/chat.js`: text chat (stateless; the browser runs the tool calls and sends results back). Model `OPENAI_CHAT_MODEL` or `OPENAI_MODEL`; `OPENAI_CHAT_REASONING_EFFORT` overrides the effort for chat only.
+- `api/realtime.js`: short-lived voice session. `OPENAI_REALTIME_MODEL` (default `gpt-realtime-2.1`, then `gpt-realtime`), `OPENAI_VOICE` (default `marin`), `VOICE_ENABLED=false` turns voice off. Sessions end after 10 minutes; 30 per IP per day.
+- Tools are defined once in `lib/agent-tools.mjs`.
+
 ## Setup
 
 1. **Vercel → Project → Settings → Environment Variables**: `OPENAI_API_KEY` (type Sensitive, Production + Preview). Optional `OPENAI_MODEL` (default `gpt-6-luna`, falling back to `gpt-5-mini` / `gpt-4.1-mini` if the key can't use it) and `OPENAI_REASONING_EFFORT` (default `high`; `none` to omit). Optional `MAPILLARY_TOKEN` (free client token from mapillary.com/dashboard/developers) for street-level photos in the building panel.

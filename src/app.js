@@ -4,7 +4,7 @@ import { USES, entityKey } from './lib/taxonomy.mjs';
 import { recentChanges } from './lib/changes.mjs';
 import { initTimeline } from './timeline.js';
 import { initWho, initChanges } from './views.js';
-import { initAsk } from './ask.js';
+import { initAssistant } from './assistant.js';
 import { initMarket } from './market.js';
 import { initSaved } from './saved.js';
 import { initBuildings } from './building.js';
@@ -16,6 +16,7 @@ const getJSON=(u,optional)=>fetch(u,{cache:'no-cache'}).then(r=>{ if(!r.ok) thro
 const [GEO,FIL,CHG]=await Promise.all([getJSON('data/geo.json'),getJSON('data/filings.json'),getJSON('data/changes.json',true)]);
 const DATA={...GEO,...FIL,changes:CHG||{runs:[]}};
 const R2D=180/Math.PI, EARTH_MI=3958.8;
+const ym=d=>d.toISOString().slice(0,7);
 const fmtM = v => v>=1e9 ? '$'+(v/1e9).toFixed(2)+'B' : v>=1e6 ? '$'+(v/1e6).toFixed(v>=1e8?0:1)+'M' : v>=1e3 ? '$'+Math.round(v/1e3)+'K' : '$'+Math.round(v);
 const fmtN = n => n.toLocaleString('en-US');
 const fmtMi = d => d==null?'':(d<10?d.toFixed(1):String(Math.round(d)))+' mi';
@@ -39,15 +40,21 @@ const F=DATA.filings.map(f=>({...f,r:Math.max(2.2,Math.min(15,1.6+Math.sqrt(f.co
 const BY_ID=new Map(F.map(f=>[f.id,f]));
 const state={counties:new Set(COUNTIES),types:new Set(TYPES),min:0,max:0,q:'',uses:null,who:null,d:null,chg:null,month:null,sel:null,shown:150};
 const sel={kind:null,label:'',feature:null,counties:new Set(),center:null};
+// registration period presets; the default view is the last 12 months of filings
+const PERIODS=[['3m','3 mo',3],['12m','12 mo',12],['2y','2 yr',24],['5y','5 yr',60],['all','All',0]];
+function periodSpec(k){ const p=PERIODS.find(x=>x[0]===k)||PERIODS[1]; if(!p[2]) return {f:'all',from:'',to:''}; const d=new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth()-p[2]+1); return {f:'reg',from:ym(d),to:''}; }
+const periodOf=d=>{ if(!d) return 'all'; if(d.f==='all') return 'all'; if(d.f!=='reg'||d.to) return null; const hit=PERIODS.find(p=>p[2]&&periodSpec(p[0]).from===d.from); return hit?hit[0]:null; };
+const DEFAULT_SPEC=()=>({d:periodSpec('12m')});
 let visible=F, visibleNoWho=F;
-const ym=d=>d.toISOString().slice(0,7);
 const monthRange=m=>{ const [y,mo]=m.split('-').map(Number); return [m+'-01',new Date(Date.UTC(y,mo,0)).toISOString().slice(0,10)]; };
 const inSel=f=>!sel.feature||d3.geoContains(sel.feature,[f.lon,f.lat]);
 const countyGeo=DATA.counties.map(c=>({name:c.name,geom:{type:'MultiPolygon',coordinates:c.outline}}));
 
 // ---------- map ----------
 const STYLES={dots:['dataviz','dataviz-dark'],streets:['streets-v2','streets-v2-dark'],sat:['hybrid','hybrid'],topo:['topo-v2','topo-v2-dark']};
-const layers={style:'dots',roads:true,names:true,counties:true};
+const layers={style:'dots',roads:true,names:true,counties:true,size:'uniform',heat:'off'};
+try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(['off','count','value'].includes(L.heat)) layers.heat=L.heat; }catch(e){}
+const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({size:layers.size,heat:layers.heat})); }catch(e){} };
 const styleUrl=s=>'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl('dots'),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
@@ -61,7 +68,8 @@ const GJ={
   counties:fc(DATA.counties.map(c=>({type:'Feature',properties:{name:c.name,w:c.name===HOME_C?1:0},geometry:{type:'MultiPolygon',coordinates:c.outline}}))),
   clabels:fc(DATA.counties.map(c=>({type:'Feature',properties:{t:c.name.toUpperCase()+' CO.',w:c.name===HOME_C?1:0},geometry:{type:'Point',coordinates:c.label}})))
 };
-function filingsFC(){ return fc(visible.map(f=>({type:'Feature',id:F.indexOf(f),properties:{i:F.indexOf(f),t:f.type,r:f.r,h:(f.approx||f.type==='Addition')?1:0},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}))); }
+const IDX=new Map(F.map((f,i)=>[f,i]));
+function filingsFC(){ return fc(visible.map(f=>({type:'Feature',properties:{i:IDX.get(f),t:f.type,r:f.r,lc:Math.log10(Math.max(f.cost,1e4)),h:(f.approx||f.type==='Addition')?1:0},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}))); }
 const C=()=>isDark()?{new:'#4caf70',reno:'#939a9d',add:'#8acda3',line:'rgba(255,255,255,.55)',waller:'#4caf70',dot:'#8d9598',lab:'#dde1e2',halo:'#16191a',sel:'#4caf70',stroke:'#16191a'}
   : (layers.style==='sat'?{new:'#5fd38a',reno:'#f1f3f3',add:'#c2e3d0',line:'rgba(255,255,255,.85)',waller:'#8acda3',dot:'#ffffff',lab:'#ffffff',halo:'#0b0d0c',sel:'#c2e3d0',stroke:'#0b0d0c'}
   : {new:'#006527',reno:'#6b7174',add:'#1f9249',line:'rgba(22,25,26,.45)',waller:'#006527',dot:'#5b6366',lab:'#23282a',halo:'#ffffff',sel:'#006527',stroke:'#ffffff'});
@@ -75,9 +83,11 @@ function addOverlays(){
   ['sel','draft','draftpts'].forEach(id=>{ if(!map.getSource(id)) map.addSource(id,{type:'geojson',data:fc([])}); });
   if(!map.getSource('filings')) map.addSource('filings',{type:'geojson',data:filingsFC()});
   // dot grid: world → Texas → counties, each fading out as you zoom in
-  map.addLayer({id:'land-dots',type:'circle',source:'land',layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],1,1,4,1.8],'circle-color':c.dot,'circle-opacity':['interpolate',['linear'],['zoom'],2,.55,4.5,0]}},before);
-  map.addLayer({id:'texas-dots',type:'circle',source:'texas',layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],3,.8,6,1.6],'circle-color':c.dot,'circle-opacity':['interpolate',['linear'],['zoom'],3,.6,6,.5,7.5,0]}},before);
-  map.addLayer({id:'county-dots',type:'circle',source:'cdots',layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],6,.9,9,2.2,11,3],'circle-color':['case',['==',['get','w'],1],c.waller,c.dot],'circle-opacity':['interpolate',['linear'],['zoom'],5,.35,7,.75,9.5,.55,11,0]}},before);
+  // dot grid: world → Texas → counties. Small points that hand off to the next finer grid, and fade out
+  // completely by street level so they never clutter a close-up view.
+  map.addLayer({id:'land-dots',type:'circle',source:'land',maxzoom:5,layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],1,.7,4,1.1],'circle-color':c.dot,'circle-opacity':['interpolate',['linear'],['zoom'],1,.45,3,.4,4.6,0],'circle-pitch-alignment':'map'}},before);
+  map.addLayer({id:'texas-dots',type:'circle',source:'texas',minzoom:2.5,maxzoom:8.5,layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],3,.55,5,.8,7,1.1],'circle-color':c.dot,'circle-opacity':['interpolate',['linear'],['zoom'],2.5,0,3.5,.45,6,.4,7,.2,8,0],'circle-pitch-alignment':'map'}},before);
+  map.addLayer({id:'county-dots',type:'circle',source:'cdots',minzoom:5.5,maxzoom:12,layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],6,.5,8,.8,10,1.1,11.5,1.3],'circle-color':['case',['==',['get','w'],1],c.waller,c.dot],'circle-opacity':['interpolate',['linear'],['zoom'],5.5,0,6.5,.35,8.5,.45,10,.3,11.5,0],'circle-pitch-alignment':'map'}},before);
   map.addLayer({id:'county-line',type:'line',source:'counties',layout:{visibility:layers.counties?'visible':'none'},paint:{'line-color':['case',['==',['get','w'],1],c.waller,c.line],'line-width':['case',['==',['get','w'],1],2,1.2]}},before);
   map.addLayer({id:'sel-fill',type:'fill',source:'sel',paint:{'fill-color':c.sel,'fill-opacity':.09}});
   map.addLayer({id:'sel-line',type:'line',source:'sel',paint:{'line-color':c.sel,'line-width':2.2,'line-dasharray':[3,2]}});
@@ -86,13 +96,69 @@ function addOverlays(){
   map.addLayer({id:'draft-pts',type:'circle',source:'draftpts',paint:{'circle-radius':['case',['==',['get','first'],1],6,4],'circle-color':'#ffffff','circle-stroke-color':c.sel,'circle-stroke-width':2}});
   map.addLayer({id:'county-label',type:'symbol',source:'clabels',minzoom:6.2,layout:{visibility:layers.counties?'visible':'none','text-field':['get','t'],'text-font':labelFont,'text-size':11,'text-letter-spacing':.14,'text-allow-overlap':false},
     paint:{'text-color':['case',['==',['get','w'],1],c.waller,c.lab],'text-halo-color':c.halo,'text-halo-width':1.6}});
-  const rz=['interpolate',['exponential',1.6],['zoom'],5,['*',['get','r'],.55],8,['*',['get','r'],1],12,['*',['get','r'],1.7],16,['*',['get','r'],2.4]];
   const col=['match',['get','t'],'New',c.new,'Reno',c.reno,c.add];
-  map.addLayer({id:'filings',type:'circle',source:'filings',paint:{'circle-radius':rz,'circle-color':col,
-    'circle-opacity':['case',['==',['get','h'],1],.18,['==',['get','t'],'New'],.85,.7],
-    'circle-stroke-color':['case',['==',['get','h'],1],col,c.stroke],'circle-stroke-width':['case',['==',['get','h'],1],1.6,1],'circle-pitch-alignment':'map'}});
-  map.addLayer({id:'filings-hl',type:'circle',source:'filings',filter:['==',['get','i'],-1],paint:{'circle-radius':['+',rz,6],'circle-color':'rgba(0,0,0,0)','circle-stroke-color':isDark()||layers.style==='sat'?'#ffffff':'#0b0d0c','circle-stroke-width':2.2}});
+  map.addLayer({id:'heat',type:'heatmap',source:'filings',maxzoom:17,layout:{visibility:'none'},paint:{'heatmap-radius':['interpolate',['linear'],['zoom'],4,8,8,18,11,32,14,48,17,70],'heatmap-intensity':['interpolate',['linear'],['zoom'],4,.6,9,.9,13,1.3],
+    'heatmap-opacity':['interpolate',['linear'],['zoom'],11,.85,15,.4],'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(0,0,0,0)',.08,isDark()?'rgba(76,175,112,.12)':'rgba(138,205,163,.18)',.25,isDark()?'rgba(76,175,112,.45)':'rgba(138,205,163,.55)',.45,'#8acda3',.65,'#4caf70',.82,'#1f9249',.93,'#006527',1,isDark()?'#e8f5ec':'#00351a']}});
+  map.addLayer({id:'filings',type:'circle',source:'filings',paint:{'circle-color':col,
+    'circle-stroke-color':['case',['==',['get','h'],1],col,c.stroke],'circle-stroke-width':['case',['==',['get','h'],1],1.4,.8],'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'filings-hl',type:'circle',source:'filings',filter:['==',['get','i'],-1],paint:{'circle-radius':['+',markerRadius(),6],'circle-color':'rgba(0,0,0,0)','circle-stroke-color':isDark()||layers.style==='sat'?'#ffffff':'#0b0d0c','circle-stroke-width':2.2}});
+  if(!map.getSource('hl')) map.addSource('hl',{type:'geojson',data:fc([])});
+  map.addLayer({id:'hl-glow',type:'circle',source:'hl',paint:{'circle-radius':16,'circle-color':'#eda100','circle-opacity':.18,'circle-blur':.6,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'hl-ring',type:'circle',source:'hl',paint:{'circle-radius':9,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':'#eda100','circle-stroke-width':2.6,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'hl-label',type:'symbol',source:'hl',minzoom:8,layout:{'text-field':['get','name'],'text-font':labelFont,'text-size':11.5,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':12,'text-optional':true},paint:{'text-color':c.lab,'text-halo-color':c.halo,'text-halo-width':1.6}});
+  styleFilings();
   applyRoadToggles(); syncSel(); syncHighlight(); overlayHooks.forEach(fn=>fn());
+  if(hlData.length) map.getSource('hl').setData(fc(hlData));
+}
+// marker size: uniform by default (zoom only); optional size by estimated value
+function markerRadius(){ return layers.size==='value'
+  ? ['interpolate',['exponential',1.6],['zoom'],5,['*',['get','r'],.55],8,['*',['get','r'],1],12,['*',['get','r'],1.7],16,['*',['get','r'],2.4]]
+  : ['interpolate',['linear'],['zoom'],4,1.7,7,2.5,10,3.5,13,4.8,16,6.5]; }
+function styleFilings(){
+  if(!map.getLayer||!map.getLayer('filings')) return;
+  const heat=layers.heat!=='off', base=['case',['==',['get','h'],1],.2,['==',['get','t'],'New'],.88,.72];
+  map.setPaintProperty('filings','circle-radius',markerRadius());
+  map.setPaintProperty('filings-hl','circle-radius',['+',markerRadius(),6]);
+  // with the heatmap on, dots step back until you are close enough to read individual projects
+  map.setPaintProperty('filings','circle-opacity',heat?['interpolate',['linear'],['zoom'],10,0,12.5,['*',base,1]]:base);
+  map.setPaintProperty('filings','circle-stroke-opacity',heat?['interpolate',['linear'],['zoom'],10,0,12.5,1]:1);
+  map.setLayoutProperty('heat','visibility',heat?'visible':'none');
+  map.setPaintProperty('heat','heatmap-weight',layers.heat==='value'?['interpolate',['linear'],['get','lc'],4.7,.04,6,.2,7,.55,8,1,9.5,2]:1);
+  syncLegend();
+}
+function syncLegend(){
+  document.querySelector('.legend')?.classList.toggle('heat',layers.heat!=='off');
+  const lg=document.getElementById('legendT'); if(lg) lg.textContent=layers.heat!=='off'?(layers.heat==='value'?'Heatmap = est. value':'Heatmap = number of filings'):layers.size==='value'?'Dot size = est. value':'Filings';
+  document.querySelectorAll('#sizeSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.size===layers.size));
+  document.querySelectorAll('#heatSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.heat===layers.heat));
+}
+// assistant highlights: pulsing rings + labels on specific filings
+let hlData=[], hlT=0;
+function highlight(list,label){
+  hlData=list.map(f=>({type:'Feature',properties:{name:f.name.length>34?f.name.slice(0,32)+'…':f.name},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}));
+  map.getSource('hl')?.setData(fc(hlData));
+  if(list.length===1) map.flyTo({center:[list[0].lon,list[0].lat],zoom:Math.max(map.getZoom(),14),duration:reduceMotion?0:1200});
+  else fitPoints(list);
+  cancelAnimationFrame(hlT); if(reduceMotion) return; const t0=performance.now();
+  const tick=t=>{ const k=((t-t0)/1100)%1; if(!map.getLayer('hl-ring')) return; map.setPaintProperty('hl-glow','circle-radius',12+k*18); map.setPaintProperty('hl-glow','circle-opacity',.32*(1-k)); if(t-t0<9000) hlT=requestAnimationFrame(tick); else { map.setPaintProperty('hl-glow','circle-radius',16); map.setPaintProperty('hl-glow','circle-opacity',.18); } };
+  hlT=requestAnimationFrame(tick);
+}
+function clearHighlight(){ hlData=[]; cancelAnimationFrame(hlT); map.getSource('hl')?.setData(fc([])); }
+function fitPoints(list){
+  if(!list.length) return;
+  // ignore the farthest 2% so one odd geocode doesn't zoom the map out to the whole state
+  const xs=list.map(f=>f.lon).sort((a,b)=>a-b), ys=list.map(f=>f.lat).sort((a,b)=>a-b), q=a=>[a[Math.floor((a.length-1)*.02)],a[Math.ceil((a.length-1)*.98)]];
+  const [x0,x1]=list.length>20?q(xs):[xs[0],xs[xs.length-1]], [y0,y1]=list.length>20?q(ys):[ys[0],ys[ys.length-1]];
+  if(x1-x0<.004&&y1-y0<.004){ map.flyTo({center:[(x0+x1)/2,(y0+y1)/2],zoom:Math.max(map.getZoom(),14),duration:reduceMotion?0:1000}); return; }
+  safeFit([[x0,y0],[x1,y1]],{padding:60,maxZoom:15});
+}
+// fitBounds throws when the padding leaves no room (small screens with a drawer open); shrink the padding instead
+function safeFit(b,o={}){ for(const pad of [o.padding??60,24,0]){ try{ if(map.cameraForBounds(b,{...o,padding:pad})){ map.fitBounds(b,{...o,padding:pad,duration:reduceMotion?0:1000}); return; } }catch(e){} } map.flyTo({center:[(b[0][0]+b[1][0])/2,(b[0][1]+b[1][1])/2],duration:reduceMotion?0:1000}); }
+// keep the map's visual center clear of the assistant drawer / sheet
+function mapPadding(){
+  const open=document.querySelector('.app').classList.contains('ai-open'), ai=document.getElementById('ai'), phone=innerWidth<=700;
+  const pad={top:0,bottom:0,left:0,right:0}; if(open&&ai){ const r=ai.getBoundingClientRect(); if(phone) pad.bottom=Math.round(r.height); else pad.right=Math.round(r.width); }
+  map.setPadding(pad);
 }
 const overlayHooks=[];
 function applyRoadToggles(){
@@ -140,7 +206,9 @@ function applyFilters(){
   const src=map.getSource&&map.getSource('filings'); if(src) src.setData(filingsFC());
   syncFilterUI(); scheduleHash(); listeners.forEach(fn=>{ try{ fn(); }catch(e){ console.error(e); } });
 }
-const cRow=document.getElementById('countyRow'), tRow=document.getElementById('typeRow');
+const cRow=document.getElementById('countyRow'), tRow=document.getElementById('typeRow'), pRow=document.getElementById('periodRow');
+PERIODS.forEach(([k,label])=>{ const b=document.createElement('button'); b.className='chip'; b.dataset.p=k; b.textContent=label; b.setAttribute('aria-pressed','false');
+  b.onclick=()=>{ state.d=periodSpec(k); applyFilters(); }; pRow.appendChild(b); });
 COUNTIES.forEach(c=>{
   const b=document.createElement('button'); b.className='chip'; b.setAttribute('aria-pressed','true');
   b.innerHTML=c+' <span class="n">'+F.filter(f=>f.county===c).length+'</span>';
@@ -165,7 +233,7 @@ const useSel=document.getElementById('useSel'), dField=document.getElementById('
 useSel.onchange=()=>{ state.uses=useSel.value&&useSel.value!=='*'?new Set([useSel.value]):null; applyFilters(); };
 const dPeriod=[DATA.period.start.slice(0,7), ym(new Date(Date.now()+3*365*864e5))];
 [dFrom,dTo].forEach(i=>{ i.min=dPeriod[0].slice(0,4)+'-01'; i.max=dPeriod[1]; });
-function readDates(){ const f=dField.value; dFrom.disabled=dTo.disabled=!f; state.d=f?{f,from:dFrom.value||'',to:dTo.value||''}:null; applyFilters(); }
+function readDates(){ const f=dField.value; dFrom.disabled=dTo.disabled=!f; state.d=f?{f,from:dFrom.value||'',to:dTo.value||''}:{f:'all',from:'',to:''}; applyFilters(); }
 dField.onchange=()=>{ if(dField.value&&!dFrom.value&&!dTo.value){ const t=ym(new Date()); dFrom.value=dField.value==='reg'?dPeriod[0]:t; } readDates(); };
 dFrom.onchange=readDates; dTo.onchange=readDates;
 const chgRow=document.getElementById('chgRow');
@@ -178,15 +246,16 @@ function syncFilterUI(){
   [...cRow.querySelectorAll('.chip')].forEach((x,i)=>x.setAttribute('aria-pressed',state.counties.has(COUNTIES[i])));
   [...tRow.querySelectorAll('.chip')].forEach((x,i)=>x.setAttribute('aria-pressed',state.types.has(TYPES[i])));
   [...chgRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed',state.chg===x.dataset.chg));
+  const pk=periodOf(state.d); [...pRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===pk));
   const minEl=document.getElementById('minCost'); if(![...minEl.options].some(o=>+o.value===state.min)){ const o=document.createElement('option'); o.value=state.min; o.textContent=fmtM(state.min)+'+'; minEl.appendChild(o); } minEl.value=String(state.min);
   const qEl=document.getElementById('q'); if(document.activeElement!==qEl) qEl.value=state.q;
   useSel.querySelector('option[value="*"]')?.remove();
   if(state.uses&&state.uses.size>1){ const o=document.createElement('option'); o.value='*'; o.textContent=state.uses.size+' uses'; useSel.appendChild(o); useSel.value='*'; } else useSel.value=state.uses?[...state.uses][0]:'';
-  dField.value=state.d?state.d.f:''; dFrom.value=state.d?.from||''; dTo.value=state.d?.to||''; dFrom.disabled=dTo.disabled=!state.d;
-  const nMore=(state.uses?1:0)+(state.d?1:0)+(state.chg?1:0); document.getElementById('moreN').textContent=nMore?'· '+nMore+' on':''; if(nMore) document.getElementById('moreF').open=true;
+  const dd=state.d&&state.d.f!=='all'?state.d:null; dField.value=dd?dd.f:''; dFrom.value=dd?.from||''; dTo.value=dd?.to||''; dFrom.disabled=dTo.disabled=!dd;
+  const nMore=(state.uses?1:0)+(state.d&&!pk?1:0)+(state.chg?1:0); document.getElementById('moreN').textContent=nMore?'· '+nMore+' on':''; if(nMore) document.getElementById('moreF').open=true;
   const t=filterText(); document.getElementById('activeTxt').textContent=t?'Filters: '+t:''; document.getElementById('activeBar').classList.toggle('on',!!t);
 }
-document.getElementById('resetAll').onclick=()=>fromSpec({});
+document.getElementById('resetAll').onclick=()=>{ fromSpec(DEFAULT_SPEC()); if(state.month) setMonth(null); };
 // apply a whole filter spec (URL, saved search, AI answer)
 function fromSpec(spec,{fly=true}={}){
   state.counties=new Set(spec.c&&spec.c.length?spec.c.filter(c=>COUNTIES.includes(c)):COUNTIES); if(!state.counties.size) state.counties=new Set(COUNTIES);
@@ -266,7 +335,7 @@ function wireCites(el){ el.querySelectorAll('.cite').forEach(b=>b.onclick=()=>{ 
 const cardCloseHooks=[];
 function clearSel(){ state.sel=null; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
 function closeCard(){ cardCloseHooks.forEach(fn=>fn()); card.classList.remove('open'); state.sel=null; scheduleHash(); syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
-function syncHighlight(){ if(map.getLayer&&map.getLayer('filings-hl')) map.setFilter('filings-hl',['==',['get','i'],state.sel?F.indexOf(state.sel):-1]); }
+function syncHighlight(){ if(map.getLayer&&map.getLayer('filings-hl')) map.setFilter('filings-hl',['==',['get','i'],state.sel?IDX.get(state.sel):-1]); }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeCard(); });
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
 
@@ -350,7 +419,7 @@ function finishPoly(){ const pts=draft.filter((p,i)=>i===0||d3.geoDistance(p,dra
   setSelection('shape','Custom shape ('+pts.length+' points)',ringFeature(pts)); setMode('pan'); }
 document.addEventListener('keydown',e=>{ if(e.target.closest&&e.target.closest('input,select,textarea')) return;
   if(mode==='poly'&&draft.length){ if(e.key==='Enter'){e.preventDefault(); finishPoly();} else if(e.key==='Backspace'){e.preventDefault(); draft.pop(); drawDraft();} else if(e.key==='Escape'){ draft=[]; drawDraft(); } } });
-function fitGeom(g){ const b=d3.geoBounds({type:'Feature',geometry:g}); map.fitBounds([[b[0][0],b[0][1]],[b[1][0],b[1][1]]],{padding:{top:80,bottom:80,left:80,right:80},duration:reduceMotion?0:900}); }
+function fitGeom(g){ const b=d3.geoBounds({type:'Feature',geometry:g}); safeFit([[b[0][0],b[0][1]],[b[1][0],b[1][1]]],{padding:80}); }
 
 // ---------- radius search (MapTiler geocoding + local index) ----------
 const rq=document.getElementById('rq'), rsug=document.getElementById('rsug'), rmi=document.getElementById('rmi'), rrange=document.getElementById('rrange');
@@ -413,6 +482,17 @@ layersBtn.onclick=e=>{ e.stopPropagation(); const on=!layersEl.classList.contain
 let swallowClick=false;
 document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on')&&!layersEl.contains(e.target)&&!layersBtn.contains(e.target)){ layersEl.classList.remove('on'); layersBtn.setAttribute('aria-expanded',false); if(map.getCanvas().contains(e.target)) swallowClick=true; } });
 document.querySelectorAll('#styleSeg button').forEach(b=>b.onclick=()=>setBasemap(b.dataset.style));
+document.querySelectorAll('#sizeSeg button').forEach(b=>b.onclick=()=>{ layers.size=b.dataset.size; saveLayers(); styleFilings(); });
+document.querySelectorAll('#heatSeg button').forEach(b=>b.onclick=()=>{ layers.heat=b.dataset.heat; saveLayers(); styleFilings(); });
+syncLegend();
+function setMapOptions(a){ const done=[];
+  if(a.heatmap){ layers.heat=a.heatmap; done.push(a.heatmap==='off'?'heatmap off':'heatmap by '+(a.heatmap==='value'?'value':'count')); }
+  if(typeof a.size_by_value==='boolean'){ layers.size=a.size_by_value?'value':'uniform'; done.push(a.size_by_value?'dots sized by value':'uniform dots'); }
+  if(a.heatmap||typeof a.size_by_value==='boolean'){ saveLayers(); styleFilings(); }
+  if(a.basemap&&STYLES[a.basemap]){ setBasemap(a.basemap); done.push(a.basemap+' basemap'); }
+  if(typeof a.tilt==='boolean'){ document.getElementById('ly3d').checked=a.tilt; map.easeTo({pitch:a.tilt?55:0,duration:600}); done.push(a.tilt?'tilted 3D':'flat'); }
+  if(a.demographics){ const s=document.getElementById('lyDemo'); s.value=a.demographics==='off'?'':a.demographics; s.dispatchEvent(new Event('change')); done.push(a.demographics==='off'?'demographics off':'demographics: '+(s.selectedOptions[0]?.textContent||a.demographics)); }
+  return done.length?done:['no change']; }
 document.getElementById('lyRoads').onchange=e=>{ layers.roads=e.target.checked; applyRoadToggles(); };
 document.getElementById('lyNames').onchange=e=>{ layers.names=e.target.checked; applyRoadToggles(); };
 document.getElementById('lyCounties').onchange=e=>{ layers.counties=e.target.checked; ['county-line','county-label'].forEach(id=>map.getLayer(id)&&map.setLayoutProperty(id,'visibility',layers.counties?'visible':'none')); };
@@ -524,9 +604,12 @@ const MONTHS=(()=>{ const a=new Date(DATA.period.start.slice(0,7)+'-01T00:00:00Z
   for(let d=a; ym(d)<=(maxEnd.slice(0,7)<cap?maxEnd.slice(0,7):cap); d=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1))) out.push(ym(d)); return out.length?out:[ym(new Date())]; })();
 tRange.max=MONTHS.length-1; tRange.value=Math.max(0,MONTHS.indexOf(ym(new Date())));
 let playT=null;
-function setMonth(m){ state.month=m; tsl.classList.toggle('on',!!m); tLabel.textContent=m?'Under construction · '+monthLabel(m):'Under construction by month'; if(m) tRange.value=MONTHS.indexOf(m); applyFilters(); }
+const timeBtn=document.getElementById('timeBtn');
+function showTime(on){ tsl.classList.toggle('show',on); timeBtn.setAttribute('aria-pressed',on); if(!on){ stopPlay(); if(state.month) setMonth(null); } }
+timeBtn.onclick=()=>showTime(!tsl.classList.contains('show'));
+function setMonth(m){ state.month=m; tsl.classList.toggle('on',!!m); if(m&&!tsl.classList.contains('show')){ tsl.classList.add('show'); timeBtn.setAttribute('aria-pressed',true); } tLabel.textContent=m?'Under construction · '+monthLabel(m):'Under construction by month'; if(m) tRange.value=MONTHS.indexOf(m); applyFilters(); }
 let tT; tRange.oninput=()=>{ cancelAnimationFrame(tT); tT=requestAnimationFrame(()=>setMonth(MONTHS[+tRange.value])); };
-document.getElementById('tClear').onclick=()=>{ stopPlay(); setMonth(null); };
+document.getElementById('tClear').onclick=()=>showTime(false);
 function stopPlay(){ clearInterval(playT); playT=null; tPlay.classList.remove('on'); tPlay.setAttribute('aria-label','Play through months'); }
 tPlay.onclick=()=>{ if(playT){ stopPlay(); return; } tPlay.classList.add('on'); tPlay.setAttribute('aria-label','Pause');
   let i=state.month?MONTHS.indexOf(state.month):0; if(i>=MONTHS.length-1) i=0; setMonth(MONTHS[i]);
@@ -544,14 +627,18 @@ const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
   applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), mapClickHandlers:[], setRadiusCenter, setMiles, fitGeom, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
-for (const init of [initTimeline,initWho,initChanges,initAsk,initMarket,initSaved,initField,initBuildings,initMobile]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+Object.assign(ctx,{ periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+  snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
+  resetAll:()=>{ closeCard(); clearHighlight(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
+  coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
+for (const init of [initTimeline,initWho,initChanges,initAssistant,initMarket,initSaved,initField,initBuildings,initMobile]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
   document.getElementById('kicker').textContent='TDLR TABS · '+m(s)+' – '+m(e);
   document.getElementById('periodTxt').textContent=PERIOD; const miss=DATA.unmapped||0; document.getElementById('missTxt').textContent=miss>0?fmtN(miss)+' filing'+(miss>1?'s':'')+' with no mappable address '+(miss>1?'are':'is')+' left off the map. ':''; }
 { const h=location.hash.slice(1), p=new URLSearchParams(h);
-  if(h){ fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else applyFilters();
+  if(h&&[...p.keys()].some(k=>k!=='v'&&k!=='f')){ fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
   booting=false;
   if(p.get('v')) setView(p.get('v'));
   const f=p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));

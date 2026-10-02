@@ -38,20 +38,15 @@ export function initMobile(ctx) {
   new MutationObserver(() => { if (isPhone() && card.classList.contains('open') && app.dataset.mtab === 'list') { app.dataset.mtab = 'map'; syncNav(); setTimeout(() => map.resize(), 30); } })
     .observe(card, { attributes: true, attributeFilter: ['class'] });
 
-  // ---- floating ask bar (phone) ----
-  const askForm = document.getElementById('askForm'), askQ = document.getElementById('askQ'), askOut = document.getElementById('askOut'), mtop = document.getElementById('mtop');
-  document.getElementById('mAskForm').onsubmit = e => {
-    e.preventDefault(); const q = document.getElementById('mAskQ').value.trim(); if (!q) return;
-    askQ.value = q; askForm.requestSubmit(); document.getElementById('mAskQ').blur();
-  };
-  function placeAskOut() { if (isPhone()) { if (askOut.parentElement !== mtop) mtop.appendChild(askOut); } else if (askOut.previousElementSibling !== askForm) askForm.after(askOut); }
-  placeAskOut();
-  phoneMQ.addEventListener('change', () => { placeAskOut(); if (!isPhone()) { app.dataset.mtab = 'map'; closeSheet(); card.classList.remove('full'); } setTimeout(() => map.resize(), 50); });
+  // ---- floating assistant bar (phone) ----
+  document.getElementById('mAsk').onclick = () => { ctx.assistant.open(); setTimeout(() => document.getElementById('aiQ').focus(), 80); };
+  document.getElementById('mMic').onclick = () => ctx.assistant.startVoice();
+  phoneMQ.addEventListener('change', () => { if (!isPhone()) { app.dataset.mtab = 'map'; closeSheet(); card.classList.remove('full'); } setTimeout(() => map.resize(), 50); });
   document.getElementById('mFilters').onclick = () => { setTab('list'); const f = panel.querySelector('.filters'); setTimeout(() => f.scrollIntoView({ block: 'start', behavior: 'smooth' }), 30); };
 
   // live count + filter badge
   function syncCount() {
-    const v = ctx.visible, spec = ctx.curSpec(), n = Object.keys(spec).length + (ctx.state.month ? 1 : 0);
+    const v = ctx.visible, spec = ctx.curSpec(), n = Object.keys(spec).filter(k => k !== 'd').length + (ctx.state.month ? 1 : 0);
     document.getElementById('mCount').textContent = fmtN(v.length) + ' filings · ' + fmtM(v.reduce((s, f) => s + f.cost, 0));
     document.getElementById('mFiltN').textContent = n ? n : '';
   }

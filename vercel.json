@@ -5,10 +5,6 @@
   "buildCommand": "node build.mjs --assemble",
   "outputDirectory": "public",
   "functions": {
-    "api/ask.js": {
-      "maxDuration": 60,
-      "includeFiles": "data/filings.json"
-    },
     "api/brief.js": {
       "maxDuration": 60,
       "includeFiles": "data/{filings,changes,market}.json"
@@ -22,6 +18,12 @@
     },
     "api/pipeline-ai.js": {
       "maxDuration": 300
+    },
+    "api/chat.js": {
+      "maxDuration": 120
+    },
+    "api/realtime.js": {
+      "maxDuration": 15
     }
   },
   "headers": [

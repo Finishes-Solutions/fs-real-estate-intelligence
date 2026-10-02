@@ -40,7 +40,7 @@ export function initTimeline(ctx) {
     </div>
     <div class="tl-legend" id="tlLegend"></div>
     <div class="tl-chart" id="tlChart"><div class="tl-tip" id="tlTip"></div></div>
-    <div class="tl-note">Drag across the chart to filter to projects active in that range. Hatched bars use dates we estimated because the filer left them blank.</div>
+    <div class="tl-note"><span id="tlRange"></span><span id="tlHelp">Drag across the chart to see what's under construction in a range, or tap a month. Hatched bars use dates we estimated because the filer left them blank.</span></div>
     <div class="gantt" id="gantt"><div class="g-axis" id="gAxis"></div><div class="g-scroll" id="gScroll"><div class="g-inner" id="gInner"></div></div></div>`;
   const $ = id => root.querySelector('#' + id);
   for (const [id, k] of [['tlGroup', 'group'], ['tlMeasure', 'measure'], ['tlSort', 'sort']]) { const el = $(id); el.value = opt[k]; el.onchange = () => { opt[k] = el.value; save(); render(); }; }
@@ -56,7 +56,10 @@ export function initTimeline(ctx) {
     return out;
   }
 
+  let prevD = null;
+  function clearRange() { const d = prevD && prevD.f !== 'active' ? prevD : ctx.periodSpec('12m'); prevD = null; ctx.fromSpec({ ...ctx.curSpec(), d }, { fly: false }); }
   function renderChart(list, groups) {
+    const active = ctx.state.d && ctx.state.d.f === 'active' ? [ctx.state.d.from || months[0], ctx.state.d.to || months[months.length - 1]] : null;
     const el = $('tlChart'), W = el.clientWidth, H = 210, m = { t: 10, r: 14, b: 24, l: 58 };
     const idx = new Map(months.map((mo, i) => [mo, i]));
     const rowsM = months.map(mo => Object.fromEntries([['m', mo], ...groups.map(g => [g, 0])]));
@@ -76,27 +79,48 @@ export function initTimeline(ctx) {
     const bw = Math.max(1, (x(mStart(months[1] || months[0])) - x(mStart(months[0]))) || 8), gap = bw > 6 ? 2 : 0;
     svg.append('g').selectAll('g').data(stack).join('g').attr('fill', d => colorOf(opt.group, d.key))
       .selectAll('rect').data(d => d).join('rect').attr('x', (d, i) => x(mStart(months[i])) + gap / 2).attr('width', Math.max(1, bw - gap))
-      .attr('y', d => y(d[1]) + (d[1] - d[0] > 0 ? 1 : 0)).attr('height', d => Math.max(0, y(d[0]) - y(d[1]) - (d[1] - d[0] > 0 ? 1 : 0)));
+      .attr('y', d => y(d[1]) + (d[1] - d[0] > 0 ? 1 : 0)).attr('height', d => Math.max(0, y(d[0]) - y(d[1]) - (d[1] - d[0] > 0 ? 1 : 0)))
+      .attr('opacity', (d, i) => active && (months[i] < active[0] || months[i] > active[1]) ? .32 : 1);
     const xt = x.ticks(W < 600 ? 4 : 8);
     svg.append('g').attr('class', 'xax').selectAll('text').data(xt).join('text').attr('x', d => x(d)).attr('y', H - 6).attr('text-anchor', 'middle').text(d => d3.utcFormat(d.getUTCMonth() === 0 ? '%Y' : '%b')(d));
     const now = new Date(); if (now >= x.domain()[0] && now <= x.domain()[1]) svg.append('line').attr('class', 'today').attr('x1', x(now)).attr('x2', x(now)).attr('y1', m.t - 4).attr('y2', H - m.b);
-    if (ctx.state.d && ctx.state.d.f === 'active') { const [a, b] = [ctx.state.d.from || months[0], ctx.state.d.to || months[months.length - 1]]; svg.append('rect').attr('class', 'band').attr('x', x(mStart(a))).attr('width', Math.max(2, x(d3.utcMonth.offset(mStart(b), 1)) - x(mStart(a)))).attr('y', m.t).attr('height', H - m.b - m.t); }
     // hover: nearest month column under the pointer (works through the brush overlay)
     const tip = $('tlTip');
     svg.on('pointermove', ev => {
+      if (ev.pointerType && ev.pointerType !== 'mouse') return;
       const [px] = d3.pointer(ev); if (px < m.l || px > W - m.r) { tip.style.opacity = 0; return; }
       const mo = d3.utcMonth.floor(x.invert(px)).toISOString().slice(0, 7), i = months.indexOf(mo); if (i < 0) return;
       const r = rowsM[i], tot = groups.reduce((s, g) => s + r[g], 0);
       tip.innerHTML = '<b>' + esc(d3.utcFormat('%B %Y')(mStart(mo))) + '</b><span>' + fmtY(tot) + ' total</span>' + groups.slice().reverse().filter(g => r[g]).map(g => '<div><i style="background:' + colorOf(opt.group, g) + '"></i>' + esc(labelOf(opt.group, g)) + '<em>' + fmtY(r[g]) + '</em></div>').join('');
       const left = x(mStart(mo)) + bw + 10; tip.style.opacity = 1; tip.style.left = (left + tip.offsetWidth > W ? x(mStart(mo)) - tip.offsetWidth - 10 : left) + 'px'; tip.style.top = '8px';
     }).on('pointerleave', () => { tip.style.opacity = 0; });
-    // brush -> "active in" date filter
-    const brush = d3.brushX().extent([[m.l, m.t], [W - m.r, H - m.b]]).on('end', ev => {
-      if (!ev.selection) return; const [a, b] = ev.selection.map(v => d3.utcMonth.floor(x.invert(v)));
-      const from = a.toISOString().slice(0, 7), to = d3.utcMonth.offset(b, 0).toISOString().slice(0, 7);
-      ctx.fromSpec({ ...ctx.curSpec(), d: { f: 'active', from, to } }, { fly: false });
-    });
+    // brush -> "under construction during" filter. Snaps to whole months while dragging, shows the range live,
+    // stays on the chart afterwards so its edges can be adjusted; a tap without dragging picks a single month.
+    const ymOf = d => d.toISOString().slice(0, 7), fmtMo = d3.utcFormat('%b %Y');
+    const snap = ([a, b]) => { const s0 = d3.utcMonth.floor(x.invert(a)), e0 = d3.utcMonth.ceil(x.invert(b)); return [s0, e0 > s0 ? e0 : d3.utcMonth.offset(s0, 1)]; };
+    const lab = svg.append('g').attr('class', 'blabel').style('display', 'none'); lab.append('rect').attr('rx', 3).attr('height', 18).attr('y', m.t - 2); lab.append('text').attr('y', m.t + 11);
+    const showLab = (s0, e0) => { const t = fmtMo(s0) + (d3.utcMonth.offset(s0, 1) < e0 ? ' – ' + fmtMo(d3.utcMonth.offset(e0, -1)) : ''); lab.style('display', null).select('text').text(t);
+      const w = t.length * 6.4 + 14, cx = Math.max(m.l + w / 2, Math.min(W - m.r - w / 2, (x(s0) + x(e0)) / 2)); lab.select('rect').attr('x', cx - w / 2).attr('width', w); lab.select('text').attr('x', cx); };
+    const apply = (s0, e0) => {
+      if (!(ctx.state.d && ctx.state.d.f === 'active')) prevD = ctx.state.d;
+      ctx.fromSpec({ ...ctx.curSpec(), d: { f: 'active', from: ymOf(s0), to: ymOf(d3.utcMonth.offset(e0, -1)) } }, { fly: false });
+    };
+    const brush = d3.brushX().extent([[m.l, m.t], [W - m.r, H - m.b]])
+      .on('start', () => { tip.style.opacity = 0; })
+      .on('brush', function (ev) { if (!ev.sourceEvent || !ev.selection) return; const [s0, e0] = snap(ev.selection); showLab(s0, e0); })
+      .on('end', function (ev) {
+        if (!ev.sourceEvent) return;
+        if (!ev.selection) { // tap: one month, or clear when tapping the month already selected
+          const [px] = d3.pointer(ev.sourceEvent, svg.node()); if (px < m.l || px > W - m.r) return;
+          const s0 = d3.utcMonth.floor(x.invert(px)), cur = ctx.state.d;
+          if (cur && cur.f === 'active' && cur.from === ymOf(s0) && cur.to === ymOf(s0)) { clearRange(); return; }
+          apply(s0, d3.utcMonth.offset(s0, 1)); return;
+        }
+        const [s0, e0] = snap(ev.selection); apply(s0, e0);
+      });
     const bg = svg.append('g').attr('class', 'brush').call(brush); bg.select('.overlay').style('cursor', 'crosshair');
+    lab.raise();
+    if (active) { const a0 = mStart(active[0]), b0 = d3.utcMonth.offset(mStart(active[1]), 1); bg.call(brush.move, [x(a0), x(b0)]); showLab(a0, b0); }
     el.querySelector('svg')?.remove(); el.prepend(svg.node());
     $('tlLegend').innerHTML = groups.map(g => '<span><i style="background:' + colorOf(opt.group, g) + '"></i>' + esc(labelOf(opt.group, g)) + '</span>').join('');
   }
@@ -141,12 +165,18 @@ export function initTimeline(ctx) {
 
   function render() {
     if (ctx.view !== 'timeline') return;
-    const list = ctx.visible; months = domainMonths(list);
+    const list = ctx.visible, d0 = ctx.state.d, chartList = d0 && d0.f === 'active' ? ctx.matchWith({ d: prevD && prevD.f !== 'active' ? prevD : null }) : list;
+    months = domainMonths(chartList);
     const groups = groupsFor(opt.group, list);
     const est = list.filter(f => f.tsE || f.teE).length;
     $('tlSub').textContent = fmtN(list.length) + ' projects · ' + fmtM(list.reduce((s, f) => s + f.cost, 0)) + ' est. value' + (est ? ' · ' + Math.round(est / Math.max(1, list.length) * 100) + '% have estimated dates' : '') + (ctx.filterText() ? ' · ' + ctx.filterText() : '');
     if (!list.length) { $('tlChart').querySelector('svg')?.remove(); $('gInner').innerHTML = '<div class="empty">No filings match these filters.</div>'; $('gInner').style.height = 'auto'; $('tlLegend').innerHTML = ''; return; }
-    renderChart(list, groups); renderGantt(list, groups);
+    renderChart(chartList, groupsFor(opt.group, chartList)); renderGantt(list, groups);
+    const d = ctx.state.d, r = $('tlRange');
+    if (d && d.f === 'active') { const f = s => s ? d3.utcFormat('%b %Y')(mStart(s)) : '…';
+      r.innerHTML = '<b>Under construction ' + esc(f(d.from)) + (d.to !== d.from ? ' – ' + esc(f(d.to)) : '') + '</b> · ' + fmtN(list.length) + ' projects <button class="lnk" type="button">Clear</button>';
+      r.querySelector('button').onclick = clearRange; $('tlHelp').style.display = 'none'; }
+    else { r.innerHTML = ''; $('tlHelp').style.display = ''; }
   }
   ctx.onChange(render); ctx.onView('timeline', render);
   let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(render, 150); });
