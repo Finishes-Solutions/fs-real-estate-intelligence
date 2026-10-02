@@ -828,6 +828,15 @@ table.cmp td.best{font-weight:700;color:var(--brand)}
   .app.ai-open .tools button span{display:none}
   .app.ai-open .tools button{padding:0 11px}
 }
+/* building card: sizes + multi-select */
+.card dl.bsize{margin:0 16px 10px}
+.card .msum{margin:4px 16px 10px}
+.mrow{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line)}
+.mrow .lnk{flex:1;min-width:0;display:grid;gap:2px;padding:8px 0;text-align:left;color:var(--text)}
+.mrow .lnk b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow .lnk span{font-size:11.5px;font-weight:400;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow .x{width:28px;height:28px;border:0;border-radius:4px;background:transparent;color:var(--muted);font-size:17px;cursor:pointer;flex:none}
+.mrow .x:hover{background:var(--chip)}
 
 /* team sync (Field notes) */
 .team{margin-top:10px;display:grid;gap:6px;max-width:640px}

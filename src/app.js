@@ -14,6 +14,7 @@ import { initMapSearch } from './mapsearch.js';
 import { initCompare } from './compare.js';
 import { initKpis } from './kpis.js';
 import { initExport } from './export.js';
+import { initNearby } from './nearby.js';
 import { initLive } from './live.js';
 import { initTeam } from './team.js';
 import { plainText } from './lib/assist-logic.mjs';
@@ -719,7 +720,7 @@ Object.assign(ctx,{ mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, per
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap, buildReport,
   exportCsv, exportXlsx, exportGeoJSON, exportHtml, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});

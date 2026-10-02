@@ -10,7 +10,7 @@ const t = s => Date.parse(s || 0) || 0;
 
 export function initTeam(ctx) {
   const { esc, toast } = ctx;
-  let sb = null, user = null, ready = null, configured = null, step = 'idle', email = '', busy = false, msg = '', lastSync = null, syncing = null, again = false, timer = 0;
+  let sb = null, user = null, ready = null, configured = null, step = 'idle', email = '', busy = false, msg = '', lastSync = null, syncing = null, again = null, timer = 0;
   let queue = []; try { queue = JSON.parse(localStorage.getItem(QKEY) || '[]'); } catch (e) {}
   const saveQueue = () => { try { localStorage.setItem(QKEY, JSON.stringify(queue)); } catch (e) {} };
   const isTeam = () => !!user && String(user.email || '').toLowerCase().endsWith('@' + DOMAIN);
@@ -59,7 +59,7 @@ export function initTeam(ctx) {
   function schedule(ms = 1500) { clearTimeout(timer); timer = setTimeout(() => sync().catch(e => { msg = 'Sync failed: ' + e.message; paint(); }), ms); }
   async function sync() {
     if (!sb || !isTeam() || !navigator.onLine) return;
-    if (syncing) { again = true; return syncing; }
+    if (syncing) return (again ||= syncing.then(() => { again = null; return sync(); })); // one more full pass after the running one
     syncing = (async () => {
       const F = ctx.field, uid = user.id;
       // 1. deletions made on this device
@@ -114,7 +114,7 @@ export function initTeam(ctx) {
       F.replace(cur);
       lastSync = new Date(); msg = '';
     })();
-    try { await syncing; } finally { syncing = null; paint(); if (again) { again = false; schedule(500); } }
+    try { await syncing; } finally { syncing = null; paint(); }
   }
   setInterval(() => { if (isTeam() && document.visibilityState === 'visible') schedule(0); }, 120e3);
   addEventListener('online', () => isTeam() && schedule(0));
