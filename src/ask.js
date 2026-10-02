@@ -19,7 +19,7 @@ export function initAsk(ctx) {
     const g = await ctx.geocode(name + (/texas|\btx\b/i.test(name) ? '' : ', Texas'));
     return g[0] ? { c: g[0].c, label: g[0].t } : null;
   }
-  const show = html => { out.innerHTML = html; out.classList.toggle('on', !!html); };
+  const show = html => { out.innerHTML = html ? '<button class="askx" type="button" aria-label="Dismiss">×</button>' + html : ''; out.classList.toggle('on', !!html); const x = out.querySelector('.askx'); if (x) x.onclick = () => show(''); };
 
   form.onsubmit = async e => {
     e.preventDefault(); const question = input.value.trim(); if (!question || busy) return;

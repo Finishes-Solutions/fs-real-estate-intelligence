@@ -57,12 +57,12 @@ export function initBuildings(ctx) {
   const loadMarket = () => marketP ||= fetch('data/market.json').then(r => r.ok ? r.json() : null).catch(() => null).then(m => market = m);
 
   // returns true when the click hit a building (so the map doesn't treat it as a click on empty ground)
-  ctx.onMapClick = e => {
+  ctx.mapClickHandlers.push(e => {
     if (!on || !map.getLayer('fs-bldg')) return false;
     const hit = map.queryRenderedFeatures(e.point, { layers: ['fs-bldg'] })[0]; if (!hit) return false;
     open({ footprint: hit.geometry, height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: [e.lngLat.lng, e.lngLat.lat] });
     return true;
-  };
+  });
   ctx.openBuildingAt = (lngLat, footprint) => open({ footprint: footprint || null, height: null, base: 0, center: lngLat });
 
   async function open(b) {
@@ -82,6 +82,7 @@ export function initBuildings(ctx) {
     card.querySelector('#bOrbit').onclick = orbit;
     if (ctx.reduceMotion) card.querySelector('#bOrbit').remove();
     renderFilings(null); renderArea();
+    ctx.cardRendered({ kind: 'building', center: b.center, label: () => card.querySelector('#bTitle')?.textContent || 'Building', sub: () => card.querySelector('#bSub')?.textContent || '' });
 
     const q = new URLSearchParams({ lat: b.center[1].toFixed(6), lon: b.center[0].toFixed(6) });
     let d = null;

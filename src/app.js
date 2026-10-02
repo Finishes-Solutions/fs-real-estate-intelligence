@@ -7,6 +7,8 @@ import { initAsk } from './ask.js';
 import { initMarket } from './market.js';
 import { initSaved } from './saved.js';
 import { initBuildings } from './building.js';
+import { initMobile } from './mobile.js';
+import { initField } from './field.js';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
 const getJSON=(u,optional)=>fetch(u,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error(u+' '+r.status); return r.json(); }).catch(e=>{ if(optional) return null; throw e; });
@@ -242,8 +244,8 @@ function select(f,fly){
   card.querySelector('.x').onclick=closeCard; card.classList.add('open');
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
-  scheduleHash();
-  if(fly){ const z=Math.max(map.getZoom(),13.5); map.flyTo({center:[f.lon,f.lat],zoom:z,offset:window.innerWidth>860?[-140,0]:[0,-120],duration:reduceMotion?0:900}); if(window.innerWidth<=860) panel.classList.remove('up'); }
+  scheduleHash(); cardRenderHooks.forEach(fn=>fn({kind:'filing',f}));
+  if(fly){ const z=Math.max(map.getZoom(),13.5); map.flyTo({center:[f.lon,f.lat],zoom:z,offset:window.innerWidth<=700?[0,-Math.round(window.innerHeight*.22)]:window.innerWidth<=1100?[-200,0]:[-140,0],duration:reduceMotion?0:900});  }
 }
 function whoLink(k,raw,label){ const v=entityKey(raw); return v?'<a href="#" data-who="'+k+'|'+esc(v)+'">'+esc(label)+'</a>':esc(label); }
 function historyHtml(f){
@@ -277,7 +279,7 @@ map.on('mousemove','filings',e=>{
 });
 map.on('mouseleave','filings',()=>{ if(mode==='pan') map.getCanvas().style.cursor=''; tip.style.opacity=0; });
 map.on('click','filings',e=>{ if(mode!=='pan') return; e.preventDefault(); select(F[e.features[0].properties.i],false); });
-map.on('click',e=>{ if(mode!=='pan' || e.defaultPrevented || swallowClick) return; if(map.queryRenderedFeatures(e.point,{layers:['filings']}).length) return; if(!(ctx.onMapClick&&ctx.onMapClick(e))) closeCard(); });
+map.on('click',e=>{ if(mode!=='pan' || e.defaultPrevented || swallowClick) return; if(map.queryRenderedFeatures(e.point,{layers:['filings']}).length) return; if(!ctx.mapClickHandlers.some(h=>h(e))) closeCard(); });
 
 // ---------- tools ----------
 let mode='pan', draft=[], boxA=null, boxB=null;
@@ -503,12 +505,13 @@ function buildReport(list){
 }
 
 // ---------- views ----------
-let view='map'; const viewHooks={};
+let view='map'; const viewHooks={}, viewChangeHooks=[], cardRenderHooks=[];
 function setView(v){
   if(!document.getElementById('view-'+v)&&v!=='map') v='map'; view=v;
   document.querySelectorAll('#viewbar button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
   document.querySelectorAll('.view').forEach(el=>el.classList.toggle('on',el.id==='view-'+v));
   stage.dataset.view=v; if(v==='map') setTimeout(()=>map.resize(),0); else viewHooks[v]?.();
+  viewChangeHooks.forEach(fn=>fn(v));
   scheduleHash();
 }
 document.querySelectorAll('#viewbar button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
@@ -539,8 +542,8 @@ if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
   applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
-  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
-for (const init of [initTimeline,initWho,initChanges,initAsk,initMarket,initSaved,initBuildings]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), mapClickHandlers:[], setRadiusCenter, setMiles, fitGeom, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
+for (const init of [initTimeline,initWho,initChanges,initAsk,initMarket,initSaved,initField,initBuildings,initMobile]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
@@ -554,3 +557,6 @@ for (const init of [initTimeline,initWho,initChanges,initAsk,initMarket,initSave
   scheduleHash();
   map.once('load',()=>{ if(f) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>map.flyTo({...HOME,duration:2600,essential:true}),300); else map.jumpTo(HOME); });
 }
+
+// installable app + offline shell (served over https only)
+if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});

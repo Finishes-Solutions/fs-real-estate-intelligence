@@ -12,6 +12,8 @@ Finishes Solutions real estate intelligence map for Waller County and the six su
 - **AI project brief** on any filing: what it is, timing, who's involved, area context.
 - **Saved searches** (per browser) with "N new" counts, shareable links (all filters live in the URL), and an **RSS feed** for any search (`/api/feed?...`), which works with any reader or Zapier "RSS → email" for alerts.
 - **3D buildings and building panel**: zoom in to see buildings in 3D (OpenStreetMap footprints and heights from the MapTiler tiles). Click one for its appraisal-district parcel (owner, market/land/improvement value, year built, acquisition date, land area) from the free Texas GIO StratMap parcel service, businesses mapped inside it (OpenStreetMap), construction filings on the parcel, the census tract snapshot, an orbit camera, a Google Street View link, and a Mapillary street photo if `MAPILLARY_TOKEN` is set.
+- **Phone and tablet**: on phones the map is full screen with a bottom tab bar (Map, List, Timeline, Players, More), a floating ask bar and swipeable bottom-sheet cards; on tablets the list is a collapsible side panel and details open in a right-hand drawer. The site installs as an app (Add to Home Screen) and the app shell works offline; data refreshes when back online.
+- **Field notes**: drop a site note at the map center or your GPS location with a title, tag, notes and phone photos; star any filing or building to watch it (watched filings are flagged when the weekly refresh sees a change). "Near me" shows filings within 3 miles of your location. Notes and photos are stored on that device only; export/import GeoJSON (optionally with photos), CSV or KML to back up, share or move to another device.
 - Exports: HTML report, Excel, CSV (now including use, developer, design team and timeline columns).
 
 ## How the data works
@@ -74,5 +76,6 @@ node build.mjs           # real refresh (needs network access to TDLR, Census, O
 - The AI endpoints' per-IP rate limit is per function instance (best effort). The OpenAI budget cap is the real limit; a Vercel Firewall rate-limit rule on `/api/*` adds a second one.
 - The change feed starts with the second weekly run.
 - Building heights are only as good as OpenStreetMap; unmapped heights get a default. StratMap parcel fields depend on what each appraisal district supplies (year built and acquisition date are often blank), and Texas does not disclose sale prices.
+- Field notes live in the browser's storage on one device. Clearing site data deletes them unless exported; there is no shared team database yet.
 - Business listings come from OpenStreetMap and are incomplete, especially in suburban strip centers.
 - Building permits are not included: the City of Houston stopped publishing permit data in December 2025 and the other counties have no open feed.
