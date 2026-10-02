@@ -23,6 +23,13 @@ assert.equal(pickPlace('Daikin Park, Houston', [houston, other, park]).kind, 'po
 const addr = { t: '1004 Priya Lane, Waller, Texas 77484', name: 'Priya Lane', type: 'address', c: [-95.9, 30.05] };
 assert.equal(pickPlace('1004 Priya ln', [addr]).kind, 'address');
 assert.ok(ZOOM.address >= 17.5 && ZOOM.poi >= 17, 'single building / landmark is close up');
+// "downtown Houston" is the district, not a bar called "Downtown Split" and not the whole city
+const dtSplit = { t: 'Downtown Split, Houston, Texas 77006', name: 'Downtown Split', type: 'poi', c: [-95.39, 29.74] };
+const dt = { t: 'Downtown, Houston, Texas', name: 'Downtown', type: 'neighbourhood', c: [-95.366, 29.758], bbox: [-95.375, 29.748, -95.353, 29.769] };
+const dtPick = pickPlace('downtown Houston', [dtSplit, dt, houston]);
+assert.equal(dtPick.kind, 'area'); assert.equal(dtPick.label, dt.t); assert.deepEqual(dtPick.bbox, dt.bbox);
+assert.ok(ZOOM.area >= 14, 'a district opens at block level');
+assert.equal(pickPlace('Daikin Park Houston', [houston, dt, park]).kind, 'poi', 'a landmark named in full still wins');
 assert.equal(pickPlace('Cypress', [{ t: 'Cypress, Texas', name: 'Cypress', type: 'place', c: [-95.69, 29.97] }]).kind, 'town');
 
 // framing several filings

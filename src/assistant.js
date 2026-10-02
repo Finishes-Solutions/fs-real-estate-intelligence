@@ -228,7 +228,8 @@ export function initAssistant(ctx) {
         if (ctx.view !== 'map') ctx.setView('map');
         const def = zoom ?? ZOOM[kind] ?? 12;
         // a specific building/address/landmark stays close even if the model asks for a wide zoom
-        zoom = a.zoom > 0 ? (['building', 'address', 'poi'].includes(kind) ? Math.max(a.zoom, def) : a.zoom) : def;
+        // the model's zoom may nudge the default, never swap a neighbourhood view for a whole city
+        zoom = a.zoom > 0 ? (['building', 'address', 'poi', 'area'].includes(kind) ? Math.max(a.zoom, def) : Math.min(def + 2.5, Math.max(def - 0.75, a.zoom))) : def;
         if (kind === 'approx') zoom = Math.min(zoom, 14);
         zoom = Math.max(4, Math.min(19, zoom));
         if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt || zoom >= 16.5 ? 60 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });

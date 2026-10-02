@@ -1,3 +1,4 @@
+import { pickPlace } from './lib/assist-logic.mjs';
 // Map search (under the map tools): real street addresses, places (counties, towns, neighborhoods, landmarks, roads),
 // projects by name, companies and people (owners, developers, architects, contractors) and filings at matching addresses. Results appear while typing, 10 at a time, with more loading as you
 // scroll. Picking a place outlines it on the map: city / county / neighborhood boundaries and building footprints
@@ -196,16 +197,17 @@ export function initMapSearch(ctx) {
       const feats = await nominatim(p.kind === 'town' ? (p.name || p.label.split(',')[0]) + ', Texas' : p.label);
       const hit = best(feats, p.c, isArea);
       // a town search must land on that town, not a polygon miles away
-      if (hit && (!p.c || near(centerOf(hit.geometry), p.c) < (p.kind === 'town' || p.kind === 'zip' ? .35 : .02))) geom = hit.geometry;
+      if (hit && (!p.c || near(centerOf(hit.geometry), p.c) < (p.kind === 'town' || p.kind === 'zip' ? .35 : p.kind === 'area' ? .1 : .02))) geom = hit.geometry;
     }
     if (place?.label !== p.label) return; // a newer pick won
+    if (!geom && p.bbox && /area|town|zip|county/.test(p.kind)) { const [w, s2, e, n] = p.bbox; geom = { type: 'Polygon', coordinates: [[[w, s2], [e, s2], [e, n], [w, n], [w, s2]]] }; note = 'Approximate outline (the area’s bounding box): OpenStreetMap has no boundary for it.'; }
     place.geom = geom ? (isArea(geom) ? ctx.fixWinding(geom) : geom) : null; syncPlace();
     const pt = p.c || (geom && centerOf(geom));
     if (geom && isArea(geom) && /address|poi|building/.test(p.kind) || !geom && /address|poi|coords/.test(p.kind)) {
       // a single building: fly in close, then open the building panel (footprint highlight, parcel, businesses)
       map.flyTo({ center: pt, zoom: 18, pitch: 55, duration: ctx.reduceMotion ? 0 : 1600 });
       map.once('idle', () => { if (place?.label === p.label && !isArea(place.geom)) { const b = ctx.buildingAt?.(pt); if (b?.footprint) { place.geom = b.footprint; place.kind = 'building'; syncPlace(); placeCard(); } } });
-    } else if (geom) ctx.fitGeom(geom);
+    } else if (geom) ctx.fitGeom(place.geom);
     else if (pt) map.flyTo({ center: pt, zoom: p.kind === 'town' ? 12 : 14, duration: ctx.reduceMotion ? 0 : 1200 });
     if (!geom && !/address|poi|coords/.test(p.kind)) note = 'No outline found for this place in OpenStreetMap, so it is shown as a point.';
     placeCard(note);
@@ -249,11 +251,22 @@ export function initMapSearch(ctx) {
     const k = kind && kind !== 'auto' ? kind : null, t = String(text).trim();
     const county = COUNTIES.find(c => t.toLowerCase().replace(/\s+county.*$/, '') === c.toLowerCase());
     if (county && (!k || k === 'county')) return showPlace({ label: county + ' County', name: county, kind: 'county', c: DATA.counties.find(x => x.name === county).label });
-    const feats = await nominatim(t + (/texas|\btx\b/i.test(t) ? '' : ', Texas'));
-    const f = feats.find(x => k === 'road' ? x.properties.category === 'highway' : k === 'county' ? x.properties.addresstype === 'county' : k === 'town' ? /city|town|village|hamlet|suburb/.test(x.properties.addresstype) : k === 'building' ? /building|amenity|leisure|shop|tourism|office/.test(x.properties.category) : true) || feats[0];
-    if (!f) return null;
-    const c = centerOf(f.geometry), pr = f.properties, at = pr.addresstype || pr.type;
-    const kk = k || (pr.category === 'highway' ? 'road' : at === 'county' ? 'county' : /city|town|village|hamlet|municipality/.test(at) ? 'town' : /suburb|neighbourhood|quarter/.test(at) ? 'area' : at === 'postcode' ? 'zip' : 'poi');
+    const q = t + (/texas|\btx\b/i.test(t) ? '' : ', Texas'), areaish = !k || /area|town|county|zip|road/.test(k);
+    // "Downtown Houston" must not resolve to a skyscraper in it: area-type asks search places and streets only
+    let feats = await nominatim(q, areaish && k !== null ? '&layer=address' : '');
+    const AT = { area: /suburb|neighbourhood|quarter|city_district|borough|district/, town: /city|town|village|hamlet|municipality/, county: /^county$/, zip: /postcode/ };
+    const type = x => x.properties.addresstype || x.properties.type || '';
+    const want = x => k === 'road' ? x.properties.category === 'highway' : k === 'building' ? /building|amenity|leisure|shop|tourism|office|man_made/.test(x.properties.category) : AT[k] ? AT[k].test(type(x)) : true;
+    const rank = x => (want(x) ? 0 : 2) + (isArea(x.geometry) || isLine(x.geometry) ? 0 : 1);
+    let f = feats.slice().sort((a2, b2) => rank(a2) - rank(b2))[0];
+    if (!f || (areaish && k !== 'road' && !isArea(f.geometry))) {
+      // no outline in OpenStreetMap: let the geocoder place it (its bounding box becomes an approximate outline)
+      const g = pickPlace(t, await ctx.geocode(q, { exact: true }));
+      if (!g.error && (!f || /area|town|zip|county/.test(g.kind))) return showPlace({ label: g.label.replace(/, United States$/, ''), name: g.label.split(',')[0], kind: g.kind, c: g.c, bbox: g.bbox });
+      if (!f) return null;
+    }
+    const c = centerOf(f.geometry), pr = f.properties, at = type(f);
+    const kk = pr.category === 'highway' ? 'road' : at === 'county' ? 'county' : AT.town.test(at) ? 'town' : AT.area.test(at) ? 'area' : at === 'postcode' ? 'zip' : /building|amenity|shop|office|tourism|leisure/.test(pr.category) ? 'poi' : (k || 'poi');
     const parts = pr.display_name.split(',').map(x => x.trim()), name = pr.name || parts[0];
     const label = kk === 'county' ? (/county/i.test(name) ? name : name + ' County') : kk === 'town' ? name + ', TX' : [name, parts.find((x, i) => i && /^[A-Za-z .'-]+$/.test(x) && x !== name && !/county|texas|united states/i.test(x))].filter(Boolean).join(', ');
     return showPlace({ label, name: kk === 'county' ? name.replace(/\s+county$/i, '') : name, kind: kk, c });
