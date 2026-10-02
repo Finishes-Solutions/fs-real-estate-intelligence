@@ -45,6 +45,7 @@ globalThis.fetch = async (url, opts = {}) => {
   if (method === 'PATCH') { const patch = JSON.parse(opts.body); t.filter(r => match(r, p)).forEach(r => Object.assign(r, patch)); save(); return json(null, 204); }
   if (method === 'POST') {
     const body = [].concat(JSON.parse(opts.body)), pk = PK[path], up = u.searchParams.get('on_conflict'), out = [];
+    if (opts.body.includes('\\u0000')) return json({ code: '22P05', details: '\\u0000 cannot be converted to text.', message: 'unsupported Unicode escape sequence' }, 400); // like Postgres
     // like Postgres: integer columns refuse decimals (cost too while MOCK_COST_BIGINT emulates the pre-cents schema)
     if (path === 'filings') for (const row of body) for (const k of process.env.MOCK_COST_BIGINT ? ['cost', 'sqft', 'units'] : ['sqft', 'units']) if (row[k] != null && !Number.isInteger(row[k])) return json({ code: '22P02', message: `invalid input syntax for type bigint: "${row[k]}"` }, 400);
     for (const row of body) {
