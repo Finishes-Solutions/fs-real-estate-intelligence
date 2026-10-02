@@ -15,7 +15,7 @@ on:
         description: "Comma-separated county names to (re)process (blank = all pending)"
         required: false
       period_start:
-        description: "Backfill start YYYY-MM-DD (blank = 5 years back)"
+        description: "Backfill start YYYY-MM-DD (blank = 3 years back)"
         required: false
       max_counties:
         description: "Stop after this many counties (blank = no limit)"
@@ -44,7 +44,7 @@ jobs:
       - name: Load into Supabase
         id: load
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

@@ -5,7 +5,7 @@
 const ISS = 'https://token.actions.githubusercontent.com';
 const REPO = 'finishes-solutions/fs-real-estate-intelligence';
 const AUDIENCE = 'fs-real-estate-pipeline';
-const TABLES = new Set(['counties', 'filings', 'changes', 'runs', 'tabs_cache', 'geocode_cache', 'ai_cache', 'rpc/cache_get']);
+const TABLES = new Set(['counties', 'filings', 'changes', 'runs', 'geocode_cache', 'rpc/cache_get', 'rpc/db_size']);
 
 const b64u = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=')), c => c.charCodeAt(0));
 let jwks: { keys: JsonWebKey[] & { kid?: string }[] } | null = null, jwksAt = 0;

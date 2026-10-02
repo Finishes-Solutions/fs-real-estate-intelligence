@@ -32,6 +32,11 @@ async function assemble() {
   await fs.writeFile('public/sw.js', (await fs.readFile('src/sw.js', 'utf8')).replace('__BUILD__', Date.now().toString(36)));
   for (const f of ['geo.json', 'filings.json', 'changes.json', 'market.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
   for (const f of ['taxonomy.mjs', 'filter.mjs', 'changes.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
+  // public Supabase settings for the browser (read-only publishable key; row level security limits it to public tables)
+  const E = process.env, sbUrl = E.SUPABASE_URL || E.NEXT_PUBLIC_SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co';
+  const sbKey = E.SUPABASE_PUBLISHABLE_KEY || E.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || E.SUPABASE_ANON_KEY || E.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  await fs.writeFile('public/config.json', JSON.stringify(sbKey ? { supabase: { url: sbUrl.replace(/\/$/, ''), key: sbKey } } : {}));
+  log('assemble: supabase config', sbKey ? 'on (' + sbUrl + ')' : 'off (no publishable key in env)');
   log('assembled public/');
 }
 

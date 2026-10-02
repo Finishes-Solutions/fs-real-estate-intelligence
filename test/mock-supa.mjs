@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 const FILE = process.env.MOCK_DB, db = FILE && fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : {};
 const save = () => FILE && fs.writeFileSync(FILE, JSON.stringify(db));
-const PK = { counties: 'fips', filings: 'id', tabs_cache: 'k', geocode_cache: 'k', ai_cache: 'k', runs: 'id', changes: 'id' };
+const PK = { counties: 'fips', filings: 'id', geocode_cache: 'k', runs: 'id', changes: 'id' };
 const json = (o, s = 200) => new Response(o === null ? null : JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
 const DEFAULTS = { counties: { status: 'todo', priority: 1000 }, filings: { first_seen: 'now', approx: false, misfiled: false } };
 function match(row, params) {
@@ -33,6 +33,7 @@ globalThis.fetch = async (url, opts = {}) => {
   }
   if (!opts.headers?.apikey) return json({ message: 'no key' }, 401);
   const path = u.pathname.replace('/rest/v1/', ''), method = opts.method || 'GET', p = [...u.searchParams];
+  if (path === 'rpc/db_size') return json(+(process.env.MOCK_DB_SIZE || JSON.stringify(db).length));
   if (path === 'rpc/cache_get') { const { tbl, keys } = JSON.parse(opts.body), t = db[tbl] || []; const out = {}; for (const r of t) if (keys.includes(r.k)) out[r.k] = r.data; return json(out); }
   const t = db[path] = db[path] || [];
   if (method === 'GET') {
