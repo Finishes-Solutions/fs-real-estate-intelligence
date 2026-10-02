@@ -2,7 +2,7 @@ name: Refresh data
 
 on:
   schedule:
-    - cron: "17 9 * * 1" # Mondays 09:17 UTC (default branch only)
+    - cron: "17 9 * * *" # nightly 09:17 UTC = 4:17am Central (default branch only)
   workflow_dispatch:
     inputs:
       only:

@@ -2,7 +2,7 @@
 // Data files: network first, cached copy when offline. AI/building APIs and map tiles: always network.
 const VERSION = '__BUILD__', SHELL = 'fs-shell-' + VERSION, DATA = 'fs-data', LIBS = 'fs-libs';
 const FILES = ['./', 'index.html', 'app.css', 'app.js', 'ask.js', 'timeline.js', 'views.js', 'market.js', 'saved.js', 'building.js', 'mobile.js', 'field.js',
-  'lib/filter.mjs', 'lib/taxonomy.mjs', 'logo.png', 'icon-192.png', 'manifest.webmanifest'];
+  'lib/filter.mjs', 'lib/taxonomy.mjs', 'lib/changes.mjs', 'logo.png', 'icon-192.png', 'manifest.webmanifest'];
 const LIB_HOSTS = ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => Promise.all(FILES.map(f => c.add(f).catch(() => {})))).then(() => self.skipWaiting())); });

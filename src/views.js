@@ -1,4 +1,4 @@
-// "Who's building" (developers, architects, GCs ranked by activity) and "What changed" (weekly change feed).
+// "Who's building" (developers, architects, GCs ranked by activity) and "What changed" (nightly change feed).
 import { entityKey } from './lib/taxonomy.mjs';
 
 const ROLE = { dev: 'Developers & owners', arch: 'Architects & designers', gc: 'General contractors' };
@@ -57,7 +57,7 @@ export function initChanges(ctx) {
   function render() {
     if (ctx.view !== 'changes') return;
     const body = root.querySelector('#chBody');
-    if (!runs.length) { body.innerHTML = '<div class="empty">The change feed starts after the second weekly data refresh. Check back next week.</div>'; root.querySelector('#chSub').textContent = ''; return; }
+    if (!runs.length) { body.innerHTML = '<div class="empty">The change feed starts after the second nightly data refresh. Check back tomorrow.</div>'; root.querySelector('#chSub').textContent = ''; return; }
     const vis = new Set(ctx.visible.map(f => f.id)), run = runs[ri];
     const items = run.items.filter(x => x.k === 'gone' || !onlyVisible || vis.has(x.id));
     const newV = items.filter(x => x.k === 'new').reduce((s, x) => s + (BY_ID.get(x.id)?.cost || 0), 0);

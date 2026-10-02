@@ -19,7 +19,7 @@ export async function pool(items, n, fn) { const out = new Array(items.length); 
 
 export async function readJSON(path, fallback) { try { return JSON.parse(await fs.readFile(path, 'utf8')); } catch (e) { return fallback; } }
 
-// Caches and committed data are written one entry per line, sorted, so weekly git diffs stay small.
+// Caches and committed data are written one entry per line, sorted, so nightly git diffs stay small.
 export async function writeMap(path, obj) {
   const keys = Object.keys(obj).sort();
   await fs.writeFile(path, '{\n' + keys.map(k => JSON.stringify(k) + ':' + JSON.stringify(obj[k])).join(',\n') + '\n}\n');

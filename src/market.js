@@ -38,7 +38,7 @@ export function initMarket(ctx) {
     if (!m) { removeLayer(); renderLegend(); return; }
     if (!market) {
       try { const r = await fetch('data/market.json', { cache: 'no-cache' }); if (!r.ok) throw 0; market = await r.json(); }
-      catch (e) { ctx.toast('Demographic data isn’t available yet. It’s added by the weekly data refresh.'); sel.value = ''; metric = ''; return; }
+      catch (e) { ctx.toast('Demographic data isn’t available yet. It’s added by the nightly data refresh.'); sel.value = ''; metric = ''; return; }
     }
     breaks = m === 'gr' ? GROWTH : quantiles(market.tracts.map(t => t[m]), 5);
     addLayer(); renderLegend();

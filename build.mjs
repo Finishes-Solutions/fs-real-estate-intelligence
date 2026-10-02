@@ -44,7 +44,7 @@ async function assemble() {
   for (const f of await fs.readdir('src')) await fs.copyFile('src/' + f, 'public/' + f);
   await fs.writeFile('public/sw.js', (await fs.readFile('src/sw.js', 'utf8')).replace('__BUILD__', Date.now().toString(36)));
   for (const f of ['geo.json', 'filings.json', 'changes.json', 'market.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
-  for (const f of ['taxonomy.mjs', 'filter.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
+  for (const f of ['taxonomy.mjs', 'filter.mjs', 'changes.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
   log('assembled public/');
 }
 

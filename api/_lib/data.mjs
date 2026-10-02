@@ -1,6 +1,7 @@
 // Loads the committed data files bundled with the functions (see vercel.json includeFiles). Cached per instance.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { recentChanges } from '../../lib/changes.mjs';
 
 const cache = {};
 export async function load(name) {
@@ -8,7 +9,5 @@ export async function load(name) {
   return cache[name];
 }
 export async function changedMap() {
-  const feed = await load('changes.json').catch(() => null), m = new Map();
-  for (const x of feed?.runs?.[0]?.items || []) if (!m.has(x.id) || x.k === 'new') m.set(x.id, x.k);
-  return m;
+  return recentChanges(await load('changes.json').catch(() => null));
 }

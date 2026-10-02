@@ -1,6 +1,7 @@
 
 import { makeMatcher, encode, decode, describe } from './lib/filter.mjs';
 import { USES, entityKey } from './lib/taxonomy.mjs';
+import { recentChanges } from './lib/changes.mjs';
 import { initTimeline } from './timeline.js';
 import { initWho, initChanges } from './views.js';
 import { initAsk } from './ask.js';
@@ -33,7 +34,7 @@ document.getElementById('themeBtn').onclick=()=>{ root.dataset.theme=isDark()?'l
 
 // ---------- data ----------
 // latest change run: id -> 'new' | field that changed
-const LAST_RUN=DATA.changes.runs[0], CHANGED=new Map(); (LAST_RUN?.items||[]).forEach(x=>{ if(!CHANGED.has(x.id)||x.k==='new') CHANGED.set(x.id,x.k); });
+const LAST_RUN=DATA.changes.runs[0], CHANGED=recentChanges(DATA.changes);
 const F=DATA.filings.map(f=>({...f,r:Math.max(2.2,Math.min(15,1.6+Math.sqrt(f.cost/1e6)*1.15)),_chg:CHANGED.get(f.id)||null})).sort((a,b)=>b.cost-a.cost);
 const BY_ID=new Map(F.map(f=>[f.id,f]));
 const state={counties:new Set(COUNTIES),types:new Set(TYPES),min:0,max:0,q:'',uses:null,who:null,d:null,chg:null,month:null,sel:null,shown:150};
