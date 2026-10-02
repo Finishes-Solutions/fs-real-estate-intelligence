@@ -29,7 +29,11 @@ jobs:
     environment: Production # the secrets live in this GitHub environment
     timeout-minutes: 340
     steps:
+      # the branch tip when the job starts, not when it was queued: a run that waited behind another one then
+      # starts from that run's committed caches instead of redoing hours of geocoding
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
