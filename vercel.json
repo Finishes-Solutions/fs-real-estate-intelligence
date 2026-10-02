@@ -5,11 +5,31 @@
   "buildCommand": "node build.mjs --assemble",
   "outputDirectory": "public",
   "functions": {
-    "api/ask.js": { "maxDuration": 30, "includeFiles": "data/filings.json" },
-    "api/brief.js": { "maxDuration": 45, "includeFiles": "data/{filings,changes,market}.json" },
-    "api/feed.js": { "maxDuration": 10, "includeFiles": "data/{filings,changes}.json" }
+    "api/ask.js": {
+      "maxDuration": 30,
+      "includeFiles": "data/filings.json"
+    },
+    "api/brief.js": {
+      "maxDuration": 45,
+      "includeFiles": "data/{filings,changes,market}.json"
+    },
+    "api/feed.js": {
+      "maxDuration": 10,
+      "includeFiles": "data/{filings,changes}.json"
+    },
+    "api/building.js": {
+      "maxDuration": 20
+    }
   },
   "headers": [
-    { "source": "/data/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, s-maxage=86400, must-revalidate" }] }
+    {
+      "source": "/data/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, s-maxage=86400, must-revalidate"
+        }
+      ]
+    }
   ]
 }

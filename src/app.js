@@ -6,6 +6,7 @@ import { initWho, initChanges } from './views.js';
 import { initAsk } from './ask.js';
 import { initMarket } from './market.js';
 import { initSaved } from './saved.js';
+import { initBuildings } from './building.js';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
 const getJSON=(u,optional)=>fetch(u,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error(u+' '+r.status); return r.json(); }).catch(e=>{ if(optional) return null; throw e; });
@@ -217,6 +218,7 @@ function renderList(){
 // ---------- detail card ----------
 const card=document.getElementById('card'), panel=document.getElementById('panel');
 function select(f,fly){
+  cardCloseHooks.forEach(fn=>fn());
   state.sel=f; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach((b,i)=>b.classList.toggle('on',visible[i]===f));
   card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2></div>'+
     '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>'+
@@ -258,7 +260,9 @@ async function loadBrief(f){
 // AI text -> safe HTML: escaped, paragraphs, [TABS…] citations become buttons that select the filing
 function richText(t){ return esc(t||'').split(/\n{2,}|\n(?=[A-Z][^\n]{0,40}\n)/).map(p=>'<p>'+p.replace(/\n/g,'<br>')+'</p>').join('').replace(/\[(TABS[0-9A-Za-z-]+)\]/g,(m,id)=>BY_ID.has(id)?'<button class="cite" data-id="'+id+'">'+id+'</button>':id); }
 function wireCites(el){ el.querySelectorAll('.cite').forEach(b=>b.onclick=()=>{ const f=BY_ID.get(b.dataset.id); if(f){ setView('map'); select(f,true); } }); }
-function closeCard(){ card.classList.remove('open'); state.sel=null; scheduleHash(); syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
+const cardCloseHooks=[];
+function clearSel(){ state.sel=null; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
+function closeCard(){ cardCloseHooks.forEach(fn=>fn()); card.classList.remove('open'); state.sel=null; scheduleHash(); syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
 function syncHighlight(){ if(map.getLayer&&map.getLayer('filings-hl')) map.setFilter('filings-hl',['==',['get','i'],state.sel?F.indexOf(state.sel):-1]); }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeCard(); });
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
@@ -273,7 +277,7 @@ map.on('mousemove','filings',e=>{
 });
 map.on('mouseleave','filings',()=>{ if(mode==='pan') map.getCanvas().style.cursor=''; tip.style.opacity=0; });
 map.on('click','filings',e=>{ if(mode!=='pan') return; e.preventDefault(); select(F[e.features[0].properties.i],false); });
-map.on('click',e=>{ if(mode==='pan' && !e.defaultPrevented && !swallowClick) closeCard(); });
+map.on('click',e=>{ if(mode!=='pan' || e.defaultPrevented || swallowClick) return; if(map.queryRenderedFeatures(e.point,{layers:['filings']}).length) return; if(!(ctx.onMapClick&&ctx.onMapClick(e))) closeCard(); });
 
 // ---------- tools ----------
 let mode='pan', draft=[], boxA=null, boxB=null;
@@ -531,11 +535,12 @@ function scheduleHash(){ if(booting) return; clearTimeout(hashT); hashT=setTimeo
 document.getElementById('copyLink').onclick=async()=>{ const u=location.href.split('#')[0]+'#'+hashStr(); try{ await navigator.clipboard.writeText(u); toast('Link copied. It opens with these filters.'); }catch(e){ prompt('Copy this link',u); } };
 
 // ---------- modules ----------
+if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
   applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
-  onChange:fn=>listeners.push(fn), onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
-for (const init of [initTimeline,initWho,initChanges,initAsk,initMarket,initSaved]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
+for (const init of [initTimeline,initWho,initChanges,initAsk,initMarket,initSaved,initBuildings]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});

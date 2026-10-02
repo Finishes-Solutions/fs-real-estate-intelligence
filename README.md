@@ -11,6 +11,7 @@ Finishes Solutions real estate intelligence map for Waller County and the six su
 - **Ask**: plain-English questions ("medical over $2M near Katy starting next year") become filters you can see and undo, plus a short answer that cites TABS numbers from the matched filings only.
 - **AI project brief** on any filing: what it is, timing, who's involved, area context.
 - **Saved searches** (per browser) with "N new" counts, shareable links (all filters live in the URL), and an **RSS feed** for any search (`/api/feed?...`), which works with any reader or Zapier "RSS → email" for alerts.
+- **3D buildings and building panel**: zoom in to see buildings in 3D (OpenStreetMap footprints and heights from the MapTiler tiles). Click one for its appraisal-district parcel (owner, market/land/improvement value, year built, acquisition date, land area) from the free Texas GIO StratMap parcel service, businesses mapped inside it (OpenStreetMap), construction filings on the parcel, the census tract snapshot, an orbit camera, a Google Street View link, and a Mapillary street photo if `MAPILLARY_TOKEN` is set.
 - Exports: HTML report, Excel, CSV (now including use, developer, design team and timeline columns).
 
 ## How the data works
@@ -37,7 +38,7 @@ The first full run takes a few hours (Nominatim allows one request per second); 
 
 ## Setup
 
-1. **Vercel → Project → Settings → Environment Variables**: `OPENAI_API_KEY` (type Sensitive, Production + Preview). Optional `OPENAI_MODEL` (default `gpt-5-mini`, falling back to `gpt-4.1-mini` / `gpt-4o-mini`).
+1. **Vercel → Project → Settings → Environment Variables**: `OPENAI_API_KEY` (type Sensitive, Production + Preview). Optional `OPENAI_MODEL` (default `gpt-5-mini`, falling back to `gpt-4.1-mini` / `gpt-4o-mini`). Optional `MAPILLARY_TOKEN` (free client token from mapillary.com/dashboard/developers) for street-level photos in the building panel.
 2. **GitHub → Settings → Secrets and variables → Actions**: secret `OPENAI_API_KEY`. Optional: secret `ZAPIER_DIGEST_WEBHOOK` (a Zapier catch hook gets a weekly summary of new filings), secret `MAPTILER_KEY`, secret `CENSUS_KEY`, variable `OPENAI_MODEL`.
 3. **OpenAI dashboard**: set a monthly budget cap on the project that owns the key. The site is public, so the cap is the hard spending limit.
 4. Run **Actions → Refresh data → Run workflow** once (or push a change under `build/`). The schedule (Mondays) only runs on the default branch. The old Zapier monthly deploy hook is no longer needed.
@@ -72,4 +73,6 @@ node build.mjs           # real refresh (needs network access to TDLR, Census, O
 - Use, tenant, developer, architect and GC are extracted by AI from the filing text and can be wrong or missing. Single-asset LLCs often hide the real sponsor.
 - The AI endpoints' per-IP rate limit is per function instance (best effort). The OpenAI budget cap is the real limit; a Vercel Firewall rate-limit rule on `/api/*` adds a second one.
 - The change feed starts with the second weekly run.
+- Building heights are only as good as OpenStreetMap; unmapped heights get a default. StratMap parcel fields depend on what each appraisal district supplies (year built and acquisition date are often blank), and Texas does not disclose sale prices.
+- Business listings come from OpenStreetMap and are incomplete, especially in suburban strip centers.
 - Building permits are not included: the City of Houston stopped publishing permit data in December 2025 and the other counties have no open feed.

@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node build.mjs",
     "assemble": "node build.mjs --assemble",
-    "test": "node test/fixture.mjs && node test/api.mjs && bash test/pipeline.sh"
+    "test": "node test/fixture.mjs && node test/api.mjs && node test/building.mjs && bash test/pipeline.sh"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
