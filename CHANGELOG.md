@@ -5,6 +5,16 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 6:12 PM CT: Live planes, low-flight history, and the assistant can answer about all the data (852b396)
+- **Live Planes**: turn it on in Layers → Live Conditions (or ask the assistant). Every aircraft in view, anywhere in the world, coloured by altitude, moving smoothly and refreshed every 10 seconds. Hover for a quick look; click for a card with callsign, aircraft type, registration, altitude (climbing or descending), speed, route (e.g. IAH → ORD), a Follow button and links to adsb.lol and FlightAware. Zoom in past state level to see them.
+- **Low Flight Paths (30 Days)**: a new layer showing where aircraft fly below 3,000 ft over the region. Property cards get an **Air Traffic** line ("moderate low air traffic: about 14 sightings a day within ~1 km, lowest 850 ft"). The history is collected every 5 minutes from now on, so it takes a few days to mean much. It's an exposure index, not a count of flights.
+- **Ask about anything**: the assistant can now answer from every dataset in the app:
+  - planes overhead and how much low air traffic a site gets;
+  - the Market view numbers per county: population, jobs, housing permits, new businesses, local news;
+  - your team's field notes and watchlist;
+  - where each dataset comes from and when it was last refreshed.
+- The Sources tab lists the aircraft feed and the flight history.
+
 ### 5:58 PM CT: The assistant can take you anywhere in the world, and asks when a place is unclear (ae83277)
 - Ask for any place on Earth: "take me to Lyon, France", "show me Germany", "outline Bavaria, Germany". Whole countries and states zoom out to fit.
 - If a name could be more than one place ("take me to Paris", "Springfield", "Georgia"), the assistant no longer guesses. It asks which one and shows the choices as buttons ("Paris, France" / "Paris, Texas"). It also asks when a request is unclear.
