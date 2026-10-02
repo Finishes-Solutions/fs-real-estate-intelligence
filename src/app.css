@@ -170,6 +170,21 @@ select.chip{appearance:none;padding-right:22px;background-image:linear-gradient(
 #map{position:absolute;inset:0}
 .seg.seg4{grid-template-columns:repeat(4,1fr)}
 .seg.seg4 button{font-size:11.5px;padding:7px 2px}
+.seg.seg6{grid-template-columns:repeat(3,1fr)}
+.seg.seg6 button{font-size:11.5px;padding:7px 2px}
+.seg.seg6 button:nth-child(4){border-left:0}
+.seg.seg6 button:nth-child(n+4){border-top:1px solid var(--line-2)}
+.layers{max-height:calc(100% - 32px);overflow-y:auto}
+.live-ly{display:grid;gap:6px;border-top:1px solid var(--line);padding-top:8px}
+.live-ly .rnote:empty{display:none}
+.live-sec .btnrow{margin-bottom:8px}
+.live-out{display:grid;gap:6px}
+.live-out .chitem{text-decoration:none}
+.live-big{font-family:var(--font-mono);font-size:17px;font-weight:600;color:var(--text)}
+.live-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.live-thumbs button{border:1px solid var(--line);border-radius:4px;background:var(--chip);padding:0;cursor:pointer;text-align:left;color:var(--text);overflow:hidden}
+.live-thumbs img{display:block;width:100%;aspect-ratio:1;object-fit:cover;background:var(--line)}
+.live-thumbs span{display:block;font-size:10.5px;padding:4px 6px;font-family:var(--font-mono)}
 .maplibregl-ctrl-attrib{font-family:var(--font-display);font-size:10.5px}
 .maplibregl-canvas{outline:none}
 .stage.m-draw .maplibregl-canvas{cursor:crosshair}

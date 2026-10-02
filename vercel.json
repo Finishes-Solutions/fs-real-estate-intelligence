@@ -24,6 +24,18 @@
     },
     "api/realtime.js": {
       "maxDuration": 15
+    },
+    "api/drive.js": {
+      "maxDuration": 20
+    },
+    "api/tile.js": {
+      "maxDuration": 10
+    },
+    "api/weather.js": {
+      "maxDuration": 15
+    },
+    "api/news.js": {
+      "maxDuration": 20
     }
   },
   "headers": [

@@ -43,11 +43,36 @@ The first full run takes a few hours (Nominatim allows one request per second); 
 The **Ask AI** button (or `/`) opens a chat that works the map through tools: filter, find, highlight, open a filing, fly somewhere, toggle the heatmap or views. Press the mic to talk to it instead (OpenAI Realtime over WebRTC).
 - `api/chat.js`: text chat (stateless; the browser runs the tool calls and sends results back). Model `OPENAI_CHAT_MODEL` or `OPENAI_MODEL`; `OPENAI_CHAT_REASONING_EFFORT` overrides the effort for chat only.
 - `api/realtime.js`: short-lived voice session. `OPENAI_REALTIME_MODEL` (default `gpt-realtime-2.1`, then `gpt-realtime`), `OPENAI_VOICE` (default `marin`), `VOICE_ENABLED=false` turns voice off. Sessions end after 10 minutes; 30 per IP per day.
-- Tools are defined once in `lib/agent-tools.mjs`.
+- Tools are defined once in `lib/agent-tools.mjs`, including distance / drive time, live layers, weather, news and site imagery (see Live layers below).
+
+## Live layers, drive time and field tools
+
+Layers panel → **Live conditions**, the **From here** buttons on every filing and building card, and the assistant (text or voice) all use the same free sources:
+
+| Feature | Source | Key needed |
+|---|---|---|
+| Rain radar, lightning, satellite clouds | NOAA nowCOAST, through `api/tile` | none |
+| Hurricanes & tropical storms (cones, tracks) | NOAA National Hurricane Center, through `api/tile` / `api/weather` | none |
+| Wind arrows, weather at a spot | Open-Meteo, through `api/weather` | none (optional `OPEN_METEO_API_KEY`) |
+| Live traffic layer, drive time **with traffic** | TomTom, through `api/tile` / `api/drive` | `TOMTOM_API_KEY` (free tier) |
+| Drive time without a TomTom key | OSRM on the FOSSGIS servers (OpenStreetMap roads), through `api/drive` | none |
+| 3D terrain | Mapterhorn (browser direct) | none |
+| NASA recent imagery, site imagery thumbnails | NASA GIBS + CMR + Worldview Snapshots (HLS Landsat / Sentinel-2, 30 m), browser direct | none |
+| Project news | GDELT Project DOC 2.0, through `api/news` | none |
+| Esri sat / Free map basemaps | Esri World Imagery, OpenFreeMap | none |
+
+Voice and chat understand requests like "how far is this property from me and what's the drive time", "how's traffic getting there", "turn on radar and wind", "show hurricanes", "what's the weather here", "any news on this developer", "has work started on this site". "This" means the card that is open; "me" is the phone or laptop's GPS (the browser asks for permission once). With no card open, distance questions use the filing nearest to you.
+
+Limits to know:
+- Without `TOMTOM_API_KEY` there is no traffic layer and drive times are free-flow estimates (the app says "no live traffic data"). TomTom's free allowance is monthly (about 200,000 traffic tiles at the time of writing; check developer.tomtom.com/pricing for current routing and tile quotas). Tiles are CDN-cached for 2 minutes, so a few people panning the same area share them.
+- Radar covers the contiguous US; lightning is a 15-minute density grid (~8 km), not individual strikes.
+- NASA HLS imagery is 30 m per pixel and arrives every few days with a 1–3 day delay: good for "is the land cleared or a pad poured", not for detail. Cloud % is for the whole ~110 km scene.
+- GDELT covers about the last three months of online news and rarely finds single-asset LLC names; the card searches the developer, then the tenant, then the owner.
+- Licences: Open-Meteo's free API, the FOSSGIS routing servers and the public Photon/Nominatim services are for non-commercial or fair use. This app is internal, but heavy or customer-facing use would need Open-Meteo's paid API (`OPEN_METEO_API_KEY`) and your own OSRM server. Keep the attributions shown in the map's attribution line.
 
 ## Setup
 
-1. **Vercel → Project → Settings → Environment Variables**: `OPENAI_API_KEY` (type Sensitive, Production + Preview). Optional `OPENAI_MODEL` (default `gpt-6-luna`, falling back to `gpt-5-mini` / `gpt-4.1-mini` if the key can't use it) and `OPENAI_REASONING_EFFORT` (default `high`; `none` to omit). Optional `MAPILLARY_TOKEN` (free client token from mapillary.com/dashboard/developers) for street-level photos in the building panel.
+1. **Vercel → Project → Settings → Environment Variables**: `OPENAI_API_KEY` (type Sensitive, Production + Preview). Optional `OPENAI_MODEL` (default `gpt-6-luna`, falling back to `gpt-5-mini` / `gpt-4.1-mini` if the key can't use it) and `OPENAI_REASONING_EFFORT` (default `high`; `none` to omit). Optional `MAPILLARY_TOKEN` (free client token from mapillary.com/dashboard/developers) for street-level photos in the building panel. Optional `TOMTOM_API_KEY` (free at developer.tomtom.com → Dashboard → Keys) for the live traffic layer and traffic-aware drive times. Optional `OPEN_METEO_API_KEY` (paid Open-Meteo plan) only if you outgrow their free non-commercial API.
 2. **GitHub → Settings → Secrets and variables → Actions**: secret `OPENAI_API_KEY`. Optional: secret `ZAPIER_DIGEST_WEBHOOK` (a Zapier catch hook gets a weekly summary of new filings), secret `MAPTILER_KEY`, secret `CENSUS_KEY`, variable `OPENAI_MODEL`.
 3. **OpenAI dashboard**: set a monthly budget cap on the project that owns the key. The site is public, so the cap is the hard spending limit.
 4. Run **Actions → Refresh data → Run workflow** once (or push a change under `build/`). The nightly schedule only runs on the default branch. The old Zapier monthly deploy hook is no longer needed.
