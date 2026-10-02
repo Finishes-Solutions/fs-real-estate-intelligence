@@ -14,7 +14,7 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.pathname.startsWith('/TABS/Projects/')) {
     const id = u.pathname.split('/').pop(), n = +id.slice(-1);
     return new Response(`<html><body><dl><dt>Location Address:</dt><dd>${100 + n} Main St</dd><dd>Waller, TX 77484</dd><dt>Owner Name:</dt><dd>Acme Holdings, L.L.C.</dd>
-      <dt>Scope of Work:</dt><dd>New urgent care clinic for Memorial Hermann.</dd><dt>Square Footage:</dt><dd>12,000</dd><dt>Design Firm Name:</dt><dd>${n === 1 ? 'PGAL' : ''}</dd><dt>Tenant Name:</dt><dt>Facility Name:</dt><dd>Clinic</dd></dl></body></html>`);
+      <dt>Scope of Work:</dt><dd>New urgent care clinic for Memorial Hermann.${n === 2 ? "\u0000" : ""}</dd><dt>Square Footage:</dt><dd>12,000</dd><dt>Design Firm Name:</dt><dd>${n === 1 ? 'PGAL' : ''}</dd><dt>Tenant Name:</dt><dt>Facility Name:</dt><dd>Clinic</dd></dl></body></html>`);
   }
   if (u.host === 'geocoding.geo.census.gov') {
     const csv = await opts.body.get('addressFile').text();
