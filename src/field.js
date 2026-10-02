@@ -1,6 +1,6 @@
 // Field data gathering: site notes (pin + text + tag + phone photos) and a watchlist of filings and buildings.
-// Stored on this device (localStorage for records, IndexedDB for photos) and, once signed in, synced with the team through
-// Supabase by src/team.js (notes and photos shared, watchlist per person). Export/import as GeoJSON (with photos), CSV or KML.
+// Stored on this device (localStorage for records, IndexedDB for photos) and synced with the team through /api/field
+// (Supabase) by src/team.js: notes, photos and the watchlist are shared. Export/import as GeoJSON (with photos), CSV or KML.
 const KEY = 'fs-field-v1';
 const TAGS = ['Opportunity', 'Competitor project', 'Under construction', 'Vacant land', 'For sale / lease', 'Follow up', 'Other'];
 

@@ -1,124 +1,78 @@
-// Team sync for field notes: Supabase Auth (6-digit email code, @finishessolutions.com only) plus the field_notes,
-// watchlist and field-photos tables (supabase/migrations/20261005000000_field_notes.sql). The device copy in field.js
-// stays the working store, so everything works offline; this pushes local changes and pulls the team's.
-// Notes are shared with the team (anyone can edit, only the author deletes); the watchlist is per person.
-const SB_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
-const DOMAIN = 'finishessolutions.com';
-const QKEY = 'fs-team-queue-v1';
-const BUCKET = 'field-photos';
+// Team sync for field notes, through /api/field (Supabase behind it, no sign-in). The device copy in field.js stays the
+// working store, so everything works offline; this pushes local changes, queues deletes, and pulls the team's notes,
+// photos and watchlist. Last edit wins. Optional shared passcode when the site sets FIELD_ACCESS_CODE.
+const QKEY = 'fs-team-queue-v1', NAME_KEY = 'fs-team-name', CODE_KEY = 'fs-team-code';
 const t = s => Date.parse(s || 0) || 0;
+const get = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const put = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const b64 = blob => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); });
 
 export function initTeam(ctx) {
-  const { esc, toast } = ctx;
-  let sb = null, user = null, ready = null, configured = null, step = 'idle', email = '', busy = false, msg = '', lastSync = null, syncing = null, again = null, timer = 0;
-  let queue = []; try { queue = JSON.parse(localStorage.getItem(QKEY) || '[]'); } catch (e) {}
-  const saveQueue = () => { try { localStorage.setItem(QKEY, JSON.stringify(queue)); } catch (e) {} };
-  const isTeam = () => !!user && String(user.email || '').toLowerCase().endsWith('@' + DOMAIN);
+  const { esc } = ctx;
+  let configured = null, needCode = false, msg = '', lastSync = null, syncing = null, again = null, timer = 0, failedPhotos = 0;
+  let queue = []; try { queue = JSON.parse(get(QKEY) || '[]'); } catch (e) {}
+  const saveQueue = () => put(QKEY, JSON.stringify(queue));
+  const name = () => get(NAME_KEY).trim();
 
-  // ---------- client ----------
-  async function connect() {
-    if (sb) return sb;
-    const cfg = await fetch('config.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
-    configured = !!cfg.supabase?.url && !!cfg.supabase?.key; if (!configured) { paint(); return null; }
-    const { createClient } = await import(SB_JS);
-    sb = createClient(cfg.supabase.url, cfg.supabase.key, { auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'fs-team-auth' } });
-    sb.auth.onAuthStateChange((ev, s) => { const was = user?.id; user = s?.user || null; if (user?.id !== was) { paint(); if (isTeam()) schedule(0); } });
-    const { data } = await sb.auth.getSession(); user = data.session?.user || null;
-    // a sign-in link lands with ?code=…; supabase-js has exchanged it by now, so tidy the address bar (filters live in the hash)
-    if (/[?&]code=/.test(location.search)) { const u = new URL(location.href); u.searchParams.delete('code'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
-    paint(); if (isTeam()) schedule(0);
-    return sb;
-  }
-  ready = connect().catch(e => { console.error('team sync', e); configured = configured ?? false; msg = 'Team sync couldn’t load (' + e.message + ').'; paint(); });
-
-  // ---------- sign in ----------
-  async function sendCode(addr) {
-    addr = String(addr || '').trim().toLowerCase();
-    if (!new RegExp('^[^@\\s]+@' + DOMAIN.replace('.', '\\.') + '$').test(addr)) { msg = 'Use your @' + DOMAIN + ' email.'; paint(); return; }
-    busy = true; msg = ''; paint();
-    const { error } = await sb.auth.signInWithOtp({ email: addr, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname } });
-    busy = false;
-    if (error) msg = 'Couldn’t send the code: ' + error.message; else { email = addr; step = 'code'; msg = 'Check your email for a 6-digit code (or tap the link in it on this device).'; }
-    paint();
-  }
-  async function verify(code) {
-    code = String(code || '').replace(/\D/g, ''); if (code.length < 6) { msg = 'Enter the code from the email.'; paint(); return; }
-    busy = true; msg = ''; paint();
-    const { data, error } = await sb.auth.verifyOtp({ email, token: code, type: 'email' });
-    busy = false;
-    if (error) { msg = /expired|invalid/i.test(error.message) ? 'That code is wrong or expired. Send a new one.' : error.message; paint(); return; }
-    user = data.user || data.session?.user || null; step = 'idle'; msg = ''; paint();
-    toast('Signed in. Syncing your field notes with the team…'); schedule(0);
-  }
-  async function signOut() {
-    if (!confirm('Sign out? Notes stay on this device; changes made while signed out sync when you sign back in.')) return;
-    await sb.auth.signOut().catch(() => {}); user = null; lastSync = null; paint();
+  async function api(opts = {}, query = '') {
+    const r = await fetch('api/field' + query, { ...opts, headers: { 'Content-Type': 'application/json', 'x-field-code': get(CODE_KEY), ...(opts.headers || {}) } });
+    if (r.status === 401) { needCode = true; configured = true; throw Object.assign(new Error('passcode'), { quiet: true }); }
+    if (r.status === 503 || r.status === 404) { configured = false; throw Object.assign(new Error('off'), { quiet: true }); }
+    configured = true; needCode = false;
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Error ' + r.status);
+    return r;
   }
 
-  // ---------- sync ----------
-  function schedule(ms = 1500) { clearTimeout(timer); timer = setTimeout(() => sync().catch(e => { msg = 'Sync failed: ' + e.message; paint(); }), ms); }
-  async function sync() {
-    if (!sb || !isTeam() || !navigator.onLine) return;
+  function schedule(ms = 1500) { clearTimeout(timer); timer = setTimeout(() => sync().catch(() => {}), ms); }
+  function sync() {
+    if (!navigator.onLine || !ctx.field) return Promise.resolve();
     if (syncing) return (again ||= syncing.then(() => { again = null; return sync(); })); // one more full pass after the running one
     syncing = (async () => {
-      const F = ctx.field, uid = user.id;
-      // 1. deletions made on this device
-      for (const q of queue.slice()) {
-        let r;
-        if (q.kind === 'note') r = await sb.from('field_notes').delete().eq('client_id', q.id);
-        else if (q.kind === 'watch') r = await sb.from('watchlist').delete().eq('user_id', uid).eq('kind', q.wkind).eq('ref', q.ref);
-        else if (q.kind === 'photo') r = String(q.path).startsWith(uid + '/') ? await sb.storage.from(BUCKET).remove([q.path]) : { error: null };
-        if (!r?.error) queue = queue.filter(x => x !== q);
-      }
-      saveQueue();
-      // 2. photos and notes changed here
-      const db = F.db;
+      const F = ctx.field, db = F.db;
+      // 1. photos taken on this device -> shared/<note>/<photo>.jpg
+      failedPhotos = 0;
       for (const n of db.notes) {
         if (n.synced && t(n.updated) <= t(n.synced)) continue;
-        const photos = [];
+        const out = [];
         for (const key of n.photos) {
-          if (String(key).includes('/')) { photos.push(key); continue; }
+          if (String(key).includes('/')) { out.push(key); continue; }
           const blob = await F.localPhoto(key).catch(() => null); if (!blob) continue;
-          const path = uid + '/' + n.id + '/' + key + '.jpg';
-          const { error } = await sb.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType: blob.type || 'image/jpeg' });
-          if (error) { photos.push(key); continue; } // retried next sync
-          await F.putPhoto(path, blob).catch(() => {}); await F.delPhoto(key).catch(() => {}); photos.push(path);
+          const path = 'shared/' + n.id + '/' + key + '.jpg';
+          try { await api({ method: 'POST', body: JSON.stringify({ photo: { path, data: await b64(blob) } }) }); await F.putPhoto(path, blob).catch(() => {}); await F.delPhoto(key).catch(() => {}); out.push(path); }
+          catch (e) { if (e.quiet) throw e; failedPhotos++; out.push(key); }
         }
-        n.photos = photos;
-        const { error } = await sb.from('field_notes').upsert({ client_id: n.id, lng: n.lng, lat: n.lat, title: n.title || '', body: n.text || '', tag: n.tag || 'Other', photos: photos.filter(p => p.includes('/')), created_at: n.created, updated_at: n.updated }, { onConflict: 'client_id' });
-        if (error) throw new Error(error.message);
-        if (photos.every(p => p.includes('/'))) n.synced = n.updated;
-        if (!n.by) { n.by = user.email; n.owner = uid; }
+        n.photos = out;
       }
-      if (db.watch.length) {
-        const { error } = await sb.from('watchlist').upsert(db.watch.map(w => ({ user_id: uid, client_id: w.id, kind: w.kind, ref: w.ref, label: w.label, sub: w.sub, lng: w.lng, lat: w.lat, added_at: w.added })), { onConflict: 'user_id,kind,ref' });
-        if (error) throw new Error(error.message);
+      // 2. changed notes, new stars and deletes
+      const dirty = db.notes.filter(n => !n.synced || t(n.updated) > t(n.synced)), stars = db.watch.filter(w => !w.synced), sent = queue.slice();
+      if (dirty.length || stars.length || sent.length) {
+        await api({ method: 'POST', body: JSON.stringify({ notes: dirty, watch: stars, deletes: sent, name: name() }) });
+        queue = queue.filter(q => !sent.includes(q)); saveQueue();
+        for (const n of dirty) { if (n.photos.every(p => String(p).includes('/'))) n.synced = n.updated; if (!n.by && name()) n.by = name(); }
+        stars.forEach(w => { w.synced = true; });
       }
-      // 3. the team's notes and my watchlist
-      const [notes, watch] = await Promise.all([sb.from('field_notes').select('*').order('updated_at', { ascending: false }).limit(5000), sb.from('watchlist').select('*').eq('user_id', uid)]);
-      if (notes.error) throw new Error(notes.error.message); if (watch.error) throw new Error(watch.error.message);
-      const cur = F.db, byId = new Map(cur.notes.map(n => [n.id, n])), seen = new Set();
-      for (const r of notes.data) {
-        seen.add(r.client_id);
-        const l = byId.get(r.client_id), dirty = l && (!l.synced || t(l.updated) > t(l.synced));
-        if (l && dirty && t(l.updated) >= t(r.updated_at)) continue; // my newer edit goes up next time
-        const n = { id: r.client_id, lng: r.lng, lat: r.lat, title: r.title, text: r.body, tag: r.tag, photos: r.photos || [], created: new Date(r.created_at).toISOString(), updated: new Date(r.updated_at).toISOString(),
-          synced: new Date(r.updated_at).toISOString(), by: r.created_by_email, editedBy: r.updated_by_email, owner: r.created_by };
+      // 3. the team's notes and watchlist
+      const remote = await (await api()).json(), cur = F.db, byId = new Map(cur.notes.map(n => [n.id, n])), seen = new Set();
+      for (const r of remote.notes) {
+        seen.add(r.id);
+        const l = byId.get(r.id), dirtyHere = l && (!l.synced || t(l.updated) > t(l.synced));
+        if (dirtyHere && t(l.updated) >= t(r.updated)) continue; // my newer edit goes up next time
+        const n = { ...r, synced: r.updated };
         if (l) Object.assign(l, n); else cur.notes.push(n);
       }
-      // gone from the server and unchanged here: deleted by its author
-      cur.notes = cur.notes.filter(n => seen.has(n.id) || !n.synced || t(n.updated) > t(n.synced));
-      const local = new Map(cur.watch.map(w => [w.kind + '|' + w.ref, w]));
-      cur.watch = watch.data.map(r => ({ id: local.get(r.kind + '|' + r.ref)?.id || r.client_id, kind: r.kind, ref: r.ref, label: r.label || '', sub: r.sub || '', lng: r.lng, lat: r.lat, added: new Date(r.added_at).toISOString() }))
-        .concat(cur.watch.filter(w => !watch.data.some(r => r.kind === w.kind && r.ref === w.ref) && !queue.some(q => q.kind === 'watch' && q.ref === w.ref)));
+      cur.notes = cur.notes.filter(n => seen.has(n.id) || !n.synced || t(n.updated) > t(n.synced)); // removed by a teammate
+      const rw = new Map(remote.watch.map(w => [w.kind + '|' + w.ref, w])), pendingDel = new Set(queue.filter(q => q.kind === 'watch').map(q => q.wkind + '|' + q.ref));
+      const keep = cur.watch.filter(w => !w.synced && !rw.has(w.kind + '|' + w.ref)); // starred here since the push
+      cur.watch = remote.watch.filter(w => !pendingDel.has(w.kind + '|' + w.ref)).map(w => ({ ...(cur.watch.find(x => x.kind === w.kind && x.ref === w.ref) || {}), ...w, synced: true })).concat(keep);
       F.replace(cur);
-      lastSync = new Date(); msg = '';
-    })();
-    try { await syncing; } finally { syncing = null; paint(); }
+      lastSync = new Date(); msg = failedPhotos ? failedPhotos + ' photo' + (failedPhotos > 1 ? 's' : '') + ' couldn’t upload; they stay on this device and will retry.' : '';
+    })().catch(e => { if (!e.quiet) msg = 'Sync failed: ' + e.message + ' Changes are kept on this device.'; });
+    return syncing.finally(() => { syncing = null; paint(); });
   }
-  setInterval(() => { if (isTeam() && document.visibilityState === 'visible') schedule(0); }, 120e3);
-  addEventListener('online', () => isTeam() && schedule(0));
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && isTeam() && (!lastSync || Date.now() - lastSync > 30e3)) schedule(0); });
+  setTimeout(() => schedule(0), 800);
+  setInterval(() => { if (document.visibilityState === 'visible') schedule(0); }, 120e3);
+  addEventListener('online', () => schedule(0));
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (!lastSync || Date.now() - lastSync > 30e3)) schedule(0); });
 
   // ---------- UI (inside the Field notes view) ----------
   let slot = null;
@@ -126,30 +80,24 @@ export function initTeam(ctx) {
   function paint() {
     if (!slot || !slot.isConnected) return;
     let h;
-    if (configured === false) h = '<div class="rnote">Team sync isn’t switched on for this site yet (it needs the Supabase publishable key on Vercel).</div>';
-    else if (configured == null) h = '<div class="rnote">Connecting to team sync…</div>';
-    else if (user && !isTeam()) h = '<div class="rnote">' + esc(user.email) + ' isn’t a Finishes Solutions address, so nothing is shared. <button class="lnk" id="tOut">Sign out</button></div>';
-    else if (user) h = '<div class="team-on"><span>Shared with the team as <b>' + esc(user.email) + '</b> · ' + (syncing ? 'syncing…' : lastSync ? 'synced ' + ago(lastSync) : 'not synced yet') + (queue.length ? ' · ' + queue.length + ' change' + (queue.length > 1 ? 's' : '') + ' waiting' : '') + '</span>' +
-      '<button class="btn" id="tSync">Sync now</button><button class="lnk" id="tOut">Sign out</button></div>';
-    else if (step === 'code') h = '<form class="team-f" id="tForm"><span>Code sent to <b>' + esc(email) + '</b></span><input id="tCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6-digit code" aria-label="Sign-in code">' +
-      '<button class="btn primary" ' + (busy ? 'disabled' : '') + '>Sign in</button><button class="lnk" type="button" id="tBack">Use a different email</button></form>';
-    else h = '<form class="team-f" id="tForm"><span>Sign in to share notes, photos and your watchlist with the team.</span><input id="tEmail" type="email" autocomplete="email" placeholder="you@' + DOMAIN + '" aria-label="Work email" value="' + esc(email) + '">' +
-      '<button class="btn primary" ' + (busy ? 'disabled' : '') + '>Email me a code</button></form>';
-    slot.innerHTML = '<div class="team">' + h + (msg ? '<div class="rnote' + (/fail|couldn|wrong|use your|isn/i.test(msg) ? ' err' : '') + '">' + esc(msg) + '</div>' : '') + '</div>';
-    slot.querySelector('#tOut')?.addEventListener('click', signOut);
+    if (configured === false) h = '<div class="rnote">Team sync is off on this site (it needs SUPABASE_SECRET_KEY on Vercel). Notes stay on this device.</div>';
+    else if (needCode) h = '<form class="team-f" id="tForm"><span>Enter the team passcode to share notes.</span><input id="tCode" type="password" autocomplete="current-password" placeholder="Team passcode" aria-label="Team passcode"><button class="btn primary">Unlock</button></form>';
+    else h = '<div class="team-on"><span>' + (configured ? 'Shared with the team · ' + (syncing ? 'syncing…' : lastSync ? 'synced ' + ago(lastSync) : 'not synced yet') : 'Connecting…') +
+      (queue.length ? ' · ' + queue.length + ' change' + (queue.length > 1 ? 's' : '') + ' waiting' : '') + '</span><button class="btn" id="tSync">Sync now</button></div>' +
+      '<label class="team-f"><span>Your name (shown on notes you add or edit)</span><input id="tName" maxlength="60" autocomplete="name" placeholder="e.g. Matthew" value="' + esc(name()) + '"></label>';
+    slot.innerHTML = '<div class="team">' + h + (msg ? '<div class="rnote' + (/fail|couldn/i.test(msg) ? ' err' : '') + '">' + esc(msg) + '</div>' : '') + '</div>';
     slot.querySelector('#tSync')?.addEventListener('click', () => schedule(0));
-    slot.querySelector('#tBack')?.addEventListener('click', () => { step = 'idle'; msg = ''; paint(); });
-    const f = slot.querySelector('#tForm');
-    if (f) f.onsubmit = e => { e.preventDefault(); if (busy) return; step === 'code' ? verify(slot.querySelector('#tCode').value) : sendCode(slot.querySelector('#tEmail').value); };
+    slot.querySelector('#tName')?.addEventListener('change', e => put(NAME_KEY, e.target.value.trim()));
+    const f = slot.querySelector('#tForm'); if (f) f.onsubmit = e => { e.preventDefault(); put(CODE_KEY, slot.querySelector('#tCode').value.trim()); needCode = false; paint(); schedule(0); };
   }
 
   ctx.team = {
     mount(el) { slot = el; paint(); },
-    summary: () => isTeam() ? 'shared with the team' : null,
-    changed: () => { if (isTeam()) schedule(); },
-    removed(item) { if (item.kind === 'photo' && !String(item.path).includes('/')) return; queue.push(item); saveQueue(); if (isTeam()) schedule(); },
-    canDelete: n => !n.owner || !user || n.owner === user.id,
-    async download(path) { await ready; if (!sb || !isTeam()) return null; const { data } = await sb.storage.from(BUCKET).download(path); return data || null; },
-    sync: () => sync(), get user() { return user; }
+    summary: () => configured ? 'shared with the team' : null,
+    changed: () => schedule(),
+    removed(item) { if (item.kind === 'photo' && !String(item.path).includes('/')) return; queue.push(item); saveQueue(); schedule(); },
+    canDelete: () => true,
+    async download(path) { try { const r = await api({}, '?photo=' + encodeURIComponent(path)); return await r.blob(); } catch (e) { return null; } },
+    sync: () => sync()
   };
 }
