@@ -82,7 +82,7 @@ export function initMapSearch(ctx) {
   function render() {
     const addresses = remote.filter(p => p.kind === 'address').slice(0, 5);
     const places = localPlaces(q).concat(remote.filter(p => p.kind !== 'address')).slice(0, 6);
-    const vis = new Set(ctx.visible), filingRow = f => '<b>' + esc(f.name) + '</b><i>' + fmtM(f.cost) + '</i><span>' + esc([f.addr || f.city, f.owner].filter(Boolean).join(' · ')) + (vis.has(f) ? '' : ' · <em>hidden by filters</em>') + '</span>';
+    const vis = new Set(ctx.visible), filingRow = f => '<b>' + esc(f.name) + '</b><i>' + fmtM(f.cost) + '</i><span>' + esc([f.addr || f.city, f.owner].filter(Boolean).join(' · ')) + (f.approx ? ' · <em>approx. location</em>' : '') + (vis.has(f) ? '' : ' · <em>hidden by filters</em>') + '</span>';
     items = []; let h = '';
     const push = (it, inner) => { items.push(it); h += btn(items.length - 1, inner); };
     if (addresses.length) { h += sec('Addresses'); addresses.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>Address</i>')); }

@@ -122,6 +122,10 @@ function addOverlays(){
   if(!map.getSource('hl')) map.addSource('hl',{type:'geojson',data:fc([])});
   map.addLayer({id:'hl-glow',type:'circle',source:'hl',paint:{'circle-radius':16,'circle-color':'#eda100','circle-opacity':.18,'circle-blur':.6,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'hl-ring',type:'circle',source:'hl',paint:{'circle-radius':9,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':'#eda100','circle-stroke-width':2.6,'circle-pitch-alignment':'map'}});
+  if(!map.getSource('focus')) map.addSource('focus',{type:'geojson',data:fc([])});
+  map.addLayer({id:'focus-halo',type:'circle',source:'focus',filter:['==',['get','approx'],1],paint:{'circle-radius':['interpolate',['linear'],['zoom'],8,18,14,46],'circle-color':c.sel,'circle-opacity':.10,'circle-stroke-color':c.sel,'circle-stroke-width':1.2,'circle-stroke-opacity':.6,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'focus-dot',type:'circle',source:'focus',paint:{'circle-radius':['interpolate',['linear'],['zoom'],6,6,14,9],'circle-color':['match',['get','t'],'New',c.new,'Reno',c.reno,c.add],'circle-stroke-color':isDark()||layers.style==='sat'?'#ffffff':'#0b0d0c','circle-stroke-width':3,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'focus-label',type:'symbol',source:'focus',layout:{'text-field':['get','name'],'text-font':labelFont,'text-size':12,'text-offset':[0,1.4],'text-anchor':'top','text-max-width':14,'text-allow-overlap':true},paint:{'text-color':c.lab,'text-halo-color':c.halo,'text-halo-width':1.8}});
   map.addLayer({id:'hl-label',type:'symbol',source:'hl',minzoom:8,layout:{'text-field':['get','name'],'text-font':labelFont,'text-size':11.5,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':12,'text-optional':true},paint:{'text-color':c.lab,'text-halo-color':c.halo,'text-halo-width':1.6}});
   styleFilings();
   applyRoadToggles(); syncSel(); syncHighlight(); overlayHooks.forEach(fn=>fn());
@@ -332,14 +336,16 @@ function select(f,fly){
     (f.sum?'<div class="scope sum">'+esc(f.sum)+'</div>':'')+
     (f.scope?'<div class="scope">'+esc(f.scope)+'</div>':'')+historyHtml(f)+
     '<div class="brief" id="briefBox"><button class="btn" id="briefBtn">AI Project Brief</button></div>'+
-    (f.approx?'<div class="note">Location is approximate: the address didn’t geocode, so this marker sits near the city center.</div>':'')+
+    (f.approx?'<div class="note">Location is approximate: the address didn’t geocode, so this marker sits at the city center (shaded circle), not on the site.</div>':'')+
+    (!visible.includes(f)?'<div class="note">Your current filters'+(sel.feature?' and selection (“'+esc(sel.label)+'”)':'')+' hide this filing, so it’s shown on its own. <button class="lnk" id="showAll">Clear Filters</button></div>':'')+
     (f.misfiled?'<div class="note">The filer tagged this to '+esc(f.county)+' County, but the address is outside it.</div>':'')+
     '<a class="go" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener">Open TABS Record <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h7v7M13 3 4 12"/></svg></a>';
   card.querySelector('.x').onclick=closeCard; card.classList.add('open');
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
+  card.querySelector('#showAll')?.addEventListener('click',()=>{ clearHighlight(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC(),{fly:false}); select(f,false); });
   scheduleHash(); cardRenderHooks.forEach(fn=>fn({kind:'filing',f}));
-  if(fly){ const z=Math.max(map.getZoom(),13.5); map.flyTo({center:[f.lon,f.lat],zoom:z,offset:window.innerWidth<=700?[0,-Math.round(window.innerHeight*.22)]:window.innerWidth<=1100?[-200,0]:[-140,0],duration:reduceMotion?0:900});  }
+  if(fly){ const z=f.approx?Math.min(Math.max(map.getZoom(),12.5),13.5):Math.max(map.getZoom(),16); map.flyTo({center:[f.lon,f.lat],zoom:z,offset:window.innerWidth<=700?[0,-Math.round(window.innerHeight*.22)]:window.innerWidth<=1100?[-200,0]:[-140,0],duration:reduceMotion?0:900});  }
 }
 function whoLink(k,raw,label){ const v=entityKey(raw); return v?'<a href="#" data-who="'+k+'|'+esc(v)+'">'+esc(label)+'</a>':esc(label); }
 function historyHtml(f){
@@ -359,7 +365,8 @@ function wireCites(el){ el.querySelectorAll('.cite').forEach(b=>b.onclick=()=>{ 
 const cardCloseHooks=[];
 function clearSel(){ state.sel=null; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
 function closeCard(){ cardCloseHooks.forEach(fn=>fn()); card.classList.remove('open'); state.sel=null; scheduleHash(); syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
-function syncHighlight(){ if(map.getLayer&&map.getLayer('filings-hl')) map.setFilter('filings-hl',['==',['get','i'],state.sel?IDX.get(state.sel):-1]); }
+function syncHighlight(){ if(map.getLayer&&map.getLayer('filings-hl')) map.setFilter('filings-hl',['==',['get','i'],state.sel?IDX.get(state.sel):-1]);
+  const f=state.sel; map.getSource&&map.getSource('focus')?.setData(fc(f?[{type:'Feature',properties:{t:f.type,approx:f.approx?1:0,name:f.name.length>40?f.name.slice(0,38)+'…':f.name+(f.approx?' (approx.)':'')},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}]:[])); }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeCard(); });
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
 
