@@ -12,6 +12,31 @@ export function initMobile(ctx) {
   try { if (localStorage.getItem('fs-panel') === '0' && !isPhone()) app.classList.add('pcollapsed'); } catch (e) {}
   ptoggle.onclick = () => { app.classList.toggle('pcollapsed'); try { localStorage.setItem('fs-panel', app.classList.contains('pcollapsed') ? '0' : '1'); } catch (e) {} setTimeout(() => map.resize(), 50); };
 
+  // ---- side list width: drag the edge (or arrow keys on it); double-click goes back to the default. Saved per browser. ----
+  const grip = document.getElementById('pResize'), W_KEY = 'fs-panel-w';
+  const maxW = () => Math.max(320, Math.min(820, Math.round(innerWidth * .6)));
+  let wantW = null; try { wantW = +localStorage.getItem(W_KEY) || null; } catch (e) {}
+  let resizeRaf = 0;
+  const mapResize = () => { if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; map.resize(); }); };
+  function applyW() { // the stored width, kept inside what this window can fit; null = the stylesheet default
+    if (wantW && !isPhone()) app.style.setProperty('--pw', Math.max(300, Math.min(maxW(), wantW)) + 'px'); else app.style.removeProperty('--pw');
+    mapResize();
+  }
+  const saveW = () => { try { wantW ? localStorage.setItem(W_KEY, String(Math.round(wantW))) : localStorage.removeItem(W_KEY); } catch (e) {} };
+  applyW(); addEventListener('resize', applyW);
+  grip.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return; e.preventDefault(); grip.setPointerCapture(e.pointerId); app.classList.add('presizing');
+    const left = app.getBoundingClientRect().left;
+    const move = ev => { wantW = Math.max(300, Math.min(maxW(), ev.clientX - left)); applyW(); };
+    const up = () => { grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up); app.classList.remove('presizing'); saveW(); map.resize(); };
+    grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+  });
+  grip.addEventListener('dblclick', () => { wantW = null; saveW(); applyW(); });
+  grip.addEventListener('keydown', e => {
+    const d = e.key === 'ArrowLeft' ? -24 : e.key === 'ArrowRight' ? 24 : 0; if (!d) return; e.preventDefault();
+    wantW = Math.max(300, Math.min(maxW(), (wantW || panel.getBoundingClientRect().width) + d)); applyW(); saveW();
+  });
+
   // ---- bottom tabs (phone) ----
   function setTab(t) {
     if (t === 'more') { openSheet(); return; }
@@ -25,7 +50,7 @@ export function initMobile(ctx) {
   }
   function syncNav() {
     const t = app.dataset.mtab;
-    nav.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === t || (t === 'changes' && b.dataset.tab === 'more') || (t === 'field' && b.dataset.tab === 'more') || (t === 'compare' && b.dataset.tab === 'more')));
+    nav.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === t || (t === 'changes' && b.dataset.tab === 'more') || (t === 'field' && b.dataset.tab === 'more') || (t === 'compare' && b.dataset.tab === 'more') || (t === 'sources' && b.dataset.tab === 'more')));
   }
   nav.querySelectorAll('button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
   ctx.onViewChange(v => { // views opened from elsewhere (citations, "who" clicks, change items)
@@ -61,7 +86,7 @@ export function initMobile(ctx) {
   const chg = ctx.CHANGED.size; document.getElementById('mChgN').textContent = chg ? fmtN(chg) : ''; document.getElementById('mMoreN').textContent = chg ? fmtN(chg) : '';
   sheet.querySelectorAll('[data-go]').forEach(b => b.onclick = async () => {
     const go = b.dataset.go; closeSheet();
-    if (go === 'changes' || go === 'field' || go === 'compare') setTab(go);
+    if (go === 'changes' || go === 'field' || go === 'compare' || go === 'sources') setTab(go);
     else if (go === 'note') { setTab('map'); ctx.addNote?.({ gps: true }); }
     else if (go === 'near') { setTab('map'); ctx.nearMe(); }
     else if (go === 'saved') { setTab('list'); const box = document.getElementById('savedBox'); if (box.style.display === 'none') ctx.toast('No saved searches yet. Set filters, then tap "Save search".'); else { box.open = true; box.scrollIntoView({ block: 'center' }); } }

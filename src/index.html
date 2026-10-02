@@ -78,10 +78,11 @@
     <div class="foot">Source: <a href="https://www.tdlr.texas.gov/TABS/Search" target="_blank" rel="noopener">TDLR TABS</a>, registrations <span id="periodTxt"></span>. Costs and dates are filer estimates; hatched timeline bars are our own estimates. Located with US Census and OpenStreetMap geocoders; hollow markers are city-level approximations. Use, tenant and developer fields are AI-extracted from the filing text and can be wrong. Demographics: US Census ACS 5-year. <span id="missTxt"></span> Basemaps © MapTiler © OpenStreetMap contributors.</div>
   </aside>
 
+  <div class="presize" id="pResize" role="separator" aria-orientation="vertical" aria-label="Resize the list panel" title="Drag to resize · double-click to reset" tabindex="0"></div>
   <main class="stage" id="stage" data-view="map">
     <nav class="viewbar" id="viewbar" aria-label="Views">
       <button class="ptoggle" id="panelToggle" aria-label="Show or hide the list" title="Show or hide the list"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg></button>
-      <button data-view="map" aria-pressed="true">Map</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="compare" aria-pressed="false">Compare <span class="badge" id="cmpBadge"></span></button><button data-view="who" aria-pressed="false">Activity</button><button data-view="changes" aria-pressed="false">Updates <span class="badge" id="chgBadge"></span></button><button data-view="field" aria-pressed="false">Field Notes <span class="badge" id="fieldBadge"></span></button>
+      <button data-view="map" aria-pressed="true">Map</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="compare" aria-pressed="false">Compare <span class="badge" id="cmpBadge"></span></button><button data-view="who" aria-pressed="false">Activity</button><button data-view="changes" aria-pressed="false">Updates <span class="badge" id="chgBadge"></span></button><button data-view="field" aria-pressed="false">Field Notes <span class="badge" id="fieldBadge"></span></button><button data-view="sources" aria-pressed="false">Sources</button>
     </nav>
     <div class="viewport" id="viewport">
     <div id="map" aria-label="Interactive map of construction filings"></div>
@@ -114,9 +115,10 @@
     <div class="ctrls">
       <button id="zin" aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg></button>
       <button id="zout" aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10"/></svg></button>
+      <button id="flat" aria-label="Reset to a flat 2D view here" title="Flat 2D view, north up (stays here)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><g class="needle"><path d="M8 2.6 10 8H6z" fill="#c03b3a"/><path d="M8 13.4 6 8h4z" fill="currentColor" opacity=".45"/></g></svg></button>
       <div class="sep"></div>
       <button id="locate" aria-label="Near me" title="Filings near my location"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="4.5"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><path d="M8 1v2.2M8 12.8V15M1 8h2.2M12.8 8H15"/></svg></button>
-      <button id="home" aria-label="Reset view" title="Reset view"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h8V6.5"/></svg></button>
+      <button id="home" aria-label="Back to the whole region" title="Back to the whole region"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h8V6.5"/></svg></button>
       <button id="timeBtn" aria-label="Time-lapse by month" title="Time-lapse: play month by month" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.6V8l2.4 1.6"/></svg></button>
       <button id="layersBtn" aria-label="Map layers" title="Map layers" aria-expanded="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 2 14.5 5.5 8 9 1.5 5.5z"/><path d="M2.5 8.2 8 11.2l5.5-3M2.5 10.9 8 13.9l5.5-3"/></svg></button>
       <button id="orbit" aria-label="Zoom out to the globe" title="Globe view"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c2 2 2 9 0 11M8 2.5c-2 2-2 9 0 11"/></svg></button>
@@ -124,23 +126,23 @@
     <div class="layers" id="layers" role="dialog" aria-label="Map layers">
       <div class="lt">Map</div>
       <div class="seg seg6" id="styleSeg">
-        <button data-style="dots" aria-pressed="true">Dot grid</button><button data-style="streets" aria-pressed="false">Streets</button><button data-style="sat" aria-pressed="false">Satellite</button><button data-style="topo" aria-pressed="false">Topo</button><button data-style="esri" aria-pressed="false" title="Esri World Imagery (no key)">Esri sat</button><button data-style="free" aria-pressed="false" title="OpenFreeMap streets (no key)">Free map</button>
+        <button data-style="dots" aria-pressed="true">Dot Grid</button><button data-style="streets" aria-pressed="false">Streets</button><button data-style="sat" aria-pressed="false">Satellite</button><button data-style="topo" aria-pressed="false">Topo</button><button data-style="esri" aria-pressed="false" title="Esri World Imagery (no key)">Esri Sat</button><button data-style="free" aria-pressed="false" title="OpenFreeMap streets (no key)">Free Map</button>
       </div>
-      <div class="lt">Filing dots</div>
-      <label class="tg2"><input type="checkbox" id="lyFilings" checked><span>Show filings</span></label>
-      <div class="seg seg2" id="sizeSeg"><button data-size="uniform" aria-pressed="true">Same size</button><button data-size="value" aria-pressed="false">Sized by value</button></div>
-      <div class="lt">Activity heatmap</div>
+      <div class="lt">Filing Dots</div>
+      <label class="tg2"><input type="checkbox" id="lyFilings" checked><span>Show Filings</span></label>
+      <div class="seg seg2" id="sizeSeg"><button data-size="uniform" aria-pressed="true">Same Size</button><button data-size="value" aria-pressed="false">Sized by Value</button></div>
+      <div class="lt">Activity Heatmap</div>
       <div class="seg" id="heatSeg"><button data-heat="off" aria-pressed="true">Off</button><button data-heat="count" aria-pressed="false">Filings</button><button data-heat="value" aria-pressed="false">Value</button></div>
       <div class="lt">Show</div>
       <label class="tg2"><input type="checkbox" id="lyRoads" checked><span>Roads</span></label>
-      <label class="tg2"><input type="checkbox" id="lyNames" checked><span>Road names</span></label>
-      <label class="tg2"><input type="checkbox" id="lyCounties" checked><span>County lines</span></label>
-      <label class="tg2"><input type="checkbox" id="lyBldg" checked><span>3D buildings (zoom in)</span></label>
-      <label class="tg2"><input type="checkbox" id="ly3d"><span>Tilt (3D)</span></label>
-      <div class="lt">Demographics (census tracts)</div>
+      <label class="tg2"><input type="checkbox" id="lyNames" checked><span>Road Names</span></label>
+      <label class="tg2"><input type="checkbox" id="lyCounties" checked><span>County Lines</span></label>
+      <label class="tg2"><input type="checkbox" id="lyBldg" checked><span>3D Buildings (Zoom In)</span></label>
+      <label class="tg2"><input type="checkbox" id="ly3d"><span>3D View (Tilt)</span></label>
+      <div class="lt">Demographics (Census Tracts)</div>
       <select class="chip" id="lyDemo" aria-label="Demographic layer">
-        <option value="">Off</option><option value="gr">Population growth</option><option value="pop">Population</option><option value="inc">Median household income</option>
-        <option value="val">Median home value</option><option value="rent">Median gross rent</option><option value="vacr">Housing vacancy rate</option>
+        <option value="">Off</option><option value="gr">Population Growth</option><option value="pop">Population</option><option value="inc">Median Household Income</option>
+        <option value="val">Median Home Value</option><option value="rent">Median Gross Rent</option><option value="vacr">Housing Vacancy Rate</option>
       </select>
     </div>
     <div class="legend" aria-hidden="true">
@@ -163,6 +165,7 @@
     <section class="view" id="view-who" aria-label="Activity"></section>
     <section class="view" id="view-changes" aria-label="Updates"></section>
     <section class="view" id="view-field" aria-label="Field Notes"></section>
+    <section class="view" id="view-sources" aria-label="Sources"></section>
     <div class="mtop" id="mtop">
       <div class="mask">
         <div class="msslot" id="mSearchSlot"></div>
@@ -186,6 +189,7 @@
     <div class="mgrab"></div>
     <button data-go="changes">Updates <span class="badge" id="mChgN"></span></button>
     <button data-go="field">Field Notes &amp; Watchlist <span class="badge" id="mFieldN"></span></button>
+    <button data-go="sources">Data Sources &amp; Freshness</button>
     <button data-go="note">Add a Site Note at My Location</button>
     <button data-go="near">Filings near me</button>
     <button data-go="saved">Saved searches &amp; RSS alerts</button>

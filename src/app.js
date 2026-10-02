@@ -16,6 +16,7 @@ import { initKpis } from './kpis.js';
 import { initExport } from './export.js';
 import { initNearby } from './nearby.js';
 import { initLive } from './live.js';
+import { initSources } from './sources.js';
 import { plainText } from './lib/assist-logic.mjs';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
@@ -496,7 +497,7 @@ function renderSugs(note){
 }
 let gT;
 rq.addEventListener('input',()=>{ picked=false; const q=rq.value.trim(); sugs=localSearch(q); sugI=sugs.length?0:-1; renderSugs();
-  clearTimeout(gT); if(q.length<3||/^\s*-?\d/.test(q)&&sugs.length) return;
+  clearTimeout(gT); if(q.length<3||sugs[0]?.k==='Coordinates') return; // only "lat, long" skips the lookup: "1004 Priya Ln" starts with a digit too
   gT=setTimeout(async()=>{ const g=await geocode(q); if(picked||rq.value.trim()!==q) return; sugs=g.concat(localSearch(q)).slice(0,8); sugI=sugs.length?0:-1; renderSugs(sugs.length?'':'No match. Try a fuller address or paste lat, long.'); },220); });
 rq.addEventListener('keydown',e=>{
   if(e.key==='ArrowDown'&&sugs.length){e.preventDefault(); sugI=(sugI+1)%sugs.length; renderSugs();}
@@ -540,16 +541,34 @@ function setMapOptions(a){ const done=[];
   if(typeof a.show_filings==='boolean'){ layers.dots=a.show_filings; done.push(a.show_filings?'filings shown':'filings hidden'); }
   if(a.heatmap||typeof a.size_by_value==='boolean'||typeof a.show_filings==='boolean'){ saveLayers(); styleFilings(); }
   if(a.basemap&&a.basemap in STYLES){ setBasemap(a.basemap); done.push(a.basemap+' basemap'); }
-  if(typeof a.tilt==='boolean'){ document.getElementById('ly3d').checked=a.tilt; map.easeTo({pitch:a.tilt?55:0,duration:600}); done.push(a.tilt?'tilted 3D':'flat'); }
+  if(typeof a.tilt==='boolean'){ document.getElementById('ly3d').checked=a.tilt; set3d(a.tilt); done.push(a.tilt?'tilted 3D':'flat'); }
   if(a.demographics){ const s=document.getElementById('lyDemo'); s.value=a.demographics==='off'?'':a.demographics; s.dispatchEvent(new Event('change')); done.push(a.demographics==='off'?'demographics off':'demographics: '+(s.selectedOptions[0]?.textContent||a.demographics)); }
   return done.length?done:['no change']; }
 document.getElementById('lyRoads').onchange=e=>{ layers.roads=e.target.checked; applyRoadToggles(); };
 document.getElementById('lyNames').onchange=e=>{ layers.names=e.target.checked; applyRoadToggles(); };
 document.getElementById('lyCounties').onchange=e=>{ layers.counties=e.target.checked; ['county-line','county-label'].forEach(id=>map.getLayer(id)&&map.setLayoutProperty(id,'visibility',layers.counties?'visible':'none')); };
-document.getElementById('ly3d').onchange=e=>map.easeTo({pitch:e.target.checked?55:0,duration:600});
+// ---------- camera: 3D toggle, flat reset, globe guard ----------
+let orbitRaf=0;
+function stopOrbit(){ cancelAnimationFrame(orbitRaf); orbitRaf=0; }
+const orbitStops=[stopOrbit]; // building.js adds its own spin
+function stopAllOrbits(){ orbitStops.forEach(fn=>fn()); }
+// Off = flat and north up. On = tilted (not at globe zoom, where a tilt only pushes the globe off-centre).
+function set3d(on){ stopAllOrbits(); map.easeTo(on?{pitch:Math.max(map.getPitch(),55),duration:reduceMotion?0:600}:{pitch:0,bearing:0,roll:0,duration:reduceMotion?0:600}); }
+// back to a flat, north-up map of the same spot. At globe zoom the spot itself may be a pole or off the edge, so re-centre on Texas then.
+function flatView(){ stopAllOrbits(); const z=map.getZoom(), c=map.getCenter(), far=z<4&&(Math.abs(c.lat)>60||!isFinite(c.lat));
+  map.easeTo({center:far?[-93,26]:c,zoom:isFinite(z)?z:HOME.zoom,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:700}); }
+const ly3d=document.getElementById('ly3d'), flatBtn=document.getElementById('flat'), needle=flatBtn.querySelector('.needle');
+ly3d.onchange=e=>set3d(e.target.checked);
+let camRaf=0;
+// tilting the map by hand (right-drag, ctrl-drag, two fingers) switches 3D on; flattening it switches it off. The reset button lights up and its needle points north.
+map.on('move',()=>{ if(camRaf) return; camRaf=requestAnimationFrame(()=>{ camRaf=0; const p=map.getPitch(), b=map.getBearing();
+  ly3d.checked=p>1; needle.style.transform='rotate('+(-b)+'deg)'; flatBtn.classList.toggle('on',p>1||Math.abs(b)>.5); }); });
+// zoomed out to the globe while tilted or rotated: the globe slides off-centre or shows upside down. Straighten it once the gesture ends.
+map.on('moveend',()=>{ if(map.isEasing()||orbitRaf||map.getZoom()>=4) return; if(map.getPitch()>.5||Math.abs(map.getBearing())>.5) map.easeTo({pitch:0,bearing:0,roll:0,duration:reduceMotion?0:600}); });
+flatBtn.onclick=flatView;
 document.getElementById('zin').onclick=()=>map.zoomIn(); document.getElementById('zout').onclick=()=>map.zoomOut();
-document.getElementById('home').onclick=()=>map.flyTo({...HOME,pitch:0,bearing:0,duration:reduceMotion?0:1200});
-document.getElementById('orbit').onclick=()=>map.flyTo({center:[-93,26],zoom:2.2,pitch:0,bearing:0,duration:reduceMotion?0:1600});
+document.getElementById('home').onclick=()=>{ stopAllOrbits(); map.flyTo({...HOME,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1200}); };
+document.getElementById('orbit').onclick=()=>{ stopAllOrbits(); map.flyTo({center:[-93,26],zoom:2.2,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1600}); };
 
 // ---------- toast ----------
 const toastEl=document.getElementById('toast'); let toastT=0;
@@ -688,11 +707,10 @@ const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
   applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), mapClickHandlers:[], setRadiusCenter, setMiles, fitGeom, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
-let orbitRaf=0;
-function stopOrbit(){ cancelAnimationFrame(orbitRaf); orbitRaf=0; }
-// close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past
+// close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
+// Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.
 function orbitAt(c,zoom){ stopOrbit(); const close=zoom>=16.5; map.flyTo({center:c,zoom,pitch:close?65:60,duration:reduceMotion?0:2200,essential:true});
-  map.once('moveend',()=>{ if(reduceMotion) return; const sp=close?.06:.1, step=()=>{ map.setBearing((map.getBearing()+sp)%360); orbitRaf=requestAnimationFrame(step); }; orbitRaf=requestAnimationFrame(step); }); }
+  map.once('moveend',()=>{ if(reduceMotion||map.isEasing()) return; const sp=close?.06:.1, step=()=>{ if(map.isEasing()){ stopOrbit(); return; } map.setBearing((map.getBearing()+sp)%360); orbitRaf=requestAnimationFrame(step); }; orbitRaf=requestAnimationFrame(step); }); }
 ['mousedown','touchstart','wheel'].forEach(ev=>map.on(ev,()=>orbitRaf&&stopOrbit()));
 // What the user is looking at, in a few compact lines for the AI (chat and voice)
 function nearestPlace(c){ let best=null,bd=1e9; for(const p of DATA.places||[]){ const d=(p[1]-c[0])**2*.75+(p[2]-c[1])**2; if(d<bd){bd=d;best=p;} } return best&&bd<.05?best[0]:null; }
@@ -712,14 +730,14 @@ function screenContext(){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return COUNTIES.join(', ')+', '+[...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,60).map(x=>x[0]).join(', '); }
-Object.assign(ctx,{ mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+Object.assign(ctx,{ basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap, buildReport,
   exportCsv, exportXlsx, exportGeoJSON, exportHtml, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initNearby,initAssistant,initMarket,initSaved,initField,initBuildings,initMobile,initLive]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initNearby,initAssistant,initMarket,initSaved,initField,initBuildings,initMobile,initLive,initSources]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});

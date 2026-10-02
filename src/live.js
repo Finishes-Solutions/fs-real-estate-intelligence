@@ -5,14 +5,14 @@
 import { NASA, hlsPasses } from './lib/nasa.mjs';
 const KEY = 'fs-live-v1';
 const RASTER = { // proxied through api/tile; refreshed every few minutes
-  radar: { label: 'Rain radar', maxzoom: 10, opacity: .7, every: 4, attr: 'Radar: NOAA nowCOAST (MRMS)' },
-  lightning: { label: 'Lightning (15 min)', maxzoom: 9, opacity: .85, every: 10, attr: 'Lightning: NOAA nowCOAST (Vaisala NLDN/GLD360)' },
-  clouds: { label: 'Satellite clouds (IR)', maxzoom: 9, opacity: .55, every: 10, attr: 'Clouds: NOAA nowCOAST (GOES infrared)' },
-  storms: { label: 'Hurricanes & tropical storms', maxzoom: 10, opacity: .85, every: 15, attr: 'Tropical cyclones: NOAA National Hurricane Center' },
-  traffic: { label: 'Live traffic', maxzoom: 18, opacity: .9, every: 2, attr: 'Traffic © TomTom' }
+  radar: { label: 'Rain Radar', maxzoom: 10, opacity: .7, every: 4, attr: 'Radar: NOAA nowCOAST (MRMS)' },
+  lightning: { label: 'Lightning (15 Min)', maxzoom: 9, opacity: .85, every: 10, attr: 'Lightning: NOAA nowCOAST (Vaisala NLDN/GLD360)' },
+  clouds: { label: 'Satellite Clouds (IR)', maxzoom: 9, opacity: .55, every: 10, attr: 'Clouds: NOAA nowCOAST (GOES infrared)' },
+  storms: { label: 'Hurricanes & Tropical Storms', maxzoom: 10, opacity: .85, every: 15, attr: 'Tropical cyclones: NOAA National Hurricane Center' },
+  traffic: { label: 'Live Traffic', maxzoom: 18, opacity: .9, every: 2, attr: 'Traffic © TomTom' }
 };
 const ORDER = ['radar', 'lightning', 'clouds', 'wind', 'storms', 'traffic', 'terrain', 'nasa'];
-const LABEL = { ...Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, v.label])), wind: 'Wind (arrows, mph)', terrain: '3D terrain', nasa: 'NASA recent imagery (30 m)' };
+const LABEL = { ...Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, v.label])), wind: 'Wind (Arrows, mph)', terrain: '3D Terrain', nasa: 'NASA Recent Imagery (30 m)' };
 const EARTH_MI = 3958.8, R = Math.PI / 180;
 export const milesBetween = (a, b) => { const h = Math.sin((b[1] - a[1]) * R / 2) ** 2 + Math.cos(a[1] * R) * Math.cos(b[1] * R) * Math.sin((b[0] - a[0]) * R / 2) ** 2; return 2 * EARTH_MI * Math.asin(Math.sqrt(h)); };
 const abs = p => new URL(p, location.href).href;
@@ -29,7 +29,7 @@ export function initLive(ctx) {
   // ---------- layers panel ----------
   const panel = document.getElementById('layers'), box = document.createElement('div');
   box.className = 'live-ly';
-  box.innerHTML = '<div class="lt">Live conditions</div>' + ORDER.map(k => '<label class="tg2"><input type="checkbox" data-live="' + k + '"><span>' + esc(LABEL[k]) + '</span></label>').join('') +
+  box.innerHTML = '<div class="lt">Live Conditions</div>' + ORDER.map(k => '<label class="tg2"><input type="checkbox" data-live="' + k + '"><span>' + esc(LABEL[k]) + '</span></label>').join('') +
     '<div class="rnote" id="liveNote"></div>';
   panel.appendChild(box);
   const note = box.querySelector('#liveNote');
@@ -39,6 +39,7 @@ export function initLive(ctx) {
     const bits = [];
     if (trafficOK === false) bits.push('Traffic needs a TomTom key on the server (see README).');
     if (on.wind && windData?.time) bits.push('Wind as of ' + new Date(windData.time + ':00').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ' (Open-Meteo).');
+    if (on.terrain && map.getZoom() < TERRAIN_Z) bits.push('3D terrain appears once you zoom in to town level.');
     if (on.nasa && nasa) bits.push(nasa.day ? 'NASA ' + nasa.name + ' pass ' + nasa.day + (nasa.cloud != null ? ' · ' + Math.round(nasa.cloud) + '% cloud in the scene' : '') + '.' : 'No clear NASA pass found here in the last 60 days.');
     note.textContent = bits.join(' ');
   }
@@ -88,12 +89,21 @@ export function initLive(ctx) {
   setInterval(() => on.wind && loadWind(), 15 * 60e3);
 
   // ---------- 3D terrain (Mapterhorn, CC BY 4.0) ----------
+  // The globe only turns into a flat (Mercator) map from zoom 11-12, and MapLibre doesn't fully support terrain on the globe
+  // ("terrain is not fully supported on vertical perspective projection"): with terrain left on while zooming out to the
+  // globe, the camera could end up off-centre or upside down. So the terrain mesh is only switched on from town zoom in;
+  // the hillshade stays at every zoom.
+  const TERRAIN_Z = 10;
+  const setMesh = want => { const has = !!map.getTerrain?.(); if (want === has) return; try { map.setTerrain(want ? { source: 'live-dem', exaggeration: 1.8 } : null); } catch (e) { console.error(e); } syncUI(); };
   function addTerrain() {
     if (!map.getStyle()) return;
     if (!map.getSource('live-dem')) map.addSource('live-dem', { type: 'raster-dem', tiles: ['https://tiles.mapterhorn.com/{z}/{x}/{y}.webp'], encoding: 'terrarium', tileSize: 512, maxzoom: 12, attribution: 'Terrain: Mapterhorn (CC BY 4.0)' });
     if (!map.getLayer('live-hill')) map.addLayer({ id: 'live-hill', type: 'hillshade', source: 'live-dem', paint: { 'hillshade-exaggeration': .35, 'hillshade-shadow-color': ctx.isDark() ? '#000000' : '#5b6366' } }, below());
-    try { map.setTerrain({ source: 'live-dem', exaggeration: 1.8 }); } catch (e) { console.error(e); }
+    setMesh(map.getZoom() >= TERRAIN_Z);
   }
+  // off as soon as a zoom-out passes the threshold (half a level of slack so it doesn't flicker), back on once the move settles
+  map.on('zoom', () => { if (on.terrain && map.getZoom() < TERRAIN_Z - .5 && map.getTerrain?.()) setMesh(false); });
+  map.on('moveend', () => { if (on.terrain && map.getSource('live-dem')) setMesh(map.getZoom() >= TERRAIN_Z); });
   function removeTerrain() { try { map.setTerrain(null); } catch (e) {} if (map.getLayer('live-hill')) map.removeLayer('live-hill'); if (map.getSource('live-dem')) map.removeSource('live-dem'); }
 
   // ---------- NASA recent imagery (HLS via GIBS; dates from CMR) ----------
@@ -134,7 +144,7 @@ export function initLive(ctx) {
       on[k] = v; done.push(LABEL[k].replace(/ \(.*\)$/, '') + (v ? ' on' : ' off'));
       if (RASTER[k]) v ? addRaster(k) : removeRaster(k);
       else if (k === 'wind') { if (v) { addWind(); await loadWind(); } else removeWind(); }
-      else if (k === 'terrain') { if (v) { addTerrain(); if (map.getPitch() < 30) map.easeTo({ pitch: 55, duration: ctx.reduceMotion ? 0 : 700 }); } else removeTerrain(); }
+      else if (k === 'terrain') { if (v) { addTerrain(); if (map.getZoom() >= TERRAIN_Z && map.getPitch() < 30) map.easeTo({ pitch: 55, duration: ctx.reduceMotion ? 0 : 700 }); else if (map.getZoom() < TERRAIN_Z) done.push('terrain shows once zoomed in to town level'); } else removeTerrain(); }
       else if (k === 'nasa') { if (v) { try { await nasaForView(); } catch (e) { on.nasa = false; done.push('NASA imagery failed: ' + e.message); } } else removeNasa(); }
     }
     if (a.storms === true) { try { const d = await (await fetch('api/weather?kind=storms')).json(); if (!d.storms?.length) done.push('no active hurricanes or tropical storms right now'); } catch (e) {} }
@@ -250,5 +260,8 @@ export function initLive(ctx) {
   }
 
   syncUI();
-  ctx.live = { set, drive, weather, news, imagery, clearRoute, state: () => ({ ...on }) };
+  // for the Sources tab: what is on, how often it refreshes, and the latest data time we know of
+  const status = () => ({ on: { ...on }, trafficOK, terrainMesh: !!map.getTerrain?.(), terrainZoom: TERRAIN_Z, windTime: windData?.time || null, nasa: nasa?.day ? { day: nasa.day, name: nasa.name, cloud: nasa.cloud } : null,
+    raster: Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, { every: v.every, requested: stamp[k] != null ? stamp[k] * v.every * 60e3 : null }])) });
+  ctx.live = { set, drive, weather, news, imagery, clearRoute, state: () => ({ ...on }), status };
 }

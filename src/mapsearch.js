@@ -8,13 +8,20 @@ const OVERPASS = 'https://overpass-api.de/api/interpreter';
 const TX_VIEWBOX = '-106.7,36.5,-93.5,25.8';
 const PAGE = 10;
 const KIND_LABEL = { county: 'County', town: 'City / town', address: 'Address', poi: 'Place', road: 'Road', area: 'Neighborhood', zip: 'ZIP code', building: 'Building', coords: 'Coordinates' };
+// "lat, lon" typed into the box: only this skips the address lookup ("1004 Priya Ln" starts with a number but is an address)
+const COORDS = /^\s*(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
+// street-type and direction abbreviations, so "Priya Ln" finds "Priya Lane" (and the other way round)
+const ABBR = { ln: 'lane', dr: 'drive', st: 'street', rd: 'road', ave: 'avenue', av: 'avenue', blvd: 'boulevard', pkwy: 'parkway', hwy: 'highway', fwy: 'freeway',
+  ct: 'court', cir: 'circle', pl: 'place', trl: 'trail', ter: 'terrace', sq: 'square', expy: 'expressway', cv: 'cove', xing: 'crossing', mdw: 'meadow', mdws: 'meadows',
+  pt: 'point', ste: 'suite', nw: 'northwest', ne: 'northeast', sw: 'southwest', se: 'southeast' };
+const expandAbbr = q => q.replace(/[A-Za-z]+\.?/g, w => { const k = w.replace('.', '').toLowerCase(), v = ABBR[k]; return v ? (w[0] === w[0].toUpperCase() ? v.replace(/\b\w/g, c => c.toUpperCase()) : v) : w; });
 const kindFromMaptiler = t => ({ address: 'address', poi: 'poi', street: 'road', road: 'road', neighbourhood: 'area', locality: 'area', postal_code: 'zip', county: 'county', municipality: 'town', place: 'town', municipal_district: 'town' }[t] || 'town');
 
 export function initMapSearch(ctx) {
   const { map, esc, fmtM, fmtN, F, COUNTIES, DATA } = ctx;
   const wrap = document.getElementById('msearch'), input = document.getElementById('msq'), res = document.getElementById('msres'), clearB = document.getElementById('msx');
   const bar = document.getElementById('placebar');
-  let items = [], shown = 0, active = -1, q = '', geoT = 0, seq = 0, remote = [];
+  let items = [], shown = 0, active = -1, q = '', geoT = 0, seq = 0, remote = [], pending = false, enterWait = false;
 
   // ---------- mount: under the tools (tablet/desktop) or in the floating top bar (phone) ----------
   const phoneMQ = window.matchMedia('(max-width:700px)');
@@ -23,15 +30,17 @@ export function initMapSearch(ctx) {
 
   // ---------- local search ----------
   const low = v => (v || '').toLowerCase();
-  const matches = (h, toks) => toks.every(x => h.includes(x));
+  // a typed token matches as written or spelled out ("ln" also matches "lane"); haystacks carry both spellings too
+  const matches = (h, toks) => toks.every(x => h.includes(x) || (ABBR[x] && h.includes(ABBR[x])));
+  const hayOf = s => { const l = low(s); return l + ' ' + low(expandAbbr(l)); };
   // projects whose name matches, then filings that match only by address / city / TABS number / tenant
   function searchFilings(text) {
-    const t = low(text), toks = t.split(/\s+/).filter(Boolean); if (!toks.length) return { names: [], addrs: [] };
+    const t = low(text), toks = t.replace(/[.,#]/g, ' ').split(/\s+/).filter(Boolean); if (!toks.length) return { names: [], addrs: [] };
     const vis = new Set(ctx.visible), names = [], addrs = [];
     for (const f of F) {
       const nm = low(f.name);
       if (matches(nm, toks)) names.push({ f, s: (nm.startsWith(t) ? 4 : nm.includes(t) ? 2 : 0) + (vis.has(f) ? 1 : 0) });
-      else if (matches(f._ah ||= low([f.addr, f.city, f.id, f.ten].filter(Boolean).join(' · ')), toks)) addrs.push({ f, s: (low(f.addr).startsWith(t) ? 2 : 0) + (vis.has(f) ? 1 : 0) });
+      else if (matches(f._ah ||= hayOf([f.addr, f.city, f.id, f.ten].filter(Boolean).join(' · ')), toks)) addrs.push({ f, s: (low(f.addr).startsWith(t) ? 2 : 0) + (vis.has(f) ? 1 : 0) });
     }
     const by = (a, b) => b.s - a.s || b.f.cost - a.f.cost;
     return { names: names.sort(by).map(x => x.f), addrs: addrs.sort(by).map(x => x.f) };
@@ -55,7 +64,7 @@ export function initMapSearch(ctx) {
   }
   function localPlaces(text) {
     const t = low(text).replace(/\s+county$/, '').trim(); if (t.length < 2) return [];
-    const m = text.match(/^\s*(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
+    const m = text.match(COORDS);
     if (m) { let a = +m[1], b = +m[2], lat = a, lon = b; if (Math.abs(a) > 90) { lon = a; lat = b; } return [{ label: lat.toFixed(5) + ', ' + lon.toFixed(5), kind: 'coords', c: [lon, lat] }]; }
     const cs = COUNTIES.filter(c => low(c).startsWith(t)).map(c => ({ label: c + ' County', name: c, kind: 'county', c: DATA.counties.find(x => x.name === c).label }));
     const ts = (DATA.places || []).filter(p => low(p[0]).startsWith(t)).slice(0, 4).map(p => ({ label: p[0] + ', TX', name: p[0], kind: 'town', c: [p[1], p[2]] }));
@@ -65,16 +74,21 @@ export function initMapSearch(ctx) {
   // ---------- results: Addresses · Places · Projects · Companies & people · Filings at matching addresses ----------
   let names = [], addrs = [], ents = [], shownA = 0;
   function run(text) {
-    q = text.trim(); clearB.hidden = !q; remote = [];
-    if (!q) { close(); return; }
+    q = text.trim(); clearB.hidden = !q; remote = []; enterWait = false;
+    if (!q) { pending = false; close(); return; }
     ({ names, addrs } = searchFilings(q)); ents = searchEntities(q);
-    shown = Math.min(PAGE, names.length); shownA = Math.min(names.length ? 3 : PAGE, addrs.length); active = -1; render();
     clearTimeout(geoT); const my = ++seq;
-    if (q.length >= 3 && !/^\s*-?\d+(\.\d+)?\s*[, ]/.test(q)) geoT = setTimeout(async () => {
-      const g = await ctx.geocode(q, { limit: 10 }); if (my !== seq) return;
+    pending = q.length >= 3 && !COORDS.test(q);
+    shown = Math.min(PAGE, names.length); shownA = Math.min(names.length ? 3 : PAGE, addrs.length); active = -1; render();
+    if (pending) geoT = setTimeout(async () => {
+      let g = await ctx.geocode(q, { limit: 10 }); if (my !== seq) return;
+      // nothing back for an abbreviated street ("1004 Priya Ln")? ask again with it spelled out
+      const full = expandAbbr(q);
+      if (!g.some(x => x.type === 'address') && full !== q) { const g2 = await ctx.geocode(full, { limit: 10 }); if (my !== seq) return; if (g2.length) g = g2.concat(g.filter(x => !g2.some(y => y.t === x.t))); }
       const have = new Set(localPlaces(q).map(p => low(p.label)));
       remote = g.filter(x => !have.has(low(x.name) + ', tx')).map(x => ({ label: x.t, name: x.name, kind: kindFromMaptiler(x.type), c: x.c, bbox: x.bbox }));
-      render();
+      pending = false; render();
+      if (enterWait) { enterWait = false; if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); }
     }, 220);
   }
   const sec = (title, extra = '') => '<div class="ms-sec"><span>' + title + '</span>' + extra + '</div>';
@@ -98,7 +112,8 @@ export function initMapSearch(ctx) {
       addrs.slice(0, shownA).forEach(f => push({ t: 'filing', f }, filingRow(f)));
       if (addrs.length > shownA) h += '<button class="ms-more" data-act="moreA" type="button">Showing ' + shownA + ' of ' + fmtN(addrs.length) + ' · show more</button>';
     }
-    if (!h) h = '<div class="ms-none">' + (q.length < 3 ? 'Keep typing…' : 'Nothing matches “' + esc(q) + '”.') + '</div>';
+    if (pending) h = '<div class="ms-none">Searching addresses and places…</div>' + h;
+    else if (!h) h = '<div class="ms-none">' + (q.length < 3 ? 'Keep typing…' : 'Nothing matches “' + esc(q) + '”. Try the street name without the number, or a ZIP code.') + '</div>';
     const top = res.scrollTop; res.innerHTML = h; res.scrollTop = top; if (document.activeElement === input || res.contains(document.activeElement) || res.classList.contains('on')) open();
     res.querySelectorAll('[data-i]').forEach(b => { b.onclick = () => pick(+b.dataset.i); b.onmouseenter = () => setActive(+b.dataset.i, false); });
     res.querySelectorAll('[data-act=filter]').forEach(b => b.addEventListener('click', applyKeyword));
@@ -134,7 +149,7 @@ export function initMapSearch(ctx) {
   input.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') { e.preventDefault(); if (active >= items.length - 1) more(); setActive(Math.min(items.length - 1, active + 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(0, active - 1)); }
-    else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0) pick(active); else if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0) pick(active); else if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); else { if (input.value.trim() !== q) { clearTimeout(it0); run(input.value); } enterWait = pending; } } // address lookup still running: pick its first hit when it lands
     else if (e.key === 'Escape') { close(); input.blur(); }
   });
   clearB.onclick = () => { input.value = ''; run(''); clearPlace(); if (ctx.state.q) { ctx.state.q = ''; ctx.applyFilters(); } input.focus(); };

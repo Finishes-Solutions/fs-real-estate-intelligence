@@ -6,6 +6,7 @@ const GROWTH = [-5, -1, 1, 5, 15]; // % breaks: <-5 | -5..-1 | ±1 | 1..5 | 5..1
 export function initMarket(ctx) {
   const { map, fmtN, esc } = ctx, sel = document.getElementById('lyDemo'), legend = document.getElementById('dLegend');
   let market = null, metric = '', breaks = [];
+  ctx.marketInfo = () => market ? { year: market.year, baseYear: market.baseYear, tracts: market.tracts.length } : null;
   const money = v => v == null ? '—' : '$' + (v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? Math.round(v / 1e3) + 'K' : v);
   const FMT = { gr: v => v == null ? '—' : (v > 0 ? '+' : '') + v + '%', pop: v => v == null ? '—' : fmtN(v), inc: money, val: money, rent: v => v == null ? '—' : '$' + fmtN(v), vacr: v => v == null ? '—' : v + '%' };
   const NAME = { gr: 'Population growth', pop: 'Population', inc: 'Median household income', val: 'Median home value', rent: 'Median gross rent', vacr: 'Housing vacancy rate' };

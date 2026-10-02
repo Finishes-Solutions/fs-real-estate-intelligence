@@ -15,6 +15,9 @@ Finishes Solutions real estate intelligence map for Waller County and the six su
 - **Phone and tablet**: on phones the map is full screen with a bottom tab bar (Map, List, Timeline, Players, More), a floating ask bar and swipeable bottom-sheet cards; on tablets the list is a collapsible side panel and details open in a right-hand drawer. The site installs as an app (Add to Home Screen) and the app shell works offline; data refreshes when back online.
 - **Field notes**: drop a site note at the map center or your GPS location with a title, tag, notes and phone photos; star any filing or building to watch it (watched filings are flagged when the nightly refresh sees a change). "Near me" shows filings within 3 miles of your location. Notes and photos are stored on that device only; export/import GeoJSON (optionally with photos), CSV or KML to back up, share or move to another device.
 - Exports: HTML report, Excel, CSV (now including use, developer, design team and timeline columns).
+- **Sources** tab: every data source, what it feeds and how fresh it is (last nightly refresh, next one, which live layers are on and when their tiles were requested). It also checks whether a newer nightly refresh has landed since the page loaded.
+- **Map camera**: tilting the map by hand (right-drag, ctrl-drag, two fingers) turns **3D View** on; the compass button under the zoom buttons returns to a flat, north-up view of the same spot. Zoomed out to the globe, the map straightens itself, and the 3D terrain surface only shows from town zoom in (MapLibre doesn't fully support terrain on the globe).
+- The list panel is resizable on tablet and desktop: drag its right edge (or focus it and use the arrow keys); double-click resets it. The width is saved per browser.
 
 ## How the data works
 

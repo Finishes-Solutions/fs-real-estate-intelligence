@@ -46,12 +46,14 @@ export function initBuildings(ctx) {
   }
   function stopOrbit() { cancelAnimationFrame(orbitRaf); orbitRaf = 0; card.querySelector('#bOrbit')?.classList.remove('on'); }
   ['mousedown', 'touchstart', 'wheel', 'dragstart'].forEach(ev => map.on(ev, () => orbitRaf && stopOrbit()));
+  ctx.onOrbitStop?.(stopOrbit);
   function orbit() {
-    if (orbitRaf) { stopOrbit(); return; }
+    if (orbitRaf || card.querySelector('#bOrbit.on')) { stopOrbit(); return; }
     card.querySelector('#bOrbit')?.classList.add('on');
     map.easeTo({ center: cur.center, zoom: Math.max(map.getZoom(), 17), pitch: 62, duration: 1200 });
-    const step = () => { map.setBearing((map.getBearing() + 0.12) % 360); orbitRaf = requestAnimationFrame(step); };
-    setTimeout(() => { if (card.querySelector('#bOrbit.on')) orbitRaf = requestAnimationFrame(step); }, 1250);
+    // each step is a jumpTo, which would cancel any other camera move: give way the moment something else eases the map
+    const step = () => { if (map.isEasing()) { stopOrbit(); return; } map.setBearing((map.getBearing() + 0.12) % 360); orbitRaf = requestAnimationFrame(step); };
+    map.once('moveend', () => { if (card.querySelector('#bOrbit.on') && !map.isEasing()) orbitRaf = requestAnimationFrame(step); });
   }
   ctx.onCardClose(() => { stopOrbit(); cur = null; multi = []; addMode = false; highlight(); });
 
