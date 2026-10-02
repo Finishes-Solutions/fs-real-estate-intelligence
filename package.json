@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node build.mjs",
     "assemble": "node build.mjs --assemble",
-    "test": "node test/fixture.mjs && node test/api.mjs && node test/assistant.mjs && node test/geocode.mjs && node test/openai.mjs && node test/oidc.mjs && node test/building.mjs && node test/live.mjs && node test/imagery.mjs && node test/field.mjs && node test/area.mjs && node test/search.mjs && bash test/pipeline.sh && bash test/statewide.sh && bash test/livesync.sh",
+    "test": "node test/fixture.mjs && node test/api.mjs && node test/assistant.mjs && node test/geocode.mjs && node test/openai.mjs && node test/oidc.mjs && node test/building.mjs && node test/live.mjs && node test/imagery.mjs && node test/field.mjs && node test/area.mjs && node test/search.mjs && node test/regrid.mjs && bash test/pipeline.sh && bash test/statewide.sh && bash test/livesync.sh",
     "backfill": "node build/backfill.mjs"
   },
   "dependencies": {

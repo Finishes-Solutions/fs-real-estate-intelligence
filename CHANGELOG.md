@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 6:27 PM CT: Regrid wired in, with hard monthly caps
+- New **Parcel Lines (Regrid)** layer in Map Layers: parcel boundaries at street zoom.
+- New **Get Regrid Details** button on the building card: zoning, standardized land use and the full Regrid parcel record. A parcel looked up once is saved and free after that.
+- Hard caps so it never goes into overage: 1,800 parcel records and 180,000 tiles a month (your plan includes 2,000 and 200,000). At the cap the button says so and the parcel lines stop drawing. Usage shows on the Sources tab.
+- The Regrid token is kept on the server only. Turn it on by adding `REGRID_TOKEN` in Vercel (see README).
+
 ### 5:48 PM CT: Sharper radar, 7-day forecast card, roomier filter panel (2f38b18)
 - **Rain radar is much sharper.** Around Houston it now uses the Houston NEXRAD radar's own high-resolution scan (about 250 m detail, versus the 1 km national mosaic before), and the nearest Texas radar elsewhere. It falls back to a 500 m national composite, then the old mosaic, if a radar is down. You can zoom in further before it gets blurry.
 - **7-day forecast in the chat**: ask for a forecast ("forecast for Waller", "will it rain this week"). The card shows one row per day: conditions, chance and inches of rain, the low and high on a bar against the week's range, and wind and gusts.
@@ -15,7 +21,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - More Filters is grouped into Project, Size, People & Place and Timing;
   - Save Search, Copy Link and RSS Alerts are evenly sized buttons.
 
-### 5:45 PM CT: Statewide load no longer rejects Austin County
+### 5:45 PM CT: Statewide load no longer rejects Austin County (e45fcf3)
 - The statewide database load skipped Austin County: 22 of its filings list "Austin" as the city (the county's own name), and the safety check took that for Austin in Travis County and decided the county ID was wrong. A city that's just the county's own name no longer counts in that check (the same would have hit Houston County). Re-run Statewide data with counties = Austin to load it.
 
 ### 5:38 PM CT: Chat cards tidied, demographics answers, tabs only open when asked (2f973eb)
