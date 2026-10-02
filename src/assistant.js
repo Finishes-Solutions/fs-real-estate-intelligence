@@ -3,7 +3,7 @@
 import { makeMatcher, describe, miles } from './lib/filter.mjs';
 import { entityKey } from './lib/taxonomy.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
-import { cleanFilterArgs, pickPlace, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, fromNominatim, withTellMore, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
@@ -74,6 +74,8 @@ export function initAssistant(ctx) {
     log.querySelector('.ai-empty')?.remove();
     const d = document.createElement('div'); d.className = 'ai-m ' + role; d.innerHTML = html; log.appendChild(d); scroll(); return d;
   }
+  // the one project, place or building this turn was about (for the "Tell me more about …" follow-up)
+  let turnSubject = null;
   // follow-up suggestions under the latest answer; tapping one asks it
   function pills(list) {
     log.querySelectorAll('.ai-next').forEach(x => x.remove());
@@ -104,7 +106,7 @@ export function initAssistant(ctx) {
   }
   async function ask(text) {
     if (busy) return; open(false); busy = true; $('aiSend').disabled = true;
-    log.querySelectorAll('.ai-next').forEach(x => x.remove());
+    log.querySelectorAll('.ai-next').forEach(x => x.remove()); turnSubject = null;
     bubble('user', esc(text)); history.push({ role: 'user', content: text });
     const thinking = bubble('bot pending', '<span class="dots"><i></i><i></i><i></i></span>'); status('Thinking…');
     try {
@@ -123,7 +125,7 @@ export function initAssistant(ctx) {
         }
         log.appendChild(thinking); scroll(); status('Thinking…');
       }
-      if (next.length) pills(next);
+      next = withTellMore(next, turnSubject); if (next.length) pills(next);
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
@@ -140,15 +142,25 @@ export function initAssistant(ctx) {
     return best ? { k: 'dev', v: best[0], label: labels.get(best[0]) } : null;
   }
   // common mishearings / nicknames of local places
-  const ALIAS = [[/\bcyprus\b/i, 'Cypress'], [/\bkaty freeway\b/i, 'I-10 Katy Freeway'], [/\bthe woodland\b(?!s)/i, 'The Woodlands']];
+  const ALIAS = [[/\bcyprus\b/i, 'Cypress'], [/\bkaty freeway\b/i, 'I-10 Katy Freeway'], [/\bthe woodland\b(?!s)/i, 'The Woodlands'], [/\bh[- ]?town\b/i, 'Houston'], [/\bminute maid park\b/i, 'Daikin Park']];
+  const TOWNS = () => ['Houston', ...(ctx.DATA.places || []).map(p => p[0])];
+  // OpenStreetMap knows hotels, venues and other landmarks by name that MapTiler's geocoder often doesn't
+  async function nominatim(q) {
+    try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=us&viewbox=-106.7,36.5,-93.5,25.8&bounded=1&q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } });
+      return r.ok ? fromNominatim(await r.json()) : []; } catch (e) { return []; }
+  }
+  // Every lookup must land on the place itself or fail: a wrong guess used to fly the map to e.g. "Houston Avenue, Pasadena"
+  // before the model retried with the street address.
   async function resolvePlace(name) {
     for (const [re, to] of ALIAS) name = name.replace(re, to);
     const n = name.toLowerCase().replace(/,?\s*(tx|texas)$/, '').trim();
     const town = (ctx.DATA.places || []).find(p => p[0].toLowerCase() === n);
     if (town) return { c: [town[1], town[2]], label: town[0] + ', TX', kind: 'town' };
-    const q = name + (/texas|\btx\b/i.test(name) ? '' : ', Texas');
-    let p = pickPlace(name, await ctx.geocode(q, { exact: true }));
-    if (p.error) { const p2 = pickPlace(name, await ctx.geocode(q)); if (!p2.error) p = p2; }
+    const q = name + (/texas|\btx\b/i.test(name) ? '' : ', Texas'), towns = TOWNS();
+    let p = pickPlace(name, await ctx.geocode(q, { exact: true }), towns);
+    if (p.error) { const p2 = pickPlace(name, await ctx.geocode(q), towns); if (!p2.error) p = p2; }
+    if (p.error) { const p3 = pickPlace(name, await nominatim(q), towns); if (!p3.error) p = p3; }
+    if (p.error) { const head = name.split(',')[0].replace(/\s+(hotel|inn|suites)$/i, ''); if (head !== name.split(',')[0]) { const p4 = pickPlace(head, await nominatim(head + ', ' + (name.split(',').slice(1).join(',') || 'Texas')), towns); if (!p4.error) p = p4; } }
     return p;
   }
   const lastUserText = () => { for (let i = history.length - 1; i >= 0; i--) if (history[i].role === 'user') return history[i].content; return ''; };
@@ -208,7 +220,7 @@ export function initAssistant(ctx) {
       }
       if (name === 'open_filing') {
         const f = ctx.BY_ID.get(String(a.id || '').trim()); if (!f) return { error: 'Filing not loaded.' };
-        if (ctx.view !== 'map') ctx.setView('map'); ctx.select(f, true); actionChip('Opened ' + f.name);
+        if (ctx.view !== 'map') ctx.setView('map'); ctx.select(f, true); actionChip('Opened ' + f.name); turnSubject = f.name;
         return { opened: row(f), scope: f.scope || '', summary: f.sum || '', owner: f.owner, address: f.addr, architect: f.arch || null, gc: f.gc || null, approximate_location: !!f.approx };
       }
       if (name === 'fly_to') {
@@ -232,6 +244,7 @@ export function initAssistant(ctx) {
         if (kind === 'approx') zoom = Math.min(zoom, 14);
         zoom = Math.max(4, Math.min(19, zoom));
         if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt || zoom >= 16.5 ? 60 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });
+        if (kind !== 'group' && !/^-?\d+\.\d+, -?\d/.test(label)) turnSubject = label;
         actionChip((a.orbit ? 'Orbiting ' : 'Moved the map to ') + label); return { moved_to: label, zoom: +zoom.toFixed(1), orbiting: !!a.orbit, ...(note ? { note } : {}) };
       }
       if (name === 'highlight_area') {

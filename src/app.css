@@ -40,7 +40,7 @@ body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:none;box-shadow:0 0 0 3px rgba(10,122,54,.38);border-radius:4px}
 
-.app{--pw:480px;position:relative;height:100%;display:grid;grid-template-columns:var(--pw) minmax(0,1fr)}
+.app{--pw:480px;--aiw:min(460px,calc(100vw - 32px));position:relative;height:100%;display:grid;grid-template-columns:var(--pw) minmax(0,1fr)}
 .stage{position:relative;min-width:0;min-height:0;background:var(--c-space)}
 canvas#globe{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 canvas#globe.dragging{cursor:grabbing}
@@ -521,7 +521,7 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 .dlegend{bottom:84px}
 
 /* assistant drawer */
-.ai{position:absolute;top:12px;right:12px;bottom:12px;width:400px;z-index:6;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(11,13,12,.22);
+.ai{position:absolute;top:12px;right:12px;bottom:12px;width:var(--aiw);z-index:6;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(11,13,12,.22);
   transform:translateX(calc(100% + 24px));visibility:hidden;transition:transform 220ms cubic-bezier(.2,.7,.2,1),visibility 0s 220ms}
 .app.ai-open .ai{transform:none;visibility:visible;transition:transform 220ms cubic-bezier(.2,.7,.2,1)}
 .ai-grab{display:none}
@@ -532,7 +532,7 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 .ai-ib{border:0;background:transparent;color:var(--text-2);border-radius:6px;height:30px;min-width:30px;padding:0 8px;font-size:12px;font-weight:600;cursor:pointer;display:grid;place-items:center}
 .ai-ib:hover{background:var(--chip)}
 .ai-log{flex:1;min-height:0;overflow-y:auto;padding:14px 16px 8px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}
-.ai-m{font-size:13.5px;line-height:1.55;max-width:100%;overflow-wrap:anywhere}
+.ai-m{font-size:14px;line-height:1.55;max-width:100%;overflow-wrap:anywhere}
 .ai-m p{margin:0 0 6px}.ai-m p:last-child{margin-bottom:0}
 .ai-m.user{align-self:flex-end;max-width:85%;background:var(--text);color:var(--panel);padding:8px 12px;border-radius:14px 14px 4px 14px}
 .ai-m.bot{align-self:flex-start;color:var(--text)}
@@ -570,14 +570,14 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 
 /* make room for the drawer on desktop: controls, card and legends shift left */
 @media (min-width:1101px){
-  .app.ai-open .ctrls,.app.ai-open .dlegend{right:428px}
-  .app.ai-open .layers{right:474px}
-  .app.ai-open .card{right:428px}
+  .app.ai-open .ctrls,.app.ai-open .dlegend{right:calc(var(--aiw) + 28px)}
+  .app.ai-open .layers{right:calc(var(--aiw) + 74px)}
+  .app.ai-open .card{right:calc(var(--aiw) + 28px)}
 }
 @media (max-width:1100px) and (min-width:701px){
-  .ai{width:360px}
-  .app.ai-open .ctrls{right:384px}
-  .app.ai-open .layers{right:430px}
+  .app{--aiw:400px}
+  .app.ai-open .ctrls{right:calc(var(--aiw) + 24px)}
+  .app.ai-open .layers{right:calc(var(--aiw) + 70px)}
   .app.ai-open .card{right:auto;left:12px}
   .app.ai-open .mapleft{display:none}
 }
@@ -824,7 +824,7 @@ table.cmp td.best{font-weight:700;color:var(--brand)}
 .ai-next button:first-child{background:var(--green-700);border-color:var(--green-700);color:#fff}
 /* assistant drawer open on desktop: compact the map tools so they clear the controls */
 @media (min-width:1101px){
-  .app.ai-open .mapleft{min-width:0;max-width:calc(100% - 500px)}
+  .app.ai-open .mapleft{min-width:0;max-width:calc(100% - var(--aiw) - 100px)}
   .app.ai-open .tools button span{display:none}
   .app.ai-open .tools button{padding:0 11px}
 }

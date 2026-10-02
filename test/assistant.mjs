@@ -1,6 +1,6 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, fromNominatim, withTellMore, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
 import { USES } from '../lib/taxonomy.mjs';
 import { categoryOf, parsePlaces, overpassQuery } from '../lib/nearby.mjs';
 import { roofFromHistogram, floorsFromHeight } from '../lib/height.mjs';
@@ -24,6 +24,22 @@ const addr = { t: '1004 Priya Lane, Waller, Texas 77484', name: 'Priya Lane', ty
 assert.equal(pickPlace('1004 Priya ln', [addr]).kind, 'address');
 assert.ok(ZOOM.address >= 17.5 && ZOOM.poi >= 17, 'single building / landmark is close up');
 assert.equal(pickPlace('Cypress', [{ t: 'Cypress, Texas', name: 'Cypress', type: 'place', c: [-95.69, 29.97] }]).kind, 'town');
+// a street that only shares the city's name is not the place ("C. Baldwin Hotel, Houston" flew to Houston Avenue, Pasadena)
+const pas = { t: 'Houston Avenue, Pasadena, Texas 77502', name: 'Houston Avenue', type: 'street', c: [-95.2, 29.69] }, towns = ['Houston', 'Katy', 'Pasadena'];
+assert.ok(pickPlace('C. Baldwin Hotel, Houston', [pas], towns).error);
+assert.ok(pickPlace('Baldwin Hotel in Houston', [pas], towns).error);
+assert.ok(pickPlace('Minute Maid Park, Houston, TX', [pas], towns).error);
+assert.ok(pickPlace('Washington Avenue, Houston', [pas], towns).error, 'street type alone is not a match');
+assert.ok(pickPlace('Daikin Park, Houston', [other], towns).error, 'venue word alone is not a match');
+assert.equal(pickPlace('Houston Avenue, Pasadena', [pas], towns).label, pas.t);
+const osm = fromNominatim([{ lat: '29.7577', lon: '-95.3647', name: 'C. Baldwin', addresstype: 'tourism', display_name: 'C. Baldwin, 400, Dallas Street, Downtown, Houston, Harris County, Texas, 77002, United States' }]);
+assert.equal(osm[0].t, 'C. Baldwin, 400 Dallas Street, Downtown, Houston, Texas');
+assert.equal(pickPlace('C. Baldwin Hotel, Houston', osm, towns).kind, 'poi');
+// "Tell me more about …" follow-up
+assert.deepEqual(withTellMore(['Take me there', 'Show hotels nearby'], 'Daikin Park, 501 Crawford St'), ['Tell me more about Daikin Park', 'Take me there', 'Show hotels nearby']);
+assert.equal(withTellMore(['a', 'b', 'c', 'd'], 'X').length, 4);
+assert.deepEqual(withTellMore(['Tell me more about it'], 'X'), ['Tell me more about it']);
+assert.deepEqual(withTellMore(['a'], ''), ['a']);
 
 // framing several filings
 const f = frame([[-95.70, 29.97], [-95.701, 29.971]]); assert.ok(f.zoom > 16 && f.zoom <= 17.5, 'close group stays close: ' + f.zoom);

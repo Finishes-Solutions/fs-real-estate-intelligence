@@ -28,6 +28,19 @@ export function initMapSearch(ctx) {
   const mount = () => { const host = phoneMQ.matches ? document.getElementById('mSearchSlot') : document.getElementById('mapleft'); if (host && wrap.parentElement !== host) host.insertBefore(wrap, phoneMQ.matches ? null : document.getElementById('placebar')); };
   phoneMQ.addEventListener('change', mount); mount();
 
+  // ---------- placeholder: the longest wording that fits, so it never shows cut off when the box narrows ----------
+  // (assistant drawer open, list panel widened, small window)
+  const HINTS = ['Search addresses, places, projects, owners, developers…', 'Search addresses, places, projects, owners', 'Search addresses, places, projects', 'Search places & projects', 'Search'];
+  const meas = document.createElement('canvas').getContext('2d');
+  function fitHint() {
+    const w = input.clientWidth; if (!w) return;
+    const cs = getComputedStyle(input); meas.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    const room = w - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0) - 4;
+    const hint = HINTS.find(h => meas.measureText(h).width <= room) || HINTS[HINTS.length - 1];
+    if (input.placeholder !== hint) input.placeholder = hint;
+  }
+  new ResizeObserver(fitHint).observe(input); document.fonts?.ready.then(fitHint);
+
   // ---------- local search ----------
   const low = v => (v || '').toLowerCase();
   // a typed token matches as written or spelled out ("ln" also matches "lane"); haystacks carry both spellings too
