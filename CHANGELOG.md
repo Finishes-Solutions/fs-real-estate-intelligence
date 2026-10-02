@@ -17,7 +17,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Route pill**: while a route is showing, a one-line "Route · 41 mi · 46 min ×" pill on the map clears it. An empty pill no longer appears when there's no route.
 - **For whoever runs the database**: the flight-history migration is renamed to `supabase/migrations/20261008000000_air_traffic.sql`, because its old number clashed with the Regrid migration. It hasn't been applied yet, so nothing else changes.
 
-### 6:40 PM CT: Plane routes on the map; Regrid reads REGRID_API_KEY
+### 6:48 PM CT: Plane route lookups no longer fail on unknown flights; Regrid confirmed live
+- A flight that isn't in the adsb.lol route database used to make the route lookup error out. It now just says "Route not in the database" (and draws no line).
+- Regrid confirmed working on the live site: the token is accepted, usage is being counted, and parcel tiles load.
+
+### 6:40 PM CT: Plane routes on the map; Regrid reads REGRID_API_KEY (e69725a)
 - Selecting a plane now draws its route: the leg already flown as a solid curved line from the origin airport to the plane, the rest dashed to the destination, with both airports labeled. The map zooms to fit the whole trip (unless you're following the plane). The line moves with the plane and clears when you close the card. Planes whose route isn't in the adsb.lol database show no line.
 - Regrid now reads the token from `REGRID_API_KEY` (the name set on Vercel); `REGRID_TOKEN` also works.
 

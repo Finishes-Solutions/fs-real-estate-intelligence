@@ -52,6 +52,7 @@ res = mock(); await planes({ query: { route: 'ual1234', lat: '29.98', lon: '-95.
 assert.deepEqual([res.body.origin.code, res.body.destination.code, res.body.destination.city], ['IAH', 'ORD', 'Chicago']);
 assert.deepEqual([res.body.origin.lat, res.body.origin.lon, res.body.destination.lat, res.body.destination.lon], [29.9844, -95.3414, 41.9786, -87.9047], 'airport coordinates for drawing the route');
 res = mock(); await planes({ query: { route: 'x; drop' }, headers: H }, res); assert.equal(res.code, 400);
+{ const { route } = await import('../api/planes.js'); const r0 = await route('ZZZ999', 29.9, -95.3, async () => new Response('', { status: 200 })); assert.deepEqual([r0.origin, r0.destination], [null, null], 'unknown callsign: no route, no error'); }
 // history without the database: says so, doesn't fail
 res = mock(); await planes({ query: { history: '-95.34,29.98' }, headers: H }, res); assert.equal(res.body.history, false); assert.match(res.body.note, /SUPABASE_SECRET_KEY/);
 process.env.SUPABASE_URL = 'https://db.example'; process.env.SUPABASE_SECRET_KEY = 'sb_secret_test';
