@@ -948,10 +948,6 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 @media (max-width:900px){.mk-grid{grid-template-columns:1fr}.mk-kpis{grid-template-columns:repeat(2,1fr)!important}.mk-kpis .kpi:nth-child(odd){border-left:0}.mk-kpis .kpi:last-child:nth-child(odd){grid-column:1/-1}.mk-kpis .kpi:nth-child(n+3){border-top:1px solid var(--line)}}
 
 /* Ask AI: keyboard hint, suggested questions above it; with a card open it sits just left of the card */
-.ai-fab kbd,.mskbd{font-family:var(--font-mono);font-size:10.5px;font-weight:500;line-height:1;padding:3px 5px;border-radius:4px}
-.ai-fab kbd{background:rgba(255,255,255,.18);color:#fff;margin-left:2px}
-.mskbd{flex:none;border:1px solid var(--line-2);color:var(--muted);background:var(--panel-2)}
-.msbox:focus-within .mskbd,.msbox:has(.msx:not([hidden])) .mskbd{display:none}
 .fab-sugs{position:absolute;right:var(--fabr,16px);bottom:90px;z-index:4;display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:min(330px,calc(100% - var(--fabr,16px) - 24px));pointer-events:none}
 .fab-sugs:empty{display:none}
 .fab-sugs button{pointer-events:auto;max-width:100%;text-align:left;border:1px solid var(--line-2);background:var(--panel);color:var(--brand);border-radius:16px;padding:6px 12px;font:600 12.5px/1.3 var(--font-display);cursor:pointer;box-shadow:0 2px 8px rgba(11,13,12,.12);transition:border-color 120ms,background 120ms}
@@ -959,7 +955,6 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 .app.ai-open .fab-sugs,.stage:not([data-view="map"]) .fab-sugs{display:none}
 @media (min-width:1101px){ .app:has(.card.open){--fabr:calc(min(380px,100% - 32px) + 32px)} }
 @media (max-width:1100px) and (min-width:701px){ .app:has(.card.open){--fabr:calc(min(400px,100% - 24px) + 24px)} }
-@media (max-width:700px){ .fab-sugs,.mskbd{display:none} }
-@media (pointer:coarse){ .ai-fab kbd,.mskbd{display:none} }
+@media (max-width:700px){ .fab-sugs{display:none} }
 /* with a card open, the map buttons (and the Layers panel) move left of it, like Ask AI, so the card never hides them */
 @media (min-width:701px){ .app:has(.card.open) .ctrls{right:var(--fabr,16px)} .app:has(.card.open) .layers{right:calc(var(--fabr,16px) + 46px)} }

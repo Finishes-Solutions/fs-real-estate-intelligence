@@ -38,7 +38,7 @@ export function initAssistant(ctx) {
     </form>
   </aside>
   <div class="fab-sugs" id="fabSugs" aria-label="Suggested questions"></div>
-  <button class="ai-fab" id="aiFab" type="button" aria-controls="ai" aria-keyshortcuts="${MOD === '⌘' ? 'Meta+/' : 'Control+/'}">${SPARK}<span>Ask AI</span><kbd>${MOD}/</kbd></button>`;
+  <button class="ai-fab" id="aiFab" type="button" aria-controls="ai" aria-keyshortcuts="${MOD === '⌘' ? 'Meta+/' : 'Control+/'}">${SPARK}<span>Ask AI</span></button>`;
   ctx.viewport.append(...wrap.children);
   const $ = id => document.getElementById(id);
   const el = $('ai'), log = $('aiLog'), q = $('aiQ'), form = $('aiForm'), st = $('aiSt'), app = document.querySelector('.app');

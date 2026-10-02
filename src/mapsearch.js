@@ -159,7 +159,6 @@ export function initMapSearch(ctx) {
   }
   // ⌘K (Mac) or Ctrl+K: jump to the map search from anywhere
   const MOD = /Mac|iPhone|iPad|iPod/.test(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl+';
-  const kbd = document.createElement('kbd'); kbd.className = 'mskbd'; kbd.textContent = MOD + 'K'; kbd.setAttribute('aria-hidden', 'true'); clearB.before(kbd);
   input.setAttribute('aria-keyshortcuts', MOD === '⌘' ? 'Meta+K' : 'Control+K');
   document.addEventListener('keydown', e => {
     if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || (e.key || '').toLowerCase() !== 'k') return;
