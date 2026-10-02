@@ -776,6 +776,21 @@ Object.assign(ctx,{ nearestPlace, basemap:()=>layers.style, mode:()=>mode, scree
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
 for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initArea,initSources]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
+// ---------- map buttons next to an open card ----------
+// Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,
+// so the buttons stay in their column at the edge. Otherwise (short windows) the buttons step left of the card.
+{ const ctrlsEl=document.querySelector('.ctrls'), layersEl=document.getElementById('layers'), appEl=document.querySelector('.app'), stageEl=document.querySelector('.stage');
+  let raf=0;
+  const sync=()=>{ raf=0;
+    const open=card.classList.contains('open')&&innerWidth>1100&&!layersEl.classList.contains('on');
+    const avail=open?Math.floor(stageEl.getBoundingClientRect().bottom-16-(ctrlsEl.getBoundingClientRect().bottom+12)):0;
+    const on=open&&avail>=420; appEl.classList.toggle('card-below',on);
+    if(on) appEl.style.setProperty('--card-max',avail+'px'); else appEl.style.removeProperty('--card-max'); };
+  const soon=()=>{ if(!raf) raf=requestAnimationFrame(sync); };
+  new MutationObserver(soon).observe(card,{attributes:true,attributeFilter:['class']});
+  new MutationObserver(soon).observe(layersEl,{attributes:true,attributeFilter:['class']});
+  new ResizeObserver(soon).observe(stageEl); addEventListener('resize',soon); }
+
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
   document.getElementById('kicker').textContent='TDLR TABS · '+m(s)+' – '+m(e);

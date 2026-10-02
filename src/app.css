@@ -1110,3 +1110,12 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .rp-act .btn{font-size:12px;padding:6px 10px}
 .rp-soon p{margin:0;color:var(--muted);font-size:12.5px}
 @media (max-width:700px){ .rp-row{grid-template-columns:40px minmax(0,1fr)} .rp-act{grid-column:1/-1;justify-content:flex-start} }
+
+/* …unless there is room under them: then the card fits below the buttons (capped height, scrolls) and they stay at the edge */
+@media (min-width:1101px){
+  .app.card-below:has(.card.open) .ctrls{right:16px}
+  .app.card-below:has(.card.open) .layers{right:62px}
+  .app.card-below .card.open{max-height:var(--card-max,calc(100% - 32px))}
+  .app.card-below.ai-open:has(.card.open) .ctrls{right:calc(var(--aiw) + 28px)}
+  .app.card-below.ai-open:has(.card.open) .layers{right:calc(var(--aiw) + 74px)}
+}
