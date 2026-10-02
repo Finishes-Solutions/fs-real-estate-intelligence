@@ -68,6 +68,9 @@ Optional: `SOCRATA_APP_TOKEN` (free at data.texas.gov → Developer Settings) on
 
 Not included, on purpose: sales and lease comps. Texas does not disclose sale prices, and no free source has lease rates; that data needs a licensed provider (CoStar, CompStak and similar) kept behind a sign-in, since this site is public.
 
+- **Consumer spending (estimates)**: Map Layers → Demographics adds Consumer Spending, Spending per Household, Dining Out, Home Furnishings and Apparel per census tract; the Market view adds spending by category and the **city sales tax collected each month** (Texas Comptroller allocations, a real local spending trend). The tract figures are modeled (Census ACS households by income × BLS Consumer Expenditure Survey spending by income, adjusted to the South), not measured; the BLS coefficients are cached in `data/cache/ce.json` and refreshed monthly (optional `BLS_KEY` for the BLS v2 API).
+- **Ask about anything**
+
 ## AI assistant
 
 The **Ask AI** button (or ⌘/ on a Mac, Ctrl+/ elsewhere) opens a chat that works the map through tools: filter, find, highlight, open a filing, fly somewhere, toggle the heatmap or views. Press the mic to talk to it instead (OpenAI Realtime over WebRTC).

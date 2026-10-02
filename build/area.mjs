@@ -118,10 +118,10 @@ export async function buildPermits(fips, prev) {
 }
 
 // ---------- new businesses: Texas Comptroller sales-tax permits ----------
-const SOCRATA = 'https://data.texas.gov/resource/jrea-zgmq.json';
-const sq = p => SOCRATA + '?' + new URLSearchParams(p);
-async function socrata(p) {
-  const r = await fetch(sq(p), { headers: { ...UA, ...(process.env.SOCRATA_APP_TOKEN ? { 'X-App-Token': process.env.SOCRATA_APP_TOKEN } : {}) }, signal: AbortSignal.timeout(90000) });
+const SOCRATA = id => 'https://data.texas.gov/resource/' + id + '.json';
+const sq = (p, id = 'jrea-zgmq') => SOCRATA(id) + '?' + new URLSearchParams(p);
+async function socrata(p, id) {
+  const r = await fetch(sq(p, id), { headers: { ...UA, ...(process.env.SOCRATA_APP_TOKEN ? { 'X-App-Token': process.env.SOCRATA_APP_TOKEN } : {}) }, signal: AbortSignal.timeout(90000) });
   const t = await r.text(); if (!r.ok) throw new Error('Comptroller ' + r.status + ': ' + t.slice(0, 160));
   return JSON.parse(t);
 }
@@ -173,12 +173,57 @@ export async function buildNews(places, prev, gap = 1500) {
 }
 
 // ---------- all of it ----------
+// ---------- local spending trend: Texas Comptroller city sales-tax allocations ----------
+// The monthly sales-tax money the Comptroller sends each city: a real, ~2-month-behind measure of taxable local sales.
+// The dataset is found by name in the Socrata catalog (and its columns read from the catalog metadata), then
+// remembered in area.json, so a republished dataset is picked up again without code changes.
+const CATALOG = 'https://api.us.socrata.com/api/catalog/v1?domains=data.texas.gov&only=datasets&limit=25&q=';
+export function allocColumns(res) {
+  const f = res.columns_field_name || [], t = res.columns_datatype || [], type = n => t[f.indexOf(n)] || '';
+  const city = f.find(n => /^city(_name)?$/i.test(n)) || f.find(n => /city/i.test(n) && !/county|code/i.test(n));
+  const amount = f.find(n => /net_payment_this_period|net_allocation|^net_payment|total_allocation|allocation_amount/i.test(n))
+    || f.find(n => /alloc|payment|amount/i.test(n) && !/prior|previous|ytd|year_to_date|percent|pct|change|comparable/i.test(n) && /number|money|double/i.test(type(n)));
+  const period = f.find(n => /calendar_date|floating_timestamp/i.test(type(n)) && /alloc|period|month|date/i.test(n)) || f.find(n => /calendar_date|floating_timestamp/i.test(type(n)));
+  const year = f.find(n => /(^|_)year$/i.test(n)), month = f.find(n => /(^|_)month$/i.test(n));
+  return city && amount && (period || (year && month)) ? { city, amount, period, year, month } : null;
+}
+export async function findAllocations(prev) {
+  if (prev?.dataset?.id && prev.dataset.cols) return prev.dataset;
+  const r = await fetch(CATALOG + encodeURIComponent('sales tax allocation city'), { headers: UA, signal: AbortSignal.timeout(30000) }); if (!r.ok) throw new Error('Socrata catalog ' + r.status);
+  for (const x of (await r.json()).results || []) {
+    const res = x.resource || {}; if (!/allocation/i.test(res.name || '') || !/cit(y|ies)/i.test(res.name || '') || /county|transit|special|mixed beverage|hotel/i.test(res.name || '')) continue;
+    const cols = allocColumns(res); if (cols) return { id: res.id, name: res.name, cols };
+  }
+  throw new Error('no city sales-tax allocation dataset found in the data.texas.gov catalog');
+}
+async function buildSalesTax(filings, prev) {
+  const ds = await findAllocations(prev), c = ds.cols;
+  // the cities with filings in the region, each with the county most of its filings are in
+  const byCity = {}; for (const f of filings) if (f.city) { const k = f.city.trim(); (byCity[k] ||= {})[f.county] = ((byCity[k] ||= {})[f.county] || 0) + 1; }
+  const cities = Object.entries(byCity).map(([city, cs]) => [city, Object.entries(cs).sort((a, b) => b[1] - a[1])[0][0]]).slice(0, 120);
+  const since = new Date(Date.UTC(new Date().getUTCFullYear() - 3, new Date().getUTCMonth(), 1)).toISOString().slice(0, 10);
+  const inList = cities.map(([n]) => "'" + n.toUpperCase().replace(/'/g, "''") + "'").join(',');
+  const when = c.period ? 'date_trunc_ym(' + c.period + ') AS m' : c.year + ' AS y, ' + c.month + ' AS mo';
+  const rows = await socrata({ $select: 'upper(' + c.city + ') AS city, ' + when + ', sum(' + c.amount + ') AS v', $where: 'upper(' + c.city + ') in (' + inList + ')' + (c.period ? ' AND ' + c.period + " >= '" + since + "T00:00:00'" : ' AND ' + c.year + ' >= ' + (+since.slice(0, 4))),
+    $group: 'city, ' + (c.period ? 'm' : 'y, mo'), $limit: '50000' }, ds.id);
+  const county = Object.fromEntries(cities.map(([n, co]) => [n.toUpperCase(), [n, co]])), out = {};
+  for (const r of rows) {
+    const [name, co] = county[r.city] || [], m = r.m ? String(r.m).slice(0, 7) : r.y && r.mo ? r.y + '-' + String(r.mo).padStart(2, '0') : null, v = +r.v;
+    if (!name || !m || !Number.isFinite(v)) continue;
+    ((out[name] ||= { county: co, months: {} }).months)[m] = Math.round(v);
+  }
+  if (!Object.keys(out).length) throw new Error('no allocations matched the region\'s cities');
+  log('area: sales tax', Object.keys(out).length, 'cities from', ds.id);
+  return { dataset: { id: ds.id, name: ds.name, cols: ds.cols }, since: since.slice(0, 7), cities: out };
+}
+
 export async function buildArea(regions, filings, prev = {}) {
   const counties = regions.counties, fips = counties.map(c => c.fips), out = { built: new Date().toISOString(), counties: counties.map(c => ({ name: c.name, fips: c.fips })) };
   const step = async (k, fn) => { try { out[k] = await fn(); } catch (e) { log('area:', k, 'skipped:', e.message); if (prev[k]) out[k] = prev[k]; } };
   await step('jobs', () => buildJobs(fips, prev.jobs));
   await step('permits', () => buildPermits(fips, prev.permits));
   await step('businesses', () => buildBusinesses(counties, prev.businesses));
+  await step('salesTax', () => buildSalesTax(filings, prev.salesTax));
   // news places: each county, plus the towns with the most filings
   const towns = Object.entries(filings.reduce((m, f) => { if (f.city && !f.approx) m[f.city + '|' + f.county] = (m[f.city + '|' + f.county] || 0) + 1; return m; }, {}))
     .sort((a, b) => b[1] - a[1]).slice(0, +(process.env.AREA_NEWS_TOWNS || 10)).map(([k]) => { const [city, county] = k.split('|'); return { key: 'town:' + city, q: city + ', Texas', county }; });

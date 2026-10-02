@@ -45,7 +45,8 @@ export default async function handler(req, res) {
       nearby2mi: { count: near.length, totalValue: near.reduce((s, x) => s + x.cost, 0), largest: near.slice(0, 8).map(brief) },
       sameDeveloper: { count: same.length, totalValue: same.reduce((s, x) => s + x.cost, 0), largest: same.slice(0, 6).map(brief) },
       tract: tract ? { acsYear: market.year, population: tract.pop, growthPctSince: market.baseYear, growthPct: tract.gr, medianHouseholdIncome: tract.inc, medianHomeValue: tract.val, medianRent: tract.rent, vacancyPct: tract.vacr, medianAge: tract.age,
-        ...(market.jobsYear && tract.jobs != null ? { jobsYear: market.jobsYear, jobsLocatedHere: tract.jobs, jobGrowthPct: tract.jgr, jobGrowthSince: market.jobsBaseYear, jobsPerResident: tract.jpr } : {}) } : null,
+        ...(market.jobsYear && tract.jobs != null ? { jobsYear: market.jobsYear, jobsLocatedHere: tract.jobs, jobGrowthPct: tract.jgr, jobGrowthSince: market.jobsBaseYear, jobsPerResident: tract.jpr } : {}),
+        ...(market.spendYear && tract.sph != null ? { consumerSpendingEstimate: { perHousehold: tract.sph, tractPerYear: tract.spend, diningOut: tract.dine, homeFurnishings: tract.furn, note: 'modeled: ACS income × BLS Consumer Expenditure Survey ' + market.spendYear } } : {}) } : null,
       county: countyContext(area, f.fips || area?.counties?.find(c => c.name === f.county)?.fips),
       changeHistory: hist
     };

@@ -1,8 +1,10 @@
 // Market context: Census ACS 5-year tract demographics + simplified tract outlines (TIGERweb).
 // Refreshed when the newest ACS year changes or the file is missing; failures leave the old file in place.
 import { fetchRetry, log } from './util.mjs';
+import { ACS_BRACKET_VARS } from '../lib/spending.mjs';
 
-const VARS = { pop: 'B01003_001E', inc: 'B19013_001E', hu: 'B25001_001E', vac: 'B25002_003E', rent: 'B25064_001E', val: 'B25077_001E', age: 'B01002_001E' };
+const VARS = { pop: 'B01003_001E', inc: 'B19013_001E', hu: 'B25001_001E', vac: 'B25002_003E', rent: 'B25064_001E', val: 'B25077_001E', age: 'B01002_001E', hh: 'B11001_001E' };
+// households by income bracket (B19001, 16 brackets): feeds the modeled consumer spending (lib/spending.mjs)
 const num = v => { const n = +v; return Number.isFinite(n) && n > -1e8 ? n : null; };
 
 async function acs(year, fips, vars) {
@@ -31,9 +33,10 @@ async function tracts(fips) {
 export async function buildMarket(regions, prev) {
   const fips = regions.counties.map(c => c.fips), now = new Date().getUTCFullYear();
   let year = null, cur = null;
-  for (let y = now - 1; y >= now - 5 && !cur; y--) { try { cur = await acs(y, fips, Object.values(VARS)); year = y; } catch (e) { log('market: ACS', y, 'unavailable:', e.message.slice(0, 160)); } }
+  for (let y = now - 1; y >= now - 5 && !cur; y--) { try { cur = await acs(y, fips, [...Object.values(VARS), ...ACS_BRACKET_VARS]); year = y; } catch (e) { log('market: ACS', y, 'unavailable:', e.message.slice(0, 160)); } }
   if (!cur) throw new Error('no ACS year available');
-  if (prev && prev.year === year && prev.tracts?.length && !process.env.REBUILD_MARKET) { log('market: ACS', year, 'unchanged, reusing'); return prev; }
+  // same ACS year: reuse, unless the file predates a field the app now needs (income brackets for spending)
+  if (prev && prev.year === year && prev.tracts?.length && prev.tracts.some(t => Array.isArray(t.ib)) && !process.env.REBUILD_MARKET) { log('market: ACS', year, 'unchanged, reusing'); return prev; }
   let base = null, baseYear = null;
   for (const y of [year - 5, year - 4, year - 3]) {
     try { const b = await acs(y, fips, [VARS.pop]); const match = Object.keys(cur).filter(g => b[g]).length; if (match / Object.keys(cur).length > 0.8) { base = b; baseYear = y; break; } } catch (e) {}
@@ -43,7 +46,8 @@ export async function buildMarket(regions, prev) {
     const g = f.properties.GEOID, o = cur[g]; if (!o) return null;
     const v = Object.fromEntries(Object.entries(VARS).map(([k, code]) => [k, num(o[code])]));
     const bp = base && num(base[g]?.[VARS.pop]);
-    return { g, ...v, vacr: v.hu ? Math.round(v.vac / v.hu * 1000) / 10 : null, gr: bp && v.pop != null ? Math.round((v.pop - bp) / bp * 1000) / 10 : null, geom: f.geometry };
+    const ib = ACS_BRACKET_VARS.map(code => num(o[code]) ?? 0);
+    return { g, ...v, ib, vacr: v.hu ? Math.round(v.vac / v.hu * 1000) / 10 : null, gr: bp && v.pop != null ? Math.round((v.pop - bp) / bp * 1000) / 10 : null, geom: f.geometry };
   }).filter(Boolean);
   log('market: ACS', year, 'vs', baseYear, '|', out.length, 'tracts');
   return { year, baseYear, tracts: out };

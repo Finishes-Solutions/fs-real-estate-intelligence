@@ -3,6 +3,7 @@
 //   new business locations (Texas Comptroller sales-tax permits) and local development news (Google News).
 // Also the "Businesses registered here" lookup (api/tenants) used by the building and filing cards.
 import { SECTORS } from './lib/sectors.mjs';
+import { CAT_LABEL } from './lib/spending.mjs';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -13,7 +14,7 @@ export function initArea(ctx) {
     fetch('data/area.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null),
     fetch('data/market.json').then(r => r.ok ? r.json() : null).catch(() => null)
   ]).then(([a, m]) => { area = a; market = m; });
-  ctx.areaInfo = () => area ? { built: area.built, jobs: area.jobs, permits: !!area.permits, businesses: !!area.businesses, news: !!area.news } : null;
+  ctx.areaInfo = () => area ? { built: area.built, jobs: area.jobs, permits: !!area.permits, businesses: !!area.businesses, news: !!area.news, salesTax: area.salesTax ? { cities: Object.keys(area.salesTax.cities || {}).length, since: area.salesTax.since } : null } : null;
   // the Market view's numbers for one county (name or FIPS) or the whole region, for the assistant (market_data)
   ctx.marketData = async county => {
     await load(); if (!area) return { error: 'The market data (jobs, permits, new businesses, news) hasn’t been built yet. It fills in after the nightly data refresh.' };
@@ -55,6 +56,22 @@ export function initArea(ctx) {
       out.biz = ms.map(m => ({ m, n: sum(F, f => B.months[f]?.[m]) }));
       out.latest = F.flatMap(f => (B.latest?.[f] || []).map(x => ({ ...x, county: cname(f) }))).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 40);
     }
+    // modeled consumer spending (ACS income × BLS CE) summed over the tracts
+    const st = tr.filter(t => t.spend != null);
+    if (st.length && market.spendYear) {
+      const cats = {}; st.forEach(t => Object.entries(t.sp || {}).forEach(([k, v]) => cats[k] = (cats[k] || 0) + (v || 0)));
+      const hh = sum(st, t => t.hh);
+      out.spend = { total: sum(st, t => t.spend), perHH: hh ? Math.round(sum(st, t => t.spend) / hh) : null, cats, year: market.spendYear, acs: market.year };
+    }
+    // city sales-tax allocations (Comptroller): monthly total for the area, and each city's last 12 months vs the 12 before
+    const ST = area.salesTax;
+    if (ST?.cities) {
+      const names = new Set(F.map(cname)), cities = Object.entries(ST.cities).filter(([, c]) => names.has(c.county));
+      const ms = [...new Set(cities.flatMap(([, c]) => Object.keys(c.months)))].sort();
+      out.tax = ms.map(m => ({ m, n: sum(cities, ([, c]) => c.months[m]) }));
+      const lastM = ms[ms.length - 1], yr = (c, back) => { const keys = Object.keys(c.months).sort().filter(k => k <= lastM); const end = keys.length - back * 12; return keys.length >= end && end > 0 ? keys.slice(Math.max(0, end - 12), end).reduce((a, k) => a + c.months[k], 0) : null; };
+      out.taxCities = cities.map(([n, c]) => ({ city: n, county: c.county, last12: yr(c, 0), prior12: yr(c, 1) })).sort((a, b) => (b.last12 || 0) - (a.last12 || 0));
+    }
     if (area.news) {
       const names = new Set(F.map(cname)), places = (area.newsPlaces || []).filter(p => sel === 'all' || names.has(p.county)), seen = new Set();
       out.places = places;
@@ -67,9 +84,9 @@ export function initArea(ctx) {
   // ---------- charts (inline SVG; hover via data-tip; every chart also has a table) ----------
   let W = 520; const H = 170, PADL = 44, PADB = 22, PADT = 8;
   const nice = v => { if (v <= 0) return 1; const p = 10 ** Math.floor(Math.log10(v)), m = v / p; return (m <= 1 ? 1 : m <= 1.5 ? 1.5 : m <= 2 ? 2 : m <= 3 ? 3 : m <= 4 ? 4 : m <= 5 ? 5 : m <= 6 ? 6 : m <= 8 ? 8 : 10) * p; };
-  function axis(max) {
+  function axis(max, fmt = fmtN) {
     const top = nice(max), ticks = [0, top / 2, top];
-    return { top, html: ticks.map(t => { const y = PADT + (H - PADT - PADB) * (1 - t / top); return '<line class="mk-grid" x1="' + PADL + '" x2="' + W + '" y1="' + y + '" y2="' + y + '"/><text class="mk-ax" x="' + (PADL - 6) + '" y="' + (y + 3) + '" text-anchor="end">' + fmtN(t) + '</text>'; }).join('') };
+    return { top, html: ticks.map(t => { const y = PADT + (H - PADT - PADB) * (1 - t / top); return '<line class="mk-grid" x1="' + PADL + '" x2="' + W + '" y1="' + y + '" y2="' + y + '"/><text class="mk-ax" x="' + (PADL - 6) + '" y="' + (y + 3) + '" text-anchor="end">' + fmt(t) + '</text>'; }).join('') };
   }
   // bars with a flat baseline and rounded data end: a path with only the top corners rounded
   const bar = (x, y, w, h, r = 3) => { if (h <= 0) return ''; r = Math.min(r, w / 2, h); return 'M' + x + ',' + (y + h) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y + 'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h) + 'Z'; };
@@ -85,13 +102,18 @@ export function initArea(ctx) {
     }).join('');
     return '<svg class="mk-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Housing units permitted per year">' + ax.html + marks + '</svg>';
   }
-  function bizChart(rows) {
-    const max = Math.max(1, ...rows.map(r => r.n)), ax = axis(max), plotH = H - PADT - PADB, bw = (W - PADL - 8) / rows.length, w = Math.max(2, bw - 2), cur = new Date().toISOString().slice(0, 7), firstJan = rows.findIndex(r => r.m.endsWith('-01'));
+  function bizChart(rows, unit = 'new locations', fmt = fmtN) {
+    const max = Math.max(1, ...rows.map(r => r.n)), ax = axis(max, fmt), plotH = H - PADT - PADB, bw = (W - PADL - 8) / rows.length, w = Math.max(2, bw - 2), cur = new Date().toISOString().slice(0, 7), firstJan = rows.findIndex(r => r.m.endsWith('-01'));
     return '<svg class="mk-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="New business locations per month">' + ax.html + rows.map((r, i) => {
       const x = PADL + 8 + i * bw, h = r.n / ax.top * plotH, [yy, mm] = r.m.split('-'), lbl = MON[+mm - 1] + ' ' + yy, partial = r.m >= cur;
-      return '<g class="mk-hit" data-tip="' + esc(lbl + ': ' + fmtN(r.n) + ' new locations' + (partial ? ' (month in progress)' : '')) + '"><rect x="' + x + '" y="' + PADT + '" width="' + bw + '" height="' + plotH + '" fill="transparent"/>' +
+      return '<g class="mk-hit" data-tip="' + esc(lbl + ': ' + fmt(r.n) + ' ' + unit + (partial ? ' (month in progress)' : '')) + '"><rect x="' + x + '" y="' + PADT + '" width="' + bw + '" height="' + plotH + '" fill="transparent"/>' +
         '<path class="' + (partial ? 'mk-part' : 'mk-sf') + '" d="' + bar(x, PADT + plotH - h, w, h, 2) + '"/>' + (mm === '01' || (i === 0 && firstJan >= 4) ? '<text class="mk-ax" x="' + x + '" y="' + (H - 6) + '">' + (mm === '01' ? yy : lbl) + '</text>' : '') + '</g>';
     }).join('') + '</svg>';
+  }
+  // horizontal bars for any { label: value } (spending by category)
+  function catBars(obj, fmt) {
+    const top = Object.entries(obj).sort((a, b) => b[1] - a[1]), max = top[0]?.[1] || 1, tot = top.reduce((a, [, v]) => a + v, 0) || 1;
+    return '<div class="mk-hbars">' + top.map(([k, v]) => '<div class="mk-hb mk-hit" data-tip="' + esc(k + ': ' + fmt(v) + ' a year (' + Math.round(v / tot * 100) + '% of these categories)') + '"><span>' + esc(k) + '</span><i><b style="width:' + (v / max * 100).toFixed(1) + '%"></b></i><em>' + esc(fmt(v)) + '</em></div>').join('') + '</div>';
   }
   function sectorBars(sec) {
     const tot = sec.reduce((s, v) => s + v, 0) || 1, top = sec.map((v, i) => [i, v]).sort((a, b) => b[1] - a[1]).slice(0, 8), max = top[0]?.[1] || 1;
@@ -116,12 +138,13 @@ export function initArea(ctx) {
       s.jobs ? tile(fmtN(s.jobs.n), 'Jobs located here', (s.jobs.gr != null ? pct(s.jobs.gr) + ' since ' + s.jobs.baseYear + ' · ' : '') + 'LODES ' + s.jobs.year) : '',
       last ? tile(fmtN(last.sf + last.mf), 'Homes permitted ' + last.y, prev ? pct(chg(last.sf + last.mf, prev.sf + prev.mf)) + ' vs ' + prev.y : '') : '',
       s.ytd ? tile(fmtN(s.ytd.n), 'Homes permitted ' + s.ytd.year + ' YTD', 'Jan–' + MON[s.ytd.month - 1] + (s.ytd.prior ? ' · ' + pct(chg(s.ytd.n, s.ytd.prior)) + ' vs same months ' + (s.ytd.year - 1) : '')) : '',
-      last12.length ? tile(fmtN(sum(last12, r => r.n)), 'New businesses', 'Last ' + last12.length + ' months, still open') : ''
+      last12.length ? tile(fmtN(sum(last12, r => r.n)), 'New businesses', 'Last ' + last12.length + ' months, still open') : '',
+      s.spend ? tile(fmtM(s.spend.total), 'Consumer spending (est.)', (s.spend.perHH ? fmtM(s.spend.perHH) + ' per household · ' : '') + 'a year') : ''
     ].filter(Boolean);
     const opts = '<option value="all">Whole region</option>' + area.counties.map(c => '<option value="' + c.fips + '"' + (sel === c.fips ? ' selected' : '') + '>' + esc(c.name) + ' County</option>').join('');
     const placeOpts = s.places ? '<option value="">All places</option>' + s.places.map(p => '<option value="' + esc(p.key) + '"' + (newsPlace === p.key ? ' selected' : '') + '>' + esc(p.label) + '</option>').join('') : '';
     root.innerHTML = '<div class="vhead"><div><div class="kicker">Market</div><h2>Growth signals ' + (sel === 'all' ? 'across the region' : 'in ' + esc(cname(sel)) + ' County') + '</h2>' +
-      '<div class="vsub">Jobs, housing permits, new businesses and local development news from free public sources, refreshed with the nightly build' + (area.built ? ' (last ' + new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : '') + '. No sales or lease comps: Texas doesn’t disclose sale prices.</div></div>' +
+      '<div class="vsub">Jobs, housing permits, new businesses, consumer spending, city sales tax and local development news from free public sources, refreshed with the nightly build' + (area.built ? ' (last ' + new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : '') + '. No sales or lease comps: Texas doesn’t disclose sale prices.</div></div>' +
       '<div class="vctl"><label>Area <select class="chip" id="mkCounty">' + opts.replace('value="all"', 'value="all"' + (sel === 'all' ? ' selected' : '')) + '</select></label></div></div>' +
       (tiles.length ? '<div class="kpis mk-kpis" style="grid-template-columns:repeat(' + tiles.length + ',1fr)">' + tiles.join('') + '</div>' : '') +
       '<div class="mk-tip" id="mkTip" role="tooltip"></div><div class="mk-grid">' +
@@ -131,6 +154,12 @@ export function initArea(ctx) {
         '<div class="rnote">Texas Comptroller sales-tax permits issued per location, counting only those still active, so older months read low (closed businesses drop out). Covers businesses that sell taxable goods or services: retail, restaurants, many services; most offices and medical don’t need one.</div></section>' : '') +
       (s.jobs ? '<section class="mk-box"><h3>Jobs by industry (' + s.jobs.year + ')</h3>' + sectorBars(s.jobs.sec) + table(['Industry', 'Jobs'], s.jobs.sec.map((v, i) => [SECTORS[i][1], fmtN(v)]).sort((a, b) => parseInt(b[1].replace(/,/g, '')) - parseInt(a[1].replace(/,/g, '')))) +
         '<div class="rnote">US Census LEHD LODES: jobs counted where people work (by employer location, all private and public jobs covered by unemployment insurance). Turn on the Jobs layers under Map Layers → Demographics for the tract map.</div></section>' : '') +
+      (s.spend ? '<section class="mk-box"><h3>Consumer spending by category, a year (estimate)</h3>' + catBars(Object.fromEntries(Object.entries(s.spend.cats).map(([k, v]) => [CAT_LABEL[k] || k, v])), fmtM) +
+        table(['Category', 'Per year'], Object.entries(s.spend.cats).sort((a, b) => b[1] - a[1]).map(([k, v]) => [CAT_LABEL[k] || k, fmtM(v)])) +
+        '<div class="rnote">An estimate, not a measurement: households by income in each census tract (Census ACS ' + s.spend.acs + ') × what households at that income spend (BLS Consumer Expenditure Survey ' + s.spend.year + ', adjusted to the South region). Map it under Map Layers → Demographics.</div></section>' : '') +
+      (s.tax?.length ? '<section class="mk-box"><h3>Local sales tax sent to cities, per month</h3>' + bizChart(s.tax.map(r => ({ m: r.m, n: r.n })), 'in city sales tax', fmtM) +
+        table(['City', 'County', 'Last 12 months', 'Change vs prior 12'], s.taxCities.slice(0, 25).map(c => [c.city, c.county, c.last12 != null ? fmtM(c.last12) : '—', c.last12 != null && c.prior12 ? pct(chg(c.last12, c.prior12)) : '—'])) +
+        '<div class="rnote">Texas Comptroller sales-tax allocations: the city\'s share of sales tax, paid about two months after the sales. A real measure of taxable local spending (retail, restaurants, many services), for the cities with filings in the area.</div></section>' : '') +
       (s.news ? '<section class="mk-box"><h3>Local development news</h3><div class="mk-ctl"><select class="chip" id="mkPlace" aria-label="News place">' + placeOpts + '</select></div>' +
         (s.news.length ? s.news.map((a, i) => (i === 10 ? '<details class="raw mk-more"><summary>' + (s.news.length - 10) + ' more</summary>' : '') + '<a class="chitem" target="_blank" rel="noopener" href="' + esc(a.url) + '"><span><b>' + esc(a.title) + '</b><em>' + esc(a.domain) + (a.date ? ' · ' + esc(a.date) : '') + ' · ' + esc(a.place) + '</em></span></a>').join('') + (s.news.length > 10 ? '</details>' : '') : '<div class="rnote">No articles found in the last few months.</div>') +
         '<div class="rnote">Google News search for development, construction, rezoning and real estate stories naming each county and its busiest towns; kept for 120 days. Headlines link to the publisher.</div></section>' : '') +

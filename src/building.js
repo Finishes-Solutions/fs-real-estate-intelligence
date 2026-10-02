@@ -287,6 +287,7 @@ export function initBuildings(ctx) {
     const sq = sqMiles(t.geom), r = Math.sqrt(sq / Math.PI), f1 = v => v < 10 ? v.toFixed(1) : String(Math.round(v));
     el.innerHTML = '<div class="lt">Demographics</div><div class="rnote">Census tract ' + esc(tractNo(t.g)) + ' around this building: about ' + f1(sq) + ' sq mi (like a ' + f1(r) + '-mile radius). Tracts follow population, so they are small in dense areas and large in rural ones. US Census ACS ' + market.year + ' 5-year.</div><div class="kgrid"><div><b>' + (t.pop != null ? fmtN(t.pop) : '—') + '</b><span>Population</span></div><div><b>' + g + '</b><span>Growth since ' + (market.baseYear || '') + '</span></div>' +
       '<div><b>' + (t.inc ? fmtM(t.inc) : '—') + '</b><span>Median income</span></div><div><b>' + (t.val ? fmtM(t.val) : '—') + '</b><span>Median home value</span></div>' +
-      (market.jobsYear && t.jobs != null ? '<div><b>' + fmtN(t.jobs) + '</b><span>Jobs here (' + market.jobsYear + ')</span></div><div><b>' + (t.jgr == null ? '—' : (t.jgr > 0 ? '+' : '') + t.jgr + '%') + '</b><span>Job growth since ' + (market.jobsBaseYear || '') + '</span></div>' : '') + '</div>';
+      (market.jobsYear && t.jobs != null ? '<div><b>' + fmtN(t.jobs) + '</b><span>Jobs here (' + market.jobsYear + ')</span></div><div><b>' + (t.jgr == null ? '—' : (t.jgr > 0 ? '+' : '') + t.jgr + '%') + '</b><span>Job growth since ' + (market.jobsBaseYear || '') + '</span></div>' : '') +
+      (market.spendYear && t.sph != null ? '<div><b>' + fmtM(t.sph) + '</b><span>Spending / household (est.)</span></div><div><b>' + (t.dine != null ? fmtM(t.dine) : '—') + '</b><span>Dining out / yr, tract (est.)</span></div>' : '') + '</div>';
   }
 }
