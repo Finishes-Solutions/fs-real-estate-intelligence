@@ -1,6 +1,6 @@
 // Offline tests for api/regrid.js: caps, saved records, fail-closed without a counter, token never sent to the browser.
 import assert from 'node:assert/strict';
-process.env.REGRID_TOKEN = 'rg-secret'; process.env.SUPABASE_URL = 'https://db.test'; process.env.SUPABASE_SECRET_KEY = 'sb_secret_x';
+process.env.REGRID_API_KEY = 'rg-secret'; /* the name set on Vercel */ process.env.SUPABASE_URL = 'https://db.test'; process.env.SUPABASE_SECRET_KEY = 'sb_secret_x';
 process.env.REGRID_RECORD_CAP = '3'; process.env.REGRID_TILE_CAP = '2';
 const db = { usage: {}, parcels: {} }, calls = [];
 let regridUsed = { results: 0, tiles: 0 };
@@ -53,5 +53,5 @@ assert.equal(calls.filter(c => c.startsWith('tiles.regrid.com')).length, 2);
 r = await call({ usage: '1' }); assert.equal(r.body.records.used, 3); assert.equal(r.body.tiles.used, 2); assert.equal(r.body.records.cap, 3);
 // fail closed: no token / no counter
 delete process.env.SUPABASE_URL; r = await call({ lat: '30.4', lon: '-95.9' }); assert.equal(r.code, 503); assert.match(r.body.error, /usage counter/);
-process.env.SUPABASE_URL = 'https://db.test'; delete process.env.REGRID_TOKEN; r = await call({ tile: '15/1/1' }); assert.equal(r.code, 503);
+process.env.SUPABASE_URL = 'https://db.test'; delete process.env.REGRID_API_KEY; r = await call({ tile: '15/1/1' }); assert.equal(r.code, 503);
 console.log('regrid tests passed');

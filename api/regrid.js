@@ -60,8 +60,8 @@ export function trimRecord(feature) {
 }
 
 export default async function handler(req, res) {
-  const token = process.env.REGRID_TOKEN, q = req.query || {};
-  if (!token) return res.status(503).json({ error: 'Regrid isn’t set up on this deployment (REGRID_TOKEN is missing).' });
+  const token = process.env.REGRID_TOKEN || process.env.REGRID_API_KEY, q = req.query || {};
+  if (!token) return res.status(503).json({ error: 'Regrid isn’t set up on this deployment (REGRID_API_KEY is missing).' });
   const db = supa();
   if (!db) return res.status(503).json({ error: 'Regrid is paused: the usage counter needs SUPABASE_URL and SUPABASE_SECRET_KEY on the server.' });
 

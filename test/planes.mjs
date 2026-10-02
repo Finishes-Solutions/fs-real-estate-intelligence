@@ -15,7 +15,7 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.host === 'api.airplanes.live') return mode === 'all-down' ? json({ error: 'x' }, 503) : json({ now: 1759440000, ac: AC.slice(0, 2) });
   if (u.host === 'api.adsb.lol' && u.pathname === '/api/0/routeset') {
     const b = JSON.parse(opts.body); assert.equal(b.planes[0].callsign, 'UAL1234');
-    return json([{ callsign: 'UAL1234', _airport_codes_iata: 'IAH-ORD', _airports: [{ iata: 'IAH', name: 'George Bush Intercontinental', location: 'Houston', countryiso2: 'US' }, { iata: 'ORD', name: "Chicago O'Hare", location: 'Chicago', countryiso2: 'US' }], plausible: 1 }]);
+    return json([{ callsign: 'UAL1234', _airport_codes_iata: 'IAH-ORD', _airports: [{ iata: 'IAH', name: 'George Bush Intercontinental', location: 'Houston', countryiso2: 'US', lat: 29.984444, lon: -95.341389 }, { iata: 'ORD', name: "Chicago O'Hare", location: 'Chicago', countryiso2: 'US', lat: '41.978611', lon: '-87.904722' }], plausible: 1 }]);
   }
   if (u.host === 'db.example' && u.pathname === '/rest/v1/rpc/add_air_samples') { rpc.push(JSON.parse(opts.body)); return new Response(null, { status: 204 }); }
   if (u.host === 'db.example' && u.pathname === '/rest/v1/rpc/air_density') {
@@ -50,6 +50,7 @@ mode = 'all-down'; res = mock(); await planes({ query: { bbox: '-96.2,29.6,-95.2
 res = mock(); await planes({ query: { bbox: 'nope' }, headers: H }, res); assert.equal(res.code, 400);
 res = mock(); await planes({ query: { route: 'ual1234', lat: '29.98', lon: '-95.34' }, headers: H }, res);
 assert.deepEqual([res.body.origin.code, res.body.destination.code, res.body.destination.city], ['IAH', 'ORD', 'Chicago']);
+assert.deepEqual([res.body.origin.lat, res.body.origin.lon, res.body.destination.lat, res.body.destination.lon], [29.9844, -95.3414, 41.9786, -87.9047], 'airport coordinates for drawing the route');
 res = mock(); await planes({ query: { route: 'x; drop' }, headers: H }, res); assert.equal(res.code, 400);
 // history without the database: says so, doesn't fail
 res = mock(); await planes({ query: { history: '-95.34,29.98' }, headers: H }, res); assert.equal(res.body.history, false); assert.match(res.body.note, /SUPABASE_SECRET_KEY/);

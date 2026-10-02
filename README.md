@@ -59,8 +59,8 @@ Plan: Regrid Bundle Access, 2,000 parcel records and 200,000 tiles a month; over
 - **Parcel Lines (Regrid)** in Map Layers: parcel boundaries from street zoom (15) in. Tiles are only requested at zoom 15–16 (closer zooms reuse them) and the CDN keeps each tile for a week, so the same tile is paid for at most once a week.
 - **Get Regrid Details** on the building card: one parcel record per click (zoning, standardized land use, the full record). Each parcel is saved in Supabase (`regrid_parcels`) and is free after that.
 - **Caps** (`api/regrid.js`): `REGRID_RECORD_CAP` (default 1,800) and `REGRID_TILE_CAP` (default 180,000) a billing cycle. Every billable call is counted atomically in Supabase (`regrid_usage`, `regrid_take()`), and the count never runs behind what Regrid's own `/usage` endpoint reports. At the cap, records are refused with a message and tiles come back empty. Without Supabase there is no counter, so Regrid is refused entirely (fails closed).
-- The token stays on the server: set `REGRID_TOKEN` on Vercel (Sensitive). It is never in the code, the repo or the browser.
-- Setup: `supabase/migrations/20261007000000_regrid.sql` (already applied to the project), `REGRID_TOKEN`, and `SUPABASE_URL` + `SUPABASE_SECRET_KEY` on Vercel.
+- The token stays on the server: set `REGRID_API_KEY` (or `REGRID_TOKEN`) on Vercel (Sensitive). It is never in the code, the repo or the browser.
+- Setup: `supabase/migrations/20261007000000_regrid.sql` (already applied to the project), `REGRID_API_KEY`, and `SUPABASE_URL` + `SUPABASE_SECRET_KEY` on Vercel.
 - The Sources tab shows records and tiles used this cycle against the caps.
 
 ## Area context (Market view, jobs layers, registered businesses)

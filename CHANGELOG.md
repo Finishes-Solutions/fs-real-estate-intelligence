@@ -5,7 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
-### 6:31 PM CT: Regrid wired in, with hard monthly caps
+### 6:40 PM CT: Plane routes on the map; Regrid reads REGRID_API_KEY
+- Selecting a plane now draws its route: the leg already flown as a solid curved line from the origin airport to the plane, the rest dashed to the destination, with both airports labeled. The map zooms to fit the whole trip (unless you're following the plane). The line moves with the plane and clears when you close the card. Planes whose route isn't in the adsb.lol database show no line.
+- Regrid now reads the token from `REGRID_API_KEY` (the name set on Vercel); `REGRID_TOKEN` also works.
+
+### 6:31 PM CT: Regrid wired in, with hard monthly caps (3548070)
 - New **Parcel Lines (Regrid)** layer in Map Layers: parcel boundaries at street zoom.
 - New **Get Regrid Details** button on the building card: zoning, standardized land use and the full Regrid parcel record. A parcel looked up once is saved and free after that.
 - Hard caps so it never goes into overage: 1,800 parcel records and 180,000 tiles a month (your plan includes 2,000 and 200,000). At the cap the button says so and the parcel lines stop drawing. Usage shows on the Sources tab.
