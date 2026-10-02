@@ -45,11 +45,12 @@ export function countyCheck(outlines) {
 }
 
 const d = s => s || null;
-// integer columns: TDLR costs can carry cents ("148711.28") and AI unit counts can be fractional
+// integer columns (sqft, units) refuse decimals; cost keeps cents (numeric(14,2))
+export const cents = v => { const n = Number(v); return Number.isFinite(n) && Math.abs(n) < 1e12 ? Math.round(n * 100) / 100 : 0; };
 const int = (v, max = 2.1e9) => { const n = Math.round(Number(v)); return Number.isFinite(n) && Math.abs(n) < max ? n : null; };
 // compact filing -> public.filings row
 export function toRow(f, r, fips) {
-  return { id: f.id, name: f.name, county: f.county, fips, city: d(f.city), zip: d(r.zip), addr: d(f.addr), type: f.type, cost: int(f.cost, 9e15) ?? 0, sqft: f.sqft ? int(f.sqft) : null, owner: d(f.owner), scope: d(f.scope),
+  return { id: f.id, name: f.name, county: f.county, fips, city: d(f.city), zip: d(r.zip), addr: d(f.addr), type: f.type, cost: cents(f.cost), sqft: f.sqft ? int(f.sqft) : null, owner: d(f.owner), scope: d(f.scope),
     reg: d(f.reg), status: d(f.status), est_start: d(f.start), est_end: d(f.end), ts: d(f.ts), te: d(f.te), ts_est: f.tsE, te_est: f.teE,
     lat: f.lat ?? null, lon: f.lon ?? null, approx: !!f.approx, misfiled: !!f.misfiled, geo_src: f.gp || null,
     use: d(f.use), subtype: d(f.sub), tenant: d(f.ten), developer: d(f.dev), architect: d(f.arch), gc: d(f.gc), units: f.units == null ? null : int(f.units), summary: d(f.sum),

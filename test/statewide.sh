@@ -12,6 +12,8 @@ run 2 COUNTIES=Waller MODE=recent RECENT_MONTHS=3 BUMP=1
 run 3 MODE=backfill PERIOD_START=2026-06-01 MAX_COUNTIES=2
 # keyless: GitHub OIDC -> edge function for the database, site proxy for AI
 run 5 MODE=backfill MOCK_DB_SIZE=999999999999 PERIOD_START=2026-06-01
+# a database still on the old whole-dollar cost column keeps loading (rounded)
+cp "$T/db.json" "$T/db.keep"; run 6 MODE=backfill COUNTIES=Grimes PERIOD_START=2026-07-01 MOCK_COST_BIGINT=1; grep -q 'still a whole-dollar column' "$T/log6"; cp "$T/db.json" "$T/db6.json"; cp "$T/db.keep" "$T/db.json"
 run 4 SUPABASE_SECRET_KEY= OPENAI_API_KEY= ACTIONS_ID_TOKEN_REQUEST_URL='http://oidc.test/t?x=1' ACTIONS_ID_TOKEN_REQUEST_TOKEN=rt AI_PROXY_URL=http://site.test/api/pipeline-ai COUNTIES=Grimes PERIOD_START=2026-07-01 MODE=backfill
 n() { grep -c "$2" "$T/calls$1.log" || true; }
 echo "run1: details $(n 1 'TABS\*') openai $(n 1 chat/completions) | run2: details $(n 2 'TABS\*') openai $(n 2 chat/completions)"
@@ -24,6 +26,7 @@ a.equal(c1('Dallas').status,'error','wrong-county guard'); a.match(c1('Dallas').
 a.ok(db.filings.filter(f=>f.fips==='48473').every(f=>f.use==='Medical'&&f.lat&&f.scope),'enriched + geocoded rows');
 a.ok(!db1.filings.some(f=>f.fips==='48113'),'guarded county not stored');
 a.ok(db.filings.filter(f=>f.fips==='48473').every(f=>f.detail&&f.ai_key),'rows carry detail + ai_key');
+a.ok(db.filings.some(f=>String(f.cost).endsWith('.28')),'cents kept'); const db6=JSON.parse(fs.readFileSync('$T/db6.json')); a.ok(db6.filings.filter(f=>f.fips==='48185').every(f=>Number.isInteger(f.cost)),'bigint fallback rounds');
 const ch=db.changes||[]; a.equal(ch.filter(x=>x.kind==='cost').length,3,'nightly cost changes recorded'); a.equal(ch.filter(x=>x.kind==='new').length,0);
 a.equal(out(1).trim(),'remaining=0'); a.match(out(3),/remaining=25[01]/,'backfill reports remaining counties');
 a.equal(db.runs.length,5); a.equal(out(5).trim(),'remaining=0','size guard stops chaining'); a.equal(c('Grimes').status,'done','keyless run'); a.ok(db.filings.filter(f=>f.fips==='48185').every(f=>f.developer==='Proxy Dev'),'AI via site proxy'); a.ok(db.runs[0].tokens_in>0,'tokens logged');

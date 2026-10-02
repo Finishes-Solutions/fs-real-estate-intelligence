@@ -51,7 +51,7 @@ export function initAssistant(ctx) {
     ctx.mapPadding();
   }
   function close() { app.classList.remove('ai-open', 'ai-tall'); el.setAttribute('aria-hidden', 'true'); stopVoice(); ctx.mapPadding(); }
-  $('aiFab').onclick = () => open(); $('aiClose').onclick = close; document.getElementById('askLaunch')?.addEventListener('click', () => open());
+  $('aiFab').onclick = () => open(); $('aiClose').onclick = close;
   $('aiNew').onclick = () => { history = []; thread = null; log.innerHTML = ''; renderEmpty(); ctx.clearHighlight(); };
   document.addEventListener('keydown', e => {
     if (e.key === '/' && !e.target.closest('input,textarea,select,[contenteditable]')) { e.preventDefault(); open(); }
@@ -116,7 +116,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', show_view: 'Switching view…', reset_map: 'Resetting…' };
+  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -223,9 +223,28 @@ export function initAssistant(ctx) {
         if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt || zoom >= 16.5 ? 60 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });
         actionChip((a.orbit ? 'Orbiting ' : 'Moved the map to ') + label); return { moved_to: label, zoom: +zoom.toFixed(1), orbiting: !!a.orbit, ...(note ? { note } : {}) };
       }
+      if (name === 'highlight_area') {
+        const pl = await ctx.highlightPlace(String(a.place || ''), a.kind);
+        if (!pl) return { error: 'Couldn’t find “' + a.place + '” in OpenStreetMap. Try the official name with its city or county.' };
+        await new Promise(r => setTimeout(r, 50));
+        const out = { ...ctx.placeSummary() };
+        if (!pl.geom) out.note = 'Shown as a point: OpenStreetMap has no outline for it.';
+        if (a.filter && pl.geom && /Polygon/.test(pl.geom.type)) { ctx.setSelection('place', pl.label, pl.geom); ctx.clearPlace(); out.filtered = true; out.filings = ctx.visible.length; }
+        if (a.compare && pl.geom && /Polygon/.test(pl.geom.type)) out.added_to_compare = ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom });
+        actionChip('Outlined ' + pl.label, () => ctx.clearPlace()); return out;
+      }
+      if (name === 'compare_areas') {
+        const names = (a.places || []).map(String).filter(Boolean).slice(0, 4); if (names.length < 2) return { error: 'Give 2 to 4 places.' };
+        if (a.replace !== false) ctx.compare.clear();
+        const done = [], missed = [];
+        for (const n of names) { const pl = await ctx.highlightPlace(n); if (pl?.geom && /Polygon/.test(pl.geom.type)) { ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom }); done.push(pl.label); } else missed.push(n); }
+        ctx.clearPlace(); ctx.setView('compare');
+        const base = ctx.filtered(), areas = ctx.compare.list().map(ar => { const l = base.filter(f => d3.geoContains(ar.geom, [f.lon, f.lat])); return { area: ar.label, filings: l.length, total_value: l.reduce((s, f) => s + f.cost, 0), new_builds: l.filter(f => f.type === 'New').length, largest: l.sort((x, y) => y.cost - x.cost).slice(0, 3).map(row) }; });
+        actionChip('Comparing ' + done.join(', ')); return { compared: areas, ...(missed.length ? { not_found: missed } : {}) };
+      }
       if (name === 'stop_orbit') { ctx.stopOrbit(); return { stopped: true }; }
       if (name === 'set_map_options') { const done = ctx.setMapOptions(a); actionChip('Map: ' + done.join(', ')); return { changed: done }; }
-      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', who: 'Activity', changes: 'Updates' }[a.view] || a.view)); return { view: a.view }; }
+      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates' }[a.view] || a.view)); return { view: a.view }; }
       if (name === 'reset_map') { const before = ctx.snapshot(); ctx.resetAll(); actionChip('Reset the map', () => ctx.restore(before)); return { reset: true, filings: ctx.visible.length }; }
       return { error: 'Unknown tool ' + name };
     } catch (e) { console.error(e); return { error: e.message }; }

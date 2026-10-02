@@ -10,6 +10,10 @@ import { initSaved } from './saved.js';
 import { initBuildings } from './building.js';
 import { initMobile } from './mobile.js';
 import { initField } from './field.js';
+import { initMapSearch } from './mapsearch.js';
+import { initCompare } from './compare.js';
+import { initKpis } from './kpis.js';
+import { initExport } from './export.js';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
 const getJSON=(u,optional)=>fetch(u,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error(u+' '+r.status); return r.json(); }).catch(e=>{ if(optional) return null; throw e; });
@@ -190,7 +194,15 @@ function curSpec(withSel=true){ const s={};
 function selSpec(){ if(!sel.feature) return null;
   if(sel.kind==='radius') return {k:'r',c:sel.center,mi:radiusMiles,label:sel.place||''};
   if(sel.kind==='county') return {k:'c',names:COUNTIES.filter(n=>sel.counties.has(n))};
-  return {k:'p',ring:sel.feature.coordinates[0].slice(0,-1).map(p=>[+p[0].toFixed(4),+p[1].toFixed(4)]),label:sel.label}; }
+  return {k:'p',ring:urlRing(sel.feature),label:sel.label}; }
+function urlRing(g){ let ring=g.coordinates[0];
+  if(g.type==='MultiPolygon') ring=g.coordinates.map(p=>p[0]).sort((a,b)=>Math.abs(d3.geoArea({type:'Polygon',coordinates:[b]})-2*Math.PI)-Math.abs(d3.geoArea({type:'Polygon',coordinates:[a]})-2*Math.PI))[0]||[];
+  ring=ring.slice(0,-1); const step=Math.max(1,Math.ceil(ring.length/160)); return ring.filter((p,i)=>i%step===0).map(p=>[+p[0].toFixed(4),+p[1].toFixed(4)]); }
+// d3 wants clockwise outer rings; GeoJSON from other sources is usually counter-clockwise
+function fixWinding(g){ const fix=rings=>{ const poly={type:'Polygon',coordinates:rings}; return d3.geoArea(poly)>2*Math.PI?rings.map(r=>r.slice().reverse()):rings; };
+  if(g.type==='Polygon') return {type:'Polygon',coordinates:fix(g.coordinates)};
+  if(g.type==='MultiPolygon') return {type:'MultiPolygon',coordinates:g.coordinates.map(fix)};
+  return g; }
 const monthOK=f=>{ if(!state.month) return true; const [a,b]=monthRange(state.month); return f.ts<=b&&f.te>=a; };
 const listeners=[];
 function applyFilters(){
@@ -198,9 +210,6 @@ function applyFilters(){
   visible=F.filter(f=>m(f)&&inSel(f)&&monthOK(f));
   if(state.who){ const m2=makeMatcher({...spec,who:null},{changed:CHANGED}); visibleNoWho=F.filter(f=>m2(f)&&inSel(f)&&monthOK(f)); } else visibleNoWho=visible;
   if(sel.kind==='radius'){ visible.forEach(f=>f._d=d3.geoDistance([f.lon,f.lat],sel.center)*EARTH_MI); visible.sort((a,b)=>a._d-b._d); }
-  document.getElementById('kCount').textContent=fmtN(visible.length);
-  document.getElementById('kValue').textContent=fmtM(visible.reduce((s,f)=>s+f.cost,0));
-  document.getElementById('kNew').textContent=fmtN(visible.filter(f=>f.type==='New').length);
   document.getElementById('selbar').classList.add('on');
   document.getElementById('selName').textContent=sel.feature?sel.label:'Everything shown';
   document.getElementById('selStats').textContent=fmtN(visible.length)+' filings · '+fmtM(visible.reduce((s,f)=>s+f.cost,0));
@@ -227,7 +236,6 @@ TYPES.forEach(t=>{
   tRow.appendChild(b);
 });
 document.getElementById('minCost').onchange=e=>{state.min=+e.target.value; applyFilters();};
-let qT; document.getElementById('q').addEventListener('input',e=>{clearTimeout(qT); qT=setTimeout(()=>{state.q=e.target.value; applyFilters();},120);});
 // use, dates, updates, active-filter summary
 const useSel=document.getElementById('useSel'), dField=document.getElementById('dField'), dFrom=document.getElementById('dFrom'), dTo=document.getElementById('dTo');
 { const n={}; F.forEach(f=>{ const u=f.use||'Unclassified'; n[u]=(n[u]||0)+1; });
@@ -251,7 +259,6 @@ function syncFilterUI(){
   [...chgRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed',state.chg===x.dataset.chg));
   const pk=periodOf(state.d); [...pRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===pk));
   const minEl=document.getElementById('minCost'); if(![...minEl.options].some(o=>+o.value===state.min)){ const o=document.createElement('option'); o.value=state.min; o.textContent=fmtM(state.min)+'+'; minEl.appendChild(o); } minEl.value=String(state.min);
-  const qEl=document.getElementById('q'); if(document.activeElement!==qEl) qEl.value=state.q;
   useSel.querySelector('option[value="*"]')?.remove();
   if(state.uses&&state.uses.size>1){ const o=document.createElement('option'); o.value='*'; o.textContent=state.uses.size+' uses'; useSel.appendChild(o); useSel.value='*'; } else useSel.value=state.uses?[...state.uses][0]:'';
   const dd=state.d&&state.d.f!=='all'?state.d:null; dField.value=dd?dd.f:''; dFrom.value=dd?.from||''; dTo.value=dd?.to||''; dFrom.disabled=dTo.disabled=!dd;
@@ -550,26 +557,37 @@ async function saveFile(filename,data,mime){
 }
 const rowsFor=list=>list.map(f=>({'TABS #':f.id,'Project':f.name,'County':f.county,'City':f.city,'Address':f.addr,'Type':TYPE_LABEL[f.type],
   'Use':f.use||'','Subtype':f.sub||'','Tenant':f.ten||'','Units':f.units??'',
-  'Est. value (USD)':Math.round(f.cost),'Sq ft':f.sqft||'','Owner':f.owner,'Developer':f.dev||'','Architect':f.arch||'','GC':f.gc||'','Registered':f.reg,'Status':f.status,'Est. start':f.start,'Est. end':f.end,
+  'Est. value (USD)':+(+f.cost).toFixed(2),'Sq ft':f.sqft||'','Owner':f.owner,'Developer':f.dev||'','Architect':f.arch||'','GC':f.gc||'','Registered':f.reg,'Status':f.status,'Est. start':f.start,'Est. end':f.end,
   'Timeline start':f.ts,'Timeline end':f.te,'Timeline dates':f.tsE||f.teE?'Partly estimated':'As filed','Change this week':f._chg||'','AI summary':f.sum||'','Scope':f.scope,
   ...(sel.kind==='radius'?{'Distance (mi)':Math.round(f._d*100)/100}:{}),'Location':f.approx?'Approximate (city)':'Address','Latitude':f.lat,'Longitude':f.lon,'TABS link':tabsUrl(f.id)}));
-const guard=()=>{ if(!visible.length){ toast('Nothing to export: no filings match.'); return false; } return true; };
-document.getElementById('exCsv').onclick=()=>{ if(!guard()) return; const rows=rowsFor(visible), cols=Object.keys(rows[0]);
-  const q=v=>{ const s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
-  saveFile('tabs-filings-'+slug(scopeLabel())+'-'+stamp+'.csv','\ufeff'+[cols.join(','),...rows.map(r=>cols.map(c=>q(r[c])).join(','))].join('\r\n'),'text/csv'); };
-document.getElementById('exXlsx').onclick=()=>{ if(!guard()) return; if(!window.XLSX){ toast('Excel export is still loading.'); return; }
-  const rows=rowsFor(visible), ws=XLSX.utils.json_to_sheet(rows), cols=Object.keys(rows[0]), li=cols.indexOf('TABS link'), pi=cols.indexOf('Project'), vi=cols.indexOf('Est. value (USD)');
-  rows.forEach((r,i)=>{ const L=XLSX.utils.encode_cell({r:i+1,c:li}),P=XLSX.utils.encode_cell({r:i+1,c:pi}),V=XLSX.utils.encode_cell({r:i+1,c:vi});
-    if(ws[L]) ws[L].l={Target:r['TABS link']}; if(ws[P]) ws[P].l={Target:r['TABS link']}; if(ws[V]) ws[V].z='$#,##0'; });
-  ws['!cols']=cols.map(c=>({wch:{'Project':42,'Address':38,'Owner':30,'Scope':60,'TABS link':48}[c]||14})); ws['!autofilter']={ref:ws['!ref']};
-  const sum=[['Construction filings — '+scopeLabel()],['TDLR TABS registrations, '+PERIOD],['Generated',stamp],['Filters',filterText()||'None'],[],
-    ['Filings',visible.length],['Est. value (USD)',Math.round(visible.reduce((s,f)=>s+f.cost,0))],['New builds',visible.filter(f=>f.type==='New').length],[],['County','Filings','Est. value (USD)','New builds']];
-  COUNTIES.forEach(c=>{ const l=visible.filter(f=>f.county===c); if(l.length) sum.push([c,l.length,Math.round(l.reduce((s,f)=>s+f.cost,0)),l.filter(f=>f.type==='New').length]); });
-  sum.push([],['Type','Filings','Est. value (USD)']); TYPES.forEach(t=>{ const l=visible.filter(f=>f.type===t); if(l.length) sum.push([TYPE_LABEL[t],l.length,Math.round(l.reduce((s,f)=>s+f.cost,0))]); });
-  const ws2=XLSX.utils.aoa_to_sheet(sum); ws2['!cols']=[{wch:28},{wch:14},{wch:18},{wch:12}];
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws2,'Summary'); XLSX.utils.book_append_sheet(wb,ws,'Filings');
-  saveFile('tabs-filings-'+slug(scopeLabel())+'-'+stamp+'.xlsx',new Uint8Array(XLSX.write(wb,{bookType:'xlsx',type:'array'})),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); };
-document.getElementById('exReport').onclick=()=>{ if(!guard()) return; saveFile('tabs-report-'+slug(scopeLabel())+'-'+stamp+'.html',buildReport(visible),'text/html'); };
+const csvText=rows=>{ if(!rows.length) return ''; const cols=Object.keys(rows[0]), q=v=>{ const s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  return '\ufeff'+[cols.join(','),...rows.map(r=>cols.map(c=>q(r[c])).join(','))].join('\r\n'); };
+const fileBase=(kind,label)=>'fs-'+kind+'-'+slug(label||scopeLabel())+'-'+stamp;
+function exportCsv(rows,name){ saveFile(name+'.csv',csvText(rows),'text/csv'); }
+// Excel: one or more sheets [{name, rows|aoa, link}] (link: column holding a URL to hyperlink)
+function exportXlsx(sheets,name){
+  if(!window.XLSX){ toast('Excel export is still loading. Try again in a moment.'); return; }
+  const wb=XLSX.utils.book_new();
+  for(const sh of sheets){
+    const ws=sh.aoa?XLSX.utils.aoa_to_sheet(sh.aoa):XLSX.utils.json_to_sheet(sh.rows);
+    if(sh.rows&&sh.rows.length){ const cols=Object.keys(sh.rows[0]), li=cols.indexOf('TABS link'), pi=cols.indexOf('Project'), vi=cols.indexOf('Est. value (USD)');
+      sh.rows.forEach((r,i)=>{ const L=li>=0&&XLSX.utils.encode_cell({r:i+1,c:li}),P=pi>=0&&XLSX.utils.encode_cell({r:i+1,c:pi}),V=vi>=0&&XLSX.utils.encode_cell({r:i+1,c:vi});
+        if(L&&ws[L]) ws[L].l={Target:r['TABS link']}; if(P&&ws[P]&&r['TABS link']) ws[P].l={Target:r['TABS link']}; if(V&&ws[V]) ws[V].z='$#,##0.00'; });
+      ws['!cols']=cols.map(c=>({wch:{'Project':42,'Address':38,'Owner':30,'Scope':60,'AI summary':50,'TABS link':48,'Name':36,'Metric':26}[c]||14})); ws['!autofilter']={ref:ws['!ref']}; }
+    else if(sh.aoa) ws['!cols']=[{wch:30},{wch:18},{wch:18},{wch:18},{wch:18}];
+    XLSX.utils.book_append_sheet(wb,ws,sh.name.slice(0,31));
+  }
+  saveFile(name+'.xlsx',new Uint8Array(XLSX.write(wb,{bookType:'xlsx',type:'array'})),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+function summaryAoa(list,label){
+  const sum=[['Construction filings — '+(label||scopeLabel())],['TDLR TABS registrations, '+PERIOD],['Generated',stamp],['Filters',filterText()||'None'],[],
+    ['Filings',list.length],['Est. value (USD)',+list.reduce((s,f)=>s+f.cost,0).toFixed(2)],['New builds',list.filter(f=>f.type==='New').length],[],['County','Filings','Est. value (USD)','New builds']];
+  COUNTIES.forEach(c=>{ const l=list.filter(f=>f.county===c); if(l.length) sum.push([c,l.length,+l.reduce((s,f)=>s+f.cost,0).toFixed(2),l.filter(f=>f.type==='New').length]); });
+  sum.push([],['Type','Filings','Est. value (USD)']); TYPES.forEach(t=>{ const l=list.filter(f=>f.type===t); if(l.length) sum.push([TYPE_LABEL[t],l.length,+l.reduce((s,f)=>s+f.cost,0).toFixed(2)]); });
+  return sum; }
+function exportGeoJSON(list,name){ const rows=rowsFor(list);
+  saveFile(name+'.geojson',JSON.stringify(fc(list.map((f,i)=>({type:'Feature',properties:rows[i],geometry:{type:'Point',coordinates:[f.lon,f.lat]}})))),'application/geo+json'); }
+function exportHtml(list,name){ saveFile(name+'.html',buildReport(list),'text/html'); }
 document.getElementById('selClear').onclick=()=>{ clearSelection(); if(mode==='county') setMode('pan'); };
 const RG={}; ['primary','trunk','motorway'].forEach(k=>{ if(DATA.roads&&DATA.roads[k]) RG[k]={type:'MultiLineString',coordinates:DATA.roads[k]}; });
 function reportMap(list){
@@ -684,8 +702,11 @@ function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.cit
 Object.assign(ctx,{ mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
+  filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
+  setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap, buildReport,
+  exportCsv, exportXlsx, exportGeoJSON, exportHtml, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initTimeline,initWho,initChanges,initAssistant,initMarket,initSaved,initField,initBuildings,initMobile]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initAssistant,initMarket,initSaved,initField,initBuildings,initMobile]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});

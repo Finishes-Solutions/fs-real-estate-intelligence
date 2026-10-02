@@ -1,8 +1,9 @@
 // Offline shell for the installed app. App files: cache first, refreshed in the background.
 // Data files: network first, cached copy when offline. AI/building APIs and map tiles: always network.
 const VERSION = '__BUILD__', SHELL = 'fs-shell-' + VERSION, DATA = 'fs-data', LIBS = 'fs-libs';
-const FILES = ['./', 'index.html', 'app.css', 'app.js', 'ask.js', 'timeline.js', 'views.js', 'market.js', 'saved.js', 'building.js', 'mobile.js', 'field.js',
-  'lib/filter.mjs', 'lib/taxonomy.mjs', 'lib/changes.mjs', 'logo.png', 'icon-192.png', 'manifest.webmanifest'];
+const FILES = ['./', 'index.html', 'app.css', 'app.js', 'assistant.js', 'timeline.js', 'views.js', 'market.js', 'saved.js', 'building.js', 'mobile.js', 'field.js',
+  'mapsearch.js', 'compare.js', 'kpis.js', 'export.js', 'metrics.js',
+  'lib/filter.mjs', 'lib/taxonomy.mjs', 'lib/changes.mjs', 'lib/agent-tools.mjs', 'lib/assist-logic.mjs', 'logo.png', 'icon-192.png', 'manifest.webmanifest'];
 const LIB_HOSTS = ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => Promise.all(FILES.map(f => c.add(f).catch(() => {})))).then(() => self.skipWaiting())); });

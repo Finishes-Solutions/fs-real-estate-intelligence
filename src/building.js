@@ -79,6 +79,14 @@ export function initBuildings(ctx) {
     open({ footprint: partAt(hit.geometry, [e.lngLat.lng, e.lngLat.lat]), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: [e.lngLat.lng, e.lngLat.lat] });
     return true;
   });
+  // open the building at a point (search results, the assistant). Needs the 3D layer rendered there (zoom 14+).
+  ctx.buildingAt = c => {
+    if (!map.getLayer('fs-bldg')) return null;
+    const p = map.project(c), hit = map.queryRenderedFeatures([[p.x - 3, p.y - 3], [p.x + 3, p.y + 3]], { layers: ['fs-bldg'] }).find(h => inGeom(c, partAt(h.geometry, c))) ;
+    if (!hit) return null;
+    const b = { footprint: partAt(hit.geometry, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
+    open(b); return b;
+  };
   // desktop: a building cursor and outline show which building a click will open
   const CURSOR = 'url("data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><path d="M3 3v7M3 3h7" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M3 3v7M3 3h7" stroke="#006527" stroke-width="2" stroke-linecap="round"/><rect x="11" y="9" width="12" height="15" rx="1.5" fill="#006527" stroke="#fff" stroke-width="1.5"/><path d="M14 13h2M18 13h2M14 17h2M18 17h2M16 24v-3h2v3" stroke="#fff" stroke-width="1.4"/></svg>') + '") 3 3, pointer';
   let hovT = 0;

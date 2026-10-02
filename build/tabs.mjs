@@ -17,8 +17,7 @@ export async function listCounty(name, id, startD, endD) {
   const rows = [];
   for (let m = new Date(Date.UTC(startD.getUTCFullYear(), startD.getUTCMonth(), 1)); m <= endD; m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1))) {
     const a = m < startD ? startD : m, last = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 0)), b = last > endD ? endD : last;
-    // whole dollars: a few filers enter cents, and the database column is an integer
-    (await listRange(id, a, b)).forEach(x => rows.push({ ...x, EstimatedCost: Math.round(+x.EstimatedCost || 0), _county: name }));
+    (await listRange(id, a, b)).forEach(x => rows.push({ ...x, _county: name }));
   }
   return rows;
 }
@@ -36,7 +35,7 @@ async function fetchDetail(num) {
 
 // cache: ProjectNumber -> detail + the list-row cost it was fetched against. A cost change triggers a re-fetch.
 export async function details(rows, cache, concurrency = 8) {
-  const todo = rows.filter(r => { const c = cache[r.ProjectNumber]; return !c || Math.round(c.cost || 0) !== Math.round(r.EstimatedCost || 0); });
+  const todo = rows.filter(r => { const c = cache[r.ProjectNumber]; return !c || Math.round((c.cost || 0) * 100) !== Math.round((r.EstimatedCost || 0) * 100); });
   log('tabs details: cached', rows.length - todo.length, 'fetch', todo.length);
   let failed = 0;
   await pool(todo, concurrency, async r => {
