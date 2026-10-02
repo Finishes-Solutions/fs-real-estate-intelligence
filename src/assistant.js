@@ -5,7 +5,7 @@ import { entityKey } from './lib/taxonomy.mjs';
 import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
-import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove } from './lib/assist-logic.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
@@ -199,7 +199,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { air_traffic: 'Checking the air traffic…', market_data: 'Reading the market numbers…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', market_data: 'Reading the market numbers…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -517,6 +517,43 @@ export function initAssistant(ctx) {
         return { notes_total: db.notes.length, watchlist_total: db.watch.length, notes: notes.slice(0, 25), watchlist: watch.slice(0, 25), note: db.notes.length || db.watch.length ? undefined : 'No field notes or watched items yet.' };
       }
       if (name === 'data_sources') return ctx.sourcesList?.() || { error: 'The Sources tab isn’t loaded.' };
+      if (name === 'describe_view') {
+        const card = ctx.state.sel ? { kind: 'filing', ...row(ctx.state.sel) } : ctx.currentBuilding?.() ? { kind: 'building', ...ctx.currentBuilding() } : null;
+        return { screen: ctx.screenContext(), open_card: card, labels: ctx.viewLabels?.() || null };
+      }
+      if (name === 'move_camera') {
+        const m = ctx.map, b = m.getBounds(), cur = { center: m.getCenter().toArray(), zoom: m.getZoom(), bearing: m.getBearing(), pitch: m.getPitch(), bounds: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()] };
+        const t = cameraMove(cur, a); if (t.error) return { error: t.error };
+        if (ctx.view !== 'map') ctx.setView('map');
+        if (t.stop) ctx.stopOrbit();
+        else if (t.orbit) ctx.orbitAt(cur.center, Math.max(cur.zoom, 13));
+        else if (t.region) document.getElementById('home')?.click();
+        else { ctx.stopOrbit(); m.easeTo({ ...(t.center ? { center: t.center } : {}), ...(t.zoom != null ? { zoom: t.zoom } : {}), ...(t.bearing != null ? { bearing: t.bearing } : {}), ...(t.pitch != null ? { pitch: t.pitch } : {}), duration: ctx.reduceMotion ? 0 : 700 }); }
+        actionChip(t.label); if (t.orbit || t.stop || t.region) return { done: t.label }; return { done: t.label, zoom: +(t.zoom ?? cur.zoom).toFixed(1), pitch: Math.round(t.pitch ?? cur.pitch), bearing: Math.round(t.bearing ?? cur.bearing) };
+      }
+      if (name === 'add_site_note') {
+        if (!ctx.addNote) return { error: 'Field notes are not available.' };
+        const where = a.where || (a.place ? 'place' : ctx.state.sel || ctx.currentBuilding?.() ? 'selected' : 'center');
+        let at = null, label = 'the map center';
+        if (where === 'selected') { const f = ctx.state.sel, bd = ctx.currentBuilding?.(); if (f) { at = [f.lon, f.lat]; label = f.name; } else if (bd) { at = bd.center; label = bd.title || 'this building'; } else return { error: 'No card is open. Say where the note goes (here = map center, my location, or a place).' }; }
+        else if (where === 'place') { const p = await resolvePlace(String(a.place || '')); if (p.error) return p; at = p.c; label = p.label; }
+        else if (where === 'center') at = ctx.map.getCenter().toArray();
+        if (ctx.view !== 'map') ctx.setView('map');
+        const n = await ctx.addNote({ at, gps: where === 'me', title: a.title || '', text: a.text || '', tag: a.tag || 'Other' });
+        if (where === 'me') label = 'your location';
+        actionChip('Saved note' + (n?.title ? ' “' + n.title + '”' : '') + ' at ' + label);
+        return { saved: true, title: n?.title || '', tag: n?.tag, at: label, shared: !!ctx.team?.summary?.(), note: 'The note card is open so photos can be added.' };
+      }
+      if (name === 'watch') {
+        if (!ctx.field?.setWatch) return { error: 'The watchlist is not available.' };
+        let info = null;
+        if (a.filing_id) { const f = ctx.BY_ID.get(String(a.filing_id).trim()); if (!f) return { error: 'That filing isn’t loaded.' }; info = { kind: 'filing', f }; }
+        else if (ctx.state.sel) info = { kind: 'filing', f: ctx.state.sel };
+        else if (ctx.currentBuilding?.()) { const bd = ctx.currentBuilding(); info = { kind: 'building', center: bd.center, label: () => bd.title || 'Building', sub: () => '' }; }
+        if (!info) return { error: 'Open a filing or building first, or name the filing.' };
+        const on = ctx.field.setWatch(info, a.on !== false), what = info.kind === 'filing' ? info.f.name : info.label();
+        actionChip((on ? 'Watching ' : 'Stopped watching ') + what); return { watching: on, item: what, watchlist_size: ctx.field.db.watch.length };
+      }
       if (name === 'reset_map') { const before = ctx.snapshot(); ctx.resetAll(); actionChip('Reset the map', () => ctx.restore(before)); return { reset: true, filings: ctx.visible.length }; }
       return { error: 'Unknown tool ' + name };
     } catch (e) { console.error(e); return { error: e.message }; }
