@@ -21,7 +21,7 @@ export function tileLonLat(z, x, y) {
   const n = 2 ** z, lon = v => v / n * 360 - 180, lat = v => Math.atan(Math.sinh(Math.PI * (1 - 2 * v / n))) * 180 / Math.PI;
   return [lon(x), lat(y + 1), lon(x + 1), lat(y)];
 }
-const REGION = [-108, 24, -92, 38];
+export const REGION = [-108, 24, -92, 38];
 export function upstream(l, z, x, y, env = process.env) {
   if (WMS[l]) { const [svc, layer, style] = WMS[l];
     return NOW + svc + '/ows?' + new URLSearchParams({ service: 'WMS', version: '1.3.0', request: 'GetMap', layers: layer, styles: style, format: 'image/png', transparent: 'true', crs: 'EPSG:3857', width: '256', height: '256', bbox: bbox3857(z, x, y).map(v => v.toFixed(2)).join(',') }); }

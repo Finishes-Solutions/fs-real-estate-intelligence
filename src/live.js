@@ -11,8 +11,8 @@ const RASTER = { // proxied through api/tile; refreshed every few minutes
   storms: { label: 'Hurricanes & Tropical Storms', maxzoom: 10, opacity: .85, every: 15, attr: 'Tropical cyclones: NOAA National Hurricane Center' },
   traffic: { label: 'Live Traffic', maxzoom: 18, opacity: .9, every: 2, attr: 'Traffic © TomTom' }
 };
-const ORDER = ['radar', 'lightning', 'clouds', 'wind', 'storms', 'traffic', 'terrain', 'nasa'];
-const LABEL = { ...Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, v.label])), wind: 'Wind (Arrows, mph)', terrain: '3D Terrain', nasa: 'NASA Recent Imagery (30 m)' };
+const ORDER = ['radar', 'lightning', 'clouds', 'wind', 'storms', 'traffic', 'terrain', 'nasa', 'hires'];
+const LABEL = { ...Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, v.label])), wind: 'Wind (Arrows, mph)', terrain: '3D Terrain', nasa: 'NASA Recent Imagery (30 m)', hires: 'High-Res Site Imagery' };
 const EARTH_MI = 3958.8, R = Math.PI / 180;
 export const milesBetween = (a, b) => { const h = Math.sin((b[1] - a[1]) * R / 2) ** 2 + Math.cos(a[1] * R) * Math.cos(b[1] * R) * Math.sin((b[0] - a[0]) * R / 2) ** 2; return 2 * EARTH_MI * Math.asin(Math.sqrt(h)); };
 const abs = p => new URL(p, location.href).href;
@@ -21,7 +21,7 @@ const ymd = d => d.toISOString().slice(0, 10);
 export function initLive(ctx) {
   const { map, esc, toast } = ctx;
   const on = Object.fromEntries(ORDER.map(k => [k, false]));
-  try { const s = JSON.parse(localStorage.getItem(KEY) || '{}'); ORDER.forEach(k => { if (k !== 'nasa' && s[k] === true) on[k] = true; }); } catch (e) {}
+  try { const s = JSON.parse(localStorage.getItem(KEY) || '{}'); ORDER.forEach(k => { if (k !== 'nasa' && k !== 'hires' && s[k] === true) on[k] = true; }); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(on)); } catch (e) {} };
   let trafficOK = null, windData = null, nasa = null, route = null, lastCard = null;
   const stamp = {};
@@ -131,7 +131,7 @@ export function initLive(ctx) {
   // ---------- apply ----------
   function addAll() {
     for (const k of Object.keys(RASTER)) if (on[k]) addRaster(k);
-    if (on.wind) addWind(); if (on.terrain) addTerrain(); if (on.nasa && nasa?.day) showNasa(nasa);
+    if (on.wind) addWind(); if (on.terrain) addTerrain(); if (on.nasa && nasa?.day) showNasa(nasa); if (on.hires && hires) showHires(hires);
     if (route) drawRoute(route);
   }
   ctx.onOverlays(addAll);
@@ -145,6 +145,7 @@ export function initLive(ctx) {
       if (RASTER[k]) v ? addRaster(k) : removeRaster(k);
       else if (k === 'wind') { if (v) { addWind(); await loadWind(); } else removeWind(); }
       else if (k === 'terrain') { if (v) { addTerrain(); if (map.getZoom() >= TERRAIN_Z && map.getPitch() < 30) map.easeTo({ pitch: 55, duration: ctx.reduceMotion ? 0 : 700 }); else if (map.getZoom() < TERRAIN_Z) done.push('terrain shows once zoomed in to town level'); } else removeTerrain(); }
+      else if (k === 'hires') { if (v && hires) showHires(hires); else if (v) { on.hires = false; done.push('high-res imagery: open a property, tap Site Imagery and pick a version first'); toast('Open a property, tap Site Imagery, then pick a high-res version and Show on Map.'); } else removeHires(); }
       else if (k === 'nasa') { if (v) { try { await nasaForView(); } catch (e) { on.nasa = false; done.push('NASA imagery failed: ' + e.message); } } else removeNasa(); }
     }
     if (a.storms === true) { try { const d = await (await fetch('api/weather?kind=storms')).json(); if (!d.storms?.length) done.push('no active hurricanes or tropical storms right now'); } catch (e) {} }
@@ -221,12 +222,13 @@ export function initLive(ctx) {
   async function imagery(a = {}) {
     const f = a.filing_id ? ctx.BY_ID.get(String(a.filing_id).trim()) : null, p = f ? { c: [f.lon, f.lat], name: f.name } : cardPoint();
     if (!p) return { error: 'Open a filing or building first, or give a filing id.' };
-    const list = await passes([p.c[0] - .01, p.c[1] - .01, p.c[0] + .01, p.c[1] + .01]);
+    const [list, hi] = await Promise.all([passes([p.c[0] - .01, p.c[1] - .01, p.c[0] + .01, p.c[1] + .01]).catch(() => []), hiresCatalog(p.c)]);
+    const high_res = hiItems(hi).map(x => ({ source: x.kind === 'wb' ? 'Esri World Imagery (archived version)' : 'USDA NAIP aerial photo', date: hiDate(x), resolution_m: x.res_m || x.gsd || null }));
     const pick = (a.date && list.find(x => x.day === a.date)) || clear(list);
-    if (!pick) return { place: p.name, passes: [], note: 'No NASA passes found here in the last 60 days.' };
-    renderCardImagery(p.c, list);
+    renderCardImagery(p.c, list, hi);
+    if (!pick) return { place: p.name, passes: [], high_res, note: 'No NASA passes found here in the last 60 days. High-res aerial versions are shown in the card.' };
     if (a.show_on_map) { showNasa(pick); save(); map.flyTo({ center: p.c, zoom: Math.min(Math.max(map.getZoom(), 13.5), 14.5), duration: ctx.reduceMotion ? 0 : 900 }); }
-    return { place: p.name, ...(a.show_on_map ? { showing: pick } : { clearest: pick, shown_as: 'preview images in the property card (map unchanged)' }), passes: list.slice(0, 12), note: '30 m pixels: shows land clearing, pads and big roofs, not fine detail. Cloud % is for the whole ~110 km scene.' };
+    return { place: p.name, ...(a.show_on_map ? { showing: pick } : { clearest: pick, shown_as: 'preview images in the property card (map unchanged)' }), passes: list.slice(0, 12), high_res, note: 'NASA passes are 30 m pixels (land clearing, pads, big roofs) but arrive every few days. high_res versions are sub-metre aerial imagery (buildings, parking, equipment) but months to years old; dates are when each was captured. All are previewed in the card.' };
   }
 
   // ---------- card tools: drive time, weather, site imagery, news ----------
@@ -245,10 +247,10 @@ export function initLive(ctx) {
     sec.querySelector('[data-a=wx]').onclick = async () => { busy('Checking the weather…'); try { const d = await weather({ where: 'selected' }); if (!mine()) return; if (d.error) throw new Error(d.error);
       out.innerHTML = '<div class="live-big">' + Math.round(d.temp_f) + '°F · ' + esc(d.conditions) + '</div><div class="rnote">Wind ' + Math.round(d.wind_mph) + ' mph from the ' + esc(d.wind_from) + ' (gusts ' + Math.round(d.gust_mph) + ') · today ' + Math.round(d.today.low_f) + '–' + Math.round(d.today.high_f) + '°F, ' + (d.today.rain_chance_pct ?? 0) + '% rain</div>' +
         (Array.isArray(d.active_tropical_storms) && d.active_tropical_storms.length ? '<div class="rnote">' + d.active_tropical_storms.map(s => esc(s.type + ' ' + s.name + ', ' + s.miles_away + ' mi away')).join('<br>') + '</div>' : '') + '<div class="rnote">Open-Meteo · NOAA NHC</div>'; } catch (e) { fail(e); } };
-    sec.querySelector('[data-a=img]').onclick = async () => { busy('Searching NASA passes over the last 60 days…'); try {
-      const c = info.kind === 'filing' ? [info.f.lon, info.f.lat] : info.center, list = await passes([c[0] - .01, c[1] - .01, c[0] + .01, c[1] + .01]); if (!mine()) return;
-      if (!list.length) { out.innerHTML = '<div class="rnote">No NASA passes here in the last 60 days.</div>'; return; }
-      renderCardImagery(c, list);
+    sec.querySelector('[data-a=img]').onclick = async () => { busy('Looking for high-res aerial imagery and recent NASA passes…'); try {
+      const c = info.kind === 'filing' ? [info.f.lon, info.f.lat] : info.center;
+      const [list, hi] = await Promise.all([passes([c[0] - .01, c[1] - .01, c[0] + .01, c[1] + .01]).catch(() => []), hiresCatalog(c)]); if (!mine()) return;
+      renderCardImagery(c, list, hi);
     } catch (e) { fail(e); } };
     sec.querySelector('[data-a=news]').onclick = async () => { busy('Searching recent news…'); try {
       const d = info.kind === 'filing' ? await news({ filing_id: info.f.id }) : await news({ query: info.label() }); if (!mine()) return; if (d.error) throw new Error(d.error);
@@ -256,38 +258,97 @@ export function initLive(ctx) {
     } catch (e) { fail(e); } };
   }
 
+  // ---------- high-res site imagery (api/imagery: Esri World Imagery Wayback + USDA NAIP) ----------
+  // Archived Esri versions where the imagery at the spot changed (sub-metre, capture dates vary) and NAIP aerial photos
+  // (~0.6 m, Texas flown about every two years). Tiles come through our own endpoint, so they can be stitched into one
+  // picture on a canvas, downloaded and shown on the map.
+  let hires = null; // the version shown on the map
+  const hiresCache = new Map();
+  async function hiresCatalog(c) {
+    const k = c.map(v => v.toFixed(4)).join(','); if (hiresCache.has(k)) return hiresCache.get(k);
+    const p = fetch('api/imagery?at=' + k).then(r => r.ok ? r.json() : { wayback: [], naip: [] }).catch(() => ({ wayback: [], naip: [] }));
+    hiresCache.set(k, p); return p;
+  }
+  const hiItems = hi => [...(hi?.wayback || []).slice(0, 6).map(x => ({ kind: 'wb', ...x })), ...(hi?.naip || []).slice(0, 3).map(x => ({ kind: 'naip', ...x }))];
+  const hiDate = x => x.kind === 'wb' ? (x.captured || x.published) : x.date;
+  const hiTile = (x, z, tx, ty) => abs('api/imagery?' + (x.kind === 'wb' ? 'src=wb&r=' + x.release : 'src=naip&item=' + encodeURIComponent(x.item) + '&s=' + (x.style || 'tms')) + '&z=' + z + '&x=' + tx + '&y=' + ty);
+  const metersPerPx = (lat, z) => 156543.03392 * Math.cos(lat * R) / 2 ** z;
+  // px × px picture centred on c at zoom z, from 256 px tiles
+  const shots = new Map();
+  function composite(x, c, z, px) {
+    const key = [x.kind, x.release || x.item, z, px, c.join()].join('|'); if (shots.has(key)) return shots.get(key);
+    const job = (async () => {
+      const n = 256 * 2 ** z, s = Math.sin(c[1] * R), wx = (c[0] + 180) / 360 * n, wy = (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n;
+      const x0 = Math.round(wx - px / 2), y0 = Math.round(wy - px / 2), cv = document.createElement('canvas'); cv.width = cv.height = px;
+      const g = cv.getContext('2d'); g.fillStyle = '#0b0d0c'; g.fillRect(0, 0, px, px);
+      const jobs = []; let ok = 0;
+      for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + px - 1) / 256); tx++) for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + px - 1) / 256); ty++)
+        jobs.push(new Promise(res => { const im = new Image(); im.onload = () => { g.drawImage(im, tx * 256 - x0, ty * 256 - y0); ok++; res(); }; im.onerror = () => res(); im.src = hiTile(x, z, tx, ty); }));
+      await Promise.all(jobs); if (!ok) throw new Error('No imagery tiles loaded'); return cv;
+    })();
+    shots.set(key, job); job.catch(() => shots.delete(key)); return job;
+  }
+  function showHires(x) {
+    hires = x; removeHires(true); if (!map.getStyle()) return;
+    map.addSource('live-hires', { type: 'raster', tiles: [hiTile(x, '{z}', '{x}', '{y}')], tileSize: 256, minzoom: 10, maxzoom: x.kind === 'naip' ? 18 : 19,
+      attribution: x.kind === 'wb' ? 'Imagery: Esri World Imagery Wayback (' + hiDate(x) + ')' : 'Imagery: USDA NAIP ' + x.date + ' via Microsoft Planetary Computer' });
+    map.addLayer({ id: 'live-hires', type: 'raster', source: 'live-hires', minzoom: 10 }, ['live-nasa', 'live-hill', 'county-line', ...Object.keys(RASTER).map(k => 'live-' + k)].find(id => map.getLayer(id)) || below());
+    on.hires = true; syncUI();
+  }
+  function removeHires(keep) { if (map.getLayer('live-hires')) map.removeLayer('live-hires'); if (map.getSource('live-hires')) map.removeSource('live-hires'); if (!keep) hires = null; }
+
   // ---------- site imagery previews: thumbnails in the card, click for a large preview with download ----------
-  function renderCardImagery(c, list) {
+  const pic = p => p.kind === 'nasa' || !p.kind ? 'nasa' : 'hi';
+  const capOf = p => pic(p) === 'nasa' ? p.day + ' · ' + p.name + (p.cloud != null ? ' · ' + Math.round(p.cloud) + '% cloud' : '')
+    : p.kind === 'wb' ? (p.captured ? 'Captured ' + p.captured : 'Published ' + p.published) + (p.res_m ? ' · ' + p.res_m + ' m' : '') + ' · Esri' : p.date + ' · NAIP ' + (p.gsd || 0.6) + ' m';
+  function renderCardImagery(c, list, hi) {
     const out = document.querySelector('#liveSec .live-out'); if (!out) return;
-    if (!list.length) { out.innerHTML = '<div class="rnote">No NASA passes here in the last 60 days.</div>'; return; }
-    const shown = list.filter(p => p.cloud == null || p.cloud <= 60).slice(0, 6), show = shown.length ? shown : list.slice(0, 3);
-    out.innerHTML = '<div class="live-thumbs">' + show.map((p, i) => '<button type="button" data-i="' + i + '" title="Preview"><img loading="lazy" alt="NASA image ' + esc(p.day) + '" src="' + esc(snapshot(p.product, p.day, c)) + '"><span>' + esc(p.day) + ' · ' + esc(p.name) + (p.cloud != null ? ' · ' + Math.round(p.cloud) + '% cloud' : '') + '</span></button>').join('') + '</div>' +
-      '<div class="rnote">NASA HLS, 30 m pixels (about 2.5 km square). Cloud % is for the whole scene. Click an image to preview or download it.</div>';
-    out.querySelectorAll('[data-i]').forEach(b => b.onclick = () => openLightbox(show, +b.dataset.i, c));
+    const shown = (list || []).filter(p => p.cloud == null || p.cloud <= 60).slice(0, 4), nasaShow = (shown.length ? shown : (list || []).slice(0, 3)).map(p => ({ kind: 'nasa', ...p }));
+    const hiShow = hiItems(hi), all = [...hiShow, ...nasaShow];
+    if (!all.length) { out.innerHTML = '<div class="rnote">No imagery found here: no high-res versions and no NASA passes in the last 60 days.</div>'; return; }
+    const thumbs = (arr, off) => '<div class="live-thumbs">' + arr.map((p, i) => '<button type="button" data-i="' + (off + i) + '" title="Preview">' + (pic(p) === 'nasa' ? '<img loading="lazy" alt="NASA image ' + esc(p.day) + '" src="' + esc(snapshot(p.product, p.day, c)) + '">' : '<img alt="" class="ld">') + '<span>' + esc(capOf(p)) + '</span></button>').join('') + '</div>';
+    out.innerHTML = (hiShow.length ? '<div class="live-sub">High-Res Aerial · Dated</div>' + thumbs(hiShow, 0) + '<div class="rnote">Sub-metre imagery: buildings, parking, equipment. ' + (hi.wayback?.length ? 'Esri versions are listed only when the imagery here changed. ' : '') + 'Months to a few years old, so check the date.</div>' : '<div class="rnote">No high-res aerial versions found here.</div>') +
+      (nasaShow.length ? '<div class="live-sub">Recent Satellite · NASA, Every Few Days</div>' + thumbs(nasaShow, hiShow.length) + '<div class="rnote">30 m pixels (about 2.5 km square): land clearing, pads and big roofs, not detail. Cloud % is for the whole scene.</div>' : '') +
+      '<div class="rnote">Click an image to preview, download or show it on the map.</div>';
+    out.querySelectorAll('[data-i]').forEach(b => b.onclick = () => openLightbox(all, +b.dataset.i, c));
+    hiShow.forEach((p, i) => composite(p, c, 17, 256).then(cv => { const im = out.querySelector('[data-i="' + i + '"] img'); if (im) { im.src = cv.toDataURL('image/jpeg', .85); im.classList.remove('ld'); } })
+      .catch(() => { const b = out.querySelector('[data-i="' + i + '"]'); if (b) { b.disabled = true; b.querySelector('span').textContent += ' · didn’t load'; } }));
   }
   let lb = null;
   function closeLightbox() { if (lb) { lb.remove(); lb = null; window.removeEventListener('keydown', lbKeys, true); } }
   // capture phase, so Esc closes only the preview and not the property card under it
   function lbKeys(e) { if (!lb) return; if (['Escape', 'ArrowLeft', 'ArrowRight'].includes(e.key)) { e.stopImmediatePropagation(); e.preventDefault(); } if (e.key === 'Escape') closeLightbox(); else if (e.key === 'ArrowLeft') lb._step(-1); else if (e.key === 'ArrowRight') lb._step(1); }
   function openLightbox(list, i, c) {
-    closeLightbox(); let km = 2.5;
-    lb = document.createElement('div'); lb.className = 'lbox'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-modal', 'true'); lb.setAttribute('aria-label', 'Satellite image preview');
+    closeLightbox(); let wide = false;
+    lb = document.createElement('div'); lb.className = 'lbox'; lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-modal', 'true'); lb.setAttribute('aria-label', 'Site image preview');
     document.body.appendChild(lb); window.addEventListener('keydown', lbKeys, true);
     const where = (lastCard?.kind === 'filing' ? lastCard.f.name : lastCard?.label?.()) || 'site';
     const draw = () => {
-      const p = list[i], big = snapshot(p.product, p.day, c, km, 1024);
-      lb.innerHTML = '<div class="lb-box"><div class="lb-h"><div><b>' + esc(p.day) + ' · ' + esc(p.name) + '</b><span>' + (p.cloud != null ? Math.round(p.cloud) + '% cloud (whole scene) · ' : '') + km + ' km square · NASA HLS 30 m</span></div><button class="x" aria-label="Close">×</button></div>' +
-        '<div class="lb-img">' + (list.length > 1 ? '<button class="lb-nav prev" aria-label="Previous">‹</button>' : '') + '<img alt="NASA satellite image ' + esc(p.day) + '" src="' + esc(big) + '">' + (list.length > 1 ? '<button class="lb-nav next" aria-label="Next">›</button>' : '') + '</div>' +
-        '<div class="lb-f"><span>' + (i + 1) + ' of ' + list.length + '</span><button class="btn" id="lbWide">' + (km > 3 ? 'Closer View' : 'Wider View') + '</button><button class="btn" id="lbMap">Show on Map</button><button class="btn primary" id="lbDl">Download</button></div></div>';
+      const p = list[i], nasaP = pic(p) === 'nasa', km = nasaP ? (wide ? 10 : 2.5) : null, z = wide ? 16 : 18, PX = 1024;
+      const kmHi = Math.round(metersPerPx(c[1], z) * PX / 100) / 10;
+      const title = nasaP ? p.day + ' · ' + p.name : p.kind === 'wb' ? 'Esri World Imagery · ' + (p.captured ? 'captured ' + p.captured : 'published ' + p.published) : 'USDA NAIP aerial photo · ' + p.date;
+      const sub = nasaP ? (p.cloud != null ? Math.round(p.cloud) + '% cloud (whole scene) · ' : '') + km + ' km square · NASA HLS 30 m'
+        : kmHi + ' km square · ' + (p.kind === 'wb' ? (p.res_m ? p.res_m + ' m source' : 'sub-metre') + (p.provider ? ' · ' + p.provider : '') + ' · Wayback version of ' + p.published : (p.gsd || 0.6) + ' m · via Microsoft Planetary Computer');
+      lb.innerHTML = '<div class="lb-box"><div class="lb-h"><div><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></div><button class="x" aria-label="Close">×</button></div>' +
+        '<div class="lb-img">' + (list.length > 1 ? '<button class="lb-nav prev" aria-label="Previous">‹</button>' : '') + (nasaP ? '<img alt="NASA satellite image ' + esc(p.day) + '" src="' + esc(snapshot(p.product, p.day, c, km, 1024)) + '">' : '<img alt="High-res aerial image" class="ld"><div class="lb-load">Loading high-res tiles…</div>') + (list.length > 1 ? '<button class="lb-nav next" aria-label="Next">›</button>' : '') + '</div>' +
+        '<div class="lb-f"><span>' + (i + 1) + ' of ' + list.length + '</span><button class="btn" id="lbWide">' + (wide ? 'Closer View' : 'Wider View') + '</button><button class="btn" id="lbMap">Show on Map</button><button class="btn primary" id="lbDl">Download</button></div></div>';
       lb.querySelector('.x').onclick = closeLightbox;
       lb.querySelector('.prev')?.addEventListener('click', () => lb._step(-1)); lb.querySelector('.next')?.addEventListener('click', () => lb._step(1));
-      lb.querySelector('#lbWide').onclick = () => { km = km > 3 ? 2.5 : 10; draw(); };
-      lb.querySelector('#lbMap').onclick = () => { showNasa(p); save(); closeLightbox(); map.flyTo({ center: c, zoom: km > 3 ? 12 : Math.max(map.getZoom(), 13.5), duration: ctx.reduceMotion ? 0 : 700 }); };
+      lb.querySelector('#lbWide').onclick = () => { wide = !wide; draw(); };
+      lb.querySelector('#lbMap').onclick = () => { if (nasaP) showNasa(p); else showHires(p); save(); closeLightbox();
+        map.flyTo({ center: c, zoom: nasaP ? (wide ? 12 : Math.max(map.getZoom(), 13.5)) : (wide ? 15.5 : 17.5), duration: ctx.reduceMotion ? 0 : 700 }); };
+      const shot = nasaP ? null : composite(p, c, z, PX);
+      if (shot) shot.then(cv => { const im = lb?.querySelector('.lb-img img'); if (im && list[i] === p) { im.src = cv.toDataURL('image/jpeg', .9); im.classList.remove('ld'); lb.querySelector('.lb-load')?.remove(); } })
+        .catch(() => { const l = lb?.querySelector('.lb-load'); if (l) l.textContent = 'The imagery service didn’t answer. Try again in a minute.'; });
       lb.querySelector('#lbDl').onclick = async e => {
-        const name = ('nasa-' + p.day + '-' + p.name + '-' + where).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) + '.jpg';
+        const tag = nasaP ? 'nasa-' + p.day + '-' + p.name : p.kind === 'wb' ? 'esri-' + hiDate(p) : 'naip-' + p.date;
+        const name = (tag + '-' + where).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) + '.jpg';
         e.target.disabled = true; e.target.textContent = 'Downloading…';
-        try { const r = await fetch(big, { mode: 'cors' }); if (!r.ok) throw new Error('HTTP ' + r.status); await ctx.saveFile(name, await r.blob(), 'image/jpeg'); }
-        catch (err) { window.open(big, '_blank', 'noopener'); ctx.toast('Opened the full image in a new tab. Save it from there.'); }
+        try {
+          const blob = nasaP ? await fetch(snapshot(p.product, p.day, c, km, 1024), { mode: 'cors' }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+            : await shot.then(cv => new Promise((res, rej) => cv.toBlob(b => b ? res(b) : rej(new Error('no image')), 'image/jpeg', .92)));
+          await ctx.saveFile(name, blob, 'image/jpeg');
+        } catch (err) { if (nasaP) { window.open(snapshot(p.product, p.day, c, km, 1024), '_blank', 'noopener'); ctx.toast('Opened the full image in a new tab. Save it from there.'); } else ctx.toast('Couldn’t build the download: ' + err.message); }
         finally { if (lb) { e.target.disabled = false; e.target.textContent = 'Download'; } }
       };
     };
@@ -298,7 +359,7 @@ export function initLive(ctx) {
 
   syncUI();
   // for the Sources tab: what is on, how often it refreshes, and the latest data time we know of
-  const status = () => ({ on: { ...on }, trafficOK, terrainMesh: !!map.getTerrain?.(), terrainZoom: TERRAIN_Z, windTime: windData?.time || null, nasa: nasa?.day ? { day: nasa.day, name: nasa.name, cloud: nasa.cloud } : null,
+  const status = () => ({ hires: hires ? { kind: hires.kind, date: hiDate(hires) } : null, on: { ...on }, trafficOK, terrainMesh: !!map.getTerrain?.(), terrainZoom: TERRAIN_Z, windTime: windData?.time || null, nasa: nasa?.day ? { day: nasa.day, name: nasa.name, cloud: nasa.cloud } : null,
     raster: Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, { every: v.every, requested: stamp[k] != null ? stamp[k] * v.every * 60e3 : null }])) });
   ctx.live = { set, drive, weather, news, imagery, clearRoute, state: () => ({ ...on }), status };
 }

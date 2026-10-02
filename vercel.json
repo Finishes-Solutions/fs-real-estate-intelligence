@@ -42,6 +42,9 @@
     },
     "api/field.js": {
       "maxDuration": 30
+    },
+    "api/imagery.js": {
+      "maxDuration": 25
     }
   },
   "headers": [

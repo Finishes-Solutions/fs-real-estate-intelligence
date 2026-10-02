@@ -61,6 +61,7 @@ Layers panel → **Live conditions**, the **From here** buttons on every filing 
 | Drive time without a TomTom key | OSRM on the FOSSGIS servers (OpenStreetMap roads), through `api/drive` | none |
 | 3D terrain | Mapterhorn (browser direct) | none |
 | NASA recent imagery, site imagery thumbnails | NASA GIBS + CMR + Worldview Snapshots (HLS Landsat / Sentinel-2, 30 m), browser direct | none |
+| High-res site imagery (dated, sub-metre) | Esri World Imagery Wayback (archived versions, only those where the spot changed) and USDA NAIP (~0.6 m, Texas about every 2 years) from Microsoft Planetary Computer, through `api/imagery` | none |
 | Project news | GDELT Project DOC 2.0, through `api/news` | none |
 | Esri sat / Free map basemaps | Esri World Imagery, OpenFreeMap | none |
 
@@ -70,6 +71,7 @@ Limits to know:
 - Without `TOMTOM_API_KEY` there is no traffic layer and drive times are free-flow estimates (the app says "no live traffic data"). TomTom's free allowance is monthly (about 200,000 traffic tiles at the time of writing; check developer.tomtom.com/pricing for current routing and tile quotas). Tiles are CDN-cached for 2 minutes, so a few people panning the same area share them.
 - Radar covers the contiguous US; lightning is a 15-minute density grid (~8 km), not individual strikes.
 - NASA HLS imagery is 30 m per pixel and arrives every few days with a 1–3 day delay: good for "is the land cleared or a pad poured", not for detail. Cloud % is for the whole ~110 km scene.
+- High-res site imagery is sharp (sub-metre) but not current: Esri's archived versions are typically months to a few years old (the capture date is shown when Esri's metadata has it) and NAIP is flown about every two years. Truly recent sub-metre imagery (days or weeks old) is a paid product (e.g. Nearmap, Planet SkySat, Maxar). Esri World Imagery and Wayback are under Esri's terms of use; keep the attribution.
 - GDELT covers about the last three months of online news and rarely finds single-asset LLC names; the card searches the developer, then the tenant, then the owner.
 - Licences: Open-Meteo's free API, the FOSSGIS routing servers and the public Photon/Nominatim services are for non-commercial or fair use. This app is internal, but heavy or customer-facing use would need Open-Meteo's paid API (`OPEN_METEO_API_KEY`) and your own OSRM server. Keep the attributions shown in the map's attribution line.
 
