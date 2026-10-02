@@ -597,7 +597,7 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 
 /* make room for the drawer on desktop: controls, card and legends shift left */
 @media (min-width:1101px){
-  .app.ai-open .ctrls,.app.ai-open .dlegend{right:calc(var(--aiw) + 28px)}
+  .app.ai-open .ctrls{right:calc(var(--aiw) + 28px)}
   .app.ai-open .layers{right:calc(var(--aiw) + 74px)}
   .app.ai-open .card{right:calc(var(--aiw) + 28px)}
 }
@@ -1119,3 +1119,11 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
   .app.card-below.ai-open:has(.card.open) .ctrls{right:calc(var(--aiw) + 28px)}
   .app.card-below.ai-open:has(.card.open) .layers{right:calc(var(--aiw) + 74px)}
 }
+
+/* map legends: Filings and the demographics (census tract) legend side by side at the bottom left, clear of the
+   Ask AI button and its suggestions on the right; the demographics one wraps above when there isn't room */
+.legends{position:absolute;left:16px;bottom:28px;z-index:3;display:flex;flex-wrap:wrap-reverse;align-items:flex-end;gap:8px;max-width:calc(100% - var(--fabr,16px) - 380px);pointer-events:none}
+.legends>*{pointer-events:auto}
+.legends .legend,.legends .dlegend{position:static;left:auto;right:auto;bottom:auto}
+/* the time slider sits bottom centre: lift the legends above it while it's showing */
+.stage:has(.tslider.show) .legends{bottom:76px}

@@ -107,7 +107,17 @@ export function initAssistant(ctx) {
     const v = onScreen(), name = v.card?.kind === 'filing' ? v.card.name : v.card?.kind === 'building' && v.card.label ? v.card.label.split(',')[0] : null;
     sugBox.innerHTML = list.map(t => '<button type="button" data-q="' + esc(name ? t.replace(/\b(of|near|is) it\b|\bwill it\b/, m => m.replace(/\bit\b/, name)) : t) + '">' + esc(t) + '</button>').join('');
     sugBox.querySelectorAll('button').forEach(b => b.onclick = () => { if (busy) return; open(false); ask(b.dataset.q); });
+    fitSugs();
   }
+  // short windows: drop suggestions from the top of the stack rather than let them run into the map buttons
+  function fitSugs() {
+    const ctrls = document.querySelector('.ctrls'); if (!ctrls || !sugBox.children.length) return;
+    sugBox.querySelectorAll('button[hidden]').forEach(b => { b.hidden = false; });
+    const limit = ctrls.getBoundingClientRect().bottom + 10, bs = [...sugBox.children];
+    for (const b of bs) { if (bs.filter(x => !x.hidden).length <= 1 || b.getBoundingClientRect().top >= limit) break;
+      const c = ctrls.getBoundingClientRect(), r = sugBox.getBoundingClientRect(); if (r.left > c.right || r.right < c.left) break; b.hidden = true; }
+  }
+  addEventListener('resize', () => requestAnimationFrame(fitSugs));
   const sugSoon = () => { clearTimeout(sugT); sugT = setTimeout(renderSugs, 300); };
   ctx.onCardRender(i => { cardInfo = i; sugSoon(); }); ctx.onCardClose(() => { cardInfo = null; sugSoon(); });
   ctx.map.on('moveend', sugSoon); ctx.onChange(sugSoon); sugSoon();
