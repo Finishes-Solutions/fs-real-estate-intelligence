@@ -5,6 +5,16 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 5:48 PM CT: Sharper radar, 7-day forecast card, roomier filter panel (2f38b18)
+- **Rain radar is much sharper.** Around Houston it now uses the Houston NEXRAD radar's own high-resolution scan (about 250 m detail, versus the 1 km national mosaic before), and the nearest Texas radar elsewhere. It falls back to a 500 m national composite, then the old mosaic, if a radar is down. You can zoom in further before it gets blurry.
+- **7-day forecast in the chat**: ask for a forecast ("forecast for Waller", "will it rain this week"). The card shows one row per day: conditions, chance and inches of rain, the low and high on a bar against the week's range, and wind and gusts.
+- **Left panel redone with more room**:
+  - each filter's label now sits above its options;
+  - chips and inputs are bigger and easier to tap;
+  - paired inputs (value, sq ft, dates) share the row evenly;
+  - More Filters is grouped into Project, Size, People & Place and Timing;
+  - Save Search, Copy Link and RSS Alerts are evenly sized buttons.
+
 ### 5:45 PM CT: Statewide load no longer rejects Austin County
 - The statewide database load skipped Austin County: 22 of its filings list "Austin" as the city (the county's own name), and the safety check took that for Austin in Travis County and decided the county ID was wrong. A city that's just the county's own name no longer counts in that check (the same would have hit Houston County). Re-run Statewide data with counties = Austin to load it.
 
