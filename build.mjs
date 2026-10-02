@@ -40,6 +40,7 @@ async function assemble() {
 
 async function refresh() {
   const regions = await readJSON(D + 'regions.json');
+  await fs.mkdir(C, { recursive: true });
   const ONLY = (process.env.ONLY || '').split(',').filter(Boolean);
   const counties = regions.counties.filter(c => !ONLY.length || ONLY.includes(c.name));
   const now = new Date();
