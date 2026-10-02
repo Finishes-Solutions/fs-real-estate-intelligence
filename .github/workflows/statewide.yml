@@ -33,6 +33,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
+    environment: Production # the secrets live in this GitHub environment
     timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +50,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           AI_PROXY_URL: ${{ vars.AI_PROXY_URL || 'https://fs-real-estate-intelligence.vercel.app/api/pipeline-ai' }}
-          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || vars.OPENAI_MODEL }}
           OPENAI_ENRICH_MODEL: ${{ vars.OPENAI_ENRICH_MODEL }}
           OPENAI_REASONING_EFFORT: ${{ vars.OPENAI_REASONING_EFFORT }}
           MAPTILER_KEY: ${{ secrets.MAPTILER_KEY }}
