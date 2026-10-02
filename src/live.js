@@ -231,6 +231,14 @@ export function initLive(ctx) {
     return { place: p.name, ...(a.show_on_map ? { showing: pick } : { clearest: pick, shown_as: 'preview images in the property card (map unchanged)' }), passes: list.slice(0, 12), high_res, note: 'NASA passes are 30 m pixels (land clearing, pads, big roofs) but arrive every few days. high_res versions are sub-metre aerial imagery (buildings, parking, equipment) but months to years old; dates are when each was captured. All are previewed in the card.' };
   }
 
+  // ---------- result HTML, shared by the property card and the assistant's chat cards ----------
+  const driveHTML = d => '<div class="live-big">' + (d.at_property ? 'You’re here' : d.road_miles != null ? d.drive_minutes_now + ' min · ' + d.road_miles + ' mi' : d.straight_line_miles.toFixed(1) + ' mi straight') + '</div>' +
+    '<div class="rnote">' + esc(d.at_property ? d.summary : [d.straight_line_miles.toFixed(1) + ' mi straight line', d.live_traffic ? (d.traffic_delay_minutes > 1 ? d.traffic_delay_minutes + ' min traffic delay (usually ' + d.typical_minutes + ' min)' : 'traffic is light') : d.road_miles != null ? 'no live traffic data' : d.road_error, d.caution].filter(Boolean).join(' · ')) + '</div>' +
+    (d.google_maps ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(d.google_maps) + '">Navigate in Google Maps ↗</a>' : '');
+  const weatherHTML = d => '<div class="live-big">' + Math.round(d.temp_f) + '°F · ' + esc(d.conditions) + '</div><div class="rnote">Wind ' + Math.round(d.wind_mph) + ' mph from the ' + esc(d.wind_from) + ' (gusts ' + Math.round(d.gust_mph) + ') · today ' + Math.round(d.today.low_f) + '–' + Math.round(d.today.high_f) + '°F, ' + (d.today.rain_chance_pct ?? 0) + '% rain</div>' +
+    (Array.isArray(d.active_tropical_storms) && d.active_tropical_storms.length ? '<div class="rnote">' + d.active_tropical_storms.map(s => esc(s.type + ' ' + s.name + ', ' + s.miles_away + ' mi away')).join('<br>') + '</div>' : '') + '<div class="rnote">Open-Meteo · NOAA NHC</div>';
+  const newsHTML = (d, n = 8) => '<div class="rnote">Searched ' + esc(d.searched) + '</div>' + (d.articles.length ? d.articles.slice(0, n).map(x => '<a class="chitem" target="_blank" rel="noopener" href="' + esc(x.url) + '"><span><b>' + esc(x.title) + '</b><em>' + esc(x.domain) + (x.date ? ' · ' + esc(x.date) : '') + '</em></span></a>').join('') : '<div class="rnote">' + esc(d.note) + '</div>') + '<div class="rnote">Source: ' + esc(d.source || 'Google News') + '</div>';
+
   // ---------- card tools: drive time, weather, site imagery, news ----------
   function renderCardTools(info) {
     const card = document.getElementById('card'); card.querySelector('#liveSec')?.remove();
@@ -241,12 +249,9 @@ export function initLive(ctx) {
     const busy = t => { out.innerHTML = '<div class="rnote">' + esc(t) + '</div>'; };
     const fail = e => { if (mine()) out.innerHTML = '<div class="rnote err">' + esc(e.message || e) + '</div>'; };
     sec.querySelector('[data-a=drive]').onclick = async () => { busy('Finding you and routing…'); try { const d = await drive({ target: 'selected' }); if (!mine()) return; if (d.error) throw new Error(d.error);
-      out.innerHTML = '<div class="live-big">' + (d.at_property ? 'You’re here' : d.road_miles != null ? d.drive_minutes_now + ' min · ' + d.road_miles + ' mi' : d.straight_line_miles.toFixed(1) + ' mi straight') + '</div>' +
-        '<div class="rnote">' + esc(d.at_property ? d.summary : [d.straight_line_miles.toFixed(1) + ' mi straight line', d.live_traffic ? (d.traffic_delay_minutes > 1 ? d.traffic_delay_minutes + ' min traffic delay (usually ' + d.typical_minutes + ' min)' : 'traffic is light') : d.road_miles != null ? 'no live traffic data' : d.road_error, d.caution].filter(Boolean).join(' · ')) + '</div>' +
-        (d.google_maps ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(d.google_maps) + '">Navigate in Google Maps ↗</a>' : ''); } catch (e) { fail(e); } };
+      out.innerHTML = driveHTML(d); } catch (e) { fail(e); } };
     sec.querySelector('[data-a=wx]').onclick = async () => { busy('Checking the weather…'); try { const d = await weather({ where: 'selected' }); if (!mine()) return; if (d.error) throw new Error(d.error);
-      out.innerHTML = '<div class="live-big">' + Math.round(d.temp_f) + '°F · ' + esc(d.conditions) + '</div><div class="rnote">Wind ' + Math.round(d.wind_mph) + ' mph from the ' + esc(d.wind_from) + ' (gusts ' + Math.round(d.gust_mph) + ') · today ' + Math.round(d.today.low_f) + '–' + Math.round(d.today.high_f) + '°F, ' + (d.today.rain_chance_pct ?? 0) + '% rain</div>' +
-        (Array.isArray(d.active_tropical_storms) && d.active_tropical_storms.length ? '<div class="rnote">' + d.active_tropical_storms.map(s => esc(s.type + ' ' + s.name + ', ' + s.miles_away + ' mi away')).join('<br>') + '</div>' : '') + '<div class="rnote">Open-Meteo · NOAA NHC</div>'; } catch (e) { fail(e); } };
+      out.innerHTML = weatherHTML(d); } catch (e) { fail(e); } };
     sec.querySelector('[data-a=img]').onclick = async () => { busy('Looking for high-res aerial imagery and recent NASA passes…'); try {
       const c = info.kind === 'filing' ? [info.f.lon, info.f.lat] : info.center;
       const [list, hi] = await Promise.all([passes([c[0] - .01, c[1] - .01, c[0] + .01, c[1] + .01]).catch(() => []), hiresCatalog(c)]); if (!mine()) return;
@@ -254,7 +259,7 @@ export function initLive(ctx) {
     } catch (e) { fail(e); } };
     sec.querySelector('[data-a=news]').onclick = async () => { busy('Searching recent news…'); try {
       const d = info.kind === 'filing' ? await news({ filing_id: info.f.id }) : await news({ query: info.label() }); if (!mine()) return; if (d.error) throw new Error(d.error);
-      out.innerHTML = '<div class="rnote">Searched ' + esc(d.searched) + '</div>' + (d.articles.length ? d.articles.slice(0, 8).map(x => '<a class="chitem" target="_blank" rel="noopener" href="' + esc(x.url) + '"><span><b>' + esc(x.title) + '</b><em>' + esc(x.domain) + (x.date ? ' · ' + esc(x.date) : '') + '</em></span></a>').join('') : '<div class="rnote">' + esc(d.note) + '</div>') + '<div class="rnote">Source: ' + esc(d.source || 'Google News') + '</div>';
+      out.innerHTML = newsHTML(d);
     } catch (e) { fail(e); } };
   }
 
@@ -301,8 +306,9 @@ export function initLive(ctx) {
   const pic = p => p.kind === 'nasa' || !p.kind ? 'nasa' : 'hi';
   const capOf = p => pic(p) === 'nasa' ? p.day + ' · ' + p.name + (p.cloud != null ? ' · ' + Math.round(p.cloud) + '% cloud' : '')
     : p.kind === 'wb' ? (p.captured ? 'Captured ' + p.captured : 'Published ' + p.published) + (p.res_m ? ' · ' + p.res_m + ' m' : '') + ' · Esri' : p.date + ' · NAIP ' + (p.gsd || 0.6) + ' m';
-  function renderCardImagery(c, list, hi) {
-    const out = document.querySelector('#liveSec .live-out'); if (!out) return;
+  let lastImagery = null; // the latest site_imagery lookup, so the assistant can show the same thumbnails in the chat
+  function renderCardImagery(c, list, hi, out = document.querySelector('#liveSec .live-out')) {
+    lastImagery = { c, list, hi }; if (!out) return;
     const shown = (list || []).filter(p => p.cloud == null || p.cloud <= 60).slice(0, 4), nasaShow = (shown.length ? shown : (list || []).slice(0, 3)).map(p => ({ kind: 'nasa', ...p }));
     const hiShow = hiItems(hi), all = [...hiShow, ...nasaShow];
     if (!all.length) { out.innerHTML = '<div class="rnote">No imagery found here: no high-res versions and no NASA passes in the last 60 days.</div>'; return; }
@@ -361,5 +367,6 @@ export function initLive(ctx) {
   // for the Sources tab: what is on, how often it refreshes, and the latest data time we know of
   const status = () => ({ hires: hires ? { kind: hires.kind, date: hiDate(hires) } : null, on: { ...on }, trafficOK, terrainMesh: !!map.getTerrain?.(), terrainZoom: TERRAIN_Z, windTime: windData?.time || null, nasa: nasa?.day ? { day: nasa.day, name: nasa.name, cloud: nasa.cloud } : null,
     raster: Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, { every: v.every, requested: stamp[k] != null ? stamp[k] * v.every * 60e3 : null }])) });
-  ctx.live = { set, drive, weather, news, imagery, clearRoute, state: () => ({ ...on }), status };
+  ctx.live = { set, drive, weather, news, imagery, clearRoute, state: () => ({ ...on }), status, driveHTML, weatherHTML, newsHTML,
+    imageryInto: el => { if (lastImagery) renderCardImagery(lastImagery.c, lastImagery.list, lastImagery.hi, el); } };
 }

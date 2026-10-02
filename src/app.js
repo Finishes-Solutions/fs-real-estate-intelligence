@@ -14,12 +14,14 @@ import { initMapSearch } from './mapsearch.js';
 import { initCompare } from './compare.js';
 import { initKpis } from './kpis.js';
 import { initExport } from './export.js';
+import { initReports } from './reports.js';
+import { initChatCards } from './chatcards.js';
 import { initNearby } from './nearby.js';
 import { initLive } from './live.js';
 import { initSources } from './sources.js';
 import { initTeam } from './team.js';
 import { initArea } from './area.js';
-import { plainText } from './lib/assist-logic.mjs';
+import { plainText, textBlocks } from './lib/assist-logic.mjs';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
 const getJSON=(u,optional)=>fetch(u,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error(u+' '+r.status); return r.json(); }).catch(e=>{ if(optional) return null; throw e; });
@@ -385,7 +387,7 @@ async function loadBrief(f){
   catch(e){ if(state.sel===f) box.innerHTML='<div class="rnote">'+esc(e.message)+'</div><button class="btn" id="briefBtn">Try Again</button>', box.querySelector('#briefBtn').onclick=()=>loadBrief(f); }
 }
 // AI text -> safe HTML: escaped, paragraphs, [TABS…] citations become buttons that select the filing
-function richText(t){ return esc(plainText(t||'')).split(/\n{2,}|\n(?=[A-Z][^\n]{0,40}\n)/).map(p=>'<p>'+p.replace(/\n/g,'<br>')+'</p>').join('').replace(/\[(TABS[0-9A-Za-z-]+)\]/g,(m,id)=>BY_ID.has(id)?'<button class="cite" data-id="'+id+'">'+id+'</button>':id); }
+function richText(t){ return textBlocks(esc(plainText(t||''))).replace(/\[(TABS[0-9A-Za-z-]+)\]/g,(m,id)=>BY_ID.has(id)?'<button class="cite" data-id="'+id+'">'+id+'</button>':id); }
 function wireCites(el){ el.querySelectorAll('.cite').forEach(b=>b.onclick=()=>{ const f=BY_ID.get(b.dataset.id); if(f){ setView('map'); select(f,true); } }); }
 const cardCloseHooks=[];
 function clearSel(){ state.sel=null; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
@@ -615,7 +617,10 @@ function filterText(){ const t=describe(curSpec(false),fmtM); const mo=state.mon
 function monthLabel(m){ return new Date(m+'-15T12:00:00Z').toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
 let downloads=null; const inViewer=!!(window.claude&&window.claude.use);
 if(inViewer) window.claude.use('downloads').then(d=>{downloads=d;}).catch(()=>{});
+// every file the app saves passes through here; the Reports tab records exports (onSave)
+const saveHooks=[];
 async function saveFile(filename,data,mime){
+  saveHooks.forEach(fn=>{ try{ fn(filename,data,mime); }catch(e){ console.error(e); } });
   if(downloads){ try{ await downloads.save({filename,data}); toast('Saved '+filename);}catch(err){ if(!err||err.code!=='declined') toast('Couldn’t save the file here.'); } return; }
   const blob=data instanceof Blob?data:new Blob([data],{type:mime}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},3000); toast('Saved '+filename);
 }
@@ -738,7 +743,7 @@ if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
   applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
-  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), mapClickHandlers:[], setRadiusCenter, setMiles, fitGeom, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
+  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], setRadiusCenter, setMiles, fitGeom, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.
 function orbitAt(c,zoom){ stopOrbit(); const close=zoom>=16.5; map.flyTo({center:c,zoom,pitch:close?65:60,duration:reduceMotion?0:2200,essential:true});
@@ -769,7 +774,7 @@ Object.assign(ctx,{ nearestPlace, basemap:()=>layers.style, mode:()=>mode, scree
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap, buildReport,
   exportCsv, exportXlsx, exportGeoJSON, exportHtml, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initArea,initSources]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initArea,initSources]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});

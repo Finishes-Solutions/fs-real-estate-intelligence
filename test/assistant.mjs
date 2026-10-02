@@ -1,9 +1,11 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks } from '../lib/assist-logic.mjs';
+import { pruneReports, fmtBytes } from '../lib/reports.mjs';
+import { nameQuery } from '../api/tenants.js';
 import { USES } from '../lib/taxonomy.mjs';
 import { makeMatcher, encode, decode, describe } from '../lib/filter.mjs';
-import { categoryOf, parsePlaces, overpassQuery } from '../lib/nearby.mjs';
+import { categoryOf, parsePlaces, overpassQuery, businessQuery, mergeBusinesses } from '../lib/nearby.mjs';
 import { roofFromHistogram, floorsFromHeight } from '../lib/height.mjs';
 
 // the model filled every filter: all uses, all types, $5M–$1T, changed this week
@@ -100,6 +102,25 @@ assert.deepEqual(decode(encode(spec)), spec, 'new fields survive a link round tr
 assert.match(describe(spec), /5,000–90,000 sq ft.*50\+ units.*Company: “hines”.*Exact addresses only/);
 a = cleanFilterArgs({ sqft_min: 0, sqft_max: 5000, status: ['Registered', 'Review complete', 'Inspection complete', 'Closed'], company: ' ', exact_only: false, min_units: -1 });
 assert.deepEqual(a, { sqft_max: 5000 }, 'empty / all-status / false filters dropped');
+// chat replies: numbered and bulleted lines become real lists, a short "…:" line above a list is its lead-in
+assert.equal(textBlocks('Summary of 13 filings.\n\nLargest projects:\n1. Tower, est. $9M\n2. Clinic\n• note'),
+  '<p>Summary of 13 filings.</p><p class="lead">Largest projects:</p><ol><li>Tower, est. $9M</li><li>Clinic</li></ol><ul><li>note</li></ul>');
+assert.equal(textBlocks('One line\nnext line'), '<p>One line<br>next line</p>');
+// business search: OpenStreetMap shops and services only, Comptroller rows merged without duplicates
+const bq = businessQuery('St. Luke (Katy)', 29.7, -95.8, 8000, 8);
+assert.match(bq, /\["name"~"St\. Luke \.Katy\.",i\]\[~"\^\(shop\|amenity/); assert.ok(!/\\/.test(bq), 'no backslashes for Overpass');
+const mb = mergeBusinesses([{ name: 'Starbucks', kind: 'cafe', address: '123 Main St, Katy', lat: 29.7, lon: -95.8, miles: 1.2 }],
+  [{ name: 'STARBUCKS #1234', addr: '123 MAIN ST STE 4', city: 'Katy' }, { name: 'STARBUCKS #99', addr: '9 ELM RD', city: 'Katy', zip: '77494' }]);
+assert.deepEqual(mb.map(b => b.src + ':' + b.name), ['osm:Starbucks', 'comptroller:STARBUCKS #99'], 'same store from both sources listed once');
+assert.equal(mb[1].address, '9 ELM RD, Katy');
+assert.equal(nameQuery("Buc-ee's", ['Katy', 'Waller']), "(upper(outlet_name) like '%BUC-EE''S%' OR upper(taxpayer_name) like '%BUC-EE''S%') AND upper(outlet_city) in ('KATY', 'WALLER')");
+assert.equal(nameQuery('ab', ['Katy']), null, 'too short'); assert.equal(nameQuery('starbucks', []), null, 'needs towns');
+// past exports: newest 50 files within the size cap stay; older ones stay listed without their file
+const hist = Array.from({ length: 55 }, (_, i) => ({ id: 'r' + i, size: 1e6, stored: true }));
+const pr = pruneReports(hist);
+assert.equal(pr.keep.filter(r => r.stored).length, 50); assert.deepEqual(pr.drop, ['r50', 'r51', 'r52', 'r53', 'r54']); assert.equal(pr.keep.length, 55);
+assert.deepEqual(pruneReports([{ id: 'a', size: 9e7, stored: true }, { id: 'b', size: 9e7, stored: true }]).drop, ['b'], 'size cap');
+assert.equal(fmtBytes(2.5e6), '2.5 MB'); assert.equal(fmtBytes(800), '800 B');
 console.log('assistant ok');
 
 // voice: the transcriber echoing its own hint list is not something the user said

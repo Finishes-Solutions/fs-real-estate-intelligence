@@ -100,7 +100,7 @@
   <main class="stage" id="stage" data-view="map">
     <nav class="viewbar" id="viewbar" aria-label="Views">
       <button class="ptoggle" id="panelToggle" aria-label="Show or hide the list" title="Show or hide the list"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg></button>
-      <button data-view="map" aria-pressed="true">Map</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="compare" aria-pressed="false">Compare <span class="badge" id="cmpBadge"></span></button><button data-view="who" aria-pressed="false">Activity</button><button data-view="market" aria-pressed="false">Market</button><button data-view="changes" aria-pressed="false">Updates <span class="badge" id="chgBadge"></span></button><button data-view="field" aria-pressed="false">Field Notes <span class="badge" id="fieldBadge"></span></button><button data-view="sources" aria-pressed="false">Sources</button>
+      <button data-view="map" aria-pressed="true">Map</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="compare" aria-pressed="false">Compare <span class="badge" id="cmpBadge"></span></button><button data-view="who" aria-pressed="false">Activity</button><button data-view="market" aria-pressed="false">Market</button><button data-view="reports" aria-pressed="false">Reports</button><button data-view="changes" aria-pressed="false">Updates <span class="badge" id="chgBadge"></span></button><button data-view="field" aria-pressed="false">Field Notes <span class="badge" id="fieldBadge"></span></button><button data-view="sources" aria-pressed="false">Sources</button>
     </nav>
     <div class="viewport" id="viewport">
     <div id="map" aria-label="Interactive map of construction filings"></div>
@@ -183,6 +183,7 @@
     <section class="view" id="view-compare" aria-label="Compare"></section>
     <section class="view" id="view-who" aria-label="Activity"></section>
     <section class="view" id="view-market" aria-label="Market"></section>
+    <section class="view" id="view-reports" aria-label="Reports"></section>
     <section class="view" id="view-changes" aria-label="Updates"></section>
     <section class="view" id="view-field" aria-label="Field Notes"></section>
     <section class="view" id="view-sources" aria-label="Sources"></section>
@@ -216,7 +217,8 @@
     <button data-go="saved">Saved Searches &amp; RSS Alerts</button>
     <button data-go="layers">Map Layers &amp; Demographics</button>
     <button data-go="compare">Compare Areas <span class="badge" id="mCmpN"></span></button>
-    <button data-go="export">Export &amp; Reports</button>
+    <button data-go="reports">Reports &amp; Past Exports</button>
+    <button data-go="export">Export a Report</button>
     <button data-go="install" id="mInstall" hidden>Install as an App</button>
     <button data-go="theme">Light / Dark</button>
   </div>

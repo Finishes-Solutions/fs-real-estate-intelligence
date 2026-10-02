@@ -60,8 +60,32 @@ export async function tenants(addr, zip, city) {
   return { query: q.key.num + ' … ' + q.key.word, tenants: shapeTenants(rows) };
 }
 
+// businesses by name in the given cities (map search): "STARBUCKS" in Katy, Fulshear, Brookshire …
+export function nameQuery(name, cities) {
+  const n = String(name || '').toUpperCase().replace(/[^A-Z0-9 &'-]/g, ' ').replace(/\s+/g, ' ').trim().replace(/'/g, "''");
+  const cs = (cities || []).map(c => String(c).toUpperCase().replace(/[^A-Z .'-]/g, '').replace(/'/g, "''").trim()).filter(Boolean).slice(0, 40);
+  if (n.length < 3 || !cs.length) return null;
+  return "(upper(outlet_name) like '%" + n + "%' OR upper(taxpayer_name) like '%" + n + "%') AND upper(outlet_city) in (" + cs.map(c => "'" + c + "'").join(', ') + ')';
+}
+export async function businessesNamed(name, cities, limit = 12) {
+  const where = nameQuery(name, cities); if (!where) return { tenants: [] };
+  const p = new URLSearchParams({ $select: 'outlet_name, taxpayer_name, outlet_address, outlet_city, outlet_zip_code, outlet_naics_code, outlet_permit_issue_date, outlet_first_sales_date', $where: where, $order: 'outlet_permit_issue_date DESC', $limit: String(limit * 3) });
+  const r = await fetch(SOCRATA + '?' + p, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0', ...(process.env.SOCRATA_APP_TOKEN ? { 'X-App-Token': process.env.SOCRATA_APP_TOKEN } : {}) } });
+  const t = await r.text(); if (!r.ok) throw new Error('Comptroller data ' + r.status + (t ? ': ' + t.slice(0, 120) : ''));
+  const rows = JSON.parse(t);
+  return { tenants: shapeTenants(rows).map((x, i) => ({ ...x, city: titleCase(rows.find(r2 => String(r2.outlet_address || '').slice(0, 120) === x.addr)?.outlet_city), zip: String(rows.find(r2 => String(r2.outlet_address || '').slice(0, 120) === x.addr)?.outlet_zip_code || '').slice(0, 5) || undefined })).slice(0, limit) };
+}
+const titleCase = s => String(s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) || undefined;
+
 export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 30, perDay: 600 })) return;
+  if (req.query?.name) { // map search: GET ?name=Starbucks&cities=Katy,Fulshear
+    try {
+      const d = await businessesNamed(clip(req.query.name, 60), String(req.query.cities || '').split(',').map(s => s.trim()).filter(Boolean));
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
+      return res.json({ ...d, source: 'Texas Comptroller, active sales tax permits' });
+    } catch (e) { console.error('tenants name', e.message); res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ error: 'Couldn’t reach the Texas Comptroller data just now.' }); }
+  }
   const addr = clip(req.query?.addr, 120), zip = clip(req.query?.zip, 10), city = clip(req.query?.city, 40);
   if (!addr) return res.status(400).json({ error: 'addr is required' });
   try {

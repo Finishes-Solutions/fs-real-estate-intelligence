@@ -66,6 +66,32 @@ export function initAssistant(ctx) {
     if (e.key === 'Escape' && app.classList.contains('ai-open') && document.activeElement === q) close();
   });
 
+  // ---------- width: drag the drawer's left edge to widen it (never narrower than the default). Saved per browser. ----------
+  { const grip = document.createElement('div'), KEY = 'fs-ai-w';
+    grip.className = 'ai-resize'; grip.setAttribute('role', 'separator'); grip.setAttribute('aria-orientation', 'vertical'); grip.setAttribute('aria-label', 'Resize the assistant'); grip.tabIndex = 0; grip.title = 'Drag to resize · double-click to reset';
+    el.prepend(grip);
+    const base = () => innerWidth <= 1100 ? 400 : Math.min(460, innerWidth - 32);
+    const maxW = () => Math.max(base(), Math.min(980, (document.querySelector('.stage')?.clientWidth || innerWidth) - 360));
+    let want = null; try { want = +localStorage.getItem(KEY) || null; } catch (e) {}
+    let raf = 0; const pad = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; ctx.mapPadding(); }); };
+    const apply = () => { const w = want && innerWidth > 700 ? Math.min(maxW(), want) : 0;
+      if (w > base() + 1) app.style.setProperty('--aiw', Math.round(w) + 'px'); else app.style.removeProperty('--aiw'); pad(); };
+    const save = () => { try { want ? localStorage.setItem(KEY, String(Math.round(want))) : localStorage.removeItem(KEY); } catch (e) {} };
+    apply(); addEventListener('resize', apply);
+    grip.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return; e.preventDefault(); grip.setPointerCapture(e.pointerId); app.classList.add('airesizing');
+      const right = el.getBoundingClientRect().right;
+      const move = ev => { want = Math.max(base(), Math.min(maxW(), right - ev.clientX)); apply(); };
+      const up = () => { grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up); app.classList.remove('airesizing'); if (want <= base() + 1) want = null; save(); ctx.mapPadding(); };
+      grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+    });
+    grip.addEventListener('dblclick', () => { want = null; save(); apply(); });
+    grip.addEventListener('keydown', e => {
+      const d = e.key === 'ArrowLeft' ? 24 : e.key === 'ArrowRight' ? -24 : 0; if (!d) return; e.preventDefault();
+      want = Math.max(base(), Math.min(maxW(), (want || el.getBoundingClientRect().width) + d)); if (want <= base() + 1) want = null; apply(); save();
+    });
+  }
+
   // ---------- suggested questions above the Ask AI button, from what is on screen ----------
   const sugBox = $('fabSugs'); let cardInfo = null, sugT = 0, lastSugs = '';
   function onScreen() {
@@ -135,7 +161,7 @@ export function initAssistant(ctx) {
   async function ask(text) {
     if (busy) return; open(false); busy = true; $('aiSend').disabled = true;
     log.querySelectorAll('.ai-next').forEach(x => x.remove()); turnSubject = null;
-    bubble('user', esc(text)); history.push({ role: 'user', content: text });
+    const mine = bubble('user', esc(text)); history.push({ role: 'user', content: text });
     const thinking = bubble('bot pending', '<span class="dots"><i></i><i></i><i></i></span>'); status('Thinking…');
     try {
       let input = [{ role: 'user', content: text }], next = [];
@@ -154,10 +180,13 @@ export function initAssistant(ctx) {
         log.appendChild(thinking); scroll(); status('Thinking…');
       }
       next = withTellMore(next, turnSubject); if (next.length) pills(next);
+      // a tall answer with cards: start at the first card rather than the bottom, so its headline numbers are in view
+      let c1 = mine.nextElementSibling; while (c1 && !c1.classList.contains('ccard')) c1 = c1.nextElementSibling;
+      if (c1 && log.scrollHeight - (c1.offsetTop - log.offsetTop) > log.clientHeight) log.scrollTop = c1.offsetTop - log.offsetTop - 8;
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…' };
+  const LABEL = { filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -229,19 +258,69 @@ export function initAssistant(ctx) {
   }
   const summary = list => ({ filings: list.length, total_value: list.reduce((s, f) => s + f.cost, 0), new_construction: list.filter(f => f.type === 'New').length,
     by_use: groups(list, f => f.use, 6), by_county: groups(list, f => f.county, 6), largest: list.slice().sort((a, b) => b.cost - a.cost).slice(0, 10).map(row) });
-  const GROUP = { county: f => f.county, city: f => f.city, use: f => f.use, type: f => f.type, status: f => f.status, developer: f => f.dev || f.owner, month: f => (f.reg || '').slice(0, 7), year: f => (f.reg || '').slice(0, 4) };
+  const GROUP = { county: f => f.county, city: f => f.city, use: f => f.use, type: f => f.type, status: f => f.status, developer: f => f.dev || f.owner, month: f => (f.reg || '').slice(0, 7), year: f => (f.reg || '').slice(0, 4),
+    quarter: f => f.reg ? f.reg.slice(0, 4) + '-Q' + (Math.floor((+f.reg.slice(5, 7) - 1) / 3) + 1) : '' };
+  const inBounds = () => { const b = ctx.map.getBounds(); return ctx.visible.filter(f => b.contains([f.lon, f.lat])); };
+  // the point a lookup is about: a filing, coordinates, a named place, or what is open on screen
+  async function pointFor(a) {
+    const f = a.id && ctx.BY_ID.get(String(a.id).trim());
+    if (f) return { c: [f.lon, f.lat], label: f.addr || f.name };
+    if (isFinite(a.lat) && isFinite(a.lon) && a.lat && a.lon) return { c: [a.lon, a.lat], label: a.lat.toFixed(5) + ', ' + a.lon.toFixed(5) };
+    if (a.place) { const p = await resolvePlace(String(a.place)); if (p.error) return { error: p.error }; return { c: p.c, label: p.label }; }
+    if (ctx.state.sel) return { c: [ctx.state.sel.lon, ctx.state.sel.lat], label: ctx.state.sel.addr || ctx.state.sel.name };
+    const b = ctx.currentBuilding?.(); if (b) return { c: b.center, label: b.title || 'this building' };
+    const pl = ctx.currentPlace?.(); if (pl?.c) return { c: pl.c, label: pl.label };
+    return { error: 'Say which address or place, or open a filing or building first.' };
+  }
+  let cardList = null; // the filings a tool worked on, for its chat card
 
+  // every tool result can come with a card in the chat (src/chatcards.js), for typed and voice chat alike
   async function runTool(name, a) {
+    cardList = null;
+    const r = await runToolInner(name, a), card = ctx.chatCard?.(name, a, r, cardList);
+    if (card) { const w = bubble('ccard', ''); w.appendChild(card); ctx.wireCites(w); scroll(); }
+    return r;
+  }
+  async function runToolInner(name, a) {
     try {
+      if (name === 'summarize_filings') {
+        const sc = a.ids?.length ? 'ids' : a.scope || 'view';
+        const list = sc === 'ids' ? a.ids.map(id => ctx.BY_ID.get(String(id).trim())).filter(Boolean) : sc === 'highlighted' ? ctx.highlighted().map(id => ctx.BY_ID.get(id)).filter(Boolean) : sc === 'filters' ? ctx.visible.slice() : inBounds();
+        if (!list.length) return { error: sc === 'view' ? 'No filings are on the map in this view.' : sc === 'highlighted' ? 'Nothing is highlighted.' : 'No matching filings.' };
+        cardList = list; const regs = list.map(f => f.reg).filter(Boolean).sort();
+        const title = fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ({ view: ' in view', filters: ' with the current filters', highlighted: ' highlighted', ids: '' }[sc]);
+        return { title, scope_note: ctx.filterText() || '', ...summary(list), registered_from: regs[0], registered_to: regs[regs.length - 1], by_city: groups(list, f => f.city, 6), by_status: groups(list, f => f.status, 5),
+          by_month: groups(list, GROUP.month, 36).sort((x, y) => x.name.localeCompare(y.name)), largest: list.slice().sort((x, y) => y.cost - x.cost).slice(0, 5).map(row), shown_as: 'a summary card in the chat' };
+      }
+      if (name === 'show_chart') {
+        const { spec, notes } = await specFrom({ ...a, keep_current: a.keep_current ?? true }), list = matchList(spec), by = GROUP[a.group_by] ? a.group_by : 'county';
+        const time = /month|quarter|year/.test(by), gs = groups(list, GROUP[by], time ? 60 : 12);
+        cardList = list;
+        return { title: (a.metric === 'value' ? 'Est. value' : 'Filings') + ' by ' + by, group_by: by, metric: a.metric === 'value' ? 'value' : 'count', filters: describe(spec) || 'all', notes, filings: list.length, total_value: list.reduce((s, f) => s + f.cost, 0),
+          groups: time ? gs.filter(g => g.name !== 'Unknown').sort((x, y) => x.name.localeCompare(y.name)) : gs, shown_as: 'a chart card in the chat' };
+      }
+      if (name === 'location_info') {
+        const p = await pointFor(a); if (p.error) return p;
+        const r = await fetch('api/building?' + new URLSearchParams({ lat: p.c[1].toFixed(6), lon: p.c[0].toFixed(6) })), d = await r.json().catch(() => ({}));
+        if (!r.ok) return { error: d.error || 'Location lookup failed (' + r.status + ').' };
+        const pc = d.parcel || {}, near = (x, y) => Math.hypot((x[0] - y[0]) * 0.87, x[1] - y[1]) < 0.0005;
+        const filings = ctx.F.filter(f => near([f.lon, f.lat], p.c)).sort((x, y) => y.cost - x.cost).slice(0, 8);
+        const lid = d.height?.source === '3dep-lidar' && d.height.height_m > 2 ? d.height.height_m : d.osm?.height_m || null;
+        turnSubject = pc.situs || p.label;
+        return { place: p.label, center: p.c, address: pc.situs || null, owner: pc.owner || null, market_value: pc.marketValue || null, year_built: pc.yearBuilt || null, land_area: pc.area || null, land_use: pc.landUse || null, county: pc.county || null,
+          building_sqft: pc.buildingSqft || null, height_ft: lid ? Math.round(lid * 3.281) : null, floors: d.osm?.levels || pc.stories || null,
+          businesses: (d.places || []).filter(x => near([x.lon, x.lat], p.c)).slice(0, 15).map(x => ({ name: x.name, kind: x.kind })), filings: filings.map(row),
+          note: d.parcel ? undefined : 'No appraisal parcel record was found at this point.', source: 'Texas GIO parcels, OpenStreetMap, USGS lidar, TDLR TABS' };
+      }
       if (name === 'filter_map') {
         const before = ctx.snapshot(), { spec, notes } = await specFrom(a);
         ctx.fromSpec(spec, { fly: true }); if (ctx.view !== 'map' && ctx.view !== 'timeline') ctx.setView('map');
-        const list = ctx.visible; if (!spec.sel) ctx.fitToVisible();
+        const list = ctx.visible; if (!spec.sel) ctx.fitToVisible(); cardList = list.slice();
         actionChip('Map: ' + (describe(spec, fmtM) || 'all filings') + ' · ' + fmtN(list.length) + ' filings · est. ' + fmtM(list.reduce((s, f) => s + f.cost, 0)), () => ctx.restore(before));
         return { applied: describe(spec) || 'all filings', notes, ...summary(list) };
       }
       if (name === 'query_filings') {
-        const { spec, notes } = await specFrom({ ...a, keep_current: a.keep_current ?? false }), list = matchList(spec), lim = Math.max(1, Math.min(25, a.limit || 10));
+        const { spec, notes } = await specFrom({ ...a, keep_current: a.keep_current ?? false }), list = matchList(spec), lim = Math.max(1, Math.min(25, a.limit || 10)); cardList = list;
         if (a.group_by) return { filters: describe(spec) || 'all', notes, filings: list.length, total_value: list.reduce((s, f) => s + f.cost, 0), groups: groups(list, GROUP[a.group_by] || GROUP.county, lim) };
         const sorted = list.slice().sort(a.sort === 'newest' ? (x, y) => (y.reg || '').localeCompare(x.reg || '') : a.sort === 'oldest' ? (x, y) => (x.reg || '').localeCompare(y.reg || '') : a.sort === 'start' ? (x, y) => x.ts.localeCompare(y.ts) : (x, y) => y.cost - x.cost);
         return { filters: describe(spec) || 'all', notes, filings: list.length, total_value: list.reduce((s, f) => s + f.cost, 0), rows: sorted.slice(0, lim).map(row) };
@@ -321,10 +400,10 @@ export function initAssistant(ctx) {
       }
       if (name === 'stop_orbit') { ctx.stopOrbit(); return { stopped: true }; }
       if (name === 'set_map_options') { const done = ctx.setMapOptions(a); actionChip('Map: ' + done.join(', ')); return { changed: done }; }
-      if (name === 'distance_and_drive_time') { if (!ctx.live) return { error: 'Not available.' }; const d = await ctx.live.drive(a); if (d.summary) actionChip(d.summary, a.show_route !== false && d.road_miles != null ? () => ctx.live.clearRoute() : null); return d; }
+      if (name === 'distance_and_drive_time') { if (!ctx.live) return { error: 'Not available.' }; const d = await ctx.live.drive(a); return d; } // the chat card shows it, with Clear Route
       if (name === 'set_live_layers') { if (!ctx.live) return { error: 'Not available.' }; if (ctx.view !== 'map') ctx.setView('map'); const done = await ctx.live.set(a); actionChip('Map: ' + done.join(', ')); return { changed: done, now_on: Object.entries(ctx.live.state()).filter(([, v]) => v).map(([k]) => k) }; }
-      if (name === 'weather_at') { if (!ctx.live) return { error: 'Not available.' }; const d = await ctx.live.weather(a); if (!d.error) actionChip('Weather at ' + d.place + ': ' + Math.round(d.temp_f) + '°F, ' + d.conditions + ', wind ' + Math.round(d.wind_mph) + ' mph'); return d; }
-      if (name === 'project_news') { if (!ctx.live) return { error: 'Not available.' }; const d = await ctx.live.news(a); if (!d.error) actionChip('News: ' + d.articles.length + ' article' + (d.articles.length === 1 ? '' : 's') + ' for ' + d.searched); return d; }
+      if (name === 'weather_at') { if (!ctx.live) return { error: 'Not available.' }; return ctx.live.weather(a); }
+      if (name === 'project_news') { if (!ctx.live) return { error: 'Not available.' }; return ctx.live.news(a); }
       if (name === 'site_imagery') { if (!ctx.live) return { error: 'Not available.' }; if (ctx.view !== 'map') ctx.setView('map'); const d = await ctx.live.imagery(a); if (d.showing) actionChip('NASA imagery on the map: ' + d.showing.name + ' ' + d.showing.day); else if (d.passes?.length) actionChip('Found ' + d.passes.length + ' NASA passes · previews in the card'); return d; }
       if (name === 'web_search') {
         const r = await fetch('api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: a.query, near: a.near || turnSubject || '' }) });
@@ -333,7 +412,7 @@ export function initAssistant(ctx) {
         bubble('act', '<span class="ai-ai">Searched the web' + (d.sources.length ? ': ' : '') + '</span>' + d.sources.slice(0, 5).map(x => '<a class="ai-src" href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc(x.title) + '">' + esc(x.site) + '</a>').join(' · '));
         return { answer: d.answer, sources: d.sources.map(s => ({ site: s.site, title: s.title })) };
       }
-      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates', market: 'Market' }[a.view] || a.view)); return { view: a.view }; }
+      if (name === 'show_view') { ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates', market: 'Market', reports: 'Reports' }[a.view] || a.view)); return { view: a.view }; }
       if (name === 'reset_map') { const before = ctx.snapshot(); ctx.resetAll(); actionChip('Reset the map', () => ctx.restore(before)); return { reset: true, filings: ctx.visible.length }; }
       return { error: 'Unknown tool ' + name };
     } catch (e) { console.error(e); return { error: e.message }; }
