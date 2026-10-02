@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 5:58 PM CT: The assistant can take you anywhere in the world, and asks when a place is unclear (ae83277)
+- Ask for any place on Earth: "take me to Lyon, France", "show me Germany", "outline Bavaria, Germany". Whole countries and states zoom out to fit.
+- If a name could be more than one place ("take me to Paris", "Springfield", "Georgia"), the assistant no longer guesses. It asks which one and shows the choices as buttons ("Paris, France" / "Paris, Texas"). It also asks when a request is unclear.
+- Ask about places outside Texas (Europe, other states). The filings and census data only cover Texas, so the assistant says so and answers from general knowledge or a quick web search.
+- When the map is somewhere else, the suggested questions above Ask AI are about that place ("Tell me about Lyon").
+- Weather, nearby places and drive time now work anywhere. Drive time refuses trips no car can make (e.g. Houston to Paris).
+
 ### 5:45 PM CT: Statewide load no longer rejects Austin County
 - The statewide database load skipped Austin County: 22 of its filings list "Austin" as the city (the county's own name), and the safety check took that for Austin in Travis County and decided the county ID was wrong. A city that's just the county's own name no longer counts in that check (the same would have hit Houston County). Re-run Statewide data with counties = Austin to load it.
 
