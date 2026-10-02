@@ -28,7 +28,7 @@ async function tracts(fips) {
 export async function buildMarket(regions, prev) {
   const fips = regions.counties.map(c => c.fips), now = new Date().getUTCFullYear();
   let year = null, cur = null;
-  for (let y = now - 1; y >= now - 5 && !cur; y--) { try { cur = await acs(y, fips, Object.values(VARS)); year = y; } catch (e) { /* not released yet */ } }
+  for (let y = now - 1; y >= now - 5 && !cur; y--) { try { cur = await acs(y, fips, Object.values(VARS)); year = y; } catch (e) { log('market: ACS', y, 'unavailable:', e.message.slice(0, 160)); } }
   if (!cur) throw new Error('no ACS year available');
   if (prev && prev.year === year && prev.tracts?.length && !process.env.REBUILD_MARKET) { log('market: ACS', year, 'unchanged, reusing'); return prev; }
   let base = null, baseYear = null;
