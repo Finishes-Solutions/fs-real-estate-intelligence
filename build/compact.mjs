@@ -30,6 +30,7 @@ export function toFiling(r, loc, ai, countyGeom, { fullScope = false } = {}) {
   if (loc) {
     const c = loc.c; f.lat = Math.round(c[1] * 1e5) / 1e5; f.lon = Math.round(c[0] * 1e5) / 1e5;
     if (loc.src === 'city') f.approx = true;
+    if (loc.via) f.gp = loc.via;
     if (countyGeom && !geoContains(countyGeom, c) && minVertexDist(countyGeom, c) > 0.12) f.misfiled = true;
   }
   ai = ai || {};
@@ -38,12 +39,17 @@ export function toFiling(r, loc, ai, countyGeom, { fullScope = false } = {}) {
   return f;
 }
 
+// geocoder plausibility check: the point must fall in (or within ~8 km of) the county the filing was registered in
+export function countyCheck(outlines) {
+  return (r, c) => { const g = outlines[r._county]; return !g || geoContains(g, c) || minVertexDist(g, c) < 0.08; };
+}
+
 const d = s => s || null;
 // compact filing -> public.filings row
 export function toRow(f, r, fips) {
   return { id: f.id, name: f.name, county: f.county, fips, city: d(f.city), zip: d(r.zip), addr: d(f.addr), type: f.type, cost: f.cost, sqft: f.sqft && f.sqft < 2e9 ? f.sqft : null, owner: d(f.owner), scope: d(f.scope),
     reg: d(f.reg), status: d(f.status), est_start: d(f.start), est_end: d(f.end), ts: d(f.ts), te: d(f.te), ts_est: f.tsE, te_est: f.teE,
-    lat: f.lat ?? null, lon: f.lon ?? null, approx: !!f.approx, misfiled: !!f.misfiled,
+    lat: f.lat ?? null, lon: f.lon ?? null, approx: !!f.approx, misfiled: !!f.misfiled, geo_src: f.gp || null,
     use: d(f.use), subtype: d(f.sub), tenant: d(f.ten), developer: d(f.dev), architect: d(f.arch), gc: d(f.gc), units: f.units ?? null, summary: d(f.sum),
     design_firm: d((r.design || '').trim()), tabs_tenant: d((r.tenant || '').trim()), facility: d((r.facility || '').trim()), updated_at: new Date().toISOString() };
 }

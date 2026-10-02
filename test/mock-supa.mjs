@@ -18,7 +18,19 @@ const inner = globalThis.fetch;
 globalThis.fetch = async (url, opts = {}) => {
   const u = new URL(String(url));
   if (u.host === 'www2.census.gov') return new Response('NAME\tINTPTLAT\tINTPTLONG\nWaller city\t30.0566\t-95.9269\n');
+  if (u.host === 'oidc.test') return json({ value: 'github-oidc-test-token' });
+  if (u.host === 'site.test' && u.pathname === '/api/pipeline-ai') { // the site's AI proxy -> mocked OpenAI
+    if (opts.headers['x-github-oidc'] !== 'github-oidc-test-token') return json({ error: 'unauthorized' }, 401);
+    globalThis.__proxyCalls = (globalThis.__proxyCalls || 0) + 1;
+    const items = JSON.parse(opts.body).items;
+    return json({ data: { items: items.map(x => ({ id: x.id, use: 'Retail', subtype: '', tenant: '', developer: 'Proxy Dev', architect: '', gc: '', units: null, summary: 'Via proxy.' })) }, usage: { prompt_tokens: 7, completion_tokens: 3 } });
+  }
   if (u.host !== 'supa.test') return inner(url, opts);
+  if (u.pathname === '/functions/v1/pipeline') { // edge function: OIDC header in, PostgREST call out
+    if (opts.headers['x-github-oidc'] !== 'github-oidc-test-token') return json({ error: 'unauthorized' }, 401);
+    const b = JSON.parse(opts.body);
+    return globalThis.fetch('http://supa.test/rest/v1/' + b.path, { method: b.method, body: b.body === undefined ? undefined : JSON.stringify(b.body), headers: { apikey: 'service', ...(b.prefer ? { Prefer: b.prefer } : {}) } });
+  }
   if (!opts.headers?.apikey) return json({ message: 'no key' }, 401);
   const path = u.pathname.replace('/rest/v1/', ''), method = opts.method || 'GET', p = [...u.searchParams];
   if (path === 'rpc/cache_get') { const { tbl, keys } = JSON.parse(opts.body), t = db[tbl] || []; const out = {}; for (const r of t) if (keys.includes(r.k)) out[r.k] = r.data; return json(out); }

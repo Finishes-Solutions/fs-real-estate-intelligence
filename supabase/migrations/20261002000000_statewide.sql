@@ -46,6 +46,7 @@ create table public.filings (
     case when lon is not null and lat is not null then extensions.st_setsrid(extensions.st_makepoint(lon, lat), 4326) end) stored,
   approx boolean not null default false,   -- placed at the town center, not the address
   misfiled boolean not null default false, -- address is well outside the county it was filed under
+  geo_src text,                         -- parcel | census | osm | maptiler | city (how the point was found)
   -- AI enrichment
   use text,
   subtype text,

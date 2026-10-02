@@ -7,7 +7,7 @@ import { log, hash, readJSON, writeMap, writeRows, iso, fetchRetry } from './bui
 import { listCounty, details } from './build/tabs.mjs';
 import { geocodeRows, cleanStreet, parseCity } from './build/geocode.mjs';
 import { buildGeo } from './build/geometry.mjs';
-import { toFiling } from './build/compact.mjs';
+import { toFiling, countyCheck } from './build/compact.mjs';
 import { enrich, aiFields, aiKey } from './build/enrich.mjs';
 import { diff, appendRun } from './build/changes.mjs';
 import { buildMarket } from './build/market.mjs';
@@ -65,14 +65,15 @@ async function refresh() {
 
   // 3. geocoding (cached)
   const geoCache = await readJSON(C + 'geocode.json', {});
-  const loc = await geocodeRows(rows, geoCache, { key: KEY, bbox: regions.bbox, places: geo.places });
+  const outlines = Object.fromEntries(geo.counties.map(c => [c.name, { type: 'MultiPolygon', coordinates: c.outline }]));
+  const loc = await geocodeRows(rows, geoCache, { key: KEY, bbox: regions.bbox, places: geo.places, check: countyCheck(outlines), budget: { nominatim: +(process.env.NOMINATIM_MAX || 2500) } });
 
   // 4. AI enrichment (cached)
   const aiCache = await readJSON(C + 'ai.json', {});
   try { await enrich(rows, aiCache); } catch (e) { log('enrich stopped:', e.message); }
 
   // 5. compact filings
-  const cg = Object.fromEntries(geo.counties.map(c => [c.name, { type: 'MultiPolygon', coordinates: c.outline }]));
+  const cg = outlines;
   const inBox = c => c && c[0] > regions.bbox[0] && c[0] < regions.bbox[2] && c[1] > regions.bbox[1] && c[1] < regions.bbox[3];
   const fresh = rows.filter(r => inBox(loc[r.ProjectNumber]?.c)).map(r => toFiling(r, loc[r.ProjectNumber], aiFields(r, aiCache), cg[r._county]));
   const other = prevFile.filings.filter(f => !counties.some(c => c.name === f.county));

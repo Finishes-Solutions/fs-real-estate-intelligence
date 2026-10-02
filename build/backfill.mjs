@@ -10,7 +10,9 @@ import { listCounty, details } from './tabs.mjs';
 import { geocodeRows, cleanStreet, parseCity, addrKey } from './geocode.mjs';
 import { enrich, aiFields, aiKey } from './enrich.mjs';
 import { diff } from './changes.mjs';
-import { toFiling, toRow } from './compact.mjs';
+import { geoContains } from 'd3-geo';
+import { minVertexDist } from './geometry.mjs';
+import { toFiling, toRow, countyCheck } from './compact.mjs';
 import { texasCounties, texasPlaces, TX_BBOX } from './texas.mjs';
 import { supa } from '../lib/supa.mjs';
 
@@ -56,7 +58,7 @@ async function seed() {
 }
 
 async function processCounty(c, [startD, endD], mode, ctx) {
-  const t = Date.now();
+  const t = Date.now(), outline = c.outline;
   await db.update('counties', 'fips=eq.' + c.fips, { status: mode === 'recent' ? c.status : 'running', updated_at: new Date().toISOString() });
   let rows = await listCounty(c.name, c.tabs_id, startD, endD);
   const seen = new Set(); rows = rows.filter(r => !seen.has(r.ProjectNumber) && seen.add(r.ProjectNumber));
@@ -73,21 +75,22 @@ async function processCounty(c, [startD, endD], mode, ctx) {
   }
   rows.forEach(r => { const pc = parseCity(r.cityLine || ''); r.city = pc.city; r.zip = pc.zip; r.st = cleanStreet(r.street || ''); r._county = c.name; });
 
+  // wrong-county guard: the filings' cities must mostly lie in or near this county (the TDLR county id is derived, not read)
+  if (outline) {
+    const known = rows.map(r => ctx.placeIdx.get((r.city || '').toLowerCase())).filter(Boolean);
+    const far = known.filter(p => !geoContains(outline, p) && minVertexDist(outline, p) > 0.3).length;
+    if (known.length >= 10 && far / known.length > 0.5) throw new Error(`${far} of ${known.length} filings are in cities far from ${c.name}; TDLR county id ${c.tabs_id} may be wrong`);
+  }
+
   // geocoding
   const keys = [...new Set(rows.filter(r => r.st && r.city).map(addrKey))];
   const stored = await db.cacheGet('geocode_cache', keys.map(gkey)), geoCache = {};
   for (const k of keys) if (stored[gkey(k)]) geoCache[k] = stored[gkey(k)];
   const snap = JSON.stringify(geoCache);
-  const loc = await geocodeRows(rows, geoCache, { key: KEY, bbox: TX_BBOX, places: ctx.places, budget: ctx.budget });
+  const loc = await geocodeRows(rows, geoCache, { key: KEY, bbox: TX_BBOX, places: ctx.places, budget: ctx.budget, check: countyCheck(c.outline ? { [c.name]: c.outline } : {}) });
   const was = JSON.parse(snap), newGeo = {};
   for (const k of keys) if (geoCache[k] && JSON.stringify(geoCache[k]) !== JSON.stringify(was[k])) newGeo[gkey(k)] = geoCache[k];
   if (Object.keys(newGeo).length) await db.cachePut('geocode_cache', newGeo);
-
-  // wrong-county guard: the derived TDLR county id must actually return this county's filings
-  const outline = c.outline, exact = rows.filter(r => loc[r.ProjectNumber]?.src === 'address');
-  const filings = rows.map(r => toFiling(r, loc[r.ProjectNumber], null, outline, { fullScope: true }));
-  const off = filings.filter(f => f.misfiled && !f.approx).length;
-  if (exact.length >= 20 && off / exact.length > 0.4) throw new Error(`${off} of ${exact.length} geocoded filings fall outside ${c.name}; TDLR county id ${c.tabs_id} may be wrong`);
 
   // AI enrichment (cached by filing content), saved per chunk
   const aiCache = await db.cacheGet('ai_cache', rows.map(aiKey));
@@ -125,7 +128,8 @@ async function main() {
   if (only.length && queue.length !== only.length) log('unknown county names:', only.filter(n => !all.some(c => c.name === n)).join(', '));
   const per = period(mode);
   const run = await db.insertOne('runs', { kind: mode });
-  const ctx = { runAt: new Date().toISOString(), places: await texasPlaces(), budget: { nominatim: +(process.env.NOMINATIM_MAX || 2500) },
+  const places = await texasPlaces();
+  const ctx = { runAt: new Date().toISOString(), places, placeIdx: new Map(places.map(p => [p[0].toLowerCase(), [p[1], p[2]]])), budget: { nominatim: +(process.env.NOMINATIM_MAX || 2500) },
     detailConcurrency: +(process.env.DETAIL_CONCURRENCY || 8), tokensIn: 0, tokensOut: 0, filings: 0 };
   log(`mode ${mode} | ${queue.length} counties queued | period ${iso(per[0])} → ${iso(per[1])} | budget ${BUDGET_MIN} min`);
 

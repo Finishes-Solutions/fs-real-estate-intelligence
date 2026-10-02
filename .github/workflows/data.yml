@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write # GitHub OIDC: lets the site's /api/pipeline-ai do AI tagging with the key stored in Vercel
 
 concurrency:
   group: refresh-data-${{ github.ref }}
@@ -36,6 +37,7 @@ jobs:
       - name: Build data
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_PROXY_URL: ${{ vars.AI_PROXY_URL || 'https://fs-real-estate-intelligence.vercel.app/api/pipeline-ai' }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           OPENAI_ENRICH_MODEL: ${{ vars.OPENAI_ENRICH_MODEL }}
           OPENAI_REASONING_EFFORT: ${{ vars.OPENAI_REASONING_EFFORT }}

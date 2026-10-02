@@ -24,6 +24,7 @@ on:
 permissions:
   contents: read
   actions: write
+  id-token: write # GitHub OIDC: proves this workflow to the Supabase edge function and the site's AI proxy
 
 concurrency:
   group: statewide-data
@@ -43,10 +44,11 @@ jobs:
       - name: Load into Supabase
         id: load
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_PROXY_URL: ${{ vars.AI_PROXY_URL || 'https://fs-real-estate-intelligence.vercel.app/api/pipeline-ai' }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           OPENAI_ENRICH_MODEL: ${{ vars.OPENAI_ENRICH_MODEL }}
           OPENAI_REASONING_EFFORT: ${{ vars.OPENAI_REASONING_EFFORT }}

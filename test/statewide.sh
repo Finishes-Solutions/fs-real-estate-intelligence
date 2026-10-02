@@ -10,6 +10,8 @@ run() { MOCK_LOG="$T/calls$1.log" MOCK_DB="$T/db.json" DATA_DIR="$T/data/" SUPAB
 run 1 COUNTIES=Waller,Dallas PERIOD_START=2025-01-01 MODE=backfill; cp "$T/db.json" "$T/db1.json"
 run 2 COUNTIES=Waller MODE=recent RECENT_MONTHS=3 BUMP=1
 run 3 MODE=backfill PERIOD_START=2026-06-01 MAX_COUNTIES=2
+# keyless: GitHub OIDC -> edge function for the database, site proxy for AI
+run 4 SUPABASE_SECRET_KEY= OPENAI_API_KEY= ACTIONS_ID_TOKEN_REQUEST_URL='http://oidc.test/t?x=1' ACTIONS_ID_TOKEN_REQUEST_TOKEN=rt AI_PROXY_URL=http://site.test/api/pipeline-ai COUNTIES=Grimes PERIOD_START=2026-07-01 MODE=backfill
 n() { grep -c "$2" "$T/calls$1.log" || true; }
 echo "run1: details $(n 1 'TABS\*') openai $(n 1 chat/completions) | run2: details $(n 2 'TABS\*') openai $(n 2 chat/completions)"
 [ -n "${DEBUG:-}" ] && cat "$T/log1" "$T/log3"
@@ -23,7 +25,7 @@ a.ok(!db1.filings.some(f=>f.fips==='48113'),'guarded county not stored');
 a.ok(db.tabs_cache.some(r=>r.k==='TABS_seed'),'git caches imported');
 const ch=db.changes||[]; a.equal(ch.filter(x=>x.kind==='cost').length,3,'nightly cost changes recorded'); a.equal(ch.filter(x=>x.kind==='new').length,0);
 a.equal(out(1).trim(),'remaining=0'); a.match(out(3),/remaining=25[01]/,'backfill reports remaining counties');
-a.equal(db.runs.length,3); a.ok(db.runs[0].tokens_in>0,'tokens logged');
+a.equal(db.runs.length,4); a.equal(c('Grimes').status,'done','keyless run'); a.ok(db.filings.filter(f=>f.fips==='48185').every(f=>f.developer==='Proxy Dev'),'AI via site proxy'); a.ok(db.runs[0].tokens_in>0,'tokens logged');
 console.log('statewide ok:', db.filings.length, 'filings,', ch.length, 'changes,', out(3).trim());
 "
 grep -E "AI tokens|done in|FAILED" "$T/log1" | head -4

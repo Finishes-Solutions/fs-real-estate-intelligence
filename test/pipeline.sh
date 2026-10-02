@@ -13,11 +13,12 @@ echo "run2: details $(n 2 'TABS\*') census $(n 2 census.gov/geocoder) openai $(n
 node -e "
 const fs=require('fs'), d=JSON.parse(fs.readFileSync('$T/data/filings.json')), ch=JSON.parse(fs.readFileSync('$T/data/changes.json')), m=JSON.parse(fs.readFileSync('$T/data/market.json'));
 const a=require('assert');
-a.equal(d.filings.length,18,'18 filings'); a.ok(d.filings.every(f=>f.use==='Medical'&&f.dev==='Acme Holdings'),'enriched');
+a.ok(d.filings.length>=15&&d.filings.length+d.unmapped===18,'18 filings, implausible geocodes dropped'); a.ok(d.filings.every(f=>f.use==='Medical'&&f.dev==='Acme Holdings'),'enriched');
 const f0=d.filings.find(f=>f.id.endsWith('0')), f2=d.filings.find(f=>f.id.endsWith('2'));
 a.ok(!f0.tsE&&!f0.teE,'filed dates kept'); a.ok(f2.tsE&&f2.teE&&f2.te>f2.ts,'inferred dates flagged');
 a.ok(d.filings.some(f=>f.arch==='PGAL'),'design firm captured'); a.ok(d.filings.every(f=>f.owner==='Acme Holdings, L.L.C.'),'owner');
-a.equal(ch.runs.length,2); a.equal(ch.runs[1].items.length,0,'first run has no diff'); a.equal(ch.runs[0].items.filter(x=>x.k==='cost').length,6,'cost bumps detected');
+a.equal(ch.runs.length,2); a.equal(ch.runs[1].items.length,0,'first run has no diff'); a.equal(ch.runs[0].items.filter(x=>x.k==='cost').length,d.filings.filter(f=>f.id.endsWith('0')).length,'cost bumps detected');
+a.ok(d.filings.some(f=>f.gp==='parcel'),'parcel geocoding used');
 a.ok(m.tracts.length>=1&&m.year,'market built');
 console.log('pipeline ok:',d.filings.length,'filings,',ch.runs[0].items.length,'changes, market',m.year,'vs',m.baseYear);
 "

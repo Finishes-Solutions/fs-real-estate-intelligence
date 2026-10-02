@@ -19,6 +19,9 @@
     },
     "api/building.js": {
       "maxDuration": 20
+    },
+    "api/pipeline-ai.js": {
+      "maxDuration": 300
     }
   },
   "headers": [
