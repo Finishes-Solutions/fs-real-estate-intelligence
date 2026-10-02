@@ -94,7 +94,10 @@ async function processCounty(c, per, mode, ctx) {
 
     // wrong-county guard: the filings' cities must mostly lie in or near this county (the TDLR county id is derived, not read)
     if (outline) {
-      const known = rows.map(r => ctx.placeIdx.get((r.city || '').toLowerCase())).filter(Boolean);
+      // a "city" that is just the county's own name ("Austin" in Austin County, "Houston" in Houston County) is the filer
+      // writing the county, not the faraway city of that name, so it doesn't count either way
+      const own = c.name.toLowerCase();
+      const known = rows.filter(r => (r.city || '').toLowerCase() !== own).map(r => ctx.placeIdx.get((r.city || '').toLowerCase())).filter(Boolean);
       const far = known.filter(p => !geoContains(outline, p) && minVertexDist(outline, p) > 0.3).length;
       if (known.length >= 10 && far / known.length > 0.5) throw new Error(`${far} of ${known.length} filings are in cities far from ${c.name}; TDLR county id ${c.tabs_id} may be wrong`);
     }

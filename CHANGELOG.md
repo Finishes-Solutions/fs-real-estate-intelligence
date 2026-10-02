@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 5:45 PM CT: Statewide load no longer rejects Austin County
+- The statewide database load skipped Austin County: 22 of its filings list "Austin" as the city (the county's own name), and the safety check took that for Austin in Travis County and decided the county ID was wrong. A city that's just the county's own name no longer counts in that check (the same would have hit Houston County). Re-run Statewide data with counties = Austin to load it.
+
 ### 5:38 PM CT: Chat cards tidied, demographics answers, tabs only open when asked (2f973eb)
 - Chat card titles are in Title Case ("Filings by Developer").
 - The "Show the data" dropdown is gone; each card ends with a small line naming its sources (TDLR TABS, Census, Open-Meteo, OpenStreetMap…).
@@ -38,7 +41,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - start any report in one click;
   - every export is kept in this browser, where you can download it again, re-run it with today's data, open it on the map, or delete it.
 
-### 5:08 PM CT: Building card "Demographics" with the area it covers; new chat icon
+### 5:08 PM CT: Building card "Demographics" with the area it covers; new chat icon (84ee34e)
 - The building card's "Census tract" section is now **Demographics**, with a line saying which census tract the numbers describe and how big it is (e.g. "about 0.6 sq mi, like a 0.4-mile radius"). The numbers are for the tract the building sits in, not a fixed radius: tracts are small in dense areas and large in rural ones (median in this region about 1 sq mi, up to about 200 sq mi).
 - The assistant's "New" button is now a new-chat icon.
 
