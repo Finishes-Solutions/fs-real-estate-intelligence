@@ -18,7 +18,7 @@ export function initKpis(ctx) {
     pop.innerHTML = '<div class="kp-h"><b>Headline metrics</b><span>' + keys.length + ' of ' + MAX + ' · pick ' + MIN + '–' + MAX + '</span></div><div class="kp-list">' +
       METRICS.map(m => { const on = keys.includes(m.k), dis = on ? keys.length <= MIN : keys.length >= MAX;
         return '<label class="kp-it' + (dis ? ' dis' : '') + '"><input type="checkbox" data-k="' + m.k + '"' + (on ? ' checked' : '') + (dis ? ' disabled' : '') + '><span>' + ctx.esc(m.label) + '</span>' + (on ? '<i>' + (keys.indexOf(m.k) + 1) + '</i>' : '') + '</label>'; }).join('') +
-      '</div><div class="kp-f"><button class="lnk" id="kpiReset" type="button">Reset to default</button><button class="btn primary" id="kpiDone" type="button">Done</button></div>';
+      '</div><div class="kp-f"><button class="lnk" id="kpiReset" type="button">Reset to Default</button><button class="btn primary" id="kpiDone" type="button">Done</button></div>';
     pop.querySelectorAll('input').forEach(i => i.onchange = () => {
       const k = i.dataset.k; keys = i.checked ? [...keys, k].slice(0, MAX) : keys.length > MIN ? keys.filter(x => x !== k) : keys;
       save(); render(); renderPop();

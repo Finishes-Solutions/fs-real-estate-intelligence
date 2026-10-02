@@ -64,14 +64,14 @@ export function initCompare(ctx) {
     const base = ctx.filtered(), lists = areas.map(a => base.filter(f => contains(a, f))), ft = ctx.filterText();
     const cur = fromSelection(), canAdd = cur && areas.length < MAX && !areas.some(x => (x.key || x.label) === cur.key);
     let h = '<div class="vhead"><div><div class="kicker">Compare</div><h2>Compare up to four areas</h2><div class="vsub">' + (ft ? 'Same filters for every area: ' + esc(ft) : 'All filings in each area (no other filters).') + '</div></div>' +
-      '<div class="vctl">' + (canAdd ? '<button class="btn primary" id="cmpAddSel">+ Add “' + esc(cur.label) + '”</button>' : '') + (areas.length ? '<button class="btn" id="cmpClear">Clear all</button>' : '') + '</div></div>';
+      '<div class="vctl">' + (canAdd ? '<button class="btn primary" id="cmpAddSel">+ Add “' + esc(cur.label) + '”</button>' : '') + (areas.length ? '<button class="btn" id="cmpClear">Clear All</button>' : '') + '</div></div>';
     h += '<div class="cmp-chips">' + areas.map((a, i) => '<span class="cmp-chip" style="--c:' + color(i) + '"><i></i><button class="lnk" data-go="' + i + '">' + esc(a.label) + '</button><button class="x" data-rm="' + i + '" aria-label="Remove ' + esc(a.label) + '">×</button></span>').join('') +
       (areas.length < MAX ? '<span class="cmp-slot">' + (MAX - areas.length) + ' open slot' + (MAX - areas.length > 1 ? 's' : '') + '</span>' : '') + '</div>';
     if (areas.length < 2) {
       h += '<div class="cmp-empty"><b>' + (areas.length ? 'Add one more area to compare.' : 'Nothing to compare yet.') + '</b><ol>' +
         '<li>On the map, pick an area: search a city or county, click <em>County</em>, draw a <em>Shape</em> or <em>Area</em>, or set a <em>Radius</em>.</li>' +
         '<li>Click <em>+ Compare</em> on the selection (left panel) or on the place card.</li><li>Repeat for up to four areas, then come back here.</li></ol>' +
-        '<button class="btn" id="cmpToMap">Go to the map</button></div>';
+        '<button class="btn" id="cmpToMap">Go to the Map</button></div>';
     }
     if (areas.length) {
       const best = k => { const m = BY_KEY.get(k); if (m.text) return -1; const v = lists.map(l => m.fn(l)); const mx = Math.max(...v); return mx > 0 && v.filter(x => x === mx).length === 1 ? v.indexOf(mx) : -1; };

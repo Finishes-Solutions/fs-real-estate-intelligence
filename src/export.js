@@ -5,12 +5,12 @@ import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 const AUTOTABLE = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
 const REPORTS = {
-  summary: { label: 'Summary report', desc: 'Headline metrics, map, breakdowns by county, type and use, largest projects.', formats: ['pdf', 'xlsx', 'html'] },
-  list: { label: 'Filing list', desc: 'Every filing with address, value, owner, developer, schedule and status.', formats: ['pdf', 'xlsx', 'csv', 'geojson'] },
-  compare: { label: 'Area comparison', desc: 'The areas in Compare side by side, with the largest projects in each.', formats: ['pdf', 'xlsx', 'csv'] },
-  activity: { label: 'Activity report', desc: 'Most active developers, architects and general contractors.', formats: ['pdf', 'xlsx', 'csv'] }
+  summary: { label: 'Summary Report', desc: 'Headline metrics, map, breakdowns by county, type and use, largest projects.', formats: ['pdf', 'xlsx', 'html'] },
+  list: { label: 'Filing List', desc: 'Every filing with address, value, owner, developer, schedule and status.', formats: ['pdf', 'xlsx', 'csv', 'geojson'] },
+  compare: { label: 'Area Comparison', desc: 'The areas in Compare side by side, with the largest projects in each.', formats: ['pdf', 'xlsx', 'csv'] },
+  activity: { label: 'Activity Report', desc: 'Most active developers, architects and general contractors.', formats: ['pdf', 'xlsx', 'csv'] }
 };
-const FORMATS = { pdf: 'PDF', xlsx: 'Excel', csv: 'CSV', geojson: 'GeoJSON (GIS)', html: 'Web page' };
+const FORMATS = { pdf: 'PDF', xlsx: 'Excel', csv: 'CSV', geojson: 'GeoJSON (GIS)', html: 'Web Page' };
 const GREEN = [0, 101, 39], INK = [35, 40, 42], MUTED = [107, 113, 116], LINE = [221, 225, 226];
 
 export function initExport(ctx) {
@@ -23,7 +23,7 @@ export function initExport(ctx) {
 
   const inView = () => { const b = ctx.map.getBounds(); return ctx.visible.filter(f => f.lon >= b.getWest() && f.lon <= b.getEast() && f.lat >= b.getSouth() && f.lat <= b.getNorth()); };
   const highlighted = () => ctx.highlighted().map(id => ctx.BY_ID.get(id)).filter(Boolean);
-  const scopes = () => [['filters', 'Current filters & selection', ctx.visible.length], ['view', 'Only what’s on the map now', inView().length], ['highlight', 'Highlighted filings', highlighted().length]];
+  const scopes = () => [['filters', 'Current Filters & Selection', ctx.visible.length], ['view', 'Only What’s on the Map Now', inView().length], ['highlight', 'Highlighted Filings', highlighted().length]];
   const listFor = s => s === 'view' ? inView() : s === 'highlight' ? highlighted() : ctx.visible;
 
   function render() {
@@ -32,15 +32,15 @@ export function initExport(ctx) {
     if (st.scope !== 'filters' && !scopes().find(x => x[0] === st.scope)[2]) st.scope = 'filters';
     const n = st.report === 'compare' ? cmp.length : listFor(st.scope).length;
     const blocked = st.report === 'compare' ? (cmp.length ? '' : 'Add areas to Compare first (select an area on the map, then “+ Compare”).') : n ? '' : 'No filings match. Change the filters or pick other filings.';
-    dlg.innerHTML = '<div class="xbox"><div class="xh"><div><div class="kicker">Export</div><h2 id="xTitle">Reports & data</h2></div><button class="x" id="xClose" aria-label="Close">×</button></div>' +
+    dlg.innerHTML = '<div class="xbox"><div class="xh"><div><div class="kicker">Export</div><h2 id="xTitle">Reports &amp; Data</h2></div><button class="x" id="xClose" aria-label="Close">×</button></div>' +
       '<div class="xsec"><div class="lt">Report</div><div class="xreports">' + Object.entries(REPORTS).map(([k, r]) =>
         '<label class="xr' + (st.report === k ? ' on' : '') + '"><input type="radio" name="xrep" value="' + k + '"' + (st.report === k ? ' checked' : '') + '><b>' + r.label + (k === 'compare' ? ' <span class="n">' + cmp.length + ' area' + (cmp.length === 1 ? '' : 's') + '</span>' : '') + '</b><span>' + r.desc + '</span></label>').join('') + '</div></div>' +
       (st.report === 'compare' ? '' : '<div class="xsec"><div class="lt">Filings</div><div class="xscopes">' + scopes().map(([k, l, c]) =>
         '<label class="xs' + (c ? '' : ' dis') + '"><input type="radio" name="xscope" value="' + k + '"' + (st.scope === k ? ' checked' : '') + (c ? '' : ' disabled') + '><span>' + l + '</span><b>' + fmtN(c) + '</b></label>').join('') + '</div>' +
         (ctx.filterText() || ctx.sel.feature ? '<div class="xnote">' + esc([ctx.sel.feature ? ctx.sel.label : '', ctx.filterText()].filter(Boolean).join(' · ')) + '</div>' : '') + '</div>') +
       '<div class="xsec"><div class="lt">Format</div><div class="seg xfmt">' + R.formats.map(f => '<button type="button" data-f="' + f + '" aria-pressed="' + (st.format === f) + '">' + FORMATS[f] + '</button>').join('') + '</div></div>' +
-      '<div class="xsec xopts">' + opt('map', 'Include the map', st.format === 'pdf' && st.report === 'summary') + opt('full', 'Add the full filing list', st.format === 'pdf' && st.report === 'summary') +
-        opt('scope_text', 'Include scope of work text', st.report === 'list') + opt('ai', 'Include AI summaries and tags', st.report === 'list' && st.format !== 'pdf') + '</div>' +
+      '<div class="xsec xopts">' + opt('map', 'Include the Map', st.format === 'pdf' && st.report === 'summary') + opt('full', 'Add the Full Filing List', st.format === 'pdf' && st.report === 'summary') +
+        opt('scope_text', 'Include Scope of Work Text', st.report === 'list') + opt('ai', 'Include AI Summaries and Tags', st.report === 'list' && st.format !== 'pdf') + '</div>' +
       '<div class="xf"><span class="xmsg">' + esc(blocked) + '</span><button class="btn" id="xCancel">Cancel</button><button class="btn primary xgo" id="xGo"' + (blocked ? ' disabled' : '') + '>Export ' + FORMATS[st.format] + '</button></div></div>';
     dlg.querySelector('#xClose').onclick = dlg.querySelector('#xCancel').onclick = close;
     dlg.querySelectorAll('[name=xrep]').forEach(i => i.onchange = () => { st.report = i.value; save(); render(); });
@@ -62,7 +62,7 @@ export function initExport(ctx) {
     const btn = dlg.querySelector('#xGo'); btn.disabled = true; btn.textContent = 'Preparing…';
     try {
       const list = listFor(st.scope).slice().sort((a, b) => b.cost - a.cost);
-      const label = st.scope === 'highlight' ? 'Highlighted filings' : st.scope === 'view' ? 'Map view' : ctx.scopeLabel();
+      const label = st.scope === 'highlight' ? 'Highlighted Filings' : st.scope === 'view' ? 'Map view' : ctx.scopeLabel();
       const name = ctx.fileBase(st.report, st.report === 'compare' ? 'areas' : label);
       if (st.report === 'summary') {
         if (st.format === 'pdf') await pdfSummary(list, label, name);
