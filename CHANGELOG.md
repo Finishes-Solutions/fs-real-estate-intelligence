@@ -5,6 +5,23 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 5:15 PM CT: Cards in the AI chat, wider chat, business search, Reports tab (559bb0f)
+- The assistant now shows cards in the chat with its answers:
+  - filing summaries with metrics, a filed-by-month chart, uses, places and the largest projects;
+  - charts, single filings, areas and side-by-side comparisons;
+  - nearby places, drive time (with **Clear Route**), weather, news and site imagery;
+  - location details: owner, value, year built, size, height, businesses and filings.
+- "Summarize the filings in view" gives a summary card. Asking for a chart or trend gives a chart card. "What's at this address" gives a location card.
+- Replies show real numbered and bulleted lists.
+- Drag the chat window's left edge to make it wider (up to about 60% of the map). It never gets narrower than before; double-click resets it. The width is remembered.
+- The map search has a **Businesses** section:
+  - search by name, e.g. "Starbucks";
+  - results come from OpenStreetMap near the map center, plus Texas Comptroller sales-tax permit holders in nearby towns;
+  - picking one drops the pin, and More Information opens the location card.
+- New **Reports** tab between Market and Updates:
+  - start any report in one click;
+  - every export is kept in this browser, where you can download it again, re-run it with today's data, open it on the map, or delete it.
+
 ### 5:08 PM CT: Building card "Demographics" with the area it covers; new chat icon
 - The building card's "Census tract" section is now **Demographics**, with a line saying which census tract the numbers describe and how big it is (e.g. "about 0.6 sq mi, like a 0.4-mile radius"). The numbers are for the tract the building sits in, not a fixed radius: tracts are small in dense areas and large in rural ones (median in this region about 1 sq mi, up to about 200 sq mi).
 - The assistant's "New" button is now a new-chat icon.
