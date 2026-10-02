@@ -31,7 +31,7 @@ async function assemble() {
   for (const f of await fs.readdir('src')) await fs.copyFile('src/' + f, 'public/' + f);
   await fs.writeFile('public/sw.js', (await fs.readFile('src/sw.js', 'utf8')).replace('__BUILD__', Date.now().toString(36)));
   for (const f of ['geo.json', 'filings.json', 'changes.json', 'market.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
-  for (const f of ['taxonomy.mjs', 'filter.mjs', 'changes.mjs', 'agent-tools.mjs', 'assist-logic.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
+  for (const f of ['taxonomy.mjs', 'filter.mjs', 'changes.mjs', 'agent-tools.mjs', 'assist-logic.mjs', 'nasa.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
   // public Supabase settings for the browser (read-only publishable key; row level security limits it to public tables)
   const E = process.env, sbUrl = E.SUPABASE_URL || E.NEXT_PUBLIC_SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co';
   const sbKey = E.SUPABASE_PUBLISHABLE_KEY || E.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || E.SUPABASE_ANON_KEY || E.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';

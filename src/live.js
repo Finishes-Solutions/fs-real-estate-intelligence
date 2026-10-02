@@ -2,6 +2,7 @@
 // NASA recent imagery on the map; drive time, weather, site imagery and news for the open property. All sources are free:
 //   NOAA nowCOAST + NHC (via /api/tile), Open-Meteo (/api/weather), TomTom traffic (/api/tile, optional key), Mapterhorn terrain,
 //   NASA GIBS + CMR (browser direct), GDELT news (/api/news), OSRM or TomTom routing (/api/drive).
+import { NASA, hlsPasses } from './lib/nasa.mjs';
 const KEY = 'fs-live-v1';
 const RASTER = { // proxied through api/tile; refreshed every few minutes
   radar: { label: 'Rain radar', maxzoom: 10, opacity: .7, every: 4, attr: 'Radar: NOAA nowCOAST (MRMS)' },
@@ -12,7 +13,6 @@ const RASTER = { // proxied through api/tile; refreshed every few minutes
 };
 const ORDER = ['radar', 'lightning', 'clouds', 'wind', 'storms', 'traffic', 'terrain', 'nasa'];
 const LABEL = { ...Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, v.label])), wind: 'Wind (arrows, mph)', terrain: '3D terrain', nasa: 'NASA recent imagery (30 m)' };
-const NASA = { S30: ['HLS_S30_Nadir_BRDF_Adjusted_Reflectance', 'C2021957295-LPCLOUD', 'Sentinel-2'], L30: ['HLS_L30_Nadir_BRDF_Adjusted_Reflectance', 'C2021957657-LPCLOUD', 'Landsat 8/9'] };
 const EARTH_MI = 3958.8, R = Math.PI / 180;
 export const milesBetween = (a, b) => { const h = Math.sin((b[1] - a[1]) * R / 2) ** 2 + Math.cos(a[1] * R) * Math.cos(b[1] * R) * Math.sin((b[0] - a[0]) * R / 2) ** 2; return 2 * EARTH_MI * Math.asin(Math.sqrt(h)); };
 const abs = p => new URL(p, location.href).href;
@@ -97,21 +97,8 @@ export function initLive(ctx) {
   function removeTerrain() { try { map.setTerrain(null); } catch (e) {} if (map.getLayer('live-hill')) map.removeLayer('live-hill'); if (map.getSource('live-dem')) map.removeSource('live-dem'); }
 
   // ---------- NASA recent imagery (HLS via GIBS; dates from CMR) ----------
-  async function passes([w, s, e, n], days = 60) {
-    const end = new Date(), start = new Date(Date.now() - days * 864e5), out = [];
-    await Promise.all(Object.entries(NASA).map(async ([p, [, coll, name]]) => {
-      const u = 'https://cmr.earthdata.nasa.gov/search/granules.umm_json?collection_concept_id=' + coll + '&bounding_box=' + [w, s, e, n].map(v => v.toFixed(4)).join(',') + '&temporal=' + start.toISOString() + ',' + end.toISOString() + '&sort_key=-start_date&page_size=100';
-      const r = await fetch(u); if (!r.ok) throw new Error('NASA CMR ' + r.status);
-      for (const it of (await r.json()).items || []) {
-        const t = it.umm?.TemporalExtent?.RangeDateTime?.BeginningDateTime; if (!t) continue;
-        const cc = (it.umm.AdditionalAttributes || []).find(a => a.Name === 'CLOUD_COVERAGE')?.Values?.[0];
-        out.push({ product: p, name, day: t.slice(0, 10), cloud: cc == null ? null : +cc });
-      }
-    }));
-    // one entry per product/day: worst cloud of the granules that day (a scene is ~110 km, so this is a regional figure)
-    const by = new Map(); for (const g of out) { const k = g.product + g.day, o = by.get(k); if (!o || (g.cloud ?? 100) > (o.cloud ?? 100)) by.set(k, g); }
-    return [...by.values()].sort((a, b) => b.day.localeCompare(a.day) || (a.cloud ?? 100) - (b.cloud ?? 100));
-  }
+  const passes = (box, days) => hlsPasses(box, days);
+
   const gibs = (p, day) => ['a', 'b', 'c'].map(s => 'https://gibs-' + s + '.earthdata.nasa.gov/wmts/epsg3857/best/' + NASA[p][0] + '/default/' + day + '/GoogleMapsCompatible_Level12/{z}/{y}/{x}.png');
   const snapshot = (p, day, c, km = 2.5, px = 320) => { const dy = km / 111.32, dx = km / (111.32 * Math.cos(c[1] * R));
     return 'https://wvs.earthdata.nasa.gov/api/v1/snapshot?REQUEST=GetSnapshot&LAYERS=' + NASA[p][0] + '&CRS=EPSG:4326&TIME=' + day + '&BBOX=' + [c[1] - dy, c[0] - dx, c[1] + dy, c[0] + dx].map(v => v.toFixed(5)).join(',') + '&WIDTH=' + px + '&HEIGHT=' + px + '&FORMAT=image/jpeg'; };
@@ -217,7 +204,7 @@ export function initLive(ctx) {
     if (!q && f) { q = f.dev || f.ten || f.owner || f.name; near = near || f.city || ''; }
     if (!q && !near) { const c = cardPoint(); if (c) q = c.name; }
     if (!q && !near) return { error: 'Say what to look up, or open a filing first.' };
-    const r = await fetch('api/news?' + new URLSearchParams({ q, near })), d = await r.json(); if (!r.ok) return { error: d.error };
+    const r = await fetch('api/news?' + new URLSearchParams({ q, near, ...(f && !a.query ? { filing: f.id } : {}) })), d = await r.json(); if (!r.ok) return { error: d.error };
     return { searched: d.query, articles: d.articles, source: 'GDELT Project', note: d.articles.length ? undefined : 'No coverage found in the last ~3 months. Single-asset LLC names rarely appear in news; try the tenant or brand.' };
   }
 

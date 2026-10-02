@@ -79,4 +79,20 @@ assert.equal(res.code, 200, JSON.stringify(res.body)); assert.equal(res.body.art
 mode = 'gdelt-text'; res = mock(); await news({ query: { q: 'Hines', near: 'Katy' }, headers: { 'x-forwarded-for': '4.4.4.4' } }, res); assert.equal(res.code, 502); assert.match(res.body.error, /busy/); mode = 'ok';
 res = mock(); await news({ query: {}, headers: { 'x-forwarded-for': '4.4.4.4' } }, res); assert.equal(res.code, 400);
 
+// news is saved to Supabase per filing and saved articles come back when GDELT is busy
+{ const store = { news_articles: [], filing_news: [] }, base = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => { const u = new URL(String(url));
+    if (u.host !== 'supa.test') return base(url, opts);
+    const t = u.pathname.split('/').pop();
+    if ((opts.method || 'GET') === 'POST') { for (const r of JSON.parse(opts.body)) { const k = t === 'news_articles' ? ['url'] : ['filing_id', 'url'], i = store[t].findIndex(x => k.every(c => x[c] === r[c])); if (i < 0) store[t].push(r); else Object.assign(store[t][i], r); } return new Response(null, { status: 201 }); }
+    assert.equal(u.searchParams.get('filing_id'), 'eq.TABS2025000001');
+    return json(store.filing_news.filter(l => l.filing_id === 'TABS2025000001').map(l => ({ url: l.url, news_articles: store.news_articles.find(n => n.url === l.url) }))); };
+  process.env.SUPABASE_URL = 'http://supa.test'; process.env.SUPABASE_SECRET_KEY = 'sb_secret_test';
+  res = mock(); await news({ query: { q: 'Hines', near: 'Katy', filing: 'TABS2025000001' }, headers: { 'x-forwarded-for': '5.5.5.5' } }, res);
+  assert.equal(res.code, 200); assert.equal(res.body.stored, true); assert.equal(store.news_articles.length, 1); assert.equal(store.filing_news[0].filing_id, 'TABS2025000001');
+  mode = 'gdelt-text'; res = mock(); await news({ query: { q: 'Hines', near: 'Katy', filing: 'TABS2025000001' }, headers: { 'x-forwarded-for': '5.5.5.5' } }, res); mode = 'ok';
+  assert.equal(res.code, 200, 'saved articles served while GDELT is busy'); assert.equal(res.body.articles[0].saved, true);
+  res = mock(); await news({ query: { q: 'Hines', near: 'Katy', filing: 'not-an-id' }, headers: { 'x-forwarded-for': '5.5.5.5' } }, res); assert.equal(res.body.stored, false, 'bad ids are not written');
+  delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SECRET_KEY; globalThis.fetch = base; }
+
 console.log('live api tests passed');

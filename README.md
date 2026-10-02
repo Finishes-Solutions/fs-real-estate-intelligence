@@ -117,6 +117,24 @@ All 254 Texas counties, five years back, are loaded into Supabase by `build/back
   - Every step is cached in the database, so an interrupted run resumes where it stopped.
 - **Progress:** `select status, count(*), sum(filings) from counties group by 1;` and `select * from runs order by id desc;`
 
+### Live-data history (workflow **Live data (Supabase)**, `build/live-sync.mjs`)
+
+Saved nightly (storms and weather every 6 hours) so the facts behind the live layers build up a history you can query:
+
+| Table | What | Rows |
+|---|---|---|
+| `news_articles`, `filing_news` | GDELT articles found for each active filing's developer / tenant / owner (120 searches a night, rotating through all of them). The site's News button also saves what it finds when Vercel has `SUPABASE_URL` + `SUPABASE_SECRET_KEY`. | small |
+| `imagery_passes` | NASA HLS passes (date, cloud %) over each active filing (600 a night, rotating) | ~6k a month |
+| `weather_daily` | Daily weather at each county centroid: 3 days back (analysis) and 7 ahead (forecast, overwritten as it firms up) | 7 counties x 365 a year |
+| `storm_advisories` | NHC active-storm snapshots | a few hundred a season |
+| `tracts` | ACS census tracts behind the Demographics layer (needs the `CENSUS_KEY` secret on the Refresh data workflow) | ~1,200 |
+
+Not stored on purpose: map tiles and images (radar, traffic, clouds, terrain, NASA imagery). They are pictures that change every few minutes, would use up the free 500 MB quickly, and TomTom's terms don't allow keeping traffic data. Drive times aren't stored either; they depend on when you ask.
+
+Setup: run `supabase/migrations/20261004000000_live_data.sql` once in the Supabase SQL editor. If the workflow uses the GitHub OIDC route instead of a stored `SUPABASE_SECRET_KEY`, redeploy the edge function too (`supabase functions deploy pipeline`) so it allows the new tables. First run: Actions → Live data (Supabase) → Run workflow with `imagery_days` = 60.
+
+Useful queries: `select f.name, n.title, n.published from filing_news l join news_articles n using (url) join filings f on f.id = l.filing_id order by n.published desc limit 50;` and `select filing_id, max(day) filter (where cloud <= 20) as last_clear_pass from imagery_passes group by 1;`
+
 ## Run locally
 
 ```
@@ -133,6 +151,6 @@ node build.mjs           # real refresh (needs network access to TDLR, Census, O
 - The AI endpoints' per-IP rate limit is per function instance (best effort). The OpenAI budget cap is the real limit; a Vercel Firewall rate-limit rule on `/api/*` adds a second one.
 - The change feed keeps 13 months of history and starts with the second run; "this week" means changes found by any refresh in the last 7 days.
 - Building heights are only as good as OpenStreetMap; unmapped heights get a default. StratMap parcel fields depend on what each appraisal district supplies (year built and acquisition date are often blank), and Texas does not disclose sale prices.
-- Field notes live in the browser's storage on one device. Clearing site data deletes them unless exported; there is no shared team database yet.
+- Field notes and the watchlist live in the browser's storage on one device (not in Supabase yet: that needs team logins). Clearing site data deletes them unless exported; there is no shared team database yet.
 - Business listings come from OpenStreetMap and are incomplete, especially in suburban strip centers.
 - Building permits are not included: the City of Houston stopped publishing permit data in December 2025 and the other counties have no open feed.

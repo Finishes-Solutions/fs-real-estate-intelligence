@@ -1,0 +1,47 @@
+name: Live data (Supabase)
+
+# Saves news, NASA imagery passes, daily weather, storm advisories and census tracts into Supabase (build/live-sync.mjs).
+# Nightly after "Refresh data" for everything; every 6 hours for storms and weather only.
+# Needs supabase/migrations/20261004000000_live_data.sql applied once.
+on:
+  schedule:
+    - cron: "37 11 * * *"     # nightly 11:37 UTC, after the regional refresh (default branch only)
+    - cron: "7 5,17,23 * * *" # storms + weather between nightly runs
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Subset: news,imagery,weather,storms,tracts (blank = all)"
+        required: false
+      imagery_days:
+        description: "NASA look-back in days (blank = 30; use 60 for the first run)"
+        required: false
+
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC for the Supabase pipeline edge function when no secret key is stored
+
+concurrency:
+  group: live-sync
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: Production # the secrets live in this GitHub environment
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Sync live data into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_KEY }}
+          OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
+          ONLY: ${{ inputs.only || (github.event.schedule == '7 5,17,23 * * *' && 'storms,weather') || '' }}
+          IMAGERY_DAYS: ${{ inputs.imagery_days }}
+        run: node build/live-sync.mjs

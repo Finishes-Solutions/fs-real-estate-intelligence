@@ -37,6 +37,14 @@ export async function here([lat, lon]) {
   return { time: c.time, conditions: WMO[c.weather_code] || 'unknown', temp_f: c.temperature_2m, feels_like_f: c.apparent_temperature, humidity_pct: c.relative_humidity_2m, rain_in_last_hour: c.precipitation,
     wind_mph: c.wind_speed_10m, gust_mph: c.wind_gusts_10m, wind_from: COMPASS(c.wind_direction_10m), today: day(0), tomorrow: day(1) };
 }
+// daily rows for several spots in one call: past `past` days (model analysis) + `ahead` days of forecast
+export async function daily(spots, past = 3, ahead = 7) {
+  const d = await get(om() + 'latitude=' + spots.map(p => p[1]).join(',') + '&longitude=' + spots.map(p => p[0]).join(',') +
+    '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max&past_days=' + past + '&forecast_days=' + ahead + '&' + UNITS);
+  return (Array.isArray(d) ? d : [d]).map(x => { const t = x.daily || {};
+    return (t.time || []).map((day, i) => ({ day, conditions: WMO[t.weather_code?.[i]] || null, high_f: t.temperature_2m_max?.[i] ?? null, low_f: t.temperature_2m_min?.[i] ?? null, rain_in: t.precipitation_sum?.[i] ?? null,
+      rain_chance_pct: t.precipitation_probability_max?.[i] ?? null, max_wind_mph: t.wind_speed_10m_max?.[i] ?? null, max_gust_mph: t.wind_gusts_10m_max?.[i] ?? null })); });
+}
 export async function storms() {
   const d = await get('https://www.nhc.noaa.gov/CurrentStorms.json');
   return { storms: (d.activeStorms || []).slice(0, 20).map(s => ({ id: s.id, name: s.name, classification: s.classification, wind_mph: s.intensity != null ? Math.round(+s.intensity * 1.15078) : null, pressure_mb: s.pressure != null ? +s.pressure : null,

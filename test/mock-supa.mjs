@@ -48,7 +48,7 @@ globalThis.fetch = async (url, opts = {}) => {
     // like Postgres: integer columns refuse decimals (cost too while MOCK_COST_BIGINT emulates the pre-cents schema)
     if (path === 'filings') for (const row of body) for (const k of process.env.MOCK_COST_BIGINT ? ['cost', 'sqft', 'units'] : ['sqft', 'units']) if (row[k] != null && !Number.isInteger(row[k])) return json({ code: '22P02', message: `invalid input syntax for type bigint: "${row[k]}"` }, 400);
     for (const row of body) {
-      const ex = up && t.find(r => r[pk] === row[pk]);
+      const keys = up ? up.split(',') : [], ex = up && t.find(r => keys.every(k => r[k] === row[k]));
       if (ex) { Object.assign(ex, row); out.push(ex); continue; }
       const n = { ...(DEFAULTS[path] || {}), ...row }; if (pk === 'id' && n.id == null) n.id = t.length + 1; t.push(n); out.push(n);
     }
