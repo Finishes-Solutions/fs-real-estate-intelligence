@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="description" content="Construction filings (TDLR TABS) around Waller, Texas — Finishes Solutions">
+<meta name="description" content="Real estate intelligence for Waller and the surrounding counties: TDLR TABS construction filings, timelines, developers and market context — Finishes Solutions">
 <meta name="theme-color" content="#006527">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Construction filings map — Waller &amp; surrounding counties</title>
+<title>Real Estate Intelligence — Finishes Solutions</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -25,13 +25,19 @@
     <div class="head">
       <div class="kicker" id="kicker">TDLR TABS</div>
       <h1>Construction filings around Waller</h1>
-      <p class="sub">Every accessibility registration filed in Waller and the six counties around it, placed where it will be built.</p>
+      <p class="sub">Every accessibility registration filed in Waller and the six counties around it over the last two years, placed where it will be built.</p>
       <div class="kpis">
         <div class="kpi"><b id="kCount">–</b><span>Filings</span></div>
         <div class="kpi"><b id="kValue">–</b><span>Est. value</span></div>
         <div class="kpi"><b id="kNew">–</b><span>New builds</span></div>
       </div>
     </div>
+    <form class="ask" id="askForm" autocomplete="off">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>
+      <input id="askQ" type="text" maxlength="300" placeholder="Ask: medical over $2M near Katy starting next year" aria-label="Ask a question about the filings">
+      <button class="btn primary" id="askBtn" type="submit">Ask</button>
+    </form>
+    <div class="askout" id="askOut" aria-live="polite"></div>
     <div class="filters">
       <label class="search"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="7" r="4.6"/><path d="M10.5 10.5 14 14"/></svg><input id="q" type="search" placeholder="Search project, owner, address" aria-label="Search filings"></label>
       <div class="row" id="countyRow"><span class="lbl">County</span></div>
@@ -41,6 +47,19 @@
           <option value="0">Any value</option><option value="1000000">$1M+</option><option value="5000000">$5M+</option><option value="25000000">$25M+</option>
         </select>
       </div>
+      <details class="more" id="moreF"><summary>More filters <span id="moreN"></span></summary>
+      <div class="row"><span class="lbl">Use</span>
+        <select class="chip" id="useSel" aria-label="Real estate use"><option value="">Any use</option></select>
+      </div>
+      <div class="row"><span class="lbl">Dates</span>
+        <select class="chip" id="dField" aria-label="Date filter"><option value="">Any time</option><option value="active">Active</option><option value="start">Starting</option><option value="reg">Registered</option></select>
+        <input class="chip mon" type="month" id="dFrom" aria-label="From month" disabled>
+        <span class="to">to</span>
+        <input class="chip mon" type="month" id="dTo" aria-label="To month" disabled>
+      </div>
+      <div class="row" id="chgRow"><span class="lbl">Updates</span></div>
+      </details>
+      <div class="active" id="activeBar"><span id="activeTxt"></span><button class="lnk" id="resetAll" type="button">Reset</button></div>
     </div>
     <div class="selbar" id="selbar">
       <div class="s1"><b id="selName">Everything shown</b><span id="selStats"></span></div>
@@ -50,13 +69,23 @@
         <button class="btn" id="exCsv">CSV</button>
         <button class="btn" id="selClear">Clear selection</button>
       </div>
+      <div class="btnrow">
+        <button class="btn" id="saveSearch">Save search</button>
+        <button class="btn" id="copyLink">Copy link</button>
+        <a class="btn" id="rssLink" href="api/feed" target="_blank" rel="noopener">RSS alerts</a>
+      </div>
+      <details class="saved" id="savedBox"><summary>Saved searches <span id="savedN"></span></summary><div id="savedList"></div></details>
     </div>
     <div class="listhead"><span id="listCount"></span></div>
     <div class="list" id="list" role="list"></div>
-    <div class="foot">Source: <a href="https://www.tdlr.texas.gov/TABS/Search" target="_blank" rel="noopener">TDLR TABS</a>, registrations <span id="periodTxt"></span>. Costs are filer estimates. Located with US Census and OpenStreetMap geocoders; hollow markers are city-level approximations. <span id="missTxt"></span> Basemaps © MapTiler © OpenStreetMap contributors.</div>
+    <div class="foot">Source: <a href="https://www.tdlr.texas.gov/TABS/Search" target="_blank" rel="noopener">TDLR TABS</a>, registrations <span id="periodTxt"></span>. Costs and dates are filer estimates; hatched timeline bars are our own estimates. Located with US Census and OpenStreetMap geocoders; hollow markers are city-level approximations. Use, tenant and developer fields are AI-extracted from the filing text and can be wrong. Demographics: US Census ACS 5-year. <span id="missTxt"></span> Basemaps © MapTiler © OpenStreetMap contributors.</div>
   </aside>
 
-  <main class="stage" id="stage">
+  <main class="stage" id="stage" data-view="map">
+    <nav class="viewbar" id="viewbar" aria-label="Views">
+      <button data-view="map" aria-pressed="true">Map</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="who" aria-pressed="false">Who’s building</button><button data-view="changes" aria-pressed="false">What changed <span class="badge" id="chgBadge"></span></button>
+    </nav>
+    <div class="viewport" id="viewport">
     <div id="map" aria-label="Interactive map of construction filings"></div>
     <div class="tools" role="toolbar" aria-label="Map tools">
       <button data-mode="pan" aria-pressed="true" title="Move the map"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8v12.4M1.8 8h12.4M6.2 3.6 8 1.8l1.8 1.8M6.2 12.4 8 14.2l1.8-1.8M3.6 6.2 1.8 8l1.8 1.8M12.4 6.2 14.2 8l-1.8 1.8"/></svg><span>Move</span></button>
@@ -92,6 +121,11 @@
       <label class="tg2"><input type="checkbox" id="lyNames" checked><span>Road names</span></label>
       <label class="tg2"><input type="checkbox" id="lyCounties" checked><span>County lines</span></label>
       <label class="tg2"><input type="checkbox" id="ly3d"><span>Tilt (3D)</span></label>
+      <div class="lt">Demographics (census tracts)</div>
+      <select class="chip" id="lyDemo" aria-label="Demographic layer">
+        <option value="">Off</option><option value="gr">Population growth</option><option value="pop">Population</option><option value="inc">Median household income</option>
+        <option value="val">Median home value</option><option value="rent">Median gross rent</option><option value="vacr">Housing vacancy rate</option>
+      </select>
     </div>
     <div class="legend" aria-hidden="true">
       <div class="t">Marker size = est. value</div>
@@ -99,14 +133,25 @@
       <div class="li"><i style="background:var(--c-reno)"></i>Renovation</div>
       <div class="li"><i style="border:2px solid var(--c-add)"></i>Addition</div>
     </div>
+    <div class="dlegend" id="dLegend" aria-live="polite"></div>
     <div class="tip" id="tip"></div>
+    <div class="tslider" id="tslider">
+      <button class="play" id="tPlay" aria-label="Play through months" title="Play"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.5v9l7-4.5z" fill="currentColor"/></svg></button>
+      <input type="range" id="tRange" min="0" max="1" step="1" value="0" aria-label="Month">
+      <span class="tl" id="tLabel">Under construction by month</span>
+      <button class="x" id="tClear" aria-label="Clear month filter" title="Clear">×</button>
+    </div>
+    <section class="view" id="view-timeline" aria-label="Timeline"></section>
+    <section class="view" id="view-who" aria-label="Who's building"></section>
+    <section class="view" id="view-changes" aria-label="What changed"></section>
     <section class="card" id="card" aria-live="polite"></section>
+    </div>
   </main>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

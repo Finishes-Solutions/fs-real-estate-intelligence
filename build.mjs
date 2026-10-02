@@ -1,173 +1,126 @@
-// Build step for the Finishes construction-filings map.
-// Pulls TDLR TABS registrations for Waller + 6 neighboring counties, geocodes them,
-// builds county / dot-grid geometry, and writes everything to public/.
-// Redeploying the site re-runs this and refreshes the data.
+// Data pipeline for the Finishes Solutions real estate intelligence map.
+//   node build.mjs             full refresh (GitHub Actions): TABS -> geocode -> AI enrichment -> change feed -> market data, then assemble
+//   node build.mjs --assemble  copy src/ + committed data/ into public/ (Vercel build; no network)
+// Everything slow is cached under data/cache/ and committed, so weekly runs only fetch what changed.
 import fs from 'node:fs/promises';
-import { geoContains, geoArea, geoCentroid } from 'd3-geo';
-import { feature } from 'topojson-client';
+import { geoContains } from 'd3-geo';
+import { log, hash, readJSON, writeMap, writeRows, iso, fetchRetry } from './build/util.mjs';
+import { listCounty, details } from './build/tabs.mjs';
+import { geocodeRows, cleanStreet, parseCity } from './build/geocode.mjs';
+import { buildGeo, minVertexDist } from './build/geometry.mjs';
+import { enrich, aiFields, aiKey } from './build/enrich.mjs';
+import { diff, appendRun } from './build/changes.mjs';
+import { buildMarket } from './build/market.mjs';
 
-const KEY = process.env.MAPTILER_KEY || 'vA28jXazwpYesC2b1Ccp';
-const ONLY = (process.env.ONLY || '').split(',').filter(Boolean);
-const COUNTY_IDS = { Waller: '2237', Harris: '2101', 'Fort Bend': '2079', Montgomery: '2167', Austin: '2008', Washington: '2239', Grimes: '2093' };
-const FIPS = { Waller: '48473', Harris: '48201', 'Fort Bend': '48157', Montgomery: '48339', Austin: '48015', Washington: '48477', Grimes: '48185' };
-const RING = ['48041','48051','48287','48149','48089','48481','48039','48167','48071','48291','48407','48471','48313'];
 const TYPE = { 9001: 'New', 9002: 'Reno', 9003: 'Addition' };
 const STATUS = { 3001: 'Inspection complete', 3007: 'Closed', 3008: 'Registered', 3009: 'Review complete' };
-const BBOX = [-97.3, 28.8, -94.3, 31.2];
-const UA = { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions filings map build)' };
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-const log = (...a) => console.log('[build]', ...a);
+const KEY = process.env.MAPTILER_KEY || 'vA28jXazwpYesC2b1Ccp';
+const D = process.env.DATA_DIR || 'data/', C = D + 'cache/';
 
-// ---- period: env or the last 3 complete months ----
-function mdY(d) { return String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + String(d.getUTCDate()).padStart(2, '0') + '/' + d.getUTCFullYear(); }
-const now = new Date();
-const endD = process.env.PERIOD_END ? new Date(process.env.PERIOD_END) : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
-const startD = process.env.PERIOD_START ? new Date(process.env.PERIOD_START) : new Date(Date.UTC(endD.getUTCFullYear(), endD.getUTCMonth() - 2, 1));
-const START = mdY(startD), END = mdY(endD);
+// ---- timeline dates: filer estimates when usable, otherwise inferred and flagged ----
+const okDate = s => /^\d{4}-\d\d-\d\d$/.test(s) && +s.slice(0, 4) >= 2000 && +s.slice(0, 4) <= 2045;
+const addMonths = (s, m) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + Math.round(m * 30.44)); return iso(d); };
+const DUR = { New: [6, 4], Reno: [3, 2], Addition: [4, 3], Other: [4, 2] }; // months = base + k * log10(cost / $50K)
+function timeline(type, cost, reg, start, end) {
+  const s = okDate(start) ? start : reg, sE = !okDate(start);
+  if (okDate(end) && end >= s) return { ts: s, te: end, tsE: sE, teE: false };
+  const [b, k] = DUR[type] || DUR.Other, m = Math.max(2, Math.min(36, b + k * Math.log10(Math.max(cost, 5e4) / 5e4)));
+  return { ts: s, te: addMonths(s, m), tsE: sE, teE: true };
+}
 
-async function fetchRetry(url, opts = {}, tries = 4) {
-  for (let i = 0; i < tries; i++) {
-    try { const r = await fetch(url, { ...opts, headers: { ...UA, ...(opts.headers || {}) } }); if (r.ok) return r; if (r.status < 500 && r.status !== 429) throw new Error(url + ' ' + r.status); }
-    catch (e) { if (i === tries - 1) throw e; }
-    await sleep(800 * (i + 1));
-  }
-  throw new Error('failed ' + url);
+async function assemble() {
+  try { await fs.access(D + 'filings.json'); } catch (e) { throw new Error('data/filings.json is missing. Run the "Refresh data" GitHub Action (or `node build.mjs` with network access) first.'); }
+  await fs.rm('public', { recursive: true, force: true });
+  await fs.mkdir('public/data', { recursive: true }); await fs.mkdir('public/lib', { recursive: true });
+  for (const f of await fs.readdir('src')) await fs.copyFile('src/' + f, 'public/' + f);
+  for (const f of ['geo.json', 'filings.json', 'changes.json', 'market.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
+  for (const f of ['taxonomy.mjs', 'filter.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
+  log('assembled public/');
 }
-async function pool(items, n, fn) { const out = new Array(items.length); let i = 0; await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); } })); return out; }
 
-// ---- 1. TABS list ----
-async function listCounty(name, id) {
-  const rows = []; let start = 0;
-  for (;;) {
-    const body = new URLSearchParams({ draw: '1', start: String(start), length: '100', LocationCounty: id, RegistrationDateBegin: START, RegistrationDateEnd: END });
-    const r = await fetchRetry('https://www.tdlr.texas.gov/TABS/Search/SearchProjects', { method: 'POST', body, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' } });
-    const d = await r.json(); (d.data || []).forEach(x => rows.push({ ...x, _county: name }));
-    start += 100; if (start >= (d.recordsFiltered || 0) || !(d.data || []).length) break;
-  }
-  return rows;
-}
-// ---- 2. detail pages ----
-const decode = s => s.replace(/&amp;/g, '&').replace(/&#39;|&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n));
-async function detail(p) {
-  try {
-    const h = await (await fetchRetry('https://www.tdlr.texas.gov/TABS/Projects/' + p.ProjectNumber)).text();
-    const L = decode(h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, '\n')).split('\n').map(s => s.trim()).filter(Boolean);
-    const after = (lbl, n = 1) => { const i = L.indexOf(lbl); return i < 0 ? '' : L.slice(i + 1, i + 1 + n).join(' | '); };
-    const loc = after('Location Address:', 2).split(' | ');
-    p.street = loc[0] || ''; p.cityLine = loc[1] || '';
-    p.owner = after('Owner Name:'); p.scope = after('Scope of Work:'); p.sqft = after('Square Footage:');
-  } catch (e) { p.street = p.street || ''; }
-  return p;
-}
-// ---- 3. geocoding ----
-function cleanStreet(s) {
-  s = s.split(/;|,|\s#|\s(?:Suite|Ste\.?|STE|Bldg\.?|Building|BLDG|Unit|Level|Lvl)\b/i)[0];
-  return s.replace(/\s*&\s*\d+/, '').replace(/(\d+)\s*1\/2/, '$1').replace(/^(\d+)-\d+/, '$1').trim();
-}
-function parseCity(line) { const m = line.match(/^(.*?),?\s*(?:TX|Texas)\s*(\d{5})?/i); return m ? { city: m[1].trim(), zip: m[2] || '' } : { city: '', zip: '' }; }
-async function censusBatch(items) {
-  const res = {};
-  for (let k = 0; k < items.length; k += 1000) {
-    const csv = items.slice(k, k + 1000).map(x => [x.id, x.street, x.city, 'TX', x.zip].map(v => '"' + String(v || '').replace(/"/g, '') + '"').join(',')).join('\n');
-    const fd = new FormData(); fd.append('addressFile', new Blob([csv], { type: 'text/csv' }), 'a.csv'); fd.append('benchmark', 'Public_AR_Current');
-    try {
-      const t = await (await fetchRetry('https://geocoding.geo.census.gov/geocoder/locations/addressbatch', { method: 'POST', body: fd }, 3)).text();
-      for (const line of t.split('\n')) { const c = line.match(/"([^"]*)"/g); if (!c || c.length < 6) continue; const v = c.map(x => x.slice(1, -1)); if (v[2] === 'Match' && v[5]) { const [lon, lat] = v[5].split(',').map(Number); res[v[0]] = [lon, lat]; } }
-    } catch (e) { log('census batch failed', e.message); }
-  }
-  return res;
-}
-async function maptiler(q, strict) {
-  const u = 'https://api.maptiler.com/geocoding/' + encodeURIComponent(q) + '.json?key=' + KEY + '&country=us&limit=1&bbox=' + BBOX.join(',');
-  try { const d = await (await fetchRetry(u, {}, 2)).json(); const f = (d.features || [])[0];
-    if (!f) return null; if (strict && !(f.address && (f.relevance || 0) >= 0.85)) return null; return f.center; } catch (e) { return null; }
-}
-async function nominatim(q) { // OpenStreetMap, max 1 request/second per usage policy
-  await sleep(1100);
-  try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=' + encodeURIComponent(q), { headers: { 'User-Agent': 'FinishesSolutions-filings-map/1.0 (monthly build)' } });
-    if (!r.ok) return null; const d = await r.json(); return d[0] ? [+d[0].lon, +d[0].lat] : null; } catch (e) { return null; }
-}
-const inBox = c => c && c[0] > BBOX[0] && c[0] < BBOX[2] && c[1] > BBOX[1] && c[1] < BBOX[3];
+async function refresh() {
+  const regions = await readJSON(D + 'regions.json');
+  const ONLY = (process.env.ONLY || '').split(',').filter(Boolean);
+  const counties = regions.counties.filter(c => !ONLY.length || ONLY.includes(c.name));
+  const now = new Date();
+  const endD = process.env.PERIOD_END ? new Date(process.env.PERIOD_END) : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1));
+  const startD = process.env.PERIOD_START ? new Date(process.env.PERIOD_START) : new Date(Date.UTC(endD.getUTCFullYear(), endD.getUTCMonth() - (regions.months - 1), 1));
+  log('period', iso(startD), '→', iso(endD), '|', counties.map(c => c.name).join(', '));
 
-// ---- geometry helpers ----
-function rewind(g) { // d3 wants clockwise exterior rings
-  const fix = poly => { const p = { type: 'Polygon', coordinates: poly }; return geoArea(p) > 2 * Math.PI ? poly.map(r => r.slice().reverse()) : poly; };
-  return g.type === 'Polygon' ? { type: 'MultiPolygon', coordinates: [fix(g.coordinates)] } : { type: 'MultiPolygon', coordinates: g.coordinates.map(fix) };
-}
-const round = c => Array.isArray(c[0]) ? c.map(round) : [Math.round(c[0] * 1e4) / 1e4, Math.round(c[1] * 1e4) / 1e4];
-function grid(geom, step) {
-  const out = []; const b = bounds(geom);
-  for (let lat = Math.floor(b[1] / step) * step; lat <= b[3]; lat += step) {
-    const ls = step / Math.max(Math.cos(lat * Math.PI / 180), 0.15);
-    for (let lon = Math.floor(b[0] / ls) * ls; lon <= b[2]; lon += ls) if (geoContains(geom, [lon, lat])) out.push([Math.round(lon * 1e3) / 1e3, Math.round(lat * 1e3) / 1e3]);
-  }
-  return out;
-}
-function bounds(g) { let x0 = 180, y0 = 90, x1 = -180, y1 = -90; const walk = c => { if (typeof c[0] === 'number') { x0 = Math.min(x0, c[0]); x1 = Math.max(x1, c[0]); y0 = Math.min(y0, c[1]); y1 = Math.max(y1, c[1]); } else c.forEach(walk); }; walk(g.coordinates); return [x0, y0, x1, y1]; }
-function minVertexDist(g, pt) { let m = 9; const walk = c => { if (typeof c[0] === 'number') m = Math.min(m, Math.hypot(c[0] - pt[0], c[1] - pt[1])); else c.forEach(walk); }; walk(g.coordinates); return m; }
+  // geometry (rebuilt only when regions change)
+  const rHash = hash(JSON.stringify(regions));
+  let geo = await readJSON(D + 'geo.json');
+  if (!geo || geo._regions !== rHash || process.env.REBUILD_GEO) { geo = { ...(await buildGeo(regions)), _regions: rHash }; await fs.writeFile(D + 'geo.json', JSON.stringify(geo)); }
 
-async function main() {
-  log('period', START, '→', END);
-  // geometry sources
-  const cj = await (await fetchRetry('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json')).json();
-  const byFips = Object.fromEntries(cj.features.filter(f => f.id.startsWith('48')).map(f => [f.id, f]));
-  const counties = Object.entries(FIPS).map(([name, f]) => { const g = rewind(byFips[f].geometry); return { name, geom: g }; });
-  const states = await (await fetchRetry('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')).json();
-  const texas = rewind(feature(states, states.objects.states).features.find(f => f.properties.name === 'Texas').geometry);
-  const world = await (await fetchRetry('https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json')).json();
-  const land = feature(world, world.objects.land);
-  const landGeom = land.features ? { type: 'MultiPolygon', coordinates: land.features.flatMap(f => rewind(f.geometry).coordinates) } : rewind(land.geometry);
-  // places gazetteer
-  let places = [];
-  try {
-    const t = await (await fetchRetry('https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_gaz_place_48.txt')).text();
-    const rows = t.split('\n').map(l => l.split('\t').map(s => s.trim())); const h = rows[0];
-    const iN = h.indexOf('NAME'), iLa = h.indexOf('INTPTLAT'), iLo = h.indexOf('INTPTLONG');
-    places = rows.slice(1).filter(r => r.length > iLo).map(r => [r[iN].replace(/ (city|town|CDP|village)$/, ''), +(+r[iLo]).toFixed(5), +(+r[iLa]).toFixed(5)]).filter(p => inBox([p[1], p[2]]));
-  } catch (e) { log('places failed', e.message); }
-
-  // filings
-  const names = ONLY.length ? ONLY : Object.keys(COUNTY_IDS);
-  let rows = []; for (const n of names) { const r = await listCounty(n, COUNTY_IDS[n]); log(n, r.length); rows = rows.concat(r); }
+  // 1. TABS list
+  let rows = [];
+  for (const c of counties) { const r = await listCounty(c.name, c.tabsId, startD, endD); log(c.name, r.length); rows = rows.concat(r); }
   const seen = new Set(); rows = rows.filter(r => !seen.has(r.ProjectNumber) && seen.add(r.ProjectNumber));
-  await pool(rows, 8, detail); log('details done', rows.length);
-  rows.forEach(r => { const pc = parseCity(r.cityLine || ''); r.city = pc.city; r.zip = pc.zip; r.st = cleanStreet(r.street || ''); });
-  const geo = await censusBatch(rows.map(r => ({ id: r.ProjectNumber, street: r.st, city: r.city, zip: r.zip }))); log('census matched', Object.keys(geo).length);
-  const src = {}; Object.keys(geo).forEach(k => src[k] = 'address');
-  const misses = rows.filter(r => !geo[r.ProjectNumber] && r.st && r.city);
-  for (const r of misses) { const c = await nominatim(`${r.st}, ${r.city}, Texas`); if (inBox(c)) { geo[r.ProjectNumber] = c; src[r.ProjectNumber] = 'address'; } }
-  log('nominatim matched', misses.filter(r => geo[r.ProjectNumber]).length, 'of', misses.length);
-  await pool(rows.filter(r => !geo[r.ProjectNumber] && r.st && r.city), 4, async r => { const c = await maptiler(`${r.st}, ${r.city}, TX ${r.zip}`, true); if (inBox(c)) { geo[r.ProjectNumber] = c; src[r.ProjectNumber] = 'address'; } });
-  const cityCache = {};
-  for (const r of rows) {
-    if (geo[r.ProjectNumber] || !r.city) continue;
-    if (!(r.city in cityCache)) { const pl = places.find(p => p[0].toLowerCase() === r.city.toLowerCase()); cityCache[r.city] = pl ? [pl[1], pl[2]] : await maptiler(r.city + ', Texas', false); }
-    const c = cityCache[r.city]; if (!inBox(c)) continue;
-    let h = 0; for (const ch of r.ProjectNumber) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    geo[r.ProjectNumber] = [c[0] + ((h % 1000) / 1000 - 0.5) * 0.03, c[1] + (((h >> 10) % 1000) / 1000 - 0.5) * 0.03]; src[r.ProjectNumber] = 'city';
-  }
-  const cg = Object.fromEntries(counties.map(c => [c.name, c.geom]));
-  const filings = rows.filter(r => inBox(geo[r.ProjectNumber])).map(r => {
-    const c = geo[r.ProjectNumber]; const sq = parseInt(String(r.sqft || '').replace(/[^\d]/g, ''), 10);
-    const scope = (r.scope || '').replace(/\s+/g, ' ').trim();
-    const inside = geoContains(cg[r._county], c);
-    return { id: r.ProjectNumber, name: (r.ProjectName || '').replace(/\s+/g, ' ').trim(), county: r._county, city: r.city, addr: [r.street, r.cityLine].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim(),
-      type: TYPE[r.TypeOfWork] || 'Other', cost: r.EstimatedCost || 0, sqft: sq > 1 ? sq : null, owner: (r.owner || '').trim(), scope: scope.length > 260 ? scope.slice(0, 250).replace(/\s\S*$/, '') + '…' : scope,
-      reg: (r.ProjectCreatedOn || '').slice(0, 10), status: STATUS[r.ProjectStatus] || '', start: (r.EstimatedStartDate || '').slice(0, 10), end: (r.EstimatedEndDate || '').slice(0, 10),
-      lat: Math.round(c[1] * 1e5) / 1e5, lon: Math.round(c[0] * 1e5) / 1e5, approx: src[r.ProjectNumber] === 'city', misfiled: !inside && minVertexDist(cg[r._county], c) > 0.12 };
-  });
-  log('mapped', filings.length, 'of', rows.length, 'approx', filings.filter(f => f.approx).length);
+  const prevFile = await readJSON(D + 'filings.json', { filings: [] });
+  const prevHere = prevFile.filings.filter(f => counties.some(c => c.name === f.county));
+  if (prevHere.length > 200 && rows.length < prevHere.length * 0.5 && !process.env.ALLOW_SHRINK) throw new Error(`TABS returned ${rows.length} filings vs ${prevHere.length} last run; refusing to overwrite (set ALLOW_SHRINK=1 to force)`);
 
-  const data = {
-    period: { start: startD.toISOString().slice(0, 10), end: endD.toISOString().slice(0, 10) }, built: new Date().toISOString(), total: rows.length,
-    filings,
-    counties: counties.map(c => ({ name: c.name, outline: round(c.geom.coordinates), label: geoCentroid(c.geom).map(v => Math.round(v * 1e3) / 1e3), dots: grid(c.geom, 0.02) })),
-    ring: RING.filter(f => byFips[f]).map(f => ({ name: byFips[f].properties.NAME, outline: round(rewind(byFips[f].geometry).coordinates) })),
-    texas: grid(texas, 0.1), land: grid(landGeom, 1.0), places, roads: {}
-  };
-  await fs.mkdir('public', { recursive: true });
-  await fs.writeFile('public/data.json', JSON.stringify(data));
-  for (const f of ['index.html', 'app.js', 'app.css', 'logo.png']) await fs.copyFile('src/' + f, 'public/' + f);
-  log('wrote public/ (data.json', Math.round(JSON.stringify(data).length / 1024), 'KB)');
+  // 2. detail pages (cached)
+  const tabsCache = await readJSON(C + 'tabs.json', {});
+  await details(rows, tabsCache);
+  rows.forEach(r => { const pc = parseCity(r.cityLine || ''); r.city = pc.city; r.zip = pc.zip; r.st = cleanStreet(r.street || ''); });
+
+  // 3. geocoding (cached)
+  const geoCache = await readJSON(C + 'geocode.json', {});
+  const loc = await geocodeRows(rows, geoCache, { key: KEY, bbox: regions.bbox, places: geo.places });
+
+  // 4. AI enrichment (cached)
+  const aiCache = await readJSON(C + 'ai.json', {});
+  try { await enrich(rows, aiCache); } catch (e) { log('enrich stopped:', e.message); }
+
+  // 5. compact filings
+  const cg = Object.fromEntries(geo.counties.map(c => [c.name, { type: 'MultiPolygon', coordinates: c.outline }]));
+  const inBox = c => c && c[0] > regions.bbox[0] && c[0] < regions.bbox[2] && c[1] > regions.bbox[1] && c[1] < regions.bbox[3];
+  const fresh = rows.filter(r => inBox(loc[r.ProjectNumber]?.c)).map(r => {
+    const { c, src } = loc[r.ProjectNumber]; const sq = parseInt(String(r.sqft || '').replace(/[^\d]/g, ''), 10);
+    const scope = (r.scope || '').replace(/\s+/g, ' ').trim(), type = TYPE[r.TypeOfWork] || 'Other', cost = r.EstimatedCost || 0;
+    const reg = (r.ProjectCreatedOn || '').slice(0, 10), start = (r.EstimatedStartDate || '').slice(0, 10), end = (r.EstimatedEndDate || '').slice(0, 10);
+    const ai = aiFields(r, aiCache) || {};
+    const f = { id: r.ProjectNumber, name: (r.ProjectName || '').replace(/\s+/g, ' ').trim(), county: r._county, city: r.city, addr: [r.street, r.cityLine].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim(),
+      type, cost, sqft: sq > 1 ? sq : null, owner: (r.owner || '').trim(), scope: scope.length > 260 ? scope.slice(0, 250).replace(/\s\S*$/, '') + '…' : scope,
+      reg, status: STATUS[r.ProjectStatus] || '', start, end, ...timeline(type, cost, reg, start, end),
+      lat: Math.round(c[1] * 1e5) / 1e5, lon: Math.round(c[0] * 1e5) / 1e5 };
+    if (src === 'city') f.approx = true;
+    if (cg[r._county] && !geoContains(cg[r._county], c) && minVertexDist(cg[r._county], c) > 0.12) f.misfiled = true;
+    if (ai.use) Object.assign(f, { use: ai.use, sub: ai.subtype || '', ten: ai.tenant || '', dev: ai.developer || '', arch: ai.architect || (r.design || '').trim(), gc: ai.gc || '', units: ai.units ?? null, sum: ai.summary || '' });
+    else if (r.design) f.arch = r.design.trim();
+    return f;
+  });
+  const other = prevFile.filings.filter(f => !counties.some(c => c.name === f.county));
+  const filings = fresh.concat(other).sort((a, b) => b.cost - a.cost);
+  log('mapped', fresh.length, 'of', rows.length, '| approx', fresh.filter(f => f.approx).length, '| enriched', fresh.filter(f => f.use).length);
+
+  // 6. change feed
+  const items = diff(prevHere, fresh);
+  const feed = appendRun(await readJSON(D + 'changes.json'), { built: now.toISOString(), items });
+  log('changes', items.length);
+
+  // 7. market context (best effort)
+  try { const m = await buildMarket(regions, await readJSON(D + 'market.json')); await fs.writeFile(D + 'market.json', JSON.stringify(m)); }
+  catch (e) { log('market skipped:', e.message); }
+
+  // write data + caches (caches pruned to filings still in the window)
+  const live = new Set(rows.map(r => r.ProjectNumber)), liveAi = new Set(rows.map(aiKey));
+  for (const k of Object.keys(tabsCache)) if (!live.has(k) && !ONLY.length) delete tabsCache[k];
+  for (const k of Object.keys(aiCache)) if (!liveAi.has(k) && !ONLY.length) delete aiCache[k];
+  await writeMap(C + 'tabs.json', tabsCache); await writeMap(C + 'geocode.json', geoCache); await writeMap(C + 'ai.json', aiCache);
+  await writeRows(D + 'filings.json', { period: { start: iso(startD), end: iso(endD) }, built: now.toISOString(), unmapped: rows.length - fresh.length }, 'filings', filings);
+  await fs.writeFile(D + 'changes.json', JSON.stringify(feed));
+
+  // optional weekly digest to a Zapier catch hook
+  if (process.env.ZAPIER_DIGEST_WEBHOOK && items.length) {
+    const byId = Object.fromEntries(filings.map(f => [f.id, f])), nu = items.filter(x => x.k === 'new').map(x => byId[x.id]).filter(Boolean).sort((a, b) => b.cost - a.cost);
+    try { await fetchRetry(process.env.ZAPIER_DIGEST_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      built: now.toISOString(), newCount: nu.length, newValue: nu.reduce((s, f) => s + f.cost, 0), changed: items.length - nu.length,
+      top: nu.slice(0, 15).map(f => ({ id: f.id, name: f.name, county: f.county, city: f.city, type: f.type, use: f.use || '', cost: f.cost, start: f.ts, link: 'https://www.tdlr.texas.gov/TABS/Projects/' + f.id })) }) }, 2); log('digest posted'); }
+    catch (e) { log('digest failed:', e.message); }
+  }
 }
-main().catch(e => { console.error(e); process.exit(1); });
+
+const assembleOnly = process.argv.includes('--assemble');
+(assembleOnly ? assemble() : refresh().then(assemble)).catch(e => { console.error(e); process.exit(1); });

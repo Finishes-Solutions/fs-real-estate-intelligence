@@ -1,8 +1,21 @@
 {
-  "name": "waller-filings-map",
+  "name": "fs-real-estate-intelligence",
   "private": true,
   "type": "module",
-  "scripts": { "build": "node build.mjs" },
-  "dependencies": { "d3-geo": "^3.1.1", "topojson-client": "^3.1.0" },
-  "engines": { "node": ">=20" }
+  "scripts": {
+    "build": "node build.mjs",
+    "assemble": "node build.mjs --assemble",
+    "test": "node test/fixture.mjs && node test/api.mjs && bash test/pipeline.sh"
+  },
+  "dependencies": {
+    "d3-geo": "^3.1.1",
+    "topojson-client": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "us-atlas": "^3.0.1",
+    "world-atlas": "^2.0.2"
+  }
 }

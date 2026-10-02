@@ -2,6 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npm install --no-audit --no-fund",
-  "buildCommand": "node build.mjs",
-  "outputDirectory": "public"
+  "buildCommand": "node build.mjs --assemble",
+  "outputDirectory": "public",
+  "functions": {
+    "api/ask.js": { "maxDuration": 30, "includeFiles": "data/filings.json" },
+    "api/brief.js": { "maxDuration": 45, "includeFiles": "data/{filings,changes,market}.json" },
+    "api/feed.js": { "maxDuration": 10, "includeFiles": "data/{filings,changes}.json" }
+  },
+  "headers": [
+    { "source": "/data/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, s-maxage=86400, must-revalidate" }] }
+  ]
 }
