@@ -1,5 +1,6 @@
 import { pickPlace, districtFor } from './lib/assist-logic.mjs';
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
+import { mergeBusinesses } from './lib/nearby.mjs';
 // Map search (under the map tools): real street addresses, places (counties, towns, neighborhoods, landmarks, roads),
 // projects by name, companies and people (owners, developers, architects, contractors) and filings at matching addresses. Results appear while typing, 10 at a time, with more loading as you
 // scroll. Picking a place outlines it on the map: city / county / neighborhood boundaries and building footprints
@@ -9,7 +10,7 @@ const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
 const TX_VIEWBOX = '-106.7,36.5,-93.5,25.8';
 const PAGE = 10;
-const KIND_LABEL = { county: 'County', town: 'City / town', address: 'Address', poi: 'Place', road: 'Road', area: 'Neighborhood', zip: 'ZIP code', building: 'Building', coords: 'Coordinates' };
+const KIND_LABEL = { business: 'Business', county: 'County', town: 'City / town', address: 'Address', poi: 'Place', road: 'Road', area: 'Neighborhood', zip: 'ZIP code', building: 'Building', coords: 'Coordinates' };
 // "lat, lon" typed into the box: only this skips the address lookup ("1004 Priya Ln" starts with a number but is an address)
 const COORDS = /^\s*(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
 // street-type and direction abbreviations, so "Priya Ln" finds "Priya Lane" (and the other way round)
@@ -88,8 +89,21 @@ export function initMapSearch(ctx) {
 
   // ---------- results: Addresses · Places · Projects · Companies & people · Filings at matching addresses ----------
   let names = [], addrs = [], ents = [], shownA = 0;
+  // ---------- businesses by name: OpenStreetMap near the map center + Texas Comptroller sales-tax permits in nearby towns ----------
+  let biz = [], bizPending = false, bizT = 0; const bizCache = new Map();
+  const bizWorthy = t => t.length >= 3 && !COORDS.test(t) && !/^\d/.test(t) && !/^\d{5}$/.test(t);
+  async function businesses(text) {
+    const c = map.getCenter(), lat = +c.lat.toFixed(2), lon = +c.lng.toFixed(2), key = low(text) + '|' + lat + ',' + lon;
+    if (bizCache.has(key)) return bizCache.get(key);
+    const towns = (DATA.places || []).map(p => [p[0], (p[1] - lon) ** 2 + (p[2] - lat) ** 2]).sort((a, b) => a[1] - b[1]).slice(0, 25).map(p => p[0]);
+    const get = u => fetch(u).then(r => r.ok ? r.json() : null).catch(() => null);
+    const [o, t] = await Promise.all([get('api/nearby?' + new URLSearchParams({ mode: 'business', name: text, lat, lon, limit: '8' })), get('api/tenants?' + new URLSearchParams({ name: text, cities: towns.join(',') }))]);
+    const out = mergeBusinesses(o?.places || [], t?.tenants || [], 8); if (o || t) bizCache.set(key, out); return out;
+  }
   function run(text) {
-    q = text.trim(); clearB.hidden = !q; remote = []; enterWait = false;
+    q = text.trim(); clearB.hidden = !q; remote = []; enterWait = false; biz = []; clearTimeout(bizT);
+    bizPending = !!q && bizWorthy(q);
+    if (bizPending) { const my0 = seq + 1; bizT = setTimeout(async () => { const b = await businesses(q); if (my0 !== seq) return; biz = b; bizPending = false; render(); }, 450); }
     if (!q) { pending = false; close(); return; }
     ({ names, addrs } = searchFilings(q)); ents = searchEntities(q);
     clearTimeout(geoT); const my = ++seq;
@@ -115,6 +129,9 @@ export function initMapSearch(ctx) {
     const push = (it, inner) => { items.push(it); h += btn(items.length - 1, inner); };
     if (addresses.length) { h += sec('Addresses'); addresses.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>Address</i>')); }
     if (places.length) { h += sec('Places'); places.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>' + esc(KIND_LABEL[p.kind] || 'Place') + '</i>')); }
+    if (biz.length) { h += sec('Businesses');
+      biz.forEach(b => push({ t: 'biz', b }, '<b>' + esc(b.name) + '</b><i>' + (b.miles != null ? (+b.miles).toFixed(1) + ' mi' : 'Business') + '</i><span>' + esc([b.kind && b.kind[0].toUpperCase() + b.kind.slice(1), b.address].filter(Boolean).join(' · ') || (b.src === 'osm' ? 'OpenStreetMap' : 'Texas Comptroller')) + '</span>')); }
+    else if (bizPending && q.length >= 3) h += sec('Businesses') + '<div class="ms-none sm">Looking up businesses…</div>';
     if (names.length) {
       h += sec('Projects · ' + fmtN(names.length), '<button class="lnk" data-act="filter" type="button">Show All on Map</button>');
       names.slice(0, shown).forEach(f => push({ t: 'filing', f }, filingRow(f)));
@@ -156,6 +173,7 @@ export function initMapSearch(ctx) {
     const it = items[i]; if (!it) return; seq++; clearTimeout(geoT); close(); input.blur();
     if (it.t === 'filing') { ctx.setView('map'); ctx.select(it.f, true); return; }
     if (it.t === 'entity') { showEntity(it.e); return; }
+    if (it.t === 'biz') { showBusiness(it.b); return; }
     showPlace(it.p);
   }
   // ⌘K (Mac) or Ctrl+K: jump to the map search from anywhere
@@ -252,22 +270,30 @@ export function initMapSearch(ctx) {
     if (!geom && p.bbox && /area|town|zip|county/.test(p.kind)) { const [w, s2, e, n] = p.bbox; geom = { type: 'Polygon', coordinates: [[[w, s2], [e, s2], [e, n], [w, n], [w, s2]]] }; note = 'Approximate outline (the area’s bounding box): OpenStreetMap has no boundary for it.'; }
     place.geom = geom ? (isArea(geom) ? ctx.fixWinding(geom) : geom) : null; syncPlace();
     const pt = p.c || (geom && centerOf(geom)); setPlacePin(pt, p.label);
-    if (geom && isArea(geom) && /address|poi|building/.test(p.kind) || !geom && /address|poi|coords/.test(p.kind)) {
+    if (geom && isArea(geom) && /address|poi|building|business/.test(p.kind) || !geom && /address|poi|coords|business/.test(p.kind)) {
       // a single building: fly in close, then open the building panel (footprint highlight, parcel, businesses)
       map.flyTo({ center: pt, zoom: 18, pitch: 55, duration: ctx.reduceMotion ? 0 : 1600 });
       map.once('idle', () => { if (place?.label === p.label && !isArea(place.geom)) { const b = ctx.buildingAt?.(pt); if (b?.footprint) { place.geom = b.footprint; place.kind = 'building'; syncPlace(); placeCard(); } } });
     } else if (geom) ctx.fitGeom(place.geom);
     else if (pt) map.flyTo({ center: pt, zoom: p.kind === 'town' ? 12 : 14, duration: ctx.reduceMotion ? 0 : 1200 });
-    if (!geom && !/address|poi|coords/.test(p.kind)) note = 'No outline found for this place in OpenStreetMap, so it is shown as a point.';
+    if (!geom && !/address|poi|coords|business/.test(p.kind)) note = 'No outline found for this place in OpenStreetMap, so it is shown as a point.';
     placeCard(note);
     return place;
   }
   ctx.showPlace = showPlace;
+  // a business: OpenStreetMap ones have a point; Comptroller ones only an address, so geocode it first
+  async function showBusiness(b) {
+    let c = b.lat != null ? [b.lon, b.lat] : null;
+    if (!c) { const g = await ctx.geocode(b.address + (b.zip ? ' ' + b.zip : '') + ', Texas', { exact: true }); const hit = g.find(x => x.type === 'address') || g[0]; if (hit) c = hit.c; }
+    if (!c) { ctx.toast('Couldn’t place ' + b.name + ' on the map (' + b.address + ').'); return; }
+    input.value = b.name; clearB.hidden = false;
+    return showPlace({ label: b.name + (b.address ? ', ' + b.address : ''), name: b.name, kind: 'business', c });
+  }
 
   // filings inside an area, or within a quarter mile of a road or point
   function placeHits() {
     const list = ctx.filtered(), g = place.geom;
-    if (isArea(g) && place.kind !== 'building') return { list: list.filter(f => d3.geoContains(g, [f.lon, f.lat])), how: 'inside' };
+    if (isArea(g) && !/building|business/.test(place.kind)) return { list: list.filter(f => d3.geoContains(g, [f.lon, f.lat])), how: 'inside' };
     const R = .25 / 3958.8, pt = place.c || (g && centerOf(g));
     if (isLine(g)) { const lines = g.type === 'LineString' ? [g.coordinates] : g.coordinates, b = bounds(g);
       return { list: list.filter(f => f.lon > b[0][0] - .01 && f.lon < b[1][0] + .01 && f.lat > b[0][1] - .01 && f.lat < b[1][1] + .01 && lines.some(l => l.some((p, i) => i && segDist([f.lon, f.lat], l[i - 1], p) < R))), how: 'within ¼ mile' }; }
@@ -280,7 +306,7 @@ export function initMapSearch(ctx) {
 
   function placeCard(note = '') {
     if (!place) return;
-    const { list, how } = placeHits(), v = list.reduce((s, f) => s + f.cost, 0), area = isArea(place.geom) && place.kind !== 'building';
+    const { list, how } = placeHits(), v = list.reduce((s, f) => s + f.cost, 0), area = isArea(place.geom) && !/building|business/.test(place.kind);
     const inCmp = ctx.compare?.list().some(a => a.key === 'place:' + place.label);
     bar.innerHTML = '<button class="x" aria-label="Clear" id="pbX">×</button><div class="pb-k">' + esc(KIND_LABEL[place.kind] || 'Place') + '</div><div class="pb-t">' + esc(place.label) + '</div>' +
       '<div class="pb-s">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' ' + how + ' · est. ' + fmtM(v) + (ctx.filterText() ? '<span> (current filters)</span>' : '') + '</div>' + (note ? '<div class="pb-n">' + esc(note) + '</div>' : '') +
@@ -299,7 +325,7 @@ export function initMapSearch(ctx) {
   // filings, businesses, Drive Time, Weather, Site Imagery, News), using the building footprint under the point when there is one
   function pointInfo() {
     const pt = place.c || centerOf(place.geom);
-    const fp = place.kind === 'building' && isArea(place.geom) ? place.geom : ctx.buildingAt?.(pt)?.footprint || null;
+    const fp = /building|business/.test(place.kind) && isArea(place.geom) ? place.geom : ctx.buildingAt?.(pt)?.footprint || null;
     ctx.openBuildingAt(pt, fp);
   }
   // "More Information" on a town, county, neighborhood or ZIP: an area summary card with the headline metrics,

@@ -4,13 +4,13 @@ import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 const AUTOTABLE = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
-const REPORTS = {
+export const REPORTS = {
   summary: { label: 'Summary Report', desc: 'Headline metrics, map, breakdowns by county, type and use, largest projects.', formats: ['pdf', 'xlsx', 'html'] },
   list: { label: 'Filing List', desc: 'Every filing with address, value, owner, developer, schedule and status.', formats: ['pdf', 'xlsx', 'csv', 'geojson'] },
   compare: { label: 'Area Comparison', desc: 'The areas in Compare side by side, with the largest projects in each.', formats: ['pdf', 'xlsx', 'csv'] },
   activity: { label: 'Activity Report', desc: 'Most active developers, architects and general contractors.', formats: ['pdf', 'xlsx', 'csv'] }
 };
-const FORMATS = { pdf: 'PDF', xlsx: 'Excel', csv: 'CSV', geojson: 'GeoJSON (GIS)', html: 'Web Page' };
+export const FORMATS = { pdf: 'PDF', xlsx: 'Excel', csv: 'CSV', geojson: 'GeoJSON (GIS)', html: 'Web Page' };
 const GREEN = [0, 101, 39], INK = [35, 40, 42], MUTED = [107, 113, 116], LINE = [221, 225, 226];
 
 export function initExport(ctx) {
@@ -51,7 +51,8 @@ export function initExport(ctx) {
   }
   const opt = (k, label, show) => show ? '<label class="tg2"><input type="checkbox" data-k="' + k + '"' + (st[k] ? ' checked' : '') + '><span>' + label + '</span></label>' : '';
   let lastFocus = null;
-  function open(report) { if (report && REPORTS[report]) st.report = report; lastFocus = document.activeElement; render(); dlg.classList.add('on'); setTimeout(() => dlg.querySelector('#xGo:not([disabled])')?.focus(), 30); }
+  // open(report, { format, scope }): the Reports tab and the assistant's cards open it preset
+  function open(report, o = {}) { if (report && REPORTS[report]) st.report = report; if (o.format && REPORTS[st.report].formats.includes(o.format)) st.format = o.format; if (o.scope) st.scope = o.scope; lastFocus = document.activeElement; render(); dlg.classList.add('on'); setTimeout(() => dlg.querySelector('#xGo:not([disabled])')?.focus(), 30); }
   function close() { dlg.classList.remove('on'); lastFocus?.focus?.(); }
   dlg.addEventListener('pointerdown', e => { if (e.target === dlg) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && dlg.classList.contains('on')) close(); });
@@ -64,6 +65,9 @@ export function initExport(ctx) {
       const list = listFor(st.scope).slice().sort((a, b) => b.cost - a.cost);
       const label = st.scope === 'highlight' ? 'Highlighted Filings' : st.scope === 'view' ? 'Map view' : ctx.scopeLabel();
       const name = ctx.fileBase(st.report, st.report === 'compare' ? 'areas' : label);
+      // what the Reports tab records with the file
+      ctx.exportMeta = { report: st.report, reportLabel: REPORTS[st.report].label, format: st.format, filings: st.report === 'compare' ? (ctx.compare?.list() || []).length : list.length,
+        unit: st.report === 'compare' ? 'areas' : 'filings', scope: label, filters: ctx.filterText(), hash: ctx.hashStr() };
       if (st.report === 'summary') {
         if (st.format === 'pdf') await pdfSummary(list, label, name);
         else if (st.format === 'xlsx') ctx.exportXlsx([{ name: 'Summary', aoa: ctx.summaryAoa(list, label) }, { name: 'Filings', rows: rows(list) }], name);
@@ -87,7 +91,7 @@ export function initExport(ctx) {
       }
       close();
     } catch (e) { console.error(e); ctx.toast('Export failed: ' + e.message); }
-    finally { if (dlg.classList.contains('on')) render(); }
+    finally { ctx.exportMeta = null; if (dlg.classList.contains('on')) render(); }
   }
   const rows = list => ctx.rowsFor(list).map(r => { const o = { ...r }; if (!st.scope_text) delete o.Scope; if (!st.ai) { delete o['AI summary']; delete o.Use; delete o.Subtype; delete o.Tenant; delete o.Developer; } return o; });
 
