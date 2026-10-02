@@ -1,6 +1,8 @@
-// Recent news about a project, company or place, from the GDELT Project DOC 2.0 API (free, no key; cite GDELT and link out).
-// GET ?q=<company or project>&near=<city>  -> { query, articles: [{ title, url, domain, date, image }] }
-// GDELT covers roughly the last three months and asks for no more than one request every 5 seconds, so answers are CDN-cached.
+// Recent news about a project, company or place. Free, no key; cite the source and link out.
+//   1. Google News search (RSS): reliable from servers, about the last year
+//   2. GDELT Project DOC 2.0 API: fallback; it often refuses cloud servers or rate-limits them (one request per 5 s for everyone)
+// GET ?q=<company or project>&near=<city>  -> { query, articles: [{ title, url, domain, date, image }], source }
+// Answers are CDN-cached.
 import { rateLimit, sameOrigin, clip } from './_lib/guard.mjs';
 import { supa } from '../lib/supa.mjs';
 
@@ -17,7 +19,32 @@ export function gdeltQuery(q, near) {
 }
 const day = s => /^(\d{4})(\d\d)(\d\d)T/.test(s || '') ? s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8) : null;
 
-export async function news(q, near, max = 12) {
+const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+const unxml = t => String(t || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e) => e[0] === '#' ? String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : +e.slice(1)) : ENT[e.toLowerCase()] ?? m).replace(/<[^>]+>/g, '').trim();
+// Google News search feed: <item><title>Headline - Outlet</title><link>…</link><pubDate>…</pubDate><source url="https://outlet">Outlet</source></item>
+export function parseGoogleNews(xml, max = 12) {
+  const out = [], seen = new Set();
+  for (const m of String(xml).matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const it = m[1], tag = n => unxml((it.match(new RegExp('<' + n + '[^>]*>([\\s\\S]*?)</' + n + '>')) || [])[1]);
+    const outlet = tag('source'), src = (it.match(/<source[^>]*url="([^"]+)"/) || [])[1] || '';
+    let title = tag('title'); if (outlet && title.endsWith(' - ' + outlet)) title = title.slice(0, -(outlet.length + 3));
+    const url = tag('link'), key = title.toLowerCase().replace(/\W+/g, ' ').trim(); if (!url || !key || seen.has(key)) continue; seen.add(key);
+    const d = new Date(tag('pubDate'));
+    out.push({ title: clip(title, 200), url, domain: outlet || (src ? new URL(src).hostname : ''), date: isNaN(d) ? null : d.toISOString().slice(0, 10), image: null });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+export async function googleNews(q, near, max = 12) {
+  const a = phrase(q), b = phrase(near), query = [a, b && b !== a ? b : ''].filter(Boolean).join(' ');
+  if (!query) return { query: '', articles: [] };
+  const u = 'https://news.google.com/rss/search?' + new URLSearchParams({ q: query + ' when:1y', hl: 'en-US', gl: 'US', ceid: 'US:en' });
+  const r = await fetch(u, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FinishesSolutions-RealEstateIntel/1.0)', Accept: 'application/rss+xml, application/xml, text/xml' } });
+  if (!r.ok) throw new Error('Google News ' + r.status);
+  return { query, articles: parseGoogleNews(await r.text(), max), source: 'Google News' };
+}
+
+export async function gdelt(q, near, max = 12) {
   const query = gdeltQuery(q, near); if (!query) return { query: '', articles: [] };
   const u = 'https://api.gdeltproject.org/api/v2/doc/doc?' + new URLSearchParams({ query, mode: 'artlist', format: 'json', maxrecords: String(max * 2), sort: 'datedesc', timespan: '3months' });
   const r = await fetch(u, { signal: AbortSignal.timeout(12000), headers: { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' } });
@@ -30,7 +57,15 @@ export async function news(q, near, max = 12) {
     articles.push({ title: clip(a.title, 200), url: a.url, domain: a.domain || new URL(a.url).hostname, date: day(a.seendate), image: a.socialimage || null });
     if (articles.length >= max) break;
   }
-  return { query, articles };
+  return { query, articles, source: 'GDELT Project' };
+}
+
+// Google News first; GDELT when Google fails or finds nothing
+export async function news(q, near, max = 12) {
+  let g = null, ge = null;
+  try { g = await googleNews(q, near, max); if (g.articles.length) return g; } catch (e) { ge = e; console.error('news google', e.message); }
+  try { const d = await gdelt(q, near, max); return d.articles.length || !g ? d : g; }
+  catch (e) { if (g) return g; throw new Error([ge?.message, e.message].filter(Boolean).join('; ')); }
 }
 
 // With SUPABASE_URL + SUPABASE_SECRET_KEY on the site, articles found for a filing are saved (news_articles / filing_news),
@@ -54,9 +89,9 @@ export default async function handler(req, res) {
   let out = null, err = null;
   try { out = await news(q, near); } catch (e) { err = e; console.error('news', e.message); }
   if (db) {
-    try { if (out) await save(db, id, out.query, out.articles); out = { query: out?.query || gdeltQuery(q, near), articles: merge(out?.articles || [], await saved(db, id)) }; }
+    try { if (out) await save(db, id, out.query, out.articles); out = { query: out?.query || gdeltQuery(q, near), source: out?.source, articles: merge(out?.articles || [], await saved(db, id)) }; }
     catch (e) { console.error('news db', e.message); }
   }
-  if (out && (!err || out.articles.length)) { res.setHeader('Cache-Control', 'public, max-age=900, s-maxage=3600'); return res.json({ ...out, stored: !!db, source: 'GDELT Project (gdeltproject.org)' }); }
-  res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ error: /limit/i.test(err?.message || '') ? 'The news index is busy. Try again in a few seconds.' : 'Couldn’t reach the news index.' });
+  if (out && (!err || out.articles.length)) { res.setHeader('Cache-Control', 'public, max-age=900, s-maxage=3600'); return res.json({ ...out, stored: !!db, source: out.source || (out.articles.some(a => a.saved) ? 'saved articles' : 'Google News') }); }
+  res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ error: /limit/i.test(err?.message || '') ? 'The news services are busy. Try again in a few seconds.' : 'Couldn’t reach the news services (Google News and GDELT) just now. Try again shortly.' });
 }

@@ -23,6 +23,11 @@ globalThis.fetch = async url => {
     return json(lats.length > 1 ? lats.map(() => one) : one);
   }
   if (u.host === 'www.nhc.noaa.gov') return json({ activeStorms: [{ id: 'al142026', name: 'Kirk', classification: 'HU', intensity: '100', pressure: '965', latitudeNumeric: 25.1, longitudeNumeric: -90.2, movementDir: 315, movementSpeed: 10 }] });
+  if (u.host === 'news.google.com') {
+    if (mode !== 'google') throw new TypeError('fetch failed');
+    assert.equal(u.searchParams.get('q'), '"Hines" "Katy" when:1y');
+    return new Response('<rss><channel><item><title>Hines breaks ground on Katy tower - Houston Chronicle</title><link>https://news.google.com/a1</link><pubDate>Tue, 29 Sep 2026 14:00:00 GMT</pubDate><source url="https://www.houstonchronicle.com">Houston Chronicle</source></item><item><title><![CDATA[Hines &amp; partners plan Katy offices - Bisnow]]></title><link>https://news.google.com/a2</link><pubDate>Mon, 14 Sep 2026 10:00:00 GMT</pubDate><source url="https://www.bisnow.com">Bisnow</source></item></channel></rss>', { headers: { 'Content-Type': 'application/rss+xml' } });
+  }
   if (u.host === 'api.gdeltproject.org') {
     if (mode === 'gdelt-text') return new Response('Please limit requests to one every 5 seconds', { status: 200 });
     assert.match(u.searchParams.get('query'), /^"(Hines Interests|Hines)" "Katy" sourcecountry:US/);
@@ -78,6 +83,11 @@ res = mock(); await news({ query: { q: 'Hines Interests LP', near: 'Katy' }, hea
 assert.equal(res.code, 200, JSON.stringify(res.body)); assert.equal(res.body.articles.length, 1, 'near-duplicate titles collapse'); assert.equal(res.body.articles[0].date, '2026-09-30');
 mode = 'gdelt-text'; res = mock(); await news({ query: { q: 'Hines', near: 'Katy' }, headers: { 'x-forwarded-for': '4.4.4.4' } }, res); assert.equal(res.code, 502); assert.match(res.body.error, /busy/); mode = 'ok';
 res = mock(); await news({ query: {}, headers: { 'x-forwarded-for': '4.4.4.4' } }, res); assert.equal(res.code, 400);
+// Google News is tried first; GDELT only when Google fails (above: Google unreachable, GDELT answered)
+mode = 'google'; res = mock(); await news({ query: { q: 'Hines Holdings LLC', near: 'Katy' }, headers: { 'x-forwarded-for': '6.6.6.6' } }, res); mode = 'ok';
+assert.equal(res.code, 200); assert.equal(res.body.source, 'Google News'); assert.equal(res.body.articles.length, 2);
+assert.equal(res.body.articles[0].title, 'Hines breaks ground on Katy tower'); assert.equal(res.body.articles[0].domain, 'Houston Chronicle'); assert.equal(res.body.articles[0].date, '2026-09-29');
+assert.equal(res.body.articles[1].title, 'Hines & partners plan Katy offices');
 
 // news is saved to Supabase per filing and saved articles come back when GDELT is busy
 { const store = { news_articles: [], filing_news: [] }, base = globalThis.fetch;

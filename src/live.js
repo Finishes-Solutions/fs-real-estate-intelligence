@@ -1,7 +1,7 @@
 // Live layers and "from here" tools: weather radar, lightning, satellite clouds, wind, hurricanes, traffic, 3D terrain and
 // NASA recent imagery on the map; drive time, weather, site imagery and news for the open property. All sources are free:
 //   NOAA nowCOAST + NHC (via /api/tile), Open-Meteo (/api/weather), TomTom traffic (/api/tile, optional key), Mapterhorn terrain,
-//   NASA GIBS + CMR (browser direct), GDELT news (/api/news), OSRM or TomTom routing (/api/drive).
+//   NASA GIBS + CMR (browser direct), news via Google News / GDELT (/api/news), OSRM or TomTom routing (/api/drive).
 import { NASA, hlsPasses } from './lib/nasa.mjs';
 const KEY = 'fs-live-v1';
 const RASTER = { // proxied through api/tile; refreshed every few minutes
@@ -216,7 +216,7 @@ export function initLive(ctx) {
     if (!q && !near) { const c = cardPoint(); if (c) q = c.name; }
     if (!q && !near) return { error: 'Say what to look up, or open a filing first.' };
     const r = await fetch('api/news?' + new URLSearchParams({ q, near, ...(f && !a.query ? { filing: f.id } : {}) })), d = await r.json(); if (!r.ok) return { error: d.error };
-    return { searched: d.query, articles: d.articles, source: 'GDELT Project', note: d.articles.length ? undefined : 'No coverage found in the last ~3 months. Single-asset LLC names rarely appear in news; try the tenant or brand.' };
+    return { searched: d.query, articles: d.articles, source: d.source || 'Google News', note: d.articles.length ? undefined : 'No coverage found in the last year. Single-asset LLC names rarely appear in news; try the tenant or brand.' };
   }
 
   async function imagery(a = {}) {
@@ -254,7 +254,7 @@ export function initLive(ctx) {
     } catch (e) { fail(e); } };
     sec.querySelector('[data-a=news]').onclick = async () => { busy('Searching recent news…'); try {
       const d = info.kind === 'filing' ? await news({ filing_id: info.f.id }) : await news({ query: info.label() }); if (!mine()) return; if (d.error) throw new Error(d.error);
-      out.innerHTML = '<div class="rnote">Searched ' + esc(d.searched) + '</div>' + (d.articles.length ? d.articles.slice(0, 8).map(x => '<a class="chitem" target="_blank" rel="noopener" href="' + esc(x.url) + '"><span><b>' + esc(x.title) + '</b><em>' + esc(x.domain) + (x.date ? ' · ' + esc(x.date) : '') + '</em></span></a>').join('') : '<div class="rnote">' + esc(d.note) + '</div>') + '<div class="rnote">News index: GDELT Project</div>';
+      out.innerHTML = '<div class="rnote">Searched ' + esc(d.searched) + '</div>' + (d.articles.length ? d.articles.slice(0, 8).map(x => '<a class="chitem" target="_blank" rel="noopener" href="' + esc(x.url) + '"><span><b>' + esc(x.title) + '</b><em>' + esc(x.domain) + (x.date ? ' · ' + esc(x.date) : '') + '</em></span></a>').join('') : '<div class="rnote">' + esc(d.note) + '</div>') + '<div class="rnote">Source: ' + esc(d.source || 'Google News') + '</div>';
     } catch (e) { fail(e); } };
   }
 
