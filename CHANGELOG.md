@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 5:38 PM CT: Chat cards tidied, demographics answers, tabs only open when asked (2f973eb)
+- Chat card titles are in Title Case ("Filings by Developer").
+- The "Show the data" dropdown is gone; each card ends with a small line naming its sources (TDLR TABS, Census, Open-Meteo, OpenStreetMap…).
+- The weather card reads "Mostly Clear" and includes tomorrow's forecast and any tropical storms.
+- Ask about median income, population, home values, rent, vacancy, age or growth for a town, neighborhood, county or address and you get a **Demographics** card. It uses the US Census tract data already in the app, and has buttons to show income or growth on the map. Area medians are approximate (averaged across tracts) and the card says so.
+- Questions like "show me construction timelines for Cypress" are answered in the chat, with a chart of estimated starts by month. The assistant no longer jumps to the Timeline (or Compare) tab on its own. It offers "Open the Timeline tab" as a follow-up button instead.
+
 ### 5:29 PM CT: Legends no longer hidden behind Ask AI (3f2cfca)
 - The census tract (demographics) legend now sits at the bottom left, next to the Filings legend, instead of behind the Ask AI button and its suggested questions. If there isn't room side by side it stacks above.
 - Both legends move up above the time slider while it's open.
