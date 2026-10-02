@@ -11,7 +11,7 @@ const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (nearby places
 export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 20, perDay: 400 })) return;
   const lat = +req.query.lat, lon = +req.query.lon, what = String(req.query.what || '').slice(0, 60), limit = Math.max(1, Math.min(10, +req.query.limit || 5));
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 24 || lat > 38 || lon < -108 || lon > -92) return res.status(400).json({ error: 'lat/lon must be in or near Texas' });
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 85 || Math.abs(lon) > 180) return res.status(400).json({ error: 'lat/lon out of range' });
   const business = req.query.mode === 'business', name = String(req.query.name || '').slice(0, 60);
   if (business ? name.trim().length < 2 : !what.trim()) return res.status(400).json({ error: business ? 'Type at least 2 letters of the business name.' : 'Say what to look for.' });
   const cat = business ? null : categoryOf(what), radii = business ? [8000, 30000, 80000] : (cat && CATEGORIES[cat].radius) || [3000, 12000, 40000];
