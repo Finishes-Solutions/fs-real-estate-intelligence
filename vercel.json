@@ -39,6 +39,9 @@
     },
     "api/nearby.js": {
       "maxDuration": 45
+    },
+    "api/field.js": {
+      "maxDuration": 30
     }
   },
   "headers": [
