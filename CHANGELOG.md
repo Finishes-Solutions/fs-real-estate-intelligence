@@ -5,6 +5,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 6:27 PM CT: Consumer spending estimates and the city sales-tax trend (043ec80)
+- **Spending on the map**: Map Layers → Demographics adds Consumer Spending, Spending per Household, Dining Out, Home Furnishings and Apparel for every census tract. These are **estimates**: each tract's households by income (Census) × what households at that income spend (Bureau of Labor Statistics spending survey, adjusted to the South). They are not measured locally, and the legend says so.
+- **Market view**:
+  - total consumer spending and spending per household for the county or region;
+  - a spending-by-category chart;
+  - **the sales tax each city receives every month** (Texas Comptroller), a real local-spending trend, with each city's last 12 months against the 12 before.
+- Building cards show spending per household and dining-out spending for their tract.
+- The assistant can answer spending questions for a place ("how much do households in Katy spend dining out?") and show the spending layers.
+- These numbers appear after the next nightly data refresh.
+- Fixed before it shipped: a new file the browser needs wasn't included in the site build, which would have stopped the page from loading. A new automatic check now catches this.
+
 ### 6:12 PM CT: Live planes, low-flight history, and the assistant can answer about all the data (852b396)
 - **Live Planes**: turn it on in Layers → Live Conditions (or ask the assistant). Every aircraft in view, anywhere in the world, coloured by altitude, moving smoothly and refreshed every 10 seconds. Hover for a quick look; click for a card with callsign, aircraft type, registration, altitude (climbing or descending), speed, route (e.g. IAH → ORD), a Follow button and links to adsb.lol and FlightAware. Zoom in past state level to see them.
 - **Low Flight Paths (30 Days)**: a new layer showing where aircraft fly below 3,000 ft over the region. Property cards get an **Air Traffic** line ("moderate low air traffic: about 14 sightings a day within ~1 km, lowest 850 ft"). The history is collected every 5 minutes from now on, so it takes a few days to mean much. It's an exposure index, not a count of flights.
