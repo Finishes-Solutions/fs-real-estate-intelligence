@@ -15,18 +15,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - where each dataset comes from and when it was last refreshed.
 - The Sources tab lists the aircraft feed and the flight history.
 
+### 6:09 PM CT: Fewer filings stuck at the town center (65690ec)
+- Diagnosed why about 1,700 filings stayed at a town-center pin. The map services were up, but none of them had a house number for most of those addresses: new subdivisions, new addresses, and filings that list "0 Main St" or just a street.
+- Those filings are now placed on their own street in their own ZIP code when the street name, street type and ZIP all match. The card says it's street-level ("not at the exact site"), and exports mark it "Street (house not found)". In a test sample this placed 15 of 24 that were previously at the town center.
+- Junction addresses ("Spacek Rd and Evergreen Falls Dr") still use OpenStreetMap, now with a time limit. It was timing out and dragging data refreshes to about 2 hours.
+- Freeway frontage addresses (e.g. "26003 Northwest Fwy") can stay at the town center: a whole stretch of freeway is too vague to place them on.
+
 ### 5:58 PM CT: The assistant can take you anywhere in the world, and asks when a place is unclear (ae83277)
 - Ask for any place on Earth: "take me to Lyon, France", "show me Germany", "outline Bavaria, Germany". Whole countries and states zoom out to fit.
 - If a name could be more than one place ("take me to Paris", "Springfield", "Georgia"), the assistant no longer guesses. It asks which one and shows the choices as buttons ("Paris, France" / "Paris, Texas"). It also asks when a request is unclear.
 - Ask about places outside Texas (Europe, other states). The filings and census data only cover Texas, so the assistant says so and answers from general knowledge or a quick web search.
 - When the map is somewhere else, the suggested questions above Ask AI are about that place ("Tell me about Lyon").
 - Weather, nearby places and drive time now work anywhere. Drive time refuses trips no car can make (e.g. Houston to Paris).
-
-### 6:09 PM CT: Fewer filings stuck at the town center (65690ec)
-- Diagnosed why about 1,700 filings stayed at a town-center pin. The map services were up, but none of them had a house number for most of those addresses: new subdivisions, new addresses, and filings that list "0 Main St" or just a street.
-- Those filings are now placed on their own street in their own ZIP code when the street name, street type and ZIP all match. The card says it's street-level ("not at the exact site"), and exports mark it "Street (house not found)". In a test sample this placed 15 of 24 that were previously at the town center.
-- Junction addresses ("Spacek Rd and Evergreen Falls Dr") still use OpenStreetMap, now with a time limit. It was timing out and dragging data refreshes to about 2 hours.
-- Freeway frontage addresses (e.g. "26003 Northwest Fwy") can stay at the town center: a whole stretch of freeway is too vague to place them on.
 
 ### 5:48 PM CT: Sharper radar, 7-day forecast card, roomier filter panel (2f38b18)
 - **Rain radar is much sharper.** Around Houston it now uses the Houston NEXRAD radar's own high-resolution scan (about 250 m detail, versus the 1 km national mosaic before), and the nearest Texas radar elsewhere. It falls back to a 500 m national composite, then the old mosaic, if a radar is down. You can zoom in further before it gets blurry.
@@ -182,7 +182,6 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 ### 12:18 AM CT: Nightly refresh and AI model settings (af5e2fd, 091a477, 96110e4, d698f65)
 - Data refreshes nightly; "this week" covers the last 7 days of runs; 13 months of change history kept.
 - Default OpenAI model and reasoning effort settings; optional cheaper model for bulk tagging.
-
 ## 2026-10-01
 
 ### 11:56 PM CT: Census fix (9a01af1)
