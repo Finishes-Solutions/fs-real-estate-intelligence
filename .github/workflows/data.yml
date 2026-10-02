@@ -56,8 +56,11 @@ jobs:
           git add data/
           if git diff --cached --quiet; then echo "No data changes"; exit 0; fi
           git commit -m "Refresh data $(date -u +%Y-%m-%d)"
-          for i in 1 2 3 4; do
-            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+          # This commit only touches data/. If someone pushed data/ meanwhile, this run's freshly built files win
+          # (-X theirs = the commit being replayed), so hours of geocoding are never thrown away over a conflict.
+          for i in 1 2 3 4 5; do
+            if git pull --rebase -X theirs --autostash origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
             sleep $((i * 5))
           done
           exit 1
