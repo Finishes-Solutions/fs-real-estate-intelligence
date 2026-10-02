@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   const ctx = body.context || {};
   const instructions = systemPrompt({ coverage: clip(ctx.coverage, 600), filters: clip(ctx.filters, 400), screen: clip(ctx.screen, 2500) }) + VOICE_STYLE;
   // vocabulary hint for the transcriber: local place names, data terms and company names it would otherwise mishear
-  const vocab = clip(['TDLR, TABS, Finishes Solutions, multifamily, build-to-rent, tilt-wall, retail, medical office, industrial', clip(ctx.vocab, 900)].filter(Boolean).join(', '), 1000);
+  const vocab = clip(['Houston area, Texas. Cypress, Katy, Fulshear, Brookshire, Waller, Hempstead, Prairie View, Hockley, Tomball, Magnolia, Conroe, The Woodlands, Spring, Humble, Kingwood, Sugar Land, Richmond, Rosenberg, Pearland, League City, Fort Bend, Harris, Montgomery, CityCentre, Energy Corridor, Daikin Park. TDLR, TABS, Finishes Solutions, multifamily, build-to-rent, tilt-wall, retail, medical office, industrial', clip(ctx.vocab, 700)].filter(Boolean).join(', '), 1000);
   let last = '';
   for (const model of MODELS) {
     const r = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
@@ -24,8 +24,8 @@ export default async function handler(req, res) {
         type: 'realtime', model, instructions, tools: realtimeTools(), tool_choice: 'auto', max_output_tokens: 2000,
         audio: { input: { transcription: { model: process.env.OPENAI_TRANSCRIBE_MODEL || 'gpt-4o-transcribe', language: 'en', prompt: vocab },
           noise_reduction: { type: 'near_field' },
-          // reply as soon as the speaker finishes a thought; talking over the reply interrupts it
-          turn_detection: { type: 'semantic_vad', eagerness: 'high', create_response: true, interrupt_response: true } }, output: { voice: process.env.OPENAI_VOICE || 'marin' } } } })
+          // reply when the speaker finishes a thought (medium waits out mid-sentence pauses); talking over the reply interrupts it
+          turn_detection: { type: 'semantic_vad', eagerness: 'medium', create_response: true, interrupt_response: true } }, output: { voice: process.env.OPENAI_VOICE || 'marin' } } } })
     });
     const d = await r.json().catch(() => ({}));
     if (r.ok && d.value) return res.json({ value: d.value, expires_at: d.expires_at, model });

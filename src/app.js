@@ -135,9 +135,9 @@ function syncLegend(){
   document.querySelectorAll('#heatSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.heat===layers.heat));
 }
 // assistant highlights: pulsing rings + labels on specific filings
-let hlData=[], hlT=0;
+let hlData=[], hlIds=[], hlT=0;
 function highlight(list,label){
-  hlData=list.map(f=>({type:'Feature',properties:{name:f.name.length>34?f.name.slice(0,32)+'…':f.name},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}));
+  hlIds=list.map(f=>f.id); hlData=list.map(f=>({type:'Feature',properties:{name:f.name.length>34?f.name.slice(0,32)+'…':f.name},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}));
   map.getSource('hl')?.setData(fc(hlData));
   if(list.length===1) map.flyTo({center:[list[0].lon,list[0].lat],zoom:Math.max(map.getZoom(),14),duration:reduceMotion?0:1200});
   else fitPoints(list);
@@ -145,7 +145,8 @@ function highlight(list,label){
   const tick=t=>{ const k=((t-t0)/1100)%1; if(!map.getLayer('hl-ring')) return; map.setPaintProperty('hl-glow','circle-radius',12+k*18); map.setPaintProperty('hl-glow','circle-opacity',.32*(1-k)); if(t-t0<9000) hlT=requestAnimationFrame(tick); else { map.setPaintProperty('hl-glow','circle-radius',16); map.setPaintProperty('hl-glow','circle-opacity',.18); } };
   hlT=requestAnimationFrame(tick);
 }
-function clearHighlight(){ hlData=[]; cancelAnimationFrame(hlT); map.getSource('hl')?.setData(fc([])); }
+const highlighted=()=>hlIds.slice();
+function clearHighlight(){ hlData=[]; hlIds=[]; cancelAnimationFrame(hlT); map.getSource('hl')?.setData(fc([])); }
 function fitPoints(list){
   if(!list.length) return;
   // ignore the farthest 2% so one odd geocode doesn't zoom the map out to the whole state
@@ -458,11 +459,13 @@ function localSearch(q){
   const toks=q.toLowerCase().split(/\s+/).filter(Boolean); if(!toks.length) return [];
   return LOCAL.filter(o=>toks.every(t=>o.l.includes(t))).slice(0,4);
 }
-async function geocode(q){
-  if(geoCtl) geoCtl.abort(); geoCtl=new AbortController();
-  const u='https://api.maptiler.com/geocoding/'+encodeURIComponent(q)+'.json?key='+MAPTILER_KEY+'&country=us&limit=6&proximity=-95.9,30.0&autocomplete=true&bbox=-97.6,28.6,-94.2,31.4';
-  try{ const r=await fetch(u,{signal:geoCtl.signal}); if(!r.ok) return []; const d=await r.json();
-    return (d.features||[]).map(f=>({t:(f.place_name||f.text||'').replace(/, United States$/,''),k:(f.place_type&&f.place_type[0]==='address')?'Address':((f.place_type&&f.place_type[0])||'Place').replace(/^\w/,c=>c.toUpperCase()),c:f.center,bbox:f.bbox})); }
+// search box: region-biased autocomplete. The assistant passes {exact:true}: whole-Texas, no autocomplete, own request
+async function geocode(q,o={}){
+  let ctl; if(!o.exact){ if(geoCtl) geoCtl.abort(); ctl=geoCtl=new AbortController(); }
+  const c=map.getCenter(), prox=o.exact?c.lng.toFixed(4)+','+c.lat.toFixed(4):'-95.9,30.0', bbox=o.exact?'-106.7,25.8,-93.5,36.5':'-97.6,28.6,-94.2,31.4';
+  const u='https://api.maptiler.com/geocoding/'+encodeURIComponent(q)+'.json?key='+MAPTILER_KEY+'&country=us&limit=6&proximity='+prox+'&autocomplete='+!o.exact+'&bbox='+bbox;
+  try{ const r=await fetch(u,ctl?{signal:ctl.signal}:{}); if(!r.ok) return []; const d=await r.json();
+    return (d.features||[]).map(f=>({t:(f.place_name||f.text||'').replace(/, United States$/,''),name:f.text||'',type:(f.place_type&&f.place_type[0])||'place',k:(f.place_type&&f.place_type[0]==='address')?'Address':((f.place_type&&f.place_type[0])||'Place').replace(/^\w/,c=>c.toUpperCase()),c:f.center,bbox:f.bbox})); }
   catch(e){ return []; }
 }
 function renderSugs(note){
@@ -656,8 +659,9 @@ const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), mapClickHandlers:[], setRadiusCenter, setMiles, fitGeom, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 let orbitRaf=0;
 function stopOrbit(){ cancelAnimationFrame(orbitRaf); orbitRaf=0; }
-function orbitAt(c,zoom){ stopOrbit(); map.flyTo({center:c,zoom,pitch:62,duration:reduceMotion?0:2200});
-  map.once('moveend',()=>{ if(reduceMotion) return; const step=()=>{ map.setBearing((map.getBearing()+0.1)%360); orbitRaf=requestAnimationFrame(step); }; orbitRaf=requestAnimationFrame(step); }); }
+// close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past
+function orbitAt(c,zoom){ stopOrbit(); const close=zoom>=16.5; map.flyTo({center:c,zoom,pitch:close?65:60,duration:reduceMotion?0:2200,essential:true});
+  map.once('moveend',()=>{ if(reduceMotion) return; const sp=close?.06:.1, step=()=>{ map.setBearing((map.getBearing()+sp)%360); orbitRaf=requestAnimationFrame(step); }; orbitRaf=requestAnimationFrame(step); }); }
 ['mousedown','touchstart','wheel'].forEach(ev=>map.on(ev,()=>orbitRaf&&stopOrbit()));
 // What the user is looking at, in a few compact lines for the AI (chat and voice)
 function nearestPlace(c){ let best=null,bd=1e9; for(const p of DATA.places||[]){ const d=(p[1]-c[0])**2*.75+(p[2]-c[1])**2; if(d<bd){bd=d;best=p;} } return best&&bd<.05?best[0]:null; }
@@ -671,12 +675,13 @@ function screenContext(){
     'Map display: '+(layers.dots?'filing dots on':'filing dots hidden')+', heatmap '+layers.heat+', basemap '+layers.style];
   if(state.sel){ const f=state.sel; lines.push('Open card: filing '+f.id+' "'+f.name+'", '+(f.addr||f.city)+', '+TYPE_LABEL[f.type]+(f.use?', '+f.use:'')+', est. '+fmtM(f.cost)+', registered '+f.reg+', schedule '+f.ts+' to '+f.te+', status '+(f.status||'?')+(f.dev?', developer '+f.dev:'')); }
   else if(ctx.currentBuilding?.()) { const bd=ctx.currentBuilding(); lines.push('Open card: building at '+bd.center[1].toFixed(5)+', '+bd.center[0].toFixed(5)+(bd.title?' ('+bd.title+')':'')+(bd.height?', about '+Math.round(bd.height*3.28)+' ft tall':'')); }
+  if(hlIds.length) lines.push('Highlighted on the map: '+hlIds.slice(0,12).join(', '));
   if(sel.feature) lines.push('Selected area: '+sel.label);
   return lines.join('\n');
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return COUNTIES.join(', ')+', '+[...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,60).map(x=>x[0]).join(', '); }
-Object.assign(ctx,{ mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+Object.assign(ctx,{ mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });

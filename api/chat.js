@@ -3,7 +3,7 @@
 // POST { previous_response_id?, input: [{ role:'user', content }] | [{ type:'function_call_output', call_id, output }], context }
 //   -> { id, text, calls: [{ call_id, name, arguments }] }
 import { respond, pickModel } from '../lib/openai.mjs';
-import { realtimeTools, systemPrompt, TOOLS } from '../lib/agent-tools.mjs';
+import { responseTools, systemPrompt, TOOLS } from '../lib/agent-tools.mjs';
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
 
 let modelP = null;
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   if (!prev && input.some(m => m.type)) return res.status(400).json({ error: 'Tool output without a conversation.' });
   const ctx = body.context || {};
   try {
-    const r = await respond({ key, model: await model(key), tools: realtimeTools(), input, previousResponseId: prev, maxTokens: 8000,
+    const r = await respond({ key, model: await model(key), tools: responseTools(), input, previousResponseId: prev, maxTokens: 8000,
       effort: process.env.OPENAI_CHAT_REASONING_EFFORT || undefined,
       instructions: systemPrompt({ coverage: clip(ctx.coverage, 600), filters: clip(ctx.filters, 400) }) });
     return res.json({ id: r.id, text: r.text, calls: r.calls.filter(c => NAMES.has(c.name)) });
