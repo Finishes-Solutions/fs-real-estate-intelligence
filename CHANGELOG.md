@@ -5,6 +5,37 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 1:19 PM CT: Airports worldwide, air traffic reports and flight reports (3924b91, 3b2ee82, 21d87ab)
+- **Every airport in the world is in the app:** 86,158 airports, including all 3,887 in Texas, and 48,000 runways. Turn on **Airports** in Map Layers: big airports show from far out, small fields and heliports as you zoom in.
+- **Click an airport for its card:**
+  - a photo of the airport;
+  - its codes, type and elevation;
+  - the weather there right now;
+  - every runway (length, width, surface, lighting) with a runway diagram;
+  - the radio frequencies.
+- **Maps of the airport:**
+  - **Show Airport Map** draws the terminals, taxiways, aprons, hangars and runways on the satellite view (from OpenStreetMap).
+  - **FAA Airport Diagram** opens the official diagram for about 900 US airports.
+- **Airlines and statistics:** the airlines that fly there and how many destinations each serves, plus the airport's own statistics: busiest routes, passengers by year and airline market share (from Wikipedia).
+- **Takeoffs and landings per day:** counted from live aircraft positions for airports within about 100 miles of Houston, starting today.
+  - Landings are counted on short final, because receivers often lose planes just before touchdown.
+  - Small planes without transponders are missed, so the figures are below official FAA counts. The card says so.
+- **Property cards show "Airports Nearby".** If a site sits under a runway's approach path, it says which runway and how far out, e.g. "Under the approach path to HOU runway 04, 2.1 nm from the runway end".
+- **Air Traffic Report** for any area (Reports tab, selection bar, or Area reports on a building):
+  - aircraft sightings a day and the busiest and quietest hours;
+  - how much traffic is under 3,000 ft, and the mix of jets, props, helicopters and military;
+  - the trend by month, nearby airports and approach paths;
+  - what's overhead right now.
+
+  The hourly and aircraft-mix history starts filling in today.
+- **Flight Report:** on any plane's card, **Export Flight Report** saves a printable report and a CSV of the track points. The report has:
+  - the aircraft photo, type, operator and FAA registration;
+  - the route and a flight path map;
+  - altitude and speed charts;
+  - today's other flights.
+- **Each card exports a report and CSV**, and the Reports tab keeps them.
+- **Ask the assistant** "tell me about Hobby airport", "what airlines fly out of Sugar Land?", "how much air traffic is over this site?" or "make a flight report for UAL1234".
+
 ### 3:11 AM CT: News about the whole place, smarter place-finding, big places fit on screen (8be5eb5)
 - **News no longer mixes in people who share a town's name.** A property in Waller was turning up stories about Fed Governor Christopher Waller. Towns are now always searched as "Waller, TX", "Waller, Texas" or "Waller County", never the bare word.
 - **The News button searches everything about the place at once**, and each story says what it's about:
