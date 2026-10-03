@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 12:03 AM CT: Flight paths and live planes fixed (2dd18c4)
+- **Low Flight Paths** only ever showed a few squares at IAH and Hobby. A database bug threw away every map square with fewer than 30 sightings. Around Houston it now shows all of them: about 650 squares from the first five hours of recording, filling in over the coming days. Property cards' "Air traffic" numbers were affected too and are now correct.
+- **Live Planes** went blank much of the time because the free aircraft feeds rate-limit or block requests from the hosting servers. There are now four feeds to try in turn. If all are busy, the map keeps showing the last snapshot (up to 2 minutes old) and moves each plane along its heading. Requests are also shared more between viewers, so the feeds are asked less often.
+
 ### 11:38 PM CT: Consumer spending estimates fixed (2c86868)
 - The spending layers and the Market view's spending section were empty after tonight's data run. The Bureau of Labor Statistics file server refuses GitHub's servers, which the nightly build runs on. The build now reads everything from the BLS data API, which does answer.
 - How the estimate is made changed slightly. The API publishes spending by **income fifth (quintile)**, not by dollar range. Each tract's households are placed on a line through the five quintiles' average income and average spending, then adjusted to the South (about 10% below the US average). It's still an estimate, and the map and Sources tab say so.
