@@ -88,3 +88,20 @@ const z = econ.parseZori(zori); assert.deepEqual(Object.keys(z.zips), ['77002', 
 assert.equal(z.zips['07701'].month, '2026-07'); assert.equal(z.zips['07701'].yoy, null); assert.equal(z.latest, '2026-08');
 assert.deepEqual(econ.parseLausAreas('A\tCN4820100000000\tHarris County, TX\t0\tT\nA\tCN4815700000000\tFort Bend County, TX\t0\nB\tMT4810180000000\tAbilene, TX Metropolitan Statistical Area\t0'), { 48201: 'Harris', 48157: 'Fort Bend' });
 console.log('site tests passed');
+
+// Market view: Houston-wide crime from four boxes, and TxDOT traffic for an area
+{ const assert = (await import('node:assert/strict')).default, { mergeReports, CITY_BOXES } = await import('../api/crime.js'), { traffic } = await import('../api/traffic.js');
+  const R = (k) => ({ latest: '2026-06-30', from: '2024-07-01', last12: { v: k, p: 2 * k, o: k, total: 4 * k }, prior12: { v: k, p: k, o: k, total: 3 * k },
+    offenses: [{ code: '13A', name: 'Aggravated assault', n: k, cat: 'v' }, { code: '23F', name: 'Theft from vehicle', n: 2 * k, cat: 'p' }], premises: [{ premise: 'Street', n: k }], months: [{ m: '2026-05', v: 1, p: 2, o: 3 }, { m: '2026-06', v: k, p: k, o: k }] });
+  const d = mergeReports([R(10), R(30), { latest: null }, null]);
+  assert.deepEqual([d.last12.total, d.prior12.total, d.change.total, d.offenses[0].name, d.offenses[0].n, d.months.length, d.months[1].v], [160, 120, 33, 'Theft from vehicle', 80, 2, 40]);
+  assert.equal(mergeReports([null]).latest, null, 'nothing loaded: says so');
+  for (const g of CITY_BOXES) { const [[a, b], , [c, e]] = g.coordinates[0]; const sq = (c - a) * Math.cos(29.8 * Math.PI / 180) * 69.17 * (e - b) * 69; assert.ok(sq < 1500, 'each box under the report limit: ' + Math.round(sq)); }
+  const fx = async u => ({ ok: true, json: async () => String(u).includes('outStatistics') ? { features: [{ attributes: { RTE_PRFX: 'IH', avg: 150000, n: 500, mx: 330394 } }, { attributes: { RTE_PRFX: 'BI', avg: 20000, n: 10, mx: 30000 } }, { attributes: { RTE_PRFX: 'BU', avg: 10000, n: 30, mx: 20000 } }] }
+    : { features: [{ attributes: { RTE_NM: 'IH0010-LG', RTE_PRFX: 'IH', RTE_NBR: '10', AADT_CUR: 330394, SYSTEM: 'On', EXT_DATE: '10-01-2026' }, geometry: { paths: [[[-95.52, 29.78], [-95.51, 29.78], [-95.5, 29.78]]] } },
+      { attributes: { RTE_NM: 'IH0010-KG', RTE_PRFX: 'IH', RTE_NBR: '10', AADT_CUR: 330000, SYSTEM: 'On' }, geometry: { paths: [[[-95.5, 29.7]]] } }, { attributes: { RTE_NM: 'WESTHEIMER RD-KG', RTE_PRFX: 'CS', AADT_CUR: 60000, SYSTEM: 'Off' }, geometry: { paths: [[[-95.4, 29.74]]] } }] } });
+  const t = await traffic([-95.8, 29.5, -95, 30.1], fx);
+  assert.deepEqual(t.roads.map(r => [r.road, r.aadt]), [['I-10', 330394], ['WESTHEIMER RD', 60000]], 'one entry per route, busiest segment');
+  assert.deepEqual([t.roads[0].lon, t.roads[0].lat], [-95.51, 29.78], 'the segment middle, for "show on map"');
+  assert.deepEqual(t.types.map(g => [g.label, g.avg, g.segments]), [['Interstates', 150000, 500], ['Business routes', 12500, 40]], 'business routes merged, weighted by segments'); }
+console.log('market crime + traffic ok');

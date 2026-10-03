@@ -66,6 +66,9 @@
     },
     "api/fema.js": {
       "maxDuration": 90
+    },
+    "api/traffic.js": {
+      "maxDuration": 20
     }
   },
   "crons": [

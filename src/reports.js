@@ -7,7 +7,7 @@ import { REPORTS, FORMATS } from './export.js';
 
 const KEY = 'fs-reports';
 const ICON = { pdf: 'PDF', xlsx: 'XLS', csv: 'CSV', geojson: 'GEO', html: 'WEB', kml: 'KML' };
-const KINDS = { ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k, r.label])), crime: 'Crime Report', field: 'Field Notes', other: 'Other' };
+const KINDS = { ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k, r.label])), crime: 'Crime Report', market: 'Market Report', field: 'Field Notes', other: 'Other' };
 
 export function initReports(ctx) {
   const { esc, fmtN } = ctx, root = document.getElementById('view-reports'); if (!root) return;
@@ -61,7 +61,14 @@ export function initReports(ctx) {
       const note = k === 'compare' ? (areas ? fmtN(areas) + ' area' + (areas === 1 ? '' : 's') + ' in Compare' : 'Add areas to Compare first') : fmtN(n) + ' filing' + (n === 1 ? '' : 's') + (ctx.filterText() ? ' with the current filters' : '');
       return '<div class="rp-card"><b>' + esc(r.label) + '</b><p>' + esc(r.desc) + '</p><em>' + esc(note) + '</em><div class="rp-fmts">' +
         r.formats.map(f => '<button type="button" class="btn" data-new="' + k + '" data-f="' + f + '">' + esc(FORMATS[f].replace(' (GIS)', '')) + '</button>').join('') + '</div></div>';
-    }).join('') + crimeCard();
+    }).join('') + marketCard() + crimeCard();
+  }
+  // Market Report: the Market view (growth, permits, businesses, jobs, spending, sales tax, crime, traffic, rates) for the
+  // area chosen there, as a printable report or the data as CSV
+  function marketCard() {
+    if (!ctx.exportMarket) return '';
+    return '<div class="rp-card"><b>Market Report</b><p>The Market view for the region or one county: population and jobs, housing permits, new businesses, consumer spending, city sales tax, Houston crime, the busiest roads and rates.</p>' +
+      '<em>Uses the area chosen on the Market tab</em><div class="rp-fmts"><button type="button" class="btn" data-market="html">Web / PDF</button><button type="button" class="btn" data-market="csv">CSV</button></div></div>';
   }
   // Crime Report (Houston Police incidents): for the selected area or the map view; opens in the card on the map, and
   // its PDF / CSV exports land in Previously Exported
@@ -95,6 +102,7 @@ export function initReports(ctx) {
         '<div class="rp-list" id="rpList">' + rows() + '</div></div>' +
       '<div class="rp-sec rp-soon"><div class="lt">Coming Soon</div><p>Scheduled reports by email, report templates and sharing past exports with your team.</p></div>';
     root.querySelectorAll('[data-new]').forEach(b => b.onclick = () => ctx.openExport(b.dataset.new, { format: b.dataset.f }));
+    root.querySelectorAll('[data-market]').forEach(b => b.onclick = () => ctx.exportMarket(b.dataset.market));
     root.querySelectorAll('[data-crime]').forEach(b => b.onclick = () => { ctx.setView('map');
       if (b.dataset.crime === 'pick') { ctx.setMode?.('area'); ctx.toast?.('Drag a box on the map, then open Reports → Crime Report → Selected area.'); return; }
       ctx.crimeReportFor(b.dataset.crime); });

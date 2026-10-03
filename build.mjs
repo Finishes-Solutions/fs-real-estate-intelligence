@@ -103,7 +103,7 @@ async function refresh() {
   if (!ONLY.length || process.env.AREA) {
     try {
       const prev = await readJSON(D + 'area.json', {}), prevJobs = await readJSON(C + 'jobs.json');
-      const area = await buildArea(regions, filings, { ...prev, jobs: prevJobs });
+      const area = await buildArea(regions, filings, { ...prev, jobs: prevJobs, places: geo.places });
       if (area.jobs) { await fs.writeFile(C + 'jobs.json', JSON.stringify(area.jobs)); market = mergeJobs(market, area.jobs); area.jobs = { year: area.jobs.year, baseYear: area.jobs.baseYear }; }
       await fs.writeFile(D + 'area.json', JSON.stringify(area));
     } catch (e) { log('area skipped:', e.message); }

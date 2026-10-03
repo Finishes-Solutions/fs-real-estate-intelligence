@@ -1507,3 +1507,24 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 #card .mi-chips{display:flex;gap:6px;flex-wrap:wrap}
 #card .mi-chips .chip{border:1px solid var(--line-2);background:var(--panel);border-radius:999px;padding:5px 12px;font:600 12px var(--font-display);color:var(--text-2);cursor:pointer;min-height:30px}
 #card .mi-chips .chip[aria-checked="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
+/* Market: interactive charts (legend toggles, month range, pinned breakdowns, selected bar) */
+.mk-lb{border:0;background:none;padding:2px 4px;margin:0 -4px;font:inherit;color:inherit;cursor:pointer;border-radius:4px}
+.mk-lb:hover{background:var(--panel-2)}
+.mk-lb[aria-pressed="false"]{opacity:.4;text-decoration:line-through}
+.mk-seg{display:inline-flex;border:1px solid var(--line-2);border-radius:6px;overflow:hidden}
+.mk-seg button{border:0;background:var(--panel);padding:6px 10px;font:600 12px var(--font-display);color:var(--text-2);cursor:pointer}
+.mk-seg button+button{border-left:1px solid var(--line-2)}
+.mk-seg button[aria-pressed="true"]{background:var(--text);color:var(--panel)}
+.mk-hint{font-size:11px;color:var(--muted);margin-top:2px}
+.mk-pin{position:relative;margin-top:8px;padding:10px 30px 10px 12px;border:1px solid var(--line-2);border-left:3px solid var(--brand);border-radius:6px;background:var(--panel-2);font-size:12.5px;line-height:1.5}
+.mk-pin .mk-x{position:absolute;right:8px;top:6px;font-size:16px;color:var(--muted)}
+.mk-pl{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.mk-pl span{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 9px;font-size:11.5px}
+.mk-pl em{font-style:normal;color:var(--muted)}
+.mk-h4{font:700 12.5px/1.3 var(--font-display);margin:14px 0 6px;color:var(--text)}
+.mk-hit{cursor:pointer;outline:none}
+.mk-hit:focus-visible rect,.mk-hit:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.mk-hit.on path,.mk-hit.on rect:not([fill="transparent"]){filter:brightness(1.18) saturate(1.2);stroke:var(--text);stroke-width:1.2}
+.mk-hb.mk-hit.on span{color:var(--text);font-weight:700}
+.mk-hb.mk-hit:hover i b,.mk-hb.mk-hit.on i b{filter:brightness(1.15)}
+.vctl .btn{min-height:32px}
