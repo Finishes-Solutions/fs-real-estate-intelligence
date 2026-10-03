@@ -28,13 +28,6 @@ export function initSources(ctx) {
   }
   const liveSt = (isOn, onText = 'On · live') => isOn ? st('live', onText) : st('off', 'Off');
 
-  // FlightAware spend this month (free to ask: read from the app's own database)
-  let fa = null, faAt = 0;
-  async function checkFa() {
-    if (Date.now() - faAt < 60e3) return; faAt = Date.now();
-    try { const r = await fetch('api/planes?aeroapi=budget'); if (r.ok) fa = await r.json(); } catch (e) {}
-    if (ctx.view === 'sources') render();
-  }
   async function checkNewer() {
     if (checking || !built) return; checking = true;
     try { const r = await fetch('data/changes.json', { cache: 'no-cache' }); if (r.ok) { const d = await r.json(), t = d.runs?.[0]?.built; newer = t && new Date(t) > new Date(built) ? t : null; } } catch (e) {}
@@ -101,9 +94,8 @@ export function initSources(ctx) {
           detail: 'A snapshot of aircraft below 3,000 ft over the region every minute, kept in the database for 400 days. Counts are an exposure index (how much low traffic), not a count of distinct flights.' },
         { name: link('FAA aircraft registry', 'https://registry.faa.gov/aircraftinquiry/'), what: 'Who a plane is registered to: plane card and the assistant', status: st('live', 'Nightly'),
           detail: 'The FAA’s Releasable Aircraft Database (every US N-number), loaded into the database each night. US aircraft only; the registered owner is often an LLC, trust or lessor rather than the operator.' },
-        { name: link('FlightAware AeroAPI', 'https://www.flightaware.com/commercial/aeroapi/'), what: 'Route, times and recent flights on plane cards when the free route database has none; assistant flight_details',
-          status: !fa ? st('off', 'Checking…') : !fa.configured ? st('off', 'Not connected') : fa.error ? st('stale', 'Cap not set up') : fa.spent != null && fa.spent >= fa.cap - 0.01 ? st('err', 'Budget used up') : st('live', 'On demand'),
-          detail: 'Paid per lookup. Hard cap of $' + (fa?.cap ?? 4.75).toFixed(2) + ' a month, under the $5 free monthly credit' + (fa?.spent != null ? ' · $' + fa.spent.toFixed(2) + ' used this month' + (fa.calls ? ' (' + fmtN(fa.calls) + ' lookups)' : '') : '') + '. Each plane is looked up at most once per visit and answers are shared for 10–20 minutes.' },
+        { name: link('adsb.lol traces', 'https://adsb.lol/') + ' · ' + link('planespotters.net', 'https://www.planespotters.net/') + ' · ' + link('adsbdb', 'https://www.adsbdb.com/'), what: 'Plane card: this flight\'s path (2D, and 3D when the map is tilted), photo, maker, operator, year built',
+          status: st('live', 'On demand'), detail: 'Looked up when a plane card opens. Flight paths are adsb.lol\'s community traces (ODbL), refreshed every 20 s; photos are credited to their photographers and link back to planespotters.net.' },
         { name: link('Open-Meteo', 'https://open-meteo.com/'), what: 'Wind arrows, weather at a spot', status: liveSt(live.on.wind),
           detail: 'Hourly model data, re-read when the map moves and every 15 min' + (live.on.wind && live.windTime ? ' · showing ' + fmtTime(live.windTime + ':00') : '') + '.' },
         { name: link('Mapterhorn', 'https://mapterhorn.com/'), what: '3D terrain and hillshade', status: live.on.terrain ? (live.terrainMesh ? st('live', 'On') : st('stale', 'On · zoom in')) : st('off', 'Off'),
@@ -161,7 +153,7 @@ export function initSources(ctx) {
     root.querySelector('#srcShow')?.addEventListener('change', e => ctx.showSources?.(e.target.checked));
   }
 
-  ctx.onView('sources', () => { render(); checkNewer(); checkFa(); });
+  ctx.onView('sources', () => { render(); checkNewer(); });
   ctx.onViewChange(v => { clearInterval(timer); if (v === 'sources') timer = setInterval(render, 30e3); });
   addEventListener('online', render); addEventListener('offline', render);
 }
