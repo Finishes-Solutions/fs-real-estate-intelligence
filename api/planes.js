@@ -8,6 +8,7 @@ import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { supa } from '../lib/supa.mjs';
 import { pointQuery, fetchPoint, boxAround, summarize, SAMPLES_PER_DAY, perDay } from '../lib/planes.mjs';
 
+const LAST = new Map(); // area -> last good aircraft snapshot in this warm instance
 const num = v => (v === '' || v == null ? NaN : Number(v));
 const box = s => { const b = String(s || '').split(',').map(num); return b.length === 4 && b.every(Number.isFinite) && b[0] < b[2] && b[1] < b[3] && Math.abs(b[1]) <= 90 && Math.abs(b[3]) <= 90 ? b : null; };
 const db = (env = process.env) => supa({ ...env, SUPABASE_URL: env.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' });
@@ -65,8 +66,18 @@ export default async function handler(req, res) {
       res.setHeader('Cache-Control', out.history ? 'public, max-age=600, s-maxage=3600' : 'no-store'); return res.json(out);
     }
     const b = box(q.bbox); if (!b) return res.status(400).json({ error: 'bbox=w,s,e,n' });
-    const p = pointQuery(b), out = await fetchPoint(p.lat, p.lon, p.nm);
-    res.setHeader('Cache-Control', 'public, max-age=5, s-maxage=8, stale-while-revalidate=10');
+    const p = pointQuery(b), key = p.lat + ',' + p.lon + ',' + p.nm;
+    let out;
+    try { out = await fetchPoint(p.lat, p.lon, p.nm); LAST.set(key, { t: Date.now(), out }); if (LAST.size > 200) LAST.delete(LAST.keys().next().value); }
+    catch (e) {
+      // every feed busy or refusing: the last snapshot this instance got for the same area, up to 2 minutes old (the map
+      // moves each plane along its track from there), rather than an empty sky
+      const last = LAST.get(key); if (!last || Date.now() - last.t > 120e3) throw e;
+      console.warn('planes: feeds failed (' + e.message + '), serving a ' + Math.round((Date.now() - last.t) / 1000) + ' s old snapshot');
+      res.setHeader('Cache-Control', 'public, max-age=5, s-maxage=5');
+      return res.json({ ...last.out, stale: true, center: [p.lon, p.lat], nm: p.nm });
+    }
+    res.setHeader('Cache-Control', 'public, max-age=5, s-maxage=8, stale-while-revalidate=30');
     return res.json({ ...out, center: [p.lon, p.lat], nm: p.nm });
   } catch (e) {
     console.error('planes', e.message);
