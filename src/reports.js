@@ -11,6 +11,7 @@ const KINDS = { ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k
 
 export function initReports(ctx) {
   const { esc, fmtN } = ctx, root = document.getElementById('view-reports'); if (!root) return;
+  const kindOf = k => KINDS[k] || (ctx.areaReports || []).find(x => x.key === k)?.label;
   let list = []; try { list = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {} };
   let q = '', kind = '';
@@ -61,7 +62,7 @@ export function initReports(ctx) {
       const note = k === 'compare' ? (areas ? fmtN(areas) + ' area' + (areas === 1 ? '' : 's') + ' in Compare' : 'Add areas to Compare first') : fmtN(n) + ' filing' + (n === 1 ? '' : 's') + (ctx.filterText() ? ' with the current filters' : '');
       return '<div class="rp-card"><b>' + esc(r.label) + '</b><p>' + esc(r.desc) + '</p><em>' + esc(note) + '</em><div class="rp-fmts">' +
         r.formats.map(f => '<button type="button" class="btn" data-new="' + k + '" data-f="' + f + '">' + esc(FORMATS[f].replace(' (GIS)', '')) + '</button>').join('') + '</div></div>';
-    }).join('') + marketCard() + crimeCard();
+    }).join('') + marketCard() + crimeCard() + areaCards();
   }
   // Market Report: the Market view (growth, permits, businesses, jobs, spending, sales tax, crime, traffic, rates) for the
   // area chosen there, as a printable report or the data as CSV
@@ -80,12 +81,18 @@ export function initReports(ctx) {
       (sel ? '<button type="button" class="btn" data-crime="selection">Selected area</button>' : '') +
       '<button type="button" class="btn" data-crime="view">Map view</button><button type="button" class="btn" data-crime="pick">Draw an area</button></div></div>';
   }
+  // the other area reports (drive time, traffic, air traffic…): same three ways to pick the area as the crime report
+  function areaCards() {
+    const sel = ctx.sel?.feature ? ctx.sel.label || 'the selected area' : null;
+    return (ctx.areaReports || []).filter(r => r.desc).map(r => '<div class="rp-card"><b>' + esc(r.label) + '</b><p>' + esc(r.desc) + '</p><em>' + esc(sel ? 'Selected: ' + sel : r.note || 'Select an area with Area, Shape, Radius or County, or use the map view') + '</em><div class="rp-fmts">' +
+      (sel ? '<button type="button" class="btn" data-ar="' + r.key + '" data-w="selection">Selected area</button>' : '') + '<button type="button" class="btn" data-ar="' + r.key + '" data-w="view">Map view</button><button type="button" class="btn" data-ar="' + r.key + '" data-w="pick">Draw an area</button></div></div>').join('');
+  }
   function rows() {
-    const t = q.toLowerCase(), shown = list.filter(r => (!kind || r.report === kind) && (!t || [r.file, KINDS[r.report], r.scope, r.filters].join(' ').toLowerCase().includes(t)));
+    const t = q.toLowerCase(), shown = list.filter(r => (!kind || r.report === kind) && (!t || [r.file, kindOf(r.report), r.scope, r.filters].join(' ').toLowerCase().includes(t)));
     if (!list.length) return '<div class="empty">No exports yet. Reports you export (from here, the Export button or the assistant) show up here so you can download them again or re-run them with today’s data.</div>';
     if (!shown.length) return '<div class="empty">No past exports match.</div>';
     return shown.map(r => '<div class="rp-row" data-id="' + r.id + '"><span class="rp-ic rp-' + esc(r.format) + '">' + esc(ICON[r.format] || r.format.toUpperCase().slice(0, 4)) + '</span>' +
-      '<div class="rp-m"><b>' + esc(KINDS[r.report] || 'Export') + (r.scope ? ' · ' + esc(r.scope) : '') + '</b><span>' + esc(when(r.at)) + ' · ' + esc(FORMATS[r.format] || r.format.toUpperCase()) + ' · ' + fmtBytes(r.size) +
+      '<div class="rp-m"><b>' + esc(kindOf(r.report) || 'Export') + (r.scope ? ' · ' + esc(r.scope) : '') + '</b><span>' + esc(when(r.at)) + ' · ' + esc(FORMATS[r.format] || r.format.toUpperCase()) + ' · ' + fmtBytes(r.size) +
         (r.filings != null ? ' · ' + fmtN(r.filings) + ' ' + esc(r.unit) : '') + '</span>' + (r.filters ? '<em>' + esc(r.filters) + '</em>' : '') + '<i>' + esc(r.file) + (r.stored ? '' : ' · file no longer stored, re-run to regenerate') + '</i></div>' +
       '<div class="rp-act">' + (r.stored ? '<button type="button" class="btn" data-a="dl">Download</button>' : '') + (REPORTS[r.report] || r.report === 'field' ? '<button type="button" class="btn" data-a="re" title="Same report and filters, with today’s data">Re-run</button>' : '') +
         (r.hash ? '<button type="button" class="btn" data-a="map">Open on Map</button>' : '') + '<button type="button" class="lnk" data-a="rm" aria-label="Delete this export">Delete</button></div></div>').join('');
@@ -97,7 +104,7 @@ export function initReports(ctx) {
       '<div class="rp-sec"><div class="lt">New Report</div><div class="rp-grid">' + newCards() + '</div></div>' +
       '<div class="rp-sec"><div class="rp-sh"><div class="lt">Previously Exported' + (list.length ? ' · ' + fmtN(list.length) : '') + '</div>' +
         (list.length ? '<div class="vctl"><label class="search sm"><input type="search" id="rpQ" placeholder="Search past exports" value="' + esc(q) + '" aria-label="Search past exports"></label>' +
-          '<select class="chip" id="rpKind" aria-label="Report type"><option value="">All types</option>' + Object.entries(KINDS).filter(([k]) => list.some(r => r.report === k)).map(([k, l]) => '<option value="' + k + '"' + (kind === k ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>' +
+          '<select class="chip" id="rpKind" aria-label="Report type"><option value="">All types</option>' + Object.entries({ ...KINDS, ...Object.fromEntries((ctx.areaReports || []).map(x => [x.key, x.label])) }).filter(([k]) => list.some(r => r.report === k)).map(([k, l]) => '<option value="' + k + '"' + (kind === k ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>' +
           '<span>' + fmtBytes(bytes) + ' stored</span><button type="button" class="lnk" id="rpClear">Clear All</button></div>' : '') + '</div>' +
         '<div class="rp-list" id="rpList">' + rows() + '</div></div>' +
       '<div class="rp-sec rp-soon"><div class="lt">Coming Soon</div><p>Scheduled reports by email, report templates and sharing past exports with your team.</p></div>';
@@ -106,6 +113,9 @@ export function initReports(ctx) {
     root.querySelectorAll('[data-crime]').forEach(b => b.onclick = () => { ctx.setView('map');
       if (b.dataset.crime === 'pick') { ctx.setMode?.('area'); ctx.toast?.('Drag a box on the map, then open Reports → Crime Report → Selected area.'); return; }
       ctx.crimeReportFor(b.dataset.crime); });
+    root.querySelectorAll('[data-ar]').forEach(b => b.onclick = () => { ctx.setView('map');
+      if (b.dataset.w === 'pick') { ctx.setMode?.('area'); ctx.toast?.('Drag a box on the map, then use the ' + (ctx.areaReports.find(x => x.key === b.dataset.ar)?.label || 'report') + ' button on the selection bar.'); return; }
+      ctx.runAreaReport(b.dataset.ar, b.dataset.w); });
     const qi = root.querySelector('#rpQ'); if (qi) qi.oninput = () => { q = qi.value; root.querySelector('#rpList').innerHTML = rows(); wire(); };
     const ks = root.querySelector('#rpKind'); if (ks) ks.onchange = () => { kind = ks.value; root.querySelector('#rpList').innerHTML = rows(); wire(); };
     root.querySelector('#rpClear')?.addEventListener('click', clearAll);

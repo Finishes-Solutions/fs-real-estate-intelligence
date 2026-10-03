@@ -34,6 +34,9 @@
     "api/drive.js": {
       "maxDuration": 20
     },
+    "api/isochrone.js": {
+      "maxDuration": 40
+    },
     "api/tile.js": {
       "maxDuration": 10
     },

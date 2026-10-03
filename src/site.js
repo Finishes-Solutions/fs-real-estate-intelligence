@@ -53,14 +53,15 @@ export function initSite(ctx) {
       row('Environmental', env1 && env1 + envList, 'EPA ECHO') + row('Alcohol sales here', bars && bars + '<br><span class="sc">Mixed beverage gross receipts, last 12 months</span>', 'Texas Comptroller') +
       econRows(area, parcel) + '</dl>' +
       // area reports for a circle around the site: pick a radius, then Crime Report or FEMA Report
-      (ctx.crimeReport || ctx.femaReport ? '<div class="site-rep"><div class="fl">Area reports</div><div class="mi-chips" role="radiogroup" aria-label="Report radius">' +
+      (ctx.crimeReport || ctx.femaReport || ctx.areaReports?.length ? '<div class="site-rep"><div class="fl">Area reports</div><div class="mi-chips" role="radiogroup" aria-label="Report radius">' +
         [1, 3, 5, 10].map(mi => '<button type="button" class="chip" role="radio" data-mi="' + mi + '" aria-checked="' + (mi === repMi) + '">' + mi + ' mi</button>').join('') + '</div><div class="bacts">' +
-        (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep">Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep">FEMA Report</button>' : '') + '</div>' +
+        (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep">Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep">FEMA Report</button>' : '') + (ctx.areaReports || []).filter(r => !r.noSite).map(r => '<button class="btn" type="button" data-ar="' + r.key + '">' + esc(r.label) + '</button>').join('') + '</div>' +
         '<div class="rnote">Crime: City of Houston only (Houston Police). FEMA: flood zones, flood insurance claims, disasters and hazard risk.</div></div>' : '');
     const where = () => parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4), lab = () => repMi + ' mi around ' + where();
     el.querySelectorAll('.mi-chips [data-mi]').forEach(b => b.onclick = () => { repMi = +b.dataset.mi; el.querySelectorAll('.mi-chips [data-mi]').forEach(x => x.setAttribute('aria-checked', x === b)); });
     el.querySelector('#siteCrimeRep')?.addEventListener('click', () => ctx.crimeReport({ geometry: circle(center, repMi), label: lab(), center }));
     el.querySelector('#siteFemaRep')?.addEventListener('click', () => ctx.femaReport({ geometry: circle(center, repMi), label: lab() }));
+    el.querySelectorAll('[data-ar]').forEach(b => b.onclick = () => ctx.runAreaReport(b.dataset.ar, { geometry: circle(center, repMi), label: lab(), center }));
   };
 
   // sources on cards: off by default (everyone sees the same clean view); a setting in the Data Sources view turns them on
