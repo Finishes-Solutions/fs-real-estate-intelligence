@@ -83,7 +83,12 @@ export function initBuildings(ctx) {
   ctx.mapClickHandlers.push(e => {
     const adding = addMode || e.originalEvent?.shiftKey, c = [e.lngLat.lng, e.lngLat.lat];
     const hit = on && map.getLayer('fs-bldg') ? map.queryRenderedFeatures(e.point, { layers: ['fs-bldg'] })[0] : null;
-    if (!hit) { if (adding && map.getZoom() >= 15) { add({ footprint: null, height: null, base: 0, center: c }); return true; } return false; }
+    if (!hit) {
+      if (adding && map.getZoom() >= 15) { add({ footprint: null, height: null, base: 0, center: c }); return true; }
+      // property-first: a click on open ground at street zoom opens that parcel (a click with a card open just closes it)
+      if (!adding && map.getZoom() >= 16 && !card.classList.contains('open')) { open({ footprint: null, height: null, base: 0, center: c }); return true; }
+      return false;
+    }
     const b = { footprint: partAt(hit.geometry, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
     if (adding) add(b); else open(b);
     return true;

@@ -25,6 +25,7 @@ import { initArea } from './area.js';
 import { initRegrid } from './regrid.js';
 import { initSite } from './site.js';
 import { initCrime } from './crime.js';
+import { initGlance } from './glance.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
@@ -77,9 +78,10 @@ const ESRI_STYLE={version:8,glyphs:OFM+'/fonts/{fontstack}/{range}.pbf',
     {id:'esri-road-lbl',type:'symbol',source:'openmaptiles','source-layer':'transportation_name',minzoom:12,layout:{'symbol-placement':'line','text-field':['get','name'],'text-font':['Noto Sans Regular'],'text-size':11},paint:{'text-color':'#ffffff','text-halo-color':'#0b0d0c','text-halo-width':1.4}},
     {id:'esri-place-lbl',type:'symbol',source:'openmaptiles','source-layer':'place',filter:['in',['get','class'],['literal',['city','town','village','suburb','neighbourhood']]],layout:{'text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',14,'town',12.5,11]},paint:{'text-color':'#ffffff','text-halo-color':'#0b0d0c','text-halo-width':1.6}}]};
 const isSat=()=>layers.style==='sat'||layers.style==='esri';
-const layers={style:'dots',roads:true,names:true,counties:true,size:'uniform',heat:'off',dots:true};
-try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(['off','count','value'].includes(L.heat)) layers.heat=L.heat; if(L.dots===false) layers.dots=false; }catch(e){}
-const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({size:layers.size,heat:layers.heat,dots:layers.dots})); }catch(e){} };
+// property-first: filing dots start hidden (Layers → Filings, the Construction Filings section or the assistant turn them on)
+const layers={style:'dots',roads:true,names:true,counties:true,size:'uniform',heat:'off',dots:false};
+try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(['off','count','value'].includes(L.heat)) layers.heat=L.heat; if(L.v===2&&typeof L.dots==='boolean') layers.dots=L.dots; }catch(e){} // v2: older saves had dots on for everyone
+const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots})); }catch(e){} };
 const styleUrl=s=>s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl('dots'),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
@@ -158,6 +160,7 @@ function styleFilings(){
   syncLegend();
 }
 function syncLegend(){
+  document.documentElement.dataset.filings=layers.dots?'on':'off'; // hides the Filings legend and the phone's filing count while the dots are off
   document.querySelector('.legend')?.classList.toggle('heat',layers.heat!=='off');
   const lg=document.getElementById('legendT'); if(lg) lg.textContent=layers.heat!=='off'?(layers.heat==='value'?'Heatmap = est. value':'Heatmap = number of filings'):layers.size==='value'?'Dot size = est. value':'Filings';
   document.querySelectorAll('#sizeSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.size===layers.size));
@@ -277,10 +280,11 @@ uMin.onchange=()=>{ state.umin=+uMin.value; applyFilters(); };
 let coT; coQ.addEventListener('input',()=>{ clearTimeout(coT); coT=setTimeout(()=>{ state.co=coQ.value; applyFilters(); },250); });
 exactBtn.onclick=()=>{ state.exact=state.exact?0:1; applyFilters(); };
 // collapsible Filters and List sections (remembered in this browser)
-for(const [btnId,bodyId,key] of [['secFilters','filtersBody','fs-sec-filters'],['secList','list','fs-sec-list']]){
-  const b=document.getElementById(btnId), body=document.getElementById(bodyId), set=open=>{ b.setAttribute('aria-expanded',open); body.classList.toggle('collapsed',!open); if(bodyId==='list') document.querySelector('.panel')?.classList.toggle('list-collapsed',!open); };
-  let open=true; try{ open=localStorage.getItem(key)!=='0'; }catch(e){} set(open);
-  b.onclick=()=>{ const o=b.getAttribute('aria-expanded')!=='true'; set(o); try{ localStorage.setItem(key,o?'1':'0'); }catch(e){} };
+// Construction Filings starts collapsed; opening it also puts the filing dots on the map
+for(const [btnId,bodyId,key,dflt] of [['secFilings','filingsBody','fs-sec-filings','0'],['secFilters','filtersBody','fs-sec-filters'],['secList','list','fs-sec-list']]){
+  const b=document.getElementById(btnId), body=document.getElementById(bodyId), set=open=>{ b.setAttribute('aria-expanded',open); body.classList.toggle('collapsed',!open); if(bodyId!=='filtersBody') document.querySelector('.panel')?.classList.toggle('list-collapsed',!open||document.getElementById('secFilings').getAttribute('aria-expanded')!=='true'||document.getElementById('secList').getAttribute('aria-expanded')!=='true'); };
+  let open=true; try{ open=(localStorage.getItem(key)??dflt)!=='0'; }catch(e){} set(open);
+  b.onclick=()=>{ const o=b.getAttribute('aria-expanded')!=='true'; set(o); if(o&&bodyId==='filingsBody') showFilings(); try{ localStorage.setItem(key,o?'1':'0'); }catch(e){} };
 }
 // use, dates, updates, active-filter summary
 const dField=document.getElementById('dField'), dFrom=document.getElementById('dFrom'), dTo=document.getElementById('dTo');
@@ -348,6 +352,7 @@ function renderList(){
 // ---------- detail card ----------
 const card=document.getElementById('card'), panel=document.getElementById('panel');
 function select(f,fly){
+  showFilings();
   cardCloseHooks.forEach(fn=>fn());
   state.sel=f; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach((b,i)=>b.classList.toggle('on',visible[i]===f));
   card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2></div>'+
@@ -574,6 +579,7 @@ document.querySelectorAll('#sizeSeg button').forEach(b=>b.onclick=()=>{ layers.s
 document.querySelectorAll('#heatSeg button').forEach(b=>b.onclick=()=>{ layers.heat=b.dataset.heat; saveLayers(); styleFilings(); });
 document.getElementById('lyFilings').onchange=e=>{ layers.dots=e.target.checked; saveLayers(); styleFilings(); };
 syncLegend();
+function showFilings(){ if(layers.dots) return; layers.dots=true; saveLayers(); if(map.getLayer('filings')) styleFilings(); }
 function setMapOptions(a){ const done=[];
   if(a.heatmap){ layers.heat=a.heatmap; done.push(a.heatmap==='off'?'heatmap off':'heatmap by '+(a.heatmap==='value'?'value':'count')); }
   if(typeof a.size_by_value==='boolean'){ layers.size=a.size_by_value?'value':'uniform'; done.push(a.size_by_value?'dots sized by value':'uniform dots'); }
@@ -797,14 +803,14 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return COUNTIES.join(', ')+', '+[...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,60).map(x=>x[0]).join(', '); }
-Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap, buildReport,
   exportCsv, exportXlsx, exportGeoJSON, exportHtml, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initSources]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initSources,initGlance]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,
@@ -823,10 +829,10 @@ for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMa
 
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
-  document.getElementById('kicker').textContent='TDLR TABS · '+m(s)+' – '+m(e);
+  document.getElementById('filingsPeriod').textContent='TDLR · '+m(s)+' – '+m(e);
   document.getElementById('periodTxt').textContent=PERIOD; const miss=DATA.unmapped||0; document.getElementById('missTxt').textContent=miss>0?fmtN(miss)+' filing'+(miss>1?'s':'')+' with no mappable address '+(miss>1?'are':'is')+' left off the map. ':''; }
 { const h=location.hash.slice(1), p=new URLSearchParams(h);
-  if(h&&[...p.keys()].some(k=>k!=='v'&&k!=='f')){ fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
+  if(h&&[...p.keys()].some(k=>k!=='v'&&k!=='f')){ showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
   booting=false;
   if(p.get('v')) setView(p.get('v'));
   const f=p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));

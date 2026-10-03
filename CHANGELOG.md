@@ -5,6 +5,33 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 12:36 AM CT: Crime map layer, crime reports and AI crime answers (c08bf63)
+- **Crime (Houston)** in Map Layers: a heat map of the last 12 months of Houston Police incidents, turning into about ¼-mile squares when you zoom in. Choose all incidents, violent or property. Hover a square for its counts; click it for its report.
+- **Crime reports for any area**: select an area (Area, Shape, Radius or County at the top of the map) and press **Crime Report** in the strip that appears under Area at a Glance, or use **Full crime report (½ mile)** on a building card. The report shows:
+  - incidents, violent, property and other, each with the change vs the year before;
+  - incidents per square mile compared with the Houston citywide rate;
+  - a 24-month chart, the top offenses and where they happened (street, parking lot, apartment…);
+  - the most recent incidents, with **Show Incidents on Map**.
+- **Export Report** saves a printable report (open it and choose Print → Save as PDF) with a dot map, the chart, tables and every incident listed; **Export CSV** saves the incidents (newest 2,000) for Excel.
+- **Ask AI about crime**: "how much crime is near this building", "car break-ins around 2700 Milam in the last year", "crime report for my selection". It answers with the numbers and recent incidents and can open the report or turn on the layer.
+- City of Houston only, and Houston Police publish about three months behind, so "last 12 months" currently ends in June 2026.
+
+### 12:30 AM CT: The map now leads with properties, not filings (4a6874b, afa6fc3)
+- **Filing dots are hidden when the map first opens.** This applies once to everyone, after which your own choice sticks. To bring them back:
+  - open **Construction Filings** in the left panel;
+  - use **Layers → Filings**;
+  - or ask the assistant to filter or highlight filings.
+- **New "Area at a Glance" panel** on the left, for whatever part of the map you're looking at:
+  - population and growth since 2020;
+  - median household income, home value and rent;
+  - households, vacancy and jobs.
+  - It uses the census tract data already in the app and updates as you move the map.
+- **Filings, their headline numbers, filters and list now sit in a "Construction Filings" section** that starts collapsed. Everything inside it works as before.
+- **Clicking open ground at street zoom opens that parcel's card** (owner, value, and so on). Clicking with a card already open just closes it.
+- **The assistant's suggested questions lead with property and area questions** (who owns it, what the area is like, what businesses are nearby), with filing questions after.
+- On phones, the **"List" tab is now "Explore"**, and the filing count pill is hidden while the filing dots are off.
+- Regrid parcel lines stay off by default. They're billed per tile and capped each month, so turning them on for everyone would use up the allowance.
+
 ### 12:22 AM CT: Follow or orbit any plane from the chat, with its type and route (4b84a22)
 - **"Check planes near …"** now lists each nearby plane with its **aircraft type** (e.g. "Boeing 737-800") and **where it's flying from and to** (e.g. IAH → ORD). It also gets each plane's position, so the assistant can act on it.
 - **Asking for a town searches 10 miles around it** instead of 3, so "planes near Spring" finds more than the sky directly overhead.

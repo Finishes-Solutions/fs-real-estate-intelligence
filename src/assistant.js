@@ -13,7 +13,7 @@ const SEND = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke
 // new chat: a speech bubble with a plus
 const NEWCHAT = '<svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 8.6c0 3.4-3 6-6.5 6-.9 0-1.8-.2-2.6-.5L3 15l.9-3A5.8 5.8 0 0 1 2.5 8.6c0-3.4 2.9-6 6.5-6s6.5 2.6 6.5 6z"/><path d="M9 5.9v5.4M6.3 8.6h5.4"/></svg>';
 const X = '<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
-const SUGGEST = ['Show medical projects over $5M filed in the last year', 'Who are the most active developers right now?', 'What’s under construction within 5 miles of Katy?', 'Show a heatmap of new construction by value', 'Take me to downtown Houston and orbit around it', 'Find the biggest multifamily projects and highlight the top 5', 'How far is this property from me, and what’s the drive time?', 'Turn on radar, wind and live traffic'];
+const SUGGEST = ['Who owns 2200 Texas Ave, Houston?', 'What are incomes and home values like around Katy?', 'Take me to downtown Houston and orbit around it', 'What businesses are near 1004 Priya Ln, Waller?', 'What’s under construction within 5 miles of Katy?', 'Who are the most active developers right now?', 'How far is this property from me, and what’s the drive time?', 'Turn on radar, wind and live traffic'];
 
 const MOD = /Mac|iPhone|iPad|iPod/.test(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl+';
 
@@ -136,7 +136,7 @@ export function initAssistant(ctx) {
 
   // ---------- rendering ----------
   function renderEmpty() {
-    log.innerHTML = '<div class="ai-empty"><b>Ask about construction anywhere on the map.</b><span>I can filter the map, find and highlight projects, compare areas and developers, and switch views. Or press the mic and just talk.</span>' +
+    log.innerHTML = '<div class="ai-empty"><b>Ask about any property or place on the map.</b><span>I can look up owners, values, zoning and site risks, describe the people and businesses around a place, track construction filings, and move the map. Or press the mic and just talk.</span>' +
       '<div class="ai-sugs"></div></div>';
     // what's on screen first (the same questions the Ask AI button offers on hover), then general examples
     let here = []; try { here = screenSugs(); } catch { /* map not ready yet */ }
@@ -380,7 +380,7 @@ export function initAssistant(ctx) {
       }
       if (name === 'filter_map') {
         const before = ctx.snapshot(), { spec, notes } = await specFrom(a);
-        ctx.fromSpec(spec, { fly: true }); if (ctx.view !== 'map' && ctx.view !== 'timeline') ctx.setView('map');
+        ctx.showFilings?.(); ctx.fromSpec(spec, { fly: true }); if (ctx.view !== 'map' && ctx.view !== 'timeline') ctx.setView('map');
         const list = ctx.visible; if (!spec.sel) ctx.fitToVisible(); cardList = list.slice();
         actionChip('Map: ' + (describe(spec, fmtM) || 'all filings') + ' · ' + fmtN(list.length) + ' filings · est. ' + fmtM(list.reduce((s, f) => s + f.cost, 0)), () => ctx.restore(before));
         return { applied: describe(spec) || 'all filings', notes, ...summary(list) };
@@ -394,7 +394,7 @@ export function initAssistant(ctx) {
       if (name === 'highlight_filings') {
         const found = (a.ids || []).map(id => ctx.BY_ID.get(String(id).trim())).filter(Boolean);
         if (!found.length) return { error: 'None of those ids are loaded.' };
-        ctx.highlight(found, a.label || ''); if (ctx.view !== 'map') ctx.setView('map');
+        ctx.showFilings?.(); ctx.highlight(found, a.label || ''); if (ctx.view !== 'map') ctx.setView('map');
         actionChip('Highlighted ' + found.length + ' filing' + (found.length > 1 ? 's' : '') + (a.label ? ': ' + a.label : ''), () => ctx.clearHighlight());
         return { highlighted: found.map(f => ({ id: f.id, name: f.name, value: f.cost })) };
       }

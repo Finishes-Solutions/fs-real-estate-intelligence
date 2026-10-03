@@ -177,8 +177,12 @@ export function initCrime(ctx) {
   }
 
   // selection bar: "Crime Report" for whatever is selected on the map
-  const btn = document.getElementById('selCrime');
-  const sync = () => { if (btn) btn.style.display = ctx.sel?.feature ? '' : 'none'; };
-  if (btn) btn.onclick = () => { const s = ctx.sel; if (s?.feature) report({ geometry: s.feature.geometry || s.feature, label: s.label || 'Selected area' }); };
+  // (the selection bar lives in the Construction Filings section, which starts collapsed, so a strip under Area at a Glance offers it too)
+  const btn = document.getElementById('selCrime'), glance = document.getElementById('glance');
+  let strip = null;
+  if (glance) { strip = document.createElement('div'); strip.className = 'crsel'; strip.hidden = true; strip.innerHTML = '<span><b></b></span><button class="btn" type="button">Crime Report</button>'; glance.after(strip); }
+  const run = () => { const s = ctx.sel; if (s?.feature) report({ geometry: s.feature.geometry || s.feature, label: s.label || 'Selected area' }); };
+  const sync = () => { const has = !!ctx.sel?.feature; if (btn) btn.style.display = has ? '' : 'none'; if (strip) { strip.hidden = !has; if (has) strip.querySelector('b').textContent = ctx.sel.label || 'Selected area'; } };
+  if (btn) btn.onclick = run; if (strip) strip.querySelector('button').onclick = run;
   ctx.onChange(sync); sync();
 }
