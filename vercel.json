@@ -57,6 +57,9 @@
     },
     "api/planes-sample.js": {
       "maxDuration": 30
+    },
+    "api/site.js": {
+      "maxDuration": 25
     }
   },
   "crons": [

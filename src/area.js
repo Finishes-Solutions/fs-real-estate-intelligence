@@ -14,7 +14,9 @@ export function initArea(ctx) {
     fetch('data/area.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null),
     fetch('data/market.json').then(r => r.ok ? r.json() : null).catch(() => null)
   ]).then(([a, m]) => { area = a; market = m; });
-  ctx.areaInfo = () => area ? { built: area.built, jobs: area.jobs, permits: !!area.permits, businesses: !!area.businesses, news: !!area.news, salesTax: area.salesTax ? { cities: Object.keys(area.salesTax.cities || {}).length, since: area.salesTax.since } : null } : null;
+  ctx.areaData = () => load().then(() => area);
+  ctx.areaInfo = () => area ? { built: area.built, jobs: area.jobs, permits: !!area.permits, businesses: !!area.businesses, news: !!area.news, salesTax: area.salesTax ? { cities: Object.keys(area.salesTax.cities || {}).length, since: area.salesTax.since } : null,
+    unemployment: area.unemployment?.state?.period || null, rates: area.rates?.series?.t10?.date || null, rents: area.rents?.latest || null, mortgages: area.mortgages?.year || null } : null;
   // the Market view's numbers for one county (name or FIPS) or the whole region, for the assistant (market_data)
   ctx.marketData = async county => {
     await load(); if (!area) return { error: 'The market data (jobs, permits, new businesses, news) hasn’t been built yet. It fills in after the nightly data refresh.' };
@@ -185,9 +187,9 @@ export function initArea(ctx) {
     p.catch(() => cache.delete(k)); cache.set(k, p); return p;
   };
   ctx.renderTenants = (el, d, err) => {
-    if (err) { el.innerHTML = '<div class="lt">Registered businesses (Texas Comptroller)</div><div class="rnote err">' + esc(err) + '</div>'; return; }
+    if (err) { el.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote err">' + esc(err) + '</div>'; return; }
     const li = t => '<div class="pl"><b>' + esc(t.name) + (t.suite ? ' <span class="sc">Ste ' + esc(t.suite) + '</span>' : '') + '</b><span>' + esc([t.sector, t.owner && 'owner ' + t.owner, t.opened && 'since ' + t.opened].filter(Boolean).join(' · ')) + '</span></div>';
-    el.innerHTML = '<div class="lt">Registered businesses (Texas Comptroller)</div>' + (d.tenants.length ? d.tenants.slice(0, 30).map(li).join('') + (d.tenants.length > 30 ? '<div class="rnote">…and ' + (d.tenants.length - 30) + ' more</div>' : '')
+    el.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div>' + (d.tenants.length ? d.tenants.slice(0, 30).map(li).join('') + (d.tenants.length > 30 ? '<div class="rnote">…and ' + (d.tenants.length - 30) + ' more</div>' : '')
       : '<div class="rnote">' + esc(d.note || 'No active sales-tax permits at this address.') + '</div>') + '<div class="rnote">Active sales-tax permits matched on house number and street' + (d.query ? ' (' + esc(d.query) + ')' : '') + '. Lists retail, restaurant and service tenants; offices and medical often aren’t listed.</div>';
   };
   // filings: the street part of "6615 Garth Rd Baytown, TX 77520", and its ZIP
@@ -200,7 +202,7 @@ export function initArea(ctx) {
     sec.innerHTML = '<div class="lt">Businesses at this address</div><button class="btn" type="button">Look Up Registered Businesses</button><div class="rnote">Texas Comptroller sales-tax permits at ' + esc(a.street) + '.</div>';
     const after = card.querySelector('#liveSec') || card.querySelector('#briefBox'); if (after) after.after(sec); else (card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
     sec.querySelector('button').onclick = async () => {
-      sec.innerHTML = '<div class="lt">Registered businesses (Texas Comptroller)</div><div class="rnote">Looking up…</div>';
+      sec.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote">Looking up…</div>';
       try { const d = await ctx.tenantsAt(a.street, a.zip, a.city); if (sec.isConnected) ctx.renderTenants(sec, d); } catch (e) { if (sec.isConnected) ctx.renderTenants(sec, null, e.message); }
     };
   });

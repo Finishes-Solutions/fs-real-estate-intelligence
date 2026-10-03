@@ -1247,3 +1247,11 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 /* Regrid: a saved parcel record that Regrid has since refreshed */
 .rg-stale{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 2px;padding:8px 10px;border-radius:6px;border:1px solid rgba(183,121,31,.45);background:rgba(183,121,31,.08);font-size:12px;color:var(--text-2)}
 .rg-stale span{flex:1;min-width:180px}
+
+/* data sources: hidden on cards and panels unless "Show sources" is on (Data Sources view); reports always list them */
+:root[data-sources="off"] .src{display:none}
+.src-opt{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:4px 0 14px;font-size:13px;cursor:pointer}
+.src-opt .s{flex-basis:100%;font-size:12px;color:var(--muted);margin-left:24px}
+.card #bSite dd .risk-hi{color:#c03b3a}
+.card #bSite dd .risk-md{color:#b7791f}
+.card #bSite dd .src{font-size:11px;color:var(--muted)}

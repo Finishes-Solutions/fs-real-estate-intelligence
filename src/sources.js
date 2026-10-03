@@ -67,6 +67,16 @@ export function initSources(ctx) {
           detail: 'Modeled, not measured: households by income in each tract × what households at that income spend nationally, adjusted to the South. The BLS publishes once a year (September); picked up by the nightly build.' },
         { name: link('Texas Comptroller sales-tax allocations', 'https://comptroller.texas.gov/transparency/local/allocations/sales-tax/'), what: 'Market view: city sales tax collected per month, a real local spending trend', status: a?.salesTax ? nightlyStatus() : st('off', 'Not built yet'),
           detail: (a?.salesTax ? a.salesTax.cities + ' cities since ' + a.salesTax.since + '. ' : '') + 'The city\'s share of sales tax, paid monthly about two months after the sales. Picked up by the nightly build.' },
+        { name: link('BLS Local Area Unemployment Statistics', 'https://www.bls.gov/lau/'), what: 'Building cards: county unemployment rate and a year earlier; Texas and metro rates', status: a?.unemployment ? nightlyStatus() : st('off', 'Not built yet'),
+          detail: (a?.unemployment ? 'Latest month ' + a.unemployment + '. ' : '') + 'Monthly, about seven weeks after the month ends; the newest month is preliminary.' },
+        { name: link('FRED (St. Louis Fed)', 'https://fred.stlouisfed.org/') + ' · ' + link('New York Fed SOFR', 'https://www.newyorkfed.org/markets/reference-rates/sofr'), what: 'Market view: 10-yr and 5-yr Treasury, SOFR and the 30-yr mortgage rate', status: a?.rates ? nightlyStatus() : st('off', 'Not built yet'),
+          detail: (a?.rates ? 'As of ' + a.rates + '. ' : '') + 'Daily rates (mortgage rate weekly), picked up by the nightly build.' },
+        { name: link('Zillow Observed Rent Index', 'https://www.zillow.com/research/data/'), what: 'Building cards: typical asking rent in the ZIP and its change over a year', status: a?.rents ? nightlyStatus() : st('off', 'Not built yet'),
+          detail: (a?.rents ? 'Through ' + a.rents + '. ' : '') + 'Monthly, all home types (single-family, condo, apartments). Not every ZIP is covered.' },
+        { name: link('CFPB HMDA', 'https://ffiec.cfpb.gov/data-browser/'), what: 'Market view: home loans originated per county', status: a?.mortgages ? nightlyStatus() : st('off', 'Not built yet'),
+          detail: (a?.mortgages ? 'Year ' + a.mortgages + '. ' : '') + 'Published once a year (spring) for the year before.' },
+        { name: link('Houston Police NIBRS incidents', 'https://www.houstontx.gov/police/cs/Monthly_Crime_Data_by_Street_and_Police_Beat.htm'), what: 'Building cards: crime within ½ mile, last 12 months vs the 12 before (Houston)', status: st('fresh', 'Nightly'),
+          detail: 'HPD republishes the yearly file monthly; the nightly sync keeps the last 25 months in the database. Houston city only for now.' },
         { name: link('US Census TIGER (us-atlas)', 'https://github.com/topojson/us-atlas'), what: 'County outlines and town names', status: st('off', 'Static'), detail: 'Boundaries change rarely; updated with the app.' },
       ]],
       ['Map layers (fetched live)', [
@@ -100,6 +110,10 @@ export function initSources(ctx) {
           detail: live.trafficOK === false ? 'No TomTom key on the server, so drive times are free-flow estimates from OpenStreetMap roads.' : 'With traffic from TomTom; OpenStreetMap routing as a fallback.' },
         { name: link('Google News', 'https://news.google.com/') + ' · ' + link('GDELT Project', 'https://www.gdeltproject.org/'), what: 'Project news on a card', status: st('live', 'On demand'), detail: 'Google News (about the last year), GDELT as a fallback; cached up to an hour.' },
         { name: link('Texas Comptroller sales-tax permits', 'https://data.texas.gov/Government-and-Taxes/Active-Sales-Tax-Permit-Holders/jrea-zgmq'), what: 'Registered businesses at a building or filing address', status: st('live', 'On demand'), detail: 'Matched on house number and street; cached up to a day. Retail, restaurant and service tenants; offices and medical often aren’t listed.' },
+        { name: link('FEMA flood maps (NFHL)', 'https://www.fema.gov/flood-maps/national-flood-hazard-layer') + ' · ' + link('TxDOT traffic counts', 'https://www.txdot.gov/data-maps/traffic-count-maps.html'), what: 'Building card Site section: flood zone and vehicles per day on nearby roads', status: st('live', 'On demand'), detail: 'Read live from the agencies’ map services; cached up to a week.' },
+        { name: link('TCEQ water districts', 'https://www.tceq.texas.gov/gis') + ' · City of Houston TIRZ · ' + link('CDFI Fund Opportunity Zones', 'https://www.cdfifund.gov/opportunity-zones') + ' · ' + link('Census school districts', 'https://tigerweb.geo.census.gov/'), what: 'Building card Site section: MUDs and other districts, tax increment zones, Opportunity Zones, school district', status: st('live', 'On demand'), detail: 'Boundaries change rarely; cached up to a week.' },
+        { name: link('EPA ECHO', 'https://echo.epa.gov/') + ' · Houston METRO', what: 'Building card Site section: regulated facilities within ¼ mile with violation and hazardous-waste flags; bus stops nearby', status: st('live', 'On demand'), detail: 'A screening flag, not a Phase I environmental review.' },
+        { name: link('Texas Comptroller mixed beverage receipts', 'https://data.texas.gov/Government-and-Taxes/Mixed-Beverage-Gross-Receipts/naix-2893'), what: 'Building card Site section: alcohol sales at bars and restaurants at the address', status: st('live', 'On demand'), detail: 'Monthly gross receipts reported by each permit holder; a strong signal of how busy a restaurant or bar is.' },
         { name: link('Mapillary', 'https://www.mapillary.com/') + ' · Google Street View', what: 'Street photos on the building card', status: st('live', 'On demand'), detail: 'Photo dates vary; Mapillary needs a key on the server.' },
         { name: link('Regrid', 'https://regrid.com/'), what: 'Parcel Lines layer and Regrid details on the building card (paid, capped)', status: (() => { const u = ctx.regridUsage?.(); return u?.records ? st('live', fmtN(u.records.used) + ' / ' + fmtN(u.records.cap) + ' records · ' + fmtN(u.tiles.used) + ' / ' + fmtN(u.tiles.cap) + ' tiles') : st('live', 'On demand'); })(),
           detail: 'Hard monthly caps: 1,800 parcel records and 180,000 tiles (plan: 2,000 / 200,000), so it never goes into overage. Each parcel looked up is saved and free after that; tiles are cached a week.' },
@@ -126,9 +140,11 @@ export function initSources(ctx) {
     ].join('');
     root.innerHTML = '<div class="vhead"><div><div class="kicker">Sources</div><h2>Where the data comes from</h2><div class="vsub">What each source feeds, how often it refreshes and when it last did. Nightly data is pulled once a night and built into the app; map layers and lookups are fetched live when you use them.</div></div></div>' +
       '<div class="src-sum">' + pills + '</div>' +
+      '<label class="src-opt"><input type="checkbox" id="srcShow"' + (ctx.showSources?.() ? ' checked' : '') + '> Show sources on cards and panels <span class="s">Off by default for a clean view. Exported reports always list their sources.</span></label>' +
       rows().map(([title, list]) => '<section class="src-grp"><h3>' + esc(title) + '</h3><table class="src-tbl"><thead><tr><th>Source</th><th>Status</th><th>Used for · freshness</th></tr></thead><tbody>' +
         list.map(r => '<tr><td><b>' + r.name + '</b></td><td>' + r.status + '</td><td>' + esc(r.what) + '<div class="s">' + esc(r.detail) + '</div></td></tr>').join('') + '</tbody></table></section>').join('');
     root.querySelector('#srcReload')?.addEventListener('click', () => location.reload());
+    root.querySelector('#srcShow')?.addEventListener('change', e => ctx.showSources?.(e.target.checked));
   }
 
   ctx.onView('sources', () => { render(); checkNewer(); });

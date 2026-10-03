@@ -14,6 +14,11 @@ globalThis.fetch = async (url, opts) => {
       precipitation_sum: [0, 0, .4, 1.2], precipitation_probability_max: [0, 10, 70, 90], wind_speed_10m_max: [10, 12, 15, 22], wind_gusts_10m_max: [18, 20, 28, 40] } };
     return json(n > 1 ? Array.from({ length: n }, () => one) : one);
   }
+  if (u.host === 'www.houstontx.gov' && /NIBRSPublicView\d{4}\.csv$/.test(u.pathname)) { // HPD yearly crime file: two geocoded rows, one without a point
+    const y = u.pathname.match(/(\d{4})\.csv$/)[1], d = new Date().toISOString().slice(0, 4) === y ? new Date(Date.now() - 20 * 864e5).toISOString().slice(0, 10) : y + '-11-15';
+    return new Response('Incident,Occurrence Date,Occurrence Hour,NIBRS Class,NIBRS Description,Offense Count,Beat,Premise,Street Number,Street Name,Street Type,Street Suffix,City,ZIP Code,Map Longitude,Map Latitude\n' +
+      'A' + y + ',' + d + ',10,13A,Aggravated assault,1,Beat 1A10,Street,1,MAIN,ST,,HOUSTON,77002,-95.3698,29.7604\nB' + y + ',' + d + ',11,23F,Theft from motor vehicle,2,Beat 1A10,Parking lot,2,MAIN,ST,,HOUSTON,77002,-95.37,29.761\nC' + y + ',' + d + ',11,290,Vandalism,1,Beat 1A10,Street,,,,,HOUSTON,77002,0,0\n', { headers: { 'Content-Type': 'text/csv' } });
+  }
   if (u.host === 'www.nhc.noaa.gov') return json({ activeStorms: [{ id: 'al142026', name: 'Kirk', classification: 'HU', intensity: '100', pressure: '965', latitudeNumeric: 25.1, longitudeNumeric: -90.2, movementDir: 315, movementSpeed: 10, lastUpdate: '2026-10-02T15:00:00.000Z' }] });
   return inner(url, opts);
 };

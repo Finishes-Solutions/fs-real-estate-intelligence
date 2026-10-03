@@ -3,6 +3,7 @@
 //   permits     US Census Building Permits Survey: new housing units authorized per county per year (+ year to date)
 //   businesses  Texas Comptroller active sales-tax permit holders: new outlets per county per month, plus the latest ones
 //   news        Google News: development and real estate headlines for each county and the busiest towns (kept 120 days)
+//   rates, unemployment, rents, mortgages: see build/econ.mjs
 // Each part is best effort: a failing source keeps last run's numbers (data/area.json) and logs why.
 import { gunzipSync } from 'node:zlib';
 import { log, sleep } from './util.mjs';
@@ -17,6 +18,7 @@ async function text(url, ms) { const r = await get(url, { ms }); if (!r.ok) thro
 const exists = async url => { try { return (await get(url, { head: true, ms: 20000 })).ok; } catch (e) { return false; } };
 
 import { SECTORS, sectorOf } from '../lib/sectors.mjs';
+import { buildRates, buildUnemployment, buildRents, buildMortgages } from './econ.mjs';
 export { SECTORS, sectorOf };
 
 // ---------- jobs: LODES WAC ----------
@@ -224,6 +226,11 @@ export async function buildArea(regions, filings, prev = {}) {
   await step('permits', () => buildPermits(fips, prev.permits));
   await step('businesses', () => buildBusinesses(counties, prev.businesses));
   await step('salesTax', () => buildSalesTax(filings, prev.salesTax));
+  // economics (build/econ.mjs): rates, county unemployment, ZIP rents, home loans
+  await step('rates', () => buildRates());
+  await step('unemployment', () => buildUnemployment());
+  await step('rents', () => buildRents());
+  await step('mortgages', () => buildMortgages(fips, prev.mortgages));
   // news places: each county, plus the towns with the most filings
   const towns = Object.entries(filings.reduce((m, f) => { if (f.city && !f.approx) m[f.city + '|' + f.county] = (m[f.city + '|' + f.county] || 0) + 1; return m; }, {}))
     .sort((a, b) => b[1] - a[1]).slice(0, +(process.env.AREA_NEWS_TOWNS || 10)).map(([k]) => { const [city, county] = k.split('|'); return { key: 'town:' + city, q: city + ', Texas', county }; });

@@ -4,17 +4,19 @@
 //   weather_daily                Open-Meteo daily weather at each county centroid (3 days back, 7 ahead)
 //   storm_advisories             NOAA NHC active-storm snapshot
 //   tracts                       ACS census tracts from data/market.json
+//   crime_incidents              Houston Police NIBRS incidents (yearly CSVs), last ~25 months, for crime near a site on building cards
 // Reads the regional data/filings.json and data/geo.json the "Refresh data" workflow commits. Needs the
 // 20261004000000_live_data.sql migration. Env: NEWS_MAX (searches per night, default 120), IMAGERY_MAX (default 600),
-// IMAGERY_DAYS (look-back, default 30), ONLY=news,imagery,weather,storms,tracts (subset).
+// IMAGERY_DAYS (look-back, default 30), ONLY=news,imagery,weather,storms,tracts,crime (subset). Crime needs 20261010000000_site_data.sql.
 import { log, readJSON } from './util.mjs';
 import { supa } from '../lib/supa.mjs';
 import { hlsPasses } from '../lib/nasa.mjs';
 import { news, phrase } from '../api/news.js';
 import { daily, storms } from '../api/weather.js';
+import { HPD_CSV, parseHpd } from '../lib/crime.mjs';
 
 const D = process.env.DATA_DIR || 'data/';
-const ONLY = (process.env.ONLY || 'news,imagery,weather,storms,tracts').split(',');
+const ONLY = (process.env.ONLY || 'news,imagery,weather,storms,tracts,crime').split(',');
 const NEWS_MAX = +(process.env.NEWS_MAX || 120), IMAGERY_MAX = +(process.env.IMAGERY_MAX || 600), IMAGERY_DAYS = +(process.env.IMAGERY_DAYS || 30);
 const NEWS_GAP_MS = +(process.env.NEWS_GAP_MS ?? 5500); // GDELT asks for at most one request per 5 seconds
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -65,6 +67,21 @@ await step('tracts', async () => {
     home_value: t.val ?? null, rent: t.rent ?? null, vacancy_pct: t.vacr ?? null, median_age: t.age ?? null, housing_units: t.hu ?? null, geom_json: t.geom, updated_at: new Date().toISOString() }));
   await db.upsert('tracts', rows, 'geoid', 200);
   return { tracts: rows.length };
+});
+
+await step('crime', async () => {
+  // first run: 25 months; after that only the months HPD may still be revising (it republishes the yearly files monthly)
+  const latest = await db.rpc('crime_latest', {}), now = new Date();
+  const since = latest ? addDays(String(latest).slice(0, 10), -75) : addDays(today, -760);
+  let rows = 0;
+  for (let y = +since.slice(0, 4); y <= now.getUTCFullYear(); y++) {
+    const r = await fetch(HPD_CSV(y), { headers: { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence)' }, signal: AbortSignal.timeout(180000) });
+    if (!r.ok) { if (y === now.getUTCFullYear() && r.status === 404) continue; throw new Error('HPD ' + y + ' ' + r.status); }
+    const list = parseHpd(await r.text(), { since });
+    await db.upsert('crime_incidents', list, 'id', 1000); rows += list.length;
+  }
+  const pruned = await db.rpc('crime_prune', { p_keep_days: 760 });
+  return { since, rows, pruned };
 });
 
 await step('imagery', async () => {

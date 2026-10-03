@@ -34,6 +34,8 @@ globalThis.fetch = async (url, opts = {}) => {
   if (!opts.headers?.apikey) return json({ message: 'no key' }, 401);
   const path = u.pathname.replace('/rest/v1/', ''), method = opts.method || 'GET', p = [...u.searchParams];
   if (path === 'rpc/db_size') return json(+(process.env.MOCK_DB_SIZE || JSON.stringify(db).length));
+  if (path === 'rpc/crime_latest') return json((db.crime_incidents || []).reduce((m, r) => !m || r.day > m ? r.day : m, null));
+  if (path === 'rpc/crime_prune') return json(0);
   if (path === 'rpc/cache_get') { const { tbl, keys } = JSON.parse(opts.body), t = db[tbl] || []; const out = {}; for (const r of t) if (keys.includes(r.k)) out[r.k] = r.data; return json(out); }
   const t = db[path] = db[path] || [];
   if (method === 'GET') {
