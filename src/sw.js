@@ -2,7 +2,7 @@
 // Data files: network first, cached copy when offline. AI/building APIs and map tiles: always network.
 const VERSION = '__BUILD__', SHELL = 'fs-shell-' + VERSION, DATA = 'fs-data', LIBS = 'fs-libs';
 const FILES = ['./', 'index.html', 'app.css', 'app.js', 'assistant.js', 'live.js', 'team.js', 'timeline.js', 'views.js', 'market.js', 'saved.js', 'building.js', 'mobile.js', 'field.js',
-  'mapsearch.js', 'nearby.js', 'sources.js', 'planes.js', 'flightpath3d.js', 'area.js', 'regrid.js', 'site.js', 'glance.js', 'crime.js', 'fema.js', 'reportkit.js', 'drivetime.js', 'traffic.js', 'compare.js', 'kpis.js', 'export.js', 'metrics.js', 'charts.js', 'chatcards.js', 'reports.js',
+  'mapsearch.js', 'nearby.js', 'sources.js', 'planes.js', 'flightpath3d.js', 'area.js', 'regrid.js', 'site.js', 'glance.js', 'crime.js', 'fema.js', 'reportkit.js', 'drivetime.js', 'traffic.js', 'airports.js', 'compare.js', 'kpis.js', 'export.js', 'metrics.js', 'charts.js', 'chatcards.js', 'reports.js',
   'lib/filter.mjs', 'lib/taxonomy.mjs', 'lib/changes.mjs', 'lib/agent-tools.mjs', 'lib/rulebook.mjs', 'lib/assist-logic.mjs', 'lib/nasa.mjs', 'lib/height.mjs', 'lib/sectors.mjs', 'lib/nearby.mjs', 'lib/reports.mjs', 'lib/demographics.mjs', 'lib/spending.mjs', 'lib/nibrs.mjs', 'lib/voice-state.mjs', 'lib/aircraft-shapes.mjs', 'lib/flightpath.mjs', 'logo.png', 'icon-192.png', 'manifest.webmanifest'];
 const LIB_HOSTS = ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 

@@ -37,6 +37,9 @@
     "api/isochrone.js": {
       "maxDuration": 40
     },
+    "api/airports.js": {
+      "maxDuration": 50
+    },
     "api/tile.js": {
       "maxDuration": 10
     },

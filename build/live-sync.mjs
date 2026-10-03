@@ -5,6 +5,8 @@
 //   storm_advisories             NOAA NHC active-storm snapshot
 //   tracts                       ACS census tracts from data/market.json
 //   crime_incidents              Houston Police NIBRS incidents (yearly CSVs), last ~25 months, for crime near a site on building cards
+//   airports, airport_runways,   OurAirports (every airport in the world, runways, frequencies) and the FAA airport diagram PDF
+//   airport_frequencies/extras   for US airports (d-TPP, current 28-day cycle); only changed rows are written
 //   aircraft_registry            the FAA registry of US aircraft (owner of each N-number / Mode S hex) for plane cards; only changed rows are written
 // Reads the regional data/filings.json and data/geo.json the "Refresh data" workflow commits. Needs the
 // 20261004000000_live_data.sql migration. Env: NEWS_MAX (searches per night, default 120), IMAGERY_MAX (default 600),
@@ -17,9 +19,10 @@ import { news, phrase } from '../api/news.js';
 import { daily, storms } from '../api/weather.js';
 import { HPD_CSV, parseHpd } from '../lib/crime.mjs';
 import { loadRegistry, parseRegistry } from '../lib/faa.mjs';
+import { OURAIRPORTS, parseCsv, airportRow, runwayRow, frequencyRow, dtppCycle, parseDtpp } from '../lib/airports.mjs';
 
 const D = process.env.DATA_DIR || 'data/';
-const ONLY = (process.env.ONLY || 'news,imagery,weather,storms,tracts,crime,aircraft').split(',');
+const ONLY = (process.env.ONLY || 'news,imagery,weather,storms,tracts,crime,aircraft,airports').split(',');
 const NEWS_MAX = +(process.env.NEWS_MAX || 120), IMAGERY_MAX = +(process.env.IMAGERY_MAX || 600), IMAGERY_DAYS = +(process.env.IMAGERY_DAYS || 30);
 const NEWS_GAP_MS = +(process.env.NEWS_GAP_MS ?? 5500); // GDELT asks for at most one request per 5 seconds
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -101,6 +104,34 @@ await step('aircraft', async () => {
   const keep = new Set(rows.map(r => r.n_number)), gone = [...have.keys()].filter(n => !keep.has(n));
   let removed = 0; for (let i = 0; i < gone.length; i += 2000) removed += +(await db.rpc('aircraft_registry_remove', { p_ids: gone.slice(i, i + 2000) })) || 0;
   return { registered: rows.length, written: changed.length, removed };
+});
+
+await step('airports', async () => {
+  const get = async (u, ms = 120000) => { const r = await fetch(u, { headers: { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0 (airport sync)' }, signal: AbortSignal.timeout(ms) }); if (!r.ok) throw new Error(u.split('/').pop() + ' ' + r.status); return r.text(); };
+  const sync = async (table, key, rows, min) => {
+    // a cut-off download must not empty the table
+    if (rows.length < min) throw new Error(table + ': only ' + rows.length + ' rows parsed (expected at least ' + min + '); nothing changed');
+    const have = new Map((await db.selectAll(table, 'select=' + key + ',h&order=' + key)).map(r => [String(r[key]), r.h]));
+    const changed = rows.filter(r => have.get(String(r[key])) !== r.h);
+    await db.upsert(table, changed, key, 1000);
+    const keep = new Set(rows.map(r => String(r[key]))), gone = [...have.keys()].filter(k => !keep.has(k));
+    let removed = 0; for (let i = 0; i < gone.length; i += 2000) removed += +(await db.rpc('airports_remove', { p_table: table, p_ids: gone.slice(i, i + 2000) })) || 0;
+    return { rows: rows.length, written: changed.length, removed };
+  };
+  const now = new Date().toISOString(), MIN = process.env.AIRPORTS_MIN_ROWS ? +process.env.AIRPORTS_MIN_ROWS : null;
+  const airports = parseCsv(await get(OURAIRPORTS + 'airports.csv')).map(airportRow).filter(Boolean).map(r => ({ ...r, synced_at: now }));
+  const out = { airports: await sync('airports', 'ident', airports, MIN ?? 60000) };
+  out.runways = await sync('airport_runways', 'id', parseCsv(await get(OURAIRPORTS + 'runways.csv')).map(runwayRow).filter(Boolean), MIN ?? 30000);
+  out.frequencies = await sync('airport_frequencies', 'id', parseCsv(await get(OURAIRPORTS + 'airport-frequencies.csv')).map(frequencyRow).filter(Boolean), MIN ?? 15000);
+  // FAA airport diagrams (US): the current d-TPP cycle's metafile names each airport's diagram PDF
+  try {
+    const { cycle } = dtppCycle(), pdfs = parseDtpp(await get('https://aeronav.faa.gov/d-tpp/' + cycle + '/xml_data/d-tpp_Metafile.xml', 180000));
+    const extras = airports.filter(a => a.iso_country === 'US').map(a => { const pdf = pdfs.get(a.icao || '') || pdfs.get(a.local_code || '') || pdfs.get(a.gps_code || '') || pdfs.get(a.ident);
+      return pdf ? { ident: a.ident, diagram_url: 'https://aeronav.faa.gov/d-tpp/' + cycle + '/' + pdf, diagram_cycle: cycle, updated_at: now } : null; }).filter(Boolean);
+    if (extras.length >= (MIN ?? 300)) await db.upsert('airport_extras', extras, 'ident', 1000);
+    out.diagrams = { cycle, airports: extras.length };
+  } catch (e) { out.diagrams = { error: e.message }; }
+  return out;
 });
 
 await step('imagery', async () => {
