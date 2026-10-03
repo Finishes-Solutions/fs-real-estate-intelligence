@@ -2,7 +2,7 @@
 // (airborne, under 3,000 ft) counted into ~1 km cells for today in Supabase (add_air_samples). Builds the history
 // behind "Low Flight Paths" and the "Air traffic" line on property cards. Vercel sends Authorization: Bearer $CRON_SECRET.
 import { supa } from '../lib/supa.mjs';
-import { fetchPoint, binLow } from '../lib/planes.mjs';
+import { fetchPoint, binLow, binProfile } from '../lib/planes.mjs';
 import { opsStep } from '../lib/airports.mjs';
 
 // 100 nm around a point between Waller County and downtown Houston: all seven counties, IAH, Hobby, Sugar Land,
@@ -19,9 +19,12 @@ export async function sample(env = process.env, fetchImpl = globalThis.fetch, no
   // the day in Central time, so a day's history lines up with the user's day
   const day = new Date(now.getTime() - 5 * 3600e3).toISOString().slice(0, 10);
   await d.rpc('add_air_samples', { p_day: day, p_rows: rows });
+  // the hourly profile and aircraft mix for air traffic reports (best effort, like the counts below)
+  let profile = null; try { const local = new Date(now.getTime() - 5 * 3600e3), prof = binProfile(snap.aircraft);
+    await d.rpc('add_air_profile', { p_month: day.slice(0, 8) + '01', p_hour: local.getUTCHours(), p_rows: prof }); profile = prof.length; } catch (e) { profile = { error: e.message }; }
   // takeoffs and landings at the airports in range (best effort: the history above never waits on it)
   let ops = null; try { ops = await countOps(d, c, snap.aircraft, day); } catch (e) { ops = { error: e.message }; }
-  return { day, source: snap.source, aircraft: snap.aircraft.length, low: rows.reduce((a, r) => a + r.n, 0), cells: rows.length, ops };
+  return { day, source: snap.source, aircraft: snap.aircraft.length, low: rows.reduce((a, r) => a + r.n, 0), cells: rows.length, profile, ops };
 }
 
 // the airports inside the sampling circle (cached for six hours in a warm instance)

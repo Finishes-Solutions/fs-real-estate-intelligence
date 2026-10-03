@@ -72,7 +72,13 @@ assert.ok(Math.abs(distNm([-95.34, 29.98], [-95.34, 30.98]) - 60) < 0.2);
   assert.deepEqual(states.find(s => s.hex === 'a5'), { hex: 'a5', ident: 'KHOU', ground: true, alt: 0 });
   assert.ok(!states.some(s => s.hex === 'a3'), 'cruising planes are not tracked');
   const again = opsStep(A, [{ hex: 'a2', lat: 29.646, lon: -95.279, alt: 0, ground: true }], new Map([['a2', { ground: true, ident: 'KHOU' }]]));
-  assert.deepEqual(again.events, [], 'still on the ground: no second landing'); }
+  assert.deepEqual(again.events, [], 'still on the ground: no second landing');
+  const fin = opsStep(A, [{ hex: 'f1', lat: 29.69, lon: -95.2789, alt: 650, ground: false, vs: -700 }], new Map([['f1', { ground: false, ident: '', alt: 1800 }]]));
+  assert.deepEqual(fin.events, [{ ident: 'KHOU', dep: 0, arr: 1 }], 'short final counts as a landing (the feed often drops planes before touchdown)');
+  const roll = opsStep(A, [{ hex: 'f1', lat: 29.646, lon: -95.279, alt: 0, ground: true }], new Map([['f1', fin.states[0]]]));
+  assert.deepEqual(roll.events, [], 'and touchdown after it is not a second landing');
+  const go = opsStep(A, [{ hex: 'g1', lat: 29.69, lon: -95.2789, alt: 650, ground: false, vs: 900 }], new Map([['g1', { ground: false, ident: '', alt: 400 }]]));
+  assert.deepEqual(go.events, [], 'climbing at 650 ft is not a landing'); }
 
 // the API: Wikipedia airlines, METAR, approach path near an airport
 { const { detail, wikiFacts, metar } = await import('../api/airports.js');
