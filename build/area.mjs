@@ -93,7 +93,7 @@ export function parseBps(txt, fips) {
   for (const l of lines.slice(2)) {
     const c = split(l), f = c[iSt].padStart(2, '0') + c[iCo].padStart(3, '0'); if (!want.has(f)) continue;
     const n = U.map(([u, v]) => [+c[u] || 0, +c[v] || 0]);
-    out[f] = { date: c[iDate], sf: n[0][0], mf: n[1][0] + n[2][0] + n[3][0], mf5: n[3][0], value: n.reduce((s, x) => s + x[1], 0) * 1000 };
+    out[f] = { date: c[iDate], sf: n[0][0], mf: n[1][0] + n[2][0] + n[3][0], mf5: n[3][0], value: n.reduce((s, x) => s + x[1], 0) }; // BPS reports value in dollars (it was multiplied by 1,000 here until 2026-10-03)
   }
   return out;
 }
@@ -198,11 +198,14 @@ export async function findAllocations(prev) {
   }
   throw new Error('no city sales-tax allocation dataset found in the data.texas.gov catalog');
 }
-async function buildSalesTax(filings, prev) {
+async function buildSalesTax(filings, prev, places) {
   const ds = await findAllocations(prev), c = ds.cols;
   // the cities with filings in the region, each with the county most of its filings are in
   const byCity = {}; for (const f of filings) if (f.city) { const k = f.city.trim(); (byCity[k] ||= {})[f.county] = ((byCity[k] ||= {})[f.county] || 0) + 1; }
-  const cities = Object.entries(byCity).map(([city, cs]) => [city, Object.entries(cs).sort((a, b) => b[1] - a[1])[0][0]]).slice(0, 120);
+  // only real places in the region: a filer's mailing city ("San Antonio" on two Houston filings) would otherwise add
+  // that whole city's sales tax to the region
+  const key = n => String(n).toLowerCase().replace(/[^a-z]/g, ''), inRegion = places?.length ? new Set(places.map(p => key(p[0]))) : null;
+  const cities = Object.entries(byCity).filter(([city]) => !inRegion || inRegion.has(key(city))).map(([city, cs]) => [city, Object.entries(cs).sort((a, b) => b[1] - a[1])[0][0]]).slice(0, 120);
   const since = new Date(Date.UTC(new Date().getUTCFullYear() - 3, new Date().getUTCMonth(), 1)).toISOString().slice(0, 10);
   const inList = cities.map(([n]) => "'" + n.toUpperCase().replace(/'/g, "''") + "'").join(',');
   const when = c.period ? 'date_trunc_ym(' + c.period + ') AS m' : c.year + ' AS y, ' + c.month + ' AS mo';
@@ -225,7 +228,7 @@ export async function buildArea(regions, filings, prev = {}) {
   await step('jobs', () => buildJobs(fips, prev.jobs));
   await step('permits', () => buildPermits(fips, prev.permits));
   await step('businesses', () => buildBusinesses(counties, prev.businesses));
-  await step('salesTax', () => buildSalesTax(filings, prev.salesTax));
+  await step('salesTax', () => buildSalesTax(filings, prev.salesTax, prev.places));
   // economics (build/econ.mjs): rates, county unemployment, ZIP rents, home loans
   await step('rates', () => buildRates());
   await step('unemployment', () => buildUnemployment());

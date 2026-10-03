@@ -3,6 +3,7 @@
 // Facts come from api/site (live, cached a week) and data/area.json (nightly). Sources are listed only when the
 // "Show sources on cards" setting is on (Data Sources view), and always in exported reports.
 export function initSite(ctx) {
+  let repMi = 1; // radius for the Site section's Crime / FEMA reports, kept while the app is open
   const { esc, fmtN, fmtM } = ctx;
   const cache = new Map();
   ctx.siteAt = (center, addr, zip) => {
@@ -10,7 +11,7 @@ export function initSite(ctx) {
     if (!cache.has(k)) { const p = fetch('api/site?' + q).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'lookup failed'); return d; }); p.catch(() => cache.delete(k)); cache.set(k, p); }
     return cache.get(k);
   };
-  // a ½-mile circle (64 points) around a point, for the crime report
+  // a 0.5-mile circle (64 points) around a point, for the crime report
   const circle = ([lon, lat], mi) => { const r = mi / 69, k = Math.cos(lat * Math.PI / 180), ring = []; for (let i = 0; i <= 64; i++) { const a = (i % 64) / 64 * 2 * Math.PI; ring.push([lon + r * Math.cos(a) / k, lat + r * Math.sin(a)]); } return { type: 'Polygon', coordinates: [ring] }; };
   const src = s => '<span class="src"> · ' + esc(s) + '</span>';
   const pct = v => v == null ? '' : (v > 0 ? '+' : '') + v + '%';
@@ -40,19 +41,26 @@ export function initSite(ctx) {
     const water = (ds.water || []).filter(x => !x.error).map(x => esc(x.name) + ' <span class="sc">' + esc(x.type) + '</span>').join('<br>');
     const tirz = Array.isArray(ds.tirz) && ds.tirz.length ? ds.tirz.map(esc).join(', ') : '';
     const schools = Array.isArray(ds.schools) && ds.schools.length ? ds.schools.map(esc).join(', ') : '';
-    const env1 = env && !env.error ? (env.count ? fmtN(env.total || env.count) + ' regulated facilit' + ((env.total || env.count) === 1 ? 'y' : 'ies') + ' within ¼ mile' + (env.flaggedCount ? '; <b class="risk-md">' + env.flaggedCount + ' flagged</b>' : '; none flagged') : 'No EPA-regulated facilities within ¼ mile') : '';
+    const env1 = env && !env.error ? (env.count ? fmtN(env.total || env.count) + ' regulated facilit' + ((env.total || env.count) === 1 ? 'y' : 'ies') + ' within 0.25 mile' + (env.flaggedCount ? '; <b class="risk-md">' + env.flaggedCount + ' flagged</b>' : '; none flagged') : 'No EPA-regulated facilities within 0.25 mile') : '';
     const envList = env?.flagged?.length ? '<details class="raw"><summary>Flagged facilities</summary>' + env.flagged.map(x => '<div class="pl"><b>' + esc(x.name) + '</b><span>' + esc([x.street, x.flags.join(', ')].filter(Boolean).join(' · ')) + '</span></div>').join('') + '</details>' : '';
-    const crime = cr && !cr.error && cr.last12 ? '<b>' + fmtN(cr.last12.total) + '</b> incidents within ½ mile in the last 12 months' + (cr.change.total != null ? ' <span class="sc">(' + pct(cr.change.total) + ' vs the year before)</span>' : '') +
-      '<br><span class="sc">Violent ' + fmtN(cr.last12.v) + (cr.change.v != null ? ' (' + pct(cr.change.v) + ')' : '') + ' · Property ' + fmtN(cr.last12.p) + (cr.change.p != null ? ' (' + pct(cr.change.p) + ')' : '') + ' · Other ' + fmtN(cr.last12.o) + (cr.latest ? ' · through ' + esc(cr.latest) : '') + '</span>' + (ctx.crimeReport ? '<br><button class="lnk" type="button" id="siteCrime">Full crime report (½ mile)</button>' : '') : '';
+    const crime = cr && !cr.error && cr.last12 ? '<b>' + fmtN(cr.last12.total) + '</b> incidents within 0.5 mile in the last 12 months' + (cr.change.total != null ? ' <span class="sc">(' + pct(cr.change.total) + ' vs the year before)</span>' : '') +
+      '<br><span class="sc">Violent ' + fmtN(cr.last12.v) + (cr.change.v != null ? ' (' + pct(cr.change.v) + ')' : '') + ' · Property ' + fmtN(cr.last12.p) + (cr.change.p != null ? ' (' + pct(cr.change.p) + ')' : '') + ' · Other ' + fmtN(cr.last12.o) + (cr.latest ? ' · through ' + esc(cr.latest) : '') + '</span>' : '';
     const bars = Array.isArray(d.bars) && d.bars.length ? d.bars.slice(0, 5).map(b => esc(b.name) + ' <b>' + fmtM(b.total) + '</b> <span class="sc">' + b.months + ' mo to ' + esc(b.last) + '</span>').join('<br>') : '';
     el.innerHTML = '<div class="lt">Site</div><dl>' +
-      row('Flood zone', flood + (ctx.femaReport ? '<br><button class="lnk" type="button" id="siteFema">FEMA report (¼ mile): claims, disasters, risk</button>' : ''), 'FEMA flood maps') + row('Traffic', traffic, 'TxDOT traffic counts') + row('Crime nearby', crime, 'Houston Police NIBRS') +
+      row('Flood zone', flood, 'FEMA flood maps') + row('Traffic', traffic, 'TxDOT traffic counts') + row('Crime nearby', crime, 'Houston Police NIBRS') +
       row('Districts', [water, tirz && 'Tax increment zone: ' + tirz, ds.opportunityZone === true ? 'Federal Opportunity Zone' : ''].filter(Boolean).join('<br>'), 'TCEQ, City of Houston, CDFI Fund') +
       row('School district', schools, 'US Census') + row('Transit', tr && !tr.error && tr.stops != null ? fmtN(tr.stops) + ' METRO bus stop' + (tr.stops === 1 ? '' : 's') + ' within 400 m' : '', 'Houston METRO') +
       row('Environmental', env1 && env1 + envList, 'EPA ECHO') + row('Alcohol sales here', bars && bars + '<br><span class="sc">Mixed beverage gross receipts, last 12 months</span>', 'Texas Comptroller') +
-      econRows(area, parcel) + '</dl>';
-    el.querySelector('#siteFema')?.addEventListener('click', () => ctx.femaReport({ geometry: circle(center, 0.25), label: '¼ mile around ' + (parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4)) }));
-    el.querySelector('#siteCrime')?.addEventListener('click', () => ctx.crimeReport({ geometry: circle(center, 0.5), label: '½ mile around ' + (parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4)), center }));
+      econRows(area, parcel) + '</dl>' +
+      // area reports for a circle around the site: pick a radius, then Crime Report or FEMA Report
+      (ctx.crimeReport || ctx.femaReport ? '<div class="site-rep"><div class="fl">Area reports</div><div class="mi-chips" role="radiogroup" aria-label="Report radius">' +
+        [1, 3, 5, 10].map(mi => '<button type="button" class="chip" role="radio" data-mi="' + mi + '" aria-checked="' + (mi === repMi) + '">' + mi + ' mi</button>').join('') + '</div><div class="bacts">' +
+        (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep">Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep">FEMA Report</button>' : '') + '</div>' +
+        '<div class="rnote">Crime: City of Houston only (Houston Police). FEMA: flood zones, flood insurance claims, disasters and hazard risk.</div></div>' : '');
+    const where = () => parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4), lab = () => repMi + ' mi around ' + where();
+    el.querySelectorAll('.mi-chips [data-mi]').forEach(b => b.onclick = () => { repMi = +b.dataset.mi; el.querySelectorAll('.mi-chips [data-mi]').forEach(x => x.setAttribute('aria-checked', x === b)); });
+    el.querySelector('#siteCrimeRep')?.addEventListener('click', () => ctx.crimeReport({ geometry: circle(center, repMi), label: lab(), center }));
+    el.querySelector('#siteFemaRep')?.addEventListener('click', () => ctx.femaReport({ geometry: circle(center, repMi), label: lab() }));
   };
 
   // sources on cards: off by default (everyone sees the same clean view); a setting in the Data Sources view turns them on

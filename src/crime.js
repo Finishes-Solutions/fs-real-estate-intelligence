@@ -1,6 +1,6 @@
 // Crime (Houston Police NIBRS incidents, via api/crime):
 //   Map layer "Crime (Houston)": a heat map zoomed out, ~400 m squares zoomed in, for all / violent / property incidents in the last 12 months.
-//   Crime report for any area: the current selection (box, polygon, county or radius), a building (½ mile) or a map square.
+//   Crime report for any area: the current selection (box, polygon, county or radius), a building (0.5 mile) or a map square.
 //   The report opens in the card (totals vs the year before and vs the city, monthly bars, top offenses and places,
 //   recent incidents), can put the incidents on the map, and exports as a printable report (HTML → PDF) or CSV.
 import { offenseName, CAT_NAME } from './lib/nibrs.mjs';
@@ -47,19 +47,21 @@ export function initCrime(ctx) {
     else map.setPaintProperty(HEAT, 'heatmap-weight', ['interpolate', ['linear'], ['get', 'n'], 0, 0, s[4], 1]);
     if (!map.getLayer(CELLS)) map.addLayer({ id: CELLS, type: 'fill', source: SRC + '-sq', minzoom: 12, paint: { 'fill-color': ramp, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 13, .5, 16, .35], 'fill-outline-color': 'rgba(255,255,255,.35)' } }, before);
     else map.setPaintProperty(CELLS, 'fill-color', ramp);
-    if (note) note.textContent = 'Houston Police incidents in the 12 months through ' + monthName(grid.latest || last) + ', per ~¼-mile square. City of Houston only. Click a square for its numbers.';
+    if (note) note.textContent = 'Houston Police incidents in the 12 months through ' + monthName(grid.latest || last) + ', per ~0.25-mile square. City of Houston only. Click a square for its numbers.';
   }
   function removeLayers() { for (const id of [HEAT, CELLS]) if (map.getLayer(id)) map.removeLayer(id); for (const s of [SRC, SRC + '-sq']) if (map.getSource(s)) map.removeSource(s); }
   const monthName = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'the latest month';
 
+  const crimeLegend = () => ctx.setLegend?.('crime', on ? '<div class="t">Crime · ' + ({ t: 'all incidents', v: 'violent', p: 'property' }[cat] || 'incidents') + '</div><div class="lg-grad" style="background:linear-gradient(90deg,#fde68a,#f59e0b,#ea580c,#c2410c,#7f1d1d)"></div><div class="lg-ticks"><span>Fewer</span><span>More</span></div><div class="lg-note">Last 12 months · City of Houston</div>' : null);
   async function setOn(v) {
     on = v; if (box) box.checked = v; if (catSel) catSel.hidden = !v; if (note) note.hidden = !v;
+    crimeLegend();
     if (!v) { removeLayers(); return; }
     try { await loadGrid(); addLayers(); if (map.getZoom() < 9) map.easeTo({ center: [-95.37, 29.76], zoom: 10, duration: ctx.reduceMotion ? 0 : 800 }); }
     catch (e) { ctx.toast('Crime layer unavailable: ' + e.message); setOn(false); }
   }
   if (box) box.onchange = () => setOn(box.checked);
-  if (catSel) catSel.onchange = () => { cat = catSel.value; try { localStorage.setItem('fs-crime-cat', cat); } catch (e) {} if (on && grid) { removeLayers(); addLayers(); } };
+  if (catSel) catSel.onchange = () => { cat = catSel.value; try { localStorage.setItem('fs-crime-cat', cat); } catch (e) {} if (on && grid) { removeLayers(); addLayers(); } crimeLegend(); };
   ctx.onOverlays(addLayers);
   ctx.crimeLayer = v => setOn(v !== false);
 
@@ -70,7 +72,7 @@ export function initCrime(ctx) {
     if (!on || !map.getLayer(CELLS) || map.getZoom() < 12) return false;
     const f = map.queryRenderedFeatures(e.point, { layers: [CELLS] })[0]; if (!f) return false;
     const ring = f.geometry.coordinates[0], c = [(ring[0][0] + ring[2][0]) / 2, (ring[0][1] + ring[2][1]) / 2];
-    report({ geometry: f.geometry, label: '¼-mile square near ' + c[1].toFixed(4) + ', ' + c[0].toFixed(4), center: c });
+    report({ geometry: f.geometry, label: '0.25-mile square near ' + c[1].toFixed(4) + ', ' + c[0].toFixed(4), center: c });
     return true;
   });
 
@@ -138,9 +140,11 @@ export function initCrime(ctx) {
   ctx.onOverlays(() => { if (shown) { const s = shown; shown = null; if (map.getSource(PTS)) { map.removeLayer(PTS); map.removeSource(PTS); } showPoints(s); } if (last && map.getSource('crime-area') == null && document.getElementById('card')?.classList.contains('open')) showArea(last.geometry); });
 
   const slug = s => String(s || 'area').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'area';
-  function exportCsv() {
+  async function exportCsv() {
     if (!last?.d?.incidents) return;
-    ctx.exportCsv(last.d.incidents.map(x => ({ Date: x.day, Offense: x.offense, 'NIBRS code': x.code, Category: CAT_NAME[x.cat] || x.cat, Count: x.n, Premise: x.premise || '', Latitude: x.lat, Longitude: x.lon })), 'crime-' + slug(last.label) + '-' + new Date().toISOString().slice(0, 10));
+    ctx.exportMeta = { report: 'crime', format: 'csv', scope: last.label, filings: last.d.incidents.length, unit: 'incidents' };
+    try { ctx.exportCsv(last.d.incidents.map(x => ({ Date: x.day, Offense: x.offense, 'NIBRS code': x.code, Category: CAT_NAME[x.cat] || x.cat, Count: x.n, Premise: x.premise || '', Latitude: x.lat, Longitude: x.lon })), 'crime-' + slug(last.label) + '-' + new Date().toISOString().slice(0, 10)); }
+    finally { ctx.exportMeta = null; }
   }
   // a small map of the area and its incidents for the printed report
   function reportMap(g, list) {
@@ -152,7 +156,7 @@ export function initCrime(ctx) {
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg"><rect width="' + W + '" height="' + H + '" fill="#f8f9f9"/><path d="' + path + '" fill="rgba(194,65,12,.05)" stroke="#c2410c" stroke-width="1.6" stroke-dasharray="6 4"/>' +
       list.slice().reverse().map(x => { const p = pr([x.lon, x.lat]); return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + (x.cat === 'v' ? 3.6 : 2.6) + '" fill="' + COL[x.cat] + '" fill-opacity="' + (x.cat === 'o' ? .45 : .85) + '"/>'; }).join('') + '</svg>';
   }
-  function exportReport() {
+  async function exportReport() {
     if (!last?.d) return; const { d, label, geometry } = last, L = d.last12, logo = document.querySelector('.brandbar .l-light')?.src || '', today = new Date();
     const css = '@page{size:letter;margin:.5in}*{box-sizing:border-box}body{margin:0;font-family:Montserrat,system-ui,sans-serif;color:#23282a;font-size:12px;line-height:1.45}.wrap{max-width:900px;margin:0 auto;padding:28px}' +
       '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #006527;padding-bottom:12px}.hd img{height:40px}.k{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#006527}' +
@@ -173,16 +177,37 @@ export function initCrime(ctx) {
       '<div class="full"><h2>Incidents (' + fmtN(list.length) + (list.length >= 2000 ? ', newest' : '') + ')</h2><table><thead><tr><th>Date</th><th>Offense</th><th>Type</th><th>Premise</th><th class="r">Count</th></tr></thead><tbody>' +
       list.map(x => '<tr><td class="m">' + esc(x.day) + '</td><td>' + esc(x.offense) + '</td><td>' + esc(CAT_NAME[x.cat] || '') + '</td><td>' + esc(x.premise || '') + '</td><td class="m r">' + x.n + '</td></tr>').join('') + '</tbody></table></div>' +
       '<div class="ft">Source: Houston Police Department NIBRS public incident data, ' + esc(d.from) + ' to ' + esc(d.latest) + '. ' + esc(d.coverage) + ' Violent = murder, rape, robbery, aggravated assault; property = burglary, theft, vehicle theft, arson, vandalism; other = all remaining offenses. Counts follow activity: busy commercial areas show more incidents than homes nearby. Locations are block-level.</div></div></body></html>';
-    ctx.saveFile('crime-report-' + slug(label) + '-' + today.toISOString().slice(0, 10) + '.html', html, 'text/html');
+    ctx.exportMeta = { report: 'crime', format: 'html', scope: label, filings: list.length, unit: 'incidents' };
+    try { await ctx.saveFile('crime-report-' + slug(label) + '-' + today.toISOString().slice(0, 10) + '.html', html, 'text/html'); } finally { ctx.exportMeta = null; }
   }
 
-  // selection bar: "Crime Report" for whatever is selected on the map
-  // (the selection bar lives in the Construction Filings section, which starts collapsed, so a strip under Area at a Glance offers it too)
-  const btn = document.getElementById('selCrime'), glance = document.getElementById('glance');
-  let strip = null;
-  if (glance) { strip = document.createElement('div'); strip.className = 'crsel'; strip.hidden = true; strip.innerHTML = '<span><b></b></span><button class="btn" type="button">Crime Report</button>'; glance.after(strip); }
-  const run = () => { const s = ctx.sel; if (s?.feature) report({ geometry: s.feature.geometry || s.feature, label: s.label || 'Selected area' }); };
-  const sync = () => { const has = !!ctx.sel?.feature; if (btn) btn.style.display = has ? '' : 'none'; if (strip) { strip.hidden = !has; if (has) strip.querySelector('b').textContent = ctx.sel.label || 'Selected area'; } };
-  if (btn) btn.onclick = run; if (strip) strip.querySelector('button').onclick = run;
-  ctx.onChange(sync); sync();
+  // property cards: "Crime" pill → incidents within 1 mile (last 12 months vs the year before), with the full report a click away.
+  // HPD data covers the City of Houston only, so elsewhere the section says so instead of showing zeros.
+  const inHouston = ([lon, lat]) => lon > -95.95 && lon < -95.0 && lat > 29.5 && lat < 30.15;
+  const circleMi = ([lon, lat], mi) => { const r = mi / 69, k = Math.cos(lat * Math.PI / 180), ring = []; for (let i = 0; i <= 64; i++) { const a = (i % 64) / 64 * 2 * Math.PI; ring.push([lon + r * Math.cos(a) / k, lat + r * Math.sin(a)]); } return { type: 'Polygon', coordinates: [ring] }; };
+  ctx.renderCrimeNear = async (el, center, label = () => 'this property', still = () => true) => {
+    if (!el) return;
+    const head = '<div class="lt">Crime within 1 mile</div>';
+    if (!inHouston(center)) { el.innerHTML = head + '<div class="rnote">Crime data covers the City of Houston only (Houston Police incident reports), so there are no figures for this spot.</div>'; return; }
+    el.innerHTML = head + '<div class="rnote">Counting reported incidents…</div>';
+    let d; try { const r = await fetch('api/crime?lat=' + center[1].toFixed(5) + '&lon=' + center[0].toFixed(5) + '&mi=1&list=8'); d = await r.json(); if (!r.ok) throw new Error(d.error || 'crime data unavailable'); }
+    catch (e) { if (still()) el.innerHTML = head + '<div class="rnote">' + esc(e.message) + '</div>'; return; }
+    if (!still()) return;
+    if (!d.latest) { el.innerHTML = head + '<div class="rnote">No crime data loaded yet.</div>'; return; }
+    const L = d.last12;
+    el.innerHTML = head + '<div class="kgrid"><div><b>' + fmtN(L.total) + '</b><span>Incidents · ' + pct(d.change.total) + '</span></div><div><b class="cr-v">' + fmtN(L.v) + '</b><span>Violent · ' + pct(d.change.v) + '</span></div>' +
+      '<div><b class="cr-p">' + fmtN(L.p) + '</b><span>Property · ' + pct(d.change.p) + '</span></div><div><b>' + (d.per_sqmi && d.city_per_sqmi ? (d.per_sqmi.total / d.city_per_sqmi.total).toFixed(1) + '×' : '—') + '</b><span>vs Houston average</span></div></div>' +
+      (d.offenses?.length ? '<dl>' + d.offenses.slice(0, 5).map(o => '<dt>' + esc(o.name) + '</dt><dd>' + fmtN(o.n) + '</dd>').join('') + '</dl>' : '') +
+      (d.incidents?.length ? '<div class="rnote"><b>Most recent:</b> ' + d.incidents.slice(0, 4).map(x => esc(x.offense + ' (' + x.day + ')')).join(' · ') + '</div>' : '') +
+      '<div class="bacts"><button class="btn" type="button" data-cr="report">Full crime report</button><button class="btn" type="button" data-cr="layer">Crime map layer</button></div>' +
+      '<div class="ssrc src">Reported incidents, 12 months through ' + esc(monthName(d.latest)) + ' (change vs the 12 months before). Houston Police (NIBRS); the file runs about three months behind. City of Houston only.</div>';
+    el.querySelector('[data-cr="report"]').onclick = () => report({ geometry: circleMi(center, 1), label: '1 mile around ' + label(), center });
+    el.querySelector('[data-cr="layer"]').onclick = () => setOn(true);
+  };
+  // the Reports tab offers the crime report (for the selection or the map view); exports are recorded there
+  ctx.crimeReportFor = which => {
+    if (which === 'selection') { const s = ctx.sel; if (!s?.feature) return false; report({ geometry: s.feature.geometry || s.feature, label: s.label || 'Selected area' }); return true; }
+    const b = map.getBounds(), w = b.getWest(), s = b.getSouth(), e = b.getEast(), n = b.getNorth();
+    report({ geometry: { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] }, label: 'Map view near ' + (ctx.viewPlace?.() || 'Houston') }); return true;
+  };
 }

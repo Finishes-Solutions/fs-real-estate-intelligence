@@ -1448,3 +1448,83 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 #card .pl-photo img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover}
 #card .pl-credit{margin:4px 16px 0;font-size:10.5px;color:var(--muted)}
 #card #plPath{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1.5 13.5c3-1 4-6 7-7.5s4.5-.5 6-3'/%3E%3Ccircle cx='1.8' cy='13.4' r='1.2'/%3E%3C/svg%3E")}
+
+/* ===== map toolbar: Filters popup (between County and Export) and its Clear button ===== */
+.maptop{position:relative}
+.fwrap{display:flex;gap:6px;align-items:stretch}
+.fbtn,.fclear{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 13px;border:1px solid var(--line-2);border-radius:6px;background:var(--panel);color:var(--text-2);font:600 12.5px var(--font-display);cursor:pointer;box-shadow:0 1px 2px rgba(11,13,12,.08);white-space:nowrap}
+.fbtn:hover,.fclear:hover{border-color:var(--text-2);color:var(--text)}
+.fbtn.on{color:var(--brand);border-color:var(--brand)}
+.fbtn.open{background:var(--text);border-color:var(--text);color:var(--panel)}
+.fcount{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--brand);color:#fff;font:700 11px/18px var(--font-mono);text-align:center}
+.fbtn.open .fcount{background:var(--panel);color:var(--text)}
+.fclear{padding:0 11px;color:var(--muted)}
+.fclear[hidden],.fcount[hidden]{display:none}
+.fpop{position:absolute;left:0;top:calc(100% + 8px);z-index:9;width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 190px);overflow:auto;background:var(--panel);border:1px solid var(--line-2);border-radius:8px;box-shadow:0 14px 40px rgba(11,13,12,.22);overscroll-behavior:contain}
+.fpop[hidden]{display:none}
+.fpop-h{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px 18px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.fpop-h b{display:block;font:700 15px/1.3 var(--font-display);color:var(--text)}
+.fpop-h span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.fpop-h .x{border:0;background:transparent;cursor:pointer;color:var(--muted);width:28px;height:28px;flex:none;border-radius:4px;display:grid;place-items:center}
+.fpop-h .x:hover{background:var(--panel-2);color:var(--text)}
+.fpop .filters{border-bottom:0}
+.fpop .active{position:sticky;bottom:0;background:var(--panel);margin:0 -24px -20px;padding:12px 24px;border-top:1px solid var(--line)}
+/* tablet: the toolbar is icon-only, so the Filters button is too */
+@media (max-width:1100px) and (min-width:701px){ .fbtn span,.fclear span{display:none} .fbtn,.fclear{padding:0 10px} }
+/* phone: the floating filter button opens the same popup as a bottom sheet */
+@media (max-width:700px){
+  .fbtn,.fclear{display:none}
+  /* it sits just above the bottom nav (its map layer is under the nav's, so it can't cover it) */
+  .fpop{position:fixed;left:0;right:0;bottom:calc(var(--navh, 64px) + var(--sb, 0px));top:auto;width:auto;max-height:calc(100% - 200px);border-radius:14px 14px 0 0;z-index:80;box-shadow:0 -10px 32px rgba(11,13,12,.28)}
+}
+
+#card #bCrime{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 1.5 13.5 3.5v4.2c0 3.3-2.3 5.7-5.5 6.8-3.2-1.1-5.5-3.5-5.5-6.8V3.5z'/%3E%3C/svg%3E")}
+
+/* ===== left panel: the rest of it in the section-card style (head, selection box, list header) ===== */
+.panel .head{padding:18px 22px 14px}
+.panel .head h1{font-size:21px;line-height:1.2}
+.panel .head .sub{font-size:12.5px;margin-top:6px}
+.panel .selbar{margin:14px 16px 0;border:1px solid var(--line-2);border-left-width:1px;border-radius:6px;background:var(--panel-2);padding:12px 14px}
+.panel .selbar b{font:700 14px/1.3 var(--font-display)}
+.panel .sechead.listhead{padding:16px 16px 6px;font:700 13px/1.3 var(--font-display);letter-spacing:0;text-transform:none;color:var(--text)}
+.panel .sechead.listhead span{color:var(--text)}
+.panel .fbody .kpiwrap{margin:0}
+
+/* map legends added by layers (ctx.setLegend): same card as the Filings legend */
+.xlegend{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:6px;font-size:12px;color:var(--text-2);min-width:170px;max-width:240px;box-shadow:0 1px 3px rgba(11,13,12,.08)}
+.xlegend .t{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.xlegend .li{display:flex;align-items:center;gap:8px}
+.xlegend .li i{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+.xlegend .lg-grad{height:10px;border-radius:5px}
+.xlegend .lg-ticks{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:-2px}
+.xlegend .lg-note{font-size:11px;color:var(--muted);line-height:1.35}
+@media (max-width:700px){ .xlegend{display:none} }
+.xlegend .lg-ticks.lg-abs{position:relative;display:block;height:12px}
+.xlegend .lg-abs span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.xlegend .lg-abs span:first-child{transform:none}.xlegend .lg-abs span:last-child{transform:translateX(-100%)}
+/* Site section: area reports (radius chips + Crime Report / FEMA Report) */
+#card .site-rep{border-top:1px solid var(--line);padding-top:12px;display:grid;gap:8px}
+#card .mi-chips{display:flex;gap:6px;flex-wrap:wrap}
+#card .mi-chips .chip{border:1px solid var(--line-2);background:var(--panel);border-radius:999px;padding:5px 12px;font:600 12px var(--font-display);color:var(--text-2);cursor:pointer;min-height:30px}
+#card .mi-chips .chip[aria-checked="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
+/* Market: interactive charts (legend toggles, month range, pinned breakdowns, selected bar) */
+.mk-lb{border:0;background:none;padding:2px 4px;margin:0 -4px;font:inherit;color:inherit;cursor:pointer;border-radius:4px}
+.mk-lb:hover{background:var(--panel-2)}
+.mk-lb[aria-pressed="false"]{opacity:.4;text-decoration:line-through}
+.mk-seg{display:inline-flex;border:1px solid var(--line-2);border-radius:6px;overflow:hidden}
+.mk-seg button{border:0;background:var(--panel);padding:6px 10px;font:600 12px var(--font-display);color:var(--text-2);cursor:pointer}
+.mk-seg button+button{border-left:1px solid var(--line-2)}
+.mk-seg button[aria-pressed="true"]{background:var(--text);color:var(--panel)}
+.mk-hint{font-size:11px;color:var(--muted);margin-top:2px}
+.mk-pin{position:relative;margin-top:8px;padding:10px 30px 10px 12px;border:1px solid var(--line-2);border-left:3px solid var(--brand);border-radius:6px;background:var(--panel-2);font-size:12.5px;line-height:1.5}
+.mk-pin .mk-x{position:absolute;right:8px;top:6px;font-size:16px;color:var(--muted)}
+.mk-pl{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.mk-pl span{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 9px;font-size:11.5px}
+.mk-pl em{font-style:normal;color:var(--muted)}
+.mk-h4{font:700 12.5px/1.3 var(--font-display);margin:14px 0 6px;color:var(--text)}
+.mk-hit{cursor:pointer;outline:none}
+.mk-hit:focus-visible rect,.mk-hit:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.mk-hit.on path,.mk-hit.on rect:not([fill="transparent"]){filter:brightness(1.18) saturate(1.2);stroke:var(--text);stroke-width:1.2}
+.mk-hb.mk-hit.on span{color:var(--text);font-weight:700}
+.mk-hb.mk-hit:hover i b,.mk-hb.mk-hit.on i b{filter:brightness(1.15)}
+.vctl .btn{min-height:32px}

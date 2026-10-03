@@ -2,6 +2,8 @@
 //   GET  ?grid=1                         the map layer: last-12-month incidents summed onto ~400 m cells [[lon, lat, violent, property, other], …]
 //   GET  ?lat=..&lon=..&mi=0.5[&list=N]  report for a circle
 //   POST { geometry, list? }             report for any area (a selection box, polygon, county or radius drawn on the map)
+//   GET  ?city=1                         the whole City of Houston (Market view): four quarter-boxes summed, each under the
+//                                        1,500 sq mi report limit; the boxes cover all of HPD's data, so nothing is missed
 // A report has totals by category for the last 12 months and the 12 before, incidents per square mile vs the city,
 // top offenses and premises, a monthly series, and (with list) the incidents themselves, newest first.
 // "Last 12 months" ends at the newest incident HPD has published (its file runs about three months behind).
@@ -50,6 +52,23 @@ export async function crimeReport(db, geometry, list = 0) {
   return shapeReport(r, rows);
 }
 
+// the HPD data's extent (the city plus the airports and annexed strips) in four boxes
+export const CITY_BOXES = (() => { const w = -95.92, e = -94.98, s = 29.50, n = 30.17, mx = (w + e) / 2, my = (s + n) / 2;
+  return [[w, s, mx, my], [mx, s, e, my], [w, my, mx, n], [mx, my, e, n]].map(([a, b, c, d]) => ({ type: 'Polygon', coordinates: [[[a, b], [c, b], [c, d], [a, d], [a, b]]] })); })();
+// several reports -> one (totals, months and offense / premise lists summed; per-sq-mi over the city's land area)
+export function mergeReports(list) {
+  const ok = list.filter(r => r?.latest); if (!ok.length) return { latest: null, note: 'No crime data loaded yet.' };
+  const add = (k, f) => ok.reduce((a, r) => a + (f(r)[k] || 0), 0), cur = {}, pri = {};
+  for (const k of ['v', 'p', 'o', 'total']) { cur[k] = add(k, r => r.last12); pri[k] = add(k, r => r.prior12); }
+  const by = (key, field) => { const m = new Map(); ok.forEach(r => (r[field] || []).forEach(x => { const id = x[key]; const y = m.get(id) || { ...x, n: 0 }; y.n += x.n; m.set(id, y); })); return [...m.values()].sort((a, b) => b.n - a.n); };
+  const months = new Map(); ok.forEach(r => (r.months || []).forEach(x => { const y = months.get(x.m) || { m: x.m, v: 0, p: 0, o: 0 }; y.v += x.v; y.p += x.p; y.o += x.o; months.set(x.m, y); }));
+  const pct = (a, b) => b ? Math.round((a / b - 1) * 100) : null;
+  return { latest: ok.map(r => r.latest).sort().pop(), from: ok.map(r => r.from).sort()[0], area_sqmi: HOUSTON_SQMI, last12: cur, prior12: pri,
+    change: { total: pct(cur.total, pri.total), v: pct(cur.v, pri.v), p: pct(cur.p, pri.p), o: pct(cur.o, pri.o) },
+    per_sqmi: { total: Math.round(cur.total / HOUSTON_SQMI), v: Math.round(cur.v / HOUSTON_SQMI), p: Math.round(cur.p / HOUSTON_SQMI) },
+    offenses: by('code', 'offenses').slice(0, 25), premises: by('premise', 'premises').slice(0, 15), months: [...months.values()].sort((a, b) => a.m.localeCompare(b.m)), coverage: COVERAGE };
+}
+
 export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 40, perDay: 1500 })) return;
   const db = supa(); if (!db) return res.status(503).json({ error: 'Crime data needs the database (SUPABASE_URL and SUPABASE_SECRET_KEY on the server).' });
@@ -60,6 +79,11 @@ export default async function handler(req, res) {
       const cell = 0.004, [rows, latest] = await Promise.all([db.rpc('crime_grid_json', { p_cell: cell }), db.rpc('crime_latest', {})]);
       res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
       return res.json({ cell, latest, cells: (rows || []).map(c => [+c[0], +c[1], +c[2], +c[3], +c[4]]).filter(c => c[2] + c[3] + c[4] > 0), coverage: COVERAGE });
+    }
+    if (q.city) {
+      const d = mergeReports(await Promise.all(CITY_BOXES.map(g => crimeReport(db, g))));
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
+      return res.json(d);
     }
     let geometry, list = 0;
     if (req.method === 'POST') { const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}; geometry = cleanGeometry(b.geometry); list = +b.list || 0; }

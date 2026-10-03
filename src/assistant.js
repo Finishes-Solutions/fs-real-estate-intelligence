@@ -574,7 +574,7 @@ export function initAssistant(ctx) {
           const p = await pointFor(a); if (p.error) return p;
           const mi = Math.min(8, Math.max(0.05, a.radius_miles || (p.kind && !/address|building|poi/.test(p.kind) ? 1 : 0.25))), r = mi / 69, k = Math.cos(p.c[1] * Math.PI / 180), ring = [];
           for (let i = 0; i <= 64; i++) { const t = (i % 64) / 64 * 2 * Math.PI; ring.push([p.c[0] + r * Math.cos(t) / k, p.c[1] + r * Math.sin(t)]); }
-          geometry = { type: 'Polygon', coordinates: [ring] }; label = (mi === 0.25 ? '¼' : mi) + ' mile around ' + p.label;
+          geometry = { type: 'Polygon', coordinates: [ring] }; label = mi + ' mi around ' + p.label;
         }
         const d = await ctx.femaReportData(geometry, label);
         if (a.show_layer) ctx.femaLayer?.(true);
@@ -595,7 +595,7 @@ export function initAssistant(ctx) {
           const p = await pointFor(a); if (p.error) return p;
           const mi = Math.min(5, Math.max(0.1, a.radius_miles || (p.kind && !/address|building|poi/.test(p.kind) ? 1 : 0.5))), r = mi / 69, k = Math.cos(p.c[1] * Math.PI / 180), ring = [];
           for (let i = 0; i <= 64; i++) { const t = (i % 64) / 64 * 2 * Math.PI; ring.push([p.c[0] + r * Math.cos(t) / k, p.c[1] + r * Math.sin(t)]); }
-          geometry = { type: 'Polygon', coordinates: [ring] }; label = (mi === 0.5 ? '½' : mi) + ' mile around ' + p.label;
+          geometry = { type: 'Polygon', coordinates: [ring] }; label = mi + ' mi around ' + p.label;
         }
         const d = await ctx.crimeReportData(geometry, 2000); if (!d.latest) return { error: d.note || 'No crime data loaded yet.' };
         if (a.show_layer) ctx.crimeLayer?.(true);

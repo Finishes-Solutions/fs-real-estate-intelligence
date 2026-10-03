@@ -24,7 +24,7 @@ export const METRICS = [
   { k: 'active', short: 'Building now', label: 'Under construction', fn: l => { const t = today(); return l.filter(f => f.ts <= t && f.te >= t).length; }, fmt: fmtN },
   { k: 'starting', short: 'Start ≤ 90 days', label: 'Starting in 90 days', fn: l => { const t = today(), e = daysFrom(90); return l.filter(f => f.ts > t && f.ts <= e).length; }, fmt: fmtN },
   { k: 'last30', short: 'Filed 30 days', label: 'Filed last 30 days', fn: l => { const s = daysFrom(-30); return l.filter(f => (f.reg || '') >= s).length; }, fmt: fmtN },
-  { k: 'sqft', label: 'Sq ft filed', fn: l => sum(l, f => f.sqft), fmt: v => v ? fmtN(v) : '–' },
+  { k: 'sqft', label: 'Sq ft filed', fn: l => sum(l, f => f.sqft), fmt: v => !v ? '–' : v >= 1e6 ? (v / 1e6).toFixed(v >= 1e8 ? 0 : 1) + 'M' : fmtN(v) }, // 213M, not 213,382,1… in a tile
   { k: 'psf', short: '$ / sq ft', label: 'Avg. $ / sq ft', fn: l => { const w = l.filter(f => f.sqft > 0 && f.cost > 0); const sq = sum(w, f => f.sqft); return sq ? sum(w, f => f.cost) / sq : 0; }, fmt: v => v ? '$' + Math.round(v) : '–' },
   { k: 'units', short: 'Units', label: 'Housing units', fn: l => sum(l, f => f.units), fmt: v => v ? fmtN(v) : '–' },
   { k: 'devs', label: 'Developers', fn: l => new Set(l.map(f => entityKey(f.dev || f.owner)).filter(Boolean)).size, fmt: fmtN },

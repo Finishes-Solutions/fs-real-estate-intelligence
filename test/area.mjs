@@ -20,7 +20,7 @@ const jobs = parseWac(wacCur, ['48473', '48201']);
 assert.equal(jobs['48473000100'].jobs, 150, 'blocks summed to the tract'); assert.equal(jobs['48473000100'].sec[6], 120, 'retail jobs (CNS07)');
 assert.equal(jobs['48201999900'].jobs, 999); assert.ok(!jobs['48481000100'], 'other counties dropped');
 const b = parseBps(BPS('2024', [['48', '473', 900, 240], ['48', '1', 5, 0], ['06', '473', 77, 77]]), ['48473']);
-assert.deepEqual(b['48473'], { date: '2024', sf: 900, mf: 2 + 0 + 240, mf5: 240, value: (900 * 250 + 400 + 240 * 120) * 1000 }, 'units by type, value in dollars, rep columns ignored');
+assert.deepEqual(b['48473'], { date: '2024', sf: 900, mf: 2 + 0 + 240, mf5: 240, value: 900 * 250 + 400 + 240 * 120 }, 'units by type, value as the file gives it (dollars), rep columns ignored');
 assert.equal(Object.keys(b).length, 1, 'only the region, matched on state + county');
 assert.throws(() => parseBps('a,b\nc,d\n', ['48473']), /unexpected BPS header/);
 assert.equal(SECTORS[sectorOf('722511')][1], 'Hotels & restaurants'); assert.equal(SECTORS[sectorOf('445110')][1], 'Retail'); assert.equal(sectorOf('999'), null);
