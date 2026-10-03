@@ -352,34 +352,52 @@ function renderList(){
 
 // ---------- detail card ----------
 const card=document.getElementById('card'), panel=document.getElementById('panel');
+// section chips under a card's title: one per section that has content (sections other modules add later appear as they
+// arrive); a chip scrolls the card to its section
+function cardNav(items){ return '<nav class="bnav" aria-label="Card sections">'+items.map(([id,l])=>'<button type="button" data-sec="'+id+'" hidden>'+esc(l)+'</button>').join('')+'</nav>'; }
+let navT=0;
+function syncNav(){ card.querySelectorAll('.bnav [data-sec]').forEach(b=>{ const el=card.querySelector('#'+b.dataset.sec); b.hidden=!(el&&!el.hidden&&el.innerHTML.trim()); }); }
+new MutationObserver(()=>{ cancelAnimationFrame(navT); navT=requestAnimationFrame(syncNav); }).observe(card,{childList:true,subtree:true});
+card.addEventListener('click',e=>{ const b=e.target.closest('.bnav [data-sec]'); if(!b) return; const el=card.querySelector('#'+b.dataset.sec); if(!el) return;
+  card.querySelectorAll('.bnav [data-sec]').forEach(x=>x.setAttribute('aria-current',x===b));
+  card.scrollTo({top:el.offsetTop-(card.querySelector('.top')?.offsetHeight||0)-10,behavior:reduceMotion?'auto':'smooth'}); });
 function select(f,fly){
   showFilings();
   cardCloseHooks.forEach(fn=>fn());
   state.sel=f; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach((b,i)=>b.classList.toggle('on',visible[i]===f));
-  card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2></div>'+
-    '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>'+
-    '<dl><dt>Est. value</dt><dd style="font-family:var(--font-mono);font-weight:600">'+fmtM(f.cost)+'</dd>'+
-    (f.sqft?'<dt>Area</dt><dd style="font-family:var(--font-mono)">'+fmtN(f.sqft)+' sq ft</dd>':'')+
-    (sel.kind==='radius'&&f._d!=null?'<dt>Distance</dt><dd style="font-family:var(--font-mono)">'+fmtMi(f._d)+' from center</dd>':'')+
-    (f.use?'<dt>Use</dt><dd>'+esc(f.use)+(f.sub?' · '+esc(f.sub):'')+(f.units?' · '+fmtN(f.units)+' units':'')+'</dd>':'')+
-    (f.ten?'<dt>Tenant</dt><dd>'+esc(f.ten)+'</dd>':'')+
-    '<dt>Address</dt><dd>'+esc(f.addr||'—')+'</dd><dt>Owner</dt><dd>'+esc(f.owner||'—')+'</dd>'+
-    (f.dev&&f.dev.toLowerCase()!==String(f.owner).toLowerCase()?'<dt>Developer</dt><dd>'+whoLink('dev',f.dev||f.owner,f.dev)+'</dd>':'')+
-    (f.arch?'<dt>Architect</dt><dd>'+whoLink('arch',f.arch,f.arch)+'</dd>':'')+(f.gc?'<dt>GC</dt><dd>'+whoLink('gc',f.gc,f.gc)+'</dd>':'')+
-    '<dt>Registered</dt><dd style="font-family:var(--font-mono)">'+esc(f.reg)+'</dd>'+
-    '<dt>Schedule</dt><dd style="font-family:var(--font-mono)">'+esc(f.ts)+(f.tsE?'<sup title="Estimated by us: the filer gave no start date">est</sup>':'')+' → '+esc(f.te)+(f.teE?'<sup title="Estimated by us from project type and value">est</sup>':'')+'</dd>'+
-    '<dt>Status</dt><dd>'+esc(f.status||'—')+'</dd><dt>TABS #</dt><dd style="font-family:var(--font-mono)">'+esc(f.id)+'</dd></dl>'+
-    (f.sum?'<div class="scope sum">'+esc(f.sum)+'</div>':'')+
-    (f.scope?'<div class="scope">'+esc(f.scope)+'</div>':'')+historyHtml(f)+
-    '<div class="brief" id="briefBox"><button class="btn" id="briefBtn">AI Project Brief</button></div>'+
+  const fld=(k,v,w)=>'<div class="f'+(w?' w':'')+'"><div class="fl">'+k+'</div><div class="fv">'+v+'</div></div>';
+  const people=[['Owner',esc(f.owner||'—')],f.dev&&f.dev.toLowerCase()!==String(f.owner).toLowerCase()?['Developer',whoLink('dev',f.dev||f.owner,f.dev)]:null,f.arch?['Architect',whoLink('arch',f.arch,f.arch)]:null,f.gc?['General contractor',whoLink('gc',f.gc,f.gc)]:null].filter(Boolean);
+  const gsv='https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+f.lat.toFixed(6)+','+f.lon.toFixed(6);
+  card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2>'+(f.addr?'<div class="bsub">'+esc(f.addr)+'</div>':'')+'</div>'+
+    '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>'+
+    cardNav([['fProj','Project'],['fSched','Schedule'],['fPeople','People'],['fScope','Scope'],['airSec','Air'],['briefBox','AI Brief'],['liveSec','From Here'],['fTools','Tools']])+'</div>'+
+    (f.sum?'<div class="bover"><div class="kicker">Overview</div><div>'+esc(f.sum)+'</div></div>':'')+
     (f.approx?'<div class="note">Location is approximate: the address didn’t geocode, so this marker sits at the city center (shaded circle), not on the site.</div>':'')+
     (f.prec==='street'?'<div class="note">Placed on '+esc((f.addr||'the street').replace(/^\s*0*\s*\d*[a-z]?(?:-\w+)?\s+/i,'').split(',')[0])+(f.zip?' in '+esc(f.zip):'')+', not at the exact site: '+(/^\s*0*[1-9]/.test(f.addr||'')?'no map service has this house number yet (often a new subdivision or a new address)':'the filing gives no house number')+'.</div>':f.prec==='intersection'?'<div class="note">Placed at the intersection named in the filing.</div>':'')+
     (!visible.includes(f)?'<div class="note">Your current filters'+(sel.feature?' and selection (“'+esc(sel.label)+'”)':'')+' hide this filing, so it’s shown on its own. <button class="lnk" id="showAll">Clear Filters</button></div>':'')+
     (f.misfiled?'<div class="note">The filer tagged this to '+esc(f.county)+' County, but the address is outside it.</div>':'')+
-    '<a class="go" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener">Open TABS Record <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h7v7M13 3 4 12"/></svg></a>';
+    '<div class="bsec" id="fProj"><div class="lt">Project</div><div class="fgrid">'+
+      fld('Est. value','<span class="mono">'+fmtM(f.cost)+'</span>')+fld('Area',f.sqft?'<span class="mono">'+fmtN(f.sqft)+' sq ft</span>':'<span class="fv dim">Not given</span>')+
+      (f.use?fld('Use',esc(f.use)+(f.sub?' · '+esc(f.sub):'')):'')+(f.units?fld('Units',fmtN(f.units)):'')+(f.ten?fld('Tenant',esc(f.ten)):'')+
+      (sel.kind==='radius'&&f._d!=null?fld('Distance',fmtMi(f._d)+' from center'):'')+fld('Address',esc(f.addr||'—'),true)+
+    '</div><div class="ssrc src">TDLR TABS registration. Costs are filer estimates.</div></div>'+
+    '<div class="bsec" id="fSched"><div class="lt">Schedule</div><dl>'+
+      '<dt>Registered</dt><dd class="mono">'+esc(f.reg)+'</dd>'+
+      '<dt>Start</dt><dd class="mono">'+esc(f.ts)+(f.tsE?'<sup title="Estimated by us: the filer gave no start date">est</sup>':'')+'</dd>'+
+      '<dt>Finish</dt><dd class="mono">'+esc(f.te)+(f.teE?'<sup title="Estimated by us from project type and value">est</sup>':'')+'</dd>'+
+      '<dt>Status</dt><dd>'+esc(f.status||'—')+'</dd><dt>TABS #</dt><dd class="mono">'+esc(f.id)+'</dd></dl>'+
+      ((f.tsE||f.teE)?'<div class="ssrc src">“est” dates are our estimates from the project type and value.</div>':'')+historyHtml(f)+'</div>'+
+    '<div class="bsec" id="fPeople"><div class="lt">People</div><dl>'+people.map(([k,v])=>'<dt>'+k+'</dt><dd>'+v+'</dd>').join('')+'</dl><div class="ssrc src">Developer, architect and GC are AI-extracted from the filing text and can be wrong.</div></div>'+
+    (f.scope?'<div class="bsec" id="fScope"><div class="lt">Scope of Work</div><div class="scope">'+esc(f.scope)+'</div></div>':'')+
+    '<div class="bsec brief-sec" id="briefBox"><div class="lt">AI Project Brief</div><button class="btn" id="briefBtn">Write a Brief</button><div class="rnote">From the filing, nearby activity and census data.</div></div>'+
+    '<div class="bsec" id="fTools"><div class="lt">Tools</div><div class="bacts">'+
+      '<a class="btn" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener">TABS Record ↗</a><a class="btn" href="'+gsv+'" target="_blank" rel="noopener">Street View ↗</a>'+
+      '<button class="btn" type="button" id="fNote">Add Site Note</button><button class="btn askai" type="button" id="fAsk">Ask AI About It</button></div></div>';
   card.querySelector('.x').onclick=closeCard; card.classList.add('open');
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
+  card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat]});
+  card.querySelector('#fAsk').onclick=()=>ctx.assistant?.ask('Tell me more about '+f.name);
   card.querySelector('#showAll')?.addEventListener('click',()=>{ clearHighlight(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC(),{fly:false}); select(f,false); });
   scheduleHash(); cardRenderHooks.forEach(fn=>fn({kind:'filing',f}));
   if(fly){ const z=f.approx?Math.min(Math.max(map.getZoom(),12.5),13.5):Math.max(map.getZoom(),16); map.flyTo({center:[f.lon,f.lat],zoom:z,offset:window.innerWidth<=700?[0,-Math.round(window.innerHeight*.22)]:window.innerWidth<=1100?[-200,0]:[-140,0],duration:reduceMotion?0:900});  }
@@ -388,13 +406,13 @@ function whoLink(k,raw,label){ const v=entityKey(raw); return v?'<a href="#" dat
 function historyHtml(f){
   const rows=DATA.changes.runs.flatMap(r=>r.items.filter(x=>x.id===f.id).map(x=>[r.built.slice(0,10),x])); if(!rows.length) return '';
   const fv=(k,v)=>v==null||v===''?'—':k==='cost'?fmtM(v):k==='sqft'?fmtN(v):String(v);
-  return '<div class="hist"><div class="lt">History</div>'+rows.map(([d,x])=>'<div><span class="m">'+esc(d)+'</span> '+(x.k==='new'?'First seen':esc(x.label)+': '+esc(fv(x.k,x.from))+' → '+esc(fv(x.k,x.to)))+'</div>').join('')+'</div>'; }
+  return '<div class="fhist"><div class="fl">History</div>'+rows.map(([d,x])=>'<div><span class="m">'+esc(d)+'</span> '+(x.k==='new'?'First seen':esc(x.label)+': '+esc(fv(x.k,x.from))+' → '+esc(fv(x.k,x.to)))+'</div>').join('')+'</div>'; }
 async function loadBrief(f){
-  const box=card.querySelector('#briefBox'); if(!box) return; box.innerHTML='<div class="rnote">Writing a brief from the filing, nearby activity and census data…</div>';
+  const box=card.querySelector('#briefBox'); if(!box) return; box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote">Writing a brief from the filing, nearby activity and census data…</div>';
   try{ const r=await fetch('api/brief?id='+encodeURIComponent(f.id)); const d=await r.json().catch(()=>({}));
     if(state.sel!==f) return; if(!r.ok) throw new Error(d.error||('Error '+r.status));
-    box.innerHTML='<div class="lt">AI project brief</div><div class="btext">'+richText(d.brief)+'</div><div class="rnote">AI-written from the data on this page. Verify before relying on it.</div>'; wireCites(box); }
-  catch(e){ if(state.sel===f) box.innerHTML='<div class="rnote">'+esc(e.message)+'</div><button class="btn" id="briefBtn">Try Again</button>', box.querySelector('#briefBtn').onclick=()=>loadBrief(f); }
+    box.innerHTML='<div class="lt">AI Project Brief</div><div class="btext">'+richText(d.brief)+'</div><div class="ssrc src">AI-written from the data on this page. Verify before relying on it.</div>'; wireCites(box); }
+  catch(e){ if(state.sel===f) box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote">'+esc(e.message)+'</div><button class="btn" id="briefBtn">Try Again</button>', box.querySelector('#briefBtn').onclick=()=>loadBrief(f); }
 }
 // AI text -> safe HTML: escaped, paragraphs, [TABS…] citations become buttons that select the filing
 function richText(t){ return textBlocks(esc(plainText(t||''))).replace(/\[(TABS[0-9A-Za-z-]+)\]/g,(m,id)=>BY_ID.has(id)?'<button class="cite" data-id="'+id+'">'+id+'</button>':id); }
@@ -804,7 +822,7 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return COUNTIES.join(', ')+', '+[...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,60).map(x=>x[0]).join(', '); }
-Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },

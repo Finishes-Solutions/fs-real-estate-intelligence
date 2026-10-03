@@ -8,6 +8,7 @@
 //                           (api/planes ?flight=, paid AeroAPI behind a hard monthly cap; one lookup per plane per session).
 // Both toggles live in Layers → Live Conditions (registered with src/live.js) and in the assistant's set_live_layers.
 import { pickAircraft } from './lib/assist-logic.mjs';
+import { SHAPES, SIZE } from './lib/aircraft-shapes.mjs';
 
 const REFRESH = 10e3, MINZ = 5, KT = 1.852 / 3600; // km per second per knot
 const BANDS = [[1, '#8d9598'], [3000, '#e3622b'], [10000, '#eda100'], [25000, '#3987e5'], [99999, '#1f9249']]; // ground, low, climbing, mid, cruise
@@ -17,13 +18,39 @@ export function initPlanes(ctx) {
   let list = [], at = 0, src = '', timer = 0, tick = 0, ctl = null, moveT = 0, err = '', follow = null, shown = null, paths = null, pathsCtl = null;
   const on = () => !!ctx.live?.state?.().planes;
 
-  // ---------- icon: an airplane pointing north, drawn once as an SDF so altitude bands can recolour it ----------
-  function planeImage() {
-    const n = 64, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'), m = n / 2;
-    g.fillStyle = '#000'; g.beginPath();
-    g.moveTo(m, 4); g.lineTo(m + 4, 14); g.lineTo(m + 4, 24); g.lineTo(m + 26, 36); g.lineTo(m + 26, 41); g.lineTo(m + 4, 34); g.lineTo(m + 4, 50);
-    g.lineTo(m + 11, 56); g.lineTo(m + 11, 60); g.lineTo(m, 57); g.lineTo(m - 11, 60); g.lineTo(m - 11, 56); g.lineTo(m - 4, 50); g.lineTo(m - 4, 34);
-    g.lineTo(m - 26, 41); g.lineTo(m - 26, 36); g.lineTo(m - 4, 24); g.lineTo(m - 4, 14); g.closePath(); g.fill();
+  // ---------- icons: a top-down silhouette per kind of aircraft (lib/aircraft-shapes.mjs picks it from the ICAO type),
+  // nose north, drawn once each as SDFs so altitude bands can recolour them; SIZE scales them (a 747 dwarfs a Cessna) ----------
+  function shapeImage(kind) {
+    const n = 64, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'), X = 32;
+    g.fillStyle = '#000';
+    const body = (y0, y1, w) => { const r = w / 2; g.beginPath(); g.moveTo(X - r, y0 + r * 1.8); g.quadraticCurveTo(X - r, y0, X, y0); g.quadraticCurveTo(X + r, y0, X + r, y0 + r * 1.8);
+      g.lineTo(X + r * .55, y1 - 1.5); g.quadraticCurveTo(X, y1 + 1, X - r * .55, y1 - 1.5); g.closePath(); g.fill(); };
+    // a pair of wings (or tailplanes): root at the fuselage, swept back by `sweep`, tip chord `tip`
+    const wings = (y, root, span, sweep, tip, half = 2.5) => { for (const k of [-1, 1]) { g.beginPath(); g.moveTo(X + k * half, y); g.lineTo(X + k * span / 2, y + sweep);
+      g.lineTo(X + k * span / 2, y + sweep + tip); g.lineTo(X + k * half, y + root); g.closePath(); g.fill(); } };
+    const rr = (x, y, w, h, r) => { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); g.fill(); };
+    const pods = (dx, y, len, w) => { for (const k of dx ? [-1, 1] : [0]) rr(X + k * dx - w / 2, y, w, len, w / 2); };
+    const props = (dx, y, w) => { for (const k of dx ? [-1, 1] : [0]) g.fillRect(X + k * dx - w / 2, y, w, 1.8); };
+    const blade = (cx, cy, len, w, a) => { g.save(); g.translate(cx, cy); g.rotate(a); g.fillRect(-len / 2, -w / 2, len, w); g.restore(); };
+    switch (kind) {
+      case 'heavy4': body(1, 62, 8); wings(21, 17, 62, 18, 5, 3.5); wings(51, 9, 26, 7, 3, 3); pods(13, 25, 9, 4.5); pods(22, 31, 8, 4); break;
+      case 'heavy2': body(1, 62, 8); wings(21, 16, 62, 17, 5, 3.5); wings(51, 9, 26, 7, 3, 3); pods(15, 25, 11, 5.5); break;
+      case 'regional': body(3, 61, 5.5); wings(27, 11, 46, 9, 4); wings(54, 7, 20, 5, 3); pods(5.4, 40, 10, 4); break;
+      case 'bizjet': body(6, 58, 5); wings(28, 10, 40, 9, 3); wings(51, 6, 18, 5, 2.5); pods(5, 39, 8, 3.6); break;
+      case 'fighter': body(1, 62, 5); wings(20, 28, 36, 22, 4); wings(50, 10, 22, 7, 3); break;
+      case 'turboprop2': body(6, 60, 5); wings(22, 9, 56, 0, 6); wings(52, 7, 20, 1, 5); pods(11, 15, 15, 4); props(11, 13.5, 12); break;
+      case 'turboprop1': body(5, 58, 5); wings(20, 9, 50, 0, 6); wings(50, 7, 18, 1, 5); props(0, 3, 14); break;
+      case 'twin': body(9, 56, 4.5); wings(24, 8, 46, 0, 6); wings(48, 6, 16, 0, 5); pods(9, 19, 11, 3.5); props(9, 17.5, 10); break;
+      case 'single': body(7, 57, 4.5); wings(19, 8, 50, 0, 7); wings(49, 7, 18, 0, 5); props(0, 5, 12); break;
+      case 'glider': body(12, 58, 3); wings(22, 5, 62, 0, 3, 1.5); wings(54, 4, 16, 0, 3, 1.5); break;
+      case 'heli': g.beginPath(); g.ellipse(X, 24, 6.5, 10, 0, 0, Math.PI * 2); g.fill(); g.fillRect(X - 1.3, 32, 2.6, 25); g.fillRect(X - 5, 54, 10, 2.6);
+        blade(X, 24, 56, 3.5, Math.PI / 4); blade(X, 24, 56, 3.5, -Math.PI / 4); break;
+      case 'balloon': g.beginPath(); g.arc(X, 25, 17, 0, Math.PI * 2); g.fill(); g.fillRect(X - 4, 48, 8, 7); g.fillRect(X - 3.5, 40, 1.4, 9); g.fillRect(X + 2.1, 40, 1.4, 9); break;
+      case 'drone': blade(X, 32, 44, 3.5, Math.PI / 4); blade(X, 32, 44, 3.5, -Math.PI / 4); rr(X - 6, 26, 12, 12, 3);
+        for (const [dx, dy] of [[-15, -15], [15, -15], [-15, 15], [15, 15]]) { g.beginPath(); g.arc(X + dx, 32 + dy, 6, 0, Math.PI * 2); g.fill(); } break;
+      case 'ground': rr(X - 8, 18, 16, 28, 4); break;
+      default: body(2, 61, 6); wings(24, 13, 56, 13, 4, 3); wings(51, 8, 22, 6, 3, 3); pods(12, 25, 9, 4); // jet
+    }
     return g.getImageData(0, 0, n, n);
   }
   const altLabel = p => p.ground ? 'ground' : p.alt == null ? '' : p.alt >= 18000 ? 'FL' + Math.round(p.alt / 100) : p.alt.toLocaleString('en-US') + ' ft';
@@ -33,18 +60,18 @@ export function initPlanes(ctx) {
     return { type: 'FeatureCollection', features: list.map(p => {
       let { lon, lat } = p;
       if (!p.ground && p.gs > 30 && p.track != null) { const d = p.gs * KT * dt, a = p.track * R; lat += d * Math.cos(a) / 110.57; lon += d * Math.sin(a) / (111.32 * Math.cos(lat * R)); }
-      return { type: 'Feature', properties: { hex: p.hex, track: p.track || 0, alt: p.ground ? 0 : (p.alt ?? 0), t: [p.flight || p.reg || '', altLabel(p)].filter(Boolean).join('\n') }, geometry: { type: 'Point', coordinates: [lon, lat] } };
+      return { type: 'Feature', properties: { hex: p.hex, shape: SHAPES.includes(p.shape) ? p.shape : 'jet', sz: SIZE[p.shape] || 1, track: p.track || 0, alt: p.ground ? 0 : (p.alt ?? 0), t: [p.flight || p.reg || '', altLabel(p)].filter(Boolean).join('\n') }, geometry: { type: 'Point', coordinates: [lon, lat] } };
     }) };
   }
   const below = () => ['filings', 'fs-field'].find(id => map.getLayer(id));
   function addLayers() {
     if (!map.getStyle()) return;
-    if (!map.hasImage('live-plane')) map.addImage('live-plane', planeImage(), { sdf: true, pixelRatio: 2 });
+    for (const k of SHAPES) if (!map.hasImage('plane-' + k)) map.addImage('plane-' + k, shapeImage(k), { sdf: true, pixelRatio: 2 });
     if (!map.getSource('live-planes')) map.addSource('live-planes', { type: 'geojson', data: fc(), attribution: 'Aircraft: adsb.lol (ODbL) · airplanes.live' });
     if (!map.getLayer('live-planes')) map.addLayer({ id: 'live-planes', type: 'symbol', source: 'live-planes', layout: {
-      'icon-image': 'live-plane', 'icon-rotate': ['get', 'track'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 5, .45, 9, .68, 13, .95],
-      'text-field': ['step', ['zoom'], '', 9, ['get', 't']], 'text-font': ['Noto Sans Bold'], 'text-size': 10, 'text-offset': [0, 1.9], 'text-optional': true, 'text-allow-overlap': false },
+      'icon-image': ['concat', 'plane-', ['get', 'shape']], 'icon-rotate': ['get', 'track'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 5, ['*', .45, ['get', 'sz']], 9, ['*', .68, ['get', 'sz']], 13, ['*', .95, ['get', 'sz']]],
+      'text-field': ['step', ['zoom'], '', 9, ['get', 't']], 'text-font': ['Noto Sans Bold'], 'text-size': 10, 'text-offset': ['case', ['>=', ['get', 'sz'], 1.2], ['literal', [0, 2.6]], ['literal', [0, 1.9]]], 'text-optional': true, 'text-allow-overlap': false },
       paint: { 'icon-color': ['step', ['get', 'alt'], BANDS[0][1], ...BANDS.flatMap(([a, c], i) => i ? [BANDS[i - 1][0], c] : [])],
         'icon-halo-color': ctx.isDark() ? '#0b0d0c' : '#ffffff', 'icon-halo-width': 1.4,
         'text-color': ctx.isDark() ? '#dde1e2' : '#23282a', 'text-halo-color': ctx.isDark() ? '#16191a' : '#ffffff', 'text-halo-width': 1.5 } });
@@ -204,18 +231,19 @@ export function initPlanes(ctx) {
     const p = find(hex); if (!p) { if (!refresh) toast('That aircraft is no longer in view.'); return; }
     if (!refresh) { const keep = follow === hex ? hex : null, orb = keep && orbiting; ctx.closeCard?.(); follow = keep; orbiting = !!orb; if (routeOn?.hex !== hex) clearRoute(); }
     shown = hex;
-    const rows = [['Altitude', p.ground ? 'On the ground' : altLabel(p) + (p.vs ? (p.vs > 150 ? ' · climbing ' : p.vs < -150 ? ' · descending ' : ' · level ') + (Math.abs(p.vs) > 150 ? Math.abs(p.vs).toLocaleString('en-US') + ' ft/min' : '') : '')],
-      ['Speed', p.gs != null ? p.gs + ' kt (' + Math.round(p.gs * 1.15078) + ' mph)' : '—'], ['Heading', p.track != null ? p.track + '°' : '—'],
-      ['Aircraft', [p.type, p.desc].filter(Boolean).join(' · ') || '—'], ['Registration', p.reg || '—'], ['Squawk', p.squawk || '—'], ['ICAO hex', p.hex]];
+    const vs = p.vs > 150 ? 'Climbing ' + Math.abs(p.vs).toLocaleString('en-US') + ' ft/min' : p.vs < -150 ? 'Descending ' + Math.abs(p.vs).toLocaleString('en-US') + ' ft/min' : p.ground ? '' : 'Level';
+    const rows = [['Type', [p.desc, p.type].filter(Boolean).join(' · ') || '—'], ['Registration', p.reg || '—'], ['Squawk', p.squawk || '—'], ['ICAO hex', p.hex]];
     card.innerHTML = '<div class="top"><div><div class="kicker">Aircraft · live</div><h2>' + esc(p.flight || p.reg || p.hex.toUpperCase()) + '</h2><div class="bsub" id="plRoute">' + (p.flight ? 'Looking up the route…' : 'No callsign') + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
-      '<dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
-      '<div class="bacts"><button class="btn' + (follow === hex && !orbiting ? ' on' : '') + '" id="plFollow">' + (follow === hex && !orbiting ? 'Following' : 'Follow') + '</button>' +
-      '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
-      '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">Track on adsb.lol ↗</a>' +
-      (p.flight ? '<a class="btn" target="_blank" rel="noopener" href="https://www.flightaware.com/live/flight/' + encodeURIComponent(p.flight) + '">FlightAware ↗</a>' : '') + '</div>' +
+      '<div class="bsec pl-sec"><div class="lt">Flight</div><div class="kgrid"><div><b>' + esc(p.ground ? 'Ground' : altLabel(p)) + '</b><span>Altitude' + (vs ? ' · ' + esc(vs) : '') + '</span></div>' +
+        '<div><b>' + (p.gs != null ? p.gs + ' kt' : '—') + '</b><span>Speed' + (p.gs != null ? ' · ' + Math.round(p.gs * 1.15078) + ' mph' : '') + '</span></div><div><b>' + (p.track != null ? p.track + '°' : '—') + '</b><span>Heading</span></div><div><b id="plDist">—</b><span>Route</span></div></div></div>' +
+      '<div class="bsec" id="plAc"><div class="lt">Aircraft</div><dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl></div>' +
       faHtml(faDone.get(hex)) + regHtml(p, regDone.get(hex)) +
-      '<div class="bsrc rnote">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown.</div>';
+      '<div class="bsec" id="plTools"><div class="lt">Tools</div><div class="bacts"><button class="btn' + (follow === hex && !orbiting ? ' on' : '') + '" id="plFollow">' + (follow === hex && !orbiting ? 'Following' : 'Follow') + '</button>' +
+      '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
+      '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">adsb.lol ↗</a>' +
+      (p.flight ? '<a class="btn" target="_blank" rel="noopener" href="https://www.flightaware.com/live/flight/' + encodeURIComponent(p.flight) + '">FlightAware ↗</a>' : '') + '</div>' +
+      '<div class="ssrc src">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown. Routes: adsbdb and adsb.lol.</div></div>';
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#plFollow').onclick = () => { const was = follow === hex && !orbiting; follow = was ? null : hex; orbiting = false; renderCard(hex, true); if (follow) followCam(); };
     card.querySelector('#plOrbit').onclick = () => { const was = follow === hex && orbiting; follow = was ? null : hex; orbiting = !was; renderCard(hex, true);
@@ -225,6 +253,7 @@ export function initPlanes(ctx) {
     const r = await routeFor(p), el = card.querySelector('#plRoute');
     const known = r?.origin && r?.destination;
     if (el && shown === hex) el.textContent = known ? ap(r.origin).replace(/&amp;/g, '&') + ' → ' + ap(r.destination).replace(/&amp;/g, '&') : faIdent(p) ? 'Checking FlightAware…' : 'No callsign';
+    const rd = card.querySelector('#plDist'); if (rd && shown === hex) rd.textContent = known ? (r.origin.code || '?') + ' → ' + (r.destination.code || '?') : '—';
     if (!known && faIdent(p)) {
       const fa = await faFor(p), e2 = card.querySelector('#plRoute'); if (shown !== hex) return;
       const c = fa?.current;
@@ -332,8 +361,10 @@ export function initPlanes(ctx) {
       const lvl = h.low_per_day >= 40 ? 'heavy' : h.low_per_day >= 10 ? 'moderate' : h.low_per_day >= 2 ? 'light' : 'very little';
       const sec = document.createElement('div'); sec.className = 'bsec'; sec.id = 'airSec';
       sec.innerHTML = '<div class="lt">Air Traffic</div><div><b>' + esc(lvl[0].toUpperCase() + lvl.slice(1)) + ' low air traffic</b>: about ' + h.low_per_day + ' sightings a day of aircraft below 3,000 ft within ~1 km' +
-        (h.lowest_ft != null ? ', lowest ' + h.lowest_ft.toLocaleString('en-US') + ' ft' : '') + '.</div><div class="rnote">Last ' + h.days + ' days, ' + h.sampled_days + ' days sampled in 5-minute snapshots (an exposure index, not a flight count). <button class="lnk" type="button" id="airNow">Planes overhead now</button></div>';
-      (card.querySelector('#liveSec') || card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
+        (h.lowest_ft != null ? ', lowest ' + h.lowest_ft.toLocaleString('en-US') + ' ft' : '') + '.</div><div class="fs">Last ' + h.days + ' days, ' + h.sampled_days + ' days sampled (an exposure index, not a flight count).' + (h.sampled_days < 3 ? ' The history is still filling in.' : '') + '</div>' +
+        '<button class="btn" type="button" id="airNow">Planes Overhead Now</button><div class="ssrc src">Community ADS-B receivers (adsb.lol), sampled every minute.</div>';
+      // building card: before Construction; filing card: before From Here
+      (card.querySelector('#bFilings') || card.querySelector('#liveSec') || card.querySelector('#fTools') || card.lastElementChild)?.before(sec);
       sec.querySelector('#airNow').onclick = () => { ctx.live.set({ planes: true }); map.easeTo({ center: c, zoom: Math.max(map.getZoom(), 11), duration: ctx.reduceMotion ? 0 : 700 }); };
     });
   });

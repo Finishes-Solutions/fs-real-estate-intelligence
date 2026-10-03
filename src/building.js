@@ -151,6 +151,7 @@ export function initBuildings(ctx) {
     if (s.gfa) r.push(['Est. floor area', '~' + fmtN(s.gfa) + ' sq ft <span class="sc">(footprint × ' + s.fl + ' floor' + (s.fl > 1 ? 's' : '') + ')</span>']);
     if (s.h) r.push(['Height', ft(s.h) + (s.lidMax ? ' · ' + ft(s.lidMax) + ' to the top' : '') + ' <span class="sc">(' + esc(s.hSrc) + ')</span>']);
     if (s.fl) r.push(['Floors', (s.fSrc === 'estimated from height' ? '~' : '') + s.fl + ' <span class="sc">(' + esc(s.fSrc) + ')</span>']);
+    if (!r.length && !s.note) return '<div class="rnote">' + (b.footprint ? 'No size or height data for this building yet.' : 'No building outline is mapped at this spot. Click a building for its footprint, height and floors.') + '</div>';
     return '<dl class="bsize">' + r.map(([k, v]) => '<dt>' + k + '</dt><dd class="mono">' + v + '</dd>').join('') + '</dl>' + (s.note ? '<div class="rnote">' + esc(s.note) + '</div>' : '');
   }
   // parcel, businesses, photo, lidar height and OpenStreetMap tags for one building (cached on the object)
@@ -166,28 +167,34 @@ export function initBuildings(ctx) {
   async function open(b) {
     ctx.clearSelection?.(); stopOrbit(); cur = b; multi = []; addMode = false; highlight();
     const gsv = 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + b.center[1].toFixed(6) + ',' + b.center[0].toFixed(6);
-    card.innerHTML = '<div class="top"><div><div class="kicker">' + (b.footprint ? 'Building' : 'Parcel') + '</div><h2 id="bTitle">Loading parcel…</h2><div class="bsub" id="bSub">' + b.center[1].toFixed(5) + ', ' + b.center[0].toFixed(5) + '</div></div>' +
-      '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
-      '<div class="bacts">' + (matchMedia('(pointer: coarse)').matches ? '<button class="btn" id="bMulti" title="Then tap more buildings or parcels">Select Multiple</button>' : '') + '<button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button></div>' +
-      '<div id="bPhoto"></div><div id="bSize">' + sizeRows(b) + '<div class="rnote">Measuring height from lidar…</div></div>' +
-      '<div class="bsec" id="bParcel"><div class="lt">Parcel</div><div class="rnote">Looking up the appraisal record…</div></div>' +
-      '<div class="bsec" id="bFilings"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses here</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div><div class="bsec" id="bSite"></div><div class="bsec" id="bRegrid"></div><div class="bsec" id="bArea"></div>' +
-      '<div class="rnote bsrc src">Footprint: OpenStreetMap. Height: USGS 3DEP lidar (Microsoft Planetary Computer) where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record when mapped, otherwise estimated from height. Parcel: Texas GIO StratMap. Values are appraisal values, not sale prices.</div>';
+    const ss = t => '<div class="ssrc src">' + t + '</div>';
+    card.innerHTML = '<div class="top"><div><div class="kicker" id="bKick">' + (b.footprint ? 'Building' : 'Parcel') + '</div><h2 id="bTitle">Loading parcel…</h2><div class="bsub" id="bSub">' + b.center[1].toFixed(5) + ', ' + b.center[0].toFixed(5) + '</div></div>' +
+      '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
+      ctx.cardNav([['bParcel', 'Value'], ['bSize', 'Building'], ['bSite', 'Site'], ['bArea', 'Area'], ['bPlaces', 'Businesses'], ['airSec', 'Air'], ['bFilings', 'Construction'], ['bRegrid', 'Regrid'], ['liveSec', 'From Here'], ['bTools', 'Tools']]) + '</div>' +
+      '<div class="bover" id="bOver" hidden></div>' +
+      '<div class="bsec" id="bParcel"><div class="lt">Ownership &amp; Value</div><div class="rnote">Looking up the appraisal record…</div></div>' +
+      '<div class="bsec" id="bSize"><div class="lt">Building</div><div id="bPhoto"></div><div id="bSizeBody">' + sizeRows(b) + '<div class="rnote">Measuring height from lidar…</div></div>' +
+        ss('Footprint: OpenStreetMap. Height: USGS 3DEP lidar where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record, otherwise estimated from height.') + '</div>' +
+      '<div class="bsec" id="bSite"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
+      '<div class="bsec" id="bFilings"></div><div class="bsec" id="bRegrid"></div><div class="bsrc"></div>' +
+      '<div class="bsec" id="bTools"><div class="lt">Site Tools</div><div class="bacts">' + (matchMedia('(pointer: coarse)').matches ? '<button class="btn" id="bMulti" title="Then tap more buildings or parcels">Select Multiple</button>' : '') +
+        '<button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button><button class="btn askai" id="bAsk">Ask AI About It</button></div></div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#bOrbit').onclick = orbit;
     card.querySelector('#bMulti')?.addEventListener('click', () => startMulti()); // touch only; with a mouse, Shift-click adds buildings
     card.querySelector('#bNote').onclick = () => ctx.addNote?.({ at: b.center });
+    card.querySelector('#bAsk').onclick = () => { const t = card.querySelector('#bTitle')?.textContent; ctx.assistant?.ask('Tell me about ' + (t && !/^Loading/.test(t) ? t : 'this property') + ': owner, value, site and the area around it'); };
     if (ctx.reduceMotion) card.querySelector('#bOrbit').remove();
     renderFilings(null); renderArea();
     ctx.cardRendered({ kind: 'building', center: b.center, label: () => card.querySelector('#bTitle')?.textContent || 'Building', sub: () => card.querySelector('#bSub')?.textContent || '' });
     let d = null;
     try { d = await details(b); }
-    catch (err) { if (cur !== b) return; card.querySelector('#bParcel').innerHTML = '<div class="lt">Parcel</div><div class="rnote">Parcel lookup unavailable (' + esc(err.message) + ').</div>'; card.querySelector('#bTitle').textContent = 'Building'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSize').innerHTML = sizeRows(b); return; }
+    catch (err) { if (cur !== b) return; card.querySelector('#bParcel').innerHTML = '<div class="lt">Parcel</div><div class="rnote">Parcel lookup unavailable (' + esc(err.message) + ').</div>'; card.querySelector('#bTitle').textContent = 'Building'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b); return; }
     if (cur !== b || multi.length) return;
     highlight();
-    card.querySelector('#bSize').innerHTML = sizeRows(b);
-    renderParcel(d.parcel, d.parcelError); renderFilings(d.parcel?.geometry || null); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel);
+    card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
+    renderParcel(d.parcel, d.parcelError); renderFilings(d.parcel?.geometry || null); renderOverview(b, d); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel);
   }
   ctx.buildingStats = () => { const list = multi.length ? multi : cur ? [cur] : []; return list.map(b => ({ address: b.parcel?.situs || null, ...stats(b), owner: b.parcel?.owner || null })); };
 
@@ -236,30 +243,65 @@ export function initBuildings(ctx) {
   }
 
   const money = v => v ? fmtM(v) : '—';
+  const fld = (k, v, o = {}) => '<div class="f' + (o.w ? ' w' : '') + '"><div class="fl">' + k + '</div><div class="fv' + (o.dim ? ' dim' : '') + '">' + v + '</div>' + (o.sub ? '<div class="fs">' + o.sub + '</div>' : '') + '</div>';
+  const title = t => String(t || '').toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+  const appraised = p => p?.marketValue || ((p?.landValue || 0) + (p?.improvementValue || 0)) || null;
   function renderParcel(p, err) {
-    const el = card.querySelector('#bParcel');
-    if (!p) { el.innerHTML = '<div class="lt">Parcel</div><div class="rnote">' + (err ? 'Parcel lookup failed: ' + esc(err) : 'No parcel record found at this point.') + '</div>'; card.querySelector('#bTitle').textContent = 'Building'; return; }
+    const el = card.querySelector('#bParcel'), head = '<div class="lt">Ownership &amp; Value</div>';
+    if (!p) {
+      // the statewide parcel layer has no Harris or Waller County records (checked 2026-10-03)
+      const co = ctx.DATA.counties.find(c => inGeom(cur.center, { type: 'MultiPolygon', coordinates: c.outline }))?.name;
+      el.innerHTML = head + '<div class="rnote">' + (err ? 'Parcel lookup failed: ' + esc(err) : /^(Harris|Waller)$/.test(co || '') ? 'The statewide parcel data doesn’t include ' + co + ' County yet, so there’s no owner or value here.' : 'No parcel record found at this point.') + '</div>';
+      card.querySelector('#bTitle').textContent = 'Building'; return;
+    }
     card.querySelector('#bTitle').textContent = p.situs || p.owner || 'Building';
-    card.querySelector('#bSub').textContent = [p.county ? p.county + ' County' : '', p.landUse].filter(Boolean).join(' · ');
-    const rows = [['Owner', esc(p.owner || '—') + (p.mailing ? '<div class="sc">' + esc(p.mailing) + '</div>' : '')], ['Market value', money(p.marketValue) + (p.taxYear ? ' <span class="sc">(' + esc(p.taxYear) + ')</span>' : '')],
-      ['Land / improvements', money(p.landValue) + ' / ' + money(p.improvementValue)], ['Year built', esc(p.yearBuilt || '—')], ['Acquired', esc(p.acquired || '—')], ['Land area', esc(p.area || '—')], ['Property ID', esc(p.propId || '—')]];
-    el.innerHTML = '<div class="lt">Parcel</div><dl>' + rows.map(([k, v]) => '<dt>' + k + '</dt><dd>' + v + '</dd>').join('') + '</dl>' +
-      (p.raw ? '<details class="raw"><summary>All appraisal fields</summary><dl>' + Object.entries(p.raw).map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl></details>' : '');
+    card.querySelector('#bSub').textContent = [p.county ? title(p.county) + ' County' : '', p.landUse].filter(Boolean).join(' · ');
+    const legal = String(p.raw?.LEGAL_DESC || '').replace(/^"+|"+$/g, '').replace(/""/g, '"').trim(), val = appraised(p);
+    el.innerHTML = head + '<div class="fgrid">' +
+      fld('Owner', esc(p.owner || '—'), { w: true, sub: p.mailing ? 'Mail: ' + esc(p.mailing) : '' }) +
+      fld(p.marketValue ? 'Market value' : 'Appraised value', '<span class="mono">' + money(val) + '</span>', { sub: p.marketValue ? '' : 'Land + improvements' }) +
+      fld('Tax year', esc(p.taxYear || '—')) +
+      fld('Land', '<span class="mono">' + money(p.landValue) + '</span>') + fld('Improvements', '<span class="mono">' + money(p.improvementValue) + '</span>') +
+      fld('Land area', esc(p.area || '—')) + fld('Year built', esc(p.yearBuilt || 'Not reported'), { dim: !p.yearBuilt }) +
+      fld('Acquired', esc(p.acquired || '—'), { dim: !p.acquired }) + fld('Property ID', '<span class="mono">' + esc(p.propId || '—') + '</span>') +
+      (legal ? fld('Legal description', esc(legal), { w: true }) : '') + '</div>' +
+      (p.raw ? '<details class="raw"><summary>All appraisal fields</summary><dl>' + Object.entries(p.raw).map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl></details>' : '') +
+      '<div class="ssrc src">' + esc(p.raw?.SOURCE ? title(p.raw.SOURCE) : 'County appraisal district') + ' via Texas GIO StratMap. Appraisal values, not sale prices.</div>';
+  }
+  // the dark summary at the top: who owns it, what it's worth, how big, and how busy construction is around it
+  function renderOverview(b, d) {
+    const el = card.querySelector('#bOver'); if (!el) return;
+    const p = d.parcel, s = stats(b), val = appraised(p), parts = [];
+    if (p) parts.push((p.area ? 'A <b>' + esc(/^[\d.]+ acres$/.test(p.area) ? p.area.replace(' acres', '-acre') : p.area) + '</b> parcel' : 'A parcel') + (p.owner ? ' owned by <b>' + esc(p.owner) + '</b>' : '') + (val ? ', appraised at <b>' + fmtM(val) + '</b>' : '') + '.');
+    if (s.h && b.footprint) parts.push('The building is about ' + ft(s.h) + ' tall' + (s.fl ? ' (' + (s.fSrc === 'estimated from height' ? '~' : '') + s.fl + ' floor' + (s.fl > 1 ? 's' : '') + ')' : '') + '.');
+    const n = near1(b.center);
+    if (n.list.length) parts.push('<b>' + fmtN(n.list.length) + ' construction filing' + (n.list.length > 1 ? 's' : '') + '</b> within a mile, est. ' + fmtM(n.value) + (n.recent ? '; ' + fmtN(n.recent) + ' filed in the last 12 months' : '') + '.');
+    el.innerHTML = parts.length ? '<div class="kicker">Overview</div><div>' + parts.join(' ') + '</div>' : ''; el.hidden = !parts.length;
+  }
+  // filings within a mile of a point (flat distance; fine at this scale)
+  function near1(c) {
+    const k = Math.cos(c[1] * Math.PI / 180), yr = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+    const list = F.filter(f => !f.approx && Math.hypot((f.lon - c[0]) * k, f.lat - c[1]) * 69.1 <= 1);
+    return { list, value: list.reduce((t, f) => t + (f.cost || 0), 0), recent: list.filter(f => (f.reg || '') >= yr).length };
   }
   function renderFilings(parcelGeom) {
     const b = cur, el = card.querySelector('#bFilings'); if (!el) return;
     const near = F.filter(f => parcelGeom ? inGeom([f.lon, f.lat], parcelGeom) : (b.footprint && inGeom([f.lon, f.lat], b.footprint)) || Math.hypot((f.lon - b.center[0]) * 0.87, f.lat - b.center[1]) < 0.0004);
-    el.innerHTML = '<div class="lt">Construction filings here<span class="src"> (TDLR TABS)</span></div>' + (near.length ? near.sort((x, y) => y.cost - x.cost).slice(0, 25).map(f => '<button class="chitem" data-id="' + esc(f.id) + '"><span><b>' + esc(f.name) + '</b><em>' + esc(f.reg) + ' · ' + esc(ctx.TYPE_LABEL[f.type] || f.type) + (f.use ? ' · ' + esc(f.use) : '') + '</em></span><span class="m">' + fmtM(f.cost) + '</span></button>').join('') : '<div class="rnote">None in the last two years.</div>');
+    const n = near1(b.center);
+    el.innerHTML = '<div class="lt">Construction Activity</div>' + (near.length ? '<div class="fl">On this ' + (parcelGeom ? 'parcel' : 'spot') + '</div>' + near.sort((x, y) => y.cost - x.cost).slice(0, 25).map(f => '<button class="chitem" data-id="' + esc(f.id) + '"><span><b>' + esc(f.name) + '</b><em>' + esc(f.reg) + ' · ' + esc(ctx.TYPE_LABEL[f.type] || f.type) + (f.use ? ' · ' + esc(f.use) : '') + '</em></span><span class="m">' + fmtM(f.cost) + '</span></button>').join('') : '<div class="rnote">No filings on this ' + (parcelGeom ? 'parcel' : 'spot') + ' in the period loaded.</div>') +
+      (n.list.length ? '<div class="fs">' + fmtN(n.list.length) + ' filing' + (n.list.length > 1 ? 's' : '') + ' within 1 mile, est. ' + fmtM(n.value) + (n.recent ? '; ' + fmtN(n.recent) + ' filed in the last 12 months' : '') + '.</div>' : '') +
+      '<div class="ssrc src">TDLR TABS registrations. Costs are filer estimates.</div>';
     el.querySelectorAll('.chitem').forEach(x => x.onclick = () => ctx.select(ctx.BY_ID.get(x.dataset.id), false));
   }
   function renderPlaces(list, err) {
     const el = card.querySelector('#bPlaces'), b = cur;
-    if (err && !list.length) { el.innerHTML = '<div class="lt">Businesses here</div><div class="rnote">Lookup failed: ' + esc(err) + '</div>'; return; }
+    if (err && !list.length) { el.innerHTML = '<div class="lt">Businesses on the Block</div><div class="rnote">Lookup failed: ' + esc(err) + '</div>'; return; }
     const shape = b.footprint || b.parcel?.geometry;
     const inside = list.filter(p => shape && inGeom([p.lon, p.lat], shape)), other = list.filter(p => !inside.includes(p)).slice(0, 8);
     const li = p => '<div class="pl"><b>' + esc(p.name) + '</b><span>' + esc(p.kind) + (p.brand && p.brand !== p.name ? ' · ' + esc(p.brand) : '') + '</span></div>';
-    el.innerHTML = '<div class="lt">Businesses here<span class="src"> (OpenStreetMap)</span></div>' + (inside.length ? inside.map(li).join('') : '<div class="rnote">None mapped inside this building.</div>') +
-      (other.length ? '<details class="raw"><summary>Nearby (' + other.length + ')</summary>' + other.map(li).join('') + '</details>' : '');
+    el.innerHTML = '<div class="lt">Businesses on the Block</div>' + (inside.length ? inside.map(li).join('') : '<div class="rnote">None mapped inside this ' + (b.footprint ? 'building' : 'parcel') + '.</div>') +
+      (other.length ? '<details class="raw"' + (inside.length ? '' : ' open') + '><summary>Nearby (' + other.length + ')</summary>' + other.map(li).join('') + '</details>' : '') +
+      '<div class="ssrc src">OpenStreetMap, within about 80 m.</div>';
   }
   // retail and service tenants registered at the parcel's street address (Texas Comptroller, via api/tenants)
   async function renderTenants(p) {
@@ -289,9 +331,10 @@ export function initBuildings(ctx) {
     const t = market.tracts.find(t => inGeom(b.center, t.geom)); if (!t) return;
     const g = t.gr == null ? '—' : (t.gr > 0 ? '+' : '') + t.gr + '%';
     const sq = sqMiles(t.geom), r = Math.sqrt(sq / Math.PI), f1 = v => v < 10 ? v.toFixed(1) : String(Math.round(v));
-    el.innerHTML = '<div class="lt">Demographics</div><div class="rnote">Census tract ' + esc(tractNo(t.g)) + ' around this building: about ' + f1(sq) + ' sq mi (like a ' + f1(r) + '-mile radius). Tracts follow population, so they are small in dense areas and large in rural ones.<span class="src"> US Census ACS ' + market.year + ' 5-year.</span></div><div class="kgrid"><div><b>' + (t.pop != null ? fmtN(t.pop) : '—') + '</b><span>Population</span></div><div><b>' + g + '</b><span>Growth since ' + (market.baseYear || '') + '</span></div>' +
+    el.innerHTML = '<div class="lt">Area · Census Tract ' + esc(tractNo(t.g)) + '</div><div class="fs">About ' + f1(sq) + ' sq mi around it (like a ' + f1(r) + '-mile radius). Tracts follow population, so they are small in dense areas and large in rural ones.</div><div class="kgrid"><div><b>' + (t.pop != null ? fmtN(t.pop) : '—') + '</b><span>Population</span></div><div><b>' + g + '</b><span>Growth since ' + (market.baseYear || '') + '</span></div>' +
       '<div><b>' + (t.inc ? fmtM(t.inc) : '—') + '</b><span>Median income</span></div><div><b>' + (t.val ? fmtM(t.val) : '—') + '</b><span>Median home value</span></div>' +
       (market.jobsYear && t.jobs != null ? '<div><b>' + fmtN(t.jobs) + '</b><span>Jobs here (' + market.jobsYear + ')</span></div><div><b>' + (t.jgr == null ? '—' : (t.jgr > 0 ? '+' : '') + t.jgr + '%') + '</b><span>Job growth since ' + (market.jobsBaseYear || '') + '</span></div>' : '') +
-      (market.spendYear && t.sph != null ? '<div><b>' + fmtM(t.sph) + '</b><span>Spending / household (est.)</span></div><div><b>' + (t.dine != null ? fmtM(t.dine) : '—') + '</b><span>Dining out / yr, tract (est.)</span></div>' : '') + '</div>';
+      (market.spendYear && t.sph != null ? '<div><b>' + fmtM(t.sph) + '</b><span>Spending / household (est.)</span></div><div><b>' + (t.dine != null ? fmtM(t.dine) : '—') + '</b><span>Dining out / yr, tract (est.)</span></div>' : '') + '</div>' +
+      '<div class="ssrc src">US Census ACS ' + market.year + ' 5-year' + (market.jobsYear ? ' · LEHD LODES jobs ' + market.jobsYear : '') + (market.spendYear ? ' · spending estimated from BLS Consumer Expenditure Survey' : '') + '.</div>';
   }
 }

@@ -209,3 +209,16 @@ console.log('aeroapi endpoint ok');
   assert.equal(normalize({ hex: 'a8aeb6', t: 'A21N', lat: 30, lon: -95, alt_baro: 5700 }).desc, 'Airbus A321neo');
   assert.equal(normalize({ hex: 'a8aeb6', t: 'ZZZZ', lat: 30, lon: -95, alt_baro: 5700 }).desc, null);
   console.log('planes route fallback ok'); }
+
+// map icons: one silhouette per kind of aircraft, from the ICAO type, else the ADS-B category
+{ const { shapeOf, SHAPES, SIZE } = await import('../lib/aircraft-shapes.mjs'), { normalize } = await import('../lib/planes.mjs');
+  const want = { B744: 'heavy4', A388: 'heavy4', B77W: 'heavy2', B789: 'heavy2', A333: 'heavy2', B738: 'jet', B38M: 'jet', A21N: 'jet', E175: 'jet', CRJ9: 'regional', E145: 'regional',
+    C68A: 'bizjet', GLF5: 'bizjet', LJ45: 'bizjet', E55P: 'bizjet', F16: 'fighter', DH8D: 'turboprop2', AT72: 'turboprop2', B350: 'turboprop2', PC12: 'turboprop1', C208: 'turboprop1',
+    BE58: 'twin', PA34: 'twin', C172: 'single', P28A: 'single', SR22: 'single', M20P: 'single', R44: 'heli', EC35: 'heli', B407: 'heli', S76: 'heli', ASK21: 'glider', BALL: 'balloon' };
+  for (const [t, k] of Object.entries(want)) assert.equal(shapeOf(t), k, t);
+  assert.deepEqual(['A1', 'A2', 'A3', 'A5', 'A7', 'B1', 'B2', 'B6', 'C1', ''].map(c => shapeOf('ZZZZ', c)), ['single', 'bizjet', 'jet', 'heavy2', 'heli', 'glider', 'balloon', 'drone', 'ground', 'jet']);
+  for (const k of SHAPES) assert.ok(SIZE[k] > 0, 'size for ' + k);
+  assert.ok(SIZE.heavy4 > SIZE.jet && SIZE.jet > SIZE.single, 'a 747 is drawn bigger than a 737, bigger than a Cessna');
+  assert.equal(normalize({ hex: 'a1', t: 'R44', lat: 30, lon: -95, alt_baro: 800 }).shape, 'heli'); assert.equal(normalize({ hex: 'a2', category: 'A5', lat: 30, lon: -95, alt_baro: 9000 }).shape, 'heavy2'); }
+console.log('aircraft shapes ok');
+

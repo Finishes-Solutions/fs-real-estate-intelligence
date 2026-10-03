@@ -5,6 +5,58 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 1:23 AM CT: FEMA flood layer and FEMA reports (5986bb1)
+- **Flood Zones (FEMA)** in Map Layers: FEMA's official flood map, the 100-year floodplain and floodway and the 500-year zone, drawn over the map when you zoom into a neighborhood. Works anywhere in Texas.
+- **FEMA Report for any area**: select an area and press **FEMA Report** (next to Crime Report under Area at a Glance), or use **FEMA report (¼ mile)** on a building card's flood zone line. The report shows:
+  - how much of the area is in the high-risk, 500-year and minimal flood zones, whether a floodway runs through it, and the base flood elevation;
+  - flood insurance claims paid around it since the 1970s: how many, how much, by year and by storm (Harvey, Allison, Imelda…). Meyerland, for example, shows 3,781 claims and $386M paid, $322M of it from Harvey;
+  - every federal disaster declaration for its county since 2000;
+  - FEMA's National Risk Index: an overall rating, the expected yearly loss, and the top hazards (hurricane, tornado, flooding, hail…).
+- **Export Report** saves a printable report (Print → Save as PDF); **Export CSV** saves every table for Excel.
+- **Ask AI** about flood zones, flood history, insurance claims, disasters or hazard risk for a place, a building or your selection; it can open the report or turn on the flood layer.
+- Claims are counted for the census tracts around the area (FEMA hides exact addresses), so they describe the neighborhood, not one parcel.
+
+### 1:22 AM CT: The same section-card style across the app (12b80c8)
+- **Tabs:** Reports, Updates, Field Notes, Market, Activity, Compare and Sources now sit on a light grey background. Each group sits in a white card with an icon and a title, like the new property card.
+- **Left panel:** Area at a Glance and Construction Filings are now titled section cards too.
+- The map buttons and legends now leave room for the wider property card (420 px instead of 380), so nothing overlaps.
+
+### 1:14 AM CT: New card design: titled section cards (option B) (1d1a25e)
+- **Building, parcel, filing and plane cards now use the "report with section cards" layout** you picked from the mockups:
+  - a row of section chips under the title that jumps to each section;
+  - a dark Overview summary at the top;
+  - then one card per section, each with an icon, a title and its own source line.
+- **Building cards** run in this order:
+  - Ownership & Value, Building, Site, Area, Businesses on the Block, Air Traffic;
+  - Construction Activity, which shows filings on the parcel plus how many are within a mile and how many were filed in the last year;
+  - Regrid, From Here, and Site Tools.
+  - Site Tools includes a new **Ask AI About It** button.
+- **Filing cards** run in this order: Overview, Project, Schedule (with history), People, Scope of Work, AI Project Brief, Air Traffic, From Here, then Tools (TABS record, Street View, Add Site Note, Ask AI About It).
+- **Plane cards** show:
+  - **Flight**: altitude, speed, heading and route as tiles;
+  - **Aircraft**: type, registration, squawk;
+  - FlightAware and FAA registration sections when available;
+  - **Tools**.
+- **Readability:**
+  - Labels no longer squeeze into a narrow column that wrapped two or three times. They sit above their values, or beside them in rows that wrap cleanly.
+  - Buttons sit in an even two-column grid.
+- **Every other card** (crime report, area summary, multi-select) picks up the same style.
+- **Cleaner parcel data:**
+  - "Null" values no longer show.
+  - Purchase dates that came through as numbers (e.g. "46082") now read as dates (2026-03-01).
+  - The city isn't repeated in the address.
+  - Land area says "acres".
+- **In Harris or Waller County**, the card now says the statewide parcel data doesn't cover that county yet, instead of just "no record".
+### 1:14 AM CT: Planes look like what they are; map buttons stay put (01eff54)
+- **Each plane on the map is drawn as its kind of aircraft**, not the same airliner icon:
+  - big jets: 747s and other four-engine jets, wide-bodies (777, 787, A330…), narrow-body airliners (737, A320…);
+  - smaller jets: regional jets with engines at the back, business jets, fighters;
+  - propeller planes: twin and single turboprops (Dash 8, King Air, Caravan, PC-12), twin and single piston planes (Baron, Cessna 172, Cirrus);
+  - everything else: helicopters, gliders, balloons, drones and ground vehicles.
+- **Sizes follow the aircraft.** A 747 is clearly bigger than a 737, which is bigger than a Cessna. Small planes stay about as big as before, so they're still easy to click.
+- The type comes from the code each plane broadcasts. Planes that don't send one use their broadcast size category.
+- **Fixed: the zoom (+/−) and other map buttons no longer drift into the middle of the map when a card is open.** They stay at the right edge. The card sits next to them, or below them when the window is tall enough.
+
 ### 1:01 AM CT: App wouldn't load: fixed (0b50595)
 - The app got stuck on a blank map with nothing clickable. A typo (an apostrophe inside a quoted sentence in the plane card's source note, added at 12:36 AM) stopped all the app's code from loading. Fixed, and the tests now check every file the browser loads, so a mistake like this can't be pushed again.
 
