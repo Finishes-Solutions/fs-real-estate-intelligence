@@ -34,7 +34,7 @@ export async function wikiFacts(a, fetchImpl = fetch) {
   }
   const out = { title: title || null, url: title ? 'https://' + lang + '.wikipedia.org/wiki/' + encodeURIComponent(title.replace(/ /g, '_')) : null, image, summary: null, airlines: [], cargo: [], tables: [] };
   if (title) {
-    const api = 'https://' + lang + '.wikipedia.org/w/api.php?format=json&action=parse&page=' + encodeURIComponent(title);
+    const api = 'https://' + lang + '.wikipedia.org/w/api.php?format=json&redirects=1&action=parse&page=' + encodeURIComponent(title); // links often name a redirect
     const [sum, secs] = await Promise.all([
       getJson('https://' + lang + '.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title.replace(/ /g, '_')), {}, 8000, fetchImpl).catch(() => null),
       getJson(api + '&prop=sections', {}, 8000, fetchImpl).catch(() => null)]);
@@ -43,7 +43,8 @@ export async function wikiFacts(a, fetchImpl = fetch) {
     const wt = async s => s ? (await getJson(api + '&prop=wikitext&section=' + s.index, {}, 8000, fetchImpl).catch(() => null))?.parse?.wikitext?.['*'] || '' : '';
     const pax = sec(/^Passenger/i) || sec(/^Airlines and destinations$/i), cargo = sec(/^Cargo$/i), stats = sec(/^(Statistics|Traffic and statistics|Traffic statistics)$/i);
     const [pw, cw, sw] = await Promise.all([wt(pax), cargo && cargo !== pax ? wt(cargo) : '', wt(stats)]);
-    out.airlines = parseAirlines(pw).slice(0, 60); out.cargo = parseAirlines(cw).slice(0, 30); out.tables = parseTables(sw).slice(0, 5);
+    out.airlines = parseAirlines(pw).slice(0, 60); if (pw && !out.airlines.length) out.airlines_unparsed = { section: pax?.line, start: pw.replace(/<ref[^>]*\/>/g, '').replace(/<ref[^>]*>[\s\S]*?<\/ref>/g, '').slice(0, 400) }; // a layout the parser doesn't know yet
+    out.cargo = parseAirlines(cw).slice(0, 30); out.tables = parseTables(sw).slice(0, 5);
   }
   WIKI.set(a.ident, { at: Date.now(), data: out }); if (WIKI.size > 300) WIKI.delete(WIKI.keys().next().value);
   return out;
