@@ -5,6 +5,19 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 2:41 AM CT: Drive-time maps (5285009)
+- **See how far you can drive in 10, 20 or 30 minutes.** Open any building or filing and press **Drive-Time Map** under From Here. Nested green, yellow and orange areas are drawn on the map.
+- **Choose when you're leaving:** now (live traffic), a weekday at 8 AM or 5 PM, or Sunday. Rush hour can shrink the areas a lot.
+- **Choose the times:** 5/10/15, 10/20/30, 15/30/45 or 20/40/60 minutes.
+- **The card shows, for each area:**
+  - square miles;
+  - people, households, median income and jobs (from Census data, for the counties loaded on the map);
+  - how many filings on the map fall inside.
+- **Use it as a trade area.** "Select this area" (or clicking an area on the map) makes it the selection. The map's filings narrow to it, and crime, FEMA and other area reports run on that drive-time area.
+- **Export Report** (printable, save as PDF) and **Export CSV**. Both are kept in the Reports tab, which now also has a Drive-Time Map card.
+- **Ask the assistant** "what's within a 20-minute drive of the Galleria at rush hour?" by text or voice.
+- **Sources:** TomTom, with live or typical traffic. If TomTom is unavailable it falls back to OpenStreetMap routing without traffic, and the card says so.
+
 ### 2:30 AM CT: Voice assistant is more reliable (ba2b843)
 - **No more bursts of place names.** When you were quiet or there was background noise, the voice transcriber sometimes "heard" its own list of local names and flashed them on screen before throwing the turn away. That list is now much shorter. Any echo that still slips in is removed, even when it's tacked onto the end of something you really said.
 - **"Listening…" and then nothing should be gone.** Several ways a turn could stall without a word are fixed:
