@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
-### 12:36 AM CT: Crime map layer, crime reports and AI crime answers (c08bf63)
+### 12:52 AM CT: Crime map layer, crime reports and AI crime answers (c08bf63, b4f00c9)
 - **Crime (Houston)** in Map Layers: a heat map of the last 12 months of Houston Police incidents, turning into about ¼-mile squares when you zoom in. Choose all incidents, violent or property. Hover a square for its counts; click it for its report.
 - **Crime reports for any area**: select an area (Area, Shape, Radius or County at the top of the map) and press **Crime Report** in the strip that appears under Area at a Glance, or use **Full crime report (½ mile)** on a building card. The report shows:
   - incidents, violent, property and other, each with the change vs the year before;
@@ -15,6 +15,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Export Report** saves a printable report (open it and choose Print → Save as PDF) with a dot map, the chart, tables and every incident listed; **Export CSV** saves the incidents (newest 2,000) for Excel.
 - **Ask AI about crime**: "how much crime is near this building", "car break-ins around 2700 Milam in the last year", "crime report for my selection". It answers with the numbers and recent incidents and can open the report or turn on the layer.
 - City of Houston only, and Houston Police publish about three months behind, so "last 12 months" currently ends in June 2026.
+### 12:36 AM CT: Plane types and routes now actually show (6585097)
+- Checking the live site showed two problems with the plane update earlier tonight:
+  - **The route service the app used (adsb.lol) has stopped answering**, so no plane had a "from → to".
+  - **The live feeds send only a type code** (e.g. "A21N"), never the type's name.
+- **Routes now fall back to adsbdb**, a second free route database, which knows most airline flights.
+- **Each route is checked against where the plane actually is.** Flight numbers get reused, so the databases are sometimes out of date.
+  - Example: one database said UAL1463 was flying Washington → Boston, while it was landing in Houston.
+  - A route that doesn't fit the plane's position is dropped rather than shown wrong.
+- **Aircraft types show by name** (e.g. "Airbus A321neo", "Pilatus PC-12") from a built-in list of about 210 common types.
+  - A rare type shows its code.
+  - Private and small planes usually have no route in either database.
 
 ### 12:30 AM CT: The map now leads with properties, not filings (4a6874b, afa6fc3)
 - **Filing dots are hidden when the map first opens.** This applies once to everyone, after which your own choice sticks. To bring them back:

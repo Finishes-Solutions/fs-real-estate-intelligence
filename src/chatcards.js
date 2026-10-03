@@ -138,7 +138,7 @@ export function initChatCards(ctx) {
         '<span class="cc-pa"><button type="button" class="btn" data-f="' + i + '">Follow</button><button type="button" class="btn" data-o="' + i + '">Orbit</button></span></div>').join('')
         : '<p class="cc-p">' + esc(L.error ? 'The aircraft feeds didn’t answer; try again in a few seconds.' : 'No aircraft broadcasting within ' + r.radius_miles + ' mi right now.') + '</p>') +
       (h && h.low_sightings_per_day_within_1km != null ? '<p class="cc-p">Low-flight history: about ' + h.low_sightings_per_day_within_1km + ' sightings a day below 3,000 ft within ~1 km (' + h.sampled_days + ' days sampled).</p>' : '') +
-      src('Sources: live ADS-B from community receivers (' + (L.source || 'adsb.lol') + '); routes from the adsb.lol route database' + (h ? '; low-flight history sampled every minute' : '')));
+      src('Sources: live ADS-B from community receivers (' + (L.source || 'adsb.lol') + '); routes from the adsbdb and adsb.lol route databases, checked against each plane's position; aircraft types from ICAO codes' + (h ? '; low-flight history sampled every minute' : '')));
     const go = (i, orbit) => { const x = ac[i]; if (x) ctx.followPlane?.(x.hex, { orbit, near: r.center }); };
     d.querySelectorAll('[data-f]').forEach(b => b.onclick = () => go(+b.dataset.f, false));
     d.querySelectorAll('[data-o]').forEach(b => b.onclick = () => go(+b.dataset.o, true));
@@ -147,7 +147,7 @@ export function initChatCards(ctx) {
   function followCard(r) {
     const d = el(head('Aircraft', r.following + (r.type_name || r.type ? ' · ' + (r.type_name || r.type) : ''), r.route_known ? r.origin + ' → ' + r.destination : 'Route not in the database') +
       tiles([{ v: r.altitude_ft != null ? r.altitude_ft.toLocaleString('en-US') + ' ft' : '–', label: 'Altitude' }, { v: r.speed_kt != null ? r.speed_kt + ' kt' : '–', label: 'Speed' }, { v: r.heading != null ? r.heading + '°' : '–', label: 'Heading' }], 'c3') +
-      '<p class="cc-p">' + (r.orbiting ? 'Orbiting' : 'Following') + ' on the map. Drag the map or close the plane card to stop.</p>' + src('Source: live ADS-B (community receivers); route from the adsb.lol route database'));
+      '<p class="cc-p">' + (r.orbiting ? 'Orbiting' : 'Following') + ' on the map. Drag the map or close the plane card to stop.</p>' + src('Source: live ADS-B (community receivers); route from the adsbdb and adsb.lol route databases'));
     return d;
   }
 
