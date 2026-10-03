@@ -46,11 +46,12 @@ export function initSite(ctx) {
       '<br><span class="sc">Violent ' + fmtN(cr.last12.v) + (cr.change.v != null ? ' (' + pct(cr.change.v) + ')' : '') + ' · Property ' + fmtN(cr.last12.p) + (cr.change.p != null ? ' (' + pct(cr.change.p) + ')' : '') + ' · Other ' + fmtN(cr.last12.o) + (cr.latest ? ' · through ' + esc(cr.latest) : '') + '</span>' + (ctx.crimeReport ? '<br><button class="lnk" type="button" id="siteCrime">Full crime report (½ mile)</button>' : '') : '';
     const bars = Array.isArray(d.bars) && d.bars.length ? d.bars.slice(0, 5).map(b => esc(b.name) + ' <b>' + fmtM(b.total) + '</b> <span class="sc">' + b.months + ' mo to ' + esc(b.last) + '</span>').join('<br>') : '';
     el.innerHTML = '<div class="lt">Site</div><dl>' +
-      row('Flood zone', flood, 'FEMA flood maps') + row('Traffic', traffic, 'TxDOT traffic counts') + row('Crime nearby', crime, 'Houston Police NIBRS') +
+      row('Flood zone', flood + (ctx.femaReport ? '<br><button class="lnk" type="button" id="siteFema">FEMA report (¼ mile): claims, disasters, risk</button>' : ''), 'FEMA flood maps') + row('Traffic', traffic, 'TxDOT traffic counts') + row('Crime nearby', crime, 'Houston Police NIBRS') +
       row('Districts', [water, tirz && 'Tax increment zone: ' + tirz, ds.opportunityZone === true ? 'Federal Opportunity Zone' : ''].filter(Boolean).join('<br>'), 'TCEQ, City of Houston, CDFI Fund') +
       row('School district', schools, 'US Census') + row('Transit', tr && !tr.error && tr.stops != null ? fmtN(tr.stops) + ' METRO bus stop' + (tr.stops === 1 ? '' : 's') + ' within 400 m' : '', 'Houston METRO') +
       row('Environmental', env1 && env1 + envList, 'EPA ECHO') + row('Alcohol sales here', bars && bars + '<br><span class="sc">Mixed beverage gross receipts, last 12 months</span>', 'Texas Comptroller') +
       econRows(area, parcel) + '</dl>';
+    el.querySelector('#siteFema')?.addEventListener('click', () => ctx.femaReport({ geometry: circle(center, 0.25), label: '¼ mile around ' + (parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4)) }));
     el.querySelector('#siteCrime')?.addEventListener('click', () => ctx.crimeReport({ geometry: circle(center, 0.5), label: '½ mile around ' + (parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4)), center }));
   };
 

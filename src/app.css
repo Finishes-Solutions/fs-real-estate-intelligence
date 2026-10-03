@@ -1300,3 +1300,8 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 :root[data-filings="off"] .legend:not(.heat),:root[data-filings="off"] .mcount{display:none}
 .crsel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 22px 0;padding:8px 10px 8px 12px;border:1px solid var(--line-2);border-left:3px solid #c2410c;border-radius:4px;background:var(--panel-2);font-size:12.5px}
 .crsel[hidden]{display:none}.crsel span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* FEMA report */
+.card .fm-bar{display:flex;height:14px;border-radius:3px;overflow:hidden;background:var(--line);margin-top:4px}.card .fm-bar i{display:block;height:100%}
+.card .fm-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--muted);margin-top:6px}.card .fm-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}.card .fm-leg b{color:var(--ink,inherit)}
+.crsel{flex-wrap:wrap}.crsel span{flex:1 1 100%}.crsel .btn{flex:1}
+#lyFemaNote{margin:0 0 6px 26px;font-size:11px}

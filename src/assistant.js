@@ -208,7 +208,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_details: 'Checking FlightAware…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_details: 'Checking FlightAware…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', fema_report: 'Checking FEMA flood and hazard data…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -553,6 +553,27 @@ export function initAssistant(ctx) {
         turnSubject = d.ident;
         return { ident: d.ident, in_the_air_now: leg(d.current), recent_flights: (d.recent || []).map(leg), source: 'FlightAware AeroAPI', budget: d.budget ? { spent_this_month: d.budget.spent, cap: d.budget.cap } : undefined,
           note: 'Times are UTC ISO strings; say them in Central time. Private owners can ask FlightAware to block their flights, so an empty answer doesn\'t mean the plane isn\'t flying.' };
+      }
+      if (name === 'fema_report') {
+        if (!ctx.femaReportData) return { error: 'FEMA data isn’t available in this version.' };
+        let geometry, label;
+        if (a.use_selection && ctx.sel?.feature) { geometry = ctx.sel.feature.geometry || ctx.sel.feature; label = ctx.sel.label || 'the selected area'; }
+        else {
+          const p = await pointFor(a); if (p.error) return p;
+          const mi = Math.min(8, Math.max(0.05, a.radius_miles || (p.kind && !/address|building|poi/.test(p.kind) ? 1 : 0.25))), r = mi / 69, k = Math.cos(p.c[1] * Math.PI / 180), ring = [];
+          for (let i = 0; i <= 64; i++) { const t = (i % 64) / 64 * 2 * Math.PI; ring.push([p.c[0] + r * Math.cos(t) / k, p.c[1] + r * Math.sin(t)]); }
+          geometry = { type: 'Polygon', coordinates: [ring] }; label = (mi === 0.25 ? '¼' : mi) + ' mile around ' + p.label;
+        }
+        const d = await ctx.femaReportData(geometry, label);
+        if (a.show_layer) ctx.femaLayer?.(true);
+        if (a.show_report) { if (ctx.view !== 'map') ctx.setView('map'); ctx.femaReport({ geometry, label }); actionChip('FEMA report: ' + label); }
+        turnSubject = label;
+        const c = d.nfip_claims || {};
+        return { area: label, area_sq_mi: d.area_sqmi, counties: d.counties, flood_zone_share_pct: d.flood_zones?.shares || d.flood_zones, flood_zones_present: d.flood_zones?.zones, floodway: d.flood_zones?.floodway, base_flood_elevation_ft: d.flood_zones?.bfe,
+          nfip_claims: c.error ? c : { claims: c.claims, total_paid: c.paid, average_paid: c.avg_paid, last_10_years: c.last_10_years, latest_loss: c.latest_loss, pct_rated_in_high_risk_zone: c.in_high_risk_zone_pct, by_year: c.by_year, top_events: c.top_events, census_tracts: c.tracts_searched },
+          disasters: d.disasters?.error ? d.disasters : { since: 2000, count: d.disasters?.count, major: d.disasters?.major, by_type: d.disasters?.by_type, recent: (d.disasters?.list || []).slice(0, 10) },
+          national_risk_index: d.risk_index && !d.risk_index.error ? { rating: d.risk_index.risk_rating, score: d.risk_index.risk_score, expected_annual_loss: d.risk_index.expected_annual_loss, top_hazards: d.risk_index.hazards, social_vulnerability: d.risk_index.social_vulnerability.rating, community_resilience: d.risk_index.community_resilience.rating, tracts: d.risk_index.tracts } : d.risk_index,
+          note: 'Flood zone shares are FEMA regulatory zones measured across the area. NFIP claims are insured losses in the census tracts touching the area (addresses are redacted by FEMA), a neighborhood measure. Risk index scores are percentiles among US census tracts.' };
       }
       if (name === 'crime_stats') {
         if (!ctx.crimeReportData) return { error: 'Crime data isn’t available in this version.' };
