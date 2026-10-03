@@ -380,7 +380,7 @@ export function initAssistant(ctx) {
       }
       if (name === 'filter_map') {
         const before = ctx.snapshot(), { spec, notes } = await specFrom(a);
-        ctx.fromSpec(spec, { fly: true }); if (ctx.view !== 'map' && ctx.view !== 'timeline') ctx.setView('map');
+        ctx.showFilings?.(); ctx.fromSpec(spec, { fly: true }); if (ctx.view !== 'map' && ctx.view !== 'timeline') ctx.setView('map');
         const list = ctx.visible; if (!spec.sel) ctx.fitToVisible(); cardList = list.slice();
         actionChip('Map: ' + (describe(spec, fmtM) || 'all filings') + ' · ' + fmtN(list.length) + ' filings · est. ' + fmtM(list.reduce((s, f) => s + f.cost, 0)), () => ctx.restore(before));
         return { applied: describe(spec) || 'all filings', notes, ...summary(list) };
@@ -394,7 +394,7 @@ export function initAssistant(ctx) {
       if (name === 'highlight_filings') {
         const found = (a.ids || []).map(id => ctx.BY_ID.get(String(id).trim())).filter(Boolean);
         if (!found.length) return { error: 'None of those ids are loaded.' };
-        ctx.highlight(found, a.label || ''); if (ctx.view !== 'map') ctx.setView('map');
+        ctx.showFilings?.(); ctx.highlight(found, a.label || ''); if (ctx.view !== 'map') ctx.setView('map');
         actionChip('Highlighted ' + found.length + ' filing' + (found.length > 1 ? 's' : '') + (a.label ? ': ' + a.label : ''), () => ctx.clearHighlight());
         return { highlighted: found.map(f => ({ id: f.id, name: f.name, value: f.cost })) };
       }
