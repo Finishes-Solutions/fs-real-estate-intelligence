@@ -1,6 +1,6 @@
 // Live aircraft and the low-flight history (lib/planes.mjs).
 //   GET ?bbox=w,s,e,n                     -> { time, source, center, nm, aircraft: [...] }   anywhere on Earth, CDN-cached ~8 s
-//   GET ?route=CALLSIGN&lat=&lon=         -> { callsign, origin, destination }                adsb.lol route database, cached 1 h
+//   GET ?route=CALLSIGN&lat=&lon=         -> { callsign, origin, destination, source }        adsb.lol, then adsbdb; checked against the plane's position
 //   GET ?history=lon,lat&km=1&days=30     -> { low_per_day, lowest_ft, sampled_days, ... }    from Supabase (api/planes-sample.js)
 //   GET ?density=w,s,e,n&days=30          -> GeoJSON cells { sightings, per_day, min_alt }    for the "Low Flight Paths" layer
 // History reads say { history: false, note } when the database isn't set up yet.
@@ -34,16 +34,47 @@ export async function density(b, days = 30, d = db()) {
   }) };
 }
 
-export async function route(callsign, lat, lon, fetchImpl = globalThis.fetch) {
-  const r = await fetchImpl('https://api.adsb.lol/api/0/routeset', { method: 'POST', signal: AbortSignal.timeout(6000), headers: { 'Content-Type': 'application/json', 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' },
+const MI = (a, b) => { const R = Math.PI / 180, h = Math.sin((b[1] - a[1]) * R / 2) ** 2 + Math.cos(a[1] * R) * Math.cos(b[1] * R) * Math.sin((b[0] - a[0]) * R / 2) ** 2; return 7917.6 * Math.asin(Math.sqrt(h)); };
+// Route databases go stale when airlines reuse flight numbers. A route is believable when the plane is roughly on the
+// way between its two airports (detour under 25% plus 100 mi) or within 60 mi of either end (taking off, landing).
+export function plausible(o, d, lat, lon) {
+  if (![o?.lat, o?.lon, d?.lat, d?.lon].every(Number.isFinite) || !Number.isFinite(lat) || !Number.isFinite(lon) || (!lat && !lon)) return null;
+  const p = [lon, lat], A = [o.lon, o.lat], B = [d.lon, d.lat];
+  return MI(p, A) < 60 || MI(p, B) < 60 || MI(p, A) + MI(p, B) <= MI(A, B) * 1.25 + 100;
+}
+
+const H = { 'Content-Type': 'application/json', 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' };
+const ll = v => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 1e4) / 1e4 : null; };
+// adsb.lol's route set (it has answered with an empty body for every flight since about October 2026)
+async function lolRoute(callsign, lat, lon, fetchImpl) {
+  const r = await fetchImpl('https://api.adsb.lol/api/0/routeset', { method: 'POST', signal: AbortSignal.timeout(6000), headers: H,
     body: JSON.stringify({ planes: [{ callsign, lat: Number.isFinite(lat) ? lat : 0, lng: Number.isFinite(lon) ? lon : 0 }] }) });
   if (!r.ok) throw new Error('route lookup ' + r.status);
   // an unknown callsign comes back as an empty body, not JSON: that's "no route", not an error
   const t = await r.text(); let x = null; try { x = t.trim() ? JSON.parse(t)?.[0] : null; } catch (e) { x = null; }
-  const ll = v => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 1e4) / 1e4 : null; };
   let ap = (x?._airports || []).map(a => ({ code: a.iata || a.icao, name: a.name, city: a.location, country: a.countryiso2, lat: ll(a.lat), lon: ll(a.lon ?? a.lng) }));
   if (!ap.length && x?._airport_codes_iata) ap = String(x._airport_codes_iata).split('-').filter(Boolean).map(code => ({ code })); // "IAH-LHR" only
-  return { callsign, origin: ap[0] || null, destination: ap[ap.length - 1] && ap.length > 1 ? ap[ap.length - 1] : null, plausible: x?.plausible ?? null };
+  return ap.length > 1 ? { origin: ap[0], destination: ap[ap.length - 1], source: 'adsb.lol' } : null;
+}
+// adsbdb.com (free, no key): the community callsign → route database
+async function dbRoute(callsign, fetchImpl) {
+  const r = await fetchImpl('https://api.adsbdb.com/v0/callsign/' + encodeURIComponent(callsign), { signal: AbortSignal.timeout(6000), headers: H });
+  if (r.status === 404) return null; if (!r.ok) throw new Error('adsbdb ' + r.status);
+  const f = (await r.json())?.response?.flightroute; if (!f?.origin || !f?.destination) return null;
+  const ap = a => ({ code: a.iata_code || a.icao_code, name: a.name, city: a.municipality, country: a.country_iso_name, lat: ll(a.latitude), lon: ll(a.longitude) });
+  return { origin: ap(f.origin), destination: ap(f.destination), source: 'adsbdb' };
+}
+
+export async function route(callsign, lat, lon, fetchImpl = globalThis.fetch) {
+  const out = { callsign, origin: null, destination: null, plausible: null };
+  for (const look of [() => lolRoute(callsign, lat, lon, fetchImpl), () => dbRoute(callsign, fetchImpl)]) {
+    let x = null; try { x = await look(); } catch (e) { console.warn('planes route', callsign, e.message); }
+    if (!x) continue;
+    const ok = plausible(x.origin, x.destination, lat, lon);
+    if (ok === false) { out.rejected = (out.rejected || []).concat(x.source + ' ' + x.origin.code + '-' + x.destination.code); continue; } // stale: the plane is nowhere near that route
+    return { ...out, ...x, plausible: ok };
+  }
+  return out;
 }
 
 export default async function handler(req, res) {

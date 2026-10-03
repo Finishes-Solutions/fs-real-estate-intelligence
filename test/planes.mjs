@@ -86,3 +86,18 @@ console.log('planes tests passed');
   assert.equal(five.low_per_day, 24); assert.equal(one.low_per_day, 24, 'same traffic, 5x the samples and sightings, same index');
   assert.equal(one.sampled_days, 1, 'a full day at one-minute sampling'); assert.equal(perDay(5, 0), null);
   console.log('planes sampling-rate tests passed'); }
+
+// routes: adsb.lol empty -> adsbdb; a stale route (the plane nowhere near it) is dropped; type names from the ICAO code
+{ const { route, plausible } = await import('../api/planes.js'), { normalize } = await import('../lib/planes.mjs');
+  const AP = { IAD: [38.9445, -77.4558], BOS: [42.3643, -71.0052], DEN: [39.8617, -104.673], IAH: [29.9844, -95.3414] };
+  const db = (o, d) => ({ response: { flightroute: { origin: { iata_code: o, name: o + ' Airport', municipality: o + ' City', latitude: AP[o][0], longitude: AP[o][1] }, destination: { iata_code: d, name: d + ' Airport', municipality: d + ' City', latitude: AP[d][0], longitude: AP[d][1] } } } });
+  const f = routes => async u => String(u).includes('routeset') ? new Response('', { status: 201 }) : routes[String(u).split('/').pop()] ? json(routes[String(u).split('/').pop()]) : json({ response: 'unknown callsign' }, 404);
+  const fx = f({ FFT2996: db('DEN', 'IAH'), UAL1463: db('IAD', 'BOS') });
+  const a = await route('FFT2996', 30.16, -95.77, fx); assert.deepEqual([a.origin.code, a.destination.code, a.source, a.plausible], ['DEN', 'IAH', 'adsbdb', true]);
+  const b = await route('UAL1463', 29.99, -95.53, fx); assert.deepEqual([b.origin, b.destination], [null, null], 'IAD→BOS is not where a plane landing at Houston is going'); assert.deepEqual(b.rejected, ['adsbdb IAD-BOS']);
+  const c = await route('LBQ640', 30.18, -95.31, fx); assert.equal(c.origin, null);
+  assert.equal(plausible({ lat: 29.98, lon: -95.34 }, { lat: 41.98, lon: -87.9 }, 33.5, -92), true, 'en route IAH→ORD');
+  assert.equal(plausible({ lat: 29.98, lon: -95.34 }, { lat: 41.98, lon: -87.9 }, 0, 0), null, 'no position: unknown');
+  assert.equal(normalize({ hex: 'a8aeb6', t: 'A21N', lat: 30, lon: -95, alt_baro: 5700 }).desc, 'Airbus A321neo');
+  assert.equal(normalize({ hex: 'a8aeb6', t: 'ZZZZ', lat: 30, lon: -95, alt_baro: 5700 }).desc, null);
+  console.log('planes route fallback ok'); }
