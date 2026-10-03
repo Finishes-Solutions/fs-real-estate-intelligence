@@ -35,8 +35,9 @@ export async function floodZones(g, sq) {
 }
 const NRI_FIELDS = ['TRACTFIPS', 'COUNTY', 'STCOFIPS', 'POPULATION', 'BUILDVALUE', 'RISK_SCORE', 'RISK_RATNG', 'EAL_VALT', 'SOVI_SCORE', 'RESL_SCORE', ...Object.keys(HAZARDS).flatMap(k => [k + '_EALT', k + '_RISKR'])];
 export async function riskTracts(g) {
-  const d = await arcQuery(NRI, g, { outFields: NRI_FIELDS.join(','), returnGeometry: 'false', resultRecordCount: '400' });
-  return (d.features || []).map(f => f.attributes);
+  // all fields: naming one the service doesn't have fails the whole query; keep only what the report uses
+  const d = await arcQuery(NRI, g, { outFields: '*', returnGeometry: 'false' });
+  return (d.features || []).map(f => Object.fromEntries(NRI_FIELDS.filter(k => k in (f.attributes || {})).map(k => [k, f.attributes[k]])));
 }
 async function openfema(entity, filter, select, top = 10000, skip = 0, order = '') {
   const p = new URLSearchParams({ $filter: filter, $select: select, $top: String(top), $skip: String(skip), $inlinecount: 'allpages', ...(order ? { $orderby: order } : {}) });
