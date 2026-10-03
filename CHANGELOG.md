@@ -16,6 +16,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **FlightAware is no longer used.** Everything above comes free from adsb.lol and the photo databases its own map uses, so there's nothing to pay or cap. The FlightAware link on plane cards is gone too.
 - **Military transports** (C-17, C-130, tankers…) get their own outline. Fighters and military helicopters keep theirs. All plane icons are a little larger.
 
+### 1:23 AM CT: FEMA flood layer and FEMA reports (5986bb1)
+- **Flood Zones (FEMA)** in Map Layers: FEMA's official flood map, the 100-year floodplain and floodway and the 500-year zone, drawn over the map when you zoom into a neighborhood. Works anywhere in Texas.
+- **FEMA Report for any area**: select an area and press **FEMA Report** (next to Crime Report under Area at a Glance), or use **FEMA report (¼ mile)** on a building card's flood zone line. The report shows:
+  - how much of the area is in the high-risk, 500-year and minimal flood zones, whether a floodway runs through it, and the base flood elevation;
+  - flood insurance claims paid around it since the 1970s: how many, how much, by year and by storm (Harvey, Allison, Imelda…). Meyerland, for example, shows 3,781 claims and $386M paid, $322M of it from Harvey;
+  - every federal disaster declaration for its county since 2000;
+  - FEMA's National Risk Index: an overall rating, the expected yearly loss, and the top hazards (hurricane, tornado, flooding, hail…).
+- **Export Report** saves a printable report (Print → Save as PDF); **Export CSV** saves every table for Excel.
+- **Ask AI** about flood zones, flood history, insurance claims, disasters or hazard risk for a place, a building or your selection; it can open the report or turn on the flood layer.
+- Claims are counted for the census tracts around the area (FEMA hides exact addresses), so they describe the neighborhood, not one parcel.
+
+
 ### 1:22 AM CT: The same section-card style across the app (12b80c8)
 - **Tabs:** Reports, Updates, Field Notes, Market, Activity, Compare and Sources now sit on a light grey background. Each group sits in a white card with an icon and a title, like the new property card.
 - **Left panel:** Area at a Glance and Construction Filings are now titled section cards too.

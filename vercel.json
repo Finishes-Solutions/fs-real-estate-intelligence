@@ -63,6 +63,9 @@
     },
     "api/crime.js": {
       "maxDuration": 30
+    },
+    "api/fema.js": {
+      "maxDuration": 45
     }
   },
   "crons": [

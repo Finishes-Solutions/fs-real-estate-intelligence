@@ -93,6 +93,7 @@
         <button class="btn primary" id="selCompare" type="button">+ Compare</button>
         <button class="btn" id="selClear">Clear Selection</button>
         <button class="btn" id="selCrime" type="button" style="display:none">Crime Report</button>
+        <button class="btn" id="selFema" type="button" style="display:none">FEMA Report</button>
       </div>
       <div class="btnrow">
         <button class="btn" id="saveSearch">Save Search</button>
@@ -172,6 +173,8 @@
       <label class="tg2" title="Houston Police incidents in the last 12 months (City of Houston)"><input type="checkbox" id="lyCrime"><span>Crime (Houston)</span></label>
       <select class="chip" id="lyCrimeCat" aria-label="Crime type" hidden><option value="t">All incidents</option><option value="v">Violent</option><option value="p">Property</option></select>
       <div class="rnote" id="lyCrimeNote" hidden></div>
+      <label class="tg2" title="FEMA National Flood Hazard Layer: 100-year and 500-year flood zones (zoom in)"><input type="checkbox" id="lyFema"><span>Flood Zones (FEMA)</span></label>
+      <div class="rnote" id="lyFemaNote" hidden>FEMA's effective flood map at street zoom: the high-risk (100-year) floodplain and floodway, and the 0.2% (500-year) zone, in FEMA's colors. Select an area for a FEMA report.</div>
       <div class="lt">Demographics (Census Tracts)</div>
       <select class="chip" id="lyDemo" aria-label="Demographic layer">
         <option value="">Off</option><option value="gr">Population Growth</option><option value="pop">Population</option><option value="inc">Median Household Income</option>
