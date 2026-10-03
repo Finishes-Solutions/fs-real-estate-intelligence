@@ -99,7 +99,9 @@ async function processCounty(c, per, mode, ctx) {
       const own = c.name.toLowerCase();
       const known = rows.filter(r => (r.city || '').toLowerCase() !== own).map(r => ctx.placeIdx.get((r.city || '').toLowerCase())).filter(Boolean);
       const far = known.filter(p => !geoContains(outline, p) && minVertexDist(outline, p) > 0.3).length;
-      if (known.length >= 10 && far / known.length > 0.5) throw new Error(`${far} of ${known.length} filings are in cities far from ${c.name}; TDLR county id ${c.tabs_id} may be wrong`);
+      // a wrong county id gives a list that is nearly all elsewhere; filers picking the wrong county (City of Austin projects
+      // filed under Austin County) only make up part of it, so those counties still load
+      if (known.length >= 10 && far / known.length > 0.75) throw new Error(`${far} of ${known.length} filings are in cities far from ${c.name}; TDLR county id ${c.tabs_id} may be wrong`);
     }
 
     // geocoding (database cache + the regional cache)

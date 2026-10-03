@@ -160,10 +160,14 @@ async function nominatim(r) {
   } catch (e) { /* miss */ }
   return null;
 }
+// strict: a house-level address match. Otherwise (town-center fallback) only a town or city: "Austin, Texas" must not land
+// on Austin County (filers often write the county name as the city; e.g. City of Austin projects filed under Austin County)
+const TOWNISH = /^(municipality|municipal_district|joint_municipality|place|locality)$/;
 export async function maptiler(key, bbox, q2, strict) {
-  const u = 'https://api.maptiler.com/geocoding/' + encodeURIComponent(q2) + '.json?key=' + key + '&country=us&limit=1&bbox=' + bbox.join(',');
-  try { const d = await (await fetchRetry(u, {}, 2)).json(); const f = (d.features || [])[0];
-    if (!f) return null; if (strict && !(f.address && (f.relevance || 0) >= 0.9)) return null; return f.center; } catch (e) { return null; }
+  const u = 'https://api.maptiler.com/geocoding/' + encodeURIComponent(q2) + '.json?key=' + key + '&country=us&limit=' + (strict ? 1 : 5) + '&bbox=' + bbox.join(',');
+  try { const d = await (await fetchRetry(u, {}, 2)).json(), fs = d.features || [];
+    if (strict) { const f = fs[0]; return f && f.address && (f.relevance || 0) >= 0.9 ? f.center : null; }
+    const f = fs.find(x => [].concat(x.place_type || []).some(t => TOWNISH.test(t))); return f ? f.center : null; } catch (e) { return null; }
 }
 
 // the street part of an address, without the house number ("12907-A Fry Rd" -> "Fry Rd", "0 Mason Road" -> "Mason Road")

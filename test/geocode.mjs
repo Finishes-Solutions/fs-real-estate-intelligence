@@ -22,6 +22,8 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.pathname.endsWith('/onelineaddress')) return json({ result: { addressMatches: /I-45/.test(u.searchParams.get('address')) ? [{ coordinates: { x: -95.55, y: 30.40 }, addressComponents: { zip: '77378' } }] : [] } });
   if (u.host === 'overpass-api.de') { const ql = decodeURIComponent(String(opts.body)); return json({ elements: /node\(w\.a\)\(w\.b\)/.test(ql) ? [{ type: 'node', lat: 29.55, lon: -95.75 }] : [] }); }
   if (u.host === 'api.maptiler.com') { const q = decodeURIComponent(u.pathname);
+    if (/^\/geocoding\/Austin, Texas/.test(q)) return json({ features: [{ place_type: ['county'], text: 'Austin County', center: [-96.24, 29.89] }] });
+    if (/^\/geocoding\/Sealy, Texas/.test(q)) return json({ features: [{ place_type: ['county'], text: 'Austin County', center: [-96.24, 29.89] }, { place_type: ['municipality'], text: 'Sealy', center: [-96.157, 29.781] }] });
     if (/Waxwing/i.test(q)) return json({ features: [{ place_type: ['address'], text: 'Waxwing Drive', place_name: 'Waxwing Drive, Brookshire, Texas 77423, United States', center: [-95.95, 29.80], context: [{ id: 'postal_code.9', text: '77423' }] }] });
     if (/Fry Rd/i.test(q)) return json({ features: [{ place_type: ['address'], text: 'Fry Road', place_name: 'Fry Road, Katy, Texas 77449, United States', center: [-95.72, 29.85] }] }); // other ZIP: rejected
   }
@@ -48,4 +50,9 @@ assert.ok(streetMatch(F('Farm-to-Market Road 1093', '77441'), { zip: '77441' }, 
 assert.equal(streetName('12907-A Fry Rd'), 'Fry Rd'); assert.equal(streetName('0 Mason Road'), 'Mason Road');
 assert.equal(cache['7612 fry rd|cypress|77433'], undefined, 'the Census batch failed, so no miss is cached: it is retried next run');
 assert.equal(cache['12206 interstate 45 n|willis|77378'].src, 'census');
+// town-center fallback: "Austin" filed under Austin County is the City of Austin, not the county: never the county's center
+const out2 = await geocodeRows([{ ProjectNumber: 'A1', st: 'xyz', street: 'xyz', city: 'Austin', zip: '78701' }, { ProjectNumber: 'A2', st: 'xyz', street: 'xyz', city: 'Sealy', zip: '77474' }], {},
+  { key: 'k', bbox: [-97.3, 28.8, -94.3, 31.2], places: [], addressPoints: false, budget: { nominatim: 0 } });
+assert.equal(out2.A1, undefined, 'a county match is not a town: left unmapped');
+assert.equal(out2.A2.src, 'city'); assert.ok(Math.abs(out2.A2.c[0] + 96.157) < 0.02, 'the town, not the county');
 console.log('geocode helpers ok');
