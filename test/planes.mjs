@@ -8,7 +8,7 @@ const AC = [
   { hex: '~0abc', lat: 29.99, lon: -95.35, alt_baro: 'ground', gs: 12 },
   { hex: 'bad' } // no position
 ];
-const seen = [], rpc = []; let mode = 'ok';
+const seen = [], rpc = []; let mode = 'ok', REG = [];
 globalThis.fetch = async (url, opts = {}) => {
   const u = new URL(String(url)); seen.push(u);
   if (u.host === 'api.adsb.lol' && u.pathname.startsWith('/v2/point/')) return mode === 'lol-down' || mode === 'all-down' ? json({ error: 'x' }, 503) : json({ now: 1759440000000, ac: AC });
@@ -25,6 +25,10 @@ globalThis.fetch = async (url, opts = {}) => {
     return json([{ lon: '-95.34', lat: '29.98', sightings: 120, min_alt: 800, samples: 576 }, { lon: '-95.35', lat: '29.98', sightings: 30, min_alt: 1500, samples: 576 }]);
   }
   if (u.host === 'db.example' && u.pathname === '/rest/v1/air_days') return json([{ samples: 288 }, { samples: 288 }]);
+  if (u.host === 'db.example' && u.pathname === '/rest/v1/aircraft_registry') {
+    const or = u.searchParams.get('or'); assert.match(or, /^\((hex\.in\.\([0-9a-f,]+\))?,?(n_number\.in\.\([0-9A-Z,]+\))?\)$/, or);
+    return json(REG.filter(r => or.includes(r.hex) || or.includes('n_number.in.(' + r.n_number) || or.includes(',' + r.n_number + ',') || or.includes(',' + r.n_number + ')')));
+  }
   return json({ error: 'unmocked ' + u }, 599);
 };
 
@@ -78,6 +82,57 @@ res = mock(); await sampler({ headers: { authorization: 'Bearer c' } }, res);
 assert.equal(res.code, 200); assert.equal(res.body.low, 1); assert.equal(rpc.length, 1);
 assert.ok(/^\d{4}-\d\d-\d\d$/.test(rpc[0].p_day)); assert.deepEqual(rpc[0].p_rows, [{ lon: -95.34, lat: 29.98, n: 1, min_alt: 1800 }]);
 delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SECRET_KEY; delete process.env.CRON_SECRET;
+
+// ---- FAA registry (lib/faa.mjs, api/planes.js ?reg=) ----
+{ const { parseRegistry, present, regKey, usHex, unzip } = await import('../lib/faa.mjs');
+  const { deflateRawSync } = await import('node:zlib');
+  const head = '\uFEFFN-NUMBER,SERIAL NUMBER,MFR MDL CODE,ENG MFR MDL,YEAR MFR,TYPE REGISTRANT,NAME,STREET,STREET2,CITY,STATE,ZIP CODE,REGION,COUNTY,COUNTRY,LAST ACTION DATE,CERT ISSUE DATE,CERTIFICATION,TYPE AIRCRAFT,TYPE ENGINE,STATUS CODE,MODE S CODE,FRACT OWNER,AIR WORTH DATE,OTHER NAMES(1),OTHER NAMES(2),OTHER NAMES(3),OTHER NAMES(4),OTHER NAMES(5),EXPIRATION DATE,UNIQUE ID,KIT MFR, KIT MODEL,MODE S CODE HEX,';
+  const MASTER = [head,
+    '12345,17281234     ,2072738,41514,2004,7,ACME AVIATION LLC        ,100 MAIN ST   ,          ,HOUSTON    ,TX,770241234 ,2,201,US,20240115,20200310,1N   ,4,1 ,V,50455351,N,20040601,JANE DOE   ,     ,     ,     ,     ,20270331,00123456,     ,     ,A0B1C2    ,',
+    '812DN,30001       ,1384911,     ,2015,3,DELTA AIR LINES INC      ,PO BOX 20706  ,DEPT 595  ,ATLANTA    ,GA,30320     ,2,121,US,20250101,20150601,1T   ,5,5 ,V,53021341,N,20150501,     ,     ,     ,     ,     ,20280630,00222222,     ,     ,AB1234    ,',
+    'BAD!,x,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,'].join('\r\n');
+  const ACFTREF = '\uFEFFCODE,MFR,MODEL,TYPE-ACFT,TYPE-ENG,AC-CAT,BUILD-CERT-IND,NO-ENG,NO-SEATS,AC-WEIGHT,SPEED,TC-DATA-SHEET,TC-DATA-HOLDER,\r\n2072738,CESSNA                        ,T182T               ,4,1 ,1,0,01,004,CLASS 1,0000,  ,  ,\r\n1384911,BOEING                        ,737-932ER           ,5,5 ,1,0,02,189,CLASS 3,0000,  ,  ,';
+  const ENGINE = '\uFEFFCODE,MFR,MODEL,TYPE,HORSEPOWER,THRUST,\r\n41514,LYCOMING  ,IO-540-AB1A5 ,1 ,00230,000000,';
+  const rows = parseRegistry({ MASTER, ACFTREF, ENGINE });
+  assert.equal(rows.length, 2, 'a malformed N-number is skipped');
+  assert.deepEqual([rows[0].n_number, rows[0].hex, rows[0].mfr, rows[0].model, rows[0].year_mfr, rows[0].registrant_type, rows[0].zip, rows[0].cert_issued, rows[0].expires, rows[0].engine, rows[0].seats, rows[0].other_names],
+    ['12345', 'a0b1c2', 'CESSNA', 'T182T', 2004, 'LLC', '77024-1234', '2020-03-10', '2027-03-31', 'LYCOMING IO-540-AB1A5', 4, ['JANE DOE']]);
+  assert.equal(rows[1].street, 'PO BOX 20706, DEPT 595'); assert.equal(rows[1].engine, null, 'no engine code'); assert.equal(rows[1].aircraft_type, 'Fixed wing, multi engine');
+  assert.match(rows[0].h, /^[0-9a-f]{16}$/); assert.equal(parseRegistry({ MASTER, ACFTREF, ENGINE })[0].h, rows[0].h, 'stable hash');
+  assert.notEqual(parseRegistry({ MASTER: MASTER.replace('ACME AVIATION LLC', 'ACME AVIATION INC'), ACFTREF, ENGINE })[0].h, rows[0].h, 'an owner change changes the hash');
+  const pr = present(rows[0]);
+  assert.deepEqual([pr.n_number, pr.owner, pr.city, pr.aircraft, pr.status, pr.address], ['N12345', 'ACME AVIATION LLC', 'Houston', '2004 CESSNA T182T', 'Valid', '100 MAIN ST, HOUSTON, TX 77024-1234']);
+  assert.match(pr.faa_url, /nNumberTxt=12345$/);
+  assert.deepEqual(['N123AB', 'a1b2c3', '~A1B2C3', 'n-12', '123456', 'N0123', 'DAL1601x'].map(regKey), [{ n: '123AB' }, { hex: 'a1b2c3' }, { hex: 'a1b2c3' }, { n: '12' }, { hex: '123456' }, null, null]);
+  assert.ok(usHex('a0b1c2') && usHex('adf7c7') && !usHex('ae0001') && !usHex('4ca123'));
+  // a zip as the FAA ships it (deflated entries in a folder-less archive)
+  const zipOf = files => { const parts = [], dir = []; let off = 0;
+    for (const [name, text] of Object.entries(files)) {
+      const data = deflateRawSync(Buffer.from(text)), n = Buffer.from(name), loc = Buffer.alloc(30);
+      loc.writeUInt32LE(0x04034b50, 0); loc.writeUInt16LE(8, 8); loc.writeUInt32LE(data.length, 18); loc.writeUInt32LE(Buffer.byteLength(text), 22); loc.writeUInt16LE(n.length, 26);
+      const cen = Buffer.alloc(46); cen.writeUInt32LE(0x02014b50, 0); cen.writeUInt16LE(8, 10); cen.writeUInt32LE(data.length, 20); cen.writeUInt32LE(Buffer.byteLength(text), 24); cen.writeUInt16LE(n.length, 28); cen.writeUInt32LE(off, 42);
+      parts.push(loc, n, data); dir.push(cen, n); off += 30 + n.length + data.length;
+    }
+    const d = Buffer.concat(dir), end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(dir.length / 2, 8); end.writeUInt16LE(dir.length / 2, 10); end.writeUInt32LE(d.length, 12); end.writeUInt32LE(off, 16);
+    return Buffer.concat([...parts, d, end]); };
+  const z = unzip(zipOf({ 'MASTER.txt': MASTER, 'DEREG.txt': 'big', 'ACFTREF.txt': ACFTREF, 'ENGINE.txt': ENGINE }));
+  assert.deepEqual(Object.keys(z).sort(), ['ACFTREF', 'ENGINE', 'MASTER'], 'only the wanted files');
+  assert.equal(z.MASTER, MASTER); assert.ok(!('DEREG' in z));
+  assert.throws(() => unzip(Buffer.from('nope, not a zip at all, definitely not')), /not a zip/);
+
+  // endpoint: no database -> FAA link only; with it -> owner by hex or N-number
+  const { registration } = await import('../api/planes.js');
+  let o = await registration(['a0b1c2', 'N12345', '4ca123'], null);
+  assert.equal(o.registry, false); assert.deepEqual([o.aircraft.a0b1c2.us, o.aircraft['4ca123'].us], [true, false], 'Irish hex: not a US aircraft'); assert.match(o.aircraft.N12345.faa_url, /nNumberTxt=12345/);
+  process.env.SUPABASE_URL = 'https://db.example'; process.env.SUPABASE_SECRET_KEY = 'sb_secret_test'; REG = rows.map(({ h, airworthy, ...r }) => r);
+  res = mock(); await planes({ query: { reg: 'a0b1c2,N812DN,a99999,4ca123' }, headers: H }, res);
+  assert.equal(res.code, 200); assert.equal(res.body.registry, true); assert.match(res.headers['Cache-Control'], /s-maxage=43200/);
+  assert.deepEqual([res.body.aircraft.a0b1c2.owner, res.body.aircraft.a0b1c2.n_number, res.body.aircraft.N812DN.owner, res.body.aircraft.N812DN.aircraft],
+    ['ACME AVIATION LLC', 'N12345', 'DELTA AIR LINES INC', '2015 BOEING 737-932ER']);
+  assert.deepEqual(res.body.aircraft.a99999, { found: false, us: true }); assert.equal(res.body.aircraft['4ca123'].us, false);
+  res = mock(); await planes({ query: { reg: Array(26).fill('a0b1c2').join(',') }, headers: H }, res); assert.equal(res.code, 400, 'at most 25');
+  delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SECRET_KEY; }
+console.log('faa registry ok');
 
 console.log('planes tests passed');
 // sampling rate doesn't change the index: a day at 5-minute samples and a day at 1-minute samples of the same traffic read the same

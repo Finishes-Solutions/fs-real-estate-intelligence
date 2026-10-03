@@ -3,6 +3,7 @@
 //                           click one for callsign, type, altitude, speed, route and a follow camera. Works anywhere.
 //   Low Flight Paths:       30-day density of aircraft seen below 3,000 ft (api/planes-sample.js samples every minute).
 //   Air traffic (cards):    low-aircraft sightings a day over a property and the nearest airport.
+//   Registration (card):    who a US plane is registered to, from the FAA registry (api/planes ?reg=, loaded nightly).
 // Both toggles live in Layers → Live Conditions (registered with src/live.js) and in the assistant's set_live_layers.
 import { pickAircraft } from './lib/assist-logic.mjs';
 
@@ -139,6 +140,44 @@ export function initPlanes(ctx) {
     routes.set(p.flight, job); return job;
   }
   const ap = a => a ? esc((a.code ? a.code + ' ' : '') + (a.city || a.name || '')) : '?';
+  // FAA registration by hex or N-number: one request per batch of new ids, kept for the session (the FAA updates daily)
+  const regs = new Map(), regDone = new Map();
+  function regFor(ids) {
+    const want = [...new Set(ids.filter(id => id && !regs.has(id)))];
+    for (let i = 0; i < want.length; i += 25) {
+      const part = want.slice(i, i + 25), job = fetch('api/planes?reg=' + part.map(encodeURIComponent).join(',')).then(r => r.ok ? r.json() : null).catch(() => null);
+      part.forEach(id => regs.set(id, job.then(d => {
+        if (!d) { regs.delete(id); return null; } // try again next time
+        const r = { registry: d.registry, note: d.note, ...(d.aircraft?.[id] || { found: false }) }; regDone.set(id, r); return r;
+      })));
+    }
+    return Promise.all(ids.map(id => id ? regs.get(id) : null));
+  }
+  // by the broadcast hex; if that isn't in the registry, by the registration the feed reports (N-numbers only)
+  async function regOf(p) {
+    let [r] = await regFor([p.hex]);
+    if (r && !r.found && /^N[1-9]/i.test(p.reg || '')) { const [x] = await regFor([p.reg]); if (x) r = x.found ? x : { ...r, faa_url: x.faa_url }; }
+    if (r) regDone.set(p.hex, r); return r;
+  }
+  const fmtDay = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  function regHtml(p, r) {
+    const link = u => u ? ' <a class="lnk" target="_blank" rel="noopener" href="' + esc(u) + '">FAA record ↗</a>' : '';
+    const faa = r?.faa_url || (/^N[1-9]/i.test(p.reg || '') ? 'https://registry.faa.gov/AircraftInquiry/Search/NNumberResult?nNumberTxt=' + encodeURIComponent(p.reg.replace(/^N/i, '')) : '');
+    let body;
+    if (!r) body = '<div class="rnote">Looking up the FAA registration…</div>';
+    else if (r.failed) body = '<div class="rnote">The registration lookup didn’t answer.' + link(faa) + '</div>';
+    else if (r.found) {
+      const rows = [['Registered to', r.owner + (r.owner_type ? ' (' + r.owner_type + ')' : '')], ['Co-owners', (r.other_owners || []).join('; ')],
+        ['Owner location', [r.city, r.state, r.country && r.country !== 'US' ? r.country : ''].filter(Boolean).join(', ')], ['Tail number', r.n_number],
+        ['Aircraft', r.aircraft], ['Registered', [fmtDay(r.registered), r.expires ? 'expires ' + fmtDay(r.expires) : ''].filter(Boolean).join(' · ')],
+        ['Status', r.status && r.status !== 'Valid' ? r.status : ''], ['Note', r.fractional ? 'Fractional ownership' : '']].filter(x => x[1]);
+      body = '<dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
+        '<div class="rnote">FAA aircraft registry (updated nightly). The registered owner can be a trust, lessor or management company rather than the operator.' + link(r.faa_url) + '</div>';
+    } else if (r.us === false) body = '<div class="rnote">Not a US (N-number) aircraft, so the FAA registry has no record of it.</div>';
+    else if (r.registry === false) body = '<div class="rnote">Owner lookup isn’t set up yet.' + (faa ? ' Look it up on the FAA site:' + link(faa) : '') + '</div>';
+    else body = '<div class="rnote">Not in the FAA registry' + (p.reg ? '' : ' (no registration broadcast)') + '.' + link(faa) + '</div>';
+    return '<div class="bsec" id="plReg"><div class="lt">Registration</div>' + body + '</div>';
+  }
   async function renderCard(hex, refresh) {
     const p = find(hex); if (!p) { if (!refresh) toast('That aircraft is no longer in view.'); return; }
     if (!refresh) { const keep = follow === hex ? hex : null, orb = keep && orbiting; ctx.closeCard?.(); follow = keep; orbiting = !!orb; if (routeOn?.hex !== hex) clearRoute(); }
@@ -153,12 +192,14 @@ export function initPlanes(ctx) {
       '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
       '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">Track on adsb.lol ↗</a>' +
       (p.flight ? '<a class="btn" target="_blank" rel="noopener" href="https://www.flightaware.com/live/flight/' + encodeURIComponent(p.flight) + '">FlightAware ↗</a>' : '') + '</div>' +
+      regHtml(p, regDone.get(hex)) +
       '<div class="bsrc rnote">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown.</div>';
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#plFollow').onclick = () => { const was = follow === hex && !orbiting; follow = was ? null : hex; orbiting = false; renderCard(hex, true); if (follow) followCam(); };
     card.querySelector('#plOrbit').onclick = () => { const was = follow === hex && orbiting; follow = was ? null : hex; orbiting = !was; renderCard(hex, true);
       if (orbiting) map.easeTo({ zoom: Math.max(map.getZoom(), 11), pitch: 60, duration: ctx.reduceMotion ? 0 : 800 }); };
     if (!refresh || !card.classList.contains('open')) card.classList.add('open');
+    if (!regDone.has(hex)) regOf(p).then(r => { const sec = card.querySelector('#plReg'); if (sec && shown === hex) sec.outerHTML = regHtml(p, r || { failed: true }); });
     const r = await routeFor(p), el = card.querySelector('#plRoute');
     if (el && shown === hex) el.textContent = r?.origin && r?.destination ? ap(r.origin).replace(/&amp;/g, '&') + ' → ' + ap(r.destination).replace(/&amp;/g, '&') : p.flight ? 'Route not in the database' : 'No callsign';
     // draw the route the first time the card opens for this plane (not on every 10-second refresh)
@@ -233,6 +274,7 @@ export function initPlanes(ctx) {
   };
   ctx.showPlane = hex => renderCard(hex);
   ctx.planeRoute = p => routeFor(p);
+  ctx.planeRegistry = ids => regFor(ids);
   // the assistant: find a plane by callsign, registration or hex (or the nearest airborne one), open its card and follow
   // or orbit it. Looks up to 250 miles around `near` (default: the map centre), so it needn't be on screen.
   ctx.followPlane = async (id, o = {}) => {

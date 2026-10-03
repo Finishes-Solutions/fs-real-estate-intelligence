@@ -3,10 +3,12 @@
 //   GET ?route=CALLSIGN&lat=&lon=         -> { callsign, origin, destination }                adsb.lol route database, cached 1 h
 //   GET ?history=lon,lat&km=1&days=30     -> { low_per_day, lowest_ft, sampled_days, ... }    from Supabase (api/planes-sample.js)
 //   GET ?density=w,s,e,n&days=30          -> GeoJSON cells { sightings, per_day, min_alt }    for the "Low Flight Paths" layer
+//   GET ?reg=a1b2c3,N123AB,...            -> { registry, aircraft: { id: record | { found: false, us } } }   FAA registry (owner), up to 25
 // History reads say { history: false, note } when the database isn't set up yet.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { supa } from '../lib/supa.mjs';
 import { pointQuery, fetchPoint, boxAround, summarize, SAMPLES_PER_DAY, perDay } from '../lib/planes.mjs';
+import { regKey, usHex, present, faaUrl } from '../lib/faa.mjs';
 
 const LAST = new Map(); // area -> last good aircraft snapshot in this warm instance
 const num = v => (v === '' || v == null ? NaN : Number(v));
@@ -34,6 +36,20 @@ export async function density(b, days = 30, d = db()) {
   }) };
 }
 
+// FAA registration (registered owner, aircraft, dates) by Mode S hex or N-number, from aircraft_registry (build/live-sync.mjs).
+// Each id maps to the record, or { found: false, us } (us: false = not a US aircraft, so the FAA has no record of it).
+const REG_COLS = 'n_number,hex,serial,mfr,model,year_mfr,aircraft_type,engine_type,engine,seats,registrant_type,name,street,city,state,zip,country,other_names,cert_issued,last_action,expires,status,fractional,kit';
+export async function registration(ids, d = db()) {
+  const list = [...new Set(ids.map(x => String(x || '').trim()).filter(Boolean))].slice(0, 25).map(id => ({ id, k: regKey(id) }));
+  const miss = ({ k }) => ({ found: false, us: k ? !!(k.n || usHex(k.hex)) : null, ...(k?.n ? { faa_url: faaUrl(k.n) } : {}) });
+  if (!d || d.via !== 'key') return { registry: false, note: 'The FAA registry needs SUPABASE_SECRET_KEY on the site.', aircraft: Object.fromEntries(list.map(x => [x.id, miss(x)])) };
+  const hex = list.filter(x => x.k?.hex).map(x => x.k.hex), n = list.filter(x => x.k?.n).map(x => x.k.n);
+  const or = [hex.length && 'hex.in.(' + hex.join(',') + ')', n.length && 'n_number.in.(' + n.join(',') + ')'].filter(Boolean).join(',');
+  const rows = or ? await d.select('aircraft_registry', 'select=' + REG_COLS + '&or=(' + or + ')') : [];
+  const byHex = new Map(rows.filter(r => r.hex).map(r => [r.hex, r])), byN = new Map(rows.map(r => [r.n_number, r]));
+  return { registry: true, aircraft: Object.fromEntries(list.map(x => { const r = x.k?.hex ? byHex.get(x.k.hex) : x.k?.n ? byN.get(x.k.n) : null; return [x.id, r ? { found: true, ...present(r) } : miss(x)]; })) };
+}
+
 export async function route(callsign, lat, lon, fetchImpl = globalThis.fetch) {
   const r = await fetchImpl('https://api.adsb.lol/api/0/routeset', { method: 'POST', signal: AbortSignal.timeout(6000), headers: { 'Content-Type': 'application/json', 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' },
     body: JSON.stringify({ planes: [{ callsign, lat: Number.isFinite(lat) ? lat : 0, lng: Number.isFinite(lon) ? lon : 0 }] }) });
@@ -54,6 +70,14 @@ export default async function handler(req, res) {
       const cs = String(q.route).trim().toUpperCase(); if (!/^[A-Z0-9]{2,8}$/.test(cs)) return res.status(400).json({ error: 'route=CALLSIGN' });
       res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=3600');
       return res.json(await route(cs, num(q.lat), num(q.lon)));
+    }
+    if (q.reg) {
+      const ids = String(q.reg).split(',').filter(x => x.trim()); if (!ids.length || ids.length > 25) return res.status(400).json({ error: 'reg=hex or N-number, up to 25, comma-separated' });
+      let out;
+      try { out = await registration(ids); }
+      catch (e) { if (!/aircraft_registry|relation|does not exist|PGRST/i.test(e.message)) throw e; out = { ...(await registration(ids, null)), note: 'The FAA registry isn’t loaded yet (apply supabase/migrations/20261011000000_aircraft_registry.sql, then run the Live data workflow).' }; }
+      // the FAA publishes once a day
+      res.setHeader('Cache-Control', out.registry ? 'public, max-age=3600, s-maxage=43200' : 'no-store'); return res.json(out);
     }
     if (q.history) {
       const [lon, lat] = String(q.history).split(',').map(num); if (!Number.isFinite(lon) || !Number.isFinite(lat)) return res.status(400).json({ error: 'history=lon,lat' });

@@ -5,18 +5,21 @@
 //   storm_advisories             NOAA NHC active-storm snapshot
 //   tracts                       ACS census tracts from data/market.json
 //   crime_incidents              Houston Police NIBRS incidents (yearly CSVs), last ~25 months, for crime near a site on building cards
+//   aircraft_registry            the FAA registry of US aircraft (owner of each N-number / Mode S hex) for plane cards; only changed rows are written
 // Reads the regional data/filings.json and data/geo.json the "Refresh data" workflow commits. Needs the
 // 20261004000000_live_data.sql migration. Env: NEWS_MAX (searches per night, default 120), IMAGERY_MAX (default 600),
-// IMAGERY_DAYS (look-back, default 30), ONLY=news,imagery,weather,storms,tracts,crime (subset). Crime needs 20261010000000_site_data.sql.
+// IMAGERY_DAYS (look-back, default 30), ONLY=news,imagery,weather,storms,tracts,crime,aircraft (subset). Crime needs 20261010000000_site_data.sql; aircraft
+// needs 20261011000000_aircraft_registry.sql (FAA_DIR=folder of unzipped FAA files or FAA_ZIP=zip path/URL instead of the FAA download).
 import { log, readJSON } from './util.mjs';
 import { supa } from '../lib/supa.mjs';
 import { hlsPasses } from '../lib/nasa.mjs';
 import { news, phrase } from '../api/news.js';
 import { daily, storms } from '../api/weather.js';
 import { HPD_CSV, parseHpd } from '../lib/crime.mjs';
+import { loadRegistry, parseRegistry } from '../lib/faa.mjs';
 
 const D = process.env.DATA_DIR || 'data/';
-const ONLY = (process.env.ONLY || 'news,imagery,weather,storms,tracts,crime').split(',');
+const ONLY = (process.env.ONLY || 'news,imagery,weather,storms,tracts,crime,aircraft').split(',');
 const NEWS_MAX = +(process.env.NEWS_MAX || 120), IMAGERY_MAX = +(process.env.IMAGERY_MAX || 600), IMAGERY_DAYS = +(process.env.IMAGERY_DAYS || 30);
 const NEWS_GAP_MS = +(process.env.NEWS_GAP_MS ?? 5500); // GDELT asks for at most one request per 5 seconds
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -85,6 +88,19 @@ await step('crime', async () => {
   if (!rows && errors.length) throw new Error(errors.join('; '));
   const pruned = await db.rpc('crime_prune', { p_keep_days: 760 });
   return { since, rows, pruned, errors: errors.length ? errors : undefined };
+});
+
+await step('aircraft', async () => {
+  const rows = parseRegistry(await loadRegistry());
+  // a cut-off download or a changed file layout must not empty the table: the registry holds ~300,000 aircraft
+  const MIN = +(process.env.FAA_MIN_ROWS || 200000);
+  if (rows.length < MIN) throw new Error('only ' + rows.length + ' aircraft parsed (expected at least ' + MIN + '); nothing changed');
+  const have = new Map((await db.selectAll('aircraft_registry', 'select=n_number,h&order=n_number')).map(r => [r.n_number, r.h]));
+  const now = new Date().toISOString(), changed = rows.filter(r => have.get(r.n_number) !== r.h).map(r => ({ ...r, synced_at: now }));
+  await db.upsert('aircraft_registry', changed, 'n_number', 1000);
+  const keep = new Set(rows.map(r => r.n_number)), gone = [...have.keys()].filter(n => !keep.has(n));
+  let removed = 0; for (let i = 0; i < gone.length; i += 2000) removed += +(await db.rpc('aircraft_registry_remove', { p_ids: gone.slice(i, i + 2000) })) || 0;
+  return { registered: rows.length, written: changed.length, removed };
 });
 
 await step('imagery', async () => {

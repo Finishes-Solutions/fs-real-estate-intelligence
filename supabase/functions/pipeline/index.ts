@@ -7,7 +7,7 @@ const REPO = 'finishes-solutions/fs-real-estate-intelligence';
 const AUDIENCE = 'fs-real-estate-pipeline';
 const TABLES = new Set(['counties', 'filings', 'changes', 'runs', 'geocode_cache', 'rpc/cache_get', 'rpc/db_size',
   'news_articles', 'filing_news', 'imagery_passes', 'weather_daily', 'storm_advisories', 'tracts',
-  'crime_incidents', 'rpc/crime_prune', 'rpc/crime_latest']);
+  'crime_incidents', 'rpc/crime_prune', 'rpc/crime_latest', 'aircraft_registry', 'rpc/aircraft_registry_remove']);
 
 const b64u = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=')), c => c.charCodeAt(0));
 let jwks: { keys: JsonWebKey[] & { kid?: string }[] } | null = null, jwksAt = 0;
