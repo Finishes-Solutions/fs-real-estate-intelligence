@@ -5,6 +5,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 12:36 AM CT: Plane types and routes now actually show (6585097)
+- Checking the live site showed two problems with the plane update earlier tonight:
+  - **The route service the app used (adsb.lol) has stopped answering**, so no plane had a "from → to".
+  - **The live feeds send only a type code** (e.g. "A21N"), never the type's name.
+- **Routes now fall back to adsbdb**, a second free route database, which knows most airline flights.
+- **Each route is checked against where the plane actually is.** Flight numbers get reused, so the databases are sometimes out of date.
+  - Example: one database said UAL1463 was flying Washington → Boston, while it was landing in Houston.
+  - A route that doesn't fit the plane's position is dropped rather than shown wrong.
+- **Aircraft types show by name** (e.g. "Airbus A321neo", "Pilatus PC-12") from a built-in list of about 230 common types.
+  - A rare type shows its code.
+  - Private and small planes usually have no route in either database.
+
 ### 12:30 AM CT: The map now leads with properties, not filings (4a6874b, afa6fc3)
 - **Filing dots are hidden when the map first opens.** This applies once to everyone, after which your own choice sticks. To bring them back:
   - open **Construction Filings** in the left panel;
