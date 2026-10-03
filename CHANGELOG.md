@@ -13,7 +13,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Each route is checked against where the plane actually is.** Flight numbers get reused, so the databases are sometimes out of date.
   - Example: one database said UAL1463 was flying Washington → Boston, while it was landing in Houston.
   - A route that doesn't fit the plane's position is dropped rather than shown wrong.
-- **Aircraft types show by name** (e.g. "Airbus A321neo", "Pilatus PC-12") from a built-in list of about 230 common types.
+- **Aircraft types show by name** (e.g. "Airbus A321neo", "Pilatus PC-12") from a built-in list of about 210 common types.
   - A rare type shows its code.
   - Private and small planes usually have no route in either database.
 
