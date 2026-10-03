@@ -5,6 +5,28 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 1:46 AM CT: Filters in a popup, crime on property cards and in Reports, long flights framed right (2dd8bfa)
+- **Filters are now a popup.** Use the **Filters** button in the map toolbar, between County and Export:
+  - it shows how many filters are on;
+  - a **Clear** button next to it resets them all in one click;
+  - the popup closes when you click away or press Esc.
+  - Changing a filter puts the construction filing dots on the map, since that's what filters apply to.
+  - On phones, the filter button opens the same filters as a sheet.
+- **Property cards have a "Crime" pill**, showing incidents reported within 1 mile:
+  - totals for the last 12 months and the change from the year before;
+  - violent and property crime, and how the area compares with the Houston average;
+  - the top offenses and the most recent incidents.
+  - One click opens the full crime report or the crime map layer.
+  - The data covers the City of Houston only, and the card says so elsewhere.
+- **Crime Report moved to the Reports tab**, and is no longer in the left panel. Run it for:
+  - the selected area;
+  - the current map view;
+  - or an area you draw.
+  - Its printable report and CSV exports now appear under **Previously Exported**.
+- **Fixed: long flights showed the far side of the globe.** Selecting a plane on a route like Houston → Taipei now centres the map on the route itself.
+- **The left panel matches the new card style throughout.** The "Sq ft filed" figure reads 213M instead of a cut-off number.
+- **New releases show up on the first reload.** Previously the app's offline cache kept showing the old version until a second reload. Now, when a new version arrives right after the page opens, it reloads by itself; later in a session, a message says a new version is ready.
+
 ### 1:27 AM CT: Plane photos, details and 3D flight paths from adsb.lol; FlightAware removed (7d211b6)
 - **Plane cards now show:**
   - **a photo of the actual aircraft**, credited to its photographer and linked to planespotters.net;
