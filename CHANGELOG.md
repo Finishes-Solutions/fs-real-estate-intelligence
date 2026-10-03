@@ -5,6 +5,21 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 2:19 PM CT: No more zooming out to the whole world, more businesses, more crime statistics (31908c8)
+- **Fixed:** opening a drive-time map, showing a crime, FEMA or traffic report's area, or other area outlines could zoom the map all the way out to the whole world. Some outlines are drawn in the opposite direction, and the map read them as "everything except this area". It now zooms to the area itself.
+- **Businesses on property cards:**
+  - The search reaches about 150 m instead of 80 m, so large buildings, shopping centers and strip malls show their tenants.
+  - Up to 30 nearby businesses are listed instead of 8.
+  - When the main OpenStreetMap server is busy, two backup servers are tried before giving up. Before, a busy server meant an empty list. The map's "nearby" business search uses the backups too.
+  - The list still depends on what's mapped in OpenStreetMap, which is thin in some suburbs. The registered businesses at the address (Texas Comptroller) are still listed below it.
+- **Crime reports have new sections:**
+  - **When it happens:** incidents by hour of day and by day of week, with the busiest 3-hour stretch and the busiest and quietest days.
+  - **Year by year:** each year's incidents and its change, next to Houston's change over the same time. Partial years are compared at their yearly pace.
+  - **Per resident:** incidents per 1,000 residents a year, from the census tracts in the area.
+  - All of these are in the exported report too, and the assistant can answer from them ("what time of day are break-ins worst here?").
+- The hour of day appears after the next nightly data refresh, which reloads the stored incidents once. Day of week and year by year work now.
+- **Longer crime history** is ready for when the database is upgraded: set the repository variable CRIME_YEARS (for example 6), and the nightly sync loads and keeps that many years. It's 2 for now.
+
 ### 2:00 PM CT: Minimize cards to see the map (a9114ef)
 - **Every card can shrink to its title bar:** properties, filings, planes, airports and reports.
   - Tap the **⌄** button next to the ×, or on a phone swipe the card down.
