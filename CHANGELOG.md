@@ -5,6 +5,16 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 1:14 AM CT: Planes look like what they are; map buttons stay put (01eff54)
+- **Each plane on the map is drawn as its kind of aircraft**, not the same airliner icon:
+  - big jets: 747s and other four-engine jets, wide-bodies (777, 787, A330…), narrow-body airliners (737, A320…);
+  - smaller jets: regional jets with engines at the back, business jets, fighters;
+  - propeller planes: twin and single turboprops (Dash 8, King Air, Caravan, PC-12), twin and single piston planes (Baron, Cessna 172, Cirrus);
+  - everything else: helicopters, gliders, balloons, drones and ground vehicles.
+- **Sizes follow the aircraft.** A 747 is clearly bigger than a 737, which is bigger than a Cessna. Small planes stay about as big as before, so they're still easy to click.
+- The type comes from the code each plane broadcasts. Planes that don't send one use their broadcast size category.
+- **Fixed: the zoom (+/−) and other map buttons no longer drift into the middle of the map when a card is open.** They stay at the right edge. The card sits next to them, or below them when the window is tall enough.
+
 ### 1:01 AM CT: App wouldn't load: fixed (0b50595)
 - The app got stuck on a blank map with nothing clickable. A typo (an apostrophe inside a quoted sentence in the plane card's source note, added at 12:36 AM) stopped all the app's code from loading. Fixed, and the tests now check every file the browser loads, so a mistake like this can't be pushed again.
 
