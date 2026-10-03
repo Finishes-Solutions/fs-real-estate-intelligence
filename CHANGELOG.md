@@ -5,6 +5,20 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 2:50 AM CT: Traffic reports and a Traffic Counts layer (7e269a7)
+- **Traffic Counts** in Map Layers: every road TxDOT counts, coloured from green to dark red by how many vehicles use it a day. Zoom in to a part of town to see it, and hover a road for its count.
+- **Traffic Report** for any area (Reports tab, the selection bar, or Area reports on a building's Site section):
+  - the busiest roads, with vehicles a day;
+  - average traffic by road type (interstates, state highways, city streets…);
+  - **live speed vs normal speed** on the 8 busiest roads right now;
+  - **current crashes, closures and road works** in the area.
+- **Export Report** (printable, save as PDF) and **Export CSV**, with every counted road segment. The report includes a map of the area with the roads drawn by traffic.
+- **Ask the assistant** "how busy is Westheimer near the Galleria?" or "traffic around this site".
+- **Honest limits:**
+  - TxDOT publishes only the current year's counts in this data, so there's no year-over-year trend.
+  - The counts are annual averages for both directions; hour-by-hour volumes aren't published free.
+  - Live speeds and incidents are a snapshot from when you open the report (TomTom doesn't allow storing them).
+
 ### 2:41 AM CT: Drive-time maps (5285009)
 - **See how far you can drive in 10, 20 or 30 minutes.** Open any building or filing and press **Drive-Time Map** under From Here. Nested green, yellow and orange areas are drawn on the map.
 - **Choose when you're leaving:** now (live traffic), a weekday at 8 AM or 5 PM, or Sunday. Rush hour can shrink the areas a lot.
