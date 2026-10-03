@@ -66,6 +66,10 @@ assert.equal(rows.length, 2, 'ungeocoded and old rows dropped, repeat offense ro
 assert.equal(category('23F'), 'p'); assert.equal(category('120'), 'v'); assert.equal(category('35A'), 'o');
 assert.equal(crimeSummary([], 0.5).last12.total, 0); assert.equal(crimeSummary([], 0.5).change.total, null);
 assert.throws(() => parseHpd('a,b\n1,2'), /unexpected HPD header/);
+// the older yearly files: run-together header names, M/D/YYYY dates
+const old = parseHpd('Incident,RMSOccurrenceDate,RMSOccurrenceHour,NIBRSClass,NIBRSDescription,OffenseCount,Beat,Premise,StreetNo,StreetName,StreetType,Suffix,City,ZIPCode,MapLongitude,MapLatitude\n' +
+  '1,11/15/2025,10,120,Robbery,1,1A10,Street,1,MAIN,ST,,HOUSTON,77002,-95.37,29.76\n', { since: '2025-01-01' });
+assert.deepEqual(old.map(r => [r.day, r.cat]), [['2025-11-15', 'v']]);
 
 // ---------- economics ----------
 const econ = await import('../build/econ.mjs');

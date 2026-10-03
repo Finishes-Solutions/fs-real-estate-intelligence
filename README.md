@@ -83,6 +83,27 @@ Not included, on purpose: sales and lease comps. Texas does not disclose sale pr
 - **Consumer spending (estimates)**: Map Layers → Demographics adds Consumer Spending, Spending per Household, Dining Out, Home Furnishings and Apparel per census tract; the Market view adds spending by category and the **city sales tax collected each month** (Texas Comptroller allocations, a real local spending trend). The tract figures are modeled (Census ACS households by income × BLS Consumer Expenditure Survey spending by income, adjusted to the South), not measured; the BLS coefficients are cached in `data/cache/ce.json` and refreshed monthly (optional `BLS_KEY` for the BLS v2 API).
 - **Ask about anything**
 
+## Site facts and economics (building card Site section, Market view)
+
+Free, no keys. Live lookups go through `api/site` (cached a week at the CDN); the economics are built nightly by `build/econ.mjs` into `data/area.json`; Houston crime is loaded nightly into Supabase.
+
+| Data | Source | How | Notes |
+|---|---|---|---|
+| Flood zone | FEMA National Flood Hazard Layer (map service layer 28) | Live, at the point | A/V zones = 1% annual chance (100-year); shaded X = 0.2% (500-year). |
+| Traffic counts | TxDOT AADT feature service | Live, roads within 300 m | Annual average daily traffic; one entry per route, plus the busiest city street. |
+| Water and management districts | TCEQ water districts (ArcGIS Online) | Live | MUDs, WCIDs, management districts, regional water authorities; river authorities and groundwater districts left out. |
+| Tax increment zones, METRO stops | City of Houston open data | Live, Houston only | TIRZ at the point; bus stops within 400 m. |
+| Opportunity Zone, school district | CDFI Fund via ArcGIS Online; Census TIGERweb | Live | |
+| Environmental flags | EPA ECHO facility search | Live, ¼ mile | Flags facilities with violations, toxic releases, penalties or hazardous-waste handling. A screening flag, not a Phase I. |
+| Alcohol sales at the address | Texas Comptroller mixed beverage gross receipts (`naix-2893`) | Live | Last 12 months per permit; matched like registered businesses (house number + street word + ZIP). |
+| Crime nearby | Houston Police NIBRS yearly CSVs | Nightly into `crime_incidents` (live-sync step `crime`), queried with `crime_near()` | Last 25 months kept. HPD's file runs about three months behind. Houston city only; needs migration `20261010000000_site_data.sql`. |
+| County unemployment | BLS LAUS (API v1, or v2 with `BLS_KEY`) | Nightly | All 254 Texas counties, the state and four metros; latest month and a year earlier. |
+| Rates | FRED graph CSV (10-yr and 5-yr Treasury, Freddie Mac 30-yr), New York Fed SOFR | Nightly | Latest, a year earlier, a weekly line for the last year. |
+| Typical rent by ZIP | Zillow Observed Rent Index (ZIP, all homes) | Nightly | About 750 Texas ZIPs. |
+| Home loans | CFPB HMDA data browser | Nightly (new year each spring) | Originated loans, dollars and purchase loans per region county. |
+
+Sources are hidden on cards and panels by default (one clean view for everyone); **Sources → Show sources on cards and panels** turns them on for that browser. Reports always list sources.
+
 ## AI assistant
 
 The **Ask AI** button (or ⌘/ on a Mac, Ctrl+/ elsewhere) opens a chat that works the map through tools: filter, find, highlight, open a filing, fly somewhere, toggle the heatmap or views. Press the mic to talk to it instead (OpenAI Realtime over WebRTC).

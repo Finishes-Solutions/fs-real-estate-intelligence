@@ -73,15 +73,16 @@ await step('crime', async () => {
   // first run: 25 months; after that only the months HPD may still be revising (it republishes the yearly files monthly)
   const latest = await db.rpc('crime_latest', {}), now = new Date();
   const since = latest ? addDays(String(latest).slice(0, 10), -75) : addDays(today, -760);
-  let rows = 0;
+  let rows = 0; const errors = [];
   for (let y = +since.slice(0, 4); y <= now.getUTCFullYear(); y++) {
     const r = await fetch(HPD_CSV(y), { headers: { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence)' }, signal: AbortSignal.timeout(180000) });
     if (!r.ok) { if (y === now.getUTCFullYear() && r.status === 404) continue; throw new Error('HPD ' + y + ' ' + r.status); }
-    const list = parseHpd(await r.text(), { since });
+    let list; try { list = parseHpd(await r.text(), { since }); } catch (e) { errors.push(y + ': ' + e.message); continue; } // one odd year doesn't block the others
     await db.upsert('crime_incidents', list, 'id', 1000); rows += list.length;
   }
+  if (!rows && errors.length) throw new Error(errors.join('; '));
   const pruned = await db.rpc('crime_prune', { p_keep_days: 760 });
-  return { since, rows, pruned };
+  return { since, rows, pruned, errors: errors.length ? errors : undefined };
 });
 
 await step('imagery', async () => {

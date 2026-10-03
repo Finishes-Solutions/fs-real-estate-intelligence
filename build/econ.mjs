@@ -1,4 +1,4 @@
-// Economic context for cards, the Market view and underwriting. All free, no keys required (BLS_API_KEY optional):
+// Economic context for cards, the Market view and underwriting. All free, no keys required (BLS_KEY optional):
 //   rates         10-yr and 5-yr Treasury and 30-yr mortgage (FRED graph CSV), SOFR (New York Fed): latest + a year of weekly points
 //   unemployment  BLS LAUS monthly unemployment rate for every Texas county, the state and the metros (latest + same month a year ago)
 //   rents         Zillow Observed Rent Index (ZORI) by Texas ZIP: latest typical asking rent and change over a year
@@ -62,7 +62,7 @@ export function lausSummary(series) {
   return { period: l.y + '-' + String(l.m).padStart(2, '0'), rate: l.v, yearAgo: ya ? ya.v : null, preliminary: l.p || undefined };
 }
 async function blsSeries(ids) {
-  const key = process.env.BLS_API_KEY, per = key ? 50 : 25, out = {};
+  const key = process.env.BLS_KEY || process.env.BLS_API_KEY, per = key ? 50 : 25, out = {};
   for (let i = 0; i < ids.length; i += per) {
     const body = { seriesid: ids.slice(i, i + per), ...(key ? { registrationkey: key } : {}) };
     const d = await (await get('https://api.bls.gov/publicAPI/' + (key ? 'v2' : 'v1') + '/timeseries/data/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
