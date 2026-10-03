@@ -208,7 +208,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_details: 'Checking FlightAware…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_path: 'Tracing the flight…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -545,14 +545,25 @@ export function initAssistant(ctx) {
         return { ...x, callsign: plane?.flight || undefined, source: 'FAA aircraft registry (Releasable Aircraft Database), updated nightly',
           note: 'The registered owner is often an LLC, trust, bank or management company rather than the person flying it. Mention the address only if asked. owner_withheld: the owner asked the FAA not to publish their name. valid: false means the registration is lapsing, pending or cancelled (see status).' };
       }
-      if (name === 'flight_details') {
-        if (!ctx.flightAware) return { error: 'Flight details aren’t available in this version.' };
-        const d = await ctx.flightAware(String(a.ident || '')).catch(e => ({ error: e.message }));
-        if (d.error || !d.available || d.capped || d.busy) return { available: !!d.available && !d.capped, note: d.error || d.note };
-        const leg = f => f && { from: f.origin, to: f.destination, departed: f.departed, arrived: f.arrived, eta: f.eta, status: f.status, operator: f.operator, aircraft_type: f.aircraft_type, registration: f.registration };
-        turnSubject = d.ident;
-        return { ident: d.ident, in_the_air_now: leg(d.current), recent_flights: (d.recent || []).map(leg), source: 'FlightAware AeroAPI', budget: d.budget ? { spent_this_month: d.budget.spent, cap: d.budget.cap } : undefined,
-          note: 'Times are UTC ISO strings; say them in Central time. Private owners can ask FlightAware to block their flights, so an empty answer doesn\'t mean the plane isn\'t flying.' };
+      if (name === 'flight_path') {
+        // a plane by hex, callsign or registration (in the air within 250 miles), its flight path today from adsb.lol
+        if (!ctx.planeTrack || !ctx.planesNear) return { error: 'Flight paths aren’t available in this version.' };
+        const id = String(a.hex || a.callsign || a.registration || '').trim(); if (!id) return { error: 'Give a callsign, tail number or ICAO hex.' };
+        let hex = /^~?[0-9a-f]{6}$/i.test(id) ? id.replace('~', '').toLowerCase() : null, plane = null;
+        if (!hex) { const d = await ctx.planesNear([ctx.map.getCenter().lng, ctx.map.getCenter().lat], 250).catch(() => null); plane = d ? pickAircraft(d.aircraft || [], id) : null; hex = plane?.hex; }
+        if (!hex) return { error: 'No aircraft “' + id + '” is broadcasting within 250 miles right now, so its path can’t be looked up.' };
+        const t = await ctx.planeTrack(hex); if (!t) return { error: 'adsb.lol didn’t return a flight path for that aircraft.' };
+        // where each flight began and ended, as a town name (OpenStreetMap reverse geocoding, a few lookups at most)
+        const town = async c => { try { const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&lat=' + c[1] + '&lon=' + c[0], { headers: { Accept: 'application/json' } }); const d = await r.json(); const x = d.address || {};
+          return [x.city || x.town || x.village || x.hamlet || x.county, x.state].filter(Boolean).join(', ') || d.display_name || null; } catch (e) { return null; } };
+        const legs = (t.today || []).slice(-4);
+        const named = []; for (const l of legs) named.push({ ...l, from_place: await town(l.from), to_place: await town(l.to) });
+        if (a.show !== false) { if (ctx.view !== 'map') ctx.setView('map'); await ctx.followPlane?.(hex, {}); await ctx.planeTrack(hex); ctx.planePath3d?.(hex); actionChip('Flight path in 3D: ' + (plane?.flight || t.registration || hex.toUpperCase()), () => ctx.closeCard()); }
+        turnSubject = plane?.flight || t.registration || hex;
+        return { hex, callsign: plane?.flight || null, registration: t.registration, aircraft: t.desc, operator: t.operator, year_built: t.year, military: t.military,
+          this_flight: t.leg ? { ...named[named.length - 1], points_drawn: t.points.length } : null, flights_today: named, shown_on_map: a.show !== false,
+          source: 'adsb.lol flight traces (community ADS-B, ODbL); places from OpenStreetMap',
+          note: 'Times are UTC ISO strings; say them in Central time. A flight that started in the air (started_on_ground false) was first picked up mid-flight, so its start is not its departure airport. to_place for the current flight is where it is now.' };
       }
       if (name === 'crime_stats') {
         if (!ctx.crimeReportData) return { error: 'Crime data isn’t available in this version.' };

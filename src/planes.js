@@ -4,8 +4,9 @@
 //   Low Flight Paths:       30-day density of aircraft seen below 3,000 ft (api/planes-sample.js samples every minute).
 //   Air traffic (cards):    low-aircraft sightings a day over a property and the nearest airport.
 //   Registration (card):    who a US plane is registered to, from the FAA registry (api/planes ?reg=, loaded nightly).
-//   FlightAware (card):     origin, destination, times and recent flights when the free route database has no route
-//                           (api/planes ?flight=, paid AeroAPI behind a hard monthly cap; one lookup per plane per session).
+//   Photo, details, path:   the plane's photo (planespotters.net), maker / operator / year, and this flight's path from
+//                           adsb.lol traces (api/planes ?aircraft= / ?track=): a line coloured by altitude, and in the 3D
+//                           view (map tilted) a ribbon at the plane's real altitude with a curtain down to the ground.
 // Both toggles live in Layers → Live Conditions (registered with src/live.js) and in the assistant's set_live_layers.
 import { pickAircraft } from './lib/assist-logic.mjs';
 import { SHAPES, SIZE } from './lib/aircraft-shapes.mjs';
@@ -37,6 +38,8 @@ export function initPlanes(ctx) {
       case 'heavy2': body(1, 62, 8); wings(21, 16, 62, 17, 5, 3.5); wings(51, 9, 26, 7, 3, 3); pods(15, 25, 11, 5.5); break;
       case 'regional': body(3, 61, 5.5); wings(27, 11, 46, 9, 4); wings(54, 7, 20, 5, 3); pods(5.4, 40, 10, 4); break;
       case 'bizjet': body(6, 58, 5); wings(28, 10, 40, 9, 3); wings(51, 6, 18, 5, 2.5); pods(5, 39, 8, 3.6); break;
+      // military transport (C-17, C-130, tankers): wide body, high straight-ish wing with engines hung forward, T-tail
+      case 'military': body(2, 60, 7.5); wings(20, 12, 60, 5, 6, 3.5); wings(54, 7, 26, 3, 4); pods(12, 16, 11, 4); pods(21, 18, 10, 3.6); break;
       case 'fighter': body(1, 62, 5); wings(20, 28, 36, 22, 4); wings(50, 10, 22, 7, 3); break;
       case 'turboprop2': body(6, 60, 5); wings(22, 9, 56, 0, 6); wings(52, 7, 20, 1, 5); pods(11, 15, 15, 4); props(11, 13.5, 12); break;
       case 'turboprop1': body(5, 58, 5); wings(20, 9, 50, 0, 6); wings(50, 7, 18, 1, 5); props(0, 3, 14); break;
@@ -70,11 +73,12 @@ export function initPlanes(ctx) {
     if (!map.getSource('live-planes')) map.addSource('live-planes', { type: 'geojson', data: fc(), attribution: 'Aircraft: adsb.lol (ODbL) · airplanes.live' });
     if (!map.getLayer('live-planes')) map.addLayer({ id: 'live-planes', type: 'symbol', source: 'live-planes', layout: {
       'icon-image': ['concat', 'plane-', ['get', 'shape']], 'icon-rotate': ['get', 'track'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 5, ['*', .45, ['get', 'sz']], 9, ['*', .68, ['get', 'sz']], 13, ['*', .95, ['get', 'sz']]],
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 5, ['*', .5, ['get', 'sz']], 9, ['*', .78, ['get', 'sz']], 13, ['*', 1.05, ['get', 'sz']]],
       'text-field': ['step', ['zoom'], '', 9, ['get', 't']], 'text-font': ['Noto Sans Bold'], 'text-size': 10, 'text-offset': ['case', ['>=', ['get', 'sz'], 1.2], ['literal', [0, 2.6]], ['literal', [0, 1.9]]], 'text-optional': true, 'text-allow-overlap': false },
       paint: { 'icon-color': ['step', ['get', 'alt'], BANDS[0][1], ...BANDS.flatMap(([a, c], i) => i ? [BANDS[i - 1][0], c] : [])],
         'icon-halo-color': ctx.isDark() ? '#0b0d0c' : '#ffffff', 'icon-halo-width': 1.4,
         'text-color': ctx.isDark() ? '#dde1e2' : '#23282a', 'text-halo-color': ctx.isDark() ? '#16191a' : '#ffffff', 'text-halo-width': 1.5 } });
+    if (pathOn) { addPathLayers(); syncPath(); } // after a basemap change
   }
   // ---------- the selected plane's route: flown leg solid, remaining leg dashed, both airports ----------
   // great-circle path between two [lon, lat] points (the curve airliners actually fly)
@@ -98,7 +102,8 @@ export function initPlanes(ctx) {
     if (!routeOn) return EMPTY;
     const me = fc().features.find(f => f.properties.hex === routeOn.hex), o = [routeOn.o.lon, routeOn.o.lat], d = [routeOn.d.lon, routeOn.d.lat];
     const pos = me ? me.geometry.coordinates : null, feats = [];
-    if (pos) { feats.push({ type: 'Feature', properties: { k: 'flown' }, geometry: { type: 'LineString', coordinates: arc(o, pos) } }, { type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(pos, d) } }); }
+    if (pos && pathOn?.hex === routeOn.hex) feats.push({ type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(pos, d) } });
+    else if (pos) { feats.push({ type: 'Feature', properties: { k: 'flown' }, geometry: { type: 'LineString', coordinates: arc(o, pos) } }, { type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(pos, d) } }); }
     else feats.push({ type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(o, d) } });
     for (const a of [routeOn.o, routeOn.d]) feats.push({ type: 'Feature', properties: { k: 'ap', code: a.code || '' }, geometry: { type: 'Point', coordinates: [a.lon, a.lat] } });
     return { type: 'FeatureCollection', features: feats };
@@ -125,7 +130,68 @@ export function initPlanes(ctx) {
       map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: { top: 80, bottom: 80, left: 80, right: (ctx.card?.offsetWidth || 380) + 60 }, maxZoom: 9, duration: ctx.reduceMotion ? 0 : 1200 }); }
     return true;
   }
-  function removeLayers() { ['plane-route-label', 'plane-route-ap', 'plane-route-left', 'plane-route-flown', 'live-planes'].forEach(id => map.getLayer(id) && map.removeLayer(id)); ['plane-route', 'live-planes'].forEach(id => map.getSource(id) && map.removeSource(id)); }
+  // ---------- this flight's path (adsb.lol trace + live positions since) ----------
+  // 2D: a line coloured by altitude. 3D (map tilted 20°+): a ribbon at the real altitude and a see-through curtain down
+  // to the ground (MapLibre can't lift a line off the ground, so both are thin extruded strips per segment).
+  let pathOn = null; // { hex, pts: [[lon, lat, alt_ft, unix]] }
+  const FT = .3048, is3d = () => map.getPitch() >= 20;
+  const altColor = ['step', ['get', 'alt'], BANDS[0][1], ...BANDS.flatMap(([a, c], i) => i ? [BANDS[i - 1][0], c] : [])];
+  function pathPts() {
+    if (!pathOn) return [];
+    const pts = pathOn.pts.slice(), me = fc().features.find(f => f.properties.hex === pathOn.hex);
+    if (me) pts.push([...me.geometry.coordinates, me.properties.alt, Date.now() / 1000]); // up to where the icon is now
+    return pts;
+  }
+  function pathFC() {
+    const pts = pathPts(), feats = [];
+    for (let i = 1; i < pts.length; i++) feats.push({ type: 'Feature', properties: { alt: (pts[i - 1][2] + pts[i][2]) / 2 }, geometry: { type: 'LineString', coordinates: [pts[i - 1].slice(0, 2), pts[i].slice(0, 2)] } });
+    return { type: 'FeatureCollection', features: feats };
+  }
+  // thin quads along each segment, about `px` screen pixels wide at the current zoom; h / b in metres for the extrusion
+  function quadsFC(px, curtain) {
+    const pts = pathPts(), lat = map.getCenter().lat, R = Math.PI / 180;
+    const w = 40075016.686 * Math.cos(lat * R) / (512 * 2 ** map.getZoom()) * px, feats = [];
+    for (let i = 1; i < pts.length; i++) {
+      const [x1, y1, a1] = pts[i - 1], [x2, y2, a2] = pts[i], k = Math.cos(y1 * R) * 111320, dx = (x2 - x1) * k, dy = (y2 - y1) * 110540, L = Math.hypot(dx, dy); if (!L) continue;
+      const ox = -dy / L * w / 2 / k, oy = dx / L * w / 2 / 110540, alt = (a1 + a2) / 2, h = Math.max(alt * FT, curtain ? 0 : w);
+      feats.push({ type: 'Feature', properties: { alt, h, b: curtain ? 0 : Math.max(0, h - w) }, geometry: { type: 'Polygon', coordinates: [[[x1 + ox, y1 + oy], [x2 + ox, y2 + oy], [x2 - ox, y2 - oy], [x1 - ox, y1 - oy], [x1 + ox, y1 + oy]]] } });
+    }
+    return { type: 'FeatureCollection', features: feats };
+  }
+  function addPathLayers() {
+    if (!map.getStyle()) return;
+    const before = map.getLayer('plane-route-flown') ? 'plane-route-flown' : map.getLayer('live-planes') ? 'live-planes' : undefined;
+    if (!map.getSource('plane-path')) map.addSource('plane-path', { type: 'geojson', data: pathFC() });
+    if (!map.getSource('plane-path-3d')) map.addSource('plane-path-3d', { type: 'geojson', data: quadsFC(4) });
+    if (!map.getSource('plane-path-wall')) map.addSource('plane-path-wall', { type: 'geojson', data: quadsFC(1.2, true) });
+    if (!map.getLayer('plane-path-line')) map.addLayer({ id: 'plane-path-line', type: 'line', source: 'plane-path', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': altColor, 'line-width': 3, 'line-opacity': .9 } }, before);
+    if (!map.getLayer('plane-path-wall')) map.addLayer({ id: 'plane-path-wall', type: 'fill-extrusion', source: 'plane-path-wall', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': altColor, 'fill-extrusion-base': 0, 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .22, 'fill-extrusion-vertical-gradient': false } }, before);
+    if (!map.getLayer('plane-path-ribbon')) map.addLayer({ id: 'plane-path-ribbon', type: 'fill-extrusion', source: 'plane-path-3d', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': altColor, 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .95, 'fill-extrusion-vertical-gradient': false } }, before);
+  }
+  function syncPath() {
+    if (!map.getSource('plane-path')) return;
+    const three = !!pathOn && is3d();
+    map.getSource('plane-path').setData(pathOn ? pathFC() : EMPTY);
+    map.getSource('plane-path-3d').setData(three ? quadsFC(4) : EMPTY); map.getSource('plane-path-wall').setData(three ? quadsFC(1.2, true) : EMPTY);
+    for (const id of ['plane-path-ribbon', 'plane-path-wall']) map.getLayer(id) && map.setLayoutProperty(id, 'visibility', three ? 'visible' : 'none');
+    // in 3D the line on the ground reads as the path's shadow
+    map.getLayer('plane-path-line') && map.setPaintProperty('plane-path-line', 'line-opacity', three ? .35 : .9);
+  }
+  function showPath(hex, t) { pathOn = { hex, pts: t.points.map(p => p.slice()) }; addPathLayers(); syncPath(); syncRoute(); }
+  function clearPath() { pathOn = null; syncPath(); }
+  ['zoomend', 'pitchend'].forEach(ev => map.on(ev, () => { if (pathOn) syncPath(); }));
+  // tilt the camera along the path and fit it, so the climb and descent show
+  function view3d(hex) {
+    if (!pathOn || pathOn.hex !== hex) { const t = trackDone.get(hex); if (t?.points?.length > 1) showPath(hex, t); else return false; }
+    const pts = pathPts(), xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), a = pts[0], b = pts[pts.length - 1];
+    const bearing = (Math.atan2((b[0] - a[0]) * Math.cos(b[1] * Math.PI / 180), b[1] - a[1]) * 180 / Math.PI + 90 + 360) % 360; // look across the track
+    follow = null; orbiting = false;
+    const cam = map.cameraForBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: { top: 60, bottom: 60, left: 60, right: (ctx.card?.offsetWidth || 380) + 60 }, maxZoom: 13 });
+    map.easeTo({ ...(cam || {}), zoom: (cam?.zoom ?? map.getZoom()) - .3, pitch: 62, bearing, duration: ctx.reduceMotion ? 0 : 1600 });
+    return true;
+  }
+  function removeLayers() { ['plane-path-ribbon', 'plane-path-wall', 'plane-path-line'].forEach(id => map.getLayer(id) && map.removeLayer(id)); ['plane-path', 'plane-path-3d', 'plane-path-wall'].forEach(id => map.getSource(id) && map.removeSource(id));
+    ['plane-route-label', 'plane-route-ap', 'plane-route-left', 'plane-route-flown', 'live-planes'].forEach(id => map.getLayer(id) && map.removeLayer(id)); ['plane-route', 'live-planes'].forEach(id => map.getSource(id) && map.removeSource(id)); }
 
   async function load() {
     if (!on() || document.visibilityState === 'hidden') return;
@@ -139,13 +205,15 @@ export function initPlanes(ctx) {
       // time, never later than now (clock skew), and the moving icons start from there
       list = (d.aircraft || []).filter(p => p.seen == null || p.seen < 60); src = d.source; err = '';
       at = Math.min(Date.now(), Date.parse(d.time) || Date.now());
-      map.getSource('live-planes')?.setData(fc()); if (shown) renderCard(shown, true); if (follow) followCam();
+      if (pathOn) { const p = list.find(x => x.hex === pathOn.hex), last = pathOn.pts[pathOn.pts.length - 1];
+        if (p && (!last || last[0] !== p.lon || last[1] !== p.lat)) pathOn.pts.push([p.lon, p.lat, p.ground ? 0 : p.alt ?? last?.[2] ?? 0, Math.round(at / 1000)]); }
+      map.getSource('live-planes')?.setData(fc()); if (pathOn) syncPath(); if (shown) renderCard(shown, true); if (follow) followCam();
     } catch (e) { if (e.name !== 'AbortError') { err = e.message; } }
     ctx.live.syncUI();
   }
   function start() { addLayers(); load(); clearInterval(timer); clearInterval(tick); timer = setInterval(load, REFRESH);
-    tick = setInterval(() => { if (list.length && map.getSource('live-planes')) { map.getSource('live-planes').setData(fc()); if (routeOn) syncRoute(); if (follow) followCam(); } }, 1000); }
-  function stop() { clearInterval(timer); clearInterval(tick); ctl?.abort(); list = []; follow = null; routeOn = null; removeLayers(); }
+    tick = setInterval(() => { if (list.length && map.getSource('live-planes')) { map.getSource('live-planes').setData(fc()); if (routeOn) syncRoute(); if (pathOn) syncPath(); if (follow) followCam(); } }, 1000); }
+  function stop() { clearInterval(timer); clearInterval(tick); ctl?.abort(); list = []; follow = null; routeOn = null; pathOn = null; removeLayers(); }
   map.on('moveend', () => { if (!on()) return; clearTimeout(moveT); moveT = setTimeout(load, 600); });
   document.addEventListener('visibilitychange', () => { if (on() && document.visibilityState === 'visible') load(); });
 
@@ -188,25 +256,33 @@ export function initPlanes(ctx) {
     if (r && !r.found && /^N[1-9]/i.test(p.reg || '')) { const [x] = await regFor([p.reg]); if (x) r = x.found ? x : { ...r, faa_url: x.faa_url }; }
     if (r) regDone.set(p.hex, r); return r;
   }
-  // FlightAware: only for planes the free route database doesn't know, once per callsign / tail number per session
-  const fas = new Map(), faDone = new Map();
-  const faIdent = p => p.flight || (/^N[1-9]/i.test(p.reg || '') ? p.reg.replace(/-/g, '') : null);
-  function faFor(p) {
-    const id = faIdent(p); if (!id) return Promise.resolve(null);
-    if (!fas.has(id)) fas.set(id, fetch('api/planes?flight=' + encodeURIComponent(id)).then(r => r.json()).catch(() => null).then(d => { if (d) faDone.set(p.hex, d); else fas.delete(id); return d; }));
-    return fas.get(id);
+  // ---------- adsb.lol extras: photo and details (once per plane per visit), this flight's path ----------
+  const infos = new Map(), infoDone = new Map(), tracks = new Map(), trackDone = new Map();
+  function infoFor(p) {
+    if (!infos.has(p.hex)) infos.set(p.hex, fetch('api/planes?aircraft=' + p.hex + (p.reg ? '&r=' + encodeURIComponent(p.reg) : '')).then(r => r.ok ? r.json() : null).catch(() => null)
+      .then(d => { if (d) infoDone.set(p.hex, d); else infos.delete(p.hex); return d; }));
+    return infos.get(p.hex);
+  }
+  function trackFor(hex) {
+    if (!tracks.has(hex)) tracks.set(hex, fetch('api/planes?track=' + hex).then(r => r.ok ? r.json() : null).catch(() => null)
+      .then(d => { if (d) trackDone.set(hex, d); else tracks.delete(hex); return d; }));
+    return tracks.get(hex);
   }
   const hhmm = t => t ? new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
   const when = t => { if (!t) return ''; const d = new Date(t), today = new Date().toDateString() === d.toDateString(); return today ? hhmm(t) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + hhmm(t); };
-  const leg = f => (f.origin?.code || '?') + ' → ' + (f.destination?.code || '?');
-  function faHtml(fa) {
-    if (!fa || (!fa.current && !fa.recent?.length && !fa.capped)) return '';
-    const c = fa.current, rows = c ? [['From', [c.origin?.code, c.origin?.city || c.origin?.name].filter(Boolean).join(' ')], ['To', [c.destination?.code, c.destination?.city || c.destination?.name].filter(Boolean).join(' ')],
-      ['Departed', when(c.departed)], ['Arrives', c.eta ? 'about ' + when(c.eta) : ''], ['Operator', c.operator || '']].filter(x => x[1]) : [];
-    const past = (fa.recent || []).filter(f => f !== c && f.id !== c?.id).slice(0, 4);
-    return '<div class="bsec" id="plFa"><div class="lt">Flight · FlightAware</div>' + (fa.capped ? '<div class="rnote">' + esc(fa.note) + '</div>' : '') +
-      (rows.length ? '<dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' : '') +
-      (past.length ? '<div class="rnote">Recent: ' + past.map(f => esc(leg(f) + ' ' + when(f.departed))).join(' · ') + '</div>' : '') + '</div>';
+  const dur = sec => { const m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; };
+  function photoHtml(info) {
+    const ph = info?.photo; if (!ph?.src) return '';
+    return '<a class="pl-photo" href="' + esc(ph.link || ph.src) + '" target="_blank" rel="noopener"><img src="' + esc(ph.src) + '" alt="Photo of this aircraft" loading="lazy" referrerpolicy="no-referrer"></a>' +
+      '<div class="pl-credit">Photo' + (ph.credit ? ' © ' + esc(ph.credit) : '') + ' · ' + esc(ph.source) + '</div>';
+  }
+  function flightHtml(t) {
+    const l = t?.leg; if (!l) return '';
+    const earlier = (t.today || []).length - 1;
+    const rows = [[l.started_on_ground ? 'Departed' : 'First seen', when(l.start)], ['Flying for', dur((Date.parse(l.end) - Date.parse(l.start)) / 1000)],
+      ['Highest', l.max_alt_ft ? l.max_alt_ft.toLocaleString('en-US') + ' ft' : ''], ['Earlier today', earlier > 0 ? earlier + ' other flight' + (earlier > 1 ? 's' : '') : '']].filter(x => x[1]);
+    return '<div class="bsec" id="plPath"><div class="lt">This flight</div><dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
+      '<div class="rnote">Flight path from adsb.lol, coloured by altitude. <button class="lnk" type="button" id="pl3d">View the path in 3D</button></div></div>';
   }
   const fmtDay = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   function regHtml(p, r) {
@@ -231,38 +307,39 @@ export function initPlanes(ctx) {
     const p = find(hex); if (!p) { if (!refresh) toast('That aircraft is no longer in view.'); return; }
     if (!refresh) { const keep = follow === hex ? hex : null, orb = keep && orbiting; ctx.closeCard?.(); follow = keep; orbiting = !!orb; if (routeOn?.hex !== hex) clearRoute(); }
     shown = hex;
+    const info = infoDone.get(hex), tr = trackDone.get(hex);
     const rows = [['Altitude', p.ground ? 'On the ground' : altLabel(p) + (p.vs ? (p.vs > 150 ? ' · climbing ' : p.vs < -150 ? ' · descending ' : ' · level ') + (Math.abs(p.vs) > 150 ? Math.abs(p.vs).toLocaleString('en-US') + ' ft/min' : '') : '')],
       ['Speed', p.gs != null ? p.gs + ' kt (' + Math.round(p.gs * 1.15078) + ' mph)' : '—'], ['Heading', p.track != null ? p.track + '°' : '—'],
-      ['Aircraft', [p.type, p.desc].filter(Boolean).join(' · ') || '—'], ['Registration', p.reg || '—'], ['Squawk', p.squawk || '—'], ['ICAO hex', p.hex]];
+      ['Aircraft', [p.type, p.desc || (info?.manufacturer && info?.model ? info.manufacturer + ' ' + info.model : '')].filter(Boolean).join(' · ') || '—'],
+      ...[['Operator', tr?.operator || info?.owner || ''], ['Built', tr?.year || ''], ['Military', p.mil || tr?.military ? 'Yes' : '']].filter(x => x[1]),
+      ['Registration', p.reg || tr?.registration || '—'], ['Squawk', p.squawk || '—'], ['ICAO hex', p.hex]];
     card.innerHTML = '<div class="top"><div><div class="kicker">Aircraft · live</div><h2>' + esc(p.flight || p.reg || p.hex.toUpperCase()) + '</h2><div class="bsub" id="plRoute">' + (p.flight ? 'Looking up the route…' : 'No callsign') + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
-      '<dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
+      photoHtml(info) + '<dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
       '<div class="bacts"><button class="btn' + (follow === hex && !orbiting ? ' on' : '') + '" id="plFollow">' + (follow === hex && !orbiting ? 'Following' : 'Follow') + '</button>' +
       '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
-      '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">Track on adsb.lol ↗</a>' +
-      (p.flight ? '<a class="btn" target="_blank" rel="noopener" href="https://www.flightaware.com/live/flight/' + encodeURIComponent(p.flight) + '">FlightAware ↗</a>' : '') + '</div>' +
-      faHtml(faDone.get(hex)) + regHtml(p, regDone.get(hex)) +
+      '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">Track on adsb.lol ↗</a></div>' +
+      flightHtml(tr) + regHtml(p, regDone.get(hex)) +
       '<div class="bsrc rnote">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown.</div>';
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#plFollow').onclick = () => { const was = follow === hex && !orbiting; follow = was ? null : hex; orbiting = false; renderCard(hex, true); if (follow) followCam(); };
     card.querySelector('#plOrbit').onclick = () => { const was = follow === hex && orbiting; follow = was ? null : hex; orbiting = !was; renderCard(hex, true);
       if (orbiting) map.easeTo({ zoom: Math.max(map.getZoom(), 11), pitch: 60, duration: ctx.reduceMotion ? 0 : 800 }); };
+    card.querySelector('#pl3d')?.addEventListener('click', () => view3d(hex));
     if (!refresh || !card.classList.contains('open')) card.classList.add('open');
+    // photo / details and the flight path: fetched once when the card opens, then the card re-renders with them
+    if (!refresh) {
+      if (!infoDone.has(hex)) infoFor(p).then(d => { if (d && shown === hex) renderCard(hex, true); });
+      trackFor(hex).then(t => { if (!t || shown !== hex) return; if (t.points?.length > 1) showPath(hex, t); renderCard(hex, true); });
+    }
     if (!regDone.has(hex)) regOf(p).then(r => { const sec = card.querySelector('#plReg'); if (sec && shown === hex) sec.outerHTML = regHtml(p, r || { failed: true }); });
     const r = await routeFor(p), el = card.querySelector('#plRoute');
     const known = r?.origin && r?.destination;
-    if (el && shown === hex) el.textContent = known ? ap(r.origin).replace(/&amp;/g, '&') + ' → ' + ap(r.destination).replace(/&amp;/g, '&') : faIdent(p) ? 'Checking FlightAware…' : 'No callsign';
-    if (!known && faIdent(p)) {
-      const fa = await faFor(p), e2 = card.querySelector('#plRoute'); if (shown !== hex) return;
-      const c = fa?.current;
-      if (e2) e2.textContent = c ? leg(c) + (c.destination?.city ? ' (' + c.destination.city + ')' : '') : fa?.capped ? 'Route unknown (FlightAware budget used up this month)' : 'Route not in the database';
-      const old = card.querySelector('#plFa'), html = faHtml(fa);
-      if (old) old.outerHTML = html || ''; else if (html) card.querySelector('#plReg')?.insertAdjacentHTML('beforebegin', html);
-    }
+    if (el && shown === hex) el.textContent = known ? ap(r.origin).replace(/&amp;/g, '&') + ' → ' + ap(r.destination).replace(/&amp;/g, '&') : p.flight ? 'Route not in the database (flight path below)' : 'No callsign';
     // draw the route the first time the card opens for this plane (not on every 10-second refresh)
     if (shown === hex && !refresh && r) showRoute(hex, r);
   }
-  ctx.onCardClose?.(() => { shown = null; follow = null; orbiting = false; clearRoute(); });
+  ctx.onCardClose?.(() => { shown = null; follow = null; orbiting = false; clearRoute(); clearPath(); });
   ctx.mapClickHandlers.unshift(e => {
     if (!map.getLayer('live-planes')) return false;
     const hit = map.queryRenderedFeatures([[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]], { layers: ['live-planes'] })[0]; if (!hit) return false;
@@ -332,7 +409,9 @@ export function initPlanes(ctx) {
   ctx.showPlane = hex => renderCard(hex);
   ctx.planeRoute = p => routeFor(p);
   ctx.planeRegistry = ids => regFor(ids);
-  ctx.flightAware = id => fetch('api/planes?flight=' + encodeURIComponent(id)).then(r => r.json());
+  ctx.planeTrack = hex => trackFor(String(hex || '').toLowerCase());
+  ctx.planeInfo = p => infoFor(p);
+  ctx.planePath3d = hex => view3d(hex);
   // the assistant: find a plane by callsign, registration or hex (or the nearest airborne one), open its card and follow
   // or orbit it. Looks up to 250 miles around `near` (default: the map centre), so it needn't be on screen.
   ctx.followPlane = async (id, o = {}) => {
