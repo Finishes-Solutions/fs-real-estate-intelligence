@@ -138,7 +138,7 @@ export function initChatCards(ctx) {
         '<span class="cc-pa"><button type="button" class="btn" data-f="' + i + '">Follow</button><button type="button" class="btn" data-o="' + i + '">Orbit</button></span></div>').join('')
         : '<p class="cc-p">' + esc(L.error ? 'The aircraft feeds didn’t answer; try again in a few seconds.' : 'No aircraft broadcasting within ' + r.radius_miles + ' mi right now.') + '</p>') +
       (h && h.low_sightings_per_day_within_1km != null ? '<p class="cc-p">Low-flight history: about ' + h.low_sightings_per_day_within_1km + ' sightings a day below 3,000 ft within ~1 km (' + h.sampled_days + ' days sampled).</p>' : '') +
-      src('Sources: live ADS-B from community receivers (' + (L.source || 'adsb.lol') + '); routes from the adsbdb and adsb.lol route databases, checked against each plane's position; aircraft types from ICAO codes' + (h ? '; low-flight history sampled every minute' : '')));
+      src('Sources: live ADS-B from community receivers (' + (L.source || 'adsb.lol') + '); routes from the adsbdb and adsb.lol route databases, checked against each plane’s position; aircraft types from ICAO codes' + (h ? '; low-flight history sampled every minute' : '')));
     const go = (i, orbit) => { const x = ac[i]; if (x) ctx.followPlane?.(x.hex, { orbit, near: r.center }); };
     d.querySelectorAll('[data-f]').forEach(b => b.onclick = () => go(+b.dataset.f, false));
     d.querySelectorAll('[data-o]').forEach(b => b.onclick = () => go(+b.dataset.o, true));
