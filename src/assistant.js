@@ -543,7 +543,7 @@ export function initAssistant(ctx) {
         if (!x.found) return { found: false, id, us_aircraft: x.us, faa_url: x.faa_url, note: x.us === false ? 'Not a US aircraft: the FAA registry only covers N-numbers.' : 'Not in the current FAA registry (it may be deregistered, reserved or mistyped).' };
         turnSubject = x.n_number;
         return { ...x, callsign: plane?.flight || undefined, source: 'FAA aircraft registry (Releasable Aircraft Database), updated nightly',
-          note: 'The registered owner is often an LLC, trust, bank or management company rather than the person flying it. Mention the address only if asked.' };
+          note: 'The registered owner is often an LLC, trust, bank or management company rather than the person flying it. Mention the address only if asked. owner_withheld: the owner asked the FAA not to publish their name. valid: false means the registration is lapsing, pending or cancelled (see status).' };
       }
       if (name === 'market_data') {
         const d = await ctx.marketData?.(a.county || ''); if (!d) return { error: 'The Market view isn’t loaded in this version.' }; if (d.error) return d;

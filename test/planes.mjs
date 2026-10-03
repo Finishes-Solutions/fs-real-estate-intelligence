@@ -100,7 +100,10 @@ delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SECRET_KEY; delete 
   assert.equal(rows[1].street, 'PO BOX 20706, DEPT 595'); assert.equal(rows[1].engine, null, 'no engine code'); assert.equal(rows[1].aircraft_type, 'Fixed wing, multi engine');
   assert.match(rows[0].h, /^[0-9a-f]{16}$/); assert.equal(parseRegistry({ MASTER, ACFTREF, ENGINE })[0].h, rows[0].h, 'stable hash');
   assert.notEqual(parseRegistry({ MASTER: MASTER.replace('ACME AVIATION LLC', 'ACME AVIATION INC'), ACFTREF, ENGINE })[0].h, rows[0].h, 'an owner change changes the hash');
-  const pr = present(rows[0]);
+  const pr = present(rows[0]), pr0w = () => pr.owner_withheld;
+  assert.deepEqual([rows[0].airworthiness, rows[1].airworthiness, rows[0].weight_class, rows[1].weight_class], ['Standard', 'Standard', 'Up to 12,499 lb', '20,000 lb and over']);
+  assert.deepEqual([present({ ...rows[0], status: '27' }).status, present({ ...rows[0], status: '27' }).valid, present({ ...rows[0], status: 'T' }).valid], ['Registration expired', false, true]);
+  assert.deepEqual([present({ ...rows[0], name: null }).owner_withheld, pr0w()], [true, false]);
   assert.deepEqual([pr.n_number, pr.owner, pr.city, pr.aircraft, pr.status, pr.address], ['N12345', 'ACME AVIATION LLC', 'Houston', '2004 CESSNA T182T', 'Valid', '100 MAIN ST, HOUSTON, TX 77024-1234']);
   assert.match(pr.faa_url, /nNumberTxt=12345$/);
   assert.deepEqual(['N123AB', 'a1b2c3', '~A1B2C3', 'n-12', '123456', 'N0123', 'DAL1601x'].map(regKey), [{ n: '123AB' }, { hex: 'a1b2c3' }, { hex: 'a1b2c3' }, { n: '12' }, { hex: '123456' }, null, null]);

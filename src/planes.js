@@ -167,10 +167,10 @@ export function initPlanes(ctx) {
     if (!r) body = '<div class="rnote">Looking up the FAA registration…</div>';
     else if (r.failed) body = '<div class="rnote">The registration lookup didn’t answer.' + link(faa) + '</div>';
     else if (r.found) {
-      const rows = [['Registered to', r.owner + (r.owner_type ? ' (' + r.owner_type + ')' : '')], ['Co-owners', (r.other_owners || []).join('; ')],
+      const rows = [['Registered to', (r.owner || 'Withheld at the owner’s request') + (r.owner_type ? ' (' + r.owner_type + ')' : '')], ['Co-owners', (r.other_owners || []).join('; ')],
         ['Owner location', [r.city, r.state, r.country && r.country !== 'US' ? r.country : ''].filter(Boolean).join(', ')], ['Tail number', r.n_number],
-        ['Aircraft', r.aircraft], ['Registered', [fmtDay(r.registered), r.expires ? 'expires ' + fmtDay(r.expires) : ''].filter(Boolean).join(' · ')],
-        ['Status', r.status && r.status !== 'Valid' ? r.status : ''], ['Note', r.fractional ? 'Fractional ownership' : '']].filter(x => x[1]);
+        ['Aircraft', r.aircraft], ['Certificate', r.airworthiness && r.airworthiness !== 'Standard' ? r.airworthiness : ''], ['Max weight', r.weight_class && r.weight_class !== 'Up to 12,499 lb' ? r.weight_class : ''], ['Registered', [fmtDay(r.registered), r.expires ? 'expires ' + fmtDay(r.expires) : ''].filter(Boolean).join(' · ')],
+        ['Status', r.status && !r.valid ? r.status : ''], ['Note', r.fractional ? 'Fractional ownership' : '']].filter(x => x[1]);
       body = '<dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
         '<div class="rnote">FAA aircraft registry (updated nightly). The registered owner can be a trust, lessor or management company rather than the operator.' + link(r.faa_url) + '</div>';
     } else if (r.us === false) body = '<div class="rnote">Not a US (N-number) aircraft, so the FAA registry has no record of it.</div>';

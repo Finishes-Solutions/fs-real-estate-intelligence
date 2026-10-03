@@ -38,7 +38,7 @@ export async function density(b, days = 30, d = db()) {
 
 // FAA registration (registered owner, aircraft, dates) by Mode S hex or N-number, from aircraft_registry (build/live-sync.mjs).
 // Each id maps to the record, or { found: false, us } (us: false = not a US aircraft, so the FAA has no record of it).
-const REG_COLS = 'n_number,hex,serial,mfr,model,year_mfr,aircraft_type,engine_type,engine,seats,registrant_type,name,street,city,state,zip,country,other_names,cert_issued,last_action,expires,status,fractional,kit';
+const REG_COLS = 'n_number,hex,serial,mfr,model,year_mfr,aircraft_type,engine_type,engine,seats,weight_class,airworthiness,registrant_type,name,street,city,state,zip,country,other_names,cert_issued,last_action,expires,status,fractional,kit';
 export async function registration(ids, d = db()) {
   const list = [...new Set(ids.map(x => String(x || '').trim()).filter(Boolean))].slice(0, 25).map(id => ({ id, k: regKey(id) }));
   const miss = ({ k }) => ({ found: false, us: k ? !!(k.n || usHex(k.hex)) : null, ...(k?.n ? { faa_url: faaUrl(k.n) } : {}) });

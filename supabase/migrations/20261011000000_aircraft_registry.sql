@@ -14,6 +14,8 @@ create table if not exists public.aircraft_registry (
   engine text,
   seats smallint,
   engines smallint,
+  weight_class text,
+  airworthiness text,
   registrant_type text,
   name text,
   street text,
@@ -32,6 +34,8 @@ create table if not exists public.aircraft_registry (
   h text not null,
   synced_at timestamptz not null default now()
 );
+-- added the same day as the table (2026-10-03): harmless if the table was created with them already
+alter table public.aircraft_registry add column if not exists weight_class text, add column if not exists airworthiness text;
 create index if not exists aircraft_registry_hex_idx on public.aircraft_registry (hex);
 alter table public.aircraft_registry enable row level security;
 
