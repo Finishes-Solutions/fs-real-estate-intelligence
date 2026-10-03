@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 12:48 AM CT: More detail in plane registrations (23b68cd)
+- **Registration status in plain English.** The card shows the status only when a registration isn't currently valid, for example "Registration expired", "Sale reported" or "Revoked". The FAA has about 40 such codes.
+- **Certificate type** (Experimental, Light sport, Restricted…) is shown for planes that aren't standard category, and **maximum weight class** is shown for larger aircraft.
+- Owners who asked the FAA to keep their name private show as **"Withheld at the owner's request"** instead of a blank.
+- The setup migration (`20261011000000_aircraft_registry.sql`) now includes these two new columns. If you already ran it, run it again; it's safe to repeat.
+
 ### 12:44 AM CT: See who a plane is registered to (9687118)
 - **Plane cards now have a "Registration" section** for US aircraft, from the FAA's aircraft registry:
   - the registered owner and what kind of owner it is (individual, LLC, corporation…), plus any co-owners;
