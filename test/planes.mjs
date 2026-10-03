@@ -12,6 +12,8 @@ const seen = [], rpc = []; let mode = 'ok';
 globalThis.fetch = async (url, opts = {}) => {
   const u = new URL(String(url)); seen.push(u);
   if (u.host === 'api.adsb.lol' && u.pathname.startsWith('/v2/point/')) return mode === 'lol-down' || mode === 'all-down' ? json({ error: 'x' }, 503) : json({ now: 1759440000000, ac: AC });
+  if (u.host === 'opendata.adsb.fi') return mode === 'all-down' ? json({ error: 'x' }, 429) : json({ now: 1759440000, aircraft: AC.slice(0, 3) });
+  if (u.host === 'api.adsb.one') return mode === 'all-down' ? json({ error: 'x' }, 503) : json({ now: 1759440000, ac: AC.slice(0, 2) });
   if (u.host === 'api.airplanes.live') return mode === 'all-down' ? json({ error: 'x' }, 503) : json({ now: 1759440000, ac: AC.slice(0, 2) });
   if (u.host === 'api.adsb.lol' && u.pathname === '/api/0/routeset') {
     const b = JSON.parse(opts.body); assert.equal(b.planes[0].callsign, 'UAL1234');
@@ -37,16 +39,19 @@ assert.deepEqual(cellOf(29.7604, -95.3698), [-95.37, 29.76]);
 assert.deepEqual(binLow([p, normalize(AC[1]), normalize(AC[2])]), [{ lon: -95.34, lat: 29.98, n: 1, min_alt: 1800 }]);
 assert.deepEqual(summarize([{ n: 30, min_alt: 900 }, { n: 10, min_alt: 1500 }], 576, 30).low_per_day, 20, '40 sightings over 2 fully sampled days');
 assert.equal(summarize([], 0, 30).low_per_day, null, 'no samples yet: unknown, not zero');
-mode = 'lol-down'; assert.equal((await fetchPoint(29.9, -95.7, 50)).source, 'airplanes.live', 'falls back'); mode = 'ok';
+mode = 'lol-down'; assert.equal((await fetchPoint(29.9, -95.7, 50)).source, 'adsb.fi', 'falls back to the next feed'); mode = 'ok';
 
 // ---- endpoint ----
 const { default: planes } = await import('../api/planes.js');
 const H = { 'x-forwarded-for': '8.8.8.8' };
 let res = mock(); await planes({ query: { bbox: '-96.2,29.6,-95.2,30.2' }, headers: H }, res);
 assert.equal(res.code, 200); assert.equal(res.body.source, 'adsb.lol'); assert.equal(res.body.aircraft.length, 3); assert.match(res.headers['Cache-Control'], /s-maxage=8/);
-assert.ok(seen.some(u => /^\/v2\/point\/29\.9\/-95\.7\/\d+$/.test(u.pathname)), 'rounded point query');
+assert.ok(seen.some(u => /^\/v2\/point\/30\/-95\.6\/50$/.test(u.pathname)), 'rounded point query');
 res = mock(); await planes({ query: { bbox: '2.2,48.8,2.5,48.95' }, headers: H }, res); assert.equal(res.code, 200, 'works over Paris too');
-mode = 'all-down'; res = mock(); await planes({ query: { bbox: '-96.2,29.6,-95.2,30.2' }, headers: H }, res); assert.equal(res.code, 502); assert.equal(res.headers['Cache-Control'], 'no-store'); mode = 'ok';
+mode = 'lol-down'; res = mock(); await planes({ query: { bbox: '-80.2,25.6,-79.9,25.9' }, headers: H }, res); assert.equal(res.body.source, 'adsb.fi', 'adsb.lol rate-limited: next feed'); mode = 'ok';
+mode = 'all-down'; res = mock(); await planes({ query: { bbox: '-96.2,29.6,-95.2,30.2' }, headers: H }, res);
+assert.equal(res.code, 200); assert.equal(res.body.stale, true, 'every feed down: the last snapshot of the same area'); assert.equal(res.body.aircraft.length, 3);
+res = mock(); await planes({ query: { bbox: '-120.2,34.6,-119.9,34.9' }, headers: H }, res); assert.equal(res.code, 502, 'never seen and all down'); assert.equal(res.headers['Cache-Control'], 'no-store'); mode = 'ok';
 res = mock(); await planes({ query: { bbox: 'nope' }, headers: H }, res); assert.equal(res.code, 400);
 res = mock(); await planes({ query: { route: 'ual1234', lat: '29.98', lon: '-95.34' }, headers: H }, res);
 assert.deepEqual([res.body.origin.code, res.body.destination.code, res.body.destination.city], ['IAH', 'ORD', 'Chicago']);

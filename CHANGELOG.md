@@ -3,9 +3,9 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
-## 2026-10-02
+## 2026-10-03
 
-### 11:58 PM CT: Site facts, Houston crime, rates and unemployment (0b71ba9)
+### 12:15 AM CT: Site facts, Houston crime, rates and unemployment (0b71ba9, d043662, abd1007)
 - **New "Site" section on every building card**, from free public sources:
   - **Flood zone** at the spot (FEMA), with high-risk zones in red and a plain-English note.
   - **Traffic**: vehicles per day on the busiest roads within about 300 m (TxDOT counts).
@@ -13,11 +13,22 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - **Transit**: METRO bus stops within 400 m (Houston).
   - **Environmental**: EPA-regulated facilities within ¼ mile, with the ones that have violations or handle hazardous waste flagged. A screening flag, not a Phase I.
   - **Alcohol sales here**: a year of mixed beverage receipts for bars and restaurants at the address (Texas Comptroller), a good sign of how busy a place is.
-  - **Crime nearby** (Houston): incidents within ½ mile in the last 12 months vs the year before, split violent / property / other. Fills in once the first Houston Police load finishes; Houston's file runs about three months behind.
+  - **Crime nearby** (Houston): incidents within ½ mile in the last 12 months vs the year before, split violent / property / other. About 463,000 incidents from June 2024 on are loaded; Houston's file runs about three months behind, so the latest month is usually three months ago.
   - **Unemployment** for the county and **typical rent** for the ZIP.
 - **Market view**: an unemployment tile, and a new **Rates and home lending** box with the 10-yr and 5-yr Treasury, SOFR and the 30-yr mortgage rate (now, change over a year, a 12-month trend line), plus home loans made per county.
 - **Sources are now hidden on cards and panels by default**, so everyone sees the same clean view. Turn them on under **Sources → Show sources on cards and panels**. Exported reports still list every source. Map credits required by the map and imagery licenses still show.
 - The nightly refresh now also pulls county unemployment (BLS), rates (FRED, New York Fed), ZIP rents (Zillow) and home loans (CFPB HMDA). The nightly database sync now loads Houston Police incidents.
+
+### 12:03 AM CT: Flight paths and live planes fixed (2dd18c4)
+- **Low Flight Paths** only ever showed a few squares at IAH and Hobby. A database bug threw away every map square with fewer than 30 sightings. Around Houston it now shows all of them: about 650 squares from the first five hours of recording, filling in over the coming days. Property cards' "Air traffic" numbers were affected too and are now correct.
+- **Live Planes** went blank much of the time because the free aircraft feeds rate-limit or block requests from the hosting servers. There are now four feeds to try in turn. If all are busy, the map keeps showing the last snapshot (up to 2 minutes old) and moves each plane along its heading. Requests are also shared more between viewers, so the feeds are asked less often.
+
+## 2026-10-02
+
+### 11:38 PM CT: Consumer spending estimates fixed (2c86868)
+- The spending layers and the Market view's spending section were empty after tonight's data run. The Bureau of Labor Statistics file server refuses GitHub's servers, which the nightly build runs on. The build now reads everything from the BLS data API, which does answer.
+- How the estimate is made changed slightly. The API publishes spending by **income fifth (quintile)**, not by dollar range. Each tract's households are placed on a line through the five quintiles' average income and average spending, then adjusted to the South (about 10% below the US average). It's still an estimate, and the map and Sources tab say so.
+- The numbers appear after the next data refresh, which has been started.
 
 ### 8:00 PM CT: Austin County fix (9d86928)
 - TDLR lists some City of Austin projects (Travis County, 787xx ZIPs) under Austin County, apparently because filers picked "Austin" as the county. 22 of them were showing as approximate pins near Bellville. They are no longer placed in Austin County; they'll drop off the regional map (they're about 100 miles outside it) at the next nightly refresh.
