@@ -126,9 +126,22 @@ export function initPlanes(ctx) {
     routeOn = { hex, o: r.origin, d: r.destination }; addRouteLayers(); syncRoute();
     // frame the whole trip unless the camera is following the plane
     if (follow !== hex) { const pts = routeFC().features.flatMap(f => f.geometry.type === 'Point' ? [f.geometry.coordinates] : f.geometry.coordinates);
-      const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
-      map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: { top: 80, bottom: 80, left: 80, right: (ctx.card?.offsetWidth || 380) + 60 }, maxZoom: 9, duration: ctx.reduceMotion ? 0 : 1200 }); }
+      const cam = frameFor(pts, { top: 80, bottom: 80, left: 80, right: (ctx.card?.offsetWidth || 380) + 60 }, 9); if (cam) map.easeTo({ ...cam, duration: ctx.reduceMotion ? 0 : 1200 }); }
     return true;
+  }
+  // a camera for [lon, lat] points that may cross the date line or span half the globe (IAH → Taipei): centred on their
+  // mean direction on the sphere, with longitudes unwrapped around it. The plain bounding box of such a route is the
+  // whole world, whose middle (0°, 0°) put the globe's far side in view.
+  function frameFor(pts, padding, maxZoom = 13) {
+    if (!pts.length) return null;
+    const R = Math.PI / 180; let x = 0, y = 0, z = 0;
+    for (const [lo, la] of pts) { x += Math.cos(la * R) * Math.cos(lo * R); y += Math.cos(la * R) * Math.sin(lo * R); z += Math.sin(la * R); }
+    const clon = Math.atan2(y, x) / R, clat = Math.atan2(z, Math.hypot(x, y)) / R;
+    const xs = pts.map(([lo]) => lo + Math.round((clon - lo) / 360) * 360), ys = pts.map(p => Math.max(-84, Math.min(84, p[1])));
+    const w = Math.min(...xs), e = Math.max(...xs), cam = map.cameraForBounds([[w, Math.min(...ys)], [e, Math.max(...ys)]], { padding, maxZoom });
+    const span = e - w; // the box's own centre is right for regional routes; the sphere's for long ones
+    const c = span < 60 && cam?.center ? cam.center : [((clon + 540) % 360) - 180, clat];
+    return { center: c, zoom: Math.max(1, cam?.zoom ?? 2) };
   }
   // ---------- this flight's path (adsb.lol trace + live positions since) ----------
   // 2D: a line coloured by altitude. 3D (map tilted 20°+): a ribbon at the real altitude and a see-through curtain down
@@ -183,10 +196,10 @@ export function initPlanes(ctx) {
   // tilt the camera along the path and fit it, so the climb and descent show
   function view3d(hex) {
     if (!pathOn || pathOn.hex !== hex) { const t = trackDone.get(hex); if (t?.points?.length > 1) showPath(hex, t); else return false; }
-    const pts = pathPts(), xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), a = pts[0], b = pts[pts.length - 1];
+    const pts = pathPts(), a = pts[0], b = pts[pts.length - 1];
     const bearing = (Math.atan2((b[0] - a[0]) * Math.cos(b[1] * Math.PI / 180), b[1] - a[1]) * 180 / Math.PI + 90 + 360) % 360; // look across the track
     follow = null; orbiting = false;
-    const cam = map.cameraForBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: { top: 60, bottom: 60, left: 60, right: (ctx.card?.offsetWidth || 380) + 60 }, maxZoom: 13 });
+    const cam = frameFor(pts.map(p => p.slice(0, 2)), { top: 60, bottom: 60, left: 60, right: (ctx.card?.offsetWidth || 380) + 60 });
     map.easeTo({ ...(cam || {}), zoom: (cam?.zoom ?? map.getZoom()) - .3, pitch: 62, bearing, duration: ctx.reduceMotion ? 0 : 1600 });
     return true;
   }

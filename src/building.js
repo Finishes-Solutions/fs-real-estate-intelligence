@@ -170,12 +170,12 @@ export function initBuildings(ctx) {
     const ss = t => '<div class="ssrc src">' + t + '</div>';
     card.innerHTML = '<div class="top"><div><div class="kicker" id="bKick">' + (b.footprint ? 'Building' : 'Parcel') + '</div><h2 id="bTitle">Loading parcel…</h2><div class="bsub" id="bSub">' + b.center[1].toFixed(5) + ', ' + b.center[0].toFixed(5) + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
-      ctx.cardNav([['bParcel', 'Value'], ['bSize', 'Building'], ['bSite', 'Site'], ['bArea', 'Area'], ['bPlaces', 'Businesses'], ['airSec', 'Air'], ['bFilings', 'Construction'], ['bRegrid', 'Regrid'], ['liveSec', 'From Here'], ['bTools', 'Tools']]) + '</div>' +
+      ctx.cardNav([['bParcel', 'Value'], ['bSize', 'Building'], ['bSite', 'Site'], ['bCrime', 'Crime'], ['bArea', 'Area'], ['bPlaces', 'Businesses'], ['airSec', 'Air'], ['bFilings', 'Construction'], ['bRegrid', 'Regrid'], ['liveSec', 'From Here'], ['bTools', 'Tools']]) + '</div>' +
       '<div class="bover" id="bOver" hidden></div>' +
       '<div class="bsec" id="bParcel"><div class="lt">Ownership &amp; Value</div><div class="rnote">Looking up the appraisal record…</div></div>' +
       '<div class="bsec" id="bSize"><div class="lt">Building</div><div id="bPhoto"></div><div id="bSizeBody">' + sizeRows(b) + '<div class="rnote">Measuring height from lidar…</div></div>' +
         ss('Footprint: OpenStreetMap. Height: USGS 3DEP lidar where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record, otherwise estimated from height.') + '</div>' +
-      '<div class="bsec" id="bSite"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
+      '<div class="bsec" id="bSite"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsec" id="bRegrid"></div><div class="bsrc"></div>' +
       '<div class="bsec" id="bTools"><div class="lt">Site Tools</div><div class="bacts">' + (matchMedia('(pointer: coarse)').matches ? '<button class="btn" id="bMulti" title="Then tap more buildings or parcels">Select Multiple</button>' : '') +
         '<button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button><button class="btn askai" id="bAsk">Ask AI About It</button></div></div>';
@@ -187,6 +187,7 @@ export function initBuildings(ctx) {
     card.querySelector('#bAsk').onclick = () => { const t = card.querySelector('#bTitle')?.textContent; ctx.assistant?.ask('Tell me about ' + (t && !/^Loading/.test(t) ? t : 'this property') + ': owner, value, site and the area around it'); };
     if (ctx.reduceMotion) card.querySelector('#bOrbit').remove();
     renderFilings(null); renderArea();
+    ctx.renderCrimeNear?.(card.querySelector('#bCrime'), b.center, () => { const t = card.querySelector('#bTitle')?.textContent; return t && !/^Loading/.test(t) ? t : 'this property'; }, () => cur === b && !multi.length);
     ctx.cardRendered({ kind: 'building', center: b.center, label: () => card.querySelector('#bTitle')?.textContent || 'Building', sub: () => card.querySelector('#bSub')?.textContent || '' });
     let d = null;
     try { d = await details(b); }

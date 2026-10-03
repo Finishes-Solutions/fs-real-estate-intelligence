@@ -1448,3 +1448,44 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 #card .pl-photo img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover}
 #card .pl-credit{margin:4px 16px 0;font-size:10.5px;color:var(--muted)}
 #card #plPath{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1.5 13.5c3-1 4-6 7-7.5s4.5-.5 6-3'/%3E%3Ccircle cx='1.8' cy='13.4' r='1.2'/%3E%3C/svg%3E")}
+
+/* ===== map toolbar: Filters popup (between County and Export) and its Clear button ===== */
+.maptop{position:relative}
+.fwrap{display:flex;gap:6px;align-items:stretch}
+.fbtn,.fclear{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 13px;border:1px solid var(--line-2);border-radius:6px;background:var(--panel);color:var(--text-2);font:600 12.5px var(--font-display);cursor:pointer;box-shadow:0 1px 2px rgba(11,13,12,.08);white-space:nowrap}
+.fbtn:hover,.fclear:hover{border-color:var(--text-2);color:var(--text)}
+.fbtn.on{color:var(--brand);border-color:var(--brand)}
+.fbtn.open{background:var(--text);border-color:var(--text);color:var(--panel)}
+.fcount{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--brand);color:#fff;font:700 11px/18px var(--font-mono);text-align:center}
+.fbtn.open .fcount{background:var(--panel);color:var(--text)}
+.fclear{padding:0 11px;color:var(--muted)}
+.fclear[hidden],.fcount[hidden]{display:none}
+.fpop{position:absolute;left:0;top:calc(100% + 8px);z-index:9;width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 190px);overflow:auto;background:var(--panel);border:1px solid var(--line-2);border-radius:8px;box-shadow:0 14px 40px rgba(11,13,12,.22);overscroll-behavior:contain}
+.fpop[hidden]{display:none}
+.fpop-h{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px 18px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.fpop-h b{display:block;font:700 15px/1.3 var(--font-display);color:var(--text)}
+.fpop-h span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.fpop-h .x{border:0;background:transparent;cursor:pointer;color:var(--muted);width:28px;height:28px;flex:none;border-radius:4px;display:grid;place-items:center}
+.fpop-h .x:hover{background:var(--panel-2);color:var(--text)}
+.fpop .filters{border-bottom:0}
+.fpop .active{position:sticky;bottom:0;background:var(--panel);margin:0 -24px -20px;padding:12px 24px;border-top:1px solid var(--line)}
+/* tablet: the toolbar is icon-only, so the Filters button is too */
+@media (max-width:1100px) and (min-width:701px){ .fbtn span,.fclear span{display:none} .fbtn,.fclear{padding:0 10px} }
+/* phone: the floating filter button opens the same popup as a bottom sheet */
+@media (max-width:700px){
+  .fbtn,.fclear{display:none}
+  /* it sits just above the bottom nav (its map layer is under the nav's, so it can't cover it) */
+  .fpop{position:fixed;left:0;right:0;bottom:calc(var(--navh, 64px) + var(--sb, 0px));top:auto;width:auto;max-height:calc(100% - 200px);border-radius:14px 14px 0 0;z-index:80;box-shadow:0 -10px 32px rgba(11,13,12,.28)}
+}
+
+#card #bCrime{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 1.5 13.5 3.5v4.2c0 3.3-2.3 5.7-5.5 6.8-3.2-1.1-5.5-3.5-5.5-6.8V3.5z'/%3E%3C/svg%3E")}
+
+/* ===== left panel: the rest of it in the section-card style (head, selection box, list header) ===== */
+.panel .head{padding:18px 22px 14px}
+.panel .head h1{font-size:21px;line-height:1.2}
+.panel .head .sub{font-size:12.5px;margin-top:6px}
+.panel .selbar{margin:14px 16px 0;border:1px solid var(--line-2);border-left-width:1px;border-radius:6px;background:var(--panel-2);padding:12px 14px}
+.panel .selbar b{font:700 14px/1.3 var(--font-display)}
+.panel .sechead.listhead{padding:16px 16px 6px;font:700 13px/1.3 var(--font-display);letter-spacing:0;text-transform:none;color:var(--text)}
+.panel .sechead.listhead span{color:var(--text)}
+.panel .fbody .kpiwrap{margin:0}

@@ -282,7 +282,7 @@ let coT; coQ.addEventListener('input',()=>{ clearTimeout(coT); coT=setTimeout(()
 exactBtn.onclick=()=>{ state.exact=state.exact?0:1; applyFilters(); };
 // collapsible Filters and List sections (remembered in this browser)
 // Construction Filings starts collapsed; opening it also puts the filing dots on the map
-for(const [btnId,bodyId,key,dflt] of [['secFilings','filingsBody','fs-sec-filings','0'],['secFilters','filtersBody','fs-sec-filters'],['secList','list','fs-sec-list']]){
+for(const [btnId,bodyId,key,dflt] of [['secFilings','filingsBody','fs-sec-filings','0'],['secList','list','fs-sec-list']]){
   const b=document.getElementById(btnId), body=document.getElementById(bodyId), set=open=>{ b.setAttribute('aria-expanded',open); body.classList.toggle('collapsed',!open); if(bodyId!=='filtersBody') document.querySelector('.panel')?.classList.toggle('list-collapsed',!open||document.getElementById('secFilings').getAttribute('aria-expanded')!=='true'||document.getElementById('secList').getAttribute('aria-expanded')!=='true'); };
   let open=true; try{ open=(localStorage.getItem(key)??dflt)!=='0'; }catch(e){} set(open);
   b.onclick=()=>{ const o=b.getAttribute('aria-expanded')!=='true'; set(o); if(o&&bodyId==='filingsBody') showFilings(); try{ localStorage.setItem(key,o?'1':'0'); }catch(e){} };
@@ -314,10 +314,24 @@ function syncFilterUI(){
   uMin.value=String(state.umin||0); if(document.activeElement!==coQ) coQ.value=state.co||''; exactBtn.setAttribute('aria-pressed',!!state.exact);
   const dd=state.d&&state.d.f!=='all'?state.d:null; dField.value=dd?dd.f:''; dFrom.value=dd?.from||''; dTo.value=dd?.to||''; dFrom.disabled=dTo.disabled=!dd;
   const nMore=(state.uses?1:0)+(state.d&&!pk?1:0)+(state.chg?1:0)+(state.st?1:0)+(state.sqmin||state.sqmax?1:0)+(state.umin?1:0)+(state.co.trim()?1:0)+(state.exact?1:0); document.getElementById('moreN').textContent=nMore?'· '+nMore+' on':''; if(nMore) document.getElementById('moreF').open=true;
-  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); document.getElementById('filtOn').textContent=nAll?nAll+' on':'';
+  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const fN=document.getElementById('filterN'); fN.textContent=nAll||''; fN.hidden=!nAll; document.getElementById('filterClear').hidden=!nAll&&!state.month;
+  document.getElementById('filterBtn').classList.toggle('on',!!nAll);
   const t=filterText(); document.getElementById('activeTxt').textContent=t?'Filters: '+t:''; document.getElementById('activeBar').classList.toggle('on',!!t);
 }
-document.getElementById('resetAll').onclick=()=>{ ctx.clearPlace?.(); fromSpec(DEFAULT_SPEC()); if(state.month) setMonth(null); };
+let openFilters=()=>{}; // set below once the popup is wired; exposed as ctx.openFilters
+const clearFilters=()=>{ ctx.clearPlace?.(); fromSpec(DEFAULT_SPEC()); if(state.month) setMonth(null); };
+document.getElementById('resetAll').onclick=clearFilters;
+// Filters: a popup from the map toolbar (between County and Export), with a Clear button beside it while any are on.
+// Filters only act on construction filings, so changing one puts the filing dots on the map.
+{ const btn=document.getElementById('filterBtn'), pop=document.getElementById('filterPop'), wrap=document.getElementById('fwrap');
+  const setOpen=open=>{ pop.hidden=!open; btn.setAttribute('aria-expanded',open); btn.classList.toggle('open',open); if(open) pop.querySelector('select,button.chip,input')?.focus({preventScroll:true}); };
+  btn.onclick=()=>setOpen(pop.hidden);
+  document.getElementById('filterClose').onclick=()=>{ setOpen(false); btn.focus(); };
+  document.getElementById('filterClear').onclick=()=>{ clearFilters(); ctx.toast?.('Filters cleared'); };
+  pop.addEventListener('change',()=>showFilings()); pop.addEventListener('click',e=>{ if(e.target.closest('.chip,button[data-k],button[data-v]')) showFilings(); });
+  document.addEventListener('pointerdown',e=>{ if(!pop.hidden&&!wrap.contains(e.target)&&!e.target.closest('.kpi-pop')) setOpen(false); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!pop.hidden){ setOpen(false); btn.focus(); } });
+  openFilters=()=>{ if(ctx.view!=='map') setView('map'); setOpen(true); }; }
 // apply a whole filter spec (URL, saved search, AI answer)
 function fromSpec(spec,{fly=true}={}){
   state.counties=new Set(spec.c&&spec.c.length?spec.c.filter(c=>COUNTIES.includes(c)):COUNTIES); if(!state.counties.size) state.counties=new Set(COUNTIES);
@@ -822,6 +836,7 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return COUNTIES.join(', ')+', '+[...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,60).map(x=>x[0]).join(', '); }
+ctx.setMode=setMode; ctx.openFilters=()=>openFilters();
 Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
@@ -860,4 +875,11 @@ for (const init of [initTimeline,initWho,initChanges,initKpis,initCompare,initMa
 }
 
 // installable app + offline shell (served over https only)
-if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+// The offline cache serves the app files it has, so a new release used to show only after a second reload. When a new
+// version takes over: reload right away if the page only just opened, otherwise say so (never reload mid-task).
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  const hadSW=!!navigator.serviceWorker.controller, t0=Date.now(); let swDone=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(!hadSW||swDone) return; swDone=true;
+    if(Date.now()-t0<15000) location.reload(); else toast('A new version of the app is ready. Reload the page to use it.'); });
+  navigator.serviceWorker.register('sw.js').then(r=>r.update?.()).catch(()=>{});
+}

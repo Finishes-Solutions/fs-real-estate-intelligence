@@ -42,57 +42,11 @@
         <div class="kpi-pop" id="kpiPop" role="dialog" aria-label="Headline metrics"></div>
       </div>
     </div>
-    <button class="sechead" id="secFilters" type="button" aria-expanded="true" aria-controls="filtersBody"><svg class="chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg><span>Filters</span><em id="filtOn"></em></button>
-    <div class="filters" id="filtersBody">
-      <div class="row" id="periodRow"><span class="lbl">Filed</span></div>
-      <div class="row" id="countyRow"><span class="lbl">County</span></div>
-      <div class="row" id="typeRow"><span class="lbl">Type</span></div>
-      <div class="row"><span class="lbl">Value</span>
-        <select class="chip" id="minCost" aria-label="Minimum estimated value">
-          <option value="0">Any min</option><option value="250000">$250K+</option><option value="1000000">$1M+</option><option value="5000000">$5M+</option><option value="25000000">$25M+</option><option value="100000000">$100M+</option>
-        </select>
-        <span class="to">to</span>
-        <select class="chip" id="maxCost" aria-label="Maximum estimated value">
-          <option value="0">Any max</option><option value="250000">$250K</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="25000000">$25M</option><option value="100000000">$100M</option>
-        </select>
-      </div>
-      <details class="more" id="moreF" open><summary>More Filters <span id="moreN"></span></summary>
-      <div class="fgroup">Project</div>
-      <div class="row" id="useRow"><span class="lbl">Use</span></div>
-      <div class="row" id="statusRow"><span class="lbl">Status</span></div>
-      <div class="fgroup">Size</div>
-      <div class="row"><span class="lbl">Sq ft</span>
-        <input class="chip num" type="number" id="sqMin" min="0" step="1000" placeholder="Min" aria-label="Minimum square feet">
-        <span class="to">to</span>
-        <input class="chip num" type="number" id="sqMax" min="0" step="1000" placeholder="Max" aria-label="Maximum square feet">
-      </div>
-      <div class="row"><span class="lbl">Units</span>
-        <select class="chip" id="uMin" aria-label="Housing units"><option value="0">Any</option><option value="1">Has housing units</option><option value="50">50+ units</option><option value="100">100+ units</option><option value="250">250+ units</option></select>
-      </div>
-      <div class="fgroup">People &amp; Place</div>
-      <div class="row"><span class="lbl">Company</span>
-        <label class="search sm"><input id="coQ" type="search" placeholder="Developer, owner, architect or GC" aria-label="Company name"></label>
-      </div>
-      <div class="row"><span class="lbl">Location</span>
-        <button class="chip" id="exactBtn" type="button" aria-pressed="false" title="Hide filings placed at a town center or along a street">Exact addresses only</button>
-      </div>
-      <div class="fgroup">Timing</div>
-      <div class="row"><span class="lbl">Dates</span>
-        <select class="chip" id="dField" aria-label="Date filter"><option value="">Any time</option><option value="active">Under construction</option><option value="start">Starting</option><option value="reg">Registered</option></select>
-        <input class="chip mon" type="month" id="dFrom" aria-label="From month" disabled>
-        <span class="to">to</span>
-        <input class="chip mon" type="month" id="dTo" aria-label="To month" disabled>
-      </div>
-      <div class="row" id="chgRow"><span class="lbl">Updates</span></div>
-      </details>
-      <div class="active" id="activeBar"><span id="activeTxt"></span><button class="lnk" id="resetAll" type="button">Reset</button></div>
-    </div>
     <div class="selbar" id="selbar">
       <div class="s1"><b id="selName">Everything shown</b><span id="selStats"></span></div>
       <div class="btnrow">
         <button class="btn primary" id="selCompare" type="button">+ Compare</button>
         <button class="btn" id="selClear">Clear Selection</button>
-        <button class="btn" id="selCrime" type="button" style="display:none">Crime Report</button>
         <button class="btn" id="selFema" type="button" style="display:none">FEMA Report</button>
       </div>
       <div class="btnrow">
@@ -125,6 +79,57 @@
       <button data-mode="radius" aria-pressed="false" title="Search an address and a radius"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><path d="M8 8h6" stroke-dasharray="1.6 1.6"/></svg><span>Radius</span></button>
       <button data-mode="county" aria-pressed="false" title="Pick counties"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M2.5 3h5v4.5h6V13h-11z"/></svg><span>County</span></button>
     </div>
+      <div class="fwrap" id="fwrap">
+      <button class="fbtn" id="filterBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="filterPop" title="Filter construction filings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h12l-4.6 5.4v4.4l-2.8 1.4V8.4z"/></svg><span>Filters</span><b class="fcount" id="filterN" hidden></b></button>
+      <button class="fclear" id="filterClear" type="button" title="Clear all filters" aria-label="Clear all filters" hidden><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg><span>Clear</span></button>
+      <div class="fpop" id="filterPop" role="dialog" aria-label="Filters" hidden>
+        <div class="fpop-h"><div><b>Filters</b><span>Construction filings on the map, list, timeline and reports</span></div><button class="x" id="filterClose" type="button" aria-label="Close filters"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+          <div class="filters" id="filtersBody">
+            <div class="row" id="periodRow"><span class="lbl">Filed</span></div>
+            <div class="row" id="countyRow"><span class="lbl">County</span></div>
+            <div class="row" id="typeRow"><span class="lbl">Type</span></div>
+            <div class="row"><span class="lbl">Value</span>
+              <select class="chip" id="minCost" aria-label="Minimum estimated value">
+                <option value="0">Any min</option><option value="250000">$250K+</option><option value="1000000">$1M+</option><option value="5000000">$5M+</option><option value="25000000">$25M+</option><option value="100000000">$100M+</option>
+              </select>
+              <span class="to">to</span>
+              <select class="chip" id="maxCost" aria-label="Maximum estimated value">
+                <option value="0">Any max</option><option value="250000">$250K</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="25000000">$25M</option><option value="100000000">$100M</option>
+              </select>
+            </div>
+            <details class="more" id="moreF" open><summary>More Filters <span id="moreN"></span></summary>
+            <div class="fgroup">Project</div>
+            <div class="row" id="useRow"><span class="lbl">Use</span></div>
+            <div class="row" id="statusRow"><span class="lbl">Status</span></div>
+            <div class="fgroup">Size</div>
+            <div class="row"><span class="lbl">Sq ft</span>
+              <input class="chip num" type="number" id="sqMin" min="0" step="1000" placeholder="Min" aria-label="Minimum square feet">
+              <span class="to">to</span>
+              <input class="chip num" type="number" id="sqMax" min="0" step="1000" placeholder="Max" aria-label="Maximum square feet">
+            </div>
+            <div class="row"><span class="lbl">Units</span>
+              <select class="chip" id="uMin" aria-label="Housing units"><option value="0">Any</option><option value="1">Has housing units</option><option value="50">50+ units</option><option value="100">100+ units</option><option value="250">250+ units</option></select>
+            </div>
+            <div class="fgroup">People &amp; Place</div>
+            <div class="row"><span class="lbl">Company</span>
+              <label class="search sm"><input id="coQ" type="search" placeholder="Developer, owner, architect or GC" aria-label="Company name"></label>
+            </div>
+            <div class="row"><span class="lbl">Location</span>
+              <button class="chip" id="exactBtn" type="button" aria-pressed="false" title="Hide filings placed at a town center or along a street">Exact addresses only</button>
+            </div>
+            <div class="fgroup">Timing</div>
+            <div class="row"><span class="lbl">Dates</span>
+              <select class="chip" id="dField" aria-label="Date filter"><option value="">Any time</option><option value="active">Under construction</option><option value="start">Starting</option><option value="reg">Registered</option></select>
+              <input class="chip mon" type="month" id="dFrom" aria-label="From month" disabled>
+              <span class="to">to</span>
+              <input class="chip mon" type="month" id="dTo" aria-label="To month" disabled>
+            </div>
+            <div class="row" id="chgRow"><span class="lbl">Updates</span></div>
+            </details>
+            <div class="active" id="activeBar"><span id="activeTxt"></span><button class="lnk" id="resetAll" type="button">Reset</button></div>
+          </div>
+      </div>
+      </div>
       <button class="exbtn" id="exportBtn" type="button" aria-haspopup="dialog"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.8 6.8 8 10l3.2-3.2M2.5 11.5v2h11v-2"/></svg><span>Export</span></button>
     </div>
     <div class="msearch" id="msearch">
