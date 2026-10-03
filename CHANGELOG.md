@@ -5,6 +5,32 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 1:14 AM CT: New card design: titled section cards (option B) (3c109f6)
+- **Building, parcel, filing and plane cards now use the "report with section cards" layout** you picked from the mockups:
+  - a row of section chips under the title that jumps to each section;
+  - a dark Overview summary at the top;
+  - then one card per section, each with an icon, a title and its own source line.
+- **Building cards** run in this order:
+  - Ownership & Value, Building, Site, Area, Businesses on the Block, Air Traffic;
+  - Construction Activity, which shows filings on the parcel plus how many are within a mile and how many were filed in the last year;
+  - Regrid, From Here, and Site Tools.
+  - Site Tools includes a new **Ask AI About It** button.
+- **Filing cards** run in this order: Overview, Project, Schedule (with history), People, Scope of Work, AI Project Brief, Air Traffic, From Here, then Tools (TABS record, Street View, Add Site Note, Ask AI About It).
+- **Plane cards** show:
+  - **Flight**: altitude, speed, heading and route as tiles;
+  - **Aircraft**: type, registration, squawk;
+  - FlightAware and FAA registration sections when available;
+  - **Tools**.
+- **Readability:**
+  - Labels no longer squeeze into a narrow column that wrapped two or three times. They sit above their values, or beside them in rows that wrap cleanly.
+  - Buttons sit in an even two-column grid.
+- **Every other card** (crime report, area summary, multi-select) picks up the same style.
+- **Cleaner parcel data:**
+  - "Null" values no longer show.
+  - Purchase dates that came through as numbers (e.g. "46082") now read as dates (2026-03-01).
+  - The city isn't repeated in the address.
+  - Land area says "acres".
+- **In Harris or Waller County**, the card now says the statewide parcel data doesn't cover that county yet, instead of just "no record".
 ### 1:14 AM CT: Planes look like what they are; map buttons stay put (01eff54)
 - **Each plane on the map is drawn as its kind of aircraft**, not the same airliner icon:
   - big jets: 747s and other four-engine jets, wide-bodies (777, 787, A330…), narrow-body airliners (737, A320…);
