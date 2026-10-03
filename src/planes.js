@@ -4,6 +4,8 @@
 //   Low Flight Paths:       30-day density of aircraft seen below 3,000 ft (api/planes-sample.js samples every minute).
 //   Air traffic (cards):    low-aircraft sightings a day over a property and the nearest airport.
 //   Registration (card):    who a US plane is registered to, from the FAA registry (api/planes ?reg=, loaded nightly).
+//   FlightAware (card):     origin, destination, times and recent flights when the free route database has no route
+//                           (api/planes ?flight=, paid AeroAPI behind a hard monthly cap; one lookup per plane per session).
 // Both toggles live in Layers → Live Conditions (registered with src/live.js) and in the assistant's set_live_layers.
 import { pickAircraft } from './lib/assist-logic.mjs';
 
@@ -159,6 +161,26 @@ export function initPlanes(ctx) {
     if (r && !r.found && /^N[1-9]/i.test(p.reg || '')) { const [x] = await regFor([p.reg]); if (x) r = x.found ? x : { ...r, faa_url: x.faa_url }; }
     if (r) regDone.set(p.hex, r); return r;
   }
+  // FlightAware: only for planes the free route database doesn't know, once per callsign / tail number per session
+  const fas = new Map(), faDone = new Map();
+  const faIdent = p => p.flight || (/^N[1-9]/i.test(p.reg || '') ? p.reg.replace(/-/g, '') : null);
+  function faFor(p) {
+    const id = faIdent(p); if (!id) return Promise.resolve(null);
+    if (!fas.has(id)) fas.set(id, fetch('api/planes?flight=' + encodeURIComponent(id)).then(r => r.json()).catch(() => null).then(d => { if (d) faDone.set(p.hex, d); else fas.delete(id); return d; }));
+    return fas.get(id);
+  }
+  const hhmm = t => t ? new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+  const when = t => { if (!t) return ''; const d = new Date(t), today = new Date().toDateString() === d.toDateString(); return today ? hhmm(t) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + hhmm(t); };
+  const leg = f => (f.origin?.code || '?') + ' → ' + (f.destination?.code || '?');
+  function faHtml(fa) {
+    if (!fa || (!fa.current && !fa.recent?.length && !fa.capped)) return '';
+    const c = fa.current, rows = c ? [['From', [c.origin?.code, c.origin?.city || c.origin?.name].filter(Boolean).join(' ')], ['To', [c.destination?.code, c.destination?.city || c.destination?.name].filter(Boolean).join(' ')],
+      ['Departed', when(c.departed)], ['Arrives', c.eta ? 'about ' + when(c.eta) : ''], ['Operator', c.operator || '']].filter(x => x[1]) : [];
+    const past = (fa.recent || []).filter(f => f !== c && f.id !== c?.id).slice(0, 4);
+    return '<div class="bsec" id="plFa"><div class="lt">Flight · FlightAware</div>' + (fa.capped ? '<div class="rnote">' + esc(fa.note) + '</div>' : '') +
+      (rows.length ? '<dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' : '') +
+      (past.length ? '<div class="rnote">Recent: ' + past.map(f => esc(leg(f) + ' ' + when(f.departed))).join(' · ') + '</div>' : '') + '</div>';
+  }
   const fmtDay = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   function regHtml(p, r) {
     const link = u => u ? ' <a class="lnk" target="_blank" rel="noopener" href="' + esc(u) + '">FAA record ↗</a>' : '';
@@ -192,7 +214,7 @@ export function initPlanes(ctx) {
       '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
       '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">Track on adsb.lol ↗</a>' +
       (p.flight ? '<a class="btn" target="_blank" rel="noopener" href="https://www.flightaware.com/live/flight/' + encodeURIComponent(p.flight) + '">FlightAware ↗</a>' : '') + '</div>' +
-      regHtml(p, regDone.get(hex)) +
+      faHtml(faDone.get(hex)) + regHtml(p, regDone.get(hex)) +
       '<div class="bsrc rnote">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown.</div>';
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#plFollow').onclick = () => { const was = follow === hex && !orbiting; follow = was ? null : hex; orbiting = false; renderCard(hex, true); if (follow) followCam(); };
@@ -201,7 +223,15 @@ export function initPlanes(ctx) {
     if (!refresh || !card.classList.contains('open')) card.classList.add('open');
     if (!regDone.has(hex)) regOf(p).then(r => { const sec = card.querySelector('#plReg'); if (sec && shown === hex) sec.outerHTML = regHtml(p, r || { failed: true }); });
     const r = await routeFor(p), el = card.querySelector('#plRoute');
-    if (el && shown === hex) el.textContent = r?.origin && r?.destination ? ap(r.origin).replace(/&amp;/g, '&') + ' → ' + ap(r.destination).replace(/&amp;/g, '&') : p.flight ? 'Route not in the database' : 'No callsign';
+    const known = r?.origin && r?.destination;
+    if (el && shown === hex) el.textContent = known ? ap(r.origin).replace(/&amp;/g, '&') + ' → ' + ap(r.destination).replace(/&amp;/g, '&') : faIdent(p) ? 'Checking FlightAware…' : 'No callsign';
+    if (!known && faIdent(p)) {
+      const fa = await faFor(p), e2 = card.querySelector('#plRoute'); if (shown !== hex) return;
+      const c = fa?.current;
+      if (e2) e2.textContent = c ? leg(c) + (c.destination?.city ? ' (' + c.destination.city + ')' : '') : fa?.capped ? 'Route unknown (FlightAware budget used up this month)' : 'Route not in the database';
+      const old = card.querySelector('#plFa'), html = faHtml(fa);
+      if (old) old.outerHTML = html || ''; else if (html) card.querySelector('#plReg')?.insertAdjacentHTML('beforebegin', html);
+    }
     // draw the route the first time the card opens for this plane (not on every 10-second refresh)
     if (shown === hex && !refresh && r) showRoute(hex, r);
   }
@@ -275,6 +305,7 @@ export function initPlanes(ctx) {
   ctx.showPlane = hex => renderCard(hex);
   ctx.planeRoute = p => routeFor(p);
   ctx.planeRegistry = ids => regFor(ids);
+  ctx.flightAware = id => fetch('api/planes?flight=' + encodeURIComponent(id)).then(r => r.json());
   // the assistant: find a plane by callsign, registration or hex (or the nearest airborne one), open its card and follow
   // or orbit it. Looks up to 250 miles around `near` (default: the map centre), so it needn't be on screen.
   ctx.followPlane = async (id, o = {}) => {

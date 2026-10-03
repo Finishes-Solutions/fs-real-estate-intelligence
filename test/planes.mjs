@@ -144,3 +144,54 @@ console.log('planes tests passed');
   assert.equal(five.low_per_day, 24); assert.equal(one.low_per_day, 24, 'same traffic, 5x the samples and sightings, same index');
   assert.equal(one.sampled_days, 1, 'a full day at one-minute sampling'); assert.equal(perDay(5, 0), null);
   console.log('planes sampling-rate tests passed'); }
+
+// ---- FlightAware AeroAPI behind the monthly cap (lib/aeroapi.mjs) ----
+{ const { flights, budget, identType, cleanIdent, shape, capCents } = await import('../lib/aeroapi.mjs');
+  assert.deepEqual(['N123AB', 'DAL1601', 'EJA512'].map(identType), ['registration', 'designator', 'designator']); assert.equal(cleanIdent('n-123ab'), 'N123AB'); assert.equal(cleanIdent('x; drop'), null);
+  assert.equal(capCents({}), 475, 'default cap $4.75'); assert.equal(capCents({ AEROAPI_MONTHLY_CAP: '2' }), 200);
+  // a fake database that behaves like the migration's functions
+  const fakeDb = () => { const d = { via: 'key', calls: [], reported: 0, reportedAt: null, cache: new Map(), reserves: 0,
+    async rpc(fn, a) {
+      const since = c => !d.reportedAt || c.at > d.reportedAt;
+      if (fn === 'aeroapi_status') return [{ reported_cents: d.reported, pending_cents: d.calls.filter(since).reduce((x, c) => x + c.cents, 0), calls: d.calls.length, reported_at: d.reportedAt }];
+      if (fn === 'aeroapi_reserve') { d.reserves++; const pending = d.calls.filter(since).reduce((x, c) => x + c.cents, 0); if (d.reported + pending + a.p_cents > a.p_cap_cents) return false; d.calls.push({ at: new Date().toISOString(), cents: a.p_cents }); return true; }
+      if (fn === 'aeroapi_report') { d.reported = a.p_cents; d.reportedAt = new Date(Date.parse(a.p_as_of) - 600e3).toISOString(); return null; }
+      throw new Error('rpc ' + fn); },
+    async select(t, q) { const k = decodeURIComponent(q.match(/k=eq\.([^&]+)/)[1]); const c = d.cache.get(k); return c ? [c] : []; },
+    async upsert(t, rows) { for (const r of rows) d.cache.set(r.k, { data: r.data, at: r.at }); } }; return d; };
+  const now = Date.now(), iso = ms => new Date(now + ms).toISOString(), hits = [];
+  const fa = async (url, o) => { const u = new URL(url); hits.push(u.pathname); assert.equal(o.headers['x-apikey'], 'k');
+    if (u.pathname.endsWith('/account/usage')) return json({ total_calls: 40, total_cost: 0.2 });
+    if (u.pathname === '/aeroapi/flights/N123AB') { assert.equal(u.searchParams.get('ident_type'), 'registration'); assert.equal(u.searchParams.get('max_pages'), '1');
+      return json({ flights: [
+        { fa_flight_id: 'a', ident: 'N123AB', registration: 'N123AB', origin: { code: 'KHOU', code_iata: 'HOU', name: 'Houston Hobby', city: 'Houston' }, destination: { code: 'KAUS', code_iata: 'AUS', city: 'Austin' }, actual_off: iso(-1800e3), estimated_on: iso(1200e3), status: 'En Route', filed_altitude: 150 },
+        { fa_flight_id: 'b', ident: 'N123AB', origin: { code: 'KAUS', code_iata: 'AUS' }, destination: { code: 'KHOU', code_iata: 'HOU' }, actual_off: iso(-90000e3), actual_on: iso(-87000e3), status: 'Arrived' },
+        { fa_flight_id: 'c', ident: 'N123AB', origin: { code_lid: 'T41' }, destination: { code: 'KHOU', code_iata: 'HOU' }, scheduled_out: iso(86400e3), status: 'Scheduled' } ] }); }
+    if (u.pathname === '/aeroapi/flights/EJA512') return new Response('slow down', { status: 429 });
+    return json({ title: 'not found' }, 404); };
+  const env = { AEROAPI_KEY: 'k' };
+  assert.equal((await flights('N123AB', { db: fakeDb(), env: {}, fetchImpl: fa })).available, false, 'no key: no call');
+  assert.equal((await flights('N123AB', { db: null, env, fetchImpl: fa })).available, false, 'no database: no cap, so no call'); assert.equal(hits.length, 0);
+  let db = fakeDb(), o = await flights('N123AB', { db, env, fetchImpl: fa });
+  assert.deepEqual([o.current.origin.code, o.current.destination.code, o.current.filed_altitude_ft, o.recent.length, o.recent[1].origin.code], ['HOU', 'AUS', 15000, 2, 'AUS']);
+  assert.equal(db.reported, 20, 'FlightAware usage read first: $0.20'); assert.equal(db.calls.length, 1);
+  o = await flights('N123AB', { db, env, fetchImpl: fa }); assert.ok(o.cached); assert.equal(db.reserves, 1, 'a cached answer costs nothing');
+  assert.deepEqual(await budget(db, env).then(b => [b.cap, b.spent]), [4.75, 0.21], 'reported 20c + the 1c call since');
+  // the cap: FlightAware says $4.74 used -> the next 1c lookup would pass $4.75 ... at 4.74 + 1 = 4.75 exactly it may go; one more may not
+  db = fakeDb(); const n0 = hits.length;
+  const nearly = async (url, opt) => new URL(url).pathname.endsWith('/account/usage') ? json({ total_cost: 4.745 }) : fa(url, opt);
+  o = await flights('N9ZZ', { db, env, fetchImpl: nearly }); assert.equal(o.capped, true, 'over the cap: refused'); assert.match(o.note, /\$4\.75/);
+  assert.ok(!hits.slice(n0).some(h => h.includes('/flights/')), 'no paid call once the cap is reached');
+  // usage endpoint down: estimates alone hold the line (475 one-cent lookups at most)
+  db = fakeDb(); db.calls = Array.from({ length: 475 }, () => ({ at: new Date().toISOString(), cents: 1 }));
+  const noUsage = async (url, opt) => new URL(url).pathname.endsWith('/account/usage') ? json({}, 404) : fa(url, opt);
+  o = await flights('N777', { db, env: { ...env, AEROAPI_MONTHLY_CAP: '4.75' }, fetchImpl: noUsage }); assert.equal(o.capped, true, 'estimates alone stop it');
+  o = await flights('EJA512', { db: fakeDb(), env, fetchImpl: fa }); assert.equal(o.busy, true, '429 is reported, not thrown');
+  assert.deepEqual(shape([{ origin: { code: 'X' }, cancelled: true, actual_off: iso(-1) }]), { current: null, recent: [] }); }
+console.log('aeroapi cap ok');
+
+{ const { default: planes } = await import('../api/planes.js'), H = { 'x-forwarded-for': '9.9.9.9' }, mk = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
+  let r = mk(); await planes({ query: { flight: 'N123AB' }, headers: H }, r); assert.equal(r.body.available, false); assert.equal(r.headers['Cache-Control'], 'no-store', 'not connected: nothing cached');
+  r = mk(); await planes({ query: { flight: 'x;y' }, headers: H }, r); assert.equal(r.code, 400);
+  r = mk(); await planes({ query: { aeroapi: 'budget' }, headers: H }, r); assert.deepEqual([r.body.configured, r.body.cap], [false, 4.75]); }
+console.log('aeroapi endpoint ok');
