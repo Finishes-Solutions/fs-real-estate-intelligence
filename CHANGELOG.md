@@ -5,7 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
-### 7:06 PM CT: Regrid records cached by parcel, with an out-of-date check
+### 7:12 PM CT: Aircraft sampled every minute
+- The low-flight history now takes a snapshot of aircraft over the region every minute instead of every 5 minutes, so it fills in five times faster and catches planes that cross a spot quickly.
+- The Air Traffic numbers and the Low Flight Paths colors mean the same as before (the index is scaled to the old 5-minute rate), so today's earlier samples and the new ones mix correctly. "Days sampled" now counts a full day as 1,440 snapshots.
+
+### 7:06 PM CT: Regrid records cached by parcel, with an out-of-date check (0455334)
 - A Regrid parcel record is now saved with its outline: clicking anywhere else on the same lot later is free (before, only the same parcel ID or exact spot was).
 - The card now says when a saved record is out of date: Regrid re-pulls each county's data periodically, and if it has done so since the record was saved (or the copy is over a year old), the card shows "Update (uses 1 record)". Otherwise it says the copy is current with the county's last Regrid refresh. Nothing is re-bought automatically.
 

@@ -498,7 +498,7 @@ export function initAssistant(ctx) {
           live: live.error ? { error: live.error } : { as_of: live.time, source: live.source, count: ac.length, low_count: ac.filter(x => !x.ground && x.alt != null && x.alt < 3000).length,
             aircraft: ac.slice(0, 12).map(x => ({ callsign: x.flight, type: x.type, registration: x.reg, altitude_ft: x.ground ? 0 : x.alt, on_ground: x.ground, speed_kt: x.gs, heading: x.track, miles_away: x.miles })) },
           history: !hist ? undefined : hist.history ? { window_days: hist.days, sampled_days: hist.sampled_days, low_sightings_per_day_within_1km: hist.low_per_day, lowest_ft: hist.lowest_ft,
-            note: 'Aircraft below 3,000 ft seen in 5-minute snapshots within ~1 km; an exposure index (more = more low traffic), not a count of flights.' } : { available: false, note: hist.note } };
+            note: 'Aircraft below 3,000 ft seen in one-minute snapshots within ~1 km; an exposure index (more = more low traffic), not a count of flights.' } : { available: false, note: hist.note } };
       }
       if (name === 'market_data') {
         const d = await ctx.marketData?.(a.county || ''); if (!d) return { error: 'The Market view isn’t loaded in this version.' }; if (d.error) return d;

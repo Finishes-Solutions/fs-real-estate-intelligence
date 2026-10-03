@@ -6,7 +6,7 @@
 // History reads say { history: false, note } when the database isn't set up yet.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { supa } from '../lib/supa.mjs';
-import { pointQuery, fetchPoint, boxAround, summarize, SAMPLES_PER_DAY } from '../lib/planes.mjs';
+import { pointQuery, fetchPoint, boxAround, summarize, SAMPLES_PER_DAY, perDay } from '../lib/planes.mjs';
 
 const num = v => (v === '' || v == null ? NaN : Number(v));
 const box = s => { const b = String(s || '').split(',').map(num); return b.length === 4 && b.every(Number.isFinite) && b[0] < b[2] && b[1] < b[3] && Math.abs(b[1]) <= 90 && Math.abs(b[3]) <= 90 ? b : null; };
@@ -25,10 +25,10 @@ export async function density(b, days = 30, d = db()) {
   if (!d || d.via !== 'key') return { history: false, note: 'Flight history needs SUPABASE_SECRET_KEY on the site.' };
   const [w, s, e, n] = b, since = sinceDay(days);
   const [cells, sampled] = await Promise.all([d.rpc('air_density', { w, s, e, n, since }), d.select('air_days', 'select=samples&day=gte.' + since)]);
-  const samples = (sampled || []).reduce((a, r) => a + (r.samples || 0), 0), full = samples / SAMPLES_PER_DAY;
-  return { history: true, days, sampled_days: Math.round(full * 10) / 10, type: 'FeatureCollection', features: (cells || []).map(c => {
+  const samples = (sampled || []).reduce((a, r) => a + (r.samples || 0), 0);
+  return { history: true, days, sampled_days: Math.round(samples / SAMPLES_PER_DAY * 10) / 10, type: 'FeatureCollection', features: (cells || []).map(c => {
     const x = +c.lon, y = +c.lat;
-    return { type: 'Feature', properties: { sightings: +c.sightings, per_day: full > 0 ? Math.round(+c.sightings / full * 10) / 10 : 0, min_alt: c.min_alt },
+    return { type: 'Feature', properties: { sightings: +c.sightings, per_day: perDay(+c.sightings, samples) ?? 0, min_alt: c.min_alt },
       geometry: { type: 'Polygon', coordinates: [[[x, y], [x + .01, y], [x + .01, y + .01], [x, y + .01], [x, y]]] } };
   }) };
 }

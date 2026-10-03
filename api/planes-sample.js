@@ -1,4 +1,4 @@
-// Vercel Cron, every 5 minutes (vercel.json): one snapshot of the aircraft over the home region, the low ones
+// Vercel Cron, every minute (vercel.json): one snapshot of the aircraft over the home region, the low ones
 // (airborne, under 3,000 ft) counted into ~1 km cells for today in Supabase (add_air_samples). Builds the history
 // behind "Low Flight Paths" and the "Air traffic" line on property cards. Vercel sends Authorization: Bearer $CRON_SECRET.
 import { supa } from '../lib/supa.mjs';

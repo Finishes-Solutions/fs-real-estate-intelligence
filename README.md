@@ -109,7 +109,7 @@ Layers panel → **Live conditions**, the **From here** buttons on every filing 
 | 3D terrain | Mapterhorn (browser direct) | none |
 | NASA recent imagery, site imagery thumbnails | NASA GIBS + CMR + Worldview Snapshots (HLS Landsat / Sentinel-2, 30 m), browser direct | none |
 | Live Planes (aircraft anywhere: callsign, type, altitude, speed, route), plane card, assistant `air_traffic` | adsb.lol (open data, ODbL), airplanes.live as a fallback, through `api/planes` | none |
-| Low Flight Paths layer, "Air Traffic" on property cards | `api/planes-sample` (Vercel Cron, every 5 min) counts aircraft below 3,000 ft in ~1 km cells into Supabase (`air_cells`, `air_days`; migration `20261008000000_air_traffic.sql`) | `SUPABASE_SECRET_KEY`; set `CRON_SECRET` to lock the cron endpoint |
+| Low Flight Paths layer, "Air Traffic" on property cards | `api/planes-sample` (Vercel Cron, every minute) counts aircraft below 3,000 ft in ~1 km cells into Supabase (`air_cells`, `air_days`; migration `20261008000000_air_traffic.sql`) | `SUPABASE_SECRET_KEY`; set `CRON_SECRET` to lock the cron endpoint |
 | High-res site imagery (dated, sub-metre) | Esri World Imagery Wayback (archived versions, only those where the spot changed) and USDA NAIP (~0.6 m, Texas about every 2 years) from Microsoft Planetary Computer, through `api/imagery` | none |
 | Project news | GDELT Project DOC 2.0, through `api/news` | none |
 | ESRI / Free Map basemaps | Esri World Imagery, OpenFreeMap | none |

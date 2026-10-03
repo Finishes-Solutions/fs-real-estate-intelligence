@@ -75,3 +75,9 @@ assert.ok(/^\d{4}-\d\d-\d\d$/.test(rpc[0].p_day)); assert.deepEqual(rpc[0].p_row
 delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SECRET_KEY; delete process.env.CRON_SECRET;
 
 console.log('planes tests passed');
+// sampling rate doesn't change the index: a day at 5-minute samples and a day at 1-minute samples of the same traffic read the same
+{ const { summarize, perDay } = await import('../lib/planes.mjs');
+  const five = summarize([{ n: 24, min_alt: 900 }], 288, 30), one = summarize([{ n: 120, min_alt: 900 }], 1440, 30);
+  assert.equal(five.low_per_day, 24); assert.equal(one.low_per_day, 24, 'same traffic, 5x the samples and sightings, same index');
+  assert.equal(one.sampled_days, 1, 'a full day at one-minute sampling'); assert.equal(perDay(5, 0), null);
+  console.log('planes sampling-rate tests passed'); }

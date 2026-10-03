@@ -1,7 +1,7 @@
 // Live planes and low-flight history on the map (api/planes.js; data from the adsb.lol / airplanes.live ADS-B networks).
 //   Live Planes:            every aircraft in view, refreshed every 10 s and moved smoothly in between along its track;
 //                           click one for callsign, type, altitude, speed, route and a follow camera. Works anywhere.
-//   Low Flight Paths:       30-day density of aircraft seen below 3,000 ft (api/planes-sample.js samples every 5 min).
+//   Low Flight Paths:       30-day density of aircraft seen below 3,000 ft (api/planes-sample.js samples every minute).
 //   Air traffic (cards):    low-aircraft sightings a day over a property and the nearest airport.
 // Both toggles live in Layers → Live Conditions (registered with src/live.js) and in the assistant's set_live_layers.
 const REFRESH = 10e3, MINZ = 5, KT = 1.852 / 3600; // km per second per knot
@@ -194,7 +194,7 @@ export function initPlanes(ctx) {
     label: 'Low Flight Paths (30 Days)', persist: true,
     set: async v => { if (!v) { removePaths(); return; } addPaths(); await loadPaths(); if (paths && paths.history === false) { removePaths(); return paths.note || 'flight history isn’t available yet'; } },
     add: addPaths,
-    note: () => paths?.history ? 'Aircraft below 3,000 ft: sightings a day per ~1 km cell over ' + paths.sampled_days + ' sampled days (5-minute snapshots, an exposure index).' : paths?.note || '',
+    note: () => paths?.history ? 'Aircraft below 3,000 ft: sightings a day per ~1 km cell over ' + paths.sampled_days + ' sampled days (one-minute snapshots, an exposure index).' : paths?.note || '',
     status: () => ({ sampled_days: paths?.sampled_days ?? null, available: paths ? paths.history !== false : null })
   });
 
