@@ -54,7 +54,7 @@ export function initAssistant(ctx) {
     // tablet: give the map the room the drawer takes by folding the side list away
     if (innerWidth > 700 && innerWidth <= 1100 && !app.classList.contains('pcollapsed')) { app.classList.add('pcollapsed'); setTimeout(() => ctx.map.resize(), 30); }
     app.classList.add('ai-open'); el.setAttribute('aria-hidden', 'false');
-    if (!history.length && !log.children.length) renderEmpty();
+    if (!history.length && (!log.children.length || log.querySelector('.ai-empty'))) renderEmpty(); // fresh suggestions for what's on screen now
     if (focus && !matchMedia('(pointer: coarse)').matches) setTimeout(() => q.focus(), 60);
     ctx.mapPadding();
   }
@@ -105,11 +105,14 @@ export function initAssistant(ctx) {
     const near = ctx.nearestPlace?.([c.lng, c.lat]) || null;
     return { card, near, far: near ? null : ctx.viewPlace?.() || null, zoom: z, inView, filtered: !!ctx.filterText(), selection: ctx.sel?.feature ? ctx.sel.label || null : null, changed: ctx.CHANGED.size };
   }
-  function renderSugs() {
-    const list = suggestQuestions(onScreen()), key = list.join('|'); if (key === lastSugs) return; lastSugs = key;
-    // pills say "it" for the open card; the question sent names it, so the answer can't drift to something else
+  // pills say "it" for the open card; the question sent names it, so the answer can't drift to something else
+  function screenSugs() {
     const v = onScreen(), name = v.card?.kind === 'filing' ? v.card.name : v.card?.kind === 'building' && v.card.label ? v.card.label.split(',')[0] : null;
-    sugBox.innerHTML = list.map(t => '<button type="button" data-q="' + esc(name ? t.replace(/\b(of|near|is) it\b|\bwill it\b/, m => m.replace(/\bit\b/, name)) : t) + '">' + esc(t) + '</button>').join('');
+    return suggestQuestions(v).map(t => ({ t, q: name ? t.replace(/\b(of|near|is) it\b|\bwill it\b/, m => m.replace(/\bit\b/, name)) : t }));
+  }
+  function renderSugs() {
+    const list = screenSugs(), key = list.map(s => s.t).join('|'); if (key === lastSugs) return; lastSugs = key;
+    sugBox.innerHTML = list.map(s => '<button type="button" data-q="' + esc(s.q) + '">' + esc(s.t) + '</button>').join('');
     sugBox.querySelectorAll('button').forEach(b => b.onclick = () => { if (busy) return; open(false); ask(b.dataset.q); });
     fitSugs();
   }
@@ -134,8 +137,13 @@ export function initAssistant(ctx) {
   // ---------- rendering ----------
   function renderEmpty() {
     log.innerHTML = '<div class="ai-empty"><b>Ask about construction anywhere on the map.</b><span>I can filter the map, find and highlight projects, compare areas and developers, and switch views. Or press the mic and just talk.</span>' +
-      '<div class="ai-sugs">' + SUGGEST.map(s => '<button type="button">' + esc(s) + '</button>').join('') + '</div></div>';
-    log.querySelectorAll('.ai-sugs button').forEach(b => b.onclick = () => ask(b.textContent));
+      '<div class="ai-sugs"></div></div>';
+    // what's on screen first (the same questions the Ask AI button offers on hover), then general examples
+    let here = []; try { here = screenSugs(); } catch { /* map not ready yet */ }
+    const key = s => s.toLowerCase().split(/\s+/).slice(0, 5).join(' '), seen = new Set(here.map(s => key(s.t)));
+    const list = [...here, ...SUGGEST.filter(s => !seen.has(key(s))).map(s => ({ t: s, q: s }))].slice(0, 6);
+    const box = log.querySelector('.ai-sugs'); box.innerHTML = list.map(s => '<button type="button" data-q="' + esc(s.q) + '">' + esc(s.t) + '</button>').join('');
+    box.querySelectorAll('button').forEach(b => b.onclick = () => ask(b.dataset.q));
   }
   const scroll = () => { log.scrollTop = log.scrollHeight; };
   function bubble(role, html) {

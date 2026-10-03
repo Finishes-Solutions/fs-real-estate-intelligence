@@ -982,6 +982,13 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 .fab-sugs button{pointer-events:auto;max-width:100%;text-align:left;border:1px solid var(--line-2);background:var(--panel);color:var(--brand);border-radius:16px;padding:6px 12px;font:600 12.5px/1.3 var(--font-display);cursor:pointer;box-shadow:0 2px 8px rgba(11,13,12,.12);transition:border-color 120ms,background 120ms}
 .fab-sugs button:hover{border-color:var(--brand);background:var(--panel-2)}
 .app.ai-open .fab-sugs,.stage:not([data-view="map"]) .fab-sugs{display:none}
+/* only while the pointer is on Ask AI (or keyboard focus is on it or a pill), so they never sit on top of the Layers panel.
+   Hiding waits a moment, so the pointer can travel from the button up to a pill. Touch screens get them inside the assistant instead. */
+.fab-sugs{opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity 140ms ease,transform 140ms ease,visibility 0s linear 350ms}
+.fab-sugs:hover,.fab-sugs:focus-within,.stage:has(.ai-fab:hover) .fab-sugs,.stage:has(.ai-fab:focus-visible) .fab-sugs{opacity:1;visibility:visible;transform:none;transition-delay:0s}
+@media (hover:none){ .fab-sugs{display:none} }
+/* the Layers panel stops above the Ask AI button instead of running under it (it scrolls inside) */
+@media (min-width:701px){ .app:not(.ai-open) .layers{max-height:calc(100% - 112px)} }
 @media (min-width:1101px){ .app:has(.card.open){--fabr:calc(min(380px,100% - 32px) + 32px)} }
 @media (max-width:1100px) and (min-width:701px){ .app:has(.card.open){--fabr:calc(min(400px,100% - 24px) + 24px)} }
 @media (max-width:700px){ .fab-sugs{display:none} }
