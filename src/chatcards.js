@@ -127,6 +127,30 @@ export function initChatCards(ctx) {
     return d;
   }
 
+  // live aircraft near a place: nearest first, with route; each row can be followed or orbited on the map
+  function airCard(r) {
+    const L = r.live || {}, ac = L.aircraft || [], h = r.history;
+    const alt = x => x.on_ground ? 'on the ground' : x.altitude_ft != null ? x.altitude_ft.toLocaleString('en-US') + ' ft' : '';
+    const route = x => x.origin && x.destination ? (x.origin.code || '?') + ' → ' + (x.destination.code || '?') : '';
+    const d = el(head('Air traffic', 'Planes near ' + r.place, L.error ? 'Live feed unavailable right now' : fmtN(L.count || 0) + ' within ' + r.radius_miles + ' mi · ' + fmtN(L.low_count || 0) + ' below 3,000 ft') +
+      (ac.length ? ac.slice(0, 8).map((x, i) => '<div class="cc-row cc-plane"><span><b>' + esc(x.callsign || x.registration || x.hex.toUpperCase()) + (route(x) ? ' <em class="cc-rt">' + esc(route(x)) + '</em>' : '') + '</b>' +
+        '<em>' + esc([x.type_name || x.type, alt(x), x.speed_kt != null ? x.speed_kt + ' kt' : ''].filter(Boolean).join(' · ')) + '</em></span><i>' + (+x.miles_away).toFixed(1) + ' mi</i>' +
+        '<span class="cc-pa"><button type="button" class="btn" data-f="' + i + '">Follow</button><button type="button" class="btn" data-o="' + i + '">Orbit</button></span></div>').join('')
+        : '<p class="cc-p">' + esc(L.error ? 'The aircraft feeds didn’t answer; try again in a few seconds.' : 'No aircraft broadcasting within ' + r.radius_miles + ' mi right now.') + '</p>') +
+      (h && h.low_sightings_per_day_within_1km != null ? '<p class="cc-p">Low-flight history: about ' + h.low_sightings_per_day_within_1km + ' sightings a day below 3,000 ft within ~1 km (' + h.sampled_days + ' days sampled).</p>' : '') +
+      src('Sources: live ADS-B from community receivers (' + (L.source || 'adsb.lol') + '); routes from the adsb.lol route database' + (h ? '; low-flight history sampled every minute' : '')));
+    const go = (i, orbit) => { const x = ac[i]; if (x) ctx.followPlane?.(x.hex, { orbit, near: r.center }); };
+    d.querySelectorAll('[data-f]').forEach(b => b.onclick = () => go(+b.dataset.f, false));
+    d.querySelectorAll('[data-o]').forEach(b => b.onclick = () => go(+b.dataset.o, true));
+    return d;
+  }
+  function followCard(r) {
+    const d = el(head('Aircraft', r.following + (r.type_name || r.type ? ' · ' + (r.type_name || r.type) : ''), r.route_known ? r.origin + ' → ' + r.destination : 'Route not in the database') +
+      tiles([{ v: r.altitude_ft != null ? r.altitude_ft.toLocaleString('en-US') + ' ft' : '–', label: 'Altitude' }, { v: r.speed_kt != null ? r.speed_kt + ' kt' : '–', label: 'Speed' }, { v: r.heading != null ? r.heading + '°' : '–', label: 'Heading' }], 'c3') +
+      '<p class="cc-p">' + (r.orbiting ? 'Orbiting' : 'Following') + ' on the map. Drag the map or close the plane card to stop.</p>' + src('Source: live ADS-B (community receivers); route from the adsb.lol route database'));
+    return d;
+  }
+
   const liveCard = (kicker, title, html, cls) => el(head(kicker, title) + '<div class="cc-live">' + html + '</div>', cls);
 
   ctx.chatCard = (name, a, r, list) => {
@@ -143,6 +167,8 @@ export function initChatCards(ctx) {
         case 'nearby_places': return nearbyCard(r);
         case 'location_info': return locationCard(r);
         case 'demographics': return demographicsCard(r);
+        case 'air_traffic': return airCard(r);
+        case 'follow_aircraft': return followCard(r);
         case 'distance_and_drive_time': { if (!ctx.live) return null; const d = liveCard('Drive time', (r.from || 'Start') + ' → ' + (r.to || 'destination'), ctx.live.driveHTML(r) + (r.road_miles != null && a.show_route !== false ? btns([['clr', 'Clear Route']]) : '') + src('Routing: ' + (r.routing_source || 'straight-line distance only')));
           on(d, 'clr', e => { ctx.live.clearRoute(); e.currentTarget.remove(); }); return d; }
         case 'weather_at': return ctx.live ? liveCard('Weather', r.place, ctx.live.weatherHTML(r)) : null;

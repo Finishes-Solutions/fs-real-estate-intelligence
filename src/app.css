@@ -1264,3 +1264,8 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .mk-box .mk-kg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .mk-box .mk-kg b{display:block;font-family:var(--font-mono);font-size:14px}
 .mk-box .mk-kg span{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+/* air traffic chat card */
+.cc-plane{grid-template-columns:minmax(0,1fr) auto;row-gap:6px;cursor:default}
+.cc-plane .cc-rt{display:inline;font-style:normal;font-family:var(--font-mono);font-size:11px;color:var(--brand);font-weight:600;margin-left:6px}
+.cc-plane .cc-pa{grid-column:1/-1;display:flex;gap:6px}
+.cc-plane .cc-pa .btn{font-size:11.5px;padding:4px 10px}

@@ -4,6 +4,8 @@
 //   Low Flight Paths:       30-day density of aircraft seen below 3,000 ft (api/planes-sample.js samples every minute).
 //   Air traffic (cards):    low-aircraft sightings a day over a property and the nearest airport.
 // Both toggles live in Layers → Live Conditions (registered with src/live.js) and in the assistant's set_live_layers.
+import { pickAircraft } from './lib/assist-logic.mjs';
+
 const REFRESH = 10e3, MINZ = 5, KT = 1.852 / 3600; // km per second per knot
 const BANDS = [[1, '#8d9598'], [3000, '#e3622b'], [10000, '#eda100'], [25000, '#3987e5'], [99999, '#1f9249']]; // ground, low, climbing, mid, cruise
 
@@ -119,7 +121,17 @@ export function initPlanes(ctx) {
 
   // ---------- plane card ----------
   const find = hex => list.find(p => p.hex === hex);
-  function followCam() { const f = fc().features.find(x => x.properties.hex === follow); if (f) map.easeTo({ center: f.geometry.coordinates, duration: 900, easing: t => t }); else follow = null; }
+  // follow: keep the plane centred; orbit: also circle the camera around it (tilted), turning ~6° a second
+  let orbiting = false;
+  // keep the followed plane above the open card on wide screens (the card sits over the lower middle of the map)
+  const camOffset = () => card.classList.contains('open') && innerWidth > 760 ? [0, -Math.min(140, card.offsetHeight / 3)] : [0, 0];
+  function followCam() {
+    const f = fc().features.find(x => x.properties.hex === follow); if (!f) { follow = null; orbiting = false; return; }
+    map.easeTo({ center: f.geometry.coordinates, offset: camOffset(), duration: 950, easing: t => t, ...(orbiting ? { bearing: map.getBearing() + 6, pitch: Math.max(map.getPitch(), 55) } : {}) });
+  }
+  // a hand on the map (drag, rotate, zoom gesture) ends follow / orbit, like the place orbit
+  ['dragstart', 'rotatestart', 'pitchstart'].forEach(ev => map.on(ev, e => { if (e.originalEvent && follow) { follow = null; orbiting = false; if (shown) renderCard(shown, true); } }));
+  ctx.onOrbitStop?.(() => { orbiting = false; });
   const routes = new Map();
   async function routeFor(p) {
     if (!p.flight) return null; if (routes.has(p.flight)) return routes.get(p.flight);
@@ -129,7 +141,7 @@ export function initPlanes(ctx) {
   const ap = a => a ? esc((a.code ? a.code + ' ' : '') + (a.city || a.name || '')) : '?';
   async function renderCard(hex, refresh) {
     const p = find(hex); if (!p) { if (!refresh) toast('That aircraft is no longer in view.'); return; }
-    if (!refresh) { const keep = follow === hex ? hex : null; ctx.closeCard?.(); follow = keep; if (routeOn?.hex !== hex) clearRoute(); }
+    if (!refresh) { const keep = follow === hex ? hex : null, orb = keep && orbiting; ctx.closeCard?.(); follow = keep; orbiting = !!orb; if (routeOn?.hex !== hex) clearRoute(); }
     shown = hex;
     const rows = [['Altitude', p.ground ? 'On the ground' : altLabel(p) + (p.vs ? (p.vs > 150 ? ' · climbing ' : p.vs < -150 ? ' · descending ' : ' · level ') + (Math.abs(p.vs) > 150 ? Math.abs(p.vs).toLocaleString('en-US') + ' ft/min' : '') : '')],
       ['Speed', p.gs != null ? p.gs + ' kt (' + Math.round(p.gs * 1.15078) + ' mph)' : '—'], ['Heading', p.track != null ? p.track + '°' : '—'],
@@ -137,19 +149,22 @@ export function initPlanes(ctx) {
     card.innerHTML = '<div class="top"><div><div class="kicker">Aircraft · live</div><h2>' + esc(p.flight || p.reg || p.hex.toUpperCase()) + '</h2><div class="bsub" id="plRoute">' + (p.flight ? 'Looking up the route…' : 'No callsign') + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
       '<dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
-      '<div class="bacts"><button class="btn' + (follow === hex ? ' on' : '') + '" id="plFollow">' + (follow === hex ? 'Following' : 'Follow') + '</button>' +
+      '<div class="bacts"><button class="btn' + (follow === hex && !orbiting ? ' on' : '') + '" id="plFollow">' + (follow === hex && !orbiting ? 'Following' : 'Follow') + '</button>' +
+      '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
       '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">Track on adsb.lol ↗</a>' +
       (p.flight ? '<a class="btn" target="_blank" rel="noopener" href="https://www.flightaware.com/live/flight/' + encodeURIComponent(p.flight) + '">FlightAware ↗</a>' : '') + '</div>' +
       '<div class="bsrc rnote">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown.</div>';
     card.querySelector('.x').onclick = () => ctx.closeCard();
-    card.querySelector('#plFollow').onclick = () => { follow = follow === hex ? null : hex; renderCard(hex, true); if (follow) followCam(); };
+    card.querySelector('#plFollow').onclick = () => { const was = follow === hex && !orbiting; follow = was ? null : hex; orbiting = false; renderCard(hex, true); if (follow) followCam(); };
+    card.querySelector('#plOrbit').onclick = () => { const was = follow === hex && orbiting; follow = was ? null : hex; orbiting = !was; renderCard(hex, true);
+      if (orbiting) map.easeTo({ zoom: Math.max(map.getZoom(), 11), pitch: 60, duration: ctx.reduceMotion ? 0 : 800 }); };
     if (!refresh || !card.classList.contains('open')) card.classList.add('open');
     const r = await routeFor(p), el = card.querySelector('#plRoute');
     if (el && shown === hex) el.textContent = r?.origin && r?.destination ? ap(r.origin).replace(/&amp;/g, '&') + ' → ' + ap(r.destination).replace(/&amp;/g, '&') : p.flight ? 'Route not in the database' : 'No callsign';
     // draw the route the first time the card opens for this plane (not on every 10-second refresh)
     if (shown === hex && !refresh && r) showRoute(hex, r);
   }
-  ctx.onCardClose?.(() => { shown = null; follow = null; clearRoute(); });
+  ctx.onCardClose?.(() => { shown = null; follow = null; orbiting = false; clearRoute(); });
   ctx.mapClickHandlers.unshift(e => {
     if (!map.getLayer('live-planes')) return false;
     const hit = map.queryRenderedFeatures([[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]], { layers: ['live-planes'] })[0]; if (!hit) return false;
@@ -207,13 +222,33 @@ export function initPlanes(ctx) {
   };
   ctx.planesNear = async (c, miles = 3) => {
     const dLat = miles / 69, dLon = miles / (69 * Math.cos(c[1] * Math.PI / 180));
-    const r = await fetch('api/planes?bbox=' + [c[0] - dLon, c[1] - dLat, c[0] + dLon, c[1] + dLat].map(v => v.toFixed(3)).join(',')), d = await r.json();
+    const u = 'api/planes?bbox=' + [c[0] - dLon, c[1] - dLat, c[0] + dLon, c[1] + dLat].map(v => v.toFixed(3)).join(',');
+    // the free feeds sometimes refuse for a moment: one retry after a short pause before giving up
+    let r = await fetch(u).catch(() => null), d = r ? await r.json().catch(() => ({})) : {};
+    if (!r || !r.ok) { await new Promise(res => setTimeout(res, 1500)); r = await fetch(u); d = await r.json().catch(() => ({})); }
     if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
     const R = Math.PI / 180, mi = p => 3958.8 * 2 * Math.asin(Math.sqrt(Math.sin((p.lat - c[1]) * R / 2) ** 2 + Math.cos(c[1] * R) * Math.cos(p.lat * R) * Math.sin((p.lon - c[0]) * R / 2) ** 2));
     const near = (d.aircraft || []).map(p => ({ ...p, miles: Math.round(mi(p) * 10) / 10 })).filter(p => p.miles <= miles).sort((a, b) => a.miles - b.miles);
     return { source: d.source, time: d.time, aircraft: near };
   };
   ctx.showPlane = hex => renderCard(hex);
+  ctx.planeRoute = p => routeFor(p);
+  // the assistant: find a plane by callsign, registration or hex (or the nearest airborne one), open its card and follow
+  // or orbit it. Looks up to 250 miles around `near` (default: the map centre), so it needn't be on screen.
+  ctx.followPlane = async (id, o = {}) => {
+    if (!ctx.live.state().planes) await ctx.live.set({ planes: true });
+    const q = String(id || '').trim(), c = o.near || [map.getCenter().lng, map.getCenter().lat];
+    let p = q ? pickAircraft(list, q) : null;
+    if (!p) { const d = await ctx.planesNear(c, q ? 250 : Math.max(5, o.miles || 25)); p = pickAircraft(d.aircraft, q);
+      if (p) { list = list.filter(x => x.hex !== p.hex).concat([p]); if (!at) at = Date.now(); } }
+    if (!p) return { error: q ? 'No aircraft “' + id + '” is broadcasting within 250 miles right now.' : 'No aircraft found near there right now.' };
+    follow = p.hex; orbiting = !!o.orbit;
+    map.easeTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), o.orbit ? 11 : 10), pitch: o.orbit ? 60 : map.getPitch(), duration: ctx.reduceMotion ? 0 : 1200 });
+    await renderCard(p.hex);
+    follow = p.hex; orbiting = !!o.orbit; // renderCard closes the previous card, which clears both
+    const r = await routeFor(p);
+    return { plane: p, route: r };
+  };
 
   // "Air Traffic" on filing and building cards: low aircraft over the spot (30-day history), only where it exists
   ctx.onCardRender?.(info => {

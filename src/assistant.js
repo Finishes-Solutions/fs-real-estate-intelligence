@@ -5,7 +5,7 @@ import { entityKey } from './lib/taxonomy.mjs';
 import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
-import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove, aircraftName } from './lib/assist-logic.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
@@ -208,7 +208,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', market_data: 'Reading the market numbers…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', market_data: 'Reading the market numbers…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -314,7 +314,7 @@ export function initAssistant(ctx) {
     const f = a.id && ctx.BY_ID.get(String(a.id).trim());
     if (f) return { c: [f.lon, f.lat], label: f.addr || f.name };
     if (isFinite(a.lat) && isFinite(a.lon) && a.lat && a.lon) return { c: [a.lon, a.lat], label: a.lat.toFixed(5) + ', ' + a.lon.toFixed(5) };
-    if (a.place) { const p = await resolvePlace(String(a.place)); if (p.error) return { error: p.error }; return { c: p.c, label: p.label }; }
+    if (a.place) { const p = await resolvePlace(String(a.place)); if (p.error) return { error: p.error }; return { c: p.c, label: p.label, kind: p.kind }; }
     if (ctx.state.sel) return { c: [ctx.state.sel.lon, ctx.state.sel.lat], label: ctx.state.sel.addr || ctx.state.sel.name };
     const b = ctx.currentBuilding?.(); if (b) return { c: b.center, label: b.title || 'this building' };
     const pl = ctx.currentPlace?.(); if (pl?.c) return { c: pl.c, label: pl.label };
@@ -491,14 +491,35 @@ export function initAssistant(ctx) {
         let p = await pointFor(a);
         if (p.error && !a.place && !a.id) { const c = ctx.map.getCenter(); p = { c: [c.lng, c.lat], label: ctx.viewPlace?.() || 'the map center' }; }
         if (p.error) return p;
-        const miles = Math.min(25, Math.max(0.5, a.radius_miles || 3));
+        // a whole town or area ("planes near Spring") looks wider than a single building or address
+        const miles = Math.min(25, Math.max(0.5, a.radius_miles || (p.kind && !/address|building|poi/.test(p.kind) ? 10 : 3)));
         const [live, hist] = await Promise.all([ctx.planesNear(p.c, miles).catch(e => ({ error: e.message })), a.history === false ? null : ctx.airHistory(p.c, 1)]);
         const ac = live.aircraft || [];
-        return { place: p.label, radius_miles: miles,
+        // where the nearest ones are coming from and going to (route database, cached an hour)
+        const routes = await Promise.all(ac.slice(0, 12).map((x, i) => i < 6 && x.flight && ctx.planeRoute ? ctx.planeRoute(x).catch(() => null) : null));
+        const apt = a => a ? { code: a.code, name: a.name || null, city: a.city || null } : null;
+        cardList = null;
+        return { place: p.label, center: p.c, radius_miles: miles,
           live: live.error ? { error: live.error } : { as_of: live.time, source: live.source, count: ac.length, low_count: ac.filter(x => !x.ground && x.alt != null && x.alt < 3000).length,
-            aircraft: ac.slice(0, 12).map(x => ({ callsign: x.flight, type: x.type, registration: x.reg, altitude_ft: x.ground ? 0 : x.alt, on_ground: x.ground, speed_kt: x.gs, heading: x.track, miles_away: x.miles })) },
+            aircraft: ac.slice(0, 12).map((x, i) => ({ callsign: x.flight, hex: x.hex, type: x.type, type_name: aircraftName(x.desc), registration: x.reg, altitude_ft: x.ground ? 0 : x.alt, on_ground: x.ground,
+              climb_ft_min: x.vs, speed_kt: x.gs, heading: x.track, miles_away: x.miles, lat: x.lat, lon: x.lon,
+              ...(routes[i] ? { origin: apt(routes[i].origin), destination: apt(routes[i].destination) } : {}) })),
+            note: 'To follow or orbit one of these planes on the map, call follow_aircraft with its callsign or hex.' },
           history: !hist ? undefined : hist.history ? { window_days: hist.days, sampled_days: hist.sampled_days, low_sightings_per_day_within_1km: hist.low_per_day, lowest_ft: hist.lowest_ft,
             note: 'Aircraft below 3,000 ft seen in one-minute snapshots within ~1 km; an exposure index (more = more low traffic), not a count of flights.' } : { available: false, note: hist.note } };
+      }
+      if (name === 'follow_aircraft') {
+        if (!ctx.followPlane) return { error: 'Live planes aren’t available in this version.' };
+        let near = null; if (a.place) { const p = await resolvePlace(String(a.place)); if (p.error) return p; near = p.c; }
+        if (ctx.view !== 'map') ctx.setView('map');
+        const out = await ctx.followPlane(a.callsign || a.hex || '', { orbit: !!a.orbit, near });
+        if (out.error) return out;
+        const x = out.plane, r = out.route, apt = v => v ? [v.code, v.city || v.name].filter(Boolean).join(' ') : null;
+        actionChip((a.orbit ? 'Orbiting ' : 'Following ') + (x.flight || x.reg || x.hex.toUpperCase()), () => ctx.closeCard());
+        turnSubject = x.flight || x.reg || null;
+        return { following: x.flight || x.reg || x.hex, orbiting: !!a.orbit, hex: x.hex, type: x.type, type_name: aircraftName(x.desc), registration: x.reg, altitude_ft: x.ground ? 0 : x.alt,
+          speed_kt: x.gs, heading: x.track, lat: x.lat, lon: x.lon, origin: apt(r?.origin), destination: apt(r?.destination), route_known: !!(r?.origin && r?.destination),
+          note: 'The plane card is open on the map with its route line; the camera ' + (a.orbit ? 'circles' : 'follows') + ' it until the user drags the map or closes the card.' };
       }
       if (name === 'market_data') {
         const d = await ctx.marketData?.(a.county || ''); if (!d) return { error: 'The Market view isn’t loaded in this version.' }; if (d.error) return d;

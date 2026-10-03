@@ -1,6 +1,6 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks, placeCandidates, kindOf } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks, placeCandidates, kindOf, pickAircraft, aircraftName } from '../lib/assist-logic.mjs';
 import { pruneReports, fmtBytes } from '../lib/reports.mjs';
 import { tractsFor, summarizeTracts, inGeom } from '../lib/demographics.mjs';
 import { nameQuery } from '../api/tenants.js';
@@ -158,6 +158,13 @@ console.log('assistant ok');
   for (const t of ['Take me to the JP Morgan Chase Tower and tell me about it.', 'Show multifamily in Katy', 'Compare Katy, Cypress, Waller.', 'Katy and Cypress, which has more?']) assert.ok(!isPromptEcho(t, v), t);
   assert.ok(!isPromptEcho('Cypress, Katy, Fulshear', ''), 'no hint list, no echo'); }
 console.log('assistant echo ok');
+
+// follow_aircraft: by callsign (any spacing / case), hex or registration; with no id the nearest airborne plane
+{ const ac = [{ hex: 'a0b1c2', flight: 'N123AB', reg: 'N123AB', ground: true }, { hex: 'abc123', flight: 'DAL1601', reg: 'N812DN' }, { hex: 'a77777', flight: 'UAL1234', reg: 'N-777UA' }];
+  assert.equal(pickAircraft(ac, 'dal 1601').hex, 'abc123'); assert.equal(pickAircraft(ac, 'ABC123').flight, 'DAL1601');
+  assert.equal(pickAircraft(ac, 'n777ua').hex, 'a77777'); assert.equal(pickAircraft(ac, '').hex, 'abc123', 'skips the plane on the ground');
+  assert.equal(pickAircraft(ac, 'SWA9'), null); assert.equal(pickAircraft([ac[0]], '').hex, 'a0b1c2'); assert.equal(pickAircraft([], ''), null);
+  assert.deepEqual(['BOEING 737-800', 'AIRBUS A-321neo', 'DE HAVILLAND CANADA DHC-8-400', ''].map(aircraftName), ['Boeing 737-800', 'Airbus A-321neo', 'De Havilland Canada DHC-8-400', null]); }
 
 // ---- rulebook and camera ----
 { const { TOOLS, systemPrompt, VOICE_STYLE } = await import('../lib/agent-tools.mjs'), { RULEBOOK, SECTIONS } = await import('../lib/rulebook.mjs'), { cameraMove } = await import('../lib/assist-logic.mjs');
