@@ -71,8 +71,10 @@ await step('tracts', async () => {
 
 await step('crime', async () => {
   // first run: 25 months; after that only the months HPD may still be revising (it republishes the yearly files monthly)
-  const latest = await db.rpc('crime_latest', {}), now = new Date();
-  const since = latest ? addDays(String(latest).slice(0, 10), -75) : addDays(today, -760);
+  // the window is anchored on HPD's latest incident (its file runs ~3 months behind), so "the 12 months before" is always complete
+  const latest = await db.rpc('crime_latest', {}), now = new Date(), first = latest ? (await db.select('crime_incidents', 'select=day&order=day.asc&limit=1'))[0]?.day : null;
+  const want = latest ? addDays(String(latest).slice(0, 10), -740) : null;
+  const since = !latest ? addDays(today, -900) : first && String(first) > want ? want : addDays(String(latest).slice(0, 10), -75);
   let rows = 0; const errors = [];
   for (let y = +since.slice(0, 4); y <= now.getUTCFullYear(); y++) {
     const r = await fetch(HPD_CSV(y), { headers: { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence)' }, signal: AbortSignal.timeout(180000) });

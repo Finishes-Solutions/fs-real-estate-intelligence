@@ -10,7 +10,7 @@ globalThis.fetch = async (url, opts) => {
   }
   if (u.host === 'cmr.earthdata.nasa.gov') return json({ items: [{ umm: { TemporalExtent: { RangeDateTime: { BeginningDateTime: (u.searchParams.get('collection_concept_id').includes('957295') ? '2026-09-28' : '2026-09-21') + 'T17:00:00Z' } }, AdditionalAttributes: [{ Name: 'CLOUD_COVERAGE', Values: ['12'] }] } }] });
   if (u.host === 'api.open-meteo.com') {
-    const n = u.searchParams.get('latitude').split(',').length, one = { daily: { time: ['2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03'], weather_code: [0, 2, 61, 95], temperature_2m_max: [90, 91, 85, 83], temperature_2m_min: [70, 71, 70, 69],
+    const n = u.searchParams.get('latitude').split(',').length, one = { daily: { time: [-2, -1, 0, 1].map(k => new Date(Date.now() + k * 864e5).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })), // two days back, today, tomorrow weather_code: [0, 2, 61, 95], temperature_2m_max: [90, 91, 85, 83], temperature_2m_min: [70, 71, 70, 69],
       precipitation_sum: [0, 0, .4, 1.2], precipitation_probability_max: [0, 10, 70, 90], wind_speed_10m_max: [10, 12, 15, 22], wind_gusts_10m_max: [18, 20, 28, 40] } };
     return json(n > 1 ? Array.from({ length: n }, () => one) : one);
   }
