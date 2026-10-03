@@ -71,7 +71,7 @@
       "maxDuration": 90
     },
     "api/traffic.js": {
-      "maxDuration": 20
+      "maxDuration": 30
     }
   },
   "crons": [

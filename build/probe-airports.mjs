@@ -41,3 +41,16 @@ await hit('FAA ATADS (OPSNET) page', 'https://aspm.faa.gov/opsnet/sys/airport.as
 await hit('FAA NASR subscription page', 'https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/', {}, 0);
 await hit('FAA CY enplanements page', 'https://www.faa.gov/airports/planning_capacity/passenger_allcargo_stats/passenger', {}, 0);
 await hit('OpenSky arrivals (anon)', 'https://opensky-network.org/api/flights/arrival?airport=KIAH&begin=' + (Math.floor(Date.now() / 1000) - 86400 * 2) + '&end=' + (Math.floor(Date.now() / 1000) - 86400), {}, 300);
+// round 2: current d-TPP cycle + metafile, NASR CSV, Wikipedia "Airlines and destinations"
+const page = await hit('FAA d-TPP page (cycle links)', 'https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/', {}, 0);
+const cyc = [...new Set((page?.txt.match(/d-tpp\/(\d{4})\//g) || []).concat(page?.txt.match(/cycle=(\d{4})/g) || []))]; console.log('cycle refs', cyc.slice(0, 10), (page?.txt.match(/[^"']*[Mm]etafile[^"']*/g) || []).slice(0, 5));
+for (const c of ['2610', '2609']) { const m = await hit('d-TPP metafile ' + c, 'https://aeronav.faa.gov/d-tpp/' + c + '/xml_data/d-tpp_Metafile.xml', {}, 300); if (m?.r.ok) { const i = m.txt.indexOf('apt_ident="IAH"'); console.log(m.txt.slice(i, i + 1500)); break; } }
+const nasr = await hit('NASR page', 'https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/', {}, 0);
+console.log('NASR links', (nasr?.txt.match(/href="[^"]*NASR_Subscription\/\d{4}-\d{2}-\d{2}[^"]*"/g) || []).slice(0, 4));
+const sub = (nasr?.txt.match(/NASR_Subscription\/(\d{4}-\d{2}-\d{2})/) || [])[1];
+if (sub) { const sp = await hit('NASR cycle page ' + sub, 'https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/' + sub, {}, 0); console.log('zips', (sp?.txt.match(/https?:[^"]*\.zip/g) || []).slice(0, 12)); }
+const secs = await hit('Wikipedia sections KIAH', 'https://en.wikipedia.org/w/api.php?action=parse&page=George_Bush_Intercontinental_Airport&prop=sections&format=json', {}, 0);
+const list = JSON.parse(secs?.txt || '{}').parse?.sections || []; console.log(list.map(s => s.index + ':' + s.line).join(' | '));
+const pax = list.find(s => /^Passenger/i.test(s.line)) || list.find(s => /Airlines and destinations/i.test(s.line));
+if (pax) { const w = await hit('Wikipedia passenger section', 'https://en.wikipedia.org/w/api.php?action=parse&page=George_Bush_Intercontinental_Airport&prop=wikitext&section=' + pax.index + '&format=json', {}, 0); console.log(JSON.parse(w.txt).parse.wikitext['*'].slice(0, 2500)); }
+const st = list.find(s => /Statistics/i.test(s.line)); if (st) { const w = await hit('Wikipedia statistics section', 'https://en.wikipedia.org/w/api.php?action=parse&page=George_Bush_Intercontinental_Airport&prop=wikitext&section=' + st.index + '&format=json', {}, 0); console.log(JSON.parse(w.txt).parse.wikitext['*'].slice(0, 2500)); }

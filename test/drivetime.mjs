@@ -62,3 +62,29 @@ assert.equal(departAt('weekday-am', new Date('2026-12-04T15:00:00Z')), '2026-12-
   assert.equal(r.code, 200, JSON.stringify(r.body)); assert.equal(r.body.type, 'FeatureCollection'); assert.match(r.headers['Cache-Control'], /s-maxage=604800/, 'typical times cached');
   r = mock(); await handler(req({ lat: '29.76', lon: '-95.37', minutes: '10' }), r); assert.match(r.headers['Cache-Control'], /private/, 'now is not shared'); }
 console.log('drivetime ok');
+
+// traffic report (api/traffic.js): TxDOT counts in a polygon, TomTom live speeds and incidents
+{ const { trafficReport, countsIn } = await import('../api/traffic.js');
+  const sq = { type: 'Polygon', coordinates: [[[-95.5, 29.7], [-95.4, 29.7], [-95.4, 29.8], [-95.5, 29.8], [-95.5, 29.7]]] };
+  const f = async (url, o = {}) => {
+    const u = new URL(String(url));
+    if (u.host === 'services.arcgis.com') { const p = new URLSearchParams(o.body); assert.equal(p.get('geometryType'), 'esriGeometryPolygon');
+      if (p.get('outStatistics')) return json({ features: [{ attributes: { RTE_PRFX: 'IH', avg: 180000, n: 4, mx: 250000 } }, { attributes: { RTE_PRFX: 'CS', avg: 9000, n: 30, mx: 30000 } }] });
+      return json({ features: [
+        { attributes: { RTE_PRFX: 'IH', RTE_NBR: '0010', RTE_NM: 'IH0010', AADT_CUR: 250000, SYSTEM: 'On', EXT_DATE: 1700000000000 }, geometry: { paths: [[[-95.48, 29.75], [-95.45, 29.75], [-95.42, 29.75]]] } },
+        { attributes: { RTE_PRFX: 'IH', RTE_NBR: '0010', RTE_NM: 'IH0010', AADT_CUR: 200000, SYSTEM: 'On' }, geometry: { paths: [[[-95.42, 29.75], [-95.41, 29.75]]] } },
+        { attributes: { RTE_PRFX: 'CS', RTE_NM: 'WESTHEIMER RD-KG', AADT_CUR: 30000, SYSTEM: 'Off' }, geometry: { paths: [[[-95.46, 29.74], [-95.44, 29.74]]] } }] }); }
+    if (u.pathname.includes('flowSegmentData')) return json({ flowSegmentData: { currentSpeed: 30, freeFlowSpeed: 60, currentTravelTime: 120, freeFlowTravelTime: 60, confidence: 1 } });
+    if (u.pathname.includes('incidentDetails')) { assert.ok(u.searchParams.get('bbox')); return json({ incidents: [{ geometry: { type: 'LineString', coordinates: [[-95.45, 29.75], [-95.44, 29.75]] }, properties: { iconCategory: 1, magnitudeOfDelay: 3, events: [{ description: 'Stationary traffic' }], from: 'Bunker Hill', to: 'Gessner', roadNumbers: ['I-10'], delay: 600 } }] }); }
+    throw new Error('unexpected ' + u);
+  };
+  const c = await countsIn(sq, f);
+  assert.deepEqual(c.roads.map(r => [r.road, r.aadt, r.segments, r.avg]), [['I-10', 250000, 2, 225000], ['WESTHEIMER RD', 30000, 1, 30000]], 'busiest per road, with averages');
+  assert.equal(c.segments.length, 3); assert.equal(c.types[0].label, 'Interstates');
+  const d = await trafficReport(sq, { key: 'k', fetchImpl: f, label: 'x' });
+  assert.equal(d.live[0].congestion_pct, 50); assert.equal(d.live[0].road, 'I-10');
+  assert.equal(d.incidents[0].kind, 'Crash'); assert.equal(d.incidents[0].delay_min, 10); assert.equal(d.incidents[0].lon, -95.45);
+  const n = await trafficReport(sq, { key: '', fetchImpl: f }); assert.match(n.live.error, /TomTom/); assert.equal(n.counts.roads.length, 2, 'counts work without TomTom');
+  const big = { type: 'Polygon', coordinates: [[[-96, 29], [-95, 29], [-95, 30], [-96, 30], [-96, 29]]] };
+  await assert.rejects(trafficReport(big, { key: '', fetchImpl: f }), /too large/); }
+console.log('traffic report ok');
