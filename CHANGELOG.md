@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 1:01 AM CT: App wouldn't load: fixed (0b50595)
+- The app got stuck on a blank map with nothing clickable. A typo (an apostrophe inside a quoted sentence in the plane card's source note, added at 12:36 AM) stopped all the app's code from loading. Fixed, and the tests now check every file the browser loads, so a mistake like this can't be pushed again.
+
 ### 12:57 AM CT: Crime layer shows all of Houston; full incident lists in exports (28d5ac0)
 - The Crime map layer was only drawing about 1,000 of its ~7,500 squares, and exports stopped at 1,000 incidents, because the database hands back at most 1,000 rows at a time. Both now come back whole: the layer covers the whole city and the report and CSV include up to the newest 2,000 incidents as intended.
 
