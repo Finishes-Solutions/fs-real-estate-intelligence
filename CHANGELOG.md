@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 1:22 AM CT: The same section-card style across the app (12b80c8)
+- **Tabs:** Reports, Updates, Field Notes, Market, Activity, Compare and Sources now sit on a light grey background. Each group sits in a white card with an icon and a title, like the new property card.
+- **Left panel:** Area at a Glance and Construction Filings are now titled section cards too.
+- The map buttons and legends now leave room for the wider property card (420 px instead of 380), so nothing overlaps.
+
 ### 1:14 AM CT: New card design: titled section cards (option B) (1d1a25e)
 - **Building, parcel, filing and plane cards now use the "report with section cards" layout** you picked from the mockups:
   - a row of section chips under the title that jumps to each section;
