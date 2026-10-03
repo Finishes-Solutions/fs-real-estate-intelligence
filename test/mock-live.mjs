@@ -20,5 +20,17 @@ globalThis.fetch = async (url, opts) => {
       'A' + y + ',' + d + ',10,13A,Aggravated assault,1,Beat 1A10,Street,1,MAIN,ST,,HOUSTON,77002,-95.3698,29.7604\nB' + y + ',' + d + ',11,23F,Theft from motor vehicle,2,Beat 1A10,Parking lot,2,MAIN,ST,,HOUSTON,77002,-95.37,29.761\nC' + y + ',' + d + ',11,290,Vandalism,1,Beat 1A10,Street,,,,,HOUSTON,77002,0,0\n', { headers: { 'Content-Type': 'text/csv' } });
   }
   if (u.host === 'www.nhc.noaa.gov') return json({ activeStorms: [{ id: 'al142026', name: 'Kirk', classification: 'HU', intensity: '100', pressure: '965', latitudeNumeric: 25.1, longitudeNumeric: -90.2, movementDir: 315, movementSpeed: 10, lastUpdate: '2026-10-02T15:00:00.000Z' }] });
+  // OurAirports and the FAA d-TPP metafile (airports step)
+  if (u.host === 'davidmegginson.github.io') {
+    const csv = t => new Response(t, { headers: { 'Content-Type': 'text/csv' } });
+    if (u.pathname.endsWith('/airports.csv')) return csv('"id","ident","type","name","latitude_deg","longitude_deg","elevation_ft","continent","iso_country","iso_region","municipality","scheduled_service","icao_code","iata_code","gps_code","local_code","home_link","wikipedia_link","keywords"\n' +
+      '3604,"KIAH","large_airport","George Bush Intercontinental Houston Airport",29.984399795532227,-95.34140014648438,97,"NA","US","US-TX","Houston","yes","KIAH","IAH","KIAH","IAH",,"https://en.wikipedia.org/wiki/George_Bush_Intercontinental_Airport","IAH, ""Bush"", Intercontinental"\n' +
+      '3605,"KHOU","medium_airport","William P Hobby Airport",29.645399,-95.2789,46,"NA","US","US-TX","Houston","yes","KHOU","HOU","KHOU","HOU",,,\n' +
+      (process.env.MOCK_AIRPORT_GONE ? '' : '9,"XX99","heliport","Gone Soon Heliport",29.7,-95.4,50,"NA","US","US-TX","Houston","no",,,,"XX99",,,\n'));
+    if (u.pathname.endsWith('/runways.csv')) return csv('"id","airport_ref","airport_ident","length_ft","width_ft","surface","lighted","closed","le_ident","le_latitude_deg","le_longitude_deg","le_elevation_ft","le_heading_degT","le_displaced_threshold_ft","he_ident","he_latitude_deg","he_longitude_deg","he_elevation_ft","he_heading_degT","he_displaced_threshold_ft"\n' +
+      '241822,3604,"KIAH",9000,150,"CON",1,0,"08L",30.0072,-95.3588,92,89.9,,"26R",30.0072,-95.3304,95,269.9,\n');
+    if (u.pathname.endsWith('/airport-frequencies.csv')) return csv('"id","airport_ref","airport_ident","type","description","frequency_mhz"\n1,3604,"KIAH","TWR","TOWER",118.1\n');
+  }
+  if (u.host === 'aeronav.faa.gov' && u.pathname.endsWith('d-tpp_Metafile.xml')) return new Response('<digital_tpp cycle="x"><airport_name ID="HOUSTON INTCNTL" apt_ident="IAH" icao_ident="KIAH"><record><chart_code>MIN</chart_code><pdf_name>A.PDF</pdf_name></record><record><chart_code>APD</chart_code><pdf_name>00189AD.PDF</pdf_name></record></airport_name></digital_tpp>', { headers: { 'Content-Type': 'text/xml' } });
   return inner(url, opts);
 };

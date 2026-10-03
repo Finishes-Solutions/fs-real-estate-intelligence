@@ -209,7 +209,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_path: 'Tracing the flight…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', drive_time_map: 'Mapping drive times…', traffic_report: 'Reading traffic counts…', fema_report: 'Checking FEMA flood and hazard data…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_path: 'Tracing the flight…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', drive_time_map: 'Mapping drive times…', traffic_report: 'Reading traffic counts…', airport_info: 'Looking up the airport…', fema_report: 'Checking FEMA flood and hazard data…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -640,6 +640,28 @@ export function initAssistant(ctx) {
         return { area: label, area_sq_mi: d.area_sqmi, counts_error: c.error, counts_as_of: c.as_of, busiest_roads: (c.roads || []).slice(0, 12).map(r => ({ road: r.road, vehicles_per_day: r.aadt, type: r.type, avg_over_segments: r.avg, segments: r.segments })),
           by_road_type: c.types, live_now: Array.isArray(d.live) ? d.live.map(x => ({ road: x.road, mph_now: x.current_mph, free_flow_mph: x.free_flow_mph, slower_pct: x.congestion_pct, closed: x.closed })) : d.live,
           incidents_now: Array.isArray(d.incidents) ? d.incidents.slice(0, 15) : d.incidents, note: 'Counts are TxDOT annual average daily traffic, both directions (current year only, no history). Live speeds and incidents are right now (TomTom).' };
+      }
+      if (name === 'airport_info') {
+        if (!ctx.airportData) return { error: 'Airport data isn’t available in this version.' };
+        let id = String(a.code || '').trim().toUpperCase(), nearby = null, path = null;
+        if (!id) {
+          // a place: the nearest airports (an airport's own name resolves to the airport itself)
+          const p = await pointFor({ place: a.place }); if (p.error) return p;
+          const r = await fetch('api/airports?near=' + p.c[1].toFixed(4) + ',' + p.c[0].toFixed(4) + '&km=80&n=6&path=1'), d = await r.json().catch(() => ({})); if (!r.ok) return { error: d.error || 'Airport lookup failed.' };
+          nearby = (d.airports || []).map(x => ({ ident: x.ident, name: x.name, code: x.iata || x.icao || x.ident, type: x.type, miles: +(x.km * 0.621371).toFixed(1) })); path = d.path;
+          const named = /airport|field|hobby|intercontinental|heliport|airpark/i.test(a.place || '') ? nearby[0] : nearby.find(x => x.type !== 'small_airport') || nearby[0];
+          if (!named) return { error: 'No airports within 50 miles of ' + p.label + '.' }; id = named.ident;
+        }
+        const d = a.show_card === false ? await ctx.airportData(id) : await ctx.airportCard(id, { fly: true }); if (!d || d.error) return { error: d?.error || 'No airport matches ' + id + '.' };
+        const ap = d.airport, ops = (d.ops || []).filter(o => o.source === 'adsb').slice(-30), w = d.wiki || {};
+        if (a.show_card !== false) actionChip('Airport: ' + ap.name); turnSubject = ap.name;
+        return { airport: { ident: ap.ident, name: ap.name, iata: ap.iata, icao: ap.icao, type: ap.type, city: ap.municipality, region: ap.iso_region, elevation_ft: ap.elevation_ft, scheduled_service: ap.scheduled },
+          runways: (d.runways || []).filter(r => !r.closed).map(r => ({ runway: (r.le_ident || '') + '/' + (r.he_ident || ''), length_ft: r.length_ft, width_ft: r.width_ft, surface: r.surface, lighted: r.lighted })),
+          weather_now: d.metar ? { category: d.metar.category, temp_f: d.metar.temp_f, wind_kt: d.metar.wind_kt, raw: d.metar.raw } : null,
+          airlines: (w.airlines || []).slice(0, 30), cargo_airlines: (w.cargo || []).map(x => x.airline), statistics: (w.tables || []).slice(0, 3).map(t => ({ title: t.caption, headers: t.headers, rows: t.rows.slice(0, 10) })),
+          takeoffs_landings_per_day: ops.length ? { days: ops.length, average: Math.round(ops.reduce((s, o) => s + o.departures + o.arrivals, 0) / ops.length), by_day: ops.map(o => ({ day: o.day, takeoffs: o.departures, landings: o.arrivals })), note: 'Counted from ADS-B within ~100 nm of Houston; undercounts small aircraft. Official FAA counts are higher.' } : 'No daily counts for this airport (we count only around Houston).',
+          faa_diagram: d.extras?.diagram_url || null, wikipedia: w.url, summary: w.summary, nearest_airports: nearby || undefined, approach_path: path || undefined,
+          shown: a.show_card === false ? undefined : 'The airport card is open (photo, runways, weather, airlines, statistics; Show Airport Map draws the layout; Export Report / CSV).' };
       }
       if (name === 'crime_stats') {
         if (!ctx.crimeReportData) return { error: 'Crime data isn’t available in this version.' };

@@ -37,6 +37,7 @@ globalThis.fetch = async (url, opts = {}) => {
   if (path === 'rpc/crime_latest') return json((db.crime_incidents || []).reduce((m, r) => !m || r.day > m ? r.day : m, null));
   if (path === 'rpc/crime_prune') return json(0);
   if (path === 'rpc/aircraft_registry_remove') { const ids = JSON.parse(opts.body).p_ids, t = db.aircraft_registry || [], before = t.length; db.aircraft_registry = t.filter(r => !ids.includes(r.n_number)); save(); return json(before - db.aircraft_registry.length); }
+  if (path === 'rpc/airports_remove') { const { p_table, p_ids } = JSON.parse(opts.body), k = p_table === 'airports' ? 'ident' : 'id', t = db[p_table] || [], before = t.length; db[p_table] = t.filter(r => !p_ids.includes(String(r[k]))); save(); return json(before - db[p_table].length); }
   if (path === 'rpc/cache_get') { const { tbl, keys } = JSON.parse(opts.body), t = db[tbl] || []; const out = {}; for (const r of t) if (keys.includes(r.k)) out[r.k] = r.data; return json(out); }
   const t = db[path] = db[path] || [];
   if (method === 'GET') {
