@@ -122,6 +122,8 @@ The **Ask AI** button (or ⌘/ on a Mac, Ctrl+/ elsewhere) opens a chat that wor
 
 ## Live layers, drive time and field tools
 
+Area reports share `src/reportkit.js`: the printable HTML shell, an SVG area map, tables and bars, saving into the Reports tab, and `ctx.addAreaReport({ key, label, desc, run })`, which puts a report on the Site section (circle around a building), the Reports tab (selected area, map view or a drawn area) and the selection bar.
+
 Layers panel → **Live conditions**, the **From here** buttons on every filing and building card, and the assistant (text or voice) all use the same free sources:
 
 | Feature | Source | Key needed |
@@ -131,12 +133,14 @@ Layers panel → **Live conditions**, the **From here** buttons on every filing 
 | Wind arrows, weather at a spot | Open-Meteo, through `api/weather` | none (optional `OPEN_METEO_API_KEY`) |
 | Live traffic layer, drive time **with traffic** | TomTom, through `api/tile` / `api/drive` | `TOMTOM_API_KEY` (free tier) |
 | Drive time without a TomTom key | OSRM on the FOSSGIS servers (OpenStreetMap roads), through `api/drive` | none |
+| Drive-time maps (10/20/30-minute bands, now or rush hour / weekend), assistant `drive_time_map`; the card counts people, households and jobs (Census tracts) and filings in each band, exports HTML and CSV, and any band can become the selection | TomTom Calculate Reachable Range through `api/isochrone` (one call per band; typical-time results cached 7 days at the CDN, coordinates rounded to ~100 m); Valhalla on the FOSSGIS servers without a key or if TomTom fails (no traffic) | `TOMTOM_API_KEY` (same free tier as drive time, ~2,500 calls a day); none for the fallback |
 | 3D terrain | Mapterhorn (browser direct) | none |
 | NASA recent imagery, site imagery thumbnails | NASA GIBS + CMR + Worldview Snapshots (HLS Landsat / Sentinel-2, 30 m), browser direct | none |
 | Live Planes (aircraft anywhere: callsign, type, altitude, speed, route), plane card, assistant `air_traffic` | adsb.lol (open data, ODbL), airplanes.live as a fallback, through `api/planes` | none |
 | Plane owner ("Registration" on the plane card), assistant `aircraft_registration` | FAA Releasable Aircraft Database (`MASTER`, `ACFTREF`, `ENGINE` from registry.faa.gov/database/ReleasableAircraft.zip), loaded nightly into Supabase `aircraft_registry` by live-sync step `aircraft` (only changed rows are written), read through `api/planes?reg=` | `SUPABASE_SECRET_KEY`; migration `20261011000000_aircraft_registry.sql`. To load by hand: `FAA_DIR=<folder with the unzipped .txt files> ONLY=aircraft node build/live-sync.mjs` |
 | Plane card photo, details and flight path (2D line; 3D ribbon and curtain when tilted), assistant `flight_path` | adsb.lol traces (`globe.adsb.lol/data/traces/…/trace_full_*.json`, `trace_recent`), planespotters.net photos, adsbdb aircraft, adsb.lol airports, through `api/planes?track=` / `?aircraft=` / `?airport=` (`lib/adsblol.mjs`) | none (planespotters needs the contact URL in the User-Agent, set in code) |
 | Market view: Houston crime trend, busiest roads; Market report export | `api/crime?city=1` (four boxes summed, each under the 1,500 sq mi report limit) and `api/traffic?bbox=` (TxDOT AADT: busiest named routes and average daily traffic by road type; current year only) | Supabase for crime; none for traffic |
+| Traffic Counts map layer, Traffic Report (area: busiest roads, every counted segment, by road type, live speeds, incidents; HTML/CSV export), assistant `traffic_report` | TxDOT AADT FeatureServer through `api/traffic?lines=` (layer) and `POST api/traffic` (report; one count per road segment, roadbeds de-duplicated; current year only, TxDOT keeps no history in this layer); TomTom Traffic Flow Segment (8 busiest roads) and Incident Details (live, never stored) | none for counts; `TOMTOM_API_KEY` for live speeds and incidents |
 | Low Flight Paths layer, "Air Traffic" on property cards | `api/planes-sample` (Vercel Cron, every minute) counts aircraft below 3,000 ft in ~1 km cells into Supabase (`air_cells`, `air_days`; migration `20261008000000_air_traffic.sql`) | `SUPABASE_SECRET_KEY`; set `CRON_SECRET` to lock the cron endpoint |
 | High-res site imagery (dated, sub-metre) | Esri World Imagery Wayback (archived versions, only those where the spot changed) and USDA NAIP (~0.6 m, Texas about every 2 years) from Microsoft Planetary Computer, through `api/imagery` | none |
 | Project news | Google News search (GDELT Project DOC 2.0 as fallback), through `api/news` | none |

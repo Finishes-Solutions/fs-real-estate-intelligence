@@ -209,7 +209,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_path: 'Tracing the flight…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', fema_report: 'Checking FEMA flood and hazard data…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_path: 'Tracing the flight…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', drive_time_map: 'Mapping drive times…', traffic_report: 'Reading traffic counts…', fema_report: 'Checking FEMA flood and hazard data…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -609,6 +609,37 @@ export function initAssistant(ctx) {
           disasters: d.disasters?.error ? d.disasters : { since: 2000, count: d.disasters?.count, major: d.disasters?.major, by_type: d.disasters?.by_type, recent: (d.disasters?.list || []).slice(0, 10) },
           national_risk_index: d.risk_index && !d.risk_index.error ? { rating: d.risk_index.risk_rating, score: d.risk_index.risk_score, expected_annual_loss: d.risk_index.expected_annual_loss, top_hazards: d.risk_index.hazards, social_vulnerability: d.risk_index.social_vulnerability.rating, community_resilience: d.risk_index.community_resilience.rating, tracts: d.risk_index.tracts } : d.risk_index,
           note: 'Flood zone shares are FEMA regulatory zones measured across the area. NFIP claims are insured losses in the census tracts touching the area (addresses are redacted by FEMA), a neighborhood measure. Risk index scores are percentiles among US census tracts.' };
+      }
+      if (name === 'drive_time_map') {
+        if (!ctx.driveTime) return { error: 'Drive-time maps aren’t available in this version.' };
+        let center, label;
+        if (a.use_selection && ctx.sel?.feature) { const g = ctx.sel.feature.geometry || ctx.sel.feature, r = (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates[0][0]); center = [r.reduce((s, p) => s + p[0], 0) / r.length, r.reduce((s, p) => s + p[1], 0) / r.length]; label = ctx.sel.label || 'the selected area'; }
+        else { const p = await pointFor(a); if (p.error) return p; center = p.c; label = p.label; }
+        const minutes = (Array.isArray(a.minutes) && a.minutes.length ? a.minutes : [10, 20, 30]).map(Number).filter(m => m >= 1 && m <= 60).slice(0, 4).sort((x, y) => x - y);
+        const r = await ctx.driveTime({ center, label, minutes: minutes.length ? minutes : [10, 20, 30], depart: a.depart || 'now' });
+        if (r?.error) return { error: r.error }; if (!r?.bands) return { error: 'The drive-time map was replaced by a newer request.' };
+        actionChip('Drive-time map: ' + label); turnSubject = label;
+        return { from: label, leaving: a.depart || 'now', routing: r.d.source, traffic: r.d.traffic, note: r.d.note,
+          bands: r.bands.map(b => ({ minutes: b.minutes, area_sq_mi: b.sqmi, people: b.people, households: b.households, jobs: b.jobs, median_household_income_approx: b.income, filings_on_map: b.filings })),
+          shown: 'The bands are drawn on the map and the drive-time card is open (the user can switch rush hour / weekend, select a band as the area, and export a report or CSV). Census figures count tracts whose center is inside a band; each band includes the smaller ones.' };
+      }
+      if (name === 'traffic_report') {
+        if (!ctx.trafficReportData) return { error: 'Traffic reports aren’t available in this version.' };
+        let geometry, label;
+        if (a.use_selection && ctx.sel?.feature) { geometry = ctx.sel.feature.geometry || ctx.sel.feature; label = ctx.sel.label || 'the selected area'; }
+        else {
+          const p = await pointFor(a); if (p.error) return p;
+          const mi = Math.min(10, Math.max(0.1, a.radius_miles || (p.kind && !/address|building|poi|street/.test(p.kind) ? 2 : 0.5))), r = mi / 69, k = Math.cos(p.c[1] * Math.PI / 180), ring = [];
+          for (let i = 0; i <= 64; i++) { const t = (i % 64) / 64 * 2 * Math.PI; ring.push([p.c[0] + r * Math.cos(t) / k, p.c[1] + r * Math.sin(t)]); }
+          geometry = { type: 'Polygon', coordinates: [ring] }; label = mi + ' mi around ' + p.label;
+        }
+        const d = await ctx.trafficReportData(geometry, label);
+        if (a.show_layer) ctx.trafficLayer?.(true);
+        if (a.show_report) { ctx.trafficReport({ geometry, label }); actionChip('Traffic report: ' + label); }
+        turnSubject = label; const c = d.counts || {};
+        return { area: label, area_sq_mi: d.area_sqmi, counts_error: c.error, counts_as_of: c.as_of, busiest_roads: (c.roads || []).slice(0, 12).map(r => ({ road: r.road, vehicles_per_day: r.aadt, type: r.type, avg_over_segments: r.avg, segments: r.segments })),
+          by_road_type: c.types, live_now: Array.isArray(d.live) ? d.live.map(x => ({ road: x.road, mph_now: x.current_mph, free_flow_mph: x.free_flow_mph, slower_pct: x.congestion_pct, closed: x.closed })) : d.live,
+          incidents_now: Array.isArray(d.incidents) ? d.incidents.slice(0, 15) : d.incidents, note: 'Counts are TxDOT annual average daily traffic, both directions (current year only, no history). Live speeds and incidents are right now (TomTom).' };
       }
       if (name === 'crime_stats') {
         if (!ctx.crimeReportData) return { error: 'Crime data isn’t available in this version.' };

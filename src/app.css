@@ -1528,3 +1528,10 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .mk-hb.mk-hit.on span{color:var(--text);font-weight:700}
 .mk-hb.mk-hit:hover i b,.mk-hb.mk-hit.on i b{filter:brightness(1.15)}
 .vctl .btn{min-height:32px}
+
+/* drive-time map card */
+#card .dt-ctl{display:grid;gap:8px;margin-bottom:10px}
+#card .dt-band b{display:flex;align-items:center;gap:7px}
+#card .dt-band b i{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none}
+#card .pl.dt-band{display:grid;grid-template-columns:1fr auto;grid-template-areas:'b l' 's s';gap:2px 10px;align-items:center}
+#card .dt-band b{grid-area:b}#card .dt-band span{grid-area:s;text-align:left;white-space:normal}#card .dt-band .lnk{grid-area:l;white-space:nowrap}

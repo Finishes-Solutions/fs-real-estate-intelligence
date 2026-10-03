@@ -34,6 +34,9 @@
     "api/drive.js": {
       "maxDuration": 20
     },
+    "api/isochrone.js": {
+      "maxDuration": 40
+    },
     "api/tile.js": {
       "maxDuration": 10
     },
@@ -68,7 +71,7 @@
       "maxDuration": 90
     },
     "api/traffic.js": {
-      "maxDuration": 20
+      "maxDuration": 30
     }
   },
   "crons": [

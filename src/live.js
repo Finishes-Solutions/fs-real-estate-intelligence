@@ -308,13 +308,15 @@ export function initLive(ctx) {
   function renderCardTools(info) {
     const card = document.getElementById('card'); card.querySelector('#liveSec')?.remove();
     const sec = document.createElement('div'); sec.className = 'bsec live-sec'; sec.id = 'liveSec';
-    sec.innerHTML = '<div class="lt">From Here</div><div class="btnrow"><button class="btn" data-a="drive">Drive Time From Me</button><button class="btn" data-a="wx">Weather</button><button class="btn" data-a="img">Site Imagery</button><button class="btn" data-a="news">News</button></div><div class="live-out" aria-live="polite"></div>';
+    sec.innerHTML = '<div class="lt">From Here</div><div class="btnrow"><button class="btn" data-a="drive">Drive Time From Me</button><button class="btn" data-a="iso">Drive-Time Map</button><button class="btn" data-a="wx">Weather</button><button class="btn" data-a="img">Site Imagery</button><button class="btn" data-a="news">News</button></div><div class="live-out" aria-live="polite"></div>';
     const brief = card.querySelector('#briefBox'); if (brief) brief.after(sec); else (card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
     const out = sec.querySelector('.live-out'), mine = () => lastCard === info;
     const busy = t => { out.innerHTML = '<div class="rnote">' + esc(t) + '</div>'; };
     const fail = e => { if (mine()) out.innerHTML = '<div class="rnote err">' + esc(e.message || e) + '</div>'; };
     sec.querySelector('[data-a=drive]').onclick = async () => { busy('Finding you and routing…'); try { const d = await drive({ target: 'selected' }); if (!mine()) return; if (d.error) throw new Error(d.error);
       out.innerHTML = driveHTML(d); } catch (e) { fail(e); } };
+    sec.querySelector('[data-a=iso]').onclick = () => { const c = info.kind === 'filing' ? [info.f.lon, info.f.lat] : info.center;
+      ctx.driveTime?.({ center: c, label: info.kind === 'filing' ? info.f.addr || info.f.name : info.label?.() || info.title || c[1].toFixed(4) + ', ' + c[0].toFixed(4) }); };
     sec.querySelector('[data-a=wx]').onclick = async () => { busy('Checking the weather…'); try { const d = await weather({ where: 'selected' }); if (!mine()) return; if (d.error) throw new Error(d.error);
       out.innerHTML = weatherHTML(d); } catch (e) { fail(e); } };
     sec.querySelector('[data-a=img]').onclick = async () => { busy('Looking for high-res aerial imagery and recent NASA passes…'); try {

@@ -18,6 +18,32 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **The assistant works harder to find a place.** "Highlight Terminal B at George Bush airport" now finds the airport, then looks for Terminal B inside it. It knows common nicknames (Bush airport / IAH, Hobby, the Med Center, NRG). If the map still can't find something, it does a web search for the official name and location, then checks that against the map before showing it. Anything placed only from the web search is marked approximate.
 - **Big places fit on screen.** Going to or outlining an airport, campus, park or town now frames the whole thing, leaving room for the chat panel and the property card. Before, they were shown at street level. Single buildings and addresses still zoom in close.
 - Not checked on the live site yet: this build environment can't reach Google News or OpenStreetMap. Automated tests cover the new search logic.
+### 2:50 AM CT: Traffic reports and a Traffic Counts layer (7e269a7)
+- **Traffic Counts** in Map Layers: every road TxDOT counts, coloured from green to dark red by how many vehicles use it a day. Zoom in to a part of town to see it, and hover a road for its count.
+- **Traffic Report** for any area (Reports tab, the selection bar, or Area reports on a building's Site section):
+  - the busiest roads, with vehicles a day;
+  - average traffic by road type (interstates, state highways, city streets…);
+  - **live speed vs normal speed** on the 8 busiest roads right now;
+  - **current crashes, closures and road works** in the area.
+- **Export Report** (printable, save as PDF) and **Export CSV**, with every counted road segment. The report includes a map of the area with the roads drawn by traffic.
+- **Ask the assistant** "how busy is Westheimer near the Galleria?" or "traffic around this site".
+- **Honest limits:**
+  - TxDOT publishes only the current year's counts in this data, so there's no year-over-year trend.
+  - The counts are annual averages for both directions; hour-by-hour volumes aren't published free.
+  - Live speeds and incidents are a snapshot from when you open the report (TomTom doesn't allow storing them).
+
+### 2:41 AM CT: Drive-time maps (5285009)
+- **See how far you can drive in 10, 20 or 30 minutes.** Open any building or filing and press **Drive-Time Map** under From Here. Nested green, yellow and orange areas are drawn on the map.
+- **Choose when you're leaving:** now (live traffic), a weekday at 8 AM or 5 PM, or Sunday. Rush hour can shrink the areas a lot.
+- **Choose the times:** 5/10/15, 10/20/30, 15/30/45 or 20/40/60 minutes.
+- **The card shows, for each area:**
+  - square miles;
+  - people, households, median income and jobs (from Census data, for the counties loaded on the map);
+  - how many filings on the map fall inside.
+- **Use it as a trade area.** "Select this area" (or clicking an area on the map) makes it the selection. The map's filings narrow to it, and crime, FEMA and other area reports run on that drive-time area.
+- **Export Report** (printable, save as PDF) and **Export CSV**. Both are kept in the Reports tab, which now also has a Drive-Time Map card.
+- **Ask the assistant** "what's within a 20-minute drive of the Galleria at rush hour?" by text or voice.
+- **Sources:** TomTom, with live or typical traffic. If TomTom is unavailable it falls back to OpenStreetMap routing without traffic, and the card says so.
 
 ### 2:30 AM CT: Voice assistant is more reliable (ba2b843)
 - **No more bursts of place names.** When you were quiet or there was background noise, the voice transcriber sometimes "heard" its own list of local names and flashed them on screen before throwing the turn away. That list is now much shorter. Any echo that still slips in is removed, even when it's tacked onto the end of something you really said.
