@@ -65,7 +65,7 @@
       "maxDuration": 30
     },
     "api/fema.js": {
-      "maxDuration": 45
+      "maxDuration": 90
     }
   },
   "crons": [

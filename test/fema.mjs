@@ -39,7 +39,7 @@ assert.equal(d.risk_index.tracts, 2); assert.equal(d.risk_index.hazards[0].hazar
 assert.equal(d.risk_index.risk_score, 38, 'building-value weighted'); assert.equal(d.risk_index.risk_rating, 'Relatively Low'); assert.equal(d.risk_index.expected_annual_loss, 3063751);
 // one failing source doesn't sink the report
 const real = globalThis.fetch; globalThis.fetch = async (url, o) => String(url).includes('NfipClaims') ? new Response('down', { status: 503 }) : real(url, o);
-const e = await femaReport(AREA); assert.match(e.nfip_claims.error, /OpenFEMA 503/); assert.equal(e.risk_index.tracts, 2); globalThis.fetch = real;
+const e = await femaReport(AREA); assert.match(e.nfip_claims.error, /OpenFEMA 503/, 'retried once, then reported'); assert.equal(e.risk_index.tracts, 2); globalThis.fetch = real;
 // too large
 await assert.rejects(femaReport({ type: 'Polygon', coordinates: [[[-96, 29], [-95, 29], [-95, 30], [-96, 30], [-96, 29]]] }), /too large/);
 // big but allowed: zone shares skipped, the rest runs
@@ -49,7 +49,9 @@ const res = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; 
 let r = res(); await handler({ headers: {}, query: { tile: '14/3780/6770' } }, r); assert.equal(r.code, 200); assert.equal(r.headers['Content-Type'], 'image/png'); assert.match(r.headers['Cache-Control'], /s-maxage=2592000/);
 { const t = seen.find(s => s.includes('/export')); assert.ok(t && /bbox=-10/.test(t) && /layers=show:28/.test(t), t); }
 r = res(); await handler({ headers: {}, query: { tile: '6/1/1' } }, r); assert.equal(r.code, 400, 'no tiles zoomed far out');
-r = res(); await handler({ headers: {}, query: { lat: '29.75', lon: '-95.39', mi: '0.25' } }, r); assert.equal(r.code, 200); assert.ok(r.body.flood_zones.shares);
+r = res(); await handler({ headers: {}, query: { lat: '29.75', lon: '-95.39', mi: '0.25' } }, r); assert.equal(r.code, 200); assert.ok(r.body.flood_zones.shares); assert.match(r.headers['Cache-Control'], /s-maxage/);
+{ const real2 = globalThis.fetch; globalThis.fetch = async (url, o) => String(url).includes('NfipClaims') ? new Response('down', { status: 503 }) : real2(url, o);
+  r = res(); await handler({ headers: {}, query: { lat: '29.75', lon: '-95.39', mi: '0.25' } }, r); assert.equal(r.headers['Cache-Control'], 'no-store', 'a report with a failed part is not cached'); globalThis.fetch = real2; }
 r = res(); await handler({ headers: {}, method: 'POST', query: {}, body: { geometry: { type: 'Point', coordinates: [0, 0] } } }, r); assert.equal(r.code, 400);
 // pieces
 assert.equal(zoneClass('VE'), 'high'); assert.equal(zoneClass('X', 'AREA OF MINIMAL FLOOD HAZARD', 'F'), 'minimal'); assert.equal(zoneClass('D'), 'undetermined'); assert.equal(zoneClass(''), 'unmapped');

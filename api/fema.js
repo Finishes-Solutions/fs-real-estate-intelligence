@@ -39,9 +39,11 @@ export async function riskTracts(g) {
   const d = await arcQuery(NRI, g, { outFields: '*', returnGeometry: 'false' });
   return (d.features || []).map(f => Object.fromEntries(NRI_FIELDS.filter(k => k in (f.attributes || {})).map(k => [k, f.attributes[k]])));
 }
+// OpenFEMA can be slow on a query it hasn't seen recently: a long timeout and one retry
 async function openfema(entity, filter, select, top = 10000, skip = 0, order = '') {
   const p = new URLSearchParams({ $filter: filter, $select: select, $top: String(top), $skip: String(skip), $inlinecount: 'allpages', ...(order ? { $orderby: order } : {}) });
-  return json(OPEN + entity + '?' + p, {}, 25000);
+  try { return await json(OPEN + entity + '?' + p, {}, 30000); }
+  catch (e) { if (!/timeout|aborted|5\d\d/i.test(e.message)) throw e; return json(OPEN + entity + '?' + p, {}, 25000); }
 }
 const CLAIM_FIELDS = 'yearOfLoss,dateOfLoss,amountPaidOnBuildingClaim,amountPaidOnContentsClaim,amountPaidOnIncreasedCostOfComplianceClaim,occupancyType,ratedFloodZone,floodZoneCurrent,censusGeoid,floodEvent';
 export async function claims(tracts) {
@@ -103,7 +105,8 @@ export default async function handler(req, res) {
   if (!g) return res.status(400).json({ error: 'Send a Polygon or MultiPolygon geometry (POST) or lat, lon and mi.' });
   try {
     const d = await femaReport(g, { label });
-    res.setHeader('Cache-Control', req.method === 'POST' ? 'no-store' : 'public, max-age=3600, s-maxage=604800');
+    const partial = ['flood_zones', 'nfip_claims', 'disasters', 'risk_index'].some(k => d[k]?.error); // never cache a report with a part that failed
+    res.setHeader('Cache-Control', req.method === 'POST' || partial ? 'no-store' : 'public, max-age=3600, s-maxage=604800');
     return res.json(d);
   } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.status(e.status || 502).json({ error: e.message }); }
 }
