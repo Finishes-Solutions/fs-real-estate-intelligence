@@ -102,10 +102,36 @@ export function initMobile(ctx) {
   card.addEventListener('touchmove', e => { if (y0 == null) return; dy = e.touches[0].clientY - y0; if (dy > 0) card.style.transform = 'translateY(' + dy + 'px)'; }, { passive: true });
   card.addEventListener('touchend', () => {
     if (y0 == null) return; card.style.transform = '';
-    if (dy > 90) ctx.closeCard(); else if (dy < -30) card.classList.add('full'); else if (Math.abs(dy) < 6) card.classList.toggle('full');
+    const min = card.classList.contains('min');
+    // swipe down: full → normal → minimized (title bar only, still selected) → closed; swipe up or tap brings it back
+    if (dy > 90) { if (card.classList.contains('full')) card.classList.remove('full'); else if (!min) setMin(true); else ctx.closeCard(); }
+    else if (dy < -30) { if (min) setMin(false); else card.classList.add('full'); }
+    else if (Math.abs(dy) < 6 && !min) card.classList.toggle('full');
     y0 = null;
   });
-  ctx.onCardClose(() => card.classList.remove('full'));
+  ctx.onCardClose(() => { card.classList.remove('full'); setMin(false); });
+
+  // ---- minimize any card to its title bar (all screen sizes) ----
+  // The selection, the plane being followed, its flight path and the route stay on the map; tap the bar (or the
+  // button) to bring the card back. Cards are re-rendered often (a plane card every 10 s), so the button is added
+  // back after every render and the state lives on the card element.
+  const MIN_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>';
+  function setMin(on) {
+    const was = card.classList.contains('min'); card.classList.toggle('min', !!on); if (on) card.classList.remove('full');
+    const b = card.querySelector('.top .mn'); if (b) { b.setAttribute('aria-label', on ? 'Expand card' : 'Minimize card'); b.title = on ? 'Expand' : 'Minimize'; b.setAttribute('aria-expanded', String(!on)); }
+    if (was !== !!on) { card.scrollTop = 0; setTimeout(() => ctx.map?.resize?.(), 220); }
+  }
+  ctx.minimizeCard = setMin;
+  function addButton() {
+    const top = card.querySelector(':scope > .top'), x = top?.querySelector('.x'); if (!top || !x || top.querySelector('.mn')) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'mn'; b.innerHTML = MIN_ICON;
+    b.onclick = e => { e.stopPropagation(); setMin(!card.classList.contains('min')); };
+    x.before(b); setMin(card.classList.contains('min'));
+  }
+  new MutationObserver(addButton).observe(card, { childList: true });
+  // minimized: a tap anywhere on the title bar (not its buttons or links) expands it
+  card.addEventListener('click', e => { if (card.classList.contains('min') && e.target.closest('.top') && !e.target.closest('button,a')) setMin(false); });
+  addButton();
 
   // ---- near me ----
   ctx.locate = () => new Promise((res, rej) => {

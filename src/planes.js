@@ -271,7 +271,8 @@ export function initPlanes(ctx) {
   // follow: keep the plane centred; orbit: also circle the camera around it (tilted), turning ~6° a second
   let orbiting = false;
   // keep the followed plane above the open card on wide screens (the card sits over the lower middle of the map)
-  const camOffset = () => card.classList.contains('open') && innerWidth > 760 ? [0, -Math.min(140, card.offsetHeight / 3)] : [0, 0];
+  // phones: the card is a bottom sheet, so keep the plane in the middle of the map above it (most of the screen when the card is minimized)
+  const camOffset = () => !card.classList.contains('open') ? [0, 0] : innerWidth > 760 ? [0, -Math.min(140, card.offsetHeight / 3)] : [0, -Math.round(card.offsetHeight / 2)];
   // every frame: put the plane where it should be on screen (just above the card on wide screens), turning ~6° a second
   // when orbiting; a zoom in progress is left alone so wheel and pinch zooming still work while following
   function followCam(dt = 0) {
