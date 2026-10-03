@@ -52,14 +52,16 @@ export function initCrime(ctx) {
   function removeLayers() { for (const id of [HEAT, CELLS]) if (map.getLayer(id)) map.removeLayer(id); for (const s of [SRC, SRC + '-sq']) if (map.getSource(s)) map.removeSource(s); }
   const monthName = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'the latest month';
 
+  const crimeLegend = () => ctx.setLegend?.('crime', on ? '<div class="t">Crime · ' + ({ t: 'all incidents', v: 'violent', p: 'property' }[cat] || 'incidents') + '</div><div class="lg-grad" style="background:linear-gradient(90deg,#fde68a,#f59e0b,#ea580c,#c2410c,#7f1d1d)"></div><div class="lg-ticks"><span>Fewer</span><span>More</span></div><div class="lg-note">Last 12 months · City of Houston</div>' : null);
   async function setOn(v) {
     on = v; if (box) box.checked = v; if (catSel) catSel.hidden = !v; if (note) note.hidden = !v;
+    crimeLegend();
     if (!v) { removeLayers(); return; }
     try { await loadGrid(); addLayers(); if (map.getZoom() < 9) map.easeTo({ center: [-95.37, 29.76], zoom: 10, duration: ctx.reduceMotion ? 0 : 800 }); }
     catch (e) { ctx.toast('Crime layer unavailable: ' + e.message); setOn(false); }
   }
   if (box) box.onchange = () => setOn(box.checked);
-  if (catSel) catSel.onchange = () => { cat = catSel.value; try { localStorage.setItem('fs-crime-cat', cat); } catch (e) {} if (on && grid) { removeLayers(); addLayers(); } };
+  if (catSel) catSel.onchange = () => { cat = catSel.value; try { localStorage.setItem('fs-crime-cat', cat); } catch (e) {} if (on && grid) { removeLayers(); addLayers(); } crimeLegend(); };
   ctx.onOverlays(addLayers);
   ctx.crimeLayer = v => setOn(v !== false);
 

@@ -207,3 +207,23 @@ console.log('adsb.lol endpoints ok');
   assert.equal(normalize({ hex: 'a1', t: 'R44', lat: 30, lon: -95, alt_baro: 800 }).shape, 'heli'); assert.equal(normalize({ hex: 'a2', category: 'A5', lat: 30, lon: -95, alt_baro: 9000 }).shape, 'heavy2'); }
 console.log('aircraft shapes ok');
 
+
+// flight path smoothing and colours (lib/flightpath.mjs); stale routes against the plane's heading
+{ const { smoothPath, altColor, altColorExpr } = await import('../lib/flightpath.mjs'), { plausible } = await import('../api/planes.js');
+  const raw = [[-95.28, 29.65, 0], [-95.28, 29.66, 800], [-95.30, 29.75, 4000], [-95.40, 29.80, 8000], [-95.60, 29.85, 12000], [-95.90, 29.86, 15000]];
+  const s = smoothPath(raw);
+  assert.ok(s.length > raw.length * 3, 'densified: ' + s.length); assert.deepEqual(s[0].map(v => +v.toFixed(5)), [-95.28, 29.65, 0], 'starts where it started'); assert.deepEqual(s.at(-1).map(v => +v.toFixed(4)), [-95.9, 29.86, 15000], 'ends where it ends');
+  // smooth: no sharp corners left (heading changes between consecutive steps stay small)
+  const hd = (a, b) => Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI; let worst = 0;
+  for (let i = 2; i < s.length; i++) worst = Math.max(worst, Math.abs(((hd(s[i - 1], s[i]) - hd(s[i - 2], s[i - 1])) + 540) % 360 - 180));
+  assert.ok(worst < 25, 'largest turn between steps ' + worst.toFixed(1) + '°');
+  assert.ok(s.every(p => p[2] >= 0 && p[2] <= 15000), 'altitude stays within the reports');
+  const jitter = Array.from({ length: 50 }, (_, i) => [-95.3 + 1e-5 * (i % 2 ? 1 : -1), 29.7 + 1e-5 * (i % 3), 0]); assert.ok(smoothPath(jitter).length < 5, 'GPS jitter on the ground collapses');
+  assert.ok(smoothPath([[179.9, 50, 30000], [-179.9, 50.1, 30000]]).every(p => Math.abs(p[0]) <= 180.5), 'crosses the date line without a world-wide swing');
+  assert.deepEqual(altColor(0).map(v => Math.round(v * 255)), [0x8d, 0x95, 0x98]); assert.deepEqual(altColor(99999).map(v => Math.round(v * 255)), [0x1f, 0x92, 0x49]);
+  assert.equal(altColorExpr[0], 'interpolate');
+  const MSY = { lat: 29.99, lon: -90.25 }, MDW = { lat: 41.79, lon: -87.75 };
+  assert.equal(plausible(MSY, MDW, 38.6, -90.3, 217), false, 'SWA3004: between MSY and MDW but flying away from Chicago');
+  assert.equal(plausible(MSY, MDW, 38.6, -90.3, 20), true); assert.equal(plausible(MSY, MDW, 38.6, -90.3), true, 'no track: distance only');
+  assert.equal(plausible(MSY, MDW, 41.6, -87.9, 217), true, 'circling near the destination: fine'); }
+console.log('flight path smoothing ok');

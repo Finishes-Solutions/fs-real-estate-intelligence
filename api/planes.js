@@ -57,10 +57,16 @@ export async function registration(ids, d = db()) {
 const MI = (a, b) => { const R = Math.PI / 180, h = Math.sin((b[1] - a[1]) * R / 2) ** 2 + Math.cos(a[1] * R) * Math.cos(b[1] * R) * Math.sin((b[0] - a[0]) * R / 2) ** 2; return 7917.6 * Math.asin(Math.sqrt(h)); };
 // Route databases go stale when airlines reuse flight numbers. A route is believable when the plane is roughly on the
 // way between its two airports (detour under 25% plus 100 mi) or within 60 mi of either end (taking off, landing).
-export function plausible(o, d, lat, lon) {
+// With the plane's track: away from both airports it must also be heading roughly toward the destination (within
+// 100°). SWA3004 was listed MSY → MDW while flying 217° over Missouri: on the way, by distance, but going the other way.
+const BRG = (a, b) => { const R = Math.PI / 180, y = Math.sin((b[0] - a[0]) * R) * Math.cos(b[1] * R), x = Math.cos(a[1] * R) * Math.sin(b[1] * R) - Math.sin(a[1] * R) * Math.cos(b[1] * R) * Math.cos((b[0] - a[0]) * R); return (Math.atan2(y, x) / R + 360) % 360; };
+export function plausible(o, d, lat, lon, track) {
   if (![o?.lat, o?.lon, d?.lat, d?.lon].every(Number.isFinite) || !Number.isFinite(lat) || !Number.isFinite(lon) || (!lat && !lon)) return null;
   const p = [lon, lat], A = [o.lon, o.lat], B = [d.lon, d.lat];
-  return MI(p, A) < 60 || MI(p, B) < 60 || MI(p, A) + MI(p, B) <= MI(A, B) * 1.25 + 100;
+  if (MI(p, A) < 60 || MI(p, B) < 60) return true;
+  if (MI(p, A) + MI(p, B) > MI(A, B) * 1.25 + 100) return false;
+  if (Number.isFinite(track) && MI(p, B) > 80) { const off = Math.abs(((track - BRG(p, B)) + 540) % 360 - 180); if (off > 100) return false; }
+  return true;
 }
 
 const H = { 'Content-Type': 'application/json', 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' };
@@ -85,12 +91,12 @@ async function dbRoute(callsign, fetchImpl) {
   return { origin: ap(f.origin), destination: ap(f.destination), source: 'adsbdb' };
 }
 
-export async function route(callsign, lat, lon, fetchImpl = globalThis.fetch) {
+export async function route(callsign, lat, lon, fetchImpl = globalThis.fetch, track = NaN) {
   const out = { callsign, origin: null, destination: null, plausible: null };
   for (const look of [() => lolRoute(callsign, lat, lon, fetchImpl), () => dbRoute(callsign, fetchImpl)]) {
     let x = null; try { x = await look(); } catch (e) { console.warn('planes route', callsign, e.message); }
     if (!x) continue;
-    const ok = plausible(x.origin, x.destination, lat, lon);
+    const ok = plausible(x.origin, x.destination, lat, lon, track);
     if (ok === false) { out.rejected = (out.rejected || []).concat(x.source + ' ' + x.origin.code + '-' + x.destination.code); continue; } // stale: the plane is nowhere near that route
     return { ...out, ...x, plausible: ok };
   }
@@ -104,7 +110,7 @@ export default async function handler(req, res) {
     if (q.route) {
       const cs = String(q.route).trim().toUpperCase(); if (!/^[A-Z0-9]{2,8}$/.test(cs)) return res.status(400).json({ error: 'route=CALLSIGN' });
       res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=3600');
-      return res.json(await route(cs, num(q.lat), num(q.lon)));
+      return res.json(await route(cs, num(q.lat), num(q.lon), undefined, num(q.track)));
     }
     if (q.track) {
       const hex = String(q.track).trim().toLowerCase().replace(/^~/, ''); if (!okHex(hex)) return res.status(400).json({ error: 'track=ICAO hex' });

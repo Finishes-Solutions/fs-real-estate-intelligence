@@ -1489,3 +1489,16 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .panel .sechead.listhead{padding:16px 16px 6px;font:700 13px/1.3 var(--font-display);letter-spacing:0;text-transform:none;color:var(--text)}
 .panel .sechead.listhead span{color:var(--text)}
 .panel .fbody .kpiwrap{margin:0}
+
+/* map legends added by layers (ctx.setLegend): same card as the Filings legend */
+.xlegend{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:6px;font-size:12px;color:var(--text-2);min-width:170px;max-width:240px;box-shadow:0 1px 3px rgba(11,13,12,.08)}
+.xlegend .t{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.xlegend .li{display:flex;align-items:center;gap:8px}
+.xlegend .li i{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+.xlegend .lg-grad{height:10px;border-radius:5px}
+.xlegend .lg-ticks{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:-2px}
+.xlegend .lg-note{font-size:11px;color:var(--muted);line-height:1.35}
+@media (max-width:700px){ .xlegend{display:none} }
+.xlegend .lg-ticks.lg-abs{position:relative;display:block;height:12px}
+.xlegend .lg-abs span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.xlegend .lg-abs span:first-child{transform:none}.xlegend .lg-abs span:last-child{transform:translateX(-100%)}
