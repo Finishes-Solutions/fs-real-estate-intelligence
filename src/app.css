@@ -1269,3 +1269,8 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .cc-plane .cc-rt{display:inline;font-style:normal;font-family:var(--font-mono);font-size:11px;color:var(--brand);font-weight:600;margin-left:6px}
 .cc-plane .cc-pa{grid-column:1/-1;display:flex;gap:6px}
 .cc-plane .cc-pa .btn{font-size:11.5px;padding:4px 10px}
+/* crime report card */
+.card .cr-v{color:#c03b3a}.card .cr-p{color:#d9822b}
+.card .cr-bars{display:block;width:100%;height:auto;color:var(--muted);margin-top:4px}
+.card .cr-leg{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:4px}.card .cr-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+#lyCrimeCat{margin:2px 0 4px 26px}#lyCrimeNote{margin:0 0 6px 26px;font-size:11px}

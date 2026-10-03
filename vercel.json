@@ -60,6 +60,9 @@
     },
     "api/site.js": {
       "maxDuration": 25
+    },
+    "api/crime.js": {
+      "maxDuration": 30
     }
   },
   "crons": [
