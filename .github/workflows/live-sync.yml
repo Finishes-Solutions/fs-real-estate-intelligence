@@ -44,4 +44,5 @@ jobs:
           OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
           ONLY: ${{ inputs.only || (github.event.schedule == '7 5,17,23 * * *' && 'storms,weather') || '' }}
           IMAGERY_DAYS: ${{ inputs.imagery_days }}
+          CRIME_YEARS: ${{ vars.CRIME_YEARS }} # years of Houston crime history to keep (default 2; raise after the database upgrade)
         run: node build/live-sync.mjs

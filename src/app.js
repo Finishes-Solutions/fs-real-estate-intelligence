@@ -556,7 +556,12 @@ function finishPoly(){ const pts=draft.filter((p,i)=>i===0||d3.geoDistance(p,dra
   setSelection('shape','Custom shape ('+pts.length+' points)',ringFeature(pts)); setMode('pan'); }
 document.addEventListener('keydown',e=>{ if(e.target.closest&&e.target.closest('input,select,textarea')) return;
   if(mode==='poly'&&draft.length){ if(e.key==='Enter'){e.preventDefault(); finishPoly();} else if(e.key==='Backspace'){e.preventDefault(); draft.pop(); drawDraft();} else if(e.key==='Escape'){ draft=[]; drawDraft(); } } });
-function fitGeom(g){ const b=d3.geoBounds({type:'Feature',geometry:g}); safeFit([[b[0][0],b[0][1]],[b[1][0],b[1][1]]],{padding:80}); }
+// the box around an area's own coordinates: d3.geoBounds reads a ring wound the "wrong" way (drive-time bands, circles)
+// as the whole world minus the area, which zoomed the map all the way out
+function fitGeom(g){ g=g?.geometry||g; let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  const walk=c=>{ if(typeof c[0]==='number'){ x0=Math.min(x0,c[0]); x1=Math.max(x1,c[0]); y0=Math.min(y0,c[1]); y1=Math.max(y1,c[1]); } else c.forEach(walk); };
+  if(g?.coordinates) walk(g.coordinates); else if(g?.geometries) g.geometries.forEach(x=>walk(x.coordinates)); if(!isFinite(x0)) return;
+  safeFit([[x0,y0],[x1,y1]],{padding:80}); }
 
 // ---------- radius search (MapTiler geocoding + local index) ----------
 const rq=document.getElementById('rq'), rsug=document.getElementById('rsug'), rmi=document.getElementById('rmi'), rrange=document.getElementById('rrange');

@@ -9,7 +9,8 @@ import { rateLimit } from './_lib/guard.mjs';
 import { lidarHeight } from '../lib/height.mjs';
 
 const PARCELS = process.env.PARCEL_SERVICE || 'https://feature.geographic.texas.gov/arcgis/rest/services/Parcels/stratmap_land_parcels_48_most_recent/MapServer/0';
-const OVERPASS = process.env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter';
+// the main public Overpass server is often busy; two community mirrors carry the same OpenStreetMap data
+const OVERPASS = [process.env.OVERPASS_URL, 'https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'].filter(Boolean);
 const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (building panel)' };
 
 async function getJSON(url, opts = {}, ms = 8000) {
@@ -60,17 +61,23 @@ async function parcel(lat, lon) {
 }
 
 const KINDS = ['shop', 'amenity', 'office', 'healthcare', 'craft', 'leisure', 'tourism', 'club'];
-// one Overpass call: named businesses within 80 m, then the building outline(s) under the point
+// one Overpass call: named businesses within 150 m (big buildings and strip centers reach well past 80 m), then the
+// building outline(s) under the point; the card sorts them into "in this building" and "nearby"
 async function places(lat, lon) {
-  const ql = `[out:json][timeout:12];nwr(around:80,${lat},${lon})[name][~"^(${KINDS.join('|')})$"~"."];out tags center 40;way(around:6,${lat},${lon})[building];out tags center 3;`;
-  const d = await getJSON(OVERPASS, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 13000);
+  const ql = `[out:json][timeout:12];nwr(around:150,${lat},${lon})[name][~"^(${KINDS.join('|')})$"~"."];out tags center 80;way(around:6,${lat},${lon})[building];out tags center 3;`;
+  let d = null, last = null;
+  for (const url of OVERPASS) {
+    try { d = await getJSON(url, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 9000); if (!d?.remark || d.elements?.length) break; last = new Error(d.remark); d = null; }
+    catch (e) { last = e; }
+  }
+  if (!d) throw last || new Error('OpenStreetMap lookup failed');
   const els = d.elements || [], b = els.filter(e => e.tags?.building && !KINDS.some(k => e.tags[k] && e.tags.name)).concat(els.filter(e => e.tags?.building))[0];
   const t = b?.tags || {}, levels = num(t['building:levels']), h = num(String(t.height || '').replace(/\s*m$/, ''));
   const osm = b ? { levels, height_m: h, name: t.name || null, use: t.building !== 'yes' ? t.building.replace(/_/g, ' ') : null, roofLevels: num(t['roof:levels']) } : null;
   return { osm, list: els.filter(e => e.tags?.name && KINDS.some(k => e.tags[k])).map(e => {
     const t = e.tags || {}, k = KINDS.find(x => t[x]), c = e.center || e;
     return { name: String(t.name).slice(0, 120), kind: k ? (t[k] === 'yes' ? k : t[k].replace(/_/g, ' ')) : '', brand: t.brand || '', lat: c.lat, lon: c.lon };
-  }).filter(p => p.lat != null) };
+  }).filter(p => p.lat != null).sort((a, b) => Math.hypot(a.lat - lat, a.lon - lon) - Math.hypot(b.lat - lat, b.lon - lon)) };
 }
 
 async function photo(lat, lon) {

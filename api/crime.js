@@ -43,6 +43,11 @@ export function shapeReport(r, list) {
     offenses: (r.by_code || []).map(([code, n, cat]) => ({ code, name: offenseName(code), cat, n: +n })),
     premises: (r.by_premise || []).map(([premise, n]) => ({ premise, n: +n })),
     months: (r.by_month || []).map(([m, v, p, o]) => ({ m, v: +v, p: +p, o: +o })),
+    // when: hour of day and day of week (last 12 months), and every year kept, with Houston's own totals for comparison
+    hours: (r.by_hour || []).map(([h, v, p, o]) => ({ h: +h, v: +v, p: +p, o: +o })),
+    weekdays: (r.by_dow || []).map(([d, v, p, o]) => ({ d: +d, v: +v, p: +p, o: +o })),
+    years: (r.by_year || []).map(([y, v, p, o, d0, d1]) => ({ y: +y, v: +v, p: +p, o: +o, total: +v + +p + +o, from: d0, to: d1, days: d0 && d1 ? Math.round((Date.parse(d1) - Date.parse(d0)) / 864e5) + 1 : null })),
+    city_years: (r.city_by_year || []).map(([y, n]) => ({ y: +y, n: +n })),
     incidents: list ? list.map(x => ({ day: x.day, code: x.code, offense: offenseName(x.code), cat: x.cat, n: x.n, premise: x.premise, lon: x.lon, lat: x.lat })) : undefined,
     coverage: COVERAGE
   };

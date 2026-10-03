@@ -5,7 +5,16 @@
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { categoryOf, CATEGORIES, overpassQuery, parsePlaces, businessQuery } from '../lib/nearby.mjs';
 
-const OVERPASS = process.env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter';
+const OVERPASS = [process.env.OVERPASS_URL, 'https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'].filter(Boolean);
+// the main public server is often busy: try a mirror before giving up
+async function overpass(body) {
+  let last;
+  for (const url of OVERPASS) {
+    try { const resp = await fetch(url, { method: 'POST', headers: UA, body, signal: AbortSignal.timeout(14000) }); if (resp.ok) return resp.json(); last = new Error('OpenStreetMap search failed (HTTP ' + resp.status + ')'); }
+    catch (e) { last = e; }
+  }
+  throw last;
+}
 const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (nearby places)', 'Content-Type': 'application/x-www-form-urlencoded' };
 
 export default async function handler(req, res) {
@@ -19,10 +28,8 @@ export default async function handler(req, res) {
   try {
     for (const r of radii) {
       used = r;
-      const ctl = AbortSignal.timeout(14000);
-      const resp = await fetch(OVERPASS, { method: 'POST', headers: UA, body: new URLSearchParams({ data: business ? businessQuery(name, lat, lon, r, limit) : overpassQuery(cat, what, lat, lon, r, limit) }), signal: ctl });
-      if (!resp.ok) throw new Error('OpenStreetMap search failed (HTTP ' + resp.status + ')');
-      places = parsePlaces((await resp.json()).elements, [lat, lon], cat, limit);
+      const d = await overpass(new URLSearchParams({ data: business ? businessQuery(name, lat, lon, r, limit) : overpassQuery(cat, what, lat, lon, r, limit) }));
+      places = parsePlaces(d.elements, [lat, lon], cat, limit);
       if (places.length >= Math.min(limit, 3)) break;
     }
   } catch (e) { return res.status(502).json({ error: e.name === 'TimeoutError' ? 'OpenStreetMap search timed out. Try again.' : e.message }); }

@@ -308,11 +308,11 @@ export function initBuildings(ctx) {
     const el = card.querySelector('#bPlaces'), b = cur;
     if (err && !list.length) { el.innerHTML = '<div class="lt">Businesses on the Block</div><div class="rnote">Lookup failed: ' + esc(err) + '</div>'; return; }
     const shape = b.footprint || b.parcel?.geometry;
-    const inside = list.filter(p => shape && inGeom([p.lon, p.lat], shape)), other = list.filter(p => !inside.includes(p)).slice(0, 8);
+    const inside = list.filter(p => shape && inGeom([p.lon, p.lat], shape)), other = list.filter(p => !inside.includes(p)).slice(0, 30);
     const li = p => '<div class="pl"><b>' + esc(p.name) + '</b><span>' + esc(p.kind) + (p.brand && p.brand !== p.name ? ' · ' + esc(p.brand) : '') + '</span></div>';
     el.innerHTML = '<div class="lt">Businesses on the Block</div>' + (inside.length ? inside.map(li).join('') : '<div class="rnote">None mapped inside this ' + (b.footprint ? 'building' : 'parcel') + '.</div>') +
       (other.length ? '<details class="raw"' + (inside.length ? '' : ' open') + '><summary>Nearby (' + other.length + ')</summary>' + other.map(li).join('') + '</details>' : '') +
-      '<div class="ssrc src">OpenStreetMap, within about 80 m.</div>';
+      '<div class="ssrc src">OpenStreetMap, within about 150 m. Registered businesses at the address (Texas Comptroller) are listed below.</div>';
   }
   // retail and service tenants registered at the parcel's street address (Texas Comptroller, via api/tenants)
   async function renderTenants(p) {

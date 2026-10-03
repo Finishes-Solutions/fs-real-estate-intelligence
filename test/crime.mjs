@@ -44,3 +44,12 @@ assert.equal(shapeReport({ latest: '2026-06-30', area_sqmi: 0.01, totals: {} }).
 // no database: clear 503
 delete process.env.SUPABASE_URL; assert.equal((await call({ query: { grid: '1' } })).code, 503);
 console.log('crime tests passed');
+
+// hour of day kept from HPD's file; the report's hour, weekday and year breakdowns
+{ const assert = (await import('node:assert/strict')).default, { parseHpd } = await import('../lib/crime.mjs'), { shapeReport } = await import('../api/crime.js');
+  const rows = parseHpd('Incident,Occurrence Date,Occurrence Hour,NIBRS Class,NIBRS Description,Offense Count,Beat,Premise,Map Longitude,Map Latitude\n1,2026-01-02,23,13A,Assault,1,1A10,Street,-95.37,29.76\n2,2026-01-02,,23F,Theft,1,1A10,Lot,-95.37,29.76\n');
+  assert.deepEqual(rows.map(r => r.hour), [23, null], 'hour kept, blank stays unknown');
+  const d = shapeReport({ latest: '2026-06-30', area_sqmi: 1, totals: {}, by_hour: [[23, 1, 0, 0]], by_dow: [[5, 1, 2, 3]], by_year: [[2025, 10, 20, 30, '2025-01-01', '2025-12-31'], [2026, 5, 10, 15, '2026-01-01', '2026-06-30']], city_by_year: [[2025, 1000], [2026, 480]] });
+  assert.deepEqual(d.hours, [{ h: 23, v: 1, p: 0, o: 0 }]); assert.equal(d.weekdays[0].d, 5);
+  assert.deepEqual(d.years.map(y => [y.y, y.total, y.days]), [[2025, 60, 365], [2026, 30, 181]]); assert.equal(d.city_years[1].n, 480); }
+console.log('crime when / years ok');

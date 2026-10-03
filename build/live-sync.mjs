@@ -78,9 +78,13 @@ await step('tracts', async () => {
 await step('crime', async () => {
   // first run: 25 months; after that only the months HPD may still be revising (it republishes the yearly files monthly)
   // the window is anchored on HPD's latest incident (its file runs ~3 months behind), so "the 12 months before" is always complete
-  const latest = await db.rpc('crime_latest', {}), now = new Date(), first = latest ? (await db.select('crime_incidents', 'select=day&order=day.asc&limit=1'))[0]?.day : null;
-  const want = latest ? addDays(String(latest).slice(0, 10), -740) : null;
-  const since = !latest ? addDays(today, -900) : first && String(first) > want ? want : addDays(String(latest).slice(0, 10), -75);
+  // CRIME_YEARS: how many years back to keep (2 on the free database; more once it's upgraded). Rows saved before the
+  // hour of day was kept are reloaded once, so the time-of-day breakdown covers the whole history.
+  const YEARS = Math.min(12, Math.max(2, +(process.env.CRIME_YEARS || 2))), KEEP = YEARS * 365 + 30;
+  const latest = await db.rpc('crime_latest', {}), now = new Date(), oldest = latest ? await db.select('crime_incidents', 'select=day,hour&order=day.asc&limit=50') : [];
+  const first = oldest[0]?.day, noHour = oldest.length && oldest.every(r => r.hour == null);
+  const want = latest ? addDays(String(latest).slice(0, 10), -(KEEP - 20)) : null;
+  const since = !latest ? addDays(today, -(KEEP + 140)) : (first && String(first) > want) || noHour ? want : addDays(String(latest).slice(0, 10), -75);
   let rows = 0; const errors = [];
   for (let y = +since.slice(0, 4); y <= now.getUTCFullYear(); y++) {
     const r = await fetch(HPD_CSV(y), { headers: { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence)' }, signal: AbortSignal.timeout(180000) });
@@ -89,8 +93,8 @@ await step('crime', async () => {
     await db.upsert('crime_incidents', list, 'id', 1000); rows += list.length;
   }
   if (!rows && errors.length) throw new Error(errors.join('; '));
-  const pruned = await db.rpc('crime_prune', { p_keep_days: 760 });
-  return { since, rows, pruned, errors: errors.length ? errors : undefined };
+  const pruned = await db.rpc('crime_prune', { p_keep_days: KEEP });
+  return { since, years: YEARS, rows, pruned, errors: errors.length ? errors : undefined };
 });
 
 await step('aircraft', async () => {

@@ -708,7 +708,7 @@ export function initAssistant(ctx) {
         turnSubject = label;
         return { area: label, period: '12 months through ' + d.latest + ' (vs the 12 months before)', area_sq_mi: d.area_sqmi, last_12_months: d.last12, prior_12_months: d.prior12, change_pct: d.change,
           per_sq_mi_per_year: d.per_sqmi, houston_citywide_per_sq_mi: d.city_per_sqmi, top_offenses: d.offenses.slice(0, 12).map(o => ({ offense: o.name, type: o.cat, count: o.n })),
-          top_premises: d.premises.slice(0, 8), by_month: d.months, recent_incidents: inc.slice(0, 40).map(x => ({ date: x.day, offense: x.offense, premise: x.premise })),
+          top_premises: d.premises.slice(0, 8), by_month: d.months, by_hour_of_day: d.hours?.length ? d.hours : 'not loaded yet', by_weekday_0_is_sunday: d.weekdays, by_year: (d.years || []).map(y => ({ year: y.y, total: y.total, violent: y.v, property: y.p, days_covered: y.days })), houston_by_year: d.city_years, recent_incidents: inc.slice(0, 40).map(x => ({ date: x.day, offense: x.offense, premise: x.premise })),
           matching_incidents_last_12_months: words.length ? inc.length + (inc.length >= 2000 ? '+' : '') : undefined,
           coverage: d.coverage, note: 'Counts are incidents reported to Houston Police; busy commercial areas have more than homes nearby. Type: v violent, p property, o other.' };
       }

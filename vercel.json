@@ -14,7 +14,7 @@
       "includeFiles": "data/{filings,changes}.json"
     },
     "api/building.js": {
-      "maxDuration": 20
+      "maxDuration": 30
     },
     "api/pipeline-ai.js": {
       "maxDuration": 300
