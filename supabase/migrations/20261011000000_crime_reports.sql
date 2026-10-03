@@ -3,6 +3,7 @@
 --   crime_report(geojson)       one area's numbers: totals by category for the last 12 months and the 12 before, top offenses,
 --                               top premises, monthly counts, the area in square miles, and citywide totals for comparison
 --   crime_list(geojson, limit)  the incidents themselves in an area, newest first (report table and CSV export)
+--   crime_grid_json / crime_list_json: the same as single jsonb values (the API uses these; PostgREST caps row results at 1,000)
 -- "Last 12 months" ends at the newest incident in the data (HPD's file runs ~3 months behind), not today.
 create index if not exists crime_incidents_geom_idx on public.crime_incidents using gist ((pt::extensions.geometry));
 
@@ -57,3 +58,17 @@ revoke all on function public.crime_list(jsonb, integer) from public, anon, auth
 grant execute on function public.crime_grid(double precision) to service_role;
 grant execute on function public.crime_report(jsonb) to service_role;
 grant execute on function public.crime_list(jsonb, integer) to service_role;
+
+-- PostgREST caps a table result at 1,000 rows, so the grid (~7,500 cells) and long incident lists come back as one jsonb value
+create or replace function public.crime_grid_json(p_cell double precision default 0.004)
+returns jsonb language sql stable security definer set search_path = public, extensions as $$
+  select coalesce(jsonb_agg(jsonb_build_array(round(x::numeric, 4), round(y::numeric, 4), v, p, o)), '[]'::jsonb) from public.crime_grid(p_cell) where v + p + o > 0
+$$;
+create or replace function public.crime_list_json(p_geom jsonb, p_limit integer default 2000)
+returns jsonb language sql stable security definer set search_path = public, extensions as $$
+  select coalesce(jsonb_agg(jsonb_build_object('day', day, 'code', code, 'cat', cat, 'n', n, 'premise', premise, 'lon', lon, 'lat', lat)), '[]'::jsonb) from public.crime_list(p_geom, p_limit)
+$$;
+revoke all on function public.crime_grid_json(double precision) from public, anon, authenticated;
+revoke all on function public.crime_list_json(jsonb, integer) from public, anon, authenticated;
+grant execute on function public.crime_grid_json(double precision) to service_role;
+grant execute on function public.crime_list_json(jsonb, integer) to service_role;

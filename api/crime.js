@@ -46,7 +46,7 @@ export function shapeReport(r, list) {
   };
 }
 export async function crimeReport(db, geometry, list = 0) {
-  const [r, rows] = await Promise.all([db.rpc('crime_report', { p_geom: geometry }), list ? db.rpc('crime_list', { p_geom: geometry, p_limit: Math.min(20000, list) }) : null]);
+  const [r, rows] = await Promise.all([db.rpc('crime_report', { p_geom: geometry }), list ? db.rpc('crime_list_json', { p_geom: geometry, p_limit: Math.min(20000, list) }) : null]);
   return shapeReport(r, rows);
 }
 
@@ -56,9 +56,10 @@ export default async function handler(req, res) {
   const q = req.query || {};
   try {
     if (q.grid) {
-      const cell = 0.004, [rows, latest] = await Promise.all([db.rpc('crime_grid', { p_cell: cell }), db.rpc('crime_latest', {})]);
+      // one jsonb array: PostgREST would cap a table result at 1,000 rows (the grid has ~7,500 cells)
+      const cell = 0.004, [rows, latest] = await Promise.all([db.rpc('crime_grid_json', { p_cell: cell }), db.rpc('crime_latest', {})]);
       res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
-      return res.json({ cell, latest, cells: (rows || []).map(r => [Math.round(r.x * 1e4) / 1e4, Math.round(r.y * 1e4) / 1e4, +r.v, +r.p, +r.o]).filter(c => c[2] + c[3] + c[4] > 0), coverage: COVERAGE });
+      return res.json({ cell, latest, cells: (rows || []).map(c => [+c[0], +c[1], +c[2], +c[3], +c[4]]).filter(c => c[2] + c[3] + c[4] > 0), coverage: COVERAGE });
     }
     let geometry, list = 0;
     if (req.method === 'POST') { const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}; geometry = cleanGeometry(b.geometry); list = +b.list || 0; }

@@ -4,14 +4,14 @@ process.env.SUPABASE_URL = 'https://db.test'; process.env.SUPABASE_SECRET_KEY = 
 const seen = [];
 globalThis.fetch = async (url, opts = {}) => {
   const u = new URL(String(url)), path = u.pathname.replace('/rest/v1/', ''), body = opts.body ? JSON.parse(opts.body) : null; seen.push([path, body]);
-  if (path === 'rpc/crime_grid') return Response.json([{ x: -95.368, y: 29.76, v: 3, p: 10, o: 7 }, { x: -95.372, y: 29.764, v: 0, p: 0, o: 0 }]);
+  if (path === 'rpc/crime_grid_json') return Response.json([[-95.368, 29.76, 3, 10, 7], [-95.372, 29.764, 0, 0, 0]]);
   if (path === 'rpc/crime_latest') return Response.json('2026-06-30');
   if (path === 'rpc/crime_report') {
     if (body.p_geom.coordinates[0].length > 200) return new Response(JSON.stringify({ message: 'area too large (over 1,500 square miles)' }), { status: 400 });
     return Response.json({ latest: '2026-06-30', from: '2024-07-01', area_sqmi: 0.785, totals: { last12_v: 150, last12_p: 728, last12_o: 1283, prior12_v: 145, prior12_p: 927, prior12_o: 1293 },
       by_code: [['13B', 255, 'o'], ['23H', 204, 'p'], ['13A', 94, 'v']], by_premise: [['Parking Lot, Garage', 245]], by_month: [['2026-06', 11, 35, 91]], city_last12: { v: 25000, p: 90000, o: 107000 } });
   }
-  if (path === 'rpc/crime_list') return Response.json([{ day: '2026-06-30', code: '23F', cat: 'p', n: 1, premise: 'Parking Lot, Garage', lon: -95.37, lat: 29.76 }]);
+  if (path === 'rpc/crime_list_json') return Response.json([{ day: '2026-06-30', code: '23F', cat: 'p', n: 1, premise: 'Parking Lot, Garage', lon: -95.37, lat: 29.76 }]);
   return new Response('unmocked ' + u, { status: 599 });
 };
 const { default: handler, circle, cleanGeometry, shapeReport } = await import('../api/crime.js');
@@ -27,11 +27,11 @@ assert.equal(r.code, 200); assert.equal(r.body.last12.total, 2161); assert.equal
 assert.equal(r.body.per_sqmi.total, Math.round(2161 / 0.785)); assert.equal(r.body.city_per_sqmi.total, Math.round(222000 / 640));
 assert.deepEqual(r.body.offenses.map(o => o.name), ['Simple assault', 'Other theft', 'Aggravated assault']); assert.equal(r.body.incidents[0].offense, 'Theft from a vehicle'); assert.match(r.body.coverage, /City of Houston only/);
 const sent = seen.find(([p]) => p === 'rpc/crime_report')[1].p_geom; assert.equal(sent.type, 'Polygon'); assert.equal(sent.coordinates[0].length, 65);
-assert.equal(seen.find(([p]) => p === 'rpc/crime_list')[1].p_limit, 50);
+assert.equal(seen.find(([p]) => p === 'rpc/crime_list_json')[1].p_limit, 50);
 // polygon report by POST (a Feature is accepted), no list unless asked
 seen.length = 0;
 const box = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[-95.375, 29.755], [-95.36, 29.755], [-95.36, 29.765], [-95.375, 29.765], [-95.375, 29.755]]] } };
-r = await call({ method: 'POST', body: { geometry: box } }); assert.equal(r.code, 200); assert.equal(r.body.incidents, undefined); assert.ok(!seen.some(([p]) => p === 'rpc/crime_list')); assert.equal(r.headers['Cache-Control'], 'no-store');
+r = await call({ method: 'POST', body: { geometry: box } }); assert.equal(r.code, 200); assert.equal(r.body.incidents, undefined); assert.ok(!seen.some(([p]) => p === 'rpc/crime_list_json')); assert.equal(r.headers['Cache-Control'], 'no-store');
 // bad input
 assert.equal((await call({ method: 'POST', body: { geometry: { type: 'Point', coordinates: [0, 0] } } })).code, 400);
 assert.equal((await call({ query: { lat: '40', lon: '-74' } })).code, 400);
