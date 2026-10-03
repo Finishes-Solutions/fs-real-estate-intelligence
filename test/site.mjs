@@ -15,7 +15,7 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.pathname.endsWith('COH_METRO_Bus_Stops_view/FeatureServer/0/query')) { assert.equal(u.searchParams.get('returnCountOnly'), 'true'); return j({ count: 14 }); }
   if (u.host === 'tigerweb.geo.census.gov') return j({ features: u.pathname.includes('/School/MapServer/0/') ? [{ attributes: { NAME: 'Houston Independent School District' } }] : [] });
   if (u.pathname.endsWith('get_facilities')) return j({ Results: { QueryID: '985', QueryRows: '3' } });
-  if (u.pathname.endsWith('get_qid')) return j({ Results: { Facilities: [{ FacName: 'CLEAN CO', FacSNCFlg: 'N', FacQtrsWithNC: '0', TRIFlag: 'N' }, { FacName: 'SPILL CO', FacStreet: '1 MAIN', FacSNCFlg: 'Y', TRIFlag: 'Y' }, { FacName: 'DRY CLEAN', RCRAComplianceStatus: 'No Violation Identified' }] } });
+  if (u.pathname.endsWith('get_qid')) return j({ Results: { Facilities: [{ FacName: 'CLEAN CO', FacSNCFlg: 'N', FacQtrsWithNC: '0', TRIFlag: 'N' }, { FacName: 'SPILL CO', FacStreet: '1 MAIN', FacSNCFlg: 'Y', TRIFlag: 'Y' }, { FacName: 'DRY CLEAN', RCRAComplianceStatus: 'No Violation Identified' }, { FacName: 'OFFICE', RCRAComplianceStatus: 'Not Applicable' }] } });
   if (u.host === 'data.texas.gov' && u.pathname.endsWith('naix-2893.json')) {
     assert.match(u.searchParams.get('$where'), /like '1001 %MAIN%' AND location_zip like '77002%'/);
     return j([{ tabc_permit_number: 'MB1', location_name: 'THE BAR', obligation_end_date_yyyymmdd: '2026-08-31T00:00:00.000', total_receipts: '100000' }, { tabc_permit_number: 'MB1', location_name: 'THE BAR', obligation_end_date_yyyymmdd: '2026-07-31T00:00:00.000', total_receipts: '90000.5' }, { tabc_permit_number: 'MB2', location_name: 'OLD PLACE', obligation_end_date_yyyymmdd: '2024-01-31T00:00:00.000', total_receipts: '5' }]);
@@ -32,7 +32,7 @@ assert.deepEqual(d.traffic.roads.map(r => r.road + ' ' + r.aadt), ['I-10 250000'
 assert.deepEqual(d.districts.water.map(w => w.name), ['Harris County MUD 61', 'West Harris County RWA'], 'river authorities dropped');
 assert.equal(d.districts.opportunityZone, true); assert.deepEqual(d.districts.tirz, ['Downtown (TIRZ 3)']); assert.deepEqual(d.districts.schools, ['Houston Independent School District']);
 assert.equal(d.transit.stops, 14);
-assert.equal(d.environment.total, 3); assert.equal(d.environment.flaggedCount, 2); assert.deepEqual(d.environment.flagged[0].flags, ['violations', 'toxic releases']);
+assert.equal(d.environment.total, 3); assert.deepEqual(d.environment.flagged[1].flags, ['handles hazardous waste']); assert.equal(d.environment.flaggedCount, 2); assert.deepEqual(d.environment.flagged[0].flags, ['violations', 'toxic releases']);
 assert.equal(d.crime.last12.total, 100); assert.equal(d.crime.prior12.total, 110); assert.equal(d.crime.change.v, 20); assert.equal(d.crime.change.p, -20); assert.equal(d.crime.latest, '2026-08-31');
 assert.equal(d.bars.length, 1, 'only the last 12 months'); assert.equal(d.bars[0].total, 190001); assert.equal(d.bars[0].months, 2); assert.equal(d.bars[0].last, '2026-08');
 // outside Houston: no TIRZ / METRO / crime calls

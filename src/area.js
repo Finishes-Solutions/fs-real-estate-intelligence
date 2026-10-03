@@ -123,6 +123,26 @@ export function initArea(ctx) {
   }
   const table = (head, rows) => '<details class="raw mk-tbl"><summary>Table</summary><table><thead><tr>' + head.map((h, i) => '<th' + (i ? ' class="r"' : '') + '>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
     rows.map(r => '<tr>' + r.map((c, i) => '<td' + (i ? ' class="m r"' : '') + '>' + esc(c) + '</td>').join('') + '</tr>').join('') + '</tbody></table></details>';
+  // unemployment: the county's rate, or the Houston metro's for the whole region (BLS LAUS, nightly)
+  function unempTile() {
+    const u = area.unemployment; if (!u) return '';
+    const c = sel !== 'all' && u.counties?.[sel], m = u.metros?.['26420'], x = c || m; if (!x) return '';
+    return tile(x.rate + '%', 'Unemployment', (c ? cname(sel) + ' County' : 'Houston metro') + ', ' + MON[+x.period.slice(5) - 1] + ' ' + x.period.slice(0, 4) + (x.yearAgo != null ? ' · ' + x.yearAgo + '% a year earlier' : '') + (u.state ? ' · Texas ' + u.state.rate + '%' : ''));
+  }
+  // rates and home lending (FRED, New York Fed, CFPB HMDA)
+  function spark(pts) {
+    if (!pts?.length) return ''; const w = 120, h = 28, vs = pts.map(p => p[1]), lo = Math.min(...vs), hi = Math.max(...vs), k = hi - lo || 1;
+    return '<svg class="mk-spark" viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="' + pts.map((p, i) => (i / Math.max(1, pts.length - 1) * w).toFixed(1) + ',' + (h - 2 - (p[1] - lo) / k * (h - 4)).toFixed(1)).join(' ') + '"/></svg>';
+  }
+  function ratesBox() {
+    const r = area.rates?.series, mg = area.mortgages; if (!r && !mg) return '';
+    const rows = ['t10', 't5', 'sofr', 'm30'].filter(k => r?.[k]).map(k => { const x = r[k], d = x.yearAgo != null ? x.value - x.yearAgo : null;
+      return '<tr><td>' + esc(x.label) + '</td><td class="m r"><b>' + x.value.toFixed(2) + '%</b></td><td class="m r">' + (d == null ? '—' : (d > 0 ? '+' : '') + d.toFixed(2)) + '</td><td>' + spark(x.weekly) + '</td><td class="m">' + esc(MON[+x.date.slice(5, 7) - 1] + ' ' + +x.date.slice(8)) + '</td></tr>'; }).join('');
+    const F = fipsList().filter(f => mg?.counties?.[f]), loans = sum(F, f => mg.counties[f].loans), dollars = sum(F, f => mg.counties[f].dollars), purch = sum(F, f => mg.counties[f].purchase), prior = sum(F, f => mg.counties[f].priorLoans);
+    return '<section class="mk-box"><h3>Rates and home lending</h3>' + (rows ? '<table class="mk-rates"><thead><tr><th>Rate</th><th class="r">Now</th><th class="r">1-yr change</th><th>Last 12 months</th><th>As of</th></tr></thead><tbody>' + rows + '</tbody></table>' : '') +
+      (F.length && loans ? '<div class="kgrid mk-kg"><div><b>' + fmtN(loans) + '</b><span>Home loans made ' + mg.year + (prior ? ' (' + pct(chg(loans, prior)) + ')' : '') + '</span></div><div><b>' + fmtM(dollars) + '</b><span>Loan dollars ' + mg.year + '</span></div><div><b>' + fmtN(purch) + '</b><span>Home purchase loans</span></div><div><b>' + fmtM(loans ? dollars / loans : 0) + '</b><span>Average loan</span></div></div>' : '') +
+      '<div class="rnote">Treasury and mortgage rates move underwriting: loan rate ≈ an index plus a lender spread.<span class="src"> FRED (St. Louis Fed), New York Fed SOFR, Freddie Mac PMMS; home loans from CFPB HMDA (originated 1–4 family loans, published yearly).</span></div></section>';
+  }
   const tile = (v, label, sub) => '<div class="kpi"><b>' + v + '</b><span>' + esc(label) + '</span>' + (sub ? '<div class="mk-sub">' + esc(sub) + '</div>' : '') + '</div>';
 
   function render() {
@@ -141,6 +161,7 @@ export function initArea(ctx) {
       last ? tile(fmtN(last.sf + last.mf), 'Homes permitted ' + last.y, prev ? pct(chg(last.sf + last.mf, prev.sf + prev.mf)) + ' vs ' + prev.y : '') : '',
       s.ytd ? tile(fmtN(s.ytd.n), 'Homes permitted ' + s.ytd.year + ' YTD', 'Jan–' + MON[s.ytd.month - 1] + (s.ytd.prior ? ' · ' + pct(chg(s.ytd.n, s.ytd.prior)) + ' vs same months ' + (s.ytd.year - 1) : '')) : '',
       last12.length ? tile(fmtN(sum(last12, r => r.n)), 'New businesses', 'Last ' + last12.length + ' months, still open') : '',
+      unempTile(),
       s.spend ? tile(fmtM(s.spend.total), 'Consumer spending (est.)', (s.spend.perHH ? fmtM(s.spend.perHH) + ' per household · ' : '') + 'a year') : ''
     ].filter(Boolean);
     const opts = '<option value="all">Whole region</option>' + area.counties.map(c => '<option value="' + c.fips + '"' + (sel === c.fips ? ' selected' : '') + '>' + esc(c.name) + ' County</option>').join('');
@@ -162,6 +183,7 @@ export function initArea(ctx) {
       (s.tax?.length ? '<section class="mk-box"><h3>Local sales tax sent to cities, per month</h3>' + bizChart(s.tax.map(r => ({ m: r.m, n: r.n })), 'in city sales tax', fmtM) +
         table(['City', 'County', 'Last 12 months', 'Change vs prior 12'], s.taxCities.slice(0, 25).map(c => [c.city, c.county, c.last12 != null ? fmtM(c.last12) : '—', c.last12 != null && c.prior12 ? pct(chg(c.last12, c.prior12)) : '—'])) +
         '<div class="rnote">Texas Comptroller sales-tax allocations: the city\'s share of sales tax, paid about two months after the sales. A real measure of taxable local spending (retail, restaurants, many services), for the cities with filings in the area.</div></section>' : '') +
+      ratesBox() +
       (s.news ? '<section class="mk-box"><h3>Local development news</h3><div class="mk-ctl"><select class="chip" id="mkPlace" aria-label="News place">' + placeOpts + '</select></div>' +
         (s.news.length ? s.news.map((a, i) => (i === 10 ? '<details class="raw mk-more"><summary>' + (s.news.length - 10) + ' more</summary>' : '') + '<a class="chitem" target="_blank" rel="noopener" href="' + esc(a.url) + '"><span><b>' + esc(a.title) + '</b><em>' + esc(a.domain) + (a.date ? ' · ' + esc(a.date) : '') + ' · ' + esc(a.place) + '</em></span></a>').join('') + (s.news.length > 10 ? '</details>' : '') : '<div class="rnote">No articles found in the last few months.</div>') +
         '<div class="rnote">Google News search for development, construction, rezoning and real estate stories naming each county and its busiest towns; kept for 120 days. Headlines link to the publisher.</div></section>' : '') +

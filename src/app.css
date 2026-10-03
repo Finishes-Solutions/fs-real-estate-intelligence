@@ -1255,3 +1255,12 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .card #bSite dd .risk-hi{color:#c03b3a}
 .card #bSite dd .risk-md{color:#b7791f}
 .card #bSite dd .src{font-size:11px;color:var(--muted)}
+.mk-rates{width:100%;border-collapse:collapse;font-size:12.5px}
+.mk-rates th{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:600;padding:4px 6px}
+.mk-rates td{padding:5px 6px;border-top:1px solid var(--line);white-space:nowrap}
+.mk-rates td:first-child{white-space:normal}
+.mk-rates .r{text-align:right}
+.mk-spark{color:var(--brand);vertical-align:middle}
+.mk-box .mk-kg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.mk-box .mk-kg b{display:block;font-family:var(--font-mono);font-size:14px}
+.mk-box .mk-kg span{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}

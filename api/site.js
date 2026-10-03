@@ -57,7 +57,7 @@ export function roadName(a) {
 }
 export function trafficInfo(rows) {
   const best = new Map();
-  for (const a of rows) { const v = +a.AADT_CUR; if (!(v > 0)) continue; const name = roadName(a), k = name === 'City street' || name === 'County road' ? name + ':' + a.RTE_NBR : name;
+  for (const a of rows) { const v = +a.AADT_CUR; if (!(v > 0)) continue; const name = roadName(a), k = name; // one entry per named route, and only the busiest city street
     if (!best.has(k) || best.get(k).aadt < v) best.set(k, { road: name, aadt: v, system: a.SYSTEM === 'On' ? 'state' : 'local' }); }
   return { roads: [...best.values()].sort((a, b) => b.aadt - a.aadt).slice(0, 4) };
 }
@@ -73,7 +73,7 @@ export function echoInfo(list) {
     const flags = [];
     if (f.FacSNCFlg === 'Y' || +f.FacQtrsWithNC > 0) flags.push('violations');
     if (f.TRIFlag === 'Y') flags.push('toxic releases');
-    if (f.RCRAFlag === 'Y' || (f.RCRAComplianceStatus && f.RCRAComplianceStatus !== 'Not Applicable')) flags.push('hazardous waste');
+    if (f.RCRAFlag === 'Y' || (f.RCRAComplianceStatus && f.RCRAComplianceStatus !== 'Not Applicable')) flags.push('handles hazardous waste');
     if (+f.FacPenaltyCount > 0) flags.push('penalties');
     return { name: String(f.FacName || '').trim(), street: f.FacStreet || null, flags };
   }).filter(f => f.name);
