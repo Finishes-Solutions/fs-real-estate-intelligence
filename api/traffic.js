@@ -43,7 +43,9 @@ export async function traffic(b, fetchImpl = globalThis.fetch) {
 const esriPoly = g => JSON.stringify({ rings: g.type === 'Polygon' ? g.coordinates : g.coordinates.flat(), spatialReference: { wkid: 4326 } });
 const postQuery = (params, fetchImpl) => fetchImpl(AADT + '/query', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' }, body: new URLSearchParams(params), signal: AbortSignal.timeout(20000) })
   .then(async r => { if (!r.ok) throw new Error('TxDOT ' + r.status); const d = await r.json(); if (d.error) throw new Error('TxDOT: ' + (d.error.message || 'query failed')); return d; });
-const nameOf = a => a.RTE_PRFX === 'CS' && a.RTE_NM ? String(a.RTE_NM).replace(/-[A-Z]+$/, '') : roadName(a);
+// city streets: TxDOT names some (WESTHEIMER RD), others only by a segment number
+const nameOf = a => { if (a.RTE_PRFX !== 'CS' || !a.RTE_NM) return roadName(a); const n = String(a.RTE_NM).replace(/-[A-Z]+$/, '');
+  return /^\d+$/.test(n) ? 'Local street #' + n : n.toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase()); };
 const midOf = g => { const p = g?.paths?.[0] || []; return p[Math.floor(p.length / 2)] || null; };
 
 // TxDOT count segments in a polygon: the busiest per road, by road type, and every counted segment (for the map and CSV)
@@ -63,7 +65,8 @@ export async function countsIn(g, fetchImpl = globalThis.fetch) {
   }
   const types = (st.features || []).map(f => ({ type: f.attributes.RTE_PRFX, label: TYPE[f.attributes.RTE_PRFX] || 'Other roads', segments: +f.attributes.n || 0, avg: Math.round(+f.attributes.avg || 0), max: +f.attributes.mx || 0 }))
     .filter(x => x.segments).sort((a, b) => b.avg - a.avg);
-  return { roads: [...best.values()].map(({ sum, ...r }) => ({ ...r, avg: Math.round(sum / r.segments) })).slice(0, 25), types, segments, segments_capped: segments.length >= 1000 || undefined, as_of: asOf };
+  // TxDOT gives uncounted neighborhood streets a flat estimate (about 250 a day): they stay in the segments, not the top list
+  return { roads: [...best.values()].map(({ sum, ...r }) => ({ ...r, avg: Math.round(sum / r.segments) })).filter((r, i) => i < 3 || r.aadt >= 1000).slice(0, 25), types, segments, segments_capped: segments.length >= 1000 || undefined, as_of: asOf };
 }
 // TomTom: live speed vs free-flow speed at a point (the nearest road segment)
 export async function flowAt(key, lat, lon, fetchImpl = globalThis.fetch) {

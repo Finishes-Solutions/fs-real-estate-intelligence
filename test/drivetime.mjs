@@ -79,7 +79,7 @@ console.log('drivetime ok');
     throw new Error('unexpected ' + u);
   };
   const c = await countsIn(sq, f);
-  assert.deepEqual(c.roads.map(r => [r.road, r.aadt, r.segments, r.avg]), [['I-10', 250000, 2, 225000], ['WESTHEIMER RD', 30000, 1, 30000]], 'busiest per road, with averages');
+  assert.deepEqual(c.roads.map(r => [r.road, r.aadt, r.segments, r.avg]), [['I-10', 250000, 2, 225000], ['Westheimer Rd', 30000, 1, 30000]], 'busiest per road, with averages');
   assert.equal(c.segments.length, 3); assert.equal(c.types[0].label, 'Interstates');
   const d = await trafficReport(sq, { key: 'k', fetchImpl: f, label: 'x' });
   assert.equal(d.live[0].congestion_pct, 50); assert.equal(d.live[0].road, 'I-10');
