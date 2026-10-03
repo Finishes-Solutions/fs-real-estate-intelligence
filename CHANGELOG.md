@@ -5,6 +5,19 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 12:44 AM CT: See who a plane is registered to (9687118)
+- **Plane cards now have a "Registration" section** for US aircraft, from the FAA's aircraft registry:
+  - the registered owner and what kind of owner it is (individual, LLC, corporation…), plus any co-owners;
+  - the owner's city and state, and the tail number;
+  - year, make and model, when it was registered and when that expires;
+  - a link to the plane's FAA record.
+- **The assistant can answer "who owns N123AB?" or "whose plane is that?"**, for any US tail number, flying or not. "Check planes near …" and "follow that plane" now also say who each plane is registered to.
+- Foreign aircraft show a note that the FAA has no record of them. The registered owner is often an LLC, trust or leasing company rather than whoever is flying.
+- **Not live until two one-time setup steps are done:**
+  - run `supabase/migrations/20261011000000_aircraft_registry.sql` in Supabase;
+  - then run the **Live data** workflow once with `aircraft`. After that it refreshes every night from the FAA's own download.
+  - Until then, the card says the lookup isn't set up yet and links to the FAA website instead.
+
 ### 12:30 AM CT: The map now leads with properties, not filings (4a6874b, afa6fc3)
 - **Filing dots are hidden when the map first opens.** This applies once to everyone, after which your own choice sticks. To bring them back:
   - open **Construction Filings** in the left panel;
