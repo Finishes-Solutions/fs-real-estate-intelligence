@@ -5,6 +5,23 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 12:57 AM CT: FlightAware flight details, capped at $4.75 a month (35f7353)
+- **Plane cards fill in the route from FlightAware when the free route database doesn't have it.** This is mostly private and charter planes. The card shows:
+  - where the plane is flying from and to;
+  - when it departed and roughly when it arrives;
+  - the operator and its last few flights.
+- **New assistant question:** "where is N123AB going?", "where has that jet been flying?", "when does EJA512 land?"
+- **FlightAware charges per lookup, so spending has a hard cap of $4.75 a month**, under the $5 free monthly credit:
+  - Each lookup is counted in the database before it's made, and refused once the month would pass $4.75.
+  - The app checks FlightAware's own figure for the month every 15 minutes, and counts each lookup at about twice its published price in between.
+  - Each plane is looked up at most once per visit, and answers are shared between users for 10–20 minutes.
+  - Planes the free database already knows never cost anything.
+- **Sources tab** shows how much of the $4.75 has been used this month.
+- **Not live until setup is done:**
+  - add the API key in Vercel;
+  - run `supabase/migrations/20261012000000_aeroapi.sql` in Supabase.
+  - Without both, no FlightAware lookups are made.
+
 ### 12:48 AM CT: More detail in plane registrations (23b68cd)
 - **Registration status in plain English.** The card shows the status only when a registration isn't currently valid, for example "Registration expired", "Sale reported" or "Revoked". The FAA has about 40 such codes.
 - **Certificate type** (Experimental, Light sport, Restricted…) is shown for planes that aren't standard category, and **maximum weight class** is shown for larger aircraft.
