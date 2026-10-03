@@ -10,7 +10,7 @@
 // History reads say { history: false, note } when the database isn't set up yet.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { supa } from '../lib/supa.mjs';
-import { SOURCES, pointQuery, fetchPoint, boxAround, summarize, SAMPLES_PER_DAY, perDay } from '../lib/planes.mjs';
+import { pointQuery, fetchPoint, boxAround, summarize, SAMPLES_PER_DAY, perDay } from '../lib/planes.mjs';
 import { regKey, usHex, present, faaUrl } from '../lib/faa.mjs';
 import { track, aircraftInfo, airport, okHex } from '../lib/adsblol.mjs';
 
@@ -146,10 +146,6 @@ export default async function handler(req, res) {
     }
     const b = box(q.bbox); if (!b) return res.status(400).json({ error: 'bbox=w,s,e,n' });
     const p = pointQuery(b), key = p.lat + ',' + p.lon + ',' + p.nm;
-    // ?source=adsb.fi asks one feed only (diagnostics: which feed sees what)
-    const only = q.source ? SOURCES.filter(s => s.name === q.source) : null;
-    if (only && !only.length) return res.status(400).json({ error: 'source=' + SOURCES.map(s => s.name).join('|') });
-    if (only) { const out = await fetchPoint(p.lat, p.lon, p.nm, undefined, 8000, only); res.setHeader('Cache-Control', 'no-store'); return res.json({ ...out, center: [p.lon, p.lat], nm: p.nm }); }
     let out;
     try { out = await fetchPoint(p.lat, p.lon, p.nm); LAST.set(key, { t: Date.now(), out }); if (LAST.size > 200) LAST.delete(LAST.keys().next().value); }
     catch (e) {
