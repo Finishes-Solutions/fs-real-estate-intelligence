@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 2:00 PM CT: Minimize cards to see the map (a9114ef)
+- **Every card can shrink to its title bar:** properties, filings, planes, airports and reports.
+  - Tap the **⌄** button next to the ×, or on a phone swipe the card down.
+  - The selection stays, and so does everything the card put on the map: a plane you're following, its flight path and 3D path, routes, outlines.
+  - Tap the title bar (or swipe up) to bring the card back.
+- **Swiping down on a phone** now goes from full height to normal to minimized, and only then closes the card.
+- **Following a plane on a phone** keeps it centered in the map above the card instead of behind it, so a minimized card leaves almost the whole screen for the flight.
+
 ### 1:19 PM CT: Airports worldwide, air traffic reports and flight reports (3924b91, 3b2ee82, 21d87ab)
 - **Every airport in the world is in the app:** 86,158 airports, including all 3,887 in Texas, and 48,000 runways. Turn on **Airports** in Map Layers: big airports show from far out, small fields and heliports as you zoom in.
 - **Click an airport for its card:**
