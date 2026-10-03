@@ -27,13 +27,22 @@ globalThis.fetch = async url => {
   }
   if (u.host === 'www.nhc.noaa.gov') return json({ activeStorms: [{ id: 'al142026', name: 'Kirk', classification: 'HU', intensity: '100', pressure: '965', latitudeNumeric: 25.1, longitudeNumeric: -90.2, movementDir: 315, movementSpeed: 10 }] });
   if (u.host === 'news.google.com') {
-    if (mode !== 'google') throw new TypeError('fetch failed');
-    assert.equal(u.searchParams.get('q'), '"Hines" "Katy" when:1y');
-    return new Response('<rss><channel><item><title>Hines breaks ground on Katy tower - Houston Chronicle</title><link>https://news.google.com/a1</link><pubDate>Tue, 29 Sep 2026 14:00:00 GMT</pubDate><source url="https://www.houstonchronicle.com">Houston Chronicle</source></item><item><title><![CDATA[Hines &amp; partners plan Katy offices - Bisnow]]></title><link>https://news.google.com/a2</link><pubDate>Mon, 14 Sep 2026 10:00:00 GMT</pubDate><source url="https://www.bisnow.com">Bisnow</source></item></channel></rss>', { headers: { 'Content-Type': 'application/rss+xml' } });
+    if (!/^google/.test(mode)) throw new TypeError('fetch failed');
+    const q = u.searchParams.get('q'), rss = items => new Response('<rss><channel>' + items + '</channel></rss>', { headers: { 'Content-Type': 'application/rss+xml' } });
+    assert.match(q, / when:1y$/);
+    if (q.startsWith('"Hines" ')) {
+      assert.equal(q, '"Hines" ("Katy, TX" OR "Katy, Texas" OR Texas) when:1y');
+      return rss('<item><title>Hines breaks ground on Katy tower - Houston Chronicle</title><link>https://news.google.com/a1</link><pubDate>Tue, 29 Sep 2026 14:00:00 GMT</pubDate><source url="https://www.houstonchronicle.com">Houston Chronicle</source></item><item><title><![CDATA[Hines &amp; partners plan Katy offices - Bisnow]]></title><link>https://news.google.com/a2</link><pubDate>Mon, 14 Sep 2026 10:00:00 GMT</pubDate><source url="https://www.bisnow.com">Bisnow</source></item>');
+    }
+    if (q.startsWith('("Katy, TX" OR "Katy, Texas") (development')) {
+      if (mode === 'google-partial') return new Response('busy', { status: 503 });
+      return rss('<item><title>Katy council approves new retail center - Katy Times</title><link>https://news.google.com/k1</link><pubDate>Wed, 30 Sep 2026 09:00:00 GMT</pubDate><source url="https://katytimes.example">Katy Times</source></item><item><title>Hines breaks ground on Katy tower - Community Impact</title><link>https://news.google.com/a1b</link><pubDate>Tue, 29 Sep 2026 15:00:00 GMT</pubDate><source url="https://communityimpact.com">Community Impact</source></item>');
+    }
+    return rss('');
   }
   if (u.host === 'api.gdeltproject.org') {
     if (mode === 'gdelt-text') return new Response('Please limit requests to one every 5 seconds', { status: 200 });
-    assert.match(u.searchParams.get('query'), /^"(Hines Interests|Hines)" "Katy" sourcecountry:US/);
+    assert.match(u.searchParams.get('query'), /^"(Hines Interests|Hines)" "Katy Texas" sourcecountry:US/);
     return json({ articles: [{ url: 'https://a.com/1', title: 'Hines plans tower in Katy', seendate: '20260930T120000Z', domain: 'a.com' }, { url: 'https://b.com/1', title: 'Hines plans tower in Katy!', seendate: '20260929T120000Z', domain: 'b.com' }] });
   }
   return json({ error: 'unmocked ' + u }, 599);
@@ -88,17 +97,46 @@ assert.equal(res.body.storms[0].name, 'Kirk'); assert.equal(res.body.storms[0].w
 res = mock(); await weather({ query: { kind: 'wind', bbox: 'x' }, headers: { 'x-forwarded-for': '3.3.3.3' } }, res); assert.equal(res.code, 400);
 
 // ---- news ----
-const { default: news, gdeltQuery, phrase } = await import('../api/news.js');
+const { default: news, gdeltQuery, phrase, buildQueries } = await import('../api/news.js');
+const { ownerName, subdivision, streetPhrase, local } = await import('../lib/news-query.mjs');
 assert.equal(phrase('Hines Holdings, LLC'), '"Hines"'); assert.equal(phrase('LLC'), ''); assert.equal(gdeltQuery('', ''), '');
+assert.equal(phrase('City of Baytown'), '"City of Baytown"', 'filler words only come off the ends'); assert.equal(phrase('Pulte Homes of Texas'), '"Pulte Homes"');
+assert.equal(local('Waller', 'Waller'), '("Waller, TX" OR "Waller, Texas" OR "Waller County")'); assert.equal(local('Waller County', ''), '("Waller County")');
+assert.equal(gdeltQuery('', 'Waller'), '"Waller Texas" sourcecountry:US sourcelang:english', 'GDELT never gets the bare town');
+assert.equal(ownerName('SMITH JOHN A & MARY B'), '"John Smith"'); assert.equal(ownerName('SMITH FAMILY TRUST'), '', 'one short word is too vague');
+assert.equal(ownerName('Jane Doe Revocable Living Trust'), '"Jane Doe"'); assert.equal(ownerName('HOUSTON 2020 PROPERTIES LLC'), '"HOUSTON 2020"');
+assert.equal(subdivision('LT 4 BLK 3 CANE ISLAND SEC 7'), '"Cane Island"'); assert.equal(subdivision('STOKESBURY SEC 2, BLOCK 3, LOT 4'), '"Stokesbury"');
+assert.equal(subdivision('ABST 123 J SMITH TRACT 5'), '', 'survey acreage is not a neighborhood'); assert.equal(subdivision('TR 4-B'), '');
+assert.equal(streetPhrase('6615 Garth Rd Baytown, TX 77520'), '"6615 Garth"'); assert.equal(streetPhrase('266 FM 1488'), '"266 FM 1488"'); assert.equal(streetPhrase('Garth Rd'), '');
+{ // a Waller filing: every angle, and the town is never a bare word (the Fed's Christopher Waller)
+  const qs = buildQueries({ project: 'Pafford New Warehouse', company: ['Pafford Properties', 'Pafford Properties', 'ADC LLC'], business: ['H-E-B', 'Whataburger'], owner: 'SMITH JOHN A', address: '30250 Pafford Rd', legal: 'LT 4 BLK 3 CANE ISLAND SEC 7', city: 'Waller', county: 'WALLER' });
+  assert.deepEqual(qs.map(q => q.kind), ['project', 'company', 'business', 'business', 'owner', 'address', 'hood', 'area']);
+  for (const q of qs) for (const m of q.query.matchAll(/Waller/g)) assert.match(q.query.slice(m.index), /^Waller(, TX"|, Texas"| County")/, q.query);
+  assert.equal(qs.find(q => q.kind === 'owner').label, 'Owner: John Smith'); assert.equal(qs.find(q => q.kind === 'hood').label, 'Cane Island');
+  assert.ok(!qs.some(q => /ADC/.test(q.query)), 'a name that cleans down to nothing is skipped, not searched as just the town');
+  assert.deepEqual(buildQueries({ company: ['ADC LLC'], city: 'Waller' }).map(q => q.kind), ['area']);
+  assert.deepEqual(buildQueries({ company: ['Waller'], city: 'Waller', area: false }), [], 'the town name alone is not a company');
+  assert.match(buildQueries({ company: ['Hines'] })[0].query, /^"Hines" \(development OR/, 'a lone word with no place gets development words');
+}
 res = mock(); await news({ query: { q: 'Hines Interests LP', near: 'Katy' }, headers: { 'x-forwarded-for': '4.4.4.4' } }, res);
 assert.equal(res.code, 200, JSON.stringify(res.body)); assert.equal(res.body.articles.length, 1, 'near-duplicate titles collapse'); assert.equal(res.body.articles[0].date, '2026-09-30');
 mode = 'gdelt-text'; res = mock(); await news({ query: { q: 'Hines', near: 'Katy' }, headers: { 'x-forwarded-for': '4.4.4.4' } }, res); assert.equal(res.code, 502); assert.match(res.body.error, /busy/); mode = 'ok';
 res = mock(); await news({ query: {}, headers: { 'x-forwarded-for': '4.4.4.4' } }, res); assert.equal(res.code, 400);
-// Google News is tried first; GDELT only when Google fails (above: Google unreachable, GDELT answered)
+// Google News is tried first (every angle at once); GDELT only when every Google search fails (above: Google unreachable)
 mode = 'google'; res = mock(); await news({ query: { q: 'Hines Holdings LLC', near: 'Katy' }, headers: { 'x-forwarded-for': '6.6.6.6' } }, res); mode = 'ok';
-assert.equal(res.code, 200); assert.equal(res.body.source, 'Google News'); assert.equal(res.body.articles.length, 2);
-assert.equal(res.body.articles[0].title, 'Hines breaks ground on Katy tower'); assert.equal(res.body.articles[0].domain, 'Houston Chronicle'); assert.equal(res.body.articles[0].date, '2026-09-29');
-assert.equal(res.body.articles[1].title, 'Hines & partners plan Katy offices');
+assert.equal(res.code, 200); assert.equal(res.body.source, 'Google News'); assert.equal(res.body.articles.length, 3, 'the same story from the area search is dropped');
+assert.deepEqual(res.body.searched.map(x => [x.kind, x.label, x.found]), [['company', 'Hines', 2], ['area', 'Around Katy', 2]]);
+assert.equal(res.body.articles[0].title, 'Katy council approves new retail center'); assert.equal(res.body.articles[0].about, 'Around Katy');
+assert.equal(res.body.articles[1].title, 'Hines breaks ground on Katy tower'); assert.equal(res.body.articles[1].domain, 'Houston Chronicle'); assert.equal(res.body.articles[1].about, 'Hines');
+assert.equal(res.body.articles[2].title, 'Hines & partners plan Katy offices');
+mode = 'google-partial'; res = mock(); await news({ query: { company: 'Hines LLC', city: 'Katy' }, headers: { 'x-forwarded-for': '6.6.6.7' } }, res); mode = 'ok';
+assert.equal(res.code, 200, 'one failed angle doesn\'t sink the rest'); assert.equal(res.body.articles.length, 2); assert.equal(res.body.searched[1].found, null);
+{ // a whole property: every angle searched, each pinned to the town
+  const before = seen.length; mode = 'google'; res = mock();
+  await news({ query: { project: 'Pafford New Warehouse', company: ['Pafford Properties'], biz: ['H-E-B'], owner: 'SMITH JOHN A', addr: '30250 Pafford Rd', city: 'Waller', county: 'Waller' }, headers: { 'x-forwarded-for': '6.6.6.8' } }, res); mode = 'ok';
+  const qs = seen.slice(before).filter(u => u.host === 'news.google.com').map(u => u.searchParams.get('q'));
+  assert.equal(qs.length, 6); assert.ok(qs.every(q => /"Waller, TX" OR "Waller, Texas" OR "Waller County"/.test(q)), qs.join('\n'));
+  assert.equal(res.code, 200); assert.equal(res.body.searched.length, 6); }
 
 // news is saved to Supabase per filing and saved articles come back when GDELT is busy
 { const store = { news_articles: [], filing_news: [] }, base = globalThis.fetch;

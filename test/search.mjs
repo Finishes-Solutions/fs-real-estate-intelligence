@@ -9,6 +9,8 @@ globalThis.fetch = async (url, opts) => {
   const b = JSON.parse(opts.body); sent.push(b);
   if (mode === 'old-tool' && b.tools[0].type === 'web_search') return Response.json({ error: { message: "Invalid value: 'web_search'. Supported tools: web_search_preview" } }, { status: 400 });
   if (mode === 'down') return Response.json({ error: { message: 'server error' } }, { status: 500 });
+  if (mode === 'locate') return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'Here it is:\n```json\n{"name":"Terminal B","within":"George Bush Intercontinental Airport","address":"","city":"Houston","lat":29.9902,"lon":-95.3368}\n```', annotations: [] }] }] });
+  if (mode === 'locate-none') return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'I could not find that place.', annotations: [] }] }] });
   return Response.json(reply);
 };
 const { default: handler, parseSearch } = await import('../api/search.js');
@@ -25,6 +27,16 @@ r = res(); await handler({ method: 'GET', headers: {} }, r); assert.equal(r.code
 assert.ok(sent.some(b => b.tools[0].user_location?.city === 'Houston'), 'local by default');
 mode = 'ok'; sent.length = 0; r = res(); await handler({ method: 'POST', headers: {}, body: { query: 'what is being built in Lyon', local: false } }, r);
 assert.ok(sent.length && sent.every(b => !b.tools[0].user_location), 'no Houston bias for a question about elsewhere');
+// locate: where a place is, as JSON the map checks against OpenStreetMap
+const { parseLocate } = await import('../api/search.js');
+mode = 'locate'; sent.length = 0; r = res(); await handler({ method: 'POST', headers: { 'x-forwarded-for': '9.9.9.9' }, body: { mode: 'locate', query: 'Terminal B at George Bush airport' } }, r);
+assert.equal(r.code, 200); assert.equal(r.body.name, 'Terminal B'); assert.equal(r.body.within, 'George Bush Intercontinental Airport'); assert.equal(r.body.lat, 29.9902);
+assert.match(sent[0].instructions, /ONLY a JSON object/); assert.equal(sent[0].tool_choice, 'required');
+mode = 'locate-none'; r = res(); await handler({ method: 'POST', headers: { 'x-forwarded-for': '9.9.9.9' }, body: { mode: 'locate', query: 'Nowhere Plaza' } }, r); assert.equal(r.code, 404);
+assert.deepEqual(parseLocate('{"name":"X","lat":"abc","lon":null}'), { name: 'X', within: '', address: '', city: '', lat: null, lon: null });
+assert.equal(parseLocate('{"name":"","lat":0,"lon":0}'), null, 'no name and null-island coordinates is nothing'); assert.equal(parseLocate('not json {'), null);
+assert.equal(parseLocate('{"name":"X","lat":95,"lon":10}').lat, null, 'impossible coordinates are dropped');
+mode = 'ok';
 // the tool is for explicit requests and for current facts about places the filings don't cover, never for map data
 const { TOOLS, systemPrompt } = await import('../lib/agent-tools.mjs');
 const wd = TOOLS.find(t => t.name === 'web_search').description;

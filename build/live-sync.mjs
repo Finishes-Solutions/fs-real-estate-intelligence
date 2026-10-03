@@ -1,5 +1,5 @@
 // Nightly: save the live-data facts behind the map into Supabase (.github/workflows/live-sync.yml).
-//   news_articles + filing_news  GDELT articles for the developer / tenant / owner of active filings (rotates through them, ~5 s per search)
+//   news_articles + filing_news  Google News (GDELT fallback) for the developer / tenant / owner of active filings, pinned to the town and county (rotates through them, ~5 s per search)
 //   imagery_passes               NASA HLS passes (date, cloud %) over each active filing
 //   weather_daily                Open-Meteo daily weather at each county centroid (3 days back, 7 ahead)
 //   storm_advisories             NOAA NHC active-storm snapshot
@@ -120,13 +120,14 @@ await step('news', async () => {
   for (const f of active.filter(f => f.cost >= 1e6).sort((a, b) => b.cost - a.cost)) {
     const who = f.dev || f.ten || f.owner || f.name; if (!phrase(who)) continue;
     const k = phrase(who).toLowerCase() + '|' + (f.city || '').toLowerCase();
-    if (!groups.has(k)) groups.set(k, { who, city: f.city || '', ids: [] }); groups.get(k).ids.push(f.id);
+    if (!groups.has(k)) groups.set(k, { who, city: f.city || '', county: f.county || '', ids: [] }); groups.get(k).ids.push(f.id);
   }
   const todo = rotate([...groups.values()], NEWS_MAX); let found = 0, links = 0, errors = 0;
   for (const [i, g] of todo.entries()) {
     if (i) await sleep(NEWS_GAP_MS);
     try {
-      const { query, articles } = await news(g.who, g.city, 10); if (!articles.length) continue;
+      // the company only (the project and area angles are what the card's News button adds); "Waller, TX", never bare "Waller"
+      const { query, articles } = await news({ company: [g.who], city: g.city, county: g.county, area: false }, null, 10); if (!articles.length) continue;
       await db.upsert('news_articles', articles.map(a => ({ url: a.url, title: a.title, domain: a.domain, published: a.date, image: a.image })), 'url');
       const l = g.ids.flatMap(id => articles.map(a => ({ filing_id: id, url: a.url, query }))); await db.upsert('filing_news', l, 'filing_id,url');
       found += articles.length; links += l.length;

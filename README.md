@@ -139,7 +139,7 @@ Layers panel → **Live conditions**, the **From here** buttons on every filing 
 | Market view: Houston crime trend, busiest roads; Market report export | `api/crime?city=1` (four boxes summed, each under the 1,500 sq mi report limit) and `api/traffic?bbox=` (TxDOT AADT: busiest named routes and average daily traffic by road type; current year only) | Supabase for crime; none for traffic |
 | Low Flight Paths layer, "Air Traffic" on property cards | `api/planes-sample` (Vercel Cron, every minute) counts aircraft below 3,000 ft in ~1 km cells into Supabase (`air_cells`, `air_days`; migration `20261008000000_air_traffic.sql`) | `SUPABASE_SECRET_KEY`; set `CRON_SECRET` to lock the cron endpoint |
 | High-res site imagery (dated, sub-metre) | Esri World Imagery Wayback (archived versions, only those where the spot changed) and USDA NAIP (~0.6 m, Texas about every 2 years) from Microsoft Planetary Computer, through `api/imagery` | none |
-| Project news | GDELT Project DOC 2.0, through `api/news` | none |
+| Project news | Google News search (GDELT Project DOC 2.0 as fallback), through `api/news` | none |
 | ESRI / Free Map basemaps | Esri World Imagery, OpenFreeMap | none |
 
 Voice and chat understand requests like "how far is this property from me and what's the drive time", "how's traffic getting there", "turn on radar and wind", "show hurricanes", "what's the weather here", "any news on this developer", "has work started on this site". "This" means the card that is open; "me" is the phone or laptop's GPS (the browser asks for permission once). With no card open, distance questions use the filing nearest to you.
@@ -149,7 +149,7 @@ Limits to know:
 - Radar covers the contiguous US; lightning is a 15-minute density grid (~8 km), not individual strikes.
 - NASA HLS imagery is 30 m per pixel and arrives every few days with a 1–3 day delay: good for "is the land cleared or a pad poured", not for detail. Cloud % is for the whole ~110 km scene.
 - High-res site imagery is sharp (sub-metre) but not current: Esri's archived versions are typically months to a few years old (the capture date is shown when Esri's metadata has it) and NAIP is flown about every two years. Truly recent sub-metre imagery (days or weeks old) is a paid product (e.g. Nearmap, Planet SkySat, Maxar). Esri World Imagery and Wayback are under Esri's terms of use; keep the attribution.
-- GDELT covers about the last three months of online news and rarely finds single-asset LLC names; the card searches the developer, then the tenant, then the owner.
+- News searches several angles at once: the project, its developer / tenant / owner, the businesses at the spot, the parcel owner, the street address, the subdivision and the town or county. Towns are always searched as "Waller, TX" / "Waller, Texas" / "Waller County", never the bare word, so a town that is also a surname doesn't pull in news about that person. Single-asset LLC names rarely appear in the news. The query builder is `lib/news-query.mjs`.
 - Licences: Open-Meteo's free API, the FOSSGIS routing servers and the public Photon/Nominatim services are for non-commercial or fair use. This app is internal, but heavy or customer-facing use would need Open-Meteo's paid API (`OPEN_METEO_API_KEY`) and your own OSRM server. Keep the attributions shown in the map's attribution line.
 
 ## Setup

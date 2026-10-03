@@ -239,14 +239,35 @@ export function initLive(ctx) {
     return { place: p.name, days: d.days.slice(0, Math.max(1, Math.min(7, a.days || 7))), source: 'Open-Meteo' };
   }
 
+  // a filing's news subject: the project, the companies behind it, its street address, town and county, and the businesses
+  // registered there when that lookup has already run
+  function filingSubject(f) {
+    const ad = ctx.filingAddr?.(f) || { street: '' }, ten = ad.street && ctx.tenantsPeek?.(ad.street, ad.zip, ad.city)?.tenants || [];
+    const who = [f.dev, f.ten, f.owner].filter(Boolean);
+    return { project: f.name, company: [...new Set(who.length ? who : [f.gc].filter(Boolean))], business: ten.map(t => t.name), addr: /^\d/.test(ad.street) ? ad.street : '', city: f.city || '', county: f.county || '' };
+  }
+  // one News search covers the project, its companies, the businesses at the spot, the owner, the address, the subdivision
+  // and the town; each article says which of those found it
   async function news(a = {}) {
-    let q = a.query || '', near = a.near || '';
-    const f = a.filing_id ? ctx.BY_ID.get(String(a.filing_id).trim()) : cardPoint()?.f;
-    if (!q && f) { q = f.dev || f.ten || f.owner || f.name; near = near || f.city || ''; }
-    if (!q && !near) { const c = cardPoint(); if (c) q = c.name; }
-    if (!q && !near) return { error: 'Say what to look up, or open a filing first.' };
-    const r = await fetch('api/news?' + new URLSearchParams({ q, near, ...(f && !a.query ? { filing: f.id } : {}) })), d = await r.json(); if (!r.ok) return { error: d.error };
-    return { searched: d.query, articles: d.articles, source: d.source || 'Google News', note: d.articles.length ? undefined : 'No coverage found in the last year. Single-asset LLC names rarely appear in news; try the tenant or brand.' };
+    const f = a.filing_id ? ctx.BY_ID.get(String(a.filing_id).trim()) : a.query ? null : cardPoint()?.f;
+    let s = null;
+    if (a.query) s = { company: [a.query], city: a.near || '' };
+    else if (f) s = filingSubject(f);
+    else if (lastCard?.subject && cardPoint()) { s = lastCard.subject(); const t = cardPoint().name;
+      if (!s.business?.length && !s.owner && !s.addr && !s.city && !s.county && t && !/^(building|parcel|loading)/i.test(t)) s.company = [t]; }
+    else if (a.near) s = { city: a.near };
+    if (!s) { const c = cardPoint(); if (c) s = { company: [c.name] }; }
+    if (!s) return { error: 'Say what to look up, or open a filing first.' };
+    if (a.owner) s.owner = a.owner;
+    if (a.businesses?.length) s.business = [...a.businesses, ...(s.business || [])];
+    if (a.near && !a.query) s.city = s.city || a.near;
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries({ project: s.project, owner: s.owner, addr: s.addr, legal: s.legal, city: s.city, county: s.county })) if (v) q.set(k, String(v).slice(0, k === 'legal' ? 200 : 100));
+    (s.company || []).slice(0, 4).forEach(v => q.append('company', v)); (s.business || []).slice(0, 6).forEach(v => q.append('biz', v));
+    if (f && !a.query) q.set('filing', f.id);
+    const r = await fetch('api/news?' + q), d = await r.json(); if (!r.ok) return { error: d.error };
+    return { searched: (d.searched || []).map(x => x.label), articles: d.articles.map(x => ({ title: x.title, url: x.url, domain: x.domain, date: x.date, about: x.about || (x.saved ? 'Saved earlier' : '') })), source: d.source || 'Google News',
+      note: d.articles.length ? undefined : 'No coverage found in the last year for the project, the companies, the businesses there or the town. Single-asset LLC names rarely appear in news.' };
   }
 
   async function imagery(a = {}) {
@@ -278,7 +299,10 @@ export function initLive(ctx) {
       '<span class="fc-t"><i>' + Math.round(x.low_f) + '°</i><s><u style="left:' + ((x.low_f - lo) / span * 100).toFixed(1) + '%;right:' + ((hi - x.high_f) / span * 100).toFixed(1) + '%"></u></s><i>' + Math.round(x.high_f) + '°</i></span>' +
       '<span class="fc-w" title="Max wind (gusts)">' + Math.round(x.max_wind_mph) + (x.max_gust_mph ? '–' + Math.round(x.max_gust_mph) : '') + ' mph</span></div>').join('') + '</div>' +
       '<div class="rnote src">Source: Open-Meteo forecast (temperatures °F; rain = chance and expected inches; wind = max sustained–gusts)</div>'; };
-  const newsHTML = (d, n = 8) => '<div class="rnote">Searched ' + esc(d.searched) + '</div>' + (d.articles.length ? d.articles.slice(0, n).map(x => '<a class="chitem" target="_blank" rel="noopener" href="' + esc(x.url) + '"><span><b>' + esc(x.title) + '</b><em>' + esc(x.domain) + (x.date ? ' · ' + esc(x.date) : '') + '</em></span></a>').join('') : '<div class="rnote">' + esc(d.note) + '</div>') + '<div class="rnote src">Source: ' + esc(d.source || 'Google News') + '</div>';
+  // articles grouped by what found them (this project, a company, a business there, the owner, the town), newest first in each
+  const newsHTML = (d, n = 14) => { const groups = new Map(); for (const x of d.articles.slice(0, n)) { const k = x.about || 'News'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); }
+    return '<div class="rnote">Searched ' + esc((Array.isArray(d.searched) ? d.searched : [d.searched]).filter(Boolean).join(' · ')) + '</div>' + (d.articles.length ? [...groups].map(([k, l]) => (groups.size > 1 ? '<div class="fl">' + esc(k) + '</div>' : '') +
+      l.map(x => '<a class="chitem" target="_blank" rel="noopener" href="' + esc(x.url) + '"><span><b>' + esc(x.title) + '</b><em>' + esc(x.domain) + (x.date ? ' · ' + esc(x.date) : '') + '</em></span></a>').join('')).join('') : '<div class="rnote">' + esc(d.note) + '</div>') + '<div class="rnote src">Source: ' + esc(d.source || 'Google News') + '</div>'; };
 
   // ---------- card tools: drive time, weather, site imagery, news ----------
   function renderCardTools(info) {
@@ -298,8 +322,8 @@ export function initLive(ctx) {
       const [list, hi] = await Promise.all([passes([c[0] - .01, c[1] - .01, c[0] + .01, c[1] + .01]).catch(() => []), hiresCatalog(c)]); if (!mine()) return;
       renderCardImagery(c, list, hi);
     } catch (e) { fail(e); } };
-    sec.querySelector('[data-a=news]').onclick = async () => { busy('Searching recent news…'); try {
-      const d = info.kind === 'filing' ? await news({ filing_id: info.f.id }) : await news({ query: info.label() }); if (!mine()) return; if (d.error) throw new Error(d.error);
+    sec.querySelector('[data-a=news]').onclick = async () => { busy('Searching news about the project, the businesses there, the owner and the area…'); try {
+      const d = info.kind === 'filing' ? await news({ filing_id: info.f.id }) : await news(); if (!mine()) return; if (d.error) throw new Error(d.error);
       out.innerHTML = newsHTML(d);
     } catch (e) { fail(e); } };
   }
