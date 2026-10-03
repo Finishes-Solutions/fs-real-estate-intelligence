@@ -5,6 +5,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 12:22 AM CT: Follow or orbit any plane from the chat, with its type and route (4b84a22)
+- **"Check planes near …"** now lists each nearby plane with its **aircraft type** (e.g. "Boeing 737-800") and **where it's flying from and to** (e.g. IAH → ORD). It also gets each plane's position, so the assistant can act on it.
+- **Asking for a town searches 10 miles around it** instead of 3, so "planes near Spring" finds more than the sky directly overhead.
+- **New: follow or orbit a plane.** Say "orbit DAL1601", "follow that plane" or "pick any aircraft and orbit it":
+  - Live Planes turns on and the plane's card opens with its route line.
+  - The camera stays with the plane as it moves, and circles it in orbit mode.
+  - Drag the map or close the card to stop.
+- **Follow and Orbit buttons** sit on each plane in the chat's Air Traffic card.
+- **The plane lookup retries once** when the free live feed is briefly busy, instead of failing.
+- **The "Filings Within ¼ Mile" button is gone from the building card.**
+
 ### 12:15 AM CT: Site facts, Houston crime, rates and unemployment (0b71ba9, d043662, abd1007)
 - **New "Site" section on every building card**, from free public sources:
   - **Flood zone** at the spot (FEMA), with high-risk zones in red and a plain-English note.
