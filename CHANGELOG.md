@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
-### 1:14 AM CT: New card design: titled section cards (option B) (3c109f6)
+### 1:14 AM CT: New card design: titled section cards (option B) (1d1a25e)
 - **Building, parcel, filing and plane cards now use the "report with section cards" layout** you picked from the mockups:
   - a row of section chips under the title that jumps to each section;
   - a dark Overview summary at the top;
