@@ -3,6 +3,12 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-03
+
+### 8:00 PM CT: Austin County fix (9d86928)
+- TDLR lists some City of Austin projects (Travis County, 787xx ZIPs) under Austin County, apparently because filers picked "Austin" as the county. 22 of them were showing as approximate pins near Bellville. They are no longer placed in Austin County; they'll drop off the regional map (they're about 100 miles outside it) at the next nightly refresh.
+- The statewide data load had skipped Austin County because of those filings. It now loads it, and only skips a county when nearly all of its filings are elsewhere (a sign of a real mix-up).
+
 ## 2026-10-02
 
 ### 7:12 PM CT: Aircraft sampled every minute
