@@ -15,6 +15,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Export Report** saves a printable report (Print → Save as PDF); **Export CSV** saves every table for Excel.
 - **Ask AI** about flood zones, flood history, insurance claims, disasters or hazard risk for a place, a building or your selection; it can open the report or turn on the flood layer.
 - Claims are counted for the census tracts around the area (FEMA hides exact addresses), so they describe the neighborhood, not one parcel.
+- FEMA's claims service can be slow the first time an area is asked for; the report now waits longer and retries once, and a report missing a part is never saved, so trying again gets a full one (feb40d8).
 
 ### 1:22 AM CT: The same section-card style across the app (12b80c8)
 - **Tabs:** Reports, Updates, Field Notes, Market, Activity, Compare and Sources now sit on a light grey background. Each group sits in a white card with an icon and a title, like the new property card.
