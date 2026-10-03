@@ -173,7 +173,7 @@ export function initChatCards(ctx) {
           on(d, 'clr', e => { ctx.live.clearRoute(); e.currentTarget.remove(); }); return d; }
         case 'weather_at': return ctx.live ? liveCard('Weather', r.place, ctx.live.weatherHTML(r)) : null;
         case 'weather_forecast': return ctx.live && r.days?.length ? liveCard(r.days.length + '-day forecast', r.place, ctx.live.forecastHTML(r)) : null;
-        case 'project_news': return ctx.live ? liveCard('News', r.searched, ctx.live.newsHTML(r, 5)) : null;
+        case 'project_news': return ctx.live ? liveCard('News', [].concat(r.searched || [])[0] || 'News', ctx.live.newsHTML(r, 8)) : null;
         case 'site_imagery': { if (!ctx.live) return null; const d = liveCard('Site imagery', r.place, '<div class="live-out"></div>'); ctx.live.imageryInto(d.querySelector('.live-out')); return d; }
       }
     } catch (e) { console.error('chat card', name, e); }

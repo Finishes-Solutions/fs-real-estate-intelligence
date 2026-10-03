@@ -8,6 +8,7 @@
 import { gunzipSync } from 'node:zlib';
 import { log, sleep } from './util.mjs';
 import { parseGoogleNews } from '../api/news.js';
+import { TOPIC } from '../lib/news-query.mjs';
 
 const UA = { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions filings map build)' };
 async function get(url, { ms = 60000, head = false } = {}) {
@@ -154,7 +155,6 @@ export async function buildBusinesses(counties, prev) {
 }
 
 // ---------- area news: Google News ----------
-const TOPIC = '(development OR construction OR "breaks ground" OR groundbreaking OR rezoning OR "real estate" OR "new store" OR expansion OR "plans to build")';
 export function newsQuery(place) { return '"' + String(place).replace(/"/g, '') + '" ' + TOPIC + ' when:30d'; }
 export async function buildNews(places, prev, gap = 1500) {
   const keep = Date.now() - 120 * 864e5, out = {}; let ok = 0;

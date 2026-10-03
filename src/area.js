@@ -365,12 +365,14 @@ export function initArea(ctx) {
   ctx.onView('market', render);
 
   // ---------- businesses registered at an address (building and filing cards) ----------
-  const cache = new Map();
+  const cache = new Map(), done = new Map(), tkey = (addr, zip, city) => [addr, zip, city].join('|').toUpperCase();
   ctx.tenantsAt = (addr, zip, city) => {
-    const k = [addr, zip, city].join('|').toUpperCase(); if (cache.has(k)) return cache.get(k);
-    const p = fetch('api/tenants?' + new URLSearchParams({ addr, ...(zip ? { zip } : {}), ...(city ? { city } : {}) })).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'lookup failed'); return d; });
+    const k = tkey(addr, zip, city); if (cache.has(k)) return cache.get(k);
+    const p = fetch('api/tenants?' + new URLSearchParams({ addr, ...(zip ? { zip } : {}), ...(city ? { city } : {}) })).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'lookup failed'); done.set(k, d); return d; });
     p.catch(() => cache.delete(k)); cache.set(k, p); return p;
   };
+  // the answer only if that address was already looked up (the News button uses it without starting a lookup)
+  ctx.tenantsPeek = (addr, zip, city) => done.get(tkey(addr, zip, city)) || null;
   ctx.renderTenants = (el, d, err) => {
     if (err) { el.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote err">' + esc(err) + '</div>'; return; }
     const li = t => '<div class="pl"><b>' + esc(t.name) + (t.suite ? ' <span class="sc">Ste ' + esc(t.suite) + '</span>' : '') + '</b><span>' + esc([t.sector, t.owner && 'owner ' + t.owner, t.opened && 'since ' + t.opened].filter(Boolean).join(' · ')) + '</span></div>';
@@ -378,7 +380,7 @@ export function initArea(ctx) {
       : '<div class="rnote">' + esc(d.note || 'No active sales-tax permits at this address.') + '</div>') + '<div class="rnote">Active sales-tax permits matched on house number and street' + (d.query ? ' (' + esc(d.query) + ')' : '') + '. Lists retail, restaurant and service tenants; offices and medical often aren’t listed.</div>';
   };
   // filings: the street part of "6615 Garth Rd Baytown, TX 77520", and its ZIP
-  const filingAddr = f => { const a = String(f.addr || ''), zip = f.zip || (a.match(/\b(\d{5})(?:-\d{4})?\s*$/) || [])[1] || '', i = f.city ? a.toLowerCase().lastIndexOf(' ' + f.city.toLowerCase()) : -1; return { street: (i > 0 ? a.slice(0, i) : a.split(',')[0]).trim(), zip, city: f.city || '' }; };
+  const filingAddr = ctx.filingAddr = f => { const a = String(f.addr || ''), zip = f.zip || (a.match(/\b(\d{5})(?:-\d{4})?\s*$/) || [])[1] || '', i = f.city ? a.toLowerCase().lastIndexOf(' ' + f.city.toLowerCase()) : -1; return { street: (i > 0 ? a.slice(0, i) : a.split(',')[0]).trim(), zip, city: f.city || '' }; };
   ctx.onCardRender(info => {
     if (info.kind !== 'filing') return;
     const card = document.getElementById('card'); card.querySelector('#tenSec')?.remove();

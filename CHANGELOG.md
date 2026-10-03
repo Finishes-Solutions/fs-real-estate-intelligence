@@ -5,6 +5,19 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 3:11 AM CT: News about the whole place, smarter place-finding, big places fit on screen (8be5eb5)
+- **News no longer mixes in people who share a town's name.** A property in Waller was turning up stories about Fed Governor Christopher Waller. Towns are now always searched as "Waller, TX", "Waller, Texas" or "Waller County", never the bare word.
+- **The News button searches everything about the place at once**, and each story says what it's about:
+  - the project itself and its developer, tenant and owner
+  - the businesses at that spot (from the map and from the Comptroller lookup, if you've opened it)
+  - the owner on the appraisal record (for example, "SMITH JOHN A" is searched as "John Smith", always tied to the town)
+  - the street address and the subdivision
+  - development and real-estate news for the town or county
+
+  Results are grouped under those headings. The assistant's news answers work the same way.
+- **The assistant works harder to find a place.** "Highlight Terminal B at George Bush airport" now finds the airport, then looks for Terminal B inside it. It knows common nicknames (Bush airport / IAH, Hobby, the Med Center, NRG). If the map still can't find something, it does a web search for the official name and location, then checks that against the map before showing it. Anything placed only from the web search is marked approximate.
+- **Big places fit on screen.** Going to or outlining an airport, campus, park or town now frames the whole thing, leaving room for the chat panel and the property card. Before, they were shown at street level. Single buildings and addresses still zoom in close.
+- Not checked on the live site yet: this build environment can't reach Google News or OpenStreetMap. Automated tests cover the new search logic.
 ### 2:50 AM CT: Traffic reports and a Traffic Counts layer (7e269a7)
 - **Traffic Counts** in Map Layers: every road TxDOT counts, coloured from green to dark red by how many vehicles use it a day. Zoom in to a part of town to see it, and hover a road for its count.
 - **Traffic Report** for any area (Reports tab, the selection bar, or Area reports on a building's Site section):

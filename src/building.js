@@ -188,7 +188,7 @@ export function initBuildings(ctx) {
     if (ctx.reduceMotion) card.querySelector('#bOrbit').remove();
     renderFilings(null); renderArea();
     ctx.renderCrimeNear?.(card.querySelector('#bCrime'), b.center, () => { const t = card.querySelector('#bTitle')?.textContent; return t && !/^Loading/.test(t) ? t : 'this property'; }, () => cur === b && !multi.length);
-    ctx.cardRendered({ kind: 'building', center: b.center, label: () => card.querySelector('#bTitle')?.textContent || 'Building', sub: () => card.querySelector('#bSub')?.textContent || '' });
+    ctx.cardRendered({ kind: 'building', center: b.center, label: () => card.querySelector('#bTitle')?.textContent || 'Building', sub: () => card.querySelector('#bSub')?.textContent || '', subject: () => newsSubject(b) });
     let d = null;
     try { d = await details(b); }
     catch (err) { if (cur !== b) return; card.querySelector('#bParcel').innerHTML = '<div class="lt">Parcel</div><div class="rnote">Parcel lookup unavailable (' + esc(err.message) + ').</div>'; card.querySelector('#bTitle').textContent = 'Building'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b); return; }
@@ -278,6 +278,16 @@ export function initBuildings(ctx) {
     const n = near1(b.center);
     if (n.list.length) parts.push('<b>' + fmtN(n.list.length) + ' construction filing' + (n.list.length > 1 ? 's' : '') + '</b> within a mile, est. ' + fmtM(n.value) + (n.recent ? '; ' + fmtN(n.recent) + ' filed in the last 12 months' : '') + '.');
     el.innerHTML = parts.length ? '<div class="kicker">Overview</div><div>' + parts.join(' ') + '</div>' : ''; el.hidden = !parts.length;
+  }
+  // what the News button searches for this spot: the businesses in it (then on the block), the owner, the street address,
+  // the subdivision from the legal description, and the town and county (from the county outline when there's no parcel)
+  function newsSubject(b) {
+    const p = b.d?.parcel || b.parcel, shape = b.footprint || p?.geometry, places = b.d?.places || [];
+    const inside = places.filter(x => shape && inGeom([x.lon, x.lat], shape)), biz = [...inside, ...places.filter(x => !inside.includes(x))].map(x => x.brand || x.name);
+    const ten = p?.situsStreet ? ctx.tenantsPeek?.(p.situsStreet, p.situsZip, p.situsCity)?.tenants || [] : [];
+    const county = p?.county || ctx.DATA.counties.find(c => inGeom(b.center, { type: 'MultiPolygon', coordinates: c.outline }))?.name || '';
+    return { business: [...new Set([...ten.map(t => t.name), ...biz])].slice(0, 6), owner: p?.owner || '', addr: p?.situsStreet || '', legal: String(p?.raw?.LEGAL_DESC || ''),
+      city: p?.situsCity || ctx.nearestPlace?.(b.center) || '', county: String(county).replace(/\s+county$/i, '') };
   }
   // filings within a mile of a point (flat distance; fine at this scale)
   function near1(c) {

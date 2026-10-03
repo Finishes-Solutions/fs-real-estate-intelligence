@@ -193,6 +193,15 @@ function fitPoints(list){
   safeFit([[x0,y0],[x1,y1]],{padding:60,maxZoom:15});
 }
 // fitBounds throws when the padding leaves no room (small screens with a drawer open); shrink the padding instead
+// the room the open chat panel and property card take over the map, so a fitted place isn't hidden behind them
+function coverPad(base=60){ const m=map.getContainer().getBoundingClientRect(), p={top:base,bottom:base,left:base,right:base};
+  for(const el of [document.getElementById('ai'),document.getElementById('card')]){ if(!el||!el.offsetParent||el.id==='card'&&!el.classList.contains('open')) continue; const r=el.getBoundingClientRect();
+    if(r.width<2||r.height<2||r.right<=m.left||r.left>=m.right||r.bottom<=m.top||r.top>=m.bottom) continue;
+    if(r.width<m.width*.6){ if(r.left>m.left+m.width/2) p.right=Math.max(p.right,m.right-r.left+base/2); else if(r.right<m.left+m.width/2) p.left=Math.max(p.left,r.right-m.left+base/2); }
+    else if(r.top>m.top+m.height/3) p.bottom=Math.max(p.bottom,m.bottom-r.top+base/2); }
+  return p; }
+// a bounding box [[w,s],[e,n]] in view, clear of the panels; returns the zoom it lands on
+function fitBox(b,o={}){ const opt={padding:coverPad(),maxZoom:17,...o}; let z=null; try{ z=map.cameraForBounds(b,opt)?.zoom??null; }catch(e){} safeFit(b,opt); return z; }
 function safeFit(b,o={}){ for(const pad of [o.padding??60,24,0]){ try{ if(map.cameraForBounds(b,{...o,padding:pad})){ map.fitBounds(b,{...o,padding:pad,duration:reduceMotion?0:1000}); return; } }catch(e){} } map.flyTo({center:[(b[0][0]+b[1][0])/2,(b[0][1]+b[1][1])/2],duration:reduceMotion?0:1000}); }
 // keep the map's visual center clear of the assistant drawer / sheet
 function mapPadding(){
@@ -792,7 +801,7 @@ if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
   applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
-  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], setRadiusCenter, setMiles, fitGeom, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
+  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.
 function orbitAt(c,zoom){ stopOrbit(); const close=zoom>=16.5; map.flyTo({center:c,zoom,pitch:close?65:60,duration:reduceMotion?0:2200,essential:true});

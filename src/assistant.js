@@ -5,7 +5,7 @@ import { entityKey } from './lib/taxonomy.mjs';
 import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
-import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft, applyPlaceAlias, splitWithin, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from './lib/assist-logic.mjs';
 import { createTurns, withTimeout, createVoiceLog } from './lib/voice-state.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
@@ -237,8 +237,18 @@ export function initAssistant(ctx) {
   const ambiguous = (name, cands) => ({ ambiguous: true, candidates: cands, error: '“' + name + '” could be ' + cands.map(c => c.label).join(' or ') + '. Ask the user which one (offer these as the follow-up options); don’t guess.' });
   // Every lookup must land on the place itself or fail: a wrong guess used to fly the map to e.g. "Houston Avenue, Pasadena"
   // before the model retried with the street address.
-  async function resolvePlace(name) {
+  async function resolvePlace(name, within) {
     for (const [re, to] of ALIAS) name = name.replace(re, to);
+    name = applyPlaceAlias(name);
+    const p = within ? null : await resolveWhole(name), sp = within ? { part: name, within } : splitWithin(name);
+    if (p && (p.ambiguous || !p.error && (!sp.within || mentions(p.label, sp.part)))) return p;
+    // "Terminal B at George Bush airport": the part inside the bigger place, then a web search checked against the map
+    const f = await ctx.findPlace?.(name, null, within);
+    if (f) return { c: f.c, label: f.label, kind: f.kind, ...(f.geom ? { bbox: geomBox(f.geom) } : f.bbox ? { bbox: f.bbox } : {}), ...(f.via ? { via: f.via, approx: !!f.approx } : {}) };
+    return p && !p.error ? p : p || { error: 'Couldn’t find “' + name + (within ? '” in “' + within : '') + '”.' };
+  }
+  const geomBox = g => { let x0 = 180, y0 = 90, x1 = -180, y1 = -90; const walk = a => { if (typeof a[0] === 'number') { x0 = Math.min(x0, a[0]); x1 = Math.max(x1, a[0]); y0 = Math.min(y0, a[1]); y1 = Math.max(y1, a[1]); } else a.forEach(walk); }; walk(g.coordinates); return [x0, y0, x1, y1]; };
+  async function resolveWhole(name) {
     const n = name.toLowerCase().replace(/,?\s*(tx|texas)$/, '').trim();
     const d = districtFor(name); if (d) return { c: d.c, label: d.name, kind: 'district', zoom: d.zoom };
     const town = (ctx.DATA.places || []).find(p => p[0].toLowerCase() === n);
@@ -405,7 +415,7 @@ export function initAssistant(ctx) {
         return { opened: row(f), scope: f.scope || '', summary: f.sum || '', owner: f.owner, address: f.addr, architect: f.arch || null, gc: f.gc || null, approximate_location: !!f.approx };
       }
       if (name === 'fly_to') {
-        let c = null, label = '', kind = 'town', zoom = null, note;
+        let c = null, label = '', kind = 'town', zoom = null, note, box = null;
         const ids = a.ids?.length ? a.ids : a.id ? [a.id] : a.highlighted ? ctx.highlighted() : [];
         if (ids.length) {
           const fs = ids.map(id => ctx.BY_ID.get(String(id).trim())).filter(f => f && isFinite(f.lon) && isFinite(f.lat));
@@ -414,10 +424,13 @@ export function initAssistant(ctx) {
           else { const fr = frame(fs.map(f => [f.lon, f.lat])); c = fr.c; zoom = fr.zoom; label = fs.length + ' filings'; kind = 'group'; }
           if (fs.some(f => f.approx)) note = 'Some of these filings only have a city-level location, so the camera can’t center on the exact building.';
         } else if (isFinite(a.lat) && isFinite(a.lon) && a.lat && a.lon) { c = [a.lon, a.lat]; label = a.lat.toFixed(4) + ', ' + a.lon.toFixed(4); kind = 'building'; }
-        else if (a.place) { const p = await resolvePlace(String(a.place));
+        else if (a.place) { const p = await resolvePlace(String(a.place), a.within ? String(a.within) : '');
           // several places fit: don't move; the model asks which one and the choices become tappable pills
           if (p.ambiguous) { turnChoices = p.candidates; return { ambiguous: true, question: 'Which one did you mean?', candidates: p.candidates.map(x => x.label), note: p.error }; }
-          if (p.error) return { error: p.error }; c = p.c; label = p.label; kind = p.kind; if (p.zoom) zoom = p.zoom; }
+          if (p.error) return { error: p.error + ' Try the official name, or the bigger place it is part of as within.' }; c = p.c; label = p.label; kind = p.kind; if (p.zoom) zoom = p.zoom;
+          // an airport, campus, park, town or county: frame its whole extent rather than a fixed zoom for its type
+          if (p.bbox && extentMeters(p.bbox) > BIG_PLACE_M && !['address', 'building', 'street'].includes(kind)) box = [[p.bbox[0], p.bbox[1]], [p.bbox[2], p.bbox[3]]];
+          if (p.via === 'web') note = 'Found with a web search' + (p.approx ? '; the spot is approximate.' : ' and matched on the map.'); }
         else if (ctx.state.sel) { const f = ctx.state.sel; c = [f.lon, f.lat]; label = f.name; kind = f.approx ? 'approx' : 'building'; }
         else if (ctx.currentBuilding?.()) { const b = ctx.currentBuilding(); c = b.center; label = b.title || 'this building'; kind = 'building'; }
         if (!c) return { error: 'Say a place, an address or which filings to go to.' };
@@ -426,19 +439,29 @@ export function initAssistant(ctx) {
         // a specific building/address/landmark stays close even if the model asks for a wide zoom
         // the model's zoom may nudge the default, never swap a neighbourhood view for a whole city
         // countries and states: whatever the model asks for (a whole continent is fine)
-        zoom = a.zoom > 0 ? (['building', 'address', 'poi', 'area'].includes(kind) ? Math.max(a.zoom, def) : ['country', 'region'].includes(kind) ? a.zoom : Math.min(def + 2.5, Math.max(def - 0.75, a.zoom))) : def;
+        // one building or address stays close even if the model asks for a wide zoom; a landmark or neighbourhood may pull
+        // back (an airport is a "landmark"); the model's zoom may nudge a town, never swap it for a whole region
+        // countries and states: whatever the model asks for (a whole continent is fine)
+        zoom = a.zoom > 0 ? (['building', 'address'].includes(kind) ? Math.max(a.zoom, def) : ['poi', 'area'].includes(kind) ? Math.max(a.zoom, def - 5) : ['country', 'region'].includes(kind) ? a.zoom : Math.min(def + 2.5, Math.max(def - 0.75, a.zoom))) : def;
         if (kind === 'approx') zoom = Math.min(zoom, 14);
         zoom = Math.max(2, Math.min(19, zoom));
-        if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt || zoom >= 16.5 ? 60 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });
+        if (box && !(a.zoom > 0)) { // the whole place in view, clear of the chat panel and card
+          const fit = (() => { try { return ctx.map.cameraForBounds(box, { padding: ctx.coverPad?.() ?? 60, maxZoom: 17 })?.zoom; } catch (e) { return null; } })();
+          zoom = fit ?? zoomForBox([box[0][0], box[0][1], box[1][0], box[1][1]]) ?? zoom;
+          if (a.orbit) ctx.orbitAt(c, zoom); else ctx.fitBox(box, { maxZoom: 17, ...(a.tilt ? { pitch: 50 } : {}) });
+        }
+        else if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt || zoom >= 16.5 ? 60 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });
         if (kind !== 'group' && !/^-?\d+\.\d+, -?\d/.test(label)) turnSubject = label;
-        actionChip((a.orbit ? 'Orbiting ' : 'Moved the map to ') + label); return { moved_to: label, zoom: +zoom.toFixed(1), orbiting: !!a.orbit, ...(note ? { note } : {}) };
+        actionChip((a.orbit ? 'Orbiting ' : 'Moved the map to ') + label); return { moved_to: label, zoom: +zoom.toFixed(1), orbiting: !!a.orbit, ...(box && !(a.zoom > 0) ? { framed: 'the whole place is in view; no need to zoom in or out' } : {}), ...(note ? { note } : {}) };
       }
       if (name === 'highlight_area') {
-        const pl = await ctx.highlightPlace(String(a.place || ''), a.kind);
-        if (!pl) return { error: 'Couldn’t find “' + a.place + '” in OpenStreetMap. Try the official name with its city or county.' };
+        const pl = await ctx.highlightPlace(String(a.place || ''), a.kind, a.within ? String(a.within) : '');
+        if (!pl) return { error: 'Couldn’t find “' + a.place + '”' + (a.within ? ' in “' + a.within + '”' : '') + ' on the map or with a web search. Try its official current name, or name the bigger place it is part of (within), before telling the user.' };
         await new Promise(r => setTimeout(r, 50));
         const out = { ...ctx.placeSummary() };
         if (!pl.geom) out.note = 'Shown as a point: OpenStreetMap has no outline for it.';
+        if (pl.via === 'web') out.found_with = 'web search' + (pl.approx ? ' (approximate spot)' : ', matched on the map');
+        if (pl.within) out.inside = pl.within;
         if (a.filter && pl.geom && /Polygon/.test(pl.geom.type)) { ctx.setSelection('place', pl.label, pl.geom); ctx.clearPlace(); out.filtered = true; out.filings = ctx.visible.length; }
         if (a.compare && pl.geom && /Polygon/.test(pl.geom.type)) out.added_to_compare = ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom });
         actionChip('Outlined ' + pl.label, () => ctx.clearPlace()); return out;

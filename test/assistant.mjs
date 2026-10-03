@@ -1,6 +1,6 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks, placeCandidates, kindOf, pickAircraft, aircraftName } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks, placeCandidates, kindOf, pickAircraft, aircraftName, splitWithin, applyPlaceAlias, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from '../lib/assist-logic.mjs';
 import { pruneReports, fmtBytes } from '../lib/reports.mjs';
 import { tractsFor, summarizeTracts, inGeom } from '../lib/demographics.mjs';
 import { nameQuery } from '../api/tenants.js';
@@ -19,6 +19,24 @@ assert.equal(cleanFilterArgs({ min_value: 5e6, max_value: 1e6 }).max_value, unde
 // "Astros stadium" must not settle for the city
 const houston = { t: 'Houston, Texas', name: 'Houston', type: 'municipality', c: [-95.36, 29.76] };
 assert.ok(pickPlace('Astro Stadium', [houston]).error);
+// a part of a bigger place, and the nicknames for it ("Terminal B at George Bush airport")
+assert.deepEqual(splitWithin('Terminal B at George Bush airport'), { part: 'Terminal B', within: 'George Bush Intercontinental Airport' });
+assert.deepEqual(splitWithin('IAH Terminal B'), { part: 'Terminal B', within: 'George Bush Intercontinental Airport' });
+assert.deepEqual(splitWithin('the food court inside Memorial City Mall, TX'), { part: 'food court', within: 'Memorial City Mall' });
+assert.deepEqual(splitWithin('Katy'), { part: 'Katy', within: '' });
+assert.equal(applyPlaceAlias('George Bush Intercontinental Airport'), 'George Bush Intercontinental Airport', 'the full name stays as is');
+assert.equal(applyPlaceAlias('Houston Intercontinental Airport'), 'George Bush Intercontinental Airport'); assert.equal(applyPlaceAlias('Hobby airport'), 'William P. Hobby Airport');
+assert.equal(applyPlaceAlias('InterContinental Houston Medical Center'), 'InterContinental Houston Medical Center', 'a hotel is not the airport');
+assert.equal(applyPlaceAlias('Memorial Hermann Medical Center'), 'Memorial Hermann Medical Center'); assert.equal(applyPlaceAlias('med center'), 'Texas Medical Center');
+assert.ok(mentions('Terminal B, George Bush Intercontinental Airport', 'Terminal B')); assert.ok(!mentions('George Bush Intercontinental Airport, Houston', 'Terminal B'));
+assert.ok(mentions('The Grove at Katy, Katy', 'the Grove'));
+// big places are framed whole: an airport (~6.6 km) lands around zoom 13, not the 17.2 used for a landmark
+const iah = [-95.371, 29.9532, -95.3086, 30.0101];
+assert.ok(extentMeters(iah) > 6000 && extentMeters(iah) < 7000); assert.ok(extentMeters([-95.3700, 29.7600, -95.3695, 29.7604]) < BIG_PLACE_M, 'one building is small');
+assert.ok(zoomForBox(iah, 900) > 12.5 && zoomForBox(iah, 900) < 14, 'airport zoom ' + zoomForBox(iah, 900)); assert.ok(zoomForBox(iah) < ZOOM.poi - 3);
+assert.deepEqual(fromNominatim([{ lat: '29.98', lon: '-95.34', display_name: 'George Bush Intercontinental Airport, Houston, Harris County, Texas, United States', name: 'George Bush Intercontinental Airport', addresstype: 'aeroway', boundingbox: ['29.9532', '30.0101', '-95.3710', '-95.3086'] }])[0].bbox, iah, 'the extent comes through');
+{ const air = { t: 'George Bush Intercontinental Airport, Houston', name: 'George Bush Intercontinental Airport', type: 'poi', c: [-95.34, 29.98], bbox: iah };
+  assert.deepEqual(pickPlace('George Bush Intercontinental Airport', [air]).bbox, iah, 'a landmark keeps its extent'); }
 assert.deepEqual(pickPlace('Houston city center', [houston]), { c: houston.c, label: 'Houston, Texas', kind: 'town' });
 const park = { t: 'Daikin Park, 501 Crawford St, Houston, Texas', name: 'Daikin Park', type: 'poi', c: [-95.3555, 29.7573] };
 const other = { t: 'Park Ln, Houston, Texas', name: 'Park Ln', type: 'street', c: [-95.4, 29.8] };
