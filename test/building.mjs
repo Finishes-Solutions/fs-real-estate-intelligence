@@ -32,3 +32,9 @@ globalThis.fetch = async () => new Response('down', { status: 503 });
 res = mock(); await building({ query: { lat: '30.05', lon: '-95.92' }, headers: { 'x-forwarded-for': '8.8.8.8' } }, res);
 assert.equal(res.code, 200); assert.equal(res.body.parcel, null); assert.match(res.body.parcelError, /503/); assert.deepEqual(res.body.places, []);
 console.log('building api tests passed');
+// Fort Bend style records: "Null" strings, spreadsheet day numbers, the city already in the address, trailing commas
+{ const { normalizeParcel } = await import('../api/building.js');
+  const p = normalizeParcel({ PROP_ID: '264714', SITUS_ADDR: '16145 City WALK, Sugar Land, TX 77479', SITUS_CITY: 'Sugar Land', DATE_ACQ: '46082', YEAR_BUILT: 'Null', GIS_AREA: '1.084995', GIS_AREA_UNIT: 'Null', LOC_LAND_USE: 'Null' });
+  assert.deepEqual([p.situs, p.acquired, p.yearBuilt, p.area, p.landUse, 'YEAR_BUILT' in p.raw], ['16145 City WALK, Sugar Land, TX 77479', '2026-03-01', null, '1.08 acres', null, false]);
+  assert.equal(normalizeParcel({ SITUS_ADDR: 'Highway 90A , ,', SITUS_CITY: 'Null' }).situs, 'Highway 90A');
+  console.log('parcel clean-up ok'); }

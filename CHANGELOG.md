@@ -16,6 +16,38 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **FlightAware is no longer used.** Everything above comes free from adsb.lol and the photo databases its own map uses, so there's nothing to pay or cap. The FlightAware link on plane cards is gone too.
 - **Military transports** (C-17, C-130, tankers…) get their own outline. Fighters and military helicopters keep theirs. All plane icons are a little larger.
 
+### 1:22 AM CT: The same section-card style across the app (12b80c8)
+- **Tabs:** Reports, Updates, Field Notes, Market, Activity, Compare and Sources now sit on a light grey background. Each group sits in a white card with an icon and a title, like the new property card.
+- **Left panel:** Area at a Glance and Construction Filings are now titled section cards too.
+- The map buttons and legends now leave room for the wider property card (420 px instead of 380), so nothing overlaps.
+
+### 1:14 AM CT: New card design: titled section cards (option B) (1d1a25e)
+- **Building, parcel, filing and plane cards now use the "report with section cards" layout** you picked from the mockups:
+  - a row of section chips under the title that jumps to each section;
+  - a dark Overview summary at the top;
+  - then one card per section, each with an icon, a title and its own source line.
+- **Building cards** run in this order:
+  - Ownership & Value, Building, Site, Area, Businesses on the Block, Air Traffic;
+  - Construction Activity, which shows filings on the parcel plus how many are within a mile and how many were filed in the last year;
+  - Regrid, From Here, and Site Tools.
+  - Site Tools includes a new **Ask AI About It** button.
+- **Filing cards** run in this order: Overview, Project, Schedule (with history), People, Scope of Work, AI Project Brief, Air Traffic, From Here, then Tools (TABS record, Street View, Add Site Note, Ask AI About It).
+- **Plane cards** show:
+  - **Flight**: altitude, speed, heading and route as tiles;
+  - **Aircraft**: type, registration, squawk;
+  - FlightAware and FAA registration sections when available;
+  - **Tools**.
+- **Readability:**
+  - Labels no longer squeeze into a narrow column that wrapped two or three times. They sit above their values, or beside them in rows that wrap cleanly.
+  - Buttons sit in an even two-column grid.
+- **Every other card** (crime report, area summary, multi-select) picks up the same style.
+- **Cleaner parcel data:**
+  - "Null" values no longer show.
+  - Purchase dates that came through as numbers (e.g. "46082") now read as dates (2026-03-01).
+  - The city isn't repeated in the address.
+  - Land area says "acres".
+- **In Harris or Waller County**, the card now says the statewide parcel data doesn't cover that county yet, instead of just "no record".
+
 ### 1:14 AM CT: Planes look like what they are; map buttons stay put (01eff54)
 - **Each plane on the map is drawn as its kind of aircraft**, not the same airliner icon:
   - big jets: 747s and other four-engine jets, wide-bodies (777, 787, A330…), narrow-body airliners (737, A320…);
