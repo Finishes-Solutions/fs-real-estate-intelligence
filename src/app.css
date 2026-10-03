@@ -96,7 +96,7 @@ select.chip{appearance:none;padding-right:22px;background-image:linear-gradient(
 .tip{position:absolute;z-index:4;pointer-events:none;background:var(--panel);color:var(--text);border:1px solid var(--line-2);border-radius:4px;padding:7px 9px;font-size:12px;max-width:260px;box-shadow:0 4px 14px rgba(11,13,12,.16);opacity:0;transition:opacity 120ms}
 .tip b{display:block;font-weight:600;margin-bottom:2px}
 .tip span{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
-.card{position:absolute;z-index:5;right:16px;bottom:16px;width:min(380px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 10px 30px rgba(11,13,12,.22);display:none;max-height:calc(100% - 32px);overflow:auto}
+.card{position:absolute;z-index:5;right:16px;bottom:16px;width:min(420px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 10px 30px rgba(11,13,12,.22);display:none;max-height:calc(100% - 32px);overflow:auto}
 .card.open{display:block}
 .card .top{display:flex;justify-content:space-between;gap:10px;padding:16px 16px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:3;background:var(--panel)}
 .card h2{margin:6px 0 0;font-size:17px;line-height:1.25;letter-spacing:-.01em;font-weight:700}
@@ -989,14 +989,14 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 @media (hover:none){ .fab-sugs{display:none} }
 /* the Layers panel stops above the Ask AI button instead of running under it (it scrolls inside) */
 @media (min-width:701px){ .app:not(.ai-open) .layers{max-height:calc(100% - 112px)} }
-@media (min-width:1101px){ .app:has(.card.open){--fabr:calc(min(380px,100% - 32px) + 32px)} .app:has(.card.open):not(.card-below){--fabr:calc(min(380px,100% - 102px) + 86px)} }
+@media (min-width:1101px){ .app:has(.card.open){--fabr:calc(min(420px,100% - 32px) + 32px)} .app:has(.card.open):not(.card-below){--fabr:calc(min(420px,100% - 102px) + 86px)} }
 @media (max-width:1100px) and (min-width:701px){ .app:has(.card.open){--fabr:calc(min(400px,100% - 78px) + 78px)} }
 @media (max-width:700px){ .fab-sugs{display:none} }
 /* with a card open the map buttons never move (moving them left of the card left them floating mid-map on shorter
    windows): the card sits just left of the button column, or under it when there is room (.card-below, set in app.js).
    The Layers panel opens left of the card. */
 @media (min-width:1101px){
-  .app:has(.card.open):not(.card-below) .card{right:70px;width:min(380px,calc(100% - 102px))}
+  .app:has(.card.open):not(.card-below) .card{right:70px;width:min(420px,calc(100% - 102px))}
   .app.ai-open:has(.card.open):not(.card-below) .card{right:calc(var(--aiw) + 82px)}
   .app:has(.card.open):not(.card-below) .layers{right:var(--fabr,16px)}
 }
@@ -1141,7 +1141,7 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 
 /* map legends: Filings and the demographics (census tract) legend side by side at the bottom left, clear of the
    Ask AI button and its suggestions on the right; the demographics one wraps above when there isn't room */
-.legends{position:absolute;left:16px;bottom:28px;z-index:3;display:flex;flex-wrap:wrap-reverse;align-items:flex-end;gap:8px;max-width:calc(100% - var(--fabr,16px) - 380px);pointer-events:none}
+.legends{position:absolute;left:16px;bottom:28px;z-index:3;display:flex;flex-wrap:wrap-reverse;align-items:flex-end;gap:8px;max-width:calc(100% - var(--fabr,16px) - 420px);pointer-events:none}
 .legends>*{pointer-events:auto}
 .legends .legend,.legends .dlegend{position:static;left:auto;right:auto;bottom:auto}
 /* the time slider sits bottom centre: lift the legends above it while it's showing */
@@ -1315,7 +1315,6 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
    a white header with section chips, then one titled card per section on a light ground; labels sit beside values in
    rows that wrap, or above them in two-column grids; each section names its own source */
 #card{background:var(--panel-2);padding-bottom:14px}
-@media (min-width:701px){ #card{width:min(420px,calc(100% - 32px))} }
 #card .top{flex-wrap:wrap;align-items:flex-start;padding:18px 20px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
 #card .top>div:first-child{flex:1;min-width:0}
 #card .top h2{font-size:20px;margin-top:4px;overflow-wrap:anywhere}
@@ -1402,3 +1401,39 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 #card #plFa{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='4' cy='12' r='1.8'/%3E%3Ccircle cx='12' cy='4' r='1.8'/%3E%3Cpath d='M5.8 12H10a2 2 0 0 0 0-4H6a2 2 0 0 1 0-4h4.2'/%3E%3C/svg%3E")}
 #card #plTools{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.5 2a3 3 0 0 0-2.8 4L2.5 11.2a1.4 1.4 0 0 0 2 2L9.7 8a3 3 0 0 0 4-2.8l-1.8 1.1-1.6-.9V3.6L12 2.5A3 3 0 0 0 10.5 2z'/%3E%3C/svg%3E")}
 #card dd a,#card .fv a{color:var(--brand)}
+
+/* ===== tabs and the left panel in the same section-card style ===== */
+.view{background:var(--panel-2)}
+#view-timeline{background:var(--panel)}
+.view .rp-sec,.view .chsec,.view .fcols>section,.view .mk-box,.view .src-grp,.view .tablewrap,.view .cmp-empty{background:var(--panel);border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;min-width:0}
+.view .cmp-card{background:var(--panel);border-color:var(--line-2);border-radius:6px}
+.view .rp-sec,.view .chsec,.view .src-grp{margin:0 0 12px}
+.view .tablewrap{padding:4px 10px}
+.view .kpis .kpi{background:var(--panel)}
+.view .rp-card{border-radius:6px;border-color:var(--line-2);background:var(--panel-2)}
+.view .rp-sec>.lt,.view .rp-sh .lt,.view .chsec>h3,.view .fcols>section>h3,.view .mk-box>h3,.view .src-grp>h3{display:flex;align-items:center;gap:10px;margin:0 0 12px;font:700 14px/1.3 var(--font-display);letter-spacing:0;text-transform:none;color:var(--text)}
+.view .rp-sec>.lt::before,.view .rp-sh .lt::before,.view .chsec>h3::before,.view .fcols>section>h3::before,.view .mk-box>h3::before,.view .src-grp>h3::before{content:"";width:28px;height:28px;flex:none;border-radius:6px;background:rgba(0,101,39,.09) var(--ic) center/15px no-repeat}
+.view{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='10' height='10' rx='2'/%3E%3C/svg%3E")}
+#view-reports{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 1.5h5.5L12.5 4.5v10H4zM9.5 1.5v3h3M6 8h4.5M6 11h4.5'/%3E%3C/svg%3E")}
+#view-changes{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.3'/%3E%3Cpath d='M8 4.5V8l2.4 1.6'/%3E%3C/svg%3E")}
+#view-field{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 14.5s5-4.3 5-8.2A5 5 0 0 0 3 6.3c0 3.9 5 8.2 5 8.2z'/%3E%3Ccircle cx='8' cy='6.3' r='1.8'/%3E%3C/svg%3E")}
+#view-market{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='5.5' cy='5' r='2.2'/%3E%3Ccircle cx='11' cy='6' r='1.8'/%3E%3Cpath d='M1.5 13.5c.4-2.4 2-3.8 4-3.8s3.6 1.4 4 3.8M10 9.6c1.9-.2 3.6.9 4.2 3.4'/%3E%3C/svg%3E")}
+#view-sources{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 2h12v12H2zM2 6.5h12M2 10.5h12M6.5 2v12M10.5 2v12'/%3E%3C/svg%3E")}
+.view .chsec .chitem{border-top:1px solid var(--line);border-bottom:0}
+.view .chsec h3+.chitem{border-top:0}
+.panel{background:var(--panel-2)}
+.panel .brandbar,.panel .head{background:var(--panel)}
+.panel .glance{background:var(--panel);margin:12px 14px 0;border:1px solid var(--line-2);border-radius:6px;padding:14px 16px}
+.panel .glance .g-h{align-items:center}
+.panel .glance .g-h .kicker{display:flex;align-items:center;gap:10px;font:700 14px/1.3 var(--font-display);letter-spacing:0;text-transform:none;color:var(--text)}
+.panel .glance .g-h .kicker::before{content:"";width:28px;height:28px;flex:none;border-radius:6px;background:rgba(0,101,39,.09) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='5.5' cy='5' r='2.2'/%3E%3Ccircle cx='11' cy='6' r='1.8'/%3E%3Cpath d='M1.5 13.5c.4-2.4 2-3.8 4-3.8s3.6 1.4 4 3.8M10 9.6c1.9-.2 3.6.9 4.2 3.4'/%3E%3C/svg%3E") center/15px no-repeat}
+.panel .glance .g-h em{color:var(--muted);font-weight:500}
+.panel .sechead.fsec{background:var(--panel);margin:12px 14px 0;width:auto;border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;font:700 14px/1.3 var(--font-display);letter-spacing:0;text-transform:none;color:var(--text)}
+.panel .sechead.fsec span{display:flex;align-items:center;gap:10px}
+.panel .sechead.fsec span::before{content:"";width:28px;height:28px;flex:none;border-radius:6px;background:rgba(0,101,39,.09) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 14.5h11M4 14.5V8l4-3 4 3v6.5M8 5V1.5M6.5 11h3'/%3E%3C/svg%3E") center/15px no-repeat}
+.panel .sechead.fsec em{font:500 10.5px var(--font-mono);letter-spacing:.06em}
+.panel .sechead.fsec[aria-expanded="true"]{border-radius:6px 6px 0 0;border-bottom-color:var(--line)}
+.panel .fbody{background:var(--panel);margin:0 14px;border:1px solid var(--line-2);border-top:0;border-radius:0 0 6px 6px;overflow:hidden}
+.panel .fbody .fhead{padding:14px 16px 16px}
+.panel .fbody .sechead,.panel .fbody .filters{padding-left:16px;padding-right:16px}
+.panel .foot{background:transparent;margin-top:12px}
