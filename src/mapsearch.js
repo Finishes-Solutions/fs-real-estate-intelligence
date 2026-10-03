@@ -296,8 +296,8 @@ export function initMapSearch(ctx) {
     if (isArea(g) && !/building|business/.test(place.kind)) return { list: list.filter(f => d3.geoContains(g, [f.lon, f.lat])), how: 'inside' };
     const R = .25 / 3958.8, pt = place.c || (g && centerOf(g));
     if (isLine(g)) { const lines = g.type === 'LineString' ? [g.coordinates] : g.coordinates, b = bounds(g);
-      return { list: list.filter(f => f.lon > b[0][0] - .01 && f.lon < b[1][0] + .01 && f.lat > b[0][1] - .01 && f.lat < b[1][1] + .01 && lines.some(l => l.some((p, i) => i && segDist([f.lon, f.lat], l[i - 1], p) < R))), how: 'within ¼ mile' }; }
-    return { list: pt ? list.filter(f => d3.geoDistance(pt, [f.lon, f.lat]) < R) : [], how: 'within ¼ mile' };
+      return { list: list.filter(f => f.lon > b[0][0] - .01 && f.lon < b[1][0] + .01 && f.lat > b[0][1] - .01 && f.lat < b[1][1] + .01 && lines.some(l => l.some((p, i) => i && segDist([f.lon, f.lat], l[i - 1], p) < R))), how: 'within 0.25 mile' }; }
+    return { list: pt ? list.filter(f => d3.geoDistance(pt, [f.lon, f.lat]) < R) : [], how: 'within 0.25 mile' };
   }
   function segDist(p, a, b) { // radians, small-distance approximation
     const k = Math.cos(p[1] * Math.PI / 180), ax = (a[0] - p[0]) * k, ay = a[1] - p[1], bx = (b[0] - p[0]) * k, by = b[1] - p[1];
@@ -381,6 +381,6 @@ export function initMapSearch(ctx) {
   };
   ctx.placeSummary = () => { if (!place) return null; const { list, how } = placeHits(); return { place: place.label, kind: place.kind, outlined: !!place.geom, filings: list.length, how, total_value: list.reduce((s, f) => s + f.cost, 0) }; };
   ctx.currentPlace = () => place;
-  // the location card's "Filings Within ¼ Mile": the radius tool takes over from the searched place
+  // the location card's "Filings Within 0.25 Mile": the radius tool takes over from the searched place
   ctx.nearHere = (pt, label) => { clearPlace(); ctx.setMiles(.25, false, true); ctx.setRadiusCenter(pt, label, true); };
 }

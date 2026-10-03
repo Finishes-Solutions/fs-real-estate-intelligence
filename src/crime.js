@@ -1,6 +1,6 @@
 // Crime (Houston Police NIBRS incidents, via api/crime):
 //   Map layer "Crime (Houston)": a heat map zoomed out, ~400 m squares zoomed in, for all / violent / property incidents in the last 12 months.
-//   Crime report for any area: the current selection (box, polygon, county or radius), a building (½ mile) or a map square.
+//   Crime report for any area: the current selection (box, polygon, county or radius), a building (0.5 mile) or a map square.
 //   The report opens in the card (totals vs the year before and vs the city, monthly bars, top offenses and places,
 //   recent incidents), can put the incidents on the map, and exports as a printable report (HTML → PDF) or CSV.
 import { offenseName, CAT_NAME } from './lib/nibrs.mjs';
@@ -47,7 +47,7 @@ export function initCrime(ctx) {
     else map.setPaintProperty(HEAT, 'heatmap-weight', ['interpolate', ['linear'], ['get', 'n'], 0, 0, s[4], 1]);
     if (!map.getLayer(CELLS)) map.addLayer({ id: CELLS, type: 'fill', source: SRC + '-sq', minzoom: 12, paint: { 'fill-color': ramp, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 13, .5, 16, .35], 'fill-outline-color': 'rgba(255,255,255,.35)' } }, before);
     else map.setPaintProperty(CELLS, 'fill-color', ramp);
-    if (note) note.textContent = 'Houston Police incidents in the 12 months through ' + monthName(grid.latest || last) + ', per ~¼-mile square. City of Houston only. Click a square for its numbers.';
+    if (note) note.textContent = 'Houston Police incidents in the 12 months through ' + monthName(grid.latest || last) + ', per ~0.25-mile square. City of Houston only. Click a square for its numbers.';
   }
   function removeLayers() { for (const id of [HEAT, CELLS]) if (map.getLayer(id)) map.removeLayer(id); for (const s of [SRC, SRC + '-sq']) if (map.getSource(s)) map.removeSource(s); }
   const monthName = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'the latest month';
@@ -72,7 +72,7 @@ export function initCrime(ctx) {
     if (!on || !map.getLayer(CELLS) || map.getZoom() < 12) return false;
     const f = map.queryRenderedFeatures(e.point, { layers: [CELLS] })[0]; if (!f) return false;
     const ring = f.geometry.coordinates[0], c = [(ring[0][0] + ring[2][0]) / 2, (ring[0][1] + ring[2][1]) / 2];
-    report({ geometry: f.geometry, label: '¼-mile square near ' + c[1].toFixed(4) + ', ' + c[0].toFixed(4), center: c });
+    report({ geometry: f.geometry, label: '0.25-mile square near ' + c[1].toFixed(4) + ', ' + c[0].toFixed(4), center: c });
     return true;
   });
 

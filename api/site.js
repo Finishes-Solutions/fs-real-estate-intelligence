@@ -3,8 +3,8 @@
 //   traffic    TxDOT annual average daily traffic (AADT) on the roads within ~300 m, busiest first
 //   districts  TCEQ water districts (MUD, WCID, …), Houston TIRZ, federal Opportunity Zone, school district
 //   transit    Houston METRO bus stops within 400 m
-//   environment EPA ECHO regulated facilities within ¼ mile, with violation and hazardous-waste flags
-//   crime      Houston Police NIBRS incidents within ½ mile, last 12 months vs the 12 before (Supabase, loaded nightly)
+//   environment EPA ECHO regulated facilities within 0.25 mile, with violation and hazardous-waste flags
+//   crime      Houston Police NIBRS incidents within 0.5 mile, last 12 months vs the 12 before (Supabase, loaded nightly)
 //   bars       Texas Comptroller mixed beverage gross receipts at the street address, last 12 months (needs addr + zip)
 // Every part is free and optional: a failing source returns { error } for that part, never a 500.
 import { rateLimit } from './_lib/guard.mjs';

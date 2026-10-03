@@ -1,6 +1,6 @@
 // FEMA (via api/fema):
 //   Map layer "Flood Zones (FEMA)": the National Flood Hazard Layer drawn in FEMA's colors at street zoom.
-//   FEMA report for any area: the current selection (box, polygon, county or radius) or a building (¼ mile):
+//   FEMA report for any area: the current selection (box, polygon, county or radius) or a building (0.25 mile):
 //   share of the area in high / moderate / minimal flood risk, NFIP flood insurance claims paid nearby (by year and storm),
 //   federal disaster declarations since 2000, and FEMA's National Risk Index (expected annual loss by hazard).
 //   The report opens in the card and exports as a printable report (HTML → PDF) or CSV.

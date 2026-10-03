@@ -1502,3 +1502,8 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .xlegend .lg-ticks.lg-abs{position:relative;display:block;height:12px}
 .xlegend .lg-abs span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
 .xlegend .lg-abs span:first-child{transform:none}.xlegend .lg-abs span:last-child{transform:translateX(-100%)}
+/* Site section: area reports (radius chips + Crime Report / FEMA Report) */
+#card .site-rep{border-top:1px solid var(--line);padding-top:12px;display:grid;gap:8px}
+#card .mi-chips{display:flex;gap:6px;flex-wrap:wrap}
+#card .mi-chips .chip{border:1px solid var(--line-2);background:var(--panel);border-radius:999px;padding:5px 12px;font:600 12px var(--font-display);color:var(--text-2);cursor:pointer;min-height:30px}
+#card .mi-chips .chip[aria-checked="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
