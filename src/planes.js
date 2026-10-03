@@ -231,18 +231,19 @@ export function initPlanes(ctx) {
     const p = find(hex); if (!p) { if (!refresh) toast('That aircraft is no longer in view.'); return; }
     if (!refresh) { const keep = follow === hex ? hex : null, orb = keep && orbiting; ctx.closeCard?.(); follow = keep; orbiting = !!orb; if (routeOn?.hex !== hex) clearRoute(); }
     shown = hex;
-    const rows = [['Altitude', p.ground ? 'On the ground' : altLabel(p) + (p.vs ? (p.vs > 150 ? ' · climbing ' : p.vs < -150 ? ' · descending ' : ' · level ') + (Math.abs(p.vs) > 150 ? Math.abs(p.vs).toLocaleString('en-US') + ' ft/min' : '') : '')],
-      ['Speed', p.gs != null ? p.gs + ' kt (' + Math.round(p.gs * 1.15078) + ' mph)' : '—'], ['Heading', p.track != null ? p.track + '°' : '—'],
-      ['Aircraft', [p.type, p.desc].filter(Boolean).join(' · ') || '—'], ['Registration', p.reg || '—'], ['Squawk', p.squawk || '—'], ['ICAO hex', p.hex]];
+    const vs = p.vs > 150 ? 'Climbing ' + Math.abs(p.vs).toLocaleString('en-US') + ' ft/min' : p.vs < -150 ? 'Descending ' + Math.abs(p.vs).toLocaleString('en-US') + ' ft/min' : p.ground ? '' : 'Level';
+    const rows = [['Type', [p.desc, p.type].filter(Boolean).join(' · ') || '—'], ['Registration', p.reg || '—'], ['Squawk', p.squawk || '—'], ['ICAO hex', p.hex]];
     card.innerHTML = '<div class="top"><div><div class="kicker">Aircraft · live</div><h2>' + esc(p.flight || p.reg || p.hex.toUpperCase()) + '</h2><div class="bsub" id="plRoute">' + (p.flight ? 'Looking up the route…' : 'No callsign') + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
-      '<dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
-      '<div class="bacts"><button class="btn' + (follow === hex && !orbiting ? ' on' : '') + '" id="plFollow">' + (follow === hex && !orbiting ? 'Following' : 'Follow') + '</button>' +
-      '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
-      '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">Track on adsb.lol ↗</a>' +
-      (p.flight ? '<a class="btn" target="_blank" rel="noopener" href="https://www.flightaware.com/live/flight/' + encodeURIComponent(p.flight) + '">FlightAware ↗</a>' : '') + '</div>' +
+      '<div class="bsec pl-sec"><div class="lt">Flight</div><div class="kgrid"><div><b>' + esc(p.ground ? 'Ground' : altLabel(p)) + '</b><span>Altitude' + (vs ? ' · ' + esc(vs) : '') + '</span></div>' +
+        '<div><b>' + (p.gs != null ? p.gs + ' kt' : '—') + '</b><span>Speed' + (p.gs != null ? ' · ' + Math.round(p.gs * 1.15078) + ' mph' : '') + '</span></div><div><b>' + (p.track != null ? p.track + '°' : '—') + '</b><span>Heading</span></div><div><b id="plDist">—</b><span>Route</span></div></div></div>' +
+      '<div class="bsec" id="plAc"><div class="lt">Aircraft</div><dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl></div>' +
       faHtml(faDone.get(hex)) + regHtml(p, regDone.get(hex)) +
-      '<div class="bsrc rnote">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown.</div>';
+      '<div class="bsec" id="plTools"><div class="lt">Tools</div><div class="bacts"><button class="btn' + (follow === hex && !orbiting ? ' on' : '') + '" id="plFollow">' + (follow === hex && !orbiting ? 'Following' : 'Follow') + '</button>' +
+      '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
+      '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">adsb.lol ↗</a>' +
+      (p.flight ? '<a class="btn" target="_blank" rel="noopener" href="https://www.flightaware.com/live/flight/' + encodeURIComponent(p.flight) + '">FlightAware ↗</a>' : '') + '</div>' +
+      '<div class="ssrc src">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown. Routes: adsbdb and adsb.lol.</div></div>';
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#plFollow').onclick = () => { const was = follow === hex && !orbiting; follow = was ? null : hex; orbiting = false; renderCard(hex, true); if (follow) followCam(); };
     card.querySelector('#plOrbit').onclick = () => { const was = follow === hex && orbiting; follow = was ? null : hex; orbiting = !was; renderCard(hex, true);
@@ -252,6 +253,7 @@ export function initPlanes(ctx) {
     const r = await routeFor(p), el = card.querySelector('#plRoute');
     const known = r?.origin && r?.destination;
     if (el && shown === hex) el.textContent = known ? ap(r.origin).replace(/&amp;/g, '&') + ' → ' + ap(r.destination).replace(/&amp;/g, '&') : faIdent(p) ? 'Checking FlightAware…' : 'No callsign';
+    const rd = card.querySelector('#plDist'); if (rd && shown === hex) rd.textContent = known ? (r.origin.code || '?') + ' → ' + (r.destination.code || '?') : '—';
     if (!known && faIdent(p)) {
       const fa = await faFor(p), e2 = card.querySelector('#plRoute'); if (shown !== hex) return;
       const c = fa?.current;
@@ -359,8 +361,10 @@ export function initPlanes(ctx) {
       const lvl = h.low_per_day >= 40 ? 'heavy' : h.low_per_day >= 10 ? 'moderate' : h.low_per_day >= 2 ? 'light' : 'very little';
       const sec = document.createElement('div'); sec.className = 'bsec'; sec.id = 'airSec';
       sec.innerHTML = '<div class="lt">Air Traffic</div><div><b>' + esc(lvl[0].toUpperCase() + lvl.slice(1)) + ' low air traffic</b>: about ' + h.low_per_day + ' sightings a day of aircraft below 3,000 ft within ~1 km' +
-        (h.lowest_ft != null ? ', lowest ' + h.lowest_ft.toLocaleString('en-US') + ' ft' : '') + '.</div><div class="rnote">Last ' + h.days + ' days, ' + h.sampled_days + ' days sampled in 5-minute snapshots (an exposure index, not a flight count). <button class="lnk" type="button" id="airNow">Planes overhead now</button></div>';
-      (card.querySelector('#liveSec') || card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
+        (h.lowest_ft != null ? ', lowest ' + h.lowest_ft.toLocaleString('en-US') + ' ft' : '') + '.</div><div class="fs">Last ' + h.days + ' days, ' + h.sampled_days + ' days sampled (an exposure index, not a flight count).' + (h.sampled_days < 3 ? ' The history is still filling in.' : '') + '</div>' +
+        '<button class="btn" type="button" id="airNow">Planes Overhead Now</button><div class="ssrc src">Community ADS-B receivers (adsb.lol), sampled every minute.</div>';
+      // building card: before Construction; filing card: before From Here
+      (card.querySelector('#bFilings') || card.querySelector('#liveSec') || card.querySelector('#fTools') || card.lastElementChild)?.before(sec);
       sec.querySelector('#airNow').onclick = () => { ctx.live.set({ planes: true }); map.easeTo({ center: c, zoom: Math.max(map.getZoom(), 11), duration: ctx.reduceMotion ? 0 : 700 }); };
     });
   });

@@ -20,25 +20,29 @@ async function getJSON(url, opts = {}, ms = 8000) {
 }
 
 // StratMap field names vary a little by year; look them up case-insensitively.
-const pick = (a, ...keys) => { for (const k of keys) { const hit = Object.keys(a).find(x => x.toLowerCase() === k.toLowerCase()); if (hit && a[hit] != null && String(a[hit]).trim() !== '' && String(a[hit]).trim() !== '0') return a[hit]; } return null; };
+const pick = (a, ...keys) => { for (const k of keys) { const hit = Object.keys(a).find(x => x.toLowerCase() === k.toLowerCase()); if (hit && a[hit] != null && String(a[hit]).trim() !== '' && String(a[hit]).trim() !== '0' && !/^null$/i.test(String(a[hit]).trim())) return a[hit]; } return null; };
 const num = v => { const n = Number(String(v ?? '').replace(/[$,]/g, '')); return Number.isFinite(n) && n > 0 ? n : null; };
 function fmtDate(v) {
   if (v == null) return null;
   if (typeof v === 'number' && v > 1e11) return new Date(v).toISOString().slice(0, 10); // epoch ms
-  const s = String(v).trim(); if (/^\d{8}$/.test(s)) return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6); return s.slice(0, 20);
+  const s = String(v).trim();
+  // Fort Bend (and others) send spreadsheet day numbers: 46082 = 2026-03-01
+  if (/^\d{5}$/.test(s) && +s > 20000 && +s < 80000) return new Date(Date.UTC(1899, 11, 30) + +s * 864e5).toISOString().slice(0, 10);
+  if (/^\d{8}$/.test(s)) return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6); return s.slice(0, 20);
 }
 export function normalizeParcel(attrs, geometry) {
   const a = attrs || {}, area = num(pick(a, 'GIS_AREA', 'LEGAL_AREA')), unit = pick(a, 'GIS_AREA_UNIT', 'LGL_AREA_UNIT');
   const mail = [pick(a, 'MAIL_LINE1', 'MAIL_ADDR'), pick(a, 'MAIL_LINE2'), [pick(a, 'MAIL_CITY'), pick(a, 'MAIL_STAT', 'MAIL_STATE'), pick(a, 'MAIL_ZIP')].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-  const situs = pick(a, 'SITUS_ADDR') || [pick(a, 'SITUS_NUM'), pick(a, 'SITUS_STREET', 'SITUS_STRE', 'SITUS_ST_1')].filter(Boolean).join(' ');
-  const raw = Object.fromEntries(Object.entries(a).filter(([k, v]) => v != null && String(v).trim() !== '' && !/^(objectid|shape|globalid)/i.test(k)).slice(0, 60).map(([k, v]) => [k, String(v).slice(0, 160)]));
+  const tidy = v => String(v || '').replace(/\s+,/g, ',').replace(/(,\s*)+$/, '').replace(/,\s*,/g, ',').trim(); // "Highway 90A , ," -> "Highway 90A"
+  const situs = tidy(pick(a, 'SITUS_ADDR') || [pick(a, 'SITUS_NUM'), pick(a, 'SITUS_STREET', 'SITUS_STRE', 'SITUS_ST_1'), pick(a, 'SITUS_ST_2')].filter(Boolean).join(' ')), city = pick(a, 'SITUS_CITY');
+  const raw = Object.fromEntries(Object.entries(a).filter(([k, v]) => v != null && String(v).trim() !== '' && !/^null$/i.test(String(v).trim()) && !/^(objectid|shape|globalid|st_area|st_perimeter)/i.test(k)).slice(0, 60).map(([k, v]) => [k, String(v).slice(0, 160)]));
   return {
     propId: pick(a, 'PROP_ID', 'GEO_ID'), owner: pick(a, 'OWNER_NAME'), mailing: mail || null,
-    situs: situs ? [situs, pick(a, 'SITUS_CITY')].filter(Boolean).join(', ') : null, county: pick(a, 'COUNTY'),
-    situsStreet: situs || null, situsCity: pick(a, 'SITUS_CITY'), situsZip: (String(pick(a, 'SITUS_ZIP') || '').match(/\d{5}/) || [null])[0],
+    situs: situs ? (city && !situs.toLowerCase().includes(String(city).toLowerCase()) ? situs + ', ' + city : situs) : null, county: pick(a, 'COUNTY'),
+    situsStreet: situs || null, situsCity: city, situsZip: (String(pick(a, 'SITUS_ZIP') || '').match(/\d{5}/) || [null])[0],
     landUse: pick(a, 'LOC_LAND_USE', 'LAND_USE', 'STATE_CD'), marketValue: num(pick(a, 'MKT_VALUE')), landValue: num(pick(a, 'LAND_VALUE')),
     improvementValue: num(pick(a, 'IMP_VALUE')), yearBuilt: pick(a, 'YEAR_BUILT'), acquired: fmtDate(pick(a, 'DATE_ACQ', 'DEED_DATE')), taxYear: pick(a, 'TAX_YEAR'),
-    area: area ? Math.round(area * 100) / 100 + (unit ? ' ' + String(unit).toLowerCase() : '') : null, raw,
+    area: area ? Math.round(area * 100) / 100 + ' ' + (unit ? String(unit).toLowerCase() : 'acres') : null, raw, // StratMap areas are acres unless a unit says otherwise
     buildingSqft: num(pick(a, 'BLDG_SQFT', 'IMPRV_SQFT', 'IMP_SQFT', 'LIVING_AREA', 'LIV_AREA', 'BLD_AREA', 'BLDG_AREA', 'TOT_SQFT', 'SQ_FT', 'SQFT')),
     stories: num(pick(a, 'STORIES', 'NUM_STORIES', 'NO_STORIES', 'FLOORS')),
     geometry: geometry?.rings ? { type: 'Polygon', coordinates: geometry.rings } : null
