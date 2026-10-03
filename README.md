@@ -96,11 +96,13 @@ Free, no keys. Live lookups go through `api/site` (cached a week at the CDN); th
 | Opportunity Zone, school district | CDFI Fund via ArcGIS Online; Census TIGERweb | Live | |
 | Environmental flags | EPA ECHO facility search | Live, ¼ mile | Flags facilities with violations, toxic releases, penalties or hazardous-waste handling. A screening flag, not a Phase I. |
 | Alcohol sales at the address | Texas Comptroller mixed beverage gross receipts (`naix-2893`) | Live | Last 12 months per permit; matched like registered businesses (house number + street word + ZIP). |
-| Crime nearby | Houston Police NIBRS yearly CSVs | Nightly into `crime_incidents` (live-sync step `crime`), queried with `crime_near()` | Last 25 months kept. HPD's file runs about three months behind. Houston city only; needs migration `20261010000000_site_data.sql`. |
+| Crime nearby, crime layer and crime reports | Houston Police NIBRS yearly CSVs | Nightly into `crime_incidents` (live-sync step `crime`), queried with `crime_near()` | Last 25 months kept. HPD's file runs about three months behind. Houston city only; needs migration `20261010000000_site_data.sql`. |
 | County unemployment | BLS LAUS (API v1, or v2 with `BLS_KEY`) | Nightly | All 254 Texas counties, the state and four metros; latest month and a year earlier. |
 | Rates | FRED graph CSV (10-yr and 5-yr Treasury, Freddie Mac 30-yr), New York Fed SOFR | Nightly | Latest, a year earlier, a weekly line for the last year. |
 | Typical rent by ZIP | Zillow Observed Rent Index (ZIP, all homes) | Nightly | About 750 Texas ZIPs. |
 | Home loans | CFPB HMDA data browser | Nightly (new year each spring) | Originated loans, dollars and purchase loans per region county. |
+
+**Crime (Houston):** Map Layers → **Crime (Houston)** draws last-12-month incidents as a heat map, then ~¼-mile squares when zoomed in (all, violent or property; click a square for its report). **Crime Report** (under Area at a Glance, and on the selection bar, for any box, shape, county or radius selection) and **Full crime report** on a building card open a report card: totals vs the year before, incidents per square mile vs the citywide rate, a 24-month chart, top offenses and premises, the newest incidents, **Show Incidents on Map**, **Export Report** (printable HTML → PDF) and **Export CSV** (up to the newest 2,000 incidents). The assistant's `crime_stats` tool answers questions about incidents near a place, the open building or the selected area. Backed by `api/crime` and the SQL functions `crime_grid`, `crime_report` and `crime_list` (migration `20261011000000_crime_reports.sql`). City of Houston only; HPD's data runs about three months behind.
 
 Sources are hidden on cards and panels by default (one clean view for everyone); **Sources → Show sources on cards and panels** turns them on for that browser. Reports always list sources.
 

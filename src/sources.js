@@ -82,7 +82,7 @@ export function initSources(ctx) {
           detail: (a?.rents ? 'Through ' + a.rents + '. ' : '') + 'Monthly, all home types (single-family, condo, apartments). Not every ZIP is covered.' },
         { name: link('CFPB HMDA', 'https://ffiec.cfpb.gov/data-browser/'), what: 'Market view: home loans originated per county', status: a?.mortgages ? nightlyStatus() : st('off', 'Not built yet'),
           detail: (a?.mortgages ? 'Year ' + a.mortgages + '. ' : '') + 'Published once a year (spring) for the year before.' },
-        { name: link('Houston Police NIBRS incidents', 'https://www.houstontx.gov/police/cs/Monthly_Crime_Data_by_Street_and_Police_Beat.htm'), what: 'Building cards: crime within ½ mile, last 12 months vs the 12 before (Houston)', status: st('fresh', 'Nightly'),
+        { name: link('Houston Police NIBRS incidents', 'https://www.houstontx.gov/police/cs/Monthly_Crime_Data_by_Street_and_Police_Beat.htm'), what: 'Crime map layer, crime reports for any selected area (PDF / CSV), the assistant’s crime answers, and crime within ½ mile on building cards (Houston)', status: st('fresh', 'Nightly'),
           detail: 'HPD republishes the yearly file monthly; the nightly sync keeps the last 25 months in the database. Houston city only for now.' },
         { name: link('US Census TIGER (us-atlas)', 'https://github.com/topojson/us-atlas'), what: 'County outlines and town names', status: st('off', 'Static'), detail: 'Boundaries change rarely; updated with the app.' },
       ]],

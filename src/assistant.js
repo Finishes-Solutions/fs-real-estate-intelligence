@@ -208,7 +208,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_details: 'Checking FlightAware…', market_data: 'Reading the market numbers…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_details: 'Checking FlightAware…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -553,6 +553,27 @@ export function initAssistant(ctx) {
         turnSubject = d.ident;
         return { ident: d.ident, in_the_air_now: leg(d.current), recent_flights: (d.recent || []).map(leg), source: 'FlightAware AeroAPI', budget: d.budget ? { spent_this_month: d.budget.spent, cap: d.budget.cap } : undefined,
           note: 'Times are UTC ISO strings; say them in Central time. Private owners can ask FlightAware to block their flights, so an empty answer doesn\'t mean the plane isn\'t flying.' };
+      }
+      if (name === 'crime_stats') {
+        if (!ctx.crimeReportData) return { error: 'Crime data isn’t available in this version.' };
+        let geometry, label;
+        if (a.use_selection && ctx.sel?.feature) { geometry = ctx.sel.feature.geometry || ctx.sel.feature; label = ctx.sel.label || 'the selected area'; }
+        else {
+          const p = await pointFor(a); if (p.error) return p;
+          const mi = Math.min(5, Math.max(0.1, a.radius_miles || (p.kind && !/address|building|poi/.test(p.kind) ? 1 : 0.5))), r = mi / 69, k = Math.cos(p.c[1] * Math.PI / 180), ring = [];
+          for (let i = 0; i <= 64; i++) { const t = (i % 64) / 64 * 2 * Math.PI; ring.push([p.c[0] + r * Math.cos(t) / k, p.c[1] + r * Math.sin(t)]); }
+          geometry = { type: 'Polygon', coordinates: [ring] }; label = (mi === 0.5 ? '½' : mi) + ' mile around ' + p.label;
+        }
+        const d = await ctx.crimeReportData(geometry, 2000); if (!d.latest) return { error: d.note || 'No crime data loaded yet.' };
+        if (a.show_layer) ctx.crimeLayer?.(true);
+        if (a.show_report) { if (ctx.view !== 'map') ctx.setView('map'); ctx.crimeReport({ geometry, label }); actionChip('Crime report: ' + label); }
+        const words = String(a.offense || '').toLowerCase().split(/\s+/).filter(Boolean), inc = (d.incidents || []).filter(x => !words.length || words.some(w => x.offense.toLowerCase().includes(w)));
+        turnSubject = label;
+        return { area: label, period: '12 months through ' + d.latest + ' (vs the 12 months before)', area_sq_mi: d.area_sqmi, last_12_months: d.last12, prior_12_months: d.prior12, change_pct: d.change,
+          per_sq_mi_per_year: d.per_sqmi, houston_citywide_per_sq_mi: d.city_per_sqmi, top_offenses: d.offenses.slice(0, 12).map(o => ({ offense: o.name, type: o.cat, count: o.n })),
+          top_premises: d.premises.slice(0, 8), by_month: d.months, recent_incidents: inc.slice(0, 40).map(x => ({ date: x.day, offense: x.offense, premise: x.premise })),
+          matching_incidents_last_12_months: words.length ? inc.length + (inc.length >= 2000 ? '+' : '') : undefined,
+          coverage: d.coverage, note: 'Counts are incidents reported to Houston Police; busy commercial areas have more than homes nearby. Type: v violent, p property, o other.' };
       }
       if (name === 'market_data') {
         const d = await ctx.marketData?.(a.county || ''); if (!d) return { error: 'The Market view isn’t loaded in this version.' }; if (d.error) return d;
