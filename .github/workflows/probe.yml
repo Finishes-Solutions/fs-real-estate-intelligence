@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       script:
-        description: "Probe to run: parcels, height, news or geocode"
+        description: "Probe to run: parcels, height, news, geocode or bls"
         required: false
         default: parcels
 permissions:
