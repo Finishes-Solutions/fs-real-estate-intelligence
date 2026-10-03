@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 7:00 PM CT: Ask AI suggestions only on hover (0e744bf)
+- The suggested questions above **Ask AI** now appear only while your pointer is on the button (or it has keyboard focus). They stay up long enough for you to move up and click one. They no longer cover the Layers panel.
+- With the Layers panel open, it now ends above the Ask AI button and scrolls inside, so the button no longer covers its bottom rows.
+- On touch screens, which have no hover, the assistant's empty chat starts with the same suggestions for what's on screen, then the general examples.
+
 ### 6:50 PM CT: Roomier phone layout; routes clear when the card closes (fc2e789)
 - **Phone spacing**:
   - the map buttons are separate, larger buttons with room between them;
