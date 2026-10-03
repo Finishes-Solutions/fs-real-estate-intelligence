@@ -5,6 +5,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 1:27 AM CT: Plane photos, details and 3D flight paths from adsb.lol; FlightAware removed (7d211b6)
+- **Plane cards now show:**
+  - **a photo of the actual aircraft**, credited to its photographer and linked to planespotters.net;
+  - **who operates it and the year it was built**, and whether it's military.
+- **This flight's path is drawn on the map**, coloured by altitude: grey on the ground, orange when low, yellow when climbing, blue at mid altitude, green at cruise. It follows the plane as it moves.
+- **In 3D (tilt the map, or press "View the path in 3D" on the card)**, the path floats at the plane's real altitude, with a see-through curtain down to the ground. You can see exactly where it climbed and descended.
+- The card lists **when the flight departed, how long it's been flying, its highest altitude, and how many other flights it made today**.
+- **Ask the assistant** "show me N123AB's flight path" or "where has that jet been today?". It draws the path in 3D and names the towns where today's flights started and ended.
+- **FlightAware is no longer used.** Everything above comes free from adsb.lol and the photo databases its own map uses, so there's nothing to pay or cap. The FlightAware link on plane cards is gone too.
+- **Military transports** (C-17, C-130, tankers…) get their own outline. Fighters and military helicopters keep theirs. All plane icons are a little larger.
+
 ### 1:14 AM CT: Planes look like what they are; map buttons stay put (01eff54)
 - **Each plane on the map is drawn as its kind of aircraft**, not the same airliner icon:
   - big jets: 747s and other four-engine jets, wide-bodies (777, 787, A330…), narrow-body airliners (737, A320…);
