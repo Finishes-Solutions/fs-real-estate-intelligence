@@ -1244,3 +1244,6 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .route-chip[hidden],.stage:not([data-view="map"]) .route-chip{display:none}
 .route-chip span{white-space:nowrap}
 @media (max-width:700px){ .route-chip{top:calc(108px + var(--st));bottom:auto;max-width:calc(100% - 140px);font-size:12.5px;padding:7px 8px 7px 12px;gap:8px} .route-chip span{overflow:hidden;text-overflow:ellipsis} .route-chip b{flex:none} }
+/* Regrid: a saved parcel record that Regrid has since refreshed */
+.rg-stale{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 2px;padding:8px 10px;border-radius:6px;border:1px solid rgba(183,121,31,.45);background:rgba(183,121,31,.08);font-size:12px;color:var(--text-2)}
+.rg-stale span{flex:1;min-width:180px}

@@ -1,7 +1,13 @@
 // Regrid (paid; Bundle Access: 2,000 parcel records and 200,000 tiles a month, overage $0.10 per record / $0.001 per tile).
 // The token stays on the server (REGRID_TOKEN on Vercel); the browser only ever talks to this endpoint.
-//   GET ?lat=&lon=[&key=county|prop_id]  one parcel record (building card button). Each parcel is paid for once: the
-//                                         record is saved in Supabase (regrid_parcels) and served from there afterwards.
+//   GET ?lat=&lon=[&key=county|prop_id][&refresh=1]
+//                                         one parcel record (building card button). Each parcel is paid for once: the record
+//                                         and its outline are saved in Supabase (regrid_parcels), and any later lookup by the
+//                                         same key or anywhere inside that outline is served from there for free.
+//                                         Freshness: Regrid's Verse endpoint says when it last re-pulled each county
+//                                         (last_refresh, read at most once a day into regrid_counties). A saved record fetched
+//                                         before that date, or more than a year ago, comes back with stale: true and the card
+//                                         offers Update; only &refresh=1 (that button) spends a record on it again.
 //   GET ?tile=z/x/y                       parcel-line vector tile (map layer, zoom 15–16 only; deeper zooms reuse z16)
 //   GET ?usage=1                          what's been used this billing cycle against the caps
 // Hard caps (refuse instead of going into overage): REGRID_RECORD_CAP (default 1800), REGRID_TILE_CAP (default 180000).
@@ -41,6 +47,33 @@ async function used(db, token) {
   const rows = await db.select('regrid_usage', 'cycle=eq.' + encodeURIComponent(u.cycle) + '&select=kind,n').catch(() => []);
   const ours = Object.fromEntries(rows.map(r => [r.kind, r.n]));
   return { cycle: u.cycle, regrid_reported: u.known, records: { used: Math.max(ours.records || 0, u.records), cap: CAP.records }, tiles: { used: Math.max(ours.tiles || 0, u.tiles), cap: CAP.tiles } };
+}
+
+// ---- freshness: Regrid's own "last full refresh" date per Texas county (Verse), re-read at most once a day ----
+const DAY = 864e5, MAX_AGE = 365 * DAY;
+export async function countyRefresh(db, token, geoid, fetchImpl = globalThis.fetch) {
+  if (!geoid) return null;
+  let row = (await db.select('regrid_counties', 'geoid=eq.' + encodeURIComponent(geoid) + '&select=geoid,county,last_refresh,checked_at').catch(() => []))[0];
+  if (!row || Date.now() - Date.parse(row.checked_at) > DAY) {
+    try {
+      const r = await fetchImpl(API + '/verse?return_geometry=false', { headers: { 'x-regrid-token': token }, signal: AbortSignal.timeout(15000) });
+      if (r.ok) {
+        const d = await r.json(), list = Array.isArray(d) ? d : d?.verse || d?.features || [];
+        const now = new Date().toISOString();
+        const rows = list.map(f => f.properties || f).filter(p => p && String(p.geoid || '').startsWith('48'))
+          .map(p => ({ geoid: String(p.geoid), county: p.county || null, last_refresh: p.last_refresh || null, assessor_data_date: p.assessor_data_date || null, checked_at: now }));
+        if (rows.length) { await db.upsert('regrid_counties', rows, 'geoid'); row = rows.find(x => x.geoid === geoid) || row; }
+      }
+    } catch (e) { console.error('regrid verse', e.message); }
+  }
+  return row || null;
+}
+// is a record saved on `fetched` (ISO) out of date? county = regrid_counties row (or null)
+export function staleness(fetched, county, now = Date.now()) {
+  const f = Date.parse(fetched), lr = county?.last_refresh ? Date.parse(county.last_refresh) : NaN;
+  if (Number.isFinite(lr) && lr > f) return { stale: true, why: 'county', county_refreshed: county.last_refresh.slice(0, 10) };
+  if (now - f > MAX_AGE) return { stale: true, why: 'age' };
+  return { stale: false, ...(county?.last_refresh ? { county_refreshed: county.last_refresh.slice(0, 10) } : {}) };
 }
 
 // the fields the card shows, in order; everything else non-empty goes in `more`
@@ -90,10 +123,18 @@ export default async function handler(req, res) {
   const lat = +q.lat, lon = +q.lon;
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 25 || lat > 37 || lon < -107 || lon > -93) return res.status(400).json({ error: 'lat/lon must be inside Texas' });
   const key = /^[\w .'-]{1,40}\|[\w.-]{1,40}$/.test(String(q.key || '')) ? 'pid:' + String(q.key).toLowerCase() : 'pt:' + lat.toFixed(5) + ',' + lon.toFixed(5);
-  try {
-    const hit = (await db.select('regrid_parcels', 'k=eq.' + encodeURIComponent(key) + '&select=data,geom,fetched_at'))[0];
-    if (hit) return res.json({ ...hit.data, geom: hit.geom, cached: true, fetched: hit.fetched_at.slice(0, 10), usage: await used(db, token) });
-  } catch (e) { console.error('regrid cache', e.message); }
+  const refresh = q.refresh === '1';
+  if (!refresh) {
+    try {
+      // the same key, or any saved parcel whose outline contains the point (a second click elsewhere on the lot is free)
+      let hit = (await db.select('regrid_parcels', 'k=eq.' + encodeURIComponent(key) + '&select=data,geom,geoid,fetched_at'))[0];
+      if (!hit) hit = (await db.rpc('regrid_parcel_at', { p_lon: lon, p_lat: lat }))?.[0];
+      if (hit) {
+        const county = await countyRefresh(db, token, hit.geoid);
+        return res.json({ ...hit.data, geom: hit.geom, cached: true, fetched: hit.fetched_at.slice(0, 10), ...staleness(hit.fetched_at, county), usage: await used(db, token) });
+      }
+    } catch (e) { console.error('regrid cache', e.message); }
+  }
   if (!rateLimit(req, res, { perMinute: 10, perDay: 120 })) return;
   let total;
   try { total = await take(db, token, 'records', 1); } catch (e) { console.error('regrid counter', e.message); return res.status(503).json({ error: 'Couldn’t check the Regrid allowance, so nothing was spent. Try again shortly.' }); }
@@ -105,7 +146,8 @@ export default async function handler(req, res) {
   const d = await r.json(), f = d?.parcels?.features?.[0];
   if (!f) return res.json({ none: true, usage: await used(db, token) });
   const out = trimRecord({ ...f, zoning: d?.zoning?.features?.[0]?.properties || null });
-  try { await db.upsert('regrid_parcels', [{ k: key, ll_uuid: out.ll_uuid, data: out, geom: f.geometry || null }], 'k'); } catch (e) { console.error('regrid save', e.message); }
+  const geoid = String(f.properties?.fields?.geoid || '').slice(0, 5) || null;
+  try { await db.upsert('regrid_parcels', [{ k: key, ll_uuid: out.ll_uuid, data: out, geom: f.geometry || null, geoid, fetched_at: new Date().toISOString() }], 'k'); } catch (e) { console.error('regrid save', e.message); }
   res.setHeader('Cache-Control', 'no-store');
-  return res.json({ ...out, geom: f.geometry || null, cached: false, usage: await used(db, token) });
+  return res.json({ ...out, geom: f.geometry || null, cached: false, fetched: new Date().toISOString().slice(0, 10), stale: false, usage: await used(db, token) });
 }

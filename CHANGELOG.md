@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-02
 
+### 7:06 PM CT: Regrid records cached by parcel, with an out-of-date check
+- A Regrid parcel record is now saved with its outline: clicking anywhere else on the same lot later is free (before, only the same parcel ID or exact spot was).
+- The card now says when a saved record is out of date: Regrid re-pulls each county's data periodically, and if it has done so since the record was saved (or the copy is over a year old), the card shows "Update (uses 1 record)". Otherwise it says the copy is current with the county's last Regrid refresh. Nothing is re-bought automatically.
+
 ### 7:00 PM CT: Ask AI suggestions only on hover (0e744bf)
 - The suggested questions above **Ask AI** now appear only while your pointer is on the button (or it has keyboard focus). They stay up long enough for you to move up and click one. They no longer cover the Layers panel.
 - With the Layers panel open, it now ends above the Ask AI button and scrolls inside, so the button no longer covers its bottom rows.
@@ -22,7 +26,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Route pill**: while a route is showing, a one-line "Route · 41 mi · 46 min ×" pill on the map clears it. An empty pill no longer appears when there's no route.
 - **For whoever runs the database**: the flight-history migration is renamed to `supabase/migrations/20261008000000_air_traffic.sql`, because its old number clashed with the Regrid migration. It hasn't been applied yet, so nothing else changes.
 
-### 6:48 PM CT: Plane route lookups no longer fail on unknown flights; Regrid confirmed live
+### 6:48 PM CT: Plane route lookups no longer fail on unknown flights; Regrid confirmed live (955df7b)
 - A flight that isn't in the adsb.lol route database used to make the route lookup error out. It now just says "Route not in the database" (and draws no line).
 - Regrid confirmed working on the live site: the token is accepted, usage is being counted, and parcel tiles load.
 

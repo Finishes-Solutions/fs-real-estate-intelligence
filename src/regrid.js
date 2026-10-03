@@ -37,10 +37,12 @@ export function initRegrid(ctx) {
     el.innerHTML = btn(usage);
     getUsage().then(u => { if (el.isConnected && el.querySelector('#rgGo')) { el.innerHTML = btn(u); wire(); } });
     function wire() {
-      el.querySelector('#rgGo').onclick = async () => {
-        el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote">Looking up…</div>';
+      el.querySelector('#rgGo').onclick = () => look(false);
+    }
+    async function look(refresh) {
+        el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote">' + (refresh ? 'Getting the latest record…' : 'Looking up…') + '</div>';
         try {
-          const r = await fetch('api/regrid?' + new URLSearchParams({ lat: center[1].toFixed(6), lon: center[0].toFixed(6), ...(key ? { key } : {}) }));
+          const r = await fetch('api/regrid?' + new URLSearchParams({ lat: center[1].toFixed(6), lon: center[0].toFixed(6), ...(key ? { key } : {}), ...(refresh ? { refresh: '1' } : {}) }));
           const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Regrid lookup failed');
           if (d.usage) usage = d.usage;
           if (d.none) { el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote">Regrid has no parcel at this point.</div>'; return; }
@@ -48,10 +50,11 @@ export function initRegrid(ctx) {
           el.innerHTML = '<div class="lt">Regrid parcel record</div><dl>' + d.fields.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
             (z ? '<div class="lt">Zoning (Regrid)</div><dl>' + [['Zone', [z.zoning, z.zoning_description].filter(Boolean).join(' · ')], ['Type', [z.zoning_type, z.zoning_subtype].filter(Boolean).join(' · ')], ['Max height', z.max_building_height_ft && z.max_building_height_ft + ' ft'], ['Max FAR', z.max_far], ['Max coverage', z.max_coverage_pct && z.max_coverage_pct + '%'], ['Density', z.max_density_du_per_acre && z.max_density_du_per_acre + ' units/acre']].filter(([, v]) => v).map(([k, v]) => '<dt>' + k + '</dt><dd>' + esc(v) + '</dd>').join('') + (z.zoning_code_link ? '<dt>Code</dt><dd><a href="' + esc(z.zoning_code_link) + '" target="_blank" rel="noopener">Zoning code ↗</a></dd>' : '') + '</dl>' : '') +
             (d.more?.length ? '<details class="raw"><summary>All Regrid fields (' + d.more.length + ')</summary><dl>' + d.more.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl></details>' : '') +
-            '<div class="rnote">' + (d.cached ? 'Saved copy from ' + esc(d.fetched) + ' (no charge).' : 'Used 1 Regrid record.') + (d.usage ? ' ' + fmtN(left(d.usage, 'records')) + ' of ' + fmtN(d.usage.records.cap) + ' left this month.' : '') +
+            (d.stale ? '<div class="rg-stale"><span>' + (d.why === 'county' ? 'Regrid refreshed this county’s records on ' + esc(d.county_refreshed) + ', after this copy was saved (' + esc(d.fetched) + ').' : 'This copy is more than a year old (' + esc(d.fetched) + ').') + '</span><button class="btn" type="button" id="rgUpd">Update (uses 1 record)</button></div>' : '') +
+            '<div class="rnote">' + (d.cached ? 'Saved copy from ' + esc(d.fetched) + ' (no charge)' + (d.stale ? '' : d.county_refreshed ? ', current with Regrid’s ' + esc(d.county_refreshed) + ' county refresh' : '') + '.' : 'Used 1 Regrid record.') + (d.usage ? ' ' + fmtN(left(d.usage, 'records')) + ' of ' + fmtN(d.usage.records.cap) + ' left this month.' : '') +
             (d.path ? ' <a href="https://app.regrid.com' + esc(d.path) + '" target="_blank" rel="noopener">Open in Regrid ↗</a>' : '') + '</div>';
+          el.querySelector('#rgUpd')?.addEventListener('click', () => look(true));
         } catch (e) { el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote err">' + esc(e.message) + '</div>'; }
-      };
     }
     wire();
   };
