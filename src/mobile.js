@@ -67,7 +67,7 @@ export function initMobile(ctx) {
   document.getElementById('mAsk').onclick = () => { ctx.assistant.open(); setTimeout(() => document.getElementById('aiQ').focus(), 80); };
   document.getElementById('mMic').onclick = () => ctx.assistant.startVoice();
   phoneMQ.addEventListener('change', () => { if (!isPhone()) { app.dataset.mtab = 'map'; closeSheet(); card.classList.remove('full'); } setTimeout(() => map.resize(), 50); });
-  document.getElementById('mFilters').onclick = () => { setTab('list'); const f = panel.querySelector('.filters'); setTimeout(() => f.scrollIntoView({ block: 'start', behavior: 'smooth' }), 30); };
+  document.getElementById('mFilters').onclick = () => { setTab('list'); const fs = document.getElementById('secFilings'); if (fs.getAttribute('aria-expanded') !== 'true') fs.click(); const f = panel.querySelector('.filters'); setTimeout(() => f.scrollIntoView({ block: 'start', behavior: 'smooth' }), 30); };
 
   // live count + filter badge
   function syncCount() {

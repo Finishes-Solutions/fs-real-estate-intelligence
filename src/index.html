@@ -19,7 +19,7 @@
 </head>
 <body>
 <div class="app">
-  <aside class="panel" id="panel" aria-label="Filings">
+  <aside class="panel" id="panel" aria-label="Property intelligence">
     <button class="sheet-toggle" id="sheetToggle" aria-label="Expand list"></button>
     <div class="brandbar">
       <img class="l-light" alt="Finishes Solutions" src="logo.png">
@@ -28,9 +28,14 @@
       </button>
     </div>
     <div class="head">
-      <div class="kicker" id="kicker">TDLR TABS</div>
+      <div class="kicker" id="kicker">Property Intelligence · Texas</div>
       <h1>Real Estate Intelligence Platform</h1>
-      <p class="sub">Every accessibility registration filed in Waller and the six counties around it over the last two years, placed where it will be built.</p>
+      <p class="sub">Click any building or parcel for its owner, value, zoning, site risks and the area around it, or search an address. Construction filings are one layer among many.</p>
+    </div>
+    <section class="glance" id="glance" aria-live="polite"></section>
+    <button class="sechead fsec" id="secFilings" type="button" aria-expanded="false" aria-controls="filingsBody"><svg class="chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg><span>Construction Filings</span><em id="filingsPeriod"></em></button>
+    <div class="fbody" id="filingsBody">
+    <div class="fhead">
       <div class="kpiwrap">
         <div class="kpis" id="kpis" aria-live="polite"></div>
         <button class="kpi-edit" id="kpiEdit" type="button" aria-label="Choose headline metrics" aria-expanded="false" title="Choose metrics (3 to 9)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg><span>Metrics</span></button>
@@ -97,6 +102,7 @@
     </div>
     <button class="sechead listhead" id="secList" type="button" aria-expanded="true" aria-controls="list"><svg class="chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg><span id="listCount"></span></button>
     <div class="list" id="list" role="list"></div>
+    </div>
     <div class="foot">Source: <a href="https://www.tdlr.texas.gov/TABS/Search" target="_blank" rel="noopener">TDLR TABS</a>, registrations <span id="periodTxt"></span>. Costs and dates are filer estimates; hatched timeline bars are our own estimates. Located with US Census and OpenStreetMap geocoders; hollow markers are city-level approximations. Use, tenant and developer fields are AI-extracted from the filing text and can be wrong. Demographics: US Census ACS 5-year. <span id="missTxt"></span> Basemaps © MapTiler © OpenStreetMap contributors.</div>
   </aside>
 
@@ -209,7 +215,7 @@
   </main>
   <nav class="mnav" id="mnav" aria-label="Sections">
     <button data-tab="map" aria-pressed="true"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M2.5 5l5-2 5 2 5-2v12l-5 2-5-2-5 2z"/><path d="M7.5 3v12M12.5 5v12"/></svg><span>Map</span></button>
-    <button data-tab="list" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 5h10M6.5 10h10M6.5 15h10"/><circle cx="3.2" cy="5" r=".9" fill="currentColor"/><circle cx="3.2" cy="10" r=".9" fill="currentColor"/><circle cx="3.2" cy="15" r=".9" fill="currentColor"/></svg><span>List</span></button>
+    <button data-tab="list" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 5h10M6.5 10h10M6.5 15h10"/><circle cx="3.2" cy="5" r=".9" fill="currentColor"/><circle cx="3.2" cy="10" r=".9" fill="currentColor"/><circle cx="3.2" cy="15" r=".9" fill="currentColor"/></svg><span>Explore</span></button>
     <button data-tab="timeline" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h8M6 10h9M4 15h7"/></svg><span>Timeline</span></button>
     <button data-tab="who" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 17V8h4v9M8 17V3h4v14M13 17v-6h4v6"/></svg><span>Activity</span></button>
     <button data-tab="more" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg><span>More</span><span class="badge" id="mMoreN"></span></button>
