@@ -49,6 +49,9 @@ assert.equal(tables.length, 1); assert.match(tables[0].caption, /^Busiest Domest
 assert.deepEqual(tables[0].headers, ['Rank', 'City', 'Passengers']);
 assert.deepEqual(tables[0].rows, [['1', "Chicago–O'Hare, Illinois", '831,556'], ['2', 'Denver, Colorado', '824,987']]);
 assert.equal(cleanWiki("'''Bold''' [[A|b]] {{nowrap|c}}<ref>x</ref>"), 'Bold b c');
+assert.equal(cleanWiki('{{nowrap|Busiest domestic routes from HOU'), 'Busiest domestic routes from HOU', 'template cut at a line break');
+assert.deepEqual(parseAirlines('{{Airport destination list\n| [[Southwest Airlines]] | [[Atlanta]], [[Austin]]\n}}').map(x => x.airline), ['Southwest Airlines'], 'long template name');
+assert.deepEqual(parseAirlines('{| class="wikitable"\n|-\n! Airlines !! Destinations\n|-\n| [[Southwest Airlines]] || [[Atlanta]], [[Austin]]\n|-\n| [[Delta Air Lines]]\n| [[Atlanta]]\n|}').map(x => [x.airline, x.destinations]), [['Southwest Airlines', 2], ['Delta Air Lines', 1]], 'wikitable layout');
 
 // approach paths: a point 3 nm east of runway 26R's threshold (on the centerline) is under the path; 2 nm off it is not
 const iah = [{ le_ident: '08L', le_lat: 30.0072, le_lon: -95.3588, he_ident: '26R', he_lat: 30.0072, he_lon: -95.3304, length_ft: 9000 }];

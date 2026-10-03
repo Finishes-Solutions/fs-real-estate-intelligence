@@ -378,7 +378,7 @@ export function initPlanes(ctx) {
       '<div class="bsec" id="plTools"><div class="lt">Tools</div><div class="bacts"><button class="btn' + (follow === hex && !orbiting ? ' on' : '') + '" id="plFollow">' + (follow === hex && !orbiting ? 'Following' : 'Follow') + '</button>' +
       '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
       '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">adsb.lol ↗</a>' +
-      (tr?.points?.length > 1 ? '<button class="btn" type="button" id="pl3dBtn">3D flight path</button>' : '') + '</div>' +
+      (tr?.points?.length > 1 ? '<button class="btn" type="button" id="pl3dBtn">3D flight path</button>' : '') + (ctx.flightReport ? '<button class="btn" type="button" id="plReport">Export Flight Report</button>' : '') + '</div>' +
       '<div class="ssrc src">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown. Routes: adsbdb and adsb.lol. Flight path: adsb.lol traces.</div></div>';
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#plFollow').onclick = () => { const was = follow === hex && !orbiting; follow = was ? null : hex; orbiting = false; renderCard(hex, true); if (follow) followCam(); };
@@ -386,6 +386,7 @@ export function initPlanes(ctx) {
       if (orbiting) map.easeTo({ zoom: Math.max(map.getZoom(), 11), pitch: 60, duration: ctx.reduceMotion ? 0 : 800 }); };
     card.querySelector('#pl3d')?.addEventListener('click', () => view3d(hex));
     card.querySelector('#pl3dBtn')?.addEventListener('click', () => view3d(hex));
+    card.querySelector('#plReport')?.addEventListener('click', () => ctx.flightReport(p, { track: tr, info, reg: regDone.get(hex) }));
     if (!refresh || !card.classList.contains('open')) card.classList.add('open');
     // photo / details and the flight path: fetched once when the card opens, then the card re-renders with them
     if (!refresh) {
