@@ -5,6 +5,19 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 2:30 AM CT: Voice assistant is more reliable (ba2b843)
+- **No more bursts of place names.** When you were quiet or there was background noise, the voice transcriber sometimes "heard" its own list of local names and flashed them on screen before throwing the turn away. That list is now much shorter. Any echo that still slips in is removed, even when it's tacked onto the end of something you really said.
+- **"Listening…" and then nothing should be gone.** Several ways a turn could stall without a word are fixed:
+  - Two replies started for one question, and the second was refused.
+  - A reply that failed on OpenAI's side was treated as finished.
+  - A lookup (an address, a place) never answered.
+
+  Now one reply runs at a time. A failed or never-started reply is retried once, and lookups give up after 20 seconds. If it still can't answer, the panel says so ("No reply came back. Try again.") instead of going silent.
+- **If you talk for a while and the transcript comes out garbled**, the assistant answers from your voice. If it didn't catch you either, it asks you to repeat. Short noises are still ignored, now with "Didn't catch that" when something was heard.
+- **Long conversations keep going.** OpenAI ends voice sessions at 10 minutes. The app now renews the session just before that, between turns, and remembers what you were talking about.
+- **When a place name is ambiguous** ("Katy" the town or Katy Freeway), the options appear as buttons under the conversation. You can tap one or just say it.
+- **Voice log:** the Sources tab has a "Save it" button. It saves step-by-step timings of what the voice assistant heard and did in this visit. If voice misbehaves, send that file over.
+
 ### 1:27 AM CT: Plane photos, details and 3D flight paths from adsb.lol; FlightAware removed (7d211b6)
 - **Plane cards now show:**
   - **a photo of the actual aircraft**, credited to its photographer and linked to planespotters.net;
