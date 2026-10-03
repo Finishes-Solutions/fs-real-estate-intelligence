@@ -14,8 +14,11 @@ export default async function handler(req, res) {
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const ctx = body.context || {};
   const instructions = systemPrompt({ coverage: clip(ctx.coverage, 600), filters: clip(ctx.filters, 400), screen: clip(ctx.screen, 2500) }) + VOICE_STYLE;
-  // vocabulary hint for the transcriber: local place names, data terms and company names it would otherwise mishear
-  const vocab = clip(['Houston area, Texas. Cypress, Katy, Fulshear, Brookshire, Waller, Hempstead, Prairie View, Hockley, Tomball, Magnolia, Conroe, The Woodlands, Spring, Humble, Kingwood, Sugar Land, Richmond, Rosenberg, Pearland, League City, Fort Bend, Harris, Montgomery, CityCentre, Energy Corridor, Daikin Park. TDLR, TABS, Finishes Solutions, multifamily, build-to-rent, tilt-wall, retail, medical office, industrial', clip(ctx.vocab, 700)].filter(Boolean).join(', '), 1000);
+  // vocabulary hint for the transcriber: a short list of names it would otherwise mishear. Kept short on purpose: on
+  // silence or noise gpt-4o-transcribe can "hear" its hint read back, and a 60-name list came back as a burst of place
+  // names the user never said. A dozen names echo far less; other names are fixed after the fact by the geocoders.
+  const extra = String(ctx.vocab || '').split(',').map(x => x.trim()).filter(x => x && x.length < 40 && !/county$/i.test(x)).slice(0, 6);
+  const vocab = clip(['Houston, Texas commercial real estate. Katy, Cypress, Sugar Land, The Woodlands, Pearland, Conroe, Tomball, Fulshear', ...extra, 'TDLR, TABS, multifamily'].join(', '), 400);
   let last = '';
   for (const model of MODELS) {
     const r = await fetch('https://api.openai.com/v1/realtime/client_secrets', {

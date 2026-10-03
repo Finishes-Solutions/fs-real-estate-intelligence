@@ -548,7 +548,8 @@ async function geocode(q,o={}){
   let ctl; if(!o.exact&&!o.world){ if(geoCtl) geoCtl.abort(); ctl=geoCtl=new AbortController(); }
   const c=map.getCenter(), prox=o.exact||o.world?c.lng.toFixed(4)+','+c.lat.toFixed(4):'-95.9,30.0', bbox=o.exact?'-106.7,25.8,-93.5,36.5':'-97.6,28.6,-94.2,31.4';
   const u='https://api.maptiler.com/geocoding/'+encodeURIComponent(q)+'.json?key='+MAPTILER_KEY+'&limit='+(o.limit||6)+'&proximity='+prox+'&autocomplete='+!(o.exact||o.world)+(o.world?'':'&country=us&bbox='+bbox);
-  try{ const r=await fetch(u,ctl?{signal:ctl.signal}:{}); if(!r.ok) return []; const d=await r.json();
+  const c2=ctl||new AbortController(), tm=setTimeout(()=>c2.abort(),8000); // a geocoder that hangs must not hang the assistant
+  try{ const r=await fetch(u,{signal:c2.signal}); if(!r.ok) return []; const d=await r.json(); clearTimeout(tm);
     return (d.features||[]).map(f=>({t:(f.place_name||f.text||'').replace(/, United States$/,''),name:f.text||'',type:(f.place_type&&f.place_type[0])||'place',k:(f.place_type&&f.place_type[0]==='address')?'Address':((f.place_type&&f.place_type[0])||'Place').replace(/^\w/,c=>c.toUpperCase()),c:f.center,bbox:f.bbox})); }
   catch(e){ return []; }
 }
@@ -821,7 +822,7 @@ function viewLabels(radius=140){
   return { ...out, building_at_center:bld, zoom:+map.getZoom().toFixed(1), note:map.getZoom()<13?'Zoomed out: street and building names appear from about zoom 14.':undefined };
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
-  return COUNTIES.join(', ')+', '+[...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,60).map(x=>x[0]).join(', '); }
+  return [...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,30).map(x=>x[0]).join(', '); } // the busiest cities and developers on screen (the voice transcriber's hint list takes the first few)
 Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },

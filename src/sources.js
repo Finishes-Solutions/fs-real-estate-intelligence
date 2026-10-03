@@ -147,10 +147,12 @@ export function initSources(ctx) {
     root.innerHTML = '<div class="vhead"><div><div class="kicker">Sources</div><h2>Where the data comes from</h2><div class="vsub">What each source feeds, how often it refreshes and when it last did. Nightly data is pulled once a night and built into the app; map layers and lookups are fetched live when you use them.</div></div></div>' +
       '<div class="src-sum">' + pills + '</div>' +
       '<label class="src-opt"><input type="checkbox" id="srcShow"' + (ctx.showSources?.() ? ' checked' : '') + '> Show sources on cards and panels <span class="s">Off by default for a clean view. Exported reports always list their sources.</span></label>' +
+      '<div class="src-opt">Voice log <button class="lnk" id="srcVoiceLog" type="button">Save it</button> <span class="s">What the voice assistant heard and did in this visit, step by step, for troubleshooting when it doesn’t respond.</span></div>' +
       rows().map(([title, list]) => '<section class="src-grp"><h3>' + esc(title) + '</h3><table class="src-tbl"><thead><tr><th>Source</th><th>Status</th><th>Used for · freshness</th></tr></thead><tbody>' +
         list.map(r => '<tr><td><b>' + r.name + '</b></td><td>' + r.status + '</td><td>' + esc(r.what) + '<div class="s">' + esc(r.detail) + '</div></td></tr>').join('') + '</tbody></table></section>').join('');
     root.querySelector('#srcReload')?.addEventListener('click', () => location.reload());
     root.querySelector('#srcShow')?.addEventListener('change', e => ctx.showSources?.(e.target.checked));
+    root.querySelector('#srcVoiceLog')?.addEventListener('click', () => { const t = ctx.voiceLog?.() || ''; if (!t) { ctx.toast('No voice session yet in this visit.'); return; } ctx.saveFile('voice-log-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.txt', t, 'text/plain'); });
   }
 
   ctx.onView('sources', () => { render(); checkNewer(); });

@@ -5,7 +5,8 @@ import { entityKey } from './lib/taxonomy.mjs';
 import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
-import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft } from './lib/assist-logic.mjs';
+import { createTurns, withTimeout, createVoiceLog } from './lib/voice-state.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
@@ -226,7 +227,7 @@ export function initAssistant(ctx) {
   // OpenStreetMap knows hotels, venues and other landmarks by name that MapTiler's geocoder often doesn't
   async function nominatim(q, world = false) {
     const area = world ? '&addressdetails=1&limit=10' : '&limit=6&countrycodes=us&viewbox=-106.7,36.5,-93.5,25.8&bounded=1';
-    try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2' + area + '&q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } });
+    try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2' + area + '&q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
       return r.ok ? fromNominatim(await r.json()) : []; } catch (e) { return []; }
   }
   // the part after the first comma says where ("Lyon, France", "Paris, TX"); Texas, a Texas town or nothing keeps it local
@@ -554,7 +555,7 @@ export function initAssistant(ctx) {
         if (!hex) return { error: 'No aircraft “' + id + '” is broadcasting within 250 miles right now, so its path can’t be looked up.' };
         const t = await ctx.planeTrack(hex); if (!t) return { error: 'adsb.lol didn’t return a flight path for that aircraft.' };
         // where each flight began and ended, as a town name (OpenStreetMap reverse geocoding, a few lookups at most)
-        const town = async c => { try { const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&lat=' + c[1] + '&lon=' + c[0], { headers: { Accept: 'application/json' } }); const d = await r.json(); const x = d.address || {};
+        const town = async c => { try { const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&lat=' + c[1] + '&lon=' + c[0], { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) }); const d = await r.json(); const x = d.address || {};
           return [x.city || x.town || x.village || x.hamlet || x.county, x.state].filter(Boolean).join(', ') || d.display_name || null; } catch (e) { return null; } };
         const legs = (t.today || []).slice(-4);
         const named = []; for (const l of legs) named.push({ ...l, from_place: await town(l.from), to_place: await town(l.to) });
@@ -677,38 +678,60 @@ export function initAssistant(ctx) {
   ctx.runAssistantTool = runTool;
 
   // ---------- voice (OpenAI Realtime over WebRTC) ----------
-  let pc = null, dc = null, mic = null, audio = null, meter = null, voiceT = 0, liveBubble = null, pendingCalls = 0, vocab = '', turnT = 0;
+  let pc = null, dc = null, mic = null, audio = null, meter = null, voiceT = 0, liveBubble = null, pendingCalls = 0, vocab = '';
   const live = $('aiLive'), liveT = $('aiLiveT'), liveS = $('aiLiveS'), orb = $('aiOrb');
   // the panel's look follows the conversation: listening (calm), hearing you (reacts to the mic), thinking (spinning ring),
   // speaking (reacts to the assistant's voice)
   const stateOf = t => /^Connect/.test(t) ? 'connecting' : /^Speaking/.test(t) ? 'speaking' : /^Listening…/.test(t) ? 'hearing' : /^Listening/.test(t) ? 'listening' : 'thinking';
   const setLive = (t, s) => { liveT.textContent = t; if (s != null) liveS.textContent = s; live.dataset.state = stateOf(t); };
-  let heard = '';
-  async function startVoice() {
-    if (pc) { stopVoice(); return; }
+  let heard = new Map(), speechMs = 0, carry = '', renewT = 0;
+  const vlog = createVoiceLog(200);
+  const LISTEN_HINT = 'Talk naturally. I’ll answer when you pause.';
+  // one reply at a time; retries and give-ups surface in the panel instead of going quiet
+  const turns = createTurns({ send: o => sendEv(o), log: (t, d) => vlog.add(t, d), onStatus: (s, err) => {
+    vlog.add('gave up', s + (err ? ': ' + err : ''));
+    setLive('Listening', s === 'failed' ? 'That reply failed' + (err ? ' (' + err + ')' : '') + '. Try again.' : s === 'stuck' ? 'That took too long. Try again.' : 'No reply came back. Try again.');
+  } });
+  ctx.voiceLog = () => vlog.text();
+  async function startVoice(quiet) {
+    if (pc && !quiet) { stopVoice(); return; }
     if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) { ctx.toast('Voice needs a browser with microphone and WebRTC support.'); return; }
-    open(false); live.hidden = false; el.classList.add('voice'); $('aiMic').classList.add('on'); setLive('Connecting…', 'Allow the microphone if asked');
+    open(false); live.hidden = false; el.classList.add('voice'); $('aiMic').classList.add('on'); setLive('Connecting…', quiet ? 'Renewing the voice session…' : 'Allow the microphone if asked');
+    vlog.add('connect', quiet ? 'renew' : 'start'); turns.reset(); heard.clear();
     try {
       mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-      const r = await fetch('api/realtime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context: context() }) });
+      const r = await fetch('api/realtime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context: context() }), signal: AbortSignal.timeout(15000) });
       const s = await r.json().catch(() => ({})); if (!r.ok || !s.value) throw new Error(s.error || 'Voice isn’t available right now.'); vocab = s.vocab || '';
       pc = new RTCPeerConnection(); audio = new Audio(); audio.autoplay = true; audio.playsInline = true;
       pc.ontrack = e => { audio.srcObject = e.streams[0]; meter?.addRemote?.(e.streams[0]); };
       pc.addTrack(mic.getAudioTracks()[0], mic);
-      dc = pc.createDataChannel('oai-events'); dc.onmessage = e => { try { onEvent(JSON.parse(e.data)); } catch (err) { console.error(err); } };
-      dc.onopen = () => { lastCtx = ''; setLive('Listening', 'Talk naturally. I’ll answer when you pause.'); };
-      pc.onconnectionstatechange = () => { if (['failed', 'disconnected', 'closed'].includes(pc?.connectionState)) stopVoice('Voice connection ended.'); };
+      dc = pc.createDataChannel('oai-events'); dc.onmessage = e => { try { onEvent(JSON.parse(e.data)); } catch (err) { console.error(err); vlog.add('handler error', err.message); } };
+      dc.onopen = () => {
+        lastCtx = ''; vlog.add('open');
+        // a renewed session picks up where the last one left off
+        if (carry) { sendEv({ type: 'conversation.item.create', item: { type: 'message', role: 'system', content: [{ type: 'input_text', text: 'The voice session was renewed. The conversation so far:\n' + carry }] } }); carry = ''; }
+        setLive('Listening', LISTEN_HINT);
+      };
+      pc.onconnectionstatechange = () => { vlog.add('connection', pc?.connectionState); if (['failed', 'disconnected', 'closed'].includes(pc?.connectionState)) stopVoice('Voice connection ended.'); };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
-      const a = await fetch('https://api.openai.com/v1/realtime/calls', { method: 'POST', body: offer.sdp, headers: { Authorization: 'Bearer ' + s.value, 'Content-Type': 'application/sdp' } });
+      const a = await fetch('https://api.openai.com/v1/realtime/calls', { method: 'POST', body: offer.sdp, headers: { Authorization: 'Bearer ' + s.value, 'Content-Type': 'application/sdp' }, signal: AbortSignal.timeout(15000) });
       if (!a.ok) throw new Error('Voice connection was refused (' + a.status + ').');
       await pc.setRemoteDescription({ type: 'answer', sdp: await a.text() });
-      startMeter(); clearTimeout(voiceT); voiceT = setTimeout(() => stopVoice('Voice sessions end after 10 minutes. Tap the mic to keep going.'), 10 * 60e3);
-    } catch (e) { stopVoice(e.name === 'NotAllowedError' ? 'Microphone access was blocked.' : e.message); }
+      startMeter(); clearTimeout(voiceT); clearTimeout(renewT);
+      // OpenAI ends a session at 10 minutes: renew it just before, between turns, carrying the last few exchanges
+      renewT = setTimeout(function renew() {
+        if (turns.busy || pendingCalls || live.dataset.state === 'hearing') { renewT = setTimeout(renew, 5000); return; }
+        carry = history.slice(-8).map(h => (h.role === 'user' ? 'User: ' : 'Assistant: ') + String(h.content).slice(0, 300)).join('\n');
+        stopVoice('', true); startVoice(true);
+      }, 9 * 60e3);
+      voiceT = setTimeout(() => stopVoice('Voice sessions end after 10 minutes. Tap the mic to keep going.'), 10 * 60e3);
+    } catch (e) { vlog.add('connect failed', e.message); stopVoice(e.name === 'NotAllowedError' ? 'Microphone access was blocked.' : e.name === 'TimeoutError' ? 'Voice took too long to connect. Try again.' : e.message); }
   }
-  function stopVoice(msg) {
-    clearTimeout(voiceT); clearTimeout(turnT); cancelAnimationFrame(meter?.raf || 0); meter?.ac?.close?.().catch?.(() => {}); meter = null;
+  function stopVoice(msg, renewing) {
+    clearTimeout(voiceT); clearTimeout(renewT); turns.reset(); cancelAnimationFrame(meter?.raf || 0); meter?.ac?.close?.().catch?.(() => {}); meter = null;
     try { dc?.close(); } catch (e) {} try { pc?.close(); } catch (e) {} mic?.getTracks().forEach(t => t.stop());
-    if (audio) { audio.srcObject = null; audio = null; } pc = dc = mic = null; liveBubble = null;
+    if (audio) { audio.srcObject = null; audio = null; } pc = dc = mic = null; liveBubble = null; vlog.add('stop', msg || (renewing ? 'renew' : ''));
+    if (renewing) return;
     live.hidden = true; el.classList.remove('voice'); $('aiMic').classList.remove('on'); if (msg) ctx.toast(msg);
   }
   // levels for the orb: the mic while the user talks, the assistant's audio while it speaks
@@ -741,45 +764,76 @@ export function initAssistant(ctx) {
     }, 1500);
   }
   ctx.map.on('moveend', pushContext); ctx.onChange(pushContext); ctx.onCardRender(pushContext); ctx.onCardClose(pushContext); ctx.onViewChange(pushContext);
-  const isNoise = t => !t || /[^\u0000-\u024f\u2000-\u206f\s]/.test(t) && !/[a-z]{3}/i.test(t) || t.replace(/[^a-z]/gi, '').length < 2;
+  const isNoise = t => !t || /[^\u0000-ɏ -⁯\s]/.test(t) && !/[a-z]{3}/i.test(t) || t.replace(/[^a-z]/gi, '').length < 2;
+  // what the transcriber has so far, without any echo of its own hint list (that used to flash as a burst of place names)
+  const shown = t => { const c = stripEcho(t, vocab); return c && !isPromptEcho(c, vocab) ? c : ''; };
+  const runVoiceTool = (name, args) => withTimeout(runTool(name, args), 20000, () => ({ error: 'That lookup timed out. Tell the user it didn’t answer in time and offer to try again.' }));
   async function onEvent(e) {
+    if (!/delta$/.test(e.type)) vlog.add(e.type, e.type === 'response.done' ? (e.response?.status || '') + (e.response?.status_details?.error?.message ? ': ' + e.response.status_details.error.message : '') : e.type === 'error' ? e.error?.code || e.error?.message : e.item_id || '');
     switch (e.type) {
-      case 'input_audio_buffer.speech_started': heard = ''; setLive('Listening…', 'Pause when you’re done, or tap Send'); $('aiSendNow').hidden = false; break;
-      case 'conversation.item.input_audio_transcription.delta': heard += e.delta || ''; if (heard.trim()) liveS.textContent = '“' + heard.trim().slice(-90) + '”'; break;
-      case 'input_audio_buffer.speech_stopped': setLive('Thinking…'); $('aiSendNow').hidden = true; break;
-      // a turn ended: the reply waits for its transcript (see below); if the transcriber never answers, reply anyway
-      case 'input_audio_buffer.committed': clearTimeout(turnT); turnT = setTimeout(() => sendEv({ type: 'response.create' }), 6000); break;
-      case 'conversation.item.input_audio_transcription.failed': clearTimeout(turnT); sendEv({ type: 'response.create' }); break;
-      case 'conversation.item.input_audio_transcription.completed': {
-        clearTimeout(turnT);
-        const t = (e.transcript || '').trim();
-        // noise, other languages, background fragments and the transcriber echoing its own hint list: drop the turn, don't answer it
-        if (isNoise(t) || isPromptEcho(t, vocab)) { if (e.item_id) sendEv({ type: 'conversation.item.delete', item_id: e.item_id }); setLive('Listening', 'Talk naturally. I’ll answer when you pause.'); break; }
-        bubble('user', esc(t)); history.push({ role: 'user', content: t }); setLive('Thinking…', '“' + t.slice(-90) + '”');
-        sendEv({ type: 'response.create' }); break;
+      case 'input_audio_buffer.speech_started': speechMs = e.audio_start_ms || 0; setLive('Listening…', 'Pause when you’re done, or tap Send'); $('aiSendNow').hidden = false; break;
+      case 'conversation.item.input_audio_transcription.delta': {
+        const t = (heard.get(e.item_id) || '') + (e.delta || ''); heard.set(e.item_id, t);
+        const c = shown(t); if (c) liveS.textContent = '“' + c.slice(-90) + '”'; break;
       }
+      case 'input_audio_buffer.speech_stopped': speechMs = e.audio_end_ms && speechMs ? e.audio_end_ms - speechMs : 0; setLive('Thinking…'); $('aiSendNow').hidden = true; break;
+      // a turn ended: the reply waits for its transcript; if the transcriber never answers, it replies from the audio
+      case 'input_audio_buffer.committed': turns.committed(e.item_id); break;
+      case 'conversation.item.input_audio_transcription.failed': turns.transcript(e.item_id, true); break;
+      case 'conversation.item.input_audio_transcription.completed': {
+        const raw = (e.transcript || '').trim(), t = stripEcho(raw, vocab); heard.delete(e.item_id);
+        // noise, other languages, background fragments and the transcriber echoing its hint list are not requests
+        if (isNoise(t) || isPromptEcho(t, vocab)) {
+          // ...unless the user plainly talked for a while: then the audio is real and the transcript is what failed.
+          // The model hears the audio itself, so it answers that (and asks again if it didn't catch it either).
+          if (speechMs >= 1800 && raw) {
+            sendEv({ type: 'conversation.item.create', item: { type: 'message', role: 'system', content: [{ type: 'input_text', text: 'The written transcript of the user’s last turn was unreliable. Answer from the audio only if you clearly understood it; otherwise ask them to say it again. Don’t act on place names you aren’t sure they said.' }] } });
+            bubble('user', '<i>(transcript unclear, answering from your voice)</i>'); setLive('Thinking…', ''); turns.transcript(e.item_id, true); break;
+          }
+          if (e.item_id) sendEv({ type: 'conversation.item.delete', item_id: e.item_id });
+          turns.transcript(e.item_id, false);
+          setLive('Listening', raw && !isNoise(raw) ? 'Didn’t catch that. Try again.' : LISTEN_HINT); break;
+        }
+        bubble('user', esc(t)); history.push({ role: 'user', content: t }); setLive('Thinking…', '“' + t.slice(-90) + '”');
+        turns.transcript(e.item_id, true); break;
+      }
+      case 'response.created': turns.created(); break;
       case 'response.output_audio_transcript.delta':
         if (!liveBubble) liveBubble = bubble('bot', ''); liveBubble.dataset.t = (liveBubble.dataset.t || '') + e.delta; liveBubble.innerHTML = ctx.richText(splitFollowups(liveBubble.dataset.t).text); scroll(); setLive('Speaking'); break;
       case 'response.output_audio_transcript.done': if (liveBubble) { history.push({ role: 'assistant', content: liveBubble.dataset.t || '' }); ctx.wireCites(log); } liveBubble = null; break;
       case 'response.function_call_arguments.done': {
         pendingCalls++; setLive(LABEL[e.name] || 'Working…');
         let args = {}; try { args = JSON.parse(e.arguments || '{}'); } catch (err) {}
-        const result = await runTool(e.name, args);
+        let result; try { result = await runVoiceTool(e.name, args); } catch (err) { result = { error: err.message }; }
+        if (result?.ambiguous && turnChoices) pills(turnChoices.map(c => 'Take me to ' + c.label).slice(0, 5)); // tap or say one
         sendEv({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: e.call_id, output: JSON.stringify(result).slice(0, 11000) } });
         pendingCalls--;
         break;
       }
       case 'response.done': {
-        const calls = (e.response?.output || []).filter(o => o.type === 'function_call');
-        if (calls.length) { const waitTools = () => pendingCalls ? setTimeout(waitTools, 120) : sendEv({ type: 'response.create' }); waitTools(); }
-        else setLive('Listening');
+        const r = e.response || {}, calls = (r.output || []).filter(o => o.type === 'function_call');
+        const next = turns.done(r.status, { calls: calls.length, error: r.status_details?.error?.message || r.status_details?.reason || '' });
+        if (next === 'tools') { const t0 = Date.now(); const waitTools = () => pendingCalls && Date.now() - t0 < 25000 ? setTimeout(waitTools, 120) : turns.toolsDone(); waitTools(); }
+        else if (next === 'retry') setLive('Thinking…', 'Trying that again…');
+        else if (next !== 'failed' && next !== 'queued') setLive('Listening', r.status === 'cancelled' ? '' : undefined);
         break;
       }
-      case 'error': console.error('realtime', e.error); if (e.error?.message) ctx.toast('Voice: ' + e.error.message); break;
+      case 'error': {
+        console.error('realtime', e.error);
+        const code = e.error?.code || '', m = e.error?.message || '';
+        if (/active_response|already has an active response/i.test(code + m)) { turns.alreadyActive(); break; } // ours goes when that one ends
+        if (/item.*not.*found|cancel.*no active/i.test(code + m)) break; // harmless: a delete or cancel that raced the server
+        if (m) { setLive('Listening', 'Voice error: ' + m.slice(0, 120)); ctx.toast('Voice: ' + m); }
+        break;
+      }
     }
   }
-  $('aiMic').onclick = startVoice; $('aiStop').onclick = () => stopVoice();
-  // send now: end the turn without waiting for the pause detector
-  $('aiSendNow').onclick = () => { sendEv({ type: 'input_audio_buffer.commit' }); $('aiSendNow').hidden = true; setLive('Thinking…', ''); }; // the transcript starts the reply
+  $('aiMic').onclick = () => startVoice(); $('aiStop').onclick = () => stopVoice();
+  // send now: end the turn without waiting for the pause detector (the transcript starts the reply)
+  $('aiSendNow').onclick = () => {
+    $('aiSendNow').hidden = true;
+    if (!dc || dc.readyState !== 'open') { setLive('Listening', 'Voice isn’t connected. Tap the mic to start again.'); return; }
+    try { sendEv({ type: 'input_audio_buffer.commit' }); setLive('Thinking…', ''); } catch (err) { setLive('Listening', 'Couldn’t send that: ' + err.message); }
+  };
   ctx.assistant = { open, close, ask, startVoice };
 }

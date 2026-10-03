@@ -1,6 +1,6 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks, placeCandidates, kindOf, pickAircraft, aircraftName } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks, placeCandidates, kindOf, pickAircraft, aircraftName } from '../lib/assist-logic.mjs';
 import { pruneReports, fmtBytes } from '../lib/reports.mjs';
 import { tractsFor, summarizeTracts, inGeom } from '../lib/demographics.mjs';
 import { nameQuery } from '../api/tenants.js';
@@ -157,7 +157,38 @@ console.log('assistant ok');
   assert.ok(isPromptEcho('Cypress, Katy, Fulshear, Brookshire.', v));
   for (const t of ['Take me to the JP Morgan Chase Tower and tell me about it.', 'Show multifamily in Katy', 'Compare Katy, Cypress, Waller.', 'Katy and Cypress, which has more?']) assert.ok(!isPromptEcho(t, v), t);
   assert.ok(!isPromptEcho('Cypress, Katy, Fulshear', ''), 'no hint list, no echo'); }
+// the echo stripped from a real sentence; names the user lists themselves stay
+{ const v = 'Houston, Texas commercial real estate. Katy, Cypress, Sugar Land, The Woodlands, Pearland, Conroe, Tomball, Fulshear, TDLR, TABS, multifamily';
+  assert.equal(stripEcho('Show me multifamily near Katy. Katy, Cypress, Sugar Land, The Woodlands, Pearland.', v), 'Show me multifamily near Katy', 'echo tail removed');
+  assert.equal(stripEcho('Katy Cypress Sugar Land The Woodlands Pearland Conroe', v), '', 'comma-free echo');
+  assert.equal(stripEcho('Katy, Cypress and Sugar Land', v), '', 'and glue');
+  assert.equal(stripEcho('Compare Katy, Tomball, Cypress.', v), 'Compare Katy, Tomball, Cypress.', 'out of list order: the user said it');
+  assert.equal(stripEcho('Compare Katy and Cypress', v), 'Compare Katy and Cypress', 'two places is a request');
+  assert.equal(stripEcho('Take me to the Galleria', v), 'Take me to the Galleria');
+  assert.equal(stripEcho('Katy, Cypress, Sugar Land', ''), 'Katy, Cypress, Sugar Land', 'no hint list'); }
 console.log('assistant echo ok');
+
+// voice turns: one reply at a time, retries, no double answers
+{ const { createTurns, withTimeout, createVoiceLog } = await import('../lib/voice-state.mjs');
+  const mk = () => { const sent = [], st = [], timers = new Map(); let id = 0;
+    const t = createTurns({ send: o => sent.push(o.type), onStatus: s => st.push(s), setTimer: (f, ms) => { timers.set(++id, { f, ms }); return id; }, clearTimer: i => timers.delete(i) });
+    const fire = ms => { for (const [k, v] of [...timers]) if (v.ms === ms) { timers.delete(k); v.f(); } };
+    return { t, sent, st, fire, timers }; };
+  { const { t, sent, fire } = mk(); t.committed('a'); assert.equal(t.transcript('a', true), true); t.created(); fire(7000); assert.equal(sent.length, 1, 'transcript answered: the no-transcript fallback does not fire again');
+    assert.equal(t.transcript('a', true), false, 'late duplicate transcript never answers twice'); }
+  { const { t, sent } = mk(); t.committed('a'); t.transcript('a', true); t.created(); t.committed('b'); t.transcript('b', true); assert.equal(sent.length, 1, 'second turn waits');
+    assert.equal(t.done('completed'), 'queued'); assert.equal(sent.length, 2, 'then it goes'); }
+  { const { t, sent } = mk(); t.committed('a'); t.fire; t.transcript('a', false); assert.equal(sent.length, 0, 'dropped turn'); }
+  { const { t, sent, fire } = mk(); t.committed('a'); fire(7000); assert.equal(sent.length, 1, 'no transcript: reply from the audio'); }
+  { const { t, sent, st } = mk(); t.transcript('a', true); t.created(); assert.equal(t.done('failed'), 'retry'); assert.equal(sent.length, 2); t.created(); assert.equal(t.done('failed'), 'failed'); assert.deepEqual(st, ['failed'], 'second failure is reported'); }
+  { const { t, sent, st, fire } = mk(); t.transcript('a', true); fire(5000); assert.equal(sent.length, 2, 'no reply started: one retry'); fire(5000); assert.deepEqual(st, ['noreply']); assert.equal(t.busy, false); }
+  { const { t, sent } = mk(); t.transcript('a', true); t.created(); assert.equal(t.done('completed', { calls: 1 }), 'tools'); t.toolsDone(); assert.equal(sent.length, 2); }
+  { const { t, st, fire } = mk(); t.transcript('a', true); t.created(); fire(45000); assert.deepEqual(st, ['stuck']); assert.equal(t.busy, false); }
+  { const { t, sent } = mk(); t.alreadyActive(); t.transcript('a', true); assert.equal(sent.length, 0); t.done('completed'); assert.equal(sent.length, 1, 'sent once the running reply ends'); }
+  assert.deepEqual(await withTimeout(new Promise(() => {}), 20, { error: 'timed out' }), { error: 'timed out' });
+  assert.equal(await withTimeout(Promise.resolve(5), 1000, 0), 5);
+  const vl = createVoiceLog(3); for (let i = 0; i < 5; i++) vl.add('e' + i); assert.deepEqual(vl.list().map(r => r.type), ['e2', 'e3', 'e4']); }
+console.log('assistant voice turns ok');
 
 // follow_aircraft: by callsign (any spacing / case), hex or registration; with no id the nearest airborne plane
 { const ac = [{ hex: 'a0b1c2', flight: 'N123AB', reg: 'N123AB', ground: true }, { hex: 'abc123', flight: 'DAL1601', reg: 'N812DN' }, { hex: 'a77777', flight: 'UAL1234', reg: 'N-777UA' }];
