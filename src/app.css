@@ -989,11 +989,21 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 @media (hover:none){ .fab-sugs{display:none} }
 /* the Layers panel stops above the Ask AI button instead of running under it (it scrolls inside) */
 @media (min-width:701px){ .app:not(.ai-open) .layers{max-height:calc(100% - 112px)} }
-@media (min-width:1101px){ .app:has(.card.open){--fabr:calc(min(380px,100% - 32px) + 32px)} }
-@media (max-width:1100px) and (min-width:701px){ .app:has(.card.open){--fabr:calc(min(400px,100% - 24px) + 24px)} }
+@media (min-width:1101px){ .app:has(.card.open){--fabr:calc(min(380px,100% - 32px) + 32px)} .app:has(.card.open):not(.card-below){--fabr:calc(min(380px,100% - 102px) + 86px)} }
+@media (max-width:1100px) and (min-width:701px){ .app:has(.card.open){--fabr:calc(min(400px,100% - 78px) + 78px)} }
 @media (max-width:700px){ .fab-sugs{display:none} }
-/* with a card open, the map buttons (and the Layers panel) move left of it, like Ask AI, so the card never hides them */
-@media (min-width:701px){ .app:has(.card.open) .ctrls{right:var(--fabr,16px)} .app:has(.card.open) .layers{right:calc(var(--fabr,16px) + 46px)} }
+/* with a card open the map buttons never move (moving them left of the card left them floating mid-map on shorter
+   windows): the card sits just left of the button column, or under it when there is room (.card-below, set in app.js).
+   The Layers panel opens left of the card. */
+@media (min-width:1101px){
+  .app:has(.card.open):not(.card-below) .card{right:70px;width:min(380px,calc(100% - 102px))}
+  .app.ai-open:has(.card.open):not(.card-below) .card{right:calc(var(--aiw) + 82px)}
+  .app:has(.card.open):not(.card-below) .layers{right:var(--fabr,16px)}
+}
+@media (max-width:1100px) and (min-width:701px){
+  .app:not(.ai-open) .card{right:66px;width:min(400px,calc(100% - 78px))}
+  .app:not(.ai-open):has(.card.open) .layers{right:var(--fabr,16px)}
+}
 
 /* collapsible Filters and List sections */
 .sechead{display:flex;align-items:center;gap:8px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;padding:12px 24px;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);cursor:pointer;text-align:left}
