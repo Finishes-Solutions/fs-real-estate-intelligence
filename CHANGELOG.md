@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 12:57 AM CT: Crime layer shows all of Houston; full incident lists in exports (28d5ac0)
+- The Crime map layer was only drawing about 1,000 of its ~7,500 squares, and exports stopped at 1,000 incidents, because the database hands back at most 1,000 rows at a time. Both now come back whole: the layer covers the whole city and the report and CSV include up to the newest 2,000 incidents as intended.
+
 ### 12:52 AM CT: Crime map layer, crime reports and AI crime answers (c08bf63, b4f00c9)
 - **Crime (Houston)** in Map Layers: a heat map of the last 12 months of Houston Police incidents, turning into about ¼-mile squares when you zoom in. Choose all incidents, violent or property. Hover a square for its counts; click it for its report.
 - **Crime reports for any area**: select an area (Area, Shape, Radius or County at the top of the map) and press **Crime Report** in the strip that appears under Area at a Glance, or use **Full crime report (½ mile)** on a building card. The report shows:
