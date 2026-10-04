@@ -245,6 +245,22 @@ export function initArea(ctx) {
       '<div class="rnote">TxDOT annual average daily traffic (AADT) counts' + (t.as_of ? ', published ' + esc(t.as_of) : '') + '. TxDOT publishes the current year only, so this shows how busy roads are, not how traffic is changing. Live traffic is under Map Layers.</div></section>';
   }
 
+  // ---------- area picker: a small map of the counties (click one) beside a button per county and the whole region ----------
+  function scopeHtml() {
+    const geo = (ctx.countyGeo || []).filter(g => area.counties.some(c => c.name === g.name));
+    let svg = '';
+    if (window.d3 && geo.length) {
+      const W = 260, H = 180, fcx = { type: 'FeatureCollection', features: geo.map(g => ({ type: 'Feature', properties: {}, geometry: g.geom })) };
+      const path = d3.geoPath(d3.geoMercator().fitExtent([[6, 6], [W - 6, H - 6]], fcx));
+      svg = '<svg class="mk-mini" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">' + geo.map(g => { const c = area.counties.find(x => x.name === g.name);
+        return '<path d="' + path(g.geom) + '" data-county="' + c.fips + '" class="' + (sel === c.fips ? 'on' : sel === 'all' ? 'in' : '') + '"><title>' + esc(c.name) + ' County</title></path>'; }).join('') +
+        geo.map(g => { const [x, y] = path.centroid(g.geom), on = sel === area.counties.find(c => c.name === g.name)?.fips; return Number.isFinite(x) ? '<text x="' + x.toFixed(1) + '" y="' + (y + 3).toFixed(1) + '"' + (on ? ' class="on"' : '') + '>' + esc(g.name.toUpperCase()) + '</text>' : ''; }).join('') + '</svg>';
+    }
+    const btn = (v, name, sub) => '<button type="button" class="mk-cty" data-county="' + v + '" aria-pressed="' + (sel === v) + '"><b>' + esc(name) + '</b><span>' + esc(sub) + '</span></button>';
+    return '<div class="mk-scope"><div class="mk-scope-l"><div class="mk-scope-k">Area</div>' + svg + '</div><div class="mk-ctys" role="group" aria-label="Market area">' +
+      btn('all', 'Whole region', area.counties.length + ' counties') + area.counties.map(c => btn(c.fips, c.name, c.fips === (area.counties.find(x => x.name === ctx.HOME_C)?.fips) ? 'County · home' : 'County')).join('') +
+      '</div><div class="mk-scope-n">Click a county on the map or a button; click it again for the whole region.</div></div>';
+  }
   // ---------- export: the view as a PDF report and every series as CSV ----------
   const areaLabel = () => sel === 'all' ? 'Houston region (' + area.counties.length + ' counties)' : cname(sel) + ' County';
   const slug = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
@@ -308,13 +324,13 @@ export function initArea(ctx) {
       unempTile(),
       s.spend ? tile(fmtM(s.spend.total), 'Consumer spending (est.)', (s.spend.perHH ? fmtM(s.spend.perHH) + ' per household · ' : '') + 'a year') : ''
     ].filter(Boolean);
-    const opts = '<option value="all">Whole region</option>' + area.counties.map(c => '<option value="' + c.fips + '"' + (sel === c.fips ? ' selected' : '') + '>' + esc(c.name) + ' County</option>').join('');
     const placeOpts = s.places ? '<option value="">All places</option>' + s.places.map(p => '<option value="' + esc(p.key) + '"' + (newsPlace === p.key ? ' selected' : '') + '>' + esc(p.label) + '</option>').join('') : '';
     root.innerHTML = '<div class="vhead"><div><div class="kicker">Market</div><h2>Growth signals ' + (sel === 'all' ? 'across the region' : 'in ' + esc(cname(sel)) + ' County') + '</h2>' +
       '<div class="vsub">Jobs, housing permits, new businesses, consumer spending, city sales tax and local development news from free public sources, refreshed with the nightly build' + (area.built ? ' (last ' + new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : '') + '. No sales or lease comps: Texas doesn’t disclose sale prices.</div></div>' +
-      '<div class="vctl"><label>Area <select class="chip" id="mkCounty">' + opts.replace('value="all"', 'value="all"' + (sel === 'all' ? ' selected' : '')) + '</select></label>' +
+      '<div class="vctl">' +
       '<div class="mk-seg" role="group" aria-label="Months shown">' + [[12, '12 mo'], [24, '24 mo'], [0, 'All']].map(([v, l]) => '<button type="button" data-range="' + v + '" aria-pressed="' + (range === v) + '">' + l + '</button>').join('') + '</div>' +
       '<button class="btn" type="button" id="mkCsv">Export Data</button><button class="btn primary" type="button" id="mkExport">Export PDF</button></div></div>' +
+      scopeHtml() +
       (tiles.length ? '<div class="kpis mk-kpis" style="grid-template-columns:repeat(' + tiles.length + ',1fr)">' + tiles.join('') + '</div>' : '') +
       '<div class="mk-tip" id="mkTip" role="tooltip"></div><div class="mk-grid">' +
       (s.permits?.length ? '<section class="mk-box"><h3>New housing units permitted per year</h3><div class="mk-leg">' + legBtn('sf', 'mk-sf', 'Single-family') + legBtn('mf', 'mk-mf', 'Multifamily (2+ units)') + '</div>' + permitsChart(s.permits) + pinned('permits', s) + '<div class="rnote">US Census Building Permits Survey (units authorized; includes Census estimates for places that don’t report every month).</div></section>' : '') +
@@ -334,7 +350,7 @@ export function initArea(ctx) {
         s.latest.map(b => '<tr><td>' + esc(b.name) + (b.owner ? '<div class="sc">' + esc(b.owner) + '</div>' : '') + '</td><td>' + esc([b.addr, b.city].filter(Boolean).join(', ')) + '</td><td>' + esc(b.sec != null ? SECTORS[b.sec][1] : (b.naics || '')) + '</td><td class="m">' + esc(b.date) + '</td></tr>').join('') +
         '</tbody></table></div><div class="rnote">Texas Comptroller active sales-tax permits, newest first. A new permit can also mean a change of owner at an existing location.</div></section>' : '') +
       '</div>';
-    root.querySelector('#mkCounty').onchange = e => { sel = e.target.value; newsPlace = ''; pin = null; render(); };
+    root.querySelectorAll('.mk-scope [data-county]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.county; sel = v === sel && v !== 'all' ? 'all' : v; newsPlace = ''; pin = null; render(); }));
     root.querySelectorAll('[data-range]').forEach(b => b.onclick = () => { range = +b.dataset.range; pin = null; render(); });
     root.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { const k = b.dataset.show, pair = k === 'sf' || k === 'mf' ? ['sf', 'mf'] : ['v', 'p', 'o'];
       show[k] = !show[k]; if (!pair.some(x => show[x])) show[k] = true; render(); }); // never switch every series off

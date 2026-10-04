@@ -90,7 +90,7 @@ const ESRI_STYLE={version:8,glyphs:OFM+'/fonts/{fontstack}/{range}.pbf',
 const isSat=()=>layers.style==='sat'||layers.style==='esri';
 // property-first: filing dots start hidden (Layers → Filings, the Construction Filings section or the assistant turn them on)
 const layers={style:'dots',roads:true,names:true,counties:true,grid:true,size:'uniform',heat:'off',dots:false};
-try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(['off','count','value'].includes(L.heat)) layers.heat=L.heat; if(L.v===2&&typeof L.dots==='boolean') layers.dots=L.dots; if(typeof L.grid==='boolean') layers.grid=L.grid; }catch(e){} // v2: older saves had dots on for everyone
+try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(typeof L.grid==='boolean') layers.grid=L.grid; }catch(e){} // the map always opens without filings (dots and heatmap off); dot size and the grid are remembered
 const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} };
 const styleUrl=s=>s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl('dots'),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,
@@ -163,6 +163,8 @@ function markerRadius(){ return layers.size==='value'
   ? ['interpolate',['exponential',1.6],['zoom'],5,['*',['get','r'],.55],8,['*',['get','r'],1],12,['*',['get','r'],1.7],16,['*',['get','r'],2.4]]
   : ['interpolate',['linear'],['zoom'],4,1.7,7,2.5,10,3.5,13,4.8,16,6.5]; }
 let filingsDirty=true;
+// the quick layer buttons follow the filings layer (set once ctx exists: styleFilings can run before that)
+let syncQL=()=>{};
 function syncFilingsData(){ if(!filingsDirty||!(layers.dots||layers.heat!=='off')) return; const src=map.getSource&&map.getSource('filings'); if(src){ src.setData(filingsFC()); filingsDirty=false; } }
 function styleFilings(){
   if(!map.getLayer||!map.getLayer('filings')) return;
@@ -176,7 +178,7 @@ function styleFilings(){
   ['filings','filings-hl'].forEach(id=>map.setLayoutProperty(id,'visibility',layers.dots?'visible':'none'));
   syncFilingsData();
   syncSelBar();
-  const lf=document.getElementById('lyFilings'); if(lf) lf.checked=layers.dots;
+  const lf=document.getElementById('lyFilings'); if(lf) lf.checked=layers.dots; syncQL();
   map.setPaintProperty('heat','heatmap-weight',layers.heat==='value'?['interpolate',['linear'],['get','lc'],4.7,.04,6,.2,7,.55,8,1,9.5,2]:1);
   syncLegend();
 }
@@ -712,7 +714,10 @@ document.querySelectorAll('#sizeSeg button').forEach(b=>b.onclick=()=>{ layers.s
 document.querySelectorAll('#heatSeg button').forEach(b=>b.onclick=()=>{ layers.heat=b.dataset.heat; saveLayers(); styleFilings(); });
 document.getElementById('lyFilings').onchange=e=>{ layers.dots=e.target.checked; saveLayers(); styleFilings(); };
 syncLegend();
-function showFilings(){ if(layers.dots) return; layers.dots=true; saveLayers(); if(map.getLayer('filings')) styleFilings(); }
+function showFilings(){ if(layers.dots) return; layers.dots=true; saveLayers(); const lf=document.getElementById('lyFilings'); if(lf) lf.checked=true; if(map.getLayer('filings')) styleFilings(); syncQL(); }
+// on the map at all: dots or the heatmap (the Filings quick button shows either, and turns both off)
+const filingsShown=()=>layers.dots||layers.heat!=='off';
+function setFilingsShown(v){ layers.dots=!!v; if(!v) layers.heat='off'; saveLayers(); const lf=document.getElementById('lyFilings'); if(lf) lf.checked=layers.dots; if(map.getLayer('filings')) styleFilings(); syncQL(); }
 function setMapOptions(a){ const done=[];
   if(a.heatmap){ layers.heat=a.heatmap; done.push(a.heatmap==='off'?'heatmap off':'heatmap by '+(a.heatmap==='value'?'value':'count')); }
   if(typeof a.size_by_value==='boolean'){ layers.size=a.size_by_value?'value':'uniform'; done.push(a.size_by_value?'dots sized by value':'uniform dots'); }
@@ -914,7 +919,8 @@ ctx.setMode=setMode; ctx.openFilters=()=>openFilters(); ctx.closeFilters=()=>clo
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
   if(!html){ el?.remove(); return; } if(!el){ el=document.createElement('div'); el.className='xlegend'; el.dataset.lg=id; box.appendChild(el); } if(el.innerHTML!==html) el.innerHTML=html; };
-Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+syncQL=()=>ctx.syncQuickLayers?.();
+Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
@@ -943,7 +949,9 @@ for (const init of [initAreaReports,initTimeline,initWho,initChanges,initKpis,in
   document.getElementById('filingsPeriod').textContent='TDLR · '+m(s)+' – '+m(e);
   document.getElementById('periodTxt').textContent=PERIOD; const miss=DATA.unmapped||0; document.getElementById('missTxt').textContent=miss>0?fmtN(miss)+' filing'+(miss>1?'s':'')+' with no mappable address '+(miss>1?'are':'is')+' left off the map. ':''; }
 { const h=location.hash.slice(1), p=new URLSearchParams(h);
-  if(h&&[...p.keys()].some(k=>k!=='v'&&k!=='f')){ showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
+  // a link with filters puts the filing dots on; the date range alone (which the app writes into the address itself) doesn't,
+  // so a reload opens like a fresh start: no filings until you turn them on
+  if(h&&[...p.keys()].some(k=>k!=='v'&&k!=='f')){ if([...p.keys()].some(k=>!['v','f','d'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
   booting=false;
   if(p.get('v')) setView(p.get('v'));
   const f=p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));

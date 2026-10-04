@@ -132,7 +132,11 @@ Property filters (use, acres, value, year built, owner, zoning) are planned. The
 
 ## Map layers
 
-**Quick layer buttons** turn the most common layers on and off with one tap. **More** (or the layers button on the right) opens **Map Layers**, which holds every layer and its options:
+**Quick layer buttons** turn the most common layers on and off with one tap. A button is highlighted whenever its layer is on the map, however it was turned on. **Filings** covers both the dots and the heatmap, and turning it off hides both. Layers without their own button (crime, airports, weather and others) are counted on **More** (for example "More · 2"); hover over it to see which. **More** (or the layers button on the right) opens **Map Layers**, which holds every layer and its options.
+
+The map always opens without construction filings or planes. Turn them on with their buttons. A shared link that carries filing filters opens with the filings shown.
+
+Map Layers:
 
 - **Base Map:**
   - Default: a calm, muted map.
@@ -192,7 +196,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
 ## Market and demographics
 
 - **Area at a Glance** in the left panel shows the census numbers for what's on screen.
-- The **Market** tab, for each county or the whole region, shows:
+- The **Market** tab, for each county or the whole region, shows the items below. Pick the area at the top: click a county on the small map or its button, and click it again (or **Whole region**) to go back to all counties.
   - population and growth;
   - jobs and top industries;
   - new housing permits;
@@ -204,7 +208,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
   - unemployment;
   - the Houston crime trend and the busiest roads.
 - **Demographics** on the map colors each census tract. Hover over a tract for its numbers.
-- **Compare** puts up to 4 areas side by side.
+- **Compare** puts up to 4 areas side by side. With two or more counties selected on the map, **+ Compare Together** adds them as one area and **+ Compare Each** adds every county as its own area.
 
 ---
 
@@ -293,6 +297,9 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **The map opens clean:** no filings or planes until you turn them on, and the layer buttons always match what's on the map.
+- **Compare each county separately** when several counties are selected, or all of them together.
+- **A new area picker on the Market tab:** a small county map plus a button for each county and the whole region.
 - **Every report now exports as a PDF in the Finishes Solutions style:** filings, market, crime, FEMA, traffic, drive time, air traffic, airport and flight reports.
 - **Plane routes are back** for most airline flights, with the right leg picked on multi-stop flights.
 - **Property cards show the owner and value faster:** they no longer wait for the slower business and height lookups.

@@ -464,7 +464,7 @@ export function initPlanes(ctx) {
   }
 
   ctx.live.register('planes', {
-    label: 'Live Planes', persist: true,
+    label: 'Live Planes', persist: false, // never back on by itself: the map opens without planes
     set: v => { v ? start() : stop(); },
     add: () => { addLayers(); map.getSource('live-planes')?.setData(fc()); if (routeOn) { addRouteLayers(); syncRoute(); } },
     note: () => map.getZoom() < MINZ ? 'Zoom in to see planes.' : err ? 'Planes: ' + err : at ? list.length.toLocaleString('en-US') + ' aircraft in view · ' + new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) + ' (' + src + ').' : 'Loading planes…',

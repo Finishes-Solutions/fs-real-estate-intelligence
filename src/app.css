@@ -1692,3 +1692,26 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
   .lfrow{grid-template-columns:1fr}
   .lfrow label{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 }
+/* Market: area picker (mini map of the counties + a button for each and the whole region) */
+.mk-scope{display:grid;grid-template-columns:260px 1fr;grid-template-rows:auto auto;gap:6px 18px;align-items:center;margin:4px 0 16px;padding:12px 16px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.mk-scope-l{grid-row:1/3}
+.mk-scope-k{font:500 10px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin-bottom:4px}
+.mk-mini{display:block;width:100%;height:auto}
+.mk-mini path{fill:var(--chip);stroke:var(--panel);stroke-width:1.5;cursor:pointer;transition:fill .12s}
+.mk-mini path.in{fill:var(--green-100)}
+.mk-mini path:hover{fill:var(--green-200)}
+.mk-mini path.on{fill:var(--brand)}
+.mk-mini text{font:600 7.5px var(--font-mono);letter-spacing:.06em;fill:var(--text-2);text-anchor:middle;pointer-events:none}
+.mk-ctys{display:flex;flex-wrap:wrap;gap:8px;align-self:end}
+.mk-cty{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:104px;padding:8px 12px;border:1px solid var(--line-2);border-radius:6px;background:var(--panel);color:var(--text);cursor:pointer;text-align:left;font:inherit}
+.mk-cty b{font:700 13px var(--font-display)}
+.mk-cty span{font:500 9.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.mk-cty:hover{border-color:var(--brand)}
+.mk-cty[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.mk-cty[aria-pressed="true"] span{color:inherit;opacity:.8}
+.mk-cty:focus-visible{outline:3px solid rgba(10,122,54,.32);outline-offset:1px}
+.mk-scope-n{font-size:11.5px;color:var(--muted);align-self:start}
+:root[data-theme="dark"] .mk-mini path.in{fill:rgba(76,175,112,.18)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .mk-mini path.in{fill:rgba(76,175,112,.18)}}
+@media (max-width:760px){.mk-scope{grid-template-columns:1fr;padding:12px}.mk-scope-l{grid-row:auto;max-width:280px}.mk-ctys{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin:0 -12px;padding-left:12px;padding-right:12px}.mk-cty{flex:none}}
+.mk-mini text.on{fill:var(--brand-ink)}

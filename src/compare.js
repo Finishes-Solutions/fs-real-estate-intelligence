@@ -30,15 +30,29 @@ export function initCompare(ctx) {
   });
 
   // ---- add / remove ----
-  function add(a) {
+  function add(a, quiet = false) {
     if (!a || !a.geom) return false;
     const key = a.key || a.label;
-    if (areas.some(x => (x.key || x.label) === key)) { ctx.toast(a.label + ' is already in Compare.'); return false; }
-    if (areas.length >= MAX) { ctx.toast('Compare holds up to ' + MAX + ' areas. Remove one first.'); return false; }
+    if (areas.some(x => (x.key || x.label) === key)) { if (!quiet) ctx.toast(a.label + ' is already in Compare.'); return false; }
+    if (areas.length >= MAX) { if (!quiet) ctx.toast('Compare holds up to ' + MAX + ' areas. Remove one first.'); return false; }
     const geom = ctx.fixWinding(a.geom);
     areas.push({ key, label: a.label, kind: a.kind || 'area', geom }); save(); sync();
-    ctx.toast('Added ' + a.label + ' to Compare (' + areas.length + ' of ' + MAX + ').');
+    if (!quiet) ctx.toast('Added ' + a.label + ' to Compare (' + areas.length + ' of ' + MAX + ').');
     return true;
+  }
+  // several counties selected: each one as its own area (instead of all of them together)
+  function eachCounty() {
+    const s = ctx.sel; if (s.kind !== 'county' || s.counties.size < 2) return [];
+    return [...s.counties].sort().map(n => ({ key: 'county:' + n, label: n + ' County', kind: 'county', geom: ctx.countyGeo.find(c => c.name === n)?.geom })).filter(a => a.geom);
+  }
+  function addEach() {
+    const all = eachCounty(), fresh = all.filter(a => !areas.some(x => (x.key || x.label) === a.key)), room = MAX - areas.length;
+    if (!fresh.length) { ctx.toast('Those counties are already in Compare.'); return 0; }
+    if (room <= 0) { ctx.toast('Compare holds up to ' + MAX + ' areas. Remove one first.'); return 0; }
+    const added = fresh.slice(0, room).filter(a => add(a, true));
+    ctx.toast('Added ' + added.map(a => a.label.replace(/ County$/, '')).join(', ') + ' to Compare (' + areas.length + ' of ' + MAX + ')' +
+      (fresh.length > added.length ? '. ' + (fresh.length - added.length) + ' more didn’t fit: Compare holds ' + MAX + '.' : '.'));
+    return added.length;
   }
   const remove = i => { areas.splice(i, 1); save(); sync(); };
   function fromSelection() {
@@ -46,12 +60,21 @@ export function initCompare(ctx) {
     const key = s.kind === 'county' ? 'county:' + [...s.counties].sort().join('|') : s.kind + ':' + s.label;
     return { key, label: s.label, kind: s.kind, geom: s.feature };
   }
-  ctx.compare = { add, remove, list: () => areas.slice(), addSelection: () => add(fromSelection()), clear: () => { areas = []; save(); sync(); } };
+  ctx.compare = { add, remove, addEach, list: () => areas.slice(), addSelection: () => add(fromSelection()), clear: () => { areas = []; save(); sync(); } };
 
   // selection bar: "+ Compare"
   const selBtn = document.getElementById('selCompare');
   selBtn.onclick = () => { if (ctx.compare.addSelection() && areas.length >= 2) ctx.toast('Added. Open the Compare tab to see them side by side.'); };
-  function syncSelBtn() { const a = fromSelection(); selBtn.style.display = a ? '' : 'none'; selBtn.disabled = !!a && (areas.length >= MAX || areas.some(x => (x.key || x.label) === a.key)); }
+  const eachBtn = document.getElementById('selCompareEach');
+  if (eachBtn) eachBtn.onclick = () => { if (addEach() && areas.length >= 2) setTimeout(() => ctx.toast('Open the Compare tab to see them side by side.'), 2500); };
+  function syncSelBtn() {
+    const a = fromSelection(), each = eachCounty();
+    selBtn.style.display = a ? '' : 'none'; selBtn.disabled = !!a && (areas.length >= MAX || areas.some(x => (x.key || x.label) === a.key));
+    selBtn.textContent = each.length ? '+ Compare Together' : '+ Compare';
+    selBtn.title = each.length ? 'Add the ' + each.length + ' counties to Compare as one area' : 'Add this area to Compare';
+    if (eachBtn) { eachBtn.style.display = each.length ? '' : 'none'; eachBtn.textContent = '+ Compare Each (' + each.length + ')';
+      eachBtn.disabled = areas.length >= MAX || each.every(c => areas.some(x => (x.key || x.label) === c.key)); }
+  }
   ctx.onChange(syncSelBtn);
 
   function sync() {
@@ -65,7 +88,8 @@ export function initCompare(ctx) {
     const base = ctx.filtered(), lists = areas.map(a => base.filter(f => contains(a, f))), ft = ctx.filterText();
     const cur = fromSelection(), canAdd = cur && areas.length < MAX && !areas.some(x => (x.key || x.label) === cur.key);
     let h = '<div class="vhead"><div><div class="kicker">Compare</div><h2>Compare up to four areas</h2><div class="vsub">' + (ft ? 'Same filters for every area: ' + esc(ft) : 'All filings in each area (no other filters).') + '</div></div>' +
-      '<div class="vctl">' + (canAdd ? '<button class="btn primary" id="cmpAddSel">+ Add “' + esc(cur.label) + '”</button>' : '') + (areas.length ? '<button class="btn" id="cmpClear">Clear All</button>' : '') + '</div></div>';
+      '<div class="vctl">' + (canAdd ? '<button class="btn primary" id="cmpAddSel">+ Add “' + esc(cur.label) + '”' + (eachCounty().length ? ' Together' : '') + '</button>' : '') +
+        (eachCounty().length && areas.length < MAX ? '<button class="btn" id="cmpAddEach">+ Add Each County (' + eachCounty().length + ')</button>' : '') + (areas.length ? '<button class="btn" id="cmpClear">Clear All</button>' : '') + '</div></div>';
     h += '<div class="cmp-chips">' + areas.map((a, i) => '<span class="cmp-chip" style="--c:' + color(i) + '"><i></i><button class="lnk" data-go="' + i + '">' + esc(a.label) + '</button><button class="x" data-rm="' + i + '" aria-label="Remove ' + esc(a.label) + '">×</button></span>').join('') +
       (areas.length < MAX ? '<span class="cmp-slot">' + (MAX - areas.length) + ' open slot' + (MAX - areas.length > 1 ? 's' : '') + '</span>' : '') + '</div>';
     if (areas.length < 2) {
@@ -87,6 +111,7 @@ export function initCompare(ctx) {
     }
     root.innerHTML = h;
     root.querySelector('#cmpAddSel')?.addEventListener('click', () => ctx.compare.addSelection());
+    root.querySelector('#cmpAddEach')?.addEventListener('click', () => addEach());
     root.querySelector('#cmpClear')?.addEventListener('click', () => ctx.compare.clear());
     root.querySelector('#cmpToMap')?.addEventListener('click', () => ctx.setView('map'));
     root.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => remove(+b.dataset.rm));
