@@ -42,7 +42,7 @@ export function initExport(ctx) {
       '<div class="xsec"><div class="lt">Format</div><div class="seg xfmt">' + R.formats.map(f => '<button type="button" data-f="' + f + '" aria-pressed="' + (st.format === f) + '">' + FORMATS[f] + '</button>').join('') + '</div></div>' +
       '<div class="xsec xopts">' + opt('map', 'Include the Map', /^(pdf|html)$/.test(st.format) && st.report === 'summary') + opt('full', 'Add the Full Filing List', /^(pdf|html)$/.test(st.format) && st.report === 'summary') +
         opt('scope_text', 'Include Scope of Work Text', st.report === 'list') + opt('ai', 'Include AI Summaries and Tags', st.report === 'list' && st.format !== 'pdf') + '</div>' +
-      '<div class="xf"><span class="xmsg">' + esc(blocked) + '</span><button class="btn" id="xCancel">Cancel</button><button class="btn primary xgo" id="xGo"' + (blocked ? ' disabled' : '') + '>Export ' + FORMATS[st.format] + '</button></div></div>';
+      '<div class="xf"><span class="xmsg">' + esc(blocked || (st.format === 'pdf' && ((st.report === 'list' && n > 2000) || (st.report === 'summary' && st.full && n > 1000)) ? 'The PDF lists the ' + (st.report === 'list' ? '2,000' : '1,000') + ' largest of ' + fmtN(n) + ' filings. Excel and CSV have all of them.' : '')) + '</span><button class="btn" id="xCancel">Cancel</button><button class="btn primary xgo" id="xGo"' + (blocked ? ' disabled' : '') + '>Export ' + FORMATS[st.format] + '</button></div></div>';
     dlg.querySelector('#xClose').onclick = dlg.querySelector('#xCancel').onclick = close;
     dlg.querySelectorAll('[name=xrep]').forEach(i => i.onchange = () => { st.report = i.value; save(); render(); });
     dlg.querySelectorAll('[name=xscope]').forEach(i => i.onchange = () => { st.scope = i.value; save(); render(); });
@@ -127,7 +127,7 @@ export function initExport(ctx) {
   const doc = (kicker, title, body, o = {}) => reportDoc({ kicker: 'Construction filings · ' + kicker, title, meta: metaLine(), body, sources: o.sources || SOURCES, landscape: o.landscape, css: o.css || '' });
   // the KPI tiles chosen above the map (up to 4 a row)
   function kpis(list) {
-    const keys = (ctx.kpiKeys?.() || DEFAULT_KPIS).filter(k => BY_KEY.has(k)), per = keys.length <= 4 ? keys.length : keys.length <= 6 ? 3 : 4, rows = [];
+    const keys = (ctx.kpiKeys?.() || DEFAULT_KPIS).filter(k => BY_KEY.has(k)), n = keys.length, per = n <= 4 ? n : (-n % 3 + 3) % 3 < (-n % 4 + 4) % 4 ? 3 : 4, rows = []; // 9 tiles: 3 rows of 3, not 4 + 4 + 1
     for (let i = 0; i < keys.length; i += per) rows.push(keys.slice(i, i + per));
     return rows.map((r, j) => '<div class="kp" style="grid-template-columns:repeat(' + per + ',1fr)' + (j ? ';margin-top:8px' : '') + '">' + r.map(k => { const m = BY_KEY.get(k);
       return '<div><b' + (m.text ? ' style="font-size:11px"' : '') + '>' + esc(String(m.fmt(m.fn(list)))) + '</b><span>' + esc(m.label) + '</span></div>'; }).join('') + '</div>').join('');
@@ -154,6 +154,10 @@ export function initExport(ctx) {
       money(f.cost) + (f.sqft ? '<div class="sc">' + fmtN(f.sqft) + ' sq ft</div>' : ''), esc(f.owner || '–') + (f.dev && f.dev !== f.owner ? '<div class="sc">' + esc(f.dev) + '</div>' : ''),
       esc(f.status || '–') + (f.start || f.end ? '<div class="sc">' + esc((f.start || '?') + ' → ' + (f.end || '?')) + '</div>' : '')]), [2]);
   }
+  // a PDF table of every filing gets slow and huge (10,000 filings is ~1,000 pages):
+  // the PDF lists the largest LIST_MAX and says so; Excel and CSV always have all of them
+  const LIST_MAX = 2000;
+  const capped = (list, title, max = LIST_MAX) => '<h2>' + title + ' (' + fmtN(list.length) + ')</h2>' + (list.length > max ? '<p class="rnote">The ' + fmtN(max) + ' largest by estimated value are listed here. Export Excel or CSV for all ' + fmtN(list.length) + '.</p>' : '');
   const LEGEND = '<div class="lg"><span><i style="background:#006527"></i>New construction</span><span><i style="background:#6b7174"></i>Renovation</span><span><i style="border:1.5px solid #1f9249"></i>Addition or approximate location</span><span>Marker size = est. value</span></div>';
   function summaryDoc(list, label) {
     const uses = list.some(f => f.use);
@@ -162,9 +166,9 @@ export function initExport(ctx) {
       '<div class="two"><div><h2>By county</h2>' + breakdown(list, f => f.county, 'County') + '<h2>By type</h2>' + breakdown(list, f => ctx.TYPE_LABEL[f.type], 'Type') + '</div>' +
       '<div><h2>Largest filings</h2>' + tbl(['Project', 'City', 'Est. value'], list.slice(0, 12).map(f => [project(f) + '<div class="sc">' + esc(ctx.TYPE_LABEL[f.type] + (f.use ? ' · ' + f.use : '') + (f.sqft ? ' · ' + fmtN(f.sqft) + ' sq ft' : '')) + '</div>', esc(f.city || f.county), money(f.cost)]), [2]) + '</div></div>' +
       (uses ? '<h2>By use (AI-tagged)</h2>' + breakdown(list, f => f.use, 'Use') : '') +
-      (st.full ? '<div class="full"><h2>All filings (' + fmtN(list.length) + ')</h2>' + listTable(list, false) + '</div>' : ''));
+      (st.full ? '<div class="full">' + capped(list, 'All filings', LIST_MAX / 2) + listTable(list.slice(0, LIST_MAX / 2), false) + '</div>' : ''));
   }
-  const listDoc = (list, label) => doc('Filing list', label, kpis(list) + '<h2>Filings (' + fmtN(list.length) + ')</h2>' + listTable(list, true, st.scope_text), { landscape: true });
+  const listDoc = (list, label) => doc('Filing list', label, kpis(list) + capped(list, 'Filings') + listTable(list.slice(0, LIST_MAX), true, st.scope_text), { landscape: true });
   function compareDoc(t) {
     const n = t.areas.length, cols = Math.min(n, n > 3 ? 4 : 3);
     return doc('Area comparison', t.areas.map(a => a.label).join(' vs. '),

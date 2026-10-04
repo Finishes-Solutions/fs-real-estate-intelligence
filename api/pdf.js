@@ -42,7 +42,9 @@ export async function render(html, { landscape = false, title = 'Report' } = {})
     await page.setRequestInterception(true);
     page.on('request', r => (allowed(r.url()) ? r.continue() : r.abort()).catch(() => {}));
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 20000 });
-    return await page.pdf({ format: 'letter', landscape, printBackground: true, preferCSSPageSize: false, displayHeaderFooter: true,
+    // tagged: false: Chromium's accessibility tags make a long report about 5x bigger (a 1,000-row list: 5.4 MB vs ~1 MB),
+    // past the 4.5 MB a response can be
+    return await page.pdf({ format: 'letter', landscape, printBackground: true, preferCSSPageSize: false, displayHeaderFooter: true, tagged: false, outline: false,
       headerTemplate: '<span></span>', footerTemplate: footer(title), margin: { top: '0.5in', bottom: '0.6in', left: '0.5in', right: '0.5in' }, timeout: 30000 });
   } finally { page.close().catch(() => {}); }
 }
@@ -52,8 +54,12 @@ export default async function handler(req, res) {
   // GET ?check=1: render a one-line page and say how it went (is Chromium working on this deployment, and how fast)
   if (req.method === 'GET' && req.query?.check) {
     const t = Date.now();
-    try { const pdf = await render('<!doctype html><html><body style="font-family:Montserrat"><h1 style="font-weight:800">Finishes Solutions</h1><p style="font-family:\'IBM Plex Mono\'">PDF check</p></body></html>', { title: 'Check' });
-      res.setHeader('Cache-Control', 'no-store'); return res.json({ ok: true, bytes: pdf.length, ms: Date.now() - t, pdf_header: Buffer.from(pdf).subarray(0, 8).toString() }); }
+    // ?check=list: the worst case the app sends, a landscape list of 1,000 filings in the report layout
+    const big = req.query.check === 'list' ? (await import('../src/reportkit.js')).reportDoc({ kicker: 'Check', title: '1,000-row list', landscape: true,
+      body: '<table><thead><tr><th>#</th><th>Project</th><th>County</th><th class="r">Est. value</th><th>Owner</th><th>Status</th></tr></thead><tbody>' + Array.from({ length: 1000 }, (_, i) => '<tr><td class="m">' + (i + 1) + '</td><td><a href="https://www.tdlr.texas.gov/TABS/Projects/TABS' + i + '">Project ' + i + '</a><div class="sc">' + (i * 7) + ' Main St, Houston · New construction</div></td><td>Harris</td><td class="m r">$' + (i * 1234).toLocaleString('en-US') + '</td><td>Owner LLC ' + i + '</td><td>Project registered</td></tr>').join('') + '</tbody></table>' }) : null;
+    try { const pdf = await render(big || '<!doctype html><html><body style="font-family:Montserrat"><h1 style="font-weight:800">Finishes Solutions</h1><p style="font-family:\'IBM Plex Mono\'">PDF check</p></body></html>', { title: 'Check', landscape: !!big });
+      res.setHeader('Cache-Control', 'no-store'); const fonts = [...new Set([...Buffer.from(pdf).toString('latin1').matchAll(/\/BaseFont\s*\/(?:[A-Z]{6}\+)?([\w-]+)/g)].map(m => m[1]))];
+      return res.json({ ok: true, bytes: pdf.length, ms: Date.now() - t, fonts }); }
     catch (e) { browserP = null; res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ ok: false, error: e.message, ms: Date.now() - t }); }
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST { html, landscape?, title? }' });
@@ -62,6 +68,7 @@ export default async function handler(req, res) {
   if (!/^\s*<!doctype html>/i.test(html) || html.length > MAX) return res.status(400).json({ error: 'Send { html } (a whole HTML document, under 4 MB).' });
   try {
     const pdf = await render(html, { landscape: !!b.landscape, title: String(b.title || 'Report').slice(0, 120) });
+    if (pdf.length > 4_400_000) return res.status(413).json({ error: 'the PDF is ' + (pdf.length / 1048576).toFixed(1) + ' MB, over the 4.5 MB a download from here can be' });
     res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Cache-Control', 'no-store');
     return res.status(200).send(Buffer.from(pdf));
   } catch (e) {

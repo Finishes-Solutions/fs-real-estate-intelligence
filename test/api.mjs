@@ -65,3 +65,17 @@ const sentBodies = calls.filter(c => c.url.endsWith('/chat/completions')).map(c 
 void sentChat;
 assert.ok(sentBodies.every(b => b.reasoning_effort === 'high'), 'reasoning_effort=high sent');
 console.log('api tests passed:', calls.length, 'mocked calls, feed items', items);
+// report PDFs (api/pdf.js): what the renderer may load, the footer, the request checks, and the report layout
+{ const { allowed, footer, default: pdf } = await import('../api/pdf.js'), { reportDoc } = await import('../src/reportkit.js');
+  for (const u of ['data:image/png;base64,AA', 'https://t.plnspttrs.net/1.jpg', 'about:blank']) assert.ok(allowed(u), u);
+  for (const u of ['http://example.com/a.png', 'https://localhost/x', 'https://127.0.0.1/x', 'https://10.0.0.5/x', 'https://169.254.169.254/latest', 'https://192.168.1.2/', 'file:///etc/passwd', 'https://metadata.google.internal/', 'https://fonts.googleapis.com/css2'])
+    assert.ok(!allowed(u), 'blocked: ' + u);
+  assert.match(footer('Crime report — <b>x</b>'), /Finishes Solutions.*Crime report — &lt;b&gt;x&lt;\/b&gt;.*pageNumber.*totalPages/s);
+  const mk = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, send(b) { r.body = b; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
+  let r = mk(); await pdf({ method: 'POST', body: { html: '<p>not a document</p>' }, headers: { 'x-forwarded-for': '5.5.5.5' } }, r); assert.equal(r.code, 400);
+  r = mk(); await pdf({ method: 'PUT', query: {}, body: {}, headers: { 'x-forwarded-for': '5.5.5.5' } }, r); assert.equal(r.code, 405);
+  r = mk(); await pdf({ method: 'POST', body: { html: '<!doctype html><p>x</p>' }, headers: { 'x-forwarded-for': '5.5.5.5', origin: 'https://evil.example', host: 'app.example' } }, r); assert.equal(r.code, 403, 'other sites can’t use the renderer');
+  const d = reportDoc({ kicker: 'Crime report', title: 'A & B', meta: '1 sq mi', body: '<p>x</p>', sources: 'HPD', landscape: true });
+  assert.match(d, /^<!doctype html>/); assert.match(d, /@page\{size:letter landscape/); assert.match(d, /<h1>A &amp; B<\/h1>/); assert.match(d, /logo-white\.png/); assert.match(d, /Sources: HPD/); assert.match(d, /Building a Future Together/);
+  assert.match(reportDoc({ kicker: 'k', title: 't' }), /@page\{size:letter;/, 'portrait by default');
+  console.log('report pdf ok'); }
