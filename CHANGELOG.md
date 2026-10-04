@@ -5,6 +5,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
+### 2:30 AM CT: Plane routes back, faster property cards (95ca452, deb979b)
+- **Plane cards show routes again.** Since adsb.lol's route lookup stopped answering, every plane said "Route not in the database."
+  - Routes now come from the Virtual Radar Server community route list, the same data adsb.lol used.
+  - Multi-stop flight numbers pick the leg the plane is flying, using where it is, its heading and whether it's climbing or descending. For example, AAL2302 (Chicago → Houston → Chicago) shows **ORD → IAH** while descending into Houston, and UAL382 shows **DCA → IAH**.
+  - Routes that don't match where the plane is are still left out. In a check of six flights over Houston, four got a correct route, compared with none before.
+  - With no usable route, the card says **From IAH · destination not listed** when the flight path shows where the plane took off.
+- **The owner and value on a property card show up faster.**
+  - The appraisal record is now fetched on its own and shown as soon as it arrives, usually in a second or two.
+  - Before, it waited for the slowest part of the card. In one test the OpenStreetMap business lookup took 27 seconds.
+- **The business lookup gives up on a stalled server sooner.** The next OpenStreetMap server is asked after 2.5 seconds instead of waiting out a 9-second timeout, so a stalled server costs about 3 seconds instead of up to 27.
+- A failed business, height or parcel lookup is retried after a few minutes instead of being remembered for a day.
+
 ### 1:30 AM CT: Filters for the map's layers, and freeze fixes (690491d)
 - **Filters now cover the map's layers, not just construction filings.** The panel has a section per kind of data:
   - **Demographics:** income, population growth, home value, rent, vacancy, jobs.
