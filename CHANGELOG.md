@@ -3,6 +3,16 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-04
+
+### 12:15 AM CT: Phone map fills the screen, no sideways scrolling in menus (43c0e4d)
+- **The map now fills the phone screen:**
+  - It runs right up under the clock and battery, with a soft fade so they stay readable, and down to the bottom bar. The grey bands above and below the map are gone.
+  - The search bar also sits higher, just under the status bar. It had been pushed down twice the status bar's height.
+- **Map Layers no longer slides sideways on phones:** the crime type picker was showing even with Crime off and stuck out past the panel's edge. It now only appears when Crime is on.
+  - The panels and sheets (Map Layers, Filters, More, Explore) now only scroll up and down.
+  - The row of quick layer buttons still swipes sideways on purpose, since they don't all fit across a phone.
+
 ## 2026-10-03
 
 ### 11:48 PM CT: Quick layer buttons, one-click Clear, dot grid everywhere, a general real estate layout (3667dc3)
