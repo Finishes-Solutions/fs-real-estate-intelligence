@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "auto | backfill | recent"
+        description: "auto | backfill | recent | deepen (older history back to history_start)"
         required: false
         default: auto
       counties:
@@ -19,6 +19,9 @@ on:
         required: false
       max_counties:
         description: "Stop after this many counties (blank = no limit)"
+        required: false
+      history_start:
+        description: "deepen: load filings back to this date YYYY-MM-DD"
         required: false
 
 permissions:
@@ -58,10 +61,11 @@ jobs:
           COUNTIES: ${{ inputs.counties }}
           PERIOD_START: ${{ inputs.period_start }}
           MAX_COUNTIES: ${{ inputs.max_counties }}
+          HISTORY_START: ${{ inputs.history_start }}
           TIME_BUDGET_MIN: "270"
         run: node build/backfill.mjs
       - name: Start the next backfill run
         if: steps.load.outputs.remaining != '' && steps.load.outputs.remaining != '0' && inputs.max_counties == ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run statewide.yml --ref "${GITHUB_REF_NAME}" -f mode=backfill -f period_start="${{ inputs.period_start }}"
+        run: gh workflow run statewide.yml --ref "${GITHUB_REF_NAME}" -f mode="${{ inputs.mode == 'deepen' && 'deepen' || 'backfill' }}" -f period_start="${{ inputs.period_start }}" -f history_start="${{ inputs.history_start }}"

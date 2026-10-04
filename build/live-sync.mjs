@@ -78,9 +78,9 @@ await step('tracts', async () => {
 await step('crime', async () => {
   // first run: 25 months; after that only the months HPD may still be revising (it republishes the yearly files monthly)
   // the window is anchored on HPD's latest incident (its file runs ~3 months behind), so "the 12 months before" is always complete
-  // CRIME_YEARS: how many years back to keep (2 on the free database; more once it's upgraded). Rows saved before the
-  // hour of day was kept are reloaded once, so the time-of-day breakdown covers the whole history.
-  const YEARS = Math.min(12, Math.max(2, +(process.env.CRIME_YEARS || 2))), KEEP = YEARS * 365 + 30;
+  // CRIME_YEARS: how many years back to keep (default 6 on the Pro database, ~110 MB a year; it was 2 on the free one).
+  // Rows saved before the hour of day was kept are reloaded once, so the time-of-day breakdown covers the whole history.
+  const YEARS = Math.min(12, Math.max(2, +(process.env.CRIME_YEARS || 6))), KEEP = YEARS * 365 + 30;
   const latest = await db.rpc('crime_latest', {}), now = new Date(), oldest = latest ? await db.select('crime_incidents', 'select=day,hour&order=day.asc&limit=50') : [];
   const first = oldest[0]?.day, noHour = oldest.length && oldest.every(r => r.hour == null);
   const want = latest ? addDays(String(latest).slice(0, 10), -(KEEP - 20)) : null;

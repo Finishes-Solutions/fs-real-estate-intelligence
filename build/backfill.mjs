@@ -2,9 +2,11 @@
 //   MODE=backfill  counties not yet done (todo / error / interrupted), highest priority first, until TIME_BUDGET_MIN
 //   MODE=recent    re-list the last RECENT_MONTHS for every county and record what changed (nightly)
 //   MODE=auto      backfill while any county is pending, otherwise recent (3 months; 24 on Sundays)
+//   MODE=deepen    load older history: for every finished county whose history starts after HISTORY_START (YYYY-MM-DD), list only
+//                  the missing months before what it has, then move its start back (added for the Pro database, 2026-10-04)
 // Optional: MAX_COUNTIES=n (stop after n counties), COUNTIES="Harris,Dallas" (only these, any status), PERIOD_START=YYYY-MM-DD (backfill start; default 3 years back),
-//   DB_MAX_MB (default 450: stop before the free-tier 500 MB database limit).
-// Storage is lean for the free tier: each filings row carries its raw TDLR detail (detail jsonb) and the key of its AI
+//   DB_MAX_MB (default 7000: stop before the Pro plan's 8 GB; it was 450 on the free tier's 500 MB).
+// Storage is lean (it was sized for the free tier): each filings row carries its raw TDLR detail (detail jsonb) and the key of its AI
 // tags (ai_key), so the rows themselves are the cache; only geocodes have a separate cache table.
 import fs from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -28,7 +30,7 @@ const DATA = process.env.DATA_DIR || 'data/';
 const BUDGET_MIN = +(process.env.TIME_BUDGET_MIN || 270);
 const t0 = Date.now(), minutes = () => (Date.now() - t0) / 6e4;
 const gkey = k => createHash('sha1').update(k).digest('hex');
-const SLICE = 1000, SCOPE_MAX = 1500, DB_MAX = +(process.env.DB_MAX_MB || 450) * 2 ** 20;
+const SLICE = 1000, SCOPE_MAX = 1500, DB_MAX = +(process.env.DB_MAX_MB || 7000) * 2 ** 20;
 const AI_COLS = ['use', 'subtype', 'tenant', 'developer', 'architect', 'gc', 'units', 'summary'];
 
 const db = supa();
@@ -75,7 +77,7 @@ function windows([startD, endD]) {
 
 async function processCounty(c, per, mode, ctx) {
   const t = Date.now(), outline = c.outline;
-  await db.update('counties', 'fips=eq.' + c.fips, { status: mode === 'recent' ? c.status : 'running', updated_at: new Date().toISOString() });
+  await db.update('counties', 'fips=eq.' + c.fips, { status: mode === 'recent' || mode === 'deepen' ? c.status : 'running', updated_at: new Date().toISOString() });
   // what the database already has for this county doubles as the detail / AI cache
   const existing = await db.selectAll('filings', 'select=id,name,county,cost,status,est_start,est_end,sqft,reg,detail,ai_key,' + AI_COLS.join(',') + '&fips=eq.' + c.fips);
   const tabsCache = {}, aiCache = {};
@@ -135,7 +137,8 @@ async function processCounty(c, per, mode, ctx) {
     total += out.length; mapped += out.filter(f => f.lat != null).length; approx += out.filter(f => f.approx).length; enriched += out.filter(f => f.use).length;
   }
   const patch = { updated_at: new Date().toISOString(), error: null };
-  if (mode !== 'recent') Object.assign(patch, { status: 'done', filings: total, mapped, period_start: iso(per[0]), period_end: iso(per[1]) });
+  if (mode === 'deepen') Object.assign(patch, { status: 'done', filings: (c.filings || 0) + total, mapped: (c.mapped || 0) + mapped, period_start: iso(per[0]) });
+  else if (mode !== 'recent') Object.assign(patch, { status: 'done', filings: total, mapped, period_start: iso(per[0]), period_end: iso(per[1]) });
   await db.update('counties', 'fips=eq.' + c.fips, patch);
   ctx.filings += total;
   log(`${c.name}: done in ${((Date.now() - t) / 6e4).toFixed(1)} min | mapped ${mapped}/${total} (approx ${approx}) | enriched ${enriched} | changes ${nChanges}`);
@@ -157,18 +160,21 @@ async function upsertFilings(rows) {
 async function main() {
   const git = await seed();
   const only = (process.env.COUNTIES || '').split(',').map(s => s.trim()).filter(Boolean);
-  const all = await db.selectAll('counties', 'select=fips,name,tabs_id,outline,status,priority,filings,mapped&order=priority.asc,name.asc');
+  const all = await db.selectAll('counties', 'select=fips,name,tabs_id,outline,status,priority,filings,mapped,period_start,period_end&order=priority.asc,name.asc');
   const pending = all.filter(c => c.status !== 'done');
   let mode = process.env.MODE || 'auto';
   if (mode === 'auto') mode = pending.length ? 'backfill' : 'recent';
-  let queue = only.length ? all.filter(c => only.includes(c.name)) : mode === 'recent' ? all : pending;
+  const HIST = process.env.HISTORY_START || '', older = c => c.status === 'done' && c.period_start && String(c.period_start) > HIST;
+  if (mode === 'deepen' && !/^\d{4}-\d\d-\d\d$/.test(HIST)) throw new Error('MODE=deepen needs HISTORY_START=YYYY-MM-DD');
+  let queue = only.length ? all.filter(c => only.includes(c.name)) : mode === 'recent' ? all : mode === 'deepen' ? all.filter(older) : pending;
+  if (mode === 'deepen') queue = queue.filter(older);
   if (only.length && queue.length !== only.length) log('unknown county names:', only.filter(n => !all.some(c => c.name === n)).join(', '));
   const per = period(mode);
   const run = await db.insertOne('runs', { kind: mode });
   const places = await texasPlaces();
   const ctx = { runAt: new Date().toISOString(), places, placeIdx: new Map(places.map(p => [p[0].toLowerCase(), [p[1], p[2]]])), budget: { nominatim: +(process.env.NOMINATIM_MAX || 2500) },
     detailConcurrency: +(process.env.DETAIL_CONCURRENCY || 8), tokensIn: 0, tokensOut: 0, filings: 0, git };
-  log(`mode ${mode} | ${queue.length} counties queued | period ${iso(per[0])} → ${iso(per[1])} | budget ${BUDGET_MIN} min`);
+  log(`mode ${mode} | ${queue.length} counties queued | period ${mode === 'deepen' ? HIST + ' → each county\'s current start' : iso(per[0]) + ' → ' + iso(per[1])} | budget ${BUDGET_MIN} min`);
 
   let done = 0, failed = 0, fatal = null, full = false;
   for (const c of queue) {
@@ -178,19 +184,21 @@ async function main() {
     if (minutes() > BUDGET_MIN) { log('time budget reached'); break; }
     if (done + failed >= +(process.env.MAX_COUNTIES || Infinity)) { log('MAX_COUNTIES reached'); break; }
     c.outline = c.outline && c.outline.coordinates ? c.outline : null;
-    try { await processCounty(c, per, mode, ctx); done++; }
+    // deepen: only the months before what the county already has
+    const cper = mode === 'deepen' ? [new Date(HIST + 'T00:00:00Z'), new Date(new Date(String(c.period_start).slice(0, 10) + 'T00:00:00Z').getTime() - 864e5)] : per;
+    try { await processCounty(c, cper, mode, ctx); done++; }
     catch (e) {
       failed++; log(`${c.name}: FAILED ${e.message}`);
-      await db.update('counties', 'fips=eq.' + c.fips, { status: mode === 'recent' ? c.status : 'error', error: String(e.message).slice(0, 500), updated_at: new Date().toISOString() }).catch(() => {});
+      await db.update('counties', 'fips=eq.' + c.fips, { status: mode === 'recent' || mode === 'deepen' ? c.status : 'error', error: String(e.message).slice(0, 500), updated_at: new Date().toISOString() }).catch(() => {});
       if (/OpenAI rejected the API key|supabase/i.test(e.message)) { fatal = e; break; }
     }
   }
-  const left = (await db.select('counties', 'select=fips&status=neq.done')).length;
+  const left = mode === 'deepen' ? (await db.select('counties', 'select=fips&status=eq.done&period_start=gt.' + HIST)).length : (await db.select('counties', 'select=fips&status=neq.done')).length;
   await db.update('runs', 'id=eq.' + run.id, { finished_at: new Date().toISOString(), counties: done, filings: ctx.filings, tokens_in: ctx.tokensIn, tokens_out: ctx.tokensOut,
     notes: `${mode}; failed ${failed}; ${left} counties not done` });
   log(`run finished: ${done} counties, ${failed} failed, ${ctx.filings} filings, AI tokens in ${ctx.tokensIn} out ${ctx.tokensOut}, ${left} counties left, ${minutes().toFixed(0)} min`);
   // keep chaining only while counties are left that aren't all failing
-  const remaining = mode === 'backfill' && !only.length && done > 0 && !full ? left : 0;
+  const remaining = (mode === 'backfill' || mode === 'deepen') && !only.length && done > 0 && !full ? left : 0;
   if (process.env.GITHUB_OUTPUT) await fs.appendFile(process.env.GITHUB_OUTPUT, `remaining=${remaining}\n`);
   if (fatal) throw fatal;
 }

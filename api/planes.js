@@ -143,7 +143,7 @@ export default async function handler(req, res) {
       const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}, g = cleanGeometry(b.geometry);
       if (!g) return res.status(400).json({ error: 'Send a Polygon or MultiPolygon geometry.' });
       const d = db(); if (!d || d.via !== 'key') return res.json({ history: false, note: 'The air traffic history isn’t set up on this deployment.' });
-      const r = await d.rpc('air_profile_report', { p_geom: g, p_months: Math.min(13, Math.max(1, +b.months || 3)) });
+      const r = await d.rpc('air_profile_report', { p_geom: g, p_months: Math.min(36, Math.max(1, +b.months || 3)) });
       res.setHeader('Cache-Control', 'no-store'); return res.json({ history: true, ...r });
     }
     if (q.route) {
