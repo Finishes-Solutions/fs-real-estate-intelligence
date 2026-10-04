@@ -5,6 +5,20 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
+### 11:00 AM CT: Clean start, honest layer buttons, Compare each county, Market area picker (abff29a)
+- **The map opens without construction filings or planes.**
+  - Before, a reload often showed filing dots with the Filings button off. The app writes its default date filter into the page address, and on load any filter in the address turned the dots on.
+  - A filings heatmap or Live Planes saved from a past visit also came back on by themselves.
+  - Now filings and planes stay off until you turn them on. A shared link that carries real filing filters still opens with the filings shown.
+- **The quick layer buttons always match what's on the map:**
+  - **Filings** lights up for the dots or the heatmap, and turning it off hides both.
+  - Layers without their own button (crime, airports, weather, low flights) are counted on **More**, for example "More · 2", and hovering over it lists them.
+- **Compare each county separately.** With two or more counties selected, the selection bar offers **+ Compare Together** (one combined area, as before) and **+ Compare Each (N)**, which adds every county as its own area, up to Compare's 4. The Compare tab has the same choice.
+- **A new area picker on the Market tab** replaces the dropdown:
+  - a small map of the seven counties you can click, beside a button for each county and **Whole region**;
+  - click the selected county again to go back to the region;
+  - on phones the buttons scroll sideways.
+
 ### 3:06 AM CT: Every report exports as a branded PDF (10f4eb1, 15bda9f, d2af0a0)
 - **Reports now download as real PDFs in the Finishes Solutions style.** This covers construction filings (Summary, Filing List, Area Comparison, Activity), Market, Crime, FEMA, Traffic, Drive-Time, Air Traffic, Airport and Flight reports.
   - Before, most reports saved a web page that you had to print to PDF yourself.
