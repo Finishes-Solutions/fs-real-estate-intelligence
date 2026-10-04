@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
-### 11:48 PM CT: Quick layer buttons, one-click Clear, dot grid everywhere, a general real estate layout (COMMIT)
+### 11:48 PM CT: Quick layer buttons, one-click Clear, dot grid everywhere, a general real estate layout (3667dc3)
 - **Quick layer buttons under the map search:**
   - Satellite, 3D, Parcels, Flood Zones, Demographics, Traffic Counts, Filings, Planes and Radar, one tap each.
   - **More** opens Map Layers, which keeps every layer and the finer options: the demographic measure, crime type, filing dot size and heatmap, basemaps, live weather and so on.
