@@ -5,6 +5,22 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
+### 3:06 AM CT: Every report exports as a branded PDF (10f4eb1, 15bda9f, d2af0a0)
+- **Reports now download as real PDFs in the Finishes Solutions style.** This covers construction filings (Summary, Filing List, Area Comparison, Activity), Market, Crime, FEMA, Traffic, Drive-Time, Air Traffic, Airport and Flight reports.
+  - Before, most reports saved a web page that you had to print to PDF yourself.
+- **One look for every report:**
+  - a dark title band with the white Finishes logo, a faint blueprint grid and the green rule;
+  - Montserrat and IBM Plex Mono throughout;
+  - headline figures in tiles with a green edge, and section headings with a short green bar;
+  - clean tables whose column headers repeat on every page;
+  - a footer on every page with the report name and page numbers, and a "Building a Future Together" sign-off at the end.
+- **Portrait pages by default.** The full Filing List is landscape because its ten columns need the width, and so is an Area Comparison of four or more areas.
+- **The PDF text is real text:** you can select it and search it, and charts and maps stay sharp at any zoom.
+- **Very long lists:** a PDF Filing List shows the 2,000 largest filings (1,000 when added to a Summary report) and says so. Excel and CSV still have every filing. All 10,853 filings would be about 1,000 pages.
+- The **Export Report** buttons on report cards now read **Export PDF**. The Reports tab's Market card offers **PDF** and **CSV**.
+- If the PDF service can't be reached, the report is saved as a web page instead, with a note to use Print → Save as PDF.
+- A PDF takes a few seconds to prepare (up to about 8 seconds for the first one after a quiet period).
+
 ### 2:30 AM CT: Plane routes back, faster property cards (95ca452, deb979b)
 - **Plane cards show routes again.** Since adsb.lol's route lookup stopped answering, every plane said "Route not in the database."
   - Routes now come from the Virtual Radar Server community route list, the same data adsb.lol used.
