@@ -5,6 +5,21 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 11:31 PM CT: County lines for the whole US, planes in 3D (COMMIT)
+- **County and state lines now cover the whole country:** all 3,224 counties outside the 7 home counties, with state borders a little heavier.
+  - Labels read like "Brazos Co., TX" (parishes in Louisiana) and show from about the regional zoom level.
+  - Zoomed in to about city level, the lines switch to the exact Census boundaries for the area on screen. If those can't be loaded, the lighter national lines stay.
+  - The home counties keep their highlighted outlines.
+  - The **County Lines** switch in Map Layers turns all of it on and off.
+- **Planes are 3D models when the map is tilted:**
+  - Each plane is shown at its real altitude, pointing where it's flying.
+  - Planes tip their nose up when climbing and down when descending, and bank into turns.
+  - Each kind of aircraft has its own model: airliners, jumbo jets, business jets, military transports, fighters, turboprops, small planes, helicopters, gliders, balloons and drones. A 747 is clearly bigger than a Cessna.
+  - Up close, planes are true to scale. Zoomed out, they stay about icon size so they're easy to see.
+  - A thin line drops from each plane to the ground. The flat icon underneath turns into a grey shadow that keeps the callsign and altitude.
+  - Click or hover over a model in the air for the plane card.
+  - The flat map still shows the flat icons, same as before.
+
 ### 2:19 PM CT: No more zooming out to the whole world, more businesses, more crime statistics (31908c8)
 - **Fixed:** opening a drive-time map, showing a crime, FEMA or traffic report's area, or other area outlines could zoom the map all the way out to the whole world. Some outlines are drawn in the opposite direction, and the map read them as "everything except this area". It now zooms to the area itself.
 - **Businesses on property cards:**

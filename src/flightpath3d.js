@@ -2,7 +2,7 @@
 //   - the path itself at the plane's altitude: a smooth sloped line a few pixels wide on screen at any zoom
 //     (two crossed strips, so it reads from the side and from above),
 //   - a see-through curtain from the path down to the ground, so height is easy to judge,
-//   - a ball where the plane is now, at its altitude, moving every frame.
+//   - a ball where the plane is now, at its altitude, moving every frame (left out while the 3D plane models are on).
 // Positions go through MapLibre's own projectTileFor3D, so it sits correctly on the globe and on the flat map
 // (elevation in metres on the globe, in mercator units flat). Nothing is rebuilt when the camera moves; the static
 // path is uploaded once per change and only the short tail to the ball is refreshed each frame.
@@ -38,7 +38,7 @@ void main() {
 const STRIDE = 13; // x y elev zm nx ny side vside mpu r g b a
 
 export function flightPath3D(id = 'plane-path-3d') {
-  let map = null, gl = null, vao = null, progs = {}, vbo = null, tbo = null, bbo = null, nMain = 0, nTail = 0, path = [], ball = null, on = false, dirty = true;
+  let map = null, gl = null, vao = null, progs = {}, vbo = null, tbo = null, bbo = null, nMain = 0, nTail = 0, path = [], ball = null, on = false, dirty = true, noBall = false;
   const merc = (lon, lat, altM) => { const m = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], altM); return [m.x, m.y, m.z]; };
   // one strip pair per point list: curtain (ground → path), horizontal ribbon, vertical ribbon
   function build(pts) {
@@ -100,8 +100,8 @@ export function flightPath3D(id = 'plane-path-3d') {
         // the stretch from the last reported point to where the plane is drawn now, then the ball itself
         const t = build([path[path.length - 1], ball]); gl.bindBuffer(gl.ARRAY_BUFFER, tbo); gl.bufferData(gl.ARRAY_BUFFER, t.data, gl.DYNAMIC_DRAW); nTail = t.n;
         drawStrips(P, tbo, nTail);
-        const bb = build([ball, ball]); gl.bindBuffer(gl.ARRAY_BUFFER, bbo); gl.bufferData(gl.ARRAY_BUFFER, bb.data, gl.DYNAMIC_DRAW);
-        attribs(P, bbo); gl.uniform1f(P.u.u_ball, 1); gl.drawArrays(gl.POINTS, 3, 1); // a top-of-curtain vertex: at the plane's altitude
+        if (!noBall) { const bb = build([ball, ball]); gl.bindBuffer(gl.ARRAY_BUFFER, bbo); gl.bufferData(gl.ARRAY_BUFFER, bb.data, gl.DYNAMIC_DRAW);
+          attribs(P, bbo); gl.uniform1f(P.u.u_ball, 1); gl.drawArrays(gl.POINTS, 3, 1); } // a top-of-curtain vertex: at the plane's altitude
       }
       gl.bindVertexArray(null);
     }
@@ -112,6 +112,8 @@ export function flightPath3D(id = 'plane-path-3d') {
     setPath(pts) { path = pts || []; dirty = true; map?.triggerRepaint(); },
     // [lon, lat, alt_ft] where the plane is drawn now, or null
     setBall(b) { ball = b; if (on) map?.triggerRepaint(); },
+    // the 3D plane models stand in for the ball when they're on
+    hideBall(v) { if (noBall !== !!v) { noBall = !!v; if (on) map?.triggerRepaint(); } },
     show(v) { if (on !== !!v) { on = !!v; map?.triggerRepaint(); } },
     get shown() { return on; }
   };

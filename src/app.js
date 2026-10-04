@@ -129,6 +129,7 @@ function addOverlays(){
   map.addLayer({id:'draft-pts',type:'circle',source:'draftpts',paint:{'circle-radius':['case',['==',['get','first'],1],6,4],'circle-color':'#ffffff','circle-stroke-color':c.sel,'circle-stroke-width':2}});
   map.addLayer({id:'county-label',type:'symbol',source:'clabels',minzoom:6.2,layout:{visibility:layers.counties?'visible':'none','text-field':['get','t'],'text-font':labelFont,'text-size':11,'text-letter-spacing':.14,'text-allow-overlap':false},
     paint:{'text-color':['case',['==',['get','w'],1],c.waller,c.lab],'text-halo-color':c.halo,'text-halo-width':1.6}});
+  addUsCounties();
   const col=['match',['get','t'],'New',c.new,'Reno',c.reno,c.add];
   map.addLayer({id:'heat',type:'heatmap',source:'filings',maxzoom:17,layout:{visibility:'none'},paint:{'heatmap-radius':['interpolate',['linear'],['zoom'],4,8,8,18,11,32,14,48,17,70],'heatmap-intensity':['interpolate',['linear'],['zoom'],4,.6,9,.9,13,1.3],
     'heatmap-opacity':['interpolate',['linear'],['zoom'],11,.85,15,.4],'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(0,0,0,0)',.08,isDark()?'rgba(76,175,112,.12)':'rgba(138,205,163,.18)',.25,isDark()?'rgba(76,175,112,.45)':'rgba(138,205,163,.55)',.45,'#8acda3',.65,'#4caf70',.82,'#1f9249',.93,'#006527',1,isDark()?'#e8f5ec':'#00351a']}});
@@ -219,6 +220,48 @@ function applyRoadToggles(){
     if(sl==='transportation_name') map.setLayoutProperty(l.id,'visibility',layers.names?'visible':'none');
   });
 }
+// ---------- US county lines: every county in the US. National 1:10m lines (data/uscounties.json, fetched after the map is up)
+// under the home counties' own outlines; from zoom 10 the exact Census TIGER/Line lines for the cells in view (/api/counties)
+// replace them. If those can't be fetched the national lines simply stay. ----------
+let US=null; const PRECISE_Z=10, CELL=.5, MAX_CELLS=40, pCells=new Map(); let pOK=false, pT=0;
+const HOME_COUNTY=new Set(COUNTIES.map(n=>n+' County'));
+getJSON('data/uscounties.json',true).then(d=>{ if(!d||!d.lines) return;
+  US={uslines:fc([{type:'Feature',properties:{},geometry:{type:'MultiLineString',coordinates:d.lines}}]),usstates:fc([{type:'Feature',properties:{},geometry:{type:'MultiLineString',coordinates:d.states||[]}}]),
+    uslabels:fc((d.labels||[]).map(([t,x,y])=>({type:'Feature',properties:{t},geometry:{type:'Point',coordinates:[x,y]}})))};
+  if(styleReady) addUsCounties(); syncPrecise(); });
+const preciseFC=()=>{ const seen=new Map(); for(const c of pCells.values()) for(const k of c.counties||[]) if(!seen.has(k.id)&&!(k.id.startsWith('48')&&HOME_COUNTY.has(k.name))) seen.set(k.id,{type:'Feature',properties:{},geometry:{type:'MultiLineString',coordinates:k.lines}}); return fc([...seen.values()]); };
+function addUsCounties(){
+  if(!US||!map.getLayer('county-line')) return; const c=C(), vis=layers.counties?'visible':'none';
+  for(const k of Object.keys(US)) if(!map.getSource(k)) map.addSource(k,{type:'geojson',data:US[k]});
+  if(!map.getSource('usprecise')) map.addSource('usprecise',{type:'geojson',data:preciseFC()});
+  const w=['interpolate',['linear'],['zoom'],3,.35,6,.7,9,1,12,1.3,16,1.8];
+  if(!map.getLayer('us-county-line')) map.addLayer({id:'us-county-line',type:'line',source:'uslines',layout:{visibility:vis,'line-join':'round'},paint:{'line-color':c.line,'line-width':w,'line-opacity':.7}},'county-line');
+  if(!map.getLayer('us-county-precise')) map.addLayer({id:'us-county-precise',type:'line',source:'usprecise',minzoom:PRECISE_Z,layout:{visibility:vis,'line-join':'round'},paint:{'line-color':c.line,'line-width':w,'line-opacity':.7}},'county-line');
+  if(!map.getLayer('us-state-line')) map.addLayer({id:'us-state-line',type:'line',source:'usstates',layout:{visibility:vis,'line-join':'round'},paint:{'line-color':c.line,'line-width':['interpolate',['linear'],['zoom'],2,.6,6,1.3,10,2,16,2.6],'line-opacity':.9}},'county-line');
+  if(!map.getLayer('us-county-label')) map.addLayer({id:'us-county-label',type:'symbol',source:'uslabels',minzoom:6.5,layout:{visibility:vis,'text-field':['get','t'],'text-font':labelFont,'text-size':10,'text-letter-spacing':.1,'text-transform':'uppercase','text-max-width':9,'text-allow-overlap':false},
+    paint:{'text-color':c.lab,'text-opacity':.75,'text-halo-color':c.halo,'text-halo-width':1.5}},'county-label');
+  syncCoarse();
+}
+// the national lines step aside once the exact lines for everything in view have arrived
+function syncCoarse(){ map.getLayer('us-county-line')&&map.setPaintProperty('us-county-line','line-opacity',pOK&&map.getZoom()>=PRECISE_Z?0:.7); }
+function cellsInView(){ const b=map.getBounds(), out=[], f=v=>Math.floor(v/CELL)*CELL;
+  for(let x=f(b.getWest());x<b.getEast();x+=CELL) for(let y=f(Math.max(b.getSouth(),-15));y<Math.min(b.getNorth(),72);y+=CELL) out.push([x,y]);
+  return out.length>16?null:out; } // a tilted view to the horizon: too many cells, keep the national lines
+async function syncPrecise(){
+  const cells=US&&layers.counties&&map.getZoom()>=PRECISE_Z?cellsInView():null, ready=()=>!!cells&&cells.every(([x,y])=>{ const v=pCells.get(x+','+y); return v&&!v.err; });
+  pOK=ready(); syncCoarse(); if(!cells||pOK) return;
+  const my=++pT, now=Date.now();
+  const need=cells.filter(([x,y])=>{ const c=pCells.get(x+','+y); return !c||(c.err&&now-c.at>3e5); });
+  await Promise.all(need.map(async([x,y])=>{ const k=x+','+y;
+    try{ const r=await fetch('/api/counties?x='+x+'&y='+y); if(!r.ok) throw new Error(r.status); const d=await r.json(); pCells.set(k,{counties:d.counties||[],at:Date.now()}); }
+    catch(e){ pCells.set(k,{err:1,at:Date.now()}); } }));
+  if(my!==pT) return; // the map moved on
+  for(const [x,y] of cells){ const k=x+','+y, v=pCells.get(k); if(v){ pCells.delete(k); pCells.set(k,v); } } // most recently seen last
+  while(pCells.size>MAX_CELLS) pCells.delete(pCells.keys().next().value);
+  map.getSource('usprecise')?.setData(preciseFC());
+  pOK=ready(); syncCoarse();
+}
+map.on('moveend',()=>syncPrecise());
 let styleReady=false;
 map.on('style.load',()=>{ styleReady=true; addOverlays(); });
 function setBasemap(s){
@@ -644,7 +687,7 @@ function setMapOptions(a){ const done=[];
   return done.length?done:['no change']; }
 document.getElementById('lyRoads').onchange=e=>{ layers.roads=e.target.checked; applyRoadToggles(); };
 document.getElementById('lyNames').onchange=e=>{ layers.names=e.target.checked; applyRoadToggles(); };
-document.getElementById('lyCounties').onchange=e=>{ layers.counties=e.target.checked; ['county-line','county-label'].forEach(id=>map.getLayer(id)&&map.setLayoutProperty(id,'visibility',layers.counties?'visible':'none')); };
+document.getElementById('lyCounties').onchange=e=>{ layers.counties=e.target.checked; ['county-line','county-label','us-county-line','us-county-precise','us-state-line','us-county-label'].forEach(id=>map.getLayer(id)&&map.setLayoutProperty(id,'visibility',layers.counties?'visible':'none')); syncPrecise(); };
 // ---------- camera: 3D toggle, flat reset, globe guard ----------
 let orbitRaf=0;
 function stopOrbit(){ cancelAnimationFrame(orbitRaf); orbitRaf=0; }

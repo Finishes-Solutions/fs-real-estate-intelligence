@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { feature } from 'topojson-client';
 import { geoContains } from 'd3-geo';
-import { assembleGeo, rewind } from '../build/geometry.mjs';
+import { assembleGeo, rewind, shapeUsCounties } from '../build/geometry.mjs';
 import { USES } from '../lib/taxonomy.mjs';
 
 const require = createRequire(import.meta.url), OUT = 'test/.data/';
@@ -47,6 +47,7 @@ for (let x = -96.6; x < -94.9; x += .12) for (let y = 29.4; y < 30.7; y += .1) {
 await fs.mkdir(OUT, { recursive: true });
 await fs.writeFile(OUT + 'regions.json', JSON.stringify(regions));
 await fs.writeFile(OUT + 'geo.json', JSON.stringify(geo));
+await fs.writeFile(OUT + 'uscounties.json', JSON.stringify(shapeUsCounties(us, regions.counties.map(c => c.fips))));
 await fs.writeFile(OUT + 'filings.json', JSON.stringify({ period: { start: iso(start), end: iso(new Date(now - day)) }, built: new Date().toISOString(), unmapped: 12, filings }));
 await fs.writeFile(OUT + 'changes.json', JSON.stringify(changes));
 tracts.forEach(t => { t.jobs = Math.round(rnd() * 9000); t.jgr = Math.round((rnd() * 60 - 10) * 10) / 10; t.jpr = Math.round(t.jobs / t.pop * 100) / 100; t.jtop = [6, 15, 17]; });

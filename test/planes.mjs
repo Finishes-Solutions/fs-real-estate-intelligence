@@ -227,3 +227,32 @@ console.log('aircraft shapes ok');
   assert.equal(plausible(MSY, MDW, 38.6, -90.3, 20), true); assert.equal(plausible(MSY, MDW, 38.6, -90.3), true, 'no track: distance only');
   assert.equal(plausible(MSY, MDW, 41.6, -87.9, 217), true, 'circling near the destination: fine'); }
 console.log('flight path smoothing ok');
+
+// 3D models (lib/aircraft-meshes.mjs): one per icon shape, sane geometry, nose forward, sized for the zoom
+{ const { meshFor, MESH_SHAPES, REAL_M, modelSize } = await import('../lib/aircraft-meshes.mjs');
+  const { SHAPES, SIZE } = await import('../lib/aircraft-shapes.mjs');
+  assert.deepEqual([...MESH_SHAPES].sort(), [...SHAPES].sort(), 'a model for every icon shape');
+  for (const s of SHAPES) {
+    const m = meshFor(s), P = m.positions, N = m.normals;
+    assert.ok(m.count >= 24 && m.count % 3 === 0 && m.count / 3 <= 600, s + ': ' + m.count / 3 + ' triangles');
+    assert.equal(P.length, m.count * 3); assert.equal(N.length, m.count * 3);
+    let y0 = 9, y1 = -9, x0 = 9, x1 = -9;
+    for (let i = 0; i < P.length; i += 3) {
+      assert.ok([P[i], P[i + 1], P[i + 2]].every(Number.isFinite), s + ' finite');
+      assert.ok(Math.abs(Math.hypot(N[i], N[i + 1], N[i + 2]) - 1) < 1e-4, s + ' unit normals');
+      y0 = Math.min(y0, P[i + 1]); y1 = Math.max(y1, P[i + 1]); x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]);
+    }
+    assert.ok(y1 <= .5 && y0 >= -.5 && x1 <= .5 && x0 >= -.5, s + ' inside the icon box');
+    assert.ok(Math.abs(x0 + x1) < 1e-3, s + ' symmetric left to right');
+    assert.ok(REAL_M[s] > 0, s + ' has a real size');
+  }
+  // airliners: the nose is the +y end, the wings sit ahead of the middle of the span
+  for (const s of ['jet', 'heavy4', 'regional', 'single']) { const P = meshFor(s).positions; let ny = -9; for (let i = 1; i < P.length; i += 3) ny = Math.max(ny, P[i]); assert.ok(ny > .3, s + ' nose forward'); }
+  assert.ok(meshFor('heavy4').count > meshFor('single').count, 'four engines cost more triangles than a Cessna');
+  assert.equal(meshFor('nonsense'), meshFor('jet'), 'unknown shapes fall back to the jet');
+  // true size close in, icon size zoomed out
+  const mpp = z => 40075016.686 * Math.cos(30 * Math.PI / 180) / (512 * 2 ** z);
+  assert.equal(modelSize('jet', SIZE.jet, mpp(17)), REAL_M.jet, 'zoom 17: a 737 is 40 m');
+  assert.ok(Math.abs(modelSize('jet', SIZE.jet, mpp(7)) / mpp(7) - 30 * SIZE.jet) < 1e-6, 'zoom 7: about icon size on screen');
+  assert.ok(modelSize('heavy4', SIZE.heavy4, mpp(7)) > modelSize('single', SIZE.single, mpp(7)), 'a 747 stays bigger than a Cessna');
+  console.log('3D aircraft models ok:', SHAPES.length, 'shapes'); }

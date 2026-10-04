@@ -75,6 +75,9 @@
     },
     "api/traffic.js": {
       "maxDuration": 30
+    },
+    "api/counties.js": {
+      "maxDuration": 25
     }
   },
   "crons": [
