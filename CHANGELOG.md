@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
-### 12:58 AM CT: Plain-language product guide (COMMIT)
+### 12:58 AM CT: Plain-language product guide (40a0948)
 - **New: `PRODUCTDOC.md`,** a plain-language guide to the whole app. It covers what it is and where it works, the screen layout, property lookups, area reports and clearing the view, map layers, planes and airports, market data, construction filings, Ask AI, reports, field notes, where the data comes from, and what to keep in mind.
 - It will be updated with every change people can see, so it stays current as the app grows.
 
