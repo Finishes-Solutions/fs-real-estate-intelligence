@@ -162,7 +162,7 @@ Property filters (use, acres, value, year built, owner, zoning) are planned. The
   - show the filing dots, the same size or sized by value;
   - an activity heatmap.
 - **Map Display:**
-  - Dot Grid: the halftone dot pattern over land.
+  - Dot Grid: a faint dot texture over land.
   - County & State Lines: every US county, with exact Census boundaries when you zoom in.
   - Roads and road names.
   - 3D tilt.
@@ -289,6 +289,10 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 ---
 
 ## Recently added
+
+- **Whole buildings:** clicking a big building selects all of it, and a building on several parcels lists every parcel with a total.
+- **Tabs on the card:** Shift-click (or **+ Add** on touch screens) to pick up to 10 buildings, parcels, filings, planes or airports, each in its own tab, with an **All** tab that adds up the buildings.
+- **A subtler dot grid:** smaller, closer and much fainter dots.
 
 - **Filters for the map's layers:** demographics, traffic and risk, alongside construction filings, plus a **Match everything** mode that finds the neighborhoods meeting every threshold.
 - **Faster:**

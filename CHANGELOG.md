@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
+### 2:07 AM CT: A subtler dot grid (COMMIT)
+- **The dot grid is quieter:** smaller dots, set a little closer together, at well under half the old strength, so it reads as texture rather than pulling the eye. The home county's green dots stay a bit stronger so it still stands out.
+- The product guide now lists the whole-building selection and card tabs under Recently added.
+
 ### 2:02 AM CT: Whole buildings, buildings on several parcels, and tabs for several selections (37897ab)
 - **Clicking a big building now selects all of it.** The map draws large buildings (warehouses, shopping centers) in pieces at its tile edges, so a click used to pick only the piece under it, often about half the building. The app now joins the pieces as soon as you click, then switches to the full OpenStreetMap outline when the details load.
 - **Buildings on more than one parcel:**

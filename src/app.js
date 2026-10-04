@@ -113,9 +113,9 @@ const C=()=>isDark()?{new:'#4caf70',reno:'#939a9d',add:'#8acda3',line:'rgba(255,
   : {new:'#006527',reno:'#6b7174',add:'#1f9249',line:'rgba(22,25,26,.45)',waller:'#006527',dot:'#5b6366',lab:'#23282a',halo:'#ffffff',sel:'#006527',stroke:'#ffffff'});
 let labelFont=['Noto Sans Bold'];
 
-// one cell of the dot grid's pattern (9 px, drawn at 2x for sharp dots); the home county's dots are a touch bigger so they cover the grey ones
-function gridImg(color,r){ const n=18, cv=document.createElement('canvas'); cv.width=cv.height=n; const g=cv.getContext('2d',{willReadFrequently:true}); g.fillStyle=color; g.beginPath(); g.arc(n/2,n/2,r,0,Math.PI*2); g.fill(); return g.getImageData(0,0,n,n); }
-function addGridImages(c){ for(const [id,col,r] of [['grid-dot',c.dot,1.8],['grid-dot-home',c.waller,2.4]]){ const img=gridImg(col,r); if(map.hasImage(id)) map.updateImage(id,img); else map.addImage(id,img,{pixelRatio:2}); } }
+// one cell of the dot grid's pattern (7 px, drawn at 2x for sharp dots); the home county's dots are a touch bigger so they cover the grey ones
+function gridImg(color,r){ const n=14, cv=document.createElement('canvas'); cv.width=cv.height=n; const g=cv.getContext('2d',{willReadFrequently:true}); g.fillStyle=color; g.beginPath(); g.arc(n/2,n/2,r,0,Math.PI*2); g.fill(); return g.getImageData(0,0,n,n); }
+function addGridImages(c){ for(const [id,col,r] of [['grid-dot',c.dot,1.2],['grid-dot-home',c.waller,1.6]]){ const img=gridImg(col,r); if(map.hasImage(id)) map.updateImage(id,img); else map.addImage(id,img,{pixelRatio:2}); } }
 function setGrid(on){ layers.grid=on; saveLayers(); ['grid-dots','grid-home'].forEach(id=>map.getLayer(id)&&map.setLayoutProperty(id,'visibility',on?'visible':'none')); const el=document.getElementById('lyGrid'); if(el) el.checked=on; }
 function firstSymbolId(){ const l=map.getStyle().layers.find(x=>x.type==='symbol'); return l&&l.id; }
 function addOverlays(){
@@ -129,9 +129,10 @@ function addOverlays(){
   // are green. On imagery the dots are white and fainter. Layers → Dot Grid turns it off.
   addGridImages(c);
   const water=map.getStyle().layers.find(l=>l.type==='fill'&&/^water$/i.test(l['source-layer']||'')), gridBefore=water?water.id:before;
-  const gOp=isSat()?['interpolate',['linear'],['zoom'],1,.4,10,.32,14,.2,17,.1]:['interpolate',['linear'],['zoom'],1,.7,10,.6,14,.36,17,.14];
-  map.addLayer({id:'grid-dots',type:'fill',source:'world',layout:{visibility:layers.grid?'visible':'none'},paint:{'fill-pattern':'grid-dot','fill-opacity':gOp}},gridBefore);
-  map.addLayer({id:'grid-home',type:'fill',source:'homefill',layout:{visibility:layers.grid?'visible':'none'},paint:{'fill-pattern':'grid-dot-home','fill-opacity':gOp}},gridBefore);
+  // kept faint so it's texture, not something to read: the home county's green dots a little stronger so it still stands out
+  const op=k=>isSat()?['interpolate',['linear'],['zoom'],1,.2*k,10,.16*k,14,.1*k,17,.05*k]:['interpolate',['linear'],['zoom'],1,.3*k,10,.24*k,14,.15*k,17,.06*k];
+  map.addLayer({id:'grid-dots',type:'fill',source:'world',layout:{visibility:layers.grid?'visible':'none'},paint:{'fill-pattern':'grid-dot','fill-opacity':op(1)}},gridBefore);
+  map.addLayer({id:'grid-home',type:'fill',source:'homefill',layout:{visibility:layers.grid?'visible':'none'},paint:{'fill-pattern':'grid-dot-home','fill-opacity':op(1.6)}},gridBefore);
   map.addLayer({id:'county-line',type:'line',source:'counties',layout:{visibility:layers.counties?'visible':'none','line-join':'round'},paint:{'line-color':['case',['==',['get','w'],1],c.waller,c.line],'line-width':['interpolate',['linear'],['zoom'],6,['case',['==',['get','w'],1],1.8,1],11,['case',['==',['get','w'],1],2.2,1.4],16,['case',['==',['get','w'],1],3,2]]}},before);
   map.addLayer({id:'sel-fill',type:'fill',source:'sel',paint:{'fill-color':c.sel,'fill-opacity':.09}});
   map.addLayer({id:'sel-line',type:'line',source:'sel',paint:{'line-color':c.sel,'line-width':2.2,'line-dasharray':[3,2]}});
