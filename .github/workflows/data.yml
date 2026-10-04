@@ -14,6 +14,9 @@ on:
       period_end:
         description: "YYYY-MM-DD (blank = yesterday)"
         required: false
+      markets_only:
+        description: "yes = only refresh data/markets.json (stocks, crypto, commodities, Houston metro series)"
+        required: false
 
 permissions:
   contents: write
@@ -53,7 +56,7 @@ jobs:
           ONLY: ${{ inputs.only }}
           PERIOD_START: ${{ inputs.period_start }}
           PERIOD_END: ${{ inputs.period_end }}
-        run: node build.mjs
+        run: node build.mjs ${{ inputs.markets_only == 'yes' && '--markets' || '' }}
       - name: Commit data
         run: |
           git config user.name "github-actions[bot]"

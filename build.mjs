@@ -14,6 +14,7 @@ import { diff, appendRun } from './build/changes.mjs';
 import { buildMarket } from './build/market.mjs';
 import { buildArea, mergeJobs } from './build/area.mjs';
 import { buildCE } from './build/spending.mjs';
+import { buildMarkets } from './build/markets.mjs';
 import { mergeSpending } from './lib/spending.mjs';
 
 const KEY = process.env.MAPTILER_KEY || 'vA28jXazwpYesC2b1Ccp';
@@ -34,7 +35,7 @@ async function assemble() {
   await fs.mkdir('public/data', { recursive: true }); await fs.mkdir('public/lib', { recursive: true });
   for (const f of await fs.readdir('src')) await fs.copyFile('src/' + f, 'public/' + f);
   await fs.writeFile('public/sw.js', (await fs.readFile('src/sw.js', 'utf8')).replace('__BUILD__', Date.now().toString(36)));
-  for (const f of ['geo.json', 'uscounties.json', 'filings.json', 'changes.json', 'market.json', 'area.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
+  for (const f of ['geo.json', 'uscounties.json', 'filings.json', 'changes.json', 'market.json', 'area.json', 'markets.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
   for (const f of ['taxonomy.mjs', 'filter.mjs', 'changes.mjs', 'agent-tools.mjs', 'assist-logic.mjs', 'nasa.mjs', 'height.mjs', 'sectors.mjs', 'nearby.mjs', 'reports.mjs', 'demographics.mjs', 'spending.mjs', 'nibrs.mjs', 'rulebook.mjs', 'voice-state.mjs', 'aircraft-shapes.mjs', 'aircraft-meshes.mjs', 'flightpath.mjs', 'geomatch.mjs', 'screen.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
   // public Supabase settings for the browser (read-only publishable key; row level security limits it to public tables)
   const E = process.env, sbUrl = E.SUPABASE_URL || E.NEXT_PUBLIC_SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co';
@@ -113,6 +114,10 @@ async function refresh() {
       await fs.writeFile(D + 'area.json', JSON.stringify(area));
     } catch (e) { log('area skipped:', e.message); }
   }
+  // 8b. markets: stocks, ETFs, crypto, oil and gas, construction costs, rates, Houston metro statistics (best effort)
+  if (!ONLY.length || process.env.MARKETS) {
+    try { await fs.writeFile(D + 'markets.json', JSON.stringify(await buildMarkets(await readJSON(D + 'markets.json', {})))); } catch (e) { log('markets skipped:', e.message); }
+  }
   // 9. modeled consumer spending per tract: ACS income brackets × BLS Consumer Expenditure Survey (best effort)
   if (market?.tracts?.some(t => Array.isArray(t.ib))) {
     try { const ce = await buildCE(await readJSON(C + 'ce.json')); await fs.writeFile(C + 'ce.json', JSON.stringify(ce)); market = mergeSpending(market, ce); log('spending:', market.spendTracts, 'tracts, CE', ce.year); }
@@ -140,5 +145,5 @@ async function refresh() {
   }
 }
 
-const assembleOnly = process.argv.includes('--assemble');
-(assembleOnly ? assemble() : refresh().then(assemble)).catch(e => { console.error(e); process.exit(1); });
+const assembleOnly = process.argv.includes('--assemble'), marketsOnly = process.argv.includes('--markets');
+(assembleOnly ? assemble() : marketsOnly ? buildMarkets(await readJSON(D + 'markets.json', {})).then(m => fs.writeFile(D + 'markets.json', JSON.stringify(m))) : refresh().then(assemble)).catch(e => { console.error(e); process.exit(1); });
