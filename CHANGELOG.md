@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
-### 12:23 PM CT: Building tabs and the parcel list combined with the faster property cards (MERGE)
+### 12:23 PM CT: Building tabs and the parcel list combined with the faster property cards (80bd541)
 - Brought together two sets of changes made in parallel. The property card still shows the owner and value first, and the "this building sits on N parcels" list now fills in when the second, slower lookup finishes (a second or two later).
 - Shift-click tabs, the **All** tab and the whole-building selection work with the faster two-step lookup.
 - Fixed while combining: picking the same parcel twice (on open ground) is recognised as the same one again, so it toggles off instead of adding a duplicate tab.
