@@ -27,7 +27,7 @@ export function initPlanes(ctx) {
   // ---------- icons: a top-down silhouette per kind of aircraft (lib/aircraft-shapes.mjs picks it from the ICAO type),
   // nose north, drawn once each as SDFs so altitude bands can recolour them; SIZE scales them (a 747 dwarfs a Cessna) ----------
   function shapeImage(kind) {
-    const n = 64, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'), X = 32;
+    const n = 64, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d', { willReadFrequently: true }), X = 32;
     g.fillStyle = '#000';
     const body = (y0, y1, w) => { const r = w / 2; g.beginPath(); g.moveTo(X - r, y0 + r * 1.8); g.quadraticCurveTo(X - r, y0, X, y0); g.quadraticCurveTo(X + r, y0, X + r, y0 + r * 1.8);
       g.lineTo(X + r * .55, y1 - 1.5); g.quadraticCurveTo(X, y1 + 1, X - r * .55, y1 - 1.5); g.closePath(); g.fill(); };
@@ -135,8 +135,8 @@ export function initPlanes(ctx) {
   const EMPTY = { type: 'FeatureCollection', features: [] };
   function routeFC() {
     if (!routeOn) return EMPTY;
-    const me = fc().features.find(f => f.properties.hex === routeOn.hex), o = [routeOn.o.lon, routeOn.o.lat], d = [routeOn.d.lon, routeOn.d.lat];
-    const pos = me ? me.geometry.coordinates : null, feats = [];
+    const q = drawn.get(routeOn.hex), o = [routeOn.o.lon, routeOn.o.lat], d = [routeOn.d.lon, routeOn.d.lat]; // where the plane is drawn now (no need to rebuild every plane)
+    const pos = q && find(routeOn.hex) ? [q.lon, q.lat] : null, feats = [];
     if (pos && pathOn?.hex === routeOn.hex) feats.push({ type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(pos, d) } });
     else if (pos) { feats.push({ type: 'Feature', properties: { k: 'flown' }, geometry: { type: 'LineString', coordinates: arc(o, pos) } }, { type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(pos, d) } }); }
     else feats.push({ type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(o, d) } });
@@ -196,7 +196,7 @@ export function initPlanes(ctx) {
   // 3D models in the tilted view; the icons underneath turn into grey shadows (still labelled and clickable)
   const models = planes3D({ bands: BANDS });
   const iconColor = ['step', ['get', 'alt'], BANDS[0][1], ...BANDS.flatMap(([a, c], i) => i ? [BANDS[i - 1][0], c] : [])];
-  function modelRows() { return list.map(p => { const q = drawn.get(p.hex); return q && { hex: p.hex, shape: p.shape, sz: SIZE[p.shape] || 1, lon: q.lon, lat: q.lat, alt: p.ground ? 0 : q.alt, track: q.track, gs: p.gs, vs: p.vs, ground: !!p.ground }; }).filter(Boolean); }
+  function modelRows() { const now = Date.now(); return list.map(p => { const q = posOf(p, now); drawn.set(p.hex, q); return q && { hex: p.hex, shape: p.shape, sz: SIZE[p.shape] || 1, lon: q.lon, lat: q.lat, alt: p.ground ? 0 : q.alt, track: q.track, gs: p.gs, vs: p.vs, ground: !!p.ground }; }).filter(Boolean); }
   function syncModels() {
     const three = on() && is3d(); models.show(three); path3d.hideBall(three);
     if (three) models.setPlanes(modelRows());
@@ -265,16 +265,21 @@ export function initPlanes(ctx) {
     } catch (e) { if (e.name !== 'AbortError') { err = e.message; } }
     ctx.live.syncUI();
   }
-  // animation: planes redrawn every frame (about 30 a second when following, a path is open or the view is close in,
-  // about 12 otherwise), the route and the 2D path line once a second
-  let raf = 0, lastFrame = 0, lastSlow = 0;
+  // animation: positions advance every frame; the icon layer is redrawn at the rates below, the 3D models about 30 times
+  // a second, the route and the 2D path line once a second. Paused while the map isn't the view on screen.
+  let raf = 0, lastFrame = 0, lastSlow = 0, lastIcons = 0;
   function frame(ts) {
     raf = requestAnimationFrame(frame);
-    if (!list.length || document.visibilityState === 'hidden' || !map.getSource('live-planes')) return;
-    const fast = follow || pathOn || (models.shown && list.length < 1500) || (map.getZoom() >= 10 && list.length < 400);
-    if (ts - lastFrame < (fast ? 30 : 80)) return;
+    // nothing to do while the map is hidden behind another tab or the page is in the background
+    if (!list.length || document.visibilityState === 'hidden' || (ctx.view && ctx.view !== 'map') || !map.getSource('live-planes')) return;
+    // the icon layer is the expensive part (every update is copied to the map's worker, re-tiled and its labels re-placed):
+    // ~30 times a second only while following a plane or showing its path, ~20 when close in with few planes, else 4.
+    // The 3D models are cheap to move (no re-tiling), so in 3D they move about 30 times a second regardless.
+    const fast = follow || pathOn, close = map.getZoom() >= 11 && list.length < 200;
+    const iconMs = fast ? 30 : close ? 50 : 250, modelMs = 33;
+    if (ts - lastFrame < (models.shown ? Math.min(modelMs, iconMs) : iconMs)) return;
     const dtCam = Math.min(.25, (ts - lastFrame) / 1000); lastFrame = ts;
-    map.getSource('live-planes').setData(fc());
+    if (ts - lastIcons >= iconMs - 5) { lastIcons = ts; map.getSource('live-planes').setData(fc()); }
     if (models.shown) models.setPlanes(modelRows());
     if (follow) followCam(dtCam);
     if (pathOn) { const me = drawn.get(pathOn.hex); path3d.setBall(me ? [me.lon, me.lat, me.alt] : null); }
@@ -438,13 +443,15 @@ export function initPlanes(ctx) {
   });
   map.on('mouseleave', 'live-planes', () => { map.getCanvas().style.cursor = ''; ctx.tip.style.opacity = 0; });
   let tipModel = false;
-  map.on('mousemove', e => {
+  let hoverEv = null, hoverRaf = 0; // at most one 3D hit test per frame, however fast the mouse moves
+  map.on('mousemove', ev => { if (!models.shown && !tipModel) return; hoverEv = ev; if (!hoverRaf) hoverRaf = requestAnimationFrame(() => { hoverRaf = 0; hover3d(hoverEv); }); });
+  function hover3d(e) {
     const hex = models.shown ? models.pick(e.point) : null, p = hex && find(hex);
     if (!p) { if (tipModel) { tipModel = false; map.getCanvas().style.cursor = ''; ctx.tip.style.opacity = 0; } return; }
     tipModel = true; map.getCanvas().style.cursor = 'pointer'; const tip = ctx.tip;
     tip.innerHTML = '<b>' + esc(p.flight || p.reg || p.hex.toUpperCase()) + '</b><span>' + esc([p.type, altLabel(p), p.gs != null ? p.gs + ' kt' : ''].filter(Boolean).join(' · ')) + '</span>';
     const x = e.point.x + 14, flip = x + 220 > ctx.viewport.clientWidth; tip.style.left = (flip ? e.point.x - 14 - tip.offsetWidth : x) + 'px'; tip.style.top = (e.point.y + 10) + 'px'; tip.style.opacity = 1;
-  });
+  }
 
   ctx.live.register('planes', {
     label: 'Live Planes', persist: true,

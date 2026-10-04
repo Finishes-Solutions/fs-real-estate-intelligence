@@ -35,16 +35,24 @@ export function initAirports(ctx) {
 
   // ---------- map layer ----------
   const typesFor = z => z < 7 ? 'large' : z < 9 ? 'large,medium' : z < 11 ? 'large,medium,small' : 'large,medium,small,heliport,seaplane';
+  let ctl = null, lastKey = '';
   async function load() {
     if (!on) return; const my = ++seq, z = map.getZoom();
     if (z < 4) { setData([]); if (note) note.textContent = 'Zoom in to see airports.'; return; }
     const b = map.getBounds(), r = v => Math.round(v * 10) / 10;
     const bb = [Math.max(-180, r(b.getWest()) - .1), Math.max(-85, r(b.getSouth()) - .1), Math.min(180, r(b.getEast()) + .1), Math.min(85, r(b.getNorth()) + .1)];
     if ((bb[2] - bb[0]) * (bb[3] - bb[1]) > 2500) { if (note) note.textContent = 'Zoom in a little to see airports.'; return; }
-    try { const res = await fetch('api/airports?box=' + bb.join(',') + '&types=' + typesFor(z)), d = await res.json(); if (!res.ok) throw new Error(d.error || 'airports unavailable'); if (my !== seq) return;
+    const key = bb.join(',') + '&types=' + typesFor(z); if (key === lastKey && map.getSource(SRC)) return; // same area as what's drawn
+    ctl?.abort(); ctl = new AbortController();
+    try { const res = await fetch('api/airports?box=' + key, { signal: ctl.signal }), d = await res.json(); if (!res.ok) throw new Error(d.error || 'airports unavailable'); if (my !== seq) return; lastKey = key;
       setData(d.airports || []); if (note) note.textContent = fmt((d.airports || []).length) + ' airports in view. ' + (z < 11 ? 'Zoom in for small fields and heliports. ' : '') + 'Click one for its card.'; }
-    catch (e) { if (note) note.textContent = e.message; }
+    catch (e) { if (e.name !== 'AbortError' && note) note.textContent = e.message; }
   }
+  // click and hover handlers once (adding them with the layer stacked another set on every toggle and basemap change,
+  // so one click opened the card several times)
+  map.on('click', SRC, e => { const f = e.features?.[0]; if (f) show(f.properties.ident); });
+  map.on('mouseenter', SRC, e => { map.getCanvas().style.cursor = 'pointer'; const f = e.features?.[0]; if (f && ctx.tip) { ctx.tip.textContent = f.properties.name + ' (' + f.properties.code + ')'; ctx.tip.style.opacity = 1; ctx.tip.style.left = (e.point.x + 14) + 'px'; ctx.tip.style.top = (e.point.y + 14) + 'px'; } });
+  map.on('mouseleave', SRC, () => { map.getCanvas().style.cursor = ''; if (ctx.tip) ctx.tip.style.opacity = 0; });
   function setData(list) {
     const fc = { type: 'FeatureCollection', features: list.map(a => ({ type: 'Feature', properties: { ident: a[0], name: a[1], type: a[2], code: a[5], big: a[2] === 'large_airport' ? 2 : a[2] === 'medium_airport' ? 1 : 0 }, geometry: { type: 'Point', coordinates: [a[3], a[4]] } })) };
     try {
@@ -53,19 +61,17 @@ export function initAirports(ctx) {
       map.addLayer({ id: SRC, type: 'circle', source: SRC, paint: { 'circle-radius': ['match', ['get', 'big'], 2, 8, 1, 6, 4], 'circle-color': ['match', ['get', 'type'], ...Object.entries(COL).flat(), '#64748b'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.6 } });
       map.addLayer({ id: SRC + '-lbl', type: 'symbol', source: SRC, minzoom: 6, layout: { 'text-field': ['get', 'code'], 'text-size': ['match', ['get', 'big'], 2, 13, 1, 12, 11], 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-allow-overlap': false },
         paint: { 'text-color': '#1e293b', 'text-halo-color': '#fff', 'text-halo-width': 1.6 } });
-      map.on('click', SRC, e => { const f = e.features?.[0]; if (f) show(f.properties.ident); });
-      map.on('mouseenter', SRC, e => { map.getCanvas().style.cursor = 'pointer'; const f = e.features?.[0]; if (f && ctx.tip) { ctx.tip.textContent = f.properties.name + ' (' + f.properties.code + ')'; ctx.tip.style.opacity = 1; ctx.tip.style.left = (e.point.x + 14) + 'px'; ctx.tip.style.top = (e.point.y + 14) + 'px'; } });
-      map.on('mouseleave', SRC, () => { map.getCanvas().style.cursor = ''; if (ctx.tip) ctx.tip.style.opacity = 0; });
     } catch (e) { /* style loading */ }
   }
   function setOn(v) {
     on = !!v; if (box) box.checked = on; if (note) note.hidden = !on;
-    if (!on) { try { for (const id of [SRC + '-lbl', SRC]) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource(SRC)) map.removeSource(SRC); } catch (e) {} ctx.setLegend?.('airports', ''); return; }
+    if (!on) { ctl?.abort(); lastKey = ''; try { for (const id of [SRC + '-lbl', SRC]) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource(SRC)) map.removeSource(SRC); } catch (e) {} ctx.setLegend?.('airports', ''); return; }
     ctx.setLegend?.('airports', '<div class="t">Airports</div>' + ['large_airport', 'medium_airport', 'small_airport', 'heliport'].map(t => '<div class="li"><i style="background:' + COL[t] + '"></i>' + TYPE[t] + '</div>').join(''));
     load();
   }
   if (box) box.onchange = () => setOn(box.checked);
-  map.on('moveend', () => { if (on) load(); });
+  // reload once the map settles (following or orbiting a plane moves it every frame), not on every move
+  let moveT = 0; map.on('moveend', () => { if (on) { clearTimeout(moveT); moveT = setTimeout(load, 350); } });
   ctx.onOverlays?.(() => { if (on && !map.getSource(SRC)) load(); if (last?.osm && !map.getSource(OSM)) drawOsm(last.osm); });
   ctx.airportsLayer = setOn;
 

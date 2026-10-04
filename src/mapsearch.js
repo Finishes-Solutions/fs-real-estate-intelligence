@@ -1,6 +1,7 @@
 import { pickPlace, districtFor, splitWithin, applyPlaceAlias, mentions, extentMeters, BIG_PLACE_M } from './lib/assist-logic.mjs';
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 import { mergeBusinesses } from './lib/nearby.mjs';
+import { contains as inArea } from './lib/geomatch.mjs';
 // Map search (under the map tools): real street addresses, places (counties, towns, neighborhoods, landmarks, roads),
 // projects by name, companies and people (owners, developers, architects, contractors) and filings at matching addresses. Results appear while typing, 10 at a time, with more loading as you
 // scroll. Picking a place outlines it on the map: city / county / neighborhood boundaries and building footprints
@@ -298,7 +299,7 @@ export function initMapSearch(ctx) {
   // filings inside an area, or within a quarter mile of a road or point
   function placeHits() {
     const list = ctx.filtered(), g = place.geom;
-    if (isArea(g) && !/building|business/.test(place.kind)) return { list: list.filter(f => d3.geoContains(g, [f.lon, f.lat])), how: 'inside' };
+    if (isArea(g) && !/building|business/.test(place.kind)) return { list: list.filter(f => inArea(g, [f.lon, f.lat])), how: 'inside' };
     const R = .25 / 3958.8, pt = place.c || (g && centerOf(g));
     if (isLine(g)) { const lines = g.type === 'LineString' ? [g.coordinates] : g.coordinates, b = bounds(g);
       return { list: list.filter(f => f.lon > b[0][0] - .01 && f.lon < b[1][0] + .01 && f.lat > b[0][1] - .01 && f.lat < b[1][1] + .01 && lines.some(l => l.some((p, i) => i && segDist([f.lon, f.lat], l[i - 1], p) < R))), how: 'within 0.25 mile' }; }
@@ -410,7 +411,7 @@ export function initMapSearch(ctx) {
     let hostGeom = host.geom || null;
     if (!hostGeom) { const feats = await nominatim(far ? within : applyPlaceAlias(within) + ', Texas', '', far); hostGeom = best(feats, host.c, isArea)?.geometry || null; }
     const box = hostGeom ? flat(bounds(hostGeom)) : host.bbox || (host.c && [host.c[0] - .03, host.c[1] - .03, host.c[0] + .03, host.c[1] + .03]); if (!box) return null;
-    const inHost = c => !hostGeom || !isArea(hostGeom) || d3.geoContains(ctx.fixWinding(hostGeom), c);
+    const inHost = c => !hostGeom || !isArea(hostGeom) || inArea(hostGeom, c);
     const hostName = host.label.split(',')[0];
     let hit = (await overpassNamed(part, box)).find(x => inHost(x.c));
     if (!hit) { // the geocoder, held to the bigger place's box

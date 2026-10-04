@@ -10,12 +10,12 @@ const RISK_SHORT = { high: 'High risk (100-year)', moderate: 'Moderate (500-year
 
 export function initFema(ctx) {
   const { map, esc, fmtN, fmtM } = ctx, box = document.getElementById('lyFema'), note = document.getElementById('lyFemaNote');
-  let on = false, last = null;
+  let on = false, last = null, cls = 'all'; // cls: 'all' flood zones, or 'high' (the 100-year floodplain only; Filters → Risk)
   try { on = localStorage.getItem('fs-fema') === '1'; } catch (e) {}
 
   function addLayer() {
     if (!on || !map.getStyle()) return;
-    if (!map.getSource(SRC)) map.addSource(SRC, { type: 'raster', tiles: [location.origin + location.pathname.replace(/[^/]*$/, '') + 'api/fema?tile={z}/{x}/{y}'], tileSize: 256, minzoom: 10, maxzoom: 17, attribution: 'Flood zones: FEMA NFHL' });
+    if (!map.getSource(SRC)) map.addSource(SRC, { type: 'raster', tiles: [location.origin + location.pathname.replace(/[^/]*$/, '') + 'api/fema?tile={z}/{x}/{y}' + (cls === 'high' ? '&cls=high' : '')], tileSize: 256, minzoom: 10, maxzoom: 17, attribution: 'Flood zones: FEMA NFHL' });
     if (!map.getLayer(SRC)) map.addLayer({ id: SRC, type: 'raster', source: SRC, minzoom: 10, paint: { 'raster-opacity': .62 } }, map.getLayer('filings') ? 'filings' : undefined);
   }
   const removeLayer = () => { if (map.getLayer(SRC)) map.removeLayer(SRC); if (map.getSource(SRC)) map.removeSource(SRC); };
@@ -27,6 +27,9 @@ export function initFema(ctx) {
   if (box) { box.checked = on; box.onchange = () => setOn(box.checked); if (note) note.hidden = !on; }
   ctx.onOverlays(addLayer);
   ctx.femaLayer = v => setOn(v !== false);
+  // which zones the layer shows; switching reloads its tiles (and turns the layer on)
+  ctx.femaClass = c => { c = c === 'high' ? 'high' : 'all'; if (c === cls && on) return; cls = c; removeLayer(); if (on) addLayer(); else setOn(true); };
+  ctx.femaClassNow = () => cls;
 
   // ---------- report ----------
   const reportFor = async (geometry, label) => {

@@ -33,7 +33,9 @@ import { initAirports } from './airports.js';
 import { initAirReport } from './airreport.js';
 import { initGlance } from './glance.js';
 import { initQuickLayers } from './quicklayers.js';
+import { initLayerFilters } from './layerfilters.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
+import { contains as inArea } from './lib/geomatch.mjs';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
 const getJSON=(u,optional)=>fetch(u,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error(u+' '+r.status); return r.json(); }).catch(e=>{ if(optional) return null; throw e; });
@@ -71,7 +73,8 @@ const periodOf=d=>{ if(!d) return 'all'; if(d.f==='all') return 'all'; if(d.f!==
 const DEFAULT_SPEC=()=>({d:periodSpec('12m')});
 let visible=F, visibleNoWho=F;
 const monthRange=m=>{ const [y,mo]=m.split('-').map(Number); return [m+'-01',new Date(Date.UTC(y,mo,0)).toISOString().slice(0,10)]; };
-const inSel=f=>!sel.feature||d3.geoContains(sel.feature,[f.lon,f.lat]);
+// county selections match on each filing's own county; other areas use the fast point-in-area test (lib/geomatch.mjs)
+const inSel=f=>!sel.feature||(sel.kind==='county'&&sel.counties.size?sel.counties.has(f.county):inArea(sel.feature,[f.lon,f.lat]));
 const countyGeo=DATA.counties.map(c=>({name:c.name,geom:{type:'MultiPolygon',coordinates:c.outline}}));
 
 // ---------- map ----------
@@ -110,7 +113,7 @@ const C=()=>isDark()?{new:'#4caf70',reno:'#939a9d',add:'#8acda3',line:'rgba(255,
 let labelFont=['Noto Sans Bold'];
 
 // one cell of the dot grid's pattern (9 px, drawn at 2x for sharp dots); the home county's dots are a touch bigger so they cover the grey ones
-function gridImg(color,r){ const n=18, cv=document.createElement('canvas'); cv.width=cv.height=n; const g=cv.getContext('2d'); g.fillStyle=color; g.beginPath(); g.arc(n/2,n/2,r,0,Math.PI*2); g.fill(); return g.getImageData(0,0,n,n); }
+function gridImg(color,r){ const n=18, cv=document.createElement('canvas'); cv.width=cv.height=n; const g=cv.getContext('2d',{willReadFrequently:true}); g.fillStyle=color; g.beginPath(); g.arc(n/2,n/2,r,0,Math.PI*2); g.fill(); return g.getImageData(0,0,n,n); }
 function addGridImages(c){ for(const [id,col,r] of [['grid-dot',c.dot,1.8],['grid-dot-home',c.waller,2.4]]){ const img=gridImg(col,r); if(map.hasImage(id)) map.updateImage(id,img); else map.addImage(id,img,{pixelRatio:2}); } }
 function setGrid(on){ layers.grid=on; saveLayers(); ['grid-dots','grid-home'].forEach(id=>map.getLayer(id)&&map.setLayoutProperty(id,'visibility',on?'visible':'none')); const el=document.getElementById('lyGrid'); if(el) el.checked=on; }
 function firstSymbolId(){ const l=map.getStyle().layers.find(x=>x.type==='symbol'); return l&&l.id; }
@@ -119,7 +122,7 @@ function addOverlays(){
   const c=C(), before=firstSymbolId();
   for(const [id,data] of Object.entries({world:GJ.world,homefill:GJ.homefill,counties:GJ.counties,clabels:GJ.clabels})) if(!map.getSource(id)) map.addSource(id,{type:'geojson',data});
   ['sel','draft','draftpts'].forEach(id=>{ if(!map.getSource(id)) map.addSource(id,{type:'geojson',data:fc([])}); });
-  if(!map.getSource('filings')) map.addSource('filings',{type:'geojson',data:filingsFC()});
+  if(!map.getSource('filings')){ map.addSource('filings',{type:'geojson',data:filingsFC()}); filingsDirty=false; }
   // dot grid: a fine halftone over all land at every zoom, on every basemap. It's a repeating pattern drawn just under the
   // basemap's own water (which covers it, so the sea stays clean and bridges and roads stay on top); the home county's dots
   // are green. On imagery the dots are white and fainter. Layers → Dot Grid turns it off.
@@ -159,6 +162,8 @@ function addOverlays(){
 function markerRadius(){ return layers.size==='value'
   ? ['interpolate',['exponential',1.6],['zoom'],5,['*',['get','r'],.55],8,['*',['get','r'],1],12,['*',['get','r'],1.7],16,['*',['get','r'],2.4]]
   : ['interpolate',['linear'],['zoom'],4,1.7,7,2.5,10,3.5,13,4.8,16,6.5]; }
+let filingsDirty=true;
+function syncFilingsData(){ if(!filingsDirty||!(layers.dots||layers.heat!=='off')) return; const src=map.getSource&&map.getSource('filings'); if(src){ src.setData(filingsFC()); filingsDirty=false; } }
 function styleFilings(){
   if(!map.getLayer||!map.getLayer('filings')) return;
   const heat=layers.heat!=='off', base=['case',['==',['get','h'],1],.2,['==',['get','t'],'New'],.88,.72];
@@ -169,6 +174,7 @@ function styleFilings(){
   map.setPaintProperty('filings','circle-stroke-opacity',heat?['interpolate',['linear'],['zoom'],10,0,12.5,1]:1);
   map.setLayoutProperty('heat','visibility',heat?'visible':'none');
   ['filings','filings-hl'].forEach(id=>map.setLayoutProperty(id,'visibility',layers.dots?'visible':'none'));
+  syncFilingsData();
   syncSelBar();
   const lf=document.getElementById('lyFilings'); if(lf) lf.checked=layers.dots;
   map.setPaintProperty('heat','heatmap-weight',layers.heat==='value'?['interpolate',['linear'],['get','lc'],4.7,.04,6,.2,7,.55,8,1,9.5,2]:1);
@@ -231,7 +237,7 @@ function applyRoadToggles(){
 // ---------- US county lines: every county in the US. National 1:10m lines (data/uscounties.json, fetched after the map is up)
 // under the home counties' own outlines; from zoom 10 the exact Census TIGER/Line lines for the cells in view (/api/counties)
 // replace them. If those can't be fetched the national lines simply stay. ----------
-let US=null; const PRECISE_Z=10, CELL=.5, MAX_CELLS=40, pCells=new Map(); let pOK=false, pT=0;
+let US=null; const PRECISE_Z=10, CELL=.5, MAX_CELLS=40, pCells=new Map(); let pOK=false;
 const HOME_COUNTY=new Set(COUNTIES.map(n=>n+' County'));
 getJSON('data/uscounties.json',true).then(d=>{ if(!d||!d.lines) return;
   US={uslines:fc([{type:'Feature',properties:{},geometry:{type:'MultiLineString',coordinates:d.lines}}]),usstates:fc([{type:'Feature',properties:{},geometry:{type:'MultiLineString',coordinates:d.states||[]}}]),
@@ -255,21 +261,23 @@ function syncCoarse(){ map.getLayer('us-county-line')&&map.setPaintProperty('us-
 function cellsInView(){ const b=map.getBounds(), out=[], f=v=>Math.floor(v/CELL)*CELL;
   for(let x=f(b.getWest());x<b.getEast();x+=CELL) for(let y=f(Math.max(b.getSouth(),-15));y<Math.min(b.getNorth(),72);y+=CELL) out.push([x,y]);
   return out.length>16?null:out; } // a tilted view to the horizon: too many cells, keep the national lines
-async function syncPrecise(){
-  const cells=US&&layers.counties&&map.getZoom()>=PRECISE_Z?cellsInView():null, ready=()=>!!cells&&cells.every(([x,y])=>{ const v=pCells.get(x+','+y); return v&&!v.err; });
-  pOK=ready(); syncCoarse(); if(!cells||pOK) return;
-  const my=++pT, now=Date.now();
-  const need=cells.filter(([x,y])=>{ const c=pCells.get(x+','+y); return !c||(c.err&&now-c.at>3e5); });
-  await Promise.all(need.map(async([x,y])=>{ const k=x+','+y;
-    try{ const r=await fetch('/api/counties?x='+x+'&y='+y); if(!r.ok) throw new Error(r.status); const d=await r.json(); pCells.set(k,{counties:d.counties||[],at:Date.now()}); }
-    catch(e){ pCells.set(k,{err:1,at:Date.now()}); } }));
-  if(my!==pT) return; // the map moved on
-  for(const [x,y] of cells){ const k=x+','+y, v=pCells.get(k); if(v){ pCells.delete(k); pCells.set(k,v); } } // most recently seen last
-  while(pCells.size>MAX_CELLS) pCells.delete(pCells.keys().next().value);
-  map.getSource('usprecise')?.setData(preciseFC());
-  pOK=ready(); syncCoarse();
+// the cells in view right now; a fetch that finishes after the map moved on still lands in the cache and redraws
+let pCur=null, pRaf=0;
+const pReady=()=>!!pCur&&pCur.every(([x,y])=>{ const v=pCells.get(x+','+y); return v&&!v.err&&!v.pending; });
+function redrawPrecise(){ pRaf=0;
+  for(const [x,y] of pCur||[]){ const k=x+','+y, v=pCells.get(k); if(v){ pCells.delete(k); pCells.set(k,v); } } // most recently seen last
+  for(const k of [...pCells.keys()]){ if(pCells.size<=MAX_CELLS) break; if(!pCells.get(k).pending) pCells.delete(k); }
+  map.getSource('usprecise')?.setData(preciseFC()); pOK=pReady(); syncCoarse(); }
+function syncPrecise(){
+  pCur=US&&layers.counties&&map.getZoom()>=PRECISE_Z?cellsInView():null;
+  pOK=pReady(); syncCoarse(); if(!pCur||pOK) return;
+  const now=Date.now(), need=pCur.filter(([x,y])=>{ const c=pCells.get(x+','+y); return !c||(c.err&&now-c.at>3e5); }); // cells already loading are left alone
+  for(const [x,y] of need){ const k=x+','+y; pCells.set(k,{pending:1,at:now});
+    fetch('/api/counties?x='+x+'&y='+y).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
+      .then(d=>pCells.set(k,{counties:d.counties||[],at:Date.now()}),()=>pCells.set(k,{err:1,at:Date.now()}))
+      .then(()=>{ if(!pRaf) pRaf=requestAnimationFrame(redrawPrecise); }); }
 }
-map.on('moveend',()=>syncPrecise());
+let preciseT=0; map.on('moveend',()=>{ clearTimeout(preciseT); preciseT=setTimeout(syncPrecise,300); }); // once the map settles, not every frame of a follow or orbit
 let styleReady=false;
 map.on('style.load',()=>{ styleReady=true; addOverlays(); });
 function setBasemap(s){
@@ -317,7 +325,8 @@ function applyFilters(){
   syncSelBar();
   document.getElementById('selClear').style.display=sel.feature?'':'none';
   state.shown=150; renderList();
-  const src=map.getSource&&map.getSource('filings'); if(src) src.setData(filingsFC());
+  // the dot layer is only rebuilt while it's showing (10k points); turning it on catches up
+  filingsDirty=true; syncFilingsData();
   syncFilterUI(); scheduleHash(); listeners.forEach(fn=>{ try{ fn(); }catch(e){ console.error(e); } });
 }
 const cRow=document.getElementById('countyRow'), tRow=document.getElementById('typeRow'), pRow=document.getElementById('periodRow');
@@ -385,21 +394,23 @@ function syncFilterUI(){
   uMin.value=String(state.umin||0); if(document.activeElement!==coQ) coQ.value=state.co||''; exactBtn.setAttribute('aria-pressed',!!state.exact);
   const dd=state.d&&state.d.f!=='all'?state.d:null; dField.value=dd?dd.f:''; dFrom.value=dd?.from||''; dTo.value=dd?.to||''; dFrom.disabled=dTo.disabled=!dd;
   const nMore=(state.uses?1:0)+(state.d&&!pk?1:0)+(state.chg?1:0)+(state.st?1:0)+(state.sqmin||state.sqmax?1:0)+(state.umin?1:0)+(state.co.trim()?1:0)+(state.exact?1:0); document.getElementById('moreN').textContent=nMore?'· '+nMore+' on':''; if(nMore) document.getElementById('moreF').open=true;
-  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const fN=document.getElementById('filterN'); fN.textContent=nAll||''; fN.hidden=!nAll; syncClear(); { const fd=document.getElementById('filterDone'); if(fd) fd.textContent='Show '+fmtN(visible.length)+' filing'+(visible.length===1?'':'s'); }
-  document.getElementById('filterBtn').classList.toggle('on',!!nAll);
-  const t=filterText(); document.getElementById('activeTxt').textContent=t?'Filters: '+t:''; document.getElementById('activeBar').classList.toggle('on',!!t);
+  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const nBadge=nAll+ctx_lfCount(); const fN=document.getElementById('filterN'); fN.textContent=nBadge||''; fN.hidden=!nBadge; syncClear(); try{ ctx.syncFilterFooter?.(); }catch(e){}
+  document.getElementById('filterBtn').classList.toggle('on',!!nBadge);
+  let lt=''; try{ lt=ctx.layerFilterText?.()||''; }catch(e){}
+  const ft=filterText(), t=[lt,ft?'Filings: '+ft:''].filter(Boolean).join(' · '); document.getElementById('activeTxt').textContent=t||'No filters on'; document.getElementById('activeBar').classList.toggle('on',true);
 }
 // the Clear button beside Filters (and on phones beside the filter button): shown whenever anything narrows the view (filters,
 // a period other than the default, a time-lapse month, a selected area or a searched place's outline), one click clears it all
-const hasPlace=()=>{ try{ return !!ctx.hasPlace?.(); }catch(e){ return false; } }; // ctx is created further down; boot runs this before
+const hasPlace=()=>{ try{ return !!ctx.hasPlace?.(); }catch(e){ return false; } };
+const ctx_lfCount=()=>{ try{ return ctx.layerFilterCount?.()||0; }catch(e){ return 0; } }; // layer filters (src/layerfilters.js) // ctx is created further down; boot runs this before
 function syncClear(){
   const pk=periodOf(state.d), parts=[], nF=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0);
-  if(nF) parts.push(nF===1?'1 filter':nF+' filters'); if(state.month) parts.push('the month'); if(sel.feature) parts.push('the selected area'); if(hasPlace()) parts.push('the search outline');
-  const n=nF+(state.month?1:0)+(sel.feature?1:0)+(hasPlace()?1:0), t=parts.length?'Clear '+parts.join(', ').replace(/, ([^,]*)$/,' and $1'):'';
+  const nL=ctx_lfCount(); if(nF) parts.push(nF===1?'1 filing filter':nF+' filing filters'); if(nL) parts.push(nL===1?'1 layer filter':nL+' layer filters'); if(state.month) parts.push('the month'); if(sel.feature) parts.push('the selected area'); if(hasPlace()) parts.push('the search outline');
+  const n=nF+nL+(state.month?1:0)+(sel.feature?1:0)+(hasPlace()?1:0), t=parts.length?'Clear '+parts.join(', ').replace(/, ([^,]*)$/,' and $1'):'';
   for(const id of ['filterClear','mClear']){ const b=document.getElementById(id); if(!b) continue; b.hidden=!n; b.title=t; b.setAttribute('aria-label',t||'Clear'); const sp=b.querySelector('span'); if(sp) sp.textContent=n>1?'Clear ('+n+')':'Clear'; }
 }
-let openFilters=()=>{}; // set below once the popup is wired; exposed as ctx.openFilters
-const clearFilters=()=>{ ctx.clearPlace?.(); fromSpec(DEFAULT_SPEC()); if(state.month) setMonth(null); };
+let openFilters=()=>{}, closeFilters=()=>{}; // set below once the popup is wired; exposed as ctx.openFilters / closeFilters
+const clearFilters=()=>{ ctx.clearPlace?.(); ctx.clearLayerFilters?.(); fromSpec(DEFAULT_SPEC()); if(state.month) setMonth(null); };
 document.getElementById('resetAll').onclick=clearFilters;
 // Filters: a popup from the map toolbar (between County and Export), with a Clear button beside it while any are on.
 // Filters only act on construction filings, so changing one puts the filing dots on the map.
@@ -410,10 +421,11 @@ document.getElementById('resetAll').onclick=clearFilters;
   document.getElementById('filterDone').onclick=()=>setOpen(false); // phones: the sheet's "Show N filings" button
   const clearAll=()=>{ clearFilters(); ctx.toast?.('Cleared: showing everything'); };
   document.getElementById('filterClear').onclick=clearAll; const mc=document.getElementById('mClear'); if(mc) mc.onclick=clearAll;
-  pop.addEventListener('change',()=>showFilings()); pop.addEventListener('click',e=>{ if(e.target.closest('.chip,button[data-k],button[data-v]')) showFilings(); });
+  // only the construction filters put the filing dots on the map (the layer filters have their own layers)
+  pop.addEventListener('change',e=>{ if(e.target.closest('#filtersBody')) showFilings(); }); pop.addEventListener('click',e=>{ if(e.target.closest('#filtersBody')&&e.target.closest('.chip,button[data-k],button[data-v]')) showFilings(); });
   document.addEventListener('pointerdown',e=>{ if(!pop.hidden&&!wrap.contains(e.target)&&!e.target.closest('.kpi-pop')) setOpen(false); });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!pop.hidden){ setOpen(false); btn.focus(); } });
-  openFilters=()=>{ if(ctx.view!=='map') setView('map'); setOpen(true); }; }
+  openFilters=()=>{ if(ctx.view!=='map') setView('map'); setOpen(true); }; closeFilters=()=>setOpen(false); }
 // apply a whole filter spec (URL, saved search, AI answer)
 function fromSpec(spec,{fly=true}={}){
   state.counties=new Set(spec.c&&spec.c.length?spec.c.filter(c=>COUNTIES.includes(c)):COUNTIES); if(!state.counties.size) state.counties=new Set(COUNTIES);
@@ -610,7 +622,7 @@ map.on('click',e=>{
     if(draft.length>=3){ const f=map.project(draft[0]); if(Math.hypot(f.x-e.point.x,f.y-e.point.y)<14){ finishPoly(); return; } }
     draft.push(ll); drawDraft();
   } else if(mode==='county'){
-    const c=countyGeo.find(x=>d3.geoContains(x.geom,ll)); if(!c){ toast('Click inside one of the seven counties.'); return; }
+    const c=countyGeo.find(x=>inArea(x.geom,ll)); if(!c){ toast('Click inside one of the seven counties.'); return; }
     const set=new Set(sel.kind==='county'?sel.counties:[]); set.has(c.name)?set.delete(c.name):set.add(c.name);
     if(!set.size){ clearSelection(); return; }
     setCountySel(set);
@@ -925,7 +937,7 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return [...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,30).map(x=>x[0]).join(', '); } // the busiest cities and developers on screen (the voice transcriber's hint list takes the first few)
-ctx.setMode=setMode; ctx.openFilters=()=>openFilters(); ctx.syncClear=syncClear;
+ctx.setMode=setMode; ctx.openFilters=()=>openFilters(); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
   if(!html){ el?.remove(); return; } if(!el){ el=document.createElement('div'); el.className='xlegend'; el.dataset.lg=id; box.appendChild(el); } if(el.innerHTML!==html) el.innerHTML=html; };
@@ -936,7 +948,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap, buildReport,
   exportCsv, exportXlsx, exportGeoJSON, exportHtml, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,

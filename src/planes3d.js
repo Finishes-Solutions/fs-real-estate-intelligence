@@ -53,7 +53,6 @@ const clamp = (v, a) => Math.max(-a, Math.min(a, v));
 export function planes3D({ bands, id = 'live-planes-3d' } = {}) {
   let map = null, gl = null, vao = null, progs = {}, meshBuf = {}, lineBuf = null, instBuf = null, on = false, planes = [], last = null;
   const att = new Map(); // hex -> { track, t, bank } for the bank angle
-  const colorOf = alt => { let c = bands[0][1]; for (let i = 1; i < bands.length; i++) if (alt >= bands[i - 1][0]) c = bands[i][1]; return hex2rgb(c); };
   function program(s) {
     if (progs[s.variantName]) return progs[s.variantName];
     const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
@@ -95,21 +94,32 @@ export function planes3D({ bands, id = 'live-planes-3d' } = {}) {
     }
     for (const k of [...att.keys()]) if (!keep.has(k)) att.delete(k);
   }
-  // per-plane instance data for this frame (size depends on the zoom), grouped by shape; also kept for pick()
+  // per-plane instance data, grouped by shape, written into one reused buffer; rebuilt only when the planes moved or the
+  // zoom changed (MapLibre repaints far more often than either). Also kept for pick().
+  let built = null, buf = new Float32Array(0), version = 0, builtVersion = -1, builtZoom = -1;
+  const colors = bands.map(([, c]) => hex2rgb(c)), bandOf = alt => { let k = 0; for (let i = 1; i < bands.length; i++) if (alt >= bands[i - 1][0]) k = i; return k; };
   function instances() {
-    const z = map.getZoom(), groups = new Map();
-    for (const p of planes) {
-      const shape = MESH_SHAPES.includes(p.shape) ? p.shape : 'jet', lat = Math.max(-85, Math.min(85, p.lat)), mpu = C * Math.cos(lat * R);
-      const mc = maplibregl.MercatorCoordinate.fromLngLat([p.lon, lat], 0), altM = p.ground ? 0 : Math.max(0, p.alt || 0) * FT;
-      const size = modelSize(shape, p.sz, mpu / (512 * 2 ** z)), lift = shape === 'balloon' ? 0 : Math.max(0, .12 - altM / size); // wheels on the ground, never below it
-      if (!groups.has(shape)) groups.set(shape, []);
-      groups.get(shape).push({ hex: p.hex, row: [mc.x, mc.y, altM, mpu, p.track * R, p.pitch || 0, p.bank || 0, size, ...colorOf(p.ground ? 0 : p.alt || 0), lift] });
+    const z = map.getZoom(); if (built && builtVersion === version && Math.abs(z - builtZoom) < .01) return built;
+    const n = planes.length; if (buf.length < n * IN) buf = new Float32Array(Math.ceil(n * 1.3) * IN);
+    const byShape = new Map(); for (const p of planes) { const sh = MESH_SHAPES.includes(p.shape) ? p.shape : 'jet'; (byShape.get(sh) || byShape.set(sh, []).get(sh)).push(p); }
+    const order = [], hexes = new Array(n), k2 = 512 * 2 ** z; let o = 0, idx = 0;
+    for (const [shape, list] of byShape) {
+      order.push([shape, idx, list.length]);
+      for (const p of list) {
+        const lat = Math.max(-85, Math.min(85, p.lat)), s = Math.sin(lat * R), mpu = C * Math.cos(lat * R);
+        const altM = p.ground ? 0 : Math.max(0, p.alt || 0) * FT, size = modelSize(shape, p.sz, mpu / k2), col = colors[bandOf(p.ground ? 0 : p.alt || 0)];
+        buf[o] = (p.lon + 180) / 360; buf[o + 1] = .5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI); // Web Mercator, as MercatorCoordinate
+        buf[o + 2] = altM; buf[o + 3] = mpu; buf[o + 4] = p.track * R; buf[o + 5] = p.pitch || 0; buf[o + 6] = p.bank || 0; buf[o + 7] = size;
+        buf[o + 8] = col[0]; buf[o + 9] = col[1]; buf[o + 10] = col[2]; buf[o + 11] = shape === 'balloon' ? 0 : Math.max(0, .12 - altM / size); // wheels on the ground, never below it
+        hexes[idx++] = p.hex; o += IN;
+      }
     }
-    return groups;
+    builtVersion = version; builtZoom = z; built = { order, hexes, n, data: buf.subarray(0, n * IN), fresh: true };
+    return built;
   }
   const layer = {
     id, type: 'custom', renderingMode: '3d',
-    onAdd(m, g) { map = m; gl = g; vao = gl.createVertexArray(); instBuf = gl.createBuffer(); lineBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 0]), gl.STATIC_DRAW); progs = {}; meshBuf = {}; },
+    onAdd(m, g) { map = m; gl = g; built = null; vao = gl.createVertexArray(); instBuf = gl.createBuffer(); lineBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 0]), gl.STATIC_DRAW); progs = {}; meshBuf = {}; },
     onRemove() { for (const b of [instBuf, lineBuf, ...Object.values(meshBuf).map(x => x.b)]) b && gl.deleteBuffer(b); vao && gl.deleteVertexArray(vao); for (const k in progs) gl.deleteProgram(progs[k].p); progs = {}; meshBuf = {}; map = gl = null; last = null; },
     render(g, args) {
       if (!on || !planes.length) { last = null; return; }
@@ -121,10 +131,8 @@ export function planes3D({ bands, id = 'live-planes-3d' } = {}) {
       if (P.u.u_projection_clipping_plane) gl.uniform4f(P.u.u_projection_clipping_plane, ...d.clippingPlane);
       if (P.u.u_projection_transition) gl.uniform1f(P.u.u_projection_transition, d.projectionTransition);
       const L = [.35, -.45, .82], l = Math.hypot(...L); gl.uniform3f(P.u.u_light, L[0] / l, L[1] / l, L[2] / l);
-      const groups = instances(), rows = [], order = [];
-      for (const [shape, list] of groups) { order.push([shape, rows.length / IN, list.length]); for (const x of list) rows.push(...x.row); }
-      const data = new Float32Array(rows);
-      gl.bindBuffer(gl.ARRAY_BUFFER, instBuf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+      const B = instances(), { order, data } = B;
+      gl.bindBuffer(gl.ARRAY_BUFFER, instBuf); if (B.fresh) { gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW); B.fresh = false; }
       gl.disable(gl.CULL_FACE); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       // lines to the ground first (no depth, see-through), when there aren't so many they turn into a fence
       if (planes.length <= 250) {
@@ -135,7 +143,7 @@ export function planes3D({ bands, id = 'live-planes-3d' } = {}) {
       for (const [shape, first, n] of order) { const mb = meshVbo(shape); vertexAttribs(P, mb.b, 6); instanceAttribs(P, first); gl.drawArraysInstanced(gl.TRIANGLES, 0, mb.n, n); }
       for (const k of Object.values(P.a)) if (k >= 0) gl.vertexAttribDivisor(k, 0);
       gl.bindVertexArray(null);
-      last = { data, hexes: [...groups.values()].flatMap(list => list.map(x => x.hex)), d: { ...d, globe: /globe/i.test(args.shaderData.variantName) } };
+      last = { data, hexes: B.hexes, d: { ...d, globe: /globe/i.test(args.shaderData.variantName) } };
     }
   };
   // screen point [x, y] (CSS px) of a 3D position, with the projection the last frame used
@@ -153,7 +161,7 @@ export function planes3D({ bands, id = 'live-planes-3d' } = {}) {
   return {
     layer,
     // [{ hex, shape, sz, lon, lat, alt (ft), track, gs, vs, ground }] where each plane is drawn now
-    setPlanes(list) { planes = list || []; attitude(planes); if (on) map?.triggerRepaint(); },
+    setPlanes(list) { planes = list || []; attitude(planes); version++; if (on) map?.triggerRepaint(); },
     show(v) { if (on !== !!v) { on = !!v; if (!on) last = null; map?.triggerRepaint(); } },
     get shown() { return on; },
     // the plane whose model is under (or within a few pixels of) a screen point, nearest first

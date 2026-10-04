@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     const m = String(q.tile).match(/^(\d{1,2})\/(\d+)\/(\d+)$/); if (!m || +m[1] < 10 || +m[1] > 18) return res.status(400).json({ error: 'tile z/x/y with z 10-18' });
     const b = tileBBox(+m[1], +m[2], +m[3]);
     try {
-      const r = await fetch(NFHL + '/export?' + new URLSearchParams({ bbox: b.join(','), bboxSR: '3857', imageSR: '3857', size: '256,256', format: 'png32', transparent: 'true', layers: 'show:28', dpi: '96', f: 'image' }), { headers: UA, signal: AbortSignal.timeout(15000) });
+      const r = await fetch(NFHL + '/export?' + new URLSearchParams({ bbox: b.join(','), bboxSR: '3857', imageSR: '3857', size: '256,256', format: 'png32', transparent: 'true', layers: 'show:28', ...(q.cls === 'high' ? { layerDefs: JSON.stringify({ 28: "SFHA_TF = 'T'" }) } : {}), dpi: '96', f: 'image' }), { headers: UA, signal: AbortSignal.timeout(15000) });
       if (!r.ok || !/image/.test(r.headers.get('content-type') || '')) throw new Error('FEMA ' + r.status);
       res.setHeader('Content-Type', 'image/png'); res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=2592000, stale-while-revalidate=2592000');
       return res.send(Buffer.from(await r.arrayBuffer()));
