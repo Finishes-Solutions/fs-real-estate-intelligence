@@ -1603,3 +1603,19 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .panel .selbar .btnrow .btn{flex:1 1 auto}
 .layers{z-index:6}
 @media (min-width:701px) and (max-width:1500px){ .maptop:has(#filterClear:not([hidden])) .exbtn span{display:none} .maptop:has(#filterClear:not([hidden])) .exbtn{padding:0 11px} }
+
+/* ================= phone: edge-to-edge map, no sideways scrolling in menus ================= */
+/* hidden controls stay hidden even where a class sets display (the crime type picker showed with Crime off) */
+.layers [hidden]{display:none!important}
+.layers select.chip{max-width:100%}
+@media (max-width:700px){
+  /* the page itself is no longer padded by the safe areas: every phone element already adds the status bar (--st) and
+     home indicator (--sb) itself, so the padding counted them twice and left grey bands above the map and above the nav */
+  :root{padding-top:0;padding-bottom:0}
+  /* the map now runs under the status bar: a soft fade keeps the clock and battery readable over it */
+  .viewport::before{content:"";position:absolute;left:0;right:0;top:0;height:calc(var(--st) + 14px);z-index:4;pointer-events:none;background:linear-gradient(var(--panel) 0,color-mix(in srgb,var(--panel) 70%,transparent) 60%,transparent)}
+  .stage:not([data-view="map"]) .viewport::before{display:none}
+  /* menus scroll up and down only */
+  .layers,.fpop,.msheet,.panel,.view{overflow-x:hidden;overscroll-behavior-x:none}
+  .layers,.fpop,.msheet{touch-action:pan-y}
+}
