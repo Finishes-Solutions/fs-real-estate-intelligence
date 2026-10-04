@@ -6,12 +6,15 @@ import { floorsFromHeight } from './lib/height.mjs';
 export function initBuildings(ctx) {
   const { map, esc, fmtM, fmtN, F } = ctx, card = document.getElementById('card');
   const toggle = document.getElementById('lyBldg');
-  let on = true, cur = null, orbitRaf = 0, market = null, marketP = null, multi = [], addMode = false;
+  let on = true, cur = null, orbitRaf = 0, market = null, marketP = null;
+  // the buildings and parcels selected together are the card's building tabs (src/cardtabs.js); cur is the one shown
+  const selected = () => { const l = (ctx.tabs?.list('building') || []).map(t => t.ref).filter(Boolean); return l.length ? l : cur ? [cur] : []; };
+  const bid = b => 'b:' + b.center[0].toFixed(5) + ',' + b.center[1].toFixed(5);
   try { on = localStorage.getItem('fs-3d') !== '0'; } catch (e) {}
   toggle.checked = on;
 
   const vectorSource = () => { const s = map.getStyle()?.sources || {}; return Object.keys(s).find(id => s[id].type === 'vector' && /maptiler|openmaptiles|planet/i.test(id + (s[id].url || ''))); };
-  const colors = () => ctx.isDark() ? { fill: '#3a4245', sel: '#4caf70' } : { fill: '#d5dadb', sel: '#1f9249' };
+  const colors = () => ctx.isDark() ? { fill: '#3a4245', sel: '#4caf70', sel2: '#2d6b45' } : { fill: '#d5dadb', sel: '#1f9249', sel2: '#9fd4b2' };
   const H = ['coalesce', ['get', 'render_height'], ['get', 'height'], 6], B = ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0];
 
   function addLayers() {
@@ -20,11 +23,17 @@ export function initBuildings(ctx) {
     map.addLayer({ id: 'fs-bldg', type: 'fill-extrusion', source: src, 'source-layer': 'building', minzoom: 13, layout: { visibility: on ? 'visible' : 'none' },
       paint: { 'fill-extrusion-color': c.fill, 'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 13, 0, 14.5, H], 'fill-extrusion-base': B, 'fill-extrusion-opacity': .85 } }, before);
     if (!map.getSource('fs-bsel')) map.addSource('fs-bsel', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    // selected building: drawn a hair wider and taller than the base building so the two never z-fight
-    map.addLayer({ id: 'fs-bsel', type: 'fill-extrusion', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'b'], paint: { 'fill-extrusion-color': c.sel, 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': true } }, before);
+    // selected buildings: drawn a hair wider and taller than the base building so the two never z-fight. The one shown is
+    // bright green and rises out of the ground when picked; the others in the selection are a lighter green, numbered
+    // like their tabs. A soft glow pulses around the shown building's base.
+    map.addLayer({ id: 'fs-bglow', type: 'line', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'g'], paint: { 'line-color': c.sel, 'line-width': 8, 'line-blur': 6, 'line-opacity': .35 } }, before);
+    map.addLayer({ id: 'fs-bsel', type: 'fill-extrusion', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'b'], paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'a'], 1], c.sel, c.sel2], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-opacity': 1 } }, before);
     if (!map.getSource('fs-bhov')) map.addSource('fs-bhov', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({ id: 'fs-bhov', type: 'line', source: 'fs-bhov', minzoom: 13, paint: { 'line-color': c.sel, 'line-width': 2, 'line-opacity': .9 } }, before);
     map.addLayer({ id: 'fs-psel', type: 'line', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'p'], paint: { 'line-color': c.sel, 'line-width': 2.4, 'line-dasharray': [2, 1.5] } }, before);
+    map.addLayer({ id: 'fs-bnumc', type: 'circle', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'n'], paint: { 'circle-radius': 11, 'circle-color': ['case', ['==', ['get', 'a'], 1], c.sel, '#ffffff'], 'circle-stroke-color': c.sel, 'circle-stroke-width': 2, 'circle-pitch-alignment': 'viewport' } });
+    map.addLayer({ id: 'fs-bnum', type: 'symbol', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'n'], layout: { 'text-field': ['to-string', ['get', 'n']], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-allow-overlap': true, 'text-ignore-placement': true },
+      paint: { 'text-color': ['case', ['==', ['get', 'a'], 1], '#ffffff', c.sel] } });
     if (cur) highlight();
   }
   ctx.onOverlays(addLayers);
@@ -35,15 +44,32 @@ export function initBuildings(ctx) {
   };
   if (!vectorSource() && map.isStyleLoaded()) toggle.closest('label').title = 'This basemap has no building data';
 
+  let lastActive = null;
   function highlight() {
     const s = map.getSource('fs-bsel'); if (!s) return;
-    const feats = [];
-    for (const b of multi.length ? multi : cur ? [cur] : []) {
-      if (b.footprint) feats.push({ type: 'Feature', properties: { k: 'b', h: (b.height || 6) + 0.6, b: b.base || 0 }, geometry: grow(b.footprint, 1.004) });
-      if (b.parcel?.geometry) feats.push({ type: 'Feature', properties: { k: 'p' }, geometry: b.parcel.geometry });
-    }
+    const feats = [], list = selected(), many = list.length > 1, all = ctx.tabs?.active()?.id === 'b:all';
+    list.forEach((b, i) => {
+      const a = b === cur || all ? 1 : 0;
+      if (b.footprint) { feats.push({ type: 'Feature', properties: { k: 'b', a, h: (b.height || 6) + 0.6, b: b.base || 0 }, geometry: grow(b.footprint, 1.004) });
+        if (b === cur) feats.push({ type: 'Feature', properties: { k: 'g' }, geometry: b.footprint }); }
+      if (a) for (const p of b.d?.parcels?.length ? b.d.parcels : b.parcel ? [b.parcel] : []) if (p.geometry) feats.push({ type: 'Feature', properties: { k: 'p' }, geometry: p.geometry });
+      if (many) feats.push({ type: 'Feature', properties: { k: 'n', n: i + 1, a }, geometry: { type: 'Point', coordinates: b.footprint ? centroid(b.footprint) : b.center } });
+    });
     s.setData({ type: 'FeatureCollection', features: feats });
+    if (cur && cur !== lastActive) { lastActive = cur; reveal(); } else if (!cur) lastActive = null;
   }
+  // the shown building rises out of the ground and its glow pulses twice (skipped with reduced motion)
+  let revealRaf = 0;
+  function reveal() {
+    cancelAnimationFrame(revealRaf); if (!map.getLayer('fs-bsel')) return;
+    const H0 = ['get', 'h'], set = (k, g) => { try { map.setPaintProperty('fs-bsel', 'fill-extrusion-height', k >= 1 ? H0 : ['case', ['==', ['get', 'a'], 1], ['*', H0, k], H0]); map.setPaintProperty('fs-bglow', 'line-width', 8 + g * 14); map.setPaintProperty('fs-bglow', 'line-opacity', .35 + g * .45); } catch (e) {} };
+    if (ctx.reduceMotion) { set(1, 0); return; }
+    const t0 = performance.now(), RISE = 650, GLOW = 1800;
+    const step = t => { const r = Math.min(1, (t - t0) / RISE), e = 1 - Math.pow(1 - r, 3), gp = Math.min(1, (t - t0) / GLOW), g = gp < 1 ? Math.max(0, Math.sin(gp * Math.PI * 2 - Math.PI / 2) * .5 + .5) * (1 - gp) : 0;
+      set(e, g); if (gp < 1) revealRaf = requestAnimationFrame(step); };
+    revealRaf = requestAnimationFrame(step);
+  }
+  function centroid(g) { const ring = (g.type === 'Polygon' ? g.coordinates : g.coordinates.reduce((a, p) => p[0].length > a[0].length ? p : a))[0]; let x = 0, y = 0; for (const p of ring) { x += p[0]; y += p[1]; } return [x / ring.length, y / ring.length]; }
   function stopOrbit() { cancelAnimationFrame(orbitRaf); orbitRaf = 0; card.querySelector('#bOrbit')?.classList.remove('on'); }
   ['mousedown', 'touchstart', 'wheel', 'dragstart'].forEach(ev => map.on(ev, () => orbitRaf && stopOrbit()));
   ctx.onOrbitStop?.(stopOrbit);
@@ -55,13 +81,41 @@ export function initBuildings(ctx) {
     const step = () => { if (map.isEasing()) { stopOrbit(); return; } map.setBearing((map.getBearing() + 0.12) % 360); orbitRaf = requestAnimationFrame(step); };
     map.once('moveend', () => { if (card.querySelector('#bOrbit.on') && !map.isEasing()) orbitRaf = requestAnimationFrame(step); });
   }
-  ctx.onCardClose(() => { stopOrbit(); cur = null; multi = []; addMode = false; highlight(); });
+  ctx.onCardClose(() => { stopOrbit(); cur = null; highlight(); });
+  ctx.tabs?.onChange(() => { const a = ctx.tabs.active(); if (a && a.kind !== 'building') { if (cur) { cur = null; } } highlight(); syncAll(); });
 
   // Vector tiles merge neighbouring buildings into one MultiPolygon at lower zooms: keep only the part under the click.
   function partAt(g, pt) {
     if (!g || g.type !== 'MultiPolygon') return g;
     const hit = g.coordinates.find(rings => inGeom(pt, { type: 'Polygon', coordinates: rings }));
     return hit ? { type: 'Polygon', coordinates: hit } : null;
+  }
+  // The map's tiles cut buildings at tile edges, so the piece under the click can be half a big building. Gather the
+  // building's pieces from every loaded tile (same feature id), trim each to its own tile so they meet edge to edge,
+  // and use them together. (The OpenStreetMap outline from /api/building replaces this once it arrives.)
+  const tileBox = (z, x, y) => { const n = 2 ** z, lon = v => v / n * 360 - 180, lat = v => Math.atan(Math.sinh(Math.PI * (1 - 2 * v / n))) * 180 / Math.PI; return [lon(x), lat(y + 1), lon(x + 1), lat(y)]; };
+  function clipRing(ring, [x0, y0, x1, y1]) {
+    let out = ring.slice(0, -1);
+    for (const [inside, cut] of [[p => p[0] >= x0, (a, b) => [x0, a[1] + (b[1] - a[1]) * (x0 - a[0]) / (b[0] - a[0])]], [p => p[0] <= x1, (a, b) => [x1, a[1] + (b[1] - a[1]) * (x1 - a[0]) / (b[0] - a[0])]],
+      [p => p[1] >= y0, (a, b) => [a[0] + (b[0] - a[0]) * (y0 - a[1]) / (b[1] - a[1]), y0]], [p => p[1] <= y1, (a, b) => [a[0] + (b[0] - a[0]) * (y1 - a[1]) / (b[1] - a[1]), y1]]]) {
+      const inp = out; out = []; if (!inp.length) break;
+      for (let i = 0; i < inp.length; i++) { const a = inp[(i + inp.length - 1) % inp.length], b = inp[i];
+        if (inside(b)) { if (!inside(a)) out.push(cut(a, b)); out.push(b); } else if (inside(a)) out.push(cut(a, b)); }
+    }
+    return out.length >= 3 ? out.concat([out[0]]) : null;
+  }
+  function wholeFootprint(hit, pt) {
+    const piece = partAt(hit.geometry, pt); if (hit.id == null || !hit.source) return piece;
+    let pieces = []; try { pieces = map.querySourceFeatures(hit.source, { sourceLayer: hit.sourceLayer, filter: ['==', ['id'], hit.id] }); } catch (e) { return piece; }
+    const z = Math.max(...pieces.map(p => p._z ?? -1)); if (!(z >= 0)) return piece;
+    const polys = [], seen = new Set();
+    for (const p of pieces) {
+      if (p._z !== z || seen.has(p._x + '/' + p._y)) continue; seen.add(p._x + '/' + p._y);
+      const box = tileBox(p._z, p._x, p._y), g = p.geometry, ps = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+      for (const rings of ps) { const cr = rings.map(r => clipRing(r, box)).filter(Boolean); if (cr.length) polys.push(cr); }
+    }
+    if (polys.length < 2) return piece; // not cut: the clicked piece is the building
+    return { type: 'MultiPolygon', coordinates: polys };
   }
   // scale a footprint about its centroid (a few cm) so the highlight sits just outside the base building's walls
   function grow(g, k) {
@@ -81,7 +135,7 @@ export function initBuildings(ctx) {
   // returns true when the click hit a building (so the map doesn't treat it as a click on empty ground)
   // Shift-click (or "Select multiple" on the card) adds buildings — or a bare parcel where there is no building — to a selection.
   ctx.mapClickHandlers.push(e => {
-    const adding = addMode || e.originalEvent?.shiftKey, c = [e.lngLat.lng, e.lngLat.lat];
+    const adding = !!ctx.tabs?.adding(e) && (ctx.tabs?.count() || 0) > 0, c = [e.lngLat.lng, e.lngLat.lat];
     const hit = on && map.getLayer('fs-bldg') ? map.queryRenderedFeatures(e.point, { layers: ['fs-bldg'] })[0] : null;
     if (!hit) {
       if (adding && map.getZoom() >= 15) { add({ footprint: null, height: null, base: 0, center: c }); return true; }
@@ -89,7 +143,7 @@ export function initBuildings(ctx) {
       if (!adding && map.getZoom() >= 16 && !card.classList.contains('open')) { open({ footprint: null, height: null, base: 0, center: c }); return true; }
       return false;
     }
-    const b = { footprint: partAt(hit.geometry, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
+    const b = { footprint: wholeFootprint(hit, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
     if (adding) add(b); else open(b);
     return true;
   });
@@ -98,7 +152,7 @@ export function initBuildings(ctx) {
     if (!map.getLayer('fs-bldg')) return null;
     const p = map.project(c), hit = map.queryRenderedFeatures([[p.x - 3, p.y - 3], [p.x + 3, p.y + 3]], { layers: ['fs-bldg'] }).find(h => inGeom(c, partAt(h.geometry, c))) ;
     if (!hit) return null;
-    const b = { footprint: partAt(hit.geometry, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
+    const b = { footprint: wholeFootprint(hit, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
     open(b); return b;
   };
   // desktop: a building cursor and outline show which building a click will open
@@ -157,8 +211,9 @@ export function initBuildings(ctx) {
   // parcel, businesses, photo, lidar height and OpenStreetMap tags for one building (cached on the object). Two requests
   // in parallel: the parcel alone (about a second) and everything else (OpenStreetMap and lidar can take several), so the
   // appraisal record shows as soon as it arrives (onParcel) instead of waiting for the slowest source.
-  async function details(b, onParcel) {
-    if (b.d) return b.d;
+  // One lookup per building however many callers ask (the card and the "All" tab can ask together).
+  function details(b, onParcel) { return b.d ? Promise.resolve(b.d) : (b.p ||= load(b, onParcel).finally(() => { b.p = null; })); }
+  async function load(b, onParcel) {
     const q = new URLSearchParams({ lat: b.center[1].toFixed(6), lon: b.center[0].toFixed(6) });
     const get = part => fetch('api/building?' + q + '&part=' + part).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Error ' + r.status); return d; });
     const pj = get('parcel').then(d => { b.parcel = d.parcel; try { onParcel?.(d); } catch (e) { console.warn(e); } return d; });
@@ -168,11 +223,14 @@ export function initBuildings(ctx) {
     if (p.status === 'rejected' && rest.status === 'rejected') throw p.reason;
     const d = { ...(rest.value || { places: [], placesError: rest.reason.message, osm: null, height: { source: 'none', note: 'Lookup failed: ' + rest.reason.message }, photo: null }),
       ...(p.value || { parcel: null, parcelError: p.reason.message }) };
-    b.d = d; b.parcel = d.parcel; return d;
+    b.d = d; b.parcel = d.parcel;
+    // OpenStreetMap's outline is the whole building (the map's can be cut at a tile edge): use it when it contains the click
+    const o = d.osm?.outline; if (o && (!b.footprint || inGeom(b.center, o)) && sqft(o) >= sqft(b.footprint) * .9) b.footprint = o;
+    return d;
   }
 
   async function open(b) {
-    ctx.clearSelection?.(); stopOrbit(); cur = b; multi = []; addMode = false; highlight();
+    ctx.clearSelection?.(); stopOrbit(); cur = b; highlight();
     const gsv = 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + b.center[1].toFixed(6) + ',' + b.center[0].toFixed(6);
     const ss = t => '<div class="ssrc src">' + t + '</div>';
     card.innerHTML = '<div class="top"><div><div class="kicker" id="bKick">' + (b.footprint ? 'Building' : 'Parcel') + '</div><h2 id="bTitle">Loading parcel…</h2><div class="bsub" id="bSub">' + b.center[1].toFixed(5) + ', ' + b.center[0].toFixed(5) + '</div></div>' +
@@ -184,84 +242,96 @@ export function initBuildings(ctx) {
         ss('Footprint: OpenStreetMap. Height: USGS 3DEP lidar where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record, otherwise estimated from height.') + '</div>' +
       '<div class="bsec" id="bSite"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsec" id="bRegrid"></div><div class="bsrc"></div>' +
-      '<div class="bsec" id="bTools"><div class="lt">Site Tools</div><div class="bacts">' + (matchMedia('(pointer: coarse)').matches ? '<button class="btn" id="bMulti" title="Then tap more buildings or parcels">Select Multiple</button>' : '') +
+      '<div class="bsec" id="bTools"><div class="lt">Site Tools</div><div class="bacts">' + '<button class="btn" id="bMulti" title="Then ' + (matchMedia('(pointer: coarse)').matches ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 10">Select Multiple</button>' +
         '<button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button><button class="btn askai" id="bAsk">Ask AI About It</button></div></div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#bOrbit').onclick = orbit;
-    card.querySelector('#bMulti')?.addEventListener('click', () => startMulti()); // touch only; with a mouse, Shift-click adds buildings
+    card.querySelector('#bMulti').onclick = () => ctx.tabs?.setAdding(true); // or Shift-click
+    ctx.tabs?.track({ id: bid(b), kind: 'building', label: b.parcel?.situs || (b.footprint ? 'Building' : 'Parcel'), ref: b, reopen: () => open(b), leave: stopOrbit });
     card.querySelector('#bNote').onclick = () => ctx.addNote?.({ at: b.center });
     card.querySelector('#bAsk').onclick = () => { const t = card.querySelector('#bTitle')?.textContent; ctx.assistant?.ask('Tell me about ' + (t && !/^Loading/.test(t) ? t : 'this property') + ': owner, value, site and the area around it'); };
     if (ctx.reduceMotion) card.querySelector('#bOrbit').remove();
     renderFilings(null); renderArea();
-    ctx.renderCrimeNear?.(card.querySelector('#bCrime'), b.center, () => { const t = card.querySelector('#bTitle')?.textContent; return t && !/^Loading/.test(t) ? t : 'this property'; }, () => cur === b && !multi.length);
+    ctx.renderCrimeNear?.(card.querySelector('#bCrime'), b.center, () => { const t = card.querySelector('#bTitle')?.textContent; return t && !/^Loading/.test(t) ? t : 'this property'; }, () => cur === b);
     ctx.cardRendered({ kind: 'building', center: b.center, label: () => card.querySelector('#bTitle')?.textContent || 'Building', sub: () => card.querySelector('#bSub')?.textContent || '', subject: () => newsSubject(b) });
     let d = null, early = false;
     // the appraisal record first: owner, value, title, the parcel outline and everything keyed on it
     const onParcel = pd => {
-      if (cur !== b || multi.length) return; early = true; highlight();
+      if (cur !== b) return; early = true; highlight(); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
       renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel);
       ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel);
     };
     try { d = await details(b, onParcel); }
     catch (err) { if (cur !== b) return; card.querySelector('#bParcel').innerHTML = '<div class="lt">Parcel</div><div class="rnote">Parcel lookup unavailable (' + esc(err.message) + ').</div>'; card.querySelector('#bTitle').textContent = 'Building'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b); return; }
-    if (cur !== b || multi.length) return;
-    highlight();
+    if (cur !== b) return;
+    highlight(); ctx.tabs?.label(bid(b), d.parcel?.situs || d.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
     card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
-    if (!early) { renderParcel(d.parcel, d.parcelError); renderFilings(d.parcel?.geometry || null); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel); }
+    // the parcel list (a building on several parcels) comes with the second lookup, so the parcel section is redrawn with it
+    if (!early || d.parcels?.length > 1) renderParcel(d.parcel, d.parcelError, d.parcels);
+    if (!early) { renderFilings(d.parcel?.geometry || null); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel); }
     renderOverview(b, d); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo);
   }
-  ctx.buildingStats = () => { const list = multi.length ? multi : cur ? [cur] : []; return list.map(b => ({ address: b.parcel?.situs || null, ...stats(b), owner: b.parcel?.owner || null })); };
+  ctx.buildingStats = () => { const list = selected(); return list.map(b => ({ address: b.parcel?.situs || null, ...stats(b), owner: b.parcel?.owner || null })); };
 
-  // ---------- several buildings / parcels ----------
-  function startMulti() {
-    addMode = true; if (cur && !multi.length) multi = [cur];
-    ctx.toast((matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click') + ' more buildings or parcels to add them. Tap one again to remove it.');
-    renderMulti();
-  }
+  // ---------- several buildings / parcels: each is a tab; "All" sums them up ----------
   const same = (a, b) => a.footprint && b.footprint ? a.footprint === b.footprint || inGeom(a.center, b.footprint) || inGeom(b.center, a.footprint) : Math.hypot(a.center[0] - b.center[0], a.center[1] - b.center[1]) < 0.00005 || (a.parcel?.propId && a.parcel?.propId === b.parcel?.propId);
   function add(b) {
-    if (!cur && !multi.length) { open(b); return; }
-    if (!multi.length) multi = [cur];
-    const i = multi.findIndex(x => same(x, b));
-    if (i >= 0) multi.splice(i, 1); else { if (multi.length >= 50) { ctx.toast('Up to 50 at a time.'); return; } multi.push(b); }
-    if (!multi.length) { ctx.closeCard(); return; }
-    highlight(); renderMulti();
-    multi.forEach(x => { if (!x.d && !x.loading) { x.loading = details(x).catch(e => { x.err = e.message; }).finally(() => { x.loading = null; highlight(); renderMulti(); }); } });
+    // the same building again while adding: take it out of the selection
+    const t = (ctx.tabs?.list('building') || []).find(x => same(x.ref, b)); if (t) { ctx.tabs.remove(t.id); return; }
+    ctx.tabs?.arm({ shiftKey: true }); open(b);
   }
-  function renderMulti() {
-    if (!multi.length) return; cur = multi[multi.length - 1]; stopOrbit();
-    const rows = multi.map(b => ({ b, s: stats(b) })), uniqP = new Map();
-    multi.forEach(b => { if (b.parcel?.propId) uniqP.set(b.parcel.propId, b.parcel); });
+  // the "All" tab while two or more buildings are selected
+  function syncAll() {
+    const n = ctx.tabs?.list('building').length || 0;
+    if (n >= 2) { ctx.tabs.pin({ id: 'b:all', kind: 'summary', label: 'All ' + n, reopen: renderAll });
+      for (const t of ctx.tabs.list('building')) { const x = t.ref; if (x && !x.d && !x.loading) x.loading = details(x).catch(e => { x.err = e.message; }).finally(() => { x.loading = null; highlight(); if (ctx.tabs.active()?.id === 'b:all') renderAll(); else ctx.tabs.label(t.id, x.parcel?.situs || x.parcel?.owner || t.label); }); } }
+    else ctx.tabs?.pin({ id: 'b:all', drop: true });
+  }
+  function renderAll() {
+    const list = (ctx.tabs?.list('building') || []).map(t => t.ref).filter(Boolean); if (!list.length) return; cur = null; stopOrbit();
+    const rows = list.map(b => ({ b, s: stats(b) })), uniqP = new Map();
+    list.forEach(b => { for (const p of b.d?.parcels?.length ? b.d.parcels : b.parcel ? [b.parcel] : []) if (p.propId) uniqP.set(p.propId, p); });
     const tot = k => rows.reduce((t, r) => t + (r.s[k] || 0), 0), mv = [...uniqP.values()].reduce((t, p) => t + (p.marketValue || 0), 0);
     const acres = [...uniqP.values()].reduce((t, p) => t + (/acre/i.test(p.area || '') ? parseFloat(p.area) : 0), 0);
-    const geoms = multi.map(b => b.parcel?.geometry || b.footprint).filter(Boolean);
-    const fl = F.filter(f => geoms.some(g => inGeom([f.lon, f.lat], g))), loading = multi.some(b => b.loading);
-    card.innerHTML = '<div class="top"><div><div class="kicker">Selection</div><h2>' + multi.length + ' building' + (multi.length > 1 ? 's' : '') + ' &amp; parcels</h2><div class="bsub">' + (addMode ? ((matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click') + ' more to add, again to remove') : 'Shift-click to add more') + '</div></div>' +
+    const geoms = [...uniqP.values()].map(p => p.geometry).concat(list.filter(b => !b.parcel).map(b => b.footprint)).filter(Boolean);
+    const fl = F.filter(f => geoms.some(g => inGeom([f.lon, f.lat], g))), loading = list.some(b => b.loading);
+    card.innerHTML = '<div class="top"><div><div class="kicker">Selection</div><h2>' + list.length + ' buildings &amp; parcels</h2><div class="bsub">' + ((matchMedia('(pointer: coarse)').matches ? 'Use + Add to pick more' : 'Shift-click to add more') + ' · up to 10') + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
       '<div class="kgrid msum"><div><b>' + (tot('fp') ? fmtN(tot('fp')) : '—') + '</b><span>Footprint sq ft</span></div><div><b>' + (tot('gfa') ? '~' + fmtN(tot('gfa')) : '—') + '</b><span>Est. floor area sq ft</span></div>' +
       '<div><b>' + (mv ? fmtM(mv) : '—') + '</b><span>Market value · ' + uniqP.size + ' parcel' + (uniqP.size === 1 ? '' : 's') + '</span></div><div><b>' + (acres ? acres.toFixed(2) : '—') + '</b><span>Land acres</span></div></div>' +
       (loading ? '<div class="rnote">Loading parcels and heights…</div>' : '') +
-      '<div class="bsec"><div class="lt">Selected</div>' + rows.map(({ b, s }, i) => '<div class="mrow"><button class="lnk" data-go="' + i + '"><b>' + esc(b.parcel?.situs || (b.footprint ? 'Building ' : 'Parcel ') + (i + 1)) + '</b><span>' +
-        [s.fp ? fmtN(s.fp) + ' sq ft footprint' : (b.footprint ? '' : 'parcel only'), s.fl ? (s.fSrc === 'estimated from height' ? '~' : '') + s.fl + ' fl' : '', s.h ? ft(s.h) : '', b.parcel?.owner || ''].filter(Boolean).map(esc).join(' · ') + (b.err ? ' · lookup failed' : '') + '</span></button><button class="x" data-rm="' + i + '" aria-label="Remove">×</button></div>').join('') + '</div>' +
+      '<div class="bsec"><div class="lt">Selected</div>' + rows.map(({ b, s }, i) => '<div class="mrow"><button class="lnk" data-go="' + i + '"><b><i class="mnum">' + (i + 1) + '</i>' + esc(b.parcel?.situs || (b.footprint ? 'Building ' : 'Parcel ') + (i + 1)) + '</b><span>' +
+        [s.fp ? fmtN(s.fp) + ' sq ft footprint' : (b.footprint ? '' : 'parcel only'), s.fl ? (s.fSrc === 'estimated from height' ? '~' : '') + s.fl + ' fl' : '', s.h ? ft(s.h) : '', b.d?.parcels?.length > 1 ? b.d.parcels.length + ' parcels' : '', b.parcel?.owner || ''].filter(Boolean).map(esc).join(' · ') + (b.err ? ' · lookup failed' : '') + '</span></button><button class="x" data-rm="' + i + '" aria-label="Remove">×</button></div>').join('') + '</div>' +
       (fl.length ? '<div class="bsec"><div class="lt">Construction filings on these parcels</div><div class="rnote">' + fl.length + ' filing' + (fl.length > 1 ? 's' : '') + ' · est. ' + fmtM(fl.reduce((t, f) => t + f.cost, 0)) + '</div></div>' : '') +
-      '<div class="bacts"><button class="btn primary" id="mDone">' + (addMode ? 'Done Adding' : 'Add More') + '</button><button class="btn" id="mCsv">Export CSV</button><button class="btn" id="mFit">Zoom to All</button><button class="btn" id="mClear">Clear</button></div>';
+      '<div class="bacts"><button class="btn" id="mCsv">Export CSV</button><button class="btn" id="mFit">Zoom to All</button><button class="btn" id="mClear">Clear</button></div>';
     card.classList.add('open');
+    ctx.tabs?.track({ id: 'b:all', kind: 'summary', label: 'All ' + list.length, reopen: renderAll, pinned: true });
+    highlight();
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#mClear').onclick = () => ctx.closeCard();
-    card.querySelector('#mDone').onclick = () => { addMode = !addMode; renderMulti(); };
-    card.querySelector('#mFit').onclick = () => { const pts = multi.map(b => b.center); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); map.fitBounds([[Math.min(...xs) - .0008, Math.min(...ys) - .0008], [Math.max(...xs) + .0008, Math.max(...ys) + .0008]], { padding: 60, maxZoom: 18, duration: ctx.reduceMotion ? 0 : 800 }); };
-    card.querySelector('#mCsv').onclick = () => ctx.exportCsv(rows.map(({ b, s }, i) => ({ '#': i + 1, Address: b.parcel?.situs || '', Owner: b.parcel?.owner || '', 'Property ID': b.parcel?.propId || '', 'Footprint sq ft': s.fp || '', 'Building area sq ft (appraisal)': s.apprSqft || '',
-      'Est. floor area sq ft': s.gfa || '', 'Height ft': s.h ? Math.round(s.h * 3.281) : '', 'Height source': s.hSrc, Floors: s.fl || '', 'Floors source': s.fSrc, 'Market value': b.parcel?.marketValue || '', 'Year built': b.parcel?.yearBuilt || '', 'Land area': b.parcel?.area || '', Latitude: b.center[1].toFixed(6), Longitude: b.center[0].toFixed(6) })), 'fs-buildings-' + new Date().toISOString().slice(0, 10));
-    card.querySelectorAll('[data-rm]').forEach(x => x.onclick = () => add(multi[+x.dataset.rm]));
-    card.querySelectorAll('[data-go]').forEach(x => x.onclick = () => { const b = multi[+x.dataset.go]; map.flyTo({ center: b.center, zoom: Math.max(map.getZoom(), 17.5), duration: ctx.reduceMotion ? 0 : 700 }); });
+    card.querySelector('#mFit').onclick = () => { const pts = list.map(b => b.center); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); map.fitBounds([[Math.min(...xs) - .0008, Math.min(...ys) - .0008], [Math.max(...xs) + .0008, Math.max(...ys) + .0008]], { padding: 60, maxZoom: 18, duration: ctx.reduceMotion ? 0 : 800 }); };
+    card.querySelector('#mCsv').onclick = () => ctx.exportCsv(rows.map(({ b, s }, i) => ({ '#': i + 1, Address: b.parcel?.situs || '', Owner: b.parcel?.owner || '', 'Property ID': b.parcel?.propId || '', Parcels: b.d?.parcels?.length || (b.parcel ? 1 : 0), 'Footprint sq ft': s.fp || '',
+      'Est. floor area sq ft': s.gfa || '', 'Height ft': s.h ? Math.round(s.h * 3.281) : '', 'Height source': s.hSrc, Floors: s.fl || '', 'Floors source': s.fSrc, 'Market value': b.parcel?.marketValue || '', 'Year built': b.parcel?.yearBuilt || '', Latitude: b.center[1].toFixed(6), Longitude: b.center[0].toFixed(6) })), 'selected-buildings');
+    const ids = ctx.tabs.list('building').map(t => t.id);
+    card.querySelectorAll('[data-rm]').forEach(x => x.onclick = () => ctx.tabs.remove(ids[+x.dataset.rm]));
+    card.querySelectorAll('[data-go]').forEach(x => x.onclick = () => ctx.tabs.activate(ids[+x.dataset.go]));
   }
 
   const money = v => v ? fmtM(v) : '—';
   const fld = (k, v, o = {}) => '<div class="f' + (o.w ? ' w' : '') + '"><div class="fl">' + k + '</div><div class="fv' + (o.dim ? ' dim' : '') + '">' + v + '</div>' + (o.sub ? '<div class="fs">' + o.sub + '</div>' : '') + '</div>';
   const title = t => String(t || '').toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
   const appraised = p => p?.marketValue || ((p?.landValue || 0) + (p?.improvementValue || 0)) || null;
-  function renderParcel(p, err) {
+  // a building that spans several parcels (a shopping center, a warehouse built over lot lines): list them all, with totals
+  function parcelsHtml(list) {
+    if (!(list?.length > 1)) return '';
+    const value = list.reduce((t, x) => t + (appraised(x) || 0), 0), acres = list.reduce((t, x) => t + (/acre/i.test(x.area || '') ? parseFloat(x.area) || 0 : 0), 0);
+    const owners = new Set(list.map(x => (x.owner || '').trim().toUpperCase()).filter(Boolean));
+    return '<div class="mparc"><div class="fl">This building sits on ' + list.length + ' parcels' + (owners.size ? ' · ' + owners.size + ' owner' + (owners.size > 1 ? 's' : '') : '') + '</div>' +
+      list.map((x, i) => '<div class="mprow"><i class="mnum">' + (i + 1) + '</i><span><b>' + esc(x.situs || x.propId || 'Parcel') + '</b><em>' + esc([x.owner, x.area, x.landUse].filter(Boolean).join(' · ')) + '</em></span><span class="m mono">' + money(appraised(x)) + '</span></div>').join('') +
+      '<div class="mprow tot"><i></i><span><b>Total</b><em>' + (acres ? acres.toFixed(2) + ' acres' : '') + '</em></span><span class="m mono">' + money(value) + '</span></div></div>';
+  }
+  function renderParcel(p, err, all) {
     const el = card.querySelector('#bParcel'), head = '<div class="lt">Ownership &amp; Value</div>';
     if (!p) {
       // the statewide parcel layer has no Harris or Waller County records (checked 2026-10-03)
@@ -279,7 +349,7 @@ export function initBuildings(ctx) {
       fld('Land', '<span class="mono">' + money(p.landValue) + '</span>') + fld('Improvements', '<span class="mono">' + money(p.improvementValue) + '</span>') +
       fld('Land area', esc(p.area || '—')) + fld('Year built', esc(p.yearBuilt || 'Not reported'), { dim: !p.yearBuilt }) +
       fld('Acquired', esc(p.acquired || '—'), { dim: !p.acquired }) + fld('Property ID', '<span class="mono">' + esc(p.propId || '—') + '</span>') +
-      (legal ? fld('Legal description', esc(legal), { w: true }) : '') + '</div>' +
+      (legal ? fld('Legal description', esc(legal), { w: true }) : '') + '</div>' + parcelsHtml(all) +
       (p.raw ? '<details class="raw"><summary>All appraisal fields</summary><dl>' + Object.entries(p.raw).map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl></details>' : '') +
       '<div class="ssrc src">' + esc(p.raw?.SOURCE ? title(p.raw.SOURCE) : 'County appraisal district') + ' via Texas GIO StratMap. Appraisal values, not sale prices.</div>';
   }
@@ -288,6 +358,7 @@ export function initBuildings(ctx) {
     const el = card.querySelector('#bOver'); if (!el) return;
     const p = d.parcel, s = stats(b), val = appraised(p), parts = [];
     if (p) parts.push((p.area ? 'A <b>' + esc(/^[\d.]+ acres$/.test(p.area) ? p.area.replace(' acres', '-acre') : p.area) + '</b> parcel' : 'A parcel') + (p.owner ? ' owned by <b>' + esc(p.owner) + '</b>' : '') + (val ? ', appraised at <b>' + fmtM(val) + '</b>' : '') + '.');
+    if (d.parcels?.length > 1) parts.push('The building spans <b>' + d.parcels.length + ' parcels</b>' + (d.parcels.some(appraised) ? ' appraised at ' + fmtM(d.parcels.reduce((t, x) => t + (appraised(x) || 0), 0)) + ' together' : '') + '.');
     if (s.h && b.footprint) parts.push('The building is about ' + ft(s.h) + ' tall' + (s.fl ? ' (' + (s.fSrc === 'estimated from height' ? '~' : '') + s.fl + ' floor' + (s.fl > 1 ? 's' : '') + ')' : '') + '.');
     const n = near1(b.center);
     if (n.list.length) parts.push('<b>' + fmtN(n.list.length) + ' construction filing' + (n.list.length > 1 ? 's' : '') + '</b> within a mile, est. ' + fmtM(n.value) + (n.recent ? '; ' + fmtN(n.recent) + ' filed in the last 12 months' : '') + '.');

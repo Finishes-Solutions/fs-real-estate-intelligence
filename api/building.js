@@ -3,7 +3,8 @@
 //   places: named businesses within ~80 m from OpenStreetMap (Overpass API, free)
 //   photo:  nearest Mapillary street-level image (free; only when MAPILLARY_TOKEN is set)
 //   height: roof height from USGS 3DEP lidar (Planetary Computer) over the footprint (&fp=lon,lat;lon,lat;…)
-//   osm:    the OpenStreetMap building there (levels, height, name) when it is mapped
+//   osm:    the OpenStreetMap building there (levels, height, name, and its whole outline) when it is mapped
+//   parcels: every parcel the building sits on (when it spans more than one), from its outline
 // Every part is optional: a failing source returns an error string for that section, never a 500.
 import { rateLimit } from './_lib/guard.mjs';
 import { lidarHeight } from '../lib/height.mjs';
@@ -60,11 +61,26 @@ async function parcel(lat, lon) {
   return f ? normalizeParcel(f.attributes, f.geometry) : null;
 }
 
+export function inRing(r, [x, y]) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
+// every parcel a building outline touches (a building can straddle lot lines): identify with the polygon, nearest 10
+async function parcelsIn(g) {
+  const ring = g?.coordinates?.[0]; if (!ring || ring.length < 4) return [];
+  const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]), pad = .0005;
+  const q = new URLSearchParams({ geometry: JSON.stringify({ rings: [ring], spatialReference: { wkid: 4326 } }), geometryType: 'esriGeometryPolygon', sr: '4326', layers: 'all:' + (PARCELS.match(/\/(\d+)$/) || [0, 0])[1], tolerance: '0',
+    mapExtent: [Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad].join(','), imageDisplay: '400,400,96', returnGeometry: 'true', f: 'json' });
+  const d = await getJSON(PARCELS.replace(/\/\d+$/, '') + '/identify?' + q);
+  if (d.error) throw new Error(d.error.message || 'service error');
+  const seen = new Set(), out = [];
+  for (const f of d.results || []) { const p = normalizeParcel(f.attributes, f.geometry), k = p.propId || JSON.stringify(p.geometry?.coordinates?.[0]?.[0]); if (seen.has(k)) continue; seen.add(k); out.push(p); if (out.length >= 10) break; }
+  return out;
+}
+const ringArea = r => { let s2 = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s2 += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return Math.abs(s2) / 2; };
+
 const KINDS = ['shop', 'amenity', 'office', 'healthcare', 'craft', 'leisure', 'tourism', 'club'];
 // one Overpass call: named businesses within 150 m (big buildings and strip centers reach well past 80 m), then the
 // building outline(s) under the point; the card sorts them into "in this building" and "nearby"
 async function places(lat, lon) {
-  const ql = `[out:json][timeout:12];nwr(around:150,${lat},${lon})[name][~"^(${KINDS.join('|')})$"~"."];out tags center 80;way(around:6,${lat},${lon})[building];out tags center 3;`;
+  const ql = `[out:json][timeout:12];nwr(around:150,${lat},${lon})[name][~"^(${KINDS.join('|')})$"~"."];out tags center 80;way(around:6,${lat},${lon})[building];out tags geom 3;`;
   // staggered: the next server is asked when the one before hasn't answered within 2.5 s (or failed), and the first good
   // answer wins, so a stalled server costs 2.5 s instead of its whole 9 s timeout
   const ask = url => getJSON(url, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 9000)
@@ -75,9 +91,13 @@ async function places(lat, lon) {
       ask(url).then(d => { over = true; clearTimeout(timer); done(d); }, e => { if (--left === 0) { over = true; fail(e); } else if (!over) next(); }); timer = setTimeout(next, 2500); };
     next();
   });
-  const els = d.elements || [], b = els.filter(e => e.tags?.building && !KINDS.some(k => e.tags[k] && e.tags.name)).concat(els.filter(e => e.tags?.building))[0];
+  const els = d.elements || [];
+  // the building whose outline contains the point (a click near a wall can also find the neighbour), else the nearest
+  const outlineOf = e => { const g = (e.geometry || []).map(n => [n.lon, n.lat]); return g.length >= 4 && g[0][0] === g[g.length - 1][0] && g[0][1] === g[g.length - 1][1] ? { type: 'Polygon', coordinates: [g] } : null; };
+  const bldgs = els.filter(e => e.type === 'way' && e.tags?.building), inside = bldgs.find(e => { const o = outlineOf(e); return o && inRing(o.coordinates[0], [lon, lat]); });
+  const els0 = els.filter(e => e.tags?.building && !KINDS.some(k => e.tags[k] && e.tags.name)).concat(els.filter(e => e.tags?.building)), b = inside || els0[0];
   const t = b?.tags || {}, levels = num(t['building:levels']), h = num(String(t.height || '').replace(/\s*m$/, ''));
-  const osm = b ? { levels, height_m: h, name: t.name || null, use: t.building !== 'yes' ? t.building.replace(/_/g, ' ') : null, roofLevels: num(t['roof:levels']) } : null;
+  const osm = b ? { levels, height_m: h, name: t.name || null, use: t.building !== 'yes' ? t.building.replace(/_/g, ' ') : null, roofLevels: num(t['roof:levels']), outline: inside ? outlineOf(inside) : null } : null;
   return { osm, list: els.filter(e => e.tags?.name && KINDS.some(k => e.tags[k])).map(e => {
     const t = e.tags || {}, k = KINDS.find(x => t[x]), c = e.center || e;
     return { name: String(t.name).slice(0, 120), kind: k ? (t[k] === 'yes' ? k : t[k].replace(/_/g, ' ')) : '', brand: t.brand || '', lat: c.lat, lon: c.lon };
@@ -106,13 +126,21 @@ export default async function handler(req, res) {
   if (part === 'parcel') {
     try { return res.json({ parcel: await parcel(r5(lat), r5(lon)) }); } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.json({ parcel: null, parcelError: e.message }); }
   }
-  const [p, pl, ph, ht] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon)), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)])]);
+  const [p, pl, ph, ht, pf] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon)), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)]), footprint ? parcelsIn(footprint) : Promise.resolve([])]);
+  // the map's footprint can be a tile-clipped piece of a big building: when OpenStreetMap's outline is clearly bigger,
+  // look for parcels under the whole of it too
+  const outline = pl.status === 'fulfilled' ? pl.value.osm?.outline : null;
+  let parcels = pf.status === 'fulfilled' ? pf.value : [];
+  if (outline && (!footprint || ringArea(outline.coordinates[0]) > 1.2 * ringArea(footprint.coordinates[0]))) {
+    try { const more = await parcelsIn(outline), have = new Set(parcels.map(x => x.propId)); parcels = parcels.concat(more.filter(x => !have.has(x.propId))).slice(0, 10); } catch (e) {}
+  }
   // a source that failed (busy server, timeout) is retried in a few minutes rather than cached for a day
-  if ((part !== 'rest' && p.status === 'rejected') || pl.status === 'rejected' || ht.status === 'rejected') res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
+  if ((part !== 'rest' && p.status === 'rejected') || pl.status === 'rejected' || ht.status === 'rejected' || pf.status === 'rejected') res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
   return res.json({
     ...(part === 'rest' ? {} : { parcel: p.status === 'fulfilled' ? p.value : null }), parcelError: p.status === 'rejected' ? p.reason.message : undefined,
     places: pl.status === 'fulfilled' ? pl.value.list : [], placesError: pl.status === 'rejected' ? pl.reason.message : undefined,
     osm: pl.status === 'fulfilled' ? pl.value.osm : null,
+    parcels: parcels.length > 1 ? parcels : undefined,
     height: ht.status === 'fulfilled' ? ht.value : { source: 'none', note: 'Lidar lookup failed: ' + ht.reason?.message },
     photo: ph.status === 'fulfilled' ? ph.value : null
   });
