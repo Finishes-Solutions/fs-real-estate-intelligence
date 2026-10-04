@@ -43,7 +43,7 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 - **Filters** narrow what the map shows, layer by layer (see "Filters" below). **Clear** sits right next to it; see "Clearing the view" below.
 - **Export** makes a report.
 - **Search** finds addresses, places, roads, businesses, projects, owners and developers. Press ⌘K (Mac) or Ctrl+K to jump to it.
-- **Quick layer buttons** under the search box: Satellite, 3D, Parcels, Flood Zones, Demographics, Traffic Counts, Filings, Planes, Radar, and **More** for every layer.
+- **Quick layer buttons** under the search box: Satellite, 3D, Parcels, Flood Zones, Demographics, Traffic Counts, Filings, Planes, Radar, and **More** for every layer. On a phone they're one row just under the search bar; swipe it sideways for the rest (the faded right edge means there's more).
 
 **Right side of the map**
 - Zoom in and out.
@@ -293,6 +293,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **Whole buildings:** clicking a big building selects all of it, and a building on several parcels lists every parcel with a total.
 - **Tabs on the card:** Shift-click (or **+ Add** on touch screens) to pick up to 10 buildings, parcels, filings, planes or airports, each in its own tab, with an **All** tab that adds up the buildings.
 - **A subtler dot grid:** smaller, closer and much fainter dots.
+- **Phones:** the quick layer buttons sit in their own row under the search bar, clear of the map buttons.
 
 - **Filters for the map's layers:** demographics, traffic and risk, alongside construction filings, plus a **Match everything** mode that finds the neighborhoods meeting every threshold.
 - **Faster:**

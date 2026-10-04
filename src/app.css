@@ -1583,7 +1583,13 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .layers .lt:first-child{margin-top:0;padding-top:0;border-top:0}
 .layers .lsub{font-size:12px;color:var(--muted);margin-bottom:-4px}
 @media (max-width:700px){
-  .mapleft .qlayers{grid-column:2;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;contain:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+  /* one sideways-scrolling row in the gap between the search bar and the map buttons, edge to edge; the faded right
+     edge shows there's more */
+  .mapleft .qlayers{position:absolute;top:-44px;left:-10px;right:-62px;padding:2px 64px 2px 10px;scroll-padding-left:10px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none;contain:none;-webkit-mask-image:linear-gradient(90deg,#000 86%,transparent);mask-image:linear-gradient(90deg,#000 86%,transparent)}
+  .mtop{z-index:6}
+  /* the filing count moves out of that gap: centered between the two button columns, level with their first buttons */
+  .mtop .mcount{position:absolute;top:98px;left:50%;transform:translateX(-50%);margin:0;white-space:nowrap}
+  .app.ai-open .mtop .mcount{display:none}
   .mapleft .qlayers::-webkit-scrollbar{display:none}
   .qchip{height:34px}
 }

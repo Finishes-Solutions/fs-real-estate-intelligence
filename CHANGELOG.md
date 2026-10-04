@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
+### 12:02 PM CT: Phone layer buttons get their own row (COMMIT)
+- **On phones, the quick layer buttons (Satellite, 3D, Parcels…) moved up** into the empty band just under the search bar, instead of sitting between the map buttons on the left and right.
+- The row runs edge to edge and swipes sideways. The faded right edge shows there are more buttons, and the last one (More) scrolls fully into view.
+- **The filings count** ("1,161 filings · $7.47B") moved out of that band. It now sits centered between the two columns of map buttons.
+- Search results and the assistant's answers still open over the row. Desktop and tablet are unchanged.
+
 ### 2:07 AM CT: A subtler dot grid (8849314)
 - **The dot grid is quieter:** smaller dots, set a little closer together, at well under half the old strength, so it reads as texture rather than pulling the eye. The home county's green dots stay a bit stronger so it still stands out.
 - The product guide now lists the whole-building selection and card tabs under Recently added.
