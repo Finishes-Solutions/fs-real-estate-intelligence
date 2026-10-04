@@ -13,33 +13,41 @@ export function initTraffic(ctx) {
   let on = false, last = null, loadSeq = 0;
   const SRC = 'aadt';
   const lineColor = ['interpolate', ['linear'], ['get', 'aadt'], ...STOPS.flatMap(([v, c], i) => [i ? STOPS[i - 1][0] : 0, c])];
+  let ctl = null, lastKey = '';
   async function load() {
     if (!on) return; const my = ++loadSeq;
-    if (map.getZoom() < 11) { if (note) note.textContent = 'Zoom in to a part of town to see traffic counts.'; setData({ type: 'FeatureCollection', features: [] }); return; }
+    if (map.getZoom() < 11) { if (note) note.textContent = 'Zoom in to a part of town to see traffic counts.'; lastKey = ''; setData({ type: 'FeatureCollection', features: [] }); return; }
     const b = map.getBounds(), c = map.getCenter(), hw = Math.min(.3, (b.getEast() - b.getWest()) / 2 + .02), hh = Math.min(.3, (b.getNorth() - b.getSouth()) / 2 + .02);
     const bb = [c.lng - hw, c.lat - hh, c.lng + hw, c.lat + hh].map((v, i) => (i < 2 ? Math.floor(v * 100) : Math.ceil(v * 100)) / 100);
-    try { const r = await fetch('api/traffic?lines=' + bb.join(',')), d = await r.json(); if (!r.ok) throw new Error(d.error || 'traffic counts unavailable'); if (my !== loadSeq) return; setData(d);
+    const key = bb.join(','); if (key === lastKey && map.getSource(SRC)) return; // same area as what's drawn
+    ctl?.abort(); ctl = new AbortController();
+    try { const r = await fetch('api/traffic?lines=' + key, { signal: ctl.signal }), d = await r.json(); if (!r.ok) throw new Error(d.error || 'traffic counts unavailable'); if (my !== loadSeq) return; lastKey = key; setData(d);
       if (note) note.textContent = 'Average vehicles a day (TxDOT). ' + (d.features.length >= 2000 ? 'Showing the 2,000 busiest segments here; zoom in for more.' : fmt(d.features.length) + ' counted segments in view.') + ' Hover a road for its count.'; }
-    catch (e) { if (note) note.textContent = e.message; }
+    catch (e) { if (e.name !== 'AbortError' && note) note.textContent = e.message; }
   }
+  // hover handlers once (adding them with the layer stacked another pair on every toggle and basemap change)
+  map.on('mousemove', SRC, e => { const f = e.features?.[0]; if (f && ctx.tip) { ctx.tip.textContent = f.properties.road + ': ' + fmt(f.properties.aadt) + ' vehicles a day'; ctx.tip.style.opacity = 1; ctx.tip.style.left = (e.point.x + 14) + 'px'; ctx.tip.style.top = (e.point.y + 14) + 'px'; } });
+  map.on('mouseleave', SRC, () => { if (ctx.tip) ctx.tip.style.opacity = 0; });
+  // Filters → Traffic: hide roads below a daily count
+  let minAadt = 0; const applyMin = () => { if (map.getLayer(SRC)) map.setFilter(SRC, minAadt ? ['>=', ['get', 'aadt'], minAadt] : null); };
+  ctx.trafficMin = v => { minAadt = +v || 0; applyMin(); };
   function setData(d) {
     try {
       const s = map.getSource(SRC); if (s) { s.setData(d); return; }
       map.addSource(SRC, { type: 'geojson', data: d });
       map.addLayer({ id: SRC, type: 'line', source: SRC, layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': lineColor, 'line-width': ['interpolate', ['linear'], ['get', 'aadt'], 0, 1.5, 50000, 4, 250000, 8], 'line-opacity': .85 } });
-      map.on('mousemove', SRC, e => { const f = e.features?.[0]; if (f && ctx.tip) { ctx.tip.textContent = f.properties.road + ': ' + fmt(f.properties.aadt) + ' vehicles a day'; ctx.tip.style.opacity = 1; ctx.tip.style.left = (e.point.x + 14) + 'px'; ctx.tip.style.top = (e.point.y + 14) + 'px'; } });
-      map.on('mouseleave', SRC, () => { if (ctx.tip) ctx.tip.style.opacity = 0; });
+        paint: { 'line-color': lineColor, 'line-width': ['interpolate', ['linear'], ['get', 'aadt'], 0, 1.5, 50000, 4, 250000, 8], 'line-opacity': .85 } }); applyMin();
     } catch (e) { /* style loading */ }
   }
   function setOn(v) {
     on = !!v; if (box) box.checked = on; if (note) note.hidden = !on;
-    if (!on) { try { if (map.getLayer(SRC)) map.removeLayer(SRC); if (map.getSource(SRC)) map.removeSource(SRC); } catch (e) {} ctx.setLegend?.('aadt', ''); return; }
+    if (!on) { ctl?.abort(); lastKey = ''; try { if (map.getLayer(SRC)) map.removeLayer(SRC); if (map.getSource(SRC)) map.removeSource(SRC); } catch (e) {} ctx.setLegend?.('aadt', ''); return; }
     ctx.setLegend?.('aadt', '<div class="t">Vehicles a day</div>' + STOPS.map(([v, c], i) => '<div class="li"><i style="background:' + c + '"></i>' + (i ? fmt(STOPS[i - 1][0] / 1000) + 'k' : '0') + (i < STOPS.length - 1 ? '–' + fmt(v / 1000) + 'k' : '+') + '</div>').join(''));
     load();
   }
   if (box) box.onchange = () => setOn(box.checked);
-  map.on('moveend', () => { if (on) load(); });
+  // reload once the map settles (following or orbiting moves it every frame), not on every move
+  let moveT = 0; map.on('moveend', () => { if (on) { clearTimeout(moveT); moveT = setTimeout(load, 350); } });
   ctx.onOverlays?.(() => { if (on && !map.getSource(SRC)) load(); });
   ctx.trafficLayer = setOn;
 

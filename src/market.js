@@ -26,12 +26,17 @@ export function initMarket(ctx) {
   }
   function addLayer() {
     if (!market || !metric || !map.getStyle()) return;
-    if (!map.getSource('tracts')) map.addSource('tracts', { type: 'geojson', data: { type: 'FeatureCollection', features: market.tracts.map(t => ({ type: 'Feature', properties: { g: t.g, gr: t.gr, pop: t.pop, inc: t.inc, val: t.val, rent: t.rent, vacr: t.vacr, age: t.age, jobs: t.jobs ?? null, jgr: t.jgr ?? null, jpr: t.jpr ?? null, spend: t.spend ?? null, sph: t.sph ?? null, dine: t.dine ?? null, furn: t.furn ?? null, appa: t.appa ?? null, jtop: (t.jtop || []).map(i => SECT[i]).join(', ') }, geometry: t.geom })) } });
+    if (!map.getSource('tracts')) map.addSource('tracts', { type: 'geojson', data: { type: 'FeatureCollection', features: market.tracts.map(t => ({ type: 'Feature', properties: { g: t.g, gr: t.gr, pop: t.pop, inc: t.inc, val: t.val, rent: t.rent, vacr: t.vacr, age: t.age, jobs: t.jobs ?? null, jgr: t.jgr ?? null, jpr: t.jpr ?? null, spend: t.spend ?? null, sph: t.sph ?? null, dine: t.dine ?? null, furn: t.furn ?? null, appa: t.appa ?? null, aadt: t.aadt ?? null, fl: t.fl ?? null, jtop: (t.jtop || []).map(i => SECT[i]).join(', ') }, geometry: t.geom })) } });
     const before = map.getLayer('county-line') ? 'county-line' : undefined;
     if (!map.getLayer('tract-fill')) map.addLayer({ id: 'tract-fill', type: 'fill', source: 'tracts', paint: { 'fill-opacity': ctx.isDark() ? .55 : .62 } }, before);
     if (!map.getLayer('tract-line')) map.addLayer({ id: 'tract-line', type: 'line', source: 'tracts', paint: { 'line-color': ctx.isDark() ? 'rgba(255,255,255,.12)' : 'rgba(22,25,26,.12)', 'line-width': .5 } }, before);
-    map.setPaintProperty('tract-fill', 'fill-color', colorExpr());
+    map.setPaintProperty('tract-fill', 'fill-color', colorExpr()); applyFade();
   }
+  // Filters → Demographics (filter each layer): tracts that fail the thresholds fade almost out
+  let fade = null;
+  function applyFade() { if (!map.getLayer('tract-fill')) return; const base = ctx.isDark() ? .55 : .62; map.setPaintProperty('tract-fill', 'fill-opacity', fade ? ['case', fade, base, .06] : base); }
+  ctx.setTractFade = expr => { fade = expr || null; applyFade(); };
+  ctx.demoMetric = () => metric;
   function removeLayer() { ['tract-fill', 'tract-line'].forEach(id => map.getLayer(id) && map.removeLayer(id)); }
   function renderLegend() {
     if (!metric) { legend.classList.remove('on'); return; }

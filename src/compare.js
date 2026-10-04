@@ -2,6 +2,7 @@
 // Every area gets the same filters (everything except the area selection itself). Areas stay on the map as colored
 // outlines and are kept in this browser.
 import { BY_KEY } from './metrics.js';
+import { contains as inArea } from './lib/geomatch.mjs';
 
 const MAX = 4;
 const COLORS = [['#006527', '#4caf70'], ['#b7791f', '#e0a23c'], ['#2b6cb0', '#63a4e8'], ['#9b2c6f', '#d36aa8']];
@@ -14,7 +15,7 @@ export function initCompare(ctx) {
   try { areas = (JSON.parse(localStorage.getItem('fs-compare') || '[]') || []).filter(a => a && a.geom && a.label).slice(0, MAX); } catch (e) {}
   const save = () => { try { localStorage.setItem('fs-compare', JSON.stringify(areas)); } catch (e) { /* large outlines: keep in memory only */ } };
   const color = i => COLORS[i % COLORS.length][ctx.isDark() ? 1 : 0];
-  const contains = (a, f) => d3.geoContains(a.geom, [f.lon, f.lat]);
+  const contains = (a, f) => inArea(a.geom, [f.lon, f.lat]);
   const sqmi = g => d3.geoArea(g) * 3958.8 ** 2;
 
   // ---- map outlines ----

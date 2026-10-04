@@ -63,7 +63,7 @@ export function initLive(ctx) {
 
   // ---------- wind arrows (Open-Meteo grid over the view) ----------
   function arrowImage() {
-    const n = 48, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d');
+    const n = 48, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d', { willReadFrequently: true });
     g.fillStyle = '#000'; g.beginPath(); g.moveTo(n / 2, 4); g.lineTo(n / 2 + 11, 22); g.lineTo(n / 2 + 4, 20); g.lineTo(n / 2 + 4, n - 6); g.lineTo(n / 2 - 4, n - 6); g.lineTo(n / 2 - 4, 20); g.lineTo(n / 2 - 11, 22); g.closePath(); g.fill();
     return g.getImageData(0, 0, n, n);
   }

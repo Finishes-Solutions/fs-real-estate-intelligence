@@ -5,6 +5,29 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
+### 1:30 AM CT: Filters for the map's layers, and freeze fixes (690491d)
+- **Filters now cover the map's layers, not just construction filings.** The panel has a section per kind of data:
+  - **Demographics:** income, population growth, home value, rent, vacancy, jobs.
+  - **Traffic:** the busiest road in vehicles a day.
+  - **Risk:** all flood zones or only the high-risk 100-year floodplain, and the crime type in Houston.
+  - **Construction filings:** the filters from before, plus the number of projects in an area when matching.
+- **Two ways to use them** (the switch at the top):
+  - **Filter each layer:** demographic thresholds fade the neighborhoods that don't qualify, the traffic threshold hides quieter roads, and the risk choices change the flood and crime layers. Setting a filter turns its layer on.
+  - **Match everything:** census tracts that meet every threshold are outlined in green and the rest of the map fades. For example, income at least $100K and growth at least 5% gives 213 of 1,417 areas. The panel shows the count and offers **Zoom to matches**.
+  - Busiest road and FEMA flood risk per area come with the nightly data refresh (checked monthly). Until the first refresh after this change, they're left out of matching, and the panel says so.
+- **Clear and Clear All reset the layer filters too.** The summary at the top of the panel lists everything that's on.
+- **No more freezes when selecting a big area:**
+  - Picking Harris County with the County tool used to lock the page for about 3 seconds, and again on every filter change after that. The app's own work now takes about 15 thousandths of a second.
+  - Counties now match on each filing's own county, and other areas use a much faster inside-the-area test (about 100 times faster). The same speed-up applies to Compare, exports and searched places.
+- **Live planes are much lighter:**
+  - The plane icons refresh about 4 times a second instead of 12–30, unless you're following a plane or showing its path.
+  - The 3D models still move smoothly.
+  - Everything pauses while another tab hides the map.
+  - Turning planes on no longer stalls while their icons are drawn.
+- **Following or orbiting a plane no longer floods the app with reloads:** in a test, 37 airport reloads in 3 seconds became 3. Airports, traffic counts and the exact county lines now reload once the map settles, and cancel the previous request.
+- **Turning Airports, Traffic Counts or Crime off and on no longer stacks up duplicate handlers.** Before, a click on an airport could open its card several times.
+- Filing dots are no longer rebuilt in the background while they're hidden.
+
 ### 1:06 AM CT: Phone More menu as tiles, simpler phone Filters (bdb0916)
 - **The phone More menu is a grid of one-word tiles,** named like the desktop tabs.
   - **Views:** Market, Compare, Reports, Updates, Notes, Sources.

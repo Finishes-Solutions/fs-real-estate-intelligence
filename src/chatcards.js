@@ -3,6 +3,7 @@
 // ctx.chatCard(name, args, result, list) returns an element (or null); list = the filings the tool worked on.
 import { tiles, hbars, vbars } from './charts.js';
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
+import { contains as inArea } from './lib/geomatch.mjs';
 
 export function initChatCards(ctx) {
   const { esc, fmtM, fmtN } = ctx;
@@ -68,7 +69,7 @@ export function initChatCards(ctx) {
 
   function areaCard(r) {
     if (!r.place) return null;
-    const pl = ctx.currentPlace?.(), list = pl?.geom && /Polygon/.test(pl.geom.type) && !/building|business/.test(pl.kind) ? ctx.filtered().filter(f => d3.geoContains(pl.geom, [f.lon, f.lat])) : null;
+    const pl = ctx.currentPlace?.(), list = pl?.geom && /Polygon/.test(pl.geom.type) && !/building|business/.test(pl.kind) ? ctx.filtered().filter(f => inArea(pl.geom, [f.lon, f.lat])) : null;
     const uses = list ? group(list, f => f.use || ctx.TYPE_LABEL[f.type]).sort((a, b) => b.v - a.v).slice(0, 5) : [];
     const d = el(head(r.kind ? r.kind[0].toUpperCase() + r.kind.slice(1) : 'Area', r.place, fmtN(r.filings) + ' filings ' + (r.how || '') + ' · est. ' + fmtM(r.total_value)) +
       (uses.length > 1 ? sec('Top uses', hbars(uses.map(g => ({ label: g.name, value: g.v, text: fmtM(g.v) })))) : '') +

@@ -1,6 +1,7 @@
 // Export dialog (green Export button next to the map tools): pick a report, which filings, and a format.
 // PDFs are built in the browser with jsPDF (loaded on first use); Excel uses SheetJS (already on the page).
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
+import { contains as inArea } from './lib/geomatch.mjs';
 
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 const AUTOTABLE = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
@@ -97,7 +98,7 @@ export function initExport(ctx) {
 
   // ---------- data for reports ----------
   function compareTable() {
-    const areas = ctx.compare.list(), base = ctx.filtered(), lists = areas.map(a => base.filter(f => d3.geoContains(a.geom, [f.lon, f.lat])));
+    const areas = ctx.compare.list(), base = ctx.filtered(), lists = areas.map(a => base.filter(f => inArea(a.geom, [f.lon, f.lat])));
     const keys = ['count', 'value', 'new', 'newValue', 'reno', 'add', 'avg', 'median', 'big', 'active', 'starting', 'last30', 'sqft', 'psf', 'units', 'devs', 'topUse', 'topCity', 'topDev'];
     const sq = a => d3.geoArea(a.geom) * 3958.8 ** 2;
     const body = [['Area (sq mi)', ...areas.map(a => +sq(a).toFixed(1))], ...keys.map(k => { const m = BY_KEY.get(k); return [m.label, ...lists.map(l => m.fmt(m.fn(l)))]; }),

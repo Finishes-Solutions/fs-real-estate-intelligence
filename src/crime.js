@@ -174,12 +174,13 @@ export function initCrime(ctx) {
     if (s) { s.setData(data); return; } if (!g) return;
     map.addSource('crime-area', { type: 'geojson', data }); map.addLayer({ id: 'crime-area', type: 'line', source: 'crime-area', paint: { 'line-color': '#c2410c', 'line-width': 2, 'line-dasharray': [2, 1.5] } });
   }
+  // hover handlers once (they ignore the layer while it isn't on the map); adding them with the layer stacked a new pair every time
+  map.on('mousemove', PTS, e => { const f = e.features?.[0]; if (f) tip(e.point, f.properties.t); }); map.on('mouseleave', PTS, () => tip(null));
   function showPoints(list) { try { drawPoints(list); } catch (e) { ctx.toast?.('The map is still loading; try again in a moment.'); } }
   function drawPoints(list) {
     shown = list; const data = { type: 'FeatureCollection', features: (list || []).map(x => ({ type: 'Feature', properties: { c: x.cat, t: x.offense + ' · ' + x.day + (x.premise ? ' · ' + x.premise : '') }, geometry: { type: 'Point', coordinates: [x.lon, x.lat] } })) };
     const s = map.getSource(PTS); if (s) s.setData(data);
-    else if (list) { map.addSource(PTS, { type: 'geojson', data }); map.addLayer({ id: PTS, type: 'circle', source: PTS, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 16, 6], 'circle-color': ['match', ['get', 'c'], 'v', COL.v, 'p', COL.p, COL.o], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1, 'circle-opacity': .9 } });
-      map.on('mousemove', PTS, e => { const f = e.features?.[0]; if (f) tip(e.point, f.properties.t); }); map.on('mouseleave', PTS, () => tip(null)); }
+    else if (list) { map.addSource(PTS, { type: 'geojson', data }); map.addLayer({ id: PTS, type: 'circle', source: PTS, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 16, 6], 'circle-color': ['match', ['get', 'c'], 'v', COL.v, 'p', COL.p, COL.o], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1, 'circle-opacity': .9 } }); }
     if (list?.length && last?.geometry) ctx.fitGeom?.(last.geometry);
   }
   ctx.onOverlays(() => { if (shown) { const s = shown; shown = null; if (map.getSource(PTS)) { map.removeLayer(PTS); map.removeSource(PTS); } showPoints(s); } if (last && map.getSource('crime-area') == null && document.getElementById('card')?.classList.contains('open')) showArea(last.geometry); });

@@ -40,7 +40,7 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 
 **Top of the map**
 - **Tools:** Move, Area (drag a box), Shape (draw a shape), Radius (an address plus a distance), County (click counties).
-- **Filters** narrow the construction filings. **Clear** sits right next to it; see "Clearing the view" below.
+- **Filters** narrow what the map shows, layer by layer (see "Filters" below). **Clear** sits right next to it; see "Clearing the view" below.
 - **Export** makes a report.
 - **Search** finds addresses, places, roads, businesses, projects, owners and developers. Press ⌘K (Mac) or Ctrl+K to jump to it.
 - **Quick layer buttons** under the search box: Satellite, 3D, Parcels, Flood Zones, Demographics, Traffic Counts, Filings, Planes, Radar, and **More** for every layer.
@@ -107,6 +107,28 @@ Every report can be printed or saved as a web page or PDF and downloaded as a sp
 The **Clear** button next to Filters appears whenever something is narrowing what you see: filters, a time period other than the last 12 months, a time-lapse month, a selected area, or a searched place's outline. One click clears all of it. Hover over it to see exactly what it will clear. On phones, the **✕** next to the filter button does the same. Inside the Filters menu, **Clear All** is at the top.
 
 ---
+
+## Filters
+
+**Filters** works on the map's layers, not just construction filings. It has a section for each kind of data:
+- **Demographics:** median household income, population growth, home value, rent, housing vacancy, and jobs located here.
+- **Traffic:** the busiest road, in vehicles a day.
+- **Risk:** which flood zones show (all of them, or only the high-risk 100-year floodplain), the crime type (Houston), and, when matching, FEMA's flood risk rating.
+- **Construction filings:** the filing filters (period, county, type, value, use and so on). When matching, this section also offers the number of construction projects in an area.
+
+The switch at the top picks how the filters work:
+- **Filter each layer:** each filter acts on its own layer.
+  - Demographic thresholds fade the neighborhoods that don't qualify on the Demographics layer.
+  - The traffic threshold hides quieter roads on Traffic Counts.
+  - The risk choices change the flood and crime layers.
+  - Setting a filter turns its layer on.
+- **Match everything:** the app looks for neighborhoods (census tracts) that meet **every** threshold you set. For example: income at least $100K, growth at least 5%, at least 5 construction projects, and low flood risk.
+  - Matching areas are outlined in green and the rest of the map fades.
+  - The panel says how many areas match, and **Zoom to matches** frames them.
+
+The summary at the top of the panel lists everything that's on, and **Clear All** resets it. The **Clear** button next to Filters clears layer filters too. The busiest-road and flood-rating data for matching is added by the nightly data refresh; until it arrives, those two thresholds are left out of the match, and the panel says so.
+
+Property filters (use, acres, value, year built, owner, zoning) are planned. They need the county appraisal data to be loaded first.
 
 ## Map layers
 
@@ -189,7 +211,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
 Texas requires most commercial and public construction projects to register with the state (TDLR, through its TABS system). The app loads two years of these filings for the 7 counties every night. AI reads each filing for its use, tenant, developer, architect, contractor and housing units.
 
 - **Filing dots** are off by default. Turn them on with **Filings**. Green is new construction, grey is renovation, and a ring is an addition.
-- **Filters:** time period, county, type, value, use, status, size, housing units, company name, exact addresses only, start or registration dates, and recent changes. On phones, Filters opens as a full sheet with **Clear All** at the top and a **Show N filings** button at the bottom that closes it.
+- **Filters → Construction filings:** time period, county, type, value, use, status, size, housing units, company name, exact addresses only, start or registration dates, and recent changes. On phones, Filters opens as a full sheet with **Clear All** at the top and a button at the bottom that closes it.
 - **Filing card:** project details, dates, people involved, an **AI project brief** (what it is, timing, who's involved, area context), and nearby filings.
 - **Timeline:** the monthly pipeline of what's under construction, plus a Gantt chart of every project. Hatched bars are dates estimated because the filer left them blank.
 - **Activity:** developers, architects and contractors ranked by activity. Click one to see their projects.
@@ -257,11 +279,17 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
   - Business lists from OpenStreetMap are incomplete in some suburbs.
 - **Numbers lag.** Census averages cover five years, jobs data is about two years old, and permits arrive about six weeks after the month.
 - **Shared notes have no sign-in.** Anyone with the site address can edit them, unless a team passcode is set.
-- **Performance.** With many layers, live planes and 3D on at once, the app can slow down or briefly freeze, especially right after picking a large area like Harris County. Improvements are in progress.
+- **Performance.** With many layers, live planes and 3D on at once, older phones and laptops can still slow down. Selecting large areas, following planes, and toggling layers were made much faster in October 2026.
 
 ---
 
 ## Recently added
+
+- **Filters for the map's layers:** demographics, traffic and risk, alongside construction filings, plus a **Match everything** mode that finds the neighborhoods meeting every threshold.
+- **Faster:**
+  - Selecting a county or large area no longer freezes the page.
+  - Live planes use far less effort and pause when the map is hidden.
+  - Following a plane no longer floods the app with reloads.
 
 - **County and state lines for the whole US.** The lines sharpen to exact Census boundaries when you zoom in.
 - **3D plane models** when the map is tilted.
