@@ -4,7 +4,7 @@
 // the map selection, so every area report (crime, FEMA, traffic…) works on a "20-minute drive" trade area.
 // Data: api/isochrone (TomTom reachable range with traffic; Valhalla / OpenStreetMap without).
 import { inGeom, tractsFor, summarizeTracts } from './lib/demographics.mjs';
-import { esc, fmt, kgrid, table, areaSvg, reportDoc, saveHtml, saveCsv, openCard, cardTop, fillCard, centerOf } from './reportkit.js';
+import { esc, fmt, kgrid, table, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf } from './reportkit.js';
 
 export const BAND_COL = ['#16a34a', '#eab308', '#f97316', '#dc2626'];
 const DEPARTS = [['now', 'Now'], ['weekday-am', 'Weekday 8 AM'], ['weekday-pm', 'Weekday 5 PM'], ['weekend', 'Sunday']];
@@ -81,7 +81,7 @@ export function initDriveTime(ctx) {
         esc(fmt(b.sqmi) + ' sq mi' + (b.people != null ? ' · ' + fmt(b.people) + ' people · ' + fmt(b.households) + ' households' + (b.income ? ' · median income $' + fmt(Math.round(b.income / 1000)) + 'k' : '') + (b.jobs != null ? ' · ' + fmt(b.jobs) + ' jobs' : '') : '') + ' · ' + fmt(b.filings) + ' filings') +
         '</span><button class="lnk" type="button" data-sel="' + b.minutes + '">Select this area</button></div>').join('') +
       (hasCensus ? '<div class="rnote">People, households and jobs count the census tracts whose center is inside each band (counties loaded on the map only). Each band includes the ones inside it.</div>' : '<div class="rnote">Census figures cover the counties loaded on the map; this area is outside them.</div>') + '</div>' +
-      '<div class="bacts"><button class="btn primary" id="dtPdf" type="button">Export Report</button><button class="btn" id="dtCsv" type="button">Export CSV</button><button class="btn" id="dtClear" type="button">Clear from Map</button></div>' +
+      '<div class="bacts"><button class="btn primary" id="dtPdf" type="button">Export PDF</button><button class="btn" id="dtCsv" type="button">Export CSV</button><button class="btn" id="dtClear" type="button">Clear from Map</button></div>' +
       '<div class="rnote bsec">Drive times are estimates for a car. Click a band on the map, or “Select this area”, to run the crime, FEMA or traffic report on it.</div>');
     card.querySelectorAll('[data-dep]').forEach(b => b.onclick = () => show({ ...last, depart: b.dataset.dep }));
     card.querySelectorAll('[data-set]').forEach(b => b.onclick = () => show({ ...last, minutes: b.dataset.set.split(',').map(Number) }));
@@ -103,7 +103,7 @@ export function initDriveTime(ctx) {
       '<h2>By drive time</h2>' + table(['Drive time', { t: 'Sq mi', r: 1 }, { t: 'People', r: 1 }, { t: 'Households', r: 1 }, { t: 'Median income', r: 1 }, { t: 'Jobs', r: 1 }, { t: 'Filings', r: 1 }],
         bands.map(b => [b.minutes + ' min', fmt(b.sqmi), fmt(b.people), fmt(b.households), b.income ? '$' + fmt(b.income) : '—', fmt(b.jobs), fmt(b.filings)])) +
       '<p class="meta">Each band includes the ones inside it. People, households, income and jobs sum the census tracts whose center is inside the band. Filings are those on the map when the report was made' + (ctx.filterText?.() ? ' (filters: ' + esc(ctx.filterText()) + ')' : '') + '.</p>';
-    await saveHtml(ctx, 'drivetime', label, reportDoc({ kicker: 'Drive-time report', title: label, meta: esc(when), body,
+    await savePdf(ctx, 'drivetime', label, reportDoc({ kicker: 'Drive-time report', title: label, meta: esc(when), body,
       sources: esc(d.source) + ' routing; US Census ACS 5-year and LEHD LODES (people, households, jobs); TDLR TABS (filings). Drive times are estimates for a car and vary with traffic, signals and construction.' }));
   }
   const kgridDoc = big => '<div class="kp">' + [[fmt(big.sqmi), 'Sq mi within ' + big.minutes + ' min'], [fmt(big.people), 'People'], [fmt(big.jobs), 'Jobs'], [fmt(big.filings), 'Filings']].map(([v, l]) => '<div><b>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>';
@@ -113,6 +113,6 @@ export function initDriveTime(ctx) {
   ctx.onCardClose?.(() => { /* the bands stay until cleared: they're useful while browsing the area */ });
 
   // area reports: a drive-time map from the middle of the chosen area
-  ctx.addAreaReport?.({ key: 'drivetime', label: 'Drive-Time Map', desc: 'How far you can drive in 10, 20 and 30 minutes (or other times) from a point, now or at rush hour, with the people, households, jobs and filings inside each band. Export as a printable report or CSV.',
+  ctx.addAreaReport?.({ key: 'drivetime', label: 'Drive-Time Map', desc: 'How far you can drive in 10, 20 and 30 minutes (or other times) from a point, now or at rush hour, with the people, households, jobs and filings inside each band. Export as a PDF report or CSV.',
     note: 'From the middle of the selected area or the map view', run: ({ geometry, label, center }) => show({ center: center || centerOf(geometry), label: label.replace(/^[\d.]+ mi around /, '') }) });
 }

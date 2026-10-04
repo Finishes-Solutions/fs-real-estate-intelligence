@@ -3,7 +3,8 @@
 //   FEMA report for any area: the current selection (box, polygon, county or radius) or a building (0.25 mile):
 //   share of the area in high / moderate / minimal flood risk, NFIP flood insurance claims paid nearby (by year and storm),
 //   federal disaster declarations since 2000, and FEMA's National Risk Index (expected annual loss by hazard).
-//   The report opens in the card and exports as a printable report (HTML → PDF) or CSV.
+//   The report opens in the card and exports as a PDF report or CSV.
+import { reportDoc, savePdf } from './reportkit.js';
 const SRC = 'fema-nfhl';
 const RISK_COL = { high: '#1d4ed8', moderate: '#f59e0b', minimal: '#9ca3af', undetermined: '#a78bfa', water: '#38bdf8', unmapped: '#e5e7eb' };
 const RISK_SHORT = { high: 'High risk (100-year)', moderate: 'Moderate (500-year)', minimal: 'Minimal', undetermined: 'Not studied', water: 'Open water', unmapped: 'Not mapped' };
@@ -65,7 +66,7 @@ export function initFema(ctx) {
     let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
     last = { d, label, geometry };
     card.innerHTML = '<div class="top"><div><div class="kicker">FEMA report</div><h2>' + esc(label) + '</h2><div class="bsub">' + (d.area_sqmi < 10 ? d.area_sqmi.toFixed(2) : fmtN(d.area_sqmi)) + ' sq mi</div></div><button class="x" aria-label="Close">×</button></div>' + body(d) +
-      '<div class="bacts"><button class="btn" id="fmLayer" type="button">Show Flood Zones on Map</button><button class="btn primary" id="fmPdf" type="button">Export Report</button><button class="btn" id="fmCsv" type="button">Export CSV</button></div>' +
+      '<div class="bacts"><button class="btn" id="fmLayer" type="button">Show Flood Zones on Map</button><button class="btn primary" id="fmPdf" type="button">Export PDF</button><button class="btn" id="fmCsv" type="button">Export CSV</button></div>' +
       '<div class="rnote bsec">Flood maps show regulatory risk, not every flood; Houston floods outside them too. For a single parcel, confirm with an elevation certificate or a FEMA flood zone determination.<span class="src"> ' + esc(d.sources) + '</span></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#fmLayer').onclick = () => { setOn(true); ctx.fitGeom?.(geometry); };
@@ -92,22 +93,17 @@ export function initFema(ctx) {
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg"><rect width="' + W + '" height="' + H + '" fill="#f8f9f9"/><path d="' + rings.map(r => 'M' + r.map(p => pr(p).map(v => v.toFixed(1)).join(',')).join('L') + 'Z').join('') + '" fill="rgba(29,78,216,.08)" stroke="#1d4ed8" stroke-width="1.5" stroke-dasharray="5 3"/></svg>';
   }
   function exportReport() {
-    if (!last) return; const { d, label, geometry } = last, logo = document.querySelector('.brandbar .l-light')?.src || '', today = new Date();
-    const css = '@page{size:letter;margin:.5in}*{box-sizing:border-box}body{margin:0;font-family:Montserrat,system-ui,sans-serif;color:#23282a;font-size:12px;line-height:1.45}.wrap{max-width:900px;margin:0 auto;padding:28px}' +
-      '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #006527;padding-bottom:12px}.hd img{height:40px}.k{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#006527}' +
-      'h1{font-size:24px;margin:6px 0 2px;font-weight:800}.lt{font-size:14px;font-weight:700;margin:22px 0 8px;color:#0b0d0c}.meta,.rnote{color:#6b7174}.rnote{font-size:11px;margin-top:6px}.err{color:#c03b3a}' +
-      '.kgrid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #e8ebeb;border-radius:6px}.kgrid div{padding:10px 12px}.kgrid div+div{border-left:1px solid #e8ebeb}.kgrid b{display:block;font-family:"IBM Plex Mono",monospace;font-size:17px}.kgrid span{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6b7174}' +
-      'dl{display:grid;grid-template-columns:1fr auto;gap:4px 16px;margin:10px 0 0}dt{color:#4d5457}dd{margin:0;font-family:"IBM Plex Mono",monospace;text-align:right}.sc{color:#6b7174;font-size:10px}.pl{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e8ebeb;padding:5px 0}.pl span{color:#6b7174;font-size:11px;white-space:nowrap}' +
-      '.fm-bar{display:flex;height:16px;border-radius:3px;overflow:hidden;background:#eee}.fm-bar i{display:block;height:100%}.fm-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;margin-top:6px}.fm-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}' +
-      '.cr-bars{display:block;width:100%;max-width:560px;height:auto;color:#6b7174;margin-top:8px}.two{display:grid;grid-template-columns:2fr 1fr;gap:22px;align-items:start}.map svg{display:block;width:100%;height:auto;border:1px solid #e8ebeb;border-radius:6px}' +
-      '.ft{margin-top:22px;padding-top:10px;border-top:1px solid #e8ebeb;color:#6b7174;font-size:10.5px}.pb{position:fixed;right:18px;top:18px;background:#006527;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:600 12px Montserrat,sans-serif;cursor:pointer}.bsec{break-inside:avoid}@media print{.pb{display:none}.wrap{padding:0}}';
-    const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>FEMA report — ' + esc(label) + '</title><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet"><style>' + css + '</style></head><body>' +
-      '<button class="pb" onclick="window.print()">Print or Save as PDF</button><div class="wrap"><div class="hd"><div><div class="k">FEMA flood & hazard report</div><h1>' + esc(label) + '</h1><div class="meta">' + d.area_sqmi.toFixed(2) + ' sq mi · ' + esc((d.counties || []).join(', ') + ((d.counties || []).length ? ' County · ' : '')) + 'Generated ' + today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) + '</div></div>' + (logo ? '<img src="' + logo + '" alt="Finishes Solutions">' : '') + '</div>' +
-      '<div class="two"><div>' + body(d) + '</div><div class="map"><div class="lt">Area</div>' + areaSvg(geometry) +
+    if (!last) return; const { d, label, geometry } = last;
+    const css = 'dl{display:grid;grid-template-columns:1fr auto;gap:4px 16px;margin:10px 0 0}dt{color:#4d5457}dd{margin:0;font-family:"IBM Plex Mono",monospace;text-align:right}.err{color:#b42318}' +
+      '.pl{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e8ebeb;padding:5px 0;break-inside:avoid}.pl span{color:#6b7174;font-size:9.5px;white-space:nowrap}' +
+      '.fm-bar{display:flex;height:14px;border-radius:3px;overflow:hidden;background:#e8ebeb}.fm-bar i{display:block;height:100%}.fm-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:9.5px;margin-top:6px}.fm-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}' +
+      '.cr-bars{display:block;width:100%;max-width:560px;height:auto;color:#6b7174;margin-top:8px}.two{grid-template-columns:2fr 1fr;align-items:start}.fmap{break-inside:avoid}.fmap svg{display:block;width:100%;height:auto;border:1px solid #e8ebeb;border-radius:6px}';
+    const html = reportDoc({ kicker: 'FEMA flood & hazard report', title: label, meta: d.area_sqmi.toFixed(2) + ' sq mi' + ((d.counties || []).length ? ' · ' + esc(d.counties.join(', ')) + ' County' : ''), css, sources: esc(d.sources) + ' Flood zone shares are measured by sampling points across the area against FEMA\'s effective flood map. NFIP claims cover insured properties in the census tracts touching the area (FEMA redacts addresses), so they are a neighborhood measure, not this parcel\'s history. Flood maps show regulatory risk, not every flood: confirm a parcel with an elevation certificate or a flood zone determination.', body: '' +
+      '<div class="two"><div>' + body(d) + '</div><div class="fmap"><div class="lt">Area</div>' + areaSvg(geometry) +
       (d.risk_index?.by_tract?.length ? '<div class="lt">Census tracts</div>' + d.risk_index.by_tract.map(t => '<div class="pl"><b>' + esc(t.tract) + '</b><span>' + esc(t.risk_rating || '') + ' · ' + fmtM(t.eal) + '/yr</span></div>').join('') : '') + '</div></div>' +
       (d.disasters?.list?.length > 6 ? '<div class="bsec"><div class="lt">All disaster declarations since 2000</div>' + d.disasters.list.map(x => '<div class="pl"><b>' + esc(x.title) + '</b><span>' + esc(x.date + ' · ' + x.type + ' · ' + x.kind + ' #' + x.number) + '</span></div>').join('') + '</div>' : '') +
-      '<div class="ft">Sources: ' + esc(d.sources) + ' Flood zone shares are measured by sampling points across the area against FEMA\'s effective flood map. NFIP claims cover insured properties in the census tracts touching the area (FEMA redacts addresses), so they are a neighborhood measure, not this parcel\'s history. Flood maps show regulatory risk, not every flood: confirm a parcel with an elevation certificate or a flood zone determination.</div></div></body></html>';
-    ctx.saveFile('fema-report-' + slug(label) + '-' + today.toISOString().slice(0, 10) + '.html', html, 'text/html');
+      '' });
+    return savePdf(ctx, 'fema', label, html);
   }
 
   // entry points: the selection strip (under Area at a Glance) and the selection bar

@@ -2,9 +2,10 @@
 //   Map layer "Crime (Houston)": a heat map zoomed out, ~400 m squares zoomed in, for all / violent / property incidents in the last 12 months.
 //   Crime report for any area: the current selection (box, polygon, county or radius), a building (0.5 mile) or a map square.
 //   The report opens in the card (totals vs the year before and vs the city, monthly bars, top offenses and places,
-//   recent incidents), can put the incidents on the map, and exports as a printable report (HTML → PDF) or CSV.
+//   recent incidents), can put the incidents on the map, and exports as a PDF report or CSV.
 import { offenseName, CAT_NAME } from './lib/nibrs.mjs';
 import { tractsFor, summarizeTracts } from './lib/demographics.mjs';
+import { reportDoc, savePdf } from './reportkit.js';
 
 const SRC = 'crime', HEAT = 'crime-heat', CELLS = 'crime-cells', PTS = 'crime-pts';
 const COL = { v: '#c03b3a', p: '#d9822b', o: '#8a9396' };
@@ -154,7 +155,7 @@ export function initCrime(ctx) {
       '<div class="bsec" id="crRes"></div>' +
       '<div class="bsec"><div class="lt">Top offenses</div><dl>' + d.offenses.slice(0, 10).map(o => '<dt>' + esc(o.name) + '</dt><dd class="mono">' + fmtN(o.n) + ' <span class="sc">' + esc(CAT_NAME[o.cat] || '') + '</span></dd>').join('') + '</dl></div>' +
       '<div class="bsec"><div class="lt">Where they happened</div><dl>' + d.premises.slice(0, 8).map(p => '<dt>' + esc(p.premise) + '</dt><dd class="mono">' + fmtN(p.n) + '</dd>').join('') + '</dl></div>' +
-      '<div class="bacts"><button class="btn" id="crPts" type="button">Show Incidents on Map</button><button class="btn primary" id="crPdf" type="button">Export Report</button><button class="btn" id="crCsv" type="button">Export CSV</button></div>' +
+      '<div class="bacts"><button class="btn" id="crPts" type="button">Show Incidents on Map</button><button class="btn primary" id="crPdf" type="button">Export PDF</button><button class="btn" id="crCsv" type="button">Export CSV</button></div>' +
       '<div class="bsec"><div class="lt">Most recent incidents</div>' + (d.incidents || []).slice(0, 15).map(x => '<div class="pl"><b>' + esc(x.offense) + '</b><span>' + esc(x.day + (x.premise ? ' · ' + x.premise : '')) + '</span></div>').join('') +
       ((d.incidents || []).length >= 2000 ? '<div class="rnote">The map and export include the newest 2,000 incidents; the totals above count all of them.</div>' : '') + '</div>' +
       '<div class="rnote bsec">Offenses as reported by Houston Police (NIBRS). Counts follow where people are, so busy commercial areas show more than homes nearby; compare with similar places.<span class="src"> ' + esc(d.coverage) + '</span></div>';
@@ -203,17 +204,9 @@ export function initCrime(ctx) {
       list.slice().reverse().map(x => { const p = pr([x.lon, x.lat]); return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + (x.cat === 'v' ? 3.6 : 2.6) + '" fill="' + COL[x.cat] + '" fill-opacity="' + (x.cat === 'o' ? .45 : .85) + '"/>'; }).join('') + '</svg>';
   }
   async function exportReport() {
-    if (!last?.d) return; const { d, label, geometry } = last, L = d.last12, logo = document.querySelector('.brandbar .l-light')?.src || '', today = new Date();
-    const css = '@page{size:letter;margin:.5in}*{box-sizing:border-box}body{margin:0;font-family:Montserrat,system-ui,sans-serif;color:#23282a;font-size:12px;line-height:1.45}.wrap{max-width:900px;margin:0 auto;padding:28px}' +
-      '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #006527;padding-bottom:12px}.hd img{height:40px}.k{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#006527}' +
-      'h1{font-size:24px;margin:6px 0 2px;font-weight:800}h2{font-size:14px;margin:22px 0 8px}.meta{color:#6b7174}.kp{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #e8ebeb;border-radius:6px;margin-top:16px}.kp div{padding:10px 12px}.kp div+div{border-left:1px solid #e8ebeb}' +
-      '.kp b{display:block;font-family:"IBM Plex Mono",monospace;font-size:19px}.kp span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#6b7174}.map{margin-top:14px;border:1px solid #e8ebeb;border-radius:6px;overflow:hidden}.map svg,.bars svg{display:block;width:100%;height:auto}.bars{max-width:560px}' +
-      '.two{display:grid;grid-template-columns:1fr 1fr;gap:22px}table{width:100%;border-collapse:collapse}th{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#6b7174;text-align:left;border-bottom:1px solid #bcc2c4;padding:5px 6px}' +
-      'td{border-bottom:1px solid #e8ebeb;padding:5px 6px}.m{font-family:"IBM Plex Mono",monospace;font-size:11px;white-space:nowrap}.r{text-align:right}tr{break-inside:avoid}.lg{display:flex;gap:14px;font-size:11px;color:#4d5457;margin-top:6px}.lg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}' +
-      '.ft{margin-top:22px;padding-top:10px;border-top:1px solid #e8ebeb;color:#6b7174;font-size:10.5px}.pb{position:fixed;right:18px;top:18px;background:#006527;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:600 12px Montserrat,sans-serif;cursor:pointer}@media print{.pb{display:none}.wrap{padding:0}.full{break-before:page}}';
+    if (!last?.d) return; const { d, label, geometry } = last, L = d.last12;
     const list = d.incidents || [];
-    const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Crime report — ' + esc(label) + '</title><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet"><style>' + css + '</style></head><body>' +
-      '<button class="pb" onclick="window.print()">Print or Save as PDF</button><div class="wrap"><div class="hd"><div><div class="k">Crime report</div><h1>' + esc(label) + '</h1><div class="meta">12 months through ' + esc(monthName(d.latest)) + (d.area_sqmi ? ' · ' + d.area_sqmi.toFixed(2) + ' sq mi' : '') + ' · Generated ' + today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) + '</div></div>' + (logo ? '<img src="' + logo + '" alt="Finishes Solutions">' : '') + '</div>' +
+    const body = '' +
       '<div class="kp"><div><b>' + fmtN(L.total) + '</b><span>Incidents · ' + pct(d.change.total) + '</span></div><div><b style="color:' + COL.v + '">' + fmtN(L.v) + '</b><span>Violent · ' + pct(d.change.v) + '</span></div><div><b style="color:' + COL.p + '">' + fmtN(L.p) + '</b><span>Property · ' + pct(d.change.p) + '</span></div><div><b>' + fmtN(L.o) + '</b><span>Other · ' + pct(d.change.o) + '</span></div></div>' +
       '<p class="meta">Change is against the 12 months before (' + fmtN(d.prior12.total) + ' incidents). ' + esc(rateLine(d)) + '</p>' +
       '<div class="map">' + reportMap(geometry, list) + '</div><div class="lg"><span><i style="background:' + COL.v + '"></i>Violent</span><span><i style="background:' + COL.p + '"></i>Property</span><span><i style="background:' + COL.o + '"></i>Other</span>' + (list.length >= 2000 ? '<span>Newest 2,000 incidents shown</span>' : '') + '</div>' +
@@ -227,9 +220,9 @@ export function initCrime(ctx) {
       '<div><h2>Where they happened</h2><table><thead><tr><th>Premise</th><th class="r">Count</th></tr></thead><tbody>' + d.premises.map(p => '<tr><td>' + esc(p.premise) + '</td><td class="m r">' + fmtN(p.n) + '</td></tr>').join('') + '</tbody></table></div></div>' +
       '<div class="full"><h2>Incidents (' + fmtN(list.length) + (list.length >= 2000 ? ', newest' : '') + ')</h2><table><thead><tr><th>Date</th><th>Offense</th><th>Type</th><th>Premise</th><th class="r">Count</th></tr></thead><tbody>' +
       list.map(x => '<tr><td class="m">' + esc(x.day) + '</td><td>' + esc(x.offense) + '</td><td>' + esc(CAT_NAME[x.cat] || '') + '</td><td>' + esc(x.premise || '') + '</td><td class="m r">' + x.n + '</td></tr>').join('') + '</tbody></table></div>' +
-      '<div class="ft">Source: Houston Police Department NIBRS public incident data, ' + esc(d.from) + ' to ' + esc(d.latest) + '. ' + esc(d.coverage) + ' Violent = murder, rape, robbery, aggravated assault; property = burglary, theft, vehicle theft, arson, vandalism; other = all remaining offenses. Counts follow activity: busy commercial areas show more incidents than homes nearby. Locations are block-level.</div></div></body></html>';
-    ctx.exportMeta = { report: 'crime', format: 'html', scope: label, filings: list.length, unit: 'incidents' };
-    try { await ctx.saveFile('crime-report-' + slug(label) + '-' + today.toISOString().slice(0, 10) + '.html', html, 'text/html'); } finally { ctx.exportMeta = null; }
+      '';
+    const sources = 'Houston Police Department NIBRS public incident data, ' + esc(d.from) + ' to ' + esc(d.latest) + '. ' + esc(d.coverage) + ' Violent = murder, rape, robbery, aggravated assault; property = burglary, theft, vehicle theft, arson, vandalism; other = all remaining offenses. Counts follow activity: busy commercial areas show more incidents than homes nearby. Locations are block-level.';
+    await savePdf(ctx, 'crime', label, reportDoc({ kicker: 'Crime report', title: label, meta: '12 months through ' + esc(monthName(d.latest)) + (d.area_sqmi ? ' · ' + d.area_sqmi.toFixed(2) + ' sq mi' : ''), body, sources }), { meta: { filings: list.length, unit: 'incidents' } });
   }
 
   // property cards: "Crime" pill → incidents within 1 mile (last 12 months vs the year before), with the full report a click away.

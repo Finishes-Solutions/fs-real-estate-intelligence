@@ -5,7 +5,7 @@
 //   area, nearby airports and whether the area is under a runway's approach path, and the planes overhead right now.
 //   Flight Report for one aircraft (plane card → Export Flight Report): photo, registration, route, the flight path map,
 //   the altitude and speed profile, today's earlier flights; HTML (print to PDF) and CSV of the track points.
-import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, saveHtml, saveCsv, openCard, cardTop, fillCard, centerOf } from './reportkit.js';
+import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf } from './reportkit.js';
 
 const HOUR = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p');
 const KIND = { jet: ['Jets', '#1d4ed8'], prop: ['Props and small planes', '#16a34a'], heli: ['Helicopters', '#a855f7'], mil: ['Military', '#b45309'] };
@@ -62,7 +62,7 @@ export function initAirReport(ctx) {
       (d.low?.history ? '<div class="bsec"><div class="lt">Low flights at the center</div><div>' + fmt(d.low.low_per_day) + ' low sightings a day within ~' + Math.min(5, Math.max(1, Math.round(d.radius_mi * 1.609))) + ' km, lowest ' + (d.low.lowest_ft != null ? fmt(d.low.lowest_ft) + ' ft' : '—') + '.</div></div>' : '') +
       (d.airports.length ? '<div class="bsec"><div class="lt">Airports nearby</div>' + d.airports.slice(0, 5).map(a => '<div class="pl"><b><button class="lnk" type="button" data-apt="' + esc(a.ident) + '">' + esc(a.name) + '</button></b><span>' + esc((a.iata || a.icao || a.ident) + ' · ' + (a.km * 0.621371).toFixed(1) + ' mi') + '</span></div>').join('') + '</div>' : '') +
       '<div class="bsec"><div class="lt">Right now</div>' + (d.live?.error ? '<div class="rnote">' + esc(d.live.error) + '</div>' : '<div>' + fmt(live.length) + ' aircraft within ' + fmt(Math.max(2, d.radius_mi)) + ' mi, ' + fmt(lowNow.length) + ' under 3,000 ft.</div>' + (live.length ? '<div class="rnote">' + live.slice(0, 8).map(x => esc((x.flight || x.reg || x.hex) + (x.desc ? ' · ' + x.desc : '') + (x.alt != null ? ' · ' + fmt(x.alt) + ' ft' : ''))).join('; ') + '</div>' : '')) + '</div>' +
-      '<div class="bacts"><button class="btn primary" id="arPdf" type="button">Export Report</button><button class="btn" id="arCsv" type="button">Export CSV</button><button class="btn" id="arLive" type="button">Show Live Planes</button></div>' +
+      '<div class="bacts"><button class="btn primary" id="arPdf" type="button">Export PDF</button><button class="btn" id="arCsv" type="button">Export CSV</button><button class="btn" id="arLive" type="button">Show Live Planes</button></div>' +
       '<div class="rnote bsec">A sighting is one aircraft seen in the area at one of our once-a-minute samples, so a plane that circles counts more than one that passes. Coverage: ~100 nm around Houston, from community ADS-B receivers (some military and private aircraft are hidden). History starts October 2026.<span class="src"> adsb.lol; OurAirports.</span></div>');
     card.querySelector('#arPdf').onclick = exportReport; card.querySelector('#arCsv').onclick = exportCsv;
     card.querySelector('#arLive').onclick = () => ctx.live?.set?.({ planes: true });
@@ -89,10 +89,10 @@ export function initAirReport(ctx) {
         '<div><h2>By month</h2>' + table(['Month', { t: 'Sightings', r: 1 }, { t: 'Under 3,000 ft', r: 1 }], (p.by_month || []).map(([m, n, low]) => [esc(String(m).slice(0, 7)), fmt(n), fmt(low)])) + '</div></div>' +
       (d.airports.length ? '<h2>Airports nearby</h2>' + table(['Airport', 'Code', { t: 'Miles', r: 1 }], d.airports.map(a => [esc(a.name), esc(a.iata || a.icao || a.ident), (a.km * 0.621371).toFixed(1)])) : '') +
       (live.length ? '<h2>Aircraft overhead when the report was made</h2>' + table(['Flight', 'Aircraft', { t: 'Altitude ft', r: 1 }, { t: 'Miles away', r: 1 }], live.map(x => [esc(x.flight || x.reg || x.hex), esc(x.desc || x.type || ''), x.ground ? 'ground' : fmt(x.alt), fmt(x.miles)])) : '');
-    await saveHtml(ctx, 'airtraffic', label, reportDoc({ kicker: 'Air traffic report', title: label, meta: p.since ? 'History since ' + esc(p.since) : '', body,
+    await savePdf(ctx, 'airtraffic', label, reportDoc({ kicker: 'Air traffic report', title: label, meta: p.since ? 'History since ' + esc(p.since) : '', body,
       sources: 'Community ADS-B receivers (adsb.lol, ODbL), sampled once a minute within ~100 nm of Houston into ~5 km cells; OurAirports (airports, runways). A sighting is one aircraft seen at one sample: an exposure measure, not a count of distinct flights.' }));
   }
-  ctx.addAreaReport?.({ key: 'airtraffic', label: 'Air Traffic Report', desc: 'Plane traffic over an area: sightings a day, the busiest hours, how much is low, jets vs props vs helicopters, nearby airports and approach paths, and what’s overhead right now. Export as a printable report or CSV.',
+  ctx.addAreaReport?.({ key: 'airtraffic', label: 'Air Traffic Report', desc: 'Plane traffic over an area: sightings a day, the busiest hours, how much is low, jets vs props vs helicopters, nearby airports and approach paths, and what’s overhead right now. Export as a PDF report or CSV.',
     note: 'Houston region (~100 nm). Select an area, or use the map view', run: ({ geometry, label }) => report({ geometry, label }) });
 
   // ---------- flight report (one aircraft) ----------
@@ -122,7 +122,7 @@ export function initAirReport(ctx) {
       (leg ? '<h2>This flight</h2>' + table(['', ''], [[leg.started_on_ground ? 'Departed' : 'First seen', esc(when(leg.start))], ['Last seen', esc(when(leg.end))], ['Track points', fmt(pts.length)]]) : '') +
       ((track?.today || []).length > 1 ? '<h2>Today’s flights</h2>' + table(['Started', 'Ended', { t: 'Highest ft', r: 1 }], track.today.map(l => [esc(when(l.start)), esc(when(l.end)), fmt(l.max_alt_ft)])) : '');
     ctx.exportMeta = null;
-    await saveHtml(ctx, 'flight', id, reportDoc({ kicker: 'Flight report', title: id + (p.desc ? ' · ' + p.desc : ''), meta: esc(okRoute ? ap(route.origin) + ' → ' + ap(route.destination) : 'Route not in the database'), body,
+    await savePdf(ctx, 'flight', id, reportDoc({ kicker: 'Flight report', title: id + (p.desc ? ' · ' + p.desc : ''), meta: esc(okRoute ? ap(route.origin) + ' → ' + ap(route.destination) : 'Route not in the database'), body,
       sources: 'Community ADS-B (adsb.lol traces, ODbL); routes from adsbdb / adsb.lol; photo from planespotters.net; FAA aircraft registry. Positions are as broadcast by the aircraft; some military and private aircraft are hidden.' }));
     if (have.csv !== false && pts.length) saveCsv(ctx, 'flight', id, pts.map(x => ({ Time: new Date(x.t * 1000).toISOString(), Latitude: x.lat, Longitude: x.lon, 'Altitude ft': x.alt, 'Ground speed kt (computed)': x.kt ?? '' })));
   };

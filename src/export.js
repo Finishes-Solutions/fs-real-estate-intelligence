@@ -1,10 +1,11 @@
 // Export dialog (green Export button next to the map tools): pick a report, which filings, and a format.
-// PDFs are built in the browser with jsPDF (loaded on first use); Excel uses SheetJS (already on the page).
+// PDFs (and the summary's web page) use the shared Finishes Solutions report layout (reportkit.js), rendered to PDF on the
+// server: portrait, except the full filing list (and a comparison of four or more areas), which need landscape.
+// Excel uses SheetJS (already on the page).
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 import { contains as inArea } from './lib/geomatch.mjs';
+import { reportDoc, savePdf, saveHtml } from './reportkit.js';
 
-const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-const AUTOTABLE = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
 export const REPORTS = {
   summary: { label: 'Summary Report', desc: 'Headline metrics, map, breakdowns by county, type and use, largest projects.', formats: ['pdf', 'xlsx', 'html'] },
   list: { label: 'Filing List', desc: 'Every filing with address, value, owner, developer, schedule and status.', formats: ['pdf', 'xlsx', 'csv', 'geojson'] },
@@ -12,7 +13,6 @@ export const REPORTS = {
   activity: { label: 'Activity Report', desc: 'Most active developers, architects and general contractors.', formats: ['pdf', 'xlsx', 'csv'] }
 };
 export const FORMATS = { pdf: 'PDF', xlsx: 'Excel', csv: 'CSV', geojson: 'GeoJSON (GIS)', html: 'Web Page' };
-const GREEN = [0, 101, 39], INK = [35, 40, 42], MUTED = [107, 113, 116], LINE = [221, 225, 226];
 
 export function initExport(ctx) {
   const { esc, fmtM, fmtN } = ctx;
@@ -40,7 +40,7 @@ export function initExport(ctx) {
         '<label class="xs' + (c ? '' : ' dis') + '"><input type="radio" name="xscope" value="' + k + '"' + (st.scope === k ? ' checked' : '') + (c ? '' : ' disabled') + '><span>' + l + '</span><b>' + fmtN(c) + '</b></label>').join('') + '</div>' +
         (ctx.filterText() || ctx.sel.feature ? '<div class="xnote">' + esc([ctx.sel.feature ? ctx.sel.label : '', ctx.filterText()].filter(Boolean).join(' · ')) + '</div>' : '') + '</div>') +
       '<div class="xsec"><div class="lt">Format</div><div class="seg xfmt">' + R.formats.map(f => '<button type="button" data-f="' + f + '" aria-pressed="' + (st.format === f) + '">' + FORMATS[f] + '</button>').join('') + '</div></div>' +
-      '<div class="xsec xopts">' + opt('map', 'Include the Map', st.format === 'pdf' && st.report === 'summary') + opt('full', 'Add the Full Filing List', st.format === 'pdf' && st.report === 'summary') +
+      '<div class="xsec xopts">' + opt('map', 'Include the Map', /^(pdf|html)$/.test(st.format) && st.report === 'summary') + opt('full', 'Add the Full Filing List', /^(pdf|html)$/.test(st.format) && st.report === 'summary') +
         opt('scope_text', 'Include Scope of Work Text', st.report === 'list') + opt('ai', 'Include AI Summaries and Tags', st.report === 'list' && st.format !== 'pdf') + '</div>' +
       '<div class="xf"><span class="xmsg">' + esc(blocked) + '</span><button class="btn" id="xCancel">Cancel</button><button class="btn primary xgo" id="xGo"' + (blocked ? ' disabled' : '') + '>Export ' + FORMATS[st.format] + '</button></div></div>';
     dlg.querySelector('#xClose').onclick = dlg.querySelector('#xCancel').onclick = close;
@@ -70,22 +70,22 @@ export function initExport(ctx) {
       ctx.exportMeta = { report: st.report, reportLabel: REPORTS[st.report].label, format: st.format, filings: st.report === 'compare' ? (ctx.compare?.list() || []).length : list.length,
         unit: st.report === 'compare' ? 'areas' : 'filings', scope: label, filters: ctx.filterText(), hash: ctx.hashStr() };
       if (st.report === 'summary') {
-        if (st.format === 'pdf') await pdfSummary(list, label, name);
+        if (st.format === 'pdf') await pdf('summary', label, summaryDoc(list, label), name);
         else if (st.format === 'xlsx') ctx.exportXlsx([{ name: 'Summary', aoa: ctx.summaryAoa(list, label) }, { name: 'Filings', rows: rows(list) }], name);
-        else ctx.exportHtml(list, name);
+        else await saveHtml(ctx, 'summary', label, summaryDoc(list, label), meta());
       } else if (st.report === 'list') {
-        if (st.format === 'pdf') await pdfList(list, label, name);
+        if (st.format === 'pdf') await pdf('list', label, listDoc(list, label), name, true);
         else if (st.format === 'xlsx') ctx.exportXlsx([{ name: 'Filings', rows: rows(list) }, { name: 'Summary', aoa: ctx.summaryAoa(list, label) }], name);
         else if (st.format === 'csv') ctx.exportCsv(rows(list), name);
         else ctx.exportGeoJSON(list, name);
       } else if (st.report === 'compare') {
         const t = compareTable();
-        if (st.format === 'pdf') await pdfCompare(t, name);
+        if (st.format === 'pdf') await pdf('compare', 'areas', compareDoc(t), name, t.areas.length > 3);
         else if (st.format === 'xlsx') ctx.exportXlsx([{ name: 'Comparison', aoa: [t.head, ...t.body] }, ...t.areas.map((a, i) => ({ name: (i + 1) + ' ' + a.label.replace(/[\\/?*[\]:]/g, ' '), rows: ctx.rowsFor(t.lists[i]) })).filter(s => s.rows.length)], name);
         else ctx.exportCsv(t.body.map(r => Object.fromEntries(t.head.map((h, i) => [h, r[i]]))), name);
       } else {
         const groups = activity(list);
-        if (st.format === 'pdf') await pdfActivity(groups, list, label, name);
+        if (st.format === 'pdf') await pdf('activity', label, activityDoc(groups, list, label), name);
         else { const flat = groups.flatMap(g => g.rows.map(r => ({ Role: g.label, Name: r.label, Projects: r.n, 'Est. value (USD)': +r.v.toFixed(2), 'New builds': r.nw, 'Mostly': r.use, 'Counties': r.cos, 'Latest filing': r.last })));
           if (st.format === 'xlsx') ctx.exportXlsx(groups.map(g => ({ name: g.label, rows: g.rows.map(r => ({ Name: r.label, Projects: r.n, 'Est. value (USD)': +r.v.toFixed(2), 'New builds': r.nw, Mostly: r.use, Counties: r.cos, 'Latest filing': r.last })) })).filter(s => s.rows.length), name);
           else ctx.exportCsv(flat, name); }
@@ -117,85 +117,63 @@ export function initExport(ctx) {
     });
   }
 
-  // ---------- PDF ----------
-  let libP = null;
-  const script = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('couldn’t load the PDF library')); document.head.appendChild(s); });
-  const lib = () => libP ||= script(JSPDF).then(() => script(AUTOTABLE)).then(() => window.jspdf.jsPDF);
-  let logoP = null;
-  const logo = () => logoP ||= fetch(document.querySelector('.brandbar img').src).then(r => r.blob()).then(b => new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); })).then(src => new Promise(res => { const im = new Image(); im.onload = () => res({ src, w: im.width, h: im.height }); im.onerror = () => res(null); im.src = src; })).catch(() => null);
-  const svgPng = (svg, w, h) => new Promise((res, rej) => { const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = w * 2; c.height = h * 2; const g = c.getContext('2d'); g.scale(2, 2); g.drawImage(im, 0, 0, w, h); res(c.toDataURL('image/png')); }; im.onerror = () => rej(new Error('map image failed')); im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
-  const money = v => '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
-  async function doc0(title, kicker) {
-    const J = await lib(), d = new J({ orientation: 'landscape', unit: 'pt', format: 'letter' }), W = d.internal.pageSize.getWidth(), lg = await logo();
-    d.setFont('helvetica', 'bold'); d.setFontSize(8); d.setTextColor(...GREEN); d.text((kicker || 'Real Estate Intelligence Platform').toUpperCase(), 36, 40, { charSpace: 1 });
-    d.setFontSize(20); d.setTextColor(...INK); d.text(d.splitTextToSize(title, W - 260)[0], 36, 64);
-    d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(...MUTED);
-    const meta = ['TDLR TABS registrations ' + ctx.PERIOD, 'Generated ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })].join(' · ');
-    d.text(meta, 36, 80); const ft = ctx.filterText(); if (ft) d.text(d.splitTextToSize('Filters: ' + ft, W - 260), 36, 92);
-    if (lg) { const h = 30, w = lg.w / lg.h * h; d.addImage(lg.src, 'PNG', W - 36 - w, 38, w, h); }
-    d.setDrawColor(...GREEN); d.setLineWidth(2); d.line(36, ft ? 102 : 92, W - 36, ft ? 102 : 92);
-    return { d, W, H: d.internal.pageSize.getHeight(), y: ft ? 116 : 106 };
+  // ---------- PDF and web page: the shared report layout ----------
+  const meta = () => { const m = { ...(ctx.exportMeta || {}) }; delete m.format; return m; };
+  const pdf = (kind, label, html, name, landscape = false) => savePdf(ctx, kind, label, html, { landscape, name, meta: meta() });
+  const tabs = id => 'https://www.tdlr.texas.gov/TABS/Projects/' + encodeURIComponent(id);
+  const money = v => '$' + Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const metaLine = () => ['TDLR TABS registrations ' + ctx.PERIOD, ctx.filterText() ? 'Filters: ' + ctx.filterText() : ''].filter(Boolean).map(esc).join(' · ');
+  const SOURCES = 'Texas Department of Licensing and Regulation (TDLR), TABS project registrations. Costs and dates are the filers’ estimates; uses, tenants and developers are AI-tagged from the filings.';
+  const doc = (kicker, title, body, o = {}) => reportDoc({ kicker: 'Construction filings · ' + kicker, title, meta: metaLine(), body, sources: o.sources || SOURCES, landscape: o.landscape, css: o.css || '' });
+  // the KPI tiles chosen above the map (up to 4 a row)
+  function kpis(list) {
+    const keys = (ctx.kpiKeys?.() || DEFAULT_KPIS).filter(k => BY_KEY.has(k)), per = keys.length <= 4 ? keys.length : keys.length <= 6 ? 3 : 4, rows = [];
+    for (let i = 0; i < keys.length; i += per) rows.push(keys.slice(i, i + per));
+    return rows.map((r, j) => '<div class="kp" style="grid-template-columns:repeat(' + per + ',1fr)' + (j ? ';margin-top:8px' : '') + '">' + r.map(k => { const m = BY_KEY.get(k);
+      return '<div><b' + (m.text ? ' style="font-size:11px"' : '') + '>' + esc(String(m.fmt(m.fn(list)))) + '</b><span>' + esc(m.label) + '</span></div>'; }).join('') + '</div>').join('');
   }
-  function kpiRow(p, list) {
-    // Up to 6 tiles fit on one row; 7–9 wrap onto a second row.
-    const keys = ctx.kpiKeys?.() || DEFAULT_KPIS, per = keys.length > 6 ? Math.ceil(keys.length / 2) : keys.length, gap = 8, w = (p.W - 72 - gap * (per - 1)) / per, y0 = p.y;
-    keys.forEach((k, i) => { const m = BY_KEY.get(k), x = 36 + (i % per) * (w + gap); p.y = y0 + Math.floor(i / per) * 54;
-      p.d.setDrawColor(...LINE); p.d.setLineWidth(.8); p.d.rect(x, p.y, w, 46); p.d.setFillColor(...GREEN); p.d.rect(x, p.y, 2.5, 46, 'F');
-      p.d.setFont('helvetica', 'bold'); p.d.setFontSize(m.text ? 10 : 15); p.d.setTextColor(...INK); p.d.text(p.d.splitTextToSize(String(m.fmt(m.fn(list))), w - 16)[0], x + 10, p.y + 22);
-      p.d.setFont('helvetica', 'normal'); p.d.setFontSize(7); p.d.setTextColor(...MUTED); p.d.text(m.label.toUpperCase(), x + 10, p.y + 37, { charSpace: .6 }); });
-    p.y += 60;
+  const tbl = (head, body, right = []) => '<table><thead><tr>' + head.map((h, i) => '<th' + (right.includes(i) ? ' class="r"' : '') + '>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
+    body.map(r => '<tr>' + r.map((c, i) => '<td' + (right.includes(i) ? ' class="m r"' : '') + '>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
+  function breakdown(list, key, label, n = 14) {
+    const m = new Map(), tot = list.reduce((s, f) => s + f.cost, 0) || 1;
+    list.forEach(f => { const k = key(f) || 'Unclassified', g = m.get(k) || [k, 0, 0, 0]; g[1]++; g[2] += f.cost; if (f.type === 'New') g[3]++; m.set(k, g); });
+    return tbl([label, 'Filings', 'Est. value', 'Share', 'New'], [...m.values()].sort((a, b) => b[2] - a[2]).slice(0, n).map(g => [esc(g[0]), fmtN(g[1]), fmtM(g[2]), Math.round(g[2] / tot * 100) + '%', fmtN(g[3])]), [1, 2, 3, 4]);
   }
-  const tableStyle = { styles: { font: 'helvetica', fontSize: 8, cellPadding: 4, textColor: INK, lineColor: LINE, lineWidth: .5 }, headStyles: { fillColor: [248, 249, 249], textColor: MUTED, fontStyle: 'bold', fontSize: 7 }, alternateRowStyles: { fillColor: [252, 253, 253] }, margin: { left: 36, right: 36, top: 40, bottom: 36 } };
-  function footer(d, note) {
-    const n = d.getNumberOfPages(), W = d.internal.pageSize.getWidth(), H = d.internal.pageSize.getHeight();
-    for (let i = 1; i <= n; i++) { d.setPage(i); d.setFont('helvetica', 'normal'); d.setFontSize(7); d.setTextColor(...MUTED);
-      d.text(note || 'Source: Texas Department of Licensing and Regulation, TABS project registrations. Costs and dates are filer estimates; uses and developers are AI-tagged. Prepared for Finishes Solutions.', 36, H - 18, { maxWidth: W - 120 });
-      d.text('Page ' + i + ' of ' + n, W - 36, H - 18, { align: 'right' }); }
+  const project = f => '<a href="' + tabs(f.id) + '">' + esc(f.name) + '</a>';
+  const radius = () => ctx.sel?.kind === 'radius';
+  // every filing: wide (landscape, every column, scope text optional) or narrow (portrait, folded into fewer columns)
+  function listTable(list, wide, withScope) {
+    if (wide) return tbl(['#', 'Registered', 'Project', 'County', 'Type / use', 'Est. value', 'Sq ft', 'Owner / developer', 'Status', 'Schedule'], list.map((f, i) => [
+      '<span class="m">' + (i + 1) + '</span>', '<span class="m">' + esc(f.reg || '') + '</span>',
+      project(f) + '<div class="sc">' + esc(f.addr || f.city || '') + (radius() && f._d != null ? ' · ' + f._d.toFixed(1) + ' mi from center' : '') + (f.approx ? ' · approx. location' : '') + '</div>' + (withScope && f.scope ? '<div class="sc">' + esc(f.scope.slice(0, 600)) + '</div>' : ''),
+      esc(f.county), esc(ctx.TYPE_LABEL[f.type]) + (f.use ? '<div class="sc">' + esc(f.use) + '</div>' : ''), money(f.cost), f.sqft ? fmtN(f.sqft) : '–',
+      esc(f.owner || '–') + (f.dev && f.dev !== f.owner ? '<div class="sc">' + esc(f.dev) + '</div>' : ''), esc(f.status || '–'), '<span class="m">' + esc((f.start || '?') + ' → ' + (f.end || '?')) + '</span>']), [5, 6]);
+    return tbl(['#', 'Project', 'Est. value', 'Owner / developer', 'Status'], list.map((f, i) => [
+      '<span class="m">' + (i + 1) + '</span>',
+      project(f) + '<div class="sc">' + esc([f.addr || f.city, f.county + ' County', ctx.TYPE_LABEL[f.type] + (f.use ? ' · ' + f.use : ''), f.reg ? 'registered ' + f.reg : ''].filter(Boolean).join(' · ')) + '</div>',
+      money(f.cost) + (f.sqft ? '<div class="sc">' + fmtN(f.sqft) + ' sq ft</div>' : ''), esc(f.owner || '–') + (f.dev && f.dev !== f.owner ? '<div class="sc">' + esc(f.dev) + '</div>' : ''),
+      esc(f.status || '–') + (f.start || f.end ? '<div class="sc">' + esc((f.start || '?') + ' → ' + (f.end || '?')) + '</div>' : '')]), [2]);
   }
-  const breakdown = (list, key, label) => { const m = new Map(); list.forEach(f => { const k = key(f) || 'Unclassified'; const g = m.get(k) || [k, 0, 0, 0]; g[1]++; g[2] += f.cost; if (f.type === 'New') g[3]++; m.set(k, g); });
-    const tot = list.reduce((s, f) => s + f.cost, 0) || 1; return { head: [[label, 'Filings', 'Est. value', 'Share', 'New']], body: [...m.values()].sort((a, b) => b[2] - a[2]).slice(0, 14).map(g => [g[0], fmtN(g[1]), fmtM(g[2]), Math.round(g[2] / tot * 100) + '%', fmtN(g[3])]) }; };
-  const listTable = (p, list, withScope) => p.d.autoTable({ ...tableStyle, startY: p.y,
-    head: [['#', 'Registered', 'Project', 'County', 'Type / use', 'Est. value', 'Sq ft', 'Owner / developer', 'Status', 'Schedule']],
-    body: list.map((f, i) => [i + 1, f.reg || '', f.name + '\n' + (f.addr || f.city || '') + (withScope && f.scope ? '\n' + f.scope.slice(0, 400) : ''), f.county, ctx.TYPE_LABEL[f.type] + (f.use ? '\n' + f.use : ''), money(f.cost), f.sqft ? fmtN(f.sqft) : '', (f.owner || '') + (f.dev && f.dev !== f.owner ? '\n' + f.dev : ''), f.status || '', (f.ts || '') + ' → ' + (f.te || '')]),
-    columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 52 }, 2: { cellWidth: 190 }, 5: { halign: 'right', cellWidth: 62 }, 6: { halign: 'right', cellWidth: 44 }, 9: { cellWidth: 90 } } });
-
-  async function pdfSummary(list, label, name) {
-    const p = await doc0(label, 'Real Estate Intelligence Platform · Summary report'); kpiRow(p, list);
-    const colL = 36, mapW = st.map ? 430 : 0, colR = st.map ? colL + mapW + 18 : colL;
-    if (st.map) { const w = 1000, h = 560, png = await svgPng(ctx.reportMap(list), w, h), ih = mapW * h / w; p.d.addImage(png, 'PNG', colL, p.y, mapW, ih); p.d.setDrawColor(...LINE); p.d.rect(colL, p.y, mapW, ih);
-      p.d.setFontSize(7); p.d.setTextColor(...MUTED); p.d.text('Green = new construction · grey = renovation · ring = addition or approximate location · size = est. value', colL, p.y + ih + 10); }
-    const byC = breakdown(list, f => f.county, 'County');
-    p.d.autoTable({ ...tableStyle, startY: p.y, margin: { ...tableStyle.margin, left: colR }, tableWidth: p.W - 36 - colR, head: byC.head, body: byC.body, columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } } });
-    const byT = breakdown(list, f => ctx.TYPE_LABEL[f.type], 'Type'), byU = breakdown(list, f => f.use, 'Use (AI-tagged)'), right = { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } };
-    p.d.autoTable({ ...tableStyle, startY: p.d.lastAutoTable.finalY + 12, margin: { ...tableStyle.margin, left: colR }, tableWidth: p.W - 36 - colR, head: byT.head, body: byT.body, columnStyles: right });
-    p.d.addPage(); p.y = 40; const half = (p.W - 72 - 18) / 2;
-    p.d.autoTable({ ...tableStyle, startY: p.y, tableWidth: half, head: byU.head, body: byU.body, columnStyles: right });
-    p.d.autoTable({ ...tableStyle, startY: p.y, margin: { ...tableStyle.margin, left: 36 + half + 18 }, tableWidth: half, head: [['Largest projects', 'City', 'Type', 'Est. value']],
-      body: list.slice(0, 15).map(f => [f.name, f.city || f.county, ctx.TYPE_LABEL[f.type] + (f.use ? ' · ' + f.use : ''), money(f.cost)]), columnStyles: { 3: { halign: 'right' } } });
-    if (st.full) { p.d.addPage(); p.y = 40; p.d.setFont('helvetica', 'bold'); p.d.setFontSize(12); p.d.setTextColor(...INK); p.d.text('All filings (' + fmtN(list.length) + ')', 36, p.y); p.y += 10; listTable(p, list, false); }
-    footer(p.d); ctx.saveFile(name + '.pdf', p.d.output('blob'), 'application/pdf');
+  const LEGEND = '<div class="lg"><span><i style="background:#006527"></i>New construction</span><span><i style="background:#6b7174"></i>Renovation</span><span><i style="border:1.5px solid #1f9249"></i>Addition or approximate location</span><span>Marker size = est. value</span></div>';
+  function summaryDoc(list, label) {
+    const uses = list.some(f => f.use);
+    return doc('Summary report', label, kpis(list) +
+      (st.map ? '<div class="map">' + ctx.reportMap(list) + '</div>' + LEGEND : '') +
+      '<div class="two"><div><h2>By county</h2>' + breakdown(list, f => f.county, 'County') + '<h2>By type</h2>' + breakdown(list, f => ctx.TYPE_LABEL[f.type], 'Type') + '</div>' +
+      '<div><h2>Largest filings</h2>' + tbl(['Project', 'City', 'Est. value'], list.slice(0, 12).map(f => [project(f) + '<div class="sc">' + esc(ctx.TYPE_LABEL[f.type] + (f.use ? ' · ' + f.use : '') + (f.sqft ? ' · ' + fmtN(f.sqft) + ' sq ft' : '')) + '</div>', esc(f.city || f.county), money(f.cost)]), [2]) + '</div></div>' +
+      (uses ? '<h2>By use (AI-tagged)</h2>' + breakdown(list, f => f.use, 'Use') : '') +
+      (st.full ? '<div class="full"><h2>All filings (' + fmtN(list.length) + ')</h2>' + listTable(list, false) + '</div>' : ''));
   }
-  async function pdfList(list, label, name) {
-    const p = await doc0(label, 'Real Estate Intelligence Platform · Filing list'); kpiRow(p, list); listTable(p, list, st.scope_text);
-    footer(p.d); ctx.saveFile(name + '.pdf', p.d.output('blob'), 'application/pdf');
+  const listDoc = (list, label) => doc('Filing list', label, kpis(list) + '<h2>Filings (' + fmtN(list.length) + ')</h2>' + listTable(list, true, st.scope_text), { landscape: true });
+  function compareDoc(t) {
+    const n = t.areas.length, cols = Math.min(n, n > 3 ? 4 : 3);
+    return doc('Area comparison', t.areas.map(a => a.label).join(' vs. '),
+      '<h2>Side by side</h2>' + tbl(t.head, t.body.map(r => r.map((c, i) => i ? '<span class="m">' + esc(String(c)) + '</span>' : esc(String(c)))), t.areas.map((a, i) => i + 1)) +
+      '<h2>Largest filings in each area</h2><div style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:16px">' + t.areas.map((a, i) => '<div><h3>' + esc(a.label) + '</h3>' +
+        tbl(['Project', 'Est. value'], t.lists[i].slice().sort((x, y) => y.cost - x.cost).slice(0, 12).map(f => [project(f) + '<div class="sc">' + esc(f.city || f.county) + '</div>', money(f.cost)]), [1]) + '</div>').join('') + '</div>',
+      { landscape: n > 3 });
   }
-  async function pdfCompare(t, name) {
-    const p = await doc0(t.areas.map(a => a.label).join(' vs. '), 'Real Estate Intelligence Platform · Area comparison');
-    p.d.autoTable({ ...tableStyle, startY: p.y, head: [t.head], body: t.body.map(r => r.map(String)), columnStyles: Object.fromEntries(t.areas.map((a, i) => [i + 1, { halign: 'right' }])) });
-    p.d.addPage(); p.y = 40;
-    const w = (p.W - 72 - 12 * (t.areas.length - 1)) / t.areas.length;
-    t.areas.forEach((a, i) => p.d.autoTable({ ...tableStyle, startY: p.y, margin: { ...tableStyle.margin, left: 36 + i * (w + 12) }, tableWidth: w, head: [['Largest in ' + a.label, 'Est. value']],
-      body: t.lists[i].slice().sort((x, y) => y.cost - x.cost).slice(0, 12).map(f => [f.name + '\n' + (f.city || f.county), money(f.cost)]), columnStyles: { 1: { halign: 'right', cellWidth: 58 } } }));
-    footer(p.d); ctx.saveFile(name + '.pdf', p.d.output('blob'), 'application/pdf');
-  }
-  async function pdfActivity(groups, list, label, name) {
-    const p = await doc0(label, 'Real Estate Intelligence Platform · Activity report'); kpiRow(p, list);
-    groups.forEach((g, i) => { if (!g.rows.length) return; if (i) { p.d.addPage(); p.y = 40; }
-      p.d.setFont('helvetica', 'bold'); p.d.setFontSize(12); p.d.setTextColor(...INK); p.d.text(g.label, 36, p.y + 4); p.y += 12;
-      p.d.autoTable({ ...tableStyle, startY: p.y, head: [['#', 'Name', 'Projects', 'Est. value', 'New builds', 'Mostly', 'Where', 'Latest']],
-        body: g.rows.slice(0, 40).map((r, j) => [j + 1, r.label, fmtN(r.n), money(r.v), fmtN(r.nw), r.use, r.cos, r.last]), columnStyles: { 0: { cellWidth: 22 }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } } });
-      p.y = p.d.lastAutoTable.finalY + 20; });
-    footer(p.d, 'Grouped by name as filed (or the developer the AI identified), with LLC/Inc. variants merged. Source: TDLR TABS. Prepared for Finishes Solutions.'); ctx.saveFile(name + '.pdf', p.d.output('blob'), 'application/pdf');
-  }
+  const activityDoc = (groups, list, label) => doc('Activity report', label, kpis(list) + groups.filter(g => g.rows.length).map((g, i) => '<div' + (i ? ' class="full"' : '') + '><h2>' + esc(g.label) + '</h2>' +
+    tbl(['#', 'Name', 'Projects', 'Est. value', 'New', 'Mostly', 'Where', 'Latest'], g.rows.slice(0, 40).map((r, j) => ['<span class="m">' + (j + 1) + '</span>', '<b>' + esc(r.label) + '</b>', fmtN(r.n), money(r.v), fmtN(r.nw), esc(r.use), esc(r.cos), '<span class="m">' + esc(r.last) + '</span>']), [2, 3, 4]) + '</div>').join(''),
+    { sources: 'Grouped by name as filed (or the developer the AI identified), with LLC and Inc. variants merged. ' + SOURCES });
 }

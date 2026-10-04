@@ -801,7 +801,6 @@ function summaryAoa(list,label){
   return sum; }
 function exportGeoJSON(list,name){ const rows=rowsFor(list);
   saveFile(name+'.geojson',JSON.stringify(fc(list.map((f,i)=>({type:'Feature',properties:rows[i],geometry:{type:'Point',coordinates:[f.lon,f.lat]}})))),'application/geo+json'); }
-function exportHtml(list,name){ saveFile(name+'.html',buildReport(list),'text/html'); }
 document.getElementById('selClear').onclick=()=>{ clearSelection(); if(mode==='county') setMode('pan'); };
 const RG={}; ['primary','trunk','motorway'].forEach(k=>{ if(DATA.roads&&DATA.roads[k]) RG[k]={type:'MultiLineString',coordinates:DATA.roads[k]}; });
 function reportMap(list){
@@ -819,32 +818,6 @@ function reportMap(list){
       :'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+col+'" fill-opacity="'+(f.type==='New'?.8:.6)+'" stroke="#fff" stroke-width=".8"/>'; });
   if(sel.kind==='radius'){ const c=pr(sel.center); if(c) svg+='<circle cx="'+c[0].toFixed(1)+'" cy="'+c[1].toFixed(1)+'" r="6" fill="#006527" stroke="#fff" stroke-width="2"/>'; }
   return svg+'</svg>';
-}
-function buildReport(list){
-  const total=list.reduce((s,f)=>s+f.cost,0), newb=list.filter(f=>f.type==='New'), sq=list.reduce((s,f)=>s+(f.sqft||0),0), pct=v=>total?Math.round(v/total*100)+'%':'–';
-  const byC=COUNTIES.map(c=>{const l=list.filter(f=>f.county===c); return [c,l.length,l.reduce((s,f)=>s+f.cost,0),l.filter(f=>f.type==='New').length];}).filter(r=>r[1]);
-  const byT=TYPES.map(t=>{const l=list.filter(f=>f.type===t); return [TYPE_LABEL[t],l.length,l.reduce((s,f)=>s+f.cost,0)];}).filter(r=>r[1]);
-  const top=list.slice().sort((a,b)=>b.cost-a.cost).slice(0,10), approx=list.filter(f=>f.approx).length, logo=document.querySelector('.brandbar .l-light').src, rad=sel.kind==='radius';
-  const rowsHtml=list.map((f,i)=>'<tr><td class="m">'+(i+1)+'</td><td class="m">'+esc(f.reg)+'</td><td><a href="'+tabsUrl(f.id)+'">'+esc(f.name)+'</a>'+(f.scope?'<div class="sc">'+esc(f.scope)+'</div>':'')+'</td><td>'+esc(f.addr||f.city)+'<div class="sc">'+(rad?fmtMi(f._d)+' from center · ':'')+esc(f.county)+' County'+(f.approx?' · approx. location':'')+'</div></td><td>'+esc(TYPE_LABEL[f.type])+'</td><td class="m r">'+fmtM(f.cost)+'</td><td class="m r">'+(f.sqft?fmtN(f.sqft):'–')+'</td><td>'+esc(f.owner||'–')+'</td><td class="m">'+esc(f.status||'–')+(f.start||f.end?'<div class="sc">'+esc(f.start||'?')+' → '+esc(f.end||'?')+'</div>':'')+'</td></tr>').join('');
-  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Construction filings report — '+esc(scopeLabel())+'</title>'+
-  '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">'+
-  '<style>@page{size:letter landscape;margin:.45in}*{box-sizing:border-box}body{margin:0;font-family:Montserrat,system-ui,sans-serif;color:#23282a;background:#fff;font-size:12px;line-height:1.45}.wrap{max-width:1100px;margin:0 auto;padding:32px 28px}'+
-  '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #006527;padding-bottom:14px}.hd img{height:44px}.k{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#006527;font-weight:500}'+
-  'h1{font-size:26px;letter-spacing:-.02em;margin:6px 0 2px;font-weight:800;color:#0b0d0c}h2{font-size:15px;margin:26px 0 10px;font-weight:700;color:#0b0d0c}.meta{color:#6b7174;font-size:12px}'+
-  '.kp{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #e8ebeb;border-radius:6px;margin-top:18px}.kp div{padding:12px 14px}.kp div+div{border-left:1px solid #e8ebeb}.kp div:first-child{border-left:3px solid #006527}'+
-  '.kp b{display:block;font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:600;color:#0b0d0c}.kp span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#6b7174}'+
-  '.map{margin-top:16px;border:1px solid #e8ebeb;border-radius:6px;overflow:hidden}.map svg{display:block;width:100%;height:auto}.lg{display:flex;gap:16px;font-size:11px;color:#4d5457;margin-top:6px}.lg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}'+
-  '.two{display:grid;grid-template-columns:1fr 1fr;gap:24px}table{width:100%;border-collapse:collapse}th{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;text-align:left;font-weight:500;border-bottom:1px solid #bcc2c4;padding:6px 8px}'+
-  'td{border-bottom:1px solid #e8ebeb;padding:7px 8px;vertical-align:top}.m{font-family:"IBM Plex Mono",monospace;font-size:11px;white-space:nowrap}.r{text-align:right}thead{display:table-header-group}tr{break-inside:avoid}a{color:#006527;font-weight:600;text-decoration:none}.sc{color:#6b7174;font-size:10.5px;margin-top:2px}'+
-  '.ft{margin-top:24px;padding-top:10px;border-top:1px solid #e8ebeb;color:#6b7174;font-size:10.5px}.pb{position:fixed;right:18px;top:18px;background:#006527;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:600 12px Montserrat,sans-serif;cursor:pointer}@media print{.pb{display:none}.wrap{padding:0}.full{break-before:page}}</style></head><body>'+
-  '<button class="pb" onclick="window.print()">Print or Save as PDF</button><div class="wrap"><div class="hd"><div><div class="k">TDLR TABS · Construction filings report</div><h1>'+esc(scopeLabel())+'</h1><div class="meta">Registrations '+PERIOD+' · Generated '+today.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})+(filterText()?' · '+esc(filterText()):'')+'</div></div><img src="'+logo+'" alt="Finishes Solutions"></div>'+
-  '<div class="kp"><div><b>'+fmtN(list.length)+'</b><span>Filings</span></div><div><b>'+fmtM(total)+'</b><span>Est. value</span></div><div><b>'+fmtN(newb.length)+'</b><span>New builds · '+fmtM(newb.reduce((s,f)=>s+f.cost,0))+'</span></div><div><b>'+(sq?fmtN(sq):'–')+'</b><span>Sq ft as filed</span></div></div>'+
-  '<div class="map">'+reportMap(list)+'</div><div class="lg"><span><i style="background:#006527"></i>New construction</span><span><i style="background:#6b7174"></i>Renovation</span><span><i style="border:1.5px solid #1f9249"></i>Addition / approx. location</span><span>Marker size = est. value</span></div>'+
-  '<div class="two"><div><h2>By county</h2><table><thead><tr><th>County</th><th class="r">Filings</th><th class="r">Est. value</th><th class="r">Share</th><th class="r">New</th></tr></thead><tbody>'+byC.map(r=>'<tr><td>'+esc(r[0])+'</td><td class="m r">'+fmtN(r[1])+'</td><td class="m r">'+fmtM(r[2])+'</td><td class="m r">'+pct(r[2])+'</td><td class="m r">'+r[3]+'</td></tr>').join('')+'</tbody></table>'+
-  '<h2>By type</h2><table><thead><tr><th>Type</th><th class="r">Filings</th><th class="r">Est. value</th><th class="r">Share</th></tr></thead><tbody>'+byT.map(r=>'<tr><td>'+esc(r[0])+'</td><td class="m r">'+fmtN(r[1])+'</td><td class="m r">'+fmtM(r[2])+'</td><td class="m r">'+pct(r[2])+'</td></tr>').join('')+'</tbody></table></div>'+
-  '<div><h2>Largest filings</h2><table><thead><tr><th>Project</th><th>City</th><th class="r">Est. value</th></tr></thead><tbody>'+top.map(f=>'<tr><td><a href="'+tabsUrl(f.id)+'">'+esc(f.name)+'</a><div class="sc">'+esc(TYPE_LABEL[f.type])+(f.sqft?' · '+fmtN(f.sqft)+' sq ft':'')+'</div></td><td>'+esc(f.city||f.county)+'</td><td class="m r">'+fmtM(f.cost)+'</td></tr>').join('')+'</tbody></table></div></div>'+
-  '<div class="full"><h2>All filings ('+fmtN(list.length)+')</h2><table><thead><tr><th>#</th><th>Registered</th><th>Project</th><th>Location</th><th>Type</th><th class="r">Est. value</th><th class="r">Sq ft</th><th>Owner</th><th>Status</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
-  '<div class="ft">Source: Texas Department of Licensing and Regulation, TABS project registrations ('+PERIOD+'). Each project name links to its TABS record. Costs and dates are filer estimates. Locations come from the US Census and OpenStreetMap geocoders'+(approx?'; '+approx+' filing'+(approx>1?'s are':' is')+' placed at city level':'')+'. Prepared for Finishes Solutions.</div></div></body></html>';
 }
 
 // ---------- views ----------
@@ -945,8 +918,8 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
-  setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap, buildReport,
-  exportCsv, exportXlsx, exportGeoJSON, exportHtml, entityKey, get layersState(){ return layers; },
+  setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
+  exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
 for (const init of [initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
