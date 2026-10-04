@@ -32,7 +32,8 @@ export function initQuickLayers(ctx) {
     { k: 'demo', label: 'Demographics', title: 'Census tracts coloured by a measure (pick which in Map Layers)', on: () => !!el('lyDemo')?.value,
       toggle: () => { const s = el('lyDemo'); if (!s) return; if (s.value) { lastDemo = s.value; s.value = ''; } else s.value = lastDemo; fire(s); } },
     { k: 'traffic', label: 'Traffic Counts', title: 'TxDOT average daily traffic on counted roads', ...check('lyAadt') },
-    { k: 'filings', label: 'Filings', title: 'Construction filings (TDLR) as dots', ...check('lyFilings') },
+    { k: 'filings', label: 'Filings', title: 'Construction filings (TDLR): dots, or the heatmap set in Map Layers', on: () => ctx.filingsShown ? ctx.filingsShown() : !!el('lyFilings')?.checked,
+      toggle: () => ctx.setFilingsShown ? ctx.setFilingsShown(!ctx.filingsShown()) : check('lyFilings').toggle() },
     { k: 'planes', label: 'Planes', title: 'Live aircraft', ...live('planes') },
     { k: 'radar', label: 'Radar', title: 'Live rain radar', ...live('radar') }
   ];
@@ -40,7 +41,14 @@ export function initQuickLayers(ctx) {
     '<button class="qchip qmore" type="button" data-q="more" title="All map layers and options">' + ICON.more + '<span>More</span></button>';
   function sync() {
     for (const c of CHIPS) { const b = box.querySelector('[data-q="' + c.k + '"]'); let v = false; try { v = !!c.on(); } catch (e) {} if (b.getAttribute('aria-pressed') !== String(v)) b.setAttribute('aria-pressed', String(v)); }
-    const m = box.querySelector('.qmore'); m.setAttribute('aria-pressed', String(!!el('layers')?.classList.contains('on')));
+    // layers that are on but have no button here (crime, airports, weather, low flights…): counted on More, so anything
+    // drawn on the map shows up as selected somewhere
+    const extra = [['lyCrime', 'Crime'], ['lyAirports', 'Airports']].filter(([id]) => el(id)?.checked).map(x => x[1]);
+    try { const st = ctx.live?.state?.() || {}; for (const [k, v] of Object.entries(st)) if (v && k !== 'planes' && k !== 'radar') extra.push(ctx.live.label?.(k) || k); } catch (e) {}
+    const m = box.querySelector('.qmore'), open = !!el('layers')?.classList.contains('on');
+    m.setAttribute('aria-pressed', String(open || extra.length > 0));
+    m.querySelector('span').textContent = extra.length ? 'More · ' + extra.length : 'More';
+    m.title = extra.length ? 'Also on: ' + extra.join(', ') + '. All map layers and options.' : 'All map layers and options';
   }
   box.addEventListener('click', async e => {
     const b = e.target.closest('.qchip'); if (!b) return;

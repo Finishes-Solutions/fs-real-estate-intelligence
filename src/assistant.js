@@ -690,7 +690,7 @@ export function initAssistant(ctx) {
         const out = await ctx.followPlane(a.id || '', {}); if (out.error) return out;
         await ctx.flightReport(out.plane);
         actionChip('Flight report: ' + (out.plane.flight || out.plane.reg || out.plane.hex.toUpperCase()));
-        return { saved: true, flight: out.plane.flight || out.plane.reg || out.plane.hex, note: 'The flight report (HTML, printable) and a CSV of the track were saved; they are listed in the Reports tab. The plane card is open on the map.' };
+        return { saved: true, flight: out.plane.flight || out.plane.reg || out.plane.hex, note: 'The flight report (PDF) and a CSV of the track were saved; they are listed in the Reports tab. The plane card is open on the map.' };
       }
       if (name === 'crime_stats') {
         if (!ctx.crimeReportData) return { error: 'Crime data isn’t available in this version.' };

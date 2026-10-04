@@ -73,7 +73,7 @@ Cards slide up from the bottom: swipe down to shrink one, and swipe again to clo
 
 ## Looking up a property
 
-Click a building, or at street zoom click open ground, to open its **property card**.
+Click a building, or at street zoom click open ground, to open its **property card**. The owner and value show first, usually within a couple of seconds; the businesses, height and photo fill in after.
 
 - **Ownership & value:** owner, mailing address, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service.
 - **The building:** footprint, height, floors and estimated floor area.
@@ -105,7 +105,7 @@ Choose **Area**, **Shape**, **Radius** or **County** at the top of the map and m
 - **Crime report** (City of Houston): incidents by type, trend, time of day, day of week, and per resident.
 - **Compare:** add up to 4 areas and see them side by side.
 
-Every report can be printed or saved as a web page or PDF and downloaded as a spreadsheet. Reports are kept in the **Reports** tab.
+Every report exports as a PDF in the Finishes Solutions style, and its data as a spreadsheet. Reports are kept in the **Reports** tab.
 
 ### Clearing the view
 
@@ -137,7 +137,11 @@ Property filters (use, acres, value, year built, owner, zoning) are planned. The
 
 ## Map layers
 
-**Quick layer buttons** turn the most common layers on and off with one tap. **More** (or the layers button on the right) opens **Map Layers**, which holds every layer and its options:
+**Quick layer buttons** turn the most common layers on and off with one tap. A button is highlighted whenever its layer is on the map, however it was turned on. **Filings** covers both the dots and the heatmap, and turning it off hides both. Layers without their own button (crime, airports, weather and others) are counted on **More** (for example "More · 2"); hover over it to see which. **More** (or the layers button on the right) opens **Map Layers**, which holds every layer and its options.
+
+The map always opens without construction filings or planes. Turn them on with their buttons. A shared link that carries filing filters opens with the filings shown.
+
+Map Layers:
 
 - **Base Map:**
   - Default: a calm, muted map.
@@ -186,7 +190,9 @@ The quick buttons and the panel always match. A layer turned on in either place,
 - **Tilt the map** and planes become **3D models** at their real altitude. Each kind of aircraft has its own shape: airliners, jumbo jets, business jets, military transports, fighters, turboprops, small planes, helicopters, gliders, balloons and drones.
   - Planes bank into turns and tip their nose up or down as they climb or descend.
   - A thin line drops to the ground, and the flat icon underneath becomes a grey shadow showing the callsign and altitude.
-- **Click a plane** (or its 3D model) for its card: photo, type, operator, route, altitude and speed, registered owner (US planes), and this flight's path. Tilted, the path is a ribbon at the plane's altitude with a curtain down to the ground. You can **follow** or **orbit** a plane.
+- **Click a plane** (or its 3D model) for its card: photo, type, operator, route, altitude and speed, registered owner (US planes), and this flight's path.
+  - **Routes** come from a free community route list. For flight numbers with several stops (for example Chicago → Houston → Chicago), the card picks the leg the plane is flying from where it is, which way it's heading and whether it's climbing or descending.
+  - A listed route that doesn't match where the plane actually is gets left out. If the flight path shows where the plane took off, the card says **From (airport) · destination not listed** instead. Tilted, the path is a ribbon at the plane's altitude with a curtain down to the ground. You can **follow** or **orbit** a plane.
 - **Airports** shows every airport in the world. Click one for runways (with a diagram), radio frequencies, current weather, airlines, statistics and the FAA airport diagram.
 - **Low Flight Paths** shows where planes fly below 3,000 ft over the last 30 days. Property cards show how many low flights pass overhead.
 
@@ -195,7 +201,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
 ## Market and demographics
 
 - **Area at a Glance** in the left panel shows the census numbers for what's on screen.
-- The **Market** tab, for each county or the whole region, shows:
+- The **Market** tab, for each county or the whole region, shows the items below. Pick the area at the top: click a county on the small map or its button, and click it again (or **Whole region**) to go back to all counties.
   - population and growth;
   - jobs and top industries;
   - new housing permits;
@@ -207,7 +213,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
   - unemployment;
   - the Houston crime trend and the busiest roads.
 - **Demographics** on the map colors each census tract. Hover over a tract for its numbers.
-- **Compare** puts up to 4 areas side by side.
+- **Compare** puts up to 4 areas side by side. With two or more counties selected on the map, **+ Compare Together** adds them as one area and **+ Compare Each** adds every county as its own area.
 
 ---
 
@@ -248,7 +254,13 @@ Answers come with cards: summaries, charts, comparisons, places, drive times, we
   - a **Filing list** (PDF, Excel, CSV or map file);
   - an **Area comparison** (PDF, Excel or CSV);
   - an **Activity report** (PDF, Excel or CSV).
-- Area reports (FEMA, traffic, drive time, air traffic, crime) export as web pages or PDFs and spreadsheets.
+- Area reports (FEMA, traffic, drive time, air traffic, crime), the Market report, airport reports and flight reports export as **PDFs**, and their data as CSV.
+- **Every PDF uses the Finishes Solutions report style:**
+  - a dark title band with the logo, the green rule and the brand fonts;
+  - headline figures in tiles, clean tables, and the report name and page numbers on every page.
+  - Pages are portrait. The full filing list (and a comparison of four or more areas) is landscape, because it needs the width.
+- A PDF filing list shows the 2,000 largest filings (1,000 when added to a Summary report). Excel and CSV always have every filing.
+- If the PDF can't be made, the report is saved as a web page instead. Open it and use **Print → Save as PDF**.
 - The **Reports** tab keeps your past exports in this browser. You can download one again, re-run it with today's data, or open it on the map.
 
 ---
@@ -294,6 +306,12 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **Tabs on the card:** Shift-click (or **+ Add** on touch screens) to pick up to 10 buildings, parcels, filings, planes or airports, each in its own tab, with an **All** tab that adds up the buildings.
 - **A subtler dot grid:** smaller, closer and much fainter dots.
 - **Phones:** the quick layer buttons sit in their own row under the search bar, clear of the map buttons.
+- **The map opens clean:** no filings or planes until you turn them on, and the layer buttons always match what's on the map.
+- **Compare each county separately** when several counties are selected, or all of them together.
+- **A new area picker on the Market tab:** a small county map plus a button for each county and the whole region.
+- **Every report now exports as a PDF in the Finishes Solutions style:** filings, market, crime, FEMA, traffic, drive time, air traffic, airport and flight reports.
+- **Plane routes are back** for most airline flights, with the right leg picked on multi-stop flights.
+- **Property cards show the owner and value faster:** they no longer wait for the slower business and height lookups.
 
 - **Filters for the map's layers:** demographics, traffic and risk, alongside construction filings, plus a **Match everything** mode that finds the neighborhoods meeting every threshold.
 - **Faster:**

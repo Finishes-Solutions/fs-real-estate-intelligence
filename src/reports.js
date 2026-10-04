@@ -7,7 +7,7 @@ import { REPORTS, FORMATS } from './export.js';
 
 const KEY = 'fs-reports';
 const ICON = { pdf: 'PDF', xlsx: 'XLS', csv: 'CSV', geojson: 'GEO', html: 'WEB', kml: 'KML' };
-const KINDS = { ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k, r.label])), crime: 'Crime Report', market: 'Market Report', field: 'Field Notes', other: 'Other' };
+const KINDS = { ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k, r.label])), crime: 'Crime Report', fema: 'FEMA Report', market: 'Market Report', field: 'Field Notes', other: 'Other' };
 
 export function initReports(ctx) {
   const { esc, fmtN } = ctx, root = document.getElementById('view-reports'); if (!root) return;
@@ -65,18 +65,18 @@ export function initReports(ctx) {
     }).join('') + marketCard() + crimeCard() + areaCards();
   }
   // Market Report: the Market view (growth, permits, businesses, jobs, spending, sales tax, crime, traffic, rates) for the
-  // area chosen there, as a printable report or the data as CSV
+  // area chosen there, as a PDF report or the data as CSV
   function marketCard() {
     if (!ctx.exportMarket) return '';
     return '<div class="rp-card"><b>Market Report</b><p>The Market view for the region or one county: population and jobs, housing permits, new businesses, consumer spending, city sales tax, Houston crime, the busiest roads and rates.</p>' +
-      '<em>Uses the area chosen on the Market tab</em><div class="rp-fmts"><button type="button" class="btn" data-market="html">Web / PDF</button><button type="button" class="btn" data-market="csv">CSV</button></div></div>';
+      '<em>Uses the area chosen on the Market tab</em><div class="rp-fmts"><button type="button" class="btn" data-market="pdf">PDF</button><button type="button" class="btn" data-market="csv">CSV</button></div></div>';
   }
   // Crime Report (Houston Police incidents): for the selected area or the map view; opens in the card on the map, and
   // its PDF / CSV exports land in Previously Exported
   function crimeCard() {
     if (!ctx.crimeReportFor) return '';
     const sel = ctx.sel?.feature ? ctx.sel.label || 'the selected area' : null;
-    return '<div class="rp-card"><b>Crime Report</b><p>Houston Police incidents for an area: the last 12 months against the year before, violent and property crime, a monthly trend, top offenses and where they happened. Export as a printable report or CSV.</p>' +
+    return '<div class="rp-card"><b>Crime Report</b><p>Houston Police incidents for an area: the last 12 months against the year before, violent and property crime, a monthly trend, top offenses and where they happened. Export as a PDF report or CSV.</p>' +
       '<em>' + esc(sel ? 'Selected: ' + sel : 'City of Houston only. Select an area with Area, Shape, Radius or County, or use the map view') + '</em><div class="rp-fmts">' +
       (sel ? '<button type="button" class="btn" data-crime="selection">Selected area</button>' : '') +
       '<button type="button" class="btn" data-crime="view">Map view</button><button type="button" class="btn" data-crime="pick">Draw an area</button></div></div>';

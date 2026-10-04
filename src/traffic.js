@@ -2,8 +2,8 @@
 //   Map layer "Traffic Counts": TxDOT annual average daily traffic on each counted road segment, from zoom 11.
 //   Traffic report for any area: the busiest roads and every counted segment (TxDOT), average traffic by road type,
 //   live speed vs free flow on the busiest roads and current crashes / closures / road works (TomTom, live, not stored).
-//   Opens in the card; exports a printable report (HTML → PDF) and CSV.
-import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, saveHtml, saveCsv, openCard, cardTop, fillCard } from './reportkit.js';
+//   Opens in the card; exports a PDF report and CSV.
+import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard } from './reportkit.js';
 
 const STOPS = [[5000, '#22c55e'], [20000, '#eab308'], [60000, '#f97316'], [150000, '#dc2626'], [300000, '#7f1d1d']];
 const colorOf = v => (STOPS.find(s => v < s[0]) || STOPS[STOPS.length - 1])[1];
@@ -76,7 +76,7 @@ export function initTraffic(ctx) {
         '<dl>' + live.map(x => '<dt>' + esc(x.road) + '</dt><dd class="mono">' + fmt(x.current_mph) + ' mph <span class="sc">free flow ' + fmt(x.free_flow_mph) + ' · ' + esc(congestion(x)) + '</span></dd>').join('') + '</dl>' : '<div class="rnote">No live readings.</div>') + '</div>' +
       '<div class="bsec"><div class="lt">Incidents right now</div>' + (d.incidents?.error ? '<div class="rnote">' + esc(d.incidents.error) + '</div>' : inc.length ?
         inc.slice(0, 10).map(x => '<div class="pl"><b>' + esc(x.kind + (x.road ? ' · ' + x.road : '')) + '</b><span>' + esc([x.what, x.from && x.to ? x.from + ' to ' + x.to : x.from, x.delay_min ? x.delay_min + ' min delay' : ''].filter(Boolean).join(' · ')) + '</span></div>').join('') : '<div class="rnote">No crashes, closures or road works reported in this area.</div>') + '</div>' +
-      '<div class="bacts"><button class="btn" id="trLayer" type="button">Show Counts on Map</button><button class="btn primary" id="trPdf" type="button">Export Report</button><button class="btn" id="trCsv" type="button">Export CSV</button></div>' +
+      '<div class="bacts"><button class="btn" id="trLayer" type="button">Show Counts on Map</button><button class="btn primary" id="trPdf" type="button">Export PDF</button><button class="btn" id="trCsv" type="button">Export CSV</button></div>' +
       '<div class="rnote bsec">Counts are TxDOT annual averages (both directions, all vehicles); TxDOT publishes the current year only. Live speeds and incidents are a snapshot from when the report was opened.<span class="src"> ' + esc(d.sources) + '</span></div>');
     card.querySelector('#trLayer').onclick = () => { setOn(true); ctx.fitGeom?.(geometry); };
     card.querySelector('#trPdf').onclick = exportReport; card.querySelector('#trCsv').onclick = exportCsv;
@@ -108,7 +108,7 @@ export function initTraffic(ctx) {
       '<div class="two"><div><h2>By road type</h2>' + table(['Type', { t: 'Avg a day', r: 1 }, { t: 'Busiest', r: 1 }, { t: 'Segments', r: 1 }], (c.types || []).map(t => [esc(t.label), fmt(t.avg), fmt(t.max), fmt(t.segments)])) + '</div>' +
       '<div><h2>Live speeds (' + new Date(d.as_of_live).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) + ')</h2>' + (live.length ? table(['Road', { t: 'Now', r: 1 }, { t: 'Free flow', r: 1 }, 'Condition'], live.map(x => [esc(x.road), fmt(x.current_mph) + ' mph', fmt(x.free_flow_mph) + ' mph', esc(congestion(x))])) : '<p class="meta">' + esc(d.live?.error || 'No live readings.') + '</p>') + '</div></div>' +
       '<h2>Incidents at the time of the report</h2>' + (inc.length ? table(['Type', 'Road', 'Where', 'What', { t: 'Delay', r: 1 }], inc.map(x => [esc(x.kind), esc(x.road), esc(x.from && x.to ? x.from + ' to ' + x.to : x.from), esc(x.what), x.delay_min ? x.delay_min + ' min' : ''])) : '<p class="meta">' + esc(d.incidents?.error || 'None reported.') + '</p>');
-    await saveHtml(ctx, 'traffic', label, reportDoc({ kicker: 'Traffic report', title: label, meta: (d.area_sqmi ? fmt(d.area_sqmi) + ' sq mi' : '') + (c.as_of ? ' · TxDOT file of ' + esc(String(c.as_of).slice(0, 10)) : ''), body,
+    await savePdf(ctx, 'traffic', label, reportDoc({ kicker: 'Traffic report', title: label, meta: (d.area_sqmi ? fmt(d.area_sqmi) + ' sq mi' : '') + (c.as_of ? ' · TxDOT file of ' + esc(String(c.as_of).slice(0, 10)) : ''), body,
       sources: esc(d.sources) + ' Counts are annual averages for both directions and all vehicles; live speeds and incidents are a snapshot.' }));
   }
   // the area outline with the counted segments coloured by traffic
@@ -122,6 +122,6 @@ export function initTraffic(ctx) {
     return base.replace('</svg>', lines + '</svg>');
   }
 
-  ctx.addAreaReport?.({ key: 'traffic', label: 'Traffic Report', desc: 'Vehicle traffic for an area in Texas: the busiest roads and every counted segment (vehicles a day, TxDOT), average traffic by road type, live speeds on the busiest roads and current crashes, closures and road works. Export as a printable report or CSV.',
+  ctx.addAreaReport?.({ key: 'traffic', label: 'Traffic Report', desc: 'Vehicle traffic for an area in Texas: the busiest roads and every counted segment (vehicles a day, TxDOT), average traffic by road type, live speeds on the busiest roads and current crashes, closures and road works. Export as a PDF report or CSV.',
     note: 'Texas only. Select an area with Area, Shape, Radius or County, or use the map view', run: ({ geometry, label }) => report({ geometry, label }) });
 }

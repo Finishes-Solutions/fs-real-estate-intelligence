@@ -312,11 +312,19 @@ export function initPlanes(ctx) {
   const routes = new Map();
   async function routeFor(p) {
     if (!p.flight) return null; if (routes.has(p.flight)) return routes.get(p.flight);
-    const job = fetch('api/planes?route=' + encodeURIComponent(p.flight) + '&lat=' + p.lat + '&lon=' + p.lon + (p.track != null && !p.ground ? '&track=' + p.track : '')).then(r => r.ok ? r.json() : null).catch(() => null);
+    const job = fetch('api/planes?route=' + encodeURIComponent(p.flight) + '&lat=' + p.lat + '&lon=' + p.lon + (p.track != null && !p.ground ? '&track=' + p.track : '') + (p.vs != null && !p.ground ? '&vs=' + p.vs : '')).then(r => r.ok ? r.json() : null).catch(() => null);
     routes.set(p.flight, job); return job;
   }
   // a route fits the trace when a flight that took off on this trace left from (near) the route's origin
   const MI = (a, b) => { const R = Math.PI / 180, h = Math.sin((b[1] - a[1]) * R / 2) ** 2 + Math.cos(a[1] * R) * Math.cos(b[1] * R) * Math.sin((b[0] - a[0]) * R / 2) ** 2; return 7917.6 * Math.asin(Math.sqrt(h)); };
+  // no route listed: the airport the flight path left from (it took off on this trace), from the airports table
+  const deps = new Map();
+  function departedFrom(hex, t) {
+    if (deps.has(hex)) return deps.get(hex);
+    const job = t?.leg?.started_on_ground && Array.isArray(t.leg.from) ? fetch('api/airports?near=' + t.leg.from[1] + ',' + t.leg.from[0] + '&km=6&n=1').then(r => r.ok ? r.json() : null)
+      .then(d => { const a = d?.airports?.[0]; return a ? { code: a.iata || a.icao || a.ident, city: a.municipality, name: a.name } : null; }).catch(() => null) : Promise.resolve(null);
+    deps.set(hex, job); return job;
+  }
   const routeFits = (r, t) => !(t?.leg?.started_on_ground && Number.isFinite(r.origin?.lat) && MI(t.leg.from, [r.origin.lon, r.origin.lat]) > 40);
   const ap = a => a ? esc((a.code ? a.code + ' ' : '') + (a.city || a.name || '')) : '?';
   // FAA registration by hex or N-number: one request per batch of new ids, kept for the session (the FAA updates daily)
@@ -404,7 +412,7 @@ export function initPlanes(ctx) {
       '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
       '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">adsb.lol ↗</a>' +
       (tr?.points?.length > 1 ? '<button class="btn" type="button" id="pl3dBtn">3D flight path</button>' : '') + (ctx.flightReport ? '<button class="btn" type="button" id="plReport">Export Flight Report</button>' : '') + '</div>' +
-      '<div class="ssrc src">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown. Routes: adsbdb and adsb.lol. Flight path: adsb.lol traces.</div></div>';
+      '<div class="ssrc src">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown. Routes: VRS standing data and adsbdb. Flight path: adsb.lol traces.</div></div>';
     // a tab of its own (src/cardtabs.js); the 10-second refreshes re-render the card, so they put the tab bar back
     if (refresh) ctx.tabs?.mount();
     else ctx.tabs?.track({ id: 'p:' + hex, kind: 'plane', label: p.flight || p.reg || hex.toUpperCase(), reopen: () => renderCard(hex), leave: () => { if (shown === hex) { shown = null; follow = null; orbiting = false; clearRoute(); clearPath(); } } });
@@ -422,12 +430,14 @@ export function initPlanes(ctx) {
       trackFor(hex).then(async t => { if (!t || shown !== hex) return; if (t.points?.length > 1) showPath(hex, t);
         // the flight path can show a database route is stale: it took off far from the listed origin
         const r = await routeFor(p); if (r?.origin && !routeFits(r, t)) { r.mismatch = true; if (routeOn?.hex === hex) clearRoute(); }
+        if (!r?.origin || r.mismatch) await departedFrom(hex, t);
         if (shown === hex) renderCard(hex, true); });
     }
     if (!regDone.has(hex)) regOf(p).then(r => { const sec = card.querySelector('#plReg'); if (sec && shown === hex) sec.outerHTML = regHtml(p, r || { failed: true }); });
     const r = await routeFor(p), el = card.querySelector('#plRoute');
     const known = r?.origin && r?.destination && !r.mismatch;
-    if (el && shown === hex) el.textContent = known ? ap(r.origin).replace(/&amp;/g, '&') + ' → ' + ap(r.destination).replace(/&amp;/g, '&') : p.flight ? 'Route not in the database (flight path below)' : 'No callsign';
+    const dep = !known && deps.has(hex) ? await deps.get(hex) : null, plain = a => ap(a).replace(/&amp;/g, '&');
+    if (el && shown === hex) el.textContent = known ? plain(r.origin) + ' → ' + plain(r.destination) : dep ? 'From ' + plain(dep) + ' · destination not listed' : p.flight ? 'Route not listed (flight path below)' : 'No callsign';
     const rd = card.querySelector('#plDist'); if (rd && shown === hex) rd.textContent = known ? (r.origin.code || '?') + ' → ' + (r.destination.code || '?') : '—';
     // draw the route the first time the card opens for this plane (not on every 10-second refresh)
     if (shown === hex && !refresh && r && !r.mismatch) showRoute(hex, r);
@@ -457,7 +467,7 @@ export function initPlanes(ctx) {
   }
 
   ctx.live.register('planes', {
-    label: 'Live Planes', persist: true,
+    label: 'Live Planes', persist: false, // never back on by itself: the map opens without planes
     set: v => { v ? start() : stop(); },
     add: () => { addLayers(); map.getSource('live-planes')?.setData(fc()); if (routeOn) { addRouteLayers(); syncRoute(); } },
     note: () => map.getZoom() < MINZ ? 'Zoom in to see planes.' : err ? 'Planes: ' + err : at ? list.length.toLocaleString('en-US') + ' aircraft in view · ' + new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) + ' (' + src + ').' : 'Loading planes…',

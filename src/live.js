@@ -434,6 +434,6 @@ export function initLive(ctx) {
   // for the Sources tab: what is on, how often it refreshes, and the latest data time we know of
   const status = () => ({ ext: Object.fromEntries(Object.entries(EXT).map(([k, x]) => [k, { on: !!on[k], ...(x.status?.() || {}) }])), hires: hires ? { kind: hires.kind, date: hiDate(hires) } : null, on: { ...on }, trafficOK, terrainMesh: !!map.getTerrain?.(), terrainZoom: TERRAIN_Z, windTime: windData?.time || null, nasa: nasa?.day ? { day: nasa.day, name: nasa.name, cloud: nasa.cloud } : null,
     raster: Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, { every: v.every, requested: stamp[k] != null ? stamp[k] * v.every * 60e3 : null }])) });
-  ctx.live = { register, syncUI, set, drive, weather, forecast, forecastHTML, news, imagery, clearRoute, state: () => ({ ...on }), status, driveHTML, weatherHTML, newsHTML,
+  ctx.live = { register, syncUI, set, label: k => LABEL[k] || EXT[k]?.label || k, drive, weather, forecast, forecastHTML, news, imagery, clearRoute, state: () => ({ ...on }), status, driveHTML, weatherHTML, newsHTML,
     imageryInto: el => { if (lastImagery) renderCardImagery(lastImagery.c, lastImagery.list, lastImagery.hi, el); } };
 }

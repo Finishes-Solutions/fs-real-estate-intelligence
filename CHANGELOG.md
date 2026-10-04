@@ -5,11 +5,58 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
+### 12:23 PM CT: Building tabs and the parcel list combined with the faster property cards (MERGE)
+- Brought together two sets of changes made in parallel. The property card still shows the owner and value first, and the "this building sits on N parcels" list now fills in when the second, slower lookup finishes (a second or two later).
+- Shift-click tabs, the **All** tab and the whole-building selection work with the faster two-step lookup.
+- Fixed while combining: picking the same parcel twice (on open ground) is recognised as the same one again, so it toggles off instead of adding a duplicate tab.
+
 ### 12:02 PM CT: Phone layer buttons get their own row (7f9b530)
 - **On phones, the quick layer buttons (Satellite, 3D, Parcels…) moved up** into the empty band just under the search bar, instead of sitting between the map buttons on the left and right.
 - The row runs edge to edge and swipes sideways. The faded right edge shows there are more buttons, and the last one (More) scrolls fully into view.
 - **The filings count** ("1,161 filings · $7.47B") moved out of that band. It now sits centered between the two columns of map buttons.
 - Search results and the assistant's answers still open over the row. Desktop and tablet are unchanged.
+
+### 11:00 AM CT: Clean start, honest layer buttons, Compare each county, Market area picker (abff29a)
+- **The map opens without construction filings or planes.**
+  - Before, a reload often showed filing dots with the Filings button off. The app writes its default date filter into the page address, and on load any filter in the address turned the dots on.
+  - A filings heatmap or Live Planes saved from a past visit also came back on by themselves.
+  - Now filings and planes stay off until you turn them on. A shared link that carries real filing filters still opens with the filings shown.
+- **The quick layer buttons always match what's on the map:**
+  - **Filings** lights up for the dots or the heatmap, and turning it off hides both.
+  - Layers without their own button (crime, airports, weather, low flights) are counted on **More**, for example "More · 2", and hovering over it lists them.
+- **Compare each county separately.** With two or more counties selected, the selection bar offers **+ Compare Together** (one combined area, as before) and **+ Compare Each (N)**, which adds every county as its own area, up to Compare's 4. The Compare tab has the same choice.
+- **A new area picker on the Market tab** replaces the dropdown:
+  - a small map of the seven counties you can click, beside a button for each county and **Whole region**;
+  - click the selected county again to go back to the region;
+  - on phones the buttons scroll sideways.
+
+### 3:06 AM CT: Every report exports as a branded PDF (10f4eb1, 15bda9f, d2af0a0)
+- **Reports now download as real PDFs in the Finishes Solutions style.** This covers construction filings (Summary, Filing List, Area Comparison, Activity), Market, Crime, FEMA, Traffic, Drive-Time, Air Traffic, Airport and Flight reports.
+  - Before, most reports saved a web page that you had to print to PDF yourself.
+- **One look for every report:**
+  - a dark title band with the white Finishes logo, a faint blueprint grid and the green rule;
+  - Montserrat and IBM Plex Mono throughout;
+  - headline figures in tiles with a green edge, and section headings with a short green bar;
+  - clean tables whose column headers repeat on every page;
+  - a footer on every page with the report name and page numbers, and a "Building a Future Together" sign-off at the end.
+- **Portrait pages by default.** The full Filing List is landscape because its ten columns need the width, and so is an Area Comparison of four or more areas.
+- **The PDF text is real text:** you can select it and search it, and charts and maps stay sharp at any zoom.
+- **Very long lists:** a PDF Filing List shows the 2,000 largest filings (1,000 when added to a Summary report) and says so. Excel and CSV still have every filing. All 10,853 filings would be about 1,000 pages.
+- The **Export Report** buttons on report cards now read **Export PDF**. The Reports tab's Market card offers **PDF** and **CSV**.
+- If the PDF service can't be reached, the report is saved as a web page instead, with a note to use Print → Save as PDF.
+- A PDF takes a few seconds to prepare (up to about 8 seconds for the first one after a quiet period).
+
+### 2:30 AM CT: Plane routes back, faster property cards (95ca452, deb979b)
+- **Plane cards show routes again.** Since adsb.lol's route lookup stopped answering, every plane said "Route not in the database."
+  - Routes now come from the Virtual Radar Server community route list, the same data adsb.lol used.
+  - Multi-stop flight numbers pick the leg the plane is flying, using where it is, its heading and whether it's climbing or descending. For example, AAL2302 (Chicago → Houston → Chicago) shows **ORD → IAH** while descending into Houston, and UAL382 shows **DCA → IAH**.
+  - Routes that don't match where the plane is are still left out. In a check of six flights over Houston, four got a correct route, compared with none before.
+  - With no usable route, the card says **From IAH · destination not listed** when the flight path shows where the plane took off.
+- **The owner and value on a property card show up faster.**
+  - The appraisal record is now fetched on its own and shown as soon as it arrives, usually in a second or two.
+  - Before, it waited for the slowest part of the card. In one test the OpenStreetMap business lookup took 27 seconds.
+- **The business lookup gives up on a stalled server sooner.** The next OpenStreetMap server is asked after 2.5 seconds instead of waiting out a 9-second timeout, so a stalled server costs about 3 seconds instead of up to 27.
+- A failed business, height or parcel lookup is retried after a few minutes instead of being remembered for a day.
 
 ### 2:07 AM CT: A subtler dot grid (8849314)
 - **The dot grid is quieter:** smaller dots, set a little closer together, at well under half the old strength, so it reads as texture rather than pulling the eye. The home county's green dots stay a bit stronger so it still stands out.
@@ -29,6 +76,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - Shift-click something already picked to drop it. A plain click starts over; closing the card clears everything.
   - With two or more buildings or parcels, an **All** tab totals footprint, floor area, market value and acres (each parcel counted once), with the filings on them, a CSV export (now with a parcel count per building) and **Zoom to All**.
 - **Fixed: Shift-click did nothing on the map.** The map's Shift-drag box zoom was swallowing every Shift-click, so the old "Shift-click to select several buildings" never actually reached the app.
+
 
 ### 1:30 AM CT: Filters for the map's layers, and freeze fixes (690491d)
 - **Filters now cover the map's layers, not just construction filings.** The panel has a section per kind of data:

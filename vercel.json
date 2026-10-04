@@ -78,6 +78,10 @@
     },
     "api/counties.js": {
       "maxDuration": 25
+    },
+    "api/pdf.js": {
+      "maxDuration": 60,
+      "includeFiles": "{fonts/**,node_modules/@sparticuz/chromium/bin/**}"
     }
   },
   "crons": [

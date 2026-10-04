@@ -4,10 +4,11 @@
 //   Houston crime (Houston Police, api/crime?city=1) and the busiest roads (TxDOT counts, api/traffic).
 // Charts are interactive: hover (or focus) for the numbers, click a bar to pin its breakdown under the chart, toggle
 // series from the legend, and switch monthly charts between 12 months, 24 months and everything. "Export Report"
-// saves a printable report (HTML → PDF) and "Export Data" a CSV of every series; both are listed on the Reports tab.
+// saves a PDF report and "Export Data" a CSV of every series; both are listed on the Reports tab.
 // Also the "Businesses registered here" lookup (api/tenants) used by the building and filing cards.
 import { SECTORS } from './lib/sectors.mjs';
 import { CAT_LABEL } from './lib/spending.mjs';
+import { reportDoc, savePdf } from './reportkit.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -244,12 +245,28 @@ export function initArea(ctx) {
       '<div class="rnote">TxDOT annual average daily traffic (AADT) counts' + (t.as_of ? ', published ' + esc(t.as_of) : '') + '. TxDOT publishes the current year only, so this shows how busy roads are, not how traffic is changing. Live traffic is under Map Layers.</div></section>';
   }
 
-  // ---------- export: the view as a printable report (HTML → PDF) and every series as CSV ----------
+  // ---------- area picker: a small map of the counties (click one) beside a button per county and the whole region ----------
+  function scopeHtml() {
+    const geo = (ctx.countyGeo || []).filter(g => area.counties.some(c => c.name === g.name));
+    let svg = '';
+    if (window.d3 && geo.length) {
+      const W = 260, H = 180, fcx = { type: 'FeatureCollection', features: geo.map(g => ({ type: 'Feature', properties: {}, geometry: g.geom })) };
+      const path = d3.geoPath(d3.geoMercator().fitExtent([[6, 6], [W - 6, H - 6]], fcx));
+      svg = '<svg class="mk-mini" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">' + geo.map(g => { const c = area.counties.find(x => x.name === g.name);
+        return '<path d="' + path(g.geom) + '" data-county="' + c.fips + '" class="' + (sel === c.fips ? 'on' : sel === 'all' ? 'in' : '') + '"><title>' + esc(c.name) + ' County</title></path>'; }).join('') +
+        geo.map(g => { const [x, y] = path.centroid(g.geom), on = sel === area.counties.find(c => c.name === g.name)?.fips; return Number.isFinite(x) ? '<text x="' + x.toFixed(1) + '" y="' + (y + 3).toFixed(1) + '"' + (on ? ' class="on"' : '') + '>' + esc(g.name.toUpperCase()) + '</text>' : ''; }).join('') + '</svg>';
+    }
+    const btn = (v, name, sub) => '<button type="button" class="mk-cty" data-county="' + v + '" aria-pressed="' + (sel === v) + '"><b>' + esc(name) + '</b><span>' + esc(sub) + '</span></button>';
+    return '<div class="mk-scope"><div class="mk-scope-l"><div class="mk-scope-k">Area</div>' + svg + '</div><div class="mk-ctys" role="group" aria-label="Market area">' +
+      btn('all', 'Whole region', area.counties.length + ' counties') + area.counties.map(c => btn(c.fips, c.name, c.fips === (area.counties.find(x => x.name === ctx.HOME_C)?.fips) ? 'County · home' : 'County')).join('') +
+      '</div><div class="mk-scope-n">Click a county on the map or a button; click it again for the whole region.</div></div>';
+  }
+  // ---------- export: the view as a PDF report and every series as CSV ----------
   const areaLabel = () => sel === 'all' ? 'Houston region (' + area.counties.length + ' counties)' : cname(sel) + ' County';
   const slug = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
   async function exportReport() {
     if (!area) return; if (ctx.view !== 'market') { ctx.setView('market'); await new Promise(r => setTimeout(r, 60)); }
-    const label = areaLabel(), today = new Date(), logo = document.querySelector('.brandbar .l-light')?.src || '';
+    const label = areaLabel();
     const kp = root.querySelector('.mk-kpis')?.outerHTML || '', grid = root.querySelector('.mk-grid')?.cloneNode(true);
     if (grid) {
       grid.querySelectorAll('.mk-hint,.mk-pin,.mk-ctl,select,button.lnk').forEach(e => e.remove());
@@ -257,21 +274,17 @@ export function initArea(ctx) {
       grid.querySelectorAll('.mk-lb').forEach(b => { const sp = document.createElement('span'); sp.innerHTML = b.innerHTML; if (b.getAttribute('aria-pressed') === 'false') sp.style.opacity = '.35'; b.replaceWith(sp); });
       grid.querySelectorAll('[tabindex],[data-k],[data-tip]').forEach(e => { e.removeAttribute('tabindex'); e.removeAttribute('data-k'); e.removeAttribute('data-tip'); });
     }
-    const css = '@page{size:letter;margin:.5in}*{box-sizing:border-box}body{margin:0;font-family:Montserrat,system-ui,sans-serif;color:#23282a;font-size:12px;line-height:1.45}.wrap{max-width:960px;margin:0 auto;padding:28px}' +
-      '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #006527;padding-bottom:12px;margin-bottom:16px}.hd img{height:40px}.k{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#006527}h1{font-size:24px;margin:6px 0 2px;font-weight:800}.meta{color:#6b7174}' +
-      '.kpis{display:grid;border:1px solid #e8ebeb;border-radius:6px;margin-bottom:16px}.kpi{padding:10px 12px;border-left:1px solid #e8ebeb}.kpi:first-child{border-left:0}.kpi b{display:block;font-family:"IBM Plex Mono",monospace;font-size:18px}.kpi span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#6b7174}.mk-sub{color:#6b7174;font-size:10.5px;margin-top:2px}' +
-      '.mk-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.mk-box{border:1px solid #e8ebeb;border-radius:6px;padding:12px 14px;break-inside:avoid}.mk-wide{grid-column:1/-1}h3{font-size:14px;margin:0 0 8px}.mk-h4{font-size:12px;margin:12px 0 6px}' +
+    const css = '.kpis{display:grid;border:1px solid #e8ebeb;border-radius:6px;margin:16px 0;break-inside:avoid}.kpi{padding:10px 12px;border-left:1px solid #e8ebeb}.kpi:first-child{border-left:3px solid #006527}' +
+      '.kpi b{display:block;font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:600;color:#0b0d0c}.kpi span{display:block;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;margin-top:3px}.mk-sub{color:#6b7174;font-size:9px;margin-top:2px}' +
+      '.mk-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.mk-box{border:1px solid #e8ebeb;border-radius:6px;padding:12px 14px;break-inside:avoid}.mk-wide{grid-column:1/-1}.mk-box h3{position:relative;padding-left:10px}.mk-box h3:before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:3px;background:#006527;border-radius:1px}.mk-h4{font-size:10.5px;font-weight:700;margin:12px 0 6px}' +
       '.mk-svg{width:100%;height:auto;display:block;overflow:visible}line.mk-grid{stroke:#e8ebeb}.mk-ax{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:#6b7174}path.mk-sf{fill:#006527}path.mk-mf{fill:#2a78d6}path.mk-part{fill:rgba(0,101,39,.35)}' +
-      '.mk-leg{display:flex;gap:14px;font-size:11px;color:#4d5457;margin-bottom:4px}.mk-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}.mk-leg i.mk-sf{background:#006527}.mk-leg i.mk-mf{background:#2a78d6}' +
-      '.mk-hbars{display:grid;gap:5px}.mk-hb{display:grid;grid-template-columns:minmax(110px,40%) 1fr auto;gap:8px;align-items:center;font-size:11.5px}.mk-hb span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#4d5457}.mk-hb i{display:block;height:9px}.mk-hb i b{display:block;height:100%;background:#006527;border-radius:0 3px 3px 0}.mk-hb em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:10.5px}' +
-      '.kgrid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #e8ebeb;border-radius:6px;margin-bottom:8px}.kgrid>div{padding:8px 10px;border-left:1px solid #e8ebeb}.kgrid>div:first-child{border-left:0}.kgrid b{display:block;font-family:"IBM Plex Mono",monospace;font-size:15px}.kgrid span{font-size:9.5px;color:#6b7174;text-transform:uppercase;letter-spacing:.08em;font-family:"IBM Plex Mono",monospace}' +
-      'table{width:100%;border-collapse:collapse;font-size:11px}th{text-align:left;font-family:"IBM Plex Mono",monospace;font-size:9.5px;text-transform:uppercase;color:#6b7174;border-bottom:1px solid #e8ebeb;padding:4px}td{border-bottom:1px solid #e8ebeb;padding:4px}.chitem{display:block;color:inherit;text-decoration:none;padding:4px 0;border-top:1px solid #e8ebeb}.chitem em{display:block;font-style:normal;color:#6b7174;font-size:10.5px}' +
-      '.rnote{color:#6b7174;font-size:10.5px;margin-top:6px}.src{display:none}.ft{margin-top:22px;padding-top:10px;border-top:1px solid #e8ebeb;color:#6b7174;font-size:10.5px}.pb{position:fixed;right:18px;top:18px;background:#006527;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:600 12px Montserrat,sans-serif;cursor:pointer}@media print{.pb{display:none}}';
-    const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Market report — ' + esc(label) + '</title><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet"><style>' + css + '</style></head><body>' +
-      '<button class="pb" onclick="window.print()">Print or Save as PDF</button><div class="wrap"><div class="hd"><div><div class="k">Market report</div><h1>' + esc(label) + '</h1><div class="meta">' + esc(today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) + (range ? ' · monthly charts: last ' + range + ' months' : '') + (area.built ? ' · data built ' + esc(new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : '') + '</div></div>' + (logo ? '<img src="' + esc(logo) + '" alt="">' : '') + '</div>' +
-      kp + '<div class="mk-grid">' + (grid ? grid.innerHTML : '') + '</div><div class="ft">Sources: US Census (ACS, Building Permits Survey, LEHD LODES), BLS, Texas Comptroller, Houston Police (NIBRS), TxDOT, FRED, New York Fed, CFPB HMDA, Google News. Estimates are labelled as such in each section.</div></div></body></html>';
-    ctx.exportMeta = { report: 'market', format: 'html', scope: label };
-    try { await ctx.saveFile('market-report-' + slug(label) + '-' + today.toISOString().slice(0, 10) + '.html', html, 'text/html'); } finally { ctx.exportMeta = null; }
+      '.mk-leg{display:flex;flex-wrap:wrap;gap:12px;font-size:9.5px;color:#4d5457;margin-bottom:4px}.mk-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}.mk-leg i.mk-sf{background:#006527}.mk-leg i.mk-mf{background:#2a78d6}' +
+      '.mk-hbars{display:grid;gap:5px}.mk-hb{display:grid;grid-template-columns:minmax(100px,40%) 1fr auto;gap:8px;align-items:center;font-size:9.5px}.mk-hb span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#4d5457}.mk-hb i{display:block;height:8px}.mk-hb i b{display:block;height:100%;background:#006527;border-radius:0 3px 3px 0}.mk-hb em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:9px}' +
+      '.mk-box .kgrid{margin:0 0 8px}.mk-box .kgrid b{font-size:13px}.chitem{display:block;color:inherit;font-weight:400;text-decoration:none;padding:4px 0;border-top:1px solid #e8ebeb}.chitem em{display:block;font-style:normal;color:#6b7174;font-size:9px}.src{display:none}';
+    const html = reportDoc({ kicker: 'Market report', title: label, meta: (range ? 'Monthly charts: last ' + range + ' months' : 'Monthly charts: all months') + (area.built ? ' · data built ' + esc(new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : ''), css,
+      body: kp + '<div class="mk-grid">' + (grid ? grid.innerHTML : '') + '</div>',
+      sources: 'US Census (ACS, Building Permits Survey, LEHD LODES), BLS, Texas Comptroller, Houston Police (NIBRS), TxDOT, FRED, New York Fed, CFPB HMDA, Google News. Estimates are labelled as such in each section.' });
+    return savePdf(ctx, 'market', label, html);
   }
   async function exportData() {
     if (!area) return; const s = stats(), label = areaLabel(), rows = [], add = (section, item, value, note = '') => rows.push({ Area: label, Section: section, Item: item, Value: value, Note: note });
@@ -311,13 +324,13 @@ export function initArea(ctx) {
       unempTile(),
       s.spend ? tile(fmtM(s.spend.total), 'Consumer spending (est.)', (s.spend.perHH ? fmtM(s.spend.perHH) + ' per household · ' : '') + 'a year') : ''
     ].filter(Boolean);
-    const opts = '<option value="all">Whole region</option>' + area.counties.map(c => '<option value="' + c.fips + '"' + (sel === c.fips ? ' selected' : '') + '>' + esc(c.name) + ' County</option>').join('');
     const placeOpts = s.places ? '<option value="">All places</option>' + s.places.map(p => '<option value="' + esc(p.key) + '"' + (newsPlace === p.key ? ' selected' : '') + '>' + esc(p.label) + '</option>').join('') : '';
     root.innerHTML = '<div class="vhead"><div><div class="kicker">Market</div><h2>Growth signals ' + (sel === 'all' ? 'across the region' : 'in ' + esc(cname(sel)) + ' County') + '</h2>' +
       '<div class="vsub">Jobs, housing permits, new businesses, consumer spending, city sales tax and local development news from free public sources, refreshed with the nightly build' + (area.built ? ' (last ' + new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : '') + '. No sales or lease comps: Texas doesn’t disclose sale prices.</div></div>' +
-      '<div class="vctl"><label>Area <select class="chip" id="mkCounty">' + opts.replace('value="all"', 'value="all"' + (sel === 'all' ? ' selected' : '')) + '</select></label>' +
+      '<div class="vctl">' +
       '<div class="mk-seg" role="group" aria-label="Months shown">' + [[12, '12 mo'], [24, '24 mo'], [0, 'All']].map(([v, l]) => '<button type="button" data-range="' + v + '" aria-pressed="' + (range === v) + '">' + l + '</button>').join('') + '</div>' +
-      '<button class="btn" type="button" id="mkCsv">Export Data</button><button class="btn primary" type="button" id="mkExport">Export Report</button></div></div>' +
+      '<button class="btn" type="button" id="mkCsv">Export Data</button><button class="btn primary" type="button" id="mkExport">Export PDF</button></div></div>' +
+      scopeHtml() +
       (tiles.length ? '<div class="kpis mk-kpis" style="grid-template-columns:repeat(' + tiles.length + ',1fr)">' + tiles.join('') + '</div>' : '') +
       '<div class="mk-tip" id="mkTip" role="tooltip"></div><div class="mk-grid">' +
       (s.permits?.length ? '<section class="mk-box"><h3>New housing units permitted per year</h3><div class="mk-leg">' + legBtn('sf', 'mk-sf', 'Single-family') + legBtn('mf', 'mk-mf', 'Multifamily (2+ units)') + '</div>' + permitsChart(s.permits) + pinned('permits', s) + '<div class="rnote">US Census Building Permits Survey (units authorized; includes Census estimates for places that don’t report every month).</div></section>' : '') +
@@ -337,7 +350,7 @@ export function initArea(ctx) {
         s.latest.map(b => '<tr><td>' + esc(b.name) + (b.owner ? '<div class="sc">' + esc(b.owner) + '</div>' : '') + '</td><td>' + esc([b.addr, b.city].filter(Boolean).join(', ')) + '</td><td>' + esc(b.sec != null ? SECTORS[b.sec][1] : (b.naics || '')) + '</td><td class="m">' + esc(b.date) + '</td></tr>').join('') +
         '</tbody></table></div><div class="rnote">Texas Comptroller active sales-tax permits, newest first. A new permit can also mean a change of owner at an existing location.</div></section>' : '') +
       '</div>';
-    root.querySelector('#mkCounty').onchange = e => { sel = e.target.value; newsPlace = ''; pin = null; render(); };
+    root.querySelectorAll('.mk-scope [data-county]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.county; sel = v === sel && v !== 'all' ? 'all' : v; newsPlace = ''; pin = null; render(); }));
     root.querySelectorAll('[data-range]').forEach(b => b.onclick = () => { range = +b.dataset.range; pin = null; render(); });
     root.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { const k = b.dataset.show, pair = k === 'sf' || k === 'mf' ? ['sf', 'mf'] : ['v', 'p', 'o'];
       show[k] = !show[k]; if (!pair.some(x => show[x])) show[k] = true; render(); }); // never switch every series off

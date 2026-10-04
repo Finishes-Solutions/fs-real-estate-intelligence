@@ -1,5 +1,5 @@
-// Shared pieces for the area reports (drive time, traffic, air traffic, airports, flights): the printable HTML report
-// shell, a small SVG map of an area, tables, bar charts, saving (recorded in the Reports tab), and the registry that
+// Shared pieces for every report (area reports, crime, FEMA, market, filings): the Finishes Solutions report layout and
+// its PDF export, a small SVG map of an area, tables, bar charts, saving (recorded in the Reports tab), and the registry that
 // puts every area report on the Site section, the Reports tab and the selection bar.
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ESC[c]);
@@ -7,23 +7,44 @@ export const slug = s => String(s || 'area').toLowerCase().replace(/[^a-z0-9]+/g
 export const fmt = v => v == null || v === '' || Number.isNaN(+v) ? '—' : (+v).toLocaleString('en-US', { maximumFractionDigits: Math.abs(+v) < 10 ? 1 : 0 });
 export const today = () => new Date().toISOString().slice(0, 10);
 
-export const REPORT_CSS = '@page{size:letter;margin:.5in}*{box-sizing:border-box}body{margin:0;font-family:Montserrat,system-ui,sans-serif;color:#23282a;font-size:12px;line-height:1.45}.wrap{max-width:900px;margin:0 auto;padding:28px}' +
-  '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #006527;padding-bottom:12px}.hd img{height:40px}.k{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#006527}' +
-  'h1{font-size:24px;margin:6px 0 2px;font-weight:800}h2{font-size:14px;margin:22px 0 8px}.meta{color:#6b7174}.kp{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #e8ebeb;border-radius:6px;margin-top:16px}.kp div{padding:10px 12px}.kp div+div{border-left:1px solid #e8ebeb}' +
-  '.kp b{display:block;font-family:"IBM Plex Mono",monospace;font-size:19px}.kp span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#6b7174}.map{margin-top:14px;border:1px solid #e8ebeb;border-radius:6px;overflow:hidden}.map svg,.bars svg,.photo img{display:block;width:100%;height:auto}.bars{max-width:620px}' +
-  '.photo{margin-top:14px;border-radius:6px;overflow:hidden;max-height:360px}.photo img{object-fit:cover;max-height:360px}.cap{font-size:10px;color:#6b7174;margin-top:3px}' +
-  '.two{display:grid;grid-template-columns:1fr 1fr;gap:22px}table{width:100%;border-collapse:collapse}th{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#6b7174;text-align:left;border-bottom:1px solid #bcc2c4;padding:5px 6px}' +
-  'td{border-bottom:1px solid #e8ebeb;padding:5px 6px}.m{font-family:"IBM Plex Mono",monospace;font-size:11px;white-space:nowrap}.r{text-align:right}tr{break-inside:avoid}.lg{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:#4d5457;margin-top:6px}.lg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}' +
-  '.ft{margin-top:22px;padding-top:10px;border-top:1px solid #e8ebeb;color:#6b7174;font-size:10.5px}.pb{position:fixed;right:18px;top:18px;background:#006527;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:600 12px Montserrat,sans-serif;cursor:pointer}@media print{.pb{display:none}.wrap{padding:0}.full{break-before:page}}';
+// ---------- the Finishes Solutions report look (every report, on screen and as a PDF) ----------
+// Letter, portrait unless a report needs the width (a wide filing list). Montserrat for text, IBM Plex Mono for labels and
+// numbers, ink greys with the brand green #006527 as the accent: a dark title band with the white logo and a faint
+// blueprint grid, a green rule, KPI tiles with a green left rule, hairline tables and section rules.
+export const REPORT_CSS = '*{box-sizing:border-box}html{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+  'body{margin:0;background:#fff;font-family:Montserrat,system-ui,sans-serif;color:#23282a;font-size:10.5px;line-height:1.5}.wrap{max-width:1000px;margin:0 auto;padding:28px}' +
+  '.hd{position:relative;overflow:hidden;background:#16191a;color:#fff;border-radius:6px;padding:20px 22px 22px;display:flex;justify-content:space-between;align-items:flex-start;gap:24px;' +
+    'background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:22px 22px}' +
+  '.hd:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:#006527}.hd img{height:40px;flex:none;margin-top:2px}' +
+  '.k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#006527}.hd .k{color:#8acda3}' +
+  'h1{font-size:24px;line-height:1.15;letter-spacing:-.02em;font-weight:800;margin:7px 0 6px;color:#0b0d0c}.hd h1{color:#fff}.meta{color:#6b7174}.hd .meta{color:#bcc2c4;font-size:10.5px}' +
+  'h2,.lt{position:relative;font-size:13px;font-weight:700;color:#0b0d0c;margin:22px 0 9px;padding-top:9px;border-top:1px solid #e8ebeb;break-after:avoid}h2:before,.lt:before{content:"";position:absolute;left:0;top:-1px;width:28px;height:2px;background:#006527}' +
+  'h3{font-size:12px;font-weight:700;color:#0b0d0c;margin:0 0 8px}p{margin:8px 0}a{color:#006527;font-weight:600;text-decoration:none}' +
+  '.kp,.kgrid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #e8ebeb;border-radius:6px;margin-top:16px;break-inside:avoid}.kp>div,.kgrid>div{padding:10px 12px;border-left:1px solid #e8ebeb}' +
+  '.kp>div:first-child,.kgrid>div:first-child{border-left:3px solid #006527}.kp b,.kgrid b{display:block;font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;color:#0b0d0c;line-height:1.25}' +
+  '.kp span,.kgrid span{display:block;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;margin-top:3px}' +
+  '.map{margin-top:14px;border:1px solid #e8ebeb;border-radius:6px;overflow:hidden;break-inside:avoid}.map svg,.bars svg,.photo img{display:block;width:100%;height:auto}.bars{max-width:620px;break-inside:avoid}' +
+  '.photo{margin-top:14px;border-radius:6px;overflow:hidden;max-height:340px}.photo img{object-fit:cover;max-height:340px}.cap{font-size:9px;color:#6b7174;margin-top:3px}' +
+  '.two{display:grid;grid-template-columns:1fr 1fr;gap:22px}table{width:100%;border-collapse:collapse;font-size:10px}thead{display:table-header-group}' +
+  'th{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;text-align:left;border-bottom:1px solid #bcc2c4;padding:5px 6px}' +
+  'td{border-bottom:1px solid #e8ebeb;padding:5px 6px;vertical-align:top}tbody tr:nth-child(even) td{background:#f8f9f9}.m{font-family:"IBM Plex Mono",monospace;font-size:9.5px;white-space:nowrap}.r{text-align:right}tr{break-inside:avoid}' +
+  '.sc{color:#6b7174;font-size:9px}.lg{display:flex;flex-wrap:wrap;gap:14px;font-size:9.5px;color:#4d5457;margin-top:6px}.lg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}' +
+  '.rnote{color:#6b7174;font-size:9.5px;margin-top:6px}.bsec{break-inside:avoid}.full{break-before:page}' +
+  '.ft{margin-top:22px;padding-top:10px;border-top:1px solid #e8ebeb;color:#6b7174;font-size:9px;line-height:1.55}' +
+  '.sign{margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:10px;border-top:3px solid #006527;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#6b7174;break-inside:avoid}.sign b{color:#0b0d0c;font-weight:600}' +
+  '.pb{position:fixed;right:18px;top:18px;z-index:9;background:#006527;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:600 12px Montserrat,sans-serif;cursor:pointer}' +
+  '@media print{.pb{display:none}.wrap{padding:0;max-width:none}}';
 
-// the whole printable document: kicker, title, meta line, then the body, then the sources footer
-export function reportDoc({ kicker, title, meta = '', body = '', sources = '' }) {
-  const logo = document.querySelector('.brandbar .l-light')?.src || '';
+// the whole document: the title band (kicker, title, meta, logo), the body, sources and the sign-off. css: the report's
+// own extra rules; landscape: letter landscape (the PDF renderer is told the same).
+export function reportDoc({ kicker, title, meta = '', body = '', sources = '', css = '', landscape = false }) {
+  const logo = typeof location === 'undefined' ? 'logo-white.png' : new URL('logo-white.png', location.href).href, date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(kicker + ' — ' + title) + '</title>' +
-    '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet"><style>' + REPORT_CSS + '</style></head><body>' +
+    '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>@page{size:letter' + (landscape ? ' landscape' : '') + ';margin:.5in .5in .6in}' + REPORT_CSS + css + '</style></head><body>' +
     '<button class="pb" onclick="window.print()">Print or Save as PDF</button><div class="wrap"><div class="hd"><div><div class="k">' + esc(kicker) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + meta +
-    (meta ? ' · ' : '') + 'Generated ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) + '</div></div>' + (logo ? '<img src="' + logo + '" alt="Finishes Solutions">' : '') + '</div>' +
-    body + (sources ? '<div class="ft">Sources: ' + sources + '</div>' : '') + '</div></body></html>';
+    (meta ? ' · ' : '') + 'Generated ' + date + '</div></div><img src="' + logo + '" alt="Finishes Solutions"></div>' +
+    body + (sources ? '<div class="ft">Sources: ' + sources + '</div>' : '') +
+    '<div class="sign"><span><b>Finishes Solutions</b> · Real Estate Development &amp; Operations</span><span>Building a Future Together</span></div></div></body></html>';
 }
 // [[value, label, color?], …] -> the KPI strip (report) or the card's kgrid
 export const kpiStrip = items => '<div class="kp">' + items.map(([v, l, c]) => '<div><b' + (c ? ' style="color:' + c + '"' : '') + '>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>';
@@ -57,9 +78,34 @@ export function areaSvg(layers, { W = 1000, H = 440, points = [] } = {}) {
     layers.map(l => '<path d="' + path(l.geometry) + '" fill="' + (l.fill || 'rgba(0,101,39,.06)') + '" stroke="' + (l.stroke || '#006527') + '" stroke-width="' + (l.width || 1.6) + '"' + (l.dash ? ' stroke-dasharray="6 4"' : '') + ' fill-rule="evenodd"/>').join('') +
     points.map(p => { const [x, y] = pr(p.c); return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (p.r || 3) + '" fill="' + (p.color || '#c2410c') + '" fill-opacity="' + (p.o ?? .85) + '"/>' + (p.label ? '<text x="' + (x + 6).toFixed(1) + '" y="' + (y + 4).toFixed(1) + '" font-size="12" fill="#23282a">' + esc(p.label) + '</text>' : ''); }).join('') + '</svg>';
 }
-// save a report (or its CSV); the Reports tab records it under its kind
-export async function saveHtml(ctx, kind, label, html) {
-  ctx.exportMeta = { report: kind, format: 'html', scope: label };
+// ---------- saving ----------
+const blobData = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(b); });
+// the renderer can't reach this site's own files (preview deployments are behind a login): same-site images go inline
+async function inlineImages(html) {
+  const urls = [...new Set([...html.matchAll(/<img[^>]+src="([^"]+)"/g)].map(m => m[1]))].filter(u => { try { return new URL(u, location.href).origin === location.origin; } catch (e) { return false; } });
+  for (const u of urls) { try { const r = await fetch(u); if (r.ok) html = html.split('src="' + u + '"').join('src="' + await blobData(await r.blob()) + '"'); } catch (e) {} }
+  return html;
+}
+// a report as a PDF (rendered on the server in the report's own layout). If the PDF service can't be reached the
+// report is saved as a web page instead (it has a Print or Save as PDF button), and the toast says so.
+// meta: what the Reports tab records with it (report kind, scope, counts)
+export async function savePdf(ctx, kind, label, html, { landscape = false, meta = {}, name = kind + '-report-' + slug(label) + '-' + today() } = {}) {
+  const title = (/<title>([^<]*)<\/title>/.exec(html)?.[1] || label).replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  ctx.toast?.('Preparing the PDF…');
+  let blob = null, why = '';
+  try {
+    const r = await fetch('api/pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ html: await inlineImages(html), landscape, title }) });
+    if (r.ok && /pdf/.test(r.headers.get('content-type') || '')) blob = await r.blob(); else why = (await r.json().catch(() => ({}))).error || 'HTTP ' + r.status;
+  } catch (e) { why = e.message; }
+  ctx.exportMeta = { report: kind, scope: label, ...meta, format: blob ? 'pdf' : 'html' };
+  try {
+    if (blob) await ctx.saveFile(name + '.pdf', blob, 'application/pdf');
+    else { await ctx.saveFile(name + '.html', html, 'text/html'); ctx.toast?.('The PDF couldn’t be made (' + why + '). Saved as a web page instead: open it and use Print → Save as PDF.'); }
+  } finally { ctx.exportMeta = null; }
+}
+// the same report as a web page
+export async function saveHtml(ctx, kind, label, html, meta = {}) {
+  ctx.exportMeta = { report: kind, format: 'html', scope: label, ...meta };
   try { await ctx.saveFile(kind + '-report-' + slug(label) + '-' + today() + '.html', html, 'text/html'); } finally { ctx.exportMeta = null; }
 }
 export function saveCsv(ctx, kind, label, rows) {

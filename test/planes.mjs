@@ -193,6 +193,26 @@ console.log('adsb.lol endpoints ok');
   assert.equal(normalize({ hex: 'a8aeb6', t: 'A21N', lat: 30, lon: -95, alt_baro: 5700 }).desc, 'Airbus A321neo');
   assert.equal(normalize({ hex: 'a8aeb6', t: 'ZZZZ', lat: 30, lon: -95, alt_baro: 5700 }).desc, null);
   console.log('planes route fallback ok'); }
+// routes: VRS standing data, multi-stop flight numbers flown one leg at a time
+{ const { airlineOf, parseRoutes, pickLeg, vrsCodes } = await import('../lib/routes.mjs'), { route } = await import('../api/planes.js');
+  assert.equal(airlineOf('AAL2302'), 'AAL'); assert.equal(airlineOf('N12345'), null, 'registrations have no route'); assert.equal(airlineOf('SWA12A'), 'SWA');
+  const CSV = '﻿Callsign,Code,Number,AirlineCode,AirportCodes\r\nAAL2302,AAL,2302,AAL,KORD-KIAH-KORD\r\nAAL9,AAL,9,AAL,KDFW\r\nAAL77,AAL,77,AAL,KIAH-KLAX\r\n';
+  assert.deepEqual([...parseRoutes(CSV).keys()], ['AAL2302', 'AAL77'], 'one-airport rows skipped');
+  const ORD = { code: 'ORD', lat: 41.9786, lon: -87.9047 }, IAH = { code: 'IAH', lat: 29.9844, lon: -95.3414 }, LAX = { code: 'LAX', lat: 33.9425, lon: -118.408 };
+  // AAL2302 north-west of IAH heading west, descending: arriving from Chicago (track alone would point the wrong way)
+  assert.deepEqual(pickLeg([ORD, IAH, ORD], 30.09, -95.45, 270, -1344).i, 0);
+  assert.deepEqual(pickLeg([ORD, IAH, ORD], 30.09, -95.45, 20, 2100).i, 1, 'climbing out of IAH northbound: going back to Chicago');
+  assert.deepEqual(pickLeg([ORD, IAH, ORD], 36, -91.5, 30, 0).i, 1, 'en route over Arkansas heading north-east: IAH → ORD');
+  let n = 0; const fx = async u => { u = String(u);
+    if (u.includes('vradarserver')) { n++; return u.endsWith('/A/AAL-all.csv') ? new Response(CSV) : new Response('404', { status: 404 }); }
+    if (u.includes('api.adsb.lol/api/0/airport/')) { const c = u.split('/').pop(), a = { KORD: ORD, KIAH: IAH, KLAX: LAX }[c]; return a ? json({ icao: c, iata: a.code, name: a.code + ' Intl', location: a.code + ' City', countryiso2: 'US', lat: a.lat, lon: a.lon }) : json(null, 404); }
+    return json({ response: 'unknown callsign' }, 404); };
+  assert.deepEqual(await vrsCodes('AAL2302', fx), ['KORD', 'KIAH', 'KORD']); await vrsCodes('AAL77', fx); assert.equal(n, 1, 'one download per airline file');
+  const a = await route('AAL2302', 30.09, -95.45, fx, 270, -1344, null);
+  assert.deepEqual([a.origin.code, a.destination.code, a.source, a.plausible, a.stops], ['ORD', 'IAH', 'vrs', true, ['ORD', 'IAH', 'ORD']]);
+  const b = await route('AAL77', 29.7, -95.64, fx, 297, 1792, null); assert.deepEqual([b.origin.code, b.destination.code, b.stops], ['IAH', 'LAX', undefined]);
+  const c = await route('AAL77', 40.6, -73.8, fx, 90, 0, null); assert.equal(c.origin, null, 'over New York: not IAH → LAX'); assert.deepEqual(c.rejected, ['vrs IAH-LAX']);
+  console.log('VRS routes ok'); }
 
 // map icons: one silhouette per kind of aircraft, from the ICAO type, else the ADS-B category
 { const { shapeOf, SHAPES, SIZE } = await import('../lib/aircraft-shapes.mjs'), { normalize } = await import('../lib/planes.mjs');

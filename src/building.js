@@ -208,14 +208,21 @@ export function initBuildings(ctx) {
     if (!r.length && !s.note) return '<div class="rnote">' + (b.footprint ? 'No size or height data for this building yet.' : 'No building outline is mapped at this spot. Click a building for its footprint, height and floors.') + '</div>';
     return '<dl class="bsize">' + r.map(([k, v]) => '<dt>' + k + '</dt><dd class="mono">' + v + '</dd>').join('') + '</dl>' + (s.note ? '<div class="rnote">' + esc(s.note) + '</div>' : '');
   }
-  // parcel, businesses, photo, lidar height and OpenStreetMap tags for one building (cached on the object)
-  // (one request per building however many callers ask: the card and the "All" tab can ask together)
-  function details(b) { return b.d ? Promise.resolve(b.d) : (b.p ||= load(b).finally(() => { b.p = null; })); }
-  async function load(b) {
+  // parcel, businesses, photo, lidar height and OpenStreetMap tags for one building (cached on the object). Two requests
+  // in parallel: the parcel alone (about a second) and everything else (OpenStreetMap and lidar can take several), so the
+  // appraisal record shows as soon as it arrives (onParcel) instead of waiting for the slowest source.
+  // One lookup per building however many callers ask (the card and the "All" tab can ask together).
+  function details(b, onParcel) { return b.d ? Promise.resolve(b.d) : (b.p ||= load(b, onParcel).finally(() => { b.p = null; })); }
+  async function load(b, onParcel) {
     const q = new URLSearchParams({ lat: b.center[1].toFixed(6), lon: b.center[0].toFixed(6) });
+    const get = part => fetch('api/building?' + q + '&part=' + part).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Error ' + r.status); return d; });
+    const pj = get('parcel').then(d => { b.parcel = d.parcel; try { onParcel?.(d); } catch (e) { console.warn(e); } return d; });
     const ring = b.footprint && (b.footprint.type === 'Polygon' ? b.footprint.coordinates[0] : null);
     if (ring) { const step = Math.max(1, Math.ceil(ring.length / 100)); q.set('fp', ring.filter((p, i) => i % step === 0).map(p => p[0].toFixed(6) + ',' + p[1].toFixed(6)).join(';')); }
-    const r = await fetch('api/building?' + q); const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Error ' + r.status);
+    const [p, rest] = await Promise.allSettled([pj, get('rest')]);
+    if (p.status === 'rejected' && rest.status === 'rejected') throw p.reason;
+    const d = { ...(rest.value || { places: [], placesError: rest.reason.message, osm: null, height: { source: 'none', note: 'Lookup failed: ' + rest.reason.message }, photo: null }),
+      ...(p.value || { parcel: null, parcelError: p.reason.message }) };
     b.d = d; b.parcel = d.parcel;
     // OpenStreetMap's outline is the whole building (the map's can be cut at a tile edge): use it when it contains the click
     const o = d.osm?.outline; if (o && (!b.footprint || inGeom(b.center, o)) && sqft(o) >= sqft(b.footprint) * .9) b.footprint = o;
@@ -248,18 +255,27 @@ export function initBuildings(ctx) {
     renderFilings(null); renderArea();
     ctx.renderCrimeNear?.(card.querySelector('#bCrime'), b.center, () => { const t = card.querySelector('#bTitle')?.textContent; return t && !/^Loading/.test(t) ? t : 'this property'; }, () => cur === b);
     ctx.cardRendered({ kind: 'building', center: b.center, label: () => card.querySelector('#bTitle')?.textContent || 'Building', sub: () => card.querySelector('#bSub')?.textContent || '', subject: () => newsSubject(b) });
-    let d = null;
-    try { d = await details(b); }
+    let d = null, early = false;
+    // the appraisal record first: owner, value, title, the parcel outline and everything keyed on it
+    const onParcel = pd => {
+      if (cur !== b) return; early = true; highlight(); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
+      renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel);
+      ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel);
+    };
+    try { d = await details(b, onParcel); }
     catch (err) { if (cur !== b) return; card.querySelector('#bParcel').innerHTML = '<div class="lt">Parcel</div><div class="rnote">Parcel lookup unavailable (' + esc(err.message) + ').</div>'; card.querySelector('#bTitle').textContent = 'Building'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b); return; }
     if (cur !== b) return;
     highlight(); ctx.tabs?.label(bid(b), d.parcel?.situs || d.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
     card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
-    renderParcel(d.parcel, d.parcelError, d.parcels); renderFilings(d.parcel?.geometry || null); renderOverview(b, d); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel);
+    // the parcel list (a building on several parcels) comes with the second lookup, so the parcel section is redrawn with it
+    if (!early || d.parcels?.length > 1) renderParcel(d.parcel, d.parcelError, d.parcels);
+    if (!early) { renderFilings(d.parcel?.geometry || null); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel); }
+    renderOverview(b, d); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo);
   }
   ctx.buildingStats = () => { const list = selected(); return list.map(b => ({ address: b.parcel?.situs || null, ...stats(b), owner: b.parcel?.owner || null })); };
 
   // ---------- several buildings / parcels: each is a tab; "All" sums them up ----------
-  const same = (a, b) => a.footprint && b.footprint ? a.footprint === b.footprint || inGeom(a.center, b.footprint) || inGeom(b.center, a.footprint) : Math.hypot(a.center[0] - b.center[0], a.center[1] - b.center[1]) < 0.00005;
+  const same = (a, b) => a.footprint && b.footprint ? a.footprint === b.footprint || inGeom(a.center, b.footprint) || inGeom(b.center, a.footprint) : Math.hypot(a.center[0] - b.center[0], a.center[1] - b.center[1]) < 0.00005 || (a.parcel?.propId && a.parcel?.propId === b.parcel?.propId);
   function add(b) {
     // the same building again while adding: take it out of the selection
     const t = (ctx.tabs?.list('building') || []).find(x => same(x.ref, b)); if (t) { ctx.tabs.remove(t.id); return; }

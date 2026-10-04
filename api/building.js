@@ -81,12 +81,16 @@ const KINDS = ['shop', 'amenity', 'office', 'healthcare', 'craft', 'leisure', 't
 // building outline(s) under the point; the card sorts them into "in this building" and "nearby"
 async function places(lat, lon) {
   const ql = `[out:json][timeout:12];nwr(around:150,${lat},${lon})[name][~"^(${KINDS.join('|')})$"~"."];out tags center 80;way(around:6,${lat},${lon})[building];out tags geom 3;`;
-  let d = null, last = null;
-  for (const url of OVERPASS) {
-    try { d = await getJSON(url, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 9000); if (!d?.remark || d.elements?.length) break; last = new Error(d.remark); d = null; }
-    catch (e) { last = e; }
-  }
-  if (!d) throw last || new Error('OpenStreetMap lookup failed');
+  // staggered: the next server is asked when the one before hasn't answered within 2.5 s (or failed), and the first good
+  // answer wins, so a stalled server costs 2.5 s instead of its whole 9 s timeout
+  const ask = url => getJSON(url, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 9000)
+    .then(d => d?.remark && !d.elements?.length ? Promise.reject(new Error(d.remark)) : d);
+  const d = await new Promise((done, fail) => {
+    let left = OVERPASS.length, i = 0, timer = null, over = false;
+    const next = () => { clearTimeout(timer); if (over || i >= OVERPASS.length) return; const url = OVERPASS[i++];
+      ask(url).then(d => { over = true; clearTimeout(timer); done(d); }, e => { if (--left === 0) { over = true; fail(e); } else if (!over) next(); }); timer = setTimeout(next, 2500); };
+    next();
+  });
   const els = d.elements || [];
   // the building whose outline contains the point (a click near a wall can also find the neighbour), else the nearest
   const outlineOf = e => { const g = (e.geometry || []).map(n => [n.lon, n.lat]); return g.length >= 4 && g[0][0] === g[g.length - 1][0] && g[0][1] === g[g.length - 1][1] ? { type: 'Polygon', coordinates: [g] } : null; };
@@ -111,12 +115,18 @@ async function photo(lat, lon) {
 export default async function handler(req, res) {
   const lat = +req.query.lat, lon = +req.query.lon;
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 25 || lat > 37 || lon < -107 || lon > -93) return res.status(400).json({ error: 'lat/lon must be inside Texas' });
-  if (!rateLimit(req, res, { perMinute: 30, perDay: 600 })) return;
+  if (!rateLimit(req, res, { perMinute: 60, perDay: 1200 })) return; // two requests per card (parcel, then the rest)
   const r5 = v => Math.round(v * 1e5) / 1e5;
   // footprint for the lidar height: "lon,lat;lon,lat;…" (closed or not), at most 120 vertices
   const fp = String(req.query.fp || '').split(';').slice(0, 121).map(x => x.split(',').map(Number)).filter(c => c.length === 2 && c.every(Number.isFinite) && Math.abs(c[0] - lon) < .02 && Math.abs(c[1] - lat) < .02);
   const footprint = fp.length >= 3 ? { type: 'Polygon', coordinates: [fp[0][0] === fp[fp.length - 1][0] && fp[0][1] === fp[fp.length - 1][1] ? fp : fp.concat([fp[0]])] } : null;
-  const [p, pl, ph, ht, pf] = await Promise.allSettled([parcel(r5(lat), r5(lon)), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)]), footprint ? parcelsIn(footprint) : Promise.resolve([])]);
+  // &part=parcel: the appraisal record alone (the card shows it first); &part=rest: everything but the parcel
+  const part = req.query.part === 'parcel' || req.query.part === 'rest' ? req.query.part : null, skip = Promise.resolve(null);
+  res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
+  if (part === 'parcel') {
+    try { return res.json({ parcel: await parcel(r5(lat), r5(lon)) }); } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.json({ parcel: null, parcelError: e.message }); }
+  }
+  const [p, pl, ph, ht, pf] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon)), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)]), footprint ? parcelsIn(footprint) : Promise.resolve([])]);
   // the map's footprint can be a tile-clipped piece of a big building: when OpenStreetMap's outline is clearly bigger,
   // look for parcels under the whole of it too
   const outline = pl.status === 'fulfilled' ? pl.value.osm?.outline : null;
@@ -124,9 +134,10 @@ export default async function handler(req, res) {
   if (outline && (!footprint || ringArea(outline.coordinates[0]) > 1.2 * ringArea(footprint.coordinates[0]))) {
     try { const more = await parcelsIn(outline), have = new Set(parcels.map(x => x.propId)); parcels = parcels.concat(more.filter(x => !have.has(x.propId))).slice(0, 10); } catch (e) {}
   }
-  res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+  // a source that failed (busy server, timeout) is retried in a few minutes rather than cached for a day
+  if ((part !== 'rest' && p.status === 'rejected') || pl.status === 'rejected' || ht.status === 'rejected' || pf.status === 'rejected') res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
   return res.json({
-    parcel: p.status === 'fulfilled' ? p.value : null, parcelError: p.status === 'rejected' ? p.reason.message : undefined,
+    ...(part === 'rest' ? {} : { parcel: p.status === 'fulfilled' ? p.value : null }), parcelError: p.status === 'rejected' ? p.reason.message : undefined,
     places: pl.status === 'fulfilled' ? pl.value.list : [], placesError: pl.status === 'rejected' ? pl.reason.message : undefined,
     osm: pl.status === 'fulfilled' ? pl.value.osm : null,
     parcels: parcels.length > 1 ? parcels : undefined,

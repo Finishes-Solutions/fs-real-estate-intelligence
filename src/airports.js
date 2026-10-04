@@ -2,9 +2,9 @@
 //   Map layer "Airports": large and medium airports from a state-wide view, small fields and heliports as you zoom in.
 //   Airport card: photo, codes, weather now (METAR), runways with a diagram, the full airport layout from OpenStreetMap
 //   on the map, the FAA airport diagram, takeoffs and landings per day (counted from our own ADS-B sampling around
-//   Houston), the airlines that fly there and statistics (Wikipedia), radio frequencies; Export Report / CSV.
+//   Houston), the airlines that fly there and statistics (Wikipedia), radio frequencies; Export PDF / CSV.
 //   Building and filing cards: the nearest airports, and whether the site is under a runway's approach path.
-import { esc, fmt, kgrid, table, bars, reportDoc, saveHtml, saveCsv, openCard, cardTop, fillCard } from './reportkit.js';
+import { esc, fmt, kgrid, table, bars, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard } from './reportkit.js';
 
 const TYPE = { large_airport: 'Large airport', medium_airport: 'Medium airport', small_airport: 'Small airport', heliport: 'Heliport', seaplane_base: 'Seaplane base', balloonport: 'Balloonport' };
 const COL = { large_airport: '#1d4ed8', medium_airport: '#2563eb', small_airport: '#64748b', heliport: '#a855f7', seaplane_base: '#0891b2', balloonport: '#94a3b8' };
@@ -114,7 +114,7 @@ export function initAirports(ctx) {
       '<div class="bsec">' + kgrid([[fmt(open.length), 'Runways'], [longest?.length_ft ? fmt(longest.length_ft) + ' ft' : '—', 'Longest runway'], [a.elevation_ft != null ? fmt(a.elevation_ft) + ' ft' : '—', 'Elevation'], [ops ? fmt(ops.avg) : '—', ops ? 'Takeoffs + landings a day' : 'Daily counts']]) +
       (w.summary ? '<p class="apt-sum">' + esc(w.summary.length > 420 ? w.summary.slice(0, 400).replace(/\s\S*$/, '') + '…' : w.summary) + '</p>' : '') + '</div>' +
       '<div class="bacts"><button class="btn" type="button" id="aptMap">Show Airport Map</button>' + (d.extras?.diagram_url ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(d.extras.diagram_url) + '">FAA Airport Diagram</a>' : '') +
-        '<button class="btn primary" type="button" id="aptPdf">Export Report</button><button class="btn" type="button" id="aptCsv">Export CSV</button></div>' +
+        '<button class="btn primary" type="button" id="aptPdf">Export PDF</button><button class="btn" type="button" id="aptCsv">Export CSV</button></div>' +
       (m ? '<div class="bsec"><div class="lt">Weather now</div><div><b>' + esc(m.category || '') + '</b> ' + (m.temp_f != null ? fmt(m.temp_f) + '°F · ' : '') + (m.wind_kt != null ? 'wind ' + (m.wind_dir === 'VRB' ? 'variable' : esc(String(m.wind_dir ?? '')) + '°') + ' ' + m.wind_kt + ' kt' + (m.gust_kt ? ' gusting ' + m.gust_kt : '') + ' · ' : '') + 'visibility ' + esc(String(m.visibility ?? '—')) + ' mi' + (m.clouds ? ' · ' + esc(m.clouds) : '') + '</div><div class="mono apt-raw">' + esc(m.raw || '') + '</div></div>' : '') +
       (open.length ? '<div class="bsec"><div class="lt">Runways</div><div class="apt-rwy">' + runwaySvg(open, { dark: document.documentElement.dataset.theme === 'dark' }) + '</div><dl>' +
         open.map(r => '<dt>' + esc((r.le_ident || '') + (r.he_ident ? '/' + r.he_ident : '')) + '</dt><dd class="mono">' + (r.length_ft ? fmt(r.length_ft) + ' × ' + fmt(r.width_ft) + ' ft' : '—') + ' <span class="sc">' + esc(SURFACE(r.surface)) + (r.lighted ? ', lighted' : '') + (r.le_heading != null ? ', heading ' + Math.round(r.le_heading) + '°' : '') + '</span></dd>').join('') + '</dl></div>' : '') +
@@ -167,7 +167,7 @@ export function initAirports(ctx) {
       (w.airlines?.length ? '<h2>Airlines</h2>' + table(['Airline', { t: 'Destinations', r: 1 }, { t: 'Seasonal', r: 1 }], w.airlines.map(x => [esc(x.airline), fmt(x.destinations), x.seasonal ? fmt(x.seasonal) : ''])) + (w.cargo?.length ? '<p class="meta">Cargo airlines: ' + esc(w.cargo.map(x => x.airline).join(', ')) + '</p>' : '') : '') +
       (w.tables || []).slice(0, 4).map(t => '<h2>' + esc(t.caption || 'Statistics') + '</h2>' + table(t.headers.length ? t.headers : t.rows[0].map(() => ''), t.rows.map(r => r.map(esc)))).join('') +
       (m ? '<h2>Weather when the report was made</h2><p class="m">' + esc(m.raw || '') + '</p>' : '');
-    await saveHtml(ctx, 'airport', (a.iata || a.ident) + ' ' + a.name, reportDoc({ kicker: 'Airport report', title: a.name, meta: esc([code, TYPE[a.type], [a.municipality, a.iso_region].filter(Boolean).join(', ')].filter(Boolean).join(' · ')), body,
+    await savePdf(ctx, 'airport', (a.iata || a.ident) + ' ' + a.name, reportDoc({ kicker: 'Airport report', title: a.name, meta: esc([code, TYPE[a.type], [a.municipality, a.iso_region].filter(Boolean).join(', ')].filter(Boolean).join(' · ')), body,
       sources: 'OurAirports (codes, runways, frequencies; public domain); FAA d-TPP (diagram); Wikipedia and Wikidata (photo, airlines, statistics; CC BY-SA); aviationweather.gov (METAR); takeoff and landing counts from community ADS-B data (adsb.lol), sampled every minute.' }));
   }
 
