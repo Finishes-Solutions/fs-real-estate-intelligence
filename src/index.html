@@ -67,7 +67,7 @@
   <main class="stage" id="stage" data-view="map">
     <nav class="viewbar" id="viewbar" aria-label="Views">
       <button class="ptoggle" id="panelToggle" aria-label="Show or hide the list" title="Show or hide the list"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg></button>
-      <button data-view="map" aria-pressed="true">Map</button><button data-view="market" aria-pressed="false">Market</button><button data-view="compare" aria-pressed="false">Compare <span class="badge" id="cmpBadge"></span></button><button data-view="reports" aria-pressed="false">Reports</button><button data-view="field" aria-pressed="false">Field Notes <span class="badge" id="fieldBadge"></span></button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="who" aria-pressed="false">Activity</button><button data-view="changes" aria-pressed="false">Updates <span class="badge" id="chgBadge"></span></button><button data-view="sources" aria-pressed="false">Sources</button>
+      <button data-view="map" aria-pressed="true">Map</button><button data-view="market" aria-pressed="false">Market</button><button data-view="compare" aria-pressed="false">Compare <span class="badge" id="cmpBadge"></span></button><button data-view="reports" aria-pressed="false">Reports</button><button data-view="field" aria-pressed="false">Notes <span class="badge" id="fieldBadge"></span></button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="who" aria-pressed="false">Activity</button><button data-view="changes" aria-pressed="false">Updates <span class="badge" id="chgBadge"></span></button><button data-view="sources" aria-pressed="false">Sources</button>
     </nav>
     <div class="viewport" id="viewport">
     <div id="map" aria-label="Interactive real estate map"></div>
@@ -128,6 +128,7 @@
             <div class="row" id="chgRow"><span class="lbl">Updates</span></div>
             </details>
           </div>
+          <div class="fpop-f"><button class="fdone" id="filterDone" type="button">Show filings</button></div>
       </div>
       </div>
       <button class="exbtn" id="exportBtn" type="button" aria-haspopup="dialog"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.8 6.8 8 10l3.2-3.2M2.5 11.5v2h11v-2"/></svg><span>Export</span></button>
@@ -218,7 +219,7 @@
     <section class="view" id="view-market" aria-label="Market"></section>
     <section class="view" id="view-reports" aria-label="Reports"></section>
     <section class="view" id="view-changes" aria-label="Updates"></section>
-    <section class="view" id="view-field" aria-label="Field Notes"></section>
+    <section class="view" id="view-field" aria-label="Notes"></section>
     <section class="view" id="view-sources" aria-label="Sources"></section>
     <div class="mtop" id="mtop">
       <div class="mask">
@@ -242,19 +243,25 @@
   </nav>
   <div class="msheet" id="msheet" role="dialog" aria-label="More">
     <div class="mgrab"></div>
-    <button data-go="market">Market: Jobs, Permits, Businesses &amp; News</button>
-    <button data-go="changes">Updates <span class="badge" id="mChgN"></span></button>
-    <button data-go="field">Field Notes &amp; Watchlist <span class="badge" id="mFieldN"></span></button>
-    <button data-go="sources">Data Sources &amp; Freshness</button>
-    <button data-go="note">Add a Site Note at My Location</button>
-    <button data-go="near">Filings Near Me</button>
-    <button data-go="saved">Saved Searches &amp; RSS Alerts</button>
-    <button data-go="layers">Map Layers &amp; Demographics</button>
-    <button data-go="compare">Compare Areas <span class="badge" id="mCmpN"></span></button>
-    <button data-go="reports">Reports &amp; Past Exports</button>
-    <button data-go="export">Export a Report</button>
-    <button data-go="install" id="mInstall" hidden>Install as an App</button>
-    <button data-go="theme">Light / Dark</button>
+    <div class="mt-h">Views</div>
+    <div class="mtiles">
+      <button data-go="market"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13.5h12M3.5 11V7.5M6.5 11V4.5M9.5 11V6.5M12.5 11V2.5"/></svg></i><span>Market</span></button>
+      <button data-go="compare"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="5" height="10" rx="1"/><rect x="9" y="3" width="5" height="10" rx="1"/></svg><b class="badge" id="mCmpN"></b></i><span>Compare</span></button>
+      <button data-go="reports"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6 8.5h4.5M6 11h4.5"/></svg></i><span>Reports</span></button>
+      <button data-go="changes"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4M13.5 2.5V5h-2.5"/><path d="M8 5.5V8l1.8 1.2"/></svg><b class="badge" id="mChgN"></b></i><span>Updates</span></button>
+      <button data-go="field"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10v8.5L9.5 14H3z"/><path d="M9.5 14v-3.5H13M5.5 5.5h5M5.5 8h3"/></svg><b class="badge" id="mFieldN"></b></i><span>Notes</span></button>
+      <button data-go="sources"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="8" cy="3.8" rx="5" ry="1.8"/><path d="M3 3.8v8.4c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V3.8M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8"/></svg></i><span>Sources</span></button>
+    </div>
+    <div class="mt-h">Tools</div>
+    <div class="mtiles">
+      <button data-go="layers"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2 14.5 5.5 8 9 1.5 5.5z"/><path d="M2.5 8.2 8 11.2l5.5-3M2.5 10.9 8 13.9l5.5-3"/></svg></i><span>Layers</span></button>
+      <button data-go="export"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.8 6.8 8 10l3.2-3.2M2.5 11.5v2h11v-2"/></svg></i><span>Export</span></button>
+      <button data-go="saved" aria-label="Saved searches and alerts"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h8v12l-4-3-4 3z"/></svg></i><span>Saved</span></button>
+      <button data-go="near" aria-label="The area around my location"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4.5"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg></i><span>Nearby</span></button>
+      <button data-go="note" aria-label="Pin a site note at my location"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14.5s-4.5-4.3-4.5-7.7a4.5 4.5 0 0 1 9 0c0 3.4-4.5 7.7-4.5 7.7z"/><path d="M8 4.8v3.6M6.2 6.6h3.6"/></svg></i><span>Pin</span></button>
+      <button data-go="theme"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.2 9.8A5.5 5.5 0 1 1 6.2 2.8a4.3 4.3 0 0 0 7 7z"/></svg></i><span>Theme</span></button>
+      <button data-go="install" id="mInstall" hidden><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M8 5v5M6 8l2 2 2-2"/></svg></i><span>Install</span></button>
+    </div>
   </div>
   <div class="mscrim" id="mscrim"></div>
 </div>

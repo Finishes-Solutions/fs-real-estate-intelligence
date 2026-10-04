@@ -5,6 +5,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
+### 1:06 AM CT: Phone More menu as tiles, simpler phone Filters (bdb0916)
+- **The phone More menu is a grid of one-word tiles,** named like the desktop tabs.
+  - **Views:** Market, Compare, Reports, Updates, Notes, Sources.
+  - **Tools:** Layers, Export, Saved, Nearby, Pin (a site note at your location), Theme, and Install when the phone offers it.
+  - Counts show as badges on the tiles.
+- **The desktop Field Notes tab is now called Notes,** to match.
+- **Filters on phones is a full-height sheet:**
+  - A short header with **Clear All**, and the sections in one simple list. "More Filters" is no longer hidden behind a click.
+  - A big **Show N filings** button at the bottom shows how many filings match and closes the sheet.
+  - The sheet opens just under the search bar, so its title and close button are no longer covered.
+
 ### 12:58 AM CT: Plain-language product guide (40a0948)
 - **New: `PRODUCTDOC.md`,** a plain-language guide to the whole app. It covers what it is and where it works, the screen layout, property lookups, area reports and clearing the view, map layers, planes and airports, market data, construction filings, Ask AI, reports, field notes, where the data comes from, and what to keep in mind.
 - It will be updated with every change people can see, so it stays current as the app grows.
