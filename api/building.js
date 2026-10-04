@@ -65,12 +65,16 @@ const KINDS = ['shop', 'amenity', 'office', 'healthcare', 'craft', 'leisure', 't
 // building outline(s) under the point; the card sorts them into "in this building" and "nearby"
 async function places(lat, lon) {
   const ql = `[out:json][timeout:12];nwr(around:150,${lat},${lon})[name][~"^(${KINDS.join('|')})$"~"."];out tags center 80;way(around:6,${lat},${lon})[building];out tags center 3;`;
-  let d = null, last = null;
-  for (const url of OVERPASS) {
-    try { d = await getJSON(url, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 9000); if (!d?.remark || d.elements?.length) break; last = new Error(d.remark); d = null; }
-    catch (e) { last = e; }
-  }
-  if (!d) throw last || new Error('OpenStreetMap lookup failed');
+  // staggered: the next server is asked when the one before hasn't answered within 2.5 s (or failed), and the first good
+  // answer wins, so a stalled server costs 2.5 s instead of its whole 9 s timeout
+  const ask = url => getJSON(url, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 9000)
+    .then(d => d?.remark && !d.elements?.length ? Promise.reject(new Error(d.remark)) : d);
+  const d = await new Promise((done, fail) => {
+    let left = OVERPASS.length, i = 0, timer = null, over = false;
+    const next = () => { clearTimeout(timer); if (over || i >= OVERPASS.length) return; const url = OVERPASS[i++];
+      ask(url).then(d => { over = true; clearTimeout(timer); done(d); }, e => { if (--left === 0) { over = true; fail(e); } else if (!over) next(); }); timer = setTimeout(next, 2500); };
+    next();
+  });
   const els = d.elements || [], b = els.filter(e => e.tags?.building && !KINDS.some(k => e.tags[k] && e.tags.name)).concat(els.filter(e => e.tags?.building))[0];
   const t = b?.tags || {}, levels = num(t['building:levels']), h = num(String(t.height || '').replace(/\s*m$/, ''));
   const osm = b ? { levels, height_m: h, name: t.name || null, use: t.building !== 'yes' ? t.building.replace(/_/g, ' ') : null, roofLevels: num(t['roof:levels']) } : null;
@@ -103,6 +107,8 @@ export default async function handler(req, res) {
     try { return res.json({ parcel: await parcel(r5(lat), r5(lon)) }); } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.json({ parcel: null, parcelError: e.message }); }
   }
   const [p, pl, ph, ht] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon)), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)])]);
+  // a source that failed (busy server, timeout) is retried in a few minutes rather than cached for a day
+  if ((part !== 'rest' && p.status === 'rejected') || pl.status === 'rejected' || ht.status === 'rejected') res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
   return res.json({
     ...(part === 'rest' ? {} : { parcel: p.status === 'fulfilled' ? p.value : null }), parcelError: p.status === 'rejected' ? p.reason.message : undefined,
     places: pl.status === 'fulfilled' ? pl.value.list : [], placesError: pl.status === 'rejected' ? pl.reason.message : undefined,

@@ -73,7 +73,7 @@ Cards slide up from the bottom: swipe down to shrink one, and swipe again to clo
 
 ## Looking up a property
 
-Click a building, or at street zoom click open ground, to open its **property card**.
+Click a building, or at street zoom click open ground, to open its **property card**. The owner and value show first, usually within a couple of seconds; the businesses, height and photo fill in after.
 
 - **Ownership & value:** owner, mailing address, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service.
 - **The building:** footprint, height, floors and estimated floor area.
@@ -181,7 +181,9 @@ The quick buttons and the panel always match. A layer turned on in either place,
 - **Tilt the map** and planes become **3D models** at their real altitude. Each kind of aircraft has its own shape: airliners, jumbo jets, business jets, military transports, fighters, turboprops, small planes, helicopters, gliders, balloons and drones.
   - Planes bank into turns and tip their nose up or down as they climb or descend.
   - A thin line drops to the ground, and the flat icon underneath becomes a grey shadow showing the callsign and altitude.
-- **Click a plane** (or its 3D model) for its card: photo, type, operator, route, altitude and speed, registered owner (US planes), and this flight's path. Tilted, the path is a ribbon at the plane's altitude with a curtain down to the ground. You can **follow** or **orbit** a plane.
+- **Click a plane** (or its 3D model) for its card: photo, type, operator, route, altitude and speed, registered owner (US planes), and this flight's path.
+  - **Routes** come from a free community route list. For flight numbers with several stops (for example Chicago → Houston → Chicago), the card picks the leg the plane is flying from where it is, which way it's heading and whether it's climbing or descending.
+  - A listed route that doesn't match where the plane actually is gets left out. If the flight path shows where the plane took off, the card says **From (airport) · destination not listed** instead. Tilted, the path is a ribbon at the plane's altitude with a curtain down to the ground. You can **follow** or **orbit** a plane.
 - **Airports** shows every airport in the world. Click one for runways (with a diagram), radio frequencies, current weather, airlines, statistics and the FAA airport diagram.
 - **Low Flight Paths** shows where planes fly below 3,000 ft over the last 30 days. Property cards show how many low flights pass overhead.
 
@@ -284,6 +286,9 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 ---
 
 ## Recently added
+
+- **Plane routes are back** for most airline flights, with the right leg picked on multi-stop flights.
+- **Property cards show the owner and value faster:** they no longer wait for the slower business and height lookups.
 
 - **Filters for the map's layers:** demographics, traffic and risk, alongside construction filings, plus a **Match everything** mode that finds the neighborhoods meeting every threshold.
 - **Faster:**
