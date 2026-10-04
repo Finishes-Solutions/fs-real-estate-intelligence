@@ -15,6 +15,7 @@ import { supa } from '../lib/supa.mjs';
 import { pointQuery, fetchPoint, boxAround, summarize, SAMPLES_PER_DAY, perDay } from '../lib/planes.mjs';
 import { regKey, usHex, present, faaUrl } from '../lib/faa.mjs';
 import { track, aircraftInfo, airport, okHex } from '../lib/adsblol.mjs';
+import { vrsCodes, pickLeg } from '../lib/routes.mjs';
 import { cleanGeometry } from './crime.js';
 
 const LAST = new Map(); // area -> last good aircraft snapshot in this warm instance
@@ -74,7 +75,7 @@ export function plausible(o, d, lat, lon, track) {
 
 const H = { 'Content-Type': 'application/json', 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' };
 const ll = v => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 1e4) / 1e4 : null; };
-// adsb.lol's route set (it has answered with an empty body for every flight since about October 2026)
+// adsb.lol's route set (it has answered with an empty body for every flight since about October 2026; kept last in case it returns)
 async function lolRoute(callsign, lat, lon, fetchImpl) {
   const r = await fetchImpl('https://api.adsb.lol/api/0/routeset', { method: 'POST', signal: AbortSignal.timeout(6000), headers: H,
     body: JSON.stringify({ planes: [{ callsign, lat: Number.isFinite(lat) ? lat : 0, lng: Number.isFinite(lon) ? lon : 0 }] }) });
@@ -94,9 +95,36 @@ async function dbRoute(callsign, fetchImpl) {
   return { origin: ap(f.origin), destination: ap(f.destination), source: 'adsbdb' };
 }
 
-export async function route(callsign, lat, lon, fetchImpl = globalThis.fetch, track = NaN) {
+const within = (ms, job) => Promise.race([job, new Promise((_, no) => setTimeout(() => no(new Error('timed out')), ms))]);
+// airports by ICAO code: the airports table (OurAirports, loaded nightly), else adsb.lol's airport API; cached a day
+const APS = new Map();
+async function airportsFor(codes, d, fetchImpl) {
+  const want = [...new Set(codes)].filter(c => /^[A-Z0-9]{3,4}$/.test(c) && !(APS.has(c) && Date.now() - APS.get(c).t < 864e5));
+  const row = a => ({ code: a.iata || a.icao || a.ident, icao: a.icao || a.ident, name: a.name, city: a.municipality ?? a.city ?? null, country: a.iso_country ?? a.country ?? null, lat: ll(a.lat), lon: ll(a.lon) });
+  if (want.length && d) {
+    try {
+      const list = want.join(','), rows = await within(4000, d.select('airports', 'select=ident,icao,iata,name,municipality,iso_country,lat,lon&or=(icao.in.(' + list + '),ident.in.(' + list + '))'));
+      for (const a of rows || []) for (const k of [a.icao, a.ident]) if (k && want.includes(k)) APS.set(k, { t: Date.now(), a: row(a) });
+    } catch (e) { console.warn('planes route airports', e.message); }
+  }
+  for (const c of want.filter(c => !APS.has(c))) { try { const a = await airport(c, fetchImpl); if (a) APS.set(c, { t: Date.now(), a: row({ ...a, ident: c }) }); } catch (e) {} }
+  if (APS.size > 3000) APS.delete(APS.keys().next().value);
+  return codes.map(c => APS.get(c)?.a || null);
+}
+// VRS standing data: every stop of the flight number; the leg that fits the plane
+async function vrsRoute(callsign, lat, lon, track, vs, d, fetchImpl) {
+  const codes = await vrsCodes(callsign, fetchImpl); if (!codes) return null;
+  const aps = await airportsFor(codes, d, fetchImpl);
+  const leg = codes.length > 2 ? pickLeg(aps, lat, lon, track, vs) : aps[0] && aps[1] ? { i: 0, origin: aps[0], destination: aps[1] } : null;
+  if (!leg?.origin || !leg?.destination) return null;
+  return { origin: leg.origin, destination: leg.destination, source: 'vrs', stops: codes.length > 2 ? aps.map((a, i) => a?.code || codes[i]) : undefined };
+}
+
+// first route that fits the plane: VRS standing data (multi-stop, leg picked), adsbdb, adsb.lol's route set
+export async function route(callsign, lat, lon, fetchImpl = globalThis.fetch, track = NaN, vs = NaN, d = db()) {
   const out = { callsign, origin: null, destination: null, plausible: null };
-  for (const look of [() => lolRoute(callsign, lat, lon, fetchImpl), () => dbRoute(callsign, fetchImpl)]) {
+  const looks = [() => vrsRoute(callsign, lat, lon, track, vs, d, fetchImpl), () => dbRoute(callsign, fetchImpl), () => lolRoute(callsign, lat, lon, fetchImpl)];
+  for (const look of looks) {
     let x = null; try { x = await look(); } catch (e) { console.warn('planes route', callsign, e.message); }
     if (!x) continue;
     const ok = plausible(x.origin, x.destination, lat, lon, track);
@@ -121,7 +149,7 @@ export default async function handler(req, res) {
     if (q.route) {
       const cs = String(q.route).trim().toUpperCase(); if (!/^[A-Z0-9]{2,8}$/.test(cs)) return res.status(400).json({ error: 'route=CALLSIGN' });
       res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=3600');
-      return res.json(await route(cs, num(q.lat), num(q.lon), undefined, num(q.track)));
+      return res.json(await route(cs, num(q.lat), num(q.lon), undefined, num(q.track), num(q.vs)));
     }
     if (q.track) {
       const hex = String(q.track).trim().toLowerCase().replace(/^~/, ''); if (!okHex(hex)) return res.status(400).json({ error: 'track=ICAO hex' });

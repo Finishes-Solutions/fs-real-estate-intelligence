@@ -27,10 +27,17 @@ assert.equal(res.body.osm.levels, 3); assert.equal(res.body.osm.use, 'retail');
 assert.equal(res.body.height.source, '3dep-lidar'); assert.equal(res.body.height.date, '2018-12-31'); assert.ok(res.body.height.height_m >= 13 && res.body.height.height_m <= 15, 'roof ≈ 14 m: ' + res.body.height.height_m); assert.equal(res.body.height.max_m, 21);
 assert.equal(res.body.photo.link, 'https://www.mapillary.com/app/?pKey=9'); assert.match(res.headers['Cache-Control'], /s-maxage/);
 res = mock(); await building({ query: { lat: '40', lon: '-95' }, headers: {} }, res); assert.equal(res.code, 400, 'outside Texas rejected');
+// the card asks for the parcel alone first, then everything else
+seen.length = 0; res = mock(); await building({ query: { lat: '30.055', lon: '-95.925', part: 'parcel' }, headers: { 'x-forwarded-for': '7.7.7.8' } }, res);
+assert.equal(res.body.parcel.owner, 'ACME HOLDINGS LLC'); assert.deepEqual(Object.keys(res.body), ['parcel']); assert.ok(seen.every(u => u.includes('/identify')), 'parcel only: no Overpass, lidar or photo calls');
+seen.length = 0; res = mock(); await building({ query: { lat: '30.055', lon: '-95.925', part: 'rest' }, headers: { 'x-forwarded-for': '7.7.7.8' } }, res);
+assert.ok(!('parcel' in res.body)); assert.equal(res.body.places.length, 2); assert.ok(!seen.some(u => u.includes('/identify')), 'rest: no parcel call');
 // a failing source degrades to an error string, not a 500
 globalThis.fetch = async () => new Response('down', { status: 503 });
 res = mock(); await building({ query: { lat: '30.05', lon: '-95.92' }, headers: { 'x-forwarded-for': '8.8.8.8' } }, res);
 assert.equal(res.code, 200); assert.equal(res.body.parcel, null); assert.match(res.body.parcelError, /503/); assert.deepEqual(res.body.places, []);
+res = mock(); await building({ query: { lat: '30.05', lon: '-95.92', part: 'parcel' }, headers: { 'x-forwarded-for': '8.8.8.9' } }, res);
+assert.match(res.body.parcelError, /503/); assert.equal(res.headers['Cache-Control'], 'no-store', 'a failed parcel lookup is not cached');
 console.log('building api tests passed');
 // Fort Bend style records: "Null" strings, spreadsheet day numbers, the city already in the address, trailing commas
 { const { normalizeParcel } = await import('../api/building.js');

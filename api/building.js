@@ -91,15 +91,20 @@ async function photo(lat, lon) {
 export default async function handler(req, res) {
   const lat = +req.query.lat, lon = +req.query.lon;
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 25 || lat > 37 || lon < -107 || lon > -93) return res.status(400).json({ error: 'lat/lon must be inside Texas' });
-  if (!rateLimit(req, res, { perMinute: 30, perDay: 600 })) return;
+  if (!rateLimit(req, res, { perMinute: 60, perDay: 1200 })) return; // two requests per card (parcel, then the rest)
   const r5 = v => Math.round(v * 1e5) / 1e5;
   // footprint for the lidar height: "lon,lat;lon,lat;…" (closed or not), at most 120 vertices
   const fp = String(req.query.fp || '').split(';').slice(0, 121).map(x => x.split(',').map(Number)).filter(c => c.length === 2 && c.every(Number.isFinite) && Math.abs(c[0] - lon) < .02 && Math.abs(c[1] - lat) < .02);
   const footprint = fp.length >= 3 ? { type: 'Polygon', coordinates: [fp[0][0] === fp[fp.length - 1][0] && fp[0][1] === fp[fp.length - 1][1] ? fp : fp.concat([fp[0]])] } : null;
-  const [p, pl, ph, ht] = await Promise.allSettled([parcel(r5(lat), r5(lon)), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)])]);
-  res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+  // &part=parcel: the appraisal record alone (the card shows it first); &part=rest: everything but the parcel
+  const part = req.query.part === 'parcel' || req.query.part === 'rest' ? req.query.part : null, skip = Promise.resolve(null);
+  res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
+  if (part === 'parcel') {
+    try { return res.json({ parcel: await parcel(r5(lat), r5(lon)) }); } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.json({ parcel: null, parcelError: e.message }); }
+  }
+  const [p, pl, ph, ht] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon)), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)])]);
   return res.json({
-    parcel: p.status === 'fulfilled' ? p.value : null, parcelError: p.status === 'rejected' ? p.reason.message : undefined,
+    ...(part === 'rest' ? {} : { parcel: p.status === 'fulfilled' ? p.value : null }), parcelError: p.status === 'rejected' ? p.reason.message : undefined,
     places: pl.status === 'fulfilled' ? pl.value.list : [], placesError: pl.status === 'rejected' ? pl.reason.message : undefined,
     osm: pl.status === 'fulfilled' ? pl.value.osm : null,
     height: ht.status === 'fulfilled' ? ht.value : { source: 'none', note: 'Lidar lookup failed: ' + ht.reason?.message },
