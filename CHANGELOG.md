@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
-### 11:31 PM CT: County lines for the whole US, planes in 3D (COMMIT)
+### 11:31 PM CT: County lines for the whole US, planes in 3D (feaf75b)
 - **County and state lines now cover the whole country:** all 3,224 counties outside the 7 home counties, with state borders a little heavier.
   - Labels read like "Brazos Co., TX" (parishes in Louisiana) and show from about the regional zoom level.
   - Zoomed in to about city level, the lines switch to the exact Census boundaries for the area on screen. If those can't be loaded, the lighter national lines stay.
