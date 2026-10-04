@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
-### 1:30 AM CT: Filters for the map's layers, and freeze fixes (COMMIT)
+### 1:30 AM CT: Filters for the map's layers, and freeze fixes (690491d)
 - **Filters now cover the map's layers, not just construction filings.** The panel has a section per kind of data:
   - **Demographics:** income, population growth, home value, rent, vacancy, jobs.
   - **Traffic:** the busiest road in vehicles a day.
