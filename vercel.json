@@ -14,7 +14,7 @@
       "includeFiles": "data/{filings,changes}.json"
     },
     "api/building.js": {
-      "maxDuration": 20
+      "maxDuration": 30
     },
     "api/pipeline-ai.js": {
       "maxDuration": 300
@@ -33,6 +33,12 @@
     },
     "api/drive.js": {
       "maxDuration": 20
+    },
+    "api/isochrone.js": {
+      "maxDuration": 40
+    },
+    "api/airports.js": {
+      "maxDuration": 50
     },
     "api/tile.js": {
       "maxDuration": 10
@@ -68,7 +74,10 @@
       "maxDuration": 90
     },
     "api/traffic.js": {
-      "maxDuration": 20
+      "maxDuration": 30
+    },
+    "api/counties.js": {
+      "maxDuration": 25
     }
   },
   "crons": [

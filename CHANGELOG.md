@@ -3,7 +3,196 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-04
+
+### 1:30 AM CT: Filters for the map's layers, and freeze fixes (690491d)
+- **Filters now cover the map's layers, not just construction filings.** The panel has a section per kind of data:
+  - **Demographics:** income, population growth, home value, rent, vacancy, jobs.
+  - **Traffic:** the busiest road in vehicles a day.
+  - **Risk:** all flood zones or only the high-risk 100-year floodplain, and the crime type in Houston.
+  - **Construction filings:** the filters from before, plus the number of projects in an area when matching.
+- **Two ways to use them** (the switch at the top):
+  - **Filter each layer:** demographic thresholds fade the neighborhoods that don't qualify, the traffic threshold hides quieter roads, and the risk choices change the flood and crime layers. Setting a filter turns its layer on.
+  - **Match everything:** census tracts that meet every threshold are outlined in green and the rest of the map fades. For example, income at least $100K and growth at least 5% gives 213 of 1,417 areas. The panel shows the count and offers **Zoom to matches**.
+  - Busiest road and FEMA flood risk per area come with the nightly data refresh (checked monthly). Until the first refresh after this change, they're left out of matching, and the panel says so.
+- **Clear and Clear All reset the layer filters too.** The summary at the top of the panel lists everything that's on.
+- **No more freezes when selecting a big area:**
+  - Picking Harris County with the County tool used to lock the page for about 3 seconds, and again on every filter change after that. The app's own work now takes about 15 thousandths of a second.
+  - Counties now match on each filing's own county, and other areas use a much faster inside-the-area test (about 100 times faster). The same speed-up applies to Compare, exports and searched places.
+- **Live planes are much lighter:**
+  - The plane icons refresh about 4 times a second instead of 12–30, unless you're following a plane or showing its path.
+  - The 3D models still move smoothly.
+  - Everything pauses while another tab hides the map.
+  - Turning planes on no longer stalls while their icons are drawn.
+- **Following or orbiting a plane no longer floods the app with reloads:** in a test, 37 airport reloads in 3 seconds became 3. Airports, traffic counts and the exact county lines now reload once the map settles, and cancel the previous request.
+- **Turning Airports, Traffic Counts or Crime off and on no longer stacks up duplicate handlers.** Before, a click on an airport could open its card several times.
+- Filing dots are no longer rebuilt in the background while they're hidden.
+
+### 1:06 AM CT: Phone More menu as tiles, simpler phone Filters (bdb0916)
+- **The phone More menu is a grid of one-word tiles,** named like the desktop tabs.
+  - **Views:** Market, Compare, Reports, Updates, Notes, Sources.
+  - **Tools:** Layers, Export, Saved, Nearby, Pin (a site note at your location), Theme, and Install when the phone offers it.
+  - Counts show as badges on the tiles.
+- **The desktop Field Notes tab is now called Notes,** to match.
+- **Filters on phones is a full-height sheet:**
+  - A short header with **Clear All**, and the sections in one simple list. "More Filters" is no longer hidden behind a click.
+  - A big **Show N filings** button at the bottom shows how many filings match and closes the sheet.
+  - The sheet opens just under the search bar, so its title and close button are no longer covered.
+
+### 12:58 AM CT: Plain-language product guide (40a0948)
+- **New: `PRODUCTDOC.md`,** a plain-language guide to the whole app. It covers what it is and where it works, the screen layout, property lookups, area reports and clearing the view, map layers, planes and airports, market data, construction filings, Ask AI, reports, field notes, where the data comes from, and what to keep in mind.
+- It will be updated with every change people can see, so it stays current as the app grows.
+
+### 12:15 AM CT: Phone map fills the screen, no sideways scrolling in menus (43c0e4d)
+- **The map now fills the phone screen:**
+  - It runs right up under the clock and battery, with a soft fade so they stay readable, and down to the bottom bar. The grey bands above and below the map are gone.
+  - The search bar also sits higher, just under the status bar. It had been pushed down twice the status bar's height.
+- **Map Layers no longer slides sideways on phones:** the crime type picker was showing even with Crime off and stuck out past the panel's edge. It now only appears when Crime is on.
+  - The panels and sheets (Map Layers, Filters, More, Explore) now only scroll up and down.
+  - The row of quick layer buttons still swipes sideways on purpose, since they don't all fit across a phone.
+
 ## 2026-10-03
+
+### 11:48 PM CT: Quick layer buttons, one-click Clear, dot grid everywhere, a general real estate layout (3667dc3)
+- **Quick layer buttons under the map search:**
+  - Satellite, 3D, Parcels, Flood Zones, Demographics, Traffic Counts, Filings, Planes and Radar, one tap each.
+  - **More** opens Map Layers, which keeps every layer and the finer options: the demographic measure, crime type, filing dot size and heatmap, basemaps, live weather and so on.
+  - The buttons and the panel always agree. A layer turned on from the panel or by the assistant lights up its button too.
+- **Map Layers is regrouped:** Base Map, Property & Site, Demographics, Construction Filings, Map Display, then Live Conditions. While it's open, the map's search and buttons make room for it instead of sitting underneath.
+- **Clearing the view takes one click:**
+  - The **Clear** button next to Filters now shows whenever anything narrows the view: filters, a period other than the last 12 months, a time-lapse month, a selected area, or a searched place's outline.
+  - Hover over it to see exactly what it will clear. On phones there's a ✕ next to the filter button that does the same.
+  - Inside the Filters menu, **Clear All** is now at the top, so there's no scrolling down to reset.
+- **The dot grid covers everything:**
+  - The halftone dot pattern now covers all land at every zoom level and on every basemap, not just the 7 home counties. The sea stays clean, and Waller County's dots are green.
+  - On satellite imagery the dots are white and fainter. Turn them off with **Dot Grid** in Map Layers (the setting is remembered).
+- **Less filing-centric by default:**
+  - The left panel opens with Area at a Glance, which now shows numbers at the regional zoom level too, and a new **This Area** box: the map view or the selected area, with its area reports, Compare, Save Search and Copy Link. These used to be hidden inside the collapsed Construction Filings section.
+  - Construction Filings is still there, collapsed, as one layer among many.
+  - Tabs run Map, Market, Compare, Reports, Field Notes, then the filing views (Timeline, Activity, Updates) and Sources.
+  - The intro and footer describe the whole platform, not just TDLR filings.
+
+### 11:31 PM CT: County lines for the whole US, planes in 3D (feaf75b)
+- **County and state lines now cover the whole country:** all 3,224 counties outside the 7 home counties, with state borders a little heavier.
+  - Labels read like "Brazos Co., TX" (parishes in Louisiana) and show from about the regional zoom level.
+  - Zoomed in to about city level, the lines switch to the exact Census boundaries for the area on screen. If those can't be loaded, the lighter national lines stay.
+  - The home counties keep their highlighted outlines.
+  - The **County Lines** switch in Map Layers turns all of it on and off.
+- **Planes are 3D models when the map is tilted:**
+  - Each plane is shown at its real altitude, pointing where it's flying.
+  - Planes tip their nose up when climbing and down when descending, and bank into turns.
+  - Each kind of aircraft has its own model: airliners, jumbo jets, business jets, military transports, fighters, turboprops, small planes, helicopters, gliders, balloons and drones. A 747 is clearly bigger than a Cessna.
+  - Up close, planes are true to scale. Zoomed out, they stay about icon size so they're easy to see.
+  - A thin line drops from each plane to the ground. The flat icon underneath turns into a grey shadow that keeps the callsign and altitude.
+  - Click or hover over a model in the air for the plane card.
+  - The flat map still shows the flat icons, same as before.
+
+### 2:19 PM CT: No more zooming out to the whole world, more businesses, more crime statistics (31908c8)
+- **Fixed:** opening a drive-time map, showing a crime, FEMA or traffic report's area, or other area outlines could zoom the map all the way out to the whole world. Some outlines are drawn in the opposite direction, and the map read them as "everything except this area". It now zooms to the area itself.
+- **Businesses on property cards:**
+  - The search reaches about 150 m instead of 80 m, so large buildings, shopping centers and strip malls show their tenants.
+  - Up to 30 nearby businesses are listed instead of 8.
+  - When the main OpenStreetMap server is busy, two backup servers are tried before giving up. Before, a busy server meant an empty list. The map's "nearby" business search uses the backups too.
+  - The list still depends on what's mapped in OpenStreetMap, which is thin in some suburbs. The registered businesses at the address (Texas Comptroller) are still listed below it.
+- **Crime reports have new sections:**
+  - **When it happens:** incidents by hour of day and by day of week, with the busiest 3-hour stretch and the busiest and quietest days.
+  - **Year by year:** each year's incidents and its change, next to Houston's change over the same time. Partial years are compared at their yearly pace.
+  - **Per resident:** incidents per 1,000 residents a year, from the census tracts in the area.
+  - All of these are in the exported report too, and the assistant can answer from them ("what time of day are break-ins worst here?").
+- The hour of day appears after the next nightly data refresh, which reloads the stored incidents once. Day of week and year by year work now.
+- **Longer crime history** is ready for when the database is upgraded: set the repository variable CRIME_YEARS (for example 6), and the nightly sync loads and keeps that many years. It's 2 for now.
+
+### 2:00 PM CT: Minimize cards to see the map (a9114ef)
+- **Every card can shrink to its title bar:** properties, filings, planes, airports and reports.
+  - Tap the **⌄** button next to the ×, or on a phone swipe the card down.
+  - The selection stays, and so does everything the card put on the map: a plane you're following, its flight path and 3D path, routes, outlines.
+  - Tap the title bar (or swipe up) to bring the card back.
+- **Swiping down on a phone** now goes from full height to normal to minimized, and only then closes the card.
+- **Following a plane on a phone** keeps it centered in the map above the card instead of behind it, so a minimized card leaves almost the whole screen for the flight.
+
+### 1:19 PM CT: Airports worldwide, air traffic reports and flight reports (3924b91, 3b2ee82, 21d87ab)
+- **Every airport in the world is in the app:** 86,158 airports, including all 3,887 in Texas, and 48,000 runways. Turn on **Airports** in Map Layers: big airports show from far out, small fields and heliports as you zoom in.
+- **Click an airport for its card:**
+  - a photo of the airport;
+  - its codes, type and elevation;
+  - the weather there right now;
+  - every runway (length, width, surface, lighting) with a runway diagram;
+  - the radio frequencies.
+- **Maps of the airport:**
+  - **Show Airport Map** draws the terminals, taxiways, aprons, hangars and runways on the satellite view (from OpenStreetMap).
+  - **FAA Airport Diagram** opens the official diagram for about 900 US airports.
+- **Airlines and statistics:** the airlines that fly there and how many destinations each serves, plus the airport's own statistics: busiest routes, passengers by year and airline market share (from Wikipedia).
+- **Takeoffs and landings per day:** counted from live aircraft positions for airports within about 100 miles of Houston, starting today.
+  - Landings are counted on short final, because receivers often lose planes just before touchdown.
+  - Small planes without transponders are missed, so the figures are below official FAA counts. The card says so.
+- **Property cards show "Airports Nearby".** If a site sits under a runway's approach path, it says which runway and how far out, e.g. "Under the approach path to HOU runway 04, 2.1 nm from the runway end".
+- **Air Traffic Report** for any area (Reports tab, selection bar, or Area reports on a building):
+  - aircraft sightings a day and the busiest and quietest hours;
+  - how much traffic is under 3,000 ft, and the mix of jets, props, helicopters and military;
+  - the trend by month, nearby airports and approach paths;
+  - what's overhead right now.
+
+  The hourly and aircraft-mix history starts filling in today.
+- **Flight Report:** on any plane's card, **Export Flight Report** saves a printable report and a CSV of the track points. The report has:
+  - the aircraft photo, type, operator and FAA registration;
+  - the route and a flight path map;
+  - altitude and speed charts;
+  - today's other flights.
+- **Each card exports a report and CSV**, and the Reports tab keeps them.
+- **Ask the assistant** "tell me about Hobby airport", "what airlines fly out of Sugar Land?", "how much air traffic is over this site?" or "make a flight report for UAL1234".
+
+### 3:11 AM CT: News about the whole place, smarter place-finding, big places fit on screen (8be5eb5)
+- **News no longer mixes in people who share a town's name.** A property in Waller was turning up stories about Fed Governor Christopher Waller. Towns are now always searched as "Waller, TX", "Waller, Texas" or "Waller County", never the bare word.
+- **The News button searches everything about the place at once**, and each story says what it's about:
+  - the project itself and its developer, tenant and owner
+  - the businesses at that spot (from the map and from the Comptroller lookup, if you've opened it)
+  - the owner on the appraisal record (for example, "SMITH JOHN A" is searched as "John Smith", always tied to the town)
+  - the street address and the subdivision
+  - development and real-estate news for the town or county
+
+  Results are grouped under those headings. The assistant's news answers work the same way.
+- **The assistant works harder to find a place.** "Highlight Terminal B at George Bush airport" now finds the airport, then looks for Terminal B inside it. It knows common nicknames (Bush airport / IAH, Hobby, the Med Center, NRG). If the map still can't find something, it does a web search for the official name and location, then checks that against the map before showing it. Anything placed only from the web search is marked approximate.
+- **Big places fit on screen.** Going to or outlining an airport, campus, park or town now frames the whole thing, leaving room for the chat panel and the property card. Before, they were shown at street level. Single buildings and addresses still zoom in close.
+- Not checked on the live site yet: this build environment can't reach Google News or OpenStreetMap. Automated tests cover the new search logic.
+### 2:50 AM CT: Traffic reports and a Traffic Counts layer (7e269a7)
+- **Traffic Counts** in Map Layers: every road TxDOT counts, coloured from green to dark red by how many vehicles use it a day. Zoom in to a part of town to see it, and hover a road for its count.
+- **Traffic Report** for any area (Reports tab, the selection bar, or Area reports on a building's Site section):
+  - the busiest roads, with vehicles a day;
+  - average traffic by road type (interstates, state highways, city streets…);
+  - **live speed vs normal speed** on the 8 busiest roads right now;
+  - **current crashes, closures and road works** in the area.
+- **Export Report** (printable, save as PDF) and **Export CSV**, with every counted road segment. The report includes a map of the area with the roads drawn by traffic.
+- **Ask the assistant** "how busy is Westheimer near the Galleria?" or "traffic around this site".
+- **Honest limits:**
+  - TxDOT publishes only the current year's counts in this data, so there's no year-over-year trend.
+  - The counts are annual averages for both directions; hour-by-hour volumes aren't published free.
+  - Live speeds and incidents are a snapshot from when you open the report (TomTom doesn't allow storing them).
+
+### 2:41 AM CT: Drive-time maps (5285009)
+- **See how far you can drive in 10, 20 or 30 minutes.** Open any building or filing and press **Drive-Time Map** under From Here. Nested green, yellow and orange areas are drawn on the map.
+- **Choose when you're leaving:** now (live traffic), a weekday at 8 AM or 5 PM, or Sunday. Rush hour can shrink the areas a lot.
+- **Choose the times:** 5/10/15, 10/20/30, 15/30/45 or 20/40/60 minutes.
+- **The card shows, for each area:**
+  - square miles;
+  - people, households, median income and jobs (from Census data, for the counties loaded on the map);
+  - how many filings on the map fall inside.
+- **Use it as a trade area.** "Select this area" (or clicking an area on the map) makes it the selection. The map's filings narrow to it, and crime, FEMA and other area reports run on that drive-time area.
+- **Export Report** (printable, save as PDF) and **Export CSV**. Both are kept in the Reports tab, which now also has a Drive-Time Map card.
+- **Ask the assistant** "what's within a 20-minute drive of the Galleria at rush hour?" by text or voice.
+- **Sources:** TomTom, with live or typical traffic. If TomTom is unavailable it falls back to OpenStreetMap routing without traffic, and the card says so.
+
+### 2:30 AM CT: Voice assistant is more reliable (ba2b843)
+- **No more bursts of place names.** When you were quiet or there was background noise, the voice transcriber sometimes "heard" its own list of local names and flashed them on screen before throwing the turn away. That list is now much shorter. Any echo that still slips in is removed, even when it's tacked onto the end of something you really said.
+- **"Listening…" and then nothing should be gone.** Several ways a turn could stall without a word are fixed:
+  - Two replies started for one question, and the second was refused.
+  - A reply that failed on OpenAI's side was treated as finished.
+  - A lookup (an address, a place) never answered.
+
+  Now one reply runs at a time. A failed or never-started reply is retried once, and lookups give up after 20 seconds. If it still can't answer, the panel says so ("No reply came back. Try again.") instead of going silent.
+- **If you talk for a while and the transcript comes out garbled**, the assistant answers from your voice. If it didn't catch you either, it asks you to repeat. Short noises are still ignored, now with "Didn't catch that" when something was heard.
+- **Long conversations keep going.** OpenAI ends voice sessions at 10 minutes. The app now renews the session just before that, between turns, and remembers what you were talking about.
+- **When a place name is ambiguous** ("Katy" the town or Katy Freeway), the options appear as buttons under the conversation. You can tap one or just say it.
+- **Voice log:** the Sources tab has a "Save it" button. It saves step-by-step timings of what the voice assistant heard and did in this visit. If voice misbehaves, send that file over.
 
 ### 2:25 AM CT: Smooth 3D flight paths, smoother planes, legends, report radius, a richer Market page (f24b9c7, 03b8c3b, b204088)
 - **The 3D flight path is a real 3D line now.**

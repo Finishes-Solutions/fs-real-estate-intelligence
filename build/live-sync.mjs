@@ -1,10 +1,12 @@
 // Nightly: save the live-data facts behind the map into Supabase (.github/workflows/live-sync.yml).
-//   news_articles + filing_news  GDELT articles for the developer / tenant / owner of active filings (rotates through them, ~5 s per search)
+//   news_articles + filing_news  Google News (GDELT fallback) for the developer / tenant / owner of active filings, pinned to the town and county (rotates through them, ~5 s per search)
 //   imagery_passes               NASA HLS passes (date, cloud %) over each active filing
 //   weather_daily                Open-Meteo daily weather at each county centroid (3 days back, 7 ahead)
 //   storm_advisories             NOAA NHC active-storm snapshot
 //   tracts                       ACS census tracts from data/market.json
 //   crime_incidents              Houston Police NIBRS incidents (yearly CSVs), last ~25 months, for crime near a site on building cards
+//   airports, airport_runways,   OurAirports (every airport in the world, runways, frequencies) and the FAA airport diagram PDF
+//   airport_frequencies/extras   for US airports (d-TPP, current 28-day cycle); only changed rows are written
 //   aircraft_registry            the FAA registry of US aircraft (owner of each N-number / Mode S hex) for plane cards; only changed rows are written
 // Reads the regional data/filings.json and data/geo.json the "Refresh data" workflow commits. Needs the
 // 20261004000000_live_data.sql migration. Env: NEWS_MAX (searches per night, default 120), IMAGERY_MAX (default 600),
@@ -17,9 +19,10 @@ import { news, phrase } from '../api/news.js';
 import { daily, storms } from '../api/weather.js';
 import { HPD_CSV, parseHpd } from '../lib/crime.mjs';
 import { loadRegistry, parseRegistry } from '../lib/faa.mjs';
+import { OURAIRPORTS, parseCsv, airportRow, runwayRow, frequencyRow, dtppCycle, parseDtpp } from '../lib/airports.mjs';
 
 const D = process.env.DATA_DIR || 'data/';
-const ONLY = (process.env.ONLY || 'news,imagery,weather,storms,tracts,crime,aircraft').split(',');
+const ONLY = (process.env.ONLY || 'news,imagery,weather,storms,tracts,crime,aircraft,airports').split(',');
 const NEWS_MAX = +(process.env.NEWS_MAX || 120), IMAGERY_MAX = +(process.env.IMAGERY_MAX || 600), IMAGERY_DAYS = +(process.env.IMAGERY_DAYS || 30);
 const NEWS_GAP_MS = +(process.env.NEWS_GAP_MS ?? 5500); // GDELT asks for at most one request per 5 seconds
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -75,9 +78,13 @@ await step('tracts', async () => {
 await step('crime', async () => {
   // first run: 25 months; after that only the months HPD may still be revising (it republishes the yearly files monthly)
   // the window is anchored on HPD's latest incident (its file runs ~3 months behind), so "the 12 months before" is always complete
-  const latest = await db.rpc('crime_latest', {}), now = new Date(), first = latest ? (await db.select('crime_incidents', 'select=day&order=day.asc&limit=1'))[0]?.day : null;
-  const want = latest ? addDays(String(latest).slice(0, 10), -740) : null;
-  const since = !latest ? addDays(today, -900) : first && String(first) > want ? want : addDays(String(latest).slice(0, 10), -75);
+  // CRIME_YEARS: how many years back to keep (2 on the free database; more once it's upgraded). Rows saved before the
+  // hour of day was kept are reloaded once, so the time-of-day breakdown covers the whole history.
+  const YEARS = Math.min(12, Math.max(2, +(process.env.CRIME_YEARS || 2))), KEEP = YEARS * 365 + 30;
+  const latest = await db.rpc('crime_latest', {}), now = new Date(), oldest = latest ? await db.select('crime_incidents', 'select=day,hour&order=day.asc&limit=50') : [];
+  const first = oldest[0]?.day, noHour = oldest.length && oldest.every(r => r.hour == null);
+  const want = latest ? addDays(String(latest).slice(0, 10), -(KEEP - 20)) : null;
+  const since = !latest ? addDays(today, -(KEEP + 140)) : (first && String(first) > want) || noHour ? want : addDays(String(latest).slice(0, 10), -75);
   let rows = 0; const errors = [];
   for (let y = +since.slice(0, 4); y <= now.getUTCFullYear(); y++) {
     const r = await fetch(HPD_CSV(y), { headers: { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence)' }, signal: AbortSignal.timeout(180000) });
@@ -86,8 +93,8 @@ await step('crime', async () => {
     await db.upsert('crime_incidents', list, 'id', 1000); rows += list.length;
   }
   if (!rows && errors.length) throw new Error(errors.join('; '));
-  const pruned = await db.rpc('crime_prune', { p_keep_days: 760 });
-  return { since, rows, pruned, errors: errors.length ? errors : undefined };
+  const pruned = await db.rpc('crime_prune', { p_keep_days: KEEP });
+  return { since, years: YEARS, rows, pruned, errors: errors.length ? errors : undefined };
 });
 
 await step('aircraft', async () => {
@@ -101,6 +108,34 @@ await step('aircraft', async () => {
   const keep = new Set(rows.map(r => r.n_number)), gone = [...have.keys()].filter(n => !keep.has(n));
   let removed = 0; for (let i = 0; i < gone.length; i += 2000) removed += +(await db.rpc('aircraft_registry_remove', { p_ids: gone.slice(i, i + 2000) })) || 0;
   return { registered: rows.length, written: changed.length, removed };
+});
+
+await step('airports', async () => {
+  const get = async (u, ms = 120000) => { const r = await fetch(u, { headers: { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0 (airport sync)' }, signal: AbortSignal.timeout(ms) }); if (!r.ok) throw new Error(u.split('/').pop() + ' ' + r.status); return r.text(); };
+  const sync = async (table, key, rows, min) => {
+    // a cut-off download must not empty the table
+    if (rows.length < min) throw new Error(table + ': only ' + rows.length + ' rows parsed (expected at least ' + min + '); nothing changed');
+    const have = new Map((await db.selectAll(table, 'select=' + key + ',h&order=' + key)).map(r => [String(r[key]), r.h]));
+    const changed = rows.filter(r => have.get(String(r[key])) !== r.h);
+    await db.upsert(table, changed, key, 1000);
+    const keep = new Set(rows.map(r => String(r[key]))), gone = [...have.keys()].filter(k => !keep.has(k));
+    let removed = 0; for (let i = 0; i < gone.length; i += 2000) removed += +(await db.rpc('airports_remove', { p_table: table, p_ids: gone.slice(i, i + 2000) })) || 0;
+    return { rows: rows.length, written: changed.length, removed };
+  };
+  const now = new Date().toISOString(), MIN = process.env.AIRPORTS_MIN_ROWS ? +process.env.AIRPORTS_MIN_ROWS : null;
+  const airports = parseCsv(await get(OURAIRPORTS + 'airports.csv')).map(airportRow).filter(Boolean).map(r => ({ ...r, synced_at: now }));
+  const out = { airports: await sync('airports', 'ident', airports, MIN ?? 60000) };
+  out.runways = await sync('airport_runways', 'id', parseCsv(await get(OURAIRPORTS + 'runways.csv')).map(runwayRow).filter(Boolean), MIN ?? 30000);
+  out.frequencies = await sync('airport_frequencies', 'id', parseCsv(await get(OURAIRPORTS + 'airport-frequencies.csv')).map(frequencyRow).filter(Boolean), MIN ?? 15000);
+  // FAA airport diagrams (US): the current d-TPP cycle's metafile names each airport's diagram PDF
+  try {
+    const { cycle } = dtppCycle(), pdfs = parseDtpp(await get('https://aeronav.faa.gov/d-tpp/' + cycle + '/xml_data/d-tpp_Metafile.xml', 180000));
+    const extras = airports.filter(a => a.iso_country === 'US').map(a => { const pdf = pdfs.get(a.icao || '') || pdfs.get(a.local_code || '') || pdfs.get(a.gps_code || '') || pdfs.get(a.ident);
+      return pdf ? { ident: a.ident, diagram_url: 'https://aeronav.faa.gov/d-tpp/' + cycle + '/' + pdf, diagram_cycle: cycle, updated_at: now } : null; }).filter(Boolean);
+    if (extras.length >= (MIN ?? 300)) await db.upsert('airport_extras', extras, 'ident', 1000);
+    out.diagrams = { cycle, airports: extras.length };
+  } catch (e) { out.diagrams = { error: e.message }; }
+  return out;
 });
 
 await step('imagery', async () => {
@@ -120,13 +155,14 @@ await step('news', async () => {
   for (const f of active.filter(f => f.cost >= 1e6).sort((a, b) => b.cost - a.cost)) {
     const who = f.dev || f.ten || f.owner || f.name; if (!phrase(who)) continue;
     const k = phrase(who).toLowerCase() + '|' + (f.city || '').toLowerCase();
-    if (!groups.has(k)) groups.set(k, { who, city: f.city || '', ids: [] }); groups.get(k).ids.push(f.id);
+    if (!groups.has(k)) groups.set(k, { who, city: f.city || '', county: f.county || '', ids: [] }); groups.get(k).ids.push(f.id);
   }
   const todo = rotate([...groups.values()], NEWS_MAX); let found = 0, links = 0, errors = 0;
   for (const [i, g] of todo.entries()) {
     if (i) await sleep(NEWS_GAP_MS);
     try {
-      const { query, articles } = await news(g.who, g.city, 10); if (!articles.length) continue;
+      // the company only (the project and area angles are what the card's News button adds); "Waller, TX", never bare "Waller"
+      const { query, articles } = await news({ company: [g.who], city: g.city, county: g.county, area: false }, null, 10); if (!articles.length) continue;
       await db.upsert('news_articles', articles.map(a => ({ url: a.url, title: a.title, domain: a.domain, published: a.date, image: a.image })), 'url');
       const l = g.ids.flatMap(id => articles.map(a => ({ filing_id: id, url: a.url, query }))); await db.upsert('filing_news', l, 'filing_id,url');
       found += articles.length; links += l.length;

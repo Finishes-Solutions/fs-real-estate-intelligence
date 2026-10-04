@@ -1368,7 +1368,7 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 #card .fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
 #card .fgrid .f{display:flex;flex-direction:column;gap:3px;min-width:0}
 #card .fgrid .f.w{grid-column:1/-1}
-#card .fl{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+#card .fl,.cc-live .fl{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 #card .fv{font-size:13.5px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
 #card .fv.dim{color:var(--muted);font-weight:500}
 #card .fs{font-size:11.5px;color:var(--muted);line-height:1.4}
@@ -1468,7 +1468,12 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .fpop-h .x{border:0;background:transparent;cursor:pointer;color:var(--muted);width:28px;height:28px;flex:none;border-radius:4px;display:grid;place-items:center}
 .fpop-h .x:hover{background:var(--panel-2);color:var(--text)}
 .fpop .filters{border-bottom:0}
-.fpop .active{position:sticky;bottom:0;background:var(--panel);margin:0 -24px -20px;padding:12px 24px;border-top:1px solid var(--line)}
+.fpop-h{flex-wrap:wrap}
+.fpop-h>div:first-child{flex:1;min-width:0}
+.fpop .active{flex:0 0 calc(100% + 36px);display:flex;align-items:center;gap:10px;background:var(--panel-2);margin:2px -18px -12px;padding:9px 18px;border-top:1px solid var(--line);box-sizing:border-box}
+.fpop .active span{flex:1;min-width:0;font-size:12px;color:var(--text-2)}
+.fpill{display:inline-flex;align-items:center;gap:6px;flex:none;height:28px;padding:0 12px;border:1px solid var(--brand);border-radius:999px;background:var(--panel);color:var(--brand);font:700 12px var(--font-display);cursor:pointer}
+.fpill:hover{background:var(--brand);color:var(--brand-ink)}
 /* tablet: the toolbar is icon-only, so the Filters button is too */
 @media (max-width:1100px) and (min-width:701px){ .fbtn span,.fclear span{display:none} .fbtn,.fclear{padding:0 10px} }
 /* phone: the floating filter button opens the same popup as a bottom sheet */
@@ -1528,3 +1533,162 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .mk-hb.mk-hit.on span{color:var(--text);font-weight:700}
 .mk-hb.mk-hit:hover i b,.mk-hb.mk-hit.on i b{filter:brightness(1.15)}
 .vctl .btn{min-height:32px}
+
+/* drive-time map card */
+#card .dt-ctl{display:grid;gap:8px;margin-bottom:10px}
+#card .dt-band b{display:flex;align-items:center;gap:7px}
+#card .dt-band b i{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none}
+#card .pl.dt-band{display:grid;grid-template-columns:1fr auto;grid-template-areas:'b l' 's s';gap:2px 10px;align-items:center}
+#card .dt-band b{grid-area:b}#card .dt-band span{grid-area:s;text-align:left;white-space:normal}#card .dt-band .lnk{grid-area:l;white-space:nowrap}
+
+/* airport card */
+#card .apt-photo{position:relative;margin:0 0 4px;border-radius:6px;overflow:hidden;max-height:220px;background:var(--line)}
+#card .apt-photo img{display:block;width:100%;height:220px;object-fit:cover}
+#card .apt-photo span{position:absolute;right:6px;bottom:4px;font-size:10px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+#card .apt-sum{font-size:13px;color:var(--text-2);margin:10px 0 0;line-height:1.5}
+#card .apt-raw{font-size:11px;color:var(--muted);margin-top:4px;word-break:break-word}
+#card .apt-rwy svg{display:block;width:100%;max-width:360px;height:auto;margin:4px 0 8px}
+#card .apt-tbl{margin:8px 0 12px;overflow-x:auto}#card .apt-tbl b{display:block;font-size:12px;margin-bottom:4px}
+#card table.mini{border-collapse:collapse;font-size:11.5px;width:100%}#card table.mini th{text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--line);padding:3px 6px}#card table.mini td{border-bottom:1px solid var(--line);padding:3px 6px}
+#card .apt-path{background:rgba(234,179,8,.12);border-left:3px solid #eab308;padding:8px 10px;border-radius:4px;font-size:13px;margin-bottom:8px}
+
+/* minimized card: just the title bar; everything it shows on the map stays */
+.card .top .mn{border:0;background:transparent;cursor:pointer;color:var(--muted);width:28px;height:28px;flex:none;border-radius:4px;display:grid;place-items:center;margin-left:auto}
+.card .top .mn:hover,.card .top .x:hover{background:var(--panel-2);color:var(--text)}
+.card .top .mn svg{transition:transform 160ms ease}
+.card.min .top .mn svg{transform:rotate(180deg)}
+.card.min{overflow:hidden}
+.card.min>:not(.top){display:none!important}
+.card.min .top{border-bottom:0;cursor:pointer}
+#card.min .top .bnav,.card.min .top .bnav{display:none!important}
+.card.min .top h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:700px){
+  .card .top .mn{width:40px;height:40px;margin:-6px 0 0 0}
+  .card.min{max-height:none}
+  .card.min .top{padding-bottom:8px}
+  .card.min .top .bsub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
+
+/* ================= quick layer buttons (under the map search) ================= */
+.qlayers{display:flex;flex-wrap:wrap;gap:6px;contain:inline-size}
+.qlayers:empty{display:none}
+.qchip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px 0 9px;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);color:var(--text-2);font:600 12px var(--font-display);cursor:pointer;box-shadow:0 1px 2px rgba(11,13,12,.08);white-space:nowrap;transition:background .15s,border-color .15s,color .15s}
+.qchip svg{flex:none;opacity:.85}
+.qchip:hover{border-color:var(--text-2);color:var(--text)}
+.qchip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.qchip[aria-pressed="true"] svg{opacity:1}
+.qchip.qmore{color:var(--muted)}
+.qchip.qmore[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
+.layers .lt{margin-top:6px;padding-top:10px;border-top:1px solid var(--line)}
+.layers .lt:first-child{margin-top:0;padding-top:0;border-top:0}
+.layers .lsub{font-size:12px;color:var(--muted);margin-bottom:-4px}
+@media (max-width:700px){
+  .mapleft .qlayers{grid-column:2;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;contain:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+  .mapleft .qlayers::-webkit-scrollbar{display:none}
+  .qchip{height:34px}
+}
+.layers .live-ly{margin-top:6px;padding-top:10px}
+.layers .live-ly .lt{margin-top:0;padding-top:0;border-top:0}
+
+.mfilt.mclear[hidden]{display:none}
+.mfilt.mclear{color:var(--brand)}
+.panel .selbar.area .kicker{margin-bottom:-6px}
+/* while the layers panel is open, the map's left column (toolbar, search, quick layers) narrows to leave room for it */
+@media (min-width:701px){ .stage:has(.layers.on) .mapleft{min-width:0;max-width:calc(100% - 90px - 312px)} }
+/* the toolbar row wraps (Clear, Export onto the next line) instead of squeezing the tool buttons when the map is narrow */
+@media (min-width:701px){ .maptop{flex-wrap:wrap} .maptop .tools{flex-shrink:0} }
+.panel .selbar.area .s1{flex-wrap:wrap;row-gap:2px}
+.panel .selbar.area .s1 span{white-space:normal;font-family:inherit;font-size:12px}
+.panel .selbar .btnrow{display:flex;flex-wrap:wrap;gap:8px}
+.panel .selbar .btnrow .btn{flex:1 1 auto}
+.layers{z-index:6}
+@media (min-width:701px) and (max-width:1500px){ .maptop:has(#filterClear:not([hidden])) .exbtn span{display:none} .maptop:has(#filterClear:not([hidden])) .exbtn{padding:0 11px} }
+
+/* ================= phone: edge-to-edge map, no sideways scrolling in menus ================= */
+/* hidden controls stay hidden even where a class sets display (the crime type picker showed with Crime off) */
+.layers [hidden]{display:none!important}
+.layers select.chip{max-width:100%}
+@media (max-width:700px){
+  /* the page itself is no longer padded by the safe areas: every phone element already adds the status bar (--st) and
+     home indicator (--sb) itself, so the padding counted them twice and left grey bands above the map and above the nav */
+  :root{padding-top:0;padding-bottom:0}
+  /* the map now runs under the status bar: a soft fade keeps the clock and battery readable over it */
+  .viewport::before{content:"";position:absolute;left:0;right:0;top:0;height:calc(var(--st) + 14px);z-index:4;pointer-events:none;background:linear-gradient(var(--panel) 0,color-mix(in srgb,var(--panel) 70%,transparent) 60%,transparent)}
+  .stage:not([data-view="map"]) .viewport::before{display:none}
+  /* menus scroll up and down only */
+  .layers,.fpop,.msheet,.panel,.view{overflow-x:hidden;overscroll-behavior-x:none}
+  .layers,.fpop,.msheet{touch-action:pan-y}
+}
+
+/* ================= phone "More" sheet: one-word tiles, named like the desktop tabs ================= */
+@media (max-width:700px){
+  .msheet{padding:4px 14px calc(14px + var(--sb))}
+  .msheet .mt-h{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:10px 4px 8px}
+  .msheet .mtiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .msheet .mtiles button{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;width:auto;padding:12px 2px 10px;border:0;border-radius:12px;background:var(--panel-2);font:600 12.5px/1.2 var(--font-display);color:var(--text);text-align:center}
+  .msheet .mtiles button[hidden]{display:none}
+  .msheet .mtiles button:active{background:var(--chip)}
+  .msheet .mt-ic{position:relative;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:var(--panel);color:var(--brand);font-style:normal}
+  .msheet .mt-ic .badge{position:absolute;top:-4px;right:-10px}
+  .msheet .mt-ic .badge:empty{display:none}
+}
+
+/* ================= phone filters: a full-height sheet with a fixed header and a "Show N filings" button ================= */
+.fpop-f{display:none}
+@media (max-width:700px){
+  .fpop{top:calc(var(--st) + 68px);max-height:none;display:flex;flex-direction:column;overflow:hidden}
+  .fpop[hidden]{display:none}
+  .fpop .fpop-h{position:static;flex:none;padding:12px 16px 10px;align-items:center;row-gap:0}
+  .fpop .fpop-h>div:first-child span{display:none}
+  .fpop .fpop-h b{font-size:18px}
+  .fpop .active{margin:6px -16px -10px;padding:8px 16px;flex-basis:calc(100% + 32px)}
+  .fpop .filters{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:14px 16px 18px;gap:0}
+  .fpop .filters .row{margin-bottom:16px}
+  .fpop #dField{flex:1 0 100%}
+  .fpop .filters .lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+  .fpop .filters .more{border:0;border-radius:0;padding:0;margin:0}
+  .fpop .filters .more>summary{display:none}
+  .fpop .filters .fgroup{font:700 15px/1.3 var(--font-display);color:var(--text);letter-spacing:0;text-transform:none;border-top:1px solid var(--line);margin:4px 0 12px;padding-top:16px}
+  .fpop-f{display:block;flex:none;padding:10px 16px 12px;border-top:1px solid var(--line);background:var(--panel)}
+  .fdone{display:block;width:100%;height:48px;border:0;border-radius:12px;background:var(--brand);color:var(--brand-ink);font:700 15px var(--font-display);cursor:pointer}
+}
+
+/* ================= Filters panel: one section per layer, and the mode switch ================= */
+.fpop .lfmode{flex-basis:100%;grid-template-columns:1fr 1fr;margin-top:10px;border-radius:8px}
+.fpop .lfmode button{padding:8px 6px;font-size:12.5px}
+.fpop .lfmode button[aria-pressed="true"]{background:var(--text);color:var(--panel)}
+.lfsec{border-top:1px solid var(--line)}
+.lfsec:first-of-type{border-top:0}
+.lfsec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:14px 18px;font:700 14px var(--font-display);color:var(--text)}
+.lfsec>summary::-webkit-details-marker{display:none}
+.lfsec>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-2px);transition:transform .15s}
+.lfsec[open]>summary::after{transform:rotate(-135deg) translateY(-2px)}
+.lfsec>summary em{font-style:normal;font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--brand)}
+.lfsec .lfrows{display:grid;gap:10px;padding:0 18px 4px}
+.lfsec .lfrows:empty{display:none}
+.lfsec>.lfrow{padding:0 18px 10px}
+.lfsec>.lfrow:last-child{padding-bottom:16px}
+.lfrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:10px}
+.lfrow label{font-size:12.5px;color:var(--text-2)}
+.lfrow select.chip{width:100%;min-height:34px}
+.lfrows .lfrow:last-child{margin-bottom:12px}
+.fpop:not(.lf-match) .lfrow.mo{display:none}
+.lfsec#lfFilings .filters{padding-top:6px}
+.lfmatch{margin:12px 18px 4px;padding:12px 14px;border-radius:8px;background:var(--green-50);border:1px solid var(--green-200);display:grid;gap:4px;font-size:12.5px;color:var(--text-2)}
+:root[data-theme="dark"] .lfmatch{background:rgba(76,175,112,.08);border-color:rgba(76,175,112,.3)}
+.lfmatch[hidden]{display:none}
+.lfmatch p{margin:0}
+.lfm-n{font-size:14px;color:var(--text)}
+.lfm-n b{font:700 18px var(--font-display);color:var(--brand)}
+.lfmatch .lnk{justify-self:start;border:0;background:none;padding:0;color:var(--brand);font-weight:700;cursor:pointer;text-decoration:underline}
+.lfm-w{color:#9a6700;font-size:12px}
+@media (max-width:700px){
+  .fpop .lfbody{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  .fpop .filters{flex:none;overflow:visible;min-height:auto}
+  .lfsec>summary{padding:14px 16px}
+  .lfsec .lfrows{padding:0 16px 4px}
+  .lfsec>.lfrow{padding:0 16px 10px}
+  .lfmatch{margin:12px 16px 4px}
+  .lfrow{grid-template-columns:1fr}
+  .lfrow label{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+}

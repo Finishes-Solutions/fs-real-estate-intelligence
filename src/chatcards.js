@@ -3,6 +3,7 @@
 // ctx.chatCard(name, args, result, list) returns an element (or null); list = the filings the tool worked on.
 import { tiles, hbars, vbars } from './charts.js';
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
+import { contains as inArea } from './lib/geomatch.mjs';
 
 export function initChatCards(ctx) {
   const { esc, fmtM, fmtN } = ctx;
@@ -68,7 +69,7 @@ export function initChatCards(ctx) {
 
   function areaCard(r) {
     if (!r.place) return null;
-    const pl = ctx.currentPlace?.(), list = pl?.geom && /Polygon/.test(pl.geom.type) && !/building|business/.test(pl.kind) ? ctx.filtered().filter(f => d3.geoContains(pl.geom, [f.lon, f.lat])) : null;
+    const pl = ctx.currentPlace?.(), list = pl?.geom && /Polygon/.test(pl.geom.type) && !/building|business/.test(pl.kind) ? ctx.filtered().filter(f => inArea(pl.geom, [f.lon, f.lat])) : null;
     const uses = list ? group(list, f => f.use || ctx.TYPE_LABEL[f.type]).sort((a, b) => b.v - a.v).slice(0, 5) : [];
     const d = el(head(r.kind ? r.kind[0].toUpperCase() + r.kind.slice(1) : 'Area', r.place, fmtN(r.filings) + ' filings ' + (r.how || '') + ' · est. ' + fmtM(r.total_value)) +
       (uses.length > 1 ? sec('Top uses', hbars(uses.map(g => ({ label: g.name, value: g.v, text: fmtM(g.v) })))) : '') +
@@ -173,7 +174,7 @@ export function initChatCards(ctx) {
           on(d, 'clr', e => { ctx.live.clearRoute(); e.currentTarget.remove(); }); return d; }
         case 'weather_at': return ctx.live ? liveCard('Weather', r.place, ctx.live.weatherHTML(r)) : null;
         case 'weather_forecast': return ctx.live && r.days?.length ? liveCard(r.days.length + '-day forecast', r.place, ctx.live.forecastHTML(r)) : null;
-        case 'project_news': return ctx.live ? liveCard('News', r.searched, ctx.live.newsHTML(r, 5)) : null;
+        case 'project_news': return ctx.live ? liveCard('News', [].concat(r.searched || [])[0] || 'News', ctx.live.newsHTML(r, 8)) : null;
         case 'site_imagery': { if (!ctx.live) return null; const d = liveCard('Site imagery', r.place, '<div class="live-out"></div>'); ctx.live.imageryInto(d.querySelector('.live-out')); return d; }
       }
     } catch (e) { console.error('chat card', name, e); }

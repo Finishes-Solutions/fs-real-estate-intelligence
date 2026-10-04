@@ -1,6 +1,7 @@
-import { pickPlace, districtFor } from './lib/assist-logic.mjs';
+import { pickPlace, districtFor, splitWithin, applyPlaceAlias, mentions, extentMeters, BIG_PLACE_M } from './lib/assist-logic.mjs';
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 import { mergeBusinesses } from './lib/nearby.mjs';
+import { contains as inArea } from './lib/geomatch.mjs';
 // Map search (under the map tools): real street addresses, places (counties, towns, neighborhoods, landmarks, roads),
 // projects by name, companies and people (owners, developers, architects, contractors) and filings at matching addresses. Results appear while typing, 10 at a time, with more loading as you
 // scroll. Picking a place outlines it on the map: city / county / neighborhood boundaries and building footprints
@@ -209,7 +210,8 @@ export function initMapSearch(ctx) {
     if (!map.getLayer('place-line')) map.addLayer({ id: 'place-line', type: 'line', source: 'place', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': col, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.2, 16, 5] } });
     syncPlace();
   });
-  const syncPlace = () => map.getSource && map.getSource('place')?.setData(ctx.fc(place?.geom ? [{ type: 'Feature', properties: {}, geometry: place.geom }] : []));
+  const syncPlace = () => { map.getSource && map.getSource('place')?.setData(ctx.fc(place?.geom ? [{ type: 'Feature', properties: {}, geometry: place.geom }] : [])); ctx.syncClear?.(); };
+  ctx.hasPlace = () => !!place;
   // the location marker: an amber pin with the place name, at the address / landmark or the middle of an outline
   let pin = null;
   function setPlacePin(c, label) {
@@ -242,12 +244,13 @@ export function initMapSearch(ctx) {
   // planar bounds straight from the coordinates (d3.geoBounds reads counter-clockwise GeoJSON rings as "everything but")
   const bounds = g => { let x0 = 180, y0 = 90, x1 = -180, y1 = -90; const walk = a => { if (typeof a[0] === 'number') { if (a[0] < x0) x0 = a[0]; if (a[0] > x1) x1 = a[0]; if (a[1] < y0) y0 = a[1]; if (a[1] > y1) y1 = a[1]; } else a.forEach(walk); }; walk(g.coordinates); return [[x0, y0], [x1, y1]]; };
   const centerOf = g => { const b = bounds(g); return [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2]; };
+  const flat = b => [b[0][0], b[0][1], b[1][0], b[1][1]]; // [[w,s],[e,n]] -> [w,s,e,n]
   // pick the Nominatim feature that best matches: wanted geometry type, closest to the point we already have
   const best = (feats, c, want) => feats.filter(f => want(f.geometry)).sort((a, b) => (c ? near(centerOf(a.geometry), c) : 0) - (c ? near(centerOf(b.geometry), c) : 0))[0];
 
   async function showPlace(p) {
     ctx.setView('map'); ctx.closeCard?.();
-    place = { label: p.label, kind: p.kind, c: p.c, geom: null }; setPlacePin(p.c, p.label);
+    place = { label: p.label, kind: p.kind, c: p.c, geom: null, ...(p.via ? { via: p.via, approx: !!p.approx } : {}), ...(p.within ? { within: p.within } : {}) }; setPlacePin(p.c, p.label);
     bar.innerHTML = '<div class="pb-k">' + esc(KIND_LABEL[p.kind] || 'Place') + '</div><div class="pb-t">' + esc(p.label) + '</div><div class="pb-s">Finding the outline…</div>'; bar.classList.add('on');
     let geom = null, note = '';
     if (p.geom) geom = p.geom;
@@ -270,12 +273,15 @@ export function initMapSearch(ctx) {
     if (!geom && p.bbox && /area|town|zip|county/.test(p.kind)) { const [w, s2, e, n] = p.bbox; geom = { type: 'Polygon', coordinates: [[[w, s2], [e, s2], [e, n], [w, n], [w, s2]]] }; note = 'Approximate outline (the area’s bounding box): OpenStreetMap has no boundary for it.'; }
     place.geom = geom ? (isArea(geom) ? ctx.fixWinding(geom) : geom) : null; syncPlace();
     const pt = p.c || (geom && centerOf(geom)); setPlacePin(pt, p.label);
-    if (geom && isArea(geom) && /address|poi|building|business/.test(p.kind) || !geom && /address|poi|coords|business/.test(p.kind)) {
+    // an airport, campus, mall or park is bigger than one building: frame all of it (clear of the chat panel and card)
+    const box = geom ? flat(bounds(geom)) : p.bbox, big = extentMeters(box) > BIG_PLACE_M;
+    if (!big && (geom && isArea(geom) && /address|poi|building|business/.test(p.kind) || !geom && /address|poi|coords|business/.test(p.kind))) {
       // a single building: fly in close, then open the building panel (footprint highlight, parcel, businesses)
       map.flyTo({ center: pt, zoom: 18, pitch: 55, duration: ctx.reduceMotion ? 0 : 1600 });
       map.once('idle', () => { if (place?.label === p.label && !isArea(place.geom)) { const b = ctx.buildingAt?.(pt); if (b?.footprint) { place.geom = b.footprint; place.kind = 'building'; syncPlace(); placeCard(); } } });
-    } else if (geom) ctx.fitGeom(place.geom);
+    } else if (geom || big) ctx.fitBox([[box[0], box[1]], [box[2], box[3]]], { maxZoom: 17.5 });
     else if (pt) map.flyTo({ center: pt, zoom: p.kind === 'town' ? 12 : 14, duration: ctx.reduceMotion ? 0 : 1200 });
+    if (p.via === 'web') note = [note, 'Found with a web search' + (p.approx ? '; the spot is approximate (OpenStreetMap has no outline for it).' : ' and matched in OpenStreetMap.')].filter(Boolean).join(' ');
     if (!geom && !/address|poi|coords|business/.test(p.kind)) note = 'No outline found for this place in OpenStreetMap, so it is shown as a point.';
     placeCard(note);
     return place;
@@ -293,7 +299,7 @@ export function initMapSearch(ctx) {
   // filings inside an area, or within a quarter mile of a road or point
   function placeHits() {
     const list = ctx.filtered(), g = place.geom;
-    if (isArea(g) && !/building|business/.test(place.kind)) return { list: list.filter(f => d3.geoContains(g, [f.lon, f.lat])), how: 'inside' };
+    if (isArea(g) && !/building|business/.test(place.kind)) return { list: list.filter(f => inArea(g, [f.lon, f.lat])), how: 'inside' };
     const R = .25 / 3958.8, pt = place.c || (g && centerOf(g));
     if (isLine(g)) { const lines = g.type === 'LineString' ? [g.coordinates] : g.coordinates, b = bounds(g);
       return { list: list.filter(f => f.lon > b[0][0] - .01 && f.lon < b[1][0] + .01 && f.lat > b[0][1] - .01 && f.lat < b[1][1] + .01 && lines.some(l => l.some((p, i) => i && segDist([f.lon, f.lat], l[i - 1], p) < R))), how: 'within 0.25 mile' }; }
@@ -350,13 +356,12 @@ export function initMapSearch(ctx) {
     card.querySelector('#acCmp').onclick = e => { if (ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom })) { e.currentTarget.disabled = true; if (place === pl) placeCard(); } };
   }
 
-  // for the assistant: find a place by name and outline it
-  ctx.highlightPlace = async (text, kind) => {
-    const k = kind && kind !== 'auto' ? kind : null, t = String(text).trim();
+  // one name as OpenStreetMap or the geocoder knows it -> the place to show (or null)
+  async function findWhole(t, k) {
     const d = (!k || /area|town/.test(k)) && districtFor(t);
-    if (d) return showPlace({ label: d.name, name: d.name, kind: 'area', c: d.c, geom: d.geom });
+    if (d) return { label: d.name, name: d.name, kind: 'area', c: d.c, geom: d.geom };
     const county = COUNTIES.find(c => t.toLowerCase().replace(/\s+county.*$/, '') === c.toLowerCase());
-    if (county && (!k || k === 'county')) return showPlace({ label: county + ' County', name: county, kind: 'county', c: DATA.counties.find(x => x.name === county).label });
+    if (county && (!k || k === 'county')) return { label: county + ' County', name: county, kind: 'county', c: DATA.counties.find(x => x.name === county).label };
     // "Lyon, France", "Bavaria, Germany": outline it wherever it is; otherwise Texas
     const ctxPart = t.split(',').slice(1).join(',').trim(), far = !!ctxPart && !/\b(tx|texas|usa|us|united states)\b/i.test(ctxPart) && !(DATA.places || []).some(p => p[0].toLowerCase() === ctxPart.toLowerCase());
     const q = far || /texas|\btx\b/i.test(t) ? t : t + ', Texas', areaish = !k || /area|town|county|zip|road/.test(k);
@@ -370,15 +375,78 @@ export function initMapSearch(ctx) {
     if (!f || (areaish && k !== 'road' && !isArea(f.geometry))) {
       // no outline in OpenStreetMap: let the geocoder place it (its bounding box becomes an approximate outline)
       const g = pickPlace(t, await ctx.geocode(q, far ? { world: true } : { exact: true }));
-      if (!g.error && (!f || /area|town|zip|county/.test(g.kind))) return showPlace({ label: g.label.replace(/, United States$/, ''), name: g.label.split(',')[0], kind: g.kind, c: g.c, bbox: g.bbox });
+      if (!g.error && (!f || /area|town|zip|county/.test(g.kind))) return { label: g.label.replace(/, United States$/, ''), name: g.label.split(',')[0], kind: g.kind, c: g.c, bbox: g.bbox };
       if (!f) return null;
     }
     const c = centerOf(f.geometry), pr = f.properties, at = type(f);
     const kk = pr.category === 'highway' ? 'road' : at === 'county' ? 'county' : AT.town.test(at) ? 'town' : AT.area.test(at) ? 'area' : at === 'postcode' ? 'zip' : /building|amenity|shop|office|tourism|leisure/.test(pr.category) ? 'poi' : (k || 'poi');
     const parts = pr.display_name.split(',').map(x => x.trim()), name = pr.name || parts[0];
     const label = far ? [name, parts[parts.length - 1]].filter((x, i, a) => x && a.indexOf(x) === i).join(', ') : kk === 'county' ? (/county/i.test(name) ? name : name + ' County') : kk === 'town' ? name + ', TX' : [name, parts.find((x, i) => i && /^[A-Za-z .'-]+$/.test(x) && x !== name && !/county|texas|united states/i.test(x))].filter(Boolean).join(', ');
-    return showPlace({ label, name: kk === 'county' ? name.replace(/\s+county$/i, '') : name, kind: kk, c });
+    return { label, name: kk === 'county' ? name.replace(/\s+county$/i, '') : name, kind: kk, c, ...(isArea(f.geometry) ? { geom: f.geometry } : {}) };
+  }
+
+  // OpenStreetMap features named like `part` inside a bounding box [w,s,e,n] (or within `around` metres of a point),
+  // best first: the exact name, then outlines over lines over points
+  async function overpassNamed(part, box, around) {
+    // regex characters become "any character" (no escaping through Overpass's string rules)
+    const re = part.replace(/^the\s+/i, '').replace(/[\\.*+?^${}()|[\]"']/g, '.'), area = around ? '(around:' + around.m + ',' + around.c[1] + ',' + around.c[0] + ')' : '(' + [box[1], box[0], box[3], box[2]].map(x => x.toFixed(5)).join(',') + ')';
+    const body = '[out:json][timeout:20];nwr[~"^(name|alt_name|official_name|short_name)$"~"' + re + '",i]' + area + ';out geom 40;';
+    let els = [];
+    try { const r = await fetch(OVERPASS, { method: 'POST', body: 'data=' + encodeURIComponent(body), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(22000) }); if (r.ok) els = (await r.json()).elements || []; } catch (e) { return []; }
+    const low = x => String(x || '').toLowerCase().replace(/^the\s+/, '').trim(), want = low(part);
+    return els.map(el => { const t = el.tags || {}, name = t.name || t.official_name || t.alt_name || t.short_name || '';
+      const ring = l => l.map(p => [p.lon, p.lat]), closed = l => l.length > 3 && l[0].lat === l[l.length - 1].lat && l[0].lon === l[l.length - 1].lon;
+      let geom = null;
+      if (el.type === 'way' && el.geometry?.length > 1) geom = closed(el.geometry) ? { type: 'Polygon', coordinates: [ring(el.geometry)] } : { type: 'LineString', coordinates: ring(el.geometry) };
+      else if (el.type === 'relation') { const outer = (el.members || []).filter(m => m.role === 'outer' && m.geometry && closed(m.geometry)); if (outer.length) geom = { type: 'MultiPolygon', coordinates: outer.map(m => [ring(m.geometry)]) }; }
+      const c = geom ? centerOf(geom) : el.lat != null ? [el.lon, el.lat] : el.center ? [el.center.lon, el.center.lat] : null;
+      const exact = [t.name, t.official_name, t.alt_name, t.short_name].some(n => low(n) === want);
+      return c && { name, c, geom: geom && isArea(geom) ? ctx.fixWinding(geom) : geom, kindTag: t.aeroway || t.building || t.amenity || t.shop || t.leisure || '', score: (exact ? 0 : 4) + (geom && isArea(geom) ? 0 : geom ? 1 : 2) };
+    }).filter(Boolean).sort((a, b) => a.score - b.score);
+  }
+  // "Terminal B" inside "George Bush Intercontinental Airport": find the bigger place's outline, then the part inside it
+  async function findWithin(part, within) {
+    const far = !!within.split(',')[1] && !/\b(tx|texas|usa|us|united states)\b/i.test(within.split(',').slice(1).join(','));
+    const host = (await findWhole(applyPlaceAlias(within), null)); if (!host) return null;
+    let hostGeom = host.geom || null;
+    if (!hostGeom) { const feats = await nominatim(far ? within : applyPlaceAlias(within) + ', Texas', '', far); hostGeom = best(feats, host.c, isArea)?.geometry || null; }
+    const box = hostGeom ? flat(bounds(hostGeom)) : host.bbox || (host.c && [host.c[0] - .03, host.c[1] - .03, host.c[0] + .03, host.c[1] + .03]); if (!box) return null;
+    const inHost = c => !hostGeom || !isArea(hostGeom) || inArea(hostGeom, c);
+    const hostName = host.label.split(',')[0];
+    let hit = (await overpassNamed(part, box)).find(x => inHost(x.c));
+    if (!hit) { // the geocoder, held to the bigger place's box
+      const f = (await nominatim(part, '&viewbox=' + [box[0], box[3], box[2], box[1]].join(',') + '&bounded=1', true)).find(x => inHost(centerOf(x.geometry)));
+      if (f) hit = { name: f.properties.name || part, c: centerOf(f.geometry), geom: isArea(f.geometry) ? f.geometry : null };
+    }
+    if (!hit) return null;
+    const big = hit.geom && extentMeters(flat(bounds(hit.geom))) > BIG_PLACE_M;
+    return { label: (hit.name || part) + ', ' + hostName, name: hit.name || part, kind: hit.geom && !big ? 'building' : 'poi', c: hit.c, geom: hit.geom, within: hostName };
+  }
+  // last resort: a web search for the official name, the bigger place it's part of, the address and roughly where it is,
+  // then checked against OpenStreetMap; raw coordinates from the search are only used when nothing there matches
+  async function locateWeb(text, k) {
+    let w = null;
+    try { const r = await fetch('api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'locate', query: text }) }); if (r.ok) w = await r.json(); } catch (e) {}
+    if (!w || (!w.name && w.lat == null)) return null;
+    const pt = isFinite(w.lat) && isFinite(w.lon) && w.lat !== null ? [+w.lon, +w.lat] : null, name = w.name || text;
+    let s = w.within ? await findWithin(name, w.within) : null;
+    if (!s && pt) { const hit = (await overpassNamed(name, null, { c: pt, m: 1500 }))[0]; if (hit) s = { label: hit.name + (w.city ? ', ' + w.city : ''), name: hit.name, kind: hit.geom && isArea(hit.geom) && extentMeters(flat(bounds(hit.geom))) <= BIG_PLACE_M ? 'building' : 'poi', c: hit.c, geom: hit.geom }; }
+    if (!s) { const g = await findWhole(applyPlaceAlias(name + (w.city ? ', ' + w.city : '')), k); if (g && mentions(g.label + ' ' + (g.name || ''), name)) s = g; }
+    if (!s && w.address) { const g = pickPlace(w.address, await ctx.geocode(w.address + (/texas|\btx\b/i.test(w.address) ? '' : ', Texas'), { exact: true })); if (!g.error) s = { label: name + ', ' + g.label, name, kind: 'poi', c: g.c }; }
+    if (!s && pt) s = { label: name + (w.city ? ', ' + w.city : ''), name, kind: 'poi', c: pt, approx: true };
+    return s && { ...s, via: 'web', ...(w.official ? { official: w.official } : {}) };
+  }
+  // for the assistant: the whole name first ("The Grove at Katy" is a place), then a part of a bigger place ("Terminal B
+  // at George Bush airport", or `within` given), then the web. A whole-name hit that skips the part ("George Bush
+  // Intercontinental Airport" for "Terminal B at …") doesn't count.
+  ctx.findPlace = async (text, kind, within, web = true) => {
+    const k = kind && kind !== 'auto' ? kind : null, t = String(text || '').trim(); if (!t) return null;
+    const sp = within ? { part: t, within: String(within).trim() } : splitWithin(t);
+    if (!within) { const s = await findWhole(applyPlaceAlias(t), k); if (s && (!sp.within || mentions(s.label + ' ' + (s.name || ''), sp.part))) return s; }
+    if (sp.within) { const s = await findWithin(sp.part, sp.within); if (s) return s; }
+    return web ? locateWeb(within ? t + ' at ' + within : t, k) : null;
   };
+  ctx.highlightPlace = async (text, kind, within) => { const p = await ctx.findPlace(text, kind, within); return p ? showPlace(p) : null; };
   ctx.placeSummary = () => { if (!place) return null; const { list, how } = placeHits(); return { place: place.label, kind: place.kind, outlined: !!place.geom, filings: list.length, how, total_value: list.reduce((s, f) => s + f.cost, 0) }; };
   ctx.currentPlace = () => place;
   // the location card's "Filings Within 0.25 Mile": the radius tool takes over from the searched place

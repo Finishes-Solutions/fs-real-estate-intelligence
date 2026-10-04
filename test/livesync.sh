@@ -36,6 +36,15 @@ node -e "const a=require('assert'),db=JSON.parse(require('fs').readFileSync('$T/
 ( run ONLY=aircraft FAA_MIN_ROWS=1000 ) >/dev/null || true; grep -q 'aircraft FAILED only 2 aircraft parsed' "$T/log" || { cat "$T/log"; exit 1; }
 node -e "a=require('assert');a.equal(JSON.parse(require('fs').readFileSync('$T/db.json')).aircraft_registry.length,2,'nothing removed')"
 echo "live-sync aircraft registry ok"
+# airports: OurAirports rows and the FAA diagram; a rerun writes nothing; an airport that left the file is removed
+export AIRPORTS_MIN_ROWS=1
+run ONLY=airports
+node -e "const a=require('assert'),db=JSON.parse(require('fs').readFileSync('$T/db.json'));a.equal(db.airports.length,3);const k=db.airports.find(r=>r.ident==='KIAH');a.equal(k.iata,'IAH');a.equal(k.scheduled,true);a.equal(k.keywords,'IAH, \"Bush\", Intercontinental','quoted CSV');
+a.equal(db.airport_runways[0].le_ident,'08L');a.equal(db.airport_runways[0].lighted,true);a.equal(db.airport_frequencies[0].mhz,118.1);a.equal(db.airport_extras.find(r=>r.ident==='KIAH').diagram_url.slice(-11),'00189AD.PDF')"
+run ONLY=airports; grep -q '"airports":{"rows":3,"written":0,"removed":0}' "$T/log" || { cat "$T/log"; echo "airports rerun should write nothing"; exit 1; }
+run ONLY=airports MOCK_AIRPORT_GONE=1; grep -q '"airports":{"rows":2,"written":0,"removed":1}' "$T/log" || { cat "$T/log"; exit 1; }
+echo "live-sync airports ok"
+unset AIRPORTS_MIN_ROWS
 unset FAA_DIR FAA_MIN_ROWS
 # no tables yet -> clear instructions, non-zero exit
 rm "$T/db.json"; cat > "$T/m.mjs" <<'M'

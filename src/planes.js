@@ -7,11 +7,14 @@
 //   Photo, details, path:   the plane's photo (planespotters.net), maker / operator / year, and this flight's path from
 //                           adsb.lol traces (api/planes ?aircraft= / ?track=): a line coloured by altitude, and in the 3D
 //                           view (map tilted) a ribbon at the plane's real altitude with a curtain down to the ground.
+//   3D models:              with the map tilted, planes are 3D models at their real altitude (src/planes3d.js); the
+//                           flat icons stay underneath as their shadows. Flat map: icons only.
 // Both toggles live in Layers → Live Conditions (registered with src/live.js) and in the assistant's set_live_layers.
 import { pickAircraft } from './lib/assist-logic.mjs';
 import { SHAPES, SIZE } from './lib/aircraft-shapes.mjs';
 import { smoothPath, altColorExpr, altGradient } from './lib/flightpath.mjs';
 import { flightPath3D } from './flightpath3d.js';
+import { planes3D } from './planes3d.js';
 
 const REFRESH = 10e3, MINZ = 5, KT = 1.852 / 3600; // km per second per knot
 const BANDS = [[1, '#8d9598'], [3000, '#e3622b'], [10000, '#eda100'], [25000, '#3987e5'], [99999, '#1f9249']]; // ground, low, climbing, mid, cruise
@@ -24,7 +27,7 @@ export function initPlanes(ctx) {
   // ---------- icons: a top-down silhouette per kind of aircraft (lib/aircraft-shapes.mjs picks it from the ICAO type),
   // nose north, drawn once each as SDFs so altitude bands can recolour them; SIZE scales them (a 747 dwarfs a Cessna) ----------
   function shapeImage(kind) {
-    const n = 64, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'), X = 32;
+    const n = 64, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d', { willReadFrequently: true }), X = 32;
     g.fillStyle = '#000';
     const body = (y0, y1, w) => { const r = w / 2; g.beginPath(); g.moveTo(X - r, y0 + r * 1.8); g.quadraticCurveTo(X - r, y0, X, y0); g.quadraticCurveTo(X + r, y0, X + r, y0 + r * 1.8);
       g.lineTo(X + r * .55, y1 - 1.5); g.quadraticCurveTo(X, y1 + 1, X - r * .55, y1 - 1.5); g.closePath(); g.fill(); };
@@ -105,9 +108,11 @@ export function initPlanes(ctx) {
       'icon-image': ['concat', 'plane-', ['get', 'shape']], 'icon-rotate': ['get', 'track'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
       'icon-size': ['interpolate', ['linear'], ['zoom'], 5, ['*', .5, ['get', 'sz']], 9, ['*', .78, ['get', 'sz']], 13, ['*', 1.05, ['get', 'sz']]],
       'text-field': ['step', ['zoom'], '', 9, ['get', 't']], 'text-font': ['Noto Sans Bold'], 'text-size': 10, 'text-offset': ['case', ['>=', ['get', 'sz'], 1.2], ['literal', [0, 2.6]], ['literal', [0, 1.9]]], 'text-optional': true, 'text-allow-overlap': false },
-      paint: { 'icon-color': ['step', ['get', 'alt'], BANDS[0][1], ...BANDS.flatMap(([a, c], i) => i ? [BANDS[i - 1][0], c] : [])],
+      paint: { 'icon-color': iconColor,
         'icon-halo-color': ctx.isDark() ? '#0b0d0c' : '#ffffff', 'icon-halo-width': 1.4,
         'text-color': ctx.isDark() ? '#dde1e2' : '#23282a', 'text-halo-color': ctx.isDark() ? '#16191a' : '#ffffff', 'text-halo-width': 1.5 } });
+    if (!map.getLayer(models.layer.id)) map.addLayer(models.layer); // in the air: on top
+    syncModels();
     if (pathOn) { addPathLayers(); syncPath(); } // after a basemap change
   }
   // ---------- the selected plane's route: flown leg solid, remaining leg dashed, both airports ----------
@@ -130,8 +135,8 @@ export function initPlanes(ctx) {
   const EMPTY = { type: 'FeatureCollection', features: [] };
   function routeFC() {
     if (!routeOn) return EMPTY;
-    const me = fc().features.find(f => f.properties.hex === routeOn.hex), o = [routeOn.o.lon, routeOn.o.lat], d = [routeOn.d.lon, routeOn.d.lat];
-    const pos = me ? me.geometry.coordinates : null, feats = [];
+    const q = drawn.get(routeOn.hex), o = [routeOn.o.lon, routeOn.o.lat], d = [routeOn.d.lon, routeOn.d.lat]; // where the plane is drawn now (no need to rebuild every plane)
+    const pos = q && find(routeOn.hex) ? [q.lon, q.lat] : null, feats = [];
     if (pos && pathOn?.hex === routeOn.hex) feats.push({ type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(pos, d) } });
     else if (pos) { feats.push({ type: 'Feature', properties: { k: 'flown' }, geometry: { type: 'LineString', coordinates: arc(o, pos) } }, { type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(pos, d) } }); }
     else feats.push({ type: 'Feature', properties: { k: 'left' }, geometry: { type: 'LineString', coordinates: arc(o, d) } });
@@ -181,13 +186,26 @@ export function initPlanes(ctx) {
     ctx.setLegend('planes', pathOn
       ? '<div class="t">Flight path altitude</div><div class="lg-grad" style="background:' + altGradient(35000) + '"></div><div class="lg-ticks lg-abs"><span style="left:0">Ground</span><span style="left:28.6%">10k</span><span style="left:57.1%">20k</span><span style="left:100%">35k ft</span></div>' +
         (is3d() ? '<div class="lg-note">Line and ball at the plane’s altitude; the curtain drops to the ground.</div>' : '<div class="lg-note">Tilt the map to see it in 3D.</div>')
-      : '<div class="t">Aircraft altitude</div>' + sw);
+      : '<div class="t">Aircraft altitude</div>' + sw + (is3d() ? '<div class="lg-note">3D: planes at their real altitude; the grey marks are their spot on the ground.</div>' : '<div class="lg-note">Tilt the map to see the planes in 3D.</div>'));
   }
   // ---------- this flight's path (adsb.lol trace + live positions since) ----------
   // Smoothed (lib/flightpath.mjs) and drawn twice: a line on the ground coloured by altitude (the path in 2D, its
   // shadow in 3D), and with the map tilted, the real 3D path with a curtain and a ball at the plane (src/flightpath3d.js).
   let pathOn = null; // { hex, pts: [[lon, lat, alt_ft, unix]], smooth: [[lon, lat, alt_ft]], n }
   const is3d = () => map.getPitch() >= 15, path3d = flightPath3D();
+  // 3D models in the tilted view; the icons underneath turn into grey shadows (still labelled and clickable)
+  const models = planes3D({ bands: BANDS });
+  const iconColor = ['step', ['get', 'alt'], BANDS[0][1], ...BANDS.flatMap(([a, c], i) => i ? [BANDS[i - 1][0], c] : [])];
+  function modelRows() { const now = Date.now(); return list.map(p => { const q = posOf(p, now); drawn.set(p.hex, q); return q && { hex: p.hex, shape: p.shape, sz: SIZE[p.shape] || 1, lon: q.lon, lat: q.lat, alt: p.ground ? 0 : q.alt, track: q.track, gs: p.gs, vs: p.vs, ground: !!p.ground }; }).filter(Boolean); }
+  function syncModels() {
+    const three = on() && is3d(); models.show(three); path3d.hideBall(three);
+    if (three) models.setPlanes(modelRows());
+    if (!map.getLayer('live-planes')) return;
+    map.setPaintProperty('live-planes', 'icon-color', three ? (ctx.isDark() ? '#000000' : '#23282a') : iconColor);
+    map.setPaintProperty('live-planes', 'icon-opacity', three ? (ctx.isDark() ? .5 : .28) : 1);
+    map.setPaintProperty('live-planes', 'icon-halo-width', three ? 0 : 1.4);
+  }
+  map.on('pitch', () => { if (on() && is3d() !== models.shown) { syncModels(); syncLegend(); } });
   const pathPts = () => { if (!pathOn) return []; const me = drawn.get(pathOn.hex); return me ? pathOn.smooth.concat([[me.lon, me.lat, me.alt]]) : pathOn.smooth; };
   function pathFC() {
     const pts = pathPts(), feats = [];
@@ -226,7 +244,7 @@ export function initPlanes(ctx) {
     map.easeTo({ ...(cam || {}), zoom: (cam?.zoom ?? map.getZoom()) - .3, pitch: 62, bearing, duration: ctx.reduceMotion ? 0 : 1600 });
     return true;
   }
-  function removeLayers() { [path3d.layer.id, 'plane-path-line'].forEach(id => map.getLayer(id) && map.removeLayer(id)); ['plane-path'].forEach(id => map.getSource(id) && map.removeSource(id));
+  function removeLayers() { [models.layer.id, path3d.layer.id, 'plane-path-line'].forEach(id => map.getLayer(id) && map.removeLayer(id)); ['plane-path'].forEach(id => map.getSource(id) && map.removeSource(id));
     ['plane-route-label', 'plane-route-ap', 'plane-route-left', 'plane-route-flown', 'live-planes'].forEach(id => map.getLayer(id) && map.removeLayer(id)); ['plane-route', 'live-planes'].forEach(id => map.getSource(id) && map.removeSource(id)); }
 
   async function load() {
@@ -243,26 +261,32 @@ export function initPlanes(ctx) {
       rebase(next, nextAt); list = next; at = nextAt; src = d.source; err = '';
       if (pathOn) { const p = list.find(x => x.hex === pathOn.hex), last = pathOn.pts[pathOn.pts.length - 1];
         if (p && (!last || last[0] !== p.lon || last[1] !== p.lat)) pathOn.pts.push([p.lon, p.lat, p.ground ? 0 : p.alt ?? last?.[2] ?? 0, Math.round(at / 1000)]); }
-      map.getSource('live-planes')?.setData(fc()); if (pathOn) syncPath(); if (shown) renderCard(shown, true); if (follow) followCam();
+      map.getSource('live-planes')?.setData(fc()); if (models.shown) models.setPlanes(modelRows()); if (pathOn) syncPath(); if (shown) renderCard(shown, true); if (follow) followCam();
     } catch (e) { if (e.name !== 'AbortError') { err = e.message; } }
     ctx.live.syncUI();
   }
-  // animation: planes redrawn every frame (about 30 a second when following, a path is open or the view is close in,
-  // about 12 otherwise), the route and the 2D path line once a second
-  let raf = 0, lastFrame = 0, lastSlow = 0;
+  // animation: positions advance every frame; the icon layer is redrawn at the rates below, the 3D models about 30 times
+  // a second, the route and the 2D path line once a second. Paused while the map isn't the view on screen.
+  let raf = 0, lastFrame = 0, lastSlow = 0, lastIcons = 0;
   function frame(ts) {
     raf = requestAnimationFrame(frame);
-    if (!list.length || document.visibilityState === 'hidden' || !map.getSource('live-planes')) return;
-    const fast = follow || pathOn || (map.getZoom() >= 10 && list.length < 400);
-    if (ts - lastFrame < (fast ? 30 : 80)) return;
+    // nothing to do while the map is hidden behind another tab or the page is in the background
+    if (!list.length || document.visibilityState === 'hidden' || (ctx.view && ctx.view !== 'map') || !map.getSource('live-planes')) return;
+    // the icon layer is the expensive part (every update is copied to the map's worker, re-tiled and its labels re-placed):
+    // ~30 times a second only while following a plane or showing its path, ~20 when close in with few planes, else 4.
+    // The 3D models are cheap to move (no re-tiling), so in 3D they move about 30 times a second regardless.
+    const fast = follow || pathOn, close = map.getZoom() >= 11 && list.length < 200;
+    const iconMs = fast ? 30 : close ? 50 : 250, modelMs = 33;
+    if (ts - lastFrame < (models.shown ? Math.min(modelMs, iconMs) : iconMs)) return;
     const dtCam = Math.min(.25, (ts - lastFrame) / 1000); lastFrame = ts;
-    map.getSource('live-planes').setData(fc());
+    if (ts - lastIcons >= iconMs - 5) { lastIcons = ts; map.getSource('live-planes').setData(fc()); }
+    if (models.shown) models.setPlanes(modelRows());
     if (follow) followCam(dtCam);
     if (pathOn) { const me = drawn.get(pathOn.hex); path3d.setBall(me ? [me.lon, me.lat, me.alt] : null); }
     if (ts - lastSlow > 1000) { lastSlow = ts; if (routeOn) syncRoute(); if (pathOn) syncPath(); }
   }
   function start() { addLayers(); load(); clearInterval(timer); timer = setInterval(load, REFRESH); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); syncLegend(); }
-  function stop() { clearInterval(timer); cancelAnimationFrame(raf); ctl?.abort(); list = []; drawn.clear(); blend.clear(); follow = null; routeOn = null; pathOn = null; removeLayers(); syncLegend(); }
+  function stop() { clearInterval(timer); cancelAnimationFrame(raf); ctl?.abort(); list = []; drawn.clear(); blend.clear(); follow = null; routeOn = null; pathOn = null; models.show(false); models.setPlanes([]); removeLayers(); syncLegend(); }
   map.on('moveend', () => { if (!on()) return; clearTimeout(moveT); moveT = setTimeout(load, 600); });
   document.addEventListener('visibilitychange', () => { if (on() && document.visibilityState === 'visible') load(); });
 
@@ -271,7 +295,8 @@ export function initPlanes(ctx) {
   // follow: keep the plane centred; orbit: also circle the camera around it (tilted), turning ~6° a second
   let orbiting = false;
   // keep the followed plane above the open card on wide screens (the card sits over the lower middle of the map)
-  const camOffset = () => card.classList.contains('open') && innerWidth > 760 ? [0, -Math.min(140, card.offsetHeight / 3)] : [0, 0];
+  // phones: the card is a bottom sheet, so keep the plane in the middle of the map above it (most of the screen when the card is minimized)
+  const camOffset = () => !card.classList.contains('open') ? [0, 0] : innerWidth > 760 ? [0, -Math.min(140, card.offsetHeight / 3)] : [0, -Math.round(card.offsetHeight / 2)];
   // every frame: put the plane where it should be on screen (just above the card on wide screens), turning ~6° a second
   // when orbiting; a zoom in progress is left alone so wheel and pinch zooming still work while following
   function followCam(dt = 0) {
@@ -378,7 +403,7 @@ export function initPlanes(ctx) {
       '<div class="bsec" id="plTools"><div class="lt">Tools</div><div class="bacts"><button class="btn' + (follow === hex && !orbiting ? ' on' : '') + '" id="plFollow">' + (follow === hex && !orbiting ? 'Following' : 'Follow') + '</button>' +
       '<button class="btn' + (follow === hex && orbiting ? ' on' : '') + '" id="plOrbit">' + (follow === hex && orbiting ? 'Orbiting' : 'Orbit') + '</button>' +
       '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">adsb.lol ↗</a>' +
-      (tr?.points?.length > 1 ? '<button class="btn" type="button" id="pl3dBtn">3D flight path</button>' : '') + '</div>' +
+      (tr?.points?.length > 1 ? '<button class="btn" type="button" id="pl3dBtn">3D flight path</button>' : '') + (ctx.flightReport ? '<button class="btn" type="button" id="plReport">Export Flight Report</button>' : '') + '</div>' +
       '<div class="ssrc src">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown. Routes: adsbdb and adsb.lol. Flight path: adsb.lol traces.</div></div>';
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#plFollow').onclick = () => { const was = follow === hex && !orbiting; follow = was ? null : hex; orbiting = false; renderCard(hex, true); if (follow) followCam(); };
@@ -386,6 +411,7 @@ export function initPlanes(ctx) {
       if (orbiting) map.easeTo({ zoom: Math.max(map.getZoom(), 11), pitch: 60, duration: ctx.reduceMotion ? 0 : 800 }); };
     card.querySelector('#pl3d')?.addEventListener('click', () => view3d(hex));
     card.querySelector('#pl3dBtn')?.addEventListener('click', () => view3d(hex));
+    card.querySelector('#plReport')?.addEventListener('click', () => ctx.flightReport(p, { track: tr, info, reg: regDone.get(hex) }));
     if (!refresh || !card.classList.contains('open')) card.classList.add('open');
     // photo / details and the flight path: fetched once when the card opens, then the card re-renders with them
     if (!refresh) {
@@ -406,6 +432,7 @@ export function initPlanes(ctx) {
   ctx.onCardClose?.(() => { shown = null; follow = null; orbiting = false; clearRoute(); clearPath(); });
   ctx.mapClickHandlers.unshift(e => {
     if (!map.getLayer('live-planes')) return false;
+    const m3 = models.pick(e.point); if (m3 && find(m3)) { renderCard(m3); return true; } // a 3D model in the air
     const hit = map.queryRenderedFeatures([[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]], { layers: ['live-planes'] })[0]; if (!hit) return false;
     renderCard(hit.properties.hex); return true;
   });
@@ -415,6 +442,16 @@ export function initPlanes(ctx) {
     const x = e.point.x + 14, flip = x + 220 > ctx.viewport.clientWidth; tip.style.left = (flip ? e.point.x - 14 - tip.offsetWidth : x) + 'px'; tip.style.top = (e.point.y + 10) + 'px'; tip.style.opacity = 1;
   });
   map.on('mouseleave', 'live-planes', () => { map.getCanvas().style.cursor = ''; ctx.tip.style.opacity = 0; });
+  let tipModel = false;
+  let hoverEv = null, hoverRaf = 0; // at most one 3D hit test per frame, however fast the mouse moves
+  map.on('mousemove', ev => { if (!models.shown && !tipModel) return; hoverEv = ev; if (!hoverRaf) hoverRaf = requestAnimationFrame(() => { hoverRaf = 0; hover3d(hoverEv); }); });
+  function hover3d(e) {
+    const hex = models.shown ? models.pick(e.point) : null, p = hex && find(hex);
+    if (!p) { if (tipModel) { tipModel = false; map.getCanvas().style.cursor = ''; ctx.tip.style.opacity = 0; } return; }
+    tipModel = true; map.getCanvas().style.cursor = 'pointer'; const tip = ctx.tip;
+    tip.innerHTML = '<b>' + esc(p.flight || p.reg || p.hex.toUpperCase()) + '</b><span>' + esc([p.type, altLabel(p), p.gs != null ? p.gs + ' kt' : ''].filter(Boolean).join(' · ')) + '</span>';
+    const x = e.point.x + 14, flip = x + 220 > ctx.viewport.clientWidth; tip.style.left = (flip ? e.point.x - 14 - tip.offsetWidth : x) + 'px'; tip.style.top = (e.point.y + 10) + 'px'; tip.style.opacity = 1;
+  }
 
   ctx.live.register('planes', {
     label: 'Live Planes', persist: true,

@@ -6,7 +6,8 @@ import fs from 'node:fs/promises';
 import { log, hash, readJSON, writeMap, writeRows, iso, fetchRetry } from './build/util.mjs';
 import { listCounty, details } from './build/tabs.mjs';
 import { geocodeRows, cleanStreet, parseCity } from './build/geocode.mjs';
-import { buildGeo } from './build/geometry.mjs';
+import { buildGeo, buildUsCounties } from './build/geometry.mjs';
+import { addTractRisk } from './build/tractrisk.mjs';
 import { toFiling, countyCheck } from './build/compact.mjs';
 import { enrich, aiFields, aiKey } from './build/enrich.mjs';
 import { diff, appendRun } from './build/changes.mjs';
@@ -33,8 +34,8 @@ async function assemble() {
   await fs.mkdir('public/data', { recursive: true }); await fs.mkdir('public/lib', { recursive: true });
   for (const f of await fs.readdir('src')) await fs.copyFile('src/' + f, 'public/' + f);
   await fs.writeFile('public/sw.js', (await fs.readFile('src/sw.js', 'utf8')).replace('__BUILD__', Date.now().toString(36)));
-  for (const f of ['geo.json', 'filings.json', 'changes.json', 'market.json', 'area.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
-  for (const f of ['taxonomy.mjs', 'filter.mjs', 'changes.mjs', 'agent-tools.mjs', 'assist-logic.mjs', 'nasa.mjs', 'height.mjs', 'sectors.mjs', 'nearby.mjs', 'reports.mjs', 'demographics.mjs', 'spending.mjs', 'nibrs.mjs', 'rulebook.mjs', 'aircraft-shapes.mjs', 'flightpath.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
+  for (const f of ['geo.json', 'uscounties.json', 'filings.json', 'changes.json', 'market.json', 'area.json']) { try { await fs.copyFile(D + f, 'public/data/' + f); } catch (e) { log('assemble: no', f); } }
+  for (const f of ['taxonomy.mjs', 'filter.mjs', 'changes.mjs', 'agent-tools.mjs', 'assist-logic.mjs', 'nasa.mjs', 'height.mjs', 'sectors.mjs', 'nearby.mjs', 'reports.mjs', 'demographics.mjs', 'spending.mjs', 'nibrs.mjs', 'rulebook.mjs', 'voice-state.mjs', 'aircraft-shapes.mjs', 'aircraft-meshes.mjs', 'flightpath.mjs', 'geomatch.mjs', 'screen.mjs']) await fs.copyFile('lib/' + f, 'public/lib/' + f);
   // public Supabase settings for the browser (read-only publishable key; row level security limits it to public tables)
   const E = process.env, sbUrl = E.SUPABASE_URL || E.NEXT_PUBLIC_SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co';
   const sbKey = E.SUPABASE_PUBLISHABLE_KEY || E.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || E.SUPABASE_ANON_KEY || E.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -58,6 +59,10 @@ async function refresh() {
   const rHash = hash(JSON.stringify(regions) + GEO_V);
   let geo = await readJSON(D + 'geo.json');
   if (!geo || geo._regions !== rHash || process.env.REBUILD_GEO) { geo = { ...(await buildGeo(regions)), _regions: rHash }; await fs.writeFile(D + 'geo.json', JSON.stringify(geo)); }
+  // US county lines: the boundaries don't change, so built once (or with REBUILD_GEO / REBUILD_USCO); a failure never stops the run
+  if (!(await fs.stat(D + 'uscounties.json').catch(() => null)) || process.env.REBUILD_GEO || process.env.REBUILD_USCO) {
+    try { await fs.writeFile(D + 'uscounties.json', JSON.stringify(await buildUsCounties(regions))); } catch (e) { log('us counties failed:', e.message); }
+  }
 
   // 1. TABS list
   let rows = [];
@@ -113,6 +118,8 @@ async function refresh() {
     try { const ce = await buildCE(await readJSON(C + 'ce.json')); await fs.writeFile(C + 'ce.json', JSON.stringify(ce)); market = mergeSpending(market, ce); log('spending:', market.spendTracts, 'tracts, CE', ce.year); }
     catch (e) { log('spending skipped:', e.message); }
   }
+  // 10. per-tract busiest road and flood rating for the Filters panel's matching (best effort, monthly)
+  if (market?.tracts?.length) { try { market = await addTractRisk(market, regions.bbox); } catch (e) { log('tract risk skipped:', e.message); } }
   if (market) await fs.writeFile(D + 'market.json', JSON.stringify(market));
 
   // write data + caches (caches pruned to filings still in the window)

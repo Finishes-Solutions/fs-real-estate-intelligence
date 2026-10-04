@@ -5,7 +5,9 @@ import { entityKey } from './lib/taxonomy.mjs';
 import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
-import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft, applyPlaceAlias, splitWithin, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from './lib/assist-logic.mjs';
+import { createTurns, withTimeout, createVoiceLog } from './lib/voice-state.mjs';
+import { contains as inArea } from './lib/geomatch.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
@@ -208,7 +210,7 @@ export function initAssistant(ctx) {
     } catch (e) { bubble('bot err', esc(e.message)); }
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
-  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_path: 'Tracing the flight…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', fema_report: 'Checking FEMA flood and hazard data…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
+  const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_path: 'Tracing the flight…', market_data: 'Reading the market numbers…', crime_stats: 'Counting incidents…', drive_time_map: 'Mapping drive times…', traffic_report: 'Reading traffic counts…', airport_info: 'Looking up the airport…', air_traffic_report: 'Reading the air traffic history…', flight_report: 'Building the flight report…', fema_report: 'Checking FEMA flood and hazard data…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
   // ---------- tools ----------
   const ym = s => /^\d{4}-\d\d$/.test(s || '') ? s : '';
@@ -226,7 +228,7 @@ export function initAssistant(ctx) {
   // OpenStreetMap knows hotels, venues and other landmarks by name that MapTiler's geocoder often doesn't
   async function nominatim(q, world = false) {
     const area = world ? '&addressdetails=1&limit=10' : '&limit=6&countrycodes=us&viewbox=-106.7,36.5,-93.5,25.8&bounded=1';
-    try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2' + area + '&q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } });
+    try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2' + area + '&q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
       return r.ok ? fromNominatim(await r.json()) : []; } catch (e) { return []; }
   }
   // the part after the first comma says where ("Lyon, France", "Paris, TX"); Texas, a Texas town or nothing keeps it local
@@ -236,8 +238,18 @@ export function initAssistant(ctx) {
   const ambiguous = (name, cands) => ({ ambiguous: true, candidates: cands, error: '“' + name + '” could be ' + cands.map(c => c.label).join(' or ') + '. Ask the user which one (offer these as the follow-up options); don’t guess.' });
   // Every lookup must land on the place itself or fail: a wrong guess used to fly the map to e.g. "Houston Avenue, Pasadena"
   // before the model retried with the street address.
-  async function resolvePlace(name) {
+  async function resolvePlace(name, within) {
     for (const [re, to] of ALIAS) name = name.replace(re, to);
+    name = applyPlaceAlias(name);
+    const p = within ? null : await resolveWhole(name), sp = within ? { part: name, within } : splitWithin(name);
+    if (p && (p.ambiguous || !p.error && (!sp.within || mentions(p.label, sp.part)))) return p;
+    // "Terminal B at George Bush airport": the part inside the bigger place, then a web search checked against the map
+    const f = await ctx.findPlace?.(name, null, within);
+    if (f) return { c: f.c, label: f.label, kind: f.kind, ...(f.geom ? { bbox: geomBox(f.geom) } : f.bbox ? { bbox: f.bbox } : {}), ...(f.via ? { via: f.via, approx: !!f.approx } : {}) };
+    return p && !p.error ? p : p || { error: 'Couldn’t find “' + name + (within ? '” in “' + within : '') + '”.' };
+  }
+  const geomBox = g => { let x0 = 180, y0 = 90, x1 = -180, y1 = -90; const walk = a => { if (typeof a[0] === 'number') { x0 = Math.min(x0, a[0]); x1 = Math.max(x1, a[0]); y0 = Math.min(y0, a[1]); y1 = Math.max(y1, a[1]); } else a.forEach(walk); }; walk(g.coordinates); return [x0, y0, x1, y1]; };
+  async function resolveWhole(name) {
     const n = name.toLowerCase().replace(/,?\s*(tx|texas)$/, '').trim();
     const d = districtFor(name); if (d) return { c: d.c, label: d.name, kind: 'district', zoom: d.zoom };
     const town = (ctx.DATA.places || []).find(p => p[0].toLowerCase() === n);
@@ -404,7 +416,7 @@ export function initAssistant(ctx) {
         return { opened: row(f), scope: f.scope || '', summary: f.sum || '', owner: f.owner, address: f.addr, architect: f.arch || null, gc: f.gc || null, approximate_location: !!f.approx };
       }
       if (name === 'fly_to') {
-        let c = null, label = '', kind = 'town', zoom = null, note;
+        let c = null, label = '', kind = 'town', zoom = null, note, box = null;
         const ids = a.ids?.length ? a.ids : a.id ? [a.id] : a.highlighted ? ctx.highlighted() : [];
         if (ids.length) {
           const fs = ids.map(id => ctx.BY_ID.get(String(id).trim())).filter(f => f && isFinite(f.lon) && isFinite(f.lat));
@@ -413,10 +425,13 @@ export function initAssistant(ctx) {
           else { const fr = frame(fs.map(f => [f.lon, f.lat])); c = fr.c; zoom = fr.zoom; label = fs.length + ' filings'; kind = 'group'; }
           if (fs.some(f => f.approx)) note = 'Some of these filings only have a city-level location, so the camera can’t center on the exact building.';
         } else if (isFinite(a.lat) && isFinite(a.lon) && a.lat && a.lon) { c = [a.lon, a.lat]; label = a.lat.toFixed(4) + ', ' + a.lon.toFixed(4); kind = 'building'; }
-        else if (a.place) { const p = await resolvePlace(String(a.place));
+        else if (a.place) { const p = await resolvePlace(String(a.place), a.within ? String(a.within) : '');
           // several places fit: don't move; the model asks which one and the choices become tappable pills
           if (p.ambiguous) { turnChoices = p.candidates; return { ambiguous: true, question: 'Which one did you mean?', candidates: p.candidates.map(x => x.label), note: p.error }; }
-          if (p.error) return { error: p.error }; c = p.c; label = p.label; kind = p.kind; if (p.zoom) zoom = p.zoom; }
+          if (p.error) return { error: p.error + ' Try the official name, or the bigger place it is part of as within.' }; c = p.c; label = p.label; kind = p.kind; if (p.zoom) zoom = p.zoom;
+          // an airport, campus, park, town or county: frame its whole extent rather than a fixed zoom for its type
+          if (p.bbox && extentMeters(p.bbox) > BIG_PLACE_M && !['address', 'building', 'street'].includes(kind)) box = [[p.bbox[0], p.bbox[1]], [p.bbox[2], p.bbox[3]]];
+          if (p.via === 'web') note = 'Found with a web search' + (p.approx ? '; the spot is approximate.' : ' and matched on the map.'); }
         else if (ctx.state.sel) { const f = ctx.state.sel; c = [f.lon, f.lat]; label = f.name; kind = f.approx ? 'approx' : 'building'; }
         else if (ctx.currentBuilding?.()) { const b = ctx.currentBuilding(); c = b.center; label = b.title || 'this building'; kind = 'building'; }
         if (!c) return { error: 'Say a place, an address or which filings to go to.' };
@@ -425,19 +440,29 @@ export function initAssistant(ctx) {
         // a specific building/address/landmark stays close even if the model asks for a wide zoom
         // the model's zoom may nudge the default, never swap a neighbourhood view for a whole city
         // countries and states: whatever the model asks for (a whole continent is fine)
-        zoom = a.zoom > 0 ? (['building', 'address', 'poi', 'area'].includes(kind) ? Math.max(a.zoom, def) : ['country', 'region'].includes(kind) ? a.zoom : Math.min(def + 2.5, Math.max(def - 0.75, a.zoom))) : def;
+        // one building or address stays close even if the model asks for a wide zoom; a landmark or neighbourhood may pull
+        // back (an airport is a "landmark"); the model's zoom may nudge a town, never swap it for a whole region
+        // countries and states: whatever the model asks for (a whole continent is fine)
+        zoom = a.zoom > 0 ? (['building', 'address'].includes(kind) ? Math.max(a.zoom, def) : ['poi', 'area'].includes(kind) ? Math.max(a.zoom, def - 5) : ['country', 'region'].includes(kind) ? a.zoom : Math.min(def + 2.5, Math.max(def - 0.75, a.zoom))) : def;
         if (kind === 'approx') zoom = Math.min(zoom, 14);
         zoom = Math.max(2, Math.min(19, zoom));
-        if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt || zoom >= 16.5 ? 60 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });
+        if (box && !(a.zoom > 0)) { // the whole place in view, clear of the chat panel and card
+          const fit = (() => { try { return ctx.map.cameraForBounds(box, { padding: ctx.coverPad?.() ?? 60, maxZoom: 17 })?.zoom; } catch (e) { return null; } })();
+          zoom = fit ?? zoomForBox([box[0][0], box[0][1], box[1][0], box[1][1]]) ?? zoom;
+          if (a.orbit) ctx.orbitAt(c, zoom); else ctx.fitBox(box, { maxZoom: 17, ...(a.tilt ? { pitch: 50 } : {}) });
+        }
+        else if (a.orbit) ctx.orbitAt(c, zoom); else ctx.map.flyTo({ center: c, zoom, pitch: a.tilt || zoom >= 16.5 ? 60 : ctx.map.getPitch(), duration: ctx.reduceMotion ? 0 : 1400 });
         if (kind !== 'group' && !/^-?\d+\.\d+, -?\d/.test(label)) turnSubject = label;
-        actionChip((a.orbit ? 'Orbiting ' : 'Moved the map to ') + label); return { moved_to: label, zoom: +zoom.toFixed(1), orbiting: !!a.orbit, ...(note ? { note } : {}) };
+        actionChip((a.orbit ? 'Orbiting ' : 'Moved the map to ') + label); return { moved_to: label, zoom: +zoom.toFixed(1), orbiting: !!a.orbit, ...(box && !(a.zoom > 0) ? { framed: 'the whole place is in view; no need to zoom in or out' } : {}), ...(note ? { note } : {}) };
       }
       if (name === 'highlight_area') {
-        const pl = await ctx.highlightPlace(String(a.place || ''), a.kind);
-        if (!pl) return { error: 'Couldn’t find “' + a.place + '” in OpenStreetMap. Try the official name with its city or county.' };
+        const pl = await ctx.highlightPlace(String(a.place || ''), a.kind, a.within ? String(a.within) : '');
+        if (!pl) return { error: 'Couldn’t find “' + a.place + '”' + (a.within ? ' in “' + a.within + '”' : '') + ' on the map or with a web search. Try its official current name, or name the bigger place it is part of (within), before telling the user.' };
         await new Promise(r => setTimeout(r, 50));
         const out = { ...ctx.placeSummary() };
         if (!pl.geom) out.note = 'Shown as a point: OpenStreetMap has no outline for it.';
+        if (pl.via === 'web') out.found_with = 'web search' + (pl.approx ? ' (approximate spot)' : ', matched on the map');
+        if (pl.within) out.inside = pl.within;
         if (a.filter && pl.geom && /Polygon/.test(pl.geom.type)) { ctx.setSelection('place', pl.label, pl.geom); ctx.clearPlace(); out.filtered = true; out.filings = ctx.visible.length; }
         if (a.compare && pl.geom && /Polygon/.test(pl.geom.type)) out.added_to_compare = ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom });
         actionChip('Outlined ' + pl.label, () => ctx.clearPlace()); return out;
@@ -465,7 +490,7 @@ export function initAssistant(ctx) {
         const done = [], missed = [];
         for (const n of names) { const pl = await ctx.highlightPlace(n); if (pl?.geom && /Polygon/.test(pl.geom.type)) { ctx.compare.add({ key: 'place:' + pl.label, label: pl.label.split(',')[0], kind: pl.kind, geom: pl.geom }); done.push(pl.label); } else missed.push(n); }
         ctx.clearPlace(); if (VIEW_ASK.test(lastUserText())) ctx.setView('compare');
-        const base = ctx.filtered(), areas = ctx.compare.list().map(ar => { const l = base.filter(f => d3.geoContains(ar.geom, [f.lon, f.lat])); return { area: ar.label, filings: l.length, total_value: l.reduce((s, f) => s + f.cost, 0), new_builds: l.filter(f => f.type === 'New').length, largest: l.sort((x, y) => y.cost - x.cost).slice(0, 3).map(row) }; });
+        const base = ctx.filtered(), areas = ctx.compare.list().map(ar => { const l = base.filter(f => inArea(ar.geom, [f.lon, f.lat])); return { area: ar.label, filings: l.length, total_value: l.reduce((s, f) => s + f.cost, 0), new_builds: l.filter(f => f.type === 'New').length, largest: l.sort((x, y) => y.cost - x.cost).slice(0, 3).map(row) }; });
         actionChip('Comparing ' + done.join(', ')); return { compared: areas, ...(missed.length ? { not_found: missed } : {}) };
       }
       if (name === 'stop_orbit') { ctx.stopOrbit(); return { stopped: true }; }
@@ -554,7 +579,7 @@ export function initAssistant(ctx) {
         if (!hex) return { error: 'No aircraft “' + id + '” is broadcasting within 250 miles right now, so its path can’t be looked up.' };
         const t = await ctx.planeTrack(hex); if (!t) return { error: 'adsb.lol didn’t return a flight path for that aircraft.' };
         // where each flight began and ended, as a town name (OpenStreetMap reverse geocoding, a few lookups at most)
-        const town = async c => { try { const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&lat=' + c[1] + '&lon=' + c[0], { headers: { Accept: 'application/json' } }); const d = await r.json(); const x = d.address || {};
+        const town = async c => { try { const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&lat=' + c[1] + '&lon=' + c[0], { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) }); const d = await r.json(); const x = d.address || {};
           return [x.city || x.town || x.village || x.hamlet || x.county, x.state].filter(Boolean).join(', ') || d.display_name || null; } catch (e) { return null; } };
         const legs = (t.today || []).slice(-4);
         const named = []; for (const l of legs) named.push({ ...l, from_place: await town(l.from), to_place: await town(l.to) });
@@ -586,6 +611,87 @@ export function initAssistant(ctx) {
           national_risk_index: d.risk_index && !d.risk_index.error ? { rating: d.risk_index.risk_rating, score: d.risk_index.risk_score, expected_annual_loss: d.risk_index.expected_annual_loss, top_hazards: d.risk_index.hazards, social_vulnerability: d.risk_index.social_vulnerability.rating, community_resilience: d.risk_index.community_resilience.rating, tracts: d.risk_index.tracts } : d.risk_index,
           note: 'Flood zone shares are FEMA regulatory zones measured across the area. NFIP claims are insured losses in the census tracts touching the area (addresses are redacted by FEMA), a neighborhood measure. Risk index scores are percentiles among US census tracts.' };
       }
+      if (name === 'drive_time_map') {
+        if (!ctx.driveTime) return { error: 'Drive-time maps aren’t available in this version.' };
+        let center, label;
+        if (a.use_selection && ctx.sel?.feature) { const g = ctx.sel.feature.geometry || ctx.sel.feature, r = (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates[0][0]); center = [r.reduce((s, p) => s + p[0], 0) / r.length, r.reduce((s, p) => s + p[1], 0) / r.length]; label = ctx.sel.label || 'the selected area'; }
+        else { const p = await pointFor(a); if (p.error) return p; center = p.c; label = p.label; }
+        const minutes = (Array.isArray(a.minutes) && a.minutes.length ? a.minutes : [10, 20, 30]).map(Number).filter(m => m >= 1 && m <= 60).slice(0, 4).sort((x, y) => x - y);
+        const r = await ctx.driveTime({ center, label, minutes: minutes.length ? minutes : [10, 20, 30], depart: a.depart || 'now' });
+        if (r?.error) return { error: r.error }; if (!r?.bands) return { error: 'The drive-time map was replaced by a newer request.' };
+        actionChip('Drive-time map: ' + label); turnSubject = label;
+        return { from: label, leaving: a.depart || 'now', routing: r.d.source, traffic: r.d.traffic, note: r.d.note,
+          bands: r.bands.map(b => ({ minutes: b.minutes, area_sq_mi: b.sqmi, people: b.people, households: b.households, jobs: b.jobs, median_household_income_approx: b.income, filings_on_map: b.filings })),
+          shown: 'The bands are drawn on the map and the drive-time card is open (the user can switch rush hour / weekend, select a band as the area, and export a report or CSV). Census figures count tracts whose center is inside a band; each band includes the smaller ones.' };
+      }
+      if (name === 'traffic_report') {
+        if (!ctx.trafficReportData) return { error: 'Traffic reports aren’t available in this version.' };
+        let geometry, label;
+        if (a.use_selection && ctx.sel?.feature) { geometry = ctx.sel.feature.geometry || ctx.sel.feature; label = ctx.sel.label || 'the selected area'; }
+        else {
+          const p = await pointFor(a); if (p.error) return p;
+          const mi = Math.min(10, Math.max(0.1, a.radius_miles || (p.kind && !/address|building|poi|street/.test(p.kind) ? 2 : 0.5))), r = mi / 69, k = Math.cos(p.c[1] * Math.PI / 180), ring = [];
+          for (let i = 0; i <= 64; i++) { const t = (i % 64) / 64 * 2 * Math.PI; ring.push([p.c[0] + r * Math.cos(t) / k, p.c[1] + r * Math.sin(t)]); }
+          geometry = { type: 'Polygon', coordinates: [ring] }; label = mi + ' mi around ' + p.label;
+        }
+        const d = await ctx.trafficReportData(geometry, label);
+        if (a.show_layer) ctx.trafficLayer?.(true);
+        if (a.show_report) { ctx.trafficReport({ geometry, label }); actionChip('Traffic report: ' + label); }
+        turnSubject = label; const c = d.counts || {};
+        return { area: label, area_sq_mi: d.area_sqmi, counts_error: c.error, counts_as_of: c.as_of, busiest_roads: (c.roads || []).slice(0, 12).map(r => ({ road: r.road, vehicles_per_day: r.aadt, type: r.type, avg_over_segments: r.avg, segments: r.segments })),
+          by_road_type: c.types, live_now: Array.isArray(d.live) ? d.live.map(x => ({ road: x.road, mph_now: x.current_mph, free_flow_mph: x.free_flow_mph, slower_pct: x.congestion_pct, closed: x.closed })) : d.live,
+          incidents_now: Array.isArray(d.incidents) ? d.incidents.slice(0, 15) : d.incidents, note: 'Counts are TxDOT annual average daily traffic, both directions (current year only, no history). Live speeds and incidents are right now (TomTom).' };
+      }
+      if (name === 'airport_info') {
+        if (!ctx.airportData) return { error: 'Airport data isn’t available in this version.' };
+        let id = String(a.code || '').trim().toUpperCase(), nearby = null, path = null;
+        if (!id) {
+          // a place: the nearest airports (an airport's own name resolves to the airport itself)
+          const p = await pointFor({ place: a.place }); if (p.error) return p;
+          const r = await fetch('api/airports?near=' + p.c[1].toFixed(4) + ',' + p.c[0].toFixed(4) + '&km=80&n=6&path=1'), d = await r.json().catch(() => ({})); if (!r.ok) return { error: d.error || 'Airport lookup failed.' };
+          nearby = (d.airports || []).map(x => ({ ident: x.ident, name: x.name, code: x.iata || x.icao || x.ident, type: x.type, miles: +(x.km * 0.621371).toFixed(1) })); path = d.path;
+          const named = /airport|field|hobby|intercontinental|heliport|airpark/i.test(a.place || '') ? nearby[0] : nearby.find(x => x.type !== 'small_airport') || nearby[0];
+          if (!named) return { error: 'No airports within 50 miles of ' + p.label + '.' }; id = named.ident;
+        }
+        const d = a.show_card === false ? await ctx.airportData(id) : await ctx.airportCard(id, { fly: true }); if (!d || d.error) return { error: d?.error || 'No airport matches ' + id + '.' };
+        const ap = d.airport, ops = (d.ops || []).filter(o => o.source === 'adsb').slice(-30), w = d.wiki || {};
+        if (a.show_card !== false) actionChip('Airport: ' + ap.name); turnSubject = ap.name;
+        return { airport: { ident: ap.ident, name: ap.name, iata: ap.iata, icao: ap.icao, type: ap.type, city: ap.municipality, region: ap.iso_region, elevation_ft: ap.elevation_ft, scheduled_service: ap.scheduled },
+          runways: (d.runways || []).filter(r => !r.closed).map(r => ({ runway: (r.le_ident || '') + '/' + (r.he_ident || ''), length_ft: r.length_ft, width_ft: r.width_ft, surface: r.surface, lighted: r.lighted })),
+          weather_now: d.metar ? { category: d.metar.category, temp_f: d.metar.temp_f, wind_kt: d.metar.wind_kt, raw: d.metar.raw } : null,
+          airlines: (w.airlines || []).slice(0, 30), cargo_airlines: (w.cargo || []).map(x => x.airline), statistics: (w.tables || []).slice(0, 3).map(t => ({ title: t.caption, headers: t.headers, rows: t.rows.slice(0, 10) })),
+          takeoffs_landings_per_day: ops.length ? { days: ops.length, average: Math.round(ops.reduce((s, o) => s + o.departures + o.arrivals, 0) / ops.length), by_day: ops.map(o => ({ day: o.day, takeoffs: o.departures, landings: o.arrivals })), note: 'Counted from ADS-B within ~100 nm of Houston; undercounts small aircraft. Official FAA counts are higher.' } : 'No daily counts for this airport (we count only around Houston).',
+          faa_diagram: d.extras?.diagram_url || null, wikipedia: w.url, summary: w.summary, nearest_airports: nearby || undefined, approach_path: path || undefined,
+          shown: a.show_card === false ? undefined : 'The airport card is open (photo, runways, weather, airlines, statistics; Show Airport Map draws the layout; Export Report / CSV).' };
+      }
+      if (name === 'air_traffic_report') {
+        if (!ctx.airReportData) return { error: 'Air traffic reports aren’t available in this version.' };
+        let geometry, label;
+        if (a.use_selection && ctx.sel?.feature) { geometry = ctx.sel.feature.geometry || ctx.sel.feature; label = ctx.sel.label || 'the selected area'; }
+        else {
+          const p = await pointFor(a); if (p.error) return p;
+          const mi = Math.min(15, Math.max(0.25, a.radius_miles || (p.kind && !/address|building|poi|street/.test(p.kind) ? 3 : 1))), r = mi / 69, k = Math.cos(p.c[1] * Math.PI / 180), ring = [];
+          for (let i = 0; i <= 64; i++) { const t = (i % 64) / 64 * 2 * Math.PI; ring.push([p.c[0] + r * Math.cos(t) / k, p.c[1] + r * Math.sin(t)]); }
+          geometry = { type: 'Polygon', coordinates: [ring] }; label = mi + ' mi around ' + p.label;
+        }
+        const d = await ctx.airReportData({ geometry });
+        if (a.show_report) { ctx.airReport({ geometry, label }); actionChip('Air traffic report: ' + label); }
+        turnSubject = label; const p = d.profile;
+        return { area: label, history: p.error ? p.error : { since: p.since, sightings_per_day: p.per_day, busiest_hour: p.busiest_hour, quietest_hour: p.quietest_hour, pct_under_3000_ft: p.low_pct, mix_pct: p.mix, lowest_ft: p.lowest_ft, by_month: p.by_month,
+            by_hour: (p.hours || []).map(x => ({ hour: x.h, sightings_per_hour: x.per_hour != null ? Math.round(x.per_hour) : null })) },
+          low_flights_at_center: d.low?.history ? { per_day: d.low.low_per_day, lowest_ft: d.low.lowest_ft, days: d.low.days } : undefined,
+          approach_path: d.path || 'not under a runway approach path', nearby_airports: d.airports.slice(0, 5).map(x => ({ name: x.name, code: x.iata || x.icao || x.ident, miles: +(x.km * 0.621371).toFixed(1) })),
+          overhead_now: Array.isArray(d.live?.aircraft) ? { count: d.live.aircraft.length, under_3000_ft: d.live.aircraft.filter(x => !x.ground && x.alt < 3000).length } : d.live,
+          note: 'A sighting is one aircraft seen at one of the once-a-minute samples (~5 km cells), an exposure measure, not distinct flights. Coverage ~100 nm around Houston; history since October 2026.' };
+      }
+      if (name === 'flight_report') {
+        if (!ctx.flightReport || !ctx.followPlane) return { error: 'Flight reports aren’t available in this version.' };
+        if (ctx.view !== 'map') ctx.setView('map');
+        const out = await ctx.followPlane(a.id || '', {}); if (out.error) return out;
+        await ctx.flightReport(out.plane);
+        actionChip('Flight report: ' + (out.plane.flight || out.plane.reg || out.plane.hex.toUpperCase()));
+        return { saved: true, flight: out.plane.flight || out.plane.reg || out.plane.hex, note: 'The flight report (HTML, printable) and a CSV of the track were saved; they are listed in the Reports tab. The plane card is open on the map.' };
+      }
       if (name === 'crime_stats') {
         if (!ctx.crimeReportData) return { error: 'Crime data isn’t available in this version.' };
         let geometry, label;
@@ -603,7 +709,7 @@ export function initAssistant(ctx) {
         turnSubject = label;
         return { area: label, period: '12 months through ' + d.latest + ' (vs the 12 months before)', area_sq_mi: d.area_sqmi, last_12_months: d.last12, prior_12_months: d.prior12, change_pct: d.change,
           per_sq_mi_per_year: d.per_sqmi, houston_citywide_per_sq_mi: d.city_per_sqmi, top_offenses: d.offenses.slice(0, 12).map(o => ({ offense: o.name, type: o.cat, count: o.n })),
-          top_premises: d.premises.slice(0, 8), by_month: d.months, recent_incidents: inc.slice(0, 40).map(x => ({ date: x.day, offense: x.offense, premise: x.premise })),
+          top_premises: d.premises.slice(0, 8), by_month: d.months, by_hour_of_day: d.hours?.length ? d.hours : 'not loaded yet', by_weekday_0_is_sunday: d.weekdays, by_year: (d.years || []).map(y => ({ year: y.y, total: y.total, violent: y.v, property: y.p, days_covered: y.days })), houston_by_year: d.city_years, recent_incidents: inc.slice(0, 40).map(x => ({ date: x.day, offense: x.offense, premise: x.premise })),
           matching_incidents_last_12_months: words.length ? inc.length + (inc.length >= 2000 ? '+' : '') : undefined,
           coverage: d.coverage, note: 'Counts are incidents reported to Houston Police; busy commercial areas have more than homes nearby. Type: v violent, p property, o other.' };
       }
@@ -677,38 +783,60 @@ export function initAssistant(ctx) {
   ctx.runAssistantTool = runTool;
 
   // ---------- voice (OpenAI Realtime over WebRTC) ----------
-  let pc = null, dc = null, mic = null, audio = null, meter = null, voiceT = 0, liveBubble = null, pendingCalls = 0, vocab = '', turnT = 0;
+  let pc = null, dc = null, mic = null, audio = null, meter = null, voiceT = 0, liveBubble = null, pendingCalls = 0, vocab = '';
   const live = $('aiLive'), liveT = $('aiLiveT'), liveS = $('aiLiveS'), orb = $('aiOrb');
   // the panel's look follows the conversation: listening (calm), hearing you (reacts to the mic), thinking (spinning ring),
   // speaking (reacts to the assistant's voice)
   const stateOf = t => /^Connect/.test(t) ? 'connecting' : /^Speaking/.test(t) ? 'speaking' : /^Listening…/.test(t) ? 'hearing' : /^Listening/.test(t) ? 'listening' : 'thinking';
   const setLive = (t, s) => { liveT.textContent = t; if (s != null) liveS.textContent = s; live.dataset.state = stateOf(t); };
-  let heard = '';
-  async function startVoice() {
-    if (pc) { stopVoice(); return; }
+  let heard = new Map(), speechMs = 0, carry = '', renewT = 0;
+  const vlog = createVoiceLog(200);
+  const LISTEN_HINT = 'Talk naturally. I’ll answer when you pause.';
+  // one reply at a time; retries and give-ups surface in the panel instead of going quiet
+  const turns = createTurns({ send: o => sendEv(o), log: (t, d) => vlog.add(t, d), onStatus: (s, err) => {
+    vlog.add('gave up', s + (err ? ': ' + err : ''));
+    setLive('Listening', s === 'failed' ? 'That reply failed' + (err ? ' (' + err + ')' : '') + '. Try again.' : s === 'stuck' ? 'That took too long. Try again.' : 'No reply came back. Try again.');
+  } });
+  ctx.voiceLog = () => vlog.text();
+  async function startVoice(quiet) {
+    if (pc && !quiet) { stopVoice(); return; }
     if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) { ctx.toast('Voice needs a browser with microphone and WebRTC support.'); return; }
-    open(false); live.hidden = false; el.classList.add('voice'); $('aiMic').classList.add('on'); setLive('Connecting…', 'Allow the microphone if asked');
+    open(false); live.hidden = false; el.classList.add('voice'); $('aiMic').classList.add('on'); setLive('Connecting…', quiet ? 'Renewing the voice session…' : 'Allow the microphone if asked');
+    vlog.add('connect', quiet ? 'renew' : 'start'); turns.reset(); heard.clear();
     try {
       mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-      const r = await fetch('api/realtime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context: context() }) });
+      const r = await fetch('api/realtime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context: context() }), signal: AbortSignal.timeout(15000) });
       const s = await r.json().catch(() => ({})); if (!r.ok || !s.value) throw new Error(s.error || 'Voice isn’t available right now.'); vocab = s.vocab || '';
       pc = new RTCPeerConnection(); audio = new Audio(); audio.autoplay = true; audio.playsInline = true;
       pc.ontrack = e => { audio.srcObject = e.streams[0]; meter?.addRemote?.(e.streams[0]); };
       pc.addTrack(mic.getAudioTracks()[0], mic);
-      dc = pc.createDataChannel('oai-events'); dc.onmessage = e => { try { onEvent(JSON.parse(e.data)); } catch (err) { console.error(err); } };
-      dc.onopen = () => { lastCtx = ''; setLive('Listening', 'Talk naturally. I’ll answer when you pause.'); };
-      pc.onconnectionstatechange = () => { if (['failed', 'disconnected', 'closed'].includes(pc?.connectionState)) stopVoice('Voice connection ended.'); };
+      dc = pc.createDataChannel('oai-events'); dc.onmessage = e => { try { onEvent(JSON.parse(e.data)); } catch (err) { console.error(err); vlog.add('handler error', err.message); } };
+      dc.onopen = () => {
+        lastCtx = ''; vlog.add('open');
+        // a renewed session picks up where the last one left off
+        if (carry) { sendEv({ type: 'conversation.item.create', item: { type: 'message', role: 'system', content: [{ type: 'input_text', text: 'The voice session was renewed. The conversation so far:\n' + carry }] } }); carry = ''; }
+        setLive('Listening', LISTEN_HINT);
+      };
+      pc.onconnectionstatechange = () => { vlog.add('connection', pc?.connectionState); if (['failed', 'disconnected', 'closed'].includes(pc?.connectionState)) stopVoice('Voice connection ended.'); };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
-      const a = await fetch('https://api.openai.com/v1/realtime/calls', { method: 'POST', body: offer.sdp, headers: { Authorization: 'Bearer ' + s.value, 'Content-Type': 'application/sdp' } });
+      const a = await fetch('https://api.openai.com/v1/realtime/calls', { method: 'POST', body: offer.sdp, headers: { Authorization: 'Bearer ' + s.value, 'Content-Type': 'application/sdp' }, signal: AbortSignal.timeout(15000) });
       if (!a.ok) throw new Error('Voice connection was refused (' + a.status + ').');
       await pc.setRemoteDescription({ type: 'answer', sdp: await a.text() });
-      startMeter(); clearTimeout(voiceT); voiceT = setTimeout(() => stopVoice('Voice sessions end after 10 minutes. Tap the mic to keep going.'), 10 * 60e3);
-    } catch (e) { stopVoice(e.name === 'NotAllowedError' ? 'Microphone access was blocked.' : e.message); }
+      startMeter(); clearTimeout(voiceT); clearTimeout(renewT);
+      // OpenAI ends a session at 10 minutes: renew it just before, between turns, carrying the last few exchanges
+      renewT = setTimeout(function renew() {
+        if (turns.busy || pendingCalls || live.dataset.state === 'hearing') { renewT = setTimeout(renew, 5000); return; }
+        carry = history.slice(-8).map(h => (h.role === 'user' ? 'User: ' : 'Assistant: ') + String(h.content).slice(0, 300)).join('\n');
+        stopVoice('', true); startVoice(true);
+      }, 9 * 60e3);
+      voiceT = setTimeout(() => stopVoice('Voice sessions end after 10 minutes. Tap the mic to keep going.'), 10 * 60e3);
+    } catch (e) { vlog.add('connect failed', e.message); stopVoice(e.name === 'NotAllowedError' ? 'Microphone access was blocked.' : e.name === 'TimeoutError' ? 'Voice took too long to connect. Try again.' : e.message); }
   }
-  function stopVoice(msg) {
-    clearTimeout(voiceT); clearTimeout(turnT); cancelAnimationFrame(meter?.raf || 0); meter?.ac?.close?.().catch?.(() => {}); meter = null;
+  function stopVoice(msg, renewing) {
+    clearTimeout(voiceT); clearTimeout(renewT); turns.reset(); cancelAnimationFrame(meter?.raf || 0); meter?.ac?.close?.().catch?.(() => {}); meter = null;
     try { dc?.close(); } catch (e) {} try { pc?.close(); } catch (e) {} mic?.getTracks().forEach(t => t.stop());
-    if (audio) { audio.srcObject = null; audio = null; } pc = dc = mic = null; liveBubble = null;
+    if (audio) { audio.srcObject = null; audio = null; } pc = dc = mic = null; liveBubble = null; vlog.add('stop', msg || (renewing ? 'renew' : ''));
+    if (renewing) return;
     live.hidden = true; el.classList.remove('voice'); $('aiMic').classList.remove('on'); if (msg) ctx.toast(msg);
   }
   // levels for the orb: the mic while the user talks, the assistant's audio while it speaks
@@ -741,45 +869,76 @@ export function initAssistant(ctx) {
     }, 1500);
   }
   ctx.map.on('moveend', pushContext); ctx.onChange(pushContext); ctx.onCardRender(pushContext); ctx.onCardClose(pushContext); ctx.onViewChange(pushContext);
-  const isNoise = t => !t || /[^\u0000-\u024f\u2000-\u206f\s]/.test(t) && !/[a-z]{3}/i.test(t) || t.replace(/[^a-z]/gi, '').length < 2;
+  const isNoise = t => !t || /[^\u0000-ɏ -⁯\s]/.test(t) && !/[a-z]{3}/i.test(t) || t.replace(/[^a-z]/gi, '').length < 2;
+  // what the transcriber has so far, without any echo of its own hint list (that used to flash as a burst of place names)
+  const shown = t => { const c = stripEcho(t, vocab); return c && !isPromptEcho(c, vocab) ? c : ''; };
+  const runVoiceTool = (name, args) => withTimeout(runTool(name, args), 20000, () => ({ error: 'That lookup timed out. Tell the user it didn’t answer in time and offer to try again.' }));
   async function onEvent(e) {
+    if (!/delta$/.test(e.type)) vlog.add(e.type, e.type === 'response.done' ? (e.response?.status || '') + (e.response?.status_details?.error?.message ? ': ' + e.response.status_details.error.message : '') : e.type === 'error' ? e.error?.code || e.error?.message : e.item_id || '');
     switch (e.type) {
-      case 'input_audio_buffer.speech_started': heard = ''; setLive('Listening…', 'Pause when you’re done, or tap Send'); $('aiSendNow').hidden = false; break;
-      case 'conversation.item.input_audio_transcription.delta': heard += e.delta || ''; if (heard.trim()) liveS.textContent = '“' + heard.trim().slice(-90) + '”'; break;
-      case 'input_audio_buffer.speech_stopped': setLive('Thinking…'); $('aiSendNow').hidden = true; break;
-      // a turn ended: the reply waits for its transcript (see below); if the transcriber never answers, reply anyway
-      case 'input_audio_buffer.committed': clearTimeout(turnT); turnT = setTimeout(() => sendEv({ type: 'response.create' }), 6000); break;
-      case 'conversation.item.input_audio_transcription.failed': clearTimeout(turnT); sendEv({ type: 'response.create' }); break;
-      case 'conversation.item.input_audio_transcription.completed': {
-        clearTimeout(turnT);
-        const t = (e.transcript || '').trim();
-        // noise, other languages, background fragments and the transcriber echoing its own hint list: drop the turn, don't answer it
-        if (isNoise(t) || isPromptEcho(t, vocab)) { if (e.item_id) sendEv({ type: 'conversation.item.delete', item_id: e.item_id }); setLive('Listening', 'Talk naturally. I’ll answer when you pause.'); break; }
-        bubble('user', esc(t)); history.push({ role: 'user', content: t }); setLive('Thinking…', '“' + t.slice(-90) + '”');
-        sendEv({ type: 'response.create' }); break;
+      case 'input_audio_buffer.speech_started': speechMs = e.audio_start_ms || 0; setLive('Listening…', 'Pause when you’re done, or tap Send'); $('aiSendNow').hidden = false; break;
+      case 'conversation.item.input_audio_transcription.delta': {
+        const t = (heard.get(e.item_id) || '') + (e.delta || ''); heard.set(e.item_id, t);
+        const c = shown(t); if (c) liveS.textContent = '“' + c.slice(-90) + '”'; break;
       }
+      case 'input_audio_buffer.speech_stopped': speechMs = e.audio_end_ms && speechMs ? e.audio_end_ms - speechMs : 0; setLive('Thinking…'); $('aiSendNow').hidden = true; break;
+      // a turn ended: the reply waits for its transcript; if the transcriber never answers, it replies from the audio
+      case 'input_audio_buffer.committed': turns.committed(e.item_id); break;
+      case 'conversation.item.input_audio_transcription.failed': turns.transcript(e.item_id, true); break;
+      case 'conversation.item.input_audio_transcription.completed': {
+        const raw = (e.transcript || '').trim(), t = stripEcho(raw, vocab); heard.delete(e.item_id);
+        // noise, other languages, background fragments and the transcriber echoing its hint list are not requests
+        if (isNoise(t) || isPromptEcho(t, vocab)) {
+          // ...unless the user plainly talked for a while: then the audio is real and the transcript is what failed.
+          // The model hears the audio itself, so it answers that (and asks again if it didn't catch it either).
+          if (speechMs >= 1800 && raw) {
+            sendEv({ type: 'conversation.item.create', item: { type: 'message', role: 'system', content: [{ type: 'input_text', text: 'The written transcript of the user’s last turn was unreliable. Answer from the audio only if you clearly understood it; otherwise ask them to say it again. Don’t act on place names you aren’t sure they said.' }] } });
+            bubble('user', '<i>(transcript unclear, answering from your voice)</i>'); setLive('Thinking…', ''); turns.transcript(e.item_id, true); break;
+          }
+          if (e.item_id) sendEv({ type: 'conversation.item.delete', item_id: e.item_id });
+          turns.transcript(e.item_id, false);
+          setLive('Listening', raw && !isNoise(raw) ? 'Didn’t catch that. Try again.' : LISTEN_HINT); break;
+        }
+        bubble('user', esc(t)); history.push({ role: 'user', content: t }); setLive('Thinking…', '“' + t.slice(-90) + '”');
+        turns.transcript(e.item_id, true); break;
+      }
+      case 'response.created': turns.created(); break;
       case 'response.output_audio_transcript.delta':
         if (!liveBubble) liveBubble = bubble('bot', ''); liveBubble.dataset.t = (liveBubble.dataset.t || '') + e.delta; liveBubble.innerHTML = ctx.richText(splitFollowups(liveBubble.dataset.t).text); scroll(); setLive('Speaking'); break;
       case 'response.output_audio_transcript.done': if (liveBubble) { history.push({ role: 'assistant', content: liveBubble.dataset.t || '' }); ctx.wireCites(log); } liveBubble = null; break;
       case 'response.function_call_arguments.done': {
         pendingCalls++; setLive(LABEL[e.name] || 'Working…');
         let args = {}; try { args = JSON.parse(e.arguments || '{}'); } catch (err) {}
-        const result = await runTool(e.name, args);
+        let result; try { result = await runVoiceTool(e.name, args); } catch (err) { result = { error: err.message }; }
+        if (result?.ambiguous && turnChoices) pills(turnChoices.map(c => 'Take me to ' + c.label).slice(0, 5)); // tap or say one
         sendEv({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: e.call_id, output: JSON.stringify(result).slice(0, 11000) } });
         pendingCalls--;
         break;
       }
       case 'response.done': {
-        const calls = (e.response?.output || []).filter(o => o.type === 'function_call');
-        if (calls.length) { const waitTools = () => pendingCalls ? setTimeout(waitTools, 120) : sendEv({ type: 'response.create' }); waitTools(); }
-        else setLive('Listening');
+        const r = e.response || {}, calls = (r.output || []).filter(o => o.type === 'function_call');
+        const next = turns.done(r.status, { calls: calls.length, error: r.status_details?.error?.message || r.status_details?.reason || '' });
+        if (next === 'tools') { const t0 = Date.now(); const waitTools = () => pendingCalls && Date.now() - t0 < 25000 ? setTimeout(waitTools, 120) : turns.toolsDone(); waitTools(); }
+        else if (next === 'retry') setLive('Thinking…', 'Trying that again…');
+        else if (next !== 'failed' && next !== 'queued') setLive('Listening', r.status === 'cancelled' ? '' : undefined);
         break;
       }
-      case 'error': console.error('realtime', e.error); if (e.error?.message) ctx.toast('Voice: ' + e.error.message); break;
+      case 'error': {
+        console.error('realtime', e.error);
+        const code = e.error?.code || '', m = e.error?.message || '';
+        if (/active_response|already has an active response/i.test(code + m)) { turns.alreadyActive(); break; } // ours goes when that one ends
+        if (/item.*not.*found|cancel.*no active/i.test(code + m)) break; // harmless: a delete or cancel that raced the server
+        if (m) { setLive('Listening', 'Voice error: ' + m.slice(0, 120)); ctx.toast('Voice: ' + m); }
+        break;
+      }
     }
   }
-  $('aiMic').onclick = startVoice; $('aiStop').onclick = () => stopVoice();
-  // send now: end the turn without waiting for the pause detector
-  $('aiSendNow').onclick = () => { sendEv({ type: 'input_audio_buffer.commit' }); $('aiSendNow').hidden = true; setLive('Thinking…', ''); }; // the transcript starts the reply
+  $('aiMic').onclick = () => startVoice(); $('aiStop').onclick = () => stopVoice();
+  // send now: end the turn without waiting for the pause detector (the transcript starts the reply)
+  $('aiSendNow').onclick = () => {
+    $('aiSendNow').hidden = true;
+    if (!dc || dc.readyState !== 'open') { setLive('Listening', 'Voice isn’t connected. Tap the mic to start again.'); return; }
+    try { sendEv({ type: 'input_audio_buffer.commit' }); setLive('Thinking…', ''); } catch (err) { setLive('Listening', 'Couldn’t send that: ' + err.message); }
+  };
   ctx.assistant = { open, close, ask, startVoice };
 }

@@ -4,6 +4,7 @@
 //   The report opens in the card (totals vs the year before and vs the city, monthly bars, top offenses and places,
 //   recent incidents), can put the incidents on the map, and exports as a printable report (HTML → PDF) or CSV.
 import { offenseName, CAT_NAME } from './lib/nibrs.mjs';
+import { tractsFor, summarizeTracts } from './lib/demographics.mjs';
 
 const SRC = 'crime', HEAT = 'crime-heat', CELLS = 'crime-cells', PTS = 'crime-pts';
 const COL = { v: '#c03b3a', p: '#d9822b', o: '#8a9396' };
@@ -95,6 +96,44 @@ export function initCrime(ctx) {
         (m.m.endsWith('-01') || i === 0 ? '<text x="' + x.toFixed(1) + '" y="' + (H + 11) + '" font-size="8.5" fill="currentColor" opacity=".6">' + m.m.slice(0, 4) + '</text>' : '') + '</g>';
     }).join('') + '</svg>';
   }
+  // stacked violent / property / other bars for any list: [{ label, v, p, o }]
+  function catBars(list, aria) {
+    if (!list?.length || !list.some(x => x.v + x.p + x.o)) return '';
+    const W = 320, H = 70, max = Math.max(1, ...list.map(m => m.v + m.p + m.o)), bw = W / list.length, every = list.length > 12 ? 3 : 1;
+    return '<svg class="cr-bars" viewBox="0 0 ' + W + ' ' + (H + 14) + '" role="img" aria-label="' + esc(aria) + '">' + list.map((m, i) => {
+      const x = i * bw + 1, w = Math.max(1, bw - 2), hv = m.v / max * H, hp = m.p / max * H, ho = m.o / max * H;
+      return '<g><title>' + esc(m.label + ': ' + (m.v + m.p + m.o) + ' incidents (' + m.v + ' violent, ' + m.p + ' property, ' + m.o + ' other)') + '</title>' +
+        '<rect x="' + x.toFixed(1) + '" y="' + (H - hv).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hv.toFixed(1) + '" fill="' + COL.v + '"/>' +
+        '<rect x="' + x.toFixed(1) + '" y="' + (H - hv - hp).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hp.toFixed(1) + '" fill="' + COL.p + '"/>' +
+        '<rect x="' + x.toFixed(1) + '" y="' + (H - hv - hp - ho).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + ho.toFixed(1) + '" fill="' + COL.o + '" fill-opacity=".55"/>' +
+        (i % every === 0 ? '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H + 11) + '" font-size="8.5" text-anchor="middle" fill="currentColor" opacity=".6">' + esc(m.short || m.label) + '</text>' : '') + '</g>';
+    }).join('') + '</svg>';
+  }
+  const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], HR = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p');
+  const hourList = d => Array.from({ length: 24 }, (_, h) => { const x = (d.hours || []).find(r => r.h === h) || { v: 0, p: 0, o: 0 }; return { label: HR(h), short: HR(h), v: x.v, p: x.p, o: x.o }; });
+  const dowList = d => DOW.map((n, i) => { const x = (d.weekdays || []).find(r => r.d === i) || { v: 0, p: 0, o: 0 }; return { label: n, v: x.v, p: x.p, o: x.o }; });
+  // "when" in words: the busiest 3-hour stretch and the busiest day
+  function whenLine(d) {
+    const hs = hourList(d).map(x => x.v + x.p + x.o), tot = hs.reduce((a, b) => a + b, 0), parts = [];
+    if (tot) { let best = 0, at = 0; for (let h = 0; h < 24; h++) { const s = hs[h] + hs[(h + 1) % 24] + hs[(h + 2) % 24]; if (s > best) { best = s; at = h; } }
+      parts.push('Busiest 3 hours: ' + HR(at) + '–' + HR((at + 3) % 24) + ' (' + Math.round(best / tot * 100) + '% of incidents with a known time)'); }
+    const ds = dowList(d).map(x => ({ n: x.label, t: x.v + x.p + x.o })).sort((a, b) => b.t - a.t);
+    if (ds[0]?.t) parts.push('busiest day ' + ds[0].n + ', quietest ' + ds[ds.length - 1].n);
+    return parts.join('; ');
+  }
+  // year by year, as a yearly pace (partial years scaled to 365 days) next to Houston's own change
+  function yearRows(d) {
+    const city = new Map((d.city_years || []).map(x => [x.y, x.n])), ys = (d.years || []).filter(y => y.days >= 28);
+    return ys.map((y, i) => { const pace = Math.round(y.total / y.days * 365), prev = ys[i - 1], pPace = prev ? prev.total / prev.days * 365 : null;
+      const cNow = city.get(y.y), cPrev = prev ? city.get(prev.y) : null, cPace = cNow && y.days ? cNow / y.days * 365 : null, cPrevPace = cPrev && prev?.days ? cPrev / prev.days * 365 : null;
+      return { y: y.y, total: y.total, v: y.v, p: y.p, days: y.days, partial: y.days < 360, pace, change: pPace ? Math.round((pace / pPace - 1) * 100) : null, city_change: cPace && cPrevPace ? Math.round((cPace / cPrevPace - 1) * 100) : null }; });
+  }
+  // incidents per 1,000 residents (census tracts whose middle is inside the area); needs the Market data
+  async function perResidents(geometry, d) {
+    try { const m = await ctx.loadMarket?.(); if (!m?.tracts) return null; const x = summarizeTracts(tractsFor(m.tracts, { geom: geometry }));
+      if (!x?.population || x.population < 500) return null; return { pop: x.population, rate: Math.round(d.last12.total / x.population * 10000) / 10, v: Math.round(d.last12.v / x.population * 10000) / 10 }; }
+    catch (e) { return null; }
+  }
   const rateLine = d => d.per_sqmi && d.city_per_sqmi ? fmtN(d.per_sqmi.total) + ' per sq mi a year vs ' + fmtN(d.city_per_sqmi.total) + ' citywide (' + (d.per_sqmi.total / d.city_per_sqmi.total).toFixed(1) + '×)' : '';
   async function report({ geometry, label, center }) {
     const card = ctx.card || document.getElementById('card');
@@ -109,6 +148,10 @@ export function initCrime(ctx) {
       '<div><b class="cr-p">' + fmtN(L.p) + '</b><span>Property · ' + pct(d.change.p) + '</span></div><div><b>' + fmtN(L.o) + '</b><span>Other · ' + pct(d.change.o) + '</span></div></div>' +
       '<div class="rnote">Change is vs the 12 months before (' + fmtN(P.total) + ' incidents). ' + esc(rateLine(d)) + '</div></div>' +
       '<div class="bsec"><div class="lt">Per month (24 months)</div>' + monthBars(d.months) + '<div class="cr-leg"><span><i style="background:' + COL.v + '"></i>Violent</span><span><i style="background:' + COL.p + '"></i>Property</span><span><i style="background:' + COL.o + ';opacity:.55"></i>Other</span></div></div>' +
+      '<div class="bsec"><div class="lt">When it happens (last 12 months)</div>' + (d.hours?.length ? '<div class="fl">By hour of day</div>' + catBars(hourList(d), 'Incidents by hour of day') : '<div class="rnote">Hour of day appears after the next nightly data refresh.</div>') +
+        '<div class="fl">By day of week</div>' + catBars(dowList(d), 'Incidents by day of week') + '<div class="rnote">' + esc(whenLine(d)) + '</div></div>' +
+      (yearRows(d).length > 1 ? '<div class="bsec"><div class="lt">Year by year</div><dl>' + yearRows(d).map(y => '<dt>' + y.y + (y.partial ? '*' : '') + '</dt><dd class="mono">' + fmtN(y.total) + (y.partial ? ' <span class="sc">(' + fmtN(y.pace) + ' a year pace)</span>' : '') + (y.change != null ? ' <span class="sc">' + pct(y.change) + (y.city_change != null ? ' vs Houston ' + pct(y.city_change) : '') + '</span>' : '') + '</dd>').join('') + '</dl><div class="rnote">* Partial year; change compares yearly pace. History kept: ' + esc((d.years[0]?.from || '') + ' to ' + (d.latest || '')) + '.</div></div>' : '') +
+      '<div class="bsec" id="crRes"></div>' +
       '<div class="bsec"><div class="lt">Top offenses</div><dl>' + d.offenses.slice(0, 10).map(o => '<dt>' + esc(o.name) + '</dt><dd class="mono">' + fmtN(o.n) + ' <span class="sc">' + esc(CAT_NAME[o.cat] || '') + '</span></dd>').join('') + '</dl></div>' +
       '<div class="bsec"><div class="lt">Where they happened</div><dl>' + d.premises.slice(0, 8).map(p => '<dt>' + esc(p.premise) + '</dt><dd class="mono">' + fmtN(p.n) + '</dd>').join('') + '</dl></div>' +
       '<div class="bacts"><button class="btn" id="crPts" type="button">Show Incidents on Map</button><button class="btn primary" id="crPdf" type="button">Export Report</button><button class="btn" id="crCsv" type="button">Export CSV</button></div>' +
@@ -117,6 +160,8 @@ export function initCrime(ctx) {
       '<div class="rnote bsec">Offenses as reported by Houston Police (NIBRS). Counts follow where people are, so busy commercial areas show more than homes nearby; compare with similar places.<span class="src"> ' + esc(d.coverage) + '</span></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#crPts').onclick = () => showPoints(d.incidents || []);
+    perResidents(geometry, d).then(r => { const el = card.querySelector('#crRes'); if (!el || last?.d !== d) return; last.res = r;
+      el.innerHTML = r ? '<div class="lt">Per resident</div><div><b>' + r.rate + '</b> incidents per 1,000 residents a year (' + r.v + ' violent), ' + fmtN(r.pop) + ' people living here.</div><div class="rnote">Busy commercial areas with few residents read high: people who work and shop here count too.</div>' : ''; if (!r) el.remove(); });
     card.querySelector('#crCsv').onclick = () => exportCsv();
     card.querySelector('#crPdf').onclick = () => exportReport();
   }
@@ -129,12 +174,13 @@ export function initCrime(ctx) {
     if (s) { s.setData(data); return; } if (!g) return;
     map.addSource('crime-area', { type: 'geojson', data }); map.addLayer({ id: 'crime-area', type: 'line', source: 'crime-area', paint: { 'line-color': '#c2410c', 'line-width': 2, 'line-dasharray': [2, 1.5] } });
   }
+  // hover handlers once (they ignore the layer while it isn't on the map); adding them with the layer stacked a new pair every time
+  map.on('mousemove', PTS, e => { const f = e.features?.[0]; if (f) tip(e.point, f.properties.t); }); map.on('mouseleave', PTS, () => tip(null));
   function showPoints(list) { try { drawPoints(list); } catch (e) { ctx.toast?.('The map is still loading; try again in a moment.'); } }
   function drawPoints(list) {
     shown = list; const data = { type: 'FeatureCollection', features: (list || []).map(x => ({ type: 'Feature', properties: { c: x.cat, t: x.offense + ' · ' + x.day + (x.premise ? ' · ' + x.premise : '') }, geometry: { type: 'Point', coordinates: [x.lon, x.lat] } })) };
     const s = map.getSource(PTS); if (s) s.setData(data);
-    else if (list) { map.addSource(PTS, { type: 'geojson', data }); map.addLayer({ id: PTS, type: 'circle', source: PTS, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 16, 6], 'circle-color': ['match', ['get', 'c'], 'v', COL.v, 'p', COL.p, COL.o], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1, 'circle-opacity': .9 } });
-      map.on('mousemove', PTS, e => { const f = e.features?.[0]; if (f) tip(e.point, f.properties.t); }); map.on('mouseleave', PTS, () => tip(null)); }
+    else if (list) { map.addSource(PTS, { type: 'geojson', data }); map.addLayer({ id: PTS, type: 'circle', source: PTS, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 16, 6], 'circle-color': ['match', ['get', 'c'], 'v', COL.v, 'p', COL.p, COL.o], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1, 'circle-opacity': .9 } }); }
     if (list?.length && last?.geometry) ctx.fitGeom?.(last.geometry);
   }
   ctx.onOverlays(() => { if (shown) { const s = shown; shown = null; if (map.getSource(PTS)) { map.removeLayer(PTS); map.removeSource(PTS); } showPoints(s); } if (last && map.getSource('crime-area') == null && document.getElementById('card')?.classList.contains('open')) showArea(last.geometry); });
@@ -172,6 +218,11 @@ export function initCrime(ctx) {
       '<p class="meta">Change is against the 12 months before (' + fmtN(d.prior12.total) + ' incidents). ' + esc(rateLine(d)) + '</p>' +
       '<div class="map">' + reportMap(geometry, list) + '</div><div class="lg"><span><i style="background:' + COL.v + '"></i>Violent</span><span><i style="background:' + COL.p + '"></i>Property</span><span><i style="background:' + COL.o + '"></i>Other</span>' + (list.length >= 2000 ? '<span>Newest 2,000 incidents shown</span>' : '') + '</div>' +
       '<h2>Incidents per month</h2><div class="bars">' + monthBars(d.months) + '</div>' +
+      (d.hours?.length ? '<h2>By hour of day (last 12 months)</h2><div class="bars">' + catBars(hourList(d), 'By hour') + '</div>' : '') +
+      '<h2>By day of week (last 12 months)</h2><div class="bars">' + catBars(dowList(d), 'By day') + '</div><p class="meta">' + esc(whenLine(d)) + '</p>' +
+      (yearRows(d).length > 1 ? '<h2>Year by year</h2><table><thead><tr><th>Year</th><th class="r">Incidents</th><th class="r">Violent</th><th class="r">Property</th><th class="r">Yearly pace</th><th class="r">Change</th><th class="r">Houston change</th></tr></thead><tbody>' +
+        yearRows(d).map(y => '<tr><td>' + y.y + (y.partial ? '*' : '') + '</td><td class="m r">' + fmtN(y.total) + '</td><td class="m r">' + fmtN(y.v) + '</td><td class="m r">' + fmtN(y.p) + '</td><td class="m r">' + fmtN(y.pace) + '</td><td class="m r">' + (y.change != null ? pct(y.change) : '') + '</td><td class="m r">' + (y.city_change != null ? pct(y.city_change) : '') + '</td></tr>').join('') + '</tbody></table><p class="meta">* Partial year (the data starts or ends mid-year); changes compare the yearly pace.</p>' : '') +
+      (last.res ? '<p><b>' + last.res.rate + ' incidents per 1,000 residents a year</b> (' + last.res.v + ' violent), ' + fmtN(last.res.pop) + ' residents in the census tracts here.</p>' : '') +
       '<div class="two"><div><h2>Top offenses</h2><table><thead><tr><th>Offense</th><th>Type</th><th class="r">Count</th></tr></thead><tbody>' + d.offenses.map(o => '<tr><td>' + esc(o.name) + '</td><td>' + esc(CAT_NAME[o.cat] || '') + '</td><td class="m r">' + fmtN(o.n) + '</td></tr>').join('') + '</tbody></table></div>' +
       '<div><h2>Where they happened</h2><table><thead><tr><th>Premise</th><th class="r">Count</th></tr></thead><tbody>' + d.premises.map(p => '<tr><td>' + esc(p.premise) + '</td><td class="m r">' + fmtN(p.n) + '</td></tr>').join('') + '</tbody></table></div></div>' +
       '<div class="full"><h2>Incidents (' + fmtN(list.length) + (list.length >= 2000 ? ', newest' : '') + ')</h2><table><thead><tr><th>Date</th><th>Offense</th><th>Type</th><th>Premise</th><th class="r">Count</th></tr></thead><tbody>' +

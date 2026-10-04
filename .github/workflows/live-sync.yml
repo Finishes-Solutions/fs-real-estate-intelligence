@@ -1,6 +1,6 @@
 name: Live data (Supabase)
 
-# Saves news, NASA imagery passes, daily weather, storm advisories, census tracts, Houston crime incidents and the FAA aircraft registry into Supabase (build/live-sync.mjs).
+# Saves news, NASA imagery passes, daily weather, storm advisories, census tracts, Houston crime incidents, the FAA aircraft registry and airports worldwide (OurAirports, FAA diagrams) into Supabase (build/live-sync.mjs).
 # Nightly after "Refresh data" for everything; every 6 hours for storms and weather only.
 # Needs supabase/migrations/20261004000000_live_data.sql applied once.
 on:
@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: "Subset: news,imagery,weather,storms,tracts,crime,aircraft (blank = all)"
+        description: "Subset: news,imagery,weather,storms,tracts,crime,aircraft,airports (blank = all)"
         required: false
       imagery_days:
         description: "NASA look-back in days (blank = 30; use 60 for the first run)"
@@ -44,4 +44,5 @@ jobs:
           OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
           ONLY: ${{ inputs.only || (github.event.schedule == '7 5,17,23 * * *' && 'storms,weather') || '' }}
           IMAGERY_DAYS: ${{ inputs.imagery_days }}
+          CRIME_YEARS: ${{ vars.CRIME_YEARS }} # years of Houston crime history to keep (default 2; raise after the database upgrade)
         run: node build/live-sync.mjs

@@ -6,6 +6,8 @@
 //   GET ?track=a1b2c3                     -> { points: [[lon, lat, alt_ft, unix]], leg, today, desc, operator }   adsb.lol trace, 20 s
 //   GET ?aircraft=a1b2c3&r=N123AB         -> { photo, manufacturer, model, owner, country }   planespotters / adsbdb, a day
 //   GET ?airport=KIAH                     -> { airport: { name, city, lat, lon, elevation_ft } }   adsb.lol, a week
+//   POST ?report=1 { geometry, months } -> air traffic report: sightings by hour of day, aircraft mix, low share, by month
+//                                          for the ~5 km cells touching the area (air_profile; api/planes-sample.js)
 //   GET ?reg=a1b2c3,N123AB,...            -> { registry, aircraft: { id: record | { found: false, us } } }   FAA registry (owner), up to 25
 // History reads say { history: false, note } when the database isn't set up yet.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
@@ -13,6 +15,7 @@ import { supa } from '../lib/supa.mjs';
 import { pointQuery, fetchPoint, boxAround, summarize, SAMPLES_PER_DAY, perDay } from '../lib/planes.mjs';
 import { regKey, usHex, present, faaUrl } from '../lib/faa.mjs';
 import { track, aircraftInfo, airport, okHex } from '../lib/adsblol.mjs';
+import { cleanGeometry } from './crime.js';
 
 const LAST = new Map(); // area -> last good aircraft snapshot in this warm instance
 const num = v => (v === '' || v == null ? NaN : Number(v));
@@ -107,6 +110,14 @@ export default async function handler(req, res) {
   const q = req.query || {};
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 60, perDay: 8000 })) return;
   try {
+    if (q.report) {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'POST { geometry, months }' });
+      const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}, g = cleanGeometry(b.geometry);
+      if (!g) return res.status(400).json({ error: 'Send a Polygon or MultiPolygon geometry.' });
+      const d = db(); if (!d || d.via !== 'key') return res.json({ history: false, note: 'The air traffic history isn’t set up on this deployment.' });
+      const r = await d.rpc('air_profile_report', { p_geom: g, p_months: Math.min(13, Math.max(1, +b.months || 3)) });
+      res.setHeader('Cache-Control', 'no-store'); return res.json({ history: true, ...r });
+    }
     if (q.route) {
       const cs = String(q.route).trim().toUpperCase(); if (!/^[A-Z0-9]{2,8}$/.test(cs)) return res.status(400).json({ error: 'route=CALLSIGN' });
       res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=3600');
