@@ -209,7 +209,8 @@ export function initMapSearch(ctx) {
     if (!map.getLayer('place-line')) map.addLayer({ id: 'place-line', type: 'line', source: 'place', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': col, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.2, 16, 5] } });
     syncPlace();
   });
-  const syncPlace = () => map.getSource && map.getSource('place')?.setData(ctx.fc(place?.geom ? [{ type: 'Feature', properties: {}, geometry: place.geom }] : []));
+  const syncPlace = () => { map.getSource && map.getSource('place')?.setData(ctx.fc(place?.geom ? [{ type: 'Feature', properties: {}, geometry: place.geom }] : [])); ctx.syncClear?.(); };
+  ctx.hasPlace = () => !!place;
   // the location marker: an amber pin with the place name, at the address / landmark or the middle of an outline
   let pin = null;
   function setPlacePin(c, label) {

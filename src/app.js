@@ -32,6 +32,7 @@ import { initTraffic } from './traffic.js';
 import { initAirports } from './airports.js';
 import { initAirReport } from './airreport.js';
 import { initGlance } from './glance.js';
+import { initQuickLayers } from './quicklayers.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
@@ -85,19 +86,19 @@ const ESRI_STYLE={version:8,glyphs:OFM+'/fonts/{fontstack}/{range}.pbf',
     {id:'esri-place-lbl',type:'symbol',source:'openmaptiles','source-layer':'place',filter:['in',['get','class'],['literal',['city','town','village','suburb','neighbourhood']]],layout:{'text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',14,'town',12.5,11]},paint:{'text-color':'#ffffff','text-halo-color':'#0b0d0c','text-halo-width':1.6}}]};
 const isSat=()=>layers.style==='sat'||layers.style==='esri';
 // property-first: filing dots start hidden (Layers → Filings, the Construction Filings section or the assistant turn them on)
-const layers={style:'dots',roads:true,names:true,counties:true,size:'uniform',heat:'off',dots:false};
-try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(['off','count','value'].includes(L.heat)) layers.heat=L.heat; if(L.v===2&&typeof L.dots==='boolean') layers.dots=L.dots; }catch(e){} // v2: older saves had dots on for everyone
-const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots})); }catch(e){} };
+const layers={style:'dots',roads:true,names:true,counties:true,grid:true,size:'uniform',heat:'off',dots:false};
+try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(['off','count','value'].includes(L.heat)) layers.heat=L.heat; if(L.v===2&&typeof L.dots==='boolean') layers.dots=L.dots; if(typeof L.grid==='boolean') layers.grid=L.grid; }catch(e){} // v2: older saves had dots on for everyone
+const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} };
 const styleUrl=s=>s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl('dots'),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
 map.on('error',e=>{ const m=(e&&e.error&&e.error.message)||''; if(/40[13]|Unauthorized|Forbidden/i.test(m)&&STYLES[layers.style]) toast('MapTiler refused the key for this site. Check the key’s allowed origins.'); });
 
 const fc=features=>({type:'FeatureCollection',features});
-const ptFeatures=(pts,props)=>pts.map(p=>({type:'Feature',properties:props||{},geometry:{type:'Point',coordinates:p}}));
 const GJ={
-  land:fc(ptFeatures(DATA.land)), texas:fc(ptFeatures(DATA.texas)),
-  cdots:fc(DATA.counties.flatMap(c=>ptFeatures(c.dots,{w:c.name===HOME_C?1:0}))),
+  // the dot grid's coverage: the whole world (two halves, so the globe never sees one ring around the date line), and the home county
+  world:fc([[-180,0],[0,180]].map(([w,e])=>({type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[[[w,-85],[e,-85],[e,85],[w,85],[w,-85]]]}}))),
+  homefill:fc(DATA.counties.filter(c=>c.name===HOME_C).map(c=>({type:'Feature',properties:{},geometry:{type:'MultiPolygon',coordinates:c.outline}}))),
   counties:fc(DATA.counties.map(c=>({type:'Feature',properties:{name:c.name,w:c.name===HOME_C?1:0},geometry:{type:'MultiPolygon',coordinates:c.outline}}))),
   clabels:fc(DATA.counties.map(c=>({type:'Feature',properties:{t:c.name.toUpperCase()+' CO.',w:c.name===HOME_C?1:0},geometry:{type:'Point',coordinates:c.label}})))
 };
@@ -108,19 +109,25 @@ const C=()=>isDark()?{new:'#4caf70',reno:'#939a9d',add:'#8acda3',line:'rgba(255,
   : {new:'#006527',reno:'#6b7174',add:'#1f9249',line:'rgba(22,25,26,.45)',waller:'#006527',dot:'#5b6366',lab:'#23282a',halo:'#ffffff',sel:'#006527',stroke:'#ffffff'});
 let labelFont=['Noto Sans Bold'];
 
+// one cell of the dot grid's pattern (9 px, drawn at 2x for sharp dots); the home county's dots are a touch bigger so they cover the grey ones
+function gridImg(color,r){ const n=18, cv=document.createElement('canvas'); cv.width=cv.height=n; const g=cv.getContext('2d'); g.fillStyle=color; g.beginPath(); g.arc(n/2,n/2,r,0,Math.PI*2); g.fill(); return g.getImageData(0,0,n,n); }
+function addGridImages(c){ for(const [id,col,r] of [['grid-dot',c.dot,1.8],['grid-dot-home',c.waller,2.4]]){ const img=gridImg(col,r); if(map.hasImage(id)) map.updateImage(id,img); else map.addImage(id,img,{pixelRatio:2}); } }
+function setGrid(on){ layers.grid=on; saveLayers(); ['grid-dots','grid-home'].forEach(id=>map.getLayer(id)&&map.setLayoutProperty(id,'visibility',on?'visible':'none')); const el=document.getElementById('lyGrid'); if(el) el.checked=on; }
 function firstSymbolId(){ const l=map.getStyle().layers.find(x=>x.type==='symbol'); return l&&l.id; }
 function addOverlays(){
   try{ map.setProjection({type:'globe'}); }catch(e){}
-  const c=C(), dots=layers.style==='dots', before=firstSymbolId();
-  for(const [id,data] of Object.entries({land:GJ.land,texas:GJ.texas,cdots:GJ.cdots,counties:GJ.counties,clabels:GJ.clabels})) if(!map.getSource(id)) map.addSource(id,{type:'geojson',data});
+  const c=C(), before=firstSymbolId();
+  for(const [id,data] of Object.entries({world:GJ.world,homefill:GJ.homefill,counties:GJ.counties,clabels:GJ.clabels})) if(!map.getSource(id)) map.addSource(id,{type:'geojson',data});
   ['sel','draft','draftpts'].forEach(id=>{ if(!map.getSource(id)) map.addSource(id,{type:'geojson',data:fc([])}); });
   if(!map.getSource('filings')) map.addSource('filings',{type:'geojson',data:filingsFC()});
-  // dot grid: world → Texas → counties, each fading out as you zoom in
-  // dot grid: world → Texas → counties. Small points that hand off to the next finer grid, and fade out
-  // completely by street level so they never clutter a close-up view.
-  map.addLayer({id:'land-dots',type:'circle',source:'land',maxzoom:5,layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],1,.7,4,1.1],'circle-color':c.dot,'circle-opacity':['interpolate',['linear'],['zoom'],1,.45,3,.4,4.6,0],'circle-pitch-alignment':'map'}},before);
-  map.addLayer({id:'texas-dots',type:'circle',source:'texas',minzoom:2.5,maxzoom:8.5,layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],3,.55,5,.8,7,1.1],'circle-color':c.dot,'circle-opacity':['interpolate',['linear'],['zoom'],2.5,0,3.5,.45,6,.4,7,.2,8,0],'circle-pitch-alignment':'map'}},before);
-  map.addLayer({id:'county-dots',type:'circle',source:'cdots',minzoom:5.5,maxzoom:12,layout:{visibility:dots?'visible':'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],6,.5,8,.8,10,1.1,11.5,1.3],'circle-color':['case',['==',['get','w'],1],c.waller,c.dot],'circle-opacity':['interpolate',['linear'],['zoom'],5.5,0,6.5,.35,8.5,.45,10,.3,11.5,0],'circle-pitch-alignment':'map'}},before);
+  // dot grid: a fine halftone over all land at every zoom, on every basemap. It's a repeating pattern drawn just under the
+  // basemap's own water (which covers it, so the sea stays clean and bridges and roads stay on top); the home county's dots
+  // are green. On imagery the dots are white and fainter. Layers → Dot Grid turns it off.
+  addGridImages(c);
+  const water=map.getStyle().layers.find(l=>l.type==='fill'&&/^water$/i.test(l['source-layer']||'')), gridBefore=water?water.id:before;
+  const gOp=isSat()?['interpolate',['linear'],['zoom'],1,.4,10,.32,14,.2,17,.1]:['interpolate',['linear'],['zoom'],1,.7,10,.6,14,.36,17,.14];
+  map.addLayer({id:'grid-dots',type:'fill',source:'world',layout:{visibility:layers.grid?'visible':'none'},paint:{'fill-pattern':'grid-dot','fill-opacity':gOp}},gridBefore);
+  map.addLayer({id:'grid-home',type:'fill',source:'homefill',layout:{visibility:layers.grid?'visible':'none'},paint:{'fill-pattern':'grid-dot-home','fill-opacity':gOp}},gridBefore);
   map.addLayer({id:'county-line',type:'line',source:'counties',layout:{visibility:layers.counties?'visible':'none','line-join':'round'},paint:{'line-color':['case',['==',['get','w'],1],c.waller,c.line],'line-width':['interpolate',['linear'],['zoom'],6,['case',['==',['get','w'],1],1.8,1],11,['case',['==',['get','w'],1],2.2,1.4],16,['case',['==',['get','w'],1],3,2]]}},before);
   map.addLayer({id:'sel-fill',type:'fill',source:'sel',paint:{'fill-color':c.sel,'fill-opacity':.09}});
   map.addLayer({id:'sel-line',type:'line',source:'sel',paint:{'line-color':c.sel,'line-width':2.2,'line-dasharray':[3,2]}});
@@ -162,6 +169,7 @@ function styleFilings(){
   map.setPaintProperty('filings','circle-stroke-opacity',heat?['interpolate',['linear'],['zoom'],10,0,12.5,1]:1);
   map.setLayoutProperty('heat','visibility',heat?'visible':'none');
   ['filings','filings-hl'].forEach(id=>map.setLayoutProperty(id,'visibility',layers.dots?'visible':'none'));
+  syncSelBar();
   const lf=document.getElementById('lyFilings'); if(lf) lf.checked=layers.dots;
   map.setPaintProperty('heat','heatmap-weight',layers.heat==='value'?['interpolate',['linear'],['get','lc'],4.7,.04,6,.2,7,.55,8,1,9.5,2]:1);
   syncLegend();
@@ -293,14 +301,20 @@ function fixWinding(g){ const fix=rings=>{ const poly={type:'Polygon',coordinate
   return g; }
 const monthOK=f=>{ if(!state.month) return true; const [a,b]=monthRange(state.month); return f.ts<=b&&f.te>=a; };
 const listeners=[];
+// "This Area" in the left panel: the selected area (or the map view) and what can be done with it; the filing count only
+// while the filing dots are on
+function syncSelBar(){
+  document.getElementById('selName').textContent=sel.feature?sel.label:'Map view';
+  document.getElementById('selStats').textContent=layers.dots?fmtN(visible.length)+' filings · '+fmtM(visible.reduce((s,f)=>s+f.cost,0))
+    :sel.feature?'Reports below cover this area.':'Pick an area with Area, Shape, Radius or County on the map for reports on it.';
+}
 function applyFilters(){
   const spec=curSpec(false), m=makeMatcher(spec,{changed:CHANGED});
   visible=F.filter(f=>m(f)&&inSel(f)&&monthOK(f));
   if(state.who){ const m2=makeMatcher({...spec,who:null},{changed:CHANGED}); visibleNoWho=F.filter(f=>m2(f)&&inSel(f)&&monthOK(f)); } else visibleNoWho=visible;
   if(sel.kind==='radius'){ visible.forEach(f=>f._d=d3.geoDistance([f.lon,f.lat],sel.center)*EARTH_MI); visible.sort((a,b)=>a._d-b._d); }
   document.getElementById('selbar').classList.add('on');
-  document.getElementById('selName').textContent=sel.feature?sel.label:'Everything shown';
-  document.getElementById('selStats').textContent=fmtN(visible.length)+' filings · '+fmtM(visible.reduce((s,f)=>s+f.cost,0));
+  syncSelBar();
   document.getElementById('selClear').style.display=sel.feature?'':'none';
   state.shown=150; renderList();
   const src=map.getSource&&map.getSource('filings'); if(src) src.setData(filingsFC());
@@ -371,9 +385,18 @@ function syncFilterUI(){
   uMin.value=String(state.umin||0); if(document.activeElement!==coQ) coQ.value=state.co||''; exactBtn.setAttribute('aria-pressed',!!state.exact);
   const dd=state.d&&state.d.f!=='all'?state.d:null; dField.value=dd?dd.f:''; dFrom.value=dd?.from||''; dTo.value=dd?.to||''; dFrom.disabled=dTo.disabled=!dd;
   const nMore=(state.uses?1:0)+(state.d&&!pk?1:0)+(state.chg?1:0)+(state.st?1:0)+(state.sqmin||state.sqmax?1:0)+(state.umin?1:0)+(state.co.trim()?1:0)+(state.exact?1:0); document.getElementById('moreN').textContent=nMore?'· '+nMore+' on':''; if(nMore) document.getElementById('moreF').open=true;
-  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const fN=document.getElementById('filterN'); fN.textContent=nAll||''; fN.hidden=!nAll; document.getElementById('filterClear').hidden=!nAll&&!state.month;
+  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const fN=document.getElementById('filterN'); fN.textContent=nAll||''; fN.hidden=!nAll; syncClear();
   document.getElementById('filterBtn').classList.toggle('on',!!nAll);
   const t=filterText(); document.getElementById('activeTxt').textContent=t?'Filters: '+t:''; document.getElementById('activeBar').classList.toggle('on',!!t);
+}
+// the Clear button beside Filters (and on phones beside the filter button): shown whenever anything narrows the view (filters,
+// a period other than the default, a time-lapse month, a selected area or a searched place's outline), one click clears it all
+const hasPlace=()=>{ try{ return !!ctx.hasPlace?.(); }catch(e){ return false; } }; // ctx is created further down; boot runs this before
+function syncClear(){
+  const pk=periodOf(state.d), parts=[], nF=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0);
+  if(nF) parts.push(nF===1?'1 filter':nF+' filters'); if(state.month) parts.push('the month'); if(sel.feature) parts.push('the selected area'); if(hasPlace()) parts.push('the search outline');
+  const n=nF+(state.month?1:0)+(sel.feature?1:0)+(hasPlace()?1:0), t=parts.length?'Clear '+parts.join(', ').replace(/, ([^,]*)$/,' and $1'):'';
+  for(const id of ['filterClear','mClear']){ const b=document.getElementById(id); if(!b) continue; b.hidden=!n; b.title=t; b.setAttribute('aria-label',t||'Clear'); const sp=b.querySelector('span'); if(sp) sp.textContent=n>1?'Clear ('+n+')':'Clear'; }
 }
 let openFilters=()=>{}; // set below once the popup is wired; exposed as ctx.openFilters
 const clearFilters=()=>{ ctx.clearPlace?.(); fromSpec(DEFAULT_SPEC()); if(state.month) setMonth(null); };
@@ -384,7 +407,8 @@ document.getElementById('resetAll').onclick=clearFilters;
   const setOpen=open=>{ pop.hidden=!open; btn.setAttribute('aria-expanded',open); btn.classList.toggle('open',open); if(open) pop.querySelector('select,button.chip,input')?.focus({preventScroll:true}); };
   btn.onclick=()=>setOpen(pop.hidden);
   document.getElementById('filterClose').onclick=()=>{ setOpen(false); btn.focus(); };
-  document.getElementById('filterClear').onclick=()=>{ clearFilters(); ctx.toast?.('Filters cleared'); };
+  const clearAll=()=>{ clearFilters(); ctx.toast?.('Cleared: showing everything'); };
+  document.getElementById('filterClear').onclick=clearAll; const mc=document.getElementById('mClear'); if(mc) mc.onclick=clearAll;
   pop.addEventListener('change',()=>showFilings()); pop.addEventListener('click',e=>{ if(e.target.closest('.chip,button[data-k],button[data-v]')) showFilings(); });
   document.addEventListener('pointerdown',e=>{ if(!pop.hidden&&!wrap.contains(e.target)&&!e.target.closest('.kpi-pop')) setOpen(false); });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!pop.hidden){ setOpen(false); btn.focus(); } });
@@ -687,6 +711,7 @@ function setMapOptions(a){ const done=[];
   return done.length?done:['no change']; }
 document.getElementById('lyRoads').onchange=e=>{ layers.roads=e.target.checked; applyRoadToggles(); };
 document.getElementById('lyNames').onchange=e=>{ layers.names=e.target.checked; applyRoadToggles(); };
+document.getElementById('lyGrid').checked=layers.grid; document.getElementById('lyGrid').onchange=e=>setGrid(e.target.checked);
 document.getElementById('lyCounties').onchange=e=>{ layers.counties=e.target.checked; ['county-line','county-label','us-county-line','us-county-precise','us-state-line','us-county-label'].forEach(id=>map.getLayer(id)&&map.setLayoutProperty(id,'visibility',layers.counties?'visible':'none')); syncPrecise(); };
 // ---------- camera: 3D toggle, flat reset, globe guard ----------
 let orbitRaf=0;
@@ -899,7 +924,7 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return [...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,30).map(x=>x[0]).join(', '); } // the busiest cities and developers on screen (the voice transcriber's hint list takes the first few)
-ctx.setMode=setMode; ctx.openFilters=()=>openFilters();
+ctx.setMode=setMode; ctx.openFilters=()=>openFilters(); ctx.syncClear=syncClear;
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
   if(!html){ el?.remove(); return; } if(!el){ el=document.createElement('div'); el.className='xlegend'; el.dataset.lg=id; box.appendChild(el); } if(el.innerHTML!==html) el.innerHTML=html; };
@@ -910,7 +935,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap, buildReport,
   exportCsv, exportXlsx, exportGeoJSON, exportHtml, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,

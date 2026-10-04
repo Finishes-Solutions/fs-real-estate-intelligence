@@ -5,6 +5,25 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-03
 
+### 11:48 PM CT: Quick layer buttons, one-click Clear, dot grid everywhere, a general real estate layout (COMMIT)
+- **Quick layer buttons under the map search:**
+  - Satellite, 3D, Parcels, Flood Zones, Demographics, Traffic Counts, Filings, Planes and Radar, one tap each.
+  - **More** opens Map Layers, which keeps every layer and the finer options: the demographic measure, crime type, filing dot size and heatmap, basemaps, live weather and so on.
+  - The buttons and the panel always agree. A layer turned on from the panel or by the assistant lights up its button too.
+- **Map Layers is regrouped:** Base Map, Property & Site, Demographics, Construction Filings, Map Display, then Live Conditions. While it's open, the map's search and buttons make room for it instead of sitting underneath.
+- **Clearing the view takes one click:**
+  - The **Clear** button next to Filters now shows whenever anything narrows the view: filters, a period other than the last 12 months, a time-lapse month, a selected area, or a searched place's outline.
+  - Hover over it to see exactly what it will clear. On phones there's a ✕ next to the filter button that does the same.
+  - Inside the Filters menu, **Clear All** is now at the top, so there's no scrolling down to reset.
+- **The dot grid covers everything:**
+  - The halftone dot pattern now covers all land at every zoom level and on every basemap, not just the 7 home counties. The sea stays clean, and Waller County's dots are green.
+  - On satellite imagery the dots are white and fainter. Turn them off with **Dot Grid** in Map Layers (the setting is remembered).
+- **Less filing-centric by default:**
+  - The left panel opens with Area at a Glance, which now shows numbers at the regional zoom level too, and a new **This Area** box: the map view or the selected area, with its area reports, Compare, Save Search and Copy Link. These used to be hidden inside the collapsed Construction Filings section.
+  - Construction Filings is still there, collapsed, as one layer among many.
+  - Tabs run Map, Market, Compare, Reports, Field Notes, then the filing views (Timeline, Activity, Updates) and Sources.
+  - The intro and footer describe the whole platform, not just TDLR filings.
+
 ### 11:31 PM CT: County lines for the whole US, planes in 3D (feaf75b)
 - **County and state lines now cover the whole country:** all 3,224 counties outside the 7 home counties, with state borders a little heavier.
   - Labels read like "Brazos Co., TX" (parishes in Louisiana) and show from about the regional zoom level.
