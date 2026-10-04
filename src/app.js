@@ -34,6 +34,7 @@ import { initAirReport } from './airreport.js';
 import { initGlance } from './glance.js';
 import { initQuickLayers } from './quicklayers.js';
 import { initLayerFilters } from './layerfilters.js';
+import { initCardTabs } from './cardtabs.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
 
@@ -502,6 +503,7 @@ function select(f,fly){
       '<a class="btn" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener">TABS Record ↗</a><a class="btn" href="'+gsv+'" target="_blank" rel="noopener">Street View ↗</a>'+
       '<button class="btn" type="button" id="fNote">Add Site Note</button><button class="btn askai" type="button" id="fAsk">Ask AI About It</button></div></div>';
   card.querySelector('.x').onclick=closeCard; card.classList.add('open');
+  ctx.tabs?.track({id:'f:'+f.id,kind:'filing',label:f.name,reopen:()=>select(f,false),leave:()=>{ if(state.sel===f) clearSel(); }});
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
   card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat]});
@@ -542,7 +544,10 @@ map.on('mousemove','filings',e=>{
   let x=e.point.x+14, y=e.point.y+14; tip.style.opacity=1; const w=tip.offsetWidth; if(x+w>viewport.clientWidth-8) x=e.point.x-w-14; tip.style.left=x+'px'; tip.style.top=y+'px';
 });
 map.on('mouseleave','filings',()=>{ if(mode==='pan') map.getCanvas().style.cursor=''; tip.style.opacity=0; });
-map.on('click','filings',e=>{ if(mode!=='pan') return; e.preventDefault(); select(F[e.features[0].properties.i],false); });
+map.on('click','filings',e=>{ if(mode!=='pan') return; e.preventDefault(); ctx.tabs?.arm(e); select(F[e.features[0].properties.i],false); });
+// Shift-drag is MapLibre's box zoom, and it swallows every Shift-click (even one that doesn't drag): hand a Shift-click back
+// as a click, so Shift-click adds buildings, parcels, filings, planes and airports to the card's tabs (src/cardtabs.js)
+map.on('boxzoomcancel',e=>{ const o=e.originalEvent; if(o?.type==='mouseup'&&o.shiftKey&&maplibregl.MapMouseEvent) map.fire(new maplibregl.MapMouseEvent('click',map,o)); });
 map.on('click',e=>{ if(mode!=='pan' || e.defaultPrevented || swallowClick) return; if(map.queryRenderedFeatures(e.point,{layers:['filings']}).length) return; if(!ctx.mapClickHandlers.some(h=>h(e))) closeCard(); });
 
 // ---------- place menu: right-click (desktop) or long-press (touch) anywhere on the map ----------
@@ -948,7 +953,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap, buildReport,
   exportCsv, exportXlsx, exportGeoJSON, exportHtml, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initCardTabs,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,

@@ -5,6 +5,21 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
+### 2:02 AM CT: Whole buildings, buildings on several parcels, and tabs for several selections (COMMIT)
+- **Clicking a big building now selects all of it.** The map draws large buildings (warehouses, shopping centers) in pieces at its tile edges, so a click used to pick only the piece under it, often about half the building. The app now joins the pieces as soon as you click, then switches to the full OpenStreetMap outline when the details load.
+- **Buildings on more than one parcel:**
+  - The lookup now finds every parcel under the building (up to 10), not just the one at the point you clicked.
+  - The card lists each parcel with its owner, acres and value, plus a total. The overview says how many parcels the building spans and their combined value.
+  - All of the parcel outlines are drawn dashed on the map.
+- **A livelier selection:** the picked building rises out of the ground in green, with a soft glow pulsing around its base. Motion is skipped if your device is set to reduce motion.
+- **Select up to 10 things at once, each in its own tab on the card:**
+  - Works for buildings, parcels, construction filings, planes and airports, and you can mix them.
+  - Shift-click adds. On a touch screen, tap **+ Add** at the top of the card, tap the other things (the card drops low so the map is free), then **Done**.
+  - The tabs are numbered, and the same numbers mark the buildings on the map. Tap a tab to switch, or its **×** to remove it.
+  - Shift-click something already picked to drop it. A plain click starts over; closing the card clears everything.
+  - With two or more buildings or parcels, an **All** tab totals footprint, floor area, market value and acres (each parcel counted once), with the filings on them, a CSV export (now with a parcel count per building) and **Zoom to All**.
+- **Fixed: Shift-click did nothing on the map.** The map's Shift-drag box zoom was swallowing every Shift-click, so the old "Shift-click to select several buildings" never actually reached the app.
+
 ### 1:30 AM CT: Filters for the map's layers, and freeze fixes (690491d)
 - **Filters now cover the map's layers, not just construction filings.** The panel has a section per kind of data:
   - **Demographics:** income, population growth, home value, rent, vacancy, jobs.

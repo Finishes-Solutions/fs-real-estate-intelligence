@@ -1692,3 +1692,45 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
   .lfrow{grid-template-columns:1fr}
   .lfrow label{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 }
+
+/* ================= card tabs: several buildings, parcels, filings, planes or airports at once (src/cardtabs.js) ================= */
+.ctabs{position:sticky;top:0;z-index:4;display:flex;align-items:center;gap:4px;height:40px;padding:0 8px;background:var(--panel-2);border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
+.ctabs::-webkit-scrollbar{display:none}
+.card.has-tabs .top{top:40px}
+.ctab{flex:none;display:flex;align-items:center;gap:5px;max-width:170px;height:28px;padding:0 6px 0 7px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--text-2);font:inherit;font-size:12px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
+.ctab span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ctab svg{flex:none;opacity:.75}
+.ctab:hover{background:var(--chip);color:var(--text)}
+.ctab[aria-selected="true"]{background:var(--panel);border-color:var(--line-2);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(11,13,12,.12)}
+.ctab[aria-selected="true"] svg{color:var(--green-600);opacity:1}
+.ctab.cpin{font-family:var(--font-mono);font-size:11px;letter-spacing:.04em}
+.ctab .cnum,.mnum{flex:none;display:inline-grid;place-items:center;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--green-100);color:var(--green-800);font:700 10px/1 var(--font-mono);font-style:normal}
+.ctab[aria-selected="true"] .cnum{background:var(--green-600);color:#fff}
+.ctab .cx{flex:none;width:16px;height:16px;display:grid;place-items:center;border-radius:3px;font-style:normal;font-size:14px;line-height:1;color:var(--muted)}
+.ctab .cx:hover{background:var(--line);color:var(--text)}
+.ctadd{flex:none;margin-left:auto;position:sticky;right:0;box-shadow:-10px 0 8px -2px var(--panel-2);background:var(--panel-2) !important;height:26px;padding:0 10px;border:1px dashed var(--line-2);border-radius:13px;background:transparent;color:var(--green-700);font:600 11.5px/1 inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
+.ctadd:hover{border-style:solid;color:var(--green-800)}
+.ctadd[aria-pressed="true"]{border:1px solid var(--green-700);background:var(--green-700) !important;color:#fff;animation:ctpulse 1.6s ease-in-out infinite}
+@keyframes ctpulse{50%{box-shadow:0 0 0 4px rgba(31,146,73,.18)}}
+@media (prefers-reduced-motion:reduce){.ctadd[aria-pressed="true"]{animation:none}}
+.mrow .lnk b .mnum{margin-right:6px;vertical-align:1px}
+/* a building on several parcels */
+.mparc{margin:4px 16px 10px;border-top:1px solid var(--line)}
+.mparc .fl{font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:8px 0 4px}
+.mprow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.mprow>span:first-of-type{flex:1;min-width:0;display:grid;gap:1px}
+.mprow b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mprow em{font-style:normal;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mprow .m{white-space:nowrap}
+.mprow.tot{border-bottom:0}
+.mprow.tot i{width:17px;flex:none}
+:root[data-theme="dark"] .ctab .cnum,:root[data-theme="dark"] .mnum{background:rgba(76,175,112,.18);color:var(--green-300)}
+:root[data-theme="dark"] .ctadd{color:var(--green-300)}
+@media (max-width:700px){
+  .ctabs{height:44px;padding:0 10px}
+  .card.has-tabs .top{top:44px}
+  /* picking more: the sheet drops low so the map is free to tap */
+  .card.adding,.card.adding.full{max-height:30%}
+  .ctab{height:32px;font-size:12.5px}
+  .ctadd{height:30px}
+}

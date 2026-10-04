@@ -405,6 +405,9 @@ export function initPlanes(ctx) {
       '<a class="btn" target="_blank" rel="noopener" href="https://globe.adsb.lol/?icao=' + encodeURIComponent(p.hex) + '">adsb.lol ↗</a>' +
       (tr?.points?.length > 1 ? '<button class="btn" type="button" id="pl3dBtn">3D flight path</button>' : '') + (ctx.flightReport ? '<button class="btn" type="button" id="plReport">Export Flight Report</button>' : '') + '</div>' +
       '<div class="ssrc src">Live ADS-B from ' + esc(src || 'adsb.lol') + ' (community receivers, ODbL). Positions refresh every 10 s; some military and private aircraft aren’t shown. Routes: adsbdb and adsb.lol. Flight path: adsb.lol traces.</div></div>';
+    // a tab of its own (src/cardtabs.js); the 10-second refreshes re-render the card, so they put the tab bar back
+    if (refresh) ctx.tabs?.mount();
+    else ctx.tabs?.track({ id: 'p:' + hex, kind: 'plane', label: p.flight || p.reg || hex.toUpperCase(), reopen: () => renderCard(hex), leave: () => { if (shown === hex) { shown = null; follow = null; orbiting = false; clearRoute(); clearPath(); } } });
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#plFollow').onclick = () => { const was = follow === hex && !orbiting; follow = was ? null : hex; orbiting = false; renderCard(hex, true); if (follow) followCam(); };
     card.querySelector('#plOrbit').onclick = () => { const was = follow === hex && orbiting; follow = was ? null : hex; orbiting = !was; renderCard(hex, true);
@@ -432,9 +435,9 @@ export function initPlanes(ctx) {
   ctx.onCardClose?.(() => { shown = null; follow = null; orbiting = false; clearRoute(); clearPath(); });
   ctx.mapClickHandlers.unshift(e => {
     if (!map.getLayer('live-planes')) return false;
-    const m3 = models.pick(e.point); if (m3 && find(m3)) { renderCard(m3); return true; } // a 3D model in the air
+    const m3 = models.pick(e.point); if (m3 && find(m3)) { ctx.tabs?.arm(e); renderCard(m3); return true; } // a 3D model in the air
     const hit = map.queryRenderedFeatures([[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]], { layers: ['live-planes'] })[0]; if (!hit) return false;
-    renderCard(hit.properties.hex); return true;
+    ctx.tabs?.arm(e); renderCard(hit.properties.hex); return true;
   });
   map.on('mousemove', 'live-planes', e => {
     const f = e.features?.[0]; if (!f) return; const p = find(f.properties.hex); if (!p) return; map.getCanvas().style.cursor = 'pointer';

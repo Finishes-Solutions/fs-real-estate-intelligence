@@ -50,7 +50,7 @@ export function initAirports(ctx) {
   }
   // click and hover handlers once (adding them with the layer stacked another set on every toggle and basemap change,
   // so one click opened the card several times)
-  map.on('click', SRC, e => { const f = e.features?.[0]; if (f) show(f.properties.ident); });
+  map.on('click', SRC, e => { const f = e.features?.[0]; if (f) { ctx.tabs?.arm(e); show(f.properties.ident); } });
   map.on('mouseenter', SRC, e => { map.getCanvas().style.cursor = 'pointer'; const f = e.features?.[0]; if (f && ctx.tip) { ctx.tip.textContent = f.properties.name + ' (' + f.properties.code + ')'; ctx.tip.style.opacity = 1; ctx.tip.style.left = (e.point.x + 14) + 'px'; ctx.tip.style.top = (e.point.y + 14) + 'px'; } });
   map.on('mouseleave', SRC, () => { map.getCanvas().style.cursor = ''; if (ctx.tip) ctx.tip.style.opacity = 0; });
   function setData(list) {
@@ -101,8 +101,11 @@ export function initAirports(ctx) {
     return { days: last30.length, avg: Math.round(tot.reduce((s, v) => s + v, 0) / tot.length), max: Math.max(...tot), dep: last30.reduce((s, o) => s + o.departures, 0), arr: last30.reduce((s, o) => s + o.arrivals, 0), list: last30 }; };
   async function show(id, { fly = false } = {}) {
     if (ctx.view !== 'map') ctx.setView?.('map');
-    const card = openCard(ctx, { kicker: 'Airport', title: String(id), loading: 'Looking up the airport…' });
-    let d; try { d = await fetchAirport(id); } catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return { error: e.message }; }
+    const card = openCard(ctx, { kicker: 'Airport', title: String(id), loading: 'Looking up the airport…' }), tid = 'a:' + id;
+    ctx.tabs?.track({ id: tid, kind: 'airport', label: String(id), reopen: () => show(id), leave: () => { if (last) { last.osm = null; clearOsm(); } } });
+    const gone = () => ctx.tabs && ctx.tabs.active()?.id !== tid; // closed, or another tab picked while loading
+    let d; try { d = await fetchAirport(id); } catch (e) { if (!gone()) card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return { error: e.message }; }
+    if (gone()) return d;
     last = { d, osm: null }; const a = d.airport, rw = d.runways || [], w = d.wiki || {}, m = d.metar, ops = opsSummary(d.ops);
     if (fly) map.flyTo({ center: [a.lon, a.lat], zoom: a.type === 'large_airport' ? 12 : 13.5, duration: ctx.reduceMotion ? 0 : 1200 });
     const code = [a.iata, a.icao || a.gps_code, a.local_code && a.local_code !== a.iata ? a.local_code : null].filter(Boolean), open = rw.filter(r => !r.closed), longest = open[0];
@@ -125,6 +128,7 @@ export function initAirports(ctx) {
       '<div class="bsec" id="aptLive"><div class="lt">Aircraft here now</div><div class="rnote">Checking…</div></div>' +
       '<div class="rnote bsec">' + (w.url ? '<a target="_blank" rel="noopener" href="' + esc(w.url) + '">Wikipedia article</a>' : '') + (a.home_link ? (w.url ? ' · ' : '') + '<a target="_blank" rel="noopener" href="' + esc(a.home_link) + '">Airport website</a>' : '') +
         '<span class="src"> Sources: OurAirports (runways, codes), FAA (diagram), aviationweather.gov (weather), Wikipedia / Wikidata (photo, airlines, statistics), OpenStreetMap (layout), adsb.lol (aircraft).</span></div>');
+    ctx.tabs?.mount(); ctx.tabs?.label(tid, a.iata || a.icao || a.gps_code || a.name);
     card.querySelector('#aptMap').onclick = async ev => { const b = ev.currentTarget; b.disabled = true; b.textContent = 'Loading the layout…';
       try { const r = await fetch('api/airports?osm=' + encodeURIComponent(a.ident)), fc = await r.json(); if (!r.ok) throw new Error(fc.error || 'layout unavailable'); last.osm = fc; drawOsm(fc);
         ctx.setMapOptions?.({ basemap: 'sat' }); const xs = [a.lon], ys = [a.lat]; rw.forEach(r => { if (r.le_lon != null) { xs.push(r.le_lon, r.he_lon); ys.push(r.le_lat, r.he_lat); } });

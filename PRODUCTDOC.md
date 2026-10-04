@@ -85,7 +85,12 @@ Click a building, or at street zoom click open ground, to open its **property ca
 - **Regrid details** (paid, capped each month): zoning, zoning limits such as height and density, the last sale price and date where recorded, and land use. Harris and Waller counties aren't in the free state parcel data, so Regrid fills in owner and value there.
 - Street View, an orbit camera, notes, and **Ask AI** about this property.
 
-**Several properties at once:** Shift-click buildings (on touch screens, use the card's **Select Multiple**). You get combined acres, footprint, floor area and market value, the filings on them, and a CSV export.
+**Big buildings:** clicking any part of a building selects the whole building, even a warehouse or shopping center that the map draws in pieces. If the building sits on more than one parcel, the card lists every parcel with its owner and value, and a total.
+
+**Several things at once (tabs):** Shift-click to add more, up to 10. On a touch screen, tap **+ Add** at the top of the card (or **Select Multiple**), tap the other things, then **Done**. This works for buildings, parcels, construction filings, planes and airports, mixed together.
+- Each one gets a numbered **tab** at the top of the card; the same number marks it on the map. Tap a tab to see that card, or its **×** to drop it.
+- Shift-click something already picked to take it out. A plain click starts over with just that one; closing the card clears them all.
+- With two or more buildings or parcels, an **All** tab adds them up: footprint, floor area, market value and acres (each parcel counted once), the construction filings on them, a CSV export and **Zoom to All**.
 
 ---
 
