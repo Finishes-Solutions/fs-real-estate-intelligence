@@ -100,7 +100,7 @@ Choose **Area**, **Shape**, **Radius** or **County** at the top of the map and m
 - **Crime report** (City of Houston): incidents by type, trend, time of day, day of week, and per resident.
 - **Compare:** add up to 4 areas and see them side by side.
 
-Every report can be printed or saved as a web page or PDF and downloaded as a spreadsheet. Reports are kept in the **Reports** tab.
+Every report exports as a PDF in the Finishes Solutions style, and its data as a spreadsheet. Reports are kept in the **Reports** tab.
 
 ### Clearing the view
 
@@ -245,7 +245,13 @@ Answers come with cards: summaries, charts, comparisons, places, drive times, we
   - a **Filing list** (PDF, Excel, CSV or map file);
   - an **Area comparison** (PDF, Excel or CSV);
   - an **Activity report** (PDF, Excel or CSV).
-- Area reports (FEMA, traffic, drive time, air traffic, crime) export as web pages or PDFs and spreadsheets.
+- Area reports (FEMA, traffic, drive time, air traffic, crime), the Market report, airport reports and flight reports export as **PDFs**, and their data as CSV.
+- **Every PDF uses the Finishes Solutions report style:**
+  - a dark title band with the logo, the green rule and the brand fonts;
+  - headline figures in tiles, clean tables, and the report name and page numbers on every page.
+  - Pages are portrait. The full filing list (and a comparison of four or more areas) is landscape, because it needs the width.
+- A PDF filing list shows the 2,000 largest filings (1,000 when added to a Summary report). Excel and CSV always have every filing.
+- If the PDF can't be made, the report is saved as a web page instead. Open it and use **Print → Save as PDF**.
 - The **Reports** tab keeps your past exports in this browser. You can download one again, re-run it with today's data, or open it on the map.
 
 ---
@@ -287,6 +293,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Every report now exports as a PDF in the Finishes Solutions style:** filings, market, crime, FEMA, traffic, drive time, air traffic, airport and flight reports.
 - **Plane routes are back** for most airline flights, with the right leg picked on multi-stop flights.
 - **Property cards show the owner and value faster:** they no longer wait for the slower business and height lookups.
 
