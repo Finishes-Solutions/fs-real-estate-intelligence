@@ -5,6 +5,31 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
+### 12:33 PM CT: Markets, the Correlation explorer and more history on the Pro plan (2f8543b, c68491f, 9c11def)
+- **Markets on the Market tab.** A new section lists the latest prices, with today's change, the past year's change and a small chart, in groups:
+  - oil and natural gas;
+  - Houston companies (ExxonMobil, Chevron, ConocoPhillips, SLB, Halliburton, CenterPoint and others);
+  - homebuilders and real estate funds;
+  - building material prices (lumber, steel, concrete, copper);
+  - rates (30-year mortgage, 10-year Treasury, Fed funds);
+  - stock indexes (S&P 500, Nasdaq, Dow, Russell 2000, VIX);
+  - crypto (Bitcoin, Ethereum, Solana, XRP);
+  - Houston metro numbers (jobs, unemployment, housing permits, listing prices, homes for sale, days on market, house prices).
+  - Crypto prices are live and refresh every minute. Stock prices are delayed and come from an unofficial Yahoo Finance feed. Ten years of history are refreshed nightly.
+- **Correlation explorer.** Pick a Houston measure and a market series to see whether they move together and which one moves first, up to 12 months ahead.
+  - It compares changes, not price levels. It discounts for every lead and lag it tries and for overlapping months, and a strong link has to hold in both halves of the period.
+  - Example with real data: Houston unemployment and oil come out *moderate*, with oil moving one month first. Much of that is 2020.
+  - **What moves …?** checks one measure against all 42 market series and is honest about how often chance produces a match. For Houston unemployment, nothing passes once all 1,050 comparisons are counted.
+  - The app's own data can be used too: Houston crime, construction filings and their value, new businesses and City of Houston sales tax.
+- **Explain with AI**, and two new assistant skills:
+  - The assistant can now quote market prices ("how is oil doing this year?").
+  - It can run the correlation test and explain the result ("does oil lead Houston unemployment?", "what moves housing permits?"), including what the result doesn't prove.
+- **More history now that the database is on the Pro plan:**
+  - The Houston crime trend keeps six years instead of two, filled in by the next nightly live-data run.
+  - The Air Traffic Report can cover up to three years instead of 13 months. Keeping the extra history needs a database update that is waiting to be applied.
+  - The statewide filings loader can now reach further back in time. It hasn't been run yet because the AI reading of each filing has a cost.
+- The Market PDF report includes the Markets table and the Correlation explorer, and fits phone screens without sideways scrolling.
+
 ### 11:00 AM CT: Clean start, honest layer buttons, Compare each county, Market area picker (abff29a)
 - **The map opens without construction filings or planes.**
   - Before, a reload often showed filing dots with the Filings button off. The app writes its default date filter into the page address, and on load any filter in the address turned the dots on.
