@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
-### 2:07 AM CT: A subtler dot grid (COMMIT)
+### 2:07 AM CT: A subtler dot grid (8849314)
 - **The dot grid is quieter:** smaller dots, set a little closer together, at well under half the old strength, so it reads as texture rather than pulling the eye. The home county's green dots stay a bit stronger so it still stands out.
 - The product guide now lists the whole-building selection and card tabs under Recently added.
 
