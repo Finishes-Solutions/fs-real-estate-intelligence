@@ -45,3 +45,25 @@ console.log('building api tests passed');
   assert.deepEqual([p.situs, p.acquired, p.yearBuilt, p.area, p.landUse, 'YEAR_BUILT' in p.raw], ['16145 City WALK, Sugar Land, TX 77479', '2026-03-01', null, '1.08 acres', null, false]);
   assert.equal(normalizeParcel({ SITUS_ADDR: 'Highway 90A , ,', SITUS_CITY: 'Null' }).situs, 'Highway 90A');
   console.log('parcel clean-up ok'); }
+// a big building: OpenStreetMap's whole outline comes back, and every parcel under it (identify with the polygon)
+{ const sq = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]];
+  const ids = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    url = String(url); const json = o => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    if (url.includes('/MapServer/identify')) { const u = new URL(url), type = u.searchParams.get('geometryType'); ids.push(type);
+      if (type === 'esriGeometryPoint') return json({ results: [{ attributes: { PROP_ID: 'A', OWNER_NAME: 'WEST LLC', MKT_VALUE: 1000000 }, geometry: { rings: [sq(-95.4, 29.7, -95.399, 29.701)] } }] });
+      const ring = JSON.parse(u.searchParams.get('geometry')).rings[0]; assert.ok(ring.length >= 4);
+      const wide = ring.some(p => p[0] > -95.3985); // the whole outline reaches the east lot
+      return json({ results: [{ attributes: { PROP_ID: 'A', OWNER_NAME: 'WEST LLC' }, geometry: { rings: [sq(-95.4, 29.7, -95.399, 29.701)] } }, { attributes: { PROP_ID: 'A', OWNER_NAME: 'WEST LLC' } },
+        ...(wide ? [{ attributes: { PROP_ID: 'B', OWNER_NAME: 'EAST LLC', MKT_VALUE: 2000000 }, geometry: { rings: [sq(-95.399, 29.7, -95.398, 29.701)] } }] : [])] }); }
+    if (url.includes('overpass')) return json({ elements: [
+      { type: 'way', tags: { building: 'yes' }, geometry: sq(-95.4005, 29.7, -95.4002, 29.7003).map(([lon, lat]) => ({ lat, lon })) }, // a neighbour within 6 m
+      { type: 'way', tags: { building: 'warehouse', 'building:levels': '1' }, geometry: sq(-95.3995, 29.7002, -95.3982, 29.7008).map(([lon, lat]) => ({ lat, lon })) }] });
+    return new Response('nope', { status: 500 });
+  };
+  const res = mock(); await building({ query: { lat: '29.7005', lon: '-95.3992', fp: '-95.3995,29.7002;-95.399,29.7002;-95.399,29.7008;-95.3995,29.7008' }, headers: { 'x-forwarded-for': '9.9.9.9' } }, res);
+  assert.equal(res.body.osm.use, 'warehouse', 'the building the point is inside, not the neighbour');
+  assert.deepEqual(res.body.osm.outline.coordinates[0][0], [-95.3995, 29.7002]);
+  assert.deepEqual(res.body.parcels.map(p => p.propId), ['A', 'B'], 'both lots, each once');
+  assert.ok(ids.filter(t => t === 'esriGeometryPolygon').length === 2, 'the clipped footprint first, then the whole outline');
+  console.log('whole building outline and parcels ok'); }

@@ -35,6 +35,7 @@ import { initAirReport } from './airreport.js';
 import { initGlance } from './glance.js';
 import { initQuickLayers } from './quicklayers.js';
 import { initLayerFilters } from './layerfilters.js';
+import { initCardTabs } from './cardtabs.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
 
@@ -113,9 +114,9 @@ const C=()=>isDark()?{new:'#4caf70',reno:'#939a9d',add:'#8acda3',line:'rgba(255,
   : {new:'#006527',reno:'#6b7174',add:'#1f9249',line:'rgba(22,25,26,.45)',waller:'#006527',dot:'#5b6366',lab:'#23282a',halo:'#ffffff',sel:'#006527',stroke:'#ffffff'});
 let labelFont=['Noto Sans Bold'];
 
-// one cell of the dot grid's pattern (9 px, drawn at 2x for sharp dots); the home county's dots are a touch bigger so they cover the grey ones
-function gridImg(color,r){ const n=18, cv=document.createElement('canvas'); cv.width=cv.height=n; const g=cv.getContext('2d',{willReadFrequently:true}); g.fillStyle=color; g.beginPath(); g.arc(n/2,n/2,r,0,Math.PI*2); g.fill(); return g.getImageData(0,0,n,n); }
-function addGridImages(c){ for(const [id,col,r] of [['grid-dot',c.dot,1.8],['grid-dot-home',c.waller,2.4]]){ const img=gridImg(col,r); if(map.hasImage(id)) map.updateImage(id,img); else map.addImage(id,img,{pixelRatio:2}); } }
+// one cell of the dot grid's pattern (7 px, drawn at 2x for sharp dots); the home county's dots are a touch bigger so they cover the grey ones
+function gridImg(color,r){ const n=14, cv=document.createElement('canvas'); cv.width=cv.height=n; const g=cv.getContext('2d',{willReadFrequently:true}); g.fillStyle=color; g.beginPath(); g.arc(n/2,n/2,r,0,Math.PI*2); g.fill(); return g.getImageData(0,0,n,n); }
+function addGridImages(c){ for(const [id,col,r] of [['grid-dot',c.dot,1.2],['grid-dot-home',c.waller,1.6]]){ const img=gridImg(col,r); if(map.hasImage(id)) map.updateImage(id,img); else map.addImage(id,img,{pixelRatio:2}); } }
 function setGrid(on){ layers.grid=on; saveLayers(); ['grid-dots','grid-home'].forEach(id=>map.getLayer(id)&&map.setLayoutProperty(id,'visibility',on?'visible':'none')); const el=document.getElementById('lyGrid'); if(el) el.checked=on; }
 function firstSymbolId(){ const l=map.getStyle().layers.find(x=>x.type==='symbol'); return l&&l.id; }
 function addOverlays(){
@@ -129,9 +130,10 @@ function addOverlays(){
   // are green. On imagery the dots are white and fainter. Layers → Dot Grid turns it off.
   addGridImages(c);
   const water=map.getStyle().layers.find(l=>l.type==='fill'&&/^water$/i.test(l['source-layer']||'')), gridBefore=water?water.id:before;
-  const gOp=isSat()?['interpolate',['linear'],['zoom'],1,.4,10,.32,14,.2,17,.1]:['interpolate',['linear'],['zoom'],1,.7,10,.6,14,.36,17,.14];
-  map.addLayer({id:'grid-dots',type:'fill',source:'world',layout:{visibility:layers.grid?'visible':'none'},paint:{'fill-pattern':'grid-dot','fill-opacity':gOp}},gridBefore);
-  map.addLayer({id:'grid-home',type:'fill',source:'homefill',layout:{visibility:layers.grid?'visible':'none'},paint:{'fill-pattern':'grid-dot-home','fill-opacity':gOp}},gridBefore);
+  // kept faint so it's texture, not something to read: the home county's green dots a little stronger so it still stands out
+  const op=k=>isSat()?['interpolate',['linear'],['zoom'],1,.2*k,10,.16*k,14,.1*k,17,.05*k]:['interpolate',['linear'],['zoom'],1,.3*k,10,.24*k,14,.15*k,17,.06*k];
+  map.addLayer({id:'grid-dots',type:'fill',source:'world',layout:{visibility:layers.grid?'visible':'none'},paint:{'fill-pattern':'grid-dot','fill-opacity':op(1)}},gridBefore);
+  map.addLayer({id:'grid-home',type:'fill',source:'homefill',layout:{visibility:layers.grid?'visible':'none'},paint:{'fill-pattern':'grid-dot-home','fill-opacity':op(1.6)}},gridBefore);
   map.addLayer({id:'county-line',type:'line',source:'counties',layout:{visibility:layers.counties?'visible':'none','line-join':'round'},paint:{'line-color':['case',['==',['get','w'],1],c.waller,c.line],'line-width':['interpolate',['linear'],['zoom'],6,['case',['==',['get','w'],1],1.8,1],11,['case',['==',['get','w'],1],2.2,1.4],16,['case',['==',['get','w'],1],3,2]]}},before);
   map.addLayer({id:'sel-fill',type:'fill',source:'sel',paint:{'fill-color':c.sel,'fill-opacity':.09}});
   map.addLayer({id:'sel-line',type:'line',source:'sel',paint:{'line-color':c.sel,'line-width':2.2,'line-dasharray':[3,2]}});
@@ -505,6 +507,7 @@ function select(f,fly){
       '<a class="btn" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener">TABS Record ↗</a><a class="btn" href="'+gsv+'" target="_blank" rel="noopener">Street View ↗</a>'+
       '<button class="btn" type="button" id="fNote">Add Site Note</button><button class="btn askai" type="button" id="fAsk">Ask AI About It</button></div></div>';
   card.querySelector('.x').onclick=closeCard; card.classList.add('open');
+  ctx.tabs?.track({id:'f:'+f.id,kind:'filing',label:f.name,reopen:()=>select(f,false),leave:()=>{ if(state.sel===f) clearSel(); }});
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
   card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat]});
@@ -545,7 +548,10 @@ map.on('mousemove','filings',e=>{
   let x=e.point.x+14, y=e.point.y+14; tip.style.opacity=1; const w=tip.offsetWidth; if(x+w>viewport.clientWidth-8) x=e.point.x-w-14; tip.style.left=x+'px'; tip.style.top=y+'px';
 });
 map.on('mouseleave','filings',()=>{ if(mode==='pan') map.getCanvas().style.cursor=''; tip.style.opacity=0; });
-map.on('click','filings',e=>{ if(mode!=='pan') return; e.preventDefault(); select(F[e.features[0].properties.i],false); });
+map.on('click','filings',e=>{ if(mode!=='pan') return; e.preventDefault(); ctx.tabs?.arm(e); select(F[e.features[0].properties.i],false); });
+// Shift-drag is MapLibre's box zoom, and it swallows every Shift-click (even one that doesn't drag): hand a Shift-click back
+// as a click, so Shift-click adds buildings, parcels, filings, planes and airports to the card's tabs (src/cardtabs.js)
+map.on('boxzoomcancel',e=>{ const o=e.originalEvent; if(o?.type==='mouseup'&&o.shiftKey&&maplibregl.MapMouseEvent) map.fire(new maplibregl.MapMouseEvent('click',map,o)); });
 map.on('click',e=>{ if(mode!=='pan' || e.defaultPrevented || swallowClick) return; if(map.queryRenderedFeatures(e.point,{layers:['filings']}).length) return; if(!ctx.mapClickHandlers.some(h=>h(e))) closeCard(); });
 
 // ---------- place menu: right-click (desktop) or long-press (touch) anywhere on the map ----------
@@ -928,7 +934,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initCardTabs,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,

@@ -30,6 +30,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - The statewide filings loader can now reach further back in time. It hasn't been run yet because the AI reading of each filing has a cost.
 - The Market PDF report includes the Markets table and the Correlation explorer, and fits phone screens without sideways scrolling.
 
+### 12:23 PM CT: Building tabs and the parcel list combined with the faster property cards (80bd541)
+- Brought together two sets of changes made in parallel. The property card still shows the owner and value first, and the "this building sits on N parcels" list now fills in when the second, slower lookup finishes (a second or two later).
+- Shift-click tabs, the **All** tab and the whole-building selection work with the faster two-step lookup.
+- Fixed while combining: picking the same parcel twice (on open ground) is recognised as the same one again, so it toggles off instead of adding a duplicate tab.
+
+### 12:02 PM CT: Phone layer buttons get their own row (7f9b530)
+- **On phones, the quick layer buttons (Satellite, 3D, Parcels…) moved up** into the empty band just under the search bar, instead of sitting between the map buttons on the left and right.
+- The row runs edge to edge and swipes sideways. The faded right edge shows there are more buttons, and the last one (More) scrolls fully into view.
+- **The filings count** ("1,161 filings · $7.47B") moved out of that band. It now sits centered between the two columns of map buttons.
+- Search results and the assistant's answers still open over the row. Desktop and tablet are unchanged.
+
 ### 11:00 AM CT: Clean start, honest layer buttons, Compare each county, Market area picker (abff29a)
 - **The map opens without construction filings or planes.**
   - Before, a reload often showed filing dots with the Filings button off. The app writes its default date filter into the page address, and on load any filter in the address turned the dots on.
@@ -71,6 +82,26 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - Before, it waited for the slowest part of the card. In one test the OpenStreetMap business lookup took 27 seconds.
 - **The business lookup gives up on a stalled server sooner.** The next OpenStreetMap server is asked after 2.5 seconds instead of waiting out a 9-second timeout, so a stalled server costs about 3 seconds instead of up to 27.
 - A failed business, height or parcel lookup is retried after a few minutes instead of being remembered for a day.
+
+### 2:07 AM CT: A subtler dot grid (8849314)
+- **The dot grid is quieter:** smaller dots, set a little closer together, at well under half the old strength, so it reads as texture rather than pulling the eye. The home county's green dots stay a bit stronger so it still stands out.
+- The product guide now lists the whole-building selection and card tabs under Recently added.
+
+### 2:02 AM CT: Whole buildings, buildings on several parcels, and tabs for several selections (37897ab)
+- **Clicking a big building now selects all of it.** The map draws large buildings (warehouses, shopping centers) in pieces at its tile edges, so a click used to pick only the piece under it, often about half the building. The app now joins the pieces as soon as you click, then switches to the full OpenStreetMap outline when the details load.
+- **Buildings on more than one parcel:**
+  - The lookup now finds every parcel under the building (up to 10), not just the one at the point you clicked.
+  - The card lists each parcel with its owner, acres and value, plus a total. The overview says how many parcels the building spans and their combined value.
+  - All of the parcel outlines are drawn dashed on the map.
+- **A livelier selection:** the picked building rises out of the ground in green, with a soft glow pulsing around its base. Motion is skipped if your device is set to reduce motion.
+- **Select up to 10 things at once, each in its own tab on the card:**
+  - Works for buildings, parcels, construction filings, planes and airports, and you can mix them.
+  - Shift-click adds. On a touch screen, tap **+ Add** at the top of the card, tap the other things (the card drops low so the map is free), then **Done**.
+  - The tabs are numbered, and the same numbers mark the buildings on the map. Tap a tab to switch, or its **×** to remove it.
+  - Shift-click something already picked to drop it. A plain click starts over; closing the card clears everything.
+  - With two or more buildings or parcels, an **All** tab totals footprint, floor area, market value and acres (each parcel counted once), with the filings on them, a CSV export (now with a parcel count per building) and **Zoom to All**.
+- **Fixed: Shift-click did nothing on the map.** The map's Shift-drag box zoom was swallowing every Shift-click, so the old "Shift-click to select several buildings" never actually reached the app.
+
 
 ### 1:30 AM CT: Filters for the map's layers, and freeze fixes (690491d)
 - **Filters now cover the map's layers, not just construction filings.** The panel has a section per kind of data:
