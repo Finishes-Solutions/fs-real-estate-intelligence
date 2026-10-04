@@ -975,6 +975,54 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 .mk-box table.who .sc{color:var(--muted);font-size:11px}
 .mk-tip{position:absolute;z-index:5;pointer-events:none;opacity:0;background:var(--panel);color:var(--text);border:1px solid var(--line-2);border-radius:6px;padding:6px 9px;font-size:12px;max-width:280px;box-shadow:0 4px 14px rgba(0,0,0,.14);transition:opacity .1s}
 @media (max-width:900px){.mk-grid{grid-template-columns:1fr}.mk-kpis{grid-template-columns:repeat(2,1fr)!important}.mk-kpis .kpi:nth-child(odd){border-left:0}.mk-kpis .kpi:last-child:nth-child(odd){grid-column:1/-1}.mk-kpis .kpi:nth-child(n+3){border-top:1px solid var(--line)}}
+/* Market tab: Markets table and Correlation explorer (src/markets.js) */
+:root{--mx-a:#006527;--mx-b:#c26a00;--mx-up:#0a7a36;--mx-dn:#b3261e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--mx-a:#4caf70;--mx-b:#f0a24a;--mx-up:#4caf70;--mx-dn:#ff8a80}}
+:root[data-theme="dark"]{--mx-a:#4caf70;--mx-b:#f0a24a;--mx-up:#4caf70;--mx-dn:#ff8a80}
+.mx-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.mx-head h3{margin:0}
+.mx-asof{font-size:11.5px;color:var(--muted)}
+.mx-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.mx-tabs button{border:1px solid var(--line-2);background:transparent;color:var(--text-2);border-radius:14px;padding:4px 11px;font:500 12px/1.3 var(--font-display);cursor:pointer}
+.mx-tabs button:hover{border-color:var(--brand)}
+.mx-tabs button[aria-selected="true"]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.mx-desc{font-size:12px;color:var(--text-2);margin:2px 0 6px}
+.mx-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.mx-table th{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:500;border-bottom:1px solid var(--line-2);padding:5px 6px}
+.mx-table td{border-bottom:1px solid var(--line);padding:6px;vertical-align:middle}
+.mx-table .r{text-align:right}.mx-table .m{font-family:var(--font-mono);white-space:nowrap}
+.mx-table tbody tr{cursor:pointer}.mx-table tbody tr:hover,.mx-table tbody tr:focus-visible{background:var(--panel-2);outline:none}
+.mx-table td b{display:block;font-weight:600}
+.mx-sym{display:block;font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:.04em}
+.mx-sp{width:120px}
+.mx-spark{width:110px;height:28px;display:block}.mx-spark polyline{fill:none;stroke-width:1.5;vector-effect:non-scaling-stroke}
+.mx-spark.up polyline{stroke:var(--mx-up)}.mx-spark.dn polyline{stroke:var(--mx-dn)}
+.mx-up{color:var(--mx-up)}.mx-dn{color:var(--mx-dn)}.mx-dim{color:var(--muted)}
+.mx-ctl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px;font-size:12px;color:var(--text-2)}
+.mx-ctl label{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.mx-ctl select{max-width:280px;padding:5px 8px}
+.mx-kg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line-2);border-radius:6px;overflow:hidden;margin-bottom:10px}
+.mx-kg>div{background:var(--panel);padding:8px 10px}
+.mx-kg b{display:block;font-family:var(--font-mono);font-size:15px;font-weight:600}
+.mx-kg span{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.mx-v3{color:var(--mx-up)}.mx-v2{color:var(--brand)}.mx-v1{color:var(--mx-b)}.mx-v0{color:var(--muted)}
+.mx-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--text-2);margin-bottom:2px}
+.mx-leg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:3px}
+.mx-leg i.mx-la{background:var(--mx-a)}.mx-leg i.mx-lb{background:var(--mx-b)}
+.mx-chart,.mx-lags{width:100%;height:auto;display:block;overflow:visible}
+.mx-chart polyline{fill:none;stroke-width:1.8;stroke-linejoin:round}
+.mx-chart polyline.mx-la{stroke:var(--mx-a)}.mx-chart polyline.mx-lb{stroke:var(--mx-b);stroke-dasharray:5 3}
+.mx-zero{stroke:var(--line-2);stroke-width:1}
+.mx-ax{font-family:var(--font-mono);font-size:10px;fill:var(--muted)}
+.mx-lags rect.pos{fill:var(--green-300)}.mx-lags rect.neg{fill:var(--ink-300)}.mx-lags rect.on{fill:var(--mx-a)}
+.mx-sub{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.mx-say{font-size:13px;line-height:1.5;margin:10px 0 0;color:var(--text)}
+.mx-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.mx-scan{margin-top:10px;display:grid;gap:4px}
+.mx-row{display:grid;grid-template-columns:minmax(120px,1.4fr) 70px minmax(120px,1.6fr) 100px;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:6px;padding:7px 10px;font:12.5px/1.3 var(--font-display);cursor:pointer}
+.mx-row:hover{border-color:var(--brand);background:var(--panel-2)}
+.mx-row .m{font-family:var(--font-mono);font-size:11.5px}.mx-row span{color:var(--text-2)}.mx-row em{font-style:normal;font-weight:600;text-align:right}
+@media (max-width:700px){.mx-sp{display:none}.mx-kg{grid-template-columns:repeat(2,minmax(0,1fr))}.mx-kg>div:last-child{grid-column:1/-1}.mx-ctl label{flex:1 1 100%}.mx-ctl select{max-width:none;flex:1;min-width:0}.mx-row{grid-template-columns:1fr auto;gap:2px 10px}.mx-row span:not(.m){grid-column:1}.mx-row em{grid-row:1;grid-column:2}}
 
 /* Ask AI: keyboard hint, suggested questions above it; with a card open it sits just left of the card */
 .fab-sugs{position:absolute;right:var(--fabr,16px);bottom:90px;z-index:4;display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:min(330px,calc(100% - var(--fabr,16px) - 24px));pointer-events:none}
@@ -1270,6 +1318,7 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .mk-rates td{padding:5px 6px;border-top:1px solid var(--line);white-space:nowrap}
 .mk-rates td:first-child{white-space:normal}
 .mk-rates .r{text-align:right}
+@media (max-width:700px){.mk-rates{font-size:11.5px}.mk-rates th,.mk-rates td{padding:4px 3px}}
 .mk-spark{color:var(--brand);vertical-align:middle}
 .mk-box .mk-kg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .mk-box .mk-kg b{display:block;font-family:var(--font-mono);font-size:14px}

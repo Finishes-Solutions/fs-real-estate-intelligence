@@ -207,6 +207,21 @@ The quick buttons and the panel always match. A layer turned on in either place,
   - interest rates;
   - unemployment;
   - the Houston crime trend and the busiest roads.
+- **Markets**, at the bottom of the Market tab, lists prices for the things that move Houston real estate, in groups you pick from the tabs:
+  - oil and natural gas, and Houston's big energy and other public companies;
+  - homebuilders and real estate funds;
+  - building material prices (lumber, steel, concrete, copper);
+  - mortgage and Treasury rates, the major stock indexes, and crypto (Bitcoin, Ethereum, Solana, XRP);
+  - Houston's own monthly numbers: jobs, unemployment, housing permits, listing prices, homes for sale and days on market.
+  - Each row has the latest price, today's and the past year's change, and a small chart. Crypto prices are live. Stock prices are delayed and come from an unofficial source, so treat them as a guide, not for trading. This isn't investment advice.
+- The **Correlation explorer** below it answers "does this market move with Houston, and which goes first?":
+  - Pick a Houston measure and a market series (or click **Correlate** on any row).
+  - It compares year-over-year changes (or month-over-month) and tries every lead and lag up to 12 months.
+  - It gives a verdict (strong, moderate, weak or not reliable), the lead time, and a chart of both lines.
+  - It is deliberately strict. It discounts for every lag it tries and for months that overlap. A link has to hold in both halves of the period to be called strong. Two unrelated prices that both rose over the years won't look related.
+  - **What moves …?** tests your measure against every market series at once and lists the closest matches. With so many comparisons the bar is high, and often nothing passes. That is a real answer: it means no market series reliably tracks that measure.
+  - **Explain with AI** asks the assistant to explain the result in plain language: what the numbers show, possible economic reasons, and what they don't prove. Correlation never proves that one thing causes another.
+  - Construction filings and new businesses only go back about two years, so try month-over-month changes for them.
 - **Demographics** on the map colors each census tract. Hover over a tract for its numbers.
 - **Compare** puts up to 4 areas side by side. With two or more counties selected on the map, **+ Compare Together** adds them as one area and **+ Compare Each** adds every county as its own area.
 
@@ -237,6 +252,7 @@ The **Ask AI** button (⌘/ on a Mac, Ctrl+/ elsewhere) opens an assistant that 
 - "Turn on radar and wind." "Tilt the map." "Back to the region."
 - "What am I looking at?" "Save a note here: vacant lot, call the broker."
 - "Search the web for …" (it only searches the web when you ask).
+- "How is oil doing this year?" "Does oil lead Houston unemployment?" "What moves Houston housing permits?"
 
 Answers come with cards: summaries, charts, comparisons, places, drive times, weather, news and imagery. The suggestions above the Ask AI button change with what you're looking at.
 
@@ -276,6 +292,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **People, homes and jobs:** US Census American Community Survey (5-year averages) and Census jobs data (about two years behind).
 - **Flood:** FEMA. **Traffic counts:** TxDOT. **Crime:** Houston Police. **Places and buildings:** OpenStreetMap.
 - **Construction filings:** TDLR TABS, refreshed nightly.
+- **Markets:** Yahoo Finance (stocks, funds, indexes and crypto history; delayed), Coinbase (live crypto) and the St. Louis Fed's FRED (oil, gas, building material prices, rates and Houston metro statistics).
 - **Weather, radar and storms:** NOAA and Open-Meteo. **Planes:** adsb.lol and airplanes.live. **Airports:** OurAirports and the FAA.
 - **County and state lines:** US Census.
 
@@ -296,6 +313,9 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 ---
 
 ## Recently added
+
+- **Markets and the Correlation explorer** on the Market tab: stocks, Houston companies, homebuilders, crypto, oil and gas, building material prices and rates, with an honest test of which ones move with Houston's numbers, and an AI explanation.
+- **More history:** the Houston crime trend now covers up to six years instead of two, and the Air Traffic Report can cover up to three years once enough has been collected.
 
 - **The map opens clean:** no filings or planes until you turn them on, and the layer buttons always match what's on the map.
 - **Compare each county separately** when several counties are selected, or all of them together.

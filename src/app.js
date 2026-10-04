@@ -6,6 +6,7 @@ import { initTimeline } from './timeline.js';
 import { initWho, initChanges } from './views.js';
 import { initAssistant } from './assistant.js';
 import { initMarket } from './market.js';
+import { initMarkets } from './markets.js';
 import { initSaved } from './saved.js';
 import { initBuildings } from './building.js';
 import { initMobile } from './mobile.js';
@@ -927,7 +928,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,

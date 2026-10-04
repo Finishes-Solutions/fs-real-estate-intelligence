@@ -9,6 +9,7 @@
 import { SECTORS } from './lib/sectors.mjs';
 import { CAT_LABEL } from './lib/spending.mjs';
 import { reportDoc, savePdf } from './reportkit.js';
+import { fromObject } from './lib/correlate.mjs';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -269,7 +270,7 @@ export function initArea(ctx) {
     const label = areaLabel();
     const kp = root.querySelector('.mk-kpis')?.outerHTML || '', grid = root.querySelector('.mk-grid')?.cloneNode(true);
     if (grid) {
-      grid.querySelectorAll('.mk-hint,.mk-pin,.mk-ctl,select,button.lnk').forEach(e => e.remove());
+      grid.querySelectorAll('.mk-hint,.mk-pin,.mk-ctl,.mx-ctl,.mx-tabs,.bacts,.mx-cmp,select,button.lnk').forEach(e => e.remove());
       grid.querySelectorAll('details').forEach(d => d.open = true);
       grid.querySelectorAll('.mk-lb').forEach(b => { const sp = document.createElement('span'); sp.innerHTML = b.innerHTML; if (b.getAttribute('aria-pressed') === 'false') sp.style.opacity = '.35'; b.replaceWith(sp); });
       grid.querySelectorAll('[tabindex],[data-k],[data-tip]').forEach(e => { e.removeAttribute('tabindex'); e.removeAttribute('data-k'); e.removeAttribute('data-tip'); });
@@ -280,10 +281,14 @@ export function initArea(ctx) {
       '.mk-svg{width:100%;height:auto;display:block;overflow:visible}line.mk-grid{stroke:#e8ebeb}.mk-ax{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:#6b7174}path.mk-sf{fill:#006527}path.mk-mf{fill:#2a78d6}path.mk-part{fill:rgba(0,101,39,.35)}' +
       '.mk-leg{display:flex;flex-wrap:wrap;gap:12px;font-size:9.5px;color:#4d5457;margin-bottom:4px}.mk-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}.mk-leg i.mk-sf{background:#006527}.mk-leg i.mk-mf{background:#2a78d6}' +
       '.mk-hbars{display:grid;gap:5px}.mk-hb{display:grid;grid-template-columns:minmax(100px,40%) 1fr auto;gap:8px;align-items:center;font-size:9.5px}.mk-hb span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#4d5457}.mk-hb i{display:block;height:8px}.mk-hb i b{display:block;height:100%;background:#006527;border-radius:0 3px 3px 0}.mk-hb em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:9px}' +
+      '.mx-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.mx-asof,.mx-desc,.mx-dim{color:#6b7174;font-size:9px}.mx-table{width:100%;border-collapse:collapse;font-size:9.5px}.mx-table th{font-family:"IBM Plex Mono",monospace;font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;color:#6b7174;text-align:left;border-bottom:1px solid #dde1e2;padding:3px 4px}.mx-table td{border-bottom:1px solid #e8ebeb;padding:3px 4px}.mx-table .r{text-align:right}.mx-table .m{font-family:"IBM Plex Mono",monospace}.mx-sym{display:block;font-size:7.5px;color:#6b7174}.mx-spark{width:90px;height:22px}.mx-spark polyline,.mx-chart polyline{fill:none;stroke-width:1.4}.mx-spark.up polyline{stroke:#0a7a36}.mx-spark.dn polyline{stroke:#b3261e}.mx-up{color:#0a7a36}.mx-dn{color:#b3261e}' +
+      '.mx-kg{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid #e8ebeb;border-radius:4px;margin:6px 0}.mx-kg>div{padding:6px 8px;border-left:1px solid #e8ebeb}.mx-kg>div:first-child{border-left:0}.mx-kg b{display:block;font-family:"IBM Plex Mono",monospace;font-size:12px}.mx-kg span{font-family:"IBM Plex Mono",monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;color:#6b7174}.mx-v3{color:#0a7a36}.mx-v2{color:#006527}.mx-v1{color:#c26a00}.mx-v0{color:#6b7174}' +
+      '.mx-leg{display:flex;gap:12px;font-size:9px;color:#4d5457}.mx-leg i{display:inline-block;width:12px;height:3px;margin-right:5px;vertical-align:2px}.mx-leg i.mx-la{background:#006527}.mx-leg i.mx-lb{background:#c26a00}.mx-chart,.mx-lags{width:100%;height:auto;display:block}.mx-chart polyline.mx-la{stroke:#006527}.mx-chart polyline.mx-lb{stroke:#c26a00;stroke-dasharray:5 3}.mx-zero{stroke:#dde1e2}.mx-ax{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:#6b7174}.mx-lags rect.pos{fill:#8acda3}.mx-lags rect.neg{fill:#bcc2c4}.mx-lags rect.on{fill:#006527}' +
+      '.mx-sub{font-family:"IBM Plex Mono",monospace;font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;color:#6b7174;margin:8px 0 3px}.mx-say{font-size:10px;line-height:1.45}.mx-scan{display:grid;gap:2px}.mx-row{display:grid;grid-template-columns:1.4fr 60px 1.6fr 80px;gap:8px;border:0;border-top:1px solid #e8ebeb;background:none;padding:3px 0;font:9px/1.3 inherit;text-align:left;color:inherit}.mx-row em{font-style:normal;text-align:right}' +
       '.mk-box .kgrid{margin:0 0 8px}.mk-box .kgrid b{font-size:13px}.chitem{display:block;color:inherit;font-weight:400;text-decoration:none;padding:4px 0;border-top:1px solid #e8ebeb}.chitem em{display:block;font-style:normal;color:#6b7174;font-size:9px}.src{display:none}';
     const html = reportDoc({ kicker: 'Market report', title: label, meta: (range ? 'Monthly charts: last ' + range + ' months' : 'Monthly charts: all months') + (area.built ? ' · data built ' + esc(new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : ''), css,
       body: kp + '<div class="mk-grid">' + (grid ? grid.innerHTML : '') + '</div>',
-      sources: 'US Census (ACS, Building Permits Survey, LEHD LODES), BLS, Texas Comptroller, Houston Police (NIBRS), TxDOT, FRED, New York Fed, CFPB HMDA, Google News. Estimates are labelled as such in each section.' });
+      sources: 'US Census (ACS, Building Permits Survey, LEHD LODES), BLS, Texas Comptroller, Houston Police (NIBRS), TxDOT, FRED, Yahoo Finance (delayed), Coinbase, New York Fed, CFPB HMDA, Google News. Estimates are labelled as such in each section.' });
     return savePdf(ctx, 'market', label, html);
   }
   async function exportData() {
@@ -349,7 +354,7 @@ export function initArea(ctx) {
       (s.latest?.length ? '<section class="mk-box mk-wide"><h3>Newest business locations</h3><div class="tablewrap"><table class="who"><thead><tr><th>Business</th><th>Address</th><th>Type</th><th>Permit issued</th></tr></thead><tbody>' +
         s.latest.map(b => '<tr><td>' + esc(b.name) + (b.owner ? '<div class="sc">' + esc(b.owner) + '</div>' : '') + '</td><td>' + esc([b.addr, b.city].filter(Boolean).join(', ')) + '</td><td>' + esc(b.sec != null ? SECTORS[b.sec][1] : (b.naics || '')) + '</td><td class="m">' + esc(b.date) + '</td></tr>').join('') +
         '</tbody></table></div><div class="rnote">Texas Comptroller active sales-tax permits, newest first. A new permit can also mean a change of owner at an existing location.</div></section>' : '') +
-      '</div>';
+      (ctx.markets?.html() || '') + '</div>';
     root.querySelectorAll('.mk-scope [data-county]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.county; sel = v === sel && v !== 'all' ? 'all' : v; newsPlace = ''; pin = null; render(); }));
     root.querySelectorAll('[data-range]').forEach(b => b.onclick = () => { range = +b.dataset.range; pin = null; render(); });
     root.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { const k = b.dataset.show, pair = k === 'sf' || k === 'mf' ? ['sf', 'mf'] : ['v', 'p', 'o'];
@@ -365,7 +370,7 @@ export function initArea(ctx) {
       else if (a === 'jobsmap') { ctx.setView('map'); ctx.showDemographic?.('jobs'); }
       else if (a === 'spendmap') { ctx.setView('map'); ctx.showDemographic?.('sph'); }
       else if (a === 'crimemap') { ctx.setView('map'); ctx.crimeLayer?.(true); } });
-    loadExtras();
+    loadExtras(); ctx.markets?.wire(root, render);
     const ps = root.querySelector('#mkPlace'); if (ps) ps.onchange = e => { newsPlace = e.target.value; render(); };
     const tip = root.querySelector('#mkTip');
     root.querySelectorAll('.mk-hit').forEach(el => {
@@ -376,6 +381,23 @@ export function initArea(ctx) {
     });
   }
   ctx.onView('market', render);
+  // the app's own Houston measures for the Correlation explorer (src/markets.js): monthly, whole region, months finished
+  ctx.marketLocalSeries = () => {
+    const cur = new Date().toISOString().slice(0, 7), done = o => fromObject(Object.fromEntries(Object.entries(o).filter(([m]) => m < cur))), out = [];
+    if (crimeCity?.months?.length) {
+      out.push({ id: 'app-crime', label: 'Houston crime, all offenses (Houston Police)', short: 'Crime', map: done(Object.fromEntries(crimeCity.months.map(m => [m.m, m.v + m.p + m.o]))) });
+      out.push({ id: 'app-violent', label: 'Houston violent crime (Houston Police)', short: 'Violent crime', map: done(Object.fromEntries(crimeCity.months.map(m => [m.m, m.v]))) });
+    }
+    const fl = {}, fv = {}; (ctx.F || []).forEach(f => { const m = String(f.reg || '').slice(0, 7); if (/^\d{4}-\d\d$/.test(m)) { fl[m] = (fl[m] || 0) + 1; fv[m] = (fv[m] || 0) + (f.cost || 0); } });
+    if (Object.keys(fl).length) {
+      out.push({ id: 'app-filings', label: 'Construction filings registered (TDLR, this app)', short: 'Filings', map: done(fl) });
+      out.push({ id: 'app-filingvalue', label: 'Construction value registered (TDLR, this app)', short: 'Filing value', map: done(fv) });
+    }
+    if (area?.businesses?.months) { const b = {}; Object.values(area.businesses.months).forEach(c => Object.entries(c).forEach(([m, n]) => b[m] = (b[m] || 0) + n));
+      out.push({ id: 'app-biz', label: 'New business locations, region (Comptroller)', short: 'New businesses', map: done(b) }); }
+    const hou = area?.salesTax?.cities?.Houston?.months; if (hou) out.push({ id: 'app-tax', label: 'City of Houston sales tax (Comptroller)', short: 'Houston sales tax', map: done(hou) });
+    return out;
+  };
 
   // ---------- businesses registered at an address (building and filing cards) ----------
   const cache = new Map(), done = new Map(), tkey = (addr, zip, city) => [addr, zip, city].join('|').toUpperCase();
