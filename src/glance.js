@@ -12,7 +12,7 @@ export function initGlance(ctx) {
 
   async function render() {
     const my = ++seq;
-    if (map.getZoom() < 8) { el.innerHTML = shell('<p class="g-n">Zoom in to a city or neighborhood to see who lives and works there.</p>'); return; }
+    if (map.getZoom() < 6.5) { el.innerHTML = shell('<p class="g-n">Zoom in to a region, city or neighborhood to see who lives and works there.</p>'); return; }
     let m; try { m = await ctx.loadMarket(); } catch (e) { el.innerHTML = ''; return; }
     if (my !== seq) return;
     const b = map.getBounds(), w = b.getWest(), s = b.getSouth(), e = b.getEast(), n = b.getNorth();

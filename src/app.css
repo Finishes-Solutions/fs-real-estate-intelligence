@@ -1468,7 +1468,12 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .fpop-h .x{border:0;background:transparent;cursor:pointer;color:var(--muted);width:28px;height:28px;flex:none;border-radius:4px;display:grid;place-items:center}
 .fpop-h .x:hover{background:var(--panel-2);color:var(--text)}
 .fpop .filters{border-bottom:0}
-.fpop .active{position:sticky;bottom:0;background:var(--panel);margin:0 -24px -20px;padding:12px 24px;border-top:1px solid var(--line)}
+.fpop-h{flex-wrap:wrap}
+.fpop-h>div:first-child{flex:1;min-width:0}
+.fpop .active{flex:0 0 calc(100% + 36px);display:flex;align-items:center;gap:10px;background:var(--panel-2);margin:2px -18px -12px;padding:9px 18px;border-top:1px solid var(--line);box-sizing:border-box}
+.fpop .active span{flex:1;min-width:0;font-size:12px;color:var(--text-2)}
+.fpill{display:inline-flex;align-items:center;gap:6px;flex:none;height:28px;padding:0 12px;border:1px solid var(--brand);border-radius:999px;background:var(--panel);color:var(--brand);font:700 12px var(--font-display);cursor:pointer}
+.fpill:hover{background:var(--brand);color:var(--brand-ink)}
 /* tablet: the toolbar is icon-only, so the Filters button is too */
 @media (max-width:1100px) and (min-width:701px){ .fbtn span,.fclear span{display:none} .fbtn,.fclear{padding:0 10px} }
 /* phone: the floating filter button opens the same popup as a bottom sheet */
@@ -1563,3 +1568,38 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
   .card.min .top{padding-bottom:8px}
   .card.min .top .bsub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
+
+/* ================= quick layer buttons (under the map search) ================= */
+.qlayers{display:flex;flex-wrap:wrap;gap:6px;contain:inline-size}
+.qlayers:empty{display:none}
+.qchip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px 0 9px;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);color:var(--text-2);font:600 12px var(--font-display);cursor:pointer;box-shadow:0 1px 2px rgba(11,13,12,.08);white-space:nowrap;transition:background .15s,border-color .15s,color .15s}
+.qchip svg{flex:none;opacity:.85}
+.qchip:hover{border-color:var(--text-2);color:var(--text)}
+.qchip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.qchip[aria-pressed="true"] svg{opacity:1}
+.qchip.qmore{color:var(--muted)}
+.qchip.qmore[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
+.layers .lt{margin-top:6px;padding-top:10px;border-top:1px solid var(--line)}
+.layers .lt:first-child{margin-top:0;padding-top:0;border-top:0}
+.layers .lsub{font-size:12px;color:var(--muted);margin-bottom:-4px}
+@media (max-width:700px){
+  .mapleft .qlayers{grid-column:2;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;contain:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+  .mapleft .qlayers::-webkit-scrollbar{display:none}
+  .qchip{height:34px}
+}
+.layers .live-ly{margin-top:6px;padding-top:10px}
+.layers .live-ly .lt{margin-top:0;padding-top:0;border-top:0}
+
+.mfilt.mclear[hidden]{display:none}
+.mfilt.mclear{color:var(--brand)}
+.panel .selbar.area .kicker{margin-bottom:-6px}
+/* while the layers panel is open, the map's left column (toolbar, search, quick layers) narrows to leave room for it */
+@media (min-width:701px){ .stage:has(.layers.on) .mapleft{min-width:0;max-width:calc(100% - 90px - 312px)} }
+/* the toolbar row wraps (Clear, Export onto the next line) instead of squeezing the tool buttons when the map is narrow */
+@media (min-width:701px){ .maptop{flex-wrap:wrap} .maptop .tools{flex-shrink:0} }
+.panel .selbar.area .s1{flex-wrap:wrap;row-gap:2px}
+.panel .selbar.area .s1 span{white-space:normal;font-family:inherit;font-size:12px}
+.panel .selbar .btnrow{display:flex;flex-wrap:wrap;gap:8px}
+.panel .selbar .btnrow .btn{flex:1 1 auto}
+.layers{z-index:6}
+@media (min-width:701px) and (max-width:1500px){ .maptop:has(#filterClear:not([hidden])) .exbtn span{display:none} .maptop:has(#filterClear:not([hidden])) .exbtn{padding:0 11px} }

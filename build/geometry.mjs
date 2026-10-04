@@ -1,7 +1,7 @@
 // Base map geometry: county outlines + dot grids, ring counties, Texas and world dot grids, places gazetteer.
 // Rebuilt only when regions.json changes (or REBUILD_GEO=1), since none of it changes week to week.
 import { geoContains, geoArea, geoCentroid } from 'd3-geo';
-import { feature } from 'topojson-client';
+import { feature, mesh } from 'topojson-client';
 import { fetchRetry, log } from './util.mjs';
 
 export function rewind(g) { // d3 wants clockwise exterior rings
@@ -73,4 +73,38 @@ export function assembleGeo(regions, byFips, texas, landGeom, places) {
     ring: regions.ring.filter(f => byFips[f]).map(f => ({ name: byFips[f].properties.NAME, outline: round(rewind(byFips[f].geometry).coordinates) })),
     texas: grid(texas, 0.1), land: grid(landGeom, 1.0), places, roads: {}
   };
+}
+
+// County and state lines for the whole US (data/uscounties.json), drawn under the home counties' own accurate outlines.
+// Census cartographic boundaries at 1:10m (us-atlas): good from the national view down to city level; the browser swaps in
+// exact TIGER/Line lines from /api/counties when zoomed in closer. Each shared border is stored once (a topojson mesh).
+const ST = { '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT', '10': 'DE', '11': 'DC', '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL', '18': 'IN', '19': 'IA', '20': 'KS',
+  '21': 'KY', '22': 'LA', '23': 'ME', '24': 'MD', '25': 'MA', '26': 'MI', '27': 'MN', '28': 'MS', '29': 'MO', '30': 'MT', '31': 'NE', '32': 'NV', '33': 'NH', '34': 'NJ', '35': 'NM', '36': 'NY', '37': 'NC', '38': 'ND',
+  '39': 'OH', '40': 'OK', '41': 'OR', '42': 'PA', '44': 'RI', '45': 'SC', '46': 'SD', '47': 'TN', '48': 'TX', '49': 'UT', '50': 'VT', '51': 'VA', '53': 'WA', '54': 'WV', '55': 'WI', '56': 'WY',
+  '60': 'AS', '66': 'GU', '69': 'MP', '72': 'PR', '78': 'VI' };
+// "Harris Co., TX", "Orleans Par., LA"; Alaska boroughs, Virginia's independent cities and the territories keep their plain name
+export function countyLabel(name, fips) {
+  const s = fips.slice(0, 2), st = ST[s] || '';
+  if (s === '22') return name + ' Par., ' + st;
+  if (s === '02' || +s >= 60 || (s === '51' && +fips.slice(2) >= 500)) return name + ', ' + st;
+  return name + ' Co., ' + st;
+}
+// pure part: us-atlas topology → { lines, states, labels }; `homeFips` counties are left out (the app draws them itself)
+export function shapeUsCounties(topo, homeFips = []) {
+  const home = new Set(homeFips.map(String)), isHome = g => home.has(String(g.id));
+  const lines = mesh(topo, topo.objects.counties, (a, b) => a !== b && !isHome(a) && !isHome(b));
+  const states = mesh(topo, topo.objects.states, (a, b) => a !== b);
+  const labels = feature(topo, topo.objects.counties).features.filter(f => !isHome(f) && f.geometry)
+    .map(f => { const [x, y] = geoCentroid(f); return [countyLabel(f.properties.name, String(f.id)), Math.round(x * 1e3) / 1e3, Math.round(y * 1e3) / 1e3]; })
+    .filter(l => isFinite(l[1]) && isFinite(l[2]));
+  const r4 = ls => ls.map(l => l.map(([x, y]) => [Math.round(x * 1e4) / 1e4, Math.round(y * 1e4) / 1e4]));
+  return { v: 1, source: 'US Census cartographic boundaries 1:10m (us-atlas)', lines: r4(lines.coordinates), states: r4(states.coordinates), labels };
+}
+export async function buildUsCounties(regions) {
+  let topo;
+  try { topo = (await import('us-atlas/counties-10m.json', { with: { type: 'json' } })).default; }
+  catch { topo = await (await fetchRetry('https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json')).json(); }
+  const out = shapeUsCounties(topo, regions.counties.map(c => c.fips));
+  log('us counties:', out.labels.length, 'counties,', out.lines.length, 'border lines');
+  return out;
 }
