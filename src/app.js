@@ -385,7 +385,7 @@ function syncFilterUI(){
   uMin.value=String(state.umin||0); if(document.activeElement!==coQ) coQ.value=state.co||''; exactBtn.setAttribute('aria-pressed',!!state.exact);
   const dd=state.d&&state.d.f!=='all'?state.d:null; dField.value=dd?dd.f:''; dFrom.value=dd?.from||''; dTo.value=dd?.to||''; dFrom.disabled=dTo.disabled=!dd;
   const nMore=(state.uses?1:0)+(state.d&&!pk?1:0)+(state.chg?1:0)+(state.st?1:0)+(state.sqmin||state.sqmax?1:0)+(state.umin?1:0)+(state.co.trim()?1:0)+(state.exact?1:0); document.getElementById('moreN').textContent=nMore?'· '+nMore+' on':''; if(nMore) document.getElementById('moreF').open=true;
-  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const fN=document.getElementById('filterN'); fN.textContent=nAll||''; fN.hidden=!nAll; syncClear();
+  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const fN=document.getElementById('filterN'); fN.textContent=nAll||''; fN.hidden=!nAll; syncClear(); { const fd=document.getElementById('filterDone'); if(fd) fd.textContent='Show '+fmtN(visible.length)+' filing'+(visible.length===1?'':'s'); }
   document.getElementById('filterBtn').classList.toggle('on',!!nAll);
   const t=filterText(); document.getElementById('activeTxt').textContent=t?'Filters: '+t:''; document.getElementById('activeBar').classList.toggle('on',!!t);
 }
@@ -404,9 +404,10 @@ document.getElementById('resetAll').onclick=clearFilters;
 // Filters: a popup from the map toolbar (between County and Export), with a Clear button beside it while any are on.
 // Filters only act on construction filings, so changing one puts the filing dots on the map.
 { const btn=document.getElementById('filterBtn'), pop=document.getElementById('filterPop'), wrap=document.getElementById('fwrap');
-  const setOpen=open=>{ pop.hidden=!open; btn.setAttribute('aria-expanded',open); btn.classList.toggle('open',open); if(open) pop.querySelector('select,button.chip,input')?.focus({preventScroll:true}); };
+  const setOpen=open=>{ if(open&&matchMedia('(max-width:700px)').matches) document.getElementById('moreF').open=true; pop.hidden=!open; btn.setAttribute('aria-expanded',open); btn.classList.toggle('open',open); if(open) pop.querySelector('select,button.chip,input')?.focus({preventScroll:true}); };
   btn.onclick=()=>setOpen(pop.hidden);
   document.getElementById('filterClose').onclick=()=>{ setOpen(false); btn.focus(); };
+  document.getElementById('filterDone').onclick=()=>setOpen(false); // phones: the sheet's "Show N filings" button
   const clearAll=()=>{ clearFilters(); ctx.toast?.('Cleared: showing everything'); };
   document.getElementById('filterClear').onclick=clearAll; const mc=document.getElementById('mClear'); if(mc) mc.onclick=clearAll;
   pop.addEventListener('change',()=>showFilings()); pop.addEventListener('click',e=>{ if(e.target.closest('.chip,button[data-k],button[data-v]')) showFilings(); });

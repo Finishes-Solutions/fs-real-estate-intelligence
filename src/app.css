@@ -1619,3 +1619,36 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
   .layers,.fpop,.msheet,.panel,.view{overflow-x:hidden;overscroll-behavior-x:none}
   .layers,.fpop,.msheet{touch-action:pan-y}
 }
+
+/* ================= phone "More" sheet: one-word tiles, named like the desktop tabs ================= */
+@media (max-width:700px){
+  .msheet{padding:4px 14px calc(14px + var(--sb))}
+  .msheet .mt-h{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:10px 4px 8px}
+  .msheet .mtiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .msheet .mtiles button{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;width:auto;padding:12px 2px 10px;border:0;border-radius:12px;background:var(--panel-2);font:600 12.5px/1.2 var(--font-display);color:var(--text);text-align:center}
+  .msheet .mtiles button[hidden]{display:none}
+  .msheet .mtiles button:active{background:var(--chip)}
+  .msheet .mt-ic{position:relative;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:var(--panel);color:var(--brand);font-style:normal}
+  .msheet .mt-ic .badge{position:absolute;top:-4px;right:-10px}
+  .msheet .mt-ic .badge:empty{display:none}
+}
+
+/* ================= phone filters: a full-height sheet with a fixed header and a "Show N filings" button ================= */
+.fpop-f{display:none}
+@media (max-width:700px){
+  .fpop{top:calc(var(--st) + 68px);max-height:none;display:flex;flex-direction:column;overflow:hidden}
+  .fpop[hidden]{display:none}
+  .fpop .fpop-h{position:static;flex:none;padding:12px 16px 10px;align-items:center;row-gap:0}
+  .fpop .fpop-h>div:first-child span{display:none}
+  .fpop .fpop-h b{font-size:18px}
+  .fpop .active{margin:6px -16px -10px;padding:8px 16px;flex-basis:calc(100% + 32px)}
+  .fpop .filters{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:14px 16px 18px;gap:0}
+  .fpop .filters .row{margin-bottom:16px}
+  .fpop #dField{flex:1 0 100%}
+  .fpop .filters .lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+  .fpop .filters .more{border:0;border-radius:0;padding:0;margin:0}
+  .fpop .filters .more>summary{display:none}
+  .fpop .filters .fgroup{font:700 15px/1.3 var(--font-display);color:var(--text);letter-spacing:0;text-transform:none;border-top:1px solid var(--line);margin:4px 0 12px;padding-top:16px}
+  .fpop-f{display:block;flex:none;padding:10px 16px 12px;border-top:1px solid var(--line);background:var(--panel)}
+  .fdone{display:block;width:100%;height:48px;border:0;border-radius:12px;background:var(--brand);color:var(--brand-ink);font:700 15px var(--font-display);cursor:pointer}
+}

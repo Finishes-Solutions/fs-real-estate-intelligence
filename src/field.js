@@ -57,7 +57,7 @@ export function initField(ctx) {
   function syncBadges() {
     const n = db.notes.length + db.watch.length, alerts = db.watch.filter(w => w.kind === 'filing' && CHANGED.has(w.ref)).length;
     document.getElementById('fieldBadge').textContent = alerts ? alerts + ' updated' : (n ? fmtN(n) : '');
-    document.getElementById('mFieldN').textContent = alerts ? alerts + ' updated' : (n ? fmtN(n) : '');
+    document.getElementById('mFieldN').textContent = alerts ? fmtN(alerts) : (n ? fmtN(n) : '');
   }
 
   // ---- watch star on filing and building cards (and the assistant's watch tool) ----

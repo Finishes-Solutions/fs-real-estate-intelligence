@@ -54,9 +54,20 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 - **Map Layers.**
 - **Globe view.**
 
-**Tabs** (desktop and tablet): Map, Market, Compare, Reports, Field Notes, then the construction views (Timeline, Activity, Updates), and Sources.
+**Tabs** (desktop and tablet): Map, Market, Compare, Reports, Notes, then the construction views (Timeline, Activity, Updates), and Sources.
 
-**Phones:** the map fills the screen. The bottom bar has Map, Explore, Timeline, Activity and More. Cards slide up from the bottom: swipe down to shrink one, and swipe again to close it.
+**Phones:** the map fills the screen. The bottom bar has Map, Explore, Timeline, Activity and More. **More** opens a grid of one-word tiles:
+- **Views**, named like the desktop tabs: Market, Compare, Reports, Updates, Notes, Sources.
+- **Tools:**
+  - Layers.
+  - Export.
+  - Saved: saved searches and alerts.
+  - Nearby: the area around you.
+  - Pin: a site note at your location.
+  - Theme: light or dark.
+  - Install, when your phone offers it.
+
+Cards slide up from the bottom: swipe down to shrink one, and swipe again to close it.
 
 ---
 
@@ -178,7 +189,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
 Texas requires most commercial and public construction projects to register with the state (TDLR, through its TABS system). The app loads two years of these filings for the 7 counties every night. AI reads each filing for its use, tenant, developer, architect, contractor and housing units.
 
 - **Filing dots** are off by default. Turn them on with **Filings**. Green is new construction, grey is renovation, and a ring is an addition.
-- **Filters:** time period, county, type, value, use, status, size, housing units, company name, exact addresses only, start or registration dates, and recent changes.
+- **Filters:** time period, county, type, value, use, status, size, housing units, company name, exact addresses only, start or registration dates, and recent changes. On phones, Filters opens as a full sheet with **Clear All** at the top and a **Show N filings** button at the bottom that closes it.
 - **Filing card:** project details, dates, people involved, an **AI project brief** (what it is, timing, who's involved, area context), and nearby filings.
 - **Timeline:** the monthly pipeline of what's under construction, plus a Gantt chart of every project. Hatched bars are dates estimated because the filer left them blank.
 - **Activity:** developers, architects and contractors ranked by activity. Click one to see their projects.
@@ -215,7 +226,7 @@ Answers come with cards: summaries, charts, comparisons, places, drive times, we
 
 ---
 
-## Field notes and watchlist
+## Notes and watchlist
 
 - **Add a site note** at the map center or your current location: a title, tag, notes and phone photos. Notes are shared with the team and work offline.
 - **Watch** any filing or building with the star. Watched filings are flagged when the nightly refresh sees a change.
@@ -259,3 +270,4 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **The dot grid now covers all land** on every basemap.
 - **A general real estate layout:** This Area box, Area at a Glance from the regional zoom, general tabs first.
 - **Phones:** the map fills the whole screen, and the menus only scroll up and down.
+- **Phones:** a tile-style More menu with one-word names matching the desktop tabs, and a simpler full-height Filters sheet. The desktop **Field Notes** tab is now **Notes**.
