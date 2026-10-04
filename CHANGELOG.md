@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
-### 12:02 PM CT: Phone layer buttons get their own row (COMMIT)
+### 12:02 PM CT: Phone layer buttons get their own row (7f9b530)
 - **On phones, the quick layer buttons (Satellite, 3D, Parcels…) moved up** into the empty band just under the search bar, instead of sitting between the map buttons on the left and right.
 - The row runs edge to edge and swipes sideways. The faded right edge shows there are more buttons, and the last one (More) scrolls fully into view.
 - **The filings count** ("1,161 filings · $7.47B") moved out of that band. It now sits centered between the two columns of map buttons.
