@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-04
 
-### 1:06 AM CT: Phone More menu as tiles, simpler phone Filters (COMMIT)
+### 1:06 AM CT: Phone More menu as tiles, simpler phone Filters (bdb0916)
 - **The phone More menu is a grid of one-word tiles,** named like the desktop tabs.
   - **Views:** Market, Compare, Reports, Updates, Notes, Sources.
   - **Tools:** Layers, Export, Saved, Nearby, Pin (a site note at your location), Theme, and Install when the phone offers it.
