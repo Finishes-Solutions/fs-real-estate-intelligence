@@ -41,6 +41,7 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 
 **Top of the map**
 - **Tools:** Move, Area (drag a box), Shape (draw a shape), Radius (an address plus a distance), County (click counties).
+- **Cursors** (mouse or trackpad) show what a click will do: the dark arrow for nothing in particular, a green arrow over anything you can open or select, a small building at street zoom when a click opens that building, four arrows while you drag the map, and a crosshair with a small badge for each drawing tool (a dashed box for Area, a shape for Shape, a circle for Radius, a county for County). Text boxes keep the normal text cursor.
 - **Filters** narrow what the map shows, layer by layer (see "Filters" below). **Clear** sits right next to it; see "Clearing the view" below.
 - **Export** makes a report.
 - **Search** finds addresses, places, roads, businesses, projects, owners and developers. Press ⌘K (Mac) or Ctrl+K to jump to it. When Google is set up for the site, a **Google** section lists Google's matches too; picking one switches to the Google map and opens a Google place card (address, phone, website, hours, rating and a link to Google Maps).
@@ -351,6 +352,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **The app's own cursors:** a branded set that shows what a click will do, with a different one for each selection tool.
 - **A new Market tab:** construction pipeline, growth, housing and rents, building material costs and rates, each in its own section with a button to jump to it, hover numbers on every chart, and a "What's moving" summary.
 - **Street maps in reports:** every report PDF now shows its area on a real street map instead of a plain outline.
 - **Google maps, Google 3D and Google place search** (once the site's Google keys are added): Google and Google Satellite base maps, Google's photorealistic 3D city, and Google results in search with a place card.
