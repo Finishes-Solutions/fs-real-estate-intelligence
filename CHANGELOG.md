@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 2:44 PM CT: Tidier legends and small fixes (33ed15e)
+- **Shorter map legends:** the Businesses & Places and Environmental Sites legends are now two compact columns instead of two tall lists covering the map.
+- The small popup on an environmental site closes when you open its Environmental report.
+- Officer titles from the Comptroller are spelled out ("Vice President" instead of "Vice-Presi").
+- Groundwater-restriction areas are drawn with more accurate outlines.
+- Checked in a browser with real data: the Businesses & Places dots, the place card, the environmental site dots, the popup and the Environmental report all show and open correctly.
+
 ### 2:31 PM CT: Google maps, Google 3D and Google place search, ready for keys (503d184)
 - **Google base maps:** "Google" and "Google Sat" buttons under Base Map, with Google's logo and map credits shown while they're on.
 - **Google 3D:** Google's photorealistic 3D city replaces the simple building blocks at street zoom (tilt the map). Clicking a building still opens its property card.
