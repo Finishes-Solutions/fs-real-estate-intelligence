@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 11:49 AM CT: The app reads the government data key (GOV_API_KEY) (6dd783b)
+- **Crime by city / county now has a backup:** if the FBI website's feed is down or changes, the app switches to the FBI's official data service using the api.data.gov key saved on Vercel as `GOV_API_KEY`. Nothing changes on screen.
+- The same key can be reused for other federal data services later; the app reads it from one place.
+
 ### 11:31 AM CT: Crime by city / county, anywhere in the US (9540c9f, 6bc25ce, e36d54c)
 - **Property and parcel cards now show crime anywhere in the US**, under the Houston street-level section:
   - the local police department: the city's own police inside city limits, otherwise the county police or sheriff;
