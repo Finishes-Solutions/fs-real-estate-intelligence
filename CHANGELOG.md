@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
-### 1:45 PM CT: Businesses & Places layer from open data (c27cf86)
+### 1:45 PM CT: Businesses & Places layer from open data (c27cf86, 3c7b07a)
 - **New map layer, Businesses & Places:** about 300,000 businesses and places across the seven counties, colored by kind (food, retail, health care, offices, construction and home services, industrial and farms, and more). It shows from street zoom; pick one kind from the list under the switch.
 - **Click a dot** for a card with the name, category, address, phone, website, the sources that list it, a link to Google Maps and a button for the building and parcel there.
 - **Property cards list many more businesses:** the open data is added to OpenStreetMap's list, and each one opens its card.
