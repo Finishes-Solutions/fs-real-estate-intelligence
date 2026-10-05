@@ -218,7 +218,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
   - **Routes** come from a free community route list. For flight numbers with several stops (for example Chicago → Houston → Chicago), the card picks the leg the plane is flying from where it is, which way it's heading and whether it's climbing or descending.
   - A listed route that doesn't match where the plane actually is gets left out. If the flight path shows where the plane took off, the card says **From (airport) · destination not listed** instead. Tilted, the path is a ribbon at the plane's altitude with a curtain down to the ground. You can **follow** or **orbit** a plane.
 - **Airports** shows every airport in the world. Click one for runways (with a diagram), radio frequencies, current weather, airlines, statistics and the FAA airport diagram.
-- **Low Flight Paths** shows where planes fly below 3,000 ft over the last 30 days. Property cards show how many low flights pass overhead.
+- **Low Flight Paths** shows where planes fly below 3,000 ft over the last 30 days. Construction filing cards show how many low flights pass overhead and the nearest airports; for a property, use the Air Traffic Report under the card's Area reports.
 
 ---
 

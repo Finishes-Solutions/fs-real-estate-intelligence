@@ -171,9 +171,9 @@ export function initAirports(ctx) {
       sources: 'OurAirports (codes, runways, frequencies; public domain); FAA d-TPP (diagram); Wikipedia and Wikidata (photo, airlines, statistics; CC BY-SA); aviationweather.gov (METAR); takeoff and landing counts from community ADS-B data (adsb.lol), sampled every minute.' }));
   }
 
-  // ---------- building / filing cards: the nearest airports and approach paths ----------
+  // ---------- filing cards: the nearest airports and approach paths (not on property cards) ----------
   ctx.onCardRender?.(info => {
-    const c = info.kind === 'filing' ? (info.f.approx ? null : [info.f.lon, info.f.lat]) : info.kind === 'building' ? info.center : null; if (!c) return;
+    const c = info.kind === 'filing' && !info.f.approx ? [info.f.lon, info.f.lat] : null; if (!c) return;
     const card = document.getElementById('card');
     fetch('api/airports?near=' + c[1].toFixed(4) + ',' + c[0].toFixed(4) + '&km=60&n=4&path=1').then(r => r.ok ? r.json() : null).then(d => {
       if (!d?.airports?.length || !card.classList.contains('open')) return;
