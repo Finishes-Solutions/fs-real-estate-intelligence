@@ -10,16 +10,18 @@ import { SECTORS } from './lib/sectors.mjs';
 import { CAT_LABEL } from './lib/spending.mjs';
 import { reportDoc, savePdf } from './reportkit.js';
 import { fromObject } from './lib/correlate.mjs';
+import { inGeom, centroid } from './lib/demographics.mjs';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function initArea(ctx) {
   const { esc, fmtN, fmtM } = ctx, root = document.getElementById('view-market');
-  let area = null, market = null, loadP = null, sel = 'all', newsPlace = '';
+  // sel: 'all' (the whole region), one county FIPS, or several joined by commas (a multi-county selection on the map)
+  let area = null, market = null, loadP = null, sel = 'all', newsPlace = '', adopted = null;
   let range = 24, pin = null; const show = { sf: true, mf: true, v: true, p: true, o: true };
   // crime (City of Houston, the same for the region and the three counties it spans) and traffic (per area), fetched once
   const HOU = new Set(['48201', '48157', '48339']), traffic = new Map(); let crimeCity;
-  const wantCrime = () => sel === 'all' || HOU.has(sel);
+  const wantCrime = () => sel === 'all' || fipsList().some(f => HOU.has(f));
   function areaBox() {
     const names = new Set(fipsList().map(cname)), geos = (ctx.countyGeo || []).filter(c => names.has(c.name)); if (!geos.length) return null;
     let w = 180, so = 90, e = -180, n = -90; for (const g of geos) for (const poly of g.geom.coordinates) for (const ring of poly) for (const [x, y] of ring) { w = Math.min(w, x); e = Math.max(e, x); so = Math.min(so, y); n = Math.max(n, y); }
@@ -49,7 +51,17 @@ export function initArea(ctx) {
 
   const pct = v => v == null || !Number.isFinite(v) ? '—' : (v > 0 ? '+' : '') + (Math.abs(v) >= 10 ? Math.round(v) : v.toFixed(1)) + '%';
   const chg = (a, b) => a != null && b ? (a - b) / b * 100 : null;
-  const fipsList = () => sel === 'all' ? area.counties.map(c => c.fips) : [sel];
+  const fipsList = () => sel === 'all' ? area.counties.map(c => c.fips) : sel.split(',');
+  const one = () => sel !== 'all' && !sel.includes(',') ? sel : null; // the county when exactly one is shown
+  // the map's selection, as Market counties: a county selection's counties, or the county under any other area's middle
+  function mapCounties() {
+    const s = ctx.sel; if (!s?.feature || !area) return 'all';
+    if (s.kind === 'county' && s.counties?.size) { const l = area.counties.filter(c => s.counties.has(c.name)).map(c => c.fips); return l.length ? l.join(',') : 'all'; }
+    const g = s.feature.geometry || s.feature, c = s.center || centroid(g), hit = c && (ctx.countyGeo || []).find(x => inGeom(c, x.geom));
+    return area.counties.find(x => x.name === hit?.name)?.fips || 'all';
+  }
+  // follow the map selection when it changes (a county picked here by hand stays until the map selection changes)
+  function adopt() { const k = mapCounties(); if (k === adopted) return; adopted = k; sel = k; newsPlace = ''; pin = null; }
   const cname = f => area.counties.find(c => c.fips === f)?.name || f;
   const sum = (arr, fn) => arr.reduce((s, x) => s + (fn(x) || 0), 0);
 
@@ -167,13 +179,16 @@ export function initArea(ctx) {
   // unemployment: the county's rate, or the Houston metro's for the whole region (BLS LAUS, nightly)
   function unempTile() {
     const u = area.unemployment; if (!u) return '';
-    const c = sel !== 'all' && u.counties?.[sel], m = u.metros?.['26420'], x = c || m; if (!x) return '';
-    return tile(x.rate + '%', 'Unemployment', (c ? cname(sel) + ' County' : 'Houston metro') + ', ' + MON[+x.period.slice(5) - 1] + ' ' + x.period.slice(0, 4) + (x.yearAgo != null ? ' · ' + x.yearAgo + '% a year earlier' : '') + (u.state ? ' · Texas ' + u.state.rate + '%' : ''));
+    const c = one() && u.counties?.[one()], m = u.metros?.['26420'], x = c || m; if (!x) return '';
+    return tile(x.rate + '%', 'Unemployment', (c ? cname(one()) + ' County' : 'Houston metro') + ', ' + MON[+x.period.slice(5) - 1] + ' ' + x.period.slice(0, 4) + (x.yearAgo != null ? ' · ' + x.yearAgo + '% a year earlier' : '') + (u.state ? ' · Texas ' + u.state.rate + '%' : ''));
   }
   // rates and home lending (FRED, New York Fed, CFPB HMDA)
-  function spark(pts) {
+  // weekly rate sparkline; hover a week for its date and value
+  function spark(pts, unit = '%') {
     if (!pts?.length) return ''; const w = 120, h = 28, vs = pts.map(p => p[1]), lo = Math.min(...vs), hi = Math.max(...vs), k = hi - lo || 1;
-    return '<svg class="mk-spark" viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="' + pts.map((p, i) => (i / Math.max(1, pts.length - 1) * w).toFixed(1) + ',' + (h - 2 - (p[1] - lo) / k * (h - 4)).toFixed(1)).join(' ') + '"/></svg>';
+    const X = i => i / Math.max(1, pts.length - 1) * w, Y = v => h - 2 - (v - lo) / k * (h - 4), cw = w / Math.max(1, pts.length - 1);
+    return '<svg class="mk-spark" viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" role="img" aria-label="Last 12 months"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="' + pts.map((p, i) => X(i).toFixed(1) + ',' + Y(p[1]).toFixed(1)).join(' ') + '"/>' +
+      pts.map((p, i) => '<g class="mk-hit" data-tip="' + esc(MON[+String(p[0]).slice(5, 7) - 1] + ' ' + +String(p[0]).slice(8, 10) + ', ' + String(p[0]).slice(0, 4) + ': ' + (+p[1]).toFixed(2) + unit) + '"><rect x="' + (X(i) - cw / 2).toFixed(1) + '" y="0" width="' + cw.toFixed(2) + '" height="' + h + '" fill="transparent"/><circle cx="' + X(i).toFixed(1) + '" cy="' + Y(p[1]).toFixed(1) + '" r="2" fill="currentColor" opacity="0"/></g>').join('') + '</svg>';
   }
   function ratesBox() {
     const r = area.rates?.series, mg = area.mortgages; if (!r && !mg) return '';
@@ -235,7 +250,7 @@ export function initArea(ctx) {
       '<div><b style="color:' + CR.p + '">' + fmtN(L.p) + '</b><span>Property · ' + pct(d.change.p) + '</span></div><div><b>' + fmtN(d.per_sqmi?.total) + '</b><span>Per sq mi a year</span></div></div>' +
       '<div class="mk-leg">' + legBtn('v', '', 'Violent', CR.v) + legBtn('p', '', 'Property', CR.p) + legBtn('o', '', 'Other', CR.o) + '</div>' + crimeChart(d.months || []) + pinned('crime', s) +
       '<h4 class="mk-h4">Most reported offenses, last 12 months</h4>' + hbars((d.offenses || []).slice(0, 8).map((o, i) => ({ label: o.name, v: o.n, k: 'offense:' + i, tip: o.name + ': ' + fmtN(o.n) + ' incidents' })), fmtN) + pinned('offense', s) +
-      '<div class="rnote">Houston Police incidents (NIBRS) through ' + esc(monthLabel(d.latest.slice(0, 7))) + ', compared with the 12 months before; the file runs about three months behind. City of Houston only' + (sel === 'all' ? '' : ' (part of ' + esc(cname(sel)) + ' County)') + '.</div></section>';
+      '<div class="rnote">Houston Police incidents (NIBRS) through ' + esc(monthLabel(d.latest.slice(0, 7))) + ', compared with the 12 months before; the file runs about three months behind. City of Houston only' + (sel === 'all' ? '' : ' (part of ' + esc(areaLabel()) + ')') + '.</div></section>';
   }
   function trafficBox(s) {
     const t = traffic.get(sel); if (t === undefined) return '';
@@ -254,16 +269,17 @@ export function initArea(ctx) {
       const W = 260, H = 180, fcx = { type: 'FeatureCollection', features: geo.map(g => ({ type: 'Feature', properties: {}, geometry: g.geom })) };
       const path = d3.geoPath(d3.geoMercator().fitExtent([[6, 6], [W - 6, H - 6]], fcx));
       svg = '<svg class="mk-mini" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">' + geo.map(g => { const c = area.counties.find(x => x.name === g.name);
-        return '<path d="' + path(g.geom) + '" data-county="' + c.fips + '" class="' + (sel === c.fips ? 'on' : sel === 'all' ? 'in' : '') + '"><title>' + esc(c.name) + ' County</title></path>'; }).join('') +
-        geo.map(g => { const [x, y] = path.centroid(g.geom), on = sel === area.counties.find(c => c.name === g.name)?.fips; return Number.isFinite(x) ? '<text x="' + x.toFixed(1) + '" y="' + (y + 3).toFixed(1) + '"' + (on ? ' class="on"' : '') + '>' + esc(g.name.toUpperCase()) + '</text>' : ''; }).join('') + '</svg>';
+        return '<path d="' + path(g.geom) + '" data-county="' + c.fips + '" class="' + (sel !== 'all' && fipsList().includes(c.fips) ? 'on' : sel === 'all' ? 'in' : '') + '"><title>' + esc(c.name) + ' County</title></path>'; }).join('') +
+        geo.map(g => { const [x, y] = path.centroid(g.geom), on = sel !== 'all' && fipsList().includes(area.counties.find(c => c.name === g.name)?.fips); return Number.isFinite(x) ? '<text x="' + x.toFixed(1) + '" y="' + (y + 3).toFixed(1) + '"' + (on ? ' class="on"' : '') + '>' + esc(g.name.toUpperCase()) + '</text>' : ''; }).join('') + '</svg>';
     }
-    const btn = (v, name, sub) => '<button type="button" class="mk-cty" data-county="' + v + '" aria-pressed="' + (sel === v) + '"><b>' + esc(name) + '</b><span>' + esc(sub) + '</span></button>';
+    const btn = (v, name, sub) => '<button type="button" class="mk-cty" data-county="' + v + '" aria-pressed="' + (v === 'all' ? sel === 'all' : sel !== 'all' && fipsList().includes(v)) + '"><b>' + esc(name) + '</b><span>' + esc(sub) + '</span></button>';
     return '<div class="mk-scope"><div class="mk-scope-l"><div class="mk-scope-k">Area</div>' + svg + '</div><div class="mk-ctys" role="group" aria-label="Market area">' +
       btn('all', 'Whole region', area.counties.length + ' counties') + area.counties.map(c => btn(c.fips, c.name, c.fips === (area.counties.find(x => x.name === ctx.HOME_C)?.fips) ? 'County · home' : 'County')).join('') +
-      '</div><div class="mk-scope-n">Click a county on the map or a button; click it again for the whole region.</div></div>';
+      '</div><div class="mk-scope-n">' + (sel !== 'all' && sel === adopted ? 'Showing the area selected on the map. ' : '') + 'Click a county on the map or a button; click it again for the whole region.</div></div>';
   }
   // ---------- export: the view as a PDF report and every series as CSV ----------
-  const areaLabel = () => sel === 'all' ? 'Houston region (' + area.counties.length + ' counties)' : cname(sel) + ' County';
+  const areaLabel = () => { if (sel === 'all') return 'Houston region (' + area.counties.length + ' counties)'; const n = fipsList().map(cname);
+    return n.length === 1 ? n[0] + ' County' : n.length === 2 ? n.join(' + ') + ' counties' : n.length + ' counties (' + n.join(', ') + ')'; };
   const slug = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
   async function exportReport() {
     if (!area) return; if (ctx.view !== 'market') { ctx.setView('market'); await new Promise(r => setTimeout(r, 60)); }
@@ -307,7 +323,7 @@ export function initArea(ctx) {
     ctx.exportMeta = { report: 'market', format: 'csv', scope: label };
     try { await ctx.exportCsv(rows, 'market-data-' + slug(label) + '-' + new Date().toISOString().slice(0, 10)); } finally { ctx.exportMeta = null; }
   }
-  ctx.exportMarket = async (format = 'html', county) => { await load(); if (county) { const c = area?.counties.find(x => x.fips === county || x.name.toLowerCase() === String(county).toLowerCase()); if (c) sel = c.fips; }
+  ctx.exportMarket = async (format = 'html', county) => { await load(); if (county) { const c = area?.counties.find(x => x.fips === county || x.name.toLowerCase() === String(county).toLowerCase()); if (c) { sel = c.fips; adopted = mapCounties(); } }
     if (format === 'csv') return exportData(); ctx.setView('market'); await new Promise(r => setTimeout(r, 120)); return exportReport(); };
 
   function render() {
@@ -317,6 +333,7 @@ export function initArea(ctx) {
       load().then(() => { if (area) render(); else if (ctx.view === 'market') root.querySelector('.empty').textContent = 'Market data isn’t available yet. It’s added by the nightly data refresh.'; });
       return;
     }
+    adopt();
     W = Math.max(300, Math.min(520, (root.clientWidth || 520) - (root.clientWidth > 900 ? root.clientWidth / 2 + 40 : 70)));
     const s = stats(), last = s.permits?.[s.permits.length - 1], prev = s.permits?.[s.permits.length - 2];
     const last12 = s.biz ? s.biz.filter(r => r.m < new Date().toISOString().slice(0, 7)).slice(-12) : [];
@@ -330,7 +347,7 @@ export function initArea(ctx) {
       s.spend ? tile(fmtM(s.spend.total), 'Consumer spending (est.)', (s.spend.perHH ? fmtM(s.spend.perHH) + ' per household · ' : '') + 'a year') : ''
     ].filter(Boolean);
     const placeOpts = s.places ? '<option value="">All places</option>' + s.places.map(p => '<option value="' + esc(p.key) + '"' + (newsPlace === p.key ? ' selected' : '') + '>' + esc(p.label) + '</option>').join('') : '';
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Market</div><h2>Growth signals ' + (sel === 'all' ? 'across the region' : 'in ' + esc(cname(sel)) + ' County') + '</h2>' +
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">Market</div><h2>Growth signals ' + (sel === 'all' ? 'across the region' : 'in ' + esc(areaLabel())) + '</h2>' +
       '<div class="vsub">Jobs, housing permits, new businesses, consumer spending, city sales tax and local development news from free public sources, refreshed with the nightly build' + (area.built ? ' (last ' + new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : '') + '. No sales or lease comps: Texas doesn’t disclose sale prices.</div></div>' +
       '<div class="vctl">' +
       '<div class="mk-seg" role="group" aria-label="Months shown">' + [[12, '12 mo'], [24, '24 mo'], [0, 'All']].map(([v, l]) => '<button type="button" data-range="' + v + '" aria-pressed="' + (range === v) + '">' + l + '</button>').join('') + '</div>' +
@@ -351,10 +368,13 @@ export function initArea(ctx) {
       (s.news ? '<section class="mk-box"><h3>Local development news</h3><div class="mk-ctl"><select class="chip" id="mkPlace" aria-label="News place">' + placeOpts + '</select></div>' +
         (s.news.length ? s.news.map((a, i) => (i === 10 ? '<details class="raw mk-more"><summary>' + (s.news.length - 10) + ' more</summary>' : '') + '<a class="chitem" target="_blank" rel="noopener" href="' + esc(a.url) + '"><span><b>' + esc(a.title) + '</b><em>' + esc(a.domain) + (a.date ? ' · ' + esc(a.date) : '') + ' · ' + esc(a.place) + '</em></span></a>').join('') + (s.news.length > 10 ? '</details>' : '') : '<div class="rnote">No articles found in the last few months.</div>') +
         '<div class="rnote">Google News search for development, construction, rezoning and real estate stories naming each county and its busiest towns; kept for 120 days. Headlines link to the publisher.</div></section>' : '') +
-      (s.latest?.length ? '<section class="mk-box mk-wide"><h3>Newest business locations</h3><div class="tablewrap"><table class="who"><thead><tr><th>Business</th><th>Address</th><th>Type</th><th>Permit issued</th></tr></thead><tbody>' +
-        s.latest.map(b => '<tr><td>' + esc(b.name) + (b.owner ? '<div class="sc">' + esc(b.owner) + '</div>' : '') + '</td><td>' + esc([b.addr, b.city].filter(Boolean).join(', ')) + '</td><td>' + esc(b.sec != null ? SECTORS[b.sec][1] : (b.naics || '')) + '</td><td class="m">' + esc(b.date) + '</td></tr>').join('') +
-        '</tbody></table></div><div class="rnote">Texas Comptroller active sales-tax permits, newest first. A new permit can also mean a change of owner at an existing location.</div></section>' : '') +
-      (ctx.markets?.html() || '') + '</div>';
+      (ctx.markets?.html() || '') +
+      // newest business locations: last on the page, 10 rows at a time
+      (s.latest?.length ? '<section class="mk-box mk-wide" id="mkLatest"><h3>Newest business locations</h3><div class="tablewrap"><table class="who"><thead><tr><th>Business</th><th>Address</th><th>Type</th><th>Permit issued</th></tr></thead><tbody>' +
+        s.latest.map((b, i) => '<tr' + (i >= 10 ? ' hidden' : '') + '><td>' + esc(b.name) + (b.owner ? '<div class="sc">' + esc(b.owner) + '</div>' : '') + '</td><td>' + esc([b.addr, b.city].filter(Boolean).join(', ')) + '</td><td>' + esc(b.sec != null ? SECTORS[b.sec][1] : (b.naics || '')) + '</td><td class="m">' + esc(b.date) + '</td></tr>').join('') +
+        '</tbody></table></div>' + (s.latest.length > 10 ? '<button class="btn mk-morebtn" type="button" id="mkLatestMore">Show ' + Math.min(10, s.latest.length - 10) + ' more (' + (s.latest.length - 10) + ' left)</button>' : '') +
+        '<div class="rnote">Texas Comptroller active sales-tax permits, newest first (the latest ' + s.latest.length + '). A new permit can also mean a change of owner at an existing location.</div></section>' : '') +
+      '</div>';
     root.querySelectorAll('.mk-scope [data-county]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.county; sel = v === sel && v !== 'all' ? 'all' : v; newsPlace = ''; pin = null; render(); }));
     root.querySelectorAll('[data-range]').forEach(b => b.onclick = () => { range = +b.dataset.range; pin = null; render(); });
     root.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { const k = b.dataset.show, pair = k === 'sf' || k === 'mf' ? ['sf', 'mf'] : ['v', 'p', 'o'];
@@ -371,6 +391,9 @@ export function initArea(ctx) {
       else if (a === 'spendmap') { ctx.setView('map'); ctx.showDemographic?.('sph'); }
       else if (a === 'crimemap') { ctx.setView('map'); ctx.crimeLayer?.(true); } });
     loadExtras(); ctx.markets?.wire(root, render);
+    const more = root.querySelector('#mkLatestMore');
+    if (more) more.onclick = () => { const h = [...root.querySelectorAll('#mkLatest tbody tr[hidden]')]; h.slice(0, 10).forEach(tr => tr.hidden = false);
+      const left = h.length - 10; if (left > 0) more.textContent = 'Show ' + Math.min(10, left) + ' more (' + left + ' left)'; else more.remove(); };
     const ps = root.querySelector('#mkPlace'); if (ps) ps.onchange = e => { newsPlace = e.target.value; render(); };
     const tip = root.querySelector('#mkTip');
     root.querySelectorAll('.mk-hit').forEach(el => {

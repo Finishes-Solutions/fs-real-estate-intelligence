@@ -1,5 +1,6 @@
 // Offline tests for drive-time areas (api/isochrone.js): TomTom reachable range, the Valhalla fallback, limits.
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { parseMinutes, departAt, isochrones, tomtomRange, valhalla } from '../api/isochrone.js';
 
 const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
@@ -85,6 +86,27 @@ console.log('drivetime ok');
   assert.equal(d.live[0].congestion_pct, 50); assert.equal(d.live[0].road, 'I-10');
   assert.equal(d.incidents[0].kind, 'Crash'); assert.equal(d.incidents[0].delay_min, 10); assert.equal(d.incidents[0].lon, -95.45);
   const n = await trafficReport(sq, { key: '', fetchImpl: f }); assert.match(n.live.error, /TomTom/); assert.equal(n.counts.roads.length, 2, 'counts work without TomTom');
-  const big = { type: 'Polygon', coordinates: [[[-96, 29], [-95, 29], [-95, 30], [-96, 30], [-96, 29]]] };
-  await assert.rejects(trafficReport(big, { key: '', fetchImpl: f }), /too large/); }
+  // a county works (Waller is ~520 sq mi; the limit used to be 250); several counties' worth of Texas is too much
+  const geo = JSON.parse(fs.readFileSync(new URL('../data/geo.json', import.meta.url)));
+  const waller = { type: 'MultiPolygon', coordinates: geo.counties.find(c => c.name === 'Waller').outline };
+  const w = await trafficReport(waller, { key: '', fetchImpl: f, label: 'Waller County' }); assert.ok(w.area_sqmi > 400 && w.area_sqmi < 700, 'Waller ' + w.area_sqmi); assert.equal(w.counts.roads.length, 2);
+  const harris = { type: 'MultiPolygon', coordinates: geo.counties.find(c => c.name === 'Harris').outline };
+  assert.ok((await trafficReport(harris, { key: '', fetchImpl: f })).area_sqmi > 1500, 'Harris County');
+  const big = { type: 'Polygon', coordinates: [[[-97, 29], [-95, 29], [-95, 31], [-97, 31], [-97, 29]]] };
+  await assert.rejects(trafficReport(big, { key: '', fetchImpl: f }), /too large .*5,000/);
+  // TomTom incident boxes stop at 10,000 km²: a county-wide box is asked in 4 pieces, then kept to the area itself
+  const { incidentBoxes, incidentsIn } = await import('../api/traffic.js');
+  assert.equal(incidentBoxes([-95.5, 29.7, -95.4, 29.8]).length, 1);
+  const allThree = { type: 'MultiPolygon', coordinates: geo.counties.filter(c => ['Harris', 'Fort Bend', 'Montgomery'].includes(c.name)).flatMap(c => c.outline) };
+  const { bbox } = await import('../lib/fema.mjs');
+  const parts = incidentBoxes(bbox(allThree)); assert.equal(parts.length, 4, 'three counties: four boxes');
+  assert.equal(incidentBoxes([-100, 28, -94, 34]), null, 'too wide for incidents');
+  const asked = []; const g = async url => { const u = new URL(String(url)); asked.push(u.searchParams.get('bbox'));
+    return json({ incidents: [
+      { geometry: { type: 'Point', coordinates: [-95.95, 30.1] }, properties: { iconCategory: 8, startTime: 'a' } }, // in Waller
+      { geometry: { type: 'Point', coordinates: [-95.6, 29.8] }, properties: { iconCategory: 1, startTime: 'b' } } ] }); }; // west Houston: in the box, not the county
+  const inc = await incidentsIn('k', bbox(waller), g, waller);
+  assert.deepEqual(inc.map(x => x.kind), ['Road closed'], 'only incidents inside Waller County');
+  asked.length = 0; const inc3 = await incidentsIn('k', bbox(allThree), g, allThree);
+  assert.equal(asked.length, 4); assert.equal(inc3.length, 1, 'the same incident from several boxes is kept once'); }
 console.log('traffic report ok');

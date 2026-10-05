@@ -9,6 +9,9 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.pathname.endsWith('/NFHL/MapServer/28/query')) { const b = new URLSearchParams(opts.body); assert.match(b.get('geometry'), /rings/); return Response.json({ features: [
     { attributes: { FLD_ZONE: 'AE', ZONE_SUBTY: null, SFHA_TF: 'T', STATIC_BFE: 51 }, geometry: { rings: [[[-95.41, 29.73], [-95.39, 29.73], [-95.39, 29.77], [-95.41, 29.77], [-95.41, 29.73]]] } },
     { attributes: { FLD_ZONE: 'X', ZONE_SUBTY: '0.2 PCT ANNUAL CHANCE FLOOD HAZARD', SFHA_TF: 'F', STATIC_BFE: -9999 }, geometry: { rings: [[[-95.39, 29.73], [-95.37, 29.73], [-95.37, 29.77], [-95.39, 29.77], [-95.39, 29.73]]] } }] }); }
+  if (u.pathname.endsWith('/NFHL/MapServer/legend')) return Response.json({ layers: [{ layerId: 3, legend: [{ label: 'x', imageData: 'AA' }] }, { layerId: 28, legend: [
+    { label: '1% Annual Chance Flood Hazard', imageData: 'QUFB', contentType: 'image/png' }, { label: 'Regulatory Floodway', imageData: 'QkJC', contentType: 'image/png' },
+    { label: '0.2% Annual Chance Flood Hazard', imageData: 'Q0ND', contentType: 'image/png' }, { label: '1% Annual Chance Flood Hazard', imageData: 'RERE' }, { label: '<all other values>', imageData: 'RUVF' }] }] });
   if (u.pathname.endsWith('/NFHL/MapServer/export')) return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'Content-Type': 'image/png' } });
   if (u.pathname.includes('National_Risk_Index_Census_Tracts')) return Response.json({ features: [
     { attributes: { TRACTFIPS: '48201412901', COUNTY: 'Harris', STCOFIPS: '48201', POPULATION: 1577, BUILDVALUE: 3e8, RISK_SCORE: 24, RISK_RATNG: 'Relatively Low', EAL_VALT: 1063751, SOVI_SCORE: 9, RESL_SCORE: 16, HRCN_EALT: 600000, HRCN_RISKR: 'Relatively High', RFLD_EALT: 300000, RFLD_RISKR: 'Relatively Moderate', HAIL_EALT: 456, HAIL_RISKR: 'Very Low' } },
@@ -25,7 +28,11 @@ globalThis.fetch = async (url, opts = {}) => {
       { disasterNumber: 3500, declarationDate: '2020-03-13T00:00:00.000Z', incidentType: 'Biological', declarationTitle: 'COVID-19', declarationType: 'EM' }] }); }
   return new Response('unmocked ' + u, { status: 599 });
 };
-const { default: handler, femaReport, tileBBox } = await import('../api/fema.js');
+const { default: handler, femaReport, tileBBox, femaLegend } = await import('../api/fema.js');
+// map legend: FEMA's own swatches for the flood zone layer, plain labels, no duplicates; the 100-year-only filter keeps those
+{ const all = await femaLegend(); assert.deepEqual(all.items.map(x => x.label), ['High risk: 1% a year (100-year floodplain)', 'Floodway (keep clear for flood flow)', 'Moderate risk: 0.2% a year (500-year)']);
+  assert.equal(all.items[0].img, 'data:image/png;base64,QUFB');
+  assert.deepEqual((await femaLegend({ cls: 'high' })).items.map(x => x.fema), ['1% Annual Chance Flood Hazard', 'Regulatory Floodway']); }
 const { zoneClass, zoneShares, claimsSummary, nriSummary, areaSqMi, samplePoints } = await import('../lib/fema.mjs');
 
 const d = await femaReport(AREA, { label: 'Test area' });

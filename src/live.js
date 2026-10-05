@@ -36,7 +36,11 @@ export function initLive(ctx) {
   panel.appendChild(box);
   const note = box.querySelector('#liveNote');
   box.querySelectorAll('input[data-live]').forEach(i => i.onchange = () => set({ [i.dataset.live]: i.checked }));
+  // rain radar legend (bottom left): NWS base reflectivity colors, as the radar tiles draw them (api/tile)
+  const RADAR_LEGEND = '<div class="t">Rain radar</div><div class="lg-grad" style="background:linear-gradient(90deg,#04e9e7 0%,#019ff4 10%,#0300f4 20%,#02fd02 30%,#01c501 37%,#008e00 45%,#fdf802 52%,#e5bc00 58%,#fd9500 65%,#fd0000 72%,#d40000 80%,#bc0000 86%,#f800fd 93%,#9854c6 100%);opacity:.8"></div>' +
+    '<div class="lg-ticks"><span>Light</span><span>Moderate</span><span>Heavy</span><span>Severe</span></div><div class="lg-note">Reflectivity, about 5 to 75 dBZ; updates every 4 minutes.</div>';
   function syncUI() {
+    ctx.setLegend?.('radar', on.radar ? RADAR_LEGEND : '');
     box.querySelectorAll('input[data-live]').forEach(i => { i.checked = on[i.dataset.live]; if (i.dataset.live === 'traffic') i.disabled = trafficOK === false && !on.traffic; });
     const bits = [];
     if (trafficOK === false) bits.push('Traffic needs a TomTom key on the server (see README).');

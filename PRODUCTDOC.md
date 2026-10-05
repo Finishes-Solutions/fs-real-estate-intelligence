@@ -35,7 +35,7 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 ## The screen at a glance
 
 **Left panel** (on phones, the **Explore** tab)
-- **Area at a Glance:** who lives and works in the area on screen: population and growth, median income, home value, rent, households and jobs. It updates as you move the map.
+- **Area at a Glance:** who lives and works in the area you've selected (a county, shape, radius or place), or in the area on screen when nothing is selected (zoomed in on a block, the census tract you're in): population and growth, median income, home value, rent, households and jobs. Its heading names the area it covers. With nothing selected it updates as you move the map; clear the selection to go back to following the map.
 - **This Area:** the area you've picked, or the map view if you haven't picked one. It holds the area reports, Compare, Save Search and Copy Link.
 - **Construction Filings:** the construction project list, KPIs and filters. It's collapsed until you open it.
 
@@ -77,14 +77,14 @@ Cards slide up from the bottom: swipe down to shrink one, and swipe again to clo
 Click a building, or at street zoom click open ground, to open its **property card**. The owner and value show first, usually within a couple of seconds; the businesses, height and photo fill in after.
 
 - **Ownership & value:** owner, mailing address, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service.
-- **The building:** footprint, height, floors and estimated floor area.
+- **The building:** footprint, height, floors and estimated floor area. Height comes from USGS lidar where it's believable; a reading that doesn't fit the building (say, hundreds of feet on a one-storey store) is set aside with a note, and the map or appraisal record is used instead.
 - **Site:** flood zone, traffic counts on nearby roads, water and utility districts (MUDs), tax-increment zones, Opportunity Zone, school district, bus stops, nearby environmental sites, crime nearby (Houston), and area rents and jobs.
 - **Crime:** inside Houston, the incidents reported within a mile. Anywhere in the US, **Crime by city / county**:
   - the local police department: the city's own police inside city limits, otherwise the county police or sheriff;
   - violent and property crimes per 100,000 residents for the newest full year, compared with the state and the US, and the change from the year before;
   - a 10-year trend line against the state and the US, and the share of crimes solved;
   - how it ranks among the same kind of departments in its state, e.g. "violent crime lower than 71% of Texas city police departments";
-  - **Other departments** in the county, if you'd rather see a neighboring city or the sheriff;
+  - **Other departments** in the county, if you'd rather see a neighboring city or the sheriff (the section stays where it is on screen while the new department loads);
   - **Full report** for the year-by-year table and the mix of offenses (murder, robbery, burglary, theft and others), with PDF and CSV export.
   - These are whole-year, department-wide figures from the FBI: every spot a department covers shows the same numbers. The card says which year they're for, and warns you when a department reported only part of a year or has stopped reporting.
 - **Area snapshot:** census numbers for that neighborhood.
@@ -94,9 +94,11 @@ Click a building, or at street zoom click open ground, to open its **property ca
 - **Regrid details** (paid, capped each month): zoning, zoning limits such as height and density, the last sale price and date where recorded, and land use. Harris and Waller counties aren't in the free state parcel data, so Regrid fills in owner and value there.
 - Street View, an orbit camera, notes, and **Ask AI** about this property.
 
+**Section buttons** under the card's title (Value, Building, Site, Crime, Area…) jump to that section, with its heading just below the card's header.
+
 **Big buildings:** clicking any part of a building selects the whole building, even a warehouse or shopping center that the map draws in pieces. If the building sits on more than one parcel, the card lists every parcel with its owner and value, and a total.
 
-**Several things at once (tabs):** Shift-click to add more, up to 10. On a touch screen, tap **+ Add** at the top of the card (or **Select Multiple**), tap the other things, then **Done**. This works for buildings, parcels, construction filings, planes and airports, mixed together.
+**Several things at once (tabs):** Shift-click to add more, up to 10. On a touch screen, tap **Add** at the top of the card (or **Select Multiple**), tap the other things, then **Done**. This works for buildings, parcels, construction filings, planes and airports, mixed together.
 - Each one gets a numbered **tab** at the top of the card; the same number marks it on the map. Tap a tab to see that card, or its **×** to drop it.
 - Shift-click something already picked to take it out. A plain click starts over with just that one; closing the card clears them all.
 - With two or more buildings or parcels, an **All** tab adds them up: footprint, floor area, market value and acres (each parcel counted once), the construction filings on them, a CSV export and **Zoom to All**.
@@ -108,7 +110,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
 Choose **Area**, **Shape**, **Radius** or **County** at the top of the map and mark the area. It becomes the **selected area**, shown in the **This Area** box. From there you can run:
 
 - **FEMA report:** flood zones, past flood insurance claims, disaster declarations and FEMA's risk index.
-- **Traffic report:** the busiest roads and daily traffic counts, plus live speeds and incidents where available.
+- **Traffic report:** the busiest roads and daily traffic counts, plus live speeds and incidents where available. Works for areas up to 5,000 square miles, so a whole county (even Harris) or a few counties together. For big areas it lists the busiest roads; incidents are only the ones inside the area.
 - **Drive-time map:** 10, 20 and 30-minute drive areas, with the people, households and jobs inside each.
 - **Air traffic report:** how often planes pass over, how low, and which kinds.
 - **Crime report** (City of Houston): incidents by type, trend, time of day, day of week, and per resident.
@@ -147,7 +149,9 @@ Property filters (use, acres, value, year built, owner, zoning) are planned. The
 
 ## Map layers
 
-**Quick layer buttons** turn the most common layers on and off with one tap. A button is highlighted whenever its layer is on the map, however it was turned on. **Filings** covers both the dots and the heatmap, and turning it off hides both. Layers without their own button (crime, airports, weather and others) are counted on **More** (for example "More · 2"); hover over it to see which. **More** (or the layers button on the right) opens **Map Layers**, which holds every layer and its options.
+**Quick layer buttons** turn the most common layers on and off with one tap. A button is highlighted whenever its layer is on the map, however it was turned on. **Filings** covers both the dots and the heatmap, and turning it off hides both. Layers without their own button (crime, airports, weather and others) are counted on **More** (for example "More · 2"); hover over it to see which. **More** (or the layers button on the right) opens **Map Layers** right under the quick layer buttons, with every layer and its options. Click **More** again, the ×, or anywhere on the map to close it.
+
+**Legends** in the bottom-left corner explain the layers that are on: filings, traffic counts, drive times, planes, crime, airports, and now **Rain radar** (light to severe rain) and **Flood zones** (FEMA's own colors: high-risk 100-year floodplain, floodway, moderate 500-year zone).
 
 The map always opens without construction filings or planes. Turn them on with their buttons. A shared link that carries filing filters opens with the filings shown.
 
@@ -210,8 +214,8 @@ The quick buttons and the panel always match. A layer turned on in either place,
 
 ## Market and demographics
 
-- **Area at a Glance** in the left panel shows the census numbers for what's on screen.
-- The **Market** tab, for each county or the whole region, shows the items below. Pick the area at the top: click a county on the small map or its button, and click it again (or **Whole region**) to go back to all counties.
+- **Area at a Glance** in the left panel shows the census numbers for the selected area, or for what's on screen when nothing is selected.
+- The **Market** tab, for each county or the whole region, shows the items below. It opens on the area selected on the map: the selected county (or counties together), or the county a drawn area sits in; with nothing selected it shows the whole region. Change it at the top: click a county on the small map or its button, and click it again (or **Whole region**) to go back to all counties.
   - population and growth;
   - jobs and top industries;
   - new housing permits;
@@ -221,7 +225,9 @@ The quick buttons and the panel always match. A layer turned on in either place,
   - local development news;
   - interest rates;
   - unemployment;
-  - the Houston crime trend and the busiest roads.
+  - the Houston crime trend and the busiest roads;
+  - the newest business locations, at the very bottom, 10 at a time (**Show 10 more**).
+  - Hover over any chart (bars, lines and the small trend lines in the tables) to read its numbers.
 - **Markets**, at the bottom of the Market tab, lists prices for the things that move Houston real estate, in groups you pick from the tabs:
   - oil and natural gas, and Houston's big energy and other public companies;
   - homebuilders and real estate funds;
@@ -232,7 +238,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
 - The **Correlation explorer** below it answers "does this market move with Houston, and which goes first?":
   - Pick a Houston measure and a market series (or click **Correlate** on any row).
   - It compares year-over-year changes (or month-over-month) and tries every lead and lag up to 12 months.
-  - It gives a verdict (strong, moderate, weak or not reliable), the lead time, and a chart of both lines.
+  - It gives a verdict (strong, moderate, weak or not reliable), the lead time, and a chart of both lines. The choices and the verdict sit on the left, the chart on the right; hover over the chart for each month's actual changes, and over the lead/lag bars for each lag's correlation. **How this is measured** explains the method.
   - It is deliberately strict. It discounts for every lag it tries and for months that overlap. A link has to hold in both halves of the period to be called strong. Two unrelated prices that both rose over the years won't look related, and neither will two series that only share one extreme month, such as the spring 2020 crash.
   - Year over year is the safer choice. Most Houston numbers aren't seasonally adjusted, so month-over-month changes mostly show the seasons.
   - **What moves …?** tests your measure against every market series at once and lists the closest matches. With so many comparisons the bar is high, and often nothing passes. That is a real answer: it means no market series reliably tracks that measure.
@@ -250,8 +256,8 @@ Texas requires most commercial and public construction projects to register with
 - **Filing dots** are off by default. Turn them on with **Filings**. Green is new construction, grey is renovation, and a ring is an addition.
 - **Filters → Construction filings:** time period, county, type, value, use, status, size, housing units, company name, exact addresses only, start or registration dates, and recent changes. On phones, Filters opens as a full sheet with **Clear All** at the top and a button at the bottom that closes it.
 - **Filing card:** project details, dates, people involved, an **AI project brief** (what it is, timing, who's involved, area context), and nearby filings.
-- **Timeline:** the monthly pipeline of what's under construction, plus a Gantt chart of every project. Hatched bars are dates estimated because the filer left them blank.
-- **Activity:** developers, architects and contractors ranked by activity. Click one to see their projects.
+- **Timeline:** the monthly pipeline of what's under construction, plus a Gantt chart of every project. Hatched bars are dates estimated because the filer left them blank. Clicking a project or dragging across the chart turns the filings on on the map.
+- **Activity:** developers, architects and contractors ranked by activity. Click one to see their projects on the map (the filings turn on).
 - **Updates:** new filings and changes found by the nightly refresh.
 - **Time-lapse:** the clock button on the right plays construction month by month.
 - **Saved searches, links and alerts:** save a search in this browser, copy a link that reopens exactly this view, or subscribe to an RSS feed of new matching filings. RSS works with email tools like Zapier.
@@ -333,12 +339,16 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Market tab follows your selection:** it opens on the county (or counties) selected on the map, every chart shows its numbers on hover, the Correlation explorer is compact, and the newest businesses sit at the bottom, 10 at a time.
+- **Legends for Rain radar and Flood zones** in the bottom-left corner, and **Map Layers** now opens right under the quick layer buttons.
+- **Area at a Glance follows your selection:** pick a county (or draw an area) and the panel shows that area's numbers instead of the map view.
+- **Traffic reports for whole counties:** the traffic report now covers areas up to 5,000 square miles instead of 250.
 - **Crime library and state rankings:** the FBI figures for every US city and county police department are now kept in the app and refreshed monthly, so the crime section loads faster and shows how a city ranks in its state. Ask AI can list the lowest- or highest-crime cities and counties in any state.
 - **Crime by city / county, anywhere in the US:** property cards and a new City / County Crime Report show the local police department's violent and property crime rates against the state and the nation, 10 years of history and the mix of offenses, from FBI figures. Ask AI can answer crime questions outside Houston too.
 - **Markets and the Correlation explorer** on the Market tab: stocks, Houston companies, homebuilders, crypto, oil and gas, building material prices and rates, with an honest test of which ones move with Houston's numbers, and an AI explanation.
 - **More history:** the Houston crime trend now covers up to six years instead of two, and the Air Traffic Report can cover up to three years once enough has been collected.
 - **Whole buildings:** clicking a big building selects all of it, and a building on several parcels lists every parcel with a total.
-- **Tabs on the card:** Shift-click (or **+ Add** on touch screens) to pick up to 10 buildings, parcels, filings, planes or airports, each in its own tab, with an **All** tab that adds up the buildings.
+- **Tabs on the card:** Shift-click (or **Add** on touch screens) to pick up to 10 buildings, parcels, filings, planes or airports, each in its own tab, with an **All** tab that adds up the buildings.
 - **A subtler dot grid:** smaller, closer and much fainter dots.
 - **Phones:** the quick layer buttons sit in their own row under the search bar, clear of the map buttons.
 - **The map opens clean:** no filings or planes until you turn them on, and the layer buttons always match what's on the map.

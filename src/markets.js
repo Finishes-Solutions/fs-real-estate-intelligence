@@ -49,11 +49,14 @@ export function initMarkets(ctx) {
     return num(v, v >= 1000 ? 0 : 1);
   }
   const pct = v => v == null ? '<span class="mx-dim">—</span>' : '<span class="' + (v > 0 ? 'mx-up' : v < 0 ? 'mx-dn' : '') + '">' + (v > 0 ? '+' : '') + num(v, Math.abs(v) < 10 ? 2 : 1) + '%</span>';
+  // last 12 months; hover a point for its date and value
   function spark(s, d) {
-    const v = d?.recent?.v || []; if (v.length < 2) return '';
-    const W = 110, H = 28, mn = Math.min(...v), mx = Math.max(...v), y = x => H - 3 - (x - mn) / ((mx - mn) || 1) * (H - 6);
-    const pts = v.map((x, i) => (i / (v.length - 1) * W).toFixed(1) + ',' + y(x).toFixed(1)).join(' ');
-    return '<svg class="mx-spark ' + (v[v.length - 1] >= v[0] ? 'up' : 'dn') + '" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true"><polyline points="' + pts + '"/></svg>';
+    const v = d?.recent?.v || [], t = d?.recent?.t || []; if (v.length < 2) return '';
+    const W = 110, H = 28, mn = Math.min(...v), mx = Math.max(...v), x = i => i / (v.length - 1) * W, y = x => H - 3 - (x - mn) / ((mx - mn) || 1) * (H - 6), cw = W / (v.length - 1);
+    const pts = v.map((p, i) => x(i).toFixed(1) + ',' + y(p).toFixed(1)).join(' ');
+    const when = k => { const [yy, mm, dd] = String(k || '').split('-'); return yy ? new Date(Date.UTC(+yy, +mm - 1, +dd || 1)).toLocaleDateString('en-US', { month: 'short', ...(s.freq === 'd' || s.freq === 'w' ? { day: 'numeric' } : {}), year: 'numeric', timeZone: 'UTC' }) : ''; };
+    return '<svg class="mx-spark ' + (v[v.length - 1] >= v[0] ? 'up' : 'dn') + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Last 12 months"><polyline points="' + pts + '"/>' +
+      v.map((p, i) => '<g class="mk-hit" data-tip="' + esc((when(t[i]) ? when(t[i]) + ': ' : '') + fmt(s, p)) + '"><rect x="' + (x(i) - cw / 2).toFixed(1) + '" y="0" width="' + cw.toFixed(2) + '" height="' + H + '" fill="transparent"/><circle cx="' + x(i).toFixed(1) + '" cy="' + y(p).toFixed(1) + '" r="2" fill="currentColor" opacity="0"/></g>').join('') + '</svg>';
   }
   // the latest price: the live quote when it's newer than last night's close
   function latest(s) {
@@ -83,52 +86,64 @@ export function initMarkets(ctx) {
   // ---------- Correlation explorer ----------
   const opt = (s, v) => '<option value="' + s.id + '"' + (s.id === v ? ' selected' : '') + '>' + esc(s.label) + '</option>';
   function result() { const a = get(A), b = get(B); if (!a || !b) return null; return { a, b, res: correlate(a.map, b.map, { how, diffA: !!a.diff, diffB: !!b.diff }) }; }
+  // the two series' changes, standardized so they share one axis; hover a month for both actual changes
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], ym = k => MON[+k.slice(5, 7) - 1] + ' ' + k.slice(0, 4);
+  const chgTxt = (v, diff) => v == null ? '—' : (v > 0 ? '+' : '') + (diff ? num(v, 2) + ' pts' : num(v, Math.abs(v) < 10 ? 1 : 0) + '%');
   function chart(r) {
     const { res } = r; if (!res.series || res.r == null) return '';
     const a = new Map(res.series.a), b = new Map(res.series.b), keys = [...a.keys()].filter(k => b.has(shift(k, -res.lag))).sort();
     if (keys.length < 3) return '';
     const z = arr => { const m = arr.reduce((s, x) => s + x, 0) / arr.length, sd = Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / arr.length) || 1; return arr.map(x => (x - m) / sd); };
-    const va = z(keys.map(k => a.get(k))), vb = z(keys.map(k => b.get(shift(k, -res.lag)))), W = 640, H = 170, P = 26;
+    const va = z(keys.map(k => a.get(k))), vb = z(keys.map(k => b.get(shift(k, -res.lag)))), W = 560, H = 160, P = 26;
     const all2 = va.concat(vb), mn = Math.min(-2, ...all2), mx = Math.max(2, ...all2), X = i => P + i / (keys.length - 1) * (W - P - 6), Y = v => 8 + (mx - v) / (mx - mn) * (H - 30);
     const line = (vs, cls) => '<polyline class="' + cls + '" points="' + vs.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ') + '"/>';
-    const yrs = keys.map((k, i) => [k, i]).filter(([k]) => k.endsWith('-01'));
+    const yrs = keys.map((k, i) => [k, i]).filter(([k]) => k.endsWith('-01')), step = (W - P - 6) / (keys.length - 1), per = how === 'mom' ? ' vs the month before' : ' vs a year earlier';
+    const hits = keys.map((k, i) => { const kb = shift(k, -res.lag);
+      return '<g class="mk-hit mx-hit" data-tip="' + esc(ym(k) + ': ' + r.a.short + ' ' + chgTxt(a.get(k), r.a.diff) + per + ' · ' + r.b.short + (res.lag ? ' (' + ym(kb) + ')' : '') + ' ' + chgTxt(b.get(kb), r.b.diff)) + '">' +
+        '<rect x="' + (X(i) - step / 2).toFixed(1) + '" y="0" width="' + step.toFixed(2) + '" height="' + (H - 22) + '" fill="transparent"/><line x1="' + X(i).toFixed(1) + '" x2="' + X(i).toFixed(1) + '" y1="4" y2="' + (H - 22) + '"/></g>'; }).join('');
     return '<svg class="mx-chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="The two series, standardized"><line class="mx-zero" x1="' + P + '" x2="' + (W - 6) + '" y1="' + Y(0) + '" y2="' + Y(0) + '"/>' +
-      yrs.map(([k, i]) => '<text x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '" class="mx-ax">' + k.slice(0, 4) + '</text>').join('') + line(vb, 'mx-lb') + line(va, 'mx-la') + '</svg>';
+      yrs.map(([k, i]) => '<text x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '" class="mx-ax">' + k.slice(0, 4) + '</text>').join('') + line(vb, 'mx-lb') + line(va, 'mx-la') + hits + '</svg>';
   }
   const shift = (k, n) => { const [y, m] = k.split('-').map(Number), t = y * 12 + m - 1 + n; return Math.floor(t / 12) + '-' + String(t % 12 + 1).padStart(2, '0'); };
   function lagBars(res) {
     const L = res.lags.filter(l => Number.isFinite(l.r)); if (!L.length) return '';
-    const W = 640, H = 92, mid = 46, bw = W / res.lags.length;
+    const W = 560, H = 70, mid = 35, bw = W / res.lags.length;
     return '<svg class="mx-lags" viewBox="0 0 ' + W + ' ' + (H + 14) + '" role="img" aria-label="Correlation at each lead or lag">' + res.lags.map((l, i) => { if (!Number.isFinite(l.r)) return '';
       const h = Math.abs(l.r) * (mid - 4), y = l.r >= 0 ? mid - h : mid;
-      return '<rect x="' + (i * bw + 2).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + (bw - 4).toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" class="' + (l.lag === res.lag ? 'on' : l.r >= 0 ? 'pos' : 'neg') + '"><title>' + (l.lag === 0 ? 'Same month' : l.lag > 0 ? 'Market series first by ' + l.lag + ' mo' : 'Houston measure first by ' + -l.lag + ' mo') + ': r = ' + l.r.toFixed(2) + ' (' + l.n + ' months)</title></rect>'; }).join('') +
+      const tip = (l.lag === 0 ? 'Same month' : l.lag > 0 ? 'Market series first by ' + l.lag + ' mo' : 'Houston measure first by ' + -l.lag + ' mo') + ': r = ' + (l.r > 0 ? '+' : '') + l.r.toFixed(2) + ' over ' + l.n + ' months' + (l.lag === res.lag ? ' (the strongest)' : '');
+      return '<g class="mk-hit" data-tip="' + esc(tip) + '"><rect x="' + (i * bw).toFixed(1) + '" y="0" width="' + bw.toFixed(1) + '" height="' + H + '" fill="transparent"/><rect x="' + (i * bw + 2).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + (bw - 4).toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" class="' + (l.lag === res.lag ? 'on' : l.r >= 0 ? 'pos' : 'neg') + '"/></g>'; }).join('') +
       '<line x1="0" x2="' + W + '" y1="' + mid + '" y2="' + mid + '" class="mx-zero"/><text x="2" y="' + (H + 12) + '" class="mx-ax">Houston measure first ←</text><text x="' + (W / 2) + '" y="' + (H + 12) + '" class="mx-ax" text-anchor="middle">same month</text><text x="' + (W - 2) + '" y="' + (H + 12) + '" class="mx-ax" text-anchor="end">→ market series first</text></svg>';
   }
   const VERD = { strong: ['Strong', 'mx-v3'], moderate: ['Moderate', 'mx-v2'], weak: ['Weak', 'mx-v1'], 'no reliable relationship': ['Not reliable', 'mx-v0'], 'not enough overlap': ['Not enough data', 'mx-v0'] };
+  // layout: controls, the verdict tiles and the actions on the left; the chart, lead/lag bars and the plain-language
+  // summary on the right at a fixed, readable size (it used to stretch across the whole page)
   function corrBox() {
     if (!data) return '';
-    const r = result(), lo = locals(), mk = markets();
+    const r = result(), lo = locals();
     const groupsOpt = sel => GROUPS.map(([k, l]) => { const xs = all().filter(s => s.group === k); return xs.length ? '<optgroup label="' + esc(l) + '">' + xs.map(s => opt(s, sel)).join('') + '</optgroup>' : ''; }).join('');
-    let body = '';
+    let tiles = '', main = '<div class="rnote">Pick a Houston measure and a market series.</div>';
     if (r) {
       const { res } = r, v = VERD[res.verdict] || VERD['no reliable relationship'], short = res.verdict === 'not enough overlap';
-      body = short ? '<div class="rnote">' + esc(res.sentence) + (how === 'yoy' ? ' <button type="button" class="lnk" data-mxhow="mom">Try month-over-month changes</button>' : '') + '</div>' :
-        '<div class="kgrid mx-kg"><div><b class="' + v[1] + '">' + v[0] + '</b><span>Verdict</span></div><div><b>' + (res.lag === 0 ? 'Same month' : Math.abs(res.lag) + ' mo') + '</b><span>' + (res.lag > 0 ? esc(r.b.short) + ' first' : res.lag < 0 ? esc(r.a.short) + ' first' : 'Lead / lag') + '</span></div>' +
-        '<div><b>' + (res.r > 0 ? '+' : '') + res.r.toFixed(2) + '</b><span>Correlation (r)</span></div><div><b>' + res.n + ' / ' + res.neff + '</b><span>Months / independent</span></div>' +
-        '<div title="How often two unrelated series would show a link this strong, after allowing for every lead, lag and overlapping month tried. Below 0.05 is the usual bar."><b>' + (res.pAdj < .001 ? '<0.001' : num(res.pAdj, res.pAdj < .1 ? 3 : 2)) + '</b><span>p-value, corrected</span></div></div>' +
-        '<div class="mx-leg"><span><i class="mx-la"></i>' + esc(r.a.short) + '</span><span><i class="mx-lb"></i>' + esc(r.b.short) + (res.lag ? ' (shifted ' + Math.abs(res.lag) + ' mo ' + (res.lag > 0 ? 'later' : 'earlier') + ')' : '') + '</span><span class="mx-dim">' + (how === 'yoy' ? 'Year-over-year' : 'Month-over-month') + ' change, standardized</span></div>' +
-        chart(r) + '<div class="mx-sub">Correlation at each lead or lag</div>' + lagBars(res) + '<p class="mx-say">' + esc(describe(res, { a: r.a.short, b: r.b.short })) + '</p>';
+      if (short) main = '<div class="rnote">' + esc(res.sentence) + (how === 'yoy' ? ' <button type="button" class="lnk" data-mxhow="mom">Try month-over-month changes</button>' : '') + '</div>';
+      else {
+        tiles = '<div class="kgrid mx-kg"><div class="mx-kv"><b class="' + v[1] + '">' + v[0] + '</b><span>Verdict</span></div><div><b>' + (res.lag === 0 ? 'Same month' : Math.abs(res.lag) + ' mo') + '</b><span>' + (res.lag > 0 ? esc(r.b.short) + ' first' : res.lag < 0 ? esc(r.a.short) + ' first' : 'Lead / lag') + '</span></div>' +
+          '<div><b>' + (res.r > 0 ? '+' : '') + res.r.toFixed(2) + '</b><span>Correlation (r)</span></div><div><b>' + res.n + ' / ' + res.neff + '</b><span>Months / independent</span></div>' +
+          '<div class="mk-hit" tabindex="0" data-tip="How often two unrelated series would show a link this strong, after allowing for every lead, lag and overlapping month tried. Below 0.05 is the usual bar."><b>' + (res.pAdj < .001 ? '<0.001' : num(res.pAdj, res.pAdj < .1 ? 3 : 2)) + '</b><span>p-value, corrected</span></div></div>';
+        main = '<div class="mx-leg"><span><i class="mx-la"></i>' + esc(r.a.short) + '</span><span><i class="mx-lb"></i>' + esc(r.b.short) + (res.lag ? ' (shifted ' + Math.abs(res.lag) + ' mo ' + (res.lag > 0 ? 'later' : 'earlier') + ')' : '') + '</span><span class="mx-dim">' + (how === 'yoy' ? 'Year-over-year' : 'Month-over-month') + ' change, standardized · hover for values</span></div>' +
+          chart(r) + '<div class="mx-sub">Correlation at each lead or lag</div>' + lagBars(res) + '<p class="mx-say">' + esc(describe(res, { a: r.a.short, b: r.b.short })) + '</p>';
+      }
     }
     const sc = scanRes && scanFor === A + '|' + how ? scanRes : null;
-    return '<section class="mk-box mk-wide" id="mxCorr"><div class="mx-head"><h3>Correlation explorer</h3><span class="mx-asof">Does a market move with Houston, and which goes first?</span></div>' +
-      '<div class="mx-ctl"><label>Houston measure <select class="chip" id="mxA">' + lo.map(s => opt(s, A)).join('') + '</select></label>' +
-      '<label>compared with <select class="chip" id="mxB">' + groupsOpt(B) + '</select></label>' +
+    return '<section class="mk-box mk-wide" id="mxCorr"><div class="mx-head"><h3>Correlation explorer</h3><span class="mx-asof">Does a market move with Houston, and which goes first?</span></div><div class="mx-wrap"><div class="mx-side">' +
+      '<div class="mx-ctl"><label><span>Houston measure</span><select class="chip" id="mxA">' + lo.map(s => opt(s, A)).join('') + '</select></label>' +
+      '<label><span>Compared with</span><select class="chip" id="mxB">' + groupsOpt(B) + '</select></label>' +
       '<div class="mk-seg" role="group" aria-label="Change compared"><button type="button" data-mxhow="yoy" aria-pressed="' + (how === 'yoy') + '">Year over year</button><button type="button" data-mxhow="mom" aria-pressed="' + (how === 'mom') + '">Month over month</button></div></div>' +
-      body + '<div class="bacts mx-acts"><button type="button" class="btn primary" id="mxAi">Explain with AI</button><button type="button" class="btn" id="mxScan">What moves ' + esc(get(A)?.short || 'this') + '?</button></div>' +
+      tiles + '<div class="bacts mx-acts"><button type="button" class="btn primary" id="mxAi">Explain with AI</button><button type="button" class="btn" id="mxScan">What moves ' + esc(get(A)?.short || 'this') + '?</button></div></div>' +
+      '<div class="mx-main">' + main + '</div></div>' +
       (sc ? '<div class="mx-scan"><div class="mx-sub">' + esc(get(A)?.short || '') + ' against all ' + sc.results.length + ' market series · ' + fmtN(sc.tests) + ' comparisons, so the bar for “reliable” is high · ' + (sc.reliable ? sc.reliable + ' held up' : 'none held up') + '</div>' +
         sc.results.slice(0, 10).map(x => { const s = get(x.id), v = VERD[x.res.verdict] || VERD['no reliable relationship'];
           return '<button type="button" class="mx-row" data-mxb="' + x.id + '"><b>' + esc(s?.short || x.id) + '</b><span class="m">r ' + (x.res.r > 0 ? '+' : '') + x.res.r.toFixed(2) + '</span><span>' + (x.res.lag === 0 ? 'same month' : x.res.lag > 0 ? s?.short + ' first by ' + x.res.lag + ' mo' : 'Houston first by ' + -x.res.lag + ' mo') + '</span><em class="' + v[1] + '">' + v[0] + '</em></button>'; }).join('') + '</div>' : '') +
-      '<div class="rnote">Compares changes, not price levels (anything that trends up looks related otherwise), by rank, so one extreme month like spring 2020 can’t carry the result. Tries every lead and lag up to 12 months and discounts for each one tried, and for months that overlap. A relationship has to hold in both halves of the period to be called strong, and a best fit at the 12-month limit counts as weak at most. Correlation doesn’t prove one causes the other. Houston measures from FRED (BLS, Census, Realtor.com, FHFA) and this app (Houston Police crime, TDLR filings, Comptroller permits and sales tax).</div></section>';
+      '<details class="mx-how"><summary>How this is measured</summary><div class="rnote">Compares changes, not price levels (anything that trends up looks related otherwise), by rank, so one extreme month like spring 2020 can’t carry the result. Tries every lead and lag up to 12 months and discounts for each one tried, and for months that overlap. A relationship has to hold in both halves of the period to be called strong, and a best fit at the 12-month limit counts as weak at most. Correlation doesn’t prove one causes the other. Houston measures from FRED (BLS, Census, Realtor.com, FHFA) and this app (Houston Police crime, TDLR filings, Comptroller permits and sales tax).</div></details></section>';
   }
 
   function wire(root, render) {

@@ -38,7 +38,7 @@ export function initQuickLayers(ctx) {
     { k: 'radar', label: 'Radar', title: 'Live rain radar', ...live('radar') }
   ];
   box.innerHTML = CHIPS.map(c => '<button class="qchip" type="button" data-q="' + c.k + '" aria-pressed="false" title="' + c.title + '">' + ICON[c.k] + '<span>' + c.label + '</span></button>').join('') +
-    '<button class="qchip qmore" type="button" data-q="more" title="All map layers and options">' + ICON.more + '<span>More</span></button>';
+    '<button class="qchip qmore" type="button" data-q="more" aria-haspopup="dialog" aria-expanded="false" title="All map layers and options">' + ICON.more + '<span>More</span></button>';
   function sync() {
     for (const c of CHIPS) { const b = box.querySelector('[data-q="' + c.k + '"]'); let v = false; try { v = !!c.on(); } catch (e) {} if (b.getAttribute('aria-pressed') !== String(v)) b.setAttribute('aria-pressed', String(v)); }
     // layers that are on but have no button here (crime, airports, weather, low flights…): counted on More, so anything

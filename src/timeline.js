@@ -103,7 +103,7 @@ export function initTimeline(ctx) {
       const w = t.length * 6.4 + 14, cx = Math.max(m.l + w / 2, Math.min(W - m.r - w / 2, (x(s0) + x(e0)) / 2)); lab.select('rect').attr('x', cx - w / 2).attr('width', w); lab.select('text').attr('x', cx); };
     const apply = (s0, e0) => {
       if (!(ctx.state.d && ctx.state.d.f === 'active')) prevD = ctx.state.d;
-      ctx.fromSpec({ ...ctx.curSpec(), d: { f: 'active', from: ymOf(s0), to: ymOf(d3.utcMonth.offset(e0, -1)) } }, { fly: false });
+      ctx.showFilings?.(); ctx.fromSpec({ ...ctx.curSpec(), d: { f: 'active', from: ymOf(s0), to: ymOf(d3.utcMonth.offset(e0, -1)) } }, { fly: false });
     };
     const brush = d3.brushX().extent([[m.l, m.t], [W - m.r, H - m.b]])
       .on('start', () => { tip.style.opacity = 0; })
