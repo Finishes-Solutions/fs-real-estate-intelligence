@@ -5,6 +5,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 11:31 AM CT: Crime by city / county, anywhere in the US (9540c9f, 6bc25ce, e36d54c)
+- **Property and parcel cards now show crime anywhere in the US**, under the Houston street-level section:
+  - the local police department: the city's own police inside city limits, otherwise the county police or sheriff;
+  - violent and property crimes per 100,000 residents for 2025 (the newest full year), compared with the state and the US, and the change from 2024;
+  - a 10-year trend against the state and the US, and the share of crimes solved;
+  - a list of the other departments in the county to switch to (a neighboring city, or the sheriff).
+- **New City / County Crime Report** (Reports tab, or **Full report** on the card): year-by-year table, offense mix (murder, rape, robbery, aggravated assault, burglary, theft, vehicle theft, arson) against the state and the US, exported as a PDF or CSV.
+- **Ask AI answers crime questions outside Houston**, e.g. "How does crime in Hempstead compare with Texas?"
+- **Clear labels:** every view says the figures are yearly and department-wide, which year they cover, and warns when a department reported only part of a year or has stopped reporting (New Orleans' newest year is 2023, for example).
+- Checked against live FBI data for 24 places, including Houston, Brookshire, Hempstead, Katy, rural Waller County, New York, Washington DC, Nashville, Fairfax, Los Angeles, Chicago, Louisville and Honolulu.
+- Source: the FBI Crime Data Explorer (no account or key needed), listed on the Sources tab.
+
 ### 11:08 AM CT: FBI crime data check (d9d7c59)
 - Behind the scenes only: a diagnostic that tests which FBI Crime Data Explorer feeds still answer, ahead of crime numbers by city and county for the whole US. Nothing in the app changes yet.
 
