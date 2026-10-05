@@ -22,6 +22,9 @@
     "api/chat.js": {
       "maxDuration": 120
     },
+    "api/crimeus.js": {
+      "maxDuration": 30
+    },
     "api/regrid.js": {
       "maxDuration": 20
     },
