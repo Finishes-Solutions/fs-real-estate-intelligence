@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 3:28 PM CT: Shorter property card (9bc91fa)
+- **Removed from the property card:** the Airports Nearby and Air Traffic sections, and the "Air" jump button at the top of the card.
+- Construction filing cards still show both.
+- For a property, the Air Traffic Report is still available under the card's Area reports.
+
 ### 3:07 PM CT: Shift-clicking a parcel no longer adds it again; numbers sit in the middle (19683df)
 - **Fixed:** Shift-clicking open ground in a parcel that was already picked added it again, with a new number each time. In one Waller case that put ten numbers in one parcel.
   - **Why:** a parcel picked as open ground was recognized only by the exact spot clicked, so a click a few steps away counted as new.
