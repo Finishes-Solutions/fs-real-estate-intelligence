@@ -35,13 +35,13 @@ export function bestMatch(query, list) {
 }
 const titleCase = s => String(s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()).replace(/\b(Llc|Lp|Inc|Ltd|Ii|Iii|Iv|Pc|Pllc|Usa|Us)\b/g, m => m.toUpperCase());
 const addr = (street, city, state, zip) => [street, [city, [String(state || '').trim(), zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', ').replace(/_/g, ' ');
-const TITLES = { 'VICE PRESI': 'Vice President', 'SENIOR VIC': 'Senior Vice President', 'ASSISTANT': 'Assistant', 'PRESIDENT': 'President', 'DIRECTOR': 'Director', 'SECRETARY': 'Secretary', 'TREASURER': 'Treasurer', 'MANAGER': 'Manager', 'MEMBER': 'Member', 'MANAGING M': 'Managing Member', 'GENERAL PA': 'General Partner', 'CEO': 'CEO', 'CFO': 'CFO' };
+const TITLES = { 'VICE PRESI': 'Vice President', 'VICE PRES': 'Vice President', 'VP': 'Vice President', 'PRES': 'President', 'SECRETARY/': 'Secretary', 'SEC': 'Secretary', 'TREAS': 'Treasurer', 'SENIOR VIC': 'Senior Vice President', 'ASSISTANT': 'Assistant', 'PRESIDENT': 'President', 'DIRECTOR': 'Director', 'SECRETARY': 'Secretary', 'TREASURER': 'Treasurer', 'MANAGER': 'Manager', 'MEMBER': 'Member', 'MANAGING M': 'Managing Member', 'GENERAL PA': 'General Partner', 'CEO': 'CEO', 'CFO': 'CFO' };
 export function shapeDetail(x) {
   if (!x) return null;
   const yr = String(x.reportYear || ''), people = new Map();
   for (const o of x.officerInfo || []) {
     if (yr && o.AGNT_ACTV_YR && String(o.AGNT_ACTV_YR) !== yr) continue;
-    const name = titleCase(o.AGNT_NM), t = TITLES[String(o.AGNT_TITL_TX || '').trim().toUpperCase()] || titleCase(o.AGNT_TITL_TX);
+    const name = titleCase(o.AGNT_NM), raw = String(o.AGNT_TITL_TX || '').toUpperCase().replace(/[^A-Z/ ]+/g, ' ').replace(/\s+/g, ' ').trim(), t = TITLES[raw] || TITLES[raw.slice(0, 10).trim()] || titleCase(o.AGNT_TITL_TX);
     if (!name) continue;
     const p = people.get(name) || { name, titles: [], address: addr(o.AD_STR_POB_TX, titleCase(o.CITY_NM), o.ST_CD, o.AD_ZP) };
     if (t && !p.titles.includes(t)) p.titles.push(t); people.set(name, p);

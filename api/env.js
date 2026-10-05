@@ -52,7 +52,7 @@ export async function sitesInBox(b, set) {
     const K = KINDS[k];
     try {
       const d = await query(K.url, { geometry: env, geometryType: 'esriGeometryEnvelope', spatialRel: 'esriSpatialRelIntersects', outFields: [K.f.id, K.f.name, K.f.addr].filter(Boolean).join(','), returnGeometry: 'true', resultRecordCount: '2000',
-        ...(K.poly ? { maxAllowableOffset: '0.0001', geometryPrecision: '5' } : {}) });
+        ...(K.poly ? { maxAllowableOffset: '0.00002', geometryPrecision: '6' } : {}) });
       return (d.features || []).map(f => { const a = f.attributes || {}, g = f.geometry || {};
         if (K.poly) return { kind: k, id: String(a[K.f.id] ?? ''), name: a[K.f.name] || K.short, addr: a[K.f.addr] || '', rings: g.rings };
         return g.x != null ? [k, String(a[K.f.id] ?? ''), String(a[K.f.name] || K.short).slice(0, 80), String(a[K.f.addr] || '').slice(0, 80), Math.round(g.x * 1e6) / 1e6, Math.round(g.y * 1e6) / 1e6] : null; }).filter(Boolean);

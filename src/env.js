@@ -69,7 +69,7 @@ export function initEnv(ctx) {
   function legend() {
     if (!st.sites) { ctx.setLegend?.('env', ''); return; }
     const ks = Object.keys(KINDS).filter(k => st.set === 'all' ? ['cleanup', 'tanks', 'epa'].includes(KINDS[k].set) : KINDS[k].set === st.set);
-    ctx.setLegend?.('env', '<div class="t">' + esc(SETS[st.set] || 'Environmental sites') + '</div>' + ks.map(k => '<div class="li"><i style="background:' + KINDS[k].color + '"></i>' + esc(KINDS[k].short) + '</div>').join(''));
+    ctx.setLegend?.('env', '<div class="t">' + esc(SETS[st.set] || 'Environmental sites') + '</div><div class="lg2">' + ks.map(k => '<div class="li" title="' + esc(KINDS[k].label) + '"><i style="background:' + KINDS[k].color + '"></i>' + esc(KINDS[k].short) + '</div>').join('') + '</div>');
   }
   function setSitesOn(v) {
     st.sites = !!v; save(); if (sbox) sbox.checked = st.sites; if (snote) snote.hidden = !st.sites; if (ssel) ssel.hidden = !st.sites;
@@ -83,8 +83,9 @@ export function initEnv(ctx) {
   ctx.onOverlays?.(() => { for (const k of Object.keys(RASTERS)) addRaster(k); if (st.sites) { lastKey = ''; legend(); loadSites(); } });
   const showPopup = e => {
     const f = e.features?.[0]; if (!f) return; const K = KINDS[f.properties.k] || {};
-    new maplibregl.Popup({ closeButton: true, maxWidth: '280px' }).setLngLat(e.lngLat).setHTML('<div class="env-pop"><span class="pl-dot" style="background:' + (K.color || '#555') + '"></span><b>' + esc(f.properties.name) + '</b><div>' + esc(K.label || '') + (f.properties.id ? ' · ID ' + esc(f.properties.id) : '') + '</div>' + (f.properties.addr ? '<div>' + esc(f.properties.addr) + '</div>' : '') +
-      '<button class="btn sm" type="button">Environmental Report Here</button></div>').addTo(map).getElement().querySelector('button').onclick = () => report({ geometry: circleAt([e.lngLat.lng, e.lngLat.lat], 0.05), label: f.properties.name });
+    const pop = new maplibregl.Popup({ closeButton: true, maxWidth: '280px' }).setLngLat(e.lngLat).setHTML('<div class="env-pop"><span class="pl-dot" style="background:' + (K.color || '#555') + '"></span><b>' + esc(f.properties.name) + '</b><div>' + esc(K.label || '') + (f.properties.id ? ' · ID ' + esc(f.properties.id) : '') + '</div>' + (f.properties.addr ? '<div>' + esc(f.properties.addr) + '</div>' : '') +
+      '<button class="btn sm" type="button">Environmental Report Here</button></div>').addTo(map);
+    pop.getElement().querySelector('button').onclick = () => { pop.remove(); report({ geometry: circleAt([e.lngLat.lng, e.lngLat.lat], 0.05), label: f.properties.name }); };
   };
   // these layers handle their own clicks (the map's click doesn't also open a building)
   // (only the dots: a click inside a groundwater-restriction area still opens the building there)

@@ -59,9 +59,9 @@ const cw = { type: 'Polygon', coordinates: [[[0, 0], [0, 1], [1, 1], [1, 0], [0,
 assert.match(soilsQuery(cw), /polygon\(\(0\.000000 0\.000000,1\.000000 0\.000000,1\.000000 1\.000000/, 'rings go to SQL Server counter-clockwise');
 const det = shapeDetail({ taxpayerId: '1', name: 'X LLC', rightToTransactTX: 'ACTIVE', stateOfFormation: ' DE', reportYear: '2026', registeredAgentName: 'C T CORPORATION SYSTEM',
   registeredOfficeAddressStreet: '1999 BRYAN ST', registeredOfficeAddressCity: 'DALLAS', registeredOfficeAddressState: 'TX', registeredOfficeAddressZip: '75201', mailingAddressStreet: '9550 SPRING GREEN BLVD_STE 408',
-  officerInfo: [{ AGNT_NM: 'JANE DOE', AGNT_TITL_TX: 'VICE PRESI', AGNT_ACTV_YR: '2026' }, { AGNT_NM: 'JANE DOE', AGNT_TITL_TX: 'DIRECTOR', AGNT_ACTV_YR: '2026' }, { AGNT_NM: 'OLD GUY', AGNT_TITL_TX: 'DIRECTOR', AGNT_ACTV_YR: '2020' }] });
+  officerInfo: [{ AGNT_NM: 'JANE DOE', AGNT_TITL_TX: 'VICE PRESI', AGNT_ACTV_YR: '2026' }, { AGNT_NM: 'JANE DOE', AGNT_TITL_TX: 'DIRECTOR', AGNT_ACTV_YR: '2026' }, { AGNT_NM: 'OLD GUY', AGNT_TITL_TX: 'DIRECTOR', AGNT_ACTV_YR: '2020' }, { AGNT_NM: 'STEVE LI', AGNT_TITL_TX: 'VICE-PRESI', AGNT_ACTV_YR: '2026' }] });
 assert.equal(det.state, 'DE'); assert.equal(det.status, 'Active'); assert.equal(det.agent.address, '1999 BRYAN ST, DALLAS, TX 75201'); assert.equal(det.mailing, '9550 SPRING GREEN BLVD STE 408');
-assert.deepEqual(det.officers.map(o => [o.name, o.titles]), [['Jane Doe', ['Vice President', 'Director']]], 'only the latest report year, titles combined');
+assert.deepEqual(det.officers.map(o => [o.name, o.titles]), [['Jane Doe', ['Vice President', 'Director']], ['Steve Li', ['Vice President']]], 'only the latest report year, titles combined and spelled out');
 const calls = [];
 const fake = async u => { calls.push(u); return { ok: true, json: async () => u.includes('?name=') ? { success: true, data: [{ name: 'PROLOGIS-A4 TX, L.P.', taxpayerId: '12345678901' }, { name: 'PROLOGIS-A5 TX LP', taxpayerId: '2' }], count: 2 } : { success: true, data: { taxpayerId: '12345678901', name: 'PROLOGIS-A4 TX, L.P.', rightToTransactTX: 'ACTIVE' } } }; };
 const look = await lookupEntity('PROLOGIS-A4 TX LP', fake);

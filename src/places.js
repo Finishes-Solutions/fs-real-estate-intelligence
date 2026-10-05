@@ -44,7 +44,7 @@ export function initPlaces(ctx) {
   }
   function legend() {
     const used = grp ? [grp] : Object.keys(GROUPS).filter(k => k !== 'other');
-    ctx.setLegend?.('places', '<div class="t">Businesses &amp; places</div>' + used.map(k => '<div class="li"><i style="background:' + GROUPS[k].color + '"></i>' + esc(GROUPS[k].label) + '</div>').join(''));
+    ctx.setLegend?.('places', '<div class="t">Businesses &amp; places</div><div class="lg2">' + used.map(k => '<div class="li" title="' + esc(GROUPS[k].label) + '"><i style="background:' + GROUPS[k].color + '"></i>' + esc(grp ? GROUPS[k].label : GROUPS[k].short) + '</div>').join('') + '</div>');
   }
   function setOn(v) {
     on = !!v; if (box) box.checked = on; if (note) note.hidden = !on; if (sel) sel.hidden = !on;
