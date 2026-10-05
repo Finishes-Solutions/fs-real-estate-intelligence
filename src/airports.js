@@ -51,7 +51,7 @@ export function initAirports(ctx) {
   // click and hover handlers once (adding them with the layer stacked another set on every toggle and basemap change,
   // so one click opened the card several times)
   map.on('click', SRC, e => { const f = e.features?.[0]; if (f) { ctx.tabs?.arm(e); show(f.properties.ident); } });
-  map.on('mouseenter', SRC, e => { map.getCanvas().style.cursor = 'pointer'; const f = e.features?.[0]; if (f && ctx.tip) { ctx.tip.textContent = f.properties.name + ' (' + f.properties.code + ')'; ctx.tip.style.opacity = 1; ctx.tip.style.left = (e.point.x + 14) + 'px'; ctx.tip.style.top = (e.point.y + 14) + 'px'; } });
+  map.on('mouseenter', SRC, e => { map.getCanvas().style.cursor = 'var(--cur-pointer)'; const f = e.features?.[0]; if (f && ctx.tip) { ctx.tip.textContent = f.properties.name + ' (' + f.properties.code + ')'; ctx.tip.style.opacity = 1; ctx.tip.style.left = (e.point.x + 14) + 'px'; ctx.tip.style.top = (e.point.y + 14) + 'px'; } });
   map.on('mouseleave', SRC, () => { map.getCanvas().style.cursor = ''; if (ctx.tip) ctx.tip.style.opacity = 0; });
   function setData(list) {
     const fc = { type: 'FeatureCollection', features: list.map(a => ({ type: 'Feature', properties: { ident: a[0], name: a[1], type: a[2], code: a[5], big: a[2] === 'large_airport' ? 2 : a[2] === 'medium_airport' ? 1 : 0 }, geometry: { type: 'Point', coordinates: [a[3], a[4]] } })) };

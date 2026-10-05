@@ -118,7 +118,7 @@ export function initTimeline(ctx) {
         }
         const [s0, e0] = snap(ev.selection); apply(s0, e0);
       });
-    const bg = svg.append('g').attr('class', 'brush').call(brush); bg.select('.overlay').style('cursor', 'crosshair');
+    const bg = svg.append('g').attr('class', 'brush').call(brush); bg.select('.overlay').style('cursor', 'var(--cur-cross, crosshair)');
     lab.raise();
     if (active) { const a0 = mStart(active[0]), b0 = d3.utcMonth.offset(mStart(active[1]), 1); bg.call(brush.move, [x(a0), x(b0)]); showLab(a0, b0); }
     el.querySelector('svg')?.remove(); el.prepend(svg.node());

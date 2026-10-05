@@ -450,7 +450,7 @@ export function initPlanes(ctx) {
     ctx.tabs?.arm(e); renderCard(hit.properties.hex); return true;
   });
   map.on('mousemove', 'live-planes', e => {
-    const f = e.features?.[0]; if (!f) return; const p = find(f.properties.hex); if (!p) return; map.getCanvas().style.cursor = 'pointer';
+    const f = e.features?.[0]; if (!f) return; const p = find(f.properties.hex); if (!p) return; map.getCanvas().style.cursor = 'var(--cur-pointer)';
     const tip = ctx.tip; tip.innerHTML = '<b>' + esc(p.flight || p.reg || p.hex.toUpperCase()) + '</b><span>' + esc([p.type, altLabel(p), p.gs != null ? p.gs + ' kt' : ''].filter(Boolean).join(' · ')) + '</span>';
     const x = e.point.x + 14, flip = x + 220 > ctx.viewport.clientWidth; tip.style.left = (flip ? e.point.x - 14 - tip.offsetWidth : x) + 'px'; tip.style.top = (e.point.y + 10) + 'px'; tip.style.opacity = 1;
   });
@@ -461,7 +461,7 @@ export function initPlanes(ctx) {
   function hover3d(e) {
     const hex = models.shown ? models.pick(e.point) : null, p = hex && find(hex);
     if (!p) { if (tipModel) { tipModel = false; map.getCanvas().style.cursor = ''; ctx.tip.style.opacity = 0; } return; }
-    tipModel = true; map.getCanvas().style.cursor = 'pointer'; const tip = ctx.tip;
+    tipModel = true; map.getCanvas().style.cursor = 'var(--cur-pointer)'; const tip = ctx.tip;
     tip.innerHTML = '<b>' + esc(p.flight || p.reg || p.hex.toUpperCase()) + '</b><span>' + esc([p.type, altLabel(p), p.gs != null ? p.gs + ' kt' : ''].filter(Boolean).join(' · ')) + '</span>';
     const x = e.point.x + 14, flip = x + 220 > ctx.viewport.clientWidth; tip.style.left = (flip ? e.point.x - 14 - tip.offsetWidth : x) + 'px'; tip.style.top = (e.point.y + 10) + 'px'; tip.style.opacity = 1;
   }

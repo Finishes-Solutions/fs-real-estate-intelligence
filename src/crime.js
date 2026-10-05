@@ -68,7 +68,7 @@ export function initCrime(ctx) {
   ctx.crimeLayer = v => setOn(v !== false);
 
   // hover / click a square
-  map.on('mousemove', CELLS, e => { const f = e.features?.[0]; if (!f) return; map.getCanvas().style.cursor = 'pointer'; const p = f.properties; tip(e.point, fmtN(p.v + p.p + p.o) + ' incidents in 12 months · ' + fmtN(p.v) + ' violent · ' + fmtN(p.p) + ' property'); });
+  map.on('mousemove', CELLS, e => { const f = e.features?.[0]; if (!f) return; map.getCanvas().style.cursor = 'var(--cur-pointer)'; const p = f.properties; tip(e.point, fmtN(p.v + p.p + p.o) + ' incidents in 12 months · ' + fmtN(p.v) + ' violent · ' + fmtN(p.p) + ' property'); });
   map.on('mouseleave', CELLS, () => { map.getCanvas().style.cursor = ''; tip(null); });
   ctx.mapClickHandlers.unshift(e => {
     if (!on || !map.getLayer(CELLS) || map.getZoom() < 12) return false;

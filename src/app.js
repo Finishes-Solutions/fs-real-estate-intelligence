@@ -1,4 +1,5 @@
 
+import './cursors.js';
 import { makeMatcher, encode, decode, describe } from './lib/filter.mjs';
 import { USES, entityKey } from './lib/taxonomy.mjs';
 import { recentChanges } from './lib/changes.mjs';
@@ -555,7 +556,7 @@ document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
 // hover + click on markers
 const tip=document.getElementById('tip'), stage=document.getElementById('stage'), viewport=document.getElementById('viewport');
 map.on('mousemove','filings',e=>{
-  if(mode!=='pan') return; map.getCanvas().style.cursor='pointer';
+  if(mode!=='pan') return; map.getCanvas().style.cursor='var(--cur-pointer)';
   const f=F[e.features[0].properties.i]; tip.innerHTML='<b></b><span></span>'; tip.querySelector('b').textContent=f.name;
   tip.querySelector('span').textContent=fmtM(f.cost)+' · '+TYPE_LABEL[f.type]+' · '+(f.city||f.county);
   let x=e.point.x+14, y=e.point.y+14; tip.style.opacity=1; const w=tip.offsetWidth; if(x+w>viewport.clientWidth-8) x=e.point.x-w-14; tip.style.left=x+'px'; tip.style.top=y+'px';
@@ -600,7 +601,7 @@ function setMode(m){
   document.querySelectorAll('.tools button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));
   hintEl.textContent=HINTS[m]||''; hintEl.classList.toggle('on',!!HINTS[m]);
   radiusEl.classList.toggle('on',m==='radius'); if(m==='radius') setTimeout(()=>rq.focus(),30);
-  stage.classList.toggle('m-draw',m!=='pan');
+  stage.classList.toggle('m-draw',m!=='pan'); stage.dataset.dmode=m; // each drawing tool has its own cursor (src/cursors.js)
   if(m==='area') map.dragPan.disable(); else map.dragPan.enable();
   if(m==='poly') map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
   tip.style.opacity=0;

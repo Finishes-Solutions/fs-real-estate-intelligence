@@ -90,7 +90,7 @@ export function initEnv(ctx) {
   // these layers handle their own clicks (the map's click doesn't also open a building)
   // (only the dots: a click inside a groundwater-restriction area still opens the building there)
   ctx.clickLayers?.push(SRC);
-  for (const id of [SRC]) { map.on('click', id, showPopup); map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; }); map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; }); }
+  for (const id of [SRC]) { map.on('click', id, showPopup); map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'var(--cur-pointer)'; }); map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; }); }
   ctx.envLayer = (which, v, set) => { if (which === 'sites') { if (set && (SETS[set] || set === 'all')) { st.set = set; if (ssel) ssel.value = set; lastKey = ''; } setSitesOn(v !== false); } else if (RASTERS[which]) setRaster(which, v !== false); };
 
   // ---------- the report ----------
