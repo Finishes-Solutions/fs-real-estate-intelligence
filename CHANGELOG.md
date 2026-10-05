@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 11:08 AM CT: FBI crime data check (HASH)
+- Behind the scenes only: a diagnostic that tests which FBI Crime Data Explorer feeds still answer, ahead of crime numbers by city and county for the whole US. Nothing in the app changes yet.
+
 ### 8:23 AM CT: Correlation explorer no longer overstates links (19061b3)
 - **Fixed two flaws that made unrelated series look related:**
   - **Quarterly house prices** skipped the correction for overlapping year-over-year changes. They came out "strong" against 24 market series, including oil companies and the Fed rate. None of those hold up now.
