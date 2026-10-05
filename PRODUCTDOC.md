@@ -15,7 +15,8 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 | Property, owner and value lookups | Texas |
 | Census demographics, jobs, market numbers | Waller County and the six counties around it (Harris, Fort Bend, Montgomery, Austin, Washington, Grimes), plus the next ring of counties for context |
 | Construction filings (TDLR) | The same 7 counties, last two years |
-| Crime | City of Houston only |
+| Crime, street level (each incident) | City of Houston only |
+| Crime by city / county (yearly, per police department) | The whole US |
 | Flood zones | Anywhere FEMA has mapped (zoom in) |
 | Traffic counts | Texas roads (TxDOT) |
 | County and state lines | The whole US |
@@ -78,6 +79,13 @@ Click a building, or at street zoom click open ground, to open its **property ca
 - **Ownership & value:** owner, mailing address, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service.
 - **The building:** footprint, height, floors and estimated floor area.
 - **Site:** flood zone, traffic counts on nearby roads, water and utility districts (MUDs), tax-increment zones, Opportunity Zone, school district, bus stops, nearby environmental sites, crime nearby (Houston), and area rents and jobs.
+- **Crime:** inside Houston, the incidents reported within a mile. Anywhere in the US, **Crime by city / county**:
+  - the local police department: the city's own police inside city limits, otherwise the county police or sheriff;
+  - violent and property crimes per 100,000 residents for the newest full year, compared with the state and the US, and the change from the year before;
+  - a 10-year trend line against the state and the US, and the share of crimes solved;
+  - **Other departments** in the county, if you'd rather see a neighboring city or the sheriff;
+  - **Full report** for the year-by-year table and the mix of offenses (murder, robbery, burglary, theft and others), with PDF and CSV export.
+  - These are whole-year, department-wide figures from the FBI: every spot a department covers shows the same numbers. The card says which year they're for, and warns you when a department reported only part of a year or has stopped reporting.
 - **Area snapshot:** census numbers for that neighborhood.
 - **Businesses:** what's inside or next door (OpenStreetMap), plus businesses registered for sales tax at the address.
 - **Construction filings** on the parcel.
@@ -103,6 +111,7 @@ Choose **Area**, **Shape**, **Radius** or **County** at the top of the map and m
 - **Drive-time map:** 10, 20 and 30-minute drive areas, with the people, households and jobs inside each.
 - **Air traffic report:** how often planes pass over, how low, and which kinds.
 - **Crime report** (City of Houston): incidents by type, trend, time of day, day of week, and per resident.
+- **City / County Crime Report** (anywhere in the US, from the **Reports** tab): the police department at the middle of the map or of the selected area, with the same figures as the property card's Crime by city / county.
 - **Compare:** add up to 4 areas and see them side by side.
 
 Every report exports as a PDF in the Finishes Solutions style, and its data as a spreadsheet. Reports are kept in the **Reports** tab.
@@ -258,6 +267,7 @@ The **Ask AI** button (⌘/ on a Mac, Ctrl+/ elsewhere) opens an assistant that 
 - "Turn on radar and wind." "Tilt the map." "Back to the region."
 - "What am I looking at?" "Save a note here: vacant lot, call the broker."
 - "Search the web for …" (it only searches the web when you ask).
+"- "How does crime in Hempstead compare with Texas?" "Is crime in Austin going up?" (anywhere in the US, from FBI yearly figures)
 - "How is oil doing this year?" "Does oil lead Houston unemployment?" "What moves Houston housing permits?"
 
 Answers come with cards: summaries, charts, comparisons, places, drive times, weather, news and imagery. The suggestions above the Ask AI button change with what you're looking at.
@@ -271,7 +281,7 @@ Answers come with cards: summaries, charts, comparisons, places, drive times, we
   - a **Filing list** (PDF, Excel, CSV or map file);
   - an **Area comparison** (PDF, Excel or CSV);
   - an **Activity report** (PDF, Excel or CSV).
-- Area reports (FEMA, traffic, drive time, air traffic, crime), the Market report, airport reports and flight reports export as **PDFs**, and their data as CSV.
+- Area reports (FEMA, traffic, drive time, air traffic, crime), the City / County Crime Report, the Market report, airport reports and flight reports export as **PDFs**, and their data as CSV.
 - **Every PDF uses the Finishes Solutions report style:**
   - a dark title band with the logo, the green rule and the brand fonts;
   - headline figures in tiles, clean tables, and the report name and page numbers on every page.
@@ -296,7 +306,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 - **Parcels and owners:** county appraisal districts through the Texas GIO parcel service (free), and Regrid (paid, capped).
 - **People, homes and jobs:** US Census American Community Survey (5-year averages) and Census jobs data (about two years behind).
-- **Flood:** FEMA. **Traffic counts:** TxDOT. **Crime:** Houston Police. **Places and buildings:** OpenStreetMap.
+- **Flood:** FEMA. **Traffic counts:** TxDOT. **Crime:** Houston Police (street level) and the FBI (yearly, by police department, nationwide). **Places and buildings:** OpenStreetMap.
 - **Construction filings:** TDLR TABS, refreshed nightly.
 - **Markets:** Yahoo Finance (stocks, funds, indexes and crypto history; delayed), Coinbase (live crypto) and the St. Louis Fed's FRED (oil, gas, building material prices, rates and Houston metro statistics).
 - **Weather, radar and storms:** NOAA and Open-Meteo. **Planes:** adsb.lol and airplanes.live. **Airports:** OurAirports and the FAA.
@@ -310,7 +320,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **Filings are filer estimates.** Costs and dates come from whoever filed. About four in ten filings are missing a start or end date, and the app estimates those (shown hatched). AI-read fields such as use, tenant and developer can be wrong.
 - **Coverage gaps:**
   - Harris and Waller aren't in the free state parcel data; use Regrid details there.
-  - Crime covers the City of Houston only.
+  - Street-level crime covers the City of Houston only. Elsewhere crime is yearly and department-wide (FBI), so it can't show which blocks are worse.
+  - FBI crime figures come out once the year is over; the newest full year is shown. Some departments report only part of a year or have stopped reporting, and the card says so. Rates count residents only, so places with many visitors (downtowns, shopping areas) read high.
   - Business lists from OpenStreetMap are incomplete in some suburbs.
 - **Numbers lag.** Census averages cover five years, jobs data is about two years old, and permits arrive about six weeks after the month.
 - **Shared notes have no sign-in.** Anyone with the site address can edit them, unless a team passcode is set.
@@ -320,6 +331,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Crime by city / county, anywhere in the US:** property cards and a new City / County Crime Report show the local police department's violent and property crime rates against the state and the nation, 10 years of history and the mix of offenses, from FBI figures. Ask AI can answer crime questions outside Houston too.
 - **Markets and the Correlation explorer** on the Market tab: stocks, Houston companies, homebuilders, crypto, oil and gas, building material prices and rates, with an honest test of which ones move with Houston's numbers, and an AI explanation.
 - **More history:** the Houston crime trend now covers up to six years instead of two, and the Air Traffic Report can cover up to three years once enough has been collected.
 - **Whole buildings:** clicking a big building selects all of it, and a building on several parcels lists every parcel with a total.

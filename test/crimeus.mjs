@@ -10,6 +10,7 @@ assert.ok(agencyKeys('Blasdell Village Police Department').includes('blasdell'))
 assert.ok(agencyKeys('Metropolitan Nashville Police Department').includes('nashville'));
 assert.ok(agencyKeys('New York City Police Department').includes('new york'));
 assert.ok(agencyKeys('Prairie View  Police Department').includes('prairie view'));
+assert.ok(agencyKeys('Louisville Metro Police Department').includes('louisville'));
 assert.ok(placeKeys('Nashville-Davidson metropolitan government (balance)').includes('nashville'));
 assert.deepEqual(placeKeys('Katy'), ['katy']);
 
@@ -39,6 +40,9 @@ m = matchAgency(pa, { place: null, subdivision: 'Lower Merion', county: 'Montgom
 const va = flattenDirectory({ FAIRFAX: [A('VA029SO00', "Fairfax County Sheriff's Office", 'County', 'FAIRFAX'), A('VA0290100', 'Fairfax County Police Department', 'County', 'FAIRFAX'), A('VA1075000', 'Fairfax City Police Department', 'City', 'FAIRFAX CITY')] });
 assert.equal(countyAgency(va, 'Fairfax').ori, 'VA0290100');
 assert.equal(matchAgency(va, { place: 'Fairfax', county: 'Fairfax' }).agency.ori, 'VA1075000'); // independent city: its own "county"
+// Honolulu: a city-county department filed as a city one, and the spot is in no incorporated place
+const hi = flattenDirectory({ HONOLULU: [A('HI0020000', 'Honolulu Police Department', 'City', 'HONOLULU')] });
+assert.equal(matchAgency(hi, { place: null, county: 'Honolulu' }).agency.ori, 'HI0020000');
 // New York City: the department lists no county
 const ny = flattenDirectory({ 'NOT SPECIFIED': [A('NY0303000', 'New York City Police Department', 'City', 'NOT SPECIFIED')], KINGS: [A('NY0303', 'Kings County Sheriff', 'County', 'KINGS')] });
 assert.equal(matchAgency(ny, { place: 'New York', county: 'Kings' }).agency.ori, 'NY0303000');
@@ -72,7 +76,10 @@ rep = buildReport({ agency, stateAbbr: 'TX', totals: { v: sum({ 2024: 120, 2025:
 assert.equal(rep.year, 2024); assert.equal(rep.partial, false); assert.equal(rep.years[0].months, 6); assert.equal(rep.years[0].rate_v, Math.round(75 / 60000 * 1e5 * 2 * 10) / 10);
 assert.equal(rep.headline.change_v, null); // no whole year before 2024 here
 rep = buildReport({ agency, stateAbbr: 'TX', totals: { v: sum({ 2025: 150 }, { partial: { 2025: 9 } }), p: sum({ 2025: 1100 }, { partial: { 2025: 9 } }) }, offenses: {}, lastYear: 2025, firstYear: 2016 });
-assert.equal(rep.year, 2025); assert.equal(rep.partial, true); assert.equal(rep.months, 9);
+assert.equal(rep.year, 2025); assert.equal(rep.partial, true); assert.equal(rep.months, 9); assert.equal(rep.stale, false);
+// a department that stopped reporting (New Orleans after 2023): the newest year it has, flagged stale
+rep = buildReport({ agency, stateAbbr: 'LA', totals: { v: sum({ 2023: 150 }), p: sum({ 2023: 1100 }) }, offenses: {}, lastYear: 2025, firstYear: 2016 });
+assert.equal(rep.year, 2023); assert.equal(rep.stale, true); assert.equal(rep.latest_full_year, 2025);
 
 // ---------- the endpoint ----------
 const seen = [];

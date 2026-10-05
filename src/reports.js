@@ -7,7 +7,7 @@ import { REPORTS, FORMATS } from './export.js';
 
 const KEY = 'fs-reports';
 const ICON = { pdf: 'PDF', xlsx: 'XLS', csv: 'CSV', geojson: 'GEO', html: 'WEB', kml: 'KML' };
-const KINDS = { ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k, r.label])), crime: 'Crime Report', fema: 'FEMA Report', market: 'Market Report', field: 'Field Notes', other: 'Other' };
+const KINDS = { ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k, r.label])), crime: 'Crime Report', crimeus: 'City / County Crime Report', fema: 'FEMA Report', market: 'Market Report', field: 'Field Notes', other: 'Other' };
 
 export function initReports(ctx) {
   const { esc, fmtN } = ctx, root = document.getElementById('view-reports'); if (!root) return;
@@ -62,7 +62,7 @@ export function initReports(ctx) {
       const note = k === 'compare' ? (areas ? fmtN(areas) + ' area' + (areas === 1 ? '' : 's') + ' in Compare' : 'Add areas to Compare first') : fmtN(n) + ' filing' + (n === 1 ? '' : 's') + (ctx.filterText() ? ' with the current filters' : '');
       return '<div class="rp-card"><b>' + esc(r.label) + '</b><p>' + esc(r.desc) + '</p><em>' + esc(note) + '</em><div class="rp-fmts">' +
         r.formats.map(f => '<button type="button" class="btn" data-new="' + k + '" data-f="' + f + '">' + esc(FORMATS[f].replace(' (GIS)', '')) + '</button>').join('') + '</div></div>';
-    }).join('') + marketCard() + crimeCard() + areaCards();
+    }).join('') + marketCard() + crimeCard() + crimeUSCard() + areaCards();
   }
   // Market Report: the Market view (growth, permits, businesses, jobs, spending, sales tax, crime, traffic, rates) for the
   // area chosen there, as a PDF report or the data as CSV
@@ -80,6 +80,14 @@ export function initReports(ctx) {
       '<em>' + esc(sel ? 'Selected: ' + sel : 'City of Houston only. Select an area with Area, Shape, Radius or County, or use the map view') + '</em><div class="rp-fmts">' +
       (sel ? '<button type="button" class="btn" data-crime="selection">Selected area</button>' : '') +
       '<button type="button" class="btn" data-crime="view">Map view</button><button type="button" class="btn" data-crime="pick">Draw an area</button></div></div>';
+  }
+  // City / County Crime Report (FBI, any US city or county): the police department at the map center or the middle of the selection
+  function crimeUSCard() {
+    if (!ctx.crimeUSReportFor) return '';
+    const sel = ctx.sel?.feature ? ctx.sel.label || 'the selected area' : null;
+    return '<div class="rp-card"><b>City / County Crime Report</b><p>Yearly FBI figures for the local police department anywhere in the US: violent and property crime per 100,000 residents against the state and the nation, ten years of history and the mix of offenses. Export as a PDF report or CSV.</p>' +
+      '<em>' + esc(sel ? 'Selected: ' + sel : 'The city or county at the middle of the map') + '</em><div class="rp-fmts">' + (sel ? '<button type="button" class="btn" data-crimeus="selection">Selected area</button>' : '') +
+      '<button type="button" class="btn" data-crimeus="view">Map center</button></div></div>';
   }
   // the other area reports (drive time, traffic, air traffic…): same three ways to pick the area as the crime report
   function areaCards() {
@@ -113,6 +121,7 @@ export function initReports(ctx) {
     root.querySelectorAll('[data-crime]').forEach(b => b.onclick = () => { ctx.setView('map');
       if (b.dataset.crime === 'pick') { ctx.setMode?.('area'); ctx.toast?.('Drag a box on the map, then open Reports → Crime Report → Selected area.'); return; }
       ctx.crimeReportFor(b.dataset.crime); });
+    root.querySelectorAll('[data-crimeus]').forEach(b => b.onclick = () => { ctx.setView('map'); ctx.crimeUSReportFor(b.dataset.crimeus); });
     root.querySelectorAll('[data-ar]').forEach(b => b.onclick = () => { ctx.setView('map');
       if (b.dataset.w === 'pick') { ctx.setMode?.('area'); ctx.toast?.('Drag a box on the map, then use the ' + (ctx.areaReports.find(x => x.key === b.dataset.ar)?.label || 'report') + ' button on the selection bar.'); return; }
       ctx.runAreaReport(b.dataset.ar, b.dataset.w); });
