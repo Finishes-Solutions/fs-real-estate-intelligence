@@ -5,6 +5,22 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 2:09 PM CT: Market tab follows your selection, map legends, property card fixes (5811648)
+- **Market tab opens on what you've selected on the map:** a county, several counties together, or the county a drawn area sits in. With nothing selected it shows the whole region. Picking a county on the tab still works.
+- **Every Market chart shows its numbers on hover**, including the Correlation explorer's lines and lead/lag bars and the small trend lines in the Markets and Rates tables.
+- **Correlation explorer redesigned:** the choices and verdict sit on the left and the chart on the right at a normal size (it used to stretch across the whole page with oversized text). The method note is folded under "How this is measured".
+- **Newest business locations** moved to the bottom of the Market tab and show 10 at a time, with "Show 10 more".
+- **Legends for Rain radar and Flood zones** in the bottom-left corner. The flood legend uses FEMA's own colors and plain labels (100-year floodplain, floodway, 500-year zone).
+- **Map Layers (More) opens right under the quick layer buttons** on the left, restyled, with a close button. Clicking More again now closes it (before, it reopened).
+- **Clicking a developer or contractor on Activity, or dragging across the Timeline chart, turns the filings on** so the projects show on the map.
+- **Property card:**
+  - The section buttons (Value, Building, Site, Crime, Area…) now land with the section's heading visible. Before, the heading was hidden under the card's header.
+  - Switching police department in the crime section keeps it in place instead of jumping down out of view.
+  - The **Add** button (pick more items) restyled to match the card's buttons.
+  - **Fixed: a one-storey building in Waller read as 651 ft and 51 floors.** The lidar height is now checked before it's used. A reading that doesn't fit the building, such as hundreds of feet with nothing else showing a tall building there, is set aside with a note. The app also rejects malformed lidar responses, the likely cause here, and ignores stray specks (birds, wires).
+- **The selected building's green highlight no longer flickers** while zooming or orbiting. It now sits half a metre outside every wall instead of overlapping the grey building.
+- **Area at a Glance** zoomed in on a single block now shows the census tract you're in, instead of saying there's no data.
+
 ### 1:50 PM CT: Area at a Glance shows your selection; traffic reports for whole counties (6405bd9)
 - **Area at a Glance follows what you've selected:** pick a county (or draw an area, a radius or a shape) and the panel shows that area's population, income, home value, rent, households and jobs, with its name in the heading. With nothing selected it still shows the map view; clearing the selection switches back.
 - A very small selection (smaller than a census tract) shows the numbers for the tract it sits in.
