@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 2:01 PM CT: Crime library loads at a polite pace (c48b6a1)
+- **Fixed:** the first load asked the FBI for data far too fast (about 65 requests a second). After about 150 Alabama departments the FBI stopped answering. The load was stopped; the app itself was not affected.
+- The loader now asks at most 5 times a second. If many departments fail in a row it pauses, and after a few pauses it stops until next week instead of retrying straight away.
+- A full load now takes about six hours, split over two back-to-back runs. Departments already loaded are kept.
+
 ### 1:39 PM CT: Crime library and state rankings (1cb349e)
 - **The app now keeps its own copy of the FBI crime figures** for every city and county police department in the US (about 11,000 of them, 2015 to 2025). A weekly job refreshes each department once a month. Departments not loaded yet are still looked up live, as before.
 - **Faster crime sections** on property cards once a department is in the library.
