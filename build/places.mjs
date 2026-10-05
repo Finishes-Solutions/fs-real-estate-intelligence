@@ -59,7 +59,7 @@ export function inCounties(rows, counties) {
 }
 export const countyBox = counties => { let b = [Infinity, Infinity, -Infinity, -Infinity]; for (const c of counties) for (const p of c.outline) for (const r of p) for (const [x, y] of r) b = [Math.min(b[0], x), Math.min(b[1], y), Math.max(b[2], x), Math.max(b[3], y)]; return b.map(v => Math.round(v * 1000) / 1000); };
 
-async function main() {
+export async function main() {
   const regions = JSON.parse(await fs.readFile('data/regions.json', 'utf8')), geo = JSON.parse(await fs.readFile('data/geo.json', 'utf8'));
   const counties = geo.counties.map(c => ({ name: c.name, outline: c.outline, fips: regions.counties.find(r => r.name === c.name)?.fips }));
   const box = countyBox(counties), d = await duck();
