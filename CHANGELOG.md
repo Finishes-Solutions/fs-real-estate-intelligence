@@ -5,6 +5,19 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 3:32 PM CT: Street maps in every report, and a new Market tab (58ddc6f)
+- **Report PDFs now show a real street map** (roads, towns, labels) with the area outlined, instead of a bare outline on grey. This covers the FEMA, crime, traffic, drive-time, air traffic and flight reports, the Summary report's filings map, the Area Comparison (each area in its colour), the Market report, and the airport and City / County Crime reports (a locator map).
+- **The Market tab is rebuilt**, with buttons to jump between sections:
+  - **Overview:** headline tiles with their change and a small trend line (construction under way, starting in 90 days, homes permitted, new businesses, jobs, population, typical rent, unemployment, building material prices). Below them, **What's moving** lists the biggest changes in plain words, and **Ask AI for a market brief** asks the assistant to sum them up.
+  - **Construction pipeline (new):** value under construction each month, including what's already scheduled for the next year; by use and by county; the largest projects and those starting in the next 90 days. Click a project to open it on the map. A filing with an obviously mis-entered value (the $6.5B Garth Road entry) is left out of the totals and named.
+  - **Growth & demand:** homes permitted, now split into single-family, 2–4 units and apartments, plus new businesses, jobs by industry, city sales tax and consumer spending.
+  - **Housing & rents (new on this tab):** census home values, incomes, rents and vacancy, household income bands, Zillow rents by ZIP, and the Houston for-sale market.
+  - **Costs & rates:** five years of building material prices (lumber, steel, concrete, copper and building materials overall) and interest rates, up front instead of behind a tab.
+  - Every chart shows its numbers on hover; bars with a breakdown open it on click.
+  - **Export PDF** includes a street map of the area. **Export Data** now also has the pipeline, housing, rents and material costs.
+- The construction filing list starts in November 2024, so the tab doesn't compare construction under way with a year ago yet. That comparison would be inflated while the list fills in.
+- Ask AI's market answers now cover the pipeline, rents and material costs.
+
 ### 2:09 PM CT: Market tab follows your selection, map legends, property card fixes (5811648)
 - **Market tab opens on what you've selected on the map:** a county, several counties together, or the county a drawn area sits in. With nothing selected it shows the whole region. Picking a county on the tab still works.
 - **Every Market chart shows its numbers on hover**, including the Correlation explorer's lines and lead/lag bars and the small trend lines in the Markets and Rates tables.
