@@ -12,8 +12,34 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Search finds these businesses by name**, closest first, before the OpenStreetMap and Comptroller results.
 - **Where it comes from:** Overture Maps (which already includes records from Meta, Microsoft, BrightQuery and Foursquare) and, once a free Hugging Face token is added, Foursquare's own open dataset. Both are free and refreshed monthly. Closed places and pins without a street address that are probably service-area businesses are left out, and the same business from two sources is shown once.
 
+### 1:39 PM CT: Crime library and state rankings (1cb349e)
+- **The app now keeps its own copy of the FBI crime figures** for every city and county police department in the US (about 11,000 of them, 2015 to 2025). A weekly job refreshes each department once a month. Departments not loaded yet are still looked up live, as before.
+- **Faster crime sections** on property cards once a department is in the library.
+- **State rank on the card, report and PDF:** e.g. "Among 640 Texas city police departments (2025): violent crime lower than 58% of them, property crime lower than 81%." Only whole-year departments with at least 2,500 residents are compared.
+- **Ask AI can rank places:** "safest cities in Texas over 50,000 people", "Louisiana counties with the most property crime".
+- The library fills over the first run (roughly an hour or two); rankings and state ranks appear as each state finishes.
+
+### 11:49 AM CT: The app reads the government data key (GOV_API_KEY) (6dd783b)
+- **Crime by city / county now has a backup:** if the FBI website's feed is down or changes, the app switches to the FBI's official data service using the api.data.gov key saved on Vercel as `GOV_API_KEY`. Nothing changes on screen.
+- The same key can be reused for other federal data services later; the app reads it from one place.
+
 ### 11:40 AM CT: Behind the scenes: checking new free data sources (28666a6, e87ab6c)
 - No change in the app yet. Added a server-side check of the free environmental and business-registration services (state environmental agency, Railroad Commission, wetlands, soils, EPA, Texas Comptroller) so they can be added next.
+
+### 11:31 AM CT: Crime by city / county, anywhere in the US (9540c9f, 6bc25ce, e36d54c)
+- **Property and parcel cards now show crime anywhere in the US**, under the Houston street-level section:
+  - the local police department: the city's own police inside city limits, otherwise the county police or sheriff;
+  - violent and property crimes per 100,000 residents for 2025 (the newest full year), compared with the state and the US, and the change from 2024;
+  - a 10-year trend against the state and the US, and the share of crimes solved;
+  - a list of the other departments in the county to switch to (a neighboring city, or the sheriff).
+- **New City / County Crime Report** (Reports tab, or **Full report** on the card): year-by-year table, offense mix (murder, rape, robbery, aggravated assault, burglary, theft, vehicle theft, arson) against the state and the US, exported as a PDF or CSV.
+- **Ask AI answers crime questions outside Houston**, e.g. "How does crime in Hempstead compare with Texas?"
+- **Clear labels:** every view says the figures are yearly and department-wide, which year they cover, and warns when a department reported only part of a year or has stopped reporting (New Orleans' newest year is 2023, for example).
+- Checked against live FBI data for 24 places, including Houston, Brookshire, Hempstead, Katy, rural Waller County, New York, Washington DC, Nashville, Fairfax, Los Angeles, Chicago, Louisville and Honolulu.
+- Source: the FBI Crime Data Explorer (no account or key needed), listed on the Sources tab.
+
+### 11:08 AM CT: FBI crime data check (d9d7c59)
+- Behind the scenes only: a diagnostic that tests which FBI Crime Data Explorer feeds still answer, ahead of crime numbers by city and county for the whole US. Nothing in the app changes yet.
 
 ### 11:06 AM CT: Clicking a building selects only that building again (71f0f33)
 - **Fixed:** clicking a building could highlight and measure many unrelated buildings around it. In one Waller example that was about 260,000 sq ft of buildings across the screen, on different parcels. The card's size, floor area and overview used that wrong total.

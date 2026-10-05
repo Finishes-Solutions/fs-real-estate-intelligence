@@ -1,0 +1,57 @@
+name: Crime library (Supabase)
+
+# Saves the FBI Crime Data Explorer's yearly figures for every US city and county police department into Supabase
+# (build/crime-library.mjs) for crime by city / county and state rankings. Weekly; each department is re-read once its
+# figures are 30 days old. A run stops after ~5 hours and starts the next one itself while departments are left.
+# Needs supabase/migrations/20261016000000_crime_library.sql applied once.
+on:
+  schedule:
+    - cron: "23 8 * * 0" # Sundays 08:23 UTC (default branch only)
+  workflow_dispatch:
+    inputs:
+      states:
+        description: "Comma-separated state abbreviations (blank = all)"
+        required: false
+      refresh_days:
+        description: "Re-read departments older than this many days (blank = 30; 0 = all)"
+        required: false
+      max_minutes:
+        description: "Stop after this many minutes (blank = 300)"
+        required: false
+
+permissions:
+  contents: read
+  actions: write
+  id-token: write # GitHub OIDC for the Supabase pipeline edge function when no secret key is stored
+
+concurrency:
+  group: crime-library
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: Production # the secrets live in this GitHub environment
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Load the crime library
+        id: load
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_KEY }}
+          STATES: ${{ inputs.states }}
+          REFRESH_DAYS: ${{ inputs.refresh_days }}
+          MAX_MINUTES: ${{ inputs.max_minutes || '300' }}
+        run: node build/crime-library.mjs
+      - name: Start the next run
+        if: steps.load.outputs.remaining != '' && steps.load.outputs.remaining != '0' && inputs.max_minutes == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run crime-library.yml --ref "${GITHUB_REF_NAME}" -f states="${{ inputs.states }}" -f refresh_days="${{ inputs.refresh_days }}"

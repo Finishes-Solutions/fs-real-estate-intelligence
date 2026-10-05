@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       script:
-        description: "Probe to run: parcels, height, news, geocode, bls, sources, streets, planes, adsblol, ground, markets, traffic, airports, wiki, identify or env"
+        description: "Probe to run: parcels, height, news, geocode, bls, sources, streets, planes, adsblol, ground, markets, traffic, airports, wiki, identify, fbi or env"
         required: false
         default: parcels
 permissions:
@@ -23,3 +23,4 @@ jobs:
       - run: node build/probe-${{ inputs.script || 'parcels' }}.mjs
         env:
           MAPTILER_KEY: ${{ secrets.MAPTILER_KEY }}
+          GOV_API_KEY: ${{ secrets.GOV_API_KEY }}

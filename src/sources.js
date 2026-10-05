@@ -77,6 +77,8 @@ export function initSources(ctx) {
           detail: (a?.mortgages ? 'Year ' + a.mortgages + '. ' : '') + 'Published once a year (spring) for the year before.' },
         { name: link('Houston Police NIBRS incidents', 'https://www.houstontx.gov/police/cs/Monthly_Crime_Data_by_Street_and_Police_Beat.htm'), what: 'Crime map layer, crime reports for any selected area (PDF / CSV), the assistant’s crime answers, and crime within 0.5 mile on building cards (Houston)', status: st('fresh', 'Nightly'),
           detail: 'HPD republishes the yearly file monthly; the nightly sync keeps the last 25 months in the database. Houston city only for now.' },
+        { name: link('FBI Crime Data Explorer', 'https://cde.ucr.cjis.gov/') + ' · ' + link('US Census Geocoder', 'https://geocoding.geo.census.gov/'), what: 'Crime by city / county on building and parcel cards, the City / County Crime Report (PDF / CSV), state rankings and the assistant’s answers about crime outside Houston', status: st('fresh', 'Weekly'),
+          detail: 'Offenses each police department reports to the FBI, by calendar year, for the whole US. Every city and county department is saved in the app’s crime library and re-read monthly (a department not in it yet is asked live). The newest full year is shown; the FBI keeps adding late reports, and some departments report only part of a year or have stopped reporting (the card says so). Department-level only: no street-level detail.' },
         { name: link('US Census TIGER (us-atlas)', 'https://github.com/topojson/us-atlas'), what: 'County outlines and town names', status: st('off', 'Static'), detail: 'Boundaries change rarely; updated with the app.' },
       ]],
       ['Map layers (fetched live)', [

@@ -1334,7 +1334,10 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 /* crime report card */
 .card .cr-v{color:#c03b3a}.card .cr-p{color:#d9822b}
 .card .cr-bars{display:block;width:100%;height:auto;color:var(--muted);margin-top:4px}
-.card .cr-leg{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:4px}.card .cr-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.card .cu-ag{display:flex;flex-direction:column;gap:1px;margin:2px 0 8px}.card .cu-ag span{font-size:11px;color:var(--muted)}
+.card .cu-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}.card .cu-tbl th{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)}.card .cu-tbl td{font-family:var(--font-mono);text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)}.card .cu-tbl th:first-child,.card .cu-tbl td:first-child{text-align:left}.card .cu-tbl td:nth-child(3),.card .cu-tbl td:nth-child(5){color:var(--muted)}
+.card .cu-oth{display:flex;flex-direction:column;gap:4px;margin-top:8px}.card .cu-oth select{max-width:100%}
+.card .cr-leg{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--muted);margin-top:4px}.card .cr-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 #lyCrimeCat{margin:2px 0 4px 26px}#lyCrimeNote{margin:0 0 6px 26px;font-size:11px}
 
 /* property-first panel: Area at a Glance, then a collapsible Construction Filings section */
