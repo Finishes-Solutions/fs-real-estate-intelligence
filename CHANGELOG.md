@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 2:31 PM CT: Google maps, Google 3D and Google place search, ready for keys (503d184)
+- **Google base maps:** "Google" and "Google Sat" buttons under Base Map, with Google's logo and map credits shown while they're on.
+- **Google 3D:** Google's photorealistic 3D city replaces the simple building blocks at street zoom (tilt the map). Clicking a building still opens its property card.
+- **Google in search:** a Google section in the search results. Picking one switches to the Google map and opens a Google place card: address, phone, website, opening hours, rating and a link to Google Maps.
+- **Nothing shows until Google keys are added to the site** (two keys: one for the browser, limited to this site's address, and one for the server). Place searches are capped each month (900 place cards and 9,000 searches by default) to stay inside Google's free monthly use.
+- **Fixes to the 2:08 PM release:** the soils part of the Environmental report timed out (the site outline was sent the wrong way round); company names cut off at 50 characters now match; cities, counties and school or utility districts are no longer sent to the Comptroller.
+
 ### 2:08 PM CT: Environment layers, Environmental report and company owner lookup (41791f9)
 - **New Environment section in Map Layers:**
   - **Environmental Sites:** state and federal cleanup and contamination sites (Superfund, hazardous waste cleanups, voluntary cleanups, brownfields, dry cleaner cleanups, leaking petroleum tanks, landfills, and areas where groundwater use is restricted). A picker switches to registered petroleum tanks or EPA-permitted facilities. Click a dot for its program and ID.
