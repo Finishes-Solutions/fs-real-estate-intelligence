@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 3:46 PM CT: Environmental report gets the street map too (0a64ad3)
+- The **Environmental screening report** (added earlier today) now opens with the site on a street map, like every other report.
+
 ### 3:32 PM CT: Street maps in every report, and a new Market tab (58ddc6f)
 - **Report PDFs now show a real street map** (roads, towns, labels) with the area outlined, instead of a bare outline on grey. This covers the FEMA, crime, traffic, drive-time, air traffic and flight reports, the Summary report's filings map, the Area Comparison (each area in its colour), the Market report, and the airport and City / County Crime reports (a locator map).
 - **The Market tab is rebuilt**, with buttons to jump between sections:
