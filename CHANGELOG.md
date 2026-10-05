@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 3:55 PM CT: The app's own cursors (3c1c458)
+- **A branded cursor set** across the app (mouse and trackpad; phones and tablets have none):
+  - a dark arrow everywhere;
+  - a green arrow over anything you can click to open or select;
+  - four arrows while you drag the map;
+  - the small building cursor at street zoom when a click opens that building.
+- **Each selection tool has its own cursor:** a crosshair with a dashed box for Area, a shape for Shape and a circle for Radius, and a green arrow with a county for County.
+- Text boxes keep the normal text cursor. If a browser can't show a custom cursor it falls back to the usual one.
+
 ### 3:46 PM CT: Environmental report gets the street map too (0a64ad3)
 - The **Environmental screening report** (added earlier today) now opens with the site on a street map, like every other report.
 
