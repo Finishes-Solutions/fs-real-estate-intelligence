@@ -11,7 +11,8 @@ export function initGlance(ctx) {
   const tile = (k, v, s) => '<div class="g-t"><b>' + v + '</b><span>' + esc(k) + '</span>' + (s ? '<i>' + s + '</i>' : '') + '</div>';
   const shell = (body, place) => '<div class="g-h"><span class="kicker">Area at a Glance</span>' + (place ? '<em>' + esc(place) + '</em>' : '') + '</div>' + body;
 
-  // the selection's tracts: those centred inside it, or (a selection smaller than a tract) the tract under its middle
+  // the tracts of an area (the selection or the view): those centred inside it, or (an area smaller than a tract, e.g. zoomed
+  // in on a block) the tract under its middle
   const selTracts = (tracts, g) => { const l = tractsFor(tracts, { geom: g }); if (l.length) return l; const c = centroid(g); return c ? tracts.filter(t => t.geom && inGeom(c, t.geom)) : []; };
   async function render() {
     const my = ++seq, sel = ctx.sel?.feature ? ctx.sel : null, sg = sel && (sel.feature.geometry || sel.feature);
@@ -21,7 +22,7 @@ export function initGlance(ctx) {
     let list, place, where;
     if (sg) { list = selTracts(m.tracts, sg); place = sel.label || 'Selected area'; where = 'in the selection'; }
     else { const b = map.getBounds(), w = b.getWest(), s = b.getSouth(), e = b.getEast(), n = b.getNorth();
-      list = tractsFor(m.tracts, { geom: { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] } }); place = ctx.viewPlace?.() || ''; where = 'in view'; }
+      list = selTracts(m.tracts, { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] }); place = ctx.viewPlace?.() || ''; where = 'in view'; }
     const x = summarizeTracts(list);
     if (!x) { el.innerHTML = shell('<p class="g-n">' + (sg ? 'No census data for the selected area: census numbers cover the counties loaded on the map.' : 'Census data covers the counties loaded on the map. Move the map over them to see the area’s numbers.') + '</p>', place); return; }
     const gr = x.population_growth_pct;

@@ -1,5 +1,6 @@
 // FEMA data for the map and FEMA reports. All free, no keys:
 //   GET  ?tile=z/x/y                     Flood Zones map layer: FEMA National Flood Hazard Layer (zones, FEMA's own colors) as 256 px PNG tiles
+//   GET  ?legend=1[&cls=high]            that layer's legend: FEMA's own swatches with plain-language labels
 //   GET  ?lat=..&lon=..&mi=0.25          FEMA report for a circle
 //   POST { geometry }                    FEMA report for any area (selection box, polygon, county or radius drawn on the map)
 // A report has: the share of the area in each flood risk class (NFHL), NFIP flood insurance claims paid in the census tracts
@@ -81,6 +82,25 @@ export async function femaReport(g, { label } = {}) {
     risk_index: Array.isArray(nriRows) ? nriSummary(nriRows) : nriRows, counties: Array.isArray(nriRows) ? [...new Set(nriRows.map(r => r.COUNTY))] : [], sources: SOURCES };
 }
 
+// ---------- legend ----------
+// FEMA's legend for the flood zone layer (28), so the map legend shows FEMA's real colors, with plain-language labels
+const PLAIN = [[/^1% annual chance flood hazard$/i, 'High risk: 1% a year (100-year floodplain)'], [/^0\.2% annual chance flood hazard$/i, 'Moderate risk: 0.2% a year (500-year)'],
+  [/regulatory floodway/i, 'Floodway (keep clear for flood flow)'], [/special floodway/i, 'Special floodway'], [/future conditions/i, 'Future 1% a year floodplain'],
+  [/reduced risk due to levee/i, 'Behind a levee (reduced risk)'], [/undetermined/i, 'Not studied (undetermined)']];
+export async function femaLegend({ cls = 'all', fetchImpl = globalThis.fetch } = {}) {
+  const r = await fetchImpl(NFHL + '/legend?f=json', { headers: UA, signal: AbortSignal.timeout(12000) });
+  if (!r.ok) throw new Error('FEMA legend ' + r.status);
+  const d = await r.json(), layer = (d.layers || []).find(l => l.layerId === 28); if (!layer) throw new Error('FEMA legend: no flood zone layer');
+  const seen = new Set(), items = [];
+  for (const x of layer.legend || []) {
+    const raw = String(x.label || '').trim(); if (!raw || !x.imageData || /all other values/i.test(raw)) continue;
+    const label = (PLAIN.find(([re]) => re.test(raw)) || [, raw])[1]; if (seen.has(label)) continue;
+    if (cls === 'high' && !/1% a year \(100|floodway/i.test(label)) continue; // the "100-year floodplain only" filter draws only those
+    seen.add(label); items.push({ label, fema: raw, img: 'data:' + (x.contentType || 'image/png') + ';base64,' + x.imageData });
+  }
+  return { items };
+}
+
 // ---------- tiles ----------
 const HALF = 20037508.342789244;
 export function tileBBox(z, x, y) { const s = 2 * HALF / 2 ** z; return [-HALF + x * s, HALF - (y + 1) * s, -HALF + (x + 1) * s, HALF - y * s]; }
@@ -88,6 +108,10 @@ export function tileBBox(z, x, y) { const s = 2 * HALF / 2 ** z; return [-HALF +
 export default async function handler(req, res) {
   if (!sameOrigin(req, res)) return;
   const q = req.query || {};
+  if (q.legend) {
+    try { const d = await femaLegend({ cls: q.cls === 'high' ? 'high' : 'all' }); res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=2592000, stale-while-revalidate=2592000'); return res.json(d); }
+    catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ error: e.message }); }
+  }
   if (q.tile) {
     const m = String(q.tile).match(/^(\d{1,2})\/(\d+)\/(\d+)$/); if (!m || +m[1] < 10 || +m[1] > 18) return res.status(400).json({ error: 'tile z/x/y with z 10-18' });
     const b = tileBBox(+m[1], +m[2], +m[3]);

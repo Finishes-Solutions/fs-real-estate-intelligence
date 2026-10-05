@@ -7,7 +7,7 @@ import { nameQuery } from '../api/tenants.js';
 import { USES } from '../lib/taxonomy.mjs';
 import { makeMatcher, encode, decode, describe } from '../lib/filter.mjs';
 import { categoryOf, parsePlaces, overpassQuery, businessQuery, mergeBusinesses } from '../lib/nearby.mjs';
-import { roofFromHistogram, floorsFromHeight } from '../lib/height.mjs';
+import { roofFromHistogram, floorsFromHeight, plausibleHeight } from '../lib/height.mjs';
 
 // the model filled every filter: all uses, all types, $5M–$1T, changed this week
 let a = cleanFilterArgs({ uses: USES, types: ['New', 'Reno', 'Addition'], min_value: 5e6, max_value: 1e12, changed: 'any', counties: ['Waller'], keywords: '' }, 'Show medical projects over $5M filed in the last year');
@@ -119,6 +119,16 @@ const pl = parsePlaces([{ lat: 29.99, lon: -95.34, tags: { name: 'George Bush In
 assert.deepEqual(pl.map(p => p.code), ['IAH', 'HOU'], 'private strips dropped, nearest first'); assert.ok(pl[0].miles > 30 && pl[0].miles < 40);
 // lidar roof height and floors
 assert.equal(roofFromHistogram([[500, 0, 0], [0, 1, 2, 3]]).height_m, 0, 'flat ground → no building');
+{ const edges = Array.from({ length: 341 }, (_, i) => i), c = new Array(340).fill(0); c[0] = 200; c[5] = 400; c[6] = 50; c[199] = 1; c[214] = 2; // one-storey roof, 3 noise pixels way up
+  const r = roofFromHistogram([c, edges]); assert.equal(r.height_m, 6.5, 'roof from the main group (90th percentile)'); assert.equal(r.max_m, 7, 'specks at 199 / 214 m dropped'); }
+{ // the data API answering with its own 10 coarse bins (35 m wide, from below ground) instead of the 1 m bins asked for: the
+  // Waller store that read as 198.5 m (651 ft, 51 floors), with 216 m "to the top"
+  const coarse = [[30, 40, 60, 900, 0, 0, 0, 0, 0, 260], [-134, -99, -64, -29, 6, 41, 76, 111, 146, 181, 216]];
+  assert.equal(roofFromHistogram(coarse), null, 'coarse bins rejected (the next lidar item is tried)'); }
+assert.equal(roofFromHistogram([[10, 10], [-50, -49, -48]]), null, 'bins below ground rejected');
+assert.equal(plausibleHeight(198.5, {}).ok, false, '198 m with nothing else saying so'); assert.equal(plausibleHeight(198.5, { mapHeight: 190 }).ok, true, 'a real tower');
+assert.equal(plausibleHeight(30, { stories: 1 }).ok, false, '30 m on a one-storey record'); assert.equal(plausibleHeight(12, { stories: 1 }).ok, true, 'a tall one-storey warehouse');
+assert.equal(plausibleHeight(60, { levels: 15 }).ok, true); assert.equal(plausibleHeight(14, {}).ok, true);
 assert.equal(floorsFromHeight(272, 'office'), 70); assert.equal(floorsFromHeight(7, 'house'), 2); assert.equal(floorsFromHeight(1), null);
 // the newer filters: status, sq ft, company, exact address, housing units
 const fs = [

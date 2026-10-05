@@ -5,6 +5,7 @@ import { entityKey } from './lib/taxonomy.mjs';
 import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
+import { plausibleHeight } from './lib/height.mjs';
 import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft, applyPlaceAlias, splitWithin, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from './lib/assist-logic.mjs';
 import { createTurns, withTimeout, createVoiceLog } from './lib/voice-state.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
@@ -383,7 +384,7 @@ export function initAssistant(ctx) {
         if (!r.ok) return { error: d.error || 'Location lookup failed (' + r.status + ').' };
         const pc = d.parcel || {}, near = (x, y) => Math.hypot((x[0] - y[0]) * 0.87, x[1] - y[1]) < 0.0005;
         const filings = ctx.F.filter(f => near([f.lon, f.lat], p.c)).sort((x, y) => y.cost - x.cost).slice(0, 8);
-        const lid = d.height?.source === '3dep-lidar' && d.height.height_m > 2 ? d.height.height_m : d.osm?.height_m || null;
+        const lid = d.height?.source === '3dep-lidar' && d.height.height_m > 2 && plausibleHeight(d.height.height_m, { levels: d.osm?.levels, stories: pc.stories, mapHeight: d.osm?.height_m }).ok ? d.height.height_m : d.osm?.height_m || null;
         turnSubject = pc.situs || p.label;
         return { place: p.label, center: p.c, address: pc.situs || null, owner: pc.owner || null, market_value: pc.marketValue || null, year_built: pc.yearBuilt || null, land_area: pc.area || null, land_use: pc.landUse || null, county: pc.county || null,
           building_sqft: pc.buildingSqft || null, height_ft: lid ? Math.round(lid * 3.281) : null, floors: d.osm?.levels || pc.stories || null,

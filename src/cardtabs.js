@@ -31,7 +31,8 @@ export function initCardTabs(ctx) {
         (i >= 0 && n > 1 ? '<b class="cnum">' + (i + 1) + '</b>' : '') + '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (ICON[t.kind] || ICON.summary) + '</svg>' +
         '<span>' + esc(t.label) + '</span>' + (t.pinned || n < 2 ? '' : '<i class="cx" data-x="' + esc(t.id) + '" aria-label="Remove ' + esc(t.label) + '">×</i>') + '</button>'; }).join('') +
       '<button type="button" class="ctadd" aria-pressed="' + addMode + '" title="' + (addMode ? 'Stop adding' : 'Add more: then click or tap other buildings, parcels, filings, planes or airports (or Shift-click)') + '">' +
-      (addMode ? 'Done' : '+ Add') + '</button>';
+      '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (addMode ? '<path d="M2.5 6.2l2.3 2.3 4.7-5"/>' : '<path d="M6 2v8M2 6h8"/>') + '</svg>' +
+      (addMode ? 'Done' : 'Add') + '</button>';
     mount(); bar.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
   function mount() { if (!tabs.length || !bar) return; if (bar.parentNode !== card || card.firstElementChild !== bar) card.prepend(bar); card.classList.add('has-tabs'); }
