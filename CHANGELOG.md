@@ -21,11 +21,24 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **The selected building's green highlight no longer flickers** while zooming or orbiting. It now sits half a metre outside every wall instead of overlapping the grey building.
 - **Area at a Glance** zoomed in on a single block now shows the census tract you're in, instead of saying there's no data.
 
+### 2:01 PM CT: Crime library loads at a polite pace (c48b6a1)
+- **Fixed:** the first load asked the FBI for data far too fast (about 65 requests a second). After about 150 Alabama departments the FBI stopped answering. The load was stopped; the app itself was not affected.
+- The loader now asks at most 5 times a second. If many departments fail in a row it pauses, and after a few pauses it stops until next week instead of retrying straight away.
+- A full load now takes about six hours, split over two back-to-back runs. Departments already loaded are kept.
+
 ### 1:50 PM CT: Area at a Glance shows your selection; traffic reports for whole counties (6405bd9)
 - **Area at a Glance follows what you've selected:** pick a county (or draw an area, a radius or a shape) and the panel shows that area's population, income, home value, rent, households and jobs, with its name in the heading. With nothing selected it still shows the map view; clearing the selection switches back.
 - A very small selection (smaller than a census tract) shows the numbers for the tract it sits in.
 - **Fixed: "That area is too large for a traffic report" on a county.** The limit was 250 square miles, smaller than any county here (Waller is about 520). It is now 5,000 square miles, enough for Harris County or a few counties together.
 - **Incidents in a county traffic report are only the ones inside the county**, not on roads in the neighbouring counties that fall in the same box. Large areas look them up in several pieces so the live incident service accepts them.
+
+### 1:39 PM CT: Crime library and state rankings (1cb349e)
+- **The app now keeps its own copy of the FBI crime figures** for every city and county police department in the US (about 11,000 of them, 2015 to 2025). A weekly job refreshes each department once a month. Departments not loaded yet are still looked up live, as before.
+- **Faster crime sections** on property cards once a department is in the library.
+- **State rank on the card, report and PDF:** e.g. "Among 640 Texas city police departments (2025): violent crime lower than 58% of them, property crime lower than 81%." Only whole-year departments with at least 2,500 residents are compared.
+- **Ask AI can rank places:** "safest cities in Texas over 50,000 people", "Louisiana counties with the most property crime".
+- The library fills over the first run (roughly an hour or two); rankings and state ranks appear as each state finishes.
+
 
 ### 11:49 AM CT: The app reads the government data key (GOV_API_KEY) (6dd783b)
 - **Crime by city / county now has a backup:** if the FBI website's feed is down or changes, the app switches to the FBI's official data service using the api.data.gov key saved on Vercel as `GOV_API_KEY`. Nothing changes on screen.

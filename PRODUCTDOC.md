@@ -83,6 +83,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
   - the local police department: the city's own police inside city limits, otherwise the county police or sheriff;
   - violent and property crimes per 100,000 residents for the newest full year, compared with the state and the US, and the change from the year before;
   - a 10-year trend line against the state and the US, and the share of crimes solved;
+  - how it ranks among the same kind of departments in its state, e.g. "violent crime lower than 71% of Texas city police departments";
   - **Other departments** in the county, if you'd rather see a neighboring city or the sheriff (the section stays where it is on screen while the new department loads);
   - **Full report** for the year-by-year table and the mix of offenses (murder, robbery, burglary, theft and others), with PDF and CSV export.
   - These are whole-year, department-wide figures from the FBI: every spot a department covers shows the same numbers. The card says which year they're for, and warns you when a department reported only part of a year or has stopped reporting.
@@ -274,6 +275,7 @@ The **Ask AI** button (⌘/ on a Mac, Ctrl+/ elsewhere) opens an assistant that 
 - "What am I looking at?" "Save a note here: vacant lot, call the broker."
 - "Search the web for …" (it only searches the web when you ask).
 "- "How does crime in Hempstead compare with Texas?" "Is crime in Austin going up?" (anywhere in the US, from FBI yearly figures)
+- "What are the safest cities in Texas over 50,000 people?" "Which Louisiana counties have the most property crime?"
 - "How is oil doing this year?" "Does oil lead Houston unemployment?" "What moves Houston housing permits?"
 
 Answers come with cards: summaries, charts, comparisons, places, drive times, weather, news and imagery. The suggestions above the Ask AI button change with what you're looking at.
@@ -341,6 +343,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **Legends for Rain radar and Flood zones** in the bottom-left corner, and **Map Layers** now opens right under the quick layer buttons.
 - **Area at a Glance follows your selection:** pick a county (or draw an area) and the panel shows that area's numbers instead of the map view.
 - **Traffic reports for whole counties:** the traffic report now covers areas up to 5,000 square miles instead of 250.
+- **Crime library and state rankings:** the FBI figures for every US city and county police department are now kept in the app and refreshed monthly, so the crime section loads faster and shows how a city ranks in its state. Ask AI can list the lowest- or highest-crime cities and counties in any state.
 - **Crime by city / county, anywhere in the US:** property cards and a new City / County Crime Report show the local police department's violent and property crime rates against the state and the nation, 10 years of history and the mix of offenses, from FBI figures. Ask AI can answer crime questions outside Houston too.
 - **Markets and the Correlation explorer** on the Market tab: stocks, Houston companies, homebuilders, crypto, oil and gas, building material prices and rates, with an honest test of which ones move with Houston's numbers, and an AI explanation.
 - **More history:** the Houston crime trend now covers up to six years instead of two, and the Air Traffic Report can cover up to three years once enough has been collected.

@@ -129,4 +129,49 @@ assert.equal((await call({})).code, 400);
 r = await call({ lat: '48.85', lon: '2.35' }); assert.equal(r.code, 404); assert.match(r.body.error, /United States only/);
 r = await call({ ori: 'TX9999999' }); assert.equal(r.code, 404);
 r = await call({ ori: 'ZZ1234567' }); assert.equal(r.code, 400);
+
+// ---------- the crime library ----------
+{
+  const { libraryRows, areaRows, fromLibrary } = await import('../lib/fbicrime.mjs');
+  // FBI summaries -> library rows -> back: the same report
+  // counts in multiples of 48, so the fake monthly split (n/12, cleared n/48) adds back up to whole numbers
+  const s = { v: sum({ 2023: 96, 2024: 144, 2025: 192 }, { stRate: 400, usRate: 360, pop: 60000 }), p: sum({ 2023: 960, 2024: 1056, 2025: 1152 }, { stRate: 1800, usRate: 1700, pop: 60000 }),
+    offenses: { homicide: sum({ 2024: 48, 2025: 96 }, { stRate: 6, usRate: 5 }), larceny: sum({ 2024: 480, 2025: 576 }, { stRate: 1200, usRate: 1100 }) } };
+  const rows = libraryRows('TX2370000', s), areas = areaRows('TX', s);
+  assert.deepEqual(rows.map(r => r.year), [2023, 2024, 2025]); assert.equal(rows[2].v, 192); assert.equal(rows[2].v_months, 12); assert.equal(rows[2].pop, 60000); assert.equal(rows[2].larceny, 576); assert.equal(rows[2].rape, null); assert.equal(rows[2].v_cleared, 48);
+  assert.equal(areas.find(a => a.area === 'TX' && a.year === 2025).v_rate, 400); assert.equal(areas.find(a => a.area === 'US' && a.year === 2025).larceny_rate, 1100);
+  const back = fromLibrary(rows, areas, 'TX');
+  const a1 = buildReport({ agency, stateAbbr: 'TX', totals: { v: s.v, p: s.p }, offenses: s.offenses, lastYear: 2025, firstYear: 2016 });
+  const a2 = buildReport({ agency, stateAbbr: 'TX', totals: back.totals, offenses: back.offenses, lastYear: 2025, firstYear: 2016 });
+  assert.deepEqual(a2.headline, a1.headline); assert.deepEqual(a2.years, a1.years); assert.deepEqual(a2.offenses, a1.offenses);
+
+  // the endpoint reads the library first (no FBI calls), adds the state rank, and ranks a state's departments
+  process.env.SUPABASE_URL = 'https://db.test'; process.env.SUPABASE_SECRET_KEY = 'sb_secret_x';
+  const fbiFetch = globalThis.fetch, dbSeen = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url); if (!u.startsWith('https://db.test/')) return fbiFetch(url, opts);
+    const path = decodeURIComponent(u.replace('https://db.test/rest/v1/', '')); dbSeen.push(path);
+    if (path.startsWith('crime_agencies?ori=eq.TX2370800')) return Response.json([{ loaded_at: new Date().toISOString(), data_through: '09/2026' }]);
+    if (path.startsWith('crime_agencies?ori=eq.')) return Response.json([]);
+    if (path.startsWith('crime_agencies?state=eq.TX')) return Response.json([{ data_through: '09/2026' }]);
+    if (path.startsWith('crime_agency_years?ori=eq.TX2370800')) return Response.json(rows.map(r => ({ ...r, ori: 'TX2370800' })).reverse());
+    if (path.startsWith('crime_area_years?area=in.(US,TX)')) return Response.json(areas);
+    if (path === 'rpc/crime_peer_rank') return Response.json({ peers: 640, type: 'City', state: 'TX', year: 2025, v_lower_than_pct: 71, p_lower_than_pct: 80 });
+    if (path === 'rpc/crime_rankings') return Response.json([{ ori: 'TX0790500', name: 'Sugar Land Police Department', pop: 109606, v_rate: 73, p_rate: 1221.6 }]);
+    return new Response('unmocked ' + path, { status: 599 });
+  };
+  seen.length = 0;
+  let r = await call({ ori: 'TX2370800' });
+  assert.equal(r.code, 200, JSON.stringify(r.body)); assert.equal(r.body.source, 'library'); assert.equal(r.body.agency.name, 'Prairie View Police Department');
+  assert.deepEqual(r.body.headline, a1.headline); assert.equal(r.body.rank.v_lower_than_pct, 71); assert.equal(seen.filter(u => u.includes('/summarized/')).length, 0);
+  // not in the library yet: live from the FBI, still with the rank lookup
+  r = await call({ ori: 'TX2370000' }); assert.equal(r.code, 200); // cached from the live test above
+  // rankings
+  r = await call({ rank: 'tx', type: 'City', min_pop: '50000', limit: '5' });
+  assert.equal(r.code, 200, JSON.stringify(r.body)); assert.equal(r.body.year, 2025); assert.equal(r.body.departments[0].name, 'Sugar Land Police Department'); assert.equal(r.body.min_pop, 50000);
+  assert.ok(dbSeen.includes('rpc/crime_rankings'));
+  assert.equal((await call({ rank: 'ZZ' })).code, 400);
+  delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SECRET_KEY; globalThis.fetch = fbiFetch;
+  assert.equal((await call({ rank: 'TX' })).code, 503);
+}
 console.log('crimeus ok');

@@ -19,6 +19,8 @@ export function initCrimeUS(ctx) {
   };
   const query = ({ center, ori }) => ({ ...(center ? { lat: center[1].toFixed(4), lon: center[0].toFixed(4) } : {}), ...(ori ? { ori } : {}) });
   ctx.crimeUSData = o => load(query(o));
+  // departments in a state ranked by crime rate (crime library): { state, type, min_pop, order, desc, limit, year }
+  ctx.crimeRankings = o => load({ rank: o.state, ...(o.type ? { type: o.type } : {}), ...(o.min_pop ? { min_pop: o.min_pop } : {}), ...(o.order ? { order: o.order } : {}), ...(o.desc ? { desc: '1' } : {}), ...(o.limit ? { limit: o.limit } : {}), ...(o.year ? { year: o.year } : {}) });
 
   const r1 = v => v == null ? '—' : v >= 100 ? fmtN(Math.round(v)) : String(Math.round(v * 10) / 10);
   const x = v => v == null ? '' : v.toFixed(v >= 10 ? 0 : 1) + '×';
@@ -28,6 +30,11 @@ export function initCrimeUS(ctx) {
   const when = d => d.year ? (d.partial ? d.year + ' (' + d.months + ' of 12 months, annualized)' : String(d.year)) : '';
   const through = d => { const m = String(d.data_through || '').match(/^(\d{1,2})\/(\d{4})$/); return m ? new Date(+m[2], +m[1] - 1, 15).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''; };
   // the department stopped reporting, or reports no population (so no rate): said plainly under the numbers
+  // where it sits among the same kind of departments in its state (from the crime library; needs enough peers to mean much)
+  const rankText = d => { const k = d.rank; if (!k || !(k.peers >= 20) || k.v_lower_than_pct == null) return '';
+    const kind = k.type === 'County' ? 'county departments' : 'city police departments';
+    return 'Among ' + fmtN(k.peers) + ' ' + d.state_name + ' ' + kind + ' (' + k.year + ', 2,500+ residents): violent crime lower than ' + k.v_lower_than_pct + '% of them, property crime lower than ' + k.p_lower_than_pct + '%.'; };
+  const rankNote = d => rankText(d) ? '<div class="rnote cu-rank">' + esc(rankText(d)) + '</div>' : '';
   const caveats = d => [d.stale ? 'The newest year this department reported to the FBI is ' + d.year + ' (the FBI has full years through ' + d.latest_full_year + ' for others), so these are ' + d.year + '’s figures.' : '',
     d.headline && d.headline.rate_v == null ? 'The FBI lists no population for this department, so only counts are shown, not rates.' : ''].filter(Boolean).map(t => '<div class="rnote">' + esc(t) + '</div>').join('');
   const srcLine = d => 'FBI Crime Data Explorer · reported by the department · calendar ' + when(d) + ' (' + (d.stale ? 'the newest year this department reported' : 'newest full year') + (through(d) ? '; the FBI has partial months through ' + through(d) : '') + '). Rates are per 100,000 residents the department covers.';
@@ -65,7 +72,7 @@ export function initCrimeUS(ctx) {
     if (!d.agency || !d.headline) { el.innerHTML = head + '<div class="rnote">' + esc(d.note || 'No department figures for this spot.') + '</div>' + pickOthers(d, 'cuOth'); wireOthers(el, center, still, d); keep(); return; }
     el.innerHTML = head + '<div class="cu-ag"><b>' + esc(d.agency.name) + '</b><span>' + esc([when(d), covers(d)].filter(Boolean).join(' · ')) + '</span></div>' + tiles(d) +
       '<div class="fl">Violent crime per 100k, by year</div>' + trend(d.years, 'v', COL.v, 'Violent crime per 100,000 by year') + legend(d) +
-      caveats(d) + (d.headline.rate_v == null ? '<div class="rnote">' + esc(fmtN(d.headline.v) + ' violent and ' + fmtN(d.headline.p) + ' property offenses in ' + d.year + '.') + '</div>' : '') +
+      rankNote(d) + caveats(d) + (d.headline.rate_v == null ? '<div class="rnote">' + esc(fmtN(d.headline.v) + ' violent and ' + fmtN(d.headline.p) + ' property offenses in ' + d.year + '.') + '</div>' : '') +
       (d.headline.cleared_v != null ? '<div class="rnote">Solved (cleared): ' + d.headline.cleared_v + '% of violent and ' + d.headline.cleared_p + '% of property offenses in ' + d.year + '.</div>' : '') +
       (d.note ? '<div class="rnote">' + esc(d.note) + '</div>' : '') +
       '<div class="bacts"><button class="btn" type="button" data-cu="report">Full report</button></div>' + pickOthers(d, 'cuOth') +
@@ -89,7 +96,7 @@ export function initCrimeUS(ctx) {
     last = { d, center };
     const h = d.headline, mix = d.offenses || [];
     card.innerHTML = '<div class="top"><div><div class="kicker">Crime by city / county</div><h2>' + esc(d.agency.name) + '</h2><div class="bsub">' + esc([d.state_name, when(d), covers(d)].filter(Boolean).join(' · ')) + '</div></div><button class="x" aria-label="Close">×</button></div>' +
-      '<div class="bsec">' + tiles(d) + '<div class="rnote">' + esc(fmtN(h.v) + ' violent and ' + fmtN(h.p) + ' property offenses in ' + d.year + (h.change_v != null ? '; change is in the rate vs ' + (d.year - 1) : '') + '.') + '</div>' + caveats(d) + (d.note ? '<div class="rnote">' + esc(d.note) + '</div>' : '') + '</div>' +
+      '<div class="bsec">' + tiles(d) + '<div class="rnote">' + esc(fmtN(h.v) + ' violent and ' + fmtN(h.p) + ' property offenses in ' + d.year + (h.change_v != null ? '; change is in the rate vs ' + (d.year - 1) : '') + '.') + '</div>' + rankNote(d) + caveats(d) + (d.note ? '<div class="rnote">' + esc(d.note) + '</div>' : '') + '</div>' +
       '<div class="bsec"><div class="lt">Over the years</div><div class="fl">Violent crime per 100k</div>' + trend(d.years, 'v', COL.v, 'Violent crime per 100,000 by year') +
         '<div class="fl">Property crime per 100k</div>' + trend(d.years, 'p', COL.p, 'Property crime per 100,000 by year') + legend(d) +
         '<table class="cu-tbl"><thead><tr><th>Year</th><th>Violent</th><th>' + esc(d.state) + '</th><th>Property</th><th>' + esc(d.state) + '</th></tr></thead><tbody>' +
@@ -119,7 +126,7 @@ export function initCrimeUS(ctx) {
     if (!last) return; const { d } = last, h = d.headline;
     const body = '<div class="kp"><div><b style="color:' + COL.v + '">' + r1(h.rate_v) + '</b><span>Violent per 100k' + (h.change_v != null ? ' · ' + pct(h.change_v) : '') + '</span></div><div><b style="color:' + COL.p + '">' + r1(h.rate_p) + '</b><span>Property per 100k' + (h.change_p != null ? ' · ' + pct(h.change_p) : '') + '</span></div>' +
         '<div><b>' + esc(vs(h.rate_v, h.state_rate_v, h.us_rate_v, d.state) || '—') + '</b><span>Violent vs ' + esc(d.state) + ' · US</span></div><div><b>' + esc(vs(h.rate_p, h.state_rate_p, h.us_rate_p, d.state) || '—') + '</b><span>Property vs ' + esc(d.state) + ' · US</span></div></div>' +
-      '<p class="meta">' + esc(fmtN(h.v) + ' violent and ' + fmtN(h.p) + ' property offenses in ' + d.year + ', ' + covers(d) + '. ' + (d.note || '') + (h.cleared_v != null ? ' Cleared: ' + h.cleared_v + '% of violent and ' + h.cleared_p + '% of property offenses.' : '')) + '</p>' +
+      '<p class="meta">' + esc(fmtN(h.v) + ' violent and ' + fmtN(h.p) + ' property offenses in ' + d.year + ', ' + covers(d) + '. ' + (d.note || '') + (h.cleared_v != null ? ' Cleared: ' + h.cleared_v + '% of violent and ' + h.cleared_p + '% of property offenses.' : '') + (rankText(d) ? ' ' + rankText(d) : '')) + '</p>' +
       '<div class="two"><div><h2>Violent crime per 100,000</h2><div class="bars">' + trend(d.years, 'v', COL.v, 'Violent') + '</div></div><div><h2>Property crime per 100,000</h2><div class="bars">' + trend(d.years, 'p', COL.p, 'Property') + '</div></div></div>' +
       '<p class="meta">Solid: ' + esc(d.agency.name) + '. Dashed: ' + esc(d.state_name) + '. Dotted: United States. Open dots: part-year, scaled to 12 months.</p>' +
       '<h2>Year by year</h2><table><thead><tr><th>Year</th><th class="r">Months</th><th class="r">Population</th><th class="r">Violent</th><th class="r">per 100k</th><th class="r">' + esc(d.state) + '</th><th class="r">US</th><th class="r">Property</th><th class="r">per 100k</th><th class="r">' + esc(d.state) + '</th><th class="r">US</th></tr></thead><tbody>' +
