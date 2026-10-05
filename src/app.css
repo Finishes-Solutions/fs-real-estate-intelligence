@@ -359,6 +359,9 @@ table.who .r,th.r{text-align:right}
 .card .raw dl{margin-top:6px;font-size:11px}
 .card .pl{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)}
 .card .pl span{color:var(--muted);font-size:11.5px;text-align:right}
+.card button.plb{width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:inherit;font:inherit;text-align:left;cursor:pointer}
+.card button.plb:hover b{text-decoration:underline}
+.pl-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
 .card .kgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .card .kgrid b{display:block;font-family:var(--font-mono);font-size:14px}
 .card .kgrid span{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}

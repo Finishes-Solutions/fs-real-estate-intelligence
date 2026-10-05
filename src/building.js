@@ -362,15 +362,29 @@ export function initBuildings(ctx) {
       '<div class="ssrc src">TDLR TABS registrations. Costs are filer estimates.</div>';
     el.querySelectorAll('.chitem').forEach(x => x.onclick = () => ctx.select(ctx.BY_ID.get(x.dataset.id), false));
   }
+  // OpenStreetMap (with the building lookup) plus Overture / Foursquare places (api/places), merged: the same name a
+  // few steps apart is one business. The open-data list arrives separately and redraws the section.
+  const nn = s => String(s || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').replace(/\b(the|llc|inc|co|corp|ltd)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  function mergePlaces(osm, open) {
+    const out = (open || []).map(p => ({ name: p.name, kind: p.cat || '', brand: p.brand, lat: p.lat, lon: p.lon, id: p.id, src: 'open' }));
+    for (const p of osm || []) if (!out.some(o => nn(o.name) === nn(p.name) && Math.abs(o.lat - p.lat) < 0.0006 && Math.abs(o.lon - p.lon) < 0.0007)) out.push({ ...p, src: 'osm' });
+    return out;
+  }
   function renderPlaces(list, err) {
-    const el = card.querySelector('#bPlaces'), b = cur;
+    const el = card.querySelector('#bPlaces'), b = cur; if (!el) return;
+    if (!b._open && ctx.placesNear && !b._openAsked) {
+      b._openAsked = true;
+      ctx.placesNear(b.center[1], b.center[0], 150).then(o => { b._open = o; }, () => { b._open = []; }).then(() => { if (cur === b) renderPlaces(b.d?.places || list, b.d?.placesError || err); });
+    }
+    list = mergePlaces(list, b._open);
     if (err && !list.length) { el.innerHTML = '<div class="lt">Businesses on the Block</div><div class="rnote">Lookup failed: ' + esc(err) + '</div>'; return; }
     const shape = b.footprint || b.parcel?.geometry;
     const inside = list.filter(p => shape && inGeom([p.lon, p.lat], shape)), other = list.filter(p => !inside.includes(p)).slice(0, 30);
-    const li = p => '<div class="pl"><b>' + esc(p.name) + '</b><span>' + esc(p.kind) + (p.brand && p.brand !== p.name ? ' · ' + esc(p.brand) : '') + '</span></div>';
+    const li = p => (p.id ? '<button class="pl plb" type="button" data-pid="' + esc(p.id) + '">' : '<div class="pl">') + '<b>' + esc(p.name) + '</b><span>' + esc(p.kind) + (p.brand && p.brand !== p.name ? ' · ' + esc(p.brand) : '') + '</span>' + (p.id ? '</button>' : '</div>');
     el.innerHTML = '<div class="lt">Businesses on the Block</div>' + (inside.length ? inside.map(li).join('') : '<div class="rnote">None mapped inside this ' + (b.footprint ? 'building' : 'parcel') + '.</div>') +
       (other.length ? '<details class="raw"' + (inside.length ? '' : ' open') + '><summary>Nearby (' + other.length + ')</summary>' + other.map(li).join('') + '</details>' : '') +
-      '<div class="ssrc src">OpenStreetMap, within about 150 m. Registered businesses at the address (Texas Comptroller) are listed below.</div>';
+      '<div class="ssrc src">Overture Maps, Foursquare and OpenStreetMap, within about 150 m' + (b._open ? '' : ' (more loading)') + '. Registered businesses at the address (Texas Comptroller) are listed below.</div>';
+    el.querySelectorAll('[data-pid]').forEach(x => x.onclick = () => ctx.showPlace?.(x.dataset.pid));
   }
   // retail and service tenants registered at the parcel's street address (Texas Comptroller, via api/tenants)
   async function renderTenants(p) {

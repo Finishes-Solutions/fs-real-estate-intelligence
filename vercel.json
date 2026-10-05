@@ -85,6 +85,9 @@
     },
     "api/markets.js": {
       "maxDuration": 20
+    },
+    "api/places.js": {
+      "maxDuration": 15
     }
   },
   "crons": [

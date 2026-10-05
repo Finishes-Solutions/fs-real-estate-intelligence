@@ -61,7 +61,7 @@
     <button class="sechead listhead" id="secList" type="button" aria-expanded="true" aria-controls="list"><svg class="chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg><span id="listCount"></span></button>
     <div class="list" id="list" role="list"></div>
     </div>
-    <div class="foot">Sources: parcels from Texas GIO StratMap and Regrid; demographics from US Census ACS 5-year and LEHD; flood zones from FEMA; traffic counts from TxDOT; places from OpenStreetMap. Construction filings: <a href="https://www.tdlr.texas.gov/TABS/Search" target="_blank" rel="noopener">TDLR TABS</a>, registrations <span id="periodTxt"></span>; costs and dates are filer estimates, and use, tenant and developer fields are AI-extracted and can be wrong. <span id="missTxt"></span> Every source and its freshness is in the Sources tab. Basemaps © MapTiler © OpenStreetMap contributors.</div>
+    <div class="foot">Sources: parcels from Texas GIO StratMap and Regrid; demographics from US Census ACS 5-year and LEHD; flood zones from FEMA; traffic counts from TxDOT; businesses and places from Overture Maps, Foursquare and OpenStreetMap. Construction filings: <a href="https://www.tdlr.texas.gov/TABS/Search" target="_blank" rel="noopener">TDLR TABS</a>, registrations <span id="periodTxt"></span>; costs and dates are filer estimates, and use, tenant and developer fields are AI-extracted and can be wrong. <span id="missTxt"></span> Every source and its freshness is in the Sources tab. Basemaps © MapTiler © OpenStreetMap contributors.</div>
   </aside>
 
   <div class="presize" id="pResize" role="separator" aria-orientation="vertical" aria-label="Resize the list panel" title="Drag to resize · double-click to reset" tabindex="0"></div>
@@ -180,6 +180,9 @@
       <div class="lt">Property &amp; Site</div>
       <label class="tg2"><input type="checkbox" id="lyBldg" checked><span>3D Buildings (Zoom In)</span></label>
       <label class="tg2" title="Regrid parcel boundaries at street zoom (counts against the monthly Regrid tile allowance)"><input type="checkbox" id="lyRegrid"><span>Parcel Lines (Regrid)</span></label>
+      <label class="tg2" title="Every mapped business and place at street zoom (Overture Maps and Foursquare open data, refreshed monthly)"><input type="checkbox" id="lyPlaces"><span>Businesses &amp; Places</span></label>
+      <select class="chip" id="lyPlacesGrp" aria-label="Kind of business" hidden></select>
+      <div class="rnote" id="lyPlacesNote" hidden></div>
       <label class="tg2" title="FEMA National Flood Hazard Layer: 100-year and 500-year flood zones (zoom in)"><input type="checkbox" id="lyFema"><span>Flood Zones (FEMA)</span></label>
       <div class="rnote" id="lyFemaNote" hidden>FEMA's effective flood map at street zoom: the high-risk (100-year) floodplain and floodway, and the 0.2% (500-year) zone, in FEMA's colors. Select an area for a FEMA report.</div>
       <label class="tg2" title="TxDOT traffic counts: average vehicles a day on each counted road (Texas; zoom in)"><input type="checkbox" id="lyAadt"><span>Traffic Counts</span></label>

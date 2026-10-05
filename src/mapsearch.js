@@ -90,7 +90,7 @@ export function initMapSearch(ctx) {
 
   // ---------- results: Addresses · Places · Projects · Companies & people · Filings at matching addresses ----------
   let names = [], addrs = [], ents = [], shownA = 0;
-  // ---------- businesses by name: OpenStreetMap near the map center + Texas Comptroller sales-tax permits in nearby towns ----------
+  // ---------- businesses by name: Overture / Foursquare places and OpenStreetMap near the map center + Texas Comptroller sales-tax permits in nearby towns ----------
   let biz = [], bizPending = false, bizT = 0; const bizCache = new Map();
   const bizWorthy = t => t.length >= 3 && !COORDS.test(t) && !/^\d/.test(t) && !/^\d{5}$/.test(t);
   async function businesses(text) {
@@ -98,8 +98,10 @@ export function initMapSearch(ctx) {
     if (bizCache.has(key)) return bizCache.get(key);
     const towns = (DATA.places || []).map(p => [p[0], (p[1] - lon) ** 2 + (p[2] - lat) ** 2]).sort((a, b) => a[1] - b[1]).slice(0, 25).map(p => p[0]);
     const get = u => fetch(u).then(r => r.ok ? r.json() : null).catch(() => null);
-    const [o, t] = await Promise.all([get('api/nearby?' + new URLSearchParams({ mode: 'business', name: text, lat, lon, limit: '8' })), get('api/tenants?' + new URLSearchParams({ name: text, cities: towns.join(',') }))]);
-    const out = mergeBusinesses(o?.places || [], t?.tenants || [], 8); if (o || t) bizCache.set(key, out); return out;
+    // Overture / Foursquare places first (fast, complete in the suburbs), then OpenStreetMap, then the Comptroller
+    const [p, o, t] = await Promise.all([get('api/places?' + new URLSearchParams({ q: text, near: lat + ',' + lon, n: '8' })), get('api/nearby?' + new URLSearchParams({ mode: 'business', name: text, lat, lon, limit: '8' })), get('api/tenants?' + new URLSearchParams({ name: text, cities: towns.join(',') }))]);
+    const open = (p?.places || []).map(x => ({ src: 'places', name: x.name, kind: x.cat || '', address: [x.addr, x.city].filter(Boolean).join(', '), lat: x.lat, lon: x.lon, miles: x.km != null ? +(x.km * 0.6214).toFixed(2) : undefined }));
+    const out = mergeBusinesses([...open, ...(o?.places || [])], t?.tenants || [], 8); if (p || o || t) bizCache.set(key, out); return out;
   }
   function run(text) {
     q = text.trim(); clearB.hidden = !q; remote = []; enterWait = false; biz = []; clearTimeout(bizT);

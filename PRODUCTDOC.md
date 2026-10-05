@@ -79,7 +79,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
 - **The building:** footprint, height, floors and estimated floor area.
 - **Site:** flood zone, traffic counts on nearby roads, water and utility districts (MUDs), tax-increment zones, Opportunity Zone, school district, bus stops, nearby environmental sites, crime nearby (Houston), and area rents and jobs.
 - **Area snapshot:** census numbers for that neighborhood.
-- **Businesses:** what's inside or next door (OpenStreetMap), plus businesses registered for sales tax at the address.
+- **Businesses:** what's inside or next door, from the Overture Maps and Foursquare open business lists plus OpenStreetMap, and businesses registered for sales tax at the address. Click a business for its details.
 - **Construction filings** on the parcel.
 - **From here:** distance and drive time, a drive-time map, weather, news, and site imagery (recent satellite and dated high-resolution photos).
 - **Regrid details** (paid, capped each month): zoning, zoning limits such as height and density, the last sale price and date where recorded, and land use. Harris and Waller counties aren't in the free state parcel data, so Regrid fills in owner and value there.
@@ -153,6 +153,7 @@ Map Layers:
 - **Property & Site:**
   - 3D buildings (zoom in).
   - Parcel lines (Regrid).
+  - Businesses & places: every mapped business at street zoom, colored by kind (food, retail, health care, offices, construction and home services, industrial and more). Pick one kind from the list under it, or click a dot for the name, category, address, phone, website and a link to Google Maps.
   - Flood zones (FEMA).
   - Traffic counts.
   - Crime (Houston), with a choice of all, violent or property crime.
@@ -296,7 +297,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 - **Parcels and owners:** county appraisal districts through the Texas GIO parcel service (free), and Regrid (paid, capped).
 - **People, homes and jobs:** US Census American Community Survey (5-year averages) and Census jobs data (about two years behind).
-- **Flood:** FEMA. **Traffic counts:** TxDOT. **Crime:** Houston Police. **Places and buildings:** OpenStreetMap.
+- **Flood:** FEMA. **Traffic counts:** TxDOT. **Crime:** Houston Police. **Buildings:** OpenStreetMap.
+- **Businesses and places:** Overture Maps and Foursquare's free open datasets, reloaded monthly (about 300,000 in the seven counties), plus OpenStreetMap.
 - **Construction filings:** TDLR TABS, refreshed nightly.
 - **Markets:** Yahoo Finance (stocks, funds, indexes and crypto history; delayed), Coinbase (live crypto) and the St. Louis Fed's FRED (oil, gas, building material prices, rates and Houston metro statistics).
 - **Weather, radar and storms:** NOAA and Open-Meteo. **Planes:** adsb.lol and airplanes.live. **Airports:** OurAirports and the FAA.
@@ -311,7 +313,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **Coverage gaps:**
   - Harris and Waller aren't in the free state parcel data; use Regrid details there.
   - Crime covers the City of Houston only.
-  - Business lists from OpenStreetMap are incomplete in some suburbs.
+  - Business lists come from open data: most businesses are there, but some are missing, closed or slightly misplaced. They are refreshed monthly.
 - **Numbers lag.** Census averages cover five years, jobs data is about two years old, and permits arrive about six weeks after the month.
 - **Shared notes have no sign-in.** Anyone with the site address can edit them, unless a team passcode is set.
 - **Performance.** With many layers, live planes and 3D on at once, older phones and laptops can still slow down. Selecting large areas, following planes, and toggling layers were made much faster in October 2026.
@@ -320,6 +322,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Businesses & Places layer:** about 300,000 businesses across the seven counties from the Overture Maps and Foursquare open data, colored by kind, with a card for each. Search finds them by name, and property cards list many more businesses than before.
 - **Markets and the Correlation explorer** on the Market tab: stocks, Houston companies, homebuilders, crypto, oil and gas, building material prices and rates, with an honest test of which ones move with Houston's numbers, and an AI explanation.
 - **More history:** the Houston crime trend now covers up to six years instead of two, and the Air Traffic Report can cover up to three years once enough has been collected.
 - **Whole buildings:** clicking a big building selects all of it, and a building on several parcels lists every parcel with a total.
