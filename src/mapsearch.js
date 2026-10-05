@@ -92,6 +92,8 @@ export function initMapSearch(ctx) {
   let names = [], addrs = [], ents = [], shownA = 0;
   // ---------- businesses by name: Overture / Foursquare places and OpenStreetMap near the map center + Texas Comptroller sales-tax permits in nearby towns ----------
   let biz = [], bizPending = false, bizT = 0; const bizCache = new Map();
+  // Google place suggestions (only when the site has a Google key; src/google.js)
+  let gs = [], gsT = 0;
   const bizWorthy = t => t.length >= 3 && !COORDS.test(t) && !/^\d/.test(t) && !/^\d{5}$/.test(t);
   async function businesses(text) {
     const c = map.getCenter(), lat = +c.lat.toFixed(2), lon = +c.lng.toFixed(2), key = low(text) + '|' + lat + ',' + lon;
@@ -104,7 +106,8 @@ export function initMapSearch(ctx) {
     const out = mergeBusinesses([...open, ...(o?.places || [])], t?.tenants || [], 8); if (p || o || t) bizCache.set(key, out); return out;
   }
   function run(text) {
-    q = text.trim(); clearB.hidden = !q; remote = []; enterWait = false; biz = []; clearTimeout(bizT);
+    q = text.trim(); clearB.hidden = !q; remote = []; enterWait = false; biz = []; clearTimeout(bizT); gs = []; clearTimeout(gsT);
+    if (q.length >= 3 && !COORDS.test(q) && ctx.google?.enabled()) { const my0 = seq + 1, c = map.getCenter(); gsT = setTimeout(async () => { const g = await ctx.google.suggest(q, [c.lng, c.lat]).catch(() => []); if (my0 !== seq) return; gs = g.slice(0, 5); render(); }, 380); }
     bizPending = !!q && bizWorthy(q);
     if (bizPending) { const my0 = seq + 1; bizT = setTimeout(async () => { const b = await businesses(q); if (my0 !== seq) return; biz = b; bizPending = false; render(); }, 450); }
     if (!q) { pending = false; close(); return; }
@@ -135,6 +138,7 @@ export function initMapSearch(ctx) {
     if (biz.length) { h += sec('Businesses');
       biz.forEach(b => push({ t: 'biz', b }, '<b>' + esc(b.name) + '</b><i>' + (b.miles != null ? (+b.miles).toFixed(1) + ' mi' : 'Business') + '</i><span>' + esc([b.kind && b.kind[0].toUpperCase() + b.kind.slice(1), b.address].filter(Boolean).join(' · ') || (b.src === 'osm' ? 'OpenStreetMap' : 'Texas Comptroller')) + '</span>')); }
     else if (bizPending && q.length >= 3) h += sec('Businesses') + '<div class="ms-none sm">Looking up businesses…</div>';
+    if (gs.length) { h += sec('Google', '<span class="g-pow">powered by Google</span>'); gs.forEach(g => push({ t: 'google', g }, '<b>' + esc(g.main) + '</b><i>Google</i><span>' + esc(g.secondary) + '</span>')); }
     if (names.length) {
       h += sec('Projects · ' + fmtN(names.length), '<button class="lnk" data-act="filter" type="button">Show All on Map</button>');
       names.slice(0, shown).forEach(f => push({ t: 'filing', f }, filingRow(f)));
@@ -177,6 +181,7 @@ export function initMapSearch(ctx) {
     if (it.t === 'filing') { ctx.setView('map'); ctx.select(it.f, true); return; }
     if (it.t === 'entity') { showEntity(it.e); return; }
     if (it.t === 'biz') { showBusiness(it.b); return; }
+    if (it.t === 'google') { ctx.setView('map'); ctx.google.open(it.g.id); return; }
     showPlace(it.p);
   }
   // ⌘K (Mac) or Ctrl+K: jump to the map search from anywhere
@@ -224,6 +229,7 @@ export function initMapSearch(ctx) {
     else pin.setLngLat(c);
     pin.getElement().querySelector('span').textContent = String(label || '').split(',')[0];
   }
+  ctx.setPlacePin = setPlacePin;
   function clearPlace() { place = null; syncPlace(); setPlacePin(null); bar.classList.remove('on'); bar.innerHTML = ''; }
   ctx.clearPlace = clearPlace;
 

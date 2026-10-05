@@ -51,6 +51,12 @@ assert.equal(normEntity('Hines REIT 1001 Main, L.L.C.'), normEntity('HINES REIT 
 assert.equal(normEntity('ACME HOLDINGS, LIMITED PARTNERSHIP'), normEntity('Acme Holdings L.P.'));
 assert.ok(bestMatch('KATY ASIAN TOWN RETAIL CONDOMINIUM ASSOCIATION IN', [{ name: 'KATY ASIAN TOWN RETAIL CONDOMINIUM ASSOCIATION, IN' }]), 'names cut at 50 characters still match');
 assert.equal(bestMatch('ACME LLC', [{ name: 'ACME HOLDINGS LLC' }]), null, 'a different company is not a match');
+assert.ok(bestMatch('KATY ASIAN TOWN RETAIL CONDOMINIUM ASSOCIATION', [{ name: 'KATY ASIAN TOWN RETAIL CONDOMINIUM ASSOCIATION, IN' }]), 'the Comptroller name runs on into a cut-off "INC"');
+assert.equal(bestMatch('SMITH PROPERTIES', [{ name: 'SMITH PROPERTIES HOLDINGS GROUP LLC' }]), null, 'a longer, different name is not a match');
+assert.deepEqual(await lookupEntity('HOUSTON INDEPENDENT SCHOOL DISTRICT', async () => { throw new Error('no call'); }), { query: 'HOUSTON INDEPENDENT SCHOOL DISTRICT', public: true });
+assert.deepEqual(await lookupEntity('HARRIS COUNTY', async () => { throw new Error('no call'); }), { query: 'HARRIS COUNTY', public: true });
+const cw = { type: 'Polygon', coordinates: [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]] }; // clockwise
+assert.match(soilsQuery(cw), /polygon\(\(0\.000000 0\.000000,1\.000000 0\.000000,1\.000000 1\.000000/, 'rings go to SQL Server counter-clockwise');
 const det = shapeDetail({ taxpayerId: '1', name: 'X LLC', rightToTransactTX: 'ACTIVE', stateOfFormation: ' DE', reportYear: '2026', registeredAgentName: 'C T CORPORATION SYSTEM',
   registeredOfficeAddressStreet: '1999 BRYAN ST', registeredOfficeAddressCity: 'DALLAS', registeredOfficeAddressState: 'TX', registeredOfficeAddressZip: '75201', mailingAddressStreet: '9550 SPRING GREEN BLVD_STE 408',
   officerInfo: [{ AGNT_NM: 'JANE DOE', AGNT_TITL_TX: 'VICE PRESI', AGNT_ACTV_YR: '2026' }, { AGNT_NM: 'JANE DOE', AGNT_TITL_TX: 'DIRECTOR', AGNT_ACTV_YR: '2026' }, { AGNT_NM: 'OLD GUY', AGNT_TITL_TX: 'DIRECTOR', AGNT_ACTV_YR: '2020' }] });

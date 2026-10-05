@@ -176,10 +176,11 @@
     <div class="layers" id="layers" role="dialog" aria-label="Map layers">
       <div class="lt">Base Map</div>
       <div class="seg seg6" id="styleSeg">
-        <button data-style="dots" aria-pressed="true">Default</button><button data-style="streets" aria-pressed="false">Streets</button><button data-style="sat" aria-pressed="false">Satellite</button><button data-style="topo" aria-pressed="false">Topo</button><button data-style="esri" aria-pressed="false" title="Esri World Imagery (no key)">ESRI</button><button data-style="free" aria-pressed="false" title="OpenFreeMap streets (no key)">Free Map</button>
+        <button data-style="dots" aria-pressed="true">Default</button><button data-style="streets" aria-pressed="false">Streets</button><button data-style="sat" aria-pressed="false">Satellite</button><button data-style="topo" aria-pressed="false">Topo</button><button data-style="esri" aria-pressed="false" title="Esri World Imagery (no key)">ESRI</button><button data-style="free" aria-pressed="false" title="OpenFreeMap streets (no key)">Free Map</button><button data-style="google" aria-pressed="false" title="Google Maps" hidden>Google</button><button data-style="gsat" aria-pressed="false" title="Google satellite with roads and labels" hidden>Google Sat</button>
       </div>
       <div class="lt">Property &amp; Site</div>
       <label class="tg2"><input type="checkbox" id="lyBldg" checked><span>3D Buildings (Zoom In)</span></label>
+      <label class="tg2" id="lyG3dRow" title="Google photorealistic 3D city model (street zoom, tilt the map)" hidden><input type="checkbox" id="lyG3d"><span>Google 3D (Photorealistic)</span></label>
       <label class="tg2" title="Regrid parcel boundaries at street zoom (counts against the monthly Regrid tile allowance)"><input type="checkbox" id="lyRegrid"><span>Parcel Lines (Regrid)</span></label>
       <label class="tg2" title="Every mapped business and place at street zoom (Overture Maps and Foursquare open data, refreshed monthly)"><input type="checkbox" id="lyPlaces"><span>Businesses &amp; Places</span></label>
       <select class="chip" id="lyPlacesGrp" aria-label="Kind of business" hidden></select>

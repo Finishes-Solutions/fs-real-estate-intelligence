@@ -43,7 +43,7 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 - **Tools:** Move, Area (drag a box), Shape (draw a shape), Radius (an address plus a distance), County (click counties).
 - **Filters** narrow what the map shows, layer by layer (see "Filters" below). **Clear** sits right next to it; see "Clearing the view" below.
 - **Export** makes a report.
-- **Search** finds addresses, places, roads, businesses, projects, owners and developers. Press ⌘K (Mac) or Ctrl+K to jump to it.
+- **Search** finds addresses, places, roads, businesses, projects, owners and developers. Press ⌘K (Mac) or Ctrl+K to jump to it. When Google is set up for the site, a **Google** section lists Google's matches too; picking one switches to the Google map and opens a Google place card (address, phone, website, hours, rating and a link to Google Maps).
 - **Quick layer buttons** under the search box: Satellite, 3D, Parcels, Flood Zones, Demographics, Traffic Counts, Filings, Planes, Radar, and **More** for every layer. On a phone they're one row just under the search bar; swipe it sideways for the rest (the faded right edge means there's more).
 
 **Right side of the map**
@@ -162,8 +162,10 @@ Map Layers:
   - Topo.
   - ESRI satellite.
   - Free Map.
+  - Google and Google Satellite (only when Google is set up for the site): Google's own map, with the Google logo and map credits at the bottom while it's on.
 - **Property & Site:**
   - 3D buildings (zoom in).
+  - Google 3D (only when Google is set up): Google's photorealistic 3D model of the city in place of the simple blocks. Zoom in to street level and tilt the map. Clicking a building still opens its property card.
   - Parcel lines (Regrid).
   - Businesses & places: every mapped business at street zoom, colored by kind (food, retail, health care, offices, construction and home services, industrial and more). Pick one kind from the list under it, or click a dot for the name, category, address, phone, website and a link to Google Maps.
   - Flood zones (FEMA).
@@ -319,6 +321,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **Flood:** FEMA. **Traffic counts:** TxDOT. **Crime:** Houston Police (street level) and the FBI (yearly, by police department, nationwide). **Buildings:** OpenStreetMap.
 - **Environment:** Texas Commission on Environmental Quality, US EPA, Railroad Commission of Texas (wells and pipelines), US Fish & Wildlife Service (wetlands) and USDA (soils).
 - **Company owners:** Texas Comptroller franchise-tax records and the Secretary of State.
+- **Google (paid, capped each month):** Google base maps, 3D city and place search, when the site's Google keys are set. A monthly allowance keeps place searches inside Google's free monthly use; past it, search uses the free sources until the next month.
 - **Businesses and places:** Overture Maps and Foursquare's free open datasets, reloaded monthly (about 300,000 in the seven counties), plus OpenStreetMap.
 - **Construction filings:** TDLR TABS, refreshed nightly.
 - **Markets:** Yahoo Finance (stocks, funds, indexes and crypto history; delayed), Coinbase (live crypto) and the St. Louis Fed's FRED (oil, gas, building material prices, rates and Houston metro statistics).
@@ -344,6 +347,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Google maps, Google 3D and Google place search** (once the site's Google keys are added): Google and Google Satellite base maps, Google's photorealistic 3D city, and Google results in search with a place card.
 - **Environment layers and the Environmental report:** cleanup and contamination sites, petroleum tanks, EPA-permitted facilities, oil and gas wells and pipelines, wetlands and soils on the map, and a Phase I style records screen for any parcel or area.
 - **Company behind the owner:** property cards look up company owners in the Texas Comptroller's free records: status, registered agent, mailing address and officers.
 - **Businesses & Places layer:** about 300,000 businesses across the seven counties from the Overture Maps and Foursquare open data, colored by kind, with a card for each. Search finds them by name, and property cards list many more businesses than before.

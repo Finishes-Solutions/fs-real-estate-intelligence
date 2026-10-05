@@ -12,6 +12,7 @@ export const SOURCE = 'Texas Comptroller of Public Accounts, franchise tax accou
 const ENTITY = /\b(L\.?\s?L\.?\s?C|L\.?\s?P|L\.?\s?L\.?\s?P|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|TRUST|TRUSTEES?|PARTNERS(HIP)?|HOLDINGS?|PROPERTIES|PROPERTY|INVESTMENTS?|INVESTORS|GROUP|FUND|REIT|BANK|ASSOCIATION|ASSN|CHURCH|MINISTRIES|DISTRICT|AUTHORITY|ENTERPRISES?|VENTURES?|CAPITAL|REALTY|DEVELOPMENT|MANAGEMENT|PLLC|PC|PA|FOUNDATION|SOCIETY|UNIVERSITY|COLLEGE|HOSPITAL|COUNTY|CITY OF|STATE OF|ISD|MUD|LLLP)\b\.?/i;
 // "SMITH JOHN & MARY" is a person; "SMITH FAMILY TRUST" is a trust (looked up: some are registered entities)
 export const isEntity = name => ENTITY.test(String(name || ''));
+const PUBLIC = /\b(CITY OF|COUNTY OF|STATE OF|\w+ COUNTY$|INDEPENDENT SCHOOL DISTRICT|ISD|SCHOOL DISTRICT|MUNICIPAL UTILITY DISTRICT|MUD|UTILITY DISTRICT|DRAINAGE DISTRICT|WATER CONTROL|NAVIGATION DISTRICT|FLOOD CONTROL|HOSPITAL DISTRICT|COLLEGE DISTRICT|AUTHORITY|UNITED STATES|USA)\b/i;
 // the owner field often carries care-of and attention lines after the name
 export function cleanOwner(name) {
   return String(name || '').replace(/\s+(C\/O|%|ATTN:?|ATTENTION)\s.*$/i, '').replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -25,8 +26,12 @@ export function normEntity(s) {
 // best match among the search results: the same name (Comptroller names are cut at 50 characters, so compare the
 // first 40), else nothing (the candidates are listed for the person to pick)
 export function bestMatch(query, list) {
-  const q = normEntity(query), q40 = q.slice(0, 40);
-  return (list || []).find(x => normEntity(x.name) === q) || (q.length >= 12 ? (list || []).find(x => normEntity(x.name).slice(0, 40) === q40) : null) || null;
+  const q = normEntity(query), L = (list || []).map(x => ({ x, n: normEntity(x.name) }));
+  const exact = L.find(o => o.n === q); if (exact) return exact.x;
+  if (q.length < 15) return null;
+  // one of the two was cut short: the appraisal roll and the Comptroller both truncate long names (at different lengths)
+  const cut = L.find(o => (o.n.startsWith(q) && o.n.length - q.length <= 4) || (q.startsWith(o.n) && o.n.length >= 30));
+  return cut ? cut.x : null;
 }
 const titleCase = s => String(s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()).replace(/\b(Llc|Lp|Inc|Ltd|Ii|Iii|Iv|Pc|Pllc|Usa|Us)\b/g, m => m.toUpperCase());
 const addr = (street, city, state, zip) => [street, [city, [String(state || '').trim(), zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', ').replace(/_/g, ' ');
@@ -56,11 +61,14 @@ async function get(url, fetchImpl = fetch) {
 export async function lookupEntity(name, fetchImpl = fetch) {
   const q = cleanOwner(name);
   if (!isEntity(q)) return { query: q, individual: true };
+  // cities, counties, school and utility districts and the state aren't franchise taxpayers
+  if (PUBLIC.test(q)) return { query: q, public: true };
   // the search wants the name without punctuation it can't match on ("PROLOGIS-A4" works, "L.L.C." doesn't)
   // (the name as written, minus punctuation and the legal ending: the Comptroller may spell the ending differently)
   const raw = q.toUpperCase().replace(/[^A-Z0-9&'-]+/g, ' ').replace(/\s+/g, ' ').trim();
   const term = raw.replace(/(\s+(L\s?L\s?C|L\s?P|L\s?L\s?P|LLLP|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|LIMITED PARTNERSHIP|PLLC|PC))+$/, '').trim().slice(0, 50) || raw.slice(0, 50);
-  const s = await get(BASE + '?name=' + encodeURIComponent(term), fetchImpl), list = (s.data || []).slice(0, 50);
+  let s; try { s = await get(BASE + '?name=' + encodeURIComponent(term), fetchImpl); } catch (e) { if (/ 400$/.test(e.message)) return { query: q, match: null, candidates: [], total: 0 }; throw e; }
+  const list = (s.data || []).slice(0, 50);
   const m = bestMatch(q, list);
   const candidates = list.filter(x => x !== m).slice(0, 6).map(x => ({ name: x.name, taxpayer_id: x.taxpayerId, zip: x.mailingAddressZip || undefined }));
   if (!m) return { query: q, match: null, candidates, total: s.count ?? list.length };

@@ -40,6 +40,7 @@ import { initCardTabs } from './cardtabs.js';
 import { initPlaces } from './places.js';
 import { initEnv } from './env.js';
 import { initOwner } from './owner.js';
+import { initGoogle } from './google.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
 
@@ -84,7 +85,7 @@ const inSel=f=>!sel.feature||(sel.kind==='county'&&sel.counties.size?sel.countie
 const countyGeo=DATA.counties.map(c=>({name:c.name,geom:{type:'MultiPolygon',coordinates:c.outline}}));
 
 // ---------- map ----------
-const STYLES={dots:['dataviz','dataviz-dark'],streets:['streets-v2','streets-v2-dark'],sat:['hybrid','hybrid'],topo:['topo-v2','topo-v2-dark'],esri:null,free:null};
+const STYLES={dots:['dataviz','dataviz-dark'],streets:['streets-v2','streets-v2-dark'],sat:['hybrid','hybrid'],topo:['topo-v2','topo-v2-dark'],esri:null,free:null,google:null,gsat:null};
 // keyless basemaps: Esri World Imagery (with OpenFreeMap labels and buildings on top) and OpenFreeMap streets
 const OFM='https://tiles.openfreemap.org';
 const ESRI_STYLE={version:8,glyphs:OFM+'/fonts/{fontstack}/{range}.pbf',
@@ -93,12 +94,13 @@ const ESRI_STYLE={version:8,glyphs:OFM+'/fonts/{fontstack}/{range}.pbf',
   layers:[{id:'esri',type:'raster',source:'esri'},
     {id:'esri-road-lbl',type:'symbol',source:'openmaptiles','source-layer':'transportation_name',minzoom:12,layout:{'symbol-placement':'line','text-field':['get','name'],'text-font':['Noto Sans Regular'],'text-size':11},paint:{'text-color':'#ffffff','text-halo-color':'#0b0d0c','text-halo-width':1.4}},
     {id:'esri-place-lbl',type:'symbol',source:'openmaptiles','source-layer':'place',filter:['in',['get','class'],['literal',['city','town','village','suburb','neighbourhood']]],layout:{'text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',14,'town',12.5,11]},paint:{'text-color':'#ffffff','text-halo-color':'#0b0d0c','text-halo-width':1.6}}]};
-const isSat=()=>layers.style==='sat'||layers.style==='esri';
+const isSat=()=>layers.style==='sat'||layers.style==='esri'||layers.style==='gsat';
 // property-first: filing dots start hidden (Layers → Filings, the Construction Filings section or the assistant turn them on)
 const layers={style:'dots',roads:true,names:true,counties:true,grid:true,size:'uniform',heat:'off',dots:false};
 try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(typeof L.grid==='boolean') layers.grid=L.grid; }catch(e){} // the map always opens without filings (dots and heatmap off); dot size and the grid are remembered
 const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} };
-const styleUrl=s=>s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
+// Google base maps need a tile session first (src/google.js): a promise of the style
+const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl('dots'),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
 map.on('error',e=>{ const m=(e&&e.error&&e.error.message)||''; if(/40[13]|Unauthorized|Forbidden/i.test(m)&&STYLES[layers.style]) toast('MapTiler refused the key for this site. Check the key’s allowed origins.'); });
@@ -293,7 +295,9 @@ function setBasemap(s){
   layers.style=s; styleReady=false;
   document.querySelectorAll('#styleSeg button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.style===s));
   try{ if(map.getTerrain()) map.setTerrain(null); }catch(e){} // MapLibre breaks if terrain is live during a style swap; live.js re-adds it on style.load
-  map.setStyle(styleUrl(s),{diff:false});
+  const st=styleUrl(s);
+  if(st&&typeof st.then==='function'){ st.then(x=>{ if(layers.style===s) map.setStyle(x,{diff:false}); },e=>{ toast(e.message); if(layers.style===s) setBasemap('dots'); }); return; }
+  map.setStyle(st,{diff:false});
 }
 
 // ---------- filters + list ----------
@@ -938,7 +942,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initCardTabs,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,
