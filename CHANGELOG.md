@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 1:45 PM CT: Businesses & Places layer from open data (c27cf86)
+- **New map layer, Businesses & Places:** about 300,000 businesses and places across the seven counties, colored by kind (food, retail, health care, offices, construction and home services, industrial and farms, and more). It shows from street zoom; pick one kind from the list under the switch.
+- **Click a dot** for a card with the name, category, address, phone, website, the sources that list it, a link to Google Maps and a button for the building and parcel there.
+- **Property cards list many more businesses:** the open data is added to OpenStreetMap's list, and each one opens its card.
+- **Search finds these businesses by name**, closest first, before the OpenStreetMap and Comptroller results.
+- **Where it comes from:** Overture Maps (which already includes records from Meta, Microsoft, BrightQuery and Foursquare) and, once a free Hugging Face token is added, Foursquare's own open dataset. Both are free and refreshed monthly. Closed places and pins without a street address that are probably service-area businesses are left out, and the same business from two sources is shown once.
+
 ### 11:40 AM CT: Behind the scenes: checking new free data sources (28666a6, e87ab6c)
 - No change in the app yet. Added a server-side check of the free environmental and business-registration services (state environmental agency, Railroad Commission, wetlands, soils, EPA, Texas Comptroller) so they can be added next.
 
