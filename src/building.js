@@ -323,9 +323,10 @@ export function initBuildings(ctx) {
       fld('Land', '<span class="mono">' + money(p.landValue) + '</span>') + fld('Improvements', '<span class="mono">' + money(p.improvementValue) + '</span>') +
       fld('Land area', esc(p.area || '—')) + fld('Year built', esc(p.yearBuilt || 'Not reported'), { dim: !p.yearBuilt }) +
       fld('Acquired', esc(p.acquired || '—'), { dim: !p.acquired }) + fld('Property ID', '<span class="mono">' + esc(p.propId || '—') + '</span>') +
-      (legal ? fld('Legal description', esc(legal), { w: true }) : '') + '</div>' + parcelsHtml(all) +
+      (legal ? fld('Legal description', esc(legal), { w: true }) : '') + '</div>' + '<div class="oc-box" id="bOwnerCo" hidden></div>' + parcelsHtml(all) +
       (p.raw ? '<details class="raw"><summary>All appraisal fields</summary><dl>' + Object.entries(p.raw).map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl></details>' : '') +
       '<div class="ssrc src">' + esc(p.raw?.SOURCE ? title(p.raw.SOURCE) : 'County appraisal district') + ' via Texas GIO StratMap. Appraisal values, not sale prices.</div>';
+    ctx.renderOwnerCo?.(el.querySelector('#bOwnerCo'), p.owner);
   }
   // the dark summary at the top: who owns it, what it's worth, how big, and how busy construction is around it
   function renderOverview(b, d) {

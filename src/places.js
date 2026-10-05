@@ -60,6 +60,7 @@ export function initPlaces(ctx) {
   ctx.onOverlays?.(() => { if (on) { lastKey = ''; legend(); load(); } });
   ctx.placesLayer = (v, g) => { if (g !== undefined) { grp = GROUPS[g] ? g : ''; if (sel) sel.value = grp; lastKey = ''; } setOn(v !== false); };
 
+  ctx.clickLayers?.push(SRC); // the map's own click doesn't also open the building under the dot
   map.on('click', SRC, e => { const f = e.features?.[0]; if (!f) return; ctx.tabs?.arm?.(e); show(f.properties.id); });
   map.on('mouseenter', SRC, e => { map.getCanvas().style.cursor = 'pointer'; const f = e.features?.[0]; if (f && ctx.tip) { ctx.tip.textContent = f.properties.name; ctx.tip.style.opacity = 1; ctx.tip.style.left = (e.point.x + 12) + 'px'; ctx.tip.style.top = (e.point.y + 12) + 'px'; } });
   map.on('mouseleave', SRC, () => { map.getCanvas().style.cursor = ''; if (ctx.tip) ctx.tip.style.opacity = 0; });

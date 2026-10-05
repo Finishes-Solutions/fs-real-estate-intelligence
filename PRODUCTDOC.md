@@ -77,6 +77,7 @@ Cards slide up from the bottom: swipe down to shrink one, and swipe again to clo
 Click a building, or at street zoom click open ground, to open its **property card**. The owner and value show first, usually within a couple of seconds; the businesses, height and photo fill in after.
 
 - **Ownership & value:** owner, mailing address, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service.
+- **Company behind the owner:** when the owner is a company (an LLC, partnership, corporation or trust), the card looks it up in the Texas Comptroller's free public records: whether it's active, where and when it was formed, its registered agent, mailing address and the officers, managers or members from its latest public report. If the name doesn't match exactly, similar names are listed to pick from. People's names are never looked up.
 - **The building:** footprint, height, floors and estimated floor area.
 - **Site:** flood zone, traffic counts on nearby roads, water and utility districts (MUDs), tax-increment zones, Opportunity Zone, school district, bus stops, nearby environmental sites, crime nearby (Houston), and area rents and jobs.
 - **Crime:** inside Houston, the incidents reported within a mile. Anywhere in the US, **Crime by city / county**:
@@ -108,6 +109,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
 Choose **Area**, **Shape**, **Radius** or **County** at the top of the map and mark the area. It becomes the **selected area**, shown in the **This Area** box. From there you can run:
 
 - **FEMA report:** flood zones, past flood insurance claims, disaster declarations and FEMA's risk index.
+- **Environmental report:** a screen of state and federal environmental records around the area or a parcel (from a property card's **Area reports**, it uses the parcel itself): cleanup and contamination sites, leaking and registered petroleum tanks, landfills, EPA-permitted facilities, oil and gas wells (including orphan wells) and pipelines, wetlands and soils. Each kind is searched out to the distance a Phase I environmental assessment would use (¼ to 1 mile from the edge of the site), nearest first, with distance and direction. Exports as PDF or CSV. It is a screen of public databases, not a Phase I.
 - **Traffic report:** the busiest roads and daily traffic counts, plus live speeds and incidents where available.
 - **Drive-time map:** 10, 20 and 30-minute drive areas, with the people, households and jobs inside each.
 - **Air traffic report:** how often planes pass over, how low, and which kinds.
@@ -168,6 +170,11 @@ Map Layers:
   - Traffic counts.
   - Crime (Houston), with a choice of all, violent or property crime.
   - Airports.
+- **Environment:**
+  - Environmental sites: cleanup and contamination sites (state and federal Superfund, hazardous waste cleanups, voluntary cleanups, brownfields, dry cleaner cleanups, leaking petroleum tanks, landfills and areas where groundwater use is restricted), or registered petroleum tanks, or EPA-permitted facilities. Click a dot for its name, program and ID, and an Environmental Report for that spot.
+  - Oil & gas wells and pipelines (Railroad Commission of Texas).
+  - Wetlands (US Fish & Wildlife Service).
+  - Soils (USDA soil survey).
 - **Demographics:** color census tracts by:
   - population or growth;
   - income, home value, rent or vacancy;
@@ -310,6 +317,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **Parcels and owners:** county appraisal districts through the Texas GIO parcel service (free), and Regrid (paid, capped).
 - **People, homes and jobs:** US Census American Community Survey (5-year averages) and Census jobs data (about two years behind).
 - **Flood:** FEMA. **Traffic counts:** TxDOT. **Crime:** Houston Police (street level) and the FBI (yearly, by police department, nationwide). **Buildings:** OpenStreetMap.
+- **Environment:** Texas Commission on Environmental Quality, US EPA, Railroad Commission of Texas (wells and pipelines), US Fish & Wildlife Service (wetlands) and USDA (soils).
+- **Company owners:** Texas Comptroller franchise-tax records and the Secretary of State.
 - **Businesses and places:** Overture Maps and Foursquare's free open datasets, reloaded monthly (about 300,000 in the seven counties), plus OpenStreetMap.
 - **Construction filings:** TDLR TABS, refreshed nightly.
 - **Markets:** Yahoo Finance (stocks, funds, indexes and crypto history; delayed), Coinbase (live crypto) and the St. Louis Fed's FRED (oil, gas, building material prices, rates and Houston metro statistics).
@@ -335,6 +344,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Environment layers and the Environmental report:** cleanup and contamination sites, petroleum tanks, EPA-permitted facilities, oil and gas wells and pipelines, wetlands and soils on the map, and a Phase I style records screen for any parcel or area.
+- **Company behind the owner:** property cards look up company owners in the Texas Comptroller's free records: status, registered agent, mailing address and officers.
 - **Businesses & Places layer:** about 300,000 businesses across the seven counties from the Overture Maps and Foursquare open data, colored by kind, with a card for each. Search finds them by name, and property cards list many more businesses than before.
 - **Crime library and state rankings:** the FBI figures for every US city and county police department are now kept in the app and refreshed monthly, so the crime section loads faster and shows how a city ranks in its state. Ask AI can list the lowest- or highest-crime cities and counties in any state.
 - **Crime by city / county, anywhere in the US:** property cards and a new City / County Crime Report show the local police department's violent and property crime rates against the state and the nation, 10 years of history and the mix of offenses, from FBI figures. Ask AI can answer crime questions outside Houston too.

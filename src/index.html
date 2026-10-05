@@ -41,6 +41,7 @@
         <button class="btn" id="selCompareEach" type="button" style="display:none" title="Add each selected county to Compare as its own area">+ Compare Each</button>
         <button class="btn" id="selClear">Clear Selection</button>
         <button class="btn" id="selFema" type="button" style="display:none">FEMA Report</button>
+        <button class="btn" id="selEnv" type="button" style="display:none">Environmental Report</button>
       </div>
       <div class="btnrow">
         <button class="btn" id="saveSearch">Save Search</button>
@@ -192,6 +193,16 @@
       <div class="rnote" id="lyCrimeNote" hidden></div>
       <label class="tg2" title="Airports worldwide: large and medium from far out, small fields and heliports as you zoom in"><input type="checkbox" id="lyAirports"><span>Airports</span></label>
       <div class="rnote" id="lyAirportsNote" hidden></div>
+      <div class="lt">Environment</div>
+      <label class="tg2" title="State and federal environmental records: cleanup and contamination sites, petroleum tanks, EPA-permitted facilities (zoom in)"><input type="checkbox" id="lyEnvSites"><span>Environmental Sites</span></label>
+      <select class="chip" id="lyEnvSet" aria-label="Which environmental records" hidden></select>
+      <div class="rnote" id="lyEnvSitesNote" hidden></div>
+      <label class="tg2" title="Railroad Commission of Texas: oil and gas wells and pipelines (zoom in)"><input type="checkbox" id="lyRrc"><span>Oil &amp; Gas Wells, Pipelines</span></label>
+      <div class="rnote" id="lyRrcNote" hidden></div>
+      <label class="tg2" title="US Fish &amp; Wildlife Service National Wetlands Inventory (zoom in)"><input type="checkbox" id="lyWetlands"><span>Wetlands</span></label>
+      <div class="rnote" id="lyWetlandsNote" hidden></div>
+      <label class="tg2" title="USDA soil survey map units (zoom in)"><input type="checkbox" id="lySoils"><span>Soils</span></label>
+      <div class="rnote" id="lySoilsNote" hidden></div>
       <div class="lt">Demographics (Census Tracts)</div>
       <select class="chip" id="lyDemo" aria-label="Demographic layer">
         <option value="">Off</option><option value="gr">Population Growth</option><option value="pop">Population</option><option value="inc">Median Household Income</option>

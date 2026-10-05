@@ -54,6 +54,9 @@ export function initRegrid(ctx) {
             '<div class="rnote">' + (d.cached ? 'Saved copy from ' + esc(d.fetched) + ' (no charge)' + (d.stale ? '' : d.county_refreshed ? ', current with Regrid’s ' + esc(d.county_refreshed) + ' county refresh' : '') + '.' : 'Used 1 Regrid record.') + (d.usage ? ' ' + fmtN(left(d.usage, 'records')) + ' of ' + fmtN(d.usage.records.cap) + ' left this month.' : '') +
             (d.path ? ' <a href="https://app.regrid.com' + esc(d.path) + '" target="_blank" rel="noopener">Open in Regrid ↗</a>' : '') + '</div>';
           el.querySelector('#rgUpd')?.addEventListener('click', () => look(true));
+          // Harris and Waller: the owner comes from Regrid only, so the company lookup hangs off this record
+          const own = d.fields.find(([k]) => k === 'Owner')?.[1];
+          if (own && !document.querySelector('#card #bOwnerCo:not([hidden])')) { const box = document.createElement('div'); box.className = 'oc-box'; box.hidden = true; el.querySelector('dl')?.after(box); ctx.renderOwnerCo?.(box, own); }
         } catch (e) { el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote err">' + esc(e.message) + '</div>'; }
     }
     wire();

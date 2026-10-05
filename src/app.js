@@ -38,6 +38,8 @@ import { initQuickLayers } from './quicklayers.js';
 import { initLayerFilters } from './layerfilters.js';
 import { initCardTabs } from './cardtabs.js';
 import { initPlaces } from './places.js';
+import { initEnv } from './env.js';
+import { initOwner } from './owner.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
 
@@ -554,7 +556,7 @@ map.on('click','filings',e=>{ if(mode!=='pan') return; e.preventDefault(); ctx.t
 // Shift-drag is MapLibre's box zoom, and it swallows every Shift-click (even one that doesn't drag): hand a Shift-click back
 // as a click, so Shift-click adds buildings, parcels, filings, planes and airports to the card's tabs (src/cardtabs.js)
 map.on('boxzoomcancel',e=>{ const o=e.originalEvent; if(o?.type==='mouseup'&&o.shiftKey&&maplibregl.MapMouseEvent) map.fire(new maplibregl.MapMouseEvent('click',map,o)); });
-map.on('click',e=>{ if(mode!=='pan' || e.defaultPrevented || swallowClick) return; if(map.queryRenderedFeatures(e.point,{layers:['filings']}).length) return; if(!ctx.mapClickHandlers.some(h=>h(e))) closeCard(); });
+map.on('click',e=>{ if(mode!=='pan' || e.defaultPrevented || swallowClick) return; const own=['filings',...(ctx.clickLayers||[])].filter(id=>map.getLayer(id)); if(own.length&&map.queryRenderedFeatures(e.point,{layers:own}).length) return; if(!ctx.mapClickHandlers.some(h=>h(e))) closeCard(); });
 
 // ---------- place menu: right-click (desktop) or long-press (touch) anywhere on the map ----------
 const pmenu=document.createElement('div'); pmenu.className='pmenu'; pmenu.setAttribute('role','menu'); viewport.appendChild(pmenu);
@@ -875,7 +877,7 @@ if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
   applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
-  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
+  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.
 function orbitAt(c,zoom){ stopOrbit(); const close=zoom>=16.5; map.flyTo({center:c,zoom,pitch:close?65:60,duration:reduceMotion?0:2200,essential:true});
@@ -936,7 +938,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initCardTabs,initPlaces,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initCrimeUS,initFema,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initCardTabs,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,
