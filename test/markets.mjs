@@ -46,6 +46,15 @@ assert.equal(correlate(toMap([1, 2, 3]), toMap([1, 2, 3])).verdict, 'not enough 
 // scan: the planted relationship ranks first and the others are discounted for the number of tests
 const sc = scan(toMap(a), [{ id: 'noise1', map: toMap(walk(130)) }, { id: 'lead', map: toMap(b) }, { id: 'noise2', map: toMap(walk(130)) }]);
 assert.equal(sc.results[0].id, 'lead'); assert.equal(sc.tests, 75); assert.equal(sc.reliable, 1);
+// one shared extreme month (like spring 2020) doesn't make two unrelated series look related
+let spiky = 0; for (let k = 0; k < 20; k++) { const x = walk(120), y = walk(120); x[60] *= 3; y[60] *= 3; if (correlate(toMap(x), toMap(y), { how: 'mom' }).strength > 1) spiky++; }
+assert.ok(spiky <= 1, spiky + ' of 20 spike-only pairs called moderate or strong');
+// a quarterly series gets the overlap correction too (it used to count every quarter as independent)
+let qcalled = 0; for (let k = 0; k < 20; k++) { const q = new Map(); walk(120).forEach((v, i) => { if (i % 3 === 0) q.set(addMonths('2016-01', i), v); }); if (correlate(q, toMap(walk(120))).strength > 1) qcalled++; }
+assert.ok(qcalled <= 1, qcalled + ' of 20 unrelated quarterly pairs called moderate or strong');
+// a best fit at the longest lag is capped at weak
+const far = walk(130), near = far.map((v, i) => (far[i - 12] ?? far[0]) * (1 + rnd() * .01)), fr = correlate(toMap(near), toMap(far));
+assert.equal(fr.lag, 12); assert.equal(fr.edge, true); assert.equal(fr.verdict, 'weak');
 console.log('correlation ok');
 
 // the nightly build: a failing source keeps last night's numbers, marked stale

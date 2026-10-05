@@ -223,7 +223,8 @@ The quick buttons and the panel always match. A layer turned on in either place,
   - Pick a Houston measure and a market series (or click **Correlate** on any row).
   - It compares year-over-year changes (or month-over-month) and tries every lead and lag up to 12 months.
   - It gives a verdict (strong, moderate, weak or not reliable), the lead time, and a chart of both lines.
-  - It is deliberately strict. It discounts for every lag it tries and for months that overlap. A link has to hold in both halves of the period to be called strong. Two unrelated prices that both rose over the years won't look related.
+  - It is deliberately strict. It discounts for every lag it tries and for months that overlap. A link has to hold in both halves of the period to be called strong. Two unrelated prices that both rose over the years won't look related, and neither will two series that only share one extreme month, such as the spring 2020 crash.
+  - Year over year is the safer choice. Most Houston numbers aren't seasonally adjusted, so month-over-month changes mostly show the seasons.
   - **What moves …?** tests your measure against every market series at once and lists the closest matches. With so many comparisons the bar is high, and often nothing passes. That is a real answer: it means no market series reliably tracks that measure.
   - **Explain with AI** asks the assistant to explain the result in plain language: what the numbers show, possible economic reasons, and what they don't prove. Correlation never proves that one thing causes another.
   - Construction filings and new businesses only go back about two years, so try month-over-month changes for them.
