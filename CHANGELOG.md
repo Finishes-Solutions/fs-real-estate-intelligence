@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 3:07 PM CT: Shift-clicking a parcel no longer adds it again; numbers sit in the middle (19683df)
+- **Fixed:** Shift-clicking open ground in a parcel that was already picked added it again, with a new number each time. In one Waller case that put ten numbers in one parcel.
+  - **Why:** a parcel picked as open ground was recognized only by the exact spot clicked, so a click a few steps away counted as new.
+  - **Now:** a Shift-click anywhere inside a picked parcel takes it out, the same as for buildings. Two quick clicks in a parcel that hasn't loaded yet are merged as soon as it loads.
+- **Numbers sit in the middle** of each picked parcel or building, not where you happened to click. For L-shaped parcels, or parcels in two pieces, the number goes in the widest part.
+- Parcels picked as open ground keep a faint outline while you look at another tab, so each number has a shape around it.
+- Shift-click on a watchlist marker now adds it to the selection too.
+- A new automated test uses a real Waller County parcel, plus L-shaped and two-piece parcels. The change was also checked in a browser by Shift-clicking neighbouring Waller parcels.
+
 ### 2:44 PM CT: Tidier legends and small fixes (33ed15e)
 - **Shorter map legends:** the Businesses & Places and Environmental Sites legends are now two compact columns instead of two tall lists covering the map.
 - The small popup on an environmental site closes when you open its Environmental report.
