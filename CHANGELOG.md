@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 11:40 AM CT: Behind the scenes: checking new free data sources (pending)
+- No change in the app yet. Added a server-side check of the free environmental and business-registration services (state environmental agency, Railroad Commission, wetlands, soils, EPA, Texas Comptroller) so they can be added next.
+
 ### 11:06 AM CT: Clicking a building selects only that building again (71f0f33)
 - **Fixed:** clicking a building could highlight and measure many unrelated buildings around it. In one Waller example that was about 260,000 sq ft of buildings across the screen, on different parcels. The card's size, floor area and overview used that wrong total.
 - **Why it happened:** the whole-building selection added on Oct 4 assumed every map piece sharing the clicked building's ID belonged to that building. The map stores many separate nearby buildings under one ID, so the selection picked up all of them.
