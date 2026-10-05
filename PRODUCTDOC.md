@@ -35,7 +35,7 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 ## The screen at a glance
 
 **Left panel** (on phones, the **Explore** tab)
-- **Area at a Glance:** who lives and works in the area on screen: population and growth, median income, home value, rent, households and jobs. It updates as you move the map.
+- **Area at a Glance:** who lives and works in the area you've selected (a county, shape, radius or place), or in the area on screen when nothing is selected: population and growth, median income, home value, rent, households and jobs. Its heading names the area it covers. With nothing selected it updates as you move the map; clear the selection to go back to following the map.
 - **This Area:** the area you've picked, or the map view if you haven't picked one. It holds the area reports, Compare, Save Search and Copy Link.
 - **Construction Filings:** the construction project list, KPIs and filters. It's collapsed until you open it.
 
@@ -107,7 +107,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
 Choose **Area**, **Shape**, **Radius** or **County** at the top of the map and mark the area. It becomes the **selected area**, shown in the **This Area** box. From there you can run:
 
 - **FEMA report:** flood zones, past flood insurance claims, disaster declarations and FEMA's risk index.
-- **Traffic report:** the busiest roads and daily traffic counts, plus live speeds and incidents where available.
+- **Traffic report:** the busiest roads and daily traffic counts, plus live speeds and incidents where available. Works for areas up to 5,000 square miles, so a whole county (even Harris) or a few counties together. For big areas it lists the busiest roads; incidents are only the ones inside the area.
 - **Drive-time map:** 10, 20 and 30-minute drive areas, with the people, households and jobs inside each.
 - **Air traffic report:** how often planes pass over, how low, and which kinds.
 - **Crime report** (City of Houston): incidents by type, trend, time of day, day of week, and per resident.
@@ -209,7 +209,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
 
 ## Market and demographics
 
-- **Area at a Glance** in the left panel shows the census numbers for what's on screen.
+- **Area at a Glance** in the left panel shows the census numbers for the selected area, or for what's on screen when nothing is selected.
 - The **Market** tab, for each county or the whole region, shows the items below. Pick the area at the top: click a county on the small map or its button, and click it again (or **Whole region**) to go back to all counties.
   - population and growth;
   - jobs and top industries;
@@ -331,6 +331,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Area at a Glance follows your selection:** pick a county (or draw an area) and the panel shows that area's numbers instead of the map view.
+- **Traffic reports for whole counties:** the traffic report now covers areas up to 5,000 square miles instead of 250.
 - **Crime by city / county, anywhere in the US:** property cards and a new City / County Crime Report show the local police department's violent and property crime rates against the state and the nation, 10 years of history and the mix of offenses, from FBI figures. Ask AI can answer crime questions outside Houston too.
 - **Markets and the Correlation explorer** on the Market tab: stocks, Houston companies, homebuilders, crypto, oil and gas, building material prices and rates, with an honest test of which ones move with Houston's numbers, and an AI explanation.
 - **More history:** the Houston crime trend now covers up to six years instead of two, and the Air Traffic Report can cover up to three years once enough has been collected.
