@@ -5,6 +5,24 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 11:49 AM CT: The app reads the government data key (GOV_API_KEY) (6dd783b)
+- **Crime by city / county now has a backup:** if the FBI website's feed is down or changes, the app switches to the FBI's official data service using the api.data.gov key saved on Vercel as `GOV_API_KEY`. Nothing changes on screen.
+- The same key can be reused for other federal data services later; the app reads it from one place.
+
+### 11:31 AM CT: Crime by city / county, anywhere in the US (9540c9f, 6bc25ce, e36d54c)
+- **Property and parcel cards now show crime anywhere in the US**, under the Houston street-level section:
+  - the local police department: the city's own police inside city limits, otherwise the county police or sheriff;
+  - violent and property crimes per 100,000 residents for 2025 (the newest full year), compared with the state and the US, and the change from 2024;
+  - a 10-year trend against the state and the US, and the share of crimes solved;
+  - a list of the other departments in the county to switch to (a neighboring city, or the sheriff).
+- **New City / County Crime Report** (Reports tab, or **Full report** on the card): year-by-year table, offense mix (murder, rape, robbery, aggravated assault, burglary, theft, vehicle theft, arson) against the state and the US, exported as a PDF or CSV.
+- **Ask AI answers crime questions outside Houston**, e.g. "How does crime in Hempstead compare with Texas?"
+- **Clear labels:** every view says the figures are yearly and department-wide, which year they cover, and warns when a department reported only part of a year or has stopped reporting (New Orleans' newest year is 2023, for example).
+- Checked against live FBI data for 24 places, including Houston, Brookshire, Hempstead, Katy, rural Waller County, New York, Washington DC, Nashville, Fairfax, Los Angeles, Chicago, Louisville and Honolulu.
+- Source: the FBI Crime Data Explorer (no account or key needed), listed on the Sources tab.
+
+### 11:08 AM CT: FBI crime data check (d9d7c59)
+- Behind the scenes only: a diagnostic that tests which FBI Crime Data Explorer feeds still answer, ahead of crime numbers by city and county for the whole US. Nothing in the app changes yet.
 ### 11:06 AM CT: Clicking a building selects only that building again (71f0f33)
 - **Fixed:** clicking a building could highlight and measure many unrelated buildings around it. In one Waller example that was about 260,000 sq ft of buildings across the screen, on different parcels. The card's size, floor area and overview used that wrong total.
 - **Why it happened:** the whole-building selection added on Oct 4 assumed every map piece sharing the clicked building's ID belonged to that building. The map stores many separate nearby buildings under one ID, so the selection picked up all of them.

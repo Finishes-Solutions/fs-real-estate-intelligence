@@ -232,7 +232,7 @@ export function initCrime(ctx) {
   ctx.renderCrimeNear = async (el, center, label = () => 'this property', still = () => true) => {
     if (!el) return;
     const head = '<div class="lt">Crime within 1 mile</div>';
-    if (!inHouston(center)) { el.innerHTML = head + '<div class="rnote">Crime data covers the City of Houston only (Houston Police incident reports), so there are no figures for this spot.</div>'; return; }
+    if (!inHouston(center)) { el.innerHTML = head + '<div class="rnote">Street-level incidents cover the City of Houston only. The yearly figures for the local police department are below.</div>'; return; }
     el.innerHTML = head + '<div class="rnote">Counting reported incidents…</div>';
     let d; try { const r = await fetch('api/crime?lat=' + center[1].toFixed(5) + '&lon=' + center[0].toFixed(5) + '&mi=1&list=8'); d = await r.json(); if (!r.ok) throw new Error(d.error || 'crime data unavailable'); }
     catch (e) { if (still()) el.innerHTML = head + '<div class="rnote">' + esc(e.message) + '</div>'; return; }

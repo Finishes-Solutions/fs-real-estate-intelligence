@@ -213,7 +213,7 @@ export function initBuildings(ctx) {
       '<div class="bsec" id="bParcel"><div class="lt">Ownership &amp; Value</div><div class="rnote">Looking up the appraisal record…</div></div>' +
       '<div class="bsec" id="bSize"><div class="lt">Building</div><div id="bPhoto"></div><div id="bSizeBody">' + sizeRows(b) + '<div class="rnote">Measuring height from lidar…</div></div>' +
         ss('Footprint: OpenStreetMap. Height: USGS 3DEP lidar where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record, otherwise estimated from height.') + '</div>' +
-      '<div class="bsec" id="bSite"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
+      '<div class="bsec" id="bSite"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsec" id="bRegrid"></div><div class="bsrc"></div>' +
       '<div class="bsec" id="bTools"><div class="lt">Site Tools</div><div class="bacts">' + '<button class="btn" id="bMulti" title="Then ' + (matchMedia('(pointer: coarse)').matches ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 10">Select Multiple</button>' +
         '<button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button><button class="btn askai" id="bAsk">Ask AI About It</button></div></div>';
@@ -227,6 +227,7 @@ export function initBuildings(ctx) {
     if (ctx.reduceMotion) card.querySelector('#bOrbit').remove();
     renderFilings(null); renderArea();
     ctx.renderCrimeNear?.(card.querySelector('#bCrime'), b.center, () => { const t = card.querySelector('#bTitle')?.textContent; return t && !/^Loading/.test(t) ? t : 'this property'; }, () => cur === b);
+    ctx.renderCrimeUS?.(card.querySelector('#bCrimeUS'), b.center, () => cur === b);
     ctx.cardRendered({ kind: 'building', center: b.center, label: () => card.querySelector('#bTitle')?.textContent || 'Building', sub: () => card.querySelector('#bSub')?.textContent || '', subject: () => newsSubject(b) });
     let d = null, early = false;
     // the appraisal record first: owner, value, title, the parcel outline and everything keyed on it
