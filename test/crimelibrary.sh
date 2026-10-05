@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
-run() { : > "$T/calls"; MOCK_DB="$T/db.json" MOCK_LOG="$T/calls" SUPABASE_URL=http://supa.test SUPABASE_SECRET_KEY=sb_secret_test STATES=TX,LA \
+run() { : > "$T/calls"; MOCK_DB="$T/db.json" MOCK_LOG="$T/calls" SUPABASE_URL=http://supa.test SUPABASE_SECRET_KEY=sb_secret_test STATES=TX,LA RATE=1000 PAUSE_MS=0 \
   env "$@" node --import ./test/mock-fbi.mjs --import ./test/mock-supa.mjs build/crime-library.mjs > "$T/log" 2>&1 || { cat "$T/log"; exit 1; }; }
 echo '{"crime_agencies":[]}' > "$T/db.json"   # the migration has run
 run
@@ -28,3 +28,9 @@ a.equal(calls.filter(c=>c.includes('/summarized/')).length,50,'refresh_days=0 re
 a.equal(new Set(db.crime_agency_years.map(r=>r.ori+r.year)).size,db.crime_agency_years.length,'no duplicate years'); a.equal(db.crime_agencies.length,6,'no duplicate agencies');
 console.log('crime library ok:',db.crime_agencies.length,'agencies,',db.crime_agency_years.length,'department-years,',db.crime_area_years.length,'area-years');
 "
+# the FBI failing every department: the loader pauses, then gives up (exit 1) without asking the workflow for another run
+: > "$T/out"
+if MOCK_DB="$T/db.json" SUPABASE_URL=http://supa.test SUPABASE_SECRET_KEY=sb_secret_test STATES=TX RATE=1000 PAUSE_MS=0 FAIL_STREAK=2 MAX_PAUSES=1 REFRESH_DAYS=0 MOCK_FBI_DOWN=1 GITHUB_OUTPUT="$T/out" \
+  node --import ./test/mock-fbi.mjs --import ./test/mock-supa.mjs build/crime-library.mjs > "$T/log" 2>&1; then cat "$T/log"; echo 'expected the loader to give up'; exit 1; fi
+grep -q 'pausing' "$T/log" && grep -q 'stopping this run' "$T/log" && grep -q '^remaining=0$' "$T/out" || { cat "$T/log" "$T/out"; exit 1; }
+echo 'crime library gives up cleanly when the FBI fails'

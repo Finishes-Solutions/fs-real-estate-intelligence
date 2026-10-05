@@ -20,6 +20,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Company behind the owner:** when a property's owner is a company, the card shows its Texas status, where and when it was formed, registered agent, mailing address and officers or members, from the Texas Comptroller's free records. Works with the Regrid owner in Harris and Waller too. People's names are not looked up.
 - All of this is free public data; no new keys needed.
 
+### 2:01 PM CT: Crime library loads at a polite pace (c48b6a1)
+- **Fixed:** the first load asked the FBI for data far too fast (about 65 requests a second). After about 150 Alabama departments the FBI stopped answering. The load was stopped; the app itself was not affected.
+- The loader now asks at most 5 times a second. If many departments fail in a row it pauses, and after a few pauses it stops until next week instead of retrying straight away.
+- A full load now takes about six hours, split over two back-to-back runs. Departments already loaded are kept.
+
 ### 1:45 PM CT: Businesses & Places layer from open data (c27cf86, 3c7b07a)
 - **New map layer, Businesses & Places:** about 300,000 businesses and places across the seven counties, colored by kind (food, retail, health care, offices, construction and home services, industrial and farms, and more). It shows from street zoom; pick one kind from the list under the switch.
 - **Click a dot** for a card with the name, category, address, phone, website, the sources that list it, a link to Google Maps and a button for the building and parcel there.
