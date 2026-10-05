@@ -2,12 +2,16 @@
 //   GET ?lat=..&lon=..        the police department for that point: the city's own department inside city limits, else the county's
 //   GET ?lat=..&lon=..&ori=X  a different department (the card's "Other departments in this county" list)
 //   GET ?ori=X                one department by its FBI agency ID
+//   GET ?rank=TX[&type=City&min_pop=10000&order=v|p&desc=1&limit=20&year=2025]   departments ranked by crime rate (library only)
 // Returns the department, which place it covers and why it was picked, violent and property crimes per 100,000 residents for the
 // newest full year vs the state and the US, ten years of history, the offense mix and clearance rates, plus the other
-// departments in the county. Live from the FBI (a few hundred ms per offense) and cached here and at the CDN.
+// departments in the county, and where the department ranks among the same kind in its state. Read from the crime library
+// (Supabase, loaded weekly by build/crime-library.mjs) when it has the department, else live from the FBI (a few hundred ms
+// per offense); cached here and at the CDN.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { govKey } from '../lib/govkey.mjs';
-import { CDE_WEB, CDE_API, OFFENSES, TOTALS, STATE_FIPS, STATE_NAMES, flattenDirectory, matchAgency, summarizeOffense, latestFullYear, buildReport } from '../lib/fbicrime.mjs';
+import { supa } from '../lib/supa.mjs';
+import { cdeGet, OFFENSES, TOTALS, STATE_FIPS, STATE_NAMES, flattenDirectory, matchAgency, summarizeOffense, latestFullYear, buildReport, fromLibrary } from '../lib/fbicrime.mjs';
 
 const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (crime by city)', Accept: 'application/json' };
 const DAY = 864e5, memo = new Map();
@@ -24,12 +28,8 @@ async function getJSON(url, ms = 12000) {
   if (!r.ok || /^\s*</.test(t)) throw new Error('HTTP ' + r.status);
   return JSON.parse(t);
 }
-// the FBI web app's endpoints (no key, no hourly limit); the documented api.data.gov copy (GOV_API_KEY, 1,000 requests
-// an hour) when the first one fails
-async function cde(path) {
-  try { return await getJSON(CDE_WEB + path); }
-  catch (e) { const key = govKey(); if (!key) throw e; return getJSON(CDE_API + path + (path.includes('?') ? '&' : '?') + 'API_KEY=' + encodeURIComponent(key)); }
-}
+// the FBI web app's endpoints; the documented api.data.gov copy with GOV_API_KEY when they fail
+const cde = path => cdeGet(path, { key: govKey() });
 export const directory = st => remember('dir:' + st, DAY, async () => flattenDirectory(await cde('/agency/byStateAbbr/' + st)));
 
 // which city, county subdivision, county and state a point is in (Census geocoder; TIGERweb if it is down)
@@ -53,8 +53,25 @@ export async function locate(lon, lat) {
   }
 }
 
-// every offense for one department (ten-plus years, monthly) -> the report
+// one department's report: from the crime library when it holds a recent read of the department, else live from the FBI;
+// plus where it ranks among the same kind of departments in its state (library only)
+const LIB_FRESH = 45 * DAY;
 export const departmentReport = (agency, st) => remember('rep:' + agency.ori, DAY / 2, async () => {
+  const db = supa(), rep = (db && await fromDb(db, agency, st)) || await live(agency, st);
+  if (db && rep.year && !rep.partial) rep.rank = await db.rpc('crime_peer_rank', { p_ori: agency.ori, p_year: rep.year }).catch(() => null);
+  return rep;
+});
+async function fromDb(db, agency, st) {
+  try {
+    const q = encodeURIComponent(agency.ori), [a] = await db.select('crime_agencies', 'ori=eq.' + q + '&select=loaded_at,data_through');
+    if (!a?.loaded_at || Date.now() - Date.parse(a.loaded_at) > LIB_FRESH) return null;
+    const [rows, areas] = await Promise.all([db.select('crime_agency_years', 'ori=eq.' + q + '&order=year.desc&limit=40'), db.select('crime_area_years', 'area=in.(US,' + st + ')&order=year.desc&limit=80')]);
+    const lastYear = latestFullYear({ cde_properties: { max_data_date: { UCR: a.data_through } } }), s = fromLibrary(rows, areas, st);
+    return { ...buildReport({ agency, stateAbbr: st, totals: s.totals, offenses: s.offenses, lastYear, firstYear: lastYear - 9 }), data_through: a.data_through, refreshed: null, source: 'library', loaded_at: a.loaded_at };
+  } catch (e) { console.error('crimeus library', e.message); return null; }
+}
+// every offense for one department (ten-plus years, monthly) live from the FBI -> the report
+async function live(agency, st) {
   const now = new Date().getUTCFullYear(), span = '?from=01-' + (now - 11) + '&to=12-' + now;
   const keys = [...TOTALS.map(t => t.key), ...OFFENSES.map(o => o.key)];
   const resps = await Promise.all(keys.map(k => cde('/summarized/agency/' + encodeURIComponent(agency.ori) + '/' + k + span)));
@@ -62,8 +79,19 @@ export const departmentReport = (agency, st) => remember('rep:' + agency.ori, DA
   const lastYear = latestFullYear(resps[0]), props = resps[0]?.cde_properties || {};
   const offenses = Object.fromEntries(OFFENSES.map((o, i) => [o.key, sum(resps[i + 2])]));
   const rep = buildReport({ agency, stateAbbr: st, totals: { v: sum(resps[0]), p: sum(resps[1]) }, offenses, lastYear, firstYear: lastYear - 9 });
-  return { ...rep, data_through: props.max_data_date?.UCR || null, refreshed: props.last_refresh_date?.UCR || null };
-});
+  return { ...rep, data_through: props.max_data_date?.UCR || null, refreshed: props.last_refresh_date?.UCR || null, source: 'live' };
+}
+
+// departments in a state ranked by violent or property crime per 100,000 (whole years, 2,500+ residents)
+async function rankings(db, q) {
+  const st = String(q.rank || '').toUpperCase().slice(0, 2); if (!STATE_NAMES[st]) return { code: 400, body: { error: 'Unknown state ' + q.rank + '.' } };
+  let year = +q.year || null;
+  if (!year) { const [a] = await db.select('crime_agencies', 'state=eq.' + st + '&loaded_at=not.is.null&select=data_through&order=loaded_at.desc&limit=1'); if (!a) return { code: 404, body: { error: 'The crime library has no ' + STATE_NAMES[st] + ' departments yet.' } }; year = latestFullYear({ cde_properties: { max_data_date: { UCR: a.data_through } } }); }
+  const type = q.type === 'County' ? 'County' : 'City', min = Math.max(2500, +q.min_pop || 10000), order = q.order === 'p' ? 'p' : 'v', desc = q.desc === '1' || q.desc === 'true';
+  const list = await db.rpc('crime_rankings', { p_state: st, p_year: year, p_type: type, p_min_pop: min, p_order: order, p_desc: desc, p_limit: Math.min(100, +q.limit || 20) });
+  return { code: 200, body: { state: st, state_name: STATE_NAMES[st], year, type, min_pop: min, order, highest_first: desc, departments: list || [],
+    note: 'Whole-year figures for ' + (type === 'City' ? 'city' : 'county') + ' police departments covering at least ' + min.toLocaleString('en-US') + ' residents. Rates use residents only, so places with many visitors read high.' } };
+}
 
 const COVERAGE = 'FBI Crime Data Explorer: offenses reported by each police department, by calendar year. One department per place: the city’s own police inside city limits, the county’s outside them. Campus, transit, school and state police are not included.';
 function why(m, where) {
@@ -76,7 +104,13 @@ function why(m, where) {
 
 export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 30, perDay: 800 })) return;
-  const q = req.query || {}, lat = +q.lat, lon = +q.lon, ori = String(q.ori || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9);
+  const q = req.query || {};
+  if (q.rank) {
+    const db = supa(); if (!db) return res.status(503).json({ error: 'Rankings need the crime library (the database).' });
+    try { const r = await rankings(db, q); if (r.code === 200) res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400'); return res.status(r.code).json(r.body); }
+    catch (e) { console.error('crimeus rank', e.message); return res.status(502).json({ error: 'Crime rankings are unavailable right now.' }); }
+  }
+  const lat = +q.lat, lon = +q.lon, ori = String(q.ori || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9);
   const hasPoint = isFinite(lat) && isFinite(lon) && q.lat != null && q.lon != null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
   if (!hasPoint && !ori) return res.status(400).json({ error: 'Send lat and lon, or an FBI agency ID (ori).' });
   try {
