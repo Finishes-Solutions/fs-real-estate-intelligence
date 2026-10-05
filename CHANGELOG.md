@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 1:39 PM CT: Crime library and state rankings (1cb349e)
+- **The app now keeps its own copy of the FBI crime figures** for every city and county police department in the US (about 11,000 of them, 2015 to 2025). A weekly job refreshes each department once a month. Departments not loaded yet are still looked up live, as before.
+- **Faster crime sections** on property cards once a department is in the library.
+- **State rank on the card, report and PDF:** e.g. "Among 640 Texas city police departments (2025): violent crime lower than 58% of them, property crime lower than 81%." Only whole-year departments with at least 2,500 residents are compared.
+- **Ask AI can rank places:** "safest cities in Texas over 50,000 people", "Louisiana counties with the most property crime".
+- The library fills over the first run (roughly an hour or two); rankings and state ranks appear as each state finishes.
+
 ### 11:49 AM CT: The app reads the government data key (GOV_API_KEY) (6dd783b)
 - **Crime by city / county now has a backup:** if the FBI website's feed is down or changes, the app switches to the FBI's official data service using the api.data.gov key saved on Vercel as `GOV_API_KEY`. Nothing changes on screen.
 - The same key can be reused for other federal data services later; the app reads it from one place.
