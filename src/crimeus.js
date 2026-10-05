@@ -61,10 +61,15 @@ export function initCrimeUS(ctx) {
   ctx.renderCrimeUS = async (el, center, still = () => true, ori = null) => {
     if (!el) return;
     const head = '<div class="lt">Crime by city / county</div>';
-    el.innerHTML = head + '<div class="rnote">Finding the local police department…</div>';
-    let d; try { d = await ctx.crimeUSData({ center, ori }); } catch (e) { if (still() && el.isConnected) el.innerHTML = head + '<div class="rnote">' + esc(e.message) + '</div>'; return; }
+    // switching department: keep what's shown (a one-line placeholder would shrink the card and scroll it away) and,
+    // once the new department is in, put its picker back where the old one was on screen
+    const pick = ori && el.querySelector('#cuOth'), y0 = pick?.getBoundingClientRect().top;
+    if (pick) { pick.disabled = true; pick.closest('.cu-oth')?.querySelector('.fl')?.insertAdjacentHTML('beforeend', ' <span class="cu-ld">· loading…</span>'); }
+    else el.innerHTML = head + '<div class="rnote">Finding the local police department…</div>';
+    const keep = () => { if (y0 == null) return; const s = el.querySelector('#cuOth'), sc = el.closest('#card'); if (s && sc) sc.scrollTop += s.getBoundingClientRect().top - y0; s?.focus({ preventScroll: true }); };
+    let d; try { d = await ctx.crimeUSData({ center, ori }); } catch (e) { if (!still() || !el.isConnected) return; if (pick) { pick.disabled = false; el.querySelector('.cu-ld')?.remove(); ctx.toast?.(e.message); } else el.innerHTML = head + '<div class="rnote">' + esc(e.message) + '</div>'; return; }
     if (!still() || !el.isConnected) return;
-    if (!d.agency || !d.headline) { el.innerHTML = head + '<div class="rnote">' + esc(d.note || 'No department figures for this spot.') + '</div>' + pickOthers(d, 'cuOth'); wireOthers(el, center, still, d); return; }
+    if (!d.agency || !d.headline) { el.innerHTML = head + '<div class="rnote">' + esc(d.note || 'No department figures for this spot.') + '</div>' + pickOthers(d, 'cuOth'); wireOthers(el, center, still, d); keep(); return; }
     el.innerHTML = head + '<div class="cu-ag"><b>' + esc(d.agency.name) + '</b><span>' + esc([when(d), covers(d)].filter(Boolean).join(' · ')) + '</span></div>' + tiles(d) +
       '<div class="fl">Violent crime per 100k, by year</div>' + trend(d.years, 'v', COL.v, 'Violent crime per 100,000 by year') + legend(d) +
       rankNote(d) + caveats(d) + (d.headline.rate_v == null ? '<div class="rnote">' + esc(fmtN(d.headline.v) + ' violent and ' + fmtN(d.headline.p) + ' property offenses in ' + d.year + '.') + '</div>' : '') +
@@ -73,7 +78,7 @@ export function initCrimeUS(ctx) {
       '<div class="bacts"><button class="btn" type="button" data-cu="report">Full report</button></div>' + pickOthers(d, 'cuOth') +
       '<div class="ssrc src">' + esc(srcLine(d)) + '</div>';
     el.querySelector('[data-cu="report"]').onclick = () => report({ center, ori: d.why === 'chosen' ? d.agency.ori : null });
-    wireOthers(el, center, still, d);
+    wireOthers(el, center, still, d); keep();
   };
   function wireOthers(el, center, still, d) {
     const s = el.querySelector('#cuOth'); if (s) s.onchange = () => { if (s.value) ctx.renderCrimeUS(el, center, still, s.value); };

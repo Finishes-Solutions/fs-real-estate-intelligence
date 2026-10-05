@@ -481,7 +481,12 @@ function syncNav(){ card.querySelectorAll('.bnav [data-sec]').forEach(b=>{ const
 new MutationObserver(()=>{ cancelAnimationFrame(navT); navT=requestAnimationFrame(syncNav); }).observe(card,{childList:true,subtree:true});
 card.addEventListener('click',e=>{ const b=e.target.closest('.bnav [data-sec]'); if(!b) return; const el=card.querySelector('#'+b.dataset.sec); if(!el) return;
   card.querySelectorAll('.bnav [data-sec]').forEach(x=>x.setAttribute('aria-current',x===b));
-  card.scrollTo({top:el.offsetTop-(card.querySelector('.top')?.offsetHeight||0)-10,behavior:reduceMotion?'auto':'smooth'}); });
+  // the sticky card-tabs strip and the title/pills block both sit over the content: land the section just below them
+  const at=()=>el.offsetTop-(card.querySelector('.ctabs')?.offsetHeight||0)-(card.querySelector('.top')?.offsetHeight||0)-8;
+  const t0=at(); card.scrollTo({top:t0,behavior:reduceMotion?'auto':'smooth'});
+  // sections above it may fill in while scrolling: correct once, unless the person has scrolled away since
+  clearTimeout(navFix); navFix=setTimeout(()=>{ if(el.isConnected&&Math.abs(card.scrollTop-Math.min(t0,card.scrollHeight-card.clientHeight))<40&&Math.abs(at()-card.scrollTop)>4) card.scrollTo({top:at()}); },reduceMotion?50:700); });
+let navFix=0;
 function select(f,fly){
   showFilings();
   cardCloseHooks.forEach(fn=>fn());
@@ -721,9 +726,18 @@ function updateRadius(fly){
 
 // ---------- layers panel & controls ----------
 const layersEl=document.getElementById('layers'), layersBtn=document.getElementById('layersBtn');
-layersBtn.onclick=e=>{ e.stopPropagation(); const on=!layersEl.classList.contains('on'); layersEl.classList.toggle('on',on); layersBtn.setAttribute('aria-expanded',on); };
+// opens as a popover under the quick layer buttons (left side, where More is); on phones it keeps its own sheet layout
+const qlEl=document.getElementById('qlayers');
+function placeLayers(){ if(!layersEl.classList.contains('on')||!qlEl||matchMedia('(max-width:700px)').matches){ layersEl.style.removeProperty('--ly-top'); layersEl.style.removeProperty('--ly-left'); return; }
+  const host=layersEl.offsetParent?.getBoundingClientRect(), q=qlEl.getBoundingClientRect(); if(!host||!q.height) return;
+  layersEl.style.setProperty('--ly-top',Math.round(q.bottom-host.top+8)+'px'); layersEl.style.setProperty('--ly-left',Math.round(q.left-host.left)+'px'); }
+function setLayersOpen(on){ layersEl.classList.toggle('on',on); layersBtn.setAttribute('aria-expanded',on); qlEl?.querySelector('.qmore')?.setAttribute('aria-expanded',on); placeLayers(); }
+layersBtn.onclick=e=>{ e.stopPropagation(); setLayersOpen(!layersEl.classList.contains('on')); };
+document.getElementById('layersX')?.addEventListener('click',()=>setLayersOpen(false));
+addEventListener('resize',placeLayers); if(qlEl&&window.ResizeObserver) new ResizeObserver(placeLayers).observe(qlEl);
 let swallowClick=false;
-document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on')&&!layersEl.contains(e.target)&&!layersBtn.contains(e.target)){ layersEl.classList.remove('on'); layersBtn.setAttribute('aria-expanded',false); if(map.getCanvas().contains(e.target)) swallowClick=true; } });
+document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on')&&!layersEl.contains(e.target)&&!layersBtn.contains(e.target)&&!e.target.closest?.('.qmore')){ setLayersOpen(false); if(map.getCanvas().contains(e.target)) swallowClick=true; } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&layersEl.classList.contains('on')) setLayersOpen(false); });
 document.querySelectorAll('#styleSeg button').forEach(b=>b.onclick=()=>setBasemap(b.dataset.style));
 document.querySelectorAll('#sizeSeg button').forEach(b=>b.onclick=()=>{ layers.size=b.dataset.size; saveLayers(); styleFilings(); });
 document.querySelectorAll('#heatSeg button').forEach(b=>b.onclick=()=>{ layers.heat=b.dataset.heat; saveLayers(); styleFilings(); });

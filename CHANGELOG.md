@@ -28,6 +28,22 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Nothing shows until Google keys are added to the site** (two keys: one for the browser, limited to this site's address, and one for the server). Place searches are capped each month (900 place cards and 9,000 searches by default) to stay inside Google's free monthly use.
 - **Fixes to the 2:08 PM release:** the soils part of the Environmental report timed out (the site outline was sent the wrong way round); company names cut off at 50 characters now match; cities, counties and school or utility districts are no longer sent to the Comptroller.
 
+### 2:09 PM CT: Market tab follows your selection, map legends, property card fixes (5811648)
+- **Market tab opens on what you've selected on the map:** a county, several counties together, or the county a drawn area sits in. With nothing selected it shows the whole region. Picking a county on the tab still works.
+- **Every Market chart shows its numbers on hover**, including the Correlation explorer's lines and lead/lag bars and the small trend lines in the Markets and Rates tables.
+- **Correlation explorer redesigned:** the choices and verdict sit on the left and the chart on the right at a normal size (it used to stretch across the whole page with oversized text). The method note is folded under "How this is measured".
+- **Newest business locations** moved to the bottom of the Market tab and show 10 at a time, with "Show 10 more".
+- **Legends for Rain radar and Flood zones** in the bottom-left corner. The flood legend uses FEMA's own colors and plain labels (100-year floodplain, floodway, 500-year zone).
+- **Map Layers (More) opens right under the quick layer buttons** on the left, restyled, with a close button. Clicking More again now closes it (before, it reopened).
+- **Clicking a developer or contractor on Activity, or dragging across the Timeline chart, turns the filings on** so the projects show on the map.
+- **Property card:**
+  - The section buttons (Value, Building, Site, Crime, Area…) now land with the section's heading visible. Before, the heading was hidden under the card's header.
+  - Switching police department in the crime section keeps it in place instead of jumping down out of view.
+  - The **Add** button (pick more items) restyled to match the card's buttons.
+  - **Fixed: a one-storey building in Waller read as 651 ft and 51 floors.** The lidar height is now checked before it's used. A reading that doesn't fit the building, such as hundreds of feet with nothing else showing a tall building there, is set aside with a note. The app also rejects malformed lidar responses, the likely cause here, and ignores stray specks (birds, wires).
+- **The selected building's green highlight no longer flickers** while zooming or orbiting. It now sits half a metre outside every wall instead of overlapping the grey building.
+- **Area at a Glance** zoomed in on a single block now shows the census tract you're in, instead of saying there's no data.
+
 ### 2:08 PM CT: Environment layers, Environmental report and company owner lookup (41791f9)
 - **New Environment section in Map Layers:**
   - **Environmental Sites:** state and federal cleanup and contamination sites (Superfund, hazardous waste cleanups, voluntary cleanups, brownfields, dry cleaner cleanups, leaking petroleum tanks, landfills, and areas where groundwater use is restricted). A picker switches to registered petroleum tanks or EPA-permitted facilities. Click a dot for its program and ID.
@@ -40,6 +56,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Fixed:** the first load asked the FBI for data far too fast (about 65 requests a second). After about 150 Alabama departments the FBI stopped answering. The load was stopped; the app itself was not affected.
 - The loader now asks at most 5 times a second. If many departments fail in a row it pauses, and after a few pauses it stops until next week instead of retrying straight away.
 - A full load now takes about six hours, split over two back-to-back runs. Departments already loaded are kept.
+
+### 1:50 PM CT: Area at a Glance shows your selection; traffic reports for whole counties (6405bd9)
+- **Area at a Glance follows what you've selected:** pick a county (or draw an area, a radius or a shape) and the panel shows that area's population, income, home value, rent, households and jobs, with its name in the heading. With nothing selected it still shows the map view; clearing the selection switches back.
+- A very small selection (smaller than a census tract) shows the numbers for the tract it sits in.
+- **Fixed: "That area is too large for a traffic report" on a county.** The limit was 250 square miles, smaller than any county here (Waller is about 520). It is now 5,000 square miles, enough for Harris County or a few counties together.
+- **Incidents in a county traffic report are only the ones inside the county**, not on roads in the neighbouring counties that fall in the same box. Large areas look them up in several pieces so the live incident service accepts them.
 
 ### 1:45 PM CT: Businesses & Places layer from open data (c27cf86, 3c7b07a)
 - **New map layer, Businesses & Places:** about 300,000 businesses and places across the seven counties, colored by kind (food, retail, health care, offices, construction and home services, industrial and farms, and more). It shows from street zoom; pick one kind from the list under the switch.
@@ -191,7 +213,6 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - Shift-click something already picked to drop it. A plain click starts over; closing the card clears everything.
   - With two or more buildings or parcels, an **All** tab totals footprint, floor area, market value and acres (each parcel counted once), with the filings on them, a CSV export (now with a parcel count per building) and **Zoom to All**.
 - **Fixed: Shift-click did nothing on the map.** The map's Shift-drag box zoom was swallowing every Shift-click, so the old "Shift-click to select several buildings" never actually reached the app.
-
 
 ### 1:30 AM CT: Filters for the map's layers, and freeze fixes (690491d)
 - **Filters now cover the map's layers, not just construction filings.** The panel has a section per kind of data:
@@ -456,7 +477,6 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - Claims are counted for the census tracts around the area (FEMA hides exact addresses), so they describe the neighborhood, not one parcel.
 - FEMA's claims service can be slow the first time an area is asked for; the report now waits longer and retries once, and a report missing a part is never saved, so trying again gets a full one (feb40d8).
 
-
 ### 1:22 AM CT: The same section-card style across the app (12b80c8)
 - **Tabs:** Reports, Updates, Field Notes, Market, Activity, Compare and Sources now sit on a light grey background. Each group sits in a white card with an icon and a title, like the new property card.
 - **Left panel:** Area at a Glance and Construction Filings are now titled section cards too.
@@ -563,7 +583,6 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Aircraft types show by name** (e.g. "Airbus A321neo", "Pilatus PC-12") from a built-in list of about 210 common types.
   - A rare type shows its code.
   - Private and small planes usually have no route in either database.
-
 
 ### 12:30 AM CT: The map now leads with properties, not filings (4a6874b, afa6fc3)
 - **Filing dots are hidden when the map first opens.** This applies once to everyone, after which your own choice sticks. To bring them back:

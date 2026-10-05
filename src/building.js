@@ -1,8 +1,8 @@
 // 3D buildings (OpenStreetMap footprints + heights from the MapTiler vector tiles) and the building click-in panel:
 // parcel (TxGIO StratMap, via /api/building), businesses (OpenStreetMap), street-level photo (Mapillary, optional),
 // TABS filings on the parcel, census tract snapshot, and an orbit camera. All sources are free.
-import { floorsFromHeight } from './lib/height.mjs';
-import { joinPieces, partAt, inGeom, labelPoint, sameSelection } from './lib/footprint.mjs';
+import { floorsFromHeight, plausibleHeight } from './lib/height.mjs';
+import { joinPieces, partAt, inGeom, offsetGeom, labelPoint, sameSelection } from './lib/footprint.mjs';
 
 export function initBuildings(ctx) {
   const { map, esc, fmtM, fmtN, F } = ctx, card = document.getElementById('card');
@@ -21,12 +21,15 @@ export function initBuildings(ctx) {
   function addLayers() {
     const src = vectorSource(); if (!src || map.getLayer('fs-bldg')) return;
     const c = colors(), before = map.getLayer('sel-fill') ? 'sel-fill' : undefined;
+    // the basemap's own 3D buildings (OpenFreeMap's building-3d, some MapTiler styles) would sit in the same place as ours
+    // and flicker against them and the selection: ours replace them
+    for (const l of map.getStyle()?.layers || []) if (l.type === 'fill-extrusion' && !l.id.startsWith('fs-')) try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch (e) {}
     map.addLayer({ id: 'fs-bldg', type: 'fill-extrusion', source: src, 'source-layer': 'building', minzoom: 13, layout: { visibility: on ? 'visible' : 'none' },
       paint: { 'fill-extrusion-color': c.fill, 'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 13, 0, 14.5, H], 'fill-extrusion-base': B, 'fill-extrusion-opacity': .85 } }, before);
     if (!map.getSource('fs-bsel')) map.addSource('fs-bsel', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    // selected buildings: drawn a hair wider and taller than the base building so the two never z-fight. The one shown is
-    // bright green and rises out of the ground when picked; the others in the selection are a lighter green, numbered
-    // like their tabs. A soft glow pulses around the shown building's base.
+    // selected buildings: drawn half a metre outside every wall and a little taller than the base building so the two never
+    // z-fight (flicker) while zooming or orbiting. The one shown is bright green and rises out of the ground when picked;
+    // the others in the selection are a lighter green, numbered like their tabs. A soft glow pulses around its base.
     map.addLayer({ id: 'fs-bglow', type: 'line', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'g'], paint: { 'line-color': c.sel, 'line-width': 8, 'line-blur': 6, 'line-opacity': .35 } }, before);
     map.addLayer({ id: 'fs-bsel', type: 'fill-extrusion', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'b'], paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'a'], 1], c.sel, c.sel2], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-opacity': 1 } }, before);
     if (!map.getSource('fs-bhov')) map.addSource('fs-bhov', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -51,7 +54,7 @@ export function initBuildings(ctx) {
     const feats = [], list = selected(), many = list.length > 1, all = ctx.tabs?.active()?.id === 'b:all';
     list.forEach((b, i) => {
       const a = b === cur || all ? 1 : 0;
-      if (b.footprint) { feats.push({ type: 'Feature', properties: { k: 'b', a, h: (b.height || 6) + 0.6, b: b.base || 0 }, geometry: grow(b.footprint, 1.004) });
+      if (b.footprint) { feats.push({ type: 'Feature', properties: { k: 'b', a, h: (b.height || 6) + 0.6, b: b.base || 0 }, geometry: offsetGeom(b.footprint, 0.5) });
         if (b === cur) feats.push({ type: 'Feature', properties: { k: 'g' }, geometry: b.footprint }); }
       // the shown one's parcel(s); a parcel picked as open ground keeps a faint outline while another tab is shown
       if (a || !b.footprint) for (const p of b.d?.parcels?.length ? b.d.parcels : b.parcel ? [b.parcel] : []) if (p.geometry) feats.push({ type: 'Feature', properties: { k: 'p', a }, geometry: p.geometry });
@@ -101,13 +104,6 @@ export function initBuildings(ctx) {
     const piece = partAt(hit.geometry, pt); if (hit.id == null || !hit.source) return piece;
     let pieces = []; try { pieces = map.querySourceFeatures(hit.source, { sourceLayer: hit.sourceLayer, filter: ['==', ['id'], hit.id] }); } catch (e) { return piece; }
     return joinPieces(pieces.map(p => ({ z: p._z, x: p._x, y: p._y, geometry: p.geometry })), pt) || piece;
-  }
-  // scale a footprint about its centroid (a few cm) so the highlight sits just outside the base building's walls
-  function grow(g, k) {
-    const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates; let x = 0, y = 0, n = 0;
-    polys.forEach(p => p[0].forEach(([a, b]) => { x += a; y += b; n++; })); x /= n; y /= n;
-    const sc = r => r.map(([a, b]) => [x + (a - x) * k, y + (b - y) * k]), out = polys.map(p => p.map(sc));
-    return g.type === 'Polygon' ? { type: 'Polygon', coordinates: out[0] } : { type: 'MultiPolygon', coordinates: out };
   }
   const loadMarket = () => marketP ||= fetch('data/market.json').then(r => r.ok ? r.json() : null).catch(() => null).then(m => market = m);
 
@@ -163,7 +159,9 @@ export function initBuildings(ctx) {
   function stats(b) {
     const d = b.d || {}, lid = d.height, osm = d.osm, p = d.parcel || b.parcel, fp = sqft(b.footprint);
     const lidYear = lid?.date ? +lid.date.slice(0, 4) : null, built = +(p?.yearBuilt || 0);
-    const lidOk = !!b.footprint && lid?.source === '3dep-lidar' && lid.height_m > 2 && !(built && lidYear && built > lidYear);
+    const lidRaw = !!b.footprint && lid?.source === '3dep-lidar' && lid.height_m > 2 && !(built && lidYear && built > lidYear);
+    const sane = lidRaw ? plausibleHeight(lid.height_m, { mapHeight: b.height && b.height !== 6 ? b.height - (b.base || 0) : null, levels: osm?.levels, stories: p?.stories }) : { ok: false };
+    const lidOk = lidRaw && sane.ok;
     let h = null, hSrc = '';
     if (lidOk) { h = lid.height_m; hSrc = 'USGS lidar ' + lidYear; }
     else if (osm?.height_m) { h = osm.height_m; hSrc = 'OpenStreetMap'; }
@@ -172,7 +170,8 @@ export function initBuildings(ctx) {
     if (osm?.levels) { fl = osm.levels; fSrc = 'OpenStreetMap'; }
     else if (p?.stories) { fl = p.stories; fSrc = 'appraisal record'; }
     else if (h && b.footprint) { fl = floorsFromHeight(h, (osm?.use || '') + ' ' + (p?.landUse || '')); fSrc = 'estimated from height'; }
-    const note = lid?.source === '3dep-lidar' && built && lidYear && built > lidYear ? 'Built ' + built + ', after the ' + lidYear + ' lidar survey, so the lidar height is not used.'
+    const note = lidRaw && !sane.ok ? 'The ' + lidYear + ' lidar reading here (' + ft(lid.height_m) + ') looks wrong: ' + sane.why + ', so it is not used.'
+      : lid?.source === '3dep-lidar' && built && lidYear && built > lidYear ? 'Built ' + built + ', after the ' + lidYear + ' lidar survey, so the lidar height is not used.'
       : lid?.source === '3dep-lidar' && !(lid.height_m > 2) && b.footprint ? 'The ' + lidYear + ' lidar shows no structure here: likely built or rebuilt since.' : '';
     return { fp, h, hSrc, fl, fSrc, gfa: fp && fl ? fp * fl : null, apprSqft: p?.buildingSqft || null, note, lidMax: lidOk && lid.max_m > lid.height_m + 6 ? lid.max_m : null };
   }
@@ -289,7 +288,7 @@ export function initBuildings(ctx) {
     const acres = [...uniqP.values()].reduce((t, p) => t + (/acre/i.test(p.area || '') ? parseFloat(p.area) : 0), 0);
     const geoms = [...uniqP.values()].map(p => p.geometry).concat(list.filter(b => !b.parcel).map(b => b.footprint)).filter(Boolean);
     const fl = F.filter(f => geoms.some(g => inGeom([f.lon, f.lat], g))), loading = list.some(b => b.loading);
-    card.innerHTML = '<div class="top"><div><div class="kicker">Selection</div><h2>' + list.length + ' buildings &amp; parcels</h2><div class="bsub">' + ((matchMedia('(pointer: coarse)').matches ? 'Use + Add to pick more' : 'Shift-click to add more') + ' · up to 10') + '</div></div>' +
+    card.innerHTML = '<div class="top"><div><div class="kicker">Selection</div><h2>' + list.length + ' buildings &amp; parcels</h2><div class="bsub">' + ((matchMedia('(pointer: coarse)').matches ? 'Tap Add to pick more' : 'Shift-click to add more') + ' · up to 10') + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
       '<div class="kgrid msum"><div><b>' + (tot('fp') ? fmtN(tot('fp')) : '—') + '</b><span>Footprint sq ft</span></div><div><b>' + (tot('gfa') ? '~' + fmtN(tot('gfa')) : '—') + '</b><span>Est. floor area sq ft</span></div>' +
       '<div><b>' + (mv ? fmtM(mv) : '—') + '</b><span>Market value · ' + uniqP.size + ' parcel' + (uniqP.size === 1 ? '' : 's') + '</span></div><div><b>' + (acres ? acres.toFixed(2) : '—') + '</b><span>Land acres</span></div></div>' +

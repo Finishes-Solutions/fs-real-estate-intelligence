@@ -20,16 +20,29 @@ export function initFema(ctx) {
     if (!map.getLayer(SRC)) map.addLayer({ id: SRC, type: 'raster', source: SRC, minzoom: 10, paint: { 'raster-opacity': .62 } }, map.getLayer('filings') ? 'filings' : undefined);
   }
   const removeLayer = () => { if (map.getLayer(SRC)) map.removeLayer(SRC); if (map.getSource(SRC)) map.removeSource(SRC); };
+  // legend (bottom left): FEMA's own swatches for the zones drawn, fetched once per filter
+  const legends = {};
+  async function legend() {
+    if (!on) { ctx.setLegend?.('fema', ''); return; }
+    const c = cls, head = '<div class="t">Flood zones (FEMA)</div>';
+    ctx.setLegend?.('fema', head + '<div class="lg-note">Loading FEMA’s legend…</div>');
+    try { legends[c] ||= fetch('api/fema?legend=1' + (c === 'high' ? '&cls=high' : '')).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'legend unavailable'); return d; });
+      const d = await legends[c]; if (!on || c !== cls) return;
+      ctx.setLegend?.('fema', head + d.items.map(x => '<div class="li"><img class="lg-sw" src="' + esc(x.img) + '" alt="" title="' + esc(x.fema) + '"><span>' + esc(x.label) + '</span></div>').join('') +
+        '<div class="lg-note">Unshaded: minimal risk or not mapped. Zones show from neighborhood zoom.</div>'); }
+    catch (e) { delete legends[c]; if (on && c === cls) ctx.setLegend?.('fema', head + '<div class="lg-note">FEMA’s legend didn’t load. Shaded areas are flood zones; open a FEMA report for the details.</div>'); }
+  }
   function setOn(v) {
     on = v; if (box) box.checked = v; if (note) note.hidden = !v; try { localStorage.setItem('fs-fema', v ? '1' : '0'); } catch (e) {}
-    if (!v) { removeLayer(); return; }
+    legend(); if (!v) { removeLayer(); return; }
     addLayer(); if (map.getZoom() < 12) ctx.toast('Flood zones show from neighborhood zoom: zoom in to see them.');
   }
   if (box) { box.checked = on; box.onchange = () => setOn(box.checked); if (note) note.hidden = !on; }
   ctx.onOverlays(addLayer);
   ctx.femaLayer = v => setOn(v !== false);
   // which zones the layer shows; switching reloads its tiles (and turns the layer on)
-  ctx.femaClass = c => { c = c === 'high' ? 'high' : 'all'; if (c === cls && on) return; cls = c; removeLayer(); if (on) addLayer(); else setOn(true); };
+  ctx.femaClass = c => { c = c === 'high' ? 'high' : 'all'; if (c === cls && on) return; cls = c; removeLayer(); if (on) { addLayer(); legend(); } else setOn(true); };
+  if (on) (map.loaded() ? legend() : map.once('load', legend));
   ctx.femaClassNow = () => cls;
 
   // ---------- report ----------

@@ -946,6 +946,7 @@ table.cmp td.best{font-weight:700;color:var(--brand)}
 .mk-kpis{margin:0 0 16px}
 .mk-kpis .kpi b{font-size:20px}
 .mk-kpis .kpi span{white-space:normal;line-height:1.35;display:block}
+.mk-morebtn{margin-top:10px}
 .mk-more summary{cursor:pointer;font-size:11.5px;color:var(--brand);font-weight:600;margin:8px 0 4px}
 .mk-sub{font-size:11.5px;color:var(--text-2);margin-top:2px}
 .mk-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
@@ -1012,6 +1013,25 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 .mx-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--text-2);margin-bottom:2px}
 .mx-leg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:3px}
 .mx-leg i.mx-la{background:var(--mx-a)}.mx-leg i.mx-lb{background:var(--mx-b)}
+/* Correlation explorer: controls and verdict on the left, the charts at a fixed readable size on the right */
+.mx-wrap{display:grid;grid-template-columns:minmax(230px,290px) minmax(0,720px);gap:14px 22px;align-items:start}
+.mx-side .mx-ctl{flex-direction:column;align-items:stretch;gap:10px}
+.mx-side .mx-ctl label{display:grid;gap:4px}
+.mx-side .mx-ctl label>span{font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.mx-side .mx-ctl select{max-width:none;width:100%}
+.mx-side .mx-ctl .mk-seg{display:grid;grid-template-columns:1fr 1fr}
+.mx-side .mx-kg{grid-template-columns:repeat(2,minmax(0,1fr))}
+.mx-side .mx-kg>.mx-kv{grid-column:1/-1}
+.mx-side .mx-acts{margin-top:4px}
+.mx-chart g.mx-hit line{stroke:var(--text-2);stroke-width:1;stroke-dasharray:2 2;opacity:0}
+.mx-chart g.mx-hit:hover line{opacity:.6}
+.mx-lags g.mk-hit:hover rect+rect{opacity:.75}
+.mx-chart .mk-hit,.mx-lags .mk-hit,.mx-kg .mk-hit,.mk-spark .mk-hit,.mx-spark .mk-hit{cursor:default}
+.mk-spark .mk-hit:hover circle,.mx-spark .mk-hit:hover circle{opacity:1}
+.mx-how{margin-top:10px}
+.mx-how summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--brand)}
+.mx-how .rnote{margin-top:6px}
+@media (max-width:980px){ .mx-wrap{grid-template-columns:minmax(0,1fr)} }
 .mx-chart,.mx-lags{width:100%;height:auto;display:block;overflow:visible}
 .mx-chart polyline{fill:none;stroke-width:1.8;stroke-linejoin:round}
 .mx-chart polyline.mx-la{stroke:var(--mx-a)}.mx-chart polyline.mx-lb{stroke:var(--mx-b);stroke-dasharray:5 3}
@@ -1558,6 +1578,7 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .xlegend .lg-grad{height:10px;border-radius:5px}
 .xlegend .lg-ticks{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:-2px}
 .xlegend .lg-note{font-size:11px;color:var(--muted);line-height:1.35}
+.xlegend .li .lg-sw{width:16px;height:12px;flex:none;border-radius:2px;object-fit:cover;border:1px solid var(--line)}
 @media (max-width:700px){ .xlegend{display:none} }
 .xlegend .lg-ticks.lg-abs{position:relative;display:block;height:12px}
 .xlegend .lg-abs span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
@@ -1654,8 +1675,20 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .mfilt.mclear[hidden]{display:none}
 .mfilt.mclear{color:var(--brand)}
 .panel .selbar.area .kicker{margin-bottom:-6px}
-/* while the layers panel is open, the map's left column (toolbar, search, quick layers) narrows to leave room for it */
-@media (min-width:701px){ .stage:has(.layers.on) .mapleft{min-width:0;max-width:calc(100% - 90px - 312px)} }
+/* Map layers popover: opens under the quick layer buttons, left-aligned with them (placed by placeLayers() in app.js) */
+.layers .ly-h{display:flex;align-items:center;justify-content:space-between;margin:-4px -6px -2px 0}
+.layers .ly-h b{font:700 14px var(--font-display);color:var(--text)}
+.layers .ly-h .x{border:0;background:transparent;cursor:pointer;color:var(--muted);width:28px;height:28px;border-radius:4px;font-size:18px;line-height:1}
+.layers .ly-h .x:hover{background:var(--chip);color:var(--text)}
+@media (min-width:701px){
+  .app .layers.on{left:var(--ly-left,16px)!important;right:auto!important;top:var(--ly-top,16px)!important;width:320px;max-height:calc(100% - var(--ly-top,16px) - 16px)!important;
+    border-radius:8px;padding:14px 16px 16px;gap:8px;box-shadow:0 14px 40px rgba(11,13,12,.22);overscroll-behavior:contain;z-index:7}
+  .layers .lt{color:var(--brand);margin-top:8px;padding-top:12px}
+  .layers .ly-h+.lt{border-top:1px solid var(--line)}
+  .layers .tg2{margin:0 -8px;padding:5px 8px;border-radius:4px;font-size:13px}
+  .layers .tg2:hover{background:var(--panel-2)}
+  .layers .rnote{font-size:11.5px;line-height:1.4;margin-top:-2px}
+}
 /* the toolbar row wraps (Clear, Export onto the next line) instead of squeezing the tool buttons when the map is narrow */
 @media (min-width:701px){ .maptop{flex-wrap:wrap} .maptop .tools{flex-shrink:0} }
 .panel .selbar.area .s1{flex-wrap:wrap;row-gap:2px}
@@ -1769,11 +1802,11 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .ctab[aria-selected="true"] .cnum{background:var(--green-600);color:#fff}
 .ctab .cx{flex:none;width:16px;height:16px;display:grid;place-items:center;border-radius:3px;font-style:normal;font-size:14px;line-height:1;color:var(--muted)}
 .ctab .cx:hover{background:var(--line);color:var(--text)}
-.ctadd{flex:none;margin-left:auto;position:sticky;right:0;box-shadow:-10px 0 8px -2px var(--panel-2);background:var(--panel-2) !important;height:26px;padding:0 10px;border:1px dashed var(--line-2);border-radius:13px;background:transparent;color:var(--green-700);font:600 11.5px/1 inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
-.ctadd:hover{border-style:solid;color:var(--green-800)}
-.ctadd[aria-pressed="true"]{border:1px solid var(--green-700);background:var(--green-700) !important;color:#fff;animation:ctpulse 1.6s ease-in-out infinite}
-@keyframes ctpulse{50%{box-shadow:0 0 0 4px rgba(31,146,73,.18)}}
-@media (prefers-reduced-motion:reduce){.ctadd[aria-pressed="true"]{animation:none}}
+.ctadd{flex:none;margin-left:auto;position:sticky;right:0;display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px 0 8px;border:1px solid var(--line-2);border-radius:5px;background:var(--panel);box-shadow:-12px 0 8px -4px var(--panel-2);color:var(--text-2);font:600 12px/1 var(--font-display);cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
+.ctadd svg{flex:none;color:var(--brand)}
+.ctadd:hover{border-color:var(--text-2);color:var(--text)}
+.ctadd[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
+.ctadd[aria-pressed="true"] svg{color:var(--panel)}
 .mrow .lnk b .mnum{margin-right:6px;vertical-align:1px}
 /* a building on several parcels */
 .mparc{margin:4px 16px 10px;border-top:1px solid var(--line)}
@@ -1786,14 +1819,13 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .mprow.tot{border-bottom:0}
 .mprow.tot i{width:17px;flex:none}
 :root[data-theme="dark"] .ctab .cnum,:root[data-theme="dark"] .mnum{background:rgba(76,175,112,.18);color:var(--green-300)}
-:root[data-theme="dark"] .ctadd{color:var(--green-300)}
 @media (max-width:700px){
   .ctabs{height:44px;padding:0 10px}
   .card.has-tabs .top{top:44px}
   /* picking more: the sheet drops low so the map is free to tap */
   .card.adding,.card.adding.full{max-height:30%}
   .ctab{height:32px;font-size:12.5px}
-  .ctadd{height:30px}
+  .ctadd{height:32px}
 }
 
 /* Market: area picker (mini map of the counties + a button for each and the whole region) */

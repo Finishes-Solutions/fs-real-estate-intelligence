@@ -11,6 +11,7 @@ import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { roadName } from './site.js';
 import { circle, cleanGeometry } from './crime.js';
 import { areaSqMi, bbox } from '../lib/fema.mjs';
+import { inGeom } from '../lib/demographics.mjs';
 
 export const AADT = 'https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_AADT/FeatureServer/0';
 export const TYPE = { IH: 'Interstates', US: 'US highways', SH: 'State highways', SL: 'Loops', FM: 'Farm-to-market roads', BI: 'Business routes', BU: 'Business routes', BF: 'Business routes', SS: 'Spurs', CS: 'City streets', CR: 'County roads' };
@@ -77,24 +78,37 @@ export async function flowAt(key, lat, lon, fetchImpl = globalThis.fetch) {
     delay_sec_per_segment: Math.max(0, (f.currentTravelTime || 0) - (f.freeFlowTravelTime || 0)), closed: !!f.roadClosure, confidence: f.confidence };
 }
 export const INCIDENT = { 0: 'Unknown', 1: 'Crash', 2: 'Fog', 3: 'Dangerous conditions', 4: 'Rain', 5: 'Ice', 6: 'Traffic jam', 7: 'Lane closed', 8: 'Road closed', 9: 'Road works', 10: 'Wind', 11: 'Flooding', 14: 'Broken-down vehicle' };
-export async function incidentsIn(key, b, fetchImpl = globalThis.fetch) {
+// TomTom takes a box of up to 10,000 km²: a bigger area (a county or two) is asked in up to 4 pieces
+const boxKm2 = b => (b[2] - b[0]) * 111.32 * Math.cos((b[1] + b[3]) / 2 * Math.PI / 180) * (b[3] - b[1]) * 110.57;
+export function incidentBoxes(b, maxKm2 = 9500) {
+  const k = Math.ceil(Math.sqrt(boxKm2(b) / maxKm2)); if (k <= 1) return [b]; if (k > 2) return null;
+  const mx = (b[0] + b[2]) / 2, my = (b[1] + b[3]) / 2;
+  return [[b[0], b[1], mx, my], [mx, b[1], b[2], my], [b[0], my, mx, b[3]], [mx, my, b[2], b[3]]];
+}
+export async function incidentsIn(key, b, fetchImpl = globalThis.fetch, g = null) {
   const fields = '{incidents{type,geometry{type,coordinates},properties{iconCategory,magnitudeOfDelay,events{description},startTime,from,to,roadNumbers,delay,length}}}';
-  const r = await fetchImpl('https://api.tomtom.com/traffic/services/5/incidentDetails?' + new URLSearchParams({ bbox: b.map(v => v.toFixed(4)).join(','), fields, language: 'en-US', timeValidityFilter: 'present', key }), { signal: AbortSignal.timeout(9000) });
-  if (!r.ok) throw new Error('TomTom ' + r.status);
-  return ((await r.json()).incidents || []).map(x => { const p = x.properties || {}, c = x.geometry?.type === 'Point' ? x.geometry.coordinates : x.geometry?.coordinates?.[0];
+  const boxes = incidentBoxes(b); if (!boxes) throw new Error('The area is too wide for live incidents; select a smaller area.');
+  const one = async bb => { const r = await fetchImpl('https://api.tomtom.com/traffic/services/5/incidentDetails?' + new URLSearchParams({ bbox: bb.map(v => v.toFixed(4)).join(','), fields, language: 'en-US', timeValidityFilter: 'present', key }), { signal: AbortSignal.timeout(9000) });
+    if (!r.ok) throw new Error('TomTom ' + r.status); return (await r.json()).incidents || []; };
+  // an incident on a piece's edge comes back from both pieces: keep one
+  const seen = new Set(), all = (await Promise.all(boxes.map(one))).flat().filter(x => { const k = JSON.stringify(x.geometry?.coordinates?.[0] ?? x.geometry?.coordinates) + (x.properties?.startTime || ''); if (seen.has(k)) return false; seen.add(k); return true; });
+  return all.map(x => { const p = x.properties || {}, c = x.geometry?.type === 'Point' ? x.geometry.coordinates : x.geometry?.coordinates?.[0];
     return { kind: INCIDENT[p.iconCategory] || 'Incident', what: p.events?.map(e => e.description).filter(Boolean).join('; ') || '', road: (p.roadNumbers || []).join(', '), from: p.from || '', to: p.to || '',
       delay_min: p.delay ? Math.round(p.delay / 60) : 0, severity: p.magnitudeOfDelay ?? null, since: p.startTime || null, lon: c?.[0] ?? null, lat: c?.[1] ?? null }; })
+    // the box around a county takes in its neighbours' roads too: keep the incidents inside the area itself
+    .filter(x => !g || x.lon == null || inGeom([x.lon, x.lat], g))
     .sort((a, b) => (b.severity || 0) - (a.severity || 0) || b.delay_min - a.delay_min).slice(0, 60);
 }
-export const MAX_SQMI = 250;
+// a county or a few (Harris is about 1,780 sq mi): TxDOT answers with the 1,000 busiest segments plus totals by road type
+export const MAX_SQMI = 5000;
 export async function trafficReport(g, { label = '', key = process.env.TOMTOM_API_KEY, fetchImpl = globalThis.fetch } = {}) {
-  const sq = areaSqMi(g); if (sq > MAX_SQMI) { const e = new Error('That area is too large for a traffic report (over ' + MAX_SQMI + ' square miles).'); e.status = 400; throw e; }
+  const sq = areaSqMi(g); if (sq > MAX_SQMI) { const e = new Error('That area is too large for a traffic report (over ' + MAX_SQMI.toLocaleString('en-US') + ' square miles).'); e.status = 400; throw e; }
   const part = async fn => { try { return await fn(); } catch (e) { return { error: e.message }; } };
   const counts = await part(() => countsIn(g, fetchImpl));
   const top = Array.isArray(counts.roads) ? counts.roads.filter(r => r.lat != null).slice(0, 8) : [];
   const [live, incidents] = key ? await Promise.all([
     part(async () => (await Promise.all(top.map(async r => ({ road: r.road, aadt: r.aadt, lon: r.lon, lat: r.lat, ...(await flowAt(key, r.lat, r.lon, fetchImpl).catch(e => ({ error: e.message }))) })))).filter(x => !x.error)),
-    part(() => incidentsIn(key, bbox(g), fetchImpl))]) : [{ error: 'Live speeds need TomTom (not configured).' }, { error: 'Incidents need TomTom (not configured).' }];
+    part(() => incidentsIn(key, bbox(g), fetchImpl, g))]) : [{ error: 'Live speeds need TomTom (not configured).' }, { error: 'Incidents need TomTom (not configured).' }];
   return { label, area_sqmi: Math.round(sq * 100) / 100, counts, live, incidents, as_of_live: new Date().toISOString(),
     sources: 'TxDOT annual average daily traffic (AADT) count segments' + (counts.as_of ? ' (TxDOT file of ' + String(counts.as_of).slice(0, 10) + ')' : '') + '; TomTom Traffic Flow and Incidents (live, not stored).' };
 }
