@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 2:08 PM CT: Environment layers, Environmental report and company owner lookup (41791f9)
+- **New Environment section in Map Layers:**
+  - **Environmental Sites:** state and federal cleanup and contamination sites (Superfund, hazardous waste cleanups, voluntary cleanups, brownfields, dry cleaner cleanups, leaking petroleum tanks, landfills, and areas where groundwater use is restricted). A picker switches to registered petroleum tanks or EPA-permitted facilities. Click a dot for its program and ID.
+  - **Oil & Gas Wells, Pipelines** from the Railroad Commission, **Wetlands** from the US Fish & Wildlife Service and **Soils** from the USDA soil survey.
+- **New Environmental Report** for a selected area, a radius, or a property's own parcel (Area reports on the property card): every record within the distances a Phase I assessment searches (¼ to 1 mile from the site's edge), nearest first with distance and direction, plus wells (including orphan wells), pipelines (operator, product, size), wetlands and soils with their building limits. Exports as PDF or CSV. It screens public records; it is not a Phase I.
+- **Company behind the owner:** when a property's owner is a company, the card shows its Texas status, where and when it was formed, registered agent, mailing address and officers or members, from the Texas Comptroller's free records. Works with the Regrid owner in Harris and Waller too. People's names are not looked up.
+- All of this is free public data; no new keys needed.
+
 ### 1:45 PM CT: Businesses & Places layer from open data (c27cf86, 3c7b07a)
 - **New map layer, Businesses & Places:** about 300,000 businesses and places across the seven counties, colored by kind (food, retail, health care, offices, construction and home services, industrial and farms, and more). It shows from street zoom; pick one kind from the list under the switch.
 - **Click a dot** for a card with the name, category, address, phone, website, the sources that list it, a link to Google Maps and a button for the building and parcel there.
