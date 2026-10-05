@@ -3,7 +3,7 @@
 // selecting one building must never pull in the others (2026-10-05: a click in Waller selected ~260,000 sq ft of
 // unrelated buildings across the screen).
 import assert from 'node:assert/strict';
-const { joinPieces, tileBox, inGeom } = await import('../lib/footprint.mjs');
+const { joinPieces, tileBox, inGeom, labelPoint, sameSelection } = await import('../lib/footprint.mjs');
 
 const z = 16, lon = -95.93, lat = 30.09, n = 2 ** z;
 const x = Math.floor((lon + 180) / 360 * n), y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
@@ -40,4 +40,35 @@ for (const p of [[L - 0.0002, midLat + 0.0001], [L + 0.0002, midLat + 0.0001]]) 
 // nothing under the click
 assert.equal(joinPieces(pieces, [A[0] + 0.0005, midLat + 0.0012]), null);
 assert.equal(joinPieces([], [lon, lat]), null);
+
+// ---------- several parcels picked with Shift-click (2026-10-05: Shift-clicking open ground in one Waller parcel kept
+// adding it again, ten numbered dots in one parcel, each number at its click point) ----------
+// a real Waller County appraisal parcel (19750 FM 362, TxGIO StratMap), with the near-duplicate corner points the data carries
+const waller = { type: 'Polygon', coordinates: [[[-95.93203098486757, 30.055354739359796], [-95.9337052352497, 30.05536262895187], [-95.93371371804093, 30.056014768778997], [-95.93371374768535, 30.056017074138694],
+  [-95.93235753594807, 30.056006684080234], [-95.93203939309863, 30.056001851765764], [-95.9320393859121, 30.0560013207166], [-95.93203101720691, 30.055357147368824], [-95.93203098486757, 30.055354739359796]]] };
+const mid = labelPoint(waller);
+assert.ok(inGeom(mid, waller));
+assert.ok(Math.abs(mid[0] - (-95.93287)) < 0.00006 && Math.abs(mid[1] - 30.05568) < 0.00006, 'the number sits in the middle of the parcel: ' + mid);
+// an L-shaped parcel: the vertex average falls outside it; the number must sit inside, in the thick part
+const L0 = [-95.94, 30.05], u = 0.001, Lp = { type: 'Polygon', coordinates: [[[L0[0], L0[1]], [L0[0] + 4 * u, L0[1]], [L0[0] + 4 * u, L0[1] + u], [L0[0] + u, L0[1] + u], [L0[0] + u, L0[1] + 4 * u], [L0[0], L0[1] + 4 * u], [L0[0], L0[1]]]] };
+const lm = labelPoint(Lp); assert.ok(inGeom(lm, Lp), 'inside the L');
+const near = (p, q, tol) => Math.abs(p[0] - q[0]) < tol && Math.abs(p[1] - q[1]) < tol;
+assert.ok((lm[1] > L0[1] + .3 * u && lm[1] < L0[1] + .7 * u) || (lm[0] > L0[0] + .3 * u && lm[0] < L0[0] + .7 * u), 'along the middle of an arm, clear of the edges: ' + lm);
+// a parcel in two pieces (the appraisal service sends both rings in one Polygon): the number goes in the bigger piece
+const two = { type: 'Polygon', coordinates: [rect(-95.95, 30.06, -95.949, 30.061)[0], rect(-95.947, 30.06, -95.9465, 30.0603)[0]] };
+assert.ok(near(labelPoint(two), [-95.9495, 30.0605], 0.00006), 'middle of the bigger piece');
+// a building's outline (MultiPolygon from the tiles) works the same way
+assert.ok(inGeom(labelPoint({ type: 'MultiPolygon', coordinates: [big] }), { type: 'MultiPolygon', coordinates: [big] }));
+
+// the same parcel clicked again anywhere inside it (not just within 5 m of the first click) is the same selection
+const p1 = { center: [-95.9325, 30.0555], footprint: null, parcel: { propId: '29519', geometry: waller } };
+assert.ok(sameSelection(p1, { center: [-95.9336, 30.0559], footprint: null }), 'a second click across the parcel, before its parcel loads');
+assert.ok(sameSelection(p1, { center: [-95.9336, 30.0559], footprint: null, parcel: { propId: '29519', geometry: waller } }));
+assert.ok(!sameSelection(p1, { center: [-95.9325, 30.0572], footprint: null }), 'open ground in the parcel to the north is another parcel');
+assert.ok(!sameSelection(p1, { center: [-95.9325, 30.0572], footprint: null, parcel: { propId: '29520' } }));
+// a building and the open ground around it are different picks; the same building twice is the same
+const bA = { center: ptIn(big), footprint: { type: 'Polygon', coordinates: big } };
+assert.ok(!sameSelection(bA, { center: ptIn(big), footprint: null }));
+assert.ok(sameSelection(bA, { center: [ptIn(big)[0] + 0.0001, ptIn(big)[1]], footprint: { type: 'Polygon', coordinates: big } }));
+assert.ok(!sameSelection(bA, { center: ptIn(smallA[0]), footprint: { type: 'Polygon', coordinates: smallA[0] } }));
 console.log('footprint ok');

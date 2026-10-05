@@ -98,8 +98,8 @@ Click a building, or at street zoom click open ground, to open its **property ca
 **Big buildings:** clicking any part of a building selects the whole building, even a warehouse or shopping center that the map draws in pieces. If the building sits on more than one parcel, the card lists every parcel with its owner and value, and a total.
 
 **Several things at once (tabs):** Shift-click to add more, up to 10. On a touch screen, tap **+ Add** at the top of the card (or **Select Multiple**), tap the other things, then **Done**. This works for buildings, parcels, construction filings, planes and airports, mixed together.
-- Each one gets a numbered **tab** at the top of the card; the same number marks it on the map. Tap a tab to see that card, or its **×** to drop it.
-- Shift-click something already picked to take it out. A plain click starts over with just that one; closing the card clears them all.
+- Each one gets a numbered **tab** at the top of the card; the same number marks it on the map, in the middle of the building or parcel. Parcels picked as open ground keep a faint outline while you look at another tab. Tap a tab to see that card, or its **×** to drop it.
+- Shift-click something already picked to take it out (for a parcel, anywhere inside it). A parcel is never added twice. A plain click starts over with just that one; closing the card clears them all.
 - With two or more buildings or parcels, an **All** tab adds them up: footprint, floor area, market value and acres (each parcel counted once), the construction filings on them, a CSV export and **Zoom to All**.
 
 ---

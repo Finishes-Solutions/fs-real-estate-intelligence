@@ -2,7 +2,7 @@
 // parcel (TxGIO StratMap, via /api/building), businesses (OpenStreetMap), street-level photo (Mapillary, optional),
 // TABS filings on the parcel, census tract snapshot, and an orbit camera. All sources are free.
 import { floorsFromHeight } from './lib/height.mjs';
-import { joinPieces, partAt, inGeom } from './lib/footprint.mjs';
+import { joinPieces, partAt, inGeom, labelPoint, sameSelection } from './lib/footprint.mjs';
 
 export function initBuildings(ctx) {
   const { map, esc, fmtM, fmtN, F } = ctx, card = document.getElementById('card');
@@ -31,7 +31,7 @@ export function initBuildings(ctx) {
     map.addLayer({ id: 'fs-bsel', type: 'fill-extrusion', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'b'], paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'a'], 1], c.sel, c.sel2], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-opacity': 1 } }, before);
     if (!map.getSource('fs-bhov')) map.addSource('fs-bhov', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({ id: 'fs-bhov', type: 'line', source: 'fs-bhov', minzoom: 13, paint: { 'line-color': c.sel, 'line-width': 2, 'line-opacity': .9 } }, before);
-    map.addLayer({ id: 'fs-psel', type: 'line', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'p'], paint: { 'line-color': c.sel, 'line-width': 2.4, 'line-dasharray': [2, 1.5] } }, before);
+    map.addLayer({ id: 'fs-psel', type: 'line', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'p'], paint: { 'line-color': c.sel, 'line-width': ['case', ['==', ['get', 'a'], 1], 2.4, 1.6], 'line-opacity': ['case', ['==', ['get', 'a'], 1], 1, 0.5], 'line-dasharray': [2, 1.5] } }, before);
     map.addLayer({ id: 'fs-bnumc', type: 'circle', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'n'], paint: { 'circle-radius': 11, 'circle-color': ['case', ['==', ['get', 'a'], 1], c.sel, '#ffffff'], 'circle-stroke-color': c.sel, 'circle-stroke-width': 2, 'circle-pitch-alignment': 'viewport' } });
     map.addLayer({ id: 'fs-bnum', type: 'symbol', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'n'], layout: { 'text-field': ['to-string', ['get', 'n']], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-allow-overlap': true, 'text-ignore-placement': true },
       paint: { 'text-color': ['case', ['==', ['get', 'a'], 1], '#ffffff', c.sel] } });
@@ -53,8 +53,9 @@ export function initBuildings(ctx) {
       const a = b === cur || all ? 1 : 0;
       if (b.footprint) { feats.push({ type: 'Feature', properties: { k: 'b', a, h: (b.height || 6) + 0.6, b: b.base || 0 }, geometry: grow(b.footprint, 1.004) });
         if (b === cur) feats.push({ type: 'Feature', properties: { k: 'g' }, geometry: b.footprint }); }
-      if (a) for (const p of b.d?.parcels?.length ? b.d.parcels : b.parcel ? [b.parcel] : []) if (p.geometry) feats.push({ type: 'Feature', properties: { k: 'p' }, geometry: p.geometry });
-      if (many) feats.push({ type: 'Feature', properties: { k: 'n', n: i + 1, a }, geometry: { type: 'Point', coordinates: b.footprint ? centroid(b.footprint) : b.center } });
+      // the shown one's parcel(s); a parcel picked as open ground keeps a faint outline while another tab is shown
+      if (a || !b.footprint) for (const p of b.d?.parcels?.length ? b.d.parcels : b.parcel ? [b.parcel] : []) if (p.geometry) feats.push({ type: 'Feature', properties: { k: 'p', a }, geometry: p.geometry });
+      if (many) feats.push({ type: 'Feature', properties: { k: 'n', n: i + 1, a }, geometry: { type: 'Point', coordinates: numberAt(b) } });
     });
     s.setData({ type: 'FeatureCollection', features: feats });
     if (cur && cur !== lastActive) { lastActive = cur; reveal(); } else if (!cur) lastActive = null;
@@ -70,7 +71,14 @@ export function initBuildings(ctx) {
       set(e, g); if (gp < 1) revealRaf = requestAnimationFrame(step); };
     revealRaf = requestAnimationFrame(step);
   }
-  function centroid(g) { const ring = (g.type === 'Polygon' ? g.coordinates : g.coordinates.reduce((a, p) => p[0].length > a[0].length ? p : a))[0]; let x = 0, y = 0; for (const p of ring) { x += p[0]; y += p[1]; } return [x / ring.length, y / ring.length]; }
+  // the number of a selected building sits in the middle of its outline; open ground's in the middle of the parcel clicked
+  // (the click point until the parcel has loaded)
+  function numberAt(b) {
+    const g = b.footprint || (b.d?.parcels || []).find(p => p.geometry && inGeom(b.center, p.geometry))?.geometry || b.parcel?.geometry;
+    if (!g) return b.center;
+    if (b._lp?.g !== g) b._lp = { g, p: labelPoint(g) || b.center };
+    return b._lp.p;
+  }
   function stopOrbit() { cancelAnimationFrame(orbitRaf); orbitRaf = 0; card.querySelector('#bOrbit')?.classList.remove('on'); }
   ['mousedown', 'touchstart', 'wheel', 'dragstart'].forEach(ev => map.on(ev, () => orbitRaf && stopOrbit()));
   ctx.onOrbitStop?.(stopOrbit);
@@ -232,13 +240,14 @@ export function initBuildings(ctx) {
     let d = null, early = false;
     // the appraisal record first: owner, value, title, the parcel outline and everything keyed on it
     const onParcel = pd => {
-      if (cur !== b) return; early = true; highlight(); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
+      if (cur !== b || dropIfDuplicate(b)) return; early = true; highlight(); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
       renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel);
       ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel);
     };
     try { d = await details(b, onParcel); }
     catch (err) { if (cur !== b) return; card.querySelector('#bParcel').innerHTML = '<div class="lt">Parcel</div><div class="rnote">Parcel lookup unavailable (' + esc(err.message) + ').</div>'; card.querySelector('#bTitle').textContent = 'Building'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b); return; }
     if (cur !== b) return;
+    if (dropIfDuplicate(b)) return;
     highlight(); ctx.tabs?.label(bid(b), d.parcel?.situs || d.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
     card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
     // the parcel list (a building on several parcels) comes with the second lookup, so the parcel section is redrawn with it
@@ -249,7 +258,17 @@ export function initBuildings(ctx) {
   ctx.buildingStats = () => { const list = selected(); return list.map(b => ({ address: b.parcel?.situs || null, ...stats(b), owner: b.parcel?.owner || null })); };
 
   // ---------- several buildings / parcels: each is a tab; "All" sums them up ----------
-  const same = (a, b) => a.footprint && b.footprint ? a.footprint === b.footprint || inGeom(a.center, b.footprint) || inGeom(b.center, a.footprint) : Math.hypot(a.center[0] - b.center[0], a.center[1] - b.center[1]) < 0.00005 || (a.parcel?.propId && a.parcel?.propId === b.parcel?.propId);
+  const selOf = x => ({ center: x.center, footprint: x.footprint, parcel: x.parcel, parcels: x.d?.parcels });
+  const same = (a, b) => sameSelection(selOf(a), selOf(b));
+  // open ground clicked again in a parcel already picked (its parcel loaded only after the click was added): drop the
+  // new tab and show the one already there
+  function dropIfDuplicate(b) {
+    if (b.footprint || !b.parcel) return false;
+    const tabs = ctx.tabs?.list('building') || [], mine = tabs.find(t => t.ref === b), dup = tabs.find(t => t.ref && t.ref !== b && same(t.ref, b));
+    if (!mine || !dup) return false;
+    ctx.tabs.remove(mine.id); ctx.tabs.activate(dup.id); ctx.toast?.('That parcel is already selected (' + (tabs.indexOf(dup) + 1) + ').');
+    return true;
+  }
   function add(b) {
     // the same building again while adding: take it out of the selection
     const t = (ctx.tabs?.list('building') || []).find(x => same(x.ref, b)); if (t) { ctx.tabs.remove(t.id); return; }
