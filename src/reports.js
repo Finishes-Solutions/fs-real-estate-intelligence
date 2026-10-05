@@ -7,7 +7,7 @@ import { REPORTS, FORMATS } from './export.js';
 
 const KEY = 'fs-reports';
 const ICON = { pdf: 'PDF', xlsx: 'XLS', csv: 'CSV', geojson: 'GEO', html: 'WEB', kml: 'KML' };
-const KINDS = { ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k, r.label])), crime: 'Crime Report', crimeus: 'City / County Crime Report', fema: 'FEMA Report', market: 'Market Report', field: 'Field Notes', other: 'Other' };
+const KINDS = { ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k, r.label])), crime: 'Crime Report', crimeus: 'City / County Crime Report', fema: 'FEMA Report', environmental: 'Environmental Report', market: 'Market Report', field: 'Field Notes', other: 'Other' };
 
 export function initReports(ctx) {
   const { esc, fmtN } = ctx, root = document.getElementById('view-reports'); if (!root) return;

@@ -5,6 +5,29 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-05
 
+### 3:07 PM CT: Shift-clicking a parcel no longer adds it again; numbers sit in the middle (19683df)
+- **Fixed:** Shift-clicking open ground in a parcel that was already picked added it again, with a new number each time. In one Waller case that put ten numbers in one parcel.
+  - **Why:** a parcel picked as open ground was recognized only by the exact spot clicked, so a click a few steps away counted as new.
+  - **Now:** a Shift-click anywhere inside a picked parcel takes it out, the same as for buildings. Two quick clicks in a parcel that hasn't loaded yet are merged as soon as it loads.
+- **Numbers sit in the middle** of each picked parcel or building, not where you happened to click. For L-shaped parcels, or parcels in two pieces, the number goes in the widest part.
+- Parcels picked as open ground keep a faint outline while you look at another tab, so each number has a shape around it.
+- Shift-click on a watchlist marker now adds it to the selection too.
+- A new automated test uses a real Waller County parcel, plus L-shaped and two-piece parcels. The change was also checked in a browser by Shift-clicking neighbouring Waller parcels.
+
+### 2:44 PM CT: Tidier legends and small fixes (33ed15e)
+- **Shorter map legends:** the Businesses & Places and Environmental Sites legends are now two compact columns instead of two tall lists covering the map.
+- The small popup on an environmental site closes when you open its Environmental report.
+- Officer titles from the Comptroller are spelled out ("Vice President" instead of "Vice-Presi").
+- Groundwater-restriction areas are drawn with more accurate outlines.
+- Checked in a browser with real data: the Businesses & Places dots, the place card, the environmental site dots, the popup and the Environmental report all show and open correctly.
+
+### 2:31 PM CT: Google maps, Google 3D and Google place search, ready for keys (503d184)
+- **Google base maps:** "Google" and "Google Sat" buttons under Base Map, with Google's logo and map credits shown while they're on.
+- **Google 3D:** Google's photorealistic 3D city replaces the simple building blocks at street zoom (tilt the map). Clicking a building still opens its property card.
+- **Google in search:** a Google section in the search results. Picking one switches to the Google map and opens a Google place card: address, phone, website, opening hours, rating and a link to Google Maps.
+- **Nothing shows until Google keys are added to the site** (two keys: one for the browser, limited to this site's address, and one for the server). Place searches are capped each month (900 place cards and 9,000 searches by default) to stay inside Google's free monthly use.
+- **Fixes to the 2:08 PM release:** the soils part of the Environmental report timed out (the site outline was sent the wrong way round); company names cut off at 50 characters now match; cities, counties and school or utility districts are no longer sent to the Comptroller.
+
 ### 2:09 PM CT: Market tab follows your selection, map legends, property card fixes (5811648)
 - **Market tab opens on what you've selected on the map:** a county, several counties together, or the county a drawn area sits in. With nothing selected it shows the whole region. Picking a county on the tab still works.
 - **Every Market chart shows its numbers on hover**, including the Correlation explorer's lines and lead/lag bars and the small trend lines in the Markets and Rates tables.
@@ -21,6 +44,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **The selected building's green highlight no longer flickers** while zooming or orbiting. It now sits half a metre outside every wall instead of overlapping the grey building.
 - **Area at a Glance** zoomed in on a single block now shows the census tract you're in, instead of saying there's no data.
 
+### 2:08 PM CT: Environment layers, Environmental report and company owner lookup (41791f9)
+- **New Environment section in Map Layers:**
+  - **Environmental Sites:** state and federal cleanup and contamination sites (Superfund, hazardous waste cleanups, voluntary cleanups, brownfields, dry cleaner cleanups, leaking petroleum tanks, landfills, and areas where groundwater use is restricted). A picker switches to registered petroleum tanks or EPA-permitted facilities. Click a dot for its program and ID.
+  - **Oil & Gas Wells, Pipelines** from the Railroad Commission, **Wetlands** from the US Fish & Wildlife Service and **Soils** from the USDA soil survey.
+- **New Environmental Report** for a selected area, a radius, or a property's own parcel (Area reports on the property card): every record within the distances a Phase I assessment searches (¼ to 1 mile from the site's edge), nearest first with distance and direction, plus wells (including orphan wells), pipelines (operator, product, size), wetlands and soils with their building limits. Exports as PDF or CSV. It screens public records; it is not a Phase I.
+- **Company behind the owner:** when a property's owner is a company, the card shows its Texas status, where and when it was formed, registered agent, mailing address and officers or members, from the Texas Comptroller's free records. Works with the Regrid owner in Harris and Waller too. People's names are not looked up.
+- All of this is free public data; no new keys needed.
+
 ### 2:01 PM CT: Crime library loads at a polite pace (c48b6a1)
 - **Fixed:** the first load asked the FBI for data far too fast (about 65 requests a second). After about 150 Alabama departments the FBI stopped answering. The load was stopped; the app itself was not affected.
 - The loader now asks at most 5 times a second. If many departments fail in a row it pauses, and after a few pauses it stops until next week instead of retrying straight away.
@@ -32,6 +63,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Fixed: "That area is too large for a traffic report" on a county.** The limit was 250 square miles, smaller than any county here (Waller is about 520). It is now 5,000 square miles, enough for Harris County or a few counties together.
 - **Incidents in a county traffic report are only the ones inside the county**, not on roads in the neighbouring counties that fall in the same box. Large areas look them up in several pieces so the live incident service accepts them.
 
+### 1:45 PM CT: Businesses & Places layer from open data (c27cf86, 3c7b07a)
+- **New map layer, Businesses & Places:** about 300,000 businesses and places across the seven counties, colored by kind (food, retail, health care, offices, construction and home services, industrial and farms, and more). It shows from street zoom; pick one kind from the list under the switch.
+- **Click a dot** for a card with the name, category, address, phone, website, the sources that list it, a link to Google Maps and a button for the building and parcel there.
+- **Property cards list many more businesses:** the open data is added to OpenStreetMap's list, and each one opens its card.
+- **Search finds these businesses by name**, closest first, before the OpenStreetMap and Comptroller results.
+- **Where it comes from:** Overture Maps (which already includes records from Meta, Microsoft, BrightQuery and Foursquare) and, once a free Hugging Face token is added, Foursquare's own open dataset. Both are free and refreshed monthly. Closed places and pins without a street address that are probably service-area businesses are left out, and the same business from two sources is shown once.
+
 ### 1:39 PM CT: Crime library and state rankings (1cb349e)
 - **The app now keeps its own copy of the FBI crime figures** for every city and county police department in the US (about 11,000 of them, 2015 to 2025). A weekly job refreshes each department once a month. Departments not loaded yet are still looked up live, as before.
 - **Faster crime sections** on property cards once a department is in the library.
@@ -39,10 +77,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Ask AI can rank places:** "safest cities in Texas over 50,000 people", "Louisiana counties with the most property crime".
 - The library fills over the first run (roughly an hour or two); rankings and state ranks appear as each state finishes.
 
-
 ### 11:49 AM CT: The app reads the government data key (GOV_API_KEY) (6dd783b)
 - **Crime by city / county now has a backup:** if the FBI website's feed is down or changes, the app switches to the FBI's official data service using the api.data.gov key saved on Vercel as `GOV_API_KEY`. Nothing changes on screen.
 - The same key can be reused for other federal data services later; the app reads it from one place.
+
+### 11:40 AM CT: Behind the scenes: checking new free data sources (28666a6, e87ab6c)
+- No change in the app yet. Added a server-side check of the free environmental and business-registration services (state environmental agency, Railroad Commission, wetlands, soils, EPA, Texas Comptroller) so they can be added next.
 
 ### 11:31 AM CT: Crime by city / county, anywhere in the US (9540c9f, 6bc25ce, e36d54c)
 - **Property and parcel cards now show crime anywhere in the US**, under the Houston street-level section:
@@ -58,6 +98,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ### 11:08 AM CT: FBI crime data check (d9d7c59)
 - Behind the scenes only: a diagnostic that tests which FBI Crime Data Explorer feeds still answer, ahead of crime numbers by city and county for the whole US. Nothing in the app changes yet.
+
 ### 11:06 AM CT: Clicking a building selects only that building again (71f0f33)
 - **Fixed:** clicking a building could highlight and measure many unrelated buildings around it. In one Waller example that was about 260,000 sq ft of buildings across the screen, on different parcels. The card's size, floor area and overview used that wrong total.
 - **Why it happened:** the whole-building selection added on Oct 4 assumed every map piece sharing the clicked building's ID belonged to that building. The map stores many separate nearby buildings under one ID, so the selection picked up all of them.
@@ -172,7 +213,6 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - Shift-click something already picked to drop it. A plain click starts over; closing the card clears everything.
   - With two or more buildings or parcels, an **All** tab totals footprint, floor area, market value and acres (each parcel counted once), with the filings on them, a CSV export (now with a parcel count per building) and **Zoom to All**.
 - **Fixed: Shift-click did nothing on the map.** The map's Shift-drag box zoom was swallowing every Shift-click, so the old "Shift-click to select several buildings" never actually reached the app.
-
 
 ### 1:30 AM CT: Filters for the map's layers, and freeze fixes (690491d)
 - **Filters now cover the map's layers, not just construction filings.** The panel has a section per kind of data:
@@ -437,7 +477,6 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - Claims are counted for the census tracts around the area (FEMA hides exact addresses), so they describe the neighborhood, not one parcel.
 - FEMA's claims service can be slow the first time an area is asked for; the report now waits longer and retries once, and a report missing a part is never saved, so trying again gets a full one (feb40d8).
 
-
 ### 1:22 AM CT: The same section-card style across the app (12b80c8)
 - **Tabs:** Reports, Updates, Field Notes, Market, Activity, Compare and Sources now sit on a light grey background. Each group sits in a white card with an icon and a title, like the new property card.
 - **Left panel:** Area at a Glance and Construction Filings are now titled section cards too.
@@ -544,7 +583,6 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Aircraft types show by name** (e.g. "Airbus A321neo", "Pilatus PC-12") from a built-in list of about 210 common types.
   - A rare type shows its code.
   - Private and small planes usually have no route in either database.
-
 
 ### 12:30 AM CT: The map now leads with properties, not filings (4a6874b, afa6fc3)
 - **Filing dots are hidden when the map first opens.** This applies once to everyone, after which your own choice sticks. To bring them back:

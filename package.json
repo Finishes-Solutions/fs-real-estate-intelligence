@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node build.mjs",
     "assemble": "node build.mjs --assemble",
-    "test": "node test/fixture.mjs && node test/shell.mjs && node test/api.mjs && node test/assistant.mjs && node test/geocode.mjs && node test/openai.mjs && node test/oidc.mjs && node test/building.mjs && node test/footprint.mjs && node test/live.mjs && node test/imagery.mjs && node test/planes.mjs && node test/spending.mjs && node test/field.mjs && node test/area.mjs && node test/search.mjs && node test/regrid.mjs && node test/site.mjs && node test/crime.mjs && node test/crimeus.mjs && node test/fema.mjs && node test/counties.mjs && node test/geomatch.mjs && node test/layerfilters.mjs && node test/drivetime.mjs && node test/airports.mjs && node test/markets.mjs && bash test/pipeline.sh && bash test/statewide.sh && bash test/livesync.sh && bash test/crimelibrary.sh",
+    "test": "node test/fixture.mjs && node test/shell.mjs && node test/api.mjs && node test/assistant.mjs && node test/geocode.mjs && node test/openai.mjs && node test/oidc.mjs && node test/building.mjs && node test/footprint.mjs && node test/places.mjs && node test/env.mjs && node test/live.mjs && node test/imagery.mjs && node test/planes.mjs && node test/spending.mjs && node test/field.mjs && node test/area.mjs && node test/search.mjs && node test/regrid.mjs && node test/site.mjs && node test/crime.mjs && node test/crimeus.mjs && node test/fema.mjs && node test/counties.mjs && node test/geomatch.mjs && node test/layerfilters.mjs && node test/drivetime.mjs && node test/airports.mjs && node test/markets.mjs && bash test/pipeline.sh && bash test/statewide.sh && bash test/livesync.sh && bash test/crimelibrary.sh",
     "backfill": "node build/backfill.mjs"
   },
   "dependencies": {

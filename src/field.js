@@ -50,7 +50,7 @@ export function initField(ctx) {
     if (!map.getLayer('fs-field')) return false;
     const hit = map.queryRenderedFeatures(e.point, { layers: ['fs-field'] })[0]; if (!hit) return false;
     if (hit.properties.k === 'n') openNote(db.notes.find(n => n.id === hit.properties.id));
-    else { const w = db.watch.find(x => x.id === hit.properties.id); if (w) ctx.openBuildingAt([w.lng, w.lat]); }
+    else { const w = db.watch.find(x => x.id === hit.properties.id); if (w) { ctx.tabs?.arm(e); ctx.openBuildingAt([w.lng, w.lat]); } }
     return true;
   });
 

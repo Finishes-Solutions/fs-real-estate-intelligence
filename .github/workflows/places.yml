@@ -1,0 +1,47 @@
+name: Places (Overture + Foursquare)
+
+# Loads businesses and places for the seven counties into Supabase (build/places.mjs): Overture Maps Places always,
+# Foursquare Open Source Places too when the HF_TOKEN secret is set (a free Hugging Face token whose account has accepted
+# the dataset terms at huggingface.co/datasets/foursquare/fsq-os-places). Both publish monthly.
+# Needs supabase/migrations/20261016000000_places.sql applied once.
+on:
+  schedule:
+    - cron: "23 8 3 * *" # 3rd of each month, 08:23 UTC (default branch only)
+  workflow_dispatch:
+    inputs:
+      overture_release:
+        description: "Overture release, e.g. 2026-09-23.1 (blank = latest)"
+        required: false
+      allow_shrink:
+        description: "yes = accept a load with under half the places of the last one"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: places
+  cancel-in-progress: false
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    environment: Production # the secrets live in this GitHub environment
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm install --no-save --no-audit --no-fund @duckdb/node-api
+      - name: Load places
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          OVERTURE_RELEASE: ${{ inputs.overture_release }}
+          PLACES_ALLOW_SHRINK: ${{ inputs.allow_shrink == 'yes' && '1' || '' }}
+        run: node build/places.mjs
