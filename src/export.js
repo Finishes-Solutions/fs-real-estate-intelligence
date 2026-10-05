@@ -4,7 +4,7 @@
 // Excel uses SheetJS (already on the page).
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 import { contains as inArea } from './lib/geomatch.mjs';
-import { reportDoc, savePdf, saveHtml } from './reportkit.js';
+import { reportDoc, savePdf, saveHtml, areaMap } from './reportkit.js';
 
 export const REPORTS = {
   summary: { label: 'Summary Report', desc: 'Headline metrics, map, breakdowns by county, type and use, largest projects.', formats: ['pdf', 'xlsx', 'html'] },
@@ -169,10 +169,16 @@ export function initExport(ctx) {
       (st.full ? '<div class="full">' + capped(list, 'All filings', LIST_MAX / 2) + listTable(list.slice(0, LIST_MAX / 2), false) + '</div>' : ''));
   }
   const listDoc = (list, label) => doc('Filing list', label, kpis(list) + capped(list, 'Filings') + listTable(list.slice(0, LIST_MAX), true, st.scope_text), { landscape: true });
+  // every area in Compare on one street map, in its compare colour
+  function compareMap() {
+    const list = (ctx.compare?.list() || []).filter(a => a.geom); if (!list.length) return '';
+    return '<div class="map">' + areaMap(list.map((a, i) => ({ geometry: a.geom, stroke: ctx.compare.colorOf(i), fill: 'rgba(0,0,0,.03)', width: 2.2 })), { W: 1000, H: 420 }) + '</div>' +
+      '<div class="lg">' + list.map((a, i) => '<span><i style="background:' + ctx.compare.colorOf(i) + '"></i>' + (i + 1) + '. ' + esc(a.label) + '</span>').join('') + '</div>';
+  }
   function compareDoc(t) {
     const n = t.areas.length, cols = Math.min(n, n > 3 ? 4 : 3);
     return doc('Area comparison', t.areas.map(a => a.label).join(' vs. '),
-      '<h2>Side by side</h2>' + tbl(t.head, t.body.map(r => r.map((c, i) => i ? '<span class="m">' + esc(String(c)) + '</span>' : esc(String(c)))), t.areas.map((a, i) => i + 1)) +
+      compareMap() + '<h2>Side by side</h2>' + tbl(t.head, t.body.map(r => r.map((c, i) => i ? '<span class="m">' + esc(String(c)) + '</span>' : esc(String(c)))), t.areas.map((a, i) => i + 1)) +
       '<h2>Largest filings in each area</h2><div style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:16px">' + t.areas.map((a, i) => '<div><h3>' + esc(a.label) + '</h3>' +
         tbl(['Project', 'Est. value'], t.lists[i].slice().sort((x, y) => y.cost - x.cost).slice(0, 12).map(f => [project(f) + '<div class="sc">' + esc(f.city || f.county) + '</div>', money(f.cost)]), [1]) + '</div>').join('') + '</div>',
       { landscape: n > 3 });

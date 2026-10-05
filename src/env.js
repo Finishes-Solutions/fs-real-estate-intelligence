@@ -4,7 +4,7 @@
 //   Environmental Report for a site or area: every record within Phase I style search distances of the site's edge,
 //   nearest first, wells and pipelines, wetlands and soils; opens in the card and exports as PDF or CSV.
 import { KINDS, SETS } from './lib/env.mjs';
-import { esc, fmt, kgrid, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard } from './reportkit.js';
+import { esc, fmt, kgrid, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, areaMap } from './reportkit.js';
 
 const SRC = 'env-sites', AREA = 'env-areas';
 const RASTERS = { rrc: { box: 'lyRrc', note: 'lyRrcNote', minz: 11, opacity: .9, attr: 'Wells & pipelines: Railroad Commission of Texas', msg: 'Oil and gas wells (symbols by type: oil, gas, plugged, dry, injection) and pipelines from the Railroad Commission. Zoom in past neighborhood level.' },
@@ -144,12 +144,14 @@ export function initEnv(ctx) {
     saveCsv(ctx, 'environmental', last.label, rows);
   }
   function exportPdf() {
-    if (!last) return; const { d, label } = last;
+    if (!last) return; const { d, label, geometry } = last;
+    // the site on a street map (the screen covers the area plus each database's search distance around it)
+    const map = geometry ? '<div class="map">' + areaMap([{ geometry, stroke: '#b45309', fill: 'rgba(180,83,9,.08)', dash: true }], { fit: geometry, W: 1000, H: 360, minSpanM: 1500 }) + '</div>' : '';
     const css = '.kgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.kgrid div{border:1px solid #e8ebeb;border-radius:6px;padding:8px}.kgrid b{display:block;font-size:16px}.kgrid span{font-size:9.5px;color:#6b7174}' +
       '.pl{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e8ebeb;padding:4px 0;break-inside:avoid}.pl span{color:#6b7174;font-size:9px;text-align:right}.fl{font-weight:700;margin:10px 0 2px}.pl-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}' +
       'table.mini{width:100%;border-collapse:collapse;font-size:9.5px}table.mini th,table.mini td{border-bottom:1px solid #e8ebeb;padding:4px 6px;text-align:left;vertical-align:top}.mono{font-family:"IBM Plex Mono",monospace}.err{color:#b42318}.bacts{display:none}';
     const html = reportDoc({ kicker: 'Environmental screening report', title: label, meta: (d.area_sqmi < 1 ? Math.round(d.area_sqmi * 640) + ' acres' : d.area_sqmi.toFixed(2) + ' sq mi') + ' · ' + d.center[1] + ', ' + d.center[0], css,
-      sources: esc(d.sources) + ' A screen of public databases, not a Phase I environmental site assessment (ASTM E1527-21): records can be mislocated or missing, and nothing here says whether a site is contaminated.', body: body(d, { full: true }) });
+      sources: esc(d.sources) + ' A screen of public databases, not a Phase I environmental site assessment (ASTM E1527-21): records can be mislocated or missing, and nothing here says whether a site is contaminated.', body: map + body(d, { full: true }) });
     return savePdf(ctx, 'environmental', label, html);
   }
 

@@ -4,7 +4,7 @@
 //   on the map, the FAA airport diagram, takeoffs and landings per day (counted from our own ADS-B sampling around
 //   Houston), the airlines that fly there and statistics (Wikipedia), radio frequencies; Export PDF / CSV.
 //   Building and filing cards: the nearest airports, and whether the site is under a runway's approach path.
-import { esc, fmt, kgrid, table, bars, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard } from './reportkit.js';
+import { esc, fmt, kgrid, table, bars, areaMap, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard } from './reportkit.js';
 
 const TYPE = { large_airport: 'Large airport', medium_airport: 'Medium airport', small_airport: 'Small airport', heliport: 'Heliport', seaplane_base: 'Seaplane base', balloonport: 'Balloonport' };
 const COL = { large_airport: '#1d4ed8', medium_airport: '#2563eb', small_airport: '#64748b', heliport: '#a855f7', seaplane_base: '#0891b2', balloonport: '#94a3b8' };
@@ -161,6 +161,7 @@ export function initAirports(ctx) {
     const body = (w.image ? '<div class="photo"><img src="' + esc(w.image.url) + '" alt=""></div><div class="cap">Photo: ' + esc(w.image.credit || '') + '</div>' : '') +
       '<div class="kp">' + [[fmt(rw.length), 'Runways'], [rw[0]?.length_ft ? fmt(rw[0].length_ft) + ' ft' : '—', 'Longest runway'], [a.elevation_ft != null ? fmt(a.elevation_ft) + ' ft' : '—', 'Elevation'], [ops ? fmt(ops.avg) : '—', 'Ops a day (ADS-B)']].map(([v, l]) => '<div><b>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>' +
       (w.summary ? '<p>' + esc(w.summary) + '</p>' : '') +
+      (Number.isFinite(a.lat) ? '<div class="map">' + areaMap([], { W: 1000, H: 340, points: [{ c: [a.lon, a.lat], r: 6, color: '#1d4ed8', label: a.iata || a.icao || a.ident }], minSpanM: 6000 }) + '</div>' : '') +
       '<div class="two"><div><h2>Runways</h2>' + table(['Runway', { t: 'Length ft', r: 1 }, { t: 'Width ft', r: 1 }, 'Surface', 'Lighted'], rw.map(r => [esc((r.le_ident || '') + '/' + (r.he_ident || '')), fmt(r.length_ft), fmt(r.width_ft), esc(SURFACE(r.surface)), r.lighted ? 'Yes' : 'No'])) + '</div>' +
         '<div><h2>Runway diagram</h2><div class="map">' + runwaySvg(rw, { W: 420, H: 300 }) + '</div>' + (d.extras?.diagram_url ? '<p class="meta">Official FAA airport diagram: ' + esc(d.extras.diagram_url) + '</p>' : '') + '</div></div>' +
       (ops ? '<h2>Takeoffs and landings per day (ADS-B count)</h2><div class="bars">' + bars(ops.list.map(o => ({ label: o.day.slice(5), v: o.departures + o.arrivals })), { every: Math.ceil(ops.list.length / 8) }) + '</div><p class="meta">Average ' + fmt(ops.avg) + ' a day over ' + ops.days + ' days (' + fmt(ops.dep) + ' takeoffs, ' + fmt(ops.arr) + ' landings). Counted from aircraft broadcasting ADS-B; undercounts small aircraft.</p>' : '') +

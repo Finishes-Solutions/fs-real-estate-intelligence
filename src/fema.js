@@ -4,7 +4,7 @@
 //   share of the area in high / moderate / minimal flood risk, NFIP flood insurance claims paid nearby (by year and storm),
 //   federal disaster declarations since 2000, and FEMA's National Risk Index (expected annual loss by hazard).
 //   The report opens in the card and exports as a PDF report or CSV.
-import { reportDoc, savePdf } from './reportkit.js';
+import { reportDoc, savePdf, areaMap } from './reportkit.js';
 const SRC = 'fema-nfhl';
 const RISK_COL = { high: '#1d4ed8', moderate: '#f59e0b', minimal: '#9ca3af', undetermined: '#a78bfa', water: '#38bdf8', unmapped: '#e5e7eb' };
 const RISK_SHORT = { high: 'High risk (100-year)', moderate: 'Moderate (500-year)', minimal: 'Minimal', undetermined: 'Not studied', water: 'Open water', unmapped: 'Not mapped' };
@@ -98,21 +98,16 @@ export function initFema(ctx) {
     for (const t of n?.by_tract || []) rows.push({ Table: 'Risk index: tract', Item: t.tract, Year: '', Count: t.population, 'Amount ($)': t.eal, Percent: t.risk_score, Detail: t.risk_rating + ' · ' + t.county + ' County' });
     ctx.exportCsv(rows, 'fema-' + slug(last.label) + '-' + new Date().toISOString().slice(0, 10));
   }
-  function areaSvg(g) {
-    const rings = g.type === 'Polygon' ? g.coordinates : g.coordinates.flat(); let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const r of rings) for (const [x, y] of r) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-    const W = 360, H = 220, k = Math.cos((y0 + y1) / 2 * Math.PI / 180), sx = (x1 - x0) * k || 1e-4, sy = y1 - y0 || 1e-4, s = Math.min((W - 20) / sx, (H - 20) / sy);
-    const pr = ([x, y]) => [(W - sx * s) / 2 + (x - x0) * k * s, (H - sy * s) / 2 + (y1 - y) * s];
-    return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg"><rect width="' + W + '" height="' + H + '" fill="#f8f9f9"/><path d="' + rings.map(r => 'M' + r.map(p => pr(p).map(v => v.toFixed(1)).join(',')).join('L') + 'Z').join('') + '" fill="rgba(29,78,216,.08)" stroke="#1d4ed8" stroke-width="1.5" stroke-dasharray="5 3"/></svg>';
-  }
+  // the area on a street map (narrow column beside the figures)
+  const areaMapOf = g => areaMap([{ geometry: g, stroke: '#1d4ed8', fill: 'rgba(29,78,216,.10)', dash: true }], { W: 360, H: 260, px: 300 });
   function exportReport() {
     if (!last) return; const { d, label, geometry } = last;
     const css = 'dl{display:grid;grid-template-columns:1fr auto;gap:4px 16px;margin:10px 0 0}dt{color:#4d5457}dd{margin:0;font-family:"IBM Plex Mono",monospace;text-align:right}.err{color:#b42318}' +
       '.pl{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e8ebeb;padding:5px 0;break-inside:avoid}.pl span{color:#6b7174;font-size:9.5px;white-space:nowrap}' +
       '.fm-bar{display:flex;height:14px;border-radius:3px;overflow:hidden;background:#e8ebeb}.fm-bar i{display:block;height:100%}.fm-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:9.5px;margin-top:6px}.fm-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}' +
-      '.cr-bars{display:block;width:100%;max-width:560px;height:auto;color:#6b7174;margin-top:8px}.two{grid-template-columns:2fr 1fr;align-items:start}.fmap{break-inside:avoid}.fmap svg{display:block;width:100%;height:auto;border:1px solid #e8ebeb;border-radius:6px}';
+      '.cr-bars{display:block;width:100%;max-width:560px;height:auto;color:#6b7174;margin-top:8px}.two{grid-template-columns:2fr 1fr;align-items:start}.fmap{break-inside:avoid}.fmap>svg{display:block;width:100%;height:auto;border:1px solid #e8ebeb;border-radius:6px}.fmap .rmap{border:1px solid #e8ebeb;border-radius:6px}';
     const html = reportDoc({ kicker: 'FEMA flood & hazard report', title: label, meta: d.area_sqmi.toFixed(2) + ' sq mi' + ((d.counties || []).length ? ' · ' + esc(d.counties.join(', ')) + ' County' : ''), css, sources: esc(d.sources) + ' Flood zone shares are measured by sampling points across the area against FEMA\'s effective flood map. NFIP claims cover insured properties in the census tracts touching the area (FEMA redacts addresses), so they are a neighborhood measure, not this parcel\'s history. Flood maps show regulatory risk, not every flood: confirm a parcel with an elevation certificate or a flood zone determination.', body: '' +
-      '<div class="two"><div>' + body(d) + '</div><div class="fmap"><div class="lt">Area</div>' + areaSvg(geometry) +
+      '<div class="two"><div>' + body(d) + '</div><div class="fmap"><div class="lt">Area</div>' + areaMapOf(geometry) +
       (d.risk_index?.by_tract?.length ? '<div class="lt">Census tracts</div>' + d.risk_index.by_tract.map(t => '<div class="pl"><b>' + esc(t.tract) + '</b><span>' + esc(t.risk_rating || '') + ' · ' + fmtM(t.eal) + '/yr</span></div>').join('') : '') + '</div></div>' +
       (d.disasters?.list?.length > 6 ? '<div class="bsec"><div class="lt">All disaster declarations since 2000</div>' + d.disasters.list.map(x => '<div class="pl"><b>' + esc(x.title) + '</b><span>' + esc(x.date + ' · ' + x.type + ' · ' + x.kind + ' #' + x.number) + '</span></div>').join('') + '</div>' : '') +
       '' });

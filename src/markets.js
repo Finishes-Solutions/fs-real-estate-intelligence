@@ -185,5 +185,5 @@ export function initMarkets(ctx) {
       groups: GROUPS.map(g => g[1]) };
   }
 
-  ctx.markets = { load, html: () => marketsBox() + corrBox(), wire, correlateNamed, prices, find };
+  ctx.markets = { load, raw: () => data, html: () => marketsBox() + corrBox(), wire, correlateNamed, prices, find };
 }

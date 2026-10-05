@@ -23,7 +23,7 @@ export const REPORT_CSS = '*{box-sizing:border-box}html{-webkit-print-color-adju
   '.kp,.kgrid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #e8ebeb;border-radius:6px;margin-top:16px;break-inside:avoid}.kp>div,.kgrid>div{padding:10px 12px;border-left:1px solid #e8ebeb}' +
   '.kp>div:first-child,.kgrid>div:first-child{border-left:3px solid #006527}.kp b,.kgrid b{display:block;font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;color:#0b0d0c;line-height:1.25}' +
   '.kp span,.kgrid span{display:block;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;margin-top:3px}' +
-  '.map{margin-top:14px;border:1px solid #e8ebeb;border-radius:6px;overflow:hidden;break-inside:avoid}.map svg,.bars svg,.photo img{display:block;width:100%;height:auto}.bars{max-width:620px;break-inside:avoid}' +
+  '.map{margin-top:14px;border:1px solid #e8ebeb;border-radius:6px;overflow:hidden;break-inside:avoid}.rmap{break-inside:avoid}.map svg,.bars svg,.photo img{display:block;width:100%;height:auto}.bars{max-width:620px;break-inside:avoid}' +
   '.photo{margin-top:14px;border-radius:6px;overflow:hidden;max-height:340px}.photo img{object-fit:cover;max-height:340px}.cap{font-size:9px;color:#6b7174;margin-top:3px}' +
   '.two{display:grid;grid-template-columns:1fr 1fr;gap:22px}table{width:100%;border-collapse:collapse;font-size:10px}thead{display:table-header-group}' +
   'th{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;text-align:left;border-bottom:1px solid #bcc2c4;padding:5px 6px}' +
@@ -64,8 +64,62 @@ export function bars(list, { color = '#006527', height = 120, every = 1, unit = 
       (i % every === 0 ? '<text x="' + (X + bw / 2).toFixed(1) + '" y="' + (H + 12) + '" font-size="9" text-anchor="middle" fill="currentColor" opacity=".6">' + esc(x.label) + '</text>' : '') + '</g>';
   }).join('') + '</svg>';
 }
-// a small map of one or more areas (outlines, nested bands) and points, for the printed report
-export function areaSvg(layers, { W = 1000, H = 440, points = [] } = {}) {
+// ---------- report maps: a street map under the area ----------
+// Esri World Street Map tiles (keyless https images, so the PDF renderer, which runs no scripts, loads them like any picture)
+// with the area drawn on top in the same Web Mercator projection. Pure string building: no DOM, tested in test/reportmap.mjs.
+//   layers: [{ geometry (Polygon, MultiPolygon, LineString, MultiLineString), stroke, fill, width, dash }]
+//   points: [{ c: [lon, lat], r, color, o, label, hollow }]   lines: [{ coords: [[lon, lat]…], stroke, width }]
+//   fit: geometry to frame instead of everything drawn; minSpanM: smallest area shown (a lone point gets this much around it)
+//   px: the width it will print at (CSS px), so map labels come out at their normal size
+export const BASEMAP = { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', attr: 'Basemap: Esri, HERE, Garmin, © OpenStreetMap contributors and the GIS user community' };
+const R2D = 180 / Math.PI;
+export const merc = ([lon, lat]) => { const s = Math.sin(Math.max(-85.05, Math.min(85.05, lat)) / R2D); return [(lon + 180) / 360, 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)]; };
+const coordsOf = g => !g ? [] : g.type === 'Point' ? [g.coordinates] : g.type === 'LineString' || g.type === 'MultiPoint' ? g.coordinates : g.type === 'Polygon' || g.type === 'MultiLineString' ? g.coordinates.flat() : g.type === 'MultiPolygon' ? g.coordinates.flat(2) : g.type === 'Feature' ? coordsOf(g.geometry) : [];
+const ringsOf = g => !g ? [] : g.type === 'Polygon' ? g.coordinates.map(r => [r, true]) : g.type === 'MultiPolygon' ? g.coordinates.flat().map(r => [r, true]) : g.type === 'LineString' ? [[g.coordinates, false]] : g.type === 'MultiLineString' ? g.coordinates.map(r => [r, false]) : g.type === 'Feature' ? ringsOf(g.geometry) : [];
+// the frame: zoom and pixel window that fit the coordinates in a w × h box. The zoom can fall between whole levels: tiles of
+// the nearest level are drawn at T = 256·2^(zoom − z) px (between about 180 and 360), so the area fills the frame
+export function mapFrame(coords, { w, h, pad = 0.08, minSpanM = 600, maxZoom = 18, minZoom = 3 } = {}) {
+  const pts = coords.filter(c => Number.isFinite(c?.[0]) && Number.isFinite(c?.[1])); if (!pts.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, lat = 0;
+  for (const c of pts) { const [x, y] = merc(c); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); lat += c[1]; }
+  const unitPerM = 1 / (40075016.7 * Math.cos(lat / pts.length / R2D)), min = minSpanM * unitPerM;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, sx = Math.max(x1 - x0, min) * (1 + 2 * pad), sy = Math.max(y1 - y0, min) * (1 + 2 * pad);
+  const zf = Math.max(minZoom, Math.min(maxZoom, Math.log2(Math.min(w / (sx * 256), h / (sy * 256)))));
+  return frameAt(cx, cy, zf, w, h);
+}
+const frameAt = (cx, cy, zf, w, h) => { const z = Math.round(zf), T = 256 * 2 ** (zf - z), size = T * 2 ** z; return { z, zf, T, size, left: cx * size - w / 2, top: cy * size - h / 2, w, h }; };
+export function areaMap(layers = [], { W = 1000, H = 440, points = [], lines = [], fit = null, px = 700, pad, minSpanM, maxTiles = 48 } = {}) {
+  const w = Math.round(px), h = Math.round(px * H / W);
+  const all = fit ? coordsOf(fit) : [...layers.flatMap(l => coordsOf(l.geometry)), ...points.map(p => p.c), ...lines.flatMap(l => l.coords || [])];
+  let f = mapFrame(all, { w, h, pad, minSpanM }); if (!f) return '';
+  // keep the tile count sensible (each tile is one image request in the PDF renderer)
+  const count = fr => (Math.floor((fr.left + w) / fr.T) - Math.floor(fr.left / fr.T) + 1) * (Math.floor((fr.top + h) / fr.T) - Math.floor(fr.top / fr.T) + 1);
+  while (count(f) > maxTiles && f.zf > 3) f = frameAt((f.left + w / 2) / f.size, (f.top + h / 2) / f.size, f.zf - 0.5, w, h);
+  const n = 2 ** f.z, T = f.T, pct = v => (v * 100).toFixed(3) + '%', tiles = [];
+  for (let ty = Math.floor(f.top / T); ty <= Math.floor((f.top + h) / T); ty++) {
+    if (ty < 0 || ty >= n) continue;
+    for (let tx = Math.floor(f.left / T); tx <= Math.floor((f.left + w) / T); tx++) {
+      const url = BASEMAP.url.replace('{z}', f.z).replace('{y}', ty).replace('{x}', ((tx % n) + n) % n);
+      tiles.push('<img src="' + url + '" alt="" style="position:absolute;display:block;max-width:none;margin:0;left:' + pct((tx * T - f.left) / w) + ';top:' + pct((ty * T - f.top) / h) + ';width:' + pct(T / w) + ';height:' + pct(T / h) + '">');
+    }
+  }
+  const pr = c => { const [x, y] = merc(c); return [x * f.size - f.left, y * f.size - f.top]; };
+  const d = (rs) => rs.map(([r, closed]) => 'M' + r.map(c => pr(c).map(v => v.toFixed(1)).join(',')).join('L') + (closed ? 'Z' : '')).join('');
+  const halo = 'stroke="#ffffff" stroke-opacity=".85" stroke-linejoin="round" stroke-linecap="round" fill="none"';
+  const shapes = layers.map(l => { const rs = ringsOf(l.geometry); if (!rs.length) return ''; const path = d(rs), wd = l.width || 2, open = rs.every(([, c]) => !c);
+    return '<path d="' + path + '" ' + halo + ' stroke-width="' + (wd + 3) + '"/><path d="' + path + '" fill="' + (open ? 'none' : l.fill || 'rgba(0,101,39,.10)') + '" fill-rule="evenodd" stroke="' + (l.stroke || '#006527') + '" stroke-width="' + wd + '" stroke-linejoin="round" stroke-linecap="round"' + (l.dash ? ' stroke-dasharray="7 4"' : '') + '/>'; }).join('');
+  const segs = lines.map(l => (l.coords || []).length > 1 ? '<path d="' + d([[l.coords, false]]) + '" fill="none" stroke="' + (l.stroke || '#7c3aed') + '" stroke-width="' + (l.width || 2) + '" stroke-linecap="round" stroke-linejoin="round"/>' : '').join('');
+  const dots = points.map(p => { const [x, y] = pr(p.c); if (x < -20 || y < -20 || x > w + 20 || y > h + 20) return ''; const r = p.r || 3, col = p.color || '#c2410c';
+    return (p.hollow ? '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r + '" fill="none" stroke="' + col + '" stroke-width="1.6"/>'
+      : '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r + '" fill="' + col + '" fill-opacity="' + (p.o ?? .9) + '" stroke="#ffffff" stroke-width="' + (r > 4 ? 1.5 : .8) + '"/>') +
+      (p.label ? '<text x="' + (x + r + 4).toFixed(1) + '" y="' + (y + 4).toFixed(1) + '" font-family="Montserrat,Arial,sans-serif" font-size="12" font-weight="700" fill="#23282a" stroke="#ffffff" stroke-width="3" paint-order="stroke">' + esc(p.label) + '</text>' : ''); }).join('');
+  return '<div class="rmap" style="position:relative;width:100%;aspect-ratio:' + w + '/' + h + ';overflow:hidden;background:#eef0f0">' + tiles.join('') +
+    '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0;top:0;width:100%;height:100%;display:block">' + shapes + segs + dots + '</svg>' +
+    '<div style="position:absolute;right:0;bottom:0;background:rgba(255,255,255,.8);font:9px/1.4 Arial,sans-serif;color:#444;padding:1px 5px">' + esc(BASEMAP.attr) + '</div></div>';
+}
+// the area on a street map (every area report); { plain: true } keeps the old outline-only drawing
+export function areaSvg(layers, { W = 1000, H = 440, points = [], plain = false, ...o } = {}) {
+  if (!plain) return areaMap(layers, { W, H, points, ...o });
   const geoms = layers.map(l => l.geometry).filter(Boolean), polys = g => g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const grow = ([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); };

@@ -5,7 +5,7 @@
 //   recent incidents), can put the incidents on the map, and exports as a PDF report or CSV.
 import { offenseName, CAT_NAME } from './lib/nibrs.mjs';
 import { tractsFor, summarizeTracts } from './lib/demographics.mjs';
-import { reportDoc, savePdf } from './reportkit.js';
+import { reportDoc, savePdf, areaSvg } from './reportkit.js';
 
 const SRC = 'crime', HEAT = 'crime-heat', CELLS = 'crime-cells', PTS = 'crime-pts';
 const COL = { v: '#c03b3a', p: '#d9822b', o: '#8a9396' };
@@ -193,16 +193,9 @@ export function initCrime(ctx) {
     try { ctx.exportCsv(last.d.incidents.map(x => ({ Date: x.day, Offense: x.offense, 'NIBRS code': x.code, Category: CAT_NAME[x.cat] || x.cat, Count: x.n, Premise: x.premise || '', Latitude: x.lat, Longitude: x.lon })), 'crime-' + slug(last.label) + '-' + new Date().toISOString().slice(0, 10)); }
     finally { ctx.exportMeta = null; }
   }
-  // a small map of the area and its incidents for the printed report
-  function reportMap(g, list) {
-    const ring = (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).flat(2);
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-    const W = 1000, H = 420, k = Math.cos((y0 + y1) / 2 * Math.PI / 180), sx = (x1 - x0) * k || 1e-4, sy = (y1 - y0) || 1e-4, s = Math.min((W - 40) / sx, (H - 40) / sy);
-    const pr = ([x, y]) => [(W - sx * s) / 2 + (x - x0) * k * s, (H - sy * s) / 2 + (y1 - y) * s];
-    const path = (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).map(poly => poly.map(r => 'M' + r.map(p => pr(p).map(v => v.toFixed(1)).join(',')).join('L') + 'Z').join('')).join('');
-    return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg"><rect width="' + W + '" height="' + H + '" fill="#f8f9f9"/><path d="' + path + '" fill="rgba(194,65,12,.05)" stroke="#c2410c" stroke-width="1.6" stroke-dasharray="6 4"/>' +
-      list.slice().reverse().map(x => { const p = pr([x.lon, x.lat]); return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + (x.cat === 'v' ? 3.6 : 2.6) + '" fill="' + COL[x.cat] + '" fill-opacity="' + (x.cat === 'o' ? .45 : .85) + '"/>'; }).join('') + '</svg>';
-  }
+  // the area and its incidents on a street map, for the printed report
+  const reportMap = (g, list) => areaSvg([{ geometry: g, stroke: '#c2410c', fill: 'rgba(194,65,12,.06)', dash: true }],
+    { fit: g, points: list.slice().reverse().map(x => ({ c: [x.lon, x.lat], r: x.cat === 'v' ? 3.6 : 2.6, color: COL[x.cat], o: x.cat === 'o' ? .5 : .9 })) });
   async function exportReport() {
     if (!last?.d) return; const { d, label, geometry } = last, L = d.last12;
     const list = d.incidents || [];

@@ -4,7 +4,7 @@
 //   Building / parcel cards: a "Crime by city / county" section under the Houston street-level one, with a department switcher.
 //   Report card (Full report, the Reports tab, the assistant): year by year, offense mix, notes; exports as PDF or CSV.
 // Department-level and annual only: every spot a department covers gets the same numbers.
-import { reportDoc, savePdf } from './reportkit.js';
+import { reportDoc, savePdf, areaMap } from './reportkit.js';
 
 const COL = { v: '#c03b3a', p: '#d9822b', st: '#6b7174', us: '#9aa3a6' };
 
@@ -123,8 +123,10 @@ export function initCrimeUS(ctx) {
     finally { ctx.exportMeta = null; }
   }
   async function exportReport() {
-    if (!last) return; const { d } = last, h = d.headline;
-    const body = '<div class="kp"><div><b style="color:' + COL.v + '">' + r1(h.rate_v) + '</b><span>Violent per 100k' + (h.change_v != null ? ' · ' + pct(h.change_v) : '') + '</span></div><div><b style="color:' + COL.p + '">' + r1(h.rate_p) + '</b><span>Property per 100k' + (h.change_p != null ? ' · ' + pct(h.change_p) : '') + '</span></div>' +
+    if (!last) return; const { d, center } = last, h = d.headline;
+    // where the report was asked for (the department covers the city or county around it)
+    const loc = Array.isArray(center) ? '<div class="map">' + areaMap([], { W: 1000, H: 300, points: [{ c: center, r: 7, color: '#c2410c', label: 'This location' }], minSpanM: 9000 }) + '</div>' : '';
+    const body = loc + '<div class="kp"><div><b style="color:' + COL.v + '">' + r1(h.rate_v) + '</b><span>Violent per 100k' + (h.change_v != null ? ' · ' + pct(h.change_v) : '') + '</span></div><div><b style="color:' + COL.p + '">' + r1(h.rate_p) + '</b><span>Property per 100k' + (h.change_p != null ? ' · ' + pct(h.change_p) : '') + '</span></div>' +
         '<div><b>' + esc(vs(h.rate_v, h.state_rate_v, h.us_rate_v, d.state) || '—') + '</b><span>Violent vs ' + esc(d.state) + ' · US</span></div><div><b>' + esc(vs(h.rate_p, h.state_rate_p, h.us_rate_p, d.state) || '—') + '</b><span>Property vs ' + esc(d.state) + ' · US</span></div></div>' +
       '<p class="meta">' + esc(fmtN(h.v) + ' violent and ' + fmtN(h.p) + ' property offenses in ' + d.year + ', ' + covers(d) + '. ' + (d.note || '') + (h.cleared_v != null ? ' Cleared: ' + h.cleared_v + '% of violent and ' + h.cleared_p + '% of property offenses.' : '') + (rankText(d) ? ' ' + rankText(d) : '')) + '</p>' +
       '<div class="two"><div><h2>Violent crime per 100,000</h2><div class="bars">' + trend(d.years, 'v', COL.v, 'Violent') + '</div></div><div><h2>Property crime per 100,000</h2><div class="bars">' + trend(d.years, 'p', COL.p, 'Property') + '</div></div></div>' +
