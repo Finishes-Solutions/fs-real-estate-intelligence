@@ -544,9 +544,9 @@ export function initPlanes(ctx) {
     return { plane: p, route: r };
   };
 
-  // "Air Traffic" on filing and building cards: low aircraft over the spot (30-day history), only where it exists
+  // "Air Traffic" on filing cards: low aircraft over the spot (30-day history), only where it exists (not on property cards)
   ctx.onCardRender?.(info => {
-    const c = info.kind === 'filing' ? (info.f.approx ? null : [info.f.lon, info.f.lat]) : info.center; if (!c) return;
+    const c = info.kind === 'filing' && !info.f.approx ? [info.f.lon, info.f.lat] : null; if (!c) return;
     ctx.airHistory(c, 1).then(h => {
       if (!h?.history || h.low_per_day == null || !card.classList.contains('open')) return;
       card.querySelector('#airSec')?.remove();
@@ -555,7 +555,7 @@ export function initPlanes(ctx) {
       sec.innerHTML = '<div class="lt">Air Traffic</div><div><b>' + esc(lvl[0].toUpperCase() + lvl.slice(1)) + ' low air traffic</b>: about ' + h.low_per_day + ' sightings a day of aircraft below 3,000 ft within ~1 km' +
         (h.lowest_ft != null ? ', lowest ' + h.lowest_ft.toLocaleString('en-US') + ' ft' : '') + '.</div><div class="fs">Last ' + h.days + ' days, ' + h.sampled_days + ' days sampled (an exposure index, not a flight count).' + (h.sampled_days < 3 ? ' The history is still filling in.' : '') + '</div>' +
         '<button class="btn" type="button" id="airNow">Planes Overhead Now</button><div class="ssrc src">Community ADS-B receivers (adsb.lol), sampled every minute.</div>';
-      // building card: before Construction; filing card: before From Here
+      // before From Here
       (card.querySelector('#bFilings') || card.querySelector('#liveSec') || card.querySelector('#fTools') || card.lastElementChild)?.before(sec);
       sec.querySelector('#airNow').onclick = () => { ctx.live.set({ planes: true }); map.easeTo({ center: c, zoom: Math.max(map.getZoom(), 11), duration: ctx.reduceMotion ? 0 : 700 }); };
     });
