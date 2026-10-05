@@ -43,7 +43,7 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 - **Tools:** Move, Area (drag a box), Shape (draw a shape), Radius (an address plus a distance), County (click counties).
 - **Filters** narrow what the map shows, layer by layer (see "Filters" below). **Clear** sits right next to it; see "Clearing the view" below.
 - **Export** makes a report.
-- **Search** finds addresses, places, roads, businesses, projects, owners and developers. Press ⌘K (Mac) or Ctrl+K to jump to it.
+- **Search** finds addresses, places, roads, businesses, projects, owners and developers. Press ⌘K (Mac) or Ctrl+K to jump to it. When Google is set up for the site, a **Google** section lists Google's matches too; picking one switches to the Google map and opens a Google place card (address, phone, website, hours, rating and a link to Google Maps).
 - **Quick layer buttons** under the search box: Satellite, 3D, Parcels, Flood Zones, Demographics, Traffic Counts, Filings, Planes, Radar, and **More** for every layer. On a phone they're one row just under the search bar; swipe it sideways for the rest (the faded right edge means there's more).
 
 **Right side of the map**
@@ -77,6 +77,7 @@ Cards slide up from the bottom: swipe down to shrink one, and swipe again to clo
 Click a building, or at street zoom click open ground, to open its **property card**. The owner and value show first, usually within a couple of seconds; the businesses, height and photo fill in after.
 
 - **Ownership & value:** owner, mailing address, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service.
+- **Company behind the owner:** when the owner is a company (an LLC, partnership, corporation or trust), the card looks it up in the Texas Comptroller's free public records: whether it's active, where and when it was formed, its registered agent, mailing address and the officers, managers or members from its latest public report. If the name doesn't match exactly, similar names are listed to pick from. People's names are never looked up.
 - **The building:** footprint, height, floors and estimated floor area. Height comes from USGS lidar where it's believable; a reading that doesn't fit the building (say, hundreds of feet on a one-storey store) is set aside with a note, and the map or appraisal record is used instead.
 - **Site:** flood zone, traffic counts on nearby roads, water and utility districts (MUDs), tax-increment zones, Opportunity Zone, school district, bus stops, nearby environmental sites, crime nearby (Houston), and area rents and jobs.
 - **Crime:** inside Houston, the incidents reported within a mile. Anywhere in the US, **Crime by city / county**:
@@ -88,7 +89,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
   - **Full report** for the year-by-year table and the mix of offenses (murder, robbery, burglary, theft and others), with PDF and CSV export.
   - These are whole-year, department-wide figures from the FBI: every spot a department covers shows the same numbers. The card says which year they're for, and warns you when a department reported only part of a year or has stopped reporting.
 - **Area snapshot:** census numbers for that neighborhood.
-- **Businesses:** what's inside or next door (OpenStreetMap), plus businesses registered for sales tax at the address.
+- **Businesses:** what's inside or next door, from the Overture Maps and Foursquare open business lists plus OpenStreetMap, and businesses registered for sales tax at the address. Click a business for its details.
 - **Construction filings** on the parcel.
 - **From here:** distance and drive time, a drive-time map, weather, news, and site imagery (recent satellite and dated high-resolution photos).
 - **Regrid details** (paid, capped each month): zoning, zoning limits such as height and density, the last sale price and date where recorded, and land use. Harris and Waller counties aren't in the free state parcel data, so Regrid fills in owner and value there.
@@ -99,8 +100,8 @@ Click a building, or at street zoom click open ground, to open its **property ca
 **Big buildings:** clicking any part of a building selects the whole building, even a warehouse or shopping center that the map draws in pieces. If the building sits on more than one parcel, the card lists every parcel with its owner and value, and a total.
 
 **Several things at once (tabs):** Shift-click to add more, up to 10. On a touch screen, tap **Add** at the top of the card (or **Select Multiple**), tap the other things, then **Done**. This works for buildings, parcels, construction filings, planes and airports, mixed together.
-- Each one gets a numbered **tab** at the top of the card; the same number marks it on the map. Tap a tab to see that card, or its **×** to drop it.
-- Shift-click something already picked to take it out. A plain click starts over with just that one; closing the card clears them all.
+- Each one gets a numbered **tab** at the top of the card; the same number marks it on the map, in the middle of the building or parcel. Parcels picked as open ground keep a faint outline while you look at another tab. Tap a tab to see that card, or its **×** to drop it.
+- Shift-click something already picked to take it out (for a parcel, anywhere inside it). A parcel is never added twice. A plain click starts over with just that one; closing the card clears them all.
 - With two or more buildings or parcels, an **All** tab adds them up: footprint, floor area, market value and acres (each parcel counted once), the construction filings on them, a CSV export and **Zoom to All**.
 
 ---
@@ -110,6 +111,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
 Choose **Area**, **Shape**, **Radius** or **County** at the top of the map and mark the area. It becomes the **selected area**, shown in the **This Area** box. From there you can run:
 
 - **FEMA report:** flood zones, past flood insurance claims, disaster declarations and FEMA's risk index.
+- **Environmental report:** a screen of state and federal environmental records around the area or a parcel (from a property card's **Area reports**, it uses the parcel itself): cleanup and contamination sites, leaking and registered petroleum tanks, landfills, EPA-permitted facilities, oil and gas wells (including orphan wells) and pipelines, wetlands and soils. Each kind is searched out to the distance a Phase I environmental assessment would use (¼ to 1 mile from the edge of the site), nearest first, with distance and direction. Exports as PDF or CSV. It is a screen of public databases, not a Phase I.
 - **Traffic report:** the busiest roads and daily traffic counts, plus live speeds and incidents where available. Works for areas up to 5,000 square miles, so a whole county (even Harris) or a few counties together. For big areas it lists the busiest roads; incidents are only the ones inside the area.
 - **Drive-time map:** 10, 20 and 30-minute drive areas, with the people, households and jobs inside each.
 - **Air traffic report:** how often planes pass over, how low, and which kinds.
@@ -164,13 +166,21 @@ Map Layers:
   - Topo.
   - ESRI satellite.
   - Free Map.
+  - Google and Google Satellite (only when Google is set up for the site): Google's own map, with the Google logo and map credits at the bottom while it's on.
 - **Property & Site:**
   - 3D buildings (zoom in).
+  - Google 3D (only when Google is set up): Google's photorealistic 3D model of the city in place of the simple blocks. Zoom in to street level and tilt the map. Clicking a building still opens its property card.
   - Parcel lines (Regrid).
+  - Businesses & places: every mapped business at street zoom, colored by kind (food, retail, health care, offices, construction and home services, industrial and more). Pick one kind from the list under it, or click a dot for the name, category, address, phone, website and a link to Google Maps.
   - Flood zones (FEMA).
   - Traffic counts.
   - Crime (Houston), with a choice of all, violent or property crime.
   - Airports.
+- **Environment:**
+  - Environmental sites: cleanup and contamination sites (state and federal Superfund, hazardous waste cleanups, voluntary cleanups, brownfields, dry cleaner cleanups, leaking petroleum tanks, landfills and areas where groundwater use is restricted), or registered petroleum tanks, or EPA-permitted facilities. Click a dot for its name, program and ID, and an Environmental Report for that spot.
+  - Oil & gas wells and pipelines (Railroad Commission of Texas).
+  - Wetlands (US Fish & Wildlife Service).
+  - Soils (USDA soil survey).
 - **Demographics:** color census tracts by:
   - population or growth;
   - income, home value, rent or vacancy;
@@ -208,7 +218,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
   - **Routes** come from a free community route list. For flight numbers with several stops (for example Chicago → Houston → Chicago), the card picks the leg the plane is flying from where it is, which way it's heading and whether it's climbing or descending.
   - A listed route that doesn't match where the plane actually is gets left out. If the flight path shows where the plane took off, the card says **From (airport) · destination not listed** instead. Tilted, the path is a ribbon at the plane's altitude with a curtain down to the ground. You can **follow** or **orbit** a plane.
 - **Airports** shows every airport in the world. Click one for runways (with a diagram), radio frequencies, current weather, airlines, statistics and the FAA airport diagram.
-- **Low Flight Paths** shows where planes fly below 3,000 ft over the last 30 days. Property cards show how many low flights pass overhead.
+- **Low Flight Paths** shows where planes fly below 3,000 ft over the last 30 days. Construction filing cards show how many low flights pass overhead and the nearest airports; for a property, use the Air Traffic Report under the card's Area reports.
 
 ---
 
@@ -312,7 +322,11 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 - **Parcels and owners:** county appraisal districts through the Texas GIO parcel service (free), and Regrid (paid, capped).
 - **People, homes and jobs:** US Census American Community Survey (5-year averages) and Census jobs data (about two years behind).
-- **Flood:** FEMA. **Traffic counts:** TxDOT. **Crime:** Houston Police (street level) and the FBI (yearly, by police department, nationwide). **Places and buildings:** OpenStreetMap.
+- **Flood:** FEMA. **Traffic counts:** TxDOT. **Crime:** Houston Police (street level) and the FBI (yearly, by police department, nationwide). **Buildings:** OpenStreetMap.
+- **Environment:** Texas Commission on Environmental Quality, US EPA, Railroad Commission of Texas (wells and pipelines), US Fish & Wildlife Service (wetlands) and USDA (soils).
+- **Company owners:** Texas Comptroller franchise-tax records and the Secretary of State.
+- **Google (paid, capped each month):** Google base maps, 3D city and place search, when the site's Google keys are set. A monthly allowance keeps place searches inside Google's free monthly use; past it, search uses the free sources until the next month.
+- **Businesses and places:** Overture Maps and Foursquare's free open datasets, reloaded monthly (about 300,000 in the seven counties), plus OpenStreetMap.
 - **Construction filings:** TDLR TABS, refreshed nightly.
 - **Markets:** Yahoo Finance (stocks, funds, indexes and crypto history; delayed), Coinbase (live crypto) and the St. Louis Fed's FRED (oil, gas, building material prices, rates and Houston metro statistics).
 - **Weather, radar and storms:** NOAA and Open-Meteo. **Planes:** adsb.lol and airplanes.live. **Airports:** OurAirports and the FAA.
@@ -328,7 +342,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
   - Harris and Waller aren't in the free state parcel data; use Regrid details there.
   - Street-level crime covers the City of Houston only. Elsewhere crime is yearly and department-wide (FBI), so it can't show which blocks are worse.
   - FBI crime figures come out once the year is over; the newest full year is shown. Some departments report only part of a year or have stopped reporting, and the card says so. Rates count residents only, so places with many visitors (downtowns, shopping areas) read high.
-  - Business lists from OpenStreetMap are incomplete in some suburbs.
+  - Business lists come from open data: most businesses are there, but some are missing, closed or slightly misplaced. They are refreshed monthly.
 - **Numbers lag.** Census averages cover five years, jobs data is about two years old, and permits arrive about six weeks after the month.
 - **Shared notes have no sign-in.** Anyone with the site address can edit them, unless a team passcode is set.
 - **Performance.** With many layers, live planes and 3D on at once, older phones and laptops can still slow down. Selecting large areas, following planes, and toggling layers were made much faster in October 2026.
@@ -339,6 +353,10 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 - **A new Market tab:** construction pipeline, growth, housing and rents, building material costs and rates, each in its own section with a button to jump to it, hover numbers on every chart, and a "What's moving" summary.
 - **Street maps in reports:** every report PDF now shows its area on a real street map instead of a plain outline.
+- **Google maps, Google 3D and Google place search** (once the site's Google keys are added): Google and Google Satellite base maps, Google's photorealistic 3D city, and Google results in search with a place card.
+- **Environment layers and the Environmental report:** cleanup and contamination sites, petroleum tanks, EPA-permitted facilities, oil and gas wells and pipelines, wetlands and soils on the map, and a Phase I style records screen for any parcel or area.
+- **Company behind the owner:** property cards look up company owners in the Texas Comptroller's free records: status, registered agent, mailing address and officers.
+- **Businesses & Places layer:** about 300,000 businesses across the seven counties from the Overture Maps and Foursquare open data, colored by kind, with a card for each. Search finds them by name, and property cards list many more businesses than before.
 - **Market tab follows your selection:** it opens on the county (or counties) selected on the map, every chart shows its numbers on hover, the Correlation explorer is compact, and the newest businesses sit at the bottom, 10 at a time.
 - **Legends for Rain radar and Flood zones** in the bottom-left corner, and **Map Layers** now opens right under the quick layer buttons.
 - **Area at a Glance follows your selection:** pick a county (or draw an area) and the panel shows that area's numbers instead of the map view.

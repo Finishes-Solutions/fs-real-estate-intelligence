@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       script:
-        description: "Probe to run: parcels, height, news, geocode, bls, sources, streets, planes, adsblol, ground, markets, traffic, airports, wiki, identify or fbi"
+        description: "Probe to run: parcels, height, news, geocode, bls, sources, streets, planes, adsblol, ground, markets, traffic, airports, wiki, identify, fbi, env, soils or places (loads places into Supabase)"
         required: false
         default: parcels
 permissions:
@@ -20,7 +20,13 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --no-audit --no-fund
+      - if: inputs.script == 'places'
+        run: npm install --no-save --no-audit --no-fund @duckdb/node-api
       - run: node build/probe-${{ inputs.script || 'parcels' }}.mjs
         env:
           MAPTILER_KEY: ${{ secrets.MAPTILER_KEY }}
+          SUPABASE_URL: ${{ inputs.script == 'places' && (secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co') || '' }}
+          SUPABASE_SECRET_KEY: ${{ inputs.script == 'places' && secrets.SUPABASE_SECRET_KEY || '' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ inputs.script == 'places' && (secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_KEY) || '' }}
+          HF_TOKEN: ${{ inputs.script == 'places' && secrets.HF_TOKEN || '' }}
           GOV_API_KEY: ${{ secrets.GOV_API_KEY }}
