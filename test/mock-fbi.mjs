@@ -17,7 +17,7 @@ globalThis.fetch = async (url, opts) => {
   if (process.env.MOCK_LOG) fs.appendFileSync(process.env.MOCK_LOG, u.pathname + '\n');
   const d = u.pathname.match(/\/agency\/byStateAbbr\/(\w\w)$/); if (d) return json(DIR[d[1]] || {});
   const m = u.pathname.match(/\/summarized\/agency\/(\w+)\/([\w-]+)$/);
-  if (!m || m[1] === 'TX2370700') return new Response('<!DOCTYPE html><html>Service Unavailable</html>', { status: 503 });
+  if (!m || m[1] === 'TX2370700' || process.env.MOCK_FBI_DOWN) return new Response('<!DOCTYPE html><html>Service Unavailable</html>', { status: 503 });
   const name = NAME[m[1]], st = m[1].slice(0, 2) === 'TX' ? 'Texas' : 'Louisiana', quiet = m[1] === 'TX2379999';
   const act = {}, cl = {}, pop = {}, sr = {}, us = {};
   for (const y of [2024, 2025]) {
