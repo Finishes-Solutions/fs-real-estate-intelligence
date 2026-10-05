@@ -215,20 +215,17 @@ The quick buttons and the panel always match. A layer turned on in either place,
 ## Market and demographics
 
 - **Area at a Glance** in the left panel shows the census numbers for the selected area, or for what's on screen when nothing is selected.
-- The **Market** tab, for each county or the whole region, shows the items below. It opens on the area selected on the map: the selected county (or counties together), or the county a drawn area sits in; with nothing selected it shows the whole region. Change it at the top: click a county on the small map or its button, and click it again (or **Whole region**) to go back to all counties.
-  - population and growth;
-  - jobs and top industries;
-  - new housing permits;
-  - new business openings;
-  - sales tax;
-  - consumer spending;
-  - local development news;
-  - interest rates;
-  - unemployment;
-  - the Houston crime trend and the busiest roads;
-  - the newest business locations, at the very bottom, 10 at a time (**Show 10 more**).
-  - Hover over any chart (bars, lines and the small trend lines in the tables) to read its numbers.
-- **Markets**, at the bottom of the Market tab, lists prices for the things that move Houston real estate, in groups you pick from the tabs:
+- The **Market** tab shows one county, several counties together, or the whole region. It opens on the area selected on the map (the selected counties, or the county a drawn area sits in); with nothing selected it shows the whole region. Change it at the top: click a county's button or the small map, and click it again (or **Whole region**) to go back to all counties. The buttons under it jump to each section:
+  - **Overview:** headline tiles, each with its change and a small trend line: construction under way, starting in the next 90 days, homes permitted, new businesses, jobs, population, typical rent, unemployment and building material prices. **What's moving** lists the biggest changes in plain words, and **Ask AI for a market brief** has the assistant sum them up for a construction and finishes business.
+  - **Construction pipeline:** from the state's construction filings. Value under construction each month (with what's already scheduled for the next 12 months), by use (click a use for its largest projects) and by county or type, the largest projects under construction and those starting in the next 90 days. Click a project to see it on the map. A filing whose value is clearly mis-entered (over $2 billion) is left out of the totals and named. The filing list starts in November 2024, so earlier months undercount.
+  - **Growth & demand:** homes permitted per year (single-family, 2–4 units, apartments), new business locations per month, jobs by industry, city sales tax per month and by city, and estimated consumer spending.
+  - **Housing & rents:** home values, incomes, rents, vacancy and age from the census, household income bands, Zillow rents by ZIP (ZIPs are placed in a county by their town, so border ZIPs are approximate), and the Houston for-sale market (listing price, homes for sale, days on market, permits).
+  - **Costs & rates:** 5 years of building material prices (building materials, lumber, steel, ready-mix concrete, copper), interest rates (30-year mortgage, 10-year Treasury, fed funds), today's rates and home lending.
+  - **Markets** and the **Correlation explorer** (below).
+  - **Area & news:** the Houston crime trend, the busiest roads, local development news, and the newest business locations, 10 at a time (**Show 10 more**).
+  - Hover over any chart (bars, lines, the small trend lines) to read its numbers; click a bar for its breakdown. The 12 mo / 24 mo / All buttons set how many months the monthly charts show.
+  - **Export PDF** makes a Market report with a street map of the area and every section; **Export Data** saves every number as a spreadsheet.
+- **Markets**, on the Market tab, lists prices for the things that move Houston real estate, in groups you pick from the tabs:
   - oil and natural gas, and Houston's big energy and other public companies;
   - homebuilders and real estate funds;
   - building material prices (lumber, steel, concrete, copper);
@@ -290,6 +287,7 @@ Answers come with cards: summaries, charts, comparisons, places, drive times, we
   - an **Area comparison** (PDF, Excel or CSV);
   - an **Activity report** (PDF, Excel or CSV).
 - Area reports (FEMA, traffic, drive time, air traffic, crime), the City / County Crime Report, the Market report, airport reports and flight reports export as **PDFs**, and their data as CSV.
+- **Every report with a place in it shows it on a street map** (roads, towns and labels) with the area outlined: area reports, the Market report, the Summary report's filings map, the area comparison (each area in its colour), airport and flight reports, and the City / County Crime Report (where the report was asked for).
 - **Every PDF uses the Finishes Solutions report style:**
   - a dark title band with the logo, the green rule and the brand fonts;
   - headline figures in tiles, clean tables, and the report name and page numbers on every page.
@@ -339,6 +337,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **A new Market tab:** construction pipeline, growth, housing and rents, building material costs and rates, each in its own section with a button to jump to it, hover numbers on every chart, and a "What's moving" summary.
+- **Street maps in reports:** every report PDF now shows its area on a real street map instead of a plain outline.
 - **Market tab follows your selection:** it opens on the county (or counties) selected on the map, every chart shows its numbers on hover, the Correlation explorer is compact, and the newest businesses sit at the bottom, 10 at a time.
 - **Legends for Rain radar and Flood zones** in the bottom-left corner, and **Map Layers** now opens right under the quick layer buttons.
 - **Area at a Glance follows your selection:** pick a county (or draw an area) and the panel shows that area's numbers instead of the map view.

@@ -111,16 +111,9 @@ export function initTraffic(ctx) {
     await savePdf(ctx, 'traffic', label, reportDoc({ kicker: 'Traffic report', title: label, meta: (d.area_sqmi ? fmt(d.area_sqmi) + ' sq mi' : '') + (c.as_of ? ' · TxDOT file of ' + esc(String(c.as_of).slice(0, 10)) : ''), body,
       sources: esc(d.sources) + ' Counts are annual averages for both directions and all vehicles; live speeds and incidents are a snapshot.' }));
   }
-  // the area outline with the counted segments coloured by traffic
-  function areaWithLines(g, segs) {
-    const base = areaSvg([{ geometry: g, stroke: '#7c3aed', fill: 'rgba(124,58,237,.04)', dash: true }]); if (!base) return '';
-    const ring = (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).flat(2);
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-    const W = 1000, H = 440, k = Math.cos((y0 + y1) / 2 * Math.PI / 180), sx = (x1 - x0) * k || 1e-4, sy = (y1 - y0) || 1e-4, s = Math.min((W - 40) / sx, (H - 40) / sy);
-    const pr = ([x, y]) => [(W - sx * s) / 2 + (x - x0) * k * s, (H - sy * s) / 2 + (y1 - y) * s];
-    const lines = segs.slice().reverse().map(sg => '<path d="M' + sg.path.map(p => pr(p).map(v => v.toFixed(1)).join(',')).join('L') + '" fill="none" stroke="' + colorOf(sg.aadt) + '" stroke-width="' + (1.2 + Math.min(5, sg.aadt / 50000)).toFixed(1) + '" stroke-linecap="round"/>').join('');
-    return base.replace('</svg>', lines + '</svg>');
-  }
+  // the area on a street map, with the counted segments coloured by traffic
+  const areaWithLines = (g, segs) => areaSvg([{ geometry: g, stroke: '#7c3aed', fill: 'rgba(124,58,237,.05)', dash: true }],
+    { fit: g, lines: segs.slice().reverse().map(sg => ({ coords: sg.path, stroke: colorOf(sg.aadt), width: 1.4 + Math.min(5, sg.aadt / 50000) })) });
 
   ctx.addAreaReport?.({ key: 'traffic', label: 'Traffic Report', desc: 'Vehicle traffic for an area in Texas: the busiest roads and every counted segment (vehicles a day, TxDOT), average traffic by road type, live speeds on the busiest roads and current crashes, closures and road works. Export as a PDF report or CSV.',
     note: 'Texas only. Select an area with Area, Shape, Radius or County, or use the map view', run: ({ geometry, label }) => report({ geometry, label }) });

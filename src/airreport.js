@@ -106,10 +106,10 @@ export function initAirReport(ctx) {
     const id = p.flight || p.reg || p.hex.toUpperCase(), leg = track?.leg, when = s => s ? new Date(typeof s === 'number' ? s * 1000 : s).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
     const ap = a => a ? (a.code ? a.code + ' ' : '') + (a.name || a.city || '') : '';
     const okRoute = route?.origin && route?.destination;
-    const line = pts.length > 1 ? { type: 'Polygon', coordinates: [pts.map(x => [x.lon, x.lat])] } : null;
+    const line = pts.length > 1 ? { type: 'LineString', coordinates: pts.map(x => [x.lon, x.lat]) } : null;
     const mapSvg = line ? areaSvg([{ geometry: line, stroke: '#1d4ed8', fill: 'none', width: 2.2 }], { points: [
       ...(okRoute ? [route.origin, route.destination].filter(a => Number.isFinite(a.lat)).map(a => ({ c: [a.lon, a.lat], r: 5, color: '#006527', label: a.code || '' })) : []),
-      { c: [pts[pts.length - 1].lon, pts[pts.length - 1].lat], r: 6, color: '#c2410c', label: 'Now' }] }).replace(/Z" fill="none"/, '" fill="none"') : '';
+      { c: [pts[pts.length - 1].lon, pts[pts.length - 1].lat], r: 6, color: '#c2410c', label: 'Now' }] }) : '';
     const t0 = pts[0]?.t, tl = v => { const d = new Date(v * 1000); return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
     const body = (info?.photo?.src ? '<div class="photo"><img src="' + esc(info.photo.src) + '" alt=""></div><div class="cap">Photo' + (info.photo.credit ? ' © ' + esc(info.photo.credit) : '') + ' · ' + esc(info.photo.source || '') + '</div>' : '') +
       '<div class="kp">' + [[p.ground ? 'Ground' : fmt(p.alt) + ' ft', 'Altitude at report'], [p.gs != null ? p.gs + ' kt' : '—', 'Ground speed'], [leg?.max_alt_ft ? fmt(leg.max_alt_ft) + ' ft' : '—', 'Highest this flight'], [okRoute ? (route.origin.code || '?') + ' → ' + (route.destination.code || '?') : '—', 'Route']].map(([v, l]) => '<div><b>' + esc(v) + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>' +

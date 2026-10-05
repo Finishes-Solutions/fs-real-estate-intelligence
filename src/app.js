@@ -28,7 +28,7 @@ import { initSite } from './site.js';
 import { initCrime } from './crime.js';
 import { initCrimeUS } from './crimeus.js';
 import { initFema } from './fema.js';
-import { initAreaReports } from './reportkit.js';
+import { initAreaReports, areaMap } from './reportkit.js';
 import { initDriveTime } from './drivetime.js';
 import { initTraffic } from './traffic.js';
 import { initAirports } from './airports.js';
@@ -829,22 +829,13 @@ function summaryAoa(list,label){
 function exportGeoJSON(list,name){ const rows=rowsFor(list);
   saveFile(name+'.geojson',JSON.stringify(fc(list.map((f,i)=>({type:'Feature',properties:rows[i],geometry:{type:'Point',coordinates:[f.lon,f.lat]}})))),'application/geo+json'); }
 document.getElementById('selClear').onclick=()=>{ clearSelection(); if(mode==='county') setMode('pan'); };
-const RG={}; ['primary','trunk','motorway'].forEach(k=>{ if(DATA.roads&&DATA.roads[k]) RG[k]={type:'MultiLineString',coordinates:DATA.roads[k]}; });
+// the filings on a street map, framed on the selection (or the filings), for the Summary report
 function reportMap(list){
-  const w=1000,h=560, fitTo=sel.feature||{type:'MultiPoint',coordinates:list.map(f=>[f.lon,f.lat])};
-  const pr=d3.geoMercator().fitExtent([[24,24],[w-24,h-24]],fitTo); pr.clipExtent([[0,0],[w,h]]); const pth=d3.geoPath(pr);
-  const span=Math.abs(pr.invert([0,0])[0]-pr.invert([w,0])[0]);
-  let svg='<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Map of filings"><rect width="'+w+'" height="'+h+'" fill="#f8f9f9"/>';
-  DATA.ring.forEach(c=>{ svg+='<path d="'+pth({type:'MultiPolygon',coordinates:c.outline})+'" fill="none" stroke="#dde1e2"/>'; });
-  DATA.counties.forEach(c=>{ svg+='<path d="'+pth({type:'MultiPolygon',coordinates:c.outline})+'" fill="'+(c.name===HOME_C?'#f1f8f4':'#ffffff')+'" stroke="#bcc2c4"/>'; });
-  [['primary',span<2.5,'#c9cfd1',1.1],['trunk',true,'#9aa1a4',1.6],['motorway',true,'#7b8386',2.2]].forEach(([k,on,col,wd])=>{ if(on&&RG[k]){ const d=pth(RG[k]); if(d) svg+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+wd+'" stroke-linecap="round"/>'; } });
-  DATA.counties.forEach(c=>{ const p=pr(c.label); if(p&&p[0]>40&&p[0]<w-40&&p[1]>20&&p[1]<h-20) svg+='<text x="'+p[0].toFixed(1)+'" y="'+p[1].toFixed(1)+'" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="11" letter-spacing="1.5" fill="'+(c.name===HOME_C?'#006527':'#6b7174')+'">'+c.name.toUpperCase()+' CO.</text>'; });
-  if(sel.feature) svg+='<path d="'+pth(sel.feature)+'" fill="rgba(0,101,39,.06)" stroke="#006527" stroke-width="1.6" stroke-dasharray="6 4"/>';
-  list.slice().sort((a,b)=>b.cost-a.cost).forEach(f=>{ const p=pr([f.lon,f.lat]); if(!p) return; const r=Math.max(2.5,Math.min(16,2+Math.sqrt(f.cost/1e6)*1.3)), col=f.type==='New'?'#006527':f.type==='Reno'?'#6b7174':'#1f9249';
-    svg+=(f.type==='Addition'||f.approx)?'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+r.toFixed(1)+'" fill="none" stroke="'+col+'" stroke-width="1.4"/>'
-      :'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+col+'" fill-opacity="'+(f.type==='New'?.8:.6)+'" stroke="#fff" stroke-width=".8"/>'; });
-  if(sel.kind==='radius'){ const c=pr(sel.center); if(c) svg+='<circle cx="'+c[0].toFixed(1)+'" cy="'+c[1].toFixed(1)+'" r="6" fill="#006527" stroke="#fff" stroke-width="2"/>'; }
-  return svg+'</svg>';
+  const pts=list.slice().sort((a,b)=>b.cost-a.cost).map(f=>{ const col=f.type==='New'?'#006527':f.type==='Reno'?'#6b7174':'#1f9249';
+    return {c:[f.lon,f.lat],r:+Math.max(2.5,Math.min(14,2+Math.sqrt(f.cost/1e6)*1.2)).toFixed(1),color:col,o:f.type==='New'?.85:.7,hollow:f.type==='Addition'||!!f.approx}; });
+  if(sel.kind==='radius'&&sel.center) pts.push({c:sel.center,r:6,color:'#006527'});
+  const fit=sel.feature||(list.length?{type:'MultiPoint',coordinates:list.map(f=>[f.lon,f.lat])}:{type:'MultiPolygon',coordinates:DATA.counties.flatMap(c=>c.outline)});
+  return areaMap(sel.feature?[{geometry:sel.feature,stroke:'#006527',fill:'rgba(0,101,39,.08)',dash:true}]:[],{W:1000,H:560,fit,points:pts});
 }
 
 // ---------- views ----------

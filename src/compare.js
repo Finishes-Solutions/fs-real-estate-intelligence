@@ -60,7 +60,7 @@ export function initCompare(ctx) {
     const key = s.kind === 'county' ? 'county:' + [...s.counties].sort().join('|') : s.kind + ':' + s.label;
     return { key, label: s.label, kind: s.kind, geom: s.feature };
   }
-  ctx.compare = { add, remove, addEach, list: () => areas.slice(), addSelection: () => add(fromSelection()), clear: () => { areas = []; save(); sync(); } };
+  ctx.compare = { add, remove, addEach, list: () => areas.slice(), colorOf: i => COLORS[i % COLORS.length][0], addSelection: () => add(fromSelection()), clear: () => { areas = []; save(); sync(); } };
 
   // selection bar: "+ Compare"
   const selBtn = document.getElementById('selCompare');
