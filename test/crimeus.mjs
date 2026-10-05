@@ -93,8 +93,10 @@ globalThis.fetch = async url => {
       'Incorporated Places': inBrookshire ? [{ BASENAME: 'Brookshire', NAME: 'Brookshire city' }] : [] } } });
   }
   if (u.endsWith('/agency/byStateAbbr/TX')) return Response.json({ WALLER: [...DIR.WALLER, A('TX2370100', 'Brookshire Police Department', 'City', 'WALLER')] });
+  if (u.includes('cde.ucr.cjis.gov') && u.includes('/TX2370700/')) return new Response('<!DOCTYPE html><html>Service Unavailable</html>', { status: 503 });
+  if (u.startsWith('https://api.usa.gov/crime/fbi/cde/') && !u.endsWith('API_KEY=gov-key')) return new Response('{"error":{"code":"API_KEY_MISSING"}}', { status: 403 });
   const sm = u.match(/\/summarized\/agency\/(\w+)\/([\w-]+)\?from=01-(\d{4})&to=12-(\d{4})/);
-  if (sm) { const name = { TX2370100: 'Brookshire Police Department', TX2370000: "Waller County Sheriff's Office" }[sm[1]]; if (!name) return new Response('<!DOCTYPE html><html>Not Found</html>', { status: 404 });
+  if (sm) { const name = { TX2370100: 'Brookshire Police Department', TX2370000: "Waller County Sheriff's Office", TX2370700: 'Hempstead Police Department' }[sm[1]]; if (!name) return new Response('<!DOCTYPE html><html>Not Found</html>', { status: 404 });
     return Response.json(resp(name, { 2024: sm[2] === 'violent-crime' ? 24 : 120, 2025: sm[2] === 'violent-crime' ? 30 : 100 }, { stRate: 400, usRate: 360, pop: 5000 })); }
   return new Response('unmocked ' + u, { status: 599 });
 };
@@ -115,6 +117,13 @@ assert.equal(r.body.agency.ori, 'TX2370000'); assert.equal(r.body.why, 'county')
 seen.length = 0; r = await call({ lat: '30.06', lon: '-96.01' }); assert.equal(r.body.agency.ori, 'TX2370000'); assert.equal(seen.filter(u => u.includes('/summarized/')).length, 0);
 // a chosen department by ID
 r = await call({ ori: 'tx2370100' }); assert.equal(r.code, 200); assert.equal(r.body.agency.name, 'Brookshire Police Department'); assert.equal(r.body.why, 'chosen'); assert.equal(r.body.where, null);
+// the FBI web endpoints down: without a key it's an error, with GOV_API_KEY the documented API answers (the key never leaks)
+r = await call({ ori: 'TX2370700' }); assert.equal(r.code, 502); assert.ok(!seen.some(u => u.startsWith('https://api.usa.gov/')));
+process.env.GOV_API_KEY = 'gov-key'; seen.length = 0;
+r = await call({ ori: 'TX2370700' }); assert.equal(r.code, 200, JSON.stringify(r.body)); assert.equal(r.body.agency.name, 'Hempstead Police Department');
+assert.equal(seen.filter(u => u.startsWith('https://api.usa.gov/crime/fbi/cde/summarized/agency/TX2370700/') && u.endsWith('&API_KEY=gov-key')).length, 10);
+assert.ok(!JSON.stringify(r.body).includes('gov-key')); delete process.env.GOV_API_KEY;
+const { govKey } = await import('../lib/govkey.mjs'); assert.equal(govKey({ FBI_API_KEY: 'old' }), 'old'); assert.equal(govKey({ GOV_API_KEY: 'new', FBI_API_KEY: 'old' }), 'new'); assert.equal(govKey({}), null);
 // errors
 assert.equal((await call({})).code, 400);
 r = await call({ lat: '48.85', lon: '2.35' }); assert.equal(r.code, 404); assert.match(r.body.error, /United States only/);

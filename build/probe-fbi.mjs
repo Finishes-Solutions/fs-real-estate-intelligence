@@ -1,6 +1,11 @@
 // Diagnostic: crime by city / county (api/crimeus) against the live FBI and Census services for places across the US:
 // which department each point gets, why, and the headline rates. Run "Probe services" with script=fbi.
 import handler from '../api/crimeus.js';
+import { govKey } from '../lib/govkey.mjs';
+// the api.data.gov key (GOV_API_KEY): does the documented FBI API accept it, and how many calls are left this hour
+if (govKey()) { const r = await fetch('https://api.usa.gov/crime/fbi/cde/summarized/agency/TXHPD0000/violent-crime?from=01-2025&to=12-2025&API_KEY=' + encodeURIComponent(govKey()), { signal: AbortSignal.timeout(30000) });
+  console.log('GOV_API_KEY on api.usa.gov: HTTP ' + r.status + ', ' + (r.headers.get('x-ratelimit-remaining') ?? '?') + ' of ' + (r.headers.get('x-ratelimit-limit') ?? '?') + ' calls left this hour'); }
+else console.log('GOV_API_KEY not set here (add it to the GitHub Production environment to check it)');
 const PTS = [
   ['Downtown Houston', 29.7604, -95.3698], ['Brookshire TX', 29.786, -95.95], ['Rural Waller County', 30.15, -96.05], ['Hempstead TX', 30.0974, -96.0783], ['Katy (Waller side)', 29.7858, -95.8245],
   ['Cypress TX (unincorporated)', 29.9691, -95.6972], ['Sugar Land TX', 29.6197, -95.6349], ['Austin TX', 30.2672, -97.7431], ['Manhattan NY', 40.758, -73.9855], ['Brooklyn NY', 40.6782, -73.9442],

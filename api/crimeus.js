@@ -6,6 +6,7 @@
 // newest full year vs the state and the US, ten years of history, the offense mix and clearance rates, plus the other
 // departments in the county. Live from the FBI (a few hundred ms per offense) and cached here and at the CDN.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
+import { govKey } from '../lib/govkey.mjs';
 import { CDE_WEB, CDE_API, OFFENSES, TOTALS, STATE_FIPS, STATE_NAMES, flattenDirectory, matchAgency, summarizeOffense, latestFullYear, buildReport } from '../lib/fbicrime.mjs';
 
 const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (crime by city)', Accept: 'application/json' };
@@ -23,10 +24,11 @@ async function getJSON(url, ms = 12000) {
   if (!r.ok || /^\s*</.test(t)) throw new Error('HTTP ' + r.status);
   return JSON.parse(t);
 }
-// the FBI web app's endpoints (no key); the api.data.gov copy when a key is set and the first one fails
+// the FBI web app's endpoints (no key, no hourly limit); the documented api.data.gov copy (GOV_API_KEY, 1,000 requests
+// an hour) when the first one fails
 async function cde(path) {
   try { return await getJSON(CDE_WEB + path); }
-  catch (e) { const key = process.env.FBI_API_KEY; if (!key) throw e; return getJSON(CDE_API + path + (path.includes('?') ? '&' : '?') + 'API_KEY=' + encodeURIComponent(key)); }
+  catch (e) { const key = govKey(); if (!key) throw e; return getJSON(CDE_API + path + (path.includes('?') ? '&' : '?') + 'API_KEY=' + encodeURIComponent(key)); }
 }
 export const directory = st => remember('dir:' + st, DAY, async () => flattenDirectory(await cde('/agency/byStateAbbr/' + st)));
 

@@ -23,4 +23,4 @@ jobs:
       - run: node build/probe-${{ inputs.script || 'parcels' }}.mjs
         env:
           MAPTILER_KEY: ${{ secrets.MAPTILER_KEY }}
-          FBI_API_KEY: ${{ secrets.FBI_API_KEY }}
+          GOV_API_KEY: ${{ secrets.GOV_API_KEY }}
