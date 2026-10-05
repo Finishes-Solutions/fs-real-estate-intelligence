@@ -3,6 +3,17 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-05
+
+### 8:23 AM CT: Correlation explorer no longer overstates links (19061b3)
+- **Fixed two flaws that made unrelated series look related:**
+  - **Quarterly house prices** skipped the correction for overlapping year-over-year changes. They came out "strong" against 24 market series, including oil companies and the Fed rate. None of those hold up now.
+  - **One extreme month could carry the result.** Month-over-month, the spring 2020 crash made Houston unemployment and jobs look tied to 28 of 42 market series. The explorer now compares changes by rank, so a single shock month can't decide the verdict.
+- **A best fit at the 12-month limit is rated weak at most.** It usually means two series share a slow trend, not that one leads the other.
+- **Month-over-month results now carry a warning.** Most Houston numbers aren't seasonally adjusted, so year over year is the safer comparison.
+- With these fixes, Houston unemployment vs oil comes out **weak** (oil about 2 months ahead), not moderate. Checked against all 42 market series, no Houston measure has a reliable year-over-year match.
+- Houston crime history now reaches back to mid-2020 (six years), loaded this morning.
+
 ## 2026-10-04
 
 ### 12:33 PM CT: Markets, the Correlation explorer and more history on the Pro plan (2f8543b, c68491f, 9c11def)
