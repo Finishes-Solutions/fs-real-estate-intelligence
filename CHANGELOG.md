@@ -23,6 +23,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ### 11:08 AM CT: FBI crime data check (d9d7c59)
 - Behind the scenes only: a diagnostic that tests which FBI Crime Data Explorer feeds still answer, ahead of crime numbers by city and county for the whole US. Nothing in the app changes yet.
+### 11:06 AM CT: Clicking a building selects only that building again (71f0f33)
+- **Fixed:** clicking a building could highlight and measure many unrelated buildings around it. In one Waller example that was about 260,000 sq ft of buildings across the screen, on different parcels. The card's size, floor area and overview used that wrong total.
+- **Why it happened:** the whole-building selection added on Oct 4 assumed every map piece sharing the clicked building's ID belonged to that building. The map stores many separate nearby buildings under one ID, so the selection picked up all of them.
+- **Now:** the selection starts from the building under the click. It only adds a piece from a neighbouring map tile when that piece continues the same building across the tile edge, so big buildings cut by a tile edge are still selected whole.
+- When the building's OpenStreetMap outline arrives, it now always replaces the map's guess, as long as the outline covers the click.
+- A new automated test recreates the Waller case: one map feature holding many separate buildings, plus a large building cut by a tile edge. The old code fails it and the new code passes.
 
 ### 8:23 AM CT: Correlation explorer no longer overstates links (19061b3)
 - **Fixed two flaws that made unrelated series look related:**

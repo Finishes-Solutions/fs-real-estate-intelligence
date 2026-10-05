@@ -2,6 +2,7 @@
 // parcel (TxGIO StratMap, via /api/building), businesses (OpenStreetMap), street-level photo (Mapillary, optional),
 // TABS filings on the parcel, census tract snapshot, and an orbit camera. All sources are free.
 import { floorsFromHeight } from './lib/height.mjs';
+import { joinPieces, partAt, inGeom } from './lib/footprint.mjs';
 
 export function initBuildings(ctx) {
   const { map, esc, fmtM, fmtN, F } = ctx, card = document.getElementById('card');
@@ -84,38 +85,14 @@ export function initBuildings(ctx) {
   ctx.onCardClose(() => { stopOrbit(); cur = null; highlight(); });
   ctx.tabs?.onChange(() => { const a = ctx.tabs.active(); if (a && a.kind !== 'building') { if (cur) { cur = null; } } highlight(); syncAll(); });
 
-  // Vector tiles merge neighbouring buildings into one MultiPolygon at lower zooms: keep only the part under the click.
-  function partAt(g, pt) {
-    if (!g || g.type !== 'MultiPolygon') return g;
-    const hit = g.coordinates.find(rings => inGeom(pt, { type: 'Polygon', coordinates: rings }));
-    return hit ? { type: 'Polygon', coordinates: hit } : null;
-  }
-  // The map's tiles cut buildings at tile edges, so the piece under the click can be half a big building. Gather the
-  // building's pieces from every loaded tile (same feature id), trim each to its own tile so they meet edge to edge,
-  // and use them together. (The OpenStreetMap outline from /api/building replaces this once it arrives.)
-  const tileBox = (z, x, y) => { const n = 2 ** z, lon = v => v / n * 360 - 180, lat = v => Math.atan(Math.sinh(Math.PI * (1 - 2 * v / n))) * 180 / Math.PI; return [lon(x), lat(y + 1), lon(x + 1), lat(y)]; };
-  function clipRing(ring, [x0, y0, x1, y1]) {
-    let out = ring.slice(0, -1);
-    for (const [inside, cut] of [[p => p[0] >= x0, (a, b) => [x0, a[1] + (b[1] - a[1]) * (x0 - a[0]) / (b[0] - a[0])]], [p => p[0] <= x1, (a, b) => [x1, a[1] + (b[1] - a[1]) * (x1 - a[0]) / (b[0] - a[0])]],
-      [p => p[1] >= y0, (a, b) => [a[0] + (b[0] - a[0]) * (y0 - a[1]) / (b[1] - a[1]), y0]], [p => p[1] <= y1, (a, b) => [a[0] + (b[0] - a[0]) * (y1 - a[1]) / (b[1] - a[1]), y1]]]) {
-      const inp = out; out = []; if (!inp.length) break;
-      for (let i = 0; i < inp.length; i++) { const a = inp[(i + inp.length - 1) % inp.length], b = inp[i];
-        if (inside(b)) { if (!inside(a)) out.push(cut(a, b)); out.push(b); } else if (inside(a)) out.push(cut(a, b)); }
-    }
-    return out.length >= 3 ? out.concat([out[0]]) : null;
-  }
+  // The building under the click from the map's tiles (lib/footprint.mjs): the polygon under the click, plus its
+  // continuation in neighbouring tiles when a tile edge cuts it. A tile feature id is NOT one building (a feature can
+  // hold many separate neighbours), so pieces are only joined when they meet along a tile edge.
+  // (The OpenStreetMap outline from /api/building replaces this once it arrives.)
   function wholeFootprint(hit, pt) {
     const piece = partAt(hit.geometry, pt); if (hit.id == null || !hit.source) return piece;
     let pieces = []; try { pieces = map.querySourceFeatures(hit.source, { sourceLayer: hit.sourceLayer, filter: ['==', ['id'], hit.id] }); } catch (e) { return piece; }
-    const z = Math.max(...pieces.map(p => p._z ?? -1)); if (!(z >= 0)) return piece;
-    const polys = [], seen = new Set();
-    for (const p of pieces) {
-      if (p._z !== z || seen.has(p._x + '/' + p._y)) continue; seen.add(p._x + '/' + p._y);
-      const box = tileBox(p._z, p._x, p._y), g = p.geometry, ps = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
-      for (const rings of ps) { const cr = rings.map(r => clipRing(r, box)).filter(Boolean); if (cr.length) polys.push(cr); }
-    }
-    if (polys.length < 2) return piece; // not cut: the clicked piece is the building
-    return { type: 'MultiPolygon', coordinates: polys };
+    return joinPieces(pieces.map(p => ({ z: p._z, x: p._x, y: p._y, geometry: p.geometry })), pt) || piece;
   }
   // scale a footprint about its centroid (a few cm) so the highlight sits just outside the base building's walls
   function grow(g, k) {
@@ -123,12 +100,6 @@ export function initBuildings(ctx) {
     polys.forEach(p => p[0].forEach(([a, b]) => { x += a; y += b; n++; })); x /= n; y /= n;
     const sc = r => r.map(([a, b]) => [x + (a - x) * k, y + (b - y) * k]), out = polys.map(p => p.map(sc));
     return g.type === 'Polygon' ? { type: 'Polygon', coordinates: out[0] } : { type: 'MultiPolygon', coordinates: out };
-  }
-  // point-in-polygon on GeoJSON Polygon / MultiPolygon (planar; fine at parcel scale)
-  function inGeom(pt, g) {
-    if (!g) return false;
-    const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
-    return polys.some(rings => rings.reduce((ins, ring, ri) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) c = !c; } return ri === 0 ? c : ins && !c; }, false));
   }
   const loadMarket = () => marketP ||= fetch('data/market.json').then(r => r.ok ? r.json() : null).catch(() => null).then(m => market = m);
 
@@ -143,7 +114,7 @@ export function initBuildings(ctx) {
       if (!adding && map.getZoom() >= 16 && !card.classList.contains('open')) { open({ footprint: null, height: null, base: 0, center: c }); return true; }
       return false;
     }
-    const b = { footprint: wholeFootprint(hit, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
+    const b = { footprint: wholeFootprint(hit, c), piece: partAt(hit.geometry, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
     if (adding) add(b); else open(b);
     return true;
   });
@@ -152,7 +123,7 @@ export function initBuildings(ctx) {
     if (!map.getLayer('fs-bldg')) return null;
     const p = map.project(c), hit = map.queryRenderedFeatures([[p.x - 3, p.y - 3], [p.x + 3, p.y + 3]], { layers: ['fs-bldg'] }).find(h => inGeom(c, partAt(h.geometry, c))) ;
     if (!hit) return null;
-    const b = { footprint: wholeFootprint(hit, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
+    const b = { footprint: wholeFootprint(hit, c), piece: partAt(hit.geometry, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
     open(b); return b;
   };
   // desktop: a building cursor and outline show which building a click will open
@@ -225,7 +196,9 @@ export function initBuildings(ctx) {
       ...(p.value || { parcel: null, parcelError: p.reason.message }) };
     b.d = d; b.parcel = d.parcel;
     // OpenStreetMap's outline is the whole building (the map's can be cut at a tile edge): use it when it contains the click
-    const o = d.osm?.outline; if (o && (!b.footprint || inGeom(b.center, o)) && sqft(o) >= sqft(b.footprint) * .9) b.footprint = o;
+    // (compared with the piece under the click, not the joined footprint, so OpenStreetMap's single building always wins
+    // over a bigger tile-based guess)
+    const o = d.osm?.outline; if (o && (!b.footprint || inGeom(b.center, o)) && sqft(o) >= sqft(b.piece || b.footprint) * .9) b.footprint = o;
     return d;
   }
 
