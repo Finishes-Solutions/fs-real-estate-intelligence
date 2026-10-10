@@ -3,6 +3,20 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-09
+
+### 11:17 PM CT: Run any report on the parcels you pick; the assistant finds things and runs reports (b2e2c7a)
+- **Run Reports** on a property card, and on the **All** tab when several are picked, runs any report on the picked parcels. Each parcel is counted once, even when a building sits on several parcels.
+- **Feasibility Package**, from Finishes' CRE report runner: the full development package for the site.
+  - It includes an opportunity screening with a recommendation, a research report, a best-use business plan, a preliminary site plan, a pro forma, a fact register, a risk analysis and a parcel map, plus optional AI concept renderings.
+  - It takes 10 to 20 minutes. Documents appear on a card as each is finished, open as a web page or a PDF, and are listed for the whole team under **Reports → Development Reports**.
+- **Preliminary Site Plan** for a program you name (townhomes, apartments, self storage, flex…) and **Parcel Map**, in about a minute.
+- **Area reports on the parcels:** FEMA, environmental, traffic, drive time, air traffic and crime, on the parcels themselves or 1, 3 or 5 miles around them. The parcels also become the selected area, so you can keep running reports from This Area.
+- Harris and Waller picks (no free county record) can be filled in from Regrid, with the dialog saying how many paid records that may use.
+- **The assistant (typing or voice) finds things better.** It now searches businesses, construction projects, companies and addresses like the search box, instead of only looking up place names.
+- **The assistant can also act on parcels:** pick a parcel or add the one next to it, say what's picked, run any of these reports and check on past runs. A feasibility package opens the dialog filled in and only starts after you say yes.
+- **Needs setup before Development reports work:** the database tables (one script) and the report runner's address and secret on the server. Until then, the dialog says the runner isn't connected; area reports work now.
+
 ## 2026-10-05
 
 ### 3:55 PM CT: The app's own cursors (3c1c458)
