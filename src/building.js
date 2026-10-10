@@ -223,11 +223,12 @@ export function initBuildings(ctx) {
       '<div class="bsec" id="bSite"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsec" id="bRegrid"></div><div class="bsrc"></div>' +
       '<div class="bsec" id="bTools"><div class="lt">Site Tools</div><div class="bacts">' + '<button class="btn" id="bMulti" title="Then ' + (matchMedia('(pointer: coarse)').matches ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 10">Select Multiple</button>' +
-        '<button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button><button class="btn askai" id="bAsk">Ask AI About It</button></div></div>';
+        '<button class="btn primary" id="bReports" title="Feasibility package, site plan, parcel map, flood, environmental, traffic and other reports for this parcel (or every one picked)">Run Reports</button><button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button><button class="btn askai" id="bAsk">Ask AI About It</button></div></div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#bOrbit').onclick = orbit;
     card.querySelector('#bMulti').onclick = () => ctx.tabs?.setAdding(true); // or Shift-click
+    card.querySelector('#bReports').onclick = () => ctx.openSelReports?.();
     ctx.tabs?.track({ id: bid(b), kind: 'building', label: b.parcel?.situs || (b.footprint ? 'Building' : 'Parcel'), ref: b, reopen: () => open(b), leave: stopOrbit });
     card.querySelector('#bNote').onclick = () => ctx.addNote?.({ at: b.center });
     card.querySelector('#bAsk').onclick = () => { const t = card.querySelector('#bTitle')?.textContent; ctx.assistant?.ask('Tell me about ' + (t && !/^Loading/.test(t) ? t : 'this property') + ': owner, value, site and the area around it'); };
@@ -255,6 +256,9 @@ export function initBuildings(ctx) {
     renderOverview(b, d); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo);
   }
   ctx.buildingStats = () => { const list = selected(); return list.map(b => ({ address: b.parcel?.situs || null, ...stats(b), owner: b.parcel?.owner || null })); };
+  // what's picked (the tabs, or the open card) and its parcel lookup, for reports on the selection (src/selreports.js)
+  ctx.pickedBuildings = selected;
+  ctx.buildingDetails = b => details(b);
 
   // ---------- several buildings / parcels: each is a tab; "All" sums them up ----------
   const selOf = x => ({ center: x.center, footprint: x.footprint, parcel: x.parcel, parcels: x.d?.parcels });
@@ -296,12 +300,13 @@ export function initBuildings(ctx) {
       '<div class="bsec"><div class="lt">Selected</div>' + rows.map(({ b, s }, i) => '<div class="mrow"><button class="lnk" data-go="' + i + '"><b><i class="mnum">' + (i + 1) + '</i>' + esc(b.parcel?.situs || (b.footprint ? 'Building ' : 'Parcel ') + (i + 1)) + '</b><span>' +
         [s.fp ? fmtN(s.fp) + ' sq ft footprint' : (b.footprint ? '' : 'parcel only'), s.fl ? (s.fSrc === 'estimated from height' ? '~' : '') + s.fl + ' fl' : '', s.h ? ft(s.h) : '', b.d?.parcels?.length > 1 ? b.d.parcels.length + ' parcels' : '', b.parcel?.owner || ''].filter(Boolean).map(esc).join(' · ') + (b.err ? ' · lookup failed' : '') + '</span></button><button class="x" data-rm="' + i + '" aria-label="Remove">×</button></div>').join('') + '</div>' +
       (fl.length ? '<div class="bsec"><div class="lt">Construction filings on these parcels</div><div class="rnote">' + fl.length + ' filing' + (fl.length > 1 ? 's' : '') + ' · est. ' + fmtM(fl.reduce((t, f) => t + f.cost, 0)) + '</div></div>' : '') +
-      '<div class="bacts"><button class="btn" id="mCsv">Export CSV</button><button class="btn" id="mFit">Zoom to All</button><button class="btn" id="mClear">Clear</button></div>';
+      '<div class="bacts"><button class="btn primary" id="mReports">Run Reports</button><button class="btn" id="mCsv">Export CSV</button><button class="btn" id="mFit">Zoom to All</button><button class="btn" id="mClear">Clear</button></div>';
     card.classList.add('open');
     ctx.tabs?.track({ id: 'b:all', kind: 'summary', label: 'All ' + list.length, reopen: renderAll, pinned: true });
     highlight();
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#mClear').onclick = () => ctx.closeCard();
+    card.querySelector('#mReports').onclick = () => ctx.openSelReports?.();
     card.querySelector('#mFit').onclick = () => { const pts = list.map(b => b.center); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); map.fitBounds([[Math.min(...xs) - .0008, Math.min(...ys) - .0008], [Math.max(...xs) + .0008, Math.max(...ys) + .0008]], { padding: 60, maxZoom: 18, duration: ctx.reduceMotion ? 0 : 800 }); };
     card.querySelector('#mCsv').onclick = () => ctx.exportCsv(rows.map(({ b, s }, i) => ({ '#': i + 1, Address: b.parcel?.situs || '', Owner: b.parcel?.owner || '', 'Property ID': b.parcel?.propId || '', Parcels: b.d?.parcels?.length || (b.parcel ? 1 : 0), 'Footprint sq ft': s.fp || '',
       'Est. floor area sq ft': s.gfa || '', 'Height ft': s.h ? Math.round(s.h * 3.281) : '', 'Height source': s.hSrc, Floors: s.fl || '', 'Floors source': s.fSrc, 'Market value': b.parcel?.marketValue || '', 'Year built': b.parcel?.yearBuilt || '', Latitude: b.center[1].toFixed(6), Longitude: b.center[0].toFixed(6) })), 'selected-buildings');

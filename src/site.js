@@ -55,7 +55,8 @@ export function initSite(ctx) {
       // area reports for a circle around the site: pick a radius, then Crime Report or FEMA Report
       (ctx.crimeReport || ctx.femaReport || ctx.areaReports?.length ? '<div class="site-rep"><div class="fl">Area reports</div><div class="mi-chips" role="radiogroup" aria-label="Report radius">' +
         [1, 3, 5, 10].map(mi => '<button type="button" class="chip" role="radio" data-mi="' + mi + '" aria-checked="' + (mi === repMi) + '">' + mi + ' mi</button>').join('') + '</div><div class="bacts">' +
-        (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep">Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep">FEMA Report</button>' : '') + (ctx.envReport ? '<button class="btn" type="button" id="siteEnvRep">Environmental Report</button>' : '') + (ctx.areaReports || []).filter(r => !r.noSite).map(r => '<button class="btn" type="button" data-ar="' + r.key + '">' + esc(r.label) + '</button>').join('') + '</div>' +
+        (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep">Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep">FEMA Report</button>' : '') + (ctx.envReport ? '<button class="btn" type="button" id="siteEnvRep">Environmental Report</button>' : '') + (ctx.areaReports || []).filter(r => !r.noSite).map(r => '<button class="btn" type="button" data-ar="' + r.key + '">' + esc(r.label) + '</button>').join('') +
+        (ctx.openSelReports ? '<button class="btn primary" type="button" id="siteAllRep" title="Feasibility package, site plan, parcel map and every area report, for this parcel or all the ones picked">Feasibility &amp; More…</button>' : '') + '</div>' +
         '<div class="rnote">Crime: City of Houston only (Houston Police). FEMA: flood zones, flood insurance claims, disasters and hazard risk. Environmental: cleanup sites, tanks, wells, pipelines, wetlands and soils around the parcel.</div></div>' : '');
     const where = () => parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4), lab = () => repMi + ' mi around ' + where();
     el.querySelectorAll('.mi-chips [data-mi]').forEach(b => b.onclick = () => { repMi = +b.dataset.mi; el.querySelectorAll('.mi-chips [data-mi]').forEach(x => x.setAttribute('aria-checked', x === b)); });
@@ -64,6 +65,7 @@ export function initSite(ctx) {
     // environmental: the parcel itself when we have its outline (records are measured from its edge), else the circle
     el.querySelector('#siteEnvRep')?.addEventListener('click', () => ctx.envReport(parcel?.geometry ? { geometry: parcel.geometry, label: (parcel.situs || where()) + ' (parcel)' } : { geometry: circle(center, repMi), label: lab() }));
     el.querySelectorAll('[data-ar]').forEach(b => b.onclick = () => ctx.runAreaReport(b.dataset.ar, { geometry: circle(center, repMi), label: lab(), center }));
+    el.querySelector('#siteAllRep')?.addEventListener('click', () => ctx.openSelReports());
   };
 
   // sources on cards: off by default (everyone sees the same clean view); a setting in the Data Sources view turns them on

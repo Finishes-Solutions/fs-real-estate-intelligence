@@ -98,6 +98,20 @@ export function initChatCards(ctx) {
     return d;
   }
 
+  // the find tool: every kind of match, each one a click from the map (a project opens its card; anything else opens
+  // the parcel there)
+  function findCard(r) {
+    const rows = [['Addresses', r.addresses], ['Places', r.places], ['Businesses', r.businesses], ['Projects', r.projects]].flatMap(([k, l]) => (l || []).filter(x => x.lat != null).slice(0, 4).map(x => ({ ...x, sec: k })));
+    const cos = (r.companies || []).slice(0, 3);
+    if (!rows.length && !cos.length) return null;
+    const d = el(head('Search', r.query, 'Click one to go there') + '<ol class="cc-ol">' + rows.map((x, i) => '<li><button type="button" class="cc-row" data-i="' + i + '"><span><b>' + esc(x.name) + '</b><em>' +
+      esc([x.sec === 'Projects' ? 'Project' : x.kind, x.address].filter(Boolean).join(' · ')) + '</em></span><i>' + (x.value ? fmtM(x.value) : x.miles_from_search_point != null ? (+x.miles_from_search_point).toFixed(1) + ' mi' : '') + '</i></button></li>').join('') +
+      cos.map(c => '<li><span class="cc-row"><span><b>' + esc(c.name) + '</b><em>' + esc(c.kind + ' · ' + fmtN(c.filings) + ' filing' + (c.filings === 1 ? '' : 's')) + '</em></span><i>' + fmtM(c.total_value) + '</i></span></li>').join('') + '</ol>');
+    d.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { const x = rows[+b.dataset.i]; ctx.setView('map');
+      if (x.id && ctx.BY_ID.get(x.id)) ctx.runAssistantTool?.('open_filing', { id: x.id }); else ctx.runAssistantTool?.('select_property', { lat: x.lat, lon: x.lon }); });
+    return d;
+  }
+
   function locationCard(r) {
     if (!r.center) return null;
     const t = [r.market_value ? { v: fmtM(r.market_value), label: 'Market value' } : null, r.building_sqft ? { v: fmtN(r.building_sqft), label: 'Building sq ft' } : null,
@@ -167,6 +181,7 @@ export function initChatCards(ctx) {
         case 'compare_areas': return compareCard(r);
         case 'nearby_places': return nearbyCard(r);
         case 'location_info': return locationCard(r);
+        case 'find': return findCard(r);
         case 'demographics': return demographicsCard(r);
         case 'air_traffic': return airCard(r);
         case 'follow_aircraft': return followCard(r);

@@ -62,7 +62,15 @@ export function initReports(ctx) {
       const note = k === 'compare' ? (areas ? fmtN(areas) + ' area' + (areas === 1 ? '' : 's') + ' in Compare' : 'Add areas to Compare first') : fmtN(n) + ' filing' + (n === 1 ? '' : 's') + (ctx.filterText() ? ' with the current filters' : '');
       return '<div class="rp-card"><b>' + esc(r.label) + '</b><p>' + esc(r.desc) + '</p><em>' + esc(note) + '</em><div class="rp-fmts">' +
         r.formats.map(f => '<button type="button" class="btn" data-new="' + k + '" data-f="' + f + '">' + esc(FORMATS[f].replace(' (GIS)', '')) + '</button>').join('') + '</div></div>';
-    }).join('') + marketCard() + crimeCard() + crimeUSCard() + areaCards();
+    }).join('') + devCard() + marketCard() + crimeCard() + crimeUSCard() + areaCards();
+  }
+  // Feasibility package, site plan and parcel map (the CRE report runner, src/selreports.js): for the parcels picked on the map
+  function devCard() {
+    if (!ctx.openSelReports) return '';
+    const n = ctx.pickedBuildings?.().length || 0;
+    return '<div class="rp-card"><b>Feasibility, Site Plan &amp; Parcel Map</b><p>For one or more parcels: the full feasibility package (research report, business plan, site plan, pro forma, risk analysis and opportunity screening), a preliminary site plan for a development program, or a parcel map.</p>' +
+      '<em>' + (n ? n + ' picked on the map' : 'Click a parcel on the map (Shift-click for more), then Run Reports on its card') + '</em><div class="rp-fmts">' +
+      (n ? '<button type="button" class="btn" data-dev="feasibility">Feasibility</button><button type="button" class="btn" data-dev="site_plan">Site Plan</button><button type="button" class="btn" data-dev="parcel_map">Parcel Map</button>' : '') + '</div></div>';
   }
   // Market Report: the Market view (growth, permits, businesses, jobs, spending, sales tax, crime, traffic, rates) for the
   // area chosen there, as a PDF report or the data as CSV
@@ -110,6 +118,7 @@ export function initReports(ctx) {
     const bytes = list.reduce((s, r) => s + (r.stored ? r.size || 0 : 0), 0);
     root.innerHTML = '<div class="vhead"><div><div class="kicker">Reports</div><h2>Reports</h2><div class="vsub">Create a report from what’s on the map, and find the ones you’ve exported before. Past exports are kept in this browser only (not shared with your team or other devices).</div></div></div>' +
       '<div class="rp-sec"><div class="lt">New Report</div><div class="rp-grid">' + newCards() + '</div></div>' +
+      '<div class="rp-sec" id="rpRuns"><div class="lt">Development Reports</div><div class="rnote">Loading the team’s runs…</div></div>' +
       '<div class="rp-sec"><div class="rp-sh"><div class="lt">Previously Exported' + (list.length ? ' · ' + fmtN(list.length) : '') + '</div>' +
         (list.length ? '<div class="vctl"><label class="search sm"><input type="search" id="rpQ" placeholder="Search past exports" value="' + esc(q) + '" aria-label="Search past exports"></label>' +
           '<select class="chip" id="rpKind" aria-label="Report type"><option value="">All types</option>' + Object.entries({ ...KINDS, ...Object.fromEntries((ctx.areaReports || []).map(x => [x.key, x.label])) }).filter(([k]) => list.some(r => r.report === k)).map(([k, l]) => '<option value="' + k + '"' + (kind === k ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>' +
@@ -128,6 +137,8 @@ export function initReports(ctx) {
     const qi = root.querySelector('#rpQ'); if (qi) qi.oninput = () => { q = qi.value; root.querySelector('#rpList').innerHTML = rows(); wire(); };
     const ks = root.querySelector('#rpKind'); if (ks) ks.onchange = () => { kind = ks.value; root.querySelector('#rpList').innerHTML = rows(); wire(); };
     root.querySelector('#rpClear')?.addEventListener('click', clearAll);
+    root.querySelectorAll('[data-dev]').forEach(b => b.onclick = () => { ctx.setView('map'); if (!ctx.openSelReports?.({ pick: b.dataset.dev })) return; });
+    ctx.renderRunsInto?.(root.querySelector('#rpRuns'));
     wire();
   }
   function wire() {

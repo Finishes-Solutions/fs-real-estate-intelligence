@@ -378,6 +378,73 @@ export function initAssistant(ctx) {
           ...(home ? { tract_at_point: { tract: home.g, population: home.pop, median_household_income: home.inc, median_home_value: home.val, median_gross_rent: home.rent, median_age: home.age } } : {}),
           note: 'Area medians are household-weighted averages of the tract medians, so they are approximate.', source: 'US Census ACS 5-year ' + m.year + ', by census tract' };
       }
+      if (name === 'find') {
+        if (!ctx.searchEverything) return { error: 'Search isn’t available in this version.' };
+        let near = null;
+        if (a.near) { const p = await resolvePlace(String(a.near)); if (p.error) return p; near = p.c; }
+        const r = await ctx.searchEverything(String(a.query || ''), { near });
+        if (r.error) return r;
+        const n = ['addresses', 'places', 'businesses', 'projects', 'companies'].reduce((t, k) => t + r[k].length, 0);
+        turnSubject = String(a.query);
+        return n ? { query: a.query, ...r, note: 'Pick the row that matches what the user meant; if several could, ask which one. Businesses are the nearest matches to ' + (a.near || 'the map center') + '.' }
+          : { query: a.query, error: 'Nothing matched “' + a.query + '” in addresses, places, businesses, projects or companies. Ask the user to spell it or give the street address; web_search can find an official address.' };
+      }
+      if (name === 'select_property') {
+        if (!ctx.openBuildingAt) return { error: 'Picking parcels isn’t available in this version.' };
+        const p = await pointFor({ ...a, lat: +a.lat || undefined, lon: +a.lon || undefined }); if (p.error) return p;
+        if (p.kind && !/address|poi|building|coords/.test(p.kind) && !(a.lat && a.lon)) return { error: '“' + (a.place || p.label) + '” is a ' + p.kind + ', not one property. Give a street address, or use find for a business or project and pass its lat/lon.' };
+        if (ctx.view !== 'map') ctx.setView('map');
+        const adding = !!a.add && (ctx.tabs?.count() || 0) > 0;
+        // fly in to street level and let the 3D buildings draw, so a click on a building selects the whole building
+        ctx.map.flyTo({ center: p.c, zoom: Math.max(ctx.map.getZoom(), 17.5), duration: ctx.reduceMotion ? 0 : 900 });
+        await new Promise(res => { const t = setTimeout(res, 5000); ctx.map.once('idle', () => { clearTimeout(t); res(); }); });
+        if (adding) ctx.tabs.arm({ shiftKey: true });
+        const b = ctx.buildingAt?.(p.c) || ctx.openBuildingAt(p.c);
+        const picked = ctx.pickedBuildings?.() || [], ref = picked.find(x => x === b) || picked[picked.length - 1];
+        let pc = null;
+        if (ref) { try { await withTimeout(ctx.buildingDetails(ref), 9000); pc = ref.parcel; } catch (e) {} }
+        actionChip((adding ? 'Added: ' : 'Selected: ') + (pc?.situs || p.label));
+        turnSubject = pc?.situs || p.label;
+        return { selected: pc?.situs || p.label, picked_count: picked.length, added: adding, kind: ref?.footprint ? 'building' : 'parcel',
+          parcel: pc ? { address: pc.situs, owner: pc.owner, acres: pc.area, market_value: pc.marketValue, county: pc.county, parcel_id: pc.propId, land_use: pc.landUse } : null,
+          note: pc ? undefined : ref?.d ? 'No free county parcel record here (Harris and Waller aren’t in the state parcel data); reports can fill it in from Regrid.' : 'The card is open and still loading the parcel record.' };
+      }
+      if (name === 'selection_info') {
+        if (!ctx.selReports) return { error: 'Not available in this version.' };
+        const r = await ctx.selReports.summary();
+        return r.picked ? r : { picked: 0, error: 'Nothing is picked. Use select_property (or ask the user to click a parcel; Shift-click adds more).' };
+      }
+      if (name === 'run_report') {
+        if (!ctx.selReports) return { error: 'Reports on picked parcels aren’t available in this version.' };
+        if (!(ctx.pickedBuildings?.().length)) return { error: 'No parcels are picked. Pick one with select_property first (add: true for more), then run the report.' };
+        const AREA_KEY = { fema: 'fema', environmental: 'env', traffic: 'traffic', drive_time: 'drivetime', air_traffic: 'airtraffic', crime: 'crime', city_crime: 'crimeus' };
+        const rep = String(a.report || '');
+        if (AREA_KEY[rep]) {
+          const key = AREA_KEY[rep], def = ctx.selReports.AREA[key].def;
+          await ctx.selReports.runArea(key, a.area || (def === 'point' ? 'parcels' : def), true);
+          actionChip(ctx.selReports.AREA[key].label + ' opened');
+          return { opened: ctx.selReports.AREA[key].label, on: a.area && a.area !== 'parcels' ? a.area + ' mi around the picked parcels' : 'the picked parcels', note: 'The report card is open on the map with its PDF export. The parcels are now the selected area too, so other area reports can run on them.' };
+        }
+        if (!ctx.selReports.DEV[rep]) return { error: 'Unknown report: ' + rep };
+        const options = { program: a.program || '', notes: a.notes || '', purchase_price: a.purchase_price || '', images: !!a.renderings, floors: a.floors || '', units: a.units || '' };
+        // a feasibility package costs money: it starts only when the user has said yes; otherwise the dialog asks them
+        if (rep === 'feasibility' && !a.start || rep !== 'feasibility' && a.start === false) {
+          await ctx.openSelReports({ pick: rep, program: options.program, notes: options.notes, price: options.purchase_price ? String(options.purchase_price) : '', images: options.images, floors: options.floors ? String(options.floors) : '', units: options.units ? String(options.units) : '' });
+          return { needs_confirmation: true, report: ctx.selReports.DEV[rep].label, note: 'The Reports dialog is open with the details filled in. Ask the user to press Run, or to say yes; if they say yes, call run_report again with start: true.' };
+        }
+        const d = await ctx.selReports.startRun(rep, options);
+        actionChip(ctx.selReports.DEV[rep].label + ' started');
+        return { started: ctx.selReports.DEV[rep].label, for: d.label, documents_coming: d.expected, note: rep === 'feasibility' ? 'Takes 10 to 20 minutes. The documents appear on the card as each is done, and under Reports for the whole team.' : 'Usually ready in about a minute, on the card.' };
+      }
+      if (name === 'report_runs') {
+        const r = await fetch('api/runner?list=1', { cache: 'no-store' }), d = await r.json().catch(() => ({}));
+        if (!r.ok) return { error: d.error || 'Couldn’t load the report runs (' + r.status + ').' };
+        const words = String(a.match || '').toLowerCase().split(/\s+/).filter(Boolean);
+        const runs = d.runs.filter(x => words.every(w => (x.label + ' ' + (x.options?.program || '')).toLowerCase().includes(w)));
+        if (a.open && runs[0]) { ctx.selReports?.showRun(runs[0].id); actionChip('Opened: ' + runs[0].label); }
+        return { runs: runs.slice(0, 10).map(x => ({ report: ctx.selReports?.DEV[x.kind]?.label || x.kind, for: x.label, program: x.options?.program || null, status: x.status, started: x.created_at, error: x.error || null })),
+          ...(runs.length ? {} : { note: a.match ? 'No run matches “' + a.match + '”.' : 'No development reports have been run yet.' }) };
+      }
       if (name === 'location_info') {
         const p = await pointFor(a); if (p.error) return p;
         const r = await fetch('api/building?' + new URLSearchParams({ lat: p.c[1].toFixed(6), lon: p.c[0].toFixed(6) })), d = await r.json().catch(() => ({}));

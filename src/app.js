@@ -42,6 +42,7 @@ import { initPlaces } from './places.js';
 import { initEnv } from './env.js';
 import { initOwner } from './owner.js';
 import { initGoogle } from './google.js';
+import { initSelReports } from './selreports.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
 
@@ -917,7 +918,7 @@ function screenContext(){
   if(sel.feature) lines.push('Selected area: '+sel.label);
   const lv=ctx.live?.state?.(), on=lv?Object.keys(lv).filter(k=>lv[k]):[]; if(on.length) lines.push('Live layers on: '+on.join(', '));
   const ps=ctx.placeSummary?.(); if(ps?.place) lines.push('Outlined on the map: '+ps.place+(ps.kind?' ('+ps.kind+')':''));
-  const bs=ctx.buildingStats?.(); if(bs&&bs.length>1) lines.push('Buildings selected: '+bs.length);
+  const bs=ctx.buildingStats?.(); if(bs&&bs.length>1) lines.push('Picked on the map ('+bs.length+' buildings / parcels, for run_report): '+bs.slice(0,6).map(x=>x.address||'parcel').join('; '));
   const nv=(ctx.field?.db?.notes||[]).filter(n=>n.lng>=b.getWest()&&n.lng<=b.getEast()&&n.lat>=b.getSouth()&&n.lat<=b.getNorth()); if(nv.length) lines.push('Team site notes in view: '+nv.length+' ('+nv.slice(0,5).map(n=>n.title||'untitled').join('; ')+')');
   return lines.join('\n');
 }
@@ -948,7 +949,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSelReports]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,

@@ -95,8 +95,8 @@ export function initMapSearch(ctx) {
   // Google place suggestions (only when the site has a Google key; src/google.js)
   let gs = [], gsT = 0;
   const bizWorthy = t => t.length >= 3 && !COORDS.test(t) && !/^\d/.test(t) && !/^\d{5}$/.test(t);
-  async function businesses(text) {
-    const c = map.getCenter(), lat = +c.lat.toFixed(2), lon = +c.lng.toFixed(2), key = low(text) + '|' + lat + ',' + lon;
+  async function businesses(text, near) {
+    const c = near ? { lng: near[0], lat: near[1] } : map.getCenter(), lat = +c.lat.toFixed(2), lon = +c.lng.toFixed(2), key = low(text) + '|' + lat + ',' + lon;
     if (bizCache.has(key)) return bizCache.get(key);
     const towns = (DATA.places || []).map(p => [p[0], (p[1] - lon) ** 2 + (p[2] - lat) ** 2]).sort((a, b) => a[1] - b[1]).slice(0, 25).map(p => p[0]);
     const get = u => fetch(u).then(r => r.ok ? r.json() : null).catch(() => null);
@@ -453,6 +453,27 @@ export function initMapSearch(ctx) {
     if (!within) { const s = await findWhole(applyPlaceAlias(t), k); if (s && (!sp.within || mentions(s.label + ' ' + (s.name || ''), sp.part))) return s; }
     if (sp.within) { const s = await findWithin(sp.part, sp.within); if (s) return s; }
     return web ? locateWeb(within ? t + ' at ' + within : t, k) : null;
+  };
+  // for the assistant's find tool: everything the search box looks through, as plain rows with coordinates. Addresses
+  // and places (MapTiler, the loaded towns and counties), businesses by name around `near` (Overture / Foursquare,
+  // OpenStreetMap, Comptroller permits), construction projects (by name, address, TABS number or tenant), and owners,
+  // developers, architects and contractors from the filings.
+  ctx.searchEverything = async (text, { near = null, limit = 6 } = {}) => {
+    const t = String(text || '').trim(); if (!t) return { error: 'Say what to look for.' };
+    const c = near || [map.getCenter().lng, map.getCenter().lat];
+    const geo = t.length >= 3 && !COORDS.test(t) ? ctx.geocode(t, { limit: 8 }).then(async g => { const full = expandAbbr(t); if (!g.some(x => x.type === 'address') && full !== t) { const g2 = await ctx.geocode(full, { limit: 8 }); if (g2.length) return g2.concat(g); } return g; }).catch(() => []) : Promise.resolve([]);
+    const [g, b] = await Promise.all([geo, bizWorthy(t) ? businesses(t, c).catch(() => []) : Promise.resolve([])]);
+    const { names, addrs } = searchFilings(t), round = v => v == null ? null : +(+v).toFixed(6);
+    const placeRows = localPlaces(t).map(p => ({ name: p.label, kind: KIND_LABEL[p.kind] || 'Place', lat: round(p.c[1]), lon: round(p.c[0]) }))
+      .concat(g.map(x => ({ name: x.t, kind: KIND_LABEL[kindFromMaptiler(x.type)] || 'Place', lat: round(x.c[1]), lon: round(x.c[0]) })));
+    const seen = new Set(), uniq = rows => rows.filter(r => { const k = r.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+    const projects = names.concat(addrs).slice(0, limit).map(f => ({ name: f.name, kind: 'Construction project', id: f.id, address: f.addr || f.city, value: f.cost, owner: f.owner || null, lat: round(f.lat), lon: round(f.lon), approx_location: !!f.approx }));
+    const companies = searchEntities(t).slice(0, limit).map(e => ({ name: e.label, kind: 'Company in the filings (' + [...e.roles].map(r => ROLE[r]).join(', ') + ')', filings: e.ids.size, total_value: e.v, filing_ids: [...e.ids].slice(0, 8) }));
+    return {
+      addresses: uniq(placeRows.filter(r => r.kind === 'Address')).slice(0, limit), places: uniq(placeRows.filter(r => r.kind !== 'Address')).slice(0, limit),
+      businesses: b.slice(0, limit).map(x => ({ name: x.name, kind: x.kind || 'Business', address: x.address || null, lat: round(x.lat), lon: round(x.lon), miles_from_search_point: x.miles ?? null })),
+      projects, companies
+    };
   };
   ctx.highlightPlace = async (text, kind, within) => { const p = await ctx.findPlace(text, kind, within); return p ? showPlace(p) : null; };
   ctx.placeSummary = () => { if (!place) return null; const { list, how } = placeHits(); return { place: place.label, kind: place.kind, outlined: !!place.geom, filings: list.length, how, total_value: list.reduce((s, f) => s + f.cost, 0) }; };

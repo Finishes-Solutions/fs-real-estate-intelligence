@@ -64,6 +64,21 @@ Plan: Regrid Bundle Access, 2,000 parcel records and 200,000 tiles a month; over
 - Setup: `supabase/migrations/20261007000000_regrid.sql` (already applied to the project), `REGRID_API_KEY`, and `SUPABASE_URL` + `SUPABASE_SECRET_KEY` on Vercel.
 - The Sources tab shows records and tiles used this cycle against the caps.
 
+## Reports on picked parcels and the CRE report runner
+
+Pick one or more parcels or buildings on the map (click; Shift-click or **Add** for more), then **Run Reports** on the card (or **Feasibility & More…** in its Site section). The dialog runs any report on the picked parcels, each parcel counted once (`lib/selection.mjs`, tested in `test/selection.mjs` with a warehouse on two parcels, repeat picks, a parcel in two pieces and real Harris Regrid records):
+
+- **Area reports** (FEMA, Environmental, Traffic, Drive Time, Air Traffic, Crime, City / County Crime) run on the parcel outlines or a 1, 3 or 5 mile radius around them. By default the parcels also become the selected area, so the card's selection (which a report card replaces) isn't lost.
+- **Development reports** come from Finishes' CRE report runner (`mattsinitiere/fs-cre-report-runner`, a separate Vercel project) through `api/runner.js` and `lib/runner.mjs`:
+  - **Feasibility Package**: starts the runner's chain at its research report (`/api/run-report`) with the map's parcel records as its "Confirmed Parcel Record" block, so no parcel is paid for twice. The chain delivers the opportunity screening, initial information report, business plan, pro forma, preliminary site plan, fact register and risk analysis, plus a parcel map (`/api/run-sitemap`) and, if asked, five concept renderings (`/api/run-images`). 10–20 minutes.
+  - **Preliminary Site Plan** (`/api/run-site-plan`, no AI) for a program the person names; **Parcel Map** (`/api/run-sitemap`).
+  - Runs are sent with the runner's `test_mode`, which means "deliver every document to my callbackUrl only": no Monday item, Zapier hook or board column is touched. The runner therefore files these runs under `TEST-` in its own checkpoints.
+  - The runner posts each document to `/api/runner?cb=<run id>&sig=<HMAC>`; it is saved in Supabase (`report_runs`, `report_run_docs`) and shown on the run's card and in the Reports tab for the whole team. Documents open as web pages (served with scripts off) or as PDFs (rendered by `api/pdf.js`).
+  - Picks with no free county record (Harris, Waller) are filled in from Regrid when the person allows it (the same capped, saved lookup as the card's button).
+  - Guards: same-origin and per-visitor rate limits, the team passcode (`FIELD_ACCESS_CODE`) when set, and a team-wide daily ceiling on feasibility runs (`RUNNER_DAILY_CAP`, default 20).
+- Setup: run `supabase/migrations/20261018000000_report_runs.sql`; on Vercel set `REPORT_RUNNER_URL` (the runner's deployment URL), `REPORT_RUNNER_SECRET` (the runner's `SHARED_SECRET`, if it has one) and optionally `RUNNER_CALLBACK_KEY` (signs callbacks; falls back to the runner secret or the Supabase key), `RUNNER_DAILY_CAP` and `PUBLIC_URL` (this site's address, if callbacks should go to a different host). The site's production URL must be reachable by the runner without Vercel deployment protection.
+- The assistant (text and voice) can do all of this: `find` (the search box's sources: addresses, places, businesses, filings, companies), `select_property` (pick or add a parcel), `selection_info`, `run_report` (a feasibility package only starts after the person confirms) and `report_runs`.
+
 ## Area context (Market view, jobs layers, registered businesses)
 
 Built nightly by `build/area.mjs` into `data/area.json` (jobs also go onto the tracts in `data/market.json`). All free, no keys. Each source is best effort: if one fails, last night's numbers stay and the log says why.

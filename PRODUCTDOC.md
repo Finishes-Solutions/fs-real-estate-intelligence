@@ -95,6 +95,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
 - **From here:** distance and drive time, a drive-time map, weather, news, and site imagery (recent satellite and dated high-resolution photos).
 - **Regrid details** (paid, capped each month): zoning, zoning limits such as height and density, the last sale price and date where recorded, and land use. Harris and Waller counties aren't in the free state parcel data, so Regrid fills in owner and value there.
 - Street View, an orbit camera, notes, and **Ask AI** about this property.
+- **Run Reports** (at the bottom of the card, and **Feasibility & More…** in the Site section) runs any report on this parcel, or on every parcel you've picked. See "Reports on the parcels you pick" below.
 
 **Section buttons** under the card's title (Value, Building, Site, Crime, Area…) jump to that section, with its heading just below the card's header.
 
@@ -103,7 +104,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
 **Several things at once (tabs):** Shift-click to add more, up to 10. On a touch screen, tap **Add** at the top of the card (or **Select Multiple**), tap the other things, then **Done**. This works for buildings, parcels, construction filings, planes and airports, mixed together.
 - Each one gets a numbered **tab** at the top of the card; the same number marks it on the map, in the middle of the building or parcel. Parcels picked as open ground keep a faint outline while you look at another tab. Tap a tab to see that card, or its **×** to drop it.
 - Shift-click something already picked to take it out (for a parcel, anywhere inside it). A parcel is never added twice. A plain click starts over with just that one; closing the card clears them all.
-- With two or more buildings or parcels, an **All** tab adds them up: footprint, floor area, market value and acres (each parcel counted once), the construction filings on them, a CSV export and **Zoom to All**.
+- With two or more buildings or parcels, an **All** tab adds them up: footprint, floor area, market value and acres (each parcel counted once), the construction filings on them, **Run Reports** for all of them together, a CSV export and **Zoom to All**.
 
 ---
 
@@ -121,6 +122,25 @@ Choose **Area**, **Shape**, **Radius** or **County** at the top of the map and m
 - **Compare:** add up to 4 areas and see them side by side.
 
 Every report exports as a PDF in the Finishes Solutions style, and its data as a spreadsheet. Reports are kept in the **Reports** tab.
+
+### Reports on the parcels you pick
+
+Pick a parcel or building on the map (click it; Shift-click or **Add** to pick more, up to 10), then press **Run Reports** on its card or on the **All** tab. Every parcel is counted once, even when a building sits on several parcels or two picks land on the same lot. The dialog shows how many parcels, the total acres, the market value and the number of owners, then offers:
+
+- **Development reports**, made by Finishes' CRE report runner from the parcel records:
+  - **Feasibility Package:** the full development package for the site. It includes:
+    - an opportunity screening with a recommendation and viability and risk scores;
+    - a research report on the site, a best-use business plan, a preliminary site plan and a pro forma;
+    - a fact and assumption register and a risk analysis;
+    - a parcel map.
+    Tell it the development program if you have one in mind (or leave it blank to let the analysis pick the best use), anything you know about the site, and an asking price. It can also make five AI concept renderings. It uses paid AI with web research and takes 10 to 20 minutes.
+  - **Preliminary Site Plan:** measured from the parcel outlines for a program you name (townhomes, apartments, self storage, flex industrial…): the buildable area after setbacks and detention, building footprint, units or leasable space, parking, a budget and a pro forma. About a minute.
+  - **Parcel Map:** the parcels drawn to scale with acreage, owners and addresses. About a minute.
+- **Area reports:** FEMA, Environmental, Traffic, Drive-Time Map, Air Traffic, Crime (Houston) and City / County Crime. They cover the parcels themselves or 1, 3 or 5 miles around them. The parcels also become the selected area (you can turn that off), so you can run more reports from **This Area** afterwards.
+
+Harris and Waller parcels aren't in the free state parcel data. When you've picked one there, the dialog offers to fill it in from Regrid. That uses a paid Regrid record, unless the parcel was looked up before.
+
+Development reports open in a card on the map that fills in as each document is finished (about 10 to 20 minutes for a feasibility package). You can close it; the run carries on. Each document opens as a web page or downloads as a PDF. The whole team sees every run under **Reports → Development Reports**. A run that has been going for more than 45 minutes says it may have stopped.
 
 ### Clearing the view
 
@@ -285,6 +305,10 @@ The **Ask AI** button (⌘/ on a Mac, Ctrl+/ elsewhere) opens an assistant that 
 "- "How does crime in Hempstead compare with Texas?" "Is crime in Austin going up?" (anywhere in the US, from FBI yearly figures)
 - "What are the safest cities in Texas over 50,000 people?" "Which Louisiana counties have the most property crime?"
 - "How is oil doing this year?" "Does oil lead Houston unemployment?" "What moves Houston housing permits?"
+- "Find the Buc-ee's in Katy." "Where's the Hines warehouse in Brookshire?" (it searches addresses, places, businesses, construction projects and the companies behind them, the same as the search box)
+- "Select 19455 Stokes Road, and add the lot next to it." "What's selected?"
+- "Run a site plan for townhomes on these parcels." "Run a flood report on them." "Run a feasibility package on this site." For a feasibility package it opens the Reports dialog with the details filled in and asks you to confirm before starting, because it uses paid AI.
+- "Is my feasibility report done?" "Open the site plan for Stokes Road."
 
 Answers come with cards: summaries, charts, comparisons, places, drive times, weather, news and imagery. The suggestions above the Ask AI button change with what you're looking at.
 
@@ -297,6 +321,7 @@ Answers come with cards: summaries, charts, comparisons, places, drive times, we
   - a **Filing list** (PDF, Excel, CSV or map file);
   - an **Area comparison** (PDF, Excel or CSV);
   - an **Activity report** (PDF, Excel or CSV).
+- **Development reports** (feasibility package, site plan, parcel map) for the parcels picked on the map: see "Reports on the parcels you pick". They're listed for the whole team under **Reports → Development Reports**, each document as a web page or a PDF.
 - Area reports (FEMA, traffic, drive time, air traffic, crime), the City / County Crime Report, the Market report, airport reports and flight reports export as **PDFs**, and their data as CSV.
 - **Every report with a place in it shows it on a street map** (roads, towns and labels) with the area outlined: area reports, the Market report, the Summary report's filings map, the area comparison (each area in its colour), airport and flight reports, and the City / County Crime Report (where the report was asked for).
 - **Every PDF uses the Finishes Solutions report style:**
@@ -337,6 +362,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Good to know
 
+- **Development reports are first drafts.** The feasibility package is preliminary working papers built from public records and AI web research. Check every figure before relying on it. The team can run up to 20 feasibility packages a day.
 - **No sale prices.** Texas doesn't publish what properties sell for. Regrid has some recorded sales, and rent and sales comps would need a paid data provider.
 - **Filings are filer estimates.** Costs and dates come from whoever filed. About four in ten filings are missing a start or end date, and the app estimates those (shown hatched). AI-read fields such as use, tenant and developer can be wrong.
 - **Coverage gaps:**
@@ -352,6 +378,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Run any report on the parcels you pick:** one parcel or several. That includes the full **Feasibility Package**, a **Preliminary Site Plan** for a program you name, a **Parcel Map**, and the FEMA, environmental, traffic, drive-time, air traffic and crime reports.
+- **The assistant finds things better:** it searches businesses, construction projects, companies and addresses the way the search box does. It can also pick parcels for you and run reports on them, by voice or by typing.
 - **The app's own cursors:** a branded set that shows what a click will do, with a different one for each selection tool.
 - **A new Market tab:** construction pipeline, growth, housing and rents, building material costs and rates, each in its own section with a button to jump to it, hover numbers on every chart, and a "What's moving" summary.
 - **Street maps in reports:** every report PDF now shows its area on a real street map instead of a plain outline.
