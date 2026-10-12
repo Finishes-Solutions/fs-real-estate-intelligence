@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-12
 
-### 3:03 PM CT: Site plans rebuilt: three usable, connected options every time (COMMIT)
+### 3:03 PM CT: Site plans rebuilt: three usable, connected options every time (667d063)
 - **Every Build with AI run gives three usable options.** Each is checked before it's offered: inside the setbacks, no overlaps, enough parking, and every drive and parking row reachable from the entry. The app tries many arrangements and keeps the best three that pass.
 - **Laid out like a real site plan:** the drives come first as one connected network (aisles joined by curved drives into loops, no dead ends), parking rows line the aisles, extra parking bays run between them where needed, and buildings sit between the rows facing their parking across a walk.
 - **Apartments:** the clubhouse sits at the entry with the pool on a deck right beside it (no more pool across the site with a pond in between), garden-style buildings with staggered fronts, and a walking trail round the pond. **Shops** face their parking with pad sites and drive-thru lanes along the street; **warehouses** get a truck court on the dock side; **townhomes** get two rows per private lane.
