@@ -331,13 +331,18 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 
 **Build with AI**
 - Say what should go there, e.g. "25,000 sf retail strip", "6,000 sf restaurant with drive-thru", "200 apartments, 3 stories", "warehouse with truck court, as big as fits", or tap a suggestion.
-- The AI turns your words into a program: the use, floor area, floors, units, parking ratio and setbacks, filling gaps with typical Houston-area numbers. It lists what it assumed.
+- The AI turns your words into a program: the use, floor area, floors, units, number of buildings, parking ratio, setbacks and how stormwater is handled, filling gaps with typical Houston-area numbers. It lists what it assumed.
+- **What you ask for is what it lays out, as closely as the site allows.** Ask for "28,000 sf of retail across 4 buildings" (or "4 buildings of 7,000 sf") and you get four buildings sharing the floor area evenly, spread along the rows with walks between them, not one big box. Apartments asked for in so many buildings are split the same way.
 - The app then lays out **three options** (A, B, C) on the lot, each with its floor area, parking and coverage, and a name that says how it's arranged (for example "Rows facing the street · pond at the entry" or "Rows running back · pond at the back"). Click one to use it; **Undo** goes back.
 - Every option is laid out the way a site planner draws one: the drives come first, as one connected network (drive aisles joined by curved connector drives into loops, with no dead ends), parking rows line the aisles, and the buildings sit between the rows facing their parking across a walk. Extra parking bays run between aisles where the buildings need more parking.
 - **Every option is usable:** it stays inside the setbacks, nothing overlaps, it has enough parking, and every drive and parking row is reached from the entry. The app tries many arrangements and only offers ones that pass; it always shows three.
 - **Apartments** get a clubhouse right by the entry with its pool on a deck beside it, garden-style buildings with staggered fronts, and a walking trail around the pond. **Shops** face their parking with pad sites (with drive-thru lanes) along the street. **Warehouses** get a truck court on the dock side. **Townhomes** sit in two rows per lane, garages on the lane.
-- Leave the size out and it fits as much as the parking and detention allow; give a size or a number of units and it lays out that much. If it doesn't all fit, the option says how much did ("Fits about 160 of the 200 units asked for"). Land a smaller program doesn't need is marked **Future development**.
-- **Detention** is about 10% of a site over three acres, drawn as a pond with natural curves, at the back, at the entry or at the far end of the rows depending on the option. Land the layout can't use for buildings becomes lawns, a dog park or a playground, not unexplained empty space.
+- Leave the size out and it fits as much as the parking and detention allow; give a size or a number of units and it lays out that much. If it doesn't all fit, the option says how much did ("Fits about 160 of the 200 units asked for"). A fixed program gets the parking it needs plus about a tenth to spare, not every row the site could hold, and the land it doesn't need is kept in one piece as a **Future pad site** or **Future development** (with its acreage) instead of lawn. On a big tract, a "compact, room to expand" option builds on just the part of the frontage it needs. Leave the size out and the plan fills the site with as much leasable building as parks, with only the landscape the buffers, islands and stormwater need.
+- **Stormwater** is sized from the land actually developed: about 0.55 acre-feet of storage per acre, in a pond about 5 ft deep (roughly 13% of the developed land). It's a **detention** pond (a dry basin) by default, a **retention** pond (a wet pond with a permanent pool) when you ask for one, **underground vaults** under the parking (no pond) or **none** for a regional facility. Sites under an acre get none unless you choose it. The pond goes beside the buildings, at the back, at the entry or at the far end of the rows depending on the option; when it can't hold it all, the option says how much would go underground.
+- **Paving is one surface.** Drives, parking rows and truck courts are drawn as one paved area with a single curb line around the outside, the way the asphalt is poured, so there are no lines where a drive meets a parking row (on the map, the sheet and in CAD). Click a piece to see its own outline.
+- **Markings:** stall stripes along every row, **accessible (ADA) stalls** in the rows nearest the buildings (as many as the federal table asks for, one in six van-accessible, in blue with a striped access aisle shared by each pair), and at the entry a stop bar for traffic leaving and a double yellow centre line (none where the entry has a median).
+- **Trash enclosures** are placed by the usual rules: apartments get a double enclosure (trash and recycling) for about every 50 units, or a compactor plus recycling from 200 units; shops and offices one for about every 25,000 sf, none more than about 250 ft from a building; a restaurant its own; a warehouse one per building; homes roll carts to the curb, so none. Each sits beside a drive aisle or in place of a few spare parking stalls, gate facing the drive for the truck, at least 10 ft from a building. If the plan can't find room for all of them, the option says so. Your city's solid waste rules decide in the end.
+- Land the layout can't use for buildings becomes lawns, a dog park or a playground on a fill-the-site plan, not unexplained empty space.
 - **Curved pieces:** connector drives turn on arcs, the entry has curb returns and a planted median, parking rows end in rounded planted islands, and ponds, the pool and lawns are free-form shapes.
 - If the AI isn't available, the app reads your words directly and still lays out the options.
 - **Mixed use:** describe several uses ("37,700 sf retail with 2 pads, a commons with a lake, 120 apartments, 18 townhomes and 12 duplex units") and the site is laid out in zones from the street back, on one connected drive network:
@@ -356,10 +361,10 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - Curved pieces (ponds, the pool, lawns, curved drives) resize from their corner handles. Ponds, pools, lawns, plazas and courts can switch between **natural curves**, a **rounded rectangle** and a **rectangle**, keeping their area.
 
 **Drawing by hand**
-- Add a **Building, Parking, Drive, Truck court, Detention or Landscape** piece. Drag a piece to move it, its white corners to resize it, and the orange dot to turn it (it snaps to the lot's lines; hold Shift to turn freely).
+- Add a **Building, Parking, Drive, Truck court, Detention, Landscape or Trash enclosure** piece. An enclosure you place stays where you put it, and the plan adds any others the rules still call for. Drag a piece to move it, its white corners to resize it, and the orange dot to turn it (it snaps to the lot's lines; hold Shift to turn freely).
 - Curved pieces from Build with AI (curved drives, the entry, ponds, the pool, lawns) move as a whole: drag them or nudge them with the arrow keys. They don't resize or turn.
 - Keyboard: arrow keys nudge (Shift for 10 ft), R turns 90°, Delete removes, ⌘Z / Ctrl+Z undoes.
-- Parking counts its spaces as you size it (9 × 18 ft spaces on 24 ft aisles).
+- Parking counts its spaces as you size it (9 × 18 ft spaces on 24 ft aisles). Each pair of accessible stalls shares an aisle the width of a stall, so it costs one space; the count shown already allows for that.
 - Type exact sizes, the turn, the number of floors, the building's use (which sets its parking and colour) and its name in the **Selected** box. Townhomes and duplexes also take the number of homes.
 - **Street Side:** the orange line marks the side along the street. The app finds it from the map's roads; when it can't, it says the line is a guess. Click **Street Side**, then the lot line along the street, to set it. Front setbacks and drives follow it.
 - **Add or Remove Parcels:** click a parcel next to the site to add it (up to 20), or one in the site to take it out; the outline is merged again and the pieces stay where they are.
@@ -367,17 +372,19 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - Building heights show in 3D when you tilt the map.
 
 **Numbers and checks**
-- Site area, building floor area (and about how many apartments), coverage, FAR, parking provided against what's needed, detention, paved area and open space.
+- Site area, building floor area (and about how many apartments), coverage, FAR, parking provided against what's needed (with the accessible stalls), detention, paved area and open space.
 - Red outlines and a list flag a building inside a setback, anything outside the lot, buildings overlapping other pieces, a parking shortfall, and coverage, FAR or height over the zoning limits when Regrid has them.
 - **Deal summaries**, the way TestFit tabulates a scheme: acreage, FAR, building coverage, impervious coverage, units, units per acre, beds, net rentable and gross square feet and the parking ratio, plus the unit mix (units, share and net square feet of each type) or the home mix.
 - **Site parameters** (changing any of them re-solves the options, or re-fits a changed plan):
-  - **Program:** the use, parking per unit, per home or per 1,000 sf, floors, building depth, efficiency (net ÷ gross) and detention share.
+  - **Program:** the use, parking per unit, per home or per 1,000 sf, floors, building depth and efficiency (net ÷ gross).
+  - **Stormwater:** detention pond, retention (wet) pond, underground vaults or none; the storage per acre and the pond depth; and an optional pond size as a share of the site. A line underneath says how much storage this plan needs for its developed acres, how big the pond drawn is, and how much would go underground.
+  - **Trash:** enclosures placed by the rules or none, and how many apartments or how many square feet of commercial space each one serves.
   - **Unit mix** for apartments: each unit type's size, share and beds (studio, 1, 2 and 3 bedroom to start); add or remove types. The mix sets the average unit, the unit count and the beds.
   - **Setbacks:** building setbacks front, side and rear, and the landscape buffer front, side and rear, each set turned on or off.
   - **Parking:** stall width and depth and the drive aisle width.
   - **Buildings:** apartment depth, longest building and the space between buildings.
   - **Look:** trees on or off; ponds and pools as natural curves, rounded rectangles or rectangles; parking rows ending in rounded islands or square; drive corners curved or square.
-  - Defaults: 25 ft front, 10 ft sides, 20 ft rear, 10 ft buffer, 9 × 18 ft stalls on 24 ft aisles, and detention of 10% on sites over three acres.
+  - Defaults: 25 ft front, 10 ft sides, 20 ft rear, 10 ft buffer, 9 × 18 ft stalls on 24 ft aisles, and a detention pond holding 0.55 acre-feet per developed acre, 5 ft deep, on sites of an acre or more.
 
 **Several options:** **More options…** under the three options lists every usable layout the planner found (up to 12), sorted best first or by units, floor area, parking or open space. **+ Copy** starts another option from the current one (Option B, C…). Each project keeps all its options.
 
@@ -385,7 +392,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - Opens under the plan and reads its buildings, units by type, homes, parking and site area. It shows the total cost (and per unit), stabilized NOI, yield on cost and spread over the market cap rate, stabilized value, profit, unlevered and levered IRR, equity multiple, peak equity and debt coverage, with the budget and the stabilized operating statement.
 - **The schedule** in months: design and permits, construction, lease-up (or sales for homes) and the hold, drawn as a bar. The months are estimated from the size of the job (for example 9 months of design and permits, about 12 months plus one month per 30 apartments of construction, and lease-up at about 20 apartments a month) and can be changed.
 - **Two methods.** *Month by month* (the default): land at closing, soft and hard costs spread through design and construction, equity first and then a construction loan with its interest, lease-up from empty to stabilized, refinancing into a permanent loan, and a sale at the end of the hold. *TestFit method*: the one-page annual sheet TestFit's custom pro forma uses, reproduced exactly; it puts all the money in at year 0 and starts full rents in year 1, so it reads higher, and the panel shows both.
-- Assumptions to change: land price (the parcels' appraised value when the county has it), hard cost per gross square foot for each use, site work or finished-lot cost, soft costs, contingency and developer fee, rents by unit type (or per home, or per square foot for commercial), other income, vacancy, operating costs and the property tax rate, loan-to-cost and rates, cap rates, rent and expense growth, the hold, and the schedule. Homes can be **for sale** instead of for rent (price per square foot and sales pace).
+- Assumptions to change: land price (the parcels' appraised value when the county has it), hard cost per gross square foot for each use, site work or finished-lot cost, underground stormwater storage (about $420,000 an acre-foot, counted when the plan uses vaults or its pond can't hold all the storage, and shown as its own line under site work), soft costs, contingency and developer fee, rents by unit type (or per home, or per square foot for commercial), other income, vacancy, operating costs and the property tax rate, loan-to-cost and rates, cap rates, rent and expense growth, the hold, and the schedule. Homes can be **for sale** instead of for rent (price per square foot and sales pace).
 - **Pro Forma (Excel):** a workbook with the assumptions, the one-page pro forma with live formulas, the month-by-month cash flows with IRR formulas, and the budget.
 - The default numbers are typical Houston-area starting points, not quotes.
 
@@ -397,7 +404,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
   - notes on constraints and due diligence from the site's own data (flood zone, water district, school district, the busiest road and its traffic, EPA-regulated facilities nearby, a replat for several parcels) plus any problems on the plan;
   - a legend and a "conceptual, for feasibility only" disclaimer.
   - If the PDF can't be made, it's saved as a web page to print instead.
-- **CAD (DXF):** opens in AutoCAD, CADCraft, LibreCAD and most CAD programs, in feet, with layers for the lot, setback line, buildings, parking, stripes, drives and detention, and a notes block.
+- **CAD (DXF):** opens in AutoCAD, CADCraft, LibreCAD and most CAD programs, in feet, with layers for the lot, setback line, buildings, parking, stripes, drives, detention, the curb line round all the paving, accessible stalls, pavement markings and trash enclosures, and a notes block.
 - **Map File (GeoJSON)** and **Copy Summary** (the numbers as text).
 
 **The Projects tab** lists every project: rename it, set its status (Idea, Pursuing, Under contract, Closed, Passed), keep notes, see each option's numbers, open a plan, jump to a parcel, or **Draw a Site** for land without a parcel outline.
@@ -405,7 +412,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 **Good to know**
 - The PDF is a conceptual sheet. It has no survey bearings, easements, utilities or title research, so it won't match an engineer's or architect's sheet; it's for feasibility and early conversations.
 - A site plan is a planning sketch from the parcel outline: not a survey, and no grading, utilities, fire lanes or code review. Parcel outlines from appraisal districts can be off by several feet.
-- The setbacks, parking ratios and detention share are typical starting numbers, not the rules for a specific city. Houston has no zoning but has building lines and parking rules; other cities differ.
+- The setbacks, parking ratios, stormwater storage and trash rules are typical starting numbers, not the rules for a specific city or drainage district. Houston has no zoning but has building lines and parking rules; other cities differ.
 - Projects are saved in this browser. Sharing them with the team switches on once the site's team database is set up for projects; until then the Projects tab says they're saved on this device.
 
 ---
@@ -444,6 +451,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 ---
 
 ## Recently added
+
+- **Site plans that follow the request:** ask for a number of buildings and a floor area and you get that many buildings sharing it; parking trimmed to what's needed with the rest of the land kept for a future pad or phase; stormwater sized from the developed land as a detention pond, retention pond, underground vaults or none (with the underground cost in the pro forma); drives and parking drawn as one paved surface with one curb line; accessible stalls, an entry stop bar and centre line; and trash enclosures placed by the rules, or added by hand.
 
 - **TestFit-style tools for site plans:** site parameters (setbacks and landscape buffers by side, parking stall and aisle sizes, building depth and length, trees on or off, natural, rounded or square shapes), a unit mix for apartments, single-family homes with a 1-, 2- and 3-story mix on lot lines, deal summaries (FAR, coverage, units per acre, beds), move or resize any piece and the plan re-fits around it, **More options…**, and a **pro forma** with a development schedule in months, a month-by-month model, TestFit's one-page method for comparison and an Excel workbook with live formulas.
 

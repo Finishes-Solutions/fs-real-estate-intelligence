@@ -14,7 +14,7 @@ const model = key => (modelP ||= pickModel(key, process.env.OPENAI_MODEL).catch(
 const n = description => ({ type: ['number', 'null'], description });
 export const SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'truck', 'setbacks', 'zones', 'summary', 'assumptions'],
+  required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'setbacks', 'zones', 'summary', 'assumptions'],
   properties: {
     use: { type: 'string', enum: Object.keys(USES), description: 'Main use. other = anything that fits none of these (self storage, church, school, hotel…).' },
     gfa: n('Total building floor area in square feet across all floors. null when the request gives no size (the tool then uses a typical size for the use and site) or asks for as much as fits.'),
@@ -24,7 +24,8 @@ export const SCHEMA = {
     ratio: n('Parking spaces per 1,000 sq ft of floor area (non-residential).'),
     perUnit: n('Parking spaces per dwelling unit (multifamily).'),
     depth: n('Building depth in feet (front to back), only if the request implies it.'),
-    detentionPct: n('Share of the site for a detention pond, percent. null = the default (10% on sites over an acre).'),
+    detentionPct: n('Share of the site for a detention pond, percent, only when the request names one. null = sized from the storage the developed land needs.'),
+    storm: { type: ['string', 'null'], enum: ['detention', 'retention', 'underground', 'none', null], description: 'Stormwater: detention (a dry basin, the usual), retention (a wet pond with a permanent pool), underground (vaults under the parking, no pond), none (a regional facility or a small site). null = detention on sites over an acre.' },
     truck: { type: ['boolean', 'null'], description: 'Truck court / loading behind the building.' },
     setbacks: { type: 'object', additionalProperties: false, required: ['front', 'side', 'rear', 'paving'], description: 'Feet. null keeps the default.',
       properties: { front: n('Building setback from the street.'), side: n('Side setback.'), rear: n('Rear setback.'), paving: n('Landscape buffer between paving and the lot lines.') } },
@@ -43,6 +44,7 @@ export const SYSTEM = `You set up a development program for a site-planning tool
 - The City of Houston has no zoning; building lines are usually 25 ft on major roads and 10 ft on local streets. Other cities and counties differ. If zoning limits are given, stay within them.
 - Size the program to the site: check floor area and parking against the acreage given. If the request clearly can't fit, keep the use, set gfa to null and say so in assumptions.
 - Mixed use (several uses on one site): fill zones from the street back, give each its size (floor area or units) when you can, and set the top-level use to the front zone's use. A single use: zones is empty.
+- A number of buildings ("4 buildings", "two pads") goes in buildings, with gfa the total across them. Stormwater: retention when they ask for a wet pond or lake, underground when they ask for vaults or no pond, none for regional detention.
 - Never claim code compliance. Assumptions are short phrases, e.g. "4 spaces per 1,000 sf (typical retail)".`;
 
 export function siteText(site = {}, prompt = '', program = null) {

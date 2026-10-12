@@ -160,4 +160,43 @@ function usable(plan, o, what) {
 }
 // ---- more options than three, for the list ----
 { const plan = siteOf(fm362, true), many = L.layoutOptions(plan, { use: 'multifamily' }, { count: 10 }); assert.ok(many.length > 3, many.length + ' options'); many.forEach(o => usable(plan, o, 'more options')); }
+// ---- what was asked for: 28,000 sf across 4 buildings, parking trimmed to the need, detention sized to the land used ----
+{
+  const plan = siteOf(fm362, true), prog = { use: 'retail', gfa: 28000, buildings: 4 }, opts = L.layoutOptions(plan, prog);
+  assert.equal(opts.length, 3);
+  for (const o of opts) {
+    const { m } = usable(plan, o, '28k retail in 4'), B = o.elements.filter(e => e.kind === 'building');
+    assert.equal(B.length, 4, o.name + ': four buildings, not one 28,000 sf box');
+    for (const b of B) assert.ok(Math.abs(b.w * b.d - 7000) < 350, 'each about 7,000 sf: ' + Math.round(b.w * b.d));
+    assert.ok(Math.abs(m.gfa - 28000) < 500 && m.spaces <= m.required * 1.35, o.name + ': ' + m.spaces + ' spaces for ' + m.required + ' needed (no acres of spare parking)');
+    assert.ok(m.pond > 0 && m.pond < 0.6 * 43560, 'detention for the ~2 acres developed, not the whole 7.7: ' + (m.pond / 43560).toFixed(2) + ' ac');
+    assert.ok(o.elements.some(e => e.kind === 'green' && e.future), 'the land not used is kept as a future pad or phase');
+    const T = o.elements.filter(e => e.kind === 'trash'); assert.ok(T.length >= 2, 'a trash enclosure per ~25,000 sf (two here)');
+    for (const t of T) assert.ok(B.some(b => S.outline(b).some((p, i, r) => S.segDist([t.x, t.y], p, r[(i + 1) % r.length]) < 250)), 'every enclosure within 250 ft of a building');
+    const pv = S.pavement({ ...plan, elements: o.elements }); assert.equal(pv.length, 1, 'drives and parking are one paved surface');
+    const raw = o.elements.filter(e => e.kind === 'parking').reduce((s, e) => s + S.stalls(e).count, 0), A = S.accessible({ ...plan, elements: o.elements });
+    assert.equal(A.stalls.length, S.adaCount(raw), 'every accessible stall the ADA table asks for'); assert.equal(m.spaces, raw - S.adaLoss(raw), 'a shared access aisle costs a stall per pair');
+    for (const a of A.stalls) assert.ok(B.some(b => Math.hypot(a.sym[0] - b.x, a.sym[1] - b.y) < 200), 'accessible stalls by the buildings');
+    assert.ok(S.entryMarks({ ...plan, elements: o.elements }).length >= 1, 'a stop bar at the entry');
+  }
+  const svg = G.planSVG({ ...plan, elements: opts[0].elements, program: opts[0].program }).svg; assert.ok(svg.includes('clip-path') && svg.includes(G.PALETTE.ada), 'one curb line round the paving, accessible stalls drawn');
+}
+// ---- stormwater: detention, retention, underground, none ----
+{
+  assert.equal(S.stormNeed(10).mode, 'detention'); assert.ok(Math.abs(S.stormNeed(10).volume - 5.5) < 1e-9 && Math.abs(S.stormNeed(10).area - 5.5 * 43560 / 5 * 1.2) < 1, '0.55 ac-ft an acre, 5 ft deep, a fifth for slopes');
+  assert.equal(S.stormNeed(0.6).mode, 'none', 'under an acre: no pond by default'); assert.equal(S.stormNeed(10, {}, { storm: 'underground' }).area, 0, 'vaults take no land');
+  assert.equal(S.stormNeed(10, { storm: { rate: 1, depth: 4 } }).volume, 10);
+  const plan = siteOf(fm362, true);
+  const u = L.layoutOptions(plan, { use: 'multifamily', units: 120, storm: 'underground' })[0]; assert.ok(!u.elements.some(e => e.kind === 'pond') && u.notes.some(n => /underground/.test(n)), 'underground: no pond, a note on the vaults');
+  const w = L.layoutOptions({ ...plan, params: { storm: { mode: 'retention' } } }, { use: 'multifamily', units: 120 })[0]; assert.ok(w.elements.some(e => e.kind === 'pond' && /Retention/.test(e.name)), 'retention: a wet pond');
+  const sw = S.stormOf({ ...plan, elements: u.elements, program: u.program }); assert.ok(sw.vault > 1 && sw.mode === 'underground');
+}
+// ---- trash enclosures by the rules ----
+{
+  const plan = siteOf(fm362, true), mf = L.layoutOptions(plan, { use: 'multifamily' })[0], m = S.metrics({ ...plan, elements: mf.elements, program: mf.program });
+  assert.equal(mf.elements.filter(e => e.kind === 'trash').length, Math.ceil(m.units / 50), 'apartments: a double enclosure per ~50 units');
+  const th = L.layoutOptions(plan, { use: 'townhomes' })[0]; assert.equal(th.elements.filter(e => e.kind === 'trash').length, 0, 'homes roll carts to the curb');
+  const off = L.layoutOptions({ ...plan, params: { trash: { mode: 'none' } } }, { use: 'retail', gfa: 28000 })[0]; assert.equal(off.elements.filter(e => e.kind === 'trash').length, 0, 'turned off');
+  assert.equal(S.trashNeeds({ ...plan, program: { use: 'multifamily' }, elements: [{ kind: 'building', use: 'multifamily', x: 0, y: 0, w: 200, d: 60, units: 240 }] }).map(t => t.type).join(), 'compactor,double', 'a compactor from 200 units, with recycling');
+}
 console.log('site layouts ok');
