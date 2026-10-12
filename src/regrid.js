@@ -44,6 +44,7 @@ export function initRegrid(ctx) {
         try {
           const r = await fetch('api/regrid?' + new URLSearchParams({ lat: center[1].toFixed(6), lon: center[0].toFixed(6), ...(key ? { key } : {}), ...(refresh ? { refresh: '1' } : {}) }));
           const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Regrid lookup failed');
+          if (d.geom) ctx.lastRegrid = { center, geom: d.geom, zoning: d.zoning || null }; // for Start Site Plan
           if (d.usage) usage = d.usage;
           if (d.none) { el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote">Regrid has no parcel at this point.</div>'; return; }
           const z = d.zoning;

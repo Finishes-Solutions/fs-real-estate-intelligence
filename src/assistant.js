@@ -802,6 +802,13 @@ export function initAssistant(ctx) {
         const on = ctx.field.setWatch(info, a.on !== false), what = info.kind === 'filing' ? info.f.name : info.label();
         actionChip((on ? 'Watching ' : 'Stopped watching ') + what); return { watching: on, item: what, watchlist_size: ctx.field.db.watch.length };
       }
+      if (name === 'site_plan') {
+        if (!ctx.sitePlan) return { error: 'Site plans are not available.' };
+        if (ctx.view !== 'map') ctx.setView('map');
+        const r = await ctx.sitePlan.forAssistant({ request: String(a.request || '').trim(), project: String(a.project || '').trim() });
+        if (!r.error) actionChip(r.built ? 'Laid out ' + (r.shown?.building_sf ? r.shown.building_sf.toLocaleString('en-US') + ' sq ft' : 'a site plan') + ' · ' + r.plan : 'Started a site plan');
+        return r;
+      }
       if (name === 'reset_map') { const before = ctx.snapshot(); ctx.resetAll(); actionChip('Reset the map', () => ctx.restore(before)); return { reset: true, filings: ctx.visible.length }; }
       return { error: 'Unknown tool ' + name };
     } catch (e) { console.error(e); return { error: e.message }; }

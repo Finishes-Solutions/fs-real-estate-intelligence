@@ -145,7 +145,7 @@ export function initBuildings(ctx) {
   });
   map.getCanvas().addEventListener('mouseleave', () => map.getSource('fs-bhov')?.setData({ type: 'FeatureCollection', features: [] }));
 
-  ctx.currentBuilding = () => cur && { center: cur.center, height: cur.height, title: card.querySelector('#bTitle')?.textContent };
+  ctx.currentBuilding = () => cur && { center: cur.center, height: cur.height, title: card.querySelector('#bTitle')?.textContent, parcel: cur.d?.parcel || cur.parcel || null };
   ctx.openBuildingAt = (lngLat, footprint) => open({ footprint: footprint || null, height: null, base: 0, center: lngLat });
 
   // ---------- sizes, height, floors ----------
@@ -223,13 +223,14 @@ export function initBuildings(ctx) {
       '<div class="bsec" id="bSite"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsec" id="bRegrid"></div><div class="bsrc"></div>' +
       '<div class="bsec" id="bTools"><div class="lt">Site Tools</div><div class="bacts">' + '<button class="btn" id="bMulti" title="Then ' + (matchMedia('(pointer: coarse)').matches ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 10">Select Multiple</button>' +
-        '<button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button><button class="btn askai" id="bAsk">Ask AI About It</button></div></div>';
+        '<button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button><button class="btn" id="bPlan" title="Start a project and lay out a site plan on this parcel, by hand or with AI">Start Site Plan</button><button class="btn askai" id="bAsk">Ask AI About It</button></div></div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#bOrbit').onclick = orbit;
     card.querySelector('#bMulti').onclick = () => ctx.tabs?.setAdding(true); // or Shift-click
     ctx.tabs?.track({ id: bid(b), kind: 'building', label: b.parcel?.situs || (b.footprint ? 'Building' : 'Parcel'), ref: b, reopen: () => open(b), leave: stopOrbit });
     card.querySelector('#bNote').onclick = () => ctx.addNote?.({ at: b.center });
+    card.querySelector('#bPlan').onclick = () => ctx.sitePlan?.start(ctx.currentBuilding());
     card.querySelector('#bAsk').onclick = () => { const t = card.querySelector('#bTitle')?.textContent; ctx.assistant?.ask('Tell me about ' + (t && !/^Loading/.test(t) ? t : 'this property') + ': owner, value, site and the area around it'); };
     if (ctx.reduceMotion) card.querySelector('#bOrbit').remove();
     renderFilings(null); renderArea();
