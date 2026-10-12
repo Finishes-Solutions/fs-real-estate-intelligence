@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-12
 
-### 12:29 PM CT: Projects and site plans, with Build with AI (COMMIT)
+### 12:29 PM CT: Projects and site plans, with Build with AI (1112f7d)
 - **Start Site Plan** on every property card (Site Tools): start a new project or add the parcel to an existing one, and the plan opens on the parcel's outline (Regrid's outline in Harris and Waller once you've opened Regrid details, or draw the site yourself).
 - **Build with AI:** describe what should go there ("25,000 sf retail strip", "200 apartments, 3 stories", "warehouse with truck court, as big as fits"). The AI sets the program (use, size, floors, parking ratio, setbacks) and the app lays out three options on the lot, each with its floor area, parking and coverage. The layout itself is measured by the app, not drawn by the AI. Without AI it reads your words directly.
 - **Draw by hand:** buildings, parking (spaces counted as you size it), drives, truck courts, detention and landscape. Drag, resize and turn pieces on the map, type exact sizes, undo and redo. Buildings show in 3D when the map is tilted.
