@@ -5,7 +5,7 @@
 // Projects are kept on this device and shared with the team through /api/projects once it's set up. Exports DXF
 // (AutoCAD, CADCraft and other CAD programs) and GeoJSON.
 import * as SP from './lib/siteplan.mjs';
-import { composeSite } from './lib/sitecompose.mjs';
+import { layoutOptions } from './lib/sitelayout.mjs';
 import { sheetHTML } from './lib/sitesheet.mjs';
 import { areaMap } from './reportkit.js';
 
@@ -14,7 +14,7 @@ const STATUS = ['Idea', 'Pursuing', 'Under contract', 'Closed', 'Passed'];
 const ADD = ['building', 'parking', 'drive', 'truck', 'pond', 'green'];
 const SIZE = { building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40] };
 const SUGGEST = ['25,000 sf retail strip with 2 pads', '6,000 sf restaurant with drive-thru', '2-story medical office', '200 apartments, 3 stories', 'Warehouse with truck court, as big as fits', 'Mixed use: retail in front, a commons with a lake, 120 apartments, 18 townhomes and 12 duplex units'];
-const COL = { building: '#d0694c', parking: '#9aa3a6', drive: '#7c8689', truck: '#9a8fb8', pond: '#5b9bd1', green: '#62b072', plaza: '#d9c8a9', court: '#4f7fa3', pool: '#7ccbe6', play: '#e3cc9a' };
+const COL = { trail: '#d9c7a0', building: '#d0694c', parking: '#9aa3a6', drive: '#7c8689', truck: '#9a8fb8', pond: '#5b9bd1', green: '#62b072', plaza: '#d9c8a9', court: '#4f7fa3', pool: '#7ccbe6', play: '#e3cc9a' };
 const USE_COL = { retail: '#c8673d', restaurant: '#c8673d', office: '#b5553c', medical: '#b5553c', other: '#b0603f', industrial: '#a2775b', multifamily: '#d8b16a', townhomes: '#b8865b', duplex: '#d9a77c', amenity: '#8a6fb3' };
 const get = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -166,8 +166,8 @@ export function initSitePlan(ctx) {
     map.addSource(SRC, { type: 'geojson', data: EMPTY }); map.addSource(HSRC, { type: 'geojson', data: EMPTY }); map.addSource(DSRC, { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'fs-sp-lot', type: 'fill', source: SRC, filter: kind('lot'), paint: { 'fill-color': dark ? '#ffffff' : '#ffffff', 'fill-opacity': dark ? .06 : .35 } });
     map.addLayer({ id: 'fs-sp-zone', type: 'line', source: SRC, filter: kind('zone'), paint: { 'line-color': dark ? '#939a9d' : '#6b7174', 'line-width': 1, 'line-dasharray': [6, 4] } });
-    map.addLayer({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play']]],
-      paint: { 'fill-color': ['match', ['get', 'k'], 'parking', COL.parking, 'drive', COL.drive, 'truck', COL.truck, 'pond', COL.pond, 'plaza', COL.plaza, 'court', COL.court, 'pool', COL.pool, 'play', COL.play, COL.green], 'fill-opacity': ['case', ['==', ['get', 'sel'], 1], .9, .75] } });
+    map.addLayer({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trail']]],
+      paint: { 'fill-color': ['match', ['get', 'k'], 'trail', COL.trail, 'parking', COL.parking, 'drive', COL.drive, 'truck', COL.truck, 'pond', COL.pond, 'plaza', COL.plaza, 'court', COL.court, 'pool', COL.pool, 'play', COL.play, COL.green], 'fill-opacity': ['case', ['==', ['get', 'sel'], 1], .9, .75] } });
     map.addLayer({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': dark ? '#5b6366' : '#ecece6', 'fill-opacity': .85 } });
     map.addLayer({ id: 'fs-sp-stall', type: 'line', source: SRC, filter: kind('stall'), minzoom: 16, paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': .9 } });
     map.addLayer({ id: 'fs-sp-isl', type: 'fill', source: SRC, filter: kind('island'), paint: { 'fill-color': COL.green, 'fill-opacity': .9 } });
@@ -190,7 +190,7 @@ export function initSitePlan(ctx) {
   ctx.onOverlays?.(() => { for (const id of ['fs-sp-zone', 'fs-sp-walk', 'fs-sp-isl', 'fs-sp-tree', 'fs-sp-pl', 'fs-sp-lot', 'fs-sp-fill', 'fs-sp-stall', 'fs-sp-sb', 'fs-sp-lotl', 'fs-sp-front', 'fs-sp-bldg', 'fs-sp-edge', 'fs-sp-lab', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-h']) if (map.getLayer(id)) map.removeLayer(id);
     for (const s of [SRC, HSRC, DSRC]) if (map.getSource(s)) map.removeSource(s); if (ed) { addLayers(); if (map.getLayer('fs-bldg')) map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } });
   function handles(pl) {
-    const e = pl.elements.find(x => x.id === ed.sel); if (!e) return [];
+    const e = pl.elements.find(x => x.id === ed.sel); if (!e || SP.isFree(e)) return []; // curved pieces move as a whole
     const F = SP.frame(pl.origin), c = SP.corners(e), top = [e.x, e.y], a = (e.rot || 0) * Math.PI / 180, L = e.d / 2 + Math.max(14, e.d * 0.15);
     return c.map((p, i) => ({ i, at: F.toLL(p) })).concat([{ i: 'r', at: F.toLL([top[0] - Math.sin(a) * L, top[1] + Math.cos(a) * L]) }]);
   }
@@ -208,7 +208,7 @@ export function initSitePlan(ctx) {
 
   // ---------- pointer: select, move, resize, rotate ----------
   const ftAt = (pl, lngLat) => SP.frame(pl.origin).toFt([lngLat.lng, lngLat.lat]);
-  const ORDER = ['building', 'pond', 'drive', 'truck', 'parking', 'green'];
+  const ORDER = ['building', 'pool', 'court', 'play', 'plaza', 'pond', 'drive', 'truck', 'parking', 'trail', 'green'];
   function hit(pl, e) {
     for (const h of handles(pl)) { const p = map.project(h.at); if (Math.hypot(p.x - e.point.x, p.y - e.point.y) < 12) return { h: h.i }; }
     const ft = ftAt(pl, e.lngLat);
@@ -228,7 +228,7 @@ export function initSitePlan(ctx) {
   function move(e) {
     if (!drag) return; const pl = PL(), el = pl?.elements.find(x => x.id === drag.id); if (!el) return;
     const p = ftAt(pl, e.lngLat), o = drag.orig; drag.moved = true;
-    if (drag.type === 'move') { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); }
+    if (drag.type === 'move') { if (SP.isFree(o)) Object.assign(el, SP.moveBy({ ...o }, p[0] - drag.from[0], p[1] - drag.from[1])); else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); } }
     else if (drag.type === 'size') {
       const sx = [-1, 1, 1, -1][drag.k], sy = [-1, -1, 1, 1][drag.k], opp = [-sx * o.w / 2, -sy * o.d / 2], q = SP.toLocal(o, p);
       const w = Math.max(8, Math.abs(q[0] - opp[0])), d = Math.max(8, Math.abs(q[1] - opp[1])), mid = [opp[0] + sx * w / 2, opp[1] + sy * d / 2], a = (o.rot || 0) * Math.PI / 180;
@@ -271,7 +271,8 @@ export function initSitePlan(ctx) {
   // move a plan to a new boundary (and origin), keeping every piece where it is on the ground
   function reorigin(x, b, src) {
     const G = SP.frame(x.origin), N = SP.frame(b.origin);
-    x.elements.forEach(e => { const q = N.toFt(G.toLL([e.x, e.y])); e.x = +q[0].toFixed(2); e.y = +q[1].toFixed(2); });
+    const to = p => N.toFt(G.toLL(p)).map(v => +v.toFixed(2));
+    x.elements.forEach(e => { [e.x, e.y] = to([e.x, e.y]); if (e.path) e.path = e.path.map(to); if (e.poly) e.poly = e.poly.map(to); });
     x.origin = b.origin; x.ring = b.ring; x.src = src; x.front = null; x.frontGuess = true;
   }
   function setParcels(keys) {
@@ -314,8 +315,8 @@ export function initSitePlan(ctx) {
     if (!el) return;
     if (k === 'Delete' || k === 'Backspace') { used(); change(x => { x.elements = x.elements.filter(y => y.id !== el.id); }); ed.sel = null; draw(); panel(); return; }
     const step = e.shiftKey ? 10 : 1, a = frameAngle(pl) * Math.PI / 180, mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[k];
-    if (mv) { used(); change(() => { el.x = +(el.x + step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a))).toFixed(2); el.y = +(el.y + step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a))).toFixed(2); }, true); return; }
-    if ((k === 'r' || k === 'R') && !mod) { used(); change(() => { el.rot = ((el.rot || 0) + 90) % 360; }); }
+    if (mv) { used(); change(() => SP.moveBy(el, step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a))), true); return; }
+    if ((k === 'r' || k === 'R') && !mod && !SP.isFree(el)) { used(); change(() => { el.rot = ((el.rot || 0) + 90) % 360; }); }
   }, true);
 
   // ---------- the panel ----------
@@ -330,7 +331,7 @@ export function initSitePlan(ctx) {
       (drawing ? '<div class="bsec sp-draw"><div class="lt">Draw the site</div><p>Click each corner of the site on the map. Click the first corner again (or double-click, or press Enter) to finish.' + (ed.draft.length ? ' ' + ed.draft.length + ' corner' + (ed.draft.length > 1 ? 's' : '') + ' so far.' : '') + '</p><div class="bacts" style="padding:0"><button class="btn askai" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button class="btn" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button class="btn" id="spCancelDraw">Keep the Old Site</button>') + '</div></div>' :
       '<div class="bsec sp-ai"><label class="lt" for="spAsk">Build with AI</label><textarea id="spAsk" rows="2" placeholder="What should go here? e.g. 25,000 sf retail strip with 4 per 1,000 parking">' + esc(ed.ask || '') + '</textarea>' +
         '<div class="sp-sugs">' + SUGGEST.map(s => '<button class="chip" data-sug="' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div>' +
-        '<div class="bacts" style="padding:8px 0 0"><button class="btn askai" id="spGo">Build Options</button><span class="rnote" id="spAiNote">' + esc(ed.aiNote || '') + '</span></div>' +
+        '<div class="bacts sp-go"><button class="btn askai" id="spGo">Build Options</button></div><div class="rnote sp-ainote" id="spAiNote">' + esc(ed.aiNote || '') + '</div>' +
         '<div id="spVariants">' + variantsHtml() + '</div></div>' +
       siteHtml(p, pl) +
       '<div class="bsec"><div class="lt">Draw</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + COL[k] + '"></i>' + SP.KINDS[k].label + '</button>').join('') + '</div>' +
@@ -392,18 +393,19 @@ export function initSitePlan(ctx) {
 
   function selHtml(e, prog) {
     if (!e) return '<div class="lt">Selected</div><div class="rnote">Click a piece of the plan to move it. Drag a white corner to resize it, the orange dot to turn it. Arrow keys nudge it, R turns it 90°, Delete removes it.</div>';
-    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + '</div><div class="sp-grid">' +
-      '<label>Width (ft)<input type="number" min="8" step="1" data-e="w" value="' + Math.round(e.w) + '"></label><label>Depth (ft)<input type="number" min="8" step="1" data-e="d" value="' + Math.round(e.d) + '"></label>' +
-      '<label>Turn (°)<input type="number" step="1" data-e="rot" value="' + Math.round(e.rot || 0) + '"></label>' +
+    const free = SP.isFree(e);
+    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free ? ' · curved' : '') + '</div><div class="sp-grid">' +
+      (free ? '' : '<label>Width (ft)<input type="number" min="8" step="1" data-e="w" value="' + Math.round(e.w) + '"></label><label>Depth (ft)<input type="number" min="8" step="1" data-e="d" value="' + Math.round(e.d) + '"></label>' +
+      '<label>Turn (°)<input type="number" step="1" data-e="rot" value="' + Math.round(e.rot || 0) + '"></label>') +
       (e.kind === 'building' ? '<label>Floors<input type="number" min="1" max="40" step="1" data-e="floors" value="' + (e.floors || 1) + '"></label>' +
         '<label>Use<select data-use="1">' + Object.entries(SP.USES).map(([k, u]) => '<option value="' + k + '"' + (k === (e.use || prog.use) ? ' selected' : '') + '>' + u.label + '</option>').join('') + '</select></label>' +
         (SP.USES[e.use || prog.use]?.garage ? '<label>Homes<input type="number" min="1" max="40" step="1" data-e="units" value="' + (e.units || 1) + '"></label>' : '') : '') +
       '<label class="sp-wide">Name<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A"></label>' +
-      '</div><div class="rnote" id="spRead"></div><div class="bacts" style="padding:8px 0 0"><button class="btn" id="spRot">Turn 90°</button><button class="btn" id="spDup">Copy</button><button class="btn sp-del" id="spDel">Delete</button></div>';
+      '</div><div class="rnote" id="spRead"></div><div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + '<button class="btn" id="spDup">Copy</button><button class="btn sp-del" id="spDel">Delete</button></div>';
   }
   function readout(e) {
     const el = card.querySelector('#spRead'); if (!el || !e) return;
-    el.textContent = e.kind === 'building' ? f0(e.w * e.d) + ' sf footprint · ' + f0(e.w * e.d * (e.floors || 1)) + ' sf total' : e.kind === 'parking' ? SP.stalls(e).count + ' spaces (9 × 18 ft stalls, 24 ft aisles)' : e.kind === 'pond' ? (e.w * e.d / 43560).toFixed(2) + ' acres' : f0(e.w * e.d) + ' sf';
+    el.textContent = e.kind === 'building' ? f0(e.w * e.d) + ' sf footprint · ' + f0(e.w * e.d * (e.floors || 1)) + ' sf total' : e.kind === 'parking' ? SP.stalls(e).count + ' spaces (9 × 18 ft stalls, 24 ft aisles)' : e.kind === 'pond' ? (SP.elArea(e) / 43560).toFixed(2) + ' acres' : f0(SP.elArea(e)) + ' sf' + (SP.isFree(e) ? ' · drag to move it' : '');
     for (const k of ['w', 'd']) { const i = card.querySelector('[data-e="' + k + '"]'); if (i && document.activeElement !== i) i.value = Math.round(e[k]); }
     const r = card.querySelector('[data-e="rot"]'); if (r && document.activeElement !== r) r.value = Math.round(e.rot || 0);
     if (!drag) nums();
@@ -413,8 +415,8 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v)) return; change(() => { const k = i.dataset.e; e[k] = k === 'floors' || k === 'units' ? Math.max(1, Math.round(v)) : k === 'rot' ? ((v % 360) + 360) % 360 : Math.max(8, v); }, true); readout(e); });
     card.querySelector('[data-use]')?.addEventListener('change', ev => change(() => { e.use = ev.target.value; }));
     card.querySelector('[data-name]')?.addEventListener('change', ev => change(() => { e.name = ev.target.value.trim().slice(0, 40); }, true));
-    card.querySelector('#spRot').onclick = () => change(() => { e.rot = ((e.rot || 0) + 90) % 360; });
-    card.querySelector('#spDup').onclick = () => { const c = { ...clone(e), id: uid() }, a = (e.rot || 0) * Math.PI / 180, off = e.w + 20; c.x = +(e.x + off * Math.cos(a)).toFixed(2); c.y = +(e.y + off * Math.sin(a)).toFixed(2); change(x => x.elements.push(c)); ed.sel = c.id; draw(); panel(); };
+    if (card.querySelector('#spRot')) card.querySelector('#spRot').onclick = () => change(() => { e.rot = ((e.rot || 0) + 90) % 360; });
+    card.querySelector('#spDup').onclick = () => { const c = { ...clone(e), id: uid() }, a = (e.rot || 0) * Math.PI / 180, off = e.w + 20; SP.moveBy(c, off * Math.cos(a), off * Math.sin(a)); change(x => x.elements.push(c)); ed.sel = c.id; draw(); panel(); };
     card.querySelector('#spDel').onclick = () => { change(x => { x.elements = x.elements.filter(y => y.id !== e.id); }); ed.sel = null; draw(); panel(); };
   }
   function nums() {
@@ -464,12 +466,8 @@ export function initSitePlan(ctx) {
     if (ed?.plid !== pl.id) return;
     if (btn) btn.textContent = 'Laying out…';
     await new Promise(r => setTimeout(r, 30));
-    const variants = [];
-    for (let v = 0; v < SP.VARIANTS.length; v++) {
-      const plan = { ...pl, setbacks }, r = composeSite(plan, prog, v);
-      variants.push({ ...r, setbacks, m: SP.metrics({ ...plan, program: r.program || prog, elements: r.elements }), name: SP.VARIANTS[v] });
-      await new Promise(r => setTimeout(r, 0)); // keep the page responsive between options
-    }
+    const plan = { ...pl, setbacks }, variants = layoutOptions(plan, prog).map((r, i, all) => ({ ...r, setbacks, m: SP.metrics({ ...plan, program: r.program || prog, elements: r.elements }),
+      name: String.fromCharCode(65 + i) + ' · ' + r.name + (all.slice(0, i).some(o => o.name === r.name) ? ' (alternate)' : '') }));
     if (ed?.plid !== pl.id) return;
     ed.variants = variants; ed.aiNote = note; ed.pick = null;
     const best = variants.findIndex(v => v.elements.length); if (best >= 0) useVariant(best); else panel();

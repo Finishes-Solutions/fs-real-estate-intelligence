@@ -332,20 +332,25 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 **Build with AI**
 - Say what should go there, e.g. "25,000 sf retail strip", "6,000 sf restaurant with drive-thru", "200 apartments, 3 stories", "warehouse with truck court, as big as fits", or tap a suggestion.
 - The AI turns your words into a program: the use, floor area, floors, units, parking ratio and setbacks, filling gaps with typical Houston-area numbers. It lists what it assumed.
-- The app then lays out **three options** on the lot (parking in front, building at the street, parking beside), squared up with the lot's main lines, each with its floor area, parking and coverage. Click one to use it; **Undo** goes back.
-- Leave the size out and it uses a typical size for that use on a lot that size; say "as big as fits" and it fits the most building the parking allows.
-- Detention is a strip along the back of the lot (or behind the buildings on a big lot), sized to the land the project covers rather than the whole lot.
+- The app then lays out **three options** (A, B, C) on the lot, each with its floor area, parking and coverage, and a name that says how it's arranged (for example "Rows facing the street · pond at the entry" or "Rows running back · pond at the back"). Click one to use it; **Undo** goes back.
+- Every option is laid out the way a site planner draws one: the drives come first, as one connected network (drive aisles joined by curved connector drives into loops, with no dead ends), parking rows line the aisles, and the buildings sit between the rows facing their parking across a walk. Extra parking bays run between aisles where the buildings need more parking.
+- **Every option is usable:** it stays inside the setbacks, nothing overlaps, it has enough parking, and every drive and parking row is reached from the entry. The app tries many arrangements and only offers ones that pass; it always shows three.
+- **Apartments** get a clubhouse right by the entry with its pool on a deck beside it, garden-style buildings with staggered fronts, and a walking trail around the pond. **Shops** face their parking with pad sites (with drive-thru lanes) along the street. **Warehouses** get a truck court on the dock side. **Townhomes** sit in two rows per lane, garages on the lane.
+- Leave the size out and it fits as much as the parking and detention allow; give a size or a number of units and it lays out that much. If it doesn't all fit, the option says how much did ("Fits about 160 of the 200 units asked for"). Land a smaller program doesn't need is marked **Future development**.
+- **Detention** is about 10% of a site over three acres, drawn as a pond with natural curves, at the back, at the entry or at the far end of the rows depending on the option. Land the layout can't use for buildings becomes lawns, a dog park or a playground, not unexplained empty space.
+- **Curved pieces:** connector drives turn on arcs, the entry has curb returns and a planted median, parking rows end in rounded planted islands, and ponds, the pool and lawns are free-form shapes.
 - If the AI isn't available, the app reads your words directly and still lays out the options.
-- **Mixed use:** describe several uses ("37,700 sf retail with 2 pads, a commons with a lake, 120 apartments, 18 townhomes and 12 duplex units") and the site is laid out in zones from the street back, the way a conceptual site plan is drawn:
-  - shops at the front, with pad sites (restaurants, coffee with drive-thru) at the street corners and the shops behind a shared parking field;
-  - a commons in the middle: an amenity lake that holds the site's detention, a pavilion, pickleball courts, a playground, lawn and dog park as room allows;
-  - apartment buildings with a clubhouse and pool, townhome rows back to back on rear-load lanes, and duplexes on lanes at the back;
-  - 26 ft drives between the zones and a main entry drive from the street.
-  - A zone too shallow for its use shares a band with its neighbour, side by side. If the program needs more land than the site has, it's scaled down, with a note.
+- **Mixed use:** describe several uses ("37,700 sf retail with 2 pads, a commons with a lake, 120 apartments, 18 townhomes and 12 duplex units") and the site is laid out in zones from the street back, on one connected drive network:
+  - shops at the front facing their parking, with pad sites along the street and a service drive behind;
+  - a commons with an amenity lake that holds the site's detention, a pavilion, pickleball courts, a playground and restrooms;
+  - apartment buildings with a clubhouse and pool, townhome rows on private lanes, and duplexes on a street at the back;
+  - on a wide site, a main boulevard runs from the entry through every zone.
+  - On a lot too shallow for every zone one behind the other, smaller zones share a row side by side (townhomes beside duplexes, the commons beside the apartments). A small program on a big tract is built along the part of the frontage it needs, and the rest is kept for a future phase. Each option notes anything that didn't fully fit.
 - **Detail:** buildings are named and sized ("Apt Bldg 1 · 40 units · 42,353 sf · 3 fl", "Pad A", "Townhome Row 2"), parking has planted islands with trees, buildings have walks around them, and trees line the landscape buffer and the lake.
 
 **Drawing by hand**
 - Add a **Building, Parking, Drive, Truck court, Detention or Landscape** piece. Drag a piece to move it, its white corners to resize it, and the orange dot to turn it (it snaps to the lot's lines; hold Shift to turn freely).
+- Curved pieces from Build with AI (curved drives, the entry, ponds, the pool, lawns) move as a whole: drag them or nudge them with the arrow keys. They don't resize or turn.
 - Keyboard: arrow keys nudge (Shift for 10 ft), R turns 90°, Delete removes, ⌘Z / Ctrl+Z undoes.
 - Parking counts its spaces as you size it (9 × 18 ft spaces on 24 ft aisles).
 - Type exact sizes, the turn, the number of floors, the building's use (which sets its parking and colour) and its name in the **Selected** box. Townhomes and duplexes also take the number of homes.
@@ -416,6 +421,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 ---
 
 ## Recently added
+
+- **Site plans rebuilt to be usable:** every Build with AI run gives three options that pass the checks, with one connected drive network (curved loops, no dead ends), parking rows along the aisles, buildings facing their parking, the pool beside the clubhouse at the entry, organic detention ponds, rounded parking islands and staggered apartment buildings. Leftover land becomes lawns, a dog park or a playground, or is marked for a future phase. The Build Options button keeps its size; the AI's note sits under it.
 
 - **Site plans like a real conceptual sheet:** up to 20 parcels merged into one site, mixed-use layouts in zones (shops and pads, a commons with an amenity lake, apartments with a clubhouse and pool, townhomes, duplexes), trees, walks and planted parking islands, named buildings, and a **Site Plan PDF** on 11 × 17 or 24 × 36 with data tables, notes from the site's data and a vicinity map.
 - **Projects and site plans:** start a project from any property card and lay out a site plan on the parcel, by hand or with **Build with AI** (three options with floor area, parking and coverage), checked against setbacks, and exported to CAD (DXF).
