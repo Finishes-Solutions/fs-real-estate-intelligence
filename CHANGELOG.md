@@ -3,6 +3,12 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-12
+
+### 3:04 PM CT: Parcel lines cached for two weeks (c2f5825)
+- **Parcel lines (Regrid) now stay cached for 14 days instead of 7**, so the same map area costs a Regrid tile at most once every two weeks. That stretches the monthly tile allowance further.
+- The trade-off: a boundary change Regrid makes can take up to two weeks to show on the map.
+
 ## 2026-10-05
 
 ### 3:55 PM CT: The app's own cursors (3c1c458)
