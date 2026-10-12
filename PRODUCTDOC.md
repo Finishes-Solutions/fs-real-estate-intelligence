@@ -348,6 +348,13 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
   - On a lot too shallow for every zone one behind the other, smaller zones share a row side by side (townhomes beside duplexes, the commons beside the apartments). A small program on a big tract is built along the part of the frontage it needs, and the rest is kept for a future phase. Each option notes anything that didn't fully fit.
 - **Detail:** buildings are named and sized ("Apt Bldg 1 · 40 units · 42,353 sf · 3 fl", "Pad A", "Townhome Row 2"), parking has planted islands with trees, buildings have walks around them, and trees line the landscape buffer and the lake.
 
+**Single-family homes:** choose **Single-family homes** (or say "single-family homes, mostly 2-story"). Homes go on lots along 28 ft streets, both sides of each street, with lot lines, driveways and a cul-de-sac at a dead end. Set the **home mix** (the share of 1-, 2- and 3-story homes) and the lot depth under Site parameters; each home type takes its own lot width (about 60, 50 and 40 ft).
+
+**Changing a plan and letting it re-fit**
+- Move, resize or reshape a piece of a plan from Build Options (a building, the pond, the pool) and the rest of the plan re-fits around it: drives, parking and other buildings are laid out again, and the piece you changed stays exactly where you put it (marked 📌 in the Selected box; **Let it move** releases it). A pond you enlarge counts toward the detention.
+- Pieces you add by hand are kept the same way. **Re-fit Plan** in the Selected box re-fits on demand, and "Re-solve as I change settings" under Site parameters turns the automatic re-fit and re-solve on or off.
+- Curved pieces (ponds, the pool, lawns, curved drives) resize from their corner handles. Ponds, pools, lawns, plazas and courts can switch between **natural curves**, a **rounded rectangle** and a **rectangle**, keeping their area.
+
 **Drawing by hand**
 - Add a **Building, Parking, Drive, Truck court, Detention or Landscape** piece. Drag a piece to move it, its white corners to resize it, and the orange dot to turn it (it snaps to the lot's lines; hold Shift to turn freely).
 - Curved pieces from Build with AI (curved drives, the entry, ponds, the pool, lawns) move as a whole: drag them or nudge them with the arrow keys. They don't resize or turn.
@@ -362,9 +369,25 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 **Numbers and checks**
 - Site area, building floor area (and about how many apartments), coverage, FAR, parking provided against what's needed, detention, paved area and open space.
 - Red outlines and a list flag a building inside a setback, anything outside the lot, buildings overlapping other pieces, a parking shortfall, and coverage, FAR or height over the zoning limits when Regrid has them.
-- **Program & setbacks** sets the use, parking ratio (or spaces per apartment), detention share and the front, side and rear setbacks and landscape buffer. Defaults: 25 ft front, 10 ft sides, 20 ft rear, 10 ft buffer, and detention of 10% on sites over an acre.
+- **Deal summaries**, the way TestFit tabulates a scheme: acreage, FAR, building coverage, impervious coverage, units, units per acre, beds, net rentable and gross square feet and the parking ratio, plus the unit mix (units, share and net square feet of each type) or the home mix.
+- **Site parameters** (changing any of them re-solves the options, or re-fits a changed plan):
+  - **Program:** the use, parking per unit, per home or per 1,000 sf, floors, building depth, efficiency (net ÷ gross) and detention share.
+  - **Unit mix** for apartments: each unit type's size, share and beds (studio, 1, 2 and 3 bedroom to start); add or remove types. The mix sets the average unit, the unit count and the beds.
+  - **Setbacks:** building setbacks front, side and rear, and the landscape buffer front, side and rear, each set turned on or off.
+  - **Parking:** stall width and depth and the drive aisle width.
+  - **Buildings:** apartment depth, longest building and the space between buildings.
+  - **Look:** trees on or off; ponds and pools as natural curves, rounded rectangles or rectangles; parking rows ending in rounded islands or square; drive corners curved or square.
+  - Defaults: 25 ft front, 10 ft sides, 20 ft rear, 10 ft buffer, 9 × 18 ft stalls on 24 ft aisles, and detention of 10% on sites over three acres.
 
-**Several options:** **+ Copy** starts another option from the current one (Option B, C…). Each project keeps all its options.
+**Several options:** **More options…** under the three options lists every usable layout the planner found (up to 12), sorted best first or by units, floor area, parking or open space. **+ Copy** starts another option from the current one (Option B, C…). Each project keeps all its options.
+
+**Pro forma**
+- Opens under the plan and reads its buildings, units by type, homes, parking and site area. It shows the total cost (and per unit), stabilized NOI, yield on cost and spread over the market cap rate, stabilized value, profit, unlevered and levered IRR, equity multiple, peak equity and debt coverage, with the budget and the stabilized operating statement.
+- **The schedule** in months: design and permits, construction, lease-up (or sales for homes) and the hold, drawn as a bar. The months are estimated from the size of the job (for example 9 months of design and permits, about 12 months plus one month per 30 apartments of construction, and lease-up at about 20 apartments a month) and can be changed.
+- **Two methods.** *Month by month* (the default): land at closing, soft and hard costs spread through design and construction, equity first and then a construction loan with its interest, lease-up from empty to stabilized, refinancing into a permanent loan, and a sale at the end of the hold. *TestFit method*: the one-page annual sheet TestFit's custom pro forma uses, reproduced exactly; it puts all the money in at year 0 and starts full rents in year 1, so it reads higher, and the panel shows both.
+- Assumptions to change: land price (the parcels' appraised value when the county has it), hard cost per gross square foot for each use, site work or finished-lot cost, soft costs, contingency and developer fee, rents by unit type (or per home, or per square foot for commercial), other income, vacancy, operating costs and the property tax rate, loan-to-cost and rates, cap rates, rent and expense growth, the hold, and the schedule. Homes can be **for sale** instead of for rent (price per square foot and sales pace).
+- **Pro Forma (Excel):** a workbook with the assumptions, the one-page pro forma with live formulas, the month-by-month cash flows with IRR formulas, and the budget.
+- The default numbers are typical Houston-area starting points, not quotes.
 
 **Exports**
 - **Site Plan PDF:** a conceptual site plan sheet on **11 × 17** or **24 × 36** paper:
@@ -421,6 +444,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 ---
 
 ## Recently added
+
+- **TestFit-style tools for site plans:** site parameters (setbacks and landscape buffers by side, parking stall and aisle sizes, building depth and length, trees on or off, natural, rounded or square shapes), a unit mix for apartments, single-family homes with a 1-, 2- and 3-story mix on lot lines, deal summaries (FAR, coverage, units per acre, beds), move or resize any piece and the plan re-fits around it, **More options…**, and a **pro forma** with a development schedule in months, a month-by-month model, TestFit's one-page method for comparison and an Excel workbook with live formulas.
 
 - **Site plans rebuilt to be usable:** every Build with AI run gives three options that pass the checks, with one connected drive network (curved loops, no dead ends), parking rows along the aisles, buildings facing their parking, the pool beside the clubhouse at the entry, organic detention ponds, rounded parking islands and staggered apartment buildings. Leftover land becomes lawns, a dog park or a playground, or is marked for a future phase. The Build Options button keeps its size; the AI's note sits under it.
 
