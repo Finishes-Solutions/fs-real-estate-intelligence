@@ -5,6 +5,22 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-12
 
+### 1:54 PM CT: Site plans on up to 20 parcels, mixed-use layouts and a PDF sheet (e14ac58)
+- **Up to 20 parcels as one site:** pick them (Shift-click or Select Multiple, now up to 20), then **Site Plan for All** on the All tab, or **Add or Remove Parcels** inside a plan. Small gaps and overlaps between neighbouring parcels are closed up; parcels across a road stay out, with a note.
+- **Mixed-use plans:** describe several uses and the site is laid out in zones from the street back: shops with pad sites at the street corners, a commons with an amenity lake (the site's detention), pavilion, courts and playground, apartments with a clubhouse and pool, townhome rows on rear-load lanes, and duplexes, with 26 ft drives between zones and a main entry drive. Works with or without AI.
+- **More detail on every plan:** named, sized buildings ("Apt Bldg 2 · 40 units · 3 fl", "Pad A"), planted parking islands with trees, walks around buildings, trees along the buffer and the lake, buildings coloured by use. The Selected box sets a building's use and name.
+- **Site Plan PDF:** a conceptual site plan sheet on 11 × 17 or 24 × 36: the plan to scale with the street at the bottom, north arrow and scale bar, vicinity map, title block, program at a glance, site data and land use by zone, program and parking, parcels and owners, notes from the site's own data (flood zone, districts, traffic, environmental records), legend and a feasibility-only disclaimer.
+- The CAD (DXF) export also carries the zones, trees, walks and building names.
+
+### 1:17 PM CT: Site plans laid out like real sites (de724e2)
+- **Buildings square up with the lot** instead of tilting to its longest line, so a lot with one slanted street edge no longer gets crooked buildings.
+- **The building sits near the street** with its parking in front of it, behind it, or beside it (the three options). Before, "parking in front" pushed the building to the back of the lot.
+- **No size given means a typical size** for that use on a lot that size (say "as big as fits" to fill the site). Before, "2-story medical office" on 27 acres filled it with 450,000 sf.
+- **Detention is a strip along the back** (or behind the buildings on a big lot), sized to the land the project covers, not the whole lot.
+- **One parking field with at most two driveways**, instead of scattered lots each with its own drive.
+- "Turned 90°" is replaced by **Parking beside**. Pieces you add by hand also line up with the lot.
+- A warehouse that fills the site keeps its truck court.
+
 ### 12:29 PM CT: Projects and site plans, with Build with AI (1112f7d)
 - **Start Site Plan** on every property card (Site Tools): start a new project or add the parcel to an existing one, and the plan opens on the parcel's outline (Regrid's outline in Harris and Waller once you've opened Regrid details, or draw the site yourself).
 - **Build with AI:** describe what should go there ("25,000 sf retail strip", "200 apartments, 3 stories", "warehouse with truck court, as big as fits"). The AI sets the program (use, size, floors, parking ratio, setbacks) and the app lays out three options on the lot, each with its floor area, parking and coverage. The layout itself is measured by the app, not drawn by the AI. Without AI it reads your words directly.

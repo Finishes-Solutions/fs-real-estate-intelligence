@@ -100,7 +100,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
 
 **Big buildings:** clicking any part of a building selects the whole building, even a warehouse or shopping center that the map draws in pieces. If the building sits on more than one parcel, the card lists every parcel with its owner and value, and a total.
 
-**Several things at once (tabs):** Shift-click to add more, up to 10. On a touch screen, tap **Add** at the top of the card (or **Select Multiple**), tap the other things, then **Done**. This works for buildings, parcels, construction filings, planes and airports, mixed together.
+**Several things at once (tabs):** Shift-click to add more, up to 20. On a touch screen, tap **Add** at the top of the card (or **Select Multiple**), tap the other things, then **Done**. This works for buildings, parcels, construction filings, planes and airports, mixed together.
 - Each one gets a numbered **tab** at the top of the card; the same number marks it on the map, in the middle of the building or parcel. Parcels picked as open ground keep a faint outline while you look at another tab. Tap a tab to see that card, or its **×** to drop it.
 - Shift-click something already picked to take it out (for a parcel, anywhere inside it). A parcel is never added twice. A plain click starts over with just that one; closing the card clears them all.
 - With two or more buildings or parcels, an **All** tab adds them up: footprint, floor area, market value and acres (each parcel counted once), the construction filings on them, a CSV export and **Zoom to All**.
@@ -320,10 +320,11 @@ Answers come with cards: summaries, charts, comparisons, places, drive times, we
 
 ## Projects and site plans
 
-Test-fit a building on a piece of land, by hand or with AI.
+Test-fit a building, or a whole mixed-use development, on one parcel or up to 20 together, by hand or with AI, and print it as a site plan sheet.
 
 **Starting one**
 - Open a property card (click a building, or open ground at street zoom) and choose **Start Site Plan** under Site Tools.
+- **Several parcels as one site:** pick up to 20 (Shift-click, or **Select Multiple** on touch screens), open the **All** tab and choose **Site Plan for All**. Their outlines are merged into one site; small gaps and overlaps between neighbouring parcels (common in appraisal data) are closed up, while parcels across a road stay separate and are left out, with a note.
 - Start a **new project** (named after the address) or **add the parcel to a project** you already have.
 - The plan starts from the parcel's outline from the county appraisal district. Harris and Waller aren't in that data: open the card's **Regrid details** first and the plan uses Regrid's outline, or draw the site yourself (click each corner, then the first corner again).
 - The map zooms to the lot. The existing buildings are hidden while you plan, and come back when you close the plan.
@@ -331,17 +332,26 @@ Test-fit a building on a piece of land, by hand or with AI.
 **Build with AI**
 - Say what should go there, e.g. "25,000 sf retail strip", "6,000 sf restaurant with drive-thru", "200 apartments, 3 stories", "warehouse with truck court, as big as fits", or tap a suggestion.
 - The AI turns your words into a program: the use, floor area, floors, units, parking ratio and setbacks, filling gaps with typical Houston-area numbers. It lists what it assumed.
-- The app then lays out **three options** on the lot (parking in front, building at the street, turned 90°), each with its floor area, parking and coverage. Click one to use it; **Undo** goes back.
-- Leave the size out ("as big as fits") and it fits the most building the parking allows.
+- The app then lays out **three options** on the lot (parking in front, building at the street, parking beside), squared up with the lot's main lines, each with its floor area, parking and coverage. Click one to use it; **Undo** goes back.
+- Leave the size out and it uses a typical size for that use on a lot that size; say "as big as fits" and it fits the most building the parking allows.
+- Detention is a strip along the back of the lot (or behind the buildings on a big lot), sized to the land the project covers rather than the whole lot.
 - If the AI isn't available, the app reads your words directly and still lays out the options.
+- **Mixed use:** describe several uses ("37,700 sf retail with 2 pads, a commons with a lake, 120 apartments, 18 townhomes and 12 duplex units") and the site is laid out in zones from the street back, the way a conceptual site plan is drawn:
+  - shops at the front, with pad sites (restaurants, coffee with drive-thru) at the street corners and the shops behind a shared parking field;
+  - a commons in the middle: an amenity lake that holds the site's detention, a pavilion, pickleball courts, a playground, lawn and dog park as room allows;
+  - apartment buildings with a clubhouse and pool, townhome rows back to back on rear-load lanes, and duplexes on lanes at the back;
+  - 26 ft drives between the zones and a main entry drive from the street.
+  - A zone too shallow for its use shares a band with its neighbour, side by side. If the program needs more land than the site has, it's scaled down, with a note.
+- **Detail:** buildings are named and sized ("Apt Bldg 1 · 40 units · 42,353 sf · 3 fl", "Pad A", "Townhome Row 2"), parking has planted islands with trees, buildings have walks around them, and trees line the landscape buffer and the lake.
 
 **Drawing by hand**
 - Add a **Building, Parking, Drive, Truck court, Detention or Landscape** piece. Drag a piece to move it, its white corners to resize it, and the orange dot to turn it (it snaps to the lot's lines; hold Shift to turn freely).
 - Keyboard: arrow keys nudge (Shift for 10 ft), R turns 90°, Delete removes, ⌘Z / Ctrl+Z undoes.
 - Parking counts its spaces as you size it (9 × 18 ft spaces on 24 ft aisles).
-- Type exact sizes, the turn and the number of floors in the **Selected** box.
+- Type exact sizes, the turn, the number of floors, the building's use (which sets its parking and colour) and its name in the **Selected** box. Townhomes and duplexes also take the number of homes.
 - **Street Side:** the orange line marks the side along the street. The app finds it from the map's roads; when it can't, it says the line is a guess. Click **Street Side**, then the lot line along the street, to set it. Front setbacks and drives follow it.
-- **Redraw Site** replaces the outline (for part of a parcel, or several parcels together).
+- **Add or Remove Parcels:** click a parcel next to the site to add it (up to 20), or one in the site to take it out; the outline is merged again and the pieces stay where they are.
+- **Redraw Site** replaces the outline (for part of a parcel, or a site that doesn't follow parcel lines).
 - Building heights show in 3D when you tilt the map.
 
 **Numbers and checks**
@@ -352,12 +362,20 @@ Test-fit a building on a piece of land, by hand or with AI.
 **Several options:** **+ Copy** starts another option from the current one (Option B, C…). Each project keeps all its options.
 
 **Exports**
+- **Site Plan PDF:** a conceptual site plan sheet on **11 × 17** or **24 × 36** paper:
+  - the plan to a standard scale (1" = 50', 100', 150'…), turned so the street is at the bottom, with a north arrow and scale bar;
+  - a vicinity map, the project and sheet title, the program at a glance, and the basis of design;
+  - tables for site data and land use (by zone), development program and parking, and the parcels (address, owner, acres);
+  - notes on constraints and due diligence from the site's own data (flood zone, water district, school district, the busiest road and its traffic, EPA-regulated facilities nearby, a replat for several parcels) plus any problems on the plan;
+  - a legend and a "conceptual, for feasibility only" disclaimer.
+  - If the PDF can't be made, it's saved as a web page to print instead.
 - **CAD (DXF):** opens in AutoCAD, CADCraft, LibreCAD and most CAD programs, in feet, with layers for the lot, setback line, buildings, parking, stripes, drives and detention, and a notes block.
 - **Map File (GeoJSON)** and **Copy Summary** (the numbers as text).
 
 **The Projects tab** lists every project: rename it, set its status (Idea, Pursuing, Under contract, Closed, Passed), keep notes, see each option's numbers, open a plan, jump to a parcel, or **Draw a Site** for land without a parcel outline.
 
 **Good to know**
+- The PDF is a conceptual sheet. It has no survey bearings, easements, utilities or title research, so it won't match an engineer's or architect's sheet; it's for feasibility and early conversations.
 - A site plan is a planning sketch from the parcel outline: not a survey, and no grading, utilities, fire lanes or code review. Parcel outlines from appraisal districts can be off by several feet.
 - The setbacks, parking ratios and detention share are typical starting numbers, not the rules for a specific city. Houston has no zoning but has building lines and parking rules; other cities differ.
 - Projects are saved in this browser. Sharing them with the team switches on once the site's team database is set up for projects; until then the Projects tab says they're saved on this device.
@@ -399,6 +417,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Site plans like a real conceptual sheet:** up to 20 parcels merged into one site, mixed-use layouts in zones (shops and pads, a commons with an amenity lake, apartments with a clubhouse and pool, townhomes, duplexes), trees, walks and planted parking islands, named buildings, and a **Site Plan PDF** on 11 × 17 or 24 × 36 with data tables, notes from the site's data and a vicinity map.
 - **Projects and site plans:** start a project from any property card and lay out a site plan on the parcel, by hand or with **Build with AI** (three options with floor area, parking and coverage), checked against setbacks, and exported to CAD (DXF).
 - **The app's own cursors:** a branded set that shows what a click will do, with a different one for each selection tool.
 - **A new Market tab:** construction pipeline, growth, housing and rents, building material costs and rates, each in its own section with a button to jump to it, hover numbers on every chart, and a "What's moving" summary.

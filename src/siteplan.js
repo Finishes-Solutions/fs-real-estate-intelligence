@@ -5,13 +5,17 @@
 // Projects are kept on this device and shared with the team through /api/projects once it's set up. Exports DXF
 // (AutoCAD, CADCraft and other CAD programs) and GeoJSON.
 import * as SP from './lib/siteplan.mjs';
+import { composeSite } from './lib/sitecompose.mjs';
+import { sheetHTML } from './lib/sitesheet.mjs';
+import { areaMap } from './reportkit.js';
 
 const KEY = 'fs-projects-v1', CODE_KEY = 'fs-team-code', NAME_KEY = 'fs-team-name';
 const STATUS = ['Idea', 'Pursuing', 'Under contract', 'Closed', 'Passed'];
 const ADD = ['building', 'parking', 'drive', 'truck', 'pond', 'green'];
 const SIZE = { building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40] };
-const SUGGEST = ['25,000 sf retail strip', '6,000 sf restaurant with drive-thru', '2-story medical office', '200 apartments, 3 stories', 'Warehouse with truck court, as big as fits'];
-const COL = { building: '#d0694c', parking: '#9aa3a6', drive: '#7c8689', truck: '#9a8fb8', pond: '#5b9bd1', green: '#62b072' };
+const SUGGEST = ['25,000 sf retail strip with 2 pads', '6,000 sf restaurant with drive-thru', '2-story medical office', '200 apartments, 3 stories', 'Warehouse with truck court, as big as fits', 'Mixed use: retail in front, a commons with a lake, 120 apartments, 18 townhomes and 12 duplex units'];
+const COL = { building: '#d0694c', parking: '#9aa3a6', drive: '#7c8689', truck: '#9a8fb8', pond: '#5b9bd1', green: '#62b072', plaza: '#d9c8a9', court: '#4f7fa3', pool: '#7ccbe6', play: '#e3cc9a' };
+const USE_COL = { retail: '#c8673d', restaurant: '#c8673d', office: '#b5553c', medical: '#b5553c', other: '#b0603f', industrial: '#a2775b', multifamily: '#d8b16a', townhomes: '#b8865b', duplex: '#d9a77c', amenity: '#8a6fb3' };
 const get = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const t = s => Date.parse(s || 0) || 0;
@@ -62,29 +66,42 @@ export function initSitePlan(ctx) {
   const parcelKey = pc => pc.propId ? 'pid:' + pc.propId : 'pt:' + pc.center.map(v => v.toFixed(5)).join(',');
 
   // ---------- starting from a property card ----------
-  // info: { center, title, parcel, parcels } from the building card
+  // info: { center, title, parcel } from a property card, or { center, title, parcels: [...] } from the card's All tab
+  const MAXP = 20;
+  const llRound = g => g && JSON.parse(JSON.stringify(g, (k, v) => typeof v === 'number' ? +v.toFixed(7) : v));
+  const parcelOf = (pc, center) => { const g = pc.geometry, r = g && (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates?.[0]?.[0]); const cc = r ? SP.centroid(r) : center;
+    const rec = { key: '', label: pc.situs || pc.owner || 'Parcel', owner: pc.owner || '', propId: pc.propId || null, acres: g ? +(SP.ringArea(SP.boundaryFrom(g, center)?.ring || []) / 43560).toFixed(3) : null, center: cc.map(v => +v.toFixed(6)), geometry: llRound(g) || null };
+    rec.key = parcelKey(rec); return rec; };
+  // the site boundary for a set of parcels (one outline, or several merged)
+  function siteOf(recs) { const g = recs.map(r => r.geometry).filter(Boolean); return g.length > 1 ? SP.unionParcels(g) : g.length ? { ...SP.boundaryFrom(g[0], recs[0].center), pieces: 1 } : null; }
   function start(info) {
-    if (!info?.center) { ctx.toast('Open a parcel first: click a building or open ground at street zoom.'); return; }
-    const rg = ctx.lastRegrid?.geom, pc = info.parcel || null, geom = pc?.geometry || (rg && inGeom(info.center, rg) ? rg : null); // Harris and Waller: Regrid's outline
-    const b = geom ? SP.boundaryFrom(geom, info.center) : null, label = pc?.situs || info.title || 'Site';
+    let list = (info?.parcels?.length ? info.parcels : info?.parcel ? [info.parcel] : []).slice(0, MAXP);
+    if (!info?.center && !list.length) { ctx.toast('Open a parcel first: click a building or open ground at street zoom.'); return; }
+    const rg = ctx.lastRegrid?.geom, center = info.center || list[0]?.center;
+    if (list.length <= 1 && !list[0]?.geometry && rg && inGeom(center, rg)) list = [{ ...(list[0] || {}), geometry: rg, regrid: true }]; // Harris and Waller: Regrid's outline
+    const recs = list.map(pc => parcelOf(pc, center)), b = siteOf(recs), many = recs.length > 1;
+    const label = many ? recs.length + ' parcels' + (recs[0].label ? ' · ' + recs[0].label : '') : recs[0]?.label || info.title || 'Site';
     const acres = b ? SP.ringArea(b.ring) / 43560 : null, recent = db.projects.slice().sort((x, y) => t(y.updated) - t(x.updated)).slice(0, 8);
+    const noGeom = recs.filter(r => !r.geometry).length;
     ctx.clearSelection?.();
     card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan</div><h2>Start a site plan</h2><div class="bsub">' + esc(label) + (acres ? ' · ' + acres.toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() + '</div>' +
       '<div class="bsec sp-start"><div class="lt">Project</div>' +
-      '<label class="sp-radio"><input type="radio" name="spP" value="" checked> New project <input id="spName" class="sp-in" value="' + esc(pc?.situs || pc?.owner || label) + '" aria-label="Project name"></label>' +
+      '<label class="sp-radio"><input type="radio" name="spP" value="" checked> New project <input id="spName" class="sp-in" value="' + esc(recs[0]?.label || label) + '" aria-label="Project name"></label>' +
       recent.map(p => '<label class="sp-radio"><input type="radio" name="spP" value="' + esc(p.id) + '"> Add to <b>' + esc(p.name) + '</b> <span class="rnote">' + p.plans.length + ' plan' + (p.plans.length === 1 ? '' : 's') + '</span></label>').join('') +
-      '<div class="lt" style="margin-top:12px">Boundary</div><div class="rnote">' + (b ? 'The parcel outline from ' + (pc?.geometry ? 'the county appraisal district' : 'Regrid') + '. You can redraw it in the plan.' : 'There’s no parcel outline here' + (pc ? '' : ' yet') + ' (Harris and Waller parcels need Regrid details first). You’ll draw the site on the map.') + '</div>' +
+      '<div class="lt" style="margin-top:12px">Site</div><div class="rnote">' + (b ? (many ? recs.length + ' parcel outlines from the county appraisal district, merged into one site (small gaps and overlaps between them are closed up).' : 'The parcel outline from ' + (list[0]?.regrid ? 'Regrid' : 'the county appraisal district') + '.') + ' You can add or remove parcels, or redraw the site, in the plan.' : 'There’s no parcel outline here (Harris and Waller parcels need Regrid details first). You’ll draw the site on the map.') + '</div>' +
+      (b?.pieces > 1 ? '<div class="rnote sp-warn">Some parcels don’t touch the rest (a road or a gap wider than 6 ft between them), so they’re left out of the site.</div>' : '') +
+      (noGeom && b ? '<div class="rnote sp-warn">' + noGeom + ' of the parcels have no outline from the county and are left out.</div>' : '') +
       '<div class="bacts" style="padding:12px 0 0"><button class="btn askai" id="spStart">Start Site Plan</button><button class="btn" id="spBack">Back</button></div></div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
-    card.querySelector('#spBack').onclick = () => ctx.openBuildingAt(info.center);
+    card.querySelector('#spBack').onclick = () => ctx.openBuildingAt(center);
     card.querySelector('#spStart').onclick = () => {
       const pick = card.querySelector('input[name=spP]:checked').value;
       let p = db.projects.find(x => x.id === pick);
       if (!p) { p = { id: uid(), name: card.querySelector('#spName').value.trim() || label, status: 'Idea', notes: '', parcels: [], plans: [], created: new Date().toISOString(), by: get(NAME_KEY) }; db.projects.push(p); }
-      const parcel = { key: '', label, owner: pc?.owner || '', propId: pc?.propId || null, acres: acres ? +acres.toFixed(3) : null, center: info.center.map(v => +v.toFixed(6)) };
-      parcel.key = parcelKey(parcel); if (!p.parcels.some(x => x.key === parcel.key)) p.parcels.push(parcel);
-      const plan = newPlan(p, b ? { origin: b.origin, ring: b.ring, src: pc?.geometry ? 'parcel' : 'regrid', parcel: parcel.key, zoning: ctx.lastRegrid?.zoning && geom === ctx.lastRegrid.geom ? zoningOf(ctx.lastRegrid.zoning) : null } : { parcel: parcel.key, origin: info.center });
+      for (const r of recs) { const i = p.parcels.findIndex(x => x.key === r.key); if (i < 0) p.parcels.push(r); else if (!p.parcels[i].geometry && r.geometry) p.parcels[i] = r; }
+      const z = ctx.lastRegrid?.zoning && list.some(x => x.regrid) ? zoningOf(ctx.lastRegrid.zoning) : null;
+      const plan = newPlan(p, b ? { origin: b.origin, ring: b.ring, src: many ? 'parcels' : list[0]?.regrid ? 'regrid' : 'parcel', parcel: recs[0].key, parcels: recs.map(r => r.key), zoning: z } : { parcel: recs[0]?.key, parcels: recs.map(r => r.key), origin: center });
       p.plans.push(plan); save(p); open(p.id, plan.id, { draw: !b });
     };
     return true;
@@ -131,7 +148,7 @@ export function initSitePlan(ctx) {
     if (f != null) { pl.front = f; pl.frontGuess = false; save(P()); draw(); panel(); }
   }
 
-  function snapshot() { const pl = PL(); return clone({ elements: pl.elements, front: pl.front, frontGuess: pl.frontGuess, setbacks: pl.setbacks, program: pl.program, ring: pl.ring, origin: pl.origin, src: pl.src }); }
+  function snapshot() { const pl = PL(); return clone({ zones: pl.zones || [], elements: pl.elements, front: pl.front, frontGuess: pl.frontGuess, setbacks: pl.setbacks, program: pl.program, ring: pl.ring, origin: pl.origin, src: pl.src }); }
   function change(fn, keepPanel) {
     const pl = PL(); if (!pl) return; ed.undo.push(snapshot()); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = [];
     fn(pl); pl.updated = new Date().toISOString(); save(P()); draw(); if (!keepPanel) panel(); else nums();
@@ -148,23 +165,29 @@ export function initSitePlan(ctx) {
     const kind = k => ['==', ['get', 'k'], k], dark = ctx.isDark();
     map.addSource(SRC, { type: 'geojson', data: EMPTY }); map.addSource(HSRC, { type: 'geojson', data: EMPTY }); map.addSource(DSRC, { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'fs-sp-lot', type: 'fill', source: SRC, filter: kind('lot'), paint: { 'fill-color': dark ? '#ffffff' : '#ffffff', 'fill-opacity': dark ? .06 : .35 } });
-    map.addLayer({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'green']]],
-      paint: { 'fill-color': ['match', ['get', 'k'], 'parking', COL.parking, 'drive', COL.drive, 'truck', COL.truck, 'pond', COL.pond, COL.green], 'fill-opacity': ['case', ['==', ['get', 'sel'], 1], .9, .75] } });
+    map.addLayer({ id: 'fs-sp-zone', type: 'line', source: SRC, filter: kind('zone'), paint: { 'line-color': dark ? '#939a9d' : '#6b7174', 'line-width': 1, 'line-dasharray': [6, 4] } });
+    map.addLayer({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play']]],
+      paint: { 'fill-color': ['match', ['get', 'k'], 'parking', COL.parking, 'drive', COL.drive, 'truck', COL.truck, 'pond', COL.pond, 'plaza', COL.plaza, 'court', COL.court, 'pool', COL.pool, 'play', COL.play, COL.green], 'fill-opacity': ['case', ['==', ['get', 'sel'], 1], .9, .75] } });
+    map.addLayer({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': dark ? '#5b6366' : '#ecece6', 'fill-opacity': .85 } });
     map.addLayer({ id: 'fs-sp-stall', type: 'line', source: SRC, filter: kind('stall'), minzoom: 16, paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': .9 } });
+    map.addLayer({ id: 'fs-sp-isl', type: 'fill', source: SRC, filter: kind('island'), paint: { 'fill-color': COL.green, 'fill-opacity': .9 } });
+    map.addLayer({ id: 'fs-sp-pl', type: 'line', source: SRC, filter: kind('pline'), paint: { 'line-color': dark ? '#8acda3' : '#0a7a36', 'line-width': 1, 'line-dasharray': [4, 3], 'line-opacity': .8 } });
     map.addLayer({ id: 'fs-sp-sb', type: 'line', source: SRC, filter: kind('setback'), paint: { 'line-color': dark ? '#bcc2c4' : '#4d5457', 'line-width': 1.3, 'line-dasharray': [3, 2] } });
     map.addLayer({ id: 'fs-sp-lotl', type: 'line', source: SRC, filter: kind('lot'), paint: { 'line-color': dark ? '#4caf70' : '#006527', 'line-width': 2.5 } });
     map.addLayer({ id: 'fs-sp-front', type: 'line', source: SRC, filter: kind('front'), paint: { 'line-color': '#e0a23c', 'line-width': 5, 'line-opacity': .9 } });
-    map.addLayer({ id: 'fs-sp-bldg', type: 'fill-extrusion', source: SRC, filter: kind('building'), paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], '#d64541', COL.building], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .88 } });
-    map.addLayer({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['building', 'parking', 'drive', 'truck', 'pond', 'green']]],
+    map.addLayer({ id: 'fs-sp-tree', type: 'circle', source: SRC, filter: kind('tree'), minzoom: 15, paint: { 'circle-color': '#7fae5f', 'circle-opacity': .85, 'circle-stroke-color': '#55803c', 'circle-stroke-width': 1,
+      'circle-radius': ['interpolate', ['exponential', 2], ['zoom'], 15, ['*', ['get', 'r'], 0.074], 22, ['*', ['get', 'r'], 9.42]] } }); // canopy radius in feet, to scale
+    map.addLayer({ id: 'fs-sp-bldg', type: 'fill-extrusion', source: SRC, filter: kind('building'), paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], '#d64541', ['match', ['get', 'use'], ...Object.entries(USE_COL).flat(), COL.building]], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .88 } });
+    map.addLayer({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['building', 'parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play']]],
       paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], '#d64541', ['==', ['get', 'sel'], 1], dark ? '#ffffff' : '#0b0d0c', dark ? 'rgba(255,255,255,.5)' : 'rgba(11,13,12,.45)'], 'line-width': ['case', ['==', ['get', 'sel'], 1], 2.5, ['==', ['get', 'bad'], 1], 2, 1] } });
-    map.addLayer({ id: 'fs-sp-lab', type: 'symbol', source: SRC, filter: kind('label'), layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-allow-overlap': false },
+    map.addLayer({ id: 'fs-sp-lab', type: 'symbol', source: SRC, filter: kind('label'), layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': ['case', ['==', ['get', 'big'], 1], 12, 10.5], 'text-allow-overlap': false, 'text-max-width': 14 },
       paint: { 'text-color': '#0b0d0c', 'text-halo-color': '#ffffff', 'text-halo-width': 1.6 } });
     map.addLayer({ id: 'fs-sp-dl', type: 'line', source: DSRC, paint: { 'line-color': '#e0a23c', 'line-width': 2.5, 'line-dasharray': [2, 1.5] } });
     map.addLayer({ id: 'fs-sp-dp', type: 'circle', source: DSRC, filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#e0a23c', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
     map.addLayer({ id: 'fs-sp-h', type: 'circle', source: HSRC, paint: { 'circle-radius': ['case', ['==', ['get', 'r'], 1], 7, 6], 'circle-color': ['case', ['==', ['get', 'r'], 1], '#e0a23c', '#ffffff'], 'circle-stroke-color': '#0b0d0c', 'circle-stroke-width': 1.5 } });
     draw();
   }
-  ctx.onOverlays?.(() => { for (const id of ['fs-sp-lot', 'fs-sp-fill', 'fs-sp-stall', 'fs-sp-sb', 'fs-sp-lotl', 'fs-sp-front', 'fs-sp-bldg', 'fs-sp-edge', 'fs-sp-lab', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-h']) if (map.getLayer(id)) map.removeLayer(id);
+  ctx.onOverlays?.(() => { for (const id of ['fs-sp-zone', 'fs-sp-walk', 'fs-sp-isl', 'fs-sp-tree', 'fs-sp-pl', 'fs-sp-lot', 'fs-sp-fill', 'fs-sp-stall', 'fs-sp-sb', 'fs-sp-lotl', 'fs-sp-front', 'fs-sp-bldg', 'fs-sp-edge', 'fs-sp-lab', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-h']) if (map.getLayer(id)) map.removeLayer(id);
     for (const s of [SRC, HSRC, DSRC]) if (map.getSource(s)) map.removeSource(s); if (ed) { addLayers(); if (map.getLayer('fs-bldg')) map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } });
   function handles(pl) {
     const e = pl.elements.find(x => x.id === ed.sel); if (!e) return [];
@@ -174,7 +197,9 @@ export function initSitePlan(ctx) {
   function draw() {
     cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
       const pl = ed && PL(), s = map.getSource(SRC); if (!s) return;
-      s.setData(pl?.ring.length >= 3 ? SP.planFeatures(pl, ed.sel) : EMPTY);
+      const fc = pl?.ring.length >= 3 ? SP.planFeatures(pl, ed.sel) : EMPTY, P0 = P();
+      if (fc !== EMPTY && (pl.parcels?.length > 1 || ed.mode === 'parcels')) for (const k of pl.parcels || []) { const r = P0.parcels.find(x => x.key === k); if (r?.geometry) fc.features.push({ type: 'Feature', properties: { k: 'pline' }, geometry: r.geometry }); }
+      s.setData(fc);
       map.getSource(HSRC)?.setData(pl?.ring.length >= 3 ? { type: 'FeatureCollection', features: handles(pl).map(h => ({ type: 'Feature', properties: { r: h.i === 'r' ? 1 : 0 }, geometry: { type: 'Point', coordinates: h.at } })) } : EMPTY);
       const d = ed?.mode === 'draw' && pl?.origin ? ed.draft.map(SP.frame(pl.origin).toLL) : [];
       map.getSource(DSRC)?.setData({ type: 'FeatureCollection', features: d.map(c => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } })).concat(d.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: d } }] : []) });
@@ -227,7 +252,7 @@ export function initSitePlan(ctx) {
     const c = map.getCanvas(); if (ed.mode) { c.style.cursor = 'crosshair'; return; }
     const h = pl.ring.length >= 3 && hit(pl, e); c.style.cursor = !h ? '' : h.h === 'r' ? 'grab' : h.h != null ? 'nwse-resize' : 'move';
   });
-  const frameAngle = pl => { const r = pl.ring, f = pl.front ?? SP.longestEdge(r), a = r[f], b = r[(f + 1) % r.length]; return a && b ? Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI : 0; };
+  const frameAngle = pl => pl.ring.length >= 3 ? SP.mainAngle(pl.ring) : 0; // the lot's main lines: new pieces square up with them
 
   // clicks while the plan is open: draw the boundary, pick the street side, or select; never open other cards
   ctx.mapClickHandlers.unshift(e => {
@@ -237,16 +262,44 @@ export function initSitePlan(ctx) {
       if (first && ed.draft.length >= 3 && Math.hypot(first.x - e.point.x, first.y - e.point.y) < 14) finishDraw(); else { ed.draft.push(p); draw(); panel(); }
       return true;
     }
+    if (ed.mode === 'parcels') { pickParcel(e.lngLat); return true; }
     if (ed.mode === 'front') { const p = ftAt(pl, e.lngLat); change(x => { x.front = SP.nearestEdge(x.ring, p); x.frontGuess = false; }); ed.mode = null; panel(); return true; }
     if (!hit(pl, e) && ed.sel) { ed.sel = null; draw(); panel(); }
     return true;
   });
   map.on('dblclick', e => { if (ed?.mode === 'draw') { e.preventDefault(); finishDraw(); } });
+  // move a plan to a new boundary (and origin), keeping every piece where it is on the ground
+  function reorigin(x, b, src) {
+    const G = SP.frame(x.origin), N = SP.frame(b.origin);
+    x.elements.forEach(e => { const q = N.toFt(G.toLL([e.x, e.y])); e.x = +q[0].toFixed(2); e.y = +q[1].toFixed(2); });
+    x.origin = b.origin; x.ring = b.ring; x.src = src; x.front = null; x.frontGuess = true;
+  }
+  function setParcels(keys) {
+    const p = P(), recs = keys.map(k => p.parcels.find(x => x.key === k)).filter(r => r?.geometry), b = siteOf(recs);
+    if (!b) { ctx.toast('Those parcels have no outline to plan on.'); return; }
+    const pl = PL(); change(x => { reorigin(x, b, recs.length > 1 ? 'parcels' : 'parcel'); x.parcels = recs.map(r => r.key); x.parcel = recs[0].key; });
+    if (b.pieces > 1) ctx.toast('Some parcels don’t touch the rest (a road or a gap wider than 6 ft), so they’re left out of the site.');
+    map.once('idle', () => PL() === pl && detectFront(pl));
+  }
+  async function pickParcel(lngLat) {
+    const p = P(), pl = PL(), c = [lngLat.lng, lngLat.lat], keys = pl.parcels || (pl.parcel ? [pl.parcel] : []);
+    const inside = keys.map(k => p.parcels.find(x => x.key === k)).find(r => r?.geometry && inGeom(c, r.geometry));
+    if (inside) { if (keys.length === 1) { ctx.toast('A site needs at least one parcel.'); return; } setParcels(keys.filter(k => k !== inside.key)); return; }
+    if (keys.length >= MAXP) { ctx.toast('Up to ' + MAXP + ' parcels in one site.'); return; }
+    ctx.toast('Looking up the parcel…');
+    try {
+      const r = await fetch('api/building?' + new URLSearchParams({ lat: c[1].toFixed(6), lon: c[0].toFixed(6), part: 'parcel' })), d = await r.json();
+      if (!r.ok || !d.parcel) throw new Error(d.error || 'No parcel here.');
+      if (!d.parcel.geometry) { ctx.toast('The county has no outline for that parcel (Harris and Waller need Regrid details).'); return; }
+      const rec = parcelOf(d.parcel, c); if (!p.parcels.some(x => x.key === rec.key)) p.parcels.push(rec);
+      if (keys.includes(rec.key)) return; setParcels([...keys, rec.key]);
+    } catch (e) { ctx.toast('Couldn’t look up that parcel: ' + e.message); }
+  }
   function finishDraw() {
     const pl = PL(); if (!pl || ed.draft.length < 3) { ctx.toast('Click at least three corners of the site.'); return; }
     const F = SP.frame(pl.origin), ll = ed.draft.map(F.toLL), b = SP.boundaryFrom({ type: 'Polygon', coordinates: [ll.concat([ll[0]])] });
     if (!b) return; const old = pl.origin;
-    change(x => { const G = SP.frame(old); x.elements.forEach(e => { const q = SP.frame(b.origin).toFt(G.toLL([e.x, e.y])); e.x = +q[0].toFixed(2); e.y = +q[1].toFixed(2); }); x.origin = b.origin; x.ring = b.ring; x.src = 'drawn'; x.front = null; x.frontGuess = true; });
+    change(x => reorigin(x, b, 'drawn'));
     ed.mode = null; ed.draft = []; draw(); panel(); map.once('idle', () => PL() === pl && detectFront(pl));
   }
 
@@ -279,6 +332,7 @@ export function initSitePlan(ctx) {
         '<div class="sp-sugs">' + SUGGEST.map(s => '<button class="chip" data-sug="' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div>' +
         '<div class="bacts" style="padding:8px 0 0"><button class="btn askai" id="spGo">Build Options</button><span class="rnote" id="spAiNote">' + esc(ed.aiNote || '') + '</span></div>' +
         '<div id="spVariants">' + variantsHtml() + '</div></div>' +
+      siteHtml(p, pl) +
       '<div class="bsec"><div class="lt">Draw</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + COL[k] + '"></i>' + SP.KINDS[k].label + '</button>').join('') + '</div>' +
         '<div class="sp-tools"><button class="btn" aria-pressed="' + (ed.mode === 'front') + '" id="spFront" title="Then click the lot line along the street">' + (ed.mode === 'front' ? 'Click the street side…' : 'Street Side') + '</button><button class="btn" id="spRedraw">Redraw Site</button>' +
         '<button class="btn" id="spUndo"' + (ed.undo.length ? '' : ' disabled') + ' title="Undo (⌘Z / Ctrl+Z)">Undo</button><button class="btn" id="spRedo"' + (ed.redo.length ? '' : ' disabled') + '>Redo</button></div>' +
@@ -291,7 +345,7 @@ export function initSitePlan(ctx) {
         num('detentionPct', 'Detention (% of site)', prog.detentionPct ?? (SP.ringArea(pl.ring) >= 43560 ? 10 : 0), 1) +
         ['front', 'side', 'rear', 'paving'].map(k => num('sb-' + k, { front: 'Front setback (ft)', side: 'Side setback (ft)', rear: 'Rear setback (ft)', paving: 'Landscape buffer (ft)' }[k], (pl.setbacks || SP.SETBACKS)[k], 1)).join('') +
         '</div><div class="rnote">Typical suburban numbers to start with. Check the city’s or county’s rules (Houston has no zoning but has building lines and parking rules).</div></details>' +
-      '<div class="bsec"><div class="lt">Export</div><div class="bacts" style="padding:0"><button class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button class="btn" id="spGeo">Map File (GeoJSON)</button><button class="btn" id="spSum">Copy Summary</button></div>' +
+      '<div class="bsec"><div class="lt">Export</div><div class="bacts" style="padding:0 0 8px"><button class="btn askai" id="spPdf" title="A conceptual site plan sheet: the plan to scale with title block, site data, program and parking, parcels, notes and legend">Site Plan PDF</button><select class="chip" id="spSheet" aria-label="Sheet size"><option value="tabloid">11 × 17</option><option value="archd">24 × 36</option></select></div><div class="bacts" style="padding:0"><button class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button class="btn" id="spGeo">Map File (GeoJSON)</button><button class="btn" id="spSum">Copy Summary</button></div>' +
         '<div class="bacts" style="padding:8px 0 0"><button class="btn" id="spProj">All Projects</button><button class="btn sp-del" id="spDelPlan">Delete This Plan</button></div></div>') +
       '</div>';
     card.classList.add('open');
@@ -311,17 +365,27 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('[data-add]').forEach(b => b.onclick = () => addEl(b.dataset.add));
     on('#spFront', () => { ed.mode = ed.mode === 'front' ? null : 'front'; panel(); });
     on('#spRedraw', () => { ed.mode = 'draw'; ed.draft = []; ed.sel = null; ctx.toast('Click each corner of the site; click the first one again to finish. Esc cancels.'); draw(); panel(); });
+    on('#spParcels', () => { ed.mode = ed.mode === 'parcels' ? null : 'parcels'; ed.sel = null; draw(); panel(); });
+    card.querySelectorAll('[data-rmp]').forEach(b => b.onclick = () => { const keys = (pl.parcels || []).filter(k => k !== b.dataset.rmp); if (keys.length) setParcels(keys); });
     on('#spUndo', () => undo(true)); on('#spRedo', () => undo(false));
     $('#spUse').onchange = e => change(x => { x.program = { ...x.program, use: e.target.value, ratio: null, perUnit: null, floors: null, depth: null, truck: null }; });
     card.querySelectorAll('.sp-grid input[data-k]').forEach(i => i.onchange = () => change(x => { const k = i.dataset.k, v = i.value === '' ? null : +i.value; if (k.startsWith('sb-')) x.setbacks = { ...(x.setbacks || SP.SETBACKS), [k.slice(3)]: v ?? SP.SETBACKS[k.slice(3)] }; else x.program = { ...x.program, [k]: v }; }));
     $('.sp-prog').ontoggle = e => { ed.progOpen = e.target.open; };
     wireSel(sel);
+    on('#spPdf', () => exportPdf(p, pl, card.querySelector('#spSheet').value));
     on('#spDxf', () => ctx.saveFile(fileName(p, pl) + '.dxf', SP.toDXF(pl, p.name + ' - ' + pl.name), 'application/dxf'));
     on('#spGeo', () => ctx.saveFile(fileName(p, pl) + '.geojson', JSON.stringify(geojson(p, pl), null, 1), 'application/geo+json'));
     on('#spSum', async () => { const s = summary(p, pl); try { await navigator.clipboard.writeText(s); ctx.toast('Summary copied.'); } catch (e) { prompt('Copy the summary', s); } });
     on('#spProj', () => { ctx.closeCard(); ctx.setView('projects'); });
     on('#spDelPlan', () => { if (!confirm('Delete ' + pl.name + ' from ' + p.name + '?')) return; p.plans = p.plans.filter(x => x.id !== pl.id); save(p); ctx.closeCard(); ctx.setView('projects'); });
     nums();
+  }
+  function siteHtml(p, pl) {
+    const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), recs = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), on = ed.mode === 'parcels';
+    return '<div class="bsec"><div class="lt">Site · ' + recs.length + ' parcel' + (recs.length === 1 ? '' : 's') + ' · ' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' ac</div>' +
+      (recs.length > 1 ? '<div class="sp-parcels">' + recs.map(r => '<span class="chip">' + esc(r.label) + (r.acres ? ' · ' + r.acres.toFixed(2) + ' ac' : '') + '<button class="sp-x" data-rmp="' + esc(r.key) + '" aria-label="Remove ' + esc(r.label) + ' from the site">×</button></span>').join('') + '</div>' : '') +
+      '<div class="sp-tools"><button class="btn" aria-pressed="' + on + '" id="spParcels" title="Click parcels on the map to add them to the site (up to ' + MAXP + ') or take them out">' + (on ? 'Done Adding Parcels' : 'Add or Remove Parcels') + '</button></div>' +
+      (on ? '<div class="rnote">Click a parcel next to the site to add it, or one in the site to take it out. Small gaps between parcels are closed up; parcels across a road stay separate.</div>' : '') + '</div>';
   }
   const num = (k, label, v, step) => '<label>' + label + '<input type="number" inputmode="decimal" min="0" step="' + step + '" data-k="' + k + '" value="' + (v ?? '') + '"></label>';
   const fileName = (p, pl) => (p.name + ' ' + pl.name).replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'site-plan';
@@ -331,7 +395,10 @@ export function initSitePlan(ctx) {
     return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + '</div><div class="sp-grid">' +
       '<label>Width (ft)<input type="number" min="8" step="1" data-e="w" value="' + Math.round(e.w) + '"></label><label>Depth (ft)<input type="number" min="8" step="1" data-e="d" value="' + Math.round(e.d) + '"></label>' +
       '<label>Turn (°)<input type="number" step="1" data-e="rot" value="' + Math.round(e.rot || 0) + '"></label>' +
-      (e.kind === 'building' ? '<label>Floors<input type="number" min="1" max="40" step="1" data-e="floors" value="' + (e.floors || 1) + '"></label>' : '') +
+      (e.kind === 'building' ? '<label>Floors<input type="number" min="1" max="40" step="1" data-e="floors" value="' + (e.floors || 1) + '"></label>' +
+        '<label>Use<select data-use="1">' + Object.entries(SP.USES).map(([k, u]) => '<option value="' + k + '"' + (k === (e.use || prog.use) ? ' selected' : '') + '>' + u.label + '</option>').join('') + '</select></label>' +
+        (SP.USES[e.use || prog.use]?.garage ? '<label>Homes<input type="number" min="1" max="40" step="1" data-e="units" value="' + (e.units || 1) + '"></label>' : '') : '') +
+      '<label class="sp-wide">Name<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A"></label>' +
       '</div><div class="rnote" id="spRead"></div><div class="bacts" style="padding:8px 0 0"><button class="btn" id="spRot">Turn 90°</button><button class="btn" id="spDup">Copy</button><button class="btn sp-del" id="spDel">Delete</button></div>';
   }
   function readout(e) {
@@ -343,7 +410,9 @@ export function initSitePlan(ctx) {
   }
   function wireSel(e) {
     if (!e) return; readout(e);
-    card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v)) return; change(() => { const k = i.dataset.e; e[k] = k === 'floors' ? Math.max(1, Math.round(v)) : k === 'rot' ? ((v % 360) + 360) % 360 : Math.max(8, v); }, true); readout(e); });
+    card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v)) return; change(() => { const k = i.dataset.e; e[k] = k === 'floors' || k === 'units' ? Math.max(1, Math.round(v)) : k === 'rot' ? ((v % 360) + 360) % 360 : Math.max(8, v); }, true); readout(e); });
+    card.querySelector('[data-use]')?.addEventListener('change', ev => change(() => { e.use = ev.target.value; }));
+    card.querySelector('[data-name]')?.addEventListener('change', ev => change(() => { e.name = ev.target.value.trim().slice(0, 40); }, true));
     card.querySelector('#spRot').onclick = () => change(() => { e.rot = ((e.rot || 0) + 90) % 360; });
     card.querySelector('#spDup').onclick = () => { const c = { ...clone(e), id: uid() }, a = (e.rot || 0) * Math.PI / 180, off = e.w + 20; c.x = +(e.x + off * Math.cos(a)).toFixed(2); c.y = +(e.y + off * Math.sin(a)).toFixed(2); change(x => x.elements.push(c)); ed.sel = c.id; draw(); panel(); };
     card.querySelector('#spDel').onclick = () => { change(x => { x.elements = x.elements.filter(y => y.id !== e.id); }); ed.sel = null; draw(); panel(); };
@@ -357,7 +426,7 @@ export function initSitePlan(ctx) {
       row('Site', m.acres.toFixed(2) + ' ac · ' + f0(m.siteSf) + ' sf') +
       row('Building', m.gfa ? f0(m.gfa) + ' sf' + (m.buildings > 1 ? ' in ' + m.buildings + ' buildings' : '') + (m.units ? ' · about ' + f0(m.units) + ' units' : '') : '—') +
       row('Coverage', pct(m.coverage) + (z?.max_coverage_pct ? ' <span class="sc">(max ' + esc(z.max_coverage_pct) + '%)</span>' : '')) + row('FAR', m.far.toFixed(2) + (z?.max_far ? ' <span class="sc">(max ' + esc(z.max_far) + ')</span>' : '')) +
-      row('Parking', f0(m.spaces) + ' spaces' + (m.gfa ? ' <span class="sc">' + f0(m.required) + ' needed at ' + (prog.use === 'multifamily' ? prog.perUnit + '/unit' : prog.ratio + '/1,000 sf') + '</span>' : '')) +
+      row('Parking', f0(m.spaces) + ' spaces' + (m.garages ? ' (' + f0(m.garages) + ' in garages)' : '') + (m.gfa ? ' <span class="sc">' + f0(m.required) + ' needed at ' + (new Set(pl.elements.filter(e => e.kind === 'building').map(e => e.use || prog.use)).size > 1 ? 'each use’s ratio' : prog.use === 'multifamily' ? prog.perUnit + '/unit' : prog.ratio + '/1,000 sf') + '</span>' : '')) +
       row('Detention', m.pond ? (m.pond / 43560).toFixed(2) + ' ac (' + pct(m.pond / m.siteSf) + ')' : '—') +
       row('Paved + roofs', pct(m.impervious)) + row('Open space', pct(m.green)) +
       (m.heightFt ? row('Height', 'about ' + m.heightFt + ' ft') : '') + '</dl>' +
@@ -397,7 +466,7 @@ export function initSitePlan(ctx) {
     await new Promise(r => setTimeout(r, 30));
     const variants = [];
     for (let v = 0; v < SP.VARIANTS.length; v++) {
-      const plan = { ...pl, setbacks }, r = SP.autoLayout(plan, prog, v);
+      const plan = { ...pl, setbacks }, r = composeSite(plan, prog, v);
       variants.push({ ...r, setbacks, m: SP.metrics({ ...plan, program: r.program || prog, elements: r.elements }), name: SP.VARIANTS[v] });
       await new Promise(r => setTimeout(r, 0)); // keep the page responsive between options
     }
@@ -412,11 +481,46 @@ export function initSitePlan(ctx) {
   }
   function useVariant(i) {
     const v = ed.variants?.[i]; if (!v?.elements.length) return;
-    change(x => { x.elements = clone(v.elements); x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; });
+    change(x => { x.elements = clone(v.elements); x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; x.zones = clone(v.zones || []); });
     ed.pick = i; ed.sel = null; draw(); panel();
   }
 
   // ---------- exports ----------
+  // notes for the sheet from the Site facts (flood zone, districts, roads, environmental records) at the middle of the site
+  async function siteFacts(pl, parcel) {
+    if (!ctx.siteAt) return [];
+    const c = SP.frame(pl.origin).toLL(SP.centroid(pl.ring)), out = [];
+    try {
+      const d = await Promise.race([ctx.siteAt(c, '', ''), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 9000))]), f = d.flood;
+      if (f?.zone) out.push('FEMA flood zone ' + f.zone + (f.risk === 'high' ? ' — in the 100-year floodplain; expect fill, elevated slabs and floodplain permits.' : f.risk === 'moderate' ? ' — moderate risk (500-year floodplain).' : ' — outside the 100-year floodplain.') + ' (FEMA NFHL; at the middle of the site)');
+      const w = d.districts?.water || []; out.push(w.length ? 'Water / utility district: ' + w.map(x => x.name).join(', ') + '. Confirm capacity and annexation.' : 'No water or utility district (MUD) found here: water and sewer service needs to be confirmed.');
+      if (d.districts?.schools?.length) out.push('School district: ' + d.districts.schools.join(', ') + '.');
+      if (d.districts?.opportunityZone) out.push('In a federal Opportunity Zone.');
+      if (d.districts?.tirz?.length) out.push('In ' + d.districts.tirz.join(', ') + '.');
+      const r = d.traffic?.roads?.[0]; if (r) out.push('Busiest road nearby: ' + r.road + ', about ' + Math.round(r.aadt).toLocaleString('en-US') + ' vehicles a day (TxDOT). Expect driveway permits and possibly turn lanes.');
+      const e = d.environment; if (e && !e.error && e.total != null) out.push(e.total ? e.total + ' EPA-regulated facilit' + (e.total === 1 ? 'y' : 'ies') + ' within ¼ mile' + (e.flaggedCount ? ', ' + e.flaggedCount + ' with violations or hazardous waste' : '') + '. A Phase I ESA is recommended.' : 'No EPA-regulated facilities within ¼ mile.');
+    } catch (e) { /* the sheet still prints; notes say what's known */ }
+    if ((pl.parcels || []).length > 1) out.push((pl.parcels.length) + ' parcels: a replat into one reserve or lot is likely needed.');
+    return out;
+  }
+  async function exportPdf(p, pl, size) {
+    const btn = card.querySelector('#spPdf'); if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+    try {
+      const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), parcels = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), F = SP.frame(pl.origin);
+      const site = { type: 'Polygon', coordinates: [pl.ring.concat([pl.ring[0]]).map(F.toLL)] };
+      let vicinity = ''; try { vicinity = areaMap([{ geometry: site, stroke: '#c0392b', fill: 'rgba(192,57,43,.25)', width: 2 }], { W: 320, H: 190, px: 320, minSpanM: 3500, maxTiles: 16 }); } catch (e) {}
+      const facts = await siteFacts(pl), notes = SP.check(pl).map(i => i.text);
+      const county = (ctx.DATA?.counties || []).find(c => (c.outline || []).some(poly => SP.inRing(F.toLL(SP.centroid(pl.ring)), poly[0])))?.name;
+      const html = sheetHTML({ plan: pl, planName: pl.name, project: p, size, parcels, facts, notes, vicinity, address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '',
+        date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), preparedFor: '', boundarySource: pl.src === 'drawn' ? 'a boundary drawn on the map' : pl.src === 'regrid' ? 'the Regrid parcel outline' : (keys.length > 1 ? keys.length + ' county appraisal district parcel outlines, merged' : 'the county appraisal district parcel outline') });
+      const name = fileName(p, pl) + '-site-plan';
+      ctx.toast('Preparing the PDF…');
+      let blob = null, why = '';
+      try { const r = await fetch('api/pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ html, sheet: size, title: p.name + ' — Site plan' }) }); if (r.ok && /pdf/.test(r.headers.get('content-type') || '')) blob = await r.blob(); else why = (await r.json().catch(() => ({}))).error || 'HTTP ' + r.status; } catch (e) { why = e.message; }
+      if (blob) await ctx.saveFile(name + '.pdf', blob, 'application/pdf');
+      else { await ctx.saveFile(name + '.html', html, 'text/html'); ctx.toast('The PDF couldn’t be made (' + why + '). Saved as a web page instead: open it and print it on ' + (size === 'archd' ? '24 × 36' : '11 × 17') + ' paper.'); }
+    } finally { if (btn) { btn.disabled = false; btn.textContent = 'Site Plan PDF'; } }
+  }
   function geojson(p, pl) {
     const fc = SP.planFeatures(pl, null);
     fc.features = fc.features.filter(f => f.properties.k !== 'label').map(f => ({ ...f, properties: { ...f.properties, project: p.name, plan: pl.name } }));

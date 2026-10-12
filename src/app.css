@@ -2026,3 +2026,8 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 @media (max-width:640px){.pj-open{flex-direction:column;gap:2px}.pj-open span{text-align:left}}
 .pj-foot .bacts{gap:6px}
+.sp-parcels{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 6px}
+.sp-parcels .chip{font-size:11.5px;padding:2px 4px 2px 8px;min-height:0;cursor:var(--cur-default,default)}
+.sp-x{border:0;background:transparent;color:var(--muted);font-size:14px;line-height:1;padding:0 4px;cursor:var(--cur-pointer,pointer)}
+.sp-x:hover{color:var(--text)}
+.sp-grid .sp-wide{grid-column:1 / -1}
