@@ -110,8 +110,8 @@ export default async function handler(req, res) {
     if (!r || !r.ok) return res.status(r?.status === 404 ? 204 : 502).end();
     res.setHeader('Content-Type', r.headers.get('content-type') || 'application/x-protobuf');
     // (fetch already decompressed the body, so no Content-Encoding is passed on)
-    // parcel lines change rarely: the CDN keeps each tile a week, so a tile is paid for once a week at most
-    res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800');
+    // parcel lines change rarely: the CDN keeps each tile 14 days, so a tile is paid for once every 14 days at most
+    res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=1209600');
     return res.status(200).send(Buffer.from(await r.arrayBuffer()));
   }
 

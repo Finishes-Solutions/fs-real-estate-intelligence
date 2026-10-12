@@ -64,7 +64,7 @@ const n = calls.filter(c => c.endsWith('/parcels/point')).length;
 r = await call({ lat: '30.3', lon: '-95.9' }); assert.equal(r.code, 429); assert.ok(r.body.capped); assert.equal(calls.filter(c => c.endsWith('/parcels/point')).length, n, 'capped: Regrid not called');
 // tiles: only zoom 15-16, capped at 2
 assert.equal((await call({ tile: '14/1/1' })).code, 400); assert.equal((await call({ tile: '17/1/1' })).code, 400);
-r = await call({ tile: '15/7500/13500' }); assert.equal(r.code, 200); assert.match(r.headers['Cache-Control'], /s-maxage=604800/);
+r = await call({ tile: '15/7500/13500' }); assert.equal(r.code, 200); assert.match(r.headers['Cache-Control'], /s-maxage=1209600/);
 r = await call({ tile: '16/15000/27000' }); assert.equal(r.code, 200);
 r = await call({ tile: '16/15001/27000' }); assert.equal(r.code, 204, 'tile cap reached: empty tile, no Regrid call'); assert.equal(r.headers['X-Regrid-Capped'], '1');
 assert.equal(calls.filter(c => c.startsWith('tiles.regrid.com')).length, 2);
