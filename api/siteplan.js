@@ -16,7 +16,7 @@ export const SCHEMA = {
   required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'truck', 'setbacks', 'summary', 'assumptions'],
   properties: {
     use: { type: 'string', enum: Object.keys(USES), description: 'Main use. other = anything that fits none of these (self storage, church, school, hotel…).' },
-    gfa: n('Total building floor area in square feet across all floors. null = as much as the site fits with its parking.'),
+    gfa: n('Total building floor area in square feet across all floors. null when the request gives no size (the tool then uses a typical size for the use and site) or asks for as much as fits.'),
     floors: { type: ['integer', 'null'], description: 'Floors per building.' },
     units: { type: ['integer', 'null'], description: 'Dwelling units (multifamily only).' },
     buildings: { type: ['integer', 'null'], description: 'Number of separate buildings, only when the request implies it (pad sites, apartment bars). null = let the layout decide.' },
@@ -35,7 +35,7 @@ export const SCHEMA = {
 export const SYSTEM = `You set up a development program for a site-planning tool used by a commercial construction company in the Houston region. A separate layout engine places the buildings, parking, drives and detention on the parcel; you only choose the numbers.
 - Follow the user's request. Fill gaps with typical suburban Houston-area practice: retail 4 spaces/1,000 sf, restaurant 10/1,000, office 3.5/1,000, medical office 5/1,000, warehouse 0.5-1/1,000 plus a truck court, multifamily about 1.6 spaces per unit and 3 floors, about 900 sf per unit.
 - The City of Houston has no zoning; building lines are usually 25 ft on major roads and 10 ft on local streets. Other cities and counties differ. If zoning limits are given, stay within them.
-- Size the program to the site: check floor area and parking against the acreage given. If the request clearly can't fit, keep the use, set gfa to null (fit as much as possible) and say so in assumptions.
+- Size the program to the site: check floor area and parking against the acreage given. If the request clearly can't fit, keep the use, set gfa to null and say so in assumptions.
 - Never claim code compliance. Assumptions are short phrases, e.g. "4 spaces per 1,000 sf (typical retail)".`;
 
 export function siteText(site = {}, prompt = '', program = null) {

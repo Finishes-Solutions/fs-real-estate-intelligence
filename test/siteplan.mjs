@@ -89,7 +89,7 @@ function layout(lot, words, v) {
 for (const v of [0, 1, 2]) {
   let { r, m } = layout('pad', '25,000 sf retail strip', v);
   assert.ok(Math.abs(m.gfa - 25000) < 50, 'asked-for floor area: ' + m.gfa); assert.ok(m.spaces >= m.required, 'parks: ' + m.spaces + '/' + m.required);
-  assert.ok(r.elements.some(e => e.kind === 'drive'), 'a drive to the street'); assert.ok(Math.abs(m.pond / m.siteSf - 0.1) < 0.02, 'default 10% detention over an acre');
+  assert.ok(r.elements.some(e => e.kind === 'drive'), 'a drive to the street'); assert.ok(m.pond > 0 && m.pond <= 0.105 * m.siteSf && m.pond >= 0.1 * Math.min(m.siteSf, m.footprint + m.paved) * 0.9, 'default detention: 10% of the land the project covers: ' + (m.pond / m.siteSf * 100).toFixed(1) + '%');
   ({ m } = layout('pad', '6,000 sf restaurant with drive-thru', v)); assert.equal(m.required, 60); assert.ok(m.spaces >= 60);
   ({ r, m } = layout('deep', '240 units 3 story garden apartments', v)); assert.ok(m.buildings >= 3, 'apartments split into bars: ' + m.buildings); assert.ok(Math.abs(m.units - 240) <= 1, 'units: ' + m.units); assert.ok(m.spaces >= m.required);
   ({ m } = layout('ell', 'medical office 2 stories', v)); assert.ok(m.gfa > 40000 && m.spaces >= m.required, 'fits as much as parks on the L: ' + Math.round(m.gfa));

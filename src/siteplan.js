@@ -227,7 +227,7 @@ export function initSitePlan(ctx) {
     const c = map.getCanvas(); if (ed.mode) { c.style.cursor = 'crosshair'; return; }
     const h = pl.ring.length >= 3 && hit(pl, e); c.style.cursor = !h ? '' : h.h === 'r' ? 'grab' : h.h != null ? 'nwse-resize' : 'move';
   });
-  const frameAngle = pl => { const r = pl.ring, f = pl.front ?? SP.longestEdge(r), a = r[f], b = r[(f + 1) % r.length]; return a && b ? Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI : 0; };
+  const frameAngle = pl => pl.ring.length >= 3 ? SP.mainAngle(pl.ring) : 0; // the lot's main lines: new pieces square up with them
 
   // clicks while the plan is open: draw the boundary, pick the street side, or select; never open other cards
   ctx.mapClickHandlers.unshift(e => {

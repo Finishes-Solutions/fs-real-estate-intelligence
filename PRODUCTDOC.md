@@ -331,8 +331,9 @@ Test-fit a building on a piece of land, by hand or with AI.
 **Build with AI**
 - Say what should go there, e.g. "25,000 sf retail strip", "6,000 sf restaurant with drive-thru", "200 apartments, 3 stories", "warehouse with truck court, as big as fits", or tap a suggestion.
 - The AI turns your words into a program: the use, floor area, floors, units, parking ratio and setbacks, filling gaps with typical Houston-area numbers. It lists what it assumed.
-- The app then lays out **three options** on the lot (parking in front, building at the street, turned 90°), each with its floor area, parking and coverage. Click one to use it; **Undo** goes back.
-- Leave the size out ("as big as fits") and it fits the most building the parking allows.
+- The app then lays out **three options** on the lot (parking in front, building at the street, parking beside), squared up with the lot's main lines, each with its floor area, parking and coverage. Click one to use it; **Undo** goes back.
+- Leave the size out and it uses a typical size for that use on a lot that size; say "as big as fits" and it fits the most building the parking allows.
+- Detention is a strip along the back of the lot (or behind the buildings on a big lot), sized to the land the project covers rather than the whole lot.
 - If the AI isn't available, the app reads your words directly and still lays out the options.
 
 **Drawing by hand**
