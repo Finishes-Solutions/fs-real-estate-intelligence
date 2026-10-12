@@ -5,6 +5,16 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-12
 
+### 3:03 PM CT: Site plans rebuilt: three usable, connected options every time (COMMIT)
+- **Every Build with AI run gives three usable options.** Each is checked before it's offered: inside the setbacks, no overlaps, enough parking, and every drive and parking row reachable from the entry. The app tries many arrangements and keeps the best three that pass.
+- **Laid out like a real site plan:** the drives come first as one connected network (aisles joined by curved drives into loops, no dead ends), parking rows line the aisles, extra parking bays run between them where needed, and buildings sit between the rows facing their parking across a walk.
+- **Apartments:** the clubhouse sits at the entry with the pool on a deck right beside it (no more pool across the site with a pond in between), garden-style buildings with staggered fronts, and a walking trail round the pond. **Shops** face their parking with pad sites and drive-thru lanes along the street; **warehouses** get a truck court on the dock side; **townhomes** get two rows per private lane.
+- **Curved, detailed shapes:** drives turn on arcs, the entry has curb returns and a planted median, parking rows end in rounded planted islands, and ponds, pools and lawns are free-form. Curved pieces drag and nudge as a whole.
+- **No wasted land:** the plan fills the site as far as parking and detention allow. Detention is a natural-shaped pond at the back, at the entry or at the end of the rows; land left over becomes lawns, a dog park or a playground, and land a small program doesn't need is marked Future development. Options say plainly when a program didn't all fit.
+- **Mixed use** runs on the same connected network, with zones that share a row side by side when the lot is too shallow to stack them.
+- **The Build Options button keeps its size** after a build; the AI's note now sits under it.
+- Tested on a copy of the 7.7-acre FM 362 lot from the screenshot, a real 27-acre parcel, a skewed 2.5-acre lot and a 20-acre mixed-use tract.
+
 ### 1:54 PM CT: Site plans on up to 20 parcels, mixed-use layouts and a PDF sheet (e14ac58)
 - **Up to 20 parcels as one site:** pick them (Shift-click or Select Multiple, now up to 20), then **Site Plan for All** on the All tab, or **Add or Remove Parcels** inside a plan. Small gaps and overlaps between neighbouring parcels are closed up; parcels across a road stay out, with a note.
 - **Mixed-use plans:** describe several uses and the site is laid out in zones from the street back: shops with pad sites at the street corners, a commons with an amenity lake (the site's detention), pavilion, courts and playground, apartments with a clubhouse and pool, townhome rows on rear-load lanes, and duplexes, with 26 ft drives between zones and a main entry drive. Works with or without AI.
