@@ -107,4 +107,96 @@ function usable(plan, o, what) {
   assert.equal(opts.length, 3); opts.forEach(o => usable(plan, o, 'Pine apartments'));
   assert.ok(opts[0].notes.some(n => /of the 60 units/.test(n)), 'says how many of the asked-for units fit');
 }
+// ---- single-family homes: lots on both sides of the street, a mix of 1-, 2- and 3-story homes ----
+{
+  const plan = siteOf(fm362, true), prog = { use: 'sfr', homeMix: [{ stories: 1, pct: 40 }, { stories: 2, pct: 50 }, { stories: 3, pct: 10 }] }, opts = L.layoutOptions(plan, prog);
+  assert.equal(opts.length, 3);
+  for (const o of opts) {
+    const { m } = usable(plan, o, 'FM 362 homes'), H = o.elements.filter(e => e.use === 'sfr'), lots = o.elements.filter(e => e.kind === 'lot');
+    assert.ok(H.length >= 20 && lots.length === H.length, o.name + ': ' + H.length + ' homes on their own lots');
+    assert.equal(m.units, H.length); assert.equal(m.garages, 2 * H.length);
+    for (const h of H) assert.ok(lots.some(l => S.hitRect(l, [h.x, h.y])), 'each home sits on a lot');
+    const n1 = H.filter(e => e.floors === 1).length, n2 = H.filter(e => e.floors === 2).length; assert.ok(n1 > 0 && n2 > 0 && Math.abs(n1 / H.length - 0.4) < 0.2, 'the mix: ' + n1 + ' one-story, ' + n2 + ' two-story');
+    assert.ok(new Set(H.map(e => Math.round(S.toLocal({ x: 0, y: 0, rot: e.rot }, [e.x, e.y])[1] / 40))).size >= 2, 'homes on both sides of a street');
+  }
+}
+// ---- site parameters: stall size, square shapes, trees off, setbacks by side ----
+{
+  const base = siteOf(fm362, true);
+  const plan = { ...base, setbacks: { ...S.SETBACKS, paveSide: 20, rear: 30 }, params: { stallW: 9.5, stallD: 19, aisle: 26, trees: false, style: { ponds: 'square', islands: 'square', corners: 'square' } } };
+  const o = L.layoutOptions(plan, { use: 'multifamily' })[0], p = { ...plan, elements: o.elements, program: o.program }, P = o.elements.filter(e => e.kind === 'parking');
+  usable(plan, o, 'parameters');
+  assert.ok(P.length && P.every(e => e.sw === 9.5 && e.sd === 19 && !e.caps), 'stalls 9.5 x 19, square ends');
+  assert.ok(o.elements.filter(e => e.kind === 'pond').every(e => !e.poly), 'square ponds'); assert.ok(o.elements.filter(e => e.kind === 'pool').every(e => !e.poly), 'square pool');
+  assert.ok(!o.elements.some(e => e.kind === 'drive' && e.path), 'square corners: no curved drives');
+  assert.equal(S.details(p).trees.length, 0, 'trees off'); assert.ok(S.details({ ...p, params: { trees: true } }).trees.length > 20, 'trees on');
+  const R = S.edgeRules(p.ring, p.front, p.setbacks); assert.ok(R.some(r => r.role === 'side' && r.pave === 20) && R.some(r => r.role === 'rear' && r.build === 30), 'buffers and setbacks by side');
+  assert.ok(S.edgeRules(p.ring, p.front, { ...p.setbacks, buildOn: false }).every(r => r.build === 0), 'setbacks can be turned off');
+}
+// ---- unit mix: units by type, beds, rentable area ----
+{
+  const plan = siteOf(fm362, true), mix = [{ name: '1 BR', sf: 700, pct: 60, beds: 1 }, { name: '2 BR', sf: 1050, pct: 40, beds: 2 }];
+  const o = L.layoutOptions(plan, { use: 'multifamily', mix })[0], m = S.metrics({ ...plan, elements: o.elements, program: o.program });
+  assert.equal(S.normalizeProgram({ use: 'multifamily', mix }).unitSf, 840, 'the mix sets the average unit');
+  assert.equal(m.mix.reduce((s, t) => s + t.n, 0), m.units); assert.ok(Math.abs(m.mix[0].n / m.units - 0.6) < 0.02);
+  assert.equal(m.beds, m.mix[0].n + 2 * m.mix[1].n); assert.equal(m.nrsf, m.mix[0].n * 700 + m.mix[1].n * 1050); assert.ok(m.duAc > 15);
+}
+// ---- edits: move a building, make the pond bigger; the plan re-fits around them ----
+{
+  const plan = { ...siteOf(fm362, true), program: { use: 'multifamily' } }, opts = L.layoutOptions(plan, plan.program);
+  for (const [k, o] of opts.entries()) {
+    const P = { ...plan, elements: JSON.parse(JSON.stringify(o.elements)), recipe: JSON.parse(JSON.stringify(o.recipe)) }, b = P.elements.find(e => e.use === 'multifamily');
+    const a = (b.rot || 0) * Math.PI / 180, step = k === 1 ? 30 : -30; S.moveBy(b, step * Math.cos(a), step * Math.sin(a)); b.pinned = true; // slid along its row
+    const t0 = Date.now(), r = L.refit(P); assert.ok(r && Date.now() - t0 < 6000, 'refit took ' + (Date.now() - t0) + ' ms');
+    const kept = r.elements.find(e => e.id === b.id); assert.ok(kept && kept.x === b.x && kept.y === b.y, 'the moved building stays put');
+    const m = S.metrics({ ...P, elements: r.elements }); assert.ok(m.units >= 0.75 * S.metrics({ ...P, elements: o.elements }).units, 'still a full plan: ' + m.units + ' units');
+    const bad = S.check({ ...P, elements: r.elements }).filter(i => i.level === 'bad' && i.id !== b.id); assert.deepEqual(bad.map(i => i.text), [], 'nothing else breaks a rule');
+  }
+  const P = { ...plan, elements: JSON.parse(JSON.stringify(opts[1].elements)), recipe: opts[1].recipe }, pd = P.elements.find(e => e.kind === 'pond');
+  S.scaleBy(pd, 1.25); pd.pinned = true; const r = L.refit(P), m = S.metrics({ ...P, elements: r.elements });
+  assert.ok(r.elements.some(e => e.id === pd.id) && m.pond >= S.elArea(pd) - 1, 'the bigger pond is kept');
+  assert.equal(S.check({ ...P, elements: r.elements }).filter(i => i.level === 'bad' && i.id !== pd.id).length, 0);
+  const shape = { kind: 'pond', x: 0, y: 0, w: 120, d: 80, rot: 0 }; S.reshape(shape, 'organic'); assert.ok(shape.poly && Math.abs(S.elArea(shape) - 9600) < 50); S.reshape(shape, 'rounded'); assert.ok(shape.shape === 'round' && Math.abs(S.elArea(shape) - 9600) < 50);
+}
+// ---- more options than three, for the list ----
+{ const plan = siteOf(fm362, true), many = L.layoutOptions(plan, { use: 'multifamily' }, { count: 10 }); assert.ok(many.length > 3, many.length + ' options'); many.forEach(o => usable(plan, o, 'more options')); }
+// ---- what was asked for: 28,000 sf across 4 buildings, parking trimmed to the need, detention sized to the land used ----
+{
+  const plan = siteOf(fm362, true), prog = { use: 'retail', gfa: 28000, buildings: 4 }, opts = L.layoutOptions(plan, prog);
+  assert.equal(opts.length, 3);
+  for (const o of opts) {
+    const { m } = usable(plan, o, '28k retail in 4'), B = o.elements.filter(e => e.kind === 'building');
+    assert.equal(B.length, 4, o.name + ': four buildings, not one 28,000 sf box');
+    for (const b of B) assert.ok(Math.abs(b.w * b.d - 7000) < 350, 'each about 7,000 sf: ' + Math.round(b.w * b.d));
+    assert.ok(Math.abs(m.gfa - 28000) < 500 && m.spaces <= m.required * 1.35, o.name + ': ' + m.spaces + ' spaces for ' + m.required + ' needed (no acres of spare parking)');
+    assert.ok(m.pond > 0 && m.pond < 0.6 * 43560, 'detention for the ~2 acres developed, not the whole 7.7: ' + (m.pond / 43560).toFixed(2) + ' ac');
+    assert.ok(o.elements.some(e => e.kind === 'green' && e.future), 'the land not used is kept as a future pad or phase');
+    const T = o.elements.filter(e => e.kind === 'trash'); assert.ok(T.length >= 2, 'a trash enclosure per ~25,000 sf (two here)');
+    for (const t of T) assert.ok(B.some(b => S.outline(b).some((p, i, r) => S.segDist([t.x, t.y], p, r[(i + 1) % r.length]) < 250)), 'every enclosure within 250 ft of a building');
+    const pv = S.pavement({ ...plan, elements: o.elements }); assert.equal(pv.length, 1, 'drives and parking are one paved surface');
+    const raw = o.elements.filter(e => e.kind === 'parking').reduce((s, e) => s + S.stalls(e).count, 0), A = S.accessible({ ...plan, elements: o.elements });
+    assert.equal(A.stalls.length, S.adaCount(raw), 'every accessible stall the ADA table asks for'); assert.equal(m.spaces, raw - S.adaLoss(raw), 'a shared access aisle costs a stall per pair');
+    for (const a of A.stalls) assert.ok(B.some(b => Math.hypot(a.sym[0] - b.x, a.sym[1] - b.y) < 200), 'accessible stalls by the buildings');
+    assert.ok(S.entryMarks({ ...plan, elements: o.elements }).length >= 1, 'a stop bar at the entry');
+  }
+  const svg = G.planSVG({ ...plan, elements: opts[0].elements, program: opts[0].program }).svg; assert.ok(svg.includes('clip-path') && svg.includes(G.PALETTE.ada), 'one curb line round the paving, accessible stalls drawn');
+}
+// ---- stormwater: detention, retention, underground, none ----
+{
+  assert.equal(S.stormNeed(10).mode, 'detention'); assert.ok(Math.abs(S.stormNeed(10).volume - 5.5) < 1e-9 && Math.abs(S.stormNeed(10).area - 5.5 * 43560 / 5 * 1.2) < 1, '0.55 ac-ft an acre, 5 ft deep, a fifth for slopes');
+  assert.equal(S.stormNeed(0.6).mode, 'none', 'under an acre: no pond by default'); assert.equal(S.stormNeed(10, {}, { storm: 'underground' }).area, 0, 'vaults take no land');
+  assert.equal(S.stormNeed(10, { storm: { rate: 1, depth: 4 } }).volume, 10);
+  const plan = siteOf(fm362, true);
+  const u = L.layoutOptions(plan, { use: 'multifamily', units: 120, storm: 'underground' })[0]; assert.ok(!u.elements.some(e => e.kind === 'pond') && u.notes.some(n => /underground/.test(n)), 'underground: no pond, a note on the vaults');
+  const w = L.layoutOptions({ ...plan, params: { storm: { mode: 'retention' } } }, { use: 'multifamily', units: 120 })[0]; assert.ok(w.elements.some(e => e.kind === 'pond' && /Retention/.test(e.name)), 'retention: a wet pond');
+  const sw = S.stormOf({ ...plan, elements: u.elements, program: u.program }); assert.ok(sw.vault > 1 && sw.mode === 'underground');
+}
+// ---- trash enclosures by the rules ----
+{
+  const plan = siteOf(fm362, true), mf = L.layoutOptions(plan, { use: 'multifamily' })[0], m = S.metrics({ ...plan, elements: mf.elements, program: mf.program });
+  assert.equal(mf.elements.filter(e => e.kind === 'trash').length, Math.ceil(m.units / 50), 'apartments: a double enclosure per ~50 units');
+  const th = L.layoutOptions(plan, { use: 'townhomes' })[0]; assert.equal(th.elements.filter(e => e.kind === 'trash').length, 0, 'homes roll carts to the curb');
+  const off = L.layoutOptions({ ...plan, params: { trash: { mode: 'none' } } }, { use: 'retail', gfa: 28000 })[0]; assert.equal(off.elements.filter(e => e.kind === 'trash').length, 0, 'turned off');
+  assert.equal(S.trashNeeds({ ...plan, program: { use: 'multifamily' }, elements: [{ kind: 'building', use: 'multifamily', x: 0, y: 0, w: 200, d: 60, units: 240 }] }).map(t => t.type).join(), 'compactor,double', 'a compactor from 200 units, with recycling');
+}
 console.log('site layouts ok');

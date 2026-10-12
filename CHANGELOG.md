@@ -5,6 +5,24 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-12
 
+### 4:40 PM CT: Site plans follow the request: building counts, stormwater, one paved surface, ADA stalls, trash (3118744)
+- **Building counts are honoured:** "28,000 sf of retail across 4 buildings" now gives four buildings of about 7,000 sf each, spread along the rows, instead of one 28,000 sf building. "4 buildings of 7,000 sf each" is read the same way.
+- **Less leftover green, more usable land:** a fixed program gets the parking it needs plus about a tenth, not every row the site could hold; drive aisles that serve nothing are removed; the land not needed stays in one piece marked as a future pad site or future development. On a large tract a "compact, room to expand" option builds on just the part of the frontage it needs.
+- **Stormwater:** sized from the developed land (about 0.55 acre-feet per acre, 5 ft deep) as a detention pond, a retention (wet) pond, underground vaults or none, chosen in the request ("with a retention pond", "underground detention") or under Site parameters, where a line shows what the plan needs and holds. Ponds sit beside the buildings. Underground storage is priced in the pro forma (about $420,000 an acre-foot, editable).
+- **One paved surface:** drives, parking and truck courts are drawn as one area with one curb line round the outside, so there are no lines where they meet, on the map, the PDF sheet and in CAD.
+- **Accurate markings:** accessible (ADA) stalls by the federal table near the buildings, in blue with striped access aisles (each pair costs one space, counted in the totals); a stop bar and centre line at the entry.
+- **Trash enclosures** placed by the usual rules (apartments about one per 50 units or a compactor from 200, shops and offices one per about 25,000 sf within 250 ft, one per restaurant or warehouse, none for homes), gate on a drive; a **Trash enclosure** piece to add by hand; settings to turn them off or change the rule.
+
+### 3:40 PM CT: Site plans: TestFit-style parameters, unit and home mixes, edit and re-fit, pro forma (461d026)
+- **Site parameters** under the plan: building setbacks and landscape buffers by front, side and rear (each turned on or off), parking stall width and depth and aisle width, apartment depth, longest building and spacing, detention share, trees on or off, and the look: ponds and pools as natural curves, rounded rectangles or rectangles; parking rows with rounded or square ends; curved or square drive corners. Changing a setting lays the options out again.
+- **Unit mix** for apartments (studio, 1, 2, 3 bedroom: size, share, beds): it sets the average unit and the unit count, and the plan lists units by type, beds and rentable area.
+- **Single-family homes** with a 1-, 2- and 3-story mix: lots on both sides of each street with lot lines, driveways and cul-de-sacs.
+- **Deal summaries** like TestFit's: acreage, FAR, building and impervious coverage, units per acre, beds, net and gross square feet, parking ratio.
+- **Move, resize or reshape a piece and the plan re-fits around it:** the piece stays where you put it and drives, parking and other buildings are laid out again. A bigger pond counts toward detention. Curved pieces resize from their corners and switch between natural, rounded and square.
+- **More options…** lists every usable layout found (up to 12), sortable by units, floor area, parking or open space.
+- **Pro forma** with a development schedule in months (design and permits, construction, lease-up or sales, hold), a month-by-month model (construction loan and interest, lease-up, refinance, sale), TestFit's one-page method side by side, homes for rent or for sale, and **Pro Forma (Excel)** with live formulas.
+- TestFit's custom pro forma was reverse-engineered: the one-page method reproduces its sheet to the dollar (61.51% unlevered and 114.44% levered IRR on its inputs). It skips the construction period and lease-up, which is why those IRRs run so high.
+
 ### 3:04 PM CT: Parcel lines cached for two weeks (c2f5825)
 - **Parcel lines (Regrid) now stay cached for 14 days instead of 7**, so the same map area costs a Regrid tile at most once every two weeks. That stretches the monthly tile allowance further.
 - The trade-off: a boundary change Regrid makes can take up to two weeks to show on the map.

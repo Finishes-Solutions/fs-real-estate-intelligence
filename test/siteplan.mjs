@@ -74,19 +74,21 @@ assert.equal(S.stalls({ w: 8, d: 18 }).count, 0);
     { id: 'b', kind: 'building', x: 0, y: 60, w: 120, d: 100, rot: 0, floors: 1 },              // fine: 40 ft from the rear
     { id: 'p', kind: 'parking', x: 0, y: -60, w: 180, d: 60, rot: 0 },                          // fine
     { id: 'd', kind: 'drive', x: 0, y: -135, w: 26, d: 40, rot: 0 } ] };                        // meets the street: allowed
-  assert.deepEqual(S.check(plan).map(i => i.text), ['Parking is 8 spaces short of 48 required']);
+  assert.deepEqual(S.check(plan).map(i => i.text), ['Parking is 9 spaces short of 48 required']); // 40 striped, 2 accessible sharing one aisle: 39
   plan.elements[0].y = 85; assert.match(S.check(plan)[0].text, /Building is inside the 20 ft rear setback/);
   plan.elements[0].y = 60; plan.elements[2] = { id: 'd', kind: 'drive', x: 95, y: 0, w: 26, d: 60, rot: 0 };
   assert.match(S.check(plan).find(i => i.id === 'd').text, /Drive runs outside the lot/, 'a drive through a side line is outside');
   plan.elements[2] = { id: 'd', kind: 'pond', x: 0, y: 20, w: 40, d: 40, rot: 0 }; assert.ok(S.check(plan).some(i => /Building overlaps detention/.test(i.text)));
   plan.elements.pop(); plan.zoning = { max_coverage_pct: 15, max_far: 0.1 };
   const z = S.check(plan).map(i => i.text).join(' | '); assert.match(z, /Coverage 20% is over the zoning limit of 15%/); assert.match(z, /FAR 0.20 is over the zoning limit of 0.1/);
-  const m = S.metrics(plan); assert.equal(m.gfa, 12000); assert.equal(m.spaces, 40); assert.equal(m.required, 48); assert.equal(+m.coverage.toFixed(2), 0.2); }
+  const m = S.metrics(plan); assert.equal(m.gfa, 12000); assert.equal(m.spaces, 39); assert.equal(m.ada, 2); assert.equal(m.required, 48); assert.equal(+m.coverage.toFixed(2), 0.2); }
 
 // ---- words -> program ----
 assert.deepEqual(S.guessProgram('25,000 sf retail strip with 4.5/1000 parking'), { use: 'retail', gfa: 25000, ratio: 4.5 });
 assert.deepEqual(S.guessProgram('200 apartments, 3 stories, 1.75 spaces per unit'), { use: 'multifamily', floors: 3, units: 200, perUnit: 1.75 });
 assert.deepEqual(S.guessProgram('150k sq ft warehouse, no detention'), { use: 'industrial', gfa: 150000, detentionPct: 0 });
+assert.deepEqual(S.guessProgram('28000 sf of retail across 4 buildings with a retention pond'), { use: 'retail', gfa: 28000, buildings: 4, storm: 'retention' });
+assert.deepEqual(S.guessProgram('4 buildings of 7,000 sf each, retail, underground detention'), { use: 'retail', gfa: 28000, buildings: 4, storm: 'underground' });
 assert.equal(S.guessProgram('as big a medical office as fits').use, 'medical');
 assert.equal(S.normalizeProgram({ use: 'multifamily', units: 100 }).gfa, Math.round(100 * 900 / 0.85), 'units become floor area');
 assert.equal(S.normalizeProgram({ use: 'nope', floors: 99 }).use, 'other'); assert.equal(S.normalizeProgram({ floors: 99 }).floors, 40);
@@ -129,7 +131,10 @@ for (const v of [0, 1, 2]) {
   const dxf = S.toDXF(done, 'Katy Pad – Option A'), g = dxf.split('\r\n'); g.pop();
   assert.equal(g.length % 2, 0, 'group code / value pairs'); assert.deepEqual(g.slice(0, 4), ['0', 'SECTION', '2', 'HEADER']); assert.deepEqual(g.slice(-2), ['0', 'EOF']);
   for (let i = 0; i < g.length; i += 2) assert.ok(/^-?\d+$/.test(g[i].trim()), 'group code at line ' + i);
-  const ents = g.filter((x, i) => i % 2 && g[i - 1] === '0'); const D = S.details(done); assert.equal(ents.filter(x => x === 'POLYLINE').length, done.elements.length + 3 + D.walks.length + D.islands.length, 'lot, setback line, every element, walks, islands, north arrow');
+  const ents = g.filter((x, i) => i % 2 && g[i - 1] === '0'); const D = S.details(done); const PV = S.pavement(done), A = S.accessible(done), curbs = PV.reduce((s, p) => s + 1 + p.holes.length, 0);
+  assert.equal(ents.filter(x => x === 'POLYLINE').length, done.elements.length + 3 + D.walks.length + D.islands.length + curbs + A.stalls.length + A.aisles.length, 'lot, setback line, every element, walks, islands, north arrow, curb, accessible stalls and aisles');
+  assert.equal(PV.length, 1, 'the drives and parking pour as one surface'); assert.equal(A.stalls.length, S.adaCount(done.elements.filter(e => e.kind === 'parking').reduce((s, e) => s + S.stalls(e).count, 0)), 'every accessible stall the table asks for is placed');
+  assert.ok(kinds.includes('paved') && kinds.includes('ada'), 'one paved surface and accessible stalls on the map');
   assert.equal(ents.filter(x => x === 'CIRCLE').length, D.trees.length, 'a circle per tree'); assert.ok(D.trees.length > 10 && D.islands.length > 0, 'trees on the buffer and in parking islands');
   assert.ok(ents.filter(x => x === 'LINE').length > 40, 'stall stripes'); assert.ok(!/[^\x00-\x7f]/.test(dxf), 'plain ASCII (the en dash in the title is replaced)');
   assert.ok(dxf.includes('LON ' + done.origin[0]), 'the origin is written on the drawing'); }
