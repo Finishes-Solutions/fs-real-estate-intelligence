@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-12
 
-### 1:54 PM CT: Site plans on up to 20 parcels, mixed-use layouts and a PDF sheet (COMMIT)
+### 1:54 PM CT: Site plans on up to 20 parcels, mixed-use layouts and a PDF sheet (e14ac58)
 - **Up to 20 parcels as one site:** pick them (Shift-click or Select Multiple, now up to 20), then **Site Plan for All** on the All tab, or **Add or Remove Parcels** inside a plan. Small gaps and overlaps between neighbouring parcels are closed up; parcels across a road stay out, with a note.
 - **Mixed-use plans:** describe several uses and the site is laid out in zones from the street back: shops with pad sites at the street corners, a commons with an amenity lake (the site's detention), pavilion, courts and playground, apartments with a clubhouse and pool, townhome rows on rear-load lanes, and duplexes, with 26 ft drives between zones and a main entry drive. Works with or without AI.
 - **More detail on every plan:** named, sized buildings ("Apt Bldg 2 · 40 units · 3 fl", "Pad A"), planted parking islands with trees, walks around buildings, trees along the buffer and the lake, buildings coloured by use. The Selected box sets a building's use and name.
