@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-12
 
-### 1:17 PM CT: Site plans laid out like real sites (COMMIT)
+### 1:17 PM CT: Site plans laid out like real sites (de724e2)
 - **Buildings square up with the lot** instead of tilting to its longest line, so a lot with one slanted street edge no longer gets crooked buildings.
 - **The building sits near the street** with its parking in front of it, behind it, or beside it (the three options). Before, "parking in front" pushed the building to the back of the lot.
 - **No size given means a typical size** for that use on a lot that size (say "as big as fits" to fill the site). Before, "2-story medical office" on 27 acres filled it with 450,000 sf.
