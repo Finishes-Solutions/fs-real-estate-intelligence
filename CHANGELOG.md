@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-12
 
-### 3:40 PM CT: Site plans: TestFit-style parameters, unit and home mixes, edit and re-fit, pro forma (COMMIT)
+### 3:40 PM CT: Site plans: TestFit-style parameters, unit and home mixes, edit and re-fit, pro forma (461d026)
 - **Site parameters** under the plan: building setbacks and landscape buffers by front, side and rear (each turned on or off), parking stall width and depth and aisle width, apartment depth, longest building and spacing, detention share, trees on or off, and the look: ponds and pools as natural curves, rounded rectangles or rectangles; parking rows with rounded or square ends; curved or square drive corners. Changing a setting lays the options out again.
 - **Unit mix** for apartments (studio, 1, 2, 3 bedroom: size, share, beds): it sets the average unit and the unit count, and the plan lists units by type, beds and rentable area.
 - **Single-family homes** with a 1-, 2- and 3-story mix: lots on both sides of each street with lot lines, driveways and cul-de-sacs.
