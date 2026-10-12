@@ -56,10 +56,10 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 - **Map Layers.**
 - **Globe view.**
 
-**Tabs** (desktop and tablet): Map, Market, Compare, Reports, Notes, then the construction views (Timeline, Activity, Updates), and Sources.
+**Tabs** (desktop and tablet): Map, Market, Compare, Reports, Notes, Projects, then the construction views (Timeline, Activity, Updates), and Sources.
 
 **Phones:** the map fills the screen. The bottom bar has Map, Explore, Timeline, Activity and More. **More** opens a grid of one-word tiles:
-- **Views**, named like the desktop tabs: Market, Compare, Reports, Updates, Notes, Sources.
+- **Views**, named like the desktop tabs: Market, Compare, Reports, Updates, Notes, Projects, Sources.
 - **Tools:**
   - Layers.
   - Export.
@@ -94,7 +94,7 @@ Click a building, or at street zoom click open ground, to open its **property ca
 - **Construction filings** on the parcel.
 - **From here:** distance and drive time, a drive-time map, weather, news, and site imagery (recent satellite and dated high-resolution photos).
 - **Regrid details** (paid, capped each month): zoning, zoning limits such as height and density, the last sale price and date where recorded, and land use. Harris and Waller counties aren't in the free state parcel data, so Regrid fills in owner and value there.
-- Street View, an orbit camera, notes, and **Ask AI** about this property.
+- Street View, an orbit camera, notes, **Start Site Plan** (see "Projects and site plans" below), and **Ask AI** about this property.
 
 **Section buttons** under the card's title (Value, Building, Site, Crime, Area…) jump to that section, with its heading just below the card's header.
 
@@ -285,6 +285,7 @@ The **Ask AI** button (⌘/ on a Mac, Ctrl+/ elsewhere) opens an assistant that 
 "- "How does crime in Hempstead compare with Texas?" "Is crime in Austin going up?" (anywhere in the US, from FBI yearly figures)
 - "What are the safest cities in Texas over 50,000 people?" "Which Louisiana counties have the most property crime?"
 - "How is oil doing this year?" "Does oil lead Houston unemployment?" "What moves Houston housing permits?"
+- With a property card open: "Lay out a 25,000 sf retail strip here." "How many apartments fit on this lot?" (it starts a site plan and lays out options; see below)
 
 Answers come with cards: summaries, charts, comparisons, places, drive times, weather, news and imagery. The suggestions above the Ask AI button change with what you're looking at.
 
@@ -314,6 +315,52 @@ Answers come with cards: summaries, charts, comparisons, places, drive times, we
 - **Add a site note** at the map center or your current location: a title, tag, notes and phone photos. Notes are shared with the team and work offline.
 - **Watch** any filing or building with the star. Watched filings are flagged when the nightly refresh sees a change.
 - Notes export as map files (GeoJSON or KML) or a spreadsheet.
+
+---
+
+## Projects and site plans
+
+Test-fit a building on a piece of land, by hand or with AI.
+
+**Starting one**
+- Open a property card (click a building, or open ground at street zoom) and choose **Start Site Plan** under Site Tools.
+- Start a **new project** (named after the address) or **add the parcel to a project** you already have.
+- The plan starts from the parcel's outline from the county appraisal district. Harris and Waller aren't in that data: open the card's **Regrid details** first and the plan uses Regrid's outline, or draw the site yourself (click each corner, then the first corner again).
+- The map zooms to the lot. The existing buildings are hidden while you plan, and come back when you close the plan.
+
+**Build with AI**
+- Say what should go there, e.g. "25,000 sf retail strip", "6,000 sf restaurant with drive-thru", "200 apartments, 3 stories", "warehouse with truck court, as big as fits", or tap a suggestion.
+- The AI turns your words into a program: the use, floor area, floors, units, parking ratio and setbacks, filling gaps with typical Houston-area numbers. It lists what it assumed.
+- The app then lays out **three options** on the lot (parking in front, building at the street, turned 90°), each with its floor area, parking and coverage. Click one to use it; **Undo** goes back.
+- Leave the size out ("as big as fits") and it fits the most building the parking allows.
+- If the AI isn't available, the app reads your words directly and still lays out the options.
+
+**Drawing by hand**
+- Add a **Building, Parking, Drive, Truck court, Detention or Landscape** piece. Drag a piece to move it, its white corners to resize it, and the orange dot to turn it (it snaps to the lot's lines; hold Shift to turn freely).
+- Keyboard: arrow keys nudge (Shift for 10 ft), R turns 90°, Delete removes, ⌘Z / Ctrl+Z undoes.
+- Parking counts its spaces as you size it (9 × 18 ft spaces on 24 ft aisles).
+- Type exact sizes, the turn and the number of floors in the **Selected** box.
+- **Street Side:** the orange line marks the side along the street. The app finds it from the map's roads; when it can't, it says the line is a guess. Click **Street Side**, then the lot line along the street, to set it. Front setbacks and drives follow it.
+- **Redraw Site** replaces the outline (for part of a parcel, or several parcels together).
+- Building heights show in 3D when you tilt the map.
+
+**Numbers and checks**
+- Site area, building floor area (and about how many apartments), coverage, FAR, parking provided against what's needed, detention, paved area and open space.
+- Red outlines and a list flag a building inside a setback, anything outside the lot, buildings overlapping other pieces, a parking shortfall, and coverage, FAR or height over the zoning limits when Regrid has them.
+- **Program & setbacks** sets the use, parking ratio (or spaces per apartment), detention share and the front, side and rear setbacks and landscape buffer. Defaults: 25 ft front, 10 ft sides, 20 ft rear, 10 ft buffer, and detention of 10% on sites over an acre.
+
+**Several options:** **+ Copy** starts another option from the current one (Option B, C…). Each project keeps all its options.
+
+**Exports**
+- **CAD (DXF):** opens in AutoCAD, CADCraft, LibreCAD and most CAD programs, in feet, with layers for the lot, setback line, buildings, parking, stripes, drives and detention, and a notes block.
+- **Map File (GeoJSON)** and **Copy Summary** (the numbers as text).
+
+**The Projects tab** lists every project: rename it, set its status (Idea, Pursuing, Under contract, Closed, Passed), keep notes, see each option's numbers, open a plan, jump to a parcel, or **Draw a Site** for land without a parcel outline.
+
+**Good to know**
+- A site plan is a planning sketch from the parcel outline: not a survey, and no grading, utilities, fire lanes or code review. Parcel outlines from appraisal districts can be off by several feet.
+- The setbacks, parking ratios and detention share are typical starting numbers, not the rules for a specific city. Houston has no zoning but has building lines and parking rules; other cities differ.
+- Projects are saved in this browser. Sharing them with the team switches on once the site's team database is set up for projects; until then the Projects tab says they're saved on this device.
 
 ---
 
@@ -352,6 +399,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Projects and site plans:** start a project from any property card and lay out a site plan on the parcel, by hand or with **Build with AI** (three options with floor area, parking and coverage), checked against setbacks, and exported to CAD (DXF).
 - **The app's own cursors:** a branded set that shows what a click will do, with a different one for each selection tool.
 - **A new Market tab:** construction pipeline, growth, housing and rents, building material costs and rates, each in its own section with a button to jump to it, hover numbers on every chart, and a "What's moving" summary.
 - **Street maps in reports:** every report PDF now shows its area on a real street map instead of a plain outline.
