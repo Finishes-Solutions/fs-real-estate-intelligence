@@ -222,7 +222,7 @@ export function initBuildings(ctx) {
         ss('Footprint: OpenStreetMap. Height: USGS 3DEP lidar where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record, otherwise estimated from height.') + '</div>' +
       '<div class="bsec" id="bSite"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsec" id="bRegrid"></div><div class="bsrc"></div>' +
-      '<div class="bsec" id="bTools"><div class="lt">Site Tools</div><div class="bacts">' + '<button class="btn" id="bMulti" title="Then ' + (matchMedia('(pointer: coarse)').matches ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 10">Select Multiple</button>' +
+      '<div class="bsec" id="bTools"><div class="lt">Site Tools</div><div class="bacts">' + '<button class="btn" id="bMulti" title="Then ' + (matchMedia('(pointer: coarse)').matches ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 20">Select Multiple</button>' +
         '<button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button><button class="btn" id="bPlan" title="Start a project and lay out a site plan on this parcel, by hand or with AI">Start Site Plan</button><button class="btn askai" id="bAsk">Ask AI About It</button></div></div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
@@ -289,7 +289,7 @@ export function initBuildings(ctx) {
     const acres = [...uniqP.values()].reduce((t, p) => t + (/acre/i.test(p.area || '') ? parseFloat(p.area) : 0), 0);
     const geoms = [...uniqP.values()].map(p => p.geometry).concat(list.filter(b => !b.parcel).map(b => b.footprint)).filter(Boolean);
     const fl = F.filter(f => geoms.some(g => inGeom([f.lon, f.lat], g))), loading = list.some(b => b.loading);
-    card.innerHTML = '<div class="top"><div><div class="kicker">Selection</div><h2>' + list.length + ' buildings &amp; parcels</h2><div class="bsub">' + ((matchMedia('(pointer: coarse)').matches ? 'Tap Add to pick more' : 'Shift-click to add more') + ' · up to 10') + '</div></div>' +
+    card.innerHTML = '<div class="top"><div><div class="kicker">Selection</div><h2>' + list.length + ' buildings &amp; parcels</h2><div class="bsub">' + ((matchMedia('(pointer: coarse)').matches ? 'Tap Add to pick more' : 'Shift-click to add more') + ' · up to 20') + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
       '<div class="kgrid msum"><div><b>' + (tot('fp') ? fmtN(tot('fp')) : '—') + '</b><span>Footprint sq ft</span></div><div><b>' + (tot('gfa') ? '~' + fmtN(tot('gfa')) : '—') + '</b><span>Est. floor area sq ft</span></div>' +
       '<div><b>' + (mv ? fmtM(mv) : '—') + '</b><span>Market value · ' + uniqP.size + ' parcel' + (uniqP.size === 1 ? '' : 's') + '</span></div><div><b>' + (acres ? acres.toFixed(2) : '—') + '</b><span>Land acres</span></div></div>' +
@@ -297,12 +297,16 @@ export function initBuildings(ctx) {
       '<div class="bsec"><div class="lt">Selected</div>' + rows.map(({ b, s }, i) => '<div class="mrow"><button class="lnk" data-go="' + i + '"><b><i class="mnum">' + (i + 1) + '</i>' + esc(b.parcel?.situs || (b.footprint ? 'Building ' : 'Parcel ') + (i + 1)) + '</b><span>' +
         [s.fp ? fmtN(s.fp) + ' sq ft footprint' : (b.footprint ? '' : 'parcel only'), s.fl ? (s.fSrc === 'estimated from height' ? '~' : '') + s.fl + ' fl' : '', s.h ? ft(s.h) : '', b.d?.parcels?.length > 1 ? b.d.parcels.length + ' parcels' : '', b.parcel?.owner || ''].filter(Boolean).map(esc).join(' · ') + (b.err ? ' · lookup failed' : '') + '</span></button><button class="x" data-rm="' + i + '" aria-label="Remove">×</button></div>').join('') + '</div>' +
       (fl.length ? '<div class="bsec"><div class="lt">Construction filings on these parcels</div><div class="rnote">' + fl.length + ' filing' + (fl.length > 1 ? 's' : '') + ' · est. ' + fmtM(fl.reduce((t, f) => t + f.cost, 0)) + '</div></div>' : '') +
-      '<div class="bacts"><button class="btn" id="mCsv">Export CSV</button><button class="btn" id="mFit">Zoom to All</button><button class="btn" id="mClear">Clear</button></div>';
+      '<div class="bacts"><button class="btn askai" id="mPlan" title="One site plan on all these parcels together (up to 20)">Site Plan for All</button><button class="btn" id="mCsv">Export CSV</button><button class="btn" id="mFit">Zoom to All</button><button class="btn" id="mClear">Clear</button></div>';
     card.classList.add('open');
     ctx.tabs?.track({ id: 'b:all', kind: 'summary', label: 'All ' + list.length, reopen: renderAll, pinned: true });
     highlight();
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#mClear').onclick = () => ctx.closeCard();
+    card.querySelector('#mPlan').onclick = () => {
+      if (list.some(b => b.loading)) { ctx.toast('Still loading the parcels. Try again in a moment.'); return; }
+      ctx.sitePlan?.start({ center: list[0].center, title: list.length + ' parcels', parcels: [...uniqP.values()] });
+    };
     card.querySelector('#mFit').onclick = () => { const pts = list.map(b => b.center); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); map.fitBounds([[Math.min(...xs) - .0008, Math.min(...ys) - .0008], [Math.max(...xs) + .0008, Math.max(...ys) + .0008]], { padding: 60, maxZoom: 18, duration: ctx.reduceMotion ? 0 : 800 }); };
     card.querySelector('#mCsv').onclick = () => ctx.exportCsv(rows.map(({ b, s }, i) => ({ '#': i + 1, Address: b.parcel?.situs || '', Owner: b.parcel?.owner || '', 'Property ID': b.parcel?.propId || '', Parcels: b.d?.parcels?.length || (b.parcel ? 1 : 0), 'Footprint sq ft': s.fp || '',
       'Est. floor area sq ft': s.gfa || '', 'Height ft': s.h ? Math.round(s.h * 3.281) : '', 'Height source': s.hSrc, Floors: s.fl || '', 'Floors source': s.fSrc, 'Market value': b.parcel?.marketValue || '', 'Year built': b.parcel?.yearBuilt || '', Latitude: b.center[1].toFixed(6), Longitude: b.center[0].toFixed(6) })), 'selected-buildings');

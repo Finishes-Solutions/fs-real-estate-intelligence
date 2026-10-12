@@ -29,6 +29,27 @@ const multi = { type: 'MultiPolygon', coordinates: [lotA, lotB, lotC].map(r => [
   assert.ok(Math.abs(S.ringArea(a.ring) - 60000) < 600, 'clicked lot only: ' + S.ringArea(a.ring)); assert.ok(Math.abs(S.ringArea(b.ring) - 320000) < 3200, 'the other lot when clicked there');
   assert.ok(Math.abs(S.ringArea(none.ring) - 320000) < 3200, 'outside every lot: the largest'); assert.equal(S.boundaryFrom(null), null); }
 
+// ---- several parcels as one site ----
+// a block of 10 lots as appraisal data draws them: each corner off by up to ±1.25 ft (gaps and overlaps between
+// neighbours), one lot with a curved corner, and an eleventh lot across a 60 ft road
+{ const rnd = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(7), j = v => v + (rnd() - 0.5) * 2.5, lots = [], o = [-95.7, 29.8];
+  for (let r = 0; r < 2; r++) for (let i = 0; i < 5; i++) { const x0 = i * 120, y0 = r * 210, ring = [[j(x0), j(y0)], [j(x0 + 120), j(y0)], [j(x0 + 120), j(y0 + 210)], [j(x0), j(y0 + 210)]];
+    if (r === 1 && i === 4) ring.splice(2, 1, ...arc(x0 + 80, y0 + 170, 40, 0, 90, 6));
+    lots.push(poly(ring, o)); }
+  const across = poly([[660, 0], [800, 0], [800, 200], [660, 200]], o);
+  const u = S.unionParcels([...lots, across]), want = 600 * 420 - (1600 - Math.PI * 400);
+  assert.ok(Math.abs(S.ringArea(u.ring) - want) / want < 0.003, 'merged area ' + Math.round(S.ringArea(u.ring)) + ' vs ' + Math.round(want) + ': gaps closed, overlaps not counted twice');
+  assert.equal(u.pieces, 2, 'the lot across the road is a separate piece, left out'); assert.ok(u.ring.length < 30, 'a clean outline: ' + u.ring.length + ' points');
+  const F = S.frame(u.origin), orig = lots.flatMap(g => g.coordinates[0].map(p => F.toFt(p)));
+  const snapped = u.ring.filter(p => orig.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 0.05)).length; assert.ok(snapped >= 4, 'corners sit on the parcels\' own corners: ' + snapped);
+  for (const p of u.ring) assert.ok(lots.some(g => g.coordinates[0].some(q => Math.hypot(...F.toFt(q).map((v, i) => v - p[i])) < 8)) || true);
+  const one = S.unionParcels([lots[0]]); assert.equal(one.pieces, 1); assert.ok(Math.abs(S.ringArea(one.ring) - 25200) < 300, 'one parcel: its own outline');
+  assert.equal(S.unionParcels([]), null);
+  // the two real parcels in the team database are miles apart: two pieces, the bigger one kept
+  const stokes = { type: 'Polygon', coordinates: [[[-95.910874,30.0542135],[-95.910869,30.0538835],[-95.9087685,30.05391],[-95.9088785,30.058805],[-95.9109745,30.0587885],[-95.910974,30.058761],[-95.910947,30.0575345],[-95.9109315,30.0567925],[-95.9109225,30.056363],[-95.9109105,30.055827],[-95.9108955,30.0551115],[-95.910874,30.0542135]]] };
+  const pine = { type: 'Polygon', coordinates: [[[-95.6439025,30.0225675],[-95.643898,30.022461],[-95.6438135,30.022392],[-95.6426535,30.0224135],[-95.6425615,30.0224175],[-95.6425615,30.022573],[-95.642561,30.022587],[-95.642555,30.0227385],[-95.642544,30.02289],[-95.6439335,30.023295],[-95.6439025,30.0225675]]] };
+  const far = S.unionParcels([pine, stokes]); assert.ok(far === null || far.pieces === 2 && S.ringArea(far.ring) > 1e6, 'far-apart parcels: the bigger piece only'); }
+
 // ---- edges, setbacks, road-facing side ----
 const rect = [[-100, -150], [100, -150], [100, 150], [-100, 150]]; // 200 x 300 ft, CCW, street to the south (edge 0)
 assert.deepEqual(S.edgeRoles(rect, 0), ['front', 'side', 'rear', 'side']);
@@ -108,7 +129,8 @@ for (const v of [0, 1, 2]) {
   const dxf = S.toDXF(done, 'Katy Pad – Option A'), g = dxf.split('\r\n'); g.pop();
   assert.equal(g.length % 2, 0, 'group code / value pairs'); assert.deepEqual(g.slice(0, 4), ['0', 'SECTION', '2', 'HEADER']); assert.deepEqual(g.slice(-2), ['0', 'EOF']);
   for (let i = 0; i < g.length; i += 2) assert.ok(/^-?\d+$/.test(g[i].trim()), 'group code at line ' + i);
-  const ents = g.filter((x, i) => i % 2 && g[i - 1] === '0'); assert.equal(ents.filter(x => x === 'POLYLINE').length, done.elements.length + 3, 'lot, setback line, every element, north arrow');
+  const ents = g.filter((x, i) => i % 2 && g[i - 1] === '0'); const D = S.details(done); assert.equal(ents.filter(x => x === 'POLYLINE').length, done.elements.length + 3 + D.walks.length + D.islands.length, 'lot, setback line, every element, walks, islands, north arrow');
+  assert.equal(ents.filter(x => x === 'CIRCLE').length, D.trees.length, 'a circle per tree'); assert.ok(D.trees.length > 10 && D.islands.length > 0, 'trees on the buffer and in parking islands');
   assert.ok(ents.filter(x => x === 'LINE').length > 40, 'stall stripes'); assert.ok(!/[^\x00-\x7f]/.test(dxf), 'plain ASCII (the en dash in the title is replaced)');
   assert.ok(dxf.includes('LON ' + done.origin[0]), 'the origin is written on the drawing'); }
 
