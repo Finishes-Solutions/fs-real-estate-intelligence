@@ -15,6 +15,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Pro forma** with a development schedule in months (design and permits, construction, lease-up or sales, hold), a month-by-month model (construction loan and interest, lease-up, refinance, sale), TestFit's one-page method side by side, homes for rent or for sale, and **Pro Forma (Excel)** with live formulas.
 - TestFit's custom pro forma was reverse-engineered: the one-page method reproduces its sheet to the dollar (61.51% unlevered and 114.44% levered IRR on its inputs). It skips the construction period and lease-up, which is why those IRRs run so high.
 
+### 3:04 PM CT: Parcel lines cached for two weeks (c2f5825)
+- **Parcel lines (Regrid) now stay cached for 14 days instead of 7**, so the same map area costs a Regrid tile at most once every two weeks. That stretches the monthly tile allowance further.
+- The trade-off: a boundary change Regrid makes can take up to two weeks to show on the map.
+
 ### 3:03 PM CT: Site plans rebuilt: three usable, connected options every time (667d063)
 - **Every Build with AI run gives three usable options.** Each is checked before it's offered: inside the setbacks, no overlaps, enough parking, and every drive and parking row reachable from the entry. The app tries many arrangements and keeps the best three that pass.
 - **Laid out like a real site plan:** the drives come first as one connected network (aisles joined by curved drives into loops, no dead ends), parking rows line the aisles, extra parking bays run between them where needed, and buildings sit between the rows facing their parking across a walk.
