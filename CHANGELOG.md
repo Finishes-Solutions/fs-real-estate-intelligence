@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 4:32 PM CT: One pool by its clubhouse; moving a building keeps the plan tidy (c4c4568)
+- **One pool per community, where it belongs:** apartments with a commons no longer get a second pool and clubhouse out behind the buildings by the pond. The clubhouse and pool by the entry serve everyone; the commons keeps the park, playground, pavilion and lake. Neighbourhoods with homes for sale still get a community center with its own pool, now on a deck right against the center.
+- **Commons amenities line the drive** (community center, pool, playground, pavilion, courts) with the lake and lawns behind them, instead of sitting out in the middle of the park.
+- **The checks flag** a pool that isn't beside its clubhouse and a second pool for one community of rentals, so the AI review catches them too; the AI is also told to plan one pool per community.
+- **Dragging a building no longer wrecks the layout:** it settles in the nearest clear spot to where you let go, off the drives and clear of other buildings (hold Alt / Option to place it anyway). A clubhouse takes its pool deck and pool with it, a restaurant its patio and drive-thru lane.
+- **Parking comes back:** stalls a building covered grow back when you move it off them, so trying a spot and moving back leaves the plan as it was.
+
 ### 4:01 PM CT: The AI suggests what to build and reviews the layouts (ce4e152)
 - **What Should Go Here?** in the site plan panel: the AI reads what the app knows about the site (flood zone, roads and traffic, utility districts and lines, environmental records), what's nearby and local rents, and suggests three to five uses with why each fits and what to check. **Lay This Out** builds any of them.
 - **Build Options now has the AI check the engine's work:** the engine still draws every option, then the AI looks at each one (a picture of the plan plus its numbers and checks), changes the program and has the engine lay it out again when the options miss, and puts the best first. Each option shows the AI's score, a verdict and what to watch. It takes a minute or two; a switch under the button turns it off.
