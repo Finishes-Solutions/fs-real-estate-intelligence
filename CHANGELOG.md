@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 11:56 AM CT: Townhome and duplex communities that fit, side streets, pull-through drives (b080bd8)
+- **"24 duplex units" on a small tract now gives 24 units, not 4:** when the homes asked for won't fit on lots of their own, the plan lays them out as two-story six-unit townhome rows facing a shared parking court with a turnaround at the end, like a rental community on one tract, and says why. On the 1.46-acre Waller Tomball Rd tract this matches the hand-drawn 24-unit plan set: 4 buildings, 49 spaces for 48 needed, underground detention.
+- **Unit lines and fenced back patios** are drawn on these buildings, on the sheet and the map.
+- **Side Street:** a second street along a corner lot, found from the map's roads or set with the new **Side Street** button. Buildings keep the street setback from it, and "pull-through drive" in the request runs a second drive between the buildings out to it.
+- Build with AI can now choose between homes on lots and a parking court, and ask for a pull-through drive.
+- Options that fit far fewer homes than the best one, and plain fallback layouts, are no longer shown for these.
+
 ### 11:31 AM CT: Site plans fill the site, cleaner shapes, trees, more building types (e993f7b)
 - **The whole site is used:** what you ask for is laid out as Phase 1, and the rest of the land holds more of the same size of building as Phase 2 (lighter, dashed), instead of lawn. "28,000 sf across 4 buildings" on 27 acres now shows the 4 buildings plus 32 more of the same size. Deep sites get several rows of shops or offices. A switch under Site parameters turns this off.
 - **Cleaner drawing:** no more blob-shaped lawns and ponds. The site is one landscape background, ponds are rectangles beside the buildings, and parking rows end square. Trash enclosures are left out unless turned on.
