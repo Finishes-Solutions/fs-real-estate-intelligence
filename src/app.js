@@ -44,6 +44,7 @@ import { initEnv } from './env.js';
 import { initOwner } from './owner.js';
 import { initGoogle } from './google.js';
 import { initSitePlan } from './siteplan.js';
+import { renderNav, syncNav as syncNavTabs, leafFor, pathOf } from './nav.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
 
@@ -851,18 +852,27 @@ function reportMap(list){
 // ---------- views ----------
 let view='map'; const appEl=document.querySelector('.app'), viewHooks={}, viewChangeHooks=[], cardRenderHooks=[];
 function setView(v){
+  // every page id works (#v=who, saved reports, the assistant); a group id (filings, marketgrp, work) opens its last-used page
+  if(!document.getElementById('view-'+v)&&v!=='map') v=leafFor(v);
   if(!document.getElementById('view-'+v)&&v!=='map') v='map'; const was=view; view=v;
-  document.querySelectorAll('#viewbar button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
+  syncNavTabs(v); // app bar tab, sub-tab row (src/nav.js)
   document.querySelectorAll('.view').forEach(el=>el.classList.toggle('on',el.id==='view-'+v));
   stage.dataset.view=v; appEl.dataset.view=v; // pages (not the Map) hide the list panel and use the full width (app.css)
   // the map is wider on a page (no panel); resize it now, not on the next tick, so a fit/fly that follows this call
   // (Compare's "go", "show on map", the assistant) is measured against the map's real width
   if(v==='map'){ appEl.classList.remove('pview-open'); if(was!=='map') map.resize(); setTimeout(()=>map.resize(),0); } else viewHooks[v]?.();
+  if(v==='changes') changesSeen();
   viewChangeHooks.forEach(fn=>fn(v));
   scheduleHash();
 }
-document.querySelectorAll('#viewbar button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
-{ const n=CHANGED.size; document.getElementById('chgBadge').textContent=n?fmtN(n):''; }
+// Changes badge: filings new or changed in nightly checks since you last opened Changes (all of this week's on a first visit)
+const CHG_SEEN='fs-chg-seen';
+function changesBadge(){
+  let seen=null; try{ seen=localStorage.getItem(CHG_SEEN); }catch(e){}
+  const ids=new Set(); for(const r of DATA.changes.runs||[]){ if(seen&&r.built<=seen) break; for(const x of r.items) if(CHANGED.has(x.id)) ids.add(x.id); }
+  ctx.setBadge('changes',ids.size,{alert:true,title:'New and changed filings since your last visit'});
+}
+function changesSeen(){ const last=DATA.changes.runs?.[0]?.built; if(!last) return; try{ localStorage.setItem(CHG_SEEN,last); }catch(e){} changesBadge(); }
 
 // ---------- month slider (map) ----------
 const tRange=document.getElementById('tRange'), tLabel=document.getElementById('tLabel'), tPlay=document.getElementById('tPlay'), tsl=document.getElementById('tslider');
@@ -912,7 +922,7 @@ function screenContext(){
   const c=map.getCenter(), b=map.getBounds(), z=map.getZoom(), near=nearestPlace([c.lng,c.lat])||farLabel;
   const inView=visible.filter(f=>f.lon>=b.getWest()&&f.lon<=b.getEast()&&f.lat>=b.getSouth()&&f.lat<=b.getNorth());
   const top=inView.slice().sort((a,b)=>b.cost-a.cost).slice(0,8).map(f=>f.id+' '+f.name.slice(0,60)+' ('+(f.use||TYPE_LABEL[f.type])+', est. '+fmtM(f.cost)+', '+(f.city||f.county)+')');
-  const lines=['View: '+(view==='map'?'map':view+' tab')+'; map centered '+c.lat.toFixed(4)+', '+c.lng.toFixed(4)+(near?' (near '+near+')':'')+', zoom '+z.toFixed(1)+(z>=14?' (street level, 3D buildings visible)':z>=11?' (neighborhood)':z>=8?' (city/county)':' (region)')+(map.getPitch()>20?', tilted 3D':'')+(orbitRaf?', orbiting':''),
+  const lines=['View: '+(view==='map'?'map':view+' tab ('+pathOf(view)+')')+'; map centered '+c.lat.toFixed(4)+', '+c.lng.toFixed(4)+(near?' (near '+near+')':'')+', zoom '+z.toFixed(1)+(z>=14?' (street level, 3D buildings visible)':z>=11?' (neighborhood)':z>=8?' (city/county)':' (region)')+(map.getPitch()>20?', tilted 3D':'')+(orbitRaf?', orbiting':''),
     'Visible area: W '+b.getWest().toFixed(3)+' S '+b.getSouth().toFixed(3)+' E '+b.getEast().toFixed(3)+' N '+b.getNorth().toFixed(3),
     'Filings on screen: '+fmtN(inView.length)+' of '+fmtN(visible.length)+' matching, est. '+fmtM(inView.reduce((s,f)=>s+f.cost,0))+(top.length?'. Largest in view: '+top.join('; '):''),
     'Map display: '+(layers.dots?'filing dots on':'filing dots hidden')+', heatmap '+layers.heat+', basemap '+layers.style];
@@ -953,6 +963,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
+renderNav(ctx); changesBadge(); // menus first: modules look up the badge spans, #mInstall and the sub-tab rows
 for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------

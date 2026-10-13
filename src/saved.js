@@ -23,7 +23,23 @@ export function initSaved(ctx) {
     listEl.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { const all = read(), s = all[+b.dataset.i]; s.seen = new Date().toISOString(); write(all);
       const p = new URLSearchParams(s.hash); ctx.fromSpec(decode(s.hash)); if (p.get('m')) ctx.setMonth(p.get('m')); else if (ctx.state.month) ctx.setMonth(null); render(); });
     listEl.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const all = read(); all.splice(+b.dataset.del, 1); write(all); render(); });
+    if (ctx.view === 'saved') renderPage();
   }
+  // My Work › Saved searches: the same searches as a page (open one to see it on the map)
+  const page = document.getElementById('workSaved');
+  function open(i) { const all = read(), s = all[i]; if (!s) return; s.seen = new Date().toISOString(); write(all);
+    const p = new URLSearchParams(s.hash); ctx.fromSpec(decode(s.hash)); if (p.get('m')) ctx.setMonth(p.get('m')); else if (ctx.state.month) ctx.setMonth(null); render(); }
+  function renderPage() {
+    if (!page) return; const a = read();
+    page.innerHTML = '<div class="vhead"><div><div class="kicker">My Work</div><h2>Saved searches</h2><div class="vsub">Searches you saved in this browser, with how many new filings match each one since you last opened it. To save one, set filters on the Map, then choose Save Search under This Area.</div></div></div>' +
+      (a.length ? '<div class="svp">' + a.map((s, i) => { const n = newSince(s); return '<div class="svp-r"><div><b>' + esc(s.name) + '</b>' + (n ? ' <span class="bdg new">' + fmtN(n) + ' new</span>' : '') + '</div><div class="svp-a"><button type="button" class="btn sm primary" data-open="' + i + '">Show on map</button>' +
+        '<a class="btn sm" href="api/feed?' + esc(s.hash.replace(/(^|&)(m|v|f)=[^&]*/g, '')) + '" target="_blank" rel="noopener" title="New matching filings as an RSS feed">RSS</a><button type="button" class="btn sm ghost" data-del="' + i + '" aria-label="Delete ' + esc(s.name) + '">Delete</button></div></div>'; }).join('') + '</div>'
+        : '<div class="empty">No saved searches yet. <button type="button" class="lnk" id="svpGo">Go to the Map</button> to set filters and save one.</div>');
+    page.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { open(+b.dataset.open); ctx.showFilings?.(); ctx.setView('map'); });
+    page.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const all = read(); all.splice(+b.dataset.del, 1); write(all); render(); renderPage(); });
+    const go = page.querySelector('#svpGo'); if (go) go.onclick = () => ctx.setView('map');
+  }
+  ctx.onView('saved', renderPage);
   document.getElementById('saveSearch').onclick = () => {
     const name = prompt('Name this search', ctx.filterText().slice(0, 60) || 'All filings'); if (!name) return;
     const p = new URLSearchParams(ctx.hashStr()); p.delete('f'); p.delete('v');

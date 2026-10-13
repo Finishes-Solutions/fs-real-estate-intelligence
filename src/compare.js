@@ -10,7 +10,7 @@ const ROWS = ['count', 'value', 'new', 'newValue', 'reno', 'add', 'avg', 'median
 
 export function initCompare(ctx) {
   const { map, esc, fmtM, fmtN } = ctx;
-  const root = document.getElementById('view-compare'), badge = document.getElementById('cmpBadge');
+  const root = document.getElementById('view-compare');
   let areas = [];
   try { areas = (JSON.parse(localStorage.getItem('fs-compare') || '[]') || []).filter(a => a && a.geom && a.label).slice(0, MAX); } catch (e) {}
   const save = () => { try { localStorage.setItem('fs-compare', JSON.stringify(areas)); } catch (e) { /* large outlines: keep in memory only */ } };
@@ -78,7 +78,7 @@ export function initCompare(ctx) {
   ctx.onChange(syncSelBtn);
 
   function sync() {
-    badge.textContent = areas.length ? areas.length : ''; const mb = document.getElementById('mCmpN'); if (mb) mb.textContent = areas.length ? areas.length : '';
+    ctx.setBadge?.('compare', areas.length); // a muted count beside the Compare areas sub-tab
     syncMap(); syncSelBtn(); render();
   }
 

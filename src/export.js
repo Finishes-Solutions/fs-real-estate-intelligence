@@ -33,7 +33,7 @@ export function initExport(ctx) {
     if (st.scope !== 'filters' && !scopes().find(x => x[0] === st.scope)[2]) st.scope = 'filters';
     const n = st.report === 'compare' ? cmp.length : listFor(st.scope).length;
     const blocked = st.report === 'compare' ? (cmp.length ? '' : 'Add areas to Compare first (select an area on the map, then “+ Compare”).') : n ? '' : 'No filings match. Change the filters or pick other filings.';
-    dlg.innerHTML = '<div class="xbox"><div class="xh"><div><div class="kicker">Export</div><h2 id="xTitle">Reports &amp; Data</h2></div><button class="x" id="xClose" aria-label="Close">×</button></div>' +
+    dlg.innerHTML = '<div class="xbox"><div class="xh"><div><div class="kicker">Reports &amp; data</div><h2 id="xTitle">New report</h2></div><button class="x" id="xClose" aria-label="Close">×</button></div>' +
       '<div class="xsec"><div class="lt">Report</div><div class="xreports">' + Object.entries(REPORTS).map(([k, r]) =>
         '<label class="xr' + (st.report === k ? ' on' : '') + '"><input type="radio" name="xrep" value="' + k + '"' + (st.report === k ? ' checked' : '') + '><b>' + r.label + (k === 'compare' ? ' <span class="n">' + cmp.length + ' area' + (cmp.length === 1 ? '' : 's') + '</span>' : '') + '</b><span>' + r.desc + '</span></label>').join('') + '</div></div>' +
       (st.report === 'compare' ? '' : '<div class="xsec"><div class="lt">Filings</div><div class="xscopes">' + scopes().map(([k, l, c]) =>

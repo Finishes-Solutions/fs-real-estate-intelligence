@@ -47,7 +47,7 @@ export function initSources(ctx) {
       ['Nightly data (built into the app)', [
         { name: link('TDLR TABS', 'https://www.tdlr.texas.gov/TABS/Search'), what: 'Construction registrations: every filing on the map, list, timeline and activity views', status: nightlyStatus(),
           detail: nightly + '. ' + fmtN(F.length) + ' filings registered ' + fmtDay(DATA.period.start) + ' to ' + fmtDay(DATA.period.end) + (unmapped ? '; ' + fmtN(unmapped) + ' couldn’t be mapped' : '') + '.' },
-        { name: 'TABS change feed', what: 'Updates tab: new filings and status, value and date changes', status: runs.length ? nightlyStatus() : st('off', 'Starts after 2 runs'),
+        { name: 'TABS change feed', what: 'Changes page: new filings and status, value and date changes', status: runs.length ? nightlyStatus() : st('off', 'Starts after 2 runs'),
           detail: runs.length ? 'Latest comparison ' + fmtWhen(runs[0].built) + ' · ' + fmtN(runs.length) + ' nightly run' + (runs.length === 1 ? '' : 's') + ' kept.' : 'Each nightly pull is compared with the one before.' },
         { name: link('US Census Geocoder', 'https://geocoding.geo.census.gov/') + ' · ' + link('OpenStreetMap Nominatim', 'https://nominatim.org/'), what: 'Where each filing sits on the map', status: nightlyStatus(),
           detail: 'New addresses are located during the nightly build and cached. ' + (approx ? fmtN(approx) + ' filing' + (approx === 1 ? ' is' : 's are') + ' placed at city level (hollow markers).' : 'All filings have a street-level location.') },

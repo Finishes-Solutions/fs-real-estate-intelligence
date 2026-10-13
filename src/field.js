@@ -56,8 +56,9 @@ export function initField(ctx) {
 
   function syncBadges() {
     const n = db.notes.length + db.watch.length, alerts = db.watch.filter(w => w.kind === 'filing' && CHANGED.has(w.ref)).length;
-    document.getElementById('fieldBadge').textContent = alerts ? alerts + ' updated' : (n ? fmtN(n) : '');
-    document.getElementById('mFieldN').textContent = alerts ? fmtN(alerts) : (n ? fmtN(n) : '');
+    // only watched filings that changed need attention (a badge that rolls up to My Work / More); otherwise a muted count
+    if (alerts) ctx.setBadge?.('field', alerts, { alert: true, text: fmtN(alerts) + ' updated', title: 'Watched filings that changed in the latest nightly check' });
+    else ctx.setBadge?.('field', n);
   }
 
   // ---- watch star on filing and building cards (and the assistant's watch tool) ----
@@ -137,7 +138,7 @@ export function initField(ctx) {
     const ctr = map.getCenter().toArray();
     const notes = db.notes.slice().sort((a, b) => b.updated.localeCompare(a.updated));
     const watch = db.watch.map(w => ({ ...w, f: w.kind === 'filing' ? BY_ID.get(w.ref) : null }));
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Field notes</div><h2>Your sites &amp; watchlist</h2><div class="vsub">' + fmtN(notes.length) + ' site notes · ' + fmtN(watch.length) + ' watched · ' + (ctx.team?.summary() || 'stored on this device') + '</div><div id="fTeam"></div></div>' +
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">Notes &amp; watchlist</div><h2>Your sites &amp; watchlist</h2><div class="vsub">' + fmtN(notes.length) + ' site notes · ' + fmtN(watch.length) + ' watched · ' + (ctx.team?.summary() || 'stored on this device') + '</div><div id="fTeam"></div></div>' +
       '<div class="vctl"><button class="btn primary" id="fAdd">+ Site note here</button><button class="btn" id="fGeo">Export GeoJSON</button><button class="btn" id="fCsv">CSV</button><button class="btn" id="fKml">KML</button>' +
       '<label class="btn">Import<input type="file" accept=".geojson,.json,application/geo+json,application/json" hidden id="fImp"></label>' +
       '<label class="tg2"><input type="checkbox" id="fPh" checked><span>Include photos in GeoJSON</span></label></div></div>' +

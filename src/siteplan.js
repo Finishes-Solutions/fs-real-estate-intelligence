@@ -66,7 +66,7 @@ export function initSitePlan(ctx) {
   }
   window.addEventListener('online', sync);
   setTimeout(sync, 4000);
-  function badge() { const n = db.projects.length, el = document.getElementById('pjBadge'), m = document.getElementById('mPjN'); if (el) el.textContent = n ? fmtN(n) : ''; if (m) m.textContent = n ? fmtN(n) : ''; }
+  function badge() { ctx.setBadge?.('projects', db.projects.length); } // a muted count beside the Projects sub-tab
   badge();
 
   const P = () => db.projects.find(p => p.id === ed?.pid), PL = () => P()?.plans.find(x => x.id === ed?.plid);

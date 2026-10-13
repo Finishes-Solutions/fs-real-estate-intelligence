@@ -1,5 +1,8 @@
 // Phone and tablet behaviour. Phone (≤700px): full-screen map, bottom tab bar, floating ask bar,
 // list as its own tab, swipeable bottom-sheet cards and a "More" sheet. Tablet/desktop: collapsible side list.
+// The bottom bar and the More sheet are drawn from the navigation registry (src/nav.js).
+import { PHONE, parentOf, leafFor } from './nav.js';
+
 export function initMobile(ctx) {
   const { map, fmtN, fmtM } = ctx;
   const app = document.querySelector('.app'), nav = document.getElementById('mnav'), sheet = document.getElementById('msheet'), scrim = document.getElementById('mscrim');
@@ -48,15 +51,16 @@ export function initMobile(ctx) {
     if (t === 'more') { openSheet(); return; }
     closeSheet();
     if (t !== 'map' && card.classList.contains('open')) ctx.closeCard();
-    app.dataset.mtab = t;
-    if (t === 'map' || t === 'list') { if (ctx.view !== 'map') ctx.setView('map'); }
-    else ctx.setView(t);
+    if (t === 'map' || t === 'list') { app.dataset.mtab = t; if (ctx.view !== 'map') ctx.setView('map'); }
+    else { const leaf = leafFor(t); app.dataset.mtab = leaf; ctx.setView(leaf); } // Filings / Market open the page used last
     syncNav();
     if (t === 'map') setTimeout(() => map.resize(), 30);
   }
+  // a tab is lit for its own pages; every page that isn't in the bottom bar lights More
+  const inNav = new Set(PHONE);
   function syncNav() {
-    const t = app.dataset.mtab;
-    nav.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === t || (t === 'changes' && b.dataset.tab === 'more') || (t === 'field' && b.dataset.tab === 'more') || (t === 'projects' && b.dataset.tab === 'more') || (t === 'compare' && b.dataset.tab === 'more') || (t === 'sources' && b.dataset.tab === 'more') || (t === 'market' && b.dataset.tab === 'more') || (t === 'reports' && b.dataset.tab === 'more')));
+    const p = parentOf(app.dataset.mtab);
+    nav.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === p || (b.dataset.tab === 'more' && !inNav.has(p)))));
   }
   nav.querySelectorAll('button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
   ctx.onViewChange(v => { // views opened from elsewhere (citations, "who" clicks, change items)
@@ -89,17 +93,15 @@ export function initMobile(ctx) {
   scrim.onclick = closeSheet;
   let installEvt = null;
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; document.getElementById('mInstall').hidden = false; });
-  const chg = ctx.CHANGED.size; document.getElementById('mChgN').textContent = chg ? fmtN(chg) : ''; document.getElementById('mMoreN').textContent = chg ? fmtN(chg) : '';
   sheet.querySelectorAll('[data-go]').forEach(b => b.onclick = async () => {
     const go = b.dataset.go; closeSheet();
-    if (go === 'changes' || go === 'field' || go === 'projects' || go === 'compare' || go === 'sources' || go === 'market' || go === 'reports') setTab(go);
-    else if (go === 'note') { setTab('map'); ctx.addNote?.({ gps: true }); }
+    if (go === 'note') { setTab('map'); ctx.addNote?.({ gps: true }); }
     else if (go === 'near') { setTab('map'); ctx.nearMe(); }
-    else if (go === 'saved') { setTab('list'); const box = document.getElementById('savedBox'); if (box.style.display === 'none') ctx.toast('No saved searches yet. Set filters, then tap "Save search".'); else { box.open = true; box.scrollIntoView({ block: 'center' }); } }
     else if (go === 'layers') { setTab('map'); setTimeout(() => document.getElementById('layersBtn').click(), 50); }
     else if (go === 'export') ctx.openExport();
-    else if (go === 'install' && installEvt) { installEvt.prompt(); installEvt = null; b.hidden = true; }
+    else if (go === 'install') { if (installEvt) { installEvt.prompt(); installEvt = null; } b.hidden = true; }
     else if (go === 'theme') document.getElementById('themeBtn').click();
+    else if (document.getElementById('view-' + go)) setTab(go); // every page in the registry (My Work, Reports, Data & help)
   });
 
   // ---- swipeable bottom-sheet card (phone) ----

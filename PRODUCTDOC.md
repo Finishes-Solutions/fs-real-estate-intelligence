@@ -34,6 +34,17 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 
 ## The screen at a glance
 
+**The top bar** (computer and tablet) runs across the whole window and is the same on every page:
+- On the left: the panel button (shows or hides the Map's left panel), the logo, and five places to go: **Map**, **Filings**, **Market**, **Reports** and **My Work**.
+- On the right: **Ask AI**, **?** (Data & help: where every number comes from and how fresh it is) and the **gear** (Settings; for now, light or dark).
+
+Three of the five hold more than one page. A row of buttons at the top of the page switches between them, and the place remembers the page you used last:
+- **Filings:** Timeline, Companies (who's building the most) and Changes (what the nightly check found).
+- **Market:** Overview and Compare areas.
+- **My Work:** Projects, Notes & watchlist, and Saved searches.
+
+A small green number means something new needs a look: on **Changes**, the filings that are new or changed since you last opened it; on **Notes & watchlist**, watched filings that changed. The number also shows on the place above it (Filings, My Work). Plain grey numbers are just counts (your projects, the areas in Compare).
+
 **Left panel** (on phones, the **Explore** tab)
 - **Area at a Glance:** who lives and works in the area you've selected (a county, shape, radius or place), or in the area on screen when nothing is selected (zoomed in on a block, the census tract you're in): population and growth, median income, home value, rent, households and jobs. Its heading names the area it covers. With nothing selected it updates as you move the map; clear the selection to go back to following the map.
 - **This Area:** the area you've picked, or the map view if you haven't picked one. It holds the area reports, Compare, Save Search and Copy Link.
@@ -56,22 +67,18 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 - **Map Layers.**
 - **Globe view.**
 
-**Tabs** (desktop and tablet): Map, Market, Compare, Reports, Notes, Projects, then the construction views (Timeline, Activity, Updates), and Sources.
-
-**Pages use the whole width.** The left panel belongs to the Map: on every other tab (Market, Reports, Notes, Activity and the rest) it steps aside so the page has room, and it comes back on the Map just as you left it, at the same width, open or closed. To glance at it from a page, click the panel button at the far left of the tabs; that only affects the page you're on. On a tablet the panel starts closed so the map isn't cut in half; open it with the same button, and the app remembers your choice.
+**Pages use the whole width.** The left panel belongs to the Map: on every other page (Market, Reports, Notes & watchlist, Companies and the rest) it steps aside so the page has room, and it comes back on the Map just as you left it, at the same width, open or closed. To glance at it from a page, click the panel button at the far left of the top bar; that only affects the page you're on. On a tablet the panel starts closed so the map isn't cut in half; open it with the same button, and the app remembers your choice.
 
 **Buttons** follow one pattern everywhere: the main action is a solid green button and the other choices are outlined, in light and dark mode alike. On touch screens every button, chip and map control is at least a fingertip wide.
 
-**Phones:** the map fills the screen. The bottom bar has Map, Explore, Timeline, Activity and More. **More** opens a grid of one-word tiles:
-- **Views**, named like the desktop tabs: Market, Compare, Reports, Updates, Notes, Projects, Sources.
-- **Tools:**
-  - Layers.
-  - Export.
-  - Saved: saved searches and alerts.
-  - Nearby: the area around you.
-  - Pin: a site note at your location.
-  - Theme: light or dark.
-  - Install, when your phone offers it.
+**Phones:** the map fills the screen. The bottom bar has **Map**, **Explore** (the left panel), **Filings**, **Market** and **More**. Filings and Market open the page you used last, with the same row of page buttons at the top as on a computer. **More** is a short list in groups:
+- **My Work:** Projects, Notes & watchlist, Saved searches.
+- **Reports & export:** the Reports page, and **Quick export** for a report straight from the map.
+- **Map tools:** Layers, Nearby (the area around you) and Pin a note (a site note at your location).
+- **Settings:** light or dark, and **Install the app** when your phone offers it.
+- **Data & help:** data sources and how fresh they are.
+
+The tab you're on is lit: Market stays lit on Compare areas, and More is lit on its pages (for example Notes & watchlist). A green number on More means something inside it needs a look.
 
 Cards slide up from the bottom: swipe down to shrink one, and swipe again to close it.
 
@@ -125,10 +132,10 @@ Choose **Area**, **Shape**, **Radius** or **County** at the top of the map and m
 - **Drive-time map:** 10, 20 and 30-minute drive areas, with the people, households and jobs inside each.
 - **Air traffic report:** how often planes pass over, how low, and which kinds.
 - **Crime report** (City of Houston): incidents by type, trend, time of day, day of week, and per resident.
-- **City / County Crime Report** (anywhere in the US, from the **Reports** tab): the police department at the middle of the map or of the selected area, with the same figures as the property card's Crime by city / county.
+- **City / County Crime Report** (anywhere in the US, from the **Reports** page): the police department at the middle of the map or of the selected area, with the same figures as the property card's Crime by city / county.
 - **Compare:** add up to 4 areas and see them side by side.
 
-Every report exports as a PDF in the Finishes Solutions style, and its data as a spreadsheet. Reports are kept in the **Reports** tab.
+Every report exports as a PDF in the Finishes Solutions style, and its data as a spreadsheet. Reports are kept on the **Reports** page.
 
 ### Clearing the view
 
@@ -235,7 +242,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
 ## Market and demographics
 
 - **Area at a Glance** in the left panel shows the census numbers for the selected area, or for what's on screen when nothing is selected.
-- The **Market** tab shows one county, several counties together, or the whole region. It opens on the area selected on the map (the selected counties, or the county a drawn area sits in); with nothing selected it shows the whole region. Change it at the top: click a county's button or the small map, and click it again (or **Whole region**) to go back to all counties. The buttons under it jump to each section:
+- The **Market** page (Market → Overview) shows one county, several counties together, or the whole region. It opens on the area selected on the map (the selected counties, or the county a drawn area sits in); with nothing selected it shows the whole region. Change it at the top: click a county's button or the small map, and click it again (or **Whole region**) to go back to all counties. The buttons under it jump to each section:
   - **Overview:** headline tiles, each with its change and a small trend line: construction under way, starting in the next 90 days, homes permitted, new businesses, jobs, population, typical rent, unemployment and building material prices. **What's moving** lists the biggest changes in plain words, and **Ask AI for a market brief** has the assistant sum them up for a construction and finishes business.
   - **Construction pipeline:** from the state's construction filings. Value under construction each month (with what's already scheduled for the next 12 months), by use (click a use for its largest projects) and by county or type, the largest projects under construction and those starting in the next 90 days. Click a project to see it on the map. A filing whose value is clearly mis-entered (over $2 billion) is left out of the totals and named. The filing list starts in November 2024, so earlier months undercount.
   - **Growth & demand:** homes permitted per year (single-family, 2–4 units, apartments), new business locations per month, jobs by industry, city sales tax per month and by city, and estimated consumer spending.
@@ -273,17 +280,17 @@ Texas requires most commercial and public construction projects to register with
 - **Filing dots** are off by default. Turn them on with **Filings**. Green is new construction, grey is renovation, and a ring is an addition.
 - **Filters → Construction filings:** time period, county, type, value, use, status, size, housing units, company name, exact addresses only, start or registration dates, and recent changes. On phones, Filters opens as a full sheet with **Clear All** at the top and a button at the bottom that closes it.
 - **Filing card:** project details, dates, people involved, an **AI project brief** (what it is, timing, who's involved, area context), and nearby filings.
-- **Timeline:** the monthly pipeline of what's under construction, plus a Gantt chart of every project. Hatched bars are dates estimated because the filer left them blank. Clicking a project or dragging across the chart turns the filings on on the map.
-- **Activity:** developers, architects and contractors ranked by activity. Click one to see their projects on the map (the filings turn on).
-- **Updates:** new filings and changes found by the nightly refresh.
+- **Timeline** (Filings → Timeline): the monthly pipeline of what's under construction, plus a Gantt chart of every project. Hatched bars are dates estimated because the filer left them blank. Clicking a project or dragging across the chart turns the filings on on the map.
+- **Companies** (Filings → Companies): developers, architects and contractors ranked by activity; switch between Developers, Architects and Contractors at the top. Click one to see their projects on the map (the filings turn on).
+- **Changes** (Filings → Changes): new filings and changes found by the nightly refresh. The green number on it counts what's new since you last looked and clears when you open it.
 - **Time-lapse:** the clock button on the right plays construction month by month.
-- **Saved searches, links and alerts:** save a search in this browser, copy a link that reopens exactly this view, or subscribe to an RSS feed of new matching filings. RSS works with email tools like Zapier.
+- **Saved searches, links and alerts:** save a search in this browser, copy a link that reopens exactly this view, or subscribe to an RSS feed of new matching filings. RSS works with email tools like Zapier. Your saved searches are listed under **My Work → Saved searches**, each with how many new filings match it and a **Show on map** button.
 
 ---
 
 ## Ask AI
 
-The **Ask AI** button (⌘/ on a Mac, Ctrl+/ elsewhere) opens an assistant that can work the map for you. Tap the microphone to talk to it instead. For example:
+The **Ask AI** button in the top bar, on every page (on phones, the sparkle in the search bar; ⌘/ on a Mac, Ctrl+/ elsewhere), opens an assistant that can work the map for you. Tap the microphone to talk to it instead. For example:
 
 - "Show medical projects over $2M near Katy starting next year."
 - "What's the flood risk and traffic around this property?"
@@ -296,13 +303,13 @@ The **Ask AI** button (⌘/ on a Mac, Ctrl+/ elsewhere) opens an assistant that 
 - "How is oil doing this year?" "Does oil lead Houston unemployment?" "What moves Houston housing permits?"
 - With a property card open: "Lay out a 25,000 sf retail strip here." "How many apartments fit on this lot?" (it starts a site plan and lays out options; see below)
 
-Answers come with cards: summaries, charts, comparisons, places, drive times, weather, news and imagery. The suggestions above the Ask AI button change with what you're looking at.
+Answers come with cards: summaries, charts, comparisons, places, drive times, weather, news and imagery. When it opens, its suggested questions change with what you're looking at.
 
 ---
 
 ## Reports and exporting
 
-- The green **Export** button makes:
+- The green **Export** button on the map opens **New report**, which makes:
   - a **Summary report** (PDF, Excel or web page);
   - a **Filing list** (PDF, Excel, CSV or map file);
   - an **Area comparison** (PDF, Excel or CSV);
@@ -315,11 +322,13 @@ Answers come with cards: summaries, charts, comparisons, places, drive times, we
   - Pages are portrait. The full filing list (and a comparison of four or more areas) is landscape, because it needs the width.
 - A PDF filing list shows the 2,000 largest filings (1,000 when added to a Summary report). Excel and CSV always have every filing.
 - If the PDF can't be made, the report is saved as a web page instead. Open it and use **Print → Save as PDF**.
-- The **Reports** tab keeps your past exports in this browser. You can download one again, re-run it with today's data, or open it on the map.
+- The **Reports** page (in the top bar) keeps your past exports in this browser. You can download one again, re-run it with today's data, or open it on the map.
 
 ---
 
 ## Notes and watchlist
+
+Find them under **My Work → Notes & watchlist**.
 
 - **Add a site note** at the map center or your current location: a title, tag, notes and phone photos. Notes are shared with the team and work offline.
 - **Watch** any filing or building with the star. Watched filings are flagged when the nightly refresh sees a change.
@@ -441,7 +450,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - **CAD (DXF):** opens in AutoCAD, CADCraft, LibreCAD and most CAD programs, in feet, with layers for the lot, setback line, buildings, parking, stripes, drives, detention, the curb line round all the paving, accessible stalls, pavement markings and trash enclosures, and a notes block.
 - **Map File (GeoJSON)** and **Copy Summary** (the numbers as text).
 
-**The Projects tab** shows every project as **Cards** or a **List** (switch at the top right; your choice is remembered on this device). Each one shows a drawing of its site, the parcel address, acres, how many options it has, its largest option and when it was last changed. Search by name, address, owner or notes, and sort by last update, name, site size or number of options. **+ New Project** asks for a name right on the page.
+**The Projects page** (My Work → Projects) shows every project as **Cards** or a **List** (switch at the top right; your choice is remembered on this device). Each one shows a drawing of its site, the parcel address, acres, how many options it has, its largest option and when it was last changed. Search by name, address, owner or notes, and sort by last update, name, site size or number of options. **+ New Project** asks for a name right on the page.
 
 Click a project to open its page:
 - **A summary card:** the site drawing, the name (**Rename** to change it), site area in acres and square feet, number of parcels, owner(s), appraised value (with land value), number of site plan options and the largest one.
@@ -461,7 +470,7 @@ Click a project to open its page:
 
 ## Where the data comes from
 
-The **Sources** tab lists every source, what it's used for, and how fresh it is. The main ones are:
+The **?** button at the top right (Data & help; on phones, More → Data sources & freshness) lists every source, what it's used for, and how fresh it is. The main ones are:
 
 - **Parcels and owners:** county appraisal districts through the Texas GIO parcel service (free), and Regrid (paid, capped).
 - **People, homes and jobs:** US Census American Community Survey (5-year averages) and Census jobs data (about two years behind).
@@ -495,6 +504,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Simpler navigation:** a top bar with five places (Map, Filings, Market, Reports, My Work) instead of ten tabs that ran off the edge; Timeline, Companies (was Activity) and Changes (was Updates) sit under Filings, Compare areas under Market, and Projects, Notes & watchlist and Saved searches under My Work; **Ask AI**, **?** (Data & help, was the Sources tab) and the Settings gear are always at the top right, on every page; the green number on Changes now counts only what's new since your last look; and on phones the bottom bar is Map, Explore, Filings, Market and More, with More as a short grouped list.
 - **Roomier pages:** Market, Reports, Notes, Activity and the other tabs now use the full width (the Map's left panel steps aside and comes back when you return to the Map); tablets open with the map at full width; buttons look the same everywhere, including in dark mode; and buttons and chips are easier to tap on touch screens.
 - **Site plans that always fit and look finished:** every plan has its parking, a drive and dumpsters, and an ask too big for the land becomes the most that fits; small extras (patio, playground, lawn) beside a single use; neighbourhoods that fill large tracts with a community center and park; better tree placement; a library of about 230 building types; point-by-point shape editing; dependable Cmd+Z; a site plan panel laid out like a property card; faster on sites up to 300 acres; and the AI thinks longer about the program.
 - **Curving neighbourhood streets:** single-family layouts now have streets that curve, with lots and homes following them, for about the same number of lots as straight streets; a setting switches back to straight.
