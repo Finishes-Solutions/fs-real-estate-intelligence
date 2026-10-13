@@ -412,7 +412,13 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - **CAD (DXF):** opens in AutoCAD, CADCraft, LibreCAD and most CAD programs, in feet, with layers for the lot, setback line, buildings, parking, stripes, drives, detention, the curb line round all the paving, accessible stalls, pavement markings and trash enclosures, and a notes block.
 - **Map File (GeoJSON)** and **Copy Summary** (the numbers as text).
 
-**The Projects tab** lists every project: rename it, set its status (Idea, Pursuing, Under contract, Closed, Passed), keep notes, see each option's numbers, open a plan, jump to a parcel, or **Draw a Site** for land without a parcel outline.
+**The Projects tab** lists every project as a card:
+- Each site plan option shows as a small drawing of the plan (street side down) with its floor area, units, parking against what's needed (amber when short), coverage, and a red count if it has problems. Click one to open it on the map.
+- **New Option** starts a blank plan on the same site (the latest option's outline, setbacks and street side, or the project's parcels). **Draw a Site** is for land without a parcel outline, or a different site.
+- Rename a project by clicking its name; set its status (Idea, Pursuing, Under contract, Closed, Passed), which colours the card; keep notes; click a parcel to see it on the map.
+- Filter by status (with a count for each), search by name, parcel, owner or notes, and sort by last update, name, status or site size.
+- **+ New Project** asks for a name right on the page. A project with no site yet explains how to add one, with **Find a Parcel** and **Draw a Site** buttons.
+- Your notes are safe while you type: a team sync waits until you leave the field.
 
 **Good to know**
 - The PDF is a conceptual sheet. It has no survey bearings, easements, utilities or title research, so it won't match an engineer's or architect's sheet; it's for feasibility and early conversations.
@@ -457,6 +463,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 ---
 
 ## Recently added
+
+- **A clearer Projects tab:** each option shows as a drawing with its key numbers; projects can be filtered by status, searched and sorted; **New Option** adds a plan on the same site in one click; new projects are named on the page; and the tab now fits phone screens.
 
 - **Utilities near a site:** the property card's Site section shows the nearest power lines (with voltage and owner) and substation, who provides water and sewer here, and in Houston the nearest public sewer main; a **Power, Water & Sewer Lines** map layer; and the site plan sheet notes them. Projects now sync with the team.
 
