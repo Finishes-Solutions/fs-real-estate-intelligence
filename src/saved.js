@@ -14,31 +14,34 @@ export function initSaved(ctx) {
     for (const [id, at] of firstSeen) { if (at <= s.seen) continue; const f = BY_ID.get(id); if (f && m(f) && matchSel(f, spec.sel)) n++; }
     return n;
   }
-  function render() {
-    const a = read(); box.style.display = a.length ? '' : 'none';
-    let total = 0;
-    listEl.innerHTML = a.map((s, i) => { const n = newSince(s); total += n; return '<div class="sv"><button class="lnk" data-i="' + i + '">' + esc(s.name) + '</button>' + (n ? '<span class="bdg new">' + fmtN(n) + ' new</span>' : '') +
-      '<a class="lnk" href="api/feed?' + esc(s.hash.replace(/(^|&)(m|v|f)=[^&]*/g, '')) + '" target="_blank" rel="noopener" title="RSS feed">RSS</a><button class="lnk x" data-del="' + i + '" aria-label="Delete">×</button></div>'; }).join('');
-    nEl.textContent = total ? '· ' + fmtN(total) + ' new' : '';
-    listEl.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { const all = read(), s = all[+b.dataset.i]; s.seen = new Date().toISOString(); write(all);
-      const p = new URLSearchParams(s.hash); ctx.fromSpec(decode(s.hash)); if (p.get('m')) ctx.setMonth(p.get('m')); else if (ctx.state.month) ctx.setMonth(null); render(); });
-    listEl.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const all = read(); all.splice(+b.dataset.del, 1); write(all); render(); });
-    if (ctx.view === 'saved') renderPage();
-  }
-  // My Work › Saved searches: the same searches as a page (open one to see it on the map)
+  // one list, two places: the panel's Saved Searches box (compact) and My Work › Saved searches (a page)
   const page = document.getElementById('workSaved');
+  const rss = s => 'api/feed?' + esc(s.hash.replace(/(^|&)(m|v|f)=[^&]*/g, ''));
   function open(i) { const all = read(), s = all[i]; if (!s) return; s.seen = new Date().toISOString(); write(all);
     const p = new URLSearchParams(s.hash); ctx.fromSpec(decode(s.hash)); if (p.get('m')) ctx.setMonth(p.get('m')); else if (ctx.state.month) ctx.setMonth(null); render(); }
-  function renderPage() {
-    if (!page) return; const a = read();
-    page.innerHTML = '<div class="vhead"><div><div class="kicker">My Work</div><h2>Saved searches</h2><div class="vsub">Searches you saved in this browser, with how many new filings match each one since you last opened it. To save one, set filters on the Map, then choose Save Search under This Area.</div></div></div>' +
-      (a.length ? '<div class="svp">' + a.map((s, i) => { const n = newSince(s); return '<div class="svp-r"><div><b>' + esc(s.name) + '</b>' + (n ? ' <span class="bdg new">' + fmtN(n) + ' new</span>' : '') + '</div><div class="svp-a"><button type="button" class="btn sm primary" data-open="' + i + '">Show on map</button>' +
-        '<a class="btn sm" href="api/feed?' + esc(s.hash.replace(/(^|&)(m|v|f)=[^&]*/g, '')) + '" target="_blank" rel="noopener" title="New matching filings as an RSS feed">RSS</a><button type="button" class="btn sm ghost" data-del="' + i + '" aria-label="Delete ' + esc(s.name) + '">Delete</button></div></div>'; }).join('') + '</div>'
+  function paint(el, isPage) {
+    if (!el) return 0; const a = read(); let total = 0;
+    const row = (s, i) => { const n = newSince(s); total += n; const nb = n ? '<span class="bdg new">' + fmtN(n) + ' new</span>' : '';
+      return isPage ? '<div class="svp-r"><div><b>' + esc(s.name) + '</b>' + (nb ? ' ' + nb : '') + '</div><div class="svp-a"><button type="button" class="btn sm primary" data-open="' + i + '">Show on map</button>' +
+          '<a class="btn sm" href="' + rss(s) + '" target="_blank" rel="noopener" title="New matching filings as an RSS feed">RSS</a><button type="button" class="btn sm ghost" data-del="' + i + '" aria-label="Delete ' + esc(s.name) + '">Delete</button></div></div>'
+        : '<div class="sv"><button class="lnk" data-open="' + i + '">' + esc(s.name) + '</button>' + nb + '<a class="lnk" href="' + rss(s) + '" target="_blank" rel="noopener" title="RSS feed">RSS</a><button class="lnk x" data-del="' + i + '" aria-label="Delete">×</button></div>'; };
+    if (isPage) el.innerHTML = '<div class="vhead"><div><div class="kicker">My Work</div><h2>Saved searches</h2><div class="vsub">Searches you saved in this browser, with how many new filings match each one since you last opened it.</div></div>' +
+        (a.length ? '<div class="vctl"><button type="button" class="btn md" id="svpGo">Save another on the Map</button></div>' : '') + '</div>' +
+      (a.length ? '<div class="svp">' + a.map(row).join('') + '</div><p class="vfoot">To save a search, set filters on the Map, then choose Save Search under This Area.</p>'
+        : ctx.vempty ? ctx.vempty({ icon: 'bookmark', title: 'No saved searches yet', text: 'Save a filter set to see how many new filings match each visit, or get an RSS alert. Set filters on the Map, then choose Save Search under This Area.', actions: [{ label: 'Go to the Map', id: 'svpGo', primary: true }] })
         : '<div class="empty">No saved searches yet. <button type="button" class="lnk" id="svpGo">Go to the Map</button> to set filters and save one.</div>');
-    page.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { open(+b.dataset.open); ctx.showFilings?.(); ctx.setView('map'); });
-    page.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const all = read(); all.splice(+b.dataset.del, 1); write(all); render(); renderPage(); });
-    const go = page.querySelector('#svpGo'); if (go) go.onclick = () => ctx.setView('map');
+    else el.innerHTML = a.map(row).join('');
+    el.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { open(+b.dataset.open); if (isPage) { ctx.showFilings?.(); ctx.setView('map'); } });
+    el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const all = read(); all.splice(+b.dataset.del, 1); write(all); render(); });
+    el.querySelector('#svpGo')?.addEventListener('click', () => ctx.setView('map'));
+    return total;
   }
+  function render() {
+    box.style.display = read().length ? '' : 'none';
+    const total = paint(listEl, false); nEl.textContent = total ? '· ' + fmtN(total) + ' new' : '';
+    if (ctx.view === 'saved') paint(page, true);
+  }
+  const renderPage = () => paint(page, true);
   ctx.onView('saved', renderPage);
   document.getElementById('saveSearch').onclick = () => {
     const name = prompt('Name this search', ctx.filterText().slice(0, 60) || 'All filings'); if (!name) return;

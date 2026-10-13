@@ -45,7 +45,7 @@ import { initOwner } from './owner.js';
 import { initGoogle } from './google.js';
 import { initSitePlan } from './siteplan.js';
 import { initSettings } from './settings.js';
-import { renderNav, syncNav as syncNavTabs, leafFor, pathOf } from './nav.js';
+import { renderNav, syncNav as syncNavTabs, leafFor, pathOf, labelOf, parentOf } from './nav.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
 
@@ -443,17 +443,83 @@ document.getElementById('resetAll').onclick=clearFilters;
 // Filters: a popup from the map toolbar (between County and Export), with a Clear button beside it while any are on.
 // Filters only act on construction filings, so changing one puts the filing dots on the map.
 { const btn=document.getElementById('filterBtn'), pop=document.getElementById('filterPop'), wrap=document.getElementById('fwrap');
-  const setOpen=open=>{ if(open&&matchMedia('(max-width:700px)').matches) document.getElementById('moreF').open=true; pop.hidden=!open; btn.setAttribute('aria-expanded',open); btn.classList.toggle('open',open); if(open) pop.querySelector('select,button.chip,input')?.focus({preventScroll:true}); };
+  // On Filings pages, Compare and Reports the same popup floats over the page under the "Edit filters" button that opened
+  // it (only the construction filters show there), instead of jumping to the Map. The node itself never moves.
+  const sub=pop.querySelector('.fpop-h span'), subMap=sub.textContent; let anchor=null;
+  const place=()=>{ if(anchor&&!anchor.isConnected){ anchor=document.querySelector('#view-'+ctx.view+' [data-edit-filters]')||anchor; anchor.setAttribute?.('aria-expanded','true'); } // pages redraw
+    if(!anchor||!pop.classList.contains('fpop-floating')||matchMedia('(max-width:700px)').matches){ pop.style.left=pop.style.top=pop.style.maxHeight=''; return; }
+    const r=anchor.getBoundingClientRect(), w=Math.min(460,innerWidth-16), top=Math.round(r.bottom+8);
+    pop.style.left=Math.round(Math.max(8,Math.min(r.right-w,innerWidth-w-8)))+'px'; pop.style.top=top+'px'; pop.style.maxHeight=Math.max(240,innerHeight-top-12)+'px'; };
+  const setOpen=(open,at=null)=>{ if(open&&matchMedia('(max-width:700px)').matches) document.getElementById('moreF').open=true;
+    const floating=open&&!!at; anchor=floating?at:null; pop.classList.toggle('fpop-floating',floating); sub.textContent=floating?'Construction filings, here and on the map':subMap;
+    if(floating) document.getElementById('lfFilings').open=true;
+    pop.hidden=!open; btn.setAttribute('aria-expanded',open&&!floating); btn.classList.toggle('open',open&&!floating);
+    document.querySelectorAll('[data-edit-filters]').forEach(b=>b.setAttribute('aria-expanded',String(floating&&b===at))); place();
+    if(open) (floating?pop.querySelector('#filtersBody select,#filtersBody button.chip,#filtersBody input'):pop.querySelector('select,button.chip,input'))?.focus({preventScroll:true}); };
+  addEventListener('resize',place); listeners.push(()=>{ if(!pop.hidden&&anchor) requestAnimationFrame(place); });
+  const dismiss=()=>{ const a=anchor; setOpen(false); (a&&a.isConnected?a:btn).focus(); };
   btn.onclick=()=>setOpen(pop.hidden);
-  document.getElementById('filterClose').onclick=()=>{ setOpen(false); btn.focus(); };
+  document.getElementById('filterClose').onclick=dismiss;
   document.getElementById('filterDone').onclick=()=>setOpen(false); // phones: the sheet's "Show N filings" button
   const clearAll=()=>{ clearFilters(); ctx.toast?.('Cleared: showing everything'); };
   document.getElementById('filterClear').onclick=clearAll; const mc=document.getElementById('mClear'); if(mc) mc.onclick=clearAll;
   // only the construction filters put the filing dots on the map (the layer filters have their own layers)
   pop.addEventListener('change',e=>{ if(e.target.closest('#filtersBody')) showFilings(); }); pop.addEventListener('click',e=>{ if(e.target.closest('#filtersBody')&&e.target.closest('.chip,button[data-k],button[data-v]')) showFilings(); });
-  document.addEventListener('pointerdown',e=>{ if(!pop.hidden&&!wrap.contains(e.target)&&!e.target.closest('.kpi-pop')) setOpen(false); });
-  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!pop.hidden){ setOpen(false); btn.focus(); } });
-  openFilters=()=>{ if(ctx.view!=='map') setView('map'); setOpen(true); }; closeFilters=()=>setOpen(false); }
+  document.addEventListener('pointerdown',e=>{ if(!pop.hidden&&!wrap.contains(e.target)&&!e.target.closest('.kpi-pop,[data-edit-filters]')) setOpen(false); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!pop.hidden){ dismiss(); } });
+  // openFilters({at: button}): pages whose content follows the filters keep the user where they are
+  openFilters=({at=null}={})=>{ const here=at&&ctx.view!=='map'&&(parentOf(ctx.view)==='filings'||['compare','reports'].includes(ctx.view));
+    if(here){ if(!pop.hidden&&anchor===at){ setOpen(false); return; } setOpen(true,at); return; }
+    if(ctx.view!=='map') setView('map'); setOpen(true); };
+  closeFilters=()=>{ if(!pop.hidden) setOpen(false); }; }
+// ---------- page kit: scope bar, empty states, Export ▾ menus (shared by every page) ----------
+// The filters in effect as removable chips: [{label, remove()}]. The registration period is always listed first; it can be
+// removed (back to the default last 12 months) only when it isn't the default.
+const PERIOD_LABEL={'3m':'Filed in the last 3 months','12m':'Filed in the last 12 months','2y':'Filed in the last 2 years','5y':'Filed in the last 5 years',all:'Filed any time'};
+const RESET={c:()=>{ state.counties=new Set(COUNTIES); },t:()=>{ state.types=new Set(TYPES); },u:()=>{ state.uses=null; },min:()=>{ state.min=0; state.max=0; },max:()=>{ state.min=0; state.max=0; },
+  who:()=>{ state.who=null; },chg:()=>{ state.chg=null; },st:()=>{ state.st=null; },sqmin:()=>{ state.sqmin=0; state.sqmax=0; },sqmax:()=>{ state.sqmin=0; state.sqmax=0; },
+  umin:()=>{ state.umin=0; },co:()=>{ state.co=''; },exact:()=>{ state.exact=0; },q:()=>{ state.q=''; }};
+// every filing filter back to the default (and the month and, unless area is false, the selected area)
+function resetFilings({area=true}={}){ Object.values(RESET).forEach(f=>f()); state.d=periodSpec('12m');
+  if(state.month) setMonth(null); if(area&&sel.feature) clearSelection(); else applyFilters(); }
+function filterChips({area=true}={}){
+  const s=curSpec(false), out=[], pk=periodOf(state.d), drop=fn=>()=>{ fn(); applyFilters(); };
+  out.push({label:pk?PERIOD_LABEL[pk]:describe({d:state.d},fmtM)||'Any time',fixed:pk==='12m',remove:drop(()=>{ state.d=periodSpec('12m'); })});
+  const seen=new Set();
+  for(const k of Object.keys(s)){ if(k==='d'||!RESET[k]) continue; const g=k==='max'?'min':k==='sqmax'?'sqmin':k; if(seen.has(g)) continue; seen.add(g);
+    const part=g==='min'?{min:s.min,max:s.max}:g==='sqmin'?{sqmin:s.sqmin,sqmax:s.sqmax}:{[k]:s[k]};
+    out.push({label:describe(part,fmtM),remove:drop(RESET[k])}); }
+  if(state.month) out.push({label:'Under construction in '+monthLabel(state.month),remove:()=>setMonth(null)});
+  if(area&&sel.feature) out.push({label:'Area: '+sel.label,remove:()=>clearSelection()});
+  return out;
+}
+// the bar under a page header: "5,291 filings · $16.3B", the filters as chips, [Edit filters] [Reset]
+function scopeBar(el,{list=visible,area=true,lead='',count=true}={}){
+  if(!el) return; const chips=filterChips({area}), n=list.length, v=list.reduce((t,f)=>t+f.cost,0), canReset=chips.some(c=>!c.fixed);
+  el.className='vscope';
+  el.innerHTML=(lead||count?'<span class="vs-n">'+(lead?esc(lead):'<b>'+fmtN(n)+'</b> filing'+(n===1?'':'s')+' · '+fmtM(v))+'</span>':'')+'<span class="vs-chips">'+chips.map((c,i)=>'<span class="vs-chip'+(c.fixed?' fixed':'')+'">'+esc(c.label)+
+    (c.fixed?'':'<button type="button" data-rm="'+i+'" aria-label="Remove filter: '+esc(c.label)+'">×</button>')+'</span>').join('')+'</span>'+
+    '<span class="vs-act"><button type="button" class="btn sm" data-edit-filters aria-haspopup="dialog" aria-controls="filterPop" aria-expanded="false">Edit filters</button>'+(canReset?'<button type="button" class="btn sm ghost" data-reset>Reset</button>':'')+'</span>';
+  el.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>chips[+b.dataset.rm].remove());
+  el.querySelector('[data-edit-filters]').onclick=e=>openFilters({at:e.currentTarget});
+  el.querySelector('[data-reset]')?.addEventListener('click',()=>resetFilings({area}));
+}
+// an empty page or section: icon, title, one sentence, buttons [{label, id?, primary?, attrs?}]
+const VE_IC={search:'<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>',pin:'<path d="M8 14.5s5-4.3 5-8.2A5 5 0 0 0 3 6.3c0 3.9 5 8.2 5 8.2z"/><circle cx="8" cy="6.3" r="1.8"/>',
+  doc:'<path d="M4 1.5h5.5L12.5 4.5v10H4zM9.5 1.5v3h3M6 8h4.5M6 11h4.5"/>',areas:'<rect x="1.5" y="3" width="6" height="10" rx="1"/><rect x="8.5" y="3" width="6" height="10" rx="1"/>',
+  bookmark:'<path d="M4 1.8h8v12.4l-4-3-4 3z"/>',clock:'<circle cx="8" cy="8" r="6.3"/><path d="M8 4.5V8l2.4 1.6"/>',star:'<path d="m8 1.8 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/>'};
+function vempty({icon='doc',title='',text='',actions=[],extra=''}={}){
+  return '<div class="vempty"><span class="ve-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(VE_IC[icon]||VE_IC.doc)+'</svg></span>'+
+    (title?'<b>'+esc(title)+'</b>':'')+(text?'<p>'+text+'</p>':'')+extra+(actions.length?'<div class="ve-act">'+actions.map(a=>'<button type="button" class="btn md'+(a.primary?' primary':'')+'"'+(a.id?' id="'+a.id+'"':'')+(a.attrs||'')+'>'+esc(a.label)+'</button>').join('')+'</div>':'')+'</div>';
+}
+// "Export ▾": a small menu (a <details>) of [{label, sub?, attrs}] or {divider:true} or {html}
+function exportMenu(items,{label='Export',cls=''}={}){
+  return '<details class="vmenu '+cls+'"><summary class="btn">'+esc(label)+' <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 3.5 3 3 3-3"/></svg></summary><div class="vm-pop" role="menu">'+
+    items.map(it=>it.divider?'<hr>':it.html?it.html:'<button type="button" role="menuitem"'+(it.attrs||'')+'>'+esc(it.label)+(it.sub?'<em>'+esc(it.sub)+'</em>':'')+'</button>').join('')+'</div></details>';
+}
+// close an open menu on a click elsewhere, after picking an item, or on Esc
+document.addEventListener('click',e=>{ document.querySelectorAll('details.vmenu[open]').forEach(d=>{ if(!d.contains(e.target)||e.target.closest('.vm-pop [role=menuitem]')) d.open=false; }); });
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; const d=document.querySelector('details.vmenu[open]'); if(d){ d.open=false; d.querySelector('summary')?.focus(); } });
 // apply a whole filter spec (URL, saved search, AI answer)
 function fromSpec(spec,{fly=true}={}){
   state.counties=new Set(spec.c&&spec.c.length?spec.c.filter(c=>COUNTIES.includes(c)):COUNTIES); if(!state.counties.size) state.counties=new Set(COUNTIES);
@@ -509,7 +575,7 @@ function select(f,fly){
   const fld=(k,v,w)=>'<div class="f'+(w?' w':'')+'"><div class="fl">'+k+'</div><div class="fv">'+v+'</div></div>';
   const people=[['Owner',esc(f.owner||'—')],f.dev&&f.dev.toLowerCase()!==String(f.owner).toLowerCase()?['Developer',whoLink('dev',f.dev||f.owner,f.dev)]:null,f.arch?['Architect',whoLink('arch',f.arch,f.arch)]:null,f.gc?['General contractor',whoLink('gc',f.gc,f.gc)]:null].filter(Boolean);
   const gsv='https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+f.lat.toFixed(6)+','+f.lon.toFixed(6);
-  card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2>'+(f.addr?'<div class="bsub">'+esc(f.addr)+'</div>':'')+'</div>'+
+  card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2>'+(f.addr?'<div class="bsub">'+esc(f.addr)+'</div>':'')+'<button class="btn sm cshow" type="button" id="fShowMap">Show on map</button></div>'+
     '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>'+
     cardNav([['fProj','Project'],['fSched','Schedule'],['fPeople','People'],['fScope','Scope'],['airSec','Air'],['briefBox','AI Brief'],['liveSec','From Here'],['fTools','Tools']])+'</div>'+
     (f.sum?'<div class="bover"><div class="kicker">Overview</div><div>'+esc(f.sum)+'</div></div>':'')+
@@ -538,6 +604,7 @@ function select(f,fly){
   ctx.tabs?.track({id:'f:'+f.id,kind:'filing',label:f.name,reopen:()=>select(f,false),leave:()=>{ if(state.sel===f) clearSel(); }});
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
+  card.querySelector('#fShowMap').onclick=()=>{ setView('map',{user:true}); select(f,true); }; // over a page (Timeline, Changes…): only shown there
   card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat]});
   card.querySelector('#fAsk').onclick=()=>ctx.assistant?.ask('Tell me more about '+f.name);
   card.querySelector('#showAll')?.addEventListener('click',()=>{ clearHighlight(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC(),{fly:false}); select(f,false); });
@@ -862,10 +929,15 @@ function reportMap(list){
 
 // ---------- views ----------
 let view='map'; const appEl=document.querySelector('.app'), viewHooks={}, viewChangeHooks=[], cardRenderHooks=[];
-function setView(v){
+function setView(v,{user}={}){
   // every page id works (#v=who, saved reports, the assistant); a group id (filings, marketgrp, work) opens its last-used page
   if(!document.getElementById('view-'+v)&&v!=='map') v=leafFor(v);
-  if(!document.getElementById('view-'+v)&&v!=='map') v='map'; const was=view; view=v;
+  if(!document.getElementById('view-'+v)&&v!=='map') v='map'; const was=view;
+  // "← Back to <page>": only when the user clicked something on the page (or on the card over it) that lands on the Map;
+  // the app bar, the assistant, links and boot never leave one. Any other page choice clears it.
+  if(v==='map'&&was!=='map'){ if(user??(pageAct&&pageAct.from===was&&performance.now()-pageAct.t<1500)) setBack(was); }
+  else if(v!=='map') setBack(null);
+  pageAct=null; if(v!==was) closeFilters(); view=v;
   syncNavTabs(v); // app bar tab, sub-tab row (src/nav.js)
   document.querySelectorAll('.view').forEach(el=>el.classList.toggle('on',el.id==='view-'+v));
   stage.dataset.view=v; appEl.dataset.view=v; // pages (not the Map) hide the list panel and use the full width (app.css)
@@ -876,6 +948,21 @@ function setView(v){
   viewChangeHooks.forEach(fn=>fn(v));
   scheduleHash();
 }
+let pageAct=null, back=null;
+document.addEventListener('click',e=>{ if(e.isTrusted&&view!=='map'&&e.target.closest?.('.view,#card')) pageAct={t:performance.now(),from:view}; },true);
+const backEl=document.createElement('div'); backEl.className='backchip'; backEl.hidden=true;
+backEl.innerHTML='<button type="button" class="bk-go"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8H3.5M7.5 3.5 3 8l4.5 4.5"/></svg><span></span></button><button type="button" class="bk-x" aria-label="Dismiss"><svg width="12" height="12" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>';
+document.getElementById('viewport').appendChild(backEl);
+function setBack(from){
+  if(!from){ back=null; backEl.hidden=true; appEl.classList.remove('has-back'); return; }
+  const sec=document.getElementById('view-'+from); // read the scroll positions now, before the page is hidden
+  back={from,top:sec?.scrollTop||0,inner:[...(sec?.querySelectorAll('.g-scroll')||[])].map(el=>el.scrollTop)};
+  backEl.querySelector('span').textContent='Back to '+labelOf(from); backEl.hidden=false; appEl.classList.add('has-back');
+}
+backEl.querySelector('.bk-go').onclick=()=>{ const b=back; if(!b) return; setView(b.from);
+  const put=()=>{ const sec=document.getElementById('view-'+b.from); if(!sec) return; sec.scrollTop=b.top; sec.querySelectorAll('.g-scroll').forEach((el,i)=>{ if(b.inner[i]!=null) el.scrollTop=b.inner[i]; }); };
+  put(); requestAnimationFrame(()=>{ put(); setTimeout(put,120); }); };
+backEl.querySelector('.bk-x').onclick=()=>setBack(null);
 // Changes badge: filings new or changed in nightly checks since you last opened Changes (all of this week's on a first visit)
 const CHG_SEEN='fs-chg-seen';
 function changesBadge(){
@@ -962,7 +1049,7 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return [...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,30).map(x=>x[0]).join(', '); } // the busiest cities and developers on screen (the voice transcriber's hint list takes the first few)
-ctx.setMode=setMode; ctx.openFilters=()=>openFilters(); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
+ctx.setMode=setMode; ctx.filterChips=filterChips; ctx.scopeBar=scopeBar; ctx.resetFilings=resetFilings; ctx.vempty=vempty; ctx.exportMenu=exportMenu; ctx.openFilters=o=>openFilters(o); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
   if(!html){ el?.remove(); return; } if(!el){ el=document.createElement('div'); el.className='xlegend'; el.dataset.lg=id; box.appendChild(el); } if(el.innerHTML!==html) el.innerHTML=html; };

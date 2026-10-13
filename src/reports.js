@@ -14,7 +14,7 @@ export function initReports(ctx) {
   const kindOf = k => KINDS[k] || (ctx.areaReports || []).find(x => x.key === k)?.label;
   let list = []; try { list = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {} };
-  let q = '', kind = '';
+  let q = '', kind = '', showAll = false; const RECENT = 3;
 
   // ---------- file store (IndexedDB) ----------
   let dbp = null;
@@ -56,66 +56,75 @@ export function initReports(ctx) {
 
   // ---------- view ----------
   const when = iso => { const d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
-  function newCards() {
-    const n = ctx.visible.length, areas = ctx.compare?.list().length || 0;
-    return Object.entries(REPORTS).map(([k, r]) => {
-      const note = k === 'compare' ? (areas ? fmtN(areas) + ' area' + (areas === 1 ? '' : 's') + ' in Compare' : 'Add areas to Compare first') : fmtN(n) + ' filing' + (n === 1 ? '' : 's') + (ctx.filterText() ? ' with the current filters' : '');
-      return '<div class="rp-card"><b>' + esc(r.label) + '</b><p>' + esc(r.desc) + '</p><em>' + esc(note) + '</em><div class="rp-fmts">' +
-        r.formats.map(f => '<button type="button" class="btn" data-new="' + k + '" data-f="' + f + '">' + esc(FORMATS[f].replace(' (GIS)', '')) + '</button>').join('') + '</div></div>';
-    }).join('') + marketCard() + crimeCard() + crimeUSCard() + areaCards();
+  // one report card: name, a two-line description (the full text on hover), an optional note, then its buttons
+  const cardHtml = (label, desc, note, btns) => '<div class="rp-card"><b>' + esc(label) + '</b><p title="' + esc(desc) + '">' + esc(desc) + '</p>' + (note ? '<em>' + esc(note) + '</em>' : '') + '<div class="rp-fmts">' + btns + '</div></div>';
+  // "From your filters": the filing reports. The filing count is in the group heading, not on every card.
+  function filterCards() {
+    const areas = ctx.compare?.list().length || 0;
+    return Object.entries(REPORTS).map(([k, r]) => cardHtml(r.label, r.desc, k === 'compare' ? (areas ? fmtN(areas) + ' area' + (areas === 1 ? '' : 's') + ' in Compare' : 'Add areas to Compare first') : '',
+      r.formats.map(f => '<button type="button" class="btn" data-new="' + k + '" data-f="' + f + '">' + esc(FORMATS[f].replace(' (GIS)', '')) + '</button>').join(''))).join('');
   }
+  // "For an area": reports about a place (the selected area or the map view, or the Market page's area)
+  const areaGroupCards = () => marketCard() + crimeCard() + crimeUSCard() + areaCards();
   // Market Report: the Market view (growth, permits, businesses, jobs, spending, sales tax, crime, traffic, rates) for the
   // area chosen there, as a PDF report or the data as CSV
   function marketCard() {
     if (!ctx.exportMarket) return '';
-    return '<div class="rp-card"><b>Market Report</b><p>The Market view for the region or one county: population and jobs, housing permits, new businesses, consumer spending, city sales tax, Houston crime, the busiest roads and rates.</p>' +
-      '<em>Uses the area chosen on the Market tab</em><div class="rp-fmts"><button type="button" class="btn" data-market="pdf">PDF</button><button type="button" class="btn" data-market="csv">CSV</button></div></div>';
+    return cardHtml('Market Report', 'The Market view for the region or one county: population and jobs, housing permits, new businesses, consumer spending, city sales tax, Houston crime, the busiest roads and rates.',
+      'Uses the area chosen on the Market page', '<button type="button" class="btn" data-market="pdf">PDF</button><button type="button" class="btn" data-market="csv">CSV</button>');
   }
   // Crime Report (Houston Police incidents): for the selected area or the map view; opens in the card on the map, and
-  // its PDF / CSV exports land in Previously Exported
+  // its PDF / CSV exports land in Recent exports
   function crimeCard() {
     if (!ctx.crimeReportFor) return '';
     const sel = ctx.sel?.feature ? ctx.sel.label || 'the selected area' : null;
-    return '<div class="rp-card"><b>Crime Report</b><p>Houston Police incidents for an area: the last 12 months against the year before, violent and property crime, a monthly trend, top offenses and where they happened. Export as a PDF report or CSV.</p>' +
-      '<em>' + esc(sel ? 'Selected: ' + sel : 'City of Houston only. Select an area with Area, Shape, Radius or County, or use the map view') + '</em><div class="rp-fmts">' +
-      (sel ? '<button type="button" class="btn" data-crime="selection">Selected area</button>' : '') +
-      '<button type="button" class="btn" data-crime="view">Map view</button><button type="button" class="btn" data-crime="pick">Draw an area</button></div></div>';
+    return cardHtml('Crime Report', 'Houston Police incidents for an area: the last 12 months against the year before, violent and property crime, a monthly trend, top offenses and where they happened. Export as a PDF report or CSV.',
+      'City of Houston only', (sel ? '<button type="button" class="btn" data-crime="selection">Selected area</button>' : '') +
+      '<button type="button" class="btn" data-crime="view">Map view</button><button type="button" class="btn" data-crime="pick">Draw an area</button>');
   }
   // City / County Crime Report (FBI, any US city or county): the police department at the map center or the middle of the selection
   function crimeUSCard() {
     if (!ctx.crimeUSReportFor) return '';
     const sel = ctx.sel?.feature ? ctx.sel.label || 'the selected area' : null;
-    return '<div class="rp-card"><b>City / County Crime Report</b><p>Yearly FBI figures for the local police department anywhere in the US: violent and property crime per 100,000 residents against the state and the nation, ten years of history and the mix of offenses. Export as a PDF report or CSV.</p>' +
-      '<em>' + esc(sel ? 'Selected: ' + sel : 'The city or county at the middle of the map') + '</em><div class="rp-fmts">' + (sel ? '<button type="button" class="btn" data-crimeus="selection">Selected area</button>' : '') +
-      '<button type="button" class="btn" data-crimeus="view">Map center</button></div></div>';
+    return cardHtml('City / County Crime Report', 'Yearly FBI figures for the local police department anywhere in the US: violent and property crime per 100,000 residents against the state and the nation, ten years of history and the mix of offenses. Export as a PDF report or CSV.',
+      sel ? '' : 'The city or county at the middle of the map', (sel ? '<button type="button" class="btn" data-crimeus="selection">Selected area</button>' : '') +
+      '<button type="button" class="btn" data-crimeus="view">Map center</button>');
   }
   // the other area reports (drive time, traffic, air traffic…): same three ways to pick the area as the crime report
   function areaCards() {
     const sel = ctx.sel?.feature ? ctx.sel.label || 'the selected area' : null;
-    return (ctx.areaReports || []).filter(r => r.desc).map(r => '<div class="rp-card"><b>' + esc(r.label) + '</b><p>' + esc(r.desc) + '</p><em>' + esc(sel ? 'Selected: ' + sel : r.note || 'Select an area with Area, Shape, Radius or County, or use the map view') + '</em><div class="rp-fmts">' +
-      (sel ? '<button type="button" class="btn" data-ar="' + r.key + '" data-w="selection">Selected area</button>' : '') + '<button type="button" class="btn" data-ar="' + r.key + '" data-w="view">Map view</button><button type="button" class="btn" data-ar="' + r.key + '" data-w="pick">Draw an area</button></div></div>').join('');
+    return (ctx.areaReports || []).filter(r => r.desc).map(r => cardHtml(r.label, r.desc, sel ? '' : r.note || '',
+      (sel ? '<button type="button" class="btn" data-ar="' + r.key + '" data-w="selection">Selected area</button>' : '') + '<button type="button" class="btn" data-ar="' + r.key + '" data-w="view">Map view</button><button type="button" class="btn" data-ar="' + r.key + '" data-w="pick">Draw an area</button>')).join('');
   }
   function rows() {
-    const t = q.toLowerCase(), shown = list.filter(r => (!kind || r.report === kind) && (!t || [r.file, kindOf(r.report), r.scope, r.filters].join(' ').toLowerCase().includes(t)));
+    const t = q.toLowerCase(), all = list.filter(r => (!kind || r.report === kind) && (!t || [r.file, kindOf(r.report), r.scope, r.filters].join(' ').toLowerCase().includes(t)));
     if (!list.length) return '<div class="empty">No exports yet. Reports you export (from here, the Export button or the assistant) show up here so you can download them again or re-run them with today’s data.</div>';
-    if (!shown.length) return '<div class="empty">No past exports match.</div>';
+    if (!all.length) return '<div class="empty">No past exports match.</div>';
+    const cut = !showAll && !t && !kind && all.length > RECENT, shown = cut ? all.slice(0, RECENT) : all;
     return shown.map(r => '<div class="rp-row" data-id="' + r.id + '"><span class="rp-ic rp-' + esc(r.format) + '">' + esc(ICON[r.format] || r.format.toUpperCase().slice(0, 4)) + '</span>' +
       '<div class="rp-m"><b>' + esc(kindOf(r.report) || 'Export') + (r.scope ? ' · ' + esc(r.scope) : '') + '</b><span>' + esc(when(r.at)) + ' · ' + esc(FORMATS[r.format] || r.format.toUpperCase()) + ' · ' + fmtBytes(r.size) +
         (r.filings != null ? ' · ' + fmtN(r.filings) + ' ' + esc(r.unit) : '') + '</span>' + (r.filters ? '<em>' + esc(r.filters) + '</em>' : '') + '<i>' + esc(r.file) + (r.stored ? '' : ' · file no longer stored, re-run to regenerate') + '</i></div>' +
       '<div class="rp-act">' + (r.stored ? '<button type="button" class="btn" data-a="dl">Download</button>' : '') + (REPORTS[r.report] || r.report === 'field' ? '<button type="button" class="btn" data-a="re" title="Same report and filters, with today’s data">Re-run</button>' : '') +
-        (r.hash ? '<button type="button" class="btn" data-a="map">Open on Map</button>' : '') + '<button type="button" class="lnk" data-a="rm" aria-label="Delete this export">Delete</button></div></div>').join('');
+        (r.hash ? '<button type="button" class="btn" data-a="map">Open on Map</button>' : '') + '<button type="button" class="lnk" data-a="rm" aria-label="Delete this export">Delete</button></div></div>').join('') +
+      (cut ? '<button type="button" class="lnk rp-more" id="rpMore">Show all ' + fmtN(all.length) + ' past exports</button>' : showAll && !t && !kind && all.length > RECENT ? '<button type="button" class="lnk rp-more" id="rpMore">Show only the latest ' + RECENT + '</button>' : '');
   }
   function render() {
     if (ctx.view !== 'reports') return;
-    const bytes = list.reduce((s, r) => s + (r.stored ? r.size || 0 : 0), 0);
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Reports</div><h2>Reports</h2><div class="vsub">Create a report from what’s on the map, and find the ones you’ve exported before. Past exports are kept in this browser only (not shared with your team or other devices).</div></div></div>' +
-      '<div class="rp-sec"><div class="lt">New Report</div><div class="rp-grid">' + newCards() + '</div></div>' +
-      '<div class="rp-sec"><div class="rp-sh"><div class="lt">Previously Exported' + (list.length ? ' · ' + fmtN(list.length) : '') + '</div>' +
+    const bytes = list.reduce((s, r) => s + (r.stored ? r.size || 0 : 0), 0), n = ctx.visible.length, sel = ctx.sel?.feature ? ctx.sel.label || 'the selected area' : null;
+    const past = '<div class="rp-sh"><div class="lt">' + (list.length ? 'Recent exports · ' + fmtN(list.length) : 'Past exports') + '</div>' +
         (list.length ? '<div class="vctl"><label class="search sm"><input type="search" id="rpQ" placeholder="Search past exports" value="' + esc(q) + '" aria-label="Search past exports"></label>' +
           '<select class="chip" id="rpKind" aria-label="Report type"><option value="">All types</option>' + Object.entries({ ...KINDS, ...Object.fromEntries((ctx.areaReports || []).map(x => [x.key, x.label])) }).filter(([k]) => list.some(r => r.report === k)).map(([k, l]) => '<option value="' + k + '"' + (kind === k ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>' +
           '<span>' + fmtBytes(bytes) + ' stored</span><button type="button" class="lnk" id="rpClear">Clear All</button></div>' : '') + '</div>' +
-        '<div class="rp-list" id="rpList">' + rows() + '</div></div>' +
-      '<div class="rp-sec rp-soon"><div class="lt">Coming Soon</div><p>Scheduled reports by email, report templates and sharing past exports with your team.</p></div>';
+        '<div class="rp-list" id="rpList">' + rows() + '</div>';
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">Reports</div><h2>Reports</h2><div class="vsub">Make a report from your filters or for an area, and download past exports again. Past exports stay in this browser only.</div></div>' +
+        '<div class="vctl"><button type="button" class="btn primary md" id="rpNew">New report</button></div></div>' +
+      (list.length ? '<div class="rp-sec rp-recent">' + past + '</div>' : '') +
+      '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">From your filters <span class="rp-n">' + fmtN(n) + ' filing' + (n === 1 ? '' : 's') + '</span></div></div><div id="rpScope"></div><div class="rp-grid">' + filterCards() + '</div></div>' +
+      '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">For an area <span class="rp-n">' + esc(sel || 'the map view') + '</span></div>' +
+        (sel ? '' : '<span class="rp-hint">Select an area on the Map with Area, Shape, Radius or County, or use the map view.</span>') + '</div><div class="rp-grid">' + areaGroupCards() + '</div></div>' +
+      (list.length ? '' : '<div class="rp-sec rp-recent">' + past + '</div>');
+    ctx.scopeBar?.(root.querySelector('#rpScope'), { count: false });
+    root.querySelector('#rpNew').onclick = () => ctx.openExport();
     root.querySelectorAll('[data-new]').forEach(b => b.onclick = () => ctx.openExport(b.dataset.new, { format: b.dataset.f }));
     root.querySelectorAll('[data-market]').forEach(b => b.onclick = () => ctx.exportMarket(b.dataset.market));
     root.querySelectorAll('[data-crime]').forEach(b => b.onclick = () => { ctx.setView('map');
@@ -131,6 +140,7 @@ export function initReports(ctx) {
     wire();
   }
   function wire() {
+    root.querySelector('#rpMore')?.addEventListener('click', () => { showAll = !showAll; root.querySelector('#rpList').innerHTML = rows(); wire(); });
     root.querySelectorAll('.rp-row').forEach(el => { const r = list.find(x => x.id === el.dataset.id); if (!r) return;
       el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => ({ dl: download, re: rerun, map: openOnMap, rm: remove })[b.dataset.a](r)); });
   }

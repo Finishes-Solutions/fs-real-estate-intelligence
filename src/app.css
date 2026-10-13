@@ -2406,3 +2406,118 @@ body>.toast{position:fixed;z-index:52;left:calc(100% - min(420px,100%) / 2);bott
   .set-desk{display:none}
 }
 @media (pointer:coarse){ .set-go{min-height:var(--tap)} .set-jump button{min-height:36px} .team-chip{min-height:36px} }
+
+/* ---------- Pages that flow: one header template, scope bar, empty states, Export ▾ menus (WS4) ---------- */
+/* header: title column (kicker = page name, title, a 2-line summary) | actions on the same row; stacked on phones */
+.vhead{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:var(--sp-3) var(--sp-4);flex-wrap:nowrap}
+.vhead>div:first-child{min-width:0}
+.vhead .vsub{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.vhead>.vctl,.vhead>.btn{justify-self:end;justify-content:flex-end}
+.vhead .team-slot:empty{display:none}
+.vctl .team-slot{margin:0}
+.vfoot{margin:10px 2px 0;font-size:12px;color:var(--muted)}
+@media (max-width:700px){
+  .vhead{grid-template-columns:minmax(0,1fr);align-items:start}
+  .vhead>.vctl,.vhead>.btn{justify-self:stretch;justify-content:flex-start}
+  .vhead>.btn{justify-self:start}
+}
+/* scope bar under a page header: what the page is counting, the filters as removable chips, Edit filters / Reset */
+.vscope{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:0 0 14px;padding:8px 10px 8px 14px;background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r-md);font-size:12.5px;color:var(--text-2)}
+.vscope:empty{display:none}
+.vs-n b{font-family:var(--font-mono);font-weight:600;color:var(--text)}
+.vs-chips{display:flex;flex-wrap:wrap;gap:6px;min-width:0;flex:1 1 240px}
+.vs-chip{display:inline-flex;align-items:center;gap:2px;max-width:100%;padding:2px 2px 2px 10px;border-radius:var(--r-pill);background:var(--chip);color:var(--text);font-size:12px;line-height:20px}
+.vs-chip.fixed{padding-right:10px;color:var(--text-2);background:transparent;border:1px dashed var(--line-2)}
+.vs-chip button{width:22px;height:22px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:15px;line-height:1;cursor:var(--cur-pointer,pointer);flex:none}
+.vs-chip button:hover{background:var(--line-2);color:var(--text)}
+.vs-act{display:flex;gap:6px;margin-left:auto}
+.vs-act [aria-expanded="true"]{border-color:var(--text);background:var(--chip)}
+@media (pointer:coarse){ .vs-chip button{width:32px;height:32px} }
+/* empty state: icon, title, one sentence, buttons */
+.vempty{display:grid;justify-items:center;gap:8px;text-align:center;padding:32px 20px 28px;margin:4px auto 16px;max-width:620px;background:var(--panel);border:1px dashed var(--line-2);border-radius:var(--r-md);color:var(--text-2);font-size:13px}
+.vempty .ve-ic{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:rgba(0,101,39,.09);color:var(--brand)}
+.vempty>b{font:700 16px/1.3 var(--font-display);color:var(--text)}
+.vempty>p{margin:0;max-width:460px;line-height:1.5}
+.vempty ol{text-align:left;margin:4px 0 0;padding-left:20px;line-height:1.7;max-width:480px}
+.vempty ol em{font-style:normal;font-weight:700;color:var(--text)}
+.vempty .ve-act{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:6px}
+.view .fcols>section .vempty,td .vempty,.rp-list .vempty{border:0;background:transparent;margin:0 auto}
+table.who tr.nomatch td{border:0}
+:root[data-theme="dark"] .vempty .ve-ic{background:rgba(76,175,112,.14)}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .vempty .ve-ic{background:rgba(76,175,112,.14)} }
+/* Export ▾ and other small menus (a <details>) */
+.vmenu{position:relative;display:inline-block}
+.vmenu>summary{list-style:none;cursor:var(--cur-pointer,pointer);user-select:none}
+.vmenu>summary::-webkit-details-marker{display:none}
+.vmenu[open]>summary{border-color:var(--text);background:var(--chip)}
+.vm-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:230px;max-width:min(320px,calc(100vw - 24px));padding:6px;background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r-md);box-shadow:var(--sh-2);display:grid;gap:2px;text-align:left}
+.vm-pop>button,.vm-pop>label{display:block;width:100%;border:0;background:transparent;border-radius:6px;padding:8px 10px;font:600 13px/1.3 var(--font-display);color:var(--text);text-align:left;cursor:var(--cur-pointer,pointer)}
+.vm-pop>button:hover,.vm-pop>label:hover,.vm-pop>button:focus-visible,.vm-pop>label:focus-visible{background:var(--chip);outline:none}
+.vm-pop em{display:block;font:400 11.5px/1.35 var(--font-body,inherit);color:var(--muted);font-style:normal;margin-top:1px}
+.vm-pop hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+@media (max-width:700px){ .vm-pop{right:auto;left:0} .vctl .vmenu:last-child .vm-pop{left:auto;right:0} }
+/* Filters over a Filings page, Compare or Reports: the map's popup floats under "Edit filters" (construction filters only) */
+.fpop.fpop-floating{visibility:visible}
+.stage:not([data-view="map"]) .mapleft:has(.fpop-floating:not([hidden])){z-index:8}
+.fpop-floating .lfmode,.fpop-floating #lfMatch,.fpop-floating .lfsec:not(#lfFilings),.stage:not([data-view="map"]) #filterPop .lfsec:not(#lfFilings){display:none}
+@media (min-width:701px){ .fpop.fpop-floating{position:fixed;width:min(460px,calc(100vw - 16px));z-index:30;box-shadow:var(--sh-sheet)} }
+/* "← Back to <page>" after jumping from a page to the map */
+.backchip{position:absolute;left:16px;top:16px;z-index:6;display:flex;align-items:stretch;background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r-pill);box-shadow:var(--sh-2);overflow:hidden}
+.backchip[hidden],.stage:not([data-view="map"]) .backchip,.app.ai-open .backchip{display:none}
+.backchip button{border:0;background:transparent;color:var(--text);display:inline-flex;align-items:center;gap:7px;cursor:var(--cur-pointer,pointer);min-height:36px}
+.backchip .bk-go{padding:0 12px 0 13px;font:700 13px var(--font-display)}
+.backchip .bk-x{padding:0 11px;border-left:1px solid var(--line);color:var(--muted)}
+.backchip button:hover{background:var(--chip);color:var(--text)}
+@media (min-width:701px){ .app.has-back .stage[data-view="map"] .mapleft{margin-top:46px} }
+@media (max-width:700px){ .backchip{left:50%;transform:translateX(-50%);top:calc(var(--st) + 112px);max-width:calc(100% - 128px)} .backchip .bk-go{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0} }
+@media (pointer:coarse){ .backchip button{min-height:44px} }
+/* the filing card over a page: Show on map (hidden on the map itself) */
+#card .cshow{margin-top:8px}
+.stage[data-view="map"] #card .cshow{display:none}
+/* Reports: Recent exports first, then the two groups of new reports */
+.rp-gh{display:flex;align-items:baseline;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;margin-bottom:10px}
+.view .rp-gh .lt{margin:0}
+.rp-n{font:500 12px var(--font-mono);color:var(--muted);letter-spacing:0;text-transform:none}
+.rp-hint{font-size:12px;color:var(--muted)}
+.rp-group .vscope{background:var(--panel-2);margin-bottom:12px}
+.rp-card p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.rp-more{margin:10px 2px 2px;font-size:12.5px}
+.rp-recent .rp-list .empty{padding:8px 2px;text-align:left}
+/* Market: the area as one line, with the county picker folded behind "Change"; boxes without the stand-in icon */
+.mk-scopebar{margin:2px 0 12px;background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r-md)}
+.mk-scopebar>summary{display:flex;align-items:center;gap:10px;padding:9px 14px;list-style:none;cursor:var(--cur-pointer,pointer);font-size:12.5px;color:var(--text-2)}
+.mk-scopebar>summary::-webkit-details-marker{display:none}
+.mk-scopebar>summary b{color:var(--text)}
+.mk-scopebar[open]>summary .lnk{visibility:hidden}
+.mk-scopebar .mk-scope2{margin:0;border:0;border-top:1px solid var(--line);border-radius:0 0 var(--r-md) var(--r-md)}
+#view-market .mk-box>h3::before{display:none}
+/* Companies */
+#view-who .seg button{padding:7px 12px}
+#view-timeline .g-row .g-lab,#view-timeline .g-axis .g-lab{width:var(--glab,290px)}
+@media (max-width:700px){
+  /* Changes and Notes rows: name over value */
+  .view .chitem{flex-direction:column;align-items:flex-start;gap:3px}
+  .view .chitem .m{align-self:flex-start;white-space:normal}
+  /* Companies: two-line rows (name, then projects · value · trend) */
+  #view-who table.who thead{display:none}
+  #view-who table.who tbody tr[data-k]{display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:center;column-gap:12px;row-gap:2px;padding:10px 4px;border-bottom:1px solid var(--line)}
+  #view-who table.who tbody tr[data-k] td{border:0;padding:0}
+  #view-who table.who tbody tr[data-k] td:nth-child(1){grid-column:1/-1}
+  #view-who table.who tbody tr[data-k] td:nth-child(2)::after{content:" projects";font-family:var(--font-body,inherit);color:var(--muted)}
+  #view-who table.who tbody tr[data-k] td:nth-child(6){justify-self:end}
+  #view-who table.who tbody tr[data-k] td:nth-child(4),#view-who table.who tbody tr[data-k] td:nth-child(5),#view-who table.who tbody tr[data-k] td:nth-child(7){display:none}
+  #view-who .tablewrap{padding:0 10px}
+}
+.vhead .vsub-n{display:block;margin-top:2px;color:var(--text-2)}
+.cmp-chips[hidden]{display:none}
+.rp-gh .lt{font:700 15px/1.3 var(--font-display);color:var(--text);letter-spacing:0;text-transform:none}
+.mk-scopebar .vs-n b{font-family:inherit;font-weight:700}
+@media (max-width:700px){
+  .vscope{gap:6px 8px;padding:8px 8px 8px 12px}
+  .vs-chips{order:3;flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+  .vs-chips::-webkit-scrollbar{display:none}
+  .vs-chip{flex:none}
+  #view-field .vhead>.vctl{flex-wrap:nowrap;gap:8px}
+  #view-field .vctl .team-slot{min-width:0;flex:0 1 auto;display:flex}
+}
+.vctl>.btn,.vctl .vmenu>summary,.vs-act .btn{white-space:nowrap}

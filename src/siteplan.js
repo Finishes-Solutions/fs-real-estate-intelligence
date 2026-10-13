@@ -862,7 +862,7 @@ export function initSitePlan(ctx) {
       '<span class="pj-chev" aria-hidden="true">›</span></button>';
   }
   function listHtml() {
-    if (!db.projects.length) return '<div class="pj-empty"><b>No projects yet</b><ol><li>On the map, zoom in to street level and click a parcel or building.</li><li>On its card, open <b>Site Tools → Start Site Plan</b>.</li><li>Lay out the site by hand, or describe what you want and use <b>Build with AI</b>.</li></ol><div class="btnrow"><button type="button" class="btn primary" data-go="map">Go to the Map</button><button type="button" class="btn" data-new="1">New Empty Project</button></div></div>';
+    if (!db.projects.length) return '<div class="pj-empty"><b>No projects yet</b><ol><li>On the map, zoom in to street level and click a parcel or building.</li><li>On its card, open <b>Site Tools → Start Site Plan</b>.</li><li>Lay out the site by hand, or describe what you want and use <b>Build with AI</b>.</li></ol><div class="btnrow"><button type="button" class="btn primary" data-go="map">Go to the Map</button></div></div>';
     const list = shown();
     if (!list.length) return '<div class="pj-empty">No projects match “' + esc(pq) + '”. <button type="button" class="lnk" data-clear="1">Show all projects</button></div>';
     return mode === 'list' ? '<div class="pj-list"><div class="pj-lh" aria-hidden="true"><span></span><span>Project</span><span>Site</span><span>Options</span><span>Largest option</span><span>Updated</span><span></span></div>' + list.map(rowHtml).join('') + '</div>'
@@ -871,7 +871,7 @@ export function initSitePlan(ctx) {
   function indexHtml() {
     const all = db.projects, nPlans = all.reduce((s, p) => s + p.plans.length, 0);
     const share = shared === true ? 'shared with the team' : shared === false ? 'saved on this device only' : 'saved on this device';
-    return '<div class="vhead"><div><div class="kicker">Site planning</div><h2>Projects</h2><div class="vsub">' + (all.length ? plural(all.length, 'project') + ' · ' + plural(nPlans, 'site plan option') + ' · ' : '') + share + '</div><div class="team-slot" id="pjTeam"></div></div>' +
+    return '<div class="vhead"><div><div class="kicker">My Work</div><h2>Projects</h2><div class="vsub">' + (all.length ? plural(all.length, 'project') + ' · ' + plural(nPlans, 'site plan option') + ' · ' : '') + share + '</div><div class="team-slot" id="pjTeam"></div></div>' +
         (adding ? '' : '<button type="button" class="btn primary" id="pjNew">+ New Project</button>') + '</div>' +
       (adding ? '<form class="pj-new" id="pjForm"><label class="sr" for="pjNm">New project name</label><input id="pjNm" maxlength="120" placeholder="Project name" autocomplete="off"><span class="btnrow"><button class="btn primary">Create Project</button><button type="button" class="btn" id="pjCancel">Cancel</button></span>' +
         '<div class="rnote">You can add parcels and site plans to it next. To start from a parcel instead, click it on the map and use <b>Site Tools → Start Site Plan</b>.</div></form>' : '') +
