@@ -245,6 +245,17 @@ function usable(plan, o, what) {
   const d = S.details(p); assert.equal(d.patios.length, 24, 'a fenced patio behind every unit'); assert.ok(d.patios.every(q => q.poly.every(c => S.inRing(c, b.ring))));
   assert.ok(S.edgeRules(b.ring, front, plan.setbacks, [west])[west].street && S.edgeRules(b.ring, front, plan.setbacks, [west])[west].build === 25, 'a side street takes the street setback');
   const none = L.layoutOptions({ ...plan, streets: [] }, prog)[0]; assert.ok(!none.elements.some(e => e.through) && none.notes.some(t => /Side Street/.test(t)), 'no side street marked: says how to add one');
+  // a local edit: move one building and only it changes; the parking under it gives way in whole stalls
+  { const els = structuredClone(o.elements), b1 = els.find(e => e.name === 'Bldg 1'), rows0 = els.filter(e => e.kind === 'parking'), n0 = rows0.reduce((s2, e) => s2 + S.stalls(e).count, 0);
+    b1.x -= 30; const cut = S.cutRows(els, S.outline(b1), 5), rows = cut.filter(e => e.kind === 'parking');
+    assert.ok(rows.every(r => !S.rectsOverlap({ ...b1, w: b1.w + 10, d: b1.d + 10 }, r)), 'no stall left under the moved building (5 ft clear)');
+    assert.ok(rows.reduce((s2, e) => s2 + S.stalls(e).count, 0) < n0 && rows.every(r => Math.abs(r.w / 9 - Math.round(r.w / 9)) < 1e-6 || Math.abs(r.d / 9 - Math.round(r.d / 9)) < 1e-6), 'whole stalls');
+    assert.deepEqual(cut.filter(e => e.kind !== 'parking'), els.filter(e => e.kind !== 'parking'), 'nothing else moves');
+    assert.ok(new Set(rows.map(r => r.id).filter(Boolean)).size === rows.filter(r => r.id != null).length, 'no doubled ids'); }
+  { const els = structuredClone(o.elements), b3 = els.find(e => e.name === 'Bldg 3'), p2 = { ...plan, elements: els };
+    b3.x -= 40; const [dx, dy] = S.settleShift(p2, b3); b3.x += dx; b3.y += dy;
+    assert.ok(!S.check(p2).some(i => i.id === b3.id && /setback/.test(i.text)) && S.corners(b3).every(c => S.inRing(c, b.ring)), 'dragged into the street setback: settles back out');
+    const e2 = structuredClone(o.elements), b4 = e2.find(e => e.name === 'Bldg 4'), x0 = b4.x; b4.x += 2; const [ax] = S.settleShift({ ...plan, elements: e2 }, b4); assert.ok(Math.abs(b4.x + ax - x0) < 0.01, 'within 3 ft of its old line: lines up again'); }
   const roads = [[[-200, -178 - 30], [300, -178 - 30]], [[-93 - 35, -400], [-86 - 35, 400]]].map(l => l.map(([x, y]) => [x, y]));
   assert.deepEqual(S.streetsFromRoads(b.ring, roads, front), [west], 'side street found from road lines');
 }

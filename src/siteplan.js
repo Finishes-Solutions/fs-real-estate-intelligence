@@ -120,7 +120,7 @@ export function initSitePlan(ctx) {
   function open(pid, plid, o = {}) {
     if (ctx.view !== 'map') ctx.setView('map');
     if (card.classList.contains('open')) ctx.closeCard(); // the building card's selection goes; the plan takes over the card
-    ed = { pid, plid, sel: null, undo: [], redo: [], mode: o.draw ? 'draw' : null, draft: [], variants: null };
+    ed = { pid, plid, sel: null, undo: [], redo: [], mode: o.draw ? 'draw' : null, draft: [], variants: null, editing: false }; // editing: pieces can be moved only in Edit Layout
     if (map.getLayer('fs-bldg')) { hidBldg = map.getLayoutProperty('fs-bldg', 'visibility') || 'visible'; map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } // the plan replaces what's there
     addLayers(); draw(); panel(); fit();
     const pl = PL(); if (pl?.ring.length >= 3 && (pl.frontGuess || pl.streets == null)) map.once('idle', () => { if (PL() === pl && (pl.frontGuess || pl.streets == null)) detectFront(pl); });
@@ -206,7 +206,7 @@ export function initSitePlan(ctx) {
   ctx.onOverlays?.(() => { for (const id of ['fs-sp-b3', 'fs-sp-yard', 'fs-sp-fence', 'fs-sp-pave', 'fs-sp-curb', 'fs-sp-ada', 'fs-sp-mark', 'fs-sp-zone', 'fs-sp-lots', 'fs-sp-walk', 'fs-sp-isl', 'fs-sp-tree', 'fs-sp-pl', 'fs-sp-lot', 'fs-sp-fill', 'fs-sp-stall', 'fs-sp-sb', 'fs-sp-lotl', 'fs-sp-front', 'fs-sp-bldg', 'fs-sp-edge', 'fs-sp-lab', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-h']) if (map.getLayer(id)) map.removeLayer(id);
     for (const s of [SRC, HSRC, DSRC]) if (map.getSource(s)) map.removeSource(s); if (ed) { addLayers(); if (map.getLayer('fs-bldg')) map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } });
   function handles(pl) {
-    const e = pl.elements.find(x => x.id === ed.sel); if (!e) return [];
+    const e = ed.editing && pl.elements.find(x => x.id === ed.sel); if (!e) return [];
     if (SP.isFree(e)) { const o = SP.outline(e), xs = o.map(p => p[0]), ys = o.map(p => p[1]), F = SP.frame(pl.origin); // curved pieces: corner handles scale the whole shape
       return [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)], [Math.min(...xs), Math.max(...ys)]].map((p, i) => ({ i: 's' + i, at: F.toLL(p), ft: p })); }
     const F = SP.frame(pl.origin), c = SP.corners(e), top = [e.x, e.y], a = (e.rot || 0) * Math.PI / 180, L = e.d / 2 + Math.max(14, e.d * 0.15);
@@ -238,6 +238,7 @@ export function initSitePlan(ctx) {
     const pl = ed && PL(); if (!pl || ed.mode || ctx.view !== 'map' || pl.ring.length < 3) return;
     const oe = e.originalEvent; if (oe?.button > 0 || oe?.touches?.length > 1) return;
     const h = hit(pl, e); if (!h) return;
+    if (!ed.editing) { if (h.el && ed.sel !== h.el.id) { ed.sel = h.el.id; panel(); draw(); } return; } // looking, not editing: a click selects and the map still pans
     e.preventDefault(); // stops the map's own drag-to-pan for this press
     const el = h.el || pl.elements.find(x => x.id === ed.sel); if (!el) return;
     if (h.el && ed.sel !== el.id) { ed.sel = el.id; panel(); draw(); }
@@ -247,7 +248,7 @@ export function initSitePlan(ctx) {
   function move(e) {
     if (!drag) return; const pl = PL(), el = pl?.elements.find(x => x.id === drag.id); if (!el) return;
     const p = ftAt(pl, e.lngLat), o = drag.orig; drag.moved = true;
-    if (drag.type === 'move') { if (SP.isFree(o)) Object.assign(el, SP.moveBy({ ...o }, p[0] - drag.from[0], p[1] - drag.from[1])); else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); } }
+    if (drag.type === 'move') { if (SP.isFree(o)) Object.assign(el, SP.moveBy({ ...o }, p[0] - drag.from[0], p[1] - drag.from[1])); else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); if (!e.originalEvent?.altKey) { const [sx, sy] = SP.settleShift(pl, el); el.x = +(el.x + sx).toFixed(2); el.y = +(el.y + sy).toFixed(2); } } } // snaps to its neighbours' edges and stays out of the setbacks (hold Alt for a free move)
     else if (drag.type === 'scale') { const c = [o.x, o.y], f = Math.max(0.2, Math.min(5, Math.hypot(p[0] - c[0], p[1] - c[1]) / (Math.hypot(drag.corner[0] - c[0], drag.corner[1] - c[1]) || 1))); Object.assign(el, SP.scaleBy(clone(o), f, c)); }
     else if (drag.type === 'size') {
       const sx = [-1, 1, 1, -1][drag.k], sy = [-1, -1, 1, 1][drag.k], opp = [-sx * o.w / 2, -sy * o.d / 2], q = SP.toLocal(o, p);
@@ -263,8 +264,8 @@ export function initSitePlan(ctx) {
   function up() {
     if (!drag) return; const d = drag; drag = null;
     if (!d.moved) return;
-    ed.undo.push(d.snap); ed.redo = []; const pl = PL(), el = pl.elements.find(x => x.id === d.id); if (el) el.pinned = true;
-    pl.updated = new Date().toISOString(); save(P()); if (!refitAuto()) panel();
+    ed.undo.push(d.snap); ed.redo = []; const pl = PL(), el = pl.elements.find(x => x.id === d.id); if (el) { el.pinned = true; makeRoom(el); }
+    pl.updated = new Date().toISOString(); save(P()); draw(); panel();
   }
   map.on('mousedown', down); map.on('touchstart', down); map.on('mousemove', move); map.on('touchmove', move); map.on('mouseup', up); map.on('touchend', up);
   window.addEventListener('mouseup', up);
@@ -334,7 +335,7 @@ export function initSitePlan(ctx) {
     if (mod && k.toLowerCase() === 'y') { used(); undo(false); return; }
     if (k === 'Escape') { if (ed.mode) { ed.mode = null; ed.draft = []; draw(); panel(); } else if (ed.sel) { ed.sel = null; draw(); panel(); } return; }
     if (k === 'Enter' && ed.mode === 'draw') { finishDraw(); return; }
-    if (!el) return;
+    if (!el || !ed.editing) return;
     if (k === 'Delete' || k === 'Backspace') { used(); change(x => { x.elements = x.elements.filter(y => y.id !== el.id); }); ed.sel = null; draw(); panel(); return; }
     const step = e.shiftKey ? 10 : 1, a = frameAngle(pl) * Math.PI / 180, mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[k];
     if (mv) { used(); change(() => { SP.moveBy(el, step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a))); el.pinned = true; }, true); refitSoon(); return; }
@@ -349,7 +350,8 @@ export function initSitePlan(ctx) {
     const scroll = card.querySelector('.sp-body')?.scrollTop || 0;
     card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan · ' + esc(p.name) + '</div><h2><input id="spPlanName" class="sp-title" value="' + esc(pl.name) + '" aria-label="Plan name"></h2><div class="bsub">' + esc(parcel?.label || '') + (pl.ring.length >= 3 ? ' · ' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() + '</div>' +
       '<div class="sp-body">' +
-      '<div class="sp-plans">' + p.plans.map(x => '<button class="chip" aria-pressed="' + (x.id === pl.id) + '" data-plan="' + esc(x.id) + '">' + esc(x.name) + '</button>').join('') + '<button class="chip" id="spCopy" title="Start another option from this one">+ Copy</button></div>' +
+      '<div class="sp-plans">' + p.plans.map(x => '<button class="chip" aria-pressed="' + (x.id === pl.id) + '" data-plan="' + esc(x.id) + '">' + esc(x.name) + '</button>').join('') + '<button class="chip" id="spCopy" title="Start another option from this one">+ Copy</button>' + (noRing ? '' : '<button class="btn sp-edit' + (ed.editing ? ' askai' : '') + '" style="margin-left:auto" aria-pressed="' + !!ed.editing + '" id="spEdit" title="Move, resize and turn pieces of the plan; only the piece you move changes">' + (ed.editing ? 'Done Editing' : 'Edit Layout') + '</button>') + '</div>' +
+      (ed.editing && !noRing ? '<div class="rnote sp-editing" style="margin:0 16px 10px">Editing: drag a piece to move it, its corners to resize, the orange dot to turn it. Only that piece changes.</div>' : '') +
       (drawing ? '<div class="bsec sp-draw"><div class="lt">Draw the site</div><p>Click each corner of the site on the map. Click the first corner again (or double-click, or press Enter) to finish.' + (ed.draft.length ? ' ' + ed.draft.length + ' corner' + (ed.draft.length > 1 ? 's' : '') + ' so far.' : '') + '</p><div class="bacts" style="padding:0"><button class="btn askai" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button class="btn" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button class="btn" id="spCancelDraw">Keep the Old Site</button>') + '</div></div>' :
       '<div class="bsec sp-ai"><label class="lt" for="spAsk">Build with AI</label><textarea id="spAsk" rows="2" placeholder="What should go here? e.g. 25,000 sf retail strip with 4 per 1,000 parking">' + esc(ed.ask || '') + '</textarea>' +
         '<div class="sp-sugs">' + SUGGEST.map(s => '<button class="chip" data-sug="' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div>' +
@@ -384,8 +386,9 @@ export function initSitePlan(ctx) {
     on('#spMore', () => { const pl2 = PL(), more = layoutOptions({ ...pl2 }, pl2.program, { count: 12 }); ed.variants = named(more, pl2); ed.pick = null; panel(); });
     const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; const k = so.value, cur = ed.variants[ed.pick]; const val = v => k === 'units' ? v.m.units || 0 : k === 'gfa' ? v.m.gfa : k === 'spaces' ? v.m.spaces : k === 'open' ? v.m.green : (v.rank ?? 0);
       ed.variants.sort((a, b) => val(b) - val(a)); ed.pick = cur ? ed.variants.indexOf(cur) : null; panel(); };
-    card.querySelectorAll('[data-add]').forEach(b => b.onclick = () => addEl(b.dataset.add));
+    card.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { ed.editing = true; addEl(b.dataset.add); }); // adding a piece is editing
     const tb = card.querySelector('#spTrees'); if (tb) tb.onclick = () => { change(x => { x.params = { ...(x.params || {}), trees: x.params?.trees === false }; }); panel(); };
+    on('#spEdit', () => { ed.editing = !ed.editing; draw(); panel(); });
     on('#spFront', () => { ed.mode = ed.mode === 'front' ? null : 'front'; panel(); });
     on('#spStreet', () => { ed.mode = ed.mode === 'street' ? null : 'street'; panel(); });
     on('#spRedraw', () => { ed.mode = 'draw'; ed.draft = []; ed.sel = null; ctx.toast('Click each corner of the site; click the first one again to finish. Esc cancels.'); draw(); panel(); });
@@ -477,8 +480,13 @@ export function initSitePlan(ctx) {
   }
   // re-fit: everything not pinned is laid out again around the pinned pieces
   let refitTimer = 0;
-  const refitAuto = () => { const pl = PL(); if (!pl?.recipe || ed.autoSolve === false) return false; ctx.toast('Re-fitting the plan around your change…'); setTimeout(() => refitNow(), 30); return true; };
-  function refitSoon() { clearTimeout(refitTimer); refitTimer = setTimeout(refitAuto, 300); }
+  // a local edit: the piece stays where it was put and parking under it gives way (whole stalls); nothing else moves.
+  // Laying out everything else again is the Re-fit Plan button's job, never automatic.
+  function makeRoom(el) {
+    const pl = PL(); if (!pl || !el || el.kind === 'parking' || el.kind === 'green' || el.kind === 'lot' || el.kind === 'trail') return;
+    pl.elements = SP.cutRows(pl.elements, SP.outline(el), el.kind === 'building' || el.kind === 'garage' ? 5 : 1);
+  }
+  function refitSoon() { clearTimeout(refitTimer); refitTimer = setTimeout(() => { const pl = PL(), el = pl?.elements.find(x => x.id === ed.sel); if (!el) return; makeRoom(el); pl.updated = new Date().toISOString(); save(P()); draw(); panel(); }, 250); }
   function refitNow(asked) {
     const pl = PL(); if (!pl?.recipe) return;
     let r = null; try { r = refit(pl); } catch (err) { console.warn('refit', err); }
@@ -497,9 +505,9 @@ export function initSitePlan(ctx) {
   }
 
   function selHtml(e, prog) {
-    if (!e) return '<div class="lt">Selected</div><div class="rnote">Click a piece of the plan to move it. Drag a white corner to resize it, the orange dot to turn it. Arrow keys nudge it, R turns it 90°, Delete removes it.</div>';
+    if (!e) return '<div class="lt">Selected</div><div class="rnote">' + (ed.editing ? 'Click a piece of the plan to move it. Drag a white corner to resize it, the orange dot to turn it; it lines up with its neighbours and stays out of the setbacks (hold Alt to move it freely). Arrow keys nudge it, R turns it 90°, Delete removes it. Only that piece moves; parking under a building gives way.' : 'Click a piece of the plan to see it. Use <b>Edit Layout</b> to move, resize or turn pieces.') + '</div>';
     const free = SP.isFree(e);
-    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free ? ' · curved' : '') + '</div><div class="sp-grid">' +
+    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free ? ' · curved' : '') + '</div><fieldset class="sp-fs"' + (ed.editing ? '' : ' disabled') + ' style="border:0;padding:0;margin:0;min-width:0"><div class="sp-grid">' +
       (free ? '' : '<label>Width (ft)<input type="number" min="8" step="1" data-e="w" value="' + Math.round(e.w) + '"></label><label>Depth (ft)<input type="number" min="8" step="1" data-e="d" value="' + Math.round(e.d) + '"></label>' +
       '<label>Turn (°)<input type="number" step="1" data-e="rot" value="' + Math.round(e.rot || 0) + '"></label>') +
       (e.kind === 'building' ? '<label>Floors<input type="number" min="1" max="40" step="1" data-e="floors" value="' + (e.floors || 1) + '"></label>' +
@@ -510,8 +518,8 @@ export function initSitePlan(ctx) {
       (e.kind === 'garage' ? '<label>Levels<input type="number" min="1" max="12" step="1" data-e="levels" value="' + (e.levels || 4) + '"></label>' : '') +
       (['pond', 'pool', 'green', 'plaza', 'court'].includes(e.kind) ? '<label>Shape<select data-shape="1">' + [['organic', 'Natural curves'], ['rounded', 'Rounded rectangle'], ['square', 'Rectangle']].map(([k, t]) => '<option value="' + k + '"' + ((e.poly ? 'organic' : e.shape === 'round' ? 'rounded' : 'square') === k ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' : '') +
       '<label class="sp-wide">Name<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A"></label>' +
-      '</div><div class="rnote" id="spRead"></div>' + (PL()?.recipe ? '<div class="rnote">' + (e.pinned ? '📌 Kept in place: the plan re-fits around it. <button class="sp-link" id="spUnpin">Let it move</button>' : 'Move or resize it and the rest of the plan re-fits around it.') + '</div>' : '') +
-      '<div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + (PL()?.recipe ? '<button class="btn" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button class="btn" id="spDup">Copy</button><button class="btn sp-del" id="spDel">Delete</button></div>';
+      '</div><div class="rnote" id="spRead"></div>' + (!ed.editing ? '<div class="rnote">Use <b>Edit Layout</b> to change it.</div>' : PL()?.recipe ? '<div class="rnote">' + (e.pinned ? '📌 Placed by you: <b>Re-fit Plan</b> keeps it and lays out the rest again around it. <button class="sp-link" id="spUnpin">Let it move</button>' : 'Move or resize it and only it changes. <b>Re-fit Plan</b> lays out the rest again around the pieces you placed.') + '</div>' : '') +
+      '<div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + (PL()?.recipe ? '<button class="btn" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button class="btn" id="spDup">Copy</button><button class="btn sp-del" id="spDel">Delete</button></div></fieldset>';
   }
   function readout(e) {
     const el = card.querySelector('#spRead'); if (!el || !e) return;

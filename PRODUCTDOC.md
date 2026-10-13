@@ -366,9 +366,10 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 
 **Single-family homes:** choose **Single-family homes** (or say "single-family homes, mostly 2-story"). Homes go on lots along 28 ft streets, both sides of each street, with lot lines, driveways and a cul-de-sac at a dead end. Set the **home mix** (the share of 1-, 2- and 3-story homes) and the lot depth under Site parameters; each home type takes its own lot width (about 60, 50 and 40 ft).
 
-**Changing a plan and letting it re-fit**
-- Move, resize or reshape a piece of a plan from Build Options (a building, the pond, the pool) and the rest of the plan re-fits around it: drives, parking and other buildings are laid out again, and the piece you changed stays exactly where you put it (marked 📌 in the Selected box; **Let it move** releases it). A pond you enlarge counts toward the detention.
-- Pieces you add by hand are kept the same way. **Re-fit Plan** in the Selected box re-fits on demand, and "Re-solve as I change settings" under Site parameters turns the automatic re-fit and re-solve on or off.
+**Editing a plan**
+- A plan opens for looking: clicking a piece shows its details and dragging pans the map, so nothing moves by accident. **Edit Layout** at the top of the plan panel turns editing on (**Done Editing** turns it off); adding a piece from Draw turns it on too.
+- While editing, drag a piece to move it, its white corners to resize it and the orange dot to turn it. Only that piece changes. It lines up with the edges of the pieces near it and stays out of the setbacks (hold Alt to move it freely), and parking under a building you move gives way, whole stalls at a time. Anything that still clashes shows in red.
+- **Re-fit Plan** in the Selected box lays out everything else again around the pieces you placed (marked 📌; **Let it move** releases one). It only happens when you press it. A pond you enlarge counts toward the detention.
 - Curved pieces (ponds, the pool, lawns, curved drives) resize from their corner handles. Ponds, pools, lawns, plazas and courts can switch between **natural curves**, a **rounded rectangle** and a **rectangle**, keeping their area.
 
 **Drawing by hand**
@@ -466,6 +467,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Edit Layout:** plans open for looking; editing is a switch, and moving a piece changes only that piece (it snaps to its neighbours and the setbacks, and parking under it gives way) instead of re-laying out the whole site. Re-fit Plan does that on demand.
 - **Townhome and duplex communities that fit:** a duplex or townhome count too dense for lots of their own becomes two-story six-unit rows on a shared parking court, with fenced patios, unit lines and a turnaround; a **Side Street** tool (also found from the map's roads) and a pull-through drive out to it; and the AI now chooses between homes on lots and a court.
 
 - **Site plans that fill the site and look built:** what you ask for is Phase 1 and the rest of the site holds more of the same as Phase 2; several building rows on deep sites; clean rectangular ponds and one landscape background instead of blobs; trash left out unless turned on; tree canopies and 3D trees with a Trees button; L-shaped, courtyard and tower buildings; parapets and floor lines in 3D; restaurant pads with drive-thru and outdoor seating; real playgrounds; parking garages.
