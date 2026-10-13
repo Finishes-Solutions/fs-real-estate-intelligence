@@ -465,7 +465,7 @@ document.getElementById('resetAll').onclick=clearFilters;
   document.getElementById('filterClear').onclick=clearAll; const mc=document.getElementById('mClear'); if(mc) mc.onclick=clearAll;
   // only the construction filters put the filing dots on the map (the layer filters have their own layers)
   pop.addEventListener('change',e=>{ if(e.target.closest('#filtersBody')) showFilings(); }); pop.addEventListener('click',e=>{ if(e.target.closest('#filtersBody')&&e.target.closest('.chip,button[data-k],button[data-v]')) showFilings(); });
-  document.addEventListener('pointerdown',e=>{ if(!pop.hidden&&!wrap.contains(e.target)&&!e.target.closest('.kpi-pop,[data-edit-filters]')) setOpen(false); });
+  document.addEventListener('pointerdown',e=>{ if(!pop.hidden&&!wrap.contains(e.target)&&!e.target.closest('.kpi-pop,[data-edit-filters],.vscope')) setOpen(false); }); // the scope bar's chips and Reset change the same filters, so the popup stays open
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!pop.hidden){ dismiss(); } });
   // openFilters({at: button}): pages whose content follows the filters keep the user where they are
   openFilters=({at=null}={})=>{ const here=at&&ctx.view!=='map'&&(parentOf(ctx.view)==='filings'||['compare','reports'].includes(ctx.view));
@@ -949,7 +949,8 @@ function setView(v,{user}={}){
   scheduleHash();
 }
 let pageAct=null, back=null;
-document.addEventListener('click',e=>{ if(e.isTrusted&&view!=='map'&&e.target.closest?.('.view,#card')) pageAct={t:performance.now(),from:view}; },true);
+// a click anywhere else (the app bar's Map tab, the phone tab bar, the assistant) forgets the page click, so it can't leave a chip
+document.addEventListener('click',e=>{ if(e.isTrusted) pageAct=view!=='map'&&e.target.closest?.('.view,#card')?{t:performance.now(),from:view}:null; },true);
 const backEl=document.createElement('div'); backEl.className='backchip'; backEl.hidden=true;
 backEl.innerHTML='<button type="button" class="bk-go"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8H3.5M7.5 3.5 3 8l4.5 4.5"/></svg><span></span></button><button type="button" class="bk-x" aria-label="Dismiss"><svg width="12" height="12" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>';
 document.getElementById('viewport').appendChild(backEl);

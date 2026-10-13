@@ -489,7 +489,7 @@ Click a project to open its page:
 - The PDF is a conceptual sheet. It has no survey bearings, easements, utilities or title research, so it won't match an engineer's or architect's sheet; it's for feasibility and early conversations.
 - A site plan is a planning sketch from the parcel outline: not a survey, and no grading, utilities, fire lanes or code review. Parcel outlines from appraisal districts can be off by several feet.
 - The setbacks, parking ratios, stormwater storage and trash rules are typical starting numbers, not the rules for a specific city or drainage district. Houston has no zoning but has building lines and parking rules; other cities differ.
-- Projects are shared with the team: each one is saved in this browser and synced to the team database, and the last edit wins. The line at the top of the Projects page shows whether sharing is on and your name, which is stamped on projects you change; click it to change either in **Settings → You & your team**.
+- Projects are shared with the team: each one is saved in this browser and synced to the team database, and the last edit wins. The button beside **+ New Project** at the top of the Projects page shows whether sharing is on and your name, which is stamped on projects you change; click it to change either in **Settings → You & your team**.
 
 ---
 

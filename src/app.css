@@ -2517,7 +2517,7 @@ table.who tr.nomatch td{border:0}
   .vs-chips{order:3;flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
   .vs-chips::-webkit-scrollbar{display:none}
   .vs-chip{flex:none}
-  #view-field .vhead>.vctl{flex-wrap:nowrap;gap:8px}
-  #view-field .vctl .team-slot{min-width:0;flex:0 1 auto;display:flex}
+  #view-field .vhead>.vctl,#view-projects .vhead>.vctl{flex-wrap:nowrap;gap:8px}
+  #view-field .vctl .team-slot,#view-projects .vctl .team-slot{min-width:0;flex:0 1 auto;display:flex}
 }
 .vctl>.btn,.vctl .vmenu>summary,.vs-act .btn{white-space:nowrap}
