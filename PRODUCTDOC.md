@@ -252,7 +252,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
   - **Area & news:** the Houston crime trend, the busiest roads, local development news, and the newest business locations, 10 at a time (**Show 10 more**).
   - Hover over any chart (bars, lines, the small trend lines) to read its numbers; click a bar for its breakdown. The 12 mo / 24 mo / All buttons set how many months the monthly charts show.
   - **Export PDF** makes a Market report with a street map of the area and every section; **Export Data** saves every number as a spreadsheet.
-- **Markets**, on the Market tab, lists prices for the things that move Houston real estate, in groups you pick from the tabs:
+- **Markets**, on the Market page (Market → Overview), lists prices for the things that move Houston real estate, in groups you pick from the tabs:
   - oil and natural gas, and Houston's big energy and other public companies;
   - homebuilders and real estate funds;
   - building material prices (lumber, steel, concrete, copper);

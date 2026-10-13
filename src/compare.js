@@ -64,9 +64,9 @@ export function initCompare(ctx) {
 
   // selection bar: "+ Compare"
   const selBtn = document.getElementById('selCompare');
-  selBtn.onclick = () => { if (ctx.compare.addSelection() && areas.length >= 2) ctx.toast('Added. Open the Compare tab to see them side by side.'); };
+  selBtn.onclick = () => { if (ctx.compare.addSelection() && areas.length >= 2) ctx.toast('Added. Open Market › Compare areas to see them side by side.'); };
   const eachBtn = document.getElementById('selCompareEach');
-  if (eachBtn) eachBtn.onclick = () => { if (addEach() && areas.length >= 2) setTimeout(() => ctx.toast('Open the Compare tab to see them side by side.'), 2500); };
+  if (eachBtn) eachBtn.onclick = () => { if (addEach() && areas.length >= 2) setTimeout(() => ctx.toast('Open Market › Compare areas to see them side by side.'), 2500); };
   function syncSelBtn() {
     const a = fromSelection(), each = eachCounty();
     selBtn.style.display = a ? '' : 'none'; selBtn.disabled = !!a && (areas.length >= MAX || areas.some(x => (x.key || x.label) === a.key));

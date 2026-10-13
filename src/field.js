@@ -77,7 +77,7 @@ export function initField(ctx) {
     top.querySelector('.star')?.remove();
     const b = document.createElement('button'); b.className = 'x star'; b.setAttribute('aria-label', 'Add to watchlist');
     const paint = b._paint = () => { const on = !!findWatch(info); b.setAttribute('aria-pressed', on); b.title = on ? 'On your watchlist' : 'Add to watchlist'; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>'; };
-    b.onclick = () => { const on = setWatch(info, !findWatch(info)); paint(); ctx.toast(on ? 'Added to your watchlist (Field notes).' : 'Removed from your watchlist.'); };
+    b.onclick = () => { const on = setWatch(info, !findWatch(info)); paint(); ctx.toast(on ? 'Added to your watchlist (My Work › Notes & watchlist).' : 'Removed from your watchlist.'); };
     paint(); x.before(b);
   });
 
@@ -104,7 +104,7 @@ export function initField(ctx) {
       '<a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=' + n.lat + ',' + n.lng + '">Directions ↗</a>' +
       (navigator.share ? '<button class="btn" type="button" id="nShare">Share</button>' : '') + (ctx.team?.canDelete(n) === false ? '' : '<button class="btn" type="button" id="nDel">Delete</button>') + '</div></form>' + (n.by ? '<div class="rnote">Added by ' + esc(n.by) + (n.editedBy && n.editedBy !== n.by ? ' · last edited by ' + esc(n.editedBy) : '') + '</div>' : '') +
       (near.length ? '<div class="bsec"><div class="lt">Filings within ~300 m</div>' + near.map(f => '<button class="chitem" data-id="' + esc(f.id) + '"><span><b>' + esc(f.name) + '</b><em>' + esc(f.reg) + '</em></span><span class="m">' + fmtM(f.cost) + '</span></button>').join('') + '</div>' : '') +
-      '<div class="rnote bsrc">Saved on this device only. Use Field notes → Export to back up or move to another device.</div>';
+      '<div class="rnote bsrc">Saved on this device only. Use My Work › Notes &amp; watchlist → Export to back up or move to another device.</div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelectorAll('.chitem').forEach(x => x.onclick = () => ctx.select(BY_ID.get(x.dataset.id), false));
