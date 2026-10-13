@@ -33,7 +33,10 @@ export function initSitePlan(ctx) {
 
   // ---------- storage and team sync ----------
   function load() { try { const d = JSON.parse(localStorage.getItem(KEY) || '{}'); return { projects: d.projects || [], dirty: d.dirty || [], gone: d.gone || [] }; } catch (e) { return { projects: [], dirty: [], gone: [] }; } }
-  function persist() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { ctx.toast('This browser won’t let the page save projects.'); } }
+  let persistT = 0; // written a moment after the last change, not on every one (a big plan is megabytes)
+  function persistNow() { clearTimeout(persistT); persistT = 0; try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { ctx.toast('This browser won’t let the page save projects.'); } }
+  function persist() { clearTimeout(persistT); persistT = setTimeout(persistNow, 600); }
+  window.addEventListener('pagehide', () => { if (persistT) persistNow(); });
   function save(p) {
     if (p) { p.updated = new Date().toISOString(); p.by = get(NAME_KEY) || p.by || ''; if (!db.dirty.includes(p.id)) db.dirty.push(p.id); }
     persist(); badge(); if (ctx.view === 'projects') render();
@@ -212,10 +215,19 @@ export function initSitePlan(ctx) {
     const F = SP.frame(pl.origin), c = SP.corners(e), top = [e.x, e.y], a = (e.rot || 0) * Math.PI / 180, L = e.d / 2 + Math.max(14, e.d * 0.15);
     return c.map((p, i) => ({ i, at: F.toLL(p) })).concat([{ i: 'r', at: F.toLL([top[0] - Math.sin(a) * L, top[1] + Math.cos(a) * L]) }]);
   }
+  // layouts run in a worker (sp-worker.js) so the page stays responsive; straight in the page if workers aren't there
+  let worker = null, wseq = 0; const wait = new Map();
+  function laid(fn, ...args) {
+    try { if (!worker) { worker = new Worker(new URL('./sp-worker.js', import.meta.url), { type: 'module' }); worker.onmessage = ({ data }) => { const w = wait.get(data.id); if (!w) return; wait.delete(data.id); data.ok ? w.ok(data.result) : w.no(new Error(data.error)); }; worker.onerror = e => { for (const w of wait.values()) w.no(new Error(e.message || 'layout worker failed')); wait.clear(); worker = null; }; } }
+    catch (e) { worker = null; }
+    if (!worker) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'refit' ? refit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
+    const id = ++wseq; return new Promise((ok, no) => { wait.set(id, { ok, no }); worker.postMessage({ id, fn, args: JSON.parse(JSON.stringify(args)) }); });
+  }
+  let lastKeep = null;
   function draw() {
     cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
       const pl = ed && PL(), s = map.getSource(SRC); if (!s) return;
-      const fc = pl?.ring.length >= 3 ? SP.planFeatures(pl, ed.sel) : EMPTY, P0 = P();
+      const fc = pl?.ring.length >= 3 ? SP.planFeatures(pl, ed.sel, drag?.moved ? lastKeep : null) : EMPTY, P0 = P(); lastKeep = fc.keep || null; // mid-drag: last planting and checks
       if (fc !== EMPTY && (pl.parcels?.length > 1 || ed.mode === 'parcels')) for (const k of pl.parcels || []) { const r = P0.parcels.find(x => x.key === k); if (r?.geometry) fc.features.push({ type: 'Feature', properties: { k: 'pline' }, geometry: r.geometry }); }
       s.setData(fc);
       map.getSource(HSRC)?.setData(pl?.ring.length >= 3 ? { type: 'FeatureCollection', features: handles(pl).map(h => ({ type: 'Feature', properties: { r: h.i === 'r' ? 1 : 0 }, geometry: { type: 'Point', coordinates: h.at } })) } : EMPTY);
@@ -383,7 +395,7 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('[data-sug]').forEach(b => b.onclick = () => { ed.ask = b.dataset.sug; $('#spAsk').value = ed.ask; build(); });
     on('#spGo', build);
     card.querySelectorAll('[data-var]').forEach(b => b.onclick = () => useVariant(+b.dataset.var));
-    on('#spMore', () => { const pl2 = PL(), more = layoutOptions({ ...pl2 }, pl2.program, { count: 12 }); ed.variants = named(more, pl2); ed.pick = null; panel(); });
+    on('#spMore', async () => { const pl2 = PL(), b = card.querySelector('#spMore'); if (b) b.textContent = 'Looking…'; const more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); if (PL() !== pl2) return; ed.variants = named(more, pl2); ed.pick = null; panel(); });
     const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; const k = so.value, cur = ed.variants[ed.pick]; const val = v => k === 'units' ? v.m.units || 0 : k === 'gfa' ? v.m.gfa : k === 'spaces' ? v.m.spaces : k === 'open' ? v.m.green : (v.rank ?? 0);
       ed.variants.sort((a, b) => val(b) - val(a)); ed.pick = cur ? ed.variants.indexOf(cur) : null; panel(); };
     card.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { ed.editing = true; addEl(b.dataset.add); }); // adding a piece is editing
@@ -487,9 +499,9 @@ export function initSitePlan(ctx) {
     pl.elements = SP.cutRows(pl.elements, SP.outline(el), el.kind === 'building' || el.kind === 'garage' ? 5 : 1);
   }
   function refitSoon() { clearTimeout(refitTimer); refitTimer = setTimeout(() => { const pl = PL(), el = pl?.elements.find(x => x.id === ed.sel); if (!el) return; makeRoom(el); pl.updated = new Date().toISOString(); save(P()); draw(); panel(); }, 250); }
-  function refitNow(asked) {
+  async function refitNow(asked) {
     const pl = PL(); if (!pl?.recipe) return;
-    let r = null; try { r = refit(pl); } catch (err) { console.warn('refit', err); }
+    let r = null; ctx.toast('Re-fitting the plan around the pieces you placed…'); try { r = await laid('refit', pl); } catch (err) { console.warn('refit', err); } if (PL() !== pl) return;
     if (!r) { if (asked) ctx.toast('Couldn’t re-fit the plan around that; it stays as you left it.'); return; }
     pl.elements = r.elements; if (r.recipe) pl.recipe = clone(r.recipe); ed.refitNote = r.notes.join(' '); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null;
     pl.updated = new Date().toISOString(); save(P()); draw(); panel();
@@ -497,9 +509,9 @@ export function initSitePlan(ctx) {
   // lay the options out again with the plan's own program and settings (no AI call)
   let solveTimer = 0;
   function resolveSoon() { clearTimeout(solveTimer); solveTimer = setTimeout(resolve, 350); }
-  function resolve() {
+  async function resolve() {
     const pl = PL(); if (!pl || pl.ring.length < 3) return;
-    const keep = ed.pick ?? 0, plan = { ...pl }, variants = named(layoutOptions(plan, pl.program, { count: ed.variants?.length > 3 ? 12 : 3 }), plan);
+    const keep = ed.pick ?? 0, plan = { ...pl }, variants = named(await laid('options', plan, pl.program, { count: ed.variants?.length > 3 ? 12 : 3 }), plan); if (PL() !== pl) return;
     if (!variants.length) { ctx.toast('Nothing fits with these settings.'); return; }
     ed.variants = variants; useVariant(Math.min(keep, variants.length - 1));
   }
@@ -661,9 +673,9 @@ export function initSitePlan(ctx) {
       else note = (r.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this reads your words directly.';
     } catch (e) { note = 'Offline: this reads your words directly.'; }
     if (ed?.plid !== pl.id) return;
-    if (btn) btn.textContent = 'Laying out…';
-    await new Promise(r => setTimeout(r, 30));
-    const plan = { ...pl, setbacks }, variants = named(layoutOptions(plan, prog), { ...plan, program: prog });
+    if (btn) btn.textContent = SP.ringArea(pl.ring) > 40 * 43560 ? 'Laying out… (a big site takes up to a minute)' : 'Laying out…';
+    let out = []; try { out = await laid('options', { ...pl, setbacks }, prog); } catch (e) { console.warn('layout', e); ctx.toast('The layout failed: ' + e.message); }
+    const plan = { ...pl, setbacks }, variants = named(out, { ...plan, program: prog });
     if (ed?.plid !== pl.id) return;
     ed.variants = variants; ed.aiNote = note; ed.pick = null;
     const best = variants.findIndex(v => v.elements.length); if (best >= 0) useVariant(best); else panel();
