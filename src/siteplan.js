@@ -129,7 +129,7 @@ export function initSitePlan(ctx) {
     const pl = PL(); if (pl?.ring.length >= 3 && (pl.frontGuess || pl.streets == null)) map.once('idle', () => { if (PL() === pl && (pl.frontGuess || pl.streets == null)) detectFront(pl); });
   }
   function close() {
-    if (!ed) return; ed = null; draw();
+    card.classList.remove('sp-mode'); if (!ed) return; ed = null; draw();
     if (hidBldg && map.getLayer('fs-bldg')) map.setLayoutProperty('fs-bldg', 'visibility', hidBldg); hidBldg = null;
   }
   ctx.onCardClose?.(() => close());
@@ -372,22 +372,30 @@ export function initSitePlan(ctx) {
   }, true);
 
   // ---------- the panel ----------
+  // the dark summary under the header, as on a property card: what the plan holds and whether it passes
+  function overview(pl, prog) {
+    if (!pl.elements.length) return '<div class="kicker">Overview</div><div>No layout yet. Describe what should go here under <b>Build with AI</b>, or draw pieces by hand.</div>';
+    const m = SP.metrics(pl), bad = SP.check(pl).filter(i => i.level === 'bad').length, B = pl.elements.filter(e => e.kind === 'building').length;
+    const what = [m.units ? '<b>' + f0(m.units) + ' homes</b>' : '', '<b>' + f0(m.gfa) + ' sq ft</b> in ' + B + ' building' + (B === 1 ? '' : 's'), f0(m.spaces) + ' of ' + f0(m.required) + ' parking spaces', pct(m.coverage) + ' coverage'].filter(Boolean).join(' · ');
+    return '<div class="kicker">' + (ed.editing ? 'Editing · drag a piece; only it changes' : 'Overview') + '</div><div>' + what + '. ' + (bad ? '<b>' + bad + ' problem' + (bad > 1 ? 's' : '') + '</b> to fix (in red on the map).' : m.spaces < m.required ? 'Parking is short.' : 'Passes the setback, overlap and parking checks.') + '</div>';
+  }
   function panel() {
     const p = P(), pl = PL(); if (!p || !pl) return;
     const sel = pl.elements.find(e => e.id === ed.sel), prog = SP.normalizeProgram(pl.program), noRing = pl.ring.length < 3, drawing = noRing || ed.mode === 'draw';
     const parcel = p.parcels.find(x => x.key === pl.parcel);
-    const scroll = card.querySelector('.sp-body')?.scrollTop || 0;
-    card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan · ' + esc(p.name) + '</div><h2><input id="spPlanName" class="sp-title" value="' + esc(pl.name) + '" aria-label="Plan name"></h2><div class="bsub">' + esc(parcel?.label || '') + (pl.ring.length >= 3 ? ' · ' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() + '</div>' +
+    const scroll = card.classList.contains('sp-mode') ? card.scrollTop : 0;
+    card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan · ' + esc(p.name) + '</div><h2><input id="spPlanName" class="sp-title" value="' + esc(pl.name) + '" aria-label="Plan name"></h2><div class="bsub">' + esc(parcel?.label || '') + (pl.ring.length >= 3 ? ' · ' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() +
+      '<div class="sp-plans">' + p.plans.map(x => '<button class="chip" aria-pressed="' + (x.id === pl.id) + '" data-plan="' + esc(x.id) + '">' + esc(x.name) + '</button>').join('') + '<button class="chip" id="spCopy" title="Start another option from this one">+ Copy</button>' + (noRing ? '' : '<button class="btn sp-edit' + (ed.editing ? ' askai' : '') + '" aria-pressed="' + !!ed.editing + '" id="spEdit" title="Move, resize and turn pieces of the plan; only the piece you move changes">' + (ed.editing ? 'Done Editing' : 'Edit Layout') + '</button>') + '</div>' +
+      ctx.cardNav([['spAiSec', 'Build'], ['spSel', 'Selected'], ['spNums', 'Numbers'], ['spDrawSec', 'Draw'], ['spSiteSec', 'Site'], ['spParams', 'Settings'], ['spPfSec', 'Pro forma'], ['spExport', 'Export']]) + '</div>' +
+      (noRing ? '' : '<div class="bover" id="spOver">' + overview(pl, prog) + '</div>') +
       '<div class="sp-body">' +
-      '<div class="sp-plans">' + p.plans.map(x => '<button class="chip" aria-pressed="' + (x.id === pl.id) + '" data-plan="' + esc(x.id) + '">' + esc(x.name) + '</button>').join('') + '<button class="chip" id="spCopy" title="Start another option from this one">+ Copy</button>' + (noRing ? '' : '<button class="btn sp-edit' + (ed.editing ? ' askai' : '') + '" style="margin-left:auto" aria-pressed="' + !!ed.editing + '" id="spEdit" title="Move, resize and turn pieces of the plan; only the piece you move changes">' + (ed.editing ? 'Done Editing' : 'Edit Layout') + '</button>') + '</div>' +
-      (ed.editing && !noRing ? '<div class="rnote sp-editing" style="margin:0 16px 10px">Editing: drag a piece to move it, its corners to resize, the orange dot to turn it. Only that piece changes.</div>' : '') +
       (drawing ? '<div class="bsec sp-draw"><div class="lt">Draw the site</div><p>Click each corner of the site on the map. Click the first corner again (or double-click, or press Enter) to finish.' + (ed.draft.length ? ' ' + ed.draft.length + ' corner' + (ed.draft.length > 1 ? 's' : '') + ' so far.' : '') + '</p><div class="bacts" style="padding:0"><button class="btn askai" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button class="btn" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button class="btn" id="spCancelDraw">Keep the Old Site</button>') + '</div></div>' :
-      '<div class="bsec sp-ai"><label class="lt" for="spAsk">Build with AI</label><textarea id="spAsk" rows="2" placeholder="What should go here? e.g. 25,000 sf retail strip with 4 per 1,000 parking">' + esc(ed.ask || '') + '</textarea>' +
+      '<div class="bsec sp-ai" id="spAiSec"><label class="lt" for="spAsk">Build with AI</label><textarea id="spAsk" rows="2" placeholder="What should go here? e.g. 25,000 sf retail strip with 4 per 1,000 parking">' + esc(ed.ask || '') + '</textarea>' +
         '<div class="sp-sugs">' + SUGGEST.map(s => '<button class="chip" data-sug="' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div>' +
         '<div class="bacts sp-go"><button class="btn askai" id="spGo">Build Options</button></div><div class="rnote sp-ainote" id="spAiNote">' + esc(ed.aiNote || '') + '</div>' +
         '<div id="spVariants">' + variantsHtml() + '</div></div>' +
       siteHtml(p, pl) +
-      '<div class="bsec"><div class="lt">Draw</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + (k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building) + '"></i>' + (ADD_LABEL[k] || SP.KINDS[k].label) + '</button>').join('') + '<button class="btn" id="spTrees" aria-pressed="' + (pl.params?.trees !== false) + '" title="Show or hide the trees on the plan, the map and the PDF">Trees ' + (pl.params?.trees !== false ? 'On' : 'Off') + '</button></div>' +
+      '<div class="bsec" id="spDrawSec"><div class="lt">Draw and tools</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + (k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building) + '"></i>' + (ADD_LABEL[k] || SP.KINDS[k].label) + '</button>').join('') + '<button class="btn" id="spTrees" aria-pressed="' + (pl.params?.trees !== false) + '" title="Show or hide the trees on the plan, the map and the PDF">Trees ' + (pl.params?.trees !== false ? 'On' : 'Off') + '</button></div>' +
         '<div class="sp-tools"><button class="btn" aria-pressed="' + (ed.mode === 'front') + '" id="spFront" title="Then click the lot line along the street">' + (ed.mode === 'front' ? 'Click the street side…' : 'Street Side') + '</button><button class="btn" aria-pressed="' + (ed.mode === 'street') + '" id="spStreet" title="A second street along the lot (a corner lot): click its lot line to add it, or again to remove it">' + (ed.mode === 'street' ? 'Click the side street…' : 'Side Street') + '</button><button class="btn" id="spRedraw">Redraw Site</button>' +
         '<button class="btn" id="spUndo"' + (ed.undo.length ? '' : ' disabled') + ' title="Undo (⌘Z / Ctrl+Z)">Undo</button><button class="btn" id="spRedo"' + (ed.redo.length ? '' : ' disabled') + '>Redo</button></div>' +
         (pl.frontGuess ? '<div class="rnote sp-warn">The street side (orange line) is a guess. Use <b>Street Side</b> to pick the lot line along the street; front setbacks and drives follow it.</div>' : '') + '</div>' +
@@ -395,12 +403,12 @@ export function initSitePlan(ctx) {
       '<div class="bsec" id="spNums"></div>' +
       paramsHtml(pl, prog) +
       '<div id="spPf">' + pfHtml(p, pl) + '</div>' +
-      '<div class="bsec"><div class="lt">Export</div><div class="bacts" style="padding:0 0 8px"><button class="btn askai" id="spPdf" title="A conceptual site plan sheet: the plan to scale with title block, site data, program and parking, parcels, notes and legend">Site Plan PDF</button><select class="chip" id="spSheet" aria-label="Sheet size"><option value="tabloid">11 × 17</option><option value="archd">24 × 36</option></select></div><div class="bacts" style="padding:0"><button class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button class="btn" id="spGeo">Map File (GeoJSON)</button><button class="btn" id="spSum">Copy Summary</button></div>' +
+      '<div class="bsec" id="spExport"><div class="lt">Export</div><div class="bacts" style="padding:0 0 8px"><button class="btn askai" id="spPdf" title="A conceptual site plan sheet: the plan to scale with title block, site data, program and parking, parcels, notes and legend">Site Plan PDF</button><select class="chip" id="spSheet" aria-label="Sheet size"><option value="tabloid">11 × 17</option><option value="archd">24 × 36</option></select></div><div class="bacts" style="padding:0"><button class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button class="btn" id="spGeo">Map File (GeoJSON)</button><button class="btn" id="spSum">Copy Summary</button></div>' +
         '<div class="bacts" style="padding:8px 0 0"><button class="btn" id="spProj">All Projects</button><button class="btn sp-del" id="spDelPlan">Delete This Plan</button></div></div>') +
       '</div>';
-    card.classList.add('open');
+    card.classList.add('open', 'sp-mode');
     const $ = s => card.querySelector(s), on = (s, fn) => { const el = $(s); if (el) el.onclick = fn; };
-    card.querySelector('.sp-body').scrollTop = scroll;
+    card.scrollTop = scroll;
     on('.x', () => ctx.closeCard());
     $('#spPlanName').onchange = e => change(x => { x.name = e.target.value.trim() || x.name; }, true);
     card.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { if (b.dataset.plan === pl.id) return; open(p.id, b.dataset.plan); });
@@ -436,7 +444,7 @@ export function initSitePlan(ctx) {
   }
   function siteHtml(p, pl) {
     const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), recs = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), on = ed.mode === 'parcels';
-    return '<div class="bsec"><div class="lt">Site · ' + recs.length + ' parcel' + (recs.length === 1 ? '' : 's') + ' · ' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' ac</div>' +
+    return '<div class="bsec" id="spSiteSec"><div class="lt">Site · ' + recs.length + ' parcel' + (recs.length === 1 ? '' : 's') + ' · ' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' ac</div>' +
       (recs.length > 1 ? '<div class="sp-parcels">' + recs.map(r => '<span class="chip">' + esc(r.label) + (r.acres ? ' · ' + r.acres.toFixed(2) + ' ac' : '') + '<button class="sp-x" data-rmp="' + esc(r.key) + '" aria-label="Remove ' + esc(r.label) + ' from the site">×</button></span>').join('') + '</div>' : '') +
       '<div class="sp-tools"><button class="btn" aria-pressed="' + on + '" id="spParcels" title="Click parcels on the map to add them to the site (up to ' + MAXP + ') or take them out">' + (on ? 'Done Adding Parcels' : 'Add or Remove Parcels') + '</button></div>' +
       (on ? '<div class="rnote">Click a parcel next to the site to add it, or one in the site to take it out. Small gaps between parcels are closed up; parcels across a road stay separate.</div>' : '') + '</div>';
@@ -454,7 +462,7 @@ export function initSitePlan(ctx) {
       '</table><div class="rnote">Average unit ' + f0(prog.unitSf) + ' sf · ' + (prog.mix || SP.UNIT_MIX).reduce((s, t) => s + +t.pct, 0) + '% <button class="sp-link" id="spMixAdd">+ Add a type</button></div>' : '';
     const homes = u === 'sfr' ? '<div class="sp-sub">Home mix</div><div class="sp-grid">' + [1, 2, 3].map(n => { const t = (prog.homeMix || SP.HOME_MIX).find(h => h.stories === n), T = SP.HOME_TYPES[n];
       return '<label>' + n + '-story %<input type="number" min="0" max="100" step="5" data-home="' + n + '" value="' + (t?.pct ?? 0) + '"><small>' + f0(T.sf) + ' sf · ' + T.lotW + ' ft lot</small></label>'; }).join('') + num('lotD', 'Lot depth (ft)', prog.lotD, 5) + '</div>' : '';
-    return '<details class="bsec sp-prog"' + (ed.progOpen ? ' open' : '') + '><summary class="lt">Site parameters</summary>' +
+    return '<details class="bsec sp-prog" id="spParams"' + (ed.progOpen ? ' open' : '') + '><summary class="lt">Site parameters</summary>' +
       '<div class="sp-sub">Program</div><div class="sp-grid">' +
         '<label>Use<select id="spUse">' + Object.entries(SP.USES).map(([k, x]) => '<option value="' + k + '"' + (k === u ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select></label>' +
         (u === 'multifamily' ? num('perUnit', 'Parking per unit', prog.perUnit, 0.05) + num('floors', 'Floors', prog.floors, 1) + num('eff', 'Efficiency (net ÷ gross)', prog.eff, 0.01)
@@ -597,13 +605,13 @@ export function initSitePlan(ctx) {
   function pfRun(p, pl) { if (!pl.elements.some(e => e.kind === 'building')) return null; const d = PF.defaults(pl, landGuess(p, pl)); return PF.run(pl, pfMerge(d, pl.pf)); }
   function pfHtml(p, pl) {
     let R = null; try { R = pfRun(p, pl); } catch (e) { console.warn('pro forma', e); }
-    if (!R) return '<details class="bsec sp-pf"><summary class="lt">Pro forma</summary><div class="rnote">Lay out a plan first (Build Options or by hand); the pro forma reads its buildings, units and parking.</div></details>';
+    if (!R) return '<details class="bsec sp-pf" id="spPfSec"><summary class="lt">Pro forma</summary><div class="rnote">Lay out a plan first (Build Options or by hand); the pro forma reads its buildings, units and parking.</div></details>';
     const A = R.A, $m = v => v == null || !isFinite(v) ? '—' : (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toFixed(2) + 'M' : f0(Math.abs(v))), pc2 = v => v == null || !isFinite(v) ? 'n/a' : (v * 100).toFixed(2) + '%';
     const inp = (k, label, v, step, unit) => '<label>' + label + '<input type="number" step="' + step + '" data-pf="' + k + '" value="' + (v ?? '') + '">' + (unit ? '<small>' + unit + '</small>' : '') + '</label>';
     const card1 = (k, v, sub) => '<div class="sp-card"><span>' + k + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>', uses = Object.keys(R.P.uses), res = R.returns, S1 = R.simple, simpleOn = A.method === 'simple';
     const homes = uses.some(u => ['townhomes', 'duplex', 'sfr'].includes(u)), mf = uses.includes('multifamily'), units = R.P.units || 0;
     const sch = R.sched, tot = Math.max(1, sch.total), seg = (n, cls, t) => n > 0 ? '<i class="' + cls + '" style="flex:' + n + '" title="' + t + ': ' + n + ' months">' + n + '</i>' : '';
-    return '<details class="bsec sp-pf"' + (ed.pfOpen ? ' open' : '') + '><summary class="lt">Pro forma</summary>' +
+    return '<details class="bsec sp-pf" id="spPfSec"' + (ed.pfOpen ? ' open' : '') + '><summary class="lt">Pro forma</summary>' +
       '<div class="sp-grid"><label>Method<select data-pfs="method"><option value="schedule"' + (simpleOn ? '' : ' selected') + '>Month by month, with the schedule</option><option value="simple"' + (simpleOn ? ' selected' : '') + '>TestFit method (annual, no schedule)</option></select></label>' +
         (homes && !mf ? '<label class="sp-sw"><input type="checkbox" data-pfb="forSale"' + (A.forSale ? ' checked' : '') + '> Homes for sale (not rent)</label>' : '') + '</div>' +
       '<div class="sp-sched" title="Schedule in months">' + seg(sch.pre, 'pre', 'Pre-development') + seg(sch.build, 'bld', 'Construction') + seg(sch.lease, 'lease', R.forSale ? 'Sales' : 'Lease-up') + seg(sch.total - sch.toStabilize, 'hold', 'Hold') + '</div>' +
