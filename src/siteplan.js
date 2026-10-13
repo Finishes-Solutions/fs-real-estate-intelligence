@@ -9,6 +9,7 @@ import { layoutOptions, refit, PARAMS } from './lib/sitelayout.mjs';
 import * as PF from './lib/proforma.mjs';
 import { sheetHTML, planSVG } from './lib/sitesheet.mjs';
 import { BUILDING_TYPES, BUILDING_GROUPS, typeById, fromType } from './lib/buildings.mjs';
+import * as ED from './lib/siteedit.mjs';
 const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 
@@ -264,6 +265,7 @@ export function initSitePlan(ctx) {
       drag = { type: 'vertex', k, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap, moved: h.h[0] === 'm' }; draw(); return; }
     const hs = typeof h.h === 'string' && h.h[0] === 's' ? handles(pl).find(q => q.i === h.h) : null;
     drag = { type: h.h == null ? 'move' : h.h === 'r' ? 'rot' : hs ? 'scale' : 'size', k: h.h, corner: hs?.ft, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false };
+    if (drag.type === 'move') { const att = SP.attachedTo(pl, el); drag.att = att.map(a => ({ id: a.id, orig: clone(a) })); if (el.kind === 'building' || el.kind === 'garage') drag.obs = SP.spotObstacles(pl, el, att); } // what moves with it, and what it has to stay clear of
   }
   function move(e) {
     if (!drag) return; const pl = PL(), el = pl?.elements.find(x => x.id === drag.id); if (!el) return;
@@ -273,7 +275,13 @@ export function initSitePlan(ctx) {
       if (!e.originalEvent?.altKey) for (const nb of [P[(k - 1 + n) % n], P[(k + 1) % n]]) { const b = loc(nb); if (Math.abs(q[0] - b[0]) < 3) q = [b[0], q[1]]; if (Math.abs(q[1] - b[1]) < 3) q = [q[0], b[1]]; }
       P[k] = back(q).map(v => +v.toFixed(2)); const c = SP.centroid(P); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2); draw(); readout(el); return;
     }
-    if (drag.type === 'move') { if (SP.isFree(o)) Object.assign(el, SP.moveBy({ ...o }, p[0] - drag.from[0], p[1] - drag.from[1])); else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); if (!e.originalEvent?.altKey) { const [sx, sy] = SP.settleShift(pl, el); el.x = +(el.x + sx).toFixed(2); el.y = +(el.y + sy).toFixed(2); } } } // snaps to its neighbours' edges and stays out of the setbacks (hold Alt for a free move)
+    if (drag.type === 'move') { // snaps to its neighbours' edges, stays out of the setbacks and (a building) off the drives and other buildings; hold Alt for a free move
+      const free = e.originalEvent?.altKey, carry = () => (drag.att || []).map(a => pl.elements.find(x => x.id === a.id)).filter(Boolean);
+      if (SP.isFree(o)) Object.assign(el, SP.moveBy(clone(o), p[0] - drag.from[0], p[1] - drag.from[1])); else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); if (!free) { const [sx, sy] = SP.settleShift(pl, el); el.x = +(el.x + sx).toFixed(2); el.y = +(el.y + sy).toFixed(2); } }
+      const mv = () => { const dx = el.x - o.x, dy = el.y - o.y; for (const a of drag.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) Object.assign(t, SP.moveBy(clone(a.orig), dx, dy)); } };
+      mv(); drag.blocked = false;
+      if (!free && drag.obs) { const c = SP.clearSpot(pl, el, { carry: carry(), obs: drag.obs }); if (c) { if (c[0] || c[1]) { SP.moveBy(el, c[0], c[1]); mv(); } } else drag.blocked = true; } // the nearest clear spot to the pointer
+    }
     else if (drag.type === 'scale') { const c = [o.x, o.y], f = Math.max(0.2, Math.min(5, Math.hypot(p[0] - c[0], p[1] - c[1]) / (Math.hypot(drag.corner[0] - c[0], drag.corner[1] - c[1]) || 1))); Object.assign(el, SP.scaleBy(clone(o), f, c)); }
     else if (drag.type === 'size') {
       const sx = [-1, 1, 1, -1][drag.k], sy = [-1, -1, 1, 1][drag.k], opp = [-sx * o.w / 2, -sy * o.d / 2], q = SP.toLocal(o, p);
@@ -289,7 +297,11 @@ export function initSitePlan(ctx) {
   function up() {
     if (!drag) return; const d = drag; drag = null;
     if (!d.moved) return;
-    ed.undo.push(d.snap); ed.redo = []; const pl = PL(), el = pl.elements.find(x => x.id === d.id); if (el) { el.pinned = true; makeRoom(el); }
+    ed.undo.push(d.snap); ed.redo = []; const pl = PL(), el = pl.elements.find(x => x.id === d.id);
+    if (el) { el.pinned = true; if (el.kind === 'parking') delete el.ext; /* placed by hand: this is its length now */
+      const went = d.type === 'move' ? [d.orig, ...(d.att || []).map(a => a.orig)] : [d.orig]; makeRoom(el, went);
+      for (const a of d.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) { t.pinned = true; makeRoom(t); } } }
+    if (d.blocked) ctx.toast('No clear spot there: it overlaps a drive or another building. Hold Alt (Option) to place it anyway.');
     pl.updated = new Date().toISOString(); save(P()); draw(); panel();
   }
   map.on('mousedown', down); map.on('touchstart', down); map.on('mousemove', move); map.on('touchmove', move); map.on('mouseup', up); map.on('touchend', up);
@@ -367,9 +379,9 @@ export function initSitePlan(ctx) {
     if (k === 'Escape') { if (ed.mode) { ed.mode = null; ed.draft = []; draw(); panel(); } else if (ed.sel) { ed.sel = null; draw(); panel(); } return; }
     if (k === 'Enter' && ed.mode === 'draw') { finishDraw(); return; }
     if (!el || !ed.editing) return;
-    if (k === 'Delete' || k === 'Backspace') { used(); change(x => { x.elements = x.elements.filter(y => y.id !== el.id); }); ed.sel = null; draw(); panel(); return; }
+    if (k === 'Delete' || k === 'Backspace') { used(); change(x => dropEl(x, el)); ed.sel = null; draw(); panel(); return; }
     const step = e.shiftKey ? 10 : 1, a = frameAngle(pl) * Math.PI / 180, mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[k];
-    if (mv) { used(); change(() => { SP.moveBy(el, step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a))); el.pinned = true; }, true); refitSoon(); return; }
+    if (mv) { used(); const pl0 = PL(), att = pl0 ? SP.attachedTo(pl0, el) : []; change(() => { const dx = step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), dy = step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a)); ed.nudged = [...(ed.nudged || []), clone(el), ...att.map(clone)].slice(-12); for (const t of [el, ...att]) { SP.moveBy(t, dx, dy); t.pinned = true; } }, true); refitSoon(); return; } // what belongs to it moves too
     if ((k === 'r' || k === 'R') && !mod && !SP.isFree(el)) { used(); change(() => { el.rot = ((el.rot || 0) + 90) % 360; }); }
   }, true);
 
@@ -388,13 +400,19 @@ export function initSitePlan(ctx) {
     const scroll = card.classList.contains('sp-mode') ? card.scrollTop : 0;
     card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan · ' + esc(p.name) + '</div><h2><input id="spPlanName" class="sp-title" value="' + esc(pl.name) + '" aria-label="Plan name"></h2><div class="bsub">' + esc(parcel?.label || '') + (pl.ring.length >= 3 ? ' · ' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() +
       '<div class="sp-plans">' + p.plans.map(x => '<button class="chip" aria-pressed="' + (x.id === pl.id) + '" data-plan="' + esc(x.id) + '">' + esc(x.name) + '</button>').join('') + '<button class="chip" id="spCopy" title="Start another option from this one">+ Copy</button>' + (noRing ? '' : '<button class="btn sp-edit' + (ed.editing ? ' askai' : '') + '" aria-pressed="' + !!ed.editing + '" id="spEdit" title="Move, resize and turn pieces of the plan; only the piece you move changes">' + (ed.editing ? 'Done Editing' : 'Edit Layout') + '</button>') + '</div>' +
-      ctx.cardNav([['spAiSec', 'Build'], ['spSel', 'Selected'], ['spNums', 'Numbers'], ['spDrawSec', 'Draw'], ['spSiteSec', 'Site'], ['spParams', 'Settings'], ['spPfSec', 'Pro forma'], ['spExport', 'Export']]) + '</div>' +
+      ctx.cardNav([...(pl.elements.length ? [['spChgSec', 'Change']] : []), ['spAiSec', 'Build'], ['spSel', 'Selected'], ['spNums', 'Numbers'], ['spDrawSec', 'Draw'], ['spSiteSec', 'Site'], ['spParams', 'Settings'], ['spPfSec', 'Pro forma'], ['spExport', 'Export']]) + '</div>' +
       (noRing ? '' : '<div class="bover" id="spOver">' + overview(pl, prog) + '</div>') +
       '<div class="sp-body">' +
       (drawing ? '<div class="bsec sp-draw"><div class="lt">Draw the site</div><p>Click each corner of the site on the map. Click the first corner again (or double-click, or press Enter) to finish.' + (ed.draft.length ? ' ' + ed.draft.length + ' corner' + (ed.draft.length > 1 ? 's' : '') + ' so far.' : '') + '</p><div class="bacts" style="padding:0"><button class="btn askai" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button class="btn" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button class="btn" id="spCancelDraw">Keep the Old Site</button>') + '</div></div>' :
+      (pl.elements.length ? '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change With AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Apt Bldg 7 four stories · turn the clubhouse into a 7,500 sf one · remove Bldg 3 · swap Bldg 2 and Bldg 5">' + esc(ed.chg || '') + '</textarea>' +
+        '<div class="rnote">' + (sel ? 'About <b>' + esc(ED.labelOf(sel)) + '</b> (selected), or name any piece as it’s labelled on the plan.' : 'Name pieces as they’re labelled on the plan, or select one and say “it”.') + '</div>' +
+        '<div class="bacts sp-go"><button class="btn askai" id="spChgGo">Make Changes</button></div>' + (pl.recipe ? '<label class="sp-sw sp-revsw"><input type="checkbox" id="spChgFit"' + (ed.chgFit ? ' checked' : '') + '> Re-fit the rest of the site around the changes (otherwise only those pieces change)</label>' : '') +
+        '<div class="rnote sp-ainote" id="spChgNote">' + esc(ed.chgNote || '') + '</div></div>' : '') +
       '<div class="bsec sp-ai" id="spAiSec"><label class="lt" for="spAsk">Build with AI</label><textarea id="spAsk" rows="2" placeholder="What should go here? e.g. 25,000 sf retail strip with 4 per 1,000 parking">' + esc(ed.ask || '') + '</textarea>' +
         '<div class="sp-sugs">' + SUGGEST.map(s => '<button class="chip" data-sug="' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div>' +
-        '<div class="bacts sp-go"><button class="btn askai" id="spGo">Build Options</button></div><div class="rnote sp-ainote" id="spAiNote">' + esc(ed.aiNote || '') + '</div>' +
+        '<div class="bacts sp-go"><button class="btn askai" id="spGo">Build Options</button><button class="btn" id="spBest" title="The AI reads what the app knows about this site and its surroundings and suggests what to build">What Should Go Here?</button></div>' +
+        '<label class="sp-sw sp-revsw"><input type="checkbox" id="spReview"' + (aiReviewOn() ? ' checked' : '') + '> The AI reviews the layouts it gets back and revises the plan when they miss</label>' +
+        '<div id="spIdeas">' + ideasHtml() + '</div><div class="rnote sp-ainote" id="spAiNote">' + esc(ed.aiNote || '') + '</div>' +
         '<div id="spVariants">' + variantsHtml() + '</div></div>' +
       siteHtml(p, pl) +
       '<div class="bsec" id="spDrawSec"><div class="lt">Draw and tools</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + (k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building) + '"></i>' + (ADD_LABEL[k] || SP.KINDS[k].label) + '</button>').join('') + '<button class="btn" id="spTrees" aria-pressed="' + (pl.params?.trees !== false) + '" title="Show or hide the trees on the plan, the map and the PDF">Trees ' + (pl.params?.trees !== false ? 'On' : 'Off') + '</button></div>' +
@@ -421,7 +439,11 @@ export function initSitePlan(ctx) {
     $('#spAsk').oninput = e => { ed.ask = e.target.value; };
     $('#spAsk').onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) build(); };
     card.querySelectorAll('[data-sug]').forEach(b => b.onclick = () => { ed.ask = b.dataset.sug; $('#spAsk').value = ed.ask; build(); });
-    on('#spGo', build);
+    on('#spGo', build); on('#spBest', bestUse);
+    const chg = $('#spChg'); if (chg) { chg.oninput = e => { ed.chg = e.target.value; }; chg.onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) aiChange(); }; }
+    on('#spChgGo', aiChange); const cf = $('#spChgFit'); if (cf) cf.onchange = () => { ed.chgFit = cf.checked; };
+    const rv = $('#spReview'); if (rv) rv.onchange = () => { try { localStorage.setItem('fs-sp-review', rv.checked ? '1' : '0'); } catch (e) {} };
+    card.querySelectorAll('[data-idea]').forEach(b => b.onclick = () => { const it = ed.ideas?.list?.[+b.dataset.idea]; if (!it) return; ed.ask = it.request; const ta = $('#spAsk'); if (ta) ta.value = it.request; build(); });
     card.querySelectorAll('[data-var]').forEach(b => b.onclick = () => useVariant(+b.dataset.var));
     on('#spMore', async () => { const pl2 = PL(), b = card.querySelector('#spMore'); if (b) b.textContent = 'Looking…'; const more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); if (PL() !== pl2) return; ed.variants = named(more, pl2); ed.pick = null; panel(); });
     const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; const k = so.value, cur = ed.variants[ed.pick]; const val = v => k === 'units' ? v.m.units || 0 : k === 'gfa' ? v.m.gfa : k === 'spaces' ? v.m.spaces : k === 'open' ? v.m.green : (v.rank ?? 0);
@@ -523,16 +545,21 @@ export function initSitePlan(ctx) {
   let refitTimer = 0;
   // a local edit: the piece stays where it was put and parking under it gives way (whole stalls); nothing else moves.
   // Laying out everything else again is the Re-fit Plan button's job, never automatic.
-  function makeRoom(el) {
+  // delete a piece; the rest of a parking row it was part of stays as it is now (it doesn't grow back over the gap)
+  function dropEl(x, el) { const k = el.ext && JSON.stringify(el.ext); x.elements = x.elements.filter(y => y.id !== el.id); if (k) for (const y of x.elements) if (y.ext && JSON.stringify(y.ext) === k) delete y.ext; }
+  // left: where it was (and what moved with it); parking it had cut there grows back
+  function makeRoom(el, left = []) {
     const pl = PL(); if (!pl || !el || el.kind === 'parking' || el.kind === 'green' || el.kind === 'lot' || el.kind === 'trail') return;
-    pl.elements = SP.cutRows(pl.elements, SP.outline(el), el.kind === 'building' || el.kind === 'garage' ? 5 : 1);
+    const pad = el.kind === 'building' || el.kind === 'garage' ? 5 : 1, spare = pl.spareRows = (pl.spareRows || []).slice(-40); // rows cut away whole, kept to grow back
+    pl.elements = SP.cutRows(pl.elements, SP.outline(el), pad, spare);
+    for (const o of left) pl.elements = SP.regrowRows(pl.elements, SP.outline(o), 5, spare);
   }
-  function refitSoon() { clearTimeout(refitTimer); refitTimer = setTimeout(() => { const pl = PL(), el = pl?.elements.find(x => x.id === ed.sel); if (!el) return; makeRoom(el); pl.updated = new Date().toISOString(); save(P()); draw(); panel(); }, 250); }
+  function refitSoon() { clearTimeout(refitTimer); refitTimer = setTimeout(() => { const pl = PL(), el = pl?.elements.find(x => x.id === ed.sel); if (!el) return; makeRoom(el, ed.nudged || []); ed.nudged = null; pl.updated = new Date().toISOString(); save(P()); draw(); panel(); }, 250); }
   async function refitNow(asked) {
     const pl = PL(); if (!pl?.recipe) return;
     let r = null; ctx.toast('Re-fitting the plan around the pieces you placed…'); try { r = await laid('refit', pl); } catch (err) { console.warn('refit', err); } if (PL() !== pl) return;
     if (!r) { if (asked) ctx.toast('Couldn’t re-fit the plan around that; it stays as you left it.'); return; }
-    pl.elements = r.elements; if (r.recipe) pl.recipe = clone(r.recipe); ed.refitNote = r.notes.join(' '); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null;
+    pl.elements = r.elements; pl.spareRows = []; if (r.recipe) pl.recipe = clone(r.recipe); ed.refitNote = r.notes.join(' '); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null;
     pl.updated = new Date().toISOString(); save(P()); draw(); panel();
   }
   // lay the options out again with the plan's own program and settings (no AI call)
@@ -561,7 +588,7 @@ export function initSitePlan(ctx) {
       (e.kind === 'building' ? '<label class="sp-wide">Type<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '') + '</select></label>' : '') +
       '<label class="sp-wide">Name<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A"></label>' +
       '</div><div class="rnote" id="spRead"></div>' + (!ed.editing ? '<div class="rnote">Use <b>Edit Layout</b> to change it.</div>' : PL()?.recipe ? '<div class="rnote">' + (e.pinned ? '📌 Placed by you: <b>Re-fit Plan</b> keeps it and lays out the rest again around it. <button class="sp-link" id="spUnpin">Let it move</button>' : 'Move or resize it and only it changes. <b>Re-fit Plan</b> lays out the rest again around the pieces you placed.') + '</div>' : '') +
-      '<div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) ? '<button class="btn" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="Drag its points; drag a blue + to add a point; double-click a point to remove it">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') + (PL()?.recipe ? '<button class="btn" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button class="btn" id="spDup">Copy</button><button class="btn sp-del" id="spDel">Delete</button></div></fieldset>';
+      '<div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) ? '<button class="btn" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="Drag its points; drag a blue + to add a point; double-click a point to remove it">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') + (PL()?.recipe ? '<button class="btn" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button class="btn" id="spDup">Copy</button><button class="btn" id="spAskSel" title="Say what to change about this piece">Change With AI</button><button class="btn sp-del" id="spDel">Delete</button></div></fieldset>';
   }
   function readout(e) {
     const el = card.querySelector('#spRead'); if (!el || !e) return;
@@ -584,8 +611,9 @@ export function initSitePlan(ctx) {
     const shp = card.querySelector('#spShape'); if (shp) shp.onclick = () => { // its outline as points to drag: any shape, in plan
       if (ed.shape === e.id) { ed.shape = null; draw(); panel(); return; }
       change(() => { if (!e.poly) { e.poly = SP.outline(e).map(q => q.map(v => +v.toFixed(2))); delete e.form; delete e.jog; delete e.shape; delete e.path; } e.pinned = true; }); ed.shape = e.id; draw(); panel(); };
+    const as = card.querySelector('#spAskSel'); if (as) as.onclick = () => { const ta = card.querySelector('#spChg'); if (!ta) return; ta.scrollIntoView({ block: 'center' }); ta.focus(); };
     card.querySelector('#spDup').onclick = () => { const c = { ...clone(e), id: uid() }, a = (e.rot || 0) * Math.PI / 180, off = e.w + 20; SP.moveBy(c, off * Math.cos(a), off * Math.sin(a)); change(x => x.elements.push(c)); ed.sel = c.id; draw(); panel(); };
-    card.querySelector('#spDel').onclick = () => { change(x => { x.elements = x.elements.filter(y => y.id !== e.id); }); ed.sel = null; draw(); panel(); };
+    card.querySelector('#spDel').onclick = () => { change(x => dropEl(x, e)); ed.sel = null; draw(); panel(); };
   }
   function nums() {
     const el = card.querySelector('#spNums'), pl = PL(); if (!el || !pl) return;
@@ -701,37 +729,125 @@ export function initSitePlan(ctx) {
     return { acres: +(SP.ringArea(pl.ring) / 43560).toFixed(3), widthFt: Math.round(Math.max(...xs) - Math.min(...xs)), depthFt: Math.round(Math.max(...ys) - Math.min(...ys)), frontageFt: Math.round(SP.edgeLen(pl.ring, f)),
       address: parcel?.label || '', city: ctx.nearestPlace?.(pl.origin) || '', county: (ctx.DATA?.counties || []).find(c => SP.inRing(pl.origin, c.outline?.[0]?.[0] || []))?.name || '', zoning: pl.zoning };
   }
+  // ---------- AI: what to build, then the engine's layouts reviewed and revised ----------
+  const aiReviewOn = () => { try { return localStorage.getItem('fs-sp-review') !== '0'; } catch (e) { return true; } };
+  const factsFor = pl => (ed.facts?.id === pl.id + ':' + pl.ring.length ? ed.facts.p : (ed.facts = { id: pl.id + ':' + pl.ring.length, p: siteFacts(pl).catch(() => []) }).p); // flood, roads, districts, utilities: asked once per site
+  const post = async body => { const r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || 'AI unavailable'), { status: r.status }); return d; };
+  // an option as the AI sees it: the plan drawing as a picture, its numbers and what the checks found
+  async function planImage(plan) {
+    const svg = planSVG(plan, { px: 1000 }).svg, img = new Image();
+    await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+    const w = img.naturalWidth || 1000, h = img.naturalHeight || 1000, k = Math.min(1, 1000 / Math.max(w, h)), c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+    const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.72);
+  }
+  async function forReview(v, plan, withImage) {
+    const p2 = { ...plan, elements: v.elements, program: v.program || plan.program, params: v.params || plan.params }, m = v.m, B = v.elements.filter(e => e.kind === 'building');
+    let image = null; if (withImage) try { image = await planImage(p2); } catch (e) { /* numbers only */ }
+    return { name: v.name.replace(/^\S+ · /, ''), notes: v.notes, issues: SP.check(p2).map(i => i.text).slice(0, 8), image,
+      metrics: { acres: +m.acres.toFixed(2), buildings: B.length, floorAreaSf: Math.round(m.gfa), units: m.units || 0, unitsPerAcre: +(m.duAc || 0).toFixed(1), parkingSpaces: m.spaces, parkingRequired: m.required, coveragePct: Math.round(m.coverage * 100), far: +m.far.toFixed(2), pondAcres: +(m.pond / 43560).toFixed(2), openSpacePct: Math.round(m.green * 100) } };
+  }
+  async function aiReview(plan, prog, list, round, ask) {
+    const options = await Promise.all(list.map((v, i) => forReview(v, plan, i < 4)));
+    return post({ mode: 'review', prompt: ask, site: siteInfo(P(), PL()), facts: await factsFor(PL()), program: prog, round, options });
+  }
+  const relabel = list => list.map((v, i) => ({ ...v, rank: -i, name: (i < 26 ? String.fromCharCode(65 + i) : i + 1) + ' · ' + v.name.replace(/^\S+ · /, '') }));
   async function build() {
     const p = P(), pl = PL(); if (!pl || pl.ring.length < 3) return;
     const ask = (ed.ask || '').trim(); if (!ask) { ctx.toast('Say what should go on the site, or pick a suggestion.'); card.querySelector('#spAsk')?.focus(); return; }
-    const btn = card.querySelector('#spGo'); if (btn) { btn.disabled = true; btn.textContent = 'Thinking… (up to a minute)'; }
-    let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '';
+    const btn = card.querySelector('#spGo'), say = t => { const b = card.querySelector('#spGo'); if (b) { b.disabled = true; b.textContent = t; } }; if (btn) btn.disabled = true; say('Thinking… (up to a minute)');
+    let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '', aiOk = false;
     try {
-      const r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: ask, site: siteInfo(p, pl), program: pl.program }) });
-      const d = await r.json().catch(() => ({}));
-      if (r.ok) { prog = d.program; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = [d.summary, ...(d.assumptions || [])].filter(Boolean).join(' · '); }
-      else note = (r.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this reads your words directly.';
-    } catch (e) { note = 'Offline: this reads your words directly.'; }
+      const d = await post({ prompt: ask, site: siteInfo(p, pl), facts: await factsFor(pl), program: pl.program });
+      prog = d.program; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = [d.summary, ...(d.assumptions || [])].filter(Boolean).join(' · '); aiOk = true;
+    } catch (e) { note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : navigator.onLine ? 'The AI didn’t answer, so ' : 'Offline: ') + 'this reads your words directly.'; }
     if (ed?.plid !== pl.id) return;
-    if (btn) btn.textContent = SP.ringArea(pl.ring) > 40 * 43560 ? 'Laying out… (a big site takes up to a minute)' : 'Laying out…';
+    say(SP.ringArea(pl.ring) > 40 * 43560 ? 'Laying out… (a big site takes up to a minute)' : 'Laying out…');
     let out = []; try { out = await laid('options', { ...pl, setbacks }, prog); } catch (e) { console.warn('layout', e); ctx.toast('The layout failed: ' + e.message); }
-    const plan = { ...pl, setbacks }, variants = named(out, { ...plan, program: prog });
+    const plan = { ...pl, setbacks }; let variants = named(out, { ...plan, program: prog });
     if (ed?.plid !== pl.id) return;
+    if (aiOk && aiReviewOn() && variants.some(v => v.elements.length)) { // the AI looks at what the engine drew, and may send it back with a better program
+      try {
+        let pool = variants.filter(v => v.elements.length).slice(0, 4), revised = '';
+        say('The AI is reviewing the layouts…'); let rv = await aiReview(plan, prog, pool, 1, ask);
+        if (ed?.plid !== pl.id) return;
+        if (rv.revise && rv.program) {
+          say('Revising: ' + (rv.why || 'a better program').replace(/\.$/, '') + '…');
+          const params2 = { ...(pl.params || {}), ...(rv.params?.fill != null ? { fill: rv.params.fill } : {}), ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}) };
+          let out2 = []; try { out2 = await laid('options', { ...pl, setbacks, params: params2 }, prog2, { count: 3, depth: 6, budgetMs: 6000 }); } catch (e) { console.warn('layout', e); }
+          const v2 = named(out2, { ...plan, params: params2, program: prog2 }).filter(v => v.elements.length).map(v => ({ ...v, params: params2, revisedBy: rv.why || 'the AI review' }));
+          if (v2.length && ed?.plid === pl.id) {
+            const first = rv; pool = pool.slice(0, 3).concat(v2.slice(0, 3)); say('The AI is comparing the revised layouts…');
+            try { rv = await aiReview(plan, prog2, pool, 2, ask); } catch (e) { rv = { ...first, reviews: (first.reviews || []).filter(r => r.option < 3), ranking: (first.ranking || []).filter(i => i < 3).concat(v2.slice(0, 3).map((_, k) => 3 + k)) }; }
+            revised = first.why || 'a better program';
+          }
+        }
+        if (ed?.plid !== pl.id) return;
+        for (const r of rv.reviews || []) if (pool[r.option]) pool[r.option] = { ...pool[r.option], ai: r };
+        const order = (rv.ranking || []).filter(i => pool[i]);
+        variants = relabel(order.map(i => pool[i]).concat(pool.filter((v, i) => !order.includes(i))));
+        note = [rv.summary, revised ? 'After its first look the AI changed the program: ' + revised.replace(/\.$/, '') + '.' : ''].filter(Boolean).join(' ') || note;
+      } catch (e) { console.warn('review', e); note += (note ? ' · ' : '') + 'The AI review didn’t answer, so these are as the engine ranked them.'; }
+    }
     ed.variants = variants; ed.aiNote = note; ed.pick = null;
     const best = variants.findIndex(v => v.elements.length); if (best >= 0) useVariant(best); else panel();
+  }
+  // changes by name: the AI reads the plan (its pieces, a picture of it) and the words, and answers with edits on those
+  // pieces; they're applied here, pinned, and the rest re-fits round them when asked. Without the AI the words are read
+  // directly ("make bldg 7 four stories", "remove bldg 3").
+  async function aiChange() {
+    const p = P(), pl = PL(); if (!pl?.elements.length) return;
+    const ask = (ed.chg || '').trim(); if (!ask) { ctx.toast('Say what to change, e.g. “make Apt Bldg 7 four stories”.'); card.querySelector('#spChg')?.focus(); return; }
+    const say = t => { const b = card.querySelector('#spChgGo'); if (b) { b.disabled = true; b.textContent = t; } }; say('Thinking…');
+    const sel = ed.sel; let ops = [], full = false, note = '', question = null, byAi = false;
+    try {
+      let image = null; try { image = await planImage(pl); } catch (e) { /* words and numbers only */ }
+      const d = await post({ mode: 'edit', prompt: ask, site: siteInfo(p, pl), plan: ED.describePlan(pl, sel), image });
+      ops = d.ops || []; full = d.refit === 'full'; note = d.summary || ''; question = d.question; byAi = true;
+    } catch (e) { ops = ED.guessEdits(ask, pl, sel); full = /\bre-?(?:fit|lay)/i.test(ask); note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this read your words directly.'; }
+    if (PL() !== pl) return;
+    if (!ops.length) { ed.chgNote = question || (note ? note + ' ' : '') + 'Couldn’t tell what to change: name the piece as it’s labelled (“Apt Bldg 7”), or select it and say “it”.'; panel(); return; }
+    full = (full || ed.chgFit) && !!pl.recipe;
+    let r = null; change(x => { r = ED.applyEdits(x, ops, { refit: full, spare: x.spareRows = (x.spareRows || []).slice(-40) }); x.elements = r.elements; });
+    ed.sel = r.touched[0] || null; ed.editing = true; draw();
+    if (full) { say('Re-fitting the rest of the site…'); let rf = null; try { rf = await laid('refit', PL(), { amount: 'current' }); } catch (e) { console.warn('refit', e); }
+      if (PL() === pl && rf) { pl.elements = rf.elements; pl.spareRows = []; if (rf.recipe) pl.recipe = clone(rf.recipe); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; }
+      else if (!rf) r.skipped.push('The rest couldn’t be re-fitted around it, so only those pieces changed.'); }
+    const m = SP.metrics(pl), short = m.required - m.spaces;
+    ed.chgNote = [byAi && note ? note : [note, ...r.done].filter(Boolean).join(' '), ...r.skipped, short > 0 ? 'Parking is now ' + short + ' spaces short' + (full ? '.' : '; tick Re-fit to lay parking out again.') : ''].filter(Boolean).join(' ');
+    ed.chg = ''; pl.updated = new Date().toISOString(); save(P()); draw(); panel();
+  }
+  // what should go here: the site, its surroundings and the market, read by the AI; each idea can be laid out
+  async function bestUse() {
+    const p = P(), pl = PL(); if (!pl || pl.ring.length < 3) return;
+    const btn = card.querySelector('#spBest'); if (btn) { btn.disabled = true; btn.textContent = 'Reading the site… (up to a minute)'; }
+    const c = SP.frame(pl.origin).toLL(SP.centroid(pl.ring)), within = (pr, ms) => Promise.race([pr, new Promise(res => setTimeout(() => res(null), ms))]);
+    const kinds = ['grocery', 'restaurant', 'gas', 'pharmacy', 'school', 'hospital', 'clinic', 'mall', 'hotel', 'childcare', 'storage', 'highway'];
+    const near = await Promise.all(kinds.map(k => within(fetch('api/nearby?' + new URLSearchParams({ lat: c[1].toFixed(5), lon: c[0].toFixed(5), what: k, limit: '3' })).then(r => r.ok ? r.json() : null).catch(() => null), 12000)));
+    const nearby = Object.fromEntries(kinds.map((k, i) => [k, (near[i]?.places || []).slice(0, 3).map(x => ({ name: x.name || x.kind || k, miles: x.miles }))]).filter(([, v]) => v.length));
+    const market = {}; try { const area = ctx.areaData ? await within(ctx.areaData(), 6000) : null, parcel = p.parcels.find(x => x.key === pl.parcel) || p.parcels[0], z = parcel?.situsZip || parcel?.zip, r = z && area?.rents?.zips?.[z]; if (r) Object.assign(market, { zip: z, typicalRent: r.rent, rentChangeYearPct: r.yoy ?? null }); } catch (e) {}
+    try {
+      const d = await post({ mode: 'bestuse', prompt: (ed.ask || '').trim(), site: siteInfo(p, pl), facts: await factsFor(pl), nearby, market });
+      if (PL() !== pl) return; ed.ideas = { list: d.ideas || [], summary: d.summary || '' };
+    } catch (e) { ed.ideas = { list: [], summary: e.status === 503 ? 'AI isn’t set up on this site.' : 'The AI didn’t answer just now. Try again in a moment.' }; }
+    panel(); card.querySelector('#spIdeas')?.scrollIntoView({ block: 'nearest' });
+  }
+  function ideasHtml() {
+    const I = ed?.ideas; if (!I) return '';
+    return '<div class="sp-ideas">' + (I.summary ? '<div class="rnote">' + esc(I.summary) + '</div>' : '') + I.list.map((it, i) => '<div class="sp-idea"><div class="sp-idea-h"><b>' + esc(it.title) + '</b><span class="sp-fit">' + it.fit + '% fit</span></div><div class="sp-idea-w">' + esc(it.why) + '</div>' +
+      (it.risks?.length ? '<ul>' + it.risks.map(r => '<li>' + esc(r) + '</li>').join('') + '</ul>' : '') + '<button class="btn" data-idea="' + i + '">Lay This Out</button></div>').join('') + (I.list.length ? '<div class="rnote">Starting points from the AI, not a market study.</div>' : '') + '</div>';
   }
   const named = (list, plan) => list.map((r, i, all) => ({ ...r, rank: -i, setbacks: plan.setbacks, m: SP.metrics({ ...plan, program: r.program || plan.program, elements: r.elements }),
     name: (i < 26 ? String.fromCharCode(65 + i) : i + 1) + ' · ' + r.name + (all.slice(0, i).some(o => o.name === r.name) ? ' (alternate ' + (all.slice(0, i).filter(o => o.name === r.name).length) + ')' : '') }));
   function variantsHtml() {
     if (!ed?.variants) return '';
     return '<div class="sp-vars">' + ed.variants.map((v, i) => '<button class="sp-var" aria-pressed="' + (ed.pick === i) + '" data-var="' + i + '"' + (v.elements.length ? '' : ' disabled') + '><b>' + esc(v.name) + '</b><span>' +
-      (v.elements.length ? (v.m.units ? f0(v.m.units) + ' units · ' + v.m.duAc.toFixed(1) + '/ac · ' : '') + f0(v.m.gfa) + ' sf · ' + f0(v.m.spaces) + '/' + f0(v.m.required) + ' spaces · ' + pct(v.m.coverage) + ' coverage' : 'Nothing fits') + '</span>' + (v.notes.length ? '<em>' + esc(v.notes.join(' ')) + '</em>' : '') + '</button>').join('') + '</div>' +
+      (v.elements.length ? (v.m.units ? f0(v.m.units) + ' units · ' + v.m.duAc.toFixed(1) + '/ac · ' : '') + f0(v.m.gfa) + ' sf · ' + f0(v.m.spaces) + '/' + f0(v.m.required) + ' spaces · ' + pct(v.m.coverage) + ' coverage' : 'Nothing fits') + '</span>' + (v.ai ? '<i class="sp-aiv"><b>AI ' + v.ai.score + '</b> · ' + esc(v.ai.verdict) + (v.ai.problems?.length ? '<br>Watch: ' + esc(v.ai.problems.join('; ')) : '') + '</i>' : '') + (v.revisedBy ? '<i class="sp-aiv">From the AI’s revised program</i>' : '') + (v.notes.length ? '<em>' + esc(v.notes.join(' ')) + '</em>' : '') + '</button>').join('') + '</div>' +
       '<div class="sp-more">' + (ed.variants.length <= 3 ? '<button class="sp-link" id="spMore" title="Every usable layout the planner found, not just the top three">More options…</button>' : '') +
       '<label>Sort <select id="spSort">' + [['best', 'Best'], ['units', 'Units'], ['gfa', 'Floor area'], ['spaces', 'Parking'], ['open', 'Open space']].map(([k, t]) => '<option value="' + k + '"' + (ed.sortBy === k ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label></div>';
   }
   function useVariant(i) {
     const v = ed.variants?.[i]; if (!v?.elements.length) return;
-    change(x => { x.elements = clone(v.elements); x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; });
+    change(x => { x.elements = clone(v.elements); x.spareRows = []; x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; });
     ed.pick = i; ed.sel = null; draw(); panel();
   }
 

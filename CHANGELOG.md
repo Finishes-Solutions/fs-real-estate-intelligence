@@ -5,6 +5,24 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 5:50 PM CT: Change buildings by name with AI (b24a05d)
+- **Change With AI** in the site plan panel: type changes like "make Apt Bldg 7 four stories", "turn the clubhouse into a 7,500 sf one", "remove Bldg 3", "swap Bldg 2 and Bldg 5" or "move the clubhouse and pool to the back". Select a piece and you can say "it". The AI looks at the plan, picks buildings from the library, and says what it changed.
+- Only the named pieces change unless you ask for a re-fit (or tick the box): then the rest of the site is laid out again around them, keeping about the same amount of building. Changed pieces stay pinned. Cmd+Z undoes the whole change.
+- Without the AI, simple changes in the same words still work.
+- **Re-fit Plan is tidier:** a building you pinned keeps its parking right up to its walk, no stray lawn round it, and new buildings no longer take its name.
+
+### 4:32 PM CT: One pool by its clubhouse; moving a building keeps the plan tidy (c4c4568)
+- **One pool per community, where it belongs:** apartments with a commons no longer get a second pool and clubhouse out behind the buildings by the pond. The clubhouse and pool by the entry serve everyone; the commons keeps the park, playground, pavilion and lake. Neighbourhoods with homes for sale still get a community center with its own pool, now on a deck right against the center.
+- **Commons amenities line the drive** (community center, pool, playground, pavilion, courts) with the lake and lawns behind them, instead of sitting out in the middle of the park.
+- **The checks flag** a pool that isn't beside its clubhouse and a second pool for one community of rentals, so the AI review catches them too; the AI is also told to plan one pool per community.
+- **Dragging a building no longer wrecks the layout:** it settles in the nearest clear spot to where you let go, off the drives and clear of other buildings (hold Alt / Option to place it anyway). A clubhouse takes its pool deck and pool with it, a restaurant its patio and drive-thru lane.
+- **Parking comes back:** stalls a building covered grow back when you move it off them, so trying a spot and moving back leaves the plan as it was.
+
+### 4:01 PM CT: The AI suggests what to build and reviews the layouts (ce4e152)
+- **What Should Go Here?** in the site plan panel: the AI reads what the app knows about the site (flood zone, roads and traffic, utility districts and lines, environmental records), what's nearby and local rents, and suggests three to five uses with why each fits and what to check. **Lay This Out** builds any of them.
+- **Build Options now has the AI check the engine's work:** the engine still draws every option, then the AI looks at each one (a picture of the plan plus its numbers and checks), changes the program and has the engine lay it out again when the options miss, and puts the best first. Each option shows the AI's score, a verdict and what to watch. It takes a minute or two; a switch under the button turns it off.
+- The AI also sees the site's facts when it first reads your request.
+
 ### 1:32 PM CT: Site plans that always fit, big neighbourhoods, a building library, shape editing (03585aa, 8d0f936, 989d3e2, 0bf16d8, 4a57763, 02e3798, 6ac9f59, a586dfa)
 - **Every plan fits and is complete:** buildings come with their parking, a drive in from the street and dumpsters for shops, restaurants and offices. A restaurant on a wedge-shaped lot with a curved highway frontage now gets a real layout (it used to give "Simple layout" with no parking). Ask for more than the land holds, like 100,000 sq ft on 1.5 acres, and you get the most that fits with its parking, with a note saying so.
 - **Extras beside one building:** outdoor seating against the restaurant, a playground and a named lawn, from the words in the request.
