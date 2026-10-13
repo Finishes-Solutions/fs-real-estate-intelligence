@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 11:31 AM CT: Site plans fill the site, cleaner shapes, trees, more building types (e993f7b)
+- **The whole site is used:** what you ask for is laid out as Phase 1, and the rest of the land holds more of the same size of building as Phase 2 (lighter, dashed), instead of lawn. "28,000 sf across 4 buildings" on 27 acres now shows the 4 buildings plus 32 more of the same size. Deep sites get several rows of shops or offices. A switch under Site parameters turns this off.
+- **Cleaner drawing:** no more blob-shaped lawns and ponds. The site is one landscape background, ponds are rectangles beside the buildings, and parking rows end square. Trash enclosures are left out unless turned on.
+- **Trees** look like trees (canopies on the sheet, 3D trees on the map), with a **Trees** on/off button in the plan panel.
+- **3D:** smoother edges, roof parapets and a line at every floor, towers rising from their podium.
+- **More building types:** L-shaped, courtyard (U) and tower buildings, for the whole plan or one building; **restaurant pads** with outdoor seating and a drive-thru lane; **playgrounds** with a play structure, slide and swings; **parking garages** that count their spaces; courts, pools and patios in Draw.
+
 ### 10:47 AM CT: Utilities near a site (dbf86d7)
 - **Utilities row on the property card** (Site section): how far the parcel is from the nearest transmission line (with its voltage and owner), the nearest distribution line and the nearest substation; who holds the water and sewer service areas (CCN) here; and in Houston the nearest public sewer main (size and material) and water main where the city publishes one. Elsewhere it shows the nearest mapped water utility line and says to ask the city or MUD engineer for mains.
 - **Power, Water & Sewer Lines** map layer: transmission lines in red with their voltage, distribution lines in orange, substations, and Houston sewer and water mains at street zoom.
