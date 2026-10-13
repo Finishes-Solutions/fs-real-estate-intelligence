@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 3:44 PM CT: Pro forma charts, a clearer Timeline, and an IRR fix (e3367ea)
+- **Pro forma charts** in the site plan panel:
+  - **Cash in and out:** the investors' money added up month by month over design, build, lease-up and hold, with the most that's in at once and where it ends. Hover any month.
+  - **Where the money goes:** land, building, site and parking, soft costs, fees and financing, with the equity and loan that pay for it.
+  - **If rents and the exit cap rate change:** a 5 × 5 table of the levered IRR (profit margin for homes for sale). Green beats your plan, red falls short.
+  - Changing an assumption slides the charts and the numbers to the new result.
+- **Fixed: homes for sale showed "n/a" for IRR** even when they made money. The IRR math gave up whenever the last month was a small loan payoff. Other plan types read exactly as before.
+- **Timeline:** the chart now lines up with the project bars under it (the same month sits in the same place), has a "Today" label, highlights the month you hover, and slides to the new numbers when you change Group by or Measure. Axis amounts read $12B instead of $12.00B, and a handful of estimated dates reads "under 1%" instead of "0%".
+
 ### 3:15 PM CT: Markets section charts with D3, and fixes (bf13835)
 - **Markets price list:** the small 12-month charts are smoother, with a soft fill and a dot on the latest price. Switching groups (Energy, Housing & REITs…) grows the new rows' charts in.
 - **Correlation explorer:** the chart shows a shaded band for normal ups and downs and an "avg" line, and hovering puts a dot on both lines. Picking another series, or switching year-over-year and month-over-month, slides the lines, bars and numbers to the new result.
