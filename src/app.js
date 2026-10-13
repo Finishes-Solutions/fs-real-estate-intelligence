@@ -851,11 +851,13 @@ function reportMap(list){
 // ---------- views ----------
 let view='map'; const appEl=document.querySelector('.app'), viewHooks={}, viewChangeHooks=[], cardRenderHooks=[];
 function setView(v){
-  if(!document.getElementById('view-'+v)&&v!=='map') v='map'; view=v;
+  if(!document.getElementById('view-'+v)&&v!=='map') v='map'; const was=view; view=v;
   document.querySelectorAll('#viewbar button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
   document.querySelectorAll('.view').forEach(el=>el.classList.toggle('on',el.id==='view-'+v));
   stage.dataset.view=v; appEl.dataset.view=v; // pages (not the Map) hide the list panel and use the full width (app.css)
-  if(v==='map'){ appEl.classList.remove('pview-open'); setTimeout(()=>map.resize(),0); } else viewHooks[v]?.();
+  // the map is wider on a page (no panel); resize it now, not on the next tick, so a fit/fly that follows this call
+  // (Compare's "go", "show on map", the assistant) is measured against the map's real width
+  if(v==='map'){ appEl.classList.remove('pview-open'); if(was!=='map') map.resize(); setTimeout(()=>map.resize(),0); } else viewHooks[v]?.();
   viewChangeHooks.forEach(fn=>fn(v));
   scheduleHash();
 }
