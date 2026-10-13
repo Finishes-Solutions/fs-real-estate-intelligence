@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 12:11 PM CT: Edit Layout: moving a building no longer re-lays out the whole site (8d8f319)
+- Plans open for looking: clicking a piece shows it and dragging pans the map, so nothing moves by accident. **Edit Layout** at the top of the plan panel turns editing on.
+- While editing, moving a piece changes only that piece. It lines up with the pieces near it and stays out of the setbacks (hold Alt to move it freely), and parking under a building you move gives way, whole stalls at a time.
+- **Re-fit Plan** still lays out everything else around the pieces you placed, but only when you press it.
+
 ### 11:56 AM CT: Townhome and duplex communities that fit, side streets, pull-through drives (b080bd8)
 - **"24 duplex units" on a small tract now gives 24 units, not 4:** when the homes asked for won't fit on lots of their own, the plan lays them out as two-story six-unit townhome rows facing a shared parking court with a turnaround at the end, like a rental community on one tract, and says why. On the 1.46-acre Waller Tomball Rd tract this matches the hand-drawn 24-unit plan set: 4 buildings, 49 spaces for 48 needed, underground detention.
 - **Unit lines and fenced back patios** are drawn on these buildings, on the sheet and the map.
