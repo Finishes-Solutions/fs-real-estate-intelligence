@@ -276,4 +276,25 @@ function usable(plan, o, what) {
   assert.ok(r && r.elements.filter(e => e.use === 'sfr').length >= homes(cv[0]) - 3, 're-fits a bent plan');
   assert.deepEqual(S.fillet([[0, 0], [10, 0], [10, 10]], 0), [[0, 0], [10, 0], [10, 10]], 'r 0: no rounding');
 }
+
+// ---- a restaurant on a 2.35-acre wedge with a curved highway frontage (squared with the street, not the long lot
+// lines), with what was asked for beside it; and an ask far bigger than a site holds comes back as the most that fits ----
+{
+  const arc = Array.from({ length: 11 }, (_, i) => { const t = (i + 1) / 12; return [560 - 560 * t, -10 + 10 * t - 40 * Math.sin(Math.PI * t)]; });
+  const g = mk([-95.95, 30.08], [[0, 0], [290, 310], [560, -10], ...arc]), b = S.unionParcels([g]), front = b.ring.findIndex((p, i) => S.outwardOf(b.ring, i)[1] < -0.95), plan = { ...b, front, setbacks: { ...S.SETBACKS } };
+  const prog = S.guessProgram('A single large restaurant space with outdoor seating, grass area with a playground.'); assert.deepEqual(prog.extras, ['patio', 'playground', 'lawn']);
+  const opts = L.layoutOptions(plan, prog); assert.ok(opts.length >= 2 && opts.every(o => !/Simple layout/.test(o.name)), opts.map(o => o.name).join());
+  for (const o of opts) { const p = { ...plan, elements: o.elements, program: o.program }, m = S.metrics(p), k = new Set(o.elements.map(e => e.kind));
+    assert.ok(m.spaces >= m.required && m.gfa > 3000, o.name + ': a parked restaurant ' + m.spaces + '/' + m.required);
+    for (const want of ['building', 'parking', 'drive', 'trash', 'play']) assert.ok(k.has(want), o.name + ': has ' + want);
+    assert.ok(o.elements.some(e => e.name === 'Main entry') && o.elements.some(e => e.name === 'Lawn'), 'an entry and a lawn');
+    assert.deepEqual(S.check(p).filter(i => i.level === 'bad').map(i => i.text), []); }
+  assert.ok(opts.some(o => o.elements.some(e => e.kind === 'patio')), 'outdoor seating against the building');
+  const W = S.unionParcels([mk([-95.9339, 30.0598], [[0, 0], [178.001, 0.578], [184.601, 357.497], [6.602, 356.919]])]), wf = W.ring.findIndex((p, i) => S.outwardOf(W.ring, i)[1] < -0.9), wp = { ...W, front: wf, setbacks: { ...S.SETBACKS } };
+  for (const ask of [{ use: 'retail', gfa: 100000 }, { use: 'office', gfa: 100000 }, { use: 'multifamily', units: 300 }]) {
+    const o = L.layoutOptions(wp, ask)[0], p = { ...wp, elements: o.elements, program: o.program }, m = S.metrics(p);
+    assert.ok(m.spaces >= m.required && m.gfa > 5000 && !S.check(p).some(i => i.level === 'bad'), ask.use + ': the most that fits, parked: ' + m.gfa + ' sf ' + m.spaces + '/' + m.required);
+    assert.ok(o.notes.some(t => /won’t fit on 1\.46 acres/.test(t)), o.notes.join(' '));
+  }
+}
 console.log('site layouts ok');
