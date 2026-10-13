@@ -44,7 +44,8 @@ export function initSettings(ctx) {
     '<div class="set-body">' + SECTIONS.map(([id, l]) => '<section class="set-sec" data-sec="' + id + '" aria-labelledby="setH-' + id + '"><h3 id="setH-' + id + '">' + esc(l) + '</h3><div class="set-in"></div></section>').join('') + '</div>';
   document.body.append(scrim, sheet);
   const body = sheet.querySelector('.set-body'), secEl = id => sheet.querySelector('[data-sec="' + id + '"] .set-in');
-  let lastFocus = null;
+  let lastFocus = null, toastHome = null;
+  const toastEl = document.getElementById('toast');
 
   const row = (label, ctl, hint = '', cls = '') => '<div class="set-row' + (cls ? ' ' + cls : '') + '"><div class="set-rl"><span class="set-l">' + label + '</span>' + (hint ? '<span class="set-hint">' + hint + '</span>' : '') + '</div><div class="set-rc">' + ctl + '</div></div>';
   const go = (label, attr, hint = '') => '<button type="button" class="set-go" ' + attr + '><span><b>' + label + '</b>' + (hint ? '<em>' + hint + '</em>' : '') + '</span><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>';
@@ -143,6 +144,7 @@ export function initSettings(ctx) {
       lastFocus = document.activeElement;
       SECTIONS.forEach(([id]) => PAINT[id](secEl(id)));
       sheet.hidden = false; scrim.hidden = false; app.classList.add('set-open'); gear?.setAttribute('aria-expanded', 'true');
+      if (toastEl) { toastHome = [toastEl.parentNode, toastEl.nextSibling]; document.body.append(toastEl); } // messages from here show over the sheet
       requestAnimationFrame(() => { sheet.classList.add('on'); scrim.classList.add('on'); });
     }
     const target = section && sheet.querySelector('[data-sec="' + section + '"]');
@@ -154,6 +156,7 @@ export function initSettings(ctx) {
     if (sheet.hidden) return;
     sheet.classList.remove('on'); scrim.classList.remove('on'); app.classList.remove('set-open'); gear?.setAttribute('aria-expanded', 'false');
     sheet.hidden = true; scrim.hidden = true;
+    if (toastHome?.[0]?.isConnected) toastHome[0].insertBefore(toastEl, toastHome[1]?.parentNode === toastHome[0] ? toastHome[1] : null); toastHome = null;
     ctx.team?.refresh?.(); // the header chips pick up a new name
     if (lastFocus?.isConnected) lastFocus.focus?.({ preventScroll: true }); lastFocus = null;
   }

@@ -2380,6 +2380,8 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .team-chip:hover{color:var(--text);border-color:var(--text-2)}
 .team-chip.warn{border-color:var(--warn);color:var(--text)}
 /* Data & help: one muted line in place of the old options */
+/* while Settings is open the toast moves to <body> (src/settings.js), so a message raised from it shows over the sheet, centred on it */
+body>.toast{position:fixed;z-index:52;left:calc(100% - min(420px,100%) / 2);bottom:calc(22px + var(--sb,0px));width:max-content;max-width:min(388px,calc(100% - 32px))}
 .src-opt.muted{color:var(--muted);font-size:12.5px}
 .src-opt.muted b{color:var(--text-2)}
 .src-opt.muted .lnk{font-size:12.5px}
@@ -2395,7 +2397,8 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
   .setsheet{width:100%;border-left:0;transform:translateY(16px);padding-top:var(--st);padding-bottom:var(--sb)}
   .set-h{padding:10px 12px 8px 18px}
   .set-x{width:var(--tap);height:var(--tap)}
-  .set-jump{padding:0 18px 10px}
+  .set-jump{padding:0 18px 10px;flex-wrap:wrap;gap:6px 4px} /* every section button stays in view on a narrow phone */
+  .set-jump button{padding:5px 7px}
   .set-body{padding:4px 18px 28px}
   .set-rc{max-width:55%}
   .setsheet .seg button{padding:10px 9px;min-height:var(--tap)}

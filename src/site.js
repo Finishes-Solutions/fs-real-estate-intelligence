@@ -1,7 +1,7 @@
 // Building card "Site" section: flood zone, traffic counts, special districts, schools, transit, environmental flags,
 // crime nearby (Houston), bar and restaurant alcohol sales at the address, county unemployment and ZIP rents.
 // Facts come from api/site (live, cached a week) and data/area.json (nightly). Sources are listed only when the
-// "Show sources on cards" setting is on (Data Sources view), and always in exported reports.
+// "Show sources on cards" setting is on (Settings › Appearance), and always in exported reports.
 export function initSite(ctx) {
   let repMi = 1; // radius for the Site section's Crime / FEMA reports, kept while the app is open
   const { esc, fmtN, fmtM } = ctx;
