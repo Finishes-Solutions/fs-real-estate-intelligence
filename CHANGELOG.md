@@ -22,10 +22,25 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - A **Neighbourhood streets** setting under Site parameters switches back to straight streets. Re-fit Plan keeps the curves.
 - House lot lines on the map are thin dashed lines again, not the site's heavy outline.
 
+### 12:21 PM CT: Projects as cards or a list, with a page per project (f9253da)
+- **Cards or List:** switch at the top of the Projects tab (remembered on this device). Each project shows a drawing of its site, the parcel address, acres, number of options, its largest option and when it was last changed.
+- **A page for each project:** click one for a summary card (site area in acres and square feet, parcels, owner, appraised and land value, number of options, largest option) with **Rename**, then its parcels with **Show on Map**, its site plan options drawn with their numbers, **New Option**, and notes. **‹ All projects** goes back.
+- **Status removed:** the Idea / Pursuing / Under contract dropdown and filter are gone.
+- **Nothing cut off:** long project names, addresses and owners wrap onto more lines instead of ending in "…", and the layout fits the space it has, from phones to narrow windows with the side panel open.
+- Search now also finds owners; sort by last update, name, site size or number of options.
+
 ### 12:11 PM CT: Edit Layout: moving a building no longer re-lays out the whole site (8d8f319)
 - Plans open for looking: clicking a piece shows it and dragging pans the map, so nothing moves by accident. **Edit Layout** at the top of the plan panel turns editing on.
 - While editing, moving a piece changes only that piece. It lines up with the pieces near it and stays out of the setbacks (hold Alt to move it freely), and parking under a building you move gives way, whole stalls at a time.
 - **Re-fit Plan** still lays out everything else around the pieces you placed, but only when you press it.
+
+### 12:06 PM CT: A clearer Projects tab (370692c)
+- **Each site plan option is drawn:** a small picture of the plan with its floor area, units, parking against what's needed (amber when short), coverage, and a red count when it has problems. Click it to open the plan.
+- **New Option** adds a blank plan on the same site in one click. A project with no site yet shows how to add one, with **Find a Parcel** and **Draw a Site**.
+- **Filter, search and sort:** status chips with counts, a search box (name, parcel, owner, notes) and sorting by last update, name, status or site size. The status colours the card.
+- **+ New Project** asks for the name on the page instead of a pop-up box.
+- **Notes are no longer lost while typing:** a background team sync used to redraw the list and wipe text you hadn't finished; it now waits until you leave the field.
+- **Fits phones:** the cards no longer run off the right edge (the status and Delete were cut off); options list as rows with the drawing on the left.
 
 ### 11:56 AM CT: Townhome and duplex communities that fit, side streets, pull-through drives (b080bd8)
 - **"24 duplex units" on a small tract now gives 24 units, not 4:** when the homes asked for won't fit on lots of their own, the plan lays them out as two-story six-unit townhome rows facing a shared parking court with a turnaround at the end, like a rental community on one tract, and says why. On the 1.46-acre Waller Tomball Rd tract this matches the hand-drawn 24-unit plan set: 4 buildings, 49 spaces for 48 needed, underground detention.

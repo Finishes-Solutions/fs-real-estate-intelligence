@@ -7,13 +7,12 @@
 import * as SP from './lib/siteplan.mjs';
 import { layoutOptions, refit, PARAMS } from './lib/sitelayout.mjs';
 import * as PF from './lib/proforma.mjs';
-import { sheetHTML } from './lib/sitesheet.mjs';
+import { sheetHTML, planSVG } from './lib/sitesheet.mjs';
 import { BUILDING_TYPES, BUILDING_GROUPS, typeById, fromType } from './lib/buildings.mjs';
 const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 
 const KEY = 'fs-projects-v1', CODE_KEY = 'fs-team-code', NAME_KEY = 'fs-team-name';
-const STATUS = ['Idea', 'Pursuing', 'Under contract', 'Closed', 'Passed'];
 const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash'];
 const ADD_LABEL = { pad: 'Restaurant pad (drive-thru)', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Outdoor seating', garage: 'Parking garage' };
 const SIZE = { building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
@@ -108,7 +107,7 @@ export function initSitePlan(ctx) {
     card.querySelector('#spStart').onclick = () => {
       const pick = card.querySelector('input[name=spP]:checked').value;
       let p = db.projects.find(x => x.id === pick);
-      if (!p) { p = { id: uid(), name: card.querySelector('#spName').value.trim() || label, status: 'Idea', notes: '', parcels: [], plans: [], created: new Date().toISOString(), by: get(NAME_KEY) }; db.projects.push(p); }
+      if (!p) { p = { id: uid(), name: card.querySelector('#spName').value.trim() || label, notes: '', parcels: [], plans: [], created: new Date().toISOString(), by: get(NAME_KEY) }; db.projects.push(p); }
       for (const r of recs) { const i = p.parcels.findIndex(x => x.key === r.key); if (i < 0) p.parcels.push(r); else if (!p.parcels[i].geometry && r.geometry) p.parcels[i] = r; }
       const z = ctx.lastRegrid?.zoning && list.some(x => x.regrid) ? zoningOf(ctx.lastRegrid.zoning) : null;
       const plan = newPlan(p, b ? { origin: b.origin, ring: b.ring, src: many ? 'parcels' : list[0]?.regrid ? 'regrid' : 'parcel', parcel: recs[0].key, parcels: recs.map(r => r.key), zoning: z } : { parcel: recs[0]?.key, parcels: recs.map(r => r.key), origin: center });
@@ -125,6 +124,7 @@ export function initSitePlan(ctx) {
   function open(pid, plid, o = {}) {
     if (ctx.view !== 'map') ctx.setView('map');
     if (card.classList.contains('open')) ctx.closeCard(); // the building card's selection goes; the plan takes over the card
+    cur = pid; renaming = false;
     ed = { pid, plid, sel: null, undo: [], redo: [], mode: o.draw ? 'draw' : null, draft: [], variants: null, editing: false }; // editing: pieces can be moved only in Edit Layout
     if (map.getLayer('fs-bldg')) { hidBldg = map.getLayoutProperty('fs-bldg', 'visibility') || 'visible'; map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } // the plan replaces what's there
     addLayers(); draw(); panel(); fit();
@@ -789,30 +789,187 @@ export function initSitePlan(ctx) {
   }
 
   // ---------- the Projects view ----------
-  function render() {
-    if (!root) return;
-    const list = db.projects.slice().sort((a, b) => t(b.updated) - t(a.updated));
-    const share = shared === true ? 'Shared with the team.' : shared === false ? 'Saved on this device. Team sharing for projects isn’t set up on the site yet.' : 'Saved on this device.';
-    root.innerHTML = '<div class="pj-wrap"><div class="pj-head"><div><h2>Projects</h2><div class="rnote">' + share + '</div></div><div class="bacts" style="padding:0"><button class="btn askai" id="pjNew">New Project</button></div></div>' +
-      (list.length ? '' : '<div class="pj-empty"><b>No projects yet.</b><p>Click a parcel on the map, then <b>Start Site Plan</b> under Site Tools on its card. Or make a project here and draw the site.</p></div>') +
-      list.map(p => '<article class="pj" data-p="' + esc(p.id) + '"><div class="pj-top"><input class="pj-name" value="' + esc(p.name) + '" aria-label="Project name"><select class="chip pj-status" aria-label="Status">' + STATUS.map(s => '<option' + (s === (p.status || 'Idea') ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></div>' +
-        (p.parcels.length ? '<div class="pj-parcels">' + p.parcels.map(x => '<button class="chip" data-parcel="' + esc(x.key) + '" title="Show on the map">' + esc(x.label) + (x.acres ? ' · ' + x.acres.toFixed(2) + ' ac' : '') + '</button>').join('') + '</div>' : '') +
-        '<div class="pj-plans">' + (p.plans.length ? p.plans.map(pl => { const m = pl.ring.length >= 3 ? SP.metrics(pl) : null; return '<div class="pj-plan"><button class="pj-open" data-plan="' + esc(pl.id) + '"><b>' + esc(pl.name) + '</b><span>' +
-          (m ? (m.gfa ? f0(m.gfa) + ' sf ' + SP.USES[SP.normalizeProgram(pl.program).use].label.toLowerCase() + ' · ' + f0(m.spaces) + ' spaces · ' + pct(m.coverage) + ' coverage' : 'Empty plan on ' + m.acres.toFixed(2) + ' ac') : 'Site not drawn yet') + '</span></button></div>'; }).join('') : '<div class="rnote">No site plans yet.</div>') + '</div>' +
-        '<textarea class="pj-notes" rows="2" placeholder="Notes: asking price, broker, next steps…" aria-label="Notes">' + esc(p.notes || '') + '</textarea>' +
-        '<div class="pj-foot"><span class="rnote">Updated ' + new Date(p.updated || p.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + (p.by ? ' by ' + esc(p.by) : '') + '</span><span class="bacts" style="padding:0"><button class="btn" data-draw="1">Draw a Site</button><button class="btn sp-del" data-delp="1">Delete</button></span></div></article>').join('') + '</div>';
-    root.querySelector('#pjNew').onclick = () => { const name = prompt('Project name'); if (!name?.trim()) return; db.projects.push({ id: uid(), name: name.trim(), status: 'Idea', notes: '', parcels: [], plans: [], created: new Date().toISOString(), by: get(NAME_KEY) }); save(db.projects[db.projects.length - 1]); ctx.toast('Project added. Pick a parcel on the map and use Start Site Plan, or Draw a Site.'); };
-    root.querySelectorAll('.pj').forEach(a => {
-      const p = db.projects.find(x => x.id === a.dataset.p); if (!p) return;
-      a.querySelector('.pj-name').onchange = e => { p.name = e.target.value.trim() || p.name; save(p); };
-      a.querySelector('.pj-status').onchange = e => { p.status = e.target.value; save(p); };
-      a.querySelector('.pj-notes').onchange = e => { p.notes = e.target.value.slice(0, 8000); save(p); };
-      a.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => open(p.id, b.dataset.plan));
-      a.querySelectorAll('[data-parcel]').forEach(b => b.onclick = () => { const x = p.parcels.find(y => y.key === b.dataset.parcel); ctx.setView('map'); map.easeTo({ center: x.center, zoom: Math.max(map.getZoom(), 17) }); ctx.openBuildingAt(x.center); });
-      a.querySelector('[data-draw]').onclick = () => { const c = map.getCenter(), pl = newPlan(p, { origin: [+c.lng.toFixed(6), +c.lat.toFixed(6)] }); p.plans.push(pl); save(p); open(p.id, pl.id, { draw: true }); ctx.toast('Click each corner of the site on the map.'); };
-      a.querySelector('[data-delp]').onclick = () => { if (!confirm('Delete the project ' + p.name + ' and its ' + p.plans.length + ' plan' + (p.plans.length === 1 ? '' : 's') + '? This removes it for the team too.')) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); save(); };
-    });
+  // All projects as cards or a list (the choice is kept in this browser), with search and sort. Click one for its page:
+  // a summary card (site area, parcels, owners, appraised value, options), the parcels, each option drawn with its
+  // numbers, and notes. Text wraps rather than being cut off. A sync never redraws under someone typing (it waits
+  // until they leave the field), so half-typed notes or a name aren't lost.
+  const VIEW_KEY = 'fs-projects-view';
+  const SORTS = { updated: 'Recently updated', name: 'Name', acres: 'Largest site', options: 'Most options' };
+  const PIN = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 14.5s4.5-4.2 4.5-7.8a4.5 4.5 0 0 0-9 0c0 3.6 4.5 7.8 4.5 7.8z"/><circle cx="8" cy="6.6" r="1.6"/></svg>';
+  const ICON_CARDS = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>';
+  const ICON_LIST = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5.5 4h8.5M5.5 8h8.5M5.5 12h8.5"/><circle cx="2.6" cy="4" r=".6"/><circle cx="2.6" cy="8" r=".6"/><circle cx="2.6" cy="12" r=".6"/></svg>';
+  let pq = '', psort = 'updated', mode = get(VIEW_KEY) === 'list' ? 'list' : 'cards', cur = null, adding = false, renaming = false, waiting = false;
+  const thumbs = new Map(), infos = new Map();
+  const plural = (n, w) => f0(n) + ' ' + w + (n === 1 ? '' : 's');
+  const money = v => '$' + f0(v);
+  const when = s => { const d = new Date(s), now = new Date(), days = Math.round((new Date(now.toDateString()) - new Date(d.toDateString())) / 864e5);
+    return days === 0 ? 'today' : days === 1 ? 'yesterday' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) }); };
+  const acresOf = p => p.parcels.reduce((a, x) => a + (x.acres || 0), 0) || Math.max(0, ...p.plans.filter(x => x.ring.length >= 3).map(x => SP.ringArea(x.ring) / 43560));
+  const ver = p => p.updated || p.created || '';
+  // an option's numbers and the count of problems that block it; kept until the project changes
+  function info(p, pl) {
+    const k = pl.id + '|' + ver(p); let v = infos.get(k);
+    if (!v) { const drawn = pl.ring.length >= 3; v = { drawn, m: drawn ? SP.metrics(pl) : null, bad: drawn ? SP.check(pl).filter(i => i.level === 'bad').length : 0 }; infos.set(k, v); if (infos.size > 400) infos.delete(infos.keys().next().value); }
+    return v;
   }
+  // the drawing for an option, street side down; kept until the project changes
+  function thumb(p, pl) {
+    const k = pl.id + '|' + ver(p); let s = thumbs.get(k);
+    if (s == null) {
+      try { s = planSVG(pl, { px: 320, pad: 14, labels: false, lines: false }).svg.replace(/ width="[\d.]+" height="[\d.]+"/, ' preserveAspectRatio="xMidYMid meet" aria-hidden="true"'); } catch (e) { s = ''; }
+      thumbs.set(k, s); if (thumbs.size > 300) thumbs.delete(thumbs.keys().next().value);
+    }
+    return s;
+  }
+  // where a new option goes: the newest drawn option's site (with its street side and setbacks), else the project's parcels
+  function siteFor(p) {
+    const last = p.plans.filter(x => x.ring.length >= 3).sort((a, b) => t(b.created) - t(a.created))[0];
+    if (last) return { origin: last.origin, ring: clone(last.ring), src: last.src, front: last.front, frontGuess: last.frontGuess, setbacks: { ...last.setbacks }, parcel: last.parcel, parcels: last.parcels, zoning: last.zoning || null, program: { use: SP.normalizeProgram(last.program).use } };
+    const recs = p.parcels.filter(x => x.geometry), b = recs.length ? siteOf(recs) : null;
+    return b?.ring?.length >= 3 ? { origin: b.origin, ring: b.ring, src: recs.length > 1 ? 'parcels' : 'parcel', parcel: recs[0].key, parcels: recs.map(r => r.key) } : null;
+  }
+  // a project's picture: its newest option with buildings, else its newest drawn site, else the parcel outline
+  function cover(p) {
+    const drawn = p.plans.filter(x => x.ring.length >= 3).sort((a, b) => t(b.created) - t(a.created)), pl = drawn.find(x => x.elements.some(e => e.kind === 'building')) || drawn[0];
+    if (pl) return thumb(p, pl);
+    const s = siteFor(p); return s ? thumb(p, { id: 'site:' + p.id, ring: s.ring, origin: s.origin, front: null, elements: [], setbacks: { ...SP.SETBACKS }, program: { use: 'retail' } }) : '';
+  }
+  // the biggest option by floor area, for the summary
+  function biggest(p) { let best = null; for (const pl of p.plans) { const { m } = info(p, pl); if (m?.gfa && (!best || m.gfa > best.m.gfa)) best = { pl, m }; } return best; }
+  const addrOf = p => p.parcels.length ? esc(p.parcels[0].label) + (p.parcels.length > 1 ? ' and ' + plural(p.parcels.length - 1, 'more parcel') : '') : '';
+  function addOption(p) { const s = siteFor(p); if (!s) return drawSite(p); const pl = newPlan(p, s); p.plans.push(pl); save(p); open(p.id, pl.id); }
+  function drawSite(p) { const c = map.getCenter(), pl = newPlan(p, { origin: [+c.lng.toFixed(6), +c.lat.toFixed(6)] }); p.plans.push(pl); save(p); open(p.id, pl.id, { draw: true }); ctx.toast('Click each corner of the site on the map.'); }
+
+  // ----- all projects -----
+  function shown() {
+    const q = pq.trim().toLowerCase(), by = { updated: (a, b) => t(b.updated) - t(a.updated), name: (a, b) => a.name.localeCompare(b.name), acres: (a, b) => acresOf(b) - acresOf(a), options: (a, b) => b.plans.length - a.plans.length || t(b.updated) - t(a.updated) }[psort];
+    return db.projects.filter(p => !q || [p.name, p.notes, p.by, ...p.parcels.flatMap(x => [x.label, x.owner]), ...p.plans.map(x => x.name)].join(' ').toLowerCase().includes(q)).sort(by);
+  }
+  function cardHtml(p) {
+    const ac = acresOf(p), big = biggest(p), addr = addrOf(p), c = cover(p);
+    return '<button type="button" class="pj-card" data-open="' + esc(p.id) + '"><span class="pj-thumb">' + (c || '<i>No site yet</i>') + '</span><span class="pj-cb">' +
+      '<b class="pj-cn">' + esc(p.name) + '</b>' + (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') +
+      '<span class="pj-facts">' + (ac ? '<span class="pj-fact"><b>' + ac.toFixed(2) + '</b> acres</span>' : '') + '<span class="pj-fact"><b>' + f0(p.plans.length) + '</b> option' + (p.plans.length === 1 ? '' : 's') + '</span>' +
+        (big ? '<span class="pj-fact"><b>' + f0(big.m.gfa) + '</b> sq ft max</span>' : '') + '</span>' +
+      '<span class="pj-upd">Updated ' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + '</span></span></button>';
+  }
+  function rowHtml(p) {
+    const ac = acresOf(p), big = biggest(p), addr = addrOf(p), c = cover(p);
+    return '<button type="button" class="pj-row" data-open="' + esc(p.id) + '"><span class="pj-thumb pj-rthumb">' + (c || '<i>No site</i>') + '</span>' +
+      '<span class="pj-rmain"><b>' + esc(p.name) + '</b>' + (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + '</span>' +
+      '<span class="pj-rstats"><span class="pj-rc">' + (ac ? '<b>' + ac.toFixed(2) + '</b> acres' : '<em>No site</em>') + '</span><span class="pj-rc"><b>' + f0(p.plans.length) + '</b> option' + (p.plans.length === 1 ? '' : 's') + '</span>' +
+        '<span class="pj-rc">' + (big ? '<b>' + f0(big.m.gfa) + '</b> sq ft' : '<em>Not laid out</em>') + '</span><span class="pj-rc pj-rupd">' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + '</span></span>' +
+      '<span class="pj-chev" aria-hidden="true">›</span></button>';
+  }
+  function listHtml() {
+    if (!db.projects.length) return '<div class="pj-empty"><b>No projects yet</b><ol><li>On the map, zoom in to street level and click a parcel or building.</li><li>On its card, open <b>Site Tools → Start Site Plan</b>.</li><li>Lay out the site by hand, or describe what you want and use <b>Build with AI</b>.</li></ol><div class="btnrow"><button type="button" class="btn primary" data-go="map">Go to the Map</button><button type="button" class="btn" data-new="1">New Empty Project</button></div></div>';
+    const list = shown();
+    if (!list.length) return '<div class="pj-empty">No projects match “' + esc(pq) + '”. <button type="button" class="lnk" data-clear="1">Show all projects</button></div>';
+    return mode === 'list' ? '<div class="pj-list"><div class="pj-lh" aria-hidden="true"><span></span><span>Project</span><span>Site</span><span>Options</span><span>Largest option</span><span>Updated</span><span></span></div>' + list.map(rowHtml).join('') + '</div>'
+      : '<div class="pj-grid">' + list.map(cardHtml).join('') + '</div>';
+  }
+  function indexHtml() {
+    const all = db.projects, nPlans = all.reduce((s, p) => s + p.plans.length, 0);
+    const share = shared === true ? 'shared with the team' : shared === false ? 'saved on this device (team sharing for projects isn’t set up on the site yet)' : 'saved on this device';
+    return '<div class="vhead"><div><div class="kicker">Site planning</div><h2>Projects</h2><div class="vsub">' + (all.length ? plural(all.length, 'project') + ' · ' + plural(nPlans, 'site plan option') + ' · ' : '') + share + '</div></div>' +
+        (adding ? '' : '<button type="button" class="btn primary" id="pjNew">+ New Project</button>') + '</div>' +
+      (adding ? '<form class="pj-new" id="pjForm"><label class="sr" for="pjNm">New project name</label><input id="pjNm" maxlength="120" placeholder="Project name" autocomplete="off"><span class="btnrow"><button class="btn primary">Create Project</button><button type="button" class="btn" id="pjCancel">Cancel</button></span>' +
+        '<div class="rnote">You can add parcels and site plans to it next. To start from a parcel instead, click it on the map and use <b>Site Tools → Start Site Plan</b>.</div></form>' : '') +
+      (all.length ? '<div class="pj-bar"><label class="search sm pj-q"><input type="search" id="pjQ" placeholder="Search projects" value="' + esc(pq) + '" aria-label="Search projects, parcels, owners and notes"></label>' +
+        '<div class="pj-ctl"><label class="pj-sort">Sort <select class="chip" id="pjSort">' + Object.entries(SORTS).map(([k, l]) => '<option value="' + k + '"' + (psort === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
+        '<div class="seg seg2 pj-mode" role="group" aria-label="Show projects as">' + [['cards', 'Cards', ICON_CARDS], ['list', 'List', ICON_LIST]].map(([k, l, ic]) => '<button type="button" data-v="' + k + '" aria-pressed="' + (mode === k) + '">' + ic + l + '</button>').join('') + '</div></div></div>' : '') +
+      '<div id="pjList">' + listHtml() + '</div>';
+  }
+
+  // ----- one project -----
+  function planTile(p, pl) {
+    const { drawn, m, bad } = info(p, pl), use = SP.USES[SP.normalizeProgram(pl.program).use];
+    const stat = (v, l, cls) => '<span' + (cls ? ' class="' + cls + '"' : '') + '><b>' + v + '</b>' + l + '</span>';
+    return '<button type="button" class="pj-plan" data-plan="' + esc(pl.id) + '" title="Open ' + esc(pl.name) + ' on the map">' +
+      '<span class="pj-thumb">' + (drawn ? thumb(p, pl) : '<i>No site drawn</i>') + (bad ? '<span class="pj-iss">' + plural(bad, 'issue') + '</span>' : '') + '</span>' +
+      '<span class="pj-ph"><b>' + esc(pl.name) + '</b>' + (m?.gfa ? '<em>' + esc(use.label) + (m.units ? ' · ' + plural(m.units, 'unit') : '') + '</em>' : '') + '</span>' +
+      (m?.gfa ? '<span class="pj-stats">' + stat(f0(m.gfa), 'sq ft') + stat(f0(m.spaces), 'spaces, ' + f0(m.required) + ' needed', m.spaces < m.required ? 'short' : '') + stat(pct(m.coverage), 'coverage') + '</span>'
+        : '<span class="pj-none">' + (drawn ? m.acres.toFixed(2) + ' acres, nothing laid out yet' : 'Open it to draw the site on the map') + '</span>') + '</button>';
+  }
+  function detailHtml(p) {
+    const ac = acresOf(p), big = biggest(p), can = !!siteFor(p), c = cover(p);
+    const owners = [...new Set(p.parcels.map(x => x.owner).filter(Boolean))], value = p.parcels.reduce((s, x) => s + (x.marketValue || 0), 0), land = p.parcels.reduce((s, x) => s + (x.landValue || 0), 0);
+    const fact = (k, v, sub) => '<div><dt>' + k + '</dt><dd>' + v + (sub ? '<small>' + sub + '</small>' : '') + '</dd></div>';
+    return '<button type="button" class="lnk pj-back" data-back="1">‹ All projects</button>' +
+      '<section class="pj-sum"><div class="pj-thumb pj-sthumb">' + (c || '<i>No site yet</i>') + '</div><div class="pj-sb"><div class="kicker">Project</div>' +
+        (renaming ? '<form class="pj-ren" id="pjRenForm"><label class="sr" for="pjRen">Project name</label><textarea id="pjRen" rows="1" maxlength="120">' + esc(p.name) + '</textarea><span class="btnrow"><button class="btn primary">Save</button><button type="button" class="btn" id="pjRenX">Cancel</button></span></form>'
+          : '<div class="pj-title"><h2>' + esc(p.name) + '</h2><button type="button" class="lnk" id="pjRename">Rename</button></div>') +
+        '<div class="vsub">Updated ' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + (p.created ? ' · started ' + when(p.created) : '') + '</div>' +
+        '<dl class="pj-dl">' + fact('Site area', ac ? ac.toFixed(2) + ' acres' : 'Not set', ac ? f0(ac * 43560) + ' sq ft' : '') + fact('Parcels', f0(p.parcels.length)) +
+          (owners.length ? fact(owners.length > 1 ? 'Owners' : 'Owner', esc(owners[0]), owners.length > 1 ? 'and ' + plural(owners.length - 1, 'other') : '') : '') +
+          (value ? fact('Appraised value', money(value), land ? 'land ' + money(land) : '') : '') + fact('Site plan options', f0(p.plans.length)) +
+          (big ? fact('Largest option', f0(big.m.gfa) + ' sq ft', esc(big.pl.name) + ' · ' + esc(SP.USES[SP.normalizeProgram(big.pl.program).use].label) + (big.m.units ? ' · ' + plural(big.m.units, 'unit') : '')) : '') + '</dl></div></section>' +
+      '<section class="pj-sec"><div class="lt">Parcels' + (p.parcels.length ? ' · ' + f0(p.parcels.length) : '') + '</div>' + (p.parcels.length ? '<div class="pj-prows">' + p.parcels.map(x => '<div class="pj-prow"><span class="pj-pi">' + PIN + '</span><div class="pj-pm"><b>' + esc(x.label) + '</b><span>' +
+          [x.owner ? esc(x.owner) : '', x.acres ? x.acres.toFixed(2) + ' acres' : '', x.marketValue ? 'appraised ' + money(x.marketValue) : ''].filter(Boolean).join(' · ') + '</span></div><button type="button" class="btn" data-parcel="' + esc(x.key) + '">Show on Map</button></div>').join('') + '</div>'
+        : '<div class="pj-start"><b>No parcels yet</b><p>Find the parcel on the map, click it, then <b>Site Tools → Start Site Plan</b> and choose <b>Add to ' + esc(p.name) + '</b>. Or click the corners of the site yourself.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div></div>') + '</section>' +
+      '<section class="pj-sec"><div class="lt">Site plan options · ' + f0(p.plans.length) + '</div><div class="pj-plans">' + p.plans.map(pl => planTile(p, pl)).join('') +
+        (can ? '<button type="button" class="pj-plan pj-add" data-add="1"><span class="pj-plus" aria-hidden="true">+</span><b>New Option</b><span class="pj-none">' + (p.plans.some(x => x.ring.length >= 3) ? 'A blank plan on the same site' : 'A blank plan on ' + (p.parcels.length > 1 ? 'these parcels' : 'this parcel')) + '</span></button>'
+          : p.parcels.length ? '<div class="pj-start"><b>No site outline</b><p>These parcels have no outline from the county. Click the corners of the site on the map.</p><div class="btnrow"><button type="button" class="btn" data-draw="1">Draw a Site</button></div></div>' : '<div class="pj-none">No options yet: add a parcel or draw the site first.</div>') + '</div></section>' +
+      '<section class="pj-sec"><div class="lt"><label for="pjNotes">Notes</label></div><textarea class="pj-notes" id="pjNotes" rows="' + Math.min(10, Math.max(3, (p.notes || '').split('\n').length + 1)) + '" placeholder="Asking price, broker, next steps…">' + esc(p.notes || '') + '</textarea></section>' +
+      '<div class="pj-foot"><span class="btnrow">' + (can ? '<button type="button" class="btn" data-draw="1" title="Click the corners of a different site on the map">Draw a Different Site</button>' : '') + '</span><button type="button" class="lnk pj-del" data-delp="1">Delete Project</button></div>';
+  }
+
+  // now: the person asked for this redraw (a click, a sort); otherwise (a save or a sync) it waits while they type
+  function render(now) {
+    if (!root) return;
+    const a = document.activeElement;
+    if (now !== true && a && root.contains(a) && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT')) { waiting = true; return; } // redraw once they leave the field
+    waiting = false;
+    const key = a && root.contains(a) ? (a.id ? '#' + a.id : ['open', 'plan', 'v', 'parcel'].map(k => a.dataset[k] != null ? '[data-' + k + '="' + CSS.escape(a.dataset[k]) + '"]' : '').find(Boolean) || (a.classList[0] ? '.' + a.classList[0] : null)) : null;
+    const p = cur && db.projects.find(x => x.id === cur); if (!p) { cur = null; renaming = false; }
+    root.innerHTML = '<div class="pj-wrap">' + (p ? detailHtml(p) : indexHtml()) + '</div>';
+    wire(p);
+    if (key) try { root.querySelector(key)?.focus(); } catch (e) { /* the control is gone */ }
+  }
+  function show(id) { cur = id; renaming = false; adding = false; render(true); root.scrollTop = 0; }
+  function wire(p) {
+    const $ = s => root.querySelector(s), on = (s, f) => root.querySelectorAll(s).forEach(b => b.addEventListener('click', f));
+    const grow = el => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; };
+    if (!p) {
+      const newOne = () => { adding = true; render(true); $('#pjNm')?.focus(); };
+      on('#pjNew', newOne); on('[data-new]', newOne);
+      on('[data-go="map"]', () => ctx.setView('map'));
+      on('[data-clear]', () => { pq = ''; render(true); });
+      const form = $('#pjForm');
+      if (form) {
+        form.onsubmit = e => { e.preventDefault(); const name = $('#pjNm').value.trim(); if (!name) { $('#pjNm').focus(); return; }
+          const np = { id: uid(), name, notes: '', parcels: [], plans: [], created: new Date().toISOString(), by: get(NAME_KEY) };
+          db.projects.push(np); adding = false; pq = ''; document.activeElement?.blur(); cur = np.id; save(np); root.scrollTop = 0; };
+        $('#pjCancel').onclick = () => { adding = false; render(true); };
+        form.onkeydown = e => { if (e.key === 'Escape') $('#pjCancel').click(); };
+      }
+      const qi = $('#pjQ'); if (qi) qi.oninput = () => { pq = qi.value; $('#pjList').innerHTML = listHtml(); wireList(); };
+      const so = $('#pjSort'); if (so) so.onchange = () => { psort = so.value; render(true); };
+      on('[data-v]', e => { mode = e.currentTarget.dataset.v; try { localStorage.setItem(VIEW_KEY, mode); } catch (er) { /* kept for this visit */ } render(true); });
+      const wireList = () => { root.querySelectorAll('[data-open]').forEach(b => b.onclick = () => show(b.dataset.open)); root.querySelector('[data-clear]')?.addEventListener('click', () => { pq = ''; render(true); }); };
+      wireList();
+      return;
+    }
+    on('[data-back]', () => show(null));
+    on('#pjRename', () => { renaming = true; render(true); const r = $('#pjRen'); if (r) { grow(r); r.focus(); r.select(); } });
+    const rf = $('#pjRenForm');
+    if (rf) {
+      const r = $('#pjRen'); grow(r); r.oninput = () => grow(r);
+      rf.onsubmit = e => { e.preventDefault(); const v = r.value.replace(/\s+/g, ' ').trim(); renaming = false; document.activeElement?.blur(); if (v && v !== p.name) { p.name = v; save(p); } render(true); };
+      r.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); rf.requestSubmit(); } else if (e.key === 'Escape') $('#pjRenX').click(); };
+      $('#pjRenX').onclick = () => { renaming = false; render(true); };
+    }
+    const nt = $('#pjNotes');
+    nt.oninput = () => { if (nt.scrollHeight > nt.clientHeight + 2) grow(nt); };
+    nt.onchange = () => { p.notes = nt.value.slice(0, 8000); save(p); };
+    root.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const pl = p.plans.find(x => x.id === b.dataset.plan), none = pl && pl.ring.length < 3; open(p.id, b.dataset.plan, { draw: none }); if (none) ctx.toast('Click each corner of the site on the map.'); });
+    root.querySelectorAll('[data-parcel]').forEach(b => b.onclick = () => { const x = p.parcels.find(y => y.key === b.dataset.parcel); ctx.setView('map'); map.easeTo({ center: x.center, zoom: Math.max(map.getZoom(), 17) }); ctx.openBuildingAt(x.center); });
+    on('[data-add]', () => addOption(p));
+    on('[data-draw]', () => drawSite(p));
+    on('[data-find]', () => { ctx.setView('map'); ctx.toast('Zoom in and click the parcel, then Site Tools → Start Site Plan → Add to ' + p.name + '.'); });
+    on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? This removes it for the team too.')) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null; save(); });
+  }
+  root?.addEventListener('focusout', () => setTimeout(() => { if (waiting && ctx.view === 'projects') render(); }));
   ctx.onView?.('projects', render);
 
   // ---------- for the assistant ----------

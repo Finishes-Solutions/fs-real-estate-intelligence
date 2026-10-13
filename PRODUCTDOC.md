@@ -437,7 +437,15 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - **CAD (DXF):** opens in AutoCAD, CADCraft, LibreCAD and most CAD programs, in feet, with layers for the lot, setback line, buildings, parking, stripes, drives, detention, the curb line round all the paving, accessible stalls, pavement markings and trash enclosures, and a notes block.
 - **Map File (GeoJSON)** and **Copy Summary** (the numbers as text).
 
-**The Projects tab** lists every project: rename it, set its status (Idea, Pursuing, Under contract, Closed, Passed), keep notes, see each option's numbers, open a plan, jump to a parcel, or **Draw a Site** for land without a parcel outline.
+**The Projects tab** shows every project as **Cards** or a **List** (switch at the top right; your choice is remembered on this device). Each one shows a drawing of its site, the parcel address, acres, how many options it has, its largest option and when it was last changed. Search by name, address, owner or notes, and sort by last update, name, site size or number of options. **+ New Project** asks for a name right on the page.
+
+Click a project to open its page:
+- **A summary card:** the site drawing, the name (**Rename** to change it), site area in acres and square feet, number of parcels, owner(s), appraised value (with land value), number of site plan options and the largest one.
+- **Parcels:** each parcel's address, owner, acres and appraised value, with **Show on Map**. A project with no parcels explains how to add one, with **Find a Parcel** and **Draw a Site**.
+- **Site plan options:** each option as a drawing (street side down) with its floor area, units, parking against what's needed (amber when short), coverage, and a red count if it has problems. Click one to open it on the map. **New Option** starts a blank plan on the same site.
+- **Notes**, and **Draw a Different Site** and **Delete Project** at the bottom.
+- Long names and addresses wrap onto more lines rather than being cut off, on any screen size.
+- Your notes are safe while you type: a team sync waits until you leave the field.
 
 **Good to know**
 - The PDF is a conceptual sheet. It has no survey bearings, easements, utilities or title research, so it won't match an engineer's or architect's sheet; it's for feasibility and early conversations.
@@ -489,6 +497,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **Townhome and duplex communities that fit:** a duplex or townhome count too dense for lots of their own becomes two-story six-unit rows on a shared parking court, with fenced patios, unit lines and a turnaround; a **Side Street** tool (also found from the map's roads) and a pull-through drive out to it; and the AI now chooses between homes on lots and a court.
 
 - **Site plans that fill the site and look built:** what you ask for is Phase 1 and the rest of the site holds more of the same as Phase 2; several building rows on deep sites; clean rectangular ponds and one landscape background instead of blobs; trash left out unless turned on; tree canopies and 3D trees with a Trees button; L-shaped, courtyard and tower buildings; parapets and floor lines in 3D; restaurant pads with drive-thru and outdoor seating; real playgrounds; parking garages.
+
+- **A clearer Projects tab:** projects as cards or a list with a drawing of each site, its address and acreage; a page per project with a summary card (site area, parcels, owners, appraised value, options), its parcels, each option drawn with its numbers, and notes; search and sort; **New Option** adds a plan on the same site in one click; nothing is cut off on phones or narrow windows.
 
 - **Utilities near a site:** the property card's Site section shows the nearest power lines (with voltage and owner) and substation, who provides water and sewer here, and in Houston the nearest public sewer main; a **Power, Water & Sewer Lines** map layer; and the site plan sheet notes them. Projects now sync with the team.
 
