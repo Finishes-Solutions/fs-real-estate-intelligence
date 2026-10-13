@@ -402,4 +402,34 @@ function usable(plan, o, what) {
   assert.deepEqual(bad(rf.elements), []); assert.ok(m1.spaces >= m1.required && m1.units >= m0.units * 0.85, 'parked, and about the same amount of housing: ' + m1.units + ' vs ' + m0.units);
   assert.equal(rf.elements.filter(e => e.kind === 'pool').length, 1, 'still one pool');
 }
+// ---- more than one way in: entrances added by hand, by the AI's edits, or asked for in the program ----
+{
+  const E = await import('../lib/siteedit.mjs');
+  const T0 = siteOf(tract), T = { ...T0, front: T0.ring.findIndex((p, i) => S.outwardOf(T0.ring, i)[1] < -0.9) }, side = T.ring.findIndex((p, i) => S.outwardOf(T.ring, i)[0] > 0.9); // street along the south; the east lot line a side street
+  const plan = { ...T, streets: [side] }, o = L.layoutOptions(plan, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], base = { ...plan, elements: o.elements, program: o.program };
+  const bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text), m0 = S.metrics(base);
+  // by hand: a click on the side street, part way back
+  const a = T.ring[side], b = T.ring[(side + 1) % T.ring.length], at = [a[0] + (b[0] - a[0]) * 0.45, a[1] + (b[1] - a[1]) * 0.45];
+  const r = S.addEntrance(base, at, { id: 'ent2' }); assert.ok(!r.error, r.error); assert.equal(r.entrance.name, 'Entrance 2'); assert.ok(r.entrance.pinned && r.entrance.entry);
+  const p1 = { ...base, elements: r.elements }; assert.deepEqual(bad(r.elements), []);
+  const { seen } = reached(r.elements); assert.ok(seen.has('ent2'), 'the new driveway joins the drives from the main entry');
+  assert.ok(S.metrics(p1).spaces >= m0.spaces - 12, 'it costs only the stalls it crosses: ' + S.metrics(p1).spaces + ' vs ' + m0.spaces);
+  assert.equal(S.entryMarks(p1).filter(l => l.color === '#ffffff').length, S.entrancesOf(r.elements).filter(e => !e.through).length, 'a stop bar at each entrance');
+  // a lot line that isn't a street becomes one; a click where nothing connects says why
+  const back = T.ring.findIndex((p, i) => S.outwardOf(T.ring, i)[1] > 0.9), r2 = S.addEntrance(base, [(T.ring[back][0] + T.ring[(back + 1) % T.ring.length][0]) / 2, (T.ring[back][1] + T.ring[(back + 1) % T.ring.length][1]) / 2]);
+  if (!r2.error) assert.ok(r2.streets.includes(back) && /now marked as a street/.test(r2.note)); else assert.match(r2.error, /No way in/);
+  // automatic: as far from the others as the streets allow, at least 150 ft apart
+  const m = S.moreEntrances(base, 2); assert.equal(m.added.length, 2, m.note);
+  const cs = S.entrancesOf(m.elements).map(e => S.centroid(S.shapeOf(e))); for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) assert.ok(Math.hypot(cs[i][0] - cs[j][0], cs[i][1] - cs[j][1]) >= 140, 'entrances spaced apart');
+  assert.deepEqual(bad(m.elements), []);
+  // in the program: "two entrances" from the words gives two in every option
+  assert.equal(S.guessProgram('240 apartments with two entrances').entrances, 2); assert.equal(S.guessProgram('a retail strip with a second driveway').entrances, 2); assert.equal(S.normalizeProgram({ use: 'retail' }).entrances, null);
+  const two = L.layoutOptions(plan, S.guessProgram('240 apartments, 3 stories, two entrances'), { count: 2 }); assert.ok(S.entrancesOf(two[0].elements).length >= 2, 'the first option has both ways in');
+  for (const op of two) assert.ok(!bad(op.elements).length && (S.entrancesOf(op.elements).length >= 2 || op.notes.some(t => /No room for another entrance/.test(t))), op.name + ': two ways in, or says why not');
+  // Change With AI: "add a second entrance" (words), and the AI's own point on the lot line (sheet frame: x along, y = 0 the street)
+  const ops = E.guessEdits('add another entrance', base); assert.deepEqual(ops, [{ action: 'add', kind: 'entrance' }]);
+  const re = E.applyEdits(base, ops); assert.equal(S.entrancesOf(re.elements).length, 2, re.skipped.join(' '));
+  const f = E.sheetFrame(base), fa = f.to(T.ring[T.front]), fb = f.to(T.ring[(T.front + 1) % T.ring.length]);
+  const ra = E.applyEdits(base, [{ action: 'add', kind: 'entrance', x: (fa[0] + fb[0]) / 2 + 200, y: 0 }]); assert.ok(ra.done.length || ra.skipped.length);
+}
 console.log('site layouts ok');

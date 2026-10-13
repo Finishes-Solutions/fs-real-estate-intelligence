@@ -323,6 +323,13 @@ export function initSitePlan(ctx) {
     }
     if (ed.mode === 'parcels') { pickParcel(e.lngLat); return true; }
     if (ed.mode === 'front') { const p = ftAt(pl, e.lngLat); change(x => { x.front = SP.nearestEdge(x.ring, p); x.frontGuess = false; }); ed.mode = null; panel(); return true; }
+    if (ed.mode === 'entrance') { // a driveway in from the street where the lot line was clicked
+      const p = ftAt(pl, e.lngLat), k = SP.nearestEdge(pl.ring, p), d = SP.segDist(p, pl.ring[k], pl.ring[(k + 1) % pl.ring.length]);
+      if (d > 60) { ctx.toast('Click on the lot line along the street, where the driveway should come in.'); return true; }
+      const r = SP.addEntrance(pl, p, { id: uid() }); if (r.error) { ctx.toast(r.error); return true; }
+      change(x => { x.elements = r.elements; x.streets = r.streets; if (r.streets.length) x.streetsSet = true; }); ed.sel = r.entrance.id; ed.mode = null; ed.editing = true;
+      ctx.toast(r.entrance.name + ' added.' + (r.note ? ' ' + r.note : '')); draw(); panel(); return true;
+    }
     if (ed.mode === 'street') { const p = ftAt(pl, e.lngLat); change(x => { const k = SP.nearestEdge(x.ring, p), st = new Set(x.streets || []); if (k !== (x.front ?? SP.longestEdge(x.ring))) { if (st.has(k)) st.delete(k); else st.add(k); } x.streets = [...st]; x.streetsSet = true; }); ed.mode = null; panel(); return true; } // a side street on or off
     if (!hit(pl, e) && ed.sel) { ed.sel = null; draw(); panel(); }
     return true;
@@ -406,18 +413,18 @@ export function initSitePlan(ctx) {
       (drawing ? '<div class="bsec sp-draw"><div class="lt">Draw the site</div><p>Click each corner of the site on the map. Click the first corner again (or double-click, or press Enter) to finish.' + (ed.draft.length ? ' ' + ed.draft.length + ' corner' + (ed.draft.length > 1 ? 's' : '') + ' so far.' : '') + '</p><div class="bacts" style="padding:0"><button class="btn askai" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button class="btn" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button class="btn" id="spCancelDraw">Keep the Old Site</button>') + '</div></div>' :
       (pl.elements.length ? '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change With AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Apt Bldg 7 four stories · turn the clubhouse into a 7,500 sf one · remove Bldg 3 · swap Bldg 2 and Bldg 5">' + esc(ed.chg || '') + '</textarea>' +
         '<div class="rnote">' + (sel ? 'About <b>' + esc(ED.labelOf(sel)) + '</b> (selected), or name any piece as it’s labelled on the plan.' : 'Name pieces as they’re labelled on the plan, or select one and say “it”.') + '</div>' +
-        '<div class="bacts sp-go"><button class="btn askai" id="spChgGo">Make Changes</button></div>' + (pl.recipe ? '<label class="sp-sw sp-revsw"><input type="checkbox" id="spChgFit"' + (ed.chgFit ? ' checked' : '') + '> Re-fit the rest of the site around the changes (otherwise only those pieces change)</label>' : '') +
+        '<div class="bacts sp-go"><button class="btn askai" id="spChgGo">Make Changes</button></div><div class="sp-stage" id="spChgStage" aria-live="polite"></div>' + (pl.recipe ? '<label class="sp-sw sp-revsw"><input type="checkbox" id="spChgFit"' + (ed.chgFit ? ' checked' : '') + '> Re-fit the rest of the site around the changes (otherwise only those pieces change)</label>' : '') +
         '<div class="rnote sp-ainote" id="spChgNote">' + esc(ed.chgNote || '') + '</div></div>' : '') +
       '<div class="bsec sp-ai" id="spAiSec"><label class="lt" for="spAsk">Build with AI</label><textarea id="spAsk" rows="2" placeholder="What should go here? e.g. 25,000 sf retail strip with 4 per 1,000 parking">' + esc(ed.ask || '') + '</textarea>' +
         '<div class="sp-sugs">' + SUGGEST.map(s => '<button class="chip" data-sug="' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div>' +
         '<div class="bacts sp-go"><button class="btn askai" id="spGo">Build Options</button><button class="btn" id="spBest" title="The AI reads what the app knows about this site and its surroundings and suggests what to build">What Should Go Here?</button></div>' +
-        '<label class="sp-sw sp-revsw"><input type="checkbox" id="spReview"' + (aiReviewOn() ? ' checked' : '') + '> The AI reviews the layouts it gets back and revises the plan when they miss</label>' +
+        '<div class="sp-stage" id="spAiStage" aria-live="polite"></div>' + '<label class="sp-sw sp-revsw"><input type="checkbox" id="spReview"' + (aiReviewOn() ? ' checked' : '') + '> The AI reviews the layouts it gets back and revises the plan when they miss</label>' +
         '<div id="spIdeas">' + ideasHtml() + '</div><div class="rnote sp-ainote" id="spAiNote">' + esc(ed.aiNote || '') + '</div>' +
         '<div id="spVariants">' + variantsHtml() + '</div></div>' +
       siteHtml(p, pl) +
       '<div class="bsec" id="spDrawSec"><div class="lt">Draw and tools</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + (k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building) + '"></i>' + (ADD_LABEL[k] || SP.KINDS[k].label) + '</button>').join('') + '<button class="btn" id="spTrees" aria-pressed="' + (pl.params?.trees !== false) + '" title="Show or hide the trees on the plan, the map and the PDF">Trees ' + (pl.params?.trees !== false ? 'On' : 'Off') + '</button></div>' +
         '<label class="sp-lib">From the building library (' + BUILDING_TYPES.length + ' types)<select id="spLib"><option value="">Pick a building type to add…</option>' + typeOptions('') + '</select></label>' +
-        '<div class="sp-tools"><button class="btn" aria-pressed="' + (ed.mode === 'front') + '" id="spFront" title="Then click the lot line along the street">' + (ed.mode === 'front' ? 'Click the street side…' : 'Street Side') + '</button><button class="btn" aria-pressed="' + (ed.mode === 'street') + '" id="spStreet" title="A second street along the lot (a corner lot): click its lot line to add it, or again to remove it">' + (ed.mode === 'street' ? 'Click the side street…' : 'Side Street') + '</button><button class="btn" id="spRedraw">Redraw Site</button>' +
+        '<div class="sp-tools"><button class="btn" aria-pressed="' + (ed.mode === 'front') + '" id="spFront" title="Then click the lot line along the street">' + (ed.mode === 'front' ? 'Click the street side…' : 'Street Side') + '</button><button class="btn" aria-pressed="' + (ed.mode === 'street') + '" id="spStreet" title="A second street along the lot (a corner lot): click its lot line to add it, or again to remove it">' + (ed.mode === 'street' ? 'Click the side street…' : 'Side Street') + '</button><button class="btn" aria-pressed="' + (ed.mode === 'entrance') + '" id="spEntr" title="A driveway in from the street: click the lot line where it should come in; it runs straight in to the nearest drive">' + (ed.mode === 'entrance' ? 'Click the street edge…' : 'Add Entrance') + '</button><button class="btn" id="spRedraw">Redraw Site</button>' +
         '<button class="btn" id="spUndo"' + (ed.undo.length ? '' : ' disabled') + ' title="Undo (⌘Z / Ctrl+Z)">Undo</button><button class="btn" id="spRedo"' + (ed.redo.length ? '' : ' disabled') + '>Redo</button></div>' +
         (pl.frontGuess ? '<div class="rnote sp-warn">The street side (orange line) is a guess. Use <b>Street Side</b> to pick the lot line along the street; front setbacks and drives follow it.</div>' : '') + '</div>' +
       '<div class="bsec" id="spSel">' + selHtml(sel, prog) + '</div>' +
@@ -445,7 +452,7 @@ export function initSitePlan(ctx) {
     const rv = $('#spReview'); if (rv) rv.onchange = () => { try { localStorage.setItem('fs-sp-review', rv.checked ? '1' : '0'); } catch (e) {} };
     card.querySelectorAll('[data-idea]').forEach(b => b.onclick = () => { const it = ed.ideas?.list?.[+b.dataset.idea]; if (!it) return; ed.ask = it.request; const ta = $('#spAsk'); if (ta) ta.value = it.request; build(); });
     card.querySelectorAll('[data-var]').forEach(b => b.onclick = () => useVariant(+b.dataset.var));
-    on('#spMore', async () => { const pl2 = PL(), b = card.querySelector('#spMore'); if (b) b.textContent = 'Looking…'; const more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); if (PL() !== pl2) return; ed.variants = named(more, pl2); ed.pick = null; panel(); });
+    on('#spMore', async () => { const pl2 = PL(), b = card.querySelector('#spMore'); busy('#spMore', 'Looking for more layouts…', '#spAiStage'); const more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); if (PL() !== pl2) return; ed.variants = named(more, pl2); ed.pick = null; panel(); });
     const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; const k = so.value, cur = ed.variants[ed.pick]; const val = v => k === 'units' ? v.m.units || 0 : k === 'gfa' ? v.m.gfa : k === 'spaces' ? v.m.spaces : k === 'open' ? v.m.green : (v.rank ?? 0);
       ed.variants.sort((a, b) => val(b) - val(a)); ed.pick = cur ? ed.variants.indexOf(cur) : null; panel(); };
     card.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { ed.editing = true; addEl(b.dataset.add); }); // adding a piece is editing
@@ -454,6 +461,7 @@ export function initSitePlan(ctx) {
     on('#spEdit', () => { ed.editing = !ed.editing; draw(); panel(); });
     on('#spFront', () => { ed.mode = ed.mode === 'front' ? null : 'front'; panel(); });
     on('#spStreet', () => { ed.mode = ed.mode === 'street' ? null : 'street'; panel(); });
+    on('#spEntr', () => { ed.mode = ed.mode === 'entrance' ? null : 'entrance'; if (ed.mode) ctx.toast('Click the lot line along the street where the driveway should come in. Esc cancels.'); panel(); });
     on('#spRedraw', () => { ed.mode = 'draw'; ed.draft = []; ed.sel = null; ctx.toast('Click each corner of the site; click the first one again to finish. Esc cancels.'); draw(); panel(); });
     on('#spParcels', () => { ed.mode = ed.mode === 'parcels' ? null : 'parcels'; ed.sel = null; draw(); panel(); });
     card.querySelectorAll('[data-rmp]').forEach(b => b.onclick = () => { const keys = (pl.parcels || []).filter(k => k !== b.dataset.rmp); if (keys.length) setParcels(keys); });
@@ -754,14 +762,14 @@ export function initSitePlan(ctx) {
   async function build() {
     const p = P(), pl = PL(); if (!pl || pl.ring.length < 3) return;
     const ask = (ed.ask || '').trim(); if (!ask) { ctx.toast('Say what should go on the site, or pick a suggestion.'); card.querySelector('#spAsk')?.focus(); return; }
-    const btn = card.querySelector('#spGo'), say = t => { const b = card.querySelector('#spGo'); if (b) { b.disabled = true; b.textContent = t; } }; if (btn) btn.disabled = true; say('Thinking… (up to a minute)');
+    const say = t => busy('#spGo', t, '#spAiStage'); say('Reading your request…');
     let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '', aiOk = false;
     try {
       const d = await post({ prompt: ask, site: siteInfo(p, pl), facts: await factsFor(pl), program: pl.program });
       prog = d.program; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = [d.summary, ...(d.assumptions || [])].filter(Boolean).join(' · '); aiOk = true;
     } catch (e) { note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : navigator.onLine ? 'The AI didn’t answer, so ' : 'Offline: ') + 'this reads your words directly.'; }
     if (ed?.plid !== pl.id) return;
-    say(SP.ringArea(pl.ring) > 40 * 43560 ? 'Laying out… (a big site takes up to a minute)' : 'Laying out…');
+    say(SP.ringArea(pl.ring) > 40 * 43560 ? 'Laying out the options (a big site takes up to a minute)…' : 'Laying out the options…');
     let out = []; try { out = await laid('options', { ...pl, setbacks }, prog); } catch (e) { console.warn('layout', e); ctx.toast('The layout failed: ' + e.message); }
     const plan = { ...pl, setbacks }; let variants = named(out, { ...plan, program: prog });
     if (ed?.plid !== pl.id) return;
@@ -791,13 +799,19 @@ export function initSitePlan(ctx) {
     ed.variants = variants; ed.aiNote = note; ed.pick = null;
     const best = variants.findIndex(v => v.elements.length); if (best >= 0) useVariant(best); else panel();
   }
+  // a button working on something long: a spinner in the button (its label stays, hidden, so it keeps its size) and,
+  // under the buttons, a short line on what's happening now
+  function busy(sel, stage, stageSel) {
+    const b = card.querySelector(sel); if (b) { b.disabled = true; b.classList.add('busy'); b.setAttribute('aria-busy', 'true'); }
+    const s = stageSel && card.querySelector(stageSel); if (s) s.textContent = stage || '';
+  }
   // changes by name: the AI reads the plan (its pieces, a picture of it) and the words, and answers with edits on those
   // pieces; they're applied here, pinned, and the rest re-fits round them when asked. Without the AI the words are read
   // directly ("make bldg 7 four stories", "remove bldg 3").
   async function aiChange() {
     const p = P(), pl = PL(); if (!pl?.elements.length) return;
     const ask = (ed.chg || '').trim(); if (!ask) { ctx.toast('Say what to change, e.g. “make Apt Bldg 7 four stories”.'); card.querySelector('#spChg')?.focus(); return; }
-    const say = t => { const b = card.querySelector('#spChgGo'); if (b) { b.disabled = true; b.textContent = t; } }; say('Thinking…');
+    const say = t => busy('#spChgGo', t, '#spChgStage'); say('Reading the plan and your request…');
     const sel = ed.sel; let ops = [], full = false, note = '', question = null, byAi = false;
     try {
       let image = null; try { image = await planImage(pl); } catch (e) { /* words and numbers only */ }
@@ -807,7 +821,7 @@ export function initSitePlan(ctx) {
     if (PL() !== pl) return;
     if (!ops.length) { ed.chgNote = question || (note ? note + ' ' : '') + 'Couldn’t tell what to change: name the piece as it’s labelled (“Apt Bldg 7”), or select it and say “it”.'; panel(); return; }
     full = (full || ed.chgFit) && !!pl.recipe;
-    let r = null; change(x => { r = ED.applyEdits(x, ops, { refit: full, spare: x.spareRows = (x.spareRows || []).slice(-40) }); x.elements = r.elements; });
+    let r = null; change(x => { r = ED.applyEdits(x, ops, { refit: full, spare: x.spareRows = (x.spareRows || []).slice(-40) }); x.elements = r.elements; if (r.streets !== (x.streets || [])) x.streets = r.streets; });
     ed.sel = r.touched[0] || null; ed.editing = true; draw();
     if (full) { say('Re-fitting the rest of the site…'); let rf = null; try { rf = await laid('refit', PL(), { amount: 'current' }); } catch (e) { console.warn('refit', e); }
       if (PL() === pl && rf) { pl.elements = rf.elements; pl.spareRows = []; if (rf.recipe) pl.recipe = clone(rf.recipe); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; }
@@ -819,7 +833,7 @@ export function initSitePlan(ctx) {
   // what should go here: the site, its surroundings and the market, read by the AI; each idea can be laid out
   async function bestUse() {
     const p = P(), pl = PL(); if (!pl || pl.ring.length < 3) return;
-    const btn = card.querySelector('#spBest'); if (btn) { btn.disabled = true; btn.textContent = 'Reading the site… (up to a minute)'; }
+    busy('#spBest', 'Reading the site and what’s around it (up to a minute)…', '#spAiStage');
     const c = SP.frame(pl.origin).toLL(SP.centroid(pl.ring)), within = (pr, ms) => Promise.race([pr, new Promise(res => setTimeout(() => res(null), ms))]);
     const kinds = ['grocery', 'restaurant', 'gas', 'pharmacy', 'school', 'hospital', 'clinic', 'mall', 'hotel', 'childcare', 'storage', 'highway'];
     const near = await Promise.all(kinds.map(k => within(fetch('api/nearby?' + new URLSearchParams({ lat: c[1].toFixed(5), lon: c[0].toFixed(5), what: k, limit: '3' })).then(r => r.ok ? r.json() : null).catch(() => null), 12000)));
