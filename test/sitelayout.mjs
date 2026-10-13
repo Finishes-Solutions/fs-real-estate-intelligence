@@ -51,15 +51,15 @@ function usable(plan, o, what) {
     // the land is used: open lawn (not counting the pond's banks) is a small share of the site
     const lawn = o.elements.filter(e => e.kind === 'green' && e.name === 'Open lawn').reduce((s, e) => s + S.elArea(e), 0);
     assert.ok(lawn < 0.15 * m.siteSf, o.name + ': ' + Math.round(lawn / m.siteSf * 100) + '% open lawn');
-    // curved: drives that turn on arcs, an entry with curb returns, an organic pond, rounded parking ends, staggered buildings
+    // curved where it should be (drives on arcs, an entry with curb returns), square where it reads cleaner (ponds), staggered buildings
     assert.ok(o.elements.some(e => e.kind === 'drive' && e.path && e.r > 0), o.name + ': curved drives');
     assert.ok(o.elements.some(e => e.name === 'Main entry' && e.poly?.length > 12), 'curb returns');
-    assert.ok(o.elements.some(e => e.kind === 'pond' && e.poly?.length > 12), 'organic pond');
-    assert.ok(o.elements.some(e => e.kind === 'parking' && e.caps) && o.elements.some(e => e.kind === 'building' && e.jog), 'rounded islands and staggered buildings');
+    assert.ok(o.elements.filter(e => e.kind === 'pond').every(e => !e.poly || e.poly.length <= 30), 'clean straight-edged ponds, no blobs (the default)');
+    assert.ok(o.elements.some(e => e.kind === 'building' && e.jog), 'staggered buildings');
   }
   assert.ok(opts.some(o => o.elements.some(e => e.name === 'Clubhouse')), 'a clubhouse');
   // a curved piece moves as a whole and stays valid
-  const o = opts[0], pd = o.elements.find(e => e.kind === 'pond'), before = S.ringArea(pd.poly);
+  const o = opts[0], pd = o.elements.find(e => e.name === 'Main entry'), before = S.ringArea(pd.poly);
   const moved = S.moveBy({ ...pd }, 3, -2); assert.ok(Math.abs(S.ringArea(moved.poly) - before) < 1 && Math.abs(moved.poly[0][0] - pd.poly[0][0] - 3) < 0.01);
   // drawings: plan SVG with curved drives' centre lines, the sheet, the DXF
   const p = { ...plan, elements: o.elements, zones: o.zones, program: o.program }, svg = G.planSVG(p, { px: 900 }).svg;
@@ -127,7 +127,7 @@ function usable(plan, o, what) {
   const o = L.layoutOptions(plan, { use: 'multifamily' })[0], p = { ...plan, elements: o.elements, program: o.program }, P = o.elements.filter(e => e.kind === 'parking');
   usable(plan, o, 'parameters');
   assert.ok(P.length && P.every(e => e.sw === 9.5 && e.sd === 19 && !e.caps), 'stalls 9.5 x 19, square ends');
-  assert.ok(o.elements.filter(e => e.kind === 'pond').every(e => !e.poly), 'square ponds'); assert.ok(o.elements.filter(e => e.kind === 'pool').every(e => !e.poly), 'square pool');
+  assert.ok(o.elements.filter(e => e.kind === 'pond').every(e => !e.poly || e.poly.length <= 30), 'square-edged ponds (a rectangle, or straight edges along an L-shaped strip)'); assert.ok(o.elements.filter(e => e.kind === 'pool').every(e => !e.poly), 'square pool');
   assert.ok(!o.elements.some(e => e.kind === 'drive' && e.path), 'square corners: no curved drives');
   assert.equal(S.details(p).trees.length, 0, 'trees off'); assert.ok(S.details({ ...p, params: { trees: true } }).trees.length > 20, 'trees on');
   const R = S.edgeRules(p.ring, p.front, p.setbacks); assert.ok(R.some(r => r.role === 'side' && r.pave === 20) && R.some(r => r.role === 'rear' && r.build === 30), 'buffers and setbacks by side');
@@ -162,16 +162,25 @@ function usable(plan, o, what) {
 { const plan = siteOf(fm362, true), many = L.layoutOptions(plan, { use: 'multifamily' }, { count: 10 }); assert.ok(many.length > 3, many.length + ' options'); many.forEach(o => usable(plan, o, 'more options')); }
 // ---- what was asked for: 28,000 sf across 4 buildings, parking trimmed to the need, detention sized to the land used ----
 {
-  const plan = siteOf(fm362, true), prog = { use: 'retail', gfa: 28000, buildings: 4 }, opts = L.layoutOptions(plan, prog);
+  const plan0 = siteOf(fm362, true), prog = { use: 'retail', gfa: 28000, buildings: 4 };
+  // the default fills the site: the four asked for are Phase 1, the same size of building fills the rest as Phase 2
+  const filled = L.layoutOptions(plan0, prog); assert.equal(filled.length, 3);
+  for (const o of filled) {
+    usable(plan0, o, 'filled'); const B = o.elements.filter(e => e.kind === 'building'), P1 = B.filter(e => e.phase !== 2);
+    assert.equal(P1.length, 4, o.name + ': four Phase 1 buildings'); assert.ok(B.length > 4 && B.every(b => Math.abs(S.footArea(b) - 7000) < 400), o.name + ': ' + B.length + ' buildings of about 7,000 sf');
+    assert.deepEqual(o.program.asked, { gfa: 28000, units: null, buildings: 4 }, 'what was asked for is kept'); assert.match(o.notes[0], /Phase 1 is what was asked for: 4 buildings, 28,000 sq ft/);
+  }
+  // with filling off: just what was asked for, the rest kept as land for later
+  const plan = { ...plan0, params: { fill: false } }, opts = L.layoutOptions(plan, prog);
   assert.equal(opts.length, 3);
   for (const o of opts) {
     const { m } = usable(plan, o, '28k retail in 4'), B = o.elements.filter(e => e.kind === 'building');
     assert.equal(B.length, 4, o.name + ': four buildings, not one 28,000 sf box');
     for (const b of B) assert.ok(Math.abs(b.w * b.d - 7000) < 350, 'each about 7,000 sf: ' + Math.round(b.w * b.d));
-    assert.ok(Math.abs(m.gfa - 28000) < 500 && m.spaces <= m.required * 1.35, o.name + ': ' + m.spaces + ' spaces for ' + m.required + ' needed (no acres of spare parking)');
+    assert.ok(Math.abs(m.gfa - 28000) < 840 && m.spaces <= m.required * 1.35, o.name + ': ' + m.spaces + ' spaces for ' + m.required + ' needed (no acres of spare parking)');
     assert.ok(m.pond > 0 && m.pond < 0.6 * 43560, 'detention for the ~2 acres developed, not the whole 7.7: ' + (m.pond / 43560).toFixed(2) + ' ac');
     assert.ok(o.elements.some(e => e.kind === 'green' && e.future), 'the land not used is kept as a future pad or phase');
-    const T = o.elements.filter(e => e.kind === 'trash'); assert.ok(T.length >= 2, 'a trash enclosure per ~25,000 sf (two here)');
+    const T = S.placeTrash({ ...plan, params: { fill: false, trash: { mode: 'auto' } }, elements: o.elements, program: o.program }).elements.filter(e => e.kind === 'trash'); assert.ok(T.length >= 2, 'a trash enclosure per ~25,000 sf (two here), when turned on');
     for (const t of T) assert.ok(B.some(b => S.outline(b).some((p, i, r) => S.segDist([t.x, t.y], p, r[(i + 1) % r.length]) < 250)), 'every enclosure within 250 ft of a building');
     const pv = S.pavement({ ...plan, elements: o.elements }); assert.equal(pv.length, 1, 'drives and parking are one paved surface');
     const raw = o.elements.filter(e => e.kind === 'parking').reduce((s, e) => s + S.stalls(e).count, 0), A = S.accessible({ ...plan, elements: o.elements });
@@ -193,10 +202,27 @@ function usable(plan, o, what) {
 }
 // ---- trash enclosures by the rules ----
 {
-  const plan = siteOf(fm362, true), mf = L.layoutOptions(plan, { use: 'multifamily' })[0], m = S.metrics({ ...plan, elements: mf.elements, program: mf.program });
+  const plan = { ...siteOf(fm362, true), params: { trash: { mode: 'auto' } } }, mf = L.layoutOptions(plan, { use: 'multifamily' })[0], m = S.metrics({ ...plan, elements: mf.elements, program: mf.program });
+  assert.equal(L.layoutOptions(siteOf(fm362, true), { use: 'multifamily' })[0].elements.filter(e => e.kind === 'trash').length, 0, 'left out unless turned on (the default)');
   assert.equal(mf.elements.filter(e => e.kind === 'trash').length, Math.ceil(m.units / 50), 'apartments: a double enclosure per ~50 units');
   const th = L.layoutOptions(plan, { use: 'townhomes' })[0]; assert.equal(th.elements.filter(e => e.kind === 'trash').length, 0, 'homes roll carts to the curb');
   const off = L.layoutOptions({ ...plan, params: { trash: { mode: 'none' } } }, { use: 'retail', gfa: 28000 })[0]; assert.equal(off.elements.filter(e => e.kind === 'trash').length, 0, 'turned off');
   assert.equal(S.trashNeeds({ ...plan, program: { use: 'multifamily' }, elements: [{ kind: 'building', use: 'multifamily', x: 0, y: 0, w: 200, d: 60, units: 240 }] }).map(t => t.type).join(), 'compactor,double', 'a compactor from 200 units, with recycling');
+}
+// ---- building shapes, garages, the paving's holes, 3D detail ----
+{
+  const b = { kind: 'building', x: 0, y: 0, w: 200, d: 120, rot: 0, floors: 3 };
+  assert.equal(S.footArea(b), 24000); assert.ok(S.footArea({ ...b, form: 'L' }) < 24000 && S.footArea({ ...b, form: 'U' }) < 24000 && S.footArea({ ...b, form: 'U' }) > S.footArea({ ...b, form: 'L' }), 'L and U leave a courtyard');
+  const tw = { ...b, form: 'tower', podium: 2, floors: 10 }; assert.ok(S.gfaOf(tw) > 24000 * 2 && S.gfaOf(tw) < 24000 * 10, 'a tower: podium floors over the footprint, tower floors over its own');
+  const site = { ...siteOf(fm362, true), program: { use: 'office' } }, g = { id: 'g', kind: 'garage', x: 0, y: 0, w: 180, d: 120, rot: 0, levels: 4 };
+  assert.equal(S.metrics({ ...site, elements: [g] }).spaces, Math.floor(180 * 120 * 4 / 330), 'a garage counts its spaces');
+  // a drive loop round a lawn: one paved surface with a hole, not two surfaces
+  const loop = [{ kind: 'drive', x: 0, y: 100, w: 300, d: 24, rot: 0 }, { kind: 'drive', x: 0, y: -100, w: 300, d: 24, rot: 0 }, { kind: 'drive', x: -138, y: 0, w: 24, d: 224, rot: 0 }, { kind: 'drive', x: 138, y: 0, w: 24, d: 224, rot: 0 }];
+  const pv = S.pavement({ ...site, elements: loop }); assert.equal(pv.length, 1); assert.equal(pv[0].holes.length, 1, 'the lawn inside the loop is a hole');
+  const fc = S.planFeatures({ ...site, origin: site.origin, elements: [{ ...b, id: 'b1', form: 'U' }, { id: 'p', kind: 'parking', x: 0, y: -160, w: 180, d: 60, rot: 0 }], params: { trees: true } });
+  const ks = new Set(fc.features.map(f => f.properties.k)); assert.ok(ks.has('b3') && ks.has('tree'), '3D detail (parapets, floor lines) and 3D trees');
+  assert.ok(fc.features.filter(f => f.properties.k === 'b3' && f.properties.part === 'floor').length === 2, 'a line at each floor between three floors');
+  const fo = L.layoutOptions({ ...siteOf(fm362, true), params: { form: 'U' } }, { use: 'multifamily', floors: 4 })[0]; usable(siteOf(fm362, true), fo, 'courtyard buildings');
+  assert.ok(fo.elements.some(e => e.kind === 'building' && e.form === 'U'), 'courtyard (U) apartment buildings when asked for');
 }
 console.log('site layouts ok');

@@ -12,11 +12,14 @@ import { areaMap } from './reportkit.js';
 
 const KEY = 'fs-projects-v1', CODE_KEY = 'fs-team-code', NAME_KEY = 'fs-team-name';
 const STATUS = ['Idea', 'Pursuing', 'Under contract', 'Closed', 'Passed'];
-const ADD = ['building', 'parking', 'drive', 'truck', 'pond', 'green', 'trash'];
-const SIZE = { building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12] };
+const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash'];
+const ADD_LABEL = { pad: 'Restaurant pad (drive-thru)', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Outdoor seating', garage: 'Parking garage' };
+const SIZE = { building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
 const SUGGEST = ['Single-family homes, mostly 2-story', '25,000 sf retail strip with 2 pads', '6,000 sf restaurant with drive-thru', '2-story medical office', '200 apartments, 3 stories', 'Warehouse with truck court, as big as fits', 'Mixed use: retail in front, a commons with a lake, 120 apartments, 18 townhomes and 12 duplex units'];
-const COL = { trash: '#a59f92', trail: '#d9c7a0', building: '#d0694c', parking: '#9aa3a6', drive: '#7c8689', truck: '#9a8fb8', pond: '#5b9bd1', green: '#62b072', plaza: '#d9c8a9', court: '#4f7fa3', pool: '#7ccbe6', play: '#e3cc9a' };
+const COL = { patio: '#d8c3a0', garage: '#a3a8aa', lawn: '#cfe3bf', trash: '#a59f92', trail: '#d9c7a0', building: '#d0694c', parking: '#9aa3a6', drive: '#7c8689', truck: '#9a8fb8', pond: '#5b9bd1', green: '#62b072', plaza: '#d9c8a9', court: '#4f7fa3', pool: '#7ccbe6', play: '#e3cc9a' };
 const PAVED = ['parking', 'drive', 'truck'];
+const FORMS = [['bar', 'Bar'], ['L', 'L-shaped'], ['U', 'Courtyard (U)'], ['tower', 'Tower on a podium']];
+const lighten = hex => '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) + (255 - parseInt(hex.slice(i, i + 2), 16)) * 0.45).toString(16).padStart(2, '0')).join(''); // Phase 2 buildings
 const USE_COL = { retail: '#c8673d', restaurant: '#c8673d', office: '#b5553c', medical: '#b5553c', other: '#b0603f', industrial: '#a2775b', multifamily: '#d8b16a', townhomes: '#b8865b', duplex: '#d9a77c', amenity: '#8a6fb3' };
 const get = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -166,15 +169,15 @@ export function initSitePlan(ctx) {
     if (map.getSource(SRC)) return;
     const kind = k => ['==', ['get', 'k'], k], dark = ctx.isDark();
     map.addSource(SRC, { type: 'geojson', data: EMPTY }); map.addSource(HSRC, { type: 'geojson', data: EMPTY }); map.addSource(DSRC, { type: 'geojson', data: EMPTY });
-    map.addLayer({ id: 'fs-sp-lot', type: 'fill', source: SRC, filter: kind('lot'), paint: { 'fill-color': dark ? '#ffffff' : '#ffffff', 'fill-opacity': dark ? .06 : .35 } });
+    map.addLayer({ id: 'fs-sp-lot', type: 'fill', source: SRC, filter: kind('lot'), paint: { 'fill-color': COL.lawn, 'fill-opacity': dark ? .35 : .55 } }); // the site is landscape under everything on it
     map.addLayer({ id: 'fs-sp-zone', type: 'line', source: SRC, filter: kind('zone'), paint: { 'line-color': dark ? '#939a9d' : '#6b7174', 'line-width': 1, 'line-dasharray': [6, 4] } });
     // paving is drawn once as a whole (one colour, one curb line round it); the pieces under it stay clear, and show
     // only when picked, so drives and parking rows read as one surface without seams or darker overlaps
     map.addLayer({ id: 'fs-sp-pave', type: 'fill', source: SRC, filter: kind('paved'), paint: { 'fill-color': COL.parking, 'fill-opacity': .82 } });
     map.addLayer({ id: 'fs-sp-curb', type: 'line', source: SRC, filter: kind('paved'), paint: { 'line-color': dark ? '#d7dbd9' : '#5d6466', 'line-width': 1.2, 'line-opacity': .9 } });
-    map.addLayer({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trail', 'trash']]],
-      paint: { 'fill-color': ['match', ['get', 'k'], 'trail', COL.trail, 'trash', COL.trash, 'parking', COL.parking, 'drive', COL.drive, 'truck', COL.truck, 'pond', COL.pond, 'plaza', COL.plaza, 'court', COL.court, 'pool', COL.pool, 'play', COL.play, COL.green],
-        'fill-opacity': ['case', ['==', ['get', 'sel'], 1], .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, .75] } });
+    map.addLayer({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio']]],
+      paint: { 'fill-color': ['match', ['get', 'k'], 'trail', COL.trail, 'trash', COL.trash, 'patio', COL.patio, 'parking', COL.parking, 'drive', COL.drive, 'truck', COL.truck, 'pond', COL.pond, 'plaza', COL.plaza, 'court', COL.court, 'pool', COL.pool, 'play', COL.play, COL.green],
+        'fill-opacity': ['case', ['==', ['get', 'sel'], 1], .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, ['all', ['==', ['get', 'k'], 'green'], ['==', ['get', 'nm'], 0]], 0.01, .75] } });
     map.addLayer({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: kind('lot'), minzoom: 16, paint: { 'line-color': dark ? '#8b9a86' : '#7d8f76', 'line-width': 0.8, 'line-dasharray': [3, 2] } });
     map.addLayer({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': dark ? '#5b6366' : '#ecece6', 'fill-opacity': .85 } });
     map.addLayer({ id: 'fs-sp-stall', type: 'line', source: SRC, filter: kind('stall'), minzoom: 16, paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': .9 } });
@@ -185,10 +188,11 @@ export function initSitePlan(ctx) {
     map.addLayer({ id: 'fs-sp-sb', type: 'line', source: SRC, filter: kind('setback'), paint: { 'line-color': dark ? '#bcc2c4' : '#4d5457', 'line-width': 1.3, 'line-dasharray': [3, 2] } });
     map.addLayer({ id: 'fs-sp-lotl', type: 'line', source: SRC, filter: kind('lot'), paint: { 'line-color': dark ? '#4caf70' : '#006527', 'line-width': 2.5 } });
     map.addLayer({ id: 'fs-sp-front', type: 'line', source: SRC, filter: kind('front'), paint: { 'line-color': '#e0a23c', 'line-width': 5, 'line-opacity': .9 } });
-    map.addLayer({ id: 'fs-sp-tree', type: 'circle', source: SRC, filter: kind('tree'), minzoom: 15, paint: { 'circle-color': '#7fae5f', 'circle-opacity': .85, 'circle-stroke-color': '#55803c', 'circle-stroke-width': 1,
-      'circle-radius': ['interpolate', ['exponential', 2], ['zoom'], 15, ['*', ['get', 'r'], 0.074], 22, ['*', ['get', 'r'], 9.42]] } }); // canopy radius in feet, to scale
-    map.addLayer({ id: 'fs-sp-bldg', type: 'fill-extrusion', source: SRC, filter: kind('building'), paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], '#d64541', ['match', ['get', 'use'], ...Object.entries(USE_COL).flat(), COL.building]], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .88 } });
-    map.addLayer({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash']]], ['any', ['!', ['in', ['get', 'k'], ['literal', PAVED]]], ['==', ['get', 'sel'], 1], ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
+    map.addLayer({ id: 'fs-sp-tree', type: 'fill-extrusion', source: SRC, filter: kind('tree'), minzoom: 15, paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .95 } }); // 3D trees: trunk, crown, top
+    map.addLayer({ id: 'fs-sp-bldg', type: 'fill-extrusion', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['building', 'garage']]], paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], '#d64541', ['==', ['get', 'k'], 'garage'], COL.garage, ['==', ['get', 'ph'], 2], ['match', ['get', 'use'], ...Object.entries(USE_COL).map(([k, v]) => [k, lighten(v)]).flat(), lighten(COL.building)], ['match', ['get', 'use'], ...Object.entries(USE_COL).flat(), COL.building]], /* Phase 2 lighter */ 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .88 } });
+    map.addLayer({ id: 'fs-sp-b3', type: 'fill-extrusion', source: SRC, filter: kind('b3'), paint: { 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .95, // towers, parapets, floor lines
+      'fill-extrusion-color': ['match', ['get', 'part'], 'tower', ['case', ['==', ['get', 'ph'], 2], ['match', ['get', 'use'], ...Object.entries(USE_COL).map(([k, v]) => [k, lighten(v)]).flat(), lighten(COL.building)], ['match', ['get', 'use'], ...Object.entries(USE_COL).flat(), COL.building]], 'parapet', ['case', ['==', ['get', 'g'], 1], '#8b9092', '#6d635a'], ['case', ['==', ['get', 'g'], 1], '#6f7476', '#4f453c']] } });
+    map.addLayer({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], ['==', ['get', 'sel'], 1], ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
       paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], '#d64541', ['==', ['get', 'sel'], 1], dark ? '#ffffff' : '#0b0d0c', dark ? 'rgba(255,255,255,.5)' : 'rgba(11,13,12,.45)'], 'line-width': ['case', ['==', ['get', 'sel'], 1], 2.5, ['==', ['get', 'bad'], 1], 2, 1] } });
     map.addLayer({ id: 'fs-sp-lab', type: 'symbol', source: SRC, filter: kind('label'), layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': ['case', ['==', ['get', 'big'], 1], 12, 10.5], 'text-allow-overlap': false, 'text-max-width': 14 },
       paint: { 'text-color': '#0b0d0c', 'text-halo-color': '#ffffff', 'text-halo-width': 1.6 } });
@@ -197,7 +201,7 @@ export function initSitePlan(ctx) {
     map.addLayer({ id: 'fs-sp-h', type: 'circle', source: HSRC, paint: { 'circle-radius': ['case', ['==', ['get', 'r'], 1], 7, 6], 'circle-color': ['case', ['==', ['get', 'r'], 1], '#e0a23c', '#ffffff'], 'circle-stroke-color': '#0b0d0c', 'circle-stroke-width': 1.5 } });
     draw();
   }
-  ctx.onOverlays?.(() => { for (const id of ['fs-sp-pave', 'fs-sp-curb', 'fs-sp-ada', 'fs-sp-mark', 'fs-sp-zone', 'fs-sp-lots', 'fs-sp-walk', 'fs-sp-isl', 'fs-sp-tree', 'fs-sp-pl', 'fs-sp-lot', 'fs-sp-fill', 'fs-sp-stall', 'fs-sp-sb', 'fs-sp-lotl', 'fs-sp-front', 'fs-sp-bldg', 'fs-sp-edge', 'fs-sp-lab', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-h']) if (map.getLayer(id)) map.removeLayer(id);
+  ctx.onOverlays?.(() => { for (const id of ['fs-sp-b3', 'fs-sp-pave', 'fs-sp-curb', 'fs-sp-ada', 'fs-sp-mark', 'fs-sp-zone', 'fs-sp-lots', 'fs-sp-walk', 'fs-sp-isl', 'fs-sp-tree', 'fs-sp-pl', 'fs-sp-lot', 'fs-sp-fill', 'fs-sp-stall', 'fs-sp-sb', 'fs-sp-lotl', 'fs-sp-front', 'fs-sp-bldg', 'fs-sp-edge', 'fs-sp-lab', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-h']) if (map.getLayer(id)) map.removeLayer(id);
     for (const s of [SRC, HSRC, DSRC]) if (map.getSource(s)) map.removeSource(s); if (ed) { addLayers(); if (map.getLayer('fs-bldg')) map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } });
   function handles(pl) {
     const e = pl.elements.find(x => x.id === ed.sel); if (!e) return [];
@@ -349,7 +353,7 @@ export function initSitePlan(ctx) {
         '<div class="bacts sp-go"><button class="btn askai" id="spGo">Build Options</button></div><div class="rnote sp-ainote" id="spAiNote">' + esc(ed.aiNote || '') + '</div>' +
         '<div id="spVariants">' + variantsHtml() + '</div></div>' +
       siteHtml(p, pl) +
-      '<div class="bsec"><div class="lt">Draw</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + COL[k] + '"></i>' + SP.KINDS[k].label + '</button>').join('') + '</div>' +
+      '<div class="bsec"><div class="lt">Draw</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + (k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building) + '"></i>' + (ADD_LABEL[k] || SP.KINDS[k].label) + '</button>').join('') + '<button class="btn" id="spTrees" aria-pressed="' + (pl.params?.trees !== false) + '" title="Show or hide the trees on the plan, the map and the PDF">Trees ' + (pl.params?.trees !== false ? 'On' : 'Off') + '</button></div>' +
         '<div class="sp-tools"><button class="btn" aria-pressed="' + (ed.mode === 'front') + '" id="spFront" title="Then click the lot line along the street">' + (ed.mode === 'front' ? 'Click the street side…' : 'Street Side') + '</button><button class="btn" id="spRedraw">Redraw Site</button>' +
         '<button class="btn" id="spUndo"' + (ed.undo.length ? '' : ' disabled') + ' title="Undo (⌘Z / Ctrl+Z)">Undo</button><button class="btn" id="spRedo"' + (ed.redo.length ? '' : ' disabled') + '>Redo</button></div>' +
         (pl.frontGuess ? '<div class="rnote sp-warn">The street side (orange line) is a guess. Use <b>Street Side</b> to pick the lot line along the street; front setbacks and drives follow it.</div>' : '') + '</div>' +
@@ -378,6 +382,7 @@ export function initSitePlan(ctx) {
     const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; const k = so.value, cur = ed.variants[ed.pick]; const val = v => k === 'units' ? v.m.units || 0 : k === 'gfa' ? v.m.gfa : k === 'spaces' ? v.m.spaces : k === 'open' ? v.m.green : (v.rank ?? 0);
       ed.variants.sort((a, b) => val(b) - val(a)); ed.pick = cur ? ed.variants.indexOf(cur) : null; panel(); };
     card.querySelectorAll('[data-add]').forEach(b => b.onclick = () => addEl(b.dataset.add));
+    const tb = card.querySelector('#spTrees'); if (tb) tb.onclick = () => { change(x => { x.params = { ...(x.params || {}), trees: x.params?.trees === false }; }); panel(); };
     on('#spFront', () => { ed.mode = ed.mode === 'front' ? null : 'front'; panel(); });
     on('#spRedraw', () => { ed.mode = 'draw'; ed.draft = []; ed.sel = null; ctx.toast('Click each corner of the site; click the first one again to finish. Esc cancels.'); draw(); panel(); });
     on('#spParcels', () => { ed.mode = ed.mode === 'parcels' ? null : 'parcels'; ed.sel = null; draw(); panel(); });
@@ -418,12 +423,12 @@ export function initSitePlan(ctx) {
         '<label>Use<select id="spUse">' + Object.entries(SP.USES).map(([k, x]) => '<option value="' + k + '"' + (k === u ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select></label>' +
         (u === 'multifamily' ? num('perUnit', 'Parking per unit', prog.perUnit, 0.05) + num('floors', 'Floors', prog.floors, 1) + num('eff', 'Efficiency (net ÷ gross)', prog.eff, 0.01)
           : SP.USES[u]?.garage ? num('perUnit', 'Parking per home', prog.perUnit, 0.25) : num('ratio', 'Parking per 1,000 sf', prog.ratio, 0.1) + num('floors', 'Floors', prog.floors, 1) + num('depth', 'Building depth (ft)', prog.depth, 5)) +
-        '</div>' + mix + homes + stormHtml(pl, prog, pp) +
+        '</div><div class="sp-grid">' + sw('fill', 'Fill the whole site (what you ask for is Phase 1, the rest more of the same as Phase 2)', pp.fill !== false) + '</div>' + mix + homes + stormHtml(pl, prog, pp) +
       '<div class="sp-sub">Setbacks</div><div class="sp-grid">' + sw('buildOn', 'Building setbacks', sb.buildOn !== false) + sw('paveOn', 'Landscape buffer', sb.paveOn !== false) +
         ['front', 'side', 'rear'].map(k => num('sb-' + k, k[0].toUpperCase() + k.slice(1) + ' building (ft)', sb[k], 1)).join('') +
         [['paveFront', 'Front'], ['paveSide', 'Side'], ['paveRear', 'Rear']].map(([k, l]) => num('sb-' + k, l + ' buffer (ft)', sb[k] ?? sb.paving, 1)).join('') + '</div>' +
       '<div class="sp-sub">Parking</div><div class="sp-grid">' + num('pp-stallW', 'Stall width (ft)', pp.stallW, 0.5) + num('pp-stallD', 'Stall depth (ft)', pp.stallD, 0.5) + num('pp-aisle', 'Drive aisle (ft)', pp.aisle, 1) + '</div>' +
-      '<div class="sp-sub">Buildings</div><div class="sp-grid">' + num('pp-bldgDepth', 'Apartment depth (ft)', pp.bldgDepth, 1) + num('pp-maxLen', 'Longest building (ft)', pp.maxLen, 10) + num('pp-bldgGap', 'Space between (ft)', pp.bldgGap, 1) + '</div>' +
+      '<div class="sp-sub">Buildings</div><div class="sp-grid">' + pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) + num('pp-bldgDepth', 'Apartment depth (ft)', pp.bldgDepth, 1) + num('pp-maxLen', 'Longest building (ft)', pp.maxLen, 10) + num('pp-bldgGap', 'Space between (ft)', pp.bldgGap, 1) + '</div>' +
       '<div class="sp-sub">Look</div><div class="sp-grid">' + sw('trees', 'Trees', pp.trees !== false) +
         pick('ponds', 'Ponds and pools', pp.style.ponds, [['organic', 'Natural curves'], ['rounded', 'Rounded rectangles'], ['square', 'Rectangles']]) +
         pick('islands', 'Parking row ends', pp.style.islands, [['rounded', 'Rounded islands'], ['square', 'Square']]) +
@@ -440,7 +445,7 @@ export function initSitePlan(ctx) {
         sel('data-pr="storm"', 'Method', prog.storm, [['', 'Detention pond (default)'], ['retention', 'Retention (wet) pond'], ['underground', 'Underground vaults'], ['none', 'None (regional / small site)']]) +
         pnum('ps-storm.rate', 'Storage (ac-ft per acre)', st.rate, 0.05) + pnum('ps-storm.depth', 'Pond depth (ft)', st.depth, 0.5) + pnum('detentionPct', 'Pond size (% of site)', prog.detentionPct, 1, 'from storage') + '</div>' +
         (sn ? '<div class="rnote">' + (sn.mode === 'none' ? 'No on-site storage.' : 'Needs about ' + sn.volume.toFixed(1) + ' acre-feet for ' + sn.acres.toFixed(1) + ' developed acres' + (sn.mode === 'underground' ? ', all in vaults under the parking.' : '; pond drawn ' + (sn.pond / 43560).toFixed(2) + ' ac' + (sn.vault > 0.05 ? ', about ' + sn.vault.toFixed(1) + ' ac-ft more would go underground.' : '.'))) + ' Local drainage rules (Harris County, the city) set the real number.</div>' : '') +
-      '<div class="sp-sub">Trash</div><div class="sp-grid">' + sel('data-ps="trash.mode"', 'Enclosures', tr.mode || 'auto', [['auto', 'Placed by the rules'], ['none', 'None']]) +
+      '<div class="sp-sub">Trash</div><div class="sp-grid">' + sel('data-ps="trash.mode"', 'Enclosures', tr.mode || 'none', [['none', 'Leave them out'], ['auto', 'Place them by the rules']]) +
         pnum('ps-trash.perUnits', 'Apartments per enclosure', tr.perUnits ?? 50, 5) + pnum('ps-trash.perSf', 'Commercial sf per enclosure', tr.perSf ?? 25000, 1000) + '</div>' +
       '<div class="rnote">Homes roll carts to the curb. Apartments: a double enclosure (trash and recycling) per about 50 units, a compactor from 200. Shops and offices: one per about 25,000 sf, none more than about 250 ft away. Add or move them with Draw.</div>';
   }
@@ -455,10 +460,10 @@ export function initSitePlan(ctx) {
       else x.program = { ...x.program, [k]: v }; }); after(); });
     card.querySelectorAll('.sp-prog [data-sw]').forEach(i => i.onchange = () => { const k = i.dataset.sw;
       if (k === 'auto') { ed.autoSolve = i.checked; return; }
-      change(x => { if (k === 'trees') x.params = { ...(x.params || {}), trees: i.checked }; else x.setbacks = { ...SP.SETBACKS, ...(x.setbacks || {}), [k]: i.checked }; }); if (k !== 'trees') after(); });
+      change(x => { if (k === 'trees' || k === 'fill') x.params = { ...(x.params || {}), [k]: i.checked }; else x.setbacks = { ...SP.SETBACKS, ...(x.setbacks || {}), [k]: i.checked }; }); if (k !== 'trees') after(); });
     card.querySelectorAll('.sp-prog [data-pr]').forEach(i => i.onchange = () => { change(x => { x.program = { ...x.program, [i.dataset.pr]: i.value || null }; }); after(); });
     card.querySelectorAll('.sp-prog [data-ps]').forEach(i => i.onchange = () => { const [g, f] = i.dataset.ps.split('.'); change(x => { x.params = { ...(x.params || {}), [g]: { ...(x.params?.[g] || {}), [f]: i.value } }; }); after(); });
-    card.querySelectorAll('.sp-prog [data-st]').forEach(i => i.onchange = () => { change(x => { x.params = { ...(x.params || {}), style: { ...(x.params?.style || {}), [i.dataset.st]: i.value } }; }); after(); });
+    card.querySelectorAll('.sp-prog [data-st]').forEach(i => i.onchange = () => { change(x => { x.params = i.dataset.st === 'form' ? { ...(x.params || {}), form: i.value } : { ...(x.params || {}), style: { ...(x.params?.style || {}), [i.dataset.st]: i.value } }; }); after(); });
     const mixOf = x => clone(SP.normalizeProgram(x.program).mix || SP.UNIT_MIX);
     card.querySelectorAll('[data-mix]').forEach(i => i.onchange = () => { const [n, f] = i.dataset.mix.split(':'); change(x => { const m = mixOf(x); m[+n][f] = f === 'name' ? i.value : +i.value; x.program = { ...x.program, mix: m }; }); after(); });
     card.querySelectorAll('[data-mixdel]').forEach(b => b.onclick = () => { change(x => { const m = mixOf(x); m.splice(+b.dataset.mixdel, 1); x.program = { ...x.program, mix: m }; }); after(); });
@@ -495,7 +500,10 @@ export function initSitePlan(ctx) {
       '<label>Turn (°)<input type="number" step="1" data-e="rot" value="' + Math.round(e.rot || 0) + '"></label>') +
       (e.kind === 'building' ? '<label>Floors<input type="number" min="1" max="40" step="1" data-e="floors" value="' + (e.floors || 1) + '"></label>' +
         '<label>Use<select data-use="1">' + Object.entries(SP.USES).map(([k, u]) => '<option value="' + k + '"' + (k === (e.use || prog.use) ? ' selected' : '') + '>' + u.label + '</option>').join('') + '</select></label>' +
-        (SP.USES[e.use || prog.use]?.garage ? '<label>Homes<input type="number" min="1" max="40" step="1" data-e="units" value="' + (e.units || 1) + '"></label>' : '') : '') +
+        (SP.USES[e.use || prog.use]?.garage ? '<label>Homes<input type="number" min="1" max="40" step="1" data-e="units" value="' + (e.units || 1) + '"></label>' : '') +
+        '<label>Building shape<select data-form="1">' + FORMS.map(([k, t]) => '<option value="' + k + '"' + ((e.form || 'bar') === k ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' +
+        (e.form === 'tower' ? '<label>Podium floors<input type="number" min="1" max="6" step="1" data-e="podium" value="' + (e.podium || 2) + '"></label>' : '') : '') +
+      (e.kind === 'garage' ? '<label>Levels<input type="number" min="1" max="12" step="1" data-e="levels" value="' + (e.levels || 4) + '"></label>' : '') +
       (['pond', 'pool', 'green', 'plaza', 'court'].includes(e.kind) ? '<label>Shape<select data-shape="1">' + [['organic', 'Natural curves'], ['rounded', 'Rounded rectangle'], ['square', 'Rectangle']].map(([k, t]) => '<option value="' + k + '"' + ((e.poly ? 'organic' : e.shape === 'round' ? 'rounded' : 'square') === k ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' : '') +
       '<label class="sp-wide">Name<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A"></label>' +
       '</div><div class="rnote" id="spRead"></div>' + (PL()?.recipe ? '<div class="rnote">' + (e.pinned ? '📌 Kept in place: the plan re-fits around it. <button class="sp-link" id="spUnpin">Let it move</button>' : 'Move or resize it and the rest of the plan re-fits around it.') + '</div>' : '') +
@@ -503,18 +511,19 @@ export function initSitePlan(ctx) {
   }
   function readout(e) {
     const el = card.querySelector('#spRead'); if (!el || !e) return;
-    el.textContent = e.kind === 'building' ? f0(e.w * e.d) + ' sf footprint · ' + f0(e.w * e.d * (e.floors || 1)) + ' sf total' : e.kind === 'parking' ? SP.stalls(e).count + ' spaces (9 × 18 ft stalls, 24 ft aisles)' : e.kind === 'pond' ? (SP.elArea(e) / 43560).toFixed(2) + ' acres' : f0(SP.elArea(e)) + ' sf' + (SP.isFree(e) ? ' · drag to move it' : '');
+    el.textContent = e.kind === 'building' ? f0(SP.footArea(e)) + ' sf footprint · ' + f0(SP.gfaOf(e)) + ' sf total' : e.kind === 'parking' ? SP.stalls(e).count + ' spaces (9 × 18 ft stalls, 24 ft aisles)' : e.kind === 'pond' ? (SP.elArea(e) / 43560).toFixed(2) + ' acres' : f0(SP.elArea(e)) + ' sf' + (SP.isFree(e) ? ' · drag to move it' : '');
     for (const k of ['w', 'd']) { const i = card.querySelector('[data-e="' + k + '"]'); if (i && document.activeElement !== i) i.value = Math.round(e[k]); }
     const r = card.querySelector('[data-e="rot"]'); if (r && document.activeElement !== r) r.value = Math.round(e.rot || 0);
     if (!drag) nums();
   }
   function wireSel(e) {
     if (!e) return; readout(e);
-    card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v)) return; change(() => { const k = i.dataset.e; e[k] = k === 'floors' || k === 'units' ? Math.max(1, Math.round(v)) : k === 'rot' ? ((v % 360) + 360) % 360 : Math.max(8, v); e.pinned = true; }, true); readout(e); refitSoon(); });
+    card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v)) return; change(() => { const k = i.dataset.e; e[k] = k === 'floors' || k === 'units' || k === 'levels' || k === 'podium' ? Math.max(1, Math.round(v)) : k === 'rot' ? ((v % 360) + 360) % 360 : Math.max(8, v); e.pinned = true; }, true); readout(e); refitSoon(); });
     card.querySelector('[data-shape]')?.addEventListener('change', ev => { change(() => { SP.reshape(e, ev.target.value); e.pinned = true; }); refitSoon(); });
     const up1 = card.querySelector('#spUnpin'); if (up1) up1.onclick = () => change(() => { delete e.pinned; });
     const rf = card.querySelector('#spRefit'); if (rf) rf.onclick = () => refitNow(true);
     card.querySelector('[data-use]')?.addEventListener('change', ev => change(() => { e.use = ev.target.value; }));
+    card.querySelector('[data-form]')?.addEventListener('change', ev => { change(() => { const f = ev.target.value; if (f === 'bar') delete e.form; else e.form = f; if (f === 'tower') { e.podium = e.podium || 2; e.floors = Math.max(e.floors || 1, 8); } if ((f === 'L' || f === 'U') && e.d < 100) e.d = Math.min(150, e.d * 2); e.pinned = true; }); panel(); refitSoon(); });
     card.querySelector('[data-name]')?.addEventListener('change', ev => change(() => { e.name = ev.target.value.trim().slice(0, 40); }, true));
     if (card.querySelector('#spRot')) card.querySelector('#spRot').onclick = () => change(() => { e.rot = ((e.rot || 0) + 90) % 360; });
     card.querySelector('#spDup').onclick = () => { const c = { ...clone(e), id: uid() }, a = (e.rot || 0) * Math.PI / 180, off = e.w + 20; SP.moveBy(c, off * Math.cos(a), off * Math.sin(a)); change(x => x.elements.push(c)); ed.sel = c.id; draw(); panel(); };
@@ -609,8 +618,15 @@ export function initSitePlan(ctx) {
     const c = map.getCenter(), F = SP.frame(pl.origin); let at = F.toFt([c.lng, c.lat]);
     if (!SP.inRing(at, pl.ring)) at = SP.centroid(pl.ring);
     const prog = SP.normalizeProgram(pl.program), [w, d] = kind === 'building' ? [Math.round(Math.max(40, Math.min(240, 12000 / prog.depth))), Math.round(Math.min(prog.depth, 160))] : SIZE[kind];
-    const e = { id: uid(), kind, x: +at[0].toFixed(2), y: +at[1].toFixed(2), w, d, rot: +(((frameAngle(pl) % 360) + 360) % 360).toFixed(2), ...(kind === 'building' ? { floors: prog.floors } : {}) };
-    if (PL().recipe) e.pinned = true;
+    const rot = +(((frameAngle(pl) % 360) + 360) % 360).toFixed(2), pin = PL().recipe ? { pinned: true } : {};
+    if (kind === 'pad') { // a restaurant pad: the building, its outdoor seating by the door and a drive-thru lane round it
+      const L = (u, v) => { const q = SP.rotPt([u, v], rot); return [+(at[0] + q[0]).toFixed(2), +(at[1] + q[1]).toFixed(2)]; };
+      const b = { id: uid(), kind: 'building', ...Object.fromEntries(['x', 'y'].map((k2, i) => [k2, L(0, 0)[i]])), w: 44, d: 50, rot, use: 'restaurant', floors: 1, name: 'Pad', note: 'Restaurant · drive-thru', ...pin };
+      const pt = L(30.5, 8), patio = { id: uid(), kind: 'patio', x: pt[0], y: pt[1], w: 15, d: 34, rot, name: '', note: 'Outdoor seating', ...pin };
+      const lane = { id: uid(), kind: 'drive', path: [L(-34, 60), L(-34, -37), L(50, -37), L(50, 60)], width: 12, r: 14, name: '', note: 'Drive-thru lane', ...pin };
+      change(x => x.elements.push(b, patio, lane)); ed.sel = b.id; draw(); panel(); refitSoon(); return;
+    }
+    const e = { id: uid(), kind, x: +at[0].toFixed(2), y: +at[1].toFixed(2), w, d, rot, ...(kind === 'building' ? { floors: prog.floors } : {}), ...(kind === 'garage' ? { levels: 4, name: 'Parking garage' } : {}), ...(kind === 'play' ? { name: 'Playground' } : {}), ...(kind === 'court' ? { name: 'Pickleball courts' } : {}), ...(kind === 'patio' ? { note: 'Outdoor seating' } : {}), ...pin };
     change(x => x.elements.push(e)); ed.sel = e.id; draw(); panel(); refitSoon();
   }
 
