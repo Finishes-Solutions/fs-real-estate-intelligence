@@ -1,5 +1,6 @@
 // Timeline view: monthly pipeline chart (value or count of projects under construction, stacked) + virtualized Gantt.
-// Both render from ctx.visible, so they always agree with the map, list and exports.
+// Both render from ctx.visible, so they always agree with the map, list and exports. The chart's time axis lines up with
+// the Gantt's bars below it, and its bars slide to new heights (D3 transitions) when the grouping, measure or filters change.
 import { USES } from './lib/taxonomy.mjs';
 
 // categorical slots (fixed order; validated palette from the dataviz reference), light / dark
@@ -56,11 +57,15 @@ export function initTimeline(ctx) {
     return out;
   }
 
-  let prevD = null;
+  let prevD = null, prevBars = new Map(), drawn = false; // prevBars: each bar's last x/y/width/height, keyed group|month
+  // axis money without trailing zeros: $12B, $2.5B, $750M
+  const tickM = v => fmtM(v).replace(/(\.\d*?)0+([BMK])$/, '$1$2').replace(/\.([BMK])$/, '$1');
   function clearRange() { const d = prevD && prevD.f !== 'active' ? prevD : ctx.periodSpec('12m'); prevD = null; ctx.fromSpec({ ...ctx.curSpec(), d }, { fly: false }); }
   function renderChart(list, groups) {
     const active = ctx.state.d && ctx.state.d.f === 'active' ? [ctx.state.d.from || months[0], ctx.state.d.to || months[months.length - 1]] : null;
-    const el = $('tlChart'), W = el.clientWidth, H = 210, m = { t: 10, r: 14, b: 24, l: 58 };
+    // the plot starts where the Gantt's bars start, so a month in the chart sits right above the same month below
+    const el = $('tlChart'), W = el.clientWidth, H = 210, L = labelW() + 1, cw = Math.max(160, $('gScroll').clientWidth - labelW() - 12);
+    const m = { t: 10, r: Math.max(6, W - L - cw), b: 24, l: Math.min(L, W - 166) };
     const idx = new Map(months.map((mo, i) => [mo, i]));
     const rowsM = months.map(mo => Object.fromEntries([['m', mo], ...groups.map(g => [g, 0])]));
     for (const f of list) {
@@ -71,29 +76,43 @@ export function initTimeline(ctx) {
     const stack = d3.stack().keys(groups)(rowsM), ymax = d3.max(stack.length ? stack[stack.length - 1] : [[0, 0]], d => d[1]) || 1;
     x = d3.scaleUtc().domain([mStart(months[0]), d3.utcMonth.offset(mStart(months[months.length - 1]), 1)]).range([m.l, W - m.r]);
     const y = d3.scaleLinear().domain([0, ymax]).nice(4).range([H - m.b, m.t]);
-    const fmtY = opt.measure === 'value' ? fmtM : fmtN;
+    const fmtY = opt.measure === 'value' ? fmtM : fmtN, fmtT = opt.measure === 'value' ? tickM : fmtN;
     const svg = d3.create('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', W).attr('height', H).attr('role', 'img')
       .attr('aria-label', (opt.measure === 'value' ? 'Estimated value' : 'Number') + ' of projects under construction by month');
     svg.append('g').attr('class', 'grid').selectAll('line').data(y.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d));
-    svg.append('g').attr('class', 'yax').selectAll('text').data(y.ticks(4)).join('text').attr('x', m.l - 8).attr('y', d => y(d) + 4).attr('text-anchor', 'end').text(d => d ? fmtY(d) : '0');
+    svg.append('g').attr('class', 'yax').selectAll('text').data(y.ticks(4)).join('text').attr('x', m.l - 8).attr('y', d => y(d) + 4).attr('text-anchor', 'end').text(d => d ? fmtT(d) : '0');
     const bw = Math.max(1, (x(mStart(months[1] || months[0])) - x(mStart(months[0]))) || 8), gap = bw > 6 ? 2 : 0;
-    svg.append('g').selectAll('g').data(stack).join('g').attr('fill', d => colorOf(opt.group, d.key))
-      .selectAll('rect').data(d => d).join('rect').attr('x', (d, i) => x(mStart(months[i])) + gap / 2).attr('width', Math.max(1, bw - gap))
+    // the column under the pointer, behind the bars
+    const hl = svg.append('rect').attr('class', 'hl').attr('y', m.t).attr('height', H - m.b - m.t).attr('width', bw).style('opacity', 0);
+    const bars = svg.append('g').selectAll('g').data(stack).join('g').attr('fill', d => colorOf(opt.group, d.key))
+      .selectAll('rect').data(d => d.map(v => Object.assign(v, { k: d.key }))).join('rect').attr('data-k', (d, i) => d.k + '|' + months[i])
+      .attr('x', (d, i) => x(mStart(months[i])) + gap / 2).attr('width', Math.max(1, bw - gap))
       .attr('y', d => y(d[1]) + (d[1] - d[0] > 0 ? 1 : 0)).attr('height', d => Math.max(0, y(d[0]) - y(d[1]) - (d[1] - d[0] > 0 ? 1 : 0)))
       .attr('opacity', (d, i) => active && (months[i] < active[0] || months[i] > active[1]) ? .32 : 1);
+    // motion: a bar that was there slides from where it was; a new one grows up from the baseline (all of them the first time)
+    const next = new Map(); bars.each(function () { next.set(this.dataset.k, ['x', 'y', 'width', 'height'].map(a => +this.getAttribute(a))); });
+    if (!ctx.reduceMotion) bars.each(function (d, i) {
+      const to = next.get(this.dataset.k), from = prevBars.get(this.dataset.k) || [to[0], y(0), to[2], 0];
+      if (from.every((v, j) => Math.abs(v - to[j]) < .5)) return;
+      d3.select(this).attr('x', from[0]).attr('y', from[1]).attr('width', from[2]).attr('height', from[3])
+        .transition().duration(650).delay(drawn ? 0 : Math.min(300, i * 4)).ease(d3.easeCubicOut).attr('x', to[0]).attr('y', to[1]).attr('width', to[2]).attr('height', to[3]);
+    });
+    prevBars = next; drawn = true;
     const xt = x.ticks(W < 600 ? 4 : 8);
     svg.append('g').attr('class', 'xax').selectAll('text').data(xt).join('text').attr('x', d => x(d)).attr('y', H - 6).attr('text-anchor', 'middle').text(d => d3.utcFormat(d.getUTCMonth() === 0 ? '%Y' : '%b')(d));
-    const now = new Date(); if (now >= x.domain()[0] && now <= x.domain()[1]) svg.append('line').attr('class', 'today').attr('x1', x(now)).attr('x2', x(now)).attr('y1', m.t - 4).attr('y2', H - m.b);
+    const now = new Date(); if (now >= x.domain()[0] && now <= x.domain()[1]) { svg.append('line').attr('class', 'today').attr('x1', x(now)).attr('x2', x(now)).attr('y1', m.t - 4).attr('y2', H - m.b);
+      svg.append('text').attr('class', 'today-l').attr('x', x(now) + 4).attr('y', m.t + 4).text('Today'); }
     // hover: nearest month column under the pointer (works through the brush overlay)
     const tip = $('tlTip');
     svg.on('pointermove', ev => {
       if (ev.pointerType && ev.pointerType !== 'mouse') return;
       const [px] = d3.pointer(ev); if (px < m.l || px > W - m.r) { tip.style.opacity = 0; return; }
       const mo = d3.utcMonth.floor(x.invert(px)).toISOString().slice(0, 7), i = months.indexOf(mo); if (i < 0) return;
+      hl.attr('x', x(mStart(mo))).style('opacity', 1);
       const r = rowsM[i], tot = groups.reduce((s, g) => s + r[g], 0);
       tip.innerHTML = '<b>' + esc(d3.utcFormat('%B %Y')(mStart(mo))) + '</b><span>' + fmtY(tot) + ' total</span>' + groups.slice().reverse().filter(g => r[g]).map(g => '<div><i style="background:' + colorOf(opt.group, g) + '"></i>' + esc(labelOf(opt.group, g)) + '<em>' + fmtY(r[g]) + '</em></div>').join('');
       const left = x(mStart(mo)) + bw + 10; tip.style.opacity = 1; tip.style.left = (left + tip.offsetWidth > W ? x(mStart(mo)) - tip.offsetWidth - 10 : left) + 'px'; tip.style.top = '8px';
-    }).on('pointerleave', () => { tip.style.opacity = 0; });
+    }).on('pointerleave', () => { tip.style.opacity = 0; hl.style('opacity', 0); });
     // brush -> "under construction during" filter. Snaps to whole months while dragging, shows the range live,
     // stays on the chart afterwards so its edges can be adjusted; a tap without dragging picks a single month.
     const ymOf = d => d.toISOString().slice(0, 7), fmtMo = d3.utcFormat('%b %Y');
@@ -169,7 +188,7 @@ export function initTimeline(ctx) {
     months = domainMonths(chartList);
     const groups = groupsFor(opt.group, list);
     const est = list.filter(f => f.tsE || f.teE).length;
-    $('tlSub').textContent = fmtN(list.length) + ' projects · ' + fmtM(list.reduce((s, f) => s + f.cost, 0)) + ' est. value' + (est ? ' · ' + Math.round(est / Math.max(1, list.length) * 100) + '% have estimated dates' : '') + (ctx.filterText() ? ' · ' + ctx.filterText() : '');
+    $('tlSub').textContent = fmtN(list.length) + ' projects · ' + fmtM(list.reduce((s, f) => s + f.cost, 0)) + ' est. value' + (est ? ' · ' + (est / list.length < .005 ? 'under 1%' : Math.round(est / list.length * 100) + '%') + ' have estimated dates' : '') + (ctx.filterText() ? ' · ' + ctx.filterText() : '');
     if (!list.length) { $('tlChart').querySelector('svg')?.remove(); $('gInner').innerHTML = '<div class="empty">No filings match these filters.</div>'; $('gInner').style.height = 'auto'; $('tlLegend').innerHTML = ''; return; }
     renderChart(chartList, groupsFor(opt.group, chartList)); renderGantt(list, groups);
     const d = ctx.state.d, r = $('tlRange');

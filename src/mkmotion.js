@@ -5,7 +5,7 @@
 // to its end state, so a PDF export never captures a chart half drawn. Nothing moves when the user prefers reduced motion.
 //   data-mka on a mark: bar | line | area | dot (an SVG path: its d morphs), hb (a horizontal bar: width %), num (text)
 //   data-mk: the mark's key inside its chart; the chart is found from its box's title and its data-mkc (or its place in
-//   the box), so area.js call sites need nothing
+//   the box), so area.js call sites need nothing. Outside the Market tab a container names itself with data-mkbox.
 const DUR = 700;
 let live = new Set(), observers = [], waiting = new WeakSet();
 
@@ -36,9 +36,9 @@ const shape = d => String(d).replace(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g, '#');
 function keyer() {
   const seen = new Map();
   return el => {
-    const chart = el.closest('[data-mkc], svg, .mk-hbars, .mk-kpi'), box = chart?.closest('.mk-kpi, .mk-sm, .mk-box'); if (!box) return null;
+    const chart = el.closest('[data-mkc], svg, .mk-hbars, .mk-kpi'), box = chart?.closest('.mk-kpi, .mk-sm, .mk-box, [data-mkbox]'); if (!box) return null;
     let id = seen.get(chart);
-    if (id == null) { const title = box.querySelector('h3, .mk-kl, .mk-smh span')?.textContent || '';
+    if (id == null) { const title = box.dataset.mkbox ?? box.querySelector('h3, .mk-kl, .mk-smh span')?.textContent ?? '';
       id = title + '#' + (chart.dataset.mkc ?? [...box.querySelectorAll('svg.mk-svg, svg.mk-spk, .mk-hbars')].indexOf(chart)); seen.set(chart, id); }
     return id + '|' + el.dataset.mka + ':' + el.dataset.mk;
   };

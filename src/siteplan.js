@@ -7,6 +7,8 @@
 import * as SP from './lib/siteplan.mjs';
 import { layoutOptions, refit, PARAMS } from './lib/sitelayout.mjs';
 import * as PF from './lib/proforma.mjs';
+import { pfCharts } from './pfcharts.js';
+import { snapshot as marksBefore, animate as animateMarks } from './mkmotion.js'; // snapshot() here is the plan's undo
 import { sheetHTML, planSVG } from './lib/sitesheet.mjs';
 import { BUILDING_TYPES, BUILDING_GROUPS, typeById, fromType } from './lib/buildings.mjs';
 const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
@@ -614,20 +616,27 @@ export function initSitePlan(ctx) {
     if (!R) return '<details class="bsec sp-pf" id="spPfSec"><summary class="lt">Pro forma</summary><div class="rnote">Lay out a plan first (Build Options or by hand); the pro forma reads its buildings, units and parking.</div></details>';
     const A = R.A, $m = v => v == null || !isFinite(v) ? '—' : (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toFixed(2) + 'M' : f0(Math.abs(v))), pc2 = v => v == null || !isFinite(v) ? 'n/a' : (v * 100).toFixed(2) + '%';
     const inp = (k, label, v, step, unit) => '<label>' + label + '<input type="number" step="' + step + '" data-pf="' + k + '" value="' + (v ?? '') + '">' + (unit ? '<small>' + unit + '</small>' : '') + '</label>';
-    const card1 = (k, v, sub) => '<div class="sp-card"><span>' + k + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>', uses = Object.keys(R.P.uses), res = R.returns, S1 = R.simple, simpleOn = A.method === 'simple';
+    const card1 = (k, v, sub) => '<div class="sp-card"><span>' + k + '</span><b data-mka="num" data-mk="' + k + '">' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>', uses = Object.keys(R.P.uses), res = R.returns, S1 = R.simple, simpleOn = A.method === 'simple';
     const homes = uses.some(u => ['townhomes', 'duplex', 'sfr'].includes(u)), mf = uses.includes('multifamily'), units = R.P.units || 0;
     const sch = R.sched, tot = Math.max(1, sch.total), seg = (n, cls, t) => n > 0 ? '<i class="' + cls + '" style="flex:' + n + '" title="' + t + ': ' + n + ' months">' + n + '</i>' : '';
-    return '<details class="bsec sp-pf" id="spPfSec"' + (ed.pfOpen ? ' open' : '') + '><summary class="lt">Pro forma</summary>' +
+    // charts: the sensitivity table runs the model 25 times, so only while the section is open
+    let charts = ''; try { // a chart that fails leaves the numbers and tables as they were
+    const J = pfCharts({ esc }), sens = ed.pfOpen ? J.sens(PF.sensitivity(pl, R.A, { forSale: R.forSale, simple: simpleOn })) : '';
+    charts = '<div class="sp-sub">Cash in and out</div>' + J.jcurve(R, { simple: simpleOn }) +
+      '<div class="rnote">The investors\u2019 money, added up month by month' + (simpleOn ? ' (by year in this method)' : '') + ': equity goes in first, rent comes back, and the ' + (R.forSale ? 'home sales' : 'refinance and the sale') + ' return the rest. Hover for any month.</div>' +
+      '<div class="sp-sub">Where the money goes</div>' + J.moneyBars(R) +
+      (R.forSale && simpleOn ? '' : '<div class="sp-sub">If ' + (R.forSale ? 'prices and costs' : 'rents and the exit cap rate') + ' change</div>' + (sens ? sens + '<div class="rnote">' + (R.forSale ? 'Profit margin on the home sales' : 'Levered IRR') + '. The middle is this plan; green beats it and red falls short.</div>' : '<div class="rnote" data-pfsens>Open to see the returns at other ' + (R.forSale ? 'prices and costs' : 'rents and cap rates') + '.</div>')); } catch (e) { console.warn('pro forma charts', e); }
+    return '<details class="bsec sp-pf" id="spPfSec" data-mkbox="pf"' + (ed.pfOpen ? ' open' : '') + '><summary class="lt">Pro forma</summary>' +
       '<div class="sp-grid"><label>Method<select data-pfs="method"><option value="schedule"' + (simpleOn ? '' : ' selected') + '>Month by month, with the schedule</option><option value="simple"' + (simpleOn ? ' selected' : '') + '>TestFit method (annual, no schedule)</option></select></label>' +
         (homes && !mf ? '<label class="sp-sw"><input type="checkbox" data-pfb="forSale"' + (A.forSale ? ' checked' : '') + '> Homes for sale (not rent)</label>' : '') + '</div>' +
       '<div class="sp-sched" title="Schedule in months">' + seg(sch.pre, 'pre', 'Pre-development') + seg(sch.build, 'bld', 'Construction') + seg(sch.lease, 'lease', R.forSale ? 'Sales' : 'Lease-up') + seg(sch.total - sch.toStabilize, 'hold', 'Hold') + '</div>' +
       '<div class="rnote">Design &amp; permits ' + sch.pre + ' mo · construction ' + sch.build + ' mo · ' + (R.forSale ? 'sales ' : 'lease-up ') + sch.lease + ' mo' + (R.forSale ? '' : ' · stabilized at month ' + sch.toStabilize + ' · sale at month ' + sch.total) + '</div>' +
-      (simpleOn ? '<div class="sp-cards">' + card1('Total cost', $m(S1.cost)) + card1('NOI', $m(S1.noi)) + card1('Yield on cost', pc2(S1.yoc)) + card1('Value', $m(S1.value)) + card1('Unlevered IRR', pc2(S1.unlevIrr)) + card1('Levered IRR', pc2(S1.levIrr)) + card1('Equity multiple', isFinite(S1.multiple) ? S1.multiple.toFixed(2) + 'x' : '—') + card1('DSCR', S1.dscr.toFixed(2) + 'x') + '</div>' +
+      (simpleOn ? '<div class="sp-cards" data-mkc="cards">' + card1('Total cost', $m(S1.cost)) + card1('NOI', $m(S1.noi)) + card1('Yield on cost', pc2(S1.yoc)) + card1('Value', $m(S1.value)) + card1('Unlevered IRR', pc2(S1.unlevIrr)) + card1('Levered IRR', pc2(S1.levIrr)) + card1('Equity multiple', isFinite(S1.multiple) ? S1.multiple.toFixed(2) + 'x' : '—') + card1('DSCR', S1.dscr.toFixed(2) + 'x') + '</div>' +
         '<div class="rnote sp-warn">This is TestFit’s one-page method: all the money goes in at year 0 and full rents start in year 1, with no construction period, interest or lease-up, so it overstates returns. The month-by-month method on the same plan gives a levered IRR of ' + pc2(res.levIrr) + '.</div>'
-      : '<div class="sp-cards">' + card1('Total cost', $m(R.budget.total), units ? $m(R.budget.total / units) + ' / unit' : $m(R.budget.total / Math.max(1, R.P.gsf)) + ' / sf') +
+      : '<div class="sp-cards" data-mkc="cards">' + card1('Total cost', $m(R.budget.total), units ? $m(R.budget.total / units) + ' / unit' : $m(R.budget.total / Math.max(1, R.P.gsf)) + ' / sf') +
         (R.forSale ? card1('Home sales', $m(R.exit.sales)) + card1('Margin', pc2(res.margin)) : card1('Stabilized NOI', $m(R.ops.noi)) + card1('Yield on cost', pc2(res.yoc), 'spread ' + pc2(res.spread)) + card1('Stabilized value', $m(res.value))) +
         card1('Profit', $m(res.profit)) + card1('Unlevered IRR', pc2(res.unlevIrr)) + card1('Levered IRR', pc2(res.levIrr)) + card1('Equity multiple', res.multiple ? res.multiple.toFixed(2) + 'x' : '—') + card1('Peak equity', $m(res.peakEquity)) + (res.dscr ? card1('DSCR', res.dscr.toFixed(2) + 'x') : '') + '</div>' +
-        '<div class="rnote">The TestFit one-page method on the same numbers reads ' + pc2(S1.levIrr) + ' levered: it skips the ' + sch.toStabilize + ' months before the project is stabilized.</div>') +
+        '<div class="rnote">The TestFit one-page method on the same numbers reads ' + pc2(S1.levIrr) + ' levered: it skips the ' + sch.toStabilize + ' months before the project is stabilized.</div>') + charts +
       '<table class="sp-mixt"><tr><th>Budget</th><th>Amount</th><th>' + (units ? 'Per unit' : 'Per sf') + '</th></tr>' + [['Land', R.budget.land], ['Hard costs', R.budget.hard], ['Site work & parking', R.budget.site], ...(R.budget.storm > 0 ? [['· incl. ' + R.budget.vaultAcFt.toFixed(1) + ' ac-ft underground storage', R.budget.storm]] : []), ['Tenant improvements', R.budget.ti], ['Soft costs', R.budget.soft], ['Contingency', R.budget.cont], ['Developer fee', R.budget.fee], ['Construction interest', R.budget.interest], ['Loan fees', R.budget.loanFees], ['Total', R.budget.total]].filter(([, v]) => v > 0).map(([k, v]) => '<tr><td>' + k + '</td><td>' + $m(v) + '</td><td>' + $m(units ? v / units : v / Math.max(1, R.P.gsf)) + '</td></tr>').join('') + '</table>' +
       (R.forSale ? '' : '<table class="sp-mixt"><tr><th>Stabilized year</th><th>Amount</th></tr>' + R.ops.lines.map(l => '<tr><td>' + esc(l.k) + '</td><td>' + $m(l.v) + '</td></tr>').join('') +
         '<tr><td>Vacancy &amp; credit loss</td><td>' + $m(-R.ops.loss) + '</td></tr><tr><td>Operating expenses (taxes ' + $m(R.ops.tax) + ')</td><td>' + $m(-R.ops.opex) + '</td></tr><tr><td><b>Net operating income</b></td><td><b>' + $m(R.ops.noi) + '</b></td></tr></table>') +
@@ -645,9 +654,13 @@ export function initSitePlan(ctx) {
       '<div class="rnote">Typical Houston-area numbers to start with, not quotes: check costs with a contractor and rents with a market study.</div></details>';
   }
   function wirePf(p, pl) {
-    const box = card.querySelector('.sp-pf'); if (!box) return; box.ontoggle = () => { ed.pfOpen = box.open; };
+    const box = card.querySelector('.sp-pf'); if (!box) return; box.ontoggle = () => { ed.pfOpen = box.open; if (box.open && box.querySelector('[data-pfsens]')) redraw(); };
     const set = (k, v) => change(x => { const pf = { ...(x.pf || {}) }, [a, b] = k.split('.'); if (b) pf[a] = { ...(pf[a] || {}), [b]: v }; else pf[a] = v; x.pf = pf; }, true);
-    const redraw = () => { const el = card.querySelector('#spPf'); if (el) { el.innerHTML = pfHtml(p, PL()); wirePf(p, PL()); } };
+    // redraw after an edit: the charts and numbers slide to the new result (src/mkmotion.js)
+    const redraw = () => { const el = card.querySelector('#spPf'); if (el) { const before = marksBefore(el); el.innerHTML = pfHtml(p, PL()); wirePf(p, PL()); animateMarks(el, before, { reduce: ctx.reduceMotion }); } };
+    // chart hover: the app's tooltip, lifted above the card while it's over a chart (it normally sits under cards)
+    box.querySelectorAll('.mk-hit[data-tip]').forEach(h => { h.onpointermove = e => { const vr = ctx.viewport.getBoundingClientRect(); ctx.tip.textContent = h.dataset.tip; ctx.tip.style.zIndex = 8; let px = e.clientX - vr.left + 14; const w = ctx.tip.offsetWidth; if (px + w > vr.width - 8) px = e.clientX - vr.left - w - 14;
+      ctx.tip.style.left = px + 'px'; ctx.tip.style.top = (e.clientY - vr.top + 14) + 'px'; ctx.tip.style.opacity = 1; }; h.onpointerleave = () => { ctx.tip.style.opacity = 0; ctx.tip.style.zIndex = ''; }; });
     box.querySelectorAll('[data-pf]').forEach(i => i.onchange = () => { if (i.value === '') return; set(i.dataset.pf, +i.value); redraw(); });
     box.querySelectorAll('[data-pfs]').forEach(i => i.onchange = () => { set(i.dataset.pfs, i.value); redraw(); });
     box.querySelectorAll('[data-pfb]').forEach(i => i.onchange = () => { set(i.dataset.pfb, i.checked); redraw(); });
