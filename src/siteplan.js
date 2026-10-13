@@ -123,7 +123,7 @@ export function initSitePlan(ctx) {
     ed = { pid, plid, sel: null, undo: [], redo: [], mode: o.draw ? 'draw' : null, draft: [], variants: null };
     if (map.getLayer('fs-bldg')) { hidBldg = map.getLayoutProperty('fs-bldg', 'visibility') || 'visible'; map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } // the plan replaces what's there
     addLayers(); draw(); panel(); fit();
-    const pl = PL(); if (pl?.ring.length >= 3 && pl.frontGuess) map.once('idle', () => { if (PL() === pl && pl.frontGuess) detectFront(pl); });
+    const pl = PL(); if (pl?.ring.length >= 3 && (pl.frontGuess || pl.streets == null)) map.once('idle', () => { if (PL() === pl && (pl.frontGuess || pl.streets == null)) detectFront(pl); });
   }
   function close() {
     if (!ed) return; ed = null; draw();
@@ -149,11 +149,11 @@ export function initSitePlan(ctx) {
         for (const c of parts) { const ft = c.map(F.toFt); if (ft.some(([x, y]) => Math.abs(x) < 2500 && Math.abs(y) < 2500)) lines.push(ft); }
       }
     } catch (e) {}
-    const f = SP.frontFromRoads(pl.ring, lines);
-    if (f != null) { pl.front = f; pl.frontGuess = false; save(P()); draw(); panel(); }
+    const f = pl.frontGuess ? SP.frontFromRoads(pl.ring, lines) : pl.front;
+    if (f != null) { pl.front = f; pl.frontGuess = false; if (!pl.streetsSet) pl.streets = SP.streetsFromRoads(pl.ring, lines, f); save(P()); draw(); panel(); }
   }
 
-  function snapshot() { const pl = PL(); return clone({ zones: pl.zones || [], elements: pl.elements, front: pl.front, frontGuess: pl.frontGuess, setbacks: pl.setbacks, program: pl.program, ring: pl.ring, origin: pl.origin, src: pl.src, params: pl.params || null, recipe: pl.recipe || null }); }
+  function snapshot() { const pl = PL(); return clone({ zones: pl.zones || [], elements: pl.elements, front: pl.front, frontGuess: pl.frontGuess, streets: pl.streets || [], streetsSet: !!pl.streetsSet, setbacks: pl.setbacks, program: pl.program, ring: pl.ring, origin: pl.origin, src: pl.src, params: pl.params || null, recipe: pl.recipe || null }); }
   function change(fn, keepPanel) {
     const pl = PL(); if (!pl) return; ed.undo.push(snapshot()); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = [];
     fn(pl); pl.updated = new Date().toISOString(); save(P()); draw(); if (!keepPanel) panel(); else nums();
@@ -180,6 +180,8 @@ export function initSitePlan(ctx) {
         'fill-opacity': ['case', ['==', ['get', 'sel'], 1], .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, ['all', ['==', ['get', 'k'], 'green'], ['==', ['get', 'nm'], 0]], 0.01, .75] } });
     map.addLayer({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: kind('lot'), minzoom: 16, paint: { 'line-color': dark ? '#8b9a86' : '#7d8f76', 'line-width': 0.8, 'line-dasharray': [3, 2] } });
     map.addLayer({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': dark ? '#5b6366' : '#ecece6', 'fill-opacity': .85 } });
+    map.addLayer({ id: 'fs-sp-yard', type: 'fill', source: SRC, filter: kind('yard'), minzoom: 16, paint: { 'fill-color': dark ? '#6b6456' : '#e6dcc8', 'fill-opacity': .9 } });
+    map.addLayer({ id: 'fs-sp-fence', type: 'line', source: SRC, filter: kind('fence'), minzoom: 16, paint: { 'line-color': dark ? '#c9bba0' : '#8a7a62', 'line-width': 1 } });
     map.addLayer({ id: 'fs-sp-stall', type: 'line', source: SRC, filter: kind('stall'), minzoom: 16, paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': .9 } });
     map.addLayer({ id: 'fs-sp-isl', type: 'fill', source: SRC, filter: kind('island'), paint: { 'fill-color': COL.green, 'fill-opacity': .9 } });
     map.addLayer({ id: 'fs-sp-ada', type: 'fill', source: SRC, filter: kind('ada'), minzoom: 16, paint: { 'fill-color': '#2f6db5', 'fill-opacity': .9 } });
@@ -187,7 +189,7 @@ export function initSitePlan(ctx) {
     map.addLayer({ id: 'fs-sp-pl', type: 'line', source: SRC, filter: kind('pline'), paint: { 'line-color': dark ? '#8acda3' : '#0a7a36', 'line-width': 1, 'line-dasharray': [4, 3], 'line-opacity': .8 } });
     map.addLayer({ id: 'fs-sp-sb', type: 'line', source: SRC, filter: kind('setback'), paint: { 'line-color': dark ? '#bcc2c4' : '#4d5457', 'line-width': 1.3, 'line-dasharray': [3, 2] } });
     map.addLayer({ id: 'fs-sp-lotl', type: 'line', source: SRC, filter: kind('lot'), paint: { 'line-color': dark ? '#4caf70' : '#006527', 'line-width': 2.5 } });
-    map.addLayer({ id: 'fs-sp-front', type: 'line', source: SRC, filter: kind('front'), paint: { 'line-color': '#e0a23c', 'line-width': 5, 'line-opacity': .9 } });
+    map.addLayer({ id: 'fs-sp-front', type: 'line', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['front', 'street']]], paint: { 'line-color': '#e0a23c', 'line-width': ['match', ['get', 'k'], 'street', 3.5, 5], 'line-opacity': .9 } });
     map.addLayer({ id: 'fs-sp-tree', type: 'fill-extrusion', source: SRC, filter: kind('tree'), minzoom: 15, paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .95 } }); // 3D trees: trunk, crown, top
     map.addLayer({ id: 'fs-sp-bldg', type: 'fill-extrusion', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['building', 'garage']]], paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], '#d64541', ['==', ['get', 'k'], 'garage'], COL.garage, ['==', ['get', 'ph'], 2], ['match', ['get', 'use'], ...Object.entries(USE_COL).map(([k, v]) => [k, lighten(v)]).flat(), lighten(COL.building)], ['match', ['get', 'use'], ...Object.entries(USE_COL).flat(), COL.building]], /* Phase 2 lighter */ 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .88 } });
     map.addLayer({ id: 'fs-sp-b3', type: 'fill-extrusion', source: SRC, filter: kind('b3'), paint: { 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .95, // towers, parapets, floor lines
@@ -201,7 +203,7 @@ export function initSitePlan(ctx) {
     map.addLayer({ id: 'fs-sp-h', type: 'circle', source: HSRC, paint: { 'circle-radius': ['case', ['==', ['get', 'r'], 1], 7, 6], 'circle-color': ['case', ['==', ['get', 'r'], 1], '#e0a23c', '#ffffff'], 'circle-stroke-color': '#0b0d0c', 'circle-stroke-width': 1.5 } });
     draw();
   }
-  ctx.onOverlays?.(() => { for (const id of ['fs-sp-b3', 'fs-sp-pave', 'fs-sp-curb', 'fs-sp-ada', 'fs-sp-mark', 'fs-sp-zone', 'fs-sp-lots', 'fs-sp-walk', 'fs-sp-isl', 'fs-sp-tree', 'fs-sp-pl', 'fs-sp-lot', 'fs-sp-fill', 'fs-sp-stall', 'fs-sp-sb', 'fs-sp-lotl', 'fs-sp-front', 'fs-sp-bldg', 'fs-sp-edge', 'fs-sp-lab', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-h']) if (map.getLayer(id)) map.removeLayer(id);
+  ctx.onOverlays?.(() => { for (const id of ['fs-sp-b3', 'fs-sp-yard', 'fs-sp-fence', 'fs-sp-pave', 'fs-sp-curb', 'fs-sp-ada', 'fs-sp-mark', 'fs-sp-zone', 'fs-sp-lots', 'fs-sp-walk', 'fs-sp-isl', 'fs-sp-tree', 'fs-sp-pl', 'fs-sp-lot', 'fs-sp-fill', 'fs-sp-stall', 'fs-sp-sb', 'fs-sp-lotl', 'fs-sp-front', 'fs-sp-bldg', 'fs-sp-edge', 'fs-sp-lab', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-h']) if (map.getLayer(id)) map.removeLayer(id);
     for (const s of [SRC, HSRC, DSRC]) if (map.getSource(s)) map.removeSource(s); if (ed) { addLayers(); if (map.getLayer('fs-bldg')) map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } });
   function handles(pl) {
     const e = pl.elements.find(x => x.id === ed.sel); if (!e) return [];
@@ -283,6 +285,7 @@ export function initSitePlan(ctx) {
     }
     if (ed.mode === 'parcels') { pickParcel(e.lngLat); return true; }
     if (ed.mode === 'front') { const p = ftAt(pl, e.lngLat); change(x => { x.front = SP.nearestEdge(x.ring, p); x.frontGuess = false; }); ed.mode = null; panel(); return true; }
+    if (ed.mode === 'street') { const p = ftAt(pl, e.lngLat); change(x => { const k = SP.nearestEdge(x.ring, p), st = new Set(x.streets || []); if (k !== (x.front ?? SP.longestEdge(x.ring))) { if (st.has(k)) st.delete(k); else st.add(k); } x.streets = [...st]; x.streetsSet = true; }); ed.mode = null; panel(); return true; } // a side street on or off
     if (!hit(pl, e) && ed.sel) { ed.sel = null; draw(); panel(); }
     return true;
   });
@@ -292,7 +295,7 @@ export function initSitePlan(ctx) {
     const G = SP.frame(x.origin), N = SP.frame(b.origin);
     const to = p => N.toFt(G.toLL(p)).map(v => +v.toFixed(2));
     x.elements.forEach(e => { [e.x, e.y] = to([e.x, e.y]); if (e.path) e.path = e.path.map(to); if (e.poly) e.poly = e.poly.map(to); });
-    x.origin = b.origin; x.ring = b.ring; x.src = src; x.front = null; x.frontGuess = true;
+    x.origin = b.origin; x.ring = b.ring; x.src = src; x.front = null; x.frontGuess = true; x.streets = []; x.streetsSet = false;
   }
   function setParcels(keys) {
     const p = P(), recs = keys.map(k => p.parcels.find(x => x.key === k)).filter(r => r?.geometry), b = siteOf(recs);
@@ -354,7 +357,7 @@ export function initSitePlan(ctx) {
         '<div id="spVariants">' + variantsHtml() + '</div></div>' +
       siteHtml(p, pl) +
       '<div class="bsec"><div class="lt">Draw</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + (k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building) + '"></i>' + (ADD_LABEL[k] || SP.KINDS[k].label) + '</button>').join('') + '<button class="btn" id="spTrees" aria-pressed="' + (pl.params?.trees !== false) + '" title="Show or hide the trees on the plan, the map and the PDF">Trees ' + (pl.params?.trees !== false ? 'On' : 'Off') + '</button></div>' +
-        '<div class="sp-tools"><button class="btn" aria-pressed="' + (ed.mode === 'front') + '" id="spFront" title="Then click the lot line along the street">' + (ed.mode === 'front' ? 'Click the street side…' : 'Street Side') + '</button><button class="btn" id="spRedraw">Redraw Site</button>' +
+        '<div class="sp-tools"><button class="btn" aria-pressed="' + (ed.mode === 'front') + '" id="spFront" title="Then click the lot line along the street">' + (ed.mode === 'front' ? 'Click the street side…' : 'Street Side') + '</button><button class="btn" aria-pressed="' + (ed.mode === 'street') + '" id="spStreet" title="A second street along the lot (a corner lot): click its lot line to add it, or again to remove it">' + (ed.mode === 'street' ? 'Click the side street…' : 'Side Street') + '</button><button class="btn" id="spRedraw">Redraw Site</button>' +
         '<button class="btn" id="spUndo"' + (ed.undo.length ? '' : ' disabled') + ' title="Undo (⌘Z / Ctrl+Z)">Undo</button><button class="btn" id="spRedo"' + (ed.redo.length ? '' : ' disabled') + '>Redo</button></div>' +
         (pl.frontGuess ? '<div class="rnote sp-warn">The street side (orange line) is a guess. Use <b>Street Side</b> to pick the lot line along the street; front setbacks and drives follow it.</div>' : '') + '</div>' +
       '<div class="bsec" id="spSel">' + selHtml(sel, prog) + '</div>' +
@@ -384,6 +387,7 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('[data-add]').forEach(b => b.onclick = () => addEl(b.dataset.add));
     const tb = card.querySelector('#spTrees'); if (tb) tb.onclick = () => { change(x => { x.params = { ...(x.params || {}), trees: x.params?.trees === false }; }); panel(); };
     on('#spFront', () => { ed.mode = ed.mode === 'front' ? null : 'front'; panel(); });
+    on('#spStreet', () => { ed.mode = ed.mode === 'street' ? null : 'street'; panel(); });
     on('#spRedraw', () => { ed.mode = 'draw'; ed.draft = []; ed.sel = null; ctx.toast('Click each corner of the site; click the first one again to finish. Esc cancels.'); draw(); panel(); });
     on('#spParcels', () => { ed.mode = ed.mode === 'parcels' ? null : 'parcels'; ed.sel = null; draw(); panel(); });
     card.querySelectorAll('[data-rmp]').forEach(b => b.onclick = () => { const keys = (pl.parcels || []).filter(k => k !== b.dataset.rmp); if (keys.length) setParcels(keys); });

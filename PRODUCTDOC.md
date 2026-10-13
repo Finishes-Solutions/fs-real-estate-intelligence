@@ -355,6 +355,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - **Restaurant pads** get outdoor seating by the door and a drive-thru lane round the building. **Playgrounds** are laid out with a play structure, slide, swings and a bench, not a circle.
 - **Curved pieces:** connector drives turn on arcs, the entry has curb returns and a planted median, parking rows end in rounded planted islands, and ponds, the pool and lawns are free-form shapes.
 - If the AI isn't available, the app reads your words directly and still lays out the options.
+- **Townhomes and duplexes on a court:** when the homes asked for won't fit on lots of their own along a street ("24 duplex units" on an acre and a half), the plan lays them out the way a rental community on one tract is built: two-story rows of six townhomes facing a shared parking court, a turnaround at the end, a fenced patio behind each home and the unit lines drawn in, and it says why. Ask for a "pull-through drive" and a second drive runs between the buildings out to the side street.
 - **Mixed use:** describe several uses ("37,700 sf retail with 2 pads, a commons with a lake, 120 apartments, 18 townhomes and 12 duplex units") and the site is laid out in zones from the street back, on one connected drive network:
   - shops at the front facing their parking, with pad sites along the street and a service drive behind;
   - a commons with an amenity lake that holds the site's detention, a pavilion, pickleball courts, a playground and restrooms;
@@ -377,6 +378,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - Parking counts its spaces as you size it (9 × 18 ft spaces on 24 ft aisles). Each pair of accessible stalls shares an aisle the width of a stall, so it costs one space; the count shown already allows for that.
 - Type exact sizes, the turn, the number of floors, the building's use (which sets its parking and colour) and its name in the **Selected** box. Townhomes and duplexes also take the number of homes.
 - **Street Side:** the orange line marks the side along the street. The app finds it from the map's roads; when it can't, it says the line is a guess. Click **Street Side**, then the lot line along the street, to set it. Front setbacks and drives follow it.
+- **Side Street:** on a corner lot, a second street along another lot line (a thinner orange line). The app finds it from the map's roads; click **Side Street**, then a lot line, to add or remove one. Buildings keep the street setback from it, and a pull-through drive can reach it.
 - **Add or Remove Parcels:** click a parcel next to the site to add it (up to 20), or one in the site to take it out; the outline is merged again and the pieces stay where they are.
 - **Redraw Site** replaces the outline (for part of a parcel, or a site that doesn't follow parcel lines).
 - Building heights show in 3D when you tilt the map.
@@ -463,6 +465,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 ---
 
 ## Recently added
+
+- **Townhome and duplex communities that fit:** a duplex or townhome count too dense for lots of their own becomes two-story six-unit rows on a shared parking court, with fenced patios, unit lines and a turnaround; a **Side Street** tool (also found from the map's roads) and a pull-through drive out to it; and the AI now chooses between homes on lots and a court.
 
 - **Site plans that fill the site and look built:** what you ask for is Phase 1 and the rest of the site holds more of the same as Phase 2; several building rows on deep sites; clean rectangular ponds and one landscape background instead of blobs; trash left out unless turned on; tree canopies and 3D trees with a Trees button; L-shaped, courtyard and tower buildings; parapets and floor lines in 3D; restaurant pads with drive-thru and outdoor seating; real playgrounds; parking garages.
 

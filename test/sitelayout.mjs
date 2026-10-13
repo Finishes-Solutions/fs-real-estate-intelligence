@@ -225,4 +225,27 @@ function usable(plan, o, what) {
   const fo = L.layoutOptions({ ...siteOf(fm362, true), params: { form: 'U' } }, { use: 'multifamily', floors: 4 })[0]; usable(siteOf(fm362, true), fo, 'courtyard buildings');
   assert.ok(fo.elements.some(e => e.kind === 'building' && e.form === 'U'), 'courtyard (U) apartment buildings when asked for');
 }
+
+// ---- a duplex/townhome count that doesn't fit on lots: rows on a shared parking court (the Waller Tomball tract, a
+// 1.46-acre 178 x 357 ft survey, street on the south, Fields Store Rd on the west); "pull through" adds a second drive ----
+{
+  const W = mk([-95.9339, 30.0598], [[0, 0], [178.001, 0.578], [184.601, 357.497], [6.602, 356.919]]), b = S.unionParcels([W]), front = b.ring.findIndex((p, i) => S.outwardOf(b.ring, i)[1] < -0.9);
+  const west = b.ring.findIndex((p, i) => S.outwardOf(b.ring, i)[0] < -0.9);
+  const prog = S.guessProgram('A twenty four unit duplex community with a pull through drive. No detention pond needed.');
+  assert.deepEqual([prog.use, prog.units, prog.storm, prog.through], ['duplex', 24, 'underground', true], 'words to a program: "twenty four", "no pond", "pull through"');
+  const plan = { ...b, front, streets: [west], setbacks: { ...S.SETBACKS }, program: prog }, opts = L.layoutOptions(plan, prog);
+  assert.ok(opts.length >= 1 && opts.every(o => !/Simple layout/.test(o.name)), opts.map(o => o.name).join());
+  const o = opts[0], p = { ...plan, elements: o.elements, program: o.program }, m = S.metrics(p);
+  assert.equal(m.units, 24, 'all 24 units: ' + o.notes.join(' ')); assert.ok(m.spaces >= m.required, m.spaces + '/' + m.required);
+  assert.deepEqual(S.check(p).filter(i => i.level === 'bad').map(i => i.text), []);
+  const B = o.elements.filter(e => e.kind === 'building'); assert.ok(B.every(e => e.units === 6 && e.unitW === 19 && e.floors === 2), 'six-unit two-story rows');
+  const pt = o.elements.find(e => e.name === 'Second entry'); assert.ok(pt?.through, 'a pull-through drive');
+  assert.ok(pt.poly.some(q => S.segDist(q, b.ring[west], b.ring[(west + 1) % 4]) < 1.5), 'it reaches the side street');
+  assert.ok(B.every(e => S.outline(e).every(q => !S.inRing(q, pt.poly))), 'between buildings, not through one');
+  const d = S.details(p); assert.equal(d.patios.length, 24, 'a fenced patio behind every unit'); assert.ok(d.patios.every(q => q.poly.every(c => S.inRing(c, b.ring))));
+  assert.ok(S.edgeRules(b.ring, front, plan.setbacks, [west])[west].street && S.edgeRules(b.ring, front, plan.setbacks, [west])[west].build === 25, 'a side street takes the street setback');
+  const none = L.layoutOptions({ ...plan, streets: [] }, prog)[0]; assert.ok(!none.elements.some(e => e.through) && none.notes.some(t => /Side Street/.test(t)), 'no side street marked: says how to add one');
+  const roads = [[[-200, -178 - 30], [300, -178 - 30]], [[-93 - 35, -400], [-86 - 35, 400]]].map(l => l.map(([x, y]) => [x, y]));
+  assert.deepEqual(S.streetsFromRoads(b.ring, roads, front), [west], 'side street found from road lines');
+}
 console.log('site layouts ok');
