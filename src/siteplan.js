@@ -670,6 +670,11 @@ export function initSitePlan(ctx) {
       const r = d.traffic?.roads?.[0]; if (r) out.push('Busiest road nearby: ' + r.road + ', about ' + Math.round(r.aadt).toLocaleString('en-US') + ' vehicles a day (TxDOT). Expect driveway permits and possibly turn lanes.');
       const e = d.environment; if (e && !e.error && e.total != null) out.push(e.total ? e.total + ' EPA-regulated facilit' + (e.total === 1 ? 'y' : 'ies') + ' within ¼ mile' + (e.flaggedCount ? ', ' + e.flaggedCount + ' with violations or hazardous waste' : '') + '. A Phase I ESA is recommended.' : 'No EPA-regulated facilities within ¼ mile.');
     } catch (e) { /* the sheet still prints; notes say what's known */ }
+    if (ctx.utilitiesAt) try { // nearest power lines, the water and sewer providers, public mains (from the site's edge)
+      const F = SP.frame(pl.origin), geom = { type: 'Polygon', coordinates: [pl.ring.concat([pl.ring[0]]).map(F.toLL)] };
+      const u = await Promise.race([ctx.utilitiesAt(c, geom), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 12000))]);
+      const lines = ctx.utilityFacts(u); if (lines.length) out.push(lines.slice(0, 4).join('. ') + '. Confirm capacity and service with each provider (OpenStreetMap, PUC Texas, City of Houston).');
+    } catch (e) { /* no utility note */ }
     if ((pl.parcels || []).length > 1) out.push((pl.parcels.length) + ' parcels: a replat into one reserve or lot is likely needed.');
     return out;
   }

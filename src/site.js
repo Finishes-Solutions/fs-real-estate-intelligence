@@ -49,6 +49,7 @@ export function initSite(ctx) {
     el.innerHTML = '<div class="lt">Site</div><dl>' +
       row('Flood zone', flood, 'FEMA flood maps') + row('Traffic', traffic, 'TxDOT traffic counts') + row('Crime nearby', crime, 'Houston Police NIBRS') +
       row('Districts', [water, tirz && 'Tax increment zone: ' + tirz, ds.opportunityZone === true ? 'Federal Opportunity Zone' : ''].filter(Boolean).join('<br>'), 'TCEQ, City of Houston, CDFI Fund') +
+      (ctx.renderUtilities ? row('Utilities', '<span class="util-slot"></span>', 'OpenStreetMap, PUC Texas, City of Houston') : '') +
       row('School district', schools, 'US Census') + row('Transit', tr && !tr.error && tr.stops != null ? fmtN(tr.stops) + ' METRO bus stop' + (tr.stops === 1 ? '' : 's') + ' within 400 m' : '', 'Houston METRO') +
       row('Environmental', env1 && env1 + envList, 'EPA ECHO') + row('Alcohol sales here', bars && bars + '<br><span class="sc">Mixed beverage gross receipts, last 12 months</span>', 'Texas Comptroller') +
       econRows(area, parcel) + '</dl>' +
@@ -57,6 +58,7 @@ export function initSite(ctx) {
         [1, 3, 5, 10].map(mi => '<button type="button" class="chip" role="radio" data-mi="' + mi + '" aria-checked="' + (mi === repMi) + '">' + mi + ' mi</button>').join('') + '</div><div class="bacts">' +
         (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep">Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep">FEMA Report</button>' : '') + (ctx.envReport ? '<button class="btn" type="button" id="siteEnvRep">Environmental Report</button>' : '') + (ctx.areaReports || []).filter(r => !r.noSite).map(r => '<button class="btn" type="button" data-ar="' + r.key + '">' + esc(r.label) + '</button>').join('') + '</div>' +
         '<div class="rnote">Crime: City of Houston only (Houston Police). FEMA: flood zones, flood insurance claims, disasters and hazard risk. Environmental: cleanup sites, tanks, wells, pipelines, wetlands and soils around the parcel.</div></div>' : '');
+    ctx.renderUtilities?.(el.querySelector('.util-slot'), center, parcel);
     const where = () => parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4), lab = () => repMi + ' mi around ' + where();
     el.querySelectorAll('.mi-chips [data-mi]').forEach(b => b.onclick = () => { repMi = +b.dataset.mi; el.querySelectorAll('.mi-chips [data-mi]').forEach(x => x.setAttribute('aria-checked', x === b)); });
     el.querySelector('#siteCrimeRep')?.addEventListener('click', () => ctx.crimeReport({ geometry: circle(center, repMi), label: lab(), center }));

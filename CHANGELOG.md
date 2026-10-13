@@ -3,6 +3,15 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-13
+
+### 10:47 AM CT: Utilities near a site (dbf86d7)
+- **Utilities row on the property card** (Site section): how far the parcel is from the nearest transmission line (with its voltage and owner), the nearest distribution line and the nearest substation; who holds the water and sewer service areas (CCN) here; and in Houston the nearest public sewer main (size and material) and water main where the city publishes one. Elsewhere it shows the nearest mapped water utility line and says to ask the city or MUD engineer for mains.
+- **Power, Water & Sewer Lines** map layer: transmission lines in red with their voltage, distribution lines in orange, substations, and Houston sewer and water mains at street zoom.
+- The **site plan sheet** notes the nearest power lines and the water and sewer providers.
+- Power lines come from OpenStreetMap (the federal transmission-line map went offline in 2025); street lines are only partly mapped there, and the card says so.
+- **Projects now sync with the team**: the projects table is set up in the team database.
+
 ## 2026-10-12
 
 ### 4:40 PM CT: Site plans follow the request: building counts, stormwater, one paved surface, ADA stalls, trash (3118744)
