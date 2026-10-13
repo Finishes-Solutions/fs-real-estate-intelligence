@@ -204,6 +204,8 @@ function usable(plan, o, what) {
 {
   const plan = { ...siteOf(fm362, true), params: { trash: { mode: 'auto' } } }, mf = L.layoutOptions(plan, { use: 'multifamily' })[0], m = S.metrics({ ...plan, elements: mf.elements, program: mf.program });
   assert.equal(L.layoutOptions(siteOf(fm362, true), { use: 'multifamily' })[0].elements.filter(e => e.kind === 'trash').length, 0, 'left out unless turned on (the default)');
+  assert.equal(L.layoutOptions(siteOf(fm362, true), { use: 'retail', gfa: 28000 })[0].elements.filter(e => e.kind === 'trash').length, 0, 'shops too: none unless asked for');
+  const asked = S.guessProgram('28,000 sf retail strip with dumpsters'); assert.ok(asked.trash); assert.ok(L.layoutOptions(siteOf(fm362, true), asked)[0].elements.some(e => e.kind === 'trash'), 'asked for: there');
   assert.equal(mf.elements.filter(e => e.kind === 'trash').length, Math.ceil(m.units / 50), 'apartments: a double enclosure per ~50 units');
   const th = L.layoutOptions(plan, { use: 'townhomes' })[0]; assert.equal(th.elements.filter(e => e.kind === 'trash').length, 0, 'homes roll carts to the curb');
   const off = L.layoutOptions({ ...plan, params: { trash: { mode: 'none' } } }, { use: 'retail', gfa: 28000 })[0]; assert.equal(off.elements.filter(e => e.kind === 'trash').length, 0, 'turned off');
@@ -286,7 +288,8 @@ function usable(plan, o, what) {
   const opts = L.layoutOptions(plan, prog); assert.ok(opts.length >= 2 && opts.every(o => !/Simple layout/.test(o.name)), opts.map(o => o.name).join());
   for (const o of opts) { const p = { ...plan, elements: o.elements, program: o.program }, m = S.metrics(p), k = new Set(o.elements.map(e => e.kind));
     assert.ok(m.spaces >= m.required && m.gfa > 3000, o.name + ': a parked restaurant ' + m.spaces + '/' + m.required);
-    for (const want of ['building', 'parking', 'drive', 'trash', 'play']) assert.ok(k.has(want), o.name + ': has ' + want);
+    for (const want of ['building', 'parking', 'drive', 'play']) assert.ok(k.has(want), o.name + ': has ' + want);
+    assert.ok(!k.has('trash'), o.name + ': no dumpster unless asked for');
     assert.ok(o.elements.some(e => e.name === 'Main entry') && o.elements.some(e => e.name === 'Lawn'), 'an entry and a lawn');
     assert.deepEqual(S.check(p).filter(i => i.level === 'bad').map(i => i.text), []); }
   assert.ok(opts.some(o => o.elements.some(e => e.kind === 'patio')), 'outdoor seating against the building');
@@ -431,5 +434,41 @@ function usable(plan, o, what) {
   const re = E.applyEdits(base, ops); assert.equal(S.entrancesOf(re.elements).length, 2, re.skipped.join(' '));
   const f = E.sheetFrame(base), fa = f.to(T.ring[T.front]), fb = f.to(T.ring[(T.front + 1) % T.ring.length]);
   const ra = E.applyEdits(base, [{ action: 'add', kind: 'entrance', x: (fa[0] + fb[0]) / 2 + 200, y: 0 }]); assert.ok(ra.done.length || ra.skipped.length);
+}
+// ---- the most a site holds: shops, offices and warehouses grow to what the parking carries; garages; homes fill; housing types ranked ----
+{
+  const PF = await import('../lib/proforma.mjs');
+  const H = S.unionParcels([mk([-95.70, 30.02], [[0, 0], [1180, 0], [1330, 1520], [150, 1520]])]), hk = { ...H, front: H.ring.findIndex((p, i) => S.outwardOf(H.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } };
+  const ask = { use: 'mixed', zones: [{ use: 'retail', gfa: 60000 }, { use: 'medical', gfa: 60000, floors: 3 }, { use: 'office', gfa: 80000, floors: 3 }, { use: 'industrial', gfa: 120000 }] };
+  const opts = L.layoutOptions(hk, ask);
+  for (const o of opts) {
+    const p = { ...hk, elements: o.elements, program: o.program }, m = S.metrics(p), B = o.elements.filter(e => e.kind === 'building'), by = u => B.filter(e => e.use === u).reduce((t, e) => t + S.gfaOf(e), 0);
+    assert.ok(!B.some(e => ['duplex', 'sfr', 'townhomes'].includes(e.use)), o.name + ': warehouse land, never homes');
+    assert.ok(by('industrial') >= 120000 * 0.97 && o.elements.some(e => e.kind === 'truck'), o.name + ': the warehouse with its truck court');
+    for (const z of ask.zones) assert.ok(by(z.use) >= z.gfa * 0.97, o.name + ': at least the ' + z.gfa + ' sf of ' + z.use + ' asked (' + Math.round(by(z.use)) + ')');
+    assert.ok(m.gfa >= 320000 * 1.25, o.name + ': far more leasable floor area than asked when the land holds it: ' + Math.round(m.gfa));
+    assert.ok(m.spaces >= m.required, o.name + ': still parked ' + m.spaces + '/' + m.required);
+    assert.ok(!o.elements.some(e => e.kind === 'trash'), 'no dumpsters unless asked for');
+    assert.ok(o.elements.filter(e => /pad site/i.test(e.name || '')).length <= 2, 'two future pads at most');
+    assert.deepEqual(S.check(p).filter(i => i.level === 'bad').map(i => i.text), []);
+  }
+  // a garage where the words put it: built, counted, and the plan still parked
+  const g = S.guessProgram('A mixed use development with retail in the front, medical and office in the middle, a parking garage behind that and warehouse/storage in the back');
+  assert.deepEqual(S.normalizeProgram(g).zones.map(z => z.use), ['retail', 'office', 'medical', 'garage', 'industrial']);
+  const og = L.layoutOptions(hk, { ...g, zones: g.zones.map(z => ({ ...z, gfa: { retail: 60000, office: 80000, medical: 60000, industrial: 120000 }[z.use] ?? null })) }, { count: 1 })[0], pg = { ...hk, elements: og.elements, program: og.program }, mg = S.metrics(pg), gar = og.elements.filter(e => e.kind === 'garage');
+  assert.ok(gar.length === 1 && S.garageStalls(gar[0]) >= 200, 'a parking garage: ' + gar.map(e => S.garageStalls(e)).join());
+  assert.ok(mg.spaces >= mg.required && !S.check(pg).some(i => i.level === 'bad'), 'parked, garage counted: ' + mg.spaces + '/' + mg.required);
+  // homes with a count on a big tract: the count is phase 1, the land fills, and the detention still fits (or the plan says so)
+  const N = S.unionParcels([mk([-95.96, 30.07], [[0, 0], [2600, 0], [2600, 1700], [0, 1700]])]), nb = { ...N, front: N.ring.findIndex((p, i) => S.outwardOf(N.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } };
+  const prog = { use: 'mixed', zones: [{ use: 'retail', gfa: 60000 }, { use: 'sfr', units: 250 }, { use: 'amenity', items: ['lake', 'center', 'pool', 'playground'] }] }, on = L.layoutOptions(nb, prog, { count: 1 })[0], mn = S.metrics({ ...nb, elements: on.elements, program: on.program });
+  const need = S.stormNeed(S.ringArea(N.ring) / 43560, {}, S.normalizeProgram(prog)).area;
+  assert.ok(mn.units > 250 * 1.1 && on.notes.some(t => /phase 1/.test(t)), 'more homes than the first phase: ' + mn.units);
+  assert.ok(mn.pond >= need * 0.9 || on.notes.some(t => /detention the site needs/.test(t)), 'the detention fits, or the plan says how much doesn’t');
+  // housing in general: the types a developer would weigh, ranked by value
+  assert.ok(S.guessProgram('a multifamily rental community').compare && !S.guessProgram('240 apartments').compare);
+  const T = siteOf(tract), hs = L.layoutOptions({ ...T, front: T.ring.findIndex((p, i) => S.outwardOf(T.ring, i)[1] < -0.9) }, S.guessProgram('a multifamily rental community'));
+  assert.ok(hs.length >= 3 && new Set(hs.slice(0, 3).map(o => o.product)).size === 3 && hs.every(o => o.fin && o.fin.value > 0), hs.map(o => o.name).join(' | '));
+  assert.ok(/Best value of the housing types tried/.test(hs[0].notes[0]));
+  assert.ok(PF.quick({ ...T, elements: hs[0].elements, program: hs[0].program }).value === hs[0].fin.value);
 }
 console.log('site layouts ok');

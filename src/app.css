@@ -1988,7 +1988,8 @@ button:disabled{cursor:var(--cur-default,default)}
 .btn.busy:not(.askai)::after{border-color:var(--line-2);border-top-color:var(--text)}
 @keyframes sp-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.btn.busy::after{animation-duration:2.4s}}
-.sp-stage{margin-top:6px;font-size:12px;color:var(--muted)}.sp-stage:empty{display:none}
+.sp-stage{margin-top:6px;font-size:12px;color:var(--muted)}
+.sp-var .sp-fin{display:block;font-size:11px;color:var(--brand);font-weight:600;margin-top:2px} /* an option's value and cost */.sp-stage:empty{display:none}
 .sp-ainote{margin-top:6px;line-height:1.4}.sp-ainote:empty{display:none} /* the AI's note under the button, never beside it: a long note used to stretch the button */
 .sp-vars{display:grid;gap:6px;margin-top:10px}
 .sp-more{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px}.sp-more select{font:inherit;margin-left:4px}

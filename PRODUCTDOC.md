@@ -383,6 +383,16 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - About 230 building types: garden, breezeway, corridor, senior, L-shaped, courtyard, podium and tower apartments; townhome rows; duplexes; 24 house plans; restaurants from a coffee drive-thru to a brewpub; shop strips, pharmacies, grocery and big box; medical and office buildings; flex, warehouses and self storage; hotels, churches and more.
 - **From the building library** under Draw adds one at the middle of the view; **Type** in the Selected box swaps a placed building for another type in the same spot. Neighbourhood streets mix the house plans home to home.
 
+**Getting the most out of a site**
+- The planner aims for the most valuable plan that fits the rules: sizes in a request are the first phase, and land left over gets more of the same. Shop, office and medical buildings grow along their rows until the parking is used; warehouses grow deeper; homes keep filling the blocks to the back of the site, leaving the land the detention lake needs. Each option says what was asked for (phase 1) and what the land holds in all.
+- Warehouse, flex and storage in a mixed-use plan get a real warehouse with a truck court behind it (they used to come out as homes).
+- **Parking garages:** ask for one ("a parking garage behind the offices") and it's built there, four levels by default, carrying most of the parking so the surface lots shrink. On shop and office sites the planner also tries a garage on its own and keeps it only when the extra floor area it allows is worth more than it costs.
+- **Housing in general** ("multifamily", "rental housing", "build-to-rent") lays out garden apartments, studio and one-bed apartments, townhomes and duplexes and ranks them by value; name a product (apartments, townhomes…) to get just that one.
+- **Every option shows a value line:** stabilized value, total cost and yield on cost with the pro forma's default assumptions (change them under Pro forma). Sort the options by **Value**. These compare layouts; they aren't an appraisal.
+- Dumpsters (trash enclosures) are left off unless the request asks for them or Site parameters turns them on.
+- Land left over is landscape or open space; a **future pad site** is marked only on the street frontage where a real pad fits (at least about 0.6 acre), two at most.
+- Ponds and amenities you drag stay inside the lot.
+
 **Entrances**
 - **Add Entrance** (under Draw and tools, beside Street Side and Side Street): click the lot line where a driveway should come in. It runs straight in to the nearest drive, with curb returns at the street, sliding along the lot line a little if a building or pond is in the way; parking it crosses gives way. Clicking a lot line that isn't a street marks it as one. It's named Entrance 2, 3 and so on, gets a stop bar like the main entry, and says so if it's closer than about 150 ft to another entrance.
 - Ask for them when you build: "two entrances", "a second driveway", "3 curb cuts". The extra ones go on the front or a side street, as far from the others as they can be; options with every entrance come first, and an option that can't fit one says why (mark a side street for more room).
@@ -509,6 +519,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Plans that get the most out of the land:** buildings and homes fill what the site holds (phase 1 is what you asked), warehouses with truck courts, parking garages when asked for (or when they pay), housing requests that compare apartments, townhomes and duplexes, a value line on every option, no dumpsters by default and far fewer future pad sites.
 - **More than one entrance:** an Add Entrance tool (click the street lot line), "two entrances" in a request, or "add another entrance" in Change With AI; and the AI buttons show a spinner while they work.
 - **Change With AI:** change a laid-out plan by name ("make Apt Bldg 7 four stories", "remove Bldg 3", "move the clubhouse to the back"); only those pieces change, or the rest of the site re-fits around them when you ask.
 - **Amenities placed with sense, and moves that keep a plan tidy:** one pool per community, beside its clubhouse; commons amenities along the drive instead of out by the pond; checks that flag a lone or second pool. A building you drag settles in the nearest clear spot, takes its pool, patio or drive-thru with it, and parking it cut grows back when it moves away.
