@@ -203,13 +203,15 @@ export function initSitePlan(ctx) {
       paint: { 'text-color': '#0b0d0c', 'text-halo-color': '#ffffff', 'text-halo-width': 1.6 } });
     map.addLayer({ id: 'fs-sp-dl', type: 'line', source: DSRC, paint: { 'line-color': '#e0a23c', 'line-width': 2.5, 'line-dasharray': [2, 1.5] } });
     map.addLayer({ id: 'fs-sp-dp', type: 'circle', source: DSRC, filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#e0a23c', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
-    map.addLayer({ id: 'fs-sp-h', type: 'circle', source: HSRC, paint: { 'circle-radius': ['case', ['==', ['get', 'r'], 1], 7, 6], 'circle-color': ['case', ['==', ['get', 'r'], 1], '#e0a23c', '#ffffff'], 'circle-stroke-color': '#0b0d0c', 'circle-stroke-width': 1.5 } });
+    map.addLayer({ id: 'fs-sp-h', type: 'circle', source: HSRC, paint: { 'circle-radius': ['case', ['==', ['get', 'r'], 1], 7, ['==', ['get', 'm'], 1], 4, 6], 'circle-color': ['case', ['==', ['get', 'r'], 1], '#e0a23c', ['==', ['get', 'm'], 1], '#9fd3ff', '#ffffff'], 'circle-opacity': ['case', ['==', ['get', 'm'], 1], .85, 1], 'circle-stroke-color': '#0b0d0c', 'circle-stroke-width': 1.5 } }); // corners, the turn dot, and (editing a shape) points and + midpoints
     draw();
   }
   ctx.onOverlays?.(() => { for (const id of ['fs-sp-b3', 'fs-sp-yard', 'fs-sp-fence', 'fs-sp-pave', 'fs-sp-curb', 'fs-sp-ada', 'fs-sp-mark', 'fs-sp-zone', 'fs-sp-lots', 'fs-sp-walk', 'fs-sp-isl', 'fs-sp-tree', 'fs-sp-pl', 'fs-sp-lot', 'fs-sp-fill', 'fs-sp-stall', 'fs-sp-sb', 'fs-sp-lotl', 'fs-sp-front', 'fs-sp-bldg', 'fs-sp-edge', 'fs-sp-lab', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-h']) if (map.getLayer(id)) map.removeLayer(id);
     for (const s of [SRC, HSRC, DSRC]) if (map.getSource(s)) map.removeSource(s); if (ed) { addLayers(); if (map.getLayer('fs-bldg')) map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } });
   function handles(pl) {
     const e = ed.editing && pl.elements.find(x => x.id === ed.sel); if (!e) return [];
+    if (ed.shape === e.id && e.poly) { const F = SP.frame(pl.origin), P = e.poly; // shape editing: every point, and a + between points to add one
+      return P.map((p, i) => ({ i: 'v' + i, at: F.toLL(p), ft: p })).concat(P.map((p, i) => { const q = P[(i + 1) % P.length], m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; return { i: 'm' + i, at: F.toLL(m), ft: m }; })); }
     if (SP.isFree(e)) { const o = SP.outline(e), xs = o.map(p => p[0]), ys = o.map(p => p[1]), F = SP.frame(pl.origin); // curved pieces: corner handles scale the whole shape
       return [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)], [Math.min(...xs), Math.max(...ys)]].map((p, i) => ({ i: 's' + i, at: F.toLL(p), ft: p })); }
     const F = SP.frame(pl.origin), c = SP.corners(e), top = [e.x, e.y], a = (e.rot || 0) * Math.PI / 180, L = e.d / 2 + Math.max(14, e.d * 0.15);
@@ -230,7 +232,7 @@ export function initSitePlan(ctx) {
       const fc = pl?.ring.length >= 3 ? SP.planFeatures(pl, ed.sel, drag?.moved ? lastKeep : null) : EMPTY, P0 = P(); lastKeep = fc.keep || null; // mid-drag: last planting and checks
       if (fc !== EMPTY && (pl.parcels?.length > 1 || ed.mode === 'parcels')) for (const k of pl.parcels || []) { const r = P0.parcels.find(x => x.key === k); if (r?.geometry) fc.features.push({ type: 'Feature', properties: { k: 'pline' }, geometry: r.geometry }); }
       s.setData(fc);
-      map.getSource(HSRC)?.setData(pl?.ring.length >= 3 ? { type: 'FeatureCollection', features: handles(pl).map(h => ({ type: 'Feature', properties: { r: h.i === 'r' ? 1 : 0 }, geometry: { type: 'Point', coordinates: h.at } })) } : EMPTY);
+      map.getSource(HSRC)?.setData(pl?.ring.length >= 3 ? { type: 'FeatureCollection', features: handles(pl).map(h => ({ type: 'Feature', properties: { r: h.i === 'r' ? 1 : 0, m: String(h.i)[0] === 'm' ? 1 : 0 }, geometry: { type: 'Point', coordinates: h.at } })) } : EMPTY);
       const d = ed?.mode === 'draw' && pl?.origin ? ed.draft.map(SP.frame(pl.origin).toLL) : [];
       map.getSource(DSRC)?.setData({ type: 'FeatureCollection', features: d.map(c => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } })).concat(d.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: d } }] : []) });
     });
@@ -238,6 +240,7 @@ export function initSitePlan(ctx) {
 
   // ---------- pointer: select, move, resize, rotate ----------
   const ftAt = (pl, lngLat) => SP.frame(pl.origin).toFt([lngLat.lng, lngLat.lat]);
+  const SHAPEABLE = ['building', 'plaza', 'green', 'pond', 'court', 'pool', 'patio', 'play', 'garage']; // pieces whose outline can be edited point by point
   const ORDER = ['building', 'pool', 'court', 'play', 'plaza', 'pond', 'drive', 'truck', 'parking', 'trail', 'green'];
   function hit(pl, e) {
     for (const h of handles(pl)) { const p = map.project(h.at); if (Math.hypot(p.x - e.point.x, p.y - e.point.y) < 12) return { h: h.i }; }
@@ -254,12 +257,20 @@ export function initSitePlan(ctx) {
     e.preventDefault(); // stops the map's own drag-to-pan for this press
     const el = h.el || pl.elements.find(x => x.id === ed.sel); if (!el) return;
     if (h.el && ed.sel !== el.id) { ed.sel = el.id; panel(); draw(); }
+    if (typeof h.h === 'string' && (h.h[0] === 'v' || h.h[0] === 'm')) { // a point of the shape (a + inserts one there first)
+      let k = +h.h.slice(1); const snap = snapshot(); if (h.h[0] === 'm') { const P = el.poly, q = P[(k + 1) % P.length]; P.splice(k + 1, 0, [(P[k][0] + q[0]) / 2, (P[k][1] + q[1]) / 2]); k++; }
+      drag = { type: 'vertex', k, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap, moved: h.h[0] === 'm' }; draw(); return; }
     const hs = typeof h.h === 'string' && h.h[0] === 's' ? handles(pl).find(q => q.i === h.h) : null;
     drag = { type: h.h == null ? 'move' : h.h === 'r' ? 'rot' : hs ? 'scale' : 'size', k: h.h, corner: hs?.ft, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false };
   }
   function move(e) {
     if (!drag) return; const pl = PL(), el = pl?.elements.find(x => x.id === drag.id); if (!el) return;
     const p = ftAt(pl, e.lngLat), o = drag.orig; drag.moved = true;
+    if (drag.type === 'vertex') { // the point follows the pointer, lining up with its neighbours (within 3 ft, square to the piece) unless Alt is held
+      const P = el.poly, n = P.length, k = drag.k, r = (el.rot || 0), loc = q => SP.rotPt(q, -r), back = q => SP.rotPt(q, r); let q = loc(p);
+      if (!e.originalEvent?.altKey) for (const nb of [P[(k - 1 + n) % n], P[(k + 1) % n]]) { const b = loc(nb); if (Math.abs(q[0] - b[0]) < 3) q = [b[0], q[1]]; if (Math.abs(q[1] - b[1]) < 3) q = [q[0], b[1]]; }
+      P[k] = back(q).map(v => +v.toFixed(2)); const c = SP.centroid(P); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2); draw(); readout(el); return;
+    }
     if (drag.type === 'move') { if (SP.isFree(o)) Object.assign(el, SP.moveBy({ ...o }, p[0] - drag.from[0], p[1] - drag.from[1])); else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); if (!e.originalEvent?.altKey) { const [sx, sy] = SP.settleShift(pl, el); el.x = +(el.x + sx).toFixed(2); el.y = +(el.y + sy).toFixed(2); } } } // snaps to its neighbours' edges and stays out of the setbacks (hold Alt for a free move)
     else if (drag.type === 'scale') { const c = [o.x, o.y], f = Math.max(0.2, Math.min(5, Math.hypot(p[0] - c[0], p[1] - c[1]) / (Math.hypot(drag.corner[0] - c[0], drag.corner[1] - c[1]) || 1))); Object.assign(el, SP.scaleBy(clone(o), f, c)); }
     else if (drag.type === 'size') {
@@ -302,7 +313,11 @@ export function initSitePlan(ctx) {
     if (!hit(pl, e) && ed.sel) { ed.sel = null; draw(); panel(); }
     return true;
   });
-  map.on('dblclick', e => { if (ed?.mode === 'draw') { e.preventDefault(); finishDraw(); } });
+  map.on('dblclick', e => {
+    if (ed?.mode === 'draw') { e.preventDefault(); finishDraw(); return; }
+    const pl = ed?.editing && ed.shape && PL(), el = pl?.elements.find(x => x.id === ed.shape); if (!el?.poly || el.poly.length <= 3) return;
+    const h = hit(pl, e); if (typeof h?.h === 'string' && h.h[0] === 'v') { e.preventDefault(); change(() => { el.poly.splice(+h.h.slice(1), 1); const c = SP.centroid(el.poly); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2); }); draw(); } // a point removed
+  });
   // move a plan to a new boundary (and origin), keeping every piece where it is on the ground
   function reorigin(x, b, src) {
     const G = SP.frame(x.origin), N = SP.frame(b.origin);
@@ -340,7 +355,9 @@ export function initSitePlan(ctx) {
   }
 
   document.addEventListener('keydown', e => {
-    const pl = ed && PL(); if (!pl || ctx.view !== 'map' || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    const pl = ed && PL(), typing = /^(TEXTAREA)$/.test(e.target.tagName) || e.target.tagName === 'INPUT' && !/^(checkbox|radio|button|range)$/.test(e.target.type) || e.target.isContentEditable;
+    if (pl && ctx.view === 'map' && !typing && (e.metaKey || e.ctrlKey) && /^[zy]$/i.test(e.key)) { e.preventDefault(); e.stopPropagation(); undo(e.key.toLowerCase() === 'z' ? !e.shiftKey : false); return; } // undo and redo work whatever button was last clicked
+    if (!pl || ctx.view !== 'map' || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName) || e.target.isContentEditable) return;
     const used = () => { e.preventDefault(); e.stopPropagation(); };
     const k = e.key, el = pl.elements.find(x => x.id === ed.sel), mod = e.metaKey || e.ctrlKey;
     if (mod && k.toLowerCase() === 'z') { used(); undo(!e.shiftKey); return; }
@@ -531,7 +548,7 @@ export function initSitePlan(ctx) {
       (['pond', 'pool', 'green', 'plaza', 'court'].includes(e.kind) ? '<label>Shape<select data-shape="1">' + [['organic', 'Natural curves'], ['rounded', 'Rounded rectangle'], ['square', 'Rectangle']].map(([k, t]) => '<option value="' + k + '"' + ((e.poly ? 'organic' : e.shape === 'round' ? 'rounded' : 'square') === k ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' : '') +
       '<label class="sp-wide">Name<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A"></label>' +
       '</div><div class="rnote" id="spRead"></div>' + (!ed.editing ? '<div class="rnote">Use <b>Edit Layout</b> to change it.</div>' : PL()?.recipe ? '<div class="rnote">' + (e.pinned ? '📌 Placed by you: <b>Re-fit Plan</b> keeps it and lays out the rest again around it. <button class="sp-link" id="spUnpin">Let it move</button>' : 'Move or resize it and only it changes. <b>Re-fit Plan</b> lays out the rest again around the pieces you placed.') + '</div>' : '') +
-      '<div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + (PL()?.recipe ? '<button class="btn" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button class="btn" id="spDup">Copy</button><button class="btn sp-del" id="spDel">Delete</button></div></fieldset>';
+      '<div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) ? '<button class="btn" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="Drag its points; drag a blue + to add a point; double-click a point to remove it">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') + (PL()?.recipe ? '<button class="btn" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button class="btn" id="spDup">Copy</button><button class="btn sp-del" id="spDel">Delete</button></div></fieldset>';
   }
   function readout(e) {
     const el = card.querySelector('#spRead'); if (!el || !e) return;
@@ -550,6 +567,9 @@ export function initSitePlan(ctx) {
     card.querySelector('[data-form]')?.addEventListener('change', ev => { change(() => { const f = ev.target.value; if (f === 'bar') delete e.form; else e.form = f; if (f === 'tower') { e.podium = e.podium || 2; e.floors = Math.max(e.floors || 1, 8); } if ((f === 'L' || f === 'U') && e.d < 100) e.d = Math.min(150, e.d * 2); e.pinned = true; }); panel(); refitSoon(); });
     card.querySelector('[data-name]')?.addEventListener('change', ev => change(() => { e.name = ev.target.value.trim().slice(0, 40); }, true));
     if (card.querySelector('#spRot')) card.querySelector('#spRot').onclick = () => change(() => { e.rot = ((e.rot || 0) + 90) % 360; });
+    const shp = card.querySelector('#spShape'); if (shp) shp.onclick = () => { // its outline as points to drag: any shape, in plan
+      if (ed.shape === e.id) { ed.shape = null; draw(); panel(); return; }
+      change(() => { if (!e.poly) { e.poly = SP.outline(e).map(q => q.map(v => +v.toFixed(2))); delete e.form; delete e.jog; delete e.shape; delete e.path; } e.pinned = true; }); ed.shape = e.id; draw(); panel(); };
     card.querySelector('#spDup').onclick = () => { const c = { ...clone(e), id: uid() }, a = (e.rot || 0) * Math.PI / 180, off = e.w + 20; SP.moveBy(c, off * Math.cos(a), off * Math.sin(a)); change(x => x.elements.push(c)); ed.sel = c.id; draw(); panel(); };
     card.querySelector('#spDel').onclick = () => { change(x => { x.elements = x.elements.filter(y => y.id !== e.id); }); ed.sel = null; draw(); panel(); };
   }
