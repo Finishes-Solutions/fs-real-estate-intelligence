@@ -80,7 +80,11 @@ Click a building, or at street zoom click open ground, to open its **property ca
 - **Ownership & value:** owner, mailing address, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service.
 - **Company behind the owner:** when the owner is a company (an LLC, partnership, corporation or trust), the card looks it up in the Texas Comptroller's free public records: whether it's active, where and when it was formed, its registered agent, mailing address and the officers, managers or members from its latest public report. If the name doesn't match exactly, similar names are listed to pick from. People's names are never looked up.
 - **The building:** footprint, height, floors and estimated floor area. Height comes from USGS lidar where it's believable; a reading that doesn't fit the building (say, hundreds of feet on a one-storey store) is set aside with a note, and the map or appraisal record is used instead.
-- **Site:** flood zone, traffic counts on nearby roads, water and utility districts (MUDs), tax-increment zones, Opportunity Zone, school district, bus stops, nearby environmental sites, crime nearby (Houston), and area rents and jobs.
+- **Site:** flood zone, traffic counts on nearby roads, water and utility districts (MUDs), **utilities** (see below), tax-increment zones, Opportunity Zone, school district, bus stops, nearby environmental sites, crime nearby (Houston), and area rents and jobs.
+- **Utilities** (in the Site section, filled in a moment after the rest; distances from the parcel's edge):
+  - **Power:** how far it is to the nearest transmission line (with its voltage and owner, e.g. "480 ft to a transmission line, 138 kV, CenterPoint Energy"), the nearest distribution line, and the nearest substation. Power lines come from OpenStreetMap: high-voltage lines are mapped well, but street (distribution) lines only in part, so "none mapped" doesn't mean there are none.
+  - **Water and sewer:** who holds the state service area (CCN) for water and for sewer here, with the CCN number. "No CCN here" usually means a city or a MUD that doesn't hold one; the Districts row shows the MUD.
+  - **Mains:** in Houston, the distance to the nearest public sewer main (with its size and material) and to a public water main where the city publishes one. Elsewhere, the distance to the nearest water line a utility has mapped for its service area, and a reminder that the city or MUD engineer has the mains.
 - **Crime:** inside Houston, the incidents reported within a mile. Anywhere in the US, **Crime by city / county**:
   - the local police department: the city's own police inside city limits, otherwise the county police or sheriff;
   - violent and property crimes per 100,000 residents for the newest full year, compared with the state and the US, and the change from the year before;
@@ -182,6 +186,7 @@ Map Layers:
   - Oil & gas wells and pipelines (Railroad Commission of Texas).
   - Wetlands (US Fish & Wildlife Service).
   - Soils (USDA soil survey).
+- **Utilities:** **Power, Water & Sewer Lines** (zoom in): transmission lines in red with their voltage, distribution lines in orange (dashed where underground), substations as red dots, and in Houston at street zoom, public sewer mains in brown and water mains in blue where the city publishes them.
 - **Demographics:** color census tracts by:
   - population or growth;
   - income, home value, rent or vacancy;
@@ -413,7 +418,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - The PDF is a conceptual sheet. It has no survey bearings, easements, utilities or title research, so it won't match an engineer's or architect's sheet; it's for feasibility and early conversations.
 - A site plan is a planning sketch from the parcel outline: not a survey, and no grading, utilities, fire lanes or code review. Parcel outlines from appraisal districts can be off by several feet.
 - The setbacks, parking ratios, stormwater storage and trash rules are typical starting numbers, not the rules for a specific city or drainage district. Houston has no zoning but has building lines and parking rules; other cities differ.
-- Projects are saved in this browser. Sharing them with the team switches on once the site's team database is set up for projects; until then the Projects tab says they're saved on this device.
+- Projects are shared with the team: each one is saved in this browser and synced to the team database, and the last edit wins.
 
 ---
 
@@ -425,6 +430,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 - **People, homes and jobs:** US Census American Community Survey (5-year averages) and Census jobs data (about two years behind).
 - **Flood:** FEMA. **Traffic counts:** TxDOT. **Crime:** Houston Police (street level) and the FBI (yearly, by police department, nationwide). **Buildings:** OpenStreetMap.
 - **Environment:** Texas Commission on Environmental Quality, US EPA, Railroad Commission of Texas (wells and pipelines), US Fish & Wildlife Service (wetlands) and USDA (soils).
+- **Utilities:** OpenStreetMap (power lines and substations), the Public Utility Commission of Texas service-area (CCN) maps through Harris County and the Texas Water Development Board, and the City of Houston (public sewer and water mains). The federal transmission-line map (HIFLD) was taken offline in 2025, so it isn't used. Exact pipe locations, sizes and capacity come from the utility or district engineer.
 - **Company owners:** Texas Comptroller franchise-tax records and the Secretary of State.
 - **Google (paid, capped each month):** Google base maps, 3D city and place search, when the site's Google keys are set. A monthly allowance keeps place searches inside Google's free monthly use; past it, search uses the free sources until the next month.
 - **Businesses and places:** Overture Maps and Foursquare's free open datasets, reloaded monthly (about 300,000 in the seven counties), plus OpenStreetMap.
@@ -451,6 +457,8 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 ---
 
 ## Recently added
+
+- **Utilities near a site:** the property card's Site section shows the nearest power lines (with voltage and owner) and substation, who provides water and sewer here, and in Houston the nearest public sewer main; a **Power, Water & Sewer Lines** map layer; and the site plan sheet notes them. Projects now sync with the team.
 
 - **Site plans that follow the request:** ask for a number of buildings and a floor area and you get that many buildings sharing it; parking trimmed to what's needed with the rest of the land kept for a future pad or phase; stormwater sized from the developed land as a detention pond, retention pond, underground vaults or none (with the underground cost in the pro forma); drives and parking drawn as one paved surface with one curb line; accessible stalls, an entry stop bar and centre line; and trash enclosures placed by the rules, or added by hand.
 
