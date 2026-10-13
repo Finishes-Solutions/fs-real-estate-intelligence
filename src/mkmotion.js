@@ -4,7 +4,8 @@
 // new ones grow up from the baseline (and numbers count up) when they first scroll into view. settle() jumps everything
 // to its end state, so a PDF export never captures a chart half drawn. Nothing moves when the user prefers reduced motion.
 //   data-mka on a mark: bar | line | area | dot (an SVG path: its d morphs), hb (a horizontal bar: width %), num (text)
-//   data-mk: the mark's key inside its chart; the chart is found from its box's title, so area.js call sites need nothing
+//   data-mk: the mark's key inside its chart; the chart is found from its box's title and its data-mkc (or its place in
+//   the box), so area.js call sites need nothing
 const DUR = 700;
 let live = new Set(), observers = [], waiting = new WeakSet();
 
@@ -35,10 +36,10 @@ const shape = d => String(d).replace(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g, '#');
 function keyer() {
   const seen = new Map();
   return el => {
-    const chart = el.closest('svg, .mk-hbars, .mk-kpi'), box = chart?.closest('.mk-kpi, .mk-sm, .mk-box'); if (!box) return null;
+    const chart = el.closest('[data-mkc], svg, .mk-hbars, .mk-kpi'), box = chart?.closest('.mk-kpi, .mk-sm, .mk-box'); if (!box) return null;
     let id = seen.get(chart);
     if (id == null) { const title = box.querySelector('h3, .mk-kl, .mk-smh span')?.textContent || '';
-      id = title + '#' + [...box.querySelectorAll('svg.mk-svg, svg.mk-spk, .mk-hbars')].indexOf(chart); seen.set(chart, id); }
+      id = title + '#' + (chart.dataset.mkc ?? [...box.querySelectorAll('svg.mk-svg, svg.mk-spk, .mk-hbars')].indexOf(chart)); seen.set(chart, id); }
     return id + '|' + el.dataset.mka + ':' + el.dataset.mk;
   };
 }
@@ -65,7 +66,7 @@ export function animate(root, prev, { reduce = false } = {}) {
   const key = keyer(), now = [], later = new Map(), order = new Map();
   for (const el of root.querySelectorAll('[data-mka]')) {
     const k = key(el); if (!k) continue;
-    const kind = el.dataset.mka, had = prev.has(k), from = prev.get(k), chart = el.closest('svg, .mk-hbars, .mk-kpi');
+    const kind = el.dataset.mka, had = prev.has(k), from = prev.get(k), chart = el.closest('[data-mkc], svg, .mk-hbars, .mk-kpi');
     const n = order.get(chart) || 0; order.set(chart, n + 1);
     let a = null;
     if (kind === 'hb') {

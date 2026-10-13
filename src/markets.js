@@ -3,11 +3,12 @@
 // (lib/correlate.mjs: how a Houston measure moves with a market series, with the honesty checks built in), plus "Explain
 // with AI" (the assistant, using its market_correlation tool) and "What moves this?" (one measure against every series).
 // src/area.js puts the two boxes at the end of the Market tab; the assistant's market tools use ctx.markets too.
+// Charts are drawn with D3 (the global from index.html) and carry data-mka marks, so src/mkmotion.js animates them.
 import { SERIES, BY_ID, GROUPS } from './lib/markets.mjs';
 import { correlate, scan, describe, fromMonths, fromObject } from './lib/correlate.mjs';
 
 export function initMarkets(ctx) {
-  const { esc, fmtN } = ctx;
+  const { esc, fmtN } = ctx, d3 = globalThis.d3; let gid = 0, chartW = 560; // chartW: the correlation charts' width (area.js measures it)
   let data = null, loadP = null, quotes = {}, qAt = 0, qJob = null, timer = null;
   let group = 'energy', A = 'hous448bpprivsa', B = 'dcoilwtico', how = 'yoy', scanRes = null, scanFor = null;
   const load = () => loadP ||= fetch('data/markets.json').then(r => r.ok ? r.json() : null).catch(() => null).then(d => (data = d));
@@ -52,11 +53,14 @@ export function initMarkets(ctx) {
   // last 12 months; hover a point for its date and value
   function spark(s, d) {
     const v = d?.recent?.v || [], t = d?.recent?.t || []; if (v.length < 2) return '';
-    const W = 110, H = 28, mn = Math.min(...v), mx = Math.max(...v), x = i => i / (v.length - 1) * W, y = x => H - 3 - (x - mn) / ((mx - mn) || 1) * (H - 6), cw = W / (v.length - 1);
-    const pts = v.map((p, i) => x(i).toFixed(1) + ',' + y(p).toFixed(1)).join(' ');
+    const W = 110, H = 28, x = d3.scaleLinear([0, v.length - 1], [2, W - 3]), y = d3.scaleLinear(d3.extent(v), [H - 3, 3]), cw = x(1) - x(0), id = 'mxg' + (++gid);
     const when = k => { const [yy, mm, dd] = String(k || '').split('-'); return yy ? new Date(Date.UTC(+yy, +mm - 1, +dd || 1)).toLocaleDateString('en-US', { month: 'short', ...(s.freq === 'd' || s.freq === 'w' ? { day: 'numeric' } : {}), year: 'numeric', timeZone: 'UTC' }) : ''; };
-    return '<svg class="mx-spark ' + (v[v.length - 1] >= v[0] ? 'up' : 'dn') + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Last 12 months"><polyline points="' + pts + '"/>' +
-      v.map((p, i) => '<g class="mk-hit" data-tip="' + esc((when(t[i]) ? when(t[i]) + ': ' : '') + fmt(s, p)) + '"><rect x="' + (x(i) - cw / 2).toFixed(1) + '" y="0" width="' + cw.toFixed(2) + '" height="' + H + '" fill="transparent"/><circle cx="' + x(i).toFixed(1) + '" cy="' + y(p).toFixed(1) + '" r="2" fill="currentColor" opacity="0"/></g>').join('') + '</svg>';
+    const line = d3.line().x((p, i) => x(i)).y(y).curve(d3.curveMonotoneX).digits(1), area = d3.area().x((p, i) => x(i)).y0(H).y1(y).curve(d3.curveMonotoneX).digits(1);
+    return '<svg class="mx-spark ' + (v[v.length - 1] >= v[0] ? 'up' : 'dn') + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Last 12 months" data-mkc="' + esc(s.id) + '" data-base="' + H + '">' +
+      '<defs><linearGradient id="' + id + '" x1="0" x2="0" y1="0" y2="1"><stop offset="0" class="mx-gs" stop-opacity=".26"/><stop offset="1" class="mx-gs" stop-opacity="0"/></linearGradient></defs>' +
+      '<path data-mka="area" data-mk="a" d="' + area(v) + '" fill="url(#' + id + ')"/><path class="mx-sl" data-mka="line" data-mk="l" d="' + line(v) + '"/>' +
+      '<path class="mx-sd" data-mka="dot" data-mk="d" d="M' + x(v.length - 1).toFixed(1) + ',' + y(v[v.length - 1]).toFixed(1) + 'h0"/>' +
+      v.map((p, i) => '<g class="mk-hit" data-tip="' + esc((when(t[i]) ? when(t[i]) + ': ' : '') + fmt(s, p)) + '"><rect x="' + (x(i) - cw / 2).toFixed(1) + '" y="0" width="' + cw.toFixed(2) + '" height="' + H + '" fill="transparent"/><circle cx="' + x(i).toFixed(1) + '" cy="' + y(p).toFixed(1) + '" r="2.4" fill="currentColor" opacity="0"/></g>').join('') + '</svg>';
   }
   // the latest price: the live quote when it's newer than last night's close
   function latest(s) {
@@ -93,26 +97,39 @@ export function initMarkets(ctx) {
     const { res } = r; if (!res.series || res.r == null) return '';
     const a = new Map(res.series.a), b = new Map(res.series.b), keys = [...a.keys()].filter(k => b.has(shift(k, -res.lag))).sort();
     if (keys.length < 3) return '';
-    const z = arr => { const m = arr.reduce((s, x) => s + x, 0) / arr.length, sd = Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / arr.length) || 1; return arr.map(x => (x - m) / sd); };
-    const va = z(keys.map(k => a.get(k))), vb = z(keys.map(k => b.get(shift(k, -res.lag)))), W = 560, H = 160, P = 26;
-    const all2 = va.concat(vb), mn = Math.min(-2, ...all2), mx = Math.max(2, ...all2), X = i => P + i / (keys.length - 1) * (W - P - 6), Y = v => 8 + (mx - v) / (mx - mn) * (H - 30);
-    const line = (vs, cls) => '<polyline class="' + cls + '" points="' + vs.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ') + '"/>';
-    const yrs = keys.map((k, i) => [k, i]).filter(([k]) => k.endsWith('-01')), step = (W - P - 6) / (keys.length - 1), per = how === 'mom' ? ' vs the month before' : ' vs a year earlier';
+    const z = arr => { const m = d3.mean(arr), sd = d3.deviation(arr) * Math.sqrt((arr.length - 1) / arr.length) || 1; return arr.map(x => (x - m) / sd); };
+    const va = z(keys.map(k => a.get(k))), vb = z(keys.map(k => b.get(shift(k, -res.lag)))), W = chartW, H = 170, P = 30;
+    const [lo, hi] = d3.extent(va.concat(vb)), X = d3.scaleLinear([0, keys.length - 1], [P, W - 6]), Y = d3.scaleLinear([Math.min(-2.5, lo), Math.max(2.5, hi)], [H - 22, 8]);
+    const line = d3.line().x((v, i) => X(i)).y(Y).curve(d3.curveMonotoneX).digits(1);
+    const yrs = keys.map((k, i) => [k, i]).filter(([k]) => k.endsWith('-01')), step = X(1) - X(0), per = how === 'mom' ? ' vs the month before' : ' vs a year earlier';
+    // a band for "within 2 standard deviations of normal", the zero line (each series' average change) labelled
+    const band = '<rect class="mx-band" x="' + P + '" width="' + (W - 6 - P) + '" y="' + Y(2).toFixed(1) + '" height="' + (Y(-2) - Y(2)).toFixed(1) + '"/>' +
+      [2, 0, -2].map(t => '<text class="mx-ax" x="' + (P - 5) + '" y="' + (Y(t) + 3).toFixed(1) + '" text-anchor="end">' + (t === 0 ? 'avg' : (t > 0 ? '+' : '−') + '2σ') + '</text>').join('');
     const hits = keys.map((k, i) => { const kb = shift(k, -res.lag);
       return '<g class="mk-hit mx-hit" data-tip="' + esc(ym(k) + ': ' + r.a.short + ' ' + chgTxt(a.get(k), r.a.diff) + per + ' · ' + r.b.short + (res.lag ? ' (' + ym(kb) + ')' : '') + ' ' + chgTxt(b.get(kb), r.b.diff)) + '">' +
-        '<rect x="' + (X(i) - step / 2).toFixed(1) + '" y="0" width="' + step.toFixed(2) + '" height="' + (H - 22) + '" fill="transparent"/><line x1="' + X(i).toFixed(1) + '" x2="' + X(i).toFixed(1) + '" y1="4" y2="' + (H - 22) + '"/></g>'; }).join('');
-    return '<svg class="mx-chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="The two series, standardized"><line class="mx-zero" x1="' + P + '" x2="' + (W - 6) + '" y1="' + Y(0) + '" y2="' + Y(0) + '"/>' +
-      yrs.map(([k, i]) => '<text x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '" class="mx-ax">' + k.slice(0, 4) + '</text>').join('') + line(vb, 'mx-lb') + line(va, 'mx-la') + hits + '</svg>';
+        '<rect x="' + (X(i) - step / 2).toFixed(1) + '" y="0" width="' + step.toFixed(2) + '" height="' + (H - 22) + '" fill="transparent"/><line x1="' + X(i).toFixed(1) + '" x2="' + X(i).toFixed(1) + '" y1="4" y2="' + (H - 22) + '"/>' +
+        '<circle class="mx-db" cx="' + X(i).toFixed(1) + '" cy="' + Y(vb[i]).toFixed(1) + '" r="3.5"/><circle class="mx-da" cx="' + X(i).toFixed(1) + '" cy="' + Y(va[i]).toFixed(1) + '" r="3.5"/></g>'; }).join('');
+    return '<svg class="mx-chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="The two series, standardized" data-mkc="corr" data-base="' + Y(0).toFixed(1) + '">' + band + '<line class="mx-zero" x1="' + P + '" x2="' + (W - 6) + '" y1="' + Y(0).toFixed(1) + '" y2="' + Y(0).toFixed(1) + '"/>' +
+      yrs.filter(([k, i], j) => j % Math.ceil(36 / Math.max(1, X(12) - X(0))) === 0).map(([k, i]) => '<text x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '" class="mx-ax" text-anchor="middle">' + k.slice(0, 4) + '</text>').join('') +
+      '<path class="mx-lb" data-mka="line" data-mk="b" d="' + line(vb) + '"/><path class="mx-la" data-mka="line" data-mk="a" d="' + line(va) + '"/>' + hits + '</svg>';
   }
   const shift = (k, n) => { const [y, m] = k.split('-').map(Number), t = y * 12 + m - 1 + n; return Math.floor(t / 12) + '-' + String(t % 12 + 1).padStart(2, '0'); };
+  // correlation at each lead or lag, on a scale fitted to the values (real ones are often ±0.2, invisible on ±1)
   function lagBars(res) {
     const L = res.lags.filter(l => Number.isFinite(l.r)); if (!L.length) return '';
-    const W = 560, H = 70, mid = 35, bw = W / res.lags.length;
-    return '<svg class="mx-lags" viewBox="0 0 ' + W + ' ' + (H + 14) + '" role="img" aria-label="Correlation at each lead or lag">' + res.lags.map((l, i) => { if (!Number.isFinite(l.r)) return '';
-      const h = Math.abs(l.r) * (mid - 4), y = l.r >= 0 ? mid - h : mid;
-      const tip = (l.lag === 0 ? 'Same month' : l.lag > 0 ? 'Market series first by ' + l.lag + ' mo' : 'Houston measure first by ' + -l.lag + ' mo') + ': r = ' + (l.r > 0 ? '+' : '') + l.r.toFixed(2) + ' over ' + l.n + ' months' + (l.lag === res.lag ? ' (the strongest)' : '');
-      return '<g class="mk-hit" data-tip="' + esc(tip) + '"><rect x="' + (i * bw).toFixed(1) + '" y="0" width="' + bw.toFixed(1) + '" height="' + H + '" fill="transparent"/><rect x="' + (i * bw + 2).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + (bw - 4).toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" class="' + (l.lag === res.lag ? 'on' : l.r >= 0 ? 'pos' : 'neg') + '"/></g>'; }).join('') +
-      '<line x1="0" x2="' + W + '" y1="' + mid + '" y2="' + mid + '" class="mx-zero"/><text x="2" y="' + (H + 12) + '" class="mx-ax">Houston measure first ←</text><text x="' + (W / 2) + '" y="' + (H + 12) + '" class="mx-ax" text-anchor="middle">same month</text><text x="' + (W - 2) + '" y="' + (H + 12) + '" class="mx-ax" text-anchor="end">→ market series first</text></svg>';
+    const W = chartW, H = 96, P = 30, top = 14, m = Math.max(.2, d3.max(L, l => Math.abs(l.r))), y = d3.scaleLinear([-m, m], [H - 4, top]).nice(2), mid = y(0);
+    const x = d3.scaleBand(res.lags.map((l, i) => i), [P, W]).paddingInner(.2), best = res.lags.findIndex(l => l.lag === res.lag);
+    const ext = y.domain()[1], lab = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1);
+    return '<svg class="mx-lags" viewBox="0 0 ' + W + ' ' + (H + 16) + '" role="img" aria-label="Correlation at each lead or lag" data-mkc="lags" data-base="' + mid.toFixed(1) + '">' +
+      [ext, -ext].map(v => '<line class="mx-grid" x1="' + P + '" x2="' + W + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '"/><text class="mx-ax" x="' + (P - 5) + '" y="' + (y(v) + 3).toFixed(1) + '" text-anchor="end">' + lab(v) + '</text>').join('') +
+      '<text class="mx-ax" x="' + (P - 5) + '" y="' + (mid + 3).toFixed(1) + '" text-anchor="end">0</text>' +
+      res.lags.map((l, i) => { if (!Number.isFinite(l.r)) return '';
+        const yv = y(l.r), x0 = x(i), w = x.bandwidth();
+        const tip = (l.lag === 0 ? 'Same month' : l.lag > 0 ? 'Market series first by ' + l.lag + ' mo' : 'Houston measure first by ' + -l.lag + ' mo') + ': r = ' + (l.r > 0 ? '+' : '') + l.r.toFixed(2) + ' over ' + l.n + ' months' + (l.lag === res.lag ? ' (the strongest)' : '');
+        return '<g class="mk-hit" data-tip="' + esc(tip) + '"><rect x="' + (x0 - x.step() * .1).toFixed(1) + '" y="0" width="' + x.step().toFixed(1) + '" height="' + H + '" fill="transparent"/>' +
+          '<path data-mka="bar" data-mk="' + l.lag + '" class="' + (i === best ? 'on' : l.r >= 0 ? 'pos' : 'neg') + '" d="M' + x0.toFixed(1) + ',' + mid.toFixed(1) + 'V' + yv.toFixed(1) + 'H' + (x0 + w).toFixed(1) + 'V' + mid.toFixed(1) + 'Z"/></g>'; }).join('') +
+      (best >= 0 && Number.isFinite(res.lags[best].r) ? '<text class="mx-best" x="' + (x(best) + x.bandwidth() / 2).toFixed(1) + '" y="' + (res.lags[best].r >= 0 ? y(res.lags[best].r) - 4 : y(res.lags[best].r) + 11).toFixed(1) + '" text-anchor="middle">' + (res.lags[best].r > 0 ? '+' : '') + res.lags[best].r.toFixed(2) + '</text>' : '') +
+      '<line x1="' + P + '" x2="' + W + '" y1="' + mid.toFixed(1) + '" y2="' + mid.toFixed(1) + '" class="mx-zero"/><text x="' + P + '" y="' + (H + 14) + '" class="mx-ax">Houston measure first ←</text><text x="' + ((P + W) / 2) + '" y="' + (H + 14) + '" class="mx-ax" text-anchor="middle">same month</text><text x="' + W + '" y="' + (H + 14) + '" class="mx-ax" text-anchor="end">→ market series first</text></svg>';
   }
   const VERD = { strong: ['Strong', 'mx-v3'], moderate: ['Moderate', 'mx-v2'], weak: ['Weak', 'mx-v1'], 'no reliable relationship': ['Not reliable', 'mx-v0'], 'not enough overlap': ['Not enough data', 'mx-v0'] };
   // layout: controls, the verdict tiles and the actions on the left; the chart, lead/lag bars and the plain-language
@@ -126,8 +143,8 @@ export function initMarkets(ctx) {
       const { res } = r, v = VERD[res.verdict] || VERD['no reliable relationship'], short = res.verdict === 'not enough overlap';
       if (short) main = '<div class="rnote">' + esc(res.sentence) + (how === 'yoy' ? ' <button type="button" class="lnk" data-mxhow="mom">Try month-over-month changes</button>' : '') + '</div>';
       else {
-        tiles = '<div class="kgrid mx-kg"><div class="mx-kv"><b class="' + v[1] + '">' + v[0] + '</b><span>Verdict</span></div><div><b>' + (res.lag === 0 ? 'Same month' : Math.abs(res.lag) + ' mo') + '</b><span>' + (res.lag > 0 ? esc(r.b.short) + ' first' : res.lag < 0 ? esc(r.a.short) + ' first' : 'Lead / lag') + '</span></div>' +
-          '<div><b>' + (res.r > 0 ? '+' : '') + res.r.toFixed(2) + '</b><span>Correlation (r)</span></div><div><b>' + res.n + ' / ' + res.neff + '</b><span>Months / independent</span></div>' +
+        tiles = '<div class="kgrid mx-kg" data-mkc="tiles"><div class="mx-kv"><b class="' + v[1] + '">' + v[0] + '</b><span>Verdict</span></div><div><b>' + (res.lag === 0 ? 'Same month' : Math.abs(res.lag) + ' mo') + '</b><span>' + (res.lag > 0 ? esc(r.b.short) + ' first' : res.lag < 0 ? esc(r.a.short) + ' first' : 'Lead / lag') + '</span></div>' +
+          '<div><b data-mka="num" data-mk="r">' + (res.r > 0 ? '+' : '') + res.r.toFixed(2) + '</b><span>Correlation (r)</span></div><div><b data-mka="num" data-mk="n">' + res.n + ' / ' + res.neff + '</b><span>Months / independent</span></div>' +
           '<div class="mk-hit" tabindex="0" data-tip="How often two unrelated series would show a link this strong, after allowing for every lead, lag and overlapping month tried. Below 0.05 is the usual bar."><b>' + (res.pAdj < .001 ? '<0.001' : num(res.pAdj, res.pAdj < .1 ? 3 : 2)) + '</b><span>p-value, corrected</span></div></div>';
         main = '<div class="mx-leg"><span><i class="mx-la"></i>' + esc(r.a.short) + '</span><span><i class="mx-lb"></i>' + esc(r.b.short) + (res.lag ? ' (shifted ' + Math.abs(res.lag) + ' mo ' + (res.lag > 0 ? 'later' : 'earlier') + ')' : '') + '</span><span class="mx-dim">' + (how === 'yoy' ? 'Year-over-year' : 'Month-over-month') + ' change, standardized · hover for values</span></div>' +
           chart(r) + '<div class="mx-sub">Correlation at each lead or lag</div>' + lagBars(res) + '<p class="mx-say">' + esc(describe(res, { a: r.a.short, b: r.b.short })) + '</p>';
@@ -185,5 +202,5 @@ export function initMarkets(ctx) {
       groups: GROUPS.map(g => g[1]) };
   }
 
-  ctx.markets = { load, raw: () => data, html: () => marketsBox() + corrBox(), wire, correlateNamed, prices, find };
+  ctx.markets = { load, raw: () => data, html: ({ width } = {}) => { chartW = Math.max(300, Math.round(width) || 560); return marketsBox() + corrBox(); }, wire, correlateNamed, prices, find };
 }

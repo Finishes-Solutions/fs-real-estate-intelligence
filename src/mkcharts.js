@@ -35,6 +35,9 @@ export function mkCharts({ esc, fmtN }) {
     const top = d3.max(stack.at(-1) || [], d => d[1]) || 1, ax = yAxis({ W, H, hi: top, padL, padT, padB, fmt, n: H < 150 ? 3 : 4 });
     const x = d3.scaleBand(d3.range(rows.length), [padL + 6, W]).paddingInner(rows.length > 20 ? .18 : .38).paddingOuter(.1);
     const w = Math.max(2, Math.min(44, x.bandwidth())), step = x.step(), Y = ax.Y;
+    // x labels left to right, skipping one that would overlap the last (narrow screens: "now" beside "2027")
+    let lastR = -Infinity; const tickAt = (t, cx) => { if (!t) return ''; const half = String(t).length * 3.3; if (cx - half < lastR + 4) return ''; lastR = cx + half;
+      return '<text class="mk-ax" x="' + f1(cx) + '" y="' + (H - 6) + '" text-anchor="middle">' + esc(t) + '</text>'; };
     return '<svg class="mk-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(aria) + '" data-base="' + f1(ax.base) + '">' + ax.html + rows.map((r, i) => {
       const bx = x(i) + (x.bandwidth() - w) / 2, key = pinKey ? pinKey + ':' + (i + off) : '', id = i + off;
       // the top segment is rounded; a 1px gap of panel colour separates stacked segments
@@ -42,7 +45,7 @@ export function mkCharts({ esc, fmtN }) {
       const segs = keys.map((k, j) => { const [a, b] = stack[j][i], y0 = Y(a), y1 = Y(b), h = y0 - y1 - (j < lastK && y0 - y1 > 3 ? 1 : 0);
         return '<path data-mka="bar" data-mk="' + id + ':' + esc(k.k) + '" d="' + bar(bx, y0 - h, w, h, j === lastK ? 3 : 0) + '" style="fill:' + col(k.c) + (r.faded ? ';fill-opacity:.38' : '') + '"/>'; }).join('');
       return '<g class="mk-hit' + (pin && key === pin.k + ':' + pin.i ? ' on' : '') + '" tabindex="0"' + (key ? ' data-k="' + key + '"' : '') + ' data-tip="' + esc(r.tip || '') + '"><rect x="' + f1(x(i) - step * x.paddingInner() / 2) + '" y="' + padT + '" width="' + f1(step) + '" height="' + (H - padT - padB) + '" fill="transparent"/>' + segs +
-        (r.tick ? '<text class="mk-ax" x="' + f1(bx + w / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + esc(r.tick) + '</text>' : '') + '</g>';
+        tickAt(r.tick, bx + w / 2) + '</g>';
     }).join('') + '</svg>';
   }
 

@@ -1001,8 +1001,8 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 .mx-table td b{display:block;font-weight:600}
 .mx-sym{display:block;font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:.04em}
 .mx-sp{width:120px}
-.mx-spark{width:110px;height:28px;display:block}.mx-spark polyline{fill:none;stroke-width:1.5;vector-effect:non-scaling-stroke}
-.mx-spark.up polyline{stroke:var(--mx-up)}.mx-spark.dn polyline{stroke:var(--mx-dn)}
+.mx-spark{width:110px;height:28px;display:block;overflow:visible}.mx-spark .mx-sl{fill:none;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}.mx-spark .mx-sd{stroke-width:4.5;stroke-linecap:round}
+.mx-spark.up{color:var(--mx-up)}.mx-spark.dn{color:var(--mx-dn)}.mx-spark .mx-sl,.mx-spark .mx-sd{stroke:currentColor}.mx-spark .mx-gs{stop-color:currentColor}
 .mx-up{color:var(--mx-up)}.mx-dn{color:var(--mx-dn)}.mx-dim{color:var(--muted)}
 .mx-ctl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px;font-size:12px;color:var(--text-2)}
 .mx-ctl label{display:inline-flex;align-items:center;gap:6px;min-width:0}
@@ -1027,7 +1027,7 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 .mx-side .mx-acts{margin-top:4px}
 .mx-chart g.mx-hit line{stroke:var(--text-2);stroke-width:1;stroke-dasharray:2 2;opacity:0}
 .mx-chart g.mx-hit:hover line{opacity:.6}
-.mx-lags g.mk-hit:hover rect+rect{opacity:.75}
+.mx-lags g.mk-hit:hover path{opacity:.75}
 .mx-chart .mk-hit,.mx-lags .mk-hit,.mx-kg .mk-hit,.mk-spark .mk-hit,.mx-spark .mk-hit{cursor:var(--cur-default,default)}
 .mk-spark .mk-hit:hover circle,.mx-spark .mk-hit:hover circle{opacity:1}
 .mx-how{margin-top:10px}
@@ -1035,11 +1035,13 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 .mx-how .rnote{margin-top:6px}
 @media (max-width:980px){ .mx-wrap{grid-template-columns:minmax(0,1fr)} }
 .mx-chart,.mx-lags{width:100%;height:auto;display:block;overflow:visible}
-.mx-chart polyline{fill:none;stroke-width:1.8;stroke-linejoin:round}
-.mx-chart polyline.mx-la{stroke:var(--mx-a)}.mx-chart polyline.mx-lb{stroke:var(--mx-b);stroke-dasharray:5 3}
+.mx-chart path{fill:none;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}
+.mx-chart path.mx-la{stroke:var(--mx-a)}.mx-chart path.mx-lb{stroke:var(--mx-b);stroke-dasharray:5 3}
+.mx-band{fill:var(--text);fill-opacity:.035}.mx-grid{stroke:var(--line);stroke-width:1}.mx-best{font-family:var(--font-mono);font-size:10px;font-weight:600;fill:var(--mx-a)}
+.mx-chart circle{opacity:0;stroke:var(--panel);stroke-width:1.5}.mx-chart .mx-da{fill:var(--mx-a)}.mx-chart .mx-db{fill:var(--mx-b)}.mx-chart g.mx-hit:hover circle{opacity:1}
 .mx-zero{stroke:var(--line-2);stroke-width:1}
 .mx-ax{font-family:var(--font-mono);font-size:10px;fill:var(--muted)}
-.mx-lags rect.pos{fill:var(--green-300)}.mx-lags rect.neg{fill:var(--ink-300)}.mx-lags rect.on{fill:var(--mx-a)}
+.mx-lags path.pos{fill:var(--green-300)}.mx-lags path.neg{fill:var(--ink-300)}.mx-lags path.on{fill:var(--mx-a)}
 .mx-sub{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
 .mx-say{font-size:13px;line-height:1.5;margin:10px 0 0;color:var(--text)}
 .mx-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
@@ -1048,6 +1050,7 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 .mx-row:hover{border-color:var(--brand);background:var(--panel-2)}
 .mx-row .m{font-family:var(--font-mono);font-size:11.5px}.mx-row span{color:var(--text-2)}.mx-row em{font-style:normal;font-weight:600;text-align:right}
 @media (max-width:700px){.mx-sp{display:none}.mx-kg{grid-template-columns:repeat(2,minmax(0,1fr))}.mx-kg>div:last-child{grid-column:1/-1}.mx-ctl label{flex:1 1 100%}.mx-ctl select{max-width:none;flex:1;min-width:0}.mx-row{grid-template-columns:1fr auto;gap:2px 10px}.mx-row span:not(.m){grid-column:1}.mx-row em{grid-row:1;grid-column:2}}
+@media (max-width:700px){.mx-side .mx-kg>div:last-child{grid-column:auto}} /* the side tiles are 1 + 2×2: the last one keeps its cell */
 
 /* Ask AI: keyboard hint, suggested questions above it; with a card open it sits just left of the card */
 .fab-sugs{position:absolute;right:var(--fabr,16px);bottom:90px;z-index:4;display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:min(330px,calc(100% - var(--fabr,16px) - 24px));pointer-events:none}
