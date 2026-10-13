@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 6:54 PM CT: Site plans that get the most out of the land (00cddf7)
+- **More leasable floor area and homes:** sizes you ask for are the first phase; buildings grow along their rows until the parking is used, and homes keep filling the blocks (leaving room for the detention lake). On a 41-acre retail, medical, office and warehouse test site the same request went from about 320,000 to 514,000 sq ft, still fully parked; a 220-acre neighbourhood went from 650 homes (with blocks of empty lots) to about 740.
+- **Warehouses** in a mixed-use plan are real warehouses with truck courts; they used to come out as duplexes.
+- **Parking garages** are built when asked for ("a parking garage behind the offices"), and tried on shop and office sites where they'd pay.
+- **"Multifamily" or "rental housing"** compares garden apartments, studio and one-bed apartments, townhomes and duplexes, best value first.
+- **Every option shows its value**, cost and yield on cost (pro forma defaults), with a Value sort.
+- **No dumpsters unless asked for**, far fewer future pad sites, no sliver buildings, and a dragged pond stays inside the lot.
+
 ### 6:23 PM CT: More than one entrance; spinners on the AI buttons (a810d63)
 - **Add Entrance** in the site plan tools: click the lot line where a driveway should come in and it runs straight in to the nearest drive, with curb returns, stepping round buildings and ponds. Clicking a lot line that isn't a street marks it as one; it warns when it's closer than about 150 ft to another entrance.
 - **Ask for entrances when you build:** "two entrances" or "a second driveway" adds them on the front or a side street, spread apart; options that fit them come first, and one that can't says why.
