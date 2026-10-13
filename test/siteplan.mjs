@@ -185,6 +185,26 @@ for (const v of [0, 1, 2]) {
   let tries = 0; globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('/models/')) return Response.json({ id: 'm' }); tries++; const b = JSON.parse(opts.body); if (Array.isArray(b.messages[1].content)) return Response.json({ error: { message: 'This model does not support image inputs' } }, { status: 400 }); return Response.json({ choices: [{ message: { content: JSON.stringify({ ...reply(), reviews: [], ranking: [0], revise: false, program: prog, params: { fill: null, streets: null, form: null, storm: null }, why: '', summary: 'ok' }) } }] }); };
   res = await call({ mode: 'review', options, round: 1 }); assert.equal(res.code, 200, 'a model without image input still reviews, on the numbers'); assert.equal(tries, 2); }
 
+// ---- /api/siteplan: changes by name (the AI answers with edits on the plan's pieces) ----
+{ const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
+  let sent = null, reply = null; process.env.OPENAI_API_KEY = 'test-key';
+  globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('/models/')) return Response.json({ id: 'm' }); sent = JSON.parse(opts.body); return Response.json({ choices: [{ message: { content: JSON.stringify(reply()) } }] }); };
+  const { default: handler, EDIT_SCHEMA } = await import('../api/siteplan.js');
+  assert.deepEqual(EDIT_SCHEMA.required.slice().sort(), Object.keys(EDIT_SCHEMA.properties).sort(), 'strict schema');
+  const it = EDIT_SCHEMA.properties.ops.items; assert.deepEqual(it.required.slice().sort(), Object.keys(it.properties).sort(), 'strict op schema');
+  const call = async body => { const res = mock(); await handler({ method: 'POST', body, headers: { 'x-forwarded-for': '7.7.7.9' } }, res); return res; };
+  const plan = { site: { acres: 21.3 }, totals: { units: 240 }, pieces: [{ id: 'b7', name: 'Apt Bldg 7', kind: 'building', use: 'multifamily', at: [300, 400], size: [180, 60], turn: 0, floors: 3, units: 24, selected: true }, { id: 'c1', name: 'Clubhouse', kind: 'building', use: 'amenity', at: [100, 80], size: [90, 60] }] };
+  const op = o => ({ action: 'change', target: null, with: null, type: null, kind: null, use: null, name: null, floors: null, units: null, w: null, d: null, x: null, y: null, turn: null, ...o });
+  reply = () => ({ ops: [op({ target: 'b7', floors: 4 }), op({ target: 'nope', floors: 2 }), op({ target: 'c1', type: 'clubhouse-clubhouse-7-500-sf' }), op({ target: 'c1', type: 'made-up-type', floors: 99 }), op({ action: 'swap', target: 'b7', with: 'ghost' })], refit: 'full', summary: 'Bldg 7 goes to four stories; a bigger clubhouse.', question: null });
+  let res = await call({ mode: 'edit', prompt: 'make it four stories and give us a bigger clubhouse', plan, image: 'data:image/jpeg;base64,' + Buffer.from('x').toString('base64') });
+  assert.equal(res.code, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body.ops.map(o => [o.target, o.floors, o.type]), [['b7', 4, null], ['c1', null, 'clubhouse-clubhouse-7-500-sf'], ['c1', null, null]], 'only known pieces, library types and sane numbers');
+  assert.equal(res.body.refit, 'full'); const u = sent.messages[1].content; assert.ok(Array.isArray(u) && u[1].type === 'image_url', 'the drawing goes to the model');
+  assert.ok(/Apt Bldg 7/.test(u[0].text) && /clubhouse-clubhouse-7-500-sf = Clubhouse/.test(u[0].text), 'the plan and the library go to the model');
+  reply = () => ({ ops: [], refit: 'none', summary: '', question: 'Which building: Bldg 7 or Bldg 17?' });
+  res = await call({ mode: 'edit', prompt: 'make that one taller', plan }); assert.equal(res.body.question, 'Which building: Bldg 7 or Bldg 17?');
+  res = await call({ mode: 'edit', prompt: '', plan }); assert.equal(res.code, 400); }
+
 // ---- /api/projects ----
 { const store = []; let table = true;
   globalThis.fetch = async (url, opts = {}) => {

@@ -366,4 +366,40 @@ function usable(plan, o, what) {
   assert.deepEqual(r.att.map(a => a.kind).sort(), ['plaza', 'pool']); const pool = r.els.find(e => e.kind === 'pool');
   assert.ok(S.gapBetween(S.shapeOf(pool), S.shapeOf(r.el)) <= 30 && !S.check({ ...base, elements: r.els }).some(i => /pool|overlaps/i.test(i.text)), 'the pool is still at the clubhouse');
 }
+// ---- changes by name (Change With AI), applied to a real apartment plan, then re-fitted ----
+{
+  const E = await import('../lib/siteedit.mjs');
+  const plan = siteOf(tract), o = L.layoutOptions(plan, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], base = { ...plan, elements: o.elements, program: o.program, recipe: o.recipe };
+  const by = (els, n) => els.find(e => e.name === n), bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text);
+  // the sheet's frame: the street along the bottom
+  const f = E.sheetFrame(base), fi = base.front ?? S.longestEdge(base.ring), fr = base.ring[fi], fr2 = base.ring[(fi + 1) % base.ring.length];
+  assert.ok(Math.abs(f.to(fr)[1]) < 1 && Math.abs(f.to(fr2)[1]) < 1, 'the street edge is y = 0'); const q = f.from(f.to([123, 456])); assert.ok(Math.hypot(q[0] - 123, q[1] - 456) < 1e-6);
+  const d = E.describePlan(base, by(o.elements, 'Apt Bldg 7').id); assert.ok(d.pieces.some(p => p.name === 'Apt Bldg 7' && p.selected) && d.pieces.some(p => p.name === 'Clubhouse') && !d.pieces.some(p => p.kind === 'parking'), 'the plan as the AI reads it');
+  // plain words: four stories on one building, another removed; nothing else moves, parking where it left grows back
+  const ops = E.guessEdits('Make apt bldg 7 four stories. Remove building 3', base);
+  assert.deepEqual(ops.map(x => [x.action, o.elements.find(e => e.id === x.target)?.name, x.floors ?? null]), [['change', 'Apt Bldg 7', 4], ['remove', 'Apt Bldg 3', null]]);
+  const b7 = by(o.elements, 'Apt Bldg 7'), r = E.applyEdits(base, ops), n7 = r.elements.find(e => e.id === b7.id);
+  assert.equal(n7.floors, 4); assert.ok(n7.pinned && n7.x === b7.x && n7.y === b7.y, 'changed in place, pinned');
+  if (b7.units) assert.equal(n7.units, Math.round(b7.units * 4 / 3), 'more floors, more units');
+  assert.ok(!by(r.elements, 'Apt Bldg 3'), 'removed'); assert.deepEqual(bad(r.elements), []);
+  assert.equal(r.elements.filter(e => e.kind === 'building' && e.id !== b7.id).map(e => e.x + ',' + e.y).join(), o.elements.filter(e => e.kind === 'building' && e.id !== b7.id && e.name !== 'Apt Bldg 3').map(e => e.x + ',' + e.y).join(), 'nothing else moves');
+  assert.ok(S.metrics({ ...base, elements: r.elements }).units > S.metrics(base).units - (by(o.elements, 'Apt Bldg 3').units || 40), 'units: the extra floor counts');
+  // a bigger clubhouse from the library takes the old one's place; its pool stays with it
+  const club = by(o.elements, 'Clubhouse'), rc = E.applyEdits(base, E.guessEdits('make the clubhouse a 7,500 sf clubhouse', base)), nc = rc.elements.find(e => e.id === club.id);
+  assert.equal(nc.type, 'clubhouse-clubhouse-7-500-sf'); assert.equal(nc.name, 'Clubhouse'); assert.ok(Math.hypot(nc.x - club.x, nc.y - club.y) < 60, 'about where it was');
+  const pool = rc.elements.find(e => e.kind === 'pool'); assert.ok(S.gapBetween(S.shapeOf(pool), S.shapeOf(nc)) <= 30, 'the pool still beside it'); assert.deepEqual(bad(rc.elements), []);
+  // a swap: two buildings trade places
+  const b2 = by(o.elements, 'Apt Bldg 2'), b5 = by(o.elements, 'Apt Bldg 5'), rs = E.applyEdits(base, E.guessEdits('swap bldg 2 and bldg 5', base));
+  assert.ok(Math.hypot(rs.elements.find(e => e.id === b2.id).x - b5.x, rs.elements.find(e => e.id === b2.id).y - b5.y) < 1, 'swapped');
+  // the AI's move, in the sheet's frame: the clubhouse to the back, beside the last building; then a full re-fit round it
+  const back = d.pieces.filter(p => p.kind === 'building').sort((a, b2) => b2.at[1] - a.at[1])[0];
+  const rm = E.applyEdits(base, [{ action: 'move', target: club.id, x: back.at[0], y: back.at[1] - 150 }], { refit: true }), mc = rm.elements.find(e => e.id === club.id);
+  assert.ok(f.to([mc.x, mc.y])[1] > f.to([club.x, club.y])[1] + 100 && rm.elements.filter(e => e.kind === 'pool').every(p => S.gapBetween(S.shapeOf(p), S.shapeOf(mc)) <= 30), 'moved back, its pool with it');
+  const rf = L.refit({ ...base, elements: rm.elements }, { amount: 'current' }); assert.ok(rf, 'the rest re-fits');
+  const names = rf.elements.filter(e => e.kind === 'building' && e.name).map(e => e.name); assert.equal(new Set(names).size, names.length, 'no two buildings share a name');
+  const kept = rf.elements.find(e => e.id === club.id); assert.ok(kept && Math.hypot(kept.x - mc.x, kept.y - mc.y) < 0.5, 'the changed piece stays where it was put');
+  const m0 = S.metrics(base), m1 = S.metrics({ ...base, elements: rf.elements });
+  assert.deepEqual(bad(rf.elements), []); assert.ok(m1.spaces >= m1.required && m1.units >= m0.units * 0.85, 'parked, and about the same amount of housing: ' + m1.units + ' vs ' + m0.units);
+  assert.equal(rf.elements.filter(e => e.kind === 'pool').length, 1, 'still one pool');
+}
 console.log('site layouts ok');

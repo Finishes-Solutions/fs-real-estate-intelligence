@@ -9,6 +9,7 @@ import { layoutOptions, refit, PARAMS } from './lib/sitelayout.mjs';
 import * as PF from './lib/proforma.mjs';
 import { sheetHTML, planSVG } from './lib/sitesheet.mjs';
 import { BUILDING_TYPES, BUILDING_GROUPS, typeById, fromType } from './lib/buildings.mjs';
+import * as ED from './lib/siteedit.mjs';
 const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 
@@ -399,10 +400,14 @@ export function initSitePlan(ctx) {
     const scroll = card.classList.contains('sp-mode') ? card.scrollTop : 0;
     card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan · ' + esc(p.name) + '</div><h2><input id="spPlanName" class="sp-title" value="' + esc(pl.name) + '" aria-label="Plan name"></h2><div class="bsub">' + esc(parcel?.label || '') + (pl.ring.length >= 3 ? ' · ' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() +
       '<div class="sp-plans">' + p.plans.map(x => '<button class="chip" aria-pressed="' + (x.id === pl.id) + '" data-plan="' + esc(x.id) + '">' + esc(x.name) + '</button>').join('') + '<button class="chip" id="spCopy" title="Start another option from this one">+ Copy</button>' + (noRing ? '' : '<button class="btn sp-edit' + (ed.editing ? ' askai' : '') + '" aria-pressed="' + !!ed.editing + '" id="spEdit" title="Move, resize and turn pieces of the plan; only the piece you move changes">' + (ed.editing ? 'Done Editing' : 'Edit Layout') + '</button>') + '</div>' +
-      ctx.cardNav([['spAiSec', 'Build'], ['spSel', 'Selected'], ['spNums', 'Numbers'], ['spDrawSec', 'Draw'], ['spSiteSec', 'Site'], ['spParams', 'Settings'], ['spPfSec', 'Pro forma'], ['spExport', 'Export']]) + '</div>' +
+      ctx.cardNav([...(pl.elements.length ? [['spChgSec', 'Change']] : []), ['spAiSec', 'Build'], ['spSel', 'Selected'], ['spNums', 'Numbers'], ['spDrawSec', 'Draw'], ['spSiteSec', 'Site'], ['spParams', 'Settings'], ['spPfSec', 'Pro forma'], ['spExport', 'Export']]) + '</div>' +
       (noRing ? '' : '<div class="bover" id="spOver">' + overview(pl, prog) + '</div>') +
       '<div class="sp-body">' +
       (drawing ? '<div class="bsec sp-draw"><div class="lt">Draw the site</div><p>Click each corner of the site on the map. Click the first corner again (or double-click, or press Enter) to finish.' + (ed.draft.length ? ' ' + ed.draft.length + ' corner' + (ed.draft.length > 1 ? 's' : '') + ' so far.' : '') + '</p><div class="bacts" style="padding:0"><button class="btn askai" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button class="btn" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button class="btn" id="spCancelDraw">Keep the Old Site</button>') + '</div></div>' :
+      (pl.elements.length ? '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change With AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Apt Bldg 7 four stories · turn the clubhouse into a 7,500 sf one · remove Bldg 3 · swap Bldg 2 and Bldg 5">' + esc(ed.chg || '') + '</textarea>' +
+        '<div class="rnote">' + (sel ? 'About <b>' + esc(ED.labelOf(sel)) + '</b> (selected), or name any piece as it’s labelled on the plan.' : 'Name pieces as they’re labelled on the plan, or select one and say “it”.') + '</div>' +
+        '<div class="bacts sp-go"><button class="btn askai" id="spChgGo">Make Changes</button></div>' + (pl.recipe ? '<label class="sp-sw sp-revsw"><input type="checkbox" id="spChgFit"' + (ed.chgFit ? ' checked' : '') + '> Re-fit the rest of the site around the changes (otherwise only those pieces change)</label>' : '') +
+        '<div class="rnote sp-ainote" id="spChgNote">' + esc(ed.chgNote || '') + '</div></div>' : '') +
       '<div class="bsec sp-ai" id="spAiSec"><label class="lt" for="spAsk">Build with AI</label><textarea id="spAsk" rows="2" placeholder="What should go here? e.g. 25,000 sf retail strip with 4 per 1,000 parking">' + esc(ed.ask || '') + '</textarea>' +
         '<div class="sp-sugs">' + SUGGEST.map(s => '<button class="chip" data-sug="' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div>' +
         '<div class="bacts sp-go"><button class="btn askai" id="spGo">Build Options</button><button class="btn" id="spBest" title="The AI reads what the app knows about this site and its surroundings and suggests what to build">What Should Go Here?</button></div>' +
@@ -435,6 +440,8 @@ export function initSitePlan(ctx) {
     $('#spAsk').onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) build(); };
     card.querySelectorAll('[data-sug]').forEach(b => b.onclick = () => { ed.ask = b.dataset.sug; $('#spAsk').value = ed.ask; build(); });
     on('#spGo', build); on('#spBest', bestUse);
+    const chg = $('#spChg'); if (chg) { chg.oninput = e => { ed.chg = e.target.value; }; chg.onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) aiChange(); }; }
+    on('#spChgGo', aiChange); const cf = $('#spChgFit'); if (cf) cf.onchange = () => { ed.chgFit = cf.checked; };
     const rv = $('#spReview'); if (rv) rv.onchange = () => { try { localStorage.setItem('fs-sp-review', rv.checked ? '1' : '0'); } catch (e) {} };
     card.querySelectorAll('[data-idea]').forEach(b => b.onclick = () => { const it = ed.ideas?.list?.[+b.dataset.idea]; if (!it) return; ed.ask = it.request; const ta = $('#spAsk'); if (ta) ta.value = it.request; build(); });
     card.querySelectorAll('[data-var]').forEach(b => b.onclick = () => useVariant(+b.dataset.var));
@@ -581,7 +588,7 @@ export function initSitePlan(ctx) {
       (e.kind === 'building' ? '<label class="sp-wide">Type<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '') + '</select></label>' : '') +
       '<label class="sp-wide">Name<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A"></label>' +
       '</div><div class="rnote" id="spRead"></div>' + (!ed.editing ? '<div class="rnote">Use <b>Edit Layout</b> to change it.</div>' : PL()?.recipe ? '<div class="rnote">' + (e.pinned ? '📌 Placed by you: <b>Re-fit Plan</b> keeps it and lays out the rest again around it. <button class="sp-link" id="spUnpin">Let it move</button>' : 'Move or resize it and only it changes. <b>Re-fit Plan</b> lays out the rest again around the pieces you placed.') + '</div>' : '') +
-      '<div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) ? '<button class="btn" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="Drag its points; drag a blue + to add a point; double-click a point to remove it">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') + (PL()?.recipe ? '<button class="btn" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button class="btn" id="spDup">Copy</button><button class="btn sp-del" id="spDel">Delete</button></div></fieldset>';
+      '<div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) ? '<button class="btn" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="Drag its points; drag a blue + to add a point; double-click a point to remove it">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') + (PL()?.recipe ? '<button class="btn" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button class="btn" id="spDup">Copy</button><button class="btn" id="spAskSel" title="Say what to change about this piece">Change With AI</button><button class="btn sp-del" id="spDel">Delete</button></div></fieldset>';
   }
   function readout(e) {
     const el = card.querySelector('#spRead'); if (!el || !e) return;
@@ -604,6 +611,7 @@ export function initSitePlan(ctx) {
     const shp = card.querySelector('#spShape'); if (shp) shp.onclick = () => { // its outline as points to drag: any shape, in plan
       if (ed.shape === e.id) { ed.shape = null; draw(); panel(); return; }
       change(() => { if (!e.poly) { e.poly = SP.outline(e).map(q => q.map(v => +v.toFixed(2))); delete e.form; delete e.jog; delete e.shape; delete e.path; } e.pinned = true; }); ed.shape = e.id; draw(); panel(); };
+    const as = card.querySelector('#spAskSel'); if (as) as.onclick = () => { const ta = card.querySelector('#spChg'); if (!ta) return; ta.scrollIntoView({ block: 'center' }); ta.focus(); };
     card.querySelector('#spDup').onclick = () => { const c = { ...clone(e), id: uid() }, a = (e.rot || 0) * Math.PI / 180, off = e.w + 20; SP.moveBy(c, off * Math.cos(a), off * Math.sin(a)); change(x => x.elements.push(c)); ed.sel = c.id; draw(); panel(); };
     card.querySelector('#spDel').onclick = () => { change(x => dropEl(x, e)); ed.sel = null; draw(); panel(); };
   }
@@ -782,6 +790,31 @@ export function initSitePlan(ctx) {
     }
     ed.variants = variants; ed.aiNote = note; ed.pick = null;
     const best = variants.findIndex(v => v.elements.length); if (best >= 0) useVariant(best); else panel();
+  }
+  // changes by name: the AI reads the plan (its pieces, a picture of it) and the words, and answers with edits on those
+  // pieces; they're applied here, pinned, and the rest re-fits round them when asked. Without the AI the words are read
+  // directly ("make bldg 7 four stories", "remove bldg 3").
+  async function aiChange() {
+    const p = P(), pl = PL(); if (!pl?.elements.length) return;
+    const ask = (ed.chg || '').trim(); if (!ask) { ctx.toast('Say what to change, e.g. “make Apt Bldg 7 four stories”.'); card.querySelector('#spChg')?.focus(); return; }
+    const say = t => { const b = card.querySelector('#spChgGo'); if (b) { b.disabled = true; b.textContent = t; } }; say('Thinking…');
+    const sel = ed.sel; let ops = [], full = false, note = '', question = null, byAi = false;
+    try {
+      let image = null; try { image = await planImage(pl); } catch (e) { /* words and numbers only */ }
+      const d = await post({ mode: 'edit', prompt: ask, site: siteInfo(p, pl), plan: ED.describePlan(pl, sel), image });
+      ops = d.ops || []; full = d.refit === 'full'; note = d.summary || ''; question = d.question; byAi = true;
+    } catch (e) { ops = ED.guessEdits(ask, pl, sel); full = /\bre-?(?:fit|lay)/i.test(ask); note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this read your words directly.'; }
+    if (PL() !== pl) return;
+    if (!ops.length) { ed.chgNote = question || (note ? note + ' ' : '') + 'Couldn’t tell what to change: name the piece as it’s labelled (“Apt Bldg 7”), or select it and say “it”.'; panel(); return; }
+    full = (full || ed.chgFit) && !!pl.recipe;
+    let r = null; change(x => { r = ED.applyEdits(x, ops, { refit: full, spare: x.spareRows = (x.spareRows || []).slice(-40) }); x.elements = r.elements; });
+    ed.sel = r.touched[0] || null; ed.editing = true; draw();
+    if (full) { say('Re-fitting the rest of the site…'); let rf = null; try { rf = await laid('refit', PL(), { amount: 'current' }); } catch (e) { console.warn('refit', e); }
+      if (PL() === pl && rf) { pl.elements = rf.elements; pl.spareRows = []; if (rf.recipe) pl.recipe = clone(rf.recipe); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; }
+      else if (!rf) r.skipped.push('The rest couldn’t be re-fitted around it, so only those pieces changed.'); }
+    const m = SP.metrics(pl), short = m.required - m.spaces;
+    ed.chgNote = [byAi && note ? note : [note, ...r.done].filter(Boolean).join(' '), ...r.skipped, short > 0 ? 'Parking is now ' + short + ' spaces short' + (full ? '.' : '; tick Re-fit to lay parking out again.') : ''].filter(Boolean).join(' ');
+    ed.chg = ''; pl.updated = new Date().toISOString(); save(P()); draw(); panel();
   }
   // what should go here: the site, its surroundings and the market, read by the AI; each idea can be laid out
   async function bestUse() {
