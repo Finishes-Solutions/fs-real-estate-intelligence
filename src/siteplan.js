@@ -264,6 +264,7 @@ export function initSitePlan(ctx) {
       drag = { type: 'vertex', k, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap, moved: h.h[0] === 'm' }; draw(); return; }
     const hs = typeof h.h === 'string' && h.h[0] === 's' ? handles(pl).find(q => q.i === h.h) : null;
     drag = { type: h.h == null ? 'move' : h.h === 'r' ? 'rot' : hs ? 'scale' : 'size', k: h.h, corner: hs?.ft, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false };
+    if (drag.type === 'move') { const att = SP.attachedTo(pl, el); drag.att = att.map(a => ({ id: a.id, orig: clone(a) })); if (el.kind === 'building' || el.kind === 'garage') drag.obs = SP.spotObstacles(pl, el, att); } // what moves with it, and what it has to stay clear of
   }
   function move(e) {
     if (!drag) return; const pl = PL(), el = pl?.elements.find(x => x.id === drag.id); if (!el) return;
@@ -273,7 +274,13 @@ export function initSitePlan(ctx) {
       if (!e.originalEvent?.altKey) for (const nb of [P[(k - 1 + n) % n], P[(k + 1) % n]]) { const b = loc(nb); if (Math.abs(q[0] - b[0]) < 3) q = [b[0], q[1]]; if (Math.abs(q[1] - b[1]) < 3) q = [q[0], b[1]]; }
       P[k] = back(q).map(v => +v.toFixed(2)); const c = SP.centroid(P); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2); draw(); readout(el); return;
     }
-    if (drag.type === 'move') { if (SP.isFree(o)) Object.assign(el, SP.moveBy({ ...o }, p[0] - drag.from[0], p[1] - drag.from[1])); else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); if (!e.originalEvent?.altKey) { const [sx, sy] = SP.settleShift(pl, el); el.x = +(el.x + sx).toFixed(2); el.y = +(el.y + sy).toFixed(2); } } } // snaps to its neighbours' edges and stays out of the setbacks (hold Alt for a free move)
+    if (drag.type === 'move') { // snaps to its neighbours' edges, stays out of the setbacks and (a building) off the drives and other buildings; hold Alt for a free move
+      const free = e.originalEvent?.altKey, carry = () => (drag.att || []).map(a => pl.elements.find(x => x.id === a.id)).filter(Boolean);
+      if (SP.isFree(o)) Object.assign(el, SP.moveBy(clone(o), p[0] - drag.from[0], p[1] - drag.from[1])); else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); if (!free) { const [sx, sy] = SP.settleShift(pl, el); el.x = +(el.x + sx).toFixed(2); el.y = +(el.y + sy).toFixed(2); } }
+      const mv = () => { const dx = el.x - o.x, dy = el.y - o.y; for (const a of drag.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) Object.assign(t, SP.moveBy(clone(a.orig), dx, dy)); } };
+      mv(); drag.blocked = false;
+      if (!free && drag.obs) { const c = SP.clearSpot(pl, el, { carry: carry(), obs: drag.obs }); if (c) { if (c[0] || c[1]) { SP.moveBy(el, c[0], c[1]); mv(); } } else drag.blocked = true; } // the nearest clear spot to the pointer
+    }
     else if (drag.type === 'scale') { const c = [o.x, o.y], f = Math.max(0.2, Math.min(5, Math.hypot(p[0] - c[0], p[1] - c[1]) / (Math.hypot(drag.corner[0] - c[0], drag.corner[1] - c[1]) || 1))); Object.assign(el, SP.scaleBy(clone(o), f, c)); }
     else if (drag.type === 'size') {
       const sx = [-1, 1, 1, -1][drag.k], sy = [-1, -1, 1, 1][drag.k], opp = [-sx * o.w / 2, -sy * o.d / 2], q = SP.toLocal(o, p);
@@ -289,7 +296,11 @@ export function initSitePlan(ctx) {
   function up() {
     if (!drag) return; const d = drag; drag = null;
     if (!d.moved) return;
-    ed.undo.push(d.snap); ed.redo = []; const pl = PL(), el = pl.elements.find(x => x.id === d.id); if (el) { el.pinned = true; makeRoom(el); }
+    ed.undo.push(d.snap); ed.redo = []; const pl = PL(), el = pl.elements.find(x => x.id === d.id);
+    if (el) { el.pinned = true; if (el.kind === 'parking') delete el.ext; /* placed by hand: this is its length now */
+      const went = d.type === 'move' ? [d.orig, ...(d.att || []).map(a => a.orig)] : [d.orig]; makeRoom(el, went);
+      for (const a of d.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) { t.pinned = true; makeRoom(t); } } }
+    if (d.blocked) ctx.toast('No clear spot there: it overlaps a drive or another building. Hold Alt (Option) to place it anyway.');
     pl.updated = new Date().toISOString(); save(P()); draw(); panel();
   }
   map.on('mousedown', down); map.on('touchstart', down); map.on('mousemove', move); map.on('touchmove', move); map.on('mouseup', up); map.on('touchend', up);
@@ -367,9 +378,9 @@ export function initSitePlan(ctx) {
     if (k === 'Escape') { if (ed.mode) { ed.mode = null; ed.draft = []; draw(); panel(); } else if (ed.sel) { ed.sel = null; draw(); panel(); } return; }
     if (k === 'Enter' && ed.mode === 'draw') { finishDraw(); return; }
     if (!el || !ed.editing) return;
-    if (k === 'Delete' || k === 'Backspace') { used(); change(x => { x.elements = x.elements.filter(y => y.id !== el.id); }); ed.sel = null; draw(); panel(); return; }
+    if (k === 'Delete' || k === 'Backspace') { used(); change(x => dropEl(x, el)); ed.sel = null; draw(); panel(); return; }
     const step = e.shiftKey ? 10 : 1, a = frameAngle(pl) * Math.PI / 180, mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[k];
-    if (mv) { used(); change(() => { SP.moveBy(el, step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a))); el.pinned = true; }, true); refitSoon(); return; }
+    if (mv) { used(); const pl0 = PL(), att = pl0 ? SP.attachedTo(pl0, el) : []; change(() => { const dx = step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), dy = step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a)); ed.nudged = [...(ed.nudged || []), clone(el), ...att.map(clone)].slice(-12); for (const t of [el, ...att]) { SP.moveBy(t, dx, dy); t.pinned = true; } }, true); refitSoon(); return; } // what belongs to it moves too
     if ((k === 'r' || k === 'R') && !mod && !SP.isFree(el)) { used(); change(() => { el.rot = ((el.rot || 0) + 90) % 360; }); }
   }, true);
 
@@ -527,16 +538,21 @@ export function initSitePlan(ctx) {
   let refitTimer = 0;
   // a local edit: the piece stays where it was put and parking under it gives way (whole stalls); nothing else moves.
   // Laying out everything else again is the Re-fit Plan button's job, never automatic.
-  function makeRoom(el) {
+  // delete a piece; the rest of a parking row it was part of stays as it is now (it doesn't grow back over the gap)
+  function dropEl(x, el) { const k = el.ext && JSON.stringify(el.ext); x.elements = x.elements.filter(y => y.id !== el.id); if (k) for (const y of x.elements) if (y.ext && JSON.stringify(y.ext) === k) delete y.ext; }
+  // left: where it was (and what moved with it); parking it had cut there grows back
+  function makeRoom(el, left = []) {
     const pl = PL(); if (!pl || !el || el.kind === 'parking' || el.kind === 'green' || el.kind === 'lot' || el.kind === 'trail') return;
-    pl.elements = SP.cutRows(pl.elements, SP.outline(el), el.kind === 'building' || el.kind === 'garage' ? 5 : 1);
+    const pad = el.kind === 'building' || el.kind === 'garage' ? 5 : 1, spare = pl.spareRows = (pl.spareRows || []).slice(-40); // rows cut away whole, kept to grow back
+    pl.elements = SP.cutRows(pl.elements, SP.outline(el), pad, spare);
+    for (const o of left) pl.elements = SP.regrowRows(pl.elements, SP.outline(o), 5, spare);
   }
-  function refitSoon() { clearTimeout(refitTimer); refitTimer = setTimeout(() => { const pl = PL(), el = pl?.elements.find(x => x.id === ed.sel); if (!el) return; makeRoom(el); pl.updated = new Date().toISOString(); save(P()); draw(); panel(); }, 250); }
+  function refitSoon() { clearTimeout(refitTimer); refitTimer = setTimeout(() => { const pl = PL(), el = pl?.elements.find(x => x.id === ed.sel); if (!el) return; makeRoom(el, ed.nudged || []); ed.nudged = null; pl.updated = new Date().toISOString(); save(P()); draw(); panel(); }, 250); }
   async function refitNow(asked) {
     const pl = PL(); if (!pl?.recipe) return;
     let r = null; ctx.toast('Re-fitting the plan around the pieces you placed…'); try { r = await laid('refit', pl); } catch (err) { console.warn('refit', err); } if (PL() !== pl) return;
     if (!r) { if (asked) ctx.toast('Couldn’t re-fit the plan around that; it stays as you left it.'); return; }
-    pl.elements = r.elements; if (r.recipe) pl.recipe = clone(r.recipe); ed.refitNote = r.notes.join(' '); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null;
+    pl.elements = r.elements; pl.spareRows = []; if (r.recipe) pl.recipe = clone(r.recipe); ed.refitNote = r.notes.join(' '); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null;
     pl.updated = new Date().toISOString(); save(P()); draw(); panel();
   }
   // lay the options out again with the plan's own program and settings (no AI call)
@@ -589,7 +605,7 @@ export function initSitePlan(ctx) {
       if (ed.shape === e.id) { ed.shape = null; draw(); panel(); return; }
       change(() => { if (!e.poly) { e.poly = SP.outline(e).map(q => q.map(v => +v.toFixed(2))); delete e.form; delete e.jog; delete e.shape; delete e.path; } e.pinned = true; }); ed.shape = e.id; draw(); panel(); };
     card.querySelector('#spDup').onclick = () => { const c = { ...clone(e), id: uid() }, a = (e.rot || 0) * Math.PI / 180, off = e.w + 20; SP.moveBy(c, off * Math.cos(a), off * Math.sin(a)); change(x => x.elements.push(c)); ed.sel = c.id; draw(); panel(); };
-    card.querySelector('#spDel').onclick = () => { change(x => { x.elements = x.elements.filter(y => y.id !== e.id); }); ed.sel = null; draw(); panel(); };
+    card.querySelector('#spDel').onclick = () => { change(x => dropEl(x, e)); ed.sel = null; draw(); panel(); };
   }
   function nums() {
     const el = card.querySelector('#spNums'), pl = PL(); if (!el || !pl) return;
@@ -798,7 +814,7 @@ export function initSitePlan(ctx) {
   }
   function useVariant(i) {
     const v = ed.variants?.[i]; if (!v?.elements.length) return;
-    change(x => { x.elements = clone(v.elements); x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; });
+    change(x => { x.elements = clone(v.elements); x.spareRows = []; x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; });
     ed.pick = i; ed.sel = null; draw(); panel();
   }
 

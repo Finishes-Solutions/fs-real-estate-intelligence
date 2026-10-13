@@ -309,4 +309,61 @@ function usable(plan, o, what) {
   const g = mk([-95.70, 29.90], [[0, 0], [1400, 0], [1400, 620], [0, 620]]), b = S.unionParcels([g]), o = L.layoutOptions({ ...b, front: b.ring.findIndex((p, i) => S.outwardOf(b.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } }, { use: 'sfr' }, { count: 1 })[0];
   assert.ok(new Set(o.elements.filter(e2 => e2.use === 'sfr').map(e2 => e2.type)).size >= 6, 'homes vary through the house plans');
 }
+// ---- amenities where people use them: one pool, by its clubhouse, on the drive ----
+{
+  const plan = siteOf(tract), near = (a, b) => S.gapBetween(S.shapeOf(a), S.shapeOf(b));
+  assert.deepEqual([...L.commonsWants(['Pool', 'clubhouse', 'playground'], { clubhouse: true })].sort(), ['playground'], 'the apartments’ clubhouse and pool serve: no second ones in the commons');
+  assert.deepEqual([...L.commonsWants(['pool'], { clubhouse: true, homes: true })].sort(), ['center', 'pool'], 'homeowners get their own centre, with its pool');
+  // apartments with a commons the program filled with a centre and a pool (as the AI may ask): one pool, at the clubhouse by the entry
+  const opts = L.layoutOptions(plan, { use: 'mixed', zones: [{ use: 'multifamily', units: 240, floors: 3 }, { use: 'amenity', items: ['center', 'pool', 'playground', 'pavilion'] }] });
+  for (const o of opts) {
+    const P = o.elements.filter(e => e.kind === 'pool'), club = o.elements.filter(e => e.kind === 'building' && e.use === 'amenity' && /club|center/i.test(e.name || ''));
+    assert.equal(P.length, 1, o.name + ': one pool, not ' + P.length);
+    assert.ok(club.some(c => near(P[0], c) <= 30), o.name + ': the pool is beside its clubhouse');
+    const entry = o.elements.find(e => e.name === 'Main entry'), drives = o.elements.filter(e => e.kind === 'drive');
+    for (const a of o.elements.filter(e => e.kind === 'play' || e.name === 'Pavilion')) assert.ok(drives.some(d => near(a, d) <= 40), o.name + ': ' + (a.name || a.kind) + ' sits on the drive, not out in the park');
+    assert.ok(entry && !S.check({ ...plan, elements: o.elements, program: o.program }).some(i => /pool/i.test(i.text)), o.name + ': no pool warnings');
+  }
+  // homes and a commons with a pool: the pool comes with its community centre, on a deck against it
+  const big = siteOf(mk([-95.97, 30.07], [[-610, 0], [1933, 0], [2594, 865], [2391, 1780], [0, 1780]])); big.front = S.unionParcels([mk([-95.97, 30.07], [[-610, 0], [1933, 0], [2594, 865], [2391, 1780], [0, 1780]])]).ring.findIndex((p, i, r) => S.outwardOf(r, i)[1] < -0.9);
+  const o2 = L.layoutOptions(big, { use: 'mixed', zones: [{ use: 'sfr' }, { use: 'amenity', items: ['pool', 'playground'] }] }, { count: 1 })[0];
+  const cc = o2.elements.find(e => e.name === 'Community center'), pl2 = o2.elements.filter(e => e.kind === 'pool');
+  assert.ok(cc && pl2.length === 1 && near(pl2[0], cc) <= 15 && o2.elements.some(e => e.kind === 'plaza' && /pool deck/i.test(e.note || '') && near(e, cc) <= 1), 'the community centre with its pool on a deck');
+  // the checks flag a pool out on its own, and a second one
+  const ring = [[0, 0], [1000, 0], [1000, 1000], [0, 1000]], c0 = { id: 'c', kind: 'building', use: 'amenity', name: 'Clubhouse', x: 200, y: 200, w: 90, d: 60, rot: 0 };
+  const p1 = { id: 'p1', kind: 'pool', name: 'Pool', x: 290, y: 200, w: 70, d: 32, rot: 0 }, p2 = { id: 'p2', kind: 'pool', name: 'Pool', x: 700, y: 800, w: 70, d: 32, rot: 0 };
+  assert.deepEqual(S.check({ ring, front: 0, elements: [c0, p1] }).map(i => i.text), []);
+  const w2 = S.check({ ring, front: 0, elements: [c0, p1, p2] }); assert.ok(w2.some(i => i.id === 'p2' && /away from the clubhouse/.test(i.text)) && w2.some(i => /2 pools/.test(i.text)), w2.map(i => i.text).join(' / '));
+}
+
+// ---- moving a building in Edit Layout (a real apartment plan: bars packed between drive aisles) ----
+{
+  const plan = siteOf(tract), o = L.layoutOptions(plan, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], base = { ...plan, elements: o.elements, program: o.program };
+  const overlaps = els => S.check({ ...base, elements: els }).filter(i => /overlaps|setback|outside/.test(i.text));
+  assert.deepEqual(overlaps(o.elements), []);
+  const stalls = els => els.filter(e => e.kind === 'parking').reduce((s, e) => s + S.stalls(e).count, 0), s0 = stalls(o.elements);
+  // as the editor does it: follow the pointer, settle (edges, setbacks), then the nearest clear spot; carried pieces move along; parking gives way
+  const drop = (els, id, dx, dy, spare = []) => {
+    const p = { ...base, elements: els }, B = els.find(e => e.id === id), att = S.attachedTo(p, B), obs = S.spotObstacles(p, B, att), el = S.moveBy(structuredClone(B), dx, dy);
+    const [sx, sy] = S.settleShift(p, el); S.moveBy(el, sx, sy);
+    const carry = att.map(a => S.moveBy(structuredClone(a), el.x - B.x, el.y - B.y)), c = S.clearSpot({ ...p, elements: els.map(e => e.id === id ? el : carry.find(a => a.id === e.id) || e) }, el, { carry, obs });
+    if (c) { S.moveBy(el, c[0], c[1]); for (const a of carry) S.moveBy(a, c[0], c[1]); }
+    let out = els.map(e => e.id === id ? el : carry.find(a => a.id === e.id) || e); out = S.cutRows(out, S.outline(el), 5, spare); for (const a of carry) out = S.cutRows(out, S.outline(a), 1, spare);
+    for (const g of [B, ...att]) out = S.regrowRows(out, S.outline(g), 5, spare);
+    return { els: out, el, att, c, spare };
+  };
+  const apt = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'), b = apt[Math.floor(apt.length / 2)], others = o.elements.filter(e => e.kind === 'building' && e.id !== b.id).map(e => e.x + ',' + e.y).join();
+  for (const [dx, dy] of [[50, 0], [-50, 0], [0, 40], [25, 25]]) {
+    const r = drop(o.elements, b.id, dx, dy);
+    assert.ok(r.c, 'a clear spot near (' + dx + ', ' + dy + ')'); assert.deepEqual(overlaps(r.els), [], 'dropped ' + dx + ',' + dy + ': no overlaps');
+    assert.equal(r.els.filter(e => e.kind === 'building' && e.id !== b.id).map(e => e.x + ',' + e.y).join(), others, 'nothing else moves');
+    // and back again: the parking it cut grows back
+    const back = drop(r.els, b.id, b.x - r.el.x, b.y - r.el.y, r.spare); assert.ok(Math.hypot(back.el.x - b.x, back.el.y - b.y) < 1, 'it goes back to its spot');
+    assert.ok(stalls(back.els) >= s0 - 2, 'parking grows back: ' + stalls(back.els) + ' of ' + s0);
+  }
+  // the clubhouse takes its pool deck and pool with it
+  const club = o.elements.find(e => e.name === 'Clubhouse'), r = drop(o.elements, club.id, 0, -30);
+  assert.deepEqual(r.att.map(a => a.kind).sort(), ['plaza', 'pool']); const pool = r.els.find(e => e.kind === 'pool');
+  assert.ok(S.gapBetween(S.shapeOf(pool), S.shapeOf(r.el)) <= 30 && !S.check({ ...base, elements: r.els }).some(i => /pool|overlaps/i.test(i.text)), 'the pool is still at the clubhouse');
+}
 console.log('site layouts ok');
