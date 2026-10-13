@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 5:50 PM CT: Change buildings by name with AI (b24a05d)
+- **Change With AI** in the site plan panel: type changes like "make Apt Bldg 7 four stories", "turn the clubhouse into a 7,500 sf one", "remove Bldg 3", "swap Bldg 2 and Bldg 5" or "move the clubhouse and pool to the back". Select a piece and you can say "it". The AI looks at the plan, picks buildings from the library, and says what it changed.
+- Only the named pieces change unless you ask for a re-fit (or tick the box): then the rest of the site is laid out again around them, keeping about the same amount of building. Changed pieces stay pinned. Cmd+Z undoes the whole change.
+- Without the AI, simple changes in the same words still work.
+- **Re-fit Plan is tidier:** a building you pinned keeps its parking right up to its walk, no stray lawn round it, and new buildings no longer take its name.
+
 ### 4:32 PM CT: One pool by its clubhouse; moving a building keeps the plan tidy (c4c4568)
 - **One pool per community, where it belongs:** apartments with a commons no longer get a second pool and clubhouse out behind the buildings by the pond. The clubhouse and pool by the entry serve everyone; the commons keeps the park, playground, pavilion and lake. Neighbourhoods with homes for sale still get a community center with its own pool, now on a deck right against the center.
 - **Commons amenities line the drive** (community center, pool, playground, pavilion, courts) with the lake and lawns behind them, instead of sitting out in the middle of the park.
