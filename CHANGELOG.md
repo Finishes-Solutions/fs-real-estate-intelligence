@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 6:23 PM CT: More than one entrance; spinners on the AI buttons (a810d63)
+- **Add Entrance** in the site plan tools: click the lot line where a driveway should come in and it runs straight in to the nearest drive, with curb returns, stepping round buildings and ponds. Clicking a lot line that isn't a street marks it as one; it warns when it's closer than about 150 ft to another entrance.
+- **Ask for entrances when you build:** "two entrances" or "a second driveway" adds them on the front or a side street, spread apart; options that fit them come first, and one that can't says why.
+- **Change With AI** can add ("add another entrance") or remove entrances.
+- **The AI buttons show a spinner** while they work instead of changing their text, with a short line under them on what's happening.
+
 ### 5:50 PM CT: Change buildings by name with AI (b24a05d)
 - **Change With AI** in the site plan panel: type changes like "make Apt Bldg 7 four stories", "turn the clubhouse into a 7,500 sf one", "remove Bldg 3", "swap Bldg 2 and Bldg 5" or "move the clubhouse and pool to the back". Select a piece and you can say "it". The AI looks at the plan, picks buildings from the library, and says what it changed.
 - Only the named pieces change unless you ask for a re-fit (or tick the box): then the rest of the site is laid out again around them, keeping about the same amount of building. Changed pieces stay pinned. Cmd+Z undoes the whole change.
