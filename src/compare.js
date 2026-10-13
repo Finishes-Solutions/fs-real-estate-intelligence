@@ -95,7 +95,7 @@ export function initCompare(ctx) {
     if (areas.length < 2) {
       h += '<div class="cmp-empty"><b>' + (areas.length ? 'Add one more area to compare.' : 'Nothing to compare yet.') + '</b><ol>' +
         '<li>On the map, pick an area: search a city or county, click <em>County</em>, draw a <em>Shape</em> or <em>Area</em>, or set a <em>Radius</em>.</li>' +
-        '<li>Click <em>+ Compare</em> on the selection (left panel) or on the place card.</li><li>Repeat for up to four areas, then come back here.</li></ol>' +
+        '<li>Click <em>+ Compare</em> under This Area on the Map, or on the place card.</li><li>Repeat for up to four areas, then come back here.</li></ol>' +
         '<button class="btn" id="cmpToMap">Go to the Map</button></div>';
     }
     if (areas.length) {

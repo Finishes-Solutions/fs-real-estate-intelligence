@@ -58,6 +58,10 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 
 **Tabs** (desktop and tablet): Map, Market, Compare, Reports, Notes, Projects, then the construction views (Timeline, Activity, Updates), and Sources.
 
+**Pages use the whole width.** The left panel belongs to the Map: on every other tab (Market, Reports, Notes, Activity and the rest) it steps aside so the page has room, and it comes back on the Map just as you left it, at the same width, open or closed. To glance at it from a page, click the panel button at the far left of the tabs; that only affects the page you're on. On a tablet the panel starts closed so the map isn't cut in half; open it with the same button, and the app remembers your choice.
+
+**Buttons** follow one pattern everywhere: the main action is a solid green button and the other choices are outlined, in light and dark mode alike. On touch screens every button, chip and map control is at least a fingertip wide.
+
 **Phones:** the map fills the screen. The bottom bar has Map, Explore, Timeline, Activity and More. **More** opens a grid of one-word tiles:
 - **Views**, named like the desktop tabs: Market, Compare, Reports, Updates, Notes, Projects, Sources.
 - **Tools:**
@@ -491,6 +495,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Roomier pages:** Market, Reports, Notes, Activity and the other tabs now use the full width (the Map's left panel steps aside and comes back when you return to the Map); tablets open with the map at full width; buttons look the same everywhere, including in dark mode; and buttons and chips are easier to tap on touch screens.
 - **Site plans that always fit and look finished:** every plan has its parking, a drive and dumpsters, and an ask too big for the land becomes the most that fits; small extras (patio, playground, lawn) beside a single use; neighbourhoods that fill large tracts with a community center and park; better tree placement; a library of about 230 building types; point-by-point shape editing; dependable Cmd+Z; a site plan panel laid out like a property card; faster on sites up to 300 acres; and the AI thinks longer about the program.
 - **Curving neighbourhood streets:** single-family layouts now have streets that curve, with lots and homes following them, for about the same number of lots as straight streets; a setting switches back to straight.
 - **Edit Layout:** plans open for looking; editing is a switch, and moving a piece changes only that piece (it snaps to its neighbours and the setbacks, and parking under it gives way) instead of re-laying out the whole site. Re-fit Plan does that on demand.

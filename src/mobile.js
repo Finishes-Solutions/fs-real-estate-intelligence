@@ -9,8 +9,14 @@ export function initMobile(ctx) {
 
   // ---- side list toggle (tablet + desktop) ----
   const ptoggle = document.getElementById('panelToggle');
-  try { if (localStorage.getItem('fs-panel') === '0' && !isPhone()) app.classList.add('pcollapsed'); } catch (e) {}
-  ptoggle.onclick = () => { app.classList.toggle('pcollapsed'); try { localStorage.setItem('fs-panel', app.classList.contains('pcollapsed') ? '0' : '1'); } catch (e) {} setTimeout(() => map.resize(), 50); };
+  // the saved choice wins; with none, tablets (narrower than 1100px) start with the list closed so the map isn't halved
+  try { const saved = localStorage.getItem('fs-panel'); if (!isPhone() && (saved === '0' || (saved == null && innerWidth < 1100))) app.classList.add('pcollapsed'); } catch (e) {}
+  ptoggle.onclick = () => {
+    // on a page (not the Map) the list is hidden so the page gets the full width; the button shows it over this page only
+    // and leaves the Map's own open/closed setting alone
+    if (ctx.view !== 'map' && !isPhone()) { app.classList.toggle('pview-open'); return; }
+    app.classList.toggle('pcollapsed'); try { localStorage.setItem('fs-panel', app.classList.contains('pcollapsed') ? '0' : '1'); } catch (e) {} setTimeout(() => map.resize(), 50);
+  };
 
   // ---- side list width: drag the edge (or arrow keys on it); double-click goes back to the default. Saved per browser. ----
   const grip = document.getElementById('pResize'), W_KEY = 'fs-panel-w';

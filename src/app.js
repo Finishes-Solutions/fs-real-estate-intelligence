@@ -849,12 +849,13 @@ function reportMap(list){
 }
 
 // ---------- views ----------
-let view='map'; const viewHooks={}, viewChangeHooks=[], cardRenderHooks=[];
+let view='map'; const appEl=document.querySelector('.app'), viewHooks={}, viewChangeHooks=[], cardRenderHooks=[];
 function setView(v){
   if(!document.getElementById('view-'+v)&&v!=='map') v='map'; view=v;
   document.querySelectorAll('#viewbar button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
   document.querySelectorAll('.view').forEach(el=>el.classList.toggle('on',el.id==='view-'+v));
-  stage.dataset.view=v; if(v==='map') setTimeout(()=>map.resize(),0); else viewHooks[v]?.();
+  stage.dataset.view=v; appEl.dataset.view=v; // pages (not the Map) hide the list panel and use the full width (app.css)
+  if(v==='map'){ appEl.classList.remove('pview-open'); setTimeout(()=>map.resize(),0); } else viewHooks[v]?.();
   viewChangeHooks.forEach(fn=>fn(v));
   scheduleHash();
 }

@@ -34,13 +34,33 @@
   --c-road1:#6b7376;--c-road2:#454c4f;--c-roadtxt:#dde1e2;--c-roadbg:#23282a;--c-selfill:rgba(76,175,112,.10);--c-selline:#4caf70;
   --logo-light:none;--logo-dark:block;
 }
+/* design tokens: one scale for spacing, type, corners, shadows, status colours, control sizes and stacking.
+   New and restyled UI uses these; older rules still carry literal values and move over as they are touched. */
+:root{
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-8:32px;
+  --fs-label:10.5px;--fs-xs:11.5px;--fs-sm:12.5px;--fs-md:14px;--fs-lg:16px;--fs-xl:20px;--fs-2xl:24px;
+  --r-sm:4px;--r-md:8px;--r-lg:12px;--r-sheet:16px;--r-pill:999px;
+  --sh-1:0 1px 2px rgba(11,13,12,.08);--sh-2:0 8px 24px rgba(11,13,12,.16);--sh-sheet:0 14px 40px rgba(11,13,12,.22);
+  --danger:#b42318;--danger-ink:#fff;--warn:var(--amber);--ok:var(--brand);
+  --tap:44px;--ctl:36px;
+  --z-ui:5;--z-card:7;--z-nav:9;--z-scrim:10;--z-sheet:11;--z-toast:20;--z-modal:60;
+}
+@media (pointer:coarse){:root{--ctl:40px}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --sh-1:0 1px 2px rgba(0,0,0,.40);--sh-2:0 8px 24px rgba(0,0,0,.45);--sh-sheet:0 14px 40px rgba(0,0,0,.55);
+  --danger:#ff7b6b;--danger-ink:var(--ink-950);
+}}
+:root[data-theme="dark"]{
+  --sh-1:0 1px 2px rgba(0,0,0,.40);--sh-2:0 8px 24px rgba(0,0,0,.45);--sh-sheet:0 14px 40px rgba(0,0,0,.55);
+  --danger:#ff7b6b;--danger-ink:var(--ink-950);
+}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
 *,*::before,*::after{box-sizing:border-box}
 body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--font-display);-webkit-font-smoothing:antialiased;overflow:hidden}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:none;box-shadow:0 0 0 3px rgba(10,122,54,.38);border-radius:4px}
 
-.app{--pw:480px;--aiw:min(460px,calc(100vw - 32px));position:relative;height:100%;display:grid;grid-template-columns:var(--pw) minmax(0,1fr)}
+.app{--pw:clamp(360px,30vw,480px);--aiw:min(460px,calc(100vw - 32px));position:relative;height:100%;display:grid;grid-template-columns:var(--pw) minmax(0,1fr)}
 .stage{position:relative;min-width:0;min-height:0;background:var(--c-space)}
 canvas#globe{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:var(--cur-grab,grab)}
 canvas#globe.dragging{cursor:var(--cur-grabbing,grabbing)}
@@ -121,9 +141,16 @@ select.chip{appearance:none;padding-right:22px;background-image:linear-gradient(
 .selbar b{font-size:13px}
 .selbar .s1 span{font-family:var(--font-mono);font-size:11px;color:var(--muted);white-space:nowrap}
 .btnrow{display:flex;flex-wrap:wrap;gap:6px}
-.btn{border:1px solid var(--line-2);background:var(--panel);border-radius:4px;padding:6px 10px;font-size:12px;font-weight:600;cursor:var(--cur-pointer,pointer);color:var(--text);display:inline-flex;align-items:center;gap:6px}
-.btn.primary{background:var(--green-700);border-color:var(--green-700);color:#fff}
-.btn.primary:hover{background:var(--green-800)}
+/* button roles: .btn is the secondary (outline) button, .btn.primary the one main action (brand fill, same in both themes),
+   .btn.ghost a quiet text button. Sizes: default/.sm 32px, .md 40px; 44px on touch screens. */
+.btn{border:1px solid var(--line-2);background:var(--panel);border-radius:var(--r-sm);padding:6px 10px;min-height:32px;font-size:12px;font-weight:600;cursor:var(--cur-pointer,pointer);color:var(--text);display:inline-flex;align-items:center;gap:6px}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn.sm{min-height:32px}
+.btn.md{min-height:40px;padding:0 16px;font-size:13px}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.btn.primary:hover:not(:disabled){background:color-mix(in srgb,var(--brand) 85%,var(--text));border-color:color-mix(in srgb,var(--brand) 85%,var(--text))}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--brand)}
+.btn.ghost:hover:not(:disabled){background:var(--chip);border-color:transparent}
 .btn:disabled{opacity:.5;cursor:var(--cur-default,default)}
 .listhead .ex{font-family:var(--font-display);text-transform:none;letter-spacing:0;font-size:12px;font-weight:600;color:var(--brand);background:none;border:0;cursor:var(--cur-pointer,pointer);padding:0}
 .toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;background:var(--text);color:var(--panel);padding:8px 14px;border-radius:4px;font-size:12.5px;opacity:0;pointer-events:none;transition:opacity 200ms;max-width:calc(100% - 32px)}
@@ -398,7 +425,7 @@ table.who .r,th.r{text-align:right}
 }
 @media (pointer:coarse){
   .chip{min-height:34px;padding:6px 10px}
-  .btn{min-height:38px}
+  .btn{min-height:var(--tap)}
   .item{padding:12px}
   .ctrls button{width:42px;height:42px}
   .tools button{height:42px}
@@ -696,8 +723,8 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 .maptop{display:flex;gap:8px;align-items:stretch}
 .mapleft .tools{position:static}
 .mapleft .hint,.mapleft .radius{position:static;width:auto;max-width:none}
-.exbtn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 15px;border:0;border-radius:6px;background:var(--green-700);color:#fff;font-weight:700;font-size:12.5px;cursor:var(--cur-pointer,pointer);box-shadow:0 1px 3px rgba(0,53,26,.3);white-space:nowrap}
-.exbtn:hover{background:var(--green-800)}
+.exbtn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 15px;border:0;border-radius:6px;background:var(--brand);color:var(--brand-ink);font-weight:700;font-size:12.5px;cursor:var(--cur-pointer,pointer);box-shadow:var(--sh-1);white-space:nowrap}
+.exbtn:hover{background:color-mix(in srgb,var(--brand) 85%,var(--text))}
 .msearch{position:relative}
 .msbox{display:flex;align-items:center;gap:9px;height:40px;padding:0 6px 0 12px;background:var(--panel);border:1px solid var(--line-2);border-radius:6px;box-shadow:0 1px 3px rgba(11,13,12,.10);color:var(--muted)}
 .msbox:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px rgba(10,122,54,.18)}
@@ -1192,7 +1219,7 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .rp-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
 .rp-row:first-child{border-top:0}
 .rp-ic{display:grid;place-items:center;height:44px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-2)}
-.rp-ic.rp-pdf{color:#b42318;background:rgba(180,35,24,.07)}.rp-ic.rp-xlsx,.rp-ic.rp-csv{color:var(--brand);background:rgba(0,101,39,.07)}
+.rp-ic.rp-pdf{color:var(--danger);background:color-mix(in srgb,var(--danger) 8%,transparent)}.rp-ic.rp-xlsx,.rp-ic.rp-csv{color:var(--brand);background:rgba(0,101,39,.07)}
 .rp-m{display:grid;gap:1px;min-width:0}
 .rp-m b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rp-m span{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
@@ -1457,7 +1484,7 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 #card .bacts,#card .btnrow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0;margin:0}
 #card>.bacts{margin:12px 14px 0}
 #card .bacts .btn,#card .btnrow .btn,#card .bsec>.btn{min-height:40px;justify-content:center;text-align:center;width:100%;box-sizing:border-box}
-#card .bacts .btn.primary,#card .btn.askai{background:var(--brand);border-color:var(--brand);color:#fff}
+#card .bacts .btn.primary,#card .btn.askai{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
 #card .ssrc{font-size:10.5px;color:var(--muted);line-height:1.4;border-top:1px solid var(--line);padding-top:8px}
 #card .rnote{font-size:12px;line-height:1.45}
 #card .pl,#card .chitem{padding:8px 0;border-bottom:0;border-top:1px solid var(--line)}
@@ -2014,12 +2041,10 @@ button:disabled{cursor:var(--cur-default,default)}
 dl.sp-nums{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:4px 0 8px}
 dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nums .sc{font-weight:400;color:var(--muted)}
 .sp-issues{margin:0 0 8px;padding-left:18px;font-size:12.5px}
-.sp-issues li.bad{color:#c0392b}.sp-issues li.warn{color:var(--amber)}
+.sp-issues li.bad{color:var(--danger)}.sp-issues li.warn{color:var(--amber)}
 .sp-ok{color:var(--brand);margin-bottom:6px}
-.sp-del{color:#c0392b}
+.sp-del{color:var(--danger)}
 .sp-draw p{margin:4px 0 10px;font-size:13px;line-height:1.45}
-:root[data-theme="dark"] .sp-issues li.bad,:root[data-theme="dark"] .sp-del,:root[data-theme="dark"] .lnk.pj-del{color:#ff7b6b}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sp-issues li.bad,:root:not([data-theme="light"]) .sp-del,:root:not([data-theme="light"]) .lnk.pj-del{color:#ff7b6b}}
 
 
 /* the site plan in the card: a full-height column beside the map buttons (not squeezed under them), the header with
@@ -2140,7 +2165,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-stats b{font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--text)}
 .pj-stats .short b{color:var(--amber)}
 .pj-none{font-size:12px;line-height:1.4;color:var(--muted);padding:0 4px}
-.pj-iss{position:absolute;top:6px;left:6px;background:#b42318;color:#fff;font-size:10.5px;font-weight:700;border-radius:999px;padding:2px 8px;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.pj-iss{position:absolute;top:6px;left:6px;background:var(--danger);color:var(--danger-ink);font-size:10.5px;font-weight:700;border-radius:999px;padding:2px 8px;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .pj-add{border-style:dashed;background:transparent;align-content:center;justify-items:center;text-align:center;gap:4px;min-height:96px}
 .pj-add b{font-size:13.5px}
 .pj-plus{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand);font-size:22px;line-height:1;margin-bottom:4px}
@@ -2150,7 +2175,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-notes{width:100%;box-sizing:border-box;border:1px solid var(--line-2);border-radius:8px;background:var(--panel);color:var(--text);font:inherit;font-size:13.5px;line-height:1.5;padding:9px 11px;resize:vertical}
 .pj-notes:focus{outline:none;border-color:var(--brand)}
 .pj-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px}
-.lnk.pj-del{color:#c0392b;font-weight:600}
+.lnk.pj-del{color:var(--danger);font-weight:600}
 @container (max-width:640px){
   .pj-sum{grid-template-columns:minmax(0,1fr);padding:12px}
   .pj-title h2{font-size:19px}
@@ -2177,3 +2202,32 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .sp-x{border:0;background:transparent;color:var(--muted);font-size:14px;line-height:1;padding:0 4px;cursor:var(--cur-pointer,pointer)}
 .sp-x:hover{color:var(--text)}
 .sp-grid .sp-wide{grid-column:1 / -1}
+
+/* ================= foundations: touch targets, roomy pages ================= */
+/* touch screens: every tappable control is at least a fingertip (44px) */
+@media (pointer:coarse){
+  /* min-width only on fixed-size controls, and they never shrink: a min-width on a flex item would otherwise let it squash
+     below its label (buttons with text are wider than a fingertip anyway) */
+  .qchip,.mfilt,.theme-btn,.ctrls button,.tools button,.btn{min-height:var(--tap)}
+  .qchip,.mfilt,.theme-btn,.ctrls button,.tools button{min-width:var(--tap);flex-shrink:0}
+  .mfilt,.theme-btn,.ctrls button{width:var(--tap);height:var(--tap)}
+  .tools button{height:var(--tap)}
+  .qchip{height:var(--tap)}
+}
+@media (max-width:700px){ .mnav button{font-size:var(--fs-xs)} }
+@media (max-width:700px) and (pointer:coarse){
+  .tools button{width:var(--tap);height:var(--tap)}
+  /* the taller search-bar buttons and layer chips still fit between the search bar and the map buttons */
+  .mask{padding-top:2px;padding-bottom:2px}
+  .mapleft .qlayers{top:-48px}
+}
+/* pages (every view except the Map) use the full width: the list panel hides there and comes back on the Map at the
+   width the user left it. On a page the list button shows it over that page only, without changing the Map's setting. */
+@media (min-width:701px){
+  .app:not([data-view="map"]) .panel,.app:not([data-view="map"]) .presize{display:none}
+  .app:not([data-view="map"]){grid-template-columns:minmax(0,1fr)}
+  .app.pview-open:not([data-view="map"]) .panel{display:flex}
+  .app.pview-open:not([data-view="map"]){grid-template-columns:var(--pw) minmax(0,1fr)}
+}
+/* the closed assistant drawer sits just off the right edge; clip it so it can't widen the page on tablets */
+.viewport{overflow:hidden;overflow:clip}
