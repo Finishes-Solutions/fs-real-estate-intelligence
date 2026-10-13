@@ -145,7 +145,7 @@ for (const v of [0, 1, 2]) {
   globalThis.fetch = async (url, opts = {}) => {
     const u = String(url); if (u.includes('/models/')) return Response.json({ id: 'm' });
     sent = JSON.parse(opts.body); const user = JSON.parse(sent.messages[1].content);
-    assert.equal(user.site.acres, 3.1); assert.equal(user.request, '120 apartments'); assert.equal(sent.reasoning_effort, 'low');
+    assert.equal(user.site.acres, 3.1); assert.equal(user.request, '120 apartments'); assert.equal(sent.reasoning_effort, 'high'); // it thinks properly about the program
     return Response.json({ choices: [{ message: { content: JSON.stringify({ use: 'multifamily', gfa: null, floors: 3, units: 120, buildings: null, ratio: null, perUnit: 1.5, depth: null, detentionPct: 8, truck: null,
       setbacks: { front: 25, side: null, rear: 15, paving: null }, summary: 'Three-story garden apartments with surface parking.', assumptions: ['1.5 spaces per unit'] }) } }] });
   };

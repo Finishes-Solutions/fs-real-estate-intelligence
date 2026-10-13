@@ -366,9 +366,25 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 
 **Single-family homes:** choose **Single-family homes** (or say "single-family homes, mostly 2-story"). Homes go on lots along 28 ft streets, both sides of each street, with lot lines, driveways and a cul-de-sac at a dead end. The streets curve gently the way a neighbourhood's do, with the lots and homes following them, and the rows along the lot lines stay straight so curving costs almost no lots; **Neighbourhood streets** under Site parameters switches them to straight. Set the **home mix** (the share of 1-, 2- and 3-story homes) and the lot depth under Site parameters; each home type takes its own lot width (about 60, 50 and 40 ft).
 
+**The plan panel** works like a property card: a full-height column beside the map buttons, with the plan's options, **Edit Layout** and chips to jump to each section (Build, Selected, Numbers, Draw, Site, Settings, Pro forma, Export) pinned at the top, and a dark overview of the plan (homes, floor area, parking, coverage, and whether it passes the checks).
+
+**What every plan includes, and what fits**
+- A plan always fits the site: buildings, their parking, a drive in from the street, and dumpster enclosures for shops, restaurants and offices. Ask for more than the land holds ("100,000 sq ft on one acre") and you get the most that fits with its parking and setbacks, with a note saying so.
+- Small extras asked for with one main use are laid out on the open land beside it: outdoor seating against the building, a playground, a named lawn.
+- Odd-shaped lots (a wedge, a curved highway frontage) are laid out square to the street as well as to the lot's long lines.
+- A "residential neighbourhood" with shops in front and a community center at the back fills the whole tract: homes take whatever land the shops and apartments leave, the community center (building, pool, parking, playground) sits by the main drive, and the land around it is a park. Land left between homes is open space; only frontage beside the shops is marked as future pad sites.
+- Trees line lawn edges and the front yards of homes, with a few groves in big parks.
+- Sites up to about 300 acres work; a large layout takes up to a minute while the map stays usable, and the AI may think for up to a minute first.
+
+**The building library**
+- About 230 building types: garden, breezeway, corridor, senior, L-shaped, courtyard, podium and tower apartments; townhome rows; duplexes; 24 house plans; restaurants from a coffee drive-thru to a brewpub; shop strips, pharmacies, grocery and big box; medical and office buildings; flex, warehouses and self storage; hotels, churches and more.
+- **From the building library** under Draw adds one at the middle of the view; **Type** in the Selected box swaps a placed building for another type in the same spot. Neighbourhood streets mix the house plans home to home.
+
 **Editing a plan**
 - A plan opens for looking: clicking a piece shows its details and dragging pans the map, so nothing moves by accident. **Edit Layout** at the top of the plan panel turns editing on (**Done Editing** turns it off); adding a piece from Draw turns it on too.
 - While editing, drag a piece to move it, its white corners to resize it and the orange dot to turn it. Only that piece changes. It lines up with the edges of the pieces near it and stays out of the setbacks (hold Alt to move it freely), and parking under a building you move gives way, whole stalls at a time. Anything that still clashes shows in red.
+- **Edit Shape** in the Selected box (buildings, lawns, ponds, plazas, courts, pools, patios, garages) turns the outline into points: drag a point, drag a blue + to add one, double-click a point to remove it. Points line up square with their neighbours unless Alt is held.
+- **Cmd+Z / Ctrl+Z** undoes and **Shift+Cmd+Z** redoes, whatever button was clicked last.
 - **Re-fit Plan** in the Selected box lays out everything else again around the pieces you placed (marked 📌; **Let it move** releases one). It only happens when you press it. A pond you enlarge counts toward the detention.
 - Curved pieces (ponds, the pool, lawns, curved drives) resize from their corner handles. Ponds, pools, lawns, plazas and courts can switch between **natural curves**, a **rounded rectangle** and a **rectangle**, keeping their area.
 
@@ -467,6 +483,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Site plans that always fit and look finished:** every plan has its parking, a drive and dumpsters, and an ask too big for the land becomes the most that fits; small extras (patio, playground, lawn) beside a single use; neighbourhoods that fill large tracts with a community center and park; better tree placement; a library of about 230 building types; point-by-point shape editing; dependable Cmd+Z; a site plan panel laid out like a property card; faster on sites up to 300 acres; and the AI thinks longer about the program.
 - **Curving neighbourhood streets:** single-family layouts now have streets that curve, with lots and homes following them, for about the same number of lots as straight streets; a setting switches back to straight.
 - **Edit Layout:** plans open for looking; editing is a switch, and moving a piece changes only that piece (it snaps to its neighbours and the setbacks, and parking under it gives way) instead of re-laying out the whole site. Re-fit Plan does that on demand.
 - **Townhome and duplex communities that fit:** a duplex or townhome count too dense for lots of their own becomes two-story six-unit rows on a shared parking court, with fenced patios, unit lines and a turnaround; a **Side Street** tool (also found from the map's roads) and a pull-through drive out to it; and the AI now chooses between homes on lots and a court.

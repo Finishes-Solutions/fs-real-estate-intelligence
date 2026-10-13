@@ -704,7 +704,7 @@ export function initSitePlan(ctx) {
   async function build() {
     const p = P(), pl = PL(); if (!pl || pl.ring.length < 3) return;
     const ask = (ed.ask || '').trim(); if (!ask) { ctx.toast('Say what should go on the site, or pick a suggestion.'); card.querySelector('#spAsk')?.focus(); return; }
-    const btn = card.querySelector('#spGo'); if (btn) { btn.disabled = true; btn.textContent = 'Thinking…'; }
+    const btn = card.querySelector('#spGo'); if (btn) { btn.disabled = true; btn.textContent = 'Thinking… (up to a minute)'; }
     let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '';
     try {
       const r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: ask, site: siteInfo(p, pl), program: pl.program }) });
