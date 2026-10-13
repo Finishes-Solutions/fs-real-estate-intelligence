@@ -1,5 +1,5 @@
 // Plane traffic and flight reports.
-//   Air Traffic Report for any area (Reports tab, selection bar, Site "Area reports", the assistant): how much air traffic
+//   Air Traffic Report for any area (Reports tab, Map panel, Site "Area reports", the assistant): how much air traffic
 //   passes over it by hour of day, the mix (jets, props, helicopters, military), how much is low, the trend by month
 //   (api/planes?report, from the per-minute sampler within ~100 nm of Houston), low-flight exposure at the middle of the
 //   area, nearby airports and whether the area is under a runway's approach path, and the planes overhead right now.

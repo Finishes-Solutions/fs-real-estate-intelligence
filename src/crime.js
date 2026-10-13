@@ -247,4 +247,16 @@ export function initCrime(ctx) {
     const b = map.getBounds(), w = b.getWest(), s = b.getSouth(), e = b.getEast(), n = b.getNorth();
     report({ geometry: { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] }, label: 'Map view near ' + (ctx.viewPlace?.() || 'Houston') }); return true;
   };
+  // the Map panel's "Reports for this area" row: the selection (or the map view) when its middle is in Houston, else greyed out
+  const row = document.getElementById('selCrime');
+  if (row) {
+    const mid = g => { let w = 180, so = 90, e = -180, n = -90; const walk = a => typeof a[0] === 'number' ? (w = Math.min(w, a[0]), e = Math.max(e, a[0]), so = Math.min(so, a[1]), n = Math.max(n, a[1])) : a.forEach(walk); walk(g.coordinates); return [(w + e) / 2, (so + n) / 2]; };
+    const where = () => { const s = ctx.sel; if (s?.feature) return s.center || mid(s.feature.geometry || s.feature); const c = map.getCenter(); return [c.lng, c.lat]; };
+    const sync = () => { let ok = false; try { ok = inHouston(where()); } catch (e) {}
+      row.hidden = false; row.disabled = !ok; row.setAttribute('aria-disabled', String(!ok));
+      row.querySelector('.ar-d').textContent = !ok ? 'Houston only' : ctx.sel?.feature ? 'Last 12 months' : 'Run on map view';
+      row.title = ok ? 'Houston Police incidents: the last 12 months against the year before' : 'Street-level crime data covers the City of Houston only. Move the map to Houston or pick an area there.'; };
+    row.onclick = () => { if (!row.disabled) ctx.crimeReportFor(ctx.sel?.feature ? 'selection' : 'view'); };
+    ctx.onChange?.(sync); map.on('moveend', sync); sync();
+  }
 }

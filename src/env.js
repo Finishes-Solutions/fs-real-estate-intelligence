@@ -155,10 +155,8 @@ export function initEnv(ctx) {
     return savePdf(ctx, 'environmental', label, html);
   }
 
-  // entry points: the selection bar and the strip under Area at a Glance
+  // entry point: the Map panel's "Reports for this area" row (shown while an area is selected)
   const run = () => { const s = ctx.sel; if (s?.feature) report({ geometry: s.feature.geometry || s.feature, label: s.label || 'Selected area' }); };
-  const strip = document.querySelector('.crsel');
-  if (strip && !strip.querySelector('.env-go')) { const b = document.createElement('button'); b.className = 'btn env-go'; b.type = 'button'; b.textContent = 'Environmental Report'; b.onclick = run; strip.querySelector('button')?.before(b); }
   const sb = document.getElementById('selEnv'), sync = () => { if (sb) sb.style.display = ctx.sel?.feature ? '' : 'none'; };
   if (sb) sb.onclick = run; ctx.onChange?.(sync); sync();
 }

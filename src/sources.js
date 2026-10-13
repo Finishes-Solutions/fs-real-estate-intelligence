@@ -155,7 +155,7 @@ export function initSources(ctx) {
       offline ? '<span class="src-pill">' + st('stale', 'Offline') + ' showing the copy saved on this device</span>' : '',
       newer ? '<span class="src-pill">' + st('stale', 'Newer data') + ' refreshed ' + esc(fmtWhen(newer)) + ' · <button class="lnk" id="srcReload" type="button">Reload</button></span>' : '',
     ].join('');
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Sources</div><h2>Where the data comes from</h2><div class="vsub">What each source feeds, how often it refreshes and when it last did. Nightly data is pulled once a night and built into the app; map layers and lookups are fetched live when you use them.</div></div></div>' +
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">Sources</div><h2>Where the data comes from</h2><div class="vsub">What each source feeds, how often it refreshes and when it last did. Nightly data is pulled once a night and built into the app; map layers and lookups are fetched live when you use them.</div></div><div class="vctl"><button type="button" class="btn md" id="srcIntro" title="Show the short getting-started tip at the top of the Map panel again">Getting started</button></div></div>' +
       '<div class="src-sum">' + pills + '</div>' +
       // the options themselves live in Settings; this line says how they're set and links there
       '<div class="src-opt muted">Show sources on cards: <b id="srcShowState">' + (ctx.showSources?.() ? 'On' : 'Off') + '</b> · <button class="lnk" id="srcSettings" type="button">Change in Settings</button> · <button class="lnk" id="srcVoiceLog" type="button" title="What the voice assistant heard and did in this visit, for troubleshooting">Save voice log</button></div>' +
@@ -164,6 +164,7 @@ export function initSources(ctx) {
     root.querySelector('#srcReload')?.addEventListener('click', () => location.reload());
     root.querySelector('#srcSettings')?.addEventListener('click', () => ctx.openSettings?.('appearance'));
     root.querySelector('#srcVoiceLog')?.addEventListener('click', () => ctx.saveVoiceLog?.());
+    root.querySelector('#srcIntro')?.addEventListener('click', () => ctx.showIntro?.());
   }
 
   ctx.onView('sources', () => { render(); checkNewer(); });

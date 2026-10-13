@@ -9,7 +9,8 @@ export function initGlance(ctx) {
   const num = v => v == null ? '—' : v >= 1e6 ? (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : fmtN(v);
   let t = 0, seq = 0;
   const tile = (k, v, s) => '<div class="g-t"><b>' + v + '</b><span>' + esc(k) + '</span>' + (s ? '<i>' + s + '</i>' : '') + '</div>';
-  const shell = (body, place) => '<div class="g-h"><span class="kicker">Area at a Glance</span>' + (place ? '<em>' + esc(place) + '</em>' : '') + '</div>' + body;
+  // the area itself is named once, in the panel's scope header above
+  const shell = body => '<div class="g-h"><span class="kicker">Area at a Glance</span></div>' + body;
 
   // the tracts of an area (the selection or the view): those centred inside it, or (an area smaller than a tract, e.g. zoomed
   // in on a block) the tract under its middle

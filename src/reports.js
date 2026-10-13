@@ -132,7 +132,7 @@ export function initReports(ctx) {
       ctx.crimeReportFor(b.dataset.crime); });
     root.querySelectorAll('[data-crimeus]').forEach(b => b.onclick = () => { ctx.setView('map'); ctx.crimeUSReportFor(b.dataset.crimeus); });
     root.querySelectorAll('[data-ar]').forEach(b => b.onclick = () => { ctx.setView('map');
-      if (b.dataset.w === 'pick') { ctx.setMode?.('area'); ctx.toast?.('Drag a box on the map, then use the ' + (ctx.areaReports.find(x => x.key === b.dataset.ar)?.label || 'report') + ' button on the selection bar.'); return; }
+      if (b.dataset.w === 'pick') { ctx.setMode?.('area'); ctx.toast?.('Drag a box on the map, then use the ' + (ctx.areaReports.find(x => x.key === b.dataset.ar)?.label || 'report') + ' row under Reports for this area in the Map panel.'); return; }
       ctx.runAreaReport(b.dataset.ar, b.dataset.w); });
     const qi = root.querySelector('#rpQ'); if (qi) qi.oninput = () => { q = qi.value; root.querySelector('#rpList').innerHTML = rows(); wire(); };
     const ks = root.querySelector('#rpKind'); if (ks) ks.onchange = () => { kind = ks.value; root.querySelector('#rpList').innerHTML = rows(); wire(); };

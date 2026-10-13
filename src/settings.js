@@ -102,7 +102,7 @@ export function initSettings(ctx) {
       el.querySelector('#setReset').onclick = resetLayout;
     },
     help(el) {
-      el.innerHTML = '<div class="set-links">' + go('Data sources &amp; freshness', 'data-act="sources"', 'Where every number comes from and when it was last refreshed') +
+      el.innerHTML = '<div class="set-links">' + go('Getting started', 'data-act="intro"', 'The short tip on what the app does, at the top of the Map panel') + go('Data sources &amp; freshness', 'data-act="sources"', 'Where every number comes from and when it was last refreshed') +
         go('Save voice log', 'data-act="voicelog"', 'What the voice assistant heard and did in this visit, for troubleshooting') + '</div>';
       wireActs(el);
     },
@@ -112,6 +112,7 @@ export function initSettings(ctx) {
       const a = b.dataset.act;
       if (a === 'voicelog') { ctx.saveVoiceLog(); return; }
       close();
+      if (a === 'intro') { ctx.showIntro?.(); return; }
       if (a === 'sources') { ctx.setView('sources'); return; }
       ctx.setView('map');
       const phone = matchMedia('(max-width:700px)').matches;

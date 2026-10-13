@@ -62,7 +62,7 @@ export function initCompare(ctx) {
   }
   ctx.compare = { add, remove, addEach, list: () => areas.slice(), colorOf: i => COLORS[i % COLORS.length][0], addSelection: () => add(fromSelection()), clear: () => { areas = []; save(); sync(); } };
 
-  // selection bar: "+ Compare"
+  // the Map panel's scope header: "+ Compare"
   const selBtn = document.getElementById('selCompare');
   selBtn.onclick = () => { if (ctx.compare.addSelection() && areas.length >= 2) ctx.toast('Added. Open Market › Compare areas to see them side by side.'); };
   const eachBtn = document.getElementById('selCompareEach');
@@ -94,7 +94,7 @@ export function initCompare(ctx) {
       (areas.length < MAX ? '<span class="cmp-slot">' + (MAX - areas.length) + ' open slot' + (MAX - areas.length > 1 ? 's' : '') + '</span>' : '') + '</div>';
     if (areas.length < 2) {
       const steps = '<ol><li>On the map, pick an area: search a city or county, click <em>County</em>, draw a <em>Shape</em> or <em>Area</em>, or set a <em>Radius</em>.</li>' +
-        '<li>Click <em>+ Compare</em> under This Area on the Map, or on the place card.</li><li>Repeat for up to four areas, then come back here.</li></ol>';
+        '<li>Click <em>+ Compare</em> at the top of the Map panel, or on the place card.</li><li>Repeat for up to four areas, then come back here.</li></ol>';
       h += ctx.vempty ? ctx.vempty({ icon: 'areas', title: areas.length ? 'Add one more area to compare' : 'Nothing to compare yet', text: 'Pick areas on the Map and add each one with + Compare.', extra: steps, actions: [{ label: 'Pick on the Map', id: 'cmpToMap', primary: true }] })
         : '<div class="cmp-empty"><b>' + (areas.length ? 'Add one more area to compare.' : 'Nothing to compare yet.') + '</b>' + steps + '<button class="btn primary" id="cmpToMap">Pick on the Map</button></div>';
     }

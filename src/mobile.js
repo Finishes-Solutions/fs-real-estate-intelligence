@@ -53,6 +53,8 @@ export function initMobile(ctx) {
     closeSheet();
     if (t !== 'map' && card.classList.contains('open')) ctx.closeCard();
     if (t === 'map' || t === 'list') { app.dataset.mtab = t; if (ctx.view !== 'map') ctx.setView('map'); }
+    // Explore shows the filings straight away: the section opens for this visit (not saved, and the map's dots stay as they are)
+    if (t === 'list' && document.getElementById('secFilings')?.getAttribute('aria-expanded') !== 'true') ctx.setFilingsOpen?.(true);
     else { const leaf = leafFor(t); app.dataset.mtab = leaf; ctx.setView(leaf); } // Filings / Market open the page used last
     syncNav();
     if (t === 'map') setTimeout(() => map.resize(), 30);

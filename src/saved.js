@@ -27,8 +27,8 @@ export function initSaved(ctx) {
         : '<div class="sv"><button class="lnk" data-open="' + i + '">' + esc(s.name) + '</button>' + nb + '<a class="lnk" href="' + rss(s) + '" target="_blank" rel="noopener" title="RSS feed">RSS</a><button class="lnk x" data-del="' + i + '" aria-label="Delete">×</button></div>'; };
     if (isPage) el.innerHTML = '<div class="vhead"><div><div class="kicker">My Work</div><h2>Saved searches</h2><div class="vsub">Searches you saved in this browser, with how many new filings match each one since you last opened it.</div></div>' +
         (a.length ? '<div class="vctl"><button type="button" class="btn md" id="svpGo">Save another on the Map</button></div>' : '') + '</div>' +
-      (a.length ? '<div class="svp">' + a.map(row).join('') + '</div><p class="vfoot">To save a search, set filters on the Map, then choose Save Search under This Area.</p>'
-        : ctx.vempty ? ctx.vempty({ icon: 'bookmark', title: 'No saved searches yet', text: 'Save a filter set to see how many new filings match each visit, or get an RSS alert. Set filters on the Map, then choose Save Search under This Area.', actions: [{ label: 'Go to the Map', id: 'svpGo', primary: true }] })
+      (a.length ? '<div class="svp">' + a.map(row).join('') + '</div><p class="vfoot">To save a search, set filters or pick an area on the Map, then choose ⋯ › Save search at the top of the Map panel.</p>'
+        : ctx.vempty ? ctx.vempty({ icon: 'bookmark', title: 'No saved searches yet', text: 'Save a filter set to see how many new filings match each visit, or get an RSS alert. Set filters or pick an area on the Map, then choose ⋯ › Save search at the top of the Map panel.', actions: [{ label: 'Go to the Map', id: 'svpGo', primary: true }] })
         : '<div class="empty">No saved searches yet. <button type="button" class="lnk" id="svpGo">Go to the Map</button> to set filters and save one.</div>');
     else el.innerHTML = a.map(row).join('');
     el.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { open(+b.dataset.open); if (isPage) { ctx.showFilings?.(); ctx.setView('map'); } });
@@ -43,11 +43,11 @@ export function initSaved(ctx) {
   }
   const renderPage = () => paint(page, true);
   ctx.onView('saved', renderPage);
-  document.getElementById('saveSearch').onclick = () => {
-    const name = prompt('Name this search', ctx.filterText().slice(0, 60) || 'All filings'); if (!name) return;
+  // the panel's "…" menu › Save search asks for the name in place (src/app.js) and calls this
+  ctx.saveSearch = name => {
     const p = new URLSearchParams(ctx.hashStr()); p.delete('f'); p.delete('v');
-    const all = read(); all.unshift({ name: name.slice(0, 80), hash: p.toString(), seen: new Date().toISOString() }); write(all.slice(0, 30)); render(); box.open = true;
-    ctx.toast('Saved in this browser. Use RSS for alerts by email or in a reader.');
+    const all = read(); all.unshift({ name: String(name).slice(0, 80), hash: p.toString(), seen: new Date().toISOString() }); write(all.slice(0, 30)); render(); box.open = true;
+    ctx.toast('Saved in this browser, under My Work › Saved searches. Use RSS for alerts by email or in a reader.');
   };
   render();
 }

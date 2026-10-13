@@ -53,7 +53,7 @@ export function initDriveTime(ctx) {
     // the selection is a plain polygon wound the way d3 expects (as the drawn shapes are)
     let g = b.geometry; try { if (window.d3?.geoArea(g) > 2 * Math.PI) g = { type: 'Polygon', coordinates: [g.coordinates[0].slice().reverse()] }; } catch (e) {}
     ctx.setSelection?.('shape', label, g);
-    ctx.toast?.('Selected: ' + label + '. Area reports on the selection bar now use it.');
+    ctx.toast?.('Selected: ' + label + '. Reports for this area in the Map panel now use it.');
   }
 
   // open the drive-time card and draw the bands

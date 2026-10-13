@@ -113,7 +113,7 @@ const isSat=()=>layers.style==='sat'||layers.style==='esri'||layers.style==='gsa
 const BOOT_BASES=['dots','streets','sat','topo','esri','free'];
 const layers={style:(()=>{ try{ const b=localStorage.getItem('fs-basemap'); if(BOOT_BASES.includes(b)) return b; }catch(e){} return 'dots'; })(),roads:true,names:true,counties:true,grid:true,size:'uniform',heat:'off',dots:false};
 try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(typeof L.grid==='boolean') layers.grid=L.grid; }catch(e){} // the map always opens without filings (dots and heatmap off); dot size and the grid are remembered
-const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} };
+const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} syncFilingsSw(); }; // every change to the filing layer passes here
 // Google base maps need a tile session first (src/google.js): a promise of the style
 const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl(layers.style),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
@@ -337,13 +337,35 @@ function fixWinding(g){ const fix=rings=>{ const poly={type:'Polygon',coordinate
   return g; }
 const monthOK=f=>{ if(!state.month) return true; const [a,b]=monthRange(state.month); return f.ts<=b&&f.te>=a; };
 const listeners=[];
-// "This Area" in the left panel: the selected area (or the map view) and what can be done with it; the filing count only
-// while the filing dots are on
+// The panel's scope header (pinned at the top while the panel scrolls): what the panel is about — the selected area, or
+// the map view (named after the nearest place) — with its filing count, Compare and a "…" menu (save, link, alerts)
+const SEL_KIND={area:'Box',shape:'Shape',radius:'Radius',county:'County',place:'Place'};
+const SEL_IC={view:'<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12"/>',area:'<rect x="2.5" y="2.5" width="11" height="11" rx="1" stroke-dasharray="2.2 1.6"/>',
+  shape:'<path d="M3 4.5 9 2l4.5 5-2.5 6.5-7.5-1.5z"/>',radius:'<circle cx="8" cy="8" r="5.8"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/>',
+  county:'<path d="M3 2.5h6l1 3h3.5v8H3z"/>',place:'<path d="M8 14.5s5-4.3 5-8.2A5 5 0 0 0 3 6.3c0 3.9 5 8.2 5 8.2z"/><circle cx="8" cy="6.3" r="1.8"/>'};
+let selIcK='';
+const viewPlaceSafe=()=>{ try{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }catch(e){ return null; } }; // farLabel (below) is filled after the first move
+// with nothing selected the header names the place in view (the far-away name arrives about 600 ms after a move)
+let selNameT=0; map.on('moveend',()=>{ if(sel.feature) return; clearTimeout(selNameT); selNameT=setTimeout(syncSelBar,800); });
 function syncSelBar(){
-  document.getElementById('selName').textContent=sel.feature?sel.label:'Map view';
-  document.getElementById('selStats').textContent=layers.dots?fmtN(visible.length)+' filings · '+fmtM(visible.reduce((s,f)=>s+f.cost,0))
-    :sel.feature?'Reports below cover this area.':'Pick an area with Area, Shape, Radius or County on the map for reports on it.';
+  const k=sel.feature?(SEL_IC[sel.kind]?sel.kind:'shape'):'view';
+  document.getElementById('selKind').innerHTML=sel.feature?'<span class="sk-l">Selected area · </span>'+(SEL_KIND[sel.kind]||'Area'):'<span class="sk-l">No area picked</span>'; // phones show only the kind
+  const vp=sel.feature?null:viewPlaceSafe(); document.getElementById('selName').textContent=sel.feature?sel.label:vp?'Map view near '+vp:'Map view';
+  if(selIcK!==k){ selIcK=k; document.getElementById('selIcon').innerHTML='<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+SEL_IC[k]+'</svg>'; }
+  document.getElementById('selStats').textContent=fmtN(visible.length)+' filing'+(visible.length===1?'':'s')+' · '+fmtM(visible.reduce((s,f)=>s+f.cost,0));
+  document.getElementById('selPick').hidden=!!sel.feature;
+  // Save search and alerts only mean something once there is a filter or an area; Copy link always works
+  const custom=filterChips({area:true}).some(c=>!c.fixed);
+  ['saveSearch','rssLink'].forEach(id=>{ document.getElementById(id).hidden=!custom; }); if(!custom) document.getElementById('saveForm').hidden=true;
+  syncFilingsHead();
 }
+// the Construction Filings header: the live count for the panel's scope, the data period, and an honest "On map" switch
+function syncFilingsHead(){
+  const n=visible.length, where=sel.feature?sel.label:state.counties.size<COUNTIES.length?(state.counties.size>2?state.counties.size+' counties':[...state.counties].join(' + ')+(state.counties.size>1?' counties':' County')):'';
+  const fl=document.getElementById('filingsLive'); fl.textContent=fmtN(n)+' filing'+(n===1?'':'s')+' · '+fmtM(visible.reduce((s,f)=>s+f.cost,0))+(where?' · '+where:''); fl.title=fl.textContent;
+  syncFilingsSw();
+}
+function syncFilingsSw(){ const sw=document.getElementById('filingsOnMap'); if(sw) sw.checked=layers.dots||layers.heat!=='off'; }
 function applyFilters(){
   const spec=curSpec(false), m=makeMatcher(spec,{changed:CHANGED});
   visible=F.filter(f=>m(f)&&inSel(f)&&monthOK(f));
@@ -388,13 +410,18 @@ let numT; [sqMin,sqMax].forEach(i=>i.addEventListener('input',()=>{ clearTimeout
 uMin.onchange=()=>{ state.umin=+uMin.value; applyFilters(); };
 let coT; coQ.addEventListener('input',()=>{ clearTimeout(coT); coT=setTimeout(()=>{ state.co=coQ.value; applyFilters(); },250); });
 exactBtn.onclick=()=>{ state.exact=state.exact?0:1; applyFilters(); };
-// collapsible Filters and List sections (remembered in this browser)
-// Construction Filings starts collapsed; opening it also puts the filing dots on the map
-for(const [btnId,bodyId,key,dflt] of [['secFilings','filingsBody','fs-sec-filings','0'],['secList','list','fs-sec-list']]){
-  const b=document.getElementById(btnId), body=document.getElementById(bodyId), set=open=>{ b.setAttribute('aria-expanded',open); body.classList.toggle('collapsed',!open); if(bodyId!=='filtersBody') document.querySelector('.panel')?.classList.toggle('list-collapsed',!open||document.getElementById('secFilings').getAttribute('aria-expanded')!=='true'||document.getElementById('secList').getAttribute('aria-expanded')!=='true'); };
-  let open=true; try{ open=(localStorage.getItem(key)??dflt)!=='0'; }catch(e){} set(open);
-  b.onclick=()=>{ const o=b.getAttribute('aria-expanded')!=='true'; set(o); if(o&&bodyId==='filingsBody') showFilings(); try{ localStorage.setItem(key,o?'1':'0'); }catch(e){} };
+// Construction Filings: collapsible (remembered in this browser; starts collapsed). Opening it by hand puts the filing dots
+// on the map; a section restored open from an earlier visit leaves the map alone, and the header's "On map" switch says
+// which it is. The phone's Explore tab opens it for the visit without saving (src/mobile.js).
+const secF=document.getElementById('secFilings'), secFBody=document.getElementById('filingsBody');
+function setFilingsOpen(open,{save=false,dots=false}={}){
+  secF.setAttribute('aria-expanded',open); secFBody.classList.toggle('collapsed',!open); document.getElementById('panel').classList.toggle('list-collapsed',!open);
+  if(open&&dots) showFilings();
+  if(save) try{ localStorage.setItem('fs-sec-filings',open?'1':'0'); }catch(e){}
 }
+{ let open=false; try{ open=(localStorage.getItem('fs-sec-filings')??'0')!=='0'; }catch(e){} setFilingsOpen(open); }
+secF.onclick=()=>setFilingsOpen(secF.getAttribute('aria-expanded')!=='true',{save:true,dots:true});
+document.getElementById('filingsOnMap').onchange=e=>setFilingsShown(e.target.checked);
 // use, dates, updates, active-filter summary
 const dField=document.getElementById('dField'), dFrom=document.getElementById('dFrom'), dTo=document.getElementById('dTo');
 
@@ -996,6 +1023,30 @@ function hashStr(){ const p=new URLSearchParams(encode(curSpec())); if(state.mon
 function scheduleHash(){ if(booting) return; clearTimeout(hashT); hashT=setTimeout(()=>{ const h=hashStr(); history.replaceState(null,'',h?'#'+h:location.pathname+location.search); document.getElementById('rssLink').href='api/feed?'+encode(curSpec()); },250); }
 document.getElementById('copyLink').onclick=async()=>{ const u=location.href.split('#')[0]+'#'+hashStr(); try{ await navigator.clipboard.writeText(u); toast('Link copied. It opens with these filters.'); }catch(e){ prompt('Copy this link',u); } };
 
+// ---------- the Map panel: pick buttons, "…" menu, links, first-visit tip ----------
+// no area yet: Box / Shape / Radius / County start the same tools as the map's toolbar (on a phone, from the Map tab)
+document.querySelectorAll('#selPick [data-pick]').forEach(b=>b.onclick=()=>{
+  if(matchMedia('(max-width:700px)').matches) document.querySelector('#mnav [data-tab=map]')?.click();
+  setMode(b.dataset.pick); });
+{ const menu=document.getElementById('scopeMenu'), form=document.getElementById('saveForm'), nameEl=document.getElementById('saveName');
+  // the menu opens fresh each time: the name field only after "Save search"
+  menu.addEventListener('toggle',()=>{ if(!menu.open) form.hidden=true; });
+  document.getElementById('saveSearch').addEventListener('click',e=>{ e.stopPropagation(); // keep the menu open for the name field
+    form.hidden=false; nameEl.value=filterChips({area:true}).filter(c=>!c.fixed).map(c=>c.label.replace(/^Area: /,'')).join(' · ').slice(0,60)||'All filings'; nameEl.focus(); nameEl.select(); });
+  form.onsubmit=e=>{ e.preventDefault(); const name=nameEl.value.trim(); if(!name){ nameEl.focus(); return; } ctx.saveSearch?.(name); menu.open=false; };
+  nameEl.addEventListener('keydown',e=>{ if(e.key==='Escape'){ e.stopPropagation(); form.hidden=true; document.getElementById('saveSearch').focus(); } }); }
+document.getElementById('savedAll').onclick=()=>setView('saved');
+document.getElementById('arepAll').onclick=()=>setView('reports');
+document.getElementById('footSources').onclick=()=>setView('sources');
+const INTRO='fs-tip-intro', introEl=document.getElementById('introTip');
+try{ introEl.hidden=localStorage.getItem(INTRO)==='1'; }catch(e){ introEl.hidden=false; }
+document.getElementById('introTipOk').onclick=()=>{ introEl.hidden=true; try{ localStorage.setItem(INTRO,'1'); }catch(e){} };
+// Data & help › Getting started: the tip again, at the top of the Map panel
+function showIntro(){ try{ localStorage.removeItem(INTRO); }catch(e){} introEl.hidden=false; setView('map');
+  if(matchMedia('(max-width:700px)').matches) document.querySelector('#mnav [data-tab=list]')?.click();
+  else if(appEl.classList.contains('pcollapsed')) document.getElementById('panelToggle')?.click();
+  panel.scrollTop=0; requestAnimationFrame(()=>document.getElementById('introTipOk').focus({preventScroll:true})); }
+
 // ---------- modules ----------
 if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
@@ -1050,7 +1101,7 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return [...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,30).map(x=>x[0]).join(', '); } // the busiest cities and developers on screen (the voice transcriber's hint list takes the first few)
-ctx.setMode=setMode; ctx.filterChips=filterChips; ctx.scopeBar=scopeBar; ctx.resetFilings=resetFilings; ctx.vempty=vempty; ctx.exportMenu=exportMenu; ctx.openFilters=o=>openFilters(o); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
+ctx.setMode=setMode; ctx.setFilingsOpen=setFilingsOpen; ctx.showIntro=showIntro; ctx.filterChips=filterChips; ctx.scopeBar=scopeBar; ctx.resetFilings=resetFilings; ctx.vempty=vempty; ctx.exportMenu=exportMenu; ctx.openFilters=o=>openFilters(o); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
   if(!html){ el?.remove(); return; } if(!el){ el=document.createElement('div'); el.className='xlegend'; el.dataset.lg=id; box.appendChild(el); } if(el.innerHTML!==html) el.innerHTML=html; };
