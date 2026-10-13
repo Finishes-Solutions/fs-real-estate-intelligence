@@ -3,6 +3,16 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-13
+
+### 3:02 PM CT: Market charts drawn with D3, and they move (1581946)
+- **Charts grow in** as you scroll down the Market tab, and the headline numbers count up.
+- **Switching county or 12 mo / 24 mo / All now animates:** bars, lines, bar lengths and numbers slide from the old values to the new ones, so you can see what changed instead of the page just redrawing.
+- **Cleaner charts:** round numbers on the axes (0, 20,000, 40,000… instead of 0 / half / top), smoothed lines with a soft fill, and a dot on each trend line's latest value.
+- **Hovering a bar fades the others** so the one you're reading stands out.
+- **Fixed:** with the side panel open, the half-width charts (homes permitted, new businesses, sales tax, interest rates) were drawn at half size with tiny text. They now fit their boxes.
+- If your device is set to reduce motion, charts just appear. PDF exports always show the finished charts.
+
 ## 2026-10-05
 
 ### 3:55 PM CT: The app's own cursors (3c1c458)
