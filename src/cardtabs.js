@@ -1,4 +1,4 @@
-// Tabs on the card: select several things at once (buildings, parcels, filings, planes, airports, up to 10) and flip
+// Tabs on the card: select several things at once (buildings, parcels, filings, planes, airports, up to 20) and flip
 // between their cards. Shift-click adds to the tabs; on touch screens the "+" button on the tab bar makes the next taps
 // add. Buildings get an "All" tab with the totals (src/building.js).
 // Contract with the card modules:
@@ -13,7 +13,7 @@ const ICON = {
   airport: '<path d="M2 13h12M4 13V8l4-3 4 3v5M8 2v3"/>',
   summary: '<path d="M2.5 3.5h11M2.5 8h11M2.5 12.5h7"/>'
 };
-const MAX = 10;
+const MAX = 20;
 
 export function initCardTabs(ctx) {
   const card = document.getElementById('card'), esc = ctx.esc;

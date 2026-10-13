@@ -13,6 +13,124 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Fixed:** with the side panel open, the half-width charts (homes permitted, new businesses, sales tax, interest rates) were drawn at half size with tiny text. They now fit their boxes.
 - If your device is set to reduce motion, charts just appear. PDF exports always show the finished charts.
 
+### 1:32 PM CT: Site plans that always fit, big neighbourhoods, a building library, shape editing (03585aa, 8d0f936, 989d3e2, 0bf16d8, 4a57763, 02e3798, 6ac9f59, a586dfa)
+- **Every plan fits and is complete:** buildings come with their parking, a drive in from the street and dumpsters for shops, restaurants and offices. A restaurant on a wedge-shaped lot with a curved highway frontage now gets a real layout (it used to give "Simple layout" with no parking). Ask for more than the land holds, like 100,000 sq ft on 1.5 acres, and you get the most that fits with its parking, with a note saying so.
+- **Extras beside one building:** outdoor seating against the restaurant, a playground and a named lawn, from the words in the request.
+- **Big neighbourhoods fill the site:** "residential neighbourhood, retail in front, multifamily, community center at the back" on 110 acres now gives shops on the frontage, apartments, about 290 home lots, and a community center with pool, parking and playground in a park at the back, instead of 90 acres of "Future development". Leftover land between homes is open space.
+- **Trees** line lawn edges and front yards instead of a grid of dots.
+- **A building library of about 230 types** (apartment buildings of many kinds, townhome rows, duplexes, 24 house plans, restaurants, shops, offices, medical, industrial, hotels and more): add one from Draw, or swap a placed building's type. Neighbourhood streets mix the house plans.
+- **Edit Shape:** drag the points of a building's outline, add points, remove them.
+- **Cmd+Z** works whatever button was clicked last.
+- **The plan panel** is laid out like a property card: full height, with section chips and an overview at the top.
+- **Faster:** 300-acre plans redraw about six times faster, layouts run without freezing the map, and saving no longer slows things down as projects grow.
+- **The AI thinks longer** about the program (up to a minute) and knows the new options.
+
+### 12:26 PM CT: Curving neighbourhood streets (9cfd9c9)
+- **Single-family layouts now have curving streets**, with the lots and homes following the curves, the way a neighbourhood is drawn. The rows along the lot lines stay straight, so curving costs almost no lots (68 homes either way on a 20-acre test site).
+- A **Neighbourhood streets** setting under Site parameters switches back to straight streets. Re-fit Plan keeps the curves.
+- House lot lines on the map are thin dashed lines again, not the site's heavy outline.
+
+### 12:21 PM CT: Projects as cards or a list, with a page per project (f9253da)
+- **Cards or List:** switch at the top of the Projects tab (remembered on this device). Each project shows a drawing of its site, the parcel address, acres, number of options, its largest option and when it was last changed.
+- **A page for each project:** click one for a summary card (site area in acres and square feet, parcels, owner, appraised and land value, number of options, largest option) with **Rename**, then its parcels with **Show on Map**, its site plan options drawn with their numbers, **New Option**, and notes. **‹ All projects** goes back.
+- **Status removed:** the Idea / Pursuing / Under contract dropdown and filter are gone.
+- **Nothing cut off:** long project names, addresses and owners wrap onto more lines instead of ending in "…", and the layout fits the space it has, from phones to narrow windows with the side panel open.
+- Search now also finds owners; sort by last update, name, site size or number of options.
+
+### 12:11 PM CT: Edit Layout: moving a building no longer re-lays out the whole site (8d8f319)
+- Plans open for looking: clicking a piece shows it and dragging pans the map, so nothing moves by accident. **Edit Layout** at the top of the plan panel turns editing on.
+- While editing, moving a piece changes only that piece. It lines up with the pieces near it and stays out of the setbacks (hold Alt to move it freely), and parking under a building you move gives way, whole stalls at a time.
+- **Re-fit Plan** still lays out everything else around the pieces you placed, but only when you press it.
+
+### 12:06 PM CT: A clearer Projects tab (370692c)
+- **Each site plan option is drawn:** a small picture of the plan with its floor area, units, parking against what's needed (amber when short), coverage, and a red count when it has problems. Click it to open the plan.
+- **New Option** adds a blank plan on the same site in one click. A project with no site yet shows how to add one, with **Find a Parcel** and **Draw a Site**.
+- **Filter, search and sort:** status chips with counts, a search box (name, parcel, owner, notes) and sorting by last update, name, status or site size. The status colours the card.
+- **+ New Project** asks for the name on the page instead of a pop-up box.
+- **Notes are no longer lost while typing:** a background team sync used to redraw the list and wipe text you hadn't finished; it now waits until you leave the field.
+- **Fits phones:** the cards no longer run off the right edge (the status and Delete were cut off); options list as rows with the drawing on the left.
+
+### 11:56 AM CT: Townhome and duplex communities that fit, side streets, pull-through drives (b080bd8)
+- **"24 duplex units" on a small tract now gives 24 units, not 4:** when the homes asked for won't fit on lots of their own, the plan lays them out as two-story six-unit townhome rows facing a shared parking court with a turnaround at the end, like a rental community on one tract, and says why. On the 1.46-acre Waller Tomball Rd tract this matches the hand-drawn 24-unit plan set: 4 buildings, 49 spaces for 48 needed, underground detention.
+- **Unit lines and fenced back patios** are drawn on these buildings, on the sheet and the map.
+- **Side Street:** a second street along a corner lot, found from the map's roads or set with the new **Side Street** button. Buildings keep the street setback from it, and "pull-through drive" in the request runs a second drive between the buildings out to it.
+- Build with AI can now choose between homes on lots and a parking court, and ask for a pull-through drive.
+- Options that fit far fewer homes than the best one, and plain fallback layouts, are no longer shown for these.
+
+### 11:31 AM CT: Site plans fill the site, cleaner shapes, trees, more building types (e993f7b)
+- **The whole site is used:** what you ask for is laid out as Phase 1, and the rest of the land holds more of the same size of building as Phase 2 (lighter, dashed), instead of lawn. "28,000 sf across 4 buildings" on 27 acres now shows the 4 buildings plus 32 more of the same size. Deep sites get several rows of shops or offices. A switch under Site parameters turns this off.
+- **Cleaner drawing:** no more blob-shaped lawns and ponds. The site is one landscape background, ponds are rectangles beside the buildings, and parking rows end square. Trash enclosures are left out unless turned on.
+- **Trees** look like trees (canopies on the sheet, 3D trees on the map), with a **Trees** on/off button in the plan panel.
+- **3D:** smoother edges, roof parapets and a line at every floor, towers rising from their podium.
+- **More building types:** L-shaped, courtyard (U) and tower buildings, for the whole plan or one building; **restaurant pads** with outdoor seating and a drive-thru lane; **playgrounds** with a play structure, slide and swings; **parking garages** that count their spaces; courts, pools and patios in Draw.
+
+### 10:47 AM CT: Utilities near a site (dbf86d7)
+- **Utilities row on the property card** (Site section): how far the parcel is from the nearest transmission line (with its voltage and owner), the nearest distribution line and the nearest substation; who holds the water and sewer service areas (CCN) here; and in Houston the nearest public sewer main (size and material) and water main where the city publishes one. Elsewhere it shows the nearest mapped water utility line and says to ask the city or MUD engineer for mains.
+- **Power, Water & Sewer Lines** map layer: transmission lines in red with their voltage, distribution lines in orange, substations, and Houston sewer and water mains at street zoom.
+- The **site plan sheet** notes the nearest power lines and the water and sewer providers.
+- Power lines come from OpenStreetMap (the federal transmission-line map went offline in 2025); street lines are only partly mapped there, and the card says so.
+- **Projects now sync with the team**: the projects table is set up in the team database.
+
+## 2026-10-12
+
+### 4:40 PM CT: Site plans follow the request: building counts, stormwater, one paved surface, ADA stalls, trash (3118744)
+- **Building counts are honoured:** "28,000 sf of retail across 4 buildings" now gives four buildings of about 7,000 sf each, spread along the rows, instead of one 28,000 sf building. "4 buildings of 7,000 sf each" is read the same way.
+- **Less leftover green, more usable land:** a fixed program gets the parking it needs plus about a tenth, not every row the site could hold; drive aisles that serve nothing are removed; the land not needed stays in one piece marked as a future pad site or future development. On a large tract a "compact, room to expand" option builds on just the part of the frontage it needs.
+- **Stormwater:** sized from the developed land (about 0.55 acre-feet per acre, 5 ft deep) as a detention pond, a retention (wet) pond, underground vaults or none, chosen in the request ("with a retention pond", "underground detention") or under Site parameters, where a line shows what the plan needs and holds. Ponds sit beside the buildings. Underground storage is priced in the pro forma (about $420,000 an acre-foot, editable).
+- **One paved surface:** drives, parking and truck courts are drawn as one area with one curb line round the outside, so there are no lines where they meet, on the map, the PDF sheet and in CAD.
+- **Accurate markings:** accessible (ADA) stalls by the federal table near the buildings, in blue with striped access aisles (each pair costs one space, counted in the totals); a stop bar and centre line at the entry.
+- **Trash enclosures** placed by the usual rules (apartments about one per 50 units or a compactor from 200, shops and offices one per about 25,000 sf within 250 ft, one per restaurant or warehouse, none for homes), gate on a drive; a **Trash enclosure** piece to add by hand; settings to turn them off or change the rule.
+
+### 3:40 PM CT: Site plans: TestFit-style parameters, unit and home mixes, edit and re-fit, pro forma (461d026)
+- **Site parameters** under the plan: building setbacks and landscape buffers by front, side and rear (each turned on or off), parking stall width and depth and aisle width, apartment depth, longest building and spacing, detention share, trees on or off, and the look: ponds and pools as natural curves, rounded rectangles or rectangles; parking rows with rounded or square ends; curved or square drive corners. Changing a setting lays the options out again.
+- **Unit mix** for apartments (studio, 1, 2, 3 bedroom: size, share, beds): it sets the average unit and the unit count, and the plan lists units by type, beds and rentable area.
+- **Single-family homes** with a 1-, 2- and 3-story mix: lots on both sides of each street with lot lines, driveways and cul-de-sacs.
+- **Deal summaries** like TestFit's: acreage, FAR, building and impervious coverage, units per acre, beds, net and gross square feet, parking ratio.
+- **Move, resize or reshape a piece and the plan re-fits around it:** the piece stays where you put it and drives, parking and other buildings are laid out again. A bigger pond counts toward detention. Curved pieces resize from their corners and switch between natural, rounded and square.
+- **More options…** lists every usable layout found (up to 12), sortable by units, floor area, parking or open space.
+- **Pro forma** with a development schedule in months (design and permits, construction, lease-up or sales, hold), a month-by-month model (construction loan and interest, lease-up, refinance, sale), TestFit's one-page method side by side, homes for rent or for sale, and **Pro Forma (Excel)** with live formulas.
+- TestFit's custom pro forma was reverse-engineered: the one-page method reproduces its sheet to the dollar (61.51% unlevered and 114.44% levered IRR on its inputs). It skips the construction period and lease-up, which is why those IRRs run so high.
+
+### 3:04 PM CT: Parcel lines cached for two weeks (c2f5825)
+- **Parcel lines (Regrid) now stay cached for 14 days instead of 7**, so the same map area costs a Regrid tile at most once every two weeks. That stretches the monthly tile allowance further.
+- The trade-off: a boundary change Regrid makes can take up to two weeks to show on the map.
+
+### 3:03 PM CT: Site plans rebuilt: three usable, connected options every time (667d063)
+- **Every Build with AI run gives three usable options.** Each is checked before it's offered: inside the setbacks, no overlaps, enough parking, and every drive and parking row reachable from the entry. The app tries many arrangements and keeps the best three that pass.
+- **Laid out like a real site plan:** the drives come first as one connected network (aisles joined by curved drives into loops, no dead ends), parking rows line the aisles, extra parking bays run between them where needed, and buildings sit between the rows facing their parking across a walk.
+- **Apartments:** the clubhouse sits at the entry with the pool on a deck right beside it (no more pool across the site with a pond in between), garden-style buildings with staggered fronts, and a walking trail round the pond. **Shops** face their parking with pad sites and drive-thru lanes along the street; **warehouses** get a truck court on the dock side; **townhomes** get two rows per private lane.
+- **Curved, detailed shapes:** drives turn on arcs, the entry has curb returns and a planted median, parking rows end in rounded planted islands, and ponds, pools and lawns are free-form. Curved pieces drag and nudge as a whole.
+- **No wasted land:** the plan fills the site as far as parking and detention allow. Detention is a natural-shaped pond at the back, at the entry or at the end of the rows; land left over becomes lawns, a dog park or a playground, and land a small program doesn't need is marked Future development. Options say plainly when a program didn't all fit.
+- **Mixed use** runs on the same connected network, with zones that share a row side by side when the lot is too shallow to stack them.
+- **The Build Options button keeps its size** after a build; the AI's note now sits under it.
+- Tested on a copy of the 7.7-acre FM 362 lot from the screenshot, a real 27-acre parcel, a skewed 2.5-acre lot and a 20-acre mixed-use tract.
+
+### 1:54 PM CT: Site plans on up to 20 parcels, mixed-use layouts and a PDF sheet (e14ac58)
+- **Up to 20 parcels as one site:** pick them (Shift-click or Select Multiple, now up to 20), then **Site Plan for All** on the All tab, or **Add or Remove Parcels** inside a plan. Small gaps and overlaps between neighbouring parcels are closed up; parcels across a road stay out, with a note.
+- **Mixed-use plans:** describe several uses and the site is laid out in zones from the street back: shops with pad sites at the street corners, a commons with an amenity lake (the site's detention), pavilion, courts and playground, apartments with a clubhouse and pool, townhome rows on rear-load lanes, and duplexes, with 26 ft drives between zones and a main entry drive. Works with or without AI.
+- **More detail on every plan:** named, sized buildings ("Apt Bldg 2 · 40 units · 3 fl", "Pad A"), planted parking islands with trees, walks around buildings, trees along the buffer and the lake, buildings coloured by use. The Selected box sets a building's use and name.
+- **Site Plan PDF:** a conceptual site plan sheet on 11 × 17 or 24 × 36: the plan to scale with the street at the bottom, north arrow and scale bar, vicinity map, title block, program at a glance, site data and land use by zone, program and parking, parcels and owners, notes from the site's own data (flood zone, districts, traffic, environmental records), legend and a feasibility-only disclaimer.
+- The CAD (DXF) export also carries the zones, trees, walks and building names.
+
+### 1:17 PM CT: Site plans laid out like real sites (de724e2)
+- **Buildings square up with the lot** instead of tilting to its longest line, so a lot with one slanted street edge no longer gets crooked buildings.
+- **The building sits near the street** with its parking in front of it, behind it, or beside it (the three options). Before, "parking in front" pushed the building to the back of the lot.
+- **No size given means a typical size** for that use on a lot that size (say "as big as fits" to fill the site). Before, "2-story medical office" on 27 acres filled it with 450,000 sf.
+- **Detention is a strip along the back** (or behind the buildings on a big lot), sized to the land the project covers, not the whole lot.
+- **One parking field with at most two driveways**, instead of scattered lots each with its own drive.
+- "Turned 90°" is replaced by **Parking beside**. Pieces you add by hand also line up with the lot.
+- A warehouse that fills the site keeps its truck court.
+
+### 12:29 PM CT: Projects and site plans, with Build with AI (1112f7d)
+- **Start Site Plan** on every property card (Site Tools): start a new project or add the parcel to an existing one, and the plan opens on the parcel's outline (Regrid's outline in Harris and Waller once you've opened Regrid details, or draw the site yourself).
+- **Build with AI:** describe what should go there ("25,000 sf retail strip", "200 apartments, 3 stories", "warehouse with truck court, as big as fits"). The AI sets the program (use, size, floors, parking ratio, setbacks) and the app lays out three options on the lot, each with its floor area, parking and coverage. The layout itself is measured by the app, not drawn by the AI. Without AI it reads your words directly.
+- **Draw by hand:** buildings, parking (spaces counted as you size it), drives, truck courts, detention and landscape. Drag, resize and turn pieces on the map, type exact sizes, undo and redo. Buildings show in 3D when the map is tilted.
+- **Checks and numbers:** setbacks by street, side and rear (the street side comes from the map's roads, or you pick it), buffers, overlaps, parking needed vs provided, coverage, FAR, detention, open space, and zoning limits when Regrid has them.
+- **Exports:** CAD drawing (DXF, opens in AutoCAD, CADCraft and other CAD programs), map file (GeoJSON) and a text summary.
+- **A new Projects tab** (and a Projects tile in the phone's More menu): every project with its status, parcels, options and notes.
+- **Ask AI** can start or build a site plan on the open parcel ("how many apartments fit on this lot?").
+- Projects are saved in this browser for now; team sharing turns on once the projects table is added to the team database.
+
 ## 2026-10-05
 
 ### 3:55 PM CT: The app's own cursors (3c1c458)

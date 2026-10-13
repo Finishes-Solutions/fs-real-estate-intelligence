@@ -69,7 +69,7 @@
   <main class="stage" id="stage" data-view="map">
     <nav class="viewbar" id="viewbar" aria-label="Views">
       <button class="ptoggle" id="panelToggle" aria-label="Show or hide the list" title="Show or hide the list"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg></button>
-      <button data-view="map" aria-pressed="true">Map</button><button data-view="market" aria-pressed="false">Market</button><button data-view="compare" aria-pressed="false">Compare <span class="badge" id="cmpBadge"></span></button><button data-view="reports" aria-pressed="false">Reports</button><button data-view="field" aria-pressed="false">Notes <span class="badge" id="fieldBadge"></span></button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="who" aria-pressed="false">Activity</button><button data-view="changes" aria-pressed="false">Updates <span class="badge" id="chgBadge"></span></button><button data-view="sources" aria-pressed="false">Sources</button>
+      <button data-view="map" aria-pressed="true">Map</button><button data-view="market" aria-pressed="false">Market</button><button data-view="compare" aria-pressed="false">Compare <span class="badge" id="cmpBadge"></span></button><button data-view="reports" aria-pressed="false">Reports</button><button data-view="field" aria-pressed="false">Notes <span class="badge" id="fieldBadge"></span></button><button data-view="projects" aria-pressed="false">Projects <span class="badge" id="pjBadge"></span></button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="who" aria-pressed="false">Activity</button><button data-view="changes" aria-pressed="false">Updates <span class="badge" id="chgBadge"></span></button><button data-view="sources" aria-pressed="false">Sources</button>
     </nav>
     <div class="viewport" id="viewport">
     <div id="map" aria-label="Interactive real estate map"></div>
@@ -205,6 +205,9 @@
       <div class="rnote" id="lyWetlandsNote" hidden></div>
       <label class="tg2" title="USDA soil survey map units (zoom in)"><input type="checkbox" id="lySoils"><span>Soils</span></label>
       <div class="rnote" id="lySoilsNote" hidden></div>
+      <div class="lt">Utilities</div>
+      <label class="tg2" title="Power lines and substations (OpenStreetMap); in Houston, public sewer and water mains at street zoom (zoom in)"><input type="checkbox" id="lyUtil"><span>Power, Water &amp; Sewer Lines</span></label>
+      <div class="rnote" id="lyUtilNote" hidden></div>
       <div class="lt">Demographics (Census Tracts)</div>
       <select class="chip" id="lyDemo" aria-label="Demographic layer">
         <option value="">Off</option><option value="gr">Population Growth</option><option value="pop">Population</option><option value="inc">Median Household Income</option>
@@ -248,6 +251,7 @@
     <section class="view" id="view-reports" aria-label="Reports"></section>
     <section class="view" id="view-changes" aria-label="Updates"></section>
     <section class="view" id="view-field" aria-label="Notes"></section>
+    <section class="view" id="view-projects" aria-label="Projects"></section>
     <section class="view" id="view-sources" aria-label="Sources"></section>
     <div class="mtop" id="mtop">
       <div class="mask">
@@ -278,6 +282,7 @@
       <button data-go="reports"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6 8.5h4.5M6 11h4.5"/></svg></i><span>Reports</span></button>
       <button data-go="changes"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4M13.5 2.5V5h-2.5"/><path d="M8 5.5V8l1.8 1.2"/></svg><b class="badge" id="mChgN"></b></i><span>Updates</span></button>
       <button data-go="field"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10v8.5L9.5 14H3z"/><path d="M9.5 14v-3.5H13M5.5 5.5h5M5.5 8h3"/></svg><b class="badge" id="mFieldN"></b></i><span>Notes</span></button>
+      <button data-go="projects"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M4.5 4.5h4v3.5h-4zM10 4.5h1.5M10 7h1.5M4.5 10.5h7"/></svg><b class="badge" id="mPjN"></b></i><span>Projects</span></button>
       <button data-go="sources"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="8" cy="3.8" rx="5" ry="1.8"/><path d="M3 3.8v8.4c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V3.8M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8"/></svg></i><span>Sources</span></button>
     </div>
     <div class="mt-h">Tools</div>

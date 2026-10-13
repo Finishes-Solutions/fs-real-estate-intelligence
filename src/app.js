@@ -26,6 +26,7 @@ import { initTeam } from './team.js';
 import { initArea } from './area.js';
 import { initRegrid } from './regrid.js';
 import { initSite } from './site.js';
+import { initUtilities } from './utilities.js';
 import { initCrime } from './crime.js';
 import { initCrimeUS } from './crimeus.js';
 import { initFema } from './fema.js';
@@ -42,6 +43,7 @@ import { initPlaces } from './places.js';
 import { initEnv } from './env.js';
 import { initOwner } from './owner.js';
 import { initGoogle } from './google.js';
+import { initSitePlan } from './siteplan.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
 
@@ -102,7 +104,7 @@ try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['unifo
 const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} };
 // Google base maps need a tile session first (src/google.js): a promise of the style
 const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
-const map=new maplibregl.Map({container:'map',style:styleUrl('dots'),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,
+const map=new maplibregl.Map({container:'map',style:styleUrl('dots'),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
 map.on('error',e=>{ const m=(e&&e.error&&e.error.message)||''; if(/40[13]|Unauthorized|Forbidden/i.test(m)&&STYLES[layers.style]) toast('MapTiler refused the key for this site. Check the key’s allowed origins.'); });
 
@@ -948,7 +950,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,
