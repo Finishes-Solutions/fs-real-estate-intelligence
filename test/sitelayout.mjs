@@ -259,4 +259,21 @@ function usable(plan, o, what) {
   const roads = [[[-200, -178 - 30], [300, -178 - 30]], [[-93 - 35, -400], [-86 - 35, 400]]].map(l => l.map(([x, y]) => [x, y]));
   assert.deepEqual(S.streetsFromRoads(b.ring, roads, front), [west], 'side street found from road lines');
 }
+
+// ---- curving neighbourhood streets: the same lots as straight streets, streets that bend, lots and homes that follow ----
+{
+  const g = mk([-95.70, 29.90], [[0, 0], [1400, 0], [1400, 620], [0, 620]]), b = S.unionParcels([g]), front = b.ring.findIndex((p, i) => S.outwardOf(b.ring, i)[1] < -0.9);
+  const plan = { ...b, front, setbacks: { ...S.SETBACKS } }, homes = o => o.elements.filter(e => e.use === 'sfr').length;
+  const cv = L.layoutOptions(plan, { use: 'sfr' }), st = L.layoutOptions({ ...plan, params: { streets: 'straight' } }, { use: 'sfr' });
+  assert.ok(homes(cv[0]) >= homes(st[0]) * 0.95, 'curving costs (almost) no lots: ' + homes(cv[0]) + ' vs ' + homes(st[0]));
+  for (const o of cv) usable(plan, o, 'curving streets');
+  const streets = cv[0].elements.filter(e => e.kind === 'drive' && e.path && e.path.length > 8), turn = P => { let m = 0; for (let i = 1; i + 1 < P.length; i++) { const a = Math.atan2(P[i][1] - P[i - 1][1], P[i][0] - P[i - 1][0]), c = Math.atan2(P[i + 1][1] - P[i][1], P[i + 1][0] - P[i][0]); m = Math.max(m, Math.abs(((c - a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI)); } return m; };
+  assert.ok(streets.length && streets.some(e => { const P = e.path, ang = P.slice(1).map((q, i) => Math.atan2(q[1] - P[i][1], q[0] - P[i][0])); return Math.max(...ang) - Math.min(...ang) > 0.15; }), 'streets bend');
+  assert.ok(streets.every(e => turn(e.path) < 0.5), 'smoothly, no kinks');
+  assert.ok(cv[0].elements.filter(e => e.kind === 'lot').some(e => e.poly) && new Set(cv[0].elements.filter(e => e.use === 'sfr').map(e => Math.round(e.rot))).size > 3, 'lots bend and homes turn with the street');
+  assert.ok(st[0].elements.filter(e => e.kind === 'drive' && e.path).every(e => turn(e.path) > 0.3 || e.path.length <= 8), 'straight when asked');
+  const r = L.refit({ ...plan, program: { use: 'sfr' }, elements: cv[0].elements.map((e, i) => i === cv[0].elements.findIndex(x => x.use === 'sfr') ? { ...e, pinned: true } : e), recipe: cv[0].recipe });
+  assert.ok(r && r.elements.filter(e => e.use === 'sfr').length >= homes(cv[0]) - 3, 're-fits a bent plan');
+  assert.deepEqual(S.fillet([[0, 0], [10, 0], [10, 10]], 0), [[0, 0], [10, 0], [10, 10]], 'r 0: no rounding');
+}
 console.log('site layouts ok');

@@ -169,7 +169,7 @@ export function initSitePlan(ctx) {
     if (map.getSource(SRC)) return;
     const kind = k => ['==', ['get', 'k'], k], dark = ctx.isDark();
     map.addSource(SRC, { type: 'geojson', data: EMPTY }); map.addSource(HSRC, { type: 'geojson', data: EMPTY }); map.addSource(DSRC, { type: 'geojson', data: EMPTY });
-    map.addLayer({ id: 'fs-sp-lot', type: 'fill', source: SRC, filter: kind('lot'), paint: { 'fill-color': COL.lawn, 'fill-opacity': dark ? .35 : .55 } }); // the site is landscape under everything on it
+    map.addLayer({ id: 'fs-sp-lot', type: 'fill', source: SRC, filter: ['all', kind('lot'), ['==', ['get', 'site'], 1]], paint: { 'fill-color': COL.lawn, 'fill-opacity': dark ? .35 : .55 } }); // the site is landscape under everything on it
     map.addLayer({ id: 'fs-sp-zone', type: 'line', source: SRC, filter: kind('zone'), paint: { 'line-color': dark ? '#939a9d' : '#6b7174', 'line-width': 1, 'line-dasharray': [6, 4] } });
     // paving is drawn once as a whole (one colour, one curb line round it); the pieces under it stay clear, and show
     // only when picked, so drives and parking rows read as one surface without seams or darker overlaps
@@ -178,7 +178,7 @@ export function initSitePlan(ctx) {
     map.addLayer({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio']]],
       paint: { 'fill-color': ['match', ['get', 'k'], 'trail', COL.trail, 'trash', COL.trash, 'patio', COL.patio, 'parking', COL.parking, 'drive', COL.drive, 'truck', COL.truck, 'pond', COL.pond, 'plaza', COL.plaza, 'court', COL.court, 'pool', COL.pool, 'play', COL.play, COL.green],
         'fill-opacity': ['case', ['==', ['get', 'sel'], 1], .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, ['all', ['==', ['get', 'k'], 'green'], ['==', ['get', 'nm'], 0]], 0.01, .75] } });
-    map.addLayer({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: kind('lot'), minzoom: 16, paint: { 'line-color': dark ? '#8b9a86' : '#7d8f76', 'line-width': 0.8, 'line-dasharray': [3, 2] } });
+    map.addLayer({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: ['all', kind('lot'), ['!=', ['get', 'site'], 1]], minzoom: 16, paint: { 'line-color': dark ? '#8b9a86' : '#7d8f76', 'line-width': 0.8, 'line-dasharray': [3, 2] } });
     map.addLayer({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': dark ? '#5b6366' : '#ecece6', 'fill-opacity': .85 } });
     map.addLayer({ id: 'fs-sp-yard', type: 'fill', source: SRC, filter: kind('yard'), minzoom: 16, paint: { 'fill-color': dark ? '#6b6456' : '#e6dcc8', 'fill-opacity': .9 } });
     map.addLayer({ id: 'fs-sp-fence', type: 'line', source: SRC, filter: kind('fence'), minzoom: 16, paint: { 'line-color': dark ? '#c9bba0' : '#8a7a62', 'line-width': 1 } });
@@ -188,7 +188,7 @@ export function initSitePlan(ctx) {
     map.addLayer({ id: 'fs-sp-mark', type: 'line', source: SRC, filter: kind('mark'), minzoom: 16, paint: { 'line-color': ['get', 'c'], 'line-width': ['get', 'w'], 'line-opacity': .95 } });
     map.addLayer({ id: 'fs-sp-pl', type: 'line', source: SRC, filter: kind('pline'), paint: { 'line-color': dark ? '#8acda3' : '#0a7a36', 'line-width': 1, 'line-dasharray': [4, 3], 'line-opacity': .8 } });
     map.addLayer({ id: 'fs-sp-sb', type: 'line', source: SRC, filter: kind('setback'), paint: { 'line-color': dark ? '#bcc2c4' : '#4d5457', 'line-width': 1.3, 'line-dasharray': [3, 2] } });
-    map.addLayer({ id: 'fs-sp-lotl', type: 'line', source: SRC, filter: kind('lot'), paint: { 'line-color': dark ? '#4caf70' : '#006527', 'line-width': 2.5 } });
+    map.addLayer({ id: 'fs-sp-lotl', type: 'line', source: SRC, filter: ['all', kind('lot'), ['==', ['get', 'site'], 1]], paint: { 'line-color': dark ? '#4caf70' : '#006527', 'line-width': 2.5 } });
     map.addLayer({ id: 'fs-sp-front', type: 'line', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['front', 'street']]], paint: { 'line-color': '#e0a23c', 'line-width': ['match', ['get', 'k'], 'street', 3.5, 5], 'line-opacity': .9 } });
     map.addLayer({ id: 'fs-sp-tree', type: 'fill-extrusion', source: SRC, filter: kind('tree'), minzoom: 15, paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .95 } }); // 3D trees: trunk, crown, top
     map.addLayer({ id: 'fs-sp-bldg', type: 'fill-extrusion', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['building', 'garage']]], paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], '#d64541', ['==', ['get', 'k'], 'garage'], COL.garage, ['==', ['get', 'ph'], 2], ['match', ['get', 'use'], ...Object.entries(USE_COL).map(([k, v]) => [k, lighten(v)]).flat(), lighten(COL.building)], ['match', ['get', 'use'], ...Object.entries(USE_COL).flat(), COL.building]], /* Phase 2 lighter */ 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .88 } });
@@ -435,7 +435,7 @@ export function initSitePlan(ctx) {
         ['front', 'side', 'rear'].map(k => num('sb-' + k, k[0].toUpperCase() + k.slice(1) + ' building (ft)', sb[k], 1)).join('') +
         [['paveFront', 'Front'], ['paveSide', 'Side'], ['paveRear', 'Rear']].map(([k, l]) => num('sb-' + k, l + ' buffer (ft)', sb[k] ?? sb.paving, 1)).join('') + '</div>' +
       '<div class="sp-sub">Parking</div><div class="sp-grid">' + num('pp-stallW', 'Stall width (ft)', pp.stallW, 0.5) + num('pp-stallD', 'Stall depth (ft)', pp.stallD, 0.5) + num('pp-aisle', 'Drive aisle (ft)', pp.aisle, 1) + '</div>' +
-      '<div class="sp-sub">Buildings</div><div class="sp-grid">' + pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) + num('pp-bldgDepth', 'Apartment depth (ft)', pp.bldgDepth, 1) + num('pp-maxLen', 'Longest building (ft)', pp.maxLen, 10) + num('pp-bldgGap', 'Space between (ft)', pp.bldgGap, 1) + '</div>' +
+      '<div class="sp-sub">Buildings</div><div class="sp-grid">' + pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) + pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Curving'], ['straight', 'Straight']]) + num('pp-bldgDepth', 'Apartment depth (ft)', pp.bldgDepth, 1) + num('pp-maxLen', 'Longest building (ft)', pp.maxLen, 10) + num('pp-bldgGap', 'Space between (ft)', pp.bldgGap, 1) + '</div>' +
       '<div class="sp-sub">Look</div><div class="sp-grid">' + sw('trees', 'Trees', pp.trees !== false) +
         pick('ponds', 'Ponds and pools', pp.style.ponds, [['organic', 'Natural curves'], ['rounded', 'Rounded rectangles'], ['square', 'Rectangles']]) +
         pick('islands', 'Parking row ends', pp.style.islands, [['rounded', 'Rounded islands'], ['square', 'Square']]) +
@@ -470,7 +470,7 @@ export function initSitePlan(ctx) {
       change(x => { if (k === 'trees' || k === 'fill') x.params = { ...(x.params || {}), [k]: i.checked }; else x.setbacks = { ...SP.SETBACKS, ...(x.setbacks || {}), [k]: i.checked }; }); if (k !== 'trees') after(); });
     card.querySelectorAll('.sp-prog [data-pr]').forEach(i => i.onchange = () => { change(x => { x.program = { ...x.program, [i.dataset.pr]: i.value || null }; }); after(); });
     card.querySelectorAll('.sp-prog [data-ps]').forEach(i => i.onchange = () => { const [g, f] = i.dataset.ps.split('.'); change(x => { x.params = { ...(x.params || {}), [g]: { ...(x.params?.[g] || {}), [f]: i.value } }; }); after(); });
-    card.querySelectorAll('.sp-prog [data-st]').forEach(i => i.onchange = () => { change(x => { x.params = i.dataset.st === 'form' ? { ...(x.params || {}), form: i.value } : { ...(x.params || {}), style: { ...(x.params?.style || {}), [i.dataset.st]: i.value } }; }); after(); });
+    card.querySelectorAll('.sp-prog [data-st]').forEach(i => i.onchange = () => { change(x => { x.params = i.dataset.st === 'form' || i.dataset.st === 'streets' ? { ...(x.params || {}), [i.dataset.st]: i.value } : { ...(x.params || {}), style: { ...(x.params?.style || {}), [i.dataset.st]: i.value } }; }); after(); });
     const mixOf = x => clone(SP.normalizeProgram(x.program).mix || SP.UNIT_MIX);
     card.querySelectorAll('[data-mix]').forEach(i => i.onchange = () => { const [n, f] = i.dataset.mix.split(':'); change(x => { const m = mixOf(x); m[+n][f] = f === 'name' ? i.value : +i.value; x.program = { ...x.program, mix: m }; }); after(); });
     card.querySelectorAll('[data-mixdel]').forEach(b => b.onclick = () => { change(x => { const m = mixOf(x); m.splice(+b.dataset.mixdel, 1); x.program = { ...x.program, mix: m }; }); after(); });
