@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 4:01 PM CT: The AI suggests what to build and reviews the layouts (ce4e152)
+- **What Should Go Here?** in the site plan panel: the AI reads what the app knows about the site (flood zone, roads and traffic, utility districts and lines, environmental records), what's nearby and local rents, and suggests three to five uses with why each fits and what to check. **Lay This Out** builds any of them.
+- **Build Options now has the AI check the engine's work:** the engine still draws every option, then the AI looks at each one (a picture of the plan plus its numbers and checks), changes the program and has the engine lay it out again when the options miss, and puts the best first. Each option shows the AI's score, a verdict and what to watch. It takes a minute or two; a switch under the button turns it off.
+- The AI also sees the site's facts when it first reads your request.
+
 ### 1:32 PM CT: Site plans that always fit, big neighbourhoods, a building library, shape editing (03585aa, 8d0f936, 989d3e2, 0bf16d8, 4a57763, 02e3798, 6ac9f59, a586dfa)
 - **Every plan fits and is complete:** buildings come with their parking, a drive in from the street and dumpsters for shops, restaurants and offices. A restaurant on a wedge-shaped lot with a curved highway frontage now gets a real layout (it used to give "Simple layout" with no parking). Ask for more than the land holds, like 100,000 sq ft on 1.5 acres, and you get the most that fits with its parking, with a note saying so.
 - **Extras beside one building:** outdoor seating against the restaurant, a playground and a named lawn, from the words in the request.
