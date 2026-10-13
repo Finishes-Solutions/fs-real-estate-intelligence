@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 3:15 PM CT: Markets section charts with D3, and fixes (bf13835)
+- **Markets price list:** the small 12-month charts are smoother, with a soft fill and a dot on the latest price. Switching groups (Energy, Housing & REITs…) grows the new rows' charts in.
+- **Correlation explorer:** the chart shows a shaded band for normal ups and downs and an "avg" line, and hovering puts a dot on both lines. Picking another series, or switching year-over-year and month-over-month, slides the lines, bars and numbers to the new result.
+- **Fixed: the lead / lag bars were nearly invisible.** They were drawn on a scale up to 1 while real correlations are usually around 0.2. They now use a scale that fits, with the strongest one labelled.
+- **Fixed on phones:** the correlation charts were drawn at desktop width, so their text was tiny, and the result tiles left an empty grey cell. The construction chart's "now" label no longer runs into "2027".
+- Also brings in today's site plan and Projects tab work from the main branch.
+
 ### 3:02 PM CT: Market charts drawn with D3, and they move (1581946)
 - **Charts grow in** as you scroll down the Market tab, and the headline numbers count up.
 - **Switching county or 12 mo / 24 mo / All now animates:** bars, lines, bar lengths and numbers slide from the old values to the new ones, so you can see what changed instead of the page just redrawing.
