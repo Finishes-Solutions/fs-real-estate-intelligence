@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 12:21 PM CT: Projects as cards or a list, with a page per project (f9253da)
+- **Cards or List:** switch at the top of the Projects tab (remembered on this device). Each project shows a drawing of its site, the parcel address, acres, number of options, its largest option and when it was last changed.
+- **A page for each project:** click one for a summary card (site area in acres and square feet, parcels, owner, appraised and land value, number of options, largest option) with **Rename**, then its parcels with **Show on Map**, its site plan options drawn with their numbers, **New Option**, and notes. **‹ All projects** goes back.
+- **Status removed:** the Idea / Pursuing / Under contract dropdown and filter are gone.
+- **Nothing cut off:** long project names, addresses and owners wrap onto more lines instead of ending in "…", and the layout fits the space it has, from phones to narrow windows with the side panel open.
+- Search now also finds owners; sort by last update, name, site size or number of options.
+
 ### 12:06 PM CT: A clearer Projects tab (370692c)
 - **Each site plan option is drawn:** a small picture of the plan with its floor area, units, parking against what's needed (amber when short), coverage, and a red count when it has problems. Click it to open the plan.
 - **New Option** adds a blank plan on the same site in one click. A project with no site yet shows how to add one, with **Find a Parcel** and **Draw a Site**.
