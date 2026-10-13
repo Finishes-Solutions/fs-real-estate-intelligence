@@ -5,6 +5,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-13
 
+### 1:32 PM CT: Site plans that always fit, big neighbourhoods, a building library, shape editing (03585aa, 8d0f936, 989d3e2, 0bf16d8, 4a57763, 02e3798, 6ac9f59, a586dfa)
+- **Every plan fits and is complete:** buildings come with their parking, a drive in from the street and dumpsters for shops, restaurants and offices. A restaurant on a wedge-shaped lot with a curved highway frontage now gets a real layout (it used to give "Simple layout" with no parking). Ask for more than the land holds, like 100,000 sq ft on 1.5 acres, and you get the most that fits with its parking, with a note saying so.
+- **Extras beside one building:** outdoor seating against the restaurant, a playground and a named lawn, from the words in the request.
+- **Big neighbourhoods fill the site:** "residential neighbourhood, retail in front, multifamily, community center at the back" on 110 acres now gives shops on the frontage, apartments, about 290 home lots, and a community center with pool, parking and playground in a park at the back, instead of 90 acres of "Future development". Leftover land between homes is open space.
+- **Trees** line lawn edges and front yards instead of a grid of dots.
+- **A building library of about 230 types** (apartment buildings of many kinds, townhome rows, duplexes, 24 house plans, restaurants, shops, offices, medical, industrial, hotels and more): add one from Draw, or swap a placed building's type. Neighbourhood streets mix the house plans.
+- **Edit Shape:** drag the points of a building's outline, add points, remove them.
+- **Cmd+Z** works whatever button was clicked last.
+- **The plan panel** is laid out like a property card: full height, with section chips and an overview at the top.
+- **Faster:** 300-acre plans redraw about six times faster, layouts run without freezing the map, and saving no longer slows things down as projects grow.
+- **The AI thinks longer** about the program (up to a minute) and knows the new options.
+
 ### 12:26 PM CT: Curving neighbourhood streets (9cfd9c9)
 - **Single-family layouts now have curving streets**, with the lots and homes following the curves, the way a neighbourhood is drawn. The rows along the lot lines stay straight, so curving costs almost no lots (68 homes either way on a 20-acre test site).
 - A **Neighbourhood streets** setting under Site parameters switches back to straight streets. Re-fit Plan keeps the curves.
