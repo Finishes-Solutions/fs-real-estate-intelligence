@@ -394,7 +394,9 @@ export function initSitePlan(ctx) {
       (drawing ? '<div class="bsec sp-draw"><div class="lt">Draw the site</div><p>Click each corner of the site on the map. Click the first corner again (or double-click, or press Enter) to finish.' + (ed.draft.length ? ' ' + ed.draft.length + ' corner' + (ed.draft.length > 1 ? 's' : '') + ' so far.' : '') + '</p><div class="bacts" style="padding:0"><button class="btn askai" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button class="btn" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button class="btn" id="spCancelDraw">Keep the Old Site</button>') + '</div></div>' :
       '<div class="bsec sp-ai" id="spAiSec"><label class="lt" for="spAsk">Build with AI</label><textarea id="spAsk" rows="2" placeholder="What should go here? e.g. 25,000 sf retail strip with 4 per 1,000 parking">' + esc(ed.ask || '') + '</textarea>' +
         '<div class="sp-sugs">' + SUGGEST.map(s => '<button class="chip" data-sug="' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div>' +
-        '<div class="bacts sp-go"><button class="btn askai" id="spGo">Build Options</button></div><div class="rnote sp-ainote" id="spAiNote">' + esc(ed.aiNote || '') + '</div>' +
+        '<div class="bacts sp-go"><button class="btn askai" id="spGo">Build Options</button><button class="btn" id="spBest" title="The AI reads what the app knows about this site and its surroundings and suggests what to build">What Should Go Here?</button></div>' +
+        '<label class="sp-sw sp-revsw"><input type="checkbox" id="spReview"' + (aiReviewOn() ? ' checked' : '') + '> The AI reviews the layouts it gets back and revises the plan when they miss</label>' +
+        '<div id="spIdeas">' + ideasHtml() + '</div><div class="rnote sp-ainote" id="spAiNote">' + esc(ed.aiNote || '') + '</div>' +
         '<div id="spVariants">' + variantsHtml() + '</div></div>' +
       siteHtml(p, pl) +
       '<div class="bsec" id="spDrawSec"><div class="lt">Draw and tools</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + (k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building) + '"></i>' + (ADD_LABEL[k] || SP.KINDS[k].label) + '</button>').join('') + '<button class="btn" id="spTrees" aria-pressed="' + (pl.params?.trees !== false) + '" title="Show or hide the trees on the plan, the map and the PDF">Trees ' + (pl.params?.trees !== false ? 'On' : 'Off') + '</button></div>' +
@@ -421,7 +423,9 @@ export function initSitePlan(ctx) {
     $('#spAsk').oninput = e => { ed.ask = e.target.value; };
     $('#spAsk').onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) build(); };
     card.querySelectorAll('[data-sug]').forEach(b => b.onclick = () => { ed.ask = b.dataset.sug; $('#spAsk').value = ed.ask; build(); });
-    on('#spGo', build);
+    on('#spGo', build); on('#spBest', bestUse);
+    const rv = $('#spReview'); if (rv) rv.onchange = () => { try { localStorage.setItem('fs-sp-review', rv.checked ? '1' : '0'); } catch (e) {} };
+    card.querySelectorAll('[data-idea]').forEach(b => b.onclick = () => { const it = ed.ideas?.list?.[+b.dataset.idea]; if (!it) return; ed.ask = it.request; const ta = $('#spAsk'); if (ta) ta.value = it.request; build(); });
     card.querySelectorAll('[data-var]').forEach(b => b.onclick = () => useVariant(+b.dataset.var));
     on('#spMore', async () => { const pl2 = PL(), b = card.querySelector('#spMore'); if (b) b.textContent = 'Looking…'; const more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); if (PL() !== pl2) return; ed.variants = named(more, pl2); ed.pick = null; panel(); });
     const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; const k = so.value, cur = ed.variants[ed.pick]; const val = v => k === 'units' ? v.m.units || 0 : k === 'gfa' ? v.m.gfa : k === 'spaces' ? v.m.spaces : k === 'open' ? v.m.green : (v.rank ?? 0);
@@ -701,37 +705,100 @@ export function initSitePlan(ctx) {
     return { acres: +(SP.ringArea(pl.ring) / 43560).toFixed(3), widthFt: Math.round(Math.max(...xs) - Math.min(...xs)), depthFt: Math.round(Math.max(...ys) - Math.min(...ys)), frontageFt: Math.round(SP.edgeLen(pl.ring, f)),
       address: parcel?.label || '', city: ctx.nearestPlace?.(pl.origin) || '', county: (ctx.DATA?.counties || []).find(c => SP.inRing(pl.origin, c.outline?.[0]?.[0] || []))?.name || '', zoning: pl.zoning };
   }
+  // ---------- AI: what to build, then the engine's layouts reviewed and revised ----------
+  const aiReviewOn = () => { try { return localStorage.getItem('fs-sp-review') !== '0'; } catch (e) { return true; } };
+  const factsFor = pl => (ed.facts?.id === pl.id + ':' + pl.ring.length ? ed.facts.p : (ed.facts = { id: pl.id + ':' + pl.ring.length, p: siteFacts(pl).catch(() => []) }).p); // flood, roads, districts, utilities: asked once per site
+  const post = async body => { const r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || 'AI unavailable'), { status: r.status }); return d; };
+  // an option as the AI sees it: the plan drawing as a picture, its numbers and what the checks found
+  async function planImage(plan) {
+    const svg = planSVG(plan, { px: 1000 }).svg, img = new Image();
+    await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+    const w = img.naturalWidth || 1000, h = img.naturalHeight || 1000, k = Math.min(1, 1000 / Math.max(w, h)), c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+    const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.72);
+  }
+  async function forReview(v, plan, withImage) {
+    const p2 = { ...plan, elements: v.elements, program: v.program || plan.program, params: v.params || plan.params }, m = v.m, B = v.elements.filter(e => e.kind === 'building');
+    let image = null; if (withImage) try { image = await planImage(p2); } catch (e) { /* numbers only */ }
+    return { name: v.name.replace(/^\S+ · /, ''), notes: v.notes, issues: SP.check(p2).map(i => i.text).slice(0, 8), image,
+      metrics: { acres: +m.acres.toFixed(2), buildings: B.length, floorAreaSf: Math.round(m.gfa), units: m.units || 0, unitsPerAcre: +(m.duAc || 0).toFixed(1), parkingSpaces: m.spaces, parkingRequired: m.required, coveragePct: Math.round(m.coverage * 100), far: +m.far.toFixed(2), pondAcres: +(m.pond / 43560).toFixed(2), openSpacePct: Math.round(m.green * 100) } };
+  }
+  async function aiReview(plan, prog, list, round, ask) {
+    const options = await Promise.all(list.map((v, i) => forReview(v, plan, i < 4)));
+    return post({ mode: 'review', prompt: ask, site: siteInfo(P(), PL()), facts: await factsFor(PL()), program: prog, round, options });
+  }
+  const relabel = list => list.map((v, i) => ({ ...v, rank: -i, name: (i < 26 ? String.fromCharCode(65 + i) : i + 1) + ' · ' + v.name.replace(/^\S+ · /, '') }));
   async function build() {
     const p = P(), pl = PL(); if (!pl || pl.ring.length < 3) return;
     const ask = (ed.ask || '').trim(); if (!ask) { ctx.toast('Say what should go on the site, or pick a suggestion.'); card.querySelector('#spAsk')?.focus(); return; }
-    const btn = card.querySelector('#spGo'); if (btn) { btn.disabled = true; btn.textContent = 'Thinking… (up to a minute)'; }
-    let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '';
+    const btn = card.querySelector('#spGo'), say = t => { const b = card.querySelector('#spGo'); if (b) { b.disabled = true; b.textContent = t; } }; if (btn) btn.disabled = true; say('Thinking… (up to a minute)');
+    let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '', aiOk = false;
     try {
-      const r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: ask, site: siteInfo(p, pl), program: pl.program }) });
-      const d = await r.json().catch(() => ({}));
-      if (r.ok) { prog = d.program; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = [d.summary, ...(d.assumptions || [])].filter(Boolean).join(' · '); }
-      else note = (r.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this reads your words directly.';
-    } catch (e) { note = 'Offline: this reads your words directly.'; }
+      const d = await post({ prompt: ask, site: siteInfo(p, pl), facts: await factsFor(pl), program: pl.program });
+      prog = d.program; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = [d.summary, ...(d.assumptions || [])].filter(Boolean).join(' · '); aiOk = true;
+    } catch (e) { note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : navigator.onLine ? 'The AI didn’t answer, so ' : 'Offline: ') + 'this reads your words directly.'; }
     if (ed?.plid !== pl.id) return;
-    if (btn) btn.textContent = SP.ringArea(pl.ring) > 40 * 43560 ? 'Laying out… (a big site takes up to a minute)' : 'Laying out…';
+    say(SP.ringArea(pl.ring) > 40 * 43560 ? 'Laying out… (a big site takes up to a minute)' : 'Laying out…');
     let out = []; try { out = await laid('options', { ...pl, setbacks }, prog); } catch (e) { console.warn('layout', e); ctx.toast('The layout failed: ' + e.message); }
-    const plan = { ...pl, setbacks }, variants = named(out, { ...plan, program: prog });
+    const plan = { ...pl, setbacks }; let variants = named(out, { ...plan, program: prog });
     if (ed?.plid !== pl.id) return;
+    if (aiOk && aiReviewOn() && variants.some(v => v.elements.length)) { // the AI looks at what the engine drew, and may send it back with a better program
+      try {
+        let pool = variants.filter(v => v.elements.length).slice(0, 4), revised = '';
+        say('The AI is reviewing the layouts…'); let rv = await aiReview(plan, prog, pool, 1, ask);
+        if (ed?.plid !== pl.id) return;
+        if (rv.revise && rv.program) {
+          say('Revising: ' + (rv.why || 'a better program').replace(/\.$/, '') + '…');
+          const params2 = { ...(pl.params || {}), ...(rv.params?.fill != null ? { fill: rv.params.fill } : {}), ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}) };
+          let out2 = []; try { out2 = await laid('options', { ...pl, setbacks, params: params2 }, prog2, { count: 3, depth: 6, budgetMs: 6000 }); } catch (e) { console.warn('layout', e); }
+          const v2 = named(out2, { ...plan, params: params2, program: prog2 }).filter(v => v.elements.length).map(v => ({ ...v, params: params2, revisedBy: rv.why || 'the AI review' }));
+          if (v2.length && ed?.plid === pl.id) {
+            const first = rv; pool = pool.slice(0, 3).concat(v2.slice(0, 3)); say('The AI is comparing the revised layouts…');
+            try { rv = await aiReview(plan, prog2, pool, 2, ask); } catch (e) { rv = { ...first, reviews: (first.reviews || []).filter(r => r.option < 3), ranking: (first.ranking || []).filter(i => i < 3).concat(v2.slice(0, 3).map((_, k) => 3 + k)) }; }
+            revised = first.why || 'a better program';
+          }
+        }
+        if (ed?.plid !== pl.id) return;
+        for (const r of rv.reviews || []) if (pool[r.option]) pool[r.option] = { ...pool[r.option], ai: r };
+        const order = (rv.ranking || []).filter(i => pool[i]);
+        variants = relabel(order.map(i => pool[i]).concat(pool.filter((v, i) => !order.includes(i))));
+        note = [rv.summary, revised ? 'After its first look the AI changed the program: ' + revised.replace(/\.$/, '') + '.' : ''].filter(Boolean).join(' ') || note;
+      } catch (e) { console.warn('review', e); note += (note ? ' · ' : '') + 'The AI review didn’t answer, so these are as the engine ranked them.'; }
+    }
     ed.variants = variants; ed.aiNote = note; ed.pick = null;
     const best = variants.findIndex(v => v.elements.length); if (best >= 0) useVariant(best); else panel();
+  }
+  // what should go here: the site, its surroundings and the market, read by the AI; each idea can be laid out
+  async function bestUse() {
+    const p = P(), pl = PL(); if (!pl || pl.ring.length < 3) return;
+    const btn = card.querySelector('#spBest'); if (btn) { btn.disabled = true; btn.textContent = 'Reading the site… (up to a minute)'; }
+    const c = SP.frame(pl.origin).toLL(SP.centroid(pl.ring)), within = (pr, ms) => Promise.race([pr, new Promise(res => setTimeout(() => res(null), ms))]);
+    const kinds = ['grocery', 'restaurant', 'gas', 'pharmacy', 'school', 'hospital', 'clinic', 'mall', 'hotel', 'childcare', 'storage', 'highway'];
+    const near = await Promise.all(kinds.map(k => within(fetch('api/nearby?' + new URLSearchParams({ lat: c[1].toFixed(5), lon: c[0].toFixed(5), what: k, limit: '3' })).then(r => r.ok ? r.json() : null).catch(() => null), 12000)));
+    const nearby = Object.fromEntries(kinds.map((k, i) => [k, (near[i]?.places || []).slice(0, 3).map(x => ({ name: x.name || x.kind || k, miles: x.miles }))]).filter(([, v]) => v.length));
+    const market = {}; try { const area = ctx.areaData ? await within(ctx.areaData(), 6000) : null, parcel = p.parcels.find(x => x.key === pl.parcel) || p.parcels[0], z = parcel?.situsZip || parcel?.zip, r = z && area?.rents?.zips?.[z]; if (r) Object.assign(market, { zip: z, typicalRent: r.rent, rentChangeYearPct: r.yoy ?? null }); } catch (e) {}
+    try {
+      const d = await post({ mode: 'bestuse', prompt: (ed.ask || '').trim(), site: siteInfo(p, pl), facts: await factsFor(pl), nearby, market });
+      if (PL() !== pl) return; ed.ideas = { list: d.ideas || [], summary: d.summary || '' };
+    } catch (e) { ed.ideas = { list: [], summary: e.status === 503 ? 'AI isn’t set up on this site.' : 'The AI didn’t answer just now. Try again in a moment.' }; }
+    panel(); card.querySelector('#spIdeas')?.scrollIntoView({ block: 'nearest' });
+  }
+  function ideasHtml() {
+    const I = ed?.ideas; if (!I) return '';
+    return '<div class="sp-ideas">' + (I.summary ? '<div class="rnote">' + esc(I.summary) + '</div>' : '') + I.list.map((it, i) => '<div class="sp-idea"><div class="sp-idea-h"><b>' + esc(it.title) + '</b><span class="sp-fit">' + it.fit + '% fit</span></div><div class="sp-idea-w">' + esc(it.why) + '</div>' +
+      (it.risks?.length ? '<ul>' + it.risks.map(r => '<li>' + esc(r) + '</li>').join('') + '</ul>' : '') + '<button class="btn" data-idea="' + i + '">Lay This Out</button></div>').join('') + (I.list.length ? '<div class="rnote">Starting points from the AI, not a market study.</div>' : '') + '</div>';
   }
   const named = (list, plan) => list.map((r, i, all) => ({ ...r, rank: -i, setbacks: plan.setbacks, m: SP.metrics({ ...plan, program: r.program || plan.program, elements: r.elements }),
     name: (i < 26 ? String.fromCharCode(65 + i) : i + 1) + ' · ' + r.name + (all.slice(0, i).some(o => o.name === r.name) ? ' (alternate ' + (all.slice(0, i).filter(o => o.name === r.name).length) + ')' : '') }));
   function variantsHtml() {
     if (!ed?.variants) return '';
     return '<div class="sp-vars">' + ed.variants.map((v, i) => '<button class="sp-var" aria-pressed="' + (ed.pick === i) + '" data-var="' + i + '"' + (v.elements.length ? '' : ' disabled') + '><b>' + esc(v.name) + '</b><span>' +
-      (v.elements.length ? (v.m.units ? f0(v.m.units) + ' units · ' + v.m.duAc.toFixed(1) + '/ac · ' : '') + f0(v.m.gfa) + ' sf · ' + f0(v.m.spaces) + '/' + f0(v.m.required) + ' spaces · ' + pct(v.m.coverage) + ' coverage' : 'Nothing fits') + '</span>' + (v.notes.length ? '<em>' + esc(v.notes.join(' ')) + '</em>' : '') + '</button>').join('') + '</div>' +
+      (v.elements.length ? (v.m.units ? f0(v.m.units) + ' units · ' + v.m.duAc.toFixed(1) + '/ac · ' : '') + f0(v.m.gfa) + ' sf · ' + f0(v.m.spaces) + '/' + f0(v.m.required) + ' spaces · ' + pct(v.m.coverage) + ' coverage' : 'Nothing fits') + '</span>' + (v.ai ? '<i class="sp-aiv"><b>AI ' + v.ai.score + '</b> · ' + esc(v.ai.verdict) + (v.ai.problems?.length ? '<br>Watch: ' + esc(v.ai.problems.join('; ')) : '') + '</i>' : '') + (v.revisedBy ? '<i class="sp-aiv">From the AI’s revised program</i>' : '') + (v.notes.length ? '<em>' + esc(v.notes.join(' ')) + '</em>' : '') + '</button>').join('') + '</div>' +
       '<div class="sp-more">' + (ed.variants.length <= 3 ? '<button class="sp-link" id="spMore" title="Every usable layout the planner found, not just the top three">More options…</button>' : '') +
       '<label>Sort <select id="spSort">' + [['best', 'Best'], ['units', 'Units'], ['gfa', 'Floor area'], ['spaces', 'Parking'], ['open', 'Open space']].map(([k, t]) => '<option value="' + k + '"' + (ed.sortBy === k ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label></div>';
   }
   function useVariant(i) {
     const v = ed.variants?.[i]; if (!v?.elements.length) return;
-    change(x => { x.elements = clone(v.elements); x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; });
+    change(x => { x.elements = clone(v.elements); x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; });
     ed.pick = i; ed.sel = null; draw(); panel();
   }
 
