@@ -297,4 +297,16 @@ function usable(plan, o, what) {
     assert.ok(o.notes.some(t => /won’t fit on 1\.46 acres/.test(t)), o.notes.join(' '));
   }
 }
+
+// ---- the building library ----
+{
+  const B = await import('../lib/buildings.mjs');
+  assert.ok(B.BUILDING_TYPES.length >= 200 && new Set(B.BUILDING_TYPES.map(t => t.id)).size === B.BUILDING_TYPES.length, 'hundreds of types, each its own id');
+  for (const g of ['Apartments', 'Townhomes', 'Single-family homes', 'Restaurants', 'Shops', 'Offices', 'Industrial']) assert.ok(B.BUILDING_TYPES.some(t => t.group === g), g);
+  assert.ok(B.HOUSE_PLANS.length >= 20 && B.HOUSE_PLANS.every(h => h.lotW >= h.w + 10), 'house plans that fit their lots');
+  const t = B.BUILDING_TYPES.find(x => x.family === 'garden' && x.floors === 3 && x.w === 180), e = { id: 'x', ...B.fromType(t, [0, 0], 0) };
+  assert.equal(S.metrics({ ring: [[-200, -200], [200, -200], [200, 200], [-200, 200]], program: { use: 'multifamily' }, elements: [e] }).units, t.units, 'a library building counts its units');
+  const g = mk([-95.70, 29.90], [[0, 0], [1400, 0], [1400, 620], [0, 620]]), b = S.unionParcels([g]), o = L.layoutOptions({ ...b, front: b.ring.findIndex((p, i) => S.outwardOf(b.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } }, { use: 'sfr' }, { count: 1 })[0];
+  assert.ok(new Set(o.elements.filter(e2 => e2.use === 'sfr').map(e2 => e2.type)).size >= 6, 'homes vary through the house plans');
+}
 console.log('site layouts ok');

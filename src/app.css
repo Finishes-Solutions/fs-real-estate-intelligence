@@ -2032,6 +2032,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 #card.sp-mode .sp-plans{flex-basis:100%;margin:10px 0 0;align-items:center}
 #card.sp-mode .sp-plans .sp-edit{margin-left:auto}
 #card.sp-mode .sp-body{padding-top:0}
+.sp-lib{display:grid;gap:4px;font-size:11.5px;color:var(--text-2);margin-top:8px}.sp-lib select{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line-2);border-radius:4px;background:var(--panel);color:var(--text)}
 #card.sp-mode .bsec .sp-tools{margin-top:0}
 #card.sp-mode details.bsec>summary{list-style:none;cursor:var(--cur-pointer,pointer)}
 #card.sp-mode details.bsec>summary::-webkit-details-marker{display:none}
