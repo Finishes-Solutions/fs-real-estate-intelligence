@@ -1909,6 +1909,11 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .mk-now{stroke:var(--text-2);stroke-width:1;stroke-dasharray:3 3}
 .mk-hit:hover path{filter:brightness(1.12)}
 .mk-spk{display:block}
+/* D3 chart kit (2026-10-13): a firmer zero line, and hovering a bar dims the others so it stands out */
+#view-market line.mk-grid.mk-zero{stroke:var(--muted);stroke-opacity:.45}
+.mk-svg g.mk-hit path,.mk-hbars .mk-hit i b{transition:opacity .15s}
+.mk-svg:has(g.mk-hit:not(.mk-col):hover) g.mk-hit:not(.mk-col):not(:hover) path{opacity:.45}
+.mk-hbars:has(.mk-hit:hover) .mk-hit:not(:hover) i b{opacity:.45}
 #view-market .mk-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--text-2);margin:2px 0 6px}
 #view-market .mk-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 #view-market .mk-hb small{color:var(--muted);font-family:var(--font-mono);font-size:10.5px}

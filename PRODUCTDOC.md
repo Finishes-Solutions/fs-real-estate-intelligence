@@ -234,7 +234,8 @@ The quick buttons and the panel always match. A layer turned on in either place,
   - **Costs & rates:** 5 years of building material prices (building materials, lumber, steel, ready-mix concrete, copper), interest rates (30-year mortgage, 10-year Treasury, fed funds), today's rates and home lending.
   - **Markets** and the **Correlation explorer** (below).
   - **Area & news:** the Houston crime trend, the busiest roads, local development news, and the newest business locations, 10 at a time (**Show 10 more**).
-  - Hover over any chart (bars, lines, the small trend lines) to read its numbers; click a bar for its breakdown. The 12 mo / 24 mo / All buttons set how many months the monthly charts show.
+  - Hover over any chart (bars, lines, the small trend lines) to read its numbers; the other bars fade so the one you're on stands out. Click a bar for its breakdown. The 12 mo / 24 mo / All buttons set how many months the monthly charts show.
+  - **Charts move:** each chart grows in as you scroll to it, and when you switch county or change the months shown, the bars, lines and numbers slide to their new values, so you can see what changed. If your device is set to reduce motion, the charts just appear. Lines are smoothed, a trend line ends in a dot on its latest value, and axes use round numbers.
   - **Export PDF** makes a Market report with a street map of the area and every section; **Export Data** saves every number as a spreadsheet.
 - **Markets**, on the Market tab, lists prices for the things that move Houston real estate, in groups you pick from the tabs:
   - oil and natural gas, and Houston's big energy and other public companies;
@@ -352,6 +353,7 @@ The **Sources** tab lists every source, what it's used for, and how fresh it is.
 
 ## Recently added
 
+- **Livelier Market charts:** charts grow in as you scroll, slide to the new numbers when you switch county or months, and the headline numbers count up. Axes use round numbers, and the half-width charts are no longer drawn at half size with the side panel open.
 - **The app's own cursors:** a branded set that shows what a click will do, with a different one for each selection tool.
 - **A new Market tab:** construction pipeline, growth, housing and rents, building material costs and rates, each in its own section with a button to jump to it, hover numbers on every chart, and a "What's moving" summary.
 - **Street maps in reports:** every report PDF now shows its area on a real street map instead of a plain outline.

@@ -3,13 +3,15 @@
 //   new business locations (Texas Comptroller sales-tax permits) and local development news (Google News),
 //   Houston crime (Houston Police, api/crime?city=1) and the busiest roads (TxDOT counts, api/traffic).
 // Charts are interactive: hover (or focus) for the numbers, click a bar to pin its breakdown under the chart, toggle
-// series from the legend, and switch monthly charts between 12 months, 24 months and everything. "Export Report"
+// series from the legend, and switch monthly charts between 12 months, 24 months and everything. Charts animate (src/mkmotion.js):
+// they grow in as they scroll into view and morph to the new numbers when the county or months shown change. "Export Report"
 // saves a PDF report and "Export Data" a CSV of every series; both are listed on the Reports tab.
 // Also the "Businesses registered here" lookup (api/tenants) used by the building and filing cards.
 import { SECTORS } from './lib/sectors.mjs';
 import { CAT_LABEL } from './lib/spending.mjs';
 import { reportDoc, savePdf, areaMap } from './reportkit.js';
 import { mkCharts, col, mlabel } from './mkcharts.js';
+import { snapshot, animate, settle } from './mkmotion.js';
 import { pipeline, housing, cityCounties, rents, monthly, movers, addMonths } from './lib/marketcalc.mjs';
 import { fromObject } from './lib/correlate.mjs';
 import { inGeom, centroid } from './lib/demographics.mjs';
@@ -381,7 +383,7 @@ export function initArea(ctx) {
     '.chitem{display:block;color:inherit;text-decoration:none;padding:3px 0;border-top:1px solid #e8ebeb;font-size:9px}.chitem em{display:block;font-style:normal;color:#6b7174;font-size:8px}.src{display:none}.rnote{font-size:8px;color:#6b7174;margin-top:4px}';
   async function exportReport() {
     if (!area) return; if (ctx.view !== 'market') { ctx.setView('market'); await new Promise(r => setTimeout(r, 80)); }
-    const label = areaLabel(), body = root.querySelector('.mk-body')?.cloneNode(true); if (!body) return;
+    settle(); const label = areaLabel(), body = root.querySelector('.mk-body')?.cloneNode(true); if (!body) return;
     body.querySelectorAll('.mk-hint,.mk-pin,.mk-ctl,.mx-ctl,.mx-tabs,.bacts,.mx-cmp,.mx-acts,select,button,.mk-nav').forEach(e => e.remove());
     body.querySelectorAll('details').forEach(d => d.open = true); body.querySelectorAll('tr[hidden]').forEach(tr => tr.hidden = false);
     body.querySelectorAll('.mk-lb').forEach(b => b.remove());
@@ -429,7 +431,8 @@ export function initArea(ctx) {
       material_costs_yoy_pct: Object.fromEntries(COSTS.map(([id, l]) => [l, mk(id)?.yoy != null ? +mk(id).yoy.toFixed(1) : null])) }; };
 
   // ---------- render ----------
-  let curStats = null, navY = 0;
+  let curStats = null, navY = 0, fit = null, refit = false, carry = null;
+  const boxW = el => { if (!el) return 0; const cs = getComputedStyle(el); return Math.round(el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
   function render() {
     if (ctx.view !== 'market') return;
     if (!area) {
@@ -441,7 +444,8 @@ export function initArea(ctx) {
     adopt();
     const inner = Math.max(320, (root.clientWidth || 1100) - (root.clientWidth > 700 ? 48 : 28));
     Wf = Math.round(Math.min(1200, inner - 32)); Wh = Math.round(inner > 900 ? (inner - 14) / 2 - 32 : inner - 32); Ws = Math.round(inner > 900 ? (inner - 32 - 24) / 3 - 14 : inner > 600 ? (inner - 32 - 12) / 2 - 14 : inner - 46);
-    const s = curStats = stats(), p = pipe(), rn = rentInfo(), y0 = root.scrollTop;
+    if (fit) ({ f: Wf, h: Wh, s: Ws } = fit);
+    const s = curStats = stats(), p = pipe(), rn = rentInfo(), y0 = root.scrollTop, before = carry || snapshot(root); carry = null;
     root.innerHTML = '<div class="vhead mk-vhead"><div><div class="kicker">Market</div><h2>' + esc(areaLabel()) + '</h2>' +
       '<div class="vsub">Construction, growth, housing, costs and markets from free public sources, refreshed nightly' + (area.built ? ' (last ' + new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : '') + '. No sale prices: Texas doesn’t disclose them.</div></div>' +
       '<div class="vctl"><div class="mk-seg" role="group" aria-label="Months shown in monthly charts">' + [[12, '12 mo'], [24, '24 mo'], [0, 'All']].map(([v, l]) => '<button type="button" data-range="' + v + '" aria-pressed="' + (range === v) + '">' + l + '</button>').join('') + '</div>' +
@@ -453,7 +457,12 @@ export function initArea(ctx) {
       (ctx.markets?.html() ? '<section class="mk-sec" id="mk-markets"><div class="mk-sh"><h2>Markets</h2><p>Prices that move Houston real estate, and an honest test of which ones move with Houston’s own numbers.</p></div><div class="mk-grid">' + ctx.markets.html() + '</div></section>' : '') +
       areaSec(s) + '</div>';
     root.scrollTop = y0;
-    wire(s);
+    // draw the charts at the width of the boxes they landed in (the grid's columns follow the window, not this view, so
+    // with the side panel open the guess above was twice too wide and the axis text came out half size); redraw once if off
+    const got = { f: Math.min(1200, boxW(root.querySelector('.mk-grid > .mk-wide'))) || Wf, h: boxW(root.querySelector('.mk-grid > .mk-box:not(.mk-wide)')) || Wh, s: boxW(root.querySelector('.mk-sm')) || Ws };
+    const off = (a, b) => Math.abs(a - b) > b * .04;
+    if (!refit && (off(got.f, Wf) || off(got.h, Wh) || off(got.s, Ws))) { fit = got; refit = true; carry = before; try { render(); } finally { refit = false; } return; }
+    wire(s); animate(root, before, { reduce: ctx.reduceMotion });
   }
   function wire(s) {
     root.querySelectorAll('.mk-scope2 [data-county]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.county; sel = v === sel && v !== 'all' ? 'all' : v; newsPlace = ''; pin = null; render(); }));
