@@ -26,19 +26,13 @@
     <div class="ab-util">
       <button class="ab-ask" id="askTop" type="button" aria-controls="ai"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/></svg><span>Ask AI</span></button>
       <button class="ab-ic" id="helpBtn" type="button" aria-pressed="false" aria-label="Data and help" title="Data sources &amp; help"><span aria-hidden="true">?</span></button>
-      <button class="ab-ic" id="settingsBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="setPop" aria-label="Settings" title="Settings"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="2.6"/><path d="M10 1.8v2.3M10 15.9v2.3M18.2 10h-2.3M4.1 10H1.8M15.8 4.2l-1.6 1.6M5.8 14.2l-1.6 1.6M15.8 15.8l-1.6-1.6M5.8 5.8 4.2 4.2"/><circle cx="10" cy="10" r="5.6"/></svg></button>
-      <div class="ab-pop" id="setPop" role="dialog" aria-label="Settings" hidden>
-        <div class="ab-pop-h">Settings</div>
-        <div class="ab-pop-r"><span>Theme</span><div class="seg seg2" role="group" aria-label="Theme"><button type="button" data-theme-set="light" aria-pressed="true">Light</button><button type="button" data-theme-set="dark" aria-pressed="false">Dark</button></div></div>
-        <button class="theme-btn" hidden id="themeBtn" aria-label="Toggle light or dark">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="3.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
-      </button>
-      </div>
+      <button class="ab-ic" id="settingsBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsSheet" aria-label="Settings" title="Settings"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="2.6"/><path d="M10 1.8v2.3M10 15.9v2.3M18.2 10h-2.3M4.1 10H1.8M15.8 4.2l-1.6 1.6M5.8 14.2l-1.6 1.6M15.8 15.8l-1.6-1.6M5.8 5.8 4.2 4.2"/><circle cx="10" cy="10" r="5.6"/></svg></button>
     </div>
   </header>
   <aside class="panel" id="panel" aria-label="Property intelligence">
     <button class="sheet-toggle" id="sheetToggle" aria-label="Expand list"></button>
     <div class="head">
+      <button class="head-gear" id="exploreSettings" type="button" aria-label="Settings" title="Settings"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="2.6"/><path d="M10 1.8v2.3M10 15.9v2.3M18.2 10h-2.3M4.1 10H1.8M15.8 4.2l-1.6 1.6M5.8 14.2l-1.6 1.6M15.8 15.8l-1.6-1.6M5.8 5.8 4.2 4.2"/><circle cx="10" cy="10" r="5.6"/></svg></button>
       <div class="kicker" id="kicker">Real Estate Intelligence · Texas</div>
       <h1>Real Estate Intelligence Platform</h1>
       <p class="sub">Click any building or parcel for its owner, value, zoning and site risks. Search an address, pick an area for flood, traffic, drive-time and market reports, or turn on layers like parcels, flood zones, demographics and construction filings.</p>

@@ -74,25 +74,58 @@ export function initTeam(ctx) {
   addEventListener('online', () => schedule(0));
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (!lastSync || Date.now() - lastSync > 30e3)) schedule(0); });
 
-  // ---------- UI (inside the Field notes view) ----------
-  let slot = null;
+  // ---------- UI ----------
+  // Two kinds of slot share one paint(): the full form in Settings › You & your team, and a one-line chip in the
+  // Notes & watchlist and Projects headers that opens it. Slots that have left the page are dropped; painting never syncs.
+  const slots = new Map(); // element -> 'form' | 'chip'
+  let editCode = false;
   const ago = d => { const s = Math.round((Date.now() - d) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
-  function paint() {
-    if (!slot || !slot.isConnected) return;
-    let h;
-    if (configured === false) h = '<div class="rnote">Team sync is off on this site (it needs SUPABASE_SECRET_KEY on Vercel). Notes stay on this device.</div>';
-    else if (needCode) h = '<form class="team-f" id="tForm"><span>Enter the team passcode to share notes.</span><input id="tCode" type="password" autocomplete="current-password" placeholder="Team passcode" aria-label="Team passcode"><button class="btn primary">Unlock</button></form>';
-    else h = '<div class="team-on"><span>' + (configured ? 'Shared with the team · ' + (syncing ? 'syncing…' : lastSync ? 'synced ' + ago(lastSync) : 'not synced yet') : 'Connecting…') +
-      (queue.length ? ' · ' + queue.length + ' change' + (queue.length > 1 ? 's' : '') + ' waiting' : '') + '</span><button class="btn" id="tSync">Sync now</button></div>' +
-      '<label class="team-f"><span>Your name (shown on notes you add or edit)</span><input id="tName" maxlength="60" autocomplete="name" placeholder="e.g. Matthew" value="' + esc(name()) + '"></label>';
-    slot.innerHTML = '<div class="team">' + h + (msg ? '<div class="rnote' + (/fail|couldn/i.test(msg) ? ' err' : '') + '">' + esc(msg) + '</div>' : '') + '</div>';
-    slot.querySelector('#tSync')?.addEventListener('click', () => schedule(0));
-    slot.querySelector('#tName')?.addEventListener('change', e => put(NAME_KEY, e.target.value.trim()));
-    const f = slot.querySelector('#tForm'); if (f) f.onsubmit = e => { e.preventDefault(); put(CODE_KEY, slot.querySelector('#tCode').value.trim()); needCode = false; paint(); schedule(0); };
+  const OFF = 'Team sharing isn’t set up on this site yet, so notes stay on this device.', OFF_TIP = 'Turned on by whoever runs this site, in its server settings.';
+  const waiting = () => queue.length + (configured ? (ctx.field?.db?.notes || []).filter(n => !n.synced || t(n.updated) > t(n.synced)).length : 0);
+  const PEOPLE = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="5.5" r="2.3"/><path d="M1.8 13.5c.5-2.4 2.2-3.7 4.2-3.7s3.7 1.3 4.2 3.7"/><path d="M10.6 3.4a2.2 2.2 0 0 1 0 4.3M12.2 9.9c1 .5 1.7 1.7 2 3.6"/></svg>';
+  function chipHtml() {
+    const who = name(), state = configured === false ? 'On this device only' : needCode ? 'Team passcode needed' : configured ? 'Shared with the team' : 'Connecting…';
+    return '<button type="button" class="team-chip' + (needCode ? ' warn' : '') + '" data-open-team title="Your name, team sharing and sync: Settings">' + PEOPLE + '<span>' + esc(state) + (who ? ' · ' + esc(who) : '') + '</span></button>';
+  }
+  function formHtml() {
+    const code = get(CODE_KEY), n = waiting();
+    let status;
+    if (configured === false) status = '<div class="set-note" title="' + OFF_TIP + '">' + OFF + '</div>';
+    else if (needCode) status = '<div class="set-note warn">Enter the team passcode to share notes and projects with the team.</div>';
+    else status = '<div class="team-on"><span><i class="dot' + (configured ? ' on' : '') + '"></i>' + (configured ? 'Shared with the team · ' + (syncing ? 'syncing…' : lastSync ? 'synced ' + ago(lastSync) : 'not synced yet') : 'Connecting…') +
+      (n ? ' · ' + n + ' change' + (n > 1 ? 's' : '') + ' waiting' : '') + '</span><button class="btn sm" type="button" id="tSync">Sync now</button></div>';
+    const showCode = needCode || editCode || !code;
+    return status +
+      '<label class="set-field"><span class="set-l">Your name</span><input id="tName" maxlength="60" autocomplete="name" placeholder="e.g. Matthew" value="' + esc(name()) + '"><span class="set-hint">Shown on notes and site plans you add or edit.</span></label>' +
+      (showCode ? '<form class="set-field" id="tForm"><label class="set-l" for="tCode">Team passcode</label><span class="set-inline"><input id="tCode" type="password" autocomplete="current-password" placeholder="Team passcode"><button class="btn primary sm">' + (needCode ? 'Unlock' : 'Save') + '</button>' +
+          (editCode ? '<button class="btn sm" type="button" id="tCodeCancel">Cancel</button>' : '') + '</span><span class="set-hint">Only needed if your team uses one. Ask a teammate for it.</span></form>'
+        : '<div class="set-field"><span class="set-l">Team passcode</span><span class="set-inline"><span class="set-mask" aria-label="Passcode saved">••••••••</span><button class="btn sm" type="button" id="tCodeEdit">Change</button></span></div>') +
+      (msg ? '<div class="set-note' + (/fail|couldn/i.test(msg) ? ' err' : '') + '">' + esc(msg) + '</div>' : '');
+  }
+  function paint(chipsOnly = false) {
+    for (const [el, kind] of slots) {
+      if (!el.isConnected) { slots.delete(el); continue; }
+      if (kind !== 'chip' && chipsOnly) continue;
+      if (kind === 'chip') { el.innerHTML = chipHtml(); el.querySelector('[data-open-team]').onclick = () => ctx.openSettings?.('team'); continue; }
+      // the form: never redraw under someone typing in it
+      if (el.contains(document.activeElement) && /^(INPUT)$/.test(document.activeElement.tagName)) { const s = el.querySelector('.team-on span'); if (s) { const tmp = document.createElement('div'); tmp.innerHTML = formHtml(); const ns = tmp.querySelector('.team-on span'); if (ns) s.innerHTML = ns.innerHTML; } continue; }
+      el.innerHTML = '<div class="team">' + formHtml() + '</div>';
+      el.querySelector('#tSync')?.addEventListener('click', () => { schedule(0); ctx.sitePlan?.sync?.(); });
+      // typing a name saves it and updates the header chips; the form itself isn't redrawn (focus may be moving on)
+      el.querySelector('#tName')?.addEventListener('input', e => { put(NAME_KEY, e.target.value.trim()); paint(true); });
+      el.querySelector('#tCodeEdit')?.addEventListener('click', () => { editCode = true; paint(); el.querySelector('#tCode')?.focus(); });
+      el.querySelector('#tCodeCancel')?.addEventListener('click', () => { editCode = false; paint(); });
+      const f = el.querySelector('#tForm');
+      if (f) f.onsubmit = e => { e.preventDefault(); const v = el.querySelector('#tCode').value.trim(); if (!v && !needCode) { editCode = false; paint(); return; } put(CODE_KEY, v); needCode = false; editCode = false; document.activeElement?.blur?.(); paint(); schedule(0); ctx.sitePlan?.sync?.(); };
+    }
   }
 
   ctx.team = {
-    mount(el) { slot = el; paint(); },
+    // the Notes & watchlist header: a one-line chip that opens Settings › You & your team
+    mount(el) { if (!el) return; slots.set(el, 'chip'); paint(); },
+    chip(el) { if (!el) return; slots.set(el, 'chip'); paint(); },
+    mountSettings(el) { if (!el) return; slots.set(el, 'form'); paint(); },
+    name, refresh: () => paint(),
     summary: () => configured ? 'shared with the team' : null,
     changed: () => schedule(),
     removed(item) { if (item.kind === 'photo' && !String(item.path).includes('/')) return; queue.push(item); saveQueue(); schedule(); },

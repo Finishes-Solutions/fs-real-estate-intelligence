@@ -32,4 +32,5 @@ export function initKpis(ctx) {
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && pop.classList.contains('on')) toggle(false); });
   ctx.onChange(render); render();
   ctx.kpiKeys = () => keys.slice();
+  ctx.openKpis = () => toggle(true); // Settings › Map › Headline metrics
 }

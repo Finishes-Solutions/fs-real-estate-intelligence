@@ -2303,3 +2303,103 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
   .msheet .mrow-split .mrow{flex:1;min-width:0}
   .msheet .mrow-split .btn{flex:none;width:auto;justify-content:center;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel);font:600 13px var(--font-display);color:var(--text)}
 }
+
+/* ================= Settings sheet (src/settings.js): a right-hand sheet on desktop, full screen on phones ================= */
+.set-scrim{position:fixed;inset:0;z-index:50;background:rgba(11,13,12,.32);opacity:0;transition:opacity 180ms}
+.set-scrim.on{opacity:1}
+.set-scrim[hidden],.setsheet[hidden]{display:none}
+.setsheet{position:fixed;top:0;right:0;bottom:0;z-index:51;width:420px;max-width:100%;display:flex;flex-direction:column;background:var(--panel);color:var(--text);border-left:1px solid var(--line-2);box-shadow:var(--sh-sheet);transform:translateX(24px);opacity:0;transition:transform 200ms cubic-bezier(.2,.7,.2,1),opacity 160ms;outline:none}
+.setsheet.on{transform:none;opacity:1}
+@media (prefers-reduced-motion:reduce){ .setsheet,.set-scrim{transition:none} }
+.set-h{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);padding:14px 14px 10px 22px;flex:none}
+.set-h h2{margin:0;font:800 20px var(--font-display);letter-spacing:-.01em}
+.set-x{display:grid;place-items:center;width:var(--ctl);height:var(--ctl);border:1px solid var(--line-2);border-radius:var(--r-pill);background:var(--panel);color:var(--text-2);cursor:var(--cur-pointer,pointer)}
+.set-x:hover{color:var(--text);border-color:var(--text-2)}
+.set-jump{display:flex;gap:5px;padding:0 22px 12px;overflow-x:auto;scrollbar-width:none;flex:none;border-bottom:1px solid var(--line)}
+.set-jump::-webkit-scrollbar{display:none}
+.set-jump button{flex:none;border:1px solid var(--line-2);background:var(--panel);border-radius:var(--r-pill);padding:5px 10px;font:600 12px var(--font-display);color:var(--text-2);cursor:var(--cur-pointer,pointer);white-space:nowrap}
+.set-jump button:hover{color:var(--text);border-color:var(--text-2)}
+.set-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:6px 22px 32px;scroll-padding-top:8px}
+.set-sec{padding:18px 0 6px;border-bottom:1px solid var(--line);scroll-margin-top:4px;border-radius:var(--r-sm)}
+.set-sec:last-child{border-bottom:0}
+.set-sec.flash h3{color:var(--brand)}
+.set-sec h3{margin:0 0 10px;font:600 10.5px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);transition:color 600ms}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);padding:10px 0;border-top:1px solid var(--line)}
+.set-in>.set-row:first-child{border-top:0;padding-top:2px}
+.set-rl{display:grid;gap:3px;min-width:0;flex:1 1 auto}
+.set-rc{flex:none;display:flex;align-items:center;gap:8px;max-width:60%}
+.set-l{font-size:13.5px;font-weight:600;color:var(--text)}
+.set-hint{font-size:12px;line-height:1.45;color:var(--muted)}
+.set-rc .set-hint{text-align:right}
+.set-ok{font-size:13px;font-weight:600;color:var(--brand)}
+.set-note{font-size:12.5px;line-height:1.45;color:var(--text-2);background:var(--panel-2);border-radius:var(--r-sm);padding:9px 11px}
+.set-note.warn{color:var(--text);box-shadow:inset 3px 0 0 var(--warn)}
+.set-note.err{color:var(--danger)}
+.setsheet .seg{grid-template-columns:repeat(3,auto);border-radius:var(--r-sm)}
+.setsheet .seg button{padding:7px 11px;white-space:nowrap}
+.setsheet .seg button[aria-checked="true"]{background:var(--text);color:var(--panel)}
+.setsheet select.chip{min-height:var(--ctl);padding-left:10px;font-size:13px;color:var(--text);min-width:150px}
+.set-links{display:grid;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;margin:6px 0 10px}
+.set-go{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:11px 14px;border:0;border-top:1px solid var(--line);background:var(--panel);text-align:left;cursor:var(--cur-pointer,pointer);color:var(--text)}
+.set-go:first-child{border-top:0}
+.set-go:hover{background:var(--panel-2)}
+.set-go span{display:grid;gap:2px;min-width:0}
+.set-go b{font-size:13.5px}
+.set-go em{font-style:normal;font-size:12px;color:var(--muted)}
+.set-go svg{flex:none;color:var(--muted)}
+.set-saved{list-style:none;margin:0 0 10px;padding:0;display:grid}
+.set-saved li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px;color:var(--text-2)}
+.set-saved li:first-child{border-top:0;padding-top:0}
+.set-saved b{color:var(--text);font-variant-numeric:tabular-nums}
+.set-saved .lnk{font-size:13px}
+.set-keys{padding:10px 0;border-top:1px solid var(--line)}
+.set-in>.set-keys:first-child{border-top:0}
+.set-keys dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin:8px 0 0}
+.set-keys dl div{display:flex;align-items:center;gap:8px;min-width:0}
+.set-keys dt{flex:none}
+.set-keys dd{margin:0;font-size:12.5px;color:var(--text-2);min-width:0}
+.set-keys kbd{display:inline-block;min-width:26px;padding:2px 6px;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;background:var(--panel-2);font:600 11.5px var(--font-mono);color:var(--text);text-align:center}
+/* You & your team, inside the sheet (drawn by src/team.js) */
+.setsheet .team{margin:0;max-width:none;gap:12px}
+.setsheet .team-on{padding:9px 11px;background:var(--panel-2);border-radius:var(--r-sm)}
+.setsheet .team-on span{font-size:12.5px}
+.team-on .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:7px;vertical-align:1px}
+.team-on .dot.on{background:var(--brand)}
+.set-field{display:grid;gap:5px;margin:0}
+.set-field input{width:100%;min-width:0;min-height:var(--ctl);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:7px 10px;font:inherit;font-size:13.5px;background:var(--panel);color:var(--text)}
+.set-field input:focus{outline:2px solid color-mix(in srgb,var(--brand) 50%,transparent);outline-offset:0;border-color:var(--brand)}
+.set-inline{display:flex;align-items:center;gap:8px}
+.set-inline input{flex:1 1 auto}
+.set-mask{flex:1 1 auto;font-family:var(--font-mono);letter-spacing:.2em;color:var(--text-2)}
+/* the one-line team chip in the Notes & watchlist and Projects headers */
+.team-slot:empty{display:none}
+.team-slot{margin-top:8px}
+.team-chip{display:inline-flex;align-items:center;gap:7px;max-width:100%;border:1px solid var(--line-2);background:var(--panel);border-radius:var(--r-pill);padding:4px 11px 4px 9px;font:600 12px var(--font-display);color:var(--text-2);cursor:var(--cur-pointer,pointer)}
+.team-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team-chip svg{flex:none;color:var(--brand)}
+.team-chip:hover{color:var(--text);border-color:var(--text-2)}
+.team-chip.warn{border-color:var(--warn);color:var(--text)}
+/* Data & help: one muted line in place of the old options */
+.src-opt.muted{color:var(--muted);font-size:12.5px}
+.src-opt.muted b{color:var(--text-2)}
+.src-opt.muted .lnk{font-size:12.5px}
+/* a layer the site can't offer */
+.ly-na{display:block;font-size:11.5px;font-weight:400;color:var(--muted);margin-top:1px}
+/* the phone Explore header's gear (desktop uses the app bar's) */
+.head{position:relative}
+.head-gear{display:none}
+@media (max-width:700px){
+  .head-gear{display:grid;place-items:center;position:absolute;top:12px;right:12px;width:var(--tap);height:var(--tap);border:1px solid var(--line-2);border-radius:var(--r-pill);background:var(--panel);color:var(--text-2);cursor:var(--cur-pointer,pointer)}
+  .head .kicker,.head h1{padding-right:52px}
+  .set-scrim{display:none}
+  .setsheet{width:100%;border-left:0;transform:translateY(16px);padding-top:var(--st);padding-bottom:var(--sb)}
+  .set-h{padding:10px 12px 8px 18px}
+  .set-x{width:var(--tap);height:var(--tap)}
+  .set-jump{padding:0 18px 10px}
+  .set-body{padding:4px 18px 28px}
+  .set-rc{max-width:55%}
+  .setsheet .seg button{padding:10px 9px;min-height:var(--tap)}
+  .set-keys dl{grid-template-columns:minmax(0,1fr)}
+  .set-desk{display:none}
+}
+@media (pointer:coarse){ .set-go{min-height:var(--tap)} .set-jump button{min-height:36px} .team-chip{min-height:36px} }

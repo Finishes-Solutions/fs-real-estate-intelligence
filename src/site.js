@@ -68,7 +68,7 @@ export function initSite(ctx) {
     el.querySelectorAll('[data-ar]').forEach(b => b.onclick = () => ctx.runAreaReport(b.dataset.ar, { geometry: circle(center, repMi), label: lab(), center }));
   };
 
-  // sources on cards: off by default (everyone sees the same clean view); a setting in the Data Sources view turns them on
+  // sources on cards: off by default (everyone sees the same clean view); Settings › Appearance turns them on
   const KEY = 'fs-show-sources', apply = on => { document.documentElement.dataset.sources = on ? 'on' : 'off'; };
   let on = false; try { on = localStorage.getItem(KEY) === '1'; } catch (e) {}
   apply(on);

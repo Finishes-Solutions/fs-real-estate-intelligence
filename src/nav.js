@@ -48,8 +48,7 @@ const IC = {
   layers: svg('<path d="M10 2.5 18 7l-8 4.5L2 7z"/><path d="M3.2 10.2 10 14l6.8-3.8M3.2 13.6 10 17.4l6.8-3.8"/>', 20, 1.5),
   near: svg('<circle cx="10" cy="10" r="5.6"/><circle cx="10" cy="10" r="1.6" fill="currentColor"/><path d="M10 1.3v2.5M10 16.2v2.5M1.3 10h2.5M16.2 10h2.5"/>', 20, 1.5),
   note: svg('<path d="M10 18s-5.6-5.4-5.6-9.6a5.6 5.6 0 0 1 11.2 0C15.6 12.6 10 18 10 18z"/><path d="M10 6v4.5M7.8 8.2h4.5"/>', 20, 1.5),
-  theme: svg('<path d="M16.5 12.3A6.9 6.9 0 1 1 7.7 3.5a5.4 5.4 0 0 0 8.8 8.8z"/>', 20, 1.5),
-  install: svg('<rect x="5.6" y="1.9" width="8.8" height="16.2" rx="1.9"/><path d="M10 6.2v6.2M7.5 10l2.5 2.5 2.5-2.5"/>', 20, 1.5),
+  settings: svg('<circle cx="10" cy="10" r="2.6"/><path d="M10 1.8v2.3M10 15.9v2.3M18.2 10h-2.3M4.1 10H1.8M15.8 4.2l-1.6 1.6M5.8 14.2l-1.6 1.6M15.8 15.8l-1.6-1.6M5.8 5.8 4.2 4.2"/><circle cx="10" cy="10" r="5.6"/>', 20, 1.5),
   sources: svg('<ellipse cx="10" cy="4.8" rx="6.2" ry="2.2"/><path d="M3.8 4.8v10.4c0 1.2 2.8 2.2 6.2 2.2s6.2-1 6.2-2.2V4.8M3.8 10c0 1.2 2.8 2.2 6.2 2.2s6.2-1 6.2-2.2"/>', 20, 1.5),
 };
 const CHEV = '<svg class="mr-chev" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>';
@@ -57,7 +56,8 @@ const CHEV = '<svg class="mr-chev" width="14" height="14" viewBox="0 0 16 16" fi
 let ctxRef = null;
 const badges = new Map(); // leaf -> { n, alert }
 
-// Draws every menu from NAV. Runs before the modules start, so the badge spans and #mInstall exist when they look for them.
+// Draws every menu from NAV. Runs before the modules start, so the badge spans exist when they look for them.
+
 export function renderNav(ctx) {
   ctxRef = ctx;
   const { esc } = ctx, $ = id => document.getElementById(id);
@@ -75,15 +75,8 @@ export function renderNav(ctx) {
   const ask = $('askTop'); ask.title = 'Ask AI (' + mod + '/)'; ask.setAttribute('aria-keyshortcuts', mod === '⌘' ? 'Meta+/' : 'Control+/');
   ask.onclick = () => { const app = document.querySelector('.app'); if (app.classList.contains('ai-open')) ctx.assistant?.close(); else ctx.assistant?.open(); };
   $('helpBtn').onclick = () => ctx.setView('sources');
-  // Settings (for now: the theme; the full Settings sheet replaces this pop-over)
-  const gear = $('settingsBtn'), pop = $('setPop');
-  const setOpen = on => { pop.hidden = !on; gear.setAttribute('aria-expanded', String(on)); };
-  gear.onclick = e => { e.stopPropagation(); setOpen(pop.hidden); };
-  document.addEventListener('click', e => { if (!pop.hidden && !pop.contains(e.target) && e.target !== gear) setOpen(false); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) { setOpen(false); gear.focus(); } });
-  const themeLbl = () => { const d = document.documentElement.dataset.theme === 'dark'; pop.querySelectorAll('[data-theme-set]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.themeSet === 'dark') === d))); };
-  pop.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { if ((b.dataset.themeSet === 'dark') !== (document.documentElement.dataset.theme === 'dark')) $('themeBtn').click(); themeLbl(); });
-  new MutationObserver(themeLbl).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); themeLbl();
+  // Settings: the gear opens the Settings sheet (src/settings.js starts later, so look it up on click)
+  $('settingsBtn').onclick = () => ctx.openSettings?.();
 
   // phone bottom bar
   const PH_LABEL = { map: 'Map', list: 'Explore', filings: 'Filings', marketgrp: 'Market', more: 'More' };
@@ -96,7 +89,7 @@ export function renderNav(ctx) {
     '<div class="mt-h">My Work</div><div class="mrows">' + work.children.map(([id, label]) => row(id, esc(label))).join('') + '</div>' +
     '<div class="mt-h">Reports &amp; export</div><div class="mrows"><div class="mrow-split">' + row('reports', 'Reports') + '<button type="button" class="btn sm" data-go="export">Quick export</button></div></div>' +
     '<div class="mt-h">Map tools</div><div class="mrows">' + row('layers', 'Layers') + row('near', 'Nearby', ' aria-label="Nearby: the area around my location"') + row('note', 'Pin a note', ' aria-label="Pin a site note at my location"') + '</div>' +
-    '<div class="mt-h">Settings</div><div class="mrows">' + row('theme', 'Theme: light or dark') + row('install', 'Install the app', ' id="mInstall" hidden') + '</div>' +
+    '<div class="mt-h">Settings</div><div class="mrows">' + row('settings', 'Settings', ' aria-label="Settings: theme, your name and team, install, layout"') + '</div>' +
     '<div class="mt-h">Data &amp; help</div><div class="mrows">' + row('sources', 'Data sources &amp; freshness') + '</div>';
 
   ctx.setBadge = setBadge; ctx.navPath = pathOf;

@@ -44,6 +44,7 @@ import { initEnv } from './env.js';
 import { initOwner } from './owner.js';
 import { initGoogle } from './google.js';
 import { initSitePlan } from './siteplan.js';
+import { initSettings } from './settings.js';
 import { renderNav, syncNav as syncNavTabs, leafFor, pathOf } from './nav.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
@@ -66,9 +67,17 @@ const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // ---------- theme ----------
 const root=document.documentElement;
-root.dataset.theme='light'; try{ const t=localStorage.getItem('fs-map-theme'); if(t) root.dataset.theme=t; }catch(e){}
+// Settings › Appearance: Light (the first-visit look), Dark, or Match device ('auto', follows the OS). data-theme always
+// holds the look in use, light or dark, so the stylesheet, isDark() and the charts that watch it need no third case.
+const THEME_KEY='fs-map-theme', darkMQ=window.matchMedia('(prefers-color-scheme: dark)');
+let themePref='light'; try{ const t=localStorage.getItem(THEME_KEY); if(t==='light'||t==='dark'||t==='auto') themePref=t; }catch(e){}
+const themeNow=()=>themePref==='auto'?(darkMQ.matches?'dark':'light'):themePref;
+root.dataset.theme=themeNow();
 const isDark=()=>root.dataset.theme==='dark';
-document.getElementById('themeBtn').onclick=()=>{ root.dataset.theme=isDark()?'light':'dark'; try{localStorage.setItem('fs-map-theme',root.dataset.theme);}catch(e){} setBasemap(layers.style); };
+// a new look restyles the basemap; the timeline, market charts and other views redraw themselves when data-theme changes
+function applyTheme(){ const t=themeNow(); if(root.dataset.theme===t) return; root.dataset.theme=t; setBasemap(layers.style); }
+function setTheme(m){ if(!['light','dark','auto'].includes(m)) return; themePref=m; try{ localStorage.setItem(THEME_KEY,m); }catch(e){} applyTheme(); }
+darkMQ.addEventListener?.('change',()=>{ if(themePref==='auto') applyTheme(); });
 
 // ---------- data ----------
 // latest change run: id -> 'new' | field that changed
@@ -100,12 +109,14 @@ const ESRI_STYLE={version:8,glyphs:OFM+'/fonts/{fontstack}/{range}.pbf',
     {id:'esri-place-lbl',type:'symbol',source:'openmaptiles','source-layer':'place',filter:['in',['get','class'],['literal',['city','town','village','suburb','neighbourhood']]],layout:{'text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',14,'town',12.5,11]},paint:{'text-color':'#ffffff','text-halo-color':'#0b0d0c','text-halo-width':1.6}}]};
 const isSat=()=>layers.style==='sat'||layers.style==='esri'||layers.style==='gsat';
 // property-first: filing dots start hidden (Layers → Filings, the Construction Filings section or the assistant turn them on)
-const layers={style:'dots',roads:true,names:true,counties:true,grid:true,size:'uniform',heat:'off',dots:false};
+// Settings › Map › Default base map (fs-basemap) is where the map opens; links never carry a basemap. Google needs its tile session first, so it isn't offered.
+const BOOT_BASES=['dots','streets','sat','topo','esri','free'];
+const layers={style:(()=>{ try{ const b=localStorage.getItem('fs-basemap'); if(BOOT_BASES.includes(b)) return b; }catch(e){} return 'dots'; })(),roads:true,names:true,counties:true,grid:true,size:'uniform',heat:'off',dots:false};
 try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(typeof L.grid==='boolean') layers.grid=L.grid; }catch(e){} // the map always opens without filings (dots and heatmap off); dot size and the grid are remembered
 const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} };
 // Google base maps need a tile session first (src/google.js): a promise of the style
 const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
-const map=new maplibregl.Map({container:'map',style:styleUrl('dots'),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
+const map=new maplibregl.Map({container:'map',style:styleUrl(layers.style),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
 map.on('error',e=>{ const m=(e&&e.error&&e.error.message)||''; if(/40[13]|Unauthorized|Forbidden/i.test(m)&&STYLES[layers.style]) toast('MapTiler refused the key for this site. Check the key’s allowed origins.'); });
 
@@ -742,7 +753,7 @@ addEventListener('resize',placeLayers); if(qlEl&&window.ResizeObserver) new Resi
 let swallowClick=false;
 document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on')&&!layersEl.contains(e.target)&&!layersBtn.contains(e.target)&&!e.target.closest?.('.qmore')){ setLayersOpen(false); if(map.getCanvas().contains(e.target)) swallowClick=true; } });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&layersEl.classList.contains('on')) setLayersOpen(false); });
-document.querySelectorAll('#styleSeg button').forEach(b=>b.onclick=()=>setBasemap(b.dataset.style));
+document.querySelectorAll('#styleSeg button').forEach(b=>{ b.onclick=()=>setBasemap(b.dataset.style); b.setAttribute('aria-pressed',b.dataset.style===layers.style); });
 document.querySelectorAll('#sizeSeg button').forEach(b=>b.onclick=()=>{ layers.size=b.dataset.size; saveLayers(); styleFilings(); });
 document.querySelectorAll('#heatSeg button').forEach(b=>b.onclick=()=>{ layers.heat=b.dataset.heat; saveLayers(); styleFilings(); });
 document.getElementById('lyFilings').onchange=e=>{ layers.dots=e.target.checked; saveLayers(); styleFilings(); };
@@ -960,11 +971,12 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
+  setTheme, themePref:()=>themePref, BOOT_BASES,
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-renderNav(ctx); changesBadge(); // menus first: modules look up the badge spans, #mInstall and the sub-tab rows
-for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+renderNav(ctx); changesBadge(); // menus first: modules look up the badge spans and the sub-tab rows
+for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan,initSettings]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- map buttons next to an open card ----------
 // Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,

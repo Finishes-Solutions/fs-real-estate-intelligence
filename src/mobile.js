@@ -41,6 +41,7 @@ export function initMobile(ctx) {
     grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
   });
   grip.addEventListener('dblclick', () => { wantW = null; saveW(); applyW(); });
+  ctx.resetPanelWidth = () => { wantW = null; saveW(); applyW(); }; // Settings › Appearance
   grip.addEventListener('keydown', e => {
     const d = e.key === 'ArrowLeft' ? -24 : e.key === 'ArrowRight' ? 24 : 0; if (!d) return; e.preventDefault();
     wantW = Math.max(300, Math.min(maxW(), (wantW || panel.getBoundingClientRect().width) + d)); applyW(); saveW();
@@ -91,16 +92,13 @@ export function initMobile(ctx) {
   function openSheet() { sheet.classList.add('on'); scrim.classList.add('on'); }
   function closeSheet() { sheet.classList.remove('on'); scrim.classList.remove('on'); }
   scrim.onclick = closeSheet;
-  let installEvt = null;
-  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; document.getElementById('mInstall').hidden = false; });
   sheet.querySelectorAll('[data-go]').forEach(b => b.onclick = async () => {
     const go = b.dataset.go; closeSheet();
     if (go === 'note') { setTab('map'); ctx.addNote?.({ gps: true }); }
     else if (go === 'near') { setTab('map'); ctx.nearMe(); }
     else if (go === 'layers') { setTab('map'); setTimeout(() => document.getElementById('layersBtn').click(), 50); }
     else if (go === 'export') ctx.openExport();
-    else if (go === 'install') { if (installEvt) { installEvt.prompt(); installEvt = null; } b.hidden = true; }
-    else if (go === 'theme') document.getElementById('themeBtn').click();
+    else if (go === 'settings') ctx.openSettings?.(); // theme, team, install and the rest (src/settings.js)
     else if (document.getElementById('view-' + go)) setTab(go); // every page in the registry (My Work, Reports, Data & help)
   });
 

@@ -27,7 +27,7 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 ## Getting started
 
 - Open the site in any modern browser on a computer, tablet or phone.
-- **Install it like an app:** on a phone, use your browser's "Add to Home Screen" (on Android, More → Install as an App). It opens full screen and keeps working with a weak signal; data refreshes when you're back online.
+- **Install it like an app:** on a computer (Chrome or Edge) or an Android phone, open **Settings → App → Install app** when it's offered, or use the install button in the browser's address bar. On an iPhone, use Safari's Share → Add to Home Screen. It opens in its own window and keeps working with a weak signal; data refreshes when you're back online.
 - The map opens on the home region. The **house** button on the right always brings you back.
 
 ---
@@ -36,7 +36,7 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 
 **The top bar** (computer and tablet) runs across the whole window and is the same on every page:
 - On the left: the panel button (shows or hides the Map's left panel), the logo, and five places to go: **Map**, **Filings**, **Market**, **Reports** and **My Work**.
-- On the right: **Ask AI**, **?** (Data & help: where every number comes from and how fresh it is) and the **gear** (Settings; for now, light or dark).
+- On the right: **Ask AI**, **?** (Data & help: where every number comes from and how fresh it is) and the **gear** (Settings: everything you set once, in one place; see **Settings** below).
 
 Three of the five hold more than one page. A row of buttons at the top of the page switches between them, and the place remembers the page you used last:
 - **Filings:** Timeline, Companies (who's building the most) and Changes (what the nightly check found).
@@ -75,12 +75,27 @@ A small green number means something new needs a look: on **Changes**, the filin
 - **My Work:** Projects, Notes & watchlist, Saved searches.
 - **Reports & export:** the Reports page, and **Quick export** for a report straight from the map.
 - **Map tools:** Layers, Nearby (the area around you) and Pin a note (a site note at your location).
-- **Settings:** light or dark, and **Install the app** when your phone offers it.
+- **Settings:** opens the full Settings page (theme, your name and team, install and the rest). The gear at the top of **Explore** opens it too.
 - **Data & help:** data sources and how fresh they are.
 
 The tab you're on is lit: Market stays lit on Compare areas, and More is lit on its pages (for example Notes & watchlist). A green number on More means something inside it needs a look.
 
 Cards slide up from the bottom: swipe down to shrink one, and swipe again to close it.
+
+---
+
+## Settings
+
+Everything you set once lives in one place: the **gear** at the top right on a computer or tablet (or press **Ctrl+,**, **⌘,** on a Mac), and **More → Settings** or the gear at the top of **Explore** on a phone. It slides in from the right on a computer and fills the screen on a phone; **Esc**, the **×** or a click outside closes it. The row of buttons at the top jumps to each part.
+
+- **Appearance:** **Light** (how the app first opens), **Dark**, or **Match device**, which follows your computer or phone and switches with it (for example at sunset). The map's colours change with it. **Show sources on cards and panels** adds a source line under the numbers on property cards and panels (exported reports always list their sources). **Panel width: Reset** puts the Map's left panel back to its normal width after you've dragged it.
+- **You & your team:** **Your name** (shown on notes and site plans you add or edit), the **team passcode** if your team uses one (hidden once saved, with **Change**), whether notes and projects are shared with the team or kept on this device, when they last synced, how many changes are waiting, and **Sync now**. Notes & watchlist and Projects show a small line at the top (for example "Shared with the team · Matthew"); click it to come here.
+- **Map:** the **Default base map** the map opens with (Default, Streets, Satellite, Topo, ESRI imagery or Free Map). **Map layers & display…** opens the Layers panel (dot grid, county lines, roads, road names, 3D and every data layer), and **Headline metrics…** opens the picker for the numbers above the filing list.
+- **Saved on this device:** how many saved searches, Compare areas, site notes, projects and saved report files this browser holds, each with **Open**.
+- **App:** **Install app** when your browser offers it (or how to install on an iPhone, or "Installed ✓"), the keyboard shortcuts, and **Reset layout**. Reset layout asks first, then puts the panel (open or closed, and its width), its sections, the assistant's width, headline metrics, timeline options, export choices and the Projects view back to how they started, and reloads. Your notes, projects, saved searches, team sharing and other settings are kept.
+- **Help:** **Data sources & freshness**, and **Save voice log** (what the voice assistant heard and did this visit, for troubleshooting when it doesn't respond).
+
+When something isn't set up on your site (team sharing, live traffic), the app says so in plain words, such as "Not available on this site", instead of a technical message.
 
 ---
 
@@ -333,6 +348,7 @@ Find them under **My Work → Notes & watchlist**.
 - **Add a site note** at the map center or your current location: a title, tag, notes and phone photos. Notes are shared with the team and work offline.
 - **Watch** any filing or building with the star. Watched filings are flagged when the nightly refresh sees a change.
 - Notes export as map files (GeoJSON or KML) or a spreadsheet.
+- The line under the title says whether notes are shared with the team or kept on this device, and your name (for example "Shared with the team · Matthew"). Click it to set your name or the team passcode in **Settings → You & your team**.
 
 ---
 
@@ -464,13 +480,13 @@ Click a project to open its page:
 - The PDF is a conceptual sheet. It has no survey bearings, easements, utilities or title research, so it won't match an engineer's or architect's sheet; it's for feasibility and early conversations.
 - A site plan is a planning sketch from the parcel outline: not a survey, and no grading, utilities, fire lanes or code review. Parcel outlines from appraisal districts can be off by several feet.
 - The setbacks, parking ratios, stormwater storage and trash rules are typical starting numbers, not the rules for a specific city or drainage district. Houston has no zoning but has building lines and parking rules; other cities differ.
-- Projects are shared with the team: each one is saved in this browser and synced to the team database, and the last edit wins.
+- Projects are shared with the team: each one is saved in this browser and synced to the team database, and the last edit wins. The line at the top of the Projects page shows whether sharing is on and your name, which is stamped on projects you change; click it to change either in **Settings → You & your team**.
 
 ---
 
 ## Where the data comes from
 
-The **?** button at the top right (Data & help; on phones, More → Data sources & freshness) lists every source, what it's used for, and how fresh it is. The main ones are:
+The **?** button at the top right (Data & help; on phones, More → Data sources & freshness) lists every source, what it's used for, and how fresh it is. A line at the top says whether sources show on cards, with a link to change it in Settings and **Save voice log**. The main ones are:
 
 - **Parcels and owners:** county appraisal districts through the Texas GIO parcel service (free), and Regrid (paid, capped).
 - **People, homes and jobs:** US Census American Community Survey (5-year averages) and Census jobs data (about two years behind).
@@ -504,6 +520,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **One home for settings:** the gear (top right, or Ctrl+, / ⌘,) opens a Settings page with Light, Dark or Match device; your name and team passcode for shared notes and projects; the default base map; what's saved on this device; installing the app (now on computers too); keyboard shortcuts; Reset layout; and help. On phones it's More → Settings or the gear on Explore. Notes & watchlist and Projects show who you are and whether sharing is on, and messages about things your site hasn't set up are now plain words.
 - **Simpler navigation:** a top bar with five places (Map, Filings, Market, Reports, My Work) instead of ten tabs that ran off the edge; Timeline, Companies (was Activity) and Changes (was Updates) sit under Filings, Compare areas under Market, and Projects, Notes & watchlist and Saved searches under My Work; **Ask AI**, **?** (Data & help, was the Sources tab) and the Settings gear are always at the top right, on every page; the green number on Changes now counts only what's new since your last look; and on phones the bottom bar is Map, Explore, Filings, Market and More, with More as a short grouped list.
 - **Roomier pages:** Market, Reports, Notes, Activity and the other tabs now use the full width (the Map's left panel steps aside and comes back when you return to the Map); tablets open with the map at full width; buttons look the same everywhere, including in dark mode; and buttons and chips are easier to tap on touch screens.
 - **Site plans that always fit and look finished:** every plan has its parking, a drive and dumpsters, and an ask too big for the land becomes the most that fits; small extras (patio, playground, lawn) beside a single use; neighbourhoods that fill large tracts with a community center and park; better tree placement; a library of about 230 building types; point-by-point shape editing; dependable Cmd+Z; a site plan panel laid out like a property card; faster on sites up to 300 acres; and the AI thinks longer about the program.
