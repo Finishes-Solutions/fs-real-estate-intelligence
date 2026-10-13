@@ -14,12 +14,12 @@ const model = key => (modelP ||= pickModel(key, process.env.OPENAI_MODEL).catch(
 const n = description => ({ type: ['number', 'null'], description });
 export const SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'setbacks', 'zones', 'summary', 'assumptions'],
+  required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'product', 'extras', 'setbacks', 'zones', 'summary', 'assumptions'],
   properties: {
     use: { type: 'string', enum: Object.keys(USES), description: 'Main use. other = anything that fits none of these (self storage, church, school, hotel…).' },
     gfa: n('Total building floor area in square feet across all floors. null when the request gives no size (the tool then uses a typical size for the use and site) or asks for as much as fits.'),
     floors: { type: ['integer', 'null'], description: 'Floors per building.' },
-    units: { type: ['integer', 'null'], description: 'Dwelling units (multifamily only).' },
+    units: { type: ['integer', 'null'], description: 'Dwelling units (apartments, townhomes, duplex units, homes).' },
     buildings: { type: ['integer', 'null'], description: 'Number of separate buildings, only when the request implies it (pad sites, apartment bars). null = let the layout decide.' },
     ratio: n('Parking spaces per 1,000 sq ft of floor area (non-residential).'),
     perUnit: n('Parking spaces per dwelling unit (multifamily).'),
@@ -27,6 +27,9 @@ export const SCHEMA = {
     detentionPct: n('Share of the site for a detention pond, percent, only when the request names one. null = sized from the storage the developed land needs.'),
     storm: { type: ['string', 'null'], enum: ['detention', 'retention', 'underground', 'none', null], description: 'Stormwater: detention (a dry basin, the usual), retention (a wet pond with a permanent pool), underground (vaults under the parking, no pond), none (a regional facility or a small site). null = detention on sites over an acre.' },
     truck: { type: ['boolean', 'null'], description: 'Truck court / loading behind the building.' },
+    through: { type: ['boolean', 'null'], description: 'A second, pull-through access out to a side street, when the request asks for one.' },
+    extras: { type: 'array', items: { type: 'string', enum: ['patio', 'playground', 'lawn', 'drivethru'] }, description: 'Small things asked for beside a single main use: outdoor seating (patio), a playground, a lawn or grass area, a drive-thru. Empty when none.' },
+    product: { type: ['string', 'null'], enum: ['lots', 'court', 'court6', null], description: 'Townhomes and duplexes only: lots = homes on their own lots along a new street; court6 = six-unit two-story townhome rows on a shared parking court (one tract, usually rental); court = two-unit duplex buildings on a shared parking court. null = the tool picks by what fits.' },
     setbacks: { type: 'object', additionalProperties: false, required: ['front', 'side', 'rear', 'paving'], description: 'Feet. null keeps the default.',
       properties: { front: n('Building setback from the street.'), side: n('Side setback.'), rear: n('Rear setback.'), paving: n('Landscape buffer between paving and the lot lines.') } },
     zones: { type: 'array', description: 'Mixed use only: 2 to 5 zones from the street back (commercial in front, amenity/commons in the middle, apartments, then townhomes, then duplexes/cottages at the back). Empty for a single use.',
@@ -45,6 +48,10 @@ export const SYSTEM = `You set up a development program for a site-planning tool
 - Size the program to the site: check floor area and parking against the acreage given. If the request clearly can't fit, keep the use, set gfa to null and say so in assumptions.
 - Mixed use (several uses on one site): fill zones from the street back, give each its size (floor area or units) when you can, and set the top-level use to the front zone's use. A single use: zones is empty.
 - A number of buildings ("4 buildings", "two pads") goes in buildings, with gfa the total across them. Stormwater: retention when they ask for a wet pond or lake, underground when they ask for vaults or no pond, none for regional detention.
+- Townhomes and duplexes: homes on their own lots with a public street fit about 6-10 units an acre; denser than that, use product court6 (or court), rows on a shared parking court, rather than cutting the count.
+- A neighbourhood, subdivision or "residential" with no count: a zone of use sfr with units null; it fills whatever land the other zones leave. Give sized zones (shops, apartments) their sizes; a community center or commons is an amenity zone (items may include center, pool, playground, pavilion, courts, lake), placed last when they say "at the back".
+- Feasibility: one-story shops or restaurants with surface parking hold about 9,000-12,000 sq ft an acre; two-story offices about 14,000; garden apartments about 18-24 units an acre; homes on lots 4-6 an acre. If the ask is bigger than the land, still give the ask: the layout fits the most that works and says so.
+- Small extras with one main use (outdoor seating, a playground, a lawn, a drive-thru) go in extras, not in zones. "A single" building means buildings 1.
 - Never claim code compliance. Assumptions are short phrases, e.g. "4 spaces per 1,000 sf (typical retail)".`;
 
 export function siteText(site = {}, prompt = '', program = null) {
@@ -61,7 +68,7 @@ export default async function handler(req, res) {
   const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
-    const r = await chatJSON({ key, model: await model(key), system: SYSTEM, user: siteText(b.site, prompt, b.program), name: 'site_program', schema: SCHEMA, maxTokens: 3000, effort: 'low' });
+    const r = await chatJSON({ key, model: await model(key), system: SYSTEM, user: siteText(b.site, prompt, b.program), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: 'high' }); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
     const d = r.data, sb = Object.fromEntries(Object.entries(d.setbacks || {}).filter(([, v]) => v != null && v >= 0 && v <= 300));
     const program = { ...normalizeProgram({ ...guessProgram(prompt), ...Object.fromEntries(Object.entries(d).filter(([k, v]) => v != null && !['setbacks', 'summary', 'assumptions', 'zones'].includes(k))) }), ...(d.gfa == null && d.units == null ? { gfa: null } : {}) };
     const guess = guessProgram(prompt), zs = d.zones?.length > 1 ? d.zones : guess.zones; // the model's zones, else the ones read from the words
