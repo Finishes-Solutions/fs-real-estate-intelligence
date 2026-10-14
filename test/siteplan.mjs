@@ -228,4 +228,40 @@ for (const v of [0, 1, 2]) {
   process.env.FIELD_ACCESS_CODE = 'gate'; res = await call('GET'); assert.equal(res.code, 401); res = await call('GET', null, { 'x-field-code': 'gate' }); assert.equal(res.code, 200); delete process.env.FIELD_ACCESS_CODE;
   table = false; res = await call('GET'); assert.equal(res.code, 503); assert.equal(res.body.local, true, 'no table yet: the browser keeps projects on the device'); }
 
+// ---- suggestions sized to the site, and what a request was read as (lib/planruns.mjs) ----
+{ const R = await import('../lib/planruns.mjs');
+  // every suggestion offered without the AI is read from its words as it says: its use, size, count and stories
+  const has = (p, want) => {
+    if (want.zones) { const z = p.zones || []; assert.equal(z.length, want.zones.length, 'zones'); want.zones.forEach((w, i) => { assert.equal(z[i].use, w.use); if (w.units) assert.equal(z[i].units, w.units); }); return; }
+    assert.equal(p.use, want.use, 'use');
+    for (const k of ['gfa', 'units', 'floors']) if (want[k] != null) assert.equal(p[k], want[k], k);
+    if (want.truck) assert.equal(p.truck, true, 'truck court'); if (want.max) assert.equal(p.max, true, 'as big as fits');
+    for (const x of want.extras || []) assert.ok(p.extras.includes(x), x); };
+  const seen = new Set();
+  for (const ac of [0.4, 0.9, 1.6, 2.5, 4.7, 9, 12, 24, 43, 120]) for (const fr of [90, 300, 700]) {
+    const off = R.presets(ac, fr, { aiOff: true }), on = R.presets(ac, fr);
+    assert.ok(off.length >= 2 && on.length >= 2, ac + ' ac: suggestions');
+    for (const { text, want } of off) { const p = S.normalizeProgram(S.guessProgram(text)); has(p, want); assert.deepEqual(R.notUnderstood(text, p), [], text + ': fully read without the AI'); assert.ok(!/\d+ pads?\b/.test(text), 'no pads without the AI: ' + text); seen.add(text); }
+    for (const { text, want } of on) if (want.pads) assert.deepEqual(R.notUnderstood(text, S.normalizeProgram(S.guessProgram(text))), [want.pads + ' pad' + (want.pads > 1 ? 's' : '')], 'pads need the AI'); }
+  // the sizes follow the site: a 4.7 acre lot and a 43 acre tract get different suggestions, each sized to fit
+  const small = R.presets(4.7, 500).map(x => x.text), big = R.presets(43, 1200).map(x => x.text), tiny = R.presets(0.9, 200).map(x => x.text);
+  assert.ok(!small.some(t => big.includes(t)), 'different suggestions for 4.7 and 43 acres'); assert.ok(/QSR|drive-thru/.test(tiny[0]), 'a pad on under an acre');
+  assert.ok(small.some(t => /^25,000 sf retail strip with 2 pads$/.test(t)), small.join(' | ')); assert.ok(big.some(t => /^Mixed use/.test(t)) && seen.size > 12);
+  // read as: chips from the program
+  const P = q => S.normalizeProgram(S.guessProgram(q));
+  assert.deepEqual(R.readAs(P('25,000 sf retail strip with 2 pads'), S.USES), ['Retail', '25,000 sf', '1 story', '4/1,000 parking']);
+  assert.deepEqual(R.readAs(P('200 apartments, 3 stories'), S.USES), ['Multifamily', '200 units', '3 stories', '1.6/unit parking']);
+  assert.deepEqual(R.readAs(P('6,000 sf restaurant with drive-thru'), S.USES).slice(-1), ['Drive-thru']);
+  assert.deepEqual(R.readAs(P('Mixed use: retail in front, a commons with a lake, 120 apartments, 18 townhomes'), S.USES), ['Mixed use', 'Retail', 'Commons', '120 apartments', '18 townhomes']);
+  assert.deepEqual(R.readAs(S.normalizeProgram({ use: 'retail', gfa: 25000, buildings: 3 }), S.USES), ['Retail', '25,000 sf', '1 story', '3 buildings', '4/1,000 parking']);
+  // not understood: only a number with its noun that the program doesn't carry
+  assert.deepEqual(R.notUnderstood('25,000 sf retail strip with 2 pads', P('25,000 sf retail strip with 2 pads')), ['2 pads']);
+  assert.deepEqual(R.notUnderstood('retail with two pads', P('retail with two pads')), ['2 pads']);
+  assert.deepEqual(R.notUnderstood('25,000 sf retail strip with 2 pads', S.normalizeProgram({ use: 'retail', gfa: 25000, buildings: 3 })), [], 'the AI read the pads as buildings');
+  assert.deepEqual(R.notUnderstood('4 buildings of 7,000 sf retail', P('4 buildings of 7,000 sf retail')), [], 'per-building size');
+  assert.deepEqual(R.notUnderstood('townhomes at 20 units per acre, 40 townhomes', P('townhomes at 20 units per acre, 40 townhomes')), ['40 townhomes'], 'a density is not a count (and the words took 20 as the count, so the 40 is flagged)');
+  assert.deepEqual(R.notUnderstood('25k sf shops, 3 stories', P('25k sf shops, 3 stories')), []);
+  assert.deepEqual(R.notUnderstood('Single-family homes, mostly 2-story', P('Single-family homes, mostly 2-story')), []);
+  assert.deepEqual(R.notUnderstood('a nice coffee shop', P('a nice coffee shop')), [], 'no numbers, nothing flagged'); }
+
 console.log('site plans ok');
