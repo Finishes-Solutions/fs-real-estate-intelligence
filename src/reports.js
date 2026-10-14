@@ -184,7 +184,7 @@ export function initReports(ctx) {
     root.innerHTML = '<div class="vhead"><div><div class="kicker">Reports</div><h2>Reports</h2><div class="vsub">Make a report for an area or from your filters, and download past exports again. Past exports stay in this browser only.</div></div>' +
         '<div class="vctl"><button type="button" class="btn primary md" id="rpNew">New report</button></div></div>' +
       '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">For an area <span class="rp-n">' + esc(sel || 'the map view') + '</span></div>' +
-        (sel ? '' : '<span class="rp-hint">Select an area on the Map with Area, Shape, Radius or County, use the map view, or draw one here.</span>') + '</div><div class="rp-grid">' + crimeCard() + crimeUSCard() + areaCards() + '</div></div>' +
+        (sel ? '' : '<span class="rp-hint">Select an area on the Map with Box, Shape, Radius or County, use the map view, or draw one here.</span>') + '</div><div class="rp-grid">' + crimeCard() + crimeUSCard() + areaCards() + '</div></div>' +
       (mk ? '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">Region &amp; county</div><span class="rp-hint">The Market page, for the area chosen there.</span></div><div class="rp-grid">' + mk + '</div></div>' : '') +
       '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">From your filters <span class="rp-n">' + fmtN(n) + ' filing' + (n === 1 ? '' : 's') + '</span></div></div><div id="rpScope"></div><div class="rp-grid">' + filterCards() + '</div></div>' +
       '<div class="rp-sec rp-recent">' + past + '</div>';

@@ -3258,3 +3258,48 @@ table.cmp tr.sub th{text-align:left;font-family:var(--font-mono);font-size:10px;
 .ly-hint{font-size:12px;color:var(--muted);margin:2px 0 6px}
 .view.mk-quiet{position:fixed;left:-20000px;top:0;right:auto;bottom:auto;width:1180px;height:900px;visibility:hidden;pointer-events:none;overflow:hidden;z-index:-1}
 .ly-na.ly-fail{color:var(--danger)}
+
+/* ================= batch: map chrome, side panel and app shell ================= */
+/* toasts sit in the free part of the map: centred between the left edge and whatever docks on the right (the assistant,
+   the property card), so none of them hides a message or gets covered by it */
+.toast{z-index:7;--toast-minw:260px;min-width:min(var(--toast-minw),calc(100% - 32px));left:max(calc((100% - var(--toast-r,0px)) / 2),calc(var(--toast-minw) / 2 + 16px));max-width:max(var(--toast-minw),calc(100% - var(--toast-r,0px) - 32px))}
+/* (when the assistant and a card leave almost no free map, the note keeps its width and shows on top of them) */
+@media (min-width:701px){ .app.ai-open{--toast-r:calc(var(--aiw) + 24px)} }
+@media (min-width:1101px){
+  .app.ai-open{--toast-r:calc(var(--aiw) + 28px)}
+  .app:has(#card.open){--toast-r:calc(var(--cardw) + 24px)}
+  .app.ai-open:has(#card.open){--toast-r:calc(var(--aiw) + var(--cardw) + 40px)}
+}
+/* the "Drawing a box · Cancel" chip shows on desktop too (it used to be phone-only), under the layer chips */
+@media (min-width:701px){
+  .modechip:not([hidden]){display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 4px 0 14px;border-radius:999px;background:var(--text);color:var(--panel);font:600 13px var(--font-display);box-shadow:0 2px 8px rgba(11,13,12,.2)}
+  .modechip button{height:26px;padding:0 12px;border:0;border-radius:999px;background:color-mix(in srgb,var(--panel) 18%,transparent);color:var(--panel);font:700 12.5px var(--font-display);cursor:var(--cur-pointer,pointer)}
+  .modechip button:hover{background:color-mix(in srgb,var(--panel) 30%,transparent)}
+  /* the layer chips use the width the map has up to the camera rail; an arrow at an end with more chips replaces the faded edge */
+  .mapleft .qlayers{max-width:100%}
+  .qlayers.fr,.qlayers.fl,.qlayers.fl.fr{-webkit-mask-image:none;mask-image:none}
+}
+.qarrow{position:sticky;z-index:2;flex:none;width:30px;height:30px;padding:0;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);color:var(--text);display:grid;place-items:center;cursor:var(--cur-pointer,pointer);box-shadow:0 1px 4px rgba(11,13,12,.2)}
+.qarrow:hover{border-color:var(--text-2)}
+.qarrow[hidden]{display:none}
+.qarrow.ql{left:0;margin-right:-36px}  /* the negative margin (width + gap) keeps the chips from shifting when an arrow appears */
+.qarrow.qr{right:0;margin-left:-36px}
+@media (max-width:700px){ .qarrow{display:none!important} }
+/* keyboard focus: these controls set their own box-shadow, which beat the page-wide focus ring (it has less weight), so the ring is restated here */
+.ctrls button:focus-visible,.fbtn:focus-visible,.lybtn:focus-visible,.exbtn:focus-visible,.qchip:focus-visible,.qarrow:focus-visible,.selpill:focus-visible,.mapleft .tools button:focus-visible,.ctrls .rpop button:focus-visible,.modechip button:focus-visible,.fclear:focus-visible{outline:none;box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--brand)}
+/* the pinned area bar is solid: filing rows and cards scrolling beneath it don't show through around its rounded card */
+.scope{padding-bottom:var(--sp-2);box-shadow:0 8px 10px -8px rgba(11,13,12,.22)}
+@media (max-width:700px){ .panel .scope{box-shadow:none;padding-bottom:0} }
+/* area menu: items that don't apply yet stay in place, dimmed */
+.vm-pop>.is-off,.vm-pop>button:disabled{opacity:.5;cursor:not-allowed}
+.vm-pop>.is-off:hover,.vm-pop>button:disabled:hover{background:transparent}
+.sc-err{color:var(--danger);font-size:11.5px;font-weight:600}
+/* saved searches: a one-line summary under each */
+.saved .sv{flex-wrap:wrap;row-gap:0}
+.saved .sv>.sv-n{flex:1 1 40%;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.saved .sv-s,.svp-s{flex:0 0 100%;order:5;min-width:0;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.svp-t{min-width:0;flex:1 1 240px}
+.svp-s{display:block;margin-top:2px}
+/* the filter popup's help line scrolls with the sections (it used to ride in the pinned header) */
+.fpop .lfbody>.lfhelp{margin:0;padding:12px 18px 0}
+@media (max-width:700px){ .fpop .lfbody>.lfhelp{padding:10px 16px 0} }

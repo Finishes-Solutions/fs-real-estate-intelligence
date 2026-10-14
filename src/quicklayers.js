@@ -48,6 +48,12 @@ export function initQuickLayers(ctx) {
   const order = orderByUse(CHIPS.map(c => c.k), readUse());
   CHIPS.sort((a, b) => order.indexOf(a.k) - order.indexOf(b.k));
   box.innerHTML = CHIPS.map(c => '<button class="qchip" type="button" data-q="' + c.k + '" aria-pressed="false" title="' + c.title + '">' + ICON[c.k] + '<span>' + c.label + '</span></button>').join('');
+  // the row scrolls sideways when the chips don't all fit: an arrow at each end that has more chips past it (the faded edge alone gave no cue)
+  const ARROW = d => '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
+  const mkArrow = (dir) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'qarrow ' + (dir < 0 ? 'ql' : 'qr'); b.hidden = true; b.tabIndex = -1;
+    b.setAttribute('aria-label', dir < 0 ? 'Show earlier layer buttons' : 'Show more layer buttons'); b.title = dir < 0 ? 'Earlier layers' : 'More layers'; b.innerHTML = ARROW(dir < 0 ? 'M10 3 5 8l5 5' : 'M6 3l5 5-5 5');
+    b.onclick = () => box.scrollBy({ left: dir * Math.max(120, box.clientWidth * .7), behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); return b; };
+  const arrL = mkArrow(-1), arrR = mkArrow(1); box.prepend(arrL); box.append(arrR);
   // ---------- what's on, for the Layers button, the panel header, "On now" and the group counts ----------
   const panel = el('layers'), NOT_LAYERS = new Set(['lyFilings', 'lyBldg', 'lyGrid', 'lyCounties', 'lyRoads', 'lyNames', 'ly3d']);
   const nameOf = lab => { const sp = lab?.querySelector('span'); if (!sp) return ''; const c = sp.cloneNode(true); c.querySelector('.ly-na')?.remove(); return c.textContent.trim(); };
@@ -108,7 +114,7 @@ export function initQuickLayers(ctx) {
   panel.addEventListener('click', e => { const b = e.isTrusted && e.target.closest?.('#styleSeg [data-style]'); if (b && SAT.has(b.dataset.style) && !SAT.has(ctx.basemap())) noteUse('sat');
     const h = e.isTrusted && e.target.closest?.('#heatSeg [data-heat]'); if (h && h.dataset.heat !== 'off' && h.getAttribute('aria-pressed') !== 'true') noteUse('filings'); }, true);
   // the row scrolls sideways; a faded edge shows on whichever side has more
-  function fade() { const l = box.scrollLeft > 2, r = box.scrollLeft + box.clientWidth < box.scrollWidth - 2; box.classList.toggle('fl', l); box.classList.toggle('fr', r); }
+  function fade() { const l = box.scrollLeft > 2, r = box.scrollLeft + box.clientWidth < box.scrollWidth - 2; box.classList.toggle('fl', l); box.classList.toggle('fr', r); arrL.hidden = !l; arrR.hidden = !r; }
   box.addEventListener('scroll', fade, { passive: true });
   // a mouse wheel scrolls the row sideways when it has more chips than fit
   box.addEventListener('wheel', e => { if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || box.scrollWidth <= box.clientWidth) return; e.preventDefault(); box.scrollLeft += e.deltaY; }, { passive: false }); addEventListener('resize', fade);

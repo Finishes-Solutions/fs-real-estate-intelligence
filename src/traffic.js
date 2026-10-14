@@ -116,5 +116,5 @@ export function initTraffic(ctx) {
 
   ctx.addAreaReport?.({ key: 'traffic', label: 'Traffic Report', desc: 'Traffic for an area in Texas: the busiest roads (vehicles a day, TxDOT), traffic by road type, live speeds and current crashes and closures. PDF or CSV.',
     cover: { test: inTexas, short: 'Texas only', why: 'Traffic reports cover Texas only (TxDOT counts). Move the map to Texas, or pick an area there.' },
-    note: 'Texas only. Select an area with Area, Shape, Radius or County, or use the map view', run: ({ geometry, label }) => report({ geometry, label }) });
+    note: 'Texas only. Select an area with Box, Shape, Radius or County, or use the map view', run: ({ geometry, label }) => report({ geometry, label }) });
 }

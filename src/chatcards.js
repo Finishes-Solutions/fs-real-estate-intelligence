@@ -74,7 +74,7 @@ export function initChatCards(ctx) {
     const d = el(head(r.kind ? r.kind[0].toUpperCase() + r.kind.slice(1) : 'Area', r.place, fmtN(r.filings) + ' filings ' + (r.how || '') + ' · est. ' + fmtM(r.total_value)) +
       (uses.length > 1 ? sec('Top uses', hbars(uses.map(g => ({ label: g.name, value: g.v, text: fmtM(g.v) })))) : '') +
       (list?.length ? sec('Largest projects', list.slice().sort((a, b) => b.cost - a.cost).slice(0, 3).map(filingRow).join('')) : '') +
-      btns([['info', 'More Information', true], list && !r.filtered ? ['filter', 'Filter to This Area'] : null]) + src('Sources: OpenStreetMap outline · Texas TDLR TABS filings'));
+      btns([['info', 'More Information', true], list && !r.filtered ? ['filter', 'Use as Area'] : null]) + src('Sources: OpenStreetMap outline · Texas TDLR TABS filings'));
     wireRows(d);
     on(d, 'info', () => document.getElementById('pbInfo')?.click());
     on(d, 'filter', () => { const p = ctx.currentPlace?.(); if (p?.geom) { ctx.setSelection('place', p.label, p.geom); ctx.clearPlace(); ctx.fitGeom(p.geom); } });

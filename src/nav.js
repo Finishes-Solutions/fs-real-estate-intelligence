@@ -58,7 +58,7 @@ const IC = {
   layers: svg('<path d="M10 2.5 18 7l-8 4.5L2 7z"/><path d="M3.2 10.2 10 14l6.8-3.8M3.2 13.6 10 17.4l6.8-3.8"/>', 20, 1.5),
   near: svg('<circle cx="10" cy="10" r="5.6"/><circle cx="10" cy="10" r="1.6" fill="currentColor"/><path d="M10 1.3v2.5M10 16.2v2.5M1.3 10h2.5M16.2 10h2.5"/>', 20, 1.5),
   note: svg('<path d="M10 18s-5.6-5.4-5.6-9.6a5.6 5.6 0 0 1 11.2 0C15.6 12.6 10 18 10 18z"/><path d="M10 6v4.5M7.8 8.2h4.5"/>', 20, 1.5),
-  settings: svg('<circle cx="10" cy="10" r="2.6"/><path d="M10 1.8v2.3M10 15.9v2.3M18.2 10h-2.3M4.1 10H1.8M15.8 4.2l-1.6 1.6M5.8 14.2l-1.6 1.6M15.8 15.8l-1.6-1.6M5.8 5.8 4.2 4.2"/><circle cx="10" cy="10" r="5.6"/>', 20, 1.5),
+  settings: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   sources: svg('<ellipse cx="10" cy="4.8" rx="6.2" ry="2.2"/><path d="M3.8 4.8v10.4c0 1.2 2.8 2.2 6.2 2.2s6.2-1 6.2-2.2V4.8M3.8 10c0 1.2 2.8 2.2 6.2 2.2s6.2-1 6.2-2.2"/>', 20, 1.5),
 };
 const CHEV = '<svg class="mr-chev" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>';
@@ -86,7 +86,7 @@ export function renderNav(ctx) {
   const mod = /Mac|iPhone|iPad|iPod/.test(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl+';
   const ask = $('askTop'); ask.title = 'Ask AI (' + mod + '/)'; ask.setAttribute('aria-keyshortcuts', mod === '⌘' ? 'Meta+/' : 'Control+/');
   ask.onclick = () => { const app = document.querySelector('.app'); if (app.classList.contains('ai-open')) ctx.assistant?.close(); else ctx.assistant?.open(); };
-  $('helpBtn').onclick = () => ctx.setView('sources');
+  $('helpBtn').onclick = () => ctx.helpToggle ? ctx.helpToggle() : ctx.setView('sources'); // pressed (on Data & help): back to the page before
   // Settings: the gear opens the Settings sheet (src/settings.js starts later, so look it up on click)
   $('settingsBtn').onclick = () => ctx.openSettings?.();
 

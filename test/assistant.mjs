@@ -150,6 +150,12 @@ assert.match(describe({ who: { k: 'own', v: 'x', label: 'Hines Interests' } }), 
 fs.pop();
 const spec = { st: ['Registered', 'Review complete'], sqmin: 5000, sqmax: 90000, co: 'hines', exact: 1, umin: 50 };
 assert.deepEqual(decode(encode(spec)), spec, 'new fields survive a link round trip');
+// a drawn box and a drawn shape come back as what they were (the link carries which), and links from before the names existed still read
+{ const ring = [[-95.7, 30.0], [-95.6, 30.0], [-95.6, 30.1], [-95.7, 30.1]];
+  assert.deepEqual(decode(encode({ sel: { k: 'p', ring, label: 'Box near Tomball', box: 1 } })).sel, { k: 'p', ring, label: 'Box near Tomball', box: 1 }, 'a box stays a box');
+  assert.deepEqual(decode(encode({ sel: { k: 'p', ring, label: 'Shape near Katy' } })).sel, { k: 'p', ring, label: 'Shape near Katy' }, 'a shape has no box mark');
+  assert.equal(decode('p=-95.7,30.0;-95.6,30.0;-95.6,30.1|Area selection').sel.box, 1, 'an older link\'s "Area selection" was a box');
+  assert.equal(decode('p=-95.7,30.0;-95.6,30.0;-95.6,30.1|Custom shape (3 points)').sel.box, undefined, 'an older shape stays a shape'); }
 assert.match(describe(spec), /5,000–90,000 sq ft.*50\+ units.*Company: “hines”.*Exact addresses only/);
 a = cleanFilterArgs({ sqft_min: 0, sqft_max: 5000, status: ['Registered', 'Review complete', 'Inspection complete', 'Closed'], company: ' ', exact_only: false, min_units: -1 });
 assert.deepEqual(a, { sqft_max: 5000 }, 'empty / all-status / false filters dropped');

@@ -261,7 +261,7 @@ export function initAreaReports(ctx) {
   ctx.runAreaReport = (key, which) => {
     const r = list.find(x => x.key === key); if (!r) return false;
     let job;
-    if (which === 'selection') { const s = ctx.sel; if (!s?.feature) { ctx.toast?.('Select an area first (Area, Shape, Radius or County).'); return false; } const g = s.feature.geometry || s.feature; job = { geometry: g, label: s.label || 'Selected area', center: s.center || centerOf(g) }; }
+    if (which === 'selection') { const s = ctx.sel; if (!s?.feature) { ctx.toast?.('Select an area first (Box, Shape, Radius or County).'); return false; } const g = s.feature.geometry || s.feature; job = { geometry: g, label: s.label || 'Selected area', center: s.center || centerOf(g) }; }
     else if (which === 'view') { const g = viewBox(ctx.map); job = { geometry: g, label: viewLabel(ctx), center: ctx.map.getCenter().toArray() }; }
     else job = which;
     if (r.cover && !covered(r, job.center || centerOf(job.geometry))) { ctx.toast?.(r.cover.why); return false; }
