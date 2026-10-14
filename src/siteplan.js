@@ -223,9 +223,13 @@ export function initSitePlan(ctx) {
   const planOf = w => { const p = w && db.projects.find(x => x.id === w.pid), pl = p?.plans.find(x => x.id === w.plid); return p && pl ? { p, pl } : null; };
   function ghost(pl) {
     const ll = ringLL(pl), data = ll ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ll.concat([ll[0]])] } }] } : EMPTY;
-    if (!map.getSource(GSRC)) { if (!ll || !map.isStyleLoaded?.()) return; map.addSource(GSRC, { type: 'geojson', data: EMPTY });
-      map.addLayer({ id: 'fs-sp-ghost-f', type: 'fill', source: GSRC, paint: { 'fill-color': '#0a7a36', 'fill-opacity': .06 } });
-      map.addLayer({ id: 'fs-sp-ghost', type: 'line', source: GSRC, paint: { 'line-color': ctx.isDark() ? '#8acda3' : '#0a7a36', 'line-width': 2, 'line-dasharray': [3, 2], 'line-opacity': .75 } }); }
+    if (!map.getSource(GSRC)) { if (!ll) return;
+      // isStyleLoaded() is false while any source reloads (the property card coming back sets its own data), so try the
+      // add, and if the style really isn't ready yet, once the map settles
+      try { map.addSource(GSRC, { type: 'geojson', data: EMPTY });
+        map.addLayer({ id: 'fs-sp-ghost-f', type: 'fill', source: GSRC, paint: { 'fill-color': '#0a7a36', 'fill-opacity': .06 } });
+        map.addLayer({ id: 'fs-sp-ghost', type: 'line', source: GSRC, paint: { 'line-color': ctx.isDark() ? '#8acda3' : '#0a7a36', 'line-width': 2, 'line-dasharray': [3, 2], 'line-opacity': .75 } });
+      } catch (e) { if (map.getSource(GSRC)) map.removeSource(GSRC); map.once('idle', () => { const x = !ed && planOf(resume); if (x?.pl === pl) ghost(pl); }); return; } }
     map.getSource(GSRC).setData(data);
   }
   function showResume(w) {
