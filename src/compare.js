@@ -175,14 +175,14 @@ export function initCompare(ctx) {
     if (ctx.view !== 'compare') return;
     const ft = ctx.filterText();
     const cur = fromSelection(), canAdd = cur && areas.length < MAX && !has(cur.key);
-    let h = '<div class="vhead"><div><div class="kicker">Compare areas</div><h2>Compare up to four areas</h2><div class="vsub">' + (ft ? 'Every area gets the same filters (everything except the area itself).' : 'All filings in each area (no other filters).') + ' Filing numbers follow your filters, so they can differ from the Market page.</div></div>' +
+    let h = '<div class="vhead"><div><div class="kicker">Compare areas</div><h2>Compare up to four areas</h2><div class="vsub">' + 'Population, income, housing and jobs for each area, then its construction filings. ' + (ft ? 'Filings use the same filters for every area (everything except the area itself), so they can differ from the Market page.' : 'Filings are counted with no other filters.') + '</div></div>' +
       '<div class="vctl">' + (canAdd ? '<button class="btn primary" id="cmpAddSel">+ Add “' + esc(cur.label) + '”' + (eachCounty().length ? ' Together' : '') + '</button>' : '') +
         (eachCounty().length && areas.length < MAX ? '<button class="btn" id="cmpAddEach">+ Add Each County (' + eachCounty().length + ')</button>' : '') + (areas.length ? '<button class="btn" id="cmpClear">Clear All</button>' : '') +
         (areas.length && ctx.exportMenu ? ctx.exportMenu([{ label: 'Comparison · PDF', attrs: ' data-cx="pdf"' }, { label: 'Comparison · Excel', attrs: ' data-cx="xlsx"' }, { label: 'Comparison · CSV', attrs: ' data-cx="csv"' }]) : '') + '</div></div>';
     h += '<div id="cmpScope"></div>' + (areas.length ? '<div class="cmp-chips">' : '<div class="cmp-chips" hidden>') + areas.map((a, i) => '<span class="cmp-chip" style="--c:' + color(i) + '"><i></i><button class="lnk" data-go="' + i + '" title="Show on the map">' + esc(a.label) + '</button><button class="ed" data-ed="' + i + '" aria-label="Rename ' + esc(a.label) + '" title="Rename">✎</button><button class="x" data-rm="' + i + '" aria-label="Remove ' + esc(a.label) + '">×</button></span>').join('') +
       (areas.length < MAX ? '<span class="cmp-slot">' + (MAX - areas.length) + ' open slot' + (MAX - areas.length > 1 ? 's' : '') + '</span>' : '') + '</div>';
     if (areas.length < 2) {
-      const steps = '<ol><li>On the map, pick an area: search a city or county, click <em>County</em>, draw a <em>Shape</em> or <em>Area</em>, or set a <em>Radius</em>.</li>' +
+      const steps = '<ol><li>On the map, pick an area: search a city or county, click <em>County</em>, draw a <em>Box</em> or <em>Shape</em>, or set a <em>Radius</em>.</li>' +
         '<li>Click <em>+ Compare</em> at the top of the Map panel, or on the place card.</li><li>Repeat for up to four areas, then come back here.</li></ol>';
       h += ctx.vempty ? ctx.vempty({ icon: 'areas', title: areas.length ? 'Add one more area to compare' : 'Nothing to compare yet', text: 'Pick areas on the Map and add each one with + Compare.', extra: steps, actions: [{ label: 'Pick on the Map', id: 'cmpToMap', primary: true }] })
         : '<div class="cmp-empty"><b>' + (areas.length ? 'Add one more area to compare.' : 'Nothing to compare yet.') + '</b>' + steps + '<button class="btn primary" id="cmpToMap">Pick on the Map</button></div>';

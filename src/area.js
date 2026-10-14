@@ -515,7 +515,9 @@ export function initArea(ctx) {
     root.style.setProperty('--mk-nav', nav.offsetHeight + 'px'); // jump targets (sections, the correlation box) stop below the sticky bar
     nav.querySelector('#mkHere').onclick = () => { const d = root.querySelector('.mk-scopebar'); if (d) { d.open = true; scopeOpen = true; } root.scrollTo({ top: 0, behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); d?.querySelector('summary')?.focus({ preventScroll: true }); };
     nav.querySelectorAll('[data-sec]').forEach((b, i) => { if (!secs[i]) { b.hidden = true; return; } b.onclick = () => root.scrollTo({ top: secs[i].offsetTop - nav.offsetHeight - 10, behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); });
-    const mark = () => { const y = root.scrollTop + nav.offsetHeight + 24; let on = 0; secs.forEach((x, i) => { if (x && x.offsetTop <= y) on = i; }); nav.querySelectorAll('[data-sec]').forEach((b, i) => b.setAttribute('aria-current', i === on)); };
+    // the bar's own area button only shows once the Area line above has scrolled away (both at once would say it twice)
+    const scope = root.querySelector('.mk-scopebar');
+    const mark = () => { nav.classList.toggle('stuck', !scope || scope.getBoundingClientRect().bottom < root.getBoundingClientRect().top + 4); const y = root.scrollTop + nav.offsetHeight + 24; let on = 0; secs.forEach((x, i) => { if (x && x.offsetTop <= y) on = i; }); nav.querySelectorAll('[data-sec]').forEach((b, i) => b.setAttribute('aria-current', i === on)); };
     root.onscroll = () => { cancelAnimationFrame(navY); navY = requestAnimationFrame(mark); }; mark();
     // click (or Enter on) a bar: pin its breakdown; roads fly to the map instead
     const keep = fn => { const y = root.scrollTop; fn(); root.scrollTop = y; };

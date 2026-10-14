@@ -328,7 +328,7 @@ export function initMapSearch(ctx) {
     const inCmp = ctx.compare?.list().some(a => a.key === 'place:' + place.label);
     bar.innerHTML = '<button class="x" aria-label="Clear" id="pbX">×</button><div class="pb-k">' + esc(KIND_LABEL[place.kind] || 'Place') + '</div><div class="pb-t">' + esc(place.label) + '</div>' +
       (bare ? '' : '<div class="pb-s">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' ' + how + ' · est. ' + fmtM(v) + (ctx.filterText() ? '<span> (current filters)</span>' : '') + '</div>') + (note ? '<div class="pb-n">' + esc(note) + '</div>' : '') +
-      '<div class="pb-a"><button class="btn primary" id="pbInfo">More Information</button>' + (area ? '<button class="btn" id="pbFilter" title="Make this the picked area: the panel, Compare and Save search then use it">Use as Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>' : '') +
+      '<div class="pb-a"><button class="btn primary" id="pbInfo" title="' + (area ? 'Headline numbers, top uses and the largest projects inside it' : 'Owner, value, site and area details for the parcel here') + '">' + (area ? 'Area Summary' : 'Property Card') + '</button>' + (area ? '<button class="btn" id="pbFilter" title="Make this the picked area: the panel, Compare and Save search then use it">Use as Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>' : '') +
         (list.length ? '<button class="btn" id="pbHl">Highlight ' + (list.length > 50 ? 'Top 50' : 'Them') + '</button>' : '') + '</div>';
     bar.classList.add('on');
     bar.querySelector('#pbX').onclick = clearPlace;
@@ -339,14 +339,14 @@ export function initMapSearch(ctx) {
   }
   ctx.onChange(() => { if (place && bar.classList.contains('on') && place.geom !== undefined) placeCard(); });
 
-  // "More Information" on an address, landmark, building or coordinates: the location card (parcel, size, lidar height,
+  // "Property Card" on an address, landmark, building or coordinates: the location card (parcel, size, lidar height,
   // filings, businesses, Drive Time, Weather, Site Imagery, News), using the building footprint under the point when there is one
   function pointInfo() {
     const pt = place.c || centerOf(place.geom);
     const fp = /building|business/.test(place.kind) && isArea(place.geom) ? place.geom : ctx.buildingAt?.(pt)?.footprint || null;
     ctx.openBuildingAt(pt, fp);
   }
-  // "More Information" on a town, county, neighborhood or ZIP: an area summary card with the headline metrics,
+  // "Area Summary" on a town, county, neighborhood or ZIP: an area summary card with the headline metrics,
   // top uses and the largest projects inside it
   function areaCard() {
     const pl = place, card = ctx.card, { list } = placeHits(), keys = ctx.kpiKeys?.() || DEFAULT_KPIS;

@@ -347,6 +347,12 @@ export function initBuildings(ctx) {
   const money = v => v ? fmtM(v) : '—';
   const fld = (k, v, o = {}) => '<div class="f' + (o.w ? ' w' : '') + '"><div class="fl">' + k + '</div><div class="fv' + (o.dim ? ' dim' : '') + '">' + v + '</div>' + (o.sub ? '<div class="fs">' + o.sub + '</div>' : '') + '</div>';
   const title = t => String(t || '').toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+  // land area when the record has none: measured from the parcel outline (each polygon on its own, so winding can't flip it)
+  const outlineAcres = g => { try { if (!g || !window.d3) return null; const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+    const sr = polys.reduce((t, c) => { const a = d3.geoArea({ type: 'Polygon', coordinates: c }); return t + (a > 2 * Math.PI ? 4 * Math.PI - a : a); }, 0), ac = sr * 6371008.8 ** 2 / 4046.8564;
+    return ac > 0.001 ? ac : null; } catch (e) { return null; } };
+  const landArea = p => { if (p.area) return fld('Land area', esc(p.area)); const ac = outlineAcres(p.geometry);
+    return ac ? fld('Land area', '≈ ' + (ac < 10 ? ac.toFixed(2) : ac.toFixed(1)) + ' acres', { sub: 'From the parcel outline' }) : fld('Land area', '—'); };
   const appraised = p => p?.marketValue || ((p?.landValue || 0) + (p?.improvementValue || 0)) || null;
   // a building that spans several parcels (a shopping center, a warehouse built over lot lines): list them all, with totals.
   // Each row opens that parcel in a card tab of its own (the grid above shows parcel 1; the Overview adds them all up).
@@ -421,7 +427,7 @@ export function initBuildings(ctx) {
       fld(p.marketValue ? 'Market value' : 'Appraised value', '<span class="mono">' + money(val) + '</span>', { sub: p.marketValue ? '' : 'Land + improvements' }) +
       fld('Tax year', esc(p.taxYear || '—')) +
       fld('Land', '<span class="mono">' + money(p.landValue) + '</span>') + fld('Improvements', '<span class="mono">' + money(p.improvementValue) + '</span>') +
-      fld('Land area', esc(p.area || '—')) + fld('Year built', esc(p.yearBuilt || 'Not reported'), { dim: !p.yearBuilt }) +
+      landArea(p) + fld('Year built', esc(p.yearBuilt || 'Not reported'), { dim: !p.yearBuilt }) +
       fld('Acquired', esc(p.acquired || '—'), { dim: !p.acquired }) + fld('Property ID', '<span class="mono">' + esc(p.propId || '—') + '</span>') + '</div>' +
       '<div class="oc-box" id="bOwnerCo" hidden></div>' + parcelsHtml(all) +
       '<div class="rg-row"><span>Zoning &amp; last sale</span>' + rgRow + '</div>' +
