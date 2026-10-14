@@ -40,6 +40,14 @@ assert.deepEqual(f, { l: 0, t: 60, r: 332, b: 440 });
 // an empty tool row (height 0) and a row low on the map don't count; buttons on the left half don't either
 f = freeRect(R(0, 0, 1000, 800), { panels: [], tops: [R(0, 600, 300, 650)], buttons: R(20, 100, 60, 300) });
 assert.deepEqual(f, { l: 0, t: 0, r: 1000, b: 800 });
+// the legend card in the bottom-left corner (the Plan key while planning): a strip on the left or along the bottom,
+// whichever fits the site bigger (by its aspect), else whichever leaves more room; boxes elsewhere don't count
+const M1440 = R(0, 52, 1440, 900), base = { panels: [R(948, 64, 1428, 888)], tops: [R(16, 68, 872, 154)], buttons: R(898, 68, 934, 310) }, key = [R(16, 690, 252, 872)];
+assert.deepEqual(freeRect(M1440, { ...base, corners: key, aspect: 2 }), { l: 0, t: 154, r: 898, b: 690 }); // a wide site: the strip along the bottom goes
+assert.deepEqual(freeRect(M1440, { ...base, corners: key, aspect: 0.5 }), { l: 252, t: 154, r: 898, b: 900 }); // a tall one: the strip on the left
+assert.deepEqual(freeRect(M1440, { ...base, corners: [R(16, 300, 252, 872)] }), { l: 252, t: 154, r: 898, b: 900 }); // no aspect: the larger area (646 × 746, not 898 × 146)
+assert.deepEqual(freeRect(M1440, { ...base, corners: [R(600, 690, 800, 872), R(16, 200, 252, 300), null] }), { l: 0, t: 154, r: 898, b: 900 }); // not in the lower left
+assert.deepEqual(freeRect(M1440, { ...base, corners: [R(16, 860, 252, 860)] }), { l: 0, t: 154, r: 898, b: 900 }); // empty (folded away)
 
 // ---- the panel's sections, in order (the chips are made from the same list) ----
 const ids = o => planSections(o).map(s => s.id).join(' ');

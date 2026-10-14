@@ -1019,6 +1019,7 @@ const toastEl=document.getElementById('toast'); let toastT=0;
 function toast(m,o={}){ toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a);
   if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.onclick=()=>{ toastEl.classList.remove('on','act'); a.run(); }; toastEl.append(' ',b); }
   toastEl.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('on','act'),o.ms||(a?6500:3400)); }
+function clearToast(){ clearTimeout(toastT); toastEl.classList.remove('on','act'); } // a mode changed: its old instruction goes
 
 // ---------- export ----------
 const fmtD=s=>new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
@@ -1178,7 +1179,7 @@ function showIntro(){ try{ localStorage.removeItem(INTRO); }catch(e){} introEl.h
 if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
-  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
+  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.
@@ -1251,6 +1252,7 @@ ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box
     const pick=e=>{ const t=e.target.closest('.t'); if(!t||!box.contains(t)||t.closest('.lg-h')) return; const el=t.parentElement; if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; if(e.type==='keydown') e.preventDefault(); open=keyOf(el); if(min){ min=false; try{ localStorage.setItem('fs-legend-min','0'); }catch(err){} } sync(); };
     box.addEventListener('click',pick); box.addEventListener('keydown',pick);
     box.querySelector('.lg-h').addEventListener('click',()=>{ min=!min; try{ localStorage.setItem('fs-legend-min',min?'1':'0'); }catch(e){} sync(); });
+    ctx.foldLegend=v=>{ min=!!v; sync(); }; // folded for now (the site plan on a phone), without changing the saved choice
     sync(); } }
 syncQL=()=>ctx.syncQuickLayers?.();
 Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
