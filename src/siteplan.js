@@ -1802,7 +1802,7 @@ export function initSitePlan(ctx) {
   function indexHtml() {
     const all = db.projects, nPlans = all.reduce((s, p) => s + p.plans.length, 0);
     const share = shared === true ? 'shared with the team' : shared === false ? 'saved on this device only' : 'saved on this device';
-    return '<div class="vhead"><div><div class="kicker">My Work</div><h2>Projects</h2><div class="vsub">' + (all.length ? plural(all.length, 'project') + ' · ' + plural(nPlans, 'site plan option') + ' · ' : '') + share + '</div></div>' +
+    return '<div class="vhead"><div><div class="kicker">Site plans</div><h2>Projects</h2><div class="vsub">' + (all.length ? plural(all.length, 'project') + ' · ' + plural(nPlans, 'site plan option') + ' · ' : '') + share + '</div></div>' +
         '<div class="vctl">' + (adding ? '' : '<button type="button" class="btn primary" id="pjNew">+ New Project</button>') + '<div class="team-slot" id="pjTeam"></div></div></div>' +
       (adding ? '<form class="pj-new" id="pjForm"><label class="sr" for="pjNm">New project name</label><input id="pjNm" maxlength="120" placeholder="Project name" autocomplete="off"><span class="btnrow"><button class="btn primary">Create Project</button><button type="button" class="btn" id="pjCancel">Cancel</button></span>' +
         '<div class="rnote">You can add parcels and site plans to it next. To start from a parcel instead, click it on the map and use <b>Site plan</b> at the top of its card.</div></form>' : '') +

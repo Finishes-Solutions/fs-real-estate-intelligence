@@ -60,10 +60,9 @@ export function initMobile(ctx) {
     if (t === 'more') { openSheet(); return; }
     closeSheet();
     if (t !== 'map' && card.classList.contains('open')) ctx.closeCard();
-    if (t === 'map' || t === 'list') { app.dataset.mtab = t; if (ctx.view !== 'map') ctx.setView('map');
-      // Explore shows the filings straight away: the section opens for this visit (not saved, and the map's dots stay as they are)
-      if (t === 'list' && document.getElementById('secFilings')?.getAttribute('aria-expanded') !== 'true') ctx.setFilingsOpen?.(true); }
-    else { const leaf = leafFor(t); app.dataset.mtab = leaf; ctx.setView(leaf); } // Filings / Market open the page used last
+    // Explore is the Map's side list: the area, its reports, then the filings (folded unless opened before)
+    if (t === 'map' || t === 'list') { app.dataset.mtab = t; if (ctx.view !== 'map') ctx.setView('map'); }
+    else { const leaf = leafFor(t); app.dataset.mtab = leaf; ctx.setView(leaf); } // Projects / Reports (a group opens the page used last)
     syncNav();
     if (t === 'map') setTimeout(() => map.resize(), 30);
   }
@@ -111,7 +110,7 @@ export function initMobile(ctx) {
     else if (go === 'layers') { setTab('map'); setTimeout(() => document.getElementById('layersBtn').click(), 50); }
     else if (go === 'export') ctx.openExport();
     else if (go === 'settings') ctx.openSettings?.(); // theme, team, install and the rest (src/settings.js)
-    else if (document.getElementById('view-' + go)) setTab(go); // every page in the registry (My Work, Reports, Data & help)
+    else if (document.getElementById('view-' + go)) setTab(go); // every page in the registry (Market, Filings, My Work, Data & help)
   });
 
   // ---- swipeable bottom-sheet card (phone) ----

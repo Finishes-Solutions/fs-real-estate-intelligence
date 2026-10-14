@@ -2049,7 +2049,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 /* ---------- Projects view: all projects as cards or a list, and a page per project. Laid out by the view's own
    width (container queries), and text wraps instead of being cut off ---------- */
 #view-projects{container-type:inline-size}
-.pj-wrap{max-width:1180px;margin:0} /* left-aligned like every other page, so the title doesn't jump between My Work tabs */
+.pj-wrap{max-width:1180px;margin:0} /* left-aligned like every other page, so the title doesn't jump between pages */
 .pj-wrap .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .pj-wrap b,.pj-wrap h2,.pj-wrap dd,.pj-wrap span{overflow-wrap:anywhere}
 .pj-new{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
@@ -2241,7 +2241,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
   @media (max-width:900px){ .ab-logo{display:none} }
   @media (max-width:780px){ .ab-ask span{display:none} .ab-ask{width:36px;padding:0;justify-content:center} .appbar .viewbar button{padding:8px 10px} }
 }
-/* sub-tabs: the pages of a group (Filings, Market, My Work) above each of its pages */
+/* sub-tabs: the pages of a group (Market, Filings, My Work) above each of its pages */
 .app[data-vgroup] .vtabs{display:flex;position:absolute;left:0;right:0;top:0;z-index:4;height:var(--vtabs-h);align-items:center;padding:0 24px;background:var(--panel-2);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .vtabs::-webkit-scrollbar{display:none}
 .app[data-vgroup] .view{top:var(--vtabs-h)}
@@ -2251,6 +2251,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .vt-row button:hover{border-color:var(--text-2);color:var(--text)}
 .vt-row button[aria-current="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
 .vt-row button[aria-current="true"] .badge.muted{color:inherit;opacity:.7}
+.viewbar button[aria-pressed="true"] .badge.muted{color:inherit;opacity:.7}
 @media (pointer:coarse){ :root{--vtabs-h:58px} .vt-row button{min-height:var(--tap)} }
 /* My Work › Saved searches */
 .svp{display:grid;border:1px solid var(--line);border-radius:var(--r-md);background:var(--panel);max-width:900px}
@@ -2266,16 +2267,13 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
   .msheet .mt-h{margin:12px 4px 6px}
   .msheet .mrows{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel);overflow:hidden}
   .msheet .mrow{display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;min-height:48px;padding:7px 12px;border:0;border-top:1px solid var(--line);background:none;font:600 15px var(--font-display);color:var(--text);text-align:left}
-  .msheet .mrows>.mrow:first-child,.msheet .mrows>.mrow-split:first-child .mrow{border-top:0}
+  .msheet .mrows>.mrow:first-child{border-top:0}
   .msheet .mrow[hidden]{display:none}
   .msheet .mrow:active{background:var(--panel-2)}
   .msheet .mr-ic{display:grid;place-items:center;width:32px;height:32px;flex:none;border-radius:50%;background:var(--panel-2);color:var(--brand);font-style:normal}
   .msheet .mr-l{flex:1;min-width:0}
   .msheet .mr-chev{flex:none;color:var(--muted)}
   .msheet .mrow .badge{position:static}
-  .msheet .mrow-split{display:flex;align-items:center;gap:8px;padding-right:12px}
-  .msheet .mrow-split .mrow{flex:1;min-width:0}
-  .msheet .mrow-split .btn{flex:none;width:auto;justify-content:center;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel);font:600 13px var(--font-display);color:var(--text)}
 }
 
 /* ================= Settings sheet (src/settings.js): a right-hand sheet on desktop, full screen on phones ================= */
@@ -2656,7 +2654,6 @@ table.who tr.nomatch td{border:0}
 .qlayers.fr{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent)}
 .qlayers.fl{-webkit-mask-image:linear-gradient(90deg,transparent,#000 44px);mask-image:linear-gradient(90deg,transparent,#000 44px)}
 .qlayers.fl.fr{-webkit-mask-image:linear-gradient(90deg,transparent,#000 44px,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,transparent,#000 44px,#000 calc(100% - 44px),transparent)}
-.qchip.qbase{margin-left:8px}
 /* labels give way in order: Export first, then the five area tools, then Layers and Filters */
 @container chrome (max-width:740px){ .maptop .exbtn span{display:none} .maptop .exbtn{padding:0 11px} }
 @container chrome (max-width:676px){ .maptop .tools button span{display:none} .maptop .tools button{padding:0 11px} }

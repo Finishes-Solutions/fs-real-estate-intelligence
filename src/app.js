@@ -416,7 +416,7 @@ let coT; coQ.addEventListener('input',()=>{ clearTimeout(coT); coT=setTimeout(()
 exactBtn.onclick=()=>{ state.exact=state.exact?0:1; applyFilters(); };
 // Construction Filings: collapsible (remembered in this browser; starts collapsed). Opening it by hand puts the filing dots
 // on the map; a section restored open from an earlier visit leaves the map alone, and the header's "On map" switch says
-// which it is. The phone's Explore tab opens it for the visit without saving (src/mobile.js).
+// which it is. It sits last in the panel, under the area and its reports.
 const secF=document.getElementById('secFilings'), secFBody=document.getElementById('filingsBody');
 function setFilingsOpen(open,{save=false,dots=false}={}){
   secF.setAttribute('aria-expanded',open); secFBody.classList.toggle('collapsed',!open); document.getElementById('panel').classList.toggle('list-collapsed',!open);
@@ -1082,7 +1082,7 @@ function reportMap(list){
 // ---------- views ----------
 let view='map'; const appEl=document.querySelector('.app'), viewHooks={}, viewChangeHooks=[], cardRenderHooks=[];
 function setView(v,{user}={}){
-  // every page id works (#v=who, saved reports, the assistant); a group id (filings, marketgrp, work) opens its last-used page
+  // every page id works (#v=who, #v=projects, saved reports, the assistant); a group id (filings, marketgrp, work) opens its last-used page
   if(!document.getElementById('view-'+v)&&v!=='map') v=leafFor(v);
   if(!document.getElementById('view-'+v)&&v!=='map') v='map'; const was=view;
   // "← Back to <page>": only when the user clicked something on the page (or on the card over it) that lands on the Map;
@@ -1121,7 +1121,7 @@ const CHG_SEEN='fs-chg-seen';
 function changesBadge(){
   let seen=null; try{ seen=localStorage.getItem(CHG_SEEN); }catch(e){}
   const ids=new Set(); for(const r of DATA.changes.runs||[]){ if(seen&&r.built<=seen) break; for(const x of r.items) if(CHANGED.has(x.id)) ids.add(x.id); }
-  ctx.setBadge('changes',ids.size,{alert:true,title:'New and changed filings since your last visit'});
+  ctx.setBadge('changes',ids.size,{alert:true,roll:false,title:'New and changed filings since your last visit'}); // on the Changes sub-tab only, not the Filings tab
 }
 function changesSeen(){ const last=DATA.changes.runs?.[0]?.built; if(!last) return; try{ localStorage.setItem(CHG_SEEN,last); }catch(e){} changesBadge(); }
 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="description" content="Real estate intelligence for Texas: parcels and owners, site risks, demographics, market data, live conditions and construction filings — Finishes Solutions">
+<meta name="description" content="Real estate intelligence for Texas: parcel and property information, site plans, area data (market, demographics, map layers) and reports, plus construction filings — Finishes Solutions">
 <meta name="theme-color" content="#006527">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
@@ -34,7 +34,7 @@
     <!-- first visit: what the app does (Got it hides it; Data & help › Getting started brings it back) -->
     <section class="ptip" id="introTip" aria-labelledby="introTipH" hidden>
       <div class="ptip-h"><b id="introTipH">Getting started</b><button class="btn sm" id="introTipOk" type="button">Got it</button></div>
-      <p class="ptip-t">Click any building or parcel for its owner, value, zoning and site risks. Pick an area below for reports on it, and turn on layers like parcels and flood zones from the map’s buttons.</p>
+      <p class="ptip-t">Click any parcel or building for its owner, value, zoning and site risks, then lay out a building on it with <b>Site plan</b> (saved under Projects). Pick an area below for its demographics and reports, and turn on layers like parcels, flood zones and demographics from the map’s buttons.</p>
     </section>
     <!-- where am I: the selected area (or the map view), pinned while the panel scrolls -->
     <div class="scope" id="selbar">
@@ -64,7 +64,6 @@
       <div class="sc-pick" id="selPick"><span>Pick an area:</span><button class="btn sm" type="button" data-pick="area">Box</button><button class="btn sm" type="button" data-pick="poly">Shape</button><button class="btn sm" type="button" data-pick="radius">Radius</button><button class="btn sm" type="button" data-pick="county">County</button></div>
      </div>
     </div>
-    <details class="saved psec" id="savedBox"><summary>Saved searches <span id="savedN"></span></summary><div id="savedList"></div><button class="lnk sv-all" id="savedAll" type="button">Manage in My Work →</button></details>
     <section class="glance psec" id="glance" aria-live="polite"></section>
     <!-- what can I run on it: one row per area report (FEMA, Environmental, Crime and the reportkit ones) -->
     <section class="arep psec" id="areaReports" aria-labelledby="arepH">
@@ -75,6 +74,8 @@
         <button class="ar-row" id="selCrime" type="button" data-ic="crime" hidden title="Houston Police incidents: the last 12 months against the year before"><span class="ar-i" aria-hidden="true"></span><b>Crime Report</b><span class="ar-d">Houston Police, last 12 months</span></button>
       </div>
     </section>
+    <!-- last: your saved searches, then the construction filings (folded unless opened before) -->
+    <details class="saved psec" id="savedBox"><summary>Saved searches <span id="savedN"></span></summary><div id="savedList"></div><button class="lnk sv-all" id="savedAll" type="button">Manage in My Work →</button></details>
     <div class="fsec-h" id="filingsHead">
       <button class="fsec-b" id="secFilings" type="button" aria-expanded="false" aria-controls="filingsBody"><svg class="chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span class="fs-ic" aria-hidden="true"></span><span class="fs-t"><b>Construction Filings</b><span id="filingsLive"></span><em id="filingsPeriod"></em></span></button>
       <label class="tg2 fsw" title="Show the filing dots on the map"><input type="checkbox" role="switch" id="filingsOnMap"><span>On map</span></label>

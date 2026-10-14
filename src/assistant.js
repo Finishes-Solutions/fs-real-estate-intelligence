@@ -320,7 +320,7 @@ export function initAssistant(ctx) {
   const GROUP = { county: f => f.county, city: f => f.city, use: f => f.use, type: f => f.type, status: f => f.status, developer: f => f.dev || f.owner, month: f => (f.reg || '').slice(0, 7), year: f => (f.reg || '').slice(0, 4),
     quarter: f => f.reg ? f.reg.slice(0, 4) + '-Q' + (Math.floor((+f.reg.slice(5, 7) - 1) / 3) + 1) : '', start_month: f => (f.ts || '').slice(0, 7), finish_month: f => (f.te || '').slice(0, 7) };
   // only switch tabs when the user asked for the tab itself; otherwise the answer stays in the chat and a follow-up offers it
-  const VIEW_ASK = /\b(tab|page)\b|\b(open|switch to|go to|take me to|pull up|bring up)\s+(the\s+)?(timeline|compare|comparison|compare areas|companies|activity|market|reports?|changes|updates|field notes|sources|data sources)\b/i;
+  const VIEW_ASK = /\b(tab|page)\b|\b(open|switch to|go to|take me to|pull up|bring up)\s+(the\s+)?(timeline|compare|comparison|compare areas|companies|activity|market|reports?|projects|site plans|changes|updates|field notes|sources|data sources)\b/i;
   const inBounds = () => { const b = ctx.map.getBounds(); return ctx.visible.filter(f => b.contains([f.lon, f.lat])); };
   // the point a lookup is about: a filing, coordinates, a named place, or what is open on screen
   async function pointFor(a) {
