@@ -5,6 +5,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 5:49 PM CT: Charts that move with the data (feae7b1)
+- **Charts draw in once:** the first time a chart comes into view, its bars grow up from the baseline and its lines draw across. Coming back to a page doesn't replay it.
+- **Changes you can follow:** on the Market page, switching 12 / 24 months / All, changing the county, turning a series on or off or pinning a bar now glides the bars and lines to their new values instead of redrawing them.
+- **Live prices without restarts:** the Markets prices refresh every minute without the charts starting over.
+- **Timeline:** the chart updates smoothly when you change Group by, Measure or filters. It keeps the range you dragged, and the month under the pointer is highlighted.
+- **Numbers that count:** the headline numbers and Area at a Glance count to their new values when filters or the area change. During the time-lapse they update instantly.
+- **Placeholders:** while Market data loads you see a plain grey placeholder, never made-up numbers.
+- **Other charts:** charts in assistant answers, Compare areas, and the crime and FEMA reports draw in when they first appear.
+- **Reduced motion:** if your device is set to reduce motion, charts simply appear.
+- **Exports:** printing and PDF exports always show the finished charts.
+
 ### 12:37 PM CT: Drive-time bands clear when you close the card (cc25d91)
 - Closing a drive-time map, or the property card it came from, with × or Esc now takes the bands off the map. Before, they stayed with no way to remove them.
 - The bands still stay while you go back to the property card, or when you select a band and run a report on it.

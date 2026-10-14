@@ -303,6 +303,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
   - **Markets** and the **Correlation explorer** (below).
   - **Area & news:** the Houston crime trend, the busiest roads, local development news, and the newest business locations, 10 at a time (**Show 10 more**).
   - Hover over any chart (bars, lines, the small trend lines) to read its numbers; click a bar for its breakdown. The 12 mo / 24 mo / All buttons set how many months the monthly charts show.
+  - **Charts move with the data:** the first time a chart comes into view its bars grow up and its lines draw across (once; coming back to the page doesn't replay it). Switching 12 mo / 24 mo / All, the county, a chart's series or a pinned bar glides the bars and lines to their new values, so you can see what changed. Live market prices refresh every minute without the charts starting over. While a section's data loads you see a plain grey placeholder, never made-up numbers. If your device is set to reduce motion, charts simply appear; printed pages and PDF exports always show the finished charts.
   - **Export ▾ → Market report · PDF** makes a Market report with a street map of the area and every section; **Market data · CSV** saves every number as a spreadsheet.
 - **Markets**, on the Market page (Market → Overview), lists prices for the things that move Houston real estate, in groups you pick from the tabs:
   - oil and natural gas, and Houston's big energy and other public companies;
@@ -643,6 +644,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Charts that move with the data:** charts across the app (Market, Timeline, Compare, the assistant's chart cards, crime and FEMA reports) draw in once when you first see them, and glide to new values when you change the range, county, filters, Group by or Measure instead of redrawing. The headline numbers and Area at a Glance count to their new values (instantly during the time-lapse). The Timeline keeps the range you dragged when you change Group by or Measure, and highlights the month under the pointer. Reduced-motion settings are respected, and exports always show the finished charts.
 - **Drive-time bands clear when you close the card:** closing a drive-time map (or the property card it came from) with × or Esc now takes the bands off the map, and the legend has a **Clear from map** link.
 - **No more size limits on area reports:** the FEMA report (was 400 square miles, and flood-zone shares only up to 60), the Air Traffic report (was 2,000) and the Traffic report (was 5,000) now take any area up to several counties. FEMA reads claims for every census tract instead of the first 60. Traffic's Export CSV lists every counted road segment, and the crime Export CSV lists up to the newest 20,000 incidents instead of 2,000.
 - **Environmental report for any size of area:** the 30-square-mile limit is gone (a whole county works). Counts are now exact (no more "1,000+"), the table adds an **On site** column, larger areas get soils by share of the site, a source that times out can be retried on its own, and Export CSV lists every record.
