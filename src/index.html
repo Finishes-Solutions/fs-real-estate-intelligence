@@ -18,39 +18,67 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<div class="app">
+<div class="app" data-view="map">
+  <header class="appbar" id="appbar">
+    <button class="ptoggle" id="panelToggle" aria-label="Show or hide the list" title="Show or hide the list"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg></button>
+    <img class="ab-logo l-light" alt="Finishes Solutions" src="logo.png">
+    <nav class="viewbar" id="viewbar" aria-label="Main"></nav>
+    <div class="ab-util">
+      <button class="ab-ask" id="askTop" type="button" aria-controls="ai"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/></svg><span>Ask AI</span></button>
+      <button class="ab-ic" id="helpBtn" type="button" aria-pressed="false" aria-label="Data and help" title="Data sources &amp; help"><span aria-hidden="true">?</span></button>
+      <button class="ab-ic" id="settingsBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsSheet" aria-label="Settings" title="Settings"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="2.6"/><path d="M10 1.8v2.3M10 15.9v2.3M18.2 10h-2.3M4.1 10H1.8M15.8 4.2l-1.6 1.6M5.8 14.2l-1.6 1.6M15.8 15.8l-1.6-1.6M5.8 5.8 4.2 4.2"/><circle cx="10" cy="10" r="5.6"/></svg></button>
+    </div>
+  </header>
   <aside class="panel" id="panel" aria-label="Property intelligence">
     <button class="sheet-toggle" id="sheetToggle" aria-label="Expand list"></button>
-    <div class="brandbar">
-      <img class="l-light" alt="Finishes Solutions" src="logo.png">
-      <button class="theme-btn" id="themeBtn" aria-label="Toggle light or dark">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="3.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
-      </button>
-    </div>
-    <div class="head">
-      <div class="kicker" id="kicker">Real Estate Intelligence · Texas</div>
-      <h1>Real Estate Intelligence Platform</h1>
-      <p class="sub">Click any building or parcel for its owner, value, zoning and site risks. Search an address, pick an area for flood, traffic, drive-time and market reports, or turn on layers like parcels, flood zones, demographics and construction filings.</p>
-    </div>
-    <section class="glance" id="glance" aria-live="polite"></section>
-    <div class="selbar area" id="selbar">
-      <div class="kicker">This Area</div>
-      <div class="s1"><b id="selName">Everything shown</b><span id="selStats"></span></div>
-      <div class="btnrow">
-        <button class="btn primary" id="selCompare" type="button">+ Compare</button>
-        <button class="btn" id="selCompareEach" type="button" style="display:none" title="Add each selected county to Compare as its own area">+ Compare Each</button>
-        <button class="btn" id="selClear">Clear Selection</button>
-        <button class="btn" id="selFema" type="button" style="display:none">FEMA Report</button>
-        <button class="btn" id="selEnv" type="button" style="display:none">Environmental Report</button>
+    <!-- first visit: what the app does (Got it hides it; Data & help › Getting started brings it back) -->
+    <section class="ptip" id="introTip" aria-labelledby="introTipH" hidden>
+      <div class="ptip-h"><b id="introTipH">Getting started</b><button class="btn sm" id="introTipOk" type="button">Got it</button></div>
+      <p class="ptip-t">Click any building or parcel for its owner, value, zoning and site risks. Pick an area below for reports on it, and turn on layers like parcels and flood zones from the map’s buttons.</p>
+    </section>
+    <!-- where am I: the selected area (or the map view), pinned while the panel scrolls -->
+    <div class="scope" id="selbar">
+     <div class="sc-card">
+      <div class="sc-r1">
+        <span class="sc-ic" id="selIcon" aria-hidden="true"></span>
+        <div class="sc-nm"><span class="sc-k" id="selKind"><span class="sk-l">No area picked</span></span><b id="selName">Map view</b></div>
+        <button class="sc-x" id="selClear" type="button" title="Clear the selected area; filters stay" aria-label="Clear the selected area (filters stay)" style="display:none"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+        <button class="head-gear" id="exploreSettings" type="button" aria-label="Settings" title="Settings"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="2.6"/><path d="M10 1.8v2.3M10 15.9v2.3M18.2 10h-2.3M4.1 10H1.8M15.8 4.2l-1.6 1.6M5.8 14.2l-1.6 1.6M15.8 15.8l-1.6-1.6M5.8 5.8 4.2 4.2"/><circle cx="10" cy="10" r="5.6"/></svg></button>
       </div>
-      <div class="btnrow">
-        <button class="btn" id="saveSearch">Save Search</button>
-        <button class="btn" id="copyLink">Copy Link</button>
-        <a class="btn" id="rssLink" href="api/feed" target="_blank" rel="noopener" title="New construction filings matching this view, as an RSS feed">Filing Alerts (RSS)</a>
+      <div class="sc-r2">
+        <span class="sc-st" id="selStats"></span>
+        <span class="sc-acts">
+          <button class="btn sm" id="selCompare" type="button">+ Compare</button>
+          <button class="btn sm" id="selCompareEach" type="button" style="display:none" title="Add each selected county to Compare as its own area">+ Compare Each</button>
+          <details class="vmenu sc-more" id="scopeMenu">
+            <summary class="btn sm" aria-label="More for this area: save, copy link, alerts" title="Save search, copy link, filing alerts"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="12.5" cy="8" r="1.4"/></svg></summary>
+            <div class="vm-pop" role="menu">
+              <button type="button" role="menuitem" id="saveSearch">Save search<em>Keep these filters and this area in this browser</em></button>
+              <form class="sc-save" id="saveForm" hidden><label for="saveName">Name this search</label><span><input id="saveName" maxlength="80" autocomplete="off"><button class="btn sm primary" type="submit">Save</button></span></form>
+              <button type="button" role="menuitem" id="copyLink">Copy link<em>Opens with these filters and this area</em></button>
+              <a role="menuitem" id="rssLink" href="api/feed" target="_blank" rel="noopener" title="New construction filings matching this view, as an RSS feed">Filing alerts (RSS)<em>New matching filings in a reader or email tool</em></a>
+            </div>
+          </details>
+        </span>
       </div>
-      <details class="saved" id="savedBox"><summary>Saved Searches <span id="savedN"></span></summary><div id="savedList"></div></details>
+      <div class="sc-pick" id="selPick"><span>Pick an area:</span><button class="btn sm" type="button" data-pick="area">Box</button><button class="btn sm" type="button" data-pick="poly">Shape</button><button class="btn sm" type="button" data-pick="radius">Radius</button><button class="btn sm" type="button" data-pick="county">County</button></div>
+     </div>
     </div>
-    <button class="sechead fsec" id="secFilings" type="button" aria-expanded="false" aria-controls="filingsBody"><svg class="chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg><span>Construction Filings</span><em id="filingsPeriod"></em></button>
+    <details class="saved psec" id="savedBox"><summary>Saved searches <span id="savedN"></span></summary><div id="savedList"></div><button class="lnk sv-all" id="savedAll" type="button">Manage in My Work →</button></details>
+    <section class="glance psec" id="glance" aria-live="polite"></section>
+    <!-- what can I run on it: one row per area report (FEMA, Environmental, Crime and the reportkit ones) -->
+    <section class="arep psec" id="areaReports" aria-labelledby="arepH">
+      <div class="ar-h"><b class="ar-t" id="arepH">Reports for this area</b><button class="lnk" id="arepAll" type="button">All reports →</button></div>
+      <div class="ar-grid" id="arepGrid">
+        <button class="ar-row" id="selFema" type="button" data-ic="flood" style="display:none" title="FEMA flood zones, flood insurance claims, the national risk index and disaster declarations for the selected area"><span class="ar-i" aria-hidden="true"></span><b>FEMA Report</b><span class="ar-d">Flood zones, claims</span></button>
+        <button class="ar-row" id="selEnv" type="button" data-ic="env" style="display:none" title="A screen of public environmental databases (cleanup sites, permits, tanks) for the selected area"><span class="ar-i" aria-hidden="true"></span><b>Environmental Report</b><span class="ar-d">Cleanup sites, permits</span></button>
+        <button class="ar-row" id="selCrime" type="button" data-ic="crime" hidden title="Houston Police incidents: the last 12 months against the year before"><span class="ar-i" aria-hidden="true"></span><b>Crime Report</b><span class="ar-d">Houston Police, last 12 months</span></button>
+      </div>
+    </section>
+    <div class="fsec-h" id="filingsHead">
+      <button class="fsec-b" id="secFilings" type="button" aria-expanded="false" aria-controls="filingsBody"><svg class="chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span class="fs-ic" aria-hidden="true"></span><span class="fs-t"><b>Construction Filings</b><span id="filingsLive"></span><em id="filingsPeriod"></em></span></button>
+      <label class="tg2 fsw" title="Show the filing dots on the map"><input type="checkbox" role="switch" id="filingsOnMap"><span>On map</span></label>
+    </div>
     <div class="fbody" id="filingsBody">
     <div class="fhead">
       <div class="kpiwrap">
@@ -59,43 +87,41 @@
         <div class="kpi-pop" id="kpiPop" role="dialog" aria-label="Headline metrics"></div>
       </div>
     </div>
-    <button class="sechead listhead" id="secList" type="button" aria-expanded="true" aria-controls="list"><svg class="chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg><span id="listCount"></span></button>
+    <div class="listhead" id="secList"><span id="listCount"></span></div>
     <div class="list" id="list" role="list"></div>
+    <p class="fnote">From <a href="https://www.tdlr.texas.gov/TABS/Search" target="_blank" rel="noopener">TDLR TABS</a> registrations <span id="periodTxt"></span>. Costs and dates are filer estimates; use, tenant and developer are AI-extracted and can be wrong. <span id="missTxt"></span></p>
     </div>
-    <div class="foot">Sources: parcels from Texas GIO StratMap and Regrid; demographics from US Census ACS 5-year and LEHD; flood zones from FEMA; traffic counts from TxDOT; businesses and places from Overture Maps, Foursquare and OpenStreetMap. Construction filings: <a href="https://www.tdlr.texas.gov/TABS/Search" target="_blank" rel="noopener">TDLR TABS</a>, registrations <span id="periodTxt"></span>; costs and dates are filer estimates, and use, tenant and developer fields are AI-extracted and can be wrong. <span id="missTxt"></span> Every source and its freshness is in the Sources tab. Basemaps © MapTiler © OpenStreetMap contributors.</div>
+    <div class="pfoot"><button class="lnk" id="footSources" type="button">Data sources &amp; freshness →</button><span title="Basemaps © MapTiler © OpenStreetMap contributors">© MapTiler © OpenStreetMap</span></div>
   </aside>
 
   <div class="presize" id="pResize" role="separator" aria-orientation="vertical" aria-label="Resize the list panel" title="Drag to resize · double-click to reset" tabindex="0"></div>
   <main class="stage" id="stage" data-view="map">
-    <nav class="viewbar" id="viewbar" aria-label="Views">
-      <button class="ptoggle" id="panelToggle" aria-label="Show or hide the list" title="Show or hide the list"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg></button>
-      <button data-view="map" aria-pressed="true">Map</button><button data-view="market" aria-pressed="false">Market</button><button data-view="compare" aria-pressed="false">Compare <span class="badge" id="cmpBadge"></span></button><button data-view="reports" aria-pressed="false">Reports</button><button data-view="field" aria-pressed="false">Notes <span class="badge" id="fieldBadge"></span></button><button data-view="projects" aria-pressed="false">Projects <span class="badge" id="pjBadge"></span></button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="who" aria-pressed="false">Activity</button><button data-view="changes" aria-pressed="false">Updates <span class="badge" id="chgBadge"></span></button><button data-view="sources" aria-pressed="false">Sources</button>
-    </nav>
     <div class="viewport" id="viewport">
     <div id="map" aria-label="Interactive real estate map"></div>
     <div class="mapleft" id="mapleft">
+    <div class="msearch" id="msearch">
+      <label class="msbox"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="7" r="4.6"/><path d="M10.5 10.5 14 14"/></svg><input id="msq" type="search" placeholder="Search addresses, places, projects, owners, developers…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="msres" aria-label="Search the map"><button class="msx" id="msx" type="button" aria-label="Clear search" hidden>×</button></label>
+      <div class="msres" id="msres" role="listbox"></div>
+    </div>
     <div class="maptop">
-      <div class="tools" role="toolbar" aria-label="Map tools">
+      <button class="selpill" id="selPill" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="mapTools" title="Pick an area on the map"><svg class="sp-ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-dasharray="2.2 2"><rect x="2.5" y="3.5" width="11" height="9" rx="1"/></svg><span>Select</span><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5 5 6.5 8 3.5"/></svg></button>
+      <div class="tools" id="mapTools" role="toolbar" aria-label="Map tools">
+      <div class="tools-h"><b>Pick an area</b><button type="button" class="x" id="selClose" aria-label="Close">×</button></div>
       <button data-mode="pan" aria-pressed="true" title="Move the map"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8v12.4M1.8 8h12.4M6.2 3.6 8 1.8l1.8 1.8M6.2 12.4 8 14.2l1.8-1.8M3.6 6.2 1.8 8l1.8 1.8M12.4 6.2 14.2 8l-1.8 1.8"/></svg><span>Move</span></button>
       <button data-mode="area" aria-pressed="false" title="Drag a box"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-dasharray="2.2 2"><rect x="2.5" y="3.5" width="11" height="9" rx="1"/></svg><span>Area</span></button>
       <button data-mode="poly" aria-pressed="false" title="Draw a shape"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 4.5 9.5 2.5 13.5 8 10 13.5 2.5 11z"/></svg><span>Shape</span></button>
       <button data-mode="radius" aria-pressed="false" title="Search an address and a radius"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><path d="M8 8h6" stroke-dasharray="1.6 1.6"/></svg><span>Radius</span></button>
       <button data-mode="county" aria-pressed="false" title="Pick counties"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M2.5 3h5v4.5h6V13h-11z"/></svg><span>County</span></button>
     </div>
+      <button class="lybtn" id="layersOpen" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="layers" title="Map layers"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 2 14.5 5.5 8 9 1.5 5.5z"/><path d="M2.5 8.2 8 11.2l5.5-3M2.5 10.9 8 13.9l5.5-3"/></svg><span>Layers</span><b class="fcount" id="layersN" hidden></b></button>
       <div class="fwrap" id="fwrap">
       <button class="fbtn" id="filterBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="filterPop" title="Filter the map layers"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h12l-4.6 5.4v4.4l-2.8 1.4V8.4z"/></svg><span>Filters</span><b class="fcount" id="filterN" hidden></b></button>
       <button class="fclear" id="filterClear" type="button" title="Clear filters, selection and search outline" aria-label="Clear filters, selection and search outline" hidden><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg><span>Clear</span></button>
       <div class="fpop" id="filterPop" role="dialog" aria-label="Filters" hidden>
-        <div class="fpop-h"><div><b>Filters</b><span>Narrow what the map shows, layer by layer</span></div><button class="x" id="filterClose" type="button" aria-label="Close filters"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button><div class="seg lfmode" id="lfMode" role="group" aria-label="How filters work"><button type="button" data-m="each" aria-pressed="true">Filter each layer</button><button type="button" data-m="match" aria-pressed="false">Match everything</button></div><div class="active" id="activeBar"><span id="activeTxt"></span><button class="fpill" id="resetAll" type="button"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>Clear All</button></div></div>
+        <div class="fpop-h"><div><b>Filters</b><span>Narrow what the map shows, layer by layer</span></div><button class="x" id="filterClose" type="button" aria-label="Close filters"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button><div class="seg lfmode" id="lfMode" role="group" aria-label="How filters work"><button type="button" data-m="each" aria-pressed="true">Filter each layer</button><button type="button" data-m="match" aria-pressed="false">Match everything</button></div><p class="lfhelp" id="lfHelp">Each filter narrows its own layer: filings, census tracts, roads, flood zones or crime.</p><div class="active" id="activeBar"><span id="activeTxt"></span><button class="fpill" id="resetAll" type="button"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>Clear All</button></div></div>
           <div class="lfbody" id="lfBody">
             <div class="lfmatch" id="lfMatch" hidden></div>
-            <details class="lfsec" id="lfDemo" open><summary>Demographics <em></em></summary><div class="lfrows" data-group="demo"></div></details>
-            <details class="lfsec" id="lfTraffic"><summary>Traffic <em></em></summary><div class="lfrows" data-group="traffic"></div></details>
-            <details class="lfsec" id="lfRisk"><summary>Risk <em></em></summary><div class="lfrows" data-group="risk"></div>
-              <div class="lfrow"><label for="lfFlood">Flood zones on the map</label><select class="chip" id="lfFlood"><option value="all">All flood zones</option><option value="high">High-risk (100-year) only</option></select></div>
-              <div class="lfrow"><label for="lfCrime">Crime type (Houston)</label><select class="chip" id="lfCrime"><option value="t">All incidents</option><option value="v">Violent</option><option value="p">Property</option></select></div>
-            </details>
-            <details class="lfsec" id="lfFilings"><summary>Construction filings <em id="filingsSecN"></em></summary><div class="lfrows" data-group="filings"></div>
+            <details class="lfsec" id="lfFilings" open><summary>Construction filings <em id="filingsSecN"></em></summary><div class="lfrows" data-group="filings"></div>
           <div class="filters" id="filtersBody">
                 <div class="row" id="periodRow"><span class="lbl">Filed</span></div>
                 <div class="row" id="countyRow"><span class="lbl">County</span></div>
@@ -136,9 +162,15 @@
                   <span class="to">to</span>
                   <input class="chip mon" type="month" id="dTo" aria-label="To month" disabled>
                 </div>
-                <div class="row" id="chgRow"><span class="lbl">Updates</span></div>
+                <div class="row" id="chgRow"><span class="lbl">Changes</span></div>
                 </details>
               </div>
+            </details>
+            <details class="lfsec" id="lfDemo"><summary>Demographics <em></em></summary><div class="lfrows" data-group="demo"></div></details>
+            <details class="lfsec" id="lfTraffic"><summary>Traffic <em></em></summary><div class="lfrows" data-group="traffic"></div></details>
+            <details class="lfsec" id="lfRisk"><summary>Risk <em></em></summary><div class="lfrows" data-group="risk"></div>
+              <div class="lfrow"><label for="lfFlood">Flood zones on the map</label><select class="chip" id="lfFlood"><option value="all">All flood zones</option><option value="high">High-risk (100-year) only</option></select></div>
+              <div class="lfrow"><label for="lfCrime">Crime type (Houston)</label><select class="chip" id="lfCrime"><option value="t">All incidents</option><option value="v">Violent</option><option value="p">Property</option></select></div>
             </details>
           </div>
           <div class="fpop-f"><button class="fdone" id="filterDone" type="button">Show filings</button></div>
@@ -146,11 +178,9 @@
       </div>
       <button class="exbtn" id="exportBtn" type="button" aria-haspopup="dialog"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.8 6.8 8 10l3.2-3.2M2.5 11.5v2h11v-2"/></svg><span>Export</span></button>
     </div>
-    <div class="msearch" id="msearch">
-      <label class="msbox"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="7" r="4.6"/><path d="M10.5 10.5 14 14"/></svg><input id="msq" type="search" placeholder="Search addresses, places, projects, owners, developers…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="msres" aria-label="Search the map"><button class="msx" id="msx" type="button" aria-label="Clear search" hidden>×</button></label>
-      <div class="msres" id="msres" role="listbox"></div>
-    </div>
-    <div class="qlayers" id="qlayers" role="toolbar" aria-label="Quick layers"></div>
+    <div class="qlayers" id="qlayers" role="toolbar" aria-label="Map layers on and off"></div>
+    <div class="fchips" id="fchips" role="group" aria-label="Filters in effect" hidden></div>
+    <div class="modechip" id="modeChip" hidden><span id="modeChipT">Drawing a shape</span><button type="button" id="modeCancel">Cancel</button></div>
     <div class="hint" id="hint"></div>
     <div class="radius" id="radius" role="dialog" aria-label="Radius search">
       <label class="rrow"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="7" r="4.6"/><path d="M10.5 10.5 14 14"/></svg><input id="rq" type="search" placeholder="Address, place, or lat, long" autocomplete="off" aria-label="Search a location"></label>
@@ -162,78 +192,100 @@
     <div class="placebar" id="placebar" aria-live="polite"></div>
     </div>
     <div class="toast" id="toast" role="status"></div>
-    <div class="ctrls">
-      <button id="zin" aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg></button>
-      <button id="zout" aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10"/></svg></button>
-      <button id="flat" aria-label="Reset to a flat 2D view here" title="Flat 2D view, north up (stays here)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><g class="needle"><path d="M8 2.6 10 8H6z" fill="#c03b3a"/><path d="M8 13.4 6 8h4z" fill="currentColor" opacity=".45"/></g></svg></button>
-      <div class="sep"></div>
-      <button id="locate" aria-label="Near me" title="The area around my location"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="4.5"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><path d="M8 1v2.2M8 12.8V15M1 8h2.2M12.8 8H15"/></svg></button>
-      <button id="home" aria-label="Back to the whole region" title="Back to the whole region"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h8V6.5"/></svg></button>
-      <button id="timeBtn" aria-label="Time-lapse by month" title="Time-lapse: play month by month" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.6V8l2.4 1.6"/></svg></button>
+    <div class="ctrls" role="toolbar" aria-label="Map camera">
+      <div class="rgrp">
+      <button id="zin" aria-label="Zoom in" title="Zoom in"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg></button>
+      <button id="zout" aria-label="Zoom out" title="Zoom out"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10"/></svg></button>
+      </div>
+      <div class="rgrp">
+      <button id="flat" aria-label="Flat 2D view, north up" title="Flat 2D view, north up (stays here)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><g class="needle"><path d="M8 2.6 10 8H6z" fill="#c03b3a"/><path d="M8 13.4 6 8h4z" fill="currentColor" opacity=".45"/></g></svg></button>
+      <button id="locate" aria-label="Near me" title="Near me: the area around my location"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="4.5"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><path d="M8 1v2.2M8 12.8V15M1 8h2.2M12.8 8H15"/></svg></button>
+      <div class="rmenu" id="resetMenu">
+        <button id="resetView" type="button" aria-label="Reset view" title="Reset view" aria-haspopup="menu" aria-expanded="false" aria-controls="resetPop"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h8V6.5"/></svg><svg class="rcaret" width="7" height="7" viewBox="0 0 8 8" fill="currentColor"><path d="M1 2.5h6L4 6z"/></svg></button>
+        <div class="rpop" id="resetPop" role="menu" aria-label="Reset view" hidden>
+          <button id="home" type="button" role="menuitem" title="Back to the whole region"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h8V6.5"/></svg><span>Whole region</span></button>
+          <button id="orbit" type="button" role="menuitem" title="Zoom out to the globe"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c2 2 2 9 0 11M8 2.5c-2 2-2 9 0 11"/></svg><span>Globe</span></button>
+        </div>
+      </div>
+      </div>
       <button id="layersBtn" aria-label="Map layers" title="Map layers" aria-expanded="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 2 14.5 5.5 8 9 1.5 5.5z"/><path d="M2.5 8.2 8 11.2l5.5-3M2.5 10.9 8 13.9l5.5-3"/></svg></button>
-      <button id="orbit" aria-label="Zoom out to the globe" title="Globe view"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c2 2 2 9 0 11M8 2.5c-2 2-2 9 0 11"/></svg></button>
     </div>
     <div class="layers" id="layers" role="dialog" aria-label="Map layers">
-      <div class="ly-h"><b>Map layers</b><button type="button" class="x" id="layersX" aria-label="Close map layers">×</button></div>
-      <div class="lt">Base Map</div>
-      <div class="seg seg6" id="styleSeg">
-        <button data-style="dots" aria-pressed="true">Default</button><button data-style="streets" aria-pressed="false">Streets</button><button data-style="sat" aria-pressed="false">Satellite</button><button data-style="topo" aria-pressed="false">Topo</button><button data-style="esri" aria-pressed="false" title="Esri World Imagery (no key)">ESRI</button><button data-style="free" aria-pressed="false" title="OpenFreeMap streets (no key)">Free Map</button><button data-style="google" aria-pressed="false" title="Google Maps" hidden>Google</button><button data-style="gsat" aria-pressed="false" title="Google satellite with roads and labels" hidden>Google Sat</button>
-      </div>
-      <div class="lt">Property &amp; Site</div>
-      <label class="tg2"><input type="checkbox" id="lyBldg" checked><span>3D Buildings (Zoom In)</span></label>
-      <label class="tg2" id="lyG3dRow" title="Google photorealistic 3D city model (street zoom, tilt the map)" hidden><input type="checkbox" id="lyG3d"><span>Google 3D (Photorealistic)</span></label>
-      <label class="tg2" title="Regrid parcel boundaries at street zoom (counts against the monthly Regrid tile allowance)"><input type="checkbox" id="lyRegrid"><span>Parcel Lines (Regrid)</span></label>
-      <label class="tg2" title="Every mapped business and place at street zoom (Overture Maps and Foursquare open data, refreshed monthly)"><input type="checkbox" id="lyPlaces"><span>Businesses &amp; Places</span></label>
-      <select class="chip" id="lyPlacesGrp" aria-label="Kind of business" hidden></select>
-      <div class="rnote" id="lyPlacesNote" hidden></div>
-      <label class="tg2" title="FEMA National Flood Hazard Layer: 100-year and 500-year flood zones (zoom in)"><input type="checkbox" id="lyFema"><span>Flood Zones (FEMA)</span></label>
-      <div class="rnote" id="lyFemaNote" hidden>FEMA's effective flood map at street zoom: the high-risk (100-year) floodplain and floodway, and the 0.2% (500-year) zone, in FEMA's colors. Select an area for a FEMA report.</div>
-      <label class="tg2" title="TxDOT traffic counts: average vehicles a day on each counted road (Texas; zoom in)"><input type="checkbox" id="lyAadt"><span>Traffic Counts</span></label>
-      <div class="rnote" id="lyAadtNote" hidden>Average vehicles a day on each counted road (TxDOT), thicker and redder for busier roads. Zoom in to a part of town to see them. Select an area for a traffic report.</div>
-      <label class="tg2" title="Houston Police incidents in the last 12 months (City of Houston)"><input type="checkbox" id="lyCrime"><span>Crime (Houston)</span></label>
-      <select class="chip" id="lyCrimeCat" aria-label="Crime type" hidden><option value="t">All incidents</option><option value="v">Violent</option><option value="p">Property</option></select>
-      <div class="rnote" id="lyCrimeNote" hidden></div>
-      <label class="tg2" title="Airports worldwide: large and medium from far out, small fields and heliports as you zoom in"><input type="checkbox" id="lyAirports"><span>Airports</span></label>
-      <div class="rnote" id="lyAirportsNote" hidden></div>
-      <div class="lt">Environment</div>
-      <label class="tg2" title="State and federal environmental records: cleanup and contamination sites, petroleum tanks, EPA-permitted facilities (zoom in)"><input type="checkbox" id="lyEnvSites"><span>Environmental Sites</span></label>
-      <select class="chip" id="lyEnvSet" aria-label="Which environmental records" hidden></select>
-      <div class="rnote" id="lyEnvSitesNote" hidden></div>
-      <label class="tg2" title="Railroad Commission of Texas: oil and gas wells and pipelines (zoom in)"><input type="checkbox" id="lyRrc"><span>Oil &amp; Gas Wells, Pipelines</span></label>
-      <div class="rnote" id="lyRrcNote" hidden></div>
-      <label class="tg2" title="US Fish &amp; Wildlife Service National Wetlands Inventory (zoom in)"><input type="checkbox" id="lyWetlands"><span>Wetlands</span></label>
-      <div class="rnote" id="lyWetlandsNote" hidden></div>
-      <label class="tg2" title="USDA soil survey map units (zoom in)"><input type="checkbox" id="lySoils"><span>Soils</span></label>
-      <div class="rnote" id="lySoilsNote" hidden></div>
-      <div class="lt">Utilities</div>
-      <label class="tg2" title="Power lines and substations (OpenStreetMap); in Houston, public sewer and water mains at street zoom (zoom in)"><input type="checkbox" id="lyUtil"><span>Power, Water &amp; Sewer Lines</span></label>
-      <div class="rnote" id="lyUtilNote" hidden></div>
-      <div class="lt">Demographics (Census Tracts)</div>
-      <select class="chip" id="lyDemo" aria-label="Demographic layer">
+      <div class="ly-h"><span class="ly-grab" aria-hidden="true"></span><b>Map layers<em id="lyHeadN"></em></b><button type="button" class="x" id="layersX" aria-label="Close map layers">×</button></div>
+      <div class="ly-on" id="lyOnNow" hidden><div class="ly-ont">On now</div><div class="ly-onl" id="lyOnList"></div></div>
+      <details class="lysec" data-lyg="filings"><summary><span class="lys-t">Construction filings</span><em></em></summary><div class="lyb">
+        <div class="lyrow2"><label class="tg2"><input type="checkbox" id="lyFilings"><span>Show filings on the map</span></label><button type="button" class="lyplay" data-timelapse aria-pressed="false"><svg width="11" height="11" viewBox="0 0 12 12"><path d="M3 1.5v9l7-4.5z" fill="currentColor"/></svg><span>Play by month</span></button></div>
+        <div class="seg seg2" id="sizeSeg"><button data-size="uniform" aria-pressed="true">Same Size</button><button data-size="value" aria-pressed="false">Sized by Value</button></div>
+        <div class="lsub">Activity heatmap</div>
+        <div class="seg" id="heatSeg"><button data-heat="off" aria-pressed="true">Off</button><button data-heat="count" aria-pressed="false">Filings</button><button data-heat="value" aria-pressed="false">Value</button></div>
+      </div></details>
+      <details class="lysec" data-lyg="property"><summary><span class="lys-t">Property &amp; site</span><em></em></summary><div class="lyb">
+        <label class="tg2" title="Regrid parcel boundaries at street zoom (counts against the monthly Regrid tile allowance)"><input type="checkbox" id="lyRegrid"><span>Parcel Lines (Regrid)</span></label>
+        <label class="tg2" title="Every mapped business and place at street zoom (Overture Maps and Foursquare open data, refreshed monthly)"><input type="checkbox" id="lyPlaces"><span>Businesses &amp; Places</span></label>
+        <select class="chip" id="lyPlacesGrp" aria-label="Kind of business" hidden></select>
+        <div class="rnote" id="lyPlacesNote" hidden></div>
+        <label class="tg2" title="FEMA National Flood Hazard Layer: 100-year and 500-year flood zones (zoom in)"><input type="checkbox" id="lyFema"><span>Flood Zones (FEMA)</span></label>
+        <div class="rnote" id="lyFemaNote" hidden>FEMA's effective flood map at street zoom: the high-risk (100-year) floodplain and floodway, and the 0.2% (500-year) zone, in FEMA's colors. Select an area for a FEMA report.</div>
+        <label class="tg2" title="TxDOT traffic counts: average vehicles a day on each counted road (Texas; zoom in)"><input type="checkbox" id="lyAadt"><span>Traffic Counts</span></label>
+        <div class="rnote" id="lyAadtNote" hidden>Average vehicles a day on each counted road (TxDOT), thicker and redder for busier roads. Zoom in to a part of town to see them. Select an area for a traffic report.</div>
+        <label class="tg2" title="Houston Police incidents in the last 12 months (City of Houston)"><input type="checkbox" id="lyCrime"><span>Crime (Houston)</span></label>
+        <select class="chip" id="lyCrimeCat" aria-label="Crime type" hidden><option value="t">All incidents</option><option value="v">Violent</option><option value="p">Property</option></select>
+        <div class="rnote" id="lyCrimeNote" hidden></div>
+        <label class="tg2" title="Airports worldwide: large and medium from far out, small fields and heliports as you zoom in"><input type="checkbox" id="lyAirports"><span>Airports</span></label>
+        <div class="rnote" id="lyAirportsNote" hidden></div>
+      </div></details>
+      <details class="lysec" data-lyg="env"><summary><span class="lys-t">Environment</span><em></em></summary><div class="lyb">
+        <label class="tg2" title="State and federal environmental records: cleanup and contamination sites, petroleum tanks, EPA-permitted facilities (zoom in)"><input type="checkbox" id="lyEnvSites"><span>Environmental Sites</span></label>
+        <select class="chip" id="lyEnvSet" aria-label="Which environmental records" hidden></select>
+        <div class="rnote" id="lyEnvSitesNote" hidden></div>
+        <label class="tg2" title="Railroad Commission of Texas: oil and gas wells and pipelines (zoom in)"><input type="checkbox" id="lyRrc"><span>Oil &amp; Gas Wells, Pipelines</span></label>
+        <div class="rnote" id="lyRrcNote" hidden></div>
+        <label class="tg2" title="US Fish &amp; Wildlife Service National Wetlands Inventory (zoom in)"><input type="checkbox" id="lyWetlands"><span>Wetlands</span></label>
+        <div class="rnote" id="lyWetlandsNote" hidden></div>
+        <label class="tg2" title="USDA soil survey map units (zoom in)"><input type="checkbox" id="lySoils"><span>Soils</span></label>
+        <div class="rnote" id="lySoilsNote" hidden></div>
+      </div></details>
+      <details class="lysec" data-lyg="util"><summary><span class="lys-t">Utilities</span><em></em></summary><div class="lyb">
+        <label class="tg2" title="Power lines and substations (OpenStreetMap); in Houston, public sewer and water mains at street zoom (zoom in)"><input type="checkbox" id="lyUtil"><span>Power, Water &amp; Sewer Lines</span></label>
+        <div class="rnote" id="lyUtilNote" hidden></div>
+      </div></details>
+      <details class="lysec" data-lyg="demo"><summary><span class="lys-t">Demographics (census tracts)</span><em></em></summary><div class="lyb">
+        <select class="chip" id="lyDemo" aria-label="Demographic layer">
         <option value="">Off</option><option value="gr">Population Growth</option><option value="pop">Population</option><option value="inc">Median Household Income</option>
         <option value="val">Median Home Value</option><option value="rent">Median Gross Rent</option><option value="vacr">Housing Vacancy Rate</option>
         <option value="jobs">Jobs Located Here</option><option value="jgr">Job Growth</option><option value="jpr">Jobs per Resident</option>
         <option value="spend">Consumer Spending (Est.)</option><option value="sph">Spending per Household (Est.)</option><option value="dine">Dining Out Spending (Est.)</option><option value="furn">Home Furnishings Spending (Est.)</option><option value="appa">Apparel Spending (Est.)</option>
       </select>
-      <div class="lt">Construction Filings (TDLR)</div>
-      <label class="tg2"><input type="checkbox" id="lyFilings"><span>Show Filings</span></label>
-      <div class="seg seg2" id="sizeSeg"><button data-size="uniform" aria-pressed="true">Same Size</button><button data-size="value" aria-pressed="false">Sized by Value</button></div>
-      <div class="lsub">Activity heatmap</div>
-      <div class="seg" id="heatSeg"><button data-heat="off" aria-pressed="true">Off</button><button data-heat="count" aria-pressed="false">Filings</button><button data-heat="value" aria-pressed="false">Value</button></div>
-      <div class="lt">Map Display</div>
-      <label class="tg2"><input type="checkbox" id="lyGrid" checked><span>Dot Grid</span></label>
-      <label class="tg2"><input type="checkbox" id="lyCounties" checked><span>County &amp; State Lines</span></label>
-      <label class="tg2"><input type="checkbox" id="lyRoads" checked><span>Roads</span></label>
-      <label class="tg2"><input type="checkbox" id="lyNames" checked><span>Road Names</span></label>
-      <label class="tg2"><input type="checkbox" id="ly3d"><span>3D View (Tilt)</span></label>
+      </div></details>
+      <details class="lysec" data-lyg="live"><summary><span class="lys-t">Live conditions</span><em></em></summary><div class="lyb">
+
+      </div></details>
+      <details class="lysec" data-lyg="base"><summary><span class="lys-t">Base map, imagery &amp; 3D</span><em></em></summary><div class="lyb">
+        <div class="lsub">Base map</div>
+        <div class="seg seg6" id="styleSeg">
+        <button data-style="dots" aria-pressed="true">Default</button><button data-style="streets" aria-pressed="false">Streets</button><button data-style="sat" aria-pressed="false">Satellite</button><button data-style="topo" aria-pressed="false">Topo</button><button data-style="esri" aria-pressed="false" title="Esri World Imagery (no key)">ESRI</button><button data-style="free" aria-pressed="false" title="OpenFreeMap streets (no key)">Free Map</button><button data-style="google" aria-pressed="false" title="Google Maps" hidden>Google</button><button data-style="gsat" aria-pressed="false" title="Google satellite with roads and labels" hidden>Google Sat</button>
+      </div>
+        <label class="tg2"><input type="checkbox" id="lyBldg" checked><span>3D Buildings (Zoom In)</span></label>
+        <label class="tg2" id="lyG3dRow" title="Google photorealistic 3D city model (street zoom, tilt the map)" hidden><input type="checkbox" id="lyG3d"><span>Google 3D (Photorealistic)</span></label>
+      </div></details>
+      <details class="lysec" data-lyg="display"><summary><span class="lys-t">Map display<small>Dot grid, county lines, roads, road names</small></span><em></em></summary><div class="lyb">
+        <label class="tg2"><input type="checkbox" id="lyGrid" checked><span>Dot Grid</span></label>
+        <label class="tg2"><input type="checkbox" id="lyCounties" checked><span>County &amp; State Lines</span></label>
+        <label class="tg2"><input type="checkbox" id="lyRoads" checked><span>Roads</span></label>
+        <label class="tg2"><input type="checkbox" id="lyNames" checked><span>Road Names</span></label>
+        <label class="tg2" hidden><input type="checkbox" id="ly3d"><span>3D View (Tilt)</span></label>
+      </div></details>
+      <div class="ly-f"><button type="button" class="fdone" id="layersDone">Done</button></div>
     </div>
-    <div class="legends">
-    <div class="legend" aria-hidden="true">
+    <div class="legends" id="legends" role="region" aria-label="Map legend">
+    <div class="lg-h"><b>Legend</b><button type="button" class="lg-tog" id="lgToggle" aria-expanded="true" aria-label="Hide the legend" title="Hide the legend"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6 7.5 9 4.5"/></svg></button></div>
+    <div class="legend" data-lg="filings">
       <div class="t" id="legendT">Filings</div>
       <div class="li"><i style="background:var(--c-new)"></i>New construction</div>
       <div class="li"><i style="background:var(--c-reno)"></i>Renovation</div>
       <div class="li"><i style="border:2px solid var(--c-add)"></i>Addition</div>
       <div class="hramp"><span>Less</span><b></b><span>More</span></div>
+      <button type="button" class="lyplay" data-timelapse aria-pressed="false"><svg width="11" height="11" viewBox="0 0 12 12"><path d="M3 1.5v9l7-4.5z" fill="currentColor"/></svg><span>Play by month</span></button>
     </div>
     <div class="dlegend" id="dLegend" aria-live="polite"></div>
     </div>
@@ -245,57 +297,32 @@
       <button class="x" id="tClear" aria-label="Clear month filter" title="Clear">×</button>
     </div>
     <section class="view" id="view-timeline" aria-label="Timeline"></section>
-    <section class="view" id="view-compare" aria-label="Compare"></section>
-    <section class="view" id="view-who" aria-label="Activity"></section>
-    <section class="view" id="view-market" aria-label="Market"></section>
+    <section class="view" id="view-compare" aria-label="Compare areas"></section>
+    <section class="view" id="view-who" aria-label="Companies"></section>
+    <section class="view" id="view-market" aria-label="Market overview"></section>
     <section class="view" id="view-reports" aria-label="Reports"></section>
-    <section class="view" id="view-changes" aria-label="Updates"></section>
-    <section class="view" id="view-field" aria-label="Notes"></section>
+    <section class="view" id="view-changes" aria-label="Changes"></section>
+    <section class="view" id="view-field" aria-label="Notes and watchlist"></section>
     <section class="view" id="view-projects" aria-label="Projects"></section>
-    <section class="view" id="view-sources" aria-label="Sources"></section>
+    <section class="view" id="view-saved" aria-label="Saved searches"><div id="workSaved"></div></section>
+    <section class="view" id="view-sources" aria-label="Data sources"></section>
+    <nav class="vtabs" id="vtabs" aria-label="Pages in this section"></nav>
     <div class="mtop" id="mtop">
       <div class="mask">
         <div class="msslot" id="mSearchSlot"></div>
         <button type="button" class="mfilt mai" id="mAsk" aria-label="Ask the assistant"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/></svg></button>
         <button type="button" class="mfilt" id="mMic" aria-label="Talk to the assistant"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg></button>
-        <button type="button" class="mfilt" id="mFilters" aria-label="Filters"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 4h12M4.5 8h7M7 12h2"/></svg><span class="badge" id="mFiltN"></span></button>
+        <button type="button" class="mfilt" id="mFilters" aria-label="Filters" title="Filters"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h12l-4.6 5.4v4.4l-2.8 1.4V8.4z"/></svg><span class="badge" id="mFiltN"></span></button>
         <button type="button" class="mfilt mclear" id="mClear" aria-label="Clear filters and selection" hidden><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
       </div>
       <div class="mcount" id="mCount"></div>
     </div>
-    <section class="card" id="card" aria-live="polite"></section>
+    <section class="card" id="card" aria-label="Details"></section>
+    <div class="vh-sr" id="cardStatus" role="status" aria-live="polite"></div>
     </div>
   </main>
-  <nav class="mnav" id="mnav" aria-label="Sections">
-    <button data-tab="map" aria-pressed="true"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M2.5 5l5-2 5 2 5-2v12l-5 2-5-2-5 2z"/><path d="M7.5 3v12M12.5 5v12"/></svg><span>Map</span></button>
-    <button data-tab="list" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 5h10M6.5 10h10M6.5 15h10"/><circle cx="3.2" cy="5" r=".9" fill="currentColor"/><circle cx="3.2" cy="10" r=".9" fill="currentColor"/><circle cx="3.2" cy="15" r=".9" fill="currentColor"/></svg><span>Explore</span></button>
-    <button data-tab="timeline" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h8M6 10h9M4 15h7"/></svg><span>Timeline</span></button>
-    <button data-tab="who" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 17V8h4v9M8 17V3h4v14M13 17v-6h4v6"/></svg><span>Activity</span></button>
-    <button data-tab="more" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg><span>More</span><span class="badge" id="mMoreN"></span></button>
-  </nav>
-  <div class="msheet" id="msheet" role="dialog" aria-label="More">
-    <div class="mgrab"></div>
-    <div class="mt-h">Views</div>
-    <div class="mtiles">
-      <button data-go="market"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13.5h12M3.5 11V7.5M6.5 11V4.5M9.5 11V6.5M12.5 11V2.5"/></svg></i><span>Market</span></button>
-      <button data-go="compare"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="5" height="10" rx="1"/><rect x="9" y="3" width="5" height="10" rx="1"/></svg><b class="badge" id="mCmpN"></b></i><span>Compare</span></button>
-      <button data-go="reports"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6 8.5h4.5M6 11h4.5"/></svg></i><span>Reports</span></button>
-      <button data-go="changes"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4M13.5 2.5V5h-2.5"/><path d="M8 5.5V8l1.8 1.2"/></svg><b class="badge" id="mChgN"></b></i><span>Updates</span></button>
-      <button data-go="field"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10v8.5L9.5 14H3z"/><path d="M9.5 14v-3.5H13M5.5 5.5h5M5.5 8h3"/></svg><b class="badge" id="mFieldN"></b></i><span>Notes</span></button>
-      <button data-go="projects"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M4.5 4.5h4v3.5h-4zM10 4.5h1.5M10 7h1.5M4.5 10.5h7"/></svg><b class="badge" id="mPjN"></b></i><span>Projects</span></button>
-      <button data-go="sources"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="8" cy="3.8" rx="5" ry="1.8"/><path d="M3 3.8v8.4c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V3.8M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8"/></svg></i><span>Sources</span></button>
-    </div>
-    <div class="mt-h">Tools</div>
-    <div class="mtiles">
-      <button data-go="layers"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2 14.5 5.5 8 9 1.5 5.5z"/><path d="M2.5 8.2 8 11.2l5.5-3M2.5 10.9 8 13.9l5.5-3"/></svg></i><span>Layers</span></button>
-      <button data-go="export"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.8 6.8 8 10l3.2-3.2M2.5 11.5v2h11v-2"/></svg></i><span>Export</span></button>
-      <button data-go="saved" aria-label="Saved searches and alerts"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h8v12l-4-3-4 3z"/></svg></i><span>Saved</span></button>
-      <button data-go="near" aria-label="The area around my location"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4.5"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg></i><span>Nearby</span></button>
-      <button data-go="note" aria-label="Pin a site note at my location"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14.5s-4.5-4.3-4.5-7.7a4.5 4.5 0 0 1 9 0c0 3.4-4.5 7.7-4.5 7.7z"/><path d="M8 4.8v3.6M6.2 6.6h3.6"/></svg></i><span>Pin</span></button>
-      <button data-go="theme"><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.2 9.8A5.5 5.5 0 1 1 6.2 2.8a4.3 4.3 0 0 0 7 7z"/></svg></i><span>Theme</span></button>
-      <button data-go="install" id="mInstall" hidden><i class="mt-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M8 5v5M6 8l2 2 2-2"/></svg></i><span>Install</span></button>
-    </div>
-  </div>
+  <nav class="mnav" id="mnav" aria-label="Sections"></nav>
+  <div class="msheet" id="msheet" role="dialog" aria-label="More"></div>
   <div class="mscrim" id="mscrim"></div>
 </div>
 

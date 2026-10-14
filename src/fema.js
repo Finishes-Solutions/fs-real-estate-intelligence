@@ -114,10 +114,8 @@ export function initFema(ctx) {
     return savePdf(ctx, 'fema', label, html);
   }
 
-  // entry points: the selection strip (under Area at a Glance) and the selection bar
+  // entry point: the Map panel's "Reports for this area" row (shown while an area is selected)
   const run = () => { const s = ctx.sel; if (s?.feature) report({ geometry: s.feature.geometry || s.feature, label: s.label || 'Selected area' }); };
-  const strip = document.querySelector('.crsel');
-  if (strip && !strip.querySelector('.fm-go')) { const b = document.createElement('button'); b.className = 'btn fm-go'; b.type = 'button'; b.textContent = 'FEMA Report'; b.onclick = run; strip.querySelector('button')?.before(b); }
   const sb = document.getElementById('selFema'), sync = () => { if (sb) sb.style.display = ctx.sel?.feature ? '' : 'none'; };
   if (sb) sb.onclick = run; ctx.onChange(sync); sync();
 }

@@ -45,9 +45,9 @@ export function initSources(ctx) {
     const nightly = 'Nightly at about ' + fmtTime(nextNightly()) + (built ? ' · last refresh ' + fmtWhen(built) + ' (' + ago(built) + ')' : '');
     return [
       ['Nightly data (built into the app)', [
-        { name: link('TDLR TABS', 'https://www.tdlr.texas.gov/TABS/Search'), what: 'Construction registrations: every filing on the map, list, timeline and activity views', status: nightlyStatus(),
+        { name: link('TDLR TABS', 'https://www.tdlr.texas.gov/TABS/Search'), what: 'Construction registrations: every filing on the map, list, Timeline and Companies pages', status: nightlyStatus(),
           detail: nightly + '. ' + fmtN(F.length) + ' filings registered ' + fmtDay(DATA.period.start) + ' to ' + fmtDay(DATA.period.end) + (unmapped ? '; ' + fmtN(unmapped) + ' couldn’t be mapped' : '') + '.' },
-        { name: 'TABS change feed', what: 'Updates tab: new filings and status, value and date changes', status: runs.length ? nightlyStatus() : st('off', 'Starts after 2 runs'),
+        { name: 'TABS change feed', what: 'Changes page: new filings and status, value and date changes', status: runs.length ? nightlyStatus() : st('off', 'Starts after 2 runs'),
           detail: runs.length ? 'Latest comparison ' + fmtWhen(runs[0].built) + ' · ' + fmtN(runs.length) + ' nightly run' + (runs.length === 1 ? '' : 's') + ' kept.' : 'Each nightly pull is compared with the one before.' },
         { name: link('US Census Geocoder', 'https://geocoding.geo.census.gov/') + ' · ' + link('OpenStreetMap Nominatim', 'https://nominatim.org/'), what: 'Where each filing sits on the map', status: nightlyStatus(),
           detail: 'New addresses are located during the nightly build and cached. ' + (approx ? fmtN(approx) + ' filing' + (approx === 1 ? ' is' : 's are') + ' placed at city level (hollow markers).' : 'All filings have a street-level location.') },
@@ -120,7 +120,7 @@ export function initSources(ctx) {
           detail: 'About 300,000 businesses and places in the seven counties, merged from both open datasets (Overture includes records from Meta, Microsoft and BrightQuery). Reloaded on the 3rd of each month; closed places and doubtful pins are left out.' },
         { name: link('OpenStreetMap (Overpass)', 'https://overpass-api.de/'), what: 'Businesses in a building, nearest airports, restaurants, schools…', status: st('live', 'On demand'), detail: 'Cached up to an hour (nearby places) or a day (building card).' },
         { name: link('TomTom', 'https://developer.tomtom.com/') + ' / ' + link('OSRM', 'https://project-osrm.org/'), what: 'Drive times', status: live.trafficOK ? st('live', 'Live traffic') : live.trafficOK === false ? st('stale', 'No traffic data') : st('live', 'On demand'),
-          detail: live.trafficOK === false ? 'No TomTom key on the server, so drive times are free-flow estimates from OpenStreetMap roads.' : 'With traffic from TomTom; OpenStreetMap routing as a fallback.' },
+          detail: live.trafficOK === false ? 'Live traffic isn’t available on this site, so drive times are free-flow estimates from OpenStreetMap roads.' : 'With traffic from TomTom; OpenStreetMap routing as a fallback.' },
         { name: link('Google News', 'https://news.google.com/') + ' · ' + link('GDELT Project', 'https://www.gdeltproject.org/'), what: 'Project news on a card', status: st('live', 'On demand'), detail: 'Google News (about the last year), GDELT as a fallback; cached up to an hour.' },
         { name: link('Texas Comptroller sales-tax permits', 'https://data.texas.gov/Government-and-Taxes/Active-Sales-Tax-Permit-Holders/jrea-zgmq'), what: 'Registered businesses at a building or filing address', status: st('live', 'On demand'), detail: 'Matched on house number and street; cached up to a day. Retail, restaurant and service tenants; offices and medical often aren’t listed.' },
         { name: link('FEMA flood maps (NFHL)', 'https://www.fema.gov/flood-maps/national-flood-hazard-layer') + ' · ' + link('TxDOT traffic counts', 'https://www.txdot.gov/data-maps/traffic-count-maps.html'), what: 'Building card Site section: flood zone and vehicles per day on nearby roads', status: st('live', 'On demand'), detail: 'Read live from the agencies’ map services; cached up to a week.' },
@@ -155,18 +155,20 @@ export function initSources(ctx) {
       offline ? '<span class="src-pill">' + st('stale', 'Offline') + ' showing the copy saved on this device</span>' : '',
       newer ? '<span class="src-pill">' + st('stale', 'Newer data') + ' refreshed ' + esc(fmtWhen(newer)) + ' · <button class="lnk" id="srcReload" type="button">Reload</button></span>' : '',
     ].join('');
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Sources</div><h2>Where the data comes from</h2><div class="vsub">What each source feeds, how often it refreshes and when it last did. Nightly data is pulled once a night and built into the app; map layers and lookups are fetched live when you use them.</div></div></div>' +
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">Data &amp; help</div><h2>Where the data comes from</h2><div class="vsub">What each source feeds, how often it refreshes and when it last did. Nightly data is pulled once a night and built into the app; map layers and lookups are fetched live when you use them.</div></div><div class="vctl"><button type="button" class="btn md" id="srcIntro" title="Show the short getting-started tip at the top of the Map panel again">Getting started</button></div></div>' +
       '<div class="src-sum">' + pills + '</div>' +
-      '<label class="src-opt"><input type="checkbox" id="srcShow"' + (ctx.showSources?.() ? ' checked' : '') + '> Show sources on cards and panels <span class="s">Off by default for a clean view. Exported reports always list their sources.</span></label>' +
-      '<div class="src-opt">Voice log <button class="lnk" id="srcVoiceLog" type="button">Save it</button> <span class="s">What the voice assistant heard and did in this visit, step by step, for troubleshooting when it doesn’t respond.</span></div>' +
+      // the options themselves live in Settings; this line says how they're set and links there
+      '<div class="src-opt muted">Show sources on cards: <b id="srcShowState">' + (ctx.showSources?.() ? 'On' : 'Off') + '</b> · <button class="lnk" id="srcSettings" type="button">Change in Settings</button> · <button class="lnk" id="srcVoiceLog" type="button" title="What the voice assistant heard and did in this visit, for troubleshooting">Save voice log</button></div>' +
       rows().map(([title, list]) => '<section class="src-grp"><h3>' + esc(title) + '</h3><table class="src-tbl"><thead><tr><th>Source</th><th>Status</th><th>Used for · freshness</th></tr></thead><tbody>' +
         list.map(r => '<tr><td><b>' + r.name + '</b></td><td>' + r.status + '</td><td>' + esc(r.what) + '<div class="s">' + esc(r.detail) + '</div></td></tr>').join('') + '</tbody></table></section>').join('');
     root.querySelector('#srcReload')?.addEventListener('click', () => location.reload());
-    root.querySelector('#srcShow')?.addEventListener('change', e => ctx.showSources?.(e.target.checked));
-    root.querySelector('#srcVoiceLog')?.addEventListener('click', () => { const t = ctx.voiceLog?.() || ''; if (!t) { ctx.toast('No voice session yet in this visit.'); return; } ctx.saveFile('voice-log-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.txt', t, 'text/plain'); });
+    root.querySelector('#srcSettings')?.addEventListener('click', () => ctx.openSettings?.('appearance'));
+    root.querySelector('#srcVoiceLog')?.addEventListener('click', () => ctx.saveVoiceLog?.());
+    root.querySelector('#srcIntro')?.addEventListener('click', () => ctx.showIntro?.());
   }
 
   ctx.onView('sources', () => { render(); checkNewer(); });
+  ctx.refreshSources = render; // Settings redraws the page when an option it shows changes (does nothing on other pages)
   ctx.onViewChange(v => { clearInterval(timer); if (v === 'sources') timer = setInterval(render, 30e3); });
   addEventListener('online', render); addEventListener('offline', render);
 }

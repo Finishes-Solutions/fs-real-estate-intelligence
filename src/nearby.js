@@ -18,7 +18,7 @@ export function initNearby(ctx) {
     origin = fc(o ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: o } }] : []); sync();
     const pts = places.map(p => [p.lon, p.lat]).concat(o ? [o] : []); if (!pts.length) return;
     const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), pad = .004;
-    try { map.fitBounds([[Math.min(...xs) - pad, Math.min(...ys) - pad], [Math.max(...xs) + pad, Math.max(...ys) + pad]], { padding: { top: 140, bottom: 60, left: 60, right: document.getElementById('card')?.classList.contains('open') && innerWidth > 700 ? 460 : 60 }, maxZoom: 15.5, duration: ctx.reduceMotion ? 0 : 900 }); } catch (e) { map.flyTo({ center: o || pts[0], zoom: 12 }); }
+    try { map.fitBounds([[Math.min(...xs) - pad, Math.min(...ys) - pad], [Math.max(...xs) + pad, Math.max(...ys) + pad]], { padding: { ...(ctx.coverPad?.(60) || { bottom: 60, left: 60, right: document.getElementById('card')?.classList.contains('open') && innerWidth > 700 ? 460 : 60 }), top: 140 }, maxZoom: 15.5, duration: ctx.reduceMotion ? 0 : 900 }); } catch (e) { map.flyTo({ center: o || pts[0], zoom: 12 }); }
   };
   ctx.clearNearby = () => { data = fc([]); origin = fc([]); sync(); };
   map.on('click', 'nearby-pt', e => { const f = e.features[0]; ctx.toast(f.properties.label); });

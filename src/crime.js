@@ -13,7 +13,8 @@ const COL = { v: '#c03b3a', p: '#d9822b', o: '#8a9396' };
 export function initCrime(ctx) {
   const { map, esc, fmtN } = ctx, box = document.getElementById('lyCrime'), catSel = document.getElementById('lyCrimeCat'), note = document.getElementById('lyCrimeNote');
   let on = false, cat = 't', grid = null, gridP = null, shown = null, last = null;
-  try { cat = localStorage.getItem('fs-crime-cat') || 't'; } catch (e) {}
+  // the crime type lives with the Filters (src/layerfilters.js, fs-lf); fs-crime-cat is the old key, read until it's migrated
+  try { cat = localStorage.getItem('fs-crime-cat') || JSON.parse(localStorage.getItem('fs-lf') || 'null')?.crime || 't'; } catch (e) {}
   if (catSel) catSel.value = cat;
 
   // the map tooltip (#tip): text at a map point, or hidden
@@ -63,7 +64,10 @@ export function initCrime(ctx) {
     catch (e) { ctx.toast('Crime layer unavailable: ' + e.message); setOn(false); }
   }
   if (box) box.onchange = () => setOn(box.checked);
-  if (catSel) catSel.onchange = () => { cat = catSel.value; try { localStorage.setItem('fs-crime-cat', cat); } catch (e) {} if (on && grid) { removeLayers(); addLayers(); } crimeLegend(); };
+  // the picker here and the one in Filters share one value: setCrimeCat saves it, updates both and comes back to applyCrimeCat
+  function applyCat(v) { if (!['t', 'v', 'p'].includes(v) || v === cat) return; cat = v; if (catSel && catSel.value !== v) catSel.value = v; if (on && grid) { removeLayers(); addLayers(); } crimeLegend(); }
+  ctx.applyCrimeCat = applyCat;
+  if (catSel) catSel.onchange = () => { if (ctx.setCrimeCat) ctx.setCrimeCat(catSel.value); else applyCat(catSel.value); };
   ctx.onOverlays(addLayers);
   ctx.crimeLayer = v => setOn(v !== false);
 
@@ -236,7 +240,7 @@ export function initCrime(ctx) {
       '<div><b class="cr-p">' + fmtN(L.p) + '</b><span>Property · ' + pct(d.change.p) + '</span></div><div><b>' + (d.per_sqmi && d.city_per_sqmi ? (d.per_sqmi.total / d.city_per_sqmi.total).toFixed(1) + '×' : '—') + '</b><span>vs Houston average</span></div></div>' +
       (d.offenses?.length ? '<dl>' + d.offenses.slice(0, 5).map(o => '<dt>' + esc(o.name) + '</dt><dd>' + fmtN(o.n) + '</dd>').join('') + '</dl>' : '') +
       (d.incidents?.length ? '<div class="rnote"><b>Most recent:</b> ' + d.incidents.slice(0, 4).map(x => esc(x.offense + ' (' + x.day + ')')).join(' · ') + '</div>' : '') +
-      '<div class="bacts"><button class="btn" type="button" data-cr="report">Full crime report</button><button class="btn" type="button" data-cr="layer">Crime map layer</button></div>' +
+      '<div class="bacts"><button class="btn" type="button" data-push data-cr="report">Full crime report</button><button class="btn" type="button" data-cr="layer">Crime map layer</button></div>' +
       '<div class="ssrc src">Reported incidents, 12 months through ' + esc(monthName(d.latest)) + ' (change vs the 12 months before). Houston Police (NIBRS); the file runs about three months behind. City of Houston only.</div>';
     el.querySelector('[data-cr="report"]').onclick = () => report({ geometry: circleMi(center, 1), label: '1 mile around ' + label(), center });
     el.querySelector('[data-cr="layer"]').onclick = () => setOn(true);
@@ -247,4 +251,16 @@ export function initCrime(ctx) {
     const b = map.getBounds(), w = b.getWest(), s = b.getSouth(), e = b.getEast(), n = b.getNorth();
     report({ geometry: { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] }, label: 'Map view near ' + (ctx.viewPlace?.() || 'Houston') }); return true;
   };
+  // the Map panel's "Reports for this area" row: the selection (or the map view) when its middle is in Houston, else greyed out
+  const row = document.getElementById('selCrime');
+  if (row) {
+    const mid = g => { let w = 180, so = 90, e = -180, n = -90; const walk = a => typeof a[0] === 'number' ? (w = Math.min(w, a[0]), e = Math.max(e, a[0]), so = Math.min(so, a[1]), n = Math.max(n, a[1])) : a.forEach(walk); walk(g.coordinates); return [(w + e) / 2, (so + n) / 2]; };
+    const where = () => { const s = ctx.sel; if (s?.feature) return s.center || mid(s.feature.geometry || s.feature); const c = map.getCenter(); return [c.lng, c.lat]; };
+    const sync = () => { let ok = false; try { ok = inHouston(where()); } catch (e) {}
+      row.hidden = false; row.disabled = !ok; row.setAttribute('aria-disabled', String(!ok));
+      row.querySelector('.ar-d').textContent = !ok ? 'Houston only' : ctx.sel?.feature ? 'Last 12 months' : 'Run on map view';
+      row.title = ok ? 'Houston Police incidents: the last 12 months against the year before' : 'Street-level crime data covers the City of Houston only. Move the map to Houston or pick an area there.'; };
+    row.onclick = () => { if (!row.disabled) ctx.crimeReportFor(ctx.sel?.feature ? 'selection' : 'view'); };
+    ctx.onChange?.(sync); map.on('moveend', sync); sync();
+  }
 }

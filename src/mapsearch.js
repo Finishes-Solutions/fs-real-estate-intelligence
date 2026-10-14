@@ -29,7 +29,7 @@ export function initMapSearch(ctx) {
 
   // ---------- mount: under the tools (tablet/desktop) or in the floating top bar (phone) ----------
   const phoneMQ = window.matchMedia('(max-width:700px)');
-  const mount = () => { const host = phoneMQ.matches ? document.getElementById('mSearchSlot') : document.getElementById('mapleft'); if (host && wrap.parentElement !== host) host.insertBefore(wrap, phoneMQ.matches ? null : document.getElementById('placebar')); };
+  const mount = () => { const host = phoneMQ.matches ? document.getElementById('mSearchSlot') : document.getElementById('mapleft'); if (host && wrap.parentElement !== host) host.insertBefore(wrap, phoneMQ.matches ? null : host.firstElementChild); }; // desktop: the search is the first row of the map's controls
   phoneMQ.addEventListener('change', mount); mount();
 
   // ---------- placeholder: the longest wording that fits, so it never shows cut off when the box narrows ----------
@@ -200,7 +200,7 @@ export function initMapSearch(ctx) {
     if (e.key === 'ArrowDown') { e.preventDefault(); if (active >= items.length - 1) more(); setActive(Math.min(items.length - 1, active + 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(0, active - 1)); }
     else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0) pick(active); else if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); else { if (input.value.trim() !== q) { clearTimeout(it0); run(input.value); } enterWait = pending; } } // address lookup still running: pick its first hit when it lands
-    else if (e.key === 'Escape') { close(); input.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); close(); input.blur(); }
   });
   clearB.onclick = () => { input.value = ''; run(''); clearPlace(); if (ctx.state.q) { ctx.state.q = ''; ctx.applyFilters(); } input.focus(); };
   document.addEventListener('pointerdown', e => { if (!wrap.contains(e.target)) close(); });
@@ -219,6 +219,7 @@ export function initMapSearch(ctx) {
   });
   const syncPlace = () => { map.getSource && map.getSource('place')?.setData(ctx.fc(place?.geom ? [{ type: 'Feature', properties: {}, geometry: place.geom }] : [])); ctx.syncClear?.(); };
   ctx.hasPlace = () => !!place;
+  ctx.placeLabel = () => place?.label || '';
   // the location marker: an amber pin with the place name, at the address / landmark or the middle of an outline
   let pin = null;
   function setPlacePin(c, label) {

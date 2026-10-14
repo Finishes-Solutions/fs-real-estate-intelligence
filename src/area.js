@@ -350,6 +350,7 @@ export function initArea(ctx) {
   }
 
   // ---------- area picker: a small map of the counties (click one) beside a button per county and the whole region ----------
+  let scopeOpen = false;
   function scopeHtml() {
     const geo = (ctx.countyGeo || []).filter(g => area.counties.some(c => c.name === g.name));
     let svg = '';
@@ -360,10 +361,12 @@ export function initArea(ctx) {
         return '<path d="' + path(g.geom) + '" data-county="' + c.fips + '" class="' + (sel !== 'all' && fipsList().includes(c.fips) ? 'on' : sel === 'all' ? 'in' : '') + '"><title>' + esc(c.name) + ' County</title></path>'; }).join('') + '</svg>';
     }
     const btn = (v, name) => '<button type="button" class="mk-cty" data-county="' + v + '" aria-pressed="' + (v === 'all' ? sel === 'all' : sel !== 'all' && fipsList().includes(v)) + '">' + esc(name) + '</button>';
-    return '<div class="mk-scope2">' + svg + '<div><div class="mk-ctys" role="group" aria-label="Market area">' + btn('all', 'Whole region') + area.counties.map(c => btn(c.fips, c.name)).join('') + '</div>' +
-      '<div class="mk-scope-n">' + (sel !== 'all' && sel === adopted ? 'Showing the area selected on the map. ' : '') + 'Click a county here or on the little map; click it again for the whole region.</div></div></div>';
+    // the scope bar: the area in one line, with the county picker folded away behind "Change"
+    return '<details class="mk-scopebar"' + (scopeOpen ? ' open' : '') + '><summary><span class="vs-n">Area: <b>' + esc(areaLabel()) + '</b></span><span class="lnk">Change</span></summary>' +
+      '<div class="mk-scope2">' + svg + '<div><div class="mk-ctys" role="group" aria-label="Market area">' + btn('all', 'Whole region') + area.counties.map(c => btn(c.fips, c.name)).join('') + '</div>' +
+      '<div class="mk-scope-n">' + (sel !== 'all' && sel === adopted ? 'Showing the area selected on the map. ' : '') + 'Click a county here or on the little map; click it again for the whole region.</div></div></div></details>';
   }
-  const NAV = [['overview', 'Overview'], ['pipeline', 'Pipeline'], ['growth', 'Growth'], ['housing', 'Housing'], ['costs', 'Costs & rates'], ['markets', 'Markets'], ['area', 'Area & news']];
+  const NAV = [['overview', 'Summary'], ['pipeline', 'Pipeline'], ['growth', 'Growth'], ['housing', 'Housing'], ['costs', 'Costs & rates'], ['markets', 'Markets'], ['area', 'Area & news']];
 
   // ---------- export: the tab as a PDF report (with a street map of the area) and every series as CSV ----------
   const areaLabel = () => { if (sel === 'all') return 'Houston region (' + area.counties.length + ' counties)'; const n = fipsList().map(cname);
@@ -445,7 +448,8 @@ export function initArea(ctx) {
     root.innerHTML = '<div class="vhead mk-vhead"><div><div class="kicker">Market</div><h2>' + esc(areaLabel()) + '</h2>' +
       '<div class="vsub">Construction, growth, housing, costs and markets from free public sources, refreshed nightly' + (area.built ? ' (last ' + new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : '') + '. No sale prices: Texas doesn’t disclose them.</div></div>' +
       '<div class="vctl"><div class="mk-seg" role="group" aria-label="Months shown in monthly charts">' + [[12, '12 mo'], [24, '24 mo'], [0, 'All']].map(([v, l]) => '<button type="button" data-range="' + v + '" aria-pressed="' + (range === v) + '">' + l + '</button>').join('') + '</div>' +
-      '<button class="btn" type="button" id="mkCsv">Export Data</button><button class="btn primary" type="button" id="mkExport">Export PDF</button></div></div>' +
+      (ctx.exportMenu ? ctx.exportMenu([{ label: 'Market report · PDF', attrs: ' id="mkExport"' }, { label: 'Market data · CSV', attrs: ' id="mkCsv"' }])
+        : '<button class="btn" type="button" id="mkCsv">Export Data</button><button class="btn primary" type="button" id="mkExport">Export PDF</button>') + '</div></div>' +
       scopeHtml() +
       '<nav class="mk-nav" aria-label="Market sections">' + NAV.map(([k, l]) => '<button type="button" data-sec="' + k + '">' + l + '</button>').join('') + '</nav>' +
       '<div class="mk-tip" id="mkTip" role="tooltip"></div><div class="mk-body">' +
@@ -456,7 +460,8 @@ export function initArea(ctx) {
     wire(s);
   }
   function wire(s) {
-    root.querySelectorAll('.mk-scope2 [data-county]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.county; sel = v === sel && v !== 'all' ? 'all' : v; newsPlace = ''; pin = null; render(); }));
+    root.querySelectorAll('.mk-scope2 [data-county]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.county; sel = v === sel && v !== 'all' ? 'all' : v; newsPlace = ''; pin = null; scopeOpen = false; render(); }));
+    root.querySelector('.mk-scopebar')?.addEventListener('toggle', e => { scopeOpen = e.currentTarget.open; });
     root.querySelectorAll('[data-range]').forEach(b => b.onclick = () => { range = +b.dataset.range; pin = null; render(); });
     root.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { const k = b.dataset.show; show[k] = !show[k]; if (!['v', 'p', 'o'].some(x => show[x])) show[k] = true; render(); });
     root.querySelector('#mkExport').onclick = () => exportReport(); root.querySelector('#mkCsv').onclick = () => exportData();

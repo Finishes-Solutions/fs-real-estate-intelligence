@@ -1,6 +1,7 @@
 // Regrid (paid, capped on the server by api/regrid.js):
 //   Parcel Lines layer: Regrid parcel boundaries at street zoom (tiles are only requested at zoom 15–16; closer zooms reuse them)
-//   Building card: a "Get Regrid Details" button; one record per click, saved so the same parcel never costs twice
+//   Building card: a "Get Regrid Details" button (run from the card's Ownership section); one record per click, saved so
+//   the same parcel never costs twice. The record shows right under Ownership.
 // Both show how much of this month's allowance is left; when a cap is reached they say so and stop.
 const SRC = 'regrid', LAYER = 'regrid-lines';
 
@@ -35,7 +36,9 @@ export function initRegrid(ctx) {
     const btn = (u) => '<div class="lt">Regrid parcel record</div><button class="btn" type="button" id="rgGo">Get Regrid Details</button><div class="rnote">Zoning, standardized land use and the full parcel record. Uses 1 of your Regrid records' +
       (u && !u.error ? ' (' + fmtN(left(u, 'records')) + ' of ' + fmtN(u.records.cap) + ' left this month)' : '') + '; a parcel looked up before is free.</div>';
     el.innerHTML = btn(usage);
-    getUsage().then(u => { if (el.isConnected && el.querySelector('#rgGo')) { el.innerHTML = btn(u); wire(); } });
+    getUsage().then(u => { if (el.isConnected && el.querySelector('#rgGo')) { el.innerHTML = btn(u); wire(); }
+      // the property card's own "Get … from Regrid" buttons (src/building.js) show the same allowance
+      if (u?.records) document.querySelectorAll('#card [data-rg-left]').forEach(x => { x.textContent = ' (' + fmtN(left(u, 'records')) + ' left)'; }); });
     function wire() {
       el.querySelector('#rgGo').onclick = () => look(false);
     }

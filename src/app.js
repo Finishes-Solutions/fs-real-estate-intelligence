@@ -44,6 +44,8 @@ import { initEnv } from './env.js';
 import { initOwner } from './owner.js';
 import { initGoogle } from './google.js';
 import { initSitePlan } from './siteplan.js';
+import { initSettings } from './settings.js';
+import { renderNav, syncNav as syncNavTabs, leafFor, pathOf, labelOf, parentOf } from './nav.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
 
@@ -65,9 +67,17 @@ const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // ---------- theme ----------
 const root=document.documentElement;
-root.dataset.theme='light'; try{ const t=localStorage.getItem('fs-map-theme'); if(t) root.dataset.theme=t; }catch(e){}
+// Settings › Appearance: Light (the first-visit look), Dark, or Match device ('auto', follows the OS). data-theme always
+// holds the look in use, light or dark, so the stylesheet, isDark() and the charts that watch it need no third case.
+const THEME_KEY='fs-map-theme', darkMQ=window.matchMedia('(prefers-color-scheme: dark)');
+let themePref='light'; try{ const t=localStorage.getItem(THEME_KEY); if(t==='light'||t==='dark'||t==='auto') themePref=t; }catch(e){}
+const themeNow=()=>themePref==='auto'?(darkMQ.matches?'dark':'light'):themePref;
+root.dataset.theme=themeNow();
 const isDark=()=>root.dataset.theme==='dark';
-document.getElementById('themeBtn').onclick=()=>{ root.dataset.theme=isDark()?'light':'dark'; try{localStorage.setItem('fs-map-theme',root.dataset.theme);}catch(e){} setBasemap(layers.style); };
+// a new look restyles the basemap; the timeline, market charts and other views redraw themselves when data-theme changes
+function applyTheme(){ const t=themeNow(); if(root.dataset.theme===t) return; root.dataset.theme=t; setBasemap(layers.style); }
+function setTheme(m){ if(!['light','dark','auto'].includes(m)) return; themePref=m; try{ localStorage.setItem(THEME_KEY,m); }catch(e){} applyTheme(); }
+darkMQ.addEventListener?.('change',()=>{ if(themePref==='auto') applyTheme(); });
 
 // ---------- data ----------
 // latest change run: id -> 'new' | field that changed
@@ -99,12 +109,14 @@ const ESRI_STYLE={version:8,glyphs:OFM+'/fonts/{fontstack}/{range}.pbf',
     {id:'esri-place-lbl',type:'symbol',source:'openmaptiles','source-layer':'place',filter:['in',['get','class'],['literal',['city','town','village','suburb','neighbourhood']]],layout:{'text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',14,'town',12.5,11]},paint:{'text-color':'#ffffff','text-halo-color':'#0b0d0c','text-halo-width':1.6}}]};
 const isSat=()=>layers.style==='sat'||layers.style==='esri'||layers.style==='gsat';
 // property-first: filing dots start hidden (Layers → Filings, the Construction Filings section or the assistant turn them on)
-const layers={style:'dots',roads:true,names:true,counties:true,grid:true,size:'uniform',heat:'off',dots:false};
+// Settings › Map › Default base map (fs-basemap) is where the map opens; links never carry a basemap. Google needs its tile session first, so it isn't offered.
+const BOOT_BASES=['dots','streets','sat','topo','esri','free'];
+const layers={style:(()=>{ try{ const b=localStorage.getItem('fs-basemap'); if(BOOT_BASES.includes(b)) return b; }catch(e){} return 'dots'; })(),roads:true,names:true,counties:true,grid:true,size:'uniform',heat:'off',dots:false};
 try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(typeof L.grid==='boolean') layers.grid=L.grid; }catch(e){} // the map always opens without filings (dots and heatmap off); dot size and the grid are remembered
-const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} };
+const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} syncFilingsSw(); }; // every change to the filing layer passes here
 // Google base maps need a tile session first (src/google.js): a promise of the style
 const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
-const map=new maplibregl.Map({container:'map',style:styleUrl('dots'),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
+const map=new maplibregl.Map({container:'map',style:styleUrl(layers.style),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
 map.on('error',e=>{ const m=(e&&e.error&&e.error.message)||''; if(/40[13]|Unauthorized|Forbidden/i.test(m)&&STYLES[layers.style]) toast('MapTiler refused the key for this site. Check the key’s allowed origins.'); });
 
@@ -325,13 +337,35 @@ function fixWinding(g){ const fix=rings=>{ const poly={type:'Polygon',coordinate
   return g; }
 const monthOK=f=>{ if(!state.month) return true; const [a,b]=monthRange(state.month); return f.ts<=b&&f.te>=a; };
 const listeners=[];
-// "This Area" in the left panel: the selected area (or the map view) and what can be done with it; the filing count only
-// while the filing dots are on
+// The panel's scope header (pinned at the top while the panel scrolls): what the panel is about — the selected area, or
+// the map view (named after the nearest place) — with its filing count, Compare and a "…" menu (save, link, alerts)
+const SEL_KIND={area:'Box',shape:'Shape',radius:'Radius',county:'County',place:'Place'};
+const SEL_IC={view:'<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12"/>',area:'<rect x="2.5" y="2.5" width="11" height="11" rx="1" stroke-dasharray="2.2 1.6"/>',
+  shape:'<path d="M3 4.5 9 2l4.5 5-2.5 6.5-7.5-1.5z"/>',radius:'<circle cx="8" cy="8" r="5.8"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/>',
+  county:'<path d="M3 2.5h6l1 3h3.5v8H3z"/>',place:'<path d="M8 14.5s5-4.3 5-8.2A5 5 0 0 0 3 6.3c0 3.9 5 8.2 5 8.2z"/><circle cx="8" cy="6.3" r="1.8"/>'};
+let selIcK='';
+const viewPlaceSafe=()=>{ try{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }catch(e){ return null; } }; // farLabel (below) is filled after the first move
+// with nothing selected the header names the place in view (the far-away name arrives about 600 ms after a move)
+let selNameT=0; map.on('moveend',()=>{ if(sel.feature) return; clearTimeout(selNameT); selNameT=setTimeout(syncSelBar,800); });
 function syncSelBar(){
-  document.getElementById('selName').textContent=sel.feature?sel.label:'Map view';
-  document.getElementById('selStats').textContent=layers.dots?fmtN(visible.length)+' filings · '+fmtM(visible.reduce((s,f)=>s+f.cost,0))
-    :sel.feature?'Reports below cover this area.':'Pick an area with Area, Shape, Radius or County on the map for reports on it.';
+  const k=sel.feature?(SEL_IC[sel.kind]?sel.kind:'shape'):'view';
+  document.getElementById('selKind').innerHTML=sel.feature?'<span class="sk-l">Selected area · </span>'+(SEL_KIND[sel.kind]||'Area'):'<span class="sk-l">No area picked</span>'; // phones show only the kind
+  const vp=sel.feature?null:viewPlaceSafe(); document.getElementById('selName').textContent=sel.feature?sel.label:vp?'Map view near '+vp:'Map view';
+  if(selIcK!==k){ selIcK=k; document.getElementById('selIcon').innerHTML='<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+SEL_IC[k]+'</svg>'; }
+  document.getElementById('selStats').textContent=fmtN(visible.length)+' filing'+(visible.length===1?'':'s')+' · '+fmtM(visible.reduce((s,f)=>s+f.cost,0));
+  document.getElementById('selPick').hidden=!!sel.feature;
+  // Save search and alerts only mean something once there is a filter or an area; Copy link always works
+  const custom=filterChips({area:true}).some(c=>!c.fixed);
+  ['saveSearch','rssLink'].forEach(id=>{ document.getElementById(id).hidden=!custom; }); if(!custom) document.getElementById('saveForm').hidden=true;
+  syncFilingsHead();
 }
+// the Construction Filings header: the live count for the panel's scope, the data period, and an honest "On map" switch
+function syncFilingsHead(){
+  const n=visible.length, where=sel.feature?sel.label:state.counties.size<COUNTIES.length?(state.counties.size>2?state.counties.size+' counties':[...state.counties].join(' + ')+(state.counties.size>1?' counties':' County')):'';
+  const fl=document.getElementById('filingsLive'); fl.textContent=fmtN(n)+' filing'+(n===1?'':'s')+' · '+fmtM(visible.reduce((s,f)=>s+f.cost,0))+(where?' · '+where:''); fl.title=fl.textContent;
+  syncFilingsSw();
+}
+function syncFilingsSw(){ const sw=document.getElementById('filingsOnMap'); if(sw) sw.checked=layers.dots||layers.heat!=='off'; }
 function applyFilters(){
   const spec=curSpec(false), m=makeMatcher(spec,{changed:CHANGED});
   visible=F.filter(f=>m(f)&&inSel(f)&&monthOK(f));
@@ -376,13 +410,18 @@ let numT; [sqMin,sqMax].forEach(i=>i.addEventListener('input',()=>{ clearTimeout
 uMin.onchange=()=>{ state.umin=+uMin.value; applyFilters(); };
 let coT; coQ.addEventListener('input',()=>{ clearTimeout(coT); coT=setTimeout(()=>{ state.co=coQ.value; applyFilters(); },250); });
 exactBtn.onclick=()=>{ state.exact=state.exact?0:1; applyFilters(); };
-// collapsible Filters and List sections (remembered in this browser)
-// Construction Filings starts collapsed; opening it also puts the filing dots on the map
-for(const [btnId,bodyId,key,dflt] of [['secFilings','filingsBody','fs-sec-filings','0'],['secList','list','fs-sec-list']]){
-  const b=document.getElementById(btnId), body=document.getElementById(bodyId), set=open=>{ b.setAttribute('aria-expanded',open); body.classList.toggle('collapsed',!open); if(bodyId!=='filtersBody') document.querySelector('.panel')?.classList.toggle('list-collapsed',!open||document.getElementById('secFilings').getAttribute('aria-expanded')!=='true'||document.getElementById('secList').getAttribute('aria-expanded')!=='true'); };
-  let open=true; try{ open=(localStorage.getItem(key)??dflt)!=='0'; }catch(e){} set(open);
-  b.onclick=()=>{ const o=b.getAttribute('aria-expanded')!=='true'; set(o); if(o&&bodyId==='filingsBody') showFilings(); try{ localStorage.setItem(key,o?'1':'0'); }catch(e){} };
+// Construction Filings: collapsible (remembered in this browser; starts collapsed). Opening it by hand puts the filing dots
+// on the map; a section restored open from an earlier visit leaves the map alone, and the header's "On map" switch says
+// which it is. The phone's Explore tab opens it for the visit without saving (src/mobile.js).
+const secF=document.getElementById('secFilings'), secFBody=document.getElementById('filingsBody');
+function setFilingsOpen(open,{save=false,dots=false}={}){
+  secF.setAttribute('aria-expanded',open); secFBody.classList.toggle('collapsed',!open); document.getElementById('panel').classList.toggle('list-collapsed',!open);
+  if(open&&dots) showFilings();
+  if(save) try{ localStorage.setItem('fs-sec-filings',open?'1':'0'); }catch(e){}
 }
+{ let open=false; try{ open=(localStorage.getItem('fs-sec-filings')??'0')!=='0'; }catch(e){} setFilingsOpen(open); }
+secF.onclick=()=>setFilingsOpen(secF.getAttribute('aria-expanded')!=='true',{save:true,dots:true});
+document.getElementById('filingsOnMap').onchange=e=>setFilingsShown(e.target.checked);
 // use, dates, updates, active-filter summary
 const dField=document.getElementById('dField'), dFrom=document.getElementById('dFrom'), dTo=document.getElementById('dTo');
 
@@ -413,7 +452,9 @@ function syncFilterUI(){
   const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const nBadge=nAll+ctx_lfCount(); const fN=document.getElementById('filterN'); fN.textContent=nBadge||''; fN.hidden=!nBadge; syncClear(); try{ ctx.syncFilterFooter?.(); }catch(e){}
   document.getElementById('filterBtn').classList.toggle('on',!!nBadge);
   let lt=''; try{ lt=ctx.layerFilterText?.()||''; }catch(e){}
-  const ft=filterText(), t=[lt,ft?'Filings: '+ft:''].filter(Boolean).join(' · '); document.getElementById('activeTxt').textContent=t||'No filters on'; document.getElementById('activeBar').classList.toggle('on',true);
+  // only the default period set: "No filters on" and no Clear All
+  const none=!nBadge&&!state.month, ft=filterText(), t=none?'':[lt,ft?'Filings: '+ft:''].filter(Boolean).join(' · '); document.getElementById('activeTxt').textContent=t||'No filters on'; document.getElementById('activeBar').classList.toggle('on',true);
+  document.getElementById('activeBar').classList.toggle('none',none);
 }
 // the Clear button beside Filters (and on phones beside the filter button): shown whenever anything narrows the view (filters,
 // a period other than the default, a time-lapse month, a selected area or a searched place's outline), one click clears it all
@@ -424,24 +465,108 @@ function syncClear(){
   const nL=ctx_lfCount(); if(nF) parts.push(nF===1?'1 filing filter':nF+' filing filters'); if(nL) parts.push(nL===1?'1 layer filter':nL+' layer filters'); if(state.month) parts.push('the month'); if(sel.feature) parts.push('the selected area'); if(hasPlace()) parts.push('the search outline');
   const n=nF+nL+(state.month?1:0)+(sel.feature?1:0)+(hasPlace()?1:0), t=parts.length?'Clear '+parts.join(', ').replace(/, ([^,]*)$/,' and $1'):'';
   for(const id of ['filterClear','mClear']){ const b=document.getElementById(id); if(!b) continue; b.hidden=!n; b.title=t; b.setAttribute('aria-label',t||'Clear'); const sp=b.querySelector('span'); if(sp) sp.textContent=n>1?'Clear ('+n+')':'Clear'; }
+  renderConstraints();
 }
+// Under the layer buttons (desktop): everything that narrows the map as removable chips, ending in "Clear all". It replaces
+// the old "Clear (n)" button (#filterClear, kept hidden: phones still use #mClear). Built from the same parts as above:
+// the filing filters and the month (filterChips), each layer threshold, the Match everything mode, the selected area and a
+// searched place's outline.
+const fchipsEl=document.getElementById('fchips');
+function constraintChips(){
+  const out=filterChips({area:true}).filter(c=>!c.fixed);
+  try{ out.push(...(ctx.layerFilterChips?.()||[])); }catch(e){}
+  if(hasPlace()){ let l=''; try{ l=ctx.placeLabel?.()||''; }catch(e){} out.push({label:'Outline: '+(String(l).split(',')[0]||'searched place'),remove:()=>ctx.clearPlace?.()}); }
+  return out;
+}
+function renderConstraints(){ if(!fchipsEl) return; let cs=[]; try{ cs=constraintChips(); }catch(e){}
+  const html=cs.map((c,i)=>'<span class="fchip">'+esc(c.label)+'<button type="button" data-i="'+i+'" aria-label="Remove: '+esc(c.label)+'" title="Remove">×</button></span>').join('')+(cs.length?'<button type="button" class="fc-all">Clear all</button>':'');
+  fchipsEl.hidden=!cs.length; if(fchipsEl.innerHTML!==html) fchipsEl.innerHTML=html;
+  fchipsEl.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{ const c=cs[+b.dataset.i]; if(c) c.remove(); });
+  const all=fchipsEl.querySelector('.fc-all'); if(all) all.onclick=()=>clearEverything(); }
+function clearEverything(){ clearFilters(); ctx.toast?.('Cleared: showing everything'); }
 let openFilters=()=>{}, closeFilters=()=>{}; // set below once the popup is wired; exposed as ctx.openFilters / closeFilters
 const clearFilters=()=>{ ctx.clearPlace?.(); ctx.clearLayerFilters?.(); fromSpec(DEFAULT_SPEC()); if(state.month) setMonth(null); };
 document.getElementById('resetAll').onclick=clearFilters;
 // Filters: a popup from the map toolbar (between County and Export), with a Clear button beside it while any are on.
 // Filters only act on construction filings, so changing one puts the filing dots on the map.
 { const btn=document.getElementById('filterBtn'), pop=document.getElementById('filterPop'), wrap=document.getElementById('fwrap');
-  const setOpen=open=>{ if(open&&matchMedia('(max-width:700px)').matches) document.getElementById('moreF').open=true; pop.hidden=!open; btn.setAttribute('aria-expanded',open); btn.classList.toggle('open',open); if(open) pop.querySelector('select,button.chip,input')?.focus({preventScroll:true}); };
+  // On Filings pages, Compare and Reports the same popup floats over the page under the "Edit filters" button that opened
+  // it (only the construction filters show there), instead of jumping to the Map. The node itself never moves.
+  const sub=pop.querySelector('.fpop-h span'), subMap=sub.textContent; let anchor=null;
+  const place=()=>{ if(anchor&&!anchor.isConnected){ anchor=document.querySelector('#view-'+ctx.view+' [data-edit-filters]')||anchor; anchor.setAttribute?.('aria-expanded','true'); } // pages redraw
+    if(!anchor||!pop.classList.contains('fpop-floating')||matchMedia('(max-width:700px)').matches){ pop.style.left=pop.style.top=pop.style.maxHeight=''; return; }
+    const r=anchor.getBoundingClientRect(), w=Math.min(460,innerWidth-16), top=Math.round(r.bottom+8);
+    pop.style.left=Math.round(Math.max(8,Math.min(r.right-w,innerWidth-w-8)))+'px'; pop.style.top=top+'px'; pop.style.maxHeight=Math.max(240,innerHeight-top-12)+'px'; };
+  const setOpen=(open,at=null)=>{ if(open&&matchMedia('(max-width:700px)').matches) document.getElementById('moreF').open=true;
+    const floating=open&&!!at; anchor=floating?at:null; pop.classList.toggle('fpop-floating',floating); sub.textContent=floating?'Construction filings, here and on the map':subMap;
+    if(floating) document.getElementById('lfFilings').open=true;
+    pop.hidden=!open; btn.setAttribute('aria-expanded',open&&!floating); btn.classList.toggle('open',open&&!floating);
+    document.querySelectorAll('[data-edit-filters]').forEach(b=>b.setAttribute('aria-expanded',String(floating&&b===at))); place();
+    if(open) (floating?pop.querySelector('#filtersBody select,#filtersBody button.chip,#filtersBody input'):pop.querySelector('select,button.chip,input'))?.focus({preventScroll:true}); };
+  addEventListener('resize',place); listeners.push(()=>{ if(!pop.hidden&&anchor) requestAnimationFrame(place); });
+  const dismiss=()=>{ const a=anchor; setOpen(false); (a&&a.isConnected?a:btn).focus(); };
   btn.onclick=()=>setOpen(pop.hidden);
-  document.getElementById('filterClose').onclick=()=>{ setOpen(false); btn.focus(); };
+  document.getElementById('filterClose').onclick=dismiss;
   document.getElementById('filterDone').onclick=()=>setOpen(false); // phones: the sheet's "Show N filings" button
-  const clearAll=()=>{ clearFilters(); ctx.toast?.('Cleared: showing everything'); };
+  const clearAll=clearEverything;
   document.getElementById('filterClear').onclick=clearAll; const mc=document.getElementById('mClear'); if(mc) mc.onclick=clearAll;
   // only the construction filters put the filing dots on the map (the layer filters have their own layers)
   pop.addEventListener('change',e=>{ if(e.target.closest('#filtersBody')) showFilings(); }); pop.addEventListener('click',e=>{ if(e.target.closest('#filtersBody')&&e.target.closest('.chip,button[data-k],button[data-v]')) showFilings(); });
-  document.addEventListener('pointerdown',e=>{ if(!pop.hidden&&!wrap.contains(e.target)&&!e.target.closest('.kpi-pop')) setOpen(false); });
-  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!pop.hidden){ setOpen(false); btn.focus(); } });
-  openFilters=()=>{ if(ctx.view!=='map') setView('map'); setOpen(true); }; closeFilters=()=>setOpen(false); }
+  document.addEventListener('pointerdown',e=>{ if(!pop.hidden&&!wrap.contains(e.target)&&!e.target.closest('.kpi-pop,[data-edit-filters],.vscope')) setOpen(false); }); // the scope bar's chips and Reset change the same filters, so the popup stays open
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!pop.hidden){ e.preventDefault(); dismiss(); } });
+  // openFilters({at: button}): pages whose content follows the filters keep the user where they are
+  openFilters=({at=null}={})=>{ const here=at&&ctx.view!=='map'&&(parentOf(ctx.view)==='filings'||['compare','reports'].includes(ctx.view));
+    if(here){ if(!pop.hidden&&anchor===at){ setOpen(false); return; } setOpen(true,at); return; }
+    if(ctx.view!=='map') setView('map'); setOpen(true); };
+  closeFilters=()=>{ if(!pop.hidden) setOpen(false); }; }
+// ---------- page kit: scope bar, empty states, Export ▾ menus (shared by every page) ----------
+// The filters in effect as removable chips: [{label, remove()}]. The registration period is always listed first; it can be
+// removed (back to the default last 12 months) only when it isn't the default.
+const PERIOD_LABEL={'3m':'Filed in the last 3 months','12m':'Filed in the last 12 months','2y':'Filed in the last 2 years','5y':'Filed in the last 5 years',all:'Filed any time'};
+const RESET={c:()=>{ state.counties=new Set(COUNTIES); },t:()=>{ state.types=new Set(TYPES); },u:()=>{ state.uses=null; },min:()=>{ state.min=0; state.max=0; },max:()=>{ state.min=0; state.max=0; },
+  who:()=>{ state.who=null; },chg:()=>{ state.chg=null; },st:()=>{ state.st=null; },sqmin:()=>{ state.sqmin=0; state.sqmax=0; },sqmax:()=>{ state.sqmin=0; state.sqmax=0; },
+  umin:()=>{ state.umin=0; },co:()=>{ state.co=''; },exact:()=>{ state.exact=0; },q:()=>{ state.q=''; }};
+// every filing filter back to the default (and the month and, unless area is false, the selected area)
+function resetFilings({area=true}={}){ Object.values(RESET).forEach(f=>f()); state.d=periodSpec('12m');
+  if(state.month) setMonth(null); if(area&&sel.feature) clearSelection(); else applyFilters(); }
+function filterChips({area=true}={}){
+  const s=curSpec(false), out=[], pk=periodOf(state.d), drop=fn=>()=>{ fn(); applyFilters(); };
+  out.push({label:pk?PERIOD_LABEL[pk]:describe({d:state.d},fmtM)||'Any time',fixed:pk==='12m',remove:drop(()=>{ state.d=periodSpec('12m'); })});
+  const seen=new Set();
+  for(const k of Object.keys(s)){ if(k==='d'||!RESET[k]) continue; const g=k==='max'?'min':k==='sqmax'?'sqmin':k; if(seen.has(g)) continue; seen.add(g);
+    const part=g==='min'?{min:s.min,max:s.max}:g==='sqmin'?{sqmin:s.sqmin,sqmax:s.sqmax}:{[k]:s[k]};
+    out.push({label:describe(part,fmtM),remove:drop(RESET[k])}); }
+  if(state.month) out.push({label:'Under construction · '+monthLabel(state.month),remove:()=>showTime(false)});
+  if(area&&sel.feature) out.push({label:'Area: '+sel.label,remove:()=>clearSelection()});
+  return out;
+}
+// the bar under a page header: "5,291 filings · $16.3B", the filters as chips, [Edit filters] [Reset]
+function scopeBar(el,{list=visible,area=true,lead='',count=true}={}){
+  if(!el) return; const chips=filterChips({area}), n=list.length, v=list.reduce((t,f)=>t+f.cost,0), canReset=chips.some(c=>!c.fixed);
+  el.className='vscope';
+  el.innerHTML=(lead||count?'<span class="vs-n">'+(lead?esc(lead):'<b>'+fmtN(n)+'</b> filing'+(n===1?'':'s')+' · '+fmtM(v))+'</span>':'')+'<span class="vs-chips">'+chips.map((c,i)=>'<span class="vs-chip'+(c.fixed?' fixed':'')+'">'+esc(c.label)+
+    (c.fixed?'':'<button type="button" data-rm="'+i+'" aria-label="Remove filter: '+esc(c.label)+'">×</button>')+'</span>').join('')+'</span>'+
+    '<span class="vs-act"><button type="button" class="btn sm" data-edit-filters aria-haspopup="dialog" aria-controls="filterPop" aria-expanded="false">Edit filters</button>'+(canReset?'<button type="button" class="btn sm ghost" data-reset>Reset</button>':'')+'</span>';
+  el.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>chips[+b.dataset.rm].remove());
+  el.querySelector('[data-edit-filters]').onclick=e=>openFilters({at:e.currentTarget});
+  el.querySelector('[data-reset]')?.addEventListener('click',()=>resetFilings({area}));
+}
+// an empty page or section: icon, title, one sentence, buttons [{label, id?, primary?, attrs?}]
+const VE_IC={search:'<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>',pin:'<path d="M8 14.5s5-4.3 5-8.2A5 5 0 0 0 3 6.3c0 3.9 5 8.2 5 8.2z"/><circle cx="8" cy="6.3" r="1.8"/>',
+  doc:'<path d="M4 1.5h5.5L12.5 4.5v10H4zM9.5 1.5v3h3M6 8h4.5M6 11h4.5"/>',areas:'<rect x="1.5" y="3" width="6" height="10" rx="1"/><rect x="8.5" y="3" width="6" height="10" rx="1"/>',
+  bookmark:'<path d="M4 1.8h8v12.4l-4-3-4 3z"/>',clock:'<circle cx="8" cy="8" r="6.3"/><path d="M8 4.5V8l2.4 1.6"/>',star:'<path d="m8 1.8 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/>'};
+function vempty({icon='doc',title='',text='',actions=[],extra=''}={}){
+  return '<div class="vempty"><span class="ve-ic"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(VE_IC[icon]||VE_IC.doc)+'</svg></span>'+
+    (title?'<b>'+esc(title)+'</b>':'')+(text?'<p>'+text+'</p>':'')+extra+(actions.length?'<div class="ve-act">'+actions.map(a=>'<button type="button" class="btn md'+(a.primary?' primary':'')+'"'+(a.id?' id="'+a.id+'"':'')+(a.attrs||'')+'>'+esc(a.label)+'</button>').join('')+'</div>':'')+'</div>';
+}
+// "Export ▾": a small menu (a <details>) of [{label, sub?, attrs}] or {divider:true} or {html}
+function exportMenu(items,{label='Export',cls=''}={}){
+  return '<details class="vmenu '+cls+'"><summary class="btn">'+esc(label)+' <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 3.5 3 3 3-3"/></svg></summary><div class="vm-pop" role="menu">'+
+    items.map(it=>it.divider?'<hr>':it.html?it.html:'<button type="button" role="menuitem"'+(it.attrs||'')+'>'+esc(it.label)+(it.sub?'<em>'+esc(it.sub)+'</em>':'')+'</button>').join('')+'</div></details>';
+}
+// close an open menu on a click elsewhere, after picking an item, or on Esc
+document.addEventListener('click',e=>{ document.querySelectorAll('details.vmenu[open]').forEach(d=>{ if(!d.contains(e.target)||e.target.closest('.vm-pop [role=menuitem]')) d.open=false; }); });
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; const d=document.querySelector('details.vmenu[open]'); if(d){ e.preventDefault(); d.open=false; d.querySelector('summary')?.focus(); } });
 // apply a whole filter spec (URL, saved search, AI answer)
 function fromSpec(spec,{fly=true}={}){
   state.counties=new Set(spec.c&&spec.c.length?spec.c.filter(c=>COUNTIES.includes(c)):COUNTIES); if(!state.counties.size) state.counties=new Set(COUNTIES);
@@ -479,11 +604,46 @@ const card=document.getElementById('card'), panel=document.getElementById('panel
 // section chips under a card's title: one per section that has content (sections other modules add later appear as they
 // arrive); a chip scrolls the card to its section
 function cardNav(items){ return '<nav class="bnav" aria-label="Card sections">'+items.map(([id,l])=>'<button type="button" data-sec="'+id+'" hidden>'+esc(l)+'</button>').join('')+'</nav>'; }
+// the card's action row (under the title, in the pinned header; a footer on phones): a few buttons, then "⋯" with the rest.
+// items are menu entries: [label, attrs] buttons, {href,label} links (open in a new tab) or {divider:true}
+const DOTS='<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="12.5" cy="8" r="1.4"/></svg>';
+const SPARK='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5 9.4 6.6 14.5 8l-5.1 1.4L8 14.5 6.6 9.4 1.5 8l5.1-1.4z"/></svg>';
+function cardMore(items){ return '<details class="vmenu cmore"><summary class="btn sm" aria-label="More actions" title="More actions">'+DOTS+'</summary><div class="vm-pop" role="menu">'+
+  items.map(it=>it.divider?'<hr>':it.href?'<a role="menuitem" href="'+esc(it.href)+'" target="_blank" rel="noopener">'+esc(it.label)+(it.sub?'<em>'+esc(it.sub)+'</em>':'')+'</a>':'<button type="button" role="menuitem"'+(it.attrs||'')+'>'+esc(it.label)+(it.sub?'<em>'+esc(it.sub)+'</em>':'')+'</button>').join('')+'</div></details>'; }
+function cardActs(main,more){ return '<div class="cact" role="toolbar" aria-label="Actions">'+main+'<span class="cact-w"></span>'+cardMore(more)+'</div>'; }
+// a short line for screen readers (the card itself isn't a live region: it re-renders too often)
+const cardStatusEl=document.getElementById('cardStatus');
+function cardStatus(msg){ if(!cardStatusEl) return; cardStatusEl.textContent=''; requestAnimationFrame(()=>{ cardStatusEl.textContent=msg; }); }
+// copy a link that reopens this card (a filing: f=; a property: b=lat,lng)
+async function copyCardLink(extra){ const p=new URLSearchParams(hashStr()); for(const [k,v] of Object.entries(extra||{})) p.set(k,v); const u=location.href.split('#')[0]+'#'+p.toString();
+  try{ await navigator.clipboard.writeText(u); toast('Link copied. It opens this card.'); }catch(e){ prompt('Copy this link',u); } }
 let navT=0;
-function syncNav(){ card.querySelectorAll('.bnav [data-sec]').forEach(b=>{ const el=card.querySelector('#'+b.dataset.sec); b.hidden=!(el&&!el.hidden&&el.innerHTML.trim()); }); }
+function syncNav(){ card.querySelectorAll('.bnav [data-sec]').forEach(b=>{ const el=card.querySelector('#'+b.dataset.sec); b.hidden=!(el&&!el.hidden&&el.innerHTML.trim()); }); navFade(); spySoon(); }
 new MutationObserver(()=>{ cancelAnimationFrame(navT); navT=requestAnimationFrame(syncNav); }).observe(card,{childList:true,subtree:true});
+// the chip row fades at an edge that has more chips past it
+function navFade(){ const n=card.querySelector('.bnav'); if(!n) return; n.classList.toggle('fl',n.scrollLeft>2); n.classList.toggle('fr',n.scrollLeft+n.clientWidth<n.scrollWidth-2); }
+card.addEventListener('scroll',e=>{ if(e.target.classList?.contains('bnav')) navFade(); },true);
+// scroll-spy: the chip of the section at the top of the card is lit (and kept in view in the chip row); a scrolled card
+// folds its header to the title and actions
+let spyRaf=0, spyHold=0;
+const spySoon=()=>{ if(!spyRaf) spyRaf=requestAnimationFrame(spy); };
+card.addEventListener('scroll',spySoon,{passive:true});
+function spy(){ spyRaf=0; if(!card.classList.contains('open')) return;
+  const y=card.scrollTop, room=card.scrollHeight-card.clientHeight;
+  const was=card.classList.contains('compact'), fold=y>40&&room>160?true:y<=2?false:was; if(fold!==was) card.classList.toggle('compact',fold);
+  if(performance.now()<spyHold) return; // a chip was just clicked: it stays lit while the card scrolls to it
+  const nav=card.querySelector('.bnav'); if(!nav) return;
+  const chips=[...nav.querySelectorAll('[data-sec]:not([hidden])')]; if(!chips.length) return;
+  const off=(card.querySelector('.ctabs')?.offsetHeight||0)+(card.querySelector(':scope>.top')?.offsetHeight||0)+16;
+  let on=chips[0];
+  if(y>=room-4&&room>0) on=chips[chips.length-1];
+  else for(const b of chips){ const el=card.querySelector('#'+b.dataset.sec); if(el&&el.offsetTop-off<=y) on=b; }
+  for(const b of nav.querySelectorAll('[data-sec]')) b.setAttribute('aria-current',String(b===on));
+  const l=on.offsetLeft-nav.offsetLeft, r=l+on.offsetWidth;
+  if(l<nav.scrollLeft+8) nav.scrollLeft=Math.max(0,l-28); else if(r>nav.scrollLeft+nav.clientWidth-8) nav.scrollLeft=r-nav.clientWidth+28;
+  navFade(); }
 card.addEventListener('click',e=>{ const b=e.target.closest('.bnav [data-sec]'); if(!b) return; const el=card.querySelector('#'+b.dataset.sec); if(!el) return;
-  card.querySelectorAll('.bnav [data-sec]').forEach(x=>x.setAttribute('aria-current',x===b));
+  card.querySelectorAll('.bnav [data-sec]').forEach(x=>x.setAttribute('aria-current',x===b)); spyHold=performance.now()+(reduceMotion?120:900);
   // the sticky card-tabs strip and the title/pills block both sit over the content: land the section just below them
   const at=()=>el.offsetTop-(card.querySelector('.ctabs')?.offsetHeight||0)-(card.querySelector('.top')?.offsetHeight||0)-8;
   const t0=at(); card.scrollTo({top:t0,behavior:reduceMotion?'auto':'smooth'});
@@ -492,14 +652,16 @@ card.addEventListener('click',e=>{ const b=e.target.closest('.bnav [data-sec]');
 let navFix=0;
 function select(f,fly){
   showFilings();
-  cardCloseHooks.forEach(fn=>fn());
+  if(cpOpening) stopAllOrbits(); else { cpush=null; cardCloseHooks.forEach(fn=>fn()); }
   state.sel=f; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach((b,i)=>b.classList.toggle('on',visible[i]===f));
   const fld=(k,v,w)=>'<div class="f'+(w?' w':'')+'"><div class="fl">'+k+'</div><div class="fv">'+v+'</div></div>';
   const people=[['Owner',esc(f.owner||'—')],f.dev&&f.dev.toLowerCase()!==String(f.owner).toLowerCase()?['Developer',whoLink('dev',f.dev||f.owner,f.dev)]:null,f.arch?['Architect',whoLink('arch',f.arch,f.arch)]:null,f.gc?['General contractor',whoLink('gc',f.gc,f.gc)]:null].filter(Boolean);
   const gsv='https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+f.lat.toFixed(6)+','+f.lon.toFixed(6);
-  card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2>'+(f.addr?'<div class="bsub">'+esc(f.addr)+'</div>':'')+'</div>'+
+  card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2>'+(f.addr?'<div class="bsub">'+esc(f.addr)+'</div>':'')+'<button class="btn sm cshow" type="button" id="fShowMap">Show on map</button></div>'+
     '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>'+
-    cardNav([['fProj','Project'],['fSched','Schedule'],['fPeople','People'],['fScope','Scope'],['airSec','Air'],['briefBox','AI Brief'],['liveSec','From Here'],['fTools','Tools']])+'</div>'+
+    cardActs('<button class="btn sm askai" type="button" id="fAsk">'+SPARK+'Ask AI</button><a class="btn sm" id="fTabs" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener" title="The filing on the TDLR TABS site">TABS record ↗</a>',
+      [{href:gsv,label:'Street View ↗',sub:'Google Street View at the site'},['Add site note',' id="fNote" data-push'],{divider:true},['Select more',' id="fMulti" title="Then click or tap more filings, buildings or parcels to compare them in tabs (or Shift-click)"'],['Copy link',' id="fLink"']].map(x=>Array.isArray(x)?{label:x[0],attrs:x[1]}:x))+
+    cardNav([['fProj','Project'],['fSched','Schedule'],['fPeople','People'],['fScope','Scope'],['airSec','Air'],['briefBox','AI Brief'],['liveSec','From Here']])+'</div>'+
     (f.sum?'<div class="bover"><div class="kicker">Overview</div><div>'+esc(f.sum)+'</div></div>':'')+
     (f.approx?'<div class="note">Location is approximate: the address didn’t geocode, so this marker sits at the city center (shaded circle), not on the site.</div>':'')+
     (f.prec==='street'?'<div class="note">Placed on '+esc((f.addr||'the street').replace(/^\s*0*\s*\d*[a-z]?(?:-\w+)?\s+/i,'').split(',')[0])+(f.zip?' in '+esc(f.zip):'')+', not at the exact site: '+(/^\s*0*[1-9]/.test(f.addr||'')?'no map service has this house number yet (often a new subdivision or a new address)':'the filing gives no house number')+'.</div>':f.prec==='intersection'?'<div class="note">Placed at the intersection named in the filing.</div>':'')+
@@ -518,19 +680,20 @@ function select(f,fly){
       ((f.tsE||f.teE)?'<div class="ssrc src">“est” dates are our estimates from the project type and value.</div>':'')+historyHtml(f)+'</div>'+
     '<div class="bsec" id="fPeople"><div class="lt">People</div><dl>'+people.map(([k,v])=>'<dt>'+k+'</dt><dd>'+v+'</dd>').join('')+'</dl><div class="ssrc src">Developer, architect and GC are AI-extracted from the filing text and can be wrong.</div></div>'+
     (f.scope?'<div class="bsec" id="fScope"><div class="lt">Scope of Work</div><div class="scope">'+esc(f.scope)+'</div></div>':'')+
-    '<div class="bsec brief-sec" id="briefBox"><div class="lt">AI Project Brief</div><button class="btn" id="briefBtn">Write a Brief</button><div class="rnote">From the filing, nearby activity and census data.</div></div>'+
-    '<div class="bsec" id="fTools"><div class="lt">Tools</div><div class="bacts">'+
-      '<a class="btn" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener">TABS Record ↗</a><a class="btn" href="'+gsv+'" target="_blank" rel="noopener">Street View ↗</a>'+
-      '<button class="btn" type="button" id="fNote">Add Site Note</button><button class="btn askai" type="button" id="fAsk">Ask AI About It</button></div></div>';
-  card.querySelector('.x').onclick=closeCard; card.classList.add('open');
+    '<div class="bsec brief-sec" id="briefBox"><div class="lt">AI Project Brief</div><button class="btn" id="briefBtn">Write a Brief</button><div class="rnote">From the filing, nearby activity and census data.</div></div>';
+  card.querySelector('.x').onclick=closeCard; card.classList.add('open'); card.scrollTop=0;
   ctx.tabs?.track({id:'f:'+f.id,kind:'filing',label:f.name,reopen:()=>select(f,false),leave:()=>{ if(state.sel===f) clearSel(); }});
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
-  card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat]});
+  card.querySelector('#fShowMap').onclick=()=>{ setView('map',{user:true}); select(f,true); }; // over a page (Timeline, Changes…): only shown there
+  card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat]}); // data-push: "← <filing>" goes back with its tabs
   card.querySelector('#fAsk').onclick=()=>ctx.assistant?.ask('Tell me more about '+f.name);
+  card.querySelector('#fMulti').onclick=()=>ctx.tabs?.setAdding(true);
+  card.querySelector('#fLink').onclick=()=>copyCardLink();
+  cardStatus('Filing: '+f.name);
   card.querySelector('#showAll')?.addEventListener('click',()=>{ clearHighlight(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC(),{fly:false}); select(f,false); });
   scheduleHash(); cardRenderHooks.forEach(fn=>fn({kind:'filing',f}));
-  if(fly){ const z=f.approx?Math.min(Math.max(map.getZoom(),12.5),13.5):Math.max(map.getZoom(),16); map.flyTo({center:[f.lon,f.lat],zoom:z,offset:window.innerWidth<=700?[0,-Math.round(window.innerHeight*.22)]:window.innerWidth<=1100?[-200,0]:[-140,0],duration:reduceMotion?0:900});  }
+  if(fly){ const z=f.approx?Math.min(Math.max(map.getZoom(),12.5),13.5):Math.max(map.getZoom(),16); map.flyTo({center:[f.lon,f.lat],zoom:z,offset:window.innerWidth<=700?[0,-Math.round(window.innerHeight*.2)]:window.innerWidth<=1100?[-200,0]:[-Math.round((card.offsetWidth+24)/2),0],duration:reduceMotion?0:900});  }
 }
 function whoLink(k,raw,label){ const v=entityKey(raw); return v?'<a href="#" data-who="'+k+'|'+esc(v)+'">'+esc(label)+'</a>':esc(label); }
 function historyHtml(f){
@@ -549,10 +712,42 @@ function richText(t){ return textBlocks(esc(plainText(t||''))).replace(/\[(TABS[
 function wireCites(el){ el.querySelectorAll('.cite').forEach(b=>b.onclick=()=>{ const f=BY_ID.get(b.dataset.id); if(f){ setView('map'); select(f,true); } }); }
 const cardCloseHooks=[];
 function clearSel(){ state.sel=null; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
-function closeCard(){ cardCloseHooks.forEach(fn=>fn()); card.classList.remove('open'); state.sel=null; scheduleHash(); syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
+function closeCard(){ if(cpOpening){ stopAllOrbits(); return; } // a report opening from the card: the card behind it stays selected
+  cpush=null; cardCloseHooks.forEach(fn=>fn()); card.classList.remove('open','compact'); state.sel=null; scheduleHash(); syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
 function syncHighlight(){ if(map.getLayer&&map.getLayer('filings-hl')) map.setFilter('filings-hl',['==',['get','i'],state.sel?IDX.get(state.sel):-1]);
   const f=state.sel; map.getSource&&map.getSource('focus')?.setData(fc(f?[{type:'Feature',properties:{t:f.type,approx:f.approx?1:0,name:f.name.length>40?f.name.slice(0,38)+'…':f.name+(f.approx?' (approx.)':'')},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}]:[])); }
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeCard(); });
+// ---------- card "children": a report, a filing or a note opened from a property or filing card ----------
+// It takes the card over, but the card it came from stays selected (highlight, tabs, scroll), and "← <name>" in the new
+// card's header (or Esc) brings it back. Buttons that open one carry data-push; ctx.cardPush(reopen, label, run) does
+// the same from code. While one opens, closeCard() only stops the orbit and the card tabs wait behind it.
+let cpush=null, cpOpening=false, cpEnd=null;
+const cardTopEl=()=>card.querySelector(':scope>.top');
+function cardPushBegin(reopen,label){
+  if(cpOpening) return null;
+  const nested=!!cpush;
+  if(!nested){ const t=ctx.tabs?.active(), r=reopen||t?.reopen; if(!r||!card.classList.contains('open')) return null;
+    cpush={reopen:r,tabId:reopen?null:t.id,label:label||cardTopEl()?.querySelector('h2')?.textContent?.trim()||'Back',scroll:card.scrollTop}; }
+  const top0=cardTopEl(); cpOpening=true;
+  return ()=>{ cpOpening=false; if(!nested&&top0&&top0.isConnected){ cpush=null; return; } card.scrollTop=0; decorateBack(); if(cpush) cardStatus('Opened from '+cpush.label+'. Back or Esc returns to it.'); };
+}
+function cardPush(reopen,label,run){ const end=cardPushBegin(reopen,label); try{ run?.(); }finally{ end?.(); } }
+card.addEventListener('click',e=>{ if(cpOpening||!e.target.closest?.('[data-push]')) return; cpEnd=cardPushBegin(); if(cpEnd) setTimeout(()=>{ if(cpEnd){ const f=cpEnd; cpEnd=null; f(); } },0); },true);
+card.addEventListener('click',()=>{ if(cpEnd){ const f=cpEnd; cpEnd=null; f(); } });
+const BACK='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>';
+function decorateBack(){ if(!cpush||cpOpening) return; const head=cardTopEl()?.firstElementChild; if(!head||head.querySelector('.cback')) return;
+  const b=document.createElement('button'); b.type='button'; b.className='cback'; b.innerHTML=BACK+'<span></span>'; b.querySelector('span').textContent=cpush.label; b.title='Back to '+cpush.label+' (Esc)';
+  b.onclick=e=>{ e.stopPropagation(); cardBack(); }; head.prepend(b); }
+new MutationObserver(decorateBack).observe(card,{childList:true});
+function cardBack(){ const p=cpush; if(!p) return false; cpush=null;
+  if(!(p.tabId&&ctx.tabs?.reopen?.(p.tabId))) p.reopen();
+  const y=p.scroll; requestAnimationFrame(()=>{ card.scrollTop=y; setTimeout(()=>{ if(card.scrollTop<y-2) card.scrollTop=y; },400); });
+  cardStatus('Back to '+p.label+'.'); return true; }
+// Esc: back to the card a report came from, else close the card. Not while typing, and not when something else (the
+// Layers panel, a menu, the search box, Settings, a popup) already handled it: those call preventDefault. On window, so
+// it runs after the page's own document-level handlers.
+addEventListener('keydown',e=>{ if(e.key!=='Escape'||e.defaultPrevented||!card.classList.contains('open')) return;
+  if(e.target?.closest?.('input,textarea,select,[contenteditable="true"]')) return;
+  e.preventDefault(); if(!cardBack()) closeCard(); });
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
 
 // hover + click on markers
@@ -600,7 +795,8 @@ const isTouch=window.matchMedia('(pointer: coarse)').matches;
 const HINTS={area:'Drag a box over the area you want.',poly:isTouch?'Tap to drop points. Tap the first point to close the shape.':'Click to drop points. Click the first point or double-click to close. Backspace undoes, Esc cancels.',county:'Click counties to add or remove them from the selection.'};
 function setMode(m){
   mode=m; draft=[]; boxA=null; drawDraft();
-  document.querySelectorAll('.tools button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));
+  document.querySelectorAll('.tools button[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));
+  syncModeUI(m);
   hintEl.textContent=HINTS[m]||''; hintEl.classList.toggle('on',!!HINTS[m]);
   radiusEl.classList.toggle('on',m==='radius'); if(m==='radius') setTimeout(()=>rq.focus(),30);
   stage.classList.toggle('m-draw',m!=='pan'); stage.dataset.dmode=m; // each drawing tool has its own cursor (src/cursors.js)
@@ -608,7 +804,21 @@ function setMode(m){
   if(m==='poly') map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
   tip.style.opacity=0;
 }
-document.querySelectorAll('.tools button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+document.querySelectorAll('.tools button[data-mode]').forEach(b=>b.onclick=()=>{ setMode(b.dataset.mode); setSelSheet(false); });
+// Phones: the five area tools fold into one "Select ▾" pill that opens them as a small sheet with their names; while a
+// tool is in use a "Drawing a shape · Cancel" chip says so and gets back to moving the map.
+const MODE_TXT={area:'Drawing a box',poly:'Drawing a shape',radius:'Radius search',county:'Picking counties'};
+const selPill=document.getElementById('selPill'), modeChip=document.getElementById('modeChip');
+function setSelSheet(on){ document.querySelector('.app').classList.toggle('sel-open',!!on); selPill?.setAttribute('aria-expanded',String(!!on)); }
+function syncModeUI(m){ if(modeChip){ modeChip.hidden=m==='pan'||!MODE_TXT[m]; document.getElementById('modeChipT').textContent=MODE_TXT[m]||''; }
+  if(!selPill) return; const ic=(m==='pan'?selIc0:document.querySelector('.tools button[data-mode="'+m+'"] svg'))?.cloneNode(true);
+  if(ic){ ic.setAttribute('class','sp-ic'); selPill.querySelector('.sp-ic').replaceWith(ic); } selPill.classList.toggle('on',m!=='pan'); }
+const selIc0=selPill?.querySelector('.sp-ic')?.cloneNode(true);
+selPill&&(selPill.onclick=()=>setSelSheet(!document.querySelector('.app').classList.contains('sel-open')));
+document.getElementById('selClose')?.addEventListener('click',()=>setSelSheet(false));
+document.getElementById('modeCancel')?.addEventListener('click',()=>setMode('pan'));
+document.addEventListener('pointerdown',e=>{ if(document.querySelector('.app').classList.contains('sel-open')&&!e.target.closest('#mapTools,#selPill')) setSelSheet(false); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.querySelector('.app').classList.contains('sel-open')){ e.preventDefault(); setSelSheet(false); } });
 function ringFeature(ring){
   const r=ring.slice(); if(r[0][0]!==r[r.length-1][0]||r[0][1]!==r[r.length-1][1]) r.push(r[0]);
   let f={type:'Polygon',coordinates:[r]}; if(d3.geoArea(f)>2*Math.PI) f={type:'Polygon',coordinates:[r.slice().reverse()]}; return f;
@@ -660,7 +870,7 @@ function finishPoly(){ const pts=draft.filter((p,i)=>i===0||d3.geoDistance(p,dra
   if(pts.length<3){ toast('A shape needs at least three points.'); return; }
   setSelection('shape','Custom shape ('+pts.length+' points)',ringFeature(pts)); setMode('pan'); }
 document.addEventListener('keydown',e=>{ if(e.target.closest&&e.target.closest('input,select,textarea')) return;
-  if(mode==='poly'&&draft.length){ if(e.key==='Enter'){e.preventDefault(); finishPoly();} else if(e.key==='Backspace'){e.preventDefault(); draft.pop(); drawDraft();} else if(e.key==='Escape'){ draft=[]; drawDraft(); } } });
+  if(mode==='poly'&&draft.length){ if(e.key==='Enter'){e.preventDefault(); finishPoly();} else if(e.key==='Backspace'){e.preventDefault(); draft.pop(); drawDraft();} else if(e.key==='Escape'){ e.preventDefault(); draft=[]; drawDraft(); } } });
 // the box around an area's own coordinates: d3.geoBounds reads a ring wound the "wrong" way (drive-time bands, circles)
 // as the whole world minus the area, which zoomed the map all the way out
 function fitGeom(g){ g=g?.geometry||g; let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
@@ -728,28 +938,34 @@ function updateRadius(fly){
 }
 
 // ---------- layers panel & controls ----------
-const layersEl=document.getElementById('layers'), layersBtn=document.getElementById('layersBtn');
-// opens as a popover under the quick layer buttons (left side, where More is); on phones it keeps its own sheet layout
-const qlEl=document.getElementById('qlayers');
-function placeLayers(){ if(!layersEl.classList.contains('on')||!qlEl||matchMedia('(max-width:700px)').matches){ layersEl.style.removeProperty('--ly-top'); layersEl.style.removeProperty('--ly-left'); return; }
-  const host=layersEl.offsetParent?.getBoundingClientRect(), q=qlEl.getBoundingClientRect(); if(!host||!q.height) return;
-  layersEl.style.setProperty('--ly-top',Math.round(q.bottom-host.top+8)+'px'); layersEl.style.setProperty('--ly-left',Math.round(q.left-host.left)+'px'); }
-function setLayersOpen(on){ layersEl.classList.toggle('on',on); layersBtn.setAttribute('aria-expanded',on); qlEl?.querySelector('.qmore')?.setAttribute('aria-expanded',on); placeLayers(); }
+const layersEl=document.getElementById('layers'), layersBtn=document.getElementById('layersBtn'), layersOpen=document.getElementById('layersOpen');
+// The [Layers · N] button in the map's tool row opens the panel right under it. #layersBtn (hidden, in the camera rail) stays
+// as the trigger other code clicks (phone More › Layers, Settings › Map layers). On phones the panel is a bottom sheet.
+function placeLayers(){ const a=layersOpen&&layersOpen.offsetParent?layersOpen:null;
+  if(!layersEl.classList.contains('on')||!a||matchMedia('(max-width:700px)').matches){ layersEl.style.removeProperty('--ly-top'); layersEl.style.removeProperty('--ly-left'); return; }
+  const host=layersEl.offsetParent?.getBoundingClientRect(), q=a.getBoundingClientRect(); if(!host||!q.height) return;
+  // keep the panel inside the controls' column (#mapleft), so it doesn't spill over the camera rail or the assistant drawer
+  const ml=document.getElementById('mapleft').getBoundingClientRect(), maxL=Math.max(ml.left,ml.right-(layersEl.offsetWidth||320))-host.left;
+  layersEl.style.setProperty('--ly-top',Math.round(q.bottom-host.top+8)+'px'); layersEl.style.setProperty('--ly-left',Math.round(Math.max(16,Math.min(q.left-host.left,maxL,host.width-336)))+'px'); }
+function setLayersOpen(on){ const was=layersEl.classList.contains('on'); layersEl.classList.toggle('on',on); layersBtn.setAttribute('aria-expanded',on); layersOpen?.setAttribute('aria-expanded',on); layersOpen?.classList.toggle('open',on);
+  if(on&&!was){ try{ ctx.openLayerGroups?.(); }catch(e){} layersEl.scrollTop=0; } placeLayers(); }
 layersBtn.onclick=e=>{ e.stopPropagation(); setLayersOpen(!layersEl.classList.contains('on')); };
-document.getElementById('layersX')?.addEventListener('click',()=>setLayersOpen(false));
-addEventListener('resize',placeLayers); if(qlEl&&window.ResizeObserver) new ResizeObserver(placeLayers).observe(qlEl);
+layersOpen&&(layersOpen.onclick=e=>{ e.stopPropagation(); setLayersOpen(!layersEl.classList.contains('on')); });
+document.getElementById('layersX')?.addEventListener('click',()=>{ setLayersOpen(false); layersOpen?.offsetParent&&layersOpen.focus({preventScroll:true}); });
+document.getElementById('layersDone')?.addEventListener('click',()=>setLayersOpen(false));
+addEventListener('resize',placeLayers); if(layersOpen&&window.ResizeObserver) new ResizeObserver(placeLayers).observe(document.getElementById('mapleft'));
 let swallowClick=false;
-document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on')&&!layersEl.contains(e.target)&&!layersBtn.contains(e.target)&&!e.target.closest?.('.qmore')){ setLayersOpen(false); if(map.getCanvas().contains(e.target)) swallowClick=true; } });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&layersEl.classList.contains('on')) setLayersOpen(false); });
-document.querySelectorAll('#styleSeg button').forEach(b=>b.onclick=()=>setBasemap(b.dataset.style));
+document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on')&&!layersEl.contains(e.target)&&!layersBtn.contains(e.target)&&!layersOpen?.contains(e.target)){ setLayersOpen(false); if(map.getCanvas().contains(e.target)) swallowClick=true; } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&layersEl.classList.contains('on')){ e.preventDefault(); setLayersOpen(false); } });
+document.querySelectorAll('#styleSeg button').forEach(b=>{ b.onclick=()=>setBasemap(b.dataset.style); b.setAttribute('aria-pressed',b.dataset.style===layers.style); });
 document.querySelectorAll('#sizeSeg button').forEach(b=>b.onclick=()=>{ layers.size=b.dataset.size; saveLayers(); styleFilings(); });
 document.querySelectorAll('#heatSeg button').forEach(b=>b.onclick=()=>{ layers.heat=b.dataset.heat; saveLayers(); styleFilings(); });
-document.getElementById('lyFilings').onchange=e=>{ layers.dots=e.target.checked; saveLayers(); styleFilings(); };
+document.getElementById('lyFilings').onchange=e=>{ layers.dots=e.target.checked; saveLayers(); styleFilings(); if(!map.getLayer('filings')) syncLegend(); };
 syncLegend();
-function showFilings(){ if(layers.dots) return; layers.dots=true; saveLayers(); const lf=document.getElementById('lyFilings'); if(lf) lf.checked=true; if(map.getLayer('filings')) styleFilings(); syncQL(); }
+function showFilings(){ if(layers.dots) return; layers.dots=true; saveLayers(); const lf=document.getElementById('lyFilings'); if(lf) lf.checked=true; if(map.getLayer('filings')) styleFilings(); else syncLegend(); syncQL(); }
 // on the map at all: dots or the heatmap (the Filings quick button shows either, and turns both off)
 const filingsShown=()=>layers.dots||layers.heat!=='off';
-function setFilingsShown(v){ layers.dots=!!v; if(!v) layers.heat='off'; saveLayers(); const lf=document.getElementById('lyFilings'); if(lf) lf.checked=layers.dots; if(map.getLayer('filings')) styleFilings(); syncQL(); }
+function setFilingsShown(v){ layers.dots=!!v; if(!v) layers.heat='off'; saveLayers(); const lf=document.getElementById('lyFilings'); if(lf) lf.checked=layers.dots; if(map.getLayer('filings')) styleFilings(); else syncLegend(); syncQL(); }
 function setMapOptions(a){ const done=[];
   if(a.heatmap){ layers.heat=a.heatmap; done.push(a.heatmap==='off'?'heatmap off':'heatmap by '+(a.heatmap==='value'?'value':'count')); }
   if(typeof a.size_by_value==='boolean'){ layers.size=a.size_by_value?'value':'uniform'; done.push(a.size_by_value?'dots sized by value':'uniform dots'); }
@@ -783,8 +999,14 @@ map.on('move',()=>{ if(camRaf) return; camRaf=requestAnimationFrame(()=>{ camRaf
 map.on('moveend',()=>{ if(map.isEasing()||orbitRaf||map.getZoom()>=4) return; if(map.getPitch()>.5||Math.abs(map.getBearing())>.5) map.easeTo({pitch:0,bearing:0,roll:0,duration:reduceMotion?0:600}); });
 flatBtn.onclick=flatView;
 document.getElementById('zin').onclick=()=>map.zoomIn(); document.getElementById('zout').onclick=()=>map.zoomOut();
-document.getElementById('home').onclick=()=>{ stopAllOrbits(); map.flyTo({...HOME,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1200}); };
-document.getElementById('orbit').onclick=()=>{ stopAllOrbits(); map.flyTo({center:[-93,26],zoom:2.2,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1600}); };
+// Reset view ▾: Whole region (#home, which the assistant clicks for "show the whole region") and Globe (#orbit)
+const resetBtn=document.getElementById('resetView'), resetPop=document.getElementById('resetPop');
+const setResetOpen=on=>{ resetPop.hidden=!on; resetBtn.setAttribute('aria-expanded',String(on)); resetBtn.classList.toggle('open',on); if(on) resetPop.querySelector('button')?.focus({preventScroll:true}); };
+resetBtn.onclick=e=>{ e.stopPropagation(); setResetOpen(resetPop.hidden); };
+document.addEventListener('pointerdown',e=>{ if(!resetPop.hidden&&!e.target.closest('#resetMenu')) setResetOpen(false); });
+resetPop.addEventListener('keydown',e=>{ if(e.key==='Escape'){ e.stopPropagation(); setResetOpen(false); resetBtn.focus(); } });
+document.getElementById('home').onclick=()=>{ if(!resetPop.hidden) setResetOpen(false); stopAllOrbits(); map.flyTo({...HOME,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1200}); };
+document.getElementById('orbit').onclick=()=>{ if(!resetPop.hidden) setResetOpen(false); stopAllOrbits(); map.flyTo({center:[-93,26],zoom:2.2,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1600}); };
 
 // ---------- toast ----------
 const toastEl=document.getElementById('toast'); let toastT=0;
@@ -849,17 +1071,50 @@ function reportMap(list){
 }
 
 // ---------- views ----------
-let view='map'; const viewHooks={}, viewChangeHooks=[], cardRenderHooks=[];
-function setView(v){
-  if(!document.getElementById('view-'+v)&&v!=='map') v='map'; view=v;
-  document.querySelectorAll('#viewbar button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
+let view='map'; const appEl=document.querySelector('.app'), viewHooks={}, viewChangeHooks=[], cardRenderHooks=[];
+function setView(v,{user}={}){
+  // every page id works (#v=who, saved reports, the assistant); a group id (filings, marketgrp, work) opens its last-used page
+  if(!document.getElementById('view-'+v)&&v!=='map') v=leafFor(v);
+  if(!document.getElementById('view-'+v)&&v!=='map') v='map'; const was=view;
+  // "← Back to <page>": only when the user clicked something on the page (or on the card over it) that lands on the Map;
+  // the app bar, the assistant, links and boot never leave one. Any other page choice clears it.
+  if(v==='map'&&was!=='map'){ if(user??(pageAct&&pageAct.from===was&&performance.now()-pageAct.t<1500)) setBack(was); }
+  else if(v!=='map') setBack(null);
+  pageAct=null; if(v!==was) closeFilters(); view=v;
+  syncNavTabs(v); // app bar tab, sub-tab row (src/nav.js)
   document.querySelectorAll('.view').forEach(el=>el.classList.toggle('on',el.id==='view-'+v));
-  stage.dataset.view=v; if(v==='map') setTimeout(()=>map.resize(),0); else viewHooks[v]?.();
+  stage.dataset.view=v; appEl.dataset.view=v; // pages (not the Map) hide the list panel and use the full width (app.css)
+  // the map is wider on a page (no panel); resize it now, not on the next tick, so a fit/fly that follows this call
+  // (Compare's "go", "show on map", the assistant) is measured against the map's real width
+  if(v==='map'){ appEl.classList.remove('pview-open'); if(was!=='map') map.resize(); setTimeout(()=>map.resize(),0); } else viewHooks[v]?.();
+  if(v==='changes') changesSeen();
   viewChangeHooks.forEach(fn=>fn(v));
   scheduleHash();
 }
-document.querySelectorAll('#viewbar button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
-{ const n=CHANGED.size; document.getElementById('chgBadge').textContent=n?fmtN(n):''; }
+let pageAct=null, back=null;
+// a click anywhere else (the app bar's Map tab, the phone tab bar, the assistant) forgets the page click, so it can't leave a chip
+document.addEventListener('click',e=>{ if(e.isTrusted) pageAct=view!=='map'&&e.target.closest?.('.view,#card')?{t:performance.now(),from:view}:null; },true);
+const backEl=document.createElement('div'); backEl.className='backchip'; backEl.hidden=true;
+backEl.innerHTML='<button type="button" class="bk-go"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8H3.5M7.5 3.5 3 8l4.5 4.5"/></svg><span></span></button><button type="button" class="bk-x" aria-label="Dismiss"><svg width="12" height="12" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>';
+document.getElementById('viewport').appendChild(backEl);
+function setBack(from){
+  if(!from){ back=null; backEl.hidden=true; appEl.classList.remove('has-back'); return; }
+  const sec=document.getElementById('view-'+from); // read the scroll positions now, before the page is hidden
+  back={from,top:sec?.scrollTop||0,inner:[...(sec?.querySelectorAll('.g-scroll')||[])].map(el=>el.scrollTop)};
+  backEl.querySelector('span').textContent='Back to '+labelOf(from); backEl.hidden=false; appEl.classList.add('has-back');
+}
+backEl.querySelector('.bk-go').onclick=()=>{ const b=back; if(!b) return; setView(b.from);
+  const put=()=>{ const sec=document.getElementById('view-'+b.from); if(!sec) return; sec.scrollTop=b.top; sec.querySelectorAll('.g-scroll').forEach((el,i)=>{ if(b.inner[i]!=null) el.scrollTop=b.inner[i]; }); };
+  put(); requestAnimationFrame(()=>{ put(); setTimeout(put,120); }); };
+backEl.querySelector('.bk-x').onclick=()=>setBack(null);
+// Changes badge: filings new or changed in nightly checks since you last opened Changes (all of this week's on a first visit)
+const CHG_SEEN='fs-chg-seen';
+function changesBadge(){
+  let seen=null; try{ seen=localStorage.getItem(CHG_SEEN); }catch(e){}
+  const ids=new Set(); for(const r of DATA.changes.runs||[]){ if(seen&&r.built<=seen) break; for(const x of r.items) if(CHANGED.has(x.id)) ids.add(x.id); }
+  ctx.setBadge('changes',ids.size,{alert:true,title:'New and changed filings since your last visit'});
+}
+function changesSeen(){ const last=DATA.changes.runs?.[0]?.built; if(!last) return; try{ localStorage.setItem(CHG_SEEN,last); }catch(e){} changesBadge(); }
 
 // ---------- month slider (map) ----------
 const tRange=document.getElementById('tRange'), tLabel=document.getElementById('tLabel'), tPlay=document.getElementById('tPlay'), tsl=document.getElementById('tslider');
@@ -867,10 +1122,13 @@ const MONTHS=(()=>{ const a=new Date(DATA.period.start.slice(0,7)+'-01T00:00:00Z
   for(let d=a; ym(d)<=(maxEnd.slice(0,7)<cap?maxEnd.slice(0,7):cap); d=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1))) out.push(ym(d)); return out.length?out:[ym(new Date())]; })();
 tRange.max=MONTHS.length-1; tRange.value=Math.max(0,MONTHS.indexOf(ym(new Date())));
 let playT=null;
-const timeBtn=document.getElementById('timeBtn');
-function showTime(on){ tsl.classList.toggle('show',on); timeBtn.setAttribute('aria-pressed',on); if(!on){ stopPlay(); if(state.month) setMonth(null); } }
-timeBtn.onclick=()=>showTime(!tsl.classList.contains('show'));
-function setMonth(m){ state.month=m; tsl.classList.toggle('on',!!m); if(m&&!tsl.classList.contains('show')){ tsl.classList.add('show'); timeBtn.setAttribute('aria-pressed',true); } tLabel.textContent=m?'Under construction · '+monthLabel(m):'Under construction by month'; if(m) tRange.value=MONTHS.indexOf(m); applyFilters(); }
+// Time-lapse: "Play by month" sits on the Filings row in Map layers and on the Filings legend. It puts the filings on the
+// map first, then plays month by month; the month shows as a removable chip under the map's layer buttons.
+const syncTimeBtns=()=>{ const on=tsl.classList.contains('show'); document.querySelectorAll('[data-timelapse]').forEach(b=>{ b.setAttribute('aria-pressed',String(on)); const sp=b.querySelector('span'); if(sp) sp.textContent=on?'Stop time-lapse':'Play by month'; b.querySelector('path')?.setAttribute('d',on?'M2.5 2.5h7v7h-7z':'M3 1.5v9l7-4.5z'); }); };
+function showTime(on){ tsl.classList.toggle('show',on); syncTimeBtns(); if(!on){ stopPlay(); if(state.month) setMonth(null); } }
+function startTimelapse(){ showFilings(); if(ctx.view!=='map') setView('map'); showTime(true); if(!playT) tPlay.click(); }
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-timelapse]'); if(!b) return; if(tsl.classList.contains('show')) showTime(false); else startTimelapse(); });
+function setMonth(m){ state.month=m; tsl.classList.toggle('on',!!m); if(m&&!tsl.classList.contains('show')){ tsl.classList.add('show'); syncTimeBtns(); } tLabel.textContent=m?'Under construction · '+monthLabel(m):'Under construction by month'; if(m) tRange.value=MONTHS.indexOf(m); applyFilters(); }
 let tT; tRange.oninput=()=>{ cancelAnimationFrame(tT); tT=requestAnimationFrame(()=>setMonth(MONTHS[+tRange.value])); };
 document.getElementById('tClear').onclick=()=>showTime(false);
 function stopPlay(){ clearInterval(playT); playT=null; tPlay.classList.remove('on'); tPlay.setAttribute('aria-label','Play through months'); }
@@ -883,6 +1141,30 @@ let hashT=0, booting=true;
 function hashStr(){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id); return p.toString(); }
 function scheduleHash(){ if(booting) return; clearTimeout(hashT); hashT=setTimeout(()=>{ const h=hashStr(); history.replaceState(null,'',h?'#'+h:location.pathname+location.search); document.getElementById('rssLink').href='api/feed?'+encode(curSpec()); },250); }
 document.getElementById('copyLink').onclick=async()=>{ const u=location.href.split('#')[0]+'#'+hashStr(); try{ await navigator.clipboard.writeText(u); toast('Link copied. It opens with these filters.'); }catch(e){ prompt('Copy this link',u); } };
+
+// ---------- the Map panel: pick buttons, "…" menu, links, first-visit tip ----------
+// no area yet: Box / Shape / Radius / County start the same tools as the map's toolbar (on a phone, from the Map tab)
+document.querySelectorAll('#selPick [data-pick]').forEach(b=>b.onclick=()=>{
+  if(matchMedia('(max-width:700px)').matches) document.querySelector('#mnav [data-tab=map]')?.click();
+  setMode(b.dataset.pick); });
+{ const menu=document.getElementById('scopeMenu'), form=document.getElementById('saveForm'), nameEl=document.getElementById('saveName');
+  // the menu opens fresh each time: the name field only after "Save search"
+  menu.addEventListener('toggle',()=>{ if(!menu.open) form.hidden=true; });
+  document.getElementById('saveSearch').addEventListener('click',e=>{ e.stopPropagation(); // keep the menu open for the name field
+    form.hidden=false; nameEl.value=filterChips({area:true}).filter(c=>!c.fixed).map(c=>c.label.replace(/^Area: /,'')).join(' · ').slice(0,60)||'All filings'; nameEl.focus(); nameEl.select(); });
+  form.onsubmit=e=>{ e.preventDefault(); const name=nameEl.value.trim(); if(!name){ nameEl.focus(); return; } ctx.saveSearch?.(name); menu.open=false; };
+  nameEl.addEventListener('keydown',e=>{ if(e.key==='Escape'){ e.stopPropagation(); form.hidden=true; document.getElementById('saveSearch').focus(); } }); }
+document.getElementById('savedAll').onclick=()=>setView('saved');
+document.getElementById('arepAll').onclick=()=>setView('reports');
+document.getElementById('footSources').onclick=()=>setView('sources');
+const INTRO='fs-tip-intro', introEl=document.getElementById('introTip');
+try{ introEl.hidden=localStorage.getItem(INTRO)==='1'; }catch(e){ introEl.hidden=false; }
+document.getElementById('introTipOk').onclick=()=>{ introEl.hidden=true; try{ localStorage.setItem(INTRO,'1'); }catch(e){} };
+// Data & help › Getting started: the tip again, at the top of the Map panel
+function showIntro(){ try{ localStorage.removeItem(INTRO); }catch(e){} introEl.hidden=false; setView('map');
+  if(matchMedia('(max-width:700px)').matches) document.querySelector('#mnav [data-tab=list]')?.click();
+  else if(appEl.classList.contains('pcollapsed')) document.getElementById('panelToggle')?.click();
+  panel.scrollTop=0; requestAnimationFrame(()=>document.getElementById('introTipOk').focus({preventScroll:true})); }
 
 // ---------- modules ----------
 if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
@@ -909,7 +1191,7 @@ function screenContext(){
   const c=map.getCenter(), b=map.getBounds(), z=map.getZoom(), near=nearestPlace([c.lng,c.lat])||farLabel;
   const inView=visible.filter(f=>f.lon>=b.getWest()&&f.lon<=b.getEast()&&f.lat>=b.getSouth()&&f.lat<=b.getNorth());
   const top=inView.slice().sort((a,b)=>b.cost-a.cost).slice(0,8).map(f=>f.id+' '+f.name.slice(0,60)+' ('+(f.use||TYPE_LABEL[f.type])+', est. '+fmtM(f.cost)+', '+(f.city||f.county)+')');
-  const lines=['View: '+(view==='map'?'map':view+' tab')+'; map centered '+c.lat.toFixed(4)+', '+c.lng.toFixed(4)+(near?' (near '+near+')':'')+', zoom '+z.toFixed(1)+(z>=14?' (street level, 3D buildings visible)':z>=11?' (neighborhood)':z>=8?' (city/county)':' (region)')+(map.getPitch()>20?', tilted 3D':'')+(orbitRaf?', orbiting':''),
+  const lines=['View: '+(view==='map'?'map':view+' tab ('+pathOf(view)+')')+'; map centered '+c.lat.toFixed(4)+', '+c.lng.toFixed(4)+(near?' (near '+near+')':'')+', zoom '+z.toFixed(1)+(z>=14?' (street level, 3D buildings visible)':z>=11?' (neighborhood)':z>=8?' (city/county)':' (region)')+(map.getPitch()>20?', tilted 3D':'')+(orbitRaf?', orbiting':''),
     'Visible area: W '+b.getWest().toFixed(3)+' S '+b.getSouth().toFixed(3)+' E '+b.getEast().toFixed(3)+' N '+b.getNorth().toFixed(3),
     'Filings on screen: '+fmtN(inView.length)+' of '+fmtN(visible.length)+' matching, est. '+fmtM(inView.reduce((s,f)=>s+f.cost,0))+(top.length?'. Largest in view: '+top.join('; '):''),
     'Map display: '+(layers.dots?'filing dots on':'filing dots hidden')+', heatmap '+layers.heat+', basemap '+layers.style];
@@ -938,34 +1220,46 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return [...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,30).map(x=>x[0]).join(', '); } // the busiest cities and developers on screen (the voice transcriber's hint list takes the first few)
-ctx.setMode=setMode; ctx.openFilters=()=>openFilters(); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
+ctx.cardPush=cardPush; ctx.cardBack=cardBack; ctx.cardChild=()=>cpush?(cpOpening?'opening':'open'):null; ctx.cardChildDrop=()=>{ cpush=null; }; ctx.cardActs=cardActs; ctx.cardStatus=cardStatus; ctx.copyCardLink=copyCardLink; ctx.SPARK=SPARK;
+ctx.setMode=setMode; ctx.setFilingsOpen=setFilingsOpen; ctx.showIntro=showIntro; ctx.filterChips=filterChips; ctx.scopeBar=scopeBar; ctx.resetFilings=resetFilings; ctx.vempty=vempty; ctx.exportMenu=exportMenu; ctx.openFilters=o=>openFilters(o); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
   if(!html){ el?.remove(); return; } if(!el){ el=document.createElement('div'); el.className='xlegend'; el.dataset.lg=id; box.appendChild(el); } if(el.innerHTML!==html) el.innerHTML=html; };
+// One Legend card: every legend above is a section with its title as a header row. One section is open at a time (the
+// newest layer's, until you pick another); the chevron folds the whole card to its header. Filings shows at every width.
+{ const box=document.getElementById('legends'), tog=document.getElementById('lgToggle'), head=box?.querySelector('.lg-h b'); let open=null, seen=new Set(), raf=0, min=false;
+  try{ min=localStorage.getItem('fs-legend-min')==='1'||(localStorage.getItem('fs-legend-min')==null&&matchMedia('(max-width:700px)').matches); }catch(e){}
+  const keyOf=el=>el.dataset.lg||(el.id==='dLegend'?'demo':'');
+  const shown=el=>el.classList.contains('dlegend')?el.classList.contains('on'):el.classList.contains('legend')?(document.documentElement.dataset.filings!=='off'||el.classList.contains('heat')):true;
+  const sync=()=>{ raf=0; if(!box) return; const all=[...box.querySelectorAll(':scope>.legend,:scope>.dlegend,:scope>.xlegend')], vis=all.filter(shown), keys=vis.map(keyOf);
+    const fresh=keys.filter(k=>!seen.has(k)); seen=new Set(keys); if(fresh.length&&!booting) open=fresh[fresh.length-1]; if(!keys.includes(open)) open=keys[keys.length-1]||null;
+    for(const el of all){ const k=keyOf(el), t=el.querySelector(':scope>.t'); el.classList.toggle('lg-open',k===open||vis.length===1); el.classList.toggle('lg-one',vis.length===1);
+      if(t&&!t.hasAttribute('tabindex')){ t.setAttribute('tabindex','0'); t.setAttribute('role','button'); } t?.setAttribute('aria-expanded',String(k===open||vis.length===1)); }
+    box.classList.toggle('lg-empty',!vis.length); box.classList.toggle('lg-min',min);
+    if(head) head.textContent=min&&vis.length?'Legend · '+vis.length:'Legend';
+    tog?.setAttribute('aria-expanded',String(!min)); const lab=min?'Show the legend':'Hide the legend'; tog?.setAttribute('aria-label',lab); if(tog) tog.title=lab; };
+  const soon=()=>{ if(!raf) raf=requestAnimationFrame(sync); };
+  if(box){ new MutationObserver(soon).observe(box,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); new MutationObserver(soon).observe(document.documentElement,{attributes:true,attributeFilter:['data-filings']});
+    const pick=e=>{ const t=e.target.closest('.t'); if(!t||!box.contains(t)||t.closest('.lg-h')) return; const el=t.parentElement; if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; if(e.type==='keydown') e.preventDefault(); open=keyOf(el); if(min){ min=false; try{ localStorage.setItem('fs-legend-min','0'); }catch(err){} } sync(); };
+    box.addEventListener('click',pick); box.addEventListener('keydown',pick);
+    box.querySelector('.lg-h').addEventListener('click',()=>{ min=!min; try{ localStorage.setItem('fs-legend-min',min?'1':'0'); }catch(e){} sync(); });
+    sync(); } }
 syncQL=()=>ctx.syncQuickLayers?.();
 Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
+  setTheme, themePref:()=>themePref, BOOT_BASES,
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
-for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+renderNav(ctx); changesBadge(); // menus first: modules look up the badge spans and the sub-tab rows
+for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan,initSettings]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
-// ---------- map buttons next to an open card ----------
-// Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,
-// so the buttons stay in their column at the edge. Otherwise (short windows) the buttons step left of the card.
-{ const ctrlsEl=document.querySelector('.ctrls'), layersEl=document.getElementById('layers'), appEl=document.querySelector('.app'), stageEl=document.querySelector('.stage');
-  let raf=0;
-  const sync=()=>{ raf=0;
-    const open=card.classList.contains('open')&&innerWidth>1100&&!layersEl.classList.contains('on');
-    const avail=open?Math.floor(stageEl.getBoundingClientRect().bottom-16-(ctrlsEl.getBoundingClientRect().bottom+12)):0;
-    const on=open&&avail>=420; appEl.classList.toggle('card-below',on);
-    if(on) appEl.style.setProperty('--card-max',avail+'px'); else appEl.style.removeProperty('--card-max'); };
-  const soon=()=>{ if(!raf) raf=requestAnimationFrame(sync); };
-  new MutationObserver(soon).observe(card,{attributes:true,attributeFilter:['class']});
-  new MutationObserver(soon).observe(layersEl,{attributes:true,attributeFilter:['class']});
-  new ResizeObserver(soon).observe(stageEl); addEventListener('resize',soon); }
+// ---------- the card's dock ----------
+// Desktop: an open card is a full-height column at the right edge of the map (src/app.css, "property card dock"); the
+// map buttons and the controls' column step left of it (all CSS). A closed card drops its folded header.
+new MutationObserver(()=>{ if(!card.classList.contains('open')&&card.classList.contains('compact')) card.classList.remove('compact'); }).observe(card,{attributes:true,attributeFilter:['class']});
 
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
@@ -974,12 +1268,15 @@ for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports
 { const h=location.hash.slice(1), p=new URLSearchParams(h);
   // a link with filters puts the filing dots on; the date range alone (which the app writes into the address itself) doesn't,
   // so a reload opens like a fresh start: no filings until you turn them on
-  if(h&&[...p.keys()].some(k=>k!=='v'&&k!=='f')){ if([...p.keys()].some(k=>!['v','f','d'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
+  if(h&&[...p.keys()].some(k=>!['v','f','b'].includes(k))){ if([...p.keys()].some(k=>!['v','f','d','b'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
   booting=false;
   if(p.get('v')) setView(p.get('v'));
   const f=p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));
+  // a copied property link (#b=lat,lng): that building, or the parcel there
+  const bc=!f&&(p.get('b')||'').split(',').map(Number), bll=bc&&bc.length===2&&bc.every(Number.isFinite)&&Math.abs(bc[0])<=90&&Math.abs(bc[1])<=180?[bc[1],bc[0]]:null;
+  if(bll) map.once('load',()=>{ map.jumpTo({center:bll,zoom:17.5}); map.once('idle',()=>{ if(!ctx.buildingAt?.(bll)) ctx.openBuildingAt(bll); }); });
   scheduleHash();
-  map.once('load',()=>{ if(f) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>map.flyTo({...HOME,duration:2600,essential:true}),300); else map.jumpTo(HOME); });
+  map.once('load',()=>{ if(f||bll) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>map.flyTo({...HOME,duration:2600,essential:true}),300); else map.jumpTo(HOME); });
 }
 
 // installable app + offline shell (served over https only)

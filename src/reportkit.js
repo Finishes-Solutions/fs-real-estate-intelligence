@@ -1,6 +1,6 @@
 // Shared pieces for every report (area reports, crime, FEMA, market, filings): the Finishes Solutions report layout and
 // its PDF export, a small SVG map of an area, tables, bar charts, saving (recorded in the Reports tab), and the registry that
-// puts every area report on the Site section, the Reports tab and the selection bar.
+// puts every area report on the Site section, the Reports tab and the Map panel's "Reports for this area".
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ESC[c]);
 export const slug = s => String(s || 'area').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'area';
@@ -172,7 +172,7 @@ export function openCard(ctx, { kicker, title, sub = '', loading = 'Loading…' 
   const card = ctx.card || document.getElementById('card');
   ctx.closeCard?.();
   card.innerHTML = cardTop(kicker, title, sub) + '<div class="bsec"><div class="rnote">' + esc(loading) + '</div></div>';
-  card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard(); return card;
+  card.classList.add('open'); card.scrollTop = 0; card.querySelector('.x').onclick = () => ctx.closeCard(); return card;
 }
 export const cardTop = (kicker, title, sub = '') => '<div class="top"><div><div class="kicker">' + esc(kicker) + '</div><h2>' + esc(title) + '</h2>' + (sub ? '<div class="bsub">' + sub + '</div>' : '') + '</div><button class="x" aria-label="Close">×</button></div>';
 export function fillCard(ctx, card, html) { card.innerHTML = html; card.classList.add('open'); card.querySelector('.x')?.addEventListener('click', () => ctx.closeCard()); ctx.wireCites?.(card); }
@@ -185,14 +185,17 @@ export const centerOf = g => { const r = (g.type === 'Polygon' ? g.coordinates[0
 // ---------- area report registry ----------
 // ctx.addAreaReport({ key, label, desc, note, run({ geometry, label, center }) }): a button in the Site section's "Area
 // reports" (a circle of the chosen radius around the building), a card in the Reports tab (selected area, map view or
-// draw an area) and a button on the selection bar.
+// draw an area) and a row under "Reports for this area" in the Map panel (the selection, or the map view without one).
+const SHORT = { drivetime: '10–30 minute drives', traffic: 'Busiest roads, speeds', airtraffic: 'Planes overhead' };
 export function initAreaReports(ctx) {
   const list = ctx.areaReports = [];
-  const sbRow = document.querySelector('#selbar .btnrow');
-  const syncSel = () => list.forEach(r => { if (r.sb) r.sb.style.display = ctx.sel?.feature ? '' : 'none'; });
+  const grid = document.getElementById('arepGrid');
+  const syncSel = () => list.forEach(r => { if (r.sb) r.sb.querySelector('.ar-d').textContent = ctx.sel?.feature ? SHORT[r.key] || r.label : 'Run on map view'; });
   ctx.addAreaReport = r => {
     if (list.some(x => x.key === r.key)) return; list.push(r);
-    if (sbRow) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = r.label; b.style.display = 'none'; b.onclick = () => ctx.runAreaReport(r.key, 'selection'); sbRow.appendChild(b); r.sb = b; }
+    if (grid) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ar-row'; b.dataset.ic = r.key; b.title = r.desc || r.label;
+      b.innerHTML = '<span class="ar-i" aria-hidden="true"></span><b>' + esc(r.label) + '</b><span class="ar-d"></span>';
+      b.onclick = () => ctx.runAreaReport(r.key, ctx.sel?.feature ? 'selection' : 'view'); grid.appendChild(b); r.sb = b; }
     syncSel();
   };
   // which: 'selection' | 'view' | { geometry, label, center }

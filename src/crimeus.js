@@ -75,7 +75,7 @@ export function initCrimeUS(ctx) {
       rankNote(d) + caveats(d) + (d.headline.rate_v == null ? '<div class="rnote">' + esc(fmtN(d.headline.v) + ' violent and ' + fmtN(d.headline.p) + ' property offenses in ' + d.year + '.') + '</div>' : '') +
       (d.headline.cleared_v != null ? '<div class="rnote">Solved (cleared): ' + d.headline.cleared_v + '% of violent and ' + d.headline.cleared_p + '% of property offenses in ' + d.year + '.</div>' : '') +
       (d.note ? '<div class="rnote">' + esc(d.note) + '</div>' : '') +
-      '<div class="bacts"><button class="btn" type="button" data-cu="report">Full report</button></div>' + pickOthers(d, 'cuOth') +
+      '<div class="bacts"><button class="btn" type="button" data-push data-cu="report">Full report</button></div>' + pickOthers(d, 'cuOth') +
       '<div class="ssrc src">' + esc(srcLine(d)) + '</div>';
     el.querySelector('[data-cu="report"]').onclick = () => report({ center, ori: d.why === 'chosen' ? d.agency.ori : null });
     wireOthers(el, center, still, d); keep();

@@ -6,7 +6,8 @@ import { USES } from './lib/taxonomy.mjs';
 const CAT = { light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'], dark: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9'] };
 const OTHER = { light: '#a3a8aa', dark: '#6b7174' };
 const RH = 34, HH = 30;
-const labelW = () => window.innerWidth <= 860 ? 150 : 290;
+// the name column: 290px, 150px on narrow screens, and at least 45% of the width on phones
+const labelW = () => window.innerWidth <= 700 ? Math.max(150, Math.round((window.innerWidth - 30) * .45)) : window.innerWidth <= 860 ? 150 : 290;
 
 export function initTimeline(ctx) {
   const { F, COUNTIES, TYPES, TYPE_LABEL, fmtM, fmtN, esc } = ctx;
@@ -31,18 +32,21 @@ export function initTimeline(ctx) {
 
   root.innerHTML = `
     <div class="vhead">
-      <div><div class="kicker">Construction timeline</div><h2 id="tlTitle">Projects under construction</h2><div class="vsub" id="tlSub"></div></div>
+      <div><div class="kicker">Timeline</div><h2 id="tlTitle">Projects under construction</h2><div class="vsub" id="tlSub"></div></div>
       <div class="vctl">
         <label>Group by <select class="chip" id="tlGroup"><option value="type">Type</option><option value="county">County</option>${USE_ORDER.length ? '<option value="use">Use</option>' : ''}</select></label>
         <label>Measure <select class="chip" id="tlMeasure"><option value="value">Est. value</option><option value="count">Projects</option></select></label>
         <label>Sort <select class="chip" id="tlSort"><option value="start">Start date</option><option value="value">Value</option></select></label>
+        ${ctx.exportMenu?.([{ label: 'Filing list · Excel', attrs: ' data-x="xlsx"' }, { label: 'Filing list · CSV', attrs: ' data-x="csv"' }, { label: 'Filing list · PDF', attrs: ' data-x="pdf"' }]) || ''}
       </div>
     </div>
+    <div id="tlScope"></div>
     <div class="tl-legend" id="tlLegend"></div>
     <div class="tl-chart" id="tlChart"><div class="tl-tip" id="tlTip"></div></div>
     <div class="tl-note"><span id="tlRange"></span><span id="tlHelp">Drag across the chart to see what's under construction in a range, or tap a month. Hatched bars use dates we estimated because the filer left them blank.</span></div>
     <div class="gantt" id="gantt"><div class="g-axis" id="gAxis"></div><div class="g-scroll" id="gScroll"><div class="g-inner" id="gInner"></div></div></div>`;
   const $ = id => root.querySelector('#' + id);
+  root.querySelectorAll('[data-x]').forEach(b => b.onclick = () => ctx.openExport?.('list', { format: b.dataset.x }));
   for (const [id, k] of [['tlGroup', 'group'], ['tlMeasure', 'measure'], ['tlSort', 'sort']]) { const el = $(id); el.value = opt[k]; el.onchange = () => { opt[k] = el.value; save(); render(); }; }
 
   const mStart = m => new Date(m + '-01T00:00:00Z');
@@ -126,7 +130,7 @@ export function initTimeline(ctx) {
   }
 
   function renderGantt(list, groups) {
-    const sc = $('gScroll'), W = sc.clientWidth, cw = Math.max(160, W - labelW() - 12);
+    const sc = $('gScroll'), W = sc.clientWidth, lw = labelW(), cw = Math.max(window.innerWidth <= 700 ? 120 : 160, W - lw - 12); $('gantt').style.setProperty('--glab', lw + 'px');
     const gx = d3.scaleUtc().domain(x.domain()).range([0, cw]);
     const sorted = list.slice().sort(opt.sort === 'value' ? (a, b) => b.cost - a.cost : (a, b) => a.ts.localeCompare(b.ts) || b.cost - a.cost);
     rows = []; let y = 0;
@@ -169,8 +173,11 @@ export function initTimeline(ctx) {
     months = domainMonths(chartList);
     const groups = groupsFor(opt.group, list);
     const est = list.filter(f => f.tsE || f.teE).length;
-    $('tlSub').textContent = fmtN(list.length) + ' projects · ' + fmtM(list.reduce((s, f) => s + f.cost, 0)) + ' est. value' + (est ? ' · ' + Math.round(est / Math.max(1, list.length) * 100) + '% have estimated dates' : '') + (ctx.filterText() ? ' · ' + ctx.filterText() : '');
-    if (!list.length) { $('tlChart').querySelector('svg')?.remove(); $('gInner').innerHTML = '<div class="empty">No filings match these filters.</div>'; $('gInner').style.height = 'auto'; $('tlLegend').innerHTML = ''; return; }
+    const pct = Math.round(est / Math.max(1, list.length) * 100);
+    $('tlSub').textContent = fmtN(list.length) + ' projects · ' + fmtM(list.reduce((s, f) => s + f.cost, 0)) + ' est. value' + (est ? ' · ' + (pct < 1 ? '<1%' : pct + '%') + ' have estimated dates' : '');
+    ctx.scopeBar?.($('tlScope'));
+    if (!list.length) { $('tlChart').querySelector('svg')?.remove(); $('gInner').innerHTML = ctx.vempty ? ctx.vempty({ icon: 'search', title: 'No filings match these filters', text: 'Remove a filter above, or reset them.', actions: [{ label: 'Reset filters', id: 'tlReset', primary: true }] }) : '<div class="empty">No filings match these filters.</div>';
+      $('gInner').style.height = 'auto'; $('tlLegend').innerHTML = ''; $('tlReset')?.addEventListener('click', () => ctx.resetFilings?.()); return; }
     renderChart(chartList, groupsFor(opt.group, chartList)); renderGantt(list, groups);
     const d = ctx.state.d, r = $('tlRange');
     if (d && d.f === 'active') { const f = s => s ? d3.utcFormat('%b %Y')(mStart(s)) : '…';

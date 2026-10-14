@@ -33,7 +33,7 @@ export function initExport(ctx) {
     if (st.scope !== 'filters' && !scopes().find(x => x[0] === st.scope)[2]) st.scope = 'filters';
     const n = st.report === 'compare' ? cmp.length : listFor(st.scope).length;
     const blocked = st.report === 'compare' ? (cmp.length ? '' : 'Add areas to Compare first (select an area on the map, then “+ Compare”).') : n ? '' : 'No filings match. Change the filters or pick other filings.';
-    dlg.innerHTML = '<div class="xbox"><div class="xh"><div><div class="kicker">Export</div><h2 id="xTitle">Reports &amp; Data</h2></div><button class="x" id="xClose" aria-label="Close">×</button></div>' +
+    dlg.innerHTML = '<div class="xbox"><div class="xh"><div><div class="kicker">Reports &amp; data</div><h2 id="xTitle">New report</h2></div><button class="x" id="xClose" aria-label="Close">×</button></div>' +
       '<div class="xsec"><div class="lt">Report</div><div class="xreports">' + Object.entries(REPORTS).map(([k, r]) =>
         '<label class="xr' + (st.report === k ? ' on' : '') + '"><input type="radio" name="xrep" value="' + k + '"' + (st.report === k ? ' checked' : '') + '><b>' + r.label + (k === 'compare' ? ' <span class="n">' + cmp.length + ' area' + (cmp.length === 1 ? '' : 's') + '</span>' : '') + '</b><span>' + r.desc + '</span></label>').join('') + '</div></div>' +
       (st.report === 'compare' ? '' : '<div class="xsec"><div class="lt">Filings</div><div class="xscopes">' + scopes().map(([k, l, c]) =>
@@ -42,13 +42,15 @@ export function initExport(ctx) {
       '<div class="xsec"><div class="lt">Format</div><div class="seg xfmt">' + R.formats.map(f => '<button type="button" data-f="' + f + '" aria-pressed="' + (st.format === f) + '">' + FORMATS[f] + '</button>').join('') + '</div></div>' +
       '<div class="xsec xopts">' + opt('map', 'Include the Map', /^(pdf|html)$/.test(st.format) && st.report === 'summary') + opt('full', 'Add the Full Filing List', /^(pdf|html)$/.test(st.format) && st.report === 'summary') +
         opt('scope_text', 'Include Scope of Work Text', st.report === 'list') + opt('ai', 'Include AI Summaries and Tags', st.report === 'list' && st.format !== 'pdf') + '</div>' +
-      '<div class="xf"><span class="xmsg">' + esc(blocked || (st.format === 'pdf' && ((st.report === 'list' && n > 2000) || (st.report === 'summary' && st.full && n > 1000)) ? 'The PDF lists the ' + (st.report === 'list' ? '2,000' : '1,000') + ' largest of ' + fmtN(n) + ' filings. Excel and CSV have all of them.' : '')) + '</span><button class="btn" id="xCancel">Cancel</button><button class="btn primary xgo" id="xGo"' + (blocked ? ' disabled' : '') + '>Export ' + FORMATS[st.format] + '</button></div></div>';
+      '<div class="xf"><span class="xmsg">' + esc(blocked || (st.format === 'pdf' && ((st.report === 'list' && n > 2000) || (st.report === 'summary' && st.full && n > 1000)) ? 'The PDF lists the ' + (st.report === 'list' ? '2,000' : '1,000') + ' largest of ' + fmtN(n) + ' filings. Excel and CSV have all of them.' : '')) + '</span><button class="btn" id="xCancel">Cancel</button><button class="btn primary xgo" id="xGo"' + (blocked ? ' disabled' : '') + '>Export ' + FORMATS[st.format] + '</button></div>' +
+      (ctx.view === 'reports' ? '' : '<div class="xmore"><button type="button" class="lnk" id="xMore">More reports (traffic, flood, drive time, market) and past exports → Reports</button></div>') + '</div>';
     dlg.querySelector('#xClose').onclick = dlg.querySelector('#xCancel').onclick = close;
     dlg.querySelectorAll('[name=xrep]').forEach(i => i.onchange = () => { st.report = i.value; save(); render(); });
     dlg.querySelectorAll('[name=xscope]').forEach(i => i.onchange = () => { st.scope = i.value; save(); render(); });
     dlg.querySelectorAll('.xfmt button').forEach(b => b.onclick = () => { st.format = b.dataset.f; save(); render(); });
     dlg.querySelectorAll('.xopts input').forEach(i => i.onchange = () => { st[i.dataset.k] = i.checked; save(); });
     dlg.querySelector('#xGo').onclick = go;
+    dlg.querySelector('#xMore')?.addEventListener('click', () => { dlg.classList.remove('on'); lastFocus = null; ctx.setView('reports'); });
   }
   const opt = (k, label, show) => show ? '<label class="tg2"><input type="checkbox" data-k="' + k + '"' + (st[k] ? ' checked' : '') + '><span>' + label + '</span></label>' : '';
   let lastFocus = null;
@@ -56,7 +58,7 @@ export function initExport(ctx) {
   function open(report, o = {}) { if (report && REPORTS[report]) st.report = report; if (o.format && REPORTS[st.report].formats.includes(o.format)) st.format = o.format; if (o.scope) st.scope = o.scope; lastFocus = document.activeElement; render(); dlg.classList.add('on'); setTimeout(() => dlg.querySelector('#xGo:not([disabled])')?.focus(), 30); }
   function close() { dlg.classList.remove('on'); lastFocus?.focus?.(); }
   dlg.addEventListener('pointerdown', e => { if (e.target === dlg) close(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && dlg.classList.contains('on')) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && dlg.classList.contains('on')) { e.preventDefault(); close(); } });
   document.getElementById('exportBtn').onclick = () => open();
   ctx.openExport = open;
 

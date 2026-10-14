@@ -1,15 +1,21 @@
 // "Who's building" (developers, architects, GCs ranked by activity) and "What changed" (nightly change feed).
 import { entityKey } from './lib/taxonomy.mjs';
+import { mergeRecent } from './lib/changes.mjs';
 
 const ROLE = { dev: 'Developers & owners', arch: 'Architects & designers', gc: 'General contractors' };
+const ROLE_SHORT = { dev: 'Developers', arch: 'Architects', gc: 'Contractors' };
 
 export function initWho(ctx) {
   const { fmtM, fmtN, esc } = ctx, root = document.getElementById('view-who');
   let role = 'dev', q = '';
-  root.innerHTML = `<div class="vhead"><div><div class="kicker">Activity</div><h2>Most active developers, architects and builders</h2><div class="vsub" id="whoSub"></div></div>
-    <div class="vctl"><div class="seg seg3" id="whoRole">${Object.entries(ROLE).map(([k, v]) => `<button data-k="${k}" aria-pressed="${k === role}">${v.split(' ')[0]}</button>`).join('')}</div>
-    <label class="search sm"><input id="whoQ" type="search" placeholder="Find a name" aria-label="Find a name"></label></div></div>
-    <div class="who-note" id="whoNote"></div><div class="tablewrap"><table class="who"><thead><tr><th>Name</th><th class="r">Projects</th><th class="r">Est. value</th><th>Mostly</th><th>Where</th><th>Last 8 quarters</th><th>Latest</th></tr></thead><tbody id="whoBody"></tbody></table></div>`;
+  root.innerHTML = `<div class="vhead"><div><div class="kicker">Companies</div><h2>Most active developers, architects and builders</h2><div class="vsub" id="whoSub"></div></div>
+    <div class="vctl"><div class="seg seg3" id="whoRole">${Object.entries(ROLE).map(([k, v]) => `<button data-k="${k}" aria-pressed="${k === role}">${ROLE_SHORT[k]}</button>`).join('')}</div>
+    <label class="search sm"><input id="whoQ" type="search" placeholder="Find a name" aria-label="Find a name"></label>
+    ${ctx.exportMenu?.([{ label: 'Activity report · PDF', attrs: ' data-x="pdf"' }, { label: 'Activity report · Excel', attrs: ' data-x="xlsx"' }, { label: 'Activity report · CSV', attrs: ' data-x="csv"' }]) || ''}</div></div>
+    <div id="whoScope"></div>
+    <div class="who-note" id="whoNote"></div><div class="tablewrap"><table class="who"><thead><tr><th>Name</th><th class="r">Projects</th><th class="r">Est. value</th><th>Mostly</th><th>Where</th><th>Last 8 quarters</th><th>Latest</th></tr></thead><tbody id="whoBody"></tbody></table></div>
+    <div class="vfoot" id="whoFoot"></div>`;
+  root.querySelectorAll('[data-x]').forEach(b => b.onclick = () => ctx.openExport?.('activity', { format: b.dataset.x }));
   root.querySelectorAll('#whoRole button').forEach(b => b.onclick = () => { role = b.dataset.k; root.querySelectorAll('#whoRole button').forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
   root.querySelector('#whoQ').oninput = e => { q = e.target.value.trim().toLowerCase(); render(); };
 
@@ -30,12 +36,14 @@ export function initWho(ctx) {
     let rows = [...groups.values()].map(g => ({ ...g, label: top(g.names)[0][0] })).sort((a, b) => b.v - a.v);
     if (q) rows = rows.filter(g => g.k.includes(q) || g.label.toLowerCase().includes(q));
     const covered = list.filter(f => entityKey(role === 'dev' ? (f.dev || f.owner) : f[role])).length;
-    root.querySelector('#whoSub').textContent = fmtN(groups.size) + ' ' + ROLE[role].toLowerCase() + ' across ' + fmtN(list.length) + ' filings' + (ctx.filterText() ? ' · ' + ctx.filterText() : '');
+    root.querySelector('#whoSub').textContent = fmtN(groups.size) + ' ' + ROLE[role].toLowerCase() + ' across ' + fmtN(list.length) + ' filings';
+    ctx.scopeBar?.(root.querySelector('#whoScope'));
+    root.querySelector('#whoFoot').textContent = rows.length > 150 ? 'Showing the top 150 of ' + fmtN(rows.length) + ' by value. Search to find others.' : '';
     root.querySelector('#whoNote').textContent = role === 'dev' ? 'Grouped by owner name as filed (or the developer the AI identified), with LLC/Inc. variants merged. Single-asset LLCs often hide the real sponsor.'
       : 'Only ' + fmtN(covered) + ' of ' + fmtN(list.length) + ' filings name ' + (role === 'gc' ? 'a general contractor' : 'a design firm') + ', so this list is partial.';
     const cur = ctx.state.who;
     root.querySelector('#whoBody').innerHTML = rows.slice(0, 150).map(g => '<tr data-k="' + esc(g.k) + '" class="' + (cur && cur.k === role && cur.v === g.k ? 'on' : '') + '"><td><button class="lnk">' + esc(g.label) + '</button></td><td class="m r">' + fmtN(g.n) + '</td><td class="m r">' + fmtM(g.v) + '</td><td>' + esc(top(g.uses)[0][0] === 'Reno' ? 'Renovation' : top(g.uses)[0][0]) + '</td><td>' + esc(top(g.cos).slice(0, 2).map(x => x[0]).join(', ')) + '</td><td>' + spark(g.q) + '</td><td class="m">' + esc(g.last) + '</td></tr>').join('')
-      || '<tr><td colspan="7" class="empty">No names match.</td></tr>';
+      || '<tr class="nomatch"><td colspan="7">' + (ctx.vempty ? ctx.vempty({ icon: 'search', title: q ? 'No names match “' + q + '”' : 'No companies with these filters', text: q ? 'Check the spelling, or try part of the name.' : 'Loosen the filters above to see more filings.' }) : 'No names match.') + '</td></tr>';
     const byK = new Map(rows.map(g => [g.k, g]));
     root.querySelectorAll('#whoBody tr[data-k]').forEach(tr => tr.onclick = () => { const g = byK.get(tr.dataset.k); ctx.state.who = { k: role, v: g.k, label: g.label }; ctx.showFilings?.(); ctx.applyFilters(); ctx.setView('map'); ctx.toast('Showing ' + fmtN(g.n) + ' filings for ' + g.label + '. Reset filters to see everything.'); });
   }
@@ -44,26 +52,38 @@ export function initWho(ctx) {
 
 export function initChanges(ctx) {
   const { fmtM, fmtN, esc, BY_ID, DATA } = ctx, root = document.getElementById('view-changes');
-  const runs = DATA.changes.runs || [];
-  let ri = 0, onlyVisible = true;
-  root.innerHTML = `<div class="vhead"><div><div class="kicker">Updates</div><h2 id="chTitle">What changed in TDLR</h2><div class="vsub" id="chSub"></div></div>
-    <div class="vctl"><label>Found on <select class="chip" id="chRun">${runs.map((r, i) => `<option value="${i}">${new Date(r.built).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} · ${r.items.length} update${r.items.length === 1 ? '' : 's'}</option>`).join('')}</select></label>
-    <label class="tg2"><input type="checkbox" id="chOnly" checked><span>Only within current filters</span></label></div></div><div id="chBody" class="chbody"></div>`;
-  const runSel = root.querySelector('#chRun'); runSel.onchange = () => { ri = +runSel.value; render(); };
-  root.querySelector('#chOnly').onchange = e => { onlyVisible = e.target.checked; render(); };
+  const runs = DATA.changes.runs || [], week = mergeRecent(DATA.changes);
+  // "Last 7 days" (the default) is every nightly check in the week up to the latest, merged the way the badge and the
+  // "New this week / Any change" filters count them, so the numbers agree; each single check is still listed after it.
+  let ri = week.runs ? 'w' : 0, onlyVisible = true;
+  const dl = x => new Date(x).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const nIds = items => new Set(items.map(x => x.id)).size, plural = (n, w) => fmtN(n) + ' ' + w + (n === 1 ? '' : 's');
+  root.innerHTML = `<div class="vhead"><div><div class="kicker">Changes</div><h2 id="chTitle">What changed in TDLR</h2><div class="vsub" id="chSub"></div><div class="vsub vsub-n" id="chN"></div></div>
+    <div class="vctl"><label>Found <select class="chip" id="chRun">${week.runs ? `<option value="w">Last 7 days · ${plural(week.ids.size, 'filing')}</option>` : ''}${runs.map((r, i) => `<option value="${i}">${new Date(r.built).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} · ${r.items.length} change${r.items.length === 1 ? '' : 's'}</option>`).join('')}</select></label>
+    <label class="tg2"><input type="checkbox" id="chOnly" checked><span>Only within current filters</span></label></div></div><div id="chScope"></div><div id="chBody" class="chbody"></div>`;
+  const runSel = root.querySelector('#chRun'), onlyEl = root.querySelector('#chOnly');
+  runSel.value = String(ri); runSel.onchange = () => { ri = runSel.value === 'w' ? 'w' : +runSel.value; render(); };
+  onlyEl.onchange = e => { onlyVisible = e.target.checked; render(); };
   const SECTIONS = [['new', 'New filings'], ['status', 'Status changes'], ['cost', 'Value changes'], ['start', 'Start date changes'], ['end', 'End date changes'], ['sqft', 'Size changes'], ['gone', 'No longer listed']];
   const fv = (k, v) => v == null || v === '' ? '—' : k === 'cost' ? fmtM(v) : k === 'sqft' ? fmtN(v) : String(v);
 
   function render() {
     if (ctx.view !== 'changes') return;
     const body = root.querySelector('#chBody');
-    if (!runs.length) { body.innerHTML = '<div class="empty">Updates start after the second nightly TDLR check. Check back tomorrow.</div>'; root.querySelector('#chSub').textContent = ''; return; }
-    const vis = new Set(ctx.visible.map(f => f.id)), run = runs[ri];
-    const items = run.items.filter(x => x.k === 'gone' || !onlyVisible || vis.has(x.id));
+    ctx.scopeBar?.(root.querySelector('#chScope'));
+    if (!runs.length) { body.innerHTML = ctx.vempty ? ctx.vempty({ icon: 'clock', title: 'No changes yet', text: 'Changes start after the second nightly TDLR check. Check back tomorrow.' }) : ''; root.querySelector('#chSub').textContent = ''; return; }
+    const vis = new Set(ctx.visible.map(f => f.id)), isWeek = ri === 'w', all = isWeek ? week.items : runs[ri].items;
+    const items = all.filter(x => x.k === 'gone' || !onlyVisible || vis.has(x.id));
     const newV = items.filter(x => x.k === 'new').reduce((s, x) => s + (BY_ID.get(x.id)?.cost || 0), 0);
-    const when = new Date(run.built), prev = runs[ri + 1] ? new Date(runs[ri + 1].built) : null, d = x => x.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    root.querySelector('#chTitle').textContent = 'Updates found ' + d(when);
-    root.querySelector('#chSub').textContent = 'New filings and edits to existing filings that our nightly TDLR check found on ' + d(when) + (prev ? ', compared with ' + d(prev) : '') + ' · ' + fmtN(items.length) + ' updates' + (newV ? ' · ' + fmtM(newV) + ' in new filings' : '') + (onlyVisible && ctx.filterText() ? ' · ' + ctx.filterText() : '');
+    let lead;
+    if (isWeek) { root.querySelector('#chTitle').textContent = 'Changes in the last 7 days'; lead = 'New filings and edits our nightly TDLR checks found from ' + dl(week.since) + ' to ' + dl(week.built); }
+    else { const run = runs[ri], prev = runs[ri + 1]; root.querySelector('#chTitle').textContent = 'Changes found ' + dl(run.built); lead = 'New filings and edits our nightly TDLR check found on ' + dl(run.built) + (prev ? ', compared with ' + dl(prev.built) : ''); }
+    const nAll = nIds(all), nShown = nIds(items), sub = root.querySelector('#chSub'), nEl = root.querySelector('#chN');
+    sub.textContent = lead + (newV ? ' · ' + fmtM(newV) + ' in new filings' : ''); sub.title = sub.textContent;
+    // filtered vs total, and one click to flip it (the same as the "Only within current filters" switch)
+    nEl.innerHTML = onlyVisible ? fmtN(nShown) + ' of ' + plural(nAll, 'changed filing') + ' match your filters' + (nShown < nAll ? ' · <button type="button" class="lnk" id="chAll">Show all</button>' : '')
+      : 'Showing all ' + plural(nAll, 'changed filing') + ' · <button type="button" class="lnk" id="chAll">Only those matching your filters</button>';
+    nEl.querySelector('#chAll')?.addEventListener('click', () => { onlyVisible = !onlyVisible; onlyEl.checked = onlyVisible; render(); });
     body.innerHTML = SECTIONS.map(([k, label]) => {
       const its = items.filter(x => x.k === k).map(x => ({ x, f: BY_ID.get(x.id) })).sort((a, b) => ((b.f?.cost ?? b.x.cost) || 0) - ((a.f?.cost ?? a.x.cost) || 0));
       if (!its.length) return '';
@@ -72,8 +92,10 @@ export function initChanges(ctx) {
         const what = k === 'new' ? fmtM(f?.cost || 0) : k === 'gone' ? fmtM(x.cost || 0) : esc(fv(k, x.from)) + ' → ' + esc(fv(k, x.to));
         return '<button class="chitem" ' + (f ? 'data-id="' + esc(f.id) + '"' : 'disabled') + '><span><b>' + esc(name) + '</b><em>' + esc(meta) + '</em></span><span class="m">' + what + '</span></button>';
       }).join('') + (its.length > 200 ? '<div class="rnote">…and ' + fmtN(its.length - 200) + ' more. Narrow the filters to see them.</div>' : '') + '</section>';
-    }).join('') || '<div class="empty">No updates from this check match the current filters.</div>';
-    body.querySelectorAll('.chitem[data-id]').forEach(b => b.onclick = () => { const f = BY_ID.get(b.dataset.id); ctx.setView('map'); ctx.select(f, true); });
+    }).join('') || (ctx.vempty ? ctx.vempty({ icon: 'clock', title: onlyVisible ? 'No changes match your filters' : 'No changes in this check', text: onlyVisible ? fmtN(nAll) + ' filings changed, but none within the current filters.' : 'The nightly check found nothing new or changed.', actions: onlyVisible && nAll ? [{ label: 'Show all changes', id: 'chAll2', primary: true }] : [] }) : '');
+    body.querySelector('#chAll2')?.addEventListener('click', () => { onlyVisible = false; onlyEl.checked = false; render(); });
+    // a row opens the filing's card over this page (as on Timeline); the card's "Show on map" goes to the map
+    body.querySelectorAll('.chitem[data-id]').forEach(b => b.onclick = () => { const f = BY_ID.get(b.dataset.id); if (f) ctx.select(f, false); });
   }
   ctx.onChange(render); ctx.onView('changes', render);
 }

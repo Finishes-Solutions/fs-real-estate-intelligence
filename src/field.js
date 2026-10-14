@@ -56,8 +56,9 @@ export function initField(ctx) {
 
   function syncBadges() {
     const n = db.notes.length + db.watch.length, alerts = db.watch.filter(w => w.kind === 'filing' && CHANGED.has(w.ref)).length;
-    document.getElementById('fieldBadge').textContent = alerts ? alerts + ' updated' : (n ? fmtN(n) : '');
-    document.getElementById('mFieldN').textContent = alerts ? fmtN(alerts) : (n ? fmtN(n) : '');
+    // only watched filings that changed need attention (a badge that rolls up to My Work / More); otherwise a muted count
+    if (alerts) ctx.setBadge?.('field', alerts, { alert: true, text: fmtN(alerts) + ' updated', title: 'Watched filings that changed in the latest nightly check' });
+    else ctx.setBadge?.('field', n);
   }
 
   // ---- watch star on filing and building cards (and the assistant's watch tool) ----
@@ -69,15 +70,18 @@ export function initField(ctx) {
     else if (on && !w && info.kind === 'filing') db.watch.unshift({ id: uid(), kind: 'filing', ref: watchKey(info), label: info.f.name, sub: (info.f.city || info.f.county) + ' · ' + fmtM(info.f.cost), lng: info.f.lon, lat: info.f.lat, added: new Date().toISOString() });
     else if (on && !w) db.watch.unshift({ id: uid(), kind: 'building', ref: watchKey(info), label: info.label(), sub: info.sub(), lng: info.center[0], lat: info.center[1], added: new Date().toISOString() });
     else return !!w;
-    save(); card.querySelector('.top .star')?._paint?.(); return on;
+    save(); card.querySelector('.star')?._paint?.(); return on;
   }
+  // "☆ Watch" in the card's action row (src/app.js cardActs); cards without one get the star icon by the close button
   ctx.onCardRender(info => {
-    const top = card.querySelector('.top'), x = top?.querySelector('.x'); if (!x) return;
-    top.querySelector('.star')?.remove();
-    const b = document.createElement('button'); b.className = 'x star'; b.setAttribute('aria-label', 'Add to watchlist');
-    const paint = b._paint = () => { const on = !!findWatch(info); b.setAttribute('aria-pressed', on); b.title = on ? 'On your watchlist' : 'Add to watchlist'; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>'; };
-    b.onclick = () => { const on = setWatch(info, !findWatch(info)); paint(); ctx.toast(on ? 'Added to your watchlist (Field notes).' : 'Removed from your watchlist.'); };
-    paint(); x.before(b);
+    const top = card.querySelector('.top'), x = top?.querySelector('.x'), slot = card.querySelector('.cact-w'); if (!x && !slot) return;
+    card.querySelectorAll('.star').forEach(s => s.remove());
+    const b = document.createElement('button'); b.type = 'button'; b.className = slot ? 'btn sm star' : 'x star'; b.setAttribute('aria-label', 'Add to watchlist');
+    const icon = on => '<svg width="' + (slot ? 14 : 16) + '" height="' + (slot ? 14 : 16) + '" viewBox="0 0 16 16" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>';
+    const paint = b._paint = () => { const on = !!findWatch(info); b.setAttribute('aria-pressed', on); b.title = on ? 'On your watchlist (My Work › Notes & watchlist). Click to remove.' : 'Add to your watchlist: you’ll see when it changes';
+      b.innerHTML = icon(on) + (slot ? (on ? 'Watching' : 'Watch') : ''); if (slot) b.removeAttribute('aria-label'); };
+    b.onclick = () => { const on = setWatch(info, !findWatch(info)); paint(); ctx.toast(on ? 'Added to My Work › Watchlist.' : 'Removed from your watchlist.'); };
+    paint(); if (slot) slot.replaceWith(b); else x.before(b);
   });
 
   // ---- site notes ----
@@ -103,7 +107,7 @@ export function initField(ctx) {
       '<a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=' + n.lat + ',' + n.lng + '">Directions ↗</a>' +
       (navigator.share ? '<button class="btn" type="button" id="nShare">Share</button>' : '') + (ctx.team?.canDelete(n) === false ? '' : '<button class="btn" type="button" id="nDel">Delete</button>') + '</div></form>' + (n.by ? '<div class="rnote">Added by ' + esc(n.by) + (n.editedBy && n.editedBy !== n.by ? ' · last edited by ' + esc(n.editedBy) : '') + '</div>' : '') +
       (near.length ? '<div class="bsec"><div class="lt">Filings within ~300 m</div>' + near.map(f => '<button class="chitem" data-id="' + esc(f.id) + '"><span><b>' + esc(f.name) + '</b><em>' + esc(f.reg) + '</em></span><span class="m">' + fmtM(f.cost) + '</span></button>').join('') + '</div>' : '') +
-      '<div class="rnote bsrc">Saved on this device only. Use Field notes → Export to back up or move to another device.</div>';
+      '<div class="rnote bsrc">Saved on this device only. Use My Work › Notes &amp; watchlist → Export to back up or move to another device.</div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelectorAll('.chitem').forEach(x => x.onclick = () => ctx.select(BY_ID.get(x.dataset.id), false));
@@ -133,23 +137,33 @@ export function initField(ctx) {
 
   // ---- Field view ----
   const dist = (a, b) => { const r = Math.PI / 180, x = (b[0] - a[0]) * r * Math.cos((a[1] + b[1]) / 2 * r), y = (b[1] - a[1]) * r; return Math.sqrt(x * x + y * y) * 3958.8; };
+  const WATCH_HOW = 'Tap the star on any filing or building to watch it. Watched filings are flagged here when the nightly refresh sees a status, value or date change.';
   function render() {
     const ctr = map.getCenter().toArray();
     const notes = db.notes.slice().sort((a, b) => b.updated.localeCompare(a.updated));
     const watch = db.watch.map(w => ({ ...w, f: w.kind === 'filing' ? BY_ID.get(w.ref) : null }));
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Field notes</div><h2>Your sites &amp; watchlist</h2><div class="vsub">' + fmtN(notes.length) + ' site notes · ' + fmtN(watch.length) + ' watched · ' + (ctx.team?.summary() || 'stored on this device') + '</div><div id="fTeam"></div></div>' +
-      '<div class="vctl"><button class="btn primary" id="fAdd">+ Site note here</button><button class="btn" id="fGeo">Export GeoJSON</button><button class="btn" id="fCsv">CSV</button><button class="btn" id="fKml">KML</button>' +
-      '<label class="btn">Import<input type="file" accept=".geojson,.json,application/geo+json,application/json" hidden id="fImp"></label>' +
-      '<label class="tg2"><input type="checkbox" id="fPh" checked><span>Include photos in GeoJSON</span></label></div></div>' +
-      '<div class="fcols"><section><h3>Site notes</h3>' + (notes.length ? notes.map(n => '<button class="chitem" data-n="' + n.id + '"><span><b>' + esc(n.title || 'Untitled site') + '</b><em>' + esc(n.tag) + ' · ' + esc(new Date(n.updated).toLocaleDateString()) + (n.photos.length ? ' · ' + n.photos.length + ' photo' + (n.photos.length > 1 ? 's' : '') : '') + (n.text ? ' · ' + esc(n.text.slice(0, 60)) : '') + '</em></span><span class="m">' + dist(ctr, [n.lng, n.lat]).toFixed(1) + ' mi</span></button>').join('')
-        : '<div class="empty">No site notes yet. Tap the pin button on the map (or “+ Site note here”) while you’re on site to save a location with notes and photos.</div>') + '</section>' +
-      '<section><h3>Watchlist</h3>' + (watch.length ? watch.map(w => '<div class="witem"><button class="chitem" data-w="' + w.id + '"><span><b>' + (w.f && CHANGED.has(w.ref) ? '<span class="bdg new">' + (CHANGED.get(w.ref) === 'new' ? 'New' : 'Updated') + '</span>' : '') + esc(w.f ? w.f.name : w.label) + '</b><em>' + (w.kind === 'filing' ? (w.f ? esc((w.f.city || w.f.county) + ' · ' + (w.f.status || '') + ' · ' + w.f.ts + ' → ' + w.f.te) : 'No longer in the current data') : 'Building · ' + esc(w.sub || '')) + '</em></span><span class="m">' + (w.f ? fmtM(w.f.cost) : '') + '</span></button><button class="x" data-unw="' + w.id + '" aria-label="Remove">×</button></div>').join('')
-        : '<div class="empty">Tap the star on any filing or building to watch it. Watched filings are flagged here when the nightly refresh sees a status, value or date change.</div>') + '</section></div>';
+    const watchSec = '<section><h3>Watchlist</h3>' + (watch.length ? watch.map(w => '<div class="witem"><button class="chitem" data-w="' + w.id + '"><span><b>' + (w.f && CHANGED.has(w.ref) ? '<span class="bdg new">' + (CHANGED.get(w.ref) === 'new' ? 'New' : 'Updated') + '</span>' : '') + esc(w.f ? w.f.name : w.label) + '</b><em>' + (w.kind === 'filing' ? (w.f ? esc((w.f.city || w.f.county) + ' · ' + (w.f.status || '') + ' · ' + w.f.ts + ' → ' + w.f.te) : 'No longer in the current data') : 'Building · ' + esc(w.sub || '')) + '</em></span><span class="m">' + (w.f ? fmtM(w.f.cost) : '') + '</span></button><button class="x" data-unw="' + w.id + '" aria-label="Remove">×</button></div>').join('')
+        : '<div class="empty">' + WATCH_HOW + '</div>') + '</section>';
+    const notesSec = '<section><h3>Site notes</h3>' + (notes.length ? notes.map(n => '<button class="chitem" data-n="' + n.id + '"><span><b>' + esc(n.title || 'Untitled site') + '</b><em>' + esc(n.tag) + ' · ' + esc(new Date(n.updated).toLocaleDateString()) + (n.photos.length ? ' · ' + n.photos.length + ' photo' + (n.photos.length > 1 ? 's' : '') : '') + (n.text ? ' · ' + esc(n.text.slice(0, 60)) : '') + '</em></span><span class="m">' + dist(ctr, [n.lng, n.lat]).toFixed(1) + ' mi</span></button>').join('')
+        : '<div class="empty">No site notes yet. Tap the pin button on the map (or “+ Site note”) while you’re on site to save a location with notes and photos.</div>') + '</section>';
+    const none = !notes.length && !watch.length;
+    // header: + Site note, one Export ▾ menu (Import… is a real file picker inside it), and the team chip
+    const menu = '<details class="vmenu"><summary class="btn">Export <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 3.5 3 3 3-3"/></svg></summary><div class="vm-pop" role="menu">' +
+      '<button type="button" role="menuitem" id="fGeo">GeoJSON<em>Notes and watchlist, for GIS or another device</em></button><button type="button" role="menuitem" id="fGeoPh">GeoJSON with photos<em>Larger file; photos travel with the notes</em></button>' +
+      '<button type="button" role="menuitem" id="fCsv">CSV<em>For a spreadsheet</em></button><button type="button" role="menuitem" id="fKml">KML<em>For Google Earth</em></button><hr>' +
+      '<label role="menuitem" tabindex="0" class="vm-imp">Import…<em>A GeoJSON file exported from here</em><input type="file" accept=".geojson,.json,application/geo+json,application/json" hidden id="fImp"></label></div></details>';
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">Notes &amp; watchlist</div><h2>Your sites &amp; watchlist</h2><div class="vsub">' + fmtN(notes.length) + ' site notes · ' + fmtN(watch.length) + ' watched</div></div>' +
+      '<div class="vctl"><button class="btn primary" id="fAdd">+ Site note</button>' + menu + '<div class="team-slot" id="fTeam"></div></div></div>' +
+      (none ? (ctx.vempty ? ctx.vempty({ icon: 'pin', title: 'No site notes or watched filings yet', text: 'Pin a note with photos while you’re on site, or star a filing or building to watch it.', extra: '<p class="ve-more" id="fHow" hidden>' + WATCH_HOW + '</p>', actions: [{ label: '+ Site note at map center', id: 'fAddC', primary: true }, { label: 'How the watchlist works', id: 'fHowBtn' }] }) : '')
+        : '<div class="fcols">' + watchSec + notesSec + '</div>');
+    root.querySelector('#fAddC')?.addEventListener('click', () => { ctx.setView('map'); ctx.addNote({}); });
+    root.querySelector('#fHowBtn')?.addEventListener('click', e => { const h = root.querySelector('#fHow'); h.hidden = !h.hidden; e.currentTarget.setAttribute('aria-expanded', String(!h.hidden)); });
+    root.querySelector('.vm-imp').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); root.querySelector('#fImp').click(); } });
     root.querySelector('#fAdd').onclick = () => { ctx.setView('map'); ctx.addNote({ gps: true }); };
     root.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { const n = db.notes.find(x => x.id === b.dataset.n); ctx.setView('map'); map.easeTo({ center: [n.lng, n.lat], zoom: Math.max(map.getZoom(), 15) }); openNote(n); });
     root.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { const w = db.watch.find(x => x.id === b.dataset.w); ctx.setView('map'); if (w.kind === 'filing' && BY_ID.get(w.ref)) ctx.select(BY_ID.get(w.ref), true); else { map.easeTo({ center: [w.lng, w.lat], zoom: Math.max(map.getZoom(), 16.5) }); ctx.openBuildingAt([w.lng, w.lat]); } });
     root.querySelectorAll('[data-unw]').forEach(b => b.onclick = () => { const w = db.watch.find(x => x.id === b.dataset.unw); db.watch = db.watch.filter(x => x !== w); if (w) ctx.team?.removed({ kind: 'watch', wkind: w.kind, ref: w.ref }); save(); });
-    root.querySelector('#fGeo').onclick = () => exportGeo(root.querySelector('#fPh').checked);
+    root.querySelector('#fGeo').onclick = () => exportGeo(false); root.querySelector('#fGeoPh').onclick = () => exportGeo(true);
     root.querySelector('#fCsv').onclick = exportCsv; root.querySelector('#fKml').onclick = exportKml;
     root.querySelector('#fImp').onchange = e => importGeo(e.target.files[0]);
     ctx.team?.mount(root.querySelector('#fTeam'));

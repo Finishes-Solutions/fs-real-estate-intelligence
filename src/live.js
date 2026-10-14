@@ -29,21 +29,30 @@ export function initLive(ctx) {
   const stamp = {};
 
   // ---------- layers panel ----------
-  const panel = document.getElementById('layers'), box = document.createElement('div');
-  box.className = 'live-ly';
-  box.innerHTML = '<div class="lt">Live Conditions</div>' + ORDER.map(k => '<label class="tg2"><input type="checkbox" data-live="' + k + '"><span>' + esc(LABEL[k]) + '</span></label>').join('') +
-    '<div class="rnote" id="liveNote"></div>';
-  panel.appendChild(box);
-  const note = box.querySelector('#liveNote');
-  box.querySelectorAll('input[data-live]').forEach(i => i.onchange = () => set({ [i.dataset.live]: i.checked }));
+  // rows go into the panel's named groups: weather, traffic and other live feeds (and planes.js's layers) under Live
+  // conditions; 3D terrain and the imagery under "Base map, imagery & 3D". Without those groups they go at the end as before.
+  const panel = document.getElementById('layers'), BASE = new Set(['terrain', 'nasa', 'hires']);
+  const group = g => panel.querySelector('[data-lyg="' + g + '"] .lyb');
+  let box = group('live'), baseBox = group('base');
+  if (!box) { box = document.createElement('div'); box.className = 'live-ly'; box.innerHTML = '<div class="lt">Live Conditions</div>'; panel.appendChild(box); }
+  const row = k => { const lab = document.createElement('label'); lab.className = 'tg2'; lab.innerHTML = '<input type="checkbox" data-live="' + k + '"><span>' + esc(LABEL[k]) + '</span>'; return lab; };
+  for (const k of ORDER) (BASE.has(k) && baseBox ? baseBox : box).appendChild(row(k));
+  const note = document.createElement('div'); note.className = 'rnote'; note.id = 'liveNote'; box.appendChild(note);
+  panel.querySelectorAll('input[data-live]').forEach(i => i.onchange = () => set({ [i.dataset.live]: i.checked }));
   // rain radar legend (bottom left): NWS base reflectivity colors, as the radar tiles draw them (api/tile)
   const RADAR_LEGEND = '<div class="t">Rain radar</div><div class="lg-grad" style="background:linear-gradient(90deg,#04e9e7 0%,#019ff4 10%,#0300f4 20%,#02fd02 30%,#01c501 37%,#008e00 45%,#fdf802 52%,#e5bc00 58%,#fd9500 65%,#fd0000 72%,#d40000 80%,#bc0000 86%,#f800fd 93%,#9854c6 100%);opacity:.8"></div>' +
     '<div class="lg-ticks"><span>Light</span><span>Moderate</span><span>Heavy</span><span>Severe</span></div><div class="lg-note">Reflectivity, about 5 to 75 dBZ; updates every 4 minutes.</div>';
+  // a row the site can't offer says so under its name, in plain words (the setup detail is only in the tooltip)
+  function syncNA(input, na) {
+    const lab = input.closest('label'); let n = lab.querySelector('.ly-na');
+    if (na && !n) { n = document.createElement('span'); n.className = 'ly-na'; n.textContent = 'Not available on this site'; lab.querySelector('span').appendChild(n); }
+    if (!na) n?.remove();
+    if (na) lab.title = 'Live traffic needs a traffic data key on the server.'; else lab.removeAttribute('title');
+  }
   function syncUI() {
     ctx.setLegend?.('radar', on.radar ? RADAR_LEGEND : '');
-    box.querySelectorAll('input[data-live]').forEach(i => { i.checked = on[i.dataset.live]; if (i.dataset.live === 'traffic') i.disabled = trafficOK === false && !on.traffic; });
+    panel.querySelectorAll('input[data-live]').forEach(i => { i.checked = on[i.dataset.live]; if (i.dataset.live === 'traffic') { i.disabled = trafficOK === false && !on.traffic; syncNA(i, i.disabled); } });
     const bits = [];
-    if (trafficOK === false) bits.push('Traffic needs a TomTom key on the server (see README).');
     if (on.wind && windData?.time) bits.push('Wind as of ' + new Date(windData.time + ':00').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ' (Open-Meteo).');
     if (on.terrain && map.getZoom() < TERRAIN_Z) bits.push('3D terrain appears once you zoom in to town level.');
     if (on.nasa && nasa) bits.push(nasa.day ? 'NASA ' + nasa.name + ' pass ' + nasa.day + (nasa.cloud != null ? ' · ' + Math.round(nasa.cloud) + '% cloud in the scene' : '') + '.' : 'No clear NASA pass found here in the last 60 days.');
@@ -155,7 +164,7 @@ export function initLive(ctx) {
     if (a.all_off) allKeys().forEach(k => { if (on[k]) a[k] = false; });
     for (const k of allKeys()) {
       const v = a[k === 'nasa' ? (k in a ? k : 'nasa_imagery') : k]; if (typeof v !== 'boolean') continue;
-      if (k === 'traffic' && v && trafficOK === false) { done.push('traffic unavailable (no TomTom key on the server)'); continue; }
+      if (k === 'traffic' && v && trafficOK === false) { done.push('live traffic isn’t available on this site'); continue; }
       if (EXT[k]) { on[k] = v; const r = await EXT[k].set(v); if (r === false || typeof r === 'string') { on[k] = false; done.push(typeof r === 'string' ? r : EXT[k].label + ' unavailable'); } else done.push(EXT[k].label + (v ? ' on' : ' off')); continue; }
       on[k] = v; done.push(LABEL[k].replace(/ \(.*\)$/, '') + (v ? ' on' : ' off'));
       if (RASTER[k]) v ? addRaster(k) : removeRaster(k);
@@ -312,7 +321,7 @@ export function initLive(ctx) {
   function renderCardTools(info) {
     const card = document.getElementById('card'); card.querySelector('#liveSec')?.remove();
     const sec = document.createElement('div'); sec.className = 'bsec live-sec'; sec.id = 'liveSec';
-    sec.innerHTML = '<div class="lt">From Here</div><div class="btnrow"><button class="btn" data-a="drive">Drive Time From Me</button><button class="btn" data-a="iso">Drive-Time Map</button><button class="btn" data-a="wx">Weather</button><button class="btn" data-a="img">Site Imagery</button><button class="btn" data-a="news">News</button></div><div class="live-out" aria-live="polite"></div>';
+    sec.innerHTML = '<div class="lt">From Here</div><div class="btnrow"><button class="btn" data-a="drive">Drive Time From Me</button><button class="btn" data-push data-a="iso">Drive-Time Map</button><button class="btn" data-a="wx">Weather</button><button class="btn" data-a="img">Site Imagery</button><button class="btn" data-a="news">News</button></div><div class="live-out" aria-live="polite"></div>';
     const brief = card.querySelector('#briefBox'); if (brief) brief.after(sec); else (card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
     const out = sec.querySelector('.live-out'), mine = () => lastCard === info;
     const busy = t => { out.innerHTML = '<div class="rnote">' + esc(t) + '</div>'; };

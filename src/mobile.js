@@ -1,5 +1,8 @@
 // Phone and tablet behaviour. Phone (≤700px): full-screen map, bottom tab bar, floating ask bar,
 // list as its own tab, swipeable bottom-sheet cards and a "More" sheet. Tablet/desktop: collapsible side list.
+// The bottom bar and the More sheet are drawn from the navigation registry (src/nav.js).
+import { PHONE, parentOf, leafFor } from './nav.js';
+
 export function initMobile(ctx) {
   const { map, fmtN, fmtM } = ctx;
   const app = document.querySelector('.app'), nav = document.getElementById('mnav'), sheet = document.getElementById('msheet'), scrim = document.getElementById('mscrim');
@@ -9,8 +12,14 @@ export function initMobile(ctx) {
 
   // ---- side list toggle (tablet + desktop) ----
   const ptoggle = document.getElementById('panelToggle');
-  try { if (localStorage.getItem('fs-panel') === '0' && !isPhone()) app.classList.add('pcollapsed'); } catch (e) {}
-  ptoggle.onclick = () => { app.classList.toggle('pcollapsed'); try { localStorage.setItem('fs-panel', app.classList.contains('pcollapsed') ? '0' : '1'); } catch (e) {} setTimeout(() => map.resize(), 50); };
+  // the saved choice wins; with none, tablets (narrower than 1100px) start with the list closed so the map isn't halved
+  try { const saved = localStorage.getItem('fs-panel'); if (!isPhone() && (saved === '0' || (saved == null && innerWidth < 1100))) app.classList.add('pcollapsed'); } catch (e) {}
+  ptoggle.onclick = () => {
+    // on a page (not the Map) the list is hidden so the page gets the full width; the button shows it over this page only
+    // and leaves the Map's own open/closed setting alone
+    if (ctx.view !== 'map' && !isPhone()) { app.classList.toggle('pview-open'); return; }
+    app.classList.toggle('pcollapsed'); try { localStorage.setItem('fs-panel', app.classList.contains('pcollapsed') ? '0' : '1'); } catch (e) {} setTimeout(() => map.resize(), 50);
+  };
 
   // ---- side list width: drag the edge (or arrow keys on it); double-click goes back to the default. Saved per browser. ----
   const grip = document.getElementById('pResize'), W_KEY = 'fs-panel-w';
@@ -32,6 +41,7 @@ export function initMobile(ctx) {
     grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
   });
   grip.addEventListener('dblclick', () => { wantW = null; saveW(); applyW(); });
+  ctx.resetPanelWidth = () => { wantW = null; saveW(); applyW(); }; // Settings › Appearance
   grip.addEventListener('keydown', e => {
     const d = e.key === 'ArrowLeft' ? -24 : e.key === 'ArrowRight' ? 24 : 0; if (!d) return; e.preventDefault();
     wantW = Math.max(300, Math.min(maxW(), (wantW || panel.getBoundingClientRect().width) + d)); applyW(); saveW();
@@ -42,15 +52,18 @@ export function initMobile(ctx) {
     if (t === 'more') { openSheet(); return; }
     closeSheet();
     if (t !== 'map' && card.classList.contains('open')) ctx.closeCard();
-    app.dataset.mtab = t;
-    if (t === 'map' || t === 'list') { if (ctx.view !== 'map') ctx.setView('map'); }
-    else ctx.setView(t);
+    if (t === 'map' || t === 'list') { app.dataset.mtab = t; if (ctx.view !== 'map') ctx.setView('map');
+      // Explore shows the filings straight away: the section opens for this visit (not saved, and the map's dots stay as they are)
+      if (t === 'list' && document.getElementById('secFilings')?.getAttribute('aria-expanded') !== 'true') ctx.setFilingsOpen?.(true); }
+    else { const leaf = leafFor(t); app.dataset.mtab = leaf; ctx.setView(leaf); } // Filings / Market open the page used last
     syncNav();
     if (t === 'map') setTimeout(() => map.resize(), 30);
   }
+  // a tab is lit for its own pages; every page that isn't in the bottom bar lights More
+  const inNav = new Set(PHONE);
   function syncNav() {
-    const t = app.dataset.mtab;
-    nav.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === t || (t === 'changes' && b.dataset.tab === 'more') || (t === 'field' && b.dataset.tab === 'more') || (t === 'projects' && b.dataset.tab === 'more') || (t === 'compare' && b.dataset.tab === 'more') || (t === 'sources' && b.dataset.tab === 'more') || (t === 'market' && b.dataset.tab === 'more') || (t === 'reports' && b.dataset.tab === 'more')));
+    const p = parentOf(app.dataset.mtab);
+    nav.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === p || (b.dataset.tab === 'more' && !inNav.has(p)))));
   }
   nav.querySelectorAll('button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
   ctx.onViewChange(v => { // views opened from elsewhere (citations, "who" clicks, change items)
@@ -66,7 +79,7 @@ export function initMobile(ctx) {
   // ---- floating assistant bar (phone) ----
   document.getElementById('mAsk').onclick = () => { ctx.assistant.open(); setTimeout(() => document.getElementById('aiQ').focus(), 80); };
   document.getElementById('mMic').onclick = () => ctx.assistant.startVoice();
-  phoneMQ.addEventListener('change', () => { if (!isPhone()) { app.dataset.mtab = 'map'; closeSheet(); card.classList.remove('full'); } setTimeout(() => map.resize(), 50); });
+  phoneMQ.addEventListener('change', () => { if (!isPhone()) { app.dataset.mtab = 'map'; closeSheet(); card.classList.remove('full', 'half'); } placeActs(); setTimeout(() => map.resize(), 50); });
   document.getElementById('mFilters').onclick = () => { setTab('map'); ctx.openFilters?.(); };
 
   // live count + filter badge
@@ -81,35 +94,42 @@ export function initMobile(ctx) {
   function openSheet() { sheet.classList.add('on'); scrim.classList.add('on'); }
   function closeSheet() { sheet.classList.remove('on'); scrim.classList.remove('on'); }
   scrim.onclick = closeSheet;
-  let installEvt = null;
-  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; document.getElementById('mInstall').hidden = false; });
-  const chg = ctx.CHANGED.size; document.getElementById('mChgN').textContent = chg ? fmtN(chg) : ''; document.getElementById('mMoreN').textContent = chg ? fmtN(chg) : '';
+  // Esc closes the sheet first (before the card's window-level Esc), like every other pop-over
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented && sheet.classList.contains('on')) { e.preventDefault(); closeSheet(); } });
   sheet.querySelectorAll('[data-go]').forEach(b => b.onclick = async () => {
     const go = b.dataset.go; closeSheet();
-    if (go === 'changes' || go === 'field' || go === 'projects' || go === 'compare' || go === 'sources' || go === 'market' || go === 'reports') setTab(go);
-    else if (go === 'note') { setTab('map'); ctx.addNote?.({ gps: true }); }
+    if (go === 'note') { setTab('map'); ctx.addNote?.({ gps: true }); }
     else if (go === 'near') { setTab('map'); ctx.nearMe(); }
-    else if (go === 'saved') { setTab('list'); const box = document.getElementById('savedBox'); if (box.style.display === 'none') ctx.toast('No saved searches yet. Set filters, then tap "Save search".'); else { box.open = true; box.scrollIntoView({ block: 'center' }); } }
     else if (go === 'layers') { setTab('map'); setTimeout(() => document.getElementById('layersBtn').click(), 50); }
     else if (go === 'export') ctx.openExport();
-    else if (go === 'install' && installEvt) { installEvt.prompt(); installEvt = null; b.hidden = true; }
-    else if (go === 'theme') document.getElementById('themeBtn').click();
+    else if (go === 'settings') ctx.openSettings?.(); // theme, team, install and the rest (src/settings.js)
+    else if (document.getElementById('view-' + go)) setTab(go); // every page in the registry (My Work, Reports, Data & help)
   });
 
   // ---- swipeable bottom-sheet card (phone) ----
+  // It opens at "peek" (title, owner · value and the action row); swipe up for half, then full height. Swipe down steps
+  // back (full → half → peek → just the title bar) and never closes it: only × closes. A tap on the handle steps up.
+  const sheetAt = () => card.classList.contains('full') ? 'full' : card.classList.contains('half') ? 'half' : 'peek';
+  const setSheet = st => { card.classList.toggle('half', st === 'half'); card.classList.toggle('full', st === 'full'); };
+  // the action row is a footer on phones (always in reach under the thumb) and part of the pinned header elsewhere
+  function placeActs() {
+    const a = card.querySelector('.cact'); if (!a) return; const top = card.querySelector(':scope > .top');
+    if (isPhone()) { if (a.parentNode !== card || card.lastElementChild !== a) card.appendChild(a); }
+    else if (top && a.parentNode !== top) top.insertBefore(a, top.querySelector('.bnav'));
+  }
+  new MutationObserver(placeActs).observe(card, { childList: true });
   let y0 = null, dy = 0;
   card.addEventListener('touchstart', e => { if (!isPhone()) return; const r = card.getBoundingClientRect(), t = e.touches[0]; if (t.clientY - r.top < 48 && card.scrollTop <= 0) { y0 = t.clientY; dy = 0; } }, { passive: true });
   card.addEventListener('touchmove', e => { if (y0 == null) return; dy = e.touches[0].clientY - y0; if (dy > 0) card.style.transform = 'translateY(' + dy + 'px)'; }, { passive: true });
   card.addEventListener('touchend', () => {
     if (y0 == null) return; card.style.transform = '';
-    const min = card.classList.contains('min');
-    // swipe down: full → normal → minimized (title bar only, still selected) → closed; swipe up or tap brings it back
-    if (dy > 90) { if (card.classList.contains('full')) card.classList.remove('full'); else if (!min) setMin(true); else ctx.closeCard(); }
-    else if (dy < -30) { if (min) setMin(false); else card.classList.add('full'); }
-    else if (Math.abs(dy) < 6 && !min) card.classList.toggle('full');
+    const min = card.classList.contains('min'), at = sheetAt();
+    if (dy > 90) { if (at === 'full') setSheet('half'); else if (at === 'half') setSheet('peek'); else if (!min) setMin(true); }
+    else if (dy < -30) { if (min) setMin(false); else setSheet(at === 'peek' ? 'half' : 'full'); }
+    else if (Math.abs(dy) < 6 && !min) setSheet(at === 'peek' ? 'half' : at === 'half' ? 'full' : 'peek');
     y0 = null;
   });
-  ctx.onCardClose(() => { card.classList.remove('full'); setMin(false); });
+  ctx.onCardClose(() => { setSheet('peek'); setMin(false); });
 
   // ---- minimize any card to its title bar (all screen sizes) ----
   // The selection, the plane being followed, its flight path and the route stay on the map; tap the bar (or the
@@ -117,7 +137,7 @@ export function initMobile(ctx) {
   // back after every render and the state lives on the card element.
   const MIN_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>';
   function setMin(on) {
-    const was = card.classList.contains('min'); card.classList.toggle('min', !!on); if (on) card.classList.remove('full');
+    const was = card.classList.contains('min'); card.classList.toggle('min', !!on); if (on) card.classList.remove('full', 'half');
     const b = card.querySelector('.top .mn'); if (b) { b.setAttribute('aria-label', on ? 'Expand card' : 'Minimize card'); b.title = on ? 'Expand' : 'Minimize'; b.setAttribute('aria-expanded', String(!on)); }
     if (was !== !!on) { card.scrollTop = 0; setTimeout(() => ctx.map?.resize?.(), 220); }
   }

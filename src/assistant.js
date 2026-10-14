@@ -320,7 +320,7 @@ export function initAssistant(ctx) {
   const GROUP = { county: f => f.county, city: f => f.city, use: f => f.use, type: f => f.type, status: f => f.status, developer: f => f.dev || f.owner, month: f => (f.reg || '').slice(0, 7), year: f => (f.reg || '').slice(0, 4),
     quarter: f => f.reg ? f.reg.slice(0, 4) + '-Q' + (Math.floor((+f.reg.slice(5, 7) - 1) / 3) + 1) : '', start_month: f => (f.ts || '').slice(0, 7), finish_month: f => (f.te || '').slice(0, 7) };
   // only switch tabs when the user asked for the tab itself; otherwise the answer stays in the chat and a follow-up offers it
-  const VIEW_ASK = /\b(tab|page)\b|\b(open|switch to|go to|take me to|pull up|bring up)\s+(the\s+)?(timeline|compare|comparison|activity|market|reports?|updates|field notes|sources)\b/i;
+  const VIEW_ASK = /\b(tab|page)\b|\b(open|switch to|go to|take me to|pull up|bring up)\s+(the\s+)?(timeline|compare|comparison|compare areas|companies|activity|market|reports?|changes|updates|field notes|sources|data sources)\b/i;
   const inBounds = () => { const b = ctx.map.getBounds(); return ctx.visible.filter(f => b.contains([f.lon, f.lat])); };
   // the point a lookup is about: a filing, coordinates, a named place, or what is open on screen
   async function pointFor(a) {
@@ -510,8 +510,8 @@ export function initAssistant(ctx) {
         return { answer: d.answer, sources: d.sources.map(s => ({ site: s.site, title: s.title })) };
       }
       if (name === 'show_view') {
-        if (!VIEW_ASK.test(lastUserText())) return { not_switched: true, note: 'The user did not ask for that tab, so it was not opened. Answer in the chat and offer "Open the ' + ({ who: 'Activity', changes: 'Updates' }[a.view] || a.view[0].toUpperCase() + a.view.slice(1)) + ' tab" as a follow-up option.' };
-        ctx.setView(a.view); actionChip('Opened ' + ({ map: 'the map', timeline: 'the timeline', compare: 'Compare', who: 'Activity', changes: 'Updates', market: 'Market', reports: 'Reports' }[a.view] || a.view)); return { view: a.view }; }
+        if (!VIEW_ASK.test(lastUserText())) return { not_switched: true, note: 'The user did not ask for that tab, so it was not opened. Answer in the chat and offer "Open ' + (ctx.navPath?.(a.view) || a.view) + '" as a follow-up option.' };
+        ctx.setView(a.view); actionChip('Opened ' + (a.view === 'map' ? 'the map' : ctx.navPath?.(a.view) || a.view)); return { view: a.view }; }
       if (name === 'air_traffic') {
         // the open card, a named place or filing, else the map center
         let p = await pointFor(a);
@@ -691,7 +691,7 @@ export function initAssistant(ctx) {
         const out = await ctx.followPlane(a.id || '', {}); if (out.error) return out;
         await ctx.flightReport(out.plane);
         actionChip('Flight report: ' + (out.plane.flight || out.plane.reg || out.plane.hex.toUpperCase()));
-        return { saved: true, flight: out.plane.flight || out.plane.reg || out.plane.hex, note: 'The flight report (PDF) and a CSV of the track were saved; they are listed in the Reports tab. The plane card is open on the map.' };
+        return { saved: true, flight: out.plane.flight || out.plane.reg || out.plane.hex, note: 'The flight report (PDF) and a CSV of the track were saved; they are listed on the Reports page. The plane card is open on the map.' };
       }
       if (name === 'crime_stats') {
         if (!ctx.crimeReportData) return { error: 'Crime data isn’t available in this version.' };
@@ -764,7 +764,7 @@ export function initAssistant(ctx) {
           .map(w => ({ kind: w.kind, label: w.label, detail: w.sub, filing_id: w.kind === 'filing' ? w.ref : undefined, added: w.added?.slice(0, 10) }));
         return { notes_total: db.notes.length, watchlist_total: db.watch.length, notes: notes.slice(0, 25), watchlist: watch.slice(0, 25), note: db.notes.length || db.watch.length ? undefined : 'No field notes or watched items yet.' };
       }
-      if (name === 'data_sources') return ctx.sourcesList?.() || { error: 'The Sources tab isn’t loaded.' };
+      if (name === 'data_sources') return ctx.sourcesList?.() || { error: 'The data sources page (Data & help) isn’t loaded.' };
       if (name === 'describe_view') {
         const card = ctx.state.sel ? { kind: 'filing', ...row(ctx.state.sel) } : ctx.currentBuilding?.() ? { kind: 'building', ...ctx.currentBuilding() } : null;
         return { screen: ctx.screenContext(), open_card: card, labels: ctx.viewLabels?.() || null };
@@ -780,7 +780,7 @@ export function initAssistant(ctx) {
         actionChip(t.label); if (t.orbit || t.stop || t.region) return { done: t.label }; return { done: t.label, zoom: +(t.zoom ?? cur.zoom).toFixed(1), pitch: Math.round(t.pitch ?? cur.pitch), bearing: Math.round(t.bearing ?? cur.bearing) };
       }
       if (name === 'add_site_note') {
-        if (!ctx.addNote) return { error: 'Field notes are not available.' };
+        if (!ctx.addNote) return { error: 'Site notes are not available.' };
         const where = a.where || (a.place ? 'place' : ctx.state.sel || ctx.currentBuilding?.() ? 'selected' : 'center');
         let at = null, label = 'the map center';
         if (where === 'selected') { const f = ctx.state.sel, bd = ctx.currentBuilding?.(); if (f) { at = [f.lon, f.lat]; label = f.name; } else if (bd) { at = bd.center; label = bd.title || 'this building'; } else return { error: 'No card is open. Say where the note goes (here = map center, my location, or a place).' }; }

@@ -1,7 +1,7 @@
 // Building card "Site" section: flood zone, traffic counts, special districts, schools, transit, environmental flags,
 // crime nearby (Houston), bar and restaurant alcohol sales at the address, county unemployment and ZIP rents.
 // Facts come from api/site (live, cached a week) and data/area.json (nightly). Sources are listed only when the
-// "Show sources on cards" setting is on (Data Sources view), and always in exported reports.
+// "Show sources on cards" setting is on (Settings › Appearance), and always in exported reports.
 export function initSite(ctx) {
   let repMi = 1; // radius for the Site section's Crime / FEMA reports, kept while the app is open
   const { esc, fmtN, fmtM } = ctx;
@@ -56,7 +56,7 @@ export function initSite(ctx) {
       // area reports for a circle around the site: pick a radius, then Crime Report or FEMA Report
       (ctx.crimeReport || ctx.femaReport || ctx.areaReports?.length ? '<div class="site-rep"><div class="fl">Area reports</div><div class="mi-chips" role="radiogroup" aria-label="Report radius">' +
         [1, 3, 5, 10].map(mi => '<button type="button" class="chip" role="radio" data-mi="' + mi + '" aria-checked="' + (mi === repMi) + '">' + mi + ' mi</button>').join('') + '</div><div class="bacts">' +
-        (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep">Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep">FEMA Report</button>' : '') + (ctx.envReport ? '<button class="btn" type="button" id="siteEnvRep">Environmental Report</button>' : '') + (ctx.areaReports || []).filter(r => !r.noSite).map(r => '<button class="btn" type="button" data-ar="' + r.key + '">' + esc(r.label) + '</button>').join('') + '</div>' +
+        (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep" data-push>Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep" data-push>FEMA Report</button>' : '') + (ctx.envReport ? '<button class="btn" type="button" id="siteEnvRep" data-push>Environmental Report</button>' : '') + (ctx.areaReports || []).filter(r => !r.noSite).map(r => '<button class="btn" type="button" data-push data-ar="' + r.key + '">' + esc(r.label) + '</button>').join('') + '</div>' +
         '<div class="rnote">Crime: City of Houston only (Houston Police). FEMA: flood zones, flood insurance claims, disasters and hazard risk. Environmental: cleanup sites, tanks, wells, pipelines, wetlands and soils around the parcel.</div></div>' : '');
     ctx.renderUtilities?.(el.querySelector('.util-slot'), center, parcel);
     const where = () => parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4), lab = () => repMi + ' mi around ' + where();
@@ -68,7 +68,7 @@ export function initSite(ctx) {
     el.querySelectorAll('[data-ar]').forEach(b => b.onclick = () => ctx.runAreaReport(b.dataset.ar, { geometry: circle(center, repMi), label: lab(), center }));
   };
 
-  // sources on cards: off by default (everyone sees the same clean view); a setting in the Data Sources view turns them on
+  // sources on cards: off by default (everyone sees the same clean view); Settings › Appearance turns them on
   const KEY = 'fs-show-sources', apply = on => { document.documentElement.dataset.sources = on ? 'on' : 'off'; };
   let on = false; try { on = localStorage.getItem(KEY) === '1'; } catch (e) {}
   apply(on);

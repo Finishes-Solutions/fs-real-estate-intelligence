@@ -26,10 +26,11 @@ export function initKpis(ctx) {
     pop.querySelector('#kpiReset').onclick = () => { keys = DEFAULT_KPIS.slice(); save(); render(); renderPop(); };
     pop.querySelector('#kpiDone').onclick = () => toggle(false);
   }
-  function toggle(on) { pop.classList.toggle('on', on); btn.setAttribute('aria-expanded', on); if (on) renderPop(); }
+  function toggle(on) { pop.classList.toggle('on', on); btn.setAttribute('aria-expanded', on); if (on) { renderPop(); requestAnimationFrame(() => pop.scrollIntoView({ block: 'nearest' })); } } // it opens near the bottom of the panel: bring it into view
   btn.onclick = e => { e.stopPropagation(); toggle(!pop.classList.contains('on')); };
   document.addEventListener('pointerdown', e => { if (pop.classList.contains('on') && !pop.contains(e.target) && !btn.contains(e.target)) toggle(false); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && pop.classList.contains('on')) toggle(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && pop.classList.contains('on')) { e.preventDefault(); toggle(false); } });
   ctx.onChange(render); render();
   ctx.kpiKeys = () => keys.slice();
+  ctx.openKpis = () => toggle(true); // Settings › Map › Headline metrics
 }
