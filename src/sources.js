@@ -34,6 +34,32 @@ export function initSources(ctx) {
     checking = false; if (ctx.view === 'sources') render();
   }
 
+  // County data loads (api/devdata?meta=1): when each source last loaded, read once per visit
+  let devMeta = null, devAsked = false;
+  function devStatus(...keys) {
+    if (!devMeta) return st('off', devMeta === false ? 'Not loaded yet' : 'Checking…');
+    const ls = keys.map(k => devMeta[k]).filter(Boolean); if (!ls.length) return st('off', 'Not loaded yet');
+    if (ls.some(l => l.status === 'failed')) return st('err', 'Last load failed');
+    const at = Math.min(...ls.map(l => new Date(l.at).getTime())), h = (Date.now() - at) / 3600e3;
+    return h < 36 ? st('fresh', 'Checked ' + ago(at)) : h < 60 ? st('stale', 'A night behind') : st('err', 'Overdue');
+  }
+  const devN = (...keys) => { const n = keys.reduce((t, k) => t + (devMeta?.[k]?.rows || 0), 0); return n ? fmtN(n) + ' rows. ' : ''; };
+  function devRows() {
+    if (!devAsked) { devAsked = true; fetch('api/devdata?meta=1').then(r => r.ok ? r.json() : null).then(d => { devMeta = d?.sources && Object.keys(d.sources).length ? d.sources : false; if (ctx.view === 'sources') render(); }).catch(() => { devMeta = false; }); }
+    return [
+      { name: link('Harris Central Appraisal District', 'https://hcad.org/hcad-resources/hcad-public-data/'), what: 'Building Permits layer and permits on property cards (Harris County only)', status: devStatus('hcad-permits'),
+        detail: devN('hcad-permits') + 'The permits the district records for appraisal, from its weekly files (only re-read when they change), last 24 months, placed on the parcel. Values and contractors aren’t listed. No other county or city in the region publishes permits as open data.' },
+      { name: link('City of Houston Plat Tracker', 'https://www.houstontx.gov/planning/DevelopRegs/') + ' · ' + link('Fort Bend County', 'https://www.fortbendcountytx.gov/') + ' · ' + link('Montgomery CAD', 'https://mcad-tx.org/') + ' · Waller, Austin and Washington CADs', what: 'Plats & New Subdivisions layer',
+        status: devStatus('coh-plats', 'fbc-subdivisions', 'mcad-subdivisions'),
+        detail: devN('coh-plats', 'fbc-subdivisions', 'mcad-subdivisions', 'waller-subdivisions', 'austin-subdivisions', 'washington-subdivisions') + 'Houston plat applications for the city and its ETJ (last 24 months) and Fort Bend recorded subdivisions (10 years) carry dates. The Montgomery, Waller, Austin and Washington maps don’t, so their subdivisions count as new from the night they first appear here. Grimes publishes none with names.' },
+      { name: link('TxDOT Project Tracker', 'https://apps3.txdot.gov/apps-cq/project_tracker/'), what: 'TxDOT Projects layer, roadwork near a property', status: devStatus('txdot'),
+        detail: devN('txdot') + 'Projects planned, under way, or finished in the last two years. Dates and costs are TxDOT estimates.' },
+      { name: link('TCEQ water districts', 'https://www14.tceq.texas.gov/iwud/') + ' · ' + link('Texas Bond Review Board', 'https://www.brb.texas.gov/'), what: 'Water Districts (MUDs) layer, district on property cards', status: devStatus('tceq-districts'),
+        detail: devN('tceq-districts') + 'Active districts with TCEQ’s outlines (some years old) and creation dates (a few hundred district pages are read each night until all are), plus tax rate and bonds outstanding from the Bond Review Board’s latest yearly report.' },
+      { name: link('Texas Education Agency', 'https://tea.texas.gov/'), what: 'Schools layer, nearest schools on property cards', status: devStatus('tea-schools'),
+        detail: devN('tea-schools') + 'TEA’s school directory with state ratings, and enrollment from TEA’s latest yearly count. Enrollment forecasts aren’t public.' }
+    ];
+  }
   function rows() {
     const live = ctx.live?.status?.() || { on: {}, raster: {} }, m = ctx.marketInfo?.(), a = ctx.areaInfo?.(), base = ctx.basemap?.() || 'dots';
     const runs = DATA.changes?.runs || [], approx = F.filter(f => f.approx).length, unmapped = DATA.unmapped || 0;
@@ -105,9 +131,12 @@ export function initSources(ctx) {
         { name: link('NASA GIBS · HLS (Landsat / Sentinel-2)', 'https://www.earthdata.nasa.gov/data/projects/hls'), what: 'Recent satellite imagery, 30 m', status: live.on.nasa ? st('live', 'On') : st('off', 'Off'),
           detail: (live.on.nasa && live.nasa ? 'Showing the ' + live.nasa.name + ' pass of ' + fmtDay(live.nasa.day) + (live.nasa.cloud != null ? ' (' + Math.round(live.nasa.cloud) + '% cloud in the scene)' : '') + '. ' : '') + 'New passes every few days, 1–3 days after capture.' },
       ]],
+      ['Development pipeline (nightly, County data)', devRows()],
       ['Lookups (fetched when you use them)', [
         { name: link('MapTiler Geocoding', 'https://www.maptiler.com/cloud/geocoding/') + ' · ' + link('Nominatim', 'https://nominatim.org/') + ' · ' + link('Overpass', 'https://overpass-api.de/'), what: 'Search: addresses, places, outlines of towns, neighborhoods and whole roads', status: st('live', 'Live'), detail: 'Asked fresh each time you search.' },
         { name: link('Texas GIO StratMap parcels', 'https://geographic.texas.gov/'), what: 'Building card: owner, appraisal values, year built, acquisition date', status: st('live', 'On demand'), detail: 'Most recent county appraisal roll in StratMap (updated yearly per county). Answers cached up to a day.' },
+        { name: link('Harris Central Appraisal District', 'https://hcad.org/') + ' · ' + link('Waller, Austin, Washington and Grimes appraisal districts', 'https://waller-cad.org/') + ' (public parcel maps)', what: 'Building card: owner and appraisal values where StratMap has no parcel (all of Harris and Waller)', status: st('live', 'On demand'),
+          detail: 'Read from each district’s own public parcel map when the state data has nothing at the spot. Harris records have no year built or sale date; condominium units share one outline. Answers cached up to a day.' },
         { name: link('Esri World Imagery Wayback', 'https://livingatlas.arcgis.com/wayback/') + ' · ' + link('USDA NAIP', 'https://naip-usdaonline.hub.arcgis.com/') + ' (Planetary Computer)', what: 'High-res site imagery: dated aerial versions in Site Imagery, and on the map', status: live.hires ? st('live', 'On map: ' + live.hires.date) : st('live', 'On demand'),
           detail: 'Sub-metre. Esri versions are listed only when the imagery at the spot changed (capture dates vary, often months to a few years old); NAIP is flown over Texas about every two years. Tiles cached a month.' },
         { name: link('USGS 3DEP lidar', 'https://www.usgs.gov/3d-elevation-program') + ' (Microsoft Planetary Computer)', what: 'Building heights', status: st('live', 'On demand'), detail: 'Survey year varies by area and is shown on each building; newer buildings may not be in the survey.' },

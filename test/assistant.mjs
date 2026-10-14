@@ -234,7 +234,7 @@ console.log('assistant voice turns ok');
   assert.equal(names.size, TOOLS.length, 'tool names are unique');
   for (const [title, rules] of SECTIONS) { assert.ok(title && rules.length, 'section ' + title); for (const r of rules) assert.ok(r.length < 900, 'rule stays one readable line: ' + r.slice(0, 40)); }
   const p = systemPrompt({ coverage: 'x', filters: 'none', screen: 'View: map', followups: true });
-  assert.ok(p.includes(RULEBOOK) && /Pick the right tool:/.test(p) && /double square brackets/.test(p)); assert.ok(p.length < 12000, 'prompt stays bounded: ' + p.length);
+  assert.ok(p.includes(RULEBOOK) && /Pick the right tool:/.test(p) && /double square brackets/.test(p)); assert.ok(p.length < 12200, 'prompt stays bounded: ' + p.length); // 12,000 until Oct 2026; +200 for the development_activity rule
   assert.ok(!/double square brackets/.test(systemPrompt({})), 'no pills unless asked'); assert.match(VOICE_STYLE, /confirm what changed/);
   const c = { center: [-95.7, 30], zoom: 12, bearing: 170, pitch: 60, bounds: [-96, 29.8, -95.4, 30.2] };
   assert.equal(cameraMove(c, { action: 'zoom_out', amount: 'little' }).zoom, 11.3);

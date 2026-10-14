@@ -15,6 +15,9 @@ A map-based research tool for Finishes Solutions. Click any building or piece of
 | Property, owner and value lookups | Texas |
 | Census demographics, jobs, market numbers | Waller County and the six counties around it (Harris, Fort Bend, Montgomery, Austin, Washington, Grimes), plus the next ring of counties for context |
 | Construction filings (TDLR) | The same 7 counties, last two years |
+| Building permits | Harris County only (every city in it and the unincorporated county), last two years |
+| Plats and new subdivisions | City of Houston and its ETJ (with dates); recorded subdivisions in Fort Bend (with dates), Montgomery, Waller, Austin and Washington |
+| TxDOT projects, water districts (MUDs), schools | The same 7 counties |
 | Crime, street level (each incident) | City of Houston only |
 | Crime by city / county (yearly, per police department) | The whole US |
 | Flood zones | Anywhere FEMA has mapped (zoom in) |
@@ -125,9 +128,9 @@ Click a building, or at street zoom click open ground, to open its **property ca
 
 Scroll down and the top folds to just the title and the buttons.
 
-- **Ownership & value:** owner, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service. **More record details** opens the mailing address, the legal description and every field in the appraisal record.
+- **Ownership & value:** owner, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service. Where the state's data has no parcel (all of Harris and Waller counties), it comes straight from that county's appraisal district: Harris records have the owner, address and values but no year built or acquisition date, and where several records share one outline (condominium units) the card says how many. **More record details** opens the mailing address, the legal description and every field in the appraisal record.
   - **Zoning & last sale: Get from Regrid** looks those up (paid, capped each month; the button says how many lookups are left). The Regrid record shows right under Ownership.
-  - Where the state data has no parcel (all of Harris and Waller counties), the section starts with a big **Get owner, value & zoning from Regrid** button instead.
+  - Where neither the state data nor the appraisal district has a record at the spot (usually a street, a lake or a lot line), the section starts with a big **Get owner, value & zoning from Regrid** button instead.
 - **Company behind the owner:** when the owner is a company (an LLC, partnership, corporation or trust), the card looks it up in the Texas Comptroller's free public records and shows one line: the name, whether it's active, when it was formed and its registered agent. **Details** opens the rest: where it was formed, its mailing address and the officers, managers or members from its latest public report. If the name doesn't match exactly, similar names are listed to pick from. People's names are never looked up.
 - **The building:** footprint, height, floors and estimated floor area. Height comes from USGS lidar where it's believable; a reading that doesn't fit the building (say, hundreds of feet on a one-storey store) is set aside with a note, and the map or appraisal record is used instead.
 - **Site:** flood zone, traffic counts on nearby roads, water and utility districts (MUDs), **utilities** (see below), tax-increment zones, Opportunity Zone, school district, bus stops, nearby environmental sites, crime nearby (Houston), and area rents and jobs.
@@ -145,9 +148,10 @@ Scroll down and the top folds to just the title and the buttons.
   - These are whole-year, department-wide figures from the FBI: every spot a department covers shows the same numbers. The card says which year they're for, and warns you when a department reported only part of a year or has stopped reporting.
 - **Area snapshot:** census numbers for that neighborhood.
 - **Businesses:** what's inside or next door, from the Overture Maps and Foursquare open business lists plus OpenStreetMap, and businesses registered for sales tax at the address. Click a business for its details.
+- **Development here & nearby:** building permits on the parcel and new building or demolition permits close by (Harris County only), plats and new subdivisions within about a quarter mile, the water district (MUD) the property is in with its creation date and bonds outstanding, the nearest elementary, middle and high school with enrollment, and TxDOT work within a mile. Click any line for its card.
 - **Construction filings** on the parcel.
 - **From here:** distance and drive time, a drive-time map, weather, news, and site imagery (recent satellite and dated high-resolution photos).
-- **Regrid details** (paid, capped each month, from the Ownership section): zoning, zoning limits such as height and density, the last sale price and date where recorded, and land use. Harris and Waller counties aren't in the free state parcel data, so Regrid fills in owner and value there.
+- **Regrid details** (paid, capped each month, from the Ownership section): zoning, zoning limits such as height and density, the last sale price and date where recorded, and land use.
 
 **Section buttons** under the action row (Owner & value, Building, Site, Crime, Area…) jump to that section, with its heading just below the card's header. As you scroll, the button for the section you're reading lights up, and the row fades at an edge when there are more buttons past it.
 
@@ -253,6 +257,12 @@ The groups in Map layers:
   - Oil & gas wells and pipelines (Railroad Commission of Texas).
   - Wetlands (US Fish & Wildlife Service).
   - Soils (USDA soil survey).
+- **Development pipeline** (loaded every night; one **Show** picker sets how far back permits, plats and districts go: 90 days, 12 months, 24 months or all):
+  - **Building Permits (Harris):** permits from the Harris Central Appraisal District, colored by kind: new commercial building, new home, addition / remodel / lease space, paving or site work, demolition. Harris County only: the other counties and their cities don't publish permits.
+  - **Plats & New Subdivisions:** City of Houston plat applications (the city and its ETJ, which reaches into Fort Bend, Montgomery and Waller), from general plans to final plats and replats, and recorded subdivisions in Fort Bend. Montgomery, Waller, Austin and Washington subdivision maps have no dates, so their subdivisions count as new from the night they first appear in the app. Outlines show as you zoom in.
+  - **TxDOT Projects:** highway projects as lines, colored by stage: under way or starting soon, starting within 4 years, in 5 to 10 years, planning, and finished in the last two years. The card has the cost estimate, letting date, contractor and progress.
+  - **Water Districts (MUDs):** active MUDs, management districts, WCIDs and others, with their outlines. The card has when the district was created, its acreage, total tax rate, taxable value and the bonds it has outstanding.
+  - **Schools:** public school campuses, sized by enrollment; the card has grades, enrollment, the state rating and the district.
 - **Utilities:** **Power, Water & Sewer Lines** (zoom in): transmission lines in red with their voltage, distribution lines in orange (dashed where underground), substations as red dots, and in Houston at street zoom, public sewer mains in brown and water mains in blue where the city publishes them.
 - **Demographics:** color census tracts by:
   - population or growth;
@@ -353,6 +363,7 @@ The **Ask AI** button in the top bar, on every page (on phones, the sparkle in t
 "- "How does crime in Hempstead compare with Texas?" "Is crime in Austin going up?" (anywhere in the US, from FBI yearly figures)
 - "What are the safest cities in Texas over 50,000 people?" "Which Louisiana counties have the most property crime?"
 - "How is oil doing this year?" "Does oil lead Houston unemployment?" "What moves Houston housing permits?"
+- "What's being permitted near Katy Mills?" "New subdivisions around Fulshear in the last year?" "Which MUD is this in, and what's its tax rate?" "Schools near this lot?" "TxDOT projects on 290 in Waller County?"
 - With a property card open: "Lay out a 25,000 sf retail strip here." "How many apartments fit on this lot?" (it starts a site plan and lays out options; see below)
 
 Answers come with cards: summaries, charts, comparisons, places, drive times, weather, news and imagery. When it opens, its suggested questions change with what you're looking at.
@@ -402,7 +413,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - Start a **new project** (named after the address) or **add the parcel to a project** you already have. Your very first plan skips this choice: the project is made for you, named after the address. While you choose, the site's outline is drawn dashed on the map.
 - **Coming back to a parcel:** if the parcel is already in a project, the card says so first (**Already in (the project) · Option A · 25,000 sq ft**) with **Open Plan** to carry on where you were, or **New Option** to start another option in that project, and the choice below is set to that project, so the same land doesn't end up in a second project. The property card's button then reads **Open site plan**.
 - **Find a Parcel** on a project with no parcels yet: the next parcel you open and click **Site plan** on goes into that project (the card reads **Add a parcel to (the project)**, with it already chosen).
-- The plan starts from the parcel's outline from the county appraisal district. Harris and Waller aren't in that data: use **Get owner, value & zoning from Regrid** in the card's Ownership section first and the plan uses Regrid's outline, or draw the site yourself (click each corner, then the first corner again).
+- The plan starts from the parcel's outline from the county appraisal district (in Harris and Waller, from the district's own parcel map). Where there's no outline, use **Get owner, value & zoning from Regrid** in the card's Ownership section first and the plan uses Regrid's outline, or draw the site yourself (click each corner, then the first corner again).
 - Planning takes over the map: the left list folds away, the area tools, Filters, Export and the layer buttons step aside (**Layers** stays), and the map zooms so the whole site sits in the open part of the map, clear of the plan panel and the search. The existing buildings are hidden while you plan. Everything comes back as it was when you close the plan, including the left list open or folded as you had it.
 - The map refits to the site when the window or the left list changes size, never while you're moving the map yourself. The **Fit plan** button (top of the map buttons, while a plan is open) brings the whole site back into view.
 
@@ -620,6 +631,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 - **Google (paid, capped each month):** Google base maps, 3D city and place search, when the site's Google keys are set. A monthly allowance keeps place searches inside Google's free monthly use; past it, search uses the free sources until the next month.
 - **Businesses and places:** Overture Maps and Foursquare's free open datasets, reloaded monthly (about 300,000 in the seven counties), plus OpenStreetMap.
 - **Construction filings:** TDLR TABS, refreshed nightly.
+- **Development pipeline (nightly):** Harris Central Appraisal District (building permits, read when its weekly files change), City of Houston Plat Tracker, Fort Bend County and the Montgomery, Waller, Austin and Washington appraisal districts (subdivisions), TxDOT Project Tracker, TCEQ water districts and the Texas Bond Review Board (MUDs, tax rates and bonds), and the Texas Education Agency (schools).
 - **Markets:** Yahoo Finance (stocks, funds, indexes and crypto history; delayed), Coinbase (live crypto) and the St. Louis Fed's FRED (oil, gas, building material prices, rates and Houston metro statistics).
 - **Weather, radar and storms:** NOAA and Open-Meteo. **Planes:** adsb.lol and airplanes.live. **Airports:** OurAirports and the FAA.
 - **County and state lines:** US Census.
@@ -631,7 +643,10 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 - **No sale prices.** Texas doesn't publish what properties sell for. Regrid has some recorded sales, and rent and sales comps would need a paid data provider.
 - **Filings are filer estimates.** Costs and dates come from whoever filed. About four in ten filings are missing a start or end date, and the app estimates those (shown hatched). AI-read fields such as use, tenant and developer can be wrong.
 - **Coverage gaps:**
-  - Harris and Waller aren't in the free state parcel data; use Regrid details there.
+  - Harris and Waller aren't in the free state parcel data; their owner and value come from each county's appraisal district instead. Harris records have no year built or acquisition date (Regrid details can fill in more).
+  - Building permits are Harris County only. Fort Bend, Montgomery, Waller, Austin, Washington, Grimes and their cities don't publish permits as open data. The Harris permits are the ones the appraisal district records, so they lag the city by a few weeks and don't list values or contractors.
+  - Plat dates exist for the City of Houston (city and ETJ) and Fort Bend only. Grimes publishes no subdivision names. Water district creation dates are read a few hundred at a time, so for the first few nights some districts say "Checking".
+  - School enrollment is TEA's latest yearly count; enrollment forecasts aren't public.
   - Street-level crime covers the City of Houston only. Elsewhere crime is yearly and department-wide (FBI), so it can't show which blocks are worse.
   - FBI crime figures come out once the year is over; the newest full year is shown. Some departments report only part of a year or have stopped reporting, and the card says so. Rates count residents only, so places with many visitors (downtowns, shopping areas) read high.
   - Business lists come from open data: most businesses are there, but some are missing, closed or slightly misplaced. They are refreshed monthly.
@@ -643,6 +658,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **The development pipeline on the map and on every property card:** five new layers under **Development pipeline** in Map layers: Harris County building permits, plats and new subdivisions, TxDOT projects, water districts (MUDs) with tax rates and bonds, and schools with enrollment, all refreshed nightly, with a **Show** picker for how far back. Property cards get a **Development here & nearby** section, and Ask AI can answer "what's being permitted / platted / built near here". Harris and Waller property cards now show the owner and value straight from the county appraisal district, without Regrid.
 - **Drive-time bands clear when you close the card:** closing a drive-time map (or the property card it came from) with × or Esc now takes the bands off the map, and the legend has a **Clear from map** link.
 - **No more size limits on area reports:** the FEMA report (was 400 square miles, and flood-zone shares only up to 60), the Air Traffic report (was 2,000) and the Traffic report (was 5,000) now take any area up to several counties. FEMA reads claims for every census tract instead of the first 60. Traffic's Export CSV lists every counted road segment, and the crime Export CSV lists up to the newest 20,000 incidents instead of 2,000.
 - **Environmental report for any size of area:** the 30-square-mile limit is gone (a whole county works). Counts are now exact (no more "1,000+"), the table adds an **On site** column, larger areas get soils by share of the site, a source that times out can be retried on its own, and Export CSV lists every record.

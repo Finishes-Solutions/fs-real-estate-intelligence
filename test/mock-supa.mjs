@@ -2,9 +2,9 @@
 import fs from 'node:fs';
 const FILE = process.env.MOCK_DB, db = FILE && fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : {};
 const save = () => FILE && fs.writeFileSync(FILE, JSON.stringify(db));
-const PK = { counties: 'fips', filings: 'id', geocode_cache: 'k', runs: 'id', changes: 'id' };
+const PK = { counties: 'fips', filings: 'id', geocode_cache: 'k', runs: 'id', changes: 'id', dev_items: 'id', county_loads: 'source' };
 const json = (o, s = 200) => new Response(o === null ? null : JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
-const DEFAULTS = { counties: { status: 'todo', priority: 1000 }, filings: { first_seen: 'now', approx: false, misfiled: false } };
+const DEFAULTS = { counties: { status: 'todo', priority: 1000 }, filings: { first_seen: 'now', approx: false, misfiled: false }, dev_items: { first_seen: 'today' } };
 function match(row, params) {
   for (const [k, v] of params) {
     if (['select', 'order', 'limit', 'offset', 'on_conflict'].includes(k)) continue;
@@ -39,6 +39,14 @@ globalThis.fetch = async (url, opts = {}) => {
   if (path === 'rpc/crime_city_refresh') { db.crime_city_refreshed = (db.crime_city_refreshed || 0) + 1; save(); return json({ latest: null }); }
   if (path === 'rpc/aircraft_registry_remove') { const ids = JSON.parse(opts.body).p_ids, t = db.aircraft_registry || [], before = t.length; db.aircraft_registry = t.filter(r => !ids.includes(r.n_number)); save(); return json(before - db.aircraft_registry.length); }
   if (path === 'rpc/airports_remove') { const { p_table, p_ids } = JSON.parse(opts.body), k = p_table === 'airports' ? 'ident' : 'id', t = db[p_table] || [], before = t.length; db[p_table] = t.filter(r => !p_ids.includes(String(r[k]))); save(); return json(before - db[p_table].length); }
+  // county data (supabase/migrations/20261021000000_county_data.sql)
+  if (path === 'rpc/dev_hashes') { const { p_source, p_after, p_n } = JSON.parse(opts.body); return json(Object.fromEntries((db.dev_items || []).filter(r => r.source === p_source && r.id > (p_after || '')).sort((a, b) => a.id < b.id ? -1 : 1).slice(0, p_n).map(r => [r.id, r.h]))); }
+  if (path === 'rpc/dev_touch') { const { p_source, p_load, p_ids } = JSON.parse(opts.body); let n = 0; for (const r of db.dev_items || []) if (r.source === p_source && p_ids.includes(r.id)) { r.load_id = p_load; n++; } save(); return json(n); }
+  if (path === 'rpc/dev_prune') {
+    const { p_source, p_load, p_min_keep } = JSON.parse(opts.body), t = db.dev_items || [], mine = t.filter(r => r.source === p_source), fresh = mine.filter(r => r.load_id === p_load).length;
+    const go = !mine.length || fresh >= mine.length * p_min_keep, before = t.length; if (go) db.dev_items = t.filter(r => r.source !== p_source || r.load_id === p_load); save();
+    return json({ kept: fresh, removed: before - (db.dev_items || []).length, refused: !go, total: mine.length });
+  }
   if (path === 'rpc/cache_get') { const { tbl, keys } = JSON.parse(opts.body), t = db[tbl] || []; const out = {}; for (const r of t) if (keys.includes(r.k)) out[r.k] = r.data; return json(out); }
   const t = db[path] = db[path] || [];
   if (method === 'GET') {

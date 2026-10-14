@@ -3174,3 +3174,10 @@ table.who tr.nomatch td{border:0}
 #card .sp-chk li.skip::before{content:"!";border:0;transform:none;top:0;left:4px;width:auto;height:auto;font-weight:700;color:var(--amber)}
 #card .sp-chg-acts{padding:4px 0 0;align-items:center;flex-wrap:wrap}
 #card .sp-chg-acts .sp-link{margin-left:auto;font-size:12px}
+/* the property card's Development section (src/devlayers.js) */
+.dv-row{display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;padding:6px 2px;border-bottom:1px solid var(--line,#e5e7eb);color:inherit;font:inherit;cursor:var(--cur-pointer)}
+.dv-row:hover{background:var(--hover,rgba(0,0,0,.03))}
+.dv-row i{flex:none;width:9px;height:9px;border-radius:50%;margin-top:5px}
+.dv-row span{display:flex;flex-direction:column;min-width:0}
+.dv-row b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.dv-row em{font-style:normal;color:var(--muted,#6b7174);font-size:12px}

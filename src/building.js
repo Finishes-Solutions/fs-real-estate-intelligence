@@ -229,13 +229,13 @@ export function initBuildings(ctx) {
           ...(ctx.reduceMotion ? [] : [{ label: 'Orbit view', attrs: ' id="bOrbit"' }]),
           { label: 'Select more', attrs: ' id="bMulti" title="Then ' + (coarse ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 20"', sub: (coarse ? 'Tap' : 'Click or Shift-click') + ' more buildings or parcels' },
           { divider: true }, { label: 'Copy link', attrs: ' id="bLink"', sub: 'Opens this property' }, { label: 'Export details (CSV)', attrs: ' id="bCsv"' }]) +
-      ctx.cardNav([['bParcel', 'Owner & value'], ['bSize', 'Building'], ['bSite', 'Site'], ['bCrime', 'Crime'], ['bArea', 'Area'], ['bPlaces', 'Businesses'], ['bFilings', 'Construction'], ['liveSec', 'From Here']]) + '</div>' +
+      ctx.cardNav([['bParcel', 'Owner & value'], ['bSize', 'Building'], ['bSite', 'Site'], ['bDev', 'Development'], ['bCrime', 'Crime'], ['bArea', 'Area'], ['bPlaces', 'Businesses'], ['bFilings', 'Construction'], ['liveSec', 'From Here']]) + '</div>' +
       '<div class="bover" id="bOver" hidden></div>' +
       '<div class="bsec" id="bParcel"><div class="lt">Ownership &amp; Value</div><div class="rnote">Looking up the appraisal record…</div></div>' +
       '<div class="bsec rg-sec" id="bRegrid"></div>' +
       '<div class="bsec" id="bSize"><div class="lt">Building</div><div id="bPhoto"></div><div id="bSizeBody">' + sizeRows(b) + '<div class="rnote">Measuring height from lidar…</div></div>' +
         ss('Footprint: OpenStreetMap. Height: USGS 3DEP lidar where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record, otherwise estimated from height.') + '</div>' +
-      '<div class="bsec" id="bSite"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
+      '<div class="bsec" id="bSite"></div><div class="bsec" id="bDev"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsrc"></div>';
     card.classList.add('open'); card.scrollTop = 0; setHead(b, null);
     const mark = card.querySelector('#bParcel'), alive = () => cur === b && mark.isConnected; // still this card (not a report opened from it)
@@ -260,7 +260,7 @@ export function initBuildings(ctx) {
       if (!alive() || dropIfDuplicate(b)) return; early = true; highlight(); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
       renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel); ready(); planBtn(b);
       ctx.cardStatus?.(pd.parcel ? 'Owner and value loaded for ' + (pd.parcel.situs || 'this parcel') + '.' : 'No appraisal record here; Regrid can look it up.');
-      ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel);
+      ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel); ctx.renderDev?.(card.querySelector('#bDev'), b.center, pd.parcel);
     };
     try { d = await details(b, onParcel); }
     catch (err) { if (!alive()) return; renderParcel(null, err.message); card.querySelector('#bTitle').textContent = 'Property details unavailable'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b); ready(); return; }
@@ -271,7 +271,7 @@ export function initBuildings(ctx) {
     card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
     // the parcel list (a building on several parcels) comes with the second lookup, so the parcel section is redrawn with it
     if (!early || d.parcels?.length > 1) renderParcel(d.parcel, d.parcelError, d.parcels);
-    if (!early) { renderFilings(d.parcel?.geometry || null); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel); }
+    if (!early) { renderFilings(d.parcel?.geometry || null); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel); ctx.renderDev?.(card.querySelector('#bDev'), b.center, d.parcel); }
     renderOverview(b, d); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo); planBtn(b);
   }
   // a parcel that's already in a project: the button opens its plan (Site plan's start card offers Open Plan first)
@@ -364,17 +364,16 @@ export function initBuildings(ctx) {
     const el = card.querySelector('#bParcel'), head = '<div class="lt">Ownership &amp; Value</div>', t = card.querySelector('#bTitle'), sub = card.querySelector('#bSub'); if (!el) return;
     setHead(cur, p);
     if (!p) {
-      // the statewide parcel layer has no Harris or Waller County records (checked 2026-10-03): Regrid has them
-      const co = countyAt(cur.center);
+      // nothing from the statewide parcel layer nor the county appraisal district's own (Harris, Waller, …): Regrid may have it
       el.innerHTML = head + '<button class="btn md primary rg-cta" type="button" data-rg>Get owner, value &amp; zoning from Regrid<span data-rg-left>' + rgLeft() + '</span></button>' +
-        '<div class="rnote">' + (err ? 'The appraisal lookup failed (' + esc(err) + ').' : /^(Harris|Waller)$/.test(co) ? 'The statewide parcel data doesn’t include ' + co + ' County yet, so there’s no owner or value here.' : 'No appraisal record found at this point.') + ' Regrid has the parcel record; one already looked up is free.</div>';
+        '<div class="rnote">' + (err ? 'The appraisal lookup failed (' + esc(err) + ').' : 'No appraisal record found at this point (often a street, a lake or a lot line).') + ' Regrid has the parcel record; one already looked up is free.</div>';
       wireRegrid(el);
       if (t && !err) t.textContent = 'Unaddressed ' + kindOf(cur).toLowerCase();
       const near = ctx.nearestPlace?.(cur.center); if (sub) sub.textContent = 'No owner on file · ' + (near ? 'near ' + near : cur.center[1].toFixed(5) + ', ' + cur.center[0].toFixed(5));
       return;
     }
     if (t) t.textContent = p.situs || 'Unaddressed ' + kindOf(cur).toLowerCase();
-    const legal = String(p.raw?.LEGAL_DESC || '').replace(/^"+|"+$/g, '').replace(/""/g, '"').trim(), val = appraised(p);
+    const legal = String(p.legal || p.raw?.LEGAL_DESC || '').replace(/^"+|"+$/g, '').replace(/""/g, '"').trim(), val = appraised(p);
     if (sub) sub.textContent = [p.owner, val ? fmtM(val) + (p.marketValue ? ' market value' : ' appraised') : '', p.landUse].filter(Boolean).join(' · ');
     el.innerHTML = head + '<div class="fgrid">' +
       fld('Owner', esc(p.owner || '—'), { w: true }) +
@@ -387,7 +386,8 @@ export function initBuildings(ctx) {
       '<div class="rg-row"><span>Zoning &amp; last sale</span><button class="lnk" type="button" data-rg>Get from Regrid<span data-rg-left>' + rgLeft() + '</span></button></div>' +
       (p.mailing || legal || p.raw ? '<details class="raw more-rec"><summary>More record details</summary><dl>' + (p.mailing ? '<dt>Mailing address</dt><dd>' + esc(p.mailing) + '</dd>' : '') + (legal ? '<dt>Legal description</dt><dd>' + esc(legal) + '</dd>' : '') + '</dl>' +
         (p.raw ? '<div class="fl">All appraisal fields</div><dl>' + Object.entries(p.raw).map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' : '') + '</details>' : '') +
-      '<div class="ssrc src">' + esc(p.raw?.SOURCE ? title(p.raw.SOURCE) : 'County appraisal district') + ' via Texas GIO StratMap. Appraisal values, not sale prices.</div>';
+      (p.shared ? '<div class="rnote">' + fmtN(p.shared) + ' appraisal records share this outline (condominium units or stacked accounts); this is one of them.</div>' : '') +
+      '<div class="ssrc src">' + (p.source ? esc(p.source) + ' public parcel map (the state’s parcel data has no record here)' : esc(p.raw?.SOURCE ? title(p.raw.SOURCE) : 'County appraisal district') + ' via Texas GIO StratMap') + '. Appraisal values, not sale prices.</div>';
     wireRegrid(el);
     ctx.renderOwnerCo?.(el.querySelector('#bOwnerCo'), p.owner);
   }

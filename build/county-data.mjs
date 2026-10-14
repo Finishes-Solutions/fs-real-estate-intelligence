@@ -12,6 +12,7 @@
 // Env: ONLY=permits,plats,txdot,districts,schools (subset), FORCE=1 (reload files that haven't changed),
 // ALLOW_SHRINK=1 (accept a load under half the rows before), IWUD_MAX (district pages per night, default 300),
 // LOCATE_MAX (new permit parcels to place per night, default 60000), HCAD_ZIP (a local Real_acct_owner.zip for tests),
+// COUNTY_MIN_ROWS (the fewest rows a source may parse before it counts as broken; per source by default),
 // DRY=1 (parse and report, write nothing).
 import fs from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
@@ -29,9 +30,10 @@ const E = process.env, log = (...a) => console.log(new Date().toISOString().slic
 const ONLY = (E.ONLY || 'permits,plats,txdot,districts,schools').split(',').map(x => x.trim());
 const FORCE = !!E.FORCE, DRY = !!E.DRY, MIN_KEEP = E.ALLOW_SHRINK ? 0 : 0.5;
 const IWUD_MAX = +(E.IWUD_MAX || 300), LOCATE_MAX = +(E.LOCATE_MAX || 60000);
+const minRows = m => E.COUNTY_MIN_ROWS != null ? +E.COUNTY_MIN_ROWS : m; // tests run on a handful of rows
 const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 const monthsAgo = m => { const d = new Date(today + 'T12:00:00Z'); d.setUTCMonth(d.getUTCMonth() - m); return d.toISOString().slice(0, 10); };
-const LOAD = new Date().toISOString().slice(0, 16).replace(/\D/g, '');
+const LOAD = new Date().toISOString().replace(/\D/g, '').slice(0, 17) + '-' + process.pid; // unique per run, even two in a minute
 const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (county data; github actions)' };
 const COLS = ['id', 'kind', 'source', 'county', 'name', 'cat', 'status', 'day', 'amount', 'units', 'addr', 'attrs', 'lon', 'lat', 'shape_json', 'h', 'load_id'];
 
@@ -71,11 +73,16 @@ async function arcAll(url, where, { fields = '*', geometry = true, page = 1000, 
 const socrata = (url, p) => getJSON(url + '?' + new URLSearchParams(p), { timeout: 180000 });
 
 const stats = {}, failed = [];
+const STEP_SOURCES = { permits: ['hcad-permits'], plats: ['coh-plats', 'fbc-subdivisions', 'mcad-subdivisions'], txdot: ['txdot'], districts: ['tceq-districts'], schools: ['tea-schools'] };
 async function step(name, fn) {
   if (!ONLY.includes(name)) return;
   const t = Date.now();
   try { stats[name] = await fn(); log(name, JSON.stringify(stats[name]), ((Date.now() - t) / 1000).toFixed(0) + 's'); }
-  catch (e) { failed.push(name); log(name, 'FAILED', e.message); if (db) await db.upsert('county_loads', [{ source: name, at: new Date().toISOString(), status: 'failed', note: String(e.message).slice(0, 300) }], 'source').catch(() => {}); }
+  catch (e) {
+    failed.push(name); log(name, 'FAILED', e.message);
+    // Data & help shows the failure on the step's sources; their rows stay as they were
+    if (db) await db.upsert('county_loads', (STEP_SOURCES[name] || [name]).map(source => ({ source, at: new Date().toISOString(), status: 'failed', note: String(e.message).slice(0, 300) })), 'source').catch(() => {});
+  }
 }
 const lastLoad = async source => db ? (await db.select('county_loads', 'select=*&source=eq.' + encodeURIComponent(source)))[0] || null : null;
 
@@ -84,6 +91,7 @@ const lastLoad = async source => db ? (await db.select('county_loads', 'select=*
 // carry no date backdates them, so only rows that appear on later nights count as new.
 async function save(source, rows, { min = 1, undated = false, meta = {} } = {}) {
   const seen = new Set(); rows = rows.filter(r => r && !seen.has(r.id) && seen.add(r.id));
+  min = minRows(min);
   if (rows.length < min) throw new Error(source + ': only ' + rows.length + ' rows parsed (expected at least ' + min + '); nothing changed');
   for (const r of rows) { r.source = source; r.load_id = LOAD; r.h = C.rowHash(r, hash); }
   if (DRY) return { source, rows: rows.length, sample: rows.slice(0, 2).map(r => ({ ...r, shape_json: r.shape_json ? r.shape_json.type : null })) };
@@ -120,7 +128,7 @@ await step('permits', async () => {
   log('permits parsed', rows.length, 'since', monthsAgo(24));
   // where each permit is: the parcel's spot, from last night's rows when the account was already placed, else HCAD's layer
   const at = new Map();
-  if (db) for (const r of await db.selectAll('dev_items', 'select=id,lon,lat&source=eq.' + src + '&lon=not.is.null', 1000)) at.set(r.id.split(':')[2], [r.lon, r.lat]);
+  if (db) for (const r of await db.selectAll('dev_items', 'select=id,lon,lat&source=eq.' + src + '&lon=not.is.null', 1000)) if (r.lon != null) at.set(r.id.split(':')[2], [r.lon, r.lat]);
   const need = [...new Set(rows.map(r => r.acct))].filter(a => !at.has(a)).slice(0, LOCATE_MAX);
   let placed = 0;
   for (let i = 0; i < need.length; i += 100) {
@@ -210,9 +218,13 @@ await step('schools', async () => {
   const names = ((await getJSON(C.SRC.teaOrg + '?f=json')).services || []).map(s => s.name), svc = C.newestTeaService(names);
   if (!svc) throw new Error('no TEA districts_schools_…_C service listed');
   const feats = await arcAll(C.SRC.teaOrg + '/' + svc + '/FeatureServer/0', '1=1', { box: REGION });
-  const rows = feats.map(f => C.teaSchoolRow(f)).filter(Boolean);
-  const res = await save('tea-schools', rows, { min: 300, meta: { url: svc } });
-  return { ...res, service: svc };
+  // enrollment from the newest yearly schools layer (the dated directory has none)
+  const yearly = names.filter(n => /^Schools_\d{4}_to_\d{4}$/.test(n)).sort().pop();
+  let enrollment = new Map();
+  if (yearly) try { enrollment = C.teaEnrollment(await arcAll(C.SRC.teaOrg + '/' + yearly + '/FeatureServer/0', '1=1', { box: REGION, geometry: false })); } catch (e) { log('schools: enrollment layer failed', e.message); }
+  const rows = feats.map(f => C.teaSchoolRow(f, { enrollment })).filter(Boolean);
+  const res = await save('tea-schools', rows, { min: 300, meta: { url: svc + (yearly ? ' + ' + yearly : '') } });
+  return { ...res, service: svc, enrollmentFrom: yearly || null, withEnrollment: rows.filter(r => r.units).length };
 });
 
 log('done', JSON.stringify({ failed }));
