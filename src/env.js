@@ -5,6 +5,7 @@
 //   nearest first, wells and pipelines, wetlands and soils; opens in the card and exports as PDF or CSV.
 import { KINDS, SETS } from './lib/env.mjs';
 import { esc, fmt, kgrid, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, areaMap } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 
 const SRC = 'env-sites', AREA = 'env-areas';
 const RASTERS = { rrc: { box: 'lyRrc', note: 'lyRrcNote', minz: 11, opacity: .9, attr: 'Wells & pipelines: Railroad Commission of Texas', msg: 'Oil and gas wells (symbols by type: oil, gas, plugged, dry, injection) and pipelines from the Railroad Commission. Zoom in past neighborhood level.' },
@@ -49,7 +50,7 @@ export function initEnv(ctx) {
     const key = bb.join(',') + '&set=' + st.set; if (key === lastKey && map.getSource(SRC)) return;
     ctl?.abort(); ctl = new AbortController(); say('Loading environmental sites…');
     try {
-      const res = await fetch('api/env?box=' + key, { signal: ctl.signal }), d = await res.json().catch(() => ({})); if (!res.ok) throw new Error(d.error || 'unavailable');
+      const res = await fetch('api/env?box=' + key, { signal: ctl.signal }), d = await readJSON(res);
       if (my !== seq) return; lastKey = key; setSites(d);
       const by = {}; for (const s of d.sites) by[s[0]] = (by[s[0]] || 0) + 1;
       say(Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, n]) => fmt(n) + ' ' + KINDS[k].short.toLowerCase()).join(', ') + (d.areas?.length ? (Object.keys(by).length ? ', ' : '') + d.areas.length + ' groundwater restriction area' + (d.areas.length > 1 ? 's' : '') : '') + (d.sites.length || d.areas?.length ? ' in view.' : 'None in view.') + (d.errors ? ' Some sources did not answer.' : '') + ' Click a dot for details.');
@@ -95,7 +96,7 @@ export function initEnv(ctx) {
 
   // ---------- the report ----------
   const circleAt = ([lon, lat], mi) => { const r = mi / 69.17, k = Math.cos(lat * Math.PI / 180), ring = []; for (let i = 0; i <= 48; i++) { const a = (i % 48) / 48 * 2 * Math.PI; ring.push([lon + r * Math.cos(a) / k, lat + r * Math.sin(a)]); } return { type: 'Polygon', coordinates: [ring] }; };
-  const reportFor = async (geometry, label) => { const r = await fetch('api/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) }), d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Environmental report failed'); return d; };
+  const reportFor = async (geometry, label) => { const r = await fetch('api/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) }), d = await readJSON(r); return d; };
   ctx.envReportData = reportFor;
   const ORDER = ['npl', 'superfund', 'ihwca', 'vcp', 'brownfield', 'epa_bf', 'drycleaner', 'lpst', 'landfill', 'msd', 'pst', 'rcra', 'tri', 'air', 'water'];
   const miTxt = v => v === 0 ? 'on site' : v < 0.1 ? Math.round(v * 5280) + ' ft' : v.toFixed(2) + ' mi';

@@ -5,6 +5,7 @@
 // Data: api/isochrone (TomTom reachable range with traffic; Valhalla / OpenStreetMap without).
 import { inGeom, tractsFor, summarizeTracts } from './lib/demographics.mjs';
 import { esc, fmt, kgrid, table, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 
 export const BAND_COL = ['#16a34a', '#eab308', '#f97316', '#dc2626'];
 const DEPARTS = [['now', 'Now'], ['weekday-am', 'Weekday 8 AM'], ['weekday-pm', 'Weekday 5 PM'], ['weekend', 'Sunday']];
@@ -16,9 +17,8 @@ export function initDriveTime(ctx) {
 
   async function fetchBands(center, minutes, depart) {
     const q = new URLSearchParams({ lat: center[1].toFixed(3), lon: center[0].toFixed(3), minutes: minutes.join(','), depart }); // rounded: nearby requests share the cache
-    const r = await fetch('api/isochrone?' + q, { signal: AbortSignal.timeout(40000) }); const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || (r.status === 404 ? 'Drive-time maps aren’t deployed here.' : 'Drive-time lookup failed (' + r.status + ')'));
-    return d;
+    const r = await fetch('api/isochrone?' + q, { signal: AbortSignal.timeout(40000) }); if (r.status === 404) throw new Error('Drive-time maps aren’t deployed here.');
+    return readJSON(r);
   }
   // people, households and jobs inside each band (census tracts whose middle falls inside), and the filings on the map
   async function enrich(d) {

@@ -6,6 +6,7 @@
 import { offenseName, CAT_NAME } from './lib/nibrs.mjs';
 import { tractsFor, summarizeTracts } from './lib/demographics.mjs';
 import { reportDoc, savePdf, areaSvg } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 
 const SRC = 'crime', HEAT = 'crime-heat', CELLS = 'crime-cells', PTS = 'crime-pts';
 const COL = { v: '#c03b3a', p: '#d9822b', o: '#8a9396' };
@@ -19,7 +20,7 @@ export function initCrime(ctx) {
 
   // the map tooltip (#tip): text at a map point, or hidden
   const tip = (pt, text) => { const t = ctx.tip; if (!t) return; if (!pt) { t.style.opacity = 0; return; } t.textContent = text; t.style.opacity = 1; const w = t.offsetWidth, vw = ctx.viewport?.clientWidth || innerWidth; let x = pt.x + 14; if (x + w > vw - 8) x = pt.x - w - 14; t.style.left = x + 'px'; t.style.top = (pt.y + 14) + 'px'; };
-  const loadGrid = () => gridP ||= fetch('api/crime?grid=1').then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'crime data unavailable'); return grid = d; }).catch(e => { gridP = null; throw e; });
+  const loadGrid = () => gridP ||= fetch('api/crime?grid=1').then(async r => grid = await readJSON(r)).catch(e => { gridP = null; throw e; });
   const valueOf = c => cat === 'v' ? c[2] : cat === 'p' ? c[3] : c[2] + c[3] + c[4];
   function features() {
     const h = grid.cell / 2, pts = [], sq = [];
@@ -86,7 +87,7 @@ export function initCrime(ctx) {
   const pct = v => v == null ? '—' : (v > 0 ? '+' : '') + v + '%';
   const reportFor = async (geometry, list = 2000) => {
     const r = await fetch('api/crime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, list }) });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error || 'crime report failed'); return d;
+    return readJSON(r);
   };
   ctx.crimeReportData = reportFor;
   function monthBars(months) {
@@ -161,7 +162,7 @@ export function initCrime(ctx) {
       '<div class="bsec"><div class="lt">Where they happened</div><dl>' + d.premises.slice(0, 8).map(p => '<dt>' + esc(p.premise) + '</dt><dd class="mono">' + fmtN(p.n) + '</dd>').join('') + '</dl></div>' +
       '<div class="bacts"><button class="btn" id="crPts" type="button">Show Incidents on Map</button><button class="btn primary" id="crPdf" type="button">Export PDF</button><button class="btn" id="crCsv" type="button">Export CSV</button></div>' +
       '<div class="bsec"><div class="lt">Most recent incidents</div>' + (d.incidents || []).slice(0, 15).map(x => '<div class="pl"><b>' + esc(x.offense) + '</b><span>' + esc(x.day + (x.premise ? ' · ' + x.premise : '')) + '</span></div>').join('') +
-      ((d.incidents || []).length >= 2000 ? '<div class="rnote">The map and export include the newest 2,000 incidents; the totals above count all of them.</div>' : '') + '</div>' +
+      ((d.incidents || []).length >= 2000 ? '<div class="rnote">The map and export include the newest 2,000 incidents; the totals above count all of them.</div>' : '') + (d.incidents_note ? '<div class="rnote">' + esc(d.incidents_note) + '</div>' : '') + '</div>' +
       '<div class="rnote bsec">Offenses as reported by Houston Police (NIBRS). Counts follow where people are, so busy commercial areas show more than homes nearby; compare with similar places.<span class="src"> ' + esc(d.coverage) + '</span></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#crPts').onclick = () => showPoints(d.incidents || []);
@@ -231,7 +232,7 @@ export function initCrime(ctx) {
     const head = '<div class="lt">Crime within 1 mile</div>';
     if (!inHouston(center)) { el.innerHTML = head + '<div class="rnote">Street-level incidents cover the City of Houston only. The yearly figures for the local police department are below.</div>'; return; }
     el.innerHTML = head + '<div class="rnote">Counting reported incidents…</div>';
-    let d; try { const r = await fetch('api/crime?lat=' + center[1].toFixed(5) + '&lon=' + center[0].toFixed(5) + '&mi=1&list=8'); d = await r.json(); if (!r.ok) throw new Error(d.error || 'crime data unavailable'); }
+    let d; try { const r = await fetch('api/crime?lat=' + center[1].toFixed(5) + '&lon=' + center[0].toFixed(5) + '&mi=1&list=8'); d = await readJSON(r); }
     catch (e) { if (still()) el.innerHTML = head + '<div class="rnote">' + esc(e.message) + '</div>'; return; }
     if (!still()) return;
     if (!d.latest) { el.innerHTML = head + '<div class="rnote">No crime data loaded yet.</div>'; return; }

@@ -3,12 +3,13 @@
 //   Building card: a "Get Regrid Details" button (run from the card's Ownership section); one record per click, saved so
 //   the same parcel never costs twice. The record shows right under Ownership.
 // Both show how much of this month's allowance is left; when a cap is reached they say so and stop.
+import { readJSON } from './lib/http.mjs';
 const SRC = 'regrid', LAYER = 'regrid-lines';
 
 export function initRegrid(ctx) {
   const { map, esc, fmtN } = ctx, box = document.getElementById('lyRegrid');
   let on = false, usage = null;
-  const getUsage = async () => { try { const r = await fetch('api/regrid?usage=1', { cache: 'no-store' }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return usage = d; } catch (e) { return { error: e.message }; } };
+  const getUsage = async () => { try { const r = await fetch('api/regrid?usage=1', { cache: 'no-store' }); return usage = await readJSON(r); } catch (e) { return { error: e.message }; } };
   const left = (u, k) => u?.[k] ? Math.max(0, u[k].cap - u[k].used) : null;
 
   function addLayer() {
@@ -46,7 +47,7 @@ export function initRegrid(ctx) {
         el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote">' + (refresh ? 'Getting the latest record…' : 'Looking up…') + '</div>';
         try {
           const r = await fetch('api/regrid?' + new URLSearchParams({ lat: center[1].toFixed(6), lon: center[0].toFixed(6), ...(key ? { key } : {}), ...(refresh ? { refresh: '1' } : {}) }));
-          const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Regrid lookup failed');
+          const d = await readJSON(r);
           if (d.geom) ctx.lastRegrid = { center, geom: d.geom, zoning: d.zoning || null }; // for Start Site Plan
           if (d.usage) usage = d.usage;
           if (d.none) { el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote">Regrid has no parcel at this point.</div>'; return; }

@@ -5,6 +5,7 @@
 //   Report card (Full report, the Reports tab, the assistant): year by year, offense mix, notes; exports as PDF or CSV.
 // Department-level and annual only: every spot a department covers gets the same numbers.
 import { reportDoc, savePdf, areaMap } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 
 const COL = { v: '#c03b3a', p: '#d9822b', st: '#6b7174', us: '#9aa3a6' };
 
@@ -14,7 +15,7 @@ export function initCrimeUS(ctx) {
   // one request per point / department, kept while the app is open
   const load = q => {
     const k = new URLSearchParams(q).toString();
-    if (!cache.has(k)) { const p = fetch('api/crimeus?' + k).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'FBI crime data unavailable'); return d; }); p.catch(() => cache.delete(k)); cache.set(k, p); }
+    if (!cache.has(k)) { const p = fetch('api/crimeus?' + k).then(readJSON); p.catch(() => cache.delete(k)); cache.set(k, p); }
     return cache.get(k);
   };
   const query = ({ center, ori }) => ({ ...(center ? { lat: center[1].toFixed(4), lon: center[0].toFixed(4) } : {}), ...(ori ? { ori } : {}) });

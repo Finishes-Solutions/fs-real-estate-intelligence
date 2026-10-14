@@ -6,6 +6,7 @@
 //   Flight Report for one aircraft (plane card → Export Flight Report): photo, registration, route, the flight path map,
 //   the altitude and speed profile, today's earlier flights; HTML (print to PDF) and CSV of the track points.
 import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 
 const HOUR = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p');
 const KIND = { jet: ['Jets', '#1d4ed8'], prop: ['Props and small planes', '#16a34a'], heli: ['Helicopters', '#a855f7'], mil: ['Military', '#b45309'] };
@@ -38,7 +39,7 @@ export function initAirReport(ctx) {
   async function data({ geometry, months = 3 }) {
     const center = centerOf(geometry), mi = radiusOf(geometry);
     const prof = fetch('api/planes?report=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, months }), signal: AbortSignal.timeout(30000) })
-      .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'air traffic history unavailable'); return d; }).catch(e => ({ error: e.message }));
+      .then(readJSON).catch(e => ({ error: e.message }));
     const near = fetch('api/airports?near=' + center[1].toFixed(4) + ',' + center[0].toFixed(4) + '&km=50&n=6&path=1').then(r => r.ok ? r.json() : null).catch(() => null);
     const low = ctx.airHistory ? ctx.airHistory(center, Math.min(5, Math.max(1, Math.round(mi * 1.609)))).catch(() => null) : null;
     const live = ctx.planesNear ? ctx.planesNear(center, Math.min(15, Math.max(2, mi))).catch(e => ({ error: e.message })) : null;

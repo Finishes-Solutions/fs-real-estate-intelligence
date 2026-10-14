@@ -13,6 +13,7 @@ import { mkCharts, col, mlabel } from './mkcharts.js';
 import { pipeline, housing, cityCounties, rents, monthly, movers, addMonths } from './lib/marketcalc.mjs';
 import { fromObject } from './lib/correlate.mjs';
 import { inGeom, centroid } from './lib/demographics.mjs';
+import { readJSON } from './lib/http.mjs';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -31,9 +32,9 @@ export function initArea(ctx) {
   }
   function loadExtras() {
     const k = sel;
-    if (wantCrime() && crimeCity === undefined) { crimeCity = null; fetch('api/crime?city=1').then(async r => { const d = await r.json(); crimeCity = r.ok ? d : { error: d.error || 'unavailable' }; }).catch(e => { crimeCity = { error: e.message }; }).then(() => { if (ctx.view === 'market') render(); }); }
+    if (wantCrime() && crimeCity === undefined) { crimeCity = null; fetch('api/crime?city=1').then(async r => { crimeCity = await readJSON(r); }).catch(e => { crimeCity = { error: e.message }; }).then(() => { if (ctx.view === 'market') render(); }); }
     if (!traffic.has(k)) { const b = areaBox(); if (!b) return; traffic.set(k, null);
-      fetch('api/traffic?bbox=' + b.join(',')).then(async r => { const d = await r.json(); traffic.set(k, r.ok ? d : { error: d.error || 'unavailable' }); }).catch(e => traffic.set(k, { error: e.message })).then(() => { if (ctx.view === 'market' && sel === k) render(); }); }
+      fetch('api/traffic?bbox=' + b.join(',')).then(async r => { traffic.set(k, await readJSON(r)); }).catch(e => traffic.set(k, { error: e.message })).then(() => { if (ctx.view === 'market' && sel === k) render(); }); }
   }
   const load = () => loadP ||= Promise.all([
     fetch('data/area.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null),
@@ -521,7 +522,7 @@ export function initArea(ctx) {
   const cache = new Map(), done = new Map(), tkey = (addr, zip, city) => [addr, zip, city].join('|').toUpperCase();
   ctx.tenantsAt = (addr, zip, city) => {
     const k = tkey(addr, zip, city); if (cache.has(k)) return cache.get(k);
-    const p = fetch('api/tenants?' + new URLSearchParams({ addr, ...(zip ? { zip } : {}), ...(city ? { city } : {}) })).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'lookup failed'); done.set(k, d); return d; });
+    const p = fetch('api/tenants?' + new URLSearchParams({ addr, ...(zip ? { zip } : {}), ...(city ? { city } : {}) })).then(async r => { const d = await readJSON(r); done.set(k, d); return d; });
     p.catch(() => cache.delete(k)); cache.set(k, p); return p;
   };
   // the answer only if that address was already looked up (the News button uses it without starting a lookup)

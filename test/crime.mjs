@@ -7,11 +7,13 @@ globalThis.fetch = async (url, opts = {}) => {
   if (path === 'rpc/crime_grid_json') return Response.json([[-95.368, 29.76, 3, 10, 7], [-95.372, 29.764, 0, 0, 0]]);
   if (path === 'rpc/crime_latest') return Response.json('2026-06-30');
   if (path === 'rpc/crime_report') {
-    if (body.p_geom.coordinates[0].length > 200) return new Response(JSON.stringify({ message: 'area too large (over 1,500 square miles)' }), { status: 400 });
+    if (body.p_geom.coordinates[0][0][0] === -90) return new Response(JSON.stringify({ code: '57014', message: 'canceling statement due to statement timeout' }), { status: 500 });
     return Response.json({ latest: '2026-06-30', from: '2024-07-01', area_sqmi: 0.785, totals: { last12_v: 150, last12_p: 728, last12_o: 1283, prior12_v: 145, prior12_p: 927, prior12_o: 1293 },
       by_code: [['13B', 255, 'o'], ['23H', 204, 'p'], ['13A', 94, 'v']], by_premise: [['Parking Lot, Garage', 245]], by_month: [['2026-06', 11, 35, 91]], city_last12: { v: 25000, p: 90000, o: 107000 } });
   }
-  if (path === 'rpc/crime_list_json') return Response.json([{ day: '2026-06-30', code: '23F', cat: 'p', n: 1, premise: 'Parking Lot, Garage', lon: -95.37, lat: 29.76 }]);
+  if (path === 'rpc/crime_list_json') {
+    if (body.p_geom.coordinates[0][0][0] === -91) return new Response(JSON.stringify({ code: '57014', message: 'canceling statement due to statement timeout' }), { status: 500 });
+    return Response.json([{ day: '2026-06-30', code: '23F', cat: 'p', n: 1, premise: 'Parking Lot, Garage', lon: -95.37, lat: 29.76 }]); }
   return new Response('unmocked ' + u, { status: 599 });
 };
 const { default: handler, circle, cleanGeometry, shapeReport } = await import('../api/crime.js');
@@ -35,7 +37,18 @@ r = await call({ method: 'POST', body: { geometry: box } }); assert.equal(r.code
 // bad input
 assert.equal((await call({ method: 'POST', body: { geometry: { type: 'Point', coordinates: [0, 0] } } })).code, 400);
 assert.equal((await call({ query: { lat: '40', lon: '-74' } })).code, 400);
-r = await call({ method: 'POST', body: { geometry: circle(-95.4, 29.8, 30, 300) } }); assert.equal(r.code, 400); assert.match(r.body.error, /too large/);
+// any size: a 30-mile circle (~2,800 sq mi) is just a report now
+r = await call({ method: 'POST', body: { geometry: circle(-95.4, 29.8, 30, 300) } }); assert.equal(r.code, 200); assert.equal(r.body.last12.total, 2161);
+// the database running out of time: a clear JSON error, asked once (a statement timeout is never retried)
+const sq = x => ({ type: 'Polygon', coordinates: [[[x, 29.7], [x + 0.01, 29.7], [x + 0.01, 29.71], [x, 29.7]]] });
+seen.length = 0; r = await call({ method: 'POST', body: { geometry: sq(-90) } });
+assert.equal(r.code, 503); assert.match(r.body.error, /took too long/); assert.equal(seen.filter(([p]) => p === 'rpc/crime_report').length, 1, 'no retry after a statement timeout');
+// the incident list failing doesn't sink the report
+r = await call({ method: 'POST', body: { geometry: sq(-91), list: 2000 } });
+assert.equal(r.code, 200); assert.equal(r.body.last12.total, 2161); assert.equal(r.body.incidents, undefined); assert.match(r.body.incidents_note, /could not be loaded/);
+// whole city (Market view): one request, per square mile over the city's land area
+seen.length = 0; r = await call({ query: { city: '1' } });
+assert.equal(r.code, 200); assert.equal(seen.filter(([p]) => p === 'rpc/crime_report').length, 1); assert.equal(r.body.area_sqmi, 640); assert.equal(r.body.per_sqmi.total, Math.round(2161 / 640));
 // pieces
 assert.equal(cleanGeometry({ type: 'MultiPolygon', coordinates: [box.geometry.coordinates] }).type, 'MultiPolygon'); assert.equal(cleanGeometry(null), null);
 const c = circle(-95.37, 29.76, 0.5); assert.deepEqual(c.coordinates[0][0], c.coordinates[0][64], 'closed ring'); assert.ok(Math.abs(c.coordinates[0][16][1] - 29.76 - 0.5 / 69) < 1e-5);

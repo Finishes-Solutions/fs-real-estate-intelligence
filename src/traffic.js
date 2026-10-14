@@ -4,6 +4,7 @@
 //   live speed vs free flow on the busiest roads and current crashes / closures / road works (TomTom, live, not stored).
 //   Opens in the card; exports a PDF report and CSV.
 import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 
 const STOPS = [[5000, '#22c55e'], [20000, '#eab308'], [60000, '#f97316'], [150000, '#dc2626'], [300000, '#7f1d1d']];
 const colorOf = v => (STOPS.find(s => v < s[0]) || STOPS[STOPS.length - 1])[1];
@@ -21,7 +22,7 @@ export function initTraffic(ctx) {
     const bb = [c.lng - hw, c.lat - hh, c.lng + hw, c.lat + hh].map((v, i) => (i < 2 ? Math.floor(v * 100) : Math.ceil(v * 100)) / 100);
     const key = bb.join(','); if (key === lastKey && map.getSource(SRC)) return; // same area as what's drawn
     ctl?.abort(); ctl = new AbortController();
-    try { const r = await fetch('api/traffic?lines=' + key, { signal: ctl.signal }), d = await r.json(); if (!r.ok) throw new Error(d.error || 'traffic counts unavailable'); if (my !== loadSeq) return; lastKey = key; setData(d);
+    try { const r = await fetch('api/traffic?lines=' + key, { signal: ctl.signal }), d = await readJSON(r); if (my !== loadSeq) return; lastKey = key; setData(d);
       if (note) note.textContent = 'Average vehicles a day (TxDOT). ' + (d.features.length >= 2000 ? 'Showing the 2,000 busiest segments here; zoom in for more.' : fmt(d.features.length) + ' counted segments in view.') + ' Hover a road for its count.'; }
     catch (e) { if (e.name !== 'AbortError' && note) note.textContent = e.message; }
   }
@@ -54,7 +55,7 @@ export function initTraffic(ctx) {
   // ---------- report ----------
   async function reportFor(geometry, label) {
     const r = await fetch('api/traffic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }), signal: AbortSignal.timeout(45000) });
-    const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Traffic report failed (' + r.status + ')'); return d;
+    return readJSON(r);
   }
   ctx.trafficReportData = reportFor;
   const congestion = x => x.closed ? 'Closed' : x.congestion_pct == null ? '—' : x.congestion_pct + '% slower';

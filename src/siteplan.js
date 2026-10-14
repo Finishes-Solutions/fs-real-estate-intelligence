@@ -16,6 +16,7 @@ import * as K from './lib/planpick.mjs';
 import * as MAP from './lib/planmap.mjs';
 const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 
 const KEY = 'fs-projects-v1', CODE_KEY = 'fs-team-code', NAME_KEY = 'fs-team-name';
 const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash'];
@@ -627,8 +628,8 @@ export function initSitePlan(ctx) {
     if (keys.length >= MAXP) { ctx.toast('Up to ' + MAXP + ' parcels in one site.'); return; }
     ctx.toast('Looking up the parcel…');
     try {
-      const r = await fetch('api/building?' + new URLSearchParams({ lat: c[1].toFixed(6), lon: c[0].toFixed(6), part: 'parcel' })), d = await r.json();
-      if (!r.ok || !d.parcel) throw new Error(d.error || 'No parcel here.');
+      const r = await fetch('api/building?' + new URLSearchParams({ lat: c[1].toFixed(6), lon: c[0].toFixed(6), part: 'parcel' })), d = await readJSON(r);
+      if (!d.parcel) throw new Error('No parcel here.');
       if (!d.parcel.geometry) { ctx.toast('The county has no outline for that parcel (Harris and Waller need Regrid details).'); return; }
       const rec = parcelOf(d.parcel, c); if (!p.parcels.some(x => x.key === rec.key)) p.parcels.push(rec);
       if (keys.includes(rec.key)) return; setParcels([...keys, rec.key]);

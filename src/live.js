@@ -3,6 +3,7 @@
 //   NOAA nowCOAST + NHC (via /api/tile), Open-Meteo (/api/weather), TomTom traffic (/api/tile, optional key), Mapterhorn terrain,
 //   NASA GIBS + CMR (browser direct), news via Google News / GDELT (/api/news), OSRM or TomTom routing (/api/drive).
 import { NASA, hlsPasses } from './lib/nasa.mjs';
+import { fetchJSON, readJSON } from './lib/http.mjs';
 const KEY = 'fs-live-v1';
 const RASTER = { // proxied through api/tile; refreshed every few minutes
   radar: { label: 'Rain Radar', maxzoom: 12, opacity: .7, every: 4, attr: 'Radar: NWS NEXRAD via Iowa Environmental Mesonet' },
@@ -97,7 +98,7 @@ export function initLive(ctx) {
     if (!on.wind) return;
     const b = map.getBounds(), z = map.getZoom(), bbox = z < 6 ? [-97.6, 28.6, -94.2, 31.4] : [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
     windCtl?.abort(); windCtl = new AbortController();
-    try { const r = await fetch('api/weather?kind=wind&bbox=' + bbox.map(v => v.toFixed(2)).join(','), { signal: windCtl.signal }); const d = await r.json(); if (!r.ok) throw new Error(d.error || r.status);
+    try { const r = await fetch('api/weather?kind=wind&bbox=' + bbox.map(v => v.toFixed(2)).join(','), { signal: windCtl.signal }); const d = await readJSON(r);
       windData = d; map.getSource('live-wind')?.setData(windFC()); syncUI(); if (!d.points.length && z >= 6) toast('Wind arrows cover Texas and nearby states only.'); }
     catch (e) { if (e.name !== 'AbortError') toast('Wind data didn’t load: ' + e.message); }
   }
@@ -173,7 +174,7 @@ export function initLive(ctx) {
       else if (k === 'hires') { if (v && hires) showHires(hires); else if (v) { on.hires = false; done.push('high-res imagery: open a property, tap Site Imagery and pick a version first'); toast('Open a property, tap Site Imagery, then pick a high-res version and Show on Map.'); } else removeHires(); }
       else if (k === 'nasa') { if (v) { try { await nasaForView(); } catch (e) { on.nasa = false; done.push('NASA imagery failed: ' + e.message); } } else removeNasa(); }
     }
-    if (a.storms === true) { try { const d = await (await fetch('api/weather?kind=storms')).json(); if (!d.storms?.length) done.push('no active hurricanes or tropical storms right now'); } catch (e) {} }
+    if (a.storms === true) { try { const d = await fetchJSON('api/weather?kind=storms'); if (!d.storms?.length) done.push('no active hurricanes or tropical storms right now'); } catch (e) {} }
     save(); syncUI(); return done.length ? done : ['no change'];
   }
   if (Object.values(on).some(Boolean)) map.once('load', () => { if (on.wind) loadWind(); syncUI(); });
@@ -222,7 +223,7 @@ export function initLive(ctx) {
     if (straight < 0.1) { out.at_property = true; out.summary = 'You are at ' + to.name + ' (about ' + Math.round(straight * 5280) + ' ft away).'; return out; }
     const q = 'from=' + from.c[1].toFixed(5) + ',' + from.c[0].toFixed(5) + '&to=' + to.c[1].toFixed(5) + ',' + to.c[0].toFixed(5);
     try {
-      const r = await fetch('api/drive?' + q), d = await r.json(); if (!r.ok) throw new Error(d.error || 'Error ' + r.status);
+      const d = await fetchJSON('api/drive?' + q);
       Object.assign(out, { road_miles: d.miles, drive_minutes_now: d.minutes, typical_minutes: d.typical_minutes, traffic_delay_minutes: d.delay_minutes, live_traffic: d.traffic, routing_source: d.source, routing_note: d.note });
       out.summary = to.name + ': ' + d.miles + ' mi by road (' + straight.toFixed(1) + ' mi straight), about ' + d.minutes + ' min' + (d.traffic ? (d.delay_minutes > 1 ? ' with ' + d.delay_minutes + ' min of traffic delay' : ', traffic is light') : ' (no live traffic data)') + '.';
       if (a.show_route !== false && gone()) out.note = [out.note, 'The card was closed before the route came back, so it isn’t drawn.'].filter(Boolean).join(' ');
@@ -237,8 +238,8 @@ export function initLive(ctx) {
     const p = where === 'place' ? await place(a.place || '') : where === 'selected' ? cardPoint() : await me();
     if (!p) return { error: where === 'selected' ? 'No property card is open.' : 'Couldn’t find that place.' };
     const [r, s] = await Promise.all([fetch('api/weather?kind=here&at=' + p.c[1].toFixed(4) + ',' + p.c[0].toFixed(4)), fetch('api/weather?kind=storms').catch(() => null)]);
-    const d = await r.json(); if (!r.ok) return { error: d.error || 'Weather unavailable.' };
-    const st = s?.ok ? (await s.json()).storms || [] : null;
+    let d; try { d = await readJSON(r); } catch (e) { return { error: e.message }; }
+    const st = s?.ok ? (await s.json().catch(() => ({}))).storms || [] : null;
     return { place: p.name, ...d, active_tropical_storms: st == null ? 'unavailable' : st.map(x => ({ name: x.name, type: x.classification, wind_mph: x.wind_mph, moving: x.moving, miles_away: Math.round(milesBetween(p.c, [x.lon, x.lat])) })), source: 'Open-Meteo; NOAA NHC' };
   }
 
@@ -278,7 +279,7 @@ export function initLive(ctx) {
     for (const [k, v] of Object.entries({ project: s.project, owner: s.owner, addr: s.addr, legal: s.legal, city: s.city, county: s.county })) if (v) q.set(k, String(v).slice(0, k === 'legal' ? 200 : 100));
     (s.company || []).slice(0, 4).forEach(v => q.append('company', v)); (s.business || []).slice(0, 6).forEach(v => q.append('biz', v));
     if (f && !a.query) q.set('filing', f.id);
-    const r = await fetch('api/news?' + q), d = await r.json(); if (!r.ok) return { error: d.error };
+    let d; try { d = await fetchJSON('api/news?' + q); } catch (e) { return { error: e.message }; }
     return { searched: (d.searched || []).map(x => x.label), articles: d.articles.map(x => ({ title: x.title, url: x.url, domain: x.domain, date: x.date, about: x.about || (x.saved ? 'Saved earlier' : '') })), source: d.source || 'Google News',
       note: d.articles.length ? undefined : 'No coverage found in the last year for the project, the companies, the businesses there or the town. Single-asset LLC names rarely appear in news.' };
   }

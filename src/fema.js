@@ -5,6 +5,7 @@
 //   federal disaster declarations since 2000, and FEMA's National Risk Index (expected annual loss by hazard).
 //   The report opens in the card and exports as a PDF report or CSV.
 import { reportDoc, savePdf, areaMap } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 const SRC = 'fema-nfhl';
 const RISK_COL = { high: '#1d4ed8', moderate: '#f59e0b', minimal: '#9ca3af', undetermined: '#a78bfa', water: '#38bdf8', unmapped: '#e5e7eb' };
 const RISK_SHORT = { high: 'High risk (100-year)', moderate: 'Moderate (500-year)', minimal: 'Minimal', undetermined: 'Not studied', water: 'Open water', unmapped: 'Not mapped' };
@@ -26,7 +27,7 @@ export function initFema(ctx) {
     if (!on) { ctx.setLegend?.('fema', ''); return; }
     const c = cls, head = '<div class="t">Flood zones (FEMA)</div>';
     ctx.setLegend?.('fema', head + '<div class="lg-note">Loading FEMA’s legend…</div>');
-    try { legends[c] ||= fetch('api/fema?legend=1' + (c === 'high' ? '&cls=high' : '')).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'legend unavailable'); return d; });
+    try { legends[c] ||= fetch('api/fema?legend=1' + (c === 'high' ? '&cls=high' : '')).then(readJSON);
       const d = await legends[c]; if (!on || c !== cls) return;
       ctx.setLegend?.('fema', head + d.items.map(x => '<div class="li"><img class="lg-sw" src="' + esc(x.img) + '" alt="" title="' + esc(x.fema) + '"><span>' + esc(x.label) + '</span></div>').join('') +
         '<div class="lg-note">Unshaded: minimal risk or not mapped. Zones show from neighborhood zoom.</div>'); }
@@ -48,7 +49,7 @@ export function initFema(ctx) {
   // ---------- report ----------
   const reportFor = async (geometry, label) => {
     const r = await fetch('api/fema', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error || 'FEMA report failed'); return d;
+    return readJSON(r);
   };
   ctx.femaReportData = reportFor;
   const shareBar = sh => { const order = ['high', 'moderate', 'minimal', 'undetermined', 'water', 'unmapped'].filter(k => sh[k]); return '<div class="fm-bar">' + order.map(k => '<i style="width:' + sh[k] + '%;background:' + RISK_COL[k] + '" title="' + esc(RISK_SHORT[k] + ': ' + sh[k] + '%') + '"></i>').join('') + '</div><div class="fm-leg">' + order.map(k => '<span><i style="background:' + RISK_COL[k] + '"></i>' + esc(RISK_SHORT[k]) + ' <b>' + sh[k] + '%</b></span>').join('') + '</div>'; };

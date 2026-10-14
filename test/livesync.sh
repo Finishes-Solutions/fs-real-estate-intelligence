@@ -24,7 +24,7 @@ a.ok(db.imagery_passes.length>0); a.ok(db.imagery_passes.every(p=>F.find(f=>f.id
 a.equal(new Set(db.imagery_passes.map(p=>p.filing_id+p.product+p.day)).size,db.imagery_passes.length,'no duplicate passes');
 a.ok(db.news_articles.length>0); a.ok(db.filing_news.every(l=>db.news_articles.some(n=>n.url===l.url)),'links point at stored articles');
 const years=new Set(db.crime_incidents.map(r=>r.id.slice(1,5))); a.ok(years.size>=2,'crime: every year in the 25-month window'); a.equal(db.crime_incidents.length,years.size*2,'crime: ungeocoded rows dropped, reruns do not duplicate');
-a.ok(db.crime_incidents.every(r=>['v','p','o'].includes(r.cat)&&r.lon<-95&&r.day));
+a.ok(db.crime_incidents.every(r=>['v','p','o'].includes(r.cat)&&r.lon<-95&&r.day)); a.ok(db.crime_city_refreshed>=1,'crime: Houston-wide numbers refreshed after the load');
 a.equal(db.aircraft_registry.length,3); a.equal(db.aircraft_registry.find(r=>r.hex==='a0b1c2').mfr,'CESSNA');
 console.log('live-sync ok:', db.storm_advisories.length,'storm,',db.weather_daily.length,'weather rows,',db.tracts.length,'tracts,',db.imagery_passes.length,'passes,',db.news_articles.length,'articles,',db.filing_news.length,'links,',db.crime_incidents.length,'crime rows');
 "
