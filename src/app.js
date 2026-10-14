@@ -70,10 +70,8 @@ motionMQ.addEventListener?.('change',e=>{ reduceMotion=e.matches; if(reduceMotio
 
 // ---------- theme ----------
 const root=document.documentElement;
-// light only (dark mode was removed): data-theme is always "light" for the stylesheet and the charts that read it, and a
-// choice saved by an older version is dropped. isDark() stays (always false) for the modules that still ask.
+// light only (dark mode was removed): data-theme is always "light", and a choice saved by an older version is dropped
 root.dataset.theme='light'; try{ localStorage.removeItem('fs-map-theme'); }catch(e){}
-const isDark=()=>false;
 
 // ---------- data ----------
 // latest change run: id -> 'new' | field that changed
@@ -1195,7 +1193,7 @@ function showIntro(){ try{ localStorage.removeItem(INTRO); }catch(e){} introEl.h
 if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
-  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,trapTab,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
+  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,trapTab,esc,fmtM,fmtN,C,geocode,hashStr,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, get reduceMotion(){ return reduceMotion; }, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.

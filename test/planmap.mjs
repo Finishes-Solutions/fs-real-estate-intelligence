@@ -1,6 +1,6 @@
 // How a plan is drawn on the map (lib/planmap.mjs), on real engine output: every label knows its piece, label priority
 // (selected, problems, buildings by size, parking counts last), Phase 2 labels keep their use, the feature shapes the
-// PDF and DXF read are untouched, one palette for light and dark, the Plan key lists only what the plan uses, and
+// PDF and DXF read are untouched, one palette, the Plan key lists only what the plan uses, and
 // Change With AI's checklist.
 import assert from 'node:assert/strict';
 import * as M from '../lib/planmap.mjs';
@@ -43,14 +43,11 @@ assert.equal(M.decorate({ features: [{ properties: { k: 'building', id: 'a', sel
 const fl = M.decorate(S.planFeatures(plan, null), plan, { flash: new Set([bldgs[0].id]) }).features.filter(f => f.properties.fl === 1);
 assert.equal(fl.length, 1); assert.equal(fl[0].properties.id, bldgs[0].id);
 
-// ---- one palette, light and dark ----
-const Lt = M.palette(false), Dk = M.palette(true);
+// ---- one palette (the app is light only) ----
+const Lt = M.palette();
 assert.equal(Lt.use.multifamily, M.USE_COL.multifamily);
-assert.notEqual(Dk.use.multifamily, Lt.use.multifamily); assert.equal(Dk.use.multifamily, M.darken(M.USE_COL.multifamily, 0.15));
 const lum = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
-assert.ok(lum(Dk.p2(Dk.use.multifamily)) < lum(Dk.use.multifamily), 'a dark map’s Phase 2 sits back, it doesn’t glare');
-assert.ok(lum(Lt.p2(Lt.use.multifamily)) > lum(Lt.use.multifamily), 'a light map’s Phase 2 is lighter');
-for (const k of ['lawn', 'parking', 'drive', 'pond', 'plaza', 'green']) assert.ok(lum(Dk.col[k]) < lum(Lt.col[k]), 'dark ' + k);
+assert.ok(lum(Lt.p2(Lt.use.multifamily)) > lum(Lt.use.multifamily), 'Phase 2 is lighter');
 assert.ok(lum(M.brighten('#d8b16a')) > lum('#d8b16a'));
 assert.equal(M.buildingColor(Lt, 'retail'), M.USE_COL.retail); assert.equal(M.buildingColor(Lt, 'retail', { ph: 2 }), M.lighten(M.USE_COL.retail)); assert.equal(M.buildingColor(Lt, 'retail', { garage: true }), M.COL.garage);
 
@@ -61,7 +58,7 @@ const html = M.keyHtml(plan); assert.match(html, /Plan key/); assert.match(html,
 assert.doesNotMatch(html, /Truck court|Retail/);
 const shop = { program: { use: 'retail' }, elements: [{ id: 'b', kind: 'building', use: 'retail' }, { id: 't', kind: 'truck' }] };
 assert.doesNotMatch(M.keyHtml(shop), /Phase 2|Multifamily/); assert.match(M.keyHtml(shop), /Truck court/);
-assert.notEqual(M.keySig(plan, false), M.keySig(plan, true)); assert.equal(M.keySig(plan, false), M.keySig({ ...plan, elements: plan.elements.slice() }, false));
+assert.equal(M.keySig(plan), M.keySig({ ...plan, elements: plan.elements.slice() }));
 
 // ---- Change With AI's checklist ----
 assert.deepEqual(M.checklist(['Building A: 3 stories.', 'Removed Building F.', 'Added Pool.', 'Moved Pad A.', 'Swapped Bldg 2 and Bldg 5.', 'Nothing to change on Bldg 9.', 'Added Main Entry from the street. It meets the drive.', 'Removed Clubhouse and its pool, plaza.']),

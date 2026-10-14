@@ -12,15 +12,15 @@ const COL = { large_airport: '#1d4ed8', medium_airport: '#2563eb', small_airport
 const SURFACE = s => { const x = String(s || '').toUpperCase(); return /^(ASP|BIT)/.test(x) ? 'Asphalt' : /^(CON|PEM)/.test(x) ? 'Concrete' : /TURF|GRASS|GRS/.test(x) ? 'Grass' : /GRAV|GRVL|GVL/.test(x) ? 'Gravel' : /DIRT|SAND|SOIL/.test(x) ? 'Dirt' : /WATER/.test(x) ? 'Water' : s || '—'; };
 
 // the runways as a small diagram (true north up), with each end's number
-export function runwaySvg(runways, { W = 320, H = 220, dark = false } = {}) {
+export function runwaySvg(runways, { W = 320, H = 220 } = {}) {
   const rw = (runways || []).filter(r => r.le_lat != null && r.he_lat != null && !r.closed); if (!rw.length) return '';
   const pts = rw.flatMap(r => [[r.le_lon, r.le_lat], [r.he_lon, r.he_lat]]);
   const lat0 = pts.reduce((s, p) => s + p[1], 0) / pts.length, k = Math.cos(lat0 * Math.PI / 180);
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const [x, y] of pts) { x0 = Math.min(x0, x * k); x1 = Math.max(x1, x * k); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   const pad = 26, s = Math.min((W - 2 * pad) / ((x1 - x0) || 1e-4), (H - 2 * pad) / ((y1 - y0) || 1e-4)), ox = (W - (x1 - x0) * s) / 2, oy = (H - (y1 - y0) * s) / 2;
   const pr = ([x, y]) => [ox + (x * k - x0) * s, oy + (y1 - y) * s];
-  const ink = dark ? '#e5e7eb' : '#23282a';
-  return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Runway diagram"><rect width="' + W + '" height="' + H + '" rx="6" fill="' + (dark ? '#111827' : '#f3f5f5') + '"/>' +
+  const ink = '#23282a';
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Runway diagram"><rect width="' + W + '" height="' + H + '" rx="6" fill="#f3f5f5"/>' +
     rw.map(r => { const a = pr([r.le_lon, r.le_lat]), b = pr([r.he_lon, r.he_lat]), w = Math.max(3, Math.min(9, (r.width_ft || 100) / 25));
       const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
       return '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="butt"/>' +
@@ -117,7 +117,7 @@ export function initAirports(ctx) {
       '<div class="bacts"><button class="btn" type="button" id="aptMap">Show Airport Map</button>' + (d.extras?.diagram_url ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(d.extras.diagram_url) + '">FAA Airport Diagram</a>' : '') +
         '<button class="btn primary" type="button" id="aptPdf">Export PDF</button><button class="btn" type="button" id="aptCsv">Export CSV</button></div>' +
       (m ? '<div class="bsec"><div class="lt">Weather now</div><div><b>' + esc(m.category || '') + '</b> ' + (m.temp_f != null ? fmt(m.temp_f) + '°F · ' : '') + (m.wind_kt != null ? 'wind ' + (m.wind_dir === 'VRB' ? 'variable' : esc(String(m.wind_dir ?? '')) + '°') + ' ' + m.wind_kt + ' kt' + (m.gust_kt ? ' gusting ' + m.gust_kt : '') + ' · ' : '') + 'visibility ' + esc(String(m.visibility ?? '—')) + ' mi' + (m.clouds ? ' · ' + esc(m.clouds) : '') + '</div><div class="mono apt-raw">' + esc(m.raw || '') + '</div></div>' : '') +
-      (open.length ? '<div class="bsec"><div class="lt">Runways</div><div class="apt-rwy">' + runwaySvg(open, { dark: document.documentElement.dataset.theme === 'dark' }) + '</div><dl>' +
+      (open.length ? '<div class="bsec"><div class="lt">Runways</div><div class="apt-rwy">' + runwaySvg(open) + '</div><dl>' +
         open.map(r => '<dt>' + esc((r.le_ident || '') + (r.he_ident ? '/' + r.he_ident : '')) + '</dt><dd class="mono">' + (r.length_ft ? fmt(r.length_ft) + ' × ' + fmt(r.width_ft) + ' ft' : '—') + ' <span class="sc">' + esc(SURFACE(r.surface)) + (r.lighted ? ', lighted' : '') + (r.le_heading != null ? ', heading ' + Math.round(r.le_heading) + '°' : '') + '</span></dd>').join('') + '</dl></div>' : '') +
       '<div class="bsec"><div class="lt">Takeoffs and landings per day</div>' + (ops ? bars(ops.list.map(o => ({ label: o.day.slice(5), v: o.departures + o.arrivals })), { height: 90, every: Math.ceil(ops.list.length / 6) }) +
         '<div class="rnote">Average ' + fmt(ops.avg) + ' a day over ' + ops.days + ' day' + (ops.days === 1 ? '' : 's') + ' (' + fmt(ops.dep) + ' takeoffs, ' + fmt(ops.arr) + ' landings), busiest ' + fmt(ops.max) + '. Counted from aircraft broadcasting their position (ADS-B) within about 100 nm of Houston, so it undercounts small planes without transponders and misses some at low altitude; official FAA counts are higher at busy airports.</div>' :

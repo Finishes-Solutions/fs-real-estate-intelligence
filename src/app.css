@@ -14,7 +14,7 @@
   --c-outline:rgba(22,25,26,.28);--c-ring:rgba(22,25,26,.14);--c-label:#353b3d;
   --c-new:#006527;--c-reno:#6b7174;--c-add:#1f9249;--c-heb:#b7791f;--c-sel:#0b0d0c;
   --c-road1:#7b8386;--c-road2:#a9b0b2;--c-roadtxt:#353b3d;--c-roadbg:#ffffff;--c-selfill:rgba(0,101,39,.08);--c-selline:#006527;
-  --logo-light:block;--logo-dark:none;
+  --logo-light:block;
   box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 }
 /* design tokens: one scale for spacing, type, corners, shadows, status colours, control sizes and stacking.
@@ -53,7 +53,7 @@ canvas#globe.dragging{cursor:var(--cur-grabbing,grabbing)}
 .panel{position:relative;z-index:2;display:flex;flex-direction:column;min-height:0;background:var(--panel);border-right:1px solid var(--line)}
 .brandbar{display:flex;align-items:center;justify-content:space-between;padding:20px 22px 0}
 .brandbar img{height:34px;width:auto}
-.brandbar .l-light{display:var(--logo-light)} .brandbar .l-dark{display:var(--logo-dark)}
+.brandbar .l-light{display:var(--logo-light)}
 .kicker{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);font-weight:500}
 h1{margin:8px 0 6px;font-size:25px;line-height:1.12;letter-spacing:-.02em;font-weight:800}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);margin-top:16px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
