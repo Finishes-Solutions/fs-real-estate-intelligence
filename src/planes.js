@@ -15,6 +15,7 @@ import { SHAPES, SIZE } from './lib/aircraft-shapes.mjs';
 import { smoothPath, altColorExpr, altGradient } from './lib/flightpath.mjs';
 import { flightPath3D } from './flightpath3d.js';
 import { planes3D } from './planes3d.js';
+import { getJSON } from './reportkit.js';
 
 const REFRESH = 10e3, MINZ = 5, KT = 1.852 / 3600; // km per second per knot
 const BANDS = [[1, '#8d9598'], [3000, '#e3622b'], [10000, '#eda100'], [25000, '#3987e5'], [99999, '#1f9249']]; // ground, low, climbing, mid, cruise
@@ -253,8 +254,7 @@ export function initPlanes(ctx) {
     const b = map.getBounds(), bbox = [b.getWest(), Math.max(-85, b.getSouth()), b.getEast(), Math.min(85, b.getNorth())].map(v => v.toFixed(3)).join(',');
     ctl?.abort(); ctl = new AbortController();
     try {
-      const r = await fetch('api/planes?bbox=' + bbox, { signal: ctl.signal }), d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      const d = await getJSON('api/planes?bbox=' + bbox, { what: 'Live plane data', signal: ctl.signal });
       // drop what's already older than a minute (the feeds keep stale entries briefly); positions are as of the feed's
       // time, never later than now (clock skew), and the moving icons start from there
       const next = (d.aircraft || []).filter(p => p.seen == null || p.seen < 60), nextAt = Math.min(Date.now(), Date.parse(d.time) || Date.now());
@@ -470,7 +470,7 @@ export function initPlanes(ctx) {
     label: 'Live Planes', persist: false, // never back on by itself: the map opens without planes
     set: v => { v ? start() : stop(); },
     add: () => { addLayers(); map.getSource('live-planes')?.setData(fc()); if (routeOn) { addRouteLayers(); syncRoute(); } },
-    note: () => map.getZoom() < MINZ ? 'Zoom in to see planes.' : err ? 'Planes: ' + err : at ? list.length.toLocaleString('en-US') + ' aircraft in view · ' + new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) + ' (' + src + ').' : 'Loading planes…',
+    note: () => map.getZoom() < MINZ ? 'Zoom in to see planes.' : err ? err : at ? list.length.toLocaleString('en-US') + ' aircraft in view · ' + new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) + ' (' + src + ').' : 'Loading planes…',
     status: () => ({ count: list.length, time: at || null, source: src || null })
   });
 
@@ -479,10 +479,9 @@ export function initPlanes(ctx) {
     const b = map.getBounds(), w = Math.max(b.getWest(), map.getCenter().lng - 2), e = Math.min(b.getEast(), map.getCenter().lng + 2), s = Math.max(b.getSouth(), map.getCenter().lat - 2), n = Math.min(b.getNorth(), map.getCenter().lat + 2);
     pathsCtl?.abort(); pathsCtl = new AbortController();
     try {
-      const r = await fetch('api/planes?density=' + [w, s, e, n].map(v => v.toFixed(2)).join(',') + '&days=30', { signal: pathsCtl.signal }), d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      const d = await getJSON('api/planes?density=' + [w, s, e, n].map(v => v.toFixed(2)).join(',') + '&days=30', { what: 'Low flight history', signal: pathsCtl.signal });
       paths = d; map.getSource('live-flightpaths')?.setData(d.history ? d : { type: 'FeatureCollection', features: [] });
-    } catch (e2) { if (e2.name !== 'AbortError') paths = { history: false, note: e2.message }; }
+    } catch (e2) { if (e2.name !== 'AbortError') paths = { history: false, failed: true, note: e2.message }; }
     ctx.live.syncUI();
   }
   function addPaths() {
@@ -493,7 +492,7 @@ export function initPlanes(ctx) {
       'fill-opacity': ['interpolate', ['linear'], ['zoom'], 7, .55, 13, .4] } }, below());
   }
   function removePaths() { if (map.getLayer('live-flightpaths')) map.removeLayer('live-flightpaths'); if (map.getSource('live-flightpaths')) map.removeSource('live-flightpaths'); }
-  let pathsT = 0; map.on('moveend', () => { if (!ctx.live?.state?.().flight_paths) return; clearTimeout(pathsT); pathsT = setTimeout(loadPaths, 800); });
+  let pathsT = 0; map.on('moveend', () => { if (!ctx.live?.state?.().flight_paths) return; clearTimeout(pathsT); pathsT = setTimeout(async () => { await loadPaths(); if (paths?.failed) ctx.live.fail('flight_paths', paths.note); }, 800); });
   ctx.live.register('flight_paths', {
     label: 'Low Flight Paths (30 Days)', persist: true,
     set: async v => { if (!v) { removePaths(); ctx.setLegend?.('lowflights', null); return; } addPaths(); await loadPaths(); if (paths && paths.history === false) { removePaths(); return paths.note || 'flight history isn’t available yet'; }
@@ -507,16 +506,14 @@ export function initPlanes(ctx) {
   const hist = new Map();
   ctx.airHistory = (c, km = 1) => {
     const k = c.map(v => v.toFixed(3)).join(',') + '|' + km; if (hist.has(k)) return hist.get(k);
-    const job = fetch('api/planes?history=' + c[0].toFixed(5) + ',' + c[1].toFixed(5) + '&km=' + km).then(r => r.json()).catch(e => ({ history: false, note: e.message }));
+    const job = getJSON('api/planes?history=' + c[0].toFixed(5) + ',' + c[1].toFixed(5) + '&km=' + km, { what: 'Flight history' }).catch(e => ({ history: false, note: e.message }));
     hist.set(k, job); return job;
   };
   ctx.planesNear = async (c, miles = 3) => {
     const dLat = miles / 69, dLon = miles / (69 * Math.cos(c[1] * Math.PI / 180));
     const u = 'api/planes?bbox=' + [c[0] - dLon, c[1] - dLat, c[0] + dLon, c[1] + dLat].map(v => v.toFixed(3)).join(',');
     // the free feeds sometimes refuse for a moment: one retry after a short pause before giving up
-    let r = await fetch(u).catch(() => null), d = r ? await r.json().catch(() => ({})) : {};
-    if (!r || !r.ok) { await new Promise(res => setTimeout(res, 1500)); r = await fetch(u); d = await r.json().catch(() => ({})); }
-    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    let d; try { d = await getJSON(u, { what: 'Live plane data' }); } catch (e) { await new Promise(res => setTimeout(res, 1500)); d = await getJSON(u, { what: 'Live plane data' }); }
     const R = Math.PI / 180, mi = p => 3958.8 * 2 * Math.asin(Math.sqrt(Math.sin((p.lat - c[1]) * R / 2) ** 2 + Math.cos(c[1] * R) * Math.cos(p.lat * R) * Math.sin((p.lon - c[0]) * R / 2) ** 2));
     const near = (d.aircraft || []).map(p => ({ ...p, miles: Math.round(mi(p) * 10) / 10 })).filter(p => p.miles <= miles).sort((a, b) => a.miles - b.miles);
     return { source: d.source, time: d.time, aircraft: near };

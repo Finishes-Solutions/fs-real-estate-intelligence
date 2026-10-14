@@ -92,7 +92,7 @@ export function initDriveTime(ctx) {
   function exportCsv() {
     if (!last) return;
     saveCsv(ctx, 'drivetime', last.label, last.bands.map(b => ({ 'Drive time (min)': b.minutes, 'Leaving': DEPARTS.find(x => x[0] === last.depart)?.[1] || last.depart, 'Area (sq mi)': b.sqmi, People: b.people ?? '', Households: b.households ?? '', Jobs: b.jobs ?? '',
-      'Median household income (approx)': b.income ?? '', 'Census tracts': b.tracts, 'Filings on the map': b.filings, Routing: last.d.source })));
+      'Median household income (approx)': b.income ?? '', 'Census tracts': b.tracts, 'Filings on the map': b.filings, Routing: last.d.source })), { geom: { type: 'Point', coordinates: last.center } });
   }
   async function exportReport() {
     if (!last) return; const { d, bands, label, depart, center } = last;
@@ -104,7 +104,7 @@ export function initDriveTime(ctx) {
         bands.map(b => [b.minutes + ' min', fmt(b.sqmi), fmt(b.people), fmt(b.households), b.income ? '$' + fmt(b.income) : '—', fmt(b.jobs), fmt(b.filings)])) +
       '<p class="meta">Each band includes the ones inside it. People, households, income and jobs sum the census tracts whose center is inside the band. Filings are those on the map when the report was made' + (ctx.filterText?.() ? ' (filters: ' + esc(ctx.filterText()) + ')' : '') + '.</p>';
     await savePdf(ctx, 'drivetime', label, reportDoc({ kicker: 'Drive-time report', title: label, meta: esc(when), body,
-      sources: esc(d.source) + ' routing; US Census ACS 5-year and LEHD LODES (people, households, jobs); TDLR TABS (filings). Drive times are estimates for a car and vary with traffic, signals and construction.' }));
+      sources: esc(d.source) + ' routing; US Census ACS 5-year and LEHD LODES (people, households, jobs); TDLR TABS (filings). Drive times are estimates for a car and vary with traffic, signals and construction.' }), { meta: { geom: { type: 'Point', coordinates: center } } });
   }
   const kgridDoc = big => '<div class="kp">' + [[fmt(big.sqmi), 'Sq mi within ' + big.minutes + ' min'], [fmt(big.people), 'People'], [fmt(big.jobs), 'Jobs'], [fmt(big.filings), 'Filings']].map(([v, l]) => '<div><b>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>';
 
@@ -113,6 +113,6 @@ export function initDriveTime(ctx) {
   ctx.onCardClose?.(() => { /* the bands stay until cleared: they're useful while browsing the area */ });
 
   // area reports: a drive-time map from the middle of the chosen area
-  ctx.addAreaReport?.({ key: 'drivetime', label: 'Drive-Time Map', desc: 'How far you can drive in 10, 20 and 30 minutes (or other times) from a point, now or at rush hour, with the people, households, jobs and filings inside each band. Export as a PDF report or CSV.',
+  ctx.addAreaReport?.({ key: 'drivetime', label: 'Drive-Time Map', desc: 'How far you can drive in 10, 20 and 30 minutes from a point, now or at rush hour, with the people, jobs and filings inside each band. PDF or CSV.',
     note: 'From the middle of the selected area or the map view', run: ({ geometry, label, center }) => show({ center: center || centerOf(geometry), label: label.replace(/^[\d.]+ mi around /, '') }) });
 }

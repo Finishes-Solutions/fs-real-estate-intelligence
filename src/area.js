@@ -8,7 +8,7 @@
 // Also the "Businesses registered here" lookup (api/tenants) used by the building and filing cards.
 import { SECTORS } from './lib/sectors.mjs';
 import { CAT_LABEL } from './lib/spending.mjs';
-import { reportDoc, savePdf, areaMap } from './reportkit.js';
+import { reportDoc, savePdf, areaMap, getJSON, errorBox, fileBase } from './reportkit.js';
 import { mkCharts, col, mlabel } from './mkcharts.js';
 import { pipeline, housing, cityCounties, rents, monthly, movers, addMonths } from './lib/marketcalc.mjs';
 import { fromObject } from './lib/correlate.mjs';
@@ -20,6 +20,8 @@ export function initArea(ctx) {
   const { esc, fmtN, fmtM } = ctx, root = document.getElementById('view-market');
   // sel: 'all' (the whole region), one county FIPS, or several joined by commas (a multi-county selection on the map)
   let area = null, market = null, loadP = null, sel = 'all', newsPlace = '', adopted = null;
+  let quiet = false; // true while the Market page is drawn off screen for a report made from another page
+  const shown = () => ctx.view === 'market' || quiet;
   let range = 24, pin = null; const show = { sf: true, mf: true, v: true, p: true, o: true };
   // crime (City of Houston, the same for the region and the three counties it spans) and traffic (per area), fetched once
   const HOU = new Set(['48201', '48157', '48339']), traffic = new Map(); let crimeCity;
@@ -410,7 +412,13 @@ export function initArea(ctx) {
     '.mx-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.mx-asof,.mx-desc,.mx-dim{color:#6b7174;font-size:9px}.mx-table{width:100%;border-collapse:collapse;font-size:9px}.mx-table th{font-family:"IBM Plex Mono",monospace;font-size:7px;text-transform:uppercase;color:#6b7174;text-align:left;border-bottom:1px solid #dde1e2;padding:2px 4px}.mx-table td{border-bottom:1px solid #e8ebeb;padding:2px 4px}.mx-table .r{text-align:right}.mx-sym{display:block;font-size:7px;color:#6b7174}.mx-spark{width:90px;height:22px}.mx-spark polyline,.mx-chart polyline{fill:none;stroke-width:1.4}.mx-spark.up polyline{stroke:#0a7a36}.mx-spark.dn polyline{stroke:#b3261e}.mx-up{color:#0a7a36}.mx-dn{color:#b3261e}.mx-wrap{display:grid;grid-template-columns:200px 1fr;gap:10px}.mx-kg{display:grid;grid-template-columns:1fr 1fr;gap:4px}.mx-kg b{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px}.mx-kg span{font-size:7px;text-transform:uppercase;color:#6b7174}.mx-leg{display:flex;gap:10px;font-size:8.5px}.mx-leg i{display:inline-block;width:12px;height:3px;margin-right:4px;vertical-align:2px}.mx-leg i.mx-la{background:#006527}.mx-leg i.mx-lb{background:#c26a00}.mx-chart,.mx-lags{width:100%;height:auto;display:block}.mx-chart polyline.mx-la{stroke:#006527}.mx-chart polyline.mx-lb{stroke:#c26a00;stroke-dasharray:5 3}.mx-zero{stroke:#dde1e2}.mx-ax{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:#6b7174}.mx-lags rect.pos{fill:#8acda3}.mx-lags rect.neg{fill:#bcc2c4}.mx-lags rect.on{fill:#006527}.mx-say{font-size:9.5px}.mx-hit line{display:none}' +
     '.chitem{display:block;color:inherit;text-decoration:none;padding:3px 0;border-top:1px solid #e8ebeb;font-size:9px}.chitem em{display:block;font-style:normal;color:#6b7174;font-size:8px}.src{display:none}.rnote{font-size:8px;color:#6b7174;margin-top:4px}.mk-tag{font-size:7px;font-weight:600;color:#6b7174;border:1px solid #dde1e2;border-radius:9px;padding:0 5px;margin-left:4px;vertical-align:1px}';
   async function exportReport() {
-    if (!area) return; if (ctx.view !== 'market') { ctx.setView('market'); await new Promise(r => setTimeout(r, 80)); }
+    if (!area) return;
+    // from another page (the Reports page) the Market page is drawn off screen, so the person stays where they are
+    const away = ctx.view !== 'market'; if (away) { quiet = true; root.classList.add('on', 'mk-quiet'); render(); await new Promise(r => setTimeout(r, 160)); }
+    const leave = () => { if (away && quiet) { quiet = false; root.classList.remove('on', 'mk-quiet'); } };
+    try { return await buildReport(); } finally { leave(); }
+  }
+  async function buildReport() {
     const label = areaLabel(), body = root.querySelector('.mk-body')?.cloneNode(true); if (!body) return;
     body.querySelectorAll('.mk-hint,.mk-pin,.mk-ctl,.mx-ctl,.mx-tabs,.bacts,.mx-cmp,.mx-acts,select,button,.mk-nav').forEach(e => e.remove());
     body.querySelectorAll('details').forEach(d => d.open = true); body.querySelectorAll('tr[hidden]').forEach(tr => tr.hidden = false);
@@ -421,7 +429,7 @@ export function initArea(ctx) {
     const html = reportDoc({ kicker: 'Market report', title: label, meta: (range ? 'Monthly charts: last ' + range + ' months' : 'Monthly charts: all months') + (area.built ? ' · data built ' + esc(new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : ''), css: PRINT_CSS,
       body: map + body.innerHTML,
       sources: 'TDLR construction filings (TABS); US Census (ACS, Building Permits Survey, LEHD LODES); BLS (PPI, LAUS, CE); Texas Comptroller; Zillow Observed Rent Index; Realtor.com; FRED; Freddie Mac; CFPB HMDA; Houston Police (NIBRS); TxDOT; Yahoo Finance (delayed); Coinbase; Google News. Estimates are labelled as such in each section.' });
-    return savePdf(ctx, 'market', label, html);
+    return savePdf(ctx, 'market', label, html, { meta: { mk: sel } });
   }
   async function exportData() {
     if (!area) return; const s = stats(), label = areaLabel(), rows = [], add = (section, item, value, note = '') => rows.push({ Area: label, Section: section, Item: item, Value: value, Note: note });
@@ -445,11 +453,14 @@ export function initArea(ctx) {
       crimeCity.offenses.forEach(o => add('Crime offenses, last 12 months (City of Houston)', o.name, o.n)); }
     const t = traffic.get(sel); if (t?.roads) { t.roads.forEach(r => add('Busiest roads (TxDOT AADT)', title(r.road), r.aadt, r.lat != null ? r.lat.toFixed(4) + ', ' + r.lon.toFixed(4) : '')); t.types.forEach(g => add('Average daily traffic by road type', g.label, g.avg, fmtN(g.segments) + ' segments')); }
     Object.values(area.rates?.series || {}).forEach(x => add('Rates', x.label, x.value, 'as of ' + x.date));
-    ctx.exportMeta = { report: 'market', format: 'csv', scope: label };
-    try { await ctx.exportCsv(rows, 'market-data-' + slug(label) + '-' + new Date().toISOString().slice(0, 10)); } finally { ctx.exportMeta = null; }
+    ctx.exportMeta = { report: 'market', format: 'csv', scope: label, mk: sel };
+    try { await ctx.exportCsv(rows, fileBase('market', label)); } finally { ctx.exportMeta = null; }
   }
-  ctx.exportMarket = async (format = 'html', county) => { await load(); if (county) { const c = area?.counties.find(x => x.fips === county || x.name.toLowerCase() === String(county).toLowerCase()); if (c) { sel = c.fips; adopted = mapCounties(); } }
-    if (format === 'csv') return exportData(); ctx.setView('market'); await new Promise(r => setTimeout(r, 120)); return exportReport(); };
+  // the area the Market page is showing, for the Reports page (and a way to change it)
+  ctx.marketAreaLabel = () => area ? areaLabel() : '';
+  ctx.marketChangeArea = () => { scopeOpen = true; ctx.setView('market'); setTimeout(() => { root.querySelector('.mk-scopebar summary')?.focus({ preventScroll: false }); }, 60); };
+  ctx.exportMarket = async (format = 'html', county, { stay = false } = {}) => { await load(); if (county === 'all' || /^\d{5}(,\d{5})*$/.test(county || '')) { sel = county; adopted = mapCounties(); } else if (county) { const c = area?.counties.find(x => x.fips === county || x.name.toLowerCase() === String(county).toLowerCase()); if (c) { sel = c.fips; adopted = mapCounties(); } }
+    if (format === 'csv') return exportData(); if (!stay) { ctx.setView('market'); await new Promise(r => setTimeout(r, 120)); } return exportReport(); };
   // the assistant's market_data extras: the pipeline, housing, rents and costs (small summaries)
   ctx.marketExtras = () => { if (!area) return null; const p = pipe(), h = housing(tractsIn()), rn = rentInfo();
     return { pipeline: { under_construction: Math.round(p.active.v), projects: p.active.n, starting_90_days: Math.round(p.starting.v), starting_projects: p.starting.n, scheduled_starts: Math.round(p.upcoming.v), change_vs_year_ago_pct: p.change != null ? +p.change.toFixed(1) : null,
@@ -462,13 +473,13 @@ export function initArea(ctx) {
   let curStats = null, navY = 0;
   let measuring = false, measuredWs = 0; // measuredWs: the small charts' real width once seen (cleared when the window is resized)
   function render() {
-    if (ctx.view !== 'market') return;
+    if (!shown()) return;
     if (!area) {
       root.innerHTML = '<div class="vhead"><div><div class="kicker">Market</div><h2>Growth signals by county</h2></div></div><div class="empty">' + (loadP ? 'Market data isn’t available yet. It’s added by the nightly data refresh.' : 'Loading…') + '</div>';
-      load().then(() => { if (area) render(); else if (ctx.view === 'market') root.querySelector('.empty').textContent = 'Market data isn’t available yet. It’s added by the nightly data refresh.'; });
+      load().then(() => { if (area) render(); else if (shown()) root.querySelector('.empty').textContent = 'Market data isn’t available yet. It’s added by the nightly data refresh.'; });
       return;
     }
-    if (ctx.markets && !ctx.markets.raw?.()) ctx.markets.load?.().then(() => { if (ctx.view === 'market') render(); });
+    if (ctx.markets && !ctx.markets.raw?.()) ctx.markets.load?.().then(() => { if (shown()) render(); });
     adopt();
     const inner = Math.max(320, (root.clientWidth || 1100) - (root.clientWidth > 700 ? 48 : 28));
     Wf = Math.round(Math.min(1200, inner - 32)); Wh = Math.round(inner > 900 ? (inner - 14) / 2 - 32 : inner - 32); Ws = measuredWs || Math.round(inner > 900 ? (inner - 32 - 24) / 3 - 14 : inner > 600 ? (inner - 32 - 12) / 2 - 14 : inner - 46);
@@ -535,7 +546,7 @@ export function initArea(ctx) {
       el.onblur = () => { tip.style.opacity = 0; };
     });
   }
-  let rsT = 0; addEventListener('resize', () => { if (ctx.view !== 'market') return; measuredWs = 0; clearTimeout(rsT); rsT = setTimeout(render, 200); });
+  let rsT = 0; addEventListener('resize', () => { if (!shown()) return; measuredWs = 0; clearTimeout(rsT); rsT = setTimeout(render, 200); });
   ctx.onView('market', render);
   // the app's own Houston measures for the Correlation explorer (src/markets.js): monthly, whole region, months finished
   ctx.marketLocalSeries = () => {
@@ -559,13 +570,13 @@ export function initArea(ctx) {
   const cache = new Map(), done = new Map(), tkey = (addr, zip, city) => [addr, zip, city].join('|').toUpperCase();
   ctx.tenantsAt = (addr, zip, city) => {
     const k = tkey(addr, zip, city); if (cache.has(k)) return cache.get(k);
-    const p = fetch('api/tenants?' + new URLSearchParams({ addr, ...(zip ? { zip } : {}), ...(city ? { city } : {}) })).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'lookup failed'); done.set(k, d); return d; });
+    const p = getJSON('api/tenants?' + new URLSearchParams({ addr, ...(zip ? { zip } : {}), ...(city ? { city } : {}) }), { what: 'The business lookup' }).then(d => { done.set(k, d); return d; });
     p.catch(() => cache.delete(k)); cache.set(k, p); return p;
   };
   // the answer only if that address was already looked up (the News button uses it without starting a lookup)
   ctx.tenantsPeek = (addr, zip, city) => done.get(tkey(addr, zip, city)) || null;
-  ctx.renderTenants = (el, d, err) => {
-    if (err) { el.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote err">' + esc(err) + '</div>'; return; }
+  ctx.renderTenants = (el, d, err, retry) => {
+    if (err) { el.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div>'; el.append(errorBox(err, retry, 'The business lookup')); return; }
     const li = t => '<div class="pl"><b>' + esc(t.name) + (t.suite ? ' <span class="sc">Ste ' + esc(t.suite) + '</span>' : '') + '</b><span>' + esc([t.sector, t.owner && 'owner ' + t.owner, t.opened && 'since ' + t.opened].filter(Boolean).join(' · ')) + '</span></div>';
     el.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div>' + (d.tenants.length ? d.tenants.slice(0, 30).map(li).join('') + (d.tenants.length > 30 ? '<div class="rnote">…and ' + (d.tenants.length - 30) + ' more</div>' : '')
       : '<div class="rnote">' + esc(d.note || 'No active sales-tax permits at this address.') + '</div>') + '<div class="rnote">Active sales-tax permits matched on house number and street' + (d.query ? ' (' + esc(d.query) + ')' : '') + '. Lists retail, restaurant and service tenants; offices and medical often aren’t listed.</div>';
@@ -579,9 +590,10 @@ export function initArea(ctx) {
     const sec = document.createElement('div'); sec.className = 'bsec'; sec.id = 'tenSec';
     sec.innerHTML = '<div class="lt">Businesses at this address</div><button class="btn" type="button">Look Up Registered Businesses</button><div class="rnote">Texas Comptroller sales-tax permits at ' + esc(a.street) + '.</div>';
     const after = card.querySelector('#liveSec') || card.querySelector('#briefBox'); if (after) after.after(sec); else (card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
-    sec.querySelector('button').onclick = async () => {
+    const lookup = async () => {
       sec.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote">Looking up…</div>';
-      try { const d = await ctx.tenantsAt(a.street, a.zip, a.city); if (sec.isConnected) ctx.renderTenants(sec, d); } catch (e) { if (sec.isConnected) ctx.renderTenants(sec, null, e.message); }
+      try { const d = await ctx.tenantsAt(a.street, a.zip, a.city); if (sec.isConnected) ctx.renderTenants(sec, d); } catch (e) { if (sec.isConnected) ctx.renderTenants(sec, null, e, lookup); }
     };
+    sec.querySelector('button').onclick = lookup;
   });
 }

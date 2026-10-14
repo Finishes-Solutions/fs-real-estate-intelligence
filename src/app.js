@@ -540,7 +540,7 @@ function filterChips({area=true}={}){
   for(const k of Object.keys(s)){ if(k==='d'||!RESET[k]) continue; const g=k==='max'?'min':k==='sqmax'?'sqmin':k; if(seen.has(g)) continue; seen.add(g);
     const part=g==='min'?{min:s.min,max:s.max}:g==='sqmin'?{sqmin:s.sqmin,sqmax:s.sqmax}:{[k]:s[k]};
     out.push({label:describe(part,fmtM),remove:drop(RESET[k])}); }
-  if(state.month) out.push({label:'Under construction · '+monthLabel(state.month),remove:()=>showTime(false)});
+  if(state.month) out.push({label:'Under construction '+monthLabel(state.month),remove:()=>showTime(false)});
   if(area&&sel.feature) out.push({label:'Area: '+sel.label,remove:()=>clearSelection()});
   return out;
 }
@@ -1032,7 +1032,7 @@ const fmtD=s=>new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',
 const PERIOD=fmtD(DATA.period.start)+' – '+fmtD(DATA.period.end), today=new Date(), stamp=today.toISOString().slice(0,10);
 const slug=s=>(s||'all-filings').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'selection';
 const scopeLabel=()=>sel.feature?sel.label:'All filings shown';
-function filterText(){ const t=describe(curSpec(false),fmtM); const mo=state.month?'Under construction in '+monthLabel(state.month):''; return [t,mo].filter(Boolean).join(' · '); }
+function filterText(){ const t=describe(curSpec(false),fmtM); const mo=state.month?'Under construction '+monthLabel(state.month):''; return [t,mo].filter(Boolean).join(' · '); }
 function monthLabel(m){ return new Date(m+'-15T12:00:00Z').toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
 let downloads=null; const inViewer=!!(window.claude&&window.claude.use);
 if(inViewer) window.claude.use('downloads').then(d=>{downloads=d;}).catch(()=>{});

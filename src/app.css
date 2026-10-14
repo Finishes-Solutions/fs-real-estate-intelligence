@@ -2460,7 +2460,7 @@ table.who tr.nomatch td{border:0}
 .rp-n{font:500 12px var(--font-mono);color:var(--muted);letter-spacing:0;text-transform:none}
 .rp-hint{font-size:12px;color:var(--muted)}
 .rp-group .vscope{background:var(--panel-2);margin-bottom:12px}
-.rp-card p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.rp-card p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden}
 .rp-more{margin:10px 2px 2px;font-size:12.5px}
 .rp-recent .rp-list .empty{padding:8px 2px;text-align:left}
 /* Market: the area as one line, with the county picker folded behind "Change"; boxes without the stand-in icon */
@@ -3239,3 +3239,21 @@ table.cmp tr.sub th{text-align:left;font-family:var(--font-mono);font-size:10px;
 .panel .glance .g-t>span,.panel .glance .g-t i{white-space:normal;overflow:hidden;text-overflow:clip;overflow-wrap:anywhere;line-height:1.3;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}
 .ar-row b,.ar-row .ar-d{white-space:normal;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow-wrap:anywhere}
 .ar-row{min-height:40px;height:auto}
+
+/* ---------- B4: reports and one friendly error path ---------- */
+.rp-card .rp-cust{justify-self:start;font-size:12px}
+.rp-card em .lnk{font-size:11px}
+.rp-fmts .btn[disabled]{opacity:.5;cursor:not-allowed}
+.rp-m .rp-warn{color:var(--warn);font-size:12px}
+.rp-act .lnk.danger{color:var(--danger)}
+.rp-act .lnk.danger:hover{text-decoration:underline}
+.rnote.eb{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
+.rnote.eb .eb-retry{font-size:12px;text-decoration:underline}
+.rnote.eb .eb-retry[disabled]{opacity:.5}
+.draw-banner{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);z-index:6;display:inline-flex;align-items:center;gap:12px;max-width:calc(100% - 32px);border:1px solid var(--line-2);background:var(--panel);color:var(--text);border-radius:20px;padding:8px 14px;font-size:13px;box-shadow:0 4px 18px rgba(0,0,0,.18)}
+.draw-banner[hidden],.stage:not([data-view="map"]) .draw-banner{display:none}
+.draw-banner .db-x{font-size:13px;text-decoration:underline;white-space:nowrap}
+@media (max-width:700px){ .draw-banner{bottom:auto;top:calc(108px + var(--st));font-size:12.5px;border-radius:12px} }
+.ly-hint{font-size:12px;color:var(--muted);margin:2px 0 6px}
+.view.mk-quiet{position:fixed;left:-20000px;top:0;right:auto;bottom:auto;width:1180px;height:900px;visibility:hidden;pointer-events:none;overflow:hidden;z-index:-1}
+.ly-na.ly-fail{color:var(--danger)}

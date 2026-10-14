@@ -4,7 +4,7 @@
 //   Building / parcel cards: a "Crime by city / county" section under the Houston street-level one, with a department switcher.
 //   Report card (Full report, the Reports tab, the assistant): year by year, offense mix, notes; exports as PDF or CSV.
 // Department-level and annual only: every spot a department covers gets the same numbers.
-import { reportDoc, savePdf, areaMap } from './reportkit.js';
+import { reportDoc, savePdf, saveCsv, areaMap, getJSON, errorBox, fileBase, friendly } from './reportkit.js';
 
 const COL = { v: '#c03b3a', p: '#d9822b', st: '#6b7174', us: '#9aa3a6' };
 
@@ -14,7 +14,7 @@ export function initCrimeUS(ctx) {
   // one request per point / department, kept while the app is open
   const load = q => {
     const k = new URLSearchParams(q).toString();
-    if (!cache.has(k)) { const p = fetch('api/crimeus?' + k).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'FBI crime data unavailable'); return d; }); p.catch(() => cache.delete(k)); cache.set(k, p); }
+    if (!cache.has(k)) { const p = getJSON('api/crimeus?' + k, { what: 'FBI crime data' }); p.catch(() => cache.delete(k)); cache.set(k, p); }
     return cache.get(k);
   };
   const query = ({ center, ori }) => ({ ...(center ? { lat: center[1].toFixed(4), lon: center[0].toFixed(4) } : {}), ...(ori ? { ori } : {}) });
@@ -67,7 +67,7 @@ export function initCrimeUS(ctx) {
     if (pick) { pick.disabled = true; pick.closest('.cu-oth')?.querySelector('.fl')?.insertAdjacentHTML('beforeend', ' <span class="cu-ld">· loading…</span>'); }
     else el.innerHTML = head + '<div class="rnote">Finding the local police department…</div>';
     const keep = () => { if (y0 == null) return; const s = el.querySelector('#cuOth'), sc = el.closest('#card'); if (s && sc) sc.scrollTop += s.getBoundingClientRect().top - y0; s?.focus({ preventScroll: true }); };
-    let d; try { d = await ctx.crimeUSData({ center, ori }); } catch (e) { if (!still() || !el.isConnected) return; if (pick) { pick.disabled = false; el.querySelector('.cu-ld')?.remove(); ctx.toast?.(e.message); } else el.innerHTML = head + '<div class="rnote">' + esc(e.message) + '</div>'; return; }
+    let d; try { d = await ctx.crimeUSData({ center, ori }); } catch (e) { if (!still() || !el.isConnected) return; if (pick) { pick.disabled = false; el.querySelector('.cu-ld')?.remove(); ctx.toast?.(friendly(e, 'FBI crime data')); } else { el.innerHTML = head; el.append(errorBox(e, () => ctx.renderCrimeUS(el, center, still, ori), 'FBI crime data')); } return; }
     if (!still() || !el.isConnected) return;
     if (!d.agency || !d.headline) { el.innerHTML = head + '<div class="rnote">' + esc(d.note || 'No department figures for this spot.') + '</div>' + pickOthers(d, 'cuOth'); wireOthers(el, center, still, d); keep(); return; }
     el.innerHTML = head + '<div class="cu-ag"><b>' + esc(d.agency.name) + '</b><span>' + esc([when(d), covers(d)].filter(Boolean).join(' · ')) + '</span></div>' + tiles(d) +
@@ -91,7 +91,7 @@ export function initCrimeUS(ctx) {
     ctx.closeCard?.();
     card.innerHTML = '<div class="top"><div><div class="kicker">Crime by city / county</div><h2>' + esc(label || 'Local police department') + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote">Reading the FBI’s figures…</div></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
-    let d; try { d = await ctx.crimeUSData({ center, ori }); } catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
+    let d; try { d = await ctx.crimeUSData({ center, ori }); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ center, ori, label }), 'FBI crime data')); return; }
     if (!d.agency || !d.headline) { card.querySelector('.bsec').innerHTML = '<div class="rnote">' + esc(d.note || 'No department figures here.') + '</div>'; return; }
     last = { d, center };
     const h = d.headline, mix = d.offenses || [];
@@ -113,13 +113,12 @@ export function initCrimeUS(ctx) {
   }
   ctx.crimeUSReport = report;
 
-  const slug = s => String(s || 'department').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
   async function exportCsv() {
     if (!last) return; const { d } = last;
     ctx.exportMeta = { report: 'crimeus', format: 'csv', scope: d.agency.name, filings: d.years.filter(y => y.months > 0).length, unit: 'years' };
     try { ctx.exportCsv(d.years.filter(y => y.months > 0).map(y => ({ Department: d.agency.name, 'FBI agency ID': d.agency.ori, Year: y.y, 'Months reported': y.months, Population: y.pop ?? '', 'Violent offenses': y.v ?? '', 'Property offenses': y.p ?? '',
       'Violent per 100k': y.rate_v ?? '', 'Property per 100k': y.rate_p ?? '', [d.state + ' violent per 100k']: y.state_rate_v ?? '', [d.state + ' property per 100k']: y.state_rate_p ?? '', 'US violent per 100k': y.us_rate_v ?? '', 'US property per 100k': y.us_rate_p ?? '',
-      'Violent cleared %': y.cleared_v ?? '', 'Property cleared %': y.cleared_p ?? '' })), 'crime-' + slug(d.agency.name) + '-' + new Date().toISOString().slice(0, 10)); }
+      'Violent cleared %': y.cleared_v ?? '', 'Property cleared %': y.cleared_p ?? '' })), fileBase('crimeus', d.agency.name)); }
     finally { ctx.exportMeta = null; }
   }
   async function exportReport() {

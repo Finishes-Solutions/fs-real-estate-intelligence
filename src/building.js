@@ -502,7 +502,7 @@ export function initBuildings(ctx) {
     if (!p?.situsStreet || !/^\d/.test(p.situsStreet) || !(p.situsZip || p.situsCity)) { el.innerHTML = ''; return; }
     el.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote">Looking up…</div>';
     try { const d = await ctx.tenantsAt(p.situsStreet, p.situsZip, p.situsCity); if (cur === b) ctx.renderTenants(el, d); }
-    catch (e) { if (cur === b) ctx.renderTenants(el, null, e.message); }
+    catch (e) { if (cur === b) ctx.renderTenants(el, null, e, () => { if (cur === b) renderTenants(p); }); }
   }
   function renderPhoto(ph) {
     const el = card.querySelector('#bPhoto'); if (!el || !ph) return;

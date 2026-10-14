@@ -4,7 +4,7 @@
 //   Environmental Report for a site or area: every record within Phase I style search distances of the site's edge,
 //   nearest first, wells and pipelines, wetlands and soils; opens in the card and exports as PDF or CSV.
 import { KINDS, SETS } from './lib/env.mjs';
-import { esc, fmt, kgrid, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, areaMap } from './reportkit.js';
+import { esc, fmt, kgrid, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, areaMap, getJSON, errorBox, unavailable, layerFailed, layerOK } from './reportkit.js';
 
 const SRC = 'env-sites', AREA = 'env-areas';
 const RASTERS = { rrc: { box: 'lyRrc', note: 'lyRrcNote', minz: 11, opacity: .9, attr: 'Wells & pipelines: Railroad Commission of Texas', msg: 'Oil and gas wells (symbols by type: oil, gas, plugged, dry, injection) and pipelines from the Railroad Commission. Zoom in past neighborhood level.' },
@@ -49,11 +49,11 @@ export function initEnv(ctx) {
     const key = bb.join(',') + '&set=' + st.set; if (key === lastKey && map.getSource(SRC)) return;
     ctl?.abort(); ctl = new AbortController(); say('Loading environmental sites…');
     try {
-      const res = await fetch('api/env?box=' + key, { signal: ctl.signal }), d = await res.json().catch(() => ({})); if (!res.ok) throw new Error(d.error || 'unavailable');
+      const d = await getJSON('api/env?box=' + key, { what: 'Environmental site data', signal: ctl.signal });
       if (my !== seq) return; lastKey = key; setSites(d);
       const by = {}; for (const s of d.sites) by[s[0]] = (by[s[0]] || 0) + 1;
       say(Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, n]) => fmt(n) + ' ' + KINDS[k].short.toLowerCase()).join(', ') + (d.areas?.length ? (Object.keys(by).length ? ', ' : '') + d.areas.length + ' groundwater restriction area' + (d.areas.length > 1 ? 's' : '') : '') + (d.sites.length || d.areas?.length ? ' in view.' : 'None in view.') + (d.errors ? ' Some sources did not answer.' : '') + ' Click a dot for details.');
-    } catch (e) { if (e.name !== 'AbortError') say(e.message); }
+    } catch (e) { if (e.name !== 'AbortError') layerFailed(ctx, e, { what: 'Environmental site data', off: () => setSitesOn(false), note: snote }); }
   }
   function setSites(d) {
     const pts = { type: 'FeatureCollection', features: (d.sites || []).map(s => ({ type: 'Feature', properties: { k: s[0], id: s[1], name: s[2], addr: s[3] }, geometry: { type: 'Point', coordinates: [s[4], s[5]] } })) };
@@ -72,7 +72,7 @@ export function initEnv(ctx) {
     ctx.setLegend?.('env', '<div class="t">' + esc(SETS[st.set] || 'Environmental sites') + '</div><div class="lg2">' + ks.map(k => '<div class="li" title="' + esc(KINDS[k].label) + '"><i style="background:' + KINDS[k].color + '"></i>' + esc(KINDS[k].short) + '</div>').join('') + '</div>');
   }
   function setSitesOn(v) {
-    st.sites = !!v; save(); if (sbox) sbox.checked = st.sites; if (snote) snote.hidden = !st.sites; if (ssel) ssel.hidden = !st.sites;
+    st.sites = !!v; save(); if (sbox) sbox.checked = st.sites; if (snote) snote.hidden = !st.sites; if (ssel) ssel.hidden = !st.sites; if (st.sites) layerOK(snote);
     if (!st.sites) { ctl?.abort(); lastKey = ''; try { for (const id of [SRC, AREA + '-ln', AREA]) if (map.getLayer(id)) map.removeLayer(id); for (const id of [SRC, AREA]) if (map.getSource(id)) map.removeSource(id); } catch (e) {} legend(); return; }
     legend(); loadSites(); if (map.getZoom() < 12) ctx.toast?.('Environmental sites show from neighborhood zoom: zoom in to see them.');
   }
@@ -95,12 +95,12 @@ export function initEnv(ctx) {
 
   // ---------- the report ----------
   const circleAt = ([lon, lat], mi) => { const r = mi / 69.17, k = Math.cos(lat * Math.PI / 180), ring = []; for (let i = 0; i <= 48; i++) { const a = (i % 48) / 48 * 2 * Math.PI; ring.push([lon + r * Math.cos(a) / k, lat + r * Math.sin(a)]); } return { type: 'Polygon', coordinates: [ring] }; };
-  const reportFor = async (geometry, label) => { const r = await fetch('api/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) }), d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Environmental report failed'); return d; };
+  const reportFor = (geometry, label) => getJSON('api/env', { what: 'Environmental data', method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) });
   ctx.envReportData = reportFor;
   const ORDER = ['npl', 'superfund', 'ihwca', 'vcp', 'brownfield', 'epa_bf', 'drycleaner', 'lpst', 'landfill', 'msd', 'pst', 'rcra', 'tri', 'air', 'water'];
   const miTxt = v => v === 0 ? 'on site' : v < 0.1 ? Math.round(v * 5280) + ' ft' : v.toFixed(2) + ' mi';
   const where = r => [miTxt(r.mi), r.mi > 0 ? r.dir : ''].filter(Boolean).join(' ');
-  const errNote = x => '<div class="rnote err">Unavailable right now (' + esc(x.error) + ').</div>';
+  const errNote = (x, what = 'This part of the report') => '<div class="rnote err">' + esc(unavailable(what)) + '</div>';
   function headline(d) {
     const k = d.kinds, n = ks => ks.reduce((s, x) => s + (k[x]?.count || 0), 0), on = ks => ks.reduce((s, x) => s + (k[x]?.onsite || 0), 0);
     const cleanup = ['npl', 'superfund', 'ihwca', 'vcp', 'brownfield', 'epa_bf', 'drycleaner', 'lpst', 'landfill', 'msd'];
@@ -116,18 +116,18 @@ export function initEnv(ctx) {
       '<div class="bsec"><div class="lt">Records within the search distances</div><table class="mini env-t"><thead><tr><th>Database</th><th>Search</th><th>Found</th><th>Nearest</th></tr></thead><tbody>' + ORDER.map(row).join('') + '</tbody></table>' +
       '<div class="rnote">Distances are from the edge of the site. ' + (ORDER.some(x => k[x]?.truncated) ? 'A + means the source returned its maximum; there may be more. ' : '') + 'Search distances follow common Phase I practice.</div></div>' +
       '<div class="bsec"><div class="lt">Sites found</div>' + (ORDER.map(x => list(x, full ? 12 : 5)).join('') || '<div class="rnote">No cleanup, contamination, tank or permitted-facility records within the search distances.</div>') + '</div>' +
-      '<div class="bsec"><div class="lt">Oil &amp; gas</div>' + (w?.error ? errNote(w) : '<div class="rnote">' + fmt(w?.count || 0) + ' well' + (w?.count === 1 ? '' : 's') + ' within ¼ mile' + (w?.by_type?.length ? ': ' + esc(w.by_type.map(t => t.n + ' ' + t.type.toLowerCase()).join(', ')) : '') + (w?.nearest?.[0] ? '. Nearest ' + esc(where(w.nearest[0])) + (w.nearest[0].id ? ' (API ' + esc(w.nearest[0].id) + ')' : '') : '') + '.' +
+      '<div class="bsec"><div class="lt">Oil &amp; gas</div>' + (w?.error ? errNote(w, 'Oil and gas well data') : '<div class="rnote">' + fmt(w?.count || 0) + ' well' + (w?.count === 1 ? '' : 's') + ' within ¼ mile' + (w?.by_type?.length ? ': ' + esc(w.by_type.map(t => t.n + ' ' + t.type.toLowerCase()).join(', ')) : '') + (w?.nearest?.[0] ? '. Nearest ' + esc(where(w.nearest[0])) + (w.nearest[0].id ? ' (API ' + esc(w.nearest[0].id) + ')' : '') : '') + '.' +
         (o?.count ? ' <b>' + fmt(o.count) + ' orphan well' + (o.count > 1 ? 's' : '') + '</b> (abandoned with no responsible operator) within ½ mile, nearest ' + esc(where(o.nearest[0])) + '.' : '') + '</div>') +
-        (p?.error ? errNote(p) : p?.nearest?.length ? p.nearest.map(r => '<div class="pl"><b>' + esc(r.name) + '</b><span>' + esc([r.commodity, r.diameter ? r.diameter + '" pipe' : '', r.status, r.interstate === 'Y' ? 'interstate' : ''].filter(Boolean).join(' · ')) + ' · ' + esc(where(r)) + '</span></div>').join('') : '<div class="rnote">No pipelines mapped within ¼ mile.</div>') + '</div>' +
-      '<div class="bsec"><div class="lt">Wetlands</div>' + (wt?.error ? errNote(wt) : wt?.count ? wt.nearest.map(r => '<div class="pl"><b>' + esc(r.name) + '</b><span>' + esc([r.code, r.acres ? fmt(r.acres) + ' acres' : '', where(r)].filter(Boolean).join(' · ')) + '</span></div>').join('') + '<div class="rnote">US Fish &amp; Wildlife Service National Wetlands Inventory. Building in a wetland can need a federal (Section 404) permit; a delineation decides.</div>' : '<div class="rnote">No mapped wetlands on or within 500 ft of the site.</div>') + '</div>' +
-      '<div class="bsec"><div class="lt">Soils</div>' + (soils?.error ? errNote(soils) : soils?.skipped ? '<div class="rnote">' + esc(soils.skipped) + '</div>' : soils?.length ? '<table class="mini env-t"><thead><tr><th>Soil</th><th>Drainage</th><th>Flooding</th><th>Small commercial buildings</th></tr></thead><tbody>' +
+        (p?.error ? errNote(p, 'Pipeline data') : p?.nearest?.length ? p.nearest.map(r => '<div class="pl"><b>' + esc(r.name) + '</b><span>' + esc([r.commodity, r.diameter ? r.diameter + '" pipe' : '', r.status, r.interstate === 'Y' ? 'interstate' : ''].filter(Boolean).join(' · ')) + ' · ' + esc(where(r)) + '</span></div>').join('') : '<div class="rnote">No pipelines mapped within ¼ mile.</div>') + '</div>' +
+      '<div class="bsec"><div class="lt">Wetlands</div>' + (wt?.error ? errNote(wt, 'Wetlands data') : wt?.count ? wt.nearest.map(r => '<div class="pl"><b>' + esc(r.name) + '</b><span>' + esc([r.code, r.acres ? fmt(r.acres) + ' acres' : '', where(r)].filter(Boolean).join(' · ')) + '</span></div>').join('') + '<div class="rnote">US Fish &amp; Wildlife Service National Wetlands Inventory. Building in a wetland can need a federal (Section 404) permit; a delineation decides.</div>' : '<div class="rnote">No mapped wetlands on or within 500 ft of the site.</div>') + '</div>' +
+      '<div class="bsec"><div class="lt">Soils</div>' + (soils?.error ? errNote(soils, 'Soil data') : soils?.skipped ? '<div class="rnote">' + esc(soils.skipped) + '</div>' : soils?.length ? '<table class="mini env-t"><thead><tr><th>Soil</th><th>Drainage</th><th>Flooding</th><th>Small commercial buildings</th></tr></thead><tbody>' +
         soils.map(s => '<tr><td>' + esc(s.name) + '</td><td>' + esc(s.drainage || '—') + '</td><td>' + esc(s.flooding || '—') + '</td><td>' + esc(s.small_commercial || '—') + '</td></tr>').join('') + '</tbody></table><div class="rnote">USDA soil survey ratings for building without engineering. "Very limited" usually means shrink-swell clay, a high water table or flooding; plan a geotechnical study.</div>' : '<div class="rnote">No soil survey data here.</div>') + '</div>';
   }
   let last = null;
   async function report({ geometry, label }) {
     if (ctx.view !== 'map') ctx.setView?.('map');
     const card = openCard(ctx, { kicker: 'Environmental report', title: label, loading: 'Searching state and federal environmental records…' });
-    let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return { error: e.message }; }
+    let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Environmental data')); return { error: e.message }; }
     last = { d, label, geometry };
     fillCard(ctx, card, cardTop('Environmental report', label, (d.area_sqmi < 1 ? Math.round(d.area_sqmi * 640) + ' acres' : d.area_sqmi.toFixed(2) + ' sq mi') + ' searched, plus the distances below') + body(d) +
       '<div class="bacts"><button class="btn" id="envLayers" type="button">Show on Map</button><button class="btn primary" id="envPdf" type="button">Export PDF</button><button class="btn" id="envCsv" type="button">Export CSV</button></div>' +
@@ -141,7 +141,7 @@ export function initEnv(ctx) {
     if (!last) return; const rows = [], k = last.d.kinds;
     for (const [x, s] of Object.entries(k)) for (const r of s.nearest || []) rows.push({ Database: KINDS[x].label, 'Search (mi)': KINDS[x].mi, Name: r.name, Address: [r.addr, r.city].filter(Boolean).join(', '), 'Distance (mi)': r.mi, Direction: r.dir || '', ID: r.id || r.code || '', Detail: [r.commodity, r.diameter && r.diameter + ' in', r.status, r.tanks && r.tanks + ' tanks', r.acres && r.acres + ' acres', r.type].filter(Boolean).join('; '), Link: r.url || '' });
     for (const s of Array.isArray(last.d.soils) ? last.d.soils : []) rows.push({ Database: 'Soils (USDA)', 'Search (mi)': 0, Name: s.name, Address: '', 'Distance (mi)': 0, Direction: '', ID: '', Detail: [s.drainage, 'flooding: ' + s.flooding, 'small commercial: ' + s.small_commercial].join('; '), Link: '' });
-    saveCsv(ctx, 'environmental', last.label, rows);
+    saveCsv(ctx, 'environmental', last.label, rows, { geom: last.geometry });
   }
   function exportPdf() {
     if (!last) return; const { d, label, geometry } = last;
@@ -152,9 +152,13 @@ export function initEnv(ctx) {
       'table.mini{width:100%;border-collapse:collapse;font-size:9.5px}table.mini th,table.mini td{border-bottom:1px solid #e8ebeb;padding:4px 6px;text-align:left;vertical-align:top}.mono{font-family:"IBM Plex Mono",monospace}.err{color:#b42318}.bacts{display:none}';
     const html = reportDoc({ kicker: 'Environmental screening report', title: label, meta: (d.area_sqmi < 1 ? Math.round(d.area_sqmi * 640) + ' acres' : d.area_sqmi.toFixed(2) + ' sq mi') + ' · ' + d.center[1] + ', ' + d.center[0], css,
       sources: esc(d.sources) + ' A screen of public databases, not a Phase I environmental site assessment (ASTM E1527-21): records can be mislocated or missing, and nothing here says whether a site is contaminated.', body: map + body(d, { full: true }) });
-    return savePdf(ctx, 'environmental', label, html);
+    return savePdf(ctx, 'environmental', label, html, { meta: { geom: geometry } });
   }
 
+  // the Reports tab: the selected area, or draw one (it has its own row in the Map panel and button in the Site section)
+  ctx.addAreaReport?.({ key: 'environmental', label: 'Environmental Report', noPanel: true, noSite: true, modes: ['selection', 'pick'],
+    desc: 'A screen of public environmental databases for an area: cleanup and contamination sites, tanks, permitted facilities, oil and gas wells, pipelines, wetlands and soils, nearest first. PDF or CSV.',
+    note: 'Select an area on the Map, or draw one', run: ({ geometry, label }) => report({ geometry, label }) });
   // entry point: the Map panel's "Reports for this area" row (shown while an area is selected)
   const run = () => { const s = ctx.sel; if (s?.feature) report({ geometry: s.feature.geometry || s.feature, label: s.label || 'Selected area' }); };
   const sb = document.getElementById('selEnv'), sync = () => { if (sb) sb.style.display = ctx.sel?.feature ? '' : 'none'; };
