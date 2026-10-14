@@ -2980,6 +2980,7 @@ table.who tr.nomatch td{border:0}
 #card #spSiteSec{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 7 2.5l6.5 2.5v8L9 14.5l-6.5-2z'/%3E%3C/svg%3E")}
 /* a toast with an action ("Saved to … · Open project") */
 .toast.act{pointer-events:auto}
+body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above the Export dialog */
 /* phones: an open card is a sheet over the bottom of the map, so the toast (Undo, Open project…) shows under the search bar instead of behind it */
 @media (max-width:700px){.app:has(#card.open) .toast{bottom:auto;top:calc(66px + var(--st,0px))}}
 .toast button{margin-left:6px;padding:0;border:0;background:none;color:inherit;font:700 12.5px var(--font-display);text-decoration:underline;text-underline-offset:2px;cursor:var(--cur-pointer,pointer)}
@@ -3253,7 +3254,7 @@ table.cmp tr.sub th{text-align:left;font-family:var(--font-mono);font-size:10px;
 .draw-banner{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);z-index:6;display:inline-flex;align-items:center;gap:12px;max-width:calc(100% - 32px);border:1px solid var(--line-2);background:var(--panel);color:var(--text);border-radius:20px;padding:8px 14px;font-size:13px;box-shadow:0 4px 18px rgba(0,0,0,.18)}
 .draw-banner[hidden],.stage:not([data-view="map"]) .draw-banner{display:none}
 .draw-banner .db-x{font-size:13px;text-decoration:underline;white-space:nowrap}
-@media (max-width:700px){ .draw-banner{bottom:auto;top:calc(108px + var(--st));font-size:12.5px;border-radius:12px} }
+@media (max-width:700px){ .draw-banner{bottom:calc(76px + var(--sb));font-size:12.5px;border-radius:12px} } /* phones: low on the map, clear of the Select / Shape / Radius buttons at the top */
 .ly-hint{font-size:12px;color:var(--muted);margin:2px 0 6px}
 .view.mk-quiet{position:fixed;left:-20000px;top:0;right:auto;bottom:auto;width:1180px;height:900px;visibility:hidden;pointer-events:none;overflow:hidden;z-index:-1}
 .ly-na.ly-fail{color:var(--danger)}

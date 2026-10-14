@@ -72,7 +72,7 @@ export function initReports(ctx) {
     if (r.report === 'field') { ctx.setView('field'); return; }
     if (!REPORTS[r.report]) return;
     if (r.report === 'compare') { ctx.openExport('compare', { format: r.format }); return; }
-    const snap = ctx.snapshot(), cam = { center: ctx.map.getCenter().toArray(), zoom: ctx.map.getZoom(), pitch: ctx.map.getPitch(), bearing: ctx.map.getBearing() }, hl = ctx.highlighted();
+    const wasView = ctx.view, snap = ctx.snapshot(), cam = { center: ctx.map.getCenter().toArray(), zoom: ctx.map.getZoom(), pitch: ctx.map.getPitch(), bearing: ctx.map.getBearing() }, hl = ctx.highlighted();
     let pick = 'filters';
     if (r.hash) apply(r.hash);
     if (r.pick === 'view' && r.view?.length === 4) { ctx.setView('map'); ctx.map.fitBounds([[r.view[0], r.view[1]], [r.view[2], r.view[3]]], { duration: 0, padding: 0 }); pick = 'view'; }
@@ -80,7 +80,7 @@ export function initReports(ctx) {
     ctx.toast('Filters and area set to match this export ·', { ms: 7000, action: { label: 'Undo', run: () => {
       ctx.closeExport?.(); ctx.restore(snap);
       if (hl.length) ctx.highlight(hl.map(id => ctx.BY_ID.get(id)).filter(Boolean), ''); else ctx.clearHighlight?.();
-      ctx.map.jumpTo(cam); } } });
+      ctx.map.jumpTo(cam); if (wasView && ctx.view !== wasView) ctx.setView(wasView); } } });
     ctx.openExport(r.report, { format: r.format, scope: pick });
   }
   // "Run again" (area reports): the same report for the same area, with today's data

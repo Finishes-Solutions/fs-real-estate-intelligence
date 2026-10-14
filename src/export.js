@@ -53,16 +53,20 @@ export function initExport(ctx) {
     dlg.querySelectorAll('.xfmt button').forEach(b => b.onclick = () => { st.format = b.dataset.f; save(); render(); });
     dlg.querySelectorAll('.xopts input').forEach(i => i.onchange = () => { st[i.dataset.k] = i.checked; save(); });
     dlg.querySelector('#xGo').onclick = go;
-    dlg.querySelector('#xMore')?.addEventListener('click', () => { dlg.classList.remove('on'); lastFocus = null; ctx.setView('reports'); });
+    dlg.querySelector('#xMore')?.addEventListener('click', () => { dlg.classList.remove('on'); dropToast(); lastFocus = null; ctx.setView('reports'); });
     if (keep) dlg.querySelector(keep)?.focus(); // a re-draw must not drop the keyboard out of the dialog
   }
   const opt = (k, label, show) => show ? '<label class="tg2"><input type="checkbox" data-k="' + k + '"' + (st[k] ? ' checked' : '') + '><span>' + label + '</span></label>' : '';
   let lastFocus = null;
   // open(report, { format, scope }): the Reports tab and the assistant's cards open it preset
-  function open(report, o = {}) { if (report && REPORTS[report]) st.report = report; if (o.format && REPORTS[st.report].formats.includes(o.format)) st.format = o.format; st.scope = o.scope || 'filters'; lastFocus = document.activeElement; render(); dlg.classList.add('on');
+  function open(report, o = {}) { if (report && REPORTS[report]) st.report = report; if (o.format && REPORTS[st.report].formats.includes(o.format)) st.format = o.format; st.scope = o.scope || 'filters'; lastFocus = document.activeElement; render(); dlg.classList.add('on'); liftToast();
     // focus lands on Export, or (nothing to export) on the first report choice, so Tab never starts behind the dialog
     setTimeout(() => (dlg.querySelector('#xGo:not([disabled])') || dlg.querySelector('[name=xrep]:checked') || dlg.querySelector('[name=xrep]') || dlg.querySelector('#xClose'))?.focus(), 30); }
-  function close() { dlg.classList.remove('on'); lastFocus?.focus?.(); }
+  // the note with Undo ("Filters and area set to match this export") lives in the map stage, which sits under the dialog: while the dialog is open it moves to the page body so the button can be clicked
+  let toastHome = null; const toastEl = () => document.getElementById('toast');
+  const liftToast = () => { const t = toastEl(); if (t && t.parentNode !== document.body) { toastHome = [t.parentNode, t.nextSibling]; document.body.append(t); } };
+  const dropToast = () => { const t = toastEl(); if (toastHome?.[0]?.isConnected && t?.parentNode === document.body) toastHome[0].insertBefore(t, toastHome[1]?.parentNode === toastHome[0] ? toastHome[1] : null); toastHome = null; };
+  function close() { dlg.classList.remove('on'); dropToast(); lastFocus?.focus?.(); }
   dlg.addEventListener('pointerdown', e => { if (e.target === dlg) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && dlg.classList.contains('on')) { e.preventDefault(); close(); } });
   // Tab stays inside the dialog: from the last control it wraps to the first, and from the first (Shift+Tab) to the last
