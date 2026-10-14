@@ -63,7 +63,7 @@ export function initRegrid(ctx) {
           el.querySelector('#rgUpd')?.addEventListener('click', () => look(true));
           // the property card above fills in the owner, address and value (where the state data had none) and its Regrid row (src/building.js)
           el.dispatchEvent(new CustomEvent('regrid-record', { bubbles: true, detail: d }));
-          // Harris and Waller: the owner comes from Regrid only, so the company lookup hangs off this record
+          // when the card has no appraisal owner, the company lookup hangs off this record
           const own = d.fields.find(([k]) => k === 'Owner')?.[1];
           if (own && !document.querySelector('#card #bOwnerCo:not([hidden])')) { const box = document.createElement('div'); box.className = 'oc-box'; box.hidden = true; el.querySelector('dl')?.after(box); ctx.renderOwnerCo?.(box, own); }
         } catch (e) { el.innerHTML = lt() + '<div class="rnote err">' + esc(e.message) + '</div>'; }

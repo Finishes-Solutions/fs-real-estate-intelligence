@@ -671,7 +671,7 @@ export function initSitePlan(ctx) {
     try {
       const r = await fetch('api/building?' + new URLSearchParams({ lat: c[1].toFixed(6), lon: c[0].toFixed(6), part: 'parcel' })), d = await readJSON(r);
       if (!d.parcel) throw new Error('No parcel here.');
-      if (!d.parcel.geometry) { ctx.toast('The county has no outline for that parcel (Harris and Waller need Regrid details).'); return; }
+      if (!d.parcel.geometry) { ctx.toast('The county has no outline for that parcel. Get its Regrid details on the property card first.'); return; }
       const rec = parcelOf(d.parcel, c); if (!p.parcels.some(x => x.key === rec.key)) p.parcels.push(rec);
       if (keys.includes(rec.key)) return; setParcels([...keys, rec.key]);
     } catch (e) { ctx.toast('Couldn’t look up that parcel: ' + e.message); }
@@ -1873,7 +1873,7 @@ export function initSitePlan(ctx) {
       '<span class="pj-chev" aria-hidden="true">›</span></button>';
   }
   function listHtml() {
-    if (!db.projects.length) return '<div class="pj-empty"><b>No projects yet</b><ol><li>On the map, zoom in to street level and click a parcel or building.</li><li>At the top of its card, click <b>Site plan</b>. (In Harris or Waller County, get the parcel from Regrid in the card’s Ownership section first.)</li><li>Lay out the site by hand, or describe what you want and use <b>Build with AI</b>.</li></ol><div class="btnrow"><button type="button" class="btn primary" data-go="map">Go to the Map</button></div></div>';
+    if (!db.projects.length) return '<div class="pj-empty"><b>No projects yet</b><ol><li>On the map, zoom in to street level and click a parcel or building.</li><li>At the top of its card, click <b>Site plan</b>.</li><li>Lay out the site by hand, or describe what you want and use <b>Build with AI</b>.</li></ol><div class="btnrow"><button type="button" class="btn primary" data-go="map">Go to the Map</button></div></div>';
     const list = shown();
     if (!list.length) return '<div class="pj-empty">No projects match “' + esc(pq) + '”. <button type="button" class="lnk" data-clear="1">Show all projects</button></div>';
     return mode === 'list' ? '<div class="pj-list"><div class="pj-lh" aria-hidden="true"><span></span><span>Project</span><span>Site</span><span>Options</span><span>Largest option</span><span>Updated</span><span></span></div>' + list.map(rowHtml).join('') + '</div>'

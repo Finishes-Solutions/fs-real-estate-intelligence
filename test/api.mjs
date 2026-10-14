@@ -79,3 +79,23 @@ console.log('api tests passed:', calls.length, 'mocked calls, feed items', items
   assert.match(d, /^<!doctype html>/); assert.match(d, /@page\{size:letter landscape/); assert.match(d, /<h1>A &amp; B<\/h1>/); assert.match(d, /logo-white\.png/); assert.match(d, /Sources: HPD/); assert.match(d, /Building a Future Together/);
   assert.match(reportDoc({ kicker: 'k', title: 't' }), /@page\{size:letter;/, 'portrait by default');
   console.log('report pdf ok'); }
+// county data (api/devdata): not configured -> 503; with a key, bad input -> 400, rows come from the dev_* functions,
+// a missing migration says to run the workflow
+{ const dev = (await import('../api/devdata.js')).default, get = q => ({ method: 'GET', headers: { host: 'x.test', 'x-forwarded-for': '6.6.6.' + Math.floor(Math.random() * 200) }, query: q, url: '/' });
+  const saved = { ...process.env }; delete process.env.SUPABASE_SECRET_KEY; delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  let r = mockRes(); await dev(get({ meta: '1' }), r); assert.equal(r.code, 503);
+  process.env.SUPABASE_SECRET_KEY = 'sb_secret_test'; process.env.SUPABASE_URL = 'http://devdata.test';
+  const rpcs = []; const before = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => { const u = new URL(String(url)); if (u.host !== 'devdata.test') return before(url, opts);
+    const fn = u.pathname.split('/').pop(), args = JSON.parse(opts.body || '{}'); rpcs.push([fn, args]);
+    if (fn === 'county_meta') return new Response(JSON.stringify({ message: 'Could not find the function public.county_meta' }), { status: 404 });
+    return new Response(JSON.stringify(fn === 'dev_in_box' ? [['permit:hcad:1:1:2026-01-01', 'permit', '750 Congress St', 'remodel', '2026-01-01', -95.36, 29.76, null, null, null]] : []), { status: 200 }); };
+  r = mockRes(); await dev(get({ box: '1,2,3' }), r); assert.equal(r.code, 400);
+  r = mockRes(); await dev(get({ box: '-95.4,29.7,-95.3,29.8', kinds: 'nope' }), r); assert.equal(r.code, 400, 'kinds are checked');
+  r = mockRes(); await dev(get({ box: '-95.4,29.7,-95.3,29.8', kinds: 'permit,plat', since: '2026-01-01', shapes: '1' }), r);
+  assert.equal(r.code, 200); assert.equal(r.body.rows.length, 1); assert.deepEqual(rpcs.at(-1), ['dev_in_box', { p_kinds: ['permit', 'plat'], w: -95.4, s: 29.7, e: -95.3, n: 29.8, p_since: '2026-01-01', p_limit: 4000, p_shapes: true }]);
+  r = mockRes(); await dev(get({ box: '-96,29,-95,30', kinds: 'plat', shapes: '1' }), r); assert.equal(r.code, 400, 'outlines only for a neighborhood-sized box');
+  r = mockRes(); await dev(get({ near: '29.76,-95.36', kinds: 'school,district', m: '99999' }), r); assert.equal(rpcs.at(-1)[1].p_m, 5000, 'radius capped');
+  r = mockRes(); await dev(get({ meta: '1' }), r); assert.equal(r.code, 503); assert.match(r.body.error, /County data workflow/);
+  globalThis.fetch = before; for (const k of ['SUPABASE_SECRET_KEY', 'SUPABASE_URL']) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+  console.log('devdata api ok'); }

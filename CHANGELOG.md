@@ -19,6 +19,26 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Filings › Changes:** a night with no changes says so.
 - **Reports keep their no-size-limit behaviour** (from the earlier entries today). When a big area takes too long, or its outline is too detailed to send, the report gives that reason with Retry instead of a general "not available".
 
+### 4:38 PM CT: School enrollment on the Schools layer (4b612c3)
+- School cards and the property card's nearest schools now show enrollment (TEA's October 2024 count). The first version read the wrong column, so enrollment would have been blank.
+
+### 4:22 PM CT: The development pipeline, and Harris and Waller owners without Regrid (47fe986)
+- **Five new map layers** under **Development pipeline** in Map layers, refreshed every night:
+  - **Building Permits (Harris):** about 47,000 permits from the last two years, from the Harris Central Appraisal District, colored by kind (new commercial building, new home, addition / remodel / lease space, paving, demolition). Harris County only: no other county or city in the region publishes permits as open data.
+  - **Plats & New Subdivisions:** City of Houston plat applications for the city and its ETJ (about 4,000 in two years), Fort Bend recorded subdivisions, and the Montgomery, Waller, Austin and Washington subdivision maps. Those four maps have no dates, so their subdivisions count as new from the night they first appear.
+  - **TxDOT Projects:** about 1,850 projects as lines, by stage, with cost, letting date, contractor and progress.
+  - **Water Districts (MUDs):** about 1,070 active districts with outlines, creation date, tax rate, taxable value and bonds outstanding. Creation dates are read a few hundred districts a night, so the first nights show "Checking" for some.
+  - **Schools:** public school campuses with enrollment and state rating.
+  - A **Show** picker sets how far back permits, plats and districts go (90 days, 12 months, 24 months or all).
+- **Property cards** have a **Development here & nearby** section: permits on the parcel, new building and demolition permits and plats close by, the water district the property is in, the nearest elementary, middle and high school, and TxDOT work within a mile.
+- **Harris and Waller property cards** now show the owner and value straight from the county appraisal district instead of asking you to use Regrid. Harris records have no year built or acquisition date; where condominium units share an outline the card says how many. Site plans can start from these outlines too.
+- **Ask AI** can answer "what's being permitted / platted near here", "which MUD is this in" and "schools near this lot".
+- **Data & help** lists each new source with when it last loaded.
+- Before any of this shows data, the new database tables have to be created once and the County data job run once. The assistant's prompt size limit in the tests went from 12,000 to 12,200 characters to fit the one new rule line.
+
+### 3:40 PM CT: Checking the new county data sources (0b5bf9d, d1994cf, 268a094, bb5717e)
+- Nothing changes in the app yet. This adds checks that look at what each new free source actually publishes for the seven counties: county appraisal district owner and value files, building permits, plats and new subdivisions, new MUDs and their bonds, TxDOT road projects and school enrollment. The loaders and map layers are built on what these checks find.
+
 ### 2:53 PM CT: Property, site plans, area data and reports come first; a sweep of fixes (22242e8, 2e97724, b13e5b3, ab7dae3, b22f43a, 1a507b2, f7e1dd8, f885a72, 8e80a5c)
 - **New order:** the top bar is Map · Projects · Reports · Market · Filings · My Work, with site plans (Projects) as their own tab. On phones it's Map · Explore · Projects · Reports · More. The Map panel leads with the area, Area at a Glance and reports; saved searches and Construction Filings come last. Old links still open the same pages.
 - **Layer chips follow what you use:** the most-used layers come first in the chip row and in the Layers panel. New users start with Parcels, Flood Zones, Demographics, Traffic, Satellite and 3D.
