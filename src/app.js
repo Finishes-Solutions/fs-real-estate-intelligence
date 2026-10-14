@@ -3,6 +3,7 @@ import './cursors.js';
 import { makeMatcher, encode, decode, describe } from './lib/filter.mjs';
 import { USES, entityKey } from './lib/taxonomy.mjs';
 import { recentChanges } from './lib/changes.mjs';
+import { dockSide } from './lib/planview.mjs';
 import { initTimeline } from './timeline.js';
 import { initWho, initChanges } from './views.js';
 import { initAssistant } from './assistant.js';
@@ -239,8 +240,11 @@ function fitPoints(list){
 function coverPad(base=60){ const m=map.getContainer().getBoundingClientRect(), p={top:base,bottom:base,left:base,right:base};
   for(const el of [document.getElementById('ai'),document.getElementById('card')]){ if(!el||!el.offsetParent||el.id==='card'&&!el.classList.contains('open')) continue; const r=el.getBoundingClientRect();
     if(r.width<2||r.height<2||r.right<=m.left||r.left>=m.right||r.bottom<=m.top||r.top>=m.bottom) continue;
-    if(r.width<m.width*.6){ if(r.left>m.left+m.width/2) p.right=Math.max(p.right,m.right-r.left+base/2); else if(r.right<m.left+m.width/2) p.left=Math.max(p.left,r.right-m.left+base/2); }
-    else if(r.top>m.top+m.height/3) p.bottom=Math.max(p.bottom,m.bottom-r.top+base/2); }
+    // docked to the right edge (the property card, the site plan, the assistant drawer), whatever its width; a sheet
+    // that spans the map (phones) covers the bottom instead (lib/planview.mjs)
+    const side=dockSide(r,m);
+    if(side==='right') p.right=Math.max(p.right,m.right-r.left+base/2); else if(side==='left') p.left=Math.max(p.left,r.right-m.left+base/2);
+    else if(side==='bottom') p.bottom=Math.max(p.bottom,m.bottom-r.top+base/2); }
   return p; }
 // a bounding box [[w,s],[e,n]] in view, clear of the panels; returns the zoom it lands on
 function fitBox(b,o={}){ const opt={padding:coverPad(),maxZoom:17,...o}; let z=null; try{ z=map.cameraForBounds(b,opt)?.zoom??null; }catch(e){} safeFit(b,opt); return z; }
@@ -747,6 +751,7 @@ function cardBack(){ const p=cpush; if(!p) return false; cpush=null;
 // it runs after the page's own document-level handlers.
 addEventListener('keydown',e=>{ if(e.key!=='Escape'||e.defaultPrevented||!card.classList.contains('open')) return;
   if(e.target?.closest?.('input,textarea,select,[contenteditable="true"]')) return;
+  if(card.classList.contains('sp-mode')) return; // a site plan is never closed by Esc: it steps back itself (src/siteplan.js), and × or Done closes it
   e.preventDefault(); if(!cardBack()) closeCard(); });
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
 
@@ -1010,7 +1015,11 @@ document.getElementById('orbit').onclick=()=>{ if(!resetPop.hidden) setResetOpen
 
 // ---------- toast ----------
 const toastEl=document.getElementById('toast'); let toastT=0;
-function toast(m){ toastEl.textContent=m; toastEl.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('on'),3400); }
+// toast(text) or toast(text, {action:{label, run}}): with an action the note carries a button and stays a little longer
+function toast(m,o={}){ toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a);
+  if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.onclick=()=>{ toastEl.classList.remove('on','act'); a.run(); }; toastEl.append(' ',b); }
+  toastEl.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('on','act'),o.ms||(a?6500:3400)); }
+function clearToast(){ clearTimeout(toastT); toastEl.classList.remove('on','act'); } // a mode changed: its old instruction goes
 
 // ---------- export ----------
 const fmtD=s=>new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
@@ -1170,7 +1179,7 @@ function showIntro(){ try{ localStorage.removeItem(INTRO); }catch(e){} introEl.h
 if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
-  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
+  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.
@@ -1227,7 +1236,7 @@ ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box
   if(!html){ el?.remove(); return; } if(!el){ el=document.createElement('div'); el.className='xlegend'; el.dataset.lg=id; box.appendChild(el); } if(el.innerHTML!==html) el.innerHTML=html; };
 // One Legend card: every legend above is a section with its title as a header row. One section is open at a time (the
 // newest layer's, until you pick another); the chevron folds the whole card to its header. Filings shows at every width.
-{ const box=document.getElementById('legends'), tog=document.getElementById('lgToggle'), head=box?.querySelector('.lg-h b'); let open=null, seen=new Set(), raf=0, min=false;
+{ const box=document.getElementById('legends'), tog=document.getElementById('lgToggle'), head=box?.querySelector('.lg-h b'); let open=null, seen=new Set(), raf=0, min=false, held=null;
   try{ min=localStorage.getItem('fs-legend-min')==='1'||(localStorage.getItem('fs-legend-min')==null&&matchMedia('(max-width:700px)').matches); }catch(e){}
   const keyOf=el=>el.dataset.lg||(el.id==='dLegend'?'demo':'');
   const shown=el=>el.classList.contains('dlegend')?el.classList.contains('on'):el.classList.contains('legend')?(document.documentElement.dataset.filings!=='off'||el.classList.contains('heat')):true;
@@ -1240,9 +1249,10 @@ ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box
     tog?.setAttribute('aria-expanded',String(!min)); const lab=min?'Show the legend':'Hide the legend'; tog?.setAttribute('aria-label',lab); if(tog) tog.title=lab; };
   const soon=()=>{ if(!raf) raf=requestAnimationFrame(sync); };
   if(box){ new MutationObserver(soon).observe(box,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); new MutationObserver(soon).observe(document.documentElement,{attributes:true,attributeFilter:['data-filings']});
-    const pick=e=>{ const t=e.target.closest('.t'); if(!t||!box.contains(t)||t.closest('.lg-h')) return; const el=t.parentElement; if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; if(e.type==='keydown') e.preventDefault(); open=keyOf(el); if(min){ min=false; try{ localStorage.setItem('fs-legend-min','0'); }catch(err){} } sync(); };
+    const pick=e=>{ const t=e.target.closest('.t'); if(!t||!box.contains(t)||t.closest('.lg-h')) return; const el=t.parentElement; if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; if(e.type==='keydown') e.preventDefault(); open=keyOf(el); held=null; if(min){ min=false; try{ localStorage.setItem('fs-legend-min','0'); }catch(err){} } sync(); };
     box.addEventListener('click',pick); box.addEventListener('keydown',pick);
-    box.querySelector('.lg-h').addEventListener('click',()=>{ min=!min; try{ localStorage.setItem('fs-legend-min',min?'1':'0'); }catch(e){} sync(); });
+    box.querySelector('.lg-h').addEventListener('click',()=>{ held=null; min=!min; try{ localStorage.setItem('fs-legend-min',min?'1':'0'); }catch(e){} sync(); });
+    ctx.foldLegend=v=>{ if(v==null){ if(held!=null){ min=held; held=null; sync(); } return; } if(held==null) held=min; min=!!v; sync(); }; // folded for now (the site plan on a phone), without changing the saved choice; null puts it back as it was
     sync(); } }
 syncQL=()=>ctx.syncQuickLayers?.();
 Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,

@@ -258,7 +258,7 @@ export function initBuildings(ctx) {
     // the appraisal record first: owner, value, title, the parcel outline and everything keyed on it
     const onParcel = pd => {
       if (!alive() || dropIfDuplicate(b)) return; early = true; highlight(); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
-      renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel); ready();
+      renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel); ready(); planBtn(b);
       ctx.cardStatus?.(pd.parcel ? 'Owner and value loaded for ' + (pd.parcel.situs || 'this parcel') + '.' : 'No appraisal record here; Regrid can look it up.');
       ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel);
     };
@@ -272,7 +272,13 @@ export function initBuildings(ctx) {
     // the parcel list (a building on several parcels) comes with the second lookup, so the parcel section is redrawn with it
     if (!early || d.parcels?.length > 1) renderParcel(d.parcel, d.parcelError, d.parcels);
     if (!early) { renderFilings(d.parcel?.geometry || null); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel); }
-    renderOverview(b, d); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo);
+    renderOverview(b, d); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo); planBtn(b);
+  }
+  // a parcel that's already in a project: the button opens its plan (Site plan's start card offers Open Plan first)
+  function planBtn(b) {
+    const el = card.querySelector('#bPlan'), hit = el ? ctx.sitePlan?.projectsFor?.(b.parcel, b.center) || [] : []; if (!hit.length) return;
+    const p = hit[0].p, n = p.plans.length;
+    el.textContent = 'Open site plan'; el.title = 'This parcel is in ' + p.name + ' (' + n + ' option' + (n === 1 ? '' : 's') + ')' + (hit.length > 1 ? ' and ' + (hit.length - 1) + ' more project' + (hit.length > 2 ? 's' : '') : '') + '. Open its plan, or start another option.';
   }
   ctx.buildingStats = () => { const list = selected(); return list.map(b => ({ address: b.parcel?.situs || null, ...stats(b), owner: b.parcel?.owner || null })); };
 

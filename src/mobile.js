@@ -18,8 +18,16 @@ export function initMobile(ctx) {
     // on a page (not the Map) the list is hidden so the page gets the full width; the button shows it over this page only
     // and leaves the Map's own open/closed setting alone
     if (ctx.view !== 'map' && !isPhone()) { app.classList.toggle('pview-open'); return; }
-    app.classList.toggle('pcollapsed'); try { localStorage.setItem('fs-panel', app.classList.contains('pcollapsed') ? '0' : '1'); } catch (e) {} setTimeout(() => map.resize(), 50);
+    setPanelCollapsed(!app.classList.contains('pcollapsed'), { save: true });
   };
+  // the one way the side list opens and closes; the site plan folds it away while planning without saving that choice
+  function setPanelCollapsed(on, { save = false } = {}) {
+    if ((!save && isPhone()) || app.classList.contains('pcollapsed') === !!on) return;
+    app.classList.toggle('pcollapsed', !!on); if (save) try { localStorage.setItem('fs-panel', on ? '0' : '1'); } catch (e) {}
+    map.resize(); setTimeout(() => map.resize(), 50);
+  }
+  ctx.setPanelCollapsed = setPanelCollapsed;
+  ctx.panelCollapsed = () => app.classList.contains('pcollapsed');
 
   // ---- side list width: drag the edge (or arrow keys on it); double-click goes back to the default. Saved per browser. ----
   const grip = document.getElementById('pResize'), W_KEY = 'fs-panel-w';
