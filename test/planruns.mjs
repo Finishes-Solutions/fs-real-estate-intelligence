@@ -2,7 +2,7 @@
 // lot, re-solved with a deeper front setback), matching a layout again, slimming what's saved, the Pro forma's money and
 // the projects a parcel already belongs to.
 import assert from 'node:assert/strict';
-import { baseName, layoutKeys, layoutNames, matchLayout, slimRun, finOf, projectsWith, deltaText, syncCopy, lightenRuns } from '../lib/planruns.mjs';
+import { baseName, layoutKeys, layoutNames, matchLayout, keepCurrent, slimRun, finOf, projectsWith, deltaText, syncCopy, lightenRuns } from '../lib/planruns.mjs';
 const S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayout.mjs'), PF = await import('../lib/proforma.mjs');
 
 // ---- names ----
@@ -75,3 +75,13 @@ assert.ok(two[1].plans[0].lastRun.variants.some(v => v.elements), 'the open one 
 assert.equal(lightenRuns(two, 'o4'), false, 'nothing left to slim');
 
 console.log('planruns ok: layout names and keys, matching after a re-solve, saved runs, Pro forma money, parcels in projects, team copy and full-store slimming');
+
+// More layouts keeps the layout on the map when the new run doesn't hold it
+{ const mm = (u, sp) => ({ gfa: u * 900, units: u, spaces: sp, buildings: 2, coverage: 0.1 });
+  const cur = { key: 'k-old', arr: 'Simple layout', name: 'Layout 1 · Simple layout', m: mm(58, 0), rank: 0 };
+  const nv = [{ key: 'k1', arr: 'Simple layout', name: 'Layout 1 · Simple layout', m: mm(52, 0), rank: 0 }, { key: 'k2', arr: 'Parking beside', name: 'Layout 2 · Parking beside', m: mm(52, 0), rank: -1 }];
+  const out = keepCurrent(cur, nv);
+  assert.deepEqual(out.map(v => v.key), ['k-old', 'k1', 'k2']); assert.equal(out[0].name, 'Layout 1 · Simple layout', 'the one on the map keeps its name');
+  assert.ok(/^Layout 2 · Simple layout · 52 units$/.test(out[1].name), out[1].name); assert.equal(out[2].name, 'Layout 3 · Parking beside'); assert.deepEqual(out.map(v => v.rank), [-0, -1, -2]);
+  assert.equal(keepCurrent({ ...cur, key: 'k1' }, nv), nv, 'already there: the new list as it is'); assert.equal(keepCurrent(null, nv), nv); }
+console.log('planruns keepCurrent ok');

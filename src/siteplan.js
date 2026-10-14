@@ -1343,6 +1343,7 @@ export function initSitePlan(ctx) {
     const rec = K.recommended(vs, ed.aiPick), recV = rec ? vs[rec.index] : null, badge = K.badges(vs, rec), sim = K.similar(vs), digits = K.moneyDigits(vs.flatMap(v => v.fin ? [v.fin.cost, v.fin.value, v.fin.profit] : []));
     const alive = vs.map(v => !(Array.isArray(v.elements) && !v.elements.length)), notes = K.splitNotes(vs.map((v, i) => alive[i] ? v.notes : null));
     const named1 = (K.firstSentence(ed.aiSummary).match(/\bLayout \d+/g) || []), aiFirst = rec?.by === 'ai' && !!ed.aiSummary && (!named1.length || named1.includes(numOf(recV))); // the summary's first sentence is about the recommended one
+    const liveChk = on >= 0 && pl?.elements?.length ? K.checksOf(SP.check(pl), SP.metrics(pl)) : null; // the On map card's checks: the plan as it is now, the same as the overview's
     const order = K.sortOrder(vs, by, rec ? rec.index : -1), M = x => K.fmtM(x, digits), neg = x => x != null && x < 0 ? ' neg' : '';
     const simOpen = ed.simOpen || (ed.simOpen = new Set()), whyOpen = ed.whyOpen || (ed.whyOpen = new Set());
     const followers = i => vs.map((v, j) => j).filter(j => j !== i && sim[j] === i);
@@ -1352,7 +1353,8 @@ export function initSitePlan(ctx) {
     const baseProg = (vs.find(v => !v.revisedBy) || {}).program;
     const whyBox = (v, html) => '<details class="sp-why" data-why="' + esc(v.key) + '"' + (whyOpen.has(v.key) ? ' open' : '') + '><summary>' + (v.ai ? 'Why' : 'Details') + '</summary>' + html + '</details>';
     const card1 = i => {
-      const v = vs[i], has = !!v.elements?.length, none = !alive[i], here = on === i, f = v.fin, m = v.m || {}, cl = K.checkLabel(v.chk), isRec = rec && rec.index === i;
+      const v = vs[i], has = !!v.elements?.length, none = !alive[i], here = on === i, f = v.fin, m = v.m || {}, cl = K.checkLabel(here && liveChk ? liveChk : v.chk), isRec = rec && rec.index === i;
+      const ckTip = here && liveChk && K.checkLabel(v.chk).text !== cl.text ? 'The plan on the map now; as laid out it read “' + K.checkLabel(v.chk).text + '”' : '';
       const h = K.headline(v.m, v.m1, K.askedOf(SP.normalizeProgram(v.program || pl.program))), hot = k => by === k ? ' hot' : '';
       const cell = (k, big, sub, cls = '', tip = '') => '<span class="sp-vc' + cls + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '><small>' + k + '</small><b>' + big + '</b>' + (sub ? '<i>' + sub + '</i>' : '') + '</span>';
       const ratio = m.units ? (m.spaces / m.units).toFixed(2) + ' / unit' : m.gfa ? (m.spaces / m.gfa * 1000).toFixed(1) + ' / 1,000 sf' : '';
@@ -1364,7 +1366,7 @@ export function initSitePlan(ctx) {
             cell('Yield on cost', K.fmtPct(f.yoc), f.spread != null ? 'spread <em class="' + neg(f.spread) + '">' + K.fmtPct(f.spread) + '</em>' : '', neg(f.yoc) + hot('yoc'), finTip(v, pl)))
           : cell('Value / cost', '—', has ? 'no buildings to price' : 'when laid out', '') + cell('Yield on cost', '—', '', '')) + '</span>';
       const pills = (here ? '<i class="sp-onmap">On map' + (edited ? ' · edited' : '') + '</i>' : '') + badge[i].map(b => '<i class="sp-badge' + (b === 'Recommended' ? ' rec' : '') + '">' + b + '</i>').join('') +
-        (none ? '' : '<i class="sp-ck ' + cl.level + '" title="' + (cl.level === 'ok' ? 'Inside the lot and setbacks, no overlaps, enough parking' : 'What the checks found; the details are on the map in red once it’s on the map') + '">' + esc(cl.text) + '</i>') +
+        (none ? '' : '<i class="sp-ck ' + cl.level + '" title="' + (ckTip ? esc(ckTip) : cl.level === 'ok' ? 'Inside the lot and setbacks, no overlaps, enough parking' : 'What the checks found; the details are on the map in red once it’s on the map') + '">' + esc(cl.text) + '</i>') +
         (v.ai ? '<i class="sp-score ' + scoreBand(v.ai.score) + hot('ai') + '" title="The AI review’s score, out of 100">AI ' + v.ai.score + '</i>' : '') + (ed.reviewing && has && !v.ai ? '<i class="sp-skel" aria-label="The AI is reviewing this layout">AI reviewing…</i>' : '');
       const reason = isRec ? (rec.by === 'ai' ? (aiFirst ? K.firstSentence(ed.aiSummary) : v.ai?.verdict || '') : K.engineReason(vs, i)) : '';
       const dl = recV && !isRec && !none ? K.deltas(v, recV, digits) : [];
@@ -1412,7 +1414,8 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('details[data-why]').forEach(d => d.ontoggle = () => { if (d.open) ed.whyOpen.add(d.dataset.why); else ed.whyOpen.delete(d.dataset.why); });
     card.querySelectorAll('[data-layedit]').forEach(b => b.onclick = () => { fillAsk(ed.runMeta?.ask || ed.readAs?.ask || ed.ask || ''); card.querySelector('#spAiSec')?.scrollIntoView({ block: 'nearest' }); });
     const mo = $('#spMore'); if (mo) mo.onclick = async () => { const pl2 = PL(), run = startRun('more', ['Looking for more layouts'], '#spMore'); if (!run) return; let more = []; try { more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); } catch (e) { console.warn('layout', e); } if (!live(run) || PL() !== pl2) return;
-      if (more.length) { const old = new Map((ed.variants || []).map(v => [v.key, v])), nv = named(more, pl2); for (const v of nv) { const o = old.get(v.key); if (o?.ai) v.ai = o.ai; } ed.variants = nv; ed.reviewCleared = false; saveRun(pl2); } endRun(run); }; // the AI's scores stay on the layouts it saw
+      if (more.length) { const old = new Map((ed.variants || []).map(v => [v.key, v])), nv = named(more, pl2); for (const v of nv) { const o = old.get(v.key); if (o?.ai) v.ai = o.ai; }
+        ed.variants = RUN.keepCurrent(pl2.variant?.key && old.get(pl2.variant.key), nv); ed.reviewCleared = false; saveRun(pl2); } endRun(run); }; // the AI's scores stay on the layouts it saw; the one on the map stays in the list (first) when the new run doesn't hold it
     const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; saveRun(); redrawLayouts(); so.closest('label').title = K.SORTS.find(([k]) => k === so.value)?.[2] || ''; };
     const rr = $('#spReReview'); if (rr) rr.onclick = reviewAgain;
     lazyThumbs();
