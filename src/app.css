@@ -247,6 +247,7 @@ select.chip{appearance:none;padding-right:22px;background-image:linear-gradient(
 .rnote.err{color:#c03b3a}
 .cite{border:0;background:var(--chip);border-radius:3px;padding:0 4px;font-family:var(--font-mono);font-size:10.5px;color:var(--brand);cursor:var(--cur-pointer,pointer)}
 .lnk{border:0;background:none;padding:0;color:var(--brand);font-weight:600;font-size:12px;cursor:var(--cur-pointer,pointer);text-decoration:none;text-align:left}
+.xlegend [data-dt-clear]{display:block;margin-top:6px}
 .bdg{display:inline-block;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line-2);border-radius:3px;padding:0 4px;margin-right:6px;color:var(--text-2);vertical-align:1px}
 .bdg.new{background:var(--green-700);border-color:var(--green-700);color:#fff}
 

@@ -41,7 +41,8 @@ export function initDriveTime(ctx) {
           paint: { 'text-color': ['get', 'col'], 'text-halo-color': '#fff', 'text-halo-width': 1.6 } });
         map.on('click', SRC + '-fill', e => { if (!last || !document.getElementById('card')?.classList.contains('open')) return; const m = Math.min(...e.features.map(f => f.properties.minutes)); const b = last.bands.find(x => x.minutes === m); if (b) select(b); });
       }
-      ctx.setLegend?.('drivetime', d ? '<div class="t">Drive time</div>' + d.features.map((f, i) => '<div class="li"><i style="background:' + (BAND_COL[i] || BAND_COL[3]) + '"></i>' + f.properties.minutes + ' min</div>').join('') : '');
+      ctx.setLegend?.('drivetime', d ? '<div class="t">Drive time</div>' + d.features.map((f, i) => '<div class="li"><i style="background:' + (BAND_COL[i] || BAND_COL[3]) + '"></i>' + f.properties.minutes + ' min</div>').join('') +
+        '<button class="lnk" type="button" data-dt-clear>Clear from map</button>' : '');
     } catch (e) { /* map style still loading */ }
   }
   const clear = () => { last = null; draw(null); };
@@ -110,7 +111,13 @@ export function initDriveTime(ctx) {
 
   ctx.driveTime = show;
   ctx.driveTimeData = async ({ center, minutes = [10, 20, 30], depart = 'now' }) => { const d = await fetchBands(center, minutes, depart); return { d, bands: await enrich(d) }; };
-  ctx.onCardClose?.(() => { /* the bands stay until cleared: they're useful while browsing the area */ });
+  // Closing the card (× or Esc) clears the bands. Going back to the property card keeps them, and so does opening another
+  // card (a report on a band you selected): openCard() closes the old card and opens the new one in the same moment,
+  // so the card is open again by the time this looks.
+  ctx.onCardClose?.(() => { if (last) setTimeout(() => { if (!document.getElementById('card')?.classList.contains('open')) clear(); }, 0); });
+  // the legend's "Clear from map", for bands drawn without a card (the assistant) or after the card was replaced
+  document.addEventListener('click', e => { if (!e.target.closest?.('[data-dt-clear]')) return; e.stopPropagation(); clear();
+    const c = document.getElementById('card'); if (c?.classList.contains('open') && c.querySelector('#dtClear')) ctx.closeCard?.(); }, true);
 
   // area reports: a drive-time map from the middle of the chosen area
   ctx.addAreaReport?.({ key: 'drivetime', label: 'Drive-Time Map', desc: 'How far you can drive in 10, 20 and 30 minutes (or other times) from a point, now or at rush hour, with the people, households, jobs and filings inside each band. Export as a PDF report or CSV.',
