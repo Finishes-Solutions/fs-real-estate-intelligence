@@ -169,7 +169,7 @@ export function initSitePlan(ctx) {
   }
   function leavePlanning() {
     app.classList.remove('planning'); ro?.disconnect(); ro = null; clearTimeout(roT);
-    dropScale(); mapUi.hidden = true; pillMode.hidden = true; modeKey = ''; keySig = ''; ctx.setLegend?.('siteplan', ''); app.style.removeProperty('--sp-above'); clearGone();
+    dropScale(); ctx.foldLegend?.(null); mapUi.hidden = true; pillMode.hidden = true; modeKey = ''; keySig = ''; ctx.setLegend?.('siteplan', ''); app.style.removeProperty('--sp-above'); clearGone();
     if (planState && !!ctx.panelCollapsed?.() !== planState.collapsed) ctx.setPanelCollapsed?.(planState.collapsed); // exactly as it was
     planState = null;
   }
@@ -185,7 +185,7 @@ export function initSitePlan(ctx) {
       enterPlanning();
     }
     cur = pid; renaming = false; lastOpen = { pid, plid }; killRun();
-    ed = { pid, plid, sel: null, undo: [], redo: [], mode: o.draw ? 'draw' : null, draft: [], variants: null, editing: false, run: null }; // editing: pieces can be moved only in Edit Layout
+    ed = { pid, plid, sel: null, undo: [], redo: [], mode: o.draw || !(db.projects.find(x => x.id === pid)?.plans.find(x => x.id === plid)?.ring?.length >= 3) ? 'draw' : null, draft: [], variants: null, editing: false, run: null }; // editing: pieces can be moved only in Edit Layout
     restoreRun(PL());
     hideMapBits();
     addLayers(); draw(); panel();
@@ -450,7 +450,7 @@ export function initSitePlan(ctx) {
     const roof = ['in', ['get', 'kind'], ['literal', ['building', 'garage']]], ink = { 'text-color': dark ? ['case', roof, Lb.roofInk, Lb.ink] : Lb.ink, 'text-halo-color': dark ? ['case', roof, Lb.roofHalo, Lb.halo] : Lb.halo, 'text-halo-width': 1.6 };
     add({ id: 'fs-sp-lab-p', type: 'symbol', source: SRC, minzoom: 17.5, filter: ['all', kind('label'), ['==', ['get', 'lp'], 1], ['!', sel1]], layout: { ...txt, 'text-allow-overlap': false }, paint: ink });
     add({ id: 'fs-sp-lab', type: 'symbol', source: SRC, filter: ['all', kind('label'), ['!=', ['get', 'lp'], 1], ['!', sel1]], layout: { ...txt, 'text-allow-overlap': false }, paint: ink });
-    add({ id: 'fs-sp-lab-sel', type: 'symbol', source: SRC, filter: ['all', kind('label'), sel1], layout: { ...txt, 'text-field': ['get', 't'], 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: ink }); // all of it, always
+    add({ id: 'fs-sp-lab-sel', type: 'symbol', source: SRC, filter: ['all', kind('label'), sel1], layout: { ...txt, 'text-allow-overlap': true }, paint: ink }); // always, and the others make way for it (it's on top, so placed first); as short as the others zoomed out, so it doesn't hide the outline it names
     // drawing: the line being drawn, the street edge under the pointer (Street Side, Side Street), the handles
     add({ id: 'fs-sp-hv', type: 'line', source: DSRC, filter: ['==', ['get', 'hv'], 1], layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.frontage, 'line-width': 9, 'line-opacity': .6 } });
     add({ id: 'fs-sp-dl', type: 'line', source: DSRC, filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'hv'], 1]], paint: { 'line-color': Ln.accent, 'line-width': 2.5, 'line-dasharray': [2, 1.5] } });
@@ -663,6 +663,7 @@ export function initSitePlan(ctx) {
     if (typing && !card.contains(e.target)) return; // the assistant's box and other fields handle their own Esc
     e.preventDefault(); e.stopPropagation();
     if (typing) { e.target.blur(); return; }
+    if (ed.mode === 'draw' && PL()?.ring.length < 3) { if (ed.draft.length) { ed.draft = []; draw(); panel(); } return; } // no site yet: Esc clears the corners, drawing goes on (there's nothing to go back to)
     if (ed.mode) { ed.mode = null; ed.draft = []; draw(); panel(); return; }
     if (ed.sel || ed.shape) { ed.sel = null; ed.shape = null; draw(); panel(); return; }
     if (ed.editing) { ed.editing = false; draw(); panel(); } // the mode pill on the map goes away
@@ -754,7 +755,7 @@ export function initSitePlan(ctx) {
     const wireOver = () => { card.querySelectorAll('#spOver [data-issue]').forEach(b => b.onclick = () => { ed.sel = b.dataset.issue; draw(); panel(); }); const ck = card.querySelector('#spOvCk'); if (ck) ck.onclick = () => { ed.ovOpen = !ed.ovOpen; card.querySelector('#spOver').innerHTML = overview(pl, prog); wireOver(); }; card.querySelectorAll('#spOver [data-jump]').forEach(b => b.onclick = () => card.querySelector('.bnav [data-sec="' + b.dataset.jump + '"]')?.click()); };
     wireOver();
     on('#spUndo', () => undo(true, true)); on('#spRedo', () => undo(false, true));
-    on('#spFinish', finishDraw); on('#spClearDraw', () => { ed.draft = []; draw(); panel(); }); on('#spCancelDraw', () => { ed.mode = null; ed.draft = []; draw(); panel(); });
+    on('#spFinish', finishDraw); on('#spClearDraw', () => { ed.mode = 'draw'; ed.draft = []; draw(); panel(); }); on('#spCancelDraw', () => { ed.mode = null; ed.draft = []; draw(); panel(); });
     if (drawing) { nums(); lockRun(); paintMode(); return; }
     wireBuild(pl);
     const chg = $('#spChg'); if (chg) { chg.oninput = e => { ed.chg = e.target.value; }; chg.onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) aiChange(); }; }

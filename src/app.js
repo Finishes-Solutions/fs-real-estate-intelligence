@@ -1236,7 +1236,7 @@ ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box
   if(!html){ el?.remove(); return; } if(!el){ el=document.createElement('div'); el.className='xlegend'; el.dataset.lg=id; box.appendChild(el); } if(el.innerHTML!==html) el.innerHTML=html; };
 // One Legend card: every legend above is a section with its title as a header row. One section is open at a time (the
 // newest layer's, until you pick another); the chevron folds the whole card to its header. Filings shows at every width.
-{ const box=document.getElementById('legends'), tog=document.getElementById('lgToggle'), head=box?.querySelector('.lg-h b'); let open=null, seen=new Set(), raf=0, min=false;
+{ const box=document.getElementById('legends'), tog=document.getElementById('lgToggle'), head=box?.querySelector('.lg-h b'); let open=null, seen=new Set(), raf=0, min=false, held=null;
   try{ min=localStorage.getItem('fs-legend-min')==='1'||(localStorage.getItem('fs-legend-min')==null&&matchMedia('(max-width:700px)').matches); }catch(e){}
   const keyOf=el=>el.dataset.lg||(el.id==='dLegend'?'demo':'');
   const shown=el=>el.classList.contains('dlegend')?el.classList.contains('on'):el.classList.contains('legend')?(document.documentElement.dataset.filings!=='off'||el.classList.contains('heat')):true;
@@ -1249,10 +1249,10 @@ ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box
     tog?.setAttribute('aria-expanded',String(!min)); const lab=min?'Show the legend':'Hide the legend'; tog?.setAttribute('aria-label',lab); if(tog) tog.title=lab; };
   const soon=()=>{ if(!raf) raf=requestAnimationFrame(sync); };
   if(box){ new MutationObserver(soon).observe(box,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); new MutationObserver(soon).observe(document.documentElement,{attributes:true,attributeFilter:['data-filings']});
-    const pick=e=>{ const t=e.target.closest('.t'); if(!t||!box.contains(t)||t.closest('.lg-h')) return; const el=t.parentElement; if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; if(e.type==='keydown') e.preventDefault(); open=keyOf(el); if(min){ min=false; try{ localStorage.setItem('fs-legend-min','0'); }catch(err){} } sync(); };
+    const pick=e=>{ const t=e.target.closest('.t'); if(!t||!box.contains(t)||t.closest('.lg-h')) return; const el=t.parentElement; if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; if(e.type==='keydown') e.preventDefault(); open=keyOf(el); held=null; if(min){ min=false; try{ localStorage.setItem('fs-legend-min','0'); }catch(err){} } sync(); };
     box.addEventListener('click',pick); box.addEventListener('keydown',pick);
-    box.querySelector('.lg-h').addEventListener('click',()=>{ min=!min; try{ localStorage.setItem('fs-legend-min',min?'1':'0'); }catch(e){} sync(); });
-    ctx.foldLegend=v=>{ min=!!v; sync(); }; // folded for now (the site plan on a phone), without changing the saved choice
+    box.querySelector('.lg-h').addEventListener('click',()=>{ held=null; min=!min; try{ localStorage.setItem('fs-legend-min',min?'1':'0'); }catch(e){} sync(); });
+    ctx.foldLegend=v=>{ if(v==null){ if(held!=null){ min=held; held=null; sync(); } return; } if(held==null) held=min; min=!!v; sync(); }; // folded for now (the site plan on a phone), without changing the saved choice; null puts it back as it was
     sync(); } }
 syncQL=()=>ctx.syncQuickLayers?.();
 Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
