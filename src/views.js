@@ -101,7 +101,7 @@ export function initChanges(ctx) {
         const what = k === 'new' ? fmtM(f?.cost || 0) : k === 'gone' ? fmtM(x.cost || 0) : esc(fv(k, x.from)) + ' → ' + esc(fv(k, x.to));
         return '<button class="chitem" ' + (f ? 'data-id="' + esc(f.id) + '"' : 'disabled') + '><span><b>' + esc(name) + '</b><em>' + esc(meta) + '</em></span><span class="m">' + what + '</span></button>';
       }).join('') + (its.length > 200 ? '<div class="rnote">…and ' + fmtN(its.length - 200) + ' more. Narrow the filters to see them.</div>' : '') + '</section>';
-    }).join('') || (ctx.vempty ? ctx.vempty({ icon: 'clock', title: onlyVisible ? 'No changes match your filters' : 'No changes in this check', text: onlyVisible ? fmtN(nAll) + ' filings changed, but none within the current filters.' : 'The nightly check found nothing new or changed.', actions: onlyVisible && nAll ? [{ label: 'Show all changes', id: 'chAll2', primary: true }] : [] }) : '');
+    }).join('') || (ctx.vempty ? ctx.vempty({ icon: 'clock', title: onlyVisible && nAll ? 'No changes match your filters' : 'No changes in this check', text: onlyVisible && nAll ? fmtN(nAll) + ' filings changed, but none within the current filters.' : 'The nightly check found nothing new or changed.', actions: onlyVisible && nAll ? [{ label: 'Show all changes', id: 'chAll2', primary: true }] : [] }) : '');
     body.querySelector('#chAll2')?.addEventListener('click', () => { onlyVisible = false; onlyEl.checked = false; render(); });
     // a row opens the filing's card over this page (as on Timeline); the card's "Show on map" goes to the map
     body.querySelectorAll('.chitem[data-id]').forEach(b => b.onclick = () => { const f = BY_ID.get(b.dataset.id); if (f) ctx.select(f, false); });
