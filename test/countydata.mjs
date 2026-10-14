@@ -70,8 +70,14 @@ assert.notEqual(C.districtKey('Harris County MUD 41'), C.districtKey('Harris Cou
 const list = C.tceqDistricts([
   { county: 'WALLER', district_number: '8344284', distict_name: 'WALLER COUNTY MUD 34D', district_type: 'Municipal Utility District', activity_status: 'Active', first_name: 'JIM', last_name: 'BAILEY', phone: '(713) 555-0100' },
   { county: 'WALLER', district_number: '8344284', distict_name: 'WALLER COUNTY MUD 34D', district_type: 'Municipal Utility District', activity_status: 'Active', first_name: 'ANN' },
-  { county: 'TRAVIS', district_number: '1', distict_name: 'X' }]);
-assert.equal(list.length, 1); assert.equal(list[0].county, 'Waller'); assert.ok(!JSON.stringify(list).includes('BAILEY'), 'no people');
+  { county: 'TRAVIS', district_number: '1', distict_name: 'X' },
+  { county: 'HARRIS', district_number: '2', distict_name: 'HARRIS COUNTY FCD', district_type: 'Other' },
+  { county: 'HARRIS', district_number: '3', distict_name: 'COASTAL WATER AUTHORITY', district_type: 'Other' },
+  { county: 'MONTGOMERY', district_number: '4', distict_name: 'SAN JACINTO RIVER AUTHORITY', district_type: 'River Authority' },
+  { county: 'HARRIS', district_number: '5', distict_name: 'WESTWOOD MAGNOLIA PARKWAY ID', district_type: 'Other' },
+  { county: 'HARRIS', district_number: '6', distict_name: 'CLEAR LAKE CITY WATER AUTHORITY', district_type: 'Water Control and Improvement District' },
+  { county: 'FORT BEND', district_number: '7', distict_name: 'FORT BEND SUBSIDENCE DISTRICT', district_type: 'Groundwater Conservation District' }]);
+assert.equal(list.length, 3, 'regional authorities and the flood control district are left out'); assert.equal(list[0].county, 'Waller'); assert.deepEqual(list.slice(1).map(d => d.name), ['WESTWOOD MAGNOLIA PARKWAY ID', 'CLEAR LAKE CITY WATER AUTHORITY'], 'local districts named “water authority” stay'); assert.ok(!JSON.stringify(list).includes('BAILEY'), 'no people');
 const page = '<td>District Type: MUNICIPAL MANAGEMENT DISTRICT</td><td>Creation Type: TCEQ</td> Primary County: HARRIS Financial Status: FINANCIAL REPORT FILED Acre Size: 265.878 Directors: 5 TAX BOND AUTHORITY 09/11/2023 Activity Creation Date: 09/06/2023 Activity Date: 12/31/2024';
 assert.deepEqual(C.parseIwud(page), { created: '2023-09-06', creationType: 'TCEQ', acres: 265.878, financial: 'FINANCIAL REPORT FILED', bonds: true });
 const lp = C.parseIwudList('<a href="index.cfm?fuseaction=DetailDistrict&ID=10882&command=list&name=BROOKSHIRE+KATY+DRAINAGE+DISTRICT">x</a> <a href="index.cfm?fuseaction=listdistricts&Command=NEXT&StartName=ZZ+MUD&ID=1">Next</a>');

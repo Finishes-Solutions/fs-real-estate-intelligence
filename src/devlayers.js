@@ -165,7 +165,7 @@ export function initDevLayers(ctx) {
     const here = near.filter(r => r.kind === 'permit' && ((acct && r.id.split(':')[2] === acct) || r.m <= 25));
     const permitsNear = near.filter(r => r.kind === 'permit' && !here.includes(r) && /new-|demolition/.test(r.cat || ''));
     const plats = near.filter(r => r.kind === 'plat' && (r.day || r.first_seen > '2001'));
-    const district = wide.find(r => r.kind === 'district' && r.m === 0 && r.cat === 'MUD') || wide.find(r => r.kind === 'district' && r.m === 0);
+    const district = wide.find(r => r.kind === 'district' && r.m === 0 && r.cat === 'MUD') || wide.find(r => r.kind === 'district' && r.m === 0 && DEV.district.cats[r.cat]);
     const schools = ['elementary', 'middle', 'high'].map(l => wide.find(r => r.kind === 'school' && r.cat === l)).filter(Boolean);
     const roads = wide.filter(r => r.kind === 'txdot' && r.m <= 1609 && r.cat !== 'finished').slice(0, 4);
     const mi = m => m < 160 ? Math.round(m * 3.281) + ' ft' : (m / 1609).toFixed(1) + ' mi';
