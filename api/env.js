@@ -3,46 +3,132 @@
 //   GET  ?tile=rrc|wetlands|soils/z/x/y        map layers as 256 px PNG tiles: oil & gas wells and pipelines, wetlands, soil map units
 //   GET  ?box=w,s,e,n&set=cleanup|tanks|epa|all the sites layer: [[kind, id, name, address, lon, lat]] (+ restricted groundwater areas)
 //   GET  ?lat=..&lon=..&mi=0.1                  report for a circle
-//   POST { geometry, label }                    report for a site or area (parcel, building, selection, radius)
-// A report lists, for each kind of record, everything within its search distance of the site's edge (Phase I style
-// distances), nearest first, plus soils under the site. Each source is best effort: a failing one returns { error }.
+//   POST { geometry, label }                    report for a site or area of any size (parcel, building, selection, radius, county)
+//   POST { geometry, kinds: [..] }               just those sources (retry one that didn't finish; 'soils' for soils)
+//   POST { geometry, kinds: [k], full: true, offset }  every record of one source, 8,000 at a time (the CSV export)
+// A report counts, for each kind of record, everything within its search distance of the site's edge (Phase I style
+// distances) and how many are on the site itself, and lists them nearest first (on-site first, then the nearest
+// nearby ones, when there are more than 1,000), plus soils under the site (with each soil's share for larger sites).
+// Each source is best effort: a failing or unfinished one returns { error } and can be asked for again on its own.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
-import { KINDS, RRC, NWI, SDA, SOILS_WMS, kindsIn, siteExtent, featureRow, summarize, soilsQuery, parseSoils, SOURCES } from '../lib/env.mjs';
+import { KINDS, RRC, NWI, SDA, SOILS_WMS, kindsIn, siteExtent, featureRow, summarize, soilsQuery, soilsShareQuery, parseSoils, esriPolygon, SOURCES } from '../lib/env.mjs';
 import { areaSqMi } from '../lib/fema.mjs';
 import { circle, cleanGeometry } from './crime.js';
 import { tileBBox } from './fema.js';
 
 const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (environmental screen)' };
-const MAX_SQMI = 30;
+const MAX_SQMI = 10000;   // an abuse guard only: larger than any Texas county
+const FETCH_ALL = 1000;   // a kind with up to this many records is listed in full; above it the report counts all of them
+                          // exactly, lists the on-site ones and the nearest nearby ones, and the export fetches the rest
+const PAGE = 8000;        // records per full-list request (the export pages through them; a response must stay under 4.5 MB)
+const CHUNK = 400;        // records per ArcGIS request (object ids in the URL body)
+const BUDGET_MS = 100000; // vercel.json gives this function 120 s
 async function json(url, opts = {}, ms = 15000) {
+  if (ms < 500) throw Object.assign(new Error('didn’t finish in time'), { late: true });
   const r = await fetch(url, { ...opts, headers: { ...UA, ...(opts.headers || {}) }, signal: AbortSignal.timeout(ms) });
   if (!r.ok) throw new Error(new URL(url).host + ' ' + r.status);
   const d = await r.json(); if (d?.error) throw new Error(d.error.message || 'service error'); return d;
 }
-const query = (layer, params) => json(layer + '/query', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ f: 'json', inSR: '4326', outSR: '4326', ...params }) }, 20000);
+const left = (deadline, ms) => deadline ? Math.min(ms, deadline - Date.now()) : ms;
+const query = (layer, params, deadline) => json(layer + '/query', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ f: 'json', inSR: '4326', outSR: '4326', ...params }) }, left(deadline, 25000));
+// at most n requests at a time across one report (the state and federal services are shared and can throttle)
+export function limiter(n) {
+  let active = 0; const q = [];
+  const next = () => { if (active >= n || !q.length) return; active++; const [fn, ok, no] = q.shift(); Promise.resolve().then(fn).then(ok, no).finally(() => { active--; next(); }); };
+  return fn => new Promise((ok, no) => { q.push([fn, ok, no]); next(); });
+}
+const chunks = (a, n) => { const out = []; for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n)); return out; };
 
-// everything of one kind within (site radius + search distance) of the site's center, measured to the site's edge
-export async function kindNear(kind, site, ext) {
+// the old way, kept for a service that can't search around a polygon: a circle around the site, up to 1,000 records
+export async function kindNear(kind, site, ext, deadline) {
   const K = KINDS[kind];
   const d = await query(K.url, { geometry: ext.center.join(','), geometryType: 'esriGeometryPoint', distance: String(ext.radius + K.mi + 0.01), units: 'esriSRUnit_StatuteMile',
-    spatialRel: 'esriSpatialRelIntersects', outFields: Object.values(K.f).join(','), returnGeometry: 'true', resultRecordCount: '1000', ...(K.poly || K.line ? { maxAllowableOffset: '0.00005', geometryPrecision: '6' } : {}) });
+    spatialRel: 'esriSpatialRelIntersects', outFields: Object.values(K.f).join(','), returnGeometry: 'true', resultRecordCount: '1000', ...(K.poly || K.line ? { maxAllowableOffset: '0.00005', geometryPrecision: '6' } : {}) }, deadline);
   const s = summarize(kind, (d.features || []).map(f => featureRow(kind, f, site, ext.center)));
   return d.exceededTransferLimit ? { ...s, truncated: true } : s;
 }
-export async function soils(site) {
-  const q = soilsQuery(site); if (!q) return [];
-  const d = await json(SDA, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: 'JSON+COLUMNNAME', query: q }) }, 20000);
-  return parseSoils(d);
+
+// object ids of a kind's records within mi of the site's edge (0: touching the site). ArcGIS returns every id, with no
+// record limit, so counts are exact.
+async function idsWithin(K, site, mi, run, deadline) {
+  const d = await run(() => query(K.url, { geometry: esriPolygon(site), geometryType: 'esriGeometryPolygon', spatialRel: 'esriSpatialRelIntersects', returnIdsOnly: 'true',
+    ...(mi ? { distance: String(mi), units: 'esriSRUnit_StatuteMile' } : {}) }, deadline));
+  if (!Array.isArray(d.objectIds) && d.objectIds != null) throw new Error('unexpected id list');
+  return d.objectIds || [];
 }
-export async function envReport(site, { label } = {}) {
+// the records themselves, by id: on-site ones need no geometry (their distance is 0)
+async function byIds(kind, ids, withGeom, run, deadline) {
+  const K = KINDS[kind], out = [];
+  await Promise.all(chunks(ids, CHUNK).map(part => run(async () => {
+    const d = await query(K.url, { objectIds: part.join(','), outFields: Object.values(K.f).join(','), returnGeometry: withGeom ? 'true' : 'false',
+      ...(withGeom && (K.poly || K.line) ? { maxAllowableOffset: '0.00005', geometryPrecision: '6' } : {}) }, deadline);
+    out.push(...(d.features || []));
+  })));
+  return out;
+}
+// counts by type straight from the service (wells by kind, wetlands by type with acres, pipelines as distinct lines)
+const attr = (a, name) => a[name] ?? a[name.split('.').pop()] ?? Object.entries(a).find(([k]) => k.toLowerCase().endsWith(name.split('.').pop().toLowerCase()))?.[1];
+async function statsBy(kind, site, mi, groupBy, sum, run, deadline) {
+  const K = KINDS[kind], st = [{ statisticType: 'count', onStatisticField: groupBy[0], outStatisticFieldName: 'n' }, ...(sum ? [{ statisticType: 'sum', onStatisticField: sum, outStatisticFieldName: 's' }] : [])];
+  const d = await run(() => query(K.url, { geometry: esriPolygon(site), geometryType: 'esriGeometryPolygon', spatialRel: 'esriSpatialRelIntersects', distance: String(mi), units: 'esriSRUnit_StatuteMile',
+    groupByFieldsForStatistics: groupBy.join(','), outStatistics: JSON.stringify(st), returnGeometry: 'false' }, deadline));
+  return (d.features || []).map(f => ({ keys: groupBy.map(g => attr(f.attributes || {}, g)), n: +attr(f.attributes || {}, 'n') || 0, s: sum ? +attr(f.attributes || {}, 's') || 0 : undefined }));
+}
+
+// one kind of record for a site of any size. full: one page of every record (the export; on-site first, then nearby),
+// from offset, with next = the offset of the following page or null
+export async function kindReport(kind, site, ext, { run = limiter(6), deadline, full = false, offset = 0, page = PAGE } = {}) {
+  const K = KINDS[kind];
+  // most sites: one request, everything within the search distance of the site's edge
+  if (!full) {
+    let d; try { d = await run(() => query(K.url, { geometry: esriPolygon(site), geometryType: 'esriGeometryPolygon', spatialRel: 'esriSpatialRelIntersects', distance: String(K.mi), units: 'esriSRUnit_StatuteMile',
+      outFields: Object.values(K.f).join(','), returnGeometry: 'true', ...(K.poly || K.line ? { maxAllowableOffset: '0.00005', geometryPrecision: '6' } : {}) }, deadline)); }
+    catch (e) { if (e.late) throw e; return { ...(await kindNear(kind, site, ext, deadline)), method: 'circle' }; } // service can't search around a polygon
+    if (!d.exceededTransferLimit) return summarize(kind, (d.features || []).map(f => featureRow(kind, f, site, ext.center)));
+  }
+  // more than the service returns at once: count every record by id, then fetch them in pieces
+  let near, on;
+  try { [near, on] = await Promise.all([idsWithin(K, site, K.mi, run, deadline), idsWithin(K, site, 0, run, deadline)]); }
+  catch (e) { if (e.late || full) throw e; return { ...(await kindNear(kind, site, ext, deadline)), method: 'circle' }; } // service can't search around a polygon
+  const onSet = new Set(on), nearby = near.filter(id => !onSet.has(id)), total = new Set([...near, ...on]).size;
+  if (full) {
+    const ids = [...on, ...nearby].slice(offset, offset + page), pOn = ids.filter(id => onSet.has(id)), pNear = ids.filter(id => !onSet.has(id));
+    const [a, b] = await Promise.all([byIds(kind, pOn, false, run, deadline), byIds(kind, pNear, true, run, deadline)]);
+    const rows = summarize(kind, [...a.map(f => ({ ...featureRow(kind, f, site, ext.center), mi: 0, dir: undefined })), ...b.map(f => featureRow(kind, f, site, ext.center))], { all: true }).all;
+    return { kind, rows, total, offset, next: offset + page < on.length + nearby.length ? offset + page : null };
+  }
+  const cap = FETCH_ALL, big = total > cap;
+  // on-site records first (they matter most), then the nearby ones, which need their geometry to measure the distance
+  const onIds = on.slice(0, big ? 200 : on.length), nearIds = nearby.slice(0, Math.max(0, cap - onIds.length));
+  const [fOn, fNear] = await Promise.all([byIds(kind, onIds, false, run, deadline), byIds(kind, nearIds, true, run, deadline)]);
+  const rows = [...fOn.map(f => ({ ...featureRow(kind, f, site, ext.center), mi: 0, dir: undefined })), ...fNear.map(f => featureRow(kind, f, site, ext.center))];
+  const s = summarize(kind, rows);
+  if (!big) return s;
+  // too many to list: exact totals from the id lists, type breakdowns from the service
+  const out = { ...s, count: total, onsite: on.length, listed: rows.length };
+  const part = async fn => { try { return await fn(); } catch (e) { return null; } };
+  if (kind === 'wells') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name], null, run, deadline)); if (t) out.by_type = t.map(x => ({ type: x.keys[0] || 'Unknown', n: x.n })).sort((a, b) => b.n - a.n); }
+  if (kind === 'wetlands') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name], K.f.acres, run, deadline)); if (t) out.by_type = t.map(x => ({ type: x.keys[0] || 'Unknown', n: x.n, acres: Math.round(x.s || 0) })).sort((a, b) => b.n - a.n); }
+  if (kind === 'pipelines') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name, K.f.system, K.f.commodity, K.f.diameter], null, run, deadline)); if (t) { out.count = t.length; out.segments = total; } }
+  return out;
+}
+export async function soils(site, deadline) {
+  const share = areaSqMi(site) > 3, q = share ? soilsShareQuery(site) : soilsQuery(site); if (!q) return [];
+  const ask = query => json(SDA, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: 'JSON+COLUMNNAME', query }) }, left(deadline, 30000));
+  if (!share) return parseSoils(await ask(q));
+  // share of the site by soil: heavier for USDA; fall back to the plain list if it can't
+  try { return parseSoils(await ask(q)); } catch (e) { const list = parseSoils(await ask(soilsQuery(site))); return Object.assign(list, { note: 'Share of the site by soil wasn’t available; soils are listed without it.' }); }
+}
+export async function envReport(site, { label, kinds, full = false, offset = 0, deadline = Date.now() + BUDGET_MS } = {}) {
   const sq = areaSqMi(site);
-  if (sq > MAX_SQMI) { const e = new Error('That area is too large for an environmental report (over ' + MAX_SQMI + ' square miles). Pick a smaller area or a site.'); e.status = 400; throw e; }
+  if (sq > MAX_SQMI) { const e = new Error('That area is larger than ' + MAX_SQMI.toLocaleString('en-US') + ' square miles. Pick a smaller area.'); e.status = 400; throw e; }
   const ext = siteExtent(site); if (!ext) { const e = new Error('No site shape.'); e.status = 400; throw e; }
-  const part = async fn => { try { return await fn(); } catch (e) { return { error: e.message }; } };
-  const kinds = Object.keys(KINDS), res = await Promise.all(kinds.map(k => part(() => kindNear(k, site, ext))));
-  const out = Object.fromEntries(kinds.map((k, i) => [k, res[i].error ? { kind: k, label: KINDS[k].label, search_mi: KINDS[k].mi, error: res[i].error } : res[i]]));
-  const soil = sq <= 3 ? await part(() => soils(site)) : { skipped: 'Soils are listed for sites up to 3 square miles.' };
-  return { label, area_sqmi: Math.round(sq * 1000) / 1000, center: ext.center.map(v => Math.round(v * 1e5) / 1e5), kinds: out, soils: soil, sources: SOURCES };
+  const want = (kinds?.length ? kinds.filter(k => KINDS[k]) : Object.keys(KINDS)), run = limiter(10);
+  const part = async fn => { try { return await fn(); } catch (e) { return { error: e.late ? 'didn’t finish in time' : e.message }; } };
+  const [res, soil] = await Promise.all([Promise.all(want.map(k => part(() => kindReport(k, site, ext, { run, deadline, full, offset })))),
+    !kinds?.length || kinds.includes('soils') ? part(() => soils(site, deadline)) : null]);
+  const out = Object.fromEntries(want.map((k, i) => [k, res[i].error ? { kind: k, label: KINDS[k].label, search_mi: KINDS[k].mi, error: res[i].error } : res[i]]));
+  return { label, area_sqmi: Math.round(sq * 1000) / 1000, center: ext.center.map(v => Math.round(v * 1e5) / 1e5), kinds: out, ...(soil ? { soils: soil.error ? soil : { list: soil, note: soil.note } } : {}), sources: SOURCES };
 }
 
 // ---------- the sites layer ----------
@@ -93,12 +179,14 @@ export default async function handler(req, res) {
     catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ error: e.message }); }
   }
   if (!rateLimit(req, res, { perMinute: 12, perDay: 300 })) return;
-  let g = null, label = '';
-  if (req.method === 'POST') { const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}; g = cleanGeometry(b.geometry); label = String(b.label || '').slice(0, 120); }
+  let g = null, label = '', kinds = null, full = false, offset = 0;
+  if (req.method === 'POST') { const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}; g = cleanGeometry(b.geometry); label = String(b.label || '').slice(0, 120);
+    // kinds: just these sources (retrying one that didn't finish, or 'soils'); full: every record of them (the export)
+    if (Array.isArray(b.kinds)) kinds = b.kinds.map(String).filter(k => KINDS[k] || k === 'soils').slice(0, 20); full = !!b.full && kinds?.length === 1; offset = Math.max(0, Math.floor(+b.offset || 0)); }
   else { const lat = +q.lat, lon = +q.lon, mi = Math.min(5, Math.max(0.02, +q.mi || 0.1)); if (lat > 17 && lat < 50 && lon > -125 && lon < -65) g = circle(lon, lat, mi); }
   if (!g) return res.status(400).json({ error: 'Send a Polygon or MultiPolygon geometry (POST) or lat, lon and mi.' });
   try {
-    const d = await envReport(g, { label });
+    const d = await envReport(g, { label, kinds, full, offset });
     const partial = Object.values(d.kinds).some(k => k.error) || d.soils?.error;
     res.setHeader('Cache-Control', req.method === 'POST' || partial ? 'no-store' : 'public, max-age=3600, s-maxage=604800');
     return res.json(d);

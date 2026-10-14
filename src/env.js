@@ -96,12 +96,13 @@ export function initEnv(ctx) {
 
   // ---------- the report ----------
   const circleAt = ([lon, lat], mi) => { const r = mi / 69.17, k = Math.cos(lat * Math.PI / 180), ring = []; for (let i = 0; i <= 48; i++) { const a = (i % 48) / 48 * 2 * Math.PI; ring.push([lon + r * Math.cos(a) / k, lat + r * Math.sin(a)]); } return { type: 'Polygon', coordinates: [ring] }; };
-  const reportFor = async (geometry, label) => { const r = await fetch('api/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) }), d = await readJSON(r); return d; };
+  const reportFor = async (geometry, label, more = {}) => { const r = await fetch('api/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label, ...more }) }), d = await readJSON(r); return d; };
   ctx.envReportData = reportFor;
   const ORDER = ['npl', 'superfund', 'ihwca', 'vcp', 'brownfield', 'epa_bf', 'drycleaner', 'lpst', 'landfill', 'msd', 'pst', 'rcra', 'tri', 'air', 'water'];
   const miTxt = v => v === 0 ? 'on site' : v < 0.1 ? Math.round(v * 5280) + ' ft' : v.toFixed(2) + ' mi';
   const where = r => [miTxt(r.mi), r.mi > 0 ? r.dir : ''].filter(Boolean).join(' ');
-  const errNote = x => '<div class="rnote err">Unavailable right now (' + esc(x.error) + ').</div>';
+  const errNote = x => '<div class="rnote err">' + (/in time/.test(x.error) ? 'Didn’t finish in time.' : 'Unavailable right now (' + esc(x.error) + ').') + ' <button class="btn sm" type="button" data-retry="' + esc(x.kind || 'soils') + '">Retry</button></div>';
+  const soilList = d => d.soils?.list || (Array.isArray(d.soils) ? d.soils : null);
   function headline(d) {
     const k = d.kinds, n = ks => ks.reduce((s, x) => s + (k[x]?.count || 0), 0), on = ks => ks.reduce((s, x) => s + (k[x]?.onsite || 0), 0);
     const cleanup = ['npl', 'superfund', 'ihwca', 'vcp', 'brownfield', 'epa_bf', 'drycleaner', 'lpst', 'landfill', 'msd'];
@@ -109,39 +110,60 @@ export function initEnv(ctx) {
       [fmt(k.wells?.count || 0), 'Oil & gas wells within ¼ mi'], [fmt(k.pipelines?.count || 0), 'Pipelines within ¼ mi'], [k.wetlands?.onsite ? 'Yes' : k.wetlands?.count ? 'Nearby' : 'No', 'Mapped wetlands on site']]);
   }
   function body(d, { full = false } = {}) {
-    const k = d.kinds, row = x => '<tr><td>' + esc(KINDS[x].label) + '</td><td class="mono">' + KINDS[x].mi + ' mi</td><td class="mono">' + (k[x]?.error ? '—' : fmt(k[x]?.count || 0)) + (k[x]?.truncated ? '+' : '') + '</td><td>' + (k[x]?.error ? 'unavailable' : k[x]?.nearest?.[0] ? esc(k[x].nearest[0].name) + ' · ' + esc(where(k[x].nearest[0])) : '—') + '</td></tr>';
+    const k = d.kinds, row = x => '<tr><td>' + esc(KINDS[x].label) + '</td><td class="mono">' + KINDS[x].mi + ' mi</td><td class="mono">' + (k[x]?.error ? '—' : fmt(k[x]?.count || 0)) + (k[x]?.truncated ? '+' : '') + '</td><td class="mono">' + (k[x]?.error ? '—' : fmt(k[x]?.onsite || 0)) + '</td><td>' +
+      (k[x]?.error ? (/in time/.test(k[x].error) ? 'didn’t finish' : 'unavailable') + ' <button class="btn sm" type="button" data-retry="' + x + '">Retry</button>' : k[x]?.nearest?.[0] ? esc(k[x].nearest[0].name) + ' · ' + esc(where(k[x].nearest[0])) : '—') + '</td></tr>';
+    const many = ORDER.concat(['wells', 'orphan', 'pipelines', 'wetlands']).filter(x => k[x]?.listed != null && k[x].listed < k[x].count);
     const list = (x, max) => { const s = k[x]; if (!s?.nearest?.length) return '';
-      return '<div class="env-k"><div class="fl"><span class="pl-dot" style="background:' + KINDS[x].color + '"></span>' + esc(KINDS[x].label) + ' (' + fmt(s.count) + ')</div>' + s.nearest.slice(0, max).map(r => '<div class="pl"><b>' + (r.url ? '<a target="_blank" rel="noopener" href="' + esc(r.url) + '">' + esc(r.name) + '</a>' : esc(r.name)) + '</b><span>' + esc([r.addr, r.city].filter(Boolean).join(', ')) + (r.addr || r.city ? ' · ' : '') + esc(where(r)) + (r.tanks ? ' · ' + r.tanks + ' tank' + (r.tanks > 1 ? 's' : '') : '') + (r.id ? ' · ID ' + esc(r.id) : '') + '</span></div>').join('') + '</div>'; };
+      return '<div class="env-k"><div class="fl"><span class="pl-dot" style="background:' + KINDS[x].color + '"></span>' + esc(KINDS[x].label) + ' (' + fmt(s.count) + (s.onsite ? ', ' + fmt(s.onsite) + ' on the site' : '') + ')</div>' + s.nearest.slice(0, max).map(r => '<div class="pl"><b>' + (r.url ? '<a target="_blank" rel="noopener" href="' + esc(r.url) + '">' + esc(r.name) + '</a>' : esc(r.name)) + '</b><span>' + esc([r.addr, r.city].filter(Boolean).join(', ')) + (r.addr || r.city ? ' · ' : '') + esc(where(r)) + (r.tanks ? ' · ' + r.tanks + ' tank' + (r.tanks > 1 ? 's' : '') : '') + (r.id ? ' · ID ' + esc(r.id) : '') + '</span></div>').join('') + '</div>'; };
     const w = k.wells, o = k.orphan, p = k.pipelines, wt = k.wetlands, soils = d.soils;
     return '<div class="bsec">' + headline(d) + '</div>' +
-      '<div class="bsec"><div class="lt">Records within the search distances</div><table class="mini env-t"><thead><tr><th>Database</th><th>Search</th><th>Found</th><th>Nearest</th></tr></thead><tbody>' + ORDER.map(row).join('') + '</tbody></table>' +
-      '<div class="rnote">Distances are from the edge of the site. ' + (ORDER.some(x => k[x]?.truncated) ? 'A + means the source returned its maximum; there may be more. ' : '') + 'Search distances follow common Phase I practice.</div></div>' +
+      '<div class="bsec"><div class="lt">Records within the search distances</div><table class="mini env-t"><thead><tr><th>Database</th><th>Search</th><th>Found</th><th>On site</th><th>Nearest</th></tr></thead><tbody>' + ORDER.map(row).join('') + '</tbody></table>' +
+      '<div class="rnote">Distances are from the edge of the site. ' + (ORDER.some(x => k[x]?.truncated) ? 'A + means that source could only be searched in a circle and returned its maximum; there may be more. ' : '') +
+      (many.length ? 'Every record is counted; for ' + esc(many.map(x => KINDS[x].short.toLowerCase()).join(', ')) + ' the lists below show the on-site and nearest ones, and <b>Export CSV</b> lists all of them. ' : '') + 'Search distances follow common Phase I practice.</div></div>' +
       '<div class="bsec"><div class="lt">Sites found</div>' + (ORDER.map(x => list(x, full ? 12 : 5)).join('') || '<div class="rnote">No cleanup, contamination, tank or permitted-facility records within the search distances.</div>') + '</div>' +
       '<div class="bsec"><div class="lt">Oil &amp; gas</div>' + (w?.error ? errNote(w) : '<div class="rnote">' + fmt(w?.count || 0) + ' well' + (w?.count === 1 ? '' : 's') + ' within ¼ mile' + (w?.by_type?.length ? ': ' + esc(w.by_type.map(t => t.n + ' ' + t.type.toLowerCase()).join(', ')) : '') + (w?.nearest?.[0] ? '. Nearest ' + esc(where(w.nearest[0])) + (w.nearest[0].id ? ' (API ' + esc(w.nearest[0].id) + ')' : '') : '') + '.' +
         (o?.count ? ' <b>' + fmt(o.count) + ' orphan well' + (o.count > 1 ? 's' : '') + '</b> (abandoned with no responsible operator) within ½ mile, nearest ' + esc(where(o.nearest[0])) + '.' : '') + '</div>') +
+        (p?.segments ? '<div class="rnote">' + fmt(p.count) + ' pipelines (' + fmt(p.segments) + ' mapped segments) within ¼ mile; the nearest are listed.</div>' : '') +
         (p?.error ? errNote(p) : p?.nearest?.length ? p.nearest.map(r => '<div class="pl"><b>' + esc(r.name) + '</b><span>' + esc([r.commodity, r.diameter ? r.diameter + '" pipe' : '', r.status, r.interstate === 'Y' ? 'interstate' : ''].filter(Boolean).join(' · ')) + ' · ' + esc(where(r)) + '</span></div>').join('') : '<div class="rnote">No pipelines mapped within ¼ mile.</div>') + '</div>' +
-      '<div class="bsec"><div class="lt">Wetlands</div>' + (wt?.error ? errNote(wt) : wt?.count ? wt.nearest.map(r => '<div class="pl"><b>' + esc(r.name) + '</b><span>' + esc([r.code, r.acres ? fmt(r.acres) + ' acres' : '', where(r)].filter(Boolean).join(' · ')) + '</span></div>').join('') + '<div class="rnote">US Fish &amp; Wildlife Service National Wetlands Inventory. Building in a wetland can need a federal (Section 404) permit; a delineation decides.</div>' : '<div class="rnote">No mapped wetlands on or within 500 ft of the site.</div>') + '</div>' +
-      '<div class="bsec"><div class="lt">Soils</div>' + (soils?.error ? errNote(soils) : soils?.skipped ? '<div class="rnote">' + esc(soils.skipped) + '</div>' : soils?.length ? '<table class="mini env-t"><thead><tr><th>Soil</th><th>Drainage</th><th>Flooding</th><th>Small commercial buildings</th></tr></thead><tbody>' +
-        soils.map(s => '<tr><td>' + esc(s.name) + '</td><td>' + esc(s.drainage || '—') + '</td><td>' + esc(s.flooding || '—') + '</td><td>' + esc(s.small_commercial || '—') + '</td></tr>').join('') + '</tbody></table><div class="rnote">USDA soil survey ratings for building without engineering. "Very limited" usually means shrink-swell clay, a high water table or flooding; plan a geotechnical study.</div>' : '<div class="rnote">No soil survey data here.</div>') + '</div>';
+      '<div class="bsec"><div class="lt">Wetlands</div>' + (wt?.error ? errNote(wt) : wt?.count && wt.listed < wt.count && wt.by_type?.length ? '<div class="rnote">' + fmt(wt.count) + ' mapped wetland areas on or within 500 ft of the site (' + fmt(wt.onsite) + ' on it): ' + esc(wt.by_type.slice(0, 8).map(t => t.n + ' ' + t.type.toLowerCase() + (t.acres ? ' (' + fmt(t.acres) + ' acres)' : '')).join(', ')) + '.</div><div class="rnote">US Fish &amp; Wildlife Service National Wetlands Inventory. Building in a wetland can need a federal (Section 404) permit; a delineation decides.</div>' : wt?.count ? wt.nearest.map(r => '<div class="pl"><b>' + esc(r.name) + '</b><span>' + esc([r.code, r.acres ? fmt(r.acres) + ' acres' : '', where(r)].filter(Boolean).join(' · ')) + '</span></div>').join('') + '<div class="rnote">US Fish &amp; Wildlife Service National Wetlands Inventory. Building in a wetland can need a federal (Section 404) permit; a delineation decides.</div>' : '<div class="rnote">No mapped wetlands on or within 500 ft of the site.</div>') + '</div>' +
+      '<div class="bsec"><div class="lt">Soils</div>' + (soils?.error ? errNote(soils) : soils?.skipped ? '<div class="rnote">' + esc(soils.skipped) + '</div>' : soilList(d)?.length ? (() => { const L = soilList(d), pct = L.some(s => s.pct != null), max = full ? L.length : 15;
+        return '<table class="mini env-t"><thead><tr><th>Soil</th>' + (pct ? '<th>Share</th>' : '') + '<th>Drainage</th><th>Flooding</th><th>Small commercial buildings</th></tr></thead><tbody>' +
+        L.slice(0, max).map(s => '<tr><td>' + esc(s.name) + '</td>' + (pct ? '<td class="mono">' + (s.pct != null ? s.pct + '%' : '—') + '</td>' : '') + '<td>' + esc(s.drainage || '—') + '</td><td>' + esc(s.flooding || '—') + '</td><td>' + esc(s.small_commercial || '—') + '</td></tr>').join('') + '</tbody></table>' +
+        (L.length > max ? '<div class="rnote">' + fmt(L.length - max) + ' more soils in the CSV.</div>' : '') + (soils.note ? '<div class="rnote">' + esc(soils.note) + '</div>' : '') +
+        '<div class="rnote">USDA soil survey ratings for building without engineering. "Very limited" usually means shrink-swell clay, a high water table or flooding; plan a geotechnical study.</div>'; })() : '<div class="rnote">No soil survey data here.</div>') + '</div>';
   }
   let last = null;
   async function report({ geometry, label }) {
     if (ctx.view !== 'map') ctx.setView?.('map');
     const card = openCard(ctx, { kicker: 'Environmental report', title: label, loading: 'Searching state and federal environmental records…' });
     let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return { error: e.message }; }
-    last = { d, label, geometry };
+    last = { d, label, geometry }; draw(card);
+    return d;
+  }
+  // (re)draw the card from last.d; Retry asks again for just that source and redraws
+  function draw(card) {
+    const { d, label, geometry } = last;
     fillCard(ctx, card, cardTop('Environmental report', label, (d.area_sqmi < 1 ? Math.round(d.area_sqmi * 640) + ' acres' : d.area_sqmi.toFixed(2) + ' sq mi') + ' searched, plus the distances below') + body(d) +
       '<div class="bacts"><button class="btn" id="envLayers" type="button">Show on Map</button><button class="btn primary" id="envPdf" type="button">Export PDF</button><button class="btn" id="envCsv" type="button">Export CSV</button></div>' +
       '<div class="rnote bsec">A screen of public databases, not a Phase I environmental site assessment: records can be mislocated or missing, and nothing here says whether a site is contaminated.<span class="src"> ' + esc(d.sources) + '</span></div>');
     card.querySelector('#envLayers').onclick = () => { setSitesOn(true); setRaster('rrc', true); ctx.fitGeom?.(geometry); };
     card.querySelector('#envPdf').onclick = exportPdf; card.querySelector('#envCsv').onclick = exportCsv;
-    return d;
+    card.querySelectorAll('[data-retry]').forEach(b => b.onclick = async () => {
+      const k = b.dataset.retry, mine = last; b.disabled = true; b.textContent = 'Retrying…';
+      try { const r = await reportFor(mine.geometry, mine.label, { kinds: [k] }); if (last !== mine) return; if (k === 'soils') mine.d.soils = r.soils; else mine.d.kinds[k] = r.kinds[k]; draw(card); }
+      catch (e) { b.disabled = false; b.textContent = 'Retry'; ctx.toast?.(e.message); }
+    });
   }
   ctx.envReport = report;
-  function exportCsv() {
-    if (!last) return; const rows = [], k = last.d.kinds;
-    for (const [x, s] of Object.entries(k)) for (const r of s.nearest || []) rows.push({ Database: KINDS[x].label, 'Search (mi)': KINDS[x].mi, Name: r.name, Address: [r.addr, r.city].filter(Boolean).join(', '), 'Distance (mi)': r.mi, Direction: r.dir || '', ID: r.id || r.code || '', Detail: [r.commodity, r.diameter && r.diameter + ' in', r.status, r.tanks && r.tanks + ' tanks', r.acres && r.acres + ' acres', r.type].filter(Boolean).join('; '), Link: r.url || '' });
-    for (const s of Array.isArray(last.d.soils) ? last.d.soils : []) rows.push({ Database: 'Soils (USDA)', 'Search (mi)': 0, Name: s.name, Address: '', 'Distance (mi)': 0, Direction: '', ID: '', Detail: [s.drainage, 'flooding: ' + s.flooding, 'small commercial: ' + s.small_commercial].join('; '), Link: '' });
+  async function exportCsv() {
+    if (!last) return; const rows = [], k = last.d.kinds, mine = last;
+    // a large area lists only part of some sources in the report: fetch every record of those first
+    const big = Object.entries(k).filter(([, s]) => s.listed != null && s.listed < s.count).map(([x]) => x), fullRows = {};
+    if (big.length) { ctx.toast?.('Gathering all ' + fmt(big.reduce((n, x) => n + k[x].count, 0)) + ' records…');
+      for (const x of big) { try { const all = []; for (let offset = 0; offset != null;) { const r = (await reportFor(mine.geometry, mine.label, { kinds: [x], full: true, offset })).kinds[x]; if (r?.error) throw new Error(r.error); all.push(...(r?.rows || [])); offset = r?.next ?? null; } fullRows[x] = all; } catch (e) { ctx.toast?.(KINDS[x].short + ': ' + e.message + ' (the CSV lists the ones shown)'); } } }
+    if (last !== mine) return;
+    for (const [x, s] of Object.entries(k)) for (const r of fullRows[x] || s.nearest || []) rows.push({ Database: KINDS[x].label, 'Search (mi)': KINDS[x].mi, Name: r.name, Address: [r.addr, r.city].filter(Boolean).join(', '), 'Distance (mi)': r.mi, Direction: r.dir || '', ID: r.id || r.code || '', Detail: [r.commodity, r.diameter && r.diameter + ' in', r.status, r.tanks && r.tanks + ' tanks', r.acres && r.acres + ' acres', r.type].filter(Boolean).join('; '), Link: r.url || '' });
+    for (const s of soilList(last.d) || []) rows.push({ Database: 'Soils (USDA)', 'Search (mi)': 0, Name: s.name, Address: '', 'Distance (mi)': 0, Direction: '', ID: '', Detail: [s.pct != null ? s.pct + '% of the site' : '', s.drainage, 'flooding: ' + s.flooding, 'small commercial: ' + s.small_commercial].filter(Boolean).join('; '), Link: '' });
     saveCsv(ctx, 'environmental', last.label, rows);
   }
   function exportPdf() {

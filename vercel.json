@@ -96,7 +96,7 @@
       "maxDuration": 15
     },
     "api/env.js": {
-      "maxDuration": 40
+      "maxDuration": 120
     },
     "api/entity.js": {
       "maxDuration": 15
