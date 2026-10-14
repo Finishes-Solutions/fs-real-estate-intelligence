@@ -636,6 +636,7 @@ function spy(){ spyRaf=0; if(!card.classList.contains('open')) return;
   const y=card.scrollTop, room=card.scrollHeight-card.clientHeight;
   const was=card.classList.contains('compact'), fold=y>40&&room>160?true:y<=2?false:was; if(fold!==was) card.classList.toggle('compact',fold);
   if(performance.now()<spyHold) return; // a chip was just clicked: it stays lit while the card scrolls to it
+  if(card.classList.contains('sp-mode')) return; // the site plan panel lights its own chips (src/siteplan.js)
   const nav=card.querySelector('.bnav'); if(!nav) return;
   const chips=[...nav.querySelectorAll('[data-sec]:not([hidden])')]; if(!chips.length) return;
   const off=(card.querySelector('.ctabs')?.offsetHeight||0)+(card.querySelector(':scope>.top')?.offsetHeight||0)+16;

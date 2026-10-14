@@ -3182,3 +3182,29 @@ table.who tr.nomatch td{border:0}
 #card .sp-chk li.skip::before{content:"!";border:0;transform:none;top:0;left:4px;width:auto;height:auto;font-weight:700;color:var(--amber)}
 #card .sp-chg-acts{padding:4px 0 0;align-items:center;flex-wrap:wrap}
 #card .sp-chg-acts .sp-link{margin-left:auto;font-size:12px}
+
+/* ================= site plan: robustness fixes ================= */
+/* the section chips: two rows on a computer (nothing hidden past the edge); phones keep the scrolling row with its edge fade */
+@media (min-width:701px){
+  #card .bnav{flex-wrap:wrap;overflow:visible;margin-right:0;padding-right:0;row-gap:6px}
+  #card .bnav.fl,#card .bnav.fr,#card .bnav.fl.fr{-webkit-mask-image:none;mask-image:none}
+}
+/* options can't be switched while a build runs */
+#card .sp-plans .chip:disabled{opacity:.5;cursor:var(--cur-default,default)}
+#card .sp-plans .chip[aria-pressed="true"]:disabled{opacity:.8}
+/* the option's name says it can be edited */
+#card .sp-title{cursor:text;border-bottom:1px dashed var(--line-2);border-radius:4px 4px 0 0;padding-right:22px}
+#card .sp-title:hover,#card .sp-title:focus{border-color:transparent;border-bottom-color:var(--text-2);background:no-repeat right 4px center/14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%238a928d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 13.5l.6-3L10.8 2.8a1.5 1.5 0 0 1 2.1 0l.3.3a1.5 1.5 0 0 1 0 2.1L5.5 12.9z'/%3E%3C/svg%3E")}
+/* layouts made for another site */
+.sp-ck.stale{color:var(--amber)!important;background:color-mix(in srgb,var(--amber) 14%,transparent)!important}
+.sp-var.stale .sp-vgrid{opacity:.6}
+#card .sp-body>.sp-solvebar{margin:12px 16px 0}
+@media (max-width:700px){#card .sp-body>.sp-solvebar{margin:10px 10px 0}}
+/* parcels that aren't part of the site */
+.sp-parcels .chip.sp-off{opacity:.5}
+.sp-parcels .chip.sp-off .sp-x{opacity:1}
+/* Pro forma boxes that refused a value */
+.sp-pf input.sp-bad{border-color:var(--danger);outline-color:var(--danger)}
+.sp-pf .sp-inerr{display:block;color:var(--danger);font-weight:600}
+.sp-pf .sp-inerr[hidden]{display:none}
+.sp-vc i em{white-space:nowrap}
