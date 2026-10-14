@@ -5,6 +5,24 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 6:08 PM CT: Light only, Back button, keyboard and finishing touches (d0ef7ac, 11d6abd, cafc262, 2d528f5, 7c970fd)
+- **Dark mode removed:** the app is always light, even when your device is set to dark. If you had chosen Dark or Match device, you'll see the light look next time.
+  - Settings no longer has an Appearance section.
+  - **Show sources** and **Panel width** moved to Settings › Map.
+- **Back and Forward work:** the browser's Back and Forward buttons now move between the app's pages instead of leaving the app. Your filters and picked area stay as they are.
+- **You can see where the keyboard is:** every button shows a clear green outline when you Tab to it. Before, the outline was invisible on Export, Filters, Layers and the map buttons.
+  - Switching pages from the top bar with the keyboard puts you on the new page's title.
+  - Screen readers say which page opened.
+- **Dialogs and tabs:**
+  - The Export dialog keeps Tab inside it, keeps your place when you change a choice, and returns you to the Export button when it closes.
+  - The × on a card tab is its own button, so you can reach it with the keyboard.
+- **Reduce motion:** if your device is set to reduce motion, the app's animations stop and busy spinners turn slowly. Changing the setting takes effect straight away.
+- **Small touches:**
+  - Buttons, toggles, links and rows react when you hover or press.
+  - Close (×) buttons are easier to hit, especially on touch screens.
+  - Loading notes on cards and reports show a small spinner.
+  - Error text and grey helper text are a little easier to read.
+
 ### 5:49 PM CT: Charts that move with the data (feae7b1)
 - **Charts draw in once:** the first time a chart comes into view, its bars grow up from the baseline and its lines draw across. Coming back to a page doesn't replay it.
 - **Changes you can follow:** on the Market page, switching 12 / 24 months / All, changing the county, turning a series on or off or pinning a bar now glides the bars and lines to their new values instead of redrawing them.

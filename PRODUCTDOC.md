@@ -81,13 +81,19 @@ Time-lapse is now on the Filings layer and the Filings legend (see "Construction
 
 **Back to where you were:** when something on a page takes you to the Map (a company, a change, a saved search, a past report), a **← Back to …** button appears at the top left of the map. It returns you to that page, scrolled to where you were. Its **×** dismisses it, and picking another page clears it.
 
-**Buttons** follow one pattern everywhere: the main action is a solid green button and the other choices are outlined, in light and dark mode alike. On touch screens every button, chip and map control is at least a fingertip wide.
+**Buttons** follow one pattern everywhere: the main action is a solid green button and the other choices are outlined. On touch screens every button, chip and map control is at least a fingertip wide, and close (×) buttons are easy to hit. Buttons, toggles and rows react when you hover over or press them.
+
+**The app is light only.** There is no dark mode.
+
+**Browser Back and Forward** move between the app's pages (Map, Timeline, Market, a project's page…) instead of leaving the app. Your filters and the area you picked stay as they are; only the page changes.
+
+**Keyboard:** every button, link and field shows a clear green outline when you reach it with Tab. Switching pages from the top bar with the keyboard puts you on the new page's title, and screen readers say which page opened. Dialogs such as Export keep Tab inside them until you close them (Esc), then return you to the button that opened them. If your device is set to reduce motion, the app's animations are switched off (busy spinners keep turning slowly).
 
 **Phones:** the map fills the screen. The bottom bar has **Map**, **Explore** (the left panel), **Filings**, **Market** and **More**. Filings and Market open the page you used last, with the same row of page buttons at the top as on a computer. **More** is a short list in groups:
 - **My Work:** Projects, Notes & watchlist, Saved searches.
 - **Reports & export:** the Reports page, and **Quick export** for a report straight from the map.
 - **Map tools:** Layers, Nearby (the area around you) and Pin a note (a site note at your location).
-- **Settings:** opens the full Settings page (theme, your name and team, install and the rest). The gear at the top of **Explore** opens it too.
+- **Settings:** opens the full Settings page (your name and team, the map, install and the rest). The gear at the top of **Explore** opens it too.
 - **Data & help:** data sources and how fresh they are.
 
 The tab you're on is lit: Market stays lit on Compare areas, and More is lit on its pages (for example Notes & watchlist). A green number on More means something inside it needs a look.
@@ -102,9 +108,8 @@ Cards slide up from the bottom and open part-way, showing the title, the owner a
 
 Everything you set once lives in one place: the **gear** at the top right on a computer or tablet (or press **Ctrl+,**, **⌘,** on a Mac), and **More → Settings** or the gear at the top of **Explore** on a phone. It slides in from the right on a computer and fills the screen on a phone; **Esc**, the **×** or a click outside closes it. The row of buttons at the top jumps to each part.
 
-- **Appearance:** **Light** (how the app first opens), **Dark**, or **Match device**, which follows your computer or phone and switches with it (for example at sunset). The map's colours change with it. **Show sources on cards and panels** adds a source line under the numbers on property cards and panels (exported reports always list their sources). **Panel width: Reset** puts the Map's left panel back to its normal width after you've dragged it.
 - **You & your team:** **Your name** (shown on notes and site plans you add or edit), the **team passcode** if your team uses one (hidden once saved, with **Change**), whether notes and projects are shared with the team or kept on this device, when they last synced, how many changes are waiting, and **Sync now**. Notes & watchlist and Projects show a small line at the top (for example "Shared with the team · Matthew"); click it to come here.
-- **Map:** the **Default base map** the map opens with (Default, Streets, Satellite, Topo, ESRI imagery or Free Map). **Map layers & display…** opens the Layers panel (dot grid, county lines, roads, road names, 3D and every data layer), and **Headline metrics…** opens the picker for the numbers above the filing list.
+- **Map:** the **Default base map** the map opens with (Default, Streets, Satellite, Topo, ESRI imagery or Free Map). **Map layers & display…** opens the Layers panel (dot grid, county lines, roads, road names, 3D and every data layer), and **Headline metrics…** opens the picker for the numbers above the filing list. **Show sources on cards and panels** adds a source line under the numbers on property cards and panels (exported reports always list their sources). **Panel width: Reset** puts the Map's left panel back to its normal width after you've dragged it.
 - **Saved on this device:** how many saved searches, Compare areas, site notes, projects and saved report files this browser holds, each with **Open**.
 - **App:** **Install app** when your browser offers it (or how to install on an iPhone, or "Installed ✓"), the keyboard shortcuts, and **Reset layout**. Reset layout asks first, then puts the panel (open or closed, and its width), its sections, the assistant's width, headline metrics, timeline options, export choices and the Projects view back to how they started, and reloads. Your notes, projects, saved searches, team sharing and other settings are kept.
 - **Help:** **Getting started** (the first-visit tip again), **Data sources & freshness**, and **Save voice log** (what the voice assistant heard and did this visit, for troubleshooting when it doesn't respond).
@@ -464,7 +469,6 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - **Lines:** the site boundary is drawn on top of the tree ring with a thin white edge, a little heavier as you zoom in. Zone lines and house lot lines are dotted (house lots from close zoom). Orange is only ever the street side; the line you draw and the turn dot are green.
 - **What's selected stands out:** a green outline on a white edge, a brighter fill, and the other buildings fade back a little; its label always shows, whatever the zoom, and the labels around it make way for it (zoomed out it's the name only, like the others, so it doesn't hide the outline). A piece with a problem keeps its red outline (red edge, green inside when it's also selected).
 - **Phase 2** buildings are fainter, with dashed outlines, and their label keeps the use with **PH 2** after the name ("APT BLDG 12 · PH 2").
-- **Dark mode** has its own darker ground, paving and water, buildings about 15% darker and Phase 2 pulled back rather than glaring; labels are light on dark, except on building roofs.
 - **One pill says what mode you're in,** at the top of the open part of the map, with how to use it and a button to leave: **Editing layout** (drag to move · R turns · Del removes · Esc done), **Editing the shape**, **Draw the site** or **Redraw the site**, **Street Side**, **Side Street**, **Add Entrance** and **Add or remove parcels**, with **Cancel** or **Done**. It replaces the instruction messages that used to pop up, and an old message goes away when the mode changes.
 
 **Closing a plan and getting back to it**
@@ -644,6 +648,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Light only, and easier to use from the keyboard:** dark mode is gone (the app is always light; Settings no longer has an Appearance section, and Show sources and Panel width moved to Settings › Map). The browser's Back and Forward buttons move between pages instead of leaving the app. A clear green outline shows where the keyboard is on every button (it was invisible on Export, Filters and Layers); the Export dialog keeps Tab inside it; the × on a card tab can be reached with Tab; buttons, toggles and rows react on hover; close buttons are easier to hit; loading notes show a small spinner; error text and grey helper text are easier to read; and a reduce-motion setting on your device now switches the app's animations off.
 - **Charts that move with the data:** charts across the app (Market, Timeline, Compare, the assistant's chart cards, crime and FEMA reports) draw in once when you first see them, and glide to new values when you change the range, county, filters, Group by or Measure instead of redrawing. The headline numbers and Area at a Glance count to their new values (instantly during the time-lapse). The Timeline keeps the range you dragged when you change Group by or Measure, and highlights the month under the pointer. Reduced-motion settings are respected, and exports always show the finished charts.
 - **Drive-time bands clear when you close the card:** closing a drive-time map (or the property card it came from) with × or Esc now takes the bands off the map, and the legend has a **Clear from map** link.
 - **No more size limits on area reports:** the FEMA report (was 400 square miles, and flood-zone shares only up to 60), the Air Traffic report (was 2,000) and the Traffic report (was 5,000) now take any area up to several counties. FEMA reads claims for every census tract instead of the first 60. Traffic's Export CSV lists every counted road segment, and the crime Export CSV lists up to the newest 20,000 incidents instead of 2,000.
