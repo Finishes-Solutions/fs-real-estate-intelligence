@@ -200,7 +200,7 @@ export function initMapSearch(ctx) {
     if (e.key === 'ArrowDown') { e.preventDefault(); if (active >= items.length - 1) more(); setActive(Math.min(items.length - 1, active + 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(0, active - 1)); }
     else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0) pick(active); else if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); else { if (input.value.trim() !== q) { clearTimeout(it0); run(input.value); } enterWait = pending; } } // address lookup still running: pick its first hit when it lands
-    else if (e.key === 'Escape') { close(); input.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); close(); input.blur(); }
   });
   clearB.onclick = () => { input.value = ''; run(''); clearPlace(); if (ctx.state.q) { ctx.state.q = ''; ctx.applyFilters(); } input.focus(); };
   document.addEventListener('pointerdown', e => { if (!wrap.contains(e.target)) close(); });

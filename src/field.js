@@ -70,15 +70,18 @@ export function initField(ctx) {
     else if (on && !w && info.kind === 'filing') db.watch.unshift({ id: uid(), kind: 'filing', ref: watchKey(info), label: info.f.name, sub: (info.f.city || info.f.county) + ' · ' + fmtM(info.f.cost), lng: info.f.lon, lat: info.f.lat, added: new Date().toISOString() });
     else if (on && !w) db.watch.unshift({ id: uid(), kind: 'building', ref: watchKey(info), label: info.label(), sub: info.sub(), lng: info.center[0], lat: info.center[1], added: new Date().toISOString() });
     else return !!w;
-    save(); card.querySelector('.top .star')?._paint?.(); return on;
+    save(); card.querySelector('.star')?._paint?.(); return on;
   }
+  // "☆ Watch" in the card's action row (src/app.js cardActs); cards without one get the star icon by the close button
   ctx.onCardRender(info => {
-    const top = card.querySelector('.top'), x = top?.querySelector('.x'); if (!x) return;
-    top.querySelector('.star')?.remove();
-    const b = document.createElement('button'); b.className = 'x star'; b.setAttribute('aria-label', 'Add to watchlist');
-    const paint = b._paint = () => { const on = !!findWatch(info); b.setAttribute('aria-pressed', on); b.title = on ? 'On your watchlist' : 'Add to watchlist'; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>'; };
+    const top = card.querySelector('.top'), x = top?.querySelector('.x'), slot = card.querySelector('.cact-w'); if (!x && !slot) return;
+    card.querySelectorAll('.star').forEach(s => s.remove());
+    const b = document.createElement('button'); b.type = 'button'; b.className = slot ? 'btn sm star' : 'x star'; b.setAttribute('aria-label', 'Add to watchlist');
+    const icon = on => '<svg width="' + (slot ? 14 : 16) + '" height="' + (slot ? 14 : 16) + '" viewBox="0 0 16 16" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>';
+    const paint = b._paint = () => { const on = !!findWatch(info); b.setAttribute('aria-pressed', on); b.title = on ? 'On your watchlist (My Work › Notes & watchlist). Click to remove.' : 'Add to your watchlist: you’ll see when it changes';
+      b.innerHTML = icon(on) + (slot ? (on ? 'Watching' : 'Watch') : ''); if (slot) b.removeAttribute('aria-label'); };
     b.onclick = () => { const on = setWatch(info, !findWatch(info)); paint(); ctx.toast(on ? 'Added to My Work › Watchlist.' : 'Removed from your watchlist.'); };
-    paint(); x.before(b);
+    paint(); if (slot) slot.replaceWith(b); else x.before(b);
   });
 
   // ---- site notes ----

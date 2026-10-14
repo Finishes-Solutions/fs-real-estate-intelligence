@@ -240,7 +240,7 @@ export function initCrime(ctx) {
       '<div><b class="cr-p">' + fmtN(L.p) + '</b><span>Property · ' + pct(d.change.p) + '</span></div><div><b>' + (d.per_sqmi && d.city_per_sqmi ? (d.per_sqmi.total / d.city_per_sqmi.total).toFixed(1) + '×' : '—') + '</b><span>vs Houston average</span></div></div>' +
       (d.offenses?.length ? '<dl>' + d.offenses.slice(0, 5).map(o => '<dt>' + esc(o.name) + '</dt><dd>' + fmtN(o.n) + '</dd>').join('') + '</dl>' : '') +
       (d.incidents?.length ? '<div class="rnote"><b>Most recent:</b> ' + d.incidents.slice(0, 4).map(x => esc(x.offense + ' (' + x.day + ')')).join(' · ') + '</div>' : '') +
-      '<div class="bacts"><button class="btn" type="button" data-cr="report">Full crime report</button><button class="btn" type="button" data-cr="layer">Crime map layer</button></div>' +
+      '<div class="bacts"><button class="btn" type="button" data-push data-cr="report">Full crime report</button><button class="btn" type="button" data-cr="layer">Crime map layer</button></div>' +
       '<div class="ssrc src">Reported incidents, 12 months through ' + esc(monthName(d.latest)) + ' (change vs the 12 months before). Houston Police (NIBRS); the file runs about three months behind. City of Houston only.</div>';
     el.querySelector('[data-cr="report"]').onclick = () => report({ geometry: circleMi(center, 1), label: '1 mile around ' + label(), center });
     el.querySelector('[data-cr="layer"]').onclick = () => setOn(true);

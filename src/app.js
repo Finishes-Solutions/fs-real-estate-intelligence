@@ -513,7 +513,7 @@ document.getElementById('resetAll').onclick=clearFilters;
   // only the construction filters put the filing dots on the map (the layer filters have their own layers)
   pop.addEventListener('change',e=>{ if(e.target.closest('#filtersBody')) showFilings(); }); pop.addEventListener('click',e=>{ if(e.target.closest('#filtersBody')&&e.target.closest('.chip,button[data-k],button[data-v]')) showFilings(); });
   document.addEventListener('pointerdown',e=>{ if(!pop.hidden&&!wrap.contains(e.target)&&!e.target.closest('.kpi-pop,[data-edit-filters],.vscope')) setOpen(false); }); // the scope bar's chips and Reset change the same filters, so the popup stays open
-  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!pop.hidden){ dismiss(); } });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!pop.hidden){ e.preventDefault(); dismiss(); } });
   // openFilters({at: button}): pages whose content follows the filters keep the user where they are
   openFilters=({at=null}={})=>{ const here=at&&ctx.view!=='map'&&(parentOf(ctx.view)==='filings'||['compare','reports'].includes(ctx.view));
     if(here){ if(!pop.hidden&&anchor===at){ setOpen(false); return; } setOpen(true,at); return; }
@@ -566,7 +566,7 @@ function exportMenu(items,{label='Export',cls=''}={}){
 }
 // close an open menu on a click elsewhere, after picking an item, or on Esc
 document.addEventListener('click',e=>{ document.querySelectorAll('details.vmenu[open]').forEach(d=>{ if(!d.contains(e.target)||e.target.closest('.vm-pop [role=menuitem]')) d.open=false; }); });
-document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; const d=document.querySelector('details.vmenu[open]'); if(d){ d.open=false; d.querySelector('summary')?.focus(); } });
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; const d=document.querySelector('details.vmenu[open]'); if(d){ e.preventDefault(); d.open=false; d.querySelector('summary')?.focus(); } });
 // apply a whole filter spec (URL, saved search, AI answer)
 function fromSpec(spec,{fly=true}={}){
   state.counties=new Set(spec.c&&spec.c.length?spec.c.filter(c=>COUNTIES.includes(c)):COUNTIES); if(!state.counties.size) state.counties=new Set(COUNTIES);
@@ -604,11 +604,46 @@ const card=document.getElementById('card'), panel=document.getElementById('panel
 // section chips under a card's title: one per section that has content (sections other modules add later appear as they
 // arrive); a chip scrolls the card to its section
 function cardNav(items){ return '<nav class="bnav" aria-label="Card sections">'+items.map(([id,l])=>'<button type="button" data-sec="'+id+'" hidden>'+esc(l)+'</button>').join('')+'</nav>'; }
+// the card's action row (under the title, in the pinned header; a footer on phones): a few buttons, then "⋯" with the rest.
+// items are menu entries: [label, attrs] buttons, {href,label} links (open in a new tab) or {divider:true}
+const DOTS='<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="12.5" cy="8" r="1.4"/></svg>';
+const SPARK='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5 9.4 6.6 14.5 8l-5.1 1.4L8 14.5 6.6 9.4 1.5 8l5.1-1.4z"/></svg>';
+function cardMore(items){ return '<details class="vmenu cmore"><summary class="btn sm" aria-label="More actions" title="More actions">'+DOTS+'</summary><div class="vm-pop" role="menu">'+
+  items.map(it=>it.divider?'<hr>':it.href?'<a role="menuitem" href="'+esc(it.href)+'" target="_blank" rel="noopener">'+esc(it.label)+(it.sub?'<em>'+esc(it.sub)+'</em>':'')+'</a>':'<button type="button" role="menuitem"'+(it.attrs||'')+'>'+esc(it.label)+(it.sub?'<em>'+esc(it.sub)+'</em>':'')+'</button>').join('')+'</div></details>'; }
+function cardActs(main,more){ return '<div class="cact" role="toolbar" aria-label="Actions">'+main+'<span class="cact-w"></span>'+cardMore(more)+'</div>'; }
+// a short line for screen readers (the card itself isn't a live region: it re-renders too often)
+const cardStatusEl=document.getElementById('cardStatus');
+function cardStatus(msg){ if(!cardStatusEl) return; cardStatusEl.textContent=''; requestAnimationFrame(()=>{ cardStatusEl.textContent=msg; }); }
+// copy a link that reopens this card (a filing: f=; a property: b=lat,lng)
+async function copyCardLink(extra){ const p=new URLSearchParams(hashStr()); for(const [k,v] of Object.entries(extra||{})) p.set(k,v); const u=location.href.split('#')[0]+'#'+p.toString();
+  try{ await navigator.clipboard.writeText(u); toast('Link copied. It opens this card.'); }catch(e){ prompt('Copy this link',u); } }
 let navT=0;
-function syncNav(){ card.querySelectorAll('.bnav [data-sec]').forEach(b=>{ const el=card.querySelector('#'+b.dataset.sec); b.hidden=!(el&&!el.hidden&&el.innerHTML.trim()); }); }
+function syncNav(){ card.querySelectorAll('.bnav [data-sec]').forEach(b=>{ const el=card.querySelector('#'+b.dataset.sec); b.hidden=!(el&&!el.hidden&&el.innerHTML.trim()); }); navFade(); spySoon(); }
 new MutationObserver(()=>{ cancelAnimationFrame(navT); navT=requestAnimationFrame(syncNav); }).observe(card,{childList:true,subtree:true});
+// the chip row fades at an edge that has more chips past it
+function navFade(){ const n=card.querySelector('.bnav'); if(!n) return; n.classList.toggle('fl',n.scrollLeft>2); n.classList.toggle('fr',n.scrollLeft+n.clientWidth<n.scrollWidth-2); }
+card.addEventListener('scroll',e=>{ if(e.target.classList?.contains('bnav')) navFade(); },true);
+// scroll-spy: the chip of the section at the top of the card is lit (and kept in view in the chip row); a scrolled card
+// folds its header to the title and actions
+let spyRaf=0, spyHold=0;
+const spySoon=()=>{ if(!spyRaf) spyRaf=requestAnimationFrame(spy); };
+card.addEventListener('scroll',spySoon,{passive:true});
+function spy(){ spyRaf=0; if(!card.classList.contains('open')) return;
+  const y=card.scrollTop, room=card.scrollHeight-card.clientHeight;
+  const was=card.classList.contains('compact'), fold=y>40&&room>160?true:y<=2?false:was; if(fold!==was) card.classList.toggle('compact',fold);
+  if(performance.now()<spyHold) return; // a chip was just clicked: it stays lit while the card scrolls to it
+  const nav=card.querySelector('.bnav'); if(!nav) return;
+  const chips=[...nav.querySelectorAll('[data-sec]:not([hidden])')]; if(!chips.length) return;
+  const off=(card.querySelector('.ctabs')?.offsetHeight||0)+(card.querySelector(':scope>.top')?.offsetHeight||0)+16;
+  let on=chips[0];
+  if(y>=room-4&&room>0) on=chips[chips.length-1];
+  else for(const b of chips){ const el=card.querySelector('#'+b.dataset.sec); if(el&&el.offsetTop-off<=y) on=b; }
+  for(const b of nav.querySelectorAll('[data-sec]')) b.setAttribute('aria-current',String(b===on));
+  const l=on.offsetLeft-nav.offsetLeft, r=l+on.offsetWidth;
+  if(l<nav.scrollLeft+8) nav.scrollLeft=Math.max(0,l-28); else if(r>nav.scrollLeft+nav.clientWidth-8) nav.scrollLeft=r-nav.clientWidth+28;
+  navFade(); }
 card.addEventListener('click',e=>{ const b=e.target.closest('.bnav [data-sec]'); if(!b) return; const el=card.querySelector('#'+b.dataset.sec); if(!el) return;
-  card.querySelectorAll('.bnav [data-sec]').forEach(x=>x.setAttribute('aria-current',x===b));
+  card.querySelectorAll('.bnav [data-sec]').forEach(x=>x.setAttribute('aria-current',x===b)); spyHold=performance.now()+(reduceMotion?120:900);
   // the sticky card-tabs strip and the title/pills block both sit over the content: land the section just below them
   const at=()=>el.offsetTop-(card.querySelector('.ctabs')?.offsetHeight||0)-(card.querySelector('.top')?.offsetHeight||0)-8;
   const t0=at(); card.scrollTo({top:t0,behavior:reduceMotion?'auto':'smooth'});
@@ -617,14 +652,16 @@ card.addEventListener('click',e=>{ const b=e.target.closest('.bnav [data-sec]');
 let navFix=0;
 function select(f,fly){
   showFilings();
-  cardCloseHooks.forEach(fn=>fn());
+  if(cpOpening) stopAllOrbits(); else { cpush=null; cardCloseHooks.forEach(fn=>fn()); }
   state.sel=f; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach((b,i)=>b.classList.toggle('on',visible[i]===f));
   const fld=(k,v,w)=>'<div class="f'+(w?' w':'')+'"><div class="fl">'+k+'</div><div class="fv">'+v+'</div></div>';
   const people=[['Owner',esc(f.owner||'—')],f.dev&&f.dev.toLowerCase()!==String(f.owner).toLowerCase()?['Developer',whoLink('dev',f.dev||f.owner,f.dev)]:null,f.arch?['Architect',whoLink('arch',f.arch,f.arch)]:null,f.gc?['General contractor',whoLink('gc',f.gc,f.gc)]:null].filter(Boolean);
   const gsv='https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+f.lat.toFixed(6)+','+f.lon.toFixed(6);
   card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2>'+(f.addr?'<div class="bsub">'+esc(f.addr)+'</div>':'')+'<button class="btn sm cshow" type="button" id="fShowMap">Show on map</button></div>'+
     '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>'+
-    cardNav([['fProj','Project'],['fSched','Schedule'],['fPeople','People'],['fScope','Scope'],['airSec','Air'],['briefBox','AI Brief'],['liveSec','From Here'],['fTools','Tools']])+'</div>'+
+    cardActs('<button class="btn sm askai" type="button" id="fAsk">'+SPARK+'Ask AI</button><a class="btn sm" id="fTabs" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener" title="The filing on the TDLR TABS site">TABS record ↗</a>',
+      [{href:gsv,label:'Street View ↗',sub:'Google Street View at the site'},['Add site note',' id="fNote"'],{divider:true},['Select more',' id="fMulti" title="Then click or tap more filings, buildings or parcels to compare them in tabs (or Shift-click)"'],['Copy link',' id="fLink"']].map(x=>Array.isArray(x)?{label:x[0],attrs:x[1]}:x))+
+    cardNav([['fProj','Project'],['fSched','Schedule'],['fPeople','People'],['fScope','Scope'],['airSec','Air'],['briefBox','AI Brief'],['liveSec','From Here']])+'</div>'+
     (f.sum?'<div class="bover"><div class="kicker">Overview</div><div>'+esc(f.sum)+'</div></div>':'')+
     (f.approx?'<div class="note">Location is approximate: the address didn’t geocode, so this marker sits at the city center (shaded circle), not on the site.</div>':'')+
     (f.prec==='street'?'<div class="note">Placed on '+esc((f.addr||'the street').replace(/^\s*0*\s*\d*[a-z]?(?:-\w+)?\s+/i,'').split(',')[0])+(f.zip?' in '+esc(f.zip):'')+', not at the exact site: '+(/^\s*0*[1-9]/.test(f.addr||'')?'no map service has this house number yet (often a new subdivision or a new address)':'the filing gives no house number')+'.</div>':f.prec==='intersection'?'<div class="note">Placed at the intersection named in the filing.</div>':'')+
@@ -643,20 +680,20 @@ function select(f,fly){
       ((f.tsE||f.teE)?'<div class="ssrc src">“est” dates are our estimates from the project type and value.</div>':'')+historyHtml(f)+'</div>'+
     '<div class="bsec" id="fPeople"><div class="lt">People</div><dl>'+people.map(([k,v])=>'<dt>'+k+'</dt><dd>'+v+'</dd>').join('')+'</dl><div class="ssrc src">Developer, architect and GC are AI-extracted from the filing text and can be wrong.</div></div>'+
     (f.scope?'<div class="bsec" id="fScope"><div class="lt">Scope of Work</div><div class="scope">'+esc(f.scope)+'</div></div>':'')+
-    '<div class="bsec brief-sec" id="briefBox"><div class="lt">AI Project Brief</div><button class="btn" id="briefBtn">Write a Brief</button><div class="rnote">From the filing, nearby activity and census data.</div></div>'+
-    '<div class="bsec" id="fTools"><div class="lt">Tools</div><div class="bacts">'+
-      '<a class="btn" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener">TABS Record ↗</a><a class="btn" href="'+gsv+'" target="_blank" rel="noopener">Street View ↗</a>'+
-      '<button class="btn" type="button" id="fNote">Add Site Note</button><button class="btn askai" type="button" id="fAsk">Ask AI About It</button></div></div>';
-  card.querySelector('.x').onclick=closeCard; card.classList.add('open');
+    '<div class="bsec brief-sec" id="briefBox"><div class="lt">AI Project Brief</div><button class="btn" id="briefBtn">Write a Brief</button><div class="rnote">From the filing, nearby activity and census data.</div></div>';
+  card.querySelector('.x').onclick=closeCard; card.classList.add('open'); card.scrollTop=0;
   ctx.tabs?.track({id:'f:'+f.id,kind:'filing',label:f.name,reopen:()=>select(f,false),leave:()=>{ if(state.sel===f) clearSel(); }});
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
   card.querySelector('#fShowMap').onclick=()=>{ setView('map',{user:true}); select(f,true); }; // over a page (Timeline, Changes…): only shown there
-  card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat]});
+  card.querySelector('#fNote').onclick=()=>cardPush(()=>select(f,false),f.name,()=>ctx.addNote?.({at:[f.lon,f.lat]}));
   card.querySelector('#fAsk').onclick=()=>ctx.assistant?.ask('Tell me more about '+f.name);
+  card.querySelector('#fMulti').onclick=()=>ctx.tabs?.setAdding(true);
+  card.querySelector('#fLink').onclick=()=>copyCardLink();
+  cardStatus('Filing: '+f.name);
   card.querySelector('#showAll')?.addEventListener('click',()=>{ clearHighlight(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC(),{fly:false}); select(f,false); });
   scheduleHash(); cardRenderHooks.forEach(fn=>fn({kind:'filing',f}));
-  if(fly){ const z=f.approx?Math.min(Math.max(map.getZoom(),12.5),13.5):Math.max(map.getZoom(),16); map.flyTo({center:[f.lon,f.lat],zoom:z,offset:window.innerWidth<=700?[0,-Math.round(window.innerHeight*.22)]:window.innerWidth<=1100?[-200,0]:[-140,0],duration:reduceMotion?0:900});  }
+  if(fly){ const z=f.approx?Math.min(Math.max(map.getZoom(),12.5),13.5):Math.max(map.getZoom(),16); map.flyTo({center:[f.lon,f.lat],zoom:z,offset:window.innerWidth<=700?[0,-Math.round(window.innerHeight*.2)]:window.innerWidth<=1100?[-200,0]:[-Math.round((card.offsetWidth+24)/2),0],duration:reduceMotion?0:900});  }
 }
 function whoLink(k,raw,label){ const v=entityKey(raw); return v?'<a href="#" data-who="'+k+'|'+esc(v)+'">'+esc(label)+'</a>':esc(label); }
 function historyHtml(f){
@@ -675,10 +712,42 @@ function richText(t){ return textBlocks(esc(plainText(t||''))).replace(/\[(TABS[
 function wireCites(el){ el.querySelectorAll('.cite').forEach(b=>b.onclick=()=>{ const f=BY_ID.get(b.dataset.id); if(f){ setView('map'); select(f,true); } }); }
 const cardCloseHooks=[];
 function clearSel(){ state.sel=null; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
-function closeCard(){ cardCloseHooks.forEach(fn=>fn()); card.classList.remove('open'); state.sel=null; scheduleHash(); syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
+function closeCard(){ if(cpOpening){ stopAllOrbits(); return; } // a report opening from the card: the card behind it stays selected
+  cpush=null; cardCloseHooks.forEach(fn=>fn()); card.classList.remove('open','compact'); state.sel=null; scheduleHash(); syncHighlight(); [...listEl.querySelectorAll('.item')].forEach(b=>b.classList.remove('on')); }
 function syncHighlight(){ if(map.getLayer&&map.getLayer('filings-hl')) map.setFilter('filings-hl',['==',['get','i'],state.sel?IDX.get(state.sel):-1]);
   const f=state.sel; map.getSource&&map.getSource('focus')?.setData(fc(f?[{type:'Feature',properties:{t:f.type,approx:f.approx?1:0,name:f.name.length>40?f.name.slice(0,38)+'…':f.name+(f.approx?' (approx.)':'')},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}]:[])); }
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeCard(); });
+// ---------- card "children": a report, a filing or a note opened from a property or filing card ----------
+// It takes the card over, but the card it came from stays selected (highlight, tabs, scroll), and "← <name>" in the new
+// card's header (or Esc) brings it back. Buttons that open one carry data-push; ctx.cardPush(reopen, label, run) does
+// the same from code. While one opens, closeCard() only stops the orbit and the card tabs wait behind it.
+let cpush=null, cpOpening=false, cpEnd=null;
+const cardTopEl=()=>card.querySelector(':scope>.top');
+function cardPushBegin(reopen,label){
+  if(cpOpening) return null;
+  const nested=!!cpush;
+  if(!nested){ const t=ctx.tabs?.active(), r=reopen||t?.reopen; if(!r||!card.classList.contains('open')) return null;
+    cpush={reopen:r,tabId:reopen?null:t.id,label:label||cardTopEl()?.querySelector('h2')?.textContent?.trim()||'Back',scroll:card.scrollTop}; }
+  const top0=cardTopEl(); cpOpening=true;
+  return ()=>{ cpOpening=false; if(!nested&&top0&&top0.isConnected){ cpush=null; return; } card.scrollTop=0; decorateBack(); if(cpush) cardStatus('Opened from '+cpush.label+'. Back or Esc returns to it.'); };
+}
+function cardPush(reopen,label,run){ const end=cardPushBegin(reopen,label); try{ run?.(); }finally{ end?.(); } }
+card.addEventListener('click',e=>{ if(cpOpening||!e.target.closest?.('[data-push]')) return; cpEnd=cardPushBegin(); if(cpEnd) setTimeout(()=>{ if(cpEnd){ const f=cpEnd; cpEnd=null; f(); } },0); },true);
+card.addEventListener('click',()=>{ if(cpEnd){ const f=cpEnd; cpEnd=null; f(); } });
+const BACK='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>';
+function decorateBack(){ if(!cpush||cpOpening) return; const head=cardTopEl()?.firstElementChild; if(!head||head.querySelector('.cback')) return;
+  const b=document.createElement('button'); b.type='button'; b.className='cback'; b.innerHTML=BACK+'<span></span>'; b.querySelector('span').textContent=cpush.label; b.title='Back to '+cpush.label+' (Esc)';
+  b.onclick=e=>{ e.stopPropagation(); cardBack(); }; head.prepend(b); }
+new MutationObserver(decorateBack).observe(card,{childList:true});
+function cardBack(){ const p=cpush; if(!p) return false; cpush=null;
+  if(!(p.tabId&&ctx.tabs?.reopen?.(p.tabId))) p.reopen();
+  const y=p.scroll; requestAnimationFrame(()=>{ card.scrollTop=y; setTimeout(()=>{ if(card.scrollTop<y-2) card.scrollTop=y; },400); });
+  cardStatus('Back to '+p.label+'.'); return true; }
+// Esc: back to the card a report came from, else close the card. Not while typing, and not when something else (the
+// Layers panel, a menu, the search box, Settings, a popup) already handled it: those call preventDefault. On window, so
+// it runs after the page's own document-level handlers.
+addEventListener('keydown',e=>{ if(e.key!=='Escape'||e.defaultPrevented||!card.classList.contains('open')) return;
+  if(e.target?.closest?.('input,textarea,select,[contenteditable="true"]')) return;
+  e.preventDefault(); if(!cardBack()) closeCard(); });
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
 
 // hover + click on markers
@@ -749,7 +818,7 @@ selPill&&(selPill.onclick=()=>setSelSheet(!document.querySelector('.app').classL
 document.getElementById('selClose')?.addEventListener('click',()=>setSelSheet(false));
 document.getElementById('modeCancel')?.addEventListener('click',()=>setMode('pan'));
 document.addEventListener('pointerdown',e=>{ if(document.querySelector('.app').classList.contains('sel-open')&&!e.target.closest('#mapTools,#selPill')) setSelSheet(false); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.querySelector('.app').classList.contains('sel-open')) setSelSheet(false); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.querySelector('.app').classList.contains('sel-open')){ e.preventDefault(); setSelSheet(false); } });
 function ringFeature(ring){
   const r=ring.slice(); if(r[0][0]!==r[r.length-1][0]||r[0][1]!==r[r.length-1][1]) r.push(r[0]);
   let f={type:'Polygon',coordinates:[r]}; if(d3.geoArea(f)>2*Math.PI) f={type:'Polygon',coordinates:[r.slice().reverse()]}; return f;
@@ -801,7 +870,7 @@ function finishPoly(){ const pts=draft.filter((p,i)=>i===0||d3.geoDistance(p,dra
   if(pts.length<3){ toast('A shape needs at least three points.'); return; }
   setSelection('shape','Custom shape ('+pts.length+' points)',ringFeature(pts)); setMode('pan'); }
 document.addEventListener('keydown',e=>{ if(e.target.closest&&e.target.closest('input,select,textarea')) return;
-  if(mode==='poly'&&draft.length){ if(e.key==='Enter'){e.preventDefault(); finishPoly();} else if(e.key==='Backspace'){e.preventDefault(); draft.pop(); drawDraft();} else if(e.key==='Escape'){ draft=[]; drawDraft(); } } });
+  if(mode==='poly'&&draft.length){ if(e.key==='Enter'){e.preventDefault(); finishPoly();} else if(e.key==='Backspace'){e.preventDefault(); draft.pop(); drawDraft();} else if(e.key==='Escape'){ e.preventDefault(); draft=[]; drawDraft(); } } });
 // the box around an area's own coordinates: d3.geoBounds reads a ring wound the "wrong" way (drive-time bands, circles)
 // as the whole world minus the area, which zoomed the map all the way out
 function fitGeom(g){ g=g?.geometry||g; let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
@@ -887,7 +956,7 @@ document.getElementById('layersDone')?.addEventListener('click',()=>setLayersOpe
 addEventListener('resize',placeLayers); if(layersOpen&&window.ResizeObserver) new ResizeObserver(placeLayers).observe(document.getElementById('mapleft'));
 let swallowClick=false;
 document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on')&&!layersEl.contains(e.target)&&!layersBtn.contains(e.target)&&!layersOpen?.contains(e.target)){ setLayersOpen(false); if(map.getCanvas().contains(e.target)) swallowClick=true; } });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&layersEl.classList.contains('on')) setLayersOpen(false); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&layersEl.classList.contains('on')){ e.preventDefault(); setLayersOpen(false); } });
 document.querySelectorAll('#styleSeg button').forEach(b=>{ b.onclick=()=>setBasemap(b.dataset.style); b.setAttribute('aria-pressed',b.dataset.style===layers.style); });
 document.querySelectorAll('#sizeSeg button').forEach(b=>b.onclick=()=>{ layers.size=b.dataset.size; saveLayers(); styleFilings(); });
 document.querySelectorAll('#heatSeg button').forEach(b=>b.onclick=()=>{ layers.heat=b.dataset.heat; saveLayers(); styleFilings(); });
@@ -1151,6 +1220,7 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return [...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,30).map(x=>x[0]).join(', '); } // the busiest cities and developers on screen (the voice transcriber's hint list takes the first few)
+ctx.cardPush=cardPush; ctx.cardBack=cardBack; ctx.cardChild=()=>cpush?(cpOpening?'opening':'open'):null; ctx.cardChildDrop=()=>{ cpush=null; }; ctx.cardActs=cardActs; ctx.cardStatus=cardStatus; ctx.copyCardLink=copyCardLink; ctx.SPARK=SPARK;
 ctx.setMode=setMode; ctx.setFilingsOpen=setFilingsOpen; ctx.showIntro=showIntro; ctx.filterChips=filterChips; ctx.scopeBar=scopeBar; ctx.resetFilings=resetFilings; ctx.vempty=vempty; ctx.exportMenu=exportMenu; ctx.openFilters=o=>openFilters(o); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
@@ -1186,20 +1256,10 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
 renderNav(ctx); changesBadge(); // menus first: modules look up the badge spans and the sub-tab rows
 for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan,initSettings]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
-// ---------- map buttons next to an open card ----------
-// Desktop: when there is room under the map buttons (420 px or more), the card is capped to that space and scrolls,
-// so the buttons stay in their column at the edge. Otherwise (short windows) the buttons step left of the card.
-{ const ctrlsEl=document.querySelector('.ctrls'), layersEl=document.getElementById('layers'), appEl=document.querySelector('.app'), stageEl=document.querySelector('.stage');
-  let raf=0;
-  const sync=()=>{ raf=0;
-    const open=card.classList.contains('open')&&innerWidth>1100&&!layersEl.classList.contains('on');
-    const avail=open?Math.floor(stageEl.getBoundingClientRect().bottom-16-(ctrlsEl.getBoundingClientRect().bottom+12)):0;
-    const on=open&&avail>=420; appEl.classList.toggle('card-below',on);
-    if(on) appEl.style.setProperty('--card-max',avail+'px'); else appEl.style.removeProperty('--card-max'); };
-  const soon=()=>{ if(!raf) raf=requestAnimationFrame(sync); };
-  new MutationObserver(soon).observe(card,{attributes:true,attributeFilter:['class']});
-  new MutationObserver(soon).observe(layersEl,{attributes:true,attributeFilter:['class']});
-  new ResizeObserver(soon).observe(stageEl); addEventListener('resize',soon); }
+// ---------- the card's dock ----------
+// Desktop: an open card is a full-height column at the right edge of the map (src/app.css, "property card dock"); the
+// map buttons and the controls' column step left of it (all CSS). A closed card drops its folded header.
+new MutationObserver(()=>{ if(!card.classList.contains('open')&&card.classList.contains('compact')) card.classList.remove('compact'); }).observe(card,{attributes:true,attributeFilter:['class']});
 
 // ---------- boot ----------
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
@@ -1208,12 +1268,15 @@ for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports
 { const h=location.hash.slice(1), p=new URLSearchParams(h);
   // a link with filters puts the filing dots on; the date range alone (which the app writes into the address itself) doesn't,
   // so a reload opens like a fresh start: no filings until you turn them on
-  if(h&&[...p.keys()].some(k=>k!=='v'&&k!=='f')){ if([...p.keys()].some(k=>!['v','f','d'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
+  if(h&&[...p.keys()].some(k=>!['v','f','b'].includes(k))){ if([...p.keys()].some(k=>!['v','f','d','b'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
   booting=false;
   if(p.get('v')) setView(p.get('v'));
   const f=p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));
+  // a copied property link (#b=lat,lng): that building, or the parcel there
+  const bc=!f&&(p.get('b')||'').split(',').map(Number), bll=bc&&bc.length===2&&bc.every(Number.isFinite)&&Math.abs(bc[0])<=90&&Math.abs(bc[1])<=180?[bc[1],bc[0]]:null;
+  if(bll) map.once('load',()=>{ map.jumpTo({center:bll,zoom:17.5}); map.once('idle',()=>{ if(!ctx.buildingAt?.(bll)) ctx.openBuildingAt(bll); }); });
   scheduleHash();
-  map.once('load',()=>{ if(f) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>map.flyTo({...HOME,duration:2600,essential:true}),300); else map.jumpTo(HOME); });
+  map.once('load',()=>{ if(f||bll) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>map.flyTo({...HOME,duration:2600,essential:true}),300); else map.jumpTo(HOME); });
 }
 
 // installable app + offline shell (served over https only)

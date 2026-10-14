@@ -1058,17 +1058,9 @@ path.mk-sf{fill:var(--mk-sf)} path.mk-mf{fill:var(--mk-mf)} path.mk-part{fill:va
 @media (hover:none){ .fab-sugs{display:none} }
 /* the Layers panel stops above the Ask AI button instead of running under it (it scrolls inside) */
 @media (min-width:701px){ .app:not(.ai-open) .layers{max-height:calc(100% - 112px)} }
-@media (min-width:1101px){ .app:has(.card.open){--fabr:calc(min(420px,100% - 32px) + 32px)} .app:has(.card.open):not(.card-below){--fabr:calc(min(420px,100% - 102px) + 86px)} }
 @media (max-width:1100px) and (min-width:701px){ .app:has(.card.open){--fabr:calc(min(400px,100% - 78px) + 78px)} }
 @media (max-width:700px){ .fab-sugs{display:none} }
-/* with a card open the map buttons never move (moving them left of the card left them floating mid-map on shorter
-   windows): the card sits just left of the button column, or under it when there is room (.card-below, set in app.js).
-   The Layers panel opens left of the card. */
-@media (min-width:1101px){
-  .app:has(.card.open):not(.card-below) .card{right:70px;width:min(420px,calc(100% - 102px))}
-  .app.ai-open:has(.card.open):not(.card-below) .card{right:calc(var(--aiw) + 82px)}
-  .app:has(.card.open):not(.card-below) .layers{right:var(--fabr,16px)}
-}
+/* tablets: the card sits just left of the map buttons (desktop docks it at the edge: "property card dock" below) */
 @media (max-width:1100px) and (min-width:701px){
   .app:not(.ai-open) .card{right:66px;width:min(400px,calc(100% - 78px))}
   .app:not(.ai-open):has(.card.open) .layers{right:var(--fabr,16px)}
@@ -1196,14 +1188,6 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .rp-soon p{margin:0;color:var(--muted);font-size:12.5px}
 @media (max-width:700px){ .rp-row{grid-template-columns:40px minmax(0,1fr)} .rp-act{grid-column:1/-1;justify-content:flex-start} }
 
-/* …unless there is room under them: then the card fits below the buttons (capped height, scrolls) and they stay at the edge */
-@media (min-width:1101px){
-  .app.card-below:has(.card.open) .ctrls{right:16px}
-  .app.card-below:has(.card.open) .layers{right:62px}
-  .app.card-below .card.open{max-height:var(--card-max,calc(100% - 32px))}
-  .app.card-below.ai-open:has(.card.open) .ctrls{right:calc(var(--aiw) + 28px)}
-  .app.card-below.ai-open:has(.card.open) .layers{right:calc(var(--aiw) + 74px)}
-}
 
 /* map legends: Filings and the demographics (census tract) legend side by side at the bottom left, clear of the
    Ask AI button and its suggestions on the right; the demographics one wraps above when there isn't room */
@@ -1979,8 +1963,8 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 /* the site plan in the card: a full-height column beside the map buttons (not squeezed under them), the header with
    the plan's options, Edit Layout and section chips staying put while the sections scroll, like a property card */
 @media (min-width:1101px){
-  .app #card.card.sp-mode{top:16px;bottom:16px;right:70px;width:min(480px,calc(100% - 102px));max-height:none}
-  .app:has(#card.sp-mode.open){--fabr:calc(min(480px,100% - 102px) + 86px)}
+  /* the same dock as a property card, a little wider (see "property card dock") */
+  .app:has(#card.sp-mode.open){--cardw:min(480px,calc(100% - 102px))}
 }
 #card.sp-mode .top{position:sticky;top:0;z-index:3}
 #card.sp-mode .sp-plans{flex-basis:100%;margin:10px 0 0;align-items:center}
@@ -2778,3 +2762,103 @@ table.who tr.nomatch td{border:0}
   .mtop .mcount{left:auto;right:52px;transform:none;max-width:calc(100% - 170px);overflow:hidden;text-overflow:ellipsis}
   .app:has(.fpop:not([hidden])) .mtop .mcount{display:none}
 }
+
+/* ================= property card: a full-height dock on the right, actions in the pinned header, back links ================= */
+.vh-sr{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.ctabs[hidden]{display:none!important}
+/* desktop: the card is a column from the top of the map to the bottom at its right edge; the map buttons and the
+   controls' column (search, tools, chips) step left of it, so nothing hides under it */
+@media (min-width:1101px){
+  .app{--cardw:clamp(360px,28vw,440px)}
+  .app .card,.app #card.card.sp-mode{top:12px;bottom:12px;right:12px;width:min(var(--cardw),calc(100% - 24px));max-height:none;border-radius:var(--r-md,8px)}
+  .app.ai-open .card,.app.ai-open #card.card.sp-mode{right:calc(var(--aiw) + 28px)}
+  .app:has(.card.open){--fabr:calc(var(--cardw) + 24px)}
+  .app:has(.card.open) .ctrls{right:calc(var(--cardw) + 24px)}
+  .app.ai-open:has(.card.open) .ctrls{right:calc(var(--aiw) + var(--cardw) + 40px)}
+  .app:has(.card.open) .mapleft{width:max(0px,calc(100% - var(--railw,36px) - 68px - var(--cardw)))}
+  .app.ai-open:has(.card.open) .mapleft{width:max(0px,calc(100% - var(--aiw) - var(--railw,36px) - 84px - var(--cardw)))}
+  /* a card open over a page (Timeline, Changes…) docks the same way, and the page makes room for it */
+  .app:has(.card.open:not(.min)) .stage:not([data-view="map"]) .view{padding-right:calc(var(--cardw) + 36px)}
+}
+/* header: back link, kicker, title, owner · value, the action row, then the section chips */
+#card .top{padding:14px 16px 10px}
+#card .top h2{font-size:19px}
+#card .top .cact{flex-basis:100%;display:flex;align-items:center;gap:6px;margin-top:10px;min-width:0}
+#card .cact .btn{white-space:nowrap;padding:5px 10px;font-size:12.5px}
+#card .cact .askai{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+#card .cact .askai:hover:not([disabled]){background:color-mix(in srgb,var(--brand) 86%,var(--text))}
+#card .cact .askai[disabled]{opacity:.6;cursor:progress}
+#card .cact .askai[aria-busy="true"] svg{animation:cact-spin 1.1s linear infinite}
+@keyframes cact-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){ #card .cact .askai[aria-busy="true"] svg{animation:none} }
+#card .cact .star{color:var(--text)}
+#card .cact .star svg{color:var(--c-heb)}
+#card .cact .star[aria-pressed="true"]{border-color:var(--c-heb);background:color-mix(in srgb,var(--c-heb) 10%,var(--panel))}
+#card .cact .cmore{margin-left:auto}
+#card .cact .cmore>summary{padding:0 9px;justify-content:center}
+#card .cmore .vm-pop{min-width:230px}
+#card .cmore .vm-pop>a{display:block;border-radius:6px;padding:8px 10px;font:600 13px/1.3 var(--font-display);color:var(--text);text-decoration:none}
+#card .cmore .vm-pop>a:hover,#card .cmore .vm-pop>a:focus-visible{background:var(--chip);outline:none}
+#card .cmore #bOrbit.on{color:var(--brand)}
+/* "← 1200 Main St": a report, filing or note opened from a card goes back to it */
+#card .cback{display:flex;align-items:center;gap:4px;max-width:100%;margin:-4px 0 6px -6px;padding:4px 8px 4px 4px;border:0;border-radius:6px;background:transparent;color:var(--brand);font:600 12.5px/1.2 var(--font-display);cursor:var(--cur-pointer,pointer)}
+#card .cback span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#card .cback:hover,#card .cback:focus-visible{background:var(--chip)}
+/* scrolled: the header folds to the title and the actions */
+#card.compact .top .kicker,#card.compact .top .bsub,#card.compact .top .cshow{display:none}
+#card.compact .top{padding-top:10px}
+#card.compact .top h2{font-size:16px;margin-top:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#card.compact .top .cact{margin-top:8px}
+/* section chips: the one in view is lit; the row fades where more chips are past the edge */
+#card .bnav{margin-top:10px}
+#card .bnav button{min-height:28px;padding:5px 10px}
+#card .bnav.fr{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 40px),transparent)}
+#card .bnav.fl{-webkit-mask-image:linear-gradient(90deg,transparent,#000 40px);mask-image:linear-gradient(90deg,transparent,#000 40px)}
+#card .bnav.fl.fr{-webkit-mask-image:linear-gradient(90deg,transparent,#000 40px,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(90deg,transparent,#000 40px,#000 calc(100% - 40px),transparent)}
+/* density: smaller section headings and icons, label | value rows (40 / 60, both left-aligned) */
+#card .bsec,#card .hist,#card .brief,#card .bover{margin:10px 12px 0;padding:12px 14px;gap:8px}
+#card .lt{font-size:13px;gap:8px}
+#card .lt::before{width:20px;height:20px;border-radius:5px;background-size:12px}
+#card dl{grid-template-columns:minmax(0,2fr) minmax(0,3fr)}
+#card dt{padding-right:12px;font-size:12.5px}
+#card dd{text-align:left;font-size:12.5px}
+#card .fgrid{gap:10px 14px}
+#card .fv{font-size:13px}
+/* Ownership: Regrid fills the gaps */
+#card .rg-cta{display:block;width:100%;text-align:center;white-space:normal;line-height:1.3;padding:9px 12px}
+#card.min .cact{display:none} /* minimized: just the title bar */
+#card .rg-cta span,#card .rg-row .lnk span{font-weight:500;opacity:.85}
+#card .rg-row{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:8px;font-size:12.5px;color:var(--text-2)}
+#card .rg-row .lnk{font-size:12.5px;white-space:nowrap}
+#card #bRegrid:has(#rgGo){display:none} /* its button is the one in Ownership; the section shows with the record */
+#card #bParcel:has(+ #bRegrid dl) .rg-cta,#card #bParcel:has(+ #bRegrid dl) .rg-row{display:none} /* looked up: the record is right below */
+#card .more-rec .fl{margin-top:8px}
+/* the company behind the owner: one line, details on demand */
+#card .oc-box.oc-one{padding:0;border:0;margin-top:2px}
+#card .oc-sum{border:1px solid var(--line);border-radius:8px;padding:0 10px}
+#card .oc-sum>summary{list-style:none;display:flex;align-items:baseline;gap:8px;padding:8px 0;cursor:var(--cur-pointer,pointer)}
+#card .oc-sum>summary::-webkit-details-marker{display:none}
+#card .oc-sum[open]{padding-bottom:8px}
+#card .oc-line{flex:1;min-width:0;font-size:12.5px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#card .oc-line b{color:var(--text);font-weight:600}
+#card .oc-line .fl{margin-right:2px}
+#card .oc-more{flex:none;font:600 12px var(--font-display);color:var(--brand)}
+#card .oc-more::after{content:" ▸"}
+#card .oc-sum[open] .oc-more::after{content:" ▾"}
+/* phones: the sheet opens at peek height with the action row as a footer; swipe up for half, then full */
+@media (max-width:700px){
+  .card{max-height:44%}
+  .card.half{max-height:72%}
+  .card.full{max-height:calc(100% - 6px)}
+  .card.adding,.card.adding.half,.card.adding.full{max-height:30%}
+  #card .top{padding:6px 16px 8px}
+  #card .top h2{font-size:18px}
+  #card>.cact{position:sticky;bottom:-14px;z-index:3;display:flex;align-items:center;gap:8px;margin:12px 0 -14px;padding:8px 12px;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -6px 16px rgba(11,13,12,.08)}
+  #card>.cact .btn{min-height:44px;flex:1 1 0;justify-content:center;padding:0 8px;font-size:13px}
+  #card>.cact .cmore{flex:none;margin:0}
+  #card>.cact .cmore>summary{min-height:44px;width:48px;flex:none}
+  /* the menu floats above the footer over the map (inside the sheet it would be cut off at peek height) */
+  #card>.cact .vm-pop{position:fixed;top:auto;left:12px;right:12px;bottom:calc(var(--navh) + var(--sb) + 72px);max-width:none;max-height:calc(100% - var(--navh) - var(--sb) - 140px);overflow:auto;box-shadow:0 10px 30px rgba(11,13,12,.28)}
+  #card .bsec,#card .hist,#card .brief,#card .bover{margin:10px 10px 0}
+}
+@media (pointer:coarse){ #card .cact .btn,#card .cback{min-height:40px} }

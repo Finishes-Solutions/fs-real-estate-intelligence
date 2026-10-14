@@ -1,4 +1,4 @@
-// Projects and site plans. From a property card (Site Tools → Start Site Plan), start a project or add the parcel to
+// Projects and site plans. From a property card (the Site plan button at the top), start a project or add the parcel to
 // one, then lay out a site plan on the map: buildings, parking (stalls counted as you size it), drives, truck court,
 // detention and landscape, checked against setbacks, with coverage, FAR and parking numbers. "Build with AI" turns a
 // request ("25,000 sf retail strip") into a program (api/siteplan) and lib/siteplan.mjs lays out three options.
@@ -97,7 +97,7 @@ export function initSitePlan(ctx) {
       '<div class="bsec sp-start"><div class="lt">Project</div>' +
       '<label class="sp-radio"><input type="radio" name="spP" value="" checked> New project <input id="spName" class="sp-in" value="' + esc(recs[0]?.label || label) + '" aria-label="Project name"></label>' +
       recent.map(p => '<label class="sp-radio"><input type="radio" name="spP" value="' + esc(p.id) + '"> Add to <b>' + esc(p.name) + '</b> <span class="rnote">' + p.plans.length + ' plan' + (p.plans.length === 1 ? '' : 's') + '</span></label>').join('') +
-      '<div class="lt" style="margin-top:12px">Site</div><div class="rnote">' + (b ? (many ? recs.length + ' parcel outlines from the county appraisal district, merged into one site (small gaps and overlaps between them are closed up).' : 'The parcel outline from ' + (list[0]?.regrid ? 'Regrid' : 'the county appraisal district') + '.') + ' You can add or remove parcels, or redraw the site, in the plan.' : 'There’s no parcel outline here (Harris and Waller parcels need Regrid details first). You’ll draw the site on the map.') + '</div>' +
+      '<div class="lt" style="margin-top:12px">Site</div><div class="rnote">' + (b ? (many ? recs.length + ' parcel outlines from the county appraisal district, merged into one site (small gaps and overlaps between them are closed up).' : 'The parcel outline from ' + (list[0]?.regrid ? 'Regrid' : 'the county appraisal district') + '.') + ' You can add or remove parcels, or redraw the site, in the plan.' : 'There’s no parcel outline here (in Harris and Waller County, use “Get owner, value &amp; zoning from Regrid” on the property card first). You’ll draw the site on the map.') + '</div>' +
       (b?.pieces > 1 ? '<div class="rnote sp-warn">Some parcels don’t touch the rest (a road or a gap wider than 6 ft between them), so they’re left out of the site.</div>' : '') +
       (noGeom && b ? '<div class="rnote sp-warn">' + noGeom + ' of the parcels have no outline from the county and are left out.</div>' : '') +
       '<div class="bacts" style="padding:12px 0 0"><button class="btn askai" id="spStart">Start Site Plan</button><button class="btn" id="spBack">Back</button></div></div>';
@@ -364,7 +364,7 @@ export function initSitePlan(ctx) {
     const k = e.key, el = pl.elements.find(x => x.id === ed.sel), mod = e.metaKey || e.ctrlKey;
     if (mod && k.toLowerCase() === 'z') { used(); undo(!e.shiftKey); return; }
     if (mod && k.toLowerCase() === 'y') { used(); undo(false); return; }
-    if (k === 'Escape') { if (ed.mode) { ed.mode = null; ed.draft = []; draw(); panel(); } else if (ed.sel) { ed.sel = null; draw(); panel(); } return; }
+    if (k === 'Escape') { if (ed.mode) { e.preventDefault(); ed.mode = null; ed.draft = []; draw(); panel(); } else if (ed.sel) { e.preventDefault(); ed.sel = null; draw(); panel(); } return; }
     if (k === 'Enter' && ed.mode === 'draw') { finishDraw(); return; }
     if (!el || !ed.editing) return;
     if (k === 'Delete' || k === 'Backspace') { used(); change(x => { x.elements = x.elements.filter(y => y.id !== el.id); }); ed.sel = null; draw(); panel(); return; }
@@ -862,7 +862,7 @@ export function initSitePlan(ctx) {
       '<span class="pj-chev" aria-hidden="true">›</span></button>';
   }
   function listHtml() {
-    if (!db.projects.length) return '<div class="pj-empty"><b>No projects yet</b><ol><li>On the map, zoom in to street level and click a parcel or building.</li><li>On its card, open <b>Site Tools → Start Site Plan</b>.</li><li>Lay out the site by hand, or describe what you want and use <b>Build with AI</b>.</li></ol><div class="btnrow"><button type="button" class="btn primary" data-go="map">Go to the Map</button></div></div>';
+    if (!db.projects.length) return '<div class="pj-empty"><b>No projects yet</b><ol><li>On the map, zoom in to street level and click a parcel or building.</li><li>At the top of its card, click <b>Site plan</b>. (In Harris or Waller County, get the parcel from Regrid in the card’s Ownership section first.)</li><li>Lay out the site by hand, or describe what you want and use <b>Build with AI</b>.</li></ol><div class="btnrow"><button type="button" class="btn primary" data-go="map">Go to the Map</button></div></div>';
     const list = shown();
     if (!list.length) return '<div class="pj-empty">No projects match “' + esc(pq) + '”. <button type="button" class="lnk" data-clear="1">Show all projects</button></div>';
     return mode === 'list' ? '<div class="pj-list"><div class="pj-lh" aria-hidden="true"><span></span><span>Project</span><span>Site</span><span>Options</span><span>Largest option</span><span>Updated</span><span></span></div>' + list.map(rowHtml).join('') + '</div>'
@@ -874,7 +874,7 @@ export function initSitePlan(ctx) {
     return '<div class="vhead"><div><div class="kicker">My Work</div><h2>Projects</h2><div class="vsub">' + (all.length ? plural(all.length, 'project') + ' · ' + plural(nPlans, 'site plan option') + ' · ' : '') + share + '</div></div>' +
         '<div class="vctl">' + (adding ? '' : '<button type="button" class="btn primary" id="pjNew">+ New Project</button>') + '<div class="team-slot" id="pjTeam"></div></div></div>' +
       (adding ? '<form class="pj-new" id="pjForm"><label class="sr" for="pjNm">New project name</label><input id="pjNm" maxlength="120" placeholder="Project name" autocomplete="off"><span class="btnrow"><button class="btn primary">Create Project</button><button type="button" class="btn" id="pjCancel">Cancel</button></span>' +
-        '<div class="rnote">You can add parcels and site plans to it next. To start from a parcel instead, click it on the map and use <b>Site Tools → Start Site Plan</b>.</div></form>' : '') +
+        '<div class="rnote">You can add parcels and site plans to it next. To start from a parcel instead, click it on the map and use <b>Site plan</b> at the top of its card.</div></form>' : '') +
       (all.length ? '<div class="pj-bar"><label class="search sm pj-q"><input type="search" id="pjQ" placeholder="Search projects" value="' + esc(pq) + '" aria-label="Search projects, parcels, owners and notes"></label>' +
         '<div class="pj-ctl"><label class="pj-sort">Sort <select class="chip" id="pjSort">' + Object.entries(SORTS).map(([k, l]) => '<option value="' + k + '"' + (psort === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
         '<div class="seg seg2 pj-mode" role="group" aria-label="Show projects as">' + [['cards', 'Cards', ICON_CARDS], ['list', 'List', ICON_LIST]].map(([k, l, ic]) => '<button type="button" data-v="' + k + '" aria-pressed="' + (mode === k) + '">' + ic + l + '</button>').join('') + '</div></div></div>' : '') +
@@ -906,7 +906,7 @@ export function initSitePlan(ctx) {
           (big ? fact('Largest option', f0(big.m.gfa) + ' sq ft', esc(big.pl.name) + ' · ' + esc(SP.USES[SP.normalizeProgram(big.pl.program).use].label) + (big.m.units ? ' · ' + plural(big.m.units, 'unit') : '')) : '') + '</dl></div></section>' +
       '<section class="pj-sec"><div class="lt">Parcels' + (p.parcels.length ? ' · ' + f0(p.parcels.length) : '') + '</div>' + (p.parcels.length ? '<div class="pj-prows">' + p.parcels.map(x => '<div class="pj-prow"><span class="pj-pi">' + PIN + '</span><div class="pj-pm"><b>' + esc(x.label) + '</b><span>' +
           [x.owner ? esc(x.owner) : '', x.acres ? x.acres.toFixed(2) + ' acres' : '', x.marketValue ? 'appraised ' + money(x.marketValue) : ''].filter(Boolean).join(' · ') + '</span></div><button type="button" class="btn" data-parcel="' + esc(x.key) + '">Show on Map</button></div>').join('') + '</div>'
-        : '<div class="pj-start"><b>No parcels yet</b><p>Find the parcel on the map, click it, then <b>Site Tools → Start Site Plan</b> and choose <b>Add to ' + esc(p.name) + '</b>. Or click the corners of the site yourself.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div></div>') + '</section>' +
+        : '<div class="pj-start"><b>No parcels yet</b><p>Find the parcel on the map, click it, then <b>Site plan</b> at the top of its card and choose <b>Add to ' + esc(p.name) + '</b>. Or click the corners of the site yourself.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div></div>') + '</section>' +
       '<section class="pj-sec"><div class="lt">Site plan options · ' + f0(p.plans.length) + '</div><div class="pj-plans">' + p.plans.map(pl => planTile(p, pl)).join('') +
         (can ? '<button type="button" class="pj-plan pj-add" data-add="1"><span class="pj-plus" aria-hidden="true">+</span><b>New Option</b><span class="pj-none">' + (p.plans.some(x => x.ring.length >= 3) ? 'A blank plan on the same site' : 'A blank plan on ' + (p.parcels.length > 1 ? 'these parcels' : 'this parcel')) + '</span></button>'
           : p.parcels.length ? '<div class="pj-start"><b>No site outline</b><p>These parcels have no outline from the county. Click the corners of the site on the map.</p><div class="btnrow"><button type="button" class="btn" data-draw="1">Draw a Site</button></div></div>' : '<div class="pj-none">No options yet: add a parcel or draw the site first.</div>') + '</div></section>' +
@@ -967,7 +967,7 @@ export function initSitePlan(ctx) {
     root.querySelectorAll('[data-parcel]').forEach(b => b.onclick = () => { const x = p.parcels.find(y => y.key === b.dataset.parcel); ctx.setView('map'); map.easeTo({ center: x.center, zoom: Math.max(map.getZoom(), 17) }); ctx.openBuildingAt(x.center); });
     on('[data-add]', () => addOption(p));
     on('[data-draw]', () => drawSite(p));
-    on('[data-find]', () => { ctx.setView('map'); ctx.toast('Zoom in and click the parcel, then Site Tools → Start Site Plan → Add to ' + p.name + '.'); });
+    on('[data-find]', () => { ctx.setView('map'); ctx.toast('Zoom in and click the parcel, then Site plan (top of its card) → Add to ' + p.name + '.'); });
     on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? This removes it for the team too.')) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null; save(); });
   }
   root?.addEventListener('focusout', () => setTimeout(() => { if (waiting && ctx.view === 'projects') render(); }));

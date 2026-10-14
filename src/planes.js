@@ -556,7 +556,7 @@ export function initPlanes(ctx) {
         (h.lowest_ft != null ? ', lowest ' + h.lowest_ft.toLocaleString('en-US') + ' ft' : '') + '.</div><div class="fs">Last ' + h.days + ' days, ' + h.sampled_days + ' days sampled (an exposure index, not a flight count).' + (h.sampled_days < 3 ? ' The history is still filling in.' : '') + '</div>' +
         '<button class="btn" type="button" id="airNow">Planes Overhead Now</button><div class="ssrc src">Community ADS-B receivers (adsb.lol), sampled every minute.</div>';
       // before From Here
-      (card.querySelector('#bFilings') || card.querySelector('#liveSec') || card.querySelector('#fTools') || card.lastElementChild)?.before(sec);
+      (card.querySelector('#bFilings') || card.querySelector('#liveSec') || card.lastElementChild)?.before(sec);
       sec.querySelector('#airNow').onclick = () => { ctx.live.set({ planes: true }); map.easeTo({ center: c, zoom: Math.max(map.getZoom(), 11), duration: ctx.reduceMotion ? 0 : 700 }); };
     });
   });

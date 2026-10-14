@@ -58,7 +58,7 @@ export function initExport(ctx) {
   function open(report, o = {}) { if (report && REPORTS[report]) st.report = report; if (o.format && REPORTS[st.report].formats.includes(o.format)) st.format = o.format; if (o.scope) st.scope = o.scope; lastFocus = document.activeElement; render(); dlg.classList.add('on'); setTimeout(() => dlg.querySelector('#xGo:not([disabled])')?.focus(), 30); }
   function close() { dlg.classList.remove('on'); lastFocus?.focus?.(); }
   dlg.addEventListener('pointerdown', e => { if (e.target === dlg) close(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && dlg.classList.contains('on')) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && dlg.classList.contains('on')) { e.preventDefault(); close(); } });
   document.getElementById('exportBtn').onclick = () => open();
   ctx.openExport = open;
 

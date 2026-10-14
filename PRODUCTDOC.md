@@ -94,7 +94,7 @@ The tab you're on is lit: Market stays lit on Compare areas, and More is lit on 
 
 On the phone map, the five area tools are one **Select ▾** button at the top left. It opens a short list (Move, Area, Shape, Radius, County); pick one and a **Drawing a shape · Cancel** chip shows until you finish or tap Cancel. **Filters** is the funnel button in the search bar, and **Layers** is the stacked-squares button on the right. Both open as sheets from the bottom with a **×** at the top and a big button at the bottom (**Show results (N)** or **Done** for Filters, **Done** for Layers); the search bar and layer buttons stay in view above the Layers sheet.
 
-Cards slide up from the bottom: swipe down to shrink one, and swipe again to close it.
+Cards slide up from the bottom and open part-way, showing the title, the owner and value line and a row of buttons along the bottom (**Ask AI**, **Site plan**, **Watch** and **⋯**). Swipe up for half the screen, then the full screen. Swipe down to step back, down to just the title bar; swiping never closes a card, only the **×** does.
 
 ---
 
@@ -115,10 +115,20 @@ When something isn't set up on your site (team sharing, live traffic), the app s
 
 ## Looking up a property
 
-Click a building, or at street zoom click open ground, to open its **property card**. The owner and value show first, usually within a couple of seconds; the businesses, height and photo fill in after.
+Click a building, or at street zoom click open ground, to open its **property card**. On a computer it fills the right side of the map from top to bottom, and the map buttons move to its left, so nothing on the map hides behind it. The owner and value show first, usually within a couple of seconds; the businesses, height and photo fill in after.
 
-- **Ownership & value:** owner, mailing address, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service.
-- **Company behind the owner:** when the owner is a company (an LLC, partnership, corporation or trust), the card looks it up in the Texas Comptroller's free public records: whether it's active, where and when it was formed, its registered agent, mailing address and the officers, managers or members from its latest public report. If the name doesn't match exactly, similar names are listed to pick from. People's names are never looked up.
+**The top of the card** says what it is and where ("Parcel · Harris County"), the address (or "Unaddressed parcel"), and the owner and value under it. Under that is a row of buttons that stays in reach while you scroll:
+- **Ask AI** about this property (it's ready as soon as the parcel record arrives).
+- **Site plan** (see "Projects and site plans" below).
+- **Watch** adds it to your watchlist; it reads **Watching** while it's on the list.
+- **⋯** holds the rest: **Street View ↗**, **Add site note**, **Orbit view**, **Select more** (to pick more buildings or parcels), **Copy link** (a link that opens this property) and **Export details (CSV)**.
+
+Scroll down and the top folds to just the title and the buttons.
+
+- **Ownership & value:** owner, market, land and improvement value, year built, when it was acquired, acres, and building size. This comes from the county appraisal district through the state's parcel service. **More record details** opens the mailing address, the legal description and every field in the appraisal record.
+  - **Zoning & last sale: Get from Regrid** looks those up (paid, capped each month; the button says how many lookups are left). The Regrid record shows right under Ownership.
+  - Where the state data has no parcel (all of Harris and Waller counties), the section starts with a big **Get owner, value & zoning from Regrid** button instead.
+- **Company behind the owner:** when the owner is a company (an LLC, partnership, corporation or trust), the card looks it up in the Texas Comptroller's free public records and shows one line: the name, whether it's active, when it was formed and its registered agent. **Details** opens the rest: where it was formed, its mailing address and the officers, managers or members from its latest public report. If the name doesn't match exactly, similar names are listed to pick from. People's names are never looked up.
 - **The building:** footprint, height, floors and estimated floor area. Height comes from USGS lidar where it's believable; a reading that doesn't fit the building (say, hundreds of feet on a one-storey store) is set aside with a note, and the map or appraisal record is used instead.
 - **Site:** flood zone, traffic counts on nearby roads, water and utility districts (MUDs), **utilities** (see below), tax-increment zones, Opportunity Zone, school district, bus stops, nearby environmental sites, crime nearby (Houston), and area rents and jobs.
 - **Utilities** (in the Site section, filled in a moment after the rest; distances from the parcel's edge):
@@ -137,14 +147,17 @@ Click a building, or at street zoom click open ground, to open its **property ca
 - **Businesses:** what's inside or next door, from the Overture Maps and Foursquare open business lists plus OpenStreetMap, and businesses registered for sales tax at the address. Click a business for its details.
 - **Construction filings** on the parcel.
 - **From here:** distance and drive time, a drive-time map, weather, news, and site imagery (recent satellite and dated high-resolution photos).
-- **Regrid details** (paid, capped each month): zoning, zoning limits such as height and density, the last sale price and date where recorded, and land use. Harris and Waller counties aren't in the free state parcel data, so Regrid fills in owner and value there.
-- Street View, an orbit camera, notes, **Start Site Plan** (see "Projects and site plans" below), and **Ask AI** about this property.
+- **Regrid details** (paid, capped each month, from the Ownership section): zoning, zoning limits such as height and density, the last sale price and date where recorded, and land use. Harris and Waller counties aren't in the free state parcel data, so Regrid fills in owner and value there.
 
-**Section buttons** under the card's title (Value, Building, Site, Crime, Area…) jump to that section, with its heading just below the card's header.
+**Section buttons** under the action row (Owner & value, Building, Site, Crime, Area…) jump to that section, with its heading just below the card's header. As you scroll, the button for the section you're reading lights up, and the row fades at an edge when there are more buttons past it.
+
+**Reports and filings opened from the card come back to it:** a Crime, FEMA, Environmental or other area report from the Site section, a filing under Construction filings, a drive-time map or a new site note opens in the card with **← 1200 Main St** (the property's name) at the top. Click it, or press Esc, to return to the property just as you left it: same tabs, same spot in the card, still highlighted on the map. The filing card works the same way for its drive-time map and notes.
+
+**Esc** closes the card (or goes back, as above), but not while you're typing in a box, and not when it's closing something else first: Esc in the search box closes its results, and Esc with Map layers or a menu open closes just that.
 
 **Big buildings:** clicking any part of a building selects the whole building, even a warehouse or shopping center that the map draws in pieces. If the building sits on more than one parcel, the card lists every parcel with its owner and value, and a total.
 
-**Several things at once (tabs):** Shift-click to add more, up to 20. On a touch screen, tap **Add** at the top of the card (or **Select Multiple**), tap the other things, then **Done**. This works for buildings, parcels, construction filings, planes and airports, mixed together.
+**Several things at once (tabs):** Shift-click to add more, up to 20. On a touch screen, choose **⋯ → Select more** on the card, tap the other things, then **Done**. This works for buildings, parcels, construction filings, planes and airports, mixed together. With just one thing picked there are no tabs; they appear as soon as there are two.
 - Each one gets a numbered **tab** at the top of the card; the same number marks it on the map, in the middle of the building or parcel. Parcels picked as open ground keep a faint outline while you look at another tab. Tap a tab to see that card, or its **×** to drop it.
 - Shift-click something already picked to take it out (for a parcel, anywhere inside it). A parcel is never added twice. A plain click starts over with just that one; closing the card clears them all.
 - With two or more buildings or parcels, an **All** tab adds them up: footprint, floor area, market value and acres (each parcel counted once), the construction filings on them, a CSV export and **Zoom to All**.
@@ -316,7 +329,7 @@ Texas requires most commercial and public construction projects to register with
 
 - **Filing dots** are off by default. Turn them on with **Filings** (above the map) or the **On map** switch on the panel's Construction Filings header. Green is new construction, grey is renovation, and a ring is an addition.
 - **Filters → Construction filings:** time period, county, type, value, use, status, size, housing units, company name, exact addresses only, start or registration dates, and recent changes. On phones, Filters opens as a full sheet with **Clear All** at the top and a button at the bottom that closes it.
-- **Filing card:** project details, dates, people involved, an **AI project brief** (what it is, timing, who's involved, area context), and nearby filings.
+- **Filing card:** project details, dates, people involved, an **AI project brief** (what it is, timing, who's involved, area context), and nearby filings. Its top row has **Ask AI**, **TABS record ↗**, **Watch** and **⋯** (Street View, Add site note, Select more and Copy link).
 - **Timeline** (Filings → Timeline): the monthly pipeline of what's under construction, plus a Gantt chart of every project. Hatched bars are dates estimated because the filer left them blank. Clicking a project opens its card over the page; dragging across the chart turns the filings on on the map. **Export ▾** saves the filing list as Excel, CSV or PDF.
 - **Companies** (Filings → Companies): developers, architects and contractors ranked by activity; switch between Developers, Architects and Contractors at the top. Click one to see their projects on the map (the filings turn on), and use **← Back to Companies** to return to the same spot in the list. The list shows the top 150 by value; search to find the others. **Export ▾** saves the Activity report as PDF, Excel or CSV. On phones each company is a two-line row.
 - **Changes** (Filings → Changes): new filings and changes found by the nightly refresh. It opens on **Last 7 days**, which counts the same filings as the green number and the "New this week / Any change" filters; each single nightly check is still in the list. A line under the title says how many changed filings match your filters out of the total, with **Show all** to see every one. Clicking a change opens the filing's card over the page; **Show on map** on the card goes to the map. The green number on Changes counts what's new since you last looked and clears when you open it.
@@ -371,7 +384,7 @@ Answers come with cards: summaries, charts, comparisons, places, drive times, we
 Find them under **My Work → Notes & watchlist**.
 
 - **+ Site note** adds a note at your current location (or the map center); with nothing saved yet, **+ Site note at map center** does the same from the empty page. A note has a title, tag, notes and phone photos. Notes are shared with the team and work offline.
-- **Watch** any filing or building with the star ("Added to My Work › Watchlist"). Watched filings are flagged when the nightly refresh sees a change. The watchlist is listed first, then your site notes.
+- **Watch** any filing or building with the **Watch** button at the top of its card ("Added to My Work › Watchlist"; the button then reads **Watching**). Watched filings are flagged when the nightly refresh sees a change. The watchlist is listed first, then your site notes.
 - **Export ▾** saves everything as GeoJSON (with or without photos), CSV or KML, and **Import…** in the same menu loads a GeoJSON file exported from here.
 - The button beside them says whether notes are shared with the team or kept on this device, and your name (for example "Shared with the team · Matthew"). Click it to set your name or the team passcode in **Settings → You & your team**.
 
@@ -382,10 +395,10 @@ Find them under **My Work → Notes & watchlist**.
 Test-fit a building, or a whole mixed-use development, on one parcel or up to 20 together, by hand or with AI, and print it as a site plan sheet.
 
 **Starting one**
-- Open a property card (click a building, or open ground at street zoom) and choose **Start Site Plan** under Site Tools.
-- **Several parcels as one site:** pick up to 20 (Shift-click, or **Select Multiple** on touch screens), open the **All** tab and choose **Site Plan for All**. Their outlines are merged into one site; small gaps and overlaps between neighbouring parcels (common in appraisal data) are closed up, while parcels across a road stay separate and are left out, with a note.
+- Open a property card (click a building, or open ground at street zoom) and click **Site plan** at the top of the card.
+- **Several parcels as one site:** pick up to 20 (Shift-click, or **⋯ → Select more** on the card on touch screens), open the **All** tab and choose **Site Plan for All**. Their outlines are merged into one site; small gaps and overlaps between neighbouring parcels (common in appraisal data) are closed up, while parcels across a road stay separate and are left out, with a note.
 - Start a **new project** (named after the address) or **add the parcel to a project** you already have.
-- The plan starts from the parcel's outline from the county appraisal district. Harris and Waller aren't in that data: open the card's **Regrid details** first and the plan uses Regrid's outline, or draw the site yourself (click each corner, then the first corner again).
+- The plan starts from the parcel's outline from the county appraisal district. Harris and Waller aren't in that data: use **Get owner, value & zoning from Regrid** in the card's Ownership section first and the plan uses Regrid's outline, or draw the site yourself (click each corner, then the first corner again).
 - The map zooms to the lot. The existing buildings are hidden while you plan, and come back when you close the plan.
 
 **Build with AI**
@@ -545,6 +558,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **A property card that works like a tool:** on a computer the card fills the right side of the map from top to bottom, with the map buttons beside it, so bigger screens show more of it. **Ask AI**, **Site plan**, **Watch** and **⋯** (Street View, notes, orbit, Select more, Copy link, CSV) sit under the title instead of at the bottom, and the top folds to the title as you scroll. The section buttons follow along as you scroll. The title is the address and the line under it the owner and value; in Harris and Waller the Ownership section starts with **Get owner, value & zoning from Regrid**, and elsewhere a small **Zoning & last sale** link does the same. The company behind the owner is one line with **Details**, and the mailing address, legal description and appraisal fields are under **More record details**. A report, filing or note opened from a card has **← (the property)** to go back to it as you left it, and Esc does the same. Esc no longer closes the card while you type or when it's closing Layers or a menu. Tabs only appear once two things are picked. On phones the card opens part-way with the buttons along the bottom, and swiping down shrinks it to its title bar instead of closing it.
 - **Map controls that make sense at any size:** the search box comes first, then one tool row with the area tools, **Layers · N** (it replaces **More** and the layers button on the right), **Filters** and Export; the layer buttons stay on one sideways-scrolling line; the filters you've set show as chips you can remove one by one, with **Clear all** (it replaces the old Clear button); and with Ask AI open the tools shrink to icons instead of disappearing. The right side now only moves the map: zoom, compass, near me and **Reset view ▾** (whole region or globe), each with its name on hover. Map layers has a pinned title, an **On now** list with off switches and folding groups with counts; 3D terrain and the imagery moved into **Base map, imagery & 3D**. The time-lapse is **▶ Play by month** on the Filings layer and legend, and the legends share one card. Filters starts with Construction filings, explains each mode, says **No filters on** when nothing's set and keeps one crime type in step with Map layers. On phones the area tools are one **Select ▾** button, Layers is a bottom sheet like Filters, and Filters' button reads **Show results (N)**.
 
 - **A tidier Map panel:** the big title and the long sources paragraph are gone; a one-time **Getting started** tip replaces the intro. The area you're looking at is named in a bar that stays pinned at the top, with the filing count, **+ Compare** and a **⋯** menu (Save search now asks for the name right there, plus Copy link and Filing alerts); with nothing picked it offers Box, Shape, Radius and County. Area reports sit together under **Reports for this area** (now with Crime, and they run on the map view when nothing is picked). Construction Filings shows its live count in the header and has an honest **On map** switch, and the panel ends in one line. On phones, Explore starts with the area bar and opens the filings for you.

@@ -5,7 +5,9 @@
 //   ctx.tabs.arm(e)       in a click handler, before opening: makes the open add a tab when Shift is held or "+" is on
 //   ctx.tabs.track(entry) after a card renders: { id, kind, label, reopen() [, leave()] [, pinned] [, ref] }
 //   ctx.tabs.mount()      after a card re-renders itself (a refresh), to put the tab bar back
-// A card that renders without track() (a report, a note, a search result) takes the card over and the tabs go away.
+// A card that renders without track() (a report, a note, a search result) takes the card over and the tabs go away,
+// unless it was opened from the card (ctx.cardPush in app.js): then the tabs wait behind it until "← Back".
+// The strip shows only with two or more items (or while adding); one item's "Select more" is in the card's ⋯ menu.
 const ICON = {
   building: '<path d="M3 14V4.5L8 2l5 2.5V14M6 6.5h1M9 6.5h1M6 9h1M9 9h1M7 14v-2.5h2V14"/>',
   filing: '<path d="M3 14V6l5-4 5 4v8"/><path d="M6.5 14v-4h3v4"/>',
@@ -33,9 +35,10 @@ export function initCardTabs(ctx) {
       '<button type="button" class="ctadd" aria-pressed="' + addMode + '" title="' + (addMode ? 'Stop adding' : 'Add more: then click or tap other buildings, parcels, filings, planes or airports (or Shift-click)') + '">' +
       '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (addMode ? '<path d="M2.5 6.2l2.3 2.3 4.7-5"/>' : '<path d="M6 2v8M2 6h8"/>') + '</svg>' +
       (addMode ? 'Done' : 'Add') + '</button>';
-    mount(); bar.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    mount(); const on = bar.querySelector('[aria-selected="true"]'); if (on && !bar.hidden) bar.scrollLeft = Math.max(0, Math.min(bar.scrollLeft, on.offsetLeft - 8), on.offsetLeft + on.offsetWidth - bar.clientWidth + 8);
   }
-  function mount() { if (!tabs.length || !bar) return; if (bar.parentNode !== card || card.firstElementChild !== bar) card.prepend(bar); card.classList.add('has-tabs'); }
+  function mount() { if (!tabs.length || !bar) return; if (bar.parentNode !== card || card.firstElementChild !== bar) card.prepend(bar);
+    bar.hidden = items().length < 2 && !addMode; card.classList.toggle('has-tabs', !bar.hidden); }
   function onClick(e) {
     const x = e.target.closest('[data-x]'); if (x) { e.stopPropagation(); remove(x.dataset.x); return; }
     if (e.target.closest('.ctadd')) { setAdding(!addMode); return; }
@@ -58,6 +61,9 @@ export function initCardTabs(ctx) {
   }
   // a card was opened (or re-opened from its tab)
   function track(entry) {
+    const child = ctx.cardChild?.();
+    if (child === 'opening') return; // a filing opened from this card: it shows in front, the tabs stay as they are
+    if (child === 'open' && !switching) ctx.cardChildDrop?.(); // something else opened: the card behind is let go
     if (switching) { const t = tabs.find(x => x.id === entry.id); if (t) Object.assign(t, entry, { reopen: entry.reopen || t.reopen }); active = entry.id; render(); return; }
     const add = armed && tabs.length > 0; armed = false;
     const have = tabs.find(x => x.id === entry.id), prev = tabs.find(x => x.id === active);
@@ -73,6 +79,8 @@ export function initCardTabs(ctx) {
     arm(e) { armed = adding(e); return armed; },
     adding,
     track, mount, remove, setAdding, activate,
+    // show a tab's card again even if it is the active one (the "← Back" link of a report opened from it); false if gone
+    reopen(id) { const t = tabs.find(x => x.id === id); if (!t) return false; active = id; switching = true; try { t.reopen(); } finally { switching = false; } render(); hooks.forEach(fn => fn()); return true; },
     list: kind => tabs.filter(t => !kind || t.kind === kind),
     active: () => tabs.find(t => t.id === active) || null,
     // label a tab once its card knows its name (an address, a callsign)
@@ -86,5 +94,6 @@ export function initCardTabs(ctx) {
   // closing the card closes every tab; a card opened while adding or switching tabs is not a close
   ctx.onCardClose(() => { if (armed || switching) return; for (const t of tabs) { try { t.removed?.(); } catch (e) {} } tabs = []; active = null; addMode = false; card.classList.remove('adding'); render(); hooks.forEach(fn => fn()); });
   // a card that renders without track() (reports, notes, search results) replaces the card: the tabs go with it
-  new MutationObserver(() => { if (tabs.length && bar && bar.parentNode !== card) { tabs = []; active = null; addMode = false; bar = null; card.classList.remove('has-tabs', 'adding'); hooks.forEach(fn => fn()); } }).observe(card, { childList: true });
+  new MutationObserver(() => { if (tabs.length && bar && bar.parentNode !== card && ctx.cardChild?.()) { card.classList.remove('has-tabs'); return; }
+    if (tabs.length && bar && bar.parentNode !== card) { tabs = []; active = null; addMode = false; bar = null; card.classList.remove('has-tabs', 'adding'); hooks.forEach(fn => fn()); } }).observe(card, { childList: true });
 }

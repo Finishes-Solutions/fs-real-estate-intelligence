@@ -82,12 +82,12 @@ export function initBuildings(ctx) {
     if (b._lp?.g !== g) b._lp = { g, p: labelPoint(g) || b.center };
     return b._lp.p;
   }
-  function stopOrbit() { cancelAnimationFrame(orbitRaf); orbitRaf = 0; card.querySelector('#bOrbit')?.classList.remove('on'); }
+  function stopOrbit() { cancelAnimationFrame(orbitRaf); orbitRaf = 0; const o = card.querySelector('#bOrbit'); if (o) { o.classList.remove('on'); o.firstChild.textContent = 'Orbit view'; } }
   ['mousedown', 'touchstart', 'wheel', 'dragstart'].forEach(ev => map.on(ev, () => orbitRaf && stopOrbit()));
   ctx.onOrbitStop?.(stopOrbit);
   function orbit() {
     if (orbitRaf || card.querySelector('#bOrbit.on')) { stopOrbit(); return; }
-    card.querySelector('#bOrbit')?.classList.add('on');
+    const o = card.querySelector('#bOrbit'); if (o) { o.classList.add('on'); o.firstChild.textContent = 'Stop orbit'; }
     map.easeTo({ center: cur.center, zoom: Math.max(map.getZoom(), 17), pitch: 62, duration: 1200 });
     // each step is a jumpTo, which would cancel any other camera move: give way the moment something else eases the map
     const step = () => { if (map.isEasing()) { stopOrbit(); return; } map.setBearing((map.getBearing() + 0.12) % 360); orbitRaf = requestAnimationFrame(step); };
@@ -209,30 +209,47 @@ export function initBuildings(ctx) {
     return d;
   }
 
+  const countyAt = c => ctx.DATA.counties.find(x => inGeom(c, { type: 'MultiPolygon', coordinates: x.outline }))?.name || '';
+  const kindOf = b => b.footprint ? 'Building' : 'Parcel';
+  // the header: "Parcel · Harris County", the address (or "Unaddressed parcel"), and owner · value under it
+  function setHead(b, p) {
+    const k = card.querySelector('#bKick'), co = p?.county ? title(p.county) : countyAt(b.center);
+    if (k) k.textContent = kindOf(b) + (co ? ' · ' + co.replace(/\s+county$/i, '') + ' County' : '');
+  }
   async function open(b) {
     ctx.clearSelection?.(); stopOrbit(); cur = b; highlight();
     const gsv = 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + b.center[1].toFixed(6) + ',' + b.center[0].toFixed(6);
     const ss = t => '<div class="ssrc src">' + t + '</div>';
-    card.innerHTML = '<div class="top"><div><div class="kicker" id="bKick">' + (b.footprint ? 'Building' : 'Parcel') + '</div><h2 id="bTitle">Loading parcel…</h2><div class="bsub" id="bSub">' + b.center[1].toFixed(5) + ', ' + b.center[0].toFixed(5) + '</div></div>' +
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    card.innerHTML = '<div class="top"><div><div class="kicker" id="bKick">' + kindOf(b) + '</div><h2 id="bTitle">Loading parcel…</h2><div class="bsub" id="bSub">' + b.center[1].toFixed(5) + ', ' + b.center[0].toFixed(5) + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
-      ctx.cardNav([['bParcel', 'Value'], ['bSize', 'Building'], ['bSite', 'Site'], ['bCrime', 'Crime'], ['bArea', 'Area'], ['bPlaces', 'Businesses'], ['bFilings', 'Construction'], ['bRegrid', 'Regrid'], ['liveSec', 'From Here'], ['bTools', 'Tools']]) + '</div>' +
+      ctx.cardActs('<button class="btn sm askai" type="button" id="bAsk" disabled aria-busy="true" title="Ready once the parcel record loads">' + ctx.SPARK + 'Ask AI</button>' +
+        '<button class="btn sm" type="button" id="bPlan" title="Start a project and lay out a site plan on this parcel, by hand or with AI">Site plan</button>',
+        [{ href: gsv, label: 'Street View ↗', sub: 'Google Street View at this spot' }, { label: 'Add site note', attrs: ' id="bNote" data-push' },
+          ...(ctx.reduceMotion ? [] : [{ label: 'Orbit view', attrs: ' id="bOrbit"' }]),
+          { label: 'Select more', attrs: ' id="bMulti" title="Then ' + (coarse ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 20"', sub: (coarse ? 'Tap' : 'Click or Shift-click') + ' more buildings or parcels' },
+          { divider: true }, { label: 'Copy link', attrs: ' id="bLink"', sub: 'Opens this property' }, { label: 'Export details (CSV)', attrs: ' id="bCsv"' }]) +
+      ctx.cardNav([['bParcel', 'Owner & value'], ['bSize', 'Building'], ['bSite', 'Site'], ['bCrime', 'Crime'], ['bArea', 'Area'], ['bPlaces', 'Businesses'], ['bFilings', 'Construction'], ['liveSec', 'From Here']]) + '</div>' +
       '<div class="bover" id="bOver" hidden></div>' +
       '<div class="bsec" id="bParcel"><div class="lt">Ownership &amp; Value</div><div class="rnote">Looking up the appraisal record…</div></div>' +
+      '<div class="bsec rg-sec" id="bRegrid"></div>' +
       '<div class="bsec" id="bSize"><div class="lt">Building</div><div id="bPhoto"></div><div id="bSizeBody">' + sizeRows(b) + '<div class="rnote">Measuring height from lidar…</div></div>' +
         ss('Footprint: OpenStreetMap. Height: USGS 3DEP lidar where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record, otherwise estimated from height.') + '</div>' +
       '<div class="bsec" id="bSite"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
-      '<div class="bsec" id="bFilings"></div><div class="bsec" id="bRegrid"></div><div class="bsrc"></div>' +
-      '<div class="bsec" id="bTools"><div class="lt">Site Tools</div><div class="bacts">' + '<button class="btn" id="bMulti" title="Then ' + (matchMedia('(pointer: coarse)').matches ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 20">Select Multiple</button>' +
-        '<button class="btn" id="bOrbit">Orbit View</button><a class="btn" href="' + gsv + '" target="_blank" rel="noopener">Street View ↗</a><button class="btn" id="bNote">Add Site Note</button><button class="btn" id="bPlan" title="Start a project and lay out a site plan on this parcel, by hand or with AI">Start Site Plan</button><button class="btn askai" id="bAsk">Ask AI About It</button></div></div>';
-    card.classList.add('open');
+      '<div class="bsec" id="bFilings"></div><div class="bsrc"></div>';
+    card.classList.add('open'); card.scrollTop = 0; setHead(b, null);
+    const mark = card.querySelector('#bParcel'), alive = () => cur === b && mark.isConnected; // still this card (not a report opened from it)
     card.querySelector('.x').onclick = () => ctx.closeCard();
-    card.querySelector('#bOrbit').onclick = orbit;
+    card.querySelector('#bOrbit')?.addEventListener('click', orbit);
     card.querySelector('#bMulti').onclick = () => ctx.tabs?.setAdding(true); // or Shift-click
+    card.querySelector('#bLink').onclick = () => ctx.copyCardLink?.({ b: b.center[1].toFixed(6) + ',' + b.center[0].toFixed(6) });
+    card.querySelector('#bCsv').onclick = () => { const s = stats(b), p = b.parcel; ctx.exportCsv([{ Address: p?.situs || '', Owner: p?.owner || '', 'Property ID': p?.propId || '', County: p?.county || countyAt(b.center), 'Land use': p?.landUse || '', 'Market value': appraised(p) || '', 'Land value': p?.landValue || '', 'Improvement value': p?.improvementValue || '', 'Tax year': p?.taxYear || '', 'Land area': p?.area || '', 'Year built': p?.yearBuilt || '',
+      'Footprint sq ft': s.fp || '', 'Est. floor area sq ft': s.gfa || '', 'Height ft': s.h ? Math.round(s.h * 3.281) : '', 'Height source': s.hSrc, Floors: s.fl || '', 'Floors source': s.fSrc, Latitude: b.center[1].toFixed(6), Longitude: b.center[0].toFixed(6) }], 'property-' + String(p?.situs || 'parcel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)); };
+    const ready = () => { const a = card.querySelector('#bAsk'); if (a && alive()) { a.disabled = false; a.removeAttribute('aria-busy'); a.title = 'Ask the assistant about this property'; } };
     ctx.tabs?.track({ id: bid(b), kind: 'building', label: b.parcel?.situs || (b.footprint ? 'Building' : 'Parcel'), ref: b, reopen: () => open(b), leave: stopOrbit });
     card.querySelector('#bNote').onclick = () => ctx.addNote?.({ at: b.center });
     card.querySelector('#bPlan').onclick = () => ctx.sitePlan?.start(ctx.currentBuilding());
     card.querySelector('#bAsk').onclick = () => { const t = card.querySelector('#bTitle')?.textContent; ctx.assistant?.ask('Tell me about ' + (t && !/^Loading/.test(t) ? t : 'this property') + ': owner, value, site and the area around it'); };
-    if (ctx.reduceMotion) card.querySelector('#bOrbit').remove();
     renderFilings(null); renderArea();
     ctx.renderCrimeNear?.(card.querySelector('#bCrime'), b.center, () => { const t = card.querySelector('#bTitle')?.textContent; return t && !/^Loading/.test(t) ? t : 'this property'; }, () => cur === b);
     ctx.renderCrimeUS?.(card.querySelector('#bCrimeUS'), b.center, () => cur === b);
@@ -240,14 +257,16 @@ export function initBuildings(ctx) {
     let d = null, early = false;
     // the appraisal record first: owner, value, title, the parcel outline and everything keyed on it
     const onParcel = pd => {
-      if (cur !== b || dropIfDuplicate(b)) return; early = true; highlight(); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
-      renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel);
+      if (!alive() || dropIfDuplicate(b)) return; early = true; highlight(); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
+      renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel); ready();
+      ctx.cardStatus?.(pd.parcel ? 'Owner and value loaded for ' + (pd.parcel.situs || 'this parcel') + '.' : 'No appraisal record here; Regrid can look it up.');
       ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel);
     };
     try { d = await details(b, onParcel); }
-    catch (err) { if (cur !== b) return; card.querySelector('#bParcel').innerHTML = '<div class="lt">Parcel</div><div class="rnote">Parcel lookup unavailable (' + esc(err.message) + ').</div>'; card.querySelector('#bTitle').textContent = 'Building'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b); return; }
-    if (cur !== b) return;
+    catch (err) { if (!alive()) return; renderParcel(null, err.message); card.querySelector('#bTitle').textContent = 'Property details unavailable'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b); ready(); return; }
+    if (!alive()) return;
     if (dropIfDuplicate(b)) return;
+    ready();
     highlight(); ctx.tabs?.label(bid(b), d.parcel?.situs || d.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
     card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
     // the parcel list (a building on several parcels) comes with the second lookup, so the parcel section is redrawn with it
@@ -328,27 +347,42 @@ export function initBuildings(ctx) {
       list.map((x, i) => '<div class="mprow"><i class="mnum">' + (i + 1) + '</i><span><b>' + esc(x.situs || x.propId || 'Parcel') + '</b><em>' + esc([x.owner, x.area, x.landUse].filter(Boolean).join(' · ')) + '</em></span><span class="m mono">' + money(appraised(x)) + '</span></div>').join('') +
       '<div class="mprow tot"><i></i><span><b>Total</b><em>' + (acres ? acres.toFixed(2) + ' acres' : '') + '</em></span><span class="m mono">' + money(value) + '</span></div></div>';
   }
+  // Regrid fills the gaps (owner, value and zoning where the state data has no parcel; zoning and last sale where it does):
+  // the button here runs the Regrid section's own lookup, which shows its record right under this one
+  const rgLeft = () => { const u = ctx.regridUsage?.(); return u?.records ? ' (' + fmtN(Math.max(0, u.records.cap - u.records.used)) + ' left)' : ''; };
+  function wireRegrid(el) {
+    el.querySelectorAll('[data-rg]').forEach(x => x.onclick = () => { const go = card.querySelector('#rgGo'); if (!go) { ctx.toast?.('Regrid isn’t ready yet. Try again in a moment.'); return; }
+      go.click(); const r = card.querySelector('#bRegrid'); if (r) requestAnimationFrame(() => card.scrollTo({ top: Math.max(0, r.offsetTop - (card.querySelector(':scope>.top')?.offsetHeight || 0) - 80), behavior: ctx.reduceMotion ? 'auto' : 'smooth' })); });
+  }
   function renderParcel(p, err, all) {
-    const el = card.querySelector('#bParcel'), head = '<div class="lt">Ownership &amp; Value</div>';
+    const el = card.querySelector('#bParcel'), head = '<div class="lt">Ownership &amp; Value</div>', t = card.querySelector('#bTitle'), sub = card.querySelector('#bSub'); if (!el) return;
+    setHead(cur, p);
     if (!p) {
-      // the statewide parcel layer has no Harris or Waller County records (checked 2026-10-03)
-      const co = ctx.DATA.counties.find(c => inGeom(cur.center, { type: 'MultiPolygon', coordinates: c.outline }))?.name;
-      el.innerHTML = head + '<div class="rnote">' + (err ? 'Parcel lookup failed: ' + esc(err) : /^(Harris|Waller)$/.test(co || '') ? 'The statewide parcel data doesn’t include ' + co + ' County yet, so there’s no owner or value here.' : 'No parcel record found at this point.') + '</div>';
-      card.querySelector('#bTitle').textContent = 'Building'; return;
+      // the statewide parcel layer has no Harris or Waller County records (checked 2026-10-03): Regrid has them
+      const co = countyAt(cur.center);
+      el.innerHTML = head + '<button class="btn md primary rg-cta" type="button" data-rg>Get owner, value &amp; zoning from Regrid<span data-rg-left>' + rgLeft() + '</span></button>' +
+        '<div class="rnote">' + (err ? 'The appraisal lookup failed (' + esc(err) + ').' : /^(Harris|Waller)$/.test(co) ? 'The statewide parcel data doesn’t include ' + co + ' County yet, so there’s no owner or value here.' : 'No appraisal record found at this point.') + ' Regrid has the parcel record; one already looked up is free.</div>';
+      wireRegrid(el);
+      if (t && !err) t.textContent = 'Unaddressed ' + kindOf(cur).toLowerCase();
+      const near = ctx.nearestPlace?.(cur.center); if (sub) sub.textContent = 'No owner on file · ' + (near ? 'near ' + near : cur.center[1].toFixed(5) + ', ' + cur.center[0].toFixed(5));
+      return;
     }
-    card.querySelector('#bTitle').textContent = p.situs || p.owner || 'Building';
-    card.querySelector('#bSub').textContent = [p.county ? title(p.county) + ' County' : '', p.landUse].filter(Boolean).join(' · ');
+    if (t) t.textContent = p.situs || 'Unaddressed ' + kindOf(cur).toLowerCase();
     const legal = String(p.raw?.LEGAL_DESC || '').replace(/^"+|"+$/g, '').replace(/""/g, '"').trim(), val = appraised(p);
+    if (sub) sub.textContent = [p.owner, val ? fmtM(val) + (p.marketValue ? ' market value' : ' appraised') : '', p.landUse].filter(Boolean).join(' · ');
     el.innerHTML = head + '<div class="fgrid">' +
-      fld('Owner', esc(p.owner || '—'), { w: true, sub: p.mailing ? 'Mail: ' + esc(p.mailing) : '' }) +
+      fld('Owner', esc(p.owner || '—'), { w: true }) +
       fld(p.marketValue ? 'Market value' : 'Appraised value', '<span class="mono">' + money(val) + '</span>', { sub: p.marketValue ? '' : 'Land + improvements' }) +
       fld('Tax year', esc(p.taxYear || '—')) +
       fld('Land', '<span class="mono">' + money(p.landValue) + '</span>') + fld('Improvements', '<span class="mono">' + money(p.improvementValue) + '</span>') +
       fld('Land area', esc(p.area || '—')) + fld('Year built', esc(p.yearBuilt || 'Not reported'), { dim: !p.yearBuilt }) +
-      fld('Acquired', esc(p.acquired || '—'), { dim: !p.acquired }) + fld('Property ID', '<span class="mono">' + esc(p.propId || '—') + '</span>') +
-      (legal ? fld('Legal description', esc(legal), { w: true }) : '') + '</div>' + '<div class="oc-box" id="bOwnerCo" hidden></div>' + parcelsHtml(all) +
-      (p.raw ? '<details class="raw"><summary>All appraisal fields</summary><dl>' + Object.entries(p.raw).map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl></details>' : '') +
+      fld('Acquired', esc(p.acquired || '—'), { dim: !p.acquired }) + fld('Property ID', '<span class="mono">' + esc(p.propId || '—') + '</span>') + '</div>' +
+      '<div class="oc-box" id="bOwnerCo" hidden></div>' + parcelsHtml(all) +
+      '<div class="rg-row"><span>Zoning &amp; last sale</span><button class="lnk" type="button" data-rg>Get from Regrid<span data-rg-left>' + rgLeft() + '</span></button></div>' +
+      (p.mailing || legal || p.raw ? '<details class="raw more-rec"><summary>More record details</summary><dl>' + (p.mailing ? '<dt>Mailing address</dt><dd>' + esc(p.mailing) + '</dd>' : '') + (legal ? '<dt>Legal description</dt><dd>' + esc(legal) + '</dd>' : '') + '</dl>' +
+        (p.raw ? '<div class="fl">All appraisal fields</div><dl>' + Object.entries(p.raw).map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' : '') + '</details>' : '') +
       '<div class="ssrc src">' + esc(p.raw?.SOURCE ? title(p.raw.SOURCE) : 'County appraisal district') + ' via Texas GIO StratMap. Appraisal values, not sale prices.</div>';
+    wireRegrid(el);
     ctx.renderOwnerCo?.(el.querySelector('#bOwnerCo'), p.owner);
   }
   // the dark summary at the top: who owns it, what it's worth, how big, and how busy construction is around it
@@ -382,7 +416,7 @@ export function initBuildings(ctx) {
     const b = cur, el = card.querySelector('#bFilings'); if (!el) return;
     const near = F.filter(f => parcelGeom ? inGeom([f.lon, f.lat], parcelGeom) : (b.footprint && inGeom([f.lon, f.lat], b.footprint)) || Math.hypot((f.lon - b.center[0]) * 0.87, f.lat - b.center[1]) < 0.0004);
     const n = near1(b.center);
-    el.innerHTML = '<div class="lt">Construction Activity</div>' + (near.length ? '<div class="fl">On this ' + (parcelGeom ? 'parcel' : 'spot') + '</div>' + near.sort((x, y) => y.cost - x.cost).slice(0, 25).map(f => '<button class="chitem" data-id="' + esc(f.id) + '"><span><b>' + esc(f.name) + '</b><em>' + esc(f.reg) + ' · ' + esc(ctx.TYPE_LABEL[f.type] || f.type) + (f.use ? ' · ' + esc(f.use) : '') + '</em></span><span class="m">' + fmtM(f.cost) + '</span></button>').join('') : '<div class="rnote">No filings on this ' + (parcelGeom ? 'parcel' : 'spot') + ' in the period loaded.</div>') +
+    el.innerHTML = '<div class="lt">Construction Activity</div>' + (near.length ? '<div class="fl">On this ' + (parcelGeom ? 'parcel' : 'spot') + '</div>' + near.sort((x, y) => y.cost - x.cost).slice(0, 25).map(f => '<button class="chitem" data-push data-id="' + esc(f.id) + '"><span><b>' + esc(f.name) + '</b><em>' + esc(f.reg) + ' · ' + esc(ctx.TYPE_LABEL[f.type] || f.type) + (f.use ? ' · ' + esc(f.use) : '') + '</em></span><span class="m">' + fmtM(f.cost) + '</span></button>').join('') : '<div class="rnote">No filings on this ' + (parcelGeom ? 'parcel' : 'spot') + ' in the period loaded.</div>') +
       (n.list.length ? '<div class="fs">' + fmtN(n.list.length) + ' filing' + (n.list.length > 1 ? 's' : '') + ' within 1 mile, est. ' + fmtM(n.value) + (n.recent ? '; ' + fmtN(n.recent) + ' filed in the last 12 months' : '') + '.</div>' : '') +
       '<div class="ssrc src">TDLR TABS registrations. Costs are filer estimates.</div>';
     el.querySelectorAll('.chitem').forEach(x => x.onclick = () => ctx.select(ctx.BY_ID.get(x.dataset.id), false));

@@ -79,7 +79,7 @@ export function initMobile(ctx) {
   // ---- floating assistant bar (phone) ----
   document.getElementById('mAsk').onclick = () => { ctx.assistant.open(); setTimeout(() => document.getElementById('aiQ').focus(), 80); };
   document.getElementById('mMic').onclick = () => ctx.assistant.startVoice();
-  phoneMQ.addEventListener('change', () => { if (!isPhone()) { app.dataset.mtab = 'map'; closeSheet(); card.classList.remove('full'); } setTimeout(() => map.resize(), 50); });
+  phoneMQ.addEventListener('change', () => { if (!isPhone()) { app.dataset.mtab = 'map'; closeSheet(); card.classList.remove('full', 'half'); } placeActs(); setTimeout(() => map.resize(), 50); });
   document.getElementById('mFilters').onclick = () => { setTab('map'); ctx.openFilters?.(); };
 
   // live count + filter badge
@@ -105,19 +105,29 @@ export function initMobile(ctx) {
   });
 
   // ---- swipeable bottom-sheet card (phone) ----
+  // It opens at "peek" (title, owner · value and the action row); swipe up for half, then full height. Swipe down steps
+  // back (full → half → peek → just the title bar) and never closes it: only × closes. A tap on the handle steps up.
+  const sheetAt = () => card.classList.contains('full') ? 'full' : card.classList.contains('half') ? 'half' : 'peek';
+  const setSheet = st => { card.classList.toggle('half', st === 'half'); card.classList.toggle('full', st === 'full'); };
+  // the action row is a footer on phones (always in reach under the thumb) and part of the pinned header elsewhere
+  function placeActs() {
+    const a = card.querySelector('.cact'); if (!a) return; const top = card.querySelector(':scope > .top');
+    if (isPhone()) { if (a.parentNode !== card || card.lastElementChild !== a) card.appendChild(a); }
+    else if (top && a.parentNode !== top) top.insertBefore(a, top.querySelector('.bnav'));
+  }
+  new MutationObserver(placeActs).observe(card, { childList: true });
   let y0 = null, dy = 0;
   card.addEventListener('touchstart', e => { if (!isPhone()) return; const r = card.getBoundingClientRect(), t = e.touches[0]; if (t.clientY - r.top < 48 && card.scrollTop <= 0) { y0 = t.clientY; dy = 0; } }, { passive: true });
   card.addEventListener('touchmove', e => { if (y0 == null) return; dy = e.touches[0].clientY - y0; if (dy > 0) card.style.transform = 'translateY(' + dy + 'px)'; }, { passive: true });
   card.addEventListener('touchend', () => {
     if (y0 == null) return; card.style.transform = '';
-    const min = card.classList.contains('min');
-    // swipe down: full → normal → minimized (title bar only, still selected) → closed; swipe up or tap brings it back
-    if (dy > 90) { if (card.classList.contains('full')) card.classList.remove('full'); else if (!min) setMin(true); else ctx.closeCard(); }
-    else if (dy < -30) { if (min) setMin(false); else card.classList.add('full'); }
-    else if (Math.abs(dy) < 6 && !min) card.classList.toggle('full');
+    const min = card.classList.contains('min'), at = sheetAt();
+    if (dy > 90) { if (at === 'full') setSheet('half'); else if (at === 'half') setSheet('peek'); else if (!min) setMin(true); }
+    else if (dy < -30) { if (min) setMin(false); else setSheet(at === 'peek' ? 'half' : 'full'); }
+    else if (Math.abs(dy) < 6 && !min) setSheet(at === 'peek' ? 'half' : at === 'half' ? 'full' : 'peek');
     y0 = null;
   });
-  ctx.onCardClose(() => { card.classList.remove('full'); setMin(false); });
+  ctx.onCardClose(() => { setSheet('peek'); setMin(false); });
 
   // ---- minimize any card to its title bar (all screen sizes) ----
   // The selection, the plane being followed, its flight path and the route stay on the map; tap the bar (or the
@@ -125,7 +135,7 @@ export function initMobile(ctx) {
   // back after every render and the state lives on the card element.
   const MIN_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>';
   function setMin(on) {
-    const was = card.classList.contains('min'); card.classList.toggle('min', !!on); if (on) card.classList.remove('full');
+    const was = card.classList.contains('min'); card.classList.toggle('min', !!on); if (on) card.classList.remove('full', 'half');
     const b = card.querySelector('.top .mn'); if (b) { b.setAttribute('aria-label', on ? 'Expand card' : 'Minimize card'); b.title = on ? 'Expand' : 'Minimize'; b.setAttribute('aria-expanded', String(!on)); }
     if (was !== !!on) { card.scrollTop = 0; setTimeout(() => ctx.map?.resize?.(), 220); }
   }
