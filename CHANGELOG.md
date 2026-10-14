@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 4:38 PM CT: School enrollment on the Schools layer (4b612c3)
+- School cards and the property card's nearest schools now show enrollment (TEA's October 2024 count). The first version read the wrong column, so enrollment would have been blank.
+
 ### 4:22 PM CT: The development pipeline, and Harris and Waller owners without Regrid (47fe986)
 - **Five new map layers** under **Development pipeline** in Map layers, refreshed every night:
   - **Building Permits (Harris):** about 47,000 permits from the last two years, from the Harris Central Appraisal District, colored by kind (new commercial building, new home, addition / remodel / lease space, paving, demolition). Harris County only: no other county or city in the region publishes permits as open data.
