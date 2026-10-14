@@ -1989,7 +1989,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 /* ---------- Projects view: all projects as cards or a list, and a page per project. Laid out by the view's own
    width (container queries), and text wraps instead of being cut off ---------- */
 #view-projects{container-type:inline-size}
-.pj-wrap{max-width:1180px;margin:0 auto}
+.pj-wrap{max-width:1180px;margin:0} /* left-aligned like every other page, so the title doesn't jump between My Work tabs */
 .pj-wrap .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .pj-wrap b,.pj-wrap h2,.pj-wrap dd,.pj-wrap span{overflow-wrap:anywhere}
 .pj-new{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
@@ -2320,17 +2320,20 @@ body>.toast{position:fixed;z-index:52;left:calc(100% - min(420px,100%) / 2);bott
 
 /* ---------- Pages that flow: one header template, scope bar, empty states, Export ▾ menus (WS4) ---------- */
 /* header: title column (kicker = page name, title, a 2-line summary) | actions on the same row; stacked on phones */
-.vhead{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:var(--sp-3) var(--sp-4);flex-wrap:nowrap}
-.vhead>div:first-child{min-width:0}
+/* a wrapping row, not a fixed 2-column grid: when the page is narrowed (a card or the assistant open beside it on a small
+   desktop) the actions drop under the title instead of squeezing it until it runs into them */
+.vhead{display:flex;flex-wrap:wrap;align-items:flex-end;gap:var(--sp-3) var(--sp-4)}
+.vhead>div:first-child{min-width:0;flex:1 1 300px}
 .vhead .vsub{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
-.vhead>.vctl,.vhead>.btn{justify-self:end;justify-content:flex-end}
+.vhead>.vctl,.vhead>.btn{margin-left:auto;justify-content:flex-end;max-width:100%}
 .vhead .team-slot:empty{display:none}
 .vctl .team-slot{margin:0}
 .vfoot{margin:10px 2px 0;font-size:12px;color:var(--muted)}
 @media (max-width:700px){
-  .vhead{grid-template-columns:minmax(0,1fr);align-items:start}
-  .vhead>.vctl,.vhead>.btn{justify-self:stretch;justify-content:flex-start}
-  .vhead>.btn{justify-self:start}
+  .vhead{align-items:flex-start}
+  .vhead>div:first-child{flex-basis:100%}
+  .vhead>.vctl{margin-left:0;flex:1 1 100%;justify-content:flex-start}
+  .vhead>.btn{margin-left:0}
 }
 /* scope bar under a page header: what the page is counting, the filters as removable chips, Edit filters / Reset */
 .vscope{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:0 0 14px;padding:8px 10px 8px 14px;background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r-md);font-size:12.5px;color:var(--text-2)}
@@ -2779,6 +2782,9 @@ table.who tr.nomatch td{border:0}
   .app.ai-open:has(.card.open) .mapleft{width:max(0px,calc(100% - var(--aiw) - var(--railw,36px) - 84px - var(--cardw)))}
   /* a card open over a page (Timeline, Changes…) docks the same way, and the page makes room for it */
   .app:has(.card.open:not(.min)) .stage:not([data-view="map"]) .view{padding-right:calc(var(--cardw) + 36px)}
+  /* the assistant opened over a page (Ask AI in the top bar) makes room the same way, instead of covering its right side */
+  .app.ai-open .stage:not([data-view="map"]) .view{padding-right:calc(var(--aiw) + 36px)}
+  .app.ai-open:has(.card.open:not(.min)) .stage:not([data-view="map"]) .view{padding-right:calc(var(--aiw) + var(--cardw) + 52px)}
 }
 /* header: back link, kicker, title, owner · value, the action row, then the section chips */
 #card .top{padding:14px 16px 10px}

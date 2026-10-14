@@ -45,7 +45,7 @@ export function initSources(ctx) {
     const nightly = 'Nightly at about ' + fmtTime(nextNightly()) + (built ? ' · last refresh ' + fmtWhen(built) + ' (' + ago(built) + ')' : '');
     return [
       ['Nightly data (built into the app)', [
-        { name: link('TDLR TABS', 'https://www.tdlr.texas.gov/TABS/Search'), what: 'Construction registrations: every filing on the map, list, timeline and activity views', status: nightlyStatus(),
+        { name: link('TDLR TABS', 'https://www.tdlr.texas.gov/TABS/Search'), what: 'Construction registrations: every filing on the map, list, Timeline and Companies pages', status: nightlyStatus(),
           detail: nightly + '. ' + fmtN(F.length) + ' filings registered ' + fmtDay(DATA.period.start) + ' to ' + fmtDay(DATA.period.end) + (unmapped ? '; ' + fmtN(unmapped) + ' couldn’t be mapped' : '') + '.' },
         { name: 'TABS change feed', what: 'Changes page: new filings and status, value and date changes', status: runs.length ? nightlyStatus() : st('off', 'Starts after 2 runs'),
           detail: runs.length ? 'Latest comparison ' + fmtWhen(runs[0].built) + ' · ' + fmtN(runs.length) + ' nightly run' + (runs.length === 1 ? '' : 's') + ' kept.' : 'Each nightly pull is compared with the one before.' },
@@ -155,7 +155,7 @@ export function initSources(ctx) {
       offline ? '<span class="src-pill">' + st('stale', 'Offline') + ' showing the copy saved on this device</span>' : '',
       newer ? '<span class="src-pill">' + st('stale', 'Newer data') + ' refreshed ' + esc(fmtWhen(newer)) + ' · <button class="lnk" id="srcReload" type="button">Reload</button></span>' : '',
     ].join('');
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Sources</div><h2>Where the data comes from</h2><div class="vsub">What each source feeds, how often it refreshes and when it last did. Nightly data is pulled once a night and built into the app; map layers and lookups are fetched live when you use them.</div></div><div class="vctl"><button type="button" class="btn md" id="srcIntro" title="Show the short getting-started tip at the top of the Map panel again">Getting started</button></div></div>' +
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">Data &amp; help</div><h2>Where the data comes from</h2><div class="vsub">What each source feeds, how often it refreshes and when it last did. Nightly data is pulled once a night and built into the app; map layers and lookups are fetched live when you use them.</div></div><div class="vctl"><button type="button" class="btn md" id="srcIntro" title="Show the short getting-started tip at the top of the Map panel again">Getting started</button></div></div>' +
       '<div class="src-sum">' + pills + '</div>' +
       // the options themselves live in Settings; this line says how they're set and links there
       '<div class="src-opt muted">Show sources on cards: <b id="srcShowState">' + (ctx.showSources?.() ? 'On' : 'Off') + '</b> · <button class="lnk" id="srcSettings" type="button">Change in Settings</button> · <button class="lnk" id="srcVoiceLog" type="button" title="What the voice assistant heard and did in this visit, for troubleshooting">Save voice log</button></div>' +

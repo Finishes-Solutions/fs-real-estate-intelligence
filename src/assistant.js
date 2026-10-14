@@ -780,7 +780,7 @@ export function initAssistant(ctx) {
         actionChip(t.label); if (t.orbit || t.stop || t.region) return { done: t.label }; return { done: t.label, zoom: +(t.zoom ?? cur.zoom).toFixed(1), pitch: Math.round(t.pitch ?? cur.pitch), bearing: Math.round(t.bearing ?? cur.bearing) };
       }
       if (name === 'add_site_note') {
-        if (!ctx.addNote) return { error: 'Field notes are not available.' };
+        if (!ctx.addNote) return { error: 'Site notes are not available.' };
         const where = a.where || (a.place ? 'place' : ctx.state.sel || ctx.currentBuilding?.() ? 'selected' : 'center');
         let at = null, label = 'the map center';
         if (where === 'selected') { const f = ctx.state.sel, bd = ctx.currentBuilding?.(); if (f) { at = [f.lon, f.lat]; label = f.name; } else if (bd) { at = bd.center; label = bd.title || 'this building'; } else return { error: 'No card is open. Say where the note goes (here = map center, my location, or a place).' }; }
