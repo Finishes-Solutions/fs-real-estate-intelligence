@@ -72,7 +72,8 @@ export function initTraffic(ctx) {
         kgrid([[top ? fmt(top.aadt) : '—', top ? 'Busiest: ' + top.road : 'No counted roads'], [fmt(roads.length), 'Counted roads'], [live.length ? slow.length + ' of ' + live.length : '—', 'Busy roads slowed now'], [Array.isArray(d.incidents) ? fmt(inc.length) : '—', 'Incidents now']])) + '</div>' +
       (roads.length ? '<div class="bsec"><div class="lt">Busiest roads (vehicles a day)</div>' + bars(roads.slice(0, 10).map(r => ({ label: r.road.length > 12 ? r.road.slice(0, 11) + '…' : r.road, v: r.aadt, color: colorOf(r.aadt) })), { height: 110 }) +
         '<dl>' + roads.slice(0, 12).map(r => '<dt>' + esc(r.road) + '</dt><dd class="mono">' + fmt(r.aadt) + ' <span class="sc">' + esc(r.type) + (r.segments > 1 ? ', avg ' + fmt(r.avg) + ' over ' + r.segments + ' segments' : '') + '</span></dd>').join('') + '</dl></div>' : '') +
-      (c.types?.length ? '<div class="bsec"><div class="lt">By road type (average a day)</div><dl>' + c.types.map(t => '<dt>' + esc(t.label) + '</dt><dd class="mono">' + fmt(t.avg) + ' <span class="sc">' + fmt(t.segments) + ' segments, busiest ' + fmt(t.max) + '</span></dd>').join('') + '</dl></div>' : '') +
+      (c.types?.length ? '<div class="bsec"><div class="lt">By road type (average a day)</div><dl>' + c.types.map(t => '<dt>' + esc(t.label) + '</dt><dd class="mono">' + fmt(t.avg) + ' <span class="sc">' + fmt(t.segments) + ' segments, busiest ' + fmt(t.max) + '</span></dd>').join('') + '</dl>' +
+        (c.segments_capped ? '<div class="rnote">' + fmt(c.types.reduce((n, t) => n + t.segments, 0)) + ' counted segments in all (averages above use every one). The map and PDF show the 1,000 busiest; <b>Export CSV</b> lists all of them.</div>' : '') + '</div>' : '') +
       '<div class="bsec"><div class="lt">Live conditions on the busiest roads</div>' + (d.live?.error ? '<div class="rnote">' + esc(d.live.error) + '</div>' : live.length ?
         '<dl>' + live.map(x => '<dt>' + esc(x.road) + '</dt><dd class="mono">' + fmt(x.current_mph) + ' mph <span class="sc">free flow ' + fmt(x.free_flow_mph) + ' · ' + esc(congestion(x)) + '</span></dd>').join('') + '</dl>' : '<div class="rnote">No live readings.</div>') + '</div>' +
       '<div class="bsec"><div class="lt">Incidents right now</div>' + (d.incidents?.error ? '<div class="rnote">' + esc(d.incidents.error) + '</div>' : inc.length ?
@@ -90,9 +91,15 @@ export function initTraffic(ctx) {
   }
   ctx.onCardClose?.(() => showArea(null));
 
-  function exportCsv() {
-    if (!last) return; const { d, label } = last, c = d.counts || {}, rows = [];
-    for (const s of c.segments || []) rows.push({ Table: 'Counted segment', Road: s.road, 'Road type': s.type, 'Vehicles a day (AADT)': s.aadt, 'Live mph': '', 'Free-flow mph': '', Detail: '', Latitude: s.path[Math.floor(s.path.length / 2)]?.[1] ?? '', Longitude: s.path[Math.floor(s.path.length / 2)]?.[0] ?? '' });
+  async function exportCsv() {
+    if (!last) return; const mine = last, { d, label } = last, c = d.counts || {}, rows = [];
+    // more than the report's 1,000 busiest segments: page through every one (busiest first)
+    if (c.segments_capped) { ctx.toast?.('Gathering every counted segment…');
+      try { const all = []; for (let offset = 0; offset != null;) { const r = await fetch('api/traffic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry: mine.geometry, segments: true, offset }) }), p = await readJSON(r); all.push(...p.rows); offset = p.next; }
+        if (last !== mine) return;
+        for (const s of all) rows.push({ Table: 'Counted segment', Road: s.road, 'Road type': s.type, 'Vehicles a day (AADT)': s.aadt, 'Live mph': '', 'Free-flow mph': '', Detail: '', Latitude: s.lat ?? '', Longitude: s.lon ?? '' }); }
+      catch (e) { ctx.toast?.('Only the 1,000 busiest segments: ' + e.message); } }
+    if (!rows.length) for (const s of c.segments || []) rows.push({ Table: 'Counted segment', Road: s.road, 'Road type': s.type, 'Vehicles a day (AADT)': s.aadt, 'Live mph': '', 'Free-flow mph': '', Detail: '', Latitude: s.path[Math.floor(s.path.length / 2)]?.[1] ?? '', Longitude: s.path[Math.floor(s.path.length / 2)]?.[0] ?? '' });
     for (const x of Array.isArray(d.live) ? d.live : []) rows.push({ Table: 'Live speed', Road: x.road, 'Road type': '', 'Vehicles a day (AADT)': x.aadt, 'Live mph': x.current_mph, 'Free-flow mph': x.free_flow_mph, Detail: congestion(x), Latitude: x.lat, Longitude: x.lon });
     for (const x of Array.isArray(d.incidents) ? d.incidents : []) rows.push({ Table: 'Incident', Road: x.road, 'Road type': x.kind, 'Vehicles a day (AADT)': '', 'Live mph': '', 'Free-flow mph': '', Detail: [x.what, x.from && x.to ? x.from + ' to ' + x.to : x.from, x.delay_min ? x.delay_min + ' min delay' : ''].filter(Boolean).join(' · '), Latitude: x.lat ?? '', Longitude: x.lon ?? '' });
     saveCsv(ctx, 'traffic', label, rows);

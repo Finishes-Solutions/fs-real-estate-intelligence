@@ -77,7 +77,7 @@
       "maxDuration": 60
     },
     "api/fema.js": {
-      "maxDuration": 90
+      "maxDuration": 180
     },
     "api/traffic.js": {
       "maxDuration": 30

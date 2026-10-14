@@ -6,7 +6,7 @@ const seen = [];
 const AREA = { type: 'Polygon', coordinates: [[[-95.40, 29.74], [-95.38, 29.74], [-95.38, 29.76], [-95.40, 29.76], [-95.40, 29.74]]] };
 globalThis.fetch = async (url, opts = {}) => {
   const u = new URL(String(url)); seen.push(u.host + u.pathname + (u.search ? '?' + decodeURIComponent(u.search) : ''));
-  if (u.pathname.endsWith('/NFHL/MapServer/28/query')) { const b = new URLSearchParams(opts.body); assert.match(b.get('geometry'), /rings/); return Response.json({ features: [
+  if (u.pathname.endsWith('/NFHL/MapServer/28/query')) { const b = new URLSearchParams(opts.body); assert.match(b.get('geometry'), /rings|points/); return Response.json({ features: [
     { attributes: { FLD_ZONE: 'AE', ZONE_SUBTY: null, SFHA_TF: 'T', STATIC_BFE: 51 }, geometry: { rings: [[[-95.41, 29.73], [-95.39, 29.73], [-95.39, 29.77], [-95.41, 29.77], [-95.41, 29.73]]] } },
     { attributes: { FLD_ZONE: 'X', ZONE_SUBTY: '0.2 PCT ANNUAL CHANCE FLOOD HAZARD', SFHA_TF: 'F', STATIC_BFE: -9999 }, geometry: { rings: [[[-95.39, 29.73], [-95.37, 29.73], [-95.37, 29.77], [-95.39, 29.77], [-95.39, 29.73]]] } }] }); }
   if (u.pathname.endsWith('/NFHL/MapServer/legend')) return Response.json({ layers: [{ layerId: 3, legend: [{ label: 'x', imageData: 'AA' }] }, { layerId: 28, legend: [
@@ -47,10 +47,21 @@ assert.equal(d.risk_index.risk_score, 38, 'building-value weighted'); assert.equ
 // one failing source doesn't sink the report
 const real = globalThis.fetch; globalThis.fetch = async (url, o) => String(url).includes('NfipClaims') ? new Response('down', { status: 503 }) : real(url, o);
 const e = await femaReport(AREA); assert.match(e.nfip_claims.error, /OpenFEMA 503/, 'retried once, then reported'); assert.equal(e.risk_index.tracts, 2); globalThis.fetch = real;
-// too large
-await assert.rejects(femaReport({ type: 'Polygon', coordinates: [[[-96, 29], [-95, 29], [-95, 30], [-96, 30], [-96, 29]]] }), /too large/);
-// big but allowed: zone shares skipped, the rest runs
-const mid = await femaReport({ type: 'Polygon', coordinates: [[[-95.5, 29.7], [-95.35, 29.7], [-95.35, 29.85], [-95.5, 29.85], [-95.5, 29.7]]] }); assert.match(mid.flood_zones.skipped, /zone shares/);
+// only an abuse guard: bigger than any Texas county
+await assert.rejects(femaReport({ type: 'Polygon', coordinates: [[[-100, 28], [-96, 28], [-96, 32], [-100, 32], [-100, 28]]] }), /larger than 10,000 square miles/);
+// a county-sized area: flood zone shares from the zones under the sample points (multipoint queries of up to 150 points)
+seen.length = 0;
+const county = await femaReport({ type: 'Polygon', coordinates: [[[-96, 29], [-95, 29], [-95, 30], [-96, 30], [-96, 29]]] });
+assert.equal(county.flood_zones.method, 'points'); assert.ok(county.flood_zones.shares.unmapped > 90 && (county.flood_zones.shares.high || 0) + (county.flood_zones.shares.moderate || 0) > 0, JSON.stringify(county.flood_zones.shares));
+assert.ok(seen.filter(u => u.includes('/NFHL/MapServer/28/query')).length >= 6, 'about 900 points, 150 a request');
+const mid = await femaReport({ type: 'Polygon', coordinates: [[[-95.5, 29.7], [-95.35, 29.7], [-95.35, 29.85], [-95.5, 29.85], [-95.5, 29.7]]] }); assert.ok(mid.flood_zones.shares && !mid.flood_zones.skipped);
+// claims: every tract (no 60-tract cap), tracts whose requests fail are counted as skipped, the rest still reported
+{ const { claims } = await import('../api/fema.js'), real3 = globalThis.fetch, tracts = Array.from({ length: 30 }, (_, i) => '48201' + String(400000 + i));
+  globalThis.fetch = async (url, o) => { const u = new URL(String(url)); if (u.pathname !== '/api/open/v3/NfipClaims') return real3(url, o);
+    if (u.searchParams.get('$filter').includes('48201400012')) return new Response('down', { status: 503 });
+    return Response.json({ metadata: { count: 1 }, NfipClaims: [{ yearOfLoss: 2017, amountPaidOnBuildingClaim: 1000, occupancyType: 1 }] }); };
+  const c = await claims(tracts); globalThis.fetch = real3;
+  assert.equal(c.tracts_searched, 18); assert.equal(c.tracts_skipped, 12); assert.equal(c.claims, 2); }
 // handler
 const res = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, send(b) { r.body = b; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
 let r = res(); await handler({ headers: {}, query: { tile: '14/3780/6770' } }, r); assert.equal(r.code, 200); assert.equal(r.headers['Content-Type'], 'image/png'); assert.match(r.headers['Cache-Control'], /s-maxage=2592000/);

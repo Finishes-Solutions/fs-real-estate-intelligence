@@ -92,8 +92,14 @@ console.log('drivetime ok');
   const w = await trafficReport(waller, { key: '', fetchImpl: f, label: 'Waller County' }); assert.ok(w.area_sqmi > 400 && w.area_sqmi < 700, 'Waller ' + w.area_sqmi); assert.equal(w.counts.roads.length, 2);
   const harris = { type: 'MultiPolygon', coordinates: geo.counties.find(c => c.name === 'Harris').outline };
   assert.ok((await trafficReport(harris, { key: '', fetchImpl: f })).area_sqmi > 1500, 'Harris County');
-  const big = { type: 'Polygon', coordinates: [[[-97, 29], [-95, 29], [-95, 31], [-97, 31], [-97, 29]]] };
-  await assert.rejects(trafficReport(big, { key: '', fetchImpl: f }), /too large .*5,000/);
+  const big = { type: 'Polygon', coordinates: [[[-99, 29], [-95, 29], [-95, 31], [-99, 31], [-99, 29]]] };
+  await assert.rejects(trafficReport(big, { key: '', fetchImpl: f }), /larger than 10,000 square miles/);
+  // every counted segment for the CSV, busiest first, in pages
+  { const { segmentsPage } = await import('../api/traffic.js'); let asked;
+    const pf = async (url, o = {}) => { const p = new URLSearchParams(o.body); asked = p; const off = +p.get('resultOffset');
+      return json({ features: off >= 2500 ? [] : Array.from({ length: Math.min(2000, 2500 - off) }, (_, i) => ({ attributes: { RTE_PRFX: 'CS', RTE_NM: 'MAIN ST', AADT_CUR: 9000 - off - i }, geometry: { paths: [[[-95.45, 29.75], [-95.44, 29.75], [-95.43, 29.75]]] } })), exceededTransferLimit: off + 2000 < 2500 || undefined }); };
+    const all = []; for (let offset = 0; offset != null;) { const pg = await segmentsPage(sq, offset, pf); all.push(...pg.rows); offset = pg.next; }
+    assert.equal(all.length, 2500); assert.equal(all[0].aadt, 9000); assert.equal(all[0].lon, -95.44); assert.equal(asked.get('orderByFields'), 'AADT_CUR DESC,OBJECTID'); }
   // TomTom incident boxes stop at 10,000 km²: a county-wide box is asked in 4 pieces, then kept to the area itself
   const { incidentBoxes, incidentsIn } = await import('../api/traffic.js');
   assert.equal(incidentBoxes([-95.5, 29.7, -95.4, 29.8]).length, 1);

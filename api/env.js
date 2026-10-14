@@ -11,6 +11,7 @@
 // nearby ones, when there are more than 1,000), plus soils under the site (with each soil's share for larger sites).
 // Each source is best effort: a failing or unfinished one returns { error } and can be asked for again on its own.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
+import { limiter } from './_lib/limit.mjs';
 import { KINDS, RRC, NWI, SDA, SOILS_WMS, kindsIn, siteExtent, featureRow, summarize, soilsQuery, soilsShareQuery, parseSoils, esriPolygon, SOURCES } from '../lib/env.mjs';
 import { areaSqMi } from '../lib/fema.mjs';
 import { circle, cleanGeometry } from './crime.js';
@@ -31,12 +32,6 @@ async function json(url, opts = {}, ms = 15000) {
 }
 const left = (deadline, ms) => deadline ? Math.min(ms, deadline - Date.now()) : ms;
 const query = (layer, params, deadline) => json(layer + '/query', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ f: 'json', inSR: '4326', outSR: '4326', ...params }) }, left(deadline, 25000));
-// at most n requests at a time across one report (the state and federal services are shared and can throttle)
-export function limiter(n) {
-  let active = 0; const q = [];
-  const next = () => { if (active >= n || !q.length) return; active++; const [fn, ok, no] = q.shift(); Promise.resolve().then(fn).then(ok, no).finally(() => { active--; next(); }); };
-  return fn => new Promise((ok, no) => { q.push([fn, ok, no]); next(); });
-}
 const chunks = (a, n) => { const out = []; for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n)); return out; };
 
 // the old way, kept for a service that can't search around a polygon: a circle around the site, up to 1,000 records
@@ -119,6 +114,7 @@ export async function soils(site, deadline) {
   // share of the site by soil: heavier for USDA; fall back to the plain list if it can't
   try { return parseSoils(await ask(q)); } catch (e) { const list = parseSoils(await ask(soilsQuery(site))); return Object.assign(list, { note: 'Share of the site by soil wasn’t available; soils are listed without it.' }); }
 }
+export { limiter };
 export async function envReport(site, { label, kinds, full = false, offset = 0, deadline = Date.now() + BUDGET_MS } = {}) {
   const sq = areaSqMi(site);
   if (sq > MAX_SQMI) { const e = new Error('That area is larger than ' + MAX_SQMI.toLocaleString('en-US') + ' square miles. Pick a smaller area.'); e.status = 400; throw e; }
