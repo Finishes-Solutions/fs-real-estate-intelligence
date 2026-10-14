@@ -2,7 +2,7 @@
 // lot, re-solved with a deeper front setback), matching a layout again, slimming what's saved, the Pro forma's money and
 // the projects a parcel already belongs to.
 import assert from 'node:assert/strict';
-import { baseName, layoutKeys, layoutNames, matchLayout, slimRun, finOf, projectsWith, deltaText } from '../lib/planruns.mjs';
+import { baseName, layoutKeys, layoutNames, matchLayout, slimRun, finOf, projectsWith, deltaText, syncCopy, lightenRuns } from '../lib/planruns.mjs';
 const S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayout.mjs'), PF = await import('../lib/proforma.mjs');
 
 // ---- names ----
@@ -60,4 +60,18 @@ assert.deepEqual(projectsWith(projects, ['pid:7']), []);
 assert.equal(deltaText('Front setback 35 ft', { gfa: 25000, spaces: 110, required: 100 }, { gfa: 22800, spaces: 104, required: 92 }), 'Front setback 35 ft: 22,800 sf (−2,200), 104/92 spaces');
 assert.equal(deltaText('Floors 4', { units: 200, spaces: 300, required: 300 }, { units: 240, spaces: 330, required: 360 }), 'Floors 4: 240 units (+40), 330/360 spaces');
 
-console.log('planruns ok: layout names and keys, matching after a re-solve, saved runs, Pro forma money, parcels in projects');
+// ---- the team copy and a full browser store ----
+const proj = { id: 'p1', name: 'Big', updated: '2026-10-01', plans: [{ id: 'o1', name: 'Option A', elements: [{ id: 'b1' }], lastRun: slimRun(big, 'k1') }, { id: 'o2', name: 'Option B', elements: [] }] };
+const sc = syncCopy(proj);
+assert.ok(sc.plans[0].lastRun.variants.every(v => !v.elements), 'the team copy keeps the layouts as numbers only');
+assert.equal(sc.plans[0].lastRun.variants.length, proj.plans[0].lastRun.variants.length); assert.deepEqual(sc.plans[0].elements, [{ id: 'b1' }], 'the option itself goes whole');
+assert.ok(proj.plans[0].lastRun.variants[0].elements, 'the local project is untouched'); assert.equal(sc.updated, proj.updated);
+assert.equal(syncCopy(proj, 500).plans[0].lastRun, undefined, 'still too big: no saved layouts in the team copy');
+const plain = { id: 'p2', plans: [{ id: 'o3', elements: [] }] }; assert.equal(syncCopy(plain), plain);
+const two = [JSON.parse(JSON.stringify(proj)), { id: 'p3', plans: [{ id: 'o4', lastRun: slimRun(big, 'k2') }] }];
+assert.ok(lightenRuns(two, 'o4'));
+assert.ok(two[0].plans[0].lastRun.variants.every(v => !v.elements), 'options not open lose their layouts\' pieces');
+assert.ok(two[1].plans[0].lastRun.variants.some(v => v.elements), 'the open one keeps them');
+assert.equal(lightenRuns(two, 'o4'), false, 'nothing left to slim');
+
+console.log('planruns ok: layout names and keys, matching after a re-solve, saved runs, Pro forma money, parcels in projects, team copy and full-store slimming');

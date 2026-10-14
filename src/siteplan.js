@@ -38,7 +38,10 @@ export function initSitePlan(ctx) {
   // ---------- storage and team sync ----------
   function load() { try { const d = JSON.parse(localStorage.getItem(KEY) || '{}'); return { projects: d.projects || [], dirty: d.dirty || [], gone: d.gone || [] }; } catch (e) { return { projects: [], dirty: [], gone: [] }; } }
   let persistT = 0; // written a moment after the last change, not on every one (a big plan is megabytes)
-  function persistNow() { clearTimeout(persistT); persistT = 0; try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { ctx.toast('This browser won’t let the page save projects.'); } }
+  function persistNow() { clearTimeout(persistT); persistT = 0; try { localStorage.setItem(KEY, JSON.stringify(db)); return; } catch (e) { /* full: try lighter */ }
+    // the browser's store is full: the saved layouts of options that aren't open keep their numbers only (each is laid out again when clicked)
+    if (RUN.lightenRuns(db.projects, ed?.plid)) try { localStorage.setItem(KEY, JSON.stringify(db)); return; } catch (e) { /* still full */ }
+    ctx.toast('This browser won’t let the page save projects.'); }
   function persist() { clearTimeout(persistT); persistT = setTimeout(persistNow, 600); }
   window.addEventListener('pagehide', () => { if (persistT) persistNow(); });
   function save(p) {
@@ -52,7 +55,7 @@ export function initSitePlan(ctx) {
     try {
       if (db.dirty.length || db.gone.length) {
         const sent = db.projects.filter(p => db.dirty.includes(p.id)).map(p => [p.id, p.updated]), gone = db.gone.slice();
-        const r = await fetch('api/projects', { method: 'POST', headers: h, body: JSON.stringify({ projects: db.projects.filter(p => db.dirty.includes(p.id)), deletes: gone, name: get(NAME_KEY) }) });
+        const r = await fetch('api/projects', { method: 'POST', headers: h, body: JSON.stringify({ projects: db.projects.filter(p => db.dirty.includes(p.id)).map(p => RUN.syncCopy(p)), deletes: gone, name: get(NAME_KEY) }) });
         if (!r.ok) { shared = r.status === 503 || r.status === 401 ? false : shared; return; }
         db.dirty = db.dirty.filter(id => !sent.some(([i, u]) => i === id && db.projects.find(p => p.id === id)?.updated === u)); db.gone = db.gone.filter(id => !gone.includes(id));
       }
@@ -193,6 +196,7 @@ export function initSitePlan(ctx) {
   function restoreRun(pl) {
     const r = pl?.lastRun; if (!r?.variants?.length) return;
     let vs = clone(r.variants); if (vs.some(v => !v.key)) { const k = RUN.layoutKeys(vs); vs = vs.map((v, i) => ({ ...v, key: v.key || k[i] })); }
+    const on = pl.variant && !pl.variant.edited && vs.find(v => v.key === pl.variant.key && !v.elements); if (on) on.elements = clone(pl.elements); // the team copy keeps numbers only: the one on the map is the option's own pieces
     ed.variants = vs; ed.aiNote = r.note || ''; ed.ask = r.ask || ''; ed.run = { ask: r.ask || '', at: r.at }; if (r.ideas?.list?.length) ed.ideas = r.ideas;
     refreshFin(true);
   }
@@ -781,15 +785,17 @@ export function initSitePlan(ctx) {
   // Never over hand edits: with a changed layout on the map, new settings show a bar instead (re-fit around the changes,
   // or new layouts that replace them). Otherwise the same layout (by its key) comes back with the new settings, and a
   // toast says what changed, with Undo.
-  let solveTimer = 0, solveLabel = '';
-  function resolveSoon(label) { solveLabel = label || solveLabel; const pl = PL(); if (dirty(pl)) { clearTimeout(solveTimer); showSolveBar(); return; } clearTimeout(solveTimer); solveTimer = setTimeout(() => resolve(), 350); }
+  // solveMark: where the undo list stood before the setting changed, so the toast's Undo takes back the setting too
+  let solveTimer = 0, solveLabel = '', solveMark = null;
+  function resolveSoon(label) { solveLabel = label || solveLabel; const pl = PL(); clearTimeout(solveTimer); if (dirty(pl)) { solveMark = null; showSolveBar(); return; }
+    if (solveMark == null && ed) solveMark = Math.max(0, ed.undo.length - 1); solveTimer = setTimeout(() => resolve(), 350); }
   function showSolveBar() { // after the redraw that's under way (a setting's change event can fire while the panel is being replaced)
     if (ed.solveBar) return; ed.solveBar = true; const e0 = ed;
     setTimeout(() => { if (ed !== e0 || !ed.solveBar) return; panel(); card.querySelector('#spSolveBar')?.scrollIntoView({ block: 'nearest' }); }, 0); }
   async function resolve(o = {}) {
     const pl = PL(); if (!pl || pl.ring.length < 3) return;
-    if (!o.force && dirty(pl)) { showSolveBar(); return; }
-    const label = solveLabel; solveLabel = ''; ed.solveBar = false;
+    if (!o.force && dirty(pl)) { solveMark = null; showSolveBar(); return; }
+    const label = solveLabel, mark = o.force ? null : solveMark; solveLabel = ''; solveMark = null; ed.solveBar = false;
     const before = pl.elements.some(e => e.kind === 'building') ? SP.metrics(pl) : null, was = pl.variant ? { ...pl.variant } : null, hadAi = !!ed.variants?.some(v => v.ai);
     busy('#spResolve', 'Laying out new layouts with these settings…', '#spSolveStage');
     let out = []; try { out = await laid('options', { ...pl }, pl.program, { count: ed.variants?.length > 3 ? 12 : 3 }); } catch (e) { console.warn('layout', e); }
@@ -801,7 +807,8 @@ export function initSitePlan(ctx) {
     const r = RUN.matchLayout(variants, was?.key, was?.name);
     if (!await useVariant(r.index >= 0 ? r.index : variants.findIndex(v => v.elements.length))) { panel(); return; }
     const now = PL()?.variant, lost = was?.key && !r.exact ? numOf(was) + ' no longer fits; showing the nearest (' + numOf(now) + '). ' : '';
-    ctx.toast(lost + RUN.deltaText(label || 'New settings', before, SP.metrics(PL())), { action: { label: 'Undo', run: () => undo(true) } });
+    const depth = ed.undo.length, back = () => { if (!ed || PL() !== pl) return; if (mark != null && ed.undo.length === depth) { while (ed.undo.length > mark) undo(true); } else undo(true); }; // the new layout and, after a setting change, the setting
+    ctx.toast(lost + RUN.deltaText(label || 'New settings', before, SP.metrics(PL())), { action: { label: 'Undo', run: back } });
   }
 
   function selHtml(e, prog) {

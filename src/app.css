@@ -1932,7 +1932,7 @@ button:disabled{cursor:var(--cur-default,default)}
 .sp-var .sp-fin{display:block;font-size:11px;color:var(--brand);font-weight:600;margin-top:2px} /* an option's value and cost */.sp-stage:empty{display:none}
 .sp-ainote{margin-top:6px;line-height:1.4}.sp-ainote:empty{display:none} /* the AI's note under the button, never beside it: a long note used to stretch the button */
 .sp-vars{display:grid;gap:6px;margin-top:10px}
-.sp-more{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px}.sp-more select{font:inherit;margin-left:4px}
+.sp-more{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px}.sp-more select{font:inherit;margin-left:4px;border:1px solid var(--line-2);border-radius:4px;background:var(--panel);color:var(--text);padding:2px 4px}
 .sp-sched{display:flex;height:18px;border-radius:4px;overflow:hidden;margin:8px 0 2px;font:600 10px var(--font-mono);color:#fff}.sp-sched i{display:flex;align-items:center;justify-content:center;font-style:normal;min-width:16px}
 .sp-sched .pre{background:#8a6fb3}.sp-sched .bld{background:#c8673d}.sp-sched .lease{background:#d8a13a}.sp-sched .hold{background:#3f8f5a}.sp-card small{display:block;font-size:10px;color:var(--muted)}
 .sp-sub{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2);margin:12px 0 4px}
@@ -2942,6 +2942,8 @@ table.who tr.nomatch td{border:0}
 #card #spSiteSec{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 7 2.5l6.5 2.5v8L9 14.5l-6.5-2z'/%3E%3C/svg%3E")}
 /* a toast with an action ("Saved to … · Open project") */
 .toast.act{pointer-events:auto}
+/* phones: an open card is a sheet over the bottom of the map, so the toast (Undo, Open project…) shows under the search bar instead of behind it */
+@media (max-width:700px){.app:has(#card.open) .toast{bottom:auto;top:calc(66px + var(--st,0px))}}
 .toast button{margin-left:6px;padding:0;border:0;background:none;color:inherit;font:700 12.5px var(--font-display);text-decoration:underline;text-underline-offset:2px;cursor:var(--cur-pointer,pointer)}
 /* after closing: "Resume plan" under the search, and the site's faint outline on the map */
 .sp-resume{display:flex;align-items:stretch;justify-self:start;background:var(--panel);border:1px solid var(--line-2);border-radius:999px;box-shadow:0 2px 8px rgba(11,13,12,.14);overflow:hidden}
