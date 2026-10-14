@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 12:06 PM CT: Crime reports work for any area; clear messages when a report can't finish (ceb2862)
+- **Crime Report no longer fails on big areas.** An 80 sq mi selection (Jersey Village) showed "Unexpected token 'A'… is not valid JSON". The report took 27 seconds in the database, the database gives up after 8, and the server then retried until the whole request was cut off. It now takes about 2 seconds (the incident list under 1). The whole city takes a fraction of a second, and an area covering most of the city about 16 seconds.
+- **No 1,500 square mile limit** on crime reports: any area counts the Houston incidents inside it.
+- **Market page:** Houston-wide crime loads straight away instead of timing out when it isn't cached.
+- **Plain-language errors everywhere:** when a report or lookup can't finish (crime, FEMA, environmental, traffic, air traffic, drive time, the property card, places, weather and others), you see a sentence about what happened ("The server took too long on this area. Try again…") instead of a technical message.
+- **Crime report keeps its numbers** if the incident list can't load in time; it says so under Most recent incidents.
+- **Air Traffic Report** no longer says "Flight history isn't set up" when the real problem was something else.
+- Behind the scenes: Houston-wide crime numbers are worked out once a night instead of on every report, and incidents are stored in map order. While applying this, the database restarted once for about two minutes (12:43 PM CT) because a step used too much memory; that step was replaced before the changes went in.
+
 ### 6:55 AM CT: Site plans: a planning workspace, layouts you can compare, a map you can read (31fecfc, ae13672, 5c9686e, 11e0062, 4e46278, 194fe70, bd6f4c7, 26713a5, 168480b, f8b65e1, 9458bf4)
 - **A planning workspace:** while a plan is open the map's side list and area tools step aside so the plan gets the room. The header shows where you are (Projects › project › option) with Undo, Redo, Edit Layout and **Done** always in the same place. A **Fit plan** button re-centres it.
 - **Nothing lost by accident:** Esc steps back (stop the tool, then clear the selection, then stop editing) and never closes the plan. Closing says where the plan was saved, with a **Resume plan** chip on the map and a link to the project. Leaving the Map shows a "Return to plan" banner.
