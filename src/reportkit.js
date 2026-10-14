@@ -172,7 +172,7 @@ export function saveCsv(ctx, kind, label, rows) {
 export function openCard(ctx, { kicker, title, sub = '', loading = 'Loading…' }) {
   const card = ctx.card || document.getElementById('card');
   ctx.closeCard?.();
-  card.innerHTML = cardTop(kicker, title, sub) + '<div class="bsec"><div class="rnote">' + esc(loading) + '</div></div>';
+  card.innerHTML = cardTop(kicker, title, sub) + '<div class="bsec"><div class="rnote loading">' + esc(loading) + '</div></div>';
   card.classList.add('open'); card.scrollTop = 0; card.querySelector('.x').onclick = () => ctx.closeCard(); return card;
 }
 export const cardTop = (kicker, title, sub = '') => '<div class="top"><div><div class="kicker">' + esc(kicker) + '</div><h2>' + esc(title) + '</h2>' + (sub ? '<div class="bsub">' + sub + '</div>' : '') + '</div><button class="x" aria-label="Close">×</button></div>';

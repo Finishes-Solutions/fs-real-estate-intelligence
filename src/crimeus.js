@@ -67,7 +67,7 @@ export function initCrimeUS(ctx) {
     // once the new department is in, put its picker back where the old one was on screen
     const pick = ori && el.querySelector('#cuOth'), y0 = pick?.getBoundingClientRect().top;
     if (pick) { pick.disabled = true; pick.closest('.cu-oth')?.querySelector('.fl')?.insertAdjacentHTML('beforeend', ' <span class="cu-ld">· loading…</span>'); }
-    else el.innerHTML = head + '<div class="rnote">Finding the local police department…</div>';
+    else el.innerHTML = head + '<div class="rnote loading">Finding the local police department…</div>';
     const keep = () => { if (y0 == null) return; const s = el.querySelector('#cuOth'), sc = el.closest('#card'); if (s && sc) sc.scrollTop += s.getBoundingClientRect().top - y0; s?.focus({ preventScroll: true }); };
     let d; try { d = await ctx.crimeUSData({ center, ori }); } catch (e) { if (!still() || !el.isConnected) return; if (pick) { pick.disabled = false; el.querySelector('.cu-ld')?.remove(); ctx.toast?.(e.message); } else el.innerHTML = head + '<div class="rnote">' + esc(e.message) + '</div>'; return; }
     if (!still() || !el.isConnected) return;
@@ -92,7 +92,7 @@ export function initCrimeUS(ctx) {
   async function report({ center, ori, label }) {
     const card = ctx.card || document.getElementById('card');
     ctx.closeCard?.();
-    card.innerHTML = '<div class="top"><div><div class="kicker">Crime by city / county</div><h2>' + esc(label || 'Local police department') + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote">Reading the FBI’s figures…</div></div>';
+    card.innerHTML = '<div class="top"><div><div class="kicker">Crime by city / county</div><h2>' + esc(label || 'Local police department') + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote loading">Reading the FBI’s figures…</div></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
     let d; try { d = await ctx.crimeUSData({ center, ori }); } catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
     if (!d.agency || !d.headline) { card.querySelector('.bsec').innerHTML = '<div class="rnote">' + esc(d.note || 'No department figures here.') + '</div>'; return; }

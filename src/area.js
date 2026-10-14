@@ -297,7 +297,7 @@ export function initArea(ctx) {
   }
   function trafficBox() {
     const t = traffic.get(sel); if (t === undefined) return '';
-    if (!t) return box('Busiest roads', note('Loading TxDOT traffic counts…') + skel(170));
+    if (!t) return box('Busiest roads', '<div class="rnote loading">Loading TxDOT traffic counts…</div>' + skel(170));
     if (t.error) return box('Busiest roads', note(esc(t.error)));
     return box('Busiest roads', C.hbars(t.roads.slice(0, 10).map((r, i) => ({ label: title(r.road), v: r.aadt, k: 'road:' + i, c: 3, tip: title(r.road) + ': ' + fmtN(r.aadt) + ' vehicles a day at its busiest counted point. Click to see it on the map.' })), fmtN, null, 'mk:area:roads') +
       '<h4 class="mk-h4">Average daily traffic by road type</h4>' + C.hbars(t.types.slice(0, 8).map((g, i) => ({ label: g.label, v: g.avg, k: 'rtype:' + i, c: 3, tip: g.label + ': ' + fmtN(g.avg) + ' vehicles a day on average' })), fmtN, pin, 'mk:area:rtypes') + pinned('rtype') +
@@ -551,7 +551,7 @@ export function initArea(ctx) {
     sec.innerHTML = '<div class="lt">Businesses at this address</div><button class="btn" type="button">Look Up Registered Businesses</button><div class="rnote">Texas Comptroller sales-tax permits at ' + esc(a.street) + '.</div>';
     const after = card.querySelector('#liveSec') || card.querySelector('#briefBox'); if (after) after.after(sec); else (card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
     sec.querySelector('button').onclick = async () => {
-      sec.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote">Looking up…</div>';
+      sec.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote loading">Looking up…</div>';
       try { const d = await ctx.tenantsAt(a.street, a.zip, a.city); if (sec.isConnected) ctx.renderTenants(sec, d); } catch (e) { if (sec.isConnected) ctx.renderTenants(sec, null, e.message); }
     };
   });

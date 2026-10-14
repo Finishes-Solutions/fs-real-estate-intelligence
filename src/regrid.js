@@ -16,7 +16,7 @@ export function initRegrid(ctx) {
     if (!on || !map.getStyle()) return;
     if (!map.getSource(SRC)) map.addSource(SRC, { type: 'vector', tiles: [location.origin + location.pathname.replace(/[^/]*$/, '') + 'api/regrid?tile={z}/{x}/{y}'], minzoom: 15, maxzoom: 16, attribution: 'Parcels © Regrid' });
     if (!map.getLayer(LAYER)) map.addLayer({ id: LAYER, type: 'line', source: SRC, 'source-layer': 'parcels', minzoom: 15,
-      paint: { 'line-color': ctx.isDark() ? '#f2c14e' : '#b7791f', 'line-width': ['interpolate', ['linear'], ['zoom'], 15, .6, 18, 1.6], 'line-opacity': .85 } });
+      paint: { 'line-color': '#b7791f', 'line-width': ['interpolate', ['linear'], ['zoom'], 15, .6, 18, 1.6], 'line-opacity': .85 } });
   }
   function removeLayer() { if (map.getLayer(LAYER)) map.removeLayer(LAYER); if (map.getSource(SRC)) map.removeSource(SRC); }
   if (box) box.onchange = async () => {
@@ -44,7 +44,7 @@ export function initRegrid(ctx) {
       el.querySelector('#rgGo').onclick = () => look(false);
     }
     async function look(refresh) {
-        el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote">' + (refresh ? 'Getting the latest record…' : 'Looking up…') + '</div>';
+        el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote loading">' + (refresh ? 'Getting the latest record…' : 'Looking up…') + '</div>';
         try {
           const r = await fetch('api/regrid?' + new URLSearchParams({ lat: center[1].toFixed(6), lon: center[0].toFixed(6), ...(key ? { key } : {}), ...(refresh ? { refresh: '1' } : {}) }));
           const d = await readJSON(r);

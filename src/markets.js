@@ -71,7 +71,7 @@ export function initMarkets(ctx) {
 
   // ---------- Markets box ----------
   function marketsBox() {
-    if (!data) return '<section class="mk-box mk-wide" id="mxBox"><h3>Markets</h3><div class="rnote">Loading market data…</div><div class="mk-skel" aria-hidden="true" style="height:160px"></div></section>';
+    if (!data) return '<section class="mk-box mk-wide" id="mxBox"><h3>Markets</h3><div class="rnote loading">Loading market data…</div><div class="mk-skel" aria-hidden="true" style="height:160px"></div></section>';
     const g = GROUPS.find(x => x[0] === group) || GROUPS[1], rows = SERIES.filter(s => s.group === group && data.series[s.id]);
     const liveN = Object.keys(quotes).length;
     return '<section class="mk-box mk-wide" id="mxBox"><div class="mx-head"><h3>Markets</h3><span class="mx-asof">' +

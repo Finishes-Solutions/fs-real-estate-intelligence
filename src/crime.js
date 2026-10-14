@@ -144,7 +144,7 @@ export function initCrime(ctx) {
   const rateLine = d => d.per_sqmi && d.city_per_sqmi ? fmtN(d.per_sqmi.total) + ' per sq mi a year vs ' + fmtN(d.city_per_sqmi.total) + ' citywide (' + (d.per_sqmi.total / d.city_per_sqmi.total).toFixed(1) + '×)' : '';
   async function report({ geometry, label, center }) {
     const card = ctx.card || document.getElementById('card');
-    ctx.closeCard?.(); card.innerHTML = '<div class="top"><div><div class="kicker">Crime report</div><h2>' + esc(label) + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote">Counting incidents…</div></div>';
+    ctx.closeCard?.(); card.innerHTML = '<div class="top"><div><div class="kicker">Crime report</div><h2>' + esc(label) + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote loading">Counting incidents…</div></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
     showArea(geometry);
     let d; try { d = await reportFor(geometry); } catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
@@ -239,7 +239,7 @@ export function initCrime(ctx) {
     if (!el) return;
     const head = '<div class="lt">Crime within 1 mile</div>';
     if (!inHouston(center)) { el.innerHTML = head + '<div class="rnote">Street-level incidents cover the City of Houston only. The yearly figures for the local police department are below.</div>'; return; }
-    el.innerHTML = head + '<div class="rnote">Counting reported incidents…</div>';
+    el.innerHTML = head + '<div class="rnote loading">Counting reported incidents…</div>';
     let d; try { const r = await fetch('api/crime?lat=' + center[1].toFixed(5) + '&lon=' + center[0].toFixed(5) + '&mi=1&list=8'); d = await readJSON(r); }
     catch (e) { if (still()) el.innerHTML = head + '<div class="rnote">' + esc(e.message) + '</div>'; return; }
     if (!still()) return;

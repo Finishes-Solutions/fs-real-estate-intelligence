@@ -92,10 +92,10 @@ export function initLayerFilters(ctx) {
     const data = { type: 'FeatureCollection', features: rows.map(r => ({ type: 'Feature', properties: { m: r.ok ? 1 : 0 }, geometry: r.t.geom })) };
     const s = map.getSource(SRC); if (s) { s.setData(data); return; }
     map.addSource(SRC, { type: 'geojson', data });
-    const before = map.getLayer('county-line') ? 'county-line' : undefined, dark = ctx.isDark();
-    map.addLayer({ id: 'lf-dim', type: 'fill', source: SRC, filter: ['==', ['get', 'm'], 0], paint: { 'fill-color': dark ? '#0b0d0c' : '#ffffff', 'fill-opacity': dark ? .55 : .6 } }, before);
+    const before = map.getLayer('county-line') ? 'county-line' : undefined;
+    map.addLayer({ id: 'lf-dim', type: 'fill', source: SRC, filter: ['==', ['get', 'm'], 0], paint: { 'fill-color': '#ffffff', 'fill-opacity': .6 } }, before);
     map.addLayer({ id: 'lf-hit', type: 'fill', source: SRC, filter: ['==', ['get', 'm'], 1], paint: { 'fill-color': '#1f9249', 'fill-opacity': .22 } }, before);
-    map.addLayer({ id: 'lf-hit-line', type: 'line', source: SRC, filter: ['==', ['get', 'm'], 1], paint: { 'line-color': dark ? '#4caf70' : '#006527', 'line-width': 1.4 } }, before);
+    map.addLayer({ id: 'lf-hit-line', type: 'line', source: SRC, filter: ['==', ['get', 'm'], 1], paint: { 'line-color': '#006527', 'line-width': 1.4 } }, before);
   }
   function clearMatchLayer() { for (const id of ['lf-hit-line', 'lf-hit', 'lf-dim']) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource(SRC)) map.removeSource(SRC); lastHits = []; }
   ctx.onOverlays?.(() => { if (st.mode === 'match' && active(st.crit).length) renderMatch(); else if (st.mode !== 'match') apply(); });

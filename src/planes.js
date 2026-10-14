@@ -110,8 +110,8 @@ export function initPlanes(ctx) {
       'icon-size': ['interpolate', ['linear'], ['zoom'], 5, ['*', .5, ['get', 'sz']], 9, ['*', .78, ['get', 'sz']], 13, ['*', 1.05, ['get', 'sz']]],
       'text-field': ['step', ['zoom'], '', 9, ['get', 't']], 'text-font': ['Noto Sans Bold'], 'text-size': 10, 'text-offset': ['case', ['>=', ['get', 'sz'], 1.2], ['literal', [0, 2.6]], ['literal', [0, 1.9]]], 'text-optional': true, 'text-allow-overlap': false },
       paint: { 'icon-color': iconColor,
-        'icon-halo-color': ctx.isDark() ? '#0b0d0c' : '#ffffff', 'icon-halo-width': 1.4,
-        'text-color': ctx.isDark() ? '#dde1e2' : '#23282a', 'text-halo-color': ctx.isDark() ? '#16191a' : '#ffffff', 'text-halo-width': 1.5 } });
+        'icon-halo-color': '#ffffff', 'icon-halo-width': 1.4,
+        'text-color': '#23282a', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 } });
     if (!map.getLayer(models.layer.id)) map.addLayer(models.layer); // in the air: on top
     syncModels();
     if (pathOn) { addPathLayers(); syncPath(); } // after a basemap change
@@ -146,13 +146,13 @@ export function initPlanes(ctx) {
   }
   function addRouteLayers() {
     if (!map.getStyle()) return;
-    const c = ctx.isDark() ? '#6a8fe0' : '#2a78d6', before = map.getLayer('live-planes') ? 'live-planes' : undefined;
+    const c = '#2a78d6', before = map.getLayer('live-planes') ? 'live-planes' : undefined;
     if (!map.getSource('plane-route')) map.addSource('plane-route', { type: 'geojson', data: routeFC() });
     if (!map.getLayer('plane-route-flown')) map.addLayer({ id: 'plane-route-flown', type: 'line', source: 'plane-route', filter: ['==', ['get', 'k'], 'flown'], layout: { 'line-cap': 'round' }, paint: { 'line-color': c, 'line-width': 2.5, 'line-opacity': .9 } }, before);
     if (!map.getLayer('plane-route-left')) map.addLayer({ id: 'plane-route-left', type: 'line', source: 'plane-route', filter: ['==', ['get', 'k'], 'left'], paint: { 'line-color': c, 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': .85 } }, before);
-    if (!map.getLayer('plane-route-ap')) map.addLayer({ id: 'plane-route-ap', type: 'circle', source: 'plane-route', filter: ['==', ['get', 'k'], 'ap'], paint: { 'circle-radius': 5, 'circle-color': ctx.isDark() ? '#16191a' : '#ffffff', 'circle-stroke-color': c, 'circle-stroke-width': 2.5 } }, before);
+    if (!map.getLayer('plane-route-ap')) map.addLayer({ id: 'plane-route-ap', type: 'circle', source: 'plane-route', filter: ['==', ['get', 'k'], 'ap'], paint: { 'circle-radius': 5, 'circle-color': '#ffffff', 'circle-stroke-color': c, 'circle-stroke-width': 2.5 } }, before);
     if (!map.getLayer('plane-route-label')) map.addLayer({ id: 'plane-route-label', type: 'symbol', source: 'plane-route', filter: ['==', ['get', 'k'], 'ap'], layout: { 'text-field': ['get', 'code'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-offset': [0, 1.3], 'text-allow-overlap': true },
-      paint: { 'text-color': ctx.isDark() ? '#dde1e2' : '#23282a', 'text-halo-color': ctx.isDark() ? '#16191a' : '#ffffff', 'text-halo-width': 1.6 } });
+      paint: { 'text-color': '#23282a', 'text-halo-color': '#ffffff', 'text-halo-width': 1.6 } });
   }
   const syncRoute = () => map.getSource('plane-route')?.setData(routeFC());
   function clearRoute() { routeOn = null; syncRoute(); }
@@ -202,8 +202,8 @@ export function initPlanes(ctx) {
     const three = on() && is3d(); models.show(three); path3d.hideBall(three);
     if (three) models.setPlanes(modelRows());
     if (!map.getLayer('live-planes')) return;
-    map.setPaintProperty('live-planes', 'icon-color', three ? (ctx.isDark() ? '#000000' : '#23282a') : iconColor);
-    map.setPaintProperty('live-planes', 'icon-opacity', three ? (ctx.isDark() ? .5 : .28) : 1);
+    map.setPaintProperty('live-planes', 'icon-color', three ? ('#23282a') : iconColor);
+    map.setPaintProperty('live-planes', 'icon-opacity', three ? (.28) : 1);
     map.setPaintProperty('live-planes', 'icon-halo-width', three ? 0 : 1.4);
   }
   map.on('pitch', () => { if (on() && is3d() !== models.shown) { syncModels(); syncLegend(); } });
@@ -379,7 +379,7 @@ export function initPlanes(ctx) {
     const link = u => u ? ' <a class="lnk" target="_blank" rel="noopener" href="' + esc(u) + '">FAA record ↗</a>' : '';
     const faa = r?.faa_url || (/^N[1-9]/i.test(p.reg || '') ? 'https://registry.faa.gov/AircraftInquiry/Search/NNumberResult?nNumberTxt=' + encodeURIComponent(p.reg.replace(/^N/i, '')) : '');
     let body;
-    if (!r) body = '<div class="rnote">Looking up the FAA registration…</div>';
+    if (!r) body = '<div class="rnote loading">Looking up the FAA registration…</div>';
     else if (r.failed) body = '<div class="rnote">The registration lookup didn’t answer.' + link(faa) + '</div>';
     else if (r.found) {
       const rows = [['Registered to', (r.owner || 'Withheld at the owner’s request') + (r.owner_type ? ' (' + r.owner_type + ')' : '')], ['Co-owners', (r.other_owners || []).join('; ')],

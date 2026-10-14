@@ -31,7 +31,7 @@ export function initSite(ctx) {
 
   ctx.renderSite = async (el, center, parcel) => {
     if (!el) return;
-    el.innerHTML = '<div class="lt">Site</div><div class="rnote">Checking flood zone, traffic and districts…</div>';
+    el.innerHTML = '<div class="lt">Site</div><div class="rnote loading">Checking flood zone, traffic and districts…</div>';
     const addr = /^\d/.test(parcel?.situsStreet || '') ? parcel.situsStreet : '', zip = parcel?.situsZip || '';
     const [d, area] = await Promise.all([ctx.siteAt(center, addr, zip).catch(e => ({ error: e.message })), ctx.areaData ? ctx.areaData().catch(() => null) : null]);
     if (!el.isConnected) return;
