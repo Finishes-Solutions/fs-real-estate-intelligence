@@ -28,19 +28,20 @@ export function initCardTabs(ctx) {
     if (!bar) { bar = document.createElement('div'); bar.className = 'ctabs'; bar.setAttribute('role', 'tablist'); bar.setAttribute('aria-label', 'Selected items');
       bar.addEventListener('click', onClick); }
     const n = items().length;
-    bar.innerHTML = tabs.map(t => { const i = items().indexOf(t);
-      return '<button type="button" role="tab" class="ctab' + (t.pinned ? ' cpin' : '') + '" data-id="' + esc(t.id) + '" aria-selected="' + (t.id === active) + '" title="' + esc(t.label) + '">' +
-        (i >= 0 && n > 1 ? '<b class="cnum">' + (i + 1) + '</b>' : '') + '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (ICON[t.kind] || ICON.summary) + '</svg>' +
-        '<span>' + esc(t.label) + '</span>' + (t.pinned || n < 2 ? '' : '<i class="cx" data-x="' + esc(t.id) + '" aria-label="Remove ' + esc(t.label) + '">×</i>') + '</button>'; }).join('') +
+    // the × is its own button beside the tab (a button can't hold another), drawn over the tab's right edge so it looks the same
+    bar.innerHTML = tabs.map(t => { const i = items().indexOf(t), x = !(t.pinned || n < 2);
+      return '<span class="ctabw" role="presentation"><button type="button" role="tab" class="ctab' + (t.pinned ? ' cpin' : '') + (x ? ' has-x' : '') + '" data-id="' + esc(t.id) + '" aria-selected="' + (t.id === active) + '" title="' + esc(t.label) + '">' +
+        (i >= 0 && n > 1 ? '<b class="cnum">' + (i + 1) + '</b>' : '') + '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICON[t.kind] || ICON.summary) + '</svg>' +
+        '<span>' + esc(t.label) + '</span></button>' + (x ? '<button type="button" class="cx" data-x="' + esc(t.id) + '" aria-label="Close ' + esc(t.label) + '" title="Close">×</button>' : '') + '</span>'; }).join('') +
       '<button type="button" class="ctadd" aria-pressed="' + addMode + '" title="' + (addMode ? 'Stop adding' : 'Add more: then click or tap other buildings, parcels, filings, planes or airports (or Shift-click)') + '">' +
       '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (addMode ? '<path d="M2.5 6.2l2.3 2.3 4.7-5"/>' : '<path d="M6 2v8M2 6h8"/>') + '</svg>' +
       (addMode ? 'Done' : 'Add') + '</button>';
-    mount(); const on = bar.querySelector('[aria-selected="true"]'); if (on && !bar.hidden) bar.scrollLeft = Math.max(0, Math.min(bar.scrollLeft, on.offsetLeft - 8), on.offsetLeft + on.offsetWidth - bar.clientWidth + 8);
+    mount(); const on = bar.querySelector('[aria-selected="true"]')?.parentElement; if (on && !bar.hidden) bar.scrollLeft = Math.max(0, Math.min(bar.scrollLeft, on.offsetLeft - 8), on.offsetLeft + on.offsetWidth - bar.clientWidth + 8);
   }
   function mount() { if (!tabs.length || !bar) return; if (bar.parentNode !== card || card.firstElementChild !== bar) card.prepend(bar);
     bar.hidden = items().length < 2 && !addMode; card.classList.toggle('has-tabs', !bar.hidden); }
   function onClick(e) {
-    const x = e.target.closest('[data-x]'); if (x) { e.stopPropagation(); remove(x.dataset.x); return; }
+    const x = e.target.closest('[data-x]'); if (x) { e.stopPropagation(); const kb = e.detail === 0; remove(x.dataset.x); if (kb) ((bar && !bar.hidden && bar.querySelector('.ctab[aria-selected="true"]')) || card.querySelector('.top .x'))?.focus(); return; } // from the keyboard, focus goes to the tab now showing (one left: the card's ×)
     if (e.target.closest('.ctadd')) { setAdding(!addMode); return; }
     const t = e.target.closest('.ctab'); if (t) activate(t.dataset.id);
   }

@@ -1,9 +1,9 @@
 // Settings: one sheet for everything you set once and forget. The app-bar gear, the phone's More › Settings and
 // Explore gear, ⌘, / Ctrl+, and ctx.openSettings(section) all open it. Desktop: a 420px sheet on the right over a scrim;
-// phones: full screen. Sections: Appearance · You & your team · Map · Saved on this device · App · Help.
+// phones: full screen. Sections: You & your team · Map · Saved on this device · App · Help. (The app is light only.)
 // Options shown elsewhere (the Layers panel's map display, the panel's headline metrics) stay where they are and are
 // linked from here. Nothing here deletes notes, projects or the team's sync queue.
-const SECTIONS = [['appearance', 'Appearance', 'Appearance'], ['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help']];
+const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help']];
 const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
 const BASE_KEY = 'fs-basemap';
 // Reset layout clears only these (never localStorage.clear()): panel open/closed and width, assistant width, which
@@ -51,18 +51,6 @@ export function initSettings(ctx) {
   const go = (label, attr, hint = '') => '<button type="button" class="set-go" ' + attr + '><span><b>' + label + '</b>' + (hint ? '<em>' + hint + '</em>' : '') + '</span><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>';
 
   const PAINT = {
-    appearance(el) {
-      const pref = ctx.themePref?.() || 'light', had = el.contains(document.activeElement) ? document.activeElement.dataset.themePick : null;
-      el.innerHTML = row('Theme', '<div class="seg seg3" role="radiogroup" aria-label="Theme">' + [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Match device']].map(([k, l]) =>
-          '<button type="button" role="radio" data-theme-pick="' + k + '" aria-checked="' + (pref === k) + '" aria-pressed="' + (pref === k) + '">' + l + '</button>').join('') + '</div>',
-          pref === 'auto' ? 'Follows your computer or phone: now ' + (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light') + '.' : '') +
-        row('Show sources on cards and panels', '<label class="tg2"><input type="checkbox" id="setSources"' + (ctx.showSources?.() ? ' checked' : '') + ' aria-label="Show sources on cards and panels"></label>', 'Off by default for a clean view. Exported reports always list their sources.') +
-        row('Panel width', '<button type="button" class="btn sm" id="setPw"' + (get('fs-panel-w') ? '' : ' disabled') + '>Reset</button>', get('fs-panel-w') ? 'The Map’s side panel is ' + get('fs-panel-w') + 'px wide. Reset puts it back to the default.' : 'The Map’s side panel is at its default width. Drag its edge to change it.', 'set-desk'); // phones have no side panel
-      el.querySelectorAll('[data-theme-pick]').forEach(b => b.onclick = () => { ctx.setTheme?.(b.dataset.themePick); PAINT.appearance(el); el.querySelector('[data-theme-pick="' + b.dataset.themePick + '"]')?.focus(); });
-      if (had) el.querySelector('[data-theme-pick="' + had + '"]')?.focus(); // a redraw keeps the keyboard where it was
-      el.querySelector('#setSources').onchange = e => { ctx.showSources?.(e.target.checked); ctx.refreshSources?.(); };
-      el.querySelector('#setPw').onclick = () => { ctx.resetPanelWidth?.(); ctx.toast('Panel width reset.'); PAINT.appearance(el); };
-    },
     team(el) {
       if (!el.firstChild || !el.querySelector('.team')) { el.innerHTML = ''; const slot = document.createElement('div'); el.append(slot); ctx.team?.mountSettings?.(slot); }
       else ctx.team?.refresh?.();
@@ -71,9 +59,13 @@ export function initSettings(ctx) {
     map(el) {
       const cur = BASES[get(BASE_KEY)] ? get(BASE_KEY) : 'dots';
       el.innerHTML = row('Default base map', '<select class="chip" id="setBase" aria-label="Default base map">' + Object.entries(BASES).map(([k, l]) => '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>', 'The map opens with this one. You can still switch any time under Layers.') +
+        row('Show sources on cards and panels', '<label class="tg2"><input type="checkbox" id="setSources"' + (ctx.showSources?.() ? ' checked' : '') + ' aria-label="Show sources on cards and panels"></label>', 'Off by default for a clean view. Exported reports always list their sources.') +
+        row('Panel width', '<button type="button" class="btn sm" id="setPw"' + (get('fs-panel-w') ? '' : ' disabled') + '>Reset</button>', get('fs-panel-w') ? 'The Map’s side panel is ' + get('fs-panel-w') + 'px wide. Reset puts it back to the default.' : 'The Map’s side panel is at its default width. Drag its edge to change it.', 'set-desk') + // phones have no side panel
         '<div class="set-links">' + go('Map layers &amp; display…', 'data-act="layers"', 'Dot grid, county lines, roads, road names, 3D and every data layer') +
         go('Headline metrics…', 'data-act="kpis"', 'The 3 to 9 numbers above the filing list') + '</div>';
       el.querySelector('#setBase').onchange = e => { try { localStorage.setItem(BASE_KEY, e.target.value); } catch (err) {} if (ctx.basemap?.() !== e.target.value) ctx.setMapOptions?.({ basemap: e.target.value }); ctx.toast('The map will open with ' + BASES[e.target.value] + '.'); };
+      el.querySelector('#setSources').onchange = e => { ctx.showSources?.(e.target.checked); ctx.refreshSources?.(); };
+      el.querySelector('#setPw').onclick = () => { ctx.resetPanelWidth?.(); ctx.toast('Panel width reset.'); PAINT.map(el); el.querySelector('#setBase')?.focus(); };
       wireActs(el);
     },
     saved(el) {
@@ -168,18 +160,9 @@ export function initSettings(ctx) {
   sheet.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => { const t = sheet.querySelector('[data-sec="' + b.dataset.jump + '"]'); t.scrollIntoView({ block: 'start', behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); flash(t); });
   // Esc closes the sheet first (and only the sheet), wherever the focus is
   addEventListener('keydown', e => { if (e.key === 'Escape' && !sheet.hidden) { e.preventDefault(); e.stopImmediatePropagation(); close(); } }, true);
-  sheet.addEventListener('keydown', e => {
-    if (e.key !== 'Tab') return;
-    const f = [...sheet.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')].filter(x => x.offsetParent !== null);
-    if (!f.length) return;
-    const first = f[0], last = f[f.length - 1];
-    if (e.shiftKey && (document.activeElement === first || document.activeElement === sheet)) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-  });
+  sheet.addEventListener('keydown', e => ctx.trapTab(sheet, e)); // Tab stays in the sheet (app.js; Export uses the same)
   addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === ',' || e.code === 'Comma')) { e.preventDefault(); if (sheet.hidden) open(); else close(); }
   });
   document.getElementById('exploreSettings')?.addEventListener('click', () => open());
-  // the theme can change under an open sheet (Match device, the OS switches)
-  new MutationObserver(() => { if (!sheet.hidden) PAINT.appearance(secEl('appearance')); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }

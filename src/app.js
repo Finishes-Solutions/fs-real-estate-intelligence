@@ -64,21 +64,16 @@ const TYPES=['New','Reno','Addition'], TYPE_LABEL={New:'New',Reno:'Renovation',A
 const tabsUrl=id=>'https://www.tdlr.texas.gov/TABS/Projects/'+id;
 const HOME={center:[-95.72,window.innerWidth<600?29.8:29.98],zoom:window.innerWidth<600?6.95:(window.innerWidth<1000?7.2:7.7)};
 const esc=s=>{ const d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; };
-const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// read live: the OS setting can change while the app is open (ctx.reduceMotion is a getter over this)
+const motionMQ=window.matchMedia('(prefers-reduced-motion: reduce)'); let reduceMotion=motionMQ.matches;
+motionMQ.addEventListener?.('change',e=>{ reduceMotion=e.matches; if(reduceMotion){ cancelAnimationFrame(hlT); stopAllOrbits(); } }); // a pulse or spin under way stops
 
 // ---------- theme ----------
 const root=document.documentElement;
-// Settings › Appearance: Light (the first-visit look), Dark, or Match device ('auto', follows the OS). data-theme always
-// holds the look in use, light or dark, so the stylesheet, isDark() and the charts that watch it need no third case.
-const THEME_KEY='fs-map-theme', darkMQ=window.matchMedia('(prefers-color-scheme: dark)');
-let themePref='light'; try{ const t=localStorage.getItem(THEME_KEY); if(t==='light'||t==='dark'||t==='auto') themePref=t; }catch(e){}
-const themeNow=()=>themePref==='auto'?(darkMQ.matches?'dark':'light'):themePref;
-root.dataset.theme=themeNow();
-const isDark=()=>root.dataset.theme==='dark';
-// a new look restyles the basemap; the timeline, market charts and other views redraw themselves when data-theme changes
-function applyTheme(){ const t=themeNow(); if(root.dataset.theme===t) return; root.dataset.theme=t; setBasemap(layers.style); }
-function setTheme(m){ if(!['light','dark','auto'].includes(m)) return; themePref=m; try{ localStorage.setItem(THEME_KEY,m); }catch(e){} applyTheme(); }
-darkMQ.addEventListener?.('change',()=>{ if(themePref==='auto') applyTheme(); });
+// light only (dark mode was removed): data-theme is always "light" for the stylesheet and the charts that read it, and a
+// choice saved by an older version is dropped. isDark() stays (always false) for the modules that still ask.
+root.dataset.theme='light'; try{ localStorage.removeItem('fs-map-theme'); }catch(e){}
+const isDark=()=>false;
 
 // ---------- data ----------
 // latest change run: id -> 'new' | field that changed
@@ -99,7 +94,7 @@ const inSel=f=>!sel.feature||(sel.kind==='county'&&sel.counties.size?sel.countie
 const countyGeo=DATA.counties.map(c=>({name:c.name,geom:{type:'MultiPolygon',coordinates:c.outline}}));
 
 // ---------- map ----------
-const STYLES={dots:['dataviz','dataviz-dark'],streets:['streets-v2','streets-v2-dark'],sat:['hybrid','hybrid'],topo:['topo-v2','topo-v2-dark'],esri:null,free:null,google:null,gsat:null};
+const STYLES={dots:'dataviz',streets:'streets-v2',sat:'hybrid',topo:'topo-v2',esri:null,free:null,google:null,gsat:null}; // MapTiler map ids (light)
 // keyless basemaps: Esri World Imagery (with OpenFreeMap labels and buildings on top) and OpenFreeMap streets
 const OFM='https://tiles.openfreemap.org';
 const ESRI_STYLE={version:8,glyphs:OFM+'/fonts/{fontstack}/{range}.pbf',
@@ -116,7 +111,7 @@ const layers={style:(()=>{ try{ const b=localStorage.getItem('fs-basemap'); if(B
 try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(typeof L.grid==='boolean') layers.grid=L.grid; }catch(e){} // the map always opens without filings (dots and heatmap off); dot size and the grid are remembered
 const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} syncFilingsSw(); }; // every change to the filing layer passes here
 // Google base maps need a tile session first (src/google.js): a promise of the style
-const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
+const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl(layers.style),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
 map.on('error',e=>{ const m=(e&&e.error&&e.error.message)||''; if(/40[13]|Unauthorized|Forbidden/i.test(m)&&STYLES[layers.style]) toast('MapTiler refused the key for this site. Check the key’s allowed origins.'); });
@@ -131,8 +126,7 @@ const GJ={
 };
 const IDX=new Map(F.map((f,i)=>[f,i]));
 function filingsFC(){ return fc(visible.map(f=>({type:'Feature',properties:{i:IDX.get(f),t:f.type,r:f.r,lc:Math.log10(Math.max(f.cost,1e4)),h:(f.approx||f.type==='Addition')?1:0},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}))); }
-const C=()=>isDark()?{new:'#4caf70',reno:'#939a9d',add:'#8acda3',line:'rgba(255,255,255,.55)',waller:'#4caf70',dot:'#8d9598',lab:'#dde1e2',halo:'#16191a',sel:'#4caf70',stroke:'#16191a'}
-  : (isSat()?{new:'#5fd38a',reno:'#f1f3f3',add:'#c2e3d0',line:'rgba(255,255,255,.85)',waller:'#8acda3',dot:'#ffffff',lab:'#ffffff',halo:'#0b0d0c',sel:'#c2e3d0',stroke:'#0b0d0c'}
+const C=()=>(isSat()?{new:'#5fd38a',reno:'#f1f3f3',add:'#c2e3d0',line:'rgba(255,255,255,.85)',waller:'#8acda3',dot:'#ffffff',lab:'#ffffff',halo:'#0b0d0c',sel:'#c2e3d0',stroke:'#0b0d0c'}
   : {new:'#006527',reno:'#6b7174',add:'#1f9249',line:'rgba(22,25,26,.45)',waller:'#006527',dot:'#5b6366',lab:'#23282a',halo:'#ffffff',sel:'#006527',stroke:'#ffffff'});
 let labelFont=['Noto Sans Bold'];
 
@@ -167,16 +161,16 @@ function addOverlays(){
   addUsCounties();
   const col=['match',['get','t'],'New',c.new,'Reno',c.reno,c.add];
   map.addLayer({id:'heat',type:'heatmap',source:'filings',maxzoom:17,layout:{visibility:'none'},paint:{'heatmap-radius':['interpolate',['linear'],['zoom'],4,8,8,18,11,32,14,48,17,70],'heatmap-intensity':['interpolate',['linear'],['zoom'],4,.6,9,.9,13,1.3],
-    'heatmap-opacity':['interpolate',['linear'],['zoom'],11,.85,15,.4],'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(0,0,0,0)',.08,isDark()?'rgba(76,175,112,.12)':'rgba(138,205,163,.18)',.25,isDark()?'rgba(76,175,112,.45)':'rgba(138,205,163,.55)',.45,'#8acda3',.65,'#4caf70',.82,'#1f9249',.93,'#006527',1,isDark()?'#e8f5ec':'#00351a']}});
+    'heatmap-opacity':['interpolate',['linear'],['zoom'],11,.85,15,.4],'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(0,0,0,0)',.08,'rgba(138,205,163,.18)',.25,'rgba(138,205,163,.55)',.45,'#8acda3',.65,'#4caf70',.82,'#1f9249',.93,'#006527',1,'#00351a']}});
   map.addLayer({id:'filings',type:'circle',source:'filings',paint:{'circle-color':col,
     'circle-stroke-color':['case',['==',['get','h'],1],col,c.stroke],'circle-stroke-width':['case',['==',['get','h'],1],1.4,.8],'circle-pitch-alignment':'map'}});
-  map.addLayer({id:'filings-hl',type:'circle',source:'filings',filter:['==',['get','i'],-1],paint:{'circle-radius':['+',markerRadius(),6],'circle-color':'rgba(0,0,0,0)','circle-stroke-color':isDark()||isSat()?'#ffffff':'#0b0d0c','circle-stroke-width':2.2}});
+  map.addLayer({id:'filings-hl',type:'circle',source:'filings',filter:['==',['get','i'],-1],paint:{'circle-radius':['+',markerRadius(),6],'circle-color':'rgba(0,0,0,0)','circle-stroke-color':isSat()?'#ffffff':'#0b0d0c','circle-stroke-width':2.2}});
   if(!map.getSource('hl')) map.addSource('hl',{type:'geojson',data:fc([])});
   map.addLayer({id:'hl-glow',type:'circle',source:'hl',paint:{'circle-radius':16,'circle-color':'#eda100','circle-opacity':.18,'circle-blur':.6,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'hl-ring',type:'circle',source:'hl',paint:{'circle-radius':9,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':'#eda100','circle-stroke-width':2.6,'circle-pitch-alignment':'map'}});
   if(!map.getSource('focus')) map.addSource('focus',{type:'geojson',data:fc([])});
   map.addLayer({id:'focus-halo',type:'circle',source:'focus',filter:['==',['get','approx'],1],paint:{'circle-radius':['interpolate',['linear'],['zoom'],8,18,14,46],'circle-color':c.sel,'circle-opacity':.10,'circle-stroke-color':c.sel,'circle-stroke-width':1.2,'circle-stroke-opacity':.6,'circle-pitch-alignment':'map'}});
-  map.addLayer({id:'focus-dot',type:'circle',source:'focus',paint:{'circle-radius':['interpolate',['linear'],['zoom'],6,6,14,9],'circle-color':['match',['get','t'],'New',c.new,'Reno',c.reno,c.add],'circle-stroke-color':isDark()||layers.style==='sat'?'#ffffff':'#0b0d0c','circle-stroke-width':3,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'focus-dot',type:'circle',source:'focus',paint:{'circle-radius':['interpolate',['linear'],['zoom'],6,6,14,9],'circle-color':['match',['get','t'],'New',c.new,'Reno',c.reno,c.add],'circle-stroke-color':layers.style==='sat'?'#ffffff':'#0b0d0c','circle-stroke-width':3,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'focus-label',type:'symbol',source:'focus',layout:{'text-field':['get','name'],'text-font':labelFont,'text-size':12,'text-offset':[0,1.4],'text-anchor':'top','text-max-width':14,'text-allow-overlap':true},paint:{'text-color':c.lab,'text-halo-color':c.halo,'text-halo-width':1.8}});
   map.addLayer({id:'hl-label',type:'symbol',source:'hl',minzoom:8,layout:{'text-field':['get','name'],'text-font':labelFont,'text-size':11.5,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':12,'text-optional':true},paint:{'text-color':c.lab,'text-halo-color':c.halo,'text-halo-width':1.6}});
   styleFilings();
@@ -705,7 +699,7 @@ function historyHtml(f){
   const fv=(k,v)=>v==null||v===''?'—':k==='cost'?fmtM(v):k==='sqft'?fmtN(v):String(v);
   return '<div class="fhist"><div class="fl">History</div>'+rows.map(([d,x])=>'<div><span class="m">'+esc(d)+'</span> '+(x.k==='new'?'First seen':esc(x.label)+': '+esc(fv(x.k,x.from))+' → '+esc(fv(x.k,x.to)))+'</div>').join('')+'</div>'; }
 async function loadBrief(f){
-  const box=card.querySelector('#briefBox'); if(!box) return; box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote">Writing a brief from the filing, nearby activity and census data…</div>';
+  const box=card.querySelector('#briefBox'); if(!box) return; box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote loading">Writing a brief from the filing, nearby activity and census data…</div>';
   try{ const r=await fetch('api/brief?id='+encodeURIComponent(f.id)); const d=await r.json().catch(()=>({}));
     if(state.sel!==f) return; if(!r.ok) throw new Error(d.error||('Error '+r.status));
     box.innerHTML='<div class="lt">AI Project Brief</div><div class="btext">'+richText(d.brief)+'</div><div class="ssrc src">AI-written from the data on this page. Verify before relying on it.</div>'; wireCites(box); }
@@ -1019,6 +1013,11 @@ const toastEl=document.getElementById('toast'); let toastT=0;
 function toast(m,o={}){ toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a);
   if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.onclick=()=>{ toastEl.classList.remove('on','act'); a.run(); }; toastEl.append(' ',b); }
   toastEl.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('on','act'),o.ms||(a?6500:3400)); }
+// Tab and Shift+Tab stay inside an open dialog (Settings, Export): past the last control back to the first, and the reverse
+function trapTab(box,e){ if(e.key!=='Tab'||!box) return;
+  const f=[...box.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')].filter(x=>x.offsetParent!==null); if(!f.length) return;
+  const first=f[0], last=f[f.length-1], a=document.activeElement;
+  if(e.shiftKey&&(a===first||a===box||!box.contains(a))){ e.preventDefault(); last.focus(); } else if(!e.shiftKey&&(a===last||!box.contains(a))){ e.preventDefault(); first.focus(); } }
 function clearToast(){ clearTimeout(toastT); toastEl.classList.remove('on','act'); } // a mode changed: its old instruction goes
 
 // ---------- export ----------
@@ -1098,8 +1097,22 @@ function setView(v,{user}={}){
   if(v==='map'){ appEl.classList.remove('pview-open'); if(was!=='map') map.resize(); setTimeout(()=>map.resize(),0); } else viewHooks[v]?.();
   if(v==='changes') changesSeen();
   viewChangeHooks.forEach(fn=>fn(v));
-  scheduleHash();
+  // a new page is a new browser history entry (Back returns to the page before); boot and Back/Forward themselves don't add one
+  const moved=v!==was; scheduleHash({push:moved});
+  if(moved&&!navBoot) pageArrived(v);
 }
+// Back/Forward and boot switch pages without pushing; navKb: this navigation came from a keyboard press on a nav button
+let navQuiet=0, navBoot=false, navKb=false;
+document.addEventListener('click',e=>{ navKb=e.isTrusted&&e.detail===0&&!!e.target.closest?.('#viewbar,#vtabs,#helpBtn,#mnav,#msheet'); if(navKb) setTimeout(()=>{ navKb=false; }); },true); // Enter/Space clicks have detail 0
+// say which page opened; from the keyboard, focus lands on its heading (mouse and touch users keep their place)
+function pageArrived(v){ cardStatus((document.getElementById('view-'+v)?.getAttribute('aria-label')||labelOf(v))+' page'); if(!navKb) return; navKb=false;
+  requestAnimationFrame(()=>{ if(view!==v) return; const sec=document.getElementById('view-'+v);
+    const h=v==='map'?map.getCanvas():sec&&(sec.querySelector('h1,h2')||sec); if(!h) return;
+    if(h!==map.getCanvas()&&!h.hasAttribute('tabindex')){ h.setAttribute('tabindex','-1'); h.classList.add('pg-focus'); } h.focus({preventScroll:true}); }); }
+// Back/Forward: the page (and the open project) from the address; filters stay as they are
+addEventListener('popstate',()=>{ const p=new URLSearchParams(location.hash.slice(1)); navQuiet++; try{ setView(p.get('v')||'map'); syncProject(p.get('pj')); } finally{ navQuiet--; } });
+// My Work › Projects: the project page in the address (#pj=<id>), when src/siteplan.js offers ctx.currentProject / ctx.openProject
+function syncProject(pj){ if(view!=='projects'||!ctx.openProject) return; if((ctx.currentProject?.()||null)!==(pj||null)) ctx.openProject(pj||null); }
 let pageAct=null, back=null;
 // a click anywhere else (the app bar's Map tab, the phone tab bar, the assistant) forgets the page click, so it can't leave a chip
 document.addEventListener('click',e=>{ if(e.isTrusted) pageAct=view!=='map'&&e.target.closest?.('.view,#card')?{t:performance.now(),from:view}:null; },true);
@@ -1147,8 +1160,11 @@ tPlay.onclick=()=>{ if(playT){ stopPlay(); return; } tPlay.classList.add('on'); 
 
 // ---------- URL state (shareable links, saved searches) ----------
 let hashT=0, booting=true;
-function hashStr(){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id); return p.toString(); }
-function scheduleHash(){ if(booting) return; clearTimeout(hashT); hashT=setTimeout(()=>{ const h=hashStr(); history.replaceState(null,'',h?'#'+h:location.pathname+location.search); document.getElementById('rssLink').href='api/feed?'+encode(curSpec()); },250); }
+function hashStr(){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id);
+  const pj=view==='projects'&&ctx.currentProject?.(); if(pj) p.set('pj',pj); return p.toString(); }
+// filters, the map and the month replace the current history entry (debounced); a page change ({push:true}) adds one, at once
+function writeHash(push){ const h=hashStr(), u=h?'#'+h:location.pathname+location.search; history[push?'pushState':'replaceState'](null,'',u); document.getElementById('rssLink').href='api/feed?'+encode(curSpec()); }
+function scheduleHash(o){ if(booting) return; clearTimeout(hashT); if(o?.push&&!navQuiet){ writeHash(true); return; } hashT=setTimeout(()=>writeHash(false),250); } // never pushes during Back/Forward or boot
 document.getElementById('copyLink').onclick=async()=>{ const u=location.href.split('#')[0]+'#'+hashStr(); try{ await navigator.clipboard.writeText(u); toast('Link copied. It opens with these filters.'); }catch(e){ prompt('Copy this link',u); } };
 
 // ---------- the Map panel: pick buttons, "…" menu, links, first-visit tip ----------
@@ -1179,8 +1195,8 @@ function showIntro(){ try{ localStorage.removeItem(INTRO); }catch(e){} introEl.h
 if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
-  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
-  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
+  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,trapTab,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
+  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, get reduceMotion(){ return reduceMotion; }, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.
 function orbitAt(c,zoom){ stopOrbit(); const close=zoom>=16.5; map.flyTo({center:c,zoom,pitch:close?65:60,duration:reduceMotion?0:2200,essential:true});
@@ -1229,7 +1245,7 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return [...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,30).map(x=>x[0]).join(', '); } // the busiest cities and developers on screen (the voice transcriber's hint list takes the first few)
-ctx.cardPush=cardPush; ctx.cardBack=cardBack; ctx.cardChild=()=>cpush?(cpOpening?'opening':'open'):null; ctx.cardChildDrop=()=>{ cpush=null; }; ctx.cardActs=cardActs; ctx.cardStatus=cardStatus; ctx.copyCardLink=copyCardLink; ctx.SPARK=SPARK;
+ctx.scheduleHash=o=>scheduleHash(o); ctx.cardPush=cardPush; ctx.cardBack=cardBack; ctx.cardChild=()=>cpush?(cpOpening?'opening':'open'):null; ctx.cardChildDrop=()=>{ cpush=null; }; ctx.cardActs=cardActs; ctx.cardStatus=cardStatus; ctx.copyCardLink=copyCardLink; ctx.SPARK=SPARK;
 ctx.setMode=setMode; ctx.setFilingsOpen=setFilingsOpen; ctx.showIntro=showIntro; ctx.filterChips=filterChips; ctx.scopeBar=scopeBar; ctx.resetFilings=resetFilings; ctx.vempty=vempty; ctx.exportMenu=exportMenu; ctx.openFilters=o=>openFilters(o); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
@@ -1259,7 +1275,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
-  setTheme, themePref:()=>themePref, BOOT_BASES,
+  BOOT_BASES,
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
@@ -1278,9 +1294,9 @@ new MutationObserver(()=>{ if(!card.classList.contains('open')&&card.classList.c
 { const h=location.hash.slice(1), p=new URLSearchParams(h);
   // a link with filters puts the filing dots on; the date range alone (which the app writes into the address itself) doesn't,
   // so a reload opens like a fresh start: no filings until you turn them on
-  if(h&&[...p.keys()].some(k=>!['v','f','b'].includes(k))){ if([...p.keys()].some(k=>!['v','f','d','b'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
+  if(h&&[...p.keys()].some(k=>!['v','f','b','pj'].includes(k))){ if([...p.keys()].some(k=>!['v','f','d','b','pj'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
   booting=false;
-  if(p.get('v')) setView(p.get('v'));
+  navQuiet++; navBoot=true; try{ if(p.get('v')) setView(p.get('v')); if(p.get('pj')) syncProject(p.get('pj')); } finally{ navQuiet--; navBoot=false; } // the page the link names, without a new history entry
   const f=p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));
   // a copied property link (#b=lat,lng): that building, or the parcel there
   const bc=!f&&(p.get('b')||'').split(',').map(Number), bll=bc&&bc.length===2&&bc.every(Number.isFinite)&&Math.abs(bc[0])<=90&&Math.abs(bc[1])<=180?[bc[1],bc[0]]:null;

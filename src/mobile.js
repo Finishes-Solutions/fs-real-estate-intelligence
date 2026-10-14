@@ -49,7 +49,7 @@ export function initMobile(ctx) {
     grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
   });
   grip.addEventListener('dblclick', () => { wantW = null; saveW(); applyW(); });
-  ctx.resetPanelWidth = () => { wantW = null; saveW(); applyW(); }; // Settings › Appearance
+  ctx.resetPanelWidth = () => { wantW = null; saveW(); applyW(); }; // Settings › Map
   grip.addEventListener('keydown', e => {
     const d = e.key === 'ArrowLeft' ? -24 : e.key === 'ArrowRight' ? 24 : 0; if (!d) return; e.preventDefault();
     wantW = Math.max(300, Math.min(maxW(), (wantW || panel.getBoundingClientRect().width) + d)); applyW(); saveW();
@@ -110,7 +110,7 @@ export function initMobile(ctx) {
     else if (go === 'near') { setTab('map'); ctx.nearMe(); }
     else if (go === 'layers') { setTab('map'); setTimeout(() => document.getElementById('layersBtn').click(), 50); }
     else if (go === 'export') ctx.openExport();
-    else if (go === 'settings') ctx.openSettings?.(); // theme, team, install and the rest (src/settings.js)
+    else if (go === 'settings') ctx.openSettings?.(); // team, map, install and the rest (src/settings.js)
     else if (document.getElementById('view-' + go)) setTab(go); // every page in the registry (My Work, Reports, Data & help)
   });
 

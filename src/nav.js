@@ -89,7 +89,7 @@ export function renderNav(ctx) {
     '<div class="mt-h">My Work</div><div class="mrows">' + work.children.map(([id, label]) => row(id, esc(label))).join('') + '</div>' +
     '<div class="mt-h">Reports &amp; export</div><div class="mrows"><div class="mrow-split">' + row('reports', 'Reports') + '<button type="button" class="btn sm" data-go="export">Quick export</button></div></div>' +
     '<div class="mt-h">Map tools</div><div class="mrows">' + row('layers', 'Layers') + row('near', 'Nearby', ' aria-label="Nearby: the area around my location"') + row('note', 'Pin a note', ' aria-label="Pin a site note at my location"') + '</div>' +
-    '<div class="mt-h">Settings</div><div class="mrows">' + row('settings', 'Settings', ' aria-label="Settings: theme, your name and team, install, layout"') + '</div>' +
+    '<div class="mt-h">Settings</div><div class="mrows">' + row('settings', 'Settings', ' aria-label="Settings: your name and team, map, install, layout"') + '</div>' +
     '<div class="mt-h">Data &amp; help</div><div class="mrows">' + row('sources', 'Data sources &amp; freshness') + '</div>';
 
   ctx.setBadge = setBadge; ctx.navPath = pathOf;
