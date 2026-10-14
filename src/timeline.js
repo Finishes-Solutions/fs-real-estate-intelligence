@@ -1,6 +1,7 @@
 // Timeline view: monthly pipeline chart (value or count of projects under construction, stacked) + virtualized Gantt.
 // Both render from ctx.visible, so they always agree with the map, list and exports.
 import { USES } from './lib/taxonomy.mjs';
+import { describe } from './lib/filter.mjs';
 
 // categorical slots (fixed order; validated palette from the dataviz reference), light / dark
 const CAT = { light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'], dark: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9'] };
@@ -61,6 +62,8 @@ export function initTimeline(ctx) {
   }
 
   let prevD = null;
+  // the brush swaps the date filter for "under construction"; say what it replaced and offer the way back
+  const replaced = () => { const t = prevD && prevD.f !== 'active' ? describe({ d: prevD }, fmtM) : ''; if (t) ctx.toast('Replaces ' + t + ' ·', { ms: 7000, action: { label: 'Undo', run: clearRange } }); };
   function clearRange() { const d = prevD && prevD.f !== 'active' ? prevD : ctx.periodSpec('12m'); prevD = null; ctx.fromSpec({ ...ctx.curSpec(), d }, { fly: false }); }
   function renderChart(list, groups) {
     const active = ctx.state.d && ctx.state.d.f === 'active' ? [ctx.state.d.from || months[0], ctx.state.d.to || months[months.length - 1]] : null;
@@ -106,11 +109,13 @@ export function initTimeline(ctx) {
     const showLab = (s0, e0) => { const t = fmtMo(s0) + (d3.utcMonth.offset(s0, 1) < e0 ? ' – ' + fmtMo(d3.utcMonth.offset(e0, -1)) : ''); lab.style('display', null).select('text').text(t);
       const w = t.length * 6.4 + 14, cx = Math.max(m.l + w / 2, Math.min(W - m.r - w / 2, (x(s0) + x(e0)) / 2)); lab.select('rect').attr('x', cx - w / 2).attr('width', w); lab.select('text').attr('x', cx); };
     const apply = (s0, e0) => {
-      if (!(ctx.state.d && ctx.state.d.f === 'active')) prevD = ctx.state.d;
+      const first = !(ctx.state.d && ctx.state.d.f === 'active'); if (first) prevD = ctx.state.d;
       ctx.showFilings?.(); ctx.fromSpec({ ...ctx.curSpec(), d: { f: 'active', from: ymOf(s0), to: ymOf(d3.utcMonth.offset(e0, -1)) } }, { fly: false });
+      if (first) replaced();
     };
+    let startSel = null, downX = null;
     const brush = d3.brushX().extent([[m.l, m.t], [W - m.r, H - m.b]])
-      .on('start', () => { tip.style.opacity = 0; })
+      .on('start', ev => { tip.style.opacity = 0; startSel = ev.selection ? ev.selection.slice() : null; downX = ev.sourceEvent ? d3.pointer(ev.sourceEvent, svg.node())[0] : null; })
       .on('brush', function (ev) { if (!ev.sourceEvent || !ev.selection) return; const [s0, e0] = snap(ev.selection); showLab(s0, e0); })
       .on('end', function (ev) {
         if (!ev.sourceEvent) return;
@@ -120,14 +125,27 @@ export function initTimeline(ctx) {
           if (cur && cur.f === 'active' && cur.from === ymOf(s0) && cur.to === ymOf(s0)) { clearRange(); return; }
           apply(s0, d3.utcMonth.offset(s0, 1)); return;
         }
+        // a tap inside the month already selected (no drag) clears it, like tapping it when nothing else is picked
+        if (startSel && downX != null && downX >= startSel[0] && downX <= startSel[1] && Math.abs(ev.selection[0] - startSel[0]) < 1 && Math.abs(ev.selection[1] - startSel[1]) < 1) {
+          const cur = ctx.state.d; if (cur && cur.f === 'active' && cur.from && cur.from === cur.to) { clearRange(); return; }
+        }
         const [s0, e0] = snap(ev.selection); apply(s0, e0);
       });
     const bg = svg.append('g').attr('class', 'brush').call(brush); bg.select('.overlay').style('cursor', 'var(--cur-cross, crosshair)');
     lab.raise();
     if (active) { const a0 = mStart(active[0]), b0 = d3.utcMonth.offset(mStart(active[1]), 1); bg.call(brush.move, [x(a0), x(b0)]); showLab(a0, b0); }
     el.querySelector('svg')?.remove(); el.prepend(svg.node());
-    $('tlLegend').innerHTML = groups.map(g => '<span><i style="background:' + colorOf(opt.group, g) + '"></i>' + esc(labelOf(opt.group, g)) + '</span>').join('');
+    // the legend lists groups biggest first, the order the Gantt uses; each one jumps to its group below
+    $('tlLegend').innerHTML = byValue(groups, list).map(g => '<button type="button" data-g="' + esc(g) + '" title="Jump to ' + esc(labelOf(opt.group, g)) + ' in the list below"><i style="background:' + colorOf(opt.group, g) + '"></i>' + esc(labelOf(opt.group, g)) + '</button>').join('');
   }
+  // groups ordered by the total est. value of their filings (colors stay with the group, never with its rank)
+  function byValue(groups, list) { const tot = {}; for (const f of list) { const k = keyOf[opt.group](f); tot[k] = (tot[k] || 0) + f.cost; } return groups.slice().sort((a, b) => (tot[b] || 0) - (tot[a] || 0)); }
+  $('tlLegend').addEventListener('click', e => {
+    const b = e.target.closest('button[data-g]'); if (!b) return; const r = rows.find(x => x.g === b.dataset.g), sc = $('gScroll');
+    if (!r) { ctx.toast('No ' + labelOf(opt.group, b.dataset.g) + ' projects in the list below.'); return; }
+    $('gantt').scrollIntoView({ block: 'nearest', behavior: ctx.reduceMotion ? 'auto' : 'smooth' });
+    sc.scrollTo({ top: r.y, behavior: ctx.reduceMotion ? 'auto' : 'smooth' });
+  });
 
   function renderGantt(list, groups) {
     const sc = $('gScroll'), W = sc.clientWidth, lw = labelW(), cw = Math.max(window.innerWidth <= 700 ? 120 : 160, W - lw - 12); $('gantt').style.setProperty('--glab', lw + 'px');
@@ -178,7 +196,7 @@ export function initTimeline(ctx) {
     ctx.scopeBar?.($('tlScope'));
     if (!list.length) { $('tlChart').querySelector('svg')?.remove(); $('gInner').innerHTML = ctx.vempty ? ctx.vempty({ icon: 'search', title: 'No filings match these filters', text: 'Remove a filter above, or reset them.', actions: [{ label: 'Reset filters', id: 'tlReset', primary: true }] }) : '<div class="empty">No filings match these filters.</div>';
       $('gInner').style.height = 'auto'; $('tlLegend').innerHTML = ''; $('tlReset')?.addEventListener('click', () => ctx.resetFilings?.()); return; }
-    renderChart(chartList, groupsFor(opt.group, chartList)); renderGantt(list, groups);
+    renderChart(chartList, groupsFor(opt.group, chartList)); renderGantt(list, byValue(groups, list));
     const d = ctx.state.d, r = $('tlRange');
     if (d && d.f === 'active') { const f = s => s ? d3.utcFormat('%b %Y')(mStart(s)) : '…';
       r.innerHTML = '<b>Under construction ' + esc(f(d.from)) + (d.to !== d.from ? ' – ' + esc(f(d.to)) : '') + '</b> · ' + fmtN(list.length) + ' projects <button class="lnk" type="button">Clear</button>';
@@ -187,5 +205,8 @@ export function initTimeline(ctx) {
   }
   ctx.onChange(render); ctx.onView('timeline', render);
   let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(render, 150); });
+  // the page narrows when a card opens beside it (and widens when it closes) without the window changing: redraw at the new width
+  { let lastW = 0, raf = 0; // the page's padding changes with the card, so it is the content width that tells
+    new ResizeObserver(es => { const w = Math.round(es[0].contentRect.width); if (!w || ctx.view !== 'timeline' || Math.abs(w - lastW) < 2) { if (w && ctx.view === 'timeline') lastW = w; return; } lastW = w; cancelAnimationFrame(raf); raf = requestAnimationFrame(render); }).observe(root); }
   new MutationObserver(() => render()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }

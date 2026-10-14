@@ -4,6 +4,7 @@ import { makeMatcher, encode, decode, describe } from './lib/filter.mjs';
 import { USES, entityKey } from './lib/taxonomy.mjs';
 import { recentChanges } from './lib/changes.mjs';
 import { dockSide } from './lib/planview.mjs';
+import { aiErrorMessage, spotQuestion } from './lib/assist-logic.mjs';
 import { initTimeline } from './timeline.js';
 import { initWho, initChanges } from './views.js';
 import { initAssistant } from './assistant.js';
@@ -724,10 +725,11 @@ function historyHtml(f){
   return '<div class="fhist"><div class="fl">History</div>'+rows.map(([d,x])=>'<div><span class="m">'+esc(d)+'</span> '+(x.k==='new'?'First seen':esc(x.label)+': '+esc(fv(x.k,x.from))+' → '+esc(fv(x.k,x.to)))+'</div>').join('')+'</div>'; }
 async function loadBrief(f){
   const box=card.querySelector('#briefBox'); if(!box) return; box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote">Writing a brief from the filing, nearby activity and census data…</div>';
-  try{ const r=await fetch('api/brief?id='+encodeURIComponent(f.id)); const d=await r.json().catch(()=>({}));
-    if(state.sel!==f) return; if(!r.ok) throw new Error(d.error||('Error '+r.status));
+  try{ let r; try{ r=await fetch('api/brief?id='+encodeURIComponent(f.id)); }catch(e){ throw new Error(aiErrorMessage({network:true,offline:navigator.onLine===false})); }
+    const d=await r.json().catch(()=>({}));
+    if(state.sel!==f) return; if(!r.ok) throw new Error(aiErrorMessage({status:r.status,error:d.error}));
     box.innerHTML='<div class="lt">AI Project Brief</div><div class="btext">'+richText(d.brief)+'</div><div class="ssrc src">AI-written from the data on this page. Verify before relying on it.</div>'; wireCites(box); }
-  catch(e){ if(state.sel===f) box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote">'+esc(e.message)+'</div><button class="btn" id="briefBtn">Try Again</button>', box.querySelector('#briefBtn').onclick=()=>loadBrief(f); }
+  catch(e){ if(state.sel===f) box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote">'+esc(e.message)+' <button class="lnk" id="briefBtn" type="button">Retry</button></div>', box.querySelector('#briefBtn').onclick=()=>loadBrief(f); }
 }
 // AI text -> safe HTML: escaped, paragraphs, [TABS…] citations become buttons that select the filing
 function richText(t){ return textBlocks(esc(plainText(t||''))).replace(/\[(TABS[0-9A-Za-z-]+)\]/g,(m,id)=>BY_ID.has(id)?'<button class="cite" data-id="'+id+'">'+id+'</button>':id); }
@@ -802,10 +804,13 @@ function placeMenu(pt,ll){
   pmenu.style.left=Math.max(8,x)+'px'; pmenu.style.top=Math.max(8,y)+'px'; pmenu.classList.add('on');
   pmenu.querySelector('[data-a=note]').onclick=()=>{ hideMenu(); ctx.addNote?.({at:c}); };
   pmenu.querySelector('[data-a=radius]').onclick=()=>{ hideMenu(); setMiles(1,false,true); setRadiusCenter(c,pinLabel(c),true); };
-  pmenu.querySelector('[data-a=ask]').onclick=()=>{ hideMenu(); ctx.assistant?.ask('What is being built within 1 mile of '+c[1].toFixed(5)+', '+c[0].toFixed(5)+'? Show it on the map.'); };
+  pmenu.querySelector('[data-a=ask]').onclick=async()=>{ hideMenu(); const a=await spotAddress(c); ctx.assistant?.ask(spotQuestion(a||nearName(c),c,!!a)); };
   pmenu.querySelector('a').onclick=hideMenu;
 }
 const hideMenu=()=>pmenu.classList.remove('on');
+// the street address at a right-clicked spot (MapTiler reverse geocoding), for "Ask AI about this spot"; null when there is none nearby
+async function spotAddress(c){ try{ const r=await fetch('https://api.maptiler.com/geocoding/'+c[0]+','+c[1]+'.json?key='+MAPTILER_KEY+'&limit=1&types=address,poi',{signal:AbortSignal.timeout(2500)});
+  const f=r.ok?(await r.json())?.features?.[0]:null; return f?(f.place_name||f.text||'').replace(/, United States$/,'')||null:null; }catch(e){ return null; } }
 map.on('contextmenu',e=>{ e.preventDefault(); if(mode==='pan') placeMenu(e.point,e.lngLat); });
 { let lp=0,start=null; // long-press on touch screens
   map.on('touchstart',e=>{ clearTimeout(lp); if(e.points.length!==1||mode!=='pan') return; start=e.point; lp=setTimeout(()=>{ placeMenu(e.point,e.lngLat); swallowClick=true; },550); });

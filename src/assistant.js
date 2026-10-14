@@ -6,7 +6,7 @@ import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
 import { plausibleHeight } from './lib/height.mjs';
-import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft, applyPlaceAlias, splitWithin, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, aiErrorMessage, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft, applyPlaceAlias, splitWithin, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from './lib/assist-logic.mjs';
 import { createTurns, withTimeout, createVoiceLog } from './lib/voice-state.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
@@ -15,7 +15,16 @@ const SEND = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke
 // new chat: a speech bubble with a plus
 const NEWCHAT = '<svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 8.6c0 3.4-3 6-6.5 6-.9 0-1.8-.2-2.6-.5L3 15l.9-3A5.8 5.8 0 0 1 2.5 8.6c0-3.4 2.9-6 6.5-6s6.5 2.6 6.5 6z"/><path d="M9 5.9v5.4M6.3 8.6h5.4"/></svg>';
 const X = '<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
-const SUGGEST = ['Who owns 2200 Texas Ave, Houston?', 'What are incomes and home values like around Katy?', 'Take me to downtown Houston and orbit around it', 'What businesses are near 1004 Priya Ln, Waller?', 'What’s under construction within 5 miles of Katy?', 'Who are the most active developers right now?', 'How far is this property from me, and what’s the drive time?', 'Turn on radar, wind and live traffic'];
+// general examples under the on-screen ones. Parcel, area and market questions lead; filing questions only while filings are on
+const generalSugs = v => [
+  !v.card && 'Who owns 2200 Texas Ave, Houston?',
+  'What are incomes and home values like around Katy?',
+  v.card && 'How far is this property from me, and what’s the drive time?',
+  'Take me to downtown Houston and orbit around it',
+  !v.card && 'What businesses are near 1004 Priya Ln, Waller?',
+  'Turn on radar, wind and live traffic',
+  v.filings && 'What’s under construction within 5 miles of Katy?', v.filings && 'Who are the most active developers right now?',
+  v.card && 'What businesses are nearby?'].filter(Boolean);
 
 const MOD = /Mac|iPhone|iPad|iPod/.test(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl+';
 
@@ -23,12 +32,12 @@ export function initAssistant(ctx) {
   const { esc, fmtM, fmtN } = ctx;
   const wrap = document.createElement('div');
   wrap.innerHTML = `
-  <aside class="ai" id="ai" aria-label="AI assistant" aria-hidden="true">
+  <aside class="ai" id="ai" aria-label="Ask AI" aria-hidden="true">
     <div class="ai-grab" id="aiGrab" aria-hidden="true"></div>
     <header class="ai-h">
-      <div class="ai-t">${SPARK}<span>Assistant</span><em id="aiSt"></em></div>
+      <div class="ai-t">${SPARK}<span>Ask AI</span><em id="aiSt"></em></div>
       <button class="ai-ib" id="aiNew" type="button" title="New chat" aria-label="New chat">${NEWCHAT}</button>
-      <button class="ai-ib" id="aiClose" type="button" aria-label="Close assistant">${X}</button>
+      <button class="ai-ib" id="aiClose" type="button" title="Close Ask AI" aria-label="Close Ask AI">${X}</button>
     </header>
     <div class="ai-log" id="aiLog" aria-live="polite"></div>
     <div class="ai-live" id="aiLive" hidden>
@@ -38,8 +47,8 @@ export function initAssistant(ctx) {
       <button class="btn" id="aiStop" type="button">End</button>
     </div>
     <form class="ai-f" id="aiForm" autocomplete="off">
-      <textarea id="aiQ" rows="1" maxlength="1500" placeholder="Ask, or tell the map what to show…" aria-label="Message the assistant" enterkeyhint="send"></textarea>
-      <button class="ai-mic" id="aiMic" type="button" aria-label="Talk to the assistant" title="Talk (voice)">${MIC}</button>
+      <textarea id="aiQ" rows="1" maxlength="1500" placeholder="Ask, or tell the map what to show…" aria-label="Message Ask AI" enterkeyhint="send"></textarea>
+      <button class="ai-mic" id="aiMic" type="button" aria-label="Voice: talk to Ask AI" title="Voice">${MIC}</button>
       <button class="ai-send" id="aiSend" type="submit" aria-label="Send">${SEND}</button>
     </form>
   </aside>
@@ -47,22 +56,29 @@ export function initAssistant(ctx) {
   <button class="ai-fab" id="aiFab" type="button" aria-controls="ai" aria-keyshortcuts="${MOD === '⌘' ? 'Meta+/' : 'Control+/'}">${SPARK}<span>Ask AI</span></button>`;
   ctx.viewport.append(...wrap.children);
   const $ = id => document.getElementById(id);
-  const el = $('ai'), log = $('aiLog'), q = $('aiQ'), form = $('aiForm'), st = $('aiSt'), app = document.querySelector('.app');
+  const el = $('ai'), log = $('aiLog'), q = $('aiQ'), form = $('aiForm'), st = $('aiSt'), app = document.querySelector('.app'), cardEl = document.getElementById('card');
   if (matchMedia('(max-width:700px)').matches) q.placeholder = 'Ask anything…'; // the long hint wraps on a phone
-  let history = [], busy = false;
+  let history = [], busy = false, reclamp = () => {}, lastTurn = null;
 
   // ---------- open / close ----------
   function open(focus = true) {
     // tablet: give the map the room the drawer takes by folding the side list away
     if (innerWidth > 700 && innerWidth <= 1100 && !app.classList.contains('pcollapsed')) { app.classList.add('pcollapsed'); setTimeout(() => ctx.map.resize(), 30); }
+    // phone: the drawer is a bottom sheet over the map, so an open card folds to its title bar to leave it room
+    if (innerWidth <= 700 && cardEl.classList.contains('open')) ctx.minimizeCard?.(true);
     app.classList.add('ai-open'); el.setAttribute('aria-hidden', 'false');
-    if (!history.length && (!log.children.length || log.querySelector('.ai-empty'))) renderEmpty(); // fresh suggestions for what's on screen now
+    if (!history.length && (!log.children.length || log.querySelector('.ai-empty'))) renderEmpty(true); // fresh suggestions for what's on screen now
     if (focus && !matchMedia('(pointer: coarse)').matches) setTimeout(() => q.focus(), 60);
-    ctx.mapPadding();
+    ctx.mapPadding(); reclamp();
   }
-  function close() { app.classList.remove('ai-open', 'ai-tall'); el.setAttribute('aria-hidden', 'true'); stopVoice(); ctx.mapPadding(); }
+  function close() {
+    // keyboard users land back on the Ask AI button, not on a hidden box
+    const a = document.activeElement, hadFocus = !a || a === document.body || el.contains(a);
+    app.classList.remove('ai-open', 'ai-tall'); el.setAttribute('aria-hidden', 'true'); stopVoice(); ctx.mapPadding();
+    if (hadFocus) $('askTop')?.focus({ preventScroll: true });
+  }
   $('aiFab').onclick = () => open(); $('aiClose').onclick = close;
-  $('aiNew').onclick = () => { history = []; thread = null; log.innerHTML = ''; renderEmpty(); ctx.clearHighlight(); };
+  $('aiNew').onclick = () => { history = []; thread = null; log.innerHTML = ''; renderEmpty(true); ctx.clearHighlight(); };
   // ⌘/ (Mac) or Ctrl+/ opens the assistant from anywhere, even while typing in another box; again closes it
   document.addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === '/' || e.code === 'Slash')) {
@@ -76,13 +92,16 @@ export function initAssistant(ctx) {
     grip.className = 'ai-resize'; grip.setAttribute('role', 'separator'); grip.setAttribute('aria-orientation', 'vertical'); grip.setAttribute('aria-label', 'Resize the assistant'); grip.tabIndex = 0; grip.title = 'Drag to resize · double-click to reset';
     el.prepend(grip);
     const base = () => innerWidth <= 1100 ? 400 : Math.min(460, innerWidth - 32);
-    const maxW = () => Math.max(base(), Math.min(980, (document.querySelector('.stage')?.clientWidth || innerWidth) - 360));
+    // with a card open the drawer never takes the room the card needs: the card keeps its width and stays clear of the left panel
+    const maxW = () => { const S = document.querySelector('.stage')?.clientWidth || innerWidth, cw = cardEl.classList.contains('open') ? cardEl.offsetWidth : 0;
+      return Math.max(base(), Math.min(980, cw ? Math.min(S - 360, S - cw - 120) : S - 360)); };
     let want = null; try { want = +localStorage.getItem(KEY) || null; } catch (e) {}
     let raf = 0; const pad = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; ctx.mapPadding(); }); };
     const apply = () => { const w = want && innerWidth > 700 ? Math.min(maxW(), want) : 0;
       if (w > base() + 1) app.style.setProperty('--aiw', Math.round(w) + 'px'); else app.style.removeProperty('--aiw'); pad(); };
     const save = () => { try { want ? localStorage.setItem(KEY, String(Math.round(want))) : localStorage.removeItem(KEY); } catch (e) {} };
-    apply(); addEventListener('resize', apply);
+    apply(); addEventListener('resize', apply); reclamp = apply;
+    new MutationObserver(apply).observe(cardEl, { attributes: true, attributeFilter: ['class'] }); // a card opened, closed or widened (site plan) re-fits the drawer
     grip.addEventListener('pointerdown', e => {
       if (e.button !== 0) return; e.preventDefault(); grip.setPointerCapture(e.pointerId); app.classList.add('airesizing');
       const right = el.getBoundingClientRect().right;
@@ -99,23 +118,25 @@ export function initAssistant(ctx) {
 
   // ---------- suggested questions above the Ask AI button, from what is on screen ----------
   const sugBox = $('fabSugs'); let cardInfo = null, sugT = 0, lastSugs = '';
+  // a filter beyond the default 12-month period (the default is always on, so it says nothing about what the person is after)
+  const filterSet = () => { const sp = ctx.curSpec?.(false) || {}; return Object.keys(sp).some(k => k !== 'd') || !!(sp.d && JSON.stringify(sp.d) !== JSON.stringify(ctx.periodSpec?.('12m'))); };
   function onScreen() {
     const m = ctx.map, z = m.getZoom(), c = m.getCenter(), b = m.getBounds(), cardOpen = document.getElementById('card').classList.contains('open');
     const card = !cardOpen || !cardInfo ? null : cardInfo.kind === 'filing' ? { kind: 'filing', name: cardInfo.f.name, dev: cardInfo.f.dev || cardInfo.f.owner, approx: !!cardInfo.f.approx }
-      : cardInfo.kind === 'building' ? { kind: 'building', label: cardInfo.label?.() } : null;
+      : cardInfo.kind === 'building' ? { kind: 'building', label: (l => /^loading/i.test(l || '') ? '' : l)(cardInfo.label?.()) } : null;
     const inView = z >= 8 ? ctx.visible.reduce((n, f) => n + (b.contains([f.lon, f.lat]) ? 1 : 0), 0) : 0;
     const near = ctx.nearestPlace?.([c.lng, c.lat]) || null;
-    return { card, near, far: near ? null : ctx.viewPlace?.() || null, zoom: z, inView, filtered: !!ctx.filterText(), selection: ctx.sel?.feature ? ctx.sel.label || null : null, changed: ctx.CHANGED.size };
+    return { card, near, far: near ? null : ctx.viewPlace?.() || null, zoom: z, inView, filtered: filterSet(), selection: ctx.sel?.feature ? ctx.sel.label || null : null, changed: ctx.CHANGED.size, filings: !!ctx.filingsShown?.() };
   }
   // pills say "it" for the open card; the question sent names it, so the answer can't drift to something else
   function screenSugs() {
     const v = onScreen(), name = v.card?.kind === 'filing' ? v.card.name : v.card?.kind === 'building' && v.card.label ? v.card.label.split(',')[0] : null;
-    return suggestQuestions(v).map(t => ({ t, q: name ? t.replace(/\b(of|near|is) it\b|\bwill it\b/, m => m.replace(/\bit\b/, name)) : t }));
+    return suggestQuestions(v).map(t => ({ t, q: name ? t.replace(/\b(of|near|is|around) it\b|\bwill it\b/, m => m.replace(/\bit\b/, name)) : t }));
   }
   function renderSugs() {
     const list = screenSugs(), key = list.map(s => s.t).join('|'); if (key === lastSugs) return; lastSugs = key;
     sugBox.innerHTML = list.map(s => '<button type="button" data-q="' + esc(s.q) + '">' + esc(s.t) + '</button>').join('');
-    sugBox.querySelectorAll('button').forEach(b => b.onclick = () => { if (busy) return; open(false); ask(b.dataset.q); });
+    sugBox.querySelectorAll('button').forEach(b => b.onclick = () => ask(b.dataset.q));
     fitSugs();
   }
   // short windows: drop suggestions from the top of the stack rather than let them run into the map buttons
@@ -127,8 +148,10 @@ export function initAssistant(ctx) {
       const c = ctrls.getBoundingClientRect(), r = sugBox.getBoundingClientRect(); if (r.left > c.right || r.right < c.left) break; b.hidden = true; }
   }
   addEventListener('resize', () => requestAnimationFrame(fitSugs));
-  const sugSoon = () => { clearTimeout(sugT); sugT = setTimeout(renderSugs, 300); };
+  const sugSoon = () => { clearTimeout(sugT); sugT = setTimeout(() => { renderSugs(); if (!history.length) renderEmpty(); }, 300); };
   ctx.onCardRender(i => { cardInfo = i; sugSoon(); }); ctx.onCardClose(() => { cardInfo = null; sugSoon(); });
+  // a property card names itself once its address loads: refresh the prompts then
+  new MutationObserver(() => { if (cardInfo?.kind === 'building') sugSoon(); }).observe(cardEl, { childList: true, subtree: true, characterData: true });
   ctx.map.on('moveend', sugSoon); ctx.onChange(sugSoon); sugSoon();
   // phone: drag the grab handle to switch between half and tall sheet
   { let y0 = null; const g = $('aiGrab');
@@ -137,13 +160,16 @@ export function initAssistant(ctx) {
       if (dy < -30) app.classList.add('ai-tall'); else if (dy > 60) { if (app.classList.contains('ai-tall')) app.classList.remove('ai-tall'); else close(); } else app.classList.toggle('ai-tall'); ctx.mapPadding(); }); }
 
   // ---------- rendering ----------
-  function renderEmpty() {
+  // the empty chat offers what suits the screen: it is rebuilt when a card opens or closes or the map moves, while nothing has been asked
+  let emptyKey = '';
+  function renderEmpty(force) {
+    // what's on screen first (the same questions the Ask AI button offers on hover), then general examples
+    let here = [], v = { filings: !!ctx.filingsShown?.() }; try { here = screenSugs(); v = onScreen(); } catch { /* map not ready yet */ }
+    const key = s => s.toLowerCase().split(/\s+/).slice(0, 5).join(' '), seen = new Set(here.map(s => key(s.t)));
+    const list = [...here, ...generalSugs(v).filter(s => !seen.has(key(s))).map(s => ({ t: s, q: s }))].slice(0, 6);
+    const k = list.map(s => s.q).join('|'); if (!force && k === emptyKey && log.querySelector('.ai-empty')) return; emptyKey = k;
     log.innerHTML = '<div class="ai-empty"><b>Ask about any property or place on the map.</b><span>I can look up owners, values, zoning and site risks, describe the people and businesses around a place, track construction filings, and move the map. Or press the mic and just talk.</span>' +
       '<div class="ai-sugs"></div></div>';
-    // what's on screen first (the same questions the Ask AI button offers on hover), then general examples
-    let here = []; try { here = screenSugs(); } catch { /* map not ready yet */ }
-    const key = s => s.toLowerCase().split(/\s+/).slice(0, 5).join(' '), seen = new Set(here.map(s => key(s.t)));
-    const list = [...here, ...SUGGEST.filter(s => !seen.has(key(s))).map(s => ({ t: s, q: s }))].slice(0, 6);
     const box = log.querySelector('.ai-sugs'); box.innerHTML = list.map(s => '<button type="button" data-q="' + esc(s.q) + '">' + esc(s.t) + '</button>').join('');
     box.querySelectorAll('button').forEach(b => b.onclick = () => ask(b.dataset.q));
   }
@@ -159,7 +185,7 @@ export function initAssistant(ctx) {
     log.querySelectorAll('.ai-next').forEach(x => x.remove());
     const d = document.createElement('div'); d.className = 'ai-next';
     d.innerHTML = list.map(p => '<button type="button">' + esc(p) + '</button>').join('');
-    d.querySelectorAll('button').forEach(b => b.onclick = () => { if (busy) return; d.remove(); ask(b.textContent); });
+    d.querySelectorAll('button').forEach(b => b.onclick = () => { if (stillBusy()) return; d.remove(); ask(b.textContent); });
     log.appendChild(d); scroll();
   }
   function actionChip(text, undo) {
@@ -167,25 +193,41 @@ export function initAssistant(ctx) {
     if (undo) d.querySelector('button').onclick = () => { undo(); d.querySelector('button').remove(); d.classList.add('undone'); };
     return d;
   }
-  const status = t => { st.textContent = t || ''; };
+  let curStatus = '', stT = 0;
+  const status = t => { curStatus = t || ''; st.textContent = curStatus; };
+  // something typed or tapped while an answer is on its way is kept, not dropped: say why nothing was sent
+  const stillBusy = () => { if (!busy) return false; clearTimeout(stT); st.textContent = 'Still answering…'; stT = setTimeout(() => { st.textContent = curStatus; }, 1800); return true; };
   q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = Math.min(140, q.scrollHeight) + 'px'; });
   q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); } });
-  form.onsubmit = e => { e.preventDefault(); const t = q.value.trim(); if (!t) return; q.value = ''; q.style.height = 'auto'; ask(t); };
+  form.onsubmit = e => { e.preventDefault(); const t = q.value.trim(); if (!t || stillBusy()) return; q.value = ''; q.style.height = 'auto'; ask(t); };
 
   // ---------- text chat loop ----------
   const context = () => ({ coverage: ctx.coverage(), filters: ctx.filterText() || 'none (default view)', screen: ctx.screenContext(), vocab: ctx.vocab() });
   let thread = null; // OpenAI response id that continues this conversation
+  // a failed call is a sentence (never "Error 501" or "Failed to fetch"); the details go to the console
+  const aiErr = o => Object.assign(new Error(aiErrorMessage(o)), { friendly: true, status: o.status || 0 });
   async function post(input) {
-    const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, previous_response_id: thread, context: context() }) });
+    let r; try { r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, previous_response_id: thread, context: context() }) }); }
+    catch (e) { console.warn('[assistant]', e); throw aiErr({ network: true, offline: navigator.onLine === false }); }
     const d = await r.json().catch(() => ({}));
     if (r.status === 409) thread = null;
-    if (!r.ok) throw new Error(d.error || (r.status === 404 ? 'The assistant isn’t deployed here.' : 'Error ' + r.status));
+    if (!r.ok) { console.warn('[assistant]', r.status, d.error || ''); throw aiErr({ status: r.status, error: d.error }); }
     thread = d.id || thread; return d;
   }
-  async function ask(text) {
-    if (busy) return; open(false); busy = true; $('aiSend').disabled = true;
-    log.querySelectorAll('.ai-next').forEach(x => x.remove()); turnSubject = null; turnChoices = null;
-    const mine = bubble('user', esc(text)); history.push({ role: 'user', content: text });
+  // the error bubble offers Retry, which asks the same question again (without repeating it in the chat)
+  function errorBubble(e, text, mine) {
+    const msg = e?.friendly ? e.message : aiErrorMessage({ status: 500 }); if (!e?.friendly) console.error(e);
+    const d = bubble('bot err', '<span>' + esc(msg) + '</span> <button class="lnk" type="button">Retry</button>');
+    d.querySelector('button').onclick = () => { if (stillBusy()) return; d.remove(); ask(text, { retry: mine }); };
+  }
+  async function ask(text, opt = {}) {
+    open(false); // show the drawer first, even if the last answer is still on its way
+    if (busy) { ctx.toast('Still answering the last question…'); return false; }
+    // asked from a card or menu: put the cursor in the box, so the next Esc closes the assistant rather than the card
+    if (!matchMedia('(pointer: coarse)').matches) q.focus({ preventScroll: true });
+    busy = true; $('aiSend').disabled = true; const t0 = thread;
+    log.querySelectorAll('.ai-next').forEach(x => x.remove()); log.querySelectorAll('.ai-m.err .lnk').forEach(x => x.remove()); turnSubject = null; turnChoices = null;
+    let mine = opt.retry; if (!mine) { mine = bubble('user', esc(text)); history.push({ role: 'user', content: text }); }
     const thinking = bubble('bot pending', '<span class="dots"><i></i><i></i><i></i></span>'); status('Thinking…');
     try {
       let input = [{ role: 'user', content: text }], next = [];
@@ -207,8 +249,9 @@ export function initAssistant(ctx) {
       // a tall answer with cards: start at the first card rather than the bottom, so its headline numbers are in view
       let c1 = mine.nextElementSibling; while (c1 && !c1.classList.contains('ccard')) c1 = c1.nextElementSibling;
       if (c1 && log.scrollHeight - (c1.offsetTop - log.offsetTop) > log.clientHeight) log.scrollTop = c1.offsetTop - log.offsetTop - 8;
-    } catch (e) { bubble('bot err', esc(e.message)); }
+    } catch (e) { if (e?.status !== 409) thread = t0; errorBubble(e, text, mine); } // a half-finished tool round can't be continued: ask again from where the chat was
     finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
+    return true;
   }
   const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_path: 'Tracing the flight…', market_data: 'Reading the market numbers…', market_prices: 'Checking market prices…', market_correlation: 'Measuring the correlation…', crime_stats: 'Counting incidents…', crime_by_city: 'Reading the FBI’s crime figures…', crime_rankings: 'Ranking departments…', drive_time_map: 'Mapping drive times…', traffic_report: 'Reading traffic counts…', airport_info: 'Looking up the airport…', air_traffic_report: 'Reading the air traffic history…', flight_report: 'Building the flight report…', fema_report: 'Checking FEMA flood and hazard data…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 
@@ -332,6 +375,9 @@ export function initAssistant(ctx) {
     const pl = ctx.currentPlace?.(); if (pl?.c) return { c: pl.c, label: pl.label };
     return { error: 'Say which address or place, or open a filing or building first.' };
   }
+  // an action that turns the filings layer on puts it back the way it was on Undo (dots and heatmap)
+  const layerSnap = () => { const L = ctx.layersState; return L ? { dots: !!L.dots, heat: L.heat } : null; };
+  const layerRestore = was => { const L = ctx.layersState; if (!was || !L) return; if (!!L.dots !== was.dots) ctx.setFilingsShown?.(was.dots); if (L.heat !== was.heat) ctx.setMapOptions?.({ heatmap: was.heat }); };
   let cardList = null; // the filings a tool worked on, for its chat card
 
   // every tool result can come with a card in the chat (src/chatcards.js), for typed and voice chat alike
@@ -391,10 +437,10 @@ export function initAssistant(ctx) {
           note: d.parcel ? undefined : 'No appraisal parcel record was found at this point.', source: 'Texas GIO parcels, OpenStreetMap, USGS lidar, TDLR TABS' };
       }
       if (name === 'filter_map') {
-        const before = ctx.snapshot(), { spec, notes } = await specFrom(a);
+        const before = ctx.snapshot(), lay = layerSnap(), { spec, notes } = await specFrom(a);
         ctx.showFilings?.(); ctx.fromSpec(spec, { fly: true }); if (ctx.view !== 'map' && ctx.view !== 'timeline') ctx.setView('map');
         const list = ctx.visible; if (!spec.sel) ctx.fitToVisible(); cardList = list.slice();
-        actionChip('Map: ' + (describe(spec, fmtM) || 'all filings') + ' · ' + fmtN(list.length) + ' filings · est. ' + fmtM(list.reduce((s, f) => s + f.cost, 0)), () => ctx.restore(before));
+        actionChip('Map: ' + (describe(spec, fmtM) || 'all filings') + ' · ' + fmtN(list.length) + ' filings · est. ' + fmtM(list.reduce((s, f) => s + f.cost, 0)), () => { ctx.restore(before); layerRestore(lay); });
         return { applied: describe(spec) || 'all filings', notes, ...summary(list) };
       }
       if (name === 'query_filings') {
@@ -406,13 +452,13 @@ export function initAssistant(ctx) {
       if (name === 'highlight_filings') {
         const found = (a.ids || []).map(id => ctx.BY_ID.get(String(id).trim())).filter(Boolean);
         if (!found.length) return { error: 'None of those ids are loaded.' };
-        ctx.showFilings?.(); ctx.highlight(found, a.label || ''); if (ctx.view !== 'map') ctx.setView('map');
-        actionChip('Highlighted ' + found.length + ' filing' + (found.length > 1 ? 's' : '') + (a.label ? ': ' + a.label : ''), () => ctx.clearHighlight());
+        const lay = layerSnap(); ctx.showFilings?.(); ctx.highlight(found, a.label || ''); if (ctx.view !== 'map') ctx.setView('map');
+        actionChip('Highlighted ' + found.length + ' filing' + (found.length > 1 ? 's' : '') + (a.label ? ': ' + a.label : ''), () => { ctx.clearHighlight(); layerRestore(lay); });
         return { highlighted: found.map(f => ({ id: f.id, name: f.name, value: f.cost })) };
       }
       if (name === 'open_filing') {
         const f = ctx.BY_ID.get(String(a.id || '').trim()); if (!f) return { error: 'Filing not loaded.' };
-        if (ctx.view !== 'map') ctx.setView('map'); ctx.select(f, true); actionChip('Opened ' + f.name); turnSubject = f.name;
+        const lay = layerSnap(); if (ctx.view !== 'map') ctx.setView('map'); ctx.select(f, true); actionChip('Opened ' + f.name, () => { ctx.closeCard(); layerRestore(lay); }); turnSubject = f.name;
         return { opened: row(f), scope: f.scope || '', summary: f.sum || '', owner: f.owner, address: f.addr, architect: f.arch || null, gc: f.gc || null, approximate_location: !!f.approx };
       }
       if (name === 'fly_to') {
@@ -815,7 +861,7 @@ export function initAssistant(ctx) {
   ctx.runAssistantTool = runTool;
 
   // ---------- voice (OpenAI Realtime over WebRTC) ----------
-  let pc = null, dc = null, mic = null, audio = null, meter = null, voiceT = 0, liveBubble = null, pendingCalls = 0, vocab = '';
+  let voiceTok = 0, voiceBusy = false, pc = null, dc = null, mic = null, audio = null, meter = null, voiceT = 0, liveBubble = null, pendingCalls = 0, vocab = '';
   const live = $('aiLive'), liveT = $('aiLiveT'), liveS = $('aiLiveS'), orb = $('aiOrb');
   // the panel's look follows the conversation: listening (calm), hearing you (reacts to the mic), thinking (spinning ring),
   // speaking (reacts to the assistant's voice)
@@ -831,14 +877,17 @@ export function initAssistant(ctx) {
   } });
   ctx.voiceLog = () => vlog.text();
   async function startVoice(quiet) {
-    if (pc && !quiet) { stopVoice(); return; }
+    if (voiceBusy && !quiet) { stopVoice(); return; } // tapped again while connecting or live: cancel
     if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) { ctx.toast('Voice needs a browser with microphone and WebRTC support.'); return; }
+    const tok = ++voiceTok; voiceBusy = true; // stopVoice() bumps the token, so a start that is cancelled while it waits quietly gives up
     open(false); live.hidden = false; el.classList.add('voice'); $('aiMic').classList.add('on'); setLive('Connecting…', quiet ? 'Renewing the voice session…' : 'Allow the microphone if asked');
     vlog.add('connect', quiet ? 'renew' : 'start'); turns.reset(); heard.clear();
     try {
-      mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (tok !== voiceTok) { stream.getTracks().forEach(t => t.stop()); return; }
+      mic = stream;
       const r = await fetch('api/realtime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context: context() }), signal: AbortSignal.timeout(15000) });
-      const s = await r.json().catch(() => ({})); if (!r.ok || !s.value) throw new Error(s.error || 'Voice isn’t available right now.'); vocab = s.vocab || '';
+      const s = await r.json().catch(() => ({})); if (!r.ok || !s.value) throw new Error(s.error || 'Voice isn’t available right now.'); if (tok !== voiceTok) return; vocab = s.vocab || '';
       pc = new RTCPeerConnection(); audio = new Audio(); audio.autoplay = true; audio.playsInline = true;
       pc.ontrack = e => { audio.srcObject = e.streams[0]; meter?.addRemote?.(e.streams[0]); };
       pc.addTrack(mic.getAudioTracks()[0], mic);
@@ -850,10 +899,12 @@ export function initAssistant(ctx) {
         setLive('Listening', LISTEN_HINT);
       };
       pc.onconnectionstatechange = () => { vlog.add('connection', pc?.connectionState); if (['failed', 'disconnected', 'closed'].includes(pc?.connectionState)) stopVoice('Voice connection ended.'); };
-      const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+      const offer = await pc.createOffer(); if (tok !== voiceTok) return; await pc.setLocalDescription(offer); if (tok !== voiceTok) return;
       const a = await fetch('https://api.openai.com/v1/realtime/calls', { method: 'POST', body: offer.sdp, headers: { Authorization: 'Bearer ' + s.value, 'Content-Type': 'application/sdp' }, signal: AbortSignal.timeout(15000) });
+      if (tok !== voiceTok) return;
       if (!a.ok) throw new Error('Voice connection was refused (' + a.status + ').');
-      await pc.setRemoteDescription({ type: 'answer', sdp: await a.text() });
+      const sdp = await a.text(); if (tok !== voiceTok) return;
+      await pc.setRemoteDescription({ type: 'answer', sdp }); if (tok !== voiceTok) return;
       startMeter(); clearTimeout(voiceT); clearTimeout(renewT);
       // OpenAI ends a session at 10 minutes: renew it just before, between turns, carrying the last few exchanges
       renewT = setTimeout(function renew() {
@@ -862,10 +913,10 @@ export function initAssistant(ctx) {
         stopVoice('', true); startVoice(true);
       }, 9 * 60e3);
       voiceT = setTimeout(() => stopVoice('Voice sessions end after 10 minutes. Tap the mic to keep going.'), 10 * 60e3);
-    } catch (e) { vlog.add('connect failed', e.message); stopVoice(e.name === 'NotAllowedError' ? 'Microphone access was blocked.' : e.name === 'TimeoutError' ? 'Voice took too long to connect. Try again.' : e.message); }
+    } catch (e) { if (tok !== voiceTok) { vlog.add('cancelled', e.message); return; } vlog.add('connect failed', e.message); stopVoice(e.name === 'NotAllowedError' ? 'Microphone access was blocked.' : e.name === 'TimeoutError' ? 'Voice took too long to connect. Try again.' : e.message); }
   }
   function stopVoice(msg, renewing) {
-    clearTimeout(voiceT); clearTimeout(renewT); turns.reset(); cancelAnimationFrame(meter?.raf || 0); meter?.ac?.close?.().catch?.(() => {}); meter = null;
+    voiceTok++; voiceBusy = false; clearTimeout(voiceT); clearTimeout(renewT); turns.reset(); cancelAnimationFrame(meter?.raf || 0); meter?.ac?.close?.().catch?.(() => {}); meter = null;
     try { dc?.close(); } catch (e) {} try { pc?.close(); } catch (e) {} mic?.getTracks().forEach(t => t.stop());
     if (audio) { audio.srcObject = null; audio = null; } pc = dc = mic = null; liveBubble = null; vlog.add('stop', msg || (renewing ? 'renew' : ''));
     if (renewing) return;

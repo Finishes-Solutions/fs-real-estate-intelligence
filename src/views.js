@@ -60,11 +60,11 @@ export function initChanges(ctx) {
   const nIds = items => new Set(items.map(x => x.id)).size, plural = (n, w) => fmtN(n) + ' ' + w + (n === 1 ? '' : 's');
   root.innerHTML = `<div class="vhead"><div><div class="kicker">Changes</div><h2 id="chTitle">What changed in TDLR</h2><div class="vsub" id="chSub"></div><div class="vsub vsub-n" id="chN"></div></div>
     <div class="vctl"><label>Found <select class="chip" id="chRun">${week.runs ? `<option value="w">Last 7 days · ${plural(week.ids.size, 'filing')}</option>` : ''}${runs.map((r, i) => `<option value="${i}">${new Date(r.built).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} · ${r.items.length} change${r.items.length === 1 ? '' : 's'}</option>`).join('')}</select></label>
-    <label class="tg2"><input type="checkbox" id="chOnly" checked><span>Only within current filters</span></label></div></div><div id="chScope"></div><div id="chBody" class="chbody"></div>`;
+    <label class="tg2"><input type="checkbox" id="chOnly" checked><span>Only within current filters</span></label></div></div><div id="chScope"></div><nav id="chJump" class="ch-jump" aria-label="Jump to a section" hidden></nav><div id="chBody" class="chbody"></div>`;
   const runSel = root.querySelector('#chRun'), onlyEl = root.querySelector('#chOnly');
   runSel.value = String(ri); runSel.onchange = () => { ri = runSel.value === 'w' ? 'w' : +runSel.value; render(); };
   onlyEl.onchange = e => { onlyVisible = e.target.checked; render(); };
-  const SECTIONS = [['new', 'New filings'], ['status', 'Status changes'], ['cost', 'Value changes'], ['start', 'Start date changes'], ['end', 'End date changes'], ['sqft', 'Size changes'], ['gone', 'No longer listed']];
+  const SECTIONS = [['new', 'New filings', 'New'], ['status', 'Status changes', 'Status'], ['cost', 'Value changes', 'Value'], ['start', 'Start date changes', 'Start date'], ['end', 'End date changes', 'End date'], ['sqft', 'Size changes', 'Size'], ['gone', 'No longer listed', 'Removed']];
   const fv = (k, v) => v == null || v === '' ? '—' : k === 'cost' ? fmtM(v) : k === 'sqft' ? fmtN(v) : String(v);
 
   function render() {
@@ -81,13 +81,22 @@ export function initChanges(ctx) {
     const nAll = nIds(all), nShown = nIds(items), sub = root.querySelector('#chSub'), nEl = root.querySelector('#chN');
     sub.textContent = lead + (newV ? ' · ' + fmtM(newV) + ' in new filings' : ''); sub.title = sub.textContent;
     // filtered vs total, and one click to flip it (the same as the "Only within current filters" switch)
-    nEl.innerHTML = onlyVisible ? fmtN(nShown) + ' of ' + plural(nAll, 'changed filing') + ' match your filters' + (nShown < nAll ? ' · <button type="button" class="lnk" id="chAll">Show all</button>' : '')
+    nEl.hidden = !nAll; // a check with no changes at all has nothing to filter
+    nEl.innerHTML = !nAll ? '' : onlyVisible ? fmtN(nShown) + ' of ' + plural(nAll, 'changed filing') + ' match your filters' + (nShown < nAll ? ' · <button type="button" class="lnk" id="chAll">Show all</button>' : '')
       : 'Showing all ' + plural(nAll, 'changed filing') + ' · <button type="button" class="lnk" id="chAll">Only those matching your filters</button>';
     nEl.querySelector('#chAll')?.addEventListener('click', () => { onlyVisible = !onlyVisible; onlyEl.checked = onlyVisible; render(); });
+    // jump chips: one per section that has changes, with its count; the section headers stay put while their list scrolls
+    const jump = root.querySelector('#chJump'), counts = SECTIONS.map(([k, , short]) => [k, short, items.filter(x => x.k === k).length]).filter(c => c[2]);
+    jump.hidden = counts.length < 2;
+    jump.innerHTML = counts.map(([k, short, n]) => '<button type="button" class="chip" data-sec="' + k + '">' + esc(short) + ' <b>' + fmtN(n) + '</b></button>').join('');
+    jump.onclick = e => { const b = e.target.closest('[data-sec]'); const sec = b && body.querySelector('[data-sec="' + b.dataset.sec + '"]'); if (!sec) return;
+      root.scrollTo({ top: Math.max(0, sec.offsetTop - jump.offsetHeight - 6), behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); };
+    { const cs = getComputedStyle(root); root.style.setProperty('--chpt', cs.paddingTop); root.style.setProperty('--chpx', cs.paddingLeft); } // the page's own padding: sticky offsets start inside it
+    root.style.setProperty('--chj', (counts.length < 2 ? 0 : jump.offsetHeight) + 'px');
     body.innerHTML = SECTIONS.map(([k, label]) => {
       const its = items.filter(x => x.k === k).map(x => ({ x, f: BY_ID.get(x.id) })).sort((a, b) => ((b.f?.cost ?? b.x.cost) || 0) - ((a.f?.cost ?? a.x.cost) || 0));
       if (!its.length) return '';
-      return '<section class="chsec"><h3>' + label + ' <span>' + fmtN(its.length) + '</span></h3>' + its.slice(0, 200).map(({ x, f }) => {
+      return '<section class="chsec" data-sec="' + k + '"><h3>' + label + ' <span>' + fmtN(its.length) + '</span></h3>' + its.slice(0, 200).map(({ x, f }) => {
         const name = f ? f.name : x.name, meta = f ? (f.city || f.county) + ' · ' + (ctx.TYPE_LABEL[f.type] || f.type) + (f.use ? ' · ' + f.use : '') : (x.county || '') + ' County';
         const what = k === 'new' ? fmtM(f?.cost || 0) : k === 'gone' ? fmtM(x.cost || 0) : esc(fv(k, x.from)) + ' → ' + esc(fv(k, x.to));
         return '<button class="chitem" ' + (f ? 'data-id="' + esc(f.id) + '"' : 'disabled') + '><span><b>' + esc(name) + '</b><em>' + esc(meta) + '</em></span><span class="m">' + what + '</span></button>';

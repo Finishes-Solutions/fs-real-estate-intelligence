@@ -98,7 +98,7 @@ export function renderNav(ctx) {
   // group's pages, from NAV), then export, map tools, settings and help.
   const row = (go, label, extra = '') => '<button type="button" class="mrow" data-go="' + go + '"' + extra + '><i class="mr-ic">' + (IC[go] || '') + '</i><span class="mr-l">' + label + '</span>' + (BADGE[go] && !PHONE.includes(go) ? '<b class="badge" id="' + BADGE[go][1] + '"></b>' : '') + CHEV + '</button>';
   const groupRows = NAV.filter(g => g.children && !PHONE.includes(g.id)).map(g => '<div class="mt-h">' + esc(g.label) + '</div><div class="mrows">' + g.children.map(([id, label]) => row(id, esc(label))).join('') + '</div>').join('');
-  $('msheet').innerHTML = '<div class="mgrab"></div>' + groupRows +
+  $('msheet').innerHTML = '<div class="msh-top"><button type="button" class="mgrab" id="mshGrab" aria-label="Close More"></button><button type="button" class="msh-x" id="mshX" aria-label="Close More" title="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' + groupRows +
     '<div class="mt-h">Export</div><div class="mrows">' + row('export', 'Quick export', ' aria-label="Quick export: a spreadsheet or PDF of what the map shows"') + '</div>' +
     '<div class="mt-h">Map tools</div><div class="mrows">' + row('layers', 'Layers') + row('near', 'Nearby', ' aria-label="Nearby: the area around my location"') + row('note', 'Pin a note', ' aria-label="Pin a site note at my location"') + '</div>' +
     '<div class="mt-h">Settings</div><div class="mrows">' + row('settings', 'Settings', ' aria-label="Settings: theme, your name and team, install, layout"') + '</div>' +

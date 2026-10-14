@@ -106,6 +106,8 @@ export function initMobile(ctx) {
   function openSheet() { sheet.classList.add('on'); scrim.classList.add('on'); }
   function closeSheet() { sheet.classList.remove('on'); scrim.classList.remove('on'); }
   scrim.onclick = closeSheet;
+  // the handle and the × both close the sheet
+  sheet.querySelectorAll('#mshGrab,#mshX').forEach(b => b.onclick = closeSheet);
   // Esc closes the sheet first (before the card's window-level Esc), like every other pop-over
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented && sheet.classList.contains('on')) { e.preventDefault(); closeSheet(); } });
   sheet.querySelectorAll('[data-go]').forEach(b => b.onclick = async () => {

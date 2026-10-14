@@ -349,6 +349,12 @@ table.who .r,th.r{text-align:right}
 /* changes */
 .chbody{display:grid;gap:18px;max-width:980px}
 .chsec h3{font-size:14px;margin:0 0 6px;font-weight:700}
+.ch-jump{position:sticky;top:calc(-1 * var(--chpt,20px));z-index:3;display:flex;flex-wrap:wrap;gap:6px;margin:0 calc(-1 * var(--chpx,24px)) 12px;padding:8px var(--chpx,24px);background:var(--panel-2);border-bottom:1px solid var(--line)}
+.ch-jump[hidden]{display:none}
+.ch-jump .chip b{font-family:var(--font-mono);font-weight:600;color:var(--muted);margin-left:2px}
+.view .chsec[data-sec]>h3{position:sticky;top:calc(var(--chj,0px) - var(--chpt,20px));z-index:2;background:var(--panel);margin:-14px -16px 8px;padding:12px 16px 8px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0}
+.tl-legend button{display:inline-flex;align-items:center;gap:0;border:0;background:none;padding:2px 4px;margin:-2px -4px;border-radius:4px;font:inherit;color:inherit;cursor:var(--cur-pointer,pointer)}
+.tl-legend button:hover{background:var(--chip);color:var(--text)}
 .chsec h3 span{font-family:var(--font-mono);font-size:11px;color:var(--muted);font-weight:500}
 .chitem{display:flex;justify-content:space-between;gap:12px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;padding:8px 6px;text-align:left;cursor:var(--cur-pointer,pointer);color:var(--text);font:inherit}
 .chitem:hover{background:var(--chip)}
@@ -472,12 +478,16 @@ table.who .r,th.r{text-align:right}
   .card .top{padding-top:8px}
   .card .x{width:40px;height:40px;margin:-6px -8px 0 0}
 
-  .msheet{display:block;position:fixed;left:0;right:0;bottom:0;z-index:11;background:var(--panel);border-radius:14px 14px 0 0;padding:4px 8px calc(10px + var(--sb));transform:translateY(105%);transition:transform 200ms cubic-bezier(.2,.7,.2,1);box-shadow:0 -10px 30px rgba(11,13,12,.25)}
-  .msheet.on{transform:none}
-  .msheet .mgrab{width:42px;height:5px;border-radius:3px;background:var(--line-2);margin:6px auto 8px}
+  .msheet{display:block;position:fixed;left:0;right:0;bottom:calc(var(--navh) + var(--sb));z-index:11;max-height:calc(100% - var(--navh) - var(--sb) - var(--st) - 24px);overflow-y:auto;overscroll-behavior:contain;background:var(--panel);border-radius:14px 14px 0 0;padding:0 8px 10px;transform:translateY(calc(100% + var(--navh) + var(--sb) + 10px));visibility:hidden;transition:transform 200ms cubic-bezier(.2,.7,.2,1);box-shadow:0 -10px 30px rgba(11,13,12,.25)}
+  .msheet.on{transform:none;visibility:visible}
+  .msheet .msh-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:center;min-height:44px;margin:0 -8px;background:var(--panel);border-radius:14px 14px 0 0}
+  .msheet .mgrab{width:100%;height:44px;padding:0;border:0;background:none;position:relative;cursor:var(--cur-pointer,pointer)}
+  .msheet .mgrab::before{content:"";position:absolute;left:50%;top:19px;width:42px;height:5px;margin-left:-21px;border-radius:3px;background:var(--line-2)}
+  .msheet .msh-x{position:absolute;right:6px;top:2px;width:40px;height:40px;padding:0;justify-content:center;border:0;border-radius:50%;background:none;color:var(--text-2)}
+  .msheet .msh-x:active{background:var(--chip)}
   .msheet button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding:15px 12px;border:0;border-bottom:1px solid var(--line);background:none;font:600 15px var(--font-display);color:var(--text);cursor:var(--cur-pointer,pointer)}
   .msheet button:last-child{border-bottom:0}
-  .mscrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:10;opacity:0;pointer-events:none;transition:opacity 200ms}
+  .mscrim{display:block;position:fixed;inset:0 0 calc(var(--navh) + var(--sb)) 0;background:rgba(0,0,0,.35);z-index:10;opacity:0;pointer-events:none;transition:opacity 200ms}
   .mscrim.on{opacity:1;pointer-events:auto}
 }
 
@@ -551,6 +561,7 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 .ai-m.user{align-self:flex-end;max-width:85%;background:var(--text);color:var(--panel);padding:8px 12px;border-radius:14px 14px 4px 14px}
 .ai-m.bot{align-self:flex-start;color:var(--text)}
 .ai-m.err{color:#c03b3a}
+.ai-m.err .lnk{color:var(--brand);font-weight:600;margin-left:4px}
 .ai-m.act{align-self:flex-start;display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;color:var(--text-2);background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:6px;padding:6px 10px;max-width:100%}
 .ai-m.act .ai-ai{flex:1;min-width:0}
 .ai-m.act .lnk{font-family:var(--font-display);font-size:11.5px;white-space:nowrap}
@@ -635,7 +646,6 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
   .mlaunch{flex:1;min-width:0;display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:8px 6px 8px 10px;font-size:15px;color:var(--brand);text-align:left;cursor:var(--cur-pointer,pointer)}
   .mlaunch span{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
-@media (max-width:700px){ .app.ai-open:has(.card.open) .ai{transform:translateY(110%)} }
 .app.pcollapsed{grid-template-columns:minmax(0,1fr)}
 .ai-f textarea:focus-visible{box-shadow:none}
 .legend .hramp{display:none;align-items:center;gap:6px;font-size:10.5px;color:var(--muted)}
@@ -1658,7 +1668,7 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 
 /* ================= phone "More" sheet: one-word tiles, named like the desktop tabs ================= */
 @media (max-width:700px){
-  .msheet{padding:4px 14px calc(14px + var(--sb))}
+  .msheet{padding:0 14px 14px}
   .msheet .mt-h{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:10px 4px 8px}
   .msheet .mtiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
   .msheet .mtiles button{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;width:auto;padding:12px 2px 10px;border:0;border-radius:12px;background:var(--panel-2);font:600 12.5px/1.2 var(--font-display);color:var(--text);text-align:center}
@@ -2270,7 +2280,8 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
   .app[data-vgroup] .vtabs{padding:var(--st) 14px 0}
   .app[data-vgroup] .view{padding-top:14px}
   /* the More sheet: rows in groups, scrolling if the phone is short */
-  .msheet{max-height:calc(100% - 24px - var(--st));overflow-y:auto}
+  .msheet{max-height:calc(100% - var(--navh) - var(--sb) - var(--st) - 24px);overflow-y:auto}
+  .msheet .msh-top{margin:0 -14px}
   .msheet .mt-h{margin:12px 4px 6px}
   .msheet .mrows{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel);overflow:hidden}
   .msheet .mrow{display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;min-height:48px;padding:7px 12px;border:0;border-top:1px solid var(--line);background:none;font:600 15px var(--font-display);color:var(--text);text-align:left}
@@ -2489,6 +2500,7 @@ table.who tr.nomatch td{border:0}
   #view-who .tablewrap{padding:0 10px}
 }
 .vhead .vsub-n{display:block;margin-top:2px;color:var(--text-2)}
+.vhead .vsub-n[hidden]{display:none}
 .cmp-chips[hidden]{display:none}
 .rp-gh .lt{font:700 15px/1.3 var(--font-display);color:var(--text);letter-spacing:0;text-transform:none}
 .mk-scopebar .vs-n b{font-family:inherit;font-weight:700}
