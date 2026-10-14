@@ -12,6 +12,7 @@ import { BUILDING_TYPES, BUILDING_GROUPS, typeById, fromType } from './lib/build
 import * as ED from './lib/siteedit.mjs';
 import { freeRect as openArea, fitPadding, planSections } from './lib/planview.mjs';
 import * as RUN from './lib/planruns.mjs';
+import * as K from './lib/planpick.mjs';
 const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 
@@ -196,7 +197,8 @@ export function initSitePlan(ctx) {
     const r = pl?.lastRun; if (!r?.variants?.length) return;
     let vs = clone(r.variants); if (vs.some(v => !v.key)) { const k = RUN.layoutKeys(vs); vs = vs.map((v, i) => ({ ...v, key: v.key || k[i] })); }
     const on = pl.variant && !pl.variant.edited && vs.find(v => v.key === pl.variant.key && !v.elements); if (on) on.elements = clone(pl.elements); // the team copy keeps numbers only: the one on the map is the option's own pieces
-    ed.variants = vs; ed.aiNote = r.note || ''; ed.ask = r.ask || ''; ed.runMeta = { ask: r.ask || '', at: r.at }; if (r.ideas?.list?.length) ed.ideas = r.ideas; if (r.read) ed.readAs = r.read; ed.aiPick = r.pick || null;
+    for (const v of vs) derive(v, pl);
+    ed.variants = vs; ed.aiNote = r.note || ''; ed.aiSummary = r.summary || ''; ed.sortBy = r.sort || 'rec'; ed.ask = r.ask || ''; ed.runMeta = { ask: r.ask || '', at: r.at }; if (r.ideas?.list?.length) ed.ideas = r.ideas; if (r.read) ed.readAs = r.read; ed.aiPick = r.pick || null;
     refreshFin(true);
   }
   // the plan closes (Done, ×, another card, leaving the map): say where it was saved and leave a way back to it
@@ -568,9 +570,22 @@ export function initSitePlan(ctx) {
   function overview(pl, prog) {
     if (!pl.elements.length && ed.run?.kind === 'build') return '<div class="kicker">Building</div><div><b>Laying out “' + esc(ed.run.ask) + '”.</b> The layouts appear here as soon as they’re drawn.</div>';
     if (!pl.elements.length) return '<div class="kicker">Step 1 of 3</div><div><b>Describe what to build</b> under Build with AI, then Build Layouts. <button type="button" class="sp-link sp-quiet" data-jump="spDrawSec">or draw pieces by hand</button></div>';
-    const m = SP.metrics(pl), bad = SP.check(pl).filter(i => i.level === 'bad').length, B = pl.elements.filter(e => e.kind === 'building').length;
-    const what = [m.units ? '<b>' + f0(m.units) + ' homes</b>' : '', '<b>' + f0(m.gfa) + ' sq ft</b> in ' + B + ' building' + (B === 1 ? '' : 's'), f0(m.spaces) + ' of ' + f0(m.required) + ' parking spaces', pct(m.coverage) + ' coverage'].filter(Boolean).join(' · ');
-    return '<div class="kicker">' + (ed.editing ? 'Editing · drag a piece; only it changes' : 'Overview') + '</div><div>' + what + '. ' + (bad ? '<b>' + bad + ' problem' + (bad > 1 ? 's' : '') + '</b> to fix (in red on the map).' : m.spaces < m.required ? 'Parking is short.' : 'Passes the setback, overlap and parking checks.') + '</div>';
+    // a decision strip: which layout is on the map, Phase 1 first, parking, coverage, the money, and whether it passes
+    const m = SP.metrics(pl), issues = SP.check(pl), cl = K.checkLabel(K.checksOf(issues, m)), ph = pl.elements.some(e => e.phase === 2);
+    const m1 = ph ? SP.metrics({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, h = K.headline(m, m1, K.askedOf(prog));
+    let f = null; try { f = RUN.finOf(pfRun(P(), pl)); } catch (e) { f = null; }
+    const v = pl.variant, neg = x => x != null && x < 0 ? ' class="neg"' : '', d = f ? K.moneyDigits([f.cost, f.value]) : 1;
+    const st = (k, big, sub, tip) => '<div class="sp-ov-s"' + (tip ? ' title="' + esc(tip) + '"' : '') + '><small>' + k + '</small><b>' + big + '</b>' + (sub ? '<i>' + sub + '</i>' : '') + '</div>';
+    const probs = issues.filter(i => i.level === 'bad' || /^Parking is/.test(i.text)), open = !!ed.ovOpen && cl.level !== 'ok';
+    return '<div class="kicker">' + (ed.editing ? 'Editing · drag a piece; only it changes' : 'On the map') + '</div>' +
+      '<div class="sp-ov-n"><b>' + esc(v ? numOf(v) : pl.name) + '</b>' + (v ? '<span>' + esc(RUN.baseName(v.name)) + '</span>' : '<span>drawn by hand</span>') + (v?.edited ? '<i>edited</i>' : '') + '</div>' +
+      '<div class="sp-ov-g">' + st(m1 ? 'Phase 1' : h.units ? 'Units' : 'Floor area', esc(h.big), h.fit ? '<em class="neg">Fits ' + esc(h.fit) + '</em>' : esc(h.sub)) +
+        st('Parking', f0(m.spaces) + '/' + f0(m.required), m.spaces < m.required ? '<em class="neg">' + f0(m.required - m.spaces) + ' short</em>' : 'spaces / required') + st('Coverage', pct(m.coverage), 'FAR ' + m.far.toFixed(2)) +
+        (f ? (f.forSale ? st('Cost · margin', K.fmtM(f.cost, d), '<em' + neg(f.margin) + '>' + K.fmtPct(f.margin) + ' margin</em>', 'From the Pro forma') : st('Value / cost', K.fmtM(f.value, d) + ' / ' + K.fmtM(f.cost, d), '<em' + neg(f.yoc) + '>' + K.fmtPct(f.yoc) + ' yield</em>' + (f.spread != null ? ' · <em' + neg(f.spread) + '>' + K.fmtPct(f.spread) + ' spread</em>' : ''), 'From the Pro forma: stabilized value, total cost with land, yield on cost and the spread over the market cap rate')) : '') + '</div>' +
+      (h.p2 ? '<div class="sp-ov-p2">' + esc(h.p2) + '</div>' : '') +
+      '<div class="sp-ov-a"><button type="button" class="sp-ck ' + cl.level + '" id="spOvCk"' + (cl.level === 'ok' ? ' disabled title="Inside the lot and setbacks, no overlaps, enough parking"' : ' aria-expanded="' + open + '" aria-controls="spOvProbs" title="Show what to fix"') + '>' + esc(cl.text) + (cl.level === 'ok' ? '' : '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>') + '</button>' +
+        (ed.variants?.length > 1 ? '<button type="button" class="sp-link sp-ov-cmp" data-jump="spLayouts">Compare layouts</button>' : '') + '</div>' +
+      (open ? '<ul class="sp-ov-probs" id="spOvProbs">' + probs.map(i => '<li>' + (i.id ? '<button type="button" data-issue="' + esc(i.id) + '" title="Select it on the map">' + esc(i.text) + '</button>' : '<span>' + esc(i.text) + '</span>') + '</li>').join('') + '</ul>' : '');
   }
   const ICO = {
     undo: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 3 2.5 6l3 3"/><path d="M2.5 6h7a4 4 0 0 1 0 8H7"/></svg>',
@@ -580,7 +595,7 @@ export function initSitePlan(ctx) {
     back: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>'
   };
   // an option pill's tooltip: what it holds, from the same numbers as the Projects page
-  function optTip(p, x) { const { drawn, m } = info(p, x); return drawn && m?.gfa ? [m.units ? plural(m.units, 'unit') : f0(m.gfa) + ' sq ft', f0(m.spaces) + ' parking', pct(m.coverage) + ' coverage'].join(' · ') : drawn ? 'Nothing laid out yet' : 'No site drawn yet'; }
+  function optTip(p, x) { const { drawn, m, m1 } = info(p, x), a = m1 || m; return drawn && m?.gfa ? [(a.units ? plural(a.units, 'unit') : f0(a.gfa) + ' sq ft') + (m1 ? ' in Phase 1' : ''), f0(m.spaces) + ' parking', pct(m.coverage) + ' coverage'].join(' · ') : drawn ? 'Nothing laid out yet' : 'No site drawn yet'; }
   const plansHtml = (p, pl, extra) => '<div class="sp-plans' + (extra ? ' ' + extra : '') + '" role="group" aria-label="Options">' + p.plans.map(x => '<button type="button" class="chip" aria-pressed="' + (x.id === pl.id) + '" data-plan="' + esc(x.id) + '" title="' + esc(x.name + ': ' + optTip(p, x)) + '">' + esc(x.name) + '</button>').join('') +
     '<button type="button" class="chip sp-newopt" data-newopt="1" title="Start another option from this one">+ New Option</button></div>';
   function panel() {
@@ -596,7 +611,7 @@ export function initSitePlan(ctx) {
     const HTML = {
       spDrawSite: () => '<div class="bsec sp-draw" id="spDrawSite"><div class="lt">Draw the site</div><p>Click each corner of the site on the map. Click the first corner again (or double-click, or press Enter) to finish.' + (ed.draft.length ? ' ' + ed.draft.length + ' corner' + (ed.draft.length > 1 ? 's' : '') + ' so far.' : '') + '</p><div class="bacts" style="padding:0"><button class="btn askai" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button class="btn" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button class="btn" id="spCancelDraw">Keep the Old Site</button>') + '</div></div>',
       spSel: () => '<div class="bsec" id="spSel">' + selHtml(sel, prog) + '</div>',
-      spLayouts: () => '<div class="bsec" id="spLayouts"><div class="lt">Layouts</div><div id="spVariants">' + variantsHtml() + '</div></div>',
+      spLayouts: () => '<div class="bsec" id="spLayouts">' + layoutsHead() + '<div id="spVariants">' + variantsHtml() + '</div></div>',
       spChgSec: () => '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change With AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Apt Bldg 7 four stories · turn the clubhouse into a 7,500 sf one · remove Bldg 3 · swap Bldg 2 and Bldg 5">' + esc(ed.chg || '') + '</textarea>' +
         '<div class="rnote">' + (sel ? 'About <b>' + esc(ED.labelOf(sel)) + '</b> (selected), or name any piece as it’s labelled on the plan.' : 'Name pieces as they’re labelled on the plan, or select one and say “it”.') + '</div>' +
         '<div class="bacts sp-go"><button class="btn askai" id="spChgGo">Make Changes</button></div>' + (pl.recipe ? '<label class="sp-sw sp-revsw"><input type="checkbox" id="spChgFit"' + (ed.chgFit ? ' checked' : '') + '> Re-fit the rest of the site around the changes (otherwise only those pieces change)</label>' : '') +
@@ -633,6 +648,8 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { if (b.dataset.plan === pl.id) return; open(p.id, b.dataset.plan); });
     card.querySelectorAll('[data-newopt]').forEach(b => b.onclick = () => { const c = { ...clone(pl), id: uid(), name: nextName(p), created: new Date().toISOString() }; p.plans.push(c); save(p); open(p.id, c.id); });
     card.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => card.querySelector('.bnav [data-sec="' + b.dataset.jump + '"]')?.click());
+    const wireOver = () => { card.querySelectorAll('#spOver [data-issue]').forEach(b => b.onclick = () => { ed.sel = b.dataset.issue; draw(); panel(); }); const ck = card.querySelector('#spOvCk'); if (ck) ck.onclick = () => { ed.ovOpen = !ed.ovOpen; card.querySelector('#spOver').innerHTML = overview(pl, prog); wireOver(); }; card.querySelectorAll('#spOver [data-jump]').forEach(b => b.onclick = () => card.querySelector('.bnav [data-sec="' + b.dataset.jump + '"]')?.click()); };
+    wireOver();
     on('#spUndo', () => undo(true)); on('#spRedo', () => undo(false));
     on('#spFinish', finishDraw); on('#spClearDraw', () => { ed.draft = []; draw(); panel(); }); on('#spCancelDraw', () => { ed.mode = null; ed.draft = []; draw(); panel(); });
     if (drawing) { nums(); lockRun(); return; }
@@ -849,7 +866,7 @@ export function initSitePlan(ctx) {
     const variants = named(out, { ...pl });
     if (!variants.some(v => v.elements.length)) { endRun(run); ctx.toast('Nothing fits with these settings.'); return; }
     run.applied = true; ed.variants = variants; ed.reviewCleared = hadAi; ed.runMeta = { ask: ed.runMeta?.ask || pl.lastRun?.ask || '', at: new Date().toISOString() };
-    if (hadAi) ed.aiNote = 'Settings changed: AI review cleared.';
+    if (hadAi) { ed.aiNote = 'Settings changed: AI review cleared.'; ed.aiSummary = ''; ed.aiPick = null; }
     const r = RUN.matchLayout(variants, was?.key, was?.name);
     const ok = await useVariant(r.index >= 0 ? r.index : variants.findIndex(v => v.elements.length)); endRun(run); if (!ok) return;
     const now = PL()?.variant, lost = was?.key && !r.exact ? numOf(was) + ' no longer fits; showing the nearest (' + numOf(now) + '). ' : '';
@@ -900,19 +917,29 @@ export function initSitePlan(ctx) {
     card.querySelector('#spDup').onclick = () => { const c = { ...clone(e), id: uid() }, a = (e.rot || 0) * Math.PI / 180, off = e.w + 20; SP.moveBy(c, off * Math.cos(a), off * Math.sin(a)); change(x => x.elements.push(c)); ed.sel = c.id; draw(); panel(); };
     card.querySelector('#spDel').onclick = () => { change(x => dropEl(x, e)); ed.sel = null; draw(); panel(); };
   }
+  // Numbers: one grid of tiles, the zoning limit beside its figure; with a Phase 2, Phase 1 and the full site side by side
   function nums() {
     const el = card.querySelector('#spNums'), pl = PL(); if (!el || !pl) return;
     if (pl.ring.length < 3) { el.innerHTML = ''; return; }
-    const m = SP.metrics(pl), issues = SP.check(pl), prog = SP.normalizeProgram(pl.program), z = pl.zoning;
-    const row = (k, v) => '<dt>' + k + '</dt><dd>' + v + '</dd>';
-    el.innerHTML = '<div class="lt">Numbers</div><dl class="sp-nums">' +
-      row('Site', m.acres.toFixed(2) + ' ac · ' + f0(m.siteSf) + ' sf') +
-      row('Building', m.gfa ? f0(m.gfa) + ' sf' + (m.buildings > 1 ? ' in ' + m.buildings + ' buildings' : '') + (m.units ? ' · about ' + f0(m.units) + ' units' : '') : '—') +
-      row('Coverage', pct(m.coverage) + (z?.max_coverage_pct ? ' <span class="sc">(max ' + esc(z.max_coverage_pct) + '%)</span>' : '')) + row('FAR', m.far.toFixed(2) + (z?.max_far ? ' <span class="sc">(max ' + esc(z.max_far) + ')</span>' : '')) +
-      row('Parking', f0(m.spaces) + ' spaces' + (m.garages ? ' (' + f0(m.garages) + ' in garages)' : '') + (m.gfa ? ' <span class="sc">' + f0(m.required) + ' needed at ' + (new Set(pl.elements.filter(e => e.kind === 'building').map(e => e.use || prog.use)).size > 1 ? 'each use’s ratio' : prog.use === 'multifamily' ? prog.perUnit + '/unit' : prog.ratio + '/1,000 sf') + '</span>' : '')) +
-      row('Detention', m.pond ? (m.pond / 43560).toFixed(2) + ' ac (' + pct(m.pond / m.siteSf) + ')' : '—') +
-      row('Paved + roofs', pct(m.impervious)) + row('Open space', pct(m.green)) +
-      (m.heightFt ? row('Height', 'about ' + m.heightFt + ' ft') : '') + '</dl>' + dealHtml(pl, m) +
+    const m = SP.metrics(pl), issues = SP.check(pl), prog = SP.normalizeProgram(pl.program), z = pl.zoning || {}, ph = pl.elements.some(e => e.phase === 2);
+    const m1 = ph ? SP.metrics({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null;
+    const tile = (k, v, sub, cls = '') => '<div class="sp-tile' + cls + '"><span>' + k + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
+    const two = (k, f, sub, cls = '') => m1 ? '<div class="sp-tile two' + cls + '"><span>' + k + '</span><div class="sp-tv"><b>' + f(m1) + '<small>Phase 1</small></b><b>' + f(m) + '<small>Full site</small></b></div>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>' : tile(k, f(m), sub, cls);
+    const max = (v, lim, fmt) => +lim ? ' <span class="sc' + (v > +lim ? ' over' : '') + '">/ max ' + fmt(+lim) + '</span>' : '';
+    const ratioAt = new Set(pl.elements.filter(e => e.kind === 'building').map(e => e.use || prog.use)).size > 1 ? 'each use’s ratio' : prog.use === 'multifamily' ? prog.perUnit + '/unit' : prog.ratio + '/1,000 sf';
+    const homes = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr'), byStory = [1, 2, 3].map(n => [n, homes.filter(e => e.floors === n).length]).filter(([, c]) => c);
+    el.innerHTML = '<div class="lt">Numbers</div>' + (m1 ? '<div class="rnote">Phase 1 is what was asked for; the full site includes Phase 2. Parking, paving and ponds are counted for the whole site.</div>' : '') + '<div class="sp-tiles">' +
+      tile('Site', m.acres.toFixed(2) + ' ac', f0(m.siteSf) + ' sf') +
+      two('Floor area', x => x.gfa ? f0(x.gfa) + ' sf' : '—', m.gfa ? plural(m.buildings, 'building') + (m.nrsf ? ' · ' + f0(m.nrsf) + ' net rentable' : '') : '') +
+      (m.units ? two('Units', x => f0(x.units || 0), m.duAc.toFixed(1) + ' per acre' + (m.beds ? ' · ' + f0(m.beds) + ' beds' : '')) : '') +
+      two('Coverage', x => pct(x.coverage) + (x === m ? max(m.coverage * 100, z.max_coverage_pct, v => v + '%') : ''), '', +z.max_coverage_pct && m.coverage * 100 > +z.max_coverage_pct ? ' bad' : '') +
+      two('FAR', x => x.far.toFixed(2) + (x === m ? max(m.far, z.max_far, v => String(v)) : ''), '', +z.max_far && m.far > +z.max_far ? ' bad' : '') +
+      tile('Parking', f0(m.spaces) + ' / ' + f0(m.required), (m.gfa ? 'needed at ' + ratioAt + ' · ' : '') + (m.units ? m.perUnit.toFixed(2) + ' / unit' : m.per1k.toFixed(1) + ' / 1,000 sf') + (m.garages ? ' · ' + f0(m.garages) + ' in garages' : ''), m.gfa && m.spaces < m.required ? ' bad' : '') +
+      tile('Detention', m.pond ? (m.pond / 43560).toFixed(2) + ' ac' : '—', m.pond ? pct(m.pond / m.siteSf) + ' of the site' : '') +
+      tile('Paved + roofs', pct(m.impervious)) + tile('Open space', pct(m.green)) +
+      (m.heightFt ? tile('Height', 'about ' + m.heightFt + ' ft', +z.max_building_height_ft ? 'max ' + z.max_building_height_ft + ' ft' : '', +z.max_building_height_ft && m.heightFt > +z.max_building_height_ft ? ' bad' : '') : '') + '</div>' +
+      (m.mix.length ? '<table class="sp-mixt"><tr><th>Unit</th><th>SF</th><th>Units</th><th>%</th><th>Net sf</th></tr>' + m.mix.map(t => '<tr><td>' + esc(t.name) + '</td><td>' + f0(t.sf) + '</td><td>' + f0(t.n) + '</td><td>' + pct(t.n / Math.max(1, m.mix.reduce((s, x) => s + x.n, 0))) + '</td><td>' + f0(t.n * t.sf) + '</td></tr>').join('') + '</table>' : '') +
+      (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + n + '-story</td><td>' + f0(SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
       (issues.length ? '<ul class="sp-issues">' + issues.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul>' : m.gfa ? '<div class="rnote sp-ok">Fits the setbacks' + (m.spaces >= m.required ? ' and parks' : '') + '.</div>' : '') +
       '<div class="rnote">A planning sketch from the parcel outline: not a survey, and no engineering (grading, utilities, fire lanes, code review).</div>';
   }
@@ -927,7 +954,7 @@ export function initSitePlan(ctx) {
     if (!R) return '<details class="bsec sp-pf" id="spPfSec"><summary class="lt">Pro forma</summary><div class="rnote">Lay out a plan first (Build Layouts or by hand); the pro forma reads its buildings, units and parking.</div></details>';
     const A = R.A, $m = v => v == null || !isFinite(v) ? '—' : (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toFixed(2) + 'M' : f0(Math.abs(v))), pc2 = v => v == null || !isFinite(v) ? 'n/a' : (v * 100).toFixed(2) + '%';
     const inp = (k, label, v, step, unit) => '<label>' + label + '<input type="number" step="' + step + '" data-pf="' + k + '" value="' + (v ?? '') + '">' + (unit ? '<small>' + unit + '</small>' : '') + '</label>';
-    const card1 = (k, v, sub) => '<div class="sp-card"><span>' + k + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>', uses = Object.keys(R.P.uses), res = R.returns, S1 = R.simple, simpleOn = A.method === 'simple';
+    const card1 = (k, v, sub, bad, subBad) => '<div class="sp-card"><span>' + k + '</span><b' + (bad ? ' class="neg"' : '') + '>' + v + '</b>' + (sub ? '<small' + (subBad ? ' class="neg"' : '') + '>' + sub + '</small>' : '') + '</div>', uses = Object.keys(R.P.uses), res = R.returns, S1 = R.simple, simpleOn = A.method === 'simple';
     const homes = uses.some(u => ['townhomes', 'duplex', 'sfr'].includes(u)), mf = uses.includes('multifamily'), units = R.P.units || 0;
     const sch = R.sched, tot = Math.max(1, sch.total), seg = (n, cls, t) => n > 0 ? '<i class="' + cls + '" style="flex:' + n + '" title="' + t + ': ' + n + ' months">' + n + '</i>' : '';
     return '<details class="bsec sp-pf" id="spPfSec"' + (ed.pfOpen ? ' open' : '') + '><summary class="lt">Pro forma</summary>' +
@@ -936,11 +963,11 @@ export function initSitePlan(ctx) {
       '<div class="sp-sched" title="Schedule in months">' + seg(sch.pre, 'pre', 'Pre-development') + seg(sch.build, 'bld', 'Construction') + seg(sch.lease, 'lease', R.forSale ? 'Sales' : 'Lease-up') + seg(sch.total - sch.toStabilize, 'hold', 'Hold') + '</div>' +
       '<div class="rnote">Design &amp; permits ' + sch.pre + ' mo · construction ' + sch.build + ' mo · ' + (R.forSale ? 'sales ' : 'lease-up ') + sch.lease + ' mo' + (R.forSale ? '' : ' · stabilized at month ' + sch.toStabilize + ' · sale at month ' + sch.total) + '</div>' +
       (simpleOn ? '<div class="sp-cards">' + card1('Total cost', $m(S1.cost)) + card1('NOI', $m(S1.noi)) + card1('Yield on cost', pc2(S1.yoc)) + card1('Value', $m(S1.value)) + card1('Unlevered IRR', pc2(S1.unlevIrr)) + card1('Levered IRR', pc2(S1.levIrr)) + card1('Equity multiple', isFinite(S1.multiple) ? S1.multiple.toFixed(2) + 'x' : '—') + card1('DSCR', S1.dscr.toFixed(2) + 'x') + '</div>' +
-        '<div class="rnote sp-warn">This is TestFit’s one-page method: all the money goes in at year 0 and full rents start in year 1, with no construction period, interest or lease-up, so it overstates returns. The month-by-month method on the same plan gives a levered IRR of ' + pc2(res.levIrr) + '.</div>'
+        '<div class="rnote sp-warn">This is TestFit’s one-page method: all the money goes in at year 0 and full rents start in year 1, with no construction period, interest or lease-up, so it overstates returns. The month-by-month method on the same plan ' + (res.levIrr != null && isFinite(res.levIrr) ? 'gives a levered IRR of ' + pc2(res.levIrr) : 'has no positive cash flow to compute an IRR') + '.</div>'
       : '<div class="sp-cards">' + card1('Total cost', $m(R.budget.total), units ? $m(R.budget.total / units) + ' / unit' : $m(R.budget.total / Math.max(1, R.P.gsf)) + ' / sf') +
-        (R.forSale ? card1('Home sales', $m(R.exit.sales)) + card1('Margin', pc2(res.margin)) : card1('Stabilized NOI', $m(R.ops.noi)) + card1('Yield on cost', pc2(res.yoc), 'spread ' + pc2(res.spread)) + card1('Stabilized value', $m(res.value))) +
-        card1('Profit', $m(res.profit)) + card1('Unlevered IRR', pc2(res.unlevIrr)) + card1('Levered IRR', pc2(res.levIrr)) + card1('Equity multiple', res.multiple ? res.multiple.toFixed(2) + 'x' : '—') + card1('Peak equity', $m(res.peakEquity)) + (res.dscr ? card1('DSCR', res.dscr.toFixed(2) + 'x') : '') + '</div>' +
-        '<div class="rnote">The TestFit one-page method on the same numbers reads ' + pc2(S1.levIrr) + ' levered: it skips the ' + sch.toStabilize + ' months before the project is stabilized.</div>') +
+        (R.forSale ? card1('Home sales', $m(R.exit.sales)) + card1('Margin', pc2(res.margin), '', res.margin < 0) : card1('Stabilized NOI', $m(R.ops.noi)) + card1('Yield on cost', pc2(res.yoc), 'spread ' + pc2(res.spread), res.yoc < 0, res.spread < 0) + card1('Stabilized value', $m(res.value))) +
+        card1('Profit', $m(res.profit), '', res.profit < 0) + card1('Unlevered IRR', pc2(res.unlevIrr)) + card1('Levered IRR', pc2(res.levIrr)) + card1('Equity multiple', res.multiple ? res.multiple.toFixed(2) + 'x' : '—') + card1('Peak equity', $m(res.peakEquity)) + (res.dscr ? card1('DSCR', res.dscr.toFixed(2) + 'x') : '') + '</div>' +
+        '<div class="rnote">The TestFit one-page method on the same numbers ' + (S1.levIrr != null && isFinite(S1.levIrr) ? 'reads ' + pc2(S1.levIrr) + ' levered' : 'has no positive cash flow to compute an IRR') + ': it skips the ' + sch.toStabilize + ' months before the project is stabilized.</div>') +
       '<table class="sp-mixt"><tr><th>Budget</th><th>Amount</th><th>' + (units ? 'Per unit' : 'Per sf') + '</th></tr>' + [['Land', R.budget.land], ['Hard costs', R.budget.hard], ['Site work & parking', R.budget.site], ...(R.budget.storm > 0 ? [['· incl. ' + R.budget.vaultAcFt.toFixed(1) + ' ac-ft underground storage', R.budget.storm]] : []), ['Tenant improvements', R.budget.ti], ['Soft costs', R.budget.soft], ['Contingency', R.budget.cont], ['Developer fee', R.budget.fee], ['Construction interest', R.budget.interest], ['Loan fees', R.budget.loanFees], ['Total', R.budget.total]].filter(([, v]) => v > 0).map(([k, v]) => '<tr><td>' + k + '</td><td>' + $m(v) + '</td><td>' + $m(units ? v / units : v / Math.max(1, R.P.gsf)) + '</td></tr>').join('') + '</table>' +
       (R.forSale ? '' : '<table class="sp-mixt"><tr><th>Stabilized year</th><th>Amount</th></tr>' + R.ops.lines.map(l => '<tr><td>' + esc(l.k) + '</td><td>' + $m(l.v) + '</td></tr>').join('') +
         '<tr><td>Vacancy &amp; credit loss</td><td>' + $m(-R.ops.loss) + '</td></tr><tr><td>Operating expenses (taxes ' + $m(R.ops.tax) + ')</td><td>' + $m(-R.ops.opex) + '</td></tr><tr><td><b>Net operating income</b></td><td><b>' + $m(R.ops.noi) + '</b></td></tr></table>') +
@@ -971,17 +998,6 @@ export function initSitePlan(ctx) {
       for (const [name, rows] of Object.entries(sheets)) { const ws = XLSX.utils.aoa_to_sheet(rows.map(r => r.map(c => c && typeof c === 'object' ? { t: 'n', v: 0, f: c.f } : c))); ws['!cols'] = [{ wch: 34 }, ...Array(12).fill({ wch: 15 })]; XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31)); }
       ctx.saveFile(fileName(p, pl) + '-pro-forma.xlsx', new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' })), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     };
-  }
-
-  // deal summaries and the unit mix, the way TestFit tabulates a scheme
-  function dealHtml(pl, m) {
-    const card1 = (k, v) => '<div class="sp-card"><span>' + k + '</span><b>' + v + '</b></div>';
-    const homes = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr'), byStory = [1, 2, 3].map(n => [n, homes.filter(e => e.floors === n).length]).filter(([, c]) => c);
-    return '<div class="sp-cards">' + card1('Acreage', m.acres.toFixed(2)) + card1('FAR', m.far.toFixed(2)) + card1('Bldg coverage', pct(m.coverage)) + card1('Impervious', pct(m.impervious)) +
-      (m.units ? card1('Units', f0(m.units)) + card1('DU / acre', m.duAc.toFixed(1)) : '') + (m.beds ? card1('Beds', f0(m.beds)) : '') + (m.nrsf ? card1('Net rentable sf', f0(m.nrsf)) : '') + card1('Gross sf', f0(m.gfa)) +
-      card1('Parking', m.units ? m.perUnit.toFixed(2) + ' / unit' : m.per1k.toFixed(1) + ' / 1,000 sf') + '</div>' +
-      (m.mix.length ? '<table class="sp-mixt"><tr><th>Unit</th><th>SF</th><th>Units</th><th>%</th><th>Net sf</th></tr>' + m.mix.map(t => '<tr><td>' + esc(t.name) + '</td><td>' + f0(t.sf) + '</td><td>' + f0(t.n) + '</td><td>' + pct(t.n / Math.max(1, m.mix.reduce((s, x) => s + x.n, 0))) + '</td><td>' + f0(t.n * t.sf) + '</td></tr>').join('') + '</table>' : '') +
-      (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + n + '-story</td><td>' + f0(SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '');
   }
 
   function addType(t) { // a building from the library at the middle of the view, squared with the lot, parking under it giving way
@@ -1028,7 +1044,7 @@ export function initSitePlan(ctx) {
   async function forReview(v, plan, withImage) {
     const p2 = { ...plan, elements: v.elements, program: v.program || plan.program, params: v.params || plan.params }, m = v.m, B = v.elements.filter(e => e.kind === 'building');
     let image = null; if (withImage) try { image = await planImage(p2); } catch (e) { /* numbers only */ }
-    return { name: v.arr || RUN.baseName(v.name), notes: v.notes, issues: SP.check(p2).map(i => i.text).slice(0, 8), image,
+    return { name: v.name || v.arr, notes: v.notes, issues: SP.check(p2).map(i => i.text).slice(0, 8), image,
       metrics: { acres: +m.acres.toFixed(2), buildings: B.length, floorAreaSf: Math.round(m.gfa), units: m.units || 0, unitsPerAcre: +(m.duAc || 0).toFixed(1), parkingSpaces: m.spaces, parkingRequired: m.required, coveragePct: Math.round(m.coverage * 100), far: +m.far.toFixed(2), pondAcres: +(m.pond / 43560).toFixed(2), openSpacePct: Math.round(m.green * 100), ...(v.fin ? { valueM: +(v.fin.value / 1e6).toFixed(1), costM: +(v.fin.cost / 1e6).toFixed(1), yieldOnCostPct: +((v.fin.yoc || 0) * 100).toFixed(2) } : {}) } };
   }
   async function aiReview(plan, prog, list, round, ask, signal) {
@@ -1059,13 +1075,14 @@ export function initSitePlan(ctx) {
     if (!live(run) || PL() !== pl) return;
     const plan = { ...pl, setbacks }, variants = named(out, { ...plan, program: prog }), doReview = aiOk && review && variants.some(v => v.elements.length);
     // the layouts, at once: on the map and in the list
-    ed.variants = variants; ed.readAs = readAs; ed.aiNote = note; ed.reviewCleared = false; ed.runMeta = { ask, at: new Date().toISOString() }; ed.pickedByUser = false; ed.reviewing = doReview; ed.aiPick = null;
+    ed.variants = variants; ed.readAs = readAs; ed.aiNote = note; ed.aiSummary = ''; ed.reviewCleared = false; ed.runMeta = { ask, at: new Date().toISOString() }; ed.pickedByUser = false; ed.reviewing = doReview; ed.aiPick = null;
     if (ed.ideas?.list?.length) { if (!ed.ideas.list.some(it => it.request === ask)) ed.ideas = { ...ed.ideas, used: null }; else if (ed.ideas.used != null) ed.ideasOpen = false; } // the idea laid out: the ideas fold to a line
     run.applied = true;
-    const best = variants.findIndex(v => v.elements.length); if (best >= 0) await useVariant(best, { quiet: true }); else saveRun(pl);
+    const rec0 = K.recommended(variants, null), best = rec0 ? rec0.index : variants.findIndex(v => v.elements.length); // never a failing layout when one passes
+    if (best >= 0) await useVariant(best, { quiet: true }); else saveRun(pl);
     if (!live(run)) return;
-    if (!doReview) { endRun(run); card.scrollTop = 0; if (best < 0) ctx.toast('Nothing fits that request on this site.'); return; }
-    panel(); card.scrollTop = 0;
+    if (!doReview) { endRun(run); if (best < 0) ctx.toast('Nothing fits that request on this site.'); return; }
+    panel(); showLayouts(run);
     runStep(run, 3, 'The AI is reviewing the layouts');
     let pool = variants.filter(v => v.elements.length).slice(0, 4), extra = [], revised = '', rv = null;
     try {
@@ -1078,7 +1095,7 @@ export function initSitePlan(ctx) {
         if (!live(run)) return;
         const v2 = named(out2, { ...plan, params: params2, program: prog2 }, { params: params2, revisedBy: rv.why || 'the AI review' }).filter(v => v.elements.length);
         if (v2.length) {
-          const first = rv; extra = v2.slice(0, 3); pool = pool.slice(0, 3).concat(extra); runStep(run, 4, 'The AI is comparing the revised layouts');
+          const first = rv; extra = v2.slice(0, 3); const nm = RUN.layoutNames([...ed.variants, ...extra]); extra.forEach((v, k) => { v.name = nm[ed.variants.length + k]; }); pool = pool.slice(0, 3).concat(extra); runStep(run, 4, 'The AI is comparing the revised layouts');
           try { rv = await aiReview(plan, prog2, pool, 2, ask, run.ctl.signal); } catch (e) { if (!live(run)) return; rv = { ...first, reviews: (first.reviews || []).filter(r => r.option < 3), ranking: (first.ranking || []).filter(i => i < 3).concat(extra.map((_, k) => 3 + k)) }; }
           revised = first.why || 'a better program';
         }
@@ -1086,7 +1103,7 @@ export function initSitePlan(ctx) {
     } catch (e) { if (!live(run)) return; console.warn('review', e); rv = null; }
     if (!live(run) || PL() !== pl) return;
     ed.reviewing = false;
-    if (rv) { mergeReview(rv, pool, extra); ed.aiNote = [rv.summary, revised ? 'After its first look the AI changed the program: ' + revised.replace(/\.$/, '') + '.' : ''].filter(Boolean).join(' ') || note; }
+    if (rv) { mergeReview(rv, pool, extra); ed.aiNote = revised ? 'After its first look the AI changed the program: ' + revised.replace(/\.$/, '') + '.' : note; }
     else ed.aiNote = (note ? note + ' ' : '') + 'The AI review didn’t answer, so these are as the engine ranked them.';
     await pickAi();
     if (!live(run)) return;
@@ -1098,7 +1115,9 @@ export function initSitePlan(ctx) {
     const list = ed.variants || [], byKey = new Map(list.map(v => [v.key, v]));
     if (extra.length) { const names = RUN.layoutNames([...list, ...extra]), seen = new Set(list.map(v => v.key));
       extra.forEach((v, k) => { let key = v.key; while (seen.has(key)) key += '+'; seen.add(key); v.key = key; v.name = names[list.length + k]; byKey.set(key, v); }); }
-    for (const r of rv.reviews || []) { const v = pool[r.option] && byKey.get(pool[r.option].key); if (v) v.ai = r; }
+    const names = pool.map(v => numOf(byKey.get(v.key) || v)), tx = t => K.aiText(t, names); // "Option A", "option 1" → the layout's own name
+    for (const r of rv.reviews || []) { const v = pool[r.option] && byKey.get(pool[r.option].key); if (v) v.ai = { ...r, verdict: tx(r.verdict), strengths: (r.strengths || []).map(tx), problems: (r.problems || []).map(tx) }; }
+    ed.aiSummary = tx(rv.summary || '');
     const first = (rv.ranking || []).map(i => pool[i]?.key).filter(k => byKey.has(k)), seen = new Set(first);
     const order = [...first, ...list.map(v => v.key).filter(k => !seen.has(k)), ...extra.map(v => v.key).filter(k => !seen.has(k))];
     ed.variants = order.map((k, i) => ({ ...byKey.get(k), rank: -i })); ed.aiPick = first[0] || null; ed.reviewCleared = false;
@@ -1106,8 +1125,9 @@ export function initSitePlan(ctx) {
   // the AI's pick on the map, unless the person picked another layout (or changed the one on the map) meanwhile
   async function pickAi() {
     const k = ed.aiPick, pl = PL(), i = k && ed.variants ? ed.variants.findIndex(v => v.key === k) : -1; if (i < 0 || pl?.variant?.key === k) return;
-    if (!ed.pickedByUser && !dirty(pl)) { await useVariant(i, { quiet: true }); return; }
-    const n = numOf(ed.variants[i]); ctx.toast('The AI recommends ' + n + '.', { action: { label: 'Use it', run: () => { const j = ed?.variants?.findIndex(v => v.key === k); if (j >= 0) useVariant(j); } } });
+    const failing = K.passes(ed.variants[i].chk) === false && ed.variants.some(v => K.passes(v.chk)); // a failing layout never goes on the map by itself when one passes
+    if (!ed.pickedByUser && !dirty(pl) && !failing) { await useVariant(i, { quiet: true }); return; }
+    const n = numOf(ed.variants[i]); ctx.toast('The AI recommends ' + n + (failing ? ', though it doesn’t pass every check' : '') + '.', { action: { label: 'Use it', run: () => { const j = ed?.variants?.findIndex(v => v.key === k); if (j >= 0) useVariant(j); } } });
   }
   // ---------- a run: one build (or idea, more layouts, review, change) at a time, shown and cancellable ----------
   // ed.run = { kind, steps, step, label, t0, ctl, token, src }: lives on the editor, not the page, so a redraw of the
@@ -1128,7 +1148,7 @@ export function initSitePlan(ctx) {
   function endRun(r, o = {}) {
     if (!ed || ed.run !== r) return false;
     ed.run = null; clearInterval(runTick); runTick = 0; pillEl.hidden = true;
-    if (!o.quiet) panel();
+    if (!o.quiet) { panel(); if (['build', 'more', 'review'].includes(r.kind) && ed.variants) showLayouts(r); }
     if (ed.solveLater && !r.cancelled) { ed.solveLater = false; resolveSoon(); } // a setting changed while it ran
     return true;
   }
@@ -1142,6 +1162,22 @@ export function initSitePlan(ctx) {
   function killRun() { const r = ed?.run; if (!r) return; r.cancelled = true; r.ctl.abort(); ed.run = null; clearInterval(runTick); runTick = 0; pillEl.hidden = true; } // the plan closes or another option opens
   // a hand edit while layouts are still coming: they'd replace it, so the run stops instead
   function handEdit() { const r = ed?.run; if (r && !r.applied && LAYS.includes(r.kind) && !applying) cancelRun('Build cancelled: you changed the plan while it was laying out.'); }
+  // after a run: the Layouts section in view, right under the overview when it fits, else scrolled up under the header
+  // (on phones the sheet comes up first). If the person scrolled while it ran, only when the section is off screen.
+  function showLayouts(r) {
+    const go = () => {
+      const sec = ed && card.querySelector('#spLayouts'), top = card.querySelector(':scope>.top'); if (!sec) return;
+      const c = card.getBoundingClientRect(), s = sec.getBoundingClientRect(), head = top ? top.getBoundingClientRect().bottom : c.top, vis = Math.min(c.bottom, innerHeight);
+      const at0 = s.top + card.scrollTop, under = card.scrollTop + s.top - head - 6; // the section's top with the card at the top; the scroll that puts it under the header
+      if (r?.userScrolled) { if (s.top >= head - 4 && s.top < vis - 80) return; card.scrollTop = under; return; }
+      card.scrollTop = card.scrollTop <= 2 && at0 + Math.min(180, s.height) <= vis ? 0 : under; // already scrolled (the header folded): under the header, never back up past it
+      requestAnimationFrame(() => requestAnimationFrame(() => { // the header folds as the card scrolls: settle under it
+        const t2 = card.querySelector(':scope>.top'), h2 = t2 ? t2.getBoundingClientRect().bottom : 0, s2 = sec.isConnected && sec.getBoundingClientRect(); if (s2 && card.scrollTop > 2 && Math.abs(s2.top - h2 - 6) > 3) card.scrollTop += s2.top - h2 - 6; }));
+    };
+    if (phone() && card.classList.contains('sp-mode') && !card.classList.contains('half') && !card.classList.contains('full')) { sheetQuiet = true; card.classList.remove('min'); card.classList.add('half'); setTimeout(go, 340); }
+    else go();
+  }
+  for (const ev of ['wheel', 'touchmove', 'keydown']) card.addEventListener(ev, e => { if (ed?.run && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && (ev !== 'keydown' || /^(PageUp|PageDown|ArrowUp|ArrowDown|Home|End| )$/.test(e.key))) ed.run.userScrolled = true; }, { passive: true });
   const runText = r => (r.steps.length > 1 ? 'Step ' + r.step + ' of ' + r.steps.length + ' · ' : '') + r.label;
   function runHtml(r) {
     return '<div class="sp-run" id="spRun"><span class="sp-run-dot" aria-hidden="true"></span><span class="sp-run-t" role="status">' + esc(runText(r)) + '</span>' +
@@ -1250,9 +1286,17 @@ export function initSitePlan(ctx) {
   // engine output → layouts: numbers, money, a key and a name. extra: fields every one carries (the AI's revised params)
   function named(list, plan, extra = {}) {
     const stamp = finStamp(plan), vs = list.map(r => { const v = { ...r, ...extra, arr: r.arr || RUN.baseName(r.name), setbacks: r.setbacks || plan.setbacks };
-      v.m = SP.metrics({ ...plan, program: v.program || plan.program, elements: v.elements }); v.fin = finFor(v, plan); v.finAt = stamp; return v; });
+      v.m = SP.metrics({ ...plan, program: v.program || plan.program, elements: v.elements }); v.fin = finFor(v, plan); v.finAt = stamp; return derive(v, plan); });
     const keys = RUN.layoutKeys(vs), names = RUN.layoutNames(vs);
     return vs.map((v, i) => ({ ...v, rank: -i, key: keys[i], name: names[i] }));
+  }
+  // once per layout: what the checks find (the same levels as the overview) and Phase 1's numbers when it has a Phase 2
+  function derive(v, plan) {
+    if (!v.elements?.length) { if (!v.chk && v.m) v.chk = { bad: null, short: K.checksOf([], v.m).short }; return v; }
+    const p2 = planFor(v, plan); if (!v.m) v.m = SP.metrics(p2);
+    if (!v.chk || v.chk.bad == null) v.chk = K.checksOf(SP.check(p2), v.m);
+    if (v.m1 === undefined) v.m1 = v.elements.some(e => e.phase === 2) ? SP.metrics({ ...p2, elements: v.elements.filter(e => e.phase !== 2) }) : null;
+    return v;
   }
   const pickIdx = () => { const k = PL()?.variant?.key; return k && ed?.variants ? ed.variants.findIndex(v => v.key === k) : -1; };
   const numOf = v => (v?.name || '').match(/^Layout \d+/)?.[0] || 'That layout';
@@ -1260,7 +1304,7 @@ export function initSitePlan(ctx) {
   function saveRun(pl = PL()) {
     if (!pl || !ed?.variants) return;
     const meta = ed.runMeta || pl.lastRun || {};
-    pl.lastRun = RUN.slimRun({ ask: meta.ask || '', note: ed.aiNote || '', ...(ed.ideas?.list?.length ? { ideas: ed.ideas } : {}), ...(ed.readAs ? { read: ed.readAs } : {}), ...(ed.aiPick ? { pick: ed.aiPick } : {}), at: meta.at || new Date().toISOString(), aiReviewed: ed.variants.some(v => v.ai), variants: ed.variants }, pl.variant?.key);
+    pl.lastRun = RUN.slimRun({ ask: meta.ask || '', note: ed.aiNote || '', ...(ed.aiSummary ? { summary: ed.aiSummary } : {}), ...(ed.sortBy && ed.sortBy !== 'rec' ? { sort: ed.sortBy } : {}), ...(ed.ideas?.list?.length ? { ideas: ed.ideas } : {}), ...(ed.readAs ? { read: ed.readAs } : {}), ...(ed.aiPick ? { pick: ed.aiPick } : {}), at: meta.at || new Date().toISOString(), aiReviewed: ed.variants.some(v => v.ai), variants: ed.variants }, pl.variant?.key);
     save(projOf(pl));
   }
   // money again for every layout (the Pro forma's assumptions changed); shortly after the last change
@@ -1268,38 +1312,121 @@ export function initSitePlan(ctx) {
   function refreshFin(now) {
     clearTimeout(finT); const go = () => { const pl = PL(); if (!pl || !ed?.variants) return; const st = finStamp(pl); let n = 0;
       for (const v of ed.variants) if (v.elements?.length && v.finAt !== st) { v.fin = finFor(v, pl); v.finAt = st; n++; }
-      if (n) { const box = card.querySelector('#spVariants'); if (box) { box.innerHTML = variantsHtml(); wireVariants(); } if (pl.lastRun) { pl.lastRun = RUN.slimRun({ ...pl.lastRun, variants: ed.variants }, pl.variant?.key); persist(); } } };
+      if (n) { redrawLayouts(); if (pl.lastRun) { pl.lastRun = RUN.slimRun({ ...pl.lastRun, variants: ed.variants }, pl.variant?.key); persist(); } } };
     if (now) go(); else finT = setTimeout(go, 400);
   }
   const $M = v => v == null || !isFinite(v) ? '—' : (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toFixed(2) + 'M' : f0(Math.abs(v))), pc2 = v => v == null || !isFinite(v) ? 'n/a' : (v * 100).toFixed(2) + '%';
-  function finLine(v, pl) {
+  // the money's tooltip: where the numbers come from and the land price used
+  function finTip(v, pl) {
     const f = v.fin; if (!f) return '';
-    if (v.finAt !== finStamp(pl) && !v.elements?.length) return ''; // priced with assumptions that have since changed, and no pieces to price again
-    const lp = landGuess(projOf(pl), planFor(v, pl)), tip = 'From the Pro forma’s assumptions' + (f.method === 'simple' ? ' (TestFit method)' : '') + ', the same numbers as its Pro forma section once it’s on the map. Land at ' + $M(f.land) + (lp ? ' (the parcels’ appraised value, with closing costs)' : ' (about $175,000 an acre, the default; set yours under Pro forma)') + ', so most layouts look less rosy than a land-free estimate would. Change any assumption under Pro forma.';
-    return '<span class="sp-fin" title="' + esc(tip) + '">' + (f.forSale ? $M(f.cost) + ' cost · ' + pc2(f.margin) + ' margin' : '≈ ' + $M(f.value) + ' value · ' + $M(f.cost) + ' cost · ' + pc2(f.yoc) + ' yield on cost') + (f.irr != null ? ' · ' + pc2(f.irr) + ' levered IRR' : '') + '</span>';
+    const lp = landGuess(projOf(pl), planFor(v, pl));
+    return 'From the Pro forma’s assumptions' + (f.method === 'simple' ? ' (TestFit method)' : '') + ', the same numbers as its Pro forma section once it’s on the map. Land at ' + $M(f.land) + (lp ? ' (the parcels’ appraised value, with closing costs)' : ' (about $175,000 an acre, the default; set yours under Pro forma)') + ', so most layouts look less rosy than a land-free estimate would. Change any assumption under Pro forma.';
   }
+  // ---------- the Layouts section: a comparison ----------
+  // Each card: a small drawing, the layout's name, a fixed grid of numbers that matches the Pro forma (Phase 1 first,
+  // parking, value and cost, yield), whether it passes the checks, the AI's score, badges across the set (Recommended,
+  // Most floor area, Best yield) and what it has compared with the recommended one. Failing layouts go after passing ones;
+  // layouts with the same numbers as an earlier one fold into it. lib/planpick.mjs does the deciding.
+  const vthumbs = new Map(); let thumbIO = null;
+  const thumbKey = v => v.key + '|' + (v.elements?.length || 0) + '|' + RUN.hash(JSON.stringify(v.elements?.[0] || '') + JSON.stringify(v.elements?.[v.elements.length - 1] || ''));
+  function vthumb(v, pl) {
+    const k = thumbKey(v); let s = vthumbs.get(k);
+    if (s == null) { try { s = planSVG(planFor(v, pl), { px: 176, pad: 6, labels: false, lines: false }).svg.replace(/ width="[\d.]+" height="[\d.]+"/, ' preserveAspectRatio="xMidYMid meet" aria-hidden="true"'); } catch (e) { s = ''; }
+      vthumbs.set(k, s); if (vthumbs.size > 60) vthumbs.delete(vthumbs.keys().next().value); }
+    return s;
+  }
+  const scoreBand = n => n >= 80 ? 'hi' : n >= 65 ? 'mid' : 'lo';
   function variantsHtml() {
     if (!ed?.variants) return '';
-    const pl = PL(), on = pickIdx(), edited = !!pl?.variant?.edited;
+    const pl = PL(), vs = ed.variants, on = pickIdx(), edited = !!pl?.variant?.edited, by = K.SORTS.some(([k]) => k === ed.sortBy) ? ed.sortBy : 'rec';
+    for (const v of vs) if (!v.chk || v.elements?.length && (v.chk.bad == null || v.m1 === undefined)) derive(v, pl); // an older saved run
+    const rec = K.recommended(vs, ed.aiPick), recV = rec ? vs[rec.index] : null, badge = K.badges(vs, rec), sim = K.similar(vs), digits = K.moneyDigits(vs.flatMap(v => v.fin ? [v.fin.cost, v.fin.value, v.fin.profit] : []));
+    const alive = vs.map(v => !(Array.isArray(v.elements) && !v.elements.length)), notes = K.splitNotes(vs.map((v, i) => alive[i] ? v.notes : null));
+    const named1 = (K.firstSentence(ed.aiSummary).match(/\bLayout \d+/g) || []), aiFirst = rec?.by === 'ai' && !!ed.aiSummary && (!named1.length || named1.includes(numOf(recV))); // the summary's first sentence is about the recommended one
+    const order = K.sortOrder(vs, by, rec ? rec.index : -1), M = x => K.fmtM(x, digits), neg = x => x != null && x < 0 ? ' neg' : '';
+    const simOpen = ed.simOpen || (ed.simOpen = new Set()), whyOpen = ed.whyOpen || (ed.whyOpen = new Set());
+    const followers = i => vs.map((v, j) => j).filter(j => j !== i && sim[j] === i);
+    const shown = i => sim[i] === i || i === on || (rec && i === rec.index) || simOpen.has(vs[sim[i]].key);
+    const notesHtml = list => K.byLevel(list).filter(n => n.level !== 'info').map(n => '<p class="sp-n ' + n.level + '">' + esc(n.text) + '</p>').join('');
+    const infoHtml = list => K.byLevel(list).filter(n => n.level === 'info').map(n => '<p class="sp-n info">' + esc(n.text) + '</p>').join('');
+    const baseProg = (vs.find(v => !v.revisedBy) || {}).program;
+    const whyBox = (v, html) => '<details class="sp-why" data-why="' + esc(v.key) + '"' + (whyOpen.has(v.key) ? ' open' : '') + '><summary>' + (v.ai ? 'Why' : 'Details') + '</summary>' + html + '</details>';
+    const card1 = i => {
+      const v = vs[i], has = !!v.elements?.length, none = !alive[i], here = on === i, f = v.fin, m = v.m || {}, cl = K.checkLabel(v.chk), isRec = rec && rec.index === i;
+      const h = K.headline(v.m, v.m1, K.askedOf(SP.normalizeProgram(v.program || pl.program))), hot = k => by === k ? ' hot' : '';
+      const cell = (k, big, sub, cls = '', tip = '') => '<span class="sp-vc' + cls + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '><small>' + k + '</small><b>' + big + '</b>' + (sub ? '<i>' + sub + '</i>' : '') + '</span>';
+      const ratio = m.units ? (m.spaces / m.units).toFixed(2) + ' / unit' : m.gfa ? (m.spaces / m.gfa * 1000).toFixed(1) + ' / 1,000 sf' : '';
+      const grid = none ? '' : '<span class="sp-vgrid">' +
+        cell(v.m1 ? 'Phase 1' : h.units ? 'Units' : 'Floor area', esc(h.big), h.fit ? '<em class="neg">Fits ' + esc(h.fit) + '</em>' : esc(h.sub), hot('size')) +
+        cell('Parking', f0(m.spaces || 0) + '/' + f0(m.required || 0), ratio, (m.spaces < m.required ? ' short' : '') + hot('ratio'), 'Spaces provided / required (whole site)') +
+        (f ? (f.forSale ? cell('Cost', M(f.cost), 'profit <em class="' + neg(f.profit) + '">' + M(f.profit) + '</em>', hot('profit'), finTip(v, pl)) + cell('Margin', K.fmtPct(f.margin), '', neg(f.margin) + hot('yoc'), finTip(v, pl))
+          : cell('Value / cost', M(f.value) + ' / ' + M(f.cost), 'profit <em class="' + neg(f.profit) + '">' + M(f.profit) + '</em>', hot('profit'), finTip(v, pl)) +
+            cell('Yield on cost', K.fmtPct(f.yoc), f.spread != null ? 'spread <em class="' + neg(f.spread) + '">' + K.fmtPct(f.spread) + '</em>' : '', neg(f.yoc) + hot('yoc'), finTip(v, pl)))
+          : cell('Value / cost', '—', has ? 'no buildings to price' : 'when laid out', '') + cell('Yield on cost', '—', '', '')) + '</span>';
+      const pills = (here ? '<i class="sp-onmap">On map' + (edited ? ' · edited' : '') + '</i>' : '') + badge[i].map(b => '<i class="sp-badge' + (b === 'Recommended' ? ' rec' : '') + '">' + b + '</i>').join('') +
+        (none ? '' : '<i class="sp-ck ' + cl.level + '" title="' + (cl.level === 'ok' ? 'Inside the lot and setbacks, no overlaps, enough parking' : 'What the checks found; the details are on the map in red once it’s on the map') + '">' + esc(cl.text) + '</i>') +
+        (v.ai ? '<i class="sp-score ' + scoreBand(v.ai.score) + hot('ai') + '" title="The AI review’s score, out of 100">AI ' + v.ai.score + '</i>' : '') + (ed.reviewing && has && !v.ai ? '<i class="sp-skel" aria-label="The AI is reviewing this layout">AI reviewing…</i>' : '');
+      const reason = isRec ? (rec.by === 'ai' ? (aiFirst ? K.firstSentence(ed.aiSummary) : v.ai?.verdict || '') : K.engineReason(vs, i)) : '';
+      const dl = recV && !isRec && !none ? K.deltas(v, recV, digits) : [];
+      const fol = sim[i] === i ? followers(i) : [], foldN = fol.filter(j => !(j === on || rec && j === rec.index)).length;
+      const own = notes.own[i] || [], why = (v.ai ? (v.ai.verdict && v.ai.verdict !== reason ? '<p class="sp-why-v">' + esc(v.ai.verdict) + '</p>' : '') + '<ul class="sp-why-l">' + (v.ai.strengths || []).map(t => '<li class="ok">' + esc(t) + '</li>').join('') + (v.ai.problems || []).map(t => '<li class="bad">' + esc(t) + '</li>').join('') + '</ul>' : '') + infoHtml(own);
+      return '<div class="sp-var' + (here ? ' on' : '') + (none ? ' none' : '') + (K.passes(v.chk) === false ? ' fail' : '') + '" data-key="' + esc(v.key) + '">' +
+        '<button type="button" class="sp-var-use" aria-pressed="' + here + '" data-var="' + i + '"' + (none ? ' disabled' : '') + ' title="' + (here ? 'On the map' : has ? 'Put this layout on the map' : none ? 'Nothing fits' : 'Lay this layout out again and put it on the map') + '">' +
+          '<span class="sp-vthumb"' + (has ? ' data-thumb="' + i + '"' : '') + '>' + (has && vthumbs.has(thumbKey(v)) ? vthumbs.get(thumbKey(v)) : '') + (!has ? '<i>' + (none ? 'Nothing fits' : 'Numbers only') + '</i>' : '') + '</span>' +
+          '<span class="sp-vmain"><span class="sp-vhead"><b>' + esc(numOf(v)) + '</b><span>' + esc(RUN.baseName(v.name)) + '</span></span>' +
+            (pills ? '<span class="sp-vpills">' + pills + '</span>' : '') + grid +
+            (h.p2 ? '<span class="sp-vp2">' + esc(h.p2) + '</span>' : '') + (by === 'open' && !none ? '<span class="sp-vp2 hot">Open space ' + pct(m.green || 0) + '</span>' : '') +
+            (reason ? '<span class="sp-vwhy">' + esc(reason) + '</span>' : '') + (dl.length ? '<span class="sp-vdelta">vs Recommended: ' + dl.map(esc).join(' · ') + '</span>' : '') +
+            (!has && !none ? '<span class="sp-numonly">Numbers only: click to lay it out again</span>' : '') + '</span></button>' +
+        (none ? '' : notesHtml(own)) +
+        (none ? (why ? '<div class="sp-var-acts">' + whyBox(v, why) + '</div>' : '') : '<div class="sp-var-acts">' + (why ? whyBox(v, why) : '') + (foldN ? '<button type="button" class="sp-link sp-simt" data-sim="' + esc(v.key) + '" aria-expanded="' + simOpen.has(v.key) + '">' + foldN + ' similar layout' + (foldN > 1 ? 's' : '') + ' · ' + (simOpen.has(v.key) ? 'hide' : 'show') + '</button>' : '') +
+          (here ? '' : '<button type="button" class="sp-link" data-usevar="' + i + '">Use this layout</button>') +
+          '<button type="button" class="sp-link" data-keep="' + i + '" title="Keep this layout as a new option in ' + esc(projOf(pl)?.name || 'the project') + '; this option stays as it is">Save as new option</button></div>') + '</div>';
+    };
+    const main = order.filter(i => !vs[i].revisedBy && shown(i)), revd = order.filter(i => vs[i].revisedBy && shown(i));
+    const known = vs.filter((v, i) => alive[i] && v.m?.gfa), allFail = known.length && !known.some(v => K.passes(v.chk)) && known.some(v => K.passes(v.chk) === false);
+    const gap = allFail ? K.acreageGap(vs.flatMap(v => v.notes || [])) : null, firstBad = allFail ? K.checkLabel(known[0].chk).text : '';
+    const rest = aiFirst ? K.restSentences(ed.aiSummary) : ed.aiSummary || '';
+    const revV = revd.length ? vs[revd[0]] : null, chg = revV ? K.programChange(SP.normalizeProgram(baseProg || pl.program), SP.normalizeProgram(revV.program || pl.program)) : '';
+    const mainHtml = main.length ? (revd.length ? '<div class="sp-lgrp"><b>From your request</b></div>' : '') + '<div class="sp-vars">' + main.map(card1).join('') + '</div>' : '';
+    const revHtml = revd.length ? '<div class="sp-lgrp"><b>AI’s revision</b> <span>(' + esc([chg, revV.revisedBy ? 'why: ' + revV.revisedBy.replace(/\.$/, '') : ''].filter(Boolean).join(' · ')) + ')</span></div><div class="sp-vars">' + revd.map(card1).join('') + '</div>' : '';
     return (ed.reviewCleared ? '<div class="rnote sp-warn sp-rvc">Settings changed: AI review cleared · <button type="button" class="sp-link" id="spReReview">Review again</button></div>' : '') +
-      '<div class="sp-vars">' + ed.variants.map((v, i) => { const has = !!v.elements?.length, none = Array.isArray(v.elements) && !v.elements.length, here = on === i;
-        return '<div class="sp-var' + (here ? ' on' : '') + (none ? ' none' : '') + '"><button type="button" class="sp-var-use" aria-pressed="' + here + '" data-var="' + i + '"' + (none ? ' disabled' : '') + ' title="' + (here ? 'On the map' : has ? 'Put this layout on the map' : 'Lay this layout out again and put it on the map') + '">' +
-          '<b>' + esc(v.name) + (here ? '<i class="sp-onmap">On map' + (edited ? ' · edited' : '') + '</i>' : '') + (v.ai && v.key === ed.aiPick ? '<i class="sp-pick">AI’s pick</i>' : '') + '</b><span>' +
-          (none ? 'Nothing fits' : (v.m.units ? f0(v.m.units) + ' units · ' + v.m.duAc.toFixed(1) + '/ac · ' : '') + f0(v.m.gfa) + ' sf · ' + f0(v.m.spaces) + '/' + f0(v.m.required) + ' spaces · ' + pct(v.m.coverage) + ' coverage') + '</span>' + finLine(v, pl) +
-          (v.ai ? '<i class="sp-aiv"><b>AI ' + v.ai.score + '</b> · ' + esc(v.ai.verdict) + (v.ai.problems?.length ? '<br>Watch: ' + esc(v.ai.problems.join('; ')) : '') + '</i>' : '') + (ed.reviewing && has && !v.ai ? '<i class="sp-skel" aria-label="The AI is reviewing this layout">AI reviewing…</i>' : '') + (v.revisedBy ? '<i class="sp-aiv sp-rev">From the AI’s revision</i>' : '') + (v.notes?.length ? '<em>' + esc(v.notes.join(' ')) + '</em>' : '') +
-          (!has && !none ? '<i class="sp-numonly">Numbers only: click to lay it out again</i>' : '') + '</button>' +
-          (none ? '' : '<div class="sp-var-acts"><button type="button" class="sp-link" data-keep="' + i + '" title="Keep this layout as a new option in ' + esc(projOf(pl)?.name || 'the project') + '; this option stays as it is">Save as new option</button></div>') + '</div>'; }).join('') + '</div>' +
-      '<div class="sp-more">' + (ed.variants.length <= 3 ? '<button class="sp-link" id="spMore" title="Every usable layout the planner found, not just the top three">More layouts…</button>' : '') +
-      '<label>Sort <select id="spSort">' + [['best', 'Best'], ['value', 'Value'], ['units', 'Units'], ['gfa', 'Floor area'], ['spaces', 'Parking'], ['open', 'Open space']].map(([k, t]) => '<option value="' + k + '"' + (ed.sortBy === k ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label></div>';
+      (allFail ? '<div class="sp-lbanner" role="note"><div><b>None of these layouts passes every check.</b> ' + (gap ? 'This asks for about ' + gap.need.toFixed(1) + ' ac; the site is ' + gap.site.toFixed(1) + ' ac.' : esc(firstBad) + ' on ' + (known.length > 1 ? 'the best of them' : 'it') + '.') + '</div><button type="button" class="btn sm" data-layedit="1">Edit request</button></div>' : '') +
+      (rest ? '<div class="sp-callout"><b>From the AI’s review</b>' + esc(rest) + '</div>' : '') +
+      (notes.shared.length ? (K.byLevel(notes.shared).some(n => n.level !== 'info') ? '<div class="sp-lnotes"><span class="sp-lnh">Every layout</span>' + notesHtml(notes.shared) + (K.byLevel(notes.shared).some(n => n.level === 'info') ? '<details class="sp-ninfo"><summary>Details</summary>' + infoHtml(notes.shared) + '</details>' : '') + '</div>'
+        : '<details class="sp-ninfo sp-ninfo1"><summary>Notes on every layout (' + notes.shared.length + ')</summary>' + infoHtml(notes.shared) + '</details>') : '') +
+      (by === 'rec' && recV?.revisedBy ? revHtml + mainHtml : mainHtml + revHtml);
+  }
+  // the Layouts heading: how many, the sort and More layouts
+  function layoutsHead() {
+    const by = K.SORTS.some(([k]) => k === ed.sortBy) ? ed.sortBy : 'rec', tip = K.SORTS.find(([k]) => k === by)[2];
+    return '<div class="sp-lay-h"><div class="lt">Layouts<span class="sp-lcount"> · ' + (ed.variants?.length || 0) + '</span></div><div class="sp-lay-ctl">' +
+      '<label class="sp-sortl" title="' + esc(tip) + '">Sort <select id="spSort">' + K.SORTS.map(([k, t, tt]) => '<option value="' + k + '" title="' + esc(tt) + '"' + (by === k ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' +
+      (ed.variants?.length <= 3 ? '<button type="button" class="sp-link" id="spMore" title="Every usable layout the planner found, not just the top three">More layouts…</button>' : '') + '</div></div>';
   }
   function wireVariants() {
     const $ = q => card.querySelector(q);
-    card.querySelectorAll('[data-var]').forEach(b => b.onclick = () => { if (ed.run) ed.pickedByUser = true; useVariant(+b.dataset.var); }); // picked during a review: the AI's pick won't replace it
+    card.querySelectorAll('[data-var],[data-usevar]').forEach(b => b.onclick = () => { if (ed.run) ed.pickedByUser = true; useVariant(+(b.dataset.var ?? b.dataset.usevar)); }); // picked during a review: the AI's pick won't replace it
     card.querySelectorAll('[data-keep]').forEach(b => b.onclick = () => keepAsOption(+b.dataset.keep));
-    const mo = $('#spMore'); if (mo) mo.onclick = async () => { const pl2 = PL(), run = startRun('more', ['Looking for more layouts'], '#spMore'); if (!run) return; let more = []; try { more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); } catch (e) { console.warn('layout', e); } if (!live(run) || PL() !== pl2) return; if (more.length) { ed.variants = named(more, pl2); ed.reviewCleared = false; saveRun(pl2); } endRun(run); };
-    const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; const k = so.value; const val = v => k === 'value' ? v.fin?.value || 0 : k === 'units' ? v.m.units || 0 : k === 'gfa' ? v.m.gfa : k === 'spaces' ? v.m.spaces : k === 'open' ? v.m.green : (v.rank ?? 0);
-      ed.variants.sort((a, b) => val(b) - val(a)); saveRun(); panel(); };
+    card.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => { const k = b.dataset.sim; if (ed.simOpen.has(k)) ed.simOpen.delete(k); else ed.simOpen.add(k); redrawLayouts(); });
+    card.querySelectorAll('details[data-why]').forEach(d => d.ontoggle = () => { if (d.open) ed.whyOpen.add(d.dataset.why); else ed.whyOpen.delete(d.dataset.why); });
+    card.querySelectorAll('[data-layedit]').forEach(b => b.onclick = () => { fillAsk(ed.runMeta?.ask || ed.readAs?.ask || ed.ask || ''); card.querySelector('#spAiSec')?.scrollIntoView({ block: 'nearest' }); });
+    const mo = $('#spMore'); if (mo) mo.onclick = async () => { const pl2 = PL(), run = startRun('more', ['Looking for more layouts'], '#spMore'); if (!run) return; let more = []; try { more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); } catch (e) { console.warn('layout', e); } if (!live(run) || PL() !== pl2) return;
+      if (more.length) { const old = new Map((ed.variants || []).map(v => [v.key, v])), nv = named(more, pl2); for (const v of nv) { const o = old.get(v.key); if (o?.ai) v.ai = o.ai; } ed.variants = nv; ed.reviewCleared = false; saveRun(pl2); } endRun(run); }; // the AI's scores stay on the layouts it saw
+    const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; saveRun(); redrawLayouts(); so.closest('label').title = K.SORTS.find(([k]) => k === so.value)?.[2] || ''; };
     const rr = $('#spReReview'); if (rr) rr.onclick = reviewAgain;
+    lazyThumbs();
+  }
+  function redrawLayouts() { const box = card.querySelector('#spVariants'); if (!box || !ed) return; box.innerHTML = variantsHtml(); wireVariants(); lockRun(); }
+  // the drawings, after the cards are on screen: only the ones scrolled into view, a few a frame
+  function lazyThumbs() {
+    thumbIO?.disconnect(); thumbIO = null;
+    const slots = [...card.querySelectorAll('[data-thumb]')].filter(el => !el.firstElementChild); if (!slots.length) return;
+    const q = [], pump = () => { const t0 = performance.now(); while (q.length && performance.now() - t0 < 12) { const el = q.shift(), v = ed?.variants?.[+el.dataset.thumb]; if (el.isConnected && v?.elements?.length && !el.firstElementChild) el.insertAdjacentHTML('afterbegin', vthumb(v, PL())); } if (q.length) requestAnimationFrame(pump); };
+    const add = el => { q.push(el); if (q.length === 1) requestAnimationFrame(pump); };
+    if (!window.IntersectionObserver) { slots.forEach(add); return; }
+    thumbIO = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) { thumbIO?.unobserve(e.target); add(e.target); } }, { root: card, rootMargin: '160px 0px' });
+    slots.forEach(el => thumbIO.observe(el));
   }
   // put a layout on the map; one kept as numbers only is laid out again first
   async function useVariant(i, o = {}) {
@@ -1343,7 +1470,7 @@ export function initSitePlan(ctx) {
     if (aiOff()) { ctx.toast('AI isn’t set up on this site, so the layouts can’t be reviewed.'); return; }
     const run = startRun('review', ['The AI is reviewing the layouts'], '#spReReview'); if (!run) return; ed.reviewing = true; ed.pickedByUser = false; panel();
     try { const rv = await aiReview({ ...pl }, pl.program, pool, 1, ask, run.ctl.signal); if (!live(run) || PL() !== pl) return;
-      ed.reviewing = false; mergeReview(rv, pool); ed.aiNote = rv.summary || ed.aiNote; await pickAi();
+      ed.reviewing = false; mergeReview(rv, pool); await pickAi();
     } catch (e) { if (!live(run)) return; ed.reviewing = false; ctx.toast(e.status === 503 ? 'AI isn’t set up on this site, so the layouts can’t be reviewed.' : 'The AI review didn’t answer. Try again in a moment.'); }
     if (!live(run)) return; saveRun(pl); endRun(run);
   }
@@ -1423,7 +1550,8 @@ export function initSitePlan(ctx) {
   function info(p, pl) {
     const k = pl.id + '|' + ver(p); let v = infos.get(k);
     if (!v) { const drawn = pl.ring.length >= 3, m = drawn ? SP.metrics(pl) : null; let fin = null; if (m?.gfa) try { fin = RUN.finOf(pfRun(p, pl)); } catch (e) { fin = null; } // the money as its Pro forma shows it
-      v = { drawn, m, fin, bad: drawn ? SP.check(pl).filter(i => i.level === 'bad').length : 0 }; infos.set(k, v); if (infos.size > 400) infos.delete(infos.keys().next().value); }
+      const m1 = m?.gfa && pl.elements.some(e => e.phase === 2) ? SP.metrics({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null; // Phase 1 first, as on the plan
+      v = { drawn, m, m1, fin, bad: drawn ? SP.check(pl).filter(i => i.level === 'bad').length : 0 }; infos.set(k, v); if (infos.size > 400) infos.delete(infos.keys().next().value); }
     return v;
   }
   // the drawing for an option, street side down; kept until the project changes
@@ -1497,13 +1625,13 @@ export function initSitePlan(ctx) {
 
   // ----- one project -----
   function planTile(p, pl) {
-    const { drawn, m, bad, fin } = info(p, pl), use = SP.USES[SP.normalizeProgram(pl.program).use];
+    const { drawn, m, m1, bad, fin } = info(p, pl), use = SP.USES[SP.normalizeProgram(pl.program).use], a = m1 || m, p2 = m1 ? K.headline(m, m1, null).p2 : '';
     const stat = (v, l, cls) => '<span' + (cls ? ' class="' + cls + '"' : '') + '><b>' + v + '</b>' + l + '</span>';
     return '<button type="button" class="pj-plan" data-plan="' + esc(pl.id) + '" title="Open ' + esc(pl.name) + ' on the map">' +
       '<span class="pj-thumb">' + (drawn ? thumb(p, pl) : '<i>No site drawn</i>') + (bad ? '<span class="pj-iss">' + plural(bad, 'issue') + '</span>' : '') + (lastOpen?.plid === pl.id ? '<span class="pj-live">Open on map</span>' : '') + '</span>' +
-      '<span class="pj-ph"><b>' + esc(pl.name) + '</b>' + (m?.gfa ? '<em>' + esc(use.label) + (m.units ? ' · ' + plural(m.units, 'unit') : '') + '</em>' : '') + '</span>' +
-      (m?.gfa ? '<span class="pj-stats">' + stat(f0(m.gfa), 'sq ft') + stat(f0(m.spaces), 'spaces, ' + f0(m.required) + ' needed', m.spaces < m.required ? 'short' : '') + stat(pct(m.coverage), 'coverage') + '</span>' +
-        (fin ? '<span class="pj-fin" title="From this option’s Pro forma (land at ' + $M(fin.land) + ')">' + (fin.forSale ? $M(fin.cost) + ' cost · ' + pc2(fin.margin) + ' margin' : '≈ ' + $M(fin.value) + ' value · ' + pc2(fin.yoc) + ' yield on cost') + '</span>' : '')
+      '<span class="pj-ph"><b>' + esc(pl.name) + '</b>' + (m?.gfa ? '<em>' + esc(use.label) + (a.units ? ' · ' + plural(a.units, 'unit') + (m1 ? ' in Phase 1' : '') : '') + '</em>' : '') + '</span>' +
+      (m?.gfa ? '<span class="pj-stats">' + stat(f0(a.gfa), m1 ? 'sq ft, Phase 1' : 'sq ft') + stat(f0(m.spaces), 'spaces, ' + f0(m.required) + ' needed', m.spaces < m.required ? 'short' : '') + stat(pct(m.coverage), 'coverage') + '</span>' +
+        (p2 ? '<span class="pj-p2">' + esc(p2) + '</span>' : '') + (fin ? '<span class="pj-fin" title="From this option’s Pro forma (land at ' + $M(fin.land) + ')">' + (fin.forSale ? $M(fin.cost) + ' cost · ' + pc2(fin.margin) + ' margin' : '≈ ' + $M(fin.value) + ' value · ' + pc2(fin.yoc) + ' yield on cost') + '</span>' : '')
         : '<span class="pj-none">' + (drawn ? m.acres.toFixed(2) + ' acres, nothing laid out yet' : 'Open it to draw the site on the map') + '</span>') + '</button>';
   }
   function detailHtml(p) {
@@ -1605,7 +1733,7 @@ export function initSitePlan(ctx) {
     ed.ask = request; panel(); await build();
     if (!PL()) return { error: 'The plan was closed before the layouts came back.' };
     const m = SP.metrics(PL()), issues = SP.check(PL());
-    return { built: true, project: P().name, plan: PL().name, options: (ed.variants || []).map(v => ({ name: v.name, building_sf: Math.round(v.m.gfa), spaces: v.m.spaces, required: v.m.required, coverage_pct: Math.round(v.m.coverage * 100), notes: v.notes })),
+    return { built: true, project: P().name, plan: PL().name, options: (ed.variants || []).map(v => ({ name: v.name, building_sf: Math.round(v.m.gfa), spaces: v.m.spaces, required: v.m.required, coverage_pct: Math.round(v.m.coverage * 100), passes_checks: K.passes(v.chk), notes: v.notes })),
       shown: { building_sf: Math.round(m.gfa), units: m.units, spaces: m.spaces, required: m.required, coverage_pct: Math.round(m.coverage * 100), far: +m.far.toFixed(2), detention_acres: +(m.pond / 43560).toFixed(2) }, issues: issues.map(i => i.text), note: ed.aiNote || '' };
   }
 
