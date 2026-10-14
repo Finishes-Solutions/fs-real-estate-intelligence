@@ -875,7 +875,9 @@ const layersEl=document.getElementById('layers'), layersBtn=document.getElementB
 function placeLayers(){ const a=layersOpen&&layersOpen.offsetParent?layersOpen:null;
   if(!layersEl.classList.contains('on')||!a||matchMedia('(max-width:700px)').matches){ layersEl.style.removeProperty('--ly-top'); layersEl.style.removeProperty('--ly-left'); return; }
   const host=layersEl.offsetParent?.getBoundingClientRect(), q=a.getBoundingClientRect(); if(!host||!q.height) return;
-  layersEl.style.setProperty('--ly-top',Math.round(q.bottom-host.top+8)+'px'); layersEl.style.setProperty('--ly-left',Math.round(Math.max(16,Math.min(q.left-host.left,host.width-336)))+'px'); }
+  // keep the panel inside the controls' column (#mapleft), so it doesn't spill over the camera rail or the assistant drawer
+  const ml=document.getElementById('mapleft').getBoundingClientRect(), maxL=Math.max(ml.left,ml.right-(layersEl.offsetWidth||320))-host.left;
+  layersEl.style.setProperty('--ly-top',Math.round(q.bottom-host.top+8)+'px'); layersEl.style.setProperty('--ly-left',Math.round(Math.max(16,Math.min(q.left-host.left,maxL,host.width-336)))+'px'); }
 function setLayersOpen(on){ const was=layersEl.classList.contains('on'); layersEl.classList.toggle('on',on); layersBtn.setAttribute('aria-expanded',on); layersOpen?.setAttribute('aria-expanded',on); layersOpen?.classList.toggle('open',on);
   if(on&&!was){ try{ ctx.openLayerGroups?.(); }catch(e){} layersEl.scrollTop=0; } placeLayers(); }
 layersBtn.onclick=e=>{ e.stopPropagation(); setLayersOpen(!layersEl.classList.contains('on')); };

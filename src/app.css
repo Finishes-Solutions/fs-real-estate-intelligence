@@ -2640,6 +2640,13 @@ table.who tr.nomatch td{border:0}
 @supports not (container-type:inline-size){
   @media (max-width:1100px){ .tools button span,.exbtn span,.fbtn span,.lybtn span{display:none} }
 }
+@media (min-width:701px){
+  /* the Filters popup stays inside the controls' column too, so it doesn't spill over the rail or the assistant */
+  .mapleft .fpop:not(.fpop-floating){width:min(460px,max(320px,100cqw))}
+  /* a tablet with both the side panel and the assistant open leaves the map a sliver: the controls step aside, as they
+     did before, instead of stacking into a column over it (they come back as soon as either panel closes) */
+  @container chrome (max-width:120px){ .mapleft>*{visibility:hidden!important} }
+}
 
 /* the filters in effect, each removable, then Clear all */
 .fchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;max-width:min(100%,732px)}
@@ -2652,6 +2659,7 @@ table.who tr.nomatch td{border:0}
 
 /* Filters popup: a line under the mode switch says what the mode does; Clear All only when something's set */
 .fpop .lfhelp{flex:0 0 100%;margin:8px 0 0;font-size:12px;line-height:1.4;color:var(--muted)}
+.fpop-floating .lfhelp{display:none} /* on pages the mode switch it explains isn't shown */
 .fpop .active.none #resetAll{display:none}
 .fpop .active.none span{color:var(--muted)}
 
