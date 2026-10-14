@@ -1053,13 +1053,13 @@ export function initSitePlan(ctx) {
     if (!live(run) || PL() !== pl) return;
     if (!aiOk) run.steps = run.steps.slice(0, 2); // the AI is off: no review either
     const np = SP.normalizeProgram(prog);
-    ed.readAs = { ask, chips: RUN.readAs(np, SP.USES), miss: RUN.notUnderstood(ask, np), assumed, by: aiOk ? 'ai' : 'words' };
+    const readAs = { ask, chips: RUN.readAs(np, SP.USES), miss: RUN.notUnderstood(ask, np), assumed, by: aiOk ? 'ai' : 'words' }; // shown once the layouts land, so a cancelled build keeps the last one's
     runStep(run, 2, lay);
     let out = []; try { out = await laid('options', { ...pl, setbacks }, prog); } catch (e) { console.warn('layout', e); if (live(run)) ctx.toast('The layout failed: ' + e.message); }
     if (!live(run) || PL() !== pl) return;
     const plan = { ...pl, setbacks }, variants = named(out, { ...plan, program: prog }), doReview = aiOk && review && variants.some(v => v.elements.length);
     // the layouts, at once: on the map and in the list
-    ed.variants = variants; ed.aiNote = note; ed.reviewCleared = false; ed.runMeta = { ask, at: new Date().toISOString() }; ed.pickedByUser = false; ed.reviewing = doReview; ed.aiPick = null;
+    ed.variants = variants; ed.readAs = readAs; ed.aiNote = note; ed.reviewCleared = false; ed.runMeta = { ask, at: new Date().toISOString() }; ed.pickedByUser = false; ed.reviewing = doReview; ed.aiPick = null;
     if (ed.ideas?.list?.length) { if (!ed.ideas.list.some(it => it.request === ask)) ed.ideas = { ...ed.ideas, used: null }; else if (ed.ideas.used != null) ed.ideasOpen = false; } // the idea laid out: the ideas fold to a line
     run.applied = true;
     const best = variants.findIndex(v => v.elements.length); if (best >= 0) await useVariant(best, { quiet: true }); else saveRun(pl);
@@ -1601,7 +1601,9 @@ export function initSitePlan(ctx) {
     const pl = PL(); if (!pl) return { error: 'The plan didn’t open.' };
     if (pl.ring.length < 3) return { started: true, note: 'There’s no parcel outline here, so the user needs to draw the site on the map first (click its corners).' };
     if (!request) return { started: true, project: P().name, plan: pl.name, acres: +(SP.ringArea(pl.ring) / 43560).toFixed(2) };
+    if (ed.run) return { error: 'A build is already running on this plan. Wait for it to finish, or Cancel it in the plan panel.' };
     ed.ask = request; panel(); await build();
+    if (!PL()) return { error: 'The plan was closed before the layouts came back.' };
     const m = SP.metrics(PL()), issues = SP.check(PL());
     return { built: true, project: P().name, plan: PL().name, options: (ed.variants || []).map(v => ({ name: v.name, building_sf: Math.round(v.m.gfa), spaces: v.m.spaces, required: v.m.required, coverage_pct: Math.round(v.m.coverage * 100), notes: v.notes })),
       shown: { building_sf: Math.round(m.gfa), units: m.units, spaces: m.spaces, required: m.required, coverage_pct: Math.round(m.coverage * 100), far: +m.far.toFixed(2), detention_acres: +(m.pond / 43560).toFixed(2) }, issues: issues.map(i => i.text), note: ed.aiNote || '' };
