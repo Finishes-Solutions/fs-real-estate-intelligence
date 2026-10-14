@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 12:25 PM CT: No more size limits on FEMA, traffic and air traffic reports (243a985)
+- **FEMA report for any area:** it used to refuse anything over 400 square miles and skip flood-zone shares over 60. Both now work up to a whole county.
+  - Larger areas measure the zones at about 900 evenly spaced points.
+  - Flood insurance claims are read for every census tract touching the area, not just the first 60.
+  - If some tracts can't be read in time, the report says how many.
+- **Air Traffic report:** the 2,000 square mile limit is gone, and even a very large area answers in under a second.
+- **Traffic report:** works for areas up to 10,000 square miles (was 5,000). **Export CSV** now lists every counted road segment, not just the 1,000 busiest, and the card says when the map shows only the busiest.
+- **Crime Export CSV** lists up to the newest 20,000 incidents (was 2,000).
+
 ### 12:19 PM CT: Environmental report for any size of area (d038e3b)
 - **No size limit:** the Environmental report used to refuse anything over 30 square miles. It now works up to a whole county.
 - **Exact counts:** each database used to stop at 1,000 records (shown as "1,000+") and searched a circle much bigger than the site. Now every record within the search distance of the site's edge is counted, and the table shows how many are **on the site**.
