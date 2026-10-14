@@ -3,6 +3,7 @@ import './cursors.js';
 import { makeMatcher, encode, decode, describe } from './lib/filter.mjs';
 import { USES, entityKey } from './lib/taxonomy.mjs';
 import { recentChanges } from './lib/changes.mjs';
+import { dockSide } from './lib/planview.mjs';
 import { initTimeline } from './timeline.js';
 import { initWho, initChanges } from './views.js';
 import { initAssistant } from './assistant.js';
@@ -239,8 +240,11 @@ function fitPoints(list){
 function coverPad(base=60){ const m=map.getContainer().getBoundingClientRect(), p={top:base,bottom:base,left:base,right:base};
   for(const el of [document.getElementById('ai'),document.getElementById('card')]){ if(!el||!el.offsetParent||el.id==='card'&&!el.classList.contains('open')) continue; const r=el.getBoundingClientRect();
     if(r.width<2||r.height<2||r.right<=m.left||r.left>=m.right||r.bottom<=m.top||r.top>=m.bottom) continue;
-    if(r.width<m.width*.6){ if(r.left>m.left+m.width/2) p.right=Math.max(p.right,m.right-r.left+base/2); else if(r.right<m.left+m.width/2) p.left=Math.max(p.left,r.right-m.left+base/2); }
-    else if(r.top>m.top+m.height/3) p.bottom=Math.max(p.bottom,m.bottom-r.top+base/2); }
+    // docked to the right edge (the property card, the site plan, the assistant drawer), whatever its width; a sheet
+    // that spans the map (phones) covers the bottom instead (lib/planview.mjs)
+    const side=dockSide(r,m);
+    if(side==='right') p.right=Math.max(p.right,m.right-r.left+base/2); else if(side==='left') p.left=Math.max(p.left,r.right-m.left+base/2);
+    else if(side==='bottom') p.bottom=Math.max(p.bottom,m.bottom-r.top+base/2); }
   return p; }
 // a bounding box [[w,s],[e,n]] in view, clear of the panels; returns the zoom it lands on
 function fitBox(b,o={}){ const opt={padding:coverPad(),maxZoom:17,...o}; let z=null; try{ z=map.cameraForBounds(b,opt)?.zoom??null; }catch(e){} safeFit(b,opt); return z; }
@@ -747,6 +751,7 @@ function cardBack(){ const p=cpush; if(!p) return false; cpush=null;
 // it runs after the page's own document-level handlers.
 addEventListener('keydown',e=>{ if(e.key!=='Escape'||e.defaultPrevented||!card.classList.contains('open')) return;
   if(e.target?.closest?.('input,textarea,select,[contenteditable="true"]')) return;
+  if(card.classList.contains('sp-mode')) return; // a site plan is never closed by Esc: it steps back itself (src/siteplan.js), and × or Done closes it
   e.preventDefault(); if(!cardBack()) closeCard(); });
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
 
@@ -1010,7 +1015,10 @@ document.getElementById('orbit').onclick=()=>{ if(!resetPop.hidden) setResetOpen
 
 // ---------- toast ----------
 const toastEl=document.getElementById('toast'); let toastT=0;
-function toast(m){ toastEl.textContent=m; toastEl.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('on'),3400); }
+// toast(text) or toast(text, {action:{label, run}}): with an action the note carries a button and stays a little longer
+function toast(m,o={}){ toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a);
+  if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.onclick=()=>{ toastEl.classList.remove('on','act'); a.run(); }; toastEl.append(' ',b); }
+  toastEl.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('on','act'),o.ms||(a?6500:3400)); }
 
 // ---------- export ----------
 const fmtD=s=>new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});

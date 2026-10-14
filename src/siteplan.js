@@ -10,6 +10,7 @@ import * as PF from './lib/proforma.mjs';
 import { sheetHTML, planSVG } from './lib/sitesheet.mjs';
 import { BUILDING_TYPES, BUILDING_GROUPS, typeById, fromType } from './lib/buildings.mjs';
 import * as ED from './lib/siteedit.mjs';
+import { freeRect as openArea, fitPadding, planSections } from './lib/planview.mjs';
 const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 
@@ -93,8 +94,11 @@ export function initSitePlan(ctx) {
     const label = many ? recs.length + ' parcels' + (recs[0].label ? ' · ' + recs[0].label : '') : recs[0]?.label || info.title || 'Site';
     const acres = b ? SP.ringArea(b.ring) / 43560 : null, recent = db.projects.slice().sort((x, y) => t(y.updated) - t(x.updated)).slice(0, 8);
     const noGeom = recs.filter(r => !r.geometry).length;
+    if (ed) close();
     ctx.clearSelection?.();
-    card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan</div><h2>Start a site plan</h2><div class="bsub">' + esc(label) + (acres ? ' · ' + acres.toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() + '</div>' +
+    const back = info.title && !/^Loading/.test(info.title) ? info.title : recs[0]?.label || 'Property';
+    // started from a property card: that card waits behind the plan ("← address" in the header, and × goes back to it)
+    const paint = () => { card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan</div><h2>Start a site plan</h2><div class="bsub">' + esc(label) + (acres ? ' · ' + acres.toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() + '</div>' +
       '<div class="bsec sp-start"><div class="lt">Project</div>' +
       '<label class="sp-radio"><input type="radio" name="spP" value="" checked> New project <input id="spName" class="sp-in" value="' + esc(recs[0]?.label || label) + '" aria-label="Project name"></label>' +
       recent.map(p => '<label class="sp-radio"><input type="radio" name="spP" value="' + esc(p.id) + '"> Add to <b>' + esc(p.name) + '</b> <span class="rnote">' + p.plans.length + ' plan' + (p.plans.length === 1 ? '' : 's') + '</span></label>').join('') +
@@ -102,9 +106,11 @@ export function initSitePlan(ctx) {
       (b?.pieces > 1 ? '<div class="rnote sp-warn">Some parcels don’t touch the rest (a road or a gap wider than 6 ft between them), so they’re left out of the site.</div>' : '') +
       (noGeom && b ? '<div class="rnote sp-warn">' + noGeom + ' of the parcels have no outline from the county and are left out.</div>' : '') +
       '<div class="bacts" style="padding:12px 0 0"><button class="btn askai" id="spStart">Start Site Plan</button><button class="btn" id="spBack">Back</button></div></div>';
-    card.classList.add('open');
+      card.classList.add('open'); };
+    if (ctx.cardPush && card.classList.contains('open') && !ed) ctx.cardPush(null, back, paint); else paint();
+    fromCard = ctx.cardChild?.() === 'open' ? back : '';
     card.querySelector('.x').onclick = () => ctx.closeCard();
-    card.querySelector('#spBack').onclick = () => ctx.openBuildingAt(center);
+    card.querySelector('#spBack').onclick = () => { if (!(ctx.cardChild?.() === 'open' && ctx.cardBack?.())) ctx.openBuildingAt(center); };
     card.querySelector('#spStart').onclick = () => {
       const pick = card.querySelector('input[name=spP]:checked').value;
       let p = db.projects.find(x => x.id === pick);
@@ -121,28 +127,131 @@ export function initSitePlan(ctx) {
   const xBtn = () => '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>';
 
   // ---------- the editor ----------
-  let hidBldg = null;
+  // Planning is its own workspace: the left list folds away, the area tools, filters and layer chips step aside, the plan
+  // gets the map, and the property card's selection highlight is hidden under it. All of it is put back on close.
+  const app = document.querySelector('.app'), phone = () => matchMedia('(max-width:700px)').matches;
+  const HIDE = ['fs-bldg', 'fs-bglow', 'fs-bsel', 'fs-bhov', 'fs-psel', 'fs-bnumc', 'fs-bnum']; // the plan replaces what's there
+  let hidden = null, planState = null, leaving = false, fromCard = '', lastOpen = null;
+  function hideMapBits() { hidden = hidden || {}; for (const id of HIDE) if (map.getLayer(id)) { if (!(id in hidden)) hidden[id] = map.getLayoutProperty(id, 'visibility') || 'visible'; map.setLayoutProperty(id, 'visibility', 'none'); } }
+  function showMapBits() { for (const [id, v] of Object.entries(hidden || {})) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v); hidden = null; }
+  function enterPlanning() {
+    app.classList.add('planning');
+    if (ctx.mode && ctx.mode() !== 'pan') ctx.setMode?.('pan'); // an area tool that was on goes off
+    planState = { collapsed: !!ctx.panelCollapsed?.() };
+    if (!planState.collapsed && !phone()) ctx.setPanelCollapsed?.(true);
+    watchResize();
+  }
+  function leavePlanning() {
+    app.classList.remove('planning'); ro?.disconnect(); ro = null; clearTimeout(roT);
+    if (planState && !!ctx.panelCollapsed?.() !== planState.collapsed) ctx.setPanelCollapsed?.(planState.collapsed); // exactly as it was
+    planState = null;
+  }
   function open(pid, plid, o = {}) {
     if (ctx.view !== 'map') ctx.setView('map');
-    if (card.classList.contains('open')) ctx.closeCard(); // the building card's selection goes; the plan takes over the card
-    cur = pid; renaming = false;
+    const switching = !!ed; // another option of the open plan: the workspace stays as it is
+    clearResume(); hideAway();
+    if (!switching) {
+      // the building card's selection goes and the plan takes over the card, unless the plan was started from that card:
+      // then it waits behind the plan ("← address" in the header) and × goes back to it
+      if (card.classList.contains('open') && !(fromCard && ctx.cardChild?.() === 'open')) ctx.closeCard();
+      if (ctx.cardChild?.() !== 'open') fromCard = '';
+      enterPlanning();
+    }
+    cur = pid; renaming = false; lastOpen = { pid, plid };
     ed = { pid, plid, sel: null, undo: [], redo: [], mode: o.draw ? 'draw' : null, draft: [], variants: null, editing: false }; // editing: pieces can be moved only in Edit Layout
-    if (map.getLayer('fs-bldg')) { hidBldg = map.getLayoutProperty('fs-bldg', 'visibility') || 'visible'; map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } // the plan replaces what's there
-    addLayers(); draw(); panel(); fit();
+    hideMapBits();
+    addLayers(); draw(); panel();
+    requestAnimationFrame(() => requestAnimationFrame(() => planFit()));
     const pl = PL(); if (pl?.ring.length >= 3 && (pl.frontGuess || pl.streets == null)) map.once('idle', () => { if (PL() === pl && (pl.frontGuess || pl.streets == null)) detectFront(pl); });
   }
+  // the plan closes (Done, ×, another card, leaving the map): say where it was saved and leave a way back to it
   function close() {
-    card.classList.remove('sp-mode'); if (!ed) return; ed = null; draw();
-    if (hidBldg && map.getLayer('fs-bldg')) map.setLayoutProperty('fs-bldg', 'visibility', hidBldg); hidBldg = null;
+    card.classList.remove('sp-mode'); if (!ed) return;
+    const p = P(), pl = PL(), was = { pid: ed.pid, plid: ed.plid, at: performance.now() };
+    ed = null; fromCard = ''; draw(); showMapBits(); leavePlanning();
+    if (persistT) persistNow();
+    if (!p || !pl) return; // deleted
+    if (leaving) { showAway(was); return; }
+    showResume(was);
+    ctx.toast('Saved to ' + p.name + '.', { action: { label: 'Open project', run: () => openProject(was.pid) } });
   }
   ctx.onCardClose?.(() => close());
   ctx.onCardRender?.(() => close()); // another card (a filing, a search result) took the panel
-  function fit() {
-    const pl = PL(), F = pl?.origin && SP.frame(pl.origin), r = pl?.ring || [];
-    if (!F) return; if (r.length < 3) { map.easeTo({ center: pl.origin, zoom: Math.max(map.getZoom(), 17), pitch: 0 }); return; }
-    const ll = r.map(F.toLL), xs = ll.map(p => p[0]), ys = ll.map(p => p[1]);
-    ctx.fitBox([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { maxZoom: 19 });
+  // Done and ×: back to the property card the plan was started from, else the plan just closes
+  function closePlan() { if (fromCard && ctx.cardChild?.() === 'open' && ctx.cardBack?.()) { if (ed) close(); return; } ctx.closeCard(); }
+  function openProject(pid) { ctx.setView('projects'); if (db.projects.some(x => x.id === pid)) show(pid); }
+
+  // ----- where the plan can be seen: the map's free rectangle (not under the card, the list, the search or the buttons) -----
+  function freeRect() {
+    const m = map.getContainer().getBoundingClientRect(), vis = el => el && el.offsetParent !== null && getComputedStyle(el).visibility !== 'hidden', box = el => vis(el) ? el.getBoundingClientRect() : null;
+    const f = openArea(m, { panels: [card.classList.contains('open') ? box(card) : null, app.classList.contains('ai-open') ? box(document.getElementById('ai')) : null].filter(Boolean),
+      tops: [box(document.getElementById('mapleft')), box(document.getElementById('mtop'))].filter(Boolean), buttons: box(document.querySelector('.ctrls')) }); // search and tools on top, camera buttons on the right
+    return { ...f, m };
   }
+  function ringLL(pl) { const F = pl?.origin && pl.ring?.length >= 3 && SP.frame(pl.origin); return F ? pl.ring.map(F.toLL) : null; }
+  // the whole site in the free rectangle
+  function planFit() {
+    const pl = ed && PL(); if (!pl?.origin) return;
+    const ll = ringLL(pl); if (!ll) { map.easeTo({ center: pl.origin, zoom: Math.max(map.getZoom(), 17), pitch: 0 }); return; }
+    const xs = ll.map(p => p[0]), ys = ll.map(p => p[1]), f = freeRect(), padding = fitPadding(f, f.m, phone() ? 14 : 40);
+    if (map.getPitch() > 1) map.jumpTo({ pitch: 0 }); // the plan is a drawing: seen from straight above, it fits exactly
+    ctx.fitBox([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding, maxZoom: 19 });
+  }
+  // is the whole site on screen, clear of the panels?
+  function planInView() {
+    const ll = ringLL(ed && PL()); if (!ll) return true; const { l, t, r, b } = freeRect(), c = map.getContainer().getBoundingClientRect();
+    return ll.every(q => { const s = map.project(q), x = s.x + c.left, y = s.y + c.top; return x >= l - 2 && x <= r + 2 && y >= t - 2 && y <= b + 2; });
+  }
+  // refit when the map itself changes size (the list folds, the window resizes) or the phone sheet settles; never on a map move
+  let ro = null, roT = 0, sheetQuiet = false;
+  const refitView = () => { clearTimeout(roT); roT = setTimeout(() => { if (ed) planFit(); }, 140); };
+  function watchResize() {
+    if (ro || !window.ResizeObserver) return; let first = true;
+    ro = new ResizeObserver(() => { if (first) { first = false; return; } refitView(); }); ro.observe(map.getContainer());
+  }
+  card.addEventListener('transitionend', e => { if (e.target !== card || !ed || !phone() || !/max-height|transform/.test(e.propertyName)) return; if (sheetQuiet) { sheetQuiet = false; return; } refitView(); });
+  const fitBtnWrap = document.createElement('div'); fitBtnWrap.className = 'rgrp sp-fitg';
+  fitBtnWrap.innerHTML = '<button type="button" id="spFit" aria-label="Fit the plan in view" title="Fit the plan in view"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5"/><rect x="5" y="5" width="6" height="6" rx="1"/></svg></button>';
+  document.querySelector('.ctrls')?.prepend(fitBtnWrap); fitBtnWrap.querySelector('button').onclick = () => planFit();
+
+  // ----- after closing: a faint outline of the site and a "Resume plan" chip; away from the map, a banner back to it -----
+  const GSRC = 'fs-sp-ghost'; let resume = null, away = null;
+  const resumeEl = document.createElement('div'); resumeEl.className = 'sp-resume'; resumeEl.hidden = true; (document.getElementById('mapleft') || ctx.viewport || document.body).appendChild(resumeEl);
+  const awayEl = document.createElement('div'); awayEl.className = 'sp-away'; awayEl.hidden = true; awayEl.setAttribute('role', 'status'); (document.getElementById('stage') || document.body).appendChild(awayEl);
+  const RESUME = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.5-3.6M3 2.5v3h3"/></svg>';
+  const XS = '<svg width="12" height="12" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+  const planOf = w => { const p = w && db.projects.find(x => x.id === w.pid), pl = p?.plans.find(x => x.id === w.plid); return p && pl ? { p, pl } : null; };
+  function ghost(pl) {
+    const ll = ringLL(pl), data = ll ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ll.concat([ll[0]])] } }] } : EMPTY;
+    if (!map.getSource(GSRC)) { if (!ll || !map.isStyleLoaded?.()) return; map.addSource(GSRC, { type: 'geojson', data: EMPTY });
+      map.addLayer({ id: 'fs-sp-ghost-f', type: 'fill', source: GSRC, paint: { 'fill-color': '#0a7a36', 'fill-opacity': .06 } });
+      map.addLayer({ id: 'fs-sp-ghost', type: 'line', source: GSRC, paint: { 'line-color': ctx.isDark() ? '#8acda3' : '#0a7a36', 'line-width': 2, 'line-dasharray': [3, 2], 'line-opacity': .75 } }); }
+    map.getSource(GSRC).setData(data);
+  }
+  function showResume(w) {
+    const x = planOf(w); if (!x) return; resume = w; ghost(x.pl);
+    resumeEl.innerHTML = '<button type="button" class="sp-rs-go" title="Open ' + esc(x.pl.name) + ' of ' + esc(x.p.name) + ' again">' + RESUME + '<span>Resume plan</span><b>' + esc(x.pl.name) + '</b></button><button type="button" class="sp-rs-x" aria-label="Dismiss">' + XS + '</button>';
+    resumeEl.querySelector('.sp-rs-go').onclick = () => { const r = resume; clearResume(); if (planOf(r)) open(r.pid, r.plid); };
+    resumeEl.querySelector('.sp-rs-x').onclick = clearResume; resumeEl.hidden = false;
+  }
+  function clearResume() { resume = null; resumeEl.hidden = true; if (map.getSource(GSRC)) map.getSource(GSRC).setData(EMPTY); }
+  map.on('click', () => { if (resume && !ed && performance.now() - resume.at > 400) clearResume(); }); // the next click on the map lets it go
+  function showAway(w) {
+    const x = planOf(w); if (!x) return; away = w;
+    awayEl.innerHTML = '<span>Editing <b>' + esc(x.pl.name) + '</b> of ' + esc(x.p.name) + '</span><button type="button" class="sp-aw-go">Return to plan</button><button type="button" class="sp-aw-x" aria-label="Dismiss">' + XS + '</button>';
+    awayEl.querySelector('.sp-aw-go').onclick = () => { const a = away; hideAway(); if (planOf(a)) open(a.pid, a.plid); };
+    awayEl.querySelector('.sp-aw-x').onclick = hideAway; awayEl.hidden = ctx.view === 'map';
+  }
+  function hideAway() { away = null; awayEl.hidden = true; }
+  // leaving the map while a plan is open closes it cleanly (no editor floating over a page) and leaves the banner
+  ctx.onViewChange?.(v => {
+    if (v !== 'map') {
+      if (ed) { leaving = true; try { ctx.closeCard(); } finally { leaving = false; } }
+      else if (resume && performance.now() - resume.at < 1500) { const r = resume; clearResume(); showAway(r); } // closed on the way out (a phone tab, All Projects)
+      else clearResume();
+      awayEl.hidden = !away;
+    } else if (away) { const a = away; hideAway(); showResume({ ...a, at: performance.now() }); } // back on the map: the chip, not the banner
+  });
 
   // street side: the parcel edge facing the nearest road in the map's own road lines, else the longest edge (a guess)
   function detectFront(pl) {
@@ -210,7 +319,8 @@ export function initSitePlan(ctx) {
     draw();
   }
   ctx.onOverlays?.(() => { for (const id of ['fs-sp-b3', 'fs-sp-yard', 'fs-sp-fence', 'fs-sp-pave', 'fs-sp-curb', 'fs-sp-ada', 'fs-sp-mark', 'fs-sp-zone', 'fs-sp-lots', 'fs-sp-walk', 'fs-sp-isl', 'fs-sp-tree', 'fs-sp-pl', 'fs-sp-lot', 'fs-sp-fill', 'fs-sp-stall', 'fs-sp-sb', 'fs-sp-lotl', 'fs-sp-front', 'fs-sp-bldg', 'fs-sp-edge', 'fs-sp-lab', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-h']) if (map.getLayer(id)) map.removeLayer(id);
-    for (const s of [SRC, HSRC, DSRC]) if (map.getSource(s)) map.removeSource(s); if (ed) { addLayers(); if (map.getLayer('fs-bldg')) map.setLayoutProperty('fs-bldg', 'visibility', 'none'); } });
+    for (const s of [SRC, HSRC, DSRC]) if (map.getSource(s)) map.removeSource(s); if (map.getSource(GSRC)) { for (const id of ['fs-sp-ghost', 'fs-sp-ghost-f']) if (map.getLayer(id)) map.removeLayer(id); map.removeSource(GSRC); }
+    if (ed) { addLayers(); hideMapBits(); } else if (resume) { const x = planOf(resume); if (x) ghost(x.pl); } });
   function handles(pl) {
     const e = ed.editing && pl.elements.find(x => x.id === ed.sel); if (!e) return [];
     if (ed.shape === e.id && e.poly) { const F = SP.frame(pl.origin), P = e.poly; // shape editing: every point, and a + between points to add one
@@ -378,12 +488,12 @@ export function initSitePlan(ctx) {
   document.addEventListener('keydown', e => {
     const pl = ed && PL(), typing = /^(TEXTAREA)$/.test(e.target.tagName) || e.target.tagName === 'INPUT' && !/^(checkbox|radio|button|range)$/.test(e.target.type) || e.target.isContentEditable;
     if (pl && ctx.view === 'map' && !typing && (e.metaKey || e.ctrlKey) && /^[zy]$/i.test(e.key)) { e.preventDefault(); e.stopPropagation(); undo(e.key.toLowerCase() === 'z' ? !e.shiftKey : false); return; } // undo and redo work whatever button was last clicked
+    if (pl && ctx.view === 'map' && e.key === 'Escape' && card.classList.contains('sp-mode') && e.target.tagName !== 'SELECT') { escStep(e, typing); return; }
     if (!pl || ctx.view !== 'map' || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName) || e.target.isContentEditable) return;
     const used = () => { e.preventDefault(); e.stopPropagation(); };
     const k = e.key, el = pl.elements.find(x => x.id === ed.sel), mod = e.metaKey || e.ctrlKey;
     if (mod && k.toLowerCase() === 'z') { used(); undo(!e.shiftKey); return; }
     if (mod && k.toLowerCase() === 'y') { used(); undo(false); return; }
-    if (k === 'Escape') { if (ed.mode) { e.preventDefault(); ed.mode = null; ed.draft = []; draw(); panel(); } else if (ed.sel) { e.preventDefault(); ed.sel = null; draw(); panel(); } return; }
     if (k === 'Enter' && ed.mode === 'draw') { finishDraw(); return; }
     if (!el || !ed.editing) return;
     if (k === 'Delete' || k === 'Backspace') { used(); change(x => dropEl(x, el)); ed.sel = null; draw(); panel(); return; }
@@ -392,55 +502,92 @@ export function initSitePlan(ctx) {
     if ((k === 'r' || k === 'R') && !mod && !SP.isFree(el)) { used(); change(() => { el.rot = ((el.rot || 0) + 90) % 360; }); }
   }, true);
 
+  // Esc steps back one thing at a time and never closes the plan (× or Done does): a tool → the selection → Edit Layout.
+  // A pop-over that's open (Layers, a menu, Filters) closes first; in a text box, Esc just leaves the box.
+  function escStep(e, typing) {
+    if (document.querySelector('#layers.on, .fpop:not([hidden]), details.vmenu[open], .msheet.on, .rpop:not([hidden]), .app.sel-open, #settingsSheet:not([hidden])')) return;
+    if (typing && !card.contains(e.target)) return; // the assistant's box and other fields handle their own Esc
+    e.preventDefault(); e.stopPropagation();
+    if (typing) { e.target.blur(); return; }
+    if (ed.mode) { ed.mode = null; ed.draft = []; draw(); panel(); return; }
+    if (ed.sel || ed.shape) { ed.sel = null; ed.shape = null; draw(); panel(); return; }
+    if (ed.editing) { ed.editing = false; draw(); panel(); ctx.toast('Done editing'); }
+  }
+
   // ---------- the panel ----------
   // the dark summary under the header, as on a property card: what the plan holds and whether it passes
   function overview(pl, prog) {
-    if (!pl.elements.length) return '<div class="kicker">Overview</div><div>No layout yet. Describe what should go here under <b>Build with AI</b>, or draw pieces by hand.</div>';
+    if (!pl.elements.length) return '<div class="kicker">Step 1 of 3</div><div><b>Describe what to build</b> under Build with AI, then Build Options. <button type="button" class="sp-link sp-quiet" data-jump="spDrawSec">or draw pieces by hand</button></div>';
     const m = SP.metrics(pl), bad = SP.check(pl).filter(i => i.level === 'bad').length, B = pl.elements.filter(e => e.kind === 'building').length;
     const what = [m.units ? '<b>' + f0(m.units) + ' homes</b>' : '', '<b>' + f0(m.gfa) + ' sq ft</b> in ' + B + ' building' + (B === 1 ? '' : 's'), f0(m.spaces) + ' of ' + f0(m.required) + ' parking spaces', pct(m.coverage) + ' coverage'].filter(Boolean).join(' · ');
     return '<div class="kicker">' + (ed.editing ? 'Editing · drag a piece; only it changes' : 'Overview') + '</div><div>' + what + '. ' + (bad ? '<b>' + bad + ' problem' + (bad > 1 ? 's' : '') + '</b> to fix (in red on the map).' : m.spaces < m.required ? 'Parking is short.' : 'Passes the setback, overlap and parking checks.') + '</div>';
   }
+  const ICO = {
+    undo: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 3 2.5 6l3 3"/><path d="M2.5 6h7a4 4 0 0 1 0 8H7"/></svg>',
+    redo: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 3l3 3-3 3"/><path d="M13.5 6h-7a4 4 0 0 0 0 8H9"/></svg>',
+    edit: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 13.5l.6-3L10.8 2.8a1.5 1.5 0 0 1 2.1 0l.3.3a1.5 1.5 0 0 1 0 2.1L5.5 12.9z"/><path d="M9.5 4l2.5 2.5"/></svg>',
+    done: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>',
+    back: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>'
+  };
+  // an option pill's tooltip: what it holds, from the same numbers as the Projects page
+  function optTip(p, x) { const { drawn, m } = info(p, x); return drawn && m?.gfa ? [m.units ? plural(m.units, 'unit') : f0(m.gfa) + ' sq ft', f0(m.spaces) + ' parking', pct(m.coverage) + ' coverage'].join(' · ') : drawn ? 'Nothing laid out yet' : 'No site drawn yet'; }
+  const plansHtml = (p, pl, extra) => '<div class="sp-plans' + (extra ? ' ' + extra : '') + '" role="group" aria-label="Options">' + p.plans.map(x => '<button type="button" class="chip" aria-pressed="' + (x.id === pl.id) + '" data-plan="' + esc(x.id) + '" title="' + esc(x.name + ': ' + optTip(p, x)) + '">' + esc(x.name) + '</button>').join('') +
+    '<button type="button" class="chip sp-newopt" data-newopt="1" title="Start another option from this one">+ New Option</button></div>';
   function panel() {
     const p = P(), pl = PL(); if (!p || !pl) return;
-    const sel = pl.elements.find(e => e.id === ed.sel), prog = SP.normalizeProgram(pl.program), noRing = pl.ring.length < 3, drawing = noRing || ed.mode === 'draw';
-    const parcel = p.parcels.find(x => x.key === pl.parcel);
-    const scroll = card.classList.contains('sp-mode') ? card.scrollTop : 0;
-    card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan · ' + esc(p.name) + '</div><h2><input id="spPlanName" class="sp-title" value="' + esc(pl.name) + '" aria-label="Plan name"></h2><div class="bsub">' + esc(parcel?.label || '') + (pl.ring.length >= 3 ? ' · ' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() +
-      '<div class="sp-plans">' + p.plans.map(x => '<button class="chip" aria-pressed="' + (x.id === pl.id) + '" data-plan="' + esc(x.id) + '">' + esc(x.name) + '</button>').join('') + '<button class="chip" id="spCopy" title="Start another option from this one">+ Copy</button>' + (noRing ? '' : '<button class="btn sp-edit' + (ed.editing ? ' askai' : '') + '" aria-pressed="' + !!ed.editing + '" id="spEdit" title="Move, resize and turn pieces of the plan; only the piece you move changes">' + (ed.editing ? 'Done Editing' : 'Edit Layout') + '</button>') + '</div>' +
-      ctx.cardNav([...(pl.elements.length ? [['spChgSec', 'Change']] : []), ['spAiSec', 'Build'], ['spSel', 'Selected'], ['spNums', 'Numbers'], ['spDrawSec', 'Draw'], ['spSiteSec', 'Site'], ['spParams', 'Settings'], ['spPfSec', 'Pro forma'], ['spExport', 'Export']]) + '</div>' +
-      (noRing ? '' : '<div class="bover" id="spOver">' + overview(pl, prog) + '</div>') +
-      '<div class="sp-body">' +
-      (drawing ? '<div class="bsec sp-draw"><div class="lt">Draw the site</div><p>Click each corner of the site on the map. Click the first corner again (or double-click, or press Enter) to finish.' + (ed.draft.length ? ' ' + ed.draft.length + ' corner' + (ed.draft.length > 1 ? 's' : '') + ' so far.' : '') + '</p><div class="bacts" style="padding:0"><button class="btn askai" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button class="btn" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button class="btn" id="spCancelDraw">Keep the Old Site</button>') + '</div></div>' :
-      (pl.elements.length ? '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change With AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Apt Bldg 7 four stories · turn the clubhouse into a 7,500 sf one · remove Bldg 3 · swap Bldg 2 and Bldg 5">' + esc(ed.chg || '') + '</textarea>' +
+    const sel = pl.elements.find(e => e.id === ed.sel), prog = SP.normalizeProgram(pl.program), noRing = pl.ring.length < 3, drawing = noRing || ed.mode === 'draw', has = pl.elements.length > 0;
+    const parcel = p.parcels.find(x => x.key === pl.parcel), addr = parcel?.label || '', acres = noRing ? '' : (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' acres';
+    const selNew = !!sel && sel.id !== ed.shownSel; ed.shownSel = sel?.id || null; // a new piece picked: the card goes to the top, where Selected is
+    const scroll = selNew ? 0 : card.classList.contains('sp-mode') ? card.scrollTop : 0;
+    const act = document.activeElement, focusId = act && act !== card && card.contains(act) ? act.id : ''; // keep the focus across the redraw
+    const sub = addr && addr.trim().toLowerCase() !== p.name.trim().toLowerCase() ? esc(addr) + (acres ? ' · ' + acres : '') : acres;
+    const back = fromCard && ctx.cardChild?.() === 'open' ? '<button type="button" class="cback sp-cback" title="Back to ' + esc(fromCard) + '">' + ICO.back + '<span>' + esc(fromCard) + '</span></button>' : '';
+    // one list (lib/planview.mjs): the section chips and the sections come from it, in its order, so they can't drift apart
+    const HTML = {
+      spDrawSite: () => '<div class="bsec sp-draw" id="spDrawSite"><div class="lt">Draw the site</div><p>Click each corner of the site on the map. Click the first corner again (or double-click, or press Enter) to finish.' + (ed.draft.length ? ' ' + ed.draft.length + ' corner' + (ed.draft.length > 1 ? 's' : '') + ' so far.' : '') + '</p><div class="bacts" style="padding:0"><button class="btn askai" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button class="btn" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button class="btn" id="spCancelDraw">Keep the Old Site</button>') + '</div></div>',
+      spSel: () => '<div class="bsec" id="spSel">' + selHtml(sel, prog) + '</div>',
+      spLayouts: () => '<div class="bsec" id="spLayouts"><div class="lt">Layouts</div><div id="spVariants">' + variantsHtml() + '</div></div>',
+      spChgSec: () => '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change With AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Apt Bldg 7 four stories · turn the clubhouse into a 7,500 sf one · remove Bldg 3 · swap Bldg 2 and Bldg 5">' + esc(ed.chg || '') + '</textarea>' +
         '<div class="rnote">' + (sel ? 'About <b>' + esc(ED.labelOf(sel)) + '</b> (selected), or name any piece as it’s labelled on the plan.' : 'Name pieces as they’re labelled on the plan, or select one and say “it”.') + '</div>' +
         '<div class="bacts sp-go"><button class="btn askai" id="spChgGo">Make Changes</button></div><div class="sp-stage" id="spChgStage" aria-live="polite"></div>' + (pl.recipe ? '<label class="sp-sw sp-revsw"><input type="checkbox" id="spChgFit"' + (ed.chgFit ? ' checked' : '') + '> Re-fit the rest of the site around the changes (otherwise only those pieces change)</label>' : '') +
-        '<div class="rnote sp-ainote" id="spChgNote">' + esc(ed.chgNote || '') + '</div></div>' : '') +
-      '<div class="bsec sp-ai" id="spAiSec"><label class="lt" for="spAsk">Build with AI</label><textarea id="spAsk" rows="2" placeholder="What should go here? e.g. 25,000 sf retail strip with 4 per 1,000 parking">' + esc(ed.ask || '') + '</textarea>' +
-        '<div class="sp-sugs">' + SUGGEST.map(s => '<button class="chip" data-sug="' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div>' +
+        '<div class="rnote sp-ainote" id="spChgNote">' + esc(ed.chgNote || '') + '</div></div>',
+      spAiSec: () => '<div class="bsec sp-ai" id="spAiSec"><label class="lt" for="spAsk">Build with AI</label><textarea id="spAsk" rows="2" placeholder="What should go here? e.g. 25,000 sf retail strip with 4 per 1,000 parking">' + esc(ed.ask || '') + '</textarea>' +
+        '<div class="sp-sugs">' + SUGGEST.map(x => '<button class="chip" data-sug="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div>' +
         '<div class="bacts sp-go"><button class="btn askai" id="spGo">Build Options</button><button class="btn" id="spBest" title="The AI reads what the app knows about this site and its surroundings and suggests what to build">What Should Go Here?</button></div>' +
         '<div class="sp-stage" id="spAiStage" aria-live="polite"></div>' + '<label class="sp-sw sp-revsw"><input type="checkbox" id="spReview"' + (aiReviewOn() ? ' checked' : '') + '> The AI reviews the layouts it gets back and revises the plan when they miss</label>' +
-        '<div id="spIdeas">' + ideasHtml() + '</div><div class="rnote sp-ainote" id="spAiNote">' + esc(ed.aiNote || '') + '</div>' +
-        '<div id="spVariants">' + variantsHtml() + '</div></div>' +
-      siteHtml(p, pl) +
-      '<div class="bsec" id="spDrawSec"><div class="lt">Draw and tools</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + (k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building) + '"></i>' + (ADD_LABEL[k] || SP.KINDS[k].label) + '</button>').join('') + '<button class="btn" id="spTrees" aria-pressed="' + (pl.params?.trees !== false) + '" title="Show or hide the trees on the plan, the map and the PDF">Trees ' + (pl.params?.trees !== false ? 'On' : 'Off') + '</button></div>' +
-        '<label class="sp-lib">From the building library (' + BUILDING_TYPES.length + ' types)<select id="spLib"><option value="">Pick a building type to add…</option>' + typeOptions('') + '</select></label>' +
-        '<div class="sp-tools"><button class="btn" aria-pressed="' + (ed.mode === 'front') + '" id="spFront" title="Then click the lot line along the street">' + (ed.mode === 'front' ? 'Click the street side…' : 'Street Side') + '</button><button class="btn" aria-pressed="' + (ed.mode === 'street') + '" id="spStreet" title="A second street along the lot (a corner lot): click its lot line to add it, or again to remove it">' + (ed.mode === 'street' ? 'Click the side street…' : 'Side Street') + '</button><button class="btn" aria-pressed="' + (ed.mode === 'entrance') + '" id="spEntr" title="A driveway in from the street: click the lot line where it should come in; it runs straight in to the nearest drive">' + (ed.mode === 'entrance' ? 'Click the street edge…' : 'Add Entrance') + '</button><button class="btn" id="spRedraw">Redraw Site</button>' +
-        '<button class="btn" id="spUndo"' + (ed.undo.length ? '' : ' disabled') + ' title="Undo (⌘Z / Ctrl+Z)">Undo</button><button class="btn" id="spRedo"' + (ed.redo.length ? '' : ' disabled') + '>Redo</button></div>' +
-        (pl.frontGuess ? '<div class="rnote sp-warn">The street side (orange line) is a guess. Use <b>Street Side</b> to pick the lot line along the street; front setbacks and drives follow it.</div>' : '') + '</div>' +
-      '<div class="bsec" id="spSel">' + selHtml(sel, prog) + '</div>' +
-      '<div class="bsec" id="spNums"></div>' +
-      paramsHtml(pl, prog) +
-      '<div id="spPf">' + pfHtml(p, pl) + '</div>' +
-      '<div class="bsec" id="spExport"><div class="lt">Export</div><div class="bacts" style="padding:0 0 8px"><button class="btn askai" id="spPdf" title="A conceptual site plan sheet: the plan to scale with title block, site data, program and parking, parcels, notes and legend">Site Plan PDF</button><select class="chip" id="spSheet" aria-label="Sheet size"><option value="tabloid">11 × 17</option><option value="archd">24 × 36</option></select></div><div class="bacts" style="padding:0"><button class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button class="btn" id="spGeo">Map File (GeoJSON)</button><button class="btn" id="spSum">Copy Summary</button></div>' +
-        '<div class="bacts" style="padding:8px 0 0"><button class="btn" id="spProj">All Projects</button><button class="btn sp-del" id="spDelPlan">Delete This Plan</button></div></div>') +
-      '</div>';
+        '<div id="spIdeas">' + ideasHtml() + '</div><div class="rnote sp-ainote" id="spAiNote">' + esc(ed.aiNote || '') + '</div></div>',
+      spNums: () => '<div class="bsec" id="spNums"></div>',
+      spPfSec: () => '<div id="spPf">' + pfHtml(p, pl) + '</div>',
+      spSiteSec: () => siteHtml(p, pl),
+      spDrawSec: () => '<div class="bsec" id="spDrawSec"><div class="lt">Draw by hand</div><div class="sp-tools">' + ADD.map(k => '<button class="btn sp-add" data-add="' + k + '"><i style="background:' + (k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building) + '"></i>' + (ADD_LABEL[k] || SP.KINDS[k].label) + '</button>').join('') + '<button class="btn" id="spTrees" aria-pressed="' + (pl.params?.trees !== false) + '" title="Show or hide the trees on the plan, the map and the PDF">Trees ' + (pl.params?.trees !== false ? 'On' : 'Off') + '</button></div>' +
+        '<label class="sp-lib">From the building library (' + BUILDING_TYPES.length + ' types)<select id="spLib"><option value="">Pick a building type to add…</option>' + typeOptions('') + '</select></label></div>',
+      spParams: () => paramsHtml(pl, prog),
+      spExport: () => '<div class="bsec" id="spExport"><div class="lt">Export</div><div class="bacts" style="padding:0 0 8px"><button class="btn askai" id="spPdf" title="A conceptual site plan sheet: the plan to scale with title block, site data, program and parking, parcels, notes and legend">Site Plan PDF</button><select class="chip" id="spSheet" aria-label="Sheet size"><option value="tabloid">11 × 17</option><option value="archd">24 × 36</option></select></div><div class="bacts" style="padding:0"><button class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button class="btn" id="spGeo">Map File (GeoJSON)</button><button class="btn" id="spSum">Copy Summary</button></div></div>'
+    };
+    const secs = planSections({ drawing, selected: !!sel, layouts: !!ed.variants, laidOut: has }).map(x => ({ ...x, html: HTML[x.id] }));
+    const editBtn = has && !noRing ? '<button type="button" class="btn sm sp-edit' + (ed.editing ? ' on' : '') + '" aria-pressed="' + !!ed.editing + '" id="spEdit" title="Move, resize and turn pieces of the plan; only the piece you move changes">' + ICO.edit + '<span>' + (ed.editing ? 'Done Editing' : 'Edit Layout') + '</span></button>' : '';
+    card.innerHTML = '<div class="top sp-top"><div class="sp-head">' + back +
+        '<nav class="sp-crumb" aria-label="Where you are"><button type="button" class="sp-cr" data-crumb="all">Projects</button><span aria-hidden="true">›</span><button type="button" class="sp-cr" data-crumb="project" title="Open the project page: ' + esc(p.name) + '">' + esc(p.name) + '</button><span aria-hidden="true">›</span></nav>' +
+        '<div class="sp-ttl"><h2><input id="spPlanName" class="sp-title" value="' + esc(pl.name) + '" aria-label="Option name"></h2>' + (sub ? '<div class="bsub">' + sub + '</div>' : '') + '</div>' +
+        '<div class="sp-hact"><button type="button" class="sp-ib" id="spUndo"' + (ed.undo.length ? '' : ' disabled') + ' aria-label="Undo" title="Undo (⌘Z / Ctrl+Z)">' + ICO.undo + '</button><button type="button" class="sp-ib" id="spRedo"' + (ed.redo.length ? '' : ' disabled') + ' aria-label="Redo" title="Redo (⇧⌘Z / Ctrl+Y)">' + ICO.redo + '</button>' +
+          editBtn + '<button type="button" class="btn sm primary sp-done" id="spDone" title="Close the plan (it’s saved as you go)">' + ICO.done + '<span>Done</span></button>' + xBtn() + '</div></div>' +
+      plansHtml(p, pl) +
+      ctx.cardNav(secs.map(x => [x.id, x.label])) + '</div>' +
+      (noRing ? '' : '<div class="bover" id="spOver">' + overview(pl, prog) + '</div>') + plansHtml(p, pl, 'sp-plans-ph') +
+      '<div class="sp-body">' + secs.map(x => x.html()).join('') +
+      (drawing ? '' : '<div class="sp-foot"><button type="button" class="sp-link sp-del" id="spDelPlan">Delete This Option</button></div>') + '</div>';
     card.classList.add('open', 'sp-mode');
-    const $ = s => card.querySelector(s), on = (s, fn) => { const el = $(s); if (el) el.onclick = fn; };
+    const $ = q => card.querySelector(q), on = (q, fn) => { const el = $(q); if (el) el.onclick = fn; };
     card.scrollTop = scroll;
-    on('.x', () => ctx.closeCard());
+    if (selNew && phone() && !card.classList.contains('half') && !card.classList.contains('full')) { sheetQuiet = true; card.classList.remove('min'); card.classList.add('half'); } // phones: the sheet comes up to show it
+    if (focusId) { const f = card.querySelector('#' + CSS.escape(focusId)); if (f && f !== document.activeElement) try { f.focus({ preventScroll: true }); } catch (e) {} }
+    on('.x', closePlan); on('#spDone', closePlan); on('.sp-cback', closePlan);
+    card.querySelectorAll('[data-crumb]').forEach(b => b.onclick = () => { const pid = p.id; ctx.setView('projects'); show(b.dataset.crumb === 'project' ? pid : null); });
     $('#spPlanName').onchange = e => change(x => { x.name = e.target.value.trim() || x.name; }, true);
     card.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { if (b.dataset.plan === pl.id) return; open(p.id, b.dataset.plan); });
-    on('#spCopy', () => { const c = { ...clone(pl), id: uid(), name: nextName(p), created: new Date().toISOString() }; p.plans.push(c); save(p); open(p.id, c.id); });
+    card.querySelectorAll('[data-newopt]').forEach(b => b.onclick = () => { const c = { ...clone(pl), id: uid(), name: nextName(p), created: new Date().toISOString() }; p.plans.push(c); save(p); open(p.id, c.id); });
+    card.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => card.querySelector('.bnav [data-sec="' + b.dataset.jump + '"]')?.click());
+    on('#spUndo', () => undo(true)); on('#spRedo', () => undo(false));
     on('#spFinish', finishDraw); on('#spClearDraw', () => { ed.draft = []; draw(); panel(); }); on('#spCancelDraw', () => { ed.mode = null; ed.draft = []; draw(); panel(); });
     if (drawing) { nums(); return; }
     $('#spAsk').oninput = e => { ed.ask = e.target.value; };
@@ -452,7 +599,7 @@ export function initSitePlan(ctx) {
     const rv = $('#spReview'); if (rv) rv.onchange = () => { try { localStorage.setItem('fs-sp-review', rv.checked ? '1' : '0'); } catch (e) {} };
     card.querySelectorAll('[data-idea]').forEach(b => b.onclick = () => { const it = ed.ideas?.list?.[+b.dataset.idea]; if (!it) return; ed.ask = it.request; const ta = $('#spAsk'); if (ta) ta.value = it.request; build(); });
     card.querySelectorAll('[data-var]').forEach(b => b.onclick = () => useVariant(+b.dataset.var));
-    on('#spMore', async () => { const pl2 = PL(), b = card.querySelector('#spMore'); busy('#spMore', 'Looking for more layouts…', '#spAiStage'); const more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); if (PL() !== pl2) return; ed.variants = named(more, pl2); ed.pick = null; panel(); });
+    on('#spMore', async () => { const pl2 = PL(); busy('#spMore', 'Looking for more layouts…', '#spAiStage'); const more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); if (PL() !== pl2) return; ed.variants = named(more, pl2); ed.pick = null; panel(); });
     const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; const k = so.value, cur = ed.variants[ed.pick]; const val = v => k === 'value' ? v.fin?.value || 0 : k === 'units' ? v.m.units || 0 : k === 'gfa' ? v.m.gfa : k === 'spaces' ? v.m.spaces : k === 'open' ? v.m.green : (v.rank ?? 0);
       ed.variants.sort((a, b) => val(b) - val(a)); ed.pick = cur ? ed.variants.indexOf(cur) : null; panel(); };
     card.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { ed.editing = true; addEl(b.dataset.add); }); // adding a piece is editing
@@ -465,23 +612,31 @@ export function initSitePlan(ctx) {
     on('#spRedraw', () => { ed.mode = 'draw'; ed.draft = []; ed.sel = null; ctx.toast('Click each corner of the site; click the first one again to finish. Esc cancels.'); draw(); panel(); });
     on('#spParcels', () => { ed.mode = ed.mode === 'parcels' ? null : 'parcels'; ed.sel = null; draw(); panel(); });
     card.querySelectorAll('[data-rmp]').forEach(b => b.onclick = () => { const keys = (pl.parcels || []).filter(k => k !== b.dataset.rmp); if (keys.length) setParcels(keys); });
-    on('#spUndo', () => undo(true)); on('#spRedo', () => undo(false));
     wireParams(pl); wirePf(p, pl);
     wireSel(sel);
     on('#spPdf', () => exportPdf(p, pl, card.querySelector('#spSheet').value));
     on('#spDxf', () => ctx.saveFile(fileName(p, pl) + '.dxf', SP.toDXF(pl, p.name + ' - ' + pl.name), 'application/dxf'));
     on('#spGeo', () => ctx.saveFile(fileName(p, pl) + '.geojson', JSON.stringify(geojson(p, pl), null, 1), 'application/geo+json'));
     on('#spSum', async () => { const s = summary(p, pl); try { await navigator.clipboard.writeText(s); ctx.toast('Summary copied.'); } catch (e) { prompt('Copy the summary', s); } });
-    on('#spProj', () => { ctx.closeCard(); ctx.setView('projects'); });
+    card.querySelectorAll('details.bsec').forEach(d => d.addEventListener('toggle', tailRoom));
     on('#spDelPlan', () => { if (!confirm('Delete ' + pl.name + ' from ' + p.name + '?')) return; p.plans = p.plans.filter(x => x.id !== pl.id); save(p); ctx.closeCard(); ctx.setView('projects'); });
-    nums();
+    nums(); tailRoom();
   }
+  // room under the last sections, so a chip near the end (Draw) can still bring its section to the top of the card
+  function tailRoom() {
+    const f = card.querySelector('.sp-foot'), d = card.querySelector('#spDrawSec'), top = card.querySelector(':scope>.top'); if (!f || !d || !top) return;
+    f.style.paddingBottom = ''; const need = d.offsetTop - top.offsetHeight - 8 + card.clientHeight - card.scrollHeight;
+    if (need > 0) f.style.paddingBottom = Math.ceil(need) + 'px';
+  }
+  // the site: its parcels, the street sides and entrances, and redrawing it
   function siteHtml(p, pl) {
     const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), recs = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), on = ed.mode === 'parcels';
     return '<div class="bsec" id="spSiteSec"><div class="lt">Site · ' + recs.length + ' parcel' + (recs.length === 1 ? '' : 's') + ' · ' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' ac</div>' +
       (recs.length > 1 ? '<div class="sp-parcels">' + recs.map(r => '<span class="chip">' + esc(r.label) + (r.acres ? ' · ' + r.acres.toFixed(2) + ' ac' : '') + '<button class="sp-x" data-rmp="' + esc(r.key) + '" aria-label="Remove ' + esc(r.label) + ' from the site">×</button></span>').join('') + '</div>' : '') +
-      '<div class="sp-tools"><button class="btn" aria-pressed="' + on + '" id="spParcels" title="Click parcels on the map to add them to the site (up to ' + MAXP + ') or take them out">' + (on ? 'Done Adding Parcels' : 'Add or Remove Parcels') + '</button></div>' +
-      (on ? '<div class="rnote">Click a parcel next to the site to add it, or one in the site to take it out. Small gaps between parcels are closed up; parcels across a road stay separate.</div>' : '') + '</div>';
+      '<div class="sp-tools"><button class="btn" aria-pressed="' + on + '" id="spParcels" title="Click parcels on the map to add them to the site (up to ' + MAXP + ') or take them out">' + (on ? 'Done Adding Parcels' : 'Add or Remove Parcels') + '</button>' +
+        '<button class="btn" aria-pressed="' + (ed.mode === 'front') + '" id="spFront" title="Then click the lot line along the street">' + (ed.mode === 'front' ? 'Click the street side…' : 'Street Side') + '</button><button class="btn" aria-pressed="' + (ed.mode === 'street') + '" id="spStreet" title="A second street along the lot (a corner lot): click its lot line to add it, or again to remove it">' + (ed.mode === 'street' ? 'Click the side street…' : 'Side Street') + '</button><button class="btn" aria-pressed="' + (ed.mode === 'entrance') + '" id="spEntr" title="A driveway in from the street: click the lot line where it should come in; it runs straight in to the nearest drive">' + (ed.mode === 'entrance' ? 'Click the street edge…' : 'Add Entrance') + '</button><button class="btn" id="spRedraw">Redraw Site</button></div>' +
+      (on ? '<div class="rnote">Click a parcel next to the site to add it, or one in the site to take it out. Small gaps between parcels are closed up; parcels across a road stay separate.</div>' : '') +
+      (pl.frontGuess ? '<div class="rnote sp-warn">The street side (orange line) is a guess. Use <b>Street Side</b> to pick the lot line along the street; front setbacks and drives follow it.</div>' : '') + '</div>';
   }
   const num = (k, label, v, step) => '<label>' + label + '<input type="number" inputmode="decimal" min="0" step="' + step + '" data-k="' + k + '" value="' + (v ?? '') + '"></label>';
   const fileName = (p, pl) => (p.name + ' ' + pl.name).replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'site-plan';
@@ -863,6 +1018,7 @@ export function initSitePlan(ctx) {
     const v = ed.variants?.[i]; if (!v?.elements.length) return;
     change(x => { x.elements = clone(v.elements); x.spareRows = []; x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; });
     ed.pick = i; ed.sel = null; draw(); panel();
+    requestAnimationFrame(() => { if (ed && !planInView()) planFit(); }); // only when the site isn't all in view already
   }
 
   // ---------- exports ----------
@@ -1016,7 +1172,7 @@ export function initSitePlan(ctx) {
     const { drawn, m, bad } = info(p, pl), use = SP.USES[SP.normalizeProgram(pl.program).use];
     const stat = (v, l, cls) => '<span' + (cls ? ' class="' + cls + '"' : '') + '><b>' + v + '</b>' + l + '</span>';
     return '<button type="button" class="pj-plan" data-plan="' + esc(pl.id) + '" title="Open ' + esc(pl.name) + ' on the map">' +
-      '<span class="pj-thumb">' + (drawn ? thumb(p, pl) : '<i>No site drawn</i>') + (bad ? '<span class="pj-iss">' + plural(bad, 'issue') + '</span>' : '') + '</span>' +
+      '<span class="pj-thumb">' + (drawn ? thumb(p, pl) : '<i>No site drawn</i>') + (bad ? '<span class="pj-iss">' + plural(bad, 'issue') + '</span>' : '') + (lastOpen?.plid === pl.id ? '<span class="pj-live">Open on map</span>' : '') + '</span>' +
       '<span class="pj-ph"><b>' + esc(pl.name) + '</b>' + (m?.gfa ? '<em>' + esc(use.label) + (m.units ? ' · ' + plural(m.units, 'unit') : '') + '</em>' : '') + '</span>' +
       (m?.gfa ? '<span class="pj-stats">' + stat(f0(m.gfa), 'sq ft') + stat(f0(m.spaces), 'spaces, ' + f0(m.required) + ' needed', m.spaces < m.required ? 'short' : '') + stat(pct(m.coverage), 'coverage') + '</span>'
         : '<span class="pj-none">' + (drawn ? m.acres.toFixed(2) + ' acres, nothing laid out yet' : 'Open it to draw the site on the map') + '</span>') + '</button>';

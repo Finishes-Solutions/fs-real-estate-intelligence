@@ -2881,3 +2881,82 @@ table.who tr.nomatch td{border:0}
   #card .bsec,#card .hist,#card .brief,#card .bover{margin:10px 10px 0}
 }
 @media (pointer:coarse){ #card .cact .btn,#card .cback{min-height:40px} }
+
+/* ================= planning: the site plan as its own workspace ================= */
+/* while a plan is open the list folds away (src/siteplan.js) and the area tools, filters, export and layer chips step aside;
+   Layers stays */
+.app.planning #mapTools,.app.planning .selpill,.app.planning #fwrap,.app.planning #exportBtn,.app.planning #qlayers,.app.planning #fchips,.app.planning #modeChip,
+.app.planning #mFilters,.app.planning #mClear,.app.planning .mcount{display:none!important}
+.ctrls .sp-fitg{display:none}
+.app.planning .ctrls .sp-fitg{display:flex}
+/* header: breadcrumb and the plan's actions on one line, the option's name under it, then the options and section chips */
+#card.sp-mode .top{padding:12px 16px 10px;row-gap:0}
+#card.sp-mode .top>.sp-head{flex:1 1 100%;width:100%}
+#card .sp-head{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"back back" "crumb act" "ttl ttl";align-items:center;column-gap:10px}
+#card .sp-head>.cback{grid-area:back;justify-self:start;margin:-2px 0 6px -6px}
+#card .sp-crumb{grid-area:crumb;display:flex;align-items:center;gap:2px;min-width:0;overflow:hidden;white-space:nowrap;font:500 12px/1.2 var(--font-display);color:var(--muted)}
+#card .sp-cr{flex:none;max-width:100%;border:0;background:none;padding:3px 5px;border-radius:5px;color:var(--text-2);font:inherit;cursor:var(--cur-pointer,pointer);overflow:hidden;text-overflow:ellipsis}
+#card .sp-cr:nth-of-type(2){flex:0 1 auto;min-width:0}
+#card .sp-cr:first-child{margin-left:-5px}
+#card .sp-cr:hover,#card .sp-cr:focus-visible{color:var(--brand);background:var(--chip);outline:none}
+#card .sp-ttl{grid-area:ttl;min-width:0;margin-top:4px}
+#card .sp-ttl h2{margin:0}
+#card .sp-hact{grid-area:act;display:flex;align-items:center;gap:4px}
+#card .sp-ib{width:32px;height:32px;display:grid;place-items:center;flex:none;border:1px solid var(--line-2);border-radius:var(--r-sm,6px);background:var(--panel);color:var(--text);cursor:var(--cur-pointer,pointer)}
+#card .sp-ib:hover:not(:disabled){border-color:var(--text-2)}
+#card .sp-ib:disabled{opacity:.38;cursor:var(--cur-default,default)}
+#card .sp-hact .btn{white-space:nowrap;padding:5px 10px;font-size:12.5px}
+#card .sp-hact .btn svg{display:none}
+#card .sp-hact .sp-edit.on{background:var(--text);border-color:var(--text);color:var(--panel)}
+#card .sp-hact .sp-done{margin-left:2px}
+#card .sp-hact .mn{margin-left:0}
+#card .sp-hact .x{margin-right:-6px}
+#card.sp-mode .sp-plans{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;align-items:center}
+#card .sp-plans .chip{font-weight:600}
+#card .sp-plans .chip[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
+#card .sp-plans .sp-newopt{border-style:dashed}
+#card .sp-plans-ph{display:none!important}
+#card .sp-quiet{padding:0;color:var(--green-300);text-decoration:underline;text-underline-offset:2px}
+#card .sp-foot{display:flex;justify-content:flex-end;margin:12px 14px 0;padding:0 2px}
+#card .sp-foot .sp-del{font-size:12px;color:var(--danger)}
+#card #spLayouts{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='2' width='5' height='5' rx='1'/%3E%3Crect x='9' y='2' width='5' height='5' rx='1'/%3E%3Crect x='2' y='9' width='5' height='5' rx='1'/%3E%3Crect x='9' y='9' width='5' height='5' rx='1'/%3E%3C/svg%3E")}
+#card #spSiteSec{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 7 2.5l6.5 2.5v8L9 14.5l-6.5-2z'/%3E%3C/svg%3E")}
+/* a toast with an action ("Saved to … · Open project") */
+.toast.act{pointer-events:auto}
+.toast button{margin-left:6px;padding:0;border:0;background:none;color:inherit;font:700 12.5px var(--font-display);text-decoration:underline;text-underline-offset:2px;cursor:var(--cur-pointer,pointer)}
+/* after closing: "Resume plan" under the search, and the site's faint outline on the map */
+.sp-resume{display:flex;align-items:stretch;justify-self:start;background:var(--panel);border:1px solid var(--line-2);border-radius:999px;box-shadow:0 2px 8px rgba(11,13,12,.14);overflow:hidden}
+.sp-resume[hidden]{display:none}
+.sp-resume button{border:0;background:none;color:var(--text);font:600 12.5px var(--font-display);cursor:var(--cur-pointer,pointer);display:flex;align-items:center;gap:6px}
+.sp-resume .sp-rs-go{padding:7px 6px 7px 12px;color:var(--brand)}
+.sp-resume .sp-rs-go b{color:var(--text);font-weight:600}
+.sp-resume .sp-rs-x{padding:0 10px;color:var(--muted)}
+.sp-resume button:hover{background:var(--chip)}
+/* away from the map with a plan open: a banner back to it */
+.sp-away{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:9;display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);padding:6px 6px 6px 14px;background:var(--ink-900,#0b0d0c);color:#fff;border-radius:999px;box-shadow:0 6px 20px rgba(11,13,12,.28);font:500 13px var(--font-display)}
+.sp-away[hidden]{display:none}
+.sp-away span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-away .sp-aw-go{flex:none;border:0;border-radius:999px;background:var(--brand);color:var(--brand-ink);font:600 12.5px var(--font-display);padding:6px 12px;cursor:var(--cur-pointer,pointer)}
+.sp-away .sp-aw-x{flex:none;border:0;background:none;color:rgba(255,255,255,.7);width:28px;height:28px;display:grid;place-items:center;cursor:var(--cur-pointer,pointer)}
+.pj-live{position:absolute;right:6px;top:6px;background:var(--brand);color:var(--brand-ink);font-size:10.5px;font-weight:700;border-radius:999px;padding:2px 8px;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+/* phones: one header row (the option's name and icon buttons), the options under the overview */
+@media (max-width:700px){
+  #card.sp-mode .top{padding:4px 12px 8px}
+  #card .sp-head{grid-template-areas:"ttl act";column-gap:6px}
+  #card .sp-crumb,#card .sp-ttl .bsub,#card .sp-head>.cback{display:none!important}
+  #card .sp-ttl{margin:0}
+  #card .sp-ttl h2{font-size:17px}
+  #card .sp-hact{gap:2px}
+  #card .sp-hact .btn{width:36px;min-height:36px;padding:0;justify-content:center}
+  #card .sp-hact .btn svg{display:block}
+  #card .sp-hact .btn span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  #card .sp-ib{width:34px;height:36px;border:0;background:transparent}
+  #card .sp-hact .x{width:36px;height:36px;margin:0 -6px 0 0}
+  #card .sp-hact .mn{width:30px}
+  #card.sp-mode .top>.sp-plans{display:none}
+  #card.sp-mode .sp-plans-ph{display:flex!important;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:10px 10px 0;padding:0;gap:6px}
+  #card .sp-plans-ph .chip{flex:none}
+  #card.sp-mode .top .bnav{margin-top:6px}
+  .mapleft .sp-resume{grid-column:2;justify-self:start}
+  .sp-away{bottom:12px}
+}
