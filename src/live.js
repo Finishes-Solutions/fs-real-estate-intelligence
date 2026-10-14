@@ -321,7 +321,7 @@ export function initLive(ctx) {
   function renderCardTools(info) {
     const card = document.getElementById('card'); card.querySelector('#liveSec')?.remove();
     const sec = document.createElement('div'); sec.className = 'bsec live-sec'; sec.id = 'liveSec';
-    sec.innerHTML = '<div class="lt">From Here</div><div class="btnrow"><button class="btn" data-a="drive">Drive Time From Me</button><button class="btn" data-push data-a="iso">Drive-Time Map</button><button class="btn" data-a="wx">Weather</button><button class="btn" data-a="img">Site Imagery</button><button class="btn" data-a="news">News</button></div><div class="live-out" aria-live="polite"></div>';
+    sec.innerHTML = '<div class="lt">From Here</div><div class="btnrow"><button class="btn" data-a="drive">Drive time from my location</button><button class="btn" data-push data-a="iso">Drive-Time Map</button><button class="btn" data-a="wx">Weather</button><button class="btn" data-a="img">Site Imagery</button><button class="btn" data-a="news">News</button></div><div class="live-out" aria-live="polite"></div>';
     const brief = card.querySelector('#briefBox'); if (brief) brief.after(sec); else (card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
     const out = sec.querySelector('.live-out'), mine = () => lastCard === info;
     const busy = t => { out.innerHTML = '<div class="rnote">' + esc(t) + '</div>'; };

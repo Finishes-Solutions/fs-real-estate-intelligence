@@ -787,7 +787,7 @@ export function initAssistant(ctx) {
         else if (where === 'place') { const p = await resolvePlace(String(a.place || '')); if (p.error) return p; at = p.c; label = p.label; }
         else if (where === 'center') at = ctx.map.getCenter().toArray();
         if (ctx.view !== 'map') ctx.setView('map');
-        const n = await ctx.addNote({ at, gps: where === 'me', title: a.title || '', text: a.text || '', tag: a.tag || 'Other' });
+        const n = await ctx.addNote({ at, gps: where === 'me', title: a.title || '', text: a.text || '', tag: a.tag || 'Other', commit: true });
         if (where === 'me') label = 'your location';
         actionChip('Saved note' + (n?.title ? ' “' + n.title + '”' : '') + ' at ' + label);
         return { saved: true, title: n?.title || '', tag: n?.tag, at: label, shared: !!ctx.team?.summary?.(), note: 'The note card is open so photos can be added.' };

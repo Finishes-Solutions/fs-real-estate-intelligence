@@ -140,6 +140,14 @@ assert.equal(ids({ st: ['Registered', 'Unknown'] }), 'AC');
 assert.equal(ids({ sqmin: 10000 }), 'A'); assert.equal(ids({ sqmax: 10000 }), 'B', 'no sq ft is not under the max');
 assert.equal(ids({ co: 'tellepsen' }), 'A'); assert.equal(ids({ co: 'gensler' }), 'C'); assert.equal(ids({ co: 'tower' }), '', 'company text skips project names');
 assert.equal(ids({ exact: 1 }), 'A'); assert.equal(ids({ umin: 100 }), 'A');
+// the filing card's People > Owner link: the filing's owner exactly (the 'dev' kind follows the developer first)
+const own = { id: 'D', county: 'Harris', type: 'New', cost: 3e6, owner: 'Hines Interests', dev: 'Acme Development', name: 'Mixed use' };
+fs.push(own);
+assert.equal(ids({ who: { k: 'own', v: 'hines interests' } }), 'AD', 'the owner link lists filings by owner, developer or not');
+assert.equal(ids({ who: { k: 'dev', v: 'hines interests' } }), 'A', 'the developer kind prefers the developer');
+assert.deepEqual(decode(encode({ who: { k: 'own', v: 'hines interests', label: 'Hines Interests' } })).who, { k: 'own', v: 'hines interests', label: 'Hines Interests' });
+assert.match(describe({ who: { k: 'own', v: 'x', label: 'Hines Interests' } }), /Owner: Hines Interests/);
+fs.pop();
 const spec = { st: ['Registered', 'Review complete'], sqmin: 5000, sqmax: 90000, co: 'hines', exact: 1, umin: 50 };
 assert.deepEqual(decode(encode(spec)), spec, 'new fields survive a link round trip');
 assert.match(describe(spec), /5,000–90,000 sq ft.*50\+ units.*Company: “hines”.*Exact addresses only/);

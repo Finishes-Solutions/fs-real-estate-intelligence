@@ -64,6 +64,14 @@ export function initField(ctx) {
   // ---- watch star on filing and building cards (and the assistant's watch tool) ----
   const watchKey = info => info.kind === 'filing' ? info.f.id : info.center.map(v => v.toFixed(5)).join(',');
   const findWatch = info => db.watch.find(w => w.kind === info.kind && w.ref === watchKey(info));
+  // take an item off the watchlist; the toast's Undo puts it back where it was (and up to the team again as a new star)
+  function unwatch(w) {
+    const i = db.watch.indexOf(w); if (i < 0) return;
+    db.watch.splice(i, 1); ctx.team?.removed({ kind: 'watch', wkind: w.kind, ref: w.ref }); save(); card.querySelector('.star')?._paint?.();
+    ctx.toast('Removed from your watchlist.', { action: { label: 'Undo', run: () => {
+      if (db.watch.some(x => x.kind === w.kind && x.ref === w.ref)) return;
+      delete w.synced; db.watch.splice(Math.min(i, db.watch.length), 0, w); save(); card.querySelector('.star')?._paint?.(); } } });
+  }
   function setWatch(info, on) {
     const w = findWatch(info);
     if (!on && w) { db.watch = db.watch.filter(x => x !== w); ctx.team?.removed({ kind: 'watch', wkind: w.kind, ref: w.ref }); }
@@ -80,21 +88,37 @@ export function initField(ctx) {
     const icon = on => '<svg width="' + (slot ? 14 : 16) + '" height="' + (slot ? 14 : 16) + '" viewBox="0 0 16 16" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>';
     const paint = b._paint = () => { const on = !!findWatch(info); b.setAttribute('aria-pressed', on); b.title = on ? 'On your watchlist (My Work › Notes & watchlist). Click to remove.' : 'Add to your watchlist: you’ll see when it changes';
       b.innerHTML = icon(on) + (slot ? (on ? 'Watching' : 'Watch') : ''); if (slot) b.removeAttribute('aria-label'); };
-    b.onclick = () => { const on = setWatch(info, !findWatch(info)); paint(); ctx.toast(on ? 'Added to My Work › Watchlist.' : 'Removed from your watchlist.'); };
+    b.onclick = () => { const w = findWatch(info); if (w) { unwatch(w); paint(); return; } setWatch(info, true); paint(); ctx.toast('Added to My Work › Watchlist.'); };
     paint(); if (slot) slot.replaceWith(b); else x.before(b);
   });
 
   // ---- site notes ----
-  ctx.addNote = async ({ gps = false, at = null, title = '', text = '', tag = '' } = {}) => {
+  // A new note is a draft held in memory: it joins the saved notes (and the map, and My Work) when something is typed or added to it,
+  // or on Save. One closed while still empty leaves nothing behind. What is typed is saved as you go (see keep() below), photos too.
+  const seeds = new WeakMap(); // the title a note was opened with (the parcel's address): not something the person typed
+  const blank = n => !n.text.trim() && !n.photos.length && (!n.title.trim() || n.title === seeds.get(n));
+  function persist(n, force) {
+    const saved = db.notes.includes(n); if (!saved && !force && blank(n)) return false;
+    n.updated = new Date().toISOString(); if (!saved) db.notes.unshift(n); save(); return true;
+  }
+  let pend = null, pendT = 0;
+  const flushNote = () => { clearTimeout(pendT); const f = pend; pend = null; f?.(); };
+  addEventListener('pagehide', flushNote);
+  const shared = () => !!ctx.team?.summary?.();
+  const where = () => shared() ? 'Shared with the team and saved on this device.' : 'Saved on this device only.';
+
+  ctx.addNote = async ({ gps = false, at = null, title = '', text = '', tag = '', label = '', commit = false } = {}) => {
     let c = at || map.getCenter().toArray();
     if (gps && ctx.locate) { try { c = await ctx.locate(); } catch (e) { ctx.toast(e.message + ' Placed the note at the map center instead.'); } }
-    const n = { id: uid(), lng: +c[0].toFixed(6), lat: +c[1].toFixed(6), title: String(title).slice(0, 120), text: String(text).slice(0, 4000), tag: TAGS.includes(tag) ? tag : TAGS[0], photos: [], created: new Date().toISOString(), updated: new Date().toISOString() };
-    db.notes.unshift(n); save(); map.easeTo({ center: c, zoom: Math.max(map.getZoom(), 15), duration: ctx.reduceMotion ? 0 : 600 }); openNote(n, !title);
+    const n = { id: uid(), lng: +c[0].toFixed(6), lat: +c[1].toFixed(6), title: String(title || label).slice(0, 120), text: String(text).slice(0, 4000), tag: TAGS.includes(tag) ? tag : TAGS[0], photos: [], created: new Date().toISOString(), updated: new Date().toISOString() };
+    if (!title) seeds.set(n, n.title);
+    if (commit || title || text) persist(n, true); // the assistant (or a caller with the words in hand) saves at once
+    map.easeTo({ center: c, zoom: Math.max(map.getZoom(), 15), duration: ctx.reduceMotion ? 0 : 600 }); openNote(n, !title);
     return n;
   };
 
   async function openNote(n, isNew) {
-    if (!n) return; ctx.closeCard(); curNote = n;
+    if (!n) return; flushNote(); ctx.closeCard(); curNote = n;
     const near = F.filter(f => Math.hypot((f.lon - n.lng) * 0.87, f.lat - n.lat) < 0.003).sort((a, b) => b.cost - a.cost).slice(0, 5);
     card.innerHTML = '<div class="top"><div><div class="kicker">Site note · ' + esc(new Date(n.created).toLocaleDateString()) + '</div><h2>' + esc(n.title || 'Untitled site') + '</h2><div class="bsub">' + n.lat.toFixed(5) + ', ' + n.lng.toFixed(5) + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
@@ -107,21 +131,32 @@ export function initField(ctx) {
       '<a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=' + n.lat + ',' + n.lng + '">Directions ↗</a>' +
       (navigator.share ? '<button class="btn" type="button" id="nShare">Share</button>' : '') + (ctx.team?.canDelete(n) === false ? '' : '<button class="btn" type="button" id="nDel">Delete</button>') + '</div></form>' + (n.by ? '<div class="rnote">Added by ' + esc(n.by) + (n.editedBy && n.editedBy !== n.by ? ' · last edited by ' + esc(n.editedBy) : '') + '</div>' : '') +
       (near.length ? '<div class="bsec"><div class="lt">Filings within ~300 m</div>' + near.map(f => '<button class="chitem" data-id="' + esc(f.id) + '"><span><b>' + esc(f.name) + '</b><em>' + esc(f.reg) + '</em></span><span class="m">' + fmtM(f.cost) + '</span></button>').join('') + '</div>' : '') +
-      '<div class="rnote bsrc">Saved on this device only. Use My Work › Notes &amp; watchlist → Export to back up or move to another device.</div>';
+      '<div class="rnote bsrc">' + where() + ' What you type is kept as you go. Use My Work › Notes &amp; watchlist → Export to back up or move to another device.</div>';
     card.classList.add('open');
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelectorAll('.chitem').forEach(x => x.onclick = () => ctx.select(BY_ID.get(x.dataset.id), false));
     const form = card.querySelector('#nForm');
-    form.onsubmit = e => { e.preventDefault(); const fd = new FormData(form); Object.assign(n, { title: String(fd.get('title')).trim(), tag: fd.get('tag'), text: String(fd.get('text')), updated: new Date().toISOString() }); save(); card.querySelector('h2').textContent = n.title || 'Untitled site'; ctx.toast('Note saved on this device.'); };
-    card.querySelector('#nDel') && (card.querySelector('#nDel').onclick = async () => { if (!confirm('Delete this site note and its photos?')) return; for (const p of n.photos) { await delPhoto(p).catch(() => {}); ctx.team?.removed({ kind: 'photo', path: p }); } ctx.team?.removed({ kind: 'note', id: n.id }); db.notes = db.notes.filter(x => x !== n); save(); ctx.closeCard(); });
-    card.querySelector('#nGps').onclick = async () => { try { const c = await ctx.locate(); n.lng = +c[0].toFixed(6); n.lat = +c[1].toFixed(6); save(); map.easeTo({ center: c }); openNote(n); } catch (e) { ctx.toast(e.message); } };
+    const read = () => { const fd = new FormData(form); Object.assign(n, { title: String(fd.get('title')).trim(), tag: fd.get('tag'), text: String(fd.get('text')) }); };
+    // typing is saved a moment after it stops (and when the card closes), so closing without Save loses nothing
+    const keep = () => { clearTimeout(pendT); pend = () => { read(); if (persist(n) && form.isConnected) card.querySelector('h2').textContent = n.title || 'Untitled site'; }; pendT = setTimeout(flushNote, 500); };
+    form.addEventListener('input', keep); form.addEventListener('change', keep);
+    form.onsubmit = e => { e.preventDefault(); clearTimeout(pendT); pend = null; read(); persist(n, true); card.querySelector('h2').textContent = n.title || 'Untitled site'; ctx.toast(shared() ? 'Note saved and shared with the team.' : 'Note saved on this device.'); };
+    card.querySelector('#nDel') && (card.querySelector('#nDel').onclick = async () => {
+      if (!confirm('Delete this site note and its photos?')) return;
+      clearTimeout(pendT); pend = null;
+      for (const p of n.photos) { await delPhoto(p).catch(() => {}); ctx.team?.removed({ kind: 'photo', path: p }); }
+      if (db.notes.includes(n)) { ctx.team?.removed({ kind: 'note', id: n.id }); db.notes = db.notes.filter(x => x !== n); save(); }
+      if (!ctx.cardBack?.()) ctx.closeCard(); // opened from a property or filing card: back to it
+      ctx.toast('Note deleted.');
+    });
+    card.querySelector('#nGps').onclick = async () => { try { const c = await ctx.locate(); read(); n.lng = +c[0].toFixed(6); n.lat = +c[1].toFixed(6); persist(n); map.easeTo({ center: c }); openNote(n); } catch (e) { ctx.toast(e.message); } };
     card.querySelector('#nShare')?.addEventListener('click', () => navigator.share({ title: n.title || 'Site note', text: [n.title, n.tag, n.text].filter(Boolean).join('\n'), url: 'https://www.google.com/maps/search/?api=1&query=' + n.lat + ',' + n.lng }).catch(() => {}));
     card.querySelector('#nFile').onchange = async e => {
       for (const file of [...e.target.files].slice(0, 12)) { const id = 'p' + uid(); try { await putPhoto(id, await shrink(file)); n.photos.push(id); } catch (err) { ctx.toast('Couldn’t store that photo on this device.'); } }
-      n.updated = new Date().toISOString(); save(); renderPhotos(n);
+      read(); persist(n); renderPhotos(n);
     };
     renderPhotos(n);
-    if (isNew) setTimeout(() => form.querySelector('input[name=title]').focus(), 50);
+    if (isNew) setTimeout(() => form.querySelector(seeds.get(n) ? 'textarea[name=text]' : 'input[name=title]').focus(), 50); // an address already fills the title: start on the notes
   }
   async function renderPhotos(n) {
     const el = card.querySelector('#nPhotos'); if (!el) return; el.innerHTML = '';
@@ -129,11 +164,11 @@ export function initField(ctx) {
       const blob = await getPhoto(id).catch(() => null); if (!blob || curNote !== n) continue;
       const url = URL.createObjectURL(blob), d = document.createElement('div'); d.className = 'nph';
       d.innerHTML = '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" alt="Site photo"></a><button type="button" aria-label="Remove photo">×</button>';
-      d.querySelector('button').onclick = async () => { await delPhoto(id).catch(() => {}); ctx.team?.removed({ kind: 'photo', path: id }); n.photos = n.photos.filter(x => x !== id); n.updated = new Date().toISOString(); save(); renderPhotos(n); };
+      d.querySelector('button').onclick = async () => { await delPhoto(id).catch(() => {}); ctx.team?.removed({ kind: 'photo', path: id }); n.photos = n.photos.filter(x => x !== id); persist(n); renderPhotos(n); };
       el.appendChild(d);
     }
   }
-  ctx.onCardClose(() => { curNote = null; });
+  ctx.onCardClose(() => { flushNote(); curNote = null; });
 
   // ---- Field view ----
   const dist = (a, b) => { const r = Math.PI / 180, x = (b[0] - a[0]) * r * Math.cos((a[1] + b[1]) / 2 * r), y = (b[1] - a[1]) * r; return Math.sqrt(x * x + y * y) * 3958.8; };
@@ -152,20 +187,21 @@ export function initField(ctx) {
       '<button type="button" role="menuitem" id="fGeo">GeoJSON<em>Notes and watchlist, for GIS or another device</em></button><button type="button" role="menuitem" id="fGeoPh">GeoJSON with photos<em>Larger file; photos travel with the notes</em></button>' +
       '<button type="button" role="menuitem" id="fCsv">CSV<em>For a spreadsheet</em></button><button type="button" role="menuitem" id="fKml">KML<em>For Google Earth</em></button><hr>' +
       '<label role="menuitem" tabindex="0" class="vm-imp">Import…<em>A GeoJSON file exported from here</em><input type="file" accept=".geojson,.json,application/geo+json,application/json" hidden id="fImp"></label></div></details>';
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Notes &amp; watchlist</div><h2>Your sites &amp; watchlist</h2><div class="vsub">' + fmtN(notes.length) + ' site notes · ' + fmtN(watch.length) + ' watched</div></div>' +
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">Notes &amp; watchlist</div><h2>Your sites &amp; watchlist</h2><div class="vsub">' + fmtN(notes.length) + ' site note' + (notes.length === 1 ? '' : 's') + ' · ' + fmtN(watch.length) + ' watched</div></div>' +
       '<div class="vctl"><button class="btn primary" id="fAdd">+ Site note</button>' + menu + '<div class="team-slot" id="fTeam"></div></div></div>' +
       (none ? (ctx.vempty ? ctx.vempty({ icon: 'pin', title: 'No site notes or watched filings yet', text: 'Pin a note with photos while you’re on site, or star a filing or building to watch it.', extra: '<p class="ve-more" id="fHow" hidden>' + WATCH_HOW + '</p>', actions: [{ label: '+ Site note at map center', id: 'fAddC', primary: true }, { label: 'How the watchlist works', id: 'fHowBtn' }] }) : '')
         : '<div class="fcols">' + watchSec + notesSec + '</div>');
     root.querySelector('#fAddC')?.addEventListener('click', () => { ctx.setView('map'); ctx.addNote({}); });
     root.querySelector('#fHowBtn')?.addEventListener('click', e => { const h = root.querySelector('#fHow'); h.hidden = !h.hidden; e.currentTarget.setAttribute('aria-expanded', String(!h.hidden)); });
     root.querySelector('.vm-imp').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); root.querySelector('#fImp').click(); } });
-    root.querySelector('#fAdd').onclick = () => { ctx.setView('map'); ctx.addNote({ gps: true }); };
+    // on a phone (on site) the note goes where you stand; on a desktop it goes at the map center, like the button below (the note card has Move to My Location)
+    root.querySelector('#fAdd').onclick = () => { ctx.setView('map'); ctx.addNote({ gps: matchMedia('(pointer: coarse)').matches }); };
     root.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { const n = db.notes.find(x => x.id === b.dataset.n); ctx.setView('map'); map.easeTo({ center: [n.lng, n.lat], zoom: Math.max(map.getZoom(), 15) }); openNote(n); });
     root.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { const w = db.watch.find(x => x.id === b.dataset.w); ctx.setView('map'); if (w.kind === 'filing' && BY_ID.get(w.ref)) ctx.select(BY_ID.get(w.ref), true); else { map.easeTo({ center: [w.lng, w.lat], zoom: Math.max(map.getZoom(), 16.5) }); ctx.openBuildingAt([w.lng, w.lat]); } });
-    root.querySelectorAll('[data-unw]').forEach(b => b.onclick = () => { const w = db.watch.find(x => x.id === b.dataset.unw); db.watch = db.watch.filter(x => x !== w); if (w) ctx.team?.removed({ kind: 'watch', wkind: w.kind, ref: w.ref }); save(); });
+    root.querySelectorAll('[data-unw]').forEach(b => b.onclick = () => { const w = db.watch.find(x => x.id === b.dataset.unw); if (w) unwatch(w); });
     root.querySelector('#fGeo').onclick = () => exportGeo(false); root.querySelector('#fGeoPh').onclick = () => exportGeo(true);
     root.querySelector('#fCsv').onclick = exportCsv; root.querySelector('#fKml').onclick = exportKml;
-    root.querySelector('#fImp').onchange = e => importGeo(e.target.files[0]);
+    root.querySelector('#fImp').onchange = e => { const f = e.target.files[0]; e.target.value = ''; importGeo(f); }; // (cleared, so the same file can be chosen again)
     ctx.team?.mount(root.querySelector('#fTeam'));
   }
   ctx.onView('field', render);
@@ -202,19 +238,23 @@ export function initField(ctx) {
   async function importGeo(file) {
     if (!file) return;
     try {
-      const d = JSON.parse(await file.text()); let added = 0;
+      const d = JSON.parse(await file.text()); let added = 0, had = 0, skipped = 0, mine = 0;
       for (const f of d.features || []) {
-        const p = f.properties || {}, c = f.geometry?.coordinates; if (!Array.isArray(c) || c.length < 2 || !isFinite(c[0]) || !isFinite(c[1])) continue;
-        if (p.type === 'site-note') {
-          if (db.notes.some(n => n.id === p.id)) continue;
+        const p = f?.properties || {}, c = f?.geometry?.coordinates, isNote = p.type === 'site-note', isWatch = /^watch-(filing|building)$/.test(p.type);
+        if (!isNote && !isWatch) { skipped++; continue; }
+        mine++; if (!Array.isArray(c) || c.length < 2 || !isFinite(c[0]) || !isFinite(c[1])) { skipped++; continue; }
+        if (isNote) {
+          if (p.id && db.notes.some(n => n.id === p.id)) { had++; continue; }
           const n = { id: p.id || uid(), lng: +c[0], lat: +c[1], title: String(p.title || '').slice(0, 120), text: String(p.notes || '').slice(0, 4000), tag: TAGS.includes(p.tag) ? p.tag : 'Other', photos: [], created: p.created || new Date().toISOString(), updated: p.updated || new Date().toISOString() };
           for (const du of (p.photos || []).slice(0, 12)) { if (!/^data:image\//.test(du)) continue; const id = 'p' + uid(); try { await putPhoto(id, await (await fetch(du)).blob()); n.photos.push(id); } catch (e) {} }
           db.notes.push(n); added++;
-        } else if (/^watch-(filing|building)$/.test(p.type) && !db.watch.some(w => w.id === p.id)) {
+        } else {
+          if (db.watch.some(w => (p.id && w.id === p.id) || (w.kind === p.type.slice(6) && w.ref === String(p.ref)))) { had++; continue; }
           db.watch.push({ id: p.id || uid(), kind: p.type.slice(6), ref: String(p.ref), label: String(p.label || ''), sub: String(p.sub || ''), lng: +c[0], lat: +c[1], added: p.added || new Date().toISOString() }); added++;
         }
       }
-      save(); ctx.toast('Imported ' + added + ' item' + (added === 1 ? '' : 's') + '.');
+      if (!mine) { ctx.toast('No notes or watchlist items in that file. Import a GeoJSON exported from here.'); return; }
+      save(); ctx.toast('Added ' + added + (had ? ', ' + had + ' already here' : '') + (skipped ? ', ' + skipped + ' skipped' : '') + '.');
     } catch (e) { ctx.toast('That file isn’t a field-notes GeoJSON export.'); }
   }
   syncBadges();

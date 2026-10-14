@@ -659,12 +659,12 @@ function select(f,fly){
   if(cpOpening) stopAllOrbits(); else { cpush=null; cardCloseHooks.forEach(fn=>fn()); }
   state.sel=f; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach((b,i)=>b.classList.toggle('on',visible[i]===f));
   const fld=(k,v,w)=>'<div class="f'+(w?' w':'')+'"><div class="fl">'+k+'</div><div class="fv">'+v+'</div></div>';
-  const people=[['Owner',esc(f.owner||'—')],f.dev&&f.dev.toLowerCase()!==String(f.owner).toLowerCase()?['Developer',whoLink('dev',f.dev||f.owner,f.dev)]:null,f.arch?['Architect',whoLink('arch',f.arch,f.arch)]:null,f.gc?['General contractor',whoLink('gc',f.gc,f.gc)]:null].filter(Boolean);
+  const people=[['Owner',f.owner?whoLink('own',f.owner,f.owner):'—'],f.dev&&f.dev.toLowerCase()!==String(f.owner).toLowerCase()?['Developer',whoLink('dev',f.dev||f.owner,f.dev)]:null,f.arch?['Architect',whoLink('arch',f.arch,f.arch)]:null,f.gc?['General contractor',whoLink('gc',f.gc,f.gc)]:null].filter(Boolean);
   const gsv='https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+f.lat.toFixed(6)+','+f.lon.toFixed(6);
   card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2>'+(f.addr?'<div class="bsub">'+esc(f.addr)+'</div>':'')+'<button class="btn sm cshow" type="button" id="fShowMap">Show on map</button></div>'+
     '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>'+
-    cardActs('<button class="btn sm askai" type="button" id="fAsk">'+SPARK+'Ask AI</button><a class="btn sm" id="fTabs" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener" title="The filing on the TDLR TABS site">TABS record ↗</a>',
-      [{href:gsv,label:'Street View ↗',sub:'Google Street View at the site'},['Add site note',' id="fNote" data-push'],{divider:true},['Select more',' id="fMulti" title="Then click or tap more filings, buildings or parcels to compare them in tabs (or Shift-click)"'],['Copy link',' id="fLink"']].map(x=>Array.isArray(x)?{label:x[0],attrs:x[1]}:x))+
+    cardActs('<button class="btn sm askai" type="button" id="fAsk">'+SPARK+'Ask AI</button><button class="btn sm" type="button" id="fProp" data-push title="Open the property card: owner, value, zoning and the building at this spot">Property card</button>',
+      [['Open property card',' id="fProp2" data-push'],{href:tabsUrl(f.id),label:'TABS record ↗',sub:'The filing on the TDLR TABS site'},{href:gsv,label:'Street View ↗',sub:'Google Street View at the site'},['Add site note',' id="fNote" data-push'],{divider:true},['Select more',' id="fMulti" title="Then click or tap more filings, buildings or parcels to compare them in tabs (or Shift-click)"'],['Copy link',' id="fLink"']].map(x=>Array.isArray(x)?{label:x[0],attrs:x[1]}:x))+
     cardNav([['fProj','Project'],['fSched','Schedule'],['fPeople','People'],['fScope','Scope'],['airSec','Air'],['briefBox','AI Brief'],['liveSec','From Here']])+'</div>'+
     (f.sum?'<div class="bover"><div class="kicker">Overview</div><div>'+esc(f.sum)+'</div></div>':'')+
     (f.approx?'<div class="note">Location is approximate: the address didn’t geocode, so this marker sits at the city center (shaded circle), not on the site.</div>':'')+
@@ -690,7 +690,9 @@ function select(f,fly){
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
   card.querySelector('#fShowMap').onclick=()=>{ setView('map',{user:true}); select(f,true); }; // over a page (Timeline, Changes…): only shown there
-  card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat]}); // data-push: "← <filing>" goes back with its tabs
+  card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat],label:f.addr||f.name}); // data-push: "← <filing>" goes back with its tabs
+  // the property at the filing's spot, in front of this card (data-push: "← <filing>" comes back)
+  for(const id of ['#fProp','#fProp2']) card.querySelector(id).onclick=()=>{ if(f.approx){ toast('This filing’s address didn’t geocode, so its marker is at the city center: there’s no property to open.'); return; } ctx.openBuildingAt([f.lon,f.lat]); };
   card.querySelector('#fAsk').onclick=()=>ctx.assistant?.ask('Tell me more about '+f.name);
   card.querySelector('#fMulti').onclick=()=>ctx.tabs?.setAdding(true);
   card.querySelector('#fLink').onclick=()=>copyCardLink();
@@ -742,6 +744,9 @@ function decorateBack(){ if(!cpush||cpOpening) return; const head=cardTopEl()?.f
   const b=document.createElement('button'); b.type='button'; b.className='cback'; b.innerHTML=BACK+'<span></span>'; b.querySelector('span').textContent=cpush.label; b.title='Back to '+cpush.label+' (Esc)';
   b.onclick=e=>{ e.stopPropagation(); cardBack(); }; head.prepend(b); }
 new MutationObserver(decorateBack).observe(card,{childList:true});
+// every card's × is the property card's icon button (reports, places and child cards wrote a bare "×" that rendered small and faint)
+const X_ICON='<svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+new MutationObserver(()=>{ const x=card.querySelector(':scope>.top>.x'); if(x&&!x.firstElementChild&&x.textContent.trim()==='×') x.innerHTML=X_ICON; }).observe(card,{childList:true});
 function cardBack(){ const p=cpush; if(!p) return false; cpush=null;
   if(!(p.tabId&&ctx.tabs?.reopen?.(p.tabId))) p.reopen();
   const y=p.scroll; requestAnimationFrame(()=>{ card.scrollTop=y; setTimeout(()=>{ if(card.scrollTop<y-2) card.scrollTop=y; },400); });

@@ -69,9 +69,11 @@ export function initPlaces(ctx) {
   async function show(id) {
     const card = openCard(ctx, { kicker: 'Business / place', title: 'Loading…', loading: 'Looking up the place…' }), tid = 'p:' + id;
     ctx.tabs?.track?.({ id: tid, kind: 'place', label: 'Place', reopen: () => show(id) });
-    const gone = () => ctx.tabs && ctx.tabs.active?.()?.id !== tid;
+    // gone once something else has taken the card over (a tab switch, another click): this header is replaced then. Opened from
+    // a property card (ctx.cardPush) it is not a tab of its own, so the tab check can't tell.
+    const mine = card.querySelector(':scope>.top'), gone = () => !mine?.isConnected;
     let p; try { const r = await fetch('api/places?id=' + encodeURIComponent(id)); p = await r.json(); if (!r.ok) throw new Error(p.error || 'lookup failed'); }
-    catch (e) { if (!gone()) card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
+    catch (e) { if (!gone()) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; card.querySelector('h2').textContent = 'Place unavailable'; } return; }
     if (gone()) return;
     const g = GROUPS[p.grp] || GROUPS.other, addr = [p.addr, p.city, p.zip].filter(Boolean).join(', ');
     const gmaps = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([p.name, addr].filter(Boolean).join(', ') || p.lat + ',' + p.lon);
@@ -83,6 +85,7 @@ export function initPlaces(ctx) {
     ctx.tabs?.mount?.(); ctx.tabs?.label?.(tid, p.name);
     card.querySelector('#plBldg').onclick = () => { const c = [p.lon, p.lat]; if (!ctx.buildingAt?.(c)) ctx.openBuildingAt?.(c); };
   }
-  ctx.showPlace = show;
+  // the place card by id (the business list on a property card). ctx.showPlace belongs to the map search (src/mapsearch.js) and takes a place object.
+  ctx.showPlaceCard = show;
   ctx.placesNear = async (lat, lon, m = 150) => { const r = await fetch('api/places?near=' + (+lat).toFixed(6) + ',' + (+lon).toFixed(6) + '&m=' + m); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'places unavailable'); return d.places || []; };
 }
