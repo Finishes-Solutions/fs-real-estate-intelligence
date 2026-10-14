@@ -699,7 +699,7 @@ function historyHtml(f){
   const fv=(k,v)=>v==null||v===''?'—':k==='cost'?fmtM(v):k==='sqft'?fmtN(v):String(v);
   return '<div class="fhist"><div class="fl">History</div>'+rows.map(([d,x])=>'<div><span class="m">'+esc(d)+'</span> '+(x.k==='new'?'First seen':esc(x.label)+': '+esc(fv(x.k,x.from))+' → '+esc(fv(x.k,x.to)))+'</div>').join('')+'</div>'; }
 async function loadBrief(f){
-  const box=card.querySelector('#briefBox'); if(!box) return; box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote">Writing a brief from the filing, nearby activity and census data…</div>';
+  const box=card.querySelector('#briefBox'); if(!box) return; box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote loading">Writing a brief from the filing, nearby activity and census data…</div>';
   try{ const r=await fetch('api/brief?id='+encodeURIComponent(f.id)); const d=await r.json().catch(()=>({}));
     if(state.sel!==f) return; if(!r.ok) throw new Error(d.error||('Error '+r.status));
     box.innerHTML='<div class="lt">AI Project Brief</div><div class="btext">'+richText(d.brief)+'</div><div class="ssrc src">AI-written from the data on this page. Verify before relying on it.</div>'; wireCites(box); }
