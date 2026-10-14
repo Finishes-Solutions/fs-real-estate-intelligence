@@ -168,14 +168,7 @@ export function initSettings(ctx) {
   sheet.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => { const t = sheet.querySelector('[data-sec="' + b.dataset.jump + '"]'); t.scrollIntoView({ block: 'start', behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); flash(t); });
   // Esc closes the sheet first (and only the sheet), wherever the focus is
   addEventListener('keydown', e => { if (e.key === 'Escape' && !sheet.hidden) { e.preventDefault(); e.stopImmediatePropagation(); close(); } }, true);
-  sheet.addEventListener('keydown', e => {
-    if (e.key !== 'Tab') return;
-    const f = [...sheet.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')].filter(x => x.offsetParent !== null);
-    if (!f.length) return;
-    const first = f[0], last = f[f.length - 1];
-    if (e.shiftKey && (document.activeElement === first || document.activeElement === sheet)) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-  });
+  sheet.addEventListener('keydown', e => ctx.trapTab(sheet, e)); // Tab stays in the sheet (app.js; Export uses the same)
   addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === ',' || e.code === 'Comma')) { e.preventDefault(); if (sheet.hidden) open(); else close(); }
   });

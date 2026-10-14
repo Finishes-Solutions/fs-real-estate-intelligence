@@ -28,6 +28,8 @@ export function initExport(ctx) {
   const listFor = s => s === 'view' ? inView() : s === 'highlight' ? highlighted() : ctx.visible;
 
   function render() {
+    // a choice redraws the dialog: focus stays on the same control (else it falls to the page, outside the dialog)
+    const a = dlg.contains(document.activeElement) ? document.activeElement : null, key = a && (a.id ? '#' + a.id : a.name ? '[name="' + a.name + '"][value="' + a.value + '"]' : a.dataset.f ? '[data-f="' + a.dataset.f + '"]' : a.dataset.k ? '[data-k="' + a.dataset.k + '"]' : null);
     const R = REPORTS[st.report], cmp = ctx.compare?.list() || [];
     if (!R.formats.includes(st.format)) st.format = R.formats[0];
     if (st.scope !== 'filters' && !scopes().find(x => x[0] === st.scope)[2]) st.scope = 'filters';
@@ -51,12 +53,15 @@ export function initExport(ctx) {
     dlg.querySelectorAll('.xopts input').forEach(i => i.onchange = () => { st[i.dataset.k] = i.checked; save(); });
     dlg.querySelector('#xGo').onclick = go;
     dlg.querySelector('#xMore')?.addEventListener('click', () => { dlg.classList.remove('on'); lastFocus = null; ctx.setView('reports'); });
+    if (key) (dlg.querySelector(key + ':not([disabled])') || dlg.querySelector('#xClose'))?.focus();
   }
   const opt = (k, label, show) => show ? '<label class="tg2"><input type="checkbox" data-k="' + k + '"' + (st[k] ? ' checked' : '') + '><span>' + label + '</span></label>' : '';
   let lastFocus = null;
   // open(report, { format, scope }): the Reports tab and the assistant's cards open it preset
-  function open(report, o = {}) { if (report && REPORTS[report]) st.report = report; if (o.format && REPORTS[st.report].formats.includes(o.format)) st.format = o.format; if (o.scope) st.scope = o.scope; lastFocus = document.activeElement; render(); dlg.classList.add('on'); setTimeout(() => dlg.querySelector('#xGo:not([disabled])')?.focus(), 30); }
-  function close() { dlg.classList.remove('on'); lastFocus?.focus?.(); }
+  function open(report, o = {}) { if (report && REPORTS[report]) st.report = report; if (o.format && REPORTS[st.report].formats.includes(o.format)) st.format = o.format; if (o.scope) st.scope = o.scope; lastFocus = document.activeElement; render(); dlg.classList.add('on'); setTimeout(() => (dlg.querySelector('#xGo:not([disabled])') || dlg.querySelector('#xClose'))?.focus(), 30); }
+  function close() { if (!dlg.classList.contains('on')) return; dlg.classList.remove('on'); if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true }); lastFocus = null; }
+  // Tab and Shift+Tab stay inside the dialog while it's open (the same trap as Settings)
+  dlg.addEventListener('keydown', e => ctx.trapTab?.(dlg.querySelector('.xbox') || dlg, e));
   dlg.addEventListener('pointerdown', e => { if (e.target === dlg) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && dlg.classList.contains('on')) { e.preventDefault(); close(); } });
   document.getElementById('exportBtn').onclick = () => open();

@@ -1021,6 +1021,11 @@ const toastEl=document.getElementById('toast'); let toastT=0;
 function toast(m,o={}){ toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a);
   if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.onclick=()=>{ toastEl.classList.remove('on','act'); a.run(); }; toastEl.append(' ',b); }
   toastEl.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('on','act'),o.ms||(a?6500:3400)); }
+// Tab and Shift+Tab stay inside an open dialog (Settings, Export): past the last control back to the first, and the reverse
+function trapTab(box,e){ if(e.key!=='Tab'||!box) return;
+  const f=[...box.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')].filter(x=>x.offsetParent!==null); if(!f.length) return;
+  const first=f[0], last=f[f.length-1], a=document.activeElement;
+  if(e.shiftKey&&(a===first||a===box||!box.contains(a))){ e.preventDefault(); last.focus(); } else if(!e.shiftKey&&(a===last||!box.contains(a))){ e.preventDefault(); first.focus(); } }
 function clearToast(){ clearTimeout(toastT); toastEl.classList.remove('on','act'); } // a mode changed: its old instruction goes
 
 // ---------- export ----------
@@ -1198,7 +1203,7 @@ function showIntro(){ try{ localStorage.removeItem(INTRO); }catch(e){} introEl.h
 if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
-  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
+  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,trapTab,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, get reduceMotion(){ return reduceMotion; }, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.
