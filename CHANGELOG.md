@@ -3,6 +3,19 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-14
+
+### 6:55 AM CT: Site plans: a planning workspace, layouts you can compare, a map you can read (31fecfc, ae13672, 5c9686e, 11e0062, 4e46278, 194fe70, bd6f4c7, 26713a5, 168480b, f8b65e1, 9458bf4)
+- **A planning workspace:** while a plan is open the map's side list and area tools step aside so the plan gets the room. The header shows where you are (Projects › project › option) with Undo, Redo, Edit Layout and **Done** always in the same place. A **Fit plan** button re-centres it.
+- **Nothing lost by accident:** Esc steps back (stop the tool, then clear the selection, then stop editing) and never closes the plan. Closing says where the plan was saved, with a **Resume plan** chip on the map and a link to the project. Leaving the Map shows a "Return to plan" banner.
+- **Builds you can follow:** one build at a time, with a progress strip (step, time so far) and **Cancel**. Suggestion chips now fill the request box instead of starting a build. When the AI isn't available, the app says so and offers requests the engine understands on its own, and shows which parts of a request it didn't understand.
+- **Layouts you can compare:** each generated layout (Layout 1, 2, 3…) has a card with a thumbnail, units or floor area, parking, value and cost, yield, a Passes / problems tag and the AI's score, with **Recommended**, **Most units** and **Best yield** badges and a "vs Recommended" line. Sort by any of them. **Use this layout** or **Save as new option** from any card. The figures lead with phase 1 (what you asked for).
+- **Layouts are kept:** a build's layouts are saved with the option, so they're still there after switching options, closing or reloading. Changing a setting no longer quietly replaces a layout you've edited.
+- **Value and cost now include the land** (appraised value plus closing), the same as the Pro forma, so yields on the cards and overview read lower than before.
+- **A map you can read:** building names show before parking counts and labels no longer pile up; a **Legend** (plan key) and a scale bar; a clearer site boundary and selected piece; better colours in dark mode; and a pill on the map that always says which mode you're in and how to leave it.
+- **Safer edits:** a piece added from Draw lands in a clear spot instead of on top of others; a turned building that would overlap moves to the nearest clear spot (with Undo).
+- **Phones:** the plan fits in the strip above the sheet, and toasts show above the sheet.
+
 ## 2026-10-13
 
 ### 9:55 PM CT: Clearer layout: five destinations, one Settings, roomier pages (2a35026, 92598de, f9bbfbb, 5e6ffcf, 0972e5c, 986342f, 6d1e4bc, 7b72284, df5b244, edaa303, 5b63dbf, 8501083, 9c6e877, a44c186, ef95caa)
