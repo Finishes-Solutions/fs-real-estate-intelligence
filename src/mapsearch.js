@@ -29,7 +29,7 @@ export function initMapSearch(ctx) {
 
   // ---------- mount: under the tools (tablet/desktop) or in the floating top bar (phone) ----------
   const phoneMQ = window.matchMedia('(max-width:700px)');
-  const mount = () => { const host = phoneMQ.matches ? document.getElementById('mSearchSlot') : document.getElementById('mapleft'); if (host && wrap.parentElement !== host) host.insertBefore(wrap, phoneMQ.matches ? null : document.getElementById('placebar')); };
+  const mount = () => { const host = phoneMQ.matches ? document.getElementById('mSearchSlot') : document.getElementById('mapleft'); if (host && wrap.parentElement !== host) host.insertBefore(wrap, phoneMQ.matches ? null : host.firstElementChild); }; // desktop: the search is the first row of the map's controls
   phoneMQ.addEventListener('change', mount); mount();
 
   // ---------- placeholder: the longest wording that fits, so it never shows cut off when the box narrows ----------
@@ -219,6 +219,7 @@ export function initMapSearch(ctx) {
   });
   const syncPlace = () => { map.getSource && map.getSource('place')?.setData(ctx.fc(place?.geom ? [{ type: 'Feature', properties: {}, geometry: place.geom }] : [])); ctx.syncClear?.(); };
   ctx.hasPlace = () => !!place;
+  ctx.placeLabel = () => place?.label || '';
   // the location marker: an amber pin with the place name, at the address / landmark or the middle of an outline
   let pin = null;
   function setPlacePin(c, label) {

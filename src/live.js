@@ -29,13 +29,16 @@ export function initLive(ctx) {
   const stamp = {};
 
   // ---------- layers panel ----------
-  const panel = document.getElementById('layers'), box = document.createElement('div');
-  box.className = 'live-ly';
-  box.innerHTML = '<div class="lt">Live Conditions</div>' + ORDER.map(k => '<label class="tg2"><input type="checkbox" data-live="' + k + '"><span>' + esc(LABEL[k]) + '</span></label>').join('') +
-    '<div class="rnote" id="liveNote"></div>';
-  panel.appendChild(box);
-  const note = box.querySelector('#liveNote');
-  box.querySelectorAll('input[data-live]').forEach(i => i.onchange = () => set({ [i.dataset.live]: i.checked }));
+  // rows go into the panel's named groups: weather, traffic and other live feeds (and planes.js's layers) under Live
+  // conditions; 3D terrain and the imagery under "Base map, imagery & 3D". Without those groups they go at the end as before.
+  const panel = document.getElementById('layers'), BASE = new Set(['terrain', 'nasa', 'hires']);
+  const group = g => panel.querySelector('[data-lyg="' + g + '"] .lyb');
+  let box = group('live'), baseBox = group('base');
+  if (!box) { box = document.createElement('div'); box.className = 'live-ly'; box.innerHTML = '<div class="lt">Live Conditions</div>'; panel.appendChild(box); }
+  const row = k => { const lab = document.createElement('label'); lab.className = 'tg2'; lab.innerHTML = '<input type="checkbox" data-live="' + k + '"><span>' + esc(LABEL[k]) + '</span>'; return lab; };
+  for (const k of ORDER) (BASE.has(k) && baseBox ? baseBox : box).appendChild(row(k));
+  const note = document.createElement('div'); note.className = 'rnote'; note.id = 'liveNote'; box.appendChild(note);
+  panel.querySelectorAll('input[data-live]').forEach(i => i.onchange = () => set({ [i.dataset.live]: i.checked }));
   // rain radar legend (bottom left): NWS base reflectivity colors, as the radar tiles draw them (api/tile)
   const RADAR_LEGEND = '<div class="t">Rain radar</div><div class="lg-grad" style="background:linear-gradient(90deg,#04e9e7 0%,#019ff4 10%,#0300f4 20%,#02fd02 30%,#01c501 37%,#008e00 45%,#fdf802 52%,#e5bc00 58%,#fd9500 65%,#fd0000 72%,#d40000 80%,#bc0000 86%,#f800fd 93%,#9854c6 100%);opacity:.8"></div>' +
     '<div class="lg-ticks"><span>Light</span><span>Moderate</span><span>Heavy</span><span>Severe</span></div><div class="lg-note">Reflectivity, about 5 to 75 dBZ; updates every 4 minutes.</div>';
@@ -48,7 +51,7 @@ export function initLive(ctx) {
   }
   function syncUI() {
     ctx.setLegend?.('radar', on.radar ? RADAR_LEGEND : '');
-    box.querySelectorAll('input[data-live]').forEach(i => { i.checked = on[i.dataset.live]; if (i.dataset.live === 'traffic') { i.disabled = trafficOK === false && !on.traffic; syncNA(i, i.disabled); } });
+    panel.querySelectorAll('input[data-live]').forEach(i => { i.checked = on[i.dataset.live]; if (i.dataset.live === 'traffic') { i.disabled = trafficOK === false && !on.traffic; syncNA(i, i.disabled); } });
     const bits = [];
     if (on.wind && windData?.time) bits.push('Wind as of ' + new Date(windData.time + ':00').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ' (Open-Meteo).');
     if (on.terrain && map.getZoom() < TERRAIN_Z) bits.push('3D terrain appears once you zoom in to town level.');

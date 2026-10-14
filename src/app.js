@@ -452,7 +452,9 @@ function syncFilterUI(){
   const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const nBadge=nAll+ctx_lfCount(); const fN=document.getElementById('filterN'); fN.textContent=nBadge||''; fN.hidden=!nBadge; syncClear(); try{ ctx.syncFilterFooter?.(); }catch(e){}
   document.getElementById('filterBtn').classList.toggle('on',!!nBadge);
   let lt=''; try{ lt=ctx.layerFilterText?.()||''; }catch(e){}
-  const ft=filterText(), t=[lt,ft?'Filings: '+ft:''].filter(Boolean).join(' · '); document.getElementById('activeTxt').textContent=t||'No filters on'; document.getElementById('activeBar').classList.toggle('on',true);
+  // only the default period set: "No filters on" and no Clear All
+  const none=!nBadge&&!state.month, ft=filterText(), t=none?'':[lt,ft?'Filings: '+ft:''].filter(Boolean).join(' · '); document.getElementById('activeTxt').textContent=t||'No filters on'; document.getElementById('activeBar').classList.toggle('on',true);
+  document.getElementById('activeBar').classList.toggle('none',none);
 }
 // the Clear button beside Filters (and on phones beside the filter button): shown whenever anything narrows the view (filters,
 // a period other than the default, a time-lapse month, a selected area or a searched place's outline), one click clears it all
@@ -463,7 +465,25 @@ function syncClear(){
   const nL=ctx_lfCount(); if(nF) parts.push(nF===1?'1 filing filter':nF+' filing filters'); if(nL) parts.push(nL===1?'1 layer filter':nL+' layer filters'); if(state.month) parts.push('the month'); if(sel.feature) parts.push('the selected area'); if(hasPlace()) parts.push('the search outline');
   const n=nF+nL+(state.month?1:0)+(sel.feature?1:0)+(hasPlace()?1:0), t=parts.length?'Clear '+parts.join(', ').replace(/, ([^,]*)$/,' and $1'):'';
   for(const id of ['filterClear','mClear']){ const b=document.getElementById(id); if(!b) continue; b.hidden=!n; b.title=t; b.setAttribute('aria-label',t||'Clear'); const sp=b.querySelector('span'); if(sp) sp.textContent=n>1?'Clear ('+n+')':'Clear'; }
+  renderConstraints();
 }
+// Under the layer buttons (desktop): everything that narrows the map as removable chips, ending in "Clear all". It replaces
+// the old "Clear (n)" button (#filterClear, kept hidden: phones still use #mClear). Built from the same parts as above:
+// the filing filters and the month (filterChips), each layer threshold, the Match everything mode, the selected area and a
+// searched place's outline.
+const fchipsEl=document.getElementById('fchips');
+function constraintChips(){
+  const out=filterChips({area:true}).filter(c=>!c.fixed);
+  try{ out.push(...(ctx.layerFilterChips?.()||[])); }catch(e){}
+  if(hasPlace()){ let l=''; try{ l=ctx.placeLabel?.()||''; }catch(e){} out.push({label:'Outline: '+(String(l).split(',')[0]||'searched place'),remove:()=>ctx.clearPlace?.()}); }
+  return out;
+}
+function renderConstraints(){ if(!fchipsEl) return; let cs=[]; try{ cs=constraintChips(); }catch(e){}
+  const html=cs.map((c,i)=>'<span class="fchip">'+esc(c.label)+'<button type="button" data-i="'+i+'" aria-label="Remove: '+esc(c.label)+'" title="Remove">×</button></span>').join('')+(cs.length?'<button type="button" class="fc-all">Clear all</button>':'');
+  fchipsEl.hidden=!cs.length; if(fchipsEl.innerHTML!==html) fchipsEl.innerHTML=html;
+  fchipsEl.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{ const c=cs[+b.dataset.i]; if(c) c.remove(); });
+  const all=fchipsEl.querySelector('.fc-all'); if(all) all.onclick=()=>clearEverything(); }
+function clearEverything(){ clearFilters(); ctx.toast?.('Cleared: showing everything'); }
 let openFilters=()=>{}, closeFilters=()=>{}; // set below once the popup is wired; exposed as ctx.openFilters / closeFilters
 const clearFilters=()=>{ ctx.clearPlace?.(); ctx.clearLayerFilters?.(); fromSpec(DEFAULT_SPEC()); if(state.month) setMonth(null); };
 document.getElementById('resetAll').onclick=clearFilters;
@@ -488,7 +508,7 @@ document.getElementById('resetAll').onclick=clearFilters;
   btn.onclick=()=>setOpen(pop.hidden);
   document.getElementById('filterClose').onclick=dismiss;
   document.getElementById('filterDone').onclick=()=>setOpen(false); // phones: the sheet's "Show N filings" button
-  const clearAll=()=>{ clearFilters(); ctx.toast?.('Cleared: showing everything'); };
+  const clearAll=clearEverything;
   document.getElementById('filterClear').onclick=clearAll; const mc=document.getElementById('mClear'); if(mc) mc.onclick=clearAll;
   // only the construction filters put the filing dots on the map (the layer filters have their own layers)
   pop.addEventListener('change',e=>{ if(e.target.closest('#filtersBody')) showFilings(); }); pop.addEventListener('click',e=>{ if(e.target.closest('#filtersBody')&&e.target.closest('.chip,button[data-k],button[data-v]')) showFilings(); });
@@ -516,7 +536,7 @@ function filterChips({area=true}={}){
   for(const k of Object.keys(s)){ if(k==='d'||!RESET[k]) continue; const g=k==='max'?'min':k==='sqmax'?'sqmin':k; if(seen.has(g)) continue; seen.add(g);
     const part=g==='min'?{min:s.min,max:s.max}:g==='sqmin'?{sqmin:s.sqmin,sqmax:s.sqmax}:{[k]:s[k]};
     out.push({label:describe(part,fmtM),remove:drop(RESET[k])}); }
-  if(state.month) out.push({label:'Under construction in '+monthLabel(state.month),remove:()=>setMonth(null)});
+  if(state.month) out.push({label:'Under construction · '+monthLabel(state.month),remove:()=>showTime(false)});
   if(area&&sel.feature) out.push({label:'Area: '+sel.label,remove:()=>clearSelection()});
   return out;
 }
@@ -706,7 +726,8 @@ const isTouch=window.matchMedia('(pointer: coarse)').matches;
 const HINTS={area:'Drag a box over the area you want.',poly:isTouch?'Tap to drop points. Tap the first point to close the shape.':'Click to drop points. Click the first point or double-click to close. Backspace undoes, Esc cancels.',county:'Click counties to add or remove them from the selection.'};
 function setMode(m){
   mode=m; draft=[]; boxA=null; drawDraft();
-  document.querySelectorAll('.tools button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));
+  document.querySelectorAll('.tools button[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));
+  syncModeUI(m);
   hintEl.textContent=HINTS[m]||''; hintEl.classList.toggle('on',!!HINTS[m]);
   radiusEl.classList.toggle('on',m==='radius'); if(m==='radius') setTimeout(()=>rq.focus(),30);
   stage.classList.toggle('m-draw',m!=='pan'); stage.dataset.dmode=m; // each drawing tool has its own cursor (src/cursors.js)
@@ -714,7 +735,21 @@ function setMode(m){
   if(m==='poly') map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
   tip.style.opacity=0;
 }
-document.querySelectorAll('.tools button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+document.querySelectorAll('.tools button[data-mode]').forEach(b=>b.onclick=()=>{ setMode(b.dataset.mode); setSelSheet(false); });
+// Phones: the five area tools fold into one "Select ▾" pill that opens them as a small sheet with their names; while a
+// tool is in use a "Drawing a shape · Cancel" chip says so and gets back to moving the map.
+const MODE_TXT={area:'Drawing a box',poly:'Drawing a shape',radius:'Radius search',county:'Picking counties'};
+const selPill=document.getElementById('selPill'), modeChip=document.getElementById('modeChip');
+function setSelSheet(on){ document.querySelector('.app').classList.toggle('sel-open',!!on); selPill?.setAttribute('aria-expanded',String(!!on)); }
+function syncModeUI(m){ if(modeChip){ modeChip.hidden=m==='pan'||!MODE_TXT[m]; document.getElementById('modeChipT').textContent=MODE_TXT[m]||''; }
+  if(!selPill) return; const ic=(m==='pan'?selIc0:document.querySelector('.tools button[data-mode="'+m+'"] svg'))?.cloneNode(true);
+  if(ic){ ic.setAttribute('class','sp-ic'); selPill.querySelector('.sp-ic').replaceWith(ic); } selPill.classList.toggle('on',m!=='pan'); }
+const selIc0=selPill?.querySelector('.sp-ic')?.cloneNode(true);
+selPill&&(selPill.onclick=()=>setSelSheet(!document.querySelector('.app').classList.contains('sel-open')));
+document.getElementById('selClose')?.addEventListener('click',()=>setSelSheet(false));
+document.getElementById('modeCancel')?.addEventListener('click',()=>setMode('pan'));
+document.addEventListener('pointerdown',e=>{ if(document.querySelector('.app').classList.contains('sel-open')&&!e.target.closest('#mapTools,#selPill')) setSelSheet(false); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.querySelector('.app').classList.contains('sel-open')) setSelSheet(false); });
 function ringFeature(ring){
   const r=ring.slice(); if(r[0][0]!==r[r.length-1][0]||r[0][1]!==r[r.length-1][1]) r.push(r[0]);
   let f={type:'Polygon',coordinates:[r]}; if(d3.geoArea(f)>2*Math.PI) f={type:'Polygon',coordinates:[r.slice().reverse()]}; return f;
@@ -834,28 +869,32 @@ function updateRadius(fly){
 }
 
 // ---------- layers panel & controls ----------
-const layersEl=document.getElementById('layers'), layersBtn=document.getElementById('layersBtn');
-// opens as a popover under the quick layer buttons (left side, where More is); on phones it keeps its own sheet layout
-const qlEl=document.getElementById('qlayers');
-function placeLayers(){ if(!layersEl.classList.contains('on')||!qlEl||matchMedia('(max-width:700px)').matches){ layersEl.style.removeProperty('--ly-top'); layersEl.style.removeProperty('--ly-left'); return; }
-  const host=layersEl.offsetParent?.getBoundingClientRect(), q=qlEl.getBoundingClientRect(); if(!host||!q.height) return;
-  layersEl.style.setProperty('--ly-top',Math.round(q.bottom-host.top+8)+'px'); layersEl.style.setProperty('--ly-left',Math.round(q.left-host.left)+'px'); }
-function setLayersOpen(on){ layersEl.classList.toggle('on',on); layersBtn.setAttribute('aria-expanded',on); qlEl?.querySelector('.qmore')?.setAttribute('aria-expanded',on); placeLayers(); }
+const layersEl=document.getElementById('layers'), layersBtn=document.getElementById('layersBtn'), layersOpen=document.getElementById('layersOpen');
+// The [Layers · N] button in the map's tool row opens the panel right under it. #layersBtn (hidden, in the camera rail) stays
+// as the trigger other code clicks (phone More › Layers, Settings › Map layers). On phones the panel is a bottom sheet.
+function placeLayers(){ const a=layersOpen&&layersOpen.offsetParent?layersOpen:null;
+  if(!layersEl.classList.contains('on')||!a||matchMedia('(max-width:700px)').matches){ layersEl.style.removeProperty('--ly-top'); layersEl.style.removeProperty('--ly-left'); return; }
+  const host=layersEl.offsetParent?.getBoundingClientRect(), q=a.getBoundingClientRect(); if(!host||!q.height) return;
+  layersEl.style.setProperty('--ly-top',Math.round(q.bottom-host.top+8)+'px'); layersEl.style.setProperty('--ly-left',Math.round(Math.max(16,Math.min(q.left-host.left,host.width-336)))+'px'); }
+function setLayersOpen(on){ const was=layersEl.classList.contains('on'); layersEl.classList.toggle('on',on); layersBtn.setAttribute('aria-expanded',on); layersOpen?.setAttribute('aria-expanded',on); layersOpen?.classList.toggle('open',on);
+  if(on&&!was){ try{ ctx.openLayerGroups?.(); }catch(e){} layersEl.scrollTop=0; } placeLayers(); }
 layersBtn.onclick=e=>{ e.stopPropagation(); setLayersOpen(!layersEl.classList.contains('on')); };
-document.getElementById('layersX')?.addEventListener('click',()=>setLayersOpen(false));
-addEventListener('resize',placeLayers); if(qlEl&&window.ResizeObserver) new ResizeObserver(placeLayers).observe(qlEl);
+layersOpen&&(layersOpen.onclick=e=>{ e.stopPropagation(); setLayersOpen(!layersEl.classList.contains('on')); });
+document.getElementById('layersX')?.addEventListener('click',()=>{ setLayersOpen(false); layersOpen?.offsetParent&&layersOpen.focus({preventScroll:true}); });
+document.getElementById('layersDone')?.addEventListener('click',()=>setLayersOpen(false));
+addEventListener('resize',placeLayers); if(layersOpen&&window.ResizeObserver) new ResizeObserver(placeLayers).observe(document.getElementById('mapleft'));
 let swallowClick=false;
-document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on')&&!layersEl.contains(e.target)&&!layersBtn.contains(e.target)&&!e.target.closest?.('.qmore')){ setLayersOpen(false); if(map.getCanvas().contains(e.target)) swallowClick=true; } });
+document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on')&&!layersEl.contains(e.target)&&!layersBtn.contains(e.target)&&!layersOpen?.contains(e.target)){ setLayersOpen(false); if(map.getCanvas().contains(e.target)) swallowClick=true; } });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&layersEl.classList.contains('on')) setLayersOpen(false); });
 document.querySelectorAll('#styleSeg button').forEach(b=>{ b.onclick=()=>setBasemap(b.dataset.style); b.setAttribute('aria-pressed',b.dataset.style===layers.style); });
 document.querySelectorAll('#sizeSeg button').forEach(b=>b.onclick=()=>{ layers.size=b.dataset.size; saveLayers(); styleFilings(); });
 document.querySelectorAll('#heatSeg button').forEach(b=>b.onclick=()=>{ layers.heat=b.dataset.heat; saveLayers(); styleFilings(); });
-document.getElementById('lyFilings').onchange=e=>{ layers.dots=e.target.checked; saveLayers(); styleFilings(); };
+document.getElementById('lyFilings').onchange=e=>{ layers.dots=e.target.checked; saveLayers(); styleFilings(); if(!map.getLayer('filings')) syncLegend(); };
 syncLegend();
-function showFilings(){ if(layers.dots) return; layers.dots=true; saveLayers(); const lf=document.getElementById('lyFilings'); if(lf) lf.checked=true; if(map.getLayer('filings')) styleFilings(); syncQL(); }
+function showFilings(){ if(layers.dots) return; layers.dots=true; saveLayers(); const lf=document.getElementById('lyFilings'); if(lf) lf.checked=true; if(map.getLayer('filings')) styleFilings(); else syncLegend(); syncQL(); }
 // on the map at all: dots or the heatmap (the Filings quick button shows either, and turns both off)
 const filingsShown=()=>layers.dots||layers.heat!=='off';
-function setFilingsShown(v){ layers.dots=!!v; if(!v) layers.heat='off'; saveLayers(); const lf=document.getElementById('lyFilings'); if(lf) lf.checked=layers.dots; if(map.getLayer('filings')) styleFilings(); syncQL(); }
+function setFilingsShown(v){ layers.dots=!!v; if(!v) layers.heat='off'; saveLayers(); const lf=document.getElementById('lyFilings'); if(lf) lf.checked=layers.dots; if(map.getLayer('filings')) styleFilings(); else syncLegend(); syncQL(); }
 function setMapOptions(a){ const done=[];
   if(a.heatmap){ layers.heat=a.heatmap; done.push(a.heatmap==='off'?'heatmap off':'heatmap by '+(a.heatmap==='value'?'value':'count')); }
   if(typeof a.size_by_value==='boolean'){ layers.size=a.size_by_value?'value':'uniform'; done.push(a.size_by_value?'dots sized by value':'uniform dots'); }
@@ -889,8 +928,14 @@ map.on('move',()=>{ if(camRaf) return; camRaf=requestAnimationFrame(()=>{ camRaf
 map.on('moveend',()=>{ if(map.isEasing()||orbitRaf||map.getZoom()>=4) return; if(map.getPitch()>.5||Math.abs(map.getBearing())>.5) map.easeTo({pitch:0,bearing:0,roll:0,duration:reduceMotion?0:600}); });
 flatBtn.onclick=flatView;
 document.getElementById('zin').onclick=()=>map.zoomIn(); document.getElementById('zout').onclick=()=>map.zoomOut();
-document.getElementById('home').onclick=()=>{ stopAllOrbits(); map.flyTo({...HOME,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1200}); };
-document.getElementById('orbit').onclick=()=>{ stopAllOrbits(); map.flyTo({center:[-93,26],zoom:2.2,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1600}); };
+// Reset view ▾: Whole region (#home, which the assistant clicks for "show the whole region") and Globe (#orbit)
+const resetBtn=document.getElementById('resetView'), resetPop=document.getElementById('resetPop');
+const setResetOpen=on=>{ resetPop.hidden=!on; resetBtn.setAttribute('aria-expanded',String(on)); resetBtn.classList.toggle('open',on); if(on) resetPop.querySelector('button')?.focus({preventScroll:true}); };
+resetBtn.onclick=e=>{ e.stopPropagation(); setResetOpen(resetPop.hidden); };
+document.addEventListener('pointerdown',e=>{ if(!resetPop.hidden&&!e.target.closest('#resetMenu')) setResetOpen(false); });
+resetPop.addEventListener('keydown',e=>{ if(e.key==='Escape'){ e.stopPropagation(); setResetOpen(false); resetBtn.focus(); } });
+document.getElementById('home').onclick=()=>{ if(!resetPop.hidden) setResetOpen(false); stopAllOrbits(); map.flyTo({...HOME,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1200}); };
+document.getElementById('orbit').onclick=()=>{ if(!resetPop.hidden) setResetOpen(false); stopAllOrbits(); map.flyTo({center:[-93,26],zoom:2.2,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1600}); };
 
 // ---------- toast ----------
 const toastEl=document.getElementById('toast'); let toastT=0;
@@ -1006,10 +1051,13 @@ const MONTHS=(()=>{ const a=new Date(DATA.period.start.slice(0,7)+'-01T00:00:00Z
   for(let d=a; ym(d)<=(maxEnd.slice(0,7)<cap?maxEnd.slice(0,7):cap); d=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1))) out.push(ym(d)); return out.length?out:[ym(new Date())]; })();
 tRange.max=MONTHS.length-1; tRange.value=Math.max(0,MONTHS.indexOf(ym(new Date())));
 let playT=null;
-const timeBtn=document.getElementById('timeBtn');
-function showTime(on){ tsl.classList.toggle('show',on); timeBtn.setAttribute('aria-pressed',on); if(!on){ stopPlay(); if(state.month) setMonth(null); } }
-timeBtn.onclick=()=>showTime(!tsl.classList.contains('show'));
-function setMonth(m){ state.month=m; tsl.classList.toggle('on',!!m); if(m&&!tsl.classList.contains('show')){ tsl.classList.add('show'); timeBtn.setAttribute('aria-pressed',true); } tLabel.textContent=m?'Under construction · '+monthLabel(m):'Under construction by month'; if(m) tRange.value=MONTHS.indexOf(m); applyFilters(); }
+// Time-lapse: "Play by month" sits on the Filings row in Map layers and on the Filings legend. It puts the filings on the
+// map first, then plays month by month; the month shows as a removable chip under the map's layer buttons.
+const syncTimeBtns=()=>{ const on=tsl.classList.contains('show'); document.querySelectorAll('[data-timelapse]').forEach(b=>{ b.setAttribute('aria-pressed',String(on)); const sp=b.querySelector('span'); if(sp) sp.textContent=on?'Stop time-lapse':'Play by month'; b.querySelector('path')?.setAttribute('d',on?'M2.5 2.5h7v7h-7z':'M3 1.5v9l7-4.5z'); }); };
+function showTime(on){ tsl.classList.toggle('show',on); syncTimeBtns(); if(!on){ stopPlay(); if(state.month) setMonth(null); } }
+function startTimelapse(){ showFilings(); if(ctx.view!=='map') setView('map'); showTime(true); if(!playT) tPlay.click(); }
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-timelapse]'); if(!b) return; if(tsl.classList.contains('show')) showTime(false); else startTimelapse(); });
+function setMonth(m){ state.month=m; tsl.classList.toggle('on',!!m); if(m&&!tsl.classList.contains('show')){ tsl.classList.add('show'); syncTimeBtns(); } tLabel.textContent=m?'Under construction · '+monthLabel(m):'Under construction by month'; if(m) tRange.value=MONTHS.indexOf(m); applyFilters(); }
 let tT; tRange.oninput=()=>{ cancelAnimationFrame(tT); tT=requestAnimationFrame(()=>setMonth(MONTHS[+tRange.value])); };
 document.getElementById('tClear').onclick=()=>showTime(false);
 function stopPlay(){ clearInterval(playT); playT=null; tPlay.classList.remove('on'); tPlay.setAttribute('aria-label','Play through months'); }
@@ -1105,6 +1153,25 @@ ctx.setMode=setMode; ctx.setFilingsOpen=setFilingsOpen; ctx.showIntro=showIntro;
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
   if(!html){ el?.remove(); return; } if(!el){ el=document.createElement('div'); el.className='xlegend'; el.dataset.lg=id; box.appendChild(el); } if(el.innerHTML!==html) el.innerHTML=html; };
+// One Legend card: every legend above is a section with its title as a header row. One section is open at a time (the
+// newest layer's, until you pick another); the chevron folds the whole card to its header. Filings shows at every width.
+{ const box=document.getElementById('legends'), tog=document.getElementById('lgToggle'), head=box?.querySelector('.lg-h b'); let open=null, seen=new Set(), raf=0, min=false;
+  try{ min=localStorage.getItem('fs-legend-min')==='1'||(localStorage.getItem('fs-legend-min')==null&&matchMedia('(max-width:700px)').matches); }catch(e){}
+  const keyOf=el=>el.dataset.lg||(el.id==='dLegend'?'demo':'');
+  const shown=el=>el.classList.contains('dlegend')?el.classList.contains('on'):el.classList.contains('legend')?(document.documentElement.dataset.filings!=='off'||el.classList.contains('heat')):true;
+  const sync=()=>{ raf=0; if(!box) return; const all=[...box.querySelectorAll(':scope>.legend,:scope>.dlegend,:scope>.xlegend')], vis=all.filter(shown), keys=vis.map(keyOf);
+    const fresh=keys.filter(k=>!seen.has(k)); seen=new Set(keys); if(fresh.length&&!booting) open=fresh[fresh.length-1]; if(!keys.includes(open)) open=keys[keys.length-1]||null;
+    for(const el of all){ const k=keyOf(el), t=el.querySelector(':scope>.t'); el.classList.toggle('lg-open',k===open||vis.length===1); el.classList.toggle('lg-one',vis.length===1);
+      if(t&&!t.hasAttribute('tabindex')){ t.setAttribute('tabindex','0'); t.setAttribute('role','button'); } t?.setAttribute('aria-expanded',String(k===open||vis.length===1)); }
+    box.classList.toggle('lg-empty',!vis.length); box.classList.toggle('lg-min',min);
+    if(head) head.textContent=min&&vis.length?'Legend · '+vis.length:'Legend';
+    tog?.setAttribute('aria-expanded',String(!min)); const lab=min?'Show the legend':'Hide the legend'; tog?.setAttribute('aria-label',lab); if(tog) tog.title=lab; };
+  const soon=()=>{ if(!raf) raf=requestAnimationFrame(sync); };
+  if(box){ new MutationObserver(soon).observe(box,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); new MutationObserver(soon).observe(document.documentElement,{attributes:true,attributeFilter:['data-filings']});
+    const pick=e=>{ const t=e.target.closest('.t'); if(!t||!box.contains(t)||t.closest('.lg-h')) return; const el=t.parentElement; if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; if(e.type==='keydown') e.preventDefault(); open=keyOf(el); if(min){ min=false; try{ localStorage.setItem('fs-legend-min','0'); }catch(err){} } sync(); };
+    box.addEventListener('click',pick); box.addEventListener('keydown',pick);
+    box.querySelector('.lg-h').addEventListener('click',()=>{ min=!min; try{ localStorage.setItem('fs-legend-min',min?'1':'0'); }catch(e){} sync(); });
+    sync(); } }
 syncQL=()=>ctx.syncQuickLayers?.();
 Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },

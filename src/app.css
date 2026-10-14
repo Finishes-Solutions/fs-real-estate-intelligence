@@ -407,10 +407,7 @@ table.who .r,th.r{text-align:right}
   .tslider{width:min(420px,calc(100% - 300px))}
   .viewbar button{padding:7px 10px}
 }
-@media (max-width:1100px){
-  .tools button span{display:none}
-  .legend{display:none}
-}
+/* map tool labels and the legend follow the map's own width now (container queries, end of file) */
 @media (pointer:coarse){
   .chip{min-height:34px;padding:6px 10px}
   .btn{min-height:var(--tap)}
@@ -459,7 +456,6 @@ table.who .r,th.r{text-align:right}
   .hint{top:calc(100px + var(--st));left:62px;right:62px;max-width:none}
   .radius{top:calc(100px + var(--st));left:62px;right:10px;width:auto}
   .layers{top:calc(100px + var(--st));left:10px;right:62px;width:auto;max-height:calc(100% - 130px);overflow:auto}
-  .legend,.dlegend{display:none!important}
   .tslider{left:10px;right:10px;transform:none;width:auto;bottom:12px}
   .tslider .tl{min-width:0;font-size:11px}
   .toast{bottom:64px}
@@ -624,7 +620,6 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
   .app.ai-open .ctrls{right:calc(var(--aiw) + 24px)}
   .app.ai-open .layers{right:calc(var(--aiw) + 70px)}
   .app.ai-open .card{right:auto;left:12px}
-  .app.ai-open .mapleft{display:none}
 }
 /* phone: the assistant is a bottom sheet over the map so results stay visible above it */
 @media (max-width:700px){
@@ -862,12 +857,6 @@ table.cmp td.best{font-weight:700;color:var(--brand)}
 .ai-next button{border:1px solid var(--line-2);background:var(--panel);color:var(--brand);border-radius:16px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:var(--cur-pointer,pointer);text-align:left;line-height:1.3;transition:background 120ms,border-color 120ms}
 .ai-next button:hover{border-color:var(--brand);background:var(--panel-2)}
 .ai-next button:first-child{background:var(--green-700);border-color:var(--green-700);color:#fff}
-/* assistant drawer open on desktop: compact the map tools so they clear the controls */
-@media (min-width:1101px){
-  .app.ai-open .mapleft{min-width:0;max-width:calc(100% - var(--aiw) - 100px)}
-  .app.ai-open .tools button span{display:none}
-  .app.ai-open .tools button{padding:0 11px}
-}
 /* building card: sizes + multi-select */
 .card dl.bsize{margin:0 16px 10px}
 .card .msum{margin:4px 16px 10px}
@@ -1280,7 +1269,6 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
   .mcount{margin-top:6px}
   /* the Layers panel sits over the map tools, not under them */
   .layers{top:calc(108px + var(--st));left:12px;right:64px;z-index:8;padding:16px 16px 18px;gap:12px;border-radius:12px}
-  .app:has(#layers.on) .mapleft{visibility:hidden}
   .layers .tg2{padding:5px 0}
   /* list tab: each filter's label above its options, roomier sections, 2-column headline numbers */
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
@@ -1535,7 +1523,6 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .fpill{display:inline-flex;align-items:center;gap:6px;flex:none;height:28px;padding:0 12px;border:1px solid var(--brand);border-radius:999px;background:var(--panel);color:var(--brand);font:700 12px var(--font-display);cursor:var(--cur-pointer,pointer)}
 .fpill:hover{background:var(--brand);color:var(--brand-ink)}
 /* tablet: the toolbar is icon-only, so the Filters button is too */
-@media (max-width:1100px) and (min-width:701px){ .fbtn span,.fclear span{display:none} .fbtn,.fclear{padding:0 10px} }
 /* phone: the floating filter button opens the same popup as a bottom sheet */
 @media (max-width:700px){
   .fbtn,.fclear{display:none}
@@ -1557,7 +1544,6 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .xlegend .lg-ticks{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:-2px}
 .xlegend .lg-note{font-size:11px;color:var(--muted);line-height:1.35}
 .xlegend .li .lg-sw{width:16px;height:12px;flex:none;border-radius:2px;object-fit:cover;border:1px solid var(--line)}
-@media (max-width:700px){ .xlegend{display:none} }
 .xlegend .lg-ticks.lg-abs{position:relative;display:block;height:12px}
 .xlegend .lg-abs span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
 .xlegend .lg-abs span:first-child{transform:none}.xlegend .lg-abs span:last-child{transform:translateX(-100%)}
@@ -1669,7 +1655,6 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 /* the toolbar row wraps (Clear, Export onto the next line) instead of squeezing the tool buttons when the map is narrow */
 @media (min-width:701px){ .maptop{flex-wrap:wrap} .maptop .tools{flex-shrink:0} }
 .layers{z-index:6}
-@media (min-width:701px) and (max-width:1500px){ .maptop:has(#filterClear:not([hidden])) .exbtn span{display:none} .maptop:has(#filterClear:not([hidden])) .exbtn{padding:0 11px} }
 
 /* ================= phone: edge-to-edge map, no sideways scrolling in menus ================= */
 /* hidden controls stay hidden even where a class sets display (the crime type picker showed with Crime off) */
@@ -2587,3 +2572,201 @@ table.who tr.nomatch td{border:0}
   .sc-nm .sk-l{display:none}
 }
 @media (pointer:coarse){ .sc-pick .btn,.sc-acts>.btn,.sc-more>summary.btn{min-height:40px} .sc-more>summary.btn{min-width:40px} }
+
+/* ================= map chrome: one Layers button, one chip row, laid out on the map's real width ================= */
+/* The controls top left: search · tools, [Layers · N], [Filters · n], Export · the layer chips (one row that scrolls) · the
+   filters in effect as removable chips. Labels drop by the room the stack really has (container queries on .mapleft, whose
+   width is the map minus the camera rail and, when it's open, the assistant), so nothing wraps into a column. */
+.viewport{container:map/inline-size}
+.ctrls [hidden],.rpop[hidden],.modechip[hidden],.fchips[hidden]{display:none!important}
+.selpill,.tools-h,.modechip,.ly-grab,.ly-f{display:none}
+.lybtn{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 13px;border:1px solid var(--line-2);border-radius:6px;background:var(--panel);color:var(--text-2);font:600 12.5px var(--font-display);cursor:var(--cur-pointer,pointer);box-shadow:0 1px 2px rgba(11,13,12,.08);white-space:nowrap;flex:none}
+.lybtn:hover{border-color:var(--text-2);color:var(--text)}
+.lybtn.on{color:var(--brand);border-color:var(--brand)}
+.lybtn.open{background:var(--text);border-color:var(--text);color:var(--panel)}
+.lybtn.open .fcount{background:var(--panel);color:var(--text)}
+.fbtn.match{color:var(--brand);border-color:var(--brand)}
+@media (min-width:701px){
+  .mapleft{--railw:36px;width:calc(100% - var(--railw) - 60px);min-width:0;max-width:none;container:chrome/inline-size;pointer-events:none;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+  .app.ai-open .mapleft{width:max(0px,calc(100% - var(--aiw) - var(--railw) - 72px))}
+  .mapleft>*{pointer-events:auto;max-width:100%}
+  .mapleft .msearch{width:min(100%,732px)}
+  .maptop{flex-wrap:nowrap;gap:8px;max-width:100%}
+  .maptop .tools,.maptop .fwrap,.maptop .exbtn{flex:none}
+  .fclear{display:none!important} /* the chips under the layer buttons replace it (phones keep #mClear) */
+  .exbtn{height:38px}
+  #layersBtn{display:none!important}
+  .mapleft .qlayers{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;contain:none;width:auto;max-width:min(100%,736px);padding:2px;margin:-2px}
+  .mapleft .qlayers::-webkit-scrollbar{display:none}
+  .qchip{flex:none}
+  .mapleft .hint{max-width:min(100%,520px)}
+  .mapleft .radius{width:min(100%,400px)}
+  .mapleft .placebar{width:min(100%,520px)}
+}
+@media (min-width:701px) and (pointer:coarse){ .mapleft{--railw:44px} }
+/* the faded edge shows there are more chips that way (src/quicklayers.js sets fl / fr) */
+.qlayers.fr{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent)}
+.qlayers.fl{-webkit-mask-image:linear-gradient(90deg,transparent,#000 44px);mask-image:linear-gradient(90deg,transparent,#000 44px)}
+.qlayers.fl.fr{-webkit-mask-image:linear-gradient(90deg,transparent,#000 44px,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,transparent,#000 44px,#000 calc(100% - 44px),transparent)}
+.qchip.qbase{margin-left:8px}
+/* labels give way in order: Export first, then the five area tools, then Layers and Filters */
+@container chrome (max-width:740px){ .maptop .exbtn span{display:none} .maptop .exbtn{padding:0 11px} }
+@container chrome (max-width:676px){ .maptop .tools button span{display:none} .maptop .tools button{padding:0 11px} }
+@container chrome (max-width:440px){ .maptop .fbtn span,.maptop .lybtn span{display:none} .maptop .fbtn,.maptop .lybtn{padding:0 10px} .maptop .tools button{padding:0 9px} }
+@media (pointer:coarse){ .lybtn,.fbtn,.maptop .exbtn{height:var(--tap);min-width:var(--tap);justify-content:center} }
+/* too narrow even for the five tool icons (a tablet with the panel or the assistant open): they fold into a "Select ▾"
+   button that drops them down as a list with their names, as on phones */
+@container chrome (max-width:310px){
+  .maptop .selpill{display:inline-flex;align-items:center;gap:5px;height:38px;padding:0 9px 0 10px;border:1px solid var(--line-2);border-radius:6px;background:var(--panel);color:var(--text);font:600 12.5px var(--font-display);box-shadow:0 1px 2px rgba(11,13,12,.08);cursor:var(--cur-pointer,pointer);flex:none}
+  .maptop .selpill span{display:none}
+  .maptop .selpill.on,.app.sel-open .maptop .selpill{background:var(--text);border-color:var(--text);color:var(--panel)}
+  .maptop .tools{display:none}
+  .app.sel-open .maptop .tools{display:flex;position:absolute;left:0;top:calc(100% + 8px);z-index:9;flex-direction:column;min-width:200px;padding:4px;border-radius:8px;box-shadow:0 14px 40px rgba(11,13,12,.22)}
+  .app.sel-open .maptop .tools button[data-mode]{justify-content:flex-start;gap:10px;padding:0 12px;border:0;border-radius:6px}
+  .app.sel-open .maptop .tools button[data-mode] span{display:inline}
+  .maptop{flex-wrap:wrap;row-gap:8px}
+}
+@media (pointer:coarse){ @container chrome (max-width:384px){
+  .maptop .selpill{display:inline-flex;align-items:center;gap:5px;height:38px;padding:0 9px 0 10px;border:1px solid var(--line-2);border-radius:6px;background:var(--panel);color:var(--text);font:600 12.5px var(--font-display);box-shadow:0 1px 2px rgba(11,13,12,.08);cursor:var(--cur-pointer,pointer);flex:none}
+  .maptop .selpill span{display:none}
+  .maptop .selpill.on,.app.sel-open .maptop .selpill{background:var(--text);border-color:var(--text);color:var(--panel)}
+  .maptop .tools{display:none}
+  .app.sel-open .maptop .tools{display:flex;position:absolute;left:0;top:calc(100% + 8px);z-index:9;flex-direction:column;min-width:200px;padding:4px;border-radius:8px;box-shadow:0 14px 40px rgba(11,13,12,.22)}
+  .app.sel-open .maptop .tools button[data-mode]{justify-content:flex-start;gap:10px;padding:0 12px;border:0;border-radius:6px}
+  .app.sel-open .maptop .tools button[data-mode] span{display:inline}
+  .maptop{flex-wrap:wrap;row-gap:8px}
+} }
+@media (pointer:coarse){ .maptop .selpill{height:var(--tap)} }
+@supports not (container-type:inline-size){
+  @media (max-width:1100px){ .tools button span,.exbtn span,.fbtn span,.lybtn span{display:none} }
+}
+
+/* the filters in effect, each removable, then Clear all */
+.fchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;max-width:min(100%,732px)}
+.fchip{display:inline-flex;align-items:center;gap:2px;height:28px;padding:0 3px 0 11px;border:1px solid var(--brand);border-radius:999px;background:var(--panel);color:var(--brand);font:600 12px var(--font-display);white-space:nowrap;box-shadow:0 1px 2px rgba(11,13,12,.08);max-width:100%}
+.fchip button{width:22px;height:22px;border:0;border-radius:50%;background:transparent;color:inherit;font-size:15px;line-height:1;cursor:var(--cur-pointer,pointer);display:grid;place-items:center;flex:none}
+.fchip button:hover{background:color-mix(in srgb,var(--brand) 14%,transparent)}
+.fc-all{height:28px;padding:0 12px;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);color:var(--text-2);font:600 12px var(--font-display);cursor:var(--cur-pointer,pointer);box-shadow:0 1px 2px rgba(11,13,12,.08)}
+.fc-all:hover{border-color:var(--text-2);color:var(--text)}
+@media (pointer:coarse){ .fchip{height:36px} .fchip button{width:30px;height:30px} .fc-all{height:36px} }
+
+/* Filters popup: a line under the mode switch says what the mode does; Clear All only when something's set */
+.fpop .lfhelp{flex:0 0 100%;margin:8px 0 0;font-size:12px;line-height:1.4;color:var(--muted)}
+.fpop .active.none #resetAll{display:none}
+.fpop .active.none span{color:var(--muted)}
+
+/* camera rail: [+ / −] and [compass, near me, reset view ▾]; every button has a tooltip */
+.ctrls{gap:10px}
+.ctrls .rgrp{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line-2);border-radius:7px;box-shadow:0 1px 3px rgba(11,13,12,.10)}
+.ctrls .rgrp>*+*{border-top:1px solid var(--line)}
+.ctrls .rgrp>button,.ctrls .rmenu>button{border:0;border-radius:0;box-shadow:none;background:transparent}
+.ctrls .rgrp>:first-child,.ctrls .rgrp>:first-child>button{border-radius:6px 6px 0 0}
+.ctrls .rgrp>:last-child,.ctrls .rgrp>:last-child>button{border-radius:0 0 6px 6px}
+.ctrls .rgrp>button:hover,.ctrls .rmenu>button:hover{background:var(--panel-2)}
+.ctrls .rgrp>button[aria-pressed="true"]{background:var(--text);color:var(--panel)}
+.ctrls #flat.on{background:color-mix(in srgb,var(--green-700) 10%,var(--panel))}
+.rmenu{position:relative}
+.ctrls #resetView{position:relative}
+.ctrls #resetView.open{background:var(--text);color:var(--panel)}
+.ctrls .rcaret{position:absolute;right:3px;bottom:3px;opacity:.55}
+.rpop{position:absolute;right:calc(100% + 8px);top:-6px;z-index:8;display:grid;gap:2px;min-width:168px;padding:6px;background:var(--panel);border:1px solid var(--line-2);border-radius:8px;box-shadow:0 14px 40px rgba(11,13,12,.22)}
+.ctrls .rpop button{width:auto;height:36px;min-width:0;display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:0 10px;border:0;border-radius:6px;box-shadow:none;background:transparent;color:var(--text);font:600 13px var(--font-display);white-space:nowrap}
+.ctrls .rpop button:hover,.ctrls .rpop button:focus-visible{background:var(--panel-2)}
+.ctrls #layersBtn.on{color:var(--brand);border-color:var(--brand)}
+
+/* Map layers panel: sticky header, "On now", folding groups with counts */
+.layers{overscroll-behavior:contain}
+.app .layers.on{display:block;padding:0}
+.layers .ly-h{position:sticky;top:0;z-index:3;margin:0;padding:10px 10px 10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.layers .ly-h b em{font-style:normal;font-weight:600;color:var(--brand)}
+.ly-on{padding:10px 16px 8px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+.ly-on[hidden]{display:none}
+.ly-ont{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin-bottom:2px}
+.ly-onl{display:grid}
+.lysec{border-bottom:1px solid var(--line)}
+.lysec>summary{list-style:none;cursor:var(--cur-pointer,pointer);display:flex;align-items:center;gap:8px;padding:12px 16px;font:700 13.5px var(--font-display);color:var(--text)}
+.lysec>summary::-webkit-details-marker{display:none}
+.lysec>summary:hover{background:var(--panel-2)}
+.lysec>summary::after{content:"";margin-left:auto;flex:none;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-2px);transition:transform .15s}
+.lysec[open]>summary::after{transform:rotate(-135deg) translateY(-2px)}
+.lysec>summary em{font-style:normal;font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--brand);white-space:nowrap}
+.lysec>summary em:empty{display:none}
+.lys-t{min-width:0}
+.lys-t small{display:block;font-weight:400;font-size:11.5px;line-height:1.35;color:var(--muted);margin-top:1px}
+.lyb{display:grid;gap:8px;padding:0 16px 14px}
+.lyb:empty{display:none}
+.lyrow2{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lyrow2 .tg2{flex:1;min-width:0}
+.lyplay{display:inline-flex;align-items:center;gap:6px;flex:none;height:28px;padding:0 11px 0 9px;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);color:var(--brand);font:600 12px var(--font-display);cursor:var(--cur-pointer,pointer);white-space:nowrap}
+.lyplay:hover{border-color:var(--brand)}
+.lyplay[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
+@media (pointer:coarse){ .lyplay{height:36px} }
+.layers .lsub{margin:2px 0 -2px}
+
+/* one Legend card, bottom left: a header with a fold chevron, then each map legend as a section; one open at a time */
+.legends{left:16px;bottom:28px;width:236px;max-width:calc(100% - 32px);max-height:min(46%,380px);overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 3px rgba(11,13,12,.10);pointer-events:auto}
+.legends.lg-empty{display:none}
+.legends .lg-h{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 5px 5px 12px;background:var(--panel);cursor:var(--cur-pointer,pointer)}
+.legends .lg-h b{font:700 12px var(--font-display);color:var(--text)}
+.lg-tog{width:26px;height:26px;border:0;border-radius:4px;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:var(--cur-pointer,pointer)}
+.lg-tog:hover{background:var(--panel-2);color:var(--text)}
+.lg-tog svg{transition:transform .15s}
+.legends.lg-min .lg-tog svg{transform:rotate(180deg)}
+.legends.lg-min>:not(.lg-h){display:none!important}
+.legends>.legend,.legends>.dlegend,.legends>.xlegend{position:static;left:auto;right:auto;bottom:auto;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent;min-width:0;max-width:none;width:auto;padding:8px 12px 10px;margin:0}
+.legends>:not(.lg-open):not(.lg-h)>:not(.t){display:none!important}
+.legends>:not(.lg-h)>.t{display:flex;align-items:center;gap:8px;cursor:var(--cur-pointer,pointer);margin:0}
+.legends>:not(.lg-h)>.t::after{content:"";margin-left:auto;flex:none;width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translateY(-2px)}
+.legends>.lg-open>.t::after{transform:rotate(-135deg) translateY(-1px)}
+.legends>.lg-one>.t{cursor:var(--cur-default,default)}
+.legends>.lg-one>.t::after{display:none}
+.legends>:not(.lg-open):not(.lg-h){padding-bottom:8px}
+.legends .legend .lyplay{justify-self:start;margin-top:2px}
+/* the toast lifts above the month slider while it's showing */
+.stage:has(.tslider.show) .toast{bottom:84px}
+
+/* ================= phone: Select ▾ sheet, Layers bottom sheet, Legend pill ================= */
+@media (max-width:700px){
+  .mapleft{display:flex;flex-direction:column;align-items:flex-start;gap:8px;grid-template-columns:none}
+  .maptop{flex-direction:row;grid-row:auto;align-self:auto}
+  .mapleft .hint,.mapleft .radius,.mapleft .placebar{width:100%;grid-column:auto}
+  .lybtn{display:none}
+  .selpill{display:inline-flex;align-items:center;gap:7px;height:42px;padding:0 11px 0 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--panel);color:var(--text);font:600 13.5px var(--font-display);box-shadow:0 1px 3px rgba(11,13,12,.12);cursor:var(--cur-pointer,pointer)}
+  .selpill.on,.app.sel-open .selpill{background:var(--text);border-color:var(--text);color:var(--panel)}
+  .mapleft .tools{display:none}
+  .app.sel-open .mapleft .tools{display:flex;position:fixed;left:0;right:0;bottom:calc(var(--navh,58px) + var(--sb,0px));z-index:9;flex-direction:column;gap:2px;padding:4px 12px 14px;background:var(--panel);border:0;border-radius:16px 16px 0 0;box-shadow:0 -10px 32px rgba(11,13,12,.28)}
+  .app.sel-open .mapleft .tools .tools-h{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 6px 6px}
+  .tools-h b{font:700 17px var(--font-display);color:var(--text)}
+  .tools-h .x{width:40px;height:40px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:22px;cursor:var(--cur-pointer,pointer)}
+  .app.sel-open .mapleft .tools button[data-mode]{width:100%;height:48px;min-height:48px;justify-content:flex-start;gap:14px;padding:0 12px;border:0;border-radius:10px;box-shadow:none;background:transparent;color:var(--text);font:600 15px var(--font-display)}
+  .app.sel-open .mapleft .tools button[data-mode][aria-pressed="true"]{background:var(--panel-2);color:var(--brand)}
+  .app.sel-open .mapleft .tools button[data-mode] span{display:inline}
+  .modechip:not([hidden]){display:inline-flex;align-items:center;gap:4px;height:38px;padding:0 4px 0 14px;border-radius:999px;background:var(--text);color:var(--panel);font:600 13px var(--font-display);box-shadow:0 2px 8px rgba(11,13,12,.2)}
+  .modechip button{height:30px;padding:0 12px;border:0;border-radius:999px;background:color-mix(in srgb,var(--panel) 18%,transparent);color:var(--panel);font:700 13px var(--font-display);cursor:var(--cur-pointer,pointer)}
+  .fchips{display:none!important}
+  .ctrls #layersBtn{display:grid}
+  .ctrls .rgrp:first-child{display:none}
+  .backchip{top:calc(var(--st) + 162px)}
+  /* the chip row's fade follows the scroll position too */
+  .mapleft .qlayers{-webkit-mask-image:none;mask-image:none}
+  .mapleft .qlayers.fr{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 80px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 80px),transparent)}
+  .mapleft .qlayers.fl.fr{-webkit-mask-image:linear-gradient(90deg,transparent,#000 30px,#000 calc(100% - 80px),transparent);mask-image:linear-gradient(90deg,transparent,#000 30px,#000 calc(100% - 80px),transparent)}
+  .mapleft .qlayers.fl:not(.fr){-webkit-mask-image:linear-gradient(90deg,transparent,#000 30px);mask-image:linear-gradient(90deg,transparent,#000 30px)}
+  /* Map layers: a bottom sheet above the tab bar with a grabber, the sticky header and Done; search and chips stay in view */
+  .app .layers.on{position:fixed;left:0!important;right:0!important;top:auto!important;bottom:calc(var(--navh,58px) + var(--sb,0px));width:auto;max-height:min(64vh,560px)!important;border:0;border-radius:16px 16px 0 0;padding:0;z-index:9;box-shadow:0 -10px 32px rgba(11,13,12,.28)}
+  .layers .ly-h{padding:16px 8px 10px 16px;border-radius:16px 16px 0 0}
+  .layers .ly-h b{font-size:17px}
+  .layers .ly-h .x{width:40px;height:40px;font-size:22px}
+  .ly-grab{display:block;position:absolute;left:50%;top:6px;width:42px;height:5px;margin-left:-21px;border-radius:3px;background:var(--line-2)}
+  .ly-f{display:block;position:sticky;bottom:0;z-index:3;padding:10px 16px 12px;background:var(--panel);border-top:1px solid var(--line)}
+  .lysec>summary{padding:14px 16px;font-size:15px}
+  .layers .lyb .tg2{padding:6px 0}
+  /* the legend: a small card bottom left, folded to its header until tapped */
+  .legends{left:10px;bottom:12px;width:220px;max-width:calc(100% - 80px);max-height:40vh}
+  .legends.lg-min{width:auto}
+  .app:has(.card.open) .legends,.app.ai-open .legends,.app.sel-open .legends,.app:has(#layers.on) .legends,.app:has(.fpop:not([hidden])) .legends{display:none}
+  .stage:has(.tslider.show) .toast{bottom:76px}
+  /* the filing count sits between the Select button and the camera buttons; it steps aside while Filters is open */
+  .mtop .mcount{left:auto;right:52px;transform:none;max-width:calc(100% - 170px);overflow:hidden;text-overflow:ellipsis}
+  .app:has(.fpop:not([hidden])) .mtop .mcount{display:none}
+}

@@ -13,7 +13,8 @@ const COL = { v: '#c03b3a', p: '#d9822b', o: '#8a9396' };
 export function initCrime(ctx) {
   const { map, esc, fmtN } = ctx, box = document.getElementById('lyCrime'), catSel = document.getElementById('lyCrimeCat'), note = document.getElementById('lyCrimeNote');
   let on = false, cat = 't', grid = null, gridP = null, shown = null, last = null;
-  try { cat = localStorage.getItem('fs-crime-cat') || 't'; } catch (e) {}
+  // the crime type lives with the Filters (src/layerfilters.js, fs-lf); fs-crime-cat is the old key, read until it's migrated
+  try { cat = localStorage.getItem('fs-crime-cat') || JSON.parse(localStorage.getItem('fs-lf') || 'null')?.crime || 't'; } catch (e) {}
   if (catSel) catSel.value = cat;
 
   // the map tooltip (#tip): text at a map point, or hidden
@@ -63,7 +64,10 @@ export function initCrime(ctx) {
     catch (e) { ctx.toast('Crime layer unavailable: ' + e.message); setOn(false); }
   }
   if (box) box.onchange = () => setOn(box.checked);
-  if (catSel) catSel.onchange = () => { cat = catSel.value; try { localStorage.setItem('fs-crime-cat', cat); } catch (e) {} if (on && grid) { removeLayers(); addLayers(); } crimeLegend(); };
+  // the picker here and the one in Filters share one value: setCrimeCat saves it, updates both and comes back to applyCrimeCat
+  function applyCat(v) { if (!['t', 'v', 'p'].includes(v) || v === cat) return; cat = v; if (catSel && catSel.value !== v) catSel.value = v; if (on && grid) { removeLayers(); addLayers(); } crimeLegend(); }
+  ctx.applyCrimeCat = applyCat;
+  if (catSel) catSel.onchange = () => { if (ctx.setCrimeCat) ctx.setCrimeCat(catSel.value); else applyCat(catSel.value); };
   ctx.onOverlays(addLayers);
   ctx.crimeLayer = v => setOn(v !== false);
 

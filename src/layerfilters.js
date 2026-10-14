@@ -16,6 +16,9 @@ export function initLayerFilters(ctx) {
   let st = { mode: 'each', crit: {}, flood: 'all', crime: 't' };
   try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && typeof s === 'object') st = { ...st, ...s, crit: s.crit || {} }; } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+  // Crime type has one home: st.crime (saved in fs-lf). The Map layers picker (#lyCrimeCat, src/crime.js) and the Filters
+  // picker (#lfCrime) both go through setCrimeCat. The layer's old key (fs-crime-cat) is read once here and then removed.
+  try { const old = localStorage.getItem('fs-crime-cat'); if (old) { if (['t', 'v', 'p'].includes(old)) st.crime = old; localStorage.removeItem('fs-crime-cat'); save(); } } catch (e) {}
 
   // ---------- the rows ----------
   for (const box of pop.querySelectorAll('.lfrows')) {
@@ -25,7 +28,17 @@ export function initLayerFilters(ctx) {
   }
   pop.querySelectorAll('select[data-k]').forEach(s => s.onchange = () => { const v = s.value; if (v === '') delete st.crit[s.dataset.k]; else st.crit[s.dataset.k] = isNaN(+v) ? v : +v; changed(s.dataset.k); });
   el('lfFlood').onchange = e => { st.flood = e.target.value; ctx.femaClass?.(st.flood); changed(); };
-  el('lfCrime').onchange = e => { st.crime = e.target.value; const c = el('lyCrimeCat'); if (c) { c.value = st.crime; c.dispatchEvent(new Event('change')); } if (st.crime !== 't' && !el('lyCrime')?.checked) ctx.crimeLayer?.(true); changed(); };
+  el('lfCrime').onchange = e => setCrimeCat(e.target.value);
+  // values are set directly on both pickers (no change events), so the two can't set each other off in a loop
+  function setCrimeCat(v) {
+    if (!['t', 'v', 'p'].includes(v)) v = 't';
+    const c = el('lyCrimeCat'); if (c && c.value !== v) c.value = v; if (el('lfCrime').value !== v) el('lfCrime').value = v;
+    if (st.crime === v) return; st.crime = v; ctx.applyCrimeCat?.(v);
+    if (v !== 't' && !el('lyCrime')?.checked) ctx.crimeLayer?.(true);
+    changed();
+  }
+  ctx.setCrimeCat = setCrimeCat; ctx.crimeCat = () => st.crime;
+  ctx.applyCrimeCat?.(st.crime);
   pop.querySelectorAll('#lfMode button').forEach(b => b.onclick = () => { st.mode = b.dataset.m; changed(); });
 
   // ---------- applying them ----------
@@ -89,8 +102,12 @@ export function initLayerFilters(ctx) {
   ctx.onChange?.(() => { if (st.mode === 'match' && 'proj' in st.crit) renderMatch(); });
 
   // ---------- the panel's state ----------
+  const HELP = { each: 'Each filter narrows its own layer: filings, census tracts, roads, flood zones or crime.', match: 'Only census tracts that meet every threshold light up; the rest of the map fades.' };
   function syncUI() {
     pop.classList.toggle('lf-match', st.mode === 'match');
+    const help = el('lfHelp'); if (help) help.textContent = HELP[st.mode] || HELP.each;
+    const lab = el('filterBtn')?.querySelector('span'); if (lab) lab.textContent = st.mode === 'match' ? 'Filters · Match' : 'Filters';
+    el('filterBtn')?.classList.toggle('match', st.mode === 'match');
     pop.querySelectorAll('#lfMode button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === st.mode)));
     pop.querySelectorAll('select[data-k]').forEach(s => { const v = st.crit[s.dataset.k]; s.value = v == null ? '' : String(v); });
     el('lfFlood').value = st.flood; el('lfCrime').value = st.crime;
@@ -101,8 +118,10 @@ export function initLayerFilters(ctx) {
   }
   function syncFooter(nMatch) {
     const b = el('filterDone'); if (!b) return;
+    // "Show results (N)" while anything narrows the filings, "Done" when nothing does
+    let narrowed = false; try { narrowed = (ctx.filterChips?.() || []).some(c => !c.fixed); } catch (e) {}
     if (st.mode === 'match' && active(st.crit).length) b.textContent = 'Show ' + fmtN(nMatch ?? lastHits.length) + ' matching area' + ((nMatch ?? lastHits.length) === 1 ? '' : 's');
-    else if (ctx.layersState?.dots) b.textContent = 'Show ' + fmtN(ctx.visible.length) + ' filing' + (ctx.visible.length === 1 ? '' : 's');
+    else if (narrowed) b.textContent = 'Show results (' + fmtN(ctx.visible.length) + ')';
     else b.textContent = 'Done';
   }
   function changed(key) { save(); syncUI(); apply(key); ctx.syncFilterUI?.(); }
@@ -110,7 +129,21 @@ export function initLayerFilters(ctx) {
   // ---------- for the Clear button, the filter badge and the assistant's context ----------
   ctx.layerFilterCount = () => active(st.crit).filter(([c]) => st.mode === 'match' || !c.matchOnly).length + (st.flood !== 'all') + (st.crime !== 't');
   ctx.layerFilterText = () => [describeScreen(st.mode === 'match' ? st.crit : Object.fromEntries(Object.entries(st.crit).filter(([k]) => !BY[k].matchOnly))), st.flood === 'high' ? 'High-risk flood zones only' : '', st.crime !== 't' ? (st.crime === 'v' ? 'Violent' : 'Property') + ' crime' : ''].filter(Boolean).join(' · ') + (st.mode === 'match' && active(st.crit).length ? ' (matching everything)' : '');
-  ctx.clearLayerFilters = () => { const had = st.flood !== 'all', hadCrime = st.crime !== 't'; st = { ...st, crit: {}, flood: 'all', crime: 't' }; save(); syncUI(); if (had) ctx.femaClass?.('all'); if (hadCrime) { const c = el('lyCrimeCat'); if (c) { c.value = 't'; c.dispatchEvent(new Event('change')); } } apply(); };
+  // clearLayerFilters(): everything, and back to "Filter each layer". clearLayerFilters(key): one threshold (a criterion key,
+  // 'flood', 'crime' or 'mode'), for the removable chips under the map's layer buttons.
+  ctx.clearLayerFilters = key => {
+    if (key === 'mode') { st.mode = 'each'; changed(); return; }
+    if (key === 'flood') { st.flood = 'all'; ctx.femaClass?.('all'); changed(); return; }
+    if (key === 'crime') { setCrimeCat('t'); return; }
+    if (key) { delete st.crit[key]; changed(key); return; }
+    const had = st.flood !== 'all', hadCrime = st.crime !== 't'; st = { ...st, mode: 'each', crit: {}, flood: 'all', crime: 't' }; save(); syncUI(); if (had) ctx.femaClass?.('all'); if (hadCrime) { const c = el('lyCrimeCat'); if (c) c.value = 't'; ctx.applyCrimeCat?.('t'); } apply(); };
+  ctx.layerFilterChips = () => {
+    const out = active(st.crit).filter(([c]) => st.mode === 'match' || !c.matchOnly).map(([c, v]) => { const o = optLabel(c, v); return { label: c.label + ' ' + o[0].toLowerCase() + o.slice(1), remove: () => ctx.clearLayerFilters(c.k) }; });
+    if (st.flood !== 'all') out.push({ label: 'High-risk flood zones only', remove: () => ctx.clearLayerFilters('flood') });
+    if (st.crime !== 't') out.push({ label: (st.crime === 'v' ? 'Violent' : 'Property') + ' crime', remove: () => ctx.clearLayerFilters('crime') });
+    if (st.mode === 'match') out.push({ label: 'Match everything', remove: () => ctx.clearLayerFilters('mode') });
+    return out;
+  };
   ctx.syncFilterFooter = () => syncFooter();
   syncUI(); setTimeout(() => { apply(); if (st.flood === 'high') ctx.femaClass?.('high'); }, 0);
 }

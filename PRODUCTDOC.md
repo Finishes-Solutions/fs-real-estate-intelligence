@@ -54,22 +54,26 @@ A small green number means something new needs a look: on **Changes**, the filin
 - **Construction Filings:** the header shows the live count, value and area (for example "3,889 filings · $12.08B · Harris County") and the dates the data covers, even while the section is closed. The **On map** switch shows or hides the filing dots and always matches the map. Opening the section by hand also turns the dots on; a section left open from your last visit doesn't, and the switch says which. Inside: the headline metrics (**+ Metrics** picks them), the project list, and a short note on where the filings come from and how far to trust them. It's closed until you open it; on phones, the Explore tab opens it for you.
 - **The last line** links to **Data sources & freshness** and credits the base maps.
 
-**Top of the map**
-- **Tools:** Move, Area (drag a box), Shape (draw a shape), Radius (an address plus a distance), County (click counties).
+**Top of the map**, top to bottom:
+- **Search** (first row).
+- **The tool row:** Move, Area (drag a box), Shape (draw a shape), Radius (an address plus a distance), County (click counties), then **Layers**, **Filters** and **Export**. When the map is narrow (a tablet, or with Ask AI open) the buttons drop their names and keep their icons instead of wrapping: Export's name goes first, then the five tools', then Layers' and Filters'. If even the icons don't fit, the five tools fold into one **Select ▾** button that lists them by name. Hover over any icon for its name. The search box and these buttons stay on screen while Ask AI is open.
 - **Cursors** (mouse or trackpad) show what a click will do: the dark arrow for nothing in particular, a green arrow over anything you can open or select, a small building at street zoom when a click opens that building, four arrows while you drag the map, and a crosshair with a small badge for each drawing tool (a dashed box for Area, a shape for Shape, a circle for Radius, a county for County). Text boxes keep the normal text cursor.
-- **Filters** narrow what the map shows, layer by layer (see "Filters" below). **Clear** sits right next to it; see "Clearing the view" below.
+- **Layers** opens the Map layers panel right under it. Its number says how many layers are drawing on the map (see "Map layers" below).
+- **Filters** narrow what the map shows, layer by layer (see "Filters" below). Its number counts the filters that are on, and in **Match everything** mode it reads **Filters · Match**.
 - **Export** makes a report.
 - **Search** finds addresses, places, roads, businesses, projects, owners and developers. Press ⌘K (Mac) or Ctrl+K to jump to it. When Google is set up for the site, a **Google** section lists Google's matches too; picking one switches to the Google map and opens a Google place card (address, phone, website, hours, rating and a link to Google Maps).
-- **Quick layer buttons** under the search box: Satellite, 3D, Parcels, Flood Zones, Demographics, Traffic Counts, Filings, Planes, Radar, and **More** for every layer. On a phone they're one row just under the search bar; swipe it sideways for the rest (the faded right edge means there's more).
+- **Quick layer buttons** under the tool row, always on one line: Parcels, Flood Zones, Demographics, Traffic Counts, Filings, Planes, Radar, then Satellite and 3D at the end. Scroll the row sideways (or use the mouse wheel over it) for the rest; a faded edge shows there's more that way. On a phone the row sits just under the search bar.
+- **The filters in effect** show under the layer buttons as chips, one per filter: for example **Harris ×**, **Medical ×**, **Violent crime ×**, **Under construction · Oct 2025 ×** or **Match everything ×**, plus the picked area and a searched place's outline. Click a chip's **×** to drop just that one; **Clear all** at the end clears them all. With nothing narrowing the map, the row isn't there.
 
-**Right side of the map**
+**Right side of the map:** only buttons that move the map, in two groups, each with its name when you hover over it:
 - Zoom in and out.
 - **Compass:** back to a flat, north-up view of the same spot.
 - **Near me:** the area around your location.
-- **Home region.**
-- **Time-lapse:** play construction month by month.
-- **Map Layers.**
-- **Globe view.**
+- **Reset view ▾:** **Whole region** (back to the full Houston region) or **Globe**.
+
+Time-lapse is now on the Filings layer and the Filings legend (see "Construction filings"), and Map layers is the **Layers** button in the tool row.
+
+**Legend:** one card in the bottom-left corner lists every layer that's colouring the map. One layer's key is open at a time (the newest one you turned on); click another layer's name to open it instead. The arrow at the top folds the whole card down to its title, and the app remembers that. On phones it starts folded.
 
 **Pages use the whole width.** The left panel belongs to the Map: on every other page (Market, Reports, Notes & watchlist, Companies and the rest) it steps aside so the page has room, and it comes back on the Map just as you left it, at the same width, open or closed. To glance at it from a page, click the panel button at the far left of the top bar; that only affects the page you're on. On a tablet the panel starts closed so the map isn't cut in half; open it with the same button, and the app remembers your choice.
 
@@ -87,6 +91,8 @@ A small green number means something new needs a look: on **Changes**, the filin
 - **Data & help:** data sources and how fresh they are.
 
 The tab you're on is lit: Market stays lit on Compare areas, and More is lit on its pages (for example Notes & watchlist). A green number on More means something inside it needs a look.
+
+On the phone map, the five area tools are one **Select ▾** button at the top left. It opens a short list (Move, Area, Shape, Radius, County); pick one and a **Drawing a shape · Cancel** chip shows until you finish or tap Cancel. **Filters** is the funnel button in the search bar, and **Layers** is the stacked-squares button on the right. Both open as sheets from the bottom with a **×** at the top and a big button at the bottom (**Show results (N)** or **Done** for Filters, **Done** for Layers); the search bar and layer buttons stay in view above the Layers sheet.
 
 Cards slide up from the bottom: swipe down to shrink one, and swipe again to close it.
 
@@ -162,19 +168,19 @@ Every report exports as a PDF in the Finishes Solutions style, and its data as a
 
 ### Clearing the view
 
-The **Clear** button next to Filters appears whenever something is narrowing what you see: filters, a time period other than the last 12 months, a time-lapse month, a selected area, or a searched place's outline. One click clears all of it. Hover over it to see exactly what it will clear. On phones, the **✕** next to the filter button does the same. Inside the Filters menu, **Clear All** is at the top.
+Everything that narrows what you see shows as a chip under the map's layer buttons: each filter, a time period other than the last 12 months, a time-lapse month, the selected area and a searched place's outline. Click a chip's **×** to drop just that one, or **Clear all** at the end of the row to clear everything (and switch Filters back to **Filter each layer**). On phones, the **✕** next to the filter button clears everything. Inside the Filters menu, **Clear All** is at the top whenever there's something to clear.
 
 ---
 
 ## Filters
 
 **Filters** works on the map's layers, not just construction filings. It has a section for each kind of data:
+- **Construction filings** (first, and open when the panel opens): the filing filters (period, county, type, value, use and so on). When matching, this section also offers the number of construction projects in an area.
 - **Demographics:** median household income, population growth, home value, rent, housing vacancy, and jobs located here.
 - **Traffic:** the busiest road, in vehicles a day.
-- **Risk:** which flood zones show (all of them, or only the high-risk 100-year floodplain), the crime type (Houston), and, when matching, FEMA's flood risk rating.
-- **Construction filings:** the filing filters (period, county, type, value, use and so on). When matching, this section also offers the number of construction projects in an area.
+- **Risk:** which flood zones show (all of them, or only the high-risk 100-year floodplain), the crime type (Houston), and, when matching, FEMA's flood risk rating. The crime type is the same setting as the one under Crime in Map layers: change it in either place and both follow, the Filters number counts it, and it's kept for your next visit.
 
-The switch at the top picks how the filters work:
+The switch at the top picks how the filters work, and the line under it says what the chosen mode does:
 - **Filter each layer:** each filter acts on its own layer.
   - Demographic thresholds fade the neighborhoods that don't qualify on the Demographics layer.
   - The traffic threshold hides quieter roads on Traffic Counts.
@@ -186,21 +192,30 @@ The switch at the top picks how the filters work:
 
 On the Filings pages, Compare areas and Reports, **Edit filters** opens the same panel over the page with just the construction filters, so you can change them without leaving the page. Close it with the **×**, Esc or a click elsewhere.
 
-The summary at the top of the panel lists everything that's on, and **Clear All** resets it. The **Clear** button next to Filters clears layer filters too. The busiest-road and flood-rating data for matching is added by the nightly data refresh; until it arrives, those two thresholds are left out of the match, and the panel says so.
+The summary at the top of the panel lists everything that's on, and **Clear All** resets it (and goes back to **Filter each layer**). With only the usual last-12-months period set, it just says **No filters on**. The chips under the map's layer buttons show the same filters, each removable on its own. On phones the big button at the bottom reads **Show results (N)** while something narrows the filings, and **Done** when nothing does. The busiest-road and flood-rating data for matching is added by the nightly data refresh; until it arrives, those two thresholds are left out of the match, and the panel says so.
 
 Property filters (use, acres, value, year built, owner, zoning) are planned. They need the county appraisal data to be loaded first.
 
 ## Map layers
 
-**Quick layer buttons** turn the most common layers on and off with one tap. A button is highlighted whenever its layer is on the map, however it was turned on. **Filings** covers both the dots and the heatmap, and turning it off hides both. Layers without their own button (crime, airports, weather and others) are counted on **More** (for example "More · 2"); hover over it to see which. **More** (or the layers button on the right) opens **Map Layers** right under the quick layer buttons, with every layer and its options. Click **More** again, the ×, or anywhere on the map to close it.
+**Quick layer buttons** turn the most common layers on and off with one tap. A button is highlighted whenever its layer is on the map, however it was turned on. **Filings** covers both the dots and the heatmap, and turning it off hides both.
 
-**Legends** in the bottom-left corner explain the layers that are on: filings, traffic counts, drive times, planes, crime, airports, and now **Rain radar** (light to severe rain) and **Flood zones** (FEMA's own colors: high-risk 100-year floodplain, floodway, moderate 500-year zone).
+**Layers** (in the map's tool row, next to Filters) opens the **Map layers** panel right under it, with every layer and its options. The number on the button counts every layer drawing on the map, including ones without a quick button (crime, airports, weather and others); hover over it to see which. Click **Layers** again, the ×, press Esc, or click anywhere on the map to close it. In the panel:
+- The title stays at the top while you scroll and says how many layers are on (for example "Map layers · 2 on").
+- **On now** lists every layer that's on, each with a switch to turn it off.
+- The layers are in groups that fold open and closed, each showing how many of its layers are on. Groups with something on open by themselves; with nothing on, Construction filings opens.
+- Layers your site can't offer are greyed out with **Not available on this site**.
+
+**Legend:** one card in the bottom-left corner explains the layers that are on: filings, demographics, traffic counts, drive times, planes, crime, airports, **Rain radar** (light to severe rain) and **Flood zones** (FEMA's own colors: high-risk 100-year floodplain, floodway, moderate 500-year zone). One layer's key is open at a time; click another layer's name to switch, or fold the card with the arrow at its top. The filings key shows at every window size.
 
 The map always opens without construction filings or planes. Turn them on with their buttons. A shared link that carries filing filters opens with the filings shown.
 
-Map Layers:
+The groups in Map layers:
 
-- **Base Map:**
+- **Construction filings:**
+  - show the filing dots, the same size or sized by value, and **▶ Play by month** (the time-lapse);
+  - an activity heatmap.
+- **Base map, imagery & 3D:**
   - Default: a calm, muted map.
   - Streets.
   - Satellite.
@@ -208,9 +223,10 @@ Map Layers:
   - ESRI satellite.
   - Free Map.
   - Google and Google Satellite (only when Google is set up for the site): Google's own map, with the Google logo and map credits at the bottom while it's on.
-- **Property & Site:**
   - 3D buildings (zoom in).
   - Google 3D (only when Google is set up): Google's photorealistic 3D model of the city in place of the simple blocks. Zoom in to street level and tilt the map. Clicking a building still opens its property card.
+  - 3D terrain, NASA recent imagery and high-resolution site imagery.
+- **Property & site:**
   - Parcel lines (Regrid).
   - Businesses & places: every mapped business at street zoom, colored by kind (food, retail, health care, offices, construction and home services, industrial and more). Pick one kind from the list under it, or click a dot for the name, category, address, phone, website and a link to Google Maps.
   - Flood zones (FEMA).
@@ -228,21 +244,17 @@ Map Layers:
   - income, home value, rent or vacancy;
   - jobs, job growth or jobs per resident;
   - estimated consumer spending.
-- **Construction Filings:**
-  - show the filing dots, the same size or sized by value;
-  - an activity heatmap.
-- **Map Display:**
-  - Dot Grid: a faint dot texture over land.
-  - County & State Lines: every US county, with exact Census boundaries when you zoom in.
-  - Roads and road names.
-  - 3D tilt.
-- **Live Conditions:**
+- **Live conditions:**
   - rain radar, lightning, satellite clouds, wind;
   - hurricanes and tropical storms;
   - live traffic;
-  - 3D terrain;
-  - NASA recent imagery, high-resolution site imagery;
   - live planes, low flight paths.
+- **Map display** (last): the map's own details, which stay here:
+  - Dot grid: a faint dot texture over land.
+  - County & state lines: every US county, with exact Census boundaries when you zoom in.
+  - Roads and road names.
+
+To tilt the map, use the **3D** quick button.
 
 The quick buttons and the panel always match. A layer turned on in either place, or by the assistant, shows as on in both.
 
@@ -308,7 +320,7 @@ Texas requires most commercial and public construction projects to register with
 - **Timeline** (Filings → Timeline): the monthly pipeline of what's under construction, plus a Gantt chart of every project. Hatched bars are dates estimated because the filer left them blank. Clicking a project opens its card over the page; dragging across the chart turns the filings on on the map. **Export ▾** saves the filing list as Excel, CSV or PDF.
 - **Companies** (Filings → Companies): developers, architects and contractors ranked by activity; switch between Developers, Architects and Contractors at the top. Click one to see their projects on the map (the filings turn on), and use **← Back to Companies** to return to the same spot in the list. The list shows the top 150 by value; search to find the others. **Export ▾** saves the Activity report as PDF, Excel or CSV. On phones each company is a two-line row.
 - **Changes** (Filings → Changes): new filings and changes found by the nightly refresh. It opens on **Last 7 days**, which counts the same filings as the green number and the "New this week / Any change" filters; each single nightly check is still in the list. A line under the title says how many changed filings match your filters out of the total, with **Show all** to see every one. Clicking a change opens the filing's card over the page; **Show on map** on the card goes to the map. The green number on Changes counts what's new since you last looked and clears when you open it.
-- **Time-lapse:** the clock button on the right plays construction month by month.
+- **Time-lapse:** **▶ Play by month** on the Filings row in Map layers, or on the Filings legend, plays construction month by month. It turns the filings on first. The month shows as an **Under construction · Oct 2025 ×** chip under the layer buttons; its **×** (or **Stop time-lapse**) ends it, and a shared link with a month opens straight into the time-lapse.
 - **Saved searches, links and alerts:** from the **⋯** menu in the area bar at the top of the Map panel, save a search in this browser (you name it right in the menu), copy a link that reopens exactly this view, or subscribe to an RSS feed of new matching filings. RSS works with email tools like Zapier. Your saved searches are listed under **My Work → Saved searches** (the same list as in the panel), each with how many new filings match it, **Show on map**, its RSS feed and **Delete**. With none saved yet, the page explains how to save one.
 
 ---
@@ -532,6 +544,8 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 ---
 
 ## Recently added
+
+- **Map controls that make sense at any size:** the search box comes first, then one tool row with the area tools, **Layers · N** (it replaces **More** and the layers button on the right), **Filters** and Export; the layer buttons stay on one sideways-scrolling line; the filters you've set show as chips you can remove one by one, with **Clear all** (it replaces the old Clear button); and with Ask AI open the tools shrink to icons instead of disappearing. The right side now only moves the map: zoom, compass, near me and **Reset view ▾** (whole region or globe), each with its name on hover. Map layers has a pinned title, an **On now** list with off switches and folding groups with counts; 3D terrain and the imagery moved into **Base map, imagery & 3D**. The time-lapse is **▶ Play by month** on the Filings layer and legend, and the legends share one card. Filters starts with Construction filings, explains each mode, says **No filters on** when nothing's set and keeps one crime type in step with Map layers. On phones the area tools are one **Select ▾** button, Layers is a bottom sheet like Filters, and Filters' button reads **Show results (N)**.
 
 - **A tidier Map panel:** the big title and the long sources paragraph are gone; a one-time **Getting started** tip replaces the intro. The area you're looking at is named in a bar that stays pinned at the top, with the filing count, **+ Compare** and a **⋯** menu (Save search now asks for the name right there, plus Copy link and Filing alerts); with nothing picked it offers Box, Shape, Radius and County. Area reports sit together under **Reports for this area** (now with Crime, and they run on the map view when nothing is picked). Construction Filings shows its live count in the header and has an honest **On map** switch, and the panel ends in one line. On phones, Explore starts with the area bar and opens the filings for you.
 - **Pages that flow:** every page has the same header, with its buttons on the title row and downloads under one **Export ▾**; Timeline, Companies, Changes, Compare areas and Reports show your filters as chips with **Edit filters**, which now opens over the page instead of jumping to the Map; after a page takes you to the Map, **← Back to …** returns you to the same spot; Changes opens on **Last 7 days** so its count matches the green number, says how many changes match your filters, and opens a filing's card over the page (with **Show on map**); Reports puts recent exports first and groups new reports into "From your filters" and "For an area"; the New report dialog links to Reports; Notes & watchlist has **+ Site note**, one Export menu (with Import) and the watchlist first; the Market page folds its county picker behind **Change**; and empty pages say what to do next.
