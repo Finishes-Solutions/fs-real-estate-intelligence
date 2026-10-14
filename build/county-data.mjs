@@ -221,7 +221,7 @@ await step('schools', async () => {
   // enrollment from the newest yearly schools layer (the dated directory has none)
   const yearly = names.filter(n => /^Schools_\d{4}_to_\d{4}$/.test(n)).sort().pop();
   let enrollment = new Map();
-  if (yearly) try { enrollment = C.teaEnrollment(await arcAll(C.SRC.teaOrg + '/' + yearly + '/FeatureServer/0', '1=1', { box: REGION, geometry: false })); } catch (e) { log('schools: enrollment layer failed', e.message); }
+  if (yearly) try { enrollment = C.teaEnrollment(await arcAll(C.SRC.teaOrg + '/' + yearly + '/FeatureServer/0', '1=1', { box: REGION, geometry: false }), C.teaYearLabel(yearly)); } catch (e) { log('schools: enrollment layer failed', e.message); }
   const rows = feats.map(f => C.teaSchoolRow(f, { enrollment })).filter(Boolean);
   const res = await save('tea-schools', rows, { min: 300, meta: { url: svc + (yearly ? ' + ' + yearly : '') } });
   return { ...res, service: svc, enrollmentFrom: yearly || null, withEnrollment: rows.filter(r => r.units).length };

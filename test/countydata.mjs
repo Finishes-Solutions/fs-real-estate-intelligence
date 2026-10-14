@@ -88,9 +88,9 @@ assert.equal(dr.cat, 'MUD'); assert.equal(dr.name, 'Katy West MUD'); assert.equa
 
 // TEA: newest dated service; county from the campus number; enrollment joined from the yearly layer
 assert.equal(C.newestTeaService(['districts_schools_20260924_C', 'districts_schools_20261005_D', 'districts_schools_20261005_C', 'districts_schools_2026_0814C_view', 'Current_Schools']), 'districts_schools_20261005_C');
-const enr = C.teaEnrollment([{ attributes: { School_Number: "'008902001", School_Enrollment_as_of_Oct_2025: 1180, District_Enrollment_as_of_Oct_2025: 3200 } }]);
+const enr = C.teaEnrollment([{ attributes: { USER_School_Number: "'008902001", USER_School_Enrollment_as_of_Oc: 1180, USER_District_Enrollment_as_of_: 3200 } }], C.teaYearLabel('Schools_2024_to_2025'));
 const sc = C.teaSchoolRow({ attributes: { id: '008902001', district_name: 'Sealy ISD', campus_type: 'High School', low_grade: 'Grade 9', high_grade: 'Grade 12', name: 'Sealy HS', address: '2372 Championship Dr. Sealy. TX 77474', rating: 'B' }, geometry: { x: -96.1743469, y: 29.76199096 } }, { enrollment: enr });
-assert.equal(sc.county, 'Austin'); assert.equal(sc.cat, 'high'); assert.equal(sc.units, 1180); assert.equal(sc.attrs.enrolledAsOf, 'Oct 2025'); assert.equal(sc.attrs.grades, '9–12'); assert.equal(sc.addr, '2372 Championship Dr, Sealy, TX 77474');
+assert.equal(sc.county, 'Austin'); assert.equal(sc.cat, 'high'); assert.equal(sc.units, 1180); assert.equal(sc.attrs.enrolledAsOf, 'October 2024'); assert.equal(sc.attrs.districtEnrollment, 3200); assert.equal(sc.attrs.grades, '9–12'); assert.equal(sc.addr, '2372 Championship Dr, Sealy, TX 77474');
 assert.equal(C.teaSchoolRow({ attributes: { id: '227901001', name: 'Austin HS', campus_type: 'High School' }, geometry: { x: -97.7, y: 30.3 } }), null, 'Travis County (227) is outside the region');
 assert.equal(C.teaSchoolRow({ attributes: { id: '237902041', name: 'Waller JH', campus_type: 'Middle / Jr. High' }, geometry: { x: -95.9, y: 30.05 } }).cat, 'middle');
 

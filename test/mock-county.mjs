@@ -40,7 +40,7 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.host === 'services2.arcgis.com' && u.pathname.includes('districts_schools_20261005_C')) return json({ features: page(u, [
     { attributes: { id: '237902041', district_name: 'Waller ISD', campus_type: 'Middle / Jr. High', low_grade: 'Grade 6', high_grade: 'Grade 8', name: 'Waller JH', rating: 'B' }, geometry: { x: -95.93, y: 30.06 } },
     { attributes: { id: '227901001', name: 'Austin HS', campus_type: 'High School' }, geometry: { x: -96.1, y: 29.95 } }]) });
-  if (u.host === 'services2.arcgis.com' && u.pathname.includes('Schools_2024_to_2025')) return json({ features: page(u, [{ attributes: { School_Number: "'237902041", School_Enrollment_as_of_Oct_2025: 950 } }]) });
+  if (u.host === 'services2.arcgis.com' && u.pathname.includes('Schools_2024_to_2025')) return json({ features: page(u, [{ attributes: { USER_School_Number: "'237902041", USER_School_Enrollment_as_of_Oc: 950 } }]) });
   if (/arcgis\.com$|tceq\.texas\.gov$|hcad\.org$|houstontx\.gov$/.test(u.host)) return json({ error: { message: 'unmocked ' + u } }, 200);
   return inner(url, opts);
 };
