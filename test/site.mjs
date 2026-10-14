@@ -89,14 +89,11 @@ assert.equal(z.zips['07701'].month, '2026-07'); assert.equal(z.zips['07701'].yoy
 assert.deepEqual(econ.parseLausAreas('A\tCN4820100000000\tHarris County, TX\t0\tT\nA\tCN4815700000000\tFort Bend County, TX\t0\nB\tMT4810180000000\tAbilene, TX Metropolitan Statistical Area\t0'), { 48201: 'Harris', 48157: 'Fort Bend' });
 console.log('site tests passed');
 
-// Market view: Houston-wide crime from four boxes, and TxDOT traffic for an area
-{ const assert = (await import('node:assert/strict')).default, { mergeReports, CITY_BOXES } = await import('../api/crime.js'), { traffic } = await import('../api/traffic.js');
-  const R = (k) => ({ latest: '2026-06-30', from: '2024-07-01', last12: { v: k, p: 2 * k, o: k, total: 4 * k }, prior12: { v: k, p: k, o: k, total: 3 * k },
-    offenses: [{ code: '13A', name: 'Aggravated assault', n: k, cat: 'v' }, { code: '23F', name: 'Theft from vehicle', n: 2 * k, cat: 'p' }], premises: [{ premise: 'Street', n: k }], months: [{ m: '2026-05', v: 1, p: 2, o: 3 }, { m: '2026-06', v: k, p: k, o: k }] });
-  const d = mergeReports([R(10), R(30), { latest: null }, null]);
-  assert.deepEqual([d.last12.total, d.prior12.total, d.change.total, d.offenses[0].name, d.offenses[0].n, d.months.length, d.months[1].v], [160, 120, 33, 'Theft from vehicle', 80, 2, 40]);
-  assert.equal(mergeReports([null]).latest, null, 'nothing loaded: says so');
-  for (const g of CITY_BOXES) { const [[a, b], , [c, e]] = g.coordinates[0]; const sq = (c - a) * Math.cos(29.8 * Math.PI / 180) * 69.17 * (e - b) * 69; assert.ok(sq < 1500, 'each box under the report limit: ' + Math.round(sq)); }
+// Market view: Houston-wide crime from one box around every incident, and TxDOT traffic for an area
+{ const assert = (await import('node:assert/strict')).default, { CITY_BOX } = await import('../api/crime.js'), { parseHpd } = await import('../lib/crime.mjs'), { traffic } = await import('../api/traffic.js');
+  // the box must cover everything the nightly load keeps (so the database answers it from its whole-city numbers)
+  const [[w, s], , [e, n]] = CITY_BOX.coordinates[0], kept = parseHpd('Incident,Occurrence Date,NIBRS Class,Offense Count,Premise,Map Longitude,Map Latitude\n1,2026-01-02,13A,1,Street,-96.49,29.01\n2,2026-01-02,13A,1,Street,-94.51,30.59\n');
+  assert.equal(kept.length, 2); for (const r of kept) assert.ok(r.lon > w && r.lon < e && r.lat > s && r.lat < n, 'city box covers ' + r.lon + ',' + r.lat);
   const fx = async u => ({ ok: true, json: async () => String(u).includes('outStatistics') ? { features: [{ attributes: { RTE_PRFX: 'IH', avg: 150000, n: 500, mx: 330394 } }, { attributes: { RTE_PRFX: 'BI', avg: 20000, n: 10, mx: 30000 } }, { attributes: { RTE_PRFX: 'BU', avg: 10000, n: 30, mx: 20000 } }] }
     : { features: [{ attributes: { RTE_NM: 'IH0010-LG', RTE_PRFX: 'IH', RTE_NBR: '10', AADT_CUR: 330394, SYSTEM: 'On', EXT_DATE: '10-01-2026' }, geometry: { paths: [[[-95.52, 29.78], [-95.51, 29.78], [-95.5, 29.78]]] } },
       { attributes: { RTE_NM: 'IH0010-KG', RTE_PRFX: 'IH', RTE_NBR: '10', AADT_CUR: 330000, SYSTEM: 'On' }, geometry: { paths: [[[-95.5, 29.7]]] } }, { attributes: { RTE_NM: 'WESTHEIMER RD-KG', RTE_PRFX: 'CS', AADT_CUR: 60000, SYSTEM: 'Off' }, geometry: { paths: [[[-95.4, 29.74]]] } }] } });

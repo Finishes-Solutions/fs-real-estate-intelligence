@@ -65,7 +65,7 @@
       "maxDuration": 25
     },
     "api/planes.js": {
-      "maxDuration": 15
+      "maxDuration": 30
     },
     "api/planes-sample.js": {
       "maxDuration": 30
@@ -74,10 +74,10 @@
       "maxDuration": 25
     },
     "api/crime.js": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "api/fema.js": {
-      "maxDuration": 90
+      "maxDuration": 180
     },
     "api/traffic.js": {
       "maxDuration": 30
@@ -96,7 +96,7 @@
       "maxDuration": 15
     },
     "api/env.js": {
-      "maxDuration": 40
+      "maxDuration": 120
     },
     "api/entity.js": {
       "maxDuration": 15

@@ -53,6 +53,19 @@ reply(JSON.stringify({ error: 'That area is too large for a crime report (over 1
 e = await fails(() => getJSON('api/crime', { what: 'Crime data' }), '400'); assert.equal(e.message, 'That area is too large for a crime report (over 1,500 square miles).'); assert.equal(e.status, 400);
 reply(JSON.stringify({ error: 'Crime by city and county covers the United States only.' }), { status: 404 });
 e = await fails(() => getJSON('api/crimeus', { what: 'FBI crime data' }), 'json 404'); assert.match(e.message, /United States only/);
+// a big area that ran out of time, an outline too big to send, too many requests: the specific sentence (lib/http.mjs wording)
+{ const { httpMessage } = await import('../lib/http.mjs'), { SPECIFIC } = await import('../src/reportkit.js');
+  assert.equal(SPECIFIC.timeout, httpMessage(504)); assert.equal(SPECIFIC.tooBig, httpMessage(413)); assert.equal(SPECIFIC.busy, httpMessage(429));
+  reply('An error occurred with your deployment\n\nFUNCTION_INVOCATION_TIMEOUT\n\niad1::abc', { status: 504, type: 'text/plain' });
+  e = await fails(() => getJSON('api/env', { what: 'Environmental data', method: 'POST' }), '504'); assert.equal(e.message, httpMessage(504)); assert.equal(e.status, 504); assert.ok(!BAD.test(e.message));
+  reply('FUNCTION_PAYLOAD_TOO_LARGE', { status: 413, type: 'text/plain' });
+  e = await fails(() => getJSON('api/crime', { what: 'Crime data', method: 'POST' }), '413'); assert.equal(e.message, httpMessage(413));
+  reply('slow down', { status: 429, type: 'text/plain' }); e = await fails(() => getJSON('api/x', { what: 'Flood data' }), '429'); assert.equal(e.message, httpMessage(429));
+  // our own database time limit (a 503 whose { error } says it took too long) keeps that sentence; other 5xx text stays hidden
+  reply(JSON.stringify({ error: 'The crime database took too long on this area. Try again in a moment (a second run is usually faster).' }), { status: 503 });
+  e = await fails(() => getJSON('api/crime', { what: 'Crime data' }), '503 timeout'); assert.match(e.message, /crime database took too long/);
+  reply(JSON.stringify({ error: 'Crime data needs the database (SUPABASE_URL and SUPABASE_SECRET_KEY on the server).' }), { status: 503 });
+  e = await fails(() => getJSON('api/crime', { what: 'Crime data' }), '503 setup'); assert.equal(e.message, 'Crime data isn’t available right now. Try again in a minute.'); }
 // no network at all
 globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
 e = await fails(() => getJSON('api/x', { what: 'Flood data' }), 'network'); assert.equal(e.message, FRIENDLY); assert.equal(e.status, 0); assert.match(e.detail, /Failed to fetch/);

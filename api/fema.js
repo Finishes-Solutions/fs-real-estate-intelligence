@@ -8,62 +8,81 @@
 // counties since 2000 (OpenFEMA), and FEMA's National Risk Index for those tracts (expected annual loss by hazard).
 // Each part is best effort: a failing source returns { error } for that part.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
-import { zoneShares, claimsSummary, nriSummary, areaSqMi, bbox, HAZARDS, RISK_LABEL } from '../lib/fema.mjs';
+import { zoneShares, claimsSummary, nriSummary, areaSqMi, bbox, samplePoints, HAZARDS, RISK_LABEL } from '../lib/fema.mjs';
+import { limiter } from './_lib/limit.mjs';
 import { circle, cleanGeometry } from './crime.js';
 
 const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (FEMA report)' };
 const NFHL = 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer';
 const NRI = 'https://services.arcgis.com/XG15cJAlne2vxtgt/arcgis/rest/services/National_Risk_Index_Census_Tracts/FeatureServer/0';
 const OPEN = 'https://www.fema.gov/api/open/';
-const MAX_SQMI = 400, ZONE_MAX_SQMI = 60, MAX_TRACTS = 60;
+// MAX_SQMI is an abuse guard only (larger than any Texas county). Up to ZONE_DIRECT_SQMI the flood zones come in one query;
+// larger areas ask FEMA only for the zones under each sample point. BUDGET_MS: vercel.json gives this function 180 s.
+const MAX_SQMI = 10000, ZONE_DIRECT_SQMI = 60, BUDGET_MS = 160000;
 export const SOURCES = 'FEMA National Flood Hazard Layer; OpenFEMA NFIP Redacted Claims (v3) and Disaster Declarations Summaries; FEMA National Risk Index (census tracts).';
 
 async function json(url, opts = {}, ms = 15000) {
+  if (ms < 500) throw new Error('didn’t finish in time');
   const r = await fetch(url, { ...opts, headers: { ...UA, ...(opts.headers || {}) }, signal: AbortSignal.timeout(ms) });
   if (!r.ok) throw new Error((url.includes('fema.gov/api') ? 'OpenFEMA ' : 'FEMA map service ') + r.status);
   const d = await r.json(); if (d?.error) throw new Error(d.error.message || 'service error'); return d;
 }
 const esriPolygon = g => JSON.stringify({ rings: g.type === 'Polygon' ? g.coordinates : g.coordinates.flat(), spatialReference: { wkid: 4326 } });
-const arcQuery = (layer, g, params) => json(layer + '/query', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  body: new URLSearchParams({ geometry: esriPolygon(g), geometryType: 'esriGeometryPolygon', inSR: '4326', outSR: '4326', spatialRel: 'esriSpatialRelIntersects', f: 'json', ...params }) }, 20000);
+const left = (deadline, ms) => deadline ? Math.min(ms, deadline - Date.now()) : ms;
+const arcQuery = (layer, g, params, deadline) => json(layer + '/query', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({ geometry: esriPolygon(g), geometryType: 'esriGeometryPolygon', inSR: '4326', outSR: '4326', spatialRel: 'esriSpatialRelIntersects', f: 'json', ...params }) }, left(deadline, 20000));
 
 // ---------- parts ----------
-export async function floodZones(g, sq) {
-  if (sq > ZONE_MAX_SQMI) return { skipped: 'Area over ' + ZONE_MAX_SQMI + ' sq mi: zone shares are computed for smaller areas. Turn on the Flood Zones layer to see them.' };
-  const [x0, y0, x1, y1] = bbox(g), off = Math.max(0.00003, Math.sqrt((x1 - x0) * (y1 - y0)) / 600);
-  const d = await arcQuery(NFHL + '/28', g, { outFields: 'FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE', returnGeometry: 'true', maxAllowableOffset: String(off), geometryPrecision: '5' });
-  return { ...zoneShares(g, d.features), truncated: !!d.exceededTransferLimit || undefined };
+export async function floodZones(g, sq, deadline) {
+  const [x0, y0, x1, y1] = bbox(g), off = Math.max(0.00003, Math.sqrt((x1 - x0) * (y1 - y0)) / 600), fields = { outFields: 'OBJECTID,FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE', returnGeometry: 'true', geometryPrecision: '5' };
+  if (sq <= ZONE_DIRECT_SQMI) {
+    const d = await arcQuery(NFHL + '/28', g, { ...fields, maxAllowableOffset: String(off) }, deadline);
+    return { ...zoneShares(g, d.features), truncated: !!d.exceededTransferLimit || undefined };
+  }
+  // a large area holds thousands of zone shapes: ask only for the ones under the sample points (150 points a request),
+  // then measure the shares from the same points
+  const pts = samplePoints(g, 900), run = limiter(4), seen = new Map(); let truncated = false;
+  await Promise.all(Array.from({ length: Math.ceil(pts.length / 150) }, (_, i) => pts.slice(i * 150, i * 150 + 150)).map(part => run(async () => {
+    const d = await json(NFHL + '/28/query', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ f: 'json', inSR: '4326', outSR: '4326',
+      geometry: JSON.stringify({ points: part, spatialReference: { wkid: 4326 } }), geometryType: 'esriGeometryMultipoint', spatialRel: 'esriSpatialRelIntersects', ...fields, maxAllowableOffset: String(off / 4) }) }, left(deadline, 30000));
+    if (d.exceededTransferLimit) truncated = true;
+    for (const f of d.features || []) seen.set(f.attributes?.OBJECTID ?? seen.size + ':' + Math.random(), f);
+  })));
+  return { ...zoneShares(g, [...seen.values()], 900), truncated: truncated || undefined, method: 'points' };
 }
 const NRI_FIELDS = ['TRACTFIPS', 'COUNTY', 'STCOFIPS', 'POPULATION', 'BUILDVALUE', 'RISK_SCORE', 'RISK_RATNG', 'EAL_VALT', 'SOVI_SCORE', 'RESL_SCORE', ...Object.keys(HAZARDS).flatMap(k => [k + '_EALT', k + '_RISKR'])];
-export async function riskTracts(g) {
+export async function riskTracts(g, deadline) {
   // all fields: naming one the service doesn't have fails the whole query; keep only what the report uses
-  const d = await arcQuery(NRI, g, { outFields: '*', returnGeometry: 'false' });
+  const d = await arcQuery(NRI, g, { outFields: '*', returnGeometry: 'false' }, deadline);
   return (d.features || []).map(f => Object.fromEntries(NRI_FIELDS.filter(k => k in (f.attributes || {})).map(k => [k, f.attributes[k]])));
 }
 // OpenFEMA can be slow on a query it hasn't seen recently: a long timeout and one retry
-async function openfema(entity, filter, select, top = 10000, skip = 0, order = '') {
+async function openfema(entity, filter, select, top = 10000, skip = 0, order = '', deadline) {
   const p = new URLSearchParams({ $filter: filter, $select: select, $top: String(top), $skip: String(skip), $inlinecount: 'allpages', ...(order ? { $orderby: order } : {}) });
-  try { return await json(OPEN + entity + '?' + p, {}, 30000); }
-  catch (e) { if (!/timeout|aborted|5\d\d/i.test(e.message)) throw e; return json(OPEN + entity + '?' + p, {}, 25000); }
+  try { return await json(OPEN + entity + '?' + p, {}, left(deadline, 30000)); }
+  catch (e) { if (!/timeout|aborted|5\d\d/i.test(e.message) || /in time/.test(e.message)) throw e; return json(OPEN + entity + '?' + p, {}, left(deadline, 25000)); }
 }
 const CLAIM_FIELDS = 'yearOfLoss,dateOfLoss,amountPaidOnBuildingClaim,amountPaidOnContentsClaim,amountPaidOnIncreasedCostOfComplianceClaim,occupancyType,ratedFloodZone,floodZoneCurrent,censusGeoid,floodEvent';
-export async function claims(tracts) {
-  const list = tracts.slice(0, MAX_TRACTS), rows = [];
-  for (let i = 0; i < list.length; i += 12) {
-    const chunk = list.slice(i, i + 12), filter = chunk.map(t => "startswith(censusGeoid,'" + t + "')").join(' or ');
-    let skip = 0;
-    for (let page = 0; page < 4; page++) {
-      const d = await openfema('v3/NfipClaims', filter, CLAIM_FIELDS, 10000, skip), got = d.NfipClaims || [];
-      rows.push(...got); skip += got.length; if (got.length < 10000 || skip >= (d.metadata?.count || 0)) break;
-    }
-  }
-  return { ...claimsSummary(rows), tracts_searched: list.length, tracts_skipped: Math.max(0, tracts.length - list.length) || undefined };
+// every tract touching the area, 12 tracts a request, four requests at a time, every page; tracts whose requests didn't
+// finish within the time budget are left out and counted (tracts_skipped)
+export async function claims(tracts, deadline) {
+  const rows = [], run = limiter(4); let done = 0, failed = null;
+  await Promise.all(Array.from({ length: Math.ceil(tracts.length / 12) }, (_, i) => tracts.slice(i * 12, i * 12 + 12)).map(chunk => run(async () => {
+    const filter = chunk.map(t => "startswith(censusGeoid,'" + t + "')").join(' or '), got = [];
+    try {
+      for (let skip = 0; ;) { const d = await openfema('v3/NfipClaims', filter, CLAIM_FIELDS, 10000, skip, '', deadline), page = d.NfipClaims || [];
+        got.push(...page); skip += page.length; if (page.length < 10000 || skip >= (d.metadata?.count || 0)) break; }
+      rows.push(...got); done += chunk.length;
+    } catch (e) { failed = e; }
+  })));
+  if (!done && failed) throw failed;
+  return { ...claimsSummary(rows), tracts_searched: done, tracts_skipped: tracts.length - done || undefined };
 }
-export async function disasters(counties) {
-  const out = new Map();
-  for (const c of counties.slice(0, 6)) {
-    const d = await openfema('v2/DisasterDeclarationsSummaries', "fipsStateCode eq '" + c.slice(0, 2) + "' and fipsCountyCode eq '" + c.slice(2) + "' and declarationDate ge '2000-01-01T00:00:00.000Z'",
-      'disasterNumber,declarationDate,incidentType,declarationTitle,declarationType,incidentBeginDate,ihProgramDeclared,paProgramDeclared,designatedArea', 1000, 0, 'declarationDate desc');
+export async function disasters(counties, deadline) {
+  const out = new Map(), run = limiter(4);
+  const lists = await Promise.all(counties.map(c => run(() => openfema('v2/DisasterDeclarationsSummaries', "fipsStateCode eq '" + c.slice(0, 2) + "' and fipsCountyCode eq '" + c.slice(2) + "' and declarationDate ge '2000-01-01T00:00:00.000Z'",
+      'disasterNumber,declarationDate,incidentType,declarationTitle,declarationType,incidentBeginDate,ihProgramDeclared,paProgramDeclared,designatedArea', 1000, 0, 'declarationDate desc', deadline))));
+  for (const d of lists) {
     for (const x of d.DisasterDeclarationsSummaries || []) if (!out.has(x.disasterNumber)) out.set(x.disasterNumber, { number: x.disasterNumber, date: String(x.declarationDate).slice(0, 10), type: x.incidentType, title: x.declarationTitle, kind: x.declarationType === 'DR' ? 'Major disaster' : x.declarationType === 'EM' ? 'Emergency' : x.declarationType === 'FM' ? 'Fire management' : x.declarationType, individual_assistance: !!x.ihProgramDeclared });
   }
   const list = [...out.values()].sort((a, b) => b.date.localeCompare(a.date)), byType = {};
@@ -71,13 +90,13 @@ export async function disasters(counties) {
   return { since: '2000', count: list.length, major: list.filter(x => x.kind === 'Major disaster').length, by_type: byType, list: list.slice(0, 40) };
 }
 
-export async function femaReport(g, { label } = {}) {
+export async function femaReport(g, { label, deadline = Date.now() + BUDGET_MS } = {}) {
   const sq = areaSqMi(g);
-  if (sq > MAX_SQMI) { const e = new Error('That area is too large for a FEMA report (over ' + MAX_SQMI + ' square miles).'); e.status = 400; throw e; }
+  if (sq > MAX_SQMI) { const e = new Error('That area is larger than ' + MAX_SQMI.toLocaleString('en-US') + ' square miles. Pick a smaller area.'); e.status = 400; throw e; }
   const part = async fn => { try { return await fn(); } catch (e) { return { error: e.message }; } };
-  const [zones, nriRows] = await Promise.all([part(() => floodZones(g, sq)), part(() => riskTracts(g))]);
+  const [zones, nriRows] = await Promise.all([part(() => floodZones(g, sq, deadline)), part(() => riskTracts(g, deadline))]);
   const tracts = Array.isArray(nriRows) ? [...new Set(nriRows.map(r => String(r.TRACTFIPS)))] : [], counties = Array.isArray(nriRows) ? [...new Set(nriRows.map(r => String(r.STCOFIPS)))] : [];
-  const [nfip, dis] = await Promise.all([part(() => tracts.length ? claims(tracts) : { claims: 0, note: 'No census tracts found for this area.' }), part(() => counties.length ? disasters(counties) : { count: 0 })]);
+  const [nfip, dis] = await Promise.all([part(() => tracts.length ? claims(tracts, deadline) : { claims: 0, note: 'No census tracts found for this area.' }), part(() => counties.length ? disasters(counties, deadline) : { count: 0 })]);
   return { label, area_sqmi: Math.round(sq * 1000) / 1000, flood_zones: zones, risk_labels: RISK_LABEL, nfip_claims: nfip, disasters: dis,
     risk_index: Array.isArray(nriRows) ? nriSummary(nriRows) : nriRows, counties: Array.isArray(nriRows) ? [...new Set(nriRows.map(r => r.COUNTY))] : [], sources: SOURCES };
 }

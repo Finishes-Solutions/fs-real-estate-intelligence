@@ -15,6 +15,22 @@ export const fileBase = (kind, scope, date = today()) => 'fs-' + slug(kind).slic
 // again in a minute."): never "Unexpected token", "HTTP 404" or "Failed to execute". err.status keeps the status, err.detail the raw
 // text (console only), err.friendly marks the message as fit to show. A JSON { error } on a 4xx is the server explaining a
 // refusal in words ("That area is too large…"), so that sentence is kept. An aborted request is rethrown as it is.
+// A few failures have a more useful sentence than "isn’t available": a big area that ran out of time (Vercel's 504 /
+// FUNCTION_INVOCATION_TIMEOUT page, or our own 5xx "…took too long…" from a database time limit), an outline too detailed
+// to send (413) and too many requests (429). The wording is lib/http.mjs's httpMessage (test/reportsux.mjs checks they
+// match); it is repeated here because this file is also loaded by the server (api/pdf.js) with no lib/ beside it.
+export const SPECIFIC = {
+  timeout: 'The server took too long on this area. Try again (a second run is usually faster) or pick a smaller area.',
+  tooBig: 'That area outline is too detailed to send. Try a simpler shape.',
+  busy: 'Too many requests. Try again in a minute.',
+};
+const specific = (status, text, body) => {
+  const said = typeof body?.error === 'string' ? body.error.trim() : '';
+  if (said && said.length < 240 && (status < 500 || /took too long/i.test(said))) return said;
+  if (status === 504 || /FUNCTION_INVOCATION_TIMEOUT/i.test(text)) return SPECIFIC.timeout;
+  if (status === 413 || /FUNCTION_PAYLOAD_TOO_LARGE/i.test(text)) return SPECIFIC.tooBig;
+  return status === 429 ? SPECIFIC.busy : '';
+};
 export const unavailable = what => { const w = String(what || 'This').trim() || 'This'; return w.charAt(0).toUpperCase() + w.slice(1) + ' isn’t available right now. Try again in a minute.'; };
 export const friendly = (e, what) => e?.friendly ? e.message : unavailable(what);
 export async function getJSON(url, { what = 'This', ...init } = {}) {
@@ -22,7 +38,7 @@ export async function getJSON(url, { what = 'This', ...init } = {}) {
   let r; try { r = await fetch(url, init); } catch (e) { if (e?.name === 'AbortError') throw e; throw fail(0, e?.message || e); }
   const text = await r.text().catch(() => ''), type = r.headers?.get?.('content-type') || '';
   let body, parsed = false; if (!type || /json/i.test(type)) { try { body = JSON.parse(text); parsed = true; } catch (e) {} }
-  if (!r.ok) throw fail(r.status, parsed && body?.error || text, parsed && r.status < 500 && typeof body?.error === 'string' && body.error.trim() && body.error.length < 240 ? body.error.trim() : '');
+  if (!r.ok) throw fail(r.status, parsed && body?.error || text, specific(r.status, text, parsed ? body : null));
   if (!parsed) throw fail(r.status, text);
   return body;
 }

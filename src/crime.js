@@ -158,7 +158,7 @@ export function initCrime(ctx) {
       '<div class="bsec"><div class="lt">Where they happened</div><dl>' + d.premises.slice(0, 8).map(p => '<dt>' + esc(p.premise) + '</dt><dd class="mono">' + fmtN(p.n) + '</dd>').join('') + '</dl></div>' +
       '<div class="bacts"><button class="btn" id="crPts" type="button">Show Incidents on Map</button><button class="btn primary" id="crPdf" type="button">Export PDF</button><button class="btn" id="crCsv" type="button">Export CSV</button></div>' +
       '<div class="bsec"><div class="lt">Most recent incidents</div>' + (d.incidents || []).slice(0, 15).map(x => '<div class="pl"><b>' + esc(x.offense) + '</b><span>' + esc(x.day + (x.premise ? ' · ' + x.premise : '')) + '</span></div>').join('') +
-      ((d.incidents || []).length >= 2000 ? '<div class="rnote">The map and export include the newest 2,000 incidents; the totals above count all of them.</div>' : '') + '</div>' +
+      ((d.incidents || []).length >= 2000 ? '<div class="rnote">The map shows the newest 2,000 incidents and Export CSV the newest 20,000; the totals above count all of them.</div>' : '') + (d.incidents_note ? '<div class="rnote">' + esc(d.incidents_note) + '</div>' : '') + '</div>' +
       '<div class="rnote bsec">Offenses as reported by Houston Police (NIBRS). Counts follow where people are, so busy commercial areas show more than homes nearby; compare with similar places.<span class="src"> ' + esc(d.coverage) + '</span></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#crPts').onclick = () => showPoints(d.incidents || []);
@@ -189,8 +189,14 @@ export function initCrime(ctx) {
 
   async function exportCsv() {
     if (!last?.d?.incidents) return;
-    ctx.exportMeta = { report: 'crime', format: 'csv', scope: last.label, filings: last.d.incidents.length, unit: 'incidents', geom: last.geometry };
-    try { ctx.exportCsv(last.d.incidents.map(x => ({ Date: x.day, Offense: x.offense, 'NIBRS code': x.code, Category: CAT_NAME[x.cat] || x.cat, Count: x.n, Premise: x.premise || '', Latitude: x.lat, Longitude: x.lon })), fileBase('crime', last.label)); }
+    // the report carries the newest 2,000; the CSV asks for up to 20,000
+    let list = last.d.incidents; const mine = last;
+    if (list.length >= 2000 && (mine.d.last12?.total || 0) > list.length) { ctx.toast?.('Gathering up to 20,000 incidents…');
+      try { const d = await reportFor(mine.geometry, 20000); if (d.incidents?.length > list.length) list = mine.d.incidents_all = d.incidents; } catch (e) { ctx.toast?.('Only the newest 2,000: ' + friendly(e, 'Crime data')); } }
+    if (last !== mine) return;
+    if (list.length >= 20000) ctx.toast?.('The CSV has the newest 20,000 incidents; the report counts all of them.');
+    ctx.exportMeta = { report: 'crime', format: 'csv', scope: last.label, filings: list.length, unit: 'incidents', geom: last.geometry };
+    try { ctx.exportCsv(list.map(x => ({ Date: x.day, Offense: x.offense, 'NIBRS code': x.code, Category: CAT_NAME[x.cat] || x.cat, Count: x.n, Premise: x.premise || '', Latitude: x.lat, Longitude: x.lon })), fileBase('crime', last.label)); }
     finally { ctx.exportMeta = null; }
   }
   // the area and its incidents on a street map, for the printed report

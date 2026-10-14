@@ -117,7 +117,7 @@ export async function site(lon, lat, { addr, zip } = {}) {
     part(async () => { const out = []; for (const id of [0, 1, 2]) for (const a of await query(SRC.school + '/' + id, lon, lat, { fields: 'NAME' })) if (a.NAME && !out.includes(a.NAME)) out.push(a.NAME); return out; }),
     part(async () => inHouston(lon, lat) ? { stops: (await getJSON((await layerOf(SRC.stops)) + '/query?returnCountOnly=true&' + near(lon, lat, 400))).count ?? null } : null),
     part(() => echo(lon, lat)),
-    part(async () => db && inHouston(lon, lat) ? crimeSummary(await db.rpc('crime_near', { p_lon: lon, p_lat: lat, p_m: 805 }), 0.5) : null),
+    part(async () => db && inHouston(lon, lat) ? crimeSummary(await db.rpc('crime_near', { p_lon: lon, p_lat: lat, p_m: 805 }, { deadline: Date.now() + 15000 }), 0.5) : null),
     part(() => addr ? bars(addr, zip) : null)
   ]);
   const districts = { water, tirz, opportunityZone: oz, schools };
