@@ -3,9 +3,10 @@
 // outlines and are kept in this browser.
 import { BY_KEY } from './metrics.js';
 import { contains as inArea } from './lib/geomatch.mjs';
+import { reveal } from './motion.js';
 
 const MAX = 4;
-const COLORS = [['#006527', '#4caf70'], ['#b7791f', '#e0a23c'], ['#2b6cb0', '#63a4e8'], ['#9b2c6f', '#d36aa8']];
+const COLORS = ['#006527', '#b7791f', '#2b6cb0', '#9b2c6f'];
 const ROWS = ['count', 'value', 'new', 'newValue', 'reno', 'add', 'avg', 'median', 'big', 'active', 'starting', 'last30', 'sqft', 'psf', 'units', 'devs', 'topUse', 'topCity', 'topDev'];
 
 export function initCompare(ctx) {
@@ -14,7 +15,7 @@ export function initCompare(ctx) {
   let areas = [];
   try { areas = (JSON.parse(localStorage.getItem('fs-compare') || '[]') || []).filter(a => a && a.geom && a.label).slice(0, MAX); } catch (e) {}
   const save = () => { try { localStorage.setItem('fs-compare', JSON.stringify(areas)); } catch (e) { /* large outlines: keep in memory only */ } };
-  const color = i => COLORS[i % COLORS.length][ctx.isDark() ? 1 : 0];
+  const color = i => COLORS[i % COLORS.length];
   const contains = (a, f) => inArea(a.geom, [f.lon, f.lat]);
   const sqmi = g => d3.geoArea(g) * 3958.8 ** 2;
 
@@ -60,7 +61,7 @@ export function initCompare(ctx) {
     const key = s.kind === 'county' ? 'county:' + [...s.counties].sort().join('|') : s.kind + ':' + s.label;
     return { key, label: s.label, kind: s.kind, geom: s.feature };
   }
-  ctx.compare = { add, remove, addEach, list: () => areas.slice(), colorOf: i => COLORS[i % COLORS.length][0], addSelection: () => add(fromSelection()), clear: () => { areas = []; save(); sync(); } };
+  ctx.compare = { add, remove, addEach, list: () => areas.slice(), colorOf: i => COLORS[i % COLORS.length], addSelection: () => add(fromSelection()), clear: () => { areas = []; save(); sync(); } };
 
   // the Map panel's scope header: "+ Compare"
   const selBtn = document.getElementById('selCompare');
@@ -118,7 +119,8 @@ export function initCompare(ctx) {
     root.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => remove(+b.dataset.rm));
     root.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { ctx.setView('map'); ctx.fitGeom(areas[+b.dataset.go].geom); });
     root.querySelectorAll('.cmp-f').forEach(b => b.onclick = () => { const f = ctx.BY_ID.get(b.dataset.id); if (f) { ctx.setView('map'); ctx.select(f, true); } });
-    if (areas.length) { trend(lists); uses(lists); }
+    // the two charts draw in the first time they're seen (src/motion.js); later updates are instant
+    if (areas.length) { trend(lists); uses(lists); reveal(root.querySelector('#cmpTrend'), 'cmp:trend'); reveal(root.querySelector('#cmpUse'), 'cmp:uses'); }
   }
 
   // registrations per quarter, one line per area
@@ -134,7 +136,7 @@ export function initCompare(ctx) {
     el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="cmp-svg" role="img" aria-label="Filings by quarter">' +
       y.ticks(4).map(t => '<g><line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + y(t) + '" y2="' + y(t) + '" class="gl"/><text x="' + (M.l - 6) + '" y="' + (y(t) + 3) + '" text-anchor="end">' + t + '</text></g>').join('') +
       all.map((q, i) => i % step ? '' : '<text x="' + x(q) + '" y="' + (H - 8) + '" text-anchor="middle">' + q + '</text>').join('') +
-      series.map((s, i) => '<path d="' + line(s) + '" fill="none" stroke="' + color(i) + '" stroke-width="2.2"/>' + s.map((v, j) => '<circle cx="' + x(all[j]) + '" cy="' + y(v) + '" r="2.4" fill="' + color(i) + '"><title>' + esc(areas[i].label) + ' · ' + all[j] + ': ' + v + '</title></circle>').join('')).join('') + '</svg>';
+      series.map((s, i) => '<path class="m-line" d="' + line(s) + '" fill="none" stroke="' + color(i) + '" stroke-width="2.2"/>' + s.map((v, j) => '<circle class="m-dot" cx="' + x(all[j]) + '" cy="' + y(v) + '" r="2.4" fill="' + color(i) + '"><title>' + esc(areas[i].label) + ' · ' + all[j] + ': ' + v + '</title></circle>').join('')).join('') + '</svg>';
   }
   // 100% bars of est. value by use for each area
   function uses(lists) {
@@ -144,7 +146,7 @@ export function initCompare(ctx) {
     const pal = ['#006527', '#1f9249', '#4caf70', '#8acda3', '#b7791f', '#6b7174', '#bcc2c4'];
     el.innerHTML = lists.map((l, i) => { const v = l.reduce((s, f) => s + f.cost, 0) || 1, parts = top.map(u => l.filter(f => (f.use || 'Unclassified') === u).reduce((s, f) => s + f.cost, 0));
       parts.push(Math.max(0, v - parts.reduce((s, x) => s + x, 0)));
-      return '<div class="cmp-bar"><span class="lab" style="--c:' + color(i) + '"><i></i>' + esc(areas[i].label) + '</span><span class="bar">' + parts.map((p, j) => p > 0 ? '<b style="width:' + (p / v * 100).toFixed(2) + '%;background:' + pal[j] + '" title="' + esc((top[j] || 'All other uses') + ': ' + fmtM(p) + ' (' + Math.round(p / v * 100) + '%)') + '"></b>' : '').join('') + '</span></div>'; }).join('') +
+      return '<div class="cmp-bar"><span class="lab" style="--c:' + color(i) + '"><i></i>' + esc(areas[i].label) + '</span><span class="bar m-hbar">' + parts.map((p, j) => p > 0 ? '<b style="width:' + (p / v * 100).toFixed(2) + '%;background:' + pal[j] + '" title="' + esc((top[j] || 'All other uses') + ': ' + fmtM(p) + ' (' + Math.round(p / v * 100) + '%)') + '"></b>' : '').join('') + '</span></div>'; }).join('') +
       '<div class="cmp-key">' + top.concat('All other').map((u, j) => '<span><i style="background:' + pal[j] + '"></i>' + esc(u) + '</span>').join('') + '</div>';
   }
   ctx.onChange(() => render()); ctx.onView('compare', render);

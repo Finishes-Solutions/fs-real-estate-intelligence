@@ -3174,3 +3174,20 @@ table.who tr.nomatch td{border:0}
 #card .sp-chk li.skip::before{content:"!";border:0;transform:none;top:0;left:4px;width:auto;height:auto;font-weight:700;color:var(--amber)}
 #card .sp-chg-acts{padding:4px 0 0;align-items:center;flex-wrap:wrap}
 #card .sp-chg-acts .sp-link{margin-left:auto;font-size:12px}
+
+/* ---------- motion & charts ---------- */
+/* Chart motion runs in src/motion.js (Web Animations and attribute tweens that leave nothing behind); these rules set where
+   marks grow from, the hover feedback and the loading placeholder. Timings use the shared motion tokens. */
+.m-bar{transform-box:view-box} /* bars scale about the chart's zero line (an origin in the chart's own units) */
+.m-dot{transform-box:fill-box;transform-origin:center}
+.m-hbar{transform-origin:0 50%}
+/* hover: marks ease to their highlight instead of snapping */
+.mk-hit path,.mk-hit rect,.mk-hb i b,.mk-hb span,.mk-cross,.mk-dot,.mk-spk circle,.mx-spark circle,.mx-chart g.mx-hit line,.mx-lags rect,.mx-tabs button,.mx-row,.cmp-bar .bar b,.cc-hb s,.cc-chart rect,.tl-chart .tl-l rect{transition:opacity 120ms var(--ease,cubic-bezier(.2,.7,.2,1)),filter 120ms var(--ease,cubic-bezier(.2,.7,.2,1)),fill 120ms var(--ease,cubic-bezier(.2,.7,.2,1)),color 120ms var(--ease,cubic-bezier(.2,.7,.2,1)),background-color 120ms var(--ease,cubic-bezier(.2,.7,.2,1)),border-color 120ms var(--ease,cubic-bezier(.2,.7,.2,1))}
+.tl-chart .tl-l rect.hov{filter:brightness(1.14) saturate(1.1)}
+.cc-chart rect:hover,.cmp-bar .bar b:hover{filter:brightness(1.12)}
+/* loading: a muted block with a slow shimmer, clearly not a chart (no bars, no numbers) */
+.mk-skels{display:grid;gap:14px;margin-top:14px}
+.mk-skel{border-radius:6px;margin-top:8px;background:var(--chip) linear-gradient(100deg,transparent 30%,var(--line) 50%,transparent 70%) no-repeat;background-size:200% 100%;background-position:150% 0;animation:mk-shimmer 1.6s var(--ease,cubic-bezier(.2,.7,.2,1)) infinite}
+@keyframes mk-shimmer{to{background-position:-50% 0}}
+@media (prefers-reduced-motion:reduce){.mk-skel{animation:none;background-image:none}}
+@media print{*{animation:none!important;transition:none!important}}

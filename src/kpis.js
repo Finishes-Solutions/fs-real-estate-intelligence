@@ -1,5 +1,6 @@
 // Headline metrics under the title: 3 to 9 tiles the user picks from METRICS (saved in this browser).
 import { METRICS, BY_KEY, DEFAULT_KPIS } from './metrics.js';
+import { count, current } from './motion.js';
 
 const MIN = 3, MAX = 9;
 export function initKpis(ctx) {
@@ -8,11 +9,18 @@ export function initKpis(ctx) {
   try { const s = JSON.parse(localStorage.getItem('fs-kpis') || 'null'); if (Array.isArray(s)) { const v = s.filter(k => BY_KEY.has(k)).slice(0, MAX); if (v.length >= MIN) keys = v; } } catch (e) {}
   const save = () => { try { localStorage.setItem('fs-kpis', JSON.stringify(keys)); } catch (e) {} };
 
+  // numbers count from what the tile showed (mid-count too) to the new value, in the metric's own format (src/motion.js);
+  // text metrics, the time-lapse playing and reduced motion update at once. The tiles' live region is busy while counting.
+  const last = new Map();
   function render() {
-    const list = ctx.visible;
+    const list = ctx.visible, from = new Map(last);
+    box.querySelectorAll('.kpi b[data-k]').forEach(b => { const v = current(b); if (Number.isFinite(v)) from.set(b.dataset.k, v); });
     box.style.setProperty('--cols', keys.length === 4 ? 2 : Math.min(3, keys.length));
-    box.innerHTML = keys.map(k => { const m = BY_KEY.get(k), v = m.fmt(m.fn(list));
-      return '<div class="kpi' + (m.text ? ' txt' : '') + '"><b title="' + ctx.esc(v) + '">' + ctx.esc(v) + '</b><span title="' + ctx.esc(m.label) + '">' + ctx.esc(m.short || m.label) + '</span></div>'; }).join('');
+    const vals = keys.map(k => BY_KEY.get(k).fn(list));
+    box.innerHTML = keys.map((k, i) => { const m = BY_KEY.get(k), v = m.fmt(vals[i]);
+      return '<div class="kpi' + (m.text ? ' txt' : '') + '"><b data-k="' + k + '" title="' + ctx.esc(v) + '">' + ctx.esc(v) + '</b><span title="' + ctx.esc(m.label) + '">' + ctx.esc(m.short || m.label) + '</span></div>'; }).join('');
+    last.clear();
+    box.querySelectorAll('.kpi b[data-k]').forEach((b, i) => { const m = BY_KEY.get(keys[i]), v = vals[i]; if (m.text || typeof v !== 'number') return; last.set(keys[i], v); count(b, v, m.fmt, from.get(keys[i])); });
   }
   function renderPop() {
     pop.innerHTML = '<div class="kp-h"><b>Headline metrics</b><span>' + keys.length + ' of ' + MAX + ' · pick ' + MIN + '–' + MAX + '</span></div><div class="kp-list">' +
