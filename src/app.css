@@ -3186,3 +3186,76 @@ table.who tr.nomatch td{border:0}
 @keyframes mk-shimmer{to{background-position:-50% 0}}
 @media (prefers-reduced-motion:reduce){.mk-skel{animation:none;background-image:none}}
 @media print{*{animation:none!important;transition:none!important}}
+/* ---------- site plan tools ---------- */
+/* the tool strip on the map: grouped icon buttons, bottom left of the open map (clear of the Plan key and the scale) */
+.sp-strip{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--panel);color:var(--text);box-shadow:var(--sh-2);pointer-events:auto;transition:left var(--dur-base,220ms) var(--ease,cubic-bezier(.2,.7,.2,1)),bottom var(--dur-base,220ms) var(--ease,cubic-bezier(.2,.7,.2,1))}
+.sp-strip[hidden]{display:none}
+.sp-tgrp{display:flex;gap:2px}
+.sp-tgrp+.sp-tgrp{border-left:1px solid var(--line);padding-left:3px;margin-left:1px}
+.sp-tb{width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--text-2);cursor:var(--cur-pointer,pointer);transition:background var(--dur-fast,150ms) var(--ease,ease),color var(--dur-fast,150ms) var(--ease,ease)}
+.sp-tb:hover{background:var(--chip);color:var(--text)}
+.sp-tb.on{background:var(--brand);color:var(--brand-ink)}
+.sp-tb[aria-disabled]{opacity:.38;cursor:var(--cur-default,default)}
+.sp-tb[aria-disabled]:hover{background:transparent;color:var(--text-2)}
+.sp-tb:focus-visible,.sp-tpop button:focus-visible,.sp-tpop input:focus-visible{outline:var(--focus,2px solid var(--brand));outline-offset:1px}
+.sp-tb-more{display:none}
+/* its pop-overs: what to draw, and Layers */
+.sp-tpop{position:absolute;z-index:2;width:268px;max-width:calc(100% - 12px);overflow:auto;padding:8px;border:1px solid var(--line-2);border-radius:var(--r-lg);background:var(--panel);color:var(--text);box-shadow:var(--sh-2);pointer-events:auto;font:500 12.5px/1.35 var(--font-display)}
+.sp-tpop[hidden]{display:none}
+.sp-tp-h{font:700 10.5px/1 var(--font-display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:4px 6px 8px}
+.sp-tp-i{display:flex;align-items:center;gap:10px;width:100%;padding:7px 8px;border:0;border-radius:6px;background:transparent;color:var(--text);text-align:left;font:inherit;cursor:var(--cur-pointer,pointer)}
+.sp-tp-i:hover{background:var(--chip)}
+.sp-tp-i span{display:grid;gap:1px}
+.sp-tp-i small,.sp-lrow small,.sp-tp-sw2 small{font-size:11px;color:var(--muted);font-weight:500}
+.sp-tp-sw{flex:none;width:16px;height:12px;border-radius:2px;border:1px solid rgba(11,13,12,.18)}
+.sp-tp-sw.k-green{background:#62b072}.sp-tp-sw.k-plaza{background:#d9c8a9}.sp-tp-sw.k-pond{background:#5b9bd1}.sp-tp-sw.k-drive{background:#7c8689}.sp-tp-sw.k-trail{background:#d9c7a0}
+.sp-tp-sw.k-keepout{border:1px dashed #9b3b32;background:repeating-linear-gradient(45deg,#9b3b32 0 1.5px,transparent 1.5px 4px)}
+.sp-tp-n{margin:6px 6px 2px;font-size:11.5px;line-height:1.4;color:var(--muted)}
+.sp-lrows{display:grid}
+.sp-lrow{display:grid;grid-template-columns:minmax(0,1fr) 28px 28px;align-items:center;gap:2px;padding:3px 2px 3px 6px;border-radius:6px}
+.sp-lrow:hover{background:var(--chip)}
+.sp-lrow>span{display:grid;min-width:0}
+.sp-lrow.off>span{color:var(--muted)}
+.sp-lb{width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--text-2);cursor:var(--cur-pointer,pointer)}
+.sp-lb:hover{background:var(--panel);color:var(--text)}
+.sp-lb[aria-pressed="false"][data-f^="eye"]{color:var(--muted)}
+.sp-lb[aria-pressed="true"][data-f^="lock"]{color:var(--brand)}
+.sp-tp-sub{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 0;padding:8px 6px 0;border-top:1px solid var(--line)}
+.sp-seg{display:inline-flex;border:1px solid var(--line-2);border-radius:999px;overflow:hidden}
+.sp-seg button{border:0;background:transparent;color:var(--text-2);font:600 11.5px var(--font-display);padding:4px 10px;cursor:var(--cur-pointer,pointer)}
+.sp-seg button[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink)}
+.sp-tp-sw2{display:flex;align-items:center;gap:6px;padding:8px 6px 0;cursor:var(--cur-pointer,pointer)}
+.sp-tp-sw2 input{accent-color:var(--brand);margin:0}
+.sp-tp-sw2 span{display:grid;gap:1px}
+/* a message while planning sits above the tool strip, not over it */
+@media (min-width:701px){.app.planning .toast{bottom:64px}}
+/* Shift-drag on the map: the selection box */
+.sp-box{position:absolute;z-index:3;pointer-events:none;border:1.5px dashed var(--brand);background:color-mix(in srgb,var(--brand) 10%,transparent);border-radius:2px}
+.sp-box[hidden]{display:none}
+/* the save status, under Undo and Redo */
+#card .sp-head{grid-template-areas:"back back" "crumb act" "ttl save"}
+#card .sp-save{grid-area:save;justify-self:end;align-self:start;margin-top:8px;font:500 11.5px/1.3 var(--font-display);color:var(--muted);white-space:nowrap}
+#card .sp-save:empty{display:none}
+#card .sp-save.bad{color:var(--danger)}
+#card .sp-save .sp-link{font-size:11.5px;padding:0;color:var(--danger);text-decoration:underline}
+/* replacing a layout you changed: asked, in the panel */
+#card .sp-confirm{margin:var(--sp-3) var(--pg,16px) 0;padding:12px 14px;border:1px solid var(--amber);border-left-width:3px;border-radius:var(--r-md);background:var(--panel-2)}
+#card .sp-confirm p{margin:0 0 8px;font-size:13px;line-height:1.4}
+#card .sp-confirm .btnrow{display:flex;flex-wrap:wrap;gap:6px}
+/* several pieces picked: their buttons in one row */
+#card .sp-fsrow{display:contents;border:0;padding:0;margin:0}
+/* phones: fewer buttons until More opens the rest; the save status only when a sync failed */
+@media (max-width:700px){
+  .sp-strip{left:8px;bottom:8px;padding:2px}
+  .sp-tb{width:36px;height:36px}
+  .sp-tb-more{display:grid}
+  .sp-strip:not(.open) .sp-tb-x{display:none}
+  .sp-strip:not(.open) .sp-tgrp:not(:has(.sp-tb:not(.sp-tb-x))){display:none}
+  .sp-strip.open{flex-wrap:wrap;max-width:calc(100% - 16px)}
+  .sp-tpop{width:min(268px,calc(100vw - 16px))}
+  .sp-tpop.ph{position:fixed;z-index:var(--z-sheet,11)}
+  .sp-mapui:has(.sp-strip:not([hidden])) .sp-mpill{top:52px}
+  #card .sp-head{grid-template-areas:"ttl act" "save save"}
+  #card .sp-save{justify-self:start;margin-top:2px}
+  #card .sp-save:not(.bad){display:none}
+}

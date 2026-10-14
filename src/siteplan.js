@@ -14,6 +14,7 @@ import { freeRect as openArea, fitPadding, planSections } from './lib/planview.m
 import * as RUN from './lib/planruns.mjs';
 import * as K from './lib/planpick.mjs';
 import * as MAP from './lib/planmap.mjs';
+import * as T from './lib/sitetools.mjs';
 const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 import { readJSON } from './lib/http.mjs';
@@ -38,11 +39,14 @@ export function initSitePlan(ctx) {
   // ---------- storage and team sync ----------
   function load() { try { const d = JSON.parse(localStorage.getItem(KEY) || '{}'); return { projects: d.projects || [], dirty: d.dirty || [], gone: d.gone || [] }; } catch (e) { return { projects: [], dirty: [], gone: [] }; } }
   let persistT = 0; // written a moment after the last change, not on every one (a big plan is megabytes)
-  function persistNow() { clearTimeout(persistT); persistT = 0; try { localStorage.setItem(KEY, JSON.stringify(db)); return; } catch (e) { /* full: try lighter */ }
+  function persistNow() { clearTimeout(persistT); persistT = 0; try { localStorage.setItem(KEY, JSON.stringify(db)); saved(); return; } catch (e) { /* full: try lighter */ }
     // the browser's store is full: the saved layouts of options that aren't open keep their numbers only (each is laid out again when clicked)
-    if (RUN.lightenRuns(db.projects, ed?.plid)) try { localStorage.setItem(KEY, JSON.stringify(db)); return; } catch (e) { /* still full */ }
+    if (RUN.lightenRuns(db.projects, ed?.plid)) try { localStorage.setItem(KEY, JSON.stringify(db)); saved(); return; } catch (e) { /* still full */ }
     ctx.toast('This browser won’t let the page save projects.'); }
   function persist() { clearTimeout(persistT); persistT = setTimeout(persistNow, 600); }
+  // the plan header's save status (paintSave): saved here; synced with the team once the server has it; or a failed sync
+  const saved = () => { if (saveSt.kind !== 'synced' || db.dirty.includes(ed?.pid)) { saveSt.kind = saveSt.kind === 'failed' ? 'failed' : 'local'; } saveSt.at = Date.now(); paintSave(); };
+  const syncSaid = ok => { if (ok === false) saveSt.kind = 'failed'; else if (ok && shared && !db.dirty.includes(ed?.pid)) { saveSt.kind = 'synced'; saveSt.at = Date.now(); } else if (ok === null && saveSt.kind === 'failed') saveSt.kind = 'local'; paintSave(); };
   window.addEventListener('pagehide', () => { if (persistT) persistNow(); });
   function save(p) {
     if (p) { p.updated = new Date().toISOString(); p.by = get(NAME_KEY) || p.by || ''; if (!db.dirty.includes(p.id)) db.dirty.push(p.id); }
@@ -56,18 +60,18 @@ export function initSitePlan(ctx) {
       if (db.dirty.length || db.gone.length) {
         const sent = db.projects.filter(p => db.dirty.includes(p.id)).map(p => [p.id, p.updated]), gone = db.gone.slice();
         const r = await fetch('api/projects', { method: 'POST', headers: h, body: JSON.stringify({ projects: db.projects.filter(p => db.dirty.includes(p.id)).map(p => RUN.syncCopy(p)), deletes: gone, name: get(NAME_KEY) }) });
-        if (!r.ok) { shared = r.status === 503 || r.status === 401 ? false : shared; return; }
+        if (!r.ok) { shared = r.status === 503 || r.status === 401 ? false : shared; syncSaid([401, 404, 405, 503].includes(r.status) ? null : false); return; } // not set up: this device only
         db.dirty = db.dirty.filter(id => !sent.some(([i, u]) => i === id && db.projects.find(p => p.id === id)?.updated === u)); db.gone = db.gone.filter(id => !gone.includes(id));
       }
-      const r = await fetch('api/projects', { headers: h }); if (!r.ok) { shared = r.status === 503 || r.status === 401 ? false : shared; return; }
-      const d = await r.json(); shared = true; let changed = false;
+      const r = await fetch('api/projects', { headers: h }); if (!r.ok) { shared = r.status === 503 || r.status === 401 ? false : shared; syncSaid([401, 404, 405, 503].includes(r.status) ? null : false); return; }
+      const d = await r.json(); shared = true; let changed = false; syncSaid(true);
       for (const id of d.deleted || []) { const i = db.projects.findIndex(p => p.id === id); if (i >= 0 && !db.dirty.includes(id) && ed?.pid !== id) { db.projects.splice(i, 1); changed = true; } }
       for (const p of d.projects || []) {
         const i = db.projects.findIndex(x => x.id === p.id); if (ed?.pid === p.id || db.dirty.includes(p.id)) continue;
         if (i < 0) { db.projects.push(p); changed = true; } else if (t(p.updated) > t(db.projects[i].updated)) { db.projects[i] = p; changed = true; }
       }
       if (changed) { persist(); badge(); if (ctx.view === 'projects') render(); }
-    } catch (e) { /* offline: try again on the next change or when back online */ }
+    } catch (e) { syncSaid(false); /* offline: try again on the next change or when back online */ }
     finally { syncing = false; if (ctx.view === 'projects') render(); }
   }
   window.addEventListener('online', sync);
@@ -164,7 +168,7 @@ export function initSitePlan(ctx) {
   function enterPlanning() {
     app.classList.add('planning');
     if (ctx.mode && ctx.mode() !== 'pan') ctx.setMode?.('pan'); // an area tool that was on goes off
-    planState = { collapsed: !!ctx.panelCollapsed?.() };
+    planState = { collapsed: !!ctx.panelCollapsed?.(), boxZoom: !!map.boxZoom?.isEnabled() }; map.boxZoom?.disable(); // Shift-drag draws a selection box instead
     if (!planState.collapsed && !phone()) ctx.setPanelCollapsed?.(true);
     watchResize(); addScale(); if (phone()) ctx.foldLegend?.(true); // the Plan key starts folded on phones
   }
@@ -172,6 +176,7 @@ export function initSitePlan(ctx) {
     app.classList.remove('planning'); ro?.disconnect(); ro = null; clearTimeout(roT);
     dropScale(); ctx.foldLegend?.(null); mapUi.hidden = true; pillMode.hidden = true; modeKey = ''; keySig = ''; ctx.setLegend?.('siteplan', ''); app.style.removeProperty('--sp-above'); clearGone();
     if (planState && !!ctx.panelCollapsed?.() !== planState.collapsed) ctx.setPanelCollapsed?.(planState.collapsed); // exactly as it was
+    if (planState?.boxZoom) map.boxZoom?.enable(); closePops(); strip.classList.remove('open');
     planState = null;
   }
   function open(pid, plid, o = {}) {
@@ -186,7 +191,7 @@ export function initSitePlan(ctx) {
       enterPlanning();
     }
     cur = pid; renaming = false; lastOpen = { pid, plid }; killRun();
-    ed = { pid, plid, sel: null, undo: [], redo: [], mode: o.draw || !(db.projects.find(x => x.id === pid)?.plans.find(x => x.id === plid)?.ring?.length >= 3) ? 'draw' : null, draft: [], variants: null, editing: false, run: null }; // editing: pieces can be moved only in Edit Layout
+    ed = { pid, plid, sel: null, multi: [], undo: [], redo: [], mode: o.draw || !(db.projects.find(x => x.id === pid)?.plans.find(x => x.id === plid)?.ring?.length >= 3) ? 'draw' : null, draft: [], variants: null, editing: false, run: null }; // editing: pieces can be moved only in Edit Layout
     restoreRun(PL());
     hideMapBits();
     addLayers(); draw(); panel();
@@ -272,7 +277,7 @@ export function initSitePlan(ctx) {
     const f = freeRect(), st = stage.getBoundingClientRect(), top = phone() && card.classList.contains('open') ? card.getBoundingClientRect().top : Infinity, b = Math.min(f.b, top); // phones: above the sheet, however high it is
     Object.assign(mapUi.style, { left: Math.round(f.l - st.left) + 'px', top: Math.round(f.t - st.top) + 'px', width: Math.max(0, Math.round(f.r - f.l)) + 'px', height: Math.max(0, Math.round(b - f.t)) + 'px' });
     if (phone()) app.style.setProperty('--sp-above', Math.round(Math.max(12, innerHeight - Math.min(innerHeight, top) + 8)) + 'px'); // the phone legend rides above the sheet
-    mapUi.hidden = false;
+    mapUi.hidden = false; paintTools();
   }
   function addScale() { if (scale || !window.maplibregl?.ScaleControl) return; try { scale = new maplibregl.ScaleControl({ unit: 'imperial', maxWidth: 120 }); mapUi.querySelector('.sp-scale').appendChild(scale.onAdd(map)); } catch (e) { scale = null; } }
   function dropScale() { try { scale?.onRemove(); } catch (e) {} scale = null; }
@@ -285,6 +290,10 @@ export function initSitePlan(ctx) {
       case 'street': return { k: 'street', t: 'Side Street', d: cl + ' a lot line to add or remove a side street', b: 'Done' };
       case 'entrance': return { k: 'entrance', t: 'Add Entrance', d: cl + ' the lot line where the driveway comes in', b: 'Cancel' };
       case 'parcels': return { k: 'parcels', t: 'Add or remove parcels', d: cl + ' a parcel next to the site to add it, or one in it to take it out', b: 'Done' };
+      case 'measure': { const M = ed.meas || { pts: [] }, Q = M.pts, area = M.kind === 'area', keys = touch ? '' : ' · Esc or ' + (area ? '⇧M' : 'M') + ' leaves';
+        const tot = area ? (Q.length >= 3 ? T.fmtArea(T.polyArea(Q)) : '') : Q.length > 1 ? 'Total ' + T.fmtFt(T.pathLen(Q)) : '';
+        return { k: 'measure', t: area ? 'Measure area' : 'Measure distance', d: (tot ? tot + ' · ' : '') + (M.done ? cl + ' to start another' : area ? cl + ' round the area · the first point again' + (touch ? '' : ' or Enter') + ' closes it' : cl + ' points along the way' + (touch ? '' : ' · Enter finishes')) + keys, b: 'Done' }; }
+      case 'drawpiece': { const D = ed.dp || {}; return { k: 'drawpiece', t: 'Drawing: ' + (D.label || 'a piece'), d: D.line ? cl + ' points along it · ' + (touch ? 'double-tap' : 'Enter or double-click') + ' finishes' : cl + ' each corner · ' + cl.toLowerCase() + ' the first again' + (touch ? '' : ' or press Enter') + ' to finish', b: 'Cancel' }; }
     }
     if (ed.shape && ed.editing) return { k: 'shape', t: 'Editing the shape', d: 'Drag a point · drag a + to add one · double-' + cl.toLowerCase() + ' a point to remove it', b: 'Done' };
     if (ed.editing) return { k: 'edit', t: 'Editing layout', d: touch ? 'Drag to move · drag a corner to resize · the green dot turns' : 'Drag to move · R turns · Del removes · Esc done', b: 'Done' };
@@ -301,7 +310,7 @@ export function initSitePlan(ctx) {
   // the pill's button: Cancel a tool, or Done with it (Side Street, parcels), shaping, or editing
   function leaveMode() {
     if (!ed) return;
-    if (ed.mode) { ed.mode = null; ed.draft = []; ed.hover = null; }
+    if (ed.mode) { ed.mode = null; ed.draft = []; ed.hover = null; ed.meas = null; ed.dp = null; ed.cursor = null; }
     else if (ed.shape) ed.shape = null;
     else ed.editing = false;
     draw(); panel();
@@ -366,7 +375,8 @@ export function initSitePlan(ctx) {
     if (f != null) { pl.front = f; pl.frontGuess = false; if (!pl.streetsSet) pl.streets = SP.streetsFromRoads(pl.ring, lines, f); save(P()); draw(); panel(); }
   }
 
-  function snapshot() { const pl = PL(); return clone({ zones: pl.zones || [], elements: pl.elements, front: pl.front, frontGuess: pl.frontGuess, streets: pl.streets || [], streetsSet: !!pl.streetsSet, setbacks: pl.setbacks, program: pl.program, ring: pl.ring, origin: pl.origin, src: pl.src, params: pl.params || null, recipe: pl.recipe || null, variant: pl.variant || null }); }
+  // what Undo puts back: the pieces and the site, and the option's name, its pro forma and its parcels (absent ones as null, so they're cleared too)
+  function snapshot() { const pl = PL(); return clone({ name: pl.name, pf: pl.pf || null, parcels: pl.parcels || null, parcel: pl.parcel || null, zones: pl.zones || [], elements: pl.elements, front: pl.front, frontGuess: pl.frontGuess, streets: pl.streets || [], streetsSet: !!pl.streetsSet, setbacks: pl.setbacks, program: pl.program, ring: pl.ring, origin: pl.origin, src: pl.src, params: pl.params || null, recipe: pl.recipe || null, variant: pl.variant || null }); }
   // a layout on the map that's been changed by hand or by Change With AI is "edited": new settings never replace it silently
   let applying = false;
   const markEdited = pl => { if (pl?.variant && !pl.variant.edited) pl.variant = { ...pl.variant, edited: true }; };
@@ -381,12 +391,20 @@ export function initSitePlan(ctx) {
   // say: the person asked (the buttons, ⌘Z / Ctrl+Y): a short toast with the way back ("Undone · Redo")
   function undo(back = true, say = false) {
     const pl = PL(), from = back ? ed.undo : ed.redo, to = back ? ed.redo : ed.undo; if (!pl || !from.length) { if (say) ctx.toast(back ? 'Nothing to undo.' : 'Nothing to redo.'); return; }
-    to.push(snapshot()); Object.assign(pl, from.pop()); if (ed.run) ed.pickedByUser = true; if (ed.sel && !pl.elements.some(e => e.id === ed.sel)) ed.sel = null; save(P()); draw(); panel();
+    to.push(snapshot()); Object.assign(pl, from.pop()); for (const k of ['pf', 'parcels', 'parcel']) if (pl[k] == null) delete pl[k];
+    if (ed.run) ed.pickedByUser = true; if (ed.sel && !pl.elements.some(e => e.id === ed.sel)) ed.sel = null; ed.multi = (ed.multi || []).filter(id => pl.elements.some(e => e.id === id));
+    save(P()); draw(); panel(); refreshFin();
     if (say) ctx.toast(back ? 'Undone.' : 'Redone.', { action: { label: back ? 'Redo' : 'Undo', run: () => { if (ed) undo(!back, true); } } });
   }
   // a piece deleted (the Delete key or button): the toast names it and can bring it back
-  function delEl(el) { const name = ED.labelOf(el), n = ed.undo.length; change(x => dropEl(x, el)); ed.sel = null; draw(); panel();
+  function delEl(el) { delEls([el.id]); }
+  function delEls(ids) { // one piece or a set: one undo step
+    const pl = PL(), list = ids.map(id => pl?.elements.find(e => e.id === id)).filter(Boolean); if (!list.length) return;
+    const name = list.length > 1 ? plural(list.length, 'piece') : ED.labelOf(list[0]), n = ed.undo.length; change(x => { for (const el of list) dropEl(x, el); }); ed.sel = null; ed.multi = []; draw(); panel();
     ctx.toast('Deleted ' + name + '.', { action: { label: 'Undo', run: () => { if (ed && ed.undo.length === n + 1) undo(true); } } }); }
+  // the pieces picked: the primary (ed.sel) alone, or the set it's part of (ed.multi, Shift-click or a box)
+  const sels = () => { const pl = ed && PL(); if (!pl || !ed.sel) return []; const ok = id => pl.elements.some(e => e.id === id); return ed.multi?.length > 1 && ed.multi.includes(ed.sel) ? ed.multi.filter(ok) : ok(ed.sel) ? [ed.sel] : []; };
+  const pickOne = id => { ed.sel = id; ed.multi = []; };
 
   // ---------- map layers ----------
   // Drawn bottom to top: the ground (lawn, paving, pieces, stalls), the setback, the trees, the site boundary over them
@@ -394,7 +412,7 @@ export function initSitePlan(ctx) {
   // (problems red, Phase 2 dashed, the selection green on white), the labels (the selected piece's always shows; parking
   // counts from zoom 17.5), then the drawing line, the hovered street edge and the handles. Colours come from one palette
   // (lib/planmap.mjs) in light or dark; a theme or basemap change rebuilds them all (onOverlays below).
-  const SRC = 'fs-sp', HSRC = 'fs-sp-h', DSRC = 'fs-sp-d', XSRC = 'fs-sp-x', EMPTY = { type: 'FeatureCollection', features: [] };
+  const SRC = 'fs-sp', HSRC = 'fs-sp-h', DSRC = 'fs-sp-d', XSRC = 'fs-sp-x', GRSRC = 'fs-sp-g', EMPTY = { type: 'FeatureCollection', features: [] };
   const coarse = () => matchMedia('(pointer:coarse)').matches; // fingers: bigger handles, a wider reach, the turn dot further out
   let ids = [], dimmed = null;
   function addLayers() {
@@ -402,12 +420,15 @@ export function initSitePlan(ctx) {
     const kind = k => ['==', ['get', 'k'], k], dark = ctx.isDark(), P = MAP.palette(dark), C = P.col, Ln = P.lines, Lb = P.label, big = coarse();
     const add = def => { map.addLayer(def); ids.push(def.id); };
     ids = []; dimmed = null;
-    map.addSource(SRC, { type: 'geojson', data: EMPTY }); map.addSource(HSRC, { type: 'geojson', data: EMPTY }); map.addSource(DSRC, { type: 'geojson', data: EMPTY }); map.addSource(XSRC, { type: 'geojson', data: EMPTY });
+    map.addSource(SRC, { type: 'geojson', data: EMPTY }); map.addSource(HSRC, { type: 'geojson', data: EMPTY }); map.addSource(DSRC, { type: 'geojson', data: EMPTY }); map.addSource(XSRC, { type: 'geojson', data: EMPTY }); map.addSource(GRSRC, { type: 'geojson', data: EMPTY }); gridKey = '';
+    const hatch = 'sp-hatch-' + (dark ? 'd' : 'l'); if (!map.hasImage(hatch)) { const n = 12, px = new Uint8Array(n * n * 4), [r, g, b] = [1, 3, 5].map(i => parseInt(Ln.keepout.slice(i, i + 2), 16)); // an easement's diagonal stripes
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const on = (x + y) % n < 2, i = (y * n + x) * 4; px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = on ? 200 : 0; } try { map.addImage(hatch, { width: n, height: n, data: px }); } catch (e) { /* plain fill below */ } }
     const sel1 = ['==', ['get', 'sel'], 1], ph2 = ['==', ['get', 'ph'], 2], bk = ['in', ['get', 'k'], ['literal', ['building', 'garage']]];
     const useCol = f => ['match', ['get', 'use'], ...Object.entries(P.use).map(([k, v]) => [k, f(v)]).flat(), f(C.building)];
     const bcol = f => ['case', ['==', ['get', 'bad'], 1], Ln.bad, ['==', ['get', 'k'], 'garage'], f(C.garage), ph2, useCol(c => f(P.p2(c))), useCol(f)];
     const id = c => c, lit = c => P.sel(c);
     add({ id: 'fs-sp-lot', type: 'fill', source: SRC, filter: ['all', kind('lot'), ['==', ['get', 'site'], 1]], paint: { 'fill-color': C.lawn, 'fill-opacity': P.lotOpacity } }); // the site is landscape under everything on it
+    add({ id: 'fs-sp-grid', type: 'line', source: GRSRC, minzoom: 17, paint: { 'line-color': dark ? 'rgba(255,255,255,.16)' : 'rgba(11,13,12,.13)', 'line-width': ['interpolate', ['linear'], ['zoom'], 17, 0.5, 20, 1] } }); // the grid, light, from street zoom
     add({ id: 'fs-sp-zone', type: 'line', source: SRC, filter: kind('zone'), layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.zone, 'line-width': 1.1, 'line-dasharray': [0.1, 2.6] } }); // dotted
     // paving is drawn once as a whole (one colour, one curb line round it); the pieces under it stay clear, and show
     // only when picked, so drives and parking rows read as one surface without seams or darker overlaps
@@ -424,6 +445,10 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-isl', type: 'fill', source: SRC, filter: kind('island'), paint: { 'fill-color': C.green, 'fill-opacity': .9 } });
     add({ id: 'fs-sp-ada', type: 'fill', source: SRC, filter: kind('ada'), minzoom: 16, paint: { 'fill-color': '#2f6db5', 'fill-opacity': .9 } });
     add({ id: 'fs-sp-mark', type: 'line', source: SRC, filter: kind('mark'), minzoom: 16, paint: { 'line-color': ['get', 'c'], 'line-width': ['get', 'w'], 'line-opacity': .95 } });
+    // easements: stripes over a faint red-grey wash and a dashed outline, so they never read as a setback line
+    add({ id: 'fs-sp-ko', type: 'fill', source: SRC, filter: kind('keepout'), paint: { 'fill-color': Ln.keepout, 'fill-opacity': ['case', sel1, .22, .12] } });
+    if (map.hasImage(hatch)) add({ id: 'fs-sp-koh', type: 'fill', source: SRC, filter: kind('keepout'), paint: { 'fill-pattern': hatch, 'fill-opacity': .9 } });
+    add({ id: 'fs-sp-kol', type: 'line', source: SRC, filter: kind('keepout'), paint: { 'line-color': Ln.keepout, 'line-width': 1.6, 'line-dasharray': [3, 2] } });
     add({ id: 'fs-sp-pl', type: 'line', source: SRC, filter: kind('pline'), paint: { 'line-color': Ln.parcel, 'line-width': 1, 'line-dasharray': [4, 3], 'line-opacity': .8 } });
     add({ id: 'fs-sp-sb', type: 'line', source: SRC, filter: kind('setback'), paint: { 'line-color': Ln.setback, 'line-width': 1.3, 'line-dasharray': [3, 2] } });
     add({ id: 'fs-sp-tree', type: 'fill-extrusion', source: SRC, filter: kind('tree'), minzoom: 15, paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .95 } }); // 3D trees: trunk, crown, top
@@ -455,19 +480,23 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-lab-p', type: 'symbol', source: SRC, minzoom: 17.5, filter: ['all', kind('label'), ['==', ['get', 'lp'], 1], ['!', sel1]], layout: { ...txt, 'text-allow-overlap': false }, paint: ink });
     add({ id: 'fs-sp-lab', type: 'symbol', source: SRC, filter: ['all', kind('label'), ['!=', ['get', 'lp'], 1], ['!', sel1]], layout: { ...txt, 'text-allow-overlap': false }, paint: ink });
     add({ id: 'fs-sp-lab-sel', type: 'symbol', source: SRC, filter: ['all', kind('label'), sel1], layout: { ...txt, 'text-allow-overlap': true }, paint: ink }); // always, and the others make way for it (it's on top, so placed first); as short as the others zoomed out, so it doesn't hide the outline it names
+    // a picked piece's width and depth along its edges, close in
+    add({ id: 'fs-sp-dim', type: 'symbol', source: SRC, minzoom: 17, filter: kind('dim'), layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], 17, 9.5, 20, 12], 'text-rotate': ['get', 'r'], 'text-rotation-alignment': 'map', 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { ...ink, 'text-color': Ln.sel } });
     // drawing: the line being drawn, the street edge under the pointer (Street Side, Side Street), the handles
     add({ id: 'fs-sp-hv', type: 'line', source: DSRC, filter: ['==', ['get', 'hv'], 1], layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.frontage, 'line-width': 9, 'line-opacity': .6 } });
-    add({ id: 'fs-sp-dl', type: 'line', source: DSRC, filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'hv'], 1]], paint: { 'line-color': Ln.accent, 'line-width': 2.5, 'line-dasharray': [2, 1.5] } });
-    add({ id: 'fs-sp-dp', type: 'circle', source: DSRC, filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': big ? 7 : 5, 'circle-color': Ln.accent, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
+    add({ id: 'fs-sp-mf', type: 'fill', source: DSRC, filter: ['==', ['get', 'k'], 'mfill'], paint: { 'fill-color': Ln.accent, 'fill-opacity': .14 } }); // an area being drawn or measured
+    add({ id: 'fs-sp-dl', type: 'line', source: DSRC, filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'hv'], 1]], paint: { 'line-color': Ln.accent, 'line-width': ['case', ['==', ['get', 'rb'], 1], 1.6, 2.5], 'line-dasharray': [2, 1.5] } });
+    add({ id: 'fs-sp-dp', type: 'circle', source: DSRC, filter: ['all', ['==', ['geometry-type'], 'Point'], ['!', ['has', 'k']]], paint: { 'circle-radius': big ? 7 : 5, 'circle-color': Ln.accent, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
+    add({ id: 'fs-sp-ml', type: 'symbol', source: DSRC, filter: ['in', ['get', 'k'], ['literal', ['mlab', 'mtot']]], layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': ['case', ['==', ['get', 'k'], 'mtot'], 13, 11], 'text-offset': ['case', ['==', ['get', 'k'], 'mtot'], ['literal', [0, -1.4]], ['literal', [0, 0]]], 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': Lb.ink, 'text-halo-color': Lb.halo, 'text-halo-width': 2 } }); // lengths, the total, the area
     const hr = big ? [10, 6, 9] : [7, 4, 6]; // the turn dot, a + point, a corner
     add({ id: 'fs-sp-h', type: 'circle', source: HSRC, paint: { 'circle-radius': ['case', ['==', ['get', 'r'], 1], hr[0], ['==', ['get', 'm'], 1], hr[1], hr[2]], 'circle-color': ['case', ['==', ['get', 'r'], 1], Ln.accent, ['==', ['get', 'm'], 1], '#9fd3ff', '#ffffff'], 'circle-opacity': ['case', ['==', ['get', 'm'], 1], .85, 1], 'circle-stroke-color': ['case', ['==', ['get', 'r'], 1], '#ffffff', '#0b0d0c'], 'circle-stroke-width': big ? 2 : 1.5 } }); // corners, the turn dot, and (editing a shape) points and + midpoints
     draw();
   }
   ctx.onOverlays?.(() => { for (const id of ids) if (map.getLayer(id)) map.removeLayer(id); ids = [];
-    for (const s of [SRC, HSRC, DSRC, XSRC]) if (map.getSource(s)) map.removeSource(s); if (map.getSource(GSRC)) { for (const id of ['fs-sp-ghost', 'fs-sp-ghost-f']) if (map.getLayer(id)) map.removeLayer(id); map.removeSource(GSRC); }
+    for (const s of [SRC, HSRC, DSRC, XSRC, GRSRC]) if (map.getSource(s)) map.removeSource(s); if (map.getSource(GSRC)) { for (const id of ['fs-sp-ghost', 'fs-sp-ghost-f']) if (map.getLayer(id)) map.removeLayer(id); map.removeSource(GSRC); }
     if (ed) { keySig = ''; addLayers(); hideMapBits(); } else if (resume) { const x = planOf(resume); if (x) ghost(x.pl); } });
   function handles(pl) {
-    const e = ed.editing && pl.elements.find(x => x.id === ed.sel); if (!e) return [];
+    const e = ed.editing && sels().length === 1 && pl.elements.find(x => x.id === ed.sel); if (!e || !T.editable(T.viewOf(pl), e)) return []; // one piece, on a layer that isn't hidden or locked
     if (ed.shape === e.id && e.poly) { const F = SP.frame(pl.origin), P = e.poly; // shape editing: every point, and a + between points to add one
       return P.map((p, i) => ({ i: 'v' + i, at: F.toLL(p), ft: p })).concat(P.map((p, i) => { const q = P[(i + 1) % P.length], m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; return { i: 'm' + i, at: F.toLL(m), ft: m }; })); }
     if (SP.isFree(e)) { const o = SP.outline(e), xs = o.map(p => p[0]), ys = o.map(p => p[1]), F = SP.frame(pl.origin); // curved pieces: corner handles scale the whole shape
@@ -488,17 +517,27 @@ export function initSitePlan(ctx) {
   function draw() {
     cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
       const pl = ed && PL(), s = map.getSource(SRC); if (!s) return;
-      const fc = pl?.ring.length >= 3 ? SP.planFeatures(pl, ed.sel, drag?.moved ? lastKeep : null) : EMPTY, P0 = P(); lastKeep = fc.keep || null; // mid-drag: last planting and checks
+      let fc = pl?.ring.length >= 3 ? SP.planFeatures(pl, ed.sel, drag?.moved ? lastKeep : null) : EMPTY; const P0 = P(); lastKeep = fc.keep || null; // mid-drag: last planting and checks
+      const set = fc !== EMPTY ? sels() : [];
+      if (set.length > 1) { const on = new Set(set); for (const f of fc.features) { const q = f.properties; if (q?.id != null && on.has(q.id)) q.sel = 1; } } // every piece of a set lit up
+      if (set.length === 1) { const one = pl.elements.find(e => e.id === set[0]), F = SP.frame(pl.origin); for (const d of T.dimLabels(one)) fc.features.push({ type: 'Feature', properties: { k: 'dim', t: d.text, r: d.rot, kind: one.kind }, geometry: { type: 'Point', coordinates: F.toLL(d.at) } }); } // its width and depth
       if (fc !== EMPTY) MAP.decorate(fc, pl, { flash: ed.flash?.ids }); // labels know their piece, priorities, Phase 2 labels (one pass)
       if (fc !== EMPTY && (pl.parcels?.length > 1 || ed.mode === 'parcels')) for (const k of pl.parcels || []) { const r = P0.parcels.find(x => x.key === k); if (r?.geometry) fc.features.push({ type: 'Feature', properties: { k: 'pline' }, geometry: r.geometry }); }
-      s.setData(fc);
+      const V = T.viewOf(pl); if (fc !== EMPTY) fc = T.visibleFeatures(fc, V); // hidden layers: the map only (numbers, checks and exports count everything)
+      s.setData(fc); drawGrid(pl, V);
       map.getSource(HSRC)?.setData(pl?.ring.length >= 3 ? { type: 'FeatureCollection', features: handles(pl).map(h => ({ type: 'Feature', properties: { r: h.i === 'r' ? 1 : 0, m: String(h.i)[0] === 'm' ? 1 : 0 }, geometry: { type: 'Point', coordinates: h.at } })) } : EMPTY);
-      const F = pl?.origin && SP.frame(pl.origin), d = ed?.mode === 'draw' && F ? ed.draft.map(F.toLL) : [], hv = F && ed.hover != null && (ed.mode === 'front' || ed.mode === 'street') && pl.ring.length >= 3 ? [pl.ring[ed.hover], pl.ring[(ed.hover + 1) % pl.ring.length]].filter(Boolean).map(F.toLL) : [];
-      map.getSource(DSRC)?.setData({ type: 'FeatureCollection', features: d.map(c => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } })).concat(d.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: d } }] : [], hv.length === 2 ? [{ type: 'Feature', properties: { hv: 1 }, geometry: { type: 'LineString', coordinates: hv } }] : []) });
+      drawD();
       // something picked: the other buildings step back (extrusion opacity is per layer, so it's set here, only on a change)
       const dim = !!(ed?.sel && pl?.elements.some(e => e.id === ed.sel)); if (dim !== dimmed && map.getLayer('fs-sp-bldg')) { dimmed = dim; map.setPaintProperty('fs-sp-bldg', 'fill-extrusion-opacity', dim ? .75 : .88); map.setPaintProperty('fs-sp-bldg2', 'fill-extrusion-opacity', dim ? .5 : .6); map.setPaintProperty('fs-sp-b3', 'fill-extrusion-opacity', dim ? .75 : .95); }
       if (!drag?.moved) planKey(pl); // never mid-drag
     });
+  }
+  // the grid (pl.view.grid): light lines square to the lot over the site's box, from street zoom (redrawn only on a change)
+  let gridKey = '';
+  function drawGrid(pl, V) {
+    const src = map.getSource(GRSRC); if (!src) return; const step = pl && pl.ring.length >= 3 ? V.grid : 0, key = step ? step + '|' + pl.origin + '|' + JSON.stringify(pl.ring) : '';
+    if (key === gridKey) return; gridKey = key; const F = step && SP.frame(pl.origin);
+    src.setData(step ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: T.gridLines(pl.ring, step, frameAngle(pl), 1200).map(l => l.map(F.toLL)) } }] } : EMPTY);
   }
   // the Plan key in the map's legend card: what this plan uses, Phase 1 and 2, the lines, Problem (rebuilt only when that changes)
   function planKey(pl) {
@@ -510,22 +549,34 @@ export function initSitePlan(ctx) {
   // ---------- pointer: select, move, resize, rotate ----------
   const ftAt = (pl, lngLat) => SP.frame(pl.origin).toFt([lngLat.lng, lngLat.lat]);
   const SHAPEABLE = ['building', 'plaza', 'green', 'pond', 'court', 'pool', 'patio', 'play', 'garage']; // pieces whose outline can be edited point by point
-  const ORDER = ['building', 'pool', 'court', 'play', 'plaza', 'pond', 'drive', 'truck', 'parking', 'trail', 'green'];
+  const ORDER = ['trash', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'pond', 'keepout', 'drive', 'truck', 'parking', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
   function hit(pl, e) {
     let best = null, bd = coarse() ? 22 : 12; for (const h of handles(pl)) { const p = map.project(h.at), dd = Math.hypot(p.x - e.point.x, p.y - e.point.y); if (dd < bd) { bd = dd; best = h; } } if (best) return { h: best.i }; // the nearest handle; a finger needs more room than a mouse
     const ft = ftAt(pl, e.lngLat);
-    for (const k of ORDER) { const el = pl.elements.slice().reverse().find(x => x.kind === k && SP.hitRect(x, ft)); if (el) return { el }; }
+    const V = T.viewOf(pl); // hidden and locked layers can't be picked
+    for (const k of ORDER) { const el = pl.elements.slice().reverse().find(x => x.kind === k && T.editable(V, x) && SP.hitRect(x, ft)); if (el) return { el }; }
     return null;
   }
   let drag = null;
+  // Shift-click: a piece in or out of the set (the last one picked is the primary)
+  function toggleSel(id) {
+    const cur = sels(), has = cur.includes(id), next = has ? cur.filter(x => x !== id) : cur.concat(id);
+    ed.multi = next.length > 1 ? next : []; ed.sel = has ? (ed.sel === id ? next[next.length - 1] || null : ed.sel) : id; ed.shape = null; draw(); panel();
+  }
   function down(e) {
     const pl = ed && PL(); if (!pl || ed.mode || ctx.view !== 'map' || pl.ring.length < 3) return;
     const oe = e.originalEvent; if (oe?.button > 0 || oe?.touches?.length > 1) return;
-    const h = hit(pl, e); if (!h) return;
-    if (!ed.editing) { if (h.el && ed.sel !== h.el.id) { ed.sel = h.el.id; panel(); draw(); } return; } // looking, not editing: a click selects and the map still pans
+    const h = hit(pl, e);
+    if (oe?.shiftKey && !(h && h.h != null)) { e.preventDefault(); // Shift: a piece in or out of the set, or a box drawn on open map (Edit or not)
+      drag = { type: 'box', p0: e.point, p1: e.point, moved: false, on: h?.el?.id ?? null }; // a click toggles the piece under it; a drag draws a box
+      return; }
+    if (!h) return;
+    if (!ed.editing) { if (h.el && (ed.sel !== h.el.id || sels().length > 1)) { pickOne(h.el.id); panel(); draw(); } return; } // looking, not editing: a click selects and the map still pans
     e.preventDefault(); // stops the map's own drag-to-pan for this press
     const el = h.el || pl.elements.find(x => x.id === ed.sel); if (!el) return;
-    if (h.el && ed.sel !== el.id) { ed.sel = el.id; panel(); draw(); }
+    const set = sels(); // a piece of the set: the whole set moves (each with what's attached to it)
+    if (h.el && h.h == null && set.length > 1 && set.includes(h.el.id)) { ed.sel = h.el.id; drag = { type: 'set', ids: T.withAttached(pl, set).map(x => x.id), id: el.id, from: ftAt(pl, e.lngLat), orig: clone(pl.elements), lead: clone(el), snap: snapshot(), moved: false }; return; }
+    if (h.el && (ed.sel !== el.id || set.length > 1)) { pickOne(el.id); panel(); draw(); }
     if (typeof h.h === 'string' && (h.h[0] === 'v' || h.h[0] === 'm')) { // a point of the shape (a + inserts one there first)
       let k = +h.h.slice(1); const snap = snapshot(); if (h.h[0] === 'm') { const P = el.poly, q = P[(k + 1) % P.length]; P.splice(k + 1, 0, [(P[k][0] + q[0]) / 2, (P[k][1] + q[1]) / 2]); k++; }
       drag = { type: 'vertex', k, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap, moved: h.h[0] === 'm' }; draw(); return; }
@@ -533,17 +584,27 @@ export function initSitePlan(ctx) {
     drag = { type: h.h == null ? 'move' : h.h === 'r' ? 'rot' : hs ? 'scale' : 'size', k: h.h, corner: hs?.ft, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false };
     if (drag.type === 'move') { const att = SP.attachedTo(pl, el); drag.att = att.map(a => ({ id: a.id, orig: clone(a) })); if (el.kind === 'building' || el.kind === 'garage') drag.obs = SP.spotObstacles(pl, el, att); } // what moves with it, and what it has to stay clear of
   }
+  // the grid, when it's on and Alt isn't held: where a point or a piece lands (a corner square with the grid, else its middle)
+  const gridOf = (pl, ev) => { const V = T.viewOf(pl); return V.grid && !ev?.altKey ? { step: V.grid, a: frameAngle(pl) } : null; };
+  const onGrid = (G, e) => { const sq = !SP.isFree(e) && Math.abs((((e.rot || 0) - G.a) % 90 + 135) % 90 - 45) < 1, c = sq ? SP.corners(e)[0] : [e.x, e.y], q = T.snapPt(c, G.step, G.a); return [q[0] - c[0], q[1] - c[1]]; };
   function move(e) {
+    if (drag?.type === 'box') { drag.p1 = e.point; drag.moved = drag.moved || Math.hypot(e.point.x - drag.p0.x, e.point.y - drag.p0.y) > 3; paintBox(); return; }
+    if (drag?.type === 'set') { // the set follows the pointer; with the grid on, the piece under the pointer lands on it
+      const pl = PL(); if (!pl) return; const p = ftAt(pl, e.lngLat), G = gridOf(pl, e.originalEvent); let dx = p[0] - drag.from[0], dy = p[1] - drag.from[1];
+      if (G) { const [sx, sy] = onGrid(G, SP.moveBy(clone(drag.lead), dx, dy)); dx += sx; dy += sy; }
+      pl.elements = T.moveSet({ elements: drag.orig }, drag.ids, dx, dy, false).elements; drag.moved = drag.moved || Math.hypot(dx, dy) > 0.5; draw(); return; }
     if (!drag) return; const pl = PL(), el = pl?.elements.find(x => x.id === drag.id); if (!el) return;
-    const p = ftAt(pl, e.lngLat), o = drag.orig; drag.moved = true;
+    const p = ftAt(pl, e.lngLat), o = drag.orig, V = T.viewOf(pl), G = gridOf(pl, e.originalEvent); drag.moved = true;
     if (drag.type === 'vertex') { // the point follows the pointer, lining up with its neighbours (within 3 ft, square to the piece) unless Alt is held
       const P = el.poly, n = P.length, k = drag.k, r = (el.rot || 0), loc = q => SP.rotPt(q, -r), back = q => SP.rotPt(q, r); let q = loc(p);
-      if (!e.originalEvent?.altKey) for (const nb of [P[(k - 1 + n) % n], P[(k + 1) % n]]) { const b = loc(nb); if (Math.abs(q[0] - b[0]) < 3) q = [b[0], q[1]]; if (Math.abs(q[1] - b[1]) < 3) q = [q[0], b[1]]; }
+      if (G) q = loc(T.snapPt(p, G.step, G.a)); else if (!e.originalEvent?.altKey && V.snap) for (const nb of [P[(k - 1 + n) % n], P[(k + 1) % n]]) { const b = loc(nb); if (Math.abs(q[0] - b[0]) < 3) q = [b[0], q[1]]; if (Math.abs(q[1] - b[1]) < 3) q = [q[0], b[1]]; }
       P[k] = back(q).map(v => +v.toFixed(2)); const c = SP.centroid(P); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2); draw(); readout(el); return;
     }
     if (drag.type === 'move') { // snaps to its neighbours' edges, stays out of the setbacks and (a building) off the drives and other buildings; hold Alt for a free move
       const free = e.originalEvent?.altKey, carry = () => (drag.att || []).map(a => pl.elements.find(x => x.id === a.id)).filter(Boolean);
-      if (SP.isFree(o)) Object.assign(el, SP.moveBy(clone(o), p[0] - drag.from[0], p[1] - drag.from[1])); else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); if (!free) { const [sx, sy] = SP.settleShift(pl, el); el.x = +(el.x + sx).toFixed(2); el.y = +(el.y + sy).toFixed(2); } }
+      if (SP.isFree(o)) { Object.assign(el, SP.moveBy(clone(o), p[0] - drag.from[0], p[1] - drag.from[1])); if (G) { const [sx, sy] = onGrid(G, el); SP.moveBy(el, sx, sy); } }
+      else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); if (G) { const [gx, gy] = onGrid(G, el); el.x = +(el.x + gx).toFixed(2); el.y = +(el.y + gy).toFixed(2); }
+        if (!free) { const [sx, sy] = SP.settleShift(pl, el, G || !V.snap ? 0 : 3); el.x = +(el.x + sx).toFixed(2); el.y = +(el.y + sy).toFixed(2); } } // lines up with its neighbours' edges unless the grid's on or edge snapping is off; always out of the setbacks
       const mv = () => { const dx = el.x - o.x, dy = el.y - o.y; for (const a of drag.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) Object.assign(t, SP.moveBy(clone(a.orig), dx, dy)); } };
       mv(); drag.blocked = false;
       if (!free && drag.obs) { const c = SP.clearSpot(pl, el, { carry: carry(), obs: drag.obs }); if (c) { if (c[0] || c[1]) { SP.moveBy(el, c[0], c[1]); mv(); } } else drag.blocked = true; } // the nearest clear spot to the pointer
@@ -555,13 +616,21 @@ export function initSitePlan(ctx) {
       Object.assign(el, { w: +w.toFixed(2), d: +d.toFixed(2), x: +(o.x + mid[0] * Math.cos(a) - mid[1] * Math.sin(a)).toFixed(2), y: +(o.y + mid[0] * Math.sin(a) + mid[1] * Math.cos(a)).toFixed(2) });
     } else {
       let r = Math.atan2(p[1] - o.y, p[0] - o.x) * 180 / Math.PI - 90; const base = frameAngle(pl);
-      if (!e.originalEvent?.shiftKey) { const rel = ((r - base) % 90 + 90) % 90; r = rel < 4 ? r - rel : rel > 86 ? r + 90 - rel : Math.round(r / 5) * 5; }
+      if (!e.originalEvent?.shiftKey && V.snap) { const rel = ((r - base) % 90 + 90) % 90; r = rel < 4 ? r - rel : rel > 86 ? r + 90 - rel : Math.round(r / 5) * 5; }
       el.rot = +(((r % 360) + 360) % 360).toFixed(2);
     }
     draw(); readout(el);
   }
-  function up() {
+  function up(ev) {
     if (!drag) return; const d = drag; drag = null;
+    if (d.type === 'box') { boxEl.hidden = true; const pl = PL(); if (!pl) return; if (!d.moved) { if (d.on != null) toggleSel(d.on); return; } // the pieces wholly inside the box join the set
+      const q = [[d.p0.x, d.p0.y], [d.p1.x, d.p0.y], [d.p1.x, d.p1.y], [d.p0.x, d.p1.y]].map(([x, y]) => ftAt(pl, map.unproject([x, y])));
+      const got = T.boxSelect(pl, q, T.viewOf(pl)); if (!got.length) { ctx.toast('No pieces wholly inside that box.'); return; }
+      const all = [...new Set([...sels(), ...got])]; ed.multi = all.length > 1 ? all : []; ed.sel = all.includes(ed.sel) ? ed.sel : got[0]; ed.shape = null; draw(); panel(); return; }
+    if (d.type === 'set') { const pl = PL(); if (!d.moved) { pickOne(d.id); draw(); panel(); return; } // a click on one of the set: just that piece
+      ed.undo.push(d.snap); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = []; markEdited(pl); handEdit();
+      for (const id of d.ids) { const el = pl.elements.find(x => x.id === id), o = d.orig.find(x => x.id === id); if (el && o) { if (el.kind === 'parking') delete el.ext; makeRoom(el, [o]); } }
+      pl.updated = new Date().toISOString(); save(P()); draw(); panel(); return; }
     if (!d.moved) return;
     ed.undo.push(d.snap); ed.redo = []; const pl = PL(), el = pl.elements.find(x => x.id === d.id); markEdited(pl); handEdit();
     if (el) { el.pinned = true; if (el.kind === 'parking') delete el.ext; /* placed by hand: this is its length now */
@@ -570,11 +639,14 @@ export function initSitePlan(ctx) {
     if (d.blocked) ctx.toast('No clear spot there: it overlaps a drive or another building. Hold Alt (Option) to place it anyway.');
     pl.updated = new Date().toISOString(); save(P()); draw(); panel();
   }
+  const boxEl = document.createElement('div'); boxEl.className = 'sp-box'; boxEl.hidden = true; map.getContainer().appendChild(boxEl);
+  function paintBox() { const d = drag; if (!d || d.type !== 'box' || !d.moved) return; Object.assign(boxEl.style, { left: Math.min(d.p0.x, d.p1.x) + 'px', top: Math.min(d.p0.y, d.p1.y) + 'px', width: Math.abs(d.p1.x - d.p0.x) + 'px', height: Math.abs(d.p1.y - d.p0.y) + 'px' }); boxEl.hidden = false; }
   map.on('mousedown', down); map.on('touchstart', down); map.on('mousemove', move); map.on('touchmove', move); map.on('mouseup', up); map.on('touchend', up);
   window.addEventListener('mouseup', up);
   map.on('mousemove', e => { // cursor feedback
     const pl = ed && PL(); if (!pl || drag || ctx.view !== 'map') return;
     const c = map.getCanvas(); if (ed.mode) { c.style.cursor = 'crosshair';
+      if (ed.mode === 'draw' || ed.mode === 'drawpiece' || ed.mode === 'measure') { ed.cursor = clickFt(pl, e, ed.mode !== 'measure'); drawD(); } // the line on to the pointer
       if ((ed.mode === 'front' || ed.mode === 'street') && pl.ring.length >= 3) { const k = SP.nearestEdge(pl.ring, ftAt(pl, e.lngLat)); if (k !== ed.hover) { ed.hover = k; draw(); } } // the lot edge a click would pick, in orange
       return; }
     const h = pl.ring.length >= 3 && hit(pl, e); c.style.cursor = !h ? '' : h.h === 'r' ? 'grab' : h.h != null ? 'nwse-resize' : 'move';
@@ -582,13 +654,21 @@ export function initSitePlan(ctx) {
   const frameAngle = pl => pl.ring.length >= 3 ? SP.mainAngle(pl.ring) : 0; // the lot's main lines: new pieces square up with them
 
   // clicks while the plan is open: draw the boundary, pick the street side, or select; never open other cards
+  const nearFirst = (pl, pts, e) => { if (pts.length < 3) return false; const q = map.project(SP.frame(pl.origin).toLL(pts[0])); return Math.hypot(q.x - e.point.x, q.y - e.point.y) < 14; };
   ctx.mapClickHandlers.unshift(e => {
     const pl = ed && PL(); if (!pl) return false;
     if (ed.mode === 'draw') {
-      const F = SP.frame(pl.origin), p = F.toFt([e.lngLat.lng, e.lngLat.lat]), first = ed.draft[0] && map.project(F.toLL(ed.draft[0]));
-      if (first && ed.draft.length >= 3 && Math.hypot(first.x - e.point.x, first.y - e.point.y) < 14) finishDraw(); else { ed.draft.push(p); draw(); panel(); }
+      if (nearFirst(pl, ed.draft, e)) finishDraw(); else { ed.draft.push(clickFt(pl, e, true)); draw(); panel(); }
       return true;
     }
+    if (ed.mode === 'drawpiece') { // an area (the first point again closes it) or a line
+      if (!ed.dp.line && nearFirst(pl, ed.draft, e)) finishPiece(); else { ed.draft.push(clickFt(pl, e, true)); drawD(); paintMode(); }
+      return true;
+    }
+    if (ed.mode === 'measure') { const M = ed.meas; // a distance (points along a line) or an area (the first point again closes it)
+      if (M.done) { M.pts = []; M.done = false; }
+      if (M.kind === 'area' && nearFirst(pl, M.pts, e)) M.done = true; else M.pts.push(clickFt(pl, e, false));
+      drawD(); paintMode(); return true; }
     if (ed.mode === 'parcels') { pickParcel(e.lngLat); return true; }
     if (ed.mode === 'front') { const p = ftAt(pl, e.lngLat); change(x => { x.front = SP.nearestEdge(x.ring, p); x.frontGuess = false; }); ed.mode = null; panel(); return true; }
     if (ed.mode === 'entrance') { // a driveway in from the street where the lot line was clicked
@@ -599,11 +679,14 @@ export function initSitePlan(ctx) {
       draw(); panel(); ctx.toast(r.entrance.name + ' added.' + (r.note ? ' ' + r.note : '')); return true;
     }
     if (ed.mode === 'street') { const p = ftAt(pl, e.lngLat); change(x => { const k = SP.nearestEdge(x.ring, p), st = new Set(x.streets || []); if (k !== (x.front ?? SP.longestEdge(x.ring))) { if (st.has(k)) st.delete(k); else st.add(k); } x.streets = [...st]; x.streetsSet = true; }); return true; } // a side street on or off; it stays armed for the next one until Done
-    if (!hit(pl, e) && ed.sel) { ed.sel = null; draw(); panel(); }
+    if (e.originalEvent?.shiftKey) return true; // Shift-clicks build the set (pointer down)
+    if (!hit(pl, e) && ed.sel) { pickOne(null); ed.shape = null; draw(); panel(); }
     return true;
   });
   map.on('dblclick', e => {
     if (ed?.mode === 'draw') { e.preventDefault(); finishDraw(); return; }
+    if (ed?.mode === 'drawpiece') { e.preventDefault(); finishPiece(); return; }
+    if (ed?.mode === 'measure') { e.preventDefault(); finishMeasure(); return; }
     const pl = ed?.editing && ed.shape && PL(), el = pl?.elements.find(x => x.id === ed.shape); if (!el?.poly || el.poly.length <= 3) return;
     const h = hit(pl, e); if (typeof h?.h === 'string' && h.h[0] === 'v') { e.preventDefault(); change(() => { el.poly.splice(+h.h.slice(1), 1); const c = SP.centroid(el.poly); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2); }); draw(); } // a point removed
   });
@@ -643,33 +726,228 @@ export function initSitePlan(ctx) {
     ed.mode = null; ed.draft = []; draw(); panel(); map.once('idle', () => PL() === pl && detectFront(pl));
   }
 
+  // ---------- tools: measure, draw an area or a line, fit, the grid, layers ----------
+  // A point clicked on the map, in plan feet (on the grid when it's on, unless Alt is held)
+  const clickFt = (pl, e, snap) => { const p = ftAt(pl, e.lngLat), G = snap && gridOf(pl, e.originalEvent); return G ? T.snapPt(p, G.step, G.a) : p.map(v => +v.toFixed(2)); };
+  const dedupe = pts => pts.filter((p, i) => !i || Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) > 0.5); // a double-click's second point
+  // Measure: click points (a distance, with each segment's length and the total) or round an area (sq ft and acres).
+  // Nothing is saved; the measurement stays until you leave measuring (Esc, Done or the tool again).
+  function startMeasure(kind) {
+    if (!ed || !(PL()?.ring.length >= 3)) return; if (ed.mode === 'measure' && ed.meas?.kind === kind) { leaveMode(); return; }
+    ed.mode = 'measure'; ed.meas = { kind, pts: [], done: false }; ed.draft = []; ed.cursor = null; closePops(); draw(); panel();
+  }
+  function finishMeasure() { const M = ed?.meas; if (!M) return; M.pts = dedupe(M.pts); if (M.pts.length >= (M.kind === 'area' ? 3 : 2)) M.done = true; drawD(); paintMode(); }
+  // Draw an area (lawn, plaza, pond, an easement) or a line (a drive, a walk) point by point, like the site's outline
+  function startDrawPiece(kind) {
+    const pl = PL(); if (!pl || pl.ring.length < 3) return; if (!ed.editing) { ctx.toast('Turn on Edit to draw.'); return; }
+    const L = T.LINE_KINDS.find(x => x[0] === kind), A = T.AREA_KINDS.find(x => x[0] === kind); if (!L && !A) return;
+    ed.mode = 'drawpiece'; ed.dp = { kind, line: !!L, width: L ? L[2] : 0, label: (L || A)[1] }; ed.draft = []; ed.cursor = null; pickOne(null); ed.shape = null; closePops(); draw(); panel();
+  }
+  function finishPiece() {
+    const pl = PL(), D = ed?.dp; if (!pl || !D) return; const pts = dedupe(ed.draft); ed.draft = pts;
+    const err = D.line ? T.lineError(pl, pts) : T.areaError(pl, pts, D.kind); if (err) { ctx.toast(err); drawD(); return; }
+    const e = D.line ? T.linePiece(pl, D.kind, pts, uid(), D.width) : T.areaPiece(pl, D.kind, pts, uid());
+    change(x => { x.elements.push(e); makeRoom(e); }); // one undo step; parking under a drawn drive, pond or plaza gives way (an easement leaves it, flagged)
+    ed.mode = null; ed.dp = null; ed.draft = []; ed.cursor = null; pickOne(e.id); draw(); panel();
+    ctx.toast((e.name || D.label) + ' added.' + (e.kind === 'keepout' ? ' Anything built or paved on it shows as a problem; Re-fit Plan lays the rest out around it.' : ''));
+  }
+  // the drawing line, the measurement and the street edge under the pointer (fs-sp-d), on their own: the pointer moving
+  // redraws only these, never the plan
+  let rafD = 0;
+  function drawD() { cancelAnimationFrame(rafD); rafD = requestAnimationFrame(() => {
+    const pl = ed && PL(), src = map.getSource(DSRC); if (!src) return; const F = pl?.origin && SP.frame(pl.origin), feats = [];
+    if (F) {
+      const pt = (c, props = {}) => feats.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: F.toLL(c) } });
+      const line = (cs, props = {}) => { if (cs.length > 1) feats.push({ type: 'Feature', properties: props, geometry: { type: 'LineString', coordinates: cs.map(F.toLL) } }); };
+      const fill = cs => feats.push({ type: 'Feature', properties: { k: 'mfill' }, geometry: { type: 'Polygon', coordinates: [cs.concat([cs[0]]).map(F.toLL)] } });
+      const live = ed.cursor && ['draw', 'drawpiece', 'measure'].includes(ed.mode) ? ed.cursor : null;
+      if (ed.mode === 'draw' || ed.mode === 'drawpiece') { const d = ed.draft, area = ed.mode === 'draw' || !ed.dp?.line;
+        if (area && d.length >= 3) fill(d); d.forEach(c => pt(c)); line(d); if (live && d.length) line([d[d.length - 1], live], { rb: 1 });
+        if (ed.mode === 'drawpiece') { for (const l of T.measureLabels(d)) pt(l.at, { k: 'mlab', t: l.text }); if (area && d.length >= 3) pt(SP.centroid(d), { k: 'mtot', t: T.fmtArea(T.polyArea(d)) }); }
+      }
+      if (ed.mode === 'measure' && ed.meas) { const M = ed.meas, Q = M.pts, closed = M.kind === 'area' && M.done;
+        if (M.kind === 'area' && Q.length >= 3) fill(Q); Q.forEach(c => pt(c)); line(closed ? Q.concat([Q[0]]) : Q);
+        if (live && !M.done && Q.length) line([Q[Q.length - 1], live], { rb: 1 });
+        for (const l of T.measureLabels(Q, closed)) pt(l.at, { k: 'mlab', t: l.text });
+        if (M.kind === 'dist' && Q.length > 1) pt(Q[Q.length - 1], { k: 'mtot', t: 'Total ' + T.fmtFt(T.pathLen(Q)) });
+        if (M.kind === 'area' && Q.length >= 3) pt(SP.centroid(Q), { k: 'mtot', t: T.fmtArea(T.polyArea(Q)) });
+      }
+      if (ed.hover != null && (ed.mode === 'front' || ed.mode === 'street') && pl.ring.length >= 3) line([pl.ring[ed.hover], pl.ring[(ed.hover + 1) % pl.ring.length]].filter(Boolean), { hv: 1 });
+    }
+    src.setData({ type: 'FeatureCollection', features: feats });
+  }); }
+  // the camera on some points (lon/lat) in the open part of the map, as the plan's own fit does
+  function fitLL(ll, maxZoom = 19) {
+    const xs = ll.map(p => p[0]), ys = ll.map(p => p[1]); if (map.getPitch() > 1) map.jumpTo({ pitch: 0 });
+    const f = freeRect({ key: !phone(), aspect: aspectOf(ll) }), padding = fitPadding(f, f.m, phone() ? 14 : 40);
+    ctx.fitBox([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding, maxZoom });
+  }
+  // F: the selection in view (the whole plan when nothing is picked); Shift+F: the plan
+  function fitSel() {
+    const pl = PL(), set = sels(); if (!pl || !set.length) { planFit(); return; }
+    const b = T.bboxOf(pl.elements.filter(e => set.includes(e.id))), F = SP.frame(pl.origin); if (!b) return;
+    const pad = Math.max(30, (b[2] - b[0] + b[3] - b[1]) * 0.08); fitLL([[b[0] - pad, b[1] - pad], [b[2] + pad, b[1] - pad], [b[2] + pad, b[3] + pad], [b[0] - pad, b[3] + pad]].map(F.toLL), 20);
+  }
+  // the view settings (pl.view: the grid, edge snapping, hidden and locked layers): saved with the option, not undone
+  function setView(fn) { const pl = PL(); if (!pl) return; const v = T.viewOf(pl); fn(v); pl.view = v; save(P()); if (ed.sel && !sels().some(id => T.editable(v, pl.elements.find(e => e.id === id)))) { pickOne(null); panel(); } draw(); paintTools(); paintLayers(); }
+  const toggleGrid = () => setView(v => { v.grid = v.grid ? 0 : v.lastGrid || 10; });
+  function setEditing(on) { if (!ed) return; if (!on && ed.mode === 'drawpiece') { ed.mode = null; ed.draft = []; ed.dp = null; } ed.editing = on; if (!on) ed.shape = null; draw(); panel(); }
+
+  // ----- the tool strip: a small bar at the bottom left of the open map, clear of the Plan key and the scale -----
+  const IC = (d, extra = '') => '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + extra + '>' + d + '</svg>';
+  const TOOLS = [
+    { id: 'select', label: 'Select', key: 'V', ic: IC('<path d="M3.5 2.5l9 5.2-4 .9-2.1 3.9z"/>') },
+    { id: 'edit', label: 'Edit', key: 'E', ic: IC('<path d="M2.5 13.5l.6-3L10.8 2.8a1.5 1.5 0 0 1 2.1 0l.3.3a1.5 1.5 0 0 1 0 2.1L5.5 12.9z"/><path d="M9.5 4l2.5 2.5"/>') },
+    0,
+    { id: 'area', label: 'Draw area', key: '', ic: IC('<path d="M2.5 11.5l2-8 8 2-1.5 7.5z" stroke-dasharray="2 1.6"/><circle cx="4.5" cy="3.5" r="1.2" fill="currentColor"/>'), more: 1 },
+    { id: 'line', label: 'Draw line', key: '', ic: IC('<path d="M2.5 13l4-6 3 3 4-7"/>'), more: 1 },
+    0,
+    { id: 'dist', label: 'Measure distance', key: 'M', ic: IC('<path d="M1.5 10.5l9-9 4 4-9 9z"/><path d="M4.5 7.5l1.5 1.5M6.5 5.5l1.5 1.5M8.5 3.5l1.5 1.5"/>') },
+    { id: 'marea', label: 'Measure area', key: '⇧M', ic: IC('<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M2.5 6.5h4v-4M13.5 9.5h-4v4" />'), more: 1 },
+    0,
+    { id: 'fit', label: 'Fit plan', key: '⇧F', ic: IC('<path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5"/>') },
+    { id: 'fitsel', label: 'Fit selection', key: 'F', ic: IC('<path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5"/><rect x="5.5" y="5.5" width="5" height="5" rx=".8"/>'), more: 1 },
+    0,
+    { id: 'grid', label: 'Grid', key: 'G', ic: IC('<path d="M2.5 5.5h11M2.5 10.5h11M5.5 2.5v11M10.5 2.5v11"/>'), more: 1 },
+    0,
+    { id: 'layers', label: 'Layers', key: '', ic: IC('<path d="M8 2.5l6 3-6 3-6-3z"/><path d="M2 8.5l6 3 6-3"/><path d="M2 11.2l6 3 6-3"/>') },
+    { id: 'more', label: 'More tools', key: '', ic: IC('<circle cx="3.5" cy="8" r=".9" fill="currentColor"/><circle cx="8" cy="8" r=".9" fill="currentColor"/><circle cx="12.5" cy="8" r=".9" fill="currentColor"/>'), phone: 1 }
+  ];
+  const strip = document.createElement('div'); strip.className = 'sp-strip'; strip.setAttribute('role', 'toolbar'); strip.setAttribute('aria-label', 'Plan tools');
+  strip.innerHTML = '<div class="sp-tgrp">' + TOOLS.map(t => !t ? '</div><div class="sp-tgrp">' : '<button type="button" class="sp-tb' + (t.more ? ' sp-tb-x' : '') + (t.phone ? ' sp-tb-more' : '') + '" data-tool="' + t.id + '" aria-label="' + t.label + '">' + t.ic + '</button>').join('') + '</div>';
+  const pop = document.createElement('div'); pop.className = 'sp-tpop'; pop.hidden = true; pop.setAttribute('role', 'dialog');
+  mapUi.append(strip, pop);
+  strip.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { if (!b.getAttribute('aria-disabled')) runTool(b.dataset.tool, b); });
+  function runTool(id, b) {
+    if (!ed) return;
+    if (id === 'select') { if (ed.mode) leaveMode(); setEditing(false); }
+    else if (id === 'edit') setEditing(!ed.editing);
+    else if (id === 'area' || id === 'line') { if (ed.mode === 'drawpiece' && ed.dp?.line === (id === 'line')) { leaveMode(); return; } openPop(id, b); }
+    else if (id === 'dist') startMeasure('dist'); else if (id === 'marea') startMeasure('area');
+    else if (id === 'fit') planFit(); else if (id === 'fitsel') fitSel();
+    else if (id === 'grid') toggleGrid();
+    else if (id === 'layers') { if (popKind === 'layers') closePops(); else openPop('layers', b); }
+    else if (id === 'more') { strip.classList.toggle('open'); paintTools(); }
+    paintTools();
+  }
+  // each button: pressed when its tool is on, and when it can't be used, why (in its tooltip)
+  function paintTools() {
+    if (!ed) return; const pl = PL(), has = !!pl?.elements.length, ring = pl?.ring.length >= 3, V = T.viewOf(pl), m = ed.mode;
+    const state = {
+      select: [!ed.editing && !m, ring ? '' : 'Draw the site first'], edit: [!!ed.editing, ring && has ? '' : 'Lay something out first'],
+      area: [m === 'drawpiece' && !ed.dp?.line, !ring ? 'Draw the site first' : ed.editing ? '' : 'Turn on Edit to draw'], line: [m === 'drawpiece' && !!ed.dp?.line, !ring ? 'Draw the site first' : ed.editing ? '' : 'Turn on Edit to draw'],
+      dist: [m === 'measure' && ed.meas?.kind === 'dist', ring ? '' : 'Draw the site first'], marea: [m === 'measure' && ed.meas?.kind === 'area', ring ? '' : 'Draw the site first'],
+      fit: [null, ring ? '' : 'Draw the site first'], fitsel: [null, sels().length ? '' : 'Select a piece first'],
+      grid: [!!V.grid, ring ? '' : 'Draw the site first'], layers: [popKind === 'layers', ring ? '' : 'Draw the site first'], more: [strip.classList.contains('open'), '']
+    };
+    for (const t of TOOLS) { if (!t) continue; const b = strip.querySelector('[data-tool="' + t.id + '"]'), [on, why] = state[t.id];
+      if (on != null) b.setAttribute('aria-pressed', String(!!on)); b.classList.toggle('on', !!on);
+      if (why) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
+      const name = t.id === 'grid' && V.grid ? 'Grid (' + V.grid + ' ft)' : t.id === 'edit' && ed.editing ? 'Stop editing' : t.label;
+      b.title = name + (t.key ? ' (' + t.key + ')' : '') + (why ? ': ' + why : ''); b.setAttribute('aria-label', name); }
+    strip.hidden = !ring; placeStrip();
+  }
+  // where the strip sits: the bottom left of the open map; past the Plan key when that's there, else above it. On phones
+  // the bottom of the map holds the folded key, the scale and the sheet: the strip goes top left, the mode pill under it
+  function placeStrip() {
+    if (mapUi.hidden || strip.hidden) return;
+    if (phone()) { Object.assign(strip.style, { left: '8px', top: '8px', bottom: 'auto' }); if (popKind) placePop(); return; } strip.style.top = '';
+    const u = mapUi.getBoundingClientRect(), lg = document.getElementById('legends'), sc = mapUi.querySelector('.sp-scale')?.getBoundingClientRect();
+    const L = lg && lg.offsetParent !== null && getComputedStyle(lg).visibility !== 'hidden' ? lg.getBoundingClientRect() : null, w = strip.offsetWidth, h = strip.offsetHeight, gap = 10;
+    let left = gap, bottom = gap;
+    if (L && L.width > 2 && L.bottom > u.bottom - h - gap * 2 && L.left < u.left + w + gap) { // the Plan key is in that corner
+      const after = L.right - u.left + gap, room = (sc && sc.width ? sc.left - u.left - gap : u.width - gap) - after;
+      if (room >= w) left = after; else bottom = Math.max(gap, u.bottom - L.top + gap);
+    }
+    strip.style.left = Math.round(left) + 'px'; strip.style.bottom = Math.round(bottom) + 'px'; if (popKind) placePop();
+  }
+  if (window.ResizeObserver) { const lro = new ResizeObserver(() => { if (ed) placeStrip(); }), watchKey = () => { const lg = document.getElementById('legends'); if (lg) lro.observe(lg); else setTimeout(watchKey, 1000); }; watchKey(); } // the Plan key folds and unfolds
+  // the pop-overs from the strip: what to draw, and Layers
+  let popKind = null, popBtn = null;
+  function openPop(kind, b) { popKind = kind; popBtn = b; pop.hidden = false; pop.dataset.kind = kind; if (kind === 'layers') paintLayers(); else paintChooser(kind); placePop(); paintTools(); pop.querySelector('button, input')?.focus({ preventScroll: true }); }
+  function closePops() { const was = popKind; popKind = null; pop.hidden = true; pop.innerHTML = ''; if (was) { paintTools(); if (popBtn && document.activeElement && pop.contains(document.activeElement)) popBtn.focus(); } }
+  const closeChooser = closePops;
+  function placePop() { if (!popKind || !popBtn) return; const u = mapUi.getBoundingClientRect(), b = popBtn.getBoundingClientRect(), s = strip.getBoundingClientRect();
+    pop.classList.toggle('ph', phone()); if (phone()) { Object.assign(pop.style, { left: Math.round(Math.max(8, Math.min(b.left, innerWidth - pop.offsetWidth - 8))) + 'px', top: Math.round(s.bottom + 6) + 'px', bottom: 'auto', maxHeight: Math.round(innerHeight - s.bottom - 90) + 'px' }); return; } pop.style.top = ''; // phones: under the strip, over the sheet
+    pop.style.left = Math.round(Math.max(6, Math.min(b.left - u.left, u.width - pop.offsetWidth - 6))) + 'px'; pop.style.bottom = Math.round(u.bottom - s.top + 6) + 'px'; pop.style.maxHeight = Math.max(120, Math.round(s.top - u.top - 12)) + 'px'; }
+  function paintChooser(kind) {
+    const list = kind === 'line' ? T.LINE_KINDS.map(([k, l, w]) => [k, l, w + ' ft wide']) : T.AREA_KINDS.map(([k, l]) => [k, l, k === 'keepout' ? 'Nothing built or paved on it' : '']);
+    pop.innerHTML = '<div class="sp-tp-h">' + (kind === 'line' ? 'Draw a line' : 'Draw an area') + '</div>' + list.map(([k, l, sub]) => '<button type="button" class="sp-tp-i" data-dk="' + k + '"><i class="sp-tp-sw k-' + k + '" aria-hidden="true"></i><span>' + esc(l) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span></button>').join('') +
+      '<div class="sp-tp-n">' + (kind === 'line' ? 'Click points along it; Enter or double-click finishes.' : 'Click each corner; click the first again or press Enter to close it.') + ' Backspace takes a point back, Esc cancels.</div>';
+    pop.querySelectorAll('[data-dk]').forEach(b => b.onclick = () => startDrawPiece(b.dataset.dk));
+  }
+  const EYE = on => on ? IC('<path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>') : IC('<path d="M2 2l12 12M6.4 3.8A6.8 6.8 0 0 1 8 3.5C12.1 3.5 14.5 8 14.5 8a11 11 0 0 1-1.9 2.5M10.6 10.9A5.6 5.6 0 0 1 8 12.5C3.9 12.5 1.5 8 1.5 8a11.5 11.5 0 0 1 2.6-3"/>');
+  const LOCKI = on => on ? IC('<rect x="3.5" y="7" width="9" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>') : IC('<rect x="3.5" y="7" width="9" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1"/>');
+  function paintLayers() {
+    if (popKind !== 'layers' || !ed) return; const pl = PL(), V = T.viewOf(pl), f = document.activeElement && pop.contains(document.activeElement) ? document.activeElement.dataset.f : null;
+    pop.innerHTML = '<div class="sp-tp-h">Layers</div><div class="sp-lrows">' + T.LAYERS.map(L => { const hid = V.hidden.includes(L.id), lk = V.locked.includes(L.id);
+      return '<div class="sp-lrow' + (hid ? ' off' : '') + '"><span>' + esc(L.label) + (L.id === 'trees' ? '<small>On the map only; Trees under Draw takes them off the plan and the PDF</small>' : '') + '</span>' +
+        '<button type="button" class="sp-lb" data-f="eye:' + L.id + '" aria-pressed="' + !hid + '" aria-label="' + (hid ? 'Show ' : 'Hide ') + esc(L.label) + '" title="' + (hid ? 'Show' : 'Hide') + ' on the map">' + EYE(!hid) + '</button>' +
+        (T.lockable(L) ? '<button type="button" class="sp-lb" data-f="lock:' + L.id + '" aria-pressed="' + lk + '" aria-label="' + (lk ? 'Unlock ' : 'Lock ') + esc(L.label) + '" title="' + (lk ? 'Locked: can’t be picked or moved' : 'Lock so it can’t be picked or moved') + '">' + LOCKI(lk) + '</button>' : '<span class="sp-lb-x"></span>') + '</div>'; }).join('') + '</div>' +
+      '<div class="sp-tp-sub">Grid <span class="sp-seg" role="group" aria-label="Grid">' + [[0, 'Off'], [5, '5 ft'], [10, '10 ft']].map(([g, l]) => '<button type="button" data-f="grid:' + g + '" aria-pressed="' + (V.grid === g) + '">' + l + '</button>').join('') + '</span></div>' +
+      '<label class="sp-tp-sw2"><input type="checkbox" data-f="snap"' + (V.snap ? ' checked' : '') + '><span>Snap to edges<small>Lines pieces up with their neighbours; hold Alt to move freely</small></span></label>' +
+      '<div class="sp-tp-n">Exports always include every layer.</div>';
+    pop.querySelectorAll('[data-f]').forEach(b => b[b.type === 'checkbox' ? 'onchange' : 'onclick'] = () => { const [k, v] = b.dataset.f.split(':');
+      setView(x => { if (k === 'eye') x.hidden = x.hidden.includes(v) ? x.hidden.filter(q => q !== v) : x.hidden.concat(v); else if (k === 'lock') x.locked = x.locked.includes(v) ? x.locked.filter(q => q !== v) : x.locked.concat(v); else if (k === 'grid') { x.grid = +v; if (+v) x.lastGrid = +v; } else if (k === 'snap') x.snap = b.checked; }); });
+    if (f) pop.querySelector('[data-f="' + f + '"]')?.focus({ preventScroll: true });
+  }
+  document.addEventListener('pointerdown', e => { if (popKind && !pop.contains(e.target) && !strip.contains(e.target)) closePops(); }, true);
+
+  // ----- the save status in the header: on this device, synced with the team, or a failed sync with Retry -----
+  const saveSt = { kind: 'local', at: 0 };
+  function paintSave() {
+    const el = ed && card.querySelector('#spSave'); if (!el) return;
+    const html = saveSt.kind === 'failed' ? 'Sync failed · <button type="button" class="sp-link" data-retry>Retry</button>' : saveSt.kind === 'synced' ? 'Synced with team · ' + T.ago(Date.now() - saveSt.at) : saveSt.at ? 'Saved on this device' : '';
+    if (el.innerHTML !== html) { el.innerHTML = html; const r = el.querySelector('[data-retry]'); if (r) r.onclick = () => { saveSt.kind = 'local'; paintSave(); sync(); }; }
+    el.classList.toggle('bad', saveSt.kind === 'failed'); el.title = saveSt.kind === 'synced' ? 'Saved in this browser and shared with the team' : saveSt.kind === 'failed' ? 'Saved in this browser; the team copy didn’t update' : 'Saved in this browser';
+  }
+  setInterval(() => { if (ed && saveSt.kind === 'synced') paintSave(); }, 30000);
+
+  // keys while a plan is open on the map. Never while typing in a field (or with a list open); a focused button keeps
+  // Enter and Space. Tools: V select, E edit, M measure (Shift: an area), F fit the selection (Shift: the plan), G grid,
+  // ⌘D / Ctrl+D copy; with Edit on, arrows nudge, R turns, Delete removes (the whole set when several are picked)
   document.addEventListener('keydown', e => {
     const pl = ed && PL(), typing = /^(TEXTAREA)$/.test(e.target.tagName) || e.target.tagName === 'INPUT' && !/^(checkbox|radio|button|range)$/.test(e.target.type) || e.target.isContentEditable;
     if (pl && ctx.view === 'map' && !typing && (e.metaKey || e.ctrlKey) && /^[zy]$/i.test(e.key)) { e.preventDefault(); e.stopPropagation(); undo(e.key.toLowerCase() === 'z' ? !e.shiftKey : false, true); return; } // undo and redo work whatever button was last clicked
     if (pl && ctx.view === 'map' && e.key === 'Escape' && card.classList.contains('sp-mode') && e.target.tagName !== 'SELECT') { escStep(e, typing); return; }
-    if (!pl || ctx.view !== 'map' || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    if (!pl || ctx.view !== 'map' || typing || e.target.tagName === 'SELECT' || e.isComposing) return;
+    if (e.target.tagName === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return; // the button's own
+    if (document.querySelector('#settingsSheet:not([hidden]), .app.sel-open, #layers.on')) return;
     const used = () => { e.preventDefault(); e.stopPropagation(); };
-    const k = e.key, el = pl.elements.find(x => x.id === ed.sel), mod = e.metaKey || e.ctrlKey;
-    if (mod && k.toLowerCase() === 'z') { used(); undo(!e.shiftKey, true); return; }
-    if (mod && k.toLowerCase() === 'y') { used(); undo(false, true); return; }
-    if (k === 'Enter' && ed.mode === 'draw') { finishDraw(); return; }
+    const k = e.key, el = pl.elements.find(x => x.id === ed.sel), mod = e.metaKey || e.ctrlKey, set = sels();
+    if (mod && k.toLowerCase() === 'd') { used(); dupSel(); return; }
+    if (mod || e.altKey) return;
+    // drawing and measuring: Enter finishes, Backspace takes the last point back
+    if (ed.mode === 'draw' || ed.mode === 'drawpiece' || ed.mode === 'measure') {
+      if (k === 'Enter') { used(); if (ed.mode === 'draw') finishDraw(); else if (ed.mode === 'drawpiece') finishPiece(); else finishMeasure(); return; }
+      if (k === 'Backspace' || k === 'Delete') { used(); const L = ed.mode === 'measure' ? ed.meas.pts : ed.draft; if (ed.mode === 'measure' && ed.meas.done) ed.meas.done = false; L.pop(); drawD(); paintMode(); if (ed.mode === 'draw') panel(); return; }
+    }
+    const tool = { v: 'select', V: 'select', e: 'edit', E: 'edit', m: 'dist', M: 'marea', f: 'fitsel', F: 'fit', g: 'grid', G: 'grid' }[k];
+    if (tool && pl.ring.length >= 3) { used(); if (tool === 'edit' && !pl.elements.length) return; runTool(tool); return; }
     if (!el || !ed.editing) return;
-    if (k === 'Delete' || k === 'Backspace') { used(); delEl(el); return; }
+    if (!set.every(id => T.editable(T.viewOf(pl), pl.elements.find(x => x.id === id)))) return; // on a hidden or locked layer
+    if (k === 'Delete' || k === 'Backspace') { used(); delEls(set); return; }
     const step = e.shiftKey ? 10 : 1, a = frameAngle(pl) * Math.PI / 180, mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[k];
-    if (mv) { used(); const pl0 = PL(), att = pl0 ? SP.attachedTo(pl0, el) : []; change(() => { const dx = step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), dy = step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a)); ed.nudged = [...(ed.nudged || []), clone(el), ...att.map(clone)].slice(-12); for (const t of [el, ...att]) { SP.moveBy(t, dx, dy); t.pinned = true; } }, true); refitSoon(); return; } // what belongs to it moves too
-    if ((k === 'r' || k === 'R') && !mod && !SP.isFree(el)) { used(); turnEl(el); }
+    if (mv) { used(); const dx = step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), dy = step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a));
+      if (set.length > 1) { change(x => { const before = clone(x.elements.filter(q => set.includes(q.id))); x.elements = T.moveSet(x, set, dx, dy).elements; ed.nudged = [...(ed.nudged || []), ...before].slice(-24); }, true); refitSoon(); return; } // the set, each with what's attached
+      const pl0 = PL(), att = pl0 ? SP.attachedTo(pl0, el) : []; change(() => { ed.nudged = [...(ed.nudged || []), clone(el), ...att.map(clone)].slice(-12); for (const t of [el, ...att]) { SP.moveBy(t, dx, dy); t.pinned = true; } }, true); refitSoon(); return; } // what belongs to it moves too
+    if ((k === 'r' || k === 'R') && set.length === 1 && !SP.isFree(el)) { used(); turnEl(el); }
   }, true);
 
-  // Esc steps back one thing at a time and never closes the plan (× or Done does): a tool → the selection → Edit Layout.
+  // Esc steps back one thing at a time and never closes the plan (× or Done does): a pop-over from the tool strip →
+  // measuring → the question about replacing your edits → a tool → the selection (all of a set) → Edit Layout.
   // A pop-over that's open (Layers, a menu, Filters) closes first; in a text box, Esc just leaves the box.
   function escStep(e, typing) {
     if (document.querySelector('#layers.on, .fpop:not([hidden]), details.vmenu[open], .msheet.on, .rpop:not([hidden]), .app.sel-open, #settingsSheet:not([hidden])')) return;
     if (typing && !card.contains(e.target)) return; // the assistant's box and other fields handle their own Esc
     e.preventDefault(); e.stopPropagation();
     if (typing) { e.target.blur(); return; }
+    if (popKind) { closePops(); return; }
+    if (ed.mode === 'measure') { leaveMode(); return; }
+    if (ed.confirm) { ed.confirm = null; panel(); return; }
     if (ed.mode === 'draw' && PL()?.ring.length < 3) { if (ed.draft.length) { ed.draft = []; draw(); panel(); } return; } // no site yet: Esc clears the corners, drawing goes on (there's nothing to go back to)
-    if (ed.mode) { ed.mode = null; ed.draft = []; draw(); panel(); return; }
-    if (ed.sel || ed.shape) { ed.sel = null; ed.shape = null; draw(); panel(); return; }
+    if (ed.mode) { leaveMode(); return; }
+    if (ed.sel || ed.shape || ed.multi?.length) { pickOne(null); ed.shape = null; draw(); panel(); return; }
     if (ed.editing) { ed.editing = false; draw(); panel(); } // the mode pill on the map goes away
   }
 
@@ -739,11 +1017,11 @@ export function initSitePlan(ctx) {
         '<nav class="sp-crumb" aria-label="Where you are"><button type="button" class="sp-cr" data-crumb="all">Projects</button><span aria-hidden="true">›</span><button type="button" class="sp-cr" data-crumb="project" title="Open the project page: ' + esc(p.name) + '">' + esc(p.name) + '</button><span aria-hidden="true">›</span></nav>' +
         '<div class="sp-ttl"><h2><input id="spPlanName" class="sp-title" value="' + esc(pl.name) + '" aria-label="Option name"></h2>' + (sub ? '<div class="bsub">' + sub + '</div>' : '') + '</div>' +
         '<div class="sp-hact"><button type="button" class="sp-ib" id="spUndo"' + (ed.undo.length ? '' : ' disabled') + ' aria-label="Undo" title="Undo (⌘Z / Ctrl+Z)">' + ICO.undo + '</button><button type="button" class="sp-ib" id="spRedo"' + (ed.redo.length ? '' : ' disabled') + ' aria-label="Redo" title="Redo (⇧⌘Z / Ctrl+Y)">' + ICO.redo + '</button>' +
-          editBtn + '<button type="button" class="btn sm primary sp-done" id="spDone" title="Close the plan (it’s saved as you go)">' + ICO.done + '<span>Done</span></button>' + xBtn() + '</div></div>' +
+          editBtn + '<button type="button" class="btn sm primary sp-done" id="spDone" title="Close the plan (it’s saved as you go)">' + ICO.done + '<span>Done</span></button>' + xBtn() + '</div><span class="sp-save" id="spSave" role="status" aria-live="polite"></span></div>' +
       plansHtml(p, pl) + (ed.run ? runHtml(ed.run) : '') +
       ctx.cardNav(secs.map(x => [x.id, x.label])) + '</div>' +
       (noRing ? '' : '<div class="bover" id="spOver">' + overview(pl, prog) + '</div>') + plansHtml(p, pl, 'sp-plans-ph') +
-      '<div class="sp-body">' + secs.map(x => x.html()).join('') +
+      '<div class="sp-body">' + confirmHtml(pl) + secs.map(x => x.html()).join('') +
       (drawing ? '' : '<div class="sp-foot"><button type="button" class="sp-link sp-del" id="spDelPlan">Delete This Option</button></div>') + '</div>';
     card.classList.add('open', 'sp-mode');
     const $ = q => card.querySelector(q), on = (q, fn) => { const el = $(q); if (el) el.onclick = fn; };
@@ -783,7 +1061,30 @@ export function initSitePlan(ctx) {
     on('#spSum', async () => { const s = summary(p, pl); try { await navigator.clipboard.writeText(s); ctx.toast('Summary copied.'); } catch (e) { prompt('Copy the summary', s); } });
     card.querySelectorAll('details.bsec').forEach(d => d.addEventListener('toggle', tailRoom));
     on('#spDelPlan', () => { if (!confirm('Delete ' + pl.name + ' from ' + p.name + '?')) return; p.plans = p.plans.filter(x => x.id !== pl.id); save(p); ctx.closeCard(); ctx.setView('projects'); ctx.toast('Deleted ' + pl.name + ' from ' + p.name + '.'); });
-    nums(); tailRoom(); lockRun(); paintMode();
+    nums(); tailRoom(); lockRun(); paintMode(); wireConfirm(); paintSave();
+  }
+  // A layout you've changed is never replaced without asking (Build Layouts, Use this layout, New layouts from these
+  // settings): the question sits at the top of the panel, with Replace my edits, Save my edits as a new option first
+  // (then replace), or Cancel. Replacing is one undo step, as always.
+  function askReplace(go) {
+    const pl = PL(); if (!pl || !pl.elements.length || !dirty(pl)) { go(); return; }
+    ed.confirm = { go }; panel(); const el = card.querySelector('#spConfirm'), top = card.querySelector(':scope>.top'); if (!el) return;
+    const d = el.getBoundingClientRect().top - (top ? top.getBoundingClientRect().bottom : card.getBoundingClientRect().top) - 8; if (d < 0 || d > card.clientHeight * 0.5) card.scrollTop += d; // just under the header
+    el.querySelector('button')?.focus({ preventScroll: true });
+  }
+  function confirmHtml(pl) {
+    if (!ed.confirm) return ''; const what = pl.variant ? numOf(pl.variant) : pl.name;
+    return '<div class="sp-confirm" id="spConfirm" role="alertdialog" aria-labelledby="spConfirmT" aria-describedby="spConfirmD"><p><b id="spConfirmT">Your edits to ' + esc(what) + ' will be replaced.</b> <span id="spConfirmD">Undo brings them back.</span></p>' +
+      '<div class="btnrow"><button type="button" class="btn sm primary" data-cf="go">Replace my edits</button><button type="button" class="btn sm" data-cf="keep">Save my edits as a new option first</button><button type="button" class="btn sm ghost" data-cf="x">Cancel</button></div></div>';
+  }
+  function wireConfirm() {
+    card.querySelectorAll('[data-cf]').forEach(b => b.onclick = () => { const c = ed.confirm; ed.confirm = null; if (b.dataset.cf === 'x' || !c) { panel(); return; }
+      if (b.dataset.cf === 'keep') keepEdits(); panel(); c.go(); });
+  }
+  // the option as it is now, kept as a new option in the project (this one goes on to be replaced)
+  function keepEdits() {
+    const p = P(), pl = PL(); if (!p || !pl) return; const now = new Date().toISOString(), c = { ...clone(pl), id: uid(), name: nextName(p) + ' · my edits', created: now, updated: now };
+    p.plans.push(c); save(p); ctx.toast('Your edits are kept as ' + c.name + '.', { action: { label: 'Open ' + c.name.split(' · ')[0], run: () => { if (db.projects.some(x => x.id === p.id)) open(p.id, c.id); } } });
   }
   // Build: the request box with suggestions sized to this site, how to run it (Quick, or AI-reviewed) and whether to fill
   // the rest of the site, then what the request was read as. A suggestion only fills the box; Enter or Build Layouts runs
@@ -918,7 +1219,7 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('[data-mixdel]').forEach(b => b.onclick = () => { change(x => { const m = mixOf(x); m.splice(+b.dataset.mixdel, 1); x.program = { ...x.program, mix: m }; }); after(); });
     const add = $('#spMixAdd'); if (add) add.onclick = () => change(x => { const m = mixOf(x); m.push({ name: 'New', sf: 900, pct: 0, beds: 2 }); x.program = { ...x.program, mix: m }; });
     card.querySelectorAll('[data-home]').forEach(i => i.onchange = () => { change(x => { const m = clone(SP.normalizeProgram(x.program).homeMix || SP.HOME_MIX), t = m.find(h => h.stories === +i.dataset.home); if (t) t.pct = +i.value; else m.push({ stories: +i.dataset.home, pct: +i.value }); x.program = { ...x.program, homeMix: m }; }); after(i); });
-    const rs = $('#spResolve'); if (rs) rs.onclick = () => resolve({ force: true });
+    const rs = $('#spResolve'); if (rs) rs.onclick = () => askReplace(() => resolve({ force: true }));
     const rm = $('#spRefitMine'); if (rm) rm.onclick = () => { ed.solveBar = false; refitNow(true); };
     const nl = $('#spNewLay'); if (nl) nl.onclick = () => resolve({ force: true, src: '#spNewLay' });
   }
@@ -938,7 +1239,7 @@ export function initSitePlan(ctx) {
   function dropEl(x, el) { const k = el.ext && JSON.stringify(el.ext); x.elements = x.elements.filter(y => y.id !== el.id); if (k) for (const y of x.elements) if (y.ext && JSON.stringify(y.ext) === k) delete y.ext; }
   // left: where it was (and what moved with it); parking it had cut there grows back
   function makeRoom(el, left = []) {
-    const pl = PL(); if (!pl || !el || el.kind === 'parking' || el.kind === 'green' || el.kind === 'lot' || el.kind === 'trail') return;
+    const pl = PL(); if (!pl || !el || ['parking', 'green', 'lot', 'trail', 'keepout'].includes(el.kind)) return;
     const pad = el.kind === 'building' || el.kind === 'garage' ? 5 : 1, spare = pl.spareRows = (pl.spareRows || []).slice(-40); // rows cut away whole, kept to grow back
     pl.elements = SP.cutRows(pl.elements, SP.outline(el), pad, spare);
     for (const o of left) pl.elements = SP.regrowRows(pl.elements, SP.outline(o), 5, spare);
@@ -969,7 +1270,7 @@ export function initSitePlan(ctx) {
     const label = solveLabel, mark = o.force ? null : solveMark; solveLabel = ''; solveMark = null; ed.solveBar = false;
     const before = pl.elements.some(e => e.kind === 'building') ? SP.metrics(pl) : null, was = pl.variant ? { ...pl.variant } : null, hadAi = !!ed.variants?.some(v => v.ai);
     const run = startRun('resolve', ['Laying out new layouts with these settings'], o.src || '#spResolve'); if (!run) return;
-    let out = []; try { out = await laid('options', { ...pl }, pl.program, { count: ed.variants?.length > 3 ? 12 : 3 }); } catch (e) { console.warn('layout', e); }
+    let out = []; try { out = await laid('options', { ...pl }, pl.program, { count: ed.variants?.length > 3 ? 12 : 3, ...koOpts(pl) }); } catch (e) { console.warn('layout', e); }
     if (!live(run) || PL() !== pl) return;
     const variants = named(out, { ...pl });
     if (!variants.some(v => v.elements.length)) { endRun(run); ctx.toast('Nothing fits with these settings.'); return; }
@@ -983,6 +1284,7 @@ export function initSitePlan(ctx) {
   }
 
   function selHtml(e, prog) {
+    if (e && sels().length > 1) return multiHtml();
     if (!e) return '<div class="lt">Selected</div><div class="rnote">' + (ed.editing ? 'Click a piece of the plan to move it. Drag a white corner to resize it, the green dot to turn it; it lines up with its neighbours and stays out of the setbacks (hold Alt to move it freely). Arrow keys nudge it, R turns it 90°, Delete removes it. Only that piece moves; parking under a building gives way.' : 'Click a piece of the plan to see it. Use <b>Edit Layout</b> to move, resize or turn pieces.') + '</div>';
     const free = SP.isFree(e);
     return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free ? ' · curved' : '') + '</div><fieldset class="sp-fs"' + (ed.editing ? '' : ' disabled') + ' style="border:0;padding:0;margin:0;min-width:0"><div class="sp-grid">' +
@@ -998,16 +1300,38 @@ export function initSitePlan(ctx) {
       (e.kind === 'building' ? '<label class="sp-wide">Type<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '') + '</select></label>' : '') +
       '<label class="sp-wide">Name<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A"></label>' +
       '</div><div class="rnote" id="spRead"></div>' + (!ed.editing ? '<div class="rnote">Use <b>Edit Layout</b> to change it.</div>' : PL()?.recipe ? '<div class="rnote">' + (e.pinned ? '📌 Placed by you: <b>Re-fit Plan</b> keeps it and lays out the rest again around it. <button class="sp-link" id="spUnpin">Let it move</button>' : 'Move or resize it and only it changes. <b>Re-fit Plan</b> lays out the rest again around the pieces you placed.') + '</div>' : '') +
-      '<div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) ? '<button class="btn" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="Drag its points; drag a blue + to add a point; double-click a point to remove it">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') + (PL()?.recipe ? '<button class="btn" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button class="btn" id="spDup">Copy</button><button class="btn" id="spAskSel" title="Say what to change about this piece">Change With AI</button><button class="btn sp-del" id="spDel">Delete</button></div></fieldset>';
+      '<div class="bacts" style="padding:8px 0 0">' + (free ? '' : '<button class="btn" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) ? '<button class="btn" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="Drag its points; drag a blue + to add a point; double-click a point to remove it">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') + (PL()?.recipe ? '<button class="btn" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button class="btn" id="spDup" title="Copy it beside itself (⌘D / Ctrl+D)">Duplicate</button><button class="btn" id="spAskSel" title="Say what to change about this piece">Change With AI</button><button class="btn sp-del" id="spDel">Delete</button></div></fieldset>';
+  }
+  // several pieces picked: how many, what they cover, and what can be done to all of them at once (each one undo step)
+  function multiHtml() {
+    const pl = PL(), ids = sels(), els = pl.elements.filter(e => ids.includes(e.id)), by = new Map(); for (const e of els) { const l = SP.KINDS[e.kind]?.label || e.kind; by.set(l, (by.get(l) || 0) + 1); }
+    const pinned = els.every(e => e.pinned);
+    return '<div class="lt">' + ids.length + ' pieces selected</div><div class="rnote">' + [...by].map(([l, n]) => n + ' × ' + esc(l.toLowerCase())).join(' · ') + '<br><b>' + f0(T.footprintOf(els)) + ' sq ft</b> of ground covered in all</div>' +
+      '<div class="bacts" style="padding:8px 0 0"><fieldset class="sp-fs sp-fsrow"' + (ed.editing ? '' : ' disabled') + '><button class="btn" id="spMDup" title="Copy them beside the set (⌘D / Ctrl+D)">Duplicate</button><button class="btn" id="spMPin" title="' + (pinned ? 'Re-fit Plan may move them again' : 'Re-fit Plan keeps them where they are') + '">' + (pinned ? 'Let them move' : 'Pin') + '</button><button class="btn sp-del" id="spMDel">Delete</button></fieldset><button class="btn" id="spMFit" title="Fit the selection in view (F)">Fit selection</button></div>' +
+      '<div class="rnote">' + (ed.editing ? 'Drag any of them to move them all; arrow keys nudge the set. ' : 'Use <b>Edit Layout</b> to move, copy or delete them. ') + 'Shift-click a piece to add it or take it out; Esc clears the selection.</div>';
+  }
+  function wireMulti() {
+    const $ = q => card.querySelector(q), ids = sels();
+    if ($('#spMDup')) $('#spMDup').onclick = () => dupSel(); if ($('#spMDel')) $('#spMDel').onclick = () => delEls(ids); if ($('#spMFit')) $('#spMFit').onclick = () => fitSel();
+    if ($('#spMPin')) $('#spMPin').onclick = () => { const pl = PL(), all = pl.elements.filter(e => ids.includes(e.id)).every(e => e.pinned); change(x => { for (const e of x.elements) if (ids.includes(e.id)) { if (all) delete e.pinned; else e.pinned = true; } }); };
+  }
+  // Duplicate (⌘D): copies of the piece or the set beside it, with what's attached, in the nearest clear spot; the copies picked
+  function dupSel() {
+    const pl = PL(), ids = sels(); if (!pl || !ids.length) return; if (!ed.editing) { ctx.toast('Turn on Edit Layout to copy pieces.'); return; }
+    if (!ids.every(id => T.editable(T.viewOf(pl), pl.elements.find(e => e.id === id)))) { ctx.toast('That layer is locked.'); return; }
+    let r = null; const n = ed.undo.length; change(x => { r = T.dupPieces(x, ids, { newId: uid }); x.elements = r.elements; for (const id of r.all) { const e = x.elements.find(q => q.id === id); if (e) makeRoom(e); } });
+    if (!r?.ids.length) return; ed.sel = r.ids[0]; ed.multi = r.ids.length > 1 ? r.ids : []; ed.shape = null; draw(); panel();
+    ctx.toast((r.blocked ? 'No clear spot near: the copy overlaps (in red). Drag it somewhere clear.' : 'Copied ' + (ids.length > 1 ? plural(ids.length, 'piece') : ED.labelOf(pl.elements.find(e => e.id === r.ids[0]))) + '.'), { action: { label: 'Undo', run: () => { if (ed && ed.undo.length === n + 1) undo(true); } } });
   }
   function readout(e) {
     const el = card.querySelector('#spRead'); if (!el || !e) return;
-    el.textContent = e.kind === 'building' ? f0(SP.footArea(e)) + ' sf footprint · ' + f0(SP.gfaOf(e)) + ' sf total' : e.kind === 'parking' ? SP.stalls(e).count + ' spaces (9 × 18 ft stalls, 24 ft aisles)' : e.kind === 'pond' ? (SP.elArea(e) / 43560).toFixed(2) + ' acres' : f0(SP.elArea(e)) + ' sf' + (SP.isFree(e) ? ' · drag to move it' : '');
+    el.textContent = e.kind === 'building' ? f0(SP.footArea(e)) + ' sf footprint · ' + f0(SP.gfaOf(e)) + ' sf total' : e.kind === 'parking' ? SP.stalls(e).count + ' spaces (' + (e.sw || SP.STALL.w) + ' × ' + (e.sd || SP.STALL.d) + ' ft stalls, ' + (e.sa || SP.STALL.aisle) + ' ft aisles)' : e.kind === 'pond' ? (SP.elArea(e) / 43560).toFixed(2) + ' acres' : f0(SP.elArea(e)) + ' sf' + (SP.isFree(e) ? ' · drag to move it' : '');
     for (const k of ['w', 'd']) { const i = card.querySelector('[data-e="' + k + '"]'); if (i && document.activeElement !== i) i.value = Math.round(e[k]); }
     const r = card.querySelector('[data-e="rot"]'); if (r && document.activeElement !== r) r.value = (Math.round(e.rot || 0) % 360 + 360) % 360;
     if (!drag) nums();
   }
   function wireSel(e) {
+    if (e && sels().length > 1) { wireMulti(); return; }
     if (!e) return; readout(e);
     card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v)) return; change(() => { const k = i.dataset.e; e[k] = k === 'floors' || k === 'units' || k === 'levels' || k === 'podium' ? Math.max(1, Math.round(v)) : k === 'rot' ? ((v % 360) + 360) % 360 : Math.max(8, v); e.pinned = true; }, true); readout(e); refitSoon(); });
     card.querySelector('[data-shape]')?.addEventListener('change', ev => { change(() => { SP.reshape(e, ev.target.value); e.pinned = true; }); refitSoon(); });
@@ -1022,7 +1346,7 @@ export function initSitePlan(ctx) {
       if (ed.shape === e.id) { ed.shape = null; draw(); panel(); return; }
       change(() => { if (!e.poly) { e.poly = SP.outline(e).map(q => q.map(v => +v.toFixed(2))); delete e.form; delete e.jog; delete e.shape; delete e.path; } e.pinned = true; }); ed.shape = e.id; draw(); panel(); };
     const as = card.querySelector('#spAskSel'); if (as) as.onclick = () => { const ta = card.querySelector('#spChg'); if (!ta) return; ta.scrollIntoView({ block: 'center' }); ta.focus(); };
-    card.querySelector('#spDup').onclick = () => { const c = { ...clone(e), id: uid() }, a = (e.rot || 0) * Math.PI / 180, off = e.w + 20; SP.moveBy(c, off * Math.cos(a), off * Math.sin(a)); change(x => x.elements.push(c)); ed.sel = c.id; draw(); panel(); };
+    card.querySelector('#spDup').onclick = () => dupSel();
     card.querySelector('#spDel').onclick = () => delEl(e);
   }
   // Numbers: one grid of tiles, the zoning limit beside its figure; with a Phase 2, Phase 1 and the full site side by side
@@ -1161,7 +1485,8 @@ export function initSitePlan(ctx) {
   function addEl(kind) {
     const pl = PL(); if (!pl || pl.ring.length < 3) return;
     const { at, rot } = addAt(pl), prog = SP.normalizeProgram(pl.program), [w, d] = kind === 'building' ? [Math.round(Math.max(40, Math.min(240, 12000 / prog.depth))), Math.round(Math.min(prog.depth, 160))] : SIZE[kind];
-    const pin = PL().recipe ? { pinned: true } : {};
+    const pin = PL().recipe ? { pinned: true } : {}, pp = { ...PARAMS, ...(pl.params || {}) };
+    const stall = kind === 'parking' && (+pp.stallW !== SP.STALL.w || +pp.stallD !== SP.STALL.d || +pp.aisle !== SP.STALL.aisle) ? { sw: +pp.stallW || SP.STALL.w, sd: +pp.stallD || SP.STALL.d, sa: +pp.aisle || SP.STALL.aisle } : {}; // the plan's stall and aisle sizes (Site parameters)
     let how = 'clear';
     if (kind === 'pad') { // a restaurant pad: the building, its outdoor seating by the door and a drive-thru lane round it
       const L = (u, v) => { const q = SP.rotPt([u, v], rot); return [+(at[0] + q[0]).toFixed(2), +(at[1] + q[1]).toFixed(2)]; };
@@ -1170,7 +1495,7 @@ export function initSitePlan(ctx) {
       const lane = { id: uid(), kind: 'drive', path: [L(-34, 60), L(-34, -37), L(50, -37), L(50, 60)], width: 12, r: 14, name: '', note: 'Drive-thru lane', ...pin };
       change(x => { how = placeClear(x, b, [patio, lane]); x.elements.push(b, patio, lane); }); ed.sel = b.id; draw(); panel(); refitSoon(); showPiece(b); noRoom(how); return;
     }
-    const e = { id: uid(), kind, x: +at[0].toFixed(2), y: +at[1].toFixed(2), w, d, rot, ...(kind === 'building' ? { floors: prog.floors } : {}), ...(kind === 'garage' ? { levels: 4, name: 'Parking garage' } : {}), ...(kind === 'play' ? { name: 'Playground' } : {}), ...(kind === 'court' ? { name: 'Pickleball courts' } : {}), ...(kind === 'patio' ? { note: 'Outdoor seating' } : {}), ...pin };
+    const e = { id: uid(), kind, x: +at[0].toFixed(2), y: +at[1].toFixed(2), w, d, rot, ...(kind === 'building' ? { floors: prog.floors } : {}), ...(kind === 'garage' ? { levels: 4, name: 'Parking garage' } : {}), ...(kind === 'play' ? { name: 'Playground' } : {}), ...(kind === 'court' ? { name: 'Pickleball courts' } : {}), ...(kind === 'patio' ? { note: 'Outdoor seating' } : {}), ...stall, ...pin };
     change(x => { how = placeClear(x, e); x.elements.push(e); }); ed.sel = e.id; draw(); panel(); refitSoon(); showPiece(e); noRoom(how);
   }
 
@@ -1205,10 +1530,11 @@ export function initSitePlan(ctx) {
   // Build: describe → watch it run → choose. The engine's layouts go on the map and into the list as soon as they're
   // drawn; with the AI on, its review then fills in their scores (matched by key, not position), puts its pick first and
   // adds any layouts from a revised program. The AI's pick is put on the map only if the person hasn't picked one meanwhile.
-  async function build() {
+  async function build(o = {}) {
     const p = P(), pl = PL(); if (!pl || pl.ring.length < 3) return;
     if (ed.run) { ctx.toast('A build is already running: wait for it, or Cancel it.'); return; }
     const ask = (ed.ask || '').trim(); if (!ask) { ed.buildOpen = true; panel(); ctx.toast('Say what should go on the site, or pick a suggestion.'); card.querySelector('#spAsk')?.focus(); return; }
+    if (!o.confirmed && dirty(pl) && pl.elements.length) { const src = ed.runSrc; askReplace(() => { ed.runSrc = src; build({ confirmed: true }); }); return 'ask'; } // before the run, not after it
     const ai = !aiOff(), review = ai && aiReviewOn(), lay = SP.ringArea(pl.ring) > 40 * 43560 ? 'Laying out (big site: up to a minute)' : 'Laying out the layouts';
     ed.buildOpen = false; const src = ed.runSrc || '#spGo'; ed.runSrc = null;
     const run = startRun('build', review ? ['Reading your request', lay, 'AI review', 'Comparing'] : ['Reading your request', lay], src, { ask }); if (!run) return;
@@ -1222,7 +1548,7 @@ export function initSitePlan(ctx) {
     const np = SP.normalizeProgram(prog);
     const readAs = { ask, chips: RUN.readAs(np, SP.USES), miss: RUN.notUnderstood(ask, np), assumed, by: aiOk ? 'ai' : 'words' }; // shown once the layouts land, so a cancelled build keeps the last one's
     runStep(run, 2, lay);
-    let out = []; try { out = await laid('options', { ...pl, setbacks }, prog); } catch (e) { console.warn('layout', e); if (live(run)) ctx.toast('The layout failed: ' + e.message); }
+    let out = []; try { out = await laid('options', { ...pl, setbacks }, prog, koOpts(pl)); } catch (e) { console.warn('layout', e); if (live(run)) ctx.toast('The layout failed: ' + e.message); }
     if (!live(run) || PL() !== pl) return;
     const plan = { ...pl, setbacks }, variants = named(out, { ...plan, program: prog }), doReview = aiOk && review && variants.some(v => v.elements.length);
     // the layouts, at once: on the map and in the list
@@ -1242,7 +1568,7 @@ export function initSitePlan(ctx) {
       if (rv.revise && rv.program) {
         runStep(run, 4, 'Revising: ' + (rv.why || 'a better program').replace(/\.$/, ''));
         const params2 = { ...(pl.params || {}), ...(rv.params?.fill != null ? { fill: rv.params.fill } : {}), ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}) };
-        let out2 = []; try { out2 = await laid('options', { ...pl, setbacks, params: params2 }, prog2, { count: 3, depth: 6, budgetMs: 6000 }); } catch (e) { console.warn('layout', e); }
+        let out2 = []; try { out2 = await laid('options', { ...pl, setbacks, params: params2 }, prog2, { count: 3, depth: 6, budgetMs: 6000, ...koOpts(pl) }); } catch (e) { console.warn('layout', e); }
         if (!live(run)) return;
         const v2 = named(out2, { ...plan, params: params2, program: prog2 }, { params: params2, revisedBy: rv.why || 'the AI review' }).filter(v => v.elements.length);
         if (v2.length) {
@@ -1278,8 +1604,10 @@ export function initSitePlan(ctx) {
     const k = ed.aiPick, pl = PL(), i = k && ed.variants ? ed.variants.findIndex(v => v.key === k) : -1; if (i < 0 || pl?.variant?.key === k) return;
     const failing = K.passes(ed.variants[i].chk) === false && ed.variants.some(v => K.passes(v.chk)); // a failing layout never goes on the map by itself when one passes
     if (!ed.pickedByUser && !dirty(pl) && !failing) { await useVariant(i, { quiet: true }); return; }
-    const n = numOf(ed.variants[i]); ctx.toast('The AI recommends ' + n + (failing ? ', though it doesn’t pass every check' : '') + '.', { action: { label: 'Use it', run: () => { const j = ed?.variants?.findIndex(v => v.key === k); if (j >= 0) useVariant(j); } } });
+    const n = numOf(ed.variants[i]); ctx.toast('The AI recommends ' + n + (failing ? ', though it doesn’t pass every check' : '') + '.', { action: { label: 'Use it', run: () => { const j = ed?.variants?.findIndex(v => v.key === k); if (j >= 0) askReplace(() => useVariant(j)); } } });
   }
+  // easements on the plan go into every layout run: the layouts keep off them and carry them along
+  const koOpts = pl => { const ko = (pl?.elements || []).filter(e => e.kind === 'keepout'); return ko.length ? { keepout: clone(ko) } : {}; };
   // ---------- a run: one build (or idea, more layouts, review, change) at a time, shown and cancellable ----------
   // ed.run = { kind, steps, step, label, t0, ctl, token, src }: lives on the editor, not the page, so a redraw of the
   // panel (Trees, a setting) never loses it. Every await checks live(run) before using what came back; Cancel aborts the
@@ -1595,12 +1923,12 @@ export function initSitePlan(ctx) {
   }
   function wireVariants() {
     const $ = q => card.querySelector(q);
-    card.querySelectorAll('[data-var],[data-usevar]').forEach(b => b.onclick = () => { if (ed.run) ed.pickedByUser = true; useVariant(+(b.dataset.var ?? b.dataset.usevar)); }); // picked during a review: the AI's pick won't replace it
+    card.querySelectorAll('[data-var],[data-usevar]').forEach(b => b.onclick = () => { const i = +(b.dataset.var ?? b.dataset.usevar); askReplace(() => { if (ed.run) ed.pickedByUser = true; useVariant(i); }); }); // picked during a review: the AI's pick won't replace it
     card.querySelectorAll('[data-keep]').forEach(b => b.onclick = () => keepAsOption(+b.dataset.keep));
     card.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => { const k = b.dataset.sim; if (ed.simOpen.has(k)) ed.simOpen.delete(k); else ed.simOpen.add(k); redrawLayouts(); });
     card.querySelectorAll('details[data-why]').forEach(d => d.ontoggle = () => { if (d.open) ed.whyOpen.add(d.dataset.why); else ed.whyOpen.delete(d.dataset.why); });
     card.querySelectorAll('[data-layedit]').forEach(b => b.onclick = () => { fillAsk(ed.runMeta?.ask || ed.readAs?.ask || ed.ask || ''); card.querySelector('#spAiSec')?.scrollIntoView({ block: 'nearest' }); });
-    const mo = $('#spMore'); if (mo) mo.onclick = async () => { const pl2 = PL(), run = startRun('more', ['Looking for more layouts'], '#spMore'); if (!run) return; let more = []; try { more = await laid('options', { ...pl2 }, pl2.program, { count: 12 }); } catch (e) { console.warn('layout', e); } if (!live(run) || PL() !== pl2) return;
+    const mo = $('#spMore'); if (mo) mo.onclick = async () => { const pl2 = PL(), run = startRun('more', ['Looking for more layouts'], '#spMore'); if (!run) return; let more = []; try { more = await laid('options', { ...pl2 }, pl2.program, { count: 12, ...koOpts(pl2) }); } catch (e) { console.warn('layout', e); } if (!live(run) || PL() !== pl2) return;
       if (more.length) { const old = new Map((ed.variants || []).map(v => [v.key, v])), nv = named(more, pl2); for (const v of nv) { const o = old.get(v.key); if (o?.ai) v.ai = o.ai; }
         ed.variants = RUN.keepCurrent(pl2.variant?.key && old.get(pl2.variant.key), nv); ed.reviewCleared = false; saveRun(pl2); } endRun(run); }; // the AI's scores stay on the layouts it saw; the one on the map stays in the list (first) when the new run doesn't hold it
     const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; saveRun(); redrawLayouts(); so.closest('label').title = K.SORTS.find(([k]) => k === so.value)?.[2] || ''; };
@@ -1634,7 +1962,7 @@ export function initSitePlan(ctx) {
     const v = ed.variants[i], pl = PL(); if (!v || !pl) return null;
     ctx.toast('Laying out ' + numOf(v) + ' again…');
     const base = { ...pl, setbacks: v.setbacks || pl.setbacks, params: v.params || pl.params };
-    let out = []; try { out = await laid('options', base, v.program || pl.program, { count: 12 }); } catch (e) { console.warn('layout', e); }
+    let out = []; try { out = await laid('options', base, v.program || pl.program, { count: 12, ...koOpts(pl) }); } catch (e) { console.warn('layout', e); }
     if (PL() !== pl || ed.variants?.[i] !== v) return null;
     const list = named(out, { ...base, program: v.program || pl.program }, v.revisedBy ? { revisedBy: v.revisedBy } : {}), r = RUN.matchLayout(list, v.key, v.name);
     if (r.index < 0) { ctx.toast(numOf(v) + ' doesn’t fit with these settings any more.'); return null; }
@@ -1920,7 +2248,7 @@ export function initSitePlan(ctx) {
     if (pl.ring.length < 3) return { started: true, note: 'There’s no parcel outline here, so the user needs to draw the site on the map first (click its corners).' };
     if (!request) return { started: true, project: P().name, plan: pl.name, acres: +(SP.ringArea(pl.ring) / 43560).toFixed(2) };
     if (ed.run) return { error: 'A build is already running on this plan. Wait for it to finish, or Cancel it in the plan panel.' };
-    ed.ask = request; panel(); await build();
+    ed.ask = request; panel(); if (await build() === 'ask') return { started: true, needsConfirm: true, note: 'The layout on the map has the user’s own edits, so the plan panel now asks them whether to replace those edits (or save them as a new option first) before building.' };
     if (!PL()) return { error: 'The plan was closed before the layouts came back.' };
     const m = SP.metrics(PL()), issues = SP.check(PL());
     return { built: true, project: P().name, plan: PL().name, options: (ed.variants || []).map(v => ({ name: v.name, building_sf: Math.round(v.m.gfa), spaces: v.m.spaces, required: v.m.required, coverage_pct: Math.round(v.m.coverage * 100), passes_checks: K.passes(v.chk), notes: v.notes })),
