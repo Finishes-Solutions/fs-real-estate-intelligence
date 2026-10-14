@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 3:40 PM CT: Checking the new county data sources (0b5bf9d)
+- Nothing changes in the app yet. This adds checks that look at what each new free source actually publishes for the seven counties: county appraisal district owner and value files, building permits, plats and new subdivisions, new MUDs and their bonds, TxDOT road projects and school enrollment. The loaders and map layers are built on what these checks find.
+
 ### 12:37 PM CT: Drive-time bands clear when you close the card (cc25d91)
 - Closing a drive-time map, or the property card it came from, with × or Esc now takes the bands off the map. Before, they stayed with no way to remove them.
 - The bands still stay while you go back to the property card, or when you select a band and run a report on it.
