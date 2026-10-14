@@ -17,7 +17,7 @@ import { supa } from '../lib/supa.mjs';
 import { hlsPasses } from '../lib/nasa.mjs';
 import { news, phrase } from '../api/news.js';
 import { daily, storms } from '../api/weather.js';
-import { HPD_CSV, parseHpd } from '../lib/crime.mjs';
+import { HPD_CSV, parseHpd, cellKey } from '../lib/crime.mjs';
 import { loadRegistry, parseRegistry } from '../lib/faa.mjs';
 import { OURAIRPORTS, parseCsv, airportRow, runwayRow, frequencyRow, dtppCycle, parseDtpp } from '../lib/airports.mjs';
 
@@ -90,11 +90,17 @@ await step('crime', async () => {
     const r = await fetch(HPD_CSV(y), { headers: { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence)' }, signal: AbortSignal.timeout(180000) });
     if (!r.ok) { if (y === now.getUTCFullYear() && r.status === 404) continue; throw new Error('HPD ' + y + ' ' + r.status); }
     let list; try { list = parseHpd(await r.text(), { since }); } catch (e) { errors.push(y + ': ' + e.message); continue; } // one odd year doesn't block the others
+    // saved in location order (rows close together on the map land on the same database pages), so an area's report
+    // reads a few pages per load instead of one per incident; the table itself was put in this order by the
+    // crime_speed migration (crime_recluster() redoes it, from the SQL editor: it takes minutes)
+    list.sort((a, b) => cellKey(a) - cellKey(b));
     await db.upsert('crime_incidents', list, 'id', 1000); rows += list.length;
   }
   if (!rows && errors.length) throw new Error(errors.join('; '));
   const pruned = await db.rpc('crime_prune', { p_keep_days: KEEP });
-  return { since, years: YEARS, rows, pruned, errors: errors.length ? errors : undefined };
+  // Houston's own numbers for every report ("vs the city", and whole-city reports), once per load
+  const city = await db.rpc('crime_city_refresh', {}).then(() => 'refreshed', e => 'failed: ' + e.message);
+  return { since, years: YEARS, rows, pruned, city, errors: errors.length ? errors : undefined };
 });
 
 await step('aircraft', async () => {

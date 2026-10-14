@@ -5,6 +5,7 @@
 //   federal disaster declarations since 2000, and FEMA's National Risk Index (expected annual loss by hazard).
 //   The report opens in the card and exports as a PDF report or CSV.
 import { reportDoc, savePdf, areaMap } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 const SRC = 'fema-nfhl';
 const RISK_COL = { high: '#1d4ed8', moderate: '#f59e0b', minimal: '#9ca3af', undetermined: '#a78bfa', water: '#38bdf8', unmapped: '#e5e7eb' };
 const RISK_SHORT = { high: 'High risk (100-year)', moderate: 'Moderate (500-year)', minimal: 'Minimal', undetermined: 'Not studied', water: 'Open water', unmapped: 'Not mapped' };
@@ -26,7 +27,7 @@ export function initFema(ctx) {
     if (!on) { ctx.setLegend?.('fema', ''); return; }
     const c = cls, head = '<div class="t">Flood zones (FEMA)</div>';
     ctx.setLegend?.('fema', head + '<div class="lg-note">Loading FEMA’s legend…</div>');
-    try { legends[c] ||= fetch('api/fema?legend=1' + (c === 'high' ? '&cls=high' : '')).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'legend unavailable'); return d; });
+    try { legends[c] ||= fetch('api/fema?legend=1' + (c === 'high' ? '&cls=high' : '')).then(readJSON);
       const d = await legends[c]; if (!on || c !== cls) return;
       ctx.setLegend?.('fema', head + d.items.map(x => '<div class="li"><img class="lg-sw" src="' + esc(x.img) + '" alt="" title="' + esc(x.fema) + '"><span>' + esc(x.label) + '</span></div>').join('') +
         '<div class="lg-note">Unshaded: minimal risk or not mapped. Zones show from neighborhood zoom.</div>'); }
@@ -48,7 +49,7 @@ export function initFema(ctx) {
   // ---------- report ----------
   const reportFor = async (geometry, label) => {
     const r = await fetch('api/fema', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error || 'FEMA report failed'); return d;
+    return readJSON(r);
   };
   ctx.femaReportData = reportFor;
   const shareBar = sh => { const order = ['high', 'moderate', 'minimal', 'undetermined', 'water', 'unmapped'].filter(k => sh[k]); return '<div class="fm-bar">' + order.map(k => '<i style="width:' + sh[k] + '%;background:' + RISK_COL[k] + '" title="' + esc(RISK_SHORT[k] + ': ' + sh[k] + '%') + '"></i>').join('') + '</div><div class="fm-leg">' + order.map(k => '<span><i style="background:' + RISK_COL[k] + '"></i>' + esc(RISK_SHORT[k]) + ' <b>' + sh[k] + '%</b></span>').join('') + '</div>'; };
@@ -62,10 +63,11 @@ export function initFema(ctx) {
   const err = x => x?.error ? '<div class="rnote err">Unavailable right now (' + esc(x.error) + ').</div>' : '';
   function body(d) {
     const z = d.flood_zones || {}, c = d.nfip_claims || {}, s = d.disasters || {}, n = d.risk_index;
-    return '<div class="bsec"><div class="lt">Flood zones</div>' + (z.shares ? shareBar(z.shares) + '<div class="rnote">' + [z.zones?.length ? 'FEMA zones here: ' + z.zones.map(x => x.zone + ' ' + x.pct + '%').join(', ') : '', z.floodway ? 'Includes regulatory floodway (building is restricted).' : '', z.bfe ? 'Base flood elevation ' + (z.bfe.min === z.bfe.max ? z.bfe.min : z.bfe.min + '–' + z.bfe.max) + ' ft.' : '', z.truncated ? 'Area has many zone shapes; shares are approximate.' : ''].filter(Boolean).map(esc).join(' ') + '</div>' : z.skipped ? '<div class="rnote">' + esc(z.skipped) + '</div>' : err(z)) + '</div>' +
+    return '<div class="bsec"><div class="lt">Flood zones</div>' + (z.shares ? shareBar(z.shares) + '<div class="rnote">' + [z.zones?.length ? 'FEMA zones here: ' + z.zones.map(x => x.zone + ' ' + x.pct + '%').join(', ') : '', z.floodway ? 'Includes regulatory floodway (building is restricted).' : '', z.bfe ? 'Base flood elevation ' + (z.bfe.min === z.bfe.max ? z.bfe.min : z.bfe.min + '–' + z.bfe.max) + ' ft.' : '', z.truncated ? 'Area has many zone shapes; shares are approximate.' : '', z.method === 'points' ? 'Shares are measured at ' + fmtN(z.samples) + ' evenly spaced points across the area.' : ''].filter(Boolean).map(esc).join(' ') + '</div>' : z.skipped ? '<div class="rnote">' + esc(z.skipped) + '</div>' : err(z)) + '</div>' +
       '<div class="bsec"><div class="lt">Flood insurance claims (NFIP)</div>' + (c.error ? err(c) : '<div class="kgrid"><div><b>' + fmtN(c.claims || 0) + '</b><span>Claims paid</span></div><div><b>' + fmtM(c.paid || 0) + '</b><span>Total paid</span></div><div><b>' + (c.avg_paid ? fmtM(c.avg_paid) : '—') + '</b><span>Average claim</span></div><div><b>' + fmtN(c.last_10_years || 0) + '</b><span>Last 10 years</span></div></div>' +
         yearBars(c.by_year) + (c.top_events?.length ? '<dl>' + c.top_events.slice(0, 5).map(e => '<dt>' + esc(e.event) + '</dt><dd class="mono">' + fmtN(e.claims) + ' · ' + fmtM(e.paid) + '</dd>').join('') + '</dl>' : '') +
-        '<div class="rnote">Claims in the ' + fmtN(c.tracts_searched || 0) + ' census tract' + (c.tracts_searched === 1 ? '' : 's') + ' touching this area' + (c.in_high_risk_zone_pct != null ? '; ' + c.in_high_risk_zone_pct + '% were rated in a high-risk zone, so flooding hits outside the mapped floodplain too' : '') + '. Only insured properties appear.</div>') + '</div>' +
+        '<div class="rnote">Claims in the ' + fmtN(c.tracts_searched || 0) + ' census tract' + (c.tracts_searched === 1 ? '' : 's') + ' touching this area' + (c.in_high_risk_zone_pct != null ? '; ' + c.in_high_risk_zone_pct + '% were rated in a high-risk zone, so flooding hits outside the mapped floodplain too' : '') + '. Only insured properties appear.' +
+        (c.tracts_skipped ? ' <b>' + fmtN(c.tracts_skipped) + ' more tract' + (c.tracts_skipped === 1 ? '' : 's') + ' couldn’t be read in time</b>, so the totals are low; run the report again for a complete count.' : '') + '</div>') + '</div>' +
       '<div class="bsec"><div class="lt">Federal disaster declarations since 2000</div>' + (s.error ? err(s) : '<div class="rnote">' + fmtN(s.count || 0) + ' declarations for ' + esc((d.counties || []).join(', ') || 'this area') + (s.major != null ? ' (' + s.major + ' major disasters)' : '') + (s.by_type ? ': ' + Object.entries(s.by_type).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + ' ' + v).join(', ') : '') + '.</div>' +
         (s.list?.length ? s.list.slice(0, 6).map(x => '<div class="pl"><b>' + esc(x.title) + '</b><span>' + esc(x.date + ' · ' + x.type + ' · ' + x.kind) + '</span></div>').join('') : '')) + '</div>' +
       '<div class="bsec"><div class="lt">FEMA National Risk Index</div>' + (!n ? '<div class="rnote">No risk index data here.</div>' : n.error ? err(n) : '<div class="kgrid"><div><b>' + esc(n.risk_rating || '—') + '</b><span>Overall risk · ' + n.risk_score + ' / 100</span></div><div><b>' + fmtM(n.expected_annual_loss) + '</b><span>Expected annual loss</span></div></div>' +

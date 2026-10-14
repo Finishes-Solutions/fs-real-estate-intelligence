@@ -2,13 +2,14 @@
 // crime nearby (Houston), bar and restaurant alcohol sales at the address, county unemployment and ZIP rents.
 // Facts come from api/site (live, cached a week) and data/area.json (nightly). Sources are listed only when the
 // "Show sources on cards" setting is on (Settings › Appearance), and always in exported reports.
+import { readJSON } from './lib/http.mjs';
 export function initSite(ctx) {
   let repMi = 1; // radius for the Site section's Crime / FEMA reports, kept while the app is open
   const { esc, fmtN, fmtM } = ctx;
   const cache = new Map();
   ctx.siteAt = (center, addr, zip) => {
     const q = new URLSearchParams({ lat: center[1].toFixed(5), lon: center[0].toFixed(5), ...(addr && zip ? { addr, zip } : {}) }), k = q.toString();
-    if (!cache.has(k)) { const p = fetch('api/site?' + q).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'lookup failed'); return d; }); p.catch(() => cache.delete(k)); cache.set(k, p); }
+    if (!cache.has(k)) { const p = fetch('api/site?' + q).then(readJSON); p.catch(() => cache.delete(k)); cache.set(k, p); }
     return cache.get(k);
   };
   // a 0.5-mile circle (64 points) around a point, for the crime report

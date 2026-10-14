@@ -6,6 +6,7 @@
 //   Google place search in the map search box, and a Google place card. Google's terms ask for Google content to be
 //   shown on a Google map with attribution, so opening a Google place switches the base map to Google first.
 import { esc, openCard, cardTop, fillCard } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 
 const LOGO = 'https://maps.gstatic.com/mapfiles/api-3/images/google_white5_hdpi.png', LOGO_DARK = 'https://maps.gstatic.com/mapfiles/api-3/images/google4_hdpi.png';
 const OFM = 'https://tiles.openfreemap.org';
@@ -107,7 +108,7 @@ export function initGoogle(ctx) {
     ctx.closeCard?.();
     if (!isGoogleBase()) { const s = ctx.basemap?.() === 'sat' || ctx.basemap?.() === 'esri' ? 'gsat' : 'google'; ctx.setMapOptions?.({ basemap: s }); ctx.toast?.('Switched to the Google map to show a Google place.'); }
     const card = openCard(ctx, { kicker: 'Google place', title: 'Loading…', loading: 'Looking up the place on Google…' }); cardOpen = true; paintBrand();
-    let p; try { const r = await fetch('api/google?' + new URLSearchParams({ place: id, ...(tk ? { session: tk } : {}) })), d = await r.json(); if (!r.ok) throw new Error(d.error || 'lookup failed'); p = d.place; }
+    let p; try { const r = await fetch('api/google?' + new URLSearchParams({ place: id, ...(tk ? { session: tk } : {}) })), d = await readJSON(r); p = d.place; }
     catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
     if (p.viewport?.every(Number.isFinite) && p.types?.some(t => /locality|neighborhood|postal_code|administrative|route/.test(t))) map.fitBounds([[p.viewport[0], p.viewport[1]], [p.viewport[2], p.viewport[3]]], { padding: 60, duration: ctx.reduceMotion ? 0 : 900 });
     else map.flyTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 17), duration: ctx.reduceMotion ? 0 : 1100 });

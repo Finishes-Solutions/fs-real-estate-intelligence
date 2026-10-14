@@ -69,6 +69,15 @@ export async function countsIn(g, fetchImpl = globalThis.fetch) {
   // TxDOT gives uncounted neighborhood streets a flat estimate (about 250 a day): they stay in the segments, not the top list
   return { roads: [...best.values()].map(({ sum, ...r }) => ({ ...r, avg: Math.round(sum / r.segments) })).filter((r, i) => i < 3 || r.aadt >= 1000).slice(0, 25), types, segments, segments_capped: segments.length >= 1000 || undefined, as_of: asOf };
 }
+// every counted segment in the area, busiest first, 2,000 a page (no paths: road, type, count and its middle point), for the
+// CSV of an area with more than the report's 1,000; next is the following page's offset or null
+export const SEG_PAGE = 2000;
+export async function segmentsPage(g, offset = 0, fetchImpl = globalThis.fetch) {
+  const d = await postQuery({ geometry: esriPoly(g), geometryType: 'esriGeometryPolygon', inSR: '4326', spatialRel: 'esriSpatialRelIntersects', f: 'json', where: 'AADT_CUR > 0',
+    outFields: 'OBJECTID,RTE_NM,RTE_PRFX,RTE_NBR,AADT_CUR', orderByFields: 'AADT_CUR DESC,OBJECTID', resultOffset: String(offset), resultRecordCount: String(SEG_PAGE), returnGeometry: 'true', outSR: '4326', geometryPrecision: '5', maxAllowableOffset: '0.002' }, fetchImpl);
+  const rows = (d.features || []).map(f => { const a = f.attributes, m = midOf(f.geometry); return { road: nameOf(a), type: TYPE[a.RTE_PRFX] || 'Other roads', aadt: +a.AADT_CUR, lon: m?.[0] ?? null, lat: m?.[1] ?? null }; });
+  return { rows, offset, next: rows.length && (d.exceededTransferLimit || rows.length >= SEG_PAGE) ? offset + rows.length : null };
+}
 // TomTom: live speed vs free-flow speed at a point (the nearest road segment)
 export async function flowAt(key, lat, lon, fetchImpl = globalThis.fetch) {
   const r = await fetchImpl('https://api.tomtom.com/traffic/services/4/flowSegmentData/relative0/12/json?' + new URLSearchParams({ point: lat + ',' + lon, unit: 'mph', key }), { signal: AbortSignal.timeout(8000) });
@@ -99,10 +108,11 @@ export async function incidentsIn(key, b, fetchImpl = globalThis.fetch, g = null
     .filter(x => !g || x.lon == null || inGeom([x.lon, x.lat], g))
     .sort((a, b) => (b.severity || 0) - (a.severity || 0) || b.delay_min - a.delay_min).slice(0, 60);
 }
-// a county or a few (Harris is about 1,780 sq mi): TxDOT answers with the 1,000 busiest segments plus totals by road type
-export const MAX_SQMI = 5000;
+// any area up to a large Texas county or several (Harris is about 1,780 sq mi; 10,000 is only an abuse guard): TxDOT
+// answers with the 1,000 busiest segments plus totals by road type, and segmentsPage() pages through the rest
+export const MAX_SQMI = 10000;
 export async function trafficReport(g, { label = '', key = process.env.TOMTOM_API_KEY, fetchImpl = globalThis.fetch } = {}) {
-  const sq = areaSqMi(g); if (sq > MAX_SQMI) { const e = new Error('That area is too large for a traffic report (over ' + MAX_SQMI.toLocaleString('en-US') + ' square miles).'); e.status = 400; throw e; }
+  const sq = areaSqMi(g); if (sq > MAX_SQMI) { const e = new Error('That area is larger than ' + MAX_SQMI.toLocaleString('en-US') + ' square miles. Pick a smaller area.'); e.status = 400; throw e; }
   const part = async fn => { try { return await fn(); } catch (e) { return { error: e.message }; } };
   const counts = await part(() => countsIn(g, fetchImpl));
   const top = Array.isArray(counts.roads) ? counts.roads.filter(r => r.lat != null).slice(0, 8) : [];
@@ -131,10 +141,12 @@ export default async function handler(req, res) {
   }
   if (req.method === 'POST' || q.lat) {
     if (!rateLimit(req, res, { perMinute: 10, perDay: 300 })) return;
-    let g = null, label = '';
-    if (req.method === 'POST') { const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}; g = cleanGeometry(b.geometry); label = String(b.label || '').slice(0, 120); }
+    let g = null, label = '', seg = null;
+    if (req.method === 'POST') { const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}; g = cleanGeometry(b.geometry); label = String(b.label || '').slice(0, 120); if (b.segments) seg = Math.max(0, Math.floor(+b.offset || 0)); }
     else { const lat = +q.lat, lon = +q.lon, mi = Math.min(10, Math.max(0.1, +q.mi || 1)); if (lat > 25 && lat < 37 && lon > -107 && lon < -93) { g = circle(lon, lat, mi); label = mi + ' mi around ' + lat.toFixed(4) + ', ' + lon.toFixed(4); } }
     if (!g) return res.status(400).json({ error: 'Send a Polygon geometry (POST) or lat, lon and mi in Texas.' });
+    // { geometry, segments: true, offset }: one page of every counted segment (the CSV)
+    if (seg != null) { try { const d = await segmentsPage(g, seg); res.setHeader('Cache-Control', 'no-store'); return res.json(d); } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ error: e.message }); } }
     try { const d = await trafficReport(g, { label }); res.setHeader('Cache-Control', 'no-store'); return res.json(d); } // live parts change by the minute
     catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.status(e.status || 502).json({ error: e.message }); }
   }

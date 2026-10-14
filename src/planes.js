@@ -15,6 +15,7 @@ import { SHAPES, SIZE } from './lib/aircraft-shapes.mjs';
 import { smoothPath, altColorExpr, altGradient } from './lib/flightpath.mjs';
 import { flightPath3D } from './flightpath3d.js';
 import { planes3D } from './planes3d.js';
+import { readJSON } from './lib/http.mjs';
 
 const REFRESH = 10e3, MINZ = 5, KT = 1.852 / 3600; // km per second per knot
 const BANDS = [[1, '#8d9598'], [3000, '#e3622b'], [10000, '#eda100'], [25000, '#3987e5'], [99999, '#1f9249']]; // ground, low, climbing, mid, cruise
@@ -253,8 +254,7 @@ export function initPlanes(ctx) {
     const b = map.getBounds(), bbox = [b.getWest(), Math.max(-85, b.getSouth()), b.getEast(), Math.min(85, b.getNorth())].map(v => v.toFixed(3)).join(',');
     ctl?.abort(); ctl = new AbortController();
     try {
-      const r = await fetch('api/planes?bbox=' + bbox, { signal: ctl.signal }), d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      const r = await fetch('api/planes?bbox=' + bbox, { signal: ctl.signal }), d = await readJSON(r);
       // drop what's already older than a minute (the feeds keep stale entries briefly); positions are as of the feed's
       // time, never later than now (clock skew), and the moving icons start from there
       const next = (d.aircraft || []).filter(p => p.seen == null || p.seen < 60), nextAt = Math.min(Date.now(), Date.parse(d.time) || Date.now());
@@ -479,8 +479,7 @@ export function initPlanes(ctx) {
     const b = map.getBounds(), w = Math.max(b.getWest(), map.getCenter().lng - 2), e = Math.min(b.getEast(), map.getCenter().lng + 2), s = Math.max(b.getSouth(), map.getCenter().lat - 2), n = Math.min(b.getNorth(), map.getCenter().lat + 2);
     pathsCtl?.abort(); pathsCtl = new AbortController();
     try {
-      const r = await fetch('api/planes?density=' + [w, s, e, n].map(v => v.toFixed(2)).join(',') + '&days=30', { signal: pathsCtl.signal }), d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      const r = await fetch('api/planes?density=' + [w, s, e, n].map(v => v.toFixed(2)).join(',') + '&days=30', { signal: pathsCtl.signal }), d = await readJSON(r);
       paths = d; map.getSource('live-flightpaths')?.setData(d.history ? d : { type: 'FeatureCollection', features: [] });
     } catch (e2) { if (e2.name !== 'AbortError') paths = { history: false, note: e2.message }; }
     ctx.live.syncUI();
@@ -507,7 +506,7 @@ export function initPlanes(ctx) {
   const hist = new Map();
   ctx.airHistory = (c, km = 1) => {
     const k = c.map(v => v.toFixed(3)).join(',') + '|' + km; if (hist.has(k)) return hist.get(k);
-    const job = fetch('api/planes?history=' + c[0].toFixed(5) + ',' + c[1].toFixed(5) + '&km=' + km).then(r => r.json()).catch(e => ({ history: false, note: e.message }));
+    const job = fetch('api/planes?history=' + c[0].toFixed(5) + ',' + c[1].toFixed(5) + '&km=' + km).then(readJSON).catch(e => ({ history: false, note: e.message }));
     hist.set(k, job); return job;
   };
   ctx.planesNear = async (c, miles = 3) => {

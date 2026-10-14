@@ -4,6 +4,7 @@
 //   ctx.placesNear(lat, lon, m) for the building card ("Businesses on the Block").
 import { GROUPS, sourceText } from './lib/places.mjs';
 import { esc, fmt, openCard, cardTop, fillCard } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 
 const SRC = 'places', MINZ = 14;
 
@@ -70,7 +71,7 @@ export function initPlaces(ctx) {
     const card = openCard(ctx, { kicker: 'Business / place', title: 'Loading…', loading: 'Looking up the place…' }), tid = 'p:' + id;
     ctx.tabs?.track?.({ id: tid, kind: 'place', label: 'Place', reopen: () => show(id) });
     const gone = () => ctx.tabs && ctx.tabs.active?.()?.id !== tid;
-    let p; try { const r = await fetch('api/places?id=' + encodeURIComponent(id)); p = await r.json(); if (!r.ok) throw new Error(p.error || 'lookup failed'); }
+    let p; try { const r = await fetch('api/places?id=' + encodeURIComponent(id)); p = await readJSON(r); }
     catch (e) { if (!gone()) card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
     if (gone()) return;
     const g = GROUPS[p.grp] || GROUPS.other, addr = [p.addr, p.city, p.zip].filter(Boolean).join(', ');
@@ -84,5 +85,5 @@ export function initPlaces(ctx) {
     card.querySelector('#plBldg').onclick = () => { const c = [p.lon, p.lat]; if (!ctx.buildingAt?.(c)) ctx.openBuildingAt?.(c); };
   }
   ctx.showPlace = show;
-  ctx.placesNear = async (lat, lon, m = 150) => { const r = await fetch('api/places?near=' + (+lat).toFixed(6) + ',' + (+lon).toFixed(6) + '&m=' + m); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'places unavailable'); return d.places || []; };
+  ctx.placesNear = async (lat, lon, m = 150) => { const r = await fetch('api/places?near=' + (+lat).toFixed(6) + ',' + (+lon).toFixed(6) + '&m=' + m); return (await readJSON(r)).places || []; };
 }

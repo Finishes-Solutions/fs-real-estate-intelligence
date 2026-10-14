@@ -5,6 +5,7 @@
 // Data: api/isochrone (TomTom reachable range with traffic; Valhalla / OpenStreetMap without).
 import { inGeom, tractsFor, summarizeTracts } from './lib/demographics.mjs';
 import { esc, fmt, kgrid, table, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf } from './reportkit.js';
+import { readJSON } from './lib/http.mjs';
 
 export const BAND_COL = ['#16a34a', '#eab308', '#f97316', '#dc2626'];
 const DEPARTS = [['now', 'Now'], ['weekday-am', 'Weekday 8 AM'], ['weekday-pm', 'Weekday 5 PM'], ['weekend', 'Sunday']];
@@ -16,9 +17,8 @@ export function initDriveTime(ctx) {
 
   async function fetchBands(center, minutes, depart) {
     const q = new URLSearchParams({ lat: center[1].toFixed(3), lon: center[0].toFixed(3), minutes: minutes.join(','), depart }); // rounded: nearby requests share the cache
-    const r = await fetch('api/isochrone?' + q, { signal: AbortSignal.timeout(40000) }); const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || (r.status === 404 ? 'Drive-time maps aren’t deployed here.' : 'Drive-time lookup failed (' + r.status + ')'));
-    return d;
+    const r = await fetch('api/isochrone?' + q, { signal: AbortSignal.timeout(40000) }); if (r.status === 404) throw new Error('Drive-time maps aren’t deployed here.');
+    return readJSON(r);
   }
   // people, households and jobs inside each band (census tracts whose middle falls inside), and the filings on the map
   async function enrich(d) {
@@ -41,7 +41,8 @@ export function initDriveTime(ctx) {
           paint: { 'text-color': ['get', 'col'], 'text-halo-color': '#fff', 'text-halo-width': 1.6 } });
         map.on('click', SRC + '-fill', e => { if (!last || !document.getElementById('card')?.classList.contains('open')) return; const m = Math.min(...e.features.map(f => f.properties.minutes)); const b = last.bands.find(x => x.minutes === m); if (b) select(b); });
       }
-      ctx.setLegend?.('drivetime', d ? '<div class="t">Drive time</div>' + d.features.map((f, i) => '<div class="li"><i style="background:' + (BAND_COL[i] || BAND_COL[3]) + '"></i>' + f.properties.minutes + ' min</div>').join('') : '');
+      ctx.setLegend?.('drivetime', d ? '<div class="t">Drive time</div>' + d.features.map((f, i) => '<div class="li"><i style="background:' + (BAND_COL[i] || BAND_COL[3]) + '"></i>' + f.properties.minutes + ' min</div>').join('') +
+        '<button class="lnk" type="button" data-dt-clear>Clear from map</button>' : '');
     } catch (e) { /* map style still loading */ }
   }
   const clear = () => { last = null; draw(null); };
@@ -110,7 +111,13 @@ export function initDriveTime(ctx) {
 
   ctx.driveTime = show;
   ctx.driveTimeData = async ({ center, minutes = [10, 20, 30], depart = 'now' }) => { const d = await fetchBands(center, minutes, depart); return { d, bands: await enrich(d) }; };
-  ctx.onCardClose?.(() => { /* the bands stay until cleared: they're useful while browsing the area */ });
+  // Closing the card (× or Esc) clears the bands. Going back to the property card keeps them, and so does opening another
+  // card (a report on a band you selected): openCard() closes the old card and opens the new one in the same moment,
+  // so the card is open again by the time this looks.
+  ctx.onCardClose?.(() => { if (last) setTimeout(() => { if (!document.getElementById('card')?.classList.contains('open')) clear(); }, 0); });
+  // the legend's "Clear from map", for bands drawn without a card (the assistant) or after the card was replaced
+  document.addEventListener('click', e => { if (!e.target.closest?.('[data-dt-clear]')) return; e.stopPropagation(); clear();
+    const c = document.getElementById('card'); if (c?.classList.contains('open') && c.querySelector('#dtClear')) ctx.closeCard?.(); }, true);
 
   // area reports: a drive-time map from the middle of the chosen area
   ctx.addAreaReport?.({ key: 'drivetime', label: 'Drive-Time Map', desc: 'How far you can drive in 10, 20 and 30 minutes (or other times) from a point, now or at rush hour, with the people, households, jobs and filings inside each band. Export as a PDF report or CSV.',

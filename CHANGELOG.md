@@ -5,6 +5,36 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 12:37 PM CT: Drive-time bands clear when you close the card (cc25d91)
+- Closing a drive-time map, or the property card it came from, with × or Esc now takes the bands off the map. Before, they stayed with no way to remove them.
+- The bands still stay while you go back to the property card, or when you select a band and run a report on it.
+- The map legend's Drive time section has a **Clear from map** link.
+
+### 12:25 PM CT: No more size limits on FEMA, traffic and air traffic reports (243a985)
+- **FEMA report for any area:** it used to refuse anything over 400 square miles and skip flood-zone shares over 60. Both now work up to a whole county.
+  - Larger areas measure the zones at about 900 evenly spaced points.
+  - Flood insurance claims are read for every census tract touching the area, not just the first 60.
+  - If some tracts can't be read in time, the report says how many.
+- **Air Traffic report:** the 2,000 square mile limit is gone, and even a very large area answers in under a second.
+- **Traffic report:** works for areas up to 10,000 square miles (was 5,000). **Export CSV** now lists every counted road segment, not just the 1,000 busiest, and the card says when the map shows only the busiest.
+- **Crime Export CSV** lists up to the newest 20,000 incidents (was 2,000).
+
+### 12:19 PM CT: Environmental report for any size of area (d038e3b)
+- **No size limit:** the Environmental report used to refuse anything over 30 square miles. It now works up to a whole county.
+- **Exact counts:** each database used to stop at 1,000 records (shown as "1,000+") and searched a circle much bigger than the site. Now every record within the search distance of the site's edge is counted, and the table shows how many are **on the site**.
+- **Large areas:** when a kind has more than 1,000 records, the report lists the on-site and nearest ones. **Export CSV** gathers all of them, which can take a minute for a county. Wells and wetlands are summarized by type (wetlands with acres), and pipelines count distinct lines.
+- **Soils for any size:** larger areas show each soil's share of the site. Before, soils were skipped over 3 square miles.
+- **Retry:** a database that doesn't answer in time says so, and **Retry** asks just that one again.
+
+### 12:06 PM CT: Crime reports work for any area; clear messages when a report can't finish (ceb2862)
+- **Crime Report no longer fails on big areas.** An 80 sq mi selection (Jersey Village) showed "Unexpected token 'A'… is not valid JSON". The report took 27 seconds in the database, the database gives up after 8, and the server then retried until the whole request was cut off. It now takes about 2 seconds (the incident list under 1). The whole city takes a fraction of a second, and an area covering most of the city about 16 seconds.
+- **No 1,500 square mile limit** on crime reports: any area counts the Houston incidents inside it.
+- **Market page:** Houston-wide crime loads straight away instead of timing out when it isn't cached.
+- **Plain-language errors everywhere:** when a report or lookup can't finish (crime, FEMA, environmental, traffic, air traffic, drive time, the property card, places, weather and others), you see a sentence about what happened ("The server took too long on this area. Try again…") instead of a technical message.
+- **Crime report keeps its numbers** if the incident list can't load in time; it says so under Most recent incidents.
+- **Air Traffic Report** no longer says "Flight history isn't set up" when the real problem was something else.
+- Behind the scenes: Houston-wide crime numbers are worked out once a night instead of on every report, and incidents are stored in map order. While applying this, the database restarted once for about two minutes (12:43 PM CT) because a step used too much memory; that step was replaced before the changes went in.
+
 ### 6:55 AM CT: Site plans: a planning workspace, layouts you can compare, a map you can read (31fecfc, ae13672, 5c9686e, 11e0062, 4e46278, 194fe70, bd6f4c7, 26713a5, 168480b, f8b65e1, 9458bf4)
 - **A planning workspace:** while a plan is open the map's side list and area tools step aside so the plan gets the room. The header shows where you are (Projects › project › option) with Undo, Redo, Edit Layout and **Done** always in the same place. A **Fit plan** button re-centres it.
 - **Nothing lost by accident:** Esc steps back (stop the tool, then clear the selection, then stop editing) and never closes the plan. Closing says where the plan was saved, with a **Resume plan** chip on the map and a link to the project. Leaving the Map shows a "Return to plan" banner.

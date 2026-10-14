@@ -143,7 +143,7 @@ export default async function handler(req, res) {
       const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}, g = cleanGeometry(b.geometry);
       if (!g) return res.status(400).json({ error: 'Send a Polygon or MultiPolygon geometry.' });
       const d = db(); if (!d || d.via !== 'key') return res.json({ history: false, note: 'The air traffic history isn’t set up on this deployment.' });
-      const r = await d.rpc('air_profile_report', { p_geom: g, p_months: Math.min(36, Math.max(1, +b.months || 3)) });
+      const r = await d.rpc('air_profile_report', { p_geom: g, p_months: Math.min(36, Math.max(1, +b.months || 3)) }, { deadline: Date.now() + 25000 }); // vercel.json: 30 s
       res.setHeader('Cache-Control', 'no-store'); return res.json({ history: true, ...r });
     }
     if (q.route) {
@@ -200,6 +200,10 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error('planes', e.message);
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(502).json({ error: /air_|function|relation|does not exist|PGRST/i.test(e.message) ? 'Flight history isn’t set up in the database yet (apply supabase/migrations/20261008000000_air_traffic.sql).' : 'The aircraft feed didn’t answer. Try again in a few seconds.' });
+    // say what actually went wrong: only a missing table or function means "not set up"
+    if (e.timeout) return res.status(503).json({ error: 'The flight history database took too long on this area. Try again in a moment.' });
+    const raised = /supabase .*: 400 .*"message":"([^"]+)"/.exec(e.message);
+    if (raised && !/does not exist|could not find/i.test(raised[1])) return res.status(400).json({ error: raised[1].charAt(0).toUpperCase() + raised[1].slice(1) + '.' });
+    return res.status(502).json({ error: /PGRST20[2-5]|42883|42P01|does not exist|could not find the function/i.test(e.message) ? 'Flight history isn’t set up in the database yet (apply supabase/migrations/20261008000000_air_traffic.sql).' : 'The aircraft feed didn’t answer. Try again in a few seconds.' });
   }
 }
