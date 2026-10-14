@@ -3,7 +3,8 @@
 // selecting one building must never pull in the others (2026-10-05: a click in Waller selected ~260,000 sq ft of
 // unrelated buildings across the screen).
 import assert from 'node:assert/strict';
-const { joinPieces, tileBox, inGeom, offsetGeom, labelPoint, sameSelection } = await import('../lib/footprint.mjs');
+const { joinPieces, tileBox, inGeom, offsetGeom, labelPoint, sameSelection, partAt } = await import('../lib/footprint.mjs');
+const { groundClick } = await import('../lib/cardclick.mjs');
 
 const z = 16, lon = -95.93, lat = 30.09, n = 2 ** z;
 const x = Math.floor((lon + 180) / 360 * n), y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
@@ -91,4 +92,27 @@ assert.ok(!sameSelection(bA, { center: ptIn(smallA[0]), footprint: { type: 'Poly
   assert.ok(!inGeom(at(20, 20), offsetGeom(court, 0.5)), 'the courtyard stays open');
   const w = offsetGeom(joinPieces(pieces, [L - 0.0002, midLat + 0.0001]), 0.5);
   assert.equal(w.type, 'MultiPolygon'); assert.ok(![...smallA, ...smallB, edgeNeighbour].some(s => inGeom(ptIn(s), w)), 'still only the warehouse'); }
+
+// ---------- the next lot takes one click (2026-10-14: with a card open, a click on an empty neighbouring lot only closed the card) ----------
+// The card shows the warehouse that crosses the tile edge, on a lot that crosses it too (the lot's outline is whole: it comes from
+// the appraisal data, not the tiles). The tiles still merge every neighbouring building into the one feature.
+{ const lot = rect(L - 0.0007, midLat - 0.0004, L + 0.0006, midLat + 0.0005), lotShape = { type: 'Polygon', coordinates: lot };
+  const warehouse = joinPieces(pieces, [L - 0.0002, midLat + 0.0001]);
+  const shown = [warehouse, lotShape];
+  const card = { cardOpen: true, zoom: 17.5, shapes: shown };
+  const nextLot = [L + 0.0012, midLat + 0.0002]; // open ground in the lot east of it: no building drawn there
+  assert.equal(groundClick({ ...card, point: nextLot }), 'open', 'one click opens the neighbouring lot while a card is open');
+  assert.equal(groundClick({ ...card, point: [A[0] + 0.00005, midLat + 0.0008] }), 'open', 'and the one on the far side, in the other tile');
+  // open ground inside the lot already shown (either side of the tile edge): the click still dismisses the card, as before
+  assert.equal(groundClick({ ...card, point: [L - 0.0006, midLat - 0.0003] }), 'none'); assert.equal(groundClick({ ...card, point: [L + 0.0005, midLat - 0.0003] }), 'none');
+  // the same click with no card open, or a card with nothing shown (a report), opens the parcel; zoomed out it opens nothing
+  assert.equal(groundClick({ cardOpen: false, zoom: 17, point: nextLot }), 'open'); assert.equal(groundClick({ ...card, shapes: [], point: nextLot }), 'open');
+  assert.equal(groundClick({ ...card, zoom: 15.5, point: nextLot }), 'none'); assert.equal(groundClick({ ...card, zoom: 15.5, adding: true, point: nextLot }), 'add'); assert.equal(groundClick({ ...card, zoom: 14, adding: true, point: nextLot }), 'none');
+  assert.equal(groundClick({ ...card, adding: true, point: nextLot }), 'add', 'Shift-click still adds it to the selection');
+  // the gap between two buildings of one merged tile feature is open ground, not a building: the parcel opens. A click on any of
+  // the buildings is a building click, and its own outline is only that building (never the whole group)
+  const merged = { type: 'MultiPolygon', coordinates: [big, ...smallA] }, gap = [A[0] + 0.0015, midLat - 0.0005];
+  assert.equal(partAt(merged, gap), null, 'the gap is in the feature\'s box but in none of its buildings'); assert.equal(groundClick({ ...card, point: gap }), 'open');
+  for (const sm of smallA) { const part = partAt(merged, ptIn(sm)); assert.ok(part && inGeom(ptIn(sm), part) && !inGeom(ptIn(big), part), 'a click on one small building is that building only'); }
+}
 console.log('footprint ok');

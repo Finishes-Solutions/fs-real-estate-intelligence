@@ -34,35 +34,39 @@ export function initRegrid(ctx) {
   ctx.renderRegrid = (el, center, parcel) => {
     if (!el) return;
     const key = parcel?.propId && parcel?.county ? parcel.county + '|' + parcel.propId : '';
-    const btn = (u) => '<div class="lt">Regrid parcel record</div><button class="btn" type="button" id="rgGo">Get Regrid Details</button><div class="rnote">Zoning, standardized land use and the full parcel record. Uses 1 of your Regrid records' +
+    // a building on several parcels: the property card says which one this record is for (el.dataset.for, src/building.js)
+    const lt = () => '<div class="lt">Regrid parcel record' + (el.dataset.for ? '<span class="src">for parcel ' + esc(el.dataset.for) + '</span>' : '') + '</div>';
+    const paintLeft = u => { if (u?.records) document.querySelectorAll('#card [data-rg-left]').forEach(x => { x.textContent = ' (' + fmtN(left(u, 'records')) + ' left)'; }); };
+    const btn = (u) => lt() + '<button class="btn" type="button" id="rgGo">Get Regrid Details</button><div class="rnote">Zoning, standardized land use and the full parcel record. Uses 1 of your Regrid records' +
       (u && !u.error ? ' (' + fmtN(left(u, 'records')) + ' of ' + fmtN(u.records.cap) + ' left this month)' : '') + '; a parcel looked up before is free.</div>';
     el.innerHTML = btn(usage);
     getUsage().then(u => { if (el.isConnected && el.querySelector('#rgGo')) { el.innerHTML = btn(u); wire(); }
-      // the property card's own "Get … from Regrid" buttons (src/building.js) show the same allowance
-      if (u?.records) document.querySelectorAll('#card [data-rg-left]').forEach(x => { x.textContent = ' (' + fmtN(left(u, 'records')) + ' left)'; }); });
+      paintLeft(u); }); // the property card's own "Get … from Regrid" buttons (src/building.js) show the same allowance
     function wire() {
       el.querySelector('#rgGo').onclick = () => look(false);
     }
     async function look(refresh) {
-        el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote">' + (refresh ? 'Getting the latest record…' : 'Looking up…') + '</div>';
+        el.innerHTML = lt() + '<div class="rnote">' + (refresh ? 'Getting the latest record…' : 'Looking up…') + '</div>';
         try {
           const r = await fetch('api/regrid?' + new URLSearchParams({ lat: center[1].toFixed(6), lon: center[0].toFixed(6), ...(key ? { key } : {}), ...(refresh ? { refresh: '1' } : {}) }));
           const d = await readJSON(r);
           if (d.geom) ctx.lastRegrid = { center, geom: d.geom, zoning: d.zoning || null }; // for Start Site Plan
-          if (d.usage) usage = d.usage;
-          if (d.none) { el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote">Regrid has no parcel at this point.</div>'; return; }
+          if (d.usage) { usage = d.usage; paintLeft(usage); }
+          if (d.none) { el.innerHTML = lt() + '<div class="rnote">Regrid has no parcel at this point.</div>'; return; }
           const z = d.zoning;
-          el.innerHTML = '<div class="lt">Regrid parcel record</div><dl>' + d.fields.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
+          el.innerHTML = lt() + '<dl>' + d.fields.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' +
             (z ? '<div class="lt">Zoning (Regrid)</div><dl>' + [['Zone', [z.zoning, z.zoning_description].filter(Boolean).join(' · ')], ['Type', [z.zoning_type, z.zoning_subtype].filter(Boolean).join(' · ')], ['Max height', z.max_building_height_ft && z.max_building_height_ft + ' ft'], ['Max FAR', z.max_far], ['Max coverage', z.max_coverage_pct && z.max_coverage_pct + '%'], ['Density', z.max_density_du_per_acre && z.max_density_du_per_acre + ' units/acre']].filter(([, v]) => v).map(([k, v]) => '<dt>' + k + '</dt><dd>' + esc(v) + '</dd>').join('') + (z.zoning_code_link ? '<dt>Code</dt><dd><a href="' + esc(z.zoning_code_link) + '" target="_blank" rel="noopener">Zoning code ↗</a></dd>' : '') + '</dl>' : '') +
             (d.more?.length ? '<details class="raw"><summary>All Regrid fields (' + d.more.length + ')</summary><dl>' + d.more.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl></details>' : '') +
             (d.stale ? '<div class="rg-stale"><span>' + (d.why === 'county' ? 'Regrid refreshed this county’s records on ' + esc(d.county_refreshed) + ', after this copy was saved (' + esc(d.fetched) + ').' : 'This copy is more than a year old (' + esc(d.fetched) + ').') + '</span><button class="btn" type="button" id="rgUpd">Update (uses 1 record)</button></div>' : '') +
             '<div class="rnote">' + (d.cached ? 'Saved copy from ' + esc(d.fetched) + ' (no charge)' + (d.stale ? '' : d.county_refreshed ? ', current with Regrid’s ' + esc(d.county_refreshed) + ' county refresh' : '') + '.' : 'Used 1 Regrid record.') + (d.usage ? ' ' + fmtN(left(d.usage, 'records')) + ' of ' + fmtN(d.usage.records.cap) + ' left this month.' : '') +
             (d.path ? ' <a href="https://app.regrid.com' + esc(d.path) + '" target="_blank" rel="noopener">Open in Regrid ↗</a>' : '') + '</div>';
           el.querySelector('#rgUpd')?.addEventListener('click', () => look(true));
+          // the property card above fills in the owner, address and value (where the state data had none) and its Regrid row (src/building.js)
+          el.dispatchEvent(new CustomEvent('regrid-record', { bubbles: true, detail: d }));
           // Harris and Waller: the owner comes from Regrid only, so the company lookup hangs off this record
           const own = d.fields.find(([k]) => k === 'Owner')?.[1];
           if (own && !document.querySelector('#card #bOwnerCo:not([hidden])')) { const box = document.createElement('div'); box.className = 'oc-box'; box.hidden = true; el.querySelector('dl')?.after(box); ctx.renderOwnerCo?.(box, own); }
-        } catch (e) { el.innerHTML = '<div class="lt">Regrid parcel record</div><div class="rnote err">' + esc(e.message) + '</div>'; }
+        } catch (e) { el.innerHTML = lt() + '<div class="rnote err">' + esc(e.message) + '</div>'; }
     }
     wire();
   };

@@ -56,6 +56,6 @@ assert.equal(ids({ laidOut: true }), 'spChgSec spAiSec spNums spPfSec spSiteSec 
 assert.equal(ids({ laidOut: true, layouts: true }), 'spLayouts spChgSec spAiSec spNums spPfSec spSiteSec spDrawSec spParams spExport');
 assert.equal(ids({ laidOut: true, layouts: true, selected: true }).split(' ')[0], 'spSel', 'a picked piece comes first');
 assert.equal(ids({ drawing: true, laidOut: true, selected: true }), 'spDrawSite', 'drawing the site: only that');
-assert.deepEqual(planSections({ laidOut: true }).map(s => s.label), ['Change', 'Build', 'Numbers', 'Pro forma', 'Site', 'Draw', 'Settings', 'Export']);
+assert.deepEqual(planSections({ laidOut: true }).map(s => s.label), ['Change', 'Build', 'Numbers', 'Pro forma', 'Site', 'Draw', 'Parameters', 'Export']);
 
 console.log('planview ok: docked edges, the free map area, fit padding and the plan sections');

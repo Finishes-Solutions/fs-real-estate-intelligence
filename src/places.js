@@ -3,8 +3,7 @@
 //   Place card: name, category, address, phone, website and the sources that list it.
 //   ctx.placesNear(lat, lon, m) for the building card ("Businesses on the Block").
 import { GROUPS, sourceText } from './lib/places.mjs';
-import { esc, fmt, openCard, cardTop, fillCard } from './reportkit.js';
-import { readJSON } from './lib/http.mjs';
+import { esc, fmt, openCard, cardTop, fillCard, getJSON, errorBox, friendly, layerFailed, layerOK } from './reportkit.js';
 
 const SRC = 'places', MINZ = 14;
 
@@ -24,11 +23,11 @@ export function initPlaces(ctx) {
     const key = bb.join(',') + (grp ? '&groups=' + grp : ''); if (key === lastKey && map.getSource(SRC)) return;
     ctl?.abort(); ctl = new AbortController();
     try {
-      const res = await fetch('api/places?box=' + key, { signal: ctl.signal }), d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error || 'Places are unavailable right now.'); if (my !== seq) return; lastKey = key;
+      const d = await getJSON('api/places?box=' + key, { what: 'Business data', signal: ctl.signal });
+      if (my !== seq) return; lastKey = key;
       setData(d.places || []);
       say(fmt((d.places || []).length) + (grp ? ' ' + GROUPS[grp].label.toLowerCase() : ' businesses and places') + ' in view' + (d.capped ? ' (the best-known ones; zoom in for all)' : '') + '. Click one for details.');
-    } catch (e) { if (e.name !== 'AbortError') say(e.message); }
+    } catch (e) { if (e.name !== 'AbortError') layerFailed(ctx, e, { what: 'Business data', off: () => setOn(false), note }); }
   }
   const color = ['match', ['get', 'g'], ...Object.entries(GROUPS).flatMap(([k, g]) => [k, g.color]), GROUPS.other.color];
   function setData(list) {
@@ -48,7 +47,7 @@ export function initPlaces(ctx) {
     ctx.setLegend?.('places', '<div class="t">Businesses &amp; places</div><div class="lg2">' + used.map(k => '<div class="li" title="' + esc(GROUPS[k].label) + '"><i style="background:' + GROUPS[k].color + '"></i>' + esc(grp ? GROUPS[k].label : GROUPS[k].short) + '</div>').join('') + '</div>');
   }
   function setOn(v) {
-    on = !!v; if (box) box.checked = on; if (note) note.hidden = !on; if (sel) sel.hidden = !on;
+    on = !!v; if (box) box.checked = on; if (note) note.hidden = !on; if (sel) sel.hidden = !on; if (on) layerOK(note);
     try { localStorage.setItem('fs-places', on ? '1' : '0'); } catch (e) {}
     if (!on) { ctl?.abort(); lastKey = ''; try { for (const id of [SRC + '-lbl', SRC]) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource(SRC)) map.removeSource(SRC); } catch (e) {} ctx.setLegend?.('places', ''); return; }
     legend(); load();
@@ -70,9 +69,11 @@ export function initPlaces(ctx) {
   async function show(id) {
     const card = openCard(ctx, { kicker: 'Business / place', title: 'Loading…', loading: 'Looking up the place…' }), tid = 'p:' + id;
     ctx.tabs?.track?.({ id: tid, kind: 'place', label: 'Place', reopen: () => show(id) });
-    const gone = () => ctx.tabs && ctx.tabs.active?.()?.id !== tid;
-    let p; try { const r = await fetch('api/places?id=' + encodeURIComponent(id)); p = await readJSON(r); }
-    catch (e) { if (!gone()) card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
+    // gone once something else has taken the card over (a tab switch, another click): this header is replaced then. Opened from
+    // a property card (ctx.cardPush) it is not a tab of its own, so the tab check can't tell.
+    const mine = card.querySelector(':scope>.top'), gone = () => !mine?.isConnected;
+    let p; try { p = await getJSON('api/places?id=' + encodeURIComponent(id), { what: 'Place details' }); }
+    catch (e) { if (!gone()) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => show(id), 'Place details')); card.querySelector('h2').textContent = 'Place unavailable'; } return; }
     if (gone()) return;
     const g = GROUPS[p.grp] || GROUPS.other, addr = [p.addr, p.city, p.zip].filter(Boolean).join(', ');
     const gmaps = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([p.name, addr].filter(Boolean).join(', ') || p.lat + ',' + p.lon);
@@ -84,6 +85,7 @@ export function initPlaces(ctx) {
     ctx.tabs?.mount?.(); ctx.tabs?.label?.(tid, p.name);
     card.querySelector('#plBldg').onclick = () => { const c = [p.lon, p.lat]; if (!ctx.buildingAt?.(c)) ctx.openBuildingAt?.(c); };
   }
-  ctx.showPlace = show;
-  ctx.placesNear = async (lat, lon, m = 150) => { const r = await fetch('api/places?near=' + (+lat).toFixed(6) + ',' + (+lon).toFixed(6) + '&m=' + m); return (await readJSON(r)).places || []; };
+  // the place card by id (the business list on a property card). ctx.showPlace belongs to the map search (src/mapsearch.js) and takes a place object.
+  ctx.showPlaceCard = show;
+  ctx.placesNear = async (lat, lon, m = 150) => (await getJSON('api/places?near=' + (+lat).toFixed(6) + ',' + (+lon).toFixed(6) + '&m=' + m, { what: 'Business data' })).places || [];
 }

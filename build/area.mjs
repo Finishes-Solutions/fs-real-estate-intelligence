@@ -156,16 +156,38 @@ export async function buildBusinesses(counties, prev) {
 
 // ---------- area news: Google News ----------
 export function newsQuery(place) { return '"' + String(place).replace(/"/g, '') + '" ' + TOPIC + ' when:30d'; }
-export async function buildNews(places, prev, gap = 1500) {
+// Google News matches loosely: "Waller" is a Fed governor, "Montgomery" and "Washington" are in other states, and a county
+// search returns stories about beef prices. Keep a story only if it is about a Houston-area place (or Texas) AND about building,
+// development or real estate. names: the region's place names (counties and the towns with filings).
+const STATES = 'Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Utah|Vermont|Virginia|West Virginia|Wisconsin|Wyoming';
+const OTHER_STATE = new RegExp('\\b(' + STATES + ')\\b', 'i'), TEXAS = /\b(texas|tx|houston|greater houston)\b/i;
+const ON_TOPIC = /\b(construction|construct(ed|ing)|develop(er|ers|ment|ments|ing)|breaks? ground|groundbreaking|rezon\w*|zoning|real estate|housing|apartments?|multifamily|multi-family|homebuilders?|home builders?|new homes?|warehouses?|industrial park|shopping center|retail center|mixed-use|subdivision|master-planned|permits?|plans? to build|expansion|expands?|data center|distribution center|campus|hospital|highway|infrastructure|growth|acres?)\b/i;
+// names that are also people, words or other places (Waller the Fed governor, Spring, Washington County in 20 states): they only
+// count when the story also says Texas, TX or Houston
+const AMBIGUOUS = new Set(['washington', 'austin', 'montgomery', 'grimes', 'waller', 'harris', 'jackson', 'spring', 'humble', 'richmond', 'cypress']);
+const COUNTY_AMBIGUOUS = new Set(['washington', 'montgomery', 'harris']);
+export function newsFilter({ counties = [], cities = [] } = {}) {
+  const esc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), names = [];
+  for (const c of counties) if (!COUNTY_AMBIGUOUS.has(String(c).toLowerCase())) names.push(esc(String(c).toLowerCase()) + ' county');
+  for (const c of new Set(cities.map(x => String(x || '').trim().toLowerCase()).filter(x => x.length > 2 && !AMBIGUOUS.has(x)))) names.push(esc(c));
+  const local = names.length ? new RegExp('\\b(' + names.join('|') + ')\\b', 'i') : null;
+  return a => {
+    const t = String(a?.title || ''), where = t + ' ' + String(a?.domain || ''), tx = TEXAS.test(where);
+    if (!ON_TOPIC.test(t)) return false;
+    if (OTHER_STATE.test(t) && !tx) return false;
+    return tx || !!(local && local.test(where));
+  };
+}
+export async function buildNews(places, prev, gap = 1500, relevant = () => true) {
   const keep = Date.now() - 120 * 864e5, out = {}; let ok = 0;
   for (const [i, p] of places.entries()) {
     if (i) await sleep(gap);
-    const old = (prev?.[p.key] || []).filter(a => !a.date || Date.parse(a.date) >= keep);
+    const old = (prev?.[p.key] || []).filter(a => (!a.date || Date.parse(a.date) >= keep) && relevant(a));
     try {
       const r = await fetch('https://news.google.com/rss/search?' + new URLSearchParams({ q: newsQuery(p.q), hl: 'en-US', gl: 'US', ceid: 'US:en' }), { headers: UA, signal: AbortSignal.timeout(15000) });
       if (!r.ok) throw new Error('Google News ' + r.status);
       const fresh = parseGoogleNews(await r.text(), 25), seen = new Set(), all = [];
-      for (const a of [...fresh, ...old]) { const k = a.title.toLowerCase().replace(/\W+/g, ' ').trim(); if (seen.has(k)) continue; seen.add(k); all.push({ title: a.title, url: a.url, domain: a.domain, date: a.date }); }
+      for (const a of [...fresh.filter(relevant), ...old]) { const k = a.title.toLowerCase().replace(/\W+/g, ' ').trim(); if (seen.has(k)) continue; seen.add(k); all.push({ title: a.title, url: a.url, domain: a.domain, date: a.date }); }
       out[p.key] = all.sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 30); ok++;
     } catch (e) { out[p.key] = old; log('area: news', p.q, 'failed:', e.message); }
   }
@@ -239,7 +261,7 @@ export async function buildArea(regions, filings, prev = {}) {
     .sort((a, b) => b[1] - a[1]).slice(0, +(process.env.AREA_NEWS_TOWNS || 10)).map(([k]) => { const [city, county] = k.split('|'); return { key: 'town:' + city, q: city + ', Texas', county }; });
   const places = counties.map(c => ({ key: 'county:' + c.name, q: c.name + ' County', county: c.name })).concat(towns);
   out.newsPlaces = places.map(p => ({ key: p.key, county: p.county, label: p.q.replace(/, Texas$/, '') }));
-  await step('news', () => buildNews(places, prev.news));
+  await step('news', () => buildNews(places, prev.news, 1500, newsFilter({ counties: counties.map(c => c.name), cities: filings.map(f => f.city) })));
   if (out.jobs) out.countyJobs = countyJobs(out.jobs, fips);
   return out;
 }

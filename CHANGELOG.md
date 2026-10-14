@@ -5,6 +5,51 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 4:49 PM CT: Ask AI fixes, clearer search results, and the any-size reports merged in (06915f4, 2a83f46, bb380c2, d34f302)
+- **Ask AI:**
+  - Text you type while an answer is on its way is kept.
+  - Failures read as sentences with Retry.
+  - Suggestions lead with the property, the area and the market, and only mention filings when they're on.
+  - "Ask AI About This Spot" (right-click) asks about the property at that address.
+  - Closing the drawer returns you to the Ask AI button.
+- **Search:** an address result's main button is now **Property Card** (an area's is **Area Summary**).
+- **Property card:** shows "≈ N acres · From the parcel outline" when the county record has no land area.
+- **Market** names its area once at the top.
+- **Compare's** empty page names the Box tool.
+- **Filings › Changes:** a night with no changes says so.
+- **Reports keep their no-size-limit behaviour** (from the earlier entries today). When a big area takes too long, or its outline is too detailed to send, the report gives that reason with Retry instead of a general "not available".
+
+### 2:53 PM CT: Property, site plans, area data and reports come first; a sweep of fixes (22242e8, 2e97724, b13e5b3, ab7dae3, b22f43a, 1a507b2, f7e1dd8, f885a72, 8e80a5c)
+- **New order:** the top bar is Map · Projects · Reports · Market · Filings · My Work, with site plans (Projects) as their own tab. On phones it's Map · Explore · Projects · Reports · More. The Map panel leads with the area, Area at a Glance and reports; saved searches and Construction Filings come last. Old links still open the same pages.
+- **Layer chips follow what you use:** the most-used layers come first in the chip row and in the Layers panel. New users start with Parcels, Flood Zones, Demographics, Traffic, Satellite and 3D.
+- **Property card:**
+  - Clicking a business opens it in front of the property, with a back link.
+  - Regrid results fill the title and Ownership.
+  - A minimised card is just its title bar, and one click opens the next lot.
+  - With several parcels you see "Parcel 1 of N".
+  - Filing cards link to the property.
+  - Site notes save as you type and aren't kept until used.
+- **Site plans:**
+  - Layouts made before you changed the site, street side, entrances or parcels are marked **Out of date**, with a way to re-fit them.
+  - You can't switch options mid-build.
+  - Small lots keep their parking and a drive in.
+  - Pro forma boxes refuse impossible numbers, and profit has one meaning.
+  - Very large builds no longer fail.
+- **Area data, Market and Compare:**
+  - Compare names drawn areas (Box 1, Shape 2…), lets you rename them, shows census rows and exports to PDF, Excel or CSV.
+  - Market names its area in a sticky bar, puts people first, offers Retry on failed cards and keeps news to local development.
+- **Reports:**
+  - "For an area" reports come first, with a working Draw an area and coverage notes.
+  - Every data request that fails shows the same plain message instead of a stuck spinner.
+- **Map and app:**
+  - The browser's Back button steps through pages.
+  - Esc leaves any area tool.
+  - Drawn areas get names like "Box near Katy" or "Within 3 mi of …".
+  - The Filters popup is reordered.
+  - Saved searches have Undo on delete.
+  - Toasts are centred on the map.
+  - Plus focus rings and a proper settings cog.
+
 ### 12:37 PM CT: Drive-time bands clear when you close the card (cc25d91)
 - Closing a drive-time map, or the property card it came from, with × or Esc now takes the bands off the map. Before, they stayed with no way to remove them.
 - The bands still stay while you go back to the property card, or when you select a band and run a report on it.

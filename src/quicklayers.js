@@ -1,10 +1,15 @@
 // Quick layer buttons on the map, under its tool row: the data layers people reach for most, one tap each, on one row that
-// scrolls sideways (Satellite and 3D, which change the base map rather than add data, sit at the end). They work the same
-// controls as the Map layers panel (every layer and the finer options: demographic measure, crime type, filing dot size,
-// heatmap, base maps, live weather…), so the two always agree.
+// scrolls sideways. They work the same controls as the Map layers panel (every layer and the finer options: demographic
+// measure, crime type, filing dot size, heatmap, base maps, live weather…), so the two always agree.
+// The buttons and the panel's groups are ordered by what this person turns on most (counted per browser, lib/layeruse.mjs);
+// a new user gets parcels, flood zones, demographics, traffic, satellite and 3D first, then filings and the live feeds.
 // This file also keeps the panel's counts: the [Layers · N] button, the panel header, its "On now" list and each group's
 // count, all from activeLayers() (every layer drawing data on the map; display settings like roads or 3D buildings don't count).
+import { parseUse, bumpUse, orderByUse, orderGroups, CHIP_GROUP, PANEL_KEY } from './lib/layeruse.mjs';
 const SAT = new Set(['sat', 'esri']);
+const USE_KEY = 'fs-layer-use';
+function readUse() { try { return parseUse(localStorage.getItem(USE_KEY)); } catch (e) { return {}; } }
+function noteUse(key) { try { localStorage.setItem(USE_KEY, JSON.stringify(bumpUse(readUse(), key))); } catch (e) {} }
 const I = d => '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
 const ICON = {
   sat: I('<circle cx="8" cy="8" r="5.6"/><path d="M2.6 8h10.8M8 2.4c1.9 2 1.9 9.2 0 11.2M8 2.4c-1.9 2-1.9 9.2 0 11.2"/>'),
@@ -39,7 +44,16 @@ export function initQuickLayers(ctx) {
       toggle: () => { const b = ctx.basemap(); if (SAT.has(b)) ctx.setMapOptions({ basemap: lastBase }); else { lastBase = b; ctx.setMapOptions({ basemap: 'sat' }); } } },
     { k: 'tilt', label: '3D', title: 'Tilt the map: 3D buildings, terrain and planes in the air', on: () => map.getPitch() > 1, toggle: () => ctx.setMapOptions({ tilt: !(map.getPitch() > 1) }) }
   ];
-  box.innerHTML = CHIPS.map(c => '<button class="qchip' + (c.k === 'sat' ? ' qbase' : '') + '" type="button" data-q="' + c.k + '" aria-pressed="false" title="' + c.title + '">' + ICON[c.k] + '<span>' + c.label + '</span></button>').join('');
+  // most used first (read once per visit, so the row never shuffles under the pointer)
+  const order = orderByUse(CHIPS.map(c => c.k), readUse());
+  CHIPS.sort((a, b) => order.indexOf(a.k) - order.indexOf(b.k));
+  box.innerHTML = CHIPS.map(c => '<button class="qchip" type="button" data-q="' + c.k + '" aria-pressed="false" title="' + c.title + '">' + ICON[c.k] + '<span>' + c.label + '</span></button>').join('');
+  // the row scrolls sideways when the chips don't all fit: an arrow at each end that has more chips past it (the faded edge alone gave no cue)
+  const ARROW = d => '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
+  const mkArrow = (dir) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'qarrow ' + (dir < 0 ? 'ql' : 'qr'); b.hidden = true; b.tabIndex = -1;
+    b.setAttribute('aria-label', dir < 0 ? 'Show earlier layer buttons' : 'Show more layer buttons'); b.title = dir < 0 ? 'Earlier layers' : 'More layers'; b.innerHTML = ARROW(dir < 0 ? 'M10 3 5 8l5 5' : 'M6 3l5 5-5 5');
+    b.onclick = () => box.scrollBy({ left: dir * Math.max(120, box.clientWidth * .7), behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); return b; };
+  const arrL = mkArrow(-1), arrR = mkArrow(1); box.prepend(arrL); box.append(arrR);
   // ---------- what's on, for the Layers button, the panel header, "On now" and the group counts ----------
   const panel = el('layers'), NOT_LAYERS = new Set(['lyFilings', 'lyBldg', 'lyGrid', 'lyCounties', 'lyRoads', 'lyNames', 'ly3d']);
   const nameOf = lab => { const sp = lab?.querySelector('span'); if (!sp) return ''; const c = sp.cloneNode(true); c.querySelector('.ly-na')?.remove(); return c.textContent.trim(); };
@@ -68,10 +82,39 @@ export function initQuickLayers(ctx) {
     list.innerHTML = on.map((x, i) => '<label class="tg2"><input type="checkbox" checked data-onk="' + i + '"><span>' + ctx.esc(x.label) + '</span></label>').join('');
   }
   el('lyOnList')?.addEventListener('change', e => { const i = e.target.closest('[data-onk]'); if (!i || i.checked) return; e.stopPropagation(); const x = onNow[+i.dataset.onk]; try { x?.off(); } catch (err) { console.error(err); } setTimeout(sync, 0); setTimeout(sync, 600); });
-  // opening the panel: the groups with something on open, the rest fold (with nothing on, Construction filings opens)
-  ctx.openLayerGroups = () => { const on = activeLayers(); for (const sec of panel.querySelectorAll('details[data-lyg]')) sec.open = on.some(x => x.g === sec.dataset.lyg) || (!on.length && sec.dataset.lyg === 'filings'); };
+  // the panel's groups, most used first ("Map display" stays last). Each layer's key is its quick button's when it has one.
+  const panelKey = i => { const k = i.id || (i.dataset.live ? 'live-' + i.dataset.live : ''); return PANEL_KEY[k] || k; };
+  function groupOfKey(k) {
+    if (CHIP_GROUP[k]) return CHIP_GROUP[k];
+    const i = k.startsWith('live-') ? panel.querySelector('input[data-live="' + CSS.escape(k.slice(5)) + '"]') : el(k);
+    return i && panel.contains(i) ? i.closest('[data-lyg]')?.dataset.lyg : undefined;
+  }
+  function orderPanel() {
+    const secs = [...panel.querySelectorAll(':scope > details[data-lyg]')], last = secs.find(s => s.dataset.lyg === 'display'), lead = secs.filter(s => s !== last);
+    if (!lead.length) return;
+    const order = orderGroups(lead.map(s => s.dataset.lyg), readUse(), groupOfKey), anchor = last || lead[lead.length - 1].nextSibling;
+    for (const g of order) { const s = lead.find(x => x.dataset.lyg === g); if (s) panel.insertBefore(s, anchor); }
+  }
+  orderPanel();
+  // opening the panel: groups re-ordered by use; the groups with something on open, the rest fold (with nothing on, the
+  // most used group opens)
+  ctx.openLayerGroups = () => {
+    orderPanel();
+    const on = activeLayers(), first = panel.querySelector(':scope > details[data-lyg]');
+    for (const sec of panel.querySelectorAll('details[data-lyg]')) sec.open = on.some(x => x.g === sec.dataset.lyg) || (!on.length && sec === first);
+  };
+  // counting uses: a person turning a layer ON (a quick button, a panel switch, the demographics menu or a satellite base
+  // map). Changes made by code (the assistant, a report's "show on map", a button working the panel's switch) don't count.
+  panel.addEventListener('change', e => {
+    if (!e.isTrusted) return; const i = e.target;
+    if (!i || i.closest('#lyOnNow')) return;
+    if (i.type === 'checkbox' ? !i.checked || NOT_LAYERS.has(i.id) && i.id !== 'lyFilings' : !(i.id === 'lyDemo' && i.value)) return;
+    const k = panelKey(i); if (k) noteUse(k);
+  }, true);
+  panel.addEventListener('click', e => { const b = e.isTrusted && e.target.closest?.('#styleSeg [data-style]'); if (b && SAT.has(b.dataset.style) && !SAT.has(ctx.basemap())) noteUse('sat');
+    const h = e.isTrusted && e.target.closest?.('#heatSeg [data-heat]'); if (h && h.dataset.heat !== 'off' && h.getAttribute('aria-pressed') !== 'true') noteUse('filings'); }, true);
   // the row scrolls sideways; a faded edge shows on whichever side has more
-  function fade() { const l = box.scrollLeft > 2, r = box.scrollLeft + box.clientWidth < box.scrollWidth - 2; box.classList.toggle('fl', l); box.classList.toggle('fr', r); }
+  function fade() { const l = box.scrollLeft > 2, r = box.scrollLeft + box.clientWidth < box.scrollWidth - 2; box.classList.toggle('fl', l); box.classList.toggle('fr', r); arrL.hidden = !l; arrR.hidden = !r; }
   box.addEventListener('scroll', fade, { passive: true });
   // a mouse wheel scrolls the row sideways when it has more chips than fit
   box.addEventListener('wheel', e => { if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || box.scrollWidth <= box.clientWidth) return; e.preventDefault(); box.scrollLeft += e.deltaY; }, { passive: false }); addEventListener('resize', fade);
@@ -82,7 +125,9 @@ export function initQuickLayers(ctx) {
   }
   box.addEventListener('click', async e => {
     const b = e.target.closest('.qchip'); if (!b) return;
-    const c = CHIPS.find(x => x.k === b.dataset.q); try { await c.toggle(); } catch (err) { console.error(err); }
+    const c = CHIPS.find(x => x.k === b.dataset.q); let was = true; try { was = !!c.on(); } catch (err) {}
+    if (!was && e.isTrusted) noteUse(c.k);
+    try { await c.toggle(); } catch (err) { console.error(err); }
     sync(); setTimeout(sync, 500); setTimeout(sync, 2000); // some layers can refuse a moment later (Regrid allowance, no traffic key)
   });
   // anything else that changes a layer (the panel, the assistant, a report's "show on map") shows up here too

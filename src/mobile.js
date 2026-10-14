@@ -14,16 +14,19 @@ export function initMobile(ctx) {
   const ptoggle = document.getElementById('panelToggle');
   // the saved choice wins; with none, tablets (narrower than 1100px) start with the list closed so the map isn't halved
   try { const saved = localStorage.getItem('fs-panel'); if (!isPhone() && (saved === '0' || (saved == null && innerWidth < 1100))) app.classList.add('pcollapsed'); } catch (e) {}
+  // the button says whether the panel is showing (aria-expanded): the Map's own setting, or over a page the "peek" it opens
+  const syncToggle = () => ptoggle.setAttribute('aria-expanded', String(ctx.view !== 'map' && !isPhone() ? app.classList.contains('pview-open') : !app.classList.contains('pcollapsed')));
   ptoggle.onclick = () => {
     // on a page (not the Map) the list is hidden so the page gets the full width; the button shows it over this page only
     // and leaves the Map's own open/closed setting alone
-    if (ctx.view !== 'map' && !isPhone()) { app.classList.toggle('pview-open'); return; }
+    if (ctx.view !== 'map' && !isPhone()) { app.classList.toggle('pview-open'); syncToggle(); return; }
     setPanelCollapsed(!app.classList.contains('pcollapsed'), { save: true });
   };
+  new MutationObserver(syncToggle).observe(app, { attributes: true, attributeFilter: ['class', 'data-view'] }); syncToggle();
   // the one way the side list opens and closes; the site plan folds it away while planning without saving that choice
   function setPanelCollapsed(on, { save = false } = {}) {
     if ((!save && isPhone()) || app.classList.contains('pcollapsed') === !!on) return;
-    app.classList.toggle('pcollapsed', !!on); if (save) try { localStorage.setItem('fs-panel', on ? '0' : '1'); } catch (e) {}
+    app.classList.toggle('pcollapsed', !!on); syncToggle(); if (save) try { localStorage.setItem('fs-panel', on ? '0' : '1'); } catch (e) {}
     map.resize(); setTimeout(() => map.resize(), 50);
   }
   ctx.setPanelCollapsed = setPanelCollapsed;
@@ -38,6 +41,8 @@ export function initMobile(ctx) {
   function applyW() { // the stored width, kept inside what this window can fit; null = the stylesheet default
     if (wantW && !isPhone()) app.style.setProperty('--pw', Math.max(300, Math.min(maxW(), wantW)) + 'px'); else app.style.removeProperty('--pw');
     mapResize();
+    // the separator's value for screen readers: the panel's width in pixels
+    const w = Math.round(panel.getBoundingClientRect().width); grip.setAttribute('aria-valuemax', String(maxW())); if (w) grip.setAttribute('aria-valuenow', String(w));
   }
   const saveW = () => { try { wantW ? localStorage.setItem(W_KEY, String(Math.round(wantW))) : localStorage.removeItem(W_KEY); } catch (e) {} };
   applyW(); addEventListener('resize', applyW);
@@ -60,10 +65,9 @@ export function initMobile(ctx) {
     if (t === 'more') { openSheet(); return; }
     closeSheet();
     if (t !== 'map' && card.classList.contains('open')) ctx.closeCard();
-    if (t === 'map' || t === 'list') { app.dataset.mtab = t; if (ctx.view !== 'map') ctx.setView('map');
-      // Explore shows the filings straight away: the section opens for this visit (not saved, and the map's dots stay as they are)
-      if (t === 'list' && document.getElementById('secFilings')?.getAttribute('aria-expanded') !== 'true') ctx.setFilingsOpen?.(true); }
-    else { const leaf = leafFor(t); app.dataset.mtab = leaf; ctx.setView(leaf); } // Filings / Market open the page used last
+    // Explore is the Map's side list: the area, its reports, then the filings (folded unless opened before)
+    if (t === 'map' || t === 'list') { app.dataset.mtab = t; if (ctx.view !== 'map') ctx.setView('map'); }
+    else { const leaf = leafFor(t); app.dataset.mtab = leaf; ctx.setView(leaf); } // Projects / Reports (a group opens the page used last)
     syncNav();
     if (t === 'map') setTimeout(() => map.resize(), 30);
   }
@@ -102,6 +106,8 @@ export function initMobile(ctx) {
   function openSheet() { sheet.classList.add('on'); scrim.classList.add('on'); }
   function closeSheet() { sheet.classList.remove('on'); scrim.classList.remove('on'); }
   scrim.onclick = closeSheet;
+  // the handle and the × both close the sheet
+  sheet.querySelectorAll('#mshGrab,#mshX').forEach(b => b.onclick = closeSheet);
   // Esc closes the sheet first (before the card's window-level Esc), like every other pop-over
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented && sheet.classList.contains('on')) { e.preventDefault(); closeSheet(); } });
   sheet.querySelectorAll('[data-go]').forEach(b => b.onclick = async () => {
@@ -111,7 +117,7 @@ export function initMobile(ctx) {
     else if (go === 'layers') { setTab('map'); setTimeout(() => document.getElementById('layersBtn').click(), 50); }
     else if (go === 'export') ctx.openExport();
     else if (go === 'settings') ctx.openSettings?.(); // theme, team, install and the rest (src/settings.js)
-    else if (document.getElementById('view-' + go)) setTab(go); // every page in the registry (My Work, Reports, Data & help)
+    else if (document.getElementById('view-' + go)) setTab(go); // every page in the registry (Market, Filings, My Work, Data & help)
   });
 
   // ---- swipeable bottom-sheet card (phone) ----
@@ -167,8 +173,14 @@ export function initMobile(ctx) {
     navigator.geolocation.getCurrentPosition(p => res([p.coords.longitude, p.coords.latitude]), e => rej(new Error(e.code === 1 ? 'Location permission was denied.' : 'Couldn’t get your location.')), { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
   });
   ctx.nearMe = async () => {
-    try { const c = await ctx.locate(); ctx.setMiles(3, false, true); ctx.setRadiusCenter(c, 'My location', true); ctx.toast('Showing filings within 3 miles of you.'); }
-    catch (e) { ctx.toast(e.message); }
+    try {
+      const c = await ctx.locate(); ctx.setMiles(3, false, true); ctx.setRadiusCenter(c, 'My location', true);
+      // no census tracts and no filings within 3 miles: we have nothing here (the data covers Texas counties around Houston)
+      const near = ctx.F.some(f => d3.geoDistance(c, [f.lon, f.lat]) * 3958.8 <= 3), st = near ? true : await ctx.areaStats?.(ctx.sel.feature).catch(() => null);
+      if (!near && !st) { ctx.toast('You’re outside the area we cover.'); return; }
+      ctx.showFilings(); // the radius is about the filings: put them on the map
+      ctx.toast('Showing filings within 3 miles of you.');
+    } catch (e) { ctx.toast(e.message); }
   };
   document.getElementById('locate').onclick = ctx.nearMe;
 }
