@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 12:37 PM CT: Drive-time bands clear when you close the card (cc25d91)
+- Closing a drive-time map, or the property card it came from, with × or Esc now takes the bands off the map. Before, they stayed with no way to remove them.
+- The bands still stay while you go back to the property card, or when you select a band and run a report on it.
+- The map legend's Drive time section has a **Clear from map** link.
+
 ### 12:25 PM CT: No more size limits on FEMA, traffic and air traffic reports (243a985)
 - **FEMA report for any area:** it used to refuse anything over 400 square miles and skip flood-zone shares over 60. Both now work up to a whole county.
   - Larger areas measure the zones at about 900 evenly spaced points.
