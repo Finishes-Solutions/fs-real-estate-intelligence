@@ -59,6 +59,7 @@ html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--font-display);-webkit-font-smoothing:antialiased;overflow:hidden}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:none;box-shadow:0 0 0 3px rgba(10,122,54,.38);border-radius:4px}
+.pg-focus:focus{outline:none} /* a page's heading takes focus after keyboard navigation (app.js setView); it isn't a control */
 
 .app{--pw:clamp(360px,30vw,480px);--aiw:min(460px,calc(100vw - 32px));position:relative;height:100%;display:grid;grid-template-columns:var(--pw) minmax(0,1fr)}
 .stage{position:relative;min-width:0;min-height:0;background:var(--c-space)}

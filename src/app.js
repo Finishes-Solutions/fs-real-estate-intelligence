@@ -64,7 +64,9 @@ const TYPES=['New','Reno','Addition'], TYPE_LABEL={New:'New',Reno:'Renovation',A
 const tabsUrl=id=>'https://www.tdlr.texas.gov/TABS/Projects/'+id;
 const HOME={center:[-95.72,window.innerWidth<600?29.8:29.98],zoom:window.innerWidth<600?6.95:(window.innerWidth<1000?7.2:7.7)};
 const esc=s=>{ const d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; };
-const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// read live: the OS setting can change while the app is open (ctx.reduceMotion is a getter over this)
+const motionMQ=window.matchMedia('(prefers-reduced-motion: reduce)'); let reduceMotion=motionMQ.matches;
+motionMQ.addEventListener?.('change',e=>{ reduceMotion=e.matches; if(reduceMotion){ cancelAnimationFrame(hlT); stopAllOrbits(); } }); // a pulse or spin under way stops
 
 // ---------- theme ----------
 const root=document.documentElement;
@@ -1098,8 +1100,22 @@ function setView(v,{user}={}){
   if(v==='map'){ appEl.classList.remove('pview-open'); if(was!=='map') map.resize(); setTimeout(()=>map.resize(),0); } else viewHooks[v]?.();
   if(v==='changes') changesSeen();
   viewChangeHooks.forEach(fn=>fn(v));
-  scheduleHash();
+  // a new page is a new browser history entry (Back returns to the page before); boot and Back/Forward themselves don't add one
+  const moved=v!==was; scheduleHash({push:moved});
+  if(moved&&!navBoot) pageArrived(v);
 }
+// Back/Forward and boot switch pages without pushing; navKb: this navigation came from a keyboard press on a nav button
+let navQuiet=0, navBoot=false, navKb=false;
+document.addEventListener('click',e=>{ navKb=e.isTrusted&&e.detail===0&&!!e.target.closest?.('#viewbar,#vtabs,#helpBtn,#mnav,#msheet'); if(navKb) setTimeout(()=>{ navKb=false; }); },true); // Enter/Space clicks have detail 0
+// say which page opened; from the keyboard, focus lands on its heading (mouse and touch users keep their place)
+function pageArrived(v){ cardStatus((document.getElementById('view-'+v)?.getAttribute('aria-label')||labelOf(v))+' page'); if(!navKb) return; navKb=false;
+  requestAnimationFrame(()=>{ if(view!==v) return; const sec=document.getElementById('view-'+v);
+    const h=v==='map'?map.getCanvas():sec&&(sec.querySelector('h1,h2')||sec); if(!h) return;
+    if(h!==map.getCanvas()&&!h.hasAttribute('tabindex')){ h.setAttribute('tabindex','-1'); h.classList.add('pg-focus'); } h.focus({preventScroll:true}); }); }
+// Back/Forward: the page (and the open project) from the address; filters stay as they are
+addEventListener('popstate',()=>{ const p=new URLSearchParams(location.hash.slice(1)); navQuiet++; try{ setView(p.get('v')||'map'); syncProject(p.get('pj')); } finally{ navQuiet--; } });
+// My Work › Projects: the project page in the address (#pj=<id>), when src/siteplan.js offers ctx.currentProject / ctx.openProject
+function syncProject(pj){ if(view!=='projects'||!ctx.openProject) return; if((ctx.currentProject?.()||null)!==(pj||null)) ctx.openProject(pj||null); }
 let pageAct=null, back=null;
 // a click anywhere else (the app bar's Map tab, the phone tab bar, the assistant) forgets the page click, so it can't leave a chip
 document.addEventListener('click',e=>{ if(e.isTrusted) pageAct=view!=='map'&&e.target.closest?.('.view,#card')?{t:performance.now(),from:view}:null; },true);
@@ -1147,8 +1163,11 @@ tPlay.onclick=()=>{ if(playT){ stopPlay(); return; } tPlay.classList.add('on'); 
 
 // ---------- URL state (shareable links, saved searches) ----------
 let hashT=0, booting=true;
-function hashStr(){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id); return p.toString(); }
-function scheduleHash(){ if(booting) return; clearTimeout(hashT); hashT=setTimeout(()=>{ const h=hashStr(); history.replaceState(null,'',h?'#'+h:location.pathname+location.search); document.getElementById('rssLink').href='api/feed?'+encode(curSpec()); },250); }
+function hashStr(){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id);
+  const pj=view==='projects'&&ctx.currentProject?.(); if(pj) p.set('pj',pj); return p.toString(); }
+// filters, the map and the month replace the current history entry (debounced); a page change ({push:true}) adds one, at once
+function writeHash(push){ const h=hashStr(), u=h?'#'+h:location.pathname+location.search; history[push?'pushState':'replaceState'](null,'',u); document.getElementById('rssLink').href='api/feed?'+encode(curSpec()); }
+function scheduleHash(o){ if(booting) return; clearTimeout(hashT); if(o?.push&&!navQuiet){ writeHash(true); return; } hashT=setTimeout(()=>writeHash(false),250); } // never pushes during Back/Forward or boot
 document.getElementById('copyLink').onclick=async()=>{ const u=location.href.split('#')[0]+'#'+hashStr(); try{ await navigator.clipboard.writeText(u); toast('Link copied. It opens with these filters.'); }catch(e){ prompt('Copy this link',u); } };
 
 // ---------- the Map panel: pick buttons, "…" menu, links, first-visit tip ----------
@@ -1180,7 +1199,7 @@ if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
   applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,esc,fmtM,fmtN,isDark,C,geocode,hashStr,
-  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, reduceMotion, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
+  onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, get reduceMotion(){ return reduceMotion; }, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.
 function orbitAt(c,zoom){ stopOrbit(); const close=zoom>=16.5; map.flyTo({center:c,zoom,pitch:close?65:60,duration:reduceMotion?0:2200,essential:true});
@@ -1229,7 +1248,7 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return [...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,30).map(x=>x[0]).join(', '); } // the busiest cities and developers on screen (the voice transcriber's hint list takes the first few)
-ctx.cardPush=cardPush; ctx.cardBack=cardBack; ctx.cardChild=()=>cpush?(cpOpening?'opening':'open'):null; ctx.cardChildDrop=()=>{ cpush=null; }; ctx.cardActs=cardActs; ctx.cardStatus=cardStatus; ctx.copyCardLink=copyCardLink; ctx.SPARK=SPARK;
+ctx.scheduleHash=o=>scheduleHash(o); ctx.cardPush=cardPush; ctx.cardBack=cardBack; ctx.cardChild=()=>cpush?(cpOpening?'opening':'open'):null; ctx.cardChildDrop=()=>{ cpush=null; }; ctx.cardActs=cardActs; ctx.cardStatus=cardStatus; ctx.copyCardLink=copyCardLink; ctx.SPARK=SPARK;
 ctx.setMode=setMode; ctx.setFilingsOpen=setFilingsOpen; ctx.showIntro=showIntro; ctx.filterChips=filterChips; ctx.scopeBar=scopeBar; ctx.resetFilings=resetFilings; ctx.vempty=vempty; ctx.exportMenu=exportMenu; ctx.openFilters=o=>openFilters(o); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
@@ -1278,9 +1297,9 @@ new MutationObserver(()=>{ if(!card.classList.contains('open')&&card.classList.c
 { const h=location.hash.slice(1), p=new URLSearchParams(h);
   // a link with filters puts the filing dots on; the date range alone (which the app writes into the address itself) doesn't,
   // so a reload opens like a fresh start: no filings until you turn them on
-  if(h&&[...p.keys()].some(k=>!['v','f','b'].includes(k))){ if([...p.keys()].some(k=>!['v','f','d','b'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
+  if(h&&[...p.keys()].some(k=>!['v','f','b','pj'].includes(k))){ if([...p.keys()].some(k=>!['v','f','d','b','pj'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
   booting=false;
-  if(p.get('v')) setView(p.get('v'));
+  navQuiet++; navBoot=true; try{ if(p.get('v')) setView(p.get('v')); if(p.get('pj')) syncProject(p.get('pj')); } finally{ navQuiet--; navBoot=false; } // the page the link names, without a new history entry
   const f=p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));
   // a copied property link (#b=lat,lng): that building, or the parcel there
   const bc=!f&&(p.get('b')||'').split(',').map(Number), bll=bc&&bc.length===2&&bc.every(Number.isFinite)&&Math.abs(bc[0])<=90&&Math.abs(bc[1])<=180?[bc[1],bc[0]]:null;
