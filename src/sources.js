@@ -10,7 +10,7 @@ export function initSources(ctx) {
   let newer = null, checking = false, timer = 0;
   // the Market numbers (area.json) and census tracts (market.json) load when their pages first open; Data & help asks for
   // them itself, and until they answer those rows read "Checking…" instead of "Not built yet"
-  let waitArea = false, waitTracts = false;
+  let waitArea = false, waitTracts = false, triedArea = false, triedTracts = false; // tried: ask once; if the file never arrives the rows say Not built yet (no retry loop)
 
   const fmtWhen = t => new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
   const fmtTime = t => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -38,8 +38,8 @@ export function initSources(ctx) {
   }
 
   function ensureData() {
-    if (!ctx.areaInfo?.() && !waitArea && ctx.areaData) { waitArea = true; ctx.areaData().catch(() => null).then(() => { waitArea = false; render(); }); }
-    if (!ctx.marketInfo?.() && !waitTracts && ctx.loadMarket) { waitTracts = true; ctx.loadMarket().catch(() => null).then(() => { waitTracts = false; render(); }); }
+    if (!ctx.areaInfo?.() && !waitArea && !triedArea && ctx.areaData) { waitArea = triedArea = true; ctx.areaData().catch(() => null).then(() => { waitArea = false; render(); }); }
+    if (!ctx.marketInfo?.() && !waitTracts && !triedTracts && ctx.loadMarket) { waitTracts = triedTracts = true; ctx.loadMarket().catch(() => null).then(() => { waitTracts = false; render(); }); }
   }
   function rows() {
     ensureData();
