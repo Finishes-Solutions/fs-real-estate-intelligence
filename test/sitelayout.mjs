@@ -204,6 +204,8 @@ function usable(plan, o, what) {
 {
   const plan = { ...siteOf(fm362, true), params: { trash: { mode: 'auto' } } }, mf = L.layoutOptions(plan, { use: 'multifamily' })[0], m = S.metrics({ ...plan, elements: mf.elements, program: mf.program });
   assert.equal(L.layoutOptions(siteOf(fm362, true), { use: 'multifamily' })[0].elements.filter(e => e.kind === 'trash').length, 0, 'left out unless turned on (the default)');
+  assert.equal(L.layoutOptions(siteOf(fm362, true), { use: 'retail', gfa: 28000 })[0].elements.filter(e => e.kind === 'trash').length, 0, 'shops too: none unless asked for');
+  const asked = S.guessProgram('28,000 sf retail strip with dumpsters'); assert.ok(asked.trash); assert.ok(L.layoutOptions(siteOf(fm362, true), asked)[0].elements.some(e => e.kind === 'trash'), 'asked for: there');
   assert.equal(mf.elements.filter(e => e.kind === 'trash').length, Math.ceil(m.units / 50), 'apartments: a double enclosure per ~50 units');
   const th = L.layoutOptions(plan, { use: 'townhomes' })[0]; assert.equal(th.elements.filter(e => e.kind === 'trash').length, 0, 'homes roll carts to the curb');
   const off = L.layoutOptions({ ...plan, params: { trash: { mode: 'none' } } }, { use: 'retail', gfa: 28000 })[0]; assert.equal(off.elements.filter(e => e.kind === 'trash').length, 0, 'turned off');
@@ -286,7 +288,8 @@ function usable(plan, o, what) {
   const opts = L.layoutOptions(plan, prog); assert.ok(opts.length >= 2 && opts.every(o => !/Simple layout/.test(o.name)), opts.map(o => o.name).join());
   for (const o of opts) { const p = { ...plan, elements: o.elements, program: o.program }, m = S.metrics(p), k = new Set(o.elements.map(e => e.kind));
     assert.ok(m.spaces >= m.required && m.gfa > 3000, o.name + ': a parked restaurant ' + m.spaces + '/' + m.required);
-    for (const want of ['building', 'parking', 'drive', 'trash', 'play']) assert.ok(k.has(want), o.name + ': has ' + want);
+    for (const want of ['building', 'parking', 'drive', 'play']) assert.ok(k.has(want), o.name + ': has ' + want);
+    assert.ok(!k.has('trash'), o.name + ': no dumpster unless asked for');
     assert.ok(o.elements.some(e => e.name === 'Main entry') && o.elements.some(e => e.name === 'Lawn'), 'an entry and a lawn');
     assert.deepEqual(S.check(p).filter(i => i.level === 'bad').map(i => i.text), []); }
   assert.ok(opts.some(o => o.elements.some(e => e.kind === 'patio')), 'outdoor seating against the building');
@@ -308,5 +311,164 @@ function usable(plan, o, what) {
   assert.equal(S.metrics({ ring: [[-200, -200], [200, -200], [200, 200], [-200, 200]], program: { use: 'multifamily' }, elements: [e] }).units, t.units, 'a library building counts its units');
   const g = mk([-95.70, 29.90], [[0, 0], [1400, 0], [1400, 620], [0, 620]]), b = S.unionParcels([g]), o = L.layoutOptions({ ...b, front: b.ring.findIndex((p, i) => S.outwardOf(b.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } }, { use: 'sfr' }, { count: 1 })[0];
   assert.ok(new Set(o.elements.filter(e2 => e2.use === 'sfr').map(e2 => e2.type)).size >= 6, 'homes vary through the house plans');
+}
+// ---- amenities where people use them: one pool, by its clubhouse, on the drive ----
+{
+  const plan = siteOf(tract), near = (a, b) => S.gapBetween(S.shapeOf(a), S.shapeOf(b));
+  assert.deepEqual([...L.commonsWants(['Pool', 'clubhouse', 'playground'], { clubhouse: true })].sort(), ['playground'], 'the apartments’ clubhouse and pool serve: no second ones in the commons');
+  assert.deepEqual([...L.commonsWants(['pool'], { clubhouse: true, homes: true })].sort(), ['center', 'pool'], 'homeowners get their own centre, with its pool');
+  // apartments with a commons the program filled with a centre and a pool (as the AI may ask): one pool, at the clubhouse by the entry
+  const opts = L.layoutOptions(plan, { use: 'mixed', zones: [{ use: 'multifamily', units: 240, floors: 3 }, { use: 'amenity', items: ['center', 'pool', 'playground', 'pavilion'] }] });
+  for (const o of opts) {
+    const P = o.elements.filter(e => e.kind === 'pool'), club = o.elements.filter(e => e.kind === 'building' && e.use === 'amenity' && /club|center/i.test(e.name || ''));
+    assert.equal(P.length, 1, o.name + ': one pool, not ' + P.length);
+    assert.ok(club.some(c => near(P[0], c) <= 30), o.name + ': the pool is beside its clubhouse');
+    const entry = o.elements.find(e => e.name === 'Main entry'), drives = o.elements.filter(e => e.kind === 'drive');
+    for (const a of o.elements.filter(e => e.kind === 'play' || e.name === 'Pavilion')) assert.ok(drives.some(d => near(a, d) <= 40), o.name + ': ' + (a.name || a.kind) + ' sits on the drive, not out in the park');
+    assert.ok(entry && !S.check({ ...plan, elements: o.elements, program: o.program }).some(i => /pool/i.test(i.text)), o.name + ': no pool warnings');
+  }
+  // homes and a commons with a pool: the pool comes with its community centre, on a deck against it
+  const big = siteOf(mk([-95.97, 30.07], [[-610, 0], [1933, 0], [2594, 865], [2391, 1780], [0, 1780]])); big.front = S.unionParcels([mk([-95.97, 30.07], [[-610, 0], [1933, 0], [2594, 865], [2391, 1780], [0, 1780]])]).ring.findIndex((p, i, r) => S.outwardOf(r, i)[1] < -0.9);
+  const o2 = L.layoutOptions(big, { use: 'mixed', zones: [{ use: 'sfr' }, { use: 'amenity', items: ['pool', 'playground'] }] }, { count: 1 })[0];
+  const cc = o2.elements.find(e => e.name === 'Community center'), pl2 = o2.elements.filter(e => e.kind === 'pool');
+  assert.ok(cc && pl2.length === 1 && near(pl2[0], cc) <= 15 && o2.elements.some(e => e.kind === 'plaza' && /pool deck/i.test(e.note || '') && near(e, cc) <= 1), 'the community centre with its pool on a deck');
+  // the checks flag a pool out on its own, and a second one
+  const ring = [[0, 0], [1000, 0], [1000, 1000], [0, 1000]], c0 = { id: 'c', kind: 'building', use: 'amenity', name: 'Clubhouse', x: 200, y: 200, w: 90, d: 60, rot: 0 };
+  const p1 = { id: 'p1', kind: 'pool', name: 'Pool', x: 290, y: 200, w: 70, d: 32, rot: 0 }, p2 = { id: 'p2', kind: 'pool', name: 'Pool', x: 700, y: 800, w: 70, d: 32, rot: 0 };
+  assert.deepEqual(S.check({ ring, front: 0, elements: [c0, p1] }).map(i => i.text), []);
+  const w2 = S.check({ ring, front: 0, elements: [c0, p1, p2] }); assert.ok(w2.some(i => i.id === 'p2' && /away from the clubhouse/.test(i.text)) && w2.some(i => /2 pools/.test(i.text)), w2.map(i => i.text).join(' / '));
+}
+
+// ---- moving a building in Edit Layout (a real apartment plan: bars packed between drive aisles) ----
+{
+  const plan = siteOf(tract), o = L.layoutOptions(plan, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], base = { ...plan, elements: o.elements, program: o.program };
+  const overlaps = els => S.check({ ...base, elements: els }).filter(i => /overlaps|setback|outside/.test(i.text));
+  assert.deepEqual(overlaps(o.elements), []);
+  const stalls = els => els.filter(e => e.kind === 'parking').reduce((s, e) => s + S.stalls(e).count, 0), s0 = stalls(o.elements);
+  // as the editor does it: follow the pointer, settle (edges, setbacks), then the nearest clear spot; carried pieces move along; parking gives way
+  const drop = (els, id, dx, dy, spare = []) => {
+    const p = { ...base, elements: els }, B = els.find(e => e.id === id), att = S.attachedTo(p, B), obs = S.spotObstacles(p, B, att), el = S.moveBy(structuredClone(B), dx, dy);
+    const [sx, sy] = S.settleShift(p, el); S.moveBy(el, sx, sy);
+    const carry = att.map(a => S.moveBy(structuredClone(a), el.x - B.x, el.y - B.y)), c = S.clearSpot({ ...p, elements: els.map(e => e.id === id ? el : carry.find(a => a.id === e.id) || e) }, el, { carry, obs });
+    if (c) { S.moveBy(el, c[0], c[1]); for (const a of carry) S.moveBy(a, c[0], c[1]); }
+    let out = els.map(e => e.id === id ? el : carry.find(a => a.id === e.id) || e); out = S.cutRows(out, S.outline(el), 5, spare); for (const a of carry) out = S.cutRows(out, S.outline(a), 1, spare);
+    for (const g of [B, ...att]) out = S.regrowRows(out, S.outline(g), 5, spare);
+    return { els: out, el, att, c, spare };
+  };
+  const apt = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'), b = apt[Math.floor(apt.length / 2)], others = o.elements.filter(e => e.kind === 'building' && e.id !== b.id).map(e => e.x + ',' + e.y).join();
+  for (const [dx, dy] of [[50, 0], [-50, 0], [0, 40], [25, 25]]) {
+    const r = drop(o.elements, b.id, dx, dy);
+    assert.ok(r.c, 'a clear spot near (' + dx + ', ' + dy + ')'); assert.deepEqual(overlaps(r.els), [], 'dropped ' + dx + ',' + dy + ': no overlaps');
+    assert.equal(r.els.filter(e => e.kind === 'building' && e.id !== b.id).map(e => e.x + ',' + e.y).join(), others, 'nothing else moves');
+    // and back again: the parking it cut grows back
+    const back = drop(r.els, b.id, b.x - r.el.x, b.y - r.el.y, r.spare); assert.ok(Math.hypot(back.el.x - b.x, back.el.y - b.y) < 1, 'it goes back to its spot');
+    assert.ok(stalls(back.els) >= s0 - 2, 'parking grows back: ' + stalls(back.els) + ' of ' + s0);
+  }
+  // the clubhouse takes its pool deck and pool with it
+  const club = o.elements.find(e => e.name === 'Clubhouse'), r = drop(o.elements, club.id, 0, -30);
+  assert.deepEqual(r.att.map(a => a.kind).sort(), ['plaza', 'pool']); const pool = r.els.find(e => e.kind === 'pool');
+  assert.ok(S.gapBetween(S.shapeOf(pool), S.shapeOf(r.el)) <= 30 && !S.check({ ...base, elements: r.els }).some(i => /pool|overlaps/i.test(i.text)), 'the pool is still at the clubhouse');
+}
+// ---- changes by name (Change With AI), applied to a real apartment plan, then re-fitted ----
+{
+  const E = await import('../lib/siteedit.mjs');
+  const plan = siteOf(tract), o = L.layoutOptions(plan, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], base = { ...plan, elements: o.elements, program: o.program, recipe: o.recipe };
+  const by = (els, n) => els.find(e => e.name === n), bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text);
+  // the sheet's frame: the street along the bottom
+  const f = E.sheetFrame(base), fi = base.front ?? S.longestEdge(base.ring), fr = base.ring[fi], fr2 = base.ring[(fi + 1) % base.ring.length];
+  assert.ok(Math.abs(f.to(fr)[1]) < 1 && Math.abs(f.to(fr2)[1]) < 1, 'the street edge is y = 0'); const q = f.from(f.to([123, 456])); assert.ok(Math.hypot(q[0] - 123, q[1] - 456) < 1e-6);
+  const d = E.describePlan(base, by(o.elements, 'Apt Bldg 7').id); assert.ok(d.pieces.some(p => p.name === 'Apt Bldg 7' && p.selected) && d.pieces.some(p => p.name === 'Clubhouse') && !d.pieces.some(p => p.kind === 'parking'), 'the plan as the AI reads it');
+  // plain words: four stories on one building, another removed; nothing else moves, parking where it left grows back
+  const ops = E.guessEdits('Make apt bldg 7 four stories. Remove building 3', base);
+  assert.deepEqual(ops.map(x => [x.action, o.elements.find(e => e.id === x.target)?.name, x.floors ?? null]), [['change', 'Apt Bldg 7', 4], ['remove', 'Apt Bldg 3', null]]);
+  const b7 = by(o.elements, 'Apt Bldg 7'), r = E.applyEdits(base, ops), n7 = r.elements.find(e => e.id === b7.id);
+  assert.equal(n7.floors, 4); assert.ok(n7.pinned && n7.x === b7.x && n7.y === b7.y, 'changed in place, pinned');
+  if (b7.units) assert.equal(n7.units, Math.round(b7.units * 4 / 3), 'more floors, more units');
+  assert.ok(!by(r.elements, 'Apt Bldg 3'), 'removed'); assert.deepEqual(bad(r.elements), []);
+  assert.equal(r.elements.filter(e => e.kind === 'building' && e.id !== b7.id).map(e => e.x + ',' + e.y).join(), o.elements.filter(e => e.kind === 'building' && e.id !== b7.id && e.name !== 'Apt Bldg 3').map(e => e.x + ',' + e.y).join(), 'nothing else moves');
+  assert.ok(S.metrics({ ...base, elements: r.elements }).units > S.metrics(base).units - (by(o.elements, 'Apt Bldg 3').units || 40), 'units: the extra floor counts');
+  // a bigger clubhouse from the library takes the old one's place; its pool stays with it
+  const club = by(o.elements, 'Clubhouse'), rc = E.applyEdits(base, E.guessEdits('make the clubhouse a 7,500 sf clubhouse', base)), nc = rc.elements.find(e => e.id === club.id);
+  assert.equal(nc.type, 'clubhouse-clubhouse-7-500-sf'); assert.equal(nc.name, 'Clubhouse'); assert.ok(Math.hypot(nc.x - club.x, nc.y - club.y) < 60, 'about where it was');
+  const pool = rc.elements.find(e => e.kind === 'pool'); assert.ok(S.gapBetween(S.shapeOf(pool), S.shapeOf(nc)) <= 30, 'the pool still beside it'); assert.deepEqual(bad(rc.elements), []);
+  // a swap: two buildings trade places
+  const b2 = by(o.elements, 'Apt Bldg 2'), b5 = by(o.elements, 'Apt Bldg 5'), rs = E.applyEdits(base, E.guessEdits('swap bldg 2 and bldg 5', base));
+  assert.ok(Math.hypot(rs.elements.find(e => e.id === b2.id).x - b5.x, rs.elements.find(e => e.id === b2.id).y - b5.y) < 1, 'swapped');
+  // the AI's move, in the sheet's frame: the clubhouse to the back, beside the last building; then a full re-fit round it
+  const back = d.pieces.filter(p => p.kind === 'building').sort((a, b2) => b2.at[1] - a.at[1])[0];
+  const rm = E.applyEdits(base, [{ action: 'move', target: club.id, x: back.at[0], y: back.at[1] - 150 }], { refit: true }), mc = rm.elements.find(e => e.id === club.id);
+  assert.ok(f.to([mc.x, mc.y])[1] > f.to([club.x, club.y])[1] + 100 && rm.elements.filter(e => e.kind === 'pool').every(p => S.gapBetween(S.shapeOf(p), S.shapeOf(mc)) <= 30), 'moved back, its pool with it');
+  const rf = L.refit({ ...base, elements: rm.elements }, { amount: 'current' }); assert.ok(rf, 'the rest re-fits');
+  const names = rf.elements.filter(e => e.kind === 'building' && e.name).map(e => e.name); assert.equal(new Set(names).size, names.length, 'no two buildings share a name');
+  const kept = rf.elements.find(e => e.id === club.id); assert.ok(kept && Math.hypot(kept.x - mc.x, kept.y - mc.y) < 0.5, 'the changed piece stays where it was put');
+  const m0 = S.metrics(base), m1 = S.metrics({ ...base, elements: rf.elements });
+  assert.deepEqual(bad(rf.elements), []); assert.ok(m1.spaces >= m1.required && m1.units >= m0.units * 0.85, 'parked, and about the same amount of housing: ' + m1.units + ' vs ' + m0.units);
+  assert.equal(rf.elements.filter(e => e.kind === 'pool').length, 1, 'still one pool');
+}
+// ---- more than one way in: entrances added by hand, by the AI's edits, or asked for in the program ----
+{
+  const E = await import('../lib/siteedit.mjs');
+  const T0 = siteOf(tract), T = { ...T0, front: T0.ring.findIndex((p, i) => S.outwardOf(T0.ring, i)[1] < -0.9) }, side = T.ring.findIndex((p, i) => S.outwardOf(T.ring, i)[0] > 0.9); // street along the south; the east lot line a side street
+  const plan = { ...T, streets: [side] }, o = L.layoutOptions(plan, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], base = { ...plan, elements: o.elements, program: o.program };
+  const bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text), m0 = S.metrics(base);
+  // by hand: a click on the side street, part way back
+  const a = T.ring[side], b = T.ring[(side + 1) % T.ring.length], at = [a[0] + (b[0] - a[0]) * 0.45, a[1] + (b[1] - a[1]) * 0.45];
+  const r = S.addEntrance(base, at, { id: 'ent2' }); assert.ok(!r.error, r.error); assert.equal(r.entrance.name, 'Entrance 2'); assert.ok(r.entrance.pinned && r.entrance.entry);
+  const p1 = { ...base, elements: r.elements }; assert.deepEqual(bad(r.elements), []);
+  const { seen } = reached(r.elements); assert.ok(seen.has('ent2'), 'the new driveway joins the drives from the main entry');
+  assert.ok(S.metrics(p1).spaces >= m0.spaces - 12, 'it costs only the stalls it crosses: ' + S.metrics(p1).spaces + ' vs ' + m0.spaces);
+  assert.equal(S.entryMarks(p1).filter(l => l.color === '#ffffff').length, S.entrancesOf(r.elements).filter(e => !e.through).length, 'a stop bar at each entrance');
+  // a lot line that isn't a street becomes one; a click where nothing connects says why
+  const back = T.ring.findIndex((p, i) => S.outwardOf(T.ring, i)[1] > 0.9), r2 = S.addEntrance(base, [(T.ring[back][0] + T.ring[(back + 1) % T.ring.length][0]) / 2, (T.ring[back][1] + T.ring[(back + 1) % T.ring.length][1]) / 2]);
+  if (!r2.error) assert.ok(r2.streets.includes(back) && /now marked as a street/.test(r2.note)); else assert.match(r2.error, /No way in/);
+  // automatic: as far from the others as the streets allow, at least 150 ft apart
+  const m = S.moreEntrances(base, 2); assert.equal(m.added.length, 2, m.note);
+  const cs = S.entrancesOf(m.elements).map(e => S.centroid(S.shapeOf(e))); for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) assert.ok(Math.hypot(cs[i][0] - cs[j][0], cs[i][1] - cs[j][1]) >= 140, 'entrances spaced apart');
+  assert.deepEqual(bad(m.elements), []);
+  // in the program: "two entrances" from the words gives two in every option
+  assert.equal(S.guessProgram('240 apartments with two entrances').entrances, 2); assert.equal(S.guessProgram('a retail strip with a second driveway').entrances, 2); assert.equal(S.normalizeProgram({ use: 'retail' }).entrances, null);
+  const two = L.layoutOptions(plan, S.guessProgram('240 apartments, 3 stories, two entrances'), { count: 2 }); assert.ok(S.entrancesOf(two[0].elements).length >= 2, 'the first option has both ways in');
+  for (const op of two) assert.ok(!bad(op.elements).length && (S.entrancesOf(op.elements).length >= 2 || op.notes.some(t => /No room for another entrance/.test(t))), op.name + ': two ways in, or says why not');
+  // Change With AI: "add a second entrance" (words), and the AI's own point on the lot line (sheet frame: x along, y = 0 the street)
+  const ops = E.guessEdits('add another entrance', base); assert.deepEqual(ops, [{ action: 'add', kind: 'entrance' }]);
+  const re = E.applyEdits(base, ops); assert.equal(S.entrancesOf(re.elements).length, 2, re.skipped.join(' '));
+  const f = E.sheetFrame(base), fa = f.to(T.ring[T.front]), fb = f.to(T.ring[(T.front + 1) % T.ring.length]);
+  const ra = E.applyEdits(base, [{ action: 'add', kind: 'entrance', x: (fa[0] + fb[0]) / 2 + 200, y: 0 }]); assert.ok(ra.done.length || ra.skipped.length);
+}
+// ---- the most a site holds: shops, offices and warehouses grow to what the parking carries; garages; homes fill; housing types ranked ----
+{
+  const PF = await import('../lib/proforma.mjs');
+  const H = S.unionParcels([mk([-95.70, 30.02], [[0, 0], [1180, 0], [1330, 1520], [150, 1520]])]), hk = { ...H, front: H.ring.findIndex((p, i) => S.outwardOf(H.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } };
+  const ask = { use: 'mixed', zones: [{ use: 'retail', gfa: 60000 }, { use: 'medical', gfa: 60000, floors: 3 }, { use: 'office', gfa: 80000, floors: 3 }, { use: 'industrial', gfa: 120000 }] };
+  const opts = L.layoutOptions(hk, ask);
+  for (const o of opts) {
+    const p = { ...hk, elements: o.elements, program: o.program }, m = S.metrics(p), B = o.elements.filter(e => e.kind === 'building'), by = u => B.filter(e => e.use === u).reduce((t, e) => t + S.gfaOf(e), 0);
+    assert.ok(!B.some(e => ['duplex', 'sfr', 'townhomes'].includes(e.use)), o.name + ': warehouse land, never homes');
+    assert.ok(by('industrial') >= 120000 * 0.97 && o.elements.some(e => e.kind === 'truck'), o.name + ': the warehouse with its truck court');
+    for (const z of ask.zones) assert.ok(by(z.use) >= z.gfa * 0.97, o.name + ': at least the ' + z.gfa + ' sf of ' + z.use + ' asked (' + Math.round(by(z.use)) + ')');
+    assert.ok(m.gfa >= 320000 * 1.25, o.name + ': far more leasable floor area than asked when the land holds it: ' + Math.round(m.gfa));
+    assert.ok(m.spaces >= m.required, o.name + ': still parked ' + m.spaces + '/' + m.required);
+    assert.ok(!o.elements.some(e => e.kind === 'trash'), 'no dumpsters unless asked for');
+    assert.ok(o.elements.filter(e => /pad site/i.test(e.name || '')).length <= 2, 'two future pads at most');
+    assert.deepEqual(S.check(p).filter(i => i.level === 'bad').map(i => i.text), []);
+  }
+  // a garage where the words put it: built, counted, and the plan still parked
+  const g = S.guessProgram('A mixed use development with retail in the front, medical and office in the middle, a parking garage behind that and warehouse/storage in the back');
+  assert.deepEqual(S.normalizeProgram(g).zones.map(z => z.use), ['retail', 'office', 'medical', 'garage', 'industrial']);
+  const og = L.layoutOptions(hk, { ...g, zones: g.zones.map(z => ({ ...z, gfa: { retail: 60000, office: 80000, medical: 60000, industrial: 120000 }[z.use] ?? null })) }, { count: 1 })[0], pg = { ...hk, elements: og.elements, program: og.program }, mg = S.metrics(pg), gar = og.elements.filter(e => e.kind === 'garage');
+  assert.ok(gar.length === 1 && S.garageStalls(gar[0]) >= 200, 'a parking garage: ' + gar.map(e => S.garageStalls(e)).join());
+  assert.ok(mg.spaces >= mg.required && !S.check(pg).some(i => i.level === 'bad'), 'parked, garage counted: ' + mg.spaces + '/' + mg.required);
+  // homes with a count on a big tract: the count is phase 1, the land fills, and the detention still fits (or the plan says so)
+  const N = S.unionParcels([mk([-95.96, 30.07], [[0, 0], [2600, 0], [2600, 1700], [0, 1700]])]), nb = { ...N, front: N.ring.findIndex((p, i) => S.outwardOf(N.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } };
+  const prog = { use: 'mixed', zones: [{ use: 'retail', gfa: 60000 }, { use: 'sfr', units: 250 }, { use: 'amenity', items: ['lake', 'center', 'pool', 'playground'] }] }, on = L.layoutOptions(nb, prog, { count: 1 })[0], mn = S.metrics({ ...nb, elements: on.elements, program: on.program });
+  const need = S.stormNeed(S.ringArea(N.ring) / 43560, {}, S.normalizeProgram(prog)).area;
+  assert.ok(mn.units > 250 * 1.1 && on.notes.some(t => /phase 1/.test(t)), 'more homes than the first phase: ' + mn.units);
+  assert.ok(mn.pond >= need * 0.9 || on.notes.some(t => /detention the site needs/.test(t)), 'the detention fits, or the plan says how much doesn’t');
+  // housing in general: the types a developer would weigh, ranked by value
+  assert.ok(S.guessProgram('a multifamily rental community').compare && !S.guessProgram('240 apartments').compare);
+  const T = siteOf(tract), hs = L.layoutOptions({ ...T, front: T.ring.findIndex((p, i) => S.outwardOf(T.ring, i)[1] < -0.9) }, S.guessProgram('a multifamily rental community'));
+  assert.ok(hs.length >= 3 && new Set(hs.slice(0, 3).map(o => o.product)).size === 3 && hs.every(o => o.fin && o.fin.value > 0), hs.map(o => o.name).join(' | '));
+  assert.ok(/Best value of the housing types tried/.test(hs[0].notes[0]));
+  assert.ok(PF.quick({ ...T, elements: hs[0].elements, program: hs[0].program }).value === hs[0].fin.value);
 }
 console.log('site layouts ok');

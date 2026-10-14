@@ -14,6 +14,37 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Map controls:** one Layers button next to Filters, one row of layer chips, and active filters shown as removable chips with Clear all. The right-hand column only moves the map. Time-lapse moved to the Filings layer and legend. On phones, Layers and Filters open as bottom sheets and the drawing tools sit under one "Select" button.
 - **Property card:** sits full height on the right, with Ask AI, Site plan, Watch and "…" at the top, and section chips that follow your scrolling. Getting owner and zoning from Regrid is offered right under Ownership. Reports, filings and notes opened from a card have a back link to it. On phones the card opens half-height first.
 - **Consistent look:** one set of spacing, text sizes and button styles in light and dark, and larger touch targets on phones and tablets.
+### 6:54 PM CT: Site plans that get the most out of the land (00cddf7)
+- **More leasable floor area and homes:** sizes you ask for are the first phase; buildings grow along their rows until the parking is used, and homes keep filling the blocks (leaving room for the detention lake). On a 41-acre retail, medical, office and warehouse test site the same request went from about 320,000 to 514,000 sq ft, still fully parked; a 220-acre neighbourhood went from 650 homes (with blocks of empty lots) to about 740.
+- **Warehouses** in a mixed-use plan are real warehouses with truck courts; they used to come out as duplexes.
+- **Parking garages** are built when asked for ("a parking garage behind the offices"), and tried on shop and office sites where they'd pay.
+- **"Multifamily" or "rental housing"** compares garden apartments, studio and one-bed apartments, townhomes and duplexes, best value first.
+- **Every option shows its value**, cost and yield on cost (pro forma defaults), with a Value sort.
+- **No dumpsters unless asked for**, far fewer future pad sites, no sliver buildings, and a dragged pond stays inside the lot.
+
+### 6:23 PM CT: More than one entrance; spinners on the AI buttons (a810d63)
+- **Add Entrance** in the site plan tools: click the lot line where a driveway should come in and it runs straight in to the nearest drive, with curb returns, stepping round buildings and ponds. Clicking a lot line that isn't a street marks it as one; it warns when it's closer than about 150 ft to another entrance.
+- **Ask for entrances when you build:** "two entrances" or "a second driveway" adds them on the front or a side street, spread apart; options that fit them come first, and one that can't says why.
+- **Change With AI** can add ("add another entrance") or remove entrances.
+- **The AI buttons show a spinner** while they work instead of changing their text, with a short line under them on what's happening.
+
+### 5:50 PM CT: Change buildings by name with AI (b24a05d)
+- **Change With AI** in the site plan panel: type changes like "make Apt Bldg 7 four stories", "turn the clubhouse into a 7,500 sf one", "remove Bldg 3", "swap Bldg 2 and Bldg 5" or "move the clubhouse and pool to the back". Select a piece and you can say "it". The AI looks at the plan, picks buildings from the library, and says what it changed.
+- Only the named pieces change unless you ask for a re-fit (or tick the box): then the rest of the site is laid out again around them, keeping about the same amount of building. Changed pieces stay pinned. Cmd+Z undoes the whole change.
+- Without the AI, simple changes in the same words still work.
+- **Re-fit Plan is tidier:** a building you pinned keeps its parking right up to its walk, no stray lawn round it, and new buildings no longer take its name.
+
+### 4:32 PM CT: One pool by its clubhouse; moving a building keeps the plan tidy (c4c4568)
+- **One pool per community, where it belongs:** apartments with a commons no longer get a second pool and clubhouse out behind the buildings by the pond. The clubhouse and pool by the entry serve everyone; the commons keeps the park, playground, pavilion and lake. Neighbourhoods with homes for sale still get a community center with its own pool, now on a deck right against the center.
+- **Commons amenities line the drive** (community center, pool, playground, pavilion, courts) with the lake and lawns behind them, instead of sitting out in the middle of the park.
+- **The checks flag** a pool that isn't beside its clubhouse and a second pool for one community of rentals, so the AI review catches them too; the AI is also told to plan one pool per community.
+- **Dragging a building no longer wrecks the layout:** it settles in the nearest clear spot to where you let go, off the drives and clear of other buildings (hold Alt / Option to place it anyway). A clubhouse takes its pool deck and pool with it, a restaurant its patio and drive-thru lane.
+- **Parking comes back:** stalls a building covered grow back when you move it off them, so trying a spot and moving back leaves the plan as it was.
+
+### 4:01 PM CT: The AI suggests what to build and reviews the layouts (ce4e152)
+- **What Should Go Here?** in the site plan panel: the AI reads what the app knows about the site (flood zone, roads and traffic, utility districts and lines, environmental records), what's nearby and local rents, and suggests three to five uses with why each fits and what to check. **Lay This Out** builds any of them.
+- **Build Options now has the AI check the engine's work:** the engine still draws every option, then the AI looks at each one (a picture of the plan plus its numbers and checks), changes the program and has the engine lay it out again when the options miss, and puts the best first. Each option shows the AI's score, a verdict and what to watch. It takes a minute or two; a switch under the button turns it off.
+- The AI also sees the site's facts when it first reads your request.
 
 ### 1:32 PM CT: Site plans that always fit, big neighbourhoods, a building library, shape editing (03585aa, 8d0f936, 989d3e2, 0bf16d8, 4a57763, 02e3798, 6ac9f59, a586dfa)
 - **Every plan fits and is complete:** buildings come with their parking, a drive in from the street and dumpsters for shops, restaurants and offices. A restaurant on a wedge-shaped lot with a curved highway frontage now gets a real layout (it used to give "Simple layout" with no parking). Ask for more than the land holds, like 100,000 sq ft on 1.5 acres, and you get the most that fits with its parking, with a note saying so.
