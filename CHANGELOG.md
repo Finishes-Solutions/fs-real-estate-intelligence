@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 5:36 PM CT: Water districts without the county-wide authorities (33244aa)
+- The Water Districts layer and the property card's water district now leave out bodies that cover whole counties or river basins: Harris County Flood Control District, Coastal Water Authority, the Port of Houston Authority, river, groundwater and regional water authorities and the Fort Bend Subsidence District. Before, a downtown Houston property could show "Harris County FCD" as its water district and those outlines covered the map.
+- Local districts named "water authority" (such as Clear Lake City's) still show.
+
 ### 4:49 PM CT: Ask AI fixes, clearer search results, and the any-size reports merged in (06915f4, 2a83f46, bb380c2, d34f302)
 - **Ask AI:**
   - Text you type while an answer is on its way is kept.
