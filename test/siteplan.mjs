@@ -262,6 +262,10 @@ for (const v of [0, 1, 2]) {
   assert.deepEqual(R.notUnderstood('townhomes at 20 units per acre, 40 townhomes', P('townhomes at 20 units per acre, 40 townhomes')), ['40 townhomes'], 'a density is not a count (and the words took 20 as the count, so the 40 is flagged)');
   assert.deepEqual(R.notUnderstood('25k sf shops, 3 stories', P('25k sf shops, 3 stories')), []);
   assert.deepEqual(R.notUnderstood('Single-family homes, mostly 2-story', P('Single-family homes, mostly 2-story')), []);
-  assert.deepEqual(R.notUnderstood('a nice coffee shop', P('a nice coffee shop')), [], 'no numbers, nothing flagged'); }
+  assert.deepEqual(R.notUnderstood('a nice coffee shop', P('a nice coffee shop')), [], 'no numbers, nothing flagged');
+  // a word or two between the number and the noun ("120 single-family homes") is still a count the words may have missed
+  assert.deepEqual(R.notUnderstood('120 single-family homes and a 30,000 sf grocery', S.normalizeProgram({ use: 'retail', zones: [{ use: 'retail', gfa: 30000 }, { use: 'sfr' }] })), ['120 single-family homes']);
+  assert.deepEqual(R.notUnderstood('120 two-story homes', S.normalizeProgram({ use: 'sfr', units: 120 })), [], 'read when the program has the 120');
+  assert.deepEqual(R.notUnderstood('4 acres of townhomes', P('4 acres of townhomes')), [], 'acres are not a count'); }
 
 console.log('site plans ok');

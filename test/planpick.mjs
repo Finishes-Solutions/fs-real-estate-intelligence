@@ -31,6 +31,7 @@ assert.equal(lv('Something the engine says that no rule knows'), 'info');
 assert.deepEqual(K.byLevel(['Stormwater sized for the 2.0 developed acres.', 'Parking is 3 spaces short of 93.', 'Add the pull-through drive.']).map(n => n.level), ['bad', 'warn', 'info']);
 const sp = K.splitNotes([['A', 'B'], ['A', 'C'], ['A']]); assert.deepEqual(sp.shared, ['A']); assert.deepEqual(sp.own, [['B'], ['C'], []]);
 assert.deepEqual(K.splitNotes([['A']]).shared, []); // one layout: nothing is "shared"
+assert.deepEqual(K.splitNotes([['A', 'A', 'B'], ['A', 'B']]), { shared: ['A', 'B'], own: [[], []] }); // the same note twice shows once
 assert.deepEqual(K.acreageGap(['x', 'The program needs about 10.2 acres; it was scaled to fit 4.7.']), { need: 10.2, site: 4.7 });
 assert.equal(K.acreageGap(['Parking is short']), null);
 

@@ -3152,7 +3152,8 @@ table.who tr.nomatch td{border:0}
 .xlegend .li i.lg-p2{outline:1.5px dashed var(--text-2);outline-offset:-1.5px}
 .xlegend .li i.lg-ln{width:16px;height:0;border-radius:0;background:none!important;align-self:center}
 .xlegend .li i.lg-bad{background:transparent;border:2px solid #d64541}
-.xlegend .sp-key{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.xlegend .sp-key .li{min-width:0}.xlegend .sp-key .li span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* long names (Single-family homes, Detention pond) wrap to a second line instead of being cut off */
+.xlegend .sp-key{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.xlegend .sp-key .li{min-width:0;white-space:normal;align-items:flex-start}.xlegend .sp-key .li span{min-width:0;line-height:1.25;overflow-wrap:break-word}.xlegend .sp-key .li i{flex:none;margin-top:1px}.xlegend .sp-key .li i.lg-ln{align-self:flex-start;margin-top:7px}
 /* phones: the legend shows (folded) while planning, just above the sheet; not while a run's pill is there */
 @media (max-width:700px){
   .app.planning:has(.card.open) .legends{display:flex;position:fixed;left:10px;bottom:var(--sp-above,12px);z-index:7;max-height:min(40vh,calc(100vh - var(--sp-above,12px) - 140px))}
