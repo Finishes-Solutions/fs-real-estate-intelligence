@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 12:19 PM CT: Environmental report for any size of area (d038e3b)
+- **No size limit:** the Environmental report used to refuse anything over 30 square miles. It now works up to a whole county.
+- **Exact counts:** each database used to stop at 1,000 records (shown as "1,000+") and searched a circle much bigger than the site. Now every record within the search distance of the site's edge is counted, and the table shows how many are **on the site**.
+- **Large areas:** when a kind has more than 1,000 records, the report lists the on-site and nearest ones. **Export CSV** gathers all of them, which can take a minute for a county. Wells and wetlands are summarized by type (wetlands with acres), and pipelines count distinct lines.
+- **Soils for any size:** larger areas show each soil's share of the site. Before, soils were skipped over 3 square miles.
+- **Retry:** a database that doesn't answer in time says so, and **Retry** asks just that one again.
+
 ### 12:06 PM CT: Crime reports work for any area; clear messages when a report can't finish (ceb2862)
 - **Crime Report no longer fails on big areas.** An 80 sq mi selection (Jersey Village) showed "Unexpected token 'A'… is not valid JSON". The report took 27 seconds in the database, the database gives up after 8, and the server then retried until the whole request was cut off. It now takes about 2 seconds (the incident list under 1). The whole city takes a fraction of a second, and an area covering most of the city about 16 seconds.
 - **No 1,500 square mile limit** on crime reports: any area counts the Houston incidents inside it.
