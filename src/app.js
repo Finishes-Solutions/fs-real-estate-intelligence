@@ -1048,10 +1048,10 @@ const rowsFor=list=>list.map(f=>({'TABS #':f.id,'Project':f.name,'County':f.coun
   'Est. value (USD)':+(+f.cost).toFixed(2),'Sq ft':f.sqft||'','Owner':f.owner,'Developer':f.dev||'','Architect':f.arch||'','GC':f.gc||'','Registered':f.reg,'Status':f.status,'Est. start':f.start,'Est. end':f.end,
   'Timeline start':f.ts,'Timeline end':f.te,'Timeline dates':f.tsE||f.teE?'Partly estimated':'As filed','Change this week':f._chg||'','AI summary':f.sum||'','Scope':f.scope,
   ...(sel.kind==='radius'?{'Distance (mi)':Math.round(f._d*100)/100}:{}),'Location':f.approx?'Approximate (city)':f.prec==='street'?'Street (house not found)':f.prec==='intersection'?'Intersection':'Address','Latitude':f.lat,'Longitude':f.lon,'TABS link':tabsUrl(f.id)}));
-const csvText=rows=>{ if(!rows.length) return ''; const cols=Object.keys(rows[0]), q=v=>{ const s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
-  return '\ufeff'+[cols.join(','),...rows.map(r=>cols.map(c=>q(r[c])).join(','))].join('\r\n'); };
+const csvText=(rows,pre=[])=>{ if(!rows.length) return ''; const cols=Object.keys(rows[0]), q=v=>{ const s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  return '\ufeff'+[...pre.map(r=>r.map(q).join(',')),cols.join(','),...rows.map(r=>cols.map(c=>q(r[c])).join(','))].join('\r\n'); };
 const fileBase=(kind,label)=>'fs-'+kind+'-'+slug(label||scopeLabel())+'-'+stamp;
-function exportCsv(rows,name){ saveFile(name+'.csv',csvText(rows),'text/csv'); }
+function exportCsv(rows,name,pre){ saveFile(name+'.csv',csvText(rows,pre),'text/csv'); } // pre: [[...cells]] lines above the header (e.g. a filters line)
 // Excel: one or more sheets [{name, rows|aoa, link}] (link: column holding a URL to hyperlink)
 function exportXlsx(sheets,name){
   if(!window.XLSX){ toast('Excel export is still loading. Try again in a moment.'); return; }

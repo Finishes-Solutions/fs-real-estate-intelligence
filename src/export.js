@@ -81,10 +81,7 @@ export function initExport(ctx) {
         else if (st.format === 'csv') ctx.exportCsv(rows(list), name);
         else ctx.exportGeoJSON(list, name);
       } else if (st.report === 'compare') {
-        const t = compareTable();
-        if (st.format === 'pdf') await pdf('compare', 'areas', compareDoc(t), name, t.areas.length > 3);
-        else if (st.format === 'xlsx') ctx.exportXlsx([{ name: 'Comparison', aoa: [t.head, ...t.body] }, ...t.areas.map((a, i) => ({ name: (i + 1) + ' ' + a.label.replace(/[\\/?*[\]:]/g, ' '), rows: ctx.rowsFor(t.lists[i]) })).filter(s => s.rows.length)], name);
-        else ctx.exportCsv(t.body.map(r => Object.fromEntries(t.head.map((h, i) => [h, r[i]]))), name);
+        await compareOut(st.format, name);
       } else {
         const groups = activity(list);
         if (st.format === 'pdf') await pdf('activity', label, activityDoc(groups, list, label), name);
@@ -99,14 +96,28 @@ export function initExport(ctx) {
   const rows = list => ctx.rowsFor(list).map(r => { const o = { ...r }; if (!st.scope_text) delete o.Scope; if (!st.ai) { delete o['AI summary']; delete o.Use; delete o.Subtype; delete o.Tenant; delete o.Developer; } return o; });
 
   // ---------- data for reports ----------
-  function compareTable() {
-    const areas = ctx.compare.list(), base = ctx.filtered(), lists = areas.map(a => base.filter(f => inArea(a.geom, [f.lon, f.lat])));
-    const keys = ['count', 'value', 'new', 'newValue', 'reno', 'add', 'avg', 'median', 'big', 'active', 'starting', 'last30', 'sqft', 'psf', 'units', 'devs', 'topUse', 'topCity', 'topDev'];
-    const sq = a => d3.geoArea(a.geom) * 3958.8 ** 2;
-    const body = [['Area (sq mi)', ...areas.map(a => +sq(a).toFixed(1))], ...keys.map(k => { const m = BY_KEY.get(k); return [m.label, ...lists.map(l => m.fmt(m.fn(l)))]; }),
-      ['Filings per sq mi', ...areas.map((a, i) => +(lists[i].length / Math.max(sq(a), .01)).toFixed(2))]];
-    return { areas, lists, head: ['Metric', ...areas.map(a => a.label)], body };
+  // the Compare page's table (census numbers, then the filings), as rows for each format. Excel and CSV hold raw numbers
+  // (units in the row names) under a line saying which filters applied; the PDF shows the page's text.
+  async function compareTable() {
+    const M = await ctx.compare.model(), head = ['Metric', ...M.areas.map(a => a.label)], flat = [];
+    for (const sec of M.sections) { flat.push({ section: sec.title }); for (const r of sec.rows) flat.push({ label: r.label, unit: r.unit, cells: r.cells }); }
+    return { areas: M.areas, lists: M.lists, head, flat, note: M.note, filters: ctx.filterText() || 'None' };
   }
+  async function compareOut(format, name) {
+    const t = await compareTable(), raw = r => r.cells.map(c => c.v == null ? '' : c.v), nm = r => r.label + (r.unit ? ' (' + r.unit + ')' : '');
+    const pre = [['Area comparison'], ['Filing filters', t.filters], ['Census numbers are for the tracts centred in each area; filing numbers follow the filters above.']];
+    if (format === 'pdf') await pdf('compare', 'areas', compareDoc(t), name, t.areas.length > 3);
+    else if (format === 'xlsx') ctx.exportXlsx([{ name: 'Comparison', aoa: [...pre, [], t.head, ...t.flat.map(r => r.section ? [r.section] : [nm(r), ...raw(r)])] }, ...t.areas.map((a, i) => ({ name: (i + 1) + ' ' + a.label.replace(/[\\/?*[\]:]/g, ' '), rows: ctx.rowsFor(t.lists[i]) })).filter(s => s.rows.length)], name);
+    else ctx.exportCsv(t.flat.filter(r => !r.section).map(r => Object.fromEntries(t.head.map((h, i) => [h, i ? raw(r)[i - 1] : nm(r)]))), name, pre.slice(1, 2));
+  }
+  // the Compare page's Export menu: straight to a file in the chosen format
+  ctx.exportCompare = async format => {
+    const n = (ctx.compare?.list() || []).length; if (!n) { ctx.toast('Add areas to Compare first.'); return; }
+    try {
+      ctx.exportMeta = { report: 'compare', reportLabel: REPORTS.compare.label, format, filings: n, unit: 'areas', scope: 'areas', filters: ctx.filterText(), hash: ctx.hashStr() };
+      await compareOut(format, ctx.fileBase('compare', 'areas'));
+    } catch (e) { console.error(e); ctx.toast('Export failed: ' + e.message); } finally { ctx.exportMeta = null; }
+  };
   function activity(list) {
     const roles = [['dev', 'Developers & owners', f => f.dev || f.owner], ['arch', 'Architects & designers', f => f.arch], ['gc', 'General contractors', f => f.gc]];
     return roles.map(([k, label, get]) => {
@@ -178,12 +189,13 @@ export function initExport(ctx) {
       '<div class="lg">' + list.map((a, i) => '<span><i style="background:' + ctx.compare.colorOf(i) + '"></i>' + (i + 1) + '. ' + esc(a.label) + '</span>').join('') + '</div>';
   }
   function compareDoc(t) {
-    const n = t.areas.length, cols = Math.min(n, n > 3 ? 4 : 3);
+    const n = t.areas.length, cols = Math.min(n, n > 3 ? 4 : 3), blank = t.areas.map(() => '');
+    const rows = t.flat.map(r => r.section ? ['<b>' + esc(r.section) + '</b>', ...blank] : [esc(r.label), ...r.cells.map(c => '<span class="m">' + esc(c.t) + '</span>')]);
     return doc('Area comparison', t.areas.map(a => a.label).join(' vs. '),
-      compareMap() + '<h2>Side by side</h2>' + tbl(t.head, t.body.map(r => r.map((c, i) => i ? '<span class="m">' + esc(String(c)) + '</span>' : esc(String(c)))), t.areas.map((a, i) => i + 1)) +
+      compareMap() + '<h2>Side by side</h2>' + tbl(t.head, rows, t.areas.map((a, i) => i + 1)) + (t.note ? '<p class="rnote">' + esc(t.note) + ' Filing numbers follow your filters, so they can differ from the Market page.</p>' : '') +
       '<h2>Largest filings in each area</h2><div style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:16px">' + t.areas.map((a, i) => '<div><h3>' + esc(a.label) + '</h3>' +
         tbl(['Project', 'Est. value'], t.lists[i].slice().sort((x, y) => y.cost - x.cost).slice(0, 12).map(f => [project(f) + '<div class="sc">' + esc(f.city || f.county) + '</div>', money(f.cost)]), [1]) + '</div>').join('') + '</div>',
-      { landscape: n > 3 });
+      { landscape: n > 3, sources: SOURCES + ' Census numbers: US Census ACS 5-year and LEHD LODES.' });
   }
   const activityDoc = (groups, list, label) => doc('Activity report', label, kpis(list) + groups.filter(g => g.rows.length).map((g, i) => '<div' + (i ? ' class="full"' : '') + '><h2>' + esc(g.label) + '</h2>' +
     tbl(['#', 'Name', 'Projects', 'Est. value', 'New', 'Mostly', 'Where', 'Latest'], g.rows.slice(0, 40).map((r, j) => ['<span class="m">' + (j + 1) + '</span>', '<b>' + esc(r.label) + '</b>', fmtN(r.n), money(r.v), fmtN(r.nw), esc(r.use), esc(r.cos), '<span class="m">' + esc(r.last) + '</span>']), [2, 3, 4]) + '</div>').join(''),

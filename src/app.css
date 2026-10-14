@@ -2468,7 +2468,7 @@ table.who tr.nomatch td{border:0}
 .mk-scopebar>summary{display:flex;align-items:center;gap:10px;padding:9px 14px;list-style:none;cursor:var(--cur-pointer,pointer);font-size:12.5px;color:var(--text-2)}
 .mk-scopebar>summary::-webkit-details-marker{display:none}
 .mk-scopebar>summary b{color:var(--text)}
-.mk-scopebar[open]>summary .lnk{visibility:hidden}
+.mk-scopebar:not([open])>summary .mk-cls,.mk-scopebar[open]>summary .mk-chg{display:none}
 .mk-scopebar .mk-scope2{margin:0;border:0;border-top:1px solid var(--line);border-radius:0 0 var(--r-md) var(--r-md)}
 #view-market .mk-box>h3::before{display:none}
 /* Companies */
@@ -3208,3 +3208,34 @@ table.who tr.nomatch td{border:0}
 .sp-pf .sp-inerr{display:block;color:var(--danger);font-weight:600}
 .sp-pf .sp-inerr[hidden]{display:none}
 .sp-vc i em{white-space:nowrap}
+
+/* ---- Compare (B3): rename, section rows, part-quarter notes, use colours ---- */
+:root{--cmp-u0:#4c51bf;--cmp-u1:#d9480f;--cmp-u2:#0c8599;--cmp-u3:#8d6e63;--cmp-u4:#9aa000;--cmp-u5:#d6336c;--cmp-uo:#bcc2c4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--cmp-u0:#8f95f2;--cmp-u1:#ff9157;--cmp-u2:#4fd1e0;--cmp-u3:#c9ab9b;--cmp-u4:#d4dc4a;--cmp-u5:#f783ac;--cmp-uo:#6b7478}}
+:root[data-theme="dark"]{--cmp-u0:#8f95f2;--cmp-u1:#ff9157;--cmp-u2:#4fd1e0;--cmp-u3:#c9ab9b;--cmp-u4:#d4dc4a;--cmp-u5:#f783ac;--cmp-uo:#6b7478}
+.cmp-bar .bar b{box-shadow:-1px 0 0 var(--panel)}
+.cmp-key i{box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.cmp-chip .ed{width:24px;height:24px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:12px;cursor:var(--cur-pointer,pointer)}
+.cmp-chip .ed:hover{background:var(--chip);color:var(--text)}
+.cmp-chip .cmp-rename{font:inherit;font-size:13px;color:var(--text);background:var(--panel);border:1px solid var(--brand);border-radius:6px;padding:2px 6px;width:170px;min-width:0}
+table.cmp tr.sub th{text-align:left;font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);font-weight:600;background:var(--panel-2);padding:7px 10px;border-bottom:1px solid var(--line-2)}
+.cmp-note{margin:8px 0 0}
+.cmp-svg text.pt{font-style:italic}
+
+/* ---- Market (B3): the sticky bar names the area and holds the monthly-chart span; region-wide tags; jump targets clear the bar ---- */
+.mk-nav{align-items:center}
+.mk-nav .mk-here{display:inline-flex;align-items:center;gap:8px;max-width:min(300px,45%);background:var(--panel);border-color:var(--brand);color:var(--text)}
+.mk-nav .mk-here span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.mk-nav .mk-here em{font-style:normal;font-weight:600;color:var(--brand);white-space:nowrap}
+.mk-nav .mk-div{flex:none;width:1px;height:18px;background:var(--line-2);margin:0 2px}
+.mk-nav .mk-rng{flex:none;display:inline-flex;align-items:center;gap:8px;margin-left:auto;padding-left:10px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.mk-nav .mk-seg button{border:0;border-radius:0;padding:5px 10px;background:var(--panel);font-size:12px}
+.mk-nav .mk-seg button+button{border-left:1px solid var(--line-2)}
+.mk-nav .mk-seg button[aria-pressed="true"]{background:var(--text);color:var(--panel)}
+.mk-tag{display:inline-block;margin-left:6px;padding:1px 8px;border:1px solid var(--line-2);border-radius:999px;font:500 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);vertical-align:2px;white-space:nowrap}
+.mk-sec,#mxCorr,#mxBox{scroll-margin-top:calc(var(--mk-nav,48px) + 10px)}
+@media (max-width:700px){ .mk-nav .mk-here{max-width:60%} }
+/* Area at a Glance tiles and Reports-for-this-area rows wrap to two lines instead of cutting words off */
+.panel .glance .g-t>span,.panel .glance .g-t i{white-space:normal;overflow:hidden;text-overflow:clip;overflow-wrap:anywhere;line-height:1.3;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}
+.ar-row b,.ar-row .ar-d{white-space:normal;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow-wrap:anywhere}
+.ar-row{min-height:40px;height:auto}
