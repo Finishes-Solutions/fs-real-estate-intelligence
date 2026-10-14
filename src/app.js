@@ -70,17 +70,10 @@ motionMQ.addEventListener?.('change',e=>{ reduceMotion=e.matches; if(reduceMotio
 
 // ---------- theme ----------
 const root=document.documentElement;
-// Settings › Appearance: Light (the first-visit look), Dark, or Match device ('auto', follows the OS). data-theme always
-// holds the look in use, light or dark, so the stylesheet, isDark() and the charts that watch it need no third case.
-const THEME_KEY='fs-map-theme', darkMQ=window.matchMedia('(prefers-color-scheme: dark)');
-let themePref='light'; try{ const t=localStorage.getItem(THEME_KEY); if(t==='light'||t==='dark'||t==='auto') themePref=t; }catch(e){}
-const themeNow=()=>themePref==='auto'?(darkMQ.matches?'dark':'light'):themePref;
-root.dataset.theme=themeNow();
-const isDark=()=>root.dataset.theme==='dark';
-// a new look restyles the basemap; the timeline, market charts and other views redraw themselves when data-theme changes
-function applyTheme(){ const t=themeNow(); if(root.dataset.theme===t) return; root.dataset.theme=t; setBasemap(layers.style); }
-function setTheme(m){ if(!['light','dark','auto'].includes(m)) return; themePref=m; try{ localStorage.setItem(THEME_KEY,m); }catch(e){} applyTheme(); }
-darkMQ.addEventListener?.('change',()=>{ if(themePref==='auto') applyTheme(); });
+// light only (dark mode was removed): data-theme is always "light" for the stylesheet and the charts that read it, and a
+// choice saved by an older version is dropped. isDark() stays (always false) for the modules that still ask.
+root.dataset.theme='light'; try{ localStorage.removeItem('fs-map-theme'); }catch(e){}
+const isDark=()=>false;
 
 // ---------- data ----------
 // latest change run: id -> 'new' | field that changed
@@ -101,7 +94,7 @@ const inSel=f=>!sel.feature||(sel.kind==='county'&&sel.counties.size?sel.countie
 const countyGeo=DATA.counties.map(c=>({name:c.name,geom:{type:'MultiPolygon',coordinates:c.outline}}));
 
 // ---------- map ----------
-const STYLES={dots:['dataviz','dataviz-dark'],streets:['streets-v2','streets-v2-dark'],sat:['hybrid','hybrid'],topo:['topo-v2','topo-v2-dark'],esri:null,free:null,google:null,gsat:null};
+const STYLES={dots:'dataviz',streets:'streets-v2',sat:'hybrid',topo:'topo-v2',esri:null,free:null,google:null,gsat:null}; // MapTiler map ids (light)
 // keyless basemaps: Esri World Imagery (with OpenFreeMap labels and buildings on top) and OpenFreeMap streets
 const OFM='https://tiles.openfreemap.org';
 const ESRI_STYLE={version:8,glyphs:OFM+'/fonts/{fontstack}/{range}.pbf',
@@ -118,7 +111,7 @@ const layers={style:(()=>{ try{ const b=localStorage.getItem('fs-basemap'); if(B
 try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(typeof L.grid==='boolean') layers.grid=L.grid; }catch(e){} // the map always opens without filings (dots and heatmap off); dot size and the grid are remembered
 const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} syncFilingsSw(); }; // every change to the filing layer passes here
 // Google base maps need a tile session first (src/google.js): a promise of the style
-const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
+const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl(layers.style),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
 map.on('error',e=>{ const m=(e&&e.error&&e.error.message)||''; if(/40[13]|Unauthorized|Forbidden/i.test(m)&&STYLES[layers.style]) toast('MapTiler refused the key for this site. Check the key’s allowed origins.'); });
@@ -133,8 +126,7 @@ const GJ={
 };
 const IDX=new Map(F.map((f,i)=>[f,i]));
 function filingsFC(){ return fc(visible.map(f=>({type:'Feature',properties:{i:IDX.get(f),t:f.type,r:f.r,lc:Math.log10(Math.max(f.cost,1e4)),h:(f.approx||f.type==='Addition')?1:0},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}))); }
-const C=()=>isDark()?{new:'#4caf70',reno:'#939a9d',add:'#8acda3',line:'rgba(255,255,255,.55)',waller:'#4caf70',dot:'#8d9598',lab:'#dde1e2',halo:'#16191a',sel:'#4caf70',stroke:'#16191a'}
-  : (isSat()?{new:'#5fd38a',reno:'#f1f3f3',add:'#c2e3d0',line:'rgba(255,255,255,.85)',waller:'#8acda3',dot:'#ffffff',lab:'#ffffff',halo:'#0b0d0c',sel:'#c2e3d0',stroke:'#0b0d0c'}
+const C=()=>(isSat()?{new:'#5fd38a',reno:'#f1f3f3',add:'#c2e3d0',line:'rgba(255,255,255,.85)',waller:'#8acda3',dot:'#ffffff',lab:'#ffffff',halo:'#0b0d0c',sel:'#c2e3d0',stroke:'#0b0d0c'}
   : {new:'#006527',reno:'#6b7174',add:'#1f9249',line:'rgba(22,25,26,.45)',waller:'#006527',dot:'#5b6366',lab:'#23282a',halo:'#ffffff',sel:'#006527',stroke:'#ffffff'});
 let labelFont=['Noto Sans Bold'];
 
@@ -169,16 +161,16 @@ function addOverlays(){
   addUsCounties();
   const col=['match',['get','t'],'New',c.new,'Reno',c.reno,c.add];
   map.addLayer({id:'heat',type:'heatmap',source:'filings',maxzoom:17,layout:{visibility:'none'},paint:{'heatmap-radius':['interpolate',['linear'],['zoom'],4,8,8,18,11,32,14,48,17,70],'heatmap-intensity':['interpolate',['linear'],['zoom'],4,.6,9,.9,13,1.3],
-    'heatmap-opacity':['interpolate',['linear'],['zoom'],11,.85,15,.4],'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(0,0,0,0)',.08,isDark()?'rgba(76,175,112,.12)':'rgba(138,205,163,.18)',.25,isDark()?'rgba(76,175,112,.45)':'rgba(138,205,163,.55)',.45,'#8acda3',.65,'#4caf70',.82,'#1f9249',.93,'#006527',1,isDark()?'#e8f5ec':'#00351a']}});
+    'heatmap-opacity':['interpolate',['linear'],['zoom'],11,.85,15,.4],'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(0,0,0,0)',.08,'rgba(138,205,163,.18)',.25,'rgba(138,205,163,.55)',.45,'#8acda3',.65,'#4caf70',.82,'#1f9249',.93,'#006527',1,'#00351a']}});
   map.addLayer({id:'filings',type:'circle',source:'filings',paint:{'circle-color':col,
     'circle-stroke-color':['case',['==',['get','h'],1],col,c.stroke],'circle-stroke-width':['case',['==',['get','h'],1],1.4,.8],'circle-pitch-alignment':'map'}});
-  map.addLayer({id:'filings-hl',type:'circle',source:'filings',filter:['==',['get','i'],-1],paint:{'circle-radius':['+',markerRadius(),6],'circle-color':'rgba(0,0,0,0)','circle-stroke-color':isDark()||isSat()?'#ffffff':'#0b0d0c','circle-stroke-width':2.2}});
+  map.addLayer({id:'filings-hl',type:'circle',source:'filings',filter:['==',['get','i'],-1],paint:{'circle-radius':['+',markerRadius(),6],'circle-color':'rgba(0,0,0,0)','circle-stroke-color':isSat()?'#ffffff':'#0b0d0c','circle-stroke-width':2.2}});
   if(!map.getSource('hl')) map.addSource('hl',{type:'geojson',data:fc([])});
   map.addLayer({id:'hl-glow',type:'circle',source:'hl',paint:{'circle-radius':16,'circle-color':'#eda100','circle-opacity':.18,'circle-blur':.6,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'hl-ring',type:'circle',source:'hl',paint:{'circle-radius':9,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':'#eda100','circle-stroke-width':2.6,'circle-pitch-alignment':'map'}});
   if(!map.getSource('focus')) map.addSource('focus',{type:'geojson',data:fc([])});
   map.addLayer({id:'focus-halo',type:'circle',source:'focus',filter:['==',['get','approx'],1],paint:{'circle-radius':['interpolate',['linear'],['zoom'],8,18,14,46],'circle-color':c.sel,'circle-opacity':.10,'circle-stroke-color':c.sel,'circle-stroke-width':1.2,'circle-stroke-opacity':.6,'circle-pitch-alignment':'map'}});
-  map.addLayer({id:'focus-dot',type:'circle',source:'focus',paint:{'circle-radius':['interpolate',['linear'],['zoom'],6,6,14,9],'circle-color':['match',['get','t'],'New',c.new,'Reno',c.reno,c.add],'circle-stroke-color':isDark()||layers.style==='sat'?'#ffffff':'#0b0d0c','circle-stroke-width':3,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'focus-dot',type:'circle',source:'focus',paint:{'circle-radius':['interpolate',['linear'],['zoom'],6,6,14,9],'circle-color':['match',['get','t'],'New',c.new,'Reno',c.reno,c.add],'circle-stroke-color':layers.style==='sat'?'#ffffff':'#0b0d0c','circle-stroke-width':3,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'focus-label',type:'symbol',source:'focus',layout:{'text-field':['get','name'],'text-font':labelFont,'text-size':12,'text-offset':[0,1.4],'text-anchor':'top','text-max-width':14,'text-allow-overlap':true},paint:{'text-color':c.lab,'text-halo-color':c.halo,'text-halo-width':1.8}});
   map.addLayer({id:'hl-label',type:'symbol',source:'hl',minzoom:8,layout:{'text-field':['get','name'],'text-font':labelFont,'text-size':11.5,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':12,'text-optional':true},paint:{'text-color':c.lab,'text-halo-color':c.halo,'text-halo-width':1.6}});
   styleFilings();
@@ -1283,7 +1275,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
-  setTheme, themePref:()=>themePref, BOOT_BASES,
+  BOOT_BASES,
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
