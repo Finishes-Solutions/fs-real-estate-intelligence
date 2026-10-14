@@ -5,6 +5,20 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 4:49 PM CT: Ask AI fixes, clearer search results, and the any-size reports merged in (06915f4, 2a83f46, bb380c2, d34f302)
+- **Ask AI:**
+  - Text you type while an answer is on its way is kept.
+  - Failures read as sentences with Retry.
+  - Suggestions lead with the property, the area and the market, and only mention filings when they're on.
+  - "Ask AI About This Spot" (right-click) asks about the property at that address.
+  - Closing the drawer returns you to the Ask AI button.
+- **Search:** an address result's main button is now **Property Card** (an area's is **Area Summary**).
+- **Property card:** shows "≈ N acres · From the parcel outline" when the county record has no land area.
+- **Market** names its area once at the top.
+- **Compare's** empty page names the Box tool.
+- **Filings › Changes:** a night with no changes says so.
+- **Reports keep their no-size-limit behaviour** (from the earlier entries today). When a big area takes too long, or its outline is too detailed to send, the report gives that reason with Retry instead of a general "not available".
+
 ### 2:53 PM CT: Property, site plans, area data and reports come first; a sweep of fixes (22242e8, 2e97724, b13e5b3, ab7dae3, b22f43a, 1a507b2, f7e1dd8, f885a72, 8e80a5c)
 - **New order:** the top bar is Map · Projects · Reports · Market · Filings · My Work, with site plans (Projects) as their own tab. On phones it's Map · Explore · Projects · Reports · More. The Map panel leads with the area, Area at a Glance and reports; saved searches and Construction Filings come last. Old links still open the same pages.
 - **Layer chips follow what you use:** the most-used layers come first in the chip row and in the Layers panel. New users start with Parcels, Flood Zones, Demographics, Traffic, Satellite and 3D.
