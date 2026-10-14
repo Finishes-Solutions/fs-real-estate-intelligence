@@ -78,7 +78,7 @@ assert.equal(S.stalls({ w: 8, d: 18 }).count, 0);
   plan.elements[0].y = 85; assert.match(S.check(plan)[0].text, /Building is inside the 20 ft rear setback/);
   plan.elements[0].y = 60; plan.elements[2] = { id: 'd', kind: 'drive', x: 95, y: 0, w: 26, d: 60, rot: 0 };
   assert.match(S.check(plan).find(i => i.id === 'd').text, /Drive runs outside the lot/, 'a drive through a side line is outside');
-  plan.elements[2] = { id: 'd', kind: 'pond', x: 0, y: 20, w: 40, d: 40, rot: 0 }; assert.ok(S.check(plan).some(i => /Building overlaps detention/.test(i.text)));
+  plan.elements[2] = { id: 'd', kind: 'pond', x: 0, y: 20, w: 40, d: 40, rot: 0 }; assert.ok(S.check(plan).some(i => /Building overlaps Detention/.test(i.text)));
   plan.elements.pop(); plan.zoning = { max_coverage_pct: 15, max_far: 0.1 };
   const z = S.check(plan).map(i => i.text).join(' | '); assert.match(z, /Coverage 20% is over the zoning limit of 15%/); assert.match(z, /FAR 0.20 is over the zoning limit of 0.1/);
   const m = S.metrics(plan); assert.equal(m.gfa, 12000); assert.equal(m.spaces, 39); assert.equal(m.ada, 2); assert.equal(m.required, 48); assert.equal(+m.coverage.toFixed(2), 0.2); }
@@ -267,5 +267,32 @@ for (const v of [0, 1, 2]) {
   assert.deepEqual(R.notUnderstood('120 single-family homes and a 30,000 sf grocery', S.normalizeProgram({ use: 'retail', zones: [{ use: 'retail', gfa: 30000 }, { use: 'sfr' }] })), ['120 single-family homes']);
   assert.deepEqual(R.notUnderstood('120 two-story homes', S.normalizeProgram({ use: 'sfr', units: 120 })), [], 'read when the program has the 120');
   assert.deepEqual(R.notUnderstood('4 acres of townhomes', P('4 acres of townhomes')), [], 'acres are not a count'); }
+
+// ---- small sites: the suggested chips on 0.63 and 4.7 acres (PARCEL_SCALE 0.12 and 0.33 in the browser harness) park, with a drive in from the street ----
+{ const L = await import('../lib/sitelayout.mjs'), PC = [-95.76, 29.79];
+  const parcelAt = k => { const dx = 0.0022 * k, dy = 0.0019 * k, [lon, lat] = PC; return { type: 'Polygon', coordinates: [[[lon - dx, lat - dy], [lon + dx, lat - dy], [lon + dx * 1.05, lat + dy * 0.6], [lon + dx * 0.4, lat + dy], [lon - dx, lat + dy], [lon - dx, lat - dy]]] }; };
+  const touchesStreet = (plan, els) => { const rules = S.edgeRules(plan.ring, plan.front, plan.setbacks, plan.streets);
+    return els.some(e => e.kind === 'drive' && plan.ring.some((a, k) => (rules[k].role === 'front' || rules[k].street) && S.shapeOf(e).some((p, i, c) => S.segSeg(p, c[(i + 1) % c.length], a, plan.ring[(k + 1) % plan.ring.length]) <= 2.5))); };
+  for (const [k, ac] of [[0.12, 0.63], [0.33, 4.74]]) {
+    const b = S.boundaryFrom(parcelAt(k), PC), plan = { ...b, front: null, frontGuess: true, setbacks: { ...S.SETBACKS } };
+    assert.ok(Math.abs(S.ringArea(b.ring) / 43560 - ac) < 0.05, 'scale ' + k + ' is about ' + ac + ' acres');
+    for (const ask of ['5,000 sf retail strip', '2,500 sf QSR pad with drive-thru', '25,000 sf retail strip with a drive-thru pad']) {
+      const prog = S.guessProgram(ask), opts = L.layoutOptions(plan, prog); assert.ok(opts.length >= 1, ask + ' @' + k + ': layouts');
+      for (const o of opts) { const p = { ...plan, elements: o.elements, program: o.program || prog, zones: o.zones }, m = S.metrics(p), what = ask + ' @' + k + ' · ' + o.name;
+        assert.ok(m.spaces > 0, what + ': parks (' + m.spaces + ' of ' + m.required + ')');
+        assert.ok(touchesStreet(plan, o.elements), what + ': a drive meets the street edge');
+        assert.ok(!S.check(p).some(i => i.level === 'bad'), what + ': no blocking problems');
+        for (const n of o.notes.filter(t => /Parking is \d/.test(t))) { const q = +n.match(/Parking is ([\d,]+) space/)[1].replace(/,/g, ''); assert.equal(q, m.required - m.spaces, what + ': the note counts like the header: ' + n); assert.ok(!/ 1 spaces/.test(n), what + ': singular'); } } } }
+  // a lot with its building and nothing else: the apron parks it from the street side, drive in the middle
+  const b2 = S.boundaryFrom(parcelAt(0.2), PC), plan2 = { ...b2, front: null, setbacks: { ...S.SETBACKS } }, bld = S.autoLayout(plan2, { use: 'retail', gfa: 5000 }).elements.filter(e => e.kind === 'building');
+  const ap = S.streetApron(plan2, bld, { use: 'retail', gfa: 5000 }); assert.ok(ap && ap.elements.some(e => e.name === 'Main entry' && e.kind === 'drive'), 'apron with a main entry');
+  { const p = { ...plan2, elements: bld.concat(ap.elements), program: { use: 'retail', gfa: 5000 } }, m = S.metrics(p); assert.ok(m.spaces >= m.required, 'apron parks the 5,000 sf: ' + m.spaces + ' of ' + m.required); assert.ok(!S.check(p).some(i => i.level === 'bad'), 'apron breaks no rule'); assert.ok(touchesStreet(plan2, ap.elements), 'apron drive on the street edge'); }
+  // the engine's own shortfall note counts as the header does, and says "1 space"
+  { const b3 = S.boundaryFrom(parcelAt(0.12), PC), plan3 = { ...b3, front: null, setbacks: { ...S.SETBACKS } }, r = S.autoLayout(plan3, { use: 'retail', gfa: 5000 }), m = S.metrics({ ...plan3, elements: r.elements, program: r.program }), n = r.notes.find(t => /^Parking is/.test(t));
+    assert.equal(m.required - m.spaces, 1, 'one space short'); assert.ok(/^Parking is 1 space short;/.test(n), n); }
+  assert.equal(S.spacesWord(1), '1 space'); assert.equal(S.spacesWord(2), '2 spaces'); assert.equal(S.spacesWord(1234), '1,234 spaces');
+  // problem names keep their capitals
+  { const pl = { ring: [[0, 0], [300, 0], [300, 300], [0, 300]], front: 0, setbacks: { ...S.SETBACKS }, program: { use: 'retail' }, elements: [{ id: 'a', kind: 'building', x: 150, y: 150, w: 80, d: 60, name: 'Building A' }, { id: 'b', kind: 'building', x: 170, y: 160, w: 80, d: 60, name: 'Building B' }] };
+    assert.ok(S.check(pl).some(i => i.text === 'Building A overlaps Building B'), S.check(pl).map(i => i.text).join(' | ')); } }
 
 console.log('site plans ok');

@@ -86,6 +86,7 @@ assert.equal(K.SORTS.length, 7); assert.ok(!K.SORTS.some(([k]) => k === 'value')
 // ---- money ----
 assert.equal(K.moneyDigits([14.28e6, 14.25e6, 14.31e6]), 2, 'three costs that read $14.3M need two decimals');
 assert.equal(K.moneyDigits([4.2e6, 8.8e6]), 1);
+assert.equal(K.fmtM(6039.7e6), '$6.04B', 'over a billion: $X.XXB, never $6039.7M'); assert.equal(K.fmtM(-1.5e9), '−$1.50B'); assert.equal(K.fmtM(999e6, 1), '$999.0M');
 assert.equal(K.fmtM(14.28e6, 2), '$14.28M'); assert.equal(K.fmtM(-9.98e6), '−$10.0M'); assert.equal(K.fmtM(950000), '$950k');
 assert.equal(K.fmtPct(-0.0448), '−4.48%');
 

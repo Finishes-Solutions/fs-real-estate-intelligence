@@ -166,15 +166,15 @@ export function initMapSearch(ctx) {
   function setActive(i, scroll = true) { active = i; res.querySelectorAll('.ms-it').forEach(b => b.classList.toggle('on', +b.dataset.i === i)); if (scroll) res.querySelector('.ms-it.on')?.scrollIntoView({ block: 'nearest' }); }
   function open() { res.classList.add('on'); input.setAttribute('aria-expanded', 'true'); }
   function close() { res.classList.remove('on'); input.setAttribute('aria-expanded', 'false'); }
-  function applyKeyword() { seq++; clearTimeout(geoT); ctx.state.q = q; ctx.applyFilters(); close(); ctx.setView('map'); ctx.fitToVisible(); ctx.toast('Filtered to ' + fmtN(ctx.visible.length) + ' filings matching “' + q + '”.'); }
+  function applyKeyword() { seq++; clearTimeout(geoT); ctx.state.q = q; ctx.applyFilters(); close(); ctx.setView('map'); ctx.showFilings(); ctx.fitToVisible(); ctx.toast('Filtered to ' + fmtN(ctx.visible.length) + ' filings matching “' + q + '”.'); }
   // a company or person: the Activity filter when it covers all their projects, otherwise a keyword search on the name
   function showEntity(e) {
     ctx.setView('map'); ctx.state.q = '';
     const pick = ['dev', 'arch', 'gc'].map(k => ({ k, n: F.filter(f => ctx.entityKey(k === 'dev' ? (f.dev || f.owner) : f[k]) === e.k).length })).sort((a, b) => b.n - a.n)[0];
     if (pick.n >= e.ids.size) ctx.state.who = { k: pick.k, v: e.k, label: e.label };
     else { ctx.state.who = null; ctx.state.q = e.label; }
-    ctx.applyFilters(); ctx.fitToVisible(); input.value = e.label; clearB.hidden = false;
-    ctx.toast('Showing ' + fmtN(ctx.visible.length) + ' filings for ' + e.label + (ctx.visible.length < e.ids.size ? ' (some are outside the current date or type filters)' : '') + '.');
+    ctx.applyFilters(); ctx.showFilings(); ctx.fitToVisible(); input.value = e.label; clearB.hidden = false; // the filter is about the filings: they go on the map
+    ctx.toast('Showing ' + fmtN(ctx.visible.length) + ' filing' + (ctx.visible.length === 1 ? '' : 's') + ' for ' + e.label + (ctx.visible.length < e.ids.size ? ' (some are outside the current date or type filters)' : '') + '.');
   }
   function pick(i) {
     const it = items[i]; if (!it) return; seq++; clearTimeout(geoT); close(); input.blur();
@@ -321,11 +321,14 @@ export function initMapSearch(ctx) {
 
   function placeCard(note = '') {
     if (!place) return;
-    const { list, how } = placeHits(), v = list.reduce((s, f) => s + f.cost, 0), area = isArea(place.geom) && !/building|business/.test(place.kind);
+    let { list, how } = placeHits(); const area = isArea(place.geom) && !/building|business/.test(place.kind);
+    // a town, county, neighborhood or ZIP with no outline is only a point: "filings within 0.25 mile" of its middle would mislead, so no count
+    const bare = !area && /^(town|county|area|zip)$/.test(place.kind); if (bare) list = [];
+    const v = list.reduce((s, f) => s + f.cost, 0);
     const inCmp = ctx.compare?.list().some(a => a.key === 'place:' + place.label);
     bar.innerHTML = '<button class="x" aria-label="Clear" id="pbX">×</button><div class="pb-k">' + esc(KIND_LABEL[place.kind] || 'Place') + '</div><div class="pb-t">' + esc(place.label) + '</div>' +
-      '<div class="pb-s">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' ' + how + ' · est. ' + fmtM(v) + (ctx.filterText() ? '<span> (current filters)</span>' : '') + '</div>' + (note ? '<div class="pb-n">' + esc(note) + '</div>' : '') +
-      '<div class="pb-a"><button class="btn primary" id="pbInfo">More Information</button>' + (area ? '<button class="btn" id="pbFilter">Filter to This Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>' : '') +
+      (bare ? '' : '<div class="pb-s">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' ' + how + ' · est. ' + fmtM(v) + (ctx.filterText() ? '<span> (current filters)</span>' : '') + '</div>') + (note ? '<div class="pb-n">' + esc(note) + '</div>' : '') +
+      '<div class="pb-a"><button class="btn primary" id="pbInfo" title="' + (area ? 'Headline numbers, top uses and the largest projects inside it' : 'Owner, value, site and area details for the parcel here') + '">' + (area ? 'Area Summary' : 'Property Card') + '</button>' + (area ? '<button class="btn" id="pbFilter" title="Make this the picked area: the panel, Compare and Save search then use it">Use as Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>' : '') +
         (list.length ? '<button class="btn" id="pbHl">Highlight ' + (list.length > 50 ? 'Top 50' : 'Them') + '</button>' : '') + '</div>';
     bar.classList.add('on');
     bar.querySelector('#pbX').onclick = clearPlace;
@@ -336,14 +339,14 @@ export function initMapSearch(ctx) {
   }
   ctx.onChange(() => { if (place && bar.classList.contains('on') && place.geom !== undefined) placeCard(); });
 
-  // "More Information" on an address, landmark, building or coordinates: the location card (parcel, size, lidar height,
+  // "Property Card" on an address, landmark, building or coordinates: the location card (parcel, size, lidar height,
   // filings, businesses, Drive Time, Weather, Site Imagery, News), using the building footprint under the point when there is one
   function pointInfo() {
     const pt = place.c || centerOf(place.geom);
     const fp = /building|business/.test(place.kind) && isArea(place.geom) ? place.geom : ctx.buildingAt?.(pt)?.footprint || null;
     ctx.openBuildingAt(pt, fp);
   }
-  // "More Information" on a town, county, neighborhood or ZIP: an area summary card with the headline metrics,
+  // "Area Summary" on a town, county, neighborhood or ZIP: an area summary card with the headline metrics,
   // top uses and the largest projects inside it
   function areaCard() {
     const pl = place, card = ctx.card, { list } = placeHits(), keys = ctx.kpiKeys?.() || DEFAULT_KPIS;
@@ -353,7 +356,7 @@ export function initMapSearch(ctx) {
     ctx.closeCard();
     card.innerHTML = '<div class="top"><div><div class="kicker">' + esc(KIND_LABEL[pl.kind] || 'Area') + ' summary</div><h2>' + esc(pl.label) + '</h2><div class="bsub">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' inside' + (ctx.filterText() ? ' (current filters)' : '') + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
-      '<div class="bacts"><button class="btn primary" id="acFilter">Filter to This Area</button><button class="btn" id="acCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button></div>' +
+      '<div class="bacts"><button class="btn primary" id="acFilter" title="Make this the picked area: the panel, Compare and Save search then use it">Use as Area</button><button class="btn" id="acCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button></div>' +
       '<div class="acm">' + keys.map(k => { const m = BY_KEY.get(k); if (!m) return ''; const v = m.fmt(m.fn(list)); return '<div><b title="' + esc(v) + '">' + esc(v) + '</b><span>' + esc(m.short || m.label) + '</span></div>'; }).join('') + '</div>' +
       (topUses.length ? '<div class="bsec"><div class="lt">Top uses by value</div>' + topUses.map(u => '<div class="acu"><span>' + esc(u[0]) + '</span><i style="width:' + Math.max(2, Math.round(u[2] / tot * 100)) + '%"></i><b>' + fmtN(u[1]) + ' · ' + fmtM(u[2]) + '</b></div>').join('') + '</div>' : '') +
       (top.length ? '<div class="bsec"><div class="lt">Largest projects</div>' + top.map((f, i) => '<button class="acp" data-i="' + i + '"><b>' + esc(f.name) + '</b><span>' + esc([f.use || ctx.TYPE_LABEL?.[f.type], f.city, f.reg].filter(Boolean).join(' · ')) + '</span><em>' + fmtM(f.cost) + '</em></button>').join('') + '</div>'

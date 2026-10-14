@@ -350,6 +350,12 @@ table.who .r,th.r{text-align:right}
 /* changes */
 .chbody{display:grid;gap:18px;max-width:980px}
 .chsec h3{font-size:14px;margin:0 0 6px;font-weight:700}
+.ch-jump{position:sticky;top:calc(-1 * var(--chpt,20px));z-index:3;display:flex;flex-wrap:wrap;gap:6px;margin:0 calc(-1 * var(--chpx,24px)) 12px;padding:8px var(--chpx,24px);background:var(--panel-2);border-bottom:1px solid var(--line)}
+.ch-jump[hidden]{display:none}
+.ch-jump .chip b{font-family:var(--font-mono);font-weight:600;color:var(--muted);margin-left:2px}
+.view .chsec[data-sec]>h3{position:sticky;top:calc(var(--chj,0px) - var(--chpt,20px));z-index:2;background:var(--panel);margin:-14px -16px 8px;padding:12px 16px 8px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0}
+.tl-legend button{display:inline-flex;align-items:center;gap:0;border:0;background:none;padding:2px 4px;margin:-2px -4px;border-radius:4px;font:inherit;color:inherit;cursor:var(--cur-pointer,pointer)}
+.tl-legend button:hover{background:var(--chip);color:var(--text)}
 .chsec h3 span{font-family:var(--font-mono);font-size:11px;color:var(--muted);font-weight:500}
 .chitem{display:flex;justify-content:space-between;gap:12px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;padding:8px 6px;text-align:left;cursor:var(--cur-pointer,pointer);color:var(--text);font:inherit}
 .chitem:hover{background:var(--chip)}
@@ -473,12 +479,16 @@ table.who .r,th.r{text-align:right}
   .card .top{padding-top:8px}
   .card .x{width:40px;height:40px;margin:-6px -8px 0 0}
 
-  .msheet{display:block;position:fixed;left:0;right:0;bottom:0;z-index:11;background:var(--panel);border-radius:14px 14px 0 0;padding:4px 8px calc(10px + var(--sb));transform:translateY(105%);transition:transform 200ms cubic-bezier(.2,.7,.2,1);box-shadow:0 -10px 30px rgba(11,13,12,.25)}
-  .msheet.on{transform:none}
-  .msheet .mgrab{width:42px;height:5px;border-radius:3px;background:var(--line-2);margin:6px auto 8px}
+  .msheet{display:block;position:fixed;left:0;right:0;bottom:calc(var(--navh) + var(--sb));z-index:11;max-height:calc(100% - var(--navh) - var(--sb) - var(--st) - 24px);overflow-y:auto;overscroll-behavior:contain;background:var(--panel);border-radius:14px 14px 0 0;padding:0 8px 10px;transform:translateY(calc(100% + var(--navh) + var(--sb) + 10px));visibility:hidden;transition:transform 200ms cubic-bezier(.2,.7,.2,1);box-shadow:0 -10px 30px rgba(11,13,12,.25)}
+  .msheet.on{transform:none;visibility:visible}
+  .msheet .msh-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:center;min-height:44px;margin:0 -8px;background:var(--panel);border-radius:14px 14px 0 0}
+  .msheet .mgrab{width:100%;height:44px;padding:0;border:0;background:none;position:relative;cursor:var(--cur-pointer,pointer)}
+  .msheet .mgrab::before{content:"";position:absolute;left:50%;top:19px;width:42px;height:5px;margin-left:-21px;border-radius:3px;background:var(--line-2)}
+  .msheet .msh-x{position:absolute;right:6px;top:2px;width:40px;height:40px;padding:0;justify-content:center;border:0;border-radius:50%;background:none;color:var(--text-2)}
+  .msheet .msh-x:active{background:var(--chip)}
   .msheet button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding:15px 12px;border:0;border-bottom:1px solid var(--line);background:none;font:600 15px var(--font-display);color:var(--text);cursor:var(--cur-pointer,pointer)}
   .msheet button:last-child{border-bottom:0}
-  .mscrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:10;opacity:0;pointer-events:none;transition:opacity 200ms}
+  .mscrim{display:block;position:fixed;inset:0 0 calc(var(--navh) + var(--sb)) 0;background:rgba(0,0,0,.35);z-index:10;opacity:0;pointer-events:none;transition:opacity 200ms}
   .mscrim.on{opacity:1;pointer-events:auto}
 }
 
@@ -552,6 +562,7 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 .ai-m.user{align-self:flex-end;max-width:85%;background:var(--text);color:var(--panel);padding:8px 12px;border-radius:14px 14px 4px 14px}
 .ai-m.bot{align-self:flex-start;color:var(--text)}
 .ai-m.err{color:#c03b3a}
+.ai-m.err .lnk{color:var(--brand);font-weight:600;margin-left:4px}
 .ai-m.act{align-self:flex-start;display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;color:var(--text-2);background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:6px;padding:6px 10px;max-width:100%}
 .ai-m.act .ai-ai{flex:1;min-width:0}
 .ai-m.act .lnk{font-family:var(--font-display);font-size:11.5px;white-space:nowrap}
@@ -632,11 +643,11 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
   .ai-h{padding-top:2px}
   .ai-f textarea{font-size:16px}
   .app.ai-open .mcount,.app.ai-open .mapleft,.app.ai-open .ctrls{display:none}
+  .app.ai-open .card.open:not(.min){z-index:8} /* a card opened while Ask AI is up sits over it (Ask AI itself folds the card first) */
   .mask{padding:4px}
   .mlaunch{flex:1;min-width:0;display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:8px 6px 8px 10px;font-size:15px;color:var(--brand);text-align:left;cursor:var(--cur-pointer,pointer)}
   .mlaunch span{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
-@media (max-width:700px){ .app.ai-open:has(.card.open) .ai{transform:translateY(110%)} }
 .app.pcollapsed{grid-template-columns:minmax(0,1fr)}
 .ai-f textarea:focus-visible{box-shadow:none}
 .legend .hramp{display:none;align-items:center;gap:6px;font-size:10.5px;color:var(--muted)}
@@ -1659,7 +1670,7 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 
 /* ================= phone "More" sheet: one-word tiles, named like the desktop tabs ================= */
 @media (max-width:700px){
-  .msheet{padding:4px 14px calc(14px + var(--sb))}
+  .msheet{padding:0 14px 14px}
   .msheet .mt-h{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:10px 4px 8px}
   .msheet .mtiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
   .msheet .mtiles button{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;width:auto;padding:12px 2px 10px;border:0;border-radius:12px;background:var(--panel-2);font:600 12.5px/1.2 var(--font-display);color:var(--text);text-align:center}
@@ -1731,8 +1742,10 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 }
 
 /* ================= card tabs: several buildings, parcels, filings, planes or airports at once (src/cardtabs.js) ================= */
-.ctabs{position:sticky;top:0;z-index:4;display:flex;align-items:center;gap:4px;height:40px;padding:0 8px;background:var(--panel-2);border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
-.ctabs::-webkit-scrollbar{display:none}
+.ctabs{position:sticky;top:0;z-index:4;display:flex;align-items:center;gap:6px;height:40px;padding:0 8px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+/* the tabs scroll sideways inside their own box; Add / Done sits beside it, never over a tab */
+.ctlist{position:relative;flex:0 1 auto;min-width:0;display:flex;align-items:center;gap:4px;height:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
+.ctlist::-webkit-scrollbar{display:none}
 .card.has-tabs .top{top:40px}
 .ctab{flex:none;display:flex;align-items:center;gap:5px;max-width:170px;height:28px;padding:0 6px 0 7px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--text-2);font:inherit;font-size:12px;cursor:var(--cur-pointer,pointer);white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
 .ctab span{overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -1745,7 +1758,7 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .ctab[aria-selected="true"] .cnum{background:var(--green-600);color:#fff}
 .ctab .cx{flex:none;width:16px;height:16px;display:grid;place-items:center;border-radius:3px;font-style:normal;font-size:14px;line-height:1;color:var(--muted)}
 .ctab .cx:hover{background:var(--line);color:var(--text)}
-.ctadd{flex:none;margin-left:auto;position:sticky;right:0;display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px 0 8px;border:1px solid var(--line-2);border-radius:5px;background:var(--panel);box-shadow:-12px 0 8px -4px var(--panel-2);color:var(--text-2);font:600 12px/1 var(--font-display);cursor:var(--cur-pointer,pointer);white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
+.ctadd{flex:none;margin-left:auto;display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px 0 8px;border:1px solid var(--line-2);border-radius:5px;background:var(--panel);color:var(--text-2);font:600 12px/1 var(--font-display);cursor:var(--cur-pointer,pointer);white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
 .ctadd svg{flex:none;color:var(--brand)}
 .ctadd:hover{border-color:var(--text-2);color:var(--text)}
 .ctadd[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
@@ -1760,6 +1773,11 @@ input.chip.num{width:96px;padding:5px 8px;background:transparent;font-family:var
 .mprow em{font-style:normal;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mprow .m{white-space:nowrap}
 .mprow.tot{border-bottom:0}
+button.mprow{width:100%;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;font:inherit;font-size:12.5px;text-align:left;border-radius:4px;cursor:var(--cur-pointer,pointer)}
+button.mprow:hover,button.mprow:focus-visible{background:var(--chip)}
+button.mprow:hover b{color:var(--brand)}
+#card .pgrid-h{color:var(--text-2)}
+#card .oc-for{margin-bottom:4px}
 .mprow.tot i{width:17px;flex:none}
 :root[data-theme="dark"] .ctab .cnum,:root[data-theme="dark"] .mnum{background:rgba(76,175,112,.18);color:var(--green-300)}
 @media (max-width:700px){
@@ -2050,7 +2068,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 /* ---------- Projects view: all projects as cards or a list, and a page per project. Laid out by the view's own
    width (container queries), and text wraps instead of being cut off ---------- */
 #view-projects{container-type:inline-size}
-.pj-wrap{max-width:1180px;margin:0} /* left-aligned like every other page, so the title doesn't jump between My Work tabs */
+.pj-wrap{max-width:1180px;margin:0} /* left-aligned like every other page, so the title doesn't jump between pages */
 .pj-wrap .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .pj-wrap b,.pj-wrap h2,.pj-wrap dd,.pj-wrap span{overflow-wrap:anywhere}
 .pj-new{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
@@ -2242,7 +2260,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
   @media (max-width:900px){ .ab-logo{display:none} }
   @media (max-width:780px){ .ab-ask span{display:none} .ab-ask{width:36px;padding:0;justify-content:center} .appbar .viewbar button{padding:8px 10px} }
 }
-/* sub-tabs: the pages of a group (Filings, Market, My Work) above each of its pages */
+/* sub-tabs: the pages of a group (Market, Filings, My Work) above each of its pages */
 .app[data-vgroup] .vtabs{display:flex;position:absolute;left:0;right:0;top:0;z-index:4;height:var(--vtabs-h);align-items:center;padding:0 24px;background:var(--panel-2);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .vtabs::-webkit-scrollbar{display:none}
 .app[data-vgroup] .view{top:var(--vtabs-h)}
@@ -2252,6 +2270,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .vt-row button:hover{border-color:var(--text-2);color:var(--text)}
 .vt-row button[aria-current="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
 .vt-row button[aria-current="true"] .badge.muted{color:inherit;opacity:.7}
+.viewbar button[aria-pressed="true"] .badge.muted{color:inherit;opacity:.7}
 @media (pointer:coarse){ :root{--vtabs-h:58px} .vt-row button{min-height:var(--tap)} }
 /* My Work › Saved searches */
 .svp{display:grid;border:1px solid var(--line);border-radius:var(--r-md);background:var(--panel);max-width:900px}
@@ -2263,20 +2282,18 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
   .app[data-vgroup] .vtabs{padding:var(--st) 14px 0}
   .app[data-vgroup] .view{padding-top:14px}
   /* the More sheet: rows in groups, scrolling if the phone is short */
-  .msheet{max-height:calc(100% - 24px - var(--st));overflow-y:auto}
+  .msheet{max-height:calc(100% - var(--navh) - var(--sb) - var(--st) - 24px);overflow-y:auto}
+  .msheet .msh-top{margin:0 -14px}
   .msheet .mt-h{margin:12px 4px 6px}
   .msheet .mrows{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel);overflow:hidden}
   .msheet .mrow{display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;min-height:48px;padding:7px 12px;border:0;border-top:1px solid var(--line);background:none;font:600 15px var(--font-display);color:var(--text);text-align:left}
-  .msheet .mrows>.mrow:first-child,.msheet .mrows>.mrow-split:first-child .mrow{border-top:0}
+  .msheet .mrows>.mrow:first-child{border-top:0}
   .msheet .mrow[hidden]{display:none}
   .msheet .mrow:active{background:var(--panel-2)}
   .msheet .mr-ic{display:grid;place-items:center;width:32px;height:32px;flex:none;border-radius:50%;background:var(--panel-2);color:var(--brand);font-style:normal}
   .msheet .mr-l{flex:1;min-width:0}
   .msheet .mr-chev{flex:none;color:var(--muted)}
   .msheet .mrow .badge{position:static}
-  .msheet .mrow-split{display:flex;align-items:center;gap:8px;padding-right:12px}
-  .msheet .mrow-split .mrow{flex:1;min-width:0}
-  .msheet .mrow-split .btn{flex:none;width:auto;justify-content:center;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel);font:600 13px var(--font-display);color:var(--text)}
 }
 
 /* ================= Settings sheet (src/settings.js): a right-hand sheet on desktop, full screen on phones ================= */
@@ -2456,7 +2473,7 @@ table.who tr.nomatch td{border:0}
 .rp-n{font:500 12px var(--font-mono);color:var(--muted);letter-spacing:0;text-transform:none}
 .rp-hint{font-size:12px;color:var(--muted)}
 .rp-group .vscope{background:var(--panel-2);margin-bottom:12px}
-.rp-card p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.rp-card p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden}
 .rp-more{margin:10px 2px 2px;font-size:12.5px}
 .rp-recent .rp-list .empty{padding:8px 2px;text-align:left}
 /* Market: the area as one line, with the county picker folded behind "Change"; boxes without the stand-in icon */
@@ -2464,7 +2481,7 @@ table.who tr.nomatch td{border:0}
 .mk-scopebar>summary{display:flex;align-items:center;gap:10px;padding:9px 14px;list-style:none;cursor:var(--cur-pointer,pointer);font-size:12.5px;color:var(--text-2)}
 .mk-scopebar>summary::-webkit-details-marker{display:none}
 .mk-scopebar>summary b{color:var(--text)}
-.mk-scopebar[open]>summary .lnk{visibility:hidden}
+.mk-scopebar:not([open])>summary .mk-cls,.mk-scopebar[open]>summary .mk-chg{display:none}
 .mk-scopebar .mk-scope2{margin:0;border:0;border-top:1px solid var(--line);border-radius:0 0 var(--r-md) var(--r-md)}
 #view-market .mk-box>h3::before{display:none}
 /* Companies */
@@ -2485,6 +2502,7 @@ table.who tr.nomatch td{border:0}
   #view-who .tablewrap{padding:0 10px}
 }
 .vhead .vsub-n{display:block;margin-top:2px;color:var(--text-2)}
+.vhead .vsub-n[hidden]{display:none}
 .cmp-chips[hidden]{display:none}
 .rp-gh .lt{font:700 15px/1.3 var(--font-display);color:var(--text);letter-spacing:0;text-transform:none}
 .mk-scopebar .vs-n b{font-family:inherit;font-weight:700}
@@ -2657,7 +2675,6 @@ table.who tr.nomatch td{border:0}
 .qlayers.fr{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent)}
 .qlayers.fl{-webkit-mask-image:linear-gradient(90deg,transparent,#000 44px);mask-image:linear-gradient(90deg,transparent,#000 44px)}
 .qlayers.fl.fr{-webkit-mask-image:linear-gradient(90deg,transparent,#000 44px,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,transparent,#000 44px,#000 calc(100% - 44px),transparent)}
-.qchip.qbase{margin-left:8px}
 /* labels give way in order: Export first, then the five area tools, then Layers and Filters */
 @container chrome (max-width:740px){ .maptop .exbtn span{display:none} .maptop .exbtn{padding:0 11px} }
 @container chrome (max-width:676px){ .maptop .tools button span{display:none} .maptop .tools button{padding:0 11px} }
@@ -2836,6 +2853,8 @@ table.who tr.nomatch td{border:0}
 @media (min-width:1101px){
   .app{--cardw:clamp(360px,28vw,440px)}
   .app .card,.app #card.card.sp-mode{top:12px;bottom:12px;right:12px;width:min(var(--cardw),calc(100% - 24px));max-height:none;border-radius:var(--r-md,8px)}
+  /* minimized: only the header bar, so the map beside and below it takes clicks again */
+  .app #card.card.min{height:auto!important;bottom:auto!important;max-height:none}
   .app.ai-open .card,.app.ai-open #card.card.sp-mode{right:calc(var(--aiw) + 28px)}
   .app:has(.card.open){--fabr:calc(var(--cardw) + 24px)}
   .app:has(.card.open) .ctrls{right:calc(var(--cardw) + 24px)}
@@ -2899,7 +2918,7 @@ table.who tr.nomatch td{border:0}
 #card .rg-row{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:8px;font-size:12.5px;color:var(--text-2)}
 #card .rg-row .lnk{font-size:12.5px;white-space:nowrap}
 #card #bRegrid:has(#rgGo){display:none} /* its button is the one in Ownership; the section shows with the record */
-#card #bParcel:has(+ #bRegrid dl) .rg-cta,#card #bParcel:has(+ #bRegrid dl) .rg-row{display:none} /* looked up: the record is right below */
+#card #bParcel:has(+ #bRegrid dl) .rg-cta{display:none} /* looked up: the record is right below (the Zoning row links to it) */
 #card .more-rec .fl{margin-top:8px}
 /* the company behind the owner: one line, details on demand */
 #card .oc-box.oc-one{padding:0;border:0;margin-top:2px}
@@ -2907,7 +2926,10 @@ table.who tr.nomatch td{border:0}
 #card .oc-sum>summary{list-style:none;display:flex;align-items:baseline;gap:8px;padding:8px 0;cursor:var(--cur-pointer,pointer)}
 #card .oc-sum>summary::-webkit-details-marker{display:none}
 #card .oc-sum[open]{padding-bottom:8px}
-#card .oc-line{flex:1;min-width:0;font-size:12.5px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#card .oc-line{flex:1;min-width:0;font-size:12.5px;line-height:1.4;color:var(--text-2)}
+#card .oc-nm,#card .oc-meta{display:block;overflow-wrap:anywhere}
+#card .oc-meta{margin-top:2px;font-size:12px}
+#card .oc-off{margin-top:12px}
 #card .oc-line b{color:var(--text);font-weight:600}
 #card .oc-line .fl{margin-right:2px}
 #card .oc-more{flex:none;font:600 12px var(--font-display);color:var(--brand)}
@@ -2972,6 +2994,7 @@ table.who tr.nomatch td{border:0}
 #card #spSiteSec{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 7 2.5l6.5 2.5v8L9 14.5l-6.5-2z'/%3E%3C/svg%3E")}
 /* a toast with an action ("Saved to … · Open project") */
 .toast.act{pointer-events:auto}
+body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above the Export dialog */
 /* phones: an open card is a sheet over the bottom of the map, so the toast (Undo, Open project…) shows under the search bar instead of behind it */
 @media (max-width:700px){.app:has(#card.open) .toast{bottom:auto;top:calc(66px + var(--st,0px))}}
 .toast button{margin-left:6px;padding:0;border:0;background:none;color:inherit;font:700 12.5px var(--font-display);text-decoration:underline;text-underline-offset:2px;cursor:var(--cur-pointer,pointer)}
@@ -3181,3 +3204,124 @@ table.who tr.nomatch td{border:0}
 .dv-row span{display:flex;flex-direction:column;min-width:0}
 .dv-row b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
 .dv-row em{font-style:normal;color:var(--muted,#6b7174);font-size:12px}
+
+/* ================= site plan: robustness fixes ================= */
+/* the section chips: two rows on a computer (nothing hidden past the edge); phones keep the scrolling row with its edge fade */
+@media (min-width:701px){
+  #card .bnav{flex-wrap:wrap;overflow:visible;margin-right:0;padding-right:0;row-gap:6px}
+  #card .bnav.fl,#card .bnav.fr,#card .bnav.fl.fr{-webkit-mask-image:none;mask-image:none}
+}
+/* options can't be switched while a build runs */
+#card .sp-plans .chip:disabled{opacity:.5;cursor:var(--cur-default,default)}
+#card .sp-plans .chip[aria-pressed="true"]:disabled{opacity:.8}
+/* the option's name says it can be edited */
+#card .sp-title{cursor:text;border-bottom:1px dashed var(--line-2);border-radius:4px 4px 0 0;padding-right:22px}
+#card .sp-title:hover,#card .sp-title:focus{border-color:transparent;border-bottom-color:var(--text-2);background:no-repeat right 4px center/14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%238a928d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 13.5l.6-3L10.8 2.8a1.5 1.5 0 0 1 2.1 0l.3.3a1.5 1.5 0 0 1 0 2.1L5.5 12.9z'/%3E%3C/svg%3E")}
+/* layouts made for another site */
+.sp-ck.stale{color:var(--amber)!important;background:color-mix(in srgb,var(--amber) 14%,transparent)!important}
+.sp-var.stale .sp-vgrid{opacity:.6}
+#card .sp-body>.sp-solvebar{margin:12px 16px 0}
+@media (max-width:700px){#card .sp-body>.sp-solvebar{margin:10px 10px 0}}
+/* parcels that aren't part of the site */
+.sp-parcels .chip.sp-off{opacity:.5}
+.sp-parcels .chip.sp-off .sp-x{opacity:1}
+/* Pro forma boxes that refused a value */
+.sp-pf input.sp-bad{border-color:var(--danger);outline-color:var(--danger)}
+.sp-pf .sp-inerr{display:block;color:var(--danger);font-weight:600}
+.sp-pf .sp-inerr[hidden]{display:none}
+.sp-vc i em{white-space:nowrap}
+
+/* ---- Compare (B3): rename, section rows, part-quarter notes, use colours ---- */
+:root{--cmp-u0:#4c51bf;--cmp-u1:#d9480f;--cmp-u2:#0c8599;--cmp-u3:#8d6e63;--cmp-u4:#9aa000;--cmp-u5:#d6336c;--cmp-uo:#bcc2c4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--cmp-u0:#8f95f2;--cmp-u1:#ff9157;--cmp-u2:#4fd1e0;--cmp-u3:#c9ab9b;--cmp-u4:#d4dc4a;--cmp-u5:#f783ac;--cmp-uo:#6b7478}}
+:root[data-theme="dark"]{--cmp-u0:#8f95f2;--cmp-u1:#ff9157;--cmp-u2:#4fd1e0;--cmp-u3:#c9ab9b;--cmp-u4:#d4dc4a;--cmp-u5:#f783ac;--cmp-uo:#6b7478}
+.cmp-bar .bar b{box-shadow:-1px 0 0 var(--panel)}
+.cmp-key i{box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.cmp-chip .ed{width:24px;height:24px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:12px;cursor:var(--cur-pointer,pointer)}
+.cmp-chip .ed:hover{background:var(--chip);color:var(--text)}
+.cmp-chip .cmp-rename{font:inherit;font-size:13px;color:var(--text);background:var(--panel);border:1px solid var(--brand);border-radius:6px;padding:2px 6px;width:170px;min-width:0}
+table.cmp tr.sub th{text-align:left;font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);font-weight:600;background:var(--panel-2);padding:7px 10px;border-bottom:1px solid var(--line-2)}
+.cmp-note{margin:8px 0 0}
+.cmp-svg text.pt{font-style:italic}
+
+/* ---- Market (B3): the sticky bar names the area and holds the monthly-chart span; region-wide tags; jump targets clear the bar ---- */
+.mk-nav{align-items:center}
+.mk-nav .mk-here{display:inline-flex;align-items:center;gap:8px;max-width:min(300px,45%);background:var(--panel);border-color:var(--brand);color:var(--text)}
+.mk-nav .mk-here span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.mk-nav:not(.stuck) .mk-here,.mk-nav:not(.stuck) .mk-div{display:none}
+.mk-nav .mk-here em{font-style:normal;font-weight:600;color:var(--brand);white-space:nowrap}
+.mk-nav .mk-div{flex:none;width:1px;height:18px;background:var(--line-2);margin:0 2px}
+.mk-nav .mk-rng{flex:none;display:inline-flex;align-items:center;gap:8px;margin-left:auto;padding-left:10px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.mk-nav .mk-seg button{border:0;border-radius:0;padding:5px 10px;background:var(--panel);font-size:12px}
+.mk-nav .mk-seg button+button{border-left:1px solid var(--line-2)}
+.mk-nav .mk-seg button[aria-pressed="true"]{background:var(--text);color:var(--panel)}
+.mk-tag{display:inline-block;margin-left:6px;padding:1px 8px;border:1px solid var(--line-2);border-radius:999px;font:500 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);vertical-align:2px;white-space:nowrap}
+.mk-sec,#mxCorr,#mxBox{scroll-margin-top:calc(var(--mk-nav,48px) + 10px)}
+@media (max-width:700px){ .mk-nav .mk-here{max-width:60%} }
+/* Area at a Glance tiles and Reports-for-this-area rows wrap to two lines instead of cutting words off */
+.panel .glance .g-t>span,.panel .glance .g-t i{white-space:normal;overflow:hidden;text-overflow:clip;overflow-wrap:anywhere;line-height:1.3;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}
+.ar-row b,.ar-row .ar-d{white-space:normal;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow-wrap:anywhere}
+.ar-row{min-height:40px;height:auto}
+
+/* ---------- B4: reports and one friendly error path ---------- */
+.rp-card .rp-cust{justify-self:start;font-size:12px}
+.rp-card em .lnk{font-size:11px}
+.rp-fmts .btn[disabled]{opacity:.5;cursor:not-allowed}
+.rp-m .rp-warn{color:var(--warn);font-size:12px}
+.rp-act .lnk.danger{color:var(--danger)}
+.rp-act .lnk.danger:hover{text-decoration:underline}
+.rnote.eb{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
+.rnote.eb .eb-retry{font-size:12px;text-decoration:underline}
+.rnote.eb .eb-retry[disabled]{opacity:.5}
+.draw-banner{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);z-index:6;display:inline-flex;align-items:center;gap:12px;max-width:calc(100% - 32px);border:1px solid var(--line-2);background:var(--panel);color:var(--text);border-radius:20px;padding:8px 14px;font-size:13px;box-shadow:0 4px 18px rgba(0,0,0,.18)}
+.draw-banner[hidden],.stage:not([data-view="map"]) .draw-banner{display:none}
+.draw-banner .db-x{font-size:13px;text-decoration:underline;white-space:nowrap}
+@media (max-width:700px){ .draw-banner{bottom:calc(76px + var(--sb));font-size:12.5px;border-radius:12px} } /* phones: low on the map, clear of the Select / Shape / Radius buttons at the top */
+.ly-hint{font-size:12px;color:var(--muted);margin:2px 0 6px}
+.view.mk-quiet{position:fixed;left:-20000px;top:0;right:auto;bottom:auto;width:1180px;height:900px;visibility:hidden;pointer-events:none;overflow:hidden;z-index:-1}
+.ly-na.ly-fail{color:var(--danger)}
+
+/* ================= batch: map chrome, side panel and app shell ================= */
+/* toasts sit in the free part of the map: centred between the left edge and whatever docks on the right (the assistant,
+   the property card), so none of them hides a message or gets covered by it */
+.toast{z-index:7;--toast-minw:260px;min-width:min(var(--toast-minw),calc(100% - 32px));left:max(calc((100% - var(--toast-r,0px)) / 2),calc(var(--toast-minw) / 2 + 16px));max-width:max(var(--toast-minw),calc(100% - var(--toast-r,0px) - 32px))}
+/* (when the assistant and a card leave almost no free map, the note keeps its width and shows on top of them) */
+@media (min-width:701px){ .app.ai-open{--toast-r:calc(var(--aiw) + 24px)} }
+@media (min-width:1101px){
+  .app.ai-open{--toast-r:calc(var(--aiw) + 28px)}
+  .app:has(#card.open){--toast-r:calc(var(--cardw) + 24px)}
+  .app.ai-open:has(#card.open){--toast-r:calc(var(--aiw) + var(--cardw) + 40px)}
+}
+/* the "Drawing a box · Cancel" chip shows on desktop too (it used to be phone-only), under the layer chips */
+@media (min-width:701px){
+  .modechip:not([hidden]){display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 4px 0 14px;border-radius:999px;background:var(--text);color:var(--panel);font:600 13px var(--font-display);box-shadow:0 2px 8px rgba(11,13,12,.2)}
+  .modechip button{height:26px;padding:0 12px;border:0;border-radius:999px;background:color-mix(in srgb,var(--panel) 18%,transparent);color:var(--panel);font:700 12.5px var(--font-display);cursor:var(--cur-pointer,pointer)}
+  .modechip button:hover{background:color-mix(in srgb,var(--panel) 30%,transparent)}
+  /* the layer chips use the width the map has up to the camera rail; an arrow at an end with more chips replaces the faded edge */
+  .mapleft .qlayers{max-width:100%}
+  .qlayers.fr,.qlayers.fl,.qlayers.fl.fr{-webkit-mask-image:none;mask-image:none}
+}
+.qarrow{position:sticky;z-index:2;flex:none;width:30px;height:30px;padding:0;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);color:var(--text);display:grid;place-items:center;cursor:var(--cur-pointer,pointer);box-shadow:0 1px 4px rgba(11,13,12,.2)}
+.qarrow:hover{border-color:var(--text-2)}
+.qarrow[hidden]{display:none}
+.qarrow.ql{left:0;margin-right:-36px}  /* the negative margin (width + gap) keeps the chips from shifting when an arrow appears */
+.qarrow.qr{right:0;margin-left:-36px}
+@media (max-width:700px){ .qarrow{display:none!important} }
+/* keyboard focus: these controls set their own box-shadow, which beat the page-wide focus ring (it has less weight), so the ring is restated here */
+.ctrls button:focus-visible,.fbtn:focus-visible,.lybtn:focus-visible,.exbtn:focus-visible,.qchip:focus-visible,.qarrow:focus-visible,.selpill:focus-visible,.mapleft .tools button:focus-visible,.ctrls .rpop button:focus-visible,.modechip button:focus-visible,.fclear:focus-visible{outline:none;box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--brand)}
+/* the pinned area bar is solid: filing rows and cards scrolling beneath it don't show through around its rounded card */
+.scope{padding-bottom:var(--sp-2);box-shadow:0 8px 10px -8px rgba(11,13,12,.22)}
+@media (max-width:700px){ .panel .scope{box-shadow:none;padding-bottom:0} }
+/* area menu: items that don't apply yet stay in place, dimmed */
+.vm-pop>.is-off,.vm-pop>button:disabled{opacity:.5;cursor:not-allowed}
+.vm-pop>.is-off:hover,.vm-pop>button:disabled:hover{background:transparent}
+.sc-err{color:var(--danger);font-size:11.5px;font-weight:600}
+/* saved searches: a one-line summary under each */
+.saved .sv{flex-wrap:wrap;row-gap:0}
+.saved .sv>.sv-n{flex:1 1 40%;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.saved .sv-s,.svp-s{flex:0 0 100%;order:5;min-width:0;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.svp-t{min-width:0;flex:1 1 240px}
+.svp-s{display:block;margin-top:2px}
+/* the filter popup's help line scrolls with the sections (it used to ride in the pinned header) */
+.fpop .lfbody>.lfhelp{margin:0;padding:12px 18px 0}
+@media (max-width:700px){ .fpop .lfbody>.lfhelp{padding:10px 16px 0} }

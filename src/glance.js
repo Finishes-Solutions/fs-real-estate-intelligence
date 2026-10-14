@@ -4,17 +4,27 @@
 import { tractsFor, summarizeTracts, centroid, inGeom } from './lib/demographics.mjs';
 
 export function initGlance(ctx) {
-  const { map, esc, fmtN } = ctx, el = document.getElementById('glance'); if (!el) return;
+  const { map, esc, fmtN } = ctx, el = document.getElementById('glance');
   const money = v => v == null ? '—' : v >= 1e6 ? '$' + (v / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M' : '$' + Math.round(v / 1e3) + 'K';
   const num = v => v == null ? '—' : v >= 1e6 ? (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : fmtN(v);
   let t = 0, seq = 0;
-  const tile = (k, v, s) => '<div class="g-t"><b>' + v + '</b><span>' + esc(k) + '</span>' + (s ? '<i>' + s + '</i>' : '') + '</div>';
+  const plain = h => String(h || '').replace(/<[^>]+>/g, '');
+  const tile = (k, v, s) => '<div class="g-t" title="' + esc(k + ': ' + plain(v) + (s ? ' ' + plain(s) : '')) + '"><b>' + v + '</b><span>' + esc(k) + '</span>' + (s ? '<i>' + s + '</i>' : '') + '</div>';
   // the area itself is named once, in the panel's scope header above
   const shell = body => '<div class="g-h"><span class="kicker">Area at a Glance</span></div>' + body;
 
   // the tracts of an area (the selection or the view): those centred inside it, or (an area smaller than a tract, e.g. zoomed
   // in on a block) the tract under its middle
   const selTracts = (tracts, g) => { const l = tractsFor(tracts, { geom: g }); if (l.length) return l; const c = centroid(g); return c ? tracts.filter(t => t.geom && inGeom(c, t.geom)) : []; };
+  // the same numbers for any outline (Compare shows them per area): the tracts centred inside it, summed the way the tiles are
+  const stats = new WeakMap();
+  ctx.areaStats = async geom => {
+    if (!geom) return null; if (stats.has(geom)) return stats.get(geom);
+    let m; try { m = await ctx.loadMarket(); } catch (e) { return null; }
+    const x = summarizeTracts(selTracts(m.tracts, geom.geometry || geom)), out = x ? { ...x, year: m.year, baseYear: m.baseYear } : null;
+    stats.set(geom, out); return out;
+  };
+  if (!el) return;
   async function render() {
     const my = ++seq, sel = ctx.sel?.feature ? ctx.sel : null, sg = sel && (sel.feature.geometry || sel.feature);
     if (!sg && map.getZoom() < 6.5) { el.innerHTML = shell('<p class="g-n">Zoom in to a region, city or neighborhood to see who lives and works there.</p>'); return; }

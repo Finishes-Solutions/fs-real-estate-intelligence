@@ -3,8 +3,7 @@
 //   Traffic report for any area: the busiest roads and every counted segment (TxDOT), average traffic by road type,
 //   live speed vs free flow on the busiest roads and current crashes / closures / road works (TomTom, live, not stored).
 //   Opens in the card; exports a PDF report and CSV.
-import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard } from './reportkit.js';
-import { readJSON } from './lib/http.mjs';
+import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, getJSON, errorBox, unavailable, friendly, layerFailed, layerOK, inTexas } from './reportkit.js';
 
 const STOPS = [[5000, '#22c55e'], [20000, '#eab308'], [60000, '#f97316'], [150000, '#dc2626'], [300000, '#7f1d1d']];
 const colorOf = v => (STOPS.find(s => v < s[0]) || STOPS[STOPS.length - 1])[1];
@@ -22,9 +21,9 @@ export function initTraffic(ctx) {
     const bb = [c.lng - hw, c.lat - hh, c.lng + hw, c.lat + hh].map((v, i) => (i < 2 ? Math.floor(v * 100) : Math.ceil(v * 100)) / 100);
     const key = bb.join(','); if (key === lastKey && map.getSource(SRC)) return; // same area as what's drawn
     ctl?.abort(); ctl = new AbortController();
-    try { const r = await fetch('api/traffic?lines=' + key, { signal: ctl.signal }), d = await readJSON(r); if (my !== loadSeq) return; lastKey = key; setData(d);
+    try { const d = await getJSON('api/traffic?lines=' + key, { what: 'Traffic count data', signal: ctl.signal }); if (my !== loadSeq) return; lastKey = key; setData(d);
       if (note) note.textContent = 'Average vehicles a day (TxDOT). ' + (d.features.length >= 2000 ? 'Showing the 2,000 busiest segments here; zoom in for more.' : fmt(d.features.length) + ' counted segments in view.') + ' Hover a road for its count.'; }
-    catch (e) { if (e.name !== 'AbortError' && note) note.textContent = e.message; }
+    catch (e) { if (e.name !== 'AbortError') layerFailed(ctx, e, { what: 'Traffic count data', off: () => setOn(false), note }); }
   }
   // hover handlers once (adding them with the layer stacked another pair on every toggle and basemap change)
   map.on('mousemove', SRC, e => { const f = e.features?.[0]; if (f && ctx.tip) { ctx.tip.textContent = f.properties.road + ': ' + fmt(f.properties.aadt) + ' vehicles a day'; ctx.tip.style.opacity = 1; ctx.tip.style.left = (e.point.x + 14) + 'px'; ctx.tip.style.top = (e.point.y + 14) + 'px'; } });
@@ -41,7 +40,7 @@ export function initTraffic(ctx) {
     } catch (e) { /* style loading */ }
   }
   function setOn(v) {
-    on = !!v; if (box) box.checked = on; if (note) note.hidden = !on;
+    on = !!v; if (box) box.checked = on; if (note) note.hidden = !on; if (on) layerOK(note);
     if (!on) { ctl?.abort(); lastKey = ''; try { if (map.getLayer(SRC)) map.removeLayer(SRC); if (map.getSource(SRC)) map.removeSource(SRC); } catch (e) {} ctx.setLegend?.('aadt', ''); return; }
     ctx.setLegend?.('aadt', '<div class="t">Vehicles a day</div>' + STOPS.map(([v, c], i) => '<div class="li"><i style="background:' + c + '"></i>' + (i ? fmt(STOPS[i - 1][0] / 1000) + 'k' : '0') + (i < STOPS.length - 1 ? '–' + fmt(v / 1000) + 'k' : '+') + '</div>').join(''));
     load();
@@ -53,30 +52,29 @@ export function initTraffic(ctx) {
   ctx.trafficLayer = setOn;
 
   // ---------- report ----------
-  async function reportFor(geometry, label) {
-    const r = await fetch('api/traffic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }), signal: AbortSignal.timeout(45000) });
-    return readJSON(r);
-  }
+  const reportFor = (geometry, label) => getJSON('api/traffic', { what: 'Traffic data', method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }), signal: AbortSignal.timeout(45000) });
+  // a live part (speeds, incidents) that answered with an error: say so in words, not with the server's text
+  const sub = (x, what, plain) => /not configured/i.test(x?.error || '') ? plain + ' aren’t set up on this site.' : unavailable(what);
   ctx.trafficReportData = reportFor;
   const congestion = x => x.closed ? 'Closed' : x.congestion_pct == null ? '—' : x.congestion_pct + '% slower';
   async function report({ geometry, label }) {
     if (ctx.view !== 'map') ctx.setView?.('map');
     const card = openCard(ctx, { kicker: 'Traffic report', title: label, loading: 'Reading traffic counts and live conditions…' });
     showArea(geometry);
-    let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
+    let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Traffic data')); return; }
     last = { d, label, geometry };
     const c = d.counts || {}, roads = c.roads || [], live = Array.isArray(d.live) ? d.live : [], inc = Array.isArray(d.incidents) ? d.incidents : [];
     const top = roads[0], slow = live.filter(x => x.congestion_pct >= 25);
     fillCard(ctx, card, cardTop('Traffic report', label, (d.area_sqmi ? fmt(d.area_sqmi) + ' sq mi · ' : '') + 'TxDOT counts' + (c.as_of ? ' (file of ' + esc(String(c.as_of).slice(0, 10)) + ')' : '') + ' · live now') +
-      '<div class="bsec">' + (c.error ? '<div class="rnote err">Traffic counts: ' + esc(c.error) + '</div>' :
+      '<div class="bsec">' + (c.error ? '<div class="rnote err">' + esc(unavailable('Traffic count data')) + '</div>' :
         kgrid([[top ? fmt(top.aadt) : '—', top ? 'Busiest: ' + top.road : 'No counted roads'], [fmt(roads.length), 'Counted roads'], [live.length ? slow.length + ' of ' + live.length : '—', 'Busy roads slowed now'], [Array.isArray(d.incidents) ? fmt(inc.length) : '—', 'Incidents now']])) + '</div>' +
       (roads.length ? '<div class="bsec"><div class="lt">Busiest roads (vehicles a day)</div>' + bars(roads.slice(0, 10).map(r => ({ label: r.road.length > 12 ? r.road.slice(0, 11) + '…' : r.road, v: r.aadt, color: colorOf(r.aadt) })), { height: 110 }) +
         '<dl>' + roads.slice(0, 12).map(r => '<dt>' + esc(r.road) + '</dt><dd class="mono">' + fmt(r.aadt) + ' <span class="sc">' + esc(r.type) + (r.segments > 1 ? ', avg ' + fmt(r.avg) + ' over ' + r.segments + ' segments' : '') + '</span></dd>').join('') + '</dl></div>' : '') +
       (c.types?.length ? '<div class="bsec"><div class="lt">By road type (average a day)</div><dl>' + c.types.map(t => '<dt>' + esc(t.label) + '</dt><dd class="mono">' + fmt(t.avg) + ' <span class="sc">' + fmt(t.segments) + ' segments, busiest ' + fmt(t.max) + '</span></dd>').join('') + '</dl>' +
         (c.segments_capped ? '<div class="rnote">' + fmt(c.types.reduce((n, t) => n + t.segments, 0)) + ' counted segments in all (averages above use every one). The map and PDF show the 1,000 busiest; <b>Export CSV</b> lists all of them.</div>' : '') + '</div>' : '') +
-      '<div class="bsec"><div class="lt">Live conditions on the busiest roads</div>' + (d.live?.error ? '<div class="rnote">' + esc(d.live.error) + '</div>' : live.length ?
+      '<div class="bsec"><div class="lt">Live conditions on the busiest roads</div>' + (d.live?.error ? '<div class="rnote">' + esc(sub(d.live, 'Live speed data', 'Live speeds')) + '</div>' : live.length ?
         '<dl>' + live.map(x => '<dt>' + esc(x.road) + '</dt><dd class="mono">' + fmt(x.current_mph) + ' mph <span class="sc">free flow ' + fmt(x.free_flow_mph) + ' · ' + esc(congestion(x)) + '</span></dd>').join('') + '</dl>' : '<div class="rnote">No live readings.</div>') + '</div>' +
-      '<div class="bsec"><div class="lt">Incidents right now</div>' + (d.incidents?.error ? '<div class="rnote">' + esc(d.incidents.error) + '</div>' : inc.length ?
+      '<div class="bsec"><div class="lt">Incidents right now</div>' + (d.incidents?.error ? '<div class="rnote">' + esc(sub(d.incidents, 'Live incident data', 'Live incidents')) + '</div>' : inc.length ?
         inc.slice(0, 10).map(x => '<div class="pl"><b>' + esc(x.kind + (x.road ? ' · ' + x.road : '')) + '</b><span>' + esc([x.what, x.from && x.to ? x.from + ' to ' + x.to : x.from, x.delay_min ? x.delay_min + ' min delay' : ''].filter(Boolean).join(' · ')) + '</span></div>').join('') : '<div class="rnote">No crashes, closures or road works reported in this area.</div>') + '</div>' +
       '<div class="bacts"><button class="btn" id="trLayer" type="button">Show Counts on Map</button><button class="btn primary" id="trPdf" type="button">Export PDF</button><button class="btn" id="trCsv" type="button">Export CSV</button></div>' +
       '<div class="rnote bsec">Counts are TxDOT annual averages (both directions, all vehicles); TxDOT publishes the current year only. Live speeds and incidents are a snapshot from when the report was opened.<span class="src"> ' + esc(d.sources) + '</span></div>');
@@ -95,14 +93,14 @@ export function initTraffic(ctx) {
     if (!last) return; const mine = last, { d, label } = last, c = d.counts || {}, rows = [];
     // more than the report's 1,000 busiest segments: page through every one (busiest first)
     if (c.segments_capped) { ctx.toast?.('Gathering every counted segment…');
-      try { const all = []; for (let offset = 0; offset != null;) { const r = await fetch('api/traffic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry: mine.geometry, segments: true, offset }) }), p = await readJSON(r); all.push(...p.rows); offset = p.next; }
+      try { const all = []; for (let offset = 0; offset != null;) { const p = await getJSON('api/traffic', { what: 'Traffic count data', method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry: mine.geometry, segments: true, offset }) }); all.push(...p.rows); offset = p.next; }
         if (last !== mine) return;
         for (const s of all) rows.push({ Table: 'Counted segment', Road: s.road, 'Road type': s.type, 'Vehicles a day (AADT)': s.aadt, 'Live mph': '', 'Free-flow mph': '', Detail: '', Latitude: s.lat ?? '', Longitude: s.lon ?? '' }); }
-      catch (e) { ctx.toast?.('Only the 1,000 busiest segments: ' + e.message); } }
+      catch (e) { ctx.toast?.('Only the 1,000 busiest segments: ' + friendly(e, 'Traffic count data')); } }
     if (!rows.length) for (const s of c.segments || []) rows.push({ Table: 'Counted segment', Road: s.road, 'Road type': s.type, 'Vehicles a day (AADT)': s.aadt, 'Live mph': '', 'Free-flow mph': '', Detail: '', Latitude: s.path[Math.floor(s.path.length / 2)]?.[1] ?? '', Longitude: s.path[Math.floor(s.path.length / 2)]?.[0] ?? '' });
     for (const x of Array.isArray(d.live) ? d.live : []) rows.push({ Table: 'Live speed', Road: x.road, 'Road type': '', 'Vehicles a day (AADT)': x.aadt, 'Live mph': x.current_mph, 'Free-flow mph': x.free_flow_mph, Detail: congestion(x), Latitude: x.lat, Longitude: x.lon });
     for (const x of Array.isArray(d.incidents) ? d.incidents : []) rows.push({ Table: 'Incident', Road: x.road, 'Road type': x.kind, 'Vehicles a day (AADT)': '', 'Live mph': '', 'Free-flow mph': '', Detail: [x.what, x.from && x.to ? x.from + ' to ' + x.to : x.from, x.delay_min ? x.delay_min + ' min delay' : ''].filter(Boolean).join(' · '), Latitude: x.lat ?? '', Longitude: x.lon ?? '' });
-    saveCsv(ctx, 'traffic', label, rows);
+    saveCsv(ctx, 'traffic', label, rows, { geom: last.geometry });
   }
   async function exportReport() {
     if (!last) return; const { d, label, geometry } = last, c = d.counts || {}, roads = c.roads || [], live = Array.isArray(d.live) ? d.live : [], inc = Array.isArray(d.incidents) ? d.incidents : [];
@@ -114,15 +112,16 @@ export function initTraffic(ctx) {
       '<h2>Busiest roads</h2><div class="bars">' + bars(roads.slice(0, 12).map(r => ({ label: r.road.length > 10 ? r.road.slice(0, 9) + '…' : r.road, v: r.aadt, color: colorOf(r.aadt) }))) + '</div>' +
       table(['Road', 'Type', { t: 'Busiest segment', r: 1 }, { t: 'Average', r: 1 }, { t: 'Segments', r: 1 }], roads.map(r => [esc(r.road), esc(r.type), fmt(r.aadt), fmt(r.avg), fmt(r.segments)])) +
       '<div class="two"><div><h2>By road type</h2>' + table(['Type', { t: 'Avg a day', r: 1 }, { t: 'Busiest', r: 1 }, { t: 'Segments', r: 1 }], (c.types || []).map(t => [esc(t.label), fmt(t.avg), fmt(t.max), fmt(t.segments)])) + '</div>' +
-      '<div><h2>Live speeds (' + new Date(d.as_of_live).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) + ')</h2>' + (live.length ? table(['Road', { t: 'Now', r: 1 }, { t: 'Free flow', r: 1 }, 'Condition'], live.map(x => [esc(x.road), fmt(x.current_mph) + ' mph', fmt(x.free_flow_mph) + ' mph', esc(congestion(x))])) : '<p class="meta">' + esc(d.live?.error || 'No live readings.') + '</p>') + '</div></div>' +
-      '<h2>Incidents at the time of the report</h2>' + (inc.length ? table(['Type', 'Road', 'Where', 'What', { t: 'Delay', r: 1 }], inc.map(x => [esc(x.kind), esc(x.road), esc(x.from && x.to ? x.from + ' to ' + x.to : x.from), esc(x.what), x.delay_min ? x.delay_min + ' min' : ''])) : '<p class="meta">' + esc(d.incidents?.error || 'None reported.') + '</p>');
+      '<div><h2>Live speeds (' + new Date(d.as_of_live).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) + ')</h2>' + (live.length ? table(['Road', { t: 'Now', r: 1 }, { t: 'Free flow', r: 1 }, 'Condition'], live.map(x => [esc(x.road), fmt(x.current_mph) + ' mph', fmt(x.free_flow_mph) + ' mph', esc(congestion(x))])) : '<p class="meta">' + esc(d.live?.error ? sub(d.live, 'Live speed data', 'Live speeds') : 'No live readings.') + '</p>') + '</div></div>' +
+      '<h2>Incidents at the time of the report</h2>' + (inc.length ? table(['Type', 'Road', 'Where', 'What', { t: 'Delay', r: 1 }], inc.map(x => [esc(x.kind), esc(x.road), esc(x.from && x.to ? x.from + ' to ' + x.to : x.from), esc(x.what), x.delay_min ? x.delay_min + ' min' : ''])) : '<p class="meta">' + esc(d.incidents?.error ? sub(d.incidents, 'Live incident data', 'Live incidents') : 'None reported.') + '</p>');
     await savePdf(ctx, 'traffic', label, reportDoc({ kicker: 'Traffic report', title: label, meta: (d.area_sqmi ? fmt(d.area_sqmi) + ' sq mi' : '') + (c.as_of ? ' · TxDOT file of ' + esc(String(c.as_of).slice(0, 10)) : ''), body,
-      sources: esc(d.sources) + ' Counts are annual averages for both directions and all vehicles; live speeds and incidents are a snapshot.' }));
+      sources: esc(d.sources) + ' Counts are annual averages for both directions and all vehicles; live speeds and incidents are a snapshot.' }), { meta: { geom: geometry } });
   }
   // the area on a street map, with the counted segments coloured by traffic
   const areaWithLines = (g, segs) => areaSvg([{ geometry: g, stroke: '#7c3aed', fill: 'rgba(124,58,237,.05)', dash: true }],
     { fit: g, lines: segs.slice().reverse().map(sg => ({ coords: sg.path, stroke: colorOf(sg.aadt), width: 1.4 + Math.min(5, sg.aadt / 50000) })) });
 
-  ctx.addAreaReport?.({ key: 'traffic', label: 'Traffic Report', desc: 'Vehicle traffic for an area in Texas: the busiest roads and every counted segment (vehicles a day, TxDOT), average traffic by road type, live speeds on the busiest roads and current crashes, closures and road works. Export as a PDF report or CSV.',
-    note: 'Texas only. Select an area with Area, Shape, Radius or County, or use the map view', run: ({ geometry, label }) => report({ geometry, label }) });
+  ctx.addAreaReport?.({ key: 'traffic', label: 'Traffic Report', desc: 'Traffic for an area in Texas: the busiest roads (vehicles a day, TxDOT), traffic by road type, live speeds and current crashes and closures. PDF or CSV.',
+    cover: { test: inTexas, short: 'Texas only', why: 'Traffic reports cover Texas only (TxDOT counts). Move the map to Texas, or pick an area there.' },
+    note: 'Texas only. Select an area with Box, Shape, Radius or County, or use the map view', run: ({ geometry, label }) => report({ geometry, label }) });
 }

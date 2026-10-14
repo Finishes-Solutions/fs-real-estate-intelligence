@@ -8,6 +8,9 @@ export function initSources(ctx) {
   const loadedAt = Date.now();
   const built = DATA.built || DATA.changes?.runs?.[0]?.built || null;
   let newer = null, checking = false, timer = 0;
+  // the Market numbers (area.json) and census tracts (market.json) load when their pages first open; Data & help asks for
+  // them itself, and until they answer those rows read "Checking…" instead of "Not built yet"
+  let waitArea = false, waitTracts = false, triedArea = false, triedTracts = false; // tried: ask once; if the file never arrives the rows say Not built yet (no retry loop)
 
   const fmtWhen = t => new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
   const fmtTime = t => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -60,8 +63,14 @@ export function initSources(ctx) {
         detail: devN('tea-schools') + 'TEA’s school directory with state ratings, and enrollment from TEA’s latest yearly count. Enrollment forecasts aren’t public.' }
     ];
   }
+  function ensureData() {
+    if (!ctx.areaInfo?.() && !waitArea && !triedArea && ctx.areaData) { waitArea = triedArea = true; ctx.areaData().catch(() => null).then(() => { waitArea = false; render(); }); }
+    if (!ctx.marketInfo?.() && !waitTracts && !triedTracts && ctx.loadMarket) { waitTracts = triedTracts = true; ctx.loadMarket().catch(() => null).then(() => { waitTracts = false; render(); }); }
+  }
   function rows() {
+    ensureData();
     const live = ctx.live?.status?.() || { on: {}, raster: {} }, m = ctx.marketInfo?.(), a = ctx.areaInfo?.(), base = ctx.basemap?.() || 'dots';
+    const noArea = () => waitArea && !a ? st('off', 'Checking…') : st('off', 'Not built yet'), noTracts = () => waitTracts && !m ? st('off', 'Checking…') : st('off', 'Not built yet');
     const runs = DATA.changes?.runs || [], approx = F.filter(f => f.approx).length, unmapped = DATA.unmapped || 0;
     const ras = (k, src, url, what) => {
       const r = live.raster?.[k] || {}, isOn = !!live.on[k];
@@ -81,25 +90,25 @@ export function initSources(ctx) {
           detail: 'Runs on new or changed filings in the nightly build; results cached. AI-extracted, so it can be wrong.' },
         { name: link('US Census ACS 5-year', 'https://www.census.gov/programs-surveys/acs'), what: 'Demographics layer: tract population, growth, income, home value, rent, vacancy', status: st('fresh', 'Annual'),
           detail: (m ? 'ACS 5-year estimates ending ' + m.year + ', growth compared with ' + m.baseYear + ' · ' + fmtN(m.tracts) + ' tracts. ' : 'Loads when you turn on a demographics layer. ') + 'The Census Bureau publishes a new release each December; picked up by the nightly build.' },
-        { name: link('US Census LEHD LODES', 'https://lehd.ces.census.gov/data/'), what: 'Jobs by tract and industry: Jobs layers, Market view, building cards', status: a?.jobs ? st('fresh', 'Annual') : st('off', 'Not built yet'),
+        { name: link('US Census LEHD LODES', 'https://lehd.ces.census.gov/data/'), what: 'Jobs by tract and industry: Jobs layers, Market view, building cards', status: a?.jobs ? st('fresh', 'Annual') : noArea(),
           detail: (a?.jobs ? 'Jobs in ' + a.jobs.year + (a.jobs.baseYear ? ', growth compared with ' + a.jobs.baseYear : '') + '. ' : '') + 'Counted where people work. The Census Bureau publishes about two years after the fact; picked up by the nightly build.' },
-        { name: link('US Census Building Permits Survey', 'https://www.census.gov/construction/bps/'), what: 'Market view: new housing units permitted per county, by year and year to date', status: a?.permits ? nightlyStatus() : st('off', 'Not built yet'),
+        { name: link('US Census Building Permits Survey', 'https://www.census.gov/construction/bps/'), what: 'Market view: new housing units permitted per county, by year and year to date', status: a?.permits ? nightlyStatus() : noArea(),
           detail: 'Monthly county files, about six weeks after the month ends. Single-family and multifamily units authorized.' },
-        { name: link('Texas Comptroller sales-tax permits', 'https://data.texas.gov/Government-and-Taxes/Active-Sales-Tax-Permit-Holders/jrea-zgmq'), what: 'Market view: new business locations per month and the newest ones', status: a?.businesses ? nightlyStatus() : st('off', 'Not built yet'),
+        { name: link('Texas Comptroller sales-tax permits', 'https://data.texas.gov/Government-and-Taxes/Active-Sales-Tax-Permit-Holders/jrea-zgmq'), what: 'Market view: new business locations per month and the newest ones', status: a?.businesses ? nightlyStatus() : noArea(),
           detail: 'Active permits only (closed locations drop out), updated by the Comptroller about weekly.' },
-        { name: link('Google News', 'https://news.google.com/'), what: 'Market view: local development news per county and town', status: a?.news ? nightlyStatus() : st('off', 'Not built yet'),
+        { name: link('Google News', 'https://news.google.com/'), what: 'Market view: local development news per county and town', status: a?.news ? nightlyStatus() : noArea(),
           detail: 'Searched nightly for development, construction, rezoning and real estate stories; kept 120 days.' },
-        { name: link('BLS Consumer Expenditure Survey', 'https://www.bls.gov/cex/') + ' × Census ACS', what: 'Consumer spending estimates per tract (total, per household, dining out, home furnishings, apparel…): map layer, Market view, building cards', status: m?.spendYear ? st('fresh', 'CE ' + m.spendYear) : st('off', 'Not built yet'),
+        { name: link('BLS Consumer Expenditure Survey', 'https://www.bls.gov/cex/') + ' × Census ACS', what: 'Consumer spending estimates per tract (total, per household, dining out, home furnishings, apparel…): map layer, Market view, building cards', status: m?.spendYear ? st('fresh', 'CE ' + m.spendYear) : noTracts(),
           detail: 'Modeled, not measured: households by income in each tract × what households at that income spend nationally (read from the BLS income quintiles), adjusted to the South. The BLS publishes once a year (September); picked up by the nightly build.' },
-        { name: link('Texas Comptroller sales-tax allocations', 'https://comptroller.texas.gov/transparency/local/allocations/sales-tax/'), what: 'Market view: city sales tax collected per month, a real local spending trend', status: a?.salesTax ? nightlyStatus() : st('off', 'Not built yet'),
+        { name: link('Texas Comptroller sales-tax allocations', 'https://comptroller.texas.gov/transparency/local/allocations/sales-tax/'), what: 'Market view: city sales tax collected per month, a real local spending trend', status: a?.salesTax ? nightlyStatus() : noArea(),
           detail: (a?.salesTax ? a.salesTax.cities + ' cities since ' + a.salesTax.since + '. ' : '') + 'The city\'s share of sales tax, paid monthly about two months after the sales. Picked up by the nightly build.' },
-        { name: link('BLS Local Area Unemployment Statistics', 'https://www.bls.gov/lau/'), what: 'Building cards: county unemployment rate and a year earlier; Texas and metro rates', status: a?.unemployment ? nightlyStatus() : st('off', 'Not built yet'),
+        { name: link('BLS Local Area Unemployment Statistics', 'https://www.bls.gov/lau/'), what: 'Building cards: county unemployment rate and a year earlier; Texas and metro rates', status: a?.unemployment ? nightlyStatus() : noArea(),
           detail: (a?.unemployment ? 'Latest month ' + a.unemployment + '. ' : '') + 'Monthly, about seven weeks after the month ends; the newest month is preliminary.' },
-        { name: link('FRED (St. Louis Fed)', 'https://fred.stlouisfed.org/') + ' · ' + link('New York Fed SOFR', 'https://www.newyorkfed.org/markets/reference-rates/sofr'), what: 'Market view: 10-yr and 5-yr Treasury, SOFR and the 30-yr mortgage rate', status: a?.rates ? nightlyStatus() : st('off', 'Not built yet'),
+        { name: link('FRED (St. Louis Fed)', 'https://fred.stlouisfed.org/') + ' · ' + link('New York Fed SOFR', 'https://www.newyorkfed.org/markets/reference-rates/sofr'), what: 'Market view: 10-yr and 5-yr Treasury, SOFR and the 30-yr mortgage rate', status: a?.rates ? nightlyStatus() : noArea(),
           detail: (a?.rates ? 'As of ' + a.rates + '. ' : '') + 'Daily rates (mortgage rate weekly), picked up by the nightly build.' },
-        { name: link('Zillow Observed Rent Index', 'https://www.zillow.com/research/data/'), what: 'Building cards: typical asking rent in the ZIP and its change over a year', status: a?.rents ? nightlyStatus() : st('off', 'Not built yet'),
+        { name: link('Zillow Observed Rent Index', 'https://www.zillow.com/research/data/'), what: 'Building cards: typical asking rent in the ZIP and its change over a year', status: a?.rents ? nightlyStatus() : noArea(),
           detail: (a?.rents ? 'Through ' + a.rents + '. ' : '') + 'Monthly, all home types (single-family, condo, apartments). Not every ZIP is covered.' },
-        { name: link('CFPB HMDA', 'https://ffiec.cfpb.gov/data-browser/'), what: 'Market view: home loans originated per county', status: a?.mortgages ? nightlyStatus() : st('off', 'Not built yet'),
+        { name: link('CFPB HMDA', 'https://ffiec.cfpb.gov/data-browser/'), what: 'Market view: home loans originated per county', status: a?.mortgages ? nightlyStatus() : noArea(),
           detail: (a?.mortgages ? 'Year ' + a.mortgages + '. ' : '') + 'Published once a year (spring) for the year before.' },
         { name: link('Houston Police NIBRS incidents', 'https://www.houstontx.gov/police/cs/Monthly_Crime_Data_by_Street_and_Police_Beat.htm'), what: 'Crime map layer, crime reports for any selected area (PDF / CSV), the assistant’s crime answers, and crime within 0.5 mile on building cards (Houston)', status: st('fresh', 'Nightly'),
           detail: 'HPD republishes the yearly file monthly; the nightly sync keeps the last 25 months in the database. Houston city only for now.' },
