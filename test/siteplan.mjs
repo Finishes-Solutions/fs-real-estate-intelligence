@@ -201,6 +201,8 @@ for (const v of [0, 1, 2]) {
   assert.deepEqual(res.body.ops.map(o => [o.target, o.floors, o.type]), [['b7', 4, null], ['c1', null, 'clubhouse-clubhouse-7-500-sf'], ['c1', null, null]], 'only known pieces, library types and sane numbers');
   assert.equal(res.body.refit, 'full'); const u = sent.messages[1].content; assert.ok(Array.isArray(u) && u[1].type === 'image_url', 'the drawing goes to the model');
   assert.ok(/Apt Bldg 7/.test(u[0].text) && /clubhouse-clubhouse-7-500-sf = Clubhouse/.test(u[0].text), 'the plan and the library go to the model');
+  reply = () => ({ ops: [op({ action: 'add', kind: 'entrance', x: 300, y: 0 }), op({ action: 'add', kind: 'helipad' })], refit: 'none', summary: 'A second driveway.', question: null });
+  res = await call({ mode: 'edit', prompt: 'add a second entrance', plan }); assert.deepEqual(res.body.ops.map(o => [o.kind, o.x, o.y]), [['entrance', 300, 0], [null, null, null]], 'an entrance, at a point on the street');
   reply = () => ({ ops: [], refit: 'none', summary: '', question: 'Which building: Bldg 7 or Bldg 17?' });
   res = await call({ mode: 'edit', prompt: 'make that one taller', plan }); assert.equal(res.body.question, 'Which building: Bldg 7 or Bldg 17?');
   res = await call({ mode: 'edit', prompt: '', plan }); assert.equal(res.code, 400); }
