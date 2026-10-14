@@ -660,7 +660,7 @@ function select(f,fly){
   card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2>'+(f.addr?'<div class="bsub">'+esc(f.addr)+'</div>':'')+'<button class="btn sm cshow" type="button" id="fShowMap">Show on map</button></div>'+
     '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>'+
     cardActs('<button class="btn sm askai" type="button" id="fAsk">'+SPARK+'Ask AI</button><a class="btn sm" id="fTabs" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener" title="The filing on the TDLR TABS site">TABS record ↗</a>',
-      [{href:gsv,label:'Street View ↗',sub:'Google Street View at the site'},['Add site note',' id="fNote"'],{divider:true},['Select more',' id="fMulti" title="Then click or tap more filings, buildings or parcels to compare them in tabs (or Shift-click)"'],['Copy link',' id="fLink"']].map(x=>Array.isArray(x)?{label:x[0],attrs:x[1]}:x))+
+      [{href:gsv,label:'Street View ↗',sub:'Google Street View at the site'},['Add site note',' id="fNote" data-push'],{divider:true},['Select more',' id="fMulti" title="Then click or tap more filings, buildings or parcels to compare them in tabs (or Shift-click)"'],['Copy link',' id="fLink"']].map(x=>Array.isArray(x)?{label:x[0],attrs:x[1]}:x))+
     cardNav([['fProj','Project'],['fSched','Schedule'],['fPeople','People'],['fScope','Scope'],['airSec','Air'],['briefBox','AI Brief'],['liveSec','From Here']])+'</div>'+
     (f.sum?'<div class="bover"><div class="kicker">Overview</div><div>'+esc(f.sum)+'</div></div>':'')+
     (f.approx?'<div class="note">Location is approximate: the address didn’t geocode, so this marker sits at the city center (shaded circle), not on the site.</div>':'')+
@@ -686,7 +686,7 @@ function select(f,fly){
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
   card.querySelector('#fShowMap').onclick=()=>{ setView('map',{user:true}); select(f,true); }; // over a page (Timeline, Changes…): only shown there
-  card.querySelector('#fNote').onclick=()=>cardPush(()=>select(f,false),f.name,()=>ctx.addNote?.({at:[f.lon,f.lat]}));
+  card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat]}); // data-push: "← <filing>" goes back with its tabs
   card.querySelector('#fAsk').onclick=()=>ctx.assistant?.ask('Tell me more about '+f.name);
   card.querySelector('#fMulti').onclick=()=>ctx.tabs?.setAdding(true);
   card.querySelector('#fLink').onclick=()=>copyCardLink();
