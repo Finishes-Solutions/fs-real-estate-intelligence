@@ -49,13 +49,14 @@ export function initMarkets(ctx) {
     return num(v, v >= 1000 ? 0 : 1);
   }
   const pct = v => v == null ? '<span class="mx-dim">—</span>' : '<span class="' + (v > 0 ? 'mx-up' : v < 0 ? 'mx-dn' : '') + '">' + (v > 0 ? '+' : '') + num(v, Math.abs(v) < 10 ? 2 : 1) + '%</span>';
-  // last 12 months; hover a point for its date and value
-  function spark(s, d) {
+  // last 12 months; hover a point for its date and value. Keyed by row (i) for motion (src/motion.js): switching groups
+  // morphs each row's line into the next series' instead of replaying the entrance
+  function spark(s, d, i = 0) {
     const v = d?.recent?.v || [], t = d?.recent?.t || []; if (v.length < 2) return '';
     const W = 110, H = 28, mn = Math.min(...v), mx = Math.max(...v), x = i => i / (v.length - 1) * W, y = x => H - 3 - (x - mn) / ((mx - mn) || 1) * (H - 6), cw = W / (v.length - 1);
     const pts = v.map((p, i) => x(i).toFixed(1) + ',' + y(p).toFixed(1)).join(' ');
     const when = k => { const [yy, mm, dd] = String(k || '').split('-'); return yy ? new Date(Date.UTC(+yy, +mm - 1, +dd || 1)).toLocaleDateString('en-US', { month: 'short', ...(s.freq === 'd' || s.freq === 'w' ? { day: 'numeric' } : {}), year: 'numeric', timeZone: 'UTC' }) : ''; };
-    return '<svg class="mx-spark ' + (v[v.length - 1] >= v[0] ? 'up' : 'dn') + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Last 12 months"><polyline points="' + pts + '"/>' +
+    return '<svg class="mx-spark ' + (v[v.length - 1] >= v[0] ? 'up' : 'dn') + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Last 12 months" data-ck="mx:spark:' + i + '"><polyline class="m-line" data-mk="line" points="' + pts + '"/>' +
       v.map((p, i) => '<g class="mk-hit" data-tip="' + esc((when(t[i]) ? when(t[i]) + ': ' : '') + fmt(s, p)) + '"><rect x="' + (x(i) - cw / 2).toFixed(1) + '" y="0" width="' + cw.toFixed(2) + '" height="' + H + '" fill="transparent"/><circle cx="' + x(i).toFixed(1) + '" cy="' + y(p).toFixed(1) + '" r="2" fill="currentColor" opacity="0"/></g>').join('') + '</svg>';
   }
   // the latest price: the live quote when it's newer than last night's close
@@ -70,16 +71,16 @@ export function initMarkets(ctx) {
 
   // ---------- Markets box ----------
   function marketsBox() {
-    if (!data) return '<section class="mk-box mk-wide" id="mxBox"><h3>Markets</h3><div class="rnote">Loading market data…</div></section>';
+    if (!data) return '<section class="mk-box mk-wide" id="mxBox"><h3>Markets</h3><div class="rnote">Loading market data…</div><div class="mk-skel" aria-hidden="true" style="height:160px"></div></section>';
     const g = GROUPS.find(x => x[0] === group) || GROUPS[1], rows = SERIES.filter(s => s.group === group && data.series[s.id]);
     const liveN = Object.keys(quotes).length;
     return '<section class="mk-box mk-wide" id="mxBox"><div class="mx-head"><h3>Markets</h3><span class="mx-asof">' +
       (liveN ? 'Live prices ' + new Date(qAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' · crypto real time, stocks delayed' : 'Closing prices as of ' + esc(new Date(data.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))) + '</span></div>' +
       '<div class="mx-tabs" role="tablist" aria-label="Market groups">' + GROUPS.map(([k, l]) => '<button type="button" role="tab" data-mxg="' + k + '" aria-selected="' + (k === group) + '">' + esc(l) + '</button>').join('') + '</div>' +
       '<div class="mx-desc">' + esc(g[2]) + '</div><div class="tablewrap"><table class="mx-table"><thead><tr><th>Name</th><th class="r">Last</th><th class="r">Day</th><th class="r">1 year</th><th class="mx-sp">Last 12 months</th><th></th></tr></thead><tbody>' +
-      rows.map(s => { const L = latest(s), d = data.series[s.id];
+      rows.map((s, i) => { const L = latest(s), d = data.series[s.id];
         return '<tr data-mxs="' + s.id + '" tabindex="0" title="Compare with a Houston measure in the Correlation explorer"><td><b>' + esc(s.short) + '</b><span class="mx-sym">' + esc(s.src === 'yahoo' ? s.sym.replace(/^\^/, '').replace(/-USD$/, '') : s.freq === 'm' ? 'monthly' : s.freq === 'q' ? 'quarterly' : 'daily') + (L?.live === 'Coinbase' ? ' · live' : '') + (L?.stale ? ' · not updated last night' : '') + '</span></td>' +
-          '<td class="r m">' + fmt(s, L?.value) + '</td><td class="r m">' + (s.freq === 'd' ? pct(L?.chg) : '<span class="mx-dim">—</span>') + '</td><td class="r m">' + pct(L?.chgYr) + '</td><td class="mx-sp">' + spark(s, d) + '</td><td class="r"><button type="button" class="lnk mx-cmp" data-mxs="' + s.id + '">Correlate</button></td></tr>'; }).join('') +
+          '<td class="r m">' + fmt(s, L?.value) + '</td><td class="r m">' + (s.freq === 'd' ? pct(L?.chg) : '<span class="mx-dim">—</span>') + '</td><td class="r m">' + pct(L?.chgYr) + '</td><td class="mx-sp">' + spark(s, d, i) + '</td><td class="r"><button type="button" class="lnk mx-cmp" data-mxs="' + s.id + '">Correlate</button></td></tr>'; }).join('') +
       '</tbody></table></div><div class="rnote">Sources: Yahoo Finance chart data (stocks, ETFs, indexes, crypto history; delayed, unofficial), Coinbase (live crypto), FRED (oil, gas, producer prices, rates, Houston metro series from BLS, Census and Realtor.com). Not investment advice.</div></section>';
   }
 
@@ -96,22 +97,22 @@ export function initMarkets(ctx) {
     const z = arr => { const m = arr.reduce((s, x) => s + x, 0) / arr.length, sd = Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / arr.length) || 1; return arr.map(x => (x - m) / sd); };
     const va = z(keys.map(k => a.get(k))), vb = z(keys.map(k => b.get(shift(k, -res.lag)))), W = 560, H = 160, P = 26;
     const all2 = va.concat(vb), mn = Math.min(-2, ...all2), mx = Math.max(2, ...all2), X = i => P + i / (keys.length - 1) * (W - P - 6), Y = v => 8 + (mx - v) / (mx - mn) * (H - 30);
-    const line = (vs, cls) => '<polyline class="' + cls + '" points="' + vs.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ') + '"/>';
+    const line = (vs, cls) => '<polyline class="m-line ' + cls + '" data-mk="' + cls + '" points="' + vs.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ') + '"/>';
     const yrs = keys.map((k, i) => [k, i]).filter(([k]) => k.endsWith('-01')), step = (W - P - 6) / (keys.length - 1), per = how === 'mom' ? ' vs the month before' : ' vs a year earlier';
     const hits = keys.map((k, i) => { const kb = shift(k, -res.lag);
       return '<g class="mk-hit mx-hit" data-tip="' + esc(ym(k) + ': ' + r.a.short + ' ' + chgTxt(a.get(k), r.a.diff) + per + ' · ' + r.b.short + (res.lag ? ' (' + ym(kb) + ')' : '') + ' ' + chgTxt(b.get(kb), r.b.diff)) + '">' +
         '<rect x="' + (X(i) - step / 2).toFixed(1) + '" y="0" width="' + step.toFixed(2) + '" height="' + (H - 22) + '" fill="transparent"/><line x1="' + X(i).toFixed(1) + '" x2="' + X(i).toFixed(1) + '" y1="4" y2="' + (H - 22) + '"/></g>'; }).join('');
-    return '<svg class="mx-chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="The two series, standardized"><line class="mx-zero" x1="' + P + '" x2="' + (W - 6) + '" y1="' + Y(0) + '" y2="' + Y(0) + '"/>' +
+    return '<svg class="mx-chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="The two series, standardized" data-ck="mx:corr"><line class="mx-zero" x1="' + P + '" x2="' + (W - 6) + '" y1="' + Y(0) + '" y2="' + Y(0) + '"/>' +
       yrs.map(([k, i]) => '<text x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '" class="mx-ax">' + k.slice(0, 4) + '</text>').join('') + line(vb, 'mx-lb') + line(va, 'mx-la') + hits + '</svg>';
   }
   const shift = (k, n) => { const [y, m] = k.split('-').map(Number), t = y * 12 + m - 1 + n; return Math.floor(t / 12) + '-' + String(t % 12 + 1).padStart(2, '0'); };
   function lagBars(res) {
     const L = res.lags.filter(l => Number.isFinite(l.r)); if (!L.length) return '';
     const W = 560, H = 70, mid = 35, bw = W / res.lags.length;
-    return '<svg class="mx-lags" viewBox="0 0 ' + W + ' ' + (H + 14) + '" role="img" aria-label="Correlation at each lead or lag">' + res.lags.map((l, i) => { if (!Number.isFinite(l.r)) return '';
+    return '<svg class="mx-lags" viewBox="0 0 ' + W + ' ' + (H + 14) + '" role="img" aria-label="Correlation at each lead or lag" data-ck="mx:lags" data-base="' + mid + '">' + res.lags.map((l, i) => { if (!Number.isFinite(l.r)) return '';
       const h = Math.abs(l.r) * (mid - 4), y = l.r >= 0 ? mid - h : mid;
       const tip = (l.lag === 0 ? 'Same month' : l.lag > 0 ? 'Market series first by ' + l.lag + ' mo' : 'Houston measure first by ' + -l.lag + ' mo') + ': r = ' + (l.r > 0 ? '+' : '') + l.r.toFixed(2) + ' over ' + l.n + ' months' + (l.lag === res.lag ? ' (the strongest)' : '');
-      return '<g class="mk-hit" data-tip="' + esc(tip) + '"><rect x="' + (i * bw).toFixed(1) + '" y="0" width="' + bw.toFixed(1) + '" height="' + H + '" fill="transparent"/><rect x="' + (i * bw + 2).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + (bw - 4).toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" class="' + (l.lag === res.lag ? 'on' : l.r >= 0 ? 'pos' : 'neg') + '"/></g>'; }).join('') +
+      return '<g class="mk-hit" data-tip="' + esc(tip) + '"><rect x="' + (i * bw).toFixed(1) + '" y="0" width="' + bw.toFixed(1) + '" height="' + H + '" fill="transparent"/><rect x="' + (i * bw + 2).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + (bw - 4).toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" class="m-bar ' + (l.lag === res.lag ? 'on' : l.r >= 0 ? 'pos' : 'neg') + '" data-mk="' + l.lag + '"/></g>'; }).join('') +
       '<line x1="0" x2="' + W + '" y1="' + mid + '" y2="' + mid + '" class="mx-zero"/><text x="2" y="' + (H + 12) + '" class="mx-ax">Houston measure first ←</text><text x="' + (W / 2) + '" y="' + (H + 12) + '" class="mx-ax" text-anchor="middle">same month</text><text x="' + (W - 2) + '" y="' + (H + 12) + '" class="mx-ax" text-anchor="end">→ market series first</text></svg>';
   }
   const VERD = { strong: ['Strong', 'mx-v3'], moderate: ['Moderate', 'mx-v2'], weak: ['Weak', 'mx-v1'], 'no reliable relationship': ['Not reliable', 'mx-v0'], 'not enough overlap': ['Not enough data', 'mx-v0'] };

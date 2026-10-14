@@ -2,13 +2,21 @@
 // assistant's demographics tool) for the selected area (county, shape, radius, place) when there is one, otherwise for the
 // tracts in the map view. Updates as the map moves or the selection changes; nothing extra to fetch.
 import { tractsFor, summarizeTracts, centroid, inGeom } from './lib/demographics.mjs';
+import { count, current } from './motion.js';
 
 export function initGlance(ctx) {
   const { map, esc, fmtN } = ctx, el = document.getElementById('glance'); if (!el) return;
   const money = v => v == null ? '—' : v >= 1e6 ? '$' + (v / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M' : '$' + Math.round(v / 1e3) + 'K';
   const num = v => v == null ? '—' : v >= 1e6 ? (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : fmtN(v);
   let t = 0, seq = 0;
-  const tile = (k, v, s) => '<div class="g-t"><b>' + v + '</b><span>' + esc(k) + '</span>' + (s ? '<i>' + s + '</i>' : '') + '</div>';
+  const tile = (k, v, s) => '<div class="g-t"><b data-g="' + esc(k) + '">' + v + '</b><span>' + esc(k) + '</span>' + (s ? '<i>' + s + '</i>' : '') + '</div>';
+  // the numbers count from the last area's to this one's (src/motion.js), each in its own format; '—' stays as it is
+  const last = new Map();
+  function counts(nums) {
+    const from = new Map(last); el.querySelectorAll('b[data-g]').forEach(b => { const v = current(b); if (Number.isFinite(v)) from.set(b.dataset.g, v); });
+    last.clear();
+    el.querySelectorAll('b[data-g]').forEach(b => { const n = nums[b.dataset.g]; if (!n || n[0] == null || !Number.isFinite(+n[0])) return; last.set(b.dataset.g, +n[0]); count(b, +n[0], n[1], from.get(b.dataset.g)); });
+  }
   // the area itself is named once, in the panel's scope header above
   const shell = body => '<div class="g-h"><span class="kicker">Area at a Glance</span></div>' + body;
 
@@ -25,7 +33,7 @@ export function initGlance(ctx) {
     else { const b = map.getBounds(), w = b.getWest(), s = b.getSouth(), e = b.getEast(), n = b.getNorth();
       list = selTracts(m.tracts, { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] }); place = ctx.viewPlace?.() || ''; where = 'in view'; }
     const x = summarizeTracts(list);
-    if (!x) { el.innerHTML = shell('<p class="g-n">' + (sg ? 'No census data for the selected area: census numbers cover the counties loaded on the map.' : 'Census data covers the counties loaded on the map. Move the map over them to see the area’s numbers.') + '</p>', place); return; }
+    if (!x) { last.clear(); el.innerHTML = shell('<p class="g-n">' + (sg ? 'No census data for the selected area: census numbers cover the counties loaded on the map.' : 'Census data covers the counties loaded on the map. Move the map over them to see the area’s numbers.') + '</p>', place); return; }
     const gr = x.population_growth_pct;
     el.innerHTML = shell('<div class="g-grid">' +
       tile('Population', num(x.population), gr == null ? '' : '<span class="' + (gr >= 0 ? 'up' : 'dn') + '">' + (gr >= 0 ? '+' : '') + gr + '%</span> since ' + m.baseYear) +
@@ -35,6 +43,8 @@ export function initGlance(ctx) {
       tile('Households', num(x.households), x.vacancy_rate_pct == null ? '' : x.vacancy_rate_pct + '% of homes vacant') +
       tile('Jobs', x.jobs == null ? '—' : num(x.jobs), x.jobs == null ? '' : 'located here') +
       '</div><div class="g-s src">US Census ACS 5-year ' + m.year + ', ' + fmtN(x.tracts) + ' tract' + (x.tracts > 1 ? 's' : '') + ' ' + where + '; medians are household-weighted.</div>', place);
+    counts({ Population: [x.population, num], 'Median Income': [x.median_household_income_approx, money], 'Home Value': [x.median_home_value_approx, money],
+      'Median Rent': [x.median_gross_rent_approx, v => '$' + fmtN(v) + '/mo'], Households: [x.households, num], Jobs: [x.jobs, num] });
   }
   const soon = () => { clearTimeout(t); t = setTimeout(render, 450); };
   // the map view only matters without a selection; a new or cleared selection redraws straight away

@@ -1,6 +1,7 @@
 // Shared pieces for every report (area reports, crime, FEMA, market, filings): the Finishes Solutions report layout and
 // its PDF export, a small SVG map of an area, tables, bar charts, saving (recorded in the Reports tab), and the registry that
 // puts every area report on the Site section, the Reports tab and the Map panel's "Reports for this area".
+import { reveal } from './motion.js';
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ESC[c]);
 export const slug = s => String(s || 'area').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'area';
@@ -60,7 +61,7 @@ export function bars(list, { color = '#006527', height = 120, every = 1, unit = 
   const W = 620, H = height, n = list.length || 1, bw = W / n, mx = Math.max(1, ...list.map(x => +x.v || 0));
   return '<svg viewBox="0 0 ' + W + ' ' + (H + 16) + '" xmlns="http://www.w3.org/2000/svg" role="img">' + list.map((x, i) => {
     const h = Math.max(x.v > 0 ? 1.5 : 0, (+x.v || 0) / mx * (H - 14)), X = i * bw;
-    return '<g><title>' + esc(x.label + ': ' + fmt(x.v) + unit) + '</title><rect x="' + (X + bw * .12).toFixed(1) + '" y="' + (H - h).toFixed(1) + '" width="' + (bw * .76).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="1.5" fill="' + (x.color || color) + '"/>' +
+    return '<g><title>' + esc(x.label + ': ' + fmt(x.v) + unit) + '</title><rect class="m-bar" x="' + (X + bw * .12).toFixed(1) + '" y="' + (H - h).toFixed(1) + '" width="' + (bw * .76).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="1.5" fill="' + (x.color || color) + '"/>' +
       (i % every === 0 ? '<text x="' + (X + bw / 2).toFixed(1) + '" y="' + (H + 12) + '" font-size="9" text-anchor="middle" fill="currentColor" opacity=".6">' + esc(x.label) + '</text>' : '') + '</g>';
   }).join('') + '</svg>';
 }
@@ -175,7 +176,9 @@ export function openCard(ctx, { kicker, title, sub = '', loading = 'Loading…' 
   card.classList.add('open'); card.scrollTop = 0; card.querySelector('.x').onclick = () => ctx.closeCard(); return card;
 }
 export const cardTop = (kicker, title, sub = '') => '<div class="top"><div><div class="kicker">' + esc(kicker) + '</div><h2>' + esc(title) + '</h2>' + (sub ? '<div class="bsub">' + sub + '</div>' : '') + '</div><button class="x" aria-label="Close">×</button></div>';
-export function fillCard(ctx, card, html) { card.innerHTML = html; card.classList.add('open'); card.querySelector('.x')?.addEventListener('click', () => ctx.closeCard()); ctx.wireCites?.(card); }
+// the filled card's charts draw in once per report (its kicker and title), when first seen (src/motion.js)
+export function fillCard(ctx, card, html) { card.innerHTML = html; card.classList.add('open'); card.querySelector('.x')?.addEventListener('click', () => ctx.closeCard()); ctx.wireCites?.(card);
+  reveal(card, 'card:' + (card.querySelector('.kicker')?.textContent || '') + '|' + (card.querySelector('h2')?.textContent || '')); }
 
 // a circle (64 points) around [lon, lat]
 export const circle = ([lon, lat], mi) => { const r = mi / 69, k = Math.cos(lat * Math.PI / 180), ring = []; for (let i = 0; i <= 64; i++) { const a = (i % 64) / 64 * 2 * Math.PI; ring.push([lon + r * Math.cos(a) / k, lat + r * Math.sin(a)]); } return { type: 'Polygon', coordinates: [ring] }; };
