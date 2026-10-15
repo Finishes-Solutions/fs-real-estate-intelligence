@@ -7,6 +7,11 @@
 //        the engine's options judged as a land planner would (drawings and numbers); a revised program to lay out again
 //   POST { mode: 'bestuse', prompt?, site, facts, nearby, market } -> { ideas: [{ title, use, fit, why, risks, request }], summary }
 //        what should go on the site, from what's known about it, each idea a request the builder can lay out
+//   POST { mode: 'ask', question, history: [{ q, a }], plan: {...facts}, effort } -> { answer, followups }
+//        a question about the open plan, answered from the fact sheet the browser computed (lib/planask.mjs planFacts)
+// effort (program, review and ask): how hard the model thinks, 'low' | 'medium' | 'high' (the effort level picked under
+// Build; Ultra sends high); missing or unknown keeps the default (high, medium for ask). review also takes rounds (1-3,
+// default 2): the last round never revises.
 // site: { acres, widthFt, depthFt, frontageFt, address, city, county, zoning }; facts: short lines (flood zone, roads
 // and traffic, districts, utilities, environmental records).
 import { chatJSON, pickModel } from '../lib/openai.mjs';
@@ -17,6 +22,7 @@ import { typeById } from '../lib/buildings.mjs';
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
 
 let modelP = null;
+const EFFORTS = ['low', 'medium', 'high'], effortIn = (v, d) => EFFORTS.includes(v) ? v : d; // OpenAI reasoning_effort, from an allow-list
 const model = key => (modelP ||= pickModel(key, process.env.OPENAI_MODEL).catch(e => { modelP = null; throw e; }));
 
 const n = description => ({ type: ['number', 'null'], description });
@@ -58,6 +64,7 @@ export const SYSTEM = `You set up a development program for a site-planning tool
 - The City of Houston has no zoning; building lines are usually 25 ft on major roads and 10 ft on local streets. Other cities and counties differ. If zoning limits are given, stay within them.
 - Size the program to the site: check floor area and parking against the acreage given. If the request clearly can't fit, keep the use, set gfa to null and say so in assumptions.
 - Mixed use (several uses on one site): fill zones from the street back, give each its size (floor area or units) when you can, and set the top-level use to the front zone's use. A single use: zones is empty.
+- Where they say things go, that order wins over the usual one: "on the front" / "by the road" is the first zone, "at the back" / "in the rear" the last, "in the middle" / "in the center" between ("a community center in the middle of the homes" is homes, then the amenity zone, then homes). Name each zone for where it is and what it holds ("Front — Retail", "Middle — Community center and park", "Back — Single-family homes").
 - A number of buildings ("4 buildings", "two pads") goes in buildings, with gfa the total across them. Stormwater: retention when they ask for a wet pond or lake, underground when they ask for vaults or no pond, none for regional detention.
 - Townhomes and duplexes: homes on their own lots with a public street fit about 6-10 units an acre; denser than that, use product court6 (or court), rows on a shared parking court, rather than cutting the count.
 - A neighbourhood, subdivision or "residential" with no count: a zone of use sfr with units null; it fills whatever land the other zones leave. Give sized zones (shops, apartments) their sizes; a community center or commons is an amenity zone (items may include center, pool, playground, pavilion, courts, lake), placed last when they say "at the back". Apartments of 80+ units already get their own clubhouse and pool by the entry: don't add a center or pool to a commons beside them unless for-sale homes (sfr, townhomes, duplexes) share it; one pool per community. A pool always comes with its center.
@@ -132,9 +139,10 @@ export default async function handler(req, res) {
   if (b.mode === 'review') return review(b, key, res);
   if (b.mode === 'bestuse') return bestUse(b, key, res);
   if (b.mode === 'edit') return edit(b, key, res);
+  if (b.mode === 'ask') return ask(b, key, res);
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
-    const r = await chatJSON({ key, model: await model(key), system: SYSTEM, user: siteText(b.site, prompt, b.program, b.facts), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: 'high' }); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
+    const r = await chatJSON({ key, model: await model(key), system: SYSTEM, user: siteText(b.site, prompt, b.program, b.facts), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: effortIn(b.effort, 'high') }); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
     const d = r.data, sb = Object.fromEntries(Object.entries(d.setbacks || {}).filter(([, v]) => v != null && v >= 0 && v <= 300)), program = programFrom(d, prompt);
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ program, setbacks: { ...SETBACKS, ...sb }, summary: clip(d.summary, 400), assumptions: (d.assumptions || []).slice(0, 4).map(a => clip(a, 200)) });
@@ -147,14 +155,15 @@ export default async function handler(req, res) {
 // the engine's options, judged on their drawings and numbers; a revised program when one would clearly do better
 const num = v => Number.isFinite(+v) ? +v : null;
 async function review(b, key, res) {
-  const prompt = clip(b.prompt, 1200).trim(), opts = (Array.isArray(b.options) ? b.options : []).slice(0, 6), last = (+b.round || 1) >= 2;
+  const rounds = Math.max(1, Math.min(3, Math.round(+b.rounds) || 2)), round = Math.max(1, Math.round(+b.round) || 1), last = round >= rounds; // Medium: one round (no revise); Ultra: up to three
+  const prompt = clip(b.prompt, 1200).trim(), opts = (Array.isArray(b.options) ? b.options : []).slice(0, 6);
   if (!opts.length) return res.status(400).json({ error: 'Nothing to review.' });
   const images = opts.map(o => typeof o.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(o.image) && o.image.length < 600000 ? o.image : null);
-  const text = JSON.stringify({ request: prompt || null, round: last ? 'last (do not revise)' : 'first', site: JSON.parse(siteText(b.site, '', null, b.facts)).site, currentProgram: b.program || null,
+  const text = JSON.stringify({ request: prompt || null, round: last ? 'last (do not revise)' : round === 1 ? 'first' : round + ' of ' + rounds + ' (revise again only if it clearly helps)', site: JSON.parse(siteText(b.site, '', null, b.facts)).site, currentProgram: b.program || null,
     options: opts.map((o, i) => ({ option: i, name: clip(o.name, 120), drawing: images[i] ? 'image ' + (images.slice(0, i + 1).filter(Boolean).length) : 'none', metrics: Object.fromEntries(Object.entries(o.metrics || {}).slice(0, 16).map(([k, v]) => [clip(k, 30), num(v)])),
       issues: (o.issues || []).slice(0, 8).map(t => clip(t, 160)), notes: (o.notes || []).slice(0, 6).map(t => clip(t, 240)) })) });
   try {
-    const r = await chatJSON({ key, model: await model(key), system: REVIEW_SYSTEM, user: text, name: 'site_review', schema: REVIEW_SCHEMA, maxTokens: 20000, effort: 'high', images: images.filter(Boolean) });
+    const r = await chatJSON({ key, model: await model(key), system: REVIEW_SYSTEM, user: text, name: 'site_review', schema: REVIEW_SCHEMA, maxTokens: 20000, effort: effortIn(b.effort, 'high'), images: images.filter(Boolean) });
     const d = r.data, n = opts.length, ok = i => Number.isInteger(i) && i >= 0 && i < n;
     const ranking = [...new Set((d.ranking || []).filter(ok))]; for (let i = 0; i < n; i++) if (!ranking.includes(i)) ranking.push(i);
     const reviews = (d.reviews || []).filter(x => ok(x.option)).map(x => ({ option: x.option, score: Math.max(0, Math.min(100, Math.round(+x.score || 0))), verdict: clip(x.verdict, 300), strengths: (x.strengths || []).slice(0, 3).map(t => clip(t, 200)), problems: (x.problems || []).slice(0, 4).map(t => clip(t, 220)) }));
@@ -214,13 +223,23 @@ export const EDIT_SYSTEM = `You edit a concept site plan the way a land planner 
 - More floors on apartments add units; give units only when they name a number.
 - If they ask for something the plan can't hold (no room, outside the setbacks), do the nearest sensible thing and say so in the summary.
 - refit: "none" unless they ask for the site to re-fit or re-lay, or the change needs new drives and parking (a building added in open land, several buildings removed); then "full".
+- Places: plan.places says where things are, in the same feet as "at" (x across the frontage from its left end, y back from the street). "The front" / "by the street" is small y, "the back" / "the rear" the largest y, "the middle" / "the center" the middle of the site; "left" and "right" as on the drawing. "The middle of the homes" (or of any use: the apartments, the shops, the single-family lots) is that area's middle in places.areas; "in front of" a piece or area is toward the street from it, "behind" it away from the street; a named zone ("the back zone", "the commons") is in places.zones. Use these for x, y when they say where, without asking them to be more exact.
+- Moving or adding an amenity, clubhouse or pool among houses: the houses under its new spot give way by themselves (the app removes them); keep refit "none" so the rest of the neighbourhood stays as it is.
 - Never invent ids. If it's unclear which piece they mean, ask one short question instead.`;
+// where things are on the drawing (lib/siteedit.mjs placesOf), as the browser sent it: points and names only, kept small
+const pt = v => Array.isArray(v) && v.length >= 2 && v.slice(0, 2).every(x => Number.isFinite(+x)) ? v.slice(0, 2).map(x => Math.round(+x)) : null;
+function placesIn(p) {
+  if (!p || typeof p !== 'object') return undefined;
+  const site = Object.fromEntries(['front', 'middle', 'back', 'left', 'right'].map(k => [k, pt(p.site?.[k])]).filter(([, v]) => v));
+  const area = a => ({ name: clip(a?.name, 60), ...(a?.use ? { use: clip(a.use, 20) } : {}), ...(Number.isFinite(+a?.count) ? { count: +a.count } : {}), middle: pt(a?.middle), from: pt(a?.from), to: pt(a?.to) });
+  return { site, areas: (Array.isArray(p.areas) ? p.areas : []).slice(0, 20).map(area).filter(a => a.middle), zones: (Array.isArray(p.zones) ? p.zones : []).slice(0, 8).map(area).filter(a => a.middle) };
+}
 const opt = v => v == null || v === '' ? null : num(v); // a number that may be left out (null stays null, not 0)
 async function edit(b, key, res) {
   const prompt = clip(b.prompt, 1200).trim(), plan = b.plan && typeof b.plan === 'object' ? b.plan : null; if (!prompt || !plan) return res.status(400).json({ error: 'Say what to change.' });
   const pieces = (Array.isArray(plan.pieces) ? plan.pieces : []).slice(0, 500).map(p => ({ id: clip(p.id, 40), name: clip(p.name, 60), kind: clip(p.kind, 20), use: p.use ? clip(p.use, 20) : null, at: Array.isArray(p.at) ? p.at.slice(0, 2).map(num) : null, size: Array.isArray(p.size) ? p.size.slice(0, 2).map(num) : null, turn: num(p.turn), floors: num(p.floors), units: num(p.units), type: p.type ? clip(p.type, 90) : null, note: p.note ? clip(p.note, 80) : null, ...(p.selected ? { selected: true } : {}), ...(p.pinned ? { pinned: true } : {}) }));
   const ids = new Set(pieces.map(p => p.id)), image = typeof b.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(b.image) && b.image.length < 600000 ? b.image : null;
-  const text = JSON.stringify({ request: prompt, site: { ...JSON.parse(siteText(b.site, '', null, null)).site, ...(plan.site || {}) }, totals: plan.totals || null, parking: plan.parking || null, houses: plan.houses ? clip(plan.houses, 80) : undefined, selected: pieces.find(p => p.selected)?.id || null, pieces }) + '\n\nBuilding library (type id = name):\n' + catalogText();
+  const text = JSON.stringify({ request: prompt, site: { ...JSON.parse(siteText(b.site, '', null, null)).site, ...(plan.site || {}) }, totals: plan.totals || null, parking: plan.parking || null, houses: plan.houses ? clip(plan.houses, 80) : undefined, places: placesIn(plan.places), selected: pieces.find(p => p.selected)?.id || null, pieces }) + '\n\nBuilding library (type id = name):\n' + catalogText();
   try {
     const r = await chatJSON({ key, model: await model(key), system: EDIT_SYSTEM, user: text, name: 'site_edit', schema: EDIT_SCHEMA, maxTokens: 16000, effort: 'high', images: image ? [image] : [] });
     const d = r.data, kinds = new Set(['building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio', 'entrance']);
@@ -232,5 +251,49 @@ async function edit(b, key, res) {
   } catch (e) {
     console.error('siteplan edit', e.message);
     return res.status(502).json({ error: 'The AI didn’t answer just now.' });
+  }
+}
+
+// ---------- questions about the open plan ----------
+export const ASK_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['answer', 'followups'],
+  properties: {
+    answer: str('The answer, in plain words: two to five sentences, or a short list (lines starting "- ") for a breakdown.'),
+    followups: strs('Up to 3 short questions the user might ask next about this plan, answerable from the same facts, in their words. Empty when none.')
+  }
+};
+export const ASK_SYSTEM = `You are a land planner and development analyst explaining one concept site plan to the person who made it, in a site-planning tool used by a commercial construction company in the Houston region. You get a fact sheet the tool computed for the plan on the screen: the site and zoning, the request and the program it was read as, setbacks, the totals, parking needed and provided with the rule each use is counted by, the stormwater storage needed and what the ponds hold, the checks, the pieces with where they sit (at = [feet across the frontage from the street's left end, feet back from the street]), the pro forma's numbers and assumptions, and notes from the last build (how the request was read, the layout engine's notes, the AI review).
+- Answer the question about THIS plan from those facts, and explain the why: the rule or number that drives it, with the arithmetic when it helps ("25,000 sq ft of retail at 4 spaces per 1,000 sq ft = 100 spaces").
+- Use only the facts given. Never invent numbers, codes, costs or reasons. When the facts don't say (why a piece sits where it does, a city's own requirement), say plainly that the plan doesn't record it, then give what the facts do show and what would settle it (the city's code, a survey, a civil engineer, a market study).
+- Parking ratios, the 0.55 acre-feet a developed acre of storage and the pro forma's numbers are typical starting assumptions in this tool, not a city's requirement or a quote: say so when it matters, and where to change them (Settings, the Pro forma assumptions, Change with AI).
+- Short and plain, as you'd say it to a developer: two to five sentences, or a short list. No headings, no markdown beyond "- " list lines. Never claim code compliance; this is a concept.
+- If the question isn't about this plan or site, say briefly that you can only answer about the plan that's open.`;
+// the fact sheet as sent: plain values only, strings, arrays and depth kept short
+function tidy(v, d = 0) {
+  if (v == null) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null;
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'string') return clip(v, 700);
+  if (d >= 6 || typeof v !== 'object') return null;
+  if (Array.isArray(v)) return v.slice(0, 80).map(x => tidy(x, d + 1));
+  return Object.fromEntries(Object.entries(v).slice(0, 40).map(([k, x]) => [clip(k, 48), tidy(x, d + 1)]));
+}
+async function ask(b, key, res) {
+  const question = clip(b.question, 600).trim(), plan = b.plan && typeof b.plan === 'object' && !Array.isArray(b.plan) ? tidy(b.plan) : null;
+  if (!question) return res.status(400).json({ error: 'Ask a question about the plan.' });
+  if (!plan) return res.status(400).json({ error: 'Open a plan first.' });
+  let facts = JSON.stringify(plan); if (facts.length > 48000 && Array.isArray(plan.pieces)) { plan.pieces = plan.pieces.slice(0, 25); facts = JSON.stringify(plan); }
+  if (facts.length > 60000) facts = facts.slice(0, 60000); // still too big: cut (the model reads what's there)
+  const history = (Array.isArray(b.history) ? b.history : []).slice(-6).map(t => ({ q: clip(t?.q, 600), a: clip(t?.a, 1500) })).filter(t => t.q && t.a);
+  const user = 'Fact sheet for the plan on the screen:\n' + facts + (history.length ? '\n\nEarlier in this conversation:\n' + history.map(t => 'Q: ' + t.q + '\nA: ' + t.a).join('\n\n') : '') + '\n\nQuestion: ' + question;
+  try {
+    const r = await chatJSON({ key, model: await model(key), system: ASK_SYSTEM, user, name: 'plan_answer', schema: ASK_SCHEMA, maxTokens: 12000, effort: effortIn(b.effort, 'medium') });
+    const d = r.data, answer = clip(d.answer, 2400).trim();
+    if (!answer) throw new Error('empty answer');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ answer, followups: (d.followups || []).map(t => clip(t, 160).trim()).filter(Boolean).slice(0, 3) });
+  } catch (e) {
+    console.error('siteplan ask', e.message);
+    return res.status(502).json({ error: 'The AI didn’t answer just now. Try again in a moment.' });
   }
 }

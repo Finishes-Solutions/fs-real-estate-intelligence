@@ -120,6 +120,11 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
   const k = T.areaPiece(p, 'keepout', [[0, 0], [0, 420], [30, 420], [30, 0]], 'k1'); // drawn clockwise: stored counter-clockwise
   assert.ok(S.signedArea(k.poly) > 0 && k.pinned && k.name === 'Easement 1' && Math.abs(S.elArea(k) - 30 * 420) < 1);
   assert.equal(T.areaPiece({ elements: [k] }, 'keepout', [[100, 100], [140, 100], [140, 140]], 'k2').name, 'Easement 2');
+  { // a building drawn corner by corner (an L): its own outline, the program's floors, measured like any building
+    const L0 = [[20, 20], [20, 120], [60, 120], [60, 60], [140, 60], [140, 20]], b = T.areaPiece({ ...p, program: { floors: 3 } }, 'building', L0, 'b1');
+    assert.equal(T.areaError(p, L0, 'building'), ''); assert.ok(b.kind === 'building' && b.floors === 3 && b.pinned && b.poly.length === 6 && S.isFree(b));
+    assert.ok(Math.abs(S.elArea(b) - (40 * 100 + 80 * 40)) < 1, 'the L outline’s area, not its box’s');
+    assert.ok(T.AREA_KINDS.some(([k]) => k === 'building'), 'offered in Draw an area'); }
   const d = T.linePiece(p, 'drive', [[0, 100], [200, 100], [300, 200]], 'd1'); assert.ok(d.path && d.width === 26 && d.pinned && finite(d) && Math.abs(d.x - T.pathLen(d.path) / 2) < 0.02 && d.y === 100, 'a drive: a 26 ft path, its point halfway along');
   assert.equal(T.linePiece(p, 'trail', [[10, 10], [80, 10]], 't1').width, 6);
 }
@@ -215,5 +220,125 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
   assert.deepEqual(T.refitVerdict(local, { m: fitted.m, issues: fitted.issues.concat({ level: 'bad', text: 'Building B overlaps Building C' }) }), { ok: false, why: 'problems' });
   assert.deepEqual(T.refitVerdict({ m: { gfa: 1000, spaces: 50, required: 50 }, issues: [] }, { m: { gfa: 1000, spaces: 45, required: 50 }, issues: [] }), { ok: false, why: 'problems' }, 'parking short where it was not');
   assert.ok(T.refitVerdict({ m: { gfa: 1000 }, issues: [] }, { m: { gfa: 960 }, issues: [] }).ok, 'within 5%: fine');
+}
+// ---- the development mix: each use's building footprint, its share of the site, and the zones, on real layouts ----
+{
+  const sq = (o, w, d) => siteOf(mk(o, [[0, 0], [w, 0], [w, d], [0, d]]));
+  const planOf = (site, prog) => { const op = L.layoutOptions(site, prog, { count: 1 })[0]; return { ...site, elements: op.elements, program: op.program, zones: op.zones || [] }; };
+  const near = (a, b, tol = 0.5) => Math.abs(a - b) <= tol;
+  // the sums agree with the plan's own numbers: footprint (buildings, not garages), floor area, the site
+  const agrees = (p, what) => {
+    const x = T.mixOf(p), m = S.metrics(p), B = p.elements.filter(e => e.kind === 'building');
+    assert.ok(near(x.siteSf, m.siteSf) && near(x.siteAcres, m.acres, 1e-9), what + ': the site is the boundary');
+    assert.ok(near(x.total.footprintSf, m.footprint), what + ': footprints add up to the plan’s (' + Math.round(x.total.footprintSf) + ' vs ' + Math.round(m.footprint) + ')');
+    assert.ok(near(x.total.gfa, m.gfa), what + ': floor area adds up'); assert.equal(x.total.buildings, B.length);
+    assert.ok(near(x.total.pctSite, m.coverage, 1e-9) && near(x.rows.reduce((s, r) => s + r.pctSite, 0), m.coverage, 1e-9), what + ': the shares add up to the coverage');
+    for (const r of x.rows) {
+      const mine = B.filter(e => T.mixKey(p, e) === r.use), sf = mine.reduce((s, e) => s + S.footArea(e), 0);
+      assert.ok(near(r.footprintSf, sf) && r.buildings === mine.length, what + ': ' + r.label + ' is its buildings’ footprints');
+      assert.ok(near(r.acres, sf / 43560, 1e-9) && near(r.pctSite, sf / m.siteSf, 1e-9) && near(r.gfa, mine.reduce((s, e) => s + S.gfaOf(e), 0)));
+      assert.match(r.color, /^#[0-9a-f]{6}$/);
+    }
+    assert.equal(new Set(x.rows.map(r => r.color)).size, x.rows.length, what + ': a colour each');
+    assert.ok(x.total.footprintSf + m.paved + m.pond < x.siteSf, what + ': parking, drives and ponds aren’t in it');
+    assert.deepEqual(x.rows.map(r => r.footprintSf), x.rows.map(r => r.footprintSf).sort((a, b) => b - a), 'biggest first');
+    return x;
+  };
+  // shops, restaurants and offices in zones from the street back
+  const shops = planOf(sq([-95.70, 29.70], 900, 700), S.guessProgram('15,000 sf retail, 5,000 sf restaurant and 20,000 sf office')), xs = agrees(shops, 'retail/restaurant/office');
+  assert.deepEqual(xs.rows.map(r => r.use).sort(), ['office', 'restaurant', 'retail'], 'three uses');
+  assert.deepEqual(xs.rows.map(r => r.label).sort(), ['Office', 'Restaurant', 'Retail']);
+  assert.equal(xs.rows.find(r => r.use === 'retail').color, M.USE_COL.retail, 'retail keeps the Plan key’s colour');
+  assert.notEqual(xs.rows.find(r => r.use === 'restaurant').color, M.USE_COL.retail, 'restaurants (the same colour in the key) get one of their own');
+  assert.ok(xs.rows.find(r => r.use === 'retail').footprintSf >= 15000 * 0.95 && xs.rows.find(r => r.use === 'office').gfa >= 20000 * 0.95, 'about what was asked');
+  assert.equal(xs.zones.length, 3, 'its zones'); assert.ok(xs.zones.every(z => z.acres > 0 && near(z.pctSite, z.landSf / xs.siteSf, 1e-9) && z.landSf <= S.ringArea(shops.zones.find(q => q.name === z.name).ring) + 0.5));
+  const zsum = xs.zones.reduce((s, z) => s + z.landSf, 0); assert.ok(zsum <= xs.siteSf * 1.001 && zsum > xs.siteSf * 0.6, 'the zones share the site, a zone inside another counted once: ' + T.fmtPct(zsum / xs.siteSf));
+  for (const z of xs.zones) { const r = xs.rows.find(q => q.use === z.use); assert.ok(r && z.color === r.color, z.name + ': the colour of its use'); assert.ok(z.landSf > r.footprintSf, z.name + ': its land (with its parking) is more than its buildings'); }
+  // apartments behind retail on the front: the clubhouse is an amenity, not an apartment building
+  const mf = planOf(sq([-95.71, 29.71], 900, 1100), S.guessProgram('200 apartments with 20,000 sf of retail on the front')), xm = agrees(mf, 'multifamily + retail');
+  assert.deepEqual(xm.rows.map(r => r.use).sort(), ['amenity', 'multifamily', 'retail']); assert.equal(xm.rows[0].use, 'multifamily', 'the apartments cover the most');
+  assert.equal(xm.rows.find(r => r.use === 'amenity').buildings, mf.elements.filter(e => e.name === 'Clubhouse').length);
+  assert.equal(xm.rows.find(r => r.use === 'multifamily').color, M.USE_COL.multifamily); assert.equal(xm.rows.find(r => r.use === 'amenity').color, M.USE_COL.amenity, 'distinct already: the Plan key’s colours');
+  assert.deepEqual(xm.zones.map(z => z.use), ['retail', 'multifamily']);
+  // homes and a commons with a community center: homes counted as homes, the center as an amenity
+  const nb = planOf(sq([-95.72, 29.72], 1200, 1100), { use: 'mixed', zones: [{ use: 'sfr', units: 80 }, { use: 'amenity', items: ['center', 'pool', 'playground'] }] }), xn = agrees(nb, 'single-family + amenity center');
+  const homes = xn.rows.find(r => r.use === 'sfr'), am = xn.rows.find(r => r.use === 'amenity');
+  assert.ok(homes && homes.label === 'Single-family homes' && homes.noun === 'home' && homes.buildings >= 80, 'the homes: ' + homes?.buildings);
+  assert.ok(am && am.buildings === nb.elements.filter(e => e.name === 'Community center').length && am.buildings >= 1, 'the community center');
+  assert.ok(xn.zones.some(z => z.use === 'amenity') && xn.zones.some(z => z.use === 'sfr'));
+  // Phase 2: counted in, its share said; one use on its own: no zones list (its one zone is the whole site)
+  const xp = agrees(plan, '240 apartments'), apts = xp.rows.find(r => r.use === 'multifamily'), p2 = plan.elements.filter(e => e.kind === 'building' && e.phase === 2);
+  assert.ok(p2.length && apts.phase2 && apts.phase2.buildings === p2.length && near(apts.phase2.footprintSf, p2.reduce((s, e) => s + S.footArea(e), 0)), 'Phase 2’s share of the apartments');
+  assert.equal(T.mixOf({ ...plan, zones: [{ name: 'Multifamily', use: 'multifamily', ring: plan.ring }] }).zones.length, 0);
+  // a parking garage is parking: counted apart, not in a use
+  const gar = { id: 'g1', kind: 'garage', x: 100, y: 100, w: 180, d: 120, rot: 0, levels: 4 }, xg = T.mixOf({ ...shops, elements: shops.elements.concat(gar) });
+  assert.ok(near(xg.total.footprintSf, xs.total.footprintSf) && xg.garages.count === 1 && near(xg.garages.footprintSf, 180 * 120));
+  // the colours: told apart, the Plan key's where they can be; the fill picks one use out
+  const cs = T.mixColors(['retail', 'restaurant', 'office', 'medical', 'hotel', 'multifamily', 'townhomes', 'sfr', 'amenity']), vals = Object.values(cs);
+  assert.equal(new Set(vals).size, vals.length); assert.equal(cs.retail, M.USE_COL.retail);
+  assert.equal(T.mixFill('office', cs, { focus: 'retail' }), '#cdd1d3'); assert.equal(T.mixFill('retail', cs, { focus: 'retail' }), cs.retail); assert.equal(T.mixFill('retail', cs, { ph: 2 }), M.lighten(cs.retail, 0.4));
+  assert.equal(T.fmtPct(0.046), '4.6%'); assert.equal(T.fmtPct(0.123), '12%'); assert.equal(T.fmtPct(0.0004), '<0.1%'); assert.equal(T.fmtAc(0.344), '0.34 ac'); assert.equal(T.fmtAc(12.47), '12.5 ac');
+  assert.deepEqual(T.mixOf({ ring: [], elements: [] }).rows, []);
+}
+// ---- Items (the Layers pop-over's second tab): every piece once, under its layer, with a short line on what it is ----
+{
+  const ED = await import('../lib/siteedit.mjs'), P = M.palette();
+  // the real 240-unit apartment plan: 17 buildings, merged parking groups, curved drives, ponds, lawns, the pool deck
+  const g = T.itemGroups(plan), all = g.flatMap(x => x.items), pieces = plan.elements.filter(e => e.kind !== 'lot');
+  assert.equal(g[0].id, 'buildings', 'buildings first');
+  assert.deepEqual(g.map(x => x.id), T.LAYERS.filter(L => L.kinds && pieces.some(e => L.kinds.includes(e.kind))).map(L => L.id), 'the layers that hold pieces, in the Layers order');
+  assert.equal(all.length, pieces.length, 'every piece listed'); assert.equal(new Set(all.map(i => i.id)).size, all.length, 'each once');
+  for (const x of g) for (const it of x.items) assert.equal(T.layerOf(it.kind), x.id, it.name + ' under its own layer');
+  for (const it of all) assert.ok(it.sub && !/NaN|undefined|null/.test(it.sub), it.name + ': ' + it.sub);
+  const names = g[0].items.map(i => i.name); assert.ok(names.indexOf('Apt Bldg 2') < names.indexOf('Apt Bldg 10'), 'Bldg 2 before Bldg 10');
+  const apt = plan.elements.find(e => e.name === 'Apt Bldg 3'), ai = all.find(i => i.id === apt.id);
+  assert.match(ai.sub, /^Multifamily · 3 floors · \d+ units · [\d,]+ sf$/); assert.equal(ai.color, M.buildingColor(P, 'multifamily'), 'the map colour');
+  const row = plan.elements.find(e => e.kind === 'parking'), ri = all.find(i => i.id === row.id);
+  assert.equal(ri.sub, S.spacesWord(S.stalls(row).count), 'a parking row: its spaces'); assert.equal(ri.color, M.COL.parking);
+  const pond = plan.elements.find(e => e.kind === 'pond'); assert.match(all.find(i => i.id === pond.id).sub, /\d\.\d\d ac$/, 'a pond: its acres');
+  const drive = plan.elements.find(e => e.kind === 'drive' && e.path); assert.match(all.find(i => i.id === drive.id).sub, /ft long$/, 'a drive: how long');
+  // a building as the editor makes one: use, floors and floor area; Phase 2 says so (and is lighter, as on the map)
+  const shop = { id: 's1', kind: 'building', use: 'retail', x: 0, y: 0, w: 120, d: 55.75, floors: 2, rot: 0 };
+  assert.equal(T.itemSub(shop), 'Retail · 2 floors · 13,380 sf');
+  assert.equal(T.itemSub({ ...shop, floors: 1, phase: 2 }), 'Retail · Phase 2 · 1 floor · 6,690 sf');
+  assert.equal(T.itemColor({ ...shop, phase: 2 }), M.buildingColor(P, 'retail', { ph: 2 }));
+  assert.equal(T.itemSub({ ...shop, use: undefined }, { program: { use: 'office' } }), 'Office · 2 floors · 13,380 sf', 'no use of its own: the plan’s');
+  const ease = T.areaPiece({ elements: [] }, 'keepout', [[0, 0], [100, 0], [100, 60], [0, 60]], 'k1');
+  assert.equal(T.itemSub(ease), 'Drawn, not surveyed · 6,000 sf'); assert.equal(T.itemColor(ease), P.lines.keepout);
+  assert.equal(T.itemSub({ id: 'p', kind: 'pond', x: 0, y: 0, w: 220, d: 118.8, note: 'Dry basin' }), 'Dry basin · 0.60 ac');
+  assert.equal(T.itemSub({ id: 't', kind: 'trash', x: 0, y: 0, w: 12, d: 12, note: 'Single · 8 yd dumpster' }), 'Single · 8 yd dumpster');
+  assert.equal(T.itemSub({ id: 'g', kind: 'green', x: 0, y: 0, w: 40, d: 30, name: 'Dog park' }), 'Landscape · 1,200 sf', 'a named lawn says what it is');
+  // a neighbourhood: the homes are listed, their lot lines aren't (they're never picked)
+  const hood = L.layoutOptions(tract, { use: 'sfr' }, { count: 1 })[0], hp = { ...tract, elements: hood.elements, program: hood.program }, hg = T.itemGroups(hp);
+  assert.ok(hood.elements.some(e => e.kind === 'lot') && !hg.flatMap(x => x.items).some(i => i.kind === 'lot'), 'no lot lines');
+  assert.equal(hg[0].items.length, hood.elements.filter(e => e.kind === 'building').length); assert.match(hg[0].items[0].sub, /^House · \d floors? · [\d,]+ sf$/);
+  // renaming: what's typed, trimmed and at most 40 characters; an empty name gives the label back; the list re-sorts
+  assert.equal(T.cleanName('  The Oaks  '), 'The Oaks'); assert.equal(T.cleanName('x'.repeat(60)).length, 40); assert.equal(T.cleanName(null), '');
+  assert.equal(ED.labelOf({ ...shop, name: T.cleanName('   ') }), 'Building'); assert.equal(ED.labelOf({ kind: 'keepout' }), 'Easement');
+  const renamed = { ...plan, elements: plan.elements.map(e => e.id === apt.id ? { ...e, name: 'AAA Leasing' } : e) }, rg = T.itemGroups(renamed);
+  assert.equal(rg[0].items[0].id, apt.id, 'the renamed building sorts to its new place'); assert.equal(rg[0].items[0].name, 'AAA Leasing');
+  assert.equal(plan.elements.find(e => e.id === apt.id).name, 'Apt Bldg 3', 'the plan given is not changed');
+  assert.deepEqual(T.itemGroups({}), [], 'an empty plan: nothing');
+}
+// ---- a drive as a route: Edit Shape on aisles, drawn drives and entrances ----
+{
+  const aisle = { id: 'a', kind: 'drive', x: 100, y: 50, w: 200, d: 24, rot: 30, note: '24 ft drive aisle' }, r = T.routeOf(aisle);
+  assert.ok(r.path.length === 2 && r.width === 24 && !r.w && !r.rot && Math.abs(Math.hypot(r.path[1][0] - r.path[0][0], r.path[1][1] - r.path[0][1]) - 200) < 0.1, 'an aisle runs end to end, as wide as it was');
+  assert.ok(Math.abs(S.ringArea(S.outline(r)) - 200 * 24) < 200 * 24 * 0.02, 'and covers the same ground');
+  const ring = [[0, 0], [400, 0], [400, 300], [0, 300]], ent = { id: 'm', kind: 'drive', name: 'Main entry', note: '30 ft driveway', poly: [[-25, 0], [85, 0], [75, 3], [65, 10], [60, 20], [60, 70], [30, 70], [30, 20], [25, 10], [15, 3]].map(([x, y]) => [x + 120 - 45 + 15, y]) };
+  const re = T.routeOf(ent, ring); assert.ok(re && T.isEntrance(re) && re.flare > 0 && re.width === 30, 'an entrance keeps its width and gets a flared mouth: ' + JSON.stringify(re));
+  assert.ok(Math.abs(re.path[0][1]) < 0.01 && re.path[1][1] > 60, 'from the street (the lot line) into the site: ' + JSON.stringify(re.path));
+  const o = S.outline(re), mouth = o.filter(p => p[1] < 1).map(p => p[0]); assert.ok(Math.max(...mouth) - Math.min(...mouth) > 70, 'the mouth flares out to meet the street');
+  const ad = T.addRoutePoint([[0, 0], [100, 0], [100, 100]], [60, 8]); assert.deepEqual(ad, { path: [[0, 0], [60, 0], [100, 0], [100, 100]], k: 1 }, 'a point on the nearest stretch');
+  assert.equal(T.addRoutePoint([[0, 0], [100, 0]], [1, 1]), null, 'not on top of a point already there');
+  assert.deepEqual(T.onLotLine(ring, [150, 12]), [150, 0], 'a dragged mouth stays on the lot line');
+  assert.deepEqual(T.lotLineAt(ring, [398, 120]), { at: [400, 120], mouth: [-1, 0] }, 'and comes in square to the stretch of lot line it lands on');
+  { // bent hard (a short zigzag, a tight Curve): one clean outline, no fold, the throat square to the street, flares along it
+    const z = { ...re, path: [re.path[0], [re.path[0][0] - 40, 30], [re.path[0][0] + 10, 70]], r: 80 }, o = S.outline(z);
+    const crossings = o.reduce((t, a, i) => t + o.filter((b, j) => j > i + 1 && !(i === 0 && j === o.length - 1) && S.segSeg(a, o[(i + 1) % o.length], b, o[(j + 1) % o.length]) < 1e-6).length, 0);
+    assert.equal(crossings, 0, 'a tight zigzag still makes one clean outline'); assert.ok(S.signedArea(o) !== 0 && o.every(p => p[1] > -0.6), 'nothing pokes out across the street: ' + Math.min(...o.map(p => p[1])).toFixed(2));
+    const mouth = o.filter(p => p[1] < 0.5).map(p => p[0]); assert.ok(Math.max(...mouth) - Math.min(...mouth) > 60, 'the flares still meet the street side by side'); }
+  const bent = { kind: 'drive', path: [[0, 0], [0, 100], [100, 100]], width: 26, r: 60 }, tight = { ...bent, r: 5 };
+  assert.ok(S.ringArea(S.outline(bent)) < S.ringArea(S.outline(tight)), 'a bigger Curve rounds the bend off more');
 }
 console.log('site tools ok');

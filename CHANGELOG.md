@@ -5,6 +5,84 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 5:27 PM CT: AI effort levels, a one-click layout update, questions about a plan, and the Development mix view (b3d6460, a938129, 194c6e1, 15459bd)
+- **AI effort: Low, Medium, High and Ultra** replace Quick / AI-reviewed under Build, each saying what it does and about how long it takes.
+  - Low: the AI reads the request, with no review.
+  - Medium: one review round.
+  - High: the old AI-reviewed.
+  - Ultra: starts from five layouts and reviews up to six with drawings, with up to two rounds of program changes. It has a gold look and a short shine when picked.
+  - Your choice is remembered on the device. Old "Quick" maps to Low, and "AI-reviewed" to High.
+- **Update icon on an out-of-date layout card:** a sync icon in the card's top right re-fits the layout to your changes in one click (the same as Re-fit Around My Changes).
+- **Ask about this plan:** a new section where you can ask why it needs so much parking, whether it needs a detention pond, how the pro forma works out, or why the AI made a choice.
+  - Starter questions fit the plan, and follow-up suggestions are offered.
+  - Answers use only the plan's own numbers (parking by use and the rule behind it, stormwater, checks, pro forma, the build's notes), and they say so when something isn't recorded.
+- **Development mix (U, the pie chart on the tool bar):** colours each use's buildings and greys out parking, drives, lawns and ponds.
+  - A card lists each use's building acres and share of the site (footprint only, no parking), with Phase 2's share, the total, and on mixed-use plans the land each zone takes.
+  - Hover or click a row to light up that use.
+- **Known gaps:** answers from the AI and Ultra's timing haven't been tried against the live AI yet (tested with the AI stubbed).
+
+### 5:18 PM CT: Parking you can drive through; street sides that match the map (5a57490)
+- **Aisles go through.** An aisle with stalls along it no longer stops at a curb.
+  - It runs on until it meets a drive.
+  - Or a short drive across the ends of the rows joins it to the next aisle.
+  - Where the land leaves no way through, the last stalls are left out so cars can turn, if the plan has spaces to spare. Otherwise the plan's checks name the aisle.
+  - Across 30 test layouts, aisles that dead-end went from 40 to 8, with no layout losing the parking it needs.
+- **No stalls past the end of an aisle,** and none right at an entrance.
+  - The first 30 to 75 ft in from the street is a clear driveway.
+  - Adding an entrance by hand clears the stalls beside its mouth, and the checks flag one that's left.
+- **Street sides only where a road really runs along the lot line.**
+  - Driveways and parking lanes don't count, and neither do roads that only pass a corner or short jogs in the lot line.
+  - The front goes to the bigger road.
+  - On 19730 FM 362 the old check marked 6 of the 8 sides. It now finds FM 362 on the west and B Street on the east.
+  - Plans found the old way are checked again once when opened.
+- **Any street side can now be taken off** with Side Street: clicking the main street side moves the front to the other street.
+
+### 3:39 PM CT: Entrances that fit the site; changes that understand places; moving amenities among homes (57f6d47)
+- **The right number of entrances by itself:** when a request doesn't say how many, layouts choose.
+  - One for an ordinary lot.
+  - Two for a corner lot, with the second on the side street.
+  - Two for more than 30 homes or 200 apartments (a second way in for fire access), and for big parking fields or sites over 15 acres.
+  - Three for very large sites.
+  - The notes say why. Asking for a number always wins.
+- **Change With AI understands places:** "the back", "the front", "the middle of the homes" or "of the apartments".
+- **Moving an amenity among houses no longer breaks the plan:** moving a community center among the houses (or adding a pool beside it) only clears the few homes under it, and the rest of the neighbourhood stays.
+- **Re-fits that lose homes are held back:** if the re-fit after a change would lose homes, units or floor area, it isn't taken, and **Re-fit Anyway** is offered. On the 86-acre site a re-fit like this had dropped 461 units to 145, and the detention spread into one huge lake.
+
+### 2:59 PM CT: Smoother, connected parking; bend drives and entrances; an Items list in Layers (55542e2, f430a4a, 03e357c)
+- **Paving is one smooth surface.**
+  - Drives, aisles, parking and entrances pour together, with one curb round the outside.
+  - The curb is rounded where a row ends and where an aisle meets a drive.
+  - Curves and slightly turned rows no longer show stair-steps. The paving also draws faster.
+- **Tidier layouts:**
+  - no aisles running on past the last stall;
+  - no drives that end in the grass (or in the rear landscape buffer);
+  - no leftover scraps of 3 or 4 stalls.
+- **Moving a building no longer wrecks the parking.** Moving a building, then letting the site re-fit, lays the drives and parking out again around it. Before, it could drop to 6 spaces of 120 needed.
+- **Bend drives and entrances.** Select a drive, an aisle or an entrance, then press **Edit Shape** (or right-click › Bend it).
+  - Drag its points, or the blue + to add a bend. Double-clicking a drive also adds a bend.
+  - **Width** and **Curve** set its size and how round the bends are.
+  - An entrance keeps its mouth on the street, comes in square to it, and flares out each side (**Mouth flare**).
+  - A main entrance you've bent stays the way in when the site re-fits: no second entrance is added.
+- **Stranded parking rows are flagged.** A parking row with no aisle beside it now says so, e.g. "Parking 9 has no aisle to drive in from".
+- **Items list:** the **Items** tab in the site plan's **Layers** lists every building, parking row, drive, pond and lawn under its layer.
+  - Click one to select it.
+  - Double-click (or the pencil, or F2) to rename it.
+  - The list follows what you select on the map.
+
+### 12:46 PM CT: Drag pieces onto the site, draw any building shape, change a building's use; re-fit no longer over-parks (e840b22)
+- **Drag and drop from Add:** drag a tile from the tool bar's **Add** palette, or from the panel's Add section, onto the map.
+  - The piece's outline follows the pointer at its real size, turned the way it will land.
+  - The outline turns red off the site.
+  - It lands where you let go. Esc, or letting go off the map, cancels.
+  - A plain click still drops it near the middle of the view.
+- **Draw a building any shape:** **Draw area › Building outline** draws a building corner by corner, with the plan's number of floors.
+  - To reshape an existing building, select it and press **Edit Shape**. Drag its points, or drag the small blue + on an edge to add a point. Double-clicking the outline also adds one.
+- **Change what a building is after it's placed:** the Selected box now starts with **Use**, **Floors** and **Type** (from the building library).
+  - Right-click a building, or several selected, for **Change use ›**.
+  - The parking need follows the new use, and the rest of the site re-fits. One Undo takes it back.
+- **Building shape for custom buildings:** it reads **Custom outline** for a reshaped or drawn building. Picking Bar, L-shaped, Courtyard or Tower turns it back into that shape.
+- **Re-fit fix:** re-fitting round buildings you've moved, resized or changed no longer over-parks the site. A pinned 25,000 sf retail building got about 165 spaces for 100 needed; it now gets about 107.
+
 ### 11:55 AM CT: Merged with the latest main; right-click menu fix (89b1a01, 1b6a1f9, 9f283be)
 - **Merged with everything else that landed today:**
   - the development pipeline layers;

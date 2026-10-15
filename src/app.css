@@ -2010,6 +2010,7 @@ button:disabled{cursor:var(--cur-default,default)}
 #card .sp-start .sp-lt-proj{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1.5 4.5v8.5h13V5.5H8L6.5 3.5h-5z'/%3E%3C/svg%3E")}
 #card .sp-start .sp-lt-site{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 7 2.5l6.5 2.5v8L9 14.5l-6.5-2z'/%3E%3C/svg%3E")}
 #card #spChgSec{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 13.5l.6-3L10.8 2.8a1.5 1.5 0 0 1 2.1 0l.3.3a1.5 1.5 0 0 1 0 2.1L5.5 12.9z'/%3E%3Cpath d='M9.5 4l2.5 2.5'/%3E%3C/svg%3E")}
+#card #spAskSec{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 2.5h10a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H7.2L4.5 13.5V11H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z'/%3E%3Cpath d='M6.5 5.4a1.5 1.5 0 1 1 2.1 1.4c-.4.2-.6.5-.6.9v.2'/%3E%3Cpath d='M8 9.4v.01'/%3E%3C/svg%3E")}
 .sp-tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .sp-tools .btn[aria-pressed="true"]{background:var(--text);color:var(--panel);border-color:var(--text)}
 .sp-add i{display:inline-block;width:10px;height:10px;border-radius:2px}
@@ -3069,15 +3070,34 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 @media (prefers-reduced-motion:reduce){.btn.sp-pulse{animation:none;outline:2px solid var(--green-300);outline-offset:2px}}
 #card #spGo{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;line-height:1.2}
 #card #spGo small{font-size:10.5px;font-weight:500;opacity:.85}
-/* how to run it: Quick or AI-reviewed, and Phase 2 */
+/* how hard the AI works: Low, Medium, High, Ultra (four equal segments, the time under each), what the picked one does
+   under them, and Phase 2's setting beside the label. Ultra has a warm gradient and a spark; picking it sweeps a shine
+   across it once (none with reduced motion). */
 #card .sp-runopts{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:10px}
-.sp-modes{display:inline-flex;border:1px solid var(--line-2);border-radius:7px;padding:2px;background:var(--panel-2)}
-.sp-modes button{display:flex;align-items:baseline;gap:5px;border:0;border-radius:5px;background:none;padding:4px 10px;color:var(--text-2);font:500 12px var(--font-display);cursor:var(--cur-pointer,pointer)}
-.sp-modes button b{font-weight:600}
-.sp-modes button small{font-size:11px;color:var(--muted)}
-.sp-modes button[aria-checked="true"]{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(11,13,12,.12)}
-.sp-modes button:disabled{opacity:.45;cursor:var(--cur-default,default)}
-.sp-modes button:focus-visible{outline:2px solid var(--brand);outline-offset:0}
+.sp-effl{font:500 10.5px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sp-effort{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;border:1px solid var(--line-2);border-radius:8px;padding:2px;background:var(--panel-2)}
+.sp-eff{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:42px;padding:4px 4px;border:0;border-radius:6px;background:none;color:var(--text-2);font:500 12.5px var(--font-display);line-height:1.2;cursor:var(--cur-pointer,pointer);overflow:hidden;transition:background var(--dur-fast,150ms),color var(--dur-fast,150ms),box-shadow var(--dur-fast,150ms)}
+.sp-eff b{display:inline-flex;align-items:center;gap:4px;font-weight:600}
+.sp-eff small{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.sp-eff:hover:not(:disabled):not([aria-checked="true"]){background:color-mix(in srgb,var(--panel) 65%,transparent);color:var(--text)}
+.sp-eff[aria-checked="true"]{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(11,13,12,.12)}
+.sp-eff:disabled{opacity:.45;cursor:var(--cur-default,default)}
+.sp-eff:focus-visible{outline:2px solid var(--focus);outline-offset:0}
+.sp-eff-ultra b{background:linear-gradient(100deg,var(--green-700) 0%,#0e7c86 50%,var(--amber) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sp-eff-ultra .sp-spark{flex:none;color:var(--amber)}
+.sp-eff-ultra[aria-checked="true"]{background:linear-gradient(135deg,var(--green-50) 0%,#fff 48%,#fbf1df 100%);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--amber) 42%,transparent),0 1px 4px rgba(183,121,31,.22)}
+.sp-eff-ultra[aria-checked="true"] small{color:#8a5a12}
+.sp-eff-ultra b,.sp-eff-ultra small{position:relative;z-index:1}
+.sp-eff-ultra::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 28%,rgba(224,162,60,.38) 42%,rgba(255,250,238,.95) 50%,rgba(224,162,60,.38) 58%,transparent 72%);transform:translateX(-110%);pointer-events:none;opacity:0}
+.sp-eff-ultra.sp-shine::after{animation:sp-shine 640ms cubic-bezier(.45,0,.25,1) 1}
+.sp-eff-ultra.sp-shine .sp-spark{animation:sp-spark 620ms var(--ease) 1}
+@keyframes sp-shine{0%{transform:translateX(-110%);opacity:1}100%{transform:translateX(110%);opacity:1}}
+@keyframes sp-spark{0%{transform:scale(1) rotate(0)}45%{transform:scale(1.4) rotate(25deg)}100%{transform:scale(1) rotate(0)}}
+@media (prefers-reduced-motion:reduce){.sp-eff-ultra.sp-shine::after,.sp-eff-ultra.sp-shine .sp-spark{animation:none}}
+.sp-effhint{margin-top:-2px;font-size:12px;line-height:1.45;color:var(--text-2)}
+.sp-effon{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--chip);color:var(--text-2);font:600 10.5px/18px var(--font-display);vertical-align:1px;white-space:nowrap}
+.sp-effon.u{background:linear-gradient(135deg,var(--green-50),#fbf1df);color:#7a4f0f;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--amber) 35%,transparent)}
+.sp-effon.u .sp-spark{color:var(--amber);width:10px;height:10px}
 #card .sp-runopts .sp-sw{font-size:12px;color:var(--text-2)}
 .sp-aioff{display:flex;align-items:center;gap:6px;margin-top:8px;color:var(--text-2)}
 .sp-aioff::before{content:"i";flex:none;display:grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--line-2);font:700 10px var(--font-display);color:var(--muted)}
@@ -3242,7 +3262,7 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 .sp-tp-i span{display:grid;gap:1px}
 .sp-tp-i small,.sp-lrow small,.sp-tp-sw2 small{font-size:11px;color:var(--muted);font-weight:500}
 .sp-tp-sw{flex:none;width:16px;height:12px;border-radius:2px;border:1px solid rgba(11,13,12,.18)}
-.sp-tp-sw.k-green{background:#62b072}.sp-tp-sw.k-plaza{background:#d9c8a9}.sp-tp-sw.k-pond{background:#5b9bd1}.sp-tp-sw.k-drive{background:#7c8689}.sp-tp-sw.k-trail{background:#d9c7a0}
+.sp-tp-sw.k-building{background:#d0694c}.sp-tp-sw.k-green{background:#62b072}.sp-tp-sw.k-plaza{background:#d9c8a9}.sp-tp-sw.k-pond{background:#5b9bd1}.sp-tp-sw.k-drive{background:#7c8689}.sp-tp-sw.k-trail{background:#d9c7a0}
 .sp-tp-sw.k-keepout{border:1px dashed #9b3b32;background:repeating-linear-gradient(45deg,#9b3b32 0 1.5px,transparent 1.5px 4px)}
 .sp-tp-n{margin:6px 6px 2px;font-size:11.5px;line-height:1.4;color:var(--muted)}
 .sp-lrows{display:grid}
@@ -3261,6 +3281,44 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 .sp-tp-sw2{display:flex;align-items:center;gap:6px;padding:8px 6px 0;cursor:var(--cur-pointer,pointer)}
 .sp-tp-sw2 input{accent-color:var(--brand);margin:0}
 .sp-tp-sw2 span{display:grid;gap:1px}
+/* Layers | Items tabs; Items: every piece of the plan under its layer (sticky headings that fold), rename in place */
+.sp-ltabs{display:flex;gap:2px;margin:0 0 8px;padding:2px;border-radius:8px;background:var(--chip)}
+.sp-ltabs button{flex:1;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--text-2);font:600 12px/1.2 var(--font-display);cursor:var(--cur-pointer,pointer)}
+.sp-ltabs button:hover{color:var(--text)}
+.sp-ltabs button[aria-selected="true"]{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(11,13,12,.14)}
+.sp-tpop.sp-items{width:300px;display:flex;flex-direction:column;overflow:hidden;padding-bottom:4px}
+.sp-il{flex:1 1 auto;min-height:0;max-height:420px;overflow:auto;overscroll-behavior:contain;margin:0 -4px;padding:0 4px 4px}
+.sp-ig+.sp-ig{margin-top:2px}
+.sp-ig-h{position:sticky;top:0;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) 28px 28px;align-items:center;gap:2px;background:var(--panel)}
+.sp-ig-f{display:flex;align-items:center;gap:6px;min-width:0;height:28px;padding:0 6px 0 4px;border:0;border-radius:6px;background:transparent;color:var(--text-2);font:700 10.5px/1 var(--font-display);letter-spacing:.08em;text-transform:uppercase;text-align:left;cursor:var(--cur-pointer,pointer)}
+.sp-ig-f:hover{background:var(--chip);color:var(--text)}
+.sp-ig-f span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-ig-f small{flex:none;font-weight:600;letter-spacing:0;color:var(--muted)}
+.sp-ig-c{flex:none;width:6px;height:6px;margin:0 2px 0 3px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(-45deg);transition:transform var(--dur-fast,150ms) var(--ease,ease)}
+[aria-expanded="true"]>.sp-ig-c{transform:translateY(-1px) rotate(45deg)}
+.sp-it{display:grid;grid-template-columns:minmax(0,1fr) 26px;align-items:center;border-radius:6px}
+.sp-it:hover{background:var(--chip)}
+.sp-it.on{background:color-mix(in srgb,var(--brand) 13%,var(--panel))}
+.sp-it.on .sp-it-n{color:var(--brand);font-weight:600}
+.sp-it-b{display:flex;align-items:center;gap:8px;min-width:0;padding:4px 4px 4px 16px;border:0;border-radius:6px;background:transparent;color:var(--text);text-align:left;font:inherit;cursor:var(--cur-pointer,pointer)}
+.sp-it-b[hidden]{display:none}
+.sp-tpop .sp-it-b:focus-visible,.sp-tpop .sp-ig-f:focus-visible{outline-offset:-2px}
+.sp-it-sw{flex:none;width:12px;height:12px;border-radius:3px;background:var(--c);border:1px solid rgba(11,13,12,.18)}
+.sp-it-sw.ko{background:repeating-linear-gradient(45deg,var(--c) 0 1.5px,transparent 1.5px 4px);border:1px dashed var(--c)}
+.sp-it-t{display:grid;gap:1px;min-width:0}
+.sp-it-n,.sp-it-t small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-it-t small{font-size:11px;font-weight:500;color:var(--muted)}
+.sp-it-r{width:26px;height:26px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--muted);opacity:0;cursor:var(--cur-pointer,pointer)}
+.sp-it-r svg{width:13px;height:13px}
+.sp-it:hover .sp-it-r,.sp-it:focus-within .sp-it-r{opacity:1}
+.sp-it-r:hover{background:var(--panel);color:var(--text)}
+.sp-ig.off .sp-it-n,.sp-ig.off .sp-ig-f span{color:var(--muted)}
+.sp-ig.off .sp-it-sw{opacity:.4}
+.sp-it-e{display:flex;align-items:center;gap:8px;min-width:0;padding:3px 4px 3px 16px}
+.sp-it-in{flex:1;min-width:0;padding:4px 6px;border:1px solid var(--brand);border-radius:5px;background:var(--panel);color:var(--text);font:inherit;outline:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 18%,transparent)}
+.sp-it.ren{background:transparent}
+.sp-it.ren .sp-it-r{visibility:hidden}
+@media (hover:none){.sp-it-r{opacity:1}}
 /* a message while planning sits above the tool strip, not over it */
 @media (min-width:701px){.app.planning .toast{bottom:64px}}
 /* Shift-drag on the map: the selection box */
@@ -3280,6 +3338,40 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 #card .sp-confirm .btnrow{display:flex;flex-wrap:wrap;gap:6px}
 /* several pieces picked: their buttons in one row */
 #card .sp-fsrow{display:contents;border:0;padding:0;margin:0}
+/* the development mix (the strip's Mix): a card above the legend (or the strip), one row a use: colour, name, footprint
+   acres and share of the site in two right-aligned columns, the count and floor area on a line under them */
+.sp-dmix{position:absolute;z-index:1;width:288px;max-width:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;padding:6px 8px 10px;border:1px solid var(--line-2);border-radius:var(--r-lg);background:var(--panel);color:var(--text);box-shadow:var(--sh-2);pointer-events:auto;font:500 12.5px/1.35 var(--font-display);font-variant-numeric:tabular-nums}
+.sp-dmix[hidden]{display:none}
+.sp-dmix.fold{padding-bottom:8px}
+.sp-mx-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 -2px 2px 0}
+.sp-mx-f{display:inline-flex;align-items:center;min-height:28px;padding:0 6px;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:var(--cur-pointer,pointer)}
+.sp-mx-f:hover{background:var(--chip);color:var(--text)}
+.sp-mx-f b{font:700 10.5px/1 var(--font-display);letter-spacing:.12em;text-transform:uppercase}
+.sp-mx-x{width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--text-2);cursor:var(--cur-pointer,pointer)}
+.sp-mx-x:hover{background:var(--chip);color:var(--text)}
+.sp-mx-hd,.sp-mx-r,.sp-mx-t{display:grid;grid-template-columns:12px minmax(0,1fr) 60px 42px;align-items:baseline;column-gap:8px}
+.sp-mx-hd{padding:0 6px 3px;font-size:10.5px;font-weight:600;color:var(--muted)}
+.sp-mx-hd span:first-child,.sp-mx-t>span:first-child{grid-column:1 / 3}
+.sp-mx-hd span:not(:first-child),.sp-mx-a,.sp-mx-p{text-align:right;white-space:nowrap}
+.sp-mx-rows{display:grid;gap:1px}
+.sp-mx-r{width:100%;padding:5px 6px;border:0;border-radius:6px;background:transparent;color:var(--text);text-align:left;font:inherit}
+button.sp-mx-r{cursor:var(--cur-pointer,pointer)}
+button.sp-mx-r:hover{background:var(--chip)}
+.sp-mx-r.on{background:color-mix(in srgb,var(--brand) 9%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand) 40%,transparent)}
+.sp-mx-sw{align-self:center;width:12px;height:12px;border-radius:3px;background:var(--c);box-shadow:inset 0 0 0 1px rgba(11,13,12,.18)}
+.sp-mx-zr .sp-mx-sw{background:color-mix(in srgb,var(--c) 22%,#fff);box-shadow:inset 0 0 0 2px var(--c)}
+.sp-mx-n{min-width:0;font-weight:600;overflow-wrap:anywhere}
+.sp-mx-s{grid-column:2 / -1;font-size:11px;font-weight:500;color:var(--muted)}
+.sp-mx-a{font-weight:700}
+.sp-mx-p{color:var(--text-2);font-weight:600}
+.sp-mx-t{margin-top:3px;padding:7px 6px 0;border-top:1px solid var(--line);font-weight:700}
+.sp-mx-note{margin:5px 6px 0;font-size:11px;line-height:1.4;color:var(--muted)}
+.sp-mx-zh{display:grid;gap:2px;margin:9px 0 1px;padding:8px 6px 3px;border-top:1px solid var(--line)}
+.sp-mx-zh b{font:700 10.5px/1.2 var(--font-display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.sp-mx-zh small{font-size:11px;color:var(--muted)}
+.sp-mx-zr .sp-mx-n{font-weight:500}
+.sp-mx-e{padding:6px;color:var(--muted)}
+.sp-dmix button:focus-visible{outline:var(--focus,2px solid var(--brand));outline-offset:-1px}
 /* phones: fewer buttons until More opens the rest; the save status only when a sync failed */
 @media (max-width:700px){
   .sp-strip{left:8px;bottom:8px;padding:2px}
@@ -3289,6 +3381,8 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
   .sp-strip:not(.open) .sp-tgrp:not(:has(.sp-tb:not(.sp-tb-x))){display:none}
   .sp-strip.open{flex-wrap:wrap;max-width:calc(100% - 16px)}
   .sp-tpop{width:min(268px,calc(100vw - 16px))}
+  .sp-tpop.sp-items{width:min(300px,calc(100vw - 16px))}
+  .sp-dmix{width:min(300px,calc(100% - 16px));max-width:none}
   .sp-tpop.ph{position:fixed;z-index:var(--z-sheet,11)}
   .sp-mapui:has(.sp-strip:not([hidden])) .sp-mpill{top:52px}
 }
@@ -3465,6 +3559,25 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 /* Change with AI: the box, then Make Changes with its switch beside it */
 #card .sp-go2{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
 #card .sp-go2 .btn{min-height:40px;padding:0 16px}
+/* the layout card's update icon (top right, only while the layout is out of date): it turns while the re-fit runs */
+.sp-ov-n.has-upd{align-items:center}
+.sp-ovupd{flex:none;display:grid;place-items:center;width:32px;height:32px;margin:-6px -6px -6px auto;padding:0;border-radius:var(--r-sm);border:1px solid color-mix(in srgb,#e0a23c 70%,transparent);background:rgba(224,162,60,.14);color:#f2c16f;cursor:var(--cur-pointer,pointer);transition:background var(--dur-fast,150ms),border-color var(--dur-fast,150ms),color var(--dur-fast,150ms)}
+.sp-ovupd:hover:not(:disabled){background:rgba(224,162,60,.26);border-color:#e0a23c;color:#ffd58c}
+.sp-ovupd:focus-visible{outline:2px solid var(--green-300);outline-offset:2px}
+.sp-ovupd:disabled{cursor:var(--cur-default,default)}
+.sp-ovupd:disabled:not([aria-busy]){opacity:.45}
+.sp-ovupd[aria-busy="true"] svg{animation:sp-spin .9s linear infinite}
+/* Ask about this plan: the conversation (each question, its answer), questions to try or ask next, the box */
+#card .sp-askp .sp-ai-h .sp-link{font-size:12px;padding:0}
+.sp-convo{display:grid;gap:10px;max-height:420px;overflow-y:auto;overscroll-behavior:contain;padding:2px 2px 2px 0}
+.sp-qa{display:grid;gap:6px}
+.sp-q{justify-self:end;max-width:88%;padding:6px 10px;border-radius:10px 10px 2px 10px;background:var(--green-50);border:1px solid var(--green-200);color:var(--text);font-size:12.5px;line-height:1.45}
+.sp-a{max-width:100%;padding:8px 12px;border-left:3px solid var(--brand);background:var(--panel-2);border-radius:0 6px 6px 0;font-size:13px;line-height:1.5;color:var(--text)}
+.sp-a p{margin:0}.sp-a p+p,.sp-a p+ul,.sp-a ul+p{margin-top:6px}
+.sp-a ul{margin:4px 0 0;padding-left:18px;display:grid;gap:2px}
+.sp-a .sp-aerr{color:var(--text-2)}
+#card .sp-qsugs{margin-top:0}
+#card .sp-qsugs .chip{white-space:normal;text-align:left;height:auto;min-height:28px;line-height:1.3;padding-top:4px;padding-bottom:4px}
 #card .sp-chg-acts{margin-top:4px}
 /* Settings: New layouts and the two switches first */
 #card .sp-prm-a{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
@@ -3716,3 +3829,14 @@ table.cmp tr.sub th{text-align:left;font-family:var(--font-mono);font-size:10px;
 /* the filter popup's help line scrolls with the sections (it used to ride in the pinned header) */
 .fpop .lfbody>.lfhelp{margin:0;padding:12px 18px 0}
 @media (max-width:700px){ .fpop .lfbody>.lfhelp{padding:10px 16px 0} }
+/* dragging an Add tile onto the site plan: the piece's outline at the map's scale (red off the site) and a chip by the pointer */
+.sp-dragghost{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2000;overflow:visible}
+.sp-dragghost polygon{display:none;fill:color-mix(in srgb,var(--ac) 38%,transparent);stroke:color-mix(in srgb,var(--ac) 80%,#0b0d0c);stroke-width:2;stroke-dasharray:6 4;stroke-linejoin:round}
+.sp-dragghost.on polygon{display:block}
+.sp-dragghost.off polygon{display:block;fill:rgba(198,60,48,.16);stroke:#c63c30}
+.sp-dragchip{position:fixed;left:0;top:0;z-index:2001;pointer-events:none;display:flex;align-items:center;gap:6px;padding:4px 9px 4px 4px;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);color:var(--text);font:600 12px/1.2 var(--font-display);box-shadow:0 6px 18px rgba(11,13,12,.18);white-space:nowrap}
+.sp-dragchip svg{width:22px;height:22px;box-sizing:border-box;padding:2px;border-radius:999px;background:color-mix(in srgb,var(--ac) 22%,transparent);color:color-mix(in srgb,var(--ac) 62%,#0b0d0c)}
+.sp-dragchip.on{opacity:.92}
+html.sp-dragging,html.sp-dragging *{cursor:var(--cur-grabbing,grabbing)!important;user-select:none!important}
+#card .sp-add,.sp-ad-t{cursor:var(--cur-grab,grab)}
+.sp-ad-t{touch-action:none}
