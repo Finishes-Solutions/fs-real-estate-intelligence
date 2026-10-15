@@ -136,5 +136,35 @@ for (const [what, plan, prog] of cases) {
   row.x += u[0] * sg * 60; row.y += u[1] * sg * 60; // 60 ft back, away from the aisle it faced
   assert.ok(S.check(p).some(i => i.id === row.id && /has no aisle to drive in from/.test(i.text)), 'the moved row is flagged: ' + S.check(p).map(i => i.text).join('; '));
 }
+// ---- a way through: aisles don't stop at a curb with stalls along them ----
+{ // by hand: a 40-stall double-loaded aisle stops 30 ft short of a cross drive. Opened, it runs on to meet it: nothing lost
+  const A = { id: 'a', kind: 'drive', x: 0, y: 0, w: 180, d: 24, rot: 0, note: '24 ft drive aisle' }, rows = [{ id: 'r1', kind: 'parking', x: 0, y: 21, w: 180, d: 18, rot: 0, row: 1 }, { id: 'r2', kind: 'parking', x: 0, y: -21, w: 180, d: 18, rot: 0, row: -1 }];
+  const cross = { id: 'c', kind: 'drive', x: 133, y: 0, w: 26, d: 160, rot: 0, note: '26 ft drive' }, feed = { id: 'f', kind: 'drive', x: -103, y: 0, w: 26, d: 160, rot: 0 };
+  const p = { ...lot(640, 400), program: { use: 'retail', gfa: 8000 }, elements: [A, ...rows, cross, feed] };
+  const de = S.deadEnds(p.elements); assert.equal(de.length, 1, 'one closed end: ' + JSON.stringify(de.map(d => d.stalls))); assert.equal(de[0].stalls, 40, 'all 40 stalls lie between the only join (the far end) and the curb');
+  assert.ok(S.check(p).some(i => i.id === 'a' && /dead-ends with 40 spaces/.test(i.text)), 'and the plan says so');
+  const r = S.openDeadEnds(p, p.elements), a2 = r.elements.find(e => e.id === 'a');
+  assert.equal(r.opened, 1); assert.ok(Math.abs(a2.x + a2.w / 2 - 120) < 3, 'the aisle runs on to the cross drive: ends at ' + (a2.x + a2.w / 2));
+  assert.equal(S.deadEnds(r.elements).length, 0, 'no closed end left'); assert.equal(S.metrics({ ...p, elements: r.elements }).spaces, S.metrics(p).spaces, 'no stall lost');
+  // boxed in by a building past the end, nothing beside it: a hammerhead when the plan has stalls to spare, else nothing
+  const bl = { id: 'b', kind: 'building', x: 150, y: 0, w: 40, d: 100, rot: 0, use: 'retail', floors: 1 }, boxed = { ...p, program: { use: 'retail', gfa: 4000 }, elements: [A, ...rows, bl, feed] };
+  const h = S.openDeadEnds(boxed, boxed.elements); assert.equal(h.opened, 1);
+  assert.equal(S.metrics({ ...boxed, elements: h.elements }).spaces, S.metrics(boxed).spaces - 4, 'two stalls off each row at the closed end');
+  assert.equal(S.deadEnds(h.elements).length, 0, 'the clear end is a place to turn');
+  const tight = { ...boxed, elements: boxed.elements.map(e => e === bl ? { ...bl, floors: 3 } : e) }; assert.ok(S.metrics(tight).spaces <= S.metrics(tight).required + 3);
+  assert.equal(S.openDeadEnds(tight, tight.elements).opened, 0, 'no stalls to spare: left as it is (and flagged)'); }
+{ // generated: on the 19730 FM 362 lot (8 sides, a notch for an out-parcel; FM 362 on the west, a local road on the east) and
+  // two plain lots, most aisles go through, none is cut short of the parking the plan needs, and stalls never hang past an aisle
+  const ring = [[-441.8, -191.92], [475.3, -185.63], [474.61, -55.83], [354.06, -58.81], [353.81, 31.2], [474.04, 34.19], [472.83, 185.77], [-446.13, 190.03]];
+  const sites = [[{ origin: [-95.93, 30.05], ring, front: 7, streets: [1, 5], setbacks: { rear: 20, side: 10, front: 25, paving: 10 } }, S.guessProgram('30,000 sf office and 40,000 sf warehouse')],
+    [lot(350, 380, { streets: [1] }), { use: 'office' }], [lot(700, 620), { use: 'multifamily' }]];
+  let n = 0, dead = 0;
+  for (const [plan, prog] of sites) for (const o of L.layoutOptions({ ...plan, elements: [] }, prog)) {
+    const p = { ...plan, elements: o.elements }, m = S.metrics(p); n++; dead += S.deadEnds(o.elements).length;
+    const before = (o.notes || []).join(' '); assert.ok(m.spaces >= m.required || /short/i.test(before) || S.check(p).some(i => /short/.test(i.text)), o.name + ': parked');
+    for (const d of S.deadEnds(o.elements, 1)) assert.ok((d.rowEnd - d.L / 2 * d.sgn) * d.sgn < 2, o.name + ': no stall past the end of its aisle');
+  }
+  assert.ok(dead <= Math.floor(n / 3), dead + ' closed aisle ends in ' + n + ' layouts'); }
+
 if (process.env.PARKING_TABLE) console.log(table.map(r => r.join(' | ')).join('\n'));
 console.log('parking ok');

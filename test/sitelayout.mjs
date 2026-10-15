@@ -419,6 +419,13 @@ function usable(plan, o, what) {
   const { seen } = reached(r.elements); assert.ok(seen.has('ent2'), 'the new driveway joins the drives from the main entry');
   assert.ok(S.metrics(p1).spaces >= m0.spaces - 12, 'it costs only the stalls it crosses: ' + S.metrics(p1).spaces + ' vs ' + m0.spaces);
   assert.equal(S.entryMarks(p1).filter(l => l.color === '#ffffff').length, S.entrancesOf(r.elements).filter(e => !e.through).length, 'a stop bar at each entrance');
+  // no stalls in its mouth: within 50 ft of the street, beside the driveway, cars backing out would meet cars turning in
+  const mouthy = els => S.check({ ...base, elements: els }).filter(i => /is at the mouth of/.test(i.text));
+  assert.deepEqual(mouthy(r.elements).map(i => i.text), [], 'the new entrance clears its mouth');
+  for (const q of [o, ...L.layoutOptions(plan, { use: 'multifamily', units: 240, floors: 3 })]) assert.deepEqual(mouthy(q.elements).map(i => i.text), [], (q.name || '') + ': nothing parked at an entrance\'s mouth');
+  { const ent = S.entrancesOf(r.elements).find(e => e.id === 'ent2'), c = S.centroid(S.shapeOf(ent)), n = S.outwardOf(T.ring, side), stall = { id: 'st', kind: 'parking', x: c[0] - n[0] * 10, y: c[1] - n[1] * 10 + 20, w: 18, d: 9, rot: 0, row: 1 };
+    const p2 = r.elements.concat([{ ...stall, x: a[0] + (b[0] - a[0]) * 0.45 - n[0] * 30, y: a[1] + (b[1] - a[1]) * 0.45 - n[1] * 30 + 22 }]);
+    assert.ok(mouthy(p2).some(i => i.id === 'st'), 'a stall dropped beside the driveway near the street is flagged'); }
   // a lot line that isn't a street becomes one; a click where nothing connects says why
   const back = T.ring.findIndex((p, i) => S.outwardOf(T.ring, i)[1] > 0.9), r2 = S.addEntrance(base, [(T.ring[back][0] + T.ring[(back + 1) % T.ring.length][0]) / 2, (T.ring[back][1] + T.ring[(back + 1) % T.ring.length][1]) / 2]);
   if (!r2.error) assert.ok(r2.streets.includes(back) && /now marked as a street/.test(r2.note)); else assert.match(r2.error, /No way in/);

@@ -218,7 +218,9 @@ export function initSitePlan(ctx) {
     addLayers(); draw(); panel();
     requestAnimationFrame(() => requestAnimationFrame(() => planFit()));
     ctx.scheduleHash?.(); // sp= in the address: a reload reopens this plan
-    const pl = PL(); if (pl?.ring.length >= 3 && (pl.frontGuess || pl.streets == null)) map.once('idle', () => { if (PL() === pl && (pl.frontGuess || pl.streets == null)) detectFront(pl); });
+    // (street sides found before Oct 15 counted any road near any edge, so plans the person never set by hand look again once)
+    const again = pl => pl.frontGuess || pl.streets == null || pl.streetsBy !== 2;
+    const pl = PL(); if (pl?.ring.length >= 3 && again(pl)) map.once('idle', () => { if (PL() === pl && again(pl)) detectFront(pl); });
   }
   // the option's last build comes back with it: its layouts (the one on the map marked), the request and the AI's note
   function restoreRun(pl) {
@@ -421,13 +423,20 @@ export function initSitePlan(ctx) {
     const F = SP.frame(pl.origin), lines = [];
     try {
       for (const f of src ? map.querySourceFeatures(src, { sourceLayer: 'transportation' }) : []) {
-        if (/path|track|rail|transit|ferry|cable|bridleway|pier/.test(f.properties?.class || '')) continue;
+        const cls = f.properties?.class || ''; if (/path|track|rail|transit|ferry|cable|bridleway|pier|service|raceway/.test(cls)) continue; // (service: driveways, parking aisles and alleys, not streets)
         const g = f.geometry, parts = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
-        for (const c of parts) { const ft = c.map(F.toFt); if (ft.some(([x, y]) => Math.abs(x) < 2500 && Math.abs(y) < 2500)) lines.push(ft); }
+        for (const c of parts) { const ft = c.map(F.toFt); if (ft.some(([x, y]) => Math.abs(x) < 2500 && Math.abs(y) < 2500)) { ft.rank = SP.roadRank(cls); lines.push(ft); } }
       }
     } catch (e) {}
     const f = pl.frontGuess ? SP.frontFromRoads(pl.ring, lines) : pl.front;
-    if (f != null) { pl.front = f; pl.frontGuess = false; if (!pl.streetsSet) pl.streets = SP.streetsFromRoads(pl.ring, lines, f); save(P()); draw(); panel(); }
+    if (f == null) return; const was = pl.streetsBy != null || pl.streets == null ? null : siteParts(pl).street;
+    pl.front = f; pl.frontGuess = false; const found = SP.streetsFromRoads(pl.ring, lines, f), own = (pl.streets || []).filter(i => i !== f);
+    if (!pl.streetsSet) pl.streets = found;
+    // street sides kept from the old check plus one the person added: theirs to fix, so say which sides the map now supports
+    else if (was && [...own].sort().join() !== [...found].sort().join() && own.some(i => !found.includes(i))) ctx.toast(`This plan has ${own.length} side street${own.length === 1 ? '' : 's'} marked; the map shows ${found.length ? found.length : 'none'} beside the lot. Side Street on the toolbar: click a side to take it off.`);
+    pl.streetsBy = 2;
+    if (was && siteParts(pl).street !== was) { siteChanged(pl, 'street'); ctx.toast(`Street sides re-checked against the map: ${pl.streets.length ? `the front and ${pl.streets.length} side street${pl.streets.length > 1 ? 's' : ''}` : 'the front only'}. Side Street on the toolbar changes them.`); }
+    save(P()); draw(); panel();
   }
 
   // what Undo puts back: the pieces and the site, and the option's name, its pro forma and its parcels (absent ones as null, so they're cleared too)
@@ -816,7 +825,11 @@ export function initSitePlan(ctx) {
       change(x => { x.elements = r.elements; x.streets = r.streets; if (r.streets.length) x.streetsSet = true; }); ed.sel = r.entrance.id; ed.mode = null; ed.editing = true; if (!pl.stale) siteChanged(pl, 'entrance');
       draw(); panel(); ctx.toast(r.entrance.name + ' added.' + (r.note ? ' ' + r.note : '')); return true;
     }
-    if (ed.mode === 'street') { const p = ftAt(pl, e.lngLat); change(x => { const k = SP.nearestEdge(x.ring, p), st = new Set(x.streets || []); if (k !== (x.front ?? SP.longestEdge(x.ring))) { if (st.has(k)) st.delete(k); else st.add(k); } x.streets = [...st]; x.streetsSet = true; }); return true; } // a side street on or off; it stays armed for the next one until Done
+    if (ed.mode === 'street') { // a street side on or off; it stays armed for the next one until Done. The front can come off too when another lot line is a street: the longest of those becomes the front
+      const p = ftAt(pl, e.lngLat), k = SP.nearestEdge(pl.ring, p), f0 = pl.front ?? SP.longestEdge(pl.ring), others = (pl.streets || []).filter(i => i !== f0);
+      if (k === f0 && !others.length) { ctx.toast('That’s the site’s only street side. Mark the real street first, then click this one again to take it off.'); return true; }
+      change(x => { const st = new Set(x.streets || []); if (k === f0) { const nf = others.sort((a, b) => SP.edgeLen(x.ring, b) - SP.edgeLen(x.ring, a))[0]; st.delete(nf); x.front = nf; x.frontGuess = false; } else if (st.has(k)) st.delete(k); else st.add(k); x.streets = [...st]; x.streetsSet = true; });
+      if (k === f0) ctx.toast('Street side moved to the other street.'); return true; }
     if (e.originalEvent?.shiftKey) return true; // Shift-clicks build the set (pointer down)
     if (!hit(pl, e) && ed.sel) { pickOne(null); ed.shape = null; draw(); panel(); }
     return true;

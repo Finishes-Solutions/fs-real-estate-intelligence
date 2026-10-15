@@ -57,6 +57,20 @@ assert.equal(S.frontFromRoads(rect, [[[-400, -190], [400, -185]]]), 0, 'road 40 
 assert.equal(S.frontFromRoads(rect, [[[-400, 200], [400, 200]], [[-400, -600], [400, -600]]]), 2, 'nearest road north: the north edge');
 assert.equal(S.frontFromRoads(rect, [[[600, -1000], [600, 1000]]]), null, 'no road within 250 ft: no guess here');
 assert.equal(S.frontFromRoads(rect, [[[-50, -10], [50, 10]]]), null, 'a driveway inside the lot is not a street');
+// 19730 FM 362, Waller: 8 sides with a notch around an out-parcel on the east; FM 362 (secondary) 44 ft off the west line,
+// an unnamed local road along the east, and the neighbours' driveways (service, which the map code leaves out) north and
+// south. The old check marked 6 of the 8 sides as streets (the notch's short sides and the far edges with them).
+{ const ring = [[-441.8, -191.92], [475.3, -185.63], [474.61, -55.83], [354.06, -58.81], [353.81, 31.2], [474.04, 34.19], [472.83, 185.77], [-446.13, 190.03]];
+  const fm = Object.assign([[-469, -1442], [-481, -836], [-496, 988], [-502, 1235]], { rank: S.roadRank('secondary') });
+  const east = Object.assign([[512, 713], [508, -35], [520, -76], [547, -94], [1140, -81], [1445, -81]], { rank: S.roadRank('minor') });
+  const f = S.frontFromRoads(ring, [fm, east]); assert.equal(f, 7, 'FM 362 is the front, over a local road a little nearer on the east');
+  assert.deepEqual(S.streetsFromRoads(ring, [fm, east], f), [1, 5], 'side streets: the two east lot lines along the local road; the notch sides and the north and south lines are not streets');
+  assert.deepEqual(S.streetsFromRoads(ring, [fm], f), [], 'FM 362 alone: no side streets');
+  // a road that only passes a corner, or crosses at an angle, isn't a side street
+  assert.deepEqual(S.streetsFromRoads(rect, [[[-400, -190], [400, -185]], [[100, 300], [400, 150]]], 0), [], 'a road meeting a corner at an angle: no side street');
+  assert.deepEqual(S.streetsFromRoads(rect, [[[-400, -190], [400, -185]], [[160, -400], [160, 400]]], 0), [1], 'a road 60 ft off the east side, all along it: a side street');
+  assert.deepEqual(S.streetsFromRoads(rect, [[[-400, -190], [400, -185]], [[260, -400], [260, 400]]], 0), [], '160 ft off: someone else\'s frontage, not this lot\'s');
+  assert.equal(S.frontFromRoads(rect, [[[-400, -180], [400, -180]], Object.assign([[-400, 205], [400, 205]], { rank: 3 })]), 2, 'a highway 55 ft north wins over a local street 30 ft south'); }
 { const inset = S.insetRing(rect, S.edgeRules(rect, 0).map(r => r.build)); assert.deepEqual(inset.map(p => p.map(v => Math.round(v))), [[-90, -125], [90, -125], [90, 130], [-90, 130]], 'setback line: 25 front, 10 sides, 20 rear'); }
 
 // ---- parking ----
