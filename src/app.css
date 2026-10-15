@@ -3318,6 +3318,40 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 #card .sp-confirm .btnrow{display:flex;flex-wrap:wrap;gap:6px}
 /* several pieces picked: their buttons in one row */
 #card .sp-fsrow{display:contents;border:0;padding:0;margin:0}
+/* the development mix (the strip's Mix): a card above the legend (or the strip), one row a use: colour, name, footprint
+   acres and share of the site in two right-aligned columns, the count and floor area on a line under them */
+.sp-dmix{position:absolute;z-index:1;width:288px;max-width:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;padding:6px 8px 10px;border:1px solid var(--line-2);border-radius:var(--r-lg);background:var(--panel);color:var(--text);box-shadow:var(--sh-2);pointer-events:auto;font:500 12.5px/1.35 var(--font-display);font-variant-numeric:tabular-nums}
+.sp-dmix[hidden]{display:none}
+.sp-dmix.fold{padding-bottom:8px}
+.sp-mx-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 -2px 2px 0}
+.sp-mx-f{display:inline-flex;align-items:center;min-height:28px;padding:0 6px;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:var(--cur-pointer,pointer)}
+.sp-mx-f:hover{background:var(--chip);color:var(--text)}
+.sp-mx-f b{font:700 10.5px/1 var(--font-display);letter-spacing:.12em;text-transform:uppercase}
+.sp-mx-x{width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--text-2);cursor:var(--cur-pointer,pointer)}
+.sp-mx-x:hover{background:var(--chip);color:var(--text)}
+.sp-mx-hd,.sp-mx-r,.sp-mx-t{display:grid;grid-template-columns:12px minmax(0,1fr) 60px 42px;align-items:baseline;column-gap:8px}
+.sp-mx-hd{padding:0 6px 3px;font-size:10.5px;font-weight:600;color:var(--muted)}
+.sp-mx-hd span:first-child,.sp-mx-t>span:first-child{grid-column:1 / 3}
+.sp-mx-hd span:not(:first-child),.sp-mx-a,.sp-mx-p{text-align:right;white-space:nowrap}
+.sp-mx-rows{display:grid;gap:1px}
+.sp-mx-r{width:100%;padding:5px 6px;border:0;border-radius:6px;background:transparent;color:var(--text);text-align:left;font:inherit}
+button.sp-mx-r{cursor:var(--cur-pointer,pointer)}
+button.sp-mx-r:hover{background:var(--chip)}
+.sp-mx-r.on{background:color-mix(in srgb,var(--brand) 9%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand) 40%,transparent)}
+.sp-mx-sw{align-self:center;width:12px;height:12px;border-radius:3px;background:var(--c);box-shadow:inset 0 0 0 1px rgba(11,13,12,.18)}
+.sp-mx-zr .sp-mx-sw{background:color-mix(in srgb,var(--c) 22%,#fff);box-shadow:inset 0 0 0 2px var(--c)}
+.sp-mx-n{min-width:0;font-weight:600;overflow-wrap:anywhere}
+.sp-mx-s{grid-column:2 / -1;font-size:11px;font-weight:500;color:var(--muted)}
+.sp-mx-a{font-weight:700}
+.sp-mx-p{color:var(--text-2);font-weight:600}
+.sp-mx-t{margin-top:3px;padding:7px 6px 0;border-top:1px solid var(--line);font-weight:700}
+.sp-mx-note{margin:5px 6px 0;font-size:11px;line-height:1.4;color:var(--muted)}
+.sp-mx-zh{display:grid;gap:2px;margin:9px 0 1px;padding:8px 6px 3px;border-top:1px solid var(--line)}
+.sp-mx-zh b{font:700 10.5px/1.2 var(--font-display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.sp-mx-zh small{font-size:11px;color:var(--muted)}
+.sp-mx-zr .sp-mx-n{font-weight:500}
+.sp-mx-e{padding:6px;color:var(--muted)}
+.sp-dmix button:focus-visible{outline:var(--focus,2px solid var(--brand));outline-offset:-1px}
 /* phones: fewer buttons until More opens the rest; the save status only when a sync failed */
 @media (max-width:700px){
   .sp-strip{left:8px;bottom:8px;padding:2px}
@@ -3328,6 +3362,7 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
   .sp-strip.open{flex-wrap:wrap;max-width:calc(100% - 16px)}
   .sp-tpop{width:min(268px,calc(100vw - 16px))}
   .sp-tpop.sp-items{width:min(300px,calc(100vw - 16px))}
+  .sp-dmix{width:min(300px,calc(100% - 16px));max-width:none}
   .sp-tpop.ph{position:fixed;z-index:var(--z-sheet,11)}
   .sp-mapui:has(.sp-strip:not([hidden])) .sp-mpill{top:52px}
 }

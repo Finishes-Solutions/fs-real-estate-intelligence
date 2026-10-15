@@ -353,11 +353,11 @@ export function initSitePlan(ctx) {
   function paintMode() {
     placeMapUi(); syncDblZoom(); const m = modeOf(), k = m ? m.k : '';
     if (k !== modeKey) { modeKey = k; if (k) ctx.clearToast?.(); if (ed && ed.mode !== 'front' && ed.mode !== 'street') ed.hover = null; } // a new mode: an old instruction toast goes
-    if (!m) { pillMode.hidden = true; pillMode.innerHTML = ''; return; }
+    if (!m) { pillMode.hidden = true; pillMode.innerHTML = ''; placeMix(); return; }
     const html = '<span class="sp-mp-dot k-' + m.k + '" aria-hidden="true"></span><b class="sp-mp-t">' + esc(m.t) + '</b>' + (m.d ? '<span class="sp-mp-d" title="' + esc(m.d) + '">' + esc(m.d) + '</span>' : '') +
       m.b.map(([l, a]) => '<button type="button" class="sp-mp-b' + (l !== 'Cancel' ? ' done' : '') + '" data-mb="' + a + '"' + (a === 'finish' && !canFinish() ? ' disabled' : '') + '>' + l + '</button>').join('');
     if (pillMode.innerHTML !== html) { pillMode.innerHTML = html; pillMode.querySelectorAll('[data-mb]').forEach(b => b.onclick = () => b.dataset.mb === 'finish' ? finishMode() : leaveMode()); }
-    pillMode.hidden = false; placeChip();
+    pillMode.hidden = false; placeChip(); placeMix();
   }
   // Finish on a drawing: finish it (the site, a drawn piece), as Enter does
   const canFinish = () => ed.mode === 'draw' ? ed.draft.length >= 3 : ed.mode === 'drawpiece' ? ed.draft.length >= (ed.dp?.line ? 2 : 3) : true;
@@ -624,11 +624,12 @@ export function initSitePlan(ctx) {
       if (set.length > 1) { const on = new Set(set); for (const f of fc.features) { const q = f.properties; if (q?.id != null && on.has(q.id)) q.sel = 1; } } // every piece of a set lit up
       if (set.length === 1) { const one = pl.elements.find(e => e.id === set[0]), F = SP.frame(pl.origin); for (const d of T.dimLabels(one, Math.max(10, (ed.editing ? 17 : 11) * ftPerPx()))) fc.features.push({ type: 'Feature', properties: { k: 'dim', t: d.text, r: d.rot, kind: one.kind }, geometry: { type: 'Point', coordinates: F.toLL(d.at) } }); } // its width and depth
       if (fc !== EMPTY) MAP.decorate(fc, pl, { flash: ed.hov ? new Set([...(ed.flash?.ids || []), ed.hov]) : ed.flash?.ids }); // ed.hov: a row hovered in Items // labels know their piece, priorities, Phase 2 labels (one pass)
+      const mixed = fc !== EMPTY && ed.mix ? mixFeatures(fc, pl) : null; // the development mix: each building in its use's colour
       if (fc !== EMPTY && (pl.parcels?.length > 1 || ed.mode === 'parcels')) for (const k of pl.parcels || []) { const r = P0.parcels.find(x => x.key === k); if (r?.geometry) fc.features.push({ type: 'Feature', properties: { k: 'pline' }, geometry: r.geometry }); }
       const V = T.viewOf(pl); if (fc !== EMPTY) fc = T.visibleFeatures(fc, V); // hidden layers: the map only (numbers, checks and exports count everything)
-      s.setData(fc); drawGrid(pl, V);
+      syncMix(); s.setData(fc); drawGrid(pl, V); // the mix layers go on (or off) with the data they read, in one reload
       map.getSource(HSRC)?.setData(pl?.ring.length >= 3 ? { type: 'FeatureCollection', features: handles(pl).map(h => ({ type: 'Feature', properties: { t: h.t, a: h.a || 0 }, geometry: { type: 'Point', coordinates: h.at } })) } : EMPTY);
-      drawD();
+      drawD(); if (mixed) paintMix(mixed);
       // something picked: the other buildings step back (extrusion opacity is per layer, so it's set here, only on a change)
       const dim = !!(ed?.sel && pl?.elements.some(e => e.id === ed.sel)); if (dim !== dimmed && map.getLayer('fs-sp-bldg')) { dimmed = dim; map.setPaintProperty('fs-sp-bldg', 'fill-extrusion-opacity', dim ? .75 : .88); map.setPaintProperty('fs-sp-bldg2', 'fill-extrusion-opacity', dim ? .5 : .6); map.setPaintProperty('fs-sp-b3', 'fill-extrusion-opacity', dim ? .75 : .95); }
       if (!drag?.moved) { planKey(pl); if (popKind === 'layers') paintItems(); } // never mid-drag; the Items list follows the plan
@@ -646,6 +647,86 @@ export function initSitePlan(ctx) {
     if (!ed || !pl) { if (keySig) { keySig = ''; ctx.setLegend?.('siteplan', ''); } return; }
     const sig = MAP.keySig(pl); if (sig === keySig) return; keySig = sig;
     ctx.setLegend?.('siteplan', MAP.keyHtml(pl));
+  }
+
+  // ----- the development mix (the tool strip's Mix, U): each use's buildings in their own colour, the rest greyed, and a
+  // card with each use's footprint acres and share of the site (lib/sitetools.mjs mixOf). A view only, like Layers: it
+  // stays on through Edit, tools and selection, and goes with Mix again, the card's ×, Esc (last) or closing the plan.
+  // On the map: a grey wash over the site's ground (paving, lawns, ponds), the zones tinted and outlined in their use's
+  // colour, and the buildings' fills taken from `mx` (set per feature here) in place of their usual colour.
+  const MIXL = ['fs-sp-mix-mute', 'fs-sp-mix-zf', 'fs-sp-mix-zl'], MIXB = ['fs-sp-bldg', 'fs-sp-bldg2', 'fs-sp-bsel', 'fs-sp-b3', 'fs-sp-b3s'];
+  let mixWas = null, mixHover = null;
+  function setMix(on) {
+    if (!ed) return; const pl = PL(); if (on && !pl?.elements.some(e => e.kind === 'building')) return;
+    ed.mix = !!on; ed.mixPin = null; mixHover = null; if (on && ed.mixFold == null) ed.mixFold = phone(); // phones: folded to the total at first, as the Plan key is
+    if (!on) { mixEl.hidden = true; mixEl.innerHTML = ''; mixEl.dataset.html = ''; }
+    draw(); paintTools();
+  }
+  function mixFeatures(fc, pl) {
+    const x = T.mixOf(pl), cols = Object.fromEntries(x.rows.map(r => [r.use, r.color])), prog = SP.normalizeProgram(pl.program), focus = mixHover || ed.mixPin || null;
+    const key = new Map(pl.elements.filter(e => e.kind === 'building' || e.kind === 'garage').map(e => [e.id, T.mixKey(pl, e, prog)])), zone = new Map(x.zones.map(z => [z.name, z]));
+    for (const f of fc.features) { const q = f.properties; if (!q) continue;
+      if ((q.k === 'building' || q.k === 'garage') && key.has(q.id)) { const c = T.mixFill(key.get(q.id), cols, { ph: q.ph, focus }); q.mx = q.sel === 1 ? MAP.brighten(c) : c; }
+      else if (q.k === 'b3' && q.part === 'tower' && key.has(q.bid)) q.mx = T.mixFill(key.get(q.bid), cols, { ph: q.ph, focus });
+      else if (q.k === 'zone' && zone.has(q.t)) { const z = zone.get(q.t); q.mx = z.color; q.mz = !focus || z.use === focus ? 1 : 0; } }
+    return x;
+  }
+  // the mix's layers and colours on the map when it's on, gone (and the usual colours back) when it's off or the plan
+  // closes; a basemap change rebuilds the plan's layers (their ids include these), and the next draw puts the mix back
+  function syncMix() {
+    const want = !!ed?.mix && !!map.getLayer('fs-sp-lotc'), has = !!map.getLayer(MIXL[0]);
+    if (want && !has) {
+      const add = def => { map.addLayer(def, 'fs-sp-lotc'); ids.push(def.id); }, zf = ['all', ['==', ['get', 'k'], 'zone'], ['has', 'mx']];
+      add({ id: MIXL[0], type: 'fill', source: SRC, filter: ['all', ['==', ['get', 'k'], 'lot'], ['==', ['get', 'site'], 1]], paint: { 'fill-color': '#eef0ee', 'fill-opacity': .8 } }); // the ground greyed: paving, lawns, ponds
+      add({ id: MIXL[1], type: 'fill', source: SRC, filter: zf, paint: { 'fill-color': ['get', 'mx'], 'fill-opacity': ['case', ['==', ['get', 'mz'], 1], .14, .03] } });
+      add({ id: MIXL[2], type: 'line', source: SRC, filter: zf, layout: { 'line-join': 'round' }, paint: { 'line-color': ['get', 'mx'], 'line-width': 2, 'line-opacity': ['case', ['==', ['get', 'mz'], 1], .9, .3] } });
+      mixWas = {}; for (const id of MIXB) if (map.getLayer(id)) { const v = map.getPaintProperty(id, 'fill-extrusion-color'); mixWas[id] = v; map.setPaintProperty(id, 'fill-extrusion-color', ['case', ['has', 'mx'], ['to-color', ['get', 'mx']], v]); }
+    } else if (!want && has) {
+      for (const id of MIXL) if (map.getLayer(id)) map.removeLayer(id); ids = ids.filter(id => !MIXL.includes(id));
+      for (const [id, v] of Object.entries(mixWas || {})) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-extrusion-color', v); mixWas = null;
+    }
+  }
+  // the card: one row a use (its colour, footprint acres, share of the site; buildings and floor area under it), the
+  // total, garages apart, and a mixed-use plan's zones. Hover a row (or click it, to keep it) and only that use is lit.
+  const mixEl = document.createElement('div'); mixEl.className = 'sp-dmix'; mixEl.hidden = true; mixEl.setAttribute('role', 'region'); mixEl.setAttribute('aria-label', 'Development mix');
+  mapUi.appendChild(mixEl);
+  const n0 = v => Math.round(v).toLocaleString('en-US'), plur = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  function paintMix(x) {
+    if (!ed?.mix) return; const pin = ed.mixPin, lit = new Set(x.rows.map(r => r.use)), fold = !!ed.mixFold;
+    // a row: a button that picks its use out when there are buildings of it, else plain; subs: lines under it
+    const row = (use, color, name, acres, pct, subs = [], cls = '') => { const b = lit.has(use), on = b && pin === use, tag = b ? 'button' : 'div';
+      return '<' + tag + (b ? ' type="button"' : '') + ' class="sp-mx-r' + cls + (on ? ' on' : '') + '"' + (b ? ' data-mu="' + esc(use) + '" aria-pressed="' + on + '" title="' + (on ? 'Show every use again' : 'Show only ' + esc(T.mixLabel(use))) + '"' : '') + '>' +
+        '<i class="sp-mx-sw" style="--c:' + color + '" aria-hidden="true"></i><span class="sp-mx-n">' + esc(name) + '</span><span class="sp-mx-a">' + T.fmtAc(acres) + '</span><span class="sp-mx-p">' + T.fmtPct(pct) + '</span>' +
+        subs.map(t => '<small class="sp-mx-s">' + t + '</small>').join('') + '</' + tag + '>'; };
+    const count = (n, noun) => plur(n, noun, noun + 's');
+    const uses = x.rows.map(r => row(r.use, r.color, r.label, r.acres, r.pctSite, [count(r.buildings, r.noun) + ' · ' + n0(r.gfa) + ' sf floor area', ...(r.phase2 ? ['Phase 2: ' + count(r.phase2.buildings, r.noun) + ', ' + T.fmtAc(r.phase2.acres)] : [])])).join('');
+    const zones = x.zones.length ? '<div class="sp-mx-zh"><b>Zones</b><small>Land given to each use, its parking included</small></div><div class="sp-mx-rows">' + x.zones.map(z => row(z.use, z.color, z.name, z.acres, z.pctSite, [], ' sp-mx-zr')).join('') + '</div>' : '';
+    const html = '<div class="sp-mx-h"><button type="button" class="sp-mx-f" aria-expanded="' + !fold + '" title="' + (fold ? 'Show each use' : 'Fold to the total') + '"><b>Development mix</b>' + CHEV + '</button><button type="button" class="sp-mx-x" aria-label="Close the development mix" title="Close (U)">' + XS + '</button></div>' +
+      (fold ? '' : '<div class="sp-mx-hd" aria-hidden="true"><span>Building footprint</span><span>Acres</span><span>Of site</span></div><div class="sp-mx-rows">' + (uses || '<div class="sp-mx-e">No buildings yet.</div>') + '</div>') +
+      '<div class="sp-mx-t"><span>All buildings</span><span class="sp-mx-a">' + T.fmtAc(x.total.acres) + '</span><span class="sp-mx-p">' + T.fmtPct(x.total.pctSite) + '</span></div>' +
+      (fold ? '' : '<div class="sp-mx-note">Of the ' + T.fmtAc(x.siteAcres) + ' site, buildings only: no parking, drives, landscape or ponds.' + (x.garages ? ' ' + plur(x.garages.count, 'parking garage', 'parking garages') + ' (' + T.fmtAc(x.garages.acres) + ') count as parking.' : '') + '</div>' + zones);
+    if (html !== mixEl.dataset.html) { // unchanged: left as it is (hover and focus stay put)
+      mixEl.dataset.html = html; const a = document.activeElement, f = a && mixEl.contains(a) ? a.dataset.mu || (a.classList.contains('sp-mx-f') ? 'f' : 'x') : null;
+      mixEl.innerHTML = html; mixEl.classList.toggle('fold', fold);
+      mixEl.querySelector('.sp-mx-x').onclick = () => setMix(false);
+      mixEl.querySelector('.sp-mx-f').onclick = () => { ed.mixFold = !ed.mixFold; paintMix(x); };
+      mixEl.querySelectorAll('button[data-mu]').forEach(b => { const u = b.dataset.mu;
+        b.onpointerenter = e => { if (e.pointerType === 'mouse' && mixHover !== u) { mixHover = u; draw(); } }; b.onpointerleave = () => { if (mixHover === u) { mixHover = null; draw(); } }; // a mouse only: a tap picks (click)
+        b.onclick = () => { ed.mixPin = ed.mixPin === u ? null : u; draw(); }; });
+      if (f) mixEl.querySelector(f === 'x' ? '.sp-mx-x' : f === 'f' ? '.sp-mx-f' : 'button[data-mu="' + CSS.escape(f) + '"]')?.focus({ preventScroll: true });
+    }
+    mixEl.hidden = !!popKind; placeMix();
+  }
+  // Desktop: in the legend's column, just above it (the plan is fitted clear of the legend, so that column is open
+  // map), else above the tool strip (and the mode chip). Phones: under the strip and the chip, top left.
+  function placeMix() {
+    if (mixEl.hidden || mapUi.hidden) return; const ph = phone(), sl = parseFloat(strip.style.left) || (ph ? 8 : GUT), chip = !pillMode.hidden, H = mapUi.clientHeight;
+    if (ph) { const top = chip ? pillMode.offsetTop + pillMode.offsetHeight + 6 : strip.hidden ? 8 : strip.offsetTop + strip.offsetHeight + 6; Object.assign(mixEl.style, { left: sl + 'px', top: top + 'px', bottom: 'auto', width: '', maxHeight: Math.max(96, H - top - 8) + 'px' }); return; }
+    const u = mapUi.getBoundingClientRect(), lg = document.getElementById('legends'), L = lg && lg.offsetParent !== null && getComputedStyle(lg).visibility !== 'hidden' ? lg.getBoundingClientRect() : null;
+    if (L && L.width > 2 && L.left < u.left + GUT * 3 && L.bottom > u.top + H / 2 && L.top - u.top - GUT >= 180) { const bottom = Math.round(u.bottom - L.top + GAP);
+      Object.assign(mixEl.style, { left: Math.round(Math.max(GUT, L.left - u.left)) + 'px', top: 'auto', bottom: bottom + 'px', width: Math.round(Math.max(264, Math.min(300, L.width))) + 'px', maxHeight: Math.round(H - bottom - GUT) + 'px' }); return; }
+    const sb = parseFloat(strip.style.bottom) || GUT, bottom = (chip ? (parseFloat(pillMode.style.bottom) || sb) + pillMode.offsetHeight : sb + (strip.hidden ? 0 : strip.offsetHeight)) + 8;
+    Object.assign(mixEl.style, { left: sl + 'px', top: 'auto', bottom: bottom + 'px', width: '', maxHeight: Math.max(120, H - bottom - GUT) + 'px' });
   }
 
   // ---------- pointer: select, move, resize, rotate ----------
@@ -992,6 +1073,7 @@ export function initSitePlan(ctx) {
     0,
     { id: 'grid', label: 'Grid', key: 'G', ic: IC('<path d="M2.5 5.5h11M2.5 10.5h11M5.5 2.5v11M10.5 2.5v11"/>'), more: 1 },
     0,
+    { id: 'mix', label: 'Development mix', key: 'U', ic: IC('<circle cx="8" cy="8" r="5.5"/><path d="M8 8V2.5A5.5 5.5 0 0 1 13.5 8z" fill="currentColor" stroke="none" opacity=".5"/><path d="M8 2.5V8h5.5M8 8l-3.9 3.9"/>') },
     { id: 'layers', label: 'Layers', key: '', ic: IC('<path d="M8 2.5l6 3-6 3-6-3z"/><path d="M2 8.5l6 3 6-3"/><path d="M2 11.2l6 3 6-3"/>') },
     { id: 'more', label: 'More tools', key: '', ic: IC('<circle cx="3.5" cy="8" r=".9" fill="currentColor"/><circle cx="8" cy="8" r=".9" fill="currentColor"/><circle cx="12.5" cy="8" r=".9" fill="currentColor"/>'), phone: 1 }
   ];
@@ -1009,6 +1091,7 @@ export function initSitePlan(ctx) {
     else if (id === 'dist') startMeasure('dist'); else if (id === 'marea') startMeasure('area');
     else if (id === 'fit') planFit(); else if (id === 'fitsel') fitSel();
     else if (id === 'grid') toggleGrid();
+    else if (id === 'mix') setMix(!ed.mix);
     else if (id === 'layers') { if (popKind === 'layers') closePops(); else openPop('layers', b); }
     else if (id === 'more') { strip.classList.toggle('open'); paintTools(); }
     paintTools();
@@ -1021,13 +1104,15 @@ export function initSitePlan(ctx) {
       area: [m === 'drawpiece' && !ed.dp?.line, !ring ? 'Draw the site first' : ed.editing ? '' : 'Turn on Edit to draw'], line: [m === 'drawpiece' && !!ed.dp?.line, !ring ? 'Draw the site first' : ed.editing ? '' : 'Turn on Edit to draw'],
       dist: [m === 'measure' && ed.meas?.kind === 'dist', ring ? '' : 'Draw the site first'], marea: [m === 'measure' && ed.meas?.kind === 'area', ring ? '' : 'Draw the site first'],
       fit: [null, ring ? '' : 'Draw the site first'], fitsel: [null, sels().length ? '' : 'Select a piece first'],
-      grid: [!!V.grid, ring ? '' : 'Draw the site first'], layers: [popKind === 'layers', ring ? '' : 'Draw the site first'], more: [strip.classList.contains('open'), '']
+      grid: [!!V.grid, ring ? '' : 'Draw the site first'], layers: [popKind === 'layers', ring ? '' : 'Draw the site first'], more: [strip.classList.contains('open'), ''],
+      mix: [!!ed.mix, ed.mix || ring && pl.elements.some(e => e.kind === 'building') ? '' : 'Lay out buildings first'] // on, it can always be turned off
     };
     for (const t of TOOLS) { if (!t) continue; const b = strip.querySelector('[data-tool="' + t.id + '"]'), [on, why] = state[t.id];
       if (on != null) b.setAttribute('aria-pressed', String(!!on)); b.classList.toggle('on', !!on);
       if (why) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
       const name = t.id === 'grid' && V.grid ? 'Grid (' + V.grid + ' ft)' : t.id === 'edit' && ed.editing ? 'Stop editing' : t.label;
       b.title = name + (t.key ? ' (' + t.key + ')' : '') + (why ? ': ' + why : ''); b.setAttribute('aria-label', name); }
+    mixEl.hidden = !ed.mix || !!popKind || !ring || !mixEl.innerHTML; // the mix card steps aside while a pop-over is open
     strip.hidden = !ring; placeStrip();
   }
   // where the strip sits: the bottom left of the open map; past the Plan key when that's there, else above it. On phones
@@ -1038,7 +1123,7 @@ export function initSitePlan(ctx) {
   const GUT = 16, GAP = 12;
   function placeStrip() {
     if (mapUi.hidden) return; const sc = mapUi.querySelector('.sp-scale');
-    if (phone()) { Object.assign(strip.style, { left: '8px', top: '8px', bottom: 'auto' }); Object.assign(sc.style, { right: '8px', bottom: '8px' }); if (popKind) placePop(); placeChip(); return; } strip.style.top = '';
+    if (phone()) { Object.assign(strip.style, { left: '8px', top: '8px', bottom: 'auto' }); Object.assign(sc.style, { right: '8px', bottom: '8px' }); if (popKind) placePop(); placeChip(); placeMix(); return; } strip.style.top = '';
     const u = mapUi.getBoundingClientRect(), lg = document.getElementById('legends'), w = strip.hidden ? 0 : strip.offsetWidth, sw = sc.offsetWidth;
     const L = lg && lg.offsetParent !== null && getComputedStyle(lg).visibility !== 'hidden' && getComputedStyle(lg).display !== 'none' ? lg.getBoundingClientRect() : null;
     let left = GUT, bottom = GUT, line = GUT;
@@ -1048,7 +1133,7 @@ export function initSitePlan(ctx) {
     }
     strip.style.left = Math.round(left) + 'px'; strip.style.bottom = Math.round(bottom) + 'px';
     Object.assign(sc.style, { right: GUT + 'px', bottom: line + 'px' }); // the scale on the same line
-    if (popKind) placePop(); placeChip();
+    if (popKind) placePop(); placeChip(); placeMix();
   }
   // the mode chip rides on the strip: just above it, left edges lined up (phones: just under it, top left)
   function placeChip() {
@@ -1419,7 +1504,7 @@ export function initSitePlan(ctx) {
       if (k === 'Enter') { used(); if (ed.mode === 'draw') finishDraw(); else if (ed.mode === 'drawpiece') finishPiece(); else finishMeasure(); return; }
       if (k === 'Backspace' || k === 'Delete') { used(); const L = ed.mode === 'measure' ? ed.meas.pts : ed.draft; if (ed.mode === 'measure' && ed.meas.done) ed.meas.done = false; L.pop(); drawD(); paintMode(); if (ed.mode === 'draw') panel(); return; }
     }
-    const tool = { v: 'select', V: 'select', e: 'edit', E: 'edit', a: 'add', m: 'dist', M: 'marea', f: 'fitsel', F: 'fit', g: 'grid', G: 'grid' }[k];
+    const tool = { v: 'select', V: 'select', e: 'edit', E: 'edit', a: 'add', m: 'dist', M: 'marea', f: 'fitsel', F: 'fit', g: 'grid', G: 'grid', u: 'mix', U: 'mix' }[k];
     if (tool && pl.ring.length >= 3) { used(); if (tool === 'edit' && !pl.elements.length) return; runTool(tool); return; }
     if (!el || !ed.editing) return;
     if (!set.every(id => T.editable(T.viewOf(pl), pl.elements.find(x => x.id === id)))) return; // on a hidden or locked layer
@@ -1446,7 +1531,8 @@ export function initSitePlan(ctx) {
     if (ed.mode) { leaveMode(); return; }
     if (ed.shape) { ed.shape = null; draw(); panel(); return; } // shaping ends; the piece stays picked
     if (ed.sel || ed.multi?.length) { pickOne(null); draw(); panel(); return; }
-    if (ed.editing) { ed.editing = false; draw(); panel(); } // the mode chip on the map goes away
+    if (ed.editing) { ed.editing = false; draw(); panel(); return; } // the mode chip on the map goes away
+    if (ed.mix) setMix(false); // last: the development mix view
   }
 
   // ---------- the panel ----------
