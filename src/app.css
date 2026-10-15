@@ -1952,7 +1952,6 @@ button:disabled{cursor:var(--cur-default,default)}
 .sp-var-use:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
 .sp-vthumb{width:88px;height:88px;border:1px solid var(--line);border-radius:4px;background:#fbfbf8;display:grid;place-items:center;overflow:hidden}
 .sp-vthumb svg{width:100%;height:100%;display:block}.sp-vthumb i{font-style:normal;font-size:10.5px;color:var(--ink-500);text-align:center;padding:4px}
-.sp-vmain{display:grid;gap:6px;min-width:0}
 .sp-vhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;line-height:1.3}.sp-vhead b{font-size:13.5px;font-weight:700}.sp-vhead span{font-size:12px;color:var(--text-2)}
 .sp-vpills{display:flex;flex-wrap:wrap;gap:4px}
 .sp-vpills i{font:600 10.5px/18px var(--font-display);font-style:normal;border-radius:var(--r-pill);padding:0 7px;white-space:nowrap;background:var(--chip);color:var(--text-2)}
@@ -2032,8 +2031,10 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 #card.sp-mode .bsec .sp-tools{margin-top:0}
 #card.sp-mode details.bsec>summary{list-style:none;cursor:var(--cur-pointer,pointer)}
 #card.sp-mode details.bsec>summary::-webkit-details-marker{display:none}
-#card.sp-mode details.bsec>summary::after{content:"Show";margin-left:auto;font:500 11px var(--font-display);color:var(--muted)}
-#card.sp-mode details.bsec[open]>summary::after{content:"Hide"}
+/* what folds has a chevron that turns when it's open (no "Show" / "Hide" words); the summary stays focusable */
+#card.sp-mode details.bsec>summary::after{content:"";flex:none;width:8px;height:8px;margin:0 6px 0 auto;border-right:2px solid var(--text-2);border-bottom:2px solid var(--text-2);transform:translateY(-2px) rotate(45deg);transition:transform var(--dur-fast,150ms) var(--ease,ease)}
+#card.sp-mode details.bsec[open]>summary::after{transform:translateY(2px) rotate(-135deg)}
+#card.sp-mode details.bsec>summary:focus-visible{outline:2px solid var(--focus);outline-offset:4px;border-radius:4px}
 #card #spAiSec{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 1.5 9.4 6.6 14.5 8l-5.1 1.4L8 14.5 6.6 9.4 1.5 8l5.1-1.4z'/%3E%3C/svg%3E")}
 #card #spSel{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 14.5V3l6-1.5v13M9 6h4v8.5M1.5 14.5h13M5 5.5h2M5 8.5h2M5 11.5h2'/%3E%3C/svg%3E")}
 #card #spNums{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 1.5v3M10.5 1.5v3'/%3E%3C/svg%3E")}
@@ -2933,19 +2934,21 @@ table.who tr.nomatch td{border:0}
 .app.planning #mFilters,.app.planning #mClear,.app.planning .mcount{display:none!important}
 .ctrls .sp-fitg{display:none}
 .app.planning .ctrls .sp-fitg{display:flex}
-/* header: breadcrumb and the plan's actions on one line, the option's name under it, then the options and section chips */
+/* header: Projects › the project with Undo, Redo, the save icon and × on one line; the option's name and address with
+   Edit Layout and Done under it; then the options and section chips */
 #card.sp-mode .top{padding:12px 16px 10px;row-gap:0}
 #card.sp-mode .top>.sp-head{flex:1 1 100%;width:100%}
-#card .sp-head{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"back back" "crumb act" "ttl ttl";align-items:center;column-gap:10px}
+#card .sp-head{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"back back" "crumb tools" "ttl act";align-items:center;column-gap:12px}
 #card .sp-head>.cback{grid-area:back;justify-self:start;margin:-2px 0 6px -6px}
 #card .sp-crumb{grid-area:crumb;display:flex;align-items:center;gap:2px;min-width:0;overflow:hidden;white-space:nowrap;font:500 12px/1.2 var(--font-display);color:var(--muted)}
 #card .sp-cr{flex:none;max-width:100%;border:0;background:none;padding:3px 5px;border-radius:5px;color:var(--text-2);font:inherit;cursor:var(--cur-pointer,pointer);overflow:hidden;text-overflow:ellipsis}
-#card .sp-cr:nth-of-type(2){flex:0 1 auto;min-width:0}
+#card .sp-cr:nth-of-type(2){flex:0 1 auto;min-width:0;white-space:nowrap}
 #card .sp-cr:first-child{margin-left:-5px}
 #card .sp-cr:hover,#card .sp-cr:focus-visible{color:var(--brand);background:var(--chip)}
-#card .sp-ttl{grid-area:ttl;min-width:0;margin-top:4px}
+#card .sp-ttl{grid-area:ttl;min-width:0;margin-top:2px}
 #card .sp-ttl h2{margin:0}
-#card .sp-hact{grid-area:act;display:flex;align-items:center;gap:4px}
+#card .sp-hact{grid-area:act;display:flex;align-items:center;gap:6px;justify-self:end;align-self:start;margin-top:4px}
+#card .sp-htools{grid-area:tools;display:flex;align-items:center;gap:2px;justify-self:end;margin-right:-6px}
 #card .sp-ib{width:32px;height:32px;display:grid;place-items:center;flex:none;border:1px solid var(--line-2);border-radius:var(--r-sm,6px);background:var(--panel);color:var(--text);cursor:var(--cur-pointer,pointer)}
 #card .sp-ib:hover:not(:disabled){border-color:var(--text-2)}
 #card .sp-ib:disabled{opacity:.38;cursor:var(--cur-default,default)}
@@ -2953,8 +2956,11 @@ table.who tr.nomatch td{border:0}
 #card .sp-hact .btn svg{display:none}
 #card .sp-hact .sp-edit.on{background:var(--text);border-color:var(--text);color:var(--panel)}
 #card .sp-hact .sp-done{margin-left:2px}
-#card .sp-hact .mn{margin-left:0}
-#card .sp-hact .x{margin-right:-6px}
+#card .sp-htools .mn{margin-left:0}
+#card .sp-htools .x,#card .sp-htools .mn{width:30px;height:30px;margin:0;display:grid;place-items:center}
+#card .sp-htools .sp-ib{width:30px;height:30px;border-color:transparent;background:transparent;color:var(--text-2)}
+#card .sp-htools .sp-ib:hover:not(:disabled){background:var(--chip);border-color:transparent;color:var(--text)}
+#card .sp-htools .sp-save+.sp-ib{margin-left:2px}
 #card.sp-mode .sp-plans{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;align-items:center}
 #card .sp-plans .chip{font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} /* "Option B · Rows facing the street…": the full name is in its tooltip */
 #card .sp-plans .chip[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
@@ -2988,7 +2994,7 @@ table.who tr.nomatch td{border:0}
 /* phones: one header row (the option's name and icon buttons), the options under the overview */
 @media (max-width:700px){
   #card.sp-mode .top{padding:4px 12px 8px}
-  #card .sp-head{grid-template-areas:"ttl act";column-gap:6px}
+  #card .sp-head{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"ttl act tools";column-gap:2px}
   #card .sp-crumb,#card .sp-ttl .bsub,#card .sp-head>.cback{display:none!important}
   #card .sp-ttl{margin:0}
   #card .sp-ttl h2{font-size:17px}
@@ -2997,8 +3003,10 @@ table.who tr.nomatch td{border:0}
   #card .sp-hact .btn svg{display:block}
   #card .sp-hact .btn span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   #card .sp-ib{width:34px;height:36px;border:0;background:transparent}
-  #card .sp-hact .x{width:36px;height:36px;margin:0 -6px 0 0}
-  #card .sp-hact .mn{width:30px}
+  #card .sp-hact{margin-top:0;align-self:center}
+  #card .sp-htools .x{width:36px;height:36px}
+  #card .sp-htools .mn{width:30px;height:36px}
+  #card .sp-htools .sp-ib{width:32px;height:36px}
   #card.sp-mode .top>.sp-plans{display:none}
   #card.sp-mode .sp-plans-ph{display:flex!important;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:10px 10px 0;padding:0;gap:6px}
   #card .sp-plans-ph .chip{flex:none}
@@ -3061,8 +3069,6 @@ table.who tr.nomatch td{border:0}
 /* folded once there are layouts: one line */
 .sp-built-l{font-size:13px;line-height:1.45;color:var(--text-2)}
 .sp-built-l q{color:var(--text);font-weight:600}
-.sp-built-a{white-space:nowrap;color:var(--muted)}
-.sp-built-a .sp-link{font-size:12.5px;padding:0}
 #card .sp-built .lt{margin-bottom:4px}
 /* the AI's ideas */
 .sp-callout{margin-top:10px;padding:9px 12px;border-left:3px solid var(--brand);background:var(--panel-2);border-radius:0 6px 6px 0;font-size:12.5px;line-height:1.45;color:var(--text-2)}
@@ -3096,19 +3102,24 @@ table.who tr.nomatch td{border:0}
 .sp-ninfo summary{cursor:var(--cur-pointer,pointer);font-size:11.5px;color:var(--brand);font-weight:600;width:max-content}.sp-ninfo .sp-n{margin-top:3px}
 .sp-lgrp{margin-top:14px;font-size:12px;color:var(--text-2);line-height:1.4}.sp-lgrp b{color:var(--text)}
 #spLayouts .sp-callout{margin-top:10px}
-.sp-ov-n{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin:2px 0 8px}.sp-ov-n b{font-size:15px}.sp-ov-n span{color:var(--ink-300);font-size:12.5px}
-.sp-ov-n i{font:600 10px/16px var(--font-mono);font-style:normal;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-950);background:#e0a23c;border-radius:3px;padding:0 5px}
-.sp-ov-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px}
-.sp-ov-s{display:grid;gap:1px;min-width:0}.sp-ov-s small{font:500 10px/1.3 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--green-300)}
-.sp-ov-s b{font-size:14.5px;line-height:1.25;overflow-wrap:anywhere}.sp-ov-s i{font-style:normal;font-size:11.5px;color:var(--ink-300);line-height:1.35}
+.sp-ov-n{display:flex;align-items:baseline;gap:8px;margin:0 0 12px;min-width:0}.sp-ov-n b{flex:none;font-size:15px}.sp-ov-n span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-300);font-size:12.5px}
+.sp-ov-n i{flex:none;font:600 10px/16px var(--font-mono);font-style:normal;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-950);background:#e0a23c;border-radius:3px;padding:0 5px}
+.sp-ov-g{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) minmax(0,.8fr) minmax(0,1fr);gap:12px 14px}
+.sp-ov-g.n3{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) minmax(0,1fr)}
+.sp-ov-s{display:flex;flex-direction:column;gap:2px;min-width:0}.sp-ov-s small{font:600 11px/1.3 var(--font-display);color:var(--green-300);white-space:nowrap}
+.sp-ov-s b{font-size:15px;line-height:1.25;white-space:nowrap;font-variant-numeric:tabular-nums}.sp-ov-s i{font-style:normal;font-size:11.5px;color:var(--ink-300);line-height:1.35}
+.sp-ov-ws{display:block;margin-top:3px;padding-top:3px;border-top:1px solid rgba(255,255,255,.14);white-space:nowrap;color:var(--ink-300)}
+#card .bover .neg{color:#ff9b8f}
+#card .bover .sp-ov-msg{display:grid;gap:2px}#card .bover .sp-ov-msg b{font-size:14.5px}#card .bover .sp-ov-msg>span{color:var(--ink-300);font-size:12.5px;line-height:1.45}
 #card .bover em.neg{color:#ff9b8f;font-style:normal}#card .bover em{font-style:normal}
 .sp-ov-p2{margin-top:6px;font-size:12px;color:var(--ink-300)}
-.sp-ov-a{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
-.sp-ov-a .sp-ck{display:inline-flex;align-items:center;gap:5px;font:600 12px/24px var(--font-display);border-radius:var(--r-pill);padding:0 10px;border:1px solid;background:none;cursor:var(--cur-pointer,pointer)}
-.sp-ov-a .sp-ck.ok{color:var(--green-300)!important;border-color:color-mix(in srgb,var(--green-300) 55%,transparent);background:none!important;cursor:var(--cur-default,default)}
+.sp-ov-a{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+.sp-ovb{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,.26);background:rgba(255,255,255,.04);color:#fff;font:600 12px var(--font-display);white-space:nowrap;cursor:var(--cur-pointer,pointer);transition:border-color var(--dur-fast,150ms),background var(--dur-fast,150ms)}
+.sp-ovb:hover{border-color:rgba(255,255,255,.7);background:rgba(255,255,255,.08)}
+.sp-ovb:focus-visible{outline:2px solid var(--green-300);outline-offset:2px}
+.sp-ov-a .sp-ck.ok{color:var(--green-300)!important;border-color:color-mix(in srgb,var(--green-300) 50%,transparent);background:color-mix(in srgb,var(--green-300) 10%,transparent)!important;cursor:var(--cur-default,default)}
 .sp-ov-a .sp-ck.bad{color:#ffb0a5!important;border-color:color-mix(in srgb,#ff7b6b 60%,transparent);background:rgba(255,123,107,.12)!important}
-.sp-ov-a .sp-ck[aria-expanded="true"] svg{transform:rotate(180deg)}
-#card .bover .sp-ov-cmp{color:var(--green-300);font-size:12.5px;padding:0}#card .bover .sp-ov-cmp:hover{text-decoration:underline}
+.sp-ov-a .sp-ck .sp-chev{margin-left:2px}
 .sp-ov-probs{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:2px}
 .sp-ov-probs button,.sp-ov-probs span{display:block;width:100%;text-align:left;border:0;background:none;color:#ffd0c8;font:inherit;font-size:12.5px;padding:3px 0 3px 14px;position:relative;line-height:1.4}
 .sp-ov-probs button{cursor:var(--cur-pointer,pointer)}.sp-ov-probs button:hover{color:#fff;text-decoration:underline}
@@ -3232,12 +3243,14 @@ table.who tr.nomatch td{border:0}
 /* Shift-drag on the map: the selection box */
 .sp-box{position:absolute;z-index:3;pointer-events:none;border:1.5px dashed var(--brand);background:color-mix(in srgb,var(--brand) 10%,transparent);border-radius:2px}
 .sp-box[hidden]{display:none}
-/* the save status, under Undo and Redo */
-#card .sp-head{grid-template-areas:"back back" "crumb act" "ttl save"}
-#card .sp-save{grid-area:save;justify-self:end;align-self:start;margin-top:8px;font:500 11.5px/1.3 var(--font-display);color:var(--muted);white-space:nowrap}
+/* the save status: an icon beside Undo and Redo (its words in the tooltip); a failed sync is a red button that retries */
+#card .sp-save{display:inline-flex;align-items:center}
 #card .sp-save:empty{display:none}
-#card .sp-save.bad{color:var(--danger)}
-#card .sp-save .sp-link{font-size:11.5px;padding:0;color:var(--danger);text-decoration:underline}
+#card .sp-sv{width:28px;height:28px;display:grid;place-items:center;padding:0;border:0;border-radius:6px;background:none;color:var(--muted)}
+#card .sp-sv.synced{color:var(--brand)}
+#card button.sp-sv.bad{color:var(--danger);cursor:var(--cur-pointer,pointer)}
+#card button.sp-sv.bad:hover{background:color-mix(in srgb,var(--danger) 10%,transparent)}
+#card button.sp-sv.bad:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 /* replacing a layout you changed: asked, in the panel */
 #card .sp-confirm{margin:var(--sp-3) var(--pg,16px) 0;padding:12px 14px;border:1px solid var(--amber);border-left-width:3px;border-radius:var(--r-md);background:var(--panel-2)}
 #card .sp-confirm p{margin:0 0 8px;font-size:13px;line-height:1.4}
@@ -3255,7 +3268,187 @@ table.who tr.nomatch td{border:0}
   .sp-tpop{width:min(268px,calc(100vw - 16px))}
   .sp-tpop.ph{position:fixed;z-index:var(--z-sheet,11)}
   .sp-mapui:has(.sp-strip:not([hidden])) .sp-mpill{top:52px}
-  #card .sp-head{grid-template-areas:"ttl act" "save save"}
-  #card .sp-save{justify-self:start;margin-top:2px}
-  #card .sp-save:not(.bad){display:none}
 }
+
+/* ---------- site plan panel (round 2) ---------- */
+/* the header: a long project name is cut short in the breadcrumb (the whole of it in the tooltip); the option's name and
+   address never push the actions off the row */
+#card.sp-mode .sp-crumb{font-size:12px}
+#card .sp-title{text-overflow:ellipsis}
+#card .sp-ttl .bsub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#card .sp-hact .btn{min-height:32px}
+/* the options: one row that scrolls sideways (never two rows); names capped with an ellipsis, New Option quiet at the end */
+#card.sp-mode .sp-plans,#card.sp-mode .sp-plans-ph{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 20px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 20px),transparent);padding-right:20px}
+#card.sp-mode .sp-plans::-webkit-scrollbar{display:none}
+#card .sp-plans .chip{flex:none;max-width:160px;min-height:28px;display:block;line-height:18px}
+#card .sp-plans .sp-newopt{max-width:none;font-weight:500;color:var(--muted);background:transparent}
+#card .sp-plans .sp-newopt:hover{color:var(--text);border-color:var(--text-2)}
+/* sections: a heading with its icon tile, a row of actions, then fields */
+#card.sp-mode .bsec{gap:12px}
+#card.sp-mode .bsec .lt .src{font:500 12px var(--font-display);color:var(--muted)}
+#card .sp-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#card .sp-acts{display:flex;flex-wrap:wrap;gap:6px}
+#card.sp-mode .bsec .btn{white-space:nowrap}
+#card .btn.ghost.sp-del{color:var(--danger)}
+#card .btn.ghost.sp-del:hover:not(:disabled){background:color-mix(in srgb,var(--danger) 9%,transparent)}
+#card .sp-foot{justify-content:center;margin:20px 14px 0;padding:12px 0 0;border-top:1px solid var(--line)}
+#card .sp-foot .sp-del{font-size:12px}
+#card .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* small-caps group headers (Program, Setbacks, …) */
+#card.sp-mode .sp-sub{display:flex;flex-wrap:wrap;align-items:center;gap:2px;margin:6px 0 0;padding-top:14px;border-top:1px solid var(--line);font:700 10.5px/1.4 var(--font-display);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+/* a switch: a checkbox (role=switch) over a track and knob; brand when on, the focus ring on the track */
+#card .sp-toggle{position:relative;display:flex;align-items:center;gap:10px;min-height:var(--ctl);min-width:0;font:500 12.5px/1.3 var(--font-display);color:var(--text);cursor:var(--cur-pointer,pointer)}
+#card .sp-toggle input{position:absolute;left:0;top:50%;width:34px;height:20px;margin:-10px 0 0;opacity:0;cursor:inherit}
+#card .sp-tk{position:relative;flex:none;width:34px;height:20px;border-radius:999px;background:var(--ink-300,#b9bfbc);transition:background var(--dur-fast,150ms) var(--ease,ease)}
+#card .sp-tk::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(11,13,12,.3);transition:transform var(--dur-fast,150ms) var(--ease,ease)}
+#card .sp-toggle input:checked+.sp-tk{background:var(--brand)}
+#card .sp-toggle input:checked+.sp-tk::after{transform:translateX(14px)}
+#card .sp-toggle input:focus-visible+.sp-tk{outline:2px solid var(--focus);outline-offset:2px}
+#card .sp-toggle input:disabled~*{opacity:.5}
+#card .sp-tl{min-width:0}
+@media (prefers-reduced-motion:reduce){#card .sp-tk,#card .sp-tk::after{transition:none}}
+/* fields: two columns, the label above the box (never cut off), every box the same height, the unit inside it on the right */
+#card .sp-fg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 12px;margin:0}
+#card .sp-f{display:flex;flex-direction:column;justify-content:flex-end;gap:5px;min-width:0}
+#card .sp-f.w2,#card .sp-fg>.sp-toggle.w2{grid-column:1/-1}
+#card .sp-fg>.sp-toggle{align-self:end}
+#card .sp-fl{font:500 12px/1.3 var(--font-display);color:var(--text-2)}
+#card .sp-fl small{font-weight:400;font-size:11px;color:var(--muted);white-space:nowrap}
+#card.sp-mode .sp-f input,#card.sp-mode .sp-f select,#card.sp-mode .sp-exp select,#card.sp-mode .sp-mix input{box-sizing:border-box;width:100%;min-width:0;height:var(--ctl);margin:0;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel);color:var(--text);font:500 13px var(--font-display);padding:0 10px}
+#card.sp-mode .sp-mix input{height:32px;padding:0 6px}
+#card.sp-mode .sp-f :is(input,select):focus-visible,#card.sp-mode .sp-exp select:focus-visible,#card.sp-mode .sp-mix input:focus-visible{outline:2px solid var(--focus);outline-offset:0;border-color:var(--brand)}
+#card .sp-ctl{position:relative;display:block;min-width:0}
+#card.sp-mode .sp-ctl input{padding-right:calc(var(--u,0ch) + 10px);font-variant-numeric:tabular-nums;-moz-appearance:textfield;appearance:textfield}
+#card .sp-ctl input::-webkit-inner-spin-button,#card .sp-ctl input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+#card .sp-u{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:500 12px var(--font-display);color:var(--muted);pointer-events:none;white-space:nowrap}
+#card .sp-fs{border:0;padding:0;margin:0;min-width:0;display:grid;gap:12px}
+/* an (i) beside a heading or a line: a short note opens in place, under it */
+#card .sp-i{flex:none;display:inline-grid;place-items:center;width:24px;height:24px;margin:-4px 0 -4px 2px;padding:0;border:0;border-radius:50%;background:none;color:var(--muted);vertical-align:middle;cursor:var(--cur-pointer,pointer)}
+#card .sp-i:hover,#card .sp-i[aria-expanded="true"]{color:var(--brand);background:var(--chip)}
+#card .sp-i:focus-visible{outline:2px solid var(--focus);outline-offset:0}
+#card .sp-ipop{flex:1 0 100%;display:block;margin:6px 0 2px;padding:8px 10px;border-radius:var(--r-sm);background:var(--panel-2);border:1px solid var(--line);font:400 12px/1.45 var(--font-display);letter-spacing:0;text-transform:none;color:var(--text-2)}
+#card .sp-ipop[hidden]{display:none}
+#card.sp-mode .lt{flex-wrap:wrap}
+#card.sp-mode .lt .sp-i{margin-left:-4px}
+/* a chevron on what folds; it turns when open. A text toggle (Ideas, similar layouts), an icon one (Build), and the
+   Why / Details / notes summaries look the same */
+.sp-chev{display:inline-block;flex:none;width:7px;height:7px;margin:0 2px 0 7px;border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform var(--dur-fast,150ms) var(--ease,ease)}
+[aria-expanded="true"]>.sp-chev{transform:translateY(1px) rotate(-135deg)}
+#card .sp-tgl,#card .sp-why>summary,#card .sp-ninfo>summary{display:inline-flex;align-items:center;min-height:28px;margin:0 -6px;padding:0 6px;border:0;border-radius:6px;background:none;font:600 12px var(--font-display);color:var(--text-2);list-style:none;white-space:nowrap;cursor:var(--cur-pointer,pointer)}
+#card .sp-tgl:hover,#card .sp-why>summary:hover,#card .sp-ninfo>summary:hover{background:var(--chip);color:var(--text)}
+#card .sp-tgl:focus-visible,#card .sp-why>summary:focus-visible,#card .sp-ninfo>summary:focus-visible{outline:2px solid var(--focus);outline-offset:0}
+#card .sp-why>summary::-webkit-details-marker,#card .sp-ninfo>summary::-webkit-details-marker{display:none}
+#card .sp-why>summary::after,#card .sp-ninfo>summary::after{content:"";display:inline-block;width:7px;height:7px;margin:0 2px 0 7px;border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform var(--dur-fast,150ms) var(--ease,ease)}
+#card .sp-why[open]>summary::after,#card .sp-ninfo[open]>summary::after{transform:translateY(1px) rotate(-135deg)}
+#card .sp-tgl-i{width:30px;height:30px;min-height:30px;justify-content:center;margin:-4px -6px -4px 0;padding:0}
+#card .sp-tgl-i .sp-chev{margin:0}
+@media (prefers-reduced-motion:reduce){.sp-chev,#card .sp-why>summary::after,#card .sp-ninfo>summary::after,#card.sp-mode details.bsec>summary::after{transition:none}}
+/* Build: the request, how to run it with Phase 2's setting as a note that goes to Settings, then Build Layouts */
+#card .sp-ai-h{align-items:center}
+#card .sp-ai textarea{min-height:60px;margin-top:0;padding:8px 10px;border-radius:var(--r-sm);font-size:13px;line-height:1.4}
+#card .sp-ai textarea:focus-visible{outline:2px solid var(--focus);outline-offset:0}
+#card .sp-sugs{margin-top:-4px}
+#card .sp-runopts{margin-top:0;justify-content:space-between}
+#card .sp-fillnote{display:inline-flex;align-items:center;gap:5px;min-height:28px;margin-right:-6px;padding:0 6px;border:0;border-radius:6px;background:none;font:500 12px var(--font-display);color:var(--text-2);white-space:nowrap;cursor:var(--cur-pointer,pointer)}
+#card .sp-fillnote b{font-weight:700;color:var(--text)}
+#card .sp-fillnote .sp-chev{margin:0 0 0 2px;transform:rotate(-45deg)}
+#card .sp-fillnote:hover{background:var(--chip);color:var(--text)}
+#card .sp-fillnote:focus-visible{outline:2px solid var(--focus)}
+#card .sp-built-l{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#card .sp-built .lt{margin-bottom:0}
+#card .sp-readas{margin-top:0}
+#card .sp-readas .sp-ra-e{min-height:24px;padding:0 8px;font-size:12px}
+#card .sp-ideas-h{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:12.5px;color:var(--text-2)}
+#card .sp-ideas{margin-top:0}
+#card .sp-idea .sp-row{margin-top:2px}
+#card .sp-idea-w{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+#card .sp-idea-req span{font:600 10.5px var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+/* Change with AI: the box, then Make Changes with its switch beside it */
+#card .sp-go2{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+#card .sp-go2 .btn{min-height:40px;padding:0 16px}
+#card .sp-chg-acts{margin-top:4px}
+/* Settings: New layouts and the two switches first */
+#card .sp-prm-a{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+#card .sp-tgs{display:grid;gap:2px}
+#card .sp-tgs .sp-toggle{min-height:32px}
+#card .sp-mix{margin-top:2px}
+#card .sp-mix th{font:500 11.5px var(--font-display);padding:0 2px 4px}
+#card .sp-mix-f{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:-4px}
+#card .sp-solvebar{margin:0}
+/* Site: its tools in a grid of equal buttons with icons */
+#card .sp-g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#card .sp-g2 .btn{min-height:var(--ctl);width:100%;box-sizing:border-box;justify-content:center;overflow:hidden;text-overflow:ellipsis}
+#card .sp-g2 .sp-stb{justify-content:flex-start;gap:8px;padding:0 12px}
+#card .sp-stb svg{flex:none;color:var(--brand)}
+#card .sp-stb span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#card .sp-stb[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--panel)}
+#card .sp-stb[aria-pressed="true"] svg{color:inherit}
+#card .sp-parcels{display:flex;flex-wrap:wrap;gap:6px}
+#card .sp-parcels .chip{max-width:100%;min-width:0}
+#card .sp-parcels .chip>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Add: the pieces as tiles in their groups (groups flow side by side when they fit), then the building library */
+#card .sp-addg{display:flex;flex-wrap:wrap;gap:14px 18px}
+#card .sp-add-g{display:grid;gap:6px;flex:none;min-width:0}
+#card.sp-mode .sp-add-g .sp-sub{margin:0;padding:0;border:0}
+#card .sp-add-r{display:flex;flex-wrap:wrap;gap:6px}
+#card .sp-add{width:76px;min-height:64px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:7px 4px 6px;border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--panel);color:var(--text);font:600 11px/1.2 var(--font-display);text-align:center;cursor:var(--cur-pointer,pointer);transition:border-color var(--dur-fast,150ms),background var(--dur-fast,150ms)}
+#card .sp-add svg{width:30px;height:30px;box-sizing:border-box;padding:3px;border-radius:7px;background:color-mix(in srgb,var(--ac) 20%,transparent);color:color-mix(in srgb,var(--ac) 62%,#0b0d0c)}
+#card .sp-add span{display:block;max-width:100%}
+#card .sp-add:hover{border-color:color-mix(in srgb,var(--ac) 70%,var(--text));background:color-mix(in srgb,var(--ac) 7%,var(--panel))}
+#card .sp-add:active{transform:translateY(1px)}
+#card .sp-add:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+#card .sp-lib{display:flex;margin:2px 0 0;color:inherit;font-size:inherit}
+#card .sp-libw{position:relative;display:block}
+#card .sp-libw svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+#card.sp-mode .sp-libw select{padding-left:34px}
+/* Export: PDF and its sheet size on one row, then the files */
+#card .sp-exp select{cursor:var(--cur-pointer,pointer)}
+/* Selected: a pinned piece's note with its button */
+#card .sp-pin{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px}
+#card .sp-fsrow{display:contents}
+/* Pro forma: the schedule's legend under its bar */
+#card .sp-sched{margin:0}
+#card .sp-schl{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:-6px;font-size:11.5px;color:var(--text-2)}
+#card .sp-schl i{display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:2px}
+#card .sp-schl .pre{background:#8a6fb3}#card .sp-schl .bld{background:#c8673d}#card .sp-schl .lease{background:#d8a13a}#card .sp-schl .hold{background:#3f8f5a}
+#card .sp-cards{margin:0}
+#card .sp-mixt{margin:0}
+/* Layouts: the head with Sort and More layouts as a button */
+#card .sp-lay-ctl{gap:8px}
+#card .sp-sortl{display:flex;align-items:center;gap:6px}
+#card .sp-sortl select{height:32px;margin:0;padding:0 6px;border-radius:var(--r-sm)}
+#card .sp-rvc{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;margin:8px 0 0}
+/* a layout card: the drawing; the name and arrangement (two lines at most); badges; the numbers; notes; then actions on the right */
+#card .sp-var-use{grid-template-columns:88px minmax(0,1fr);column-gap:12px;row-gap:7px;padding:12px 12px 8px}
+#card .sp-var-use>.sp-vthumb{grid-column:1;grid-row:1/span 3}
+#card .sp-var-use>:not(.sp-vthumb){grid-column:2;min-width:0}
+#card .sp-vhead{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35;font-size:12px;color:var(--text-2)}
+#card .sp-vhead b{font-size:13.5px;font-weight:700;color:var(--text)}
+#card .sp-vpills{row-gap:4px}
+#card .sp-vc{padding:6px 8px}
+#card .sp-vc b{white-space:nowrap;overflow-wrap:normal;font-variant-numeric:tabular-nums}
+#card .sp-var>.sp-n{margin:0 12px 6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#card .sp-var-acts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:2px 12px 10px}
+#card .sp-var-acts .sp-why{margin:0;padding:0}
+#card .sp-var-acts .sp-why[open]{flex-basis:100%;order:2;margin:2px 0 0}
+#card .sp-va-r{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-left:auto}
+@media (max-width:700px){
+  #card .sp-var-use{grid-template-columns:64px minmax(0,1fr);column-gap:10px}
+  #card .sp-var-use>.sp-vthumb{grid-row:1/span 2}
+  #card .sp-var-use>:is(.sp-vgrid,.sp-vp2,.sp-vwhy,.sp-vdelta,.sp-numonly){grid-column:1/-1}
+  .sp-ov-g,.sp-ov-g.n3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #card .sp-add{width:72px}
+  #card .sp-addg{gap:12px 14px}
+  #card .sp-add-g:last-child{order:1}#card .sp-add-g:nth-child(4){order:2} /* Site beside Water & landscape, Amenities last: four rows, not five */
+}
+/* a section that folds (Settings, Pro forma): its parts spaced by margins (a details box doesn't lay out its children with gap) */
+#card.sp-mode details.bsec>:not(summary){margin-top:12px}
+#card.sp-mode details.bsec>.sp-sub{margin-top:18px}
+#card.sp-mode details.bsec>.sp-schl{margin-top:6px}
+#card.sp-mode details.bsec>.sp-sub+.sp-fg,#card.sp-mode details.bsec>.sp-sub+.sp-mix{margin-top:12px}
+#card #spIdeas:empty,#card #spVariants:empty{display:none}
+#card #spLayouts .sp-ninfo1,#card #spLayouts .sp-lnotes{margin-top:0}
+#card #spLayouts .sp-vars{margin-top:10px}
+.sp-ov-s i>.ln{display:block}.sp-ov-s i>.sep{display:none}
+@media (max-width:700px){.sp-ov-s i>.ln{display:inline}.sp-ov-s i>.sep{display:inline}}
+#card.sp-mode details.bsec:not([open]){gap:0}
