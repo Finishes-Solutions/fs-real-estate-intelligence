@@ -5,6 +5,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 3:39 PM CT: Entrances that fit the site; changes that understand places; moving amenities among homes (57f6d47)
+- **The right number of entrances by itself:** when a request doesn't say how many, layouts choose.
+  - One for an ordinary lot.
+  - Two for a corner lot, with the second on the side street.
+  - Two for more than 30 homes or 200 apartments (a second way in for fire access), and for big parking fields or sites over 15 acres.
+  - Three for very large sites.
+  - The notes say why. Asking for a number always wins.
+- **Change With AI understands places:** "the back", "the front", "the middle of the homes" or "of the apartments".
+- **Moving an amenity among houses no longer breaks the plan:** moving a community center among the houses (or adding a pool beside it) only clears the few homes under it, and the rest of the neighbourhood stays.
+- **Re-fits that lose homes are held back:** if the re-fit after a change would lose homes, units or floor area, it isn't taken, and **Re-fit Anyway** is offered. On the 86-acre site a re-fit like this had dropped 461 units to 145, and the detention spread into one huge lake.
+
 ### 2:59 PM CT: Smoother, connected parking; bend drives and entrances; an Items list in Layers (55542e2, f430a4a, 03e357c)
 - **Paving is one smooth surface.**
   - Drives, aisles, parking and entrances pour together, with one curb round the outside.
