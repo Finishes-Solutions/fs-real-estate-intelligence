@@ -52,8 +52,13 @@ import { initSettings, BASES } from './settings.js';
 import { renderNav, syncNav as syncNavTabs, leafFor, pathOf, labelOf, parentOf } from './nav.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
+import { refused, mapErrorRefused, standIn, downSince, markDown, photonSearchUrl, photonReverseUrl, fromPhoton } from './lib/maptiler.mjs';
 
 const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
+// MapTiler refused the key (monthly quota used up, account suspended): basemaps come from OpenFreeMap and searches from
+// Photon until it's been DOWN_HOURS (lib/maptiler.mjs). Remembered across reloads so each load doesn't fail first.
+let mtDown=false; try{ mtDown=!!downSince(localStorage); }catch(e){}
+function setMtDown(){ if(mtDown) return false; mtDown=true; try{ markDown(localStorage); }catch(e){} return true; }
 const getJSON=(u,optional)=>fetch(u,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error(u+' '+r.status); return r.json(); }).catch(e=>{ if(optional) return null; throw e; });
 const [GEO,FIL,CHG]=await Promise.all([getJSON('data/geo.json'),getJSON('data/filings.json'),getJSON('data/changes.json',true)]);
 const DATA={...GEO,...FIL,changes:CHG||{runs:[]}};
@@ -120,10 +125,11 @@ const layers={style:(()=>{ try{ const b=localStorage.getItem('fs-basemap'); if(B
 try{ const L=JSON.parse(localStorage.getItem('fs-map-layers')||'{}'); if(['uniform','value'].includes(L.size)) layers.size=L.size; if(typeof L.grid==='boolean') layers.grid=L.grid; }catch(e){} // the map always opens without filings (dots and heatmap off); dot size and the grid are remembered
 const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify({v:2,size:layers.size,heat:layers.heat,dots:layers.dots,grid:layers.grid})); }catch(e){} syncFilingsSw(); }; // every change to the filing layer passes here
 // Google base maps need a tile session first (src/google.js): a promise of the style
-const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
+const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':mtDown?(standIn(s,isDark())||ESRI_STYLE):'https://api.maptiler.com/maps/'+STYLES[s][isDark()?1:0]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl(layers.style),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
-map.on('error',e=>{ const m=(e&&e.error&&e.error.message)||''; if(/40[13]|Unauthorized|Forbidden/i.test(m)&&STYLES[layers.style]) toast('MapTiler refused the key for this site. Check the key’s allowed origins.'); });
+// the style or a tile refused: redraw the same basemap from the keyless stand-in (once; the tiles of one view all fail together)
+map.on('error',e=>{ if(!mapErrorRefused(e)||!setMtDown()) return; toast('MapTiler isn’t serving maps right now (its monthly limit is used up), so this is the free OpenStreetMap map.'); if(STYLES[layers.style]) setBasemap(layers.style); });
 
 const fc=features=>({type:'FeatureCollection',features});
 const GJ={
@@ -811,8 +817,12 @@ function placeMenu(pt,ll){
 }
 const hideMenu=()=>pmenu.classList.remove('on');
 // the street address at a right-clicked spot (MapTiler reverse geocoding), for "Ask AI about this spot"; null when there is none nearby
-async function spotAddress(c){ try{ const r=await fetch('https://api.maptiler.com/geocoding/'+c[0]+','+c[1]+'.json?key='+MAPTILER_KEY+'&limit=1&types=address,poi',{signal:AbortSignal.timeout(2500)});
-  const f=r.ok?(await r.json())?.features?.[0]:null; return f?(f.place_name||f.text||'').replace(/, United States$/,'')||null:null; }catch(e){ return null; } }
+async function spotAddress(c){ try{
+  if(!mtDown){ const r=await fetch('https://api.maptiler.com/geocoding/'+c[0]+','+c[1]+'.json?key='+MAPTILER_KEY+'&limit=1&types=address,poi',{signal:AbortSignal.timeout(2500)});
+    if(r.ok){ const f=(await r.json())?.features?.[0]; return f?(f.place_name||f.text||'').replace(/, United States$/,'')||null:null; }
+    if(!refused(r.status)) return null; setMtDown(); }
+  const r=await fetch(photonReverseUrl(c),{signal:AbortSignal.timeout(2500)}), f=r.ok?fromPhoton(await r.json())[0]:null;
+  return f&&/address|poi/.test(f.type)?f.t:null; }catch(e){ return null; } }
 map.on('contextmenu',e=>{ e.preventDefault(); if(mode==='pan') placeMenu(e.point,e.lngLat); });
 { let lp=0,start=null; // long-press on touch screens
   map.on('touchstart',e=>{ clearTimeout(lp); if(e.points.length!==1||mode!=='pan') return; start=e.point; lp=setTimeout(()=>{ placeMenu(e.point,e.lngLat); swallowClick=true; },550); });
@@ -946,8 +956,14 @@ async function geocode(q,o={}){
   const c=map.getCenter(), prox=o.exact||o.world?c.lng.toFixed(4)+','+c.lat.toFixed(4):'-95.9,30.0', bbox=o.exact?'-106.7,25.8,-93.5,36.5':'-97.6,28.6,-94.2,31.4';
   const u='https://api.maptiler.com/geocoding/'+encodeURIComponent(q)+'.json?key='+MAPTILER_KEY+'&limit='+(o.limit||6)+'&proximity='+prox+'&autocomplete='+!(o.exact||o.world)+(o.world?'':'&country=us&bbox='+bbox);
   const c2=ctl||new AbortController(), tm=setTimeout(()=>c2.abort(),8000); // a geocoder that hangs must not hang the assistant
-  try{ const r=await fetch(u,{signal:c2.signal}); if(!r.ok) return []; const d=await r.json(); clearTimeout(tm);
-    return (d.features||[]).map(f=>({t:(f.place_name||f.text||'').replace(/, United States$/,''),name:f.text||'',type:(f.place_type&&f.place_type[0])||'place',k:(f.place_type&&f.place_type[0]==='address')?'Address':((f.place_type&&f.place_type[0])||'Place').replace(/^\w/,c=>c.toUpperCase()),c:f.center,bbox:f.bbox})); }
+  try{
+    if(!mtDown){ const r=await fetch(u,{signal:c2.signal});
+      if(r.ok){ const d=await r.json(); clearTimeout(tm);
+        return (d.features||[]).map(f=>({t:(f.place_name||f.text||'').replace(/, United States$/,''),name:f.text||'',type:(f.place_type&&f.place_type[0])||'place',k:(f.place_type&&f.place_type[0]==='address')?'Address':((f.place_type&&f.place_type[0])||'Place').replace(/^\w/,c=>c.toUpperCase()),c:f.center,bbox:f.bbox})); }
+      if(!refused(r.status)) return []; setMtDown(); }
+    // MapTiler is out: Photon (OpenStreetMap), same region box and bias
+    const r=await fetch(photonSearchUrl(q,{limit:o.limit||6,prox,bbox:o.world?'':bbox}),{signal:c2.signal}); if(!r.ok) return []; const d=await r.json(); clearTimeout(tm);
+    return fromPhoton(d); }
   catch(e){ return []; }
 }
 function renderSugs(note){
@@ -1269,8 +1285,12 @@ let farLabel=null, farT=0; const farCache=new Map();
 map.on('moveend',()=>{ clearTimeout(farT); farT=setTimeout(async()=>{ const c=map.getCenter();
   if(nearestPlace([c.lng,c.lat])){ farLabel=null; return; }
   const k=c.lng.toFixed(2)+','+c.lat.toFixed(2); if(farCache.has(k)){ farLabel=farCache.get(k); return; }
-  try{ const r=await fetch('https://api.maptiler.com/geocoding/'+k+'.json?key='+MAPTILER_KEY+'&limit=1&types=place,municipality,locality,county,region,country'); const d=r.ok?await r.json():null;
-    const f=d?.features?.[0]; farLabel=f?(f.place_name||f.text||'').replace(/, United States$/,''):null; farCache.set(k,farLabel); }catch(e){ farLabel=null; } },600); });
+  try{ let f=null;
+    if(!mtDown){ const r=await fetch('https://api.maptiler.com/geocoding/'+k+'.json?key='+MAPTILER_KEY+'&limit=1&types=place,municipality,locality,county,region,country');
+      if(r.ok){ f=(await r.json())?.features?.[0]; f=f&&{t:(f.place_name||f.text||'').replace(/, United States$/,'')}; } else if(refused(r.status)) setMtDown(); }
+    if(mtDown){ const r=await fetch(photonReverseUrl([c.lng,c.lat])), p=r.ok?fromPhoton(await r.json())[0]:null; // the town around the spot, not the house
+      f=p&&{t:p.t.split(', ').slice(p.type==='address'||p.type==='poi'||p.type==='street'?1:0).join(', ')}; }
+    farLabel=f?.t||null; farCache.set(k,farLabel); }catch(e){ farLabel=null; } },600); });
 function screenContext(){
   const c=map.getCenter(), b=map.getBounds(), z=map.getZoom(), near=nearestPlace([c.lng,c.lat])||farLabel;
   const inView=visible.filter(f=>f.lon>=b.getWest()&&f.lon<=b.getEast()&&f.lat>=b.getSouth()&&f.lat<=b.getNorth());
@@ -1330,7 +1350,7 @@ ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box
     ctx.foldLegend=v=>{ if(v==null){ if(held!=null){ min=held; held=null; sync(); } return; } if(held==null) held=min; min=!!v; sync(); }; // folded for now (the site plan on a phone), without changing the saved choice; null puts it back as it was
     sync(); } }
 syncQL=()=>ctx.syncQuickLayers?.();
-Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mapTilerDown:()=>mtDown, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
