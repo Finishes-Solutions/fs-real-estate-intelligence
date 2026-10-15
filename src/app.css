@@ -2010,6 +2010,7 @@ button:disabled{cursor:var(--cur-default,default)}
 #card .sp-start .sp-lt-proj{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1.5 4.5v8.5h13V5.5H8L6.5 3.5h-5z'/%3E%3C/svg%3E")}
 #card .sp-start .sp-lt-site{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 7 2.5l6.5 2.5v8L9 14.5l-6.5-2z'/%3E%3C/svg%3E")}
 #card #spChgSec{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 13.5l.6-3L10.8 2.8a1.5 1.5 0 0 1 2.1 0l.3.3a1.5 1.5 0 0 1 0 2.1L5.5 12.9z'/%3E%3Cpath d='M9.5 4l2.5 2.5'/%3E%3C/svg%3E")}
+#card #spAskSec{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23006527' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 2.5h10a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H7.2L4.5 13.5V11H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z'/%3E%3Cpath d='M6.5 5.4a1.5 1.5 0 1 1 2.1 1.4c-.4.2-.6.5-.6.9v.2'/%3E%3Cpath d='M8 9.4v.01'/%3E%3C/svg%3E")}
 .sp-tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .sp-tools .btn[aria-pressed="true"]{background:var(--text);color:var(--panel);border-color:var(--text)}
 .sp-add i{display:inline-block;width:10px;height:10px;border-radius:2px}
@@ -3069,15 +3070,34 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 @media (prefers-reduced-motion:reduce){.btn.sp-pulse{animation:none;outline:2px solid var(--green-300);outline-offset:2px}}
 #card #spGo{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;line-height:1.2}
 #card #spGo small{font-size:10.5px;font-weight:500;opacity:.85}
-/* how to run it: Quick or AI-reviewed, and Phase 2 */
+/* how hard the AI works: Low, Medium, High, Ultra (four equal segments, the time under each), what the picked one does
+   under them, and Phase 2's setting beside the label. Ultra has a warm gradient and a spark; picking it sweeps a shine
+   across it once (none with reduced motion). */
 #card .sp-runopts{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:10px}
-.sp-modes{display:inline-flex;border:1px solid var(--line-2);border-radius:7px;padding:2px;background:var(--panel-2)}
-.sp-modes button{display:flex;align-items:baseline;gap:5px;border:0;border-radius:5px;background:none;padding:4px 10px;color:var(--text-2);font:500 12px var(--font-display);cursor:var(--cur-pointer,pointer)}
-.sp-modes button b{font-weight:600}
-.sp-modes button small{font-size:11px;color:var(--muted)}
-.sp-modes button[aria-checked="true"]{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(11,13,12,.12)}
-.sp-modes button:disabled{opacity:.45;cursor:var(--cur-default,default)}
-.sp-modes button:focus-visible{outline:2px solid var(--brand);outline-offset:0}
+.sp-effl{font:500 10.5px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sp-effort{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;border:1px solid var(--line-2);border-radius:8px;padding:2px;background:var(--panel-2)}
+.sp-eff{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:42px;padding:4px 4px;border:0;border-radius:6px;background:none;color:var(--text-2);font:500 12.5px var(--font-display);line-height:1.2;cursor:var(--cur-pointer,pointer);overflow:hidden;transition:background var(--dur-fast,150ms),color var(--dur-fast,150ms),box-shadow var(--dur-fast,150ms)}
+.sp-eff b{display:inline-flex;align-items:center;gap:4px;font-weight:600}
+.sp-eff small{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.sp-eff:hover:not(:disabled):not([aria-checked="true"]){background:color-mix(in srgb,var(--panel) 65%,transparent);color:var(--text)}
+.sp-eff[aria-checked="true"]{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(11,13,12,.12)}
+.sp-eff:disabled{opacity:.45;cursor:var(--cur-default,default)}
+.sp-eff:focus-visible{outline:2px solid var(--focus);outline-offset:0}
+.sp-eff-ultra b{background:linear-gradient(100deg,var(--green-700) 0%,#0e7c86 50%,var(--amber) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sp-eff-ultra .sp-spark{flex:none;color:var(--amber)}
+.sp-eff-ultra[aria-checked="true"]{background:linear-gradient(135deg,var(--green-50) 0%,#fff 48%,#fbf1df 100%);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--amber) 42%,transparent),0 1px 4px rgba(183,121,31,.22)}
+.sp-eff-ultra[aria-checked="true"] small{color:#8a5a12}
+.sp-eff-ultra b,.sp-eff-ultra small{position:relative;z-index:1}
+.sp-eff-ultra::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 28%,rgba(224,162,60,.38) 42%,rgba(255,250,238,.95) 50%,rgba(224,162,60,.38) 58%,transparent 72%);transform:translateX(-110%);pointer-events:none;opacity:0}
+.sp-eff-ultra.sp-shine::after{animation:sp-shine 640ms cubic-bezier(.45,0,.25,1) 1}
+.sp-eff-ultra.sp-shine .sp-spark{animation:sp-spark 620ms var(--ease) 1}
+@keyframes sp-shine{0%{transform:translateX(-110%);opacity:1}100%{transform:translateX(110%);opacity:1}}
+@keyframes sp-spark{0%{transform:scale(1) rotate(0)}45%{transform:scale(1.4) rotate(25deg)}100%{transform:scale(1) rotate(0)}}
+@media (prefers-reduced-motion:reduce){.sp-eff-ultra.sp-shine::after,.sp-eff-ultra.sp-shine .sp-spark{animation:none}}
+.sp-effhint{margin-top:-2px;font-size:12px;line-height:1.45;color:var(--text-2)}
+.sp-effon{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--chip);color:var(--text-2);font:600 10.5px/18px var(--font-display);vertical-align:1px;white-space:nowrap}
+.sp-effon.u{background:linear-gradient(135deg,var(--green-50),#fbf1df);color:#7a4f0f;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--amber) 35%,transparent)}
+.sp-effon.u .sp-spark{color:var(--amber);width:10px;height:10px}
 #card .sp-runopts .sp-sw{font-size:12px;color:var(--text-2)}
 .sp-aioff{display:flex;align-items:center;gap:6px;margin-top:8px;color:var(--text-2)}
 .sp-aioff::before{content:"i";flex:none;display:grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--line-2);font:700 10px var(--font-display);color:var(--muted)}
@@ -3539,6 +3559,25 @@ button.sp-mx-r:hover{background:var(--chip)}
 /* Change with AI: the box, then Make Changes with its switch beside it */
 #card .sp-go2{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
 #card .sp-go2 .btn{min-height:40px;padding:0 16px}
+/* the layout card's update icon (top right, only while the layout is out of date): it turns while the re-fit runs */
+.sp-ov-n.has-upd{align-items:center}
+.sp-ovupd{flex:none;display:grid;place-items:center;width:32px;height:32px;margin:-6px -6px -6px auto;padding:0;border-radius:var(--r-sm);border:1px solid color-mix(in srgb,#e0a23c 70%,transparent);background:rgba(224,162,60,.14);color:#f2c16f;cursor:var(--cur-pointer,pointer);transition:background var(--dur-fast,150ms),border-color var(--dur-fast,150ms),color var(--dur-fast,150ms)}
+.sp-ovupd:hover:not(:disabled){background:rgba(224,162,60,.26);border-color:#e0a23c;color:#ffd58c}
+.sp-ovupd:focus-visible{outline:2px solid var(--green-300);outline-offset:2px}
+.sp-ovupd:disabled{cursor:var(--cur-default,default)}
+.sp-ovupd:disabled:not([aria-busy]){opacity:.45}
+.sp-ovupd[aria-busy="true"] svg{animation:sp-spin .9s linear infinite}
+/* Ask about this plan: the conversation (each question, its answer), questions to try or ask next, the box */
+#card .sp-askp .sp-ai-h .sp-link{font-size:12px;padding:0}
+.sp-convo{display:grid;gap:10px;max-height:420px;overflow-y:auto;overscroll-behavior:contain;padding:2px 2px 2px 0}
+.sp-qa{display:grid;gap:6px}
+.sp-q{justify-self:end;max-width:88%;padding:6px 10px;border-radius:10px 10px 2px 10px;background:var(--green-50);border:1px solid var(--green-200);color:var(--text);font-size:12.5px;line-height:1.45}
+.sp-a{max-width:100%;padding:8px 12px;border-left:3px solid var(--brand);background:var(--panel-2);border-radius:0 6px 6px 0;font-size:13px;line-height:1.5;color:var(--text)}
+.sp-a p{margin:0}.sp-a p+p,.sp-a p+ul,.sp-a ul+p{margin-top:6px}
+.sp-a ul{margin:4px 0 0;padding-left:18px;display:grid;gap:2px}
+.sp-a .sp-aerr{color:var(--text-2)}
+#card .sp-qsugs{margin-top:0}
+#card .sp-qsugs .chip{white-space:normal;text-align:left;height:auto;min-height:28px;line-height:1.3;padding-top:4px;padding-bottom:4px}
 #card .sp-chg-acts{margin-top:4px}
 /* Settings: New layouts and the two switches first */
 #card .sp-prm-a{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
