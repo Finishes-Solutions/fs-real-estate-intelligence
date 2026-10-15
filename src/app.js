@@ -116,7 +116,11 @@ const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify(
 const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':'https://api.maptiler.com/maps/'+STYLES[s]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl(layers.style),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
-map.on('error',e=>{ const m=(e&&e.error&&e.error.message)||''; if(/40[13]|Unauthorized|Forbidden/i.test(m)&&STYLES[layers.style]) toast('MapTiler refused the key for this site. Check the key’s allowed origins.'); });
+// MapTiler refusing the key (revoked, or this site isn't an allowed origin): fall back once to the keyless OpenFreeMap
+// streets, so the map, its layers and site plans still work, and say so (setBasemap is hoisted)
+let keyRefused=false;
+map.on('error',e=>{ const m=(e&&e.error&&e.error.message)||''; if(!/40[13]|Unauthorized|Forbidden/i.test(m)||!STYLES[layers.style]) return;
+  if(!keyRefused){ keyRefused=true; toast('MapTiler refused the key for this site, so the map is showing the free OpenFreeMap base map. Check the key’s allowed origins.',{ms:9000}); setBasemap('free'); } });
 
 const fc=features=>({type:'FeatureCollection',features});
 const GJ={
