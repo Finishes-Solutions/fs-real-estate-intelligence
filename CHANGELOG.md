@@ -3,6 +3,28 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-15
+
+### 12:11 AM CT: Site plan tools on the map: right-click, drag one side, add a point, re-fit as you go (b206604, b4c2123, bcfed5c)
+- **Right-click menu:** right-click works while a plan is open (long-press on touch, or the menu key / Shift+F10 for what's selected).
+  - **On a piece:** Duplicate, Copy, Delete, Turn 90°, Edit shape, Add point here, Pin or Let it move, Fit selection and Change with AI.
+  - **On open ground or a lawn:** Add here (the piece lands where you clicked), Measure from here, Fit plan and Paste.
+  - ⌘C / ⌘V (Ctrl+C / Ctrl+V) copy and paste.
+- **Drag one side:** a selected building has white bars on its sides. Drag one to move just that wall; the opposite wall stays put. In Edit Shape, the bar on an edge moves that whole edge, and a small blue + adds a point there.
+- **Add a point:** double-click a building's outline while editing. It turns into points with the new point where you clicked (one Undo step), ready to drag.
+- **The site re-fits as you go:** when you finish moving, resizing, turning, adding, deleting or pasting a piece, the parking, drives and other placed pieces are laid out again around it.
+  - One Undo takes back both your edit and the re-fit.
+  - If re-fitting would lose floor area or units, or add problems, your edit is kept as it is and the message offers **Re-fit anyway**.
+  - Turn it off with **Re-fit the site after each edit** in Site parameters.
+- **Add button on the tool bar** (A): the grouped pieces, the same as the panel's Add section.
+- **A quieter mode indicator:** the dark pill at the top of the map is gone. A small light chip just above the tool bar says what mode you're in, with Done or Cancel.
+- **Lined up:**
+  - The legend, tool bar and scale bar share one line along the bottom of the map.
+  - Folding the legend no longer moves the tool bar.
+  - Cursors show what each handle does.
+  - On phones the tool bar hides while the sheet is pulled up full.
+- **Labels:** a building reshaped by hand reads "custom shape", not "curved".
+
 ## 2026-10-14
 
 ### 11:43 PM CT: A tidier site plan panel (155dd4b)
