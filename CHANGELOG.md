@@ -5,6 +5,22 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 5:18 PM CT: Parking you can drive through; street sides that match the map (5a57490)
+- **Aisles go through.** An aisle with stalls along it no longer stops at a curb.
+  - It runs on until it meets a drive.
+  - Or a short drive across the ends of the rows joins it to the next aisle.
+  - Where the land leaves no way through, the last stalls are left out so cars can turn, if the plan has spaces to spare. Otherwise the plan's checks name the aisle.
+  - Across 30 test layouts, aisles that dead-end went from 40 to 8, with no layout losing the parking it needs.
+- **No stalls past the end of an aisle,** and none right at an entrance.
+  - The first 30 to 75 ft in from the street is a clear driveway.
+  - Adding an entrance by hand clears the stalls beside its mouth, and the checks flag one that's left.
+- **Street sides only where a road really runs along the lot line.**
+  - Driveways and parking lanes don't count, and neither do roads that only pass a corner or short jogs in the lot line.
+  - The front goes to the bigger road.
+  - On 19730 FM 362 the old check marked 6 of the 8 sides. It now finds FM 362 on the west and B Street on the east.
+  - Plans found the old way are checked again once when opened.
+- **Any street side can now be taken off** with Side Street: clicking the main street side moves the front to the other street.
+
 ### 3:39 PM CT: Entrances that fit the site; changes that understand places; moving amenities among homes (57f6d47)
 - **The right number of entrances by itself:** when a request doesn't say how many, layouts choose.
   - One for an ordinary lot.
