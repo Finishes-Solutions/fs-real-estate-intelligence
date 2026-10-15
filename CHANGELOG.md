@@ -3,6 +3,15 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-15
+
+### 10:42 AM CT: The map keeps working when MapTiler is over its limit (1bddf09)
+- MapTiler (the Default, Streets, Satellite and Topo base maps, and part of search) ran out of its monthly quota and suspended the account, which left the map blank and address search empty.
+- Now, when MapTiler stops serving, the map switches by itself to the free OpenStreetMap map in the same style: a plain light or dark map for Default, a street map for Streets and Topo, ESRI imagery for Satellite. A note says so once, and Data sources shows which map is in use.
+- Address and place search, "Ask AI about this spot" and naming the spot you're looking at outside Texas use OpenStreetMap search instead.
+- The app remembers the outage for 6 hours, so reloads go straight to the free map instead of failing first, then tries MapTiler again.
+- The nightly data refresh no longer marks an address as "not found" just because MapTiler refused; it's tried again the next night.
+
 ## 2026-10-14
 
 ### 10:33 PM CT: Faster search, and a reload that keeps your place (43fdad5)
