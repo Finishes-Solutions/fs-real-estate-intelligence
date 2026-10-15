@@ -216,4 +216,63 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
   assert.deepEqual(T.refitVerdict({ m: { gfa: 1000, spaces: 50, required: 50 }, issues: [] }, { m: { gfa: 1000, spaces: 45, required: 50 }, issues: [] }), { ok: false, why: 'problems' }, 'parking short where it was not');
   assert.ok(T.refitVerdict({ m: { gfa: 1000 }, issues: [] }, { m: { gfa: 960 }, issues: [] }).ok, 'within 5%: fine');
 }
+// ---- the development mix: each use's building footprint, its share of the site, and the zones, on real layouts ----
+{
+  const sq = (o, w, d) => siteOf(mk(o, [[0, 0], [w, 0], [w, d], [0, d]]));
+  const planOf = (site, prog) => { const op = L.layoutOptions(site, prog, { count: 1 })[0]; return { ...site, elements: op.elements, program: op.program, zones: op.zones || [] }; };
+  const near = (a, b, tol = 0.5) => Math.abs(a - b) <= tol;
+  // the sums agree with the plan's own numbers: footprint (buildings, not garages), floor area, the site
+  const agrees = (p, what) => {
+    const x = T.mixOf(p), m = S.metrics(p), B = p.elements.filter(e => e.kind === 'building');
+    assert.ok(near(x.siteSf, m.siteSf) && near(x.siteAcres, m.acres, 1e-9), what + ': the site is the boundary');
+    assert.ok(near(x.total.footprintSf, m.footprint), what + ': footprints add up to the plan’s (' + Math.round(x.total.footprintSf) + ' vs ' + Math.round(m.footprint) + ')');
+    assert.ok(near(x.total.gfa, m.gfa), what + ': floor area adds up'); assert.equal(x.total.buildings, B.length);
+    assert.ok(near(x.total.pctSite, m.coverage, 1e-9) && near(x.rows.reduce((s, r) => s + r.pctSite, 0), m.coverage, 1e-9), what + ': the shares add up to the coverage');
+    for (const r of x.rows) {
+      const mine = B.filter(e => T.mixKey(p, e) === r.use), sf = mine.reduce((s, e) => s + S.footArea(e), 0);
+      assert.ok(near(r.footprintSf, sf) && r.buildings === mine.length, what + ': ' + r.label + ' is its buildings’ footprints');
+      assert.ok(near(r.acres, sf / 43560, 1e-9) && near(r.pctSite, sf / m.siteSf, 1e-9) && near(r.gfa, mine.reduce((s, e) => s + S.gfaOf(e), 0)));
+      assert.match(r.color, /^#[0-9a-f]{6}$/);
+    }
+    assert.equal(new Set(x.rows.map(r => r.color)).size, x.rows.length, what + ': a colour each');
+    assert.ok(x.total.footprintSf + m.paved + m.pond < x.siteSf, what + ': parking, drives and ponds aren’t in it');
+    assert.deepEqual(x.rows.map(r => r.footprintSf), x.rows.map(r => r.footprintSf).sort((a, b) => b - a), 'biggest first');
+    return x;
+  };
+  // shops, restaurants and offices in zones from the street back
+  const shops = planOf(sq([-95.70, 29.70], 900, 700), S.guessProgram('15,000 sf retail, 5,000 sf restaurant and 20,000 sf office')), xs = agrees(shops, 'retail/restaurant/office');
+  assert.deepEqual(xs.rows.map(r => r.use).sort(), ['office', 'restaurant', 'retail'], 'three uses');
+  assert.deepEqual(xs.rows.map(r => r.label).sort(), ['Office', 'Restaurant', 'Retail']);
+  assert.equal(xs.rows.find(r => r.use === 'retail').color, M.USE_COL.retail, 'retail keeps the Plan key’s colour');
+  assert.notEqual(xs.rows.find(r => r.use === 'restaurant').color, M.USE_COL.retail, 'restaurants (the same colour in the key) get one of their own');
+  assert.ok(xs.rows.find(r => r.use === 'retail').footprintSf >= 15000 * 0.95 && xs.rows.find(r => r.use === 'office').gfa >= 20000 * 0.95, 'about what was asked');
+  assert.equal(xs.zones.length, 3, 'its zones'); assert.ok(xs.zones.every(z => z.acres > 0 && near(z.pctSite, z.landSf / xs.siteSf, 1e-9) && z.landSf <= S.ringArea(shops.zones.find(q => q.name === z.name).ring) + 0.5));
+  const zsum = xs.zones.reduce((s, z) => s + z.landSf, 0); assert.ok(zsum <= xs.siteSf * 1.001 && zsum > xs.siteSf * 0.6, 'the zones share the site, a zone inside another counted once: ' + T.fmtPct(zsum / xs.siteSf));
+  for (const z of xs.zones) { const r = xs.rows.find(q => q.use === z.use); assert.ok(r && z.color === r.color, z.name + ': the colour of its use'); assert.ok(z.landSf > r.footprintSf, z.name + ': its land (with its parking) is more than its buildings'); }
+  // apartments behind retail on the front: the clubhouse is an amenity, not an apartment building
+  const mf = planOf(sq([-95.71, 29.71], 900, 1100), S.guessProgram('200 apartments with 20,000 sf of retail on the front')), xm = agrees(mf, 'multifamily + retail');
+  assert.deepEqual(xm.rows.map(r => r.use).sort(), ['amenity', 'multifamily', 'retail']); assert.equal(xm.rows[0].use, 'multifamily', 'the apartments cover the most');
+  assert.equal(xm.rows.find(r => r.use === 'amenity').buildings, mf.elements.filter(e => e.name === 'Clubhouse').length);
+  assert.equal(xm.rows.find(r => r.use === 'multifamily').color, M.USE_COL.multifamily); assert.equal(xm.rows.find(r => r.use === 'amenity').color, M.USE_COL.amenity, 'distinct already: the Plan key’s colours');
+  assert.deepEqual(xm.zones.map(z => z.use), ['retail', 'multifamily']);
+  // homes and a commons with a community center: homes counted as homes, the center as an amenity
+  const nb = planOf(sq([-95.72, 29.72], 1200, 1100), { use: 'mixed', zones: [{ use: 'sfr', units: 80 }, { use: 'amenity', items: ['center', 'pool', 'playground'] }] }), xn = agrees(nb, 'single-family + amenity center');
+  const homes = xn.rows.find(r => r.use === 'sfr'), am = xn.rows.find(r => r.use === 'amenity');
+  assert.ok(homes && homes.label === 'Single-family homes' && homes.noun === 'home' && homes.buildings >= 80, 'the homes: ' + homes?.buildings);
+  assert.ok(am && am.buildings === nb.elements.filter(e => e.name === 'Community center').length && am.buildings >= 1, 'the community center');
+  assert.ok(xn.zones.some(z => z.use === 'amenity') && xn.zones.some(z => z.use === 'sfr'));
+  // Phase 2: counted in, its share said; one use on its own: no zones list (its one zone is the whole site)
+  const xp = agrees(plan, '240 apartments'), apts = xp.rows.find(r => r.use === 'multifamily'), p2 = plan.elements.filter(e => e.kind === 'building' && e.phase === 2);
+  assert.ok(p2.length && apts.phase2 && apts.phase2.buildings === p2.length && near(apts.phase2.footprintSf, p2.reduce((s, e) => s + S.footArea(e), 0)), 'Phase 2’s share of the apartments');
+  assert.equal(T.mixOf({ ...plan, zones: [{ name: 'Multifamily', use: 'multifamily', ring: plan.ring }] }).zones.length, 0);
+  // a parking garage is parking: counted apart, not in a use
+  const gar = { id: 'g1', kind: 'garage', x: 100, y: 100, w: 180, d: 120, rot: 0, levels: 4 }, xg = T.mixOf({ ...shops, elements: shops.elements.concat(gar) });
+  assert.ok(near(xg.total.footprintSf, xs.total.footprintSf) && xg.garages.count === 1 && near(xg.garages.footprintSf, 180 * 120));
+  // the colours: told apart, the Plan key's where they can be; the fill picks one use out
+  const cs = T.mixColors(['retail', 'restaurant', 'office', 'medical', 'hotel', 'multifamily', 'townhomes', 'sfr', 'amenity']), vals = Object.values(cs);
+  assert.equal(new Set(vals).size, vals.length); assert.equal(cs.retail, M.USE_COL.retail);
+  assert.equal(T.mixFill('office', cs, { focus: 'retail' }), '#cdd1d3'); assert.equal(T.mixFill('retail', cs, { focus: 'retail' }), cs.retail); assert.equal(T.mixFill('retail', cs, { ph: 2 }), M.lighten(cs.retail, 0.4));
+  assert.equal(T.fmtPct(0.046), '4.6%'); assert.equal(T.fmtPct(0.123), '12%'); assert.equal(T.fmtPct(0.0004), '<0.1%'); assert.equal(T.fmtAc(0.344), '0.34 ac'); assert.equal(T.fmtAc(12.47), '12.5 ac');
+  assert.deepEqual(T.mixOf({ ring: [], elements: [] }).rows, []);
+}
 console.log('site tools ok');
