@@ -3312,6 +3312,23 @@ table.who tr.nomatch td{border:0}
 /* Correlation explorer: a fixed control column, the chart takes the rest */
 #view-market .mx-wrap{grid-template-columns:280px minmax(0,1fr)}
 @media (max-width:980px){ #view-market .mx-wrap{grid-template-columns:minmax(0,1fr)} }
+/* Ask AI: no status in the header while it works; the pending bubble at the bottom shows a quiet live line instead
+   ("Thinking", then the step it's on) with a soft shimmer, and a finished turn's steps fold into one muted line above
+   its answer that opens to list them */
+.ai-m.pending{padding:2px 0}
+.ai-work{display:inline-flex;align-items:center;font-size:13px;line-height:1.5;color:var(--text-2)}
+.ai-wl{background:linear-gradient(90deg,var(--muted) 0%,var(--muted) 35%,var(--text) 50%,var(--muted) 65%,var(--muted) 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ai-shimmer 1.8s linear infinite}
+@keyframes ai-shimmer{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.ai-wl{animation:none;background:none;color:var(--text-2)}}
+.ai-steps{align-self:flex-start;max-width:100%;margin:-4px 0 -2px;font-size:12px;color:var(--muted)}
+.ai-steps summary{display:inline-flex;align-items:center;gap:4px;cursor:var(--cur-pointer,pointer);list-style:none;border-radius:4px;padding:1px 2px;margin-left:-2px}
+.ai-steps summary::-webkit-details-marker{display:none}
+.ai-steps summary::after{content:"›";font-size:14px;line-height:1;transition:transform 150ms}
+.ai-steps[open] summary::after{transform:rotate(90deg)}
+.ai-steps summary:hover{color:var(--text-2)}
+.ai-steps ol{margin:4px 0 2px;padding-left:18px;display:grid;gap:1px}
+.ai-steps li span{font-family:var(--font-mono);font-size:11px}
+@media (prefers-reduced-motion:reduce){.ai-steps summary::after{transition:none}}
 /* Market on a phone: a wider label column for the bar lists, the Correlate link goes (the row opens it), full tile rows */
 @media (max-width:700px){
   #view-market .mk-hb{grid-template-columns:minmax(0,46%) minmax(0,1fr) 68px;gap:8px}
