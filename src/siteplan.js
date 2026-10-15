@@ -611,7 +611,7 @@ export function initSitePlan(ctx) {
       const set = fc !== EMPTY ? sels() : [];
       if (set.length > 1) { const on = new Set(set); for (const f of fc.features) { const q = f.properties; if (q?.id != null && on.has(q.id)) q.sel = 1; } } // every piece of a set lit up
       if (set.length === 1) { const one = pl.elements.find(e => e.id === set[0]), F = SP.frame(pl.origin); for (const d of T.dimLabels(one, Math.max(10, (ed.editing ? 17 : 11) * ftPerPx()))) fc.features.push({ type: 'Feature', properties: { k: 'dim', t: d.text, r: d.rot, kind: one.kind }, geometry: { type: 'Point', coordinates: F.toLL(d.at) } }); } // its width and depth
-      if (fc !== EMPTY) MAP.decorate(fc, pl, { flash: ed.flash?.ids }); // labels know their piece, priorities, Phase 2 labels (one pass)
+      if (fc !== EMPTY) MAP.decorate(fc, pl, { flash: ed.hov ? new Set([...(ed.flash?.ids || []), ed.hov]) : ed.flash?.ids }); // ed.hov: a row hovered in Items // labels know their piece, priorities, Phase 2 labels (one pass)
       if (fc !== EMPTY && (pl.parcels?.length > 1 || ed.mode === 'parcels')) for (const k of pl.parcels || []) { const r = P0.parcels.find(x => x.key === k); if (r?.geometry) fc.features.push({ type: 'Feature', properties: { k: 'pline' }, geometry: r.geometry }); }
       const V = T.viewOf(pl); if (fc !== EMPTY) fc = T.visibleFeatures(fc, V); // hidden layers: the map only (numbers, checks and exports count everything)
       s.setData(fc); drawGrid(pl, V);
@@ -619,7 +619,7 @@ export function initSitePlan(ctx) {
       drawD();
       // something picked: the other buildings step back (extrusion opacity is per layer, so it's set here, only on a change)
       const dim = !!(ed?.sel && pl?.elements.some(e => e.id === ed.sel)); if (dim !== dimmed && map.getLayer('fs-sp-bldg')) { dimmed = dim; map.setPaintProperty('fs-sp-bldg', 'fill-extrusion-opacity', dim ? .75 : .88); map.setPaintProperty('fs-sp-bldg2', 'fill-extrusion-opacity', dim ? .5 : .6); map.setPaintProperty('fs-sp-b3', 'fill-extrusion-opacity', dim ? .75 : .95); }
-      if (!drag?.moved) planKey(pl); // never mid-drag
+      if (!drag?.moved) { planKey(pl); if (popKind === 'layers') paintItems(); } // never mid-drag; the Items list follows the plan
     });
   }
   // the grid (pl.view.grid): light lines square to the lot over the site's box, from street zoom (redrawn only on a change)
@@ -1027,8 +1027,8 @@ export function initSitePlan(ctx) {
   if (window.ResizeObserver) { const lro = new ResizeObserver(() => { if (ed) placeStrip(); }), watchKey = () => { const lg = document.getElementById('legends'); if (lg) lro.observe(lg); else setTimeout(watchKey, 1000); }; watchKey(); } // the Plan key folds and unfolds
   // the pop-overs from the strip: what to draw, and Layers
   let popKind = null, popBtn = null;
-  function openPop(kind, b) { closeMenu(); popKind = kind; popBtn = b; pop.hidden = false; pop.dataset.kind = kind; if (kind === 'layers') paintLayers(); else if (kind === 'add') paintAdd(); else paintChooser(kind); placePop(); paintTools(); pop.querySelector('button, input')?.focus({ preventScroll: true }); }
-  function closePops() { const was = popKind; popKind = null; pop.hidden = true; pop.innerHTML = ''; if (was) { paintTools(); if (popBtn && document.activeElement && pop.contains(document.activeElement)) popBtn.focus(); } }
+  function openPop(kind, b) { closeMenu(); if (itRen != null) endRename(true); popKind = kind; popBtn = b; pop.hidden = false; pop.dataset.kind = kind; pop.classList.remove('sp-items'); pop.innerHTML = ''; itSel = null; if (kind === 'layers') paintLayers(); else if (kind === 'add') paintAdd(); else paintChooser(kind); placePop(); paintTools(); pop.querySelector('button, input')?.focus({ preventScroll: true }); }
+  function closePops() { if (itRen != null) endRename(true); const was = popKind; popKind = null; pop.hidden = true; pop.innerHTML = ''; pop.classList.remove('sp-items'); if (ed?.hov) hoverItem(null); if (was) { paintTools(); if (popBtn && document.activeElement && pop.contains(document.activeElement)) popBtn.focus(); } }
   const closeChooser = closePops;
   function placePop() { if (!popKind || !popBtn) return; const u = mapUi.getBoundingClientRect(), b = popBtn.getBoundingClientRect(), s0 = strip.getBoundingClientRect(), c = pillMode.hidden ? null : pillMode.getBoundingClientRect();
     const s = c ? { top: Math.min(s0.top, c.top), bottom: Math.max(s0.bottom, c.bottom) } : s0; // clear of the mode chip on the strip too
@@ -1091,20 +1091,133 @@ export function initSitePlan(ctx) {
   }
   const EYE = on => on ? IC('<path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>') : IC('<path d="M2 2l12 12M6.4 3.8A6.8 6.8 0 0 1 8 3.5C12.1 3.5 14.5 8 14.5 8a11 11 0 0 1-1.9 2.5M10.6 10.9A5.6 5.6 0 0 1 8 12.5C3.9 12.5 1.5 8 1.5 8a11.5 11.5 0 0 1 2.6-3"/>');
   const LOCKI = on => on ? IC('<rect x="3.5" y="7" width="9" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>') : IC('<rect x="3.5" y="7" width="9" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1"/>');
+  // Layers has two tabs: Layers (each kind of thing hidden or locked, the grid, snapping) and Items (every piece of the
+  // plan under its layer, as in a design tool's layers panel: pick one, Shift-click to add to the set, double-click, F2
+  // or the pencil to rename it). The tab last used is remembered on this device.
+  const LTAB_KEY = 'fs-sp-ltab', att = s => esc(s).replace(/"/g, '&quot;');
+  let layTab = (() => { try { return localStorage.getItem(LTAB_KEY) === 'items' ? 'items' : 'layers'; } catch (e) { return 'layers'; } })();
+  const layTabs = () => '<div class="sp-ltabs" role="tablist" aria-label="Layers or items">' + [['layers', 'Layers'], ['items', 'Items']].map(([k, l]) => '<button type="button" role="tab" id="spLt-' + k + '" data-ltab="' + k + '" aria-selected="' + (layTab === k) + '" aria-controls="spLp" tabindex="' + (layTab === k ? 0 : -1) + '">' + l + '</button>').join('') + '</div>';
+  const layerBtns = (L, V) => { const hid = V.hidden.includes(L.id), lk = V.locked.includes(L.id);
+    return '<button type="button" class="sp-lb" data-f="eye:' + L.id + '" aria-pressed="' + !hid + '" aria-label="' + (hid ? 'Show ' : 'Hide ') + esc(L.label) + '" title="' + (hid ? 'Show' : 'Hide') + ' on the map">' + EYE(!hid) + '</button>' +
+      (T.lockable(L) ? '<button type="button" class="sp-lb" data-f="lock:' + L.id + '" aria-pressed="' + lk + '" aria-label="' + (lk ? 'Unlock ' : 'Lock ') + esc(L.label) + '" title="' + (lk ? 'Locked: can’t be picked or moved' : 'Lock so it can’t be picked or moved') + '">' + LOCKI(lk) + '</button>' : '<span class="sp-lb-x"></span>'); };
+  const flipLayer = b => { const [k, v] = b.dataset.f.split(':');
+    setView(x => { if (k === 'eye') x.hidden = x.hidden.includes(v) ? x.hidden.filter(q => q !== v) : x.hidden.concat(v); else if (k === 'lock') x.locked = x.locked.includes(v) ? x.locked.filter(q => q !== v) : x.locked.concat(v); else if (k === 'grid') { x.grid = +v; if (+v) x.lastGrid = +v; } else if (k === 'snap') x.snap = b.checked; }); };
   function paintLayers() {
-    if (popKind !== 'layers' || !ed) return; const pl = PL(), V = T.viewOf(pl), f = document.activeElement && pop.contains(document.activeElement) ? document.activeElement.dataset.f : null;
-    pop.innerHTML = '<div class="sp-tp-h">Layers</div><div class="sp-lrows">' + T.LAYERS.map(L => { const hid = V.hidden.includes(L.id), lk = V.locked.includes(L.id);
-      return '<div class="sp-lrow' + (hid ? ' off' : '') + '"><span>' + esc(L.label) + (L.id === 'trees' ? '<small>On the map only; Trees in Settings › Look takes them off the plan and the PDF</small>' : '') + '</span>' +
-        '<button type="button" class="sp-lb" data-f="eye:' + L.id + '" aria-pressed="' + !hid + '" aria-label="' + (hid ? 'Show ' : 'Hide ') + esc(L.label) + '" title="' + (hid ? 'Show' : 'Hide') + ' on the map">' + EYE(!hid) + '</button>' +
-        (T.lockable(L) ? '<button type="button" class="sp-lb" data-f="lock:' + L.id + '" aria-pressed="' + lk + '" aria-label="' + (lk ? 'Unlock ' : 'Lock ') + esc(L.label) + '" title="' + (lk ? 'Locked: can’t be picked or moved' : 'Lock so it can’t be picked or moved') + '">' + LOCKI(lk) + '</button>' : '<span class="sp-lb-x"></span>') + '</div>'; }).join('') + '</div>' +
+    if (popKind !== 'layers' || !ed) return;
+    if (layTab === 'items') { if (!pop.querySelector('.sp-il')) { pop.innerHTML = layTabs() + '<div class="sp-il" id="spLp" role="tabpanel" aria-labelledby="spLt-items"></div>'; itSig = ''; } pop.classList.add('sp-items'); paintItems(true); return; }
+    pop.classList.remove('sp-items'); const pl = PL(), V = T.viewOf(pl), f = document.activeElement && pop.contains(document.activeElement) ? document.activeElement.dataset.f : null;
+    pop.innerHTML = layTabs() + '<div id="spLp" role="tabpanel" aria-labelledby="spLt-layers"><div class="sp-lrows">' + T.LAYERS.map(L => { const hid = V.hidden.includes(L.id);
+      return '<div class="sp-lrow' + (hid ? ' off' : '') + '"><span>' + esc(L.label) + (L.id === 'trees' ? '<small>On the map only; Trees in Settings › Look takes them off the plan and the PDF</small>' : '') + '</span>' + layerBtns(L, V) + '</div>'; }).join('') + '</div>' +
       '<div class="sp-tp-sub">Grid <span class="sp-seg" role="group" aria-label="Grid">' + [[0, 'Off'], [5, '5 ft'], [10, '10 ft']].map(([g, l]) => '<button type="button" data-f="grid:' + g + '" aria-pressed="' + (V.grid === g) + '">' + l + '</button>').join('') + '</span></div>' +
       '<label class="sp-tp-sw2"><input type="checkbox" data-f="snap"' + (V.snap ? ' checked' : '') + '><span>Snap to edges<small>Lines pieces up with their neighbours; hold Alt to move freely</small></span></label>' +
-      '<div class="sp-tp-n">Exports always include every layer.</div>';
-    pop.querySelectorAll('[data-f]').forEach(b => b[b.type === 'checkbox' ? 'onchange' : 'onclick'] = () => { const [k, v] = b.dataset.f.split(':');
-      setView(x => { if (k === 'eye') x.hidden = x.hidden.includes(v) ? x.hidden.filter(q => q !== v) : x.hidden.concat(v); else if (k === 'lock') x.locked = x.locked.includes(v) ? x.locked.filter(q => q !== v) : x.locked.concat(v); else if (k === 'grid') { x.grid = +v; if (+v) x.lastGrid = +v; } else if (k === 'snap') x.snap = b.checked; }); });
+      '<div class="sp-tp-n">Exports always include every layer.</div></div>';
+    pop.querySelectorAll('[data-f]').forEach(b => b[b.type === 'checkbox' ? 'onchange' : 'onclick'] = () => flipLayer(b));
     if (f) pop.querySelector('[data-f="' + f + '"]')?.focus({ preventScroll: true });
   }
-  document.addEventListener('pointerdown', e => { if (popKind && !pop.contains(e.target) && !strip.contains(e.target)) closePops(); }, true);
+  function setTab(t, focus) {
+    if (t === layTab && pop.querySelector('[data-ltab]')) { if (focus) pop.querySelector('[data-ltab="' + t + '"]')?.focus({ preventScroll: true }); return; }
+    if (itRen != null) endRename(true); layTab = t; try { localStorage.setItem(LTAB_KEY, t); } catch (e) { /* this visit only */ }
+    pop.innerHTML = ''; itSel = null; paintLayers(); placePop(); if (focus) pop.querySelector('[data-ltab="' + t + '"]')?.focus({ preventScroll: true });
+  }
+  // ----- Items -----
+  // The list repaints whenever the map does (draw), but only rebuilds when what it shows changes; a new selection just
+  // moves the highlight (and scrolls to it). Never mid-rename or mid-click (the row under the pointer would be swapped
+  // out and the click lost): it waits, then catches up. Folded layers: ed.fold; long ones (not buildings) start folded.
+  let itSig = '', itSel = null, itRen = null, itPress = false, itDirty = false, hovT = 0;
+  const PEN = IC('<path d="M2.5 13.5l.6-3L10.8 2.8a1.5 1.5 0 0 1 2.1 0l.3.3a1.5 1.5 0 0 1 0 2.1L5.5 12.9z"/><path d="M9.5 4l2.5 2.5"/>');
+  const itBox = () => popKind === 'layers' && layTab === 'items' ? pop.querySelector('.sp-il') : null;
+  const itNavs = box => [...box.querySelectorAll('[data-nav]')];
+  const itShut = g => ed.fold?.[g.id] ?? (g.id !== 'buildings' && g.items.length > 12);
+  const itRow = (box, id) => [...box.querySelectorAll('.sp-it')].find(r => r.dataset.id === String(id));
+  const navKey = a => a.dataset.pick != null ? '[data-pick="' + CSS.escape(a.dataset.pick) + '"]' : a.dataset.fold ? '[data-fold="' + a.dataset.fold + '"]' : a.dataset.f ? '[data-f="' + a.dataset.f + '"]' : a.dataset.ren != null ? '[data-ren="' + CSS.escape(a.dataset.ren) + '"]' : null;
+  function paintItems(force) {
+    const box = itBox(), pl = ed && PL(); if (!box || !pl) return;
+    const V = T.viewOf(pl), groups = T.itemGroups(pl), set = sels(), on = new Set(set), selKey = set.join('\n'), newSel = selKey !== itSel;
+    if (newSel && set.length) for (const g of groups) if (itShut(g) && g.items.some(i => on.has(i.id))) (ed.fold ||= {})[g.id] = false; // picked on the map: its layer opens
+    const sig = JSON.stringify([groups, V.hidden, V.locked, groups.map(itShut)]);
+    if (itRen != null || itPress) { itDirty = itDirty || force || sig !== itSig; markItems(box, on, newSel); itSel = selKey; return; }
+    if (force || itDirty || sig !== itSig) {
+      const top = box.scrollTop, a = document.activeElement, k = a && box.contains(a) ? navKey(a) : null, at = k ? itNavs(box).indexOf(a.closest('.sp-it')?.querySelector('[data-nav]') || a) : -1;
+      box.innerHTML = groups.length ? groups.map(g => { const L = T.LAYERS.find(x => x.id === g.id), hid = V.hidden.includes(g.id), lk = V.locked.includes(g.id), shut = itShut(g), why = hid ? ' · hidden on the map' : lk ? ' · locked' : '';
+        return '<div class="sp-ig' + (hid ? ' off' : '') + (lk ? ' lk' : '') + '" role="group" aria-label="' + att(g.label) + '"><div class="sp-ig-h"><button type="button" class="sp-ig-f" data-fold="' + g.id + '" data-nav tabindex="-1" aria-expanded="' + !shut + '" title="' + (shut ? 'Show' : 'Fold') + ' the ' + att(g.label.toLowerCase()) + '"><i class="sp-ig-c" aria-hidden="true"></i><span>' + esc(g.label) + '</span><small>' + g.items.length + '</small></button>' + layerBtns(L, V) + '</div>' +
+          (shut ? '' : '<div class="sp-ig-l">' + g.items.map(it => '<div class="sp-it" data-id="' + att(it.id) + '"><button type="button" class="sp-it-b" data-pick="' + att(it.id) + '" data-nav tabindex="-1" aria-pressed="false" title="' + att(it.name + ' · ' + it.sub + why) + '"><i class="sp-it-sw' + (it.kind === 'keepout' ? ' ko' : '') + '" style="--c:' + it.color + '" aria-hidden="true"></i><span class="sp-it-t"><span class="sp-it-n">' + esc(it.name) + '</span><small>' + esc(it.sub) + '</small></span></button>' +
+            '<button type="button" class="sp-it-r" data-ren="' + att(it.id) + '" tabindex="-1" aria-label="Rename ' + att(it.name) + '" title="Rename (F2)">' + PEN + '</button></div>').join('') + '</div>') + '</div>'; }).join('')
+        : '<div class="sp-tp-n">Nothing on this plan yet. Build layouts, or add pieces with Add.</div>';
+      box.scrollTop = top; itSig = sig; itDirty = false;
+      if (k) { const navs = itNavs(box), t = box.querySelector(k) || navs[Math.min(Math.max(at, 0), navs.length - 1)]; t?.focus({ preventScroll: true }); }
+    }
+    markItems(box, on, newSel); itSel = selKey;
+  }
+  // the selection highlighted (and kept in view when it changes); one row or layer heading is the list's Tab stop
+  function markItems(box, on, scroll) {
+    let first = null; for (const r of box.querySelectorAll('.sp-it')) { const s = on.has(r.dataset.id); r.classList.toggle('on', s); r.firstElementChild?.setAttribute('aria-pressed', String(s)); if (s && !first) first = r; }
+    const navs = itNavs(box), stop = navs.find(n => n === document.activeElement) || first?.querySelector('[data-nav]') || navs[0]; for (const n of navs) n.tabIndex = n === stop ? 0 : -1;
+    if (scroll && first) keepInView(box, first);
+  }
+  function keepInView(box, el) { const b = box.getBoundingClientRect(), r = el.getBoundingClientRect(), head = el.classList.contains('sp-it') ? (el.closest('.sp-ig')?.querySelector('.sp-ig-h')?.offsetHeight || 0) : 0; // under the sticky layer heading counts as hidden
+    if (r.top < b.top + head) box.scrollTop -= b.top + head - r.top + 4; else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom + 4; }
+  // a row clicked: that piece picked (Shift, ⌘ or Ctrl: in or out of the set), as a click on the map does, and brought into view
+  function pickItem(id, ev) {
+    const pl = PL(), el = pl?.elements.find(e => e.id === id); if (!el) return; const V = T.viewOf(pl);
+    if (!T.editable(V, el)) { const L = T.LAYERS.find(x => x.id === T.layerOf(el.kind)); ctx.toast('The ' + L.label + ' layer is ' + (V.hidden.includes(L.id) ? 'hidden on the map: show it' : 'locked: unlock it') + ' to pick ' + ED.labelOf(el) + '.'); return; }
+    if (ev?.shiftKey || ev?.metaKey || ev?.ctrlKey) toggleSel(id); else if (ed.sel !== id || sels().length > 1) { pickOne(id); ed.shape = null; draw(); panel(); }
+    showPiece(el);
+  }
+  function foldItems(gid, open) { (ed.fold ||= {})[gid] = !open; paintItems(true); }
+  // renaming in place: Enter or leaving the box keeps it, Esc puts it back; an empty name gives the piece its label back.
+  // One undo step, the same as the Name box under Selected.
+  function startRename(id) {
+    const box = itBox(); if (!box) return; if (itRen != null) endRename(true);
+    const row = itRow(box, id), el = PL()?.elements.find(e => e.id === id); if (!row || !el) return;
+    itRen = id; row.classList.add('ren'); const b = row.querySelector('.sp-it-b'), sw = b.querySelector('.sp-it-sw').cloneNode(true);
+    const w = document.createElement('div'); w.className = 'sp-it-e'; const inp = document.createElement('input');
+    Object.assign(inp, { type: 'text', className: 'sp-it-in', maxLength: 40, value: ED.labelOf(el), placeholder: ED.labelOf({ ...el, name: '' }), spellcheck: false, autocomplete: 'off' }); inp.setAttribute('aria-label', 'New name for ' + ED.labelOf(el));
+    w.append(sw, inp); b.hidden = true; row.insertBefore(w, b);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endRename(e.key === 'Enter', true); } });
+    inp.addEventListener('blur', () => { if (itRen === id) endRename(true); });
+    inp.focus({ preventScroll: true }); inp.select(); keepInView(box, row);
+  }
+  function endRename(keep, refocus) {
+    const id = itRen; if (id == null) return; itRen = null; const box = itBox(), row = box && itRow(box, id), inp = row?.querySelector('.sp-it-in'), v = inp ? T.cleanName(inp.value) : null;
+    const el = PL()?.elements.find(e => e.id === id);
+    if (row) { row.classList.remove('ren'); row.querySelector('.sp-it-e')?.remove(); const b = row.querySelector('.sp-it-b'); if (b) b.hidden = false; }
+    if (keep && el && v != null && v !== (el.name || '') && !(!el.name && v === ED.labelOf(el))) { change(x => { const t = x.elements.find(q => q.id === id); if (t) t.name = v; }); const n = row?.querySelector('.sp-it-n'); if (n) n.textContent = ED.labelOf(el); }
+    if (itDirty || keep) paintItems(true);
+    if (refocus && box) { const b = box.querySelector('[data-pick="' + CSS.escape(String(id)) + '"]'); if (b) { b.focus({ preventScroll: true }); keepInView(box, b.closest('.sp-it')); } }
+  }
+  // the keys in Items: ↑ ↓ Home End move through the rows and layer headings, ← folds a layer (on a row: to its
+  // heading), → unfolds; Enter picks the row (on the piece already picked, renames it), F2 renames; ← → on the tabs switch
+  function popNav(e) {
+    if (popKind !== 'layers') return false; const k = e.key, t = e.target, stop = () => { e.preventDefault(); e.stopPropagation(); };
+    if (t.dataset?.ltab) { if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'Home' || k === 'End') { stop(); setTab(k === 'Home' ? 'layers' : k === 'End' ? 'items' : t.dataset.ltab === 'items' ? 'layers' : 'items', true); return true; }
+      const box = itBox(); if (box && k === 'ArrowDown') { stop(); const a = box.querySelector('[data-nav][tabindex="0"]') || box.querySelector('[data-nav]'); a?.focus({ preventScroll: true }); if (a) keepInView(box, a.closest('.sp-it') || a); return true; } return !!box; }
+    const box = itBox(); if (!box || !box.contains(t)) return false; stop();
+    const navs = itNavs(box), cur = t.closest('.sp-ig-h')?.querySelector('[data-nav]') || t.closest('.sp-it')?.querySelector('[data-nav]') || t, i = navs.indexOf(cur);
+    if (cur.dataset.fold && (k === 'ArrowLeft' || k === 'ArrowRight')) { if ((cur.getAttribute('aria-expanded') === 'true') === (k === 'ArrowLeft')) foldItems(cur.dataset.fold, k === 'ArrowRight'); return true; }
+    if (k === 'ArrowLeft' && cur.dataset.pick != null) { cur.closest('.sp-ig')?.querySelector('[data-fold]')?.focus({ preventScroll: true }); return true; }
+    if (k === 'ArrowUp' && i <= 0) { pop.querySelector('[data-ltab][aria-selected="true"]')?.focus({ preventScroll: true }); return true; }
+    const to = k === 'Home' ? 0 : k === 'End' ? navs.length - 1 : k === 'ArrowDown' ? Math.min(navs.length - 1, i + 1) : k === 'ArrowUp' ? i - 1 : -1;
+    if (to >= 0 && navs[to]) { navs[to].focus({ preventScroll: true }); keepInView(box, navs[to].closest('.sp-it') || navs[to]); }
+    return true;
+  }
+  pop.addEventListener('click', e => {
+    const tb = e.target.closest('[data-ltab]'); if (tb) { setTab(tb.dataset.ltab, true); return; }
+    if (!itBox()?.contains(e.target)) return; const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.f) flipLayer(b); else if (b.dataset.fold) foldItems(b.dataset.fold, b.getAttribute('aria-expanded') !== 'true'); else if (b.dataset.ren != null) startRename(b.dataset.ren); else if (b.dataset.pick != null) pickItem(b.dataset.pick, e);
+  });
+  pop.addEventListener('dblclick', e => { const b = itBox()?.contains(e.target) && e.target.closest('[data-pick]'); if (b) { e.preventDefault(); startRename(b.dataset.pick); } });
+  pop.addEventListener('keydown', e => { const b = itBox()?.contains(e.target) && e.target.closest('[data-pick]'); if (!b || e.altKey || e.metaKey || e.ctrlKey) return; const id = b.dataset.pick;
+    if (e.key === 'F2' || e.key === 'Enter' && sels().length === 1 && sels()[0] === id) { e.preventDefault(); e.stopPropagation(); startRename(id); } });
+  pop.addEventListener('focusin', e => { const box = itBox(); if (!box || !e.target.matches?.('[data-nav]') || !box.contains(e.target)) return; for (const n of itNavs(box)) n.tabIndex = n === e.target ? 0 : -1; });
+  // a press in the list holds back a rebuild until the click lands (see paintItems)
+  pop.addEventListener('pointerdown', e => { if (itBox()?.contains(e.target)) itPress = true; });
+  document.addEventListener('pointerup', () => { if (itPress) setTimeout(() => { itPress = false; if (itDirty && itRen == null) paintItems(true); }, 0); }, true);
+  // hovering a row outlines its piece on the map (a mouse only; a short wait so sweeping down the list doesn't redraw for every row)
+  const hoverItem = id => { clearTimeout(hovT); hovT = setTimeout(() => { if (!ed || ed.hov === id) return; ed.hov = id; draw(); }, id ? 60 : 0); };
+  pop.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse') return; const r = itBox()?.contains(e.target) && e.target.closest('.sp-it'); hoverItem(r && !r.closest('.sp-ig.off') ? r.dataset.id : null); });
+  pop.addEventListener('pointerleave', () => hoverItem(null));
+  // a click outside closes the pop-over; with Items open, a click on the map doesn't (the list follows what you pick there)
+  document.addEventListener('pointerdown', e => { if (popKind && !pop.contains(e.target) && !strip.contains(e.target) && !(popKind === 'layers' && layTab === 'items' && map.getCanvasContainer().contains(e.target))) closePops(); }, true);
 
   // ----- right-click (a long press on touch) while a plan is open: what can be done right there -----
   // On a piece: it's picked, then Duplicate, Copy, Delete, Turn 90°, Edit shape and Add point here (buildings and the
@@ -1249,7 +1362,7 @@ export function initSitePlan(ctx) {
     const pl = ed && PL(), typing = /^(TEXTAREA)$/.test(e.target.tagName) || e.target.tagName === 'INPUT' && !/^(checkbox|radio|button|range)$/.test(e.target.type) || e.target.isContentEditable;
     if (document.querySelector('.xdlg.on, .lbox')) return; // a dialog over the plan (Export, a photo) has the keys, Esc included
     if (!cm.hidden) { menuKey(e); return; } // the right-click menu has them while it's open
-    if (popKind && pop.contains(e.target) && /^(Arrow|Home$|End$)/.test(e.key) && e.target.type !== 'checkbox') { stepFocus(pop, e); return; } // the Add tiles, Layers: arrows step through, never nudge
+    if (popKind && pop.contains(e.target) && /^(Arrow|Home$|End$)/.test(e.key) && e.target.type !== 'checkbox' && e.target.type !== 'text') { if (!popNav(e)) stepFocus(pop, e); return; } // the Add tiles, Layers, Items: arrows step through, never nudge (a name being typed keeps them)
     if (pl && ctx.view === 'map' && !typing && (e.metaKey || e.ctrlKey) && /^[zy]$/i.test(e.key)) { e.preventDefault(); e.stopPropagation(); undo(e.key.toLowerCase() === 'z' ? !e.shiftKey : false, true); return; } // undo and redo work whatever button was last clicked
     if (pl && ctx.view === 'map' && e.key === 'Escape' && card.classList.contains('sp-mode') && e.target.tagName !== 'SELECT') { escStep(e, typing); return; }
     if (!pl || ctx.view !== 'map' || typing || e.target.tagName === 'SELECT' || e.isComposing) return;

@@ -3261,6 +3261,44 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 .sp-tp-sw2{display:flex;align-items:center;gap:6px;padding:8px 6px 0;cursor:var(--cur-pointer,pointer)}
 .sp-tp-sw2 input{accent-color:var(--brand);margin:0}
 .sp-tp-sw2 span{display:grid;gap:1px}
+/* Layers | Items tabs; Items: every piece of the plan under its layer (sticky headings that fold), rename in place */
+.sp-ltabs{display:flex;gap:2px;margin:0 0 8px;padding:2px;border-radius:8px;background:var(--chip)}
+.sp-ltabs button{flex:1;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--text-2);font:600 12px/1.2 var(--font-display);cursor:var(--cur-pointer,pointer)}
+.sp-ltabs button:hover{color:var(--text)}
+.sp-ltabs button[aria-selected="true"]{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(11,13,12,.14)}
+.sp-tpop.sp-items{width:300px;display:flex;flex-direction:column;overflow:hidden;padding-bottom:4px}
+.sp-il{flex:1 1 auto;min-height:0;max-height:420px;overflow:auto;overscroll-behavior:contain;margin:0 -4px;padding:0 4px 4px}
+.sp-ig+.sp-ig{margin-top:2px}
+.sp-ig-h{position:sticky;top:0;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) 28px 28px;align-items:center;gap:2px;background:var(--panel)}
+.sp-ig-f{display:flex;align-items:center;gap:6px;min-width:0;height:28px;padding:0 6px 0 4px;border:0;border-radius:6px;background:transparent;color:var(--text-2);font:700 10.5px/1 var(--font-display);letter-spacing:.08em;text-transform:uppercase;text-align:left;cursor:var(--cur-pointer,pointer)}
+.sp-ig-f:hover{background:var(--chip);color:var(--text)}
+.sp-ig-f span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-ig-f small{flex:none;font-weight:600;letter-spacing:0;color:var(--muted)}
+.sp-ig-c{flex:none;width:6px;height:6px;margin:0 2px 0 3px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(-45deg);transition:transform var(--dur-fast,150ms) var(--ease,ease)}
+[aria-expanded="true"]>.sp-ig-c{transform:translateY(-1px) rotate(45deg)}
+.sp-it{display:grid;grid-template-columns:minmax(0,1fr) 26px;align-items:center;border-radius:6px}
+.sp-it:hover{background:var(--chip)}
+.sp-it.on{background:color-mix(in srgb,var(--brand) 13%,var(--panel))}
+.sp-it.on .sp-it-n{color:var(--brand);font-weight:600}
+.sp-it-b{display:flex;align-items:center;gap:8px;min-width:0;padding:4px 4px 4px 16px;border:0;border-radius:6px;background:transparent;color:var(--text);text-align:left;font:inherit;cursor:var(--cur-pointer,pointer)}
+.sp-it-b[hidden]{display:none}
+.sp-tpop .sp-it-b:focus-visible,.sp-tpop .sp-ig-f:focus-visible{outline-offset:-2px}
+.sp-it-sw{flex:none;width:12px;height:12px;border-radius:3px;background:var(--c);border:1px solid rgba(11,13,12,.18)}
+.sp-it-sw.ko{background:repeating-linear-gradient(45deg,var(--c) 0 1.5px,transparent 1.5px 4px);border:1px dashed var(--c)}
+.sp-it-t{display:grid;gap:1px;min-width:0}
+.sp-it-n,.sp-it-t small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-it-t small{font-size:11px;font-weight:500;color:var(--muted)}
+.sp-it-r{width:26px;height:26px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--muted);opacity:0;cursor:var(--cur-pointer,pointer)}
+.sp-it-r svg{width:13px;height:13px}
+.sp-it:hover .sp-it-r,.sp-it:focus-within .sp-it-r{opacity:1}
+.sp-it-r:hover{background:var(--panel);color:var(--text)}
+.sp-ig.off .sp-it-n,.sp-ig.off .sp-ig-f span{color:var(--muted)}
+.sp-ig.off .sp-it-sw{opacity:.4}
+.sp-it-e{display:flex;align-items:center;gap:8px;min-width:0;padding:3px 4px 3px 16px}
+.sp-it-in{flex:1;min-width:0;padding:4px 6px;border:1px solid var(--brand);border-radius:5px;background:var(--panel);color:var(--text);font:inherit;outline:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 18%,transparent)}
+.sp-it.ren{background:transparent}
+.sp-it.ren .sp-it-r{visibility:hidden}
+@media (hover:none){.sp-it-r{opacity:1}}
 /* a message while planning sits above the tool strip, not over it */
 @media (min-width:701px){.app.planning .toast{bottom:64px}}
 /* Shift-drag on the map: the selection box */
@@ -3289,6 +3327,7 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
   .sp-strip:not(.open) .sp-tgrp:not(:has(.sp-tb:not(.sp-tb-x))){display:none}
   .sp-strip.open{flex-wrap:wrap;max-width:calc(100% - 16px)}
   .sp-tpop{width:min(268px,calc(100vw - 16px))}
+  .sp-tpop.sp-items{width:min(300px,calc(100vw - 16px))}
   .sp-tpop.ph{position:fixed;z-index:var(--z-sheet,11)}
   .sp-mapui:has(.sp-strip:not([hidden])) .sp-mpill{top:52px}
 }

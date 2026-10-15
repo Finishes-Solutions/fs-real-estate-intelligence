@@ -221,4 +221,44 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
   assert.deepEqual(T.refitVerdict({ m: { gfa: 1000, spaces: 50, required: 50 }, issues: [] }, { m: { gfa: 1000, spaces: 45, required: 50 }, issues: [] }), { ok: false, why: 'problems' }, 'parking short where it was not');
   assert.ok(T.refitVerdict({ m: { gfa: 1000 }, issues: [] }, { m: { gfa: 960 }, issues: [] }).ok, 'within 5%: fine');
 }
+// ---- Items (the Layers pop-over's second tab): every piece once, under its layer, with a short line on what it is ----
+{
+  const ED = await import('../lib/siteedit.mjs'), P = M.palette();
+  // the real 240-unit apartment plan: 17 buildings, merged parking groups, curved drives, ponds, lawns, the pool deck
+  const g = T.itemGroups(plan), all = g.flatMap(x => x.items), pieces = plan.elements.filter(e => e.kind !== 'lot');
+  assert.equal(g[0].id, 'buildings', 'buildings first');
+  assert.deepEqual(g.map(x => x.id), T.LAYERS.filter(L => L.kinds && pieces.some(e => L.kinds.includes(e.kind))).map(L => L.id), 'the layers that hold pieces, in the Layers order');
+  assert.equal(all.length, pieces.length, 'every piece listed'); assert.equal(new Set(all.map(i => i.id)).size, all.length, 'each once');
+  for (const x of g) for (const it of x.items) assert.equal(T.layerOf(it.kind), x.id, it.name + ' under its own layer');
+  for (const it of all) assert.ok(it.sub && !/NaN|undefined|null/.test(it.sub), it.name + ': ' + it.sub);
+  const names = g[0].items.map(i => i.name); assert.ok(names.indexOf('Apt Bldg 2') < names.indexOf('Apt Bldg 10'), 'Bldg 2 before Bldg 10');
+  const apt = plan.elements.find(e => e.name === 'Apt Bldg 3'), ai = all.find(i => i.id === apt.id);
+  assert.match(ai.sub, /^Multifamily · 3 floors · \d+ units · [\d,]+ sf$/); assert.equal(ai.color, M.buildingColor(P, 'multifamily'), 'the map colour');
+  const row = plan.elements.find(e => e.kind === 'parking'), ri = all.find(i => i.id === row.id);
+  assert.equal(ri.sub, S.spacesWord(S.stalls(row).count), 'a parking row: its spaces'); assert.equal(ri.color, M.COL.parking);
+  const pond = plan.elements.find(e => e.kind === 'pond'); assert.match(all.find(i => i.id === pond.id).sub, /\d\.\d\d ac$/, 'a pond: its acres');
+  const drive = plan.elements.find(e => e.kind === 'drive' && e.path); assert.match(all.find(i => i.id === drive.id).sub, /ft long$/, 'a drive: how long');
+  // a building as the editor makes one: use, floors and floor area; Phase 2 says so (and is lighter, as on the map)
+  const shop = { id: 's1', kind: 'building', use: 'retail', x: 0, y: 0, w: 120, d: 55.75, floors: 2, rot: 0 };
+  assert.equal(T.itemSub(shop), 'Retail · 2 floors · 13,380 sf');
+  assert.equal(T.itemSub({ ...shop, floors: 1, phase: 2 }), 'Retail · Phase 2 · 1 floor · 6,690 sf');
+  assert.equal(T.itemColor({ ...shop, phase: 2 }), M.buildingColor(P, 'retail', { ph: 2 }));
+  assert.equal(T.itemSub({ ...shop, use: undefined }, { program: { use: 'office' } }), 'Office · 2 floors · 13,380 sf', 'no use of its own: the plan’s');
+  const ease = T.areaPiece({ elements: [] }, 'keepout', [[0, 0], [100, 0], [100, 60], [0, 60]], 'k1');
+  assert.equal(T.itemSub(ease), 'Drawn, not surveyed · 6,000 sf'); assert.equal(T.itemColor(ease), P.lines.keepout);
+  assert.equal(T.itemSub({ id: 'p', kind: 'pond', x: 0, y: 0, w: 220, d: 118.8, note: 'Dry basin' }), 'Dry basin · 0.60 ac');
+  assert.equal(T.itemSub({ id: 't', kind: 'trash', x: 0, y: 0, w: 12, d: 12, note: 'Single · 8 yd dumpster' }), 'Single · 8 yd dumpster');
+  assert.equal(T.itemSub({ id: 'g', kind: 'green', x: 0, y: 0, w: 40, d: 30, name: 'Dog park' }), 'Landscape · 1,200 sf', 'a named lawn says what it is');
+  // a neighbourhood: the homes are listed, their lot lines aren't (they're never picked)
+  const hood = L.layoutOptions(tract, { use: 'sfr' }, { count: 1 })[0], hp = { ...tract, elements: hood.elements, program: hood.program }, hg = T.itemGroups(hp);
+  assert.ok(hood.elements.some(e => e.kind === 'lot') && !hg.flatMap(x => x.items).some(i => i.kind === 'lot'), 'no lot lines');
+  assert.equal(hg[0].items.length, hood.elements.filter(e => e.kind === 'building').length); assert.match(hg[0].items[0].sub, /^House · \d floors? · [\d,]+ sf$/);
+  // renaming: what's typed, trimmed and at most 40 characters; an empty name gives the label back; the list re-sorts
+  assert.equal(T.cleanName('  The Oaks  '), 'The Oaks'); assert.equal(T.cleanName('x'.repeat(60)).length, 40); assert.equal(T.cleanName(null), '');
+  assert.equal(ED.labelOf({ ...shop, name: T.cleanName('   ') }), 'Building'); assert.equal(ED.labelOf({ kind: 'keepout' }), 'Easement');
+  const renamed = { ...plan, elements: plan.elements.map(e => e.id === apt.id ? { ...e, name: 'AAA Leasing' } : e) }, rg = T.itemGroups(renamed);
+  assert.equal(rg[0].items[0].id, apt.id, 'the renamed building sorts to its new place'); assert.equal(rg[0].items[0].name, 'AAA Leasing');
+  assert.equal(plan.elements.find(e => e.id === apt.id).name, 'Apt Bldg 3', 'the plan given is not changed');
+  assert.deepEqual(T.itemGroups({}), [], 'an empty plan: nothing');
+}
 console.log('site tools ok');
