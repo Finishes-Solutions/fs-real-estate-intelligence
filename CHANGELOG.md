@@ -5,6 +5,22 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 5:27 PM CT: AI effort levels, a one-click layout update, questions about a plan, and the Development mix view (b3d6460, a938129, 194c6e1, 15459bd)
+- **AI effort: Low, Medium, High and Ultra** replace Quick / AI-reviewed under Build, each saying what it does and about how long it takes.
+  - Low: the AI reads the request, with no review.
+  - Medium: one review round.
+  - High: the old AI-reviewed.
+  - Ultra: starts from five layouts and reviews up to six with drawings, with up to two rounds of program changes. It has a gold look and a short shine when picked.
+  - Your choice is remembered on the device. Old "Quick" maps to Low, and "AI-reviewed" to High.
+- **Update icon on an out-of-date layout card:** a sync icon in the card's top right re-fits the layout to your changes in one click (the same as Re-fit Around My Changes).
+- **Ask about this plan:** a new section where you can ask why it needs so much parking, whether it needs a detention pond, how the pro forma works out, or why the AI made a choice.
+  - Starter questions fit the plan, and follow-up suggestions are offered.
+  - Answers use only the plan's own numbers (parking by use and the rule behind it, stormwater, checks, pro forma, the build's notes), and they say so when something isn't recorded.
+- **Development mix (U, the pie chart on the tool bar):** colours each use's buildings and greys out parking, drives, lawns and ponds.
+  - A card lists each use's building acres and share of the site (footprint only, no parking), with Phase 2's share, the total, and on mixed-use plans the land each zone takes.
+  - Hover or click a row to light up that use.
+- **Known gaps:** answers from the AI and Ultra's timing haven't been tried against the live AI yet (tested with the AI stubbed).
+
 ### 5:18 PM CT: Parking you can drive through; street sides that match the map (5a57490)
 - **Aisles go through.** An aisle with stalls along it no longer stops at a curb.
   - It runs on until it meets a drive.
