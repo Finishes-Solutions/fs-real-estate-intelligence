@@ -191,6 +191,7 @@ export function initSitePlan(ctx) {
     hideMapBits();
     addLayers(); draw(); panel();
     requestAnimationFrame(() => requestAnimationFrame(() => planFit()));
+    ctx.scheduleHash?.(); // sp= in the address: a reload reopens this plan
     const pl = PL(); if (pl?.ring.length >= 3 && (pl.frontGuess || pl.streets == null)) map.once('idle', () => { if (PL() === pl && (pl.frontGuess || pl.streets == null)) detectFront(pl); });
   }
   // the option's last build comes back with it: its layouts (the one on the map marked), the request and the AI's note
@@ -207,7 +208,7 @@ export function initSitePlan(ctx) {
     card.classList.remove('sp-mode');
     if (!ed) { if (startGhost && !resume) clearResume(); startGhost = false; return; } // the Start card went: its outline too
     const p = P(), pl = PL(), was = { pid: ed.pid, plid: ed.plid, at: performance.now() }, draft = !!ed.draftPlan; killRun();
-    ed = null; fromCard = ''; draw(); showMapBits(); leavePlanning();
+    ed = null; fromCard = ''; draw(); showMapBits(); leavePlanning(); ctx.scheduleHash?.();
     if (persistT) persistNow();
     if (!p || !pl || draft) return; // deleted, or a site that was never finished
     if (leaving) { showAway(was); return; }
@@ -1934,7 +1935,7 @@ export function initSitePlan(ctx) {
     waiting = false;
     const key = a && root.contains(a) ? (a.id ? '#' + a.id : ['open', 'plan', 'v', 'parcel'].map(k => a.dataset[k] != null ? '[data-' + k + '="' + CSS.escape(a.dataset[k]) + '"]' : '').find(Boolean) || (a.classList[0] ? '.' + a.classList[0] : null)) : null;
     const p = cur && db.projects.find(x => x.id === cur); if (!p) { cur = null; renaming = false; }
-    root.innerHTML = '<div class="pj-wrap">' + (p ? detailHtml(p) : indexHtml()) + '</div>';
+    root.innerHTML = '<div class="pj-wrap">' + (p ? detailHtml(p) : indexHtml()) + '</div>'; ctx.scheduleHash?.(); // the open project goes in the address (pj=), so a reload comes back to it
     ctx.team?.chip?.(root.querySelector('#pjTeam')); // who you are and whether projects are shared; opens Settings
     wire(p);
     if (key) try { root.querySelector(key)?.focus(); } catch (e) { /* the control is gone */ }
@@ -2008,6 +2009,8 @@ export function initSitePlan(ctx) {
 
   // the projects a property card's parcel is already in (its Site plan button reads "Open site plan" then)
   function projectsFor(parcel, center) { if (!parcel && !center) return []; try { return RUN.projectsWith(db.projects, [parcelOf(parcel || {}, center || parcel?.center).key]); } catch (e) { return []; } }
-  ctx.sitePlan = { start, open, close, get editing() { return !!ed; }, forAssistant, get projects() { return db.projects; }, sync, projectsFor, // sync: Settings runs it after a new team passcode
+  ctx.sitePlan = { start, open, close, get editing() { return !!ed; }, show: id => { if (db.projects.some(x => x.id === id)) show(id); }, has: (pid, plid) => !!db.projects.find(x => x.id === pid)?.plans.some(x => x.id === plid),
+    // what the address keeps (reload, reopening the installed app): the open plan, else the project on the Projects page
+    get where() { return ed && !ed.draftPlan ? { plan: ed.pid + '.' + ed.plid } : cur && ctx.view === 'projects' ? { project: cur } : {}; }, forAssistant, get projects() { return db.projects; }, sync, projectsFor, // sync: Settings runs it after a new team passcode
     get pendingProject() { return pendingProject() && pending; }, set pendingProject(v) { pending = v?.id ? { id: v.id, t: v.t || Date.now() } : null; } };
 }
