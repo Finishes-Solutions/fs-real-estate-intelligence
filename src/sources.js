@@ -117,7 +117,7 @@ export function initSources(ctx) {
         { name: link('US Census TIGER (us-atlas)', 'https://github.com/topojson/us-atlas'), what: 'County outlines and town names', status: st('off', 'Static'), detail: 'Boundaries change rarely; updated with the app.' },
       ]],
       ['Map layers (fetched live)', [
-        { name: link('MapTiler', 'https://www.maptiler.com/copyright/') + ' · ' + link('Esri', 'https://www.esri.com/') + ' · ' + link('OpenFreeMap', 'https://openfreemap.org/'), what: 'Basemap: roads, labels, imagery', status: st('live', 'In use: ' + (BASEMAP[base] || base)),
+        { name: link('MapTiler', 'https://www.maptiler.com/copyright/') + ' · ' + link('Esri', 'https://www.esri.com/') + ' · ' + link('OpenFreeMap', 'https://openfreemap.org/'), what: 'Basemap: roads, labels, imagery', status: st('live', 'In use: ' + (BASEMAP[base] || base) + (ctx.mapTilerDown?.() && /MapTiler/.test(BASEMAP[base] || '') ? ' (MapTiler is over its monthly limit: drawn from OpenFreeMap / Esri instead)' : '')),
           detail: 'Tiles load as you pan. Road and place data come from OpenStreetMap (updated by the providers weekly or better); satellite imagery dates vary by area.' },
         { name: link('OpenStreetMap', 'https://www.openstreetmap.org/copyright'), what: '3D buildings: footprints and heights', status: liveSt(document.getElementById('lyBldg')?.checked, 'On · live tiles'), detail: 'From the basemap tiles; zoom in past 14 to see them.' },
         ras('radar', 'NOAA nowCOAST (MRMS)', 'https://nowcoast.noaa.gov/', 'Rain radar'),

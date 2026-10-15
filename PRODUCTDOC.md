@@ -270,6 +270,7 @@ The groups in Map layers (in their starting order the first time; after that, th
   - Topo.
   - ESRI satellite.
   - Free Map.
+  - Default, Streets, Satellite and Topo come from a paid map service with a monthly limit. If that service stops serving maps (for example when the month's limit is used up), the map switches by itself to the free OpenStreetMap map in the same look (a plain light or dark map for Default, a street map for Streets and Topo, ESRI imagery for Satellite) and says so once. Address search keeps working from OpenStreetMap too. The app tries the paid maps again a few hours later.
   - Google and Google Satellite (only when Google is set up for the site): Google's own map, with the Google logo and map credits at the bottom while it's on.
   - 3D buildings (zoom in).
   - Google 3D (only when Google is set up): Google's photorealistic 3D model of the city in place of the simple blocks. Zoom in to street level and tilt the map. Clicking a building still opens its property card.
@@ -697,6 +698,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **The map keeps working when the paid map service is over its monthly limit:** instead of a blank map and dead search, the map switches to the free OpenStreetMap map and search keeps finding addresses and places.
 - **Faster search, and a reload that keeps your place:** search results appear sooner and fill in as each source answers, picking one moves the map right away, and Enter on a street address goes to that address. Reloading the page or reopening the app comes back to the same map view, property card, site plan or project instead of starting over.
 - **The development pipeline on the map and on every property card:** five new layers under **Development pipeline** in Map layers: Harris County building permits, plats and new subdivisions, TxDOT projects, water districts (MUDs) with tax rates and bonds, and schools with enrollment, all refreshed nightly, with a **Show** picker for how far back. Property cards get a **Development here & nearby** section, and Ask AI can answer "what's being permitted / platted / built near here". Harris and Waller property cards now show the owner and value straight from the county appraisal district, without Regrid.
 - **Clearer first steps:** searching an address now offers **Property Card** (owner, value, site and area details) instead of a vague **More Information**, and a town or county offers **Area Summary**. When a parcel's record has no acreage, the property card measures the outline and shows **≈ N acres**. Market no longer names the area twice at the top of the page (the pinned bar shows it once you scroll), and Compare's empty page names the **Box** tool and explains that each area's census numbers come first.

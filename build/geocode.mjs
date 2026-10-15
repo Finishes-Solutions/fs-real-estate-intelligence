@@ -167,8 +167,11 @@ export async function maptiler(key, bbox, q2, strict) {
   const u = 'https://api.maptiler.com/geocoding/' + encodeURIComponent(q2) + '.json?key=' + key + '&country=us&limit=' + (strict ? 1 : 5) + '&bbox=' + bbox.join(',');
   try { const d = await (await fetchRetry(u, {}, 2)).json(), fs = d.features || [];
     if (strict) { const f = fs[0]; return f && f.address && (f.relevance || 0) >= 0.9 ? f.center : null; }
-    const f = fs.find(x => [].concat(x.place_type || []).some(t => TOWNISH.test(t))); return f ? f.center : null; } catch (e) { return null; }
+    const f = fs.find(x => [].concat(x.place_type || []).some(t => TOWNISH.test(t))); return f ? f.center : null; }
+  catch (e) { if (keyRefused(e)) throw e; return null; } // a refused key is not "no match": the caller must not cache a miss
 }
+// MapTiler refused the key (quota used up, suspended): fetchRetry throws "<url> 401/403", or "failed <url>" after 429s
+export const keyRefused = e => /api\.maptiler\.com/.test(e?.message || '') && /( 40[13]$|^failed )/.test(e.message);
 
 // the street part of an address, without the house number ("12907-A Fry Rd" -> "Fry Rd", "0 Mason Road" -> "Mason Road")
 export const streetName = st => String(st || '').replace(/^\s*\d+[a-z]?(?:-\w+)?\s+/i, '').trim();
@@ -231,7 +234,8 @@ export async function geocodeRows(rows, cache, { key, bbox, places, budget, chec
     if (budget) budget.nominatim--;
     const c = await nominatim(r); if (c && ok(r, c)) { put(k, c, 'osm'); nm++; }
   }
-  await pool(todo.filter(([k]) => !fresh(k) && !skipped.has(k)), 4, async ([k, r]) => { const c = await maptiler(key, bbox, `${r.st}, ${r.city}, TX ${r.zip}`, true); if (c && ok(r, c)) { put(k, c, 'maptiler'); mt++; } });
+  await pool(todo.filter(([k]) => !fresh(k) && !skipped.has(k)), 4, async ([k, r]) => {
+    try { const c = await maptiler(key, bbox, `${r.st}, ${r.city}, TX ${r.zip}`, true); if (c && ok(r, c)) { put(k, c, 'maptiler'); mt++; } } catch (e) { errored.add(k); } });
   // no source knows the house: a point on the filing's street in its ZIP (street name and ZIP must both match)
   await pool(todo.filter(([k, r]) => !fresh(k) && !parseCross(r.street || r.st)), 4, async ([k, r]) => {
     try { const c = await maptilerStreet(key, bbox, r); if (c && ok(r, c)) { put(k, c, 'street'); ns++; errored.delete(k); } } catch (e) { errored.add(k); }
@@ -259,7 +263,7 @@ export async function geocodeRows(rows, cache, { key, bbox, places, budget, chec
   for (const r of rows) {
     if (out[r.ProjectNumber] || !r.city) continue;
     const ck = r.city.toLowerCase();
-    if (!(ck in cityCache)) { const pl = places.find(p => p[0].toLowerCase() === ck); cityCache[ck] = pl ? [pl[1], pl[2]] : await maptiler(key, bbox, r.city + ', Texas', false); }
+    if (!(ck in cityCache)) { const pl = places.find(p => p[0].toLowerCase() === ck); cityCache[ck] = pl ? [pl[1], pl[2]] : await maptiler(key, bbox, r.city + ', Texas', false).catch(() => null); }
     const c = cityCache[ck]; if (!c || !ok(r, c)) continue;
     let h = 0; for (const ch of r.ProjectNumber) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
     out[r.ProjectNumber] = { c: [c[0] + ((h % 1000) / 1000 - 0.5) * 0.02, c[1] + (((h >> 10) % 1000) / 1000 - 0.5) * 0.02], src: 'city', via: 'city' };
