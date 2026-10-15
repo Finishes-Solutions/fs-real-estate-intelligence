@@ -116,5 +116,25 @@ for (const [what, plan, prog] of cases) {
   assert.ok(m.spaces >= m.required && m.spaces <= Math.ceil(m.required * 1.15) + 4, 'moved building re-fitted: ' + m.spaces + ' spaces for ' + m.required);
   assert.ok(!S.check({ ...p, elements: r.elements }).some(i => i.level === 'bad'), 'and nothing overlaps it');
 }
+// ---- a main entrance bent by hand (a route, pinned) stays the one way in when the site re-fits ----
+{
+  const T = await import('../lib/sitetools.mjs'), o = L.layoutOptions(small, S.guessProgram('25,000 sf retail strip'))[0], p = { ...small, program: o.program, elements: structuredClone(o.elements), recipe: o.recipe };
+  const k = p.elements.findIndex(e => e.name === 'Main entry'), r = T.routeOf(p.elements[k], p.ring), A = r.path[0], B = r.path[1], n = [-(B[1] - A[1]), B[0] - A[0]], L0 = Math.hypot(...n);
+  r.path = [A, [(A[0] + B[0]) / 2 + n[0] / L0 * 30, (A[1] + B[1]) / 2 + n[1] / L0 * 30], B]; r.pinned = true; p.elements[k] = r; // a bend 30 ft off to one side
+  const out = L.refit(p, { amount: 'current' }), els = out.elements, mains = els.filter(e => e.name === 'Main entry');
+  assert.equal(mains.length, 1, 'one Main entry, not the layout\'s own beside it'); assert.ok(mains[0].path?.length === 3, 'the bent one');
+  const m = S.metrics({ ...p, elements: els }); assert.ok(m.spaces >= m.required, 'still parks what it needs: ' + m.spaces + '/' + m.required);
+  assert.ok(!S.check({ ...p, elements: els }).some(i => i.level === 'bad'), 'nothing overlaps: ' + S.check({ ...p, elements: els }).filter(i => i.level === 'bad').map(i => i.text).join('; '));
+  assert.equal(S.pavement({ ...p, elements: els }).length, 1, 'and its drives and parking pour as one surface with the entrance');
+  const mo = S.outline(mains[0]); assert.ok(!els.some(e => e.kind === 'green' && S.rectsOverlap({ poly: S.outline(e) }, { poly: S.grow(mo, -2) }, 0)), 'no lawn laid over the entrance');
+}
+// ---- a stall row moved off its aisle (as a drag can leave one) is flagged; the rows a layout lays out never are ----
+{
+  const o = L.layoutOptions(small, S.guessProgram('25,000 sf retail strip'))[0], p = { ...small, elements: structuredClone(o.elements) };
+  assert.deepEqual(S.check(p).filter(i => /no aisle/.test(i.text)), [], 'every generated row faces an aisle');
+  const row = p.elements.filter(e => e.kind === 'parking' && e.row).sort((a, b) => b.w - a.w)[0], u = [-Math.sin((row.rot || 0) * Math.PI / 180), Math.cos((row.rot || 0) * Math.PI / 180)], sg = row.row > 0 ? -1 : 1;
+  row.x += u[0] * sg * 60; row.y += u[1] * sg * 60; // 60 ft back, away from the aisle it faced
+  assert.ok(S.check(p).some(i => i.id === row.id && /has no aisle to drive in from/.test(i.text)), 'the moved row is flagged: ' + S.check(p).map(i => i.text).join('; '));
+}
 if (process.env.PARKING_TABLE) console.log(table.map(r => r.join(' | ')).join('\n'));
 console.log('parking ok');

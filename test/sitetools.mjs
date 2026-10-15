@@ -261,4 +261,25 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
   assert.equal(plan.elements.find(e => e.id === apt.id).name, 'Apt Bldg 3', 'the plan given is not changed');
   assert.deepEqual(T.itemGroups({}), [], 'an empty plan: nothing');
 }
+// ---- a drive as a route: Edit Shape on aisles, drawn drives and entrances ----
+{
+  const aisle = { id: 'a', kind: 'drive', x: 100, y: 50, w: 200, d: 24, rot: 30, note: '24 ft drive aisle' }, r = T.routeOf(aisle);
+  assert.ok(r.path.length === 2 && r.width === 24 && !r.w && !r.rot && Math.abs(Math.hypot(r.path[1][0] - r.path[0][0], r.path[1][1] - r.path[0][1]) - 200) < 0.1, 'an aisle runs end to end, as wide as it was');
+  assert.ok(Math.abs(S.ringArea(S.outline(r)) - 200 * 24) < 200 * 24 * 0.02, 'and covers the same ground');
+  const ring = [[0, 0], [400, 0], [400, 300], [0, 300]], ent = { id: 'm', kind: 'drive', name: 'Main entry', note: '30 ft driveway', poly: [[-25, 0], [85, 0], [75, 3], [65, 10], [60, 20], [60, 70], [30, 70], [30, 20], [25, 10], [15, 3]].map(([x, y]) => [x + 120 - 45 + 15, y]) };
+  const re = T.routeOf(ent, ring); assert.ok(re && T.isEntrance(re) && re.flare > 0 && re.width === 30, 'an entrance keeps its width and gets a flared mouth: ' + JSON.stringify(re));
+  assert.ok(Math.abs(re.path[0][1]) < 0.01 && re.path[1][1] > 60, 'from the street (the lot line) into the site: ' + JSON.stringify(re.path));
+  const o = S.outline(re), mouth = o.filter(p => p[1] < 1).map(p => p[0]); assert.ok(Math.max(...mouth) - Math.min(...mouth) > 70, 'the mouth flares out to meet the street');
+  const ad = T.addRoutePoint([[0, 0], [100, 0], [100, 100]], [60, 8]); assert.deepEqual(ad, { path: [[0, 0], [60, 0], [100, 0], [100, 100]], k: 1 }, 'a point on the nearest stretch');
+  assert.equal(T.addRoutePoint([[0, 0], [100, 0]], [1, 1]), null, 'not on top of a point already there');
+  assert.deepEqual(T.onLotLine(ring, [150, 12]), [150, 0], 'a dragged mouth stays on the lot line');
+  assert.deepEqual(T.lotLineAt(ring, [398, 120]), { at: [400, 120], mouth: [-1, 0] }, 'and comes in square to the stretch of lot line it lands on');
+  { // bent hard (a short zigzag, a tight Curve): one clean outline, no fold, the throat square to the street, flares along it
+    const z = { ...re, path: [re.path[0], [re.path[0][0] - 40, 30], [re.path[0][0] + 10, 70]], r: 80 }, o = S.outline(z);
+    const crossings = o.reduce((t, a, i) => t + o.filter((b, j) => j > i + 1 && !(i === 0 && j === o.length - 1) && S.segSeg(a, o[(i + 1) % o.length], b, o[(j + 1) % o.length]) < 1e-6).length, 0);
+    assert.equal(crossings, 0, 'a tight zigzag still makes one clean outline'); assert.ok(S.signedArea(o) !== 0 && o.every(p => p[1] > -0.6), 'nothing pokes out across the street: ' + Math.min(...o.map(p => p[1])).toFixed(2));
+    const mouth = o.filter(p => p[1] < 0.5).map(p => p[0]); assert.ok(Math.max(...mouth) - Math.min(...mouth) > 60, 'the flares still meet the street side by side'); }
+  const bent = { kind: 'drive', path: [[0, 0], [0, 100], [100, 100]], width: 26, r: 60 }, tight = { ...bent, r: 5 };
+  assert.ok(S.ringArea(S.outline(bent)) < S.ringArea(S.outline(tight)), 'a bigger Curve rounds the bend off more');
+}
 console.log('site tools ok');
