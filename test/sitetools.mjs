@@ -75,7 +75,8 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
 // ---- layers: the view only ----
 {
   const V = T.viewOf({ view: { grid: 5, hidden: ['buildings', 'labels', 'trees'], locked: ['paving'], snap: false } });
-  assert.deepEqual([V.grid, V.snap, V.hidden.length, V.locked[0]], [5, false, 3, 'paving']); assert.deepEqual(T.viewOf({}), { grid: 0, snap: true, hidden: [], locked: [] }, 'defaults: no grid, snapping on');
+  assert.deepEqual([V.grid, V.snap, V.hidden.length, V.locked[0]], [5, false, 3, 'paving']); assert.deepEqual(T.viewOf({}), { grid: 0, snap: true, hidden: [], locked: [], autoRefit: true }, 'defaults: no grid, snapping on, re-fit after edits');
+  assert.equal(T.viewOf({ view: { autoRefit: false } }).autoRefit, false, 'auto re-fit can be turned off');
   assert.equal(T.viewOf({ view: { grid: 7 } }).grid, 0, 'only 5 or 10 ft');
   assert.ok(!T.editable(V, { kind: 'parking' }) && !T.editable(V, { kind: 'garage' }) && T.editable(V, { kind: 'pond' }));
   const fc = S.planFeatures(plan, null); M.decorate(fc, plan); const vis = T.visibleFeatures(fc, V);
@@ -156,5 +157,62 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
   assert.deepEqual(L.layoutOptions(lot, prog, { count: 1, keepout: [] })[0].elements.map(e => [e.kind, e.x, e.y]), plain.elements.map(e => [e.kind, e.x, e.y]));
   // dragging a building: an easement is an obstacle, so it settles off it
   const B = plain.elements.find(e => e.kind === 'building'), obs = S.spotObstacles(p0, B); assert.ok(obs.some(q => q.g === 2), 'the easement is among the obstacles');
+}
+// ---- one side at a time: a building's wall on a lot turned 30°, an L-shaped building's edge, a point added ----
+{
+  const a = 30 * Math.PI / 180, turn = ([x, y]) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+  const lot = siteOf(mk([-95.75, 29.80], [[0, 0], [700, 0], [700, 500], [0, 500]].map(turn))), op = L.layoutOptions(lot, S.guessProgram('40,000 sf retail strip'), { count: 1 })[0], p = { ...lot, elements: op.elements };
+  const B = p.elements.find(e => e.kind === 'building' && !S.isFree(e)); const rel = (((B?.rot || 0) - 30) % 90 + 90) % 90; assert.ok(B && Math.min(rel, 90 - rel) < 1, 'a building square to the turned lot: ' + B?.rot);
+  const near = (q, r, tol = 0.02) => Math.hypot(q[0] - r[0], q[1] - r[1]) < tol;
+  for (let side = 0; side < 4; side++) {
+    const opp = (side + 2) % 4, r = { ...B, ...T.dragSide(B, side, 20) }, n = T.sideNormal(B, side);
+    assert.ok(near(T.sideMid(r, opp), T.sideMid(B, opp)), 'side ' + side + ' dragged 20 ft out: the opposite wall stays put');
+    const moved = T.sideMid(r, side), was = T.sideMid(B, side); assert.ok(Math.abs((moved[0] - was[0]) * n[0] + (moved[1] - was[1]) * n[1] - 20) < 0.02 && near([moved[0] - n[0] * 20, moved[1] - n[1] * 20], was), 'and it moved 20 ft straight out');
+    assert.equal(side % 2 ? r.w : r.d, +((side % 2 ? B.w : B.d) + 20).toFixed(2)); assert.equal(side % 2 ? r.d : r.w, side % 2 ? B.d : B.w, 'the other size is the same');
+    assert.equal(S.footArea(r) > S.footArea(B), true);
+  }
+  const tiny = T.dragSide(B, 1, -B.w); assert.equal(tiny.w, 8, 'never under 8 ft across'); assert.ok(near(T.sideMid({ ...B, ...tiny }, 3), T.sideMid(B, 3)), 'still pinned at the opposite wall');
+  // lining a dragged wall up with a neighbour's: a second building beside it, its front 2 ft past
+  const ux = T.sideNormal(B, 1), nb = { ...B, id: 'nb', x: B.x + ux[0] * (B.w + 30), y: B.y + ux[1] * (B.w + 30) }, n0 = T.sideNormal(B, 0), off = { ...nb, x: nb.x + n0[0] * 2, y: nb.y + n0[1] * 2 };
+  const s = T.sideSnap({ elements: [B, off] }, B, 0, 3); assert.ok(Math.abs(s - 2) < 0.02, 'the wall snaps 2 ft out to line up: ' + s);
+  assert.equal(T.sideSnap({ elements: [B, { ...off, x: off.x + n0[0] * 5, y: off.y + n0[1] * 5 }] }, B, 0, 3), 0, 'nothing within 3 ft: no snap');
+  assert.equal(T.sideSnap({ elements: [B, { ...off, rot: (B.rot || 0) + 17 }] }, B, 0, 3), 0, 'a neighbour turned another way is ignored');
+  // an L-shaped building as points: its edges move one at a time, out along their normals, parallel
+  const Lb = { ...B, form: 'L', d: 120 }, P = S.outline(Lb).map(q => q.map(v => +v.toFixed(2))); assert.equal(P.length, 6, 'an L has six points'); assert.equal(T.addPoint(Lb, P[2]), null, 'no new point on a corner already there');
+  const area0 = S.ringArea(P);
+  for (let i = 0; i < P.length; i++) {
+    const n = T.edgeNormal(P, i), Q = T.dragEdge(P, i, 10), j = (i + 1) % P.length;
+    assert.ok(near([Q[i][0] - P[i][0], Q[i][1] - P[i][1]], [n[0] * 10, n[1] * 10]) && near([Q[j][0] - P[j][0], Q[j][1] - P[j][1]], [n[0] * 10, n[1] * 10]), 'edge ' + i + ': both its points move 10 ft along its normal');
+    assert.ok(Q.every((q, k) => k === i || k === j || near(q, P[k], 1e-9)), 'the other points stay');
+    const L0 = Math.hypot(P[j][0] - P[i][0], P[j][1] - P[i][1]); assert.ok(S.ringArea(Q) > area0 + 10 * L0 * 0.9, 'out is outward: the area grows by about the edge × 10 ft');
+  }
+  assert.ok(near(T.dragEdge(P.slice().reverse(), 0, 10)[0], [P.slice().reverse()[0][0] + T.edgeNormal(P.slice().reverse(), 0)[0] * 10, P.slice().reverse()[0][1] + T.edgeNormal(P.slice().reverse(), 0)[1] * 10]) && S.ringArea(T.dragEdge(P.slice().reverse(), 0, 10)) > area0, 'drawn the other way round, out is still out');
+  // a point added on a plain rectangle (as double-click does): it becomes points, the new one on the wall nearest the click
+  const wallMid = T.sideMid(B, 2), click = [wallMid[0] + T.sideNormal(B, 2)[0] * 3 + ux[0] * 11, wallMid[1] + T.sideNormal(B, 2)[1] * 3 + ux[1] * 11], ap = T.addPoint(B, click);
+  assert.ok(ap && ap.poly.length === 5, 'a rectangle with a fifth point'); assert.ok(S.segDist(ap.poly[ap.k], S.corners(B)[2], S.corners(B)[3]) < 0.02 && Math.hypot(ap.poly[ap.k][0] - click[0], ap.poly[ap.k][1] - click[1]) < 3.05, 'on the wall, nearest the click');
+  assert.ok(Math.abs(S.ringArea(ap.poly) - S.ringArea(S.outline(B))) < 10, 'the same outline (to the hundredth of a foot), one point more');
+  assert.equal(T.addPoint({ ...B, poly: ap.poly }, ap.poly[ap.k]), null, 'not twice on the same spot');
+  // pasting: copies centred where asked, new ids, pinned
+  const cs = T.copiesAt([B], [100, 200], newId); assert.ok(cs.length === 1 && cs[0].id !== B.id && cs[0].pinned && Math.abs(cs[0].x - 100) < 0.02 && Math.abs(cs[0].y - 200) < 0.02);
+}
+
+// ---- re-fit after an edit: a building dragged on a real retail plan; kept unless it loses space or adds problems ----
+{
+  const lot = siteOf(mk([-95.8245, 29.7855], [[0, 0], [600, 0], [600, 420], [0, 420]])), op = L.layoutOptions(lot, S.guessProgram('25,000 sf retail strip'), { count: 1 })[0];
+  const p = { ...lot, elements: structuredClone(op.elements), program: op.program, recipe: op.recipe }, B = p.elements.find(e => e.kind === 'building');
+  B.x += 25; B.pinned = true; // dragged 25 ft east, as the editor leaves it
+  const before = JSON.stringify(p.elements), r = L.refit(p, { amount: 'current' }); assert.ok(r?.elements?.length, 're-fits');
+  assert.equal(JSON.stringify(p.elements), before, 'the plan given is not changed (one undo step brings it back)');
+  const kept = r.elements.find(e => e.id === B.id); assert.ok(kept && kept.x === B.x && kept.y === B.y, 'the dragged building stays where it was put');
+  const at = x => ({ m: S.metrics(x), issues: S.check(x) }), local = at(p), fitted = at({ ...p, elements: r.elements });
+  assert.ok(Math.abs(fitted.m.gfa - local.m.gfa) / local.m.gfa < 0.05, 'the same program: ' + Math.round(local.m.gfa) + ' → ' + Math.round(fitted.m.gfa));
+  const v = T.refitVerdict(local, fitted); assert.ok(v.ok, 'kept: ' + v.why + ' / ' + fitted.issues.map(i => i.text).join('; '));
+  // the guard: a re-fit that drops a building, or adds a problem, or parks fewer, is turned down
+  const lessB = { m: { ...fitted.m, gfa: local.m.gfa * 0.9 }, issues: fitted.issues };
+  assert.deepEqual(T.refitVerdict(local, lessB), { ok: false, why: 'space' });
+  assert.deepEqual(T.refitVerdict({ m: { gfa: 1000, units: 100 }, issues: [] }, { m: { gfa: 1000, units: 90 }, issues: [] }), { ok: false, why: 'units' });
+  assert.deepEqual(T.refitVerdict(local, { m: fitted.m, issues: fitted.issues.concat({ level: 'bad', text: 'Building B overlaps Building C' }) }), { ok: false, why: 'problems' });
+  assert.deepEqual(T.refitVerdict({ m: { gfa: 1000, spaces: 50, required: 50 }, issues: [] }, { m: { gfa: 1000, spaces: 45, required: 50 }, issues: [] }), { ok: false, why: 'problems' }, 'parking short where it was not');
+  assert.ok(T.refitVerdict({ m: { gfa: 1000 }, issues: [] }, { m: { gfa: 960 }, issues: [] }).ok, 'within 5%: fine');
 }
 console.log('site tools ok');

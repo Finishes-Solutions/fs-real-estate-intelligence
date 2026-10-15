@@ -777,9 +777,9 @@ function placeMenu(pt,ll){
   pmenu.querySelector('a').onclick=hideMenu;
 }
 const hideMenu=()=>pmenu.classList.remove('on');
-map.on('contextmenu',e=>{ e.preventDefault(); if(mode==='pan') placeMenu(e.point,e.lngLat); });
+map.on('contextmenu',e=>{ e.preventDefault(); if(mode==='pan'&&!ctx.planOpen?.()) placeMenu(e.point,e.lngLat); }); // a site plan open: its own menu (src/siteplan.js)
 { let lp=0,start=null; // long-press on touch screens
-  map.on('touchstart',e=>{ clearTimeout(lp); if(e.points.length!==1||mode!=='pan') return; start=e.point; lp=setTimeout(()=>{ placeMenu(e.point,e.lngLat); swallowClick=true; },550); });
+  map.on('touchstart',e=>{ clearTimeout(lp); if(e.points.length!==1||mode!=='pan'||ctx.planOpen?.()) return; start=e.point; lp=setTimeout(()=>{ placeMenu(e.point,e.lngLat); swallowClick=true; },550); });
   map.on('touchmove',e=>{ if(start&&Math.hypot(e.point.x-start.x,e.point.y-start.y)>10) clearTimeout(lp); });
   map.on('touchend',()=>clearTimeout(lp)); }
 document.addEventListener('pointerdown',e=>{ if(pmenu.classList.contains('on')&&!pmenu.contains(e.target)) hideMenu(); });
