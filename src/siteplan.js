@@ -1762,7 +1762,21 @@ export function initSitePlan(ctx) {
     return '<div class="sp-readas" title="' + tip + '"><span class="sp-ra-l">Read as</span>' + R.chips.map(c => '<span class="sp-rc">' + esc(c) + '</span>').join('') +
       (R.miss || []).map(m => '<span class="sp-rc miss" title="Your request names this, but the program that was laid out doesn’t have it' + (R.by === 'ai' ? '' : ' (without the AI, only sizes, counts, stories and the use are read from the words)') + '">Not understood: ' + esc(m) + '</span>').join('') +
       '<button type="button" class="btn sm ghost sp-ra-e" data-raedit="1" title="Put the request back in the box">Edit</button></div>' +
-      (R.assumed?.length ? '<div class="rnote sp-assumed">Assumed: ' + R.assumed.map(esc).join(' · ') + '</div>' : '');
+      (R.assumed?.length ? '<div class="rnote sp-assumed">Assumed: ' + R.assumed.map(esc).join(' · ') + '</div>' : '') + plannedHtml(R.plan);
+  }
+  // the plan the AI made before placing anything (Medium and up): its idea, what goes where, the ways in, parking, the
+  // pond and the arithmetic; for Ultra the other plans it drafted and why it picked this one. Folded to one line.
+  function plannedHtml(S0) {
+    if (!S0?.concept && !S0?.placement?.length) return '';
+    const W = { front: 'Front', middle: 'Middle', back: 'Back', 'left side': 'Left side', 'right side': 'Right side', corner: 'Corner', throughout: 'Throughout' }, li = (k, v) => v ? '<li><b>' + esc(k) + ':</b> ' + v + '</li>' : '';
+    const pl = (S0.placement || []).map(q => li(W[q.where] || q.where, esc(q.what) + (q.why ? ' <span class="sp-pf-why">· ' + esc(q.why) + '</span>' : ''))).join('');
+    const e = S0.entrances || {}, k = S0.parking || {}, w = S0.stormwater || {}, n = S0.numbers || {};
+    const more = li('Ways in', e.count ? e.count + (e.where ? ' · ' + esc(e.where) : '') : '') + li('Parking', esc(k.approach || '') + (k.spaces ? ' (about ' + k.spaces.toLocaleString('en-US') + ' spaces)' : '')) +
+      li('Stormwater', w.type ? esc(w.type) + (w.where ? ' at the ' + esc(w.where) : '') + (w.why ? ' · ' + esc(w.why) : '') : '') + li('The numbers', esc(n.check || '') + (n.fits === false ? ' <b>(tight: something has to give)</b>' : ''));
+    const alts = S0.alts?.length ? '<p class="rnote">Also drafted: ' + S0.alts.map(esc).join(' · ') + (S0.why ? '. Picked this one: ' + esc(S0.why) : '') + '</p>' : '';
+    const rej = S0.rejected?.length ? '<p class="rnote">Considered and set aside: ' + S0.rejected.map(esc).join(' · ') + '</p>' : '', risk = S0.risks?.length ? '<p class="rnote">To check: ' + S0.risks.map(esc).join(' · ') + '</p>' : '';
+    return '<details class="sp-planned"><summary title="How the AI planned the site before anything was placed"><span class="sp-ra-l">Planned first</span> ' + esc(S0.name || 'The plan') + '</summary>' +
+      (S0.concept ? '<p>' + esc(S0.concept) + '</p>' : '') + '<ul>' + pl + more + '</ul>' + alts + rej + risk + '</details>';
   }
   // a suggestion, an idea's request or the last request into the box, the caret at the end; a suggestion lights Build up
   function fillAsk(text, pulse) {
@@ -2280,7 +2294,9 @@ export function initSitePlan(ctx) {
   function siteInfo(p, pl) {
     const a = frameAngle(pl), r = pl.ring.map(q => { const c = Math.cos(-a * Math.PI / 180), s = Math.sin(-a * Math.PI / 180); return [q[0] * c - q[1] * s, q[0] * s + q[1] * c]; });
     const xs = r.map(q => q[0]), ys = r.map(q => q[1]), parcel = p.parcels.find(x => x.key === pl.parcel), f = pl.front ?? SP.longestEdge(pl.ring);
+    const side = (pl.streets || []).filter(k => k !== f && k < pl.ring.length).map(k => Math.round(SP.edgeLen(pl.ring, k))), boxA = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
     return { acres: +(SP.ringArea(pl.ring) / 43560).toFixed(3), widthFt: Math.round(Math.max(...xs) - Math.min(...xs)), depthFt: Math.round(Math.max(...ys) - Math.min(...ys)), frontageFt: Math.round(SP.edgeLen(pl.ring, f)),
+      sideStreetsFt: side, shape: pl.ring.length <= 4 && SP.ringArea(pl.ring) > boxA * 0.92 ? 'rectangular' : SP.ringArea(pl.ring) > boxA * 0.8 ? 'mostly rectangular, ' + pl.ring.length + ' sides' : 'irregular, ' + pl.ring.length + ' sides (about ' + Math.round(SP.ringArea(pl.ring) / boxA * 100) + '% of its bounding box)',
       address: parcel?.label || '', city: ctx.nearestPlace?.(pl.origin) || '', county: (ctx.DATA?.counties || []).find(c => SP.inRing(pl.origin, c.outline?.[0]?.[0] || []))?.name || '', zoning: pl.zoning };
   }
   // ---------- AI: what to build, then the engine's layouts reviewed and revised ----------
@@ -2318,7 +2334,8 @@ export function initSitePlan(ctx) {
   // revises) and how many layouts go with their drawings
   async function aiReview(plan, prog, list, round, ask, signal, L = ASK.effortOf(effortNow())) {
     const options = await Promise.all(list.map((v, i) => forReview(v, plan, i < (L.images || 4))));
-    return post({ mode: 'review', prompt: ask, site: siteInfo(P(), PL()), facts: await factsFor(PL()), program: prog, round, rounds: Math.max(1, L.rounds), effort: L.effort, options }, signal);
+    const strategy = ed.readAs?.ask === ask ? ed.readAs?.plan || null : null; // the plan made before placing: the review judges the layouts against it
+    return post({ mode: 'review', prompt: ask, site: siteInfo(P(), PL()), facts: await factsFor(PL()), program: prog, round, rounds: Math.max(1, L.rounds), effort: L.effort, options, ...(strategy ? { strategy } : {}) }, signal);
   }
   // Build: describe → watch it run → choose. The engine's layouts go on the map and into the list as soon as they're
   // drawn; with the AI on, its review then fills in their scores (matched by key, not position), puts its pick first and
@@ -2332,20 +2349,33 @@ export function initSitePlan(ctx) {
     if (!o.confirmed && dirty(pl) && pl.elements.length) { const src = ed.runSrc; askReplace(() => { ed.runSrc = src; build({ confirmed: true }); }); return 'ask'; } // before the run, not after it
     const ai = !aiOff(), lvl = effortNow(), L = ASK.effortOf(lvl), review = ai && L.rounds > 0, lay = SP.ringArea(pl.ring) > 40 * 43560 ? 'Laying out (big site: up to a minute)' : L.layout.count ? 'Laying out ' + L.layout.count + ' layouts (a wider search)' : 'Laying out the layouts';
     ed.buildOpen = false; const src = ed.runSrc || '#spGo'; ed.runSrc = null;
-    const run = startRun('build', !review ? ['Reading your request', lay] : L.rounds === 1 ? ['Reading your request', lay, 'AI review'] : ['Reading your request', lay, 'AI review', 'Comparing'], src, { ask, effort: lvl }); if (!run) return;
-    let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '', aiOk = false, assumed = [];
+    // Medium and up think the site through before anything is placed (Ultra: three plans, one picked); the program, the
+    // layout settings and the review then follow that plan
+    const thinks = ai && !!L.plan, o0 = thinks ? 1 : 0, planStep = L.plan?.count > 1 ? 'Thinking through ' + L.plan.count + ' plans for the site' : 'Thinking the site through';
+    const steps0 = !review ? ['Reading your request', lay] : L.rounds === 1 ? ['Reading your request', lay, 'AI review'] : ['Reading your request', lay, 'AI review', 'Comparing'];
+    const run = startRun('build', thinks ? [planStep, ...steps0] : steps0, src, { ask, effort: lvl }); if (!run) return;
+    let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '', aiOk = false, assumed = [], strategy = null;
+    const site = ai ? siteInfo(p, pl) : null, facts = ai ? await factsFor(pl) : null; if (!live(run)) return;
+    if (thinks) try {
+      const s = await post({ mode: 'strategy', prompt: ask, site, facts, program: pl.program, effort: L.plan.effort, count: L.plan.count }, run.ctl.signal), pk = s.strategies?.[s.pick] || s.strategies?.[0];
+      if (pk) strategy = { ...pk, why: s.why || '', alts: (s.strategies || []).filter(x => x !== pk).map(x => x.name).filter(Boolean) };
+    } catch (e) { if (!live(run)) return; console.warn('strategy', e); } // no plan: the program step reads the request as before
+    if (!live(run) || PL() !== pl) return;
+    if (thinks) runStep(run, 2, 'Reading your request' + (strategy ? ' (following the plan)' : ''));
     if (ai) try {
-      const d = await post({ prompt: ask, site: siteInfo(p, pl), facts: await factsFor(pl), program: pl.program, effort: L.effort }, run.ctl.signal);
+      const d = await post({ prompt: ask, site, facts, program: pl.program, effort: L.effort, ...(strategy ? { strategy } : {}) }, run.ctl.signal);
       prog = d.program; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
     } catch (e) { if (!live(run)) return; note = e.status === 503 ? '' : navigator.onLine ? 'The AI didn’t answer, so this read your words directly.' : 'Offline: this read your words directly.'; }
     if (!live(run) || PL() !== pl) return;
-    if (!aiOk) run.steps = run.steps.slice(0, 2); // the AI is off: no review either
+    if (!aiOk) { run.steps = run.steps.slice(0, 2 + o0); strategy = null; } // the AI is off: no review either
     const np = SP.normalizeProgram(prog);
-    const readAs = { ask, chips: RUN.readAs(np, SP.USES), miss: RUN.notUnderstood(ask, np), assumed, by: aiOk ? 'ai' : 'words' }; // shown once the layouts land, so a cancelled build keeps the last one's
-    runStep(run, 2, lay);
-    let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks }, prog, { ...L.layout, ...koOpts(pl) }); } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
+    const readAs = { ask, chips: RUN.readAs(np, SP.USES), miss: RUN.notUnderstood(ask, np), assumed, by: aiOk ? 'ai' : 'words', ...(strategy ? { plan: strategy } : {}) }; // shown once the layouts land, so a cancelled build keeps the last one's
+    // the plan's layout settings (neighbourhood streets, leaving a later phase open, the apartment building form) for this run's layouts
+    const st0 = strategy?.settings || {}, params0 = strategy ? { ...(pl.params || {}), ...(st0.streets ? { streets: st0.streets } : {}), ...(st0.fill != null ? { fill: st0.fill } : {}), ...(strategy.buildings?.form ? { form: strategy.buildings.form } : {}) } : null;
+    runStep(run, 2 + o0, lay);
+    let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, ...koOpts(pl) }); } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
     if (!live(run) || PL() !== pl) return;
-    const plan = { ...pl, setbacks }, variants = named(out, { ...plan, program: prog }), doReview = aiOk && review && variants.some(v => v.elements.length);
+    const plan = { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, variants = named(out, { ...plan, program: prog }, params0 ? { params: params0 } : {}), doReview = aiOk && review && variants.some(v => v.elements.length);
     // the layouts, at once: on the map and in the list
     ed.variants = variants; ed.readAs = readAs; ed.aiNote = note; ed.aiSummary = ''; ed.reviewCleared = false; ed.runMeta = { ask, at: new Date().toISOString(), effort: aiOk ? lvl : 'low' }; ed.pickedByUser = false; ed.reviewing = doReview; ed.aiPick = null;
     if (ed.ideas?.list?.length) { if (!ed.ideas.list.some(it => it.request === ask)) ed.ideas = { ...ed.ideas, used: null }; else if (ed.ideas.used != null) ed.ideasOpen = false; } // the idea laid out: the ideas fold to a line
@@ -2355,15 +2385,15 @@ export function initSitePlan(ctx) {
     if (!live(run)) return;
     if (!doReview) { endRun(run); if (best < 0 && !failed) ctx.toast('Nothing fits that request on this site.'); return; } // (a failed layout already said so)
     panel(); showLayouts(run);
-    runStep(run, 3, 'The AI is reviewing the layouts');
-    let pool = variants.filter(v => v.elements.length).slice(0, L.pool), extra = [], revised = [], rv = null, params1 = pl.params || {};
+    runStep(run, 3 + o0, strategy ? 'The AI is reviewing the layouts against its plan' : 'The AI is reviewing the layouts');
+    let pool = variants.filter(v => v.elements.length).slice(0, L.pool), extra = [], revised = [], rv = null, params1 = plan.params || {};
     try {
       rv = await aiReview(plan, prog, pool, 1, ask, run.ctl.signal, L);
       if (!live(run)) return;
       // each round the AI may change the program (never on the last): the new program is laid out, and the best three so
       // far (by its ranking) and the new layouts go back to it to compare
       for (let round = 2; round <= L.rounds && rv.revise && rv.program; round++) {
-        runStep(run, 4, (revised.length ? 'Revising again: ' : 'Revising: ') + (rv.why || 'a better program').replace(/\.$/, ''));
+        runStep(run, 4 + o0, (revised.length ? 'Revising again: ' : 'Revising: ') + (rv.why || 'a better program').replace(/\.$/, ''));
         const params2 = { ...params1, ...(rv.params?.fill != null ? { fill: rv.params.fill } : {}), ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}) };
         let out2 = []; try { out2 = await laid('options', { ...pl, setbacks, params: params2 }, prog2, { ...(L.revise || { count: 3, depth: 6, budgetMs: 6000 }), ...koOpts(pl) }); } catch (e) { console.warn('layout', e); }
         if (!live(run)) return;
@@ -2371,12 +2401,12 @@ export function initSitePlan(ctx) {
         if (!v2.length) break;
         const first = rv, add = v2.slice(0, 3), nm = RUN.layoutNames([...ed.variants, ...extra, ...add]); add.forEach((v, k) => { v.name = nm[ed.variants.length + extra.length + k]; }); extra = extra.concat(add);
         const keep = [...new Set([...(first.ranking || []), ...pool.map((_, i) => i)])].filter(i => pool[i]).slice(0, 3), kept = keep.map(i => pool[i]);
-        pool = kept.concat(add); params1 = params2; revised.push(first.why || 'a better program'); runStep(run, 4, 'The AI is comparing the revised layouts');
+        pool = kept.concat(add); params1 = params2; revised.push(first.why || 'a better program'); runStep(run, 4 + o0, 'The AI is comparing the revised layouts');
         try { rv = await aiReview(plan, prog2, pool, round, ask, run.ctl.signal, L); }
         catch (e) { if (!live(run)) return; rv = { ...first, revise: false, reviews: (first.reviews || []).filter(r => keep.includes(r.option)).map(r => ({ ...r, option: keep.indexOf(r.option) })), ranking: keep.map((_, k) => k).concat(add.map((_, k) => kept.length + k)) }; }
         if (!live(run)) return;
       }
-      if (!revised.length) runStep(run, 4, 'Comparing');
+      if (!revised.length) runStep(run, 4 + o0, 'Comparing');
     } catch (e) { if (!live(run)) return; console.warn('review', e); rv = null; }
     if (!live(run) || PL() !== pl) return;
     ed.reviewing = false;

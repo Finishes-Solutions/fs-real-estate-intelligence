@@ -231,7 +231,7 @@ for (const v of [0, 1, 2]) {
   // the program call thinks as hard as the level says; anything not on the allow-list keeps the default
   const prog = Object.fromEntries(Object.keys(SCHEMA.properties).map(k => [k, null])); Object.assign(prog, { use: 'retail', gfa: 25000, extras: [], zones: [], setbacks: { front: null, side: null, rear: null, paving: null }, summary: 'A strip.', assumptions: [] });
   reply = () => prog;
-  for (const [effort, want] of [['low', 'low'], ['medium', 'medium'], ['high', 'high'], ['ultra', 'high'], ['xhigh', 'high'], [undefined, 'high']]) {
+  for (const [effort, want] of [['low', 'low'], ['medium', 'medium'], ['high', 'high'], ['ultra', 'high'], ['xhigh', 'xhigh'], ['max', 'high'], [undefined, 'high']]) {
     sent = []; const res = await call({ prompt: '25,000 sf retail', effort }); assert.equal(res.code, 200); assert.equal(sent[0].reasoning_effort, want, 'program effort ' + effort); }
   // Medium reviews once: one round, never revises; Ultra's middle round may revise
   const P0 = { use: 'retail', units: null, product: null, buildings: null, floors: null, gfa: 25000, ratio: null, perUnit: null, depth: null, detentionPct: null, storm: null, truck: null, through: null, compare: null, trash: null, entrances: null, extras: [], setbacks: { front: null, side: null, rear: null, paving: null }, zones: [] };
@@ -242,6 +242,32 @@ for (const v of [0, 1, 2]) {
   sent = []; res = await call({ mode: 'review', prompt: 'retail', options, round: 2, rounds: 3, effort: 'high' }); assert.equal(res.body.revise, true, 'Ultra: round 2 of 3 may revise again'); assert.match(JSON.parse(sent[0].messages[1].content).round, /2 of 3/);
   res = await call({ mode: 'review', prompt: 'retail', options, round: 2 }); assert.equal(res.body.revise, false, 'old clients: two rounds, as before');
   res = await call({ mode: 'review', prompt: 'retail', options, round: 1, rounds: 9 }); assert.equal(res.body.revise, true, 'rounds kept to 1-3');
+  // strategy: the site thought through before anything is placed. One plan (Medium, High) or three compared (Ultra, at
+  // xhigh); cleaned on the way out, and the program call and the review get the picked one back
+  const { STRATEGY_SCHEMA } = await import('../api/siteplan.js');
+  const strictAll = sc => { if (sc?.type === 'object' && sc.properties) { assert.deepEqual(sc.required.slice().sort(), Object.keys(sc.properties).sort(), 'strict: every property required'); Object.values(sc.properties).forEach(strictAll); } if (sc?.items) strictAll(sc.items); };
+  strictAll(STRATEGY_SCHEMA);
+  const strat = name => ({ name, concept: 'Retail on the highway with its parking in front; apartments behind, away from the traffic.', placement: [{ what: 'retail strip', where: 'front', why: 'visibility' }, { what: 'apartments', where: 'back', why: 'quiet' }, { what: 'helipad', where: 'on the roof', why: 'no' }],
+    entrances: { count: 7, where: 'FM 362 and the side street', why: 'a corner' }, parking: { approach: 'a field in front of the shops', where: 'front', spaces: 180 }, stormwater: { type: 'lake', where: 'back', why: 'low land' },
+    buildings: { count: 4, floors: 3, form: 'L' }, numbers: { buildingSf: 90000, units: 200, coveragePct: 140, fits: true, check: '90,000 sf of footprint and 480 spaces on 12 acres.' }, settings: { streets: 'wiggly', fill: false }, risks: ['Floodplain fill', 'x'.repeat(900)], rejected: ['All retail: too much frontage for one strip'] });
+  reply = b => ({ strategies: [strat('A'), strat('B'), strat('C'), strat('D')], pick: /three/.test(b.messages[1].content) ? 2 : 0, why: 'B and C both work; C keeps the apartments off the highway.' });
+  sent = []; res = await call({ mode: 'strategy', prompt: '20,000 sf retail and 200 apartments', site: { acres: 12, frontageFt: 600, sideStreetsFt: [380], shape: 'rectangular' }, effort: 'xhigh', count: 3 });
+  assert.equal(res.code, 200, JSON.stringify(res.body)); assert.equal(sent[0].reasoning_effort, 'xhigh', 'Ultra plans at xhigh'); assert.equal(sent[0].response_format.json_schema.name, 'site_strategy');
+  assert.match(sent[0].messages[1].content, /three different strategies/); assert.match(sent[0].messages[1].content, /"sideStreetsFt":\[380\]/, 'the side street goes along');
+  assert.equal(res.body.strategies.length, 3, 'three asked, three kept'); assert.equal(res.body.pick, 2);
+  const s0 = res.body.strategies[0]; assert.deepEqual(s0.placement.map(q => q.where), ['front', 'back'], 'a made-up place is dropped');
+  assert.equal(s0.entrances.count, 3, 'ways in kept to 1-3'); assert.equal(s0.stormwater.type, 'detention', 'an unknown pond type: detention'); assert.equal(s0.numbers.coveragePct, 100);
+  assert.equal(s0.settings.streets, null, 'an unknown street style is dropped'); assert.equal(s0.settings.fill, false); assert.equal(s0.buildings.form, 'L'); assert.ok(s0.risks[1].length <= 240);
+  sent = []; res = await call({ mode: 'strategy', prompt: 'retail', effort: 'medium' }); assert.equal(res.body.strategies.length, 1, 'one asked, one kept'); assert.equal(res.body.pick, 0); assert.equal(sent[0].reasoning_effort, 'medium'); assert.match(sent[0].messages[1].content, /one strategy/);
+  res = await call({ mode: 'strategy', prompt: '  ' }); assert.equal(res.code, 400);
+  reply = () => ({ strategies: [strat('A')], pick: 9, why: '' }); res = await call({ mode: 'strategy', prompt: 'retail', count: 3 }); assert.equal(res.body.pick, 0, 'a pick out of range: the first');
+  // the program follows the plan; the review judges against it
+  reply = () => prog; sent = []; res = await call({ prompt: '25,000 sf retail', effort: 'high', strategy: { ...s0, extra: 'ignored', concept: 'y'.repeat(5000) } });
+  assert.equal(res.code, 200); const pu = JSON.parse(sent[0].messages[1].content); assert.equal(pu.plannedStrategy.name, 'A'); assert.ok(pu.plannedStrategy.concept.length <= 600 && !('extra' in pu.plannedStrategy), 'the plan cleaned again on the way in');
+  assert.match(sent[0].messages[0].content, /plannedStrategy is given/);
+  sent = []; await call({ prompt: '25,000 sf retail' }); assert.ok(!('plannedStrategy' in JSON.parse(sent[0].messages[1].content)), 'no plan (Low): none sent');
+  reply = () => ({ reviews: [{ option: 0, score: 70, verdict: 'ok', strengths: [], problems: [] }], ranking: [0], revise: false, program: P0, params: { fill: null, streets: null, form: null, storm: null }, why: '', summary: 'Fine.' });
+  sent = []; await call({ mode: 'review', prompt: 'retail', options, round: 1, rounds: 1, strategy: s0 }); assert.equal(JSON.parse(sent[0].messages[1].content).plannedStrategy.name, 'A'); assert.match(sent[0].messages[0].content, /carries it out/);
   // ask: the fact sheet, the conversation so far and the question go to the model; a short answer and follow-ups come back
   const S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayout.mjs'), PF = await import('../lib/proforma.mjs'), A = await import('../lib/planask.mjs');
   const site = { ring: [[0, 0], [600, 0], [600, 420], [0, 420]], front: 0, setbacks: S.SETBACKS, program: { use: 'retail', gfa: 25000 } };
