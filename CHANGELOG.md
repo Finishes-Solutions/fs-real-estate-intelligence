@@ -5,6 +5,35 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 7:22 PM CT: Site plan tools: select several, duplicate, measure, grid, layers, easements (7cec88c, d2964b6, 1455a61, 19219e3, 01ed19a)
+- **A tool bar on the map** while a plan is open: Select, Edit, Draw area, Draw line, Measure distance, Measure area, Fit plan, Fit selection, Grid and Layers.
+  - Shortcuts: V, E, M, Shift+M, Shift+F, F, G and ⌘D / Ctrl+D. They don't fire while you type.
+  - A greyed-out button says why it can't be used yet.
+  - On phones the bar sits at the top left, with **⋯** for the rest.
+- **Several pieces at once:** Shift-click a piece to add or remove it, or Shift-drag a box. Move, nudge, duplicate, delete or pin the set together, as one Undo step. The Selected box shows how many are selected, what kinds, and the ground they cover.
+- **Duplicate (⌘D)** works on every piece, curved drives and the entry included. Before, copying one of those broke it. The copy brings what belongs to it, lands in the nearest clear spot and is selected.
+- **Measure** a distance (each side and the total, in feet) or an area (square feet and acres). Nothing is saved.
+- **Grid and snapping:** an optional 5 or 10 ft grid lined up with the lot, which moved pieces and drawn points snap to. **Snap to edges** can be turned off, and Alt still moves freely.
+- **Layers:** show, hide or lock buildings, parking and drives, stormwater, landscape, trash, trees, labels, the setback line, parcel lines and easements. This is saved with the option. Numbers, checks and exports always include everything.
+- **Draw by points:** draw lawns, plazas, ponds and easement / no-build areas, and draw drives or walks as lines. A shape that crosses itself or lies outside the lot is refused with a message.
+- **Easements and no-build areas:**
+  - They're hatched in red.
+  - Anything built or paved on one is flagged as a problem.
+  - **Build Layouts** and **Re-fit Plan** lay out around them.
+  - They're in the Plan key, on the PDF sheet and on their own layer in CAD.
+  - You draw them yourself; they aren't looked up or surveyed.
+- **Your edits are safe:** Build Layouts, Use this layout, New layouts from these settings and the AI's Use it now ask before replacing a layout you've changed: **Replace my edits**, **Save my edits as a new option first** or **Cancel**.
+- **Save status:** the plan header says **Saved on this device**, **Synced with team · 3 min ago** or **Sync failed · Retry**.
+- **Fixes:**
+  - Garages, outdoor seating and trash enclosures can now be clicked.
+  - Delete, the arrow keys and R work straight after clicking a button in the panel.
+  - Undo now also covers renaming an option, Pro forma changes and adding or removing parcels.
+  - Parking drawn by hand uses your stall and aisle sizes.
+  - Renaming an option updates its button straight away.
+  - A selected piece shows its width and depth when you zoom in.
+- **Plan key:** it now tells **Site boundary (planning)** apart from **Parcel line (county data)**.
+- **Projects:** Back from a plan returns to its project page, Back again to the list, and reloading a project's page keeps it open.
+
 ### 6:08 PM CT: Light only, Back button, keyboard and finishing touches (d0ef7ac, 11d6abd, cafc262, 2d528f5, 7c970fd)
 - **Dark mode removed:** the app is always light, even when your device is set to dark. If you had chosen Dark or Match device, you'll see the light look next time.
   - Settings no longer has an Appearance section.
