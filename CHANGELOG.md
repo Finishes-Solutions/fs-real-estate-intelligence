@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 10:06 PM CT: Groundwork for the site plan Add palette (51312d6)
+- Behind the scenes only: one shared list of the pieces you can add, grouped (Buildings, Paving, Water & landscape, Amenities, Site), for the redesigned Add section and the tool bar's Add palette coming next. Nothing changes on screen yet.
+
 ### 8:07 PM CT: Site plan fixes from review (5df66e8)
 - **Locked and hidden layers stay put:** a piece on a layer you lock or hide can no longer be moved, deleted or pinned along with other selected pieces. Locking a layer now takes its pieces out of the selection.
 - **Easements stay when you switch layouts:** picking another layout, or saving one as a new option, now keeps the easements you drew. Before, a layout built earlier would quietly drop them.
