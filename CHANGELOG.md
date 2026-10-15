@@ -5,6 +5,21 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 11:32 AM CT: Merged with the latest main; the map keeps working if MapTiler refuses its key (aca385d, 1b6a1f9)
+- **Merged with everything else that landed today:**
+  - the development pipeline layers;
+  - Ask AI fixes;
+  - faster search, and a reload that keeps your place;
+  - site plan safety fixes;
+  - Market and Compare clarity;
+  - the Reports page.
+
+  Nothing from either side was dropped.
+- **Back and Forward:** these step through your pages and the project you had open. Reloading still brings back the map view, the open property card, the site plan or the project.
+- **Site plan wording:** the map chip's button reads **Stop Editing** (or **Stop Measuring**, **Finish**), so **Done** in the panel is the only Done. The option button reads **+ Copy Option**, and out-of-date layouts say **Layouts out of date**.
+- **When MapTiler refuses the map key:** the map now switches to the free OpenFreeMap base map and says so. Before, it stayed blank and site plans couldn't open. That happens if the key is revoked, or the site isn't one of its allowed origins.
+- **Right-click menu:** in a site plan it no longer disappears straight after it opens.
+
 ### 12:11 AM CT: Site plan tools on the map: right-click, drag one side, add a point, re-fit as you go (b206604, b4c2123, bcfed5c)
 - **Right-click menu:** right-click works while a plan is open (long-press on touch, or the menu key / Shift+F10 for what's selected).
   - **On a piece:** Duplicate, Copy, Delete, Turn 90°, Edit shape, Add point here, Pin or Let it move, Fit selection and Change with AI.
