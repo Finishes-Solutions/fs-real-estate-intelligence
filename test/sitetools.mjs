@@ -77,6 +77,7 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
   const V = T.viewOf({ view: { grid: 5, hidden: ['buildings', 'labels', 'trees'], locked: ['paving'], snap: false } });
   assert.deepEqual([V.grid, V.snap, V.hidden.length, V.locked[0]], [5, false, 3, 'paving']); assert.deepEqual(T.viewOf({}), { grid: 0, snap: true, hidden: [], locked: [], autoRefit: true }, 'defaults: no grid, snapping on, re-fit after edits');
   assert.equal(T.viewOf({ view: { autoRefit: false } }).autoRefit, false, 'auto re-fit can be turned off');
+  { const v = T.viewOf({ view: { autoRefit: false } }); v.grid = 10; assert.equal(T.viewOf({ view: v }).autoRefit, false, 'and stays off when another view setting changes (setView writes the whole view back)'); }
   assert.equal(T.viewOf({ view: { grid: 7 } }).grid, 0, 'only 5 or 10 ft');
   assert.ok(!T.editable(V, { kind: 'parking' }) && !T.editable(V, { kind: 'garage' }) && T.editable(V, { kind: 'pond' }));
   const fc = S.planFeatures(plan, null); M.decorate(fc, plan); const vis = T.visibleFeatures(fc, V);

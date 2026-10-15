@@ -3295,4 +3295,5 @@ table.who tr.nomatch td{border:0}
 @media (min-width:701px){.app.planning .toast{bottom:104px}}
 .sp-cm-sub{max-height:calc(100vh - 16px);overflow:auto}
 @media (pointer:coarse){.sp-cm>button{min-height:42px}.sp-ad-t{padding:9px 2px 8px}}
-@media (max-width:700px){.sp-tpop[data-kind="add"]{width:min(316px,calc(100vw - 16px))}}
+@media (max-width:700px){.sp-tpop[data-kind="add"]{width:min(316px,calc(100vw - 16px))}
+  .app.planning:has(#card.open.full) .sp-mapui{display:none}} /* the sheet pulled to full height: the strip, the chip and their pop-overs step away (they'd sit over its header) */
