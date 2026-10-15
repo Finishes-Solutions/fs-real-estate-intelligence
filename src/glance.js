@@ -7,7 +7,7 @@ import { count, current } from './motion.js';
 export function initGlance(ctx) {
   const { map, esc, fmtN } = ctx, el = document.getElementById('glance'); if (!el) return;
   const money = v => v == null ? '—' : v >= 1e6 ? '$' + (v / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M' : '$' + Math.round(v / 1e3) + 'K';
-  const num = v => v == null ? '—' : v >= 1e6 ? (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : fmtN(v);
+  const num = v => v == null ? '—' : v >= 1e6 ? (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : fmtN(Math.round(v)); // whole numbers, also mid-count
   let t = 0, seq = 0;
   const tile = (k, v, s) => '<div class="g-t"><b data-g="' + esc(k) + '">' + v + '</b><span>' + esc(k) + '</span>' + (s ? '<i>' + s + '</i>' : '') + '</div>';
   // the numbers count from the last area's to this one's (src/motion.js), each in its own format; '—' stays as it is
@@ -44,7 +44,7 @@ export function initGlance(ctx) {
       tile('Jobs', x.jobs == null ? '—' : num(x.jobs), x.jobs == null ? '' : 'located here') +
       '</div><div class="g-s src">US Census ACS 5-year ' + m.year + ', ' + fmtN(x.tracts) + ' tract' + (x.tracts > 1 ? 's' : '') + ' ' + where + '; medians are household-weighted.</div>', place);
     counts({ Population: [x.population, num], 'Median Income': [x.median_household_income_approx, money], 'Home Value': [x.median_home_value_approx, money],
-      'Median Rent': [x.median_gross_rent_approx, v => '$' + fmtN(v) + '/mo'], Households: [x.households, num], Jobs: [x.jobs, num] });
+      'Median Rent': [x.median_gross_rent_approx, v => '$' + fmtN(Math.round(v)) + '/mo'], Households: [x.households, num], Jobs: [x.jobs, num] });
   }
   const soon = () => { clearTimeout(t); t = setTimeout(render, 450); };
   // the map view only matters without a selection; a new or cleared selection redraws straight away

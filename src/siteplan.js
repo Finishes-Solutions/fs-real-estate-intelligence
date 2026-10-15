@@ -403,8 +403,11 @@ export function initSitePlan(ctx) {
     const name = list.length > 1 ? plural(list.length, 'piece') : ED.labelOf(list[0]), n = ed.undo.length; change(x => { for (const el of list) dropEl(x, el); }); ed.sel = null; ed.multi = []; draw(); panel();
     ctx.toast('Deleted ' + name + '.', { action: { label: 'Undo', run: () => { if (ed && ed.undo.length === n + 1) undo(true); } } }); }
   // the pieces picked: the primary (ed.sel) alone, or the set it's part of (ed.multi, Shift-click or a box)
-  const sels = () => { const pl = ed && PL(); if (!pl || !ed.sel) return []; const ok = id => pl.elements.some(e => e.id === id); return ed.multi?.length > 1 && ed.multi.includes(ed.sel) ? ed.multi.filter(ok) : ok(ed.sel) ? [ed.sel] : []; };
+  // only pieces that still exist and sit on a visible, unlocked layer: a set never drags or deletes a hidden or locked piece
+  const sels = () => { const pl = ed && PL(); if (!pl || !ed.sel) return []; const V = T.viewOf(pl), ok = id => { const e = pl.elements.find(x => x.id === id); return !!e && T.editable(V, e); }; return ed.multi?.length > 1 && ed.multi.includes(ed.sel) ? ed.multi.filter(ok) : ok(ed.sel) ? [ed.sel] : []; };
   const pickOne = id => { ed.sel = id; ed.multi = []; };
+  // a layout's pieces with the plan's own easements: they're site constraints you drew, not part of any one layout
+  const withKeepouts = (els, cur) => clone(els.filter(e => e.kind !== 'keepout').concat((cur || []).filter(e => e.kind === 'keepout')));
 
   // ---------- map layers ----------
   // Drawn bottom to top: the ground (lawn, paving, pieces, stalls), the setback, the trees, the site boundary over them
@@ -789,7 +792,7 @@ export function initSitePlan(ctx) {
     const pad = Math.max(30, (b[2] - b[0] + b[3] - b[1]) * 0.08); fitLL([[b[0] - pad, b[1] - pad], [b[2] + pad, b[1] - pad], [b[2] + pad, b[3] + pad], [b[0] - pad, b[3] + pad]].map(F.toLL), 20);
   }
   // the view settings (pl.view: the grid, edge snapping, hidden and locked layers): saved with the option, not undone
-  function setView(fn) { const pl = PL(); if (!pl) return; const v = T.viewOf(pl); fn(v); pl.view = v; save(P()); if (ed.sel && !sels().some(id => T.editable(v, pl.elements.find(e => e.id === id)))) { pickOne(null); panel(); } draw(); paintTools(); paintLayers(); }
+  function setView(fn) { const pl = PL(); if (!pl) return; const v = T.viewOf(pl); fn(v); pl.view = v; save(P()); if (ed.sel) { const left = sels(); if (!left.length) pickOne(null); else { ed.multi = left.length > 1 ? left : []; if (!left.includes(ed.sel)) ed.sel = left[0]; } panel(); } draw(); paintTools(); paintLayers(); }
   const toggleGrid = () => setView(v => { v.grid = v.grid ? 0 : v.lastGrid || 10; });
   function setEditing(on) { if (!ed) return; if (!on && ed.mode === 'drawpiece') { ed.mode = null; ed.draft = []; ed.dp = null; } ed.editing = on; if (!on) ed.shape = null; draw(); panel(); }
 
@@ -908,6 +911,7 @@ export function initSitePlan(ctx) {
   // ⌘D / Ctrl+D copy; with Edit on, arrows nudge, R turns, Delete removes (the whole set when several are picked)
   document.addEventListener('keydown', e => {
     const pl = ed && PL(), typing = /^(TEXTAREA)$/.test(e.target.tagName) || e.target.tagName === 'INPUT' && !/^(checkbox|radio|button|range)$/.test(e.target.type) || e.target.isContentEditable;
+    if (document.querySelector('.xdlg.on, .lbox')) return; // a dialog over the plan (Export, a photo) has the keys, Esc included
     if (pl && ctx.view === 'map' && !typing && (e.metaKey || e.ctrlKey) && /^[zy]$/i.test(e.key)) { e.preventDefault(); e.stopPropagation(); undo(e.key.toLowerCase() === 'z' ? !e.shiftKey : false, true); return; } // undo and redo work whatever button was last clicked
     if (pl && ctx.view === 'map' && e.key === 'Escape' && card.classList.contains('sp-mode') && e.target.tagName !== 'SELECT') { escStep(e, typing); return; }
     if (!pl || ctx.view !== 'map' || typing || e.target.tagName === 'SELECT' || e.isComposing) return;
@@ -915,7 +919,7 @@ export function initSitePlan(ctx) {
     if (document.querySelector('#settingsSheet:not([hidden]), .app.sel-open, #layers.on')) return;
     const used = () => { e.preventDefault(); e.stopPropagation(); };
     const k = e.key, el = pl.elements.find(x => x.id === ed.sel), mod = e.metaKey || e.ctrlKey, set = sels();
-    if (mod && k.toLowerCase() === 'd') { used(); dupSel(); return; }
+    if (mod && k.toLowerCase() === 'd') { if (set.length) { used(); dupSel(); } return; } // nothing selected: the browser keeps its shortcut
     if (mod || e.altKey) return;
     // drawing and measuring: Enter finishes, Backspace takes the last point back
     if (ed.mode === 'draw' || ed.mode === 'drawpiece' || ed.mode === 'measure') {
@@ -938,7 +942,7 @@ export function initSitePlan(ctx) {
   // measuring → the question about replacing your edits → a tool → the selection (all of a set) → Edit Layout.
   // A pop-over that's open (Layers, a menu, Filters) closes first; in a text box, Esc just leaves the box.
   function escStep(e, typing) {
-    if (document.querySelector('#layers.on, .fpop:not([hidden]), details.vmenu[open], .msheet.on, .rpop:not([hidden]), .app.sel-open, #settingsSheet:not([hidden])')) return;
+    if (document.querySelector('#layers.on, .fpop:not([hidden]), details.vmenu[open], .msheet.on, .rpop:not([hidden]), .app.sel-open, #settingsSheet:not([hidden]), .xdlg.on')) return;
     if (typing && !card.contains(e.target)) return; // the assistant's box and other fields handle their own Esc
     e.preventDefault(); e.stopPropagation();
     if (typing) { e.target.blur(); return; }
@@ -1029,7 +1033,7 @@ export function initSitePlan(ctx) {
     if (selNew && phone() && !card.classList.contains('half') && !card.classList.contains('full')) { sheetQuiet = true; card.classList.remove('min'); card.classList.add('half'); } // phones: the sheet comes up to show it
     if (focusId) { const f = card.querySelector('#' + CSS.escape(focusId)); if (f && f !== document.activeElement) try { f.focus({ preventScroll: true }); } catch (e) {} }
     on('.x', closePlan); on('#spDone', closePlan); on('.sp-cback', closePlan);
-    card.querySelectorAll('[data-crumb]').forEach(b => b.onclick = () => { const pid = p.id; ctx.setView('projects'); show(b.dataset.crumb === 'project' ? pid : null); });
+    card.querySelectorAll('[data-crumb]').forEach(b => b.onclick = () => { const to = b.dataset.crumb === 'project' ? p.id : null; cur = to; ctx.setView('projects'); show(to); }); // cur first: the page change and the project are one history entry
     $('#spPlanName').onchange = e => change(x => { x.name = e.target.value.trim() || x.name; }); // the whole panel: the option buttons and the breadcrumb show the new name
     card.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { if (b.dataset.plan === pl.id) return; open(p.id, b.dataset.plan); });
     card.querySelectorAll('[data-newopt]').forEach(b => b.onclick = () => { const c = { ...clone(pl), id: uid(), name: nextName(p), created: new Date().toISOString() }; p.plans.push(c); save(p); open(p.id, c.id); });
@@ -1951,7 +1955,7 @@ export function initSitePlan(ctx) {
     let v = ed.variants?.[i]; if (!v || Array.isArray(v.elements) && !v.elements.length) return false;
     if (!v.elements) { v = await relay(i); if (!v) return false; i = ed.variants.indexOf(v); }
     applying = true;
-    try { change(x => { x.elements = clone(v.elements); x.spareRows = []; x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; }); }
+    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; }); }
     finally { applying = false; }
     ed.sel = null; ed.solveBar = false; saveRun(); if (!o.quiet) { draw(); panel(); }
     requestAnimationFrame(() => { if (ed && !planInView(true)) planFit(); }); // only when the site isn't all in view already (or the Plan key covers it)
@@ -1975,7 +1979,7 @@ export function initSitePlan(ctx) {
     let v = ed.variants?.[i]; const p = P(), pl = PL(); if (!v || !p || !pl) return;
     if (!v.elements) { v = await relay(i); if (!v || PL() !== pl) return; }
     const now = new Date().toISOString(), name = nextName(p) + ' · ' + (v.arr || RUN.baseName(v.name));
-    const c = { ...clone(pl), id: uid(), name, created: now, updated: now, elements: clone(v.elements), spareRows: [], program: { ...(v.program || pl.program) }, setbacks: clone(v.setbacks || pl.setbacks), params: v.params ? clone(v.params) : pl.params ? clone(pl.params) : null,
+    const c = { ...clone(pl), id: uid(), name, created: now, updated: now, elements: withKeepouts(v.elements, pl.elements), spareRows: [], program: { ...(v.program || pl.program) }, setbacks: clone(v.setbacks || pl.setbacks), params: v.params ? clone(v.params) : pl.params ? clone(pl.params) : null,
       zones: clone(v.zones || []), recipe: v.recipe ? clone(v.recipe) : null, variant: { key: v.key, name: v.name, at: now }, lastRun: pl.lastRun ? RUN.slimRun({ ...clone(pl.lastRun), variants: ed.variants }, v.key) : null };
     p.plans.push(c); save(p); panel();
     ctx.toast('Saved as ' + c.name + ' in ' + p.name + '.', { action: { label: 'Open ' + c.name.split(' · ')[0], run: () => { if (db.projects.some(x => x.id === p.id)) open(p.id, c.id); } } });
