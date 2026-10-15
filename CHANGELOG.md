@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 8:07 PM CT: Site plan fixes from review (5df66e8)
+- **Locked and hidden layers stay put:** a piece on a layer you lock or hide can no longer be moved, deleted or pinned along with other selected pieces. Locking a layer now takes its pieces out of the selection.
+- **Easements stay when you switch layouts:** picking another layout, or saving one as a new option, now keeps the easements you drew. Before, a layout built earlier would quietly drop them.
+- **Export over a plan:** with the Export dialog open on top of a plan, keys like G or Delete no longer change the plan behind it, and Esc closes the dialog again.
+- **Projects link:** the **Projects** link at the top of a plan adds one step to the browser's Back history instead of two.
+- **⌘D / Ctrl+D:** with nothing selected it does what your browser normally does.
+- **Area at a Glance:** numbers stay whole while they count to a new value.
+
 ### 7:22 PM CT: Site plan tools: select several, duplicate, measure, grid, layers, easements (7cec88c, d2964b6, 1455a61, 19219e3, 01ed19a)
 - **A tool bar on the map** while a plan is open: Select, Edit, Draw area, Draw line, Measure distance, Measure area, Fit plan, Fit selection, Grid and Layers.
   - Shortcuts: V, E, M, Shift+M, Shift+F, F, G and ⌘D / Ctrl+D. They don't fire while you type.
