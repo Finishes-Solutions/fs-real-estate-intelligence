@@ -5,6 +5,27 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 11:43 PM CT: A tidier site plan panel (155dd4b)
+- **Order:** Site parameters now comes second, right after Layouts. The rest follows as Build, Change, Numbers, Pro forma, Site, Add and Export.
+- **Header:**
+  - The header is two clean rows.
+  - Saved status is a small icon (a laptop when it's saved on this device, a cloud with a tick when it's synced with the team, a red warning you can click to retry), with the details on hover.
+  - Option chips stay on one row.
+  - The "Editing · drag a piece; only it changes" line is gone.
+- **Parking first for what you asked for:** the overview and the layout cards show the parking for your request (e.g. 107 / 100). When there is a Phase 2, a "Whole site" line shows below.
+- **Switches and chevrons:**
+  - Setbacks, Landscape buffer, Fill the rest of the site, Trees, Update layouts as I change settings, Re-fit the rest of the site and Homes for sale are now switches.
+  - Folding sections use a chevron instead of the words Show and Hide.
+- **Buttons, not links:** Use This Layout, Save as New Option, Edit request, New request, More Layouts, Review Again, Let It Move, Compare layouts and Delete This Option are now buttons.
+- **Less to read:**
+  - Long help paragraphs open from small (i) buttons.
+  - Settings is grouped (Program, Setbacks, Parking, Buildings, Stormwater, Trash, Mix, Look) in a two-column grid, with the units inside each box.
+- **Add (was Draw by hand):**
+  - Grouped icon tiles for Buildings, Paving, Water & landscape, Amenities and Site.
+  - A building library search.
+  - Trees moved to Settings › Look.
+- **Coming next:** Settings has a new **Re-fit the site after each edit** switch. It starts working with the next update, which brings the site plan map tools.
+
 ### 11:32 PM CT: Site plans park what they need, not three times it (277105c)
 - **Sensible parking totals:** layouts now park what their buildings need plus about 5% (and the accessible stalls). The default ratios were already normal: retail 4 per 1,000 sf, restaurant 10, office 3.5, medical 5, warehouse 0.6, apartments 1.6 per unit. The layout engine was adding far more than they called for.
   - **Parking garages** are sized to the share of parking they carry. Before, every garage was at least 180 ft long, so a 25,000 sf retail plan showed 323 spaces for 100 needed; it now shows about 105 for 100.
