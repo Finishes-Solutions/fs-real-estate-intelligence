@@ -1287,7 +1287,7 @@ export function initSitePlan(ctx) {
     if (e && sels().length > 1) return multiHtml();
     if (!e) return '<div class="lt">Selected</div><div class="rnote">' + (ed.editing ? 'Click a piece of the plan to move it. Drag a white corner to resize it, the green dot to turn it; it lines up with its neighbours and stays out of the setbacks (hold Alt to move it freely). Arrow keys nudge it, R turns it 90°, Delete removes it. Only that piece moves; parking under a building gives way.' : 'Click a piece of the plan to see it. Use <b>Edit Layout</b> to move, resize or turn pieces.') + '</div>';
     const free = SP.isFree(e);
-    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free ? ' · curved' : '') + '</div><fieldset class="sp-fs"' + (ed.editing ? '' : ' disabled') + ' style="border:0;padding:0;margin:0;min-width:0"><div class="sp-grid">' +
+    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free && e.kind !== 'keepout' ? ' · curved' : '') + '</div><fieldset class="sp-fs"' + (ed.editing ? '' : ' disabled') + ' style="border:0;padding:0;margin:0;min-width:0"><div class="sp-grid">' +
       (free ? '' : '<label>Width (ft)<input type="number" min="8" step="1" data-e="w" value="' + Math.round(e.w) + '"></label><label>Depth (ft)<input type="number" min="8" step="1" data-e="d" value="' + Math.round(e.d) + '"></label>' +
       '<label>Turn (°)<input type="number" step="1" data-e="rot" value="' + ((Math.round(e.rot || 0) % 360 + 360) % 360) + '"></label>') +
       (e.kind === 'building' ? '<label>Floors<input type="number" min="1" max="40" step="1" data-e="floors" value="' + (e.floors || 1) + '"></label>' +
