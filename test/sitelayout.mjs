@@ -410,7 +410,7 @@ function usable(plan, o, what) {
 {
   const E = await import('../lib/siteedit.mjs');
   const T0 = siteOf(tract), T = { ...T0, front: T0.ring.findIndex((p, i) => S.outwardOf(T0.ring, i)[1] < -0.9) }, side = T.ring.findIndex((p, i) => S.outwardOf(T.ring, i)[0] > 0.9); // street along the south; the east lot line a side street
-  const plan = { ...T, streets: [side] }, o = L.layoutOptions(plan, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], base = { ...plan, elements: o.elements, program: o.program };
+  const plan = { ...T, streets: [side] }, o = L.layoutOptions(plan, { use: 'multifamily', units: 240, floors: 3, entrances: 1 }, { count: 1 })[0], base = { ...plan, elements: o.elements, program: o.program }; // (one way in to start: the rest come by hand below)
   const bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text), m0 = S.metrics(base);
   // by hand: a click on the side street, part way back
   const a = T.ring[side], b = T.ring[(side + 1) % T.ring.length], at = [a[0] + (b[0] - a[0]) * 0.45, a[1] + (b[1] - a[1]) * 0.45];
@@ -471,5 +471,41 @@ function usable(plan, o, what) {
   assert.ok(hs.length >= 3 && new Set(hs.slice(0, 3).map(o => o.product)).size === 3 && hs.every(o => o.fin && o.fin.value > 0), hs.map(o => o.name).join(' | '));
   assert.ok(/Best value of the housing types tried/.test(hs[0].notes[0]));
   assert.ok(PF.quick({ ...T, elements: hs[0].elements, program: hs[0].program }).value === hs[0].fin.value);
+}
+// ---- a community center moved into the middle of the houses (with a pool beside it): the houses under it make way,
+// nothing else is lost, and the detention stays the size it was (a re-fit used to drop whole streets of homes) ----
+{
+  const E = await import('../lib/siteedit.mjs'), site = { origin: [-95.93, 30.09], ring: [[-600, -450], [600, -450], [600, 450], [-600, 450]], front: 0, setbacks: { ...S.SETBACKS } };
+  const home = { use: 'sfr', name: 'Single-story homes', floors: 1 }, prog = { use: 'sfr', max: true, storm: 'detention', unitSf: 2400, floors: 1, zones: [home, { use: 'amenity', name: 'Central community center and park', items: ['center', 'pool', 'playground', 'lawn'] }, home] }, o = L.layoutOptions(site, prog)[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe };
+  const m0 = S.metrics(base), cc = o.elements.find(e => e.kind === 'building' && e.use === 'amenity'); assert.ok(cc && m0.units > 50, 'a neighbourhood with its center: ' + m0.units + ' homes');
+  const f = E.sheetFrame(base), homes = o.elements.filter(e => e.kind === 'building' && e.use === 'sfr').map(e => f.to([e.x, e.y])), back = homes.filter(h => h[1] > f.depth * 0.6), mid = [back.reduce((t, h) => t + h[0], 0) / back.length, back.reduce((t, h) => t + h[1], 0) / back.length];
+  const r = E.applyEdits(base, [{ action: 'move', target: cc.id, x: Math.round(mid[0]), y: Math.round(mid[1]) }, { action: 'add', kind: 'pool', with: cc.id, w: 60, d: 30 }]), p = { ...base, elements: r.elements }, m = S.metrics(p);
+  const c2 = r.elements.find(e => e.id === cc.id), pool = r.elements.find(e => e.kind === 'pool' && !o.elements.some(x => x.id === e.id));
+  assert.ok(pool && Math.hypot(pool.x - c2.x, pool.y - c2.y) < 160, 'the pool is beside it: ' + r.done.join(' ') + ' ' + r.skipped.join(' '));
+  assert.ok(r.done.some(t => /homes? made way/.test(t)) && m.units >= m0.units - 12 && m.units < m0.units, 'a handful of homes made way, not streets of them: ' + m0.units + ' → ' + m.units);
+  assert.ok(!S.check(p).some(i => i.level === 'bad' && (i.id === cc.id || i.id === pool.id)), 'the center and pool sit clear: ' + S.check(p).filter(i => i.level === 'bad').map(i => i.text).join('; '));
+  assert.equal(Math.round(m.pond), Math.round(m0.pond), 'the detention is untouched');
+  // places in words: the plan's places, and the words read without the AI
+  const P = E.placesOf(base); assert.ok(P.site.front[1] < P.site.middle[1] && P.site.middle[1] < P.site.back[1], 'front, middle, back run away from the street');
+  assert.ok(P.areas.some(a => a.name === 'Single-family homes' && a.count === m0.units), 'the homes are an area: ' + JSON.stringify(P.areas.map(a => a.name + ' ' + a.count)));
+  const g = E.guessEdits('move the community center to the middle of the lots for single family homes and add a pool to it', base);
+  assert.equal(g.length, 2); assert.ok(g[0].action === 'move' && g[0].target === cc.id && g[1].action === 'add' && g[1].kind === 'pool' && g[1].with === cc.id, JSON.stringify(g));
+  const hm = P.areas.find(a => a.name === 'Single-family homes').middle; assert.deepEqual([g[0].x, g[0].y], hm, 'the middle of the homes');
+  const bk = E.guessEdits('move the community center to the back', base)[0]; assert.ok(bk && bk.y === P.site.back[1], 'the back of the site');
+}
+// ---- how many ways in, when the request doesn't say: a corner lot gets one on each street, a big apartment community a
+// second for fire access, an inside lot one ----
+{
+  const box = (w, h, extra = {}) => ({ origin: [-95.5, 29.8], ring: [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]], front: 0, setbacks: { ...S.SETBACKS }, ...extra });
+  const onEdge = (site, e) => { const c = S.centroid(S.shapeOf(e)); let best = null; site.ring.forEach((a, k) => { const d = S.segDist(c, a, site.ring[(k + 1) % site.ring.length]); if (!best || d < best.d) best = { k, d }; }); return best.k; };
+  const inside = box(640, 400), oi = L.layoutOptions(inside, S.guessProgram('25,000 sf retail strip'))[0];
+  assert.equal(S.entrancesOf(oi.elements).length, 1, 'an inside lot: one way in');
+  const corner = box(500, 380, { streets: [1] }), oc = L.layoutOptions(corner, S.guessProgram('30,000 sf retail strip'))[0], ec = S.entrancesOf(oc.elements);
+  assert.equal(ec.length, 2, 'a corner lot: two'); assert.deepEqual(ec.map(e => onEdge(corner, e)).sort(), [0, 1], 'one on each street');
+  assert.ok(oc.notes.some(t => /corner lot/.test(t)), 'and it says why'); assert.ok(!S.check({ ...corner, elements: oc.elements }).some(i => i.level === 'bad'));
+  const pad = box(180, 200, { streets: [1] }), op = L.layoutOptions(pad, S.guessProgram('4,000 sf coffee shop with a drive-thru'))[0]; assert.equal(S.entrancesOf(op.elements).length, 1, 'a small corner pad: one');
+  const apts = box(900, 625), oa = L.layoutOptions(apts, S.guessProgram('240 apartments, 3 stories'))[0];
+  assert.equal(L.entranceNeed(apts, oa.elements).why, 'apts'); assert.ok(S.entrancesOf(oa.elements).length >= 2, 'more than 200 apartments: the first layout has a second way in');
+  const one = L.layoutOptions(corner, { ...S.guessProgram('30,000 sf retail strip'), entrances: 1 })[0]; assert.equal(S.entrancesOf(one.elements).length, 1, 'one when they ask for one');
 }
 console.log('site layouts ok');
