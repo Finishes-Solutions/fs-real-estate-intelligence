@@ -226,9 +226,9 @@ export function initMapSearch(ctx) {
   let place = null; // { label, kind, geom, c }
   ctx.onOverlays(() => {
     if (!map.getSource('place')) map.addSource('place', { type: 'geojson', data: ctx.fc([]) });
-    const col = ctx.isDark() ? '#f0b429' : '#d48806';
+    const col = '#d48806';
     if (!map.getLayer('place-fill')) map.addLayer({ id: 'place-fill', type: 'fill', source: 'place', filter: ['==', '$type', 'Polygon'], paint: { 'fill-color': col, 'fill-opacity': .10 } });
-    if (!map.getLayer('place-casing')) map.addLayer({ id: 'place-casing', type: 'line', source: 'place', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': ctx.isDark() ? '#0b0d0c' : '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 16, 9], 'line-opacity': .9 } });
+    if (!map.getLayer('place-casing')) map.addLayer({ id: 'place-casing', type: 'line', source: 'place', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 16, 9], 'line-opacity': .9 } });
     if (!map.getLayer('place-line')) map.addLayer({ id: 'place-line', type: 'line', source: 'place', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': col, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.2, 16, 5] } });
     syncPlace();
   });

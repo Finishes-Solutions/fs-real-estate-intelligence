@@ -6,7 +6,7 @@ export function initNearby(ctx) {
   ctx.onOverlays(() => {
     if (!map.getSource('nearby')) map.addSource('nearby', { type: 'geojson', data });
     if (!map.getSource('nearby-o')) map.addSource('nearby-o', { type: 'geojson', data: origin });
-    const lab = ctx.isDark() ? '#e9d8fd' : '#44337a', halo = ctx.isDark() ? '#16191a' : '#ffffff';
+    const lab = '#44337a', halo = '#ffffff';
     if (!map.getLayer('nearby-o')) map.addLayer({ id: 'nearby-o', type: 'circle', source: 'nearby-o', paint: { 'circle-radius': 9, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#6b46c1', 'circle-stroke-width': 2.5 } });
     if (!map.getLayer('nearby-pt')) map.addLayer({ id: 'nearby-pt', type: 'circle', source: 'nearby', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 5, 14, 8], 'circle-color': '#6b46c1', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 } });
     if (!map.getLayer('nearby-n')) map.addLayer({ id: 'nearby-n', type: 'symbol', source: 'nearby', layout: { 'text-field': ['get', 'n'], 'text-font': ['Noto Sans Bold'], 'text-size': 10, 'text-allow-overlap': true }, paint: { 'text-color': '#ffffff' } });

@@ -4,6 +4,7 @@
 import { tiles, hbars, vbars } from './charts.js';
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 import { contains as inArea } from './lib/geomatch.mjs';
+import { reveal } from './motion.js';
 
 export function initChatCards(ctx) {
   const { esc, fmtM, fmtN } = ctx;
@@ -154,7 +155,10 @@ export function initChatCards(ctx) {
 
   const liveCard = (kicker, title, html, cls) => el(head(kicker, title) + '<div class="cc-live">' + html + '</div>', cls);
 
-  ctx.chatCard = (name, a, r, list) => {
+  // each card is built once per answer: its charts draw in when it first scrolls into view in the chat (src/motion.js)
+  let nCard = 0;
+  ctx.chatCard = (name, a, r, list) => { const d = card(name, a, r, list); if (d) reveal(d, 'cc:' + name + ':' + ++nCard); return d; };
+  const card = (name, a, r, list) => {
     if (!r || r.error) return null;
     try {
       switch (name) {

@@ -54,7 +54,7 @@ export function initExport(ctx) {
     dlg.querySelectorAll('.xopts input').forEach(i => i.onchange = () => { st[i.dataset.k] = i.checked; save(); });
     dlg.querySelector('#xGo').onclick = go;
     dlg.querySelector('#xMore')?.addEventListener('click', () => { dlg.classList.remove('on'); dropToast(); lastFocus = null; ctx.setView('reports'); });
-    if (keep) dlg.querySelector(keep)?.focus(); // a re-draw must not drop the keyboard out of the dialog
+    if (keep) (dlg.querySelector(keep + ':not([disabled])') || dlg.querySelector('#xClose'))?.focus(); // a re-draw must not drop the keyboard out of the dialog (a control that's now disabled: Close)
   }
   const opt = (k, label, show) => show ? '<label class="tg2"><input type="checkbox" data-k="' + k + '"' + (st[k] ? ' checked' : '') + '><span>' + label + '</span></label>' : '';
   let lastFocus = null;
@@ -66,7 +66,7 @@ export function initExport(ctx) {
   let toastHome = null; const toastEl = () => document.getElementById('toast');
   const liftToast = () => { const t = toastEl(); if (t && t.parentNode !== document.body) { toastHome = [t.parentNode, t.nextSibling]; document.body.append(t); } };
   const dropToast = () => { const t = toastEl(); if (toastHome?.[0]?.isConnected && t?.parentNode === document.body) toastHome[0].insertBefore(t, toastHome[1]?.parentNode === toastHome[0] ? toastHome[1] : null); toastHome = null; };
-  function close() { dlg.classList.remove('on'); dropToast(); lastFocus?.focus?.(); }
+  function close() { if (!dlg.classList.contains('on')) return; dlg.classList.remove('on'); dropToast(); if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true }); lastFocus = null; }
   dlg.addEventListener('pointerdown', e => { if (e.target === dlg) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && dlg.classList.contains('on')) { e.preventDefault(); close(); } });
   // Tab stays inside the dialog: from the last control it wraps to the first, and from the first (Shift+Tab) to the last

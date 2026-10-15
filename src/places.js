@@ -35,11 +35,10 @@ export function initPlaces(ctx) {
     try {
       const s = map.getSource(SRC); if (s) { s.setData(fc); return; }
       map.addSource(SRC, { type: 'geojson', data: fc });
-      const dark = ctx.isDark?.();
       map.addLayer({ id: SRC, type: 'circle', source: SRC, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2.6, 16, 5, 19, 8], 'circle-color': color,
-        'circle-stroke-color': dark ? '#111' : '#fff', 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 13, .6, 17, 1.4] } });
+        'circle-stroke-color': '#fff', 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 13, .6, 17, 1.4] } });
       map.addLayer({ id: SRC + '-lbl', type: 'symbol', source: SRC, minzoom: 16.5, layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 10.5, 'text-offset': [0, .9], 'text-anchor': 'top', 'text-max-width': 9, 'text-optional': true },
-        paint: { 'text-color': dark ? '#e5e7eb' : '#1f2937', 'text-halo-color': dark ? '#111' : '#fff', 'text-halo-width': 1.4 } });
+        paint: { 'text-color': '#1f2937', 'text-halo-color': '#fff', 'text-halo-width': 1.4 } });
     } catch (e) { /* style loading */ }
   }
   function legend() {

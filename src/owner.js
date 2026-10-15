@@ -34,7 +34,7 @@ export function initOwner(ctx) {
   ctx.renderOwnerCo = async (el, name) => {
     if (!el) return; const n = String(name || '').trim();
     if (!n || !ENTITY.test(n)) { el.innerHTML = ''; el.hidden = true; return; }
-    el.hidden = false; el.innerHTML = headOf(el) + '<div class="rnote">Looking up ' + esc(n) + '…</div>';
+    el.hidden = false; el.innerHTML = headOf(el) + '<div class="rnote loading">Looking up ' + esc(n) + '…</div>';
     try { const d = await get(n); if (!el.isConnected) return; if (d.individual) { el.innerHTML = ''; el.hidden = true; return; } paint(el, d); }
     catch (e) { if (el.isConnected) el.innerHTML = headOf(el) + '<div class="rnote">Company lookup unavailable (' + esc(e.message) + ').</div>'; }
   };

@@ -6,10 +6,15 @@
 // series from the legend, and switch monthly charts between 12 months, 24 months and everything. "Export Report"
 // saves a PDF report and "Export Data" a CSV of every series; both are listed on the Reports tab.
 // Also the "Businesses registered here" lookup (api/tenants) used by the building and filing cards.
+// Rendering (2026-10-15): renders are coalesced to one per frame. Opening the tab, the area, the range and resizing draw
+// the whole tab; everything else (data arriving, a pin, a legend, the news place, the Markets controls) redraws only its
+// own section, keeping open details, focus and scroll. Every number behind the sections is cached per selection and data,
+// charts are drawn at their box's measured width (one CSS pixel per unit), and events are delegated once on the tab.
 import { SECTORS } from './lib/sectors.mjs';
 import { CAT_LABEL } from './lib/spending.mjs';
 import { reportDoc, savePdf, areaMap, getJSON, errorBox, fileBase } from './reportkit.js';
 import { mkCharts, col, mlabel } from './mkcharts.js';
+import { morph, instant, finish } from './motion.js';
 import { pipeline, housing, cityCounties, rents, monthly, movers, addMonths } from './lib/marketcalc.mjs';
 import { fromObject } from './lib/correlate.mjs';
 import { inGeom, centroid } from './lib/demographics.mjs';
@@ -19,7 +24,7 @@ const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct
 export function initArea(ctx) {
   const { esc, fmtN, fmtM } = ctx, root = document.getElementById('view-market');
   // sel: 'all' (the whole region), one county FIPS, or several joined by commas (a multi-county selection on the map)
-  let area = null, market = null, loadP = null, sel = 'all', newsPlace = '', adopted = null;
+  let area = null, market = null, loadP = null, sel = 'all', newsPlace = '', adopted = null, ver = 0; // ver: bumps when area/market load
   let quiet = false; // true while the Market page is drawn off screen for a report made from another page
   const shown = () => ctx.view === 'market' || quiet;
   let range = 24, pin = null; const show = { sf: true, mf: true, v: true, p: true, o: true };
@@ -39,16 +44,20 @@ export function initArea(ctx) {
   }
   function loadExtras() {
     const k = sel;
-    if (wantCrime() && crimeCity === undefined) { crimeCity = null; getJson('api/crime?city=1').then(d => { crimeCity = d.error ? { failed: true } : d; }).catch(() => { crimeCity = { failed: true }; }).then(() => { if (ctx.view === 'market') render(); }); }
+    // each arrival redraws only the section it shows in (crime also feeds the Correlation explorer's Houston measures)
+    if (wantCrime() && crimeCity === undefined) { crimeCity = null; getJson('api/crime?city=1').then(d => { crimeCity = d.error ? { failed: true } : d; }).catch(() => { crimeCity = { failed: true }; }).then(() => { section('area'); section('markets'); }); }
     if (!traffic.has(k)) { const b = areaBox(); if (!b) return; traffic.set(k, null);
-      getJson('api/traffic?bbox=' + b.join(',')).then(d => traffic.set(k, d.error ? { failed: true } : d)).catch(() => traffic.set(k, { failed: true })).then(() => { if (ctx.view === 'market' && sel === k) render(); }); }
+      getJson('api/traffic?bbox=' + b.join(',')).then(d => traffic.set(k, d.error ? { failed: true } : d)).catch(() => traffic.set(k, { failed: true })).then(() => { if (sel === k) section('area'); }); }
   }
-  // "Retry" on a card that failed to load
-  function retry(what) { if (what === 'crime') crimeCity = undefined; else traffic.delete(sel); loadExtras(); render(); }
+  // "Retry" on a card that failed to load: fetch again and redraw its section (which shows it loading meanwhile)
+  function retry(what) { if (what === 'crime') crimeCity = undefined; else traffic.delete(sel); loadExtras(); section('area'); }
+  // market.json is the one the map and cards use (ctx.loadMarket), and markets.json comes with the rest so the first draw
+  // has the Markets numbers rather than drawing the tab a second time when they land
   const load = () => loadP ||= Promise.all([
     fetch('data/area.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null),
-    fetch('data/market.json').then(r => r.ok ? r.json() : null).catch(() => null)
-  ]).then(([a, m]) => { area = a; market = m; });
+    (ctx.loadMarket ? ctx.loadMarket() : fetch('data/market.json').then(r => r.ok ? r.json() : null)).catch(() => null),
+    ctx.markets?.load?.()
+  ]).then(([a, m]) => { area = a; market = m; ver++; });
   ctx.areaData = () => load().then(() => area);
   ctx.areaInfo = () => area ? { built: area.built, jobs: area.jobs, permits: !!area.permits, businesses: !!area.businesses, news: !!area.news, salesTax: area.salesTax ? { cities: Object.keys(area.salesTax.cities || {}).length, since: area.salesTax.since } : null,
     unemployment: area.unemployment?.state?.period || null, rates: area.rates?.series?.t10?.date || null, rents: area.rents?.latest || null, mortgages: area.mortgages?.year || null } : null;
@@ -78,7 +87,10 @@ export function initArea(ctx) {
   const sum = (arr, fn) => arr.reduce((s, x) => s + (fn(x) || 0), 0);
 
   // ---------- numbers for the selected county (or the whole region) ----------
-  function stats() {
+  // cached per data, selection and news place: every draw (and the assistant) asks for them
+  let statsK = '', statsV = null;
+  const stats = () => { const k = ver + '|' + sel + '|' + newsPlace; if (k !== statsK) { statsV = computeStats(); statsK = k; } return statsV; };
+  function computeStats() {
     const F = fipsList(), out = {};
     const tr = (market?.tracts || []).filter(t => F.some(f => String(t.g).startsWith(f)));
     if (tr.length) {
@@ -147,18 +159,43 @@ export function initArea(ctx) {
   const legBtn = (k, label, c) => '<button type="button" class="mk-lb" data-show="' + k + '" aria-pressed="' + show[k] + '"><i style="background:' + col(c) + '"></i>' + esc(label) + '</button>';
   const legend = items => '<div class="mk-leg">' + items.map(([label, c, dash]) => '<span><i style="background:' + col(c) + (dash ? ';opacity:.4' : '') + '"></i>' + esc(label) + '</span>').join('') + '</div>';
   const box = (t, html, cls = '') => '<section class="mk-box' + (cls ? ' ' + cls : '') + '"><h3>' + t + '</h3>' + html + '</section>';
+  // a section: its id (mk-<id>) is what a partial redraw replaces
+  const sec = (id, h2, p, body) => '<section class="mk-sec" id="mk-' + id + '"><div class="mk-sh"><h2>' + h2 + '</h2><p>' + p + '</p></div>' + body + '</section>';
   const tag = t => ' <span class="mk-tag" title="Not split by county: the same whichever area is chosen">' + t + '</span>';
   const note = (t, src) => '<div class="rnote">' + t + (src ? '<span class="src"> ' + src + '</span>' : '') + '</div>';
-  let Wh = 520, Wf = 1060, Ws = 320; // chart widths: half box, full box, small multiple (set from the view's width)
+  // a loading placeholder: a muted block (no fake bars or numbers) so it can't be read as data
+  const skel = (h = 120) => '<div class="mk-skel" aria-hidden="true" style="height:' + h + 'px"></div>';
+  // chart widths, measured from the page (measure()): half box, full-width box, a small multiple and how many share a row,
+  // the Correlation explorer's chart column, the Markets sparklines
+  let Wd = { full: 1100, half: 520, wide: 1060, smPad: 26, smGap: 12, smc: 3, main: 560, spark: 110 };
+  // growable charts of the section being built: after it's on the page, fit() makes the shorter of two side-by-side boxes'
+  // chart taller (or its list longer) so the pair ends level instead of leaving a gap under one of them
+  // (cap: how many px it can use; a list can only add the rows it has)
+  let growing = null; const grows = new Map();
+  const grow = (ck, make, cap = Infinity) => { growing?.push({ ck, make, cap }); return make(0); };
+  const rowsCap = (have, shown) => Math.max(0, (have - shown) * ROW);
+  // n tiles in full rows of near-equal size, at most maxC a row: the grid's column count (L) and each tile's span
+  function rowsOf(n, maxC) {
+    const nr = Math.ceil(n / Math.max(1, maxC)) || 1, base = Math.floor(n / nr), xtra = n % nr, L = xtra ? base * (base + 1) : Math.max(1, base), spans = [];
+    for (let r = 0; r < nr; r++) { const k = base + (r < xtra ? 1 : 0); for (let i = 0; i < k; i++) spans.push(L / k); }
+    return { L, spans };
+  }
+  const ROW = 28; // a horizontal-bar row: 26 px and a 2 px gap (app.css .mk-hb)
 
   // ----- data for the sections -----
   const names = () => sel === 'all' ? null : new Set(fipsList().map(cname));
   let pipeKey = '', pipeVal = null;
   const pipe = () => { const k = sel + '|' + (ctx.F?.length || 0); if (k !== pipeKey) { pipeKey = k; pipeVal = pipeline(ctx.F || [], { counties: names(), since: ctx.DATA?.period?.start }); } return pipeVal; };
-  let ccMap = null;
-  const rentInfo = () => { if (!area?.rents?.zips) return null; ccMap ||= cityCounties(ctx.DATA?.places || [], ctx.countyGeo || []); return rents(area.rents.zips, { counties: names(), cityCounty: ccMap }); };
+  let ccMap = null, rentK = '', rentV = null, housK = '', housV = null;
+  const rentInfo = () => { if (!area?.rents?.zips) return null; const k = ver + '|' + sel; if (k === rentK) return rentV;
+    // the county of each town a ZIP names (only those: testing every place against the county outlines took 100 ms)
+    if (!ccMap) { const towns = new Set(Object.values(area.rents.zips).map(z => z.city)); ccMap = cityCounties((ctx.DATA?.places || []).filter(p => towns.has(p[0])), ctx.countyGeo || []); }
+    rentK = k; return rentV = rents(area.rents.zips, { counties: names(), cityCounty: ccMap }); };
   const tractsIn = () => (market?.tracts || []).filter(t => fipsList().some(f => String(t.g).startsWith(f)));
-  const mk = id => monthly(ctx.markets?.raw?.()?.series?.[id], 60);
+  const housingNow = () => { const k = ver + '|' + sel; if (k !== housK) { housK = k; housV = housing(tractsIn()); } return housV; };
+  // one market series as monthly points, once per markets.json
+  let mkData, mkMemo = new Map();
+  const mk = id => { const d = ctx.markets?.raw?.(); if (d !== mkData) { mkData = d; mkMemo = new Map(); } if (!mkMemo.has(id)) mkMemo.set(id, monthly(d?.series?.[id], 60)); return mkMemo.get(id); };
   const COSTS = [['wpusi012011', 'Building materials'], ['wpu081', 'Lumber'], ['wpu101', 'Steel'], ['pcu327320327320', 'Ready-mix concrete'], ['pcoppusdm', 'Copper']];
   const HOMES = [['medlispri26420', 'Median listing price', v => '$' + fmtN(Math.round(v))], ['actliscou26420', 'Homes for sale', v => fmtN(Math.round(v))], ['meddayonmar26420', 'Days on market', v => fmtN(Math.round(v))], ['hous448bpprivsa', 'Housing permits a month (seasonally adjusted)', v => fmtN(Math.round(v))]];
   // one source per place: the county's own rate (BLS LAUS) for a county, and the same Houston metro series the Markets table shows
@@ -176,23 +213,27 @@ export function initArea(ctx) {
   function overview(s, p, rn) {
     const lastP = s.permits?.[s.permits.length - 1], prevP = s.permits?.[s.permits.length - 2], bz = last12(s.biz), ue = unemp(), bm = mk('wpusi012011');
     const bzA = sum(bz.a, r => r.n);
-    const pm = p.months.filter(r => !r.future), tot = r => r.New + r.Reno + r.Addition, hs = housing(tractsIn()), curM = new Date().toISOString().slice(0, 7);
+    const pm = p.months.filter(r => !r.future), tot = r => r.New + r.Reno + r.Addition, hs = housingNow(), curM = new Date().toISOString().slice(0, 7);
     // sparklines show finished months only (the month in progress would read as a plunge); the under-construction one ends on
     // today's headline value
     const bzDone = s.biz?.filter(r => r.m < curM) || [], ucVals = pm.map(tot); if (ucVals.length) ucVals[ucVals.length - 1] = p.active.v;
     const tiles = [
-      s.pop ? C.kpi({ label: 'Population', v: fmtN(s.pop.n), d: C.delta(s.pop.gr), sub: 'since ' + s.pop.baseYear }) : '',
-      s.jobs ? C.kpi({ label: 'Jobs located here', v: fmtN(s.jobs.n), d: C.delta(s.jobs.gr), sub: s.jobs.gr != null ? 'since ' + s.jobs.baseYear : 'LODES ' + s.jobs.year }) : '',
-      hs?.median_household_income_approx ? C.kpi({ label: 'Median household income', v: money(hs.median_household_income_approx), sub: 'census estimate' }) : '',
-      rn ? C.kpi({ label: 'Typical rent', v: '$' + fmtN(Math.round(rn.typical)) + '<small>/mo</small>', d: C.delta(rn.yoy), sub: 'ZIP median · a year earlier' }) : '',
-      lastP ? C.kpi({ label: 'Homes permitted ' + lastP.y, v: fmtN(lastP.sf + lastP.mf), d: prevP ? C.delta(chg(lastP.sf + lastP.mf, prevP.sf + prevP.mf)) : '', sub: prevP ? 'vs ' + prevP.y : '', sp: C.spark(s.permits.map(r => r.sf + r.mf), { tips: s.permits.map(r => r.y + ': ' + fmtN(r.sf + r.mf) + ' homes') }) }) : '',
+      s.pop ? ({ label: 'Population', v: fmtN(s.pop.n), d: C.delta(s.pop.gr), sub: 'since ' + s.pop.baseYear }) : null,
+      s.jobs ? ({ label: 'Jobs located here', v: fmtN(s.jobs.n), d: C.delta(s.jobs.gr), sub: s.jobs.gr != null ? 'since ' + s.jobs.baseYear : 'LODES ' + s.jobs.year }) : null,
+      hs?.median_household_income_approx ? ({ label: 'Median household income', v: money(hs.median_household_income_approx), sub: 'census estimate' }) : null,
+      rn ? ({ label: 'Typical rent', v: '$' + fmtN(Math.round(rn.typical)) + '<small>/mo</small>', d: C.delta(rn.yoy), sub: 'ZIP median · a year earlier' }) : null,
+      lastP ? ({ label: 'Homes permitted ' + lastP.y, v: fmtN(lastP.sf + lastP.mf), d: prevP ? C.delta(chg(lastP.sf + lastP.mf, prevP.sf + prevP.mf)) : '', sub: prevP ? 'vs ' + prevP.y : '', sp: C.spark(s.permits.map(r => r.sf + r.mf), { ck: 'mk:overview:permits', tips: s.permits.map(r => r.y + ': ' + fmtN(r.sf + r.mf) + ' homes') }) }) : null,
       // no change badge: the permit list only keeps locations still open, so older months read low and a year-on-year gain is inflated
-      bz.a.length ? C.kpi({ label: 'New businesses, 12 mo', v: fmtN(bzA), sub: 'still open · older months read low', sp: C.spark(bzDone.map(r => r.n), { tips: bzDone.map(r => monthLabel(r.m) + ': ' + fmtN(r.n)) }) }) : '',
-      ue ? C.kpi({ label: 'Unemployment', v: ue.rate.toFixed(1) + '%', d: ue.yearAgo != null ? C.delta(ue.rate - ue.yearAgo, { unit: ' pts', invert: true }) : '', sub: ue.where + ', ' + MON[+ue.period.slice(5) - 1] }) : '',
-      p.active.n ? C.kpi({ label: 'Under construction', v: money(p.active.v), d: C.delta(p.change), sub: fmtN(p.active.n) + ' projects' + (p.change != null ? ' · vs a year ago' : ''), sp: C.spark(ucVals, { tips: pm.map((r, i) => monthLabel(r.m) + ': ' + money(i === pm.length - 1 ? p.active.v : tot(r)) + ' under construction' + (i === pm.length - 1 ? ', now' : '')) }) }) : '',
-      p.starting.n ? C.kpi({ label: 'Starting in 90 days', v: money(p.starting.v), sub: fmtN(p.starting.n) + ' projects · ' + money(p.upcoming.v) + ' scheduled in all' }) : '',
-      bm ? C.kpi({ label: 'Building materials prices', v: bm.last.v.toFixed(0) + '<small> index</small>', d: C.delta(bm.yoy, { invert: true }), sub: 'in a year (PPI)', sp: C.spark(bm.pts.slice(-24).map(x => x.v), { c: 2, tips: bm.pts.slice(-24).map(x => monthLabel(x.m) + ': ' + x.v.toFixed(1)) }) }) : ''
+      bz.a.length ? ({ label: 'New businesses, 12 mo', v: fmtN(bzA), sub: 'still open · older months read low', sp: C.spark(bzDone.map(r => r.n), { ck: 'mk:overview:biz', tips: bzDone.map(r => monthLabel(r.m) + ': ' + fmtN(r.n)) }) }) : null,
+      ue ? ({ label: 'Unemployment', v: ue.rate.toFixed(1) + '%', d: ue.yearAgo != null ? C.delta(ue.rate - ue.yearAgo, { unit: ' pts', invert: true }) : null, sub: ue.where + ', ' + MON[+ue.period.slice(5) - 1] }) : null,
+      p.active.n ? ({ label: 'Under construction', v: money(p.active.v), d: C.delta(p.change), sub: fmtN(p.active.n) + ' projects' + (p.change != null ? ' · vs a year ago' : ''), sp: C.spark(ucVals, { ck: 'mk:overview:active', tips: pm.map((r, i) => monthLabel(r.m) + ': ' + money(i === pm.length - 1 ? p.active.v : tot(r)) + ' under construction' + (i === pm.length - 1 ? ', now' : '')) }) }) : null,
+      p.starting.n ? ({ label: 'Starting in 90 days', v: money(p.starting.v), sub: fmtN(p.starting.n) + ' projects · ' + money(p.upcoming.v) + ' scheduled in all' }) : null,
+      bm ? ({ label: 'Building materials prices', v: bm.last.v.toFixed(0) + '<small> index</small>', d: C.delta(bm.yoy, { invert: true }), sub: 'in a year (PPI)', sp: C.spark(bm.pts.slice(-24).map(x => x.v), { c: 2, ck: 'mk:overview:materials', tips: bm.pts.slice(-24).map(x => monthLabel(x.m) + ': ' + x.v.toFixed(1)) }) }) : null
     ].filter(Boolean);
+    // full rows only: the tiles split into rows of near-equal size (5 and 4 for nine on a desktop), each row's tiles
+    // spanning a grid wide enough for both sizes, so no tile is left alone on a last row
+    const { L, spans } = rowsOf(tiles.length, Math.max(2, Math.min(6, Math.floor((Wd.full + 10) / (210 + 10)))));
+    const tileHtml = tiles.map((t, i) => C.kpi({ ...t, span: spans[i] })).join('');
     // what's moving: the biggest changes, in words
     const c = [];
     if (lastP && prevP) { c.push({ score: chg(lastP.sf + lastP.mf, prevP.sf + prevP.mf), text: 'Homes permitted ' + upDown(chg(lastP.sf + lastP.mf, prevP.sf + prevP.mf)) + ' in ' + lastP.y + ' (' + fmtN(lastP.sf + lastP.mf) + ')' });
@@ -210,7 +251,7 @@ export function initArea(ctx) {
     const mo = mk('mortgage30us'); if (mo?.chg != null) { const wk = area.rates?.series?.m30?.value, part = mo.last.m >= curM;
       c.push({ score: mo.chg * 10, text: '30-year mortgage rate averaged ' + mo.last.v.toFixed(2) + '% in ' + MON[+mo.last.m.slice(5) - 1] + (part ? ' so far' : '') + (wk != null && Math.abs(wk - mo.last.v) >= .005 ? ' (' + wk.toFixed(2) + '% in the latest week)' : '') + ', ' + (mo.chg >= 0 ? 'up ' : 'down ') + Math.abs(mo.chg).toFixed(2) + ' points in a year' }); }
     const mv = movers(c, 6);
-    return '<section class="mk-sec" id="mk-overview"><div class="mk-kpis2">' + tiles.join('') + '</div>' +
+    return '<section class="mk-sec" id="mk-overview"><div class="mk-kpis2" style="grid-template-columns:repeat(' + L + ',minmax(0,1fr))">' + tileHtml + '</div>' +
       (mv.length ? '<div class="mk-moving"><h3>What’s moving</h3><ul>' + mv.map(x => '<li class="' + (x.score >= 0 ? 'up' : 'dn') + '">' + esc(x.text) + '</li>').join('') + '</ul>' +
         '<button type="button" class="btn" id="mkBrief"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l1.6 4.2 4.4.3-3.4 2.8 1.1 4.3L8 10.7l-3.7 2.4 1.1-4.3L2 6l4.4-.3z"/></svg>Ask AI for a market brief</button></div>' : '') + '</section>';
   }
@@ -223,15 +264,15 @@ export function initArea(ctx) {
     if (!p.active.n && !p.upcoming.n) return '';
     const now = p.months.findIndex(r => !r.future && p.months[p.months.indexOf(r) + 1]?.future);
     const nearYear = i => p.months.slice(Math.max(0, i - 2), i + 3).some(r => r.m.endsWith('-01'));
-    const rows = p.months.map((r, i) => ({ v: r, faded: r.future, tick: r.m.endsWith('-01') ? r.m.slice(0, 4) : i === now && !nearYear(i) ? 'now' : '',
+    const rows = p.months.map((r, i) => ({ id: r.m, v: r, faded: r.future, tick: r.m.endsWith('-01') ? r.m.slice(0, 4) : i === now && !nearYear(i) ? 'now' : '',
       tip: monthLabel(r.m) + ': ' + money(r.New + r.Reno + r.Addition) + ' under construction' + (r.future ? ' (scheduled)' : '') + ', ' + fmtN(r.n) + ' projects · new ' + money(r.New) + ' · renovation ' + money(r.Reno) + ' · additions ' + money(r.Addition) }));
     const multi = sel === 'all' || fipsList().length > 1, side = multi ? p.byCounty : p.byType;
     return '<section class="mk-sec" id="mk-pipeline"><div class="mk-sh"><h2>Construction pipeline</h2><p>What’s being built from the state’s construction filings (TDLR): value under construction each month, what starts soon, by use and the largest projects. Click a project to see it on the map.</p></div><div class="mk-grid">' +
       box('Under construction by month', '<div class="kgrid mk-kg4"><div><b>' + money(p.active.v) + '</b><span>Under construction · ' + fmtN(p.active.n) + ' projects</span></div><div><b>' + money(p.starting.v) + '</b><span>Starting in 90 days · ' + fmtN(p.starting.n) + '</span></div><div><b>' + money(p.upcoming.v) + '</b><span>All scheduled starts · ' + fmtN(p.upcoming.n) + '</span></div>' + (p.change != null ? '<div><b>' + pct(p.change) + '</b><span>vs a year ago</span></div>' : p.byUse[0] ? '<div><b>' + esc(p.byUse[0].name) + '</b><span>Largest use · ' + Math.round(p.byUse[0].v / (p.active.v || 1) * 100) + '% of the value</span></div>' : '') + '</div>' +
-        legend(TYPE_KEYS.map(k => [k.label, k.c]).concat([['Scheduled (later months)', 0, true]])) + C.bars({ rows, keys: TYPE_KEYS, W: Wf, H: 200, fmt: v => money(v), aria: 'Value under construction by month' }) +
+        legend(TYPE_KEYS.map(k => [k.label, k.c]).concat([['Scheduled (later months)', 0, true]])) + C.bars({ rows, keys: TYPE_KEYS, W: Wd.wide, H: 220, fmt: v => money(v), aria: 'Value under construction by month', ck: 'mk:pipeline:months' }) +
         note('Projects are counted in every month from their start to their end date as filed; later months show what’s already scheduled. Values are the filer’s estimates. This chart always shows the full span, whatever the 12 mo / 24 mo / All switch says.' + (p.since ? ' The filing list starts in ' + esc(monthLabel(p.since)) + ', so earlier months only count projects filed since then: the climb before that is partly the list filling in.' : '') + (p.outliers.length ? ' Left out as likely mis-entered: ' + esc(p.outliers.map(o => o.name + ' (' + money(o.cost) + ')').join(', ')) + '.' : ''), 'Texas Department of Licensing and Regulation (TABS).'), 'mk-wide') +
-      box('Under construction by use', C.hbars(p.byUse.slice(0, 10).map((u, i) => ({ label: u.name, v: u.v, k: 'use:' + i, tip: u.name + ': ' + money(u.v) + ' across ' + fmtN(u.n) + ' projects. Click for the largest.' })), money, pin) + pinned('use')) +
-      box(multi ? 'Under construction by county' : 'Under construction by type', C.hbars(side.slice(0, 8).map((u, i) => ({ label: multi ? u.name : (ctx.TYPE_LABEL?.[u.name] || u.name), v: u.v, c: multi ? 1 : [0, 4, 5][['New', 'Reno', 'Addition'].indexOf(u.name)] ?? 0, tip: u.name + ': ' + money(u.v) + ', ' + fmtN(u.n) + ' projects' })), money) +
+      box('Under construction by use', grow('mk:pipeline:use', x => C.hbars(p.byUse.slice(0, 10 + Math.floor(x / ROW)).map((u, i) => ({ label: u.name, v: u.v, k: 'use:' + i, tip: u.name + ': ' + money(u.v) + ' across ' + fmtN(u.n) + ' projects. Click for the largest.' })), money, pin, 'mk:pipeline:use'), rowsCap(p.byUse.length, 10)) + pinned('use')) +
+      box(multi ? 'Under construction by county' : 'Under construction by type', grow('mk:pipeline:side', x => C.hbars(side.slice(0, 8 + Math.floor(x / ROW)).map((u, i) => ({ label: multi ? u.name : (ctx.TYPE_LABEL?.[u.name] || u.name), v: u.v, c: multi ? 1 : [0, 4, 5][['New', 'Reno', 'Addition'].indexOf(u.name)] ?? 0, tip: u.name + ': ' + money(u.v) + ', ' + fmtN(u.n) + ' projects' })), money, null, 'mk:pipeline:side'), rowsCap(side.length, 8)) +
         (p.byUse[0] ? note('Largest use: ' + esc(p.byUse[0].name) + ', ' + Math.round(p.byUse[0].v / (p.active.v || 1) * 100) + '% of the value under construction.') : '')) +
       box('Largest projects under construction', fTable(p.largest)) +
       box('Starting in the next 90 days', p.starting.list.length ? fTable(p.starting.list) : note('No filed projects start in the next 90 days.')) + '</div></section>';
@@ -240,13 +281,13 @@ export function initArea(ctx) {
   // ----- Growth & demand -----
   function permitsChart(rows) {
     const keys = [{ k: 'sf', label: 'Single-family', c: 0 }, { k: 'mf24', label: '2–4 units', c: 5 }, { k: 'mf5', label: '5+ units (apartments)', c: 1 }];
-    return legend(keys.map(k => [k.label, k.c])) + C.bars({ rows: rows.map(r => ({ v: { sf: r.sf, mf24: Math.max(0, r.mf - (r.mf5 || 0)), mf5: r.mf5 || 0 }, tick: String(r.y),
-      tip: r.y + ': ' + fmtN(r.sf + r.mf) + ' homes · single-family ' + fmtN(r.sf) + ' · 2–4 units ' + fmtN(Math.max(0, r.mf - (r.mf5 || 0))) + ' · 5+ units ' + fmtN(r.mf5 || 0) + ' · value ' + money(r.value) })), keys, W: Wh, pinKey: 'permits', pin, aria: 'Housing units permitted per year' });
+    return legend(keys.map(k => [k.label, k.c])) + grow('mk:growth:permits', x => C.bars({ rows: rows.map(r => ({ id: r.y, v: { sf: r.sf, mf24: Math.max(0, r.mf - (r.mf5 || 0)), mf5: r.mf5 || 0 }, tick: String(r.y),
+      tip: r.y + ': ' + fmtN(r.sf + r.mf) + ' homes · single-family ' + fmtN(r.sf) + ' · 2–4 units ' + fmtN(Math.max(0, r.mf - (r.mf5 || 0))) + ' · 5+ units ' + fmtN(r.mf5 || 0) + ' · value ' + money(r.value) })), keys, W: Wd.half, pinKey: 'permits', pin, aria: 'Housing units permitted per year', ck: 'mk:growth:permits', H: 200 + x }));
   }
   function monthBars(all, { key, unit, fmt = fmtN, c = 0 }) {
     const off = Math.max(0, all.length - (range || all.length)), rows = ranged(all), cur = new Date().toISOString().slice(0, 7);
-    return C.bars({ rows: rows.map((r, i) => ({ v: { n: r.n }, faded: r.m >= cur, tick: r.m.endsWith('-01') ? r.m.slice(0, 4) : i === 0 && rows.length < 14 ? monthLabel(r.m) : '', tip: monthLabel(r.m) + ': ' + fmt(r.n) + ' ' + unit + (r.m >= cur ? ' (month in progress)' : '') })),
-      keys: [{ k: 'n', c }], W: Wh, fmt, pinKey: key, pin, off, aria: unit + ' per month' });
+    return grow('mk:growth:' + key, x => C.bars({ rows: rows.map((r, i) => ({ id: r.m, v: { n: r.n }, faded: r.m >= cur, tick: r.m.endsWith('-01') ? r.m.slice(0, 4) : i === 0 && rows.length < 14 ? monthLabel(r.m) : '', tip: monthLabel(r.m) + ': ' + fmt(r.n) + ' ' + unit + (r.m >= cur ? ' (month in progress)' : '') })),
+      keys: [{ k: 'n', c }], W: Wd.half, H: 200 + x, fmt, pinKey: key, pin, off, aria: unit + ' per month', ck: 'mk:growth:' + key }));
   }
   function growthSec(s) {
     const y = s.ytd;
@@ -255,45 +296,53 @@ export function initArea(ctx) {
         note('Units authorized by building permits; includes Census estimates for places that don’t report every month.', 'US Census Building Permits Survey.')) : '') +
       (s.biz?.length ? box('New business locations per month', monthBars(s.biz, { key: 'biz', unit: 'new locations' }) + pinned('biz') +
         note('Sales-tax permits issued per location that are still active, so older months read low. Covers retail, restaurants and many services; most offices and medical don’t need one.', 'Texas Comptroller.')) : '') +
-      (s.jobs ? box('Jobs by industry (' + s.jobs.year + ')', C.hbars(s.jobs.sec.map((v, i) => [i, v]).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([i, v]) => ({ label: SECTORS[i][1], v, k: 'sector:' + i, c: 1, tip: SECTORS[i][1] + ': ' + fmtN(v) + ' jobs (' + Math.round(v / (sum(s.jobs.sec, x => x) || 1) * 100) + '%)' })), fmtN, pin) + pinned('sector') +
+      (s.jobs ? box('Jobs by industry (' + s.jobs.year + ')', grow('mk:growth:jobs', x => C.hbars(s.jobs.sec.map((v, i) => [i, v]).sort((a, b) => b[1] - a[1]).slice(0, 10 + Math.floor(x / ROW)).map(([i, v]) => ({ label: SECTORS[i][1], v, k: 'sector:' + i, c: 1, tip: SECTORS[i][1] + ': ' + fmtN(v) + ' jobs (' + Math.round(v / (sum(s.jobs.sec, x => x) || 1) * 100) + '%)' })), fmtN, pin, 'mk:growth:jobs'), rowsCap(s.jobs.sec.length, 10)) + pinned('sector') +
         note('Jobs counted where people work' + (s.jobs.gr != null ? '; ' + pct(s.jobs.gr) + ' since ' + s.jobs.baseYear : '') + '. Map them under Map Layers → Demographics.', 'US Census LEHD LODES.')) : '') +
       (s.tax?.length ? box('City sales tax per month', monthBars(s.tax, { key: 'tax', unit: 'in city sales tax', fmt: fmtM, c: 5 }) + pinned('tax') +
-        '<h4 class="mk-h4">Cities, last 12 months</h4>' + C.hbars(s.taxCities.slice(0, 10).map((c, i) => ({ label: c.city, v: c.last12 || 0, k: 'city:' + i, c: 5, sub: c.last12 != null && c.prior12 ? pct(chg(c.last12, c.prior12)) : '', tip: c.city + ' (' + c.county + ' County): ' + money(c.last12) + ' in the last 12 months' + (c.prior12 ? ', ' + pct(chg(c.last12, c.prior12)) + ' on the 12 before' : '') })), fmtM, pin) + pinned('city') +
+        '<h4 class="mk-h4">Cities, last 12 months</h4>' + C.hbars(s.taxCities.slice(0, 10).map((c, i) => ({ label: c.city, v: c.last12 || 0, k: 'city:' + i, c: 5, sub: c.last12 != null && c.prior12 ? pct(chg(c.last12, c.prior12)) : '', tip: c.city + ' (' + c.county + ' County): ' + money(c.last12) + ' in the last 12 months' + (c.prior12 ? ', ' + pct(chg(c.last12, c.prior12)) + ' on the 12 before' : '') })), fmtM, pin, 'mk:growth:cities') + pinned('city') +
         note('The cities’ share of sales tax, paid about two months after the sales: a real measure of taxable local spending.', 'Texas Comptroller allocations.')) : '') +
       (s.spend ? box('Consumer spending a year (estimate)', (() => { const top = Object.entries(s.spend.cats).sort((a, b) => b[1] - a[1]), tot = sum(top, x => x[1]) || 1;
-        return '<div class="kgrid mk-kg4"><div><b>' + money(s.spend.total) + '</b><span>A year, all households</span></div><div><b>' + money(s.spend.perHH) + '</b><span>Per household</span></div></div>' + C.hbars(top.map(([k, v], i) => ({ label: CAT_LABEL[k] || k, v, k: 'spend:' + i, c: 3, tip: (CAT_LABEL[k] || k) + ': ' + money(v) + ' a year (' + Math.round(v / tot * 100) + '%)' })), fmtM, pin); })() + pinned('spend') +
+        return '<div class="kgrid mk-kg4"><div><b>' + money(s.spend.total) + '</b><span>A year, all households</span></div><div><b>' + money(s.spend.perHH) + '</b><span>Per household</span></div></div>' + C.hbars(top.map(([k, v], i) => ({ label: CAT_LABEL[k] || k, v, k: 'spend:' + i, c: 3, tip: (CAT_LABEL[k] || k) + ': ' + money(v) + ' a year (' + Math.round(v / tot * 100) + '%)' })), fmtM, pin, 'mk:growth:spend'); })() + pinned('spend') +
         note('An estimate: households by income in each census tract × what households at that income spend (BLS Consumer Expenditure Survey, South).', 'Census ACS ' + s.spend.acs + ', BLS CE ' + s.spend.year + '.'), 'mk-wide') : '') + '</div></section>';
   }
 
   // ----- Housing & rents -----
-  function smallMultiple(id, label, fmt, { c = 0, invert = false, n = 36 } = {}) {
+  // small multiples in full rows (3 a row on a desktop, 2 on a tablet, 1 on a phone; four make two rows of two), each
+  // drawn at its cell's width. list: [id, label, fmt, opts] for the series that have data
+  function smGrid(list) {
+    list = list.filter(([id]) => mk(id)); if (!list.length) return '';
+    const { L, spans } = rowsOf(list.length, Wd.smc), col = (Wd.wide - Wd.smGap * (L - 1)) / L;
+    return '<div class="mk-sms" style="grid-template-columns:repeat(' + L + ',minmax(0,1fr))">' + list.map(([id, l, f, o], i) => smallMultiple(id, l, f, o, Math.floor(col * spans[i] + Wd.smGap * (spans[i] - 1) - Wd.smPad), spans[i])).join('') + '</div>';
+  }
+  function smallMultiple(id, label, fmt, { c = 0, invert = false, n = 36 } = {}, W = 320, span = 1) {
     const x = mk(id); if (!x) return ''; const pts = x.pts.slice(-n);
-    return '<div class="mk-sm"><div class="mk-smh"><span>' + esc(label) + '</span><b>' + esc(fmt(x.last.v)) + '</b>' + C.delta(x.yoy, { invert }) + '</div>' +
-      C.lines({ xs: pts.map(p => monthLabel(p.m)), series: [{ label, c, vals: pts.map(p => p.v) }], W: Ws, H: 120, padL: 44, zero: false, fmt: v => fmt(v), tip: i => monthLabel(pts[i].m) + ': ' + fmt(pts[i].v), tick: i => pts[i].m.endsWith('-01') ? pts[i].m.slice(0, 4) : null, aria: label }) +
+    return '<div class="mk-sm" style="grid-column:span ' + span + '"><div class="mk-smh"><span>' + esc(label) + '</span><b>' + esc(fmt(x.last.v)) + '</b>' + C.delta(x.yoy, { invert }) + '</div>' +
+      C.lines({ xs: pts.map(p => monthLabel(p.m)), series: [{ label, c, vals: pts.map(p => p.v) }], W, H: 150, zero: false, fmt: v => fmt(v), tip: i => monthLabel(pts[i].m) + ': ' + fmt(pts[i].v), tick: i => pts[i].m.endsWith('-01') ? pts[i].m.slice(0, 4) : null, aria: label, ck: 'mk:sm:' + id }) +
       '<div class="mk-smf">' + esc(monthLabel(x.last.m)) + (x.yoy != null ? ' · a year earlier ' + esc(fmt(x.pts.find(p => p.m === addMonths(x.last.m, -12))?.v ?? NaN)) : '') + '</div></div>';
   }
   function housingSec(rn) {
-    const h = housing(tractsIn()), homes = HOMES.map(([id, l, f]) => smallMultiple(id, l, f, { c: 1 })).join('');
+    const h = housingNow(), homes = smGrid(HOMES.map(([id, l, f]) => [id, l, f, { c: 1 }]));
     if (!h && !rn && !homes) return '';
-    const kg = h ? '<div class="kgrid mk-kg4">' + [[money(h.median_home_value_approx), 'Median home value'], [money(h.median_household_income_approx), 'Median household income'], [h.median_gross_rent_approx ? '$' + fmtN(h.median_gross_rent_approx) : '—', 'Median rent (census)'], [fmtN(h.households), 'Households'], [h.vacancy_rate_pct != null ? h.vacancy_rate_pct + '%' : '—', 'Homes vacant'], [h.median_age_approx ?? '—', 'Median age']].map(([v, l]) => '<div><b>' + v + '</b><span>' + l + '</span></div>').join('') + '</div>' : '';
+    const kg = h ? '<div class="kgrid mk-kg4 k3">' + [[money(h.median_home_value_approx), 'Median home value'], [money(h.median_household_income_approx), 'Median household income'], [h.median_gross_rent_approx ? '$' + fmtN(h.median_gross_rent_approx) : '—', 'Median rent (census)'], [fmtN(h.households), 'Households'], [h.vacancy_rate_pct != null ? h.vacancy_rate_pct + '%' : '—', 'Homes vacant'], [h.median_age_approx ?? '—', 'Median age']].map(([v, l]) => '<div><b>' + v + '</b><span>' + l + '</span></div>').join('') + '</div>' : '';
     const zipRow = r => '<tr><td class="m">' + esc(r.zip) + '</td><td>' + esc(r.city) + '</td><td class="m r">$' + fmtN(r.rent) + '</td><td class="m r">' + (C.delta(r.yoy) || '<span class="mk-flat">n/a</span>') + '</td></tr>';
     return '<section class="mk-sec" id="mk-housing"><div class="mk-sh"><h2>Housing & rents</h2><p>Who lives here and what they earn (census tracts), what rents are doing by ZIP (Zillow), and the Houston for-sale market.</p></div><div class="mk-grid">' +
-      (h ? box('Households and incomes', kg + (h.income ? '<h4 class="mk-h4">Household income</h4>' + C.hbars(h.income.map(b => ({ label: b.label, v: b.pct, c: 1, tip: b.label + ': ' + fmtN(b.n) + ' households (' + b.pct.toFixed(1) + '%)' })), v => v.toFixed(0) + '%') : '') +
+      (h ? box('Households and incomes', kg + (h.income ? '<h4 class="mk-h4">Household income</h4>' + C.hbars(h.income.map(b => ({ label: b.label, v: b.pct, c: 1, tip: b.label + ': ' + fmtN(b.n) + ' households (' + b.pct.toFixed(1) + '%)' })), v => v.toFixed(0) + '%', null, 'mk:housing:income') : '') +
         note('Area medians are household-weighted averages of the tract medians (approximate).', 'US Census ACS 5-year ' + (market?.year || '') + '.')) : '') +
       (rn ? box('Rents by ZIP', '<div class="kgrid mk-kg4"><div><b>$' + fmtN(Math.round(rn.typical)) + '</b><span>Typical rent (ZIP median)</span></div><div><b>' + (rn.yoy != null ? pct(rn.yoy) : '—') + '</b><span>In a year</span></div><div><b>$' + fmtN(rn.low.rent) + (Math.round(rn.low.rent) === Math.round(rn.high.rent) ? '' : '–' + fmtN(rn.high.rent)) + '</b><span>' + (rn.rows.length === 1 ? 'Based on 1 ZIP' : 'Range across ' + rn.rows.length + ' ZIPs') + '</span></div></div>' +
         '<div class="tablewrap mk-zips"><table class="mk-tbl"><thead><tr><th>ZIP</th><th>Town</th><th class="r">Rent</th><th class="r">Year</th></tr></thead><tbody>' + rn.rows.slice(0, 10).map(zipRow).join('') + '</tbody></table></div>' +
         (rn.rows.length > 10 ? '<details class="mk-more"><summary>All ' + rn.rows.length + ' ZIPs</summary><div class="tablewrap"><table class="mk-tbl"><tbody>' + rn.rows.slice(10).map(zipRow).join('') + '</tbody></table></div></details>' : '') +
         note('Typical asking rent for all home types, ' + esc(monthLabel(rn.month)) + '. ZIPs are placed in a county by their town, so border ZIPs are approximate.', 'Zillow Observed Rent Index.')) : '') +
-      (homes ? box('Houston for-sale market' + tag('Houston metro'), '<div class="mk-sms">' + homes + '</div>' + note('Houston-metro monthly figures, the same for every county here. “Seasonally adjusted” means the usual seasonal swings are smoothed out.', 'Realtor.com and US Census via FRED.'), 'mk-wide') : '') + '</div></section>';
+      (homes ? box('Houston for-sale market' + tag('Houston metro'), homes + note('Houston-metro monthly figures, the same for every county here. “Seasonally adjusted” means the usual seasonal swings are smoothed out.', 'Realtor.com and US Census via FRED.'), 'mk-wide') : '') + '</div></section>';
   }
 
   // ----- Costs & rates -----
   function costsSec() {
-    const costs = COSTS.map(([id, l]) => smallMultiple(id, l, v => v >= 1000 ? fmtN(Math.round(v)) : v.toFixed(1), { c: 2, invert: true, n: 60 })).join('');
+    const costs = smGrid(COSTS.map(([id, l]) => [id, l, v => v >= 1000 ? fmtN(Math.round(v)) : v.toFixed(1), { c: 2, invert: true, n: 60 }]));
     const R = [['mortgage30us', '30-yr mortgage', 0], ['dgs10', '10-yr Treasury', 1], ['fedfunds', 'Fed funds', 4]].map(([id, l, c]) => ({ x: mk(id), l, c })).filter(r => r.x);
     let rates = '';
     if (R.length) { const ms = [...new Set(R.flatMap(r => r.x.pts.map(p => p.m)))].sort().slice(-60), val = (r, m) => r.x.pts.find(p => p.m === m)?.v ?? null;
-      rates = legend(R.map(r => [r.l, r.c])) + C.lines({ xs: ms.map(monthLabel), series: R.map(r => ({ label: r.l, c: r.c, vals: ms.map(m => val(r, m)) })), W: Wh, H: 200, fmt: v => v.toFixed(2) + '%', zero: false, tick: i => ms[i].endsWith('-01') ? ms[i].slice(0, 4) : null, aria: 'Interest rates, monthly' }); }
+      const series = R.map(r => ({ label: r.l, c: r.c, vals: ms.map(m => val(r, m)) }));
+      rates = legend(R.map(r => [r.l, r.c])) + grow('mk:costs:rates', x => C.lines({ xs: ms.map(monthLabel), series, W: Wd.half, H: 220 + x, fmt: v => v.toFixed(2) + '%', zero: false, tick: i => ms[i].endsWith('-01') ? ms[i].slice(0, 4) : null, aria: 'Interest rates, monthly', ck: 'mk:costs:rates' })); }
     const r = area.rates?.series, mg = area.mortgages;
     const now = r ? '<table class="mk-tbl"><thead><tr><th>Rate</th><th class="r">Now</th><th class="r">1-yr change</th><th>As of</th></tr></thead><tbody>' + ['m30', 't10', 't5', 'sofr'].filter(k => r[k]).map(k => { const x = r[k], d = x.yearAgo != null ? x.value - x.yearAgo : null;
       return '<tr><td>' + esc(x.label) + '</td><td class="m r"><b>' + x.value.toFixed(2) + '%</b></td><td class="m r">' + (d == null ? '—' : C.delta(d, { unit: ' pts', invert: true, digits: 2 })) + '</td><td class="m">' + esc(MON[+x.date.slice(5, 7) - 1] + ' ' + +x.date.slice(8)) + '</td></tr>'; }).join('') + '</tbody></table>' : '';
@@ -301,7 +350,7 @@ export function initArea(ctx) {
     const lend = F.length && loans ? '<h4 class="mk-h4">Home lending ' + mg.year + '</h4><div class="kgrid mk-kg4"><div><b>' + fmtN(loans) + '</b><span>Home loans' + (prior ? ' · ' + pct(chg(loans, prior)) : '') + '</span></div><div><b>' + money(dollars) + '</b><span>Loan dollars</span></div><div><b>' + fmtN(purch) + '</b><span>Purchase loans</span></div><div><b>' + money(loans ? dollars / loans : 0) + '</b><span>Average loan</span></div></div>' : '';
     if (!costs && !rates && !now) return '';
     return '<section class="mk-sec" id="mk-costs"><div class="mk-sh"><h2>Costs & rates</h2><p>What it costs to build (producer price indexes for materials) and to borrow.</p></div><div class="mk-grid">' +
-      (costs ? box('Construction material prices' + tag('National'), '<div class="mk-sms">' + costs + '</div>' + note('Producer price indexes (an index, not a price per unit; copper in $ per tonne), monthly. Red means prices rose: costs went up.', 'BLS PPI and IMF via FRED.'), 'mk-wide') : '') +
+      (costs ? box('Construction material prices' + tag('National'), costs + note('Producer price indexes (an index, not a price per unit; copper in $ per tonne), monthly. Red means prices rose: costs went up.', 'BLS PPI and IMF via FRED.'), 'mk-wide') : '') +
       (rates ? box('Interest rates, 5 years' + tag('National'), rates + note('Monthly averages. Loan rates track an index (Treasury or SOFR) plus a lender spread.', 'FRED (Freddie Mac PMMS, US Treasury, Federal Reserve).')) : '') +
       (now || lend ? box('Rates now and home lending', now + lend + note('', 'FRED, New York Fed SOFR, Freddie Mac; home loans from CFPB HMDA (originated 1–4 family loans, published yearly).')) : '') + '</div></section>';
   }
@@ -309,22 +358,22 @@ export function initArea(ctx) {
   // ----- Area & news (Houston crime, busiest roads, local news, newest businesses) -----
   function crimeBox() {
     if (!wantCrime()) return ''; const d = crimeCity;
-    if (!d) return box('Crime · City of Houston', note('Counting incidents…'), 'mk-wait');
+    if (!d) return box('Crime · City of Houston', '<div class="rnote loading">Counting incidents…</div>' + skel(170), 'mk-wait');
     if (d.failed) return box('Crime · City of Houston', note('Crime data isn’t available right now. <button class="lnk" type="button" data-retry="crime">Retry</button>'), 'mk-wait');
     if (!d.latest) return box('Crime · City of Houston', note(esc(d.note || 'No crime data loaded yet.')), 'mk-wait');
     const L = d.last12, keys = ['v', 'p', 'o'].filter(k => show[k]).map(k => ({ k, c: CR[k] })), all = d.months || [], off = Math.max(0, all.length - (range || all.length));
     return box('Crime · City of Houston', '<div class="kgrid mk-kg4"><div><b>' + fmtN(L.total) + '</b><span>Incidents, 12 months · ' + pct(d.change.total) + '</span></div><div><b style="color:' + col(6) + '">' + fmtN(L.v) + '</b><span>Violent · ' + pct(d.change.v) + '</span></div><div><b style="color:' + col(2) + '">' + fmtN(L.p) + '</b><span>Property · ' + pct(d.change.p) + '</span></div><div><b>' + fmtN(d.per_sqmi?.total) + '</b><span>Per sq mi a year</span></div></div>' +
       '<div class="mk-leg">' + legBtn('v', 'Violent', 6) + legBtn('p', 'Property', 2) + legBtn('o', 'Other', 4) + '</div>' +
-      C.bars({ rows: ranged(all).map(r => ({ v: r, tick: r.m.endsWith('-01') ? r.m.slice(0, 4) : '', tip: monthLabel(r.m) + ': ' + fmtN(r.v + r.p + r.o) + ' incidents · violent ' + fmtN(r.v) + ' · property ' + fmtN(r.p) + ' · other ' + fmtN(r.o) })), keys, W: Wh, pinKey: 'crime', pin, off, aria: 'Crime per month' }) + pinned('crime') +
-      '<h4 class="mk-h4">Most reported, last 12 months</h4>' + C.hbars((d.offenses || []).slice(0, 8).map((o, i) => ({ label: o.name, v: o.n, k: 'offense:' + i, c: CR[o.cat] ?? 4, tip: o.name + ': ' + fmtN(o.n) + ' incidents' })), fmtN, pin) + pinned('offense') +
+      grow('mk:area:crime', x => C.bars({ rows: ranged(all).map(r => ({ id: r.m, v: r, tick: r.m.endsWith('-01') ? r.m.slice(0, 4) : '', tip: monthLabel(r.m) + ': ' + fmtN(r.v + r.p + r.o) + ' incidents · violent ' + fmtN(r.v) + ' · property ' + fmtN(r.p) + ' · other ' + fmtN(r.o) })), keys, W: Wd.half, H: 200 + x, pinKey: 'crime', pin, off, aria: 'Crime per month', ck: 'mk:area:crime' })) + pinned('crime') +
+      '<h4 class="mk-h4">Most reported, last 12 months</h4>' + grow('mk:area:offenses', x => C.hbars((d.offenses || []).slice(0, 8 + Math.floor(x / ROW)).map((o, i) => ({ label: o.name, v: o.n, k: 'offense:' + i, c: CR[o.cat] ?? 4, tip: o.name + ': ' + fmtN(o.n) + ' incidents' })), fmtN, pin, 'mk:area:offenses'), rowsCap((d.offenses || []).length, 8)) + pinned('offense') +
       note('Houston Police incidents (NIBRS) through ' + esc(monthLabel(d.latest.slice(0, 7))) + '; the file runs about three months behind. City of Houston only' + (sel === 'all' ? '' : ' (part of ' + esc(areaLabel()) + ')') + '.'));
   }
   function trafficBox() {
     const t = traffic.get(sel); if (t === undefined) return '';
-    if (!t) return box('Busiest roads', note('Loading TxDOT traffic counts…'), 'mk-wait');
+    if (!t) return box('Busiest roads', '<div class="rnote loading">Loading TxDOT traffic counts…</div>' + skel(170), 'mk-wait');
     if (t.failed || t.error || !t.roads) return box('Busiest roads', note('Traffic counts aren’t available right now. <button class="lnk" type="button" data-retry="traffic">Retry</button>'), 'mk-wait');
-    return box('Busiest roads', C.hbars(t.roads.slice(0, 10).map((r, i) => ({ label: title(r.road), v: r.aadt, k: 'road:' + i, c: 3, tip: title(r.road) + ': ' + fmtN(r.aadt) + ' vehicles a day at its busiest counted point. Click to see it on the map.' })), fmtN) +
-      '<h4 class="mk-h4">Average daily traffic by road type</h4>' + C.hbars(t.types.slice(0, 8).map((g, i) => ({ label: g.label, v: g.avg, k: 'rtype:' + i, c: 3, tip: g.label + ': ' + fmtN(g.avg) + ' vehicles a day on average' })), fmtN, pin) + pinned('rtype') +
+    return box('Busiest roads', grow('mk:area:roads', x => C.hbars(t.roads.slice(0, 10 + Math.floor(x / ROW)).map((r, i) => ({ label: title(r.road), v: r.aadt, k: 'road:' + i, c: 3, tip: title(r.road) + ': ' + fmtN(r.aadt) + ' vehicles a day at its busiest counted point. Click to see it on the map.' })), fmtN, null, 'mk:area:roads'), rowsCap(t.roads.length, 10)) +
+      '<h4 class="mk-h4">Average daily traffic by road type</h4>' + grow('mk:area:rtypes', x => C.hbars(t.types.slice(0, 8 + Math.floor(x / ROW)).map((g, i) => ({ label: g.label, v: g.avg, k: 'rtype:' + i, c: 3, tip: g.label + ': ' + fmtN(g.avg) + ' vehicles a day on average' })), fmtN, pin, 'mk:area:rtypes'), rowsCap(t.types.length, 8)) + pinned('rtype') +
       note('TxDOT annual average daily traffic (AADT)' + (t.as_of ? ', published ' + esc(t.as_of) : '') + ': how busy roads are, not how traffic is changing.'));
   }
   function areaSec(s) {
@@ -378,16 +427,18 @@ export function initArea(ctx) {
   }
 
   // ---------- area picker: a small map of the counties (click one) beside a button per county and the whole region ----------
-  let scopeOpen = false;
+  let scopeOpen = false, mini = null;
   function scopeHtml() {
-    const geo = (ctx.countyGeo || []).filter(g => area.counties.some(c => c.name === g.name));
-    let svg = '';
-    if (window.d3 && geo.length) {
-      const W = 220, H = 150, fcx = { type: 'FeatureCollection', features: geo.map(g => ({ type: 'Feature', properties: {}, geometry: g.geom })) };
-      const path = d3.geoPath(d3.geoMercator().fitExtent([[4, 4], [W - 4, H - 4]], fcx));
-      svg = '<svg class="mk-mini" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">' + geo.map(g => { const c = area.counties.find(x => x.name === g.name);
-        return '<path d="' + path(g.geom) + '" data-county="' + c.fips + '" class="' + (sel !== 'all' && fipsList().includes(c.fips) ? 'on' : sel === 'all' ? 'in' : '') + '"><title>' + esc(c.name) + ' County</title></path>'; }).join('') + '</svg>';
+    // the county outlines are projected once (22,000 points), not on every draw; only their classes change
+    if (!mini || mini.geo !== ctx.countyGeo || mini.area !== area || (!mini.paths.length && window.d3)) {
+      const geo = (ctx.countyGeo || []).filter(g => area.counties.some(c => c.name === g.name)), W = 220, H = 150;
+      let paths = [];
+      if (window.d3 && geo.length) { const fcx = { type: 'FeatureCollection', features: geo.map(g => ({ type: 'Feature', properties: {}, geometry: g.geom })) }, path = d3.geoPath(d3.geoMercator().fitExtent([[4, 4], [W - 4, H - 4]], fcx));
+        paths = geo.map(g => ({ c: area.counties.find(x => x.name === g.name), d: path(g.geom) })); }
+      mini = { geo: ctx.countyGeo, area, W, H, paths };
     }
+    const svg = mini.paths.length ? '<svg class="mk-mini" viewBox="0 0 ' + mini.W + ' ' + mini.H + '" aria-hidden="true">' + mini.paths.map(({ c, d }) =>
+      '<path d="' + d + '" data-county="' + c.fips + '" class="' + (sel !== 'all' && fipsList().includes(c.fips) ? 'on' : sel === 'all' ? 'in' : '') + '"><title>' + esc(c.name) + ' County</title></path>').join('') + '</svg>' : '';
     const btn = (v, name) => '<button type="button" class="mk-cty" data-county="' + v + '" aria-pressed="' + (v === 'all' ? sel === 'all' : sel !== 'all' && fipsList().includes(v)) + '">' + esc(name) + '</button>';
     // the scope bar: the area in one line, with the county picker folded away behind "Change"
     return '<details class="mk-scopebar"' + (scopeOpen ? ' open' : '') + '><summary><span class="vs-n">Area: <b>' + esc(areaLabel()) + '</b></span><span class="lnk mk-chg">Change</span><span class="lnk mk-cls">Close</span></summary>' +
@@ -419,11 +470,16 @@ export function initArea(ctx) {
     try { return await buildReport(); } finally { leave(); }
   }
   async function buildReport() {
+    flushNow(); // a draw still waiting for the next frame happens now (a hidden tab gets no frames)
+    finish(root); // the copy must hold every chart at its final values, not mid-animation
     const label = areaLabel(), body = root.querySelector('.mk-body')?.cloneNode(true); if (!body) return;
-    body.querySelectorAll('.mk-hint,.mk-pin,.mk-ctl,.mx-ctl,.mx-tabs,.bacts,.mx-cmp,.mx-acts,select,button,.mk-nav').forEach(e => e.remove());
+    body.querySelectorAll('.mk-hint,.mk-pin,.mk-ctl,.mx-ctl,.mx-tabs,.bacts,.mx-cmp,.mx-acts,select,button,.mk-nav,.mk-skel').forEach(e => e.remove());
     body.querySelectorAll('details').forEach(d => d.open = true); body.querySelectorAll('tr[hidden]').forEach(tr => tr.hidden = false);
     body.querySelectorAll('.mk-lb,.mk-wait').forEach(b => b.remove()); // cards that failed to load (or are still loading) stay out of the report
-    body.querySelectorAll('[tabindex],[data-k],[data-tip],[data-fid]').forEach(e => { e.removeAttribute('tabindex'); e.removeAttribute('data-k'); e.removeAttribute('data-tip'); e.removeAttribute('data-fid'); });
+    // the PDF has its own tile grid; small multiples keep the screen's rows (each is drawn for its cell, so every chart's
+    // text prints at the same size)
+    body.querySelectorAll('.mk-kpis2,.mk-kpi,.mx-sp').forEach(e => e.removeAttribute('style'));
+    body.querySelectorAll('[tabindex],[data-k],[data-tip],[data-fid],[data-ck],[data-mk]').forEach(e => { ['tabindex', 'data-k', 'data-tip', 'data-fid', 'data-ck', 'data-mk'].forEach(a => e.removeAttribute(a)); });
     const geo = (ctx.countyGeo || []).filter(g => fipsList().map(cname).includes(g.name));
     const map = geo.length ? '<div class="map">' + areaMap(geo.map(g => ({ geometry: g.geom, stroke: '#006527', fill: 'rgba(0,101,39,.06)', width: 2 })), { W: 1000, H: 360 }) + '</div>' : '';
     const html = reportDoc({ kicker: 'Market report', title: label, meta: (range ? 'Monthly charts: last ' + range + ' months' : 'Monthly charts: all months') + (area.built ? ' · data built ' + esc(new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : ''), css: PRINT_CSS,
@@ -446,7 +502,7 @@ export function initArea(ctx) {
     if (s.spend) Object.entries(s.spend.cats).forEach(([k, v]) => add('Consumer spending a year (estimate)', CAT_LABEL[k] || k, Math.round(v)));
     (s.tax || []).forEach(r => add('City sales tax per month', r.m, Math.round(r.n)));
     (s.taxCities || []).forEach(c => add('City sales tax, last 12 months', c.city + ' (' + c.county + ')', c.last12 != null ? Math.round(c.last12) : '', c.prior12 ? pct(chg(c.last12, c.prior12)) + ' vs prior 12' : ''));
-    const h = housing(tractsIn()); if (h) { add('Housing (census)', 'Median home value (approx.)', h.median_home_value_approx); add('Housing (census)', 'Median household income (approx.)', h.median_household_income_approx); add('Housing (census)', 'Median rent (approx.)', h.median_gross_rent_approx); add('Housing (census)', 'Households', h.households); add('Housing (census)', 'Vacancy rate %', h.vacancy_rate_pct); (h.income || []).forEach(b => add('Household income', b.label, b.n, b.pct.toFixed(1) + '%')); }
+    const h = housingNow(); if (h) { add('Housing (census)', 'Median home value (approx.)', h.median_home_value_approx); add('Housing (census)', 'Median household income (approx.)', h.median_household_income_approx); add('Housing (census)', 'Median rent (approx.)', h.median_gross_rent_approx); add('Housing (census)', 'Households', h.households); add('Housing (census)', 'Vacancy rate %', h.vacancy_rate_pct); (h.income || []).forEach(b => add('Household income', b.label, b.n, b.pct.toFixed(1) + '%')); }
     const rn = rentInfo(); if (rn) rn.rows.forEach(r => add('Rents by ZIP (Zillow, ' + rn.month + ')', r.zip + ' ' + r.city, r.rent, r.yoy != null ? pct(r.yoy) + ' in a year' : ''));
     [...COSTS, ...HOMES].forEach(([id, l]) => { const x = mk(id); if (x) x.pts.forEach(p => add(l, p.m, p.v)); });
     if (wantCrime() && crimeCity?.latest) { crimeCity.months.forEach(m => { add('Crime per month (City of Houston)', m.m + ' violent', m.v); add('Crime per month (City of Houston)', m.m + ' property', m.p); add('Crime per month (City of Houston)', m.m + ' other', m.o); });
@@ -462,7 +518,7 @@ export function initArea(ctx) {
   ctx.exportMarket = async (format = 'html', county, { stay = false } = {}) => { await load(); if (county === 'all' || /^\d{5}(,\d{5})*$/.test(county || '')) { sel = county; adopted = mapCounties(); } else if (county) { const c = area?.counties.find(x => x.fips === county || x.name.toLowerCase() === String(county).toLowerCase()); if (c) { sel = c.fips; adopted = mapCounties(); } }
     if (format === 'csv') return exportData(); if (!stay) { ctx.setView('market'); await new Promise(r => setTimeout(r, 120)); } return exportReport(); };
   // the assistant's market_data extras: the pipeline, housing, rents and costs (small summaries)
-  ctx.marketExtras = () => { if (!area) return null; const p = pipe(), h = housing(tractsIn()), rn = rentInfo();
+  ctx.marketExtras = () => { if (!area) return null; const p = pipe(), h = housingNow(), rn = rentInfo();
     return { pipeline: { under_construction: Math.round(p.active.v), projects: p.active.n, starting_90_days: Math.round(p.starting.v), starting_projects: p.starting.n, scheduled_starts: Math.round(p.upcoming.v), change_vs_year_ago_pct: p.change != null ? +p.change.toFixed(1) : null,
         by_use: p.byUse.slice(0, 8).map(u => ({ use: u.name, value: Math.round(u.v), projects: u.n })), largest: p.largest.slice(0, 5).map(f => ({ name: f.name, value: f.cost, city: f.city || f.county, use: f.use, start: f.ts, end: f.te })), left_out: p.outliers.map(o => o.name + ' (' + fmtM(o.cost) + ')') },
       housing: h ? { median_home_value_approx: h.median_home_value_approx, median_income_approx: h.median_household_income_approx, median_rent_approx: h.median_gross_rent_approx, households: h.households, vacancy_pct: h.vacancy_rate_pct } : null,
@@ -470,20 +526,99 @@ export function initArea(ctx) {
       material_costs_yoy_pct: Object.fromEntries(COSTS.map(([id, l]) => [l, mk(id)?.yoy != null ? +mk(id).yoy.toFixed(1) : null])) }; };
 
   // ---------- render ----------
-  let curStats = null, navY = 0;
-  let measuring = false, measuredWs = 0; // measuredWs: the small charts' real width once seen (cleared when the window is resized)
-  function render() {
+  let curStats = null, navY = 0, pinSec = null, lastW = 0;
+  // Every update goes through morph (src/motion.js): charts reveal the first time they scroll into view, then changes (range,
+  // county, legend, pin, new data) tween the marks from where they were; a resize redraws at once (instant).
+  // Requests are coalesced into one draw per frame: render() is the whole tab, section(id) only <section id="mk-<id>">.
+  let want = null, raf = 0, drawn = null, drawnP = null;
+  function schedule(what) {
+    if (what === 'all') want = 'all'; else if (want !== 'all') (want ||= new Set()).add(what);
+    if (!raf) { drawnP = new Promise(r => { drawn = r; }); raf = requestAnimationFrame(flush); }
+    return drawnP;
+  }
+  function flush() {
+    const w = want, d = drawn; raf = 0; want = null; drawn = null;
+    try { if (shown()) { if (w === 'all' || !area || !root.querySelector('.mk-body')) full(); else w.forEach(drawSection); } }
+    finally { d?.(); }
+  }
+  const flushNow = () => { if (raf) { cancelAnimationFrame(raf); flush(); } else if (area && !root.querySelector('.mk-body')) full(); };
+  const render = () => schedule('all');
+  const section = id => schedule(id);
+  const full = () => keepState(root, () => morph(root, 'mk', draw));
+
+  // what a redraw keeps: which details are open, the focused control (by its id or data key) and the scroll position
+  const KEYS = ['data-k', 'data-range', 'data-show', 'data-sec', 'data-county', 'data-mxg', 'data-mxhow', 'data-mxb', 'data-mxs', 'data-fid', 'data-act'];
+  function sig(a) {
+    if (a.id) return '#' + CSS.escape(a.id);
+    for (const k of KEYS) { const v = a.getAttribute(k); if (v != null) return a.tagName.toLowerCase() + '[' + k + '="' + CSS.escape(v) + '"]'; }
+    return null;
+  }
+  function keepState(el, fn) {
+    const open = [...el.querySelectorAll('details')].map(d => d.open), a = document.activeElement, f = a && a !== el && el.contains(a) ? sig(a) : null, y = root.scrollTop;
+    fn();
+    const ds = el.isConnected ? el.querySelectorAll('details') : []; if (ds.length === open.length) ds.forEach((d, i) => { if (open[i] && !d.open) d.open = true; });
+    if (f) { const n = el.querySelector(f); if (n && document.activeElement !== n) n.focus({ preventScroll: true }); }
+    root.scrollTop = y;
+  }
+
+  // ----- widths: one layout read of a hidden copy of the grid, so every chart is drawn at the width it's shown at -----
+  function measure() {
+    const p = document.createElement('div'); p.className = 'mk-body mk-probe'; p.setAttribute('aria-hidden', 'true');
+    p.innerHTML = '<div class="mk-grid"><section class="mk-box"><i class="mk-cw"></i></section><section class="mk-box mk-wide"><i class="mk-cw"></i>' +
+      '<div class="mk-sms" style="grid-template-columns:minmax(0,1fr)"><div class="mk-sm"><i class="mk-cw"></i></div></div>' +
+      '<div class="mx-wrap"><div class="mx-side"></div><div class="mx-main"><i class="mk-cw"></i></div></div></section></div>';
+    root.appendChild(p);
+    const [half, wide, s1, main] = [...p.querySelectorAll('.mk-cw')].map(e => e.getBoundingClientRect().width), fullW = p.getBoundingClientRect().width, smGap = parseFloat(getComputedStyle(p.querySelector('.mk-sms')).columnGap) || 12;
+    p.remove();
+    // small multiples: 3 a row on a desktop, 2 on a tablet, 1 on a phone
+    Wd = { full: fullW, half: Math.floor(half), wide, smc: wide >= 960 ? 3 : wide >= 520 ? 2 : 1, smPad: wide - s1, smGap, main: Math.floor(main), spark: Math.max(110, Math.min(340, Math.round(wide * .26))) };
+    lastW = fullW;
+  }
+
+  // ----- the sections -----
+  const marketsSec = () => { const h = ctx.markets?.html(Wd); return h ? sec('markets', 'Markets', 'Prices that move Houston real estate, and an honest test of which ones move with Houston’s own numbers.', '<div class="mk-grid">' + h + '</div>') : ''; };
+  // in page order (NAV): what the area's people and economy are doing first, the construction filings after
+  const SECTIONS = {
+    overview: () => overview(stats(), pipe(), rentInfo()), growth: () => growthSec(stats()), housing: () => housingSec(rentInfo()),
+    costs: () => costsSec(), markets: marketsSec, pipeline: () => pipelineSec(pipe()), area: () => areaSec(stats())
+  };
+  function build(id) { growing = []; try { return SECTIONS[id](); } finally { grows.set(id, growing); growing = null; } }
+  // side-by-side boxes end level: the shorter box's growable chart gets the difference (all reads, then the writes)
+  // (secs: the sections just built; a grown chart is rebuilt from its base height, so only fresh sections are fitted)
+  function fit(secs) {
+    const jobs = [];
+    secs.forEach(sc => {
+      const list = grows.get(sc.id.slice(3)); if (!list?.length) return;
+      sc.querySelectorAll(':scope > .mk-grid').forEach(grid => {
+        const rows = new Map();
+        for (const b of grid.children) { if (!b.classList.contains('mk-box') || b.classList.contains('mk-wide')) continue;
+          const r = b.getBoundingClientRect(), last = b.lastElementChild, k = Math.round(r.top); (rows.get(k) || rows.set(k, []).get(k)).push({ b, nat: last ? last.getBoundingClientRect().bottom - r.top : 0 }); }
+        for (const row of rows.values()) { if (row.length < 2) continue; const hi = Math.max(...row.map(x => x.nat));
+          for (const x of row) { const d = Math.floor(hi - x.nat); if (d < 12) continue;
+            for (const g of list) { if (g.cap < 12) continue; const el = x.b.querySelector('[data-ck="' + g.ck + '"]'); if (el) { jobs.push({ el, g, d: Math.min(d, 320, g.cap) }); break; } } } }
+      });
+    });
+    jobs.forEach(j => { j.el.outerHTML = j.g.make(j.d); });
+  }
+  function drawSection(id) {
+    const el = root.querySelector('#mk-' + id); if (!el) { full(); return; }
+    curStats = stats();
+    const html = build(id); if (!html) { el.remove(); return; }
+    const t = document.createElement('template'); t.innerHTML = html; const next = t.content.firstElementChild;
+    keepState(el, () => morph(el, null, () => { el.innerHTML = next.innerHTML; fit([el]); }));
+    if (id === 'area') loadExtras();
+  }
+
+  function draw() {
     if (!shown()) return;
     if (!area) {
-      root.innerHTML = '<div class="vhead"><div><div class="kicker">Market</div><h2>Growth signals by county</h2></div></div><div class="empty">' + (loadP ? 'Market data isn’t available yet. It’s added by the nightly data refresh.' : 'Loading…') + '</div>';
-      load().then(() => { if (area) render(); else if (shown()) root.querySelector('.empty').textContent = 'Market data isn’t available yet. It’s added by the nightly data refresh.'; });
+      root.innerHTML = '<div class="vhead"><div><div class="kicker">Market</div><h2>Growth signals by county</h2></div></div><div class="empty">' + (loadP ? 'Market data isn’t available yet. It’s added by the nightly data refresh.' : 'Loading…') + '</div>' +
+        (loadP ? '' : '<div class="mk-skels">' + skel(110) + '<div class="mk-grid">' + skel(220) + skel(220) + '</div></div>');
+      load().then(() => { if (area) render(); else if (shown()) { root.querySelector('.empty').textContent = 'Market data isn’t available yet. It’s added by the nightly data refresh.'; root.querySelector('.mk-skels')?.remove(); } });
       return;
     }
-    if (ctx.markets && !ctx.markets.raw?.()) ctx.markets.load?.().then(() => { if (shown()) render(); });
-    adopt();
-    const inner = Math.max(320, (root.clientWidth || 1100) - (root.clientWidth > 700 ? 48 : 28));
-    Wf = Math.round(Math.min(1200, inner - 32)); Wh = Math.round(inner > 900 ? (inner - 14) / 2 - 32 : inner - 32); Ws = measuredWs || Math.round(inner > 900 ? (inner - 32 - 24) / 3 - 14 : inner > 600 ? (inner - 32 - 12) / 2 - 14 : inner - 46);
-    const s = curStats = stats(), p = pipe(), rn = rentInfo(), y0 = root.scrollTop;
+    adopt(); measure(); curStats = stats();
+    const y0 = root.scrollTop, body = Object.keys(SECTIONS).map(build).join('');
     root.innerHTML = '<div class="vhead mk-vhead"><div><div class="kicker">Market</div><h2>' + esc(areaLabel()) + '</h2>' +
       '<div class="vsub">Growth, housing, costs, markets and construction from free public sources, refreshed nightly' + (area.built ? ' (last ' + new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : '') + '. No sale prices: Texas doesn’t disclose them.</div></div>' +
       '<div class="vctl">' + (ctx.exportMenu ? ctx.exportMenu([{ label: 'Market report · PDF', attrs: ' id="mkExport"' }, { label: 'Market data · CSV', attrs: ' id="mkCsv"' }])
@@ -493,66 +628,106 @@ export function initArea(ctx) {
       '<nav class="mk-nav" aria-label="Market sections"><button type="button" class="mk-here" id="mkHere" title="Change the area"><span>' + esc(areaLabel()) + '</span><em>Change</em></button><i class="mk-div" aria-hidden="true"></i>' +
       NAV.map(([k, l]) => '<button type="button" data-sec="' + k + '">' + l + '</button>').join('') +
       '<span class="mk-rng"><span>Monthly charts:</span><span class="mk-seg" role="group" aria-label="Months shown in monthly charts">' + [[12, '12 mo'], [24, '24 mo'], [0, 'All']].map(([v, l]) => '<button type="button" data-range="' + v + '" aria-pressed="' + (range === v) + '">' + l + '</button>').join('') + '</span></span></nav>' +
-      '<div class="mk-tip" id="mkTip" role="tooltip"></div><div class="mk-body">' +
-      overview(s, p, rn) + growthSec(s) + housingSec(rn) + costsSec() +
-      (ctx.markets?.html() ? '<section class="mk-sec" id="mk-markets"><div class="mk-sh"><h2>Markets</h2><p>Prices that move Houston real estate, and an honest test of which ones move with Houston’s own numbers.</p></div><div class="mk-grid">' + ctx.markets.html() + '</div></section>' : '') +
-      pipelineSec(p) + areaSec(s) + '</div>';
+      '<div class="mk-tip" id="mkTip" role="tooltip"></div><div class="mk-body">' + body + '</div>';
     root.scrollTop = y0;
-    wire(s);
-    // the small charts are drawn at the width they are shown at (so their axis text is its real size): measure one and redraw once
-    const sm = !measuring && root.querySelector('.mk-sm'), w = sm ? Math.round(sm.clientWidth - 20) : 0;
-    if (w > 120 && Math.abs(w - Ws) > 3) { Ws = measuredWs = w; measuring = true; try { render(); } finally { measuring = false; } }
+    fit(root.querySelectorAll('.mk-body > .mk-sec'));
+    root.querySelectorAll('.mk-nav [data-sec]').forEach(b => { b.hidden = !root.querySelector('#mk-' + b.dataset.sec); });
+    root.style.setProperty('--mk-nav', nav().offsetHeight + 'px'); // jump targets (sections, the correlation box) stop below the sticky bar
+    mark(); loadExtras();
   }
-  function wire(s) {
-    root.querySelectorAll('.mk-scope2 [data-county]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.county; sel = v === sel && v !== 'all' ? 'all' : v; newsPlace = ''; pin = null; scopeOpen = false; render(); }));
-    root.querySelector('.mk-scopebar')?.addEventListener('toggle', e => { scopeOpen = e.currentTarget.open; });
-    root.querySelectorAll('[data-range]').forEach(b => b.onclick = () => { range = +b.dataset.range; pin = null; render(); });
-    root.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { const k = b.dataset.show; show[k] = !show[k]; if (!['v', 'p', 'o'].some(x => show[x])) show[k] = true; render(); });
-    root.querySelector('#mkExport').onclick = () => exportReport(); root.querySelector('#mkCsv').onclick = () => exportData();
-    root.querySelector('#mkBrief')?.addEventListener('click', () => ctx.assistant?.ask('Give me a short market brief for ' + areaLabel() + ': use the market_data tool (it includes the construction pipeline, housing, rents and material costs) and say what stands out for a commercial construction and finishes business: where the work is, what is growing or slowing, and costs. Keep it to a few bullets.'));
-    // section buttons: jump to the section; the one in view is highlighted as you scroll
-    const nav = root.querySelector('.mk-nav'), secs = NAV.map(([k]) => root.querySelector('#mk-' + k));
-    root.style.setProperty('--mk-nav', nav.offsetHeight + 'px'); // jump targets (sections, the correlation box) stop below the sticky bar
-    nav.querySelector('#mkHere').onclick = () => { const d = root.querySelector('.mk-scopebar'); if (d) { d.open = true; scopeOpen = true; } root.scrollTo({ top: 0, behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); d?.querySelector('summary')?.focus({ preventScroll: true }); };
-    nav.querySelectorAll('[data-sec]').forEach((b, i) => { if (!secs[i]) { b.hidden = true; return; } b.onclick = () => root.scrollTo({ top: secs[i].offsetTop - nav.offsetHeight - 10, behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); });
-    // the bar's own area button only shows once the Area line above has scrolled away (both at once would say it twice)
-    const scope = root.querySelector('.mk-scopebar');
-    const mark = () => { nav.classList.toggle('stuck', !scope || scope.getBoundingClientRect().bottom < root.getBoundingClientRect().top + 4); const y = root.scrollTop + nav.offsetHeight + 24; let on = 0; secs.forEach((x, i) => { if (x && x.offsetTop <= y) on = i; }); nav.querySelectorAll('[data-sec]').forEach((b, i) => b.setAttribute('aria-current', i === on)); };
-    root.onscroll = () => { cancelAnimationFrame(navY); navY = requestAnimationFrame(mark); }; mark();
-    // click (or Enter on) a bar: pin its breakdown; roads fly to the map instead
-    const keep = fn => { const y = root.scrollTop; fn(); root.scrollTop = y; };
-    const act = el => { const [k, i] = String(el.dataset.k || '').split(':'); if (!k) return;
-      if (k === 'road') { const r = traffic.get(sel)?.roads?.[+i]; if (r?.lon != null) { ctx.setView('map'); ctx.map.flyTo({ center: [r.lon, r.lat], zoom: 13.5, duration: ctx.reduceMotion ? 0 : 1400 }); ctx.toast?.(title(r.road) + ': ' + fmtN(r.aadt) + ' vehicles a day'); } return; }
-      pin = pin && pin.k === k && pin.i === +i ? null : { k, i: +i }; keep(render);
-      // the breakdown opens under the chart, often below the fold: bring it into view
-      if (pin) root.querySelector('.mk-pin')?.scrollIntoView({ block: 'nearest', behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); };
-    root.querySelectorAll('[data-k]').forEach(el => { el.onclick = () => act(el); el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(el); } }; });
-    // a project row: open it on the map
-    root.querySelectorAll('[data-fid]').forEach(tr => { const go = () => { const f = ctx.BY_ID?.get(tr.dataset.fid); if (!f) return; ctx.setView('map'); ctx.select?.(f, true); }; tr.onclick = go; tr.onkeydown = e => { if (e.key === 'Enter') go(); }; });
-    root.querySelectorAll('[data-retry]').forEach(b => b.onclick = () => retry(b.dataset.retry));
-    root.querySelectorAll('[data-act]').forEach(b => b.onclick = e => { e.stopPropagation(); const a = b.dataset.act;
-      if (a === 'unpin') { pin = null; keep(render); }
+
+  // ----- events: delegated once on the tab (the old per-render binding put four listeners on each of thousands of marks) -----
+  const nav = () => root.querySelector('.mk-nav');
+  // the section in view is highlighted as you scroll; the bar's own area button only shows once the Area line above has
+  // scrolled away (both at once would say it twice)
+  const mark = () => { const n = nav(); if (!n) return; const scope = root.querySelector('.mk-scopebar');
+    n.classList.toggle('stuck', !scope || scope.getBoundingClientRect().bottom < root.getBoundingClientRect().top + 4);
+    const y = root.scrollTop + n.offsetHeight + 24; let on = null;
+    root.querySelectorAll('.mk-body > .mk-sec').forEach(x => { if (x.offsetTop <= y || !on) on = x.id.slice(3); });
+    n.querySelectorAll('[data-sec]').forEach(b => b.setAttribute('aria-current', b.dataset.sec === on)); };
+  root.addEventListener('scroll', () => { cancelAnimationFrame(navY); navY = requestAnimationFrame(mark); }, { passive: true });
+  const secOf = el => el.closest('.mk-sec')?.id.slice(3) || null;
+  // click (or Enter on) a bar: pin its breakdown (only its section redraws); roads fly to the map instead
+  const act = el => { const [k, i] = String(el.dataset.k || '').split(':'); if (!k) return;
+    if (k === 'road') { const r = traffic.get(sel)?.roads?.[+i]; if (r?.lon != null) { ctx.setView('map'); ctx.map.flyTo({ center: [r.lon, r.lat], zoom: 13.5, duration: ctx.reduceMotion ? 0 : 1400 }); ctx.toast?.(title(r.road) + ': ' + fmtN(r.aadt) + ' vehicles a day'); } return; }
+    const was = pinSec, here = secOf(el); pin = pin && pin.k === k && pin.i === +i ? null : { k, i: +i }; pinSec = pin ? here : null;
+    const drawn = here ? section(here) : null; if (was && was !== here) section(was);
+    // the breakdown opens under the chart, often below the fold: bring it into view once it's drawn
+    if (pin && drawn) drawn.then(() => root.querySelector('.mk-pin')?.scrollIntoView({ block: 'nearest', behavior: ctx.reduceMotion ? 'auto' : 'smooth' })); };
+  const openFiling = tr => { const f = ctx.BY_ID?.get(tr.dataset.fid); if (!f) return; ctx.setView('map'); ctx.select?.(f, true); };
+  root.addEventListener('click', e => {
+    const t = e.target; if (!t.closest) return; let b;
+    if ((b = t.closest('.mk-scope2 [data-county]'))) { const v = b.dataset.county; sel = v === sel && v !== 'all' ? 'all' : v; newsPlace = ''; pin = null; pinSec = null; scopeOpen = false; render(); }
+    else if ((b = t.closest('[data-range]'))) { // the monthly charts are in Growth and Area & news; a pin elsewhere closes too
+      range = +b.dataset.range; root.querySelectorAll('[data-range]').forEach(x => x.setAttribute('aria-pressed', x === b));
+      const was = pinSec; pin = null; pinSec = null; section('growth'); section('area'); if (was) section(was); }
+    else if ((b = t.closest('[data-show]'))) { const k = b.dataset.show; show[k] = !show[k]; if (!['v', 'p', 'o'].some(x => show[x])) show[k] = true; section('area'); }
+    else if (t.closest('#mkExport')) exportReport();
+    else if (t.closest('#mkCsv')) exportData();
+    else if (t.closest('#mkBrief')) ctx.assistant?.ask('Give me a short market brief for ' + areaLabel() + ': use the market_data tool (it includes the construction pipeline, housing, rents and material costs) and say what stands out for a commercial construction and finishes business: where the work is, what is growing or slowing, and costs. Keep it to a few bullets.');
+    else if (t.closest('#mkHere')) { // the sticky bar's area: back to the top with the county picker open
+      const d = root.querySelector('.mk-scopebar'); if (d) { d.open = true; scopeOpen = true; } root.scrollTo({ top: 0, behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); d?.querySelector('summary')?.focus({ preventScroll: true }); }
+    else if ((b = t.closest('.mk-nav [data-sec]'))) { const x = root.querySelector('#mk-' + b.dataset.sec); if (x) root.scrollTo({ top: x.offsetTop - nav().offsetHeight - 10, behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); }
+    else if ((b = t.closest('[data-retry]'))) retry(b.dataset.retry);
+    else if ((b = t.closest('[data-act]'))) { const a = b.dataset.act;
+      if (a === 'unpin') { const here = secOf(b); pin = null; pinSec = null; if (here) section(here); }
       else if (a === 'jobsmap') { ctx.setView('map'); ctx.showDemographic?.('jobs'); }
       else if (a === 'spendmap') { ctx.setView('map'); ctx.showDemographic?.('sph'); }
-      else if (a === 'crimemap') { ctx.setView('map'); ctx.crimeLayer?.(true); } });
-    loadExtras(); ctx.markets?.wire(root, render);
-    const ps = root.querySelector('#mkPlace'); if (ps) ps.onchange = e => { newsPlace = e.target.value; keep(render); };
-    const more = root.querySelector('#mkLatestMore');
-    if (more) more.onclick = () => { const h = [...root.querySelectorAll('#mkLatest tbody tr[hidden]')]; h.slice(0, 10).forEach(tr => tr.hidden = false);
-      const left = h.length - 10; if (left > 0) more.textContent = 'Show ' + Math.min(10, left) + ' more (' + left + ' left)'; else more.remove(); };
-    const tip = root.querySelector('#mkTip');
-    root.querySelectorAll('.mk-hit').forEach(el => {
-      el.onmousemove = e => { tip.textContent = el.dataset.tip; tip.style.opacity = el.dataset.tip ? 1 : 0; const r = root.getBoundingClientRect(); let x = e.clientX - r.left + root.scrollLeft + 12; if (x + tip.offsetWidth > root.clientWidth - 8) x -= tip.offsetWidth + 24; tip.style.left = x + 'px'; tip.style.top = (e.clientY - r.top + root.scrollTop + 14) + 'px'; };
-      el.onmouseleave = () => { tip.style.opacity = 0; };
-      el.onfocus = () => { if (!el.dataset.tip) return; tip.textContent = el.dataset.tip; tip.style.opacity = 1; const r = root.getBoundingClientRect(), b = el.getBoundingClientRect(); tip.style.left = (b.left - r.left + root.scrollLeft) + 'px'; tip.style.top = (b.bottom - r.top + root.scrollTop + 6) + 'px'; };
-      el.onblur = () => { tip.style.opacity = 0; };
-    });
+      else if (a === 'crimemap') { ctx.setView('map'); ctx.crimeLayer?.(true); } }
+    else if ((b = t.closest('[data-k]'))) act(b);
+    else if ((b = t.closest('tr[data-fid]'))) openFiling(b);
+    else if ((b = t.closest('#mkLatestMore'))) { const h = [...root.querySelectorAll('#mkLatest tbody tr[hidden]')]; h.slice(0, 10).forEach(tr => tr.hidden = false);
+      const left = h.length - 10; if (left > 0) b.textContent = 'Show ' + Math.min(10, left) + ' more (' + left + ' left)'; else b.remove(); }
+  });
+  root.addEventListener('keydown', e => { const t = e.target; if (!t.closest) return;
+    if ((e.key === 'Enter' || e.key === ' ') && t.matches('[data-k]')) { e.preventDefault(); act(t); }
+    else if (e.key === 'Enter' && t.matches('tr[data-fid]')) openFiling(t); });
+  root.addEventListener('change', e => { if (e.target.id === 'mkPlace') { newsPlace = e.target.value; section('area'); } });
+  root.addEventListener('toggle', e => { if (e.target.classList?.contains('mk-scopebar')) scopeOpen = e.target.open; }, true); // toggle doesn't bubble
+  // the hover readout: one listener for every mark. A line chart's single hover strip (.mk-hx, src/mkcharts.js) holds one
+  // readout per point: the mouse x picks the nearest point, whose readout shows and whose dot and cross line move there
+  let tipOn = false, hxAt = null; const hxData = new WeakMap();
+  const tipEl = () => root.querySelector('#mkTip');
+  const unhx = () => { if (hxAt) { hxAt.classList.remove('hx-on'); hxAt = null; } };
+  const hideTip = () => { const tp = tipEl(); if (tp && tipOn) tp.style.opacity = 0; tipOn = false; unhx(); };
+  function hxPoint(el, clientX) {
+    let d = hxData.get(el); if (!d) hxData.set(el, d = { tips: el.dataset.tipx.split('\u001f'), py: el.dataset.py.split(',').map(v => v === '' ? NaN : +v), x0: +el.dataset.x0, x1: +el.dataset.x1 });
+    const svg = el.ownerSVGElement, r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, n = d.tips.length;
+    const vx = (clientX - r.left) * (vb.width || r.width) / (r.width || 1), i = Math.max(0, Math.min(n - 1, Math.round((vx - d.x0) / ((d.x1 - d.x0) || 1) * (n - 1))));
+    const cx = (d.x0 + (n > 1 ? i / (n - 1) : 0) * (d.x1 - d.x0)).toFixed(1), dot = svg.querySelector('.mk-hxd'), cross = svg.querySelector('.mk-hxc');
+    if (hxAt && hxAt !== svg) unhx(); svg.classList.add('hx-on'); hxAt = svg;
+    if (dot) { if (Number.isFinite(d.py[i])) { dot.setAttribute('cx', cx); dot.setAttribute('cy', d.py[i]); } else dot.setAttribute('cx', -99); }
+    if (cross) { cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); }
+    return d.tips[i];
   }
-  let rsT = 0; addEventListener('resize', () => { if (!shown()) return; measuredWs = 0; clearTimeout(rsT); rsT = setTimeout(render, 200); });
+  root.addEventListener('mousemove', e => {
+    const el = e.target.closest?.('.mk-hit'), tp = tipEl(); if (!tp) return;
+    if (!el) { hideTip(); return; }
+    let text = el.dataset.tip;
+    if (el.dataset.tipx != null) text = hxPoint(el, e.clientX); else unhx();
+    if (!text) { hideTip(); return; }
+    if (tp.textContent !== text) tp.textContent = text; tp.style.opacity = 1; tipOn = true;
+    const r = root.getBoundingClientRect(); let x = e.clientX - r.left + root.scrollLeft + 12; if (x + tp.offsetWidth > root.clientWidth - 8) x -= tp.offsetWidth + 24;
+    tp.style.left = x + 'px'; tp.style.top = (e.clientY - r.top + root.scrollTop + 14) + 'px';
+  });
+  root.addEventListener('mouseleave', hideTip);
+  root.addEventListener('focusin', e => { const el = e.target.closest?.('.mk-hit'), tp = tipEl(); if (!el || !tp || !el.dataset.tip) return;
+    tp.textContent = el.dataset.tip; tp.style.opacity = 1; tipOn = true; const r = root.getBoundingClientRect(), b = el.getBoundingClientRect(); tp.style.left = (b.left - r.left + root.scrollLeft) + 'px'; tp.style.top = (b.bottom - r.top + root.scrollTop + 6) + 'px'; });
+  root.addEventListener('focusout', e => { if (e.target.closest?.('.mk-hit')) hideTip(); });
+  ctx.markets?.wire(root, { section });
+  // a resize (the window, or the page narrowing for the assistant or a card) redraws at the new width, at once, no animation
+  let rsT = 0;
+  new ResizeObserver(es => { if (ctx.view !== 'market' || !root.querySelector('.mk-body')) return; const w = es[es.length - 1].contentRect.width; if (!w || Math.abs(w - lastW) < 1) return;
+    clearTimeout(rsT); rsT = setTimeout(() => { if (ctx.view === 'market' && root.querySelector('.mk-body')) keepState(root, () => instant(root, draw)); }, 150); }).observe(root);
   ctx.onView('market', render);
-  // the app's own Houston measures for the Correlation explorer (src/markets.js): monthly, whole region, months finished
+  // the app's own Houston measures for the Correlation explorer (src/markets.js): monthly, whole region, months finished.
+  // Built once per crime data, filings and area data (it reads every filing), so markets.js can cache on it
+  let localK = null, localV = null;
   ctx.marketLocalSeries = () => {
-    const cur = new Date().toISOString().slice(0, 7), done = o => fromObject(Object.fromEntries(Object.entries(o).filter(([m]) => m < cur))), out = [];
+    const cur = new Date().toISOString().slice(0, 7), k = [crimeCity, ctx.F, ctx.F?.length || 0, area, cur];
+    if (localK && k.every((x, i) => x === localK[i])) return localV;
+    localK = k;
+    const done = o => fromObject(Object.fromEntries(Object.entries(o).filter(([m]) => m < cur))), out = [];
     if (crimeCity?.months?.length) {
       out.push({ id: 'app-crime', label: 'Houston crime, all offenses (Houston Police)', short: 'Crime', map: done(Object.fromEntries(crimeCity.months.map(m => [m.m, m.v + m.p + m.o]))) });
       out.push({ id: 'app-violent', label: 'Houston violent crime (Houston Police)', short: 'Violent crime', map: done(Object.fromEntries(crimeCity.months.map(m => [m.m, m.v]))) });
@@ -565,7 +740,7 @@ export function initArea(ctx) {
     if (area?.businesses?.months) { const b = {}; Object.values(area.businesses.months).forEach(c => Object.entries(c).forEach(([m, n]) => b[m] = (b[m] || 0) + n));
       out.push({ id: 'app-biz', label: 'New business locations, region (Comptroller)', short: 'New businesses', map: done(b) }); }
     const hou = area?.salesTax?.cities?.Houston?.months; if (hou) out.push({ id: 'app-tax', label: 'City of Houston sales tax (Comptroller)', short: 'Houston sales tax', map: done(hou) });
-    return out;
+    return localV = out;
   };
 
   // ---------- businesses registered at an address (building and filing cards) ----------
@@ -593,7 +768,7 @@ export function initArea(ctx) {
     sec.innerHTML = '<div class="lt">Businesses at this address</div><button class="btn" type="button">Look Up Registered Businesses</button><div class="rnote">Texas Comptroller sales-tax permits at ' + esc(a.street) + '.</div>';
     const after = card.querySelector('#liveSec') || card.querySelector('#briefBox'); if (after) after.after(sec); else (card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
     const lookup = async () => {
-      sec.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote">Looking up…</div>';
+      sec.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote loading">Looking up…</div>';
       try { const d = await ctx.tenantsAt(a.street, a.zip, a.city); if (sec.isConnected) ctx.renderTenants(sec, d); } catch (e) { if (sec.isConnected) ctx.renderTenants(sec, null, e, lookup); }
     };
     sec.querySelector('button').onclick = lookup;

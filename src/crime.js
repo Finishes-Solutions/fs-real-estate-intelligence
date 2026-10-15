@@ -6,6 +6,7 @@
 import { offenseName, CAT_NAME } from './lib/nibrs.mjs';
 import { tractsFor, summarizeTracts } from './lib/demographics.mjs';
 import { reportDoc, savePdf, saveCsv, fileBase, areaSvg, getJSON, errorBox, layerFailed, layerOK, inHouston, viewLabel, friendly } from './reportkit.js';
+import { reveal } from './motion.js';
 
 const SRC = 'crime', HEAT = 'crime-heat', CELLS = 'crime-cells', PTS = 'crime-pts';
 const COL = { v: '#c03b3a', p: '#d9822b', o: '#8a9396' };
@@ -92,9 +93,9 @@ export function initCrime(ctx) {
     return '<svg class="cr-bars" viewBox="0 0 ' + W + ' ' + (H + 14) + '" role="img" aria-label="Incidents per month">' + months.map((m, i) => {
       const x = i * bw + 1, w = Math.max(1, bw - 2), hv = m.v / max * H, hp = m.p / max * H, ho = m.o / max * H;
       return '<g><title>' + esc(m.m + ': ' + (m.v + m.p + m.o) + ' incidents (' + m.v + ' violent, ' + m.p + ' property, ' + m.o + ' other)') + '</title>' +
-        '<rect x="' + x.toFixed(1) + '" y="' + (H - hv).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hv.toFixed(1) + '" fill="' + COL.v + '"/>' +
-        '<rect x="' + x.toFixed(1) + '" y="' + (H - hv - hp).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hp.toFixed(1) + '" fill="' + COL.p + '"/>' +
-        '<rect x="' + x.toFixed(1) + '" y="' + (H - hv - hp - ho).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + ho.toFixed(1) + '" fill="' + COL.o + '" fill-opacity=".55"/>' +
+        '<rect class="m-bar" x="' + x.toFixed(1) + '" y="' + (H - hv).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hv.toFixed(1) + '" fill="' + COL.v + '"/>' +
+        '<rect class="m-bar" x="' + x.toFixed(1) + '" y="' + (H - hv - hp).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hp.toFixed(1) + '" fill="' + COL.p + '"/>' +
+        '<rect class="m-bar" x="' + x.toFixed(1) + '" y="' + (H - hv - hp - ho).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + ho.toFixed(1) + '" fill="' + COL.o + '" fill-opacity=".55"/>' +
         (m.m.endsWith('-01') || i === 0 ? '<text x="' + x.toFixed(1) + '" y="' + (H + 11) + '" font-size="8.5" fill="currentColor" opacity=".6">' + m.m.slice(0, 4) + '</text>' : '') + '</g>';
     }).join('') + '</svg>';
   }
@@ -105,9 +106,9 @@ export function initCrime(ctx) {
     return '<svg class="cr-bars" viewBox="0 0 ' + W + ' ' + (H + 14) + '" role="img" aria-label="' + esc(aria) + '">' + list.map((m, i) => {
       const x = i * bw + 1, w = Math.max(1, bw - 2), hv = m.v / max * H, hp = m.p / max * H, ho = m.o / max * H;
       return '<g><title>' + esc(m.label + ': ' + (m.v + m.p + m.o) + ' incidents (' + m.v + ' violent, ' + m.p + ' property, ' + m.o + ' other)') + '</title>' +
-        '<rect x="' + x.toFixed(1) + '" y="' + (H - hv).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hv.toFixed(1) + '" fill="' + COL.v + '"/>' +
-        '<rect x="' + x.toFixed(1) + '" y="' + (H - hv - hp).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hp.toFixed(1) + '" fill="' + COL.p + '"/>' +
-        '<rect x="' + x.toFixed(1) + '" y="' + (H - hv - hp - ho).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + ho.toFixed(1) + '" fill="' + COL.o + '" fill-opacity=".55"/>' +
+        '<rect class="m-bar" x="' + x.toFixed(1) + '" y="' + (H - hv).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hv.toFixed(1) + '" fill="' + COL.v + '"/>' +
+        '<rect class="m-bar" x="' + x.toFixed(1) + '" y="' + (H - hv - hp).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hp.toFixed(1) + '" fill="' + COL.p + '"/>' +
+        '<rect class="m-bar" x="' + x.toFixed(1) + '" y="' + (H - hv - hp - ho).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + ho.toFixed(1) + '" fill="' + COL.o + '" fill-opacity=".55"/>' +
         (i % every === 0 ? '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H + 11) + '" font-size="8.5" text-anchor="middle" fill="currentColor" opacity=".6">' + esc(m.short || m.label) + '</text>' : '') + '</g>';
     }).join('') + '</svg>';
   }
@@ -139,7 +140,7 @@ export function initCrime(ctx) {
   const rateLine = d => d.per_sqmi && d.city_per_sqmi ? fmtN(d.per_sqmi.total) + ' per sq mi a year vs ' + fmtN(d.city_per_sqmi.total) + ' citywide (' + (d.per_sqmi.total / d.city_per_sqmi.total).toFixed(1) + '×)' : '';
   async function report({ geometry, label, center }) {
     const card = ctx.card || document.getElementById('card');
-    ctx.closeCard?.(); card.innerHTML = '<div class="top"><div><div class="kicker">Crime report</div><h2>' + esc(label) + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote">Counting incidents…</div></div>';
+    ctx.closeCard?.(); card.innerHTML = '<div class="top"><div><div class="kicker">Crime report</div><h2>' + esc(label) + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote loading">Counting incidents…</div></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
     showArea(geometry);
     let d; try { d = await reportFor(geometry); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label, center }), 'Crime data')); return; }
@@ -161,6 +162,7 @@ export function initCrime(ctx) {
       ((d.incidents || []).length >= 2000 ? '<div class="rnote">The map shows the newest 2,000 incidents and Export CSV the newest 20,000; the totals above count all of them.</div>' : '') + (d.incidents_note ? '<div class="rnote">' + esc(d.incidents_note) + '</div>' : '') + '</div>' +
       '<div class="rnote bsec">Offenses as reported by Houston Police (NIBRS). Counts follow where people are, so busy commercial areas show more than homes nearby; compare with similar places.<span class="src"> ' + esc(d.coverage) + '</span></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
+    reveal(card, 'card:crime|' + label); // its charts draw in once per report (src/motion.js)
     card.querySelector('#crPts').onclick = () => showPoints(d.incidents || []);
     perResidents(geometry, d).then(r => { const el = card.querySelector('#crRes'); if (!el || last?.d !== d) return; last.res = r;
       el.innerHTML = r ? '<div class="lt">Per resident</div><div><b>' + r.rate + '</b> incidents per 1,000 residents a year (' + r.v + ' violent), ' + fmtN(r.pop) + ' people living here.</div><div class="rnote">Busy commercial areas with few residents read high: people who work and shop here count too.</div>' : ''; if (!r) el.remove(); });
@@ -231,7 +233,7 @@ export function initCrime(ctx) {
     if (!el) return;
     const head = '<div class="lt">Crime within 1 mile</div>';
     if (!inHouston(center)) { el.innerHTML = head + '<div class="rnote">Street-level incidents cover the City of Houston only. The yearly figures for the local police department are below.</div>'; return; }
-    el.innerHTML = head + '<div class="rnote">Counting reported incidents…</div>';
+    el.innerHTML = head + '<div class="rnote loading">Counting reported incidents…</div>';
     const near = () => ctx.renderCrimeNear(el, center, label, still);
     let d; try { d = await getJSON('api/crime?lat=' + center[1].toFixed(5) + '&lon=' + center[0].toFixed(5) + '&mi=1&list=8', { what: 'Crime data' }); }
     catch (e) { if (still()) { el.innerHTML = head; el.append(errorBox(e, near, 'Crime data')); } return; }

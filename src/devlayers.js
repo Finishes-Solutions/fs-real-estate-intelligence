@@ -66,7 +66,7 @@ export function initDevLayers(ctx) {
     }
     try {
       if (map.getSource(src)) { map.getSource(src).setData(pts); map.getSource(src + '-s')?.setData(shp); return; }
-      const dark = ctx.isDark?.(), col = colorExpr(kind);
+      const col = colorExpr(kind);
       map.addSource(src + '-s', { type: 'geojson', data: shp }); map.addSource(src, { type: 'geojson', data: pts });
       if (kind === 'txdot') map.addLayer({ id: src + '-line', type: 'line', source: src + '-s', layout: { 'line-cap': 'round' }, paint: { 'line-color': col, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2, 14, 5], 'line-opacity': .85 } });
       else {
@@ -76,9 +76,9 @@ export function initDevLayers(ctx) {
       if (kind !== 'txdot') map.addLayer({ id: src, type: 'circle', source: src, paint: {
         'circle-radius': kind === 'school' ? ['interpolate', ['linear'], ['get', 'units'], 0, 3.5, 500, 5, 2500, 8, 4000, 10] : kind === 'district' ? ['interpolate', ['linear'], ['zoom'], 9, 2.5, 13, 3.5] : ['interpolate', ['linear'], ['zoom'], 10, 2.4, 14, 4, 17, 6.5],
         'circle-color': col, 'circle-opacity': kind === 'district' || kind === 'plat' ? ['interpolate', ['linear'], ['zoom'], 10, .9, 12.5, .35] : .9,
-        'circle-stroke-color': dark ? '#111' : '#fff', 'circle-stroke-width': .8 } });
+        'circle-stroke-color': '#fff', 'circle-stroke-width': .8 } });
       map.addLayer({ id: src + '-lbl', type: 'symbol', source: src, minzoom: kind === 'school' || kind === 'district' ? 12 : 15.5, layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 10.5, 'text-offset': [0, .9], 'text-anchor': 'top', 'text-max-width': 10, 'text-optional': true },
-        paint: { 'text-color': dark ? '#e5e7eb' : '#1f2937', 'text-halo-color': dark ? '#111' : '#fff', 'text-halo-width': 1.4 } });
+        paint: { 'text-color': '#1f2937', 'text-halo-color': '#fff', 'text-halo-width': 1.4 } });
       for (const id of [src, src + '-line', src + '-fill']) if (map.getLayer(id)) wire(id);
     } catch (e) { /* style still loading: the next load adds it */ }
   }

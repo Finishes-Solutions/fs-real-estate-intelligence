@@ -4,11 +4,12 @@
 // a Glance), then the construction filings, which follow the filters.
 import { BY_KEY } from './metrics.js';
 import { contains as inArea } from './lib/geomatch.mjs';
+import { reveal } from './motion.js';
 import { centroid } from './lib/demographics.mjs';
 
 const MAX = 4;
-const COLORS = [['#006527', '#4caf70'], ['#b7791f', '#e0a23c'], ['#2b6cb0', '#63a4e8'], ['#9b2c6f', '#d36aa8']];
-// Share-of-value-by-use segments: their own categorical colours (CSS vars with dark-mode versions), never the area colours
+const COLORS = ['#006527', '#b7791f', '#2b6cb0', '#9b2c6f'];
+// Share-of-value-by-use segments: their own categorical colours (CSS vars), never the area colours
 const USE_PAL = ['var(--cmp-u0)', 'var(--cmp-u1)', 'var(--cmp-u2)', 'var(--cmp-u3)', 'var(--cmp-u4)', 'var(--cmp-u5)'], USE_OTHER = 'var(--cmp-uo)';
 // the unit of each filing metric, for the raw numbers in Excel and CSV
 const UNIT = { value: '$', newValue: '$', avg: '$', median: '$', sqft: 'sq ft', psf: '$ per sq ft' };
@@ -31,7 +32,7 @@ export function initCompare(ctx) {
   let areas = [];
   try { areas = (JSON.parse(localStorage.getItem('fs-compare') || '[]') || []).filter(a => a && a.geom && a.label).slice(0, MAX); } catch (e) {}
   const save = () => { try { localStorage.setItem('fs-compare', JSON.stringify(areas)); } catch (e) { /* large outlines: keep in memory only */ } };
-  const color = i => COLORS[i % COLORS.length][ctx.isDark() ? 1 : 0];
+  const color = i => COLORS[i % COLORS.length];
   const keyOf = a => a.key || a.label;
   const has = key => areas.some(x => keyOf(x) === key);
   const sqmi = g => d3.geoArea(g) * 3958.8 ** 2;
@@ -104,7 +105,7 @@ export function initCompare(ctx) {
     const key = s.kind === 'place' ? 'place:' + s.label : (s.kind || 'area') + ':' + geomHash(s.feature);
     return { key, label: DRAWN[s.kind] ? drawnLabel(s.kind, s.feature) : s.label, kind: s.kind, geom: s.feature };
   }
-  ctx.compare = { add, remove, rename, addEach, list: () => areas.slice(), colorOf: i => COLORS[i % COLORS.length][0], addSelection: () => add(fromSelection()), clear: () => { areas = []; save(); sync(); },
+  ctx.compare = { add, remove, rename, addEach, list: () => areas.slice(), colorOf: i => COLORS[i % COLORS.length], addSelection: () => add(fromSelection()), clear: () => { areas = []; save(); sync(); },
     filingsIn, isIn: key => has(key) };
 
   // the Map panel's scope header: "+ Compare"
@@ -211,7 +212,8 @@ export function initCompare(ctx) {
     root.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => editName(b));
     root.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { ctx.setView('map'); ctx.fitGeom(areas[+b.dataset.go].geom); });
     root.querySelectorAll('.cmp-f').forEach(b => b.onclick = () => { const f = ctx.BY_ID.get(b.dataset.id); if (f) { ctx.setView('map'); ctx.select(f, true); } });
-    if (areas.length) { trend(lists); uses(lists); }
+    // the two charts draw in the first time they're seen (src/motion.js); later updates are instant
+    if (areas.length) { trend(lists); uses(lists); reveal(root.querySelector('#cmpTrend'), 'cmp:trend'); reveal(root.querySelector('#cmpUse'), 'cmp:uses'); }
   }
 
   // a small inline edit in place of the chip's name (Enter or leaving the box saves, Esc cancels)
@@ -246,8 +248,8 @@ export function initCompare(ctx) {
     el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="cmp-svg" role="img" aria-label="Filings by quarter">' +
       y.ticks(4).map(t => '<g><line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + y(t) + '" y2="' + y(t) + '" class="gl"/><text x="' + (M.l - 6) + '" y="' + (y(t) + 3) + '" text-anchor="end">' + t + '</text></g>').join('') +
       all.map((q, i) => tickAt(i) ? '<text x="' + x(q) + '" y="' + (H - 22) + '" text-anchor="' + (i === 0 ? 'start' : i === all.length - 1 ? 'end' : 'middle') + '">' + q + '</text>' + (part[i] ? '<text class="pt" x="' + x(q) + '" y="' + (H - 9) + '" text-anchor="' + (i === 0 ? 'start' : i === all.length - 1 ? 'end' : 'middle') + '">' + tag(i) + '</text>' : '') : '').join('') +
-      series.map((s, i) => '<path d="' + solid(s) + '" fill="none" stroke="' + color(i) + '" stroke-width="2.2"/>' + s.map((v, j) => part[j] ? '<path d="' + dash(s, j) + '" fill="none" stroke="' + color(i) + '" stroke-width="2" stroke-dasharray="4 3" opacity=".8"/>' : '').join('') +
-        s.map((v, j) => '<circle cx="' + x(all[j]) + '" cy="' + y(v) + '" r="' + (part[j] ? 3.4 : 2.4) + '" fill="' + (part[j] ? 'var(--panel)' : color(i)) + '"' + (part[j] ? ' stroke="' + color(i) + '" stroke-width="1.8"' : '') + '><title>' + esc(areas[i].label) + ' · ' + all[j] + (part[j] ? ' (' + (tag(j) === 'so far' ? 'so far, ' + (per.end ? 'to ' + when(per.end) : 'quarter not over') : 'partial: the filing list starts ' + when(per.start)) + ')' : '') + ': ' + v + '</title></circle>').join('')).join('') + '</svg>' +
+      series.map((s, i) => '<path class="m-line" d="' + solid(s) + '" fill="none" stroke="' + color(i) + '" stroke-width="2.2"/>' + s.map((v, j) => part[j] ? '<path class="m-line" d="' + dash(s, j) + '" fill="none" stroke="' + color(i) + '" stroke-width="2" stroke-dasharray="4 3" opacity=".8"/>' : '').join('') +
+        s.map((v, j) => '<circle class="m-dot" cx="' + x(all[j]) + '" cy="' + y(v) + '" r="' + (part[j] ? 3.4 : 2.4) + '" fill="' + (part[j] ? 'var(--panel)' : color(i)) + '"' + (part[j] ? ' stroke="' + color(i) + '" stroke-width="1.8"' : '') + '><title>' + esc(areas[i].label) + ' · ' + all[j] + (part[j] ? ' (' + (tag(j) === 'so far' ? 'so far, ' + (per.end ? 'to ' + when(per.end) : 'quarter not over') : 'partial: the filing list starts ' + when(per.start)) + ')' : '') + ': ' + v + '</title></circle>').join('')).join('') + '</svg>' +
       (part.some(Boolean) ? '<div class="rnote">Hollow points are part-quarters: the filing list ' + [part[0] ? 'starts ' + when(per.start) : '', part[part.length - 1] ? 'runs to ' + when(per.end) + ' (the last quarter is so far)' : ''].filter(Boolean).join(' and ') + '.</div>' : '');
   }
   // 100% bars of est. value by use for each area
@@ -257,7 +259,7 @@ export function initCompare(ctx) {
     const top = [...tot.entries()].sort((a, b) => b[1] - a[1]).slice(0, USE_PAL.length).map(x => x[0]), pal = USE_PAL.concat(USE_OTHER);
     el.innerHTML = lists.map((l, i) => { const v = l.reduce((s, f) => s + f.cost, 0) || 1, parts = top.map(u => l.filter(f => (f.use || 'Unclassified') === u).reduce((s, f) => s + f.cost, 0));
       parts.push(Math.max(0, v - parts.reduce((s, x) => s + x, 0)));
-      return '<div class="cmp-bar"><span class="lab" style="--c:' + color(i) + '"><i></i>' + esc(areas[i].label) + '</span><span class="bar">' + parts.map((p, j) => p > 0 ? '<b style="width:' + (p / v * 100).toFixed(2) + '%;background:' + pal[j] + '" title="' + esc((top[j] || 'All other uses') + ': ' + fmtM(p) + ' (' + Math.round(p / v * 100) + '%)') + '"></b>' : '').join('') + '</span></div>'; }).join('') +
+      return '<div class="cmp-bar"><span class="lab" style="--c:' + color(i) + '"><i></i>' + esc(areas[i].label) + '</span><span class="bar m-hbar">' + parts.map((p, j) => p > 0 ? '<b style="width:' + (p / v * 100).toFixed(2) + '%;background:' + pal[j] + '" title="' + esc((top[j] || 'All other uses') + ': ' + fmtM(p) + ' (' + Math.round(p / v * 100) + '%)') + '"></b>' : '').join('') + '</span></div>'; }).join('') +
       '<div class="cmp-key">' + top.concat('All other').map((u, j) => '<span><i style="background:' + pal[j] + '"></i>' + esc(u) + '</span>').join('') + '</div>';
   }
   ctx.onChange(() => render()); ctx.onView('compare', render);

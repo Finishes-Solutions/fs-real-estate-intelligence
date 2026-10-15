@@ -5,6 +5,7 @@
 //   Report card (Full report, the Reports tab, the assistant): year by year, offense mix, notes; exports as PDF or CSV.
 // Department-level and annual only: every spot a department covers gets the same numbers.
 import { reportDoc, savePdf, saveCsv, areaMap, getJSON, errorBox, fileBase, friendly } from './reportkit.js';
+import { reveal } from './motion.js';
 
 const COL = { v: '#c03b3a', p: '#d9822b', st: '#6b7174', us: '#9aa3a6' };
 
@@ -44,8 +45,8 @@ export function initCrimeUS(ctx) {
     const ys = years.filter(y => y.months > 0 || y['state_rate_' + k] != null).slice().reverse(); if (ys.length < 2) return '';
     const W = 300, H = 70, P = 4, vals = ys.flatMap(y => [y['rate_' + k], y['state_rate_' + k], y['us_rate_' + k]]).filter(v => v != null), max = Math.max(1, ...vals) * 1.08;
     const X = i => P + i * (W - 2 * P) / (ys.length - 1), Y = v => P + (H - 2 * P) * (1 - v / max);
-    const line = (key, stroke, dash, w) => { let d = '', on = false; ys.forEach((y, i) => { const v = y[key]; if (v == null) { on = false; return; } d += (on ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(v).toFixed(1); on = true; }); return d ? '<path d="' + d + '" fill="none" stroke="' + stroke + '" stroke-width="' + w + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>' : ''; };
-    const dots = ys.map((y, i) => y['rate_' + k] == null ? '' : '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(y['rate_' + k]).toFixed(1) + '" r="' + (y.months < 12 ? 2.2 : 2.6) + '" fill="' + (y.months < 12 ? '#fff' : color) + '" stroke="' + color + '" stroke-width="1.2"><title>' + esc(y.y + ': ' + r1(y['rate_' + k]) + ' per 100k' + (y.months < 12 ? ' (' + y.months + ' months, annualized)' : '') + (y['state_rate_' + k] != null ? '; state ' + r1(y['state_rate_' + k]) : '') + (y['us_rate_' + k] != null ? '; US ' + r1(y['us_rate_' + k]) : '')) + '</title></circle>').join('');
+    const line = (key, stroke, dash, w) => { let d = '', on = false; ys.forEach((y, i) => { const v = y[key]; if (v == null) { on = false; return; } d += (on ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(v).toFixed(1); on = true; }); return d ? '<path class="m-line" d="' + d + '" fill="none" stroke="' + stroke + '" stroke-width="' + w + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>' : ''; };
+    const dots = ys.map((y, i) => y['rate_' + k] == null ? '' : '<circle class="m-dot" cx="' + X(i).toFixed(1) + '" cy="' + Y(y['rate_' + k]).toFixed(1) + '" r="' + (y.months < 12 ? 2.2 : 2.6) + '" fill="' + (y.months < 12 ? '#fff' : color) + '" stroke="' + color + '" stroke-width="1.2"><title>' + esc(y.y + ': ' + r1(y['rate_' + k]) + ' per 100k' + (y.months < 12 ? ' (' + y.months + ' months, annualized)' : '') + (y['state_rate_' + k] != null ? '; state ' + r1(y['state_rate_' + k]) : '') + (y['us_rate_' + k] != null ? '; US ' + r1(y['us_rate_' + k]) : '')) + '</title></circle>').join('');
     const lab = ys.map((y, i) => i === 0 || i === ys.length - 1 || ys.length <= 6 ? '<text x="' + X(i).toFixed(1) + '" y="' + (H + 10) + '" font-size="8.5" text-anchor="' + (i === 0 ? 'start' : i === ys.length - 1 ? 'end' : 'middle') + '" fill="currentColor" opacity=".6">' + y.y + '</text>' : '').join('');
     return '<svg class="cr-bars" viewBox="0 0 ' + W + ' ' + (H + 13) + '" role="img" aria-label="' + esc(aria) + '">' + line('us_rate_' + k, COL.us, '1.5 2.5', 1.2) + line('state_rate_' + k, COL.st, '4 3', 1.2) + line('rate_' + k, color, '', 1.8) + dots + lab + '</svg>';
   }
@@ -65,7 +66,7 @@ export function initCrimeUS(ctx) {
     // once the new department is in, put its picker back where the old one was on screen
     const pick = ori && el.querySelector('#cuOth'), y0 = pick?.getBoundingClientRect().top;
     if (pick) { pick.disabled = true; pick.closest('.cu-oth')?.querySelector('.fl')?.insertAdjacentHTML('beforeend', ' <span class="cu-ld">· loading…</span>'); }
-    else el.innerHTML = head + '<div class="rnote">Finding the local police department…</div>';
+    else el.innerHTML = head + '<div class="rnote loading">Finding the local police department…</div>';
     const keep = () => { if (y0 == null) return; const s = el.querySelector('#cuOth'), sc = el.closest('#card'); if (s && sc) sc.scrollTop += s.getBoundingClientRect().top - y0; s?.focus({ preventScroll: true }); };
     let d; try { d = await ctx.crimeUSData({ center, ori }); } catch (e) { if (!still() || !el.isConnected) return; if (pick) { pick.disabled = false; el.querySelector('.cu-ld')?.remove(); ctx.toast?.(friendly(e, 'FBI crime data')); } else { el.innerHTML = head; el.append(errorBox(e, () => ctx.renderCrimeUS(el, center, still, ori), 'FBI crime data')); } return; }
     if (!still() || !el.isConnected) return;
@@ -77,6 +78,7 @@ export function initCrimeUS(ctx) {
       (d.note ? '<div class="rnote">' + esc(d.note) + '</div>' : '') +
       '<div class="bacts"><button class="btn" type="button" data-push data-cu="report">Full report</button></div>' + pickOthers(d, 'cuOth') +
       '<div class="ssrc src">' + esc(srcLine(d)) + '</div>';
+    reveal(el, 'cu:sec:' + (d.agency.ori || d.agency.name)); // the trend draws in once per department (src/motion.js)
     el.querySelector('[data-cu="report"]').onclick = () => report({ center, ori: d.why === 'chosen' ? d.agency.ori : null });
     wireOthers(el, center, still, d); keep();
   };
@@ -89,7 +91,7 @@ export function initCrimeUS(ctx) {
   async function report({ center, ori, label }) {
     const card = ctx.card || document.getElementById('card');
     ctx.closeCard?.();
-    card.innerHTML = '<div class="top"><div><div class="kicker">Crime by city / county</div><h2>' + esc(label || 'Local police department') + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote">Reading the FBI’s figures…</div></div>';
+    card.innerHTML = '<div class="top"><div><div class="kicker">Crime by city / county</div><h2>' + esc(label || 'Local police department') + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote loading">Reading the FBI’s figures…</div></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
     let d; try { d = await ctx.crimeUSData({ center, ori }); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ center, ori, label }), 'FBI crime data')); return; }
     if (!d.agency || !d.headline) { card.querySelector('.bsec').innerHTML = '<div class="rnote">' + esc(d.note || 'No department figures here.') + '</div>'; return; }
@@ -108,6 +110,7 @@ export function initCrimeUS(ctx) {
       '<div class="bacts"><button class="btn primary" id="cuPdf" type="button">Export PDF</button><button class="btn" id="cuCsv" type="button">Export CSV</button></div>' +
       '<div class="rnote bsec">Department-level, whole-year figures: every spot the department covers gets the same numbers, and there is no street-level detail. Places that draw many visitors or commuters read high because rates use residents only. The FBI keeps adding late reports, so the newest year can still move a little.<span class="src"> ' + esc(srcLine(d) + ' ' + d.coverage) + '</span></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
+    reveal(card, 'cu:card:' + (d.agency.ori || d.agency.name));
     card.querySelector('#cuPdf').onclick = exportReport; card.querySelector('#cuCsv').onclick = exportCsv;
     const s = card.querySelector('#cuRepOth'); if (s) s.onchange = () => { if (s.value) report({ center, ori: s.value }); };
   }

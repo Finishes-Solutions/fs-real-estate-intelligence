@@ -16,7 +16,7 @@ export function initBuildings(ctx) {
   toggle.checked = on;
 
   const vectorSource = () => { const s = map.getStyle()?.sources || {}; return Object.keys(s).find(id => s[id].type === 'vector' && /maptiler|openmaptiles|planet/i.test(id + (s[id].url || ''))); };
-  const colors = () => ctx.isDark() ? { fill: '#3a4245', sel: '#4caf70', sel2: '#2d6b45' } : { fill: '#d5dadb', sel: '#1f9249', sel2: '#9fd4b2' };
+  const colors = () => ({ fill: '#d5dadb', sel: '#1f9249', sel2: '#9fd4b2' });
   const H = ['coalesce', ['get', 'render_height'], ['get', 'height'], 6], B = ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0];
 
   function addLayers() {
@@ -235,11 +235,11 @@ export function initBuildings(ctx) {
           { divider: true }, { label: 'Copy link', attrs: ' id="bLink"', sub: 'Opens this property' }, { label: 'Export details (CSV)', attrs: ' id="bCsv"' }]) +
       ctx.cardNav([['bParcel', 'Owner & value'], ['bSize', 'Building'], ['bSite', 'Site'], ['bDev', 'Development'], ['bCrime', 'Crime'], ['bArea', 'Area'], ['bPlaces', 'Businesses'], ['bFilings', 'Construction filings'], ['liveSec', 'From Here']]) + '</div>' +
       '<div class="bover" id="bOver" hidden></div>' +
-      '<div class="bsec" id="bParcel"><div class="lt">Ownership &amp; Value</div><div class="rnote">Looking up the appraisal record…</div></div>' +
+      '<div class="bsec" id="bParcel"><div class="lt">Ownership &amp; Value</div><div class="rnote loading">Looking up the appraisal record…</div></div>' +
       '<div class="bsec rg-sec" id="bRegrid"></div>' +
       '<div class="bsec" id="bSize"><div class="lt">Building</div><div id="bPhoto"></div><div id="bSizeBody">' + sizeRows(b) + '<div class="rnote">Measuring height from lidar…</div></div>' +
         ss('Footprint: OpenStreetMap. Height: USGS 3DEP lidar where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record, otherwise estimated from height.') + '</div>' +
-      '<div class="bsec" id="bSite"></div><div class="bsec" id="bDev"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
+      '<div class="bsec" id="bSite"></div><div class="bsec" id="bDev"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote loading">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsrc"></div>';
     card.classList.add('open'); card.scrollTop = 0; setHead(b, null);
     const mark = card.querySelector('#bParcel'), alive = () => cur === b && mark.isConnected; // still this card (not a report opened from it)
@@ -322,7 +322,7 @@ export function initBuildings(ctx) {
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
       '<div class="kgrid msum"><div><b>' + (tot('fp') ? fmtN(tot('fp')) : '—') + '</b><span>Footprint sq ft</span></div><div><b>' + (tot('gfa') ? '~' + fmtN(tot('gfa')) : '—') + '</b><span>Est. floor area sq ft</span></div>' +
       '<div><b>' + (mv ? fmtM(mv) : '—') + '</b><span>Market value · ' + uniqP.size + ' parcel' + (uniqP.size === 1 ? '' : 's') + '</span></div><div><b>' + (acres ? acres.toFixed(2) : '—') + '</b><span>Land acres</span></div></div>' +
-      (loading ? '<div class="rnote">Loading parcels and heights…</div>' : '') +
+      (loading ? '<div class="rnote loading">Loading parcels and heights…</div>' : '') +
       '<div class="bsec"><div class="lt">Selected</div>' + rows.map(({ b, s }, i) => '<div class="mrow"><button class="lnk" data-go="' + i + '"><b><i class="mnum">' + (i + 1) + '</i>' + esc(b.parcel?.situs || (b.footprint ? 'Building ' : 'Parcel ') + (i + 1)) + '</b><span>' +
         [s.fp ? fmtN(s.fp) + ' sq ft footprint' : (b.footprint ? '' : 'parcel only'), s.fl ? (s.fSrc === 'estimated from height' ? '~' : '') + s.fl + ' fl' : '', s.h ? ft(s.h) : '', b.d?.parcels?.length > 1 ? b.d.parcels.length + ' parcels' : '', b.parcel?.owner || ''].filter(Boolean).map(esc).join(' · ') + (b.err ? ' · lookup failed' : '') + '</span></button><button class="x" data-rm="' + i + '" aria-label="Remove">×</button></div>').join('') + '</div>' +
       (fl.length ? '<div class="bsec"><div class="lt">Construction filings on these parcels</div><div class="rnote">' + fl.length + ' filing' + (fl.length > 1 ? 's' : '') + ' · est. ' + fmtM(fl.reduce((t, f) => t + f.cost, 0)) + '</div></div>' : '') +
@@ -506,7 +506,7 @@ export function initBuildings(ctx) {
   async function renderTenants(p) {
     const b = cur, el = card.querySelector('#bTenants'); if (!el || !ctx.tenantsAt) return;
     if (!p?.situsStreet || !/^\d/.test(p.situsStreet) || !(p.situsZip || p.situsCity)) { el.innerHTML = ''; return; }
-    el.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote">Looking up…</div>';
+    el.innerHTML = '<div class="lt">Registered businesses<span class="src"> (Texas Comptroller)</span></div><div class="rnote loading">Looking up…</div>';
     try { const d = await ctx.tenantsAt(p.situsStreet, p.situsZip, p.situsCity); if (cur === b) ctx.renderTenants(el, d); }
     catch (e) { if (cur === b) ctx.renderTenants(el, null, e, () => { if (cur === b) renderTenants(p); }); }
   }

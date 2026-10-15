@@ -200,7 +200,7 @@ export function initSources(ctx) {
       rows().map(([title, list]) => '<section class="src-grp"><h3>' + esc(title) + '</h3><table class="src-tbl"><thead><tr><th>Source</th><th>Status</th><th>Used for · freshness</th></tr></thead><tbody>' +
         list.map(r => '<tr><td><b>' + r.name + '</b></td><td>' + r.status + '</td><td>' + esc(r.what) + '<div class="s">' + esc(r.detail) + '</div></td></tr>').join('') + '</tbody></table></section>').join('');
     root.querySelector('#srcReload')?.addEventListener('click', () => location.reload());
-    root.querySelector('#srcSettings')?.addEventListener('click', () => ctx.openSettings?.('appearance'));
+    root.querySelector('#srcSettings')?.addEventListener('click', () => ctx.openSettings?.('map'));
     root.querySelector('#srcVoiceLog')?.addEventListener('click', () => ctx.saveVoiceLog?.());
     root.querySelector('#srcIntro')?.addEventListener('click', () => ctx.showIntro?.());
   }

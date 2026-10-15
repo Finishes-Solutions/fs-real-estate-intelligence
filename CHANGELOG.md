@@ -5,14 +5,105 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 11:55 AM CT: Merged with the latest main; right-click menu fix (89b1a01, 1b6a1f9, 9f283be)
+- **Merged with everything else that landed today:**
+  - the development pipeline layers;
+  - Ask AI fixes;
+  - faster search, and a reload that keeps your place;
+  - site plan safety fixes;
+  - Market and Compare clarity;
+  - the Reports page;
+  - the free-map fallback when MapTiler is over its limit.
+
+  Nothing from either side was dropped.
+- **Back and Forward:** these step through your pages and the project you had open. Reloading still brings back the map view, the open property card, the site plan or the project.
+- **Site plan wording:** the map chip's button reads **Stop Editing** (or **Stop Measuring**, **Finish**), so **Done** in the panel is the only Done. The option button reads **+ Copy Option**, and out-of-date layouts say **Layouts out of date**.
+- **Site plans open on the free map:** a site plan now opens even when MapTiler refuses its key. Before, the plan wouldn't open at all.
+- **Right-click menu:** in a site plan it no longer disappears straight after it opens.
+
 ### 10:42 AM CT: The map keeps working when MapTiler is over its limit (1bddf09)
 - MapTiler (the Default, Streets, Satellite and Topo base maps, and part of search) ran out of its monthly quota and suspended the account, which left the map blank and address search empty.
 - Now, when MapTiler stops serving, the map switches by itself to the free OpenStreetMap map in the same style: a plain light or dark map for Default, a street map for Streets and Topo, ESRI imagery for Satellite. A note says so once, and Data sources shows which map is in use.
 - Address and place search, "Ask AI about this spot" and naming the spot you're looking at outside Texas use OpenStreetMap search instead.
 - The app remembers the outage for 6 hours, so reloads go straight to the free map instead of failing first, then tries MapTiler again.
 - The nightly data refresh no longer marks an address as "not found" just because MapTiler refused; it's tried again the next night.
+### 12:11 AM CT: Site plan tools on the map: right-click, drag one side, add a point, re-fit as you go (b206604, b4c2123, bcfed5c)
+- **Right-click menu:** right-click works while a plan is open (long-press on touch, or the menu key / Shift+F10 for what's selected).
+  - **On a piece:** Duplicate, Copy, Delete, Turn 90°, Edit shape, Add point here, Pin or Let it move, Fit selection and Change with AI.
+  - **On open ground or a lawn:** Add here (the piece lands where you clicked), Measure from here, Fit plan and Paste.
+  - ⌘C / ⌘V (Ctrl+C / Ctrl+V) copy and paste.
+- **Drag one side:** a selected building has white bars on its sides. Drag one to move just that wall; the opposite wall stays put. In Edit Shape, the bar on an edge moves that whole edge, and a small blue + adds a point there.
+- **Add a point:** double-click a building's outline while editing. It turns into points with the new point where you clicked (one Undo step), ready to drag.
+- **The site re-fits as you go:** when you finish moving, resizing, turning, adding, deleting or pasting a piece, the parking, drives and other placed pieces are laid out again around it.
+  - One Undo takes back both your edit and the re-fit.
+  - If re-fitting would lose floor area or units, or add problems, your edit is kept as it is and the message offers **Re-fit anyway**.
+  - Turn it off with **Re-fit the site after each edit** in Site parameters.
+- **Add button on the tool bar** (A): the grouped pieces, the same as the panel's Add section.
+- **A quieter mode indicator:** the dark pill at the top of the map is gone. A small light chip just above the tool bar says what mode you're in, with Done or Cancel.
+- **Lined up:**
+  - The legend, tool bar and scale bar share one line along the bottom of the map.
+  - Folding the legend no longer moves the tool bar.
+  - Cursors show what each handle does.
+  - On phones the tool bar hides while the sheet is pulled up full.
+- **Labels:** a building reshaped by hand reads "custom shape", not "curved".
 
 ## 2026-10-14
+
+### 11:43 PM CT: A tidier site plan panel (155dd4b)
+- **Order:** Site parameters now comes second, right after Layouts. The rest follows as Build, Change, Numbers, Pro forma, Site, Add and Export.
+- **Header:**
+  - The header is two clean rows.
+  - Saved status is a small icon (a laptop when it's saved on this device, a cloud with a tick when it's synced with the team, a red warning you can click to retry), with the details on hover.
+  - Option chips stay on one row.
+  - The "Editing · drag a piece; only it changes" line is gone.
+- **Parking first for what you asked for:** the overview and the layout cards show the parking for your request (e.g. 107 / 100). When there is a Phase 2, a "Whole site" line shows below.
+- **Switches and chevrons:**
+  - Setbacks, Landscape buffer, Fill the rest of the site, Trees, Update layouts as I change settings, Re-fit the rest of the site and Homes for sale are now switches.
+  - Folding sections use a chevron instead of the words Show and Hide.
+- **Buttons, not links:** Use This Layout, Save as New Option, Edit request, New request, More Layouts, Review Again, Let It Move, Compare layouts and Delete This Option are now buttons.
+- **Less to read:**
+  - Long help paragraphs open from small (i) buttons.
+  - Settings is grouped (Program, Setbacks, Parking, Buildings, Stormwater, Trash, Mix, Look) in a two-column grid, with the units inside each box.
+- **Add (was Draw by hand):**
+  - Grouped icon tiles for Buildings, Paving, Water & landscape, Amenities and Site.
+  - A building library search.
+  - Trees moved to Settings › Look.
+- **Coming next:** Settings has a new **Re-fit the site after each edit** switch. It starts working with the next update, which brings the site plan map tools.
+
+### 11:32 PM CT: Site plans park what they need, not three times it (277105c)
+- **Sensible parking totals:** layouts now park what their buildings need plus about 5% (and the accessible stalls). The default ratios were already normal: retail 4 per 1,000 sf, restaurant 10, office 3.5, medical 5, warehouse 0.6, apartments 1.6 per unit. The layout engine was adding far more than they called for.
+  - **Parking garages** are sized to the share of parking they carry. Before, every garage was at least 180 ft long, so a 25,000 sf retail plan showed 323 spaces for 100 needed; it now shows about 105 for 100.
+  - **Mixed-use plans** now trim their spare parking rows, as single-use plans already did.
+  - **Small programs** land at about 107 for 100 needed.
+- **Phase 1 parking:** the plan now works out parking for what you asked for (Phase 1) separately from the whole site with Phase 2. The plan panel will show it in the next update.
+- **Every building has its own name:** Building A, B, C… across shops, restaurants and offices. Before, a plan could have two or three "Building A"s.
+- **Mixed use on a smaller lot works:** shops, a restaurant and offices on about 6 acres used to fall back to three "Simple layout" options with no parking at all. They now lay out properly, sharing one row of buildings and one parking field when they don't fit one behind the other.
+- **Better layouts without the AI:** layouts with storefronts facing the street, and with parking close to the doors, now rank higher.
+- **New uses and defaults:**
+  - **Hotel:** about 1 space per room ("120-room hotel" reads as about 66,000 sf).
+  - **Church:** 10 spaces per 1,000 sf ("600-seat church" reads as about 20,000 sf).
+  - **Townhomes:** a quarter of a guest space per home, which fits a few fewer homes.
+  - **Parking ratio:** capped at 15 per 1,000 sf.
+
+### 11:15 PM CT: Market page faster and easier to read; Ask AI shows its work quietly (1c54539, 14f9feb)
+- **Faster Market page:**
+  - Opening it no longer freezes the page: the longest pause went from about 1.3 s to under 0.7 s on a busy test machine.
+  - Switching 12 / 24 months / All takes about a tenth of a second (it was 0.6 to 1 s).
+- **Steady while data loads:**
+  - Crime, traffic and live prices now redraw only their own section when they arrive.
+  - Live prices refresh every minute without closing lists you had open (All ZIPs, more news) or moving your scroll.
+- **Readable charts:**
+  - Every chart is drawn at the width of its box, with one text size throughout. Axis text is no longer shrunk to about 6 px in the small price charts.
+  - The price charts sit three to a row (two on tablets, one on phones).
+  - The headline tiles fill whole rows.
+  - Boxes side by side end level.
+  - Bar lists line up their labels and values.
+- **Nothing removed:** all the data that was on the page is still there.
+- **Ask AI:**
+  - The "Thinking…" at the top is gone.
+  - While it works, a quiet line at the bottom says what it's doing ("Looking at the map…").
+  - When the answer arrives, the steps fold into **Worked through N steps** above it, which you can open.
+  - **New chat** has a compose (pencil) icon.
 
 ### 10:33 PM CT: Faster search, and a reload that keeps your place (43fdad5)
 - **Search is quicker:** results start coming in sooner after you stop typing, and businesses show as soon as the first source answers instead of waiting for the slowest (OpenStreetMap now gets one quick look rather than three widening ones).
@@ -21,6 +112,75 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - Enter on a street address waits the moment it takes to find it, so it lands on the address, not on a filing that matched first.
 - The Radius box and the main search box no longer cancel each other's lookups.
 - **A reload keeps your place:** the map view (with tilt and turn), an open property card, an open site plan and the project open on Projects come back after a reload, and when the installed app or the bare page is opened again. A first visit still flies in to the region; copied links and saved searches are unchanged.
+
+### 10:06 PM CT: Groundwork for the site plan Add palette (51312d6)
+- Behind the scenes only: one shared list of the pieces you can add, grouped (Buildings, Paving, Water & landscape, Amenities, Site), for the redesigned Add section and the tool bar's Add palette coming next. Nothing changes on screen yet.
+
+### 8:07 PM CT: Site plan fixes from review (5df66e8)
+- **Locked and hidden layers stay put:** a piece on a layer you lock or hide can no longer be moved, deleted or pinned along with other selected pieces. Locking a layer now takes its pieces out of the selection.
+- **Easements stay when you switch layouts:** picking another layout, or saving one as a new option, now keeps the easements you drew. Before, a layout built earlier would quietly drop them.
+- **Export over a plan:** with the Export dialog open on top of a plan, keys like G or Delete no longer change the plan behind it, and Esc closes the dialog again.
+- **Projects link:** the **Projects** link at the top of a plan adds one step to the browser's Back history instead of two.
+- **⌘D / Ctrl+D:** with nothing selected it does what your browser normally does.
+- **Area at a Glance:** numbers stay whole while they count to a new value.
+
+### 7:22 PM CT: Site plan tools: select several, duplicate, measure, grid, layers, easements (7cec88c, d2964b6, 1455a61, 19219e3, 01ed19a)
+- **A tool bar on the map** while a plan is open: Select, Edit, Draw area, Draw line, Measure distance, Measure area, Fit plan, Fit selection, Grid and Layers.
+  - Shortcuts: V, E, M, Shift+M, Shift+F, F, G and ⌘D / Ctrl+D. They don't fire while you type.
+  - A greyed-out button says why it can't be used yet.
+  - On phones the bar sits at the top left, with **⋯** for the rest.
+- **Several pieces at once:** Shift-click a piece to add or remove it, or Shift-drag a box. Move, nudge, duplicate, delete or pin the set together, as one Undo step. The Selected box shows how many are selected, what kinds, and the ground they cover.
+- **Duplicate (⌘D)** works on every piece, curved drives and the entry included. Before, copying one of those broke it. The copy brings what belongs to it, lands in the nearest clear spot and is selected.
+- **Measure** a distance (each side and the total, in feet) or an area (square feet and acres). Nothing is saved.
+- **Grid and snapping:** an optional 5 or 10 ft grid lined up with the lot, which moved pieces and drawn points snap to. **Snap to edges** can be turned off, and Alt still moves freely.
+- **Layers:** show, hide or lock buildings, parking and drives, stormwater, landscape, trash, trees, labels, the setback line, parcel lines and easements. This is saved with the option. Numbers, checks and exports always include everything.
+- **Draw by points:** draw lawns, plazas, ponds and easement / no-build areas, and draw drives or walks as lines. A shape that crosses itself or lies outside the lot is refused with a message.
+- **Easements and no-build areas:**
+  - They're hatched in red.
+  - Anything built or paved on one is flagged as a problem.
+  - **Build Layouts** and **Re-fit Plan** lay out around them.
+  - They're in the Plan key, on the PDF sheet and on their own layer in CAD.
+  - You draw them yourself; they aren't looked up or surveyed.
+- **Your edits are safe:** Build Layouts, Use this layout, New layouts from these settings and the AI's Use it now ask before replacing a layout you've changed: **Replace my edits**, **Save my edits as a new option first** or **Cancel**.
+- **Save status:** the plan header says **Saved on this device**, **Synced with team · 3 min ago** or **Sync failed · Retry**.
+- **Fixes:**
+  - Garages, outdoor seating and trash enclosures can now be clicked.
+  - Delete, the arrow keys and R work straight after clicking a button in the panel.
+  - Undo now also covers renaming an option, Pro forma changes and adding or removing parcels.
+  - Parking drawn by hand uses your stall and aisle sizes.
+  - Renaming an option updates its button straight away.
+  - A selected piece shows its width and depth when you zoom in.
+- **Plan key:** it now tells **Site boundary (planning)** apart from **Parcel line (county data)**.
+- **Projects:** Back from a plan returns to its project page, Back again to the list, and reloading a project's page keeps it open.
+
+### 6:08 PM CT: Light only, Back button, keyboard and finishing touches (d0ef7ac, 11d6abd, cafc262, 2d528f5, 7c970fd)
+- **Dark mode removed:** the app is always light, even when your device is set to dark. If you had chosen Dark or Match device, you'll see the light look next time.
+  - Settings no longer has an Appearance section.
+  - **Show sources** and **Panel width** moved to Settings › Map.
+- **Back and Forward work:** the browser's Back and Forward buttons now move between the app's pages instead of leaving the app. Your filters and picked area stay as they are.
+- **You can see where the keyboard is:** every button shows a clear green outline when you Tab to it. Before, the outline was invisible on Export, Filters, Layers and the map buttons.
+  - Switching pages from the top bar with the keyboard puts you on the new page's title.
+  - Screen readers say which page opened.
+- **Dialogs and tabs:**
+  - The Export dialog keeps Tab inside it, keeps your place when you change a choice, and returns you to the Export button when it closes.
+  - The × on a card tab is its own button, so you can reach it with the keyboard.
+- **Reduce motion:** if your device is set to reduce motion, the app's animations stop and busy spinners turn slowly. Changing the setting takes effect straight away.
+- **Small touches:**
+  - Buttons, toggles, links and rows react when you hover or press.
+  - Close (×) buttons are easier to hit, especially on touch screens.
+  - Loading notes on cards and reports show a small spinner.
+  - Error text and grey helper text are a little easier to read.
+
+### 5:49 PM CT: Charts that move with the data (feae7b1)
+- **Charts draw in once:** the first time a chart comes into view, its bars grow up from the baseline and its lines draw across. Coming back to a page doesn't replay it.
+- **Changes you can follow:** on the Market page, switching 12 / 24 months / All, changing the county, turning a series on or off or pinning a bar now glides the bars and lines to their new values instead of redrawing them.
+- **Live prices without restarts:** the Markets prices refresh every minute without the charts starting over.
+- **Timeline:** the chart updates smoothly when you change Group by, Measure or filters. It keeps the range you dragged, and the month under the pointer is highlighted.
+- **Numbers that count:** the headline numbers and Area at a Glance count to their new values when filters or the area change. During the time-lapse they update instantly.
+- **Placeholders:** while Market data loads you see a plain grey placeholder, never made-up numbers.
+- **Other charts:** charts in assistant answers, Compare areas, and the crime and FEMA reports draw in when they first appear.
+- **Reduced motion:** if your device is set to reduce motion, charts simply appear.
+- **Exports:** printing and PDF exports always show the finished charts.
 
 ### 5:36 PM CT: Water districts without the county-wide authorities (33244aa)
 - The Water Districts layer and the property card's water district now leave out bodies that cover whole counties or river basins: Harris County Flood Control District, Coastal Water Authority, the Port of Houston Authority, river, groundwater and regional water authorities and the Fort Bend Subsidence District. Before, a downtown Houston property could show "Harris County FCD" as its water district and those outlines covered the map.
@@ -143,6 +303,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Map controls:** one Layers button next to Filters, one row of layer chips, and active filters shown as removable chips with Clear all. The right-hand column only moves the map. Time-lapse moved to the Filings layer and legend. On phones, Layers and Filters open as bottom sheets and the drawing tools sit under one "Select" button.
 - **Property card:** sits full height on the right, with Ask AI, Site plan, Watch and "…" at the top, and section chips that follow your scrolling. Getting owner and zoning from Regrid is offered right under Ownership. Reports, filings and notes opened from a card have a back link to it. On phones the card opens half-height first.
 - **Consistent look:** one set of spacing, text sizes and button styles in light and dark, and larger touch targets on phones and tablets.
+
 ### 6:54 PM CT: Site plans that get the most out of the land (00cddf7)
 - **More leasable floor area and homes:** sizes you ask for are the first phase; buildings grow along their rows until the parking is used, and homes keep filling the blocks (leaving room for the detention lake). On a 41-acre retail, medical, office and warehouse test site the same request went from about 320,000 to 514,000 sq ft, still fully parked; a 220-acre neighbourhood went from 650 homes (with blocks of empty lots) to about 740.
 - **Warehouses** in a mixed-use plan are real warehouses with truck courts; they used to come out as duplexes.
@@ -319,6 +480,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - **Export PDF** includes a street map of the area. **Export Data** now also has the pipeline, housing, rents and material costs.
 - The construction filing list starts in November 2024, so the tab doesn't compare construction under way with a year ago yet. That comparison would be inflated while the list fills in.
 - Ask AI's market answers now cover the pipeline, rents and material costs.
+
 ### 3:28 PM CT: Shorter property card (9bc91fa)
 - **Removed from the property card:** the Airports Nearby and Air Traffic sections, and the "Air" jump button at the top of the card.
 - Construction filing cards still show both.
@@ -682,6 +844,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **The assistant works harder to find a place.** "Highlight Terminal B at George Bush airport" now finds the airport, then looks for Terminal B inside it. It knows common nicknames (Bush airport / IAH, Hobby, the Med Center, NRG). If the map still can't find something, it does a web search for the official name and location, then checks that against the map before showing it. Anything placed only from the web search is marked approximate.
 - **Big places fit on screen.** Going to or outlining an airport, campus, park or town now frames the whole thing, leaving room for the chat panel and the property card. Before, they were shown at street level. Single buildings and addresses still zoom in close.
 - Not checked on the live site yet: this build environment can't reach Google News or OpenStreetMap. Automated tests cover the new search logic.
+
 ### 2:50 AM CT: Traffic reports and a Traffic Counts layer (7e269a7)
 - **Traffic Counts** in Map Layers: every road TxDOT counts, coloured from green to dark red by how many vehicles use it a day. Zoom in to a part of town to see it, and hover a road for its count.
 - **Traffic Report** for any area (Reports tab, the selection bar, or Area reports on a building's Site section):
@@ -1186,6 +1349,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 ### 12:18 AM CT: Nightly refresh and AI model settings (af5e2fd, 091a477, 96110e4, d698f65)
 - Data refreshes nightly; "this week" covers the last 7 days of runs; 13 months of change history kept.
 - Default OpenAI model and reasoning effort settings; optional cheaper model for bulk tagging.
+
 ## 2026-10-01
 
 ### 11:56 PM CT: Census fix (9a01af1)

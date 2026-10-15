@@ -74,7 +74,8 @@ function usable(plan, o, what) {
   const r = L.layoutOptions(plan, { use: 'retail', gfa: 40000 }); assert.equal(r.length, 3);
   r.forEach(o => usable(plan, o, 'FM 362 retail')); assert.ok(S.metrics({ ...plan, elements: r[0].elements, program: r[0].program }).gfa >= 38000, 'the best retail option holds the 40,000 sf');
   const t = L.layoutOptions(plan, { use: 'townhomes' }); assert.equal(t.length, 3);
-  for (const o of t) { const { m } = usable(plan, o, 'FM 362 townhomes'); assert.ok(m.units >= 70 && m.garages === m.units * 2, o.name + ': ' + m.units + ' townhomes'); assert.ok(o.elements.some(e => /Private lane/.test(e.note || ''))); }
+  for (const o of t) { const { m } = usable(plan, o, 'FM 362 townhomes'); assert.ok(m.units >= 65 && m.garages === m.units * 2, o.name + ': ' + m.units + ' townhomes'); // (guest parking, a quarter space a home, takes a little of the land)
+    assert.ok(o.elements.some(e => e.kind === 'parking' && e.note === 'Guest parking'), o.name + ': guest parking'); assert.ok(o.elements.some(e => /Private lane/.test(e.note || ''))); }
   const w = L.layoutOptions(plan, { use: 'industrial' }); assert.equal(w.length, 3);
   for (const o of w) { usable(plan, o, 'FM 362 warehouse'); const b = o.elements.find(e => e.use === 'industrial'), tc = o.elements.find(e => e.kind === 'truck'); assert.ok(b && tc, 'warehouse and truck court');
     assert.ok(S.rectsOverlap({ ...b, w: b.w + 4, d: b.d + 4 }, tc, 0), o.name + ': the truck court is on the dock side'); }

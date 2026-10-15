@@ -98,8 +98,8 @@ export function initLive(ctx) {
     if (!map.getLayer('live-wind')) map.addLayer({ id: 'live-wind', type: 'symbol', source: 'live-wind', layout: {
       'icon-image': 'live-arrow', 'icon-rotate': ['get', 'rot'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['get', 'mph'], 0, .45, 10, .7, 25, 1, 50, 1.3],
       'text-field': ['concat', ['get', 't'], ' mph'], 'text-font': ['Noto Sans Bold'], 'text-size': 10.5, 'text-offset': [0, 1.7], 'text-allow-overlap': false, 'text-optional': true },
-      paint: { 'icon-color': ['interpolate', ['linear'], ['get', 'mph'], 0, '#3987e5', 10, '#1f9249', 18, '#eda100', 28, '#e3622b', 40, '#c03b3a'], 'icon-halo-color': ctx.isDark() ? '#16191a' : '#ffffff', 'icon-halo-width': 1.2,
-        'text-color': ctx.isDark() ? '#dde1e2' : '#23282a', 'text-halo-color': ctx.isDark() ? '#16191a' : '#ffffff', 'text-halo-width': 1.5 } });
+      paint: { 'icon-color': ['interpolate', ['linear'], ['get', 'mph'], 0, '#3987e5', 10, '#1f9249', 18, '#eda100', 28, '#e3622b', 40, '#c03b3a'], 'icon-halo-color': '#ffffff', 'icon-halo-width': 1.2,
+        'text-color': '#23282a', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 } });
   }
   function removeWind() { if (map.getLayer('live-wind')) map.removeLayer('live-wind'); if (map.getSource('live-wind')) map.removeSource('live-wind'); }
   let windT = 0, windCtl = null;
@@ -124,7 +124,7 @@ export function initLive(ctx) {
   function addTerrain() {
     if (!map.getStyle()) return;
     if (!map.getSource('live-dem')) map.addSource('live-dem', { type: 'raster-dem', tiles: ['https://tiles.mapterhorn.com/{z}/{x}/{y}.webp'], encoding: 'terrarium', tileSize: 512, maxzoom: 12, attribution: 'Terrain: Mapterhorn (CC BY 4.0)' });
-    if (!map.getLayer('live-hill')) map.addLayer({ id: 'live-hill', type: 'hillshade', source: 'live-dem', paint: { 'hillshade-exaggeration': .35, 'hillshade-shadow-color': ctx.isDark() ? '#000000' : '#5b6366' } }, below());
+    if (!map.getLayer('live-hill')) map.addLayer({ id: 'live-hill', type: 'hillshade', source: 'live-dem', paint: { 'hillshade-exaggeration': .35, 'hillshade-shadow-color': '#5b6366' } }, below());
     setMesh(map.getZoom() >= TERRAIN_Z);
   }
   // off as soon as a zoom-out passes the threshold (half a level of slack so it doesn't flicker), back on once the move settles

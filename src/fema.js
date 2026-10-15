@@ -5,6 +5,7 @@
 //   federal disaster declarations since 2000, and FEMA's National Risk Index (expected annual loss by hazard).
 //   The report opens in the card and exports as a PDF report or CSV.
 import { reportDoc, savePdf, saveCsv, areaMap, getJSON, errorBox, unavailable } from './reportkit.js';
+import { reveal } from './motion.js';
 const SRC = 'fema-nfhl';
 const RISK_COL = { high: '#1d4ed8', moderate: '#f59e0b', minimal: '#9ca3af', undetermined: '#a78bfa', water: '#38bdf8', unmapped: '#e5e7eb' };
 const RISK_SHORT = { high: 'High risk (100-year)', moderate: 'Moderate (500-year)', minimal: 'Minimal', undetermined: 'Not studied', water: 'Open water', unmapped: 'Not mapped' };
@@ -48,12 +49,12 @@ export function initFema(ctx) {
   // ---------- report ----------
   const reportFor = (geometry, label) => getJSON('api/fema', { what: 'Flood and hazard data', method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) });
   ctx.femaReportData = reportFor;
-  const shareBar = sh => { const order = ['high', 'moderate', 'minimal', 'undetermined', 'water', 'unmapped'].filter(k => sh[k]); return '<div class="fm-bar">' + order.map(k => '<i style="width:' + sh[k] + '%;background:' + RISK_COL[k] + '" title="' + esc(RISK_SHORT[k] + ': ' + sh[k] + '%') + '"></i>').join('') + '</div><div class="fm-leg">' + order.map(k => '<span><i style="background:' + RISK_COL[k] + '"></i>' + esc(RISK_SHORT[k]) + ' <b>' + sh[k] + '%</b></span>').join('') + '</div>'; };
+  const shareBar = sh => { const order = ['high', 'moderate', 'minimal', 'undetermined', 'water', 'unmapped'].filter(k => sh[k]); return '<div class="fm-bar m-hbar">' + order.map(k => '<i style="width:' + sh[k] + '%;background:' + RISK_COL[k] + '" title="' + esc(RISK_SHORT[k] + ': ' + sh[k] + '%') + '"></i>').join('') + '</div><div class="fm-leg">' + order.map(k => '<span><i style="background:' + RISK_COL[k] + '"></i>' + esc(RISK_SHORT[k]) + ' <b>' + sh[k] + '%</b></span>').join('') + '</div>'; };
   function yearBars(rows) {
     if (!rows?.length) return '';
     const y0 = Math.min(...rows.map(r => r.year)), y1 = Math.max(...rows.map(r => r.year)), all = []; for (let y = y0; y <= y1; y++) all.push(rows.find(r => r.year === y) || { year: y, claims: 0, paid: 0 });
     const W = 320, H = 70, max = Math.max(1, ...all.map(r => r.paid)), bw = W / all.length;
-    return '<svg class="cr-bars" viewBox="0 0 ' + W + ' ' + (H + 12) + '" role="img" aria-label="Flood claims paid per year">' + all.map((r, i) => '<g><title>' + esc(r.year + ': ' + r.claims + ' claims, ' + fmtM(r.paid) + ' paid') + '</title><rect x="' + (i * bw + .5).toFixed(1) + '" y="' + (H - r.paid / max * H).toFixed(1) + '" width="' + Math.max(1, bw - 1).toFixed(1) + '" height="' + (r.paid / max * H).toFixed(1) + '" fill="#1d4ed8"/>' +
+    return '<svg class="cr-bars" viewBox="0 0 ' + W + ' ' + (H + 12) + '" role="img" aria-label="Flood claims paid per year">' + all.map((r, i) => '<g><title>' + esc(r.year + ': ' + r.claims + ' claims, ' + fmtM(r.paid) + ' paid') + '</title><rect class="m-bar" x="' + (i * bw + .5).toFixed(1) + '" y="' + (H - r.paid / max * H).toFixed(1) + '" width="' + Math.max(1, bw - 1).toFixed(1) + '" height="' + (r.paid / max * H).toFixed(1) + '" fill="#1d4ed8"/>' +
       ((r.year % 5 === 0 || i === 0) ? '<text x="' + (i * bw).toFixed(1) + '" y="' + (H + 10) + '" font-size="8.5" fill="currentColor" opacity=".6">' + r.year + '</text>' : '') + '</g>').join('') + '</svg>';
   }
   const err = (x, what = 'This part of the report') => x?.error ? '<div class="rnote err">' + esc(/in time/.test(x.error) ? 'Didn’t finish in time; run the report again.' : unavailable(what)) + '</div>' : '';
@@ -72,7 +73,7 @@ export function initFema(ctx) {
   }
   async function report({ geometry, label }) {
     const card = ctx.card || document.getElementById('card');
-    ctx.closeCard?.(); card.innerHTML = '<div class="top"><div><div class="kicker">FEMA report</div><h2>' + esc(label) + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote">Checking flood zones, insurance claims, disasters and risk…</div></div>';
+    ctx.closeCard?.(); card.innerHTML = '<div class="top"><div><div class="kicker">FEMA report</div><h2>' + esc(label) + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote loading">Checking flood zones, insurance claims, disasters and risk…</div></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
     let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Flood and hazard data')); return; }
     last = { d, label, geometry };
@@ -80,6 +81,7 @@ export function initFema(ctx) {
       '<div class="bacts"><button class="btn" id="fmLayer" type="button">Show Flood Zones on Map</button><button class="btn primary" id="fmPdf" type="button">Export PDF</button><button class="btn" id="fmCsv" type="button">Export CSV</button></div>' +
       '<div class="rnote bsec">Flood maps show regulatory risk, not every flood; Houston floods outside them too. For a single parcel, confirm with an elevation certificate or a FEMA flood zone determination.<span class="src"> ' + esc(d.sources) + '</span></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
+    reveal(card, 'card:fema|' + label); // its charts draw in once per report (src/motion.js)
     card.querySelector('#fmLayer').onclick = () => { setOn(true); ctx.fitGeom?.(geometry); };
     card.querySelector('#fmPdf').onclick = exportReport; card.querySelector('#fmCsv').onclick = exportCsv;
   }

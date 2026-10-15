@@ -1,11 +1,12 @@
 // Timeline view: monthly pipeline chart (value or count of projects under construction, stacked) + virtualized Gantt.
 // Both render from ctx.visible, so they always agree with the map, list and exports.
 import { USES } from './lib/taxonomy.mjs';
+import { DUR, EASE, once, reduced, playing } from './motion.js';
 import { describe } from './lib/filter.mjs';
 
-// categorical slots (fixed order; validated palette from the dataviz reference), light / dark
-const CAT = { light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'], dark: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9'] };
-const OTHER = { light: '#a3a8aa', dark: '#6b7174' };
+// categorical slots (fixed order; validated palette from the dataviz reference)
+const CAT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'];
+const OTHER = '#a3a8aa';
 const RH = 34, HH = 30;
 // the name column: 290px, 150px on narrow screens, and at least 45% of the width on phones
 const labelW = () => window.innerWidth <= 700 ? Math.max(150, Math.round((window.innerWidth - 30) * .45)) : window.innerWidth <= 860 ? 150 : 290;
@@ -25,9 +26,8 @@ export function initTimeline(ctx) {
   const orderOf = { type: TYPES, county: COUNTIES.slice(0, 7), use: USE_ORDER };
   const labelOf = (g, k) => g === 'type' ? (TYPE_LABEL[k] || k) : k;
   function colorOf(g, k) {
-    const dark = ctx.isDark();
     if (g === 'type') { const c = ctx.C(); return k === 'New' ? c.new : k === 'Reno' ? c.reno : c.add; }
-    const i = orderOf[g].indexOf(k); return i >= 0 && i < 7 ? CAT[dark ? 'dark' : 'light'][i] : OTHER[dark ? 'dark' : 'light'];
+    const i = orderOf[g].indexOf(k); return i >= 0 && i < 7 ? CAT[i] : OTHER;
   }
   const groupsFor = (g, list) => { const present = new Set(list.map(keyOf[g])); return [...orderOf[g], 'Other'].filter(k => present.has(k)); };
 
@@ -61,13 +61,70 @@ export function initTimeline(ctx) {
     return out;
   }
 
-  let prevD = null;
+  let prevD = null, G = null, cur = null, byBrush = false;
   // the brush swaps the date filter for "under construction"; say what it replaced and offer the way back
   const replaced = () => { const t = prevD && prevD.f !== 'active' ? describe({ d: prevD }, fmtM) : ''; if (t) ctx.toast('Replaces ' + t + ' ·', { ms: 7000, action: { label: 'Undo', run: clearRange } }); };
   function clearRange() { const d = prevD && prevD.f !== 'active' ? prevD : ctx.periodSpec('12m'); prevD = null; ctx.fromSpec({ ...ctx.curSpec(), d }, { fly: false }); }
+  // The chart is built once (and again only when its width changes) and updated with keyed joins: a layer per series, a bar
+  // per series and month. Changes (group, measure, filters) tween bars and axes (src/motion.js timings); the brush keeps its
+  // instance and selection. Instant instead while the time-lapse plays, when the brush itself caused the render, under
+  // reduced motion and on resize. The first build grows the bars from the baseline, once per session.
+  const H = 210, m = { t: 10, r: 14, b: 24, l: 58 }, mo7 = d => d.toISOString().slice(0, 7);
+  function build(el, W) {
+    el.querySelector('svg')?.remove();
+    const svg = d3.create('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', W).attr('height', H).attr('role', 'img');
+    const g = { W, svg, grid: svg.append('g').attr('class', 'grid'), yax: svg.append('g').attr('class', 'yax'), bars: svg.append('g').attr('class', 'tl-bars'), xax: svg.append('g').attr('class', 'xax'),
+      today: svg.append('line').attr('class', 'today').style('display', 'none'), y: null, hov: null };
+    const tip = $('tlTip');
+    const hover = mo => { if (mo === g.hov) return; g.hov = mo; g.bars.selectAll('rect').classed('hov', d => d.mo === mo); };
+    // hover: nearest month column under the pointer (works through the brush overlay); reads the current render's numbers
+    svg.on('pointermove', ev => {
+      if (ev.pointerType && ev.pointerType !== 'mouse') return; const c = cur; if (!c) return;
+      const [px] = d3.pointer(ev); if (px < m.l || px > W - m.r) { tip.style.opacity = 0; hover(null); return; }
+      const mo = mo7(d3.utcMonth.floor(x.invert(px))), i = months.indexOf(mo); if (i < 0) return; hover(mo);
+      const r = c.rowsM[i], tot = c.groups.reduce((s, k) => s + r[k], 0);
+      tip.innerHTML = '<b>' + esc(d3.utcFormat('%B %Y')(mStart(mo))) + '</b><span>' + c.fmtY(tot) + ' total</span>' + c.groups.slice().reverse().filter(k => r[k]).map(k => '<div><i style="background:' + colorOf(opt.group, k) + '"></i>' + esc(labelOf(opt.group, k)) + '<em>' + c.fmtY(r[k]) + '</em></div>').join('');
+      const left = x(mStart(mo)) + c.bw + 10; tip.style.opacity = 1; tip.style.left = (left + tip.offsetWidth > W ? x(mStart(mo)) - tip.offsetWidth - 10 : left) + 'px'; tip.style.top = '8px';
+    }).on('pointerleave', () => { tip.style.opacity = 0; hover(null); });
+    // brush -> "under construction during" filter. Snaps to whole months while dragging, shows the range live,
+    // stays on the chart afterwards so its edges can be adjusted; a tap without dragging picks a single month.
+    const fmtMo = d3.utcFormat('%b %Y');
+    const snap = ([a, b]) => { const s0 = d3.utcMonth.floor(x.invert(a)), e0 = d3.utcMonth.ceil(x.invert(b)); return [s0, e0 > s0 ? e0 : d3.utcMonth.offset(s0, 1)]; };
+    const lab = svg.append('g').attr('class', 'blabel').style('display', 'none'); lab.append('rect').attr('rx', 3).attr('height', 18).attr('y', m.t - 2); lab.append('text').attr('y', m.t + 11);
+    g.showLab = (s0, e0) => { const t = fmtMo(s0) + (d3.utcMonth.offset(s0, 1) < e0 ? ' – ' + fmtMo(d3.utcMonth.offset(e0, -1)) : ''); lab.style('display', null).select('text').text(t);
+      const w = t.length * 6.4 + 14, cx = Math.max(m.l + w / 2, Math.min(W - m.r - w / 2, (x(s0) + x(e0)) / 2)); lab.select('rect').attr('x', cx - w / 2).attr('width', w); lab.select('text').attr('x', cx); };
+    g.hideLab = () => lab.style('display', 'none');
+    const apply = (s0, e0) => {
+      const first = !(ctx.state.d && ctx.state.d.f === 'active'); if (first) prevD = ctx.state.d;
+      byBrush = true; ctx.showFilings?.(); ctx.fromSpec({ ...ctx.curSpec(), d: { f: 'active', from: mo7(s0), to: mo7(d3.utcMonth.offset(e0, -1)) } }, { fly: false });
+      if (first) replaced();
+    };
+    let startSel = null, downX = null;
+    g.brush = d3.brushX().extent([[m.l, m.t], [W - m.r, H - m.b]])
+      .on('start', ev => { tip.style.opacity = 0; startSel = ev.selection ? ev.selection.slice() : null; downX = ev.sourceEvent ? d3.pointer(ev.sourceEvent, svg.node())[0] : null; })
+      .on('brush', function (ev) { if (!ev.sourceEvent || !ev.selection) return; const [s0, e0] = snap(ev.selection); g.showLab(s0, e0); })
+      .on('end', function (ev) {
+        if (!ev.sourceEvent) return;
+        if (!ev.selection) { // tap: one month, or clear when tapping the month already selected
+          const [px] = d3.pointer(ev.sourceEvent, svg.node()); if (px < m.l || px > W - m.r) return;
+          const s0 = d3.utcMonth.floor(x.invert(px)), c = ctx.state.d;
+          if (c && c.f === 'active' && c.from === mo7(s0) && c.to === mo7(s0)) { byBrush = true; clearRange(); return; }
+          apply(s0, d3.utcMonth.offset(s0, 1)); return;
+        }
+        // a tap inside the month already selected (no drag) clears it, like tapping it when nothing else is picked
+        if (startSel && downX != null && downX >= startSel[0] && downX <= startSel[1] && Math.abs(ev.selection[0] - startSel[0]) < 1 && Math.abs(ev.selection[1] - startSel[1]) < 1) {
+          const c = ctx.state.d; if (c && c.f === 'active' && c.from && c.from === c.to) { byBrush = true; clearRange(); return; }
+        }
+        const [s0, e0] = snap(ev.selection); apply(s0, e0);
+      });
+    g.bg = svg.append('g').attr('class', 'brush').call(g.brush); g.bg.select('.overlay').style('cursor', 'var(--cur-cross, crosshair)');
+    lab.raise();
+    el.prepend(svg.node());
+    return g;
+  }
   function renderChart(list, groups) {
     const active = ctx.state.d && ctx.state.d.f === 'active' ? [ctx.state.d.from || months[0], ctx.state.d.to || months[months.length - 1]] : null;
-    const el = $('tlChart'), W = el.clientWidth, H = 210, m = { t: 10, r: 14, b: 24, l: 58 };
+    const el = $('tlChart'), W = el.clientWidth;
     const idx = new Map(months.map((mo, i) => [mo, i]));
     const rowsM = months.map(mo => Object.fromEntries([['m', mo], ...groups.map(g => [g, 0])]));
     for (const f of list) {
@@ -79,62 +136,37 @@ export function initTimeline(ctx) {
     x = d3.scaleUtc().domain([mStart(months[0]), d3.utcMonth.offset(mStart(months[months.length - 1]), 1)]).range([m.l, W - m.r]);
     const y = d3.scaleLinear().domain([0, ymax]).nice(4).range([H - m.b, m.t]);
     const fmtY = opt.measure === 'value' ? fmtM : fmtN;
-    const svg = d3.create('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', W).attr('height', H).attr('role', 'img')
-      .attr('aria-label', (opt.measure === 'value' ? 'Estimated value' : 'Number') + ' of projects under construction by month');
-    svg.append('g').attr('class', 'grid').selectAll('line').data(y.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d));
-    svg.append('g').attr('class', 'yax').selectAll('text').data(y.ticks(4)).join('text').attr('x', m.l - 8).attr('y', d => y(d) + 4).attr('text-anchor', 'end').text(d => d ? fmtY(d) : '0');
-    const bw = Math.max(1, (x(mStart(months[1] || months[0])) - x(mStart(months[0]))) || 8), gap = bw > 6 ? 2 : 0;
-    svg.append('g').selectAll('g').data(stack).join('g').attr('fill', d => colorOf(opt.group, d.key))
-      .selectAll('rect').data(d => d).join('rect').attr('x', (d, i) => x(mStart(months[i])) + gap / 2).attr('width', Math.max(1, bw - gap))
-      .attr('y', d => y(d[1]) + (d[1] - d[0] > 0 ? 1 : 0)).attr('height', d => Math.max(0, y(d[0]) - y(d[1]) - (d[1] - d[0] > 0 ? 1 : 0)))
-      .attr('opacity', (d, i) => active && (months[i] < active[0] || months[i] > active[1]) ? .32 : 1);
+    const fresh = !G || G.W !== W || !G.svg.node().isConnected, first = fresh && !G;
+    const quick = fresh || byBrush || reduced() || playing(); byBrush = false;
+    if (fresh) G = build(el, W);
+    const bw = Math.max(1, (x(mStart(months[1] || months[0])) - x(mStart(months[0]))) || 8), gap = bw > 6 ? 2 : 0, y0 = G.y || y;
+    cur = { rowsM, groups, fmtY, bw };
+    G.svg.attr('aria-label', (opt.measure === 'value' ? 'Estimated value' : 'Number') + ' of projects under construction by month');
+    const tr = quick ? null : d3.transition().duration(DUR.base + 100).ease(d3.easeCubicOut), go = s => quick ? s.interrupt() : s.transition(tr);
+    // y axis and gridlines keyed by value: new ticks come in from where the old scale had them, old ones leave toward the new
+    const ticks = y.ticks(4);
+    G.grid.selectAll('line').data(ticks, d => d).join(e => e.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y0(d)).attr('y2', d => y0(d)).attr('opacity', 0), u => u,
+      o => go(o).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('opacity', 0).remove()).call(s => go(s).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('opacity', 1));
+    G.yax.selectAll('text').data(ticks, d => d).join(e => e.append('text').attr('x', m.l - 8).attr('text-anchor', 'end').attr('y', d => y0(d) + 4).attr('opacity', 0), u => u,
+      o => go(o).attr('y', d => y(d) + 4).attr('opacity', 0).remove()).text(d => d ? fmtY(d) : '0').call(s => go(s).attr('y', d => y(d) + 4).attr('opacity', 1));
+    // bars: a layer per series, a bar per month; entering bars grow from their place in the stack
+    const X = d => x(mStart(d.mo)) + gap / 2, top = d => y(d.p[1]) + (d.p[1] - d.p[0] > 0 ? 1 : 0), ht = d => Math.max(0, y(d.p[0]) - y(d.p[1]) - (d.p[1] - d.p[0] > 0 ? 1 : 0));
+    const layers = G.bars.selectAll('g.tl-l').data(stack, d => d.key).join(e => e.append('g').attr('class', 'tl-l'), u => u, o => o.remove()).attr('fill', d => colorOf(opt.group, d.key));
+    layers.selectAll('rect').data(d => d.map((p, i) => ({ p, mo: months[i], k: d.key })), d => d.mo)
+      .join(e => e.append('rect').attr('x', X).attr('width', Math.max(1, bw - gap)).attr('y', d => y(d.p[0])).attr('height', 0), u => u, o => o.remove())
+      .classed('hov', d => d.mo === G.hov)
+      .call(s => go(s).attr('x', X).attr('width', Math.max(1, bw - gap)).attr('y', top).attr('height', ht).attr('opacity', d => active && (d.mo < active[0] || d.mo > active[1]) ? .32 : 1));
     const xt = x.ticks(W < 600 ? 4 : 8);
-    svg.append('g').attr('class', 'xax').selectAll('text').data(xt).join('text').attr('x', d => x(d)).attr('y', H - 6).attr('text-anchor', 'middle').text(d => d3.utcFormat(d.getUTCMonth() === 0 ? '%Y' : '%b')(d));
-    const now = new Date(); if (now >= x.domain()[0] && now <= x.domain()[1]) svg.append('line').attr('class', 'today').attr('x1', x(now)).attr('x2', x(now)).attr('y1', m.t - 4).attr('y2', H - m.b);
-    // hover: nearest month column under the pointer (works through the brush overlay)
-    const tip = $('tlTip');
-    svg.on('pointermove', ev => {
-      if (ev.pointerType && ev.pointerType !== 'mouse') return;
-      const [px] = d3.pointer(ev); if (px < m.l || px > W - m.r) { tip.style.opacity = 0; return; }
-      const mo = d3.utcMonth.floor(x.invert(px)).toISOString().slice(0, 7), i = months.indexOf(mo); if (i < 0) return;
-      const r = rowsM[i], tot = groups.reduce((s, g) => s + r[g], 0);
-      tip.innerHTML = '<b>' + esc(d3.utcFormat('%B %Y')(mStart(mo))) + '</b><span>' + fmtY(tot) + ' total</span>' + groups.slice().reverse().filter(g => r[g]).map(g => '<div><i style="background:' + colorOf(opt.group, g) + '"></i>' + esc(labelOf(opt.group, g)) + '<em>' + fmtY(r[g]) + '</em></div>').join('');
-      const left = x(mStart(mo)) + bw + 10; tip.style.opacity = 1; tip.style.left = (left + tip.offsetWidth > W ? x(mStart(mo)) - tip.offsetWidth - 10 : left) + 'px'; tip.style.top = '8px';
-    }).on('pointerleave', () => { tip.style.opacity = 0; });
-    // brush -> "under construction during" filter. Snaps to whole months while dragging, shows the range live,
-    // stays on the chart afterwards so its edges can be adjusted; a tap without dragging picks a single month.
-    const ymOf = d => d.toISOString().slice(0, 7), fmtMo = d3.utcFormat('%b %Y');
-    const snap = ([a, b]) => { const s0 = d3.utcMonth.floor(x.invert(a)), e0 = d3.utcMonth.ceil(x.invert(b)); return [s0, e0 > s0 ? e0 : d3.utcMonth.offset(s0, 1)]; };
-    const lab = svg.append('g').attr('class', 'blabel').style('display', 'none'); lab.append('rect').attr('rx', 3).attr('height', 18).attr('y', m.t - 2); lab.append('text').attr('y', m.t + 11);
-    const showLab = (s0, e0) => { const t = fmtMo(s0) + (d3.utcMonth.offset(s0, 1) < e0 ? ' – ' + fmtMo(d3.utcMonth.offset(e0, -1)) : ''); lab.style('display', null).select('text').text(t);
-      const w = t.length * 6.4 + 14, cx = Math.max(m.l + w / 2, Math.min(W - m.r - w / 2, (x(s0) + x(e0)) / 2)); lab.select('rect').attr('x', cx - w / 2).attr('width', w); lab.select('text').attr('x', cx); };
-    const apply = (s0, e0) => {
-      const first = !(ctx.state.d && ctx.state.d.f === 'active'); if (first) prevD = ctx.state.d;
-      ctx.showFilings?.(); ctx.fromSpec({ ...ctx.curSpec(), d: { f: 'active', from: ymOf(s0), to: ymOf(d3.utcMonth.offset(e0, -1)) } }, { fly: false });
-      if (first) replaced();
-    };
-    let startSel = null, downX = null;
-    const brush = d3.brushX().extent([[m.l, m.t], [W - m.r, H - m.b]])
-      .on('start', ev => { tip.style.opacity = 0; startSel = ev.selection ? ev.selection.slice() : null; downX = ev.sourceEvent ? d3.pointer(ev.sourceEvent, svg.node())[0] : null; })
-      .on('brush', function (ev) { if (!ev.sourceEvent || !ev.selection) return; const [s0, e0] = snap(ev.selection); showLab(s0, e0); })
-      .on('end', function (ev) {
-        if (!ev.sourceEvent) return;
-        if (!ev.selection) { // tap: one month, or clear when tapping the month already selected
-          const [px] = d3.pointer(ev.sourceEvent, svg.node()); if (px < m.l || px > W - m.r) return;
-          const s0 = d3.utcMonth.floor(x.invert(px)), cur = ctx.state.d;
-          if (cur && cur.f === 'active' && cur.from === ymOf(s0) && cur.to === ymOf(s0)) { clearRange(); return; }
-          apply(s0, d3.utcMonth.offset(s0, 1)); return;
-        }
-        // a tap inside the month already selected (no drag) clears it, like tapping it when nothing else is picked
-        if (startSel && downX != null && downX >= startSel[0] && downX <= startSel[1] && Math.abs(ev.selection[0] - startSel[0]) < 1 && Math.abs(ev.selection[1] - startSel[1]) < 1) {
-          const cur = ctx.state.d; if (cur && cur.f === 'active' && cur.from && cur.from === cur.to) { clearRange(); return; }
-        }
-        const [s0, e0] = snap(ev.selection); apply(s0, e0);
-      });
-    const bg = svg.append('g').attr('class', 'brush').call(brush); bg.select('.overlay').style('cursor', 'var(--cur-cross, crosshair)');
-    lab.raise();
-    if (active) { const a0 = mStart(active[0]), b0 = d3.utcMonth.offset(mStart(active[1]), 1); bg.call(brush.move, [x(a0), x(b0)]); showLab(a0, b0); }
-    el.querySelector('svg')?.remove(); el.prepend(svg.node());
+    G.xax.selectAll('text').data(xt, d => +d).join(e => e.append('text').attr('y', H - 6).attr('text-anchor', 'middle').attr('x', d => x(d)), u => u, o => o.remove())
+      .text(d => d3.utcFormat(d.getUTCMonth() === 0 ? '%Y' : '%b')(d)).call(s => go(s).attr('x', d => x(d)));
+    const now = new Date(), inDom = now >= x.domain()[0] && now <= x.domain()[1];
+    G.today.style('display', inDom ? null : 'none').attr('y1', m.t - 4).attr('y2', H - m.b); if (inDom) go(G.today).attr('x1', x(now)).attr('x2', x(now));
+    G.y = y;
+    // the brush follows the filter: the active range, or nothing
+    if (active) { const a0 = mStart(active[0]), b0 = d3.utcMonth.offset(mStart(active[1]), 1); G.bg.call(G.brush.move, [x(a0), x(b0)]); G.showLab(a0, b0); }
+    else { if (d3.brushSelection(G.bg.node())) G.bg.call(G.brush.move, null); G.hideLab(); }
+    // first sight this session: the bars grow up from the baseline (one animation for the whole chart, nothing left behind)
+    if (first && !reduced() && once('tl:chart')) { const o = '0px ' + (H - m.b) + 'px'; G.bars.node().animate([{ transform: 'scaleY(0)', transformOrigin: o }, { transform: 'scaleY(1)', transformOrigin: o }], { duration: DUR.reveal, easing: EASE }); }
     // the legend lists groups biggest first, the order the Gantt uses; each one jumps to its group below
     $('tlLegend').innerHTML = byValue(groups, list).map(g => '<button type="button" data-g="' + esc(g) + '" title="Jump to ' + esc(labelOf(opt.group, g)) + ' in the list below"><i style="background:' + colorOf(opt.group, g) + '"></i>' + esc(labelOf(opt.group, g)) + '</button>').join('');
   }
@@ -194,7 +226,7 @@ export function initTimeline(ctx) {
     const pct = Math.round(est / Math.max(1, list.length) * 100);
     $('tlSub').textContent = fmtN(list.length) + ' projects · ' + fmtM(list.reduce((s, f) => s + f.cost, 0)) + ' est. value' + (est ? ' · ' + (pct < 1 ? '<1%' : pct + '%') + ' have estimated dates' : '');
     ctx.scopeBar?.($('tlScope'));
-    if (!list.length) { $('tlChart').querySelector('svg')?.remove(); $('gInner').innerHTML = ctx.vempty ? ctx.vempty({ icon: 'search', title: 'No filings match these filters', text: 'Remove a filter above, or reset them.', actions: [{ label: 'Reset filters', id: 'tlReset', primary: true }] }) : '<div class="empty">No filings match these filters.</div>';
+    if (!list.length) { $('tlChart').querySelector('svg')?.remove(); G = null; $('gInner').innerHTML = ctx.vempty ? ctx.vempty({ icon: 'search', title: 'No filings match these filters', text: 'Remove a filter above, or reset them.', actions: [{ label: 'Reset filters', id: 'tlReset', primary: true }] }) : '<div class="empty">No filings match these filters.</div>';
       $('gInner').style.height = 'auto'; $('tlLegend').innerHTML = ''; $('tlReset')?.addEventListener('click', () => ctx.resetFilings?.()); return; }
     renderChart(chartList, groupsFor(opt.group, chartList)); renderGantt(list, byValue(groups, list));
     const d = ctx.state.d, r = $('tlRange');
@@ -208,5 +240,4 @@ export function initTimeline(ctx) {
   // the page narrows when a card opens beside it (and widens when it closes) without the window changing: redraw at the new width
   { let lastW = 0, raf = 0; // the page's padding changes with the card, so it is the content width that tells
     new ResizeObserver(es => { const w = Math.round(es[0].contentRect.width); if (!w || ctx.view !== 'timeline' || Math.abs(w - lastW) < 2) { if (w && ctx.view === 'timeline') lastW = w; return; } lastW = w; cancelAnimationFrame(raf); raf = requestAnimationFrame(render); }).observe(root); }
-  new MutationObserver(() => render()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }

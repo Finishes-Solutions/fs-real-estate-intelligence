@@ -101,7 +101,7 @@ export function renderNav(ctx) {
   $('msheet').innerHTML = '<div class="msh-top"><button type="button" class="mgrab" id="mshGrab" aria-label="Close More"></button><button type="button" class="msh-x" id="mshX" aria-label="Close More" title="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' + groupRows +
     '<div class="mt-h">Export</div><div class="mrows">' + row('export', 'Quick export', ' aria-label="Quick export: a spreadsheet or PDF of what the map shows"') + '</div>' +
     '<div class="mt-h">Map tools</div><div class="mrows">' + row('layers', 'Layers') + row('near', 'Nearby', ' aria-label="Nearby: the area around my location"') + row('note', 'Pin a note', ' aria-label="Pin a site note at my location"') + '</div>' +
-    '<div class="mt-h">Settings</div><div class="mrows">' + row('settings', 'Settings', ' aria-label="Settings: theme, your name and team, install, layout"') + '</div>' +
+    '<div class="mt-h">Settings</div><div class="mrows">' + row('settings', 'Settings', ' aria-label="Settings: your name and team, map, install, layout"') + '</div>' +
     '<div class="mt-h">Data &amp; help</div><div class="mrows">' + row('sources', 'Data sources &amp; freshness') + '</div>';
 
   ctx.setBadge = setBadge; ctx.navPath = pathOf;
