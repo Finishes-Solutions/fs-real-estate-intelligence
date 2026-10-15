@@ -3141,16 +3141,19 @@ table.who tr.nomatch td{border:0}
 /* a box over the map's free rectangle (not under the card, the search or the buttons; src/siteplan.js keeps it there) */
 .sp-mapui{position:absolute;z-index:4;pointer-events:none}
 .sp-mapui[hidden]{display:none}
-.sp-mpill{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100% - 24px);padding:5px 5px 5px 12px;border-radius:999px;background:var(--ink-900,#0b0d0c);color:#fff;box-shadow:0 6px 18px rgba(11,13,12,.3);font:500 12.5px/1.25 var(--font-display);pointer-events:auto;white-space:nowrap}
+/* the mode: a small light chip riding on the tool strip (placed by placeChip in src/siteplan.js), the panel's colour with a hairline */
+.sp-mpill{position:absolute;left:16px;bottom:16px;display:flex;align-items:center;gap:7px;height:30px;box-sizing:border-box;max-width:calc(100% - 32px);padding:0 4px 0 10px;border:1px solid var(--line-2);border-radius:var(--r-md,8px);background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(11,13,12,.12);font:500 12px/1 var(--font-display);pointer-events:auto;white-space:nowrap}
 .sp-mpill[hidden]{display:none}
-.sp-mpill .sp-mp-t{display:flex;align-items:baseline;gap:8px;min-width:0}
-.sp-mpill b{font-weight:700;flex:none}
-.sp-mpill .sp-mp-d{min-width:0;overflow:hidden;text-overflow:ellipsis;color:rgba(255,255,255,.78)}
-.sp-mpill .sp-mp-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--green-300)}
-.sp-mpill .sp-mp-b{flex:none;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:transparent;color:#fff;font:600 12px var(--font-display);padding:4px 12px;cursor:var(--cur-pointer,pointer)}
-.sp-mpill .sp-mp-b.done{background:var(--green-400);border-color:var(--green-400);color:var(--ink-950,#0b0d0c)}
-.sp-mpill .sp-mp-b:hover{border-color:#fff}
-.sp-mpill .sp-mp-b:focus-visible{outline:2px solid var(--green-300);outline-offset:1px}
+.sp-mpill .sp-mp-t{flex:none;font-weight:700}
+.sp-mpill .sp-mp-d{min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.sp-mpill .sp-mp-dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--brand)}
+.sp-mpill .sp-mp-dot:not(.k-edit):not(.k-shape){background:var(--amber,#c98a00)}
+.sp-mpill .sp-mp-b{flex:none;height:22px;border:1px solid var(--line-2);border-radius:6px;background:transparent;color:var(--text);font:600 11.5px/1 var(--font-display);padding:0 9px;cursor:var(--cur-pointer,pointer)}
+.sp-mpill .sp-mp-b+.sp-mp-b{margin-left:-3px}
+.sp-mpill .sp-mp-b.done{background:var(--brand);border-color:var(--brand);color:var(--brand-ink,#fff)}
+.sp-mpill .sp-mp-b:hover{background:var(--chip)}.sp-mpill .sp-mp-b.done:hover{filter:brightness(1.08);background:var(--brand)}
+.sp-mpill .sp-mp-b:disabled{opacity:.45;cursor:var(--cur-default,default)}
+.sp-mpill .sp-mp-b:focus-visible{outline:var(--focus,2px solid var(--brand));outline-offset:1px}
 /* the scale bar: bottom right of the free part of the map, clear of the legend at the bottom left */
 .sp-scale{position:absolute;right:10px;bottom:10px;pointer-events:none}
 .sp-scale .maplibregl-ctrl-scale{margin:0;background:color-mix(in srgb,var(--panel) 85%,transparent);color:var(--text);border-color:var(--text-2);font:600 10.5px var(--font-mono);padding:0 5px;box-shadow:0 1px 2px rgba(11,13,12,.12)}
@@ -3165,10 +3168,8 @@ table.who tr.nomatch td{border:0}
 @media (max-width:700px){
   .app.planning:has(.card.open) .legends{display:flex;position:fixed;left:10px;bottom:var(--sp-above,12px);z-index:7;max-height:min(40vh,calc(100vh - var(--sp-above,12px) - 140px))}
   body:has(.sp-runpill:not([hidden])) .app.planning .legends{display:none!important}
-  .sp-mpill{top:8px;font-size:12px;padding:5px 5px 5px 12px;gap:8px;border-radius:14px;width:max-content}
-  .sp-mpill .sp-mp-t{flex-direction:column;align-items:flex-start;gap:0}
-  .sp-mpill .sp-mp-d{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:11px;line-height:1.3}
-  .sp-mpill .sp-mp-b{padding:7px 14px}
+  .sp-mpill{top:8px;bottom:auto;height:34px;font-size:12px}
+  .sp-mpill .sp-mp-b{height:26px;padding:0 11px}
   .sp-scale{bottom:8px;right:8px}
 }
 /* Change With AI: what it did */
@@ -3528,3 +3529,46 @@ table.who tr.nomatch td{border:0}
 .sp-ov-s i>.ln{display:block}.sp-ov-s i>.sep{display:none}
 @media (max-width:700px){.sp-ov-s i>.ln{display:inline}.sp-ov-s i>.sep{display:inline}}
 #card.sp-mode details.bsec:not([open]){gap:0}
+  #card .sp-head{grid-template-areas:"ttl act" "save save"}
+  #card .sp-save{justify-self:start;margin-top:2px}
+  #card .sp-save:not(.bad){display:none}
+}
+
+/* ---------- site plan map (round 2) ---------- */
+/* one baseline and one gutter: while planning, the legend sits 16 px in from the map's bottom left like the tool strip
+   (placed beside it by placeStrip in src/siteplan.js) and the scale bar at the bottom right */
+@media (min-width:701px){.app.planning .legends{left:16px;bottom:16px}}
+/* the Add palette: the pieces in groups, as tiles with a small drawing in the piece's own colour */
+.sp-tpop[data-kind="add"]{width:316px}
+.sp-ad{display:grid;gap:8px}
+.sp-ad-gh{font:700 10px/1 var(--font-display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:2px 4px 5px}
+.sp-ad-ts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px}
+.sp-ad-t{display:grid;justify-items:center;gap:5px;min-width:0;padding:7px 2px 6px;border:0;border-radius:8px;background:transparent;color:var(--text);font:600 11.5px/1.2 var(--font-display);text-align:center;cursor:var(--cur-pointer,pointer);transition:background var(--dur-fast,150ms) var(--ease,ease)}
+.sp-ad-t span{max-width:100%;text-wrap:balance}
+.sp-ad-t:hover{background:var(--chip)}
+.sp-ad-t:focus-visible{outline:var(--focus,2px solid var(--brand));outline-offset:-2px;background:var(--chip)}
+.sp-ad-ic{width:34px;height:34px;display:grid;place-items:center;border-radius:8px;background:color-mix(in srgb,var(--c) 16%,var(--panel));border:1px solid color-mix(in srgb,var(--c) 34%,transparent);color:color-mix(in srgb,var(--c) 62%,var(--text))}
+.sp-ad-t:hover .sp-ad-ic{background:color-mix(in srgb,var(--c) 24%,var(--panel))}
+.sp-ad-ic svg{width:20px;height:20px} /* the panel's 24px Add icons, a little smaller in the palette */
+.sp-tpop .sp-ad-lib{display:block;margin:8px 6px 0;padding:0;font-size:12px}
+/* the right-click menu (a long press on touch): light, like the app's other menus */
+.sp-cm{position:fixed;z-index:60;min-width:216px;max-width:min(300px,calc(100vw - 16px));padding:5px;display:grid;gap:1px;background:var(--panel);color:var(--text);border:1px solid var(--line-2);border-radius:var(--r-md);box-shadow:var(--sh-2);font:600 13px/1.3 var(--font-display);outline:none}
+.sp-cm[hidden]{display:none}
+.sp-cm-h{padding:6px 9px 5px;font:700 10.5px/1.2 var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp-cm>button{display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;min-height:32px;padding:6px 9px;border:0;border-radius:6px;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:var(--cur-pointer,pointer)}
+.sp-cm>button:hover,.sp-cm>button:focus-visible,.sp-cm>button[aria-expanded="true"]{background:var(--chip);outline:none}
+.sp-cm>button:focus-visible{box-shadow:inset 0 0 0 1.5px var(--brand)}
+.sp-cm>button>span{display:grid;gap:1px}
+.sp-cm kbd{border:0;background:none;box-shadow:none;padding:0;font:500 11px/1 var(--font-mono);color:var(--muted)}
+.sp-cm i{font-style:normal;font-size:15px;line-height:1;color:var(--muted)}
+.sp-cm em{font:400 11.5px/1.3 var(--font-body,inherit);font-style:normal;color:var(--muted)}
+.sp-cm>button[aria-disabled]{color:var(--muted);cursor:var(--cur-default,default)}
+.sp-cm>button[aria-disabled]:hover{background:transparent}
+.sp-cm hr{border:0;border-top:1px solid var(--line);margin:4px 3px}
+.sp-cm-sub{width:316px;padding:6px}
+/* a message while planning sits above the strip and the mode chip on it */
+@media (min-width:701px){.app.planning .toast{bottom:104px}}
+.sp-cm-sub{max-height:calc(100vh - 16px);overflow:auto}
+@media (pointer:coarse){.sp-cm>button{min-height:42px}.sp-ad-t{padding:9px 2px 8px}}
+@media (max-width:700px){.sp-tpop[data-kind="add"]{width:min(316px,calc(100vw - 16px))}
+  .app.planning:has(#card.open.full) .sp-mapui{display:none}} /* the sheet pulled to full height: the strip, the chip and their pop-overs step away (they'd sit over its header) */
