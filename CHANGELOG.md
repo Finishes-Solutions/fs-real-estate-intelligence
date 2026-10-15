@@ -5,6 +5,26 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 11:15 PM CT: Market page faster and easier to read; Ask AI shows its work quietly (1c54539, 14f9feb)
+- **Faster Market page:**
+  - Opening it no longer freezes the page: the longest pause went from about 1.3 s to under 0.7 s on a busy test machine.
+  - Switching 12 / 24 months / All takes about a tenth of a second (it was 0.6 to 1 s).
+- **Steady while data loads:**
+  - Crime, traffic and live prices now redraw only their own section when they arrive.
+  - Live prices refresh every minute without closing lists you had open (All ZIPs, more news) or moving your scroll.
+- **Readable charts:**
+  - Every chart is drawn at the width of its box, with one text size throughout. Axis text is no longer shrunk to about 6 px in the small price charts.
+  - The price charts sit three to a row (two on tablets, one on phones).
+  - The headline tiles fill whole rows.
+  - Boxes side by side end level.
+  - Bar lists line up their labels and values.
+- **Nothing removed:** all the data that was on the page is still there.
+- **Ask AI:**
+  - The "Thinking…" at the top is gone.
+  - While it works, a quiet line at the bottom says what it's doing ("Looking at the map…").
+  - When the answer arrives, the steps fold into **Worked through N steps** above it, which you can open.
+  - **New chat** has a compose (pencil) icon.
+
 ### 10:06 PM CT: Groundwork for the site plan Add palette (51312d6)
 - Behind the scenes only: one shared list of the pieces you can add, grouped (Buildings, Paving, Water & landscape, Amenities, Site), for the redesigned Add section and the tool bar's Add palette coming next. Nothing changes on screen yet.
 
