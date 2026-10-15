@@ -1170,7 +1170,7 @@ export function initSitePlan(ctx) {
     map.on('touchmove', e => { if (at && Math.hypot(e.point.x - at.x, e.point.y - at.y) > 10) clearTimeout(lp); });
     map.on('touchend', () => clearTimeout(lp)); }
   document.addEventListener('pointerdown', e => { if (!cm.hidden && !cm.contains(e.target) && !cmSub.contains(e.target)) closeMenu(); }, true);
-  for (const ev of ['movestart', 'zoomstart', 'rotatestart']) map.on(ev, () => closeMenu());
+  for (const ev of ['movestart', 'zoomstart', 'rotatestart']) map.on(ev, e => { if (e.originalEvent) closeMenu(); }); // your own pan or zoom; not the map resizing as the panel redraws
   window.addEventListener('blur', () => closeMenu()); window.addEventListener('resize', () => closeMenu());
   ctx.planOpen = () => !!ed && ctx.view === 'map'; // the map's own right-click menu stays away while a plan is open (app.js)
 
