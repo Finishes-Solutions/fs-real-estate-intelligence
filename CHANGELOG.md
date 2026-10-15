@@ -5,6 +5,27 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 2:59 PM CT: Smoother, connected parking; bend drives and entrances; an Items list in Layers (55542e2, f430a4a, 03e357c)
+- **Paving is one smooth surface.**
+  - Drives, aisles, parking and entrances pour together, with one curb round the outside.
+  - The curb is rounded where a row ends and where an aisle meets a drive.
+  - Curves and slightly turned rows no longer show stair-steps. The paving also draws faster.
+- **Tidier layouts:**
+  - no aisles running on past the last stall;
+  - no drives that end in the grass (or in the rear landscape buffer);
+  - no leftover scraps of 3 or 4 stalls.
+- **Moving a building no longer wrecks the parking.** Moving a building, then letting the site re-fit, lays the drives and parking out again around it. Before, it could drop to 6 spaces of 120 needed.
+- **Bend drives and entrances.** Select a drive, an aisle or an entrance, then press **Edit Shape** (or right-click › Bend it).
+  - Drag its points, or the blue + to add a bend. Double-clicking a drive also adds a bend.
+  - **Width** and **Curve** set its size and how round the bends are.
+  - An entrance keeps its mouth on the street, comes in square to it, and flares out each side (**Mouth flare**).
+  - A main entrance you've bent stays the way in when the site re-fits: no second entrance is added.
+- **Stranded parking rows are flagged.** A parking row with no aisle beside it now says so, e.g. "Parking 9 has no aisle to drive in from".
+- **Items list:** the **Items** tab in the site plan's **Layers** lists every building, parking row, drive, pond and lawn under its layer.
+  - Click one to select it.
+  - Double-click (or the pencil, or F2) to rename it.
+  - The list follows what you select on the map.
+
 ### 12:46 PM CT: Drag pieces onto the site, draw any building shape, change a building's use; re-fit no longer over-parks (e840b22)
 - **Drag and drop from Add:** drag a tile from the tool bar's **Add** palette, or from the panel's Add section, onto the map.
   - The piece's outline follows the pointer at its real size, turned the way it will land.
