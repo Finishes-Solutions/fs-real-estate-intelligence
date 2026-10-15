@@ -3529,10 +3529,6 @@ table.who tr.nomatch td{border:0}
 .sp-ov-s i>.ln{display:block}.sp-ov-s i>.sep{display:none}
 @media (max-width:700px){.sp-ov-s i>.ln{display:inline}.sp-ov-s i>.sep{display:inline}}
 #card.sp-mode details.bsec:not([open]){gap:0}
-  #card .sp-head{grid-template-areas:"ttl act" "save save"}
-  #card .sp-save{justify-self:start;margin-top:2px}
-  #card .sp-save:not(.bad){display:none}
-}
 
 /* ---------- site plan map (round 2) ---------- */
 /* one baseline and one gutter: while planning, the legend sits 16 px in from the map's bottom left like the tool strip

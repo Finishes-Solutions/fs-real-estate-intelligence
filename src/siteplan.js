@@ -1059,7 +1059,8 @@ export function initSitePlan(ctx) {
       it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); if (!SP.isFree(el)) it('turn', 'Turn 90°', 'R');
       if (SHAPEABLE.includes(el.kind)) { sep(); it('shape', ed.shape === el.id ? 'Done shaping' : 'Edit shape'); it('addpt', 'Add point here', 'Double-click'); }
       if (rc) { sep(); it('pin', el.pinned ? 'Let it move' : 'Pin it', '', { tip: el.pinned ? 'Re-fitting may move it again' : 'Re-fitting keeps it where it is' }); }
-      sep(); it('fitsel', 'Fit selection', 'F'); if (card.querySelector('#spChg')) it('ai', 'Change with AI…'); }
+      sep(); it('fitsel', 'Fit selection', 'F'); if (card.querySelector('#spChg')) it('ai', 'Change with AI…');
+      if (el.kind === 'green') { sep(); it('add', 'Add here', '', { sub: 1 }); it('paste', 'Paste here', MOD + 'V', clip ? {} : { off: 'Copy a piece first' }); } } // a lawn is open land: you can add or paste onto it too
     else { head = 'Here'; it('add', 'Add here', '', { sub: 1 }); it('measure', 'Measure from here', 'M'); sep(); it('fitplan', 'Fit plan', '⇧F'); it('paste', 'Paste', MOD + 'V', clip ? {} : { off: 'Copy a piece first' }); }
     cm.innerHTML = '<div class="sp-cm-h">' + esc(head) + '</div>' + items.map(x => !x ? '<hr>' : '<button type="button" role="menuitem" data-c="' + x.id + '"' + (x.sub ? ' aria-haspopup="menu" aria-expanded="false"' : '') + (x.off ? ' aria-disabled="true"' : '') + (x.tip || x.off ? ' title="' + esc(x.tip || x.off) + '"' : '') + '><span>' + esc(x.label) + (x.off ? '<em>' + esc(x.off) + '</em>' : '') + '</span>' +
       (x.sub ? '<i aria-hidden="true">›</i>' : x.key ? '<kbd>' + esc(x.key) + '</kbd>' : '') + '</button>').join('').replace(/^(<div[^>]*>.*?<\/div>)<hr>|<hr>$/g, '$1');
