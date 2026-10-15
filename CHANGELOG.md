@@ -5,6 +5,20 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 12:46 PM CT: Drag pieces onto the site, draw any building shape, change a building's use; re-fit no longer over-parks (HASH)
+- **Drag and drop from Add:** drag a tile from the tool bar's **Add** palette, or from the panel's Add section, onto the map.
+  - The piece's outline follows the pointer at its real size, turned the way it will land.
+  - The outline turns red off the site.
+  - It lands where you let go. Esc, or letting go off the map, cancels.
+  - A plain click still drops it near the middle of the view.
+- **Draw a building any shape:** **Draw area › Building outline** draws a building corner by corner, with the plan's number of floors.
+  - To reshape an existing building, select it and press **Edit Shape**. Drag its points, or drag the small blue + on an edge to add a point. Double-clicking the outline also adds one.
+- **Change what a building is after it's placed:** the Selected box now starts with **Use**, **Floors** and **Type** (from the building library).
+  - Right-click a building, or several selected, for **Change use ›**.
+  - The parking need follows the new use, and the rest of the site re-fits. One Undo takes it back.
+- **Building shape for custom buildings:** it reads **Custom outline** for a reshaped or drawn building. Picking Bar, L-shaped, Courtyard or Tower turns it back into that shape.
+- **Re-fit fix:** re-fitting round buildings you've moved, resized or changed no longer over-parks the site. A pinned 25,000 sf retail building got about 165 spaces for 100 needed; it now gets about 107.
+
 ### 11:55 AM CT: Merged with the latest main; right-click menu fix (89b1a01, 1b6a1f9, 9f283be)
 - **Merged with everything else that landed today:**
   - the development pipeline layers;

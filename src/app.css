@@ -3242,7 +3242,7 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 .sp-tp-i span{display:grid;gap:1px}
 .sp-tp-i small,.sp-lrow small,.sp-tp-sw2 small{font-size:11px;color:var(--muted);font-weight:500}
 .sp-tp-sw{flex:none;width:16px;height:12px;border-radius:2px;border:1px solid rgba(11,13,12,.18)}
-.sp-tp-sw.k-green{background:#62b072}.sp-tp-sw.k-plaza{background:#d9c8a9}.sp-tp-sw.k-pond{background:#5b9bd1}.sp-tp-sw.k-drive{background:#7c8689}.sp-tp-sw.k-trail{background:#d9c7a0}
+.sp-tp-sw.k-building{background:#d0694c}.sp-tp-sw.k-green{background:#62b072}.sp-tp-sw.k-plaza{background:#d9c8a9}.sp-tp-sw.k-pond{background:#5b9bd1}.sp-tp-sw.k-drive{background:#7c8689}.sp-tp-sw.k-trail{background:#d9c7a0}
 .sp-tp-sw.k-keepout{border:1px dashed #9b3b32;background:repeating-linear-gradient(45deg,#9b3b32 0 1.5px,transparent 1.5px 4px)}
 .sp-tp-n{margin:6px 6px 2px;font-size:11.5px;line-height:1.4;color:var(--muted)}
 .sp-lrows{display:grid}
@@ -3716,3 +3716,14 @@ table.cmp tr.sub th{text-align:left;font-family:var(--font-mono);font-size:10px;
 /* the filter popup's help line scrolls with the sections (it used to ride in the pinned header) */
 .fpop .lfbody>.lfhelp{margin:0;padding:12px 18px 0}
 @media (max-width:700px){ .fpop .lfbody>.lfhelp{padding:10px 16px 0} }
+/* dragging an Add tile onto the site plan: the piece's outline at the map's scale (red off the site) and a chip by the pointer */
+.sp-dragghost{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2000;overflow:visible}
+.sp-dragghost polygon{display:none;fill:color-mix(in srgb,var(--ac) 38%,transparent);stroke:color-mix(in srgb,var(--ac) 80%,#0b0d0c);stroke-width:2;stroke-dasharray:6 4;stroke-linejoin:round}
+.sp-dragghost.on polygon{display:block}
+.sp-dragghost.off polygon{display:block;fill:rgba(198,60,48,.16);stroke:#c63c30}
+.sp-dragchip{position:fixed;left:0;top:0;z-index:2001;pointer-events:none;display:flex;align-items:center;gap:6px;padding:4px 9px 4px 4px;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);color:var(--text);font:600 12px/1.2 var(--font-display);box-shadow:0 6px 18px rgba(11,13,12,.18);white-space:nowrap}
+.sp-dragchip svg{width:22px;height:22px;box-sizing:border-box;padding:2px;border-radius:999px;background:color-mix(in srgb,var(--ac) 22%,transparent);color:color-mix(in srgb,var(--ac) 62%,#0b0d0c)}
+.sp-dragchip.on{opacity:.92}
+html.sp-dragging,html.sp-dragging *{cursor:var(--cur-grabbing,grabbing)!important;user-select:none!important}
+#card .sp-add,.sp-ad-t{cursor:var(--cur-grab,grab)}
+.sp-ad-t{touch-action:none}

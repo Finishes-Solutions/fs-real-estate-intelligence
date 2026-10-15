@@ -1045,12 +1045,44 @@ export function initSitePlan(ctx) {
   const addTiles = () => ADD_GROUPS.map(([g, ks]) => '<div class="sp-ad-g"><div class="sp-ad-gh">' + esc(g) + '</div><div class="sp-ad-ts">' + ks.map(k => '<button type="button" class="sp-ad-t" data-ak="' + k + '" title="' + esc(ADD_LABEL[k] || SP.KINDS[k]?.label || k) + '"><i class="sp-ad-ic" style="--c:' + addAccent(k) + '">' + (ADD_ICON[k] || ADD_ICON.building) + '</i><span>' + esc(ADD_SHORT[k] || k) + '</span></button>').join('') + '</div></div>').join('');
   function paintAdd() {
     pop.innerHTML = '<div class="sp-tp-h">Add to the plan</div><div class="sp-ad">' + addTiles() + '</div>' + (card.querySelector('#spLib') ? '<button type="button" class="sp-link sp-ad-lib" data-lib>From the building library…</button>' : '') +
-      '<div class="sp-tp-n">It lands in a clear spot near the middle of the view. Right-click the map to add one at a spot.</div>';
-    pop.querySelectorAll('[data-ak]').forEach(b => b.onclick = () => { closePops(); addPiece(b.dataset.ak); });
+      '<div class="sp-tp-n">Drag one onto the site to place it there, or click to drop it near the middle of the view.</div>';
+    pop.querySelectorAll('[data-ak]').forEach(b => { b.onclick = () => { closePops(); addPiece(b.dataset.ak); }; dragToAdd(b, b.dataset.ak); });
     const lb = pop.querySelector('[data-lib]'); if (lb) lb.onclick = () => { closePops(); const s = card.querySelector('#spLib'); if (!s) return; s.scrollIntoView({ block: 'center' }); s.focus(); try { s.showPicker?.(); } catch (e) {} };
   }
   // a piece from the Add palette or the right-click menu: adding is editing, so Edit comes on (at: where, in plan feet)
   function addPiece(kind, at) { if (!ed) return; if (!ed.editing) ed.editing = true; ed.shape = null; addEl(kind, at); }
+  // drag an Add tile (the palette's or the panel's) onto the map: its outline follows the pointer at the map's scale and
+  // turned as it will land, red off the site, and it's added where you let go. A plain click still adds it mid-view; Esc
+  // or letting go off the map cancels. The palette steps aside while you drag.
+  const addSize = (pl, kind) => { if (kind !== 'building') return SIZE[kind] || [40, 40]; const pg = SP.normalizeProgram(pl.program); return [Math.round(Math.max(40, Math.min(240, 12000 / pg.depth))), Math.round(Math.min(pg.depth, 160))]; };
+  function dragToAdd(b, kind) {
+    let dragged = false;
+    b.addEventListener('click', ev => { if (dragged) { dragged = false; ev.stopImmediatePropagation(); ev.preventDefault(); } }, true); // the click that ends a drag back on the tile adds nothing
+    b.addEventListener('pointerdown', e0 => {
+      if (e0.button !== 0 || !ed || b.getAttribute('aria-disabled')) return; const pl0 = PL(); if (!pl0 || pl0.ring.length < 3) return;
+      let on = false, spot = null, ghost = null, chip = null; const inPop = pop.contains(b), x0 = e0.clientX, y0 = e0.clientY;
+      const start = () => { on = true; dragged = true; closeMenu();
+        ghost = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); ghost.setAttribute('class', 'sp-dragghost'); ghost.innerHTML = '<polygon/>'; ghost.style.setProperty('--ac', addAccent(kind));
+        chip = document.createElement('div'); chip.className = 'sp-dragchip'; chip.style.setProperty('--ac', addAccent(kind)); chip.innerHTML = ADD_ICON[kind] + '<span>' + esc(ADD_SHORT[kind] || kind) + '</span>';
+        document.body.append(ghost, chip); document.documentElement.classList.add('sp-dragging'); if (inPop) pop.style.visibility = 'hidden'; };
+      const place = (x, y) => {
+        chip.style.transform = 'translate(' + Math.round(x + 14) + 'px,' + Math.round(y + 14) + 'px)';
+        const pl = PL(), mc = map.getContainer(), r = mc.getBoundingClientRect(), t = document.elementFromPoint(x, y);
+        spot = null; ghost.classList.remove('on', 'off'); if (!pl || !t || !t.classList.contains('maplibregl-canvas')) { chip.classList.remove('on'); return; }
+        const F = SP.frame(pl.origin), at = F.toFt(map.unproject([x - r.left, y - r.top]).toArray()), inSite = SP.inRing(at, pl.ring), { rot } = addAt(pl, at), [w, d] = addSize(pl, kind);
+        const pts = SP.outline({ kind: kind === 'pad' ? 'building' : kind, x: at[0], y: at[1], w, d, rot }).map(q => { const p = map.project(F.toLL(q)); return (p.x + r.left).toFixed(1) + ',' + (p.y + r.top).toFixed(1); });
+        ghost.firstChild.setAttribute('points', pts.join(' ')); ghost.classList.add(inSite ? 'on' : 'off'); chip.classList.add('on'); spot = { at, inSite };
+      };
+      const move = e => { if (e.pointerId !== e0.pointerId) return; if (!on) { if (Math.hypot(e.clientX - x0, e.clientY - y0) < 6) return; start(); } e.preventDefault(); place(e.clientX, e.clientY); };
+      const end = drop => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', cancel); removeEventListener('keydown', key, true);
+        if (!on) return; ghost.remove(); chip.remove(); document.documentElement.classList.remove('sp-dragging'); if (inPop) pop.style.visibility = '';
+        if (!drop || !spot) return; if (!spot.inSite) { ctx.toast('Drop it inside the site.'); return; }
+        if (inPop) closePops(); addPiece(kind, spot.at); };
+      const up = e => { if (e.pointerId === e0.pointerId) end(true); }, cancel = e => { if (e.pointerId === e0.pointerId) end(false); };
+      const key = e => { if (e.key === 'Escape' && on) { e.preventDefault(); e.stopPropagation(); end(false); } };
+      addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', cancel); addEventListener('keydown', key, true);
+    });
+  }
   // arrows step through a pop-over's tiles and buttons (and the right-click menu's), Home and End to the ends
   function stepFocus(box, e, wrap = true) {
     const all = [...box.querySelectorAll('button:not([disabled]):not([aria-disabled]), input')].filter(b => b.offsetParent !== null), i = all.indexOf(document.activeElement); if (!all.length) return false;
@@ -1096,8 +1128,10 @@ export function initSitePlan(ctx) {
     const set = el ? sels() : [], items = [], it = (id, label, key = '', x = {}) => items.push({ id, label, key, ...x }), sep = () => items.push(0), rc = !!pl.recipe;
     let head = '';
     if (set.length > 1) { const pins = set.every(id => pl.elements.find(x => x.id === id)?.pinned); head = plural(set.length, 'piece') + ' selected';
+      if (set.some(id => pl.elements.find(x => x.id === id)?.kind === 'building')) { it('use', 'Change use', '', { sub: 1 }); sep(); }
       it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); if (rc) it('pin', pins ? 'Let them move' : 'Pin them', '', { tip: pins ? 'Re-fitting may move them again' : 'Re-fitting keeps them where they are' }); sep(); it('fitsel', 'Fit selection', 'F'); }
     else if (el) { const nm = ED.labelOf(el), kl = SP.KINDS[el.kind]?.label || ''; head = nm + (kl && !nm.toLowerCase().includes(kl.toLowerCase()) ? ' · ' + kl.toLowerCase() : '');
+      if (el.kind === 'building') { it('use', 'Change use', '', { sub: 1 }); sep(); } // retail, office, restaurant…: its parking need follows
       it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); if (!SP.isFree(el)) it('turn', 'Turn 90°', 'R');
       if (SHAPEABLE.includes(el.kind)) { sep(); it('shape', ed.shape === el.id ? 'Done shaping' : 'Edit shape'); it('addpt', 'Add point here', 'Double-click'); }
       if (rc) { sep(); it('pin', el.pinned ? 'Let it move' : 'Pin it', '', { tip: el.pinned ? 'Re-fitting may move it again' : 'Re-fitting keeps it where it is' }); }
@@ -1107,7 +1141,7 @@ export function initSitePlan(ctx) {
     cm.innerHTML = '<div class="sp-cm-h">' + esc(head) + '</div>' + items.map(x => !x ? '<hr>' : '<button type="button" role="menuitem" data-c="' + x.id + '"' + (x.sub ? ' aria-haspopup="menu" aria-expanded="false"' : '') + (x.off ? ' aria-disabled="true"' : '') + (x.tip || x.off ? ' title="' + esc(x.tip || x.off) + '"' : '') + '><span>' + esc(x.label) + (x.off ? '<em>' + esc(x.off) + '</em>' : '') + '</span>' +
       (x.sub ? '<i aria-hidden="true">›</i>' : x.key ? '<kbd>' + esc(x.key) + '</kbd>' : '') + '</button>').join('').replace(/^(<div[^>]*>.*?<\/div>)<hr>|<hr>$/g, '$1');
     cmFt = ft; cmEl = el; cmBack = document.activeElement !== document.body ? document.activeElement : null;
-    cm.querySelectorAll('[data-c]').forEach(b => { b.onclick = () => { if (!b.getAttribute('aria-disabled')) menuAct(b.dataset.c, b); }; if (b.dataset.c === 'add') b.onpointerenter = () => openSub(b); else b.onpointerenter = () => closeSub(); });
+    cm.querySelectorAll('[data-c]').forEach(b => { b.onclick = () => { if (!b.getAttribute('aria-disabled')) menuAct(b.dataset.c, b); }; if (b.hasAttribute('aria-haspopup')) b.onpointerenter = () => openSub(b); else b.onpointerenter = () => closeSub(); });
     const r = map.getContainer().getBoundingClientRect(); cm.hidden = false; const w = cm.offsetWidth, hh = cm.offsetHeight;
     let x = r.left + point.x + 2, y = r.top + point.y + 2; if (x + w > innerWidth - 8) x = Math.max(8, x - w - 4); if (y + hh > innerHeight - 8) y = Math.max(8, innerHeight - hh - 8);
     Object.assign(cm.style, { left: Math.round(x) + 'px', top: Math.round(y) + 'px' });
@@ -1115,16 +1149,32 @@ export function initSitePlan(ctx) {
   }
   cm.tabIndex = -1;
   function openSub(b) {
-    if (!cmSub.hidden) return; cmSub.innerHTML = '<div class="sp-cm-h">Add here</div><div class="sp-ad">' + addTiles() + '</div>'; cmSub.hidden = false; b.setAttribute('aria-expanded', 'true');
-    cmSub.querySelectorAll('[data-ak]').forEach(t => t.onclick = () => { const at = cmFt; closeMenu(); addPiece(t.dataset.ak, at); });
+    if (!cmSub.hidden && cmSub.dataset.for === b.dataset.c) return; closeSub(); cmSub.dataset.for = b.dataset.c;
+    if (b.dataset.c === 'use') { // the selected buildings' use: the current one ticked
+      const pl = PL(), bs = sels().map(id => pl.elements.find(x => x.id === id)).filter(x => x?.kind === 'building'), u0 = SP.normalizeProgram(pl.program).use, cur = new Set(bs.map(x => x.use || u0));
+      cmSub.setAttribute('aria-label', 'Change use');
+      cmSub.innerHTML = '<div class="sp-cm-h">Use</div>' + Object.entries(SP.USES).map(([k, u]) => '<button type="button" role="menuitemradio" aria-checked="' + (cur.size === 1 && cur.has(k)) + '" data-uk="' + k + '"><span>' + esc(u.label) + '</span>' + (cur.size === 1 && cur.has(k) ? '<i aria-hidden="true">✓</i>' : '') + '</button>').join('');
+      cmSub.querySelectorAll('[data-uk]').forEach(t => t.onclick = () => { closeMenu(); setUse(bs.map(x => x.id), t.dataset.uk); });
+    } else {
+      cmSub.setAttribute('aria-label', 'Add here'); cmSub.innerHTML = '<div class="sp-cm-h">Add here</div><div class="sp-ad">' + addTiles() + '</div>';
+      cmSub.querySelectorAll('[data-ak]').forEach(t => t.onclick = () => { const at = cmFt; closeMenu(); addPiece(t.dataset.ak, at); });
+    }
+    cmSub.hidden = false; b.setAttribute('aria-expanded', 'true');
     const a = b.getBoundingClientRect(), w = cmSub.offsetWidth, h = cmSub.offsetHeight; let x = a.right + 4, y = a.top - 6; if (x + w > innerWidth - 8) x = Math.max(8, a.left - w - 4); if (y + h > innerHeight - 8) y = Math.max(8, innerHeight - h - 8);
     Object.assign(cmSub.style, { left: Math.round(x) + 'px', top: Math.round(y) + 'px' });
   }
-  function closeSub() { if (cmSub.hidden) return; cmSub.hidden = true; cmSub.innerHTML = ''; cm.querySelector('[data-c="add"]')?.setAttribute('aria-expanded', 'false'); }
+  function closeSub() { if (cmSub.hidden) return; cmSub.hidden = true; cmSub.innerHTML = ''; delete cmSub.dataset.for; cm.querySelectorAll('[aria-haspopup]').forEach(x => x.setAttribute('aria-expanded', 'false')); }
+  // a building's use (or several at once): one undo step, then the parking and the rest re-fit to the new need
+  function setUse(ids, use) {
+    const pl = PL(); if (!pl || !ids.length || !SP.USES[use]) return; ensureEdit();
+    change(x => { for (const q of x.elements) if (ids.includes(q.id) && q.kind === 'building') { q.use = use; if (!SP.USES[use].garage) delete q.units; q.pinned = true; } });
+    draw(); panel(); const lbl = ids.length > 1 ? plural(ids.length, 'building') : ED.labelOf(pl.elements.find(q => q.id === ids[0]));
+    ctx.toast(lbl + ' is now ' + SP.USES[use].label.toLowerCase() + '.'); refitSoon('Changed', lbl);
+  }
   function closeMenu(refocus) { if (cm.hidden) return; closeSub(); cm.hidden = true; cm.innerHTML = ''; if (refocus && cmBack?.isConnected) try { cmBack.focus({ preventScroll: true }); } catch (e) {} cmBack = null; }
   function menuAct(id, b) {
     const pl = PL(), ft = cmFt, el = cmEl; if (!pl) return;
-    if (id === 'add') { openSub(b); cmSub.querySelector('[data-ak]')?.focus({ preventScroll: true }); return; }
+    if (id === 'add' || id === 'use') { openSub(b); cmSub.querySelector('[data-ak], [aria-checked="true"], [data-uk]')?.focus({ preventScroll: true }); return; }
     closeMenu();
     if (id === 'dup') { ensureEdit(); dupSel(); } else if (id === 'copy') copySel(); else if (id === 'del') { ensureEdit(); delEls(sels()); }
     else if (id === 'turn' && el) { ensureEdit(); turnEl(el); }
@@ -1141,10 +1191,11 @@ export function initSitePlan(ctx) {
   // keys while the menu is open: arrows and Home/End move, → and ← open and close Add here, Esc closes, Tab leaves
   function menuKey(e) {
     const k = e.key, inSub = !cmSub.hidden && cmSub.contains(document.activeElement), stop = () => { e.preventDefault(); e.stopPropagation(); };
-    if (k === 'Escape') { stop(); if (inSub) { closeSub(); cm.querySelector('[data-c="add"]')?.focus({ preventScroll: true }); } else closeMenu(true); return; }
+    const parent = () => cm.querySelector('[aria-expanded="true"]') || cm.querySelector('[aria-haspopup]');
+    if (k === 'Escape') { stop(); if (inSub) { const pb = parent(); closeSub(); pb?.focus({ preventScroll: true }); } else closeMenu(true); return; }
     if (k === 'Tab') { stop(); closeMenu(true); return; }
-    if (inSub && k === 'ArrowLeft') { stop(); closeSub(); cm.querySelector('[data-c="add"]')?.focus({ preventScroll: true }); return; }
-    if (!inSub && k === 'ArrowRight' && document.activeElement?.dataset.c === 'add') { stop(); menuAct('add', document.activeElement); return; }
+    if (inSub && k === 'ArrowLeft') { stop(); const pb = parent(); closeSub(); pb?.focus({ preventScroll: true }); return; }
+    if (!inSub && k === 'ArrowRight' && document.activeElement?.hasAttribute('aria-haspopup')) { stop(); menuAct(document.activeElement.dataset.c, document.activeElement); return; }
     if (/^(ArrowUp|ArrowDown|Home|End)$/.test(k) || inSub && k === 'ArrowRight') { stepFocus(inSub ? cmSub : cm, e); return; }
     if (k === 'Enter' || k === ' ') return; // the focused item's own click
     stop();
@@ -1392,7 +1443,7 @@ export function initSitePlan(ctx) {
     on('#spChgGo', aiChange); const cf = $('#spChgFit'); if (cf) cf.onchange = () => { ed.chgFit = cf.checked; }; wireChg();
     wireVariants();
     on('#spStaleRefit', () => refitNow(true)); on('#spStaleNew', () => resolve({ force: true, src: '#spStaleNew' }));
-    card.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { ed.editing = true; addEl(b.dataset.add); }); // adding a piece is editing
+    card.querySelectorAll('[data-add]').forEach(b => { b.onclick = () => { ed.editing = true; addEl(b.dataset.add); }; dragToAdd(b, b.dataset.add); }); // adding a piece is editing
     const lib = $('#spLib'); if (lib) lib.onchange = () => { const t = typeById(lib.value); if (t) { ed.editing = true; addType(t); } };
     on('#spEdit', () => { ed.editing = !ed.editing; draw(); panel(); });
     on('#spFront', () => { ed.mode = ed.mode === 'front' ? null : 'front'; panel(); });
@@ -1687,14 +1738,13 @@ export function initSitePlan(ctx) {
       '<div class="sp-acts">' + (free ? '' : '<button type="button" class="btn sm" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) ? '<button type="button" class="btn sm" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="Drag its points; drag a blue + to add a point; double-click a point to remove it">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') +
         (rc ? '<button type="button" class="btn sm" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button type="button" class="btn sm" id="spDup" title="Copy it beside itself (⌘D / Ctrl+D)">Duplicate</button><button type="button" class="btn sm" id="spAskSel" title="Say what to change about this piece">Change With AI</button><button type="button" class="btn sm ghost sp-del" id="spDel" title="Delete it (Delete)">Delete</button></div>' +
       (!ed.editing ? '<div class="rnote sp-1l">Turn on <b>Edit Layout</b> to change it.</div>' : rc && e.pinned ? '<div class="sp-pin"><span class="rnote">Pinned: <b>Re-fit Plan</b> keeps it where it is.</span><button type="button" class="btn sm" id="spUnpin" title="Re-fit Plan may move it again">Let It Move</button></div>' : '') +
-      '<div class="sp-fg">' + (free ? '' : n('w', 'Width', Math.round(e.w), { min: 8, unit: 'ft' }) + n('d', 'Depth', Math.round(e.d), { min: 8, unit: 'ft' }) + n('rot', 'Turn', (Math.round(e.rot || 0) % 360 + 360) % 360, { unit: '°' })) +
-        (e.kind === 'building' ? n('floors', 'Floors', e.floors || 1, { min: 1, max: 40 }) +
-          pick('data-use="1"', 'Use', Object.entries(SP.USES).map(([k, u]) => [k, u.label]), e.use || prog.use) +
-          (SP.USES[e.use || prog.use]?.garage ? n('units', 'Homes', e.units || 1, { min: 1, max: 40 }) : '') +
-          pick('data-form="1"', 'Building shape', FORMS, e.form || 'bar') + (e.form === 'tower' ? n('podium', 'Podium floors', e.podium || 2, { min: 1, max: 6 }) : '') : '') +
+      '<div class="sp-fg">' + (e.kind === 'building' ? pick('data-use="1"', 'Use', Object.entries(SP.USES).map(([k, u]) => [k, u.label]), e.use || prog.use) + n('floors', 'Floors', e.floors || 1, { min: 1, max: 40 }) +
+          fld('Type', '<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '') + '</select>', { wide: true }) : '') + // what it is first: use and type can change any time
+        (free ? '' : n('w', 'Width', Math.round(e.w), { min: 8, unit: 'ft' }) + n('d', 'Depth', Math.round(e.d), { min: 8, unit: 'ft' }) + n('rot', 'Turn', (Math.round(e.rot || 0) % 360 + 360) % 360, { unit: '°' })) +
+        (e.kind === 'building' ? (SP.USES[e.use || prog.use]?.garage ? n('units', 'Homes', e.units || 1, { min: 1, max: 40 }) : '') +
+          pick('data-form="1"', 'Building shape', e.poly ? [['custom', 'Custom outline'], ...FORMS] : FORMS, e.poly ? 'custom' : e.form || 'bar') + (e.form === 'tower' && !e.poly ? n('podium', 'Podium floors', e.podium || 2, { min: 1, max: 6 }) : '') : '') +
         (e.kind === 'garage' ? n('levels', 'Levels', e.levels || 4, { min: 1, max: 12 }) : '') +
         (['pond', 'pool', 'green', 'plaza', 'court'].includes(e.kind) ? pick('data-shape="1"', 'Shape', [['organic', 'Natural curves'], ['rounded', 'Rounded rectangle'], ['square', 'Rectangle']], e.poly ? 'organic' : e.shape === 'round' ? 'rounded' : 'square') : '') +
-        (e.kind === 'building' ? fld('Type', '<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '') + '</select>', { wide: true }) : '') +
         fld('Name', '<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A">', { wide: true }) + '</div></fieldset>';
   }
   // several pieces picked: how many, what they cover, and what can be done to all of them at once (each one undo step)
@@ -1734,8 +1784,8 @@ export function initSitePlan(ctx) {
     const up1 = card.querySelector('#spUnpin'); if (up1) up1.onclick = () => change(() => { delete e.pinned; });
     const rf = card.querySelector('#spRefit'); if (rf) rf.onclick = () => refitNow(true);
     card.querySelector('[data-type]')?.addEventListener('change', ev => { const t = typeById(ev.target.value); if (!t) return; change(() => { const keep = { id: e.id, name: e.name, rot: e.rot }; for (const k of ['poly', 'form', 'wing', 'podium', 'unitW', 'sf', 'units', 'jog', 'shape']) delete e[k]; Object.assign(e, fromType(t, [e.x, e.y], e.rot || 0), keep, { pinned: true }); makeRoom(e); }); ed.shape = null; draw(); panel(); }); // the same spot, another building from the library
-    card.querySelector('[data-use]')?.addEventListener('change', ev => change(() => { e.use = ev.target.value; }));
-    card.querySelector('[data-form]')?.addEventListener('change', ev => { change(() => { const f = ev.target.value; if (f === 'bar') delete e.form; else e.form = f; if (f === 'tower') { e.podium = e.podium || 2; e.floors = Math.max(e.floors || 1, 8); } if ((f === 'L' || f === 'U') && e.d < 100) e.d = Math.min(150, e.d * 2); e.pinned = true; }); panel(); refitSoon(); });
+    card.querySelector('[data-use]')?.addEventListener('change', ev => setUse([e.id], ev.target.value));
+    card.querySelector('[data-form]')?.addEventListener('change', ev => { if (ev.target.value === 'custom') return; change(() => { const f = ev.target.value; delete e.poly; if (f === 'bar') delete e.form; else e.form = f; if (f === 'tower') { e.podium = e.podium || 2; e.floors = Math.max(e.floors || 1, 8); } if ((f === 'L' || f === 'U') && e.d < 100) e.d = Math.min(150, e.d * 2); e.pinned = true; }); panel(); refitSoon(); });
     card.querySelector('[data-name]')?.addEventListener('change', ev => change(() => { e.name = ev.target.value.trim().slice(0, 40); }, true));
     if (card.querySelector('#spRot')) card.querySelector('#spRot').onclick = () => turnEl(e);
     const shp = card.querySelector('#spShape'); if (shp) shp.onclick = () => { // its outline as points to drag: any shape, in plan

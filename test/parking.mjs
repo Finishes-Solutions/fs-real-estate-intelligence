@@ -76,5 +76,14 @@ for (const [what, plan, prog] of cases) {
   const o = L.layoutOptions(lot(640, 400, { params: { fill: false } }), { use: 'retail', gfa: 25000 })[0], f = L.frontage(small, o.elements);
   assert.ok(f && f.face === 1 && f.walk < 90, 'the best option faces the street with its parking by the doors: ' + JSON.stringify(f));
 }
+// ---- a re-fit round pinned buildings (moved, resized or given a new use: every edit pins) parks their need, not the whole lot ----
+{
+  const o = L.layoutOptions(small, { use: 'retail', gfa: 25000 })[0], pl = { ...small, program: { use: 'retail', gfa: 25000 }, elements: o.elements, recipe: o.recipe }, m0 = S.metrics(pl);
+  for (const use of ['retail', 'office']) {
+    const p = structuredClone(pl); for (const e of p.elements) if (e.kind === 'building') { e.pinned = true; e.use = use; }
+    const r = L.refit(p, { amount: 'current' }), m = S.metrics({ ...p, elements: r.elements });
+    assert.ok(m.spaces >= m.required && m.spaces <= Math.ceil(m.required * 1.15) + 4, use + ' pinned: ' + m.spaces + ' spaces for ' + m.required + ' needed (layout had ' + m0.spaces + ' for ' + m0.required + ')');
+  }
+}
 if (process.env.PARKING_TABLE) console.log(table.map(r => r.join(' | ')).join('\n'));
 console.log('parking ok');

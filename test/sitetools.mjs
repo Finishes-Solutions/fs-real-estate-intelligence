@@ -120,6 +120,11 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
   const k = T.areaPiece(p, 'keepout', [[0, 0], [0, 420], [30, 420], [30, 0]], 'k1'); // drawn clockwise: stored counter-clockwise
   assert.ok(S.signedArea(k.poly) > 0 && k.pinned && k.name === 'Easement 1' && Math.abs(S.elArea(k) - 30 * 420) < 1);
   assert.equal(T.areaPiece({ elements: [k] }, 'keepout', [[100, 100], [140, 100], [140, 140]], 'k2').name, 'Easement 2');
+  { // a building drawn corner by corner (an L): its own outline, the program's floors, measured like any building
+    const L0 = [[20, 20], [20, 120], [60, 120], [60, 60], [140, 60], [140, 20]], b = T.areaPiece({ ...p, program: { floors: 3 } }, 'building', L0, 'b1');
+    assert.equal(T.areaError(p, L0, 'building'), ''); assert.ok(b.kind === 'building' && b.floors === 3 && b.pinned && b.poly.length === 6 && S.isFree(b));
+    assert.ok(Math.abs(S.elArea(b) - (40 * 100 + 80 * 40)) < 1, 'the L outline’s area, not its box’s');
+    assert.ok(T.AREA_KINDS.some(([k]) => k === 'building'), 'offered in Draw an area'); }
   const d = T.linePiece(p, 'drive', [[0, 100], [200, 100], [300, 200]], 'd1'); assert.ok(d.path && d.width === 26 && d.pinned && finite(d) && Math.abs(d.x - T.pathLen(d.path) / 2) < 0.02 && d.y === 100, 'a drive: a 26 ft path, its point halfway along');
   assert.equal(T.linePiece(p, 'trail', [[10, 10], [80, 10]], 't1').width, 6);
 }
