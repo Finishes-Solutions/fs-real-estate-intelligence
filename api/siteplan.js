@@ -7,6 +7,11 @@
 //        the engine's options judged as a land planner would (drawings and numbers); a revised program to lay out again
 //   POST { mode: 'bestuse', prompt?, site, facts, nearby, market } -> { ideas: [{ title, use, fit, why, risks, request }], summary }
 //        what should go on the site, from what's known about it, each idea a request the builder can lay out
+//   POST { mode: 'ask', question, history: [{ q, a }], plan: {...facts}, effort } -> { answer, followups }
+//        a question about the open plan, answered from the fact sheet the browser computed (lib/planask.mjs planFacts)
+// effort (program, review and ask): how hard the model thinks, 'low' | 'medium' | 'high' (the effort level picked under
+// Build; Ultra sends high); missing or unknown keeps the default (high, medium for ask). review also takes rounds (1-3,
+// default 2): the last round never revises.
 // site: { acres, widthFt, depthFt, frontageFt, address, city, county, zoning }; facts: short lines (flood zone, roads
 // and traffic, districts, utilities, environmental records).
 import { chatJSON, pickModel } from '../lib/openai.mjs';
@@ -17,6 +22,7 @@ import { typeById } from '../lib/buildings.mjs';
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
 
 let modelP = null;
+const EFFORTS = ['low', 'medium', 'high'], effortIn = (v, d) => EFFORTS.includes(v) ? v : d; // OpenAI reasoning_effort, from an allow-list
 const model = key => (modelP ||= pickModel(key, process.env.OPENAI_MODEL).catch(e => { modelP = null; throw e; }));
 
 const n = description => ({ type: ['number', 'null'], description });
@@ -132,9 +138,10 @@ export default async function handler(req, res) {
   if (b.mode === 'review') return review(b, key, res);
   if (b.mode === 'bestuse') return bestUse(b, key, res);
   if (b.mode === 'edit') return edit(b, key, res);
+  if (b.mode === 'ask') return ask(b, key, res);
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
-    const r = await chatJSON({ key, model: await model(key), system: SYSTEM, user: siteText(b.site, prompt, b.program, b.facts), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: 'high' }); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
+    const r = await chatJSON({ key, model: await model(key), system: SYSTEM, user: siteText(b.site, prompt, b.program, b.facts), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: effortIn(b.effort, 'high') }); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
     const d = r.data, sb = Object.fromEntries(Object.entries(d.setbacks || {}).filter(([, v]) => v != null && v >= 0 && v <= 300)), program = programFrom(d, prompt);
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ program, setbacks: { ...SETBACKS, ...sb }, summary: clip(d.summary, 400), assumptions: (d.assumptions || []).slice(0, 4).map(a => clip(a, 200)) });
@@ -147,14 +154,15 @@ export default async function handler(req, res) {
 // the engine's options, judged on their drawings and numbers; a revised program when one would clearly do better
 const num = v => Number.isFinite(+v) ? +v : null;
 async function review(b, key, res) {
-  const prompt = clip(b.prompt, 1200).trim(), opts = (Array.isArray(b.options) ? b.options : []).slice(0, 6), last = (+b.round || 1) >= 2;
+  const rounds = Math.max(1, Math.min(3, Math.round(+b.rounds) || 2)), round = Math.max(1, Math.round(+b.round) || 1), last = round >= rounds; // Medium: one round (no revise); Ultra: up to three
+  const prompt = clip(b.prompt, 1200).trim(), opts = (Array.isArray(b.options) ? b.options : []).slice(0, 6);
   if (!opts.length) return res.status(400).json({ error: 'Nothing to review.' });
   const images = opts.map(o => typeof o.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(o.image) && o.image.length < 600000 ? o.image : null);
-  const text = JSON.stringify({ request: prompt || null, round: last ? 'last (do not revise)' : 'first', site: JSON.parse(siteText(b.site, '', null, b.facts)).site, currentProgram: b.program || null,
+  const text = JSON.stringify({ request: prompt || null, round: last ? 'last (do not revise)' : round === 1 ? 'first' : round + ' of ' + rounds + ' (revise again only if it clearly helps)', site: JSON.parse(siteText(b.site, '', null, b.facts)).site, currentProgram: b.program || null,
     options: opts.map((o, i) => ({ option: i, name: clip(o.name, 120), drawing: images[i] ? 'image ' + (images.slice(0, i + 1).filter(Boolean).length) : 'none', metrics: Object.fromEntries(Object.entries(o.metrics || {}).slice(0, 16).map(([k, v]) => [clip(k, 30), num(v)])),
       issues: (o.issues || []).slice(0, 8).map(t => clip(t, 160)), notes: (o.notes || []).slice(0, 6).map(t => clip(t, 240)) })) });
   try {
-    const r = await chatJSON({ key, model: await model(key), system: REVIEW_SYSTEM, user: text, name: 'site_review', schema: REVIEW_SCHEMA, maxTokens: 20000, effort: 'high', images: images.filter(Boolean) });
+    const r = await chatJSON({ key, model: await model(key), system: REVIEW_SYSTEM, user: text, name: 'site_review', schema: REVIEW_SCHEMA, maxTokens: 20000, effort: effortIn(b.effort, 'high'), images: images.filter(Boolean) });
     const d = r.data, n = opts.length, ok = i => Number.isInteger(i) && i >= 0 && i < n;
     const ranking = [...new Set((d.ranking || []).filter(ok))]; for (let i = 0; i < n; i++) if (!ranking.includes(i)) ranking.push(i);
     const reviews = (d.reviews || []).filter(x => ok(x.option)).map(x => ({ option: x.option, score: Math.max(0, Math.min(100, Math.round(+x.score || 0))), verdict: clip(x.verdict, 300), strengths: (x.strengths || []).slice(0, 3).map(t => clip(t, 200)), problems: (x.problems || []).slice(0, 4).map(t => clip(t, 220)) }));
@@ -232,5 +240,49 @@ async function edit(b, key, res) {
   } catch (e) {
     console.error('siteplan edit', e.message);
     return res.status(502).json({ error: 'The AI didn’t answer just now.' });
+  }
+}
+
+// ---------- questions about the open plan ----------
+export const ASK_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['answer', 'followups'],
+  properties: {
+    answer: str('The answer, in plain words: two to five sentences, or a short list (lines starting "- ") for a breakdown.'),
+    followups: strs('Up to 3 short questions the user might ask next about this plan, answerable from the same facts, in their words. Empty when none.')
+  }
+};
+export const ASK_SYSTEM = `You are a land planner and development analyst explaining one concept site plan to the person who made it, in a site-planning tool used by a commercial construction company in the Houston region. You get a fact sheet the tool computed for the plan on the screen: the site and zoning, the request and the program it was read as, setbacks, the totals, parking needed and provided with the rule each use is counted by, the stormwater storage needed and what the ponds hold, the checks, the pieces with where they sit (at = [feet across the frontage from the street's left end, feet back from the street]), the pro forma's numbers and assumptions, and notes from the last build (how the request was read, the layout engine's notes, the AI review).
+- Answer the question about THIS plan from those facts, and explain the why: the rule or number that drives it, with the arithmetic when it helps ("25,000 sq ft of retail at 4 spaces per 1,000 sq ft = 100 spaces").
+- Use only the facts given. Never invent numbers, codes, costs or reasons. When the facts don't say (why a piece sits where it does, a city's own requirement), say plainly that the plan doesn't record it, then give what the facts do show and what would settle it (the city's code, a survey, a civil engineer, a market study).
+- Parking ratios, the 0.55 acre-feet a developed acre of storage and the pro forma's numbers are typical starting assumptions in this tool, not a city's requirement or a quote: say so when it matters, and where to change them (Settings, the Pro forma assumptions, Change with AI).
+- Short and plain, as you'd say it to a developer: two to five sentences, or a short list. No headings, no markdown beyond "- " list lines. Never claim code compliance; this is a concept.
+- If the question isn't about this plan or site, say briefly that you can only answer about the plan that's open.`;
+// the fact sheet as sent: plain values only, strings, arrays and depth kept short
+function tidy(v, d = 0) {
+  if (v == null) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null;
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'string') return clip(v, 700);
+  if (d >= 6 || typeof v !== 'object') return null;
+  if (Array.isArray(v)) return v.slice(0, 80).map(x => tidy(x, d + 1));
+  return Object.fromEntries(Object.entries(v).slice(0, 40).map(([k, x]) => [clip(k, 48), tidy(x, d + 1)]));
+}
+async function ask(b, key, res) {
+  const question = clip(b.question, 600).trim(), plan = b.plan && typeof b.plan === 'object' && !Array.isArray(b.plan) ? tidy(b.plan) : null;
+  if (!question) return res.status(400).json({ error: 'Ask a question about the plan.' });
+  if (!plan) return res.status(400).json({ error: 'Open a plan first.' });
+  let facts = JSON.stringify(plan); if (facts.length > 48000 && Array.isArray(plan.pieces)) { plan.pieces = plan.pieces.slice(0, 25); facts = JSON.stringify(plan); }
+  if (facts.length > 60000) facts = facts.slice(0, 60000); // still too big: cut (the model reads what's there)
+  const history = (Array.isArray(b.history) ? b.history : []).slice(-6).map(t => ({ q: clip(t?.q, 600), a: clip(t?.a, 1500) })).filter(t => t.q && t.a);
+  const user = 'Fact sheet for the plan on the screen:\n' + facts + (history.length ? '\n\nEarlier in this conversation:\n' + history.map(t => 'Q: ' + t.q + '\nA: ' + t.a).join('\n\n') : '') + '\n\nQuestion: ' + question;
+  try {
+    const r = await chatJSON({ key, model: await model(key), system: ASK_SYSTEM, user, name: 'plan_answer', schema: ASK_SCHEMA, maxTokens: 12000, effort: effortIn(b.effort, 'medium') });
+    const d = r.data, answer = clip(d.answer, 2400).trim();
+    if (!answer) throw new Error('empty answer');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ answer, followups: (d.followups || []).map(t => clip(t, 160).trim()).filter(Boolean).slice(0, 3) });
+  } catch (e) {
+    console.error('siteplan ask', e.message);
+    return res.status(502).json({ error: 'The AI didn’t answer just now. Try again in a moment.' });
   }
 }

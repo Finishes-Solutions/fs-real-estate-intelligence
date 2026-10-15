@@ -52,11 +52,11 @@ assert.deepEqual(freeRect(M1440, { ...base, corners: [R(16, 860, 252, 860)] }), 
 // ---- the panel's sections, in order (the chips are made from the same list) ----
 const ids = o => planSections(o).map(s => s.id).join(' ');
 assert.equal(ids({}), 'spParams spAiSec spSiteSec spDrawSec', 'before a layout: settings, build, site, add');
-assert.equal(ids({ laidOut: true }), 'spParams spAiSec spChgSec spNums spPfSec spSiteSec spDrawSec spExport');
-assert.equal(ids({ laidOut: true, layouts: true }), 'spLayouts spParams spAiSec spChgSec spNums spPfSec spSiteSec spDrawSec spExport', 'Settings right under Layouts');
+assert.equal(ids({ laidOut: true }), 'spParams spAiSec spChgSec spAskSec spNums spPfSec spSiteSec spDrawSec spExport');
+assert.equal(ids({ laidOut: true, layouts: true }), 'spLayouts spParams spAiSec spChgSec spAskSec spNums spPfSec spSiteSec spDrawSec spExport', 'Settings right under Layouts');
 assert.equal(ids({ laidOut: true, layouts: true, selected: true }).split(' ')[0], 'spSel', 'a picked piece comes first');
 assert.equal(ids({ drawing: true, laidOut: true, selected: true }), 'spDrawSite', 'drawing the site: only that');
-assert.deepEqual(planSections({ laidOut: true }).map(s => s.label), ['Settings', 'Build', 'Change', 'Numbers', 'Pro forma', 'Site', 'Add', 'Export']);
+assert.deepEqual(planSections({ laidOut: true }).map(s => s.label), ['Settings', 'Build', 'Change', 'Ask', 'Numbers', 'Pro forma', 'Site', 'Add', 'Export']);
 assert.deepEqual(planSections({ laidOut: true, layouts: true, selected: true }).map(s => s.label).slice(0, 3), ['Selected', 'Layouts', 'Settings'], 'Selected, Layouts, then Settings');
 
 console.log('planview ok: docked edges, the free map area, fit padding and the plan sections');

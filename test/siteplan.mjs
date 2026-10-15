@@ -207,6 +207,47 @@ for (const v of [0, 1, 2]) {
   res = await call({ mode: 'edit', prompt: 'make that one taller', plan }); assert.equal(res.body.question, 'Which building: Bldg 7 or Bldg 17?');
   res = await call({ mode: 'edit', prompt: '', plan }); assert.equal(res.code, 400); }
 
+// ---- /api/siteplan: the effort picked under Build, and questions about the open plan ----
+{ const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
+  let sent = [], reply = null; process.env.OPENAI_API_KEY = 'test-key';
+  globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('/models/')) return Response.json({ id: 'm' }); const b = JSON.parse(opts.body); sent.push(b); return Response.json({ choices: [{ message: { content: JSON.stringify(reply(b)) } }] }); };
+  const { default: handler, ASK_SCHEMA, SCHEMA } = await import('../api/siteplan.js');
+  assert.deepEqual(ASK_SCHEMA.required.slice().sort(), Object.keys(ASK_SCHEMA.properties).sort(), 'strict schema');
+  let ip = 0; const call = async body => { const res = mock(); await handler({ method: 'POST', body, headers: { 'x-forwarded-for': '7.7.8.' + (++ip) } }, res); return res; }; // a fresh address a call: past the per-minute limit
+  // the program call thinks as hard as the level says; anything not on the allow-list keeps the default
+  const prog = Object.fromEntries(Object.keys(SCHEMA.properties).map(k => [k, null])); Object.assign(prog, { use: 'retail', gfa: 25000, extras: [], zones: [], setbacks: { front: null, side: null, rear: null, paving: null }, summary: 'A strip.', assumptions: [] });
+  reply = () => prog;
+  for (const [effort, want] of [['low', 'low'], ['medium', 'medium'], ['high', 'high'], ['ultra', 'high'], ['xhigh', 'high'], [undefined, 'high']]) {
+    sent = []; const res = await call({ prompt: '25,000 sf retail', effort }); assert.equal(res.code, 200); assert.equal(sent[0].reasoning_effort, want, 'program effort ' + effort); }
+  // Medium reviews once: one round, never revises; Ultra's middle round may revise
+  const P0 = { use: 'retail', units: null, product: null, buildings: null, floors: null, gfa: 25000, ratio: null, perUnit: null, depth: null, detentionPct: null, storm: null, truck: null, through: null, compare: null, trash: null, entrances: null, extras: [], setbacks: { front: null, side: null, rear: null, paving: null }, zones: [] };
+  reply = () => ({ reviews: [{ option: 0, score: 70, verdict: 'ok', strengths: [], problems: [] }], ranking: [0], revise: true, program: P0, params: { fill: null, streets: null, form: null, storm: null }, why: 'Bigger.', summary: 'Fine.' });
+  const options = [{ name: 'Layout 1', metrics: { floorAreaSf: 25000 }, issues: [], notes: [] }];
+  sent = []; let res = await call({ mode: 'review', prompt: 'retail', options, round: 1, rounds: 1, effort: 'medium' });
+  assert.equal(res.body.revise, false, 'one round: no revise'); assert.equal(sent[0].reasoning_effort, 'medium'); assert.match(JSON.parse(sent[0].messages[1].content).round, /^last/);
+  sent = []; res = await call({ mode: 'review', prompt: 'retail', options, round: 2, rounds: 3, effort: 'high' }); assert.equal(res.body.revise, true, 'Ultra: round 2 of 3 may revise again'); assert.match(JSON.parse(sent[0].messages[1].content).round, /2 of 3/);
+  res = await call({ mode: 'review', prompt: 'retail', options, round: 2 }); assert.equal(res.body.revise, false, 'old clients: two rounds, as before');
+  res = await call({ mode: 'review', prompt: 'retail', options, round: 1, rounds: 9 }); assert.equal(res.body.revise, true, 'rounds kept to 1-3');
+  // ask: the fact sheet, the conversation so far and the question go to the model; a short answer and follow-ups come back
+  const S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayout.mjs'), PF = await import('../lib/proforma.mjs'), A = await import('../lib/planask.mjs');
+  const site = { ring: [[0, 0], [600, 0], [600, 420], [0, 420]], front: 0, setbacks: S.SETBACKS, program: { use: 'retail', gfa: 25000 } };
+  const o = L.layoutOptions(site, site.program)[0], pl = { ...site, name: 'Option A', elements: o.elements, recipe: o.recipe, variant: { key: 'k1', name: 'Layout 1 · ' + o.arr }, lastRun: { ask: '25,000 sf retail strip', note: 'A one-story strip.', effort: 'high', variants: [{ key: 'k1', name: 'Layout 1 · ' + o.arr, notes: o.notes, ai: { score: 78, verdict: 'Solid', strengths: [], problems: ['Pond at the back'] } }] } };
+  const facts = A.planFacts(pl, { site: { acres: 5.79, frontageFt: 600 }, pf: PF.run(pl, PF.defaults(pl)) });
+  reply = () => ({ answer: 'Retail is parked at 4 spaces per 1,000 sq ft, so 25,000 sq ft needs 100 spaces. '.repeat(60), followups: ['Can I park less?', '', 'Why a pond?', 'What about rents?', 'x'] });
+  sent = []; res = await call({ mode: 'ask', question: 'Why do we need so much parking?', history: [{ q: 'What is this?', a: 'A strip center.' }, { q: 'no answer' }], plan: facts, effort: 'low' });
+  assert.equal(res.code, 200, JSON.stringify(res.body)); assert.equal(sent[0].reasoning_effort, 'low', 'the effort picked');
+  const u = sent[0].messages[1].content; assert.match(u, /"required":\d+/); assert.match(u, /Q: What is this\?\nA: A strip center\./); assert.ok(!/no answer/.test(u), 'a turn without an answer is dropped'); assert.match(u, /Question: Why do we need so much parking\?$/);
+  assert.match(sent[0].messages[0].content, /only the facts given/i); assert.equal(sent[0].response_format.json_schema.name, 'plan_answer');
+  assert.ok(res.body.answer.length <= 2400, 'answer clipped'); assert.deepEqual(res.body.followups, ['Can I park less?', 'Why a pond?', 'What about rents?'], 'up to three, blanks dropped');
+  sent = []; await call({ mode: 'ask', question: 'Why?', plan: facts }); assert.equal(sent[0].reasoning_effort, 'medium', 'no effort: medium');
+  sent = []; await call({ mode: 'ask', question: 'Why?', plan: { ...facts, pieces: Array.from({ length: 500 }, (_, i) => ({ name: 'Piece ' + i, note: 'x'.repeat(5000) })) } });
+  assert.ok(sent[0].messages[1].content.length < 70000, 'an oversized fact sheet is cut down');
+  res = await call({ mode: 'ask', question: '  ', plan: facts }); assert.equal(res.code, 400);
+  res = await call({ mode: 'ask', question: 'Why?', plan: null }); assert.equal(res.code, 400);
+  res = await call({ mode: 'ask', question: 'Why?', plan: [1, 2] }); assert.equal(res.code, 400);
+  globalThis.fetch = async url => String(url).includes('/models/') ? Response.json({ id: 'm' }) : Response.json({ error: { message: 'boom' } }, { status: 400 });
+  res = await call({ mode: 'ask', question: 'Why?', plan: facts }); assert.equal(res.code, 502); assert.match(res.body.error, /didn’t answer/); }
+
 // ---- /api/projects ----
 { const store = []; let table = true;
   globalThis.fetch = async (url, opts = {}) => {
