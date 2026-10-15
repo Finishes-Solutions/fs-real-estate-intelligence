@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 10:33 PM CT: Faster search, and a reload that keeps your place (43fdad5)
+- **Search is quicker:** results start coming in sooner after you stop typing, and businesses show as soon as the first source answers instead of waiting for the slowest (OpenStreetMap now gets one quick look rather than three widening ones).
+- Picking a result moves the map straight away; a town's or road's outline fills in when it arrives instead of holding the map still for it, and a lookup that hangs gives up after a few seconds.
+- Typing "Ln" and "Lane" forms of a street are looked up at the same time, and answers are remembered for the visit, so backspacing and retyping is instant.
+- Enter on a street address waits the moment it takes to find it, so it lands on the address, not on a filing that matched first.
+- The Radius box and the main search box no longer cancel each other's lookups.
+- **A reload keeps your place:** the map view (with tilt and turn), an open property card, an open site plan and the project open on Projects come back after a reload, and when the installed app or the bare page is opened again. A first visit still flies in to the region; copied links and saved searches are unchanged.
+
 ### 5:36 PM CT: Water districts without the county-wide authorities (33244aa)
 - The Water Districts layer and the property card's water district now leave out bodies that cover whole counties or river basins: Harris County Flood Control District, Coastal Water Authority, the Port of Houston Authority, river, groundwater and regional water authorities and the Fort Bend Subsidence District. Before, a downtown Houston property could show "Harris County FCD" as its water district and those outlines covered the map.
 - Local districts named "water authority" (such as Clear Lake City's) still show.

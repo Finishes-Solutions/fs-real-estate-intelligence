@@ -1,6 +1,7 @@
 
 import './cursors.js';
 import { makeMatcher, encode, decode, describe } from './lib/filter.mjs';
+import { camStr as camFmt, parseCam, parseLatLng, parsePlanRef, startHash, showsFilings, hasSpec } from './lib/urlstate.mjs';
 import { USES, entityKey } from './lib/taxonomy.mjs';
 import { recentChanges } from './lib/changes.mjs';
 import { dockSide } from './lib/planview.mjs';
@@ -927,7 +928,7 @@ function fitGeom(g){ g=g?.geometry||g; let x0=Infinity,y0=Infinity,x1=-Infinity,
 const rq=document.getElementById('rq'), rsug=document.getElementById('rsug'), rmi=document.getElementById('rmi'), rrange=document.getElementById('rrange');
 const MAX_MI=60; // the slider, the number box and links all stop here
 rrange.max=rmi.max=MAX_MI;
-let radiusMiles=3, sugs=[], sugI=-1, picked=false, geoCtl=null;
+let radiusMiles=3, sugs=[], sugI=-1, picked=false, geoCtl={};
 const LOCAL=[]; F.forEach(f=>{ LOCAL.push({t:f.name,k:'Filing',c:[f.lon,f.lat],sub:f.addr}); });
 DATA.places.forEach(([n,lon,lat])=>LOCAL.push({t:n+', TX',k:'Town',c:[lon,lat]}));
 LOCAL.forEach(o=>o.l=o.t.toLowerCase());
@@ -940,7 +941,8 @@ function localSearch(q){
 // search box: region-biased autocomplete. The assistant passes {exact:true}: whole-Texas, no autocomplete, own request;
 // {world:true}: anywhere on Earth, biased to the map center (the assistant, for places outside Texas)
 async function geocode(q,o={}){
-  let ctl; if(!o.exact&&!o.world){ if(geoCtl) geoCtl.abort(); ctl=geoCtl=new AbortController(); }
+  // each box has its own slot (o.slot; the radius box is 'radius'): a newer request cancels the older one in the same slot only
+  let ctl; if(!o.exact&&!o.world){ const k=o.slot||'radius'; geoCtl[k]?.abort(); ctl=geoCtl[k]=new AbortController(); }
   const c=map.getCenter(), prox=o.exact||o.world?c.lng.toFixed(4)+','+c.lat.toFixed(4):'-95.9,30.0', bbox=o.exact?'-106.7,25.8,-93.5,36.5':'-97.6,28.6,-94.2,31.4';
   const u='https://api.maptiler.com/geocoding/'+encodeURIComponent(q)+'.json?key='+MAPTILER_KEY+'&limit='+(o.limit||6)+'&proximity='+prox+'&autocomplete='+!(o.exact||o.world)+(o.world?'':'&country=us&bbox='+bbox);
   const c2=ctl||new AbortController(), tm=setTimeout(()=>c2.abort(),8000); // a geocoder that hangs must not hang the assistant
@@ -1194,14 +1196,26 @@ tPlay.onclick=()=>{ if(playT){ stopPlay(); return; } tPlay.classList.add('on'); 
 
 // ---------- URL state (shareable links, saved searches) ----------
 let hashT=0, booting=true;
-// the address carries the filters, the page (v=) and an open card; "ml" (map center and zoom) is added only to a copied link
-function hashStr({map:withMap=false}={}){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id);
+// the address carries the filters, the page (v=) and an open card. A copied link adds "ml" (map center and zoom) when
+// nothing is selected. The live address (o.live) also keeps where you are, so a reload comes back to it: the camera
+// (ml=lat,lng,zoom[,bearing,pitch]), an open property card (b=lat,lng), the open site plan (sp=project.plan) or the
+// project on the Projects page (pj=). Saved searches and copied links leave those out.
+const LAST_KEY='fs-last-hash';
+let camReady=false; // the camera goes in the address only once the map has been put somewhere (not the whole-world start before the fly-in)
+const camStr=()=>{ const c=map.getCenter(); return camFmt({lat:c.lat,lng:c.lng,zoom:map.getZoom(),bearing:map.getBearing(),pitch:map.getPitch()}); };
+function hashStr({map:withMap=false,live=false}={}){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id);
   if(withMap&&!sel.feature&&!state.sel&&view==='map'){ const c=map.getCenter(); p.set('ml',[c.lat.toFixed(5),c.lng.toFixed(5),map.getZoom().toFixed(2)].join(',')); }
+  if(live){ const w=ctx.sitePlan?.where||{};
+    if(w.plan) p.set('sp',w.plan); else if(w.project) p.set('pj',w.project);
+    if(view==='map'){ const b=!state.sel&&!w.plan&&ctx.currentBuilding?.(); if(b?.center) p.set('b',b.center[1].toFixed(6)+','+b.center[0].toFixed(6)); }
+    if(camReady) p.set('ml',camStr()); } // on every page, so coming back to the map after a reload finds it where it was
   return p.toString(); }
 // a new page is a new history entry (so the browser's Back button steps back through pages and then leaves the app);
-// filter and card changes only rewrite the current entry
-function commitHash(push){ const h=hashStr(), url=h?'#'+h:location.pathname+location.search;
+// filter, card and map moves only rewrite the current entry. The last address is also kept on this device, so the bare
+// page (the installed app opening, a bookmark) comes back to it.
+function commitHash(push){ const h=hashStr({live:true}), url=h?'#'+h:location.pathname+location.search;
   try{ push?history.pushState(null,'',url):history.replaceState(null,'',url); }catch(e){}
+  try{ localStorage.setItem(LAST_KEY,h); }catch(e){}
   document.getElementById('rssLink').href='api/feed?'+encode(curSpec()); }
 function scheduleHash(push=false){ if(booting) return; clearTimeout(hashT); if(push){ commitHash(true); return; } hashT=setTimeout(()=>commitHash(false),250); }
 // Back / Forward: show the page the address names, without adding history
@@ -1325,6 +1339,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
 renderNav(ctx); changesBadge(); // menus first: modules look up the badge spans and the sub-tab rows
+ctx.scheduleHash=scheduleHash;
 for (const init of [initCardTabs,initGoogle,initPlaces,initDevLayers,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan,initSettings]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- the card's dock ----------
@@ -1336,22 +1351,35 @@ new MutationObserver(()=>{ if(!card.classList.contains('open')&&card.classList.c
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
   document.getElementById('filingsPeriod').textContent='TDLR · '+m(s)+' – '+m(e);
   document.getElementById('periodTxt').textContent=PERIOD; const miss=DATA.unmapped||0; document.getElementById('missTxt').textContent=miss>0?fmtN(miss)+' filing'+(miss>1?'s':'')+' with no mappable address '+(miss>1?'are':'is')+' left off the map. ':''; }
-{ const h=location.hash.slice(1), p=new URLSearchParams(h);
+{ let h=location.hash.slice(1);
+  // the bare page (a reload of it, the installed app opening, a bookmark): come back to where you were. A link with
+  // anything in it wins; a first visit has nothing kept and flies in to the region.
+  if(!h){ let kept=''; try{ kept=localStorage.getItem(LAST_KEY)||''; }catch(e){} h=startHash(h,kept); if(h) try{ history.replaceState(null,'','#'+h); }catch(e){} }
+  const p=new URLSearchParams(h), keys=[...p.keys()];
   // a link with filters puts the filing dots on; the date range alone (which the app writes into the address itself) doesn't,
   // so a reload opens like a fresh start: no filings until you turn them on
-  if(h&&[...p.keys()].some(k=>!['v','f','b','ml'].includes(k))){ if([...p.keys()].some(k=>!['v','f','d','b','ml'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
+  if(h&&hasSpec(keys)){ if(showsFilings(keys)) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
   booting=false;
   if(p.get('v')){ popping=true; try{ setView(p.get('v')); }finally{ popping=false; } } // the page a link opens on is the first history entry, not a new one
   syncTitle();
-  // a copied link's map position (#ml=lat,lng,zoom)
-  const ml=(p.get('ml')||'').split(',').map(Number), mll=ml.length===3&&ml.every(Number.isFinite)&&Math.abs(ml[0])<=90&&Math.abs(ml[1])<=180&&ml[2]>=1&&ml[2]<=19?{center:[ml[1],ml[0]],zoom:ml[2]}:null;
-  if(mll) map.jumpTo(mll);
-  const f=p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));
-  // a copied property link (#b=lat,lng): that building, or the parcel there
-  const bc=!f&&(p.get('b')||'').split(',').map(Number), bll=bc&&bc.length===2&&bc.every(Number.isFinite)&&Math.abs(bc[0])<=90&&Math.abs(bc[1])<=180?[bc[1],bc[0]]:null;
-  if(bll) map.once('load',()=>{ map.jumpTo({center:bll,zoom:17.5}); map.once('idle',()=>{ if(!ctx.buildingAt?.(bll)) ctx.openBuildingAt(bll); }); });
+  // the project open on the Projects page
+  if(p.get('pj')&&view==='projects') ctx.sitePlan?.show(p.get('pj'));
+  // the camera goes in the address (debounced), so a reload keeps the view: from the first move after the map loads (the fly-in, a link's card)
+  map.once('load',()=>map.on('moveend',()=>{ camReady=true; scheduleHash(); }));
+  // the map position (#ml=lat,lng,zoom[,bearing,pitch]): a copied link, or where you were before the reload
+  const mll=parseCam(p.get('ml'));
+  if(mll){ camReady=true; map.jumpTo(mll); }
+  // the open site plan (#sp=project.plan): it frames its own site
+  const sp=parsePlanRef(p.get('sp')), spOk=view==='map'&&!!sp&&!!ctx.sitePlan?.has(sp[0],sp[1]);
+  if(spOk) map.once('load',()=>{ try{ ctx.sitePlan.open(sp[0],sp[1]); }catch(e){ console.error(e); } });
+  const f=!spOk&&p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));
+  // a property card (#b=lat,lng): that building, or the parcel there. With a kept map position, that view (the building
+  // is in it unless you panned away with the card open), else close in on it.
+  const bll=!f&&!spOk?parseLatLng(p.get('b')):null;
+  if(bll) map.once('load',()=>{ if(!mll||!map.getBounds().contains(bll)) map.jumpTo({center:bll,zoom:17.5}); map.once('idle',()=>{ if(!ctx.buildingAt?.(bll)) ctx.openBuildingAt(bll); }); });
   scheduleHash();
-  map.once('load',()=>{ if(f||bll||mll) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>map.flyTo({...HOME,duration:2600,essential:true}),300); else map.jumpTo(HOME); });
+  map.once('load',()=>{ if(f||bll||mll||spOk) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>map.flyTo({...HOME,duration:2600,essential:true}),300); else map.jumpTo(HOME); });
+  cardRenderHooks.push(()=>scheduleHash()); // a property card opening (b=)
 }
 
 // installable app + offline shell (served over https only)
