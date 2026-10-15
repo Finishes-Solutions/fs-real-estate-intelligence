@@ -13,8 +13,8 @@ import { contains as inArea } from './lib/geomatch.mjs';
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
 const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.2" y="1.8" width="5.6" height="9.2" rx="2.8"/><path d="M3.5 8.6a5.5 5.5 0 0 0 11 0M9 14.1v2.4"/></svg>';
 const SEND = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15V3M4 8l5-5 5 5"/></svg>';
-// new chat: a speech bubble with a plus
-const NEWCHAT = '<svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 8.6c0 3.4-3 6-6.5 6-.9 0-1.8-.2-2.6-.5L3 15l.9-3A5.8 5.8 0 0 1 2.5 8.6c0-3.4 2.9-6 6.5-6s6.5 2.6 6.5 6z"/><path d="M9 5.9v5.4M6.3 8.6h5.4"/></svg>';
+// new chat: compose (a pencil on a square), drawn like the other header icons
+const NEWCHAT = '<svg width="17" height="17" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.6 3.2H4.6c-.8 0-1.4.6-1.4 1.4v8.8c0 .8.6 1.4 1.4 1.4h8.8c.8 0 1.4-.6 1.4-1.4V9.4"/><path d="M13.1 2.6a1.5 1.5 0 0 1 2.2 2.2L9.6 10.5l-2.9.8.8-2.9z"/></svg>';
 const X = '<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
 const SUGGEST = ['Who owns 2200 Texas Ave, Houston?', 'What are incomes and home values like around Katy?', 'Take me to downtown Houston and orbit around it', 'What businesses are near 1004 Priya Ln, Waller?', 'What’s under construction within 5 miles of Katy?', 'Who are the most active developers right now?', 'How far is this property from me, and what’s the drive time?', 'Turn on radar, wind and live traffic'];
 
@@ -27,7 +27,7 @@ export function initAssistant(ctx) {
   <aside class="ai" id="ai" aria-label="AI assistant" aria-hidden="true">
     <div class="ai-grab" id="aiGrab" aria-hidden="true"></div>
     <header class="ai-h">
-      <div class="ai-t">${SPARK}<span>Assistant</span><em id="aiSt"></em></div>
+      <div class="ai-t">${SPARK}<span>Assistant</span></div>
       <button class="ai-ib" id="aiNew" type="button" title="New chat" aria-label="New chat">${NEWCHAT}</button>
       <button class="ai-ib" id="aiClose" type="button" aria-label="Close assistant">${X}</button>
     </header>
@@ -48,7 +48,7 @@ export function initAssistant(ctx) {
   <button class="ai-fab" id="aiFab" type="button" aria-controls="ai" aria-keyshortcuts="${MOD === '⌘' ? 'Meta+/' : 'Control+/'}">${SPARK}<span>Ask AI</span></button>`;
   ctx.viewport.append(...wrap.children);
   const $ = id => document.getElementById(id);
-  const el = $('ai'), log = $('aiLog'), q = $('aiQ'), form = $('aiForm'), st = $('aiSt'), app = document.querySelector('.app');
+  const el = $('ai'), log = $('aiLog'), q = $('aiQ'), form = $('aiForm'), app = document.querySelector('.app');
   if (matchMedia('(max-width:700px)').matches) q.placeholder = 'Ask anything…'; // the long hint wraps on a phone
   let history = [], busy = false;
 
@@ -168,7 +168,17 @@ export function initAssistant(ctx) {
     if (undo) d.querySelector('button').onclick = () => { undo(); d.querySelector('button').remove(); d.classList.add('undone'); };
     return d;
   }
-  const status = t => { st.textContent = t || ''; };
+  // while a text answer is on its way, the pending bubble at the bottom says what's happening: "Thinking", then each tool's
+  // step ("Looking at the map…"). The steps a turn took fold into one muted line above its answer ("Worked through 2
+  // steps"), which opens to list them. Voice keeps its own status (setLive)
+  const working = () => bubble('bot pending', '<span class="ai-work" role="status"><span class="ai-wl">Thinking</span></span>');
+  const workOn = (b, t) => { const l = b.querySelector('.ai-wl'); if (l && l.textContent !== t) l.textContent = t; };
+  function stepsLine(steps, after) {
+    const list = steps.reduce((a, s) => { const l = a[a.length - 1]; if (l && l.t === s) l.n++; else a.push({ t: s, n: 1 }); return a; }, []);
+    const d = document.createElement('details'); d.className = 'ai-steps';
+    d.innerHTML = '<summary>Worked through ' + steps.length + ' step' + (steps.length === 1 ? '' : 's') + '</summary><ol>' + list.map(s => '<li>' + esc(s.t.replace(/…$/, '')) + (s.n > 1 ? ' <span>×' + s.n + '</span>' : '') + '</li>').join('') + '</ol>';
+    after.after(d); return d;
+  }
   q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = Math.min(140, q.scrollHeight) + 'px'; });
   q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); } });
   form.onsubmit = e => { e.preventDefault(); const t = q.value.trim(); if (!t) return; q.value = ''; q.style.height = 'auto'; ask(t); };
@@ -187,7 +197,7 @@ export function initAssistant(ctx) {
     if (busy) return; open(false); busy = true; $('aiSend').disabled = true;
     log.querySelectorAll('.ai-next').forEach(x => x.remove()); turnSubject = null; turnChoices = null;
     const mine = bubble('user', esc(text)); history.push({ role: 'user', content: text });
-    const thinking = bubble('bot pending', '<span class="dots"><i></i><i></i><i></i></span>'); status('Thinking…');
+    const thinking = working(), steps = [];
     try {
       let input = [{ role: 'user', content: text }], next = [];
       for (let round = 0; round < 6; round++) {
@@ -197,19 +207,19 @@ export function initAssistant(ctx) {
         if (!m.calls?.length) break;
         input = [];
         for (const c of m.calls) {
-          status(LABEL[c.name] || 'Working…');
+          const step = LABEL[c.name] || 'Working…'; steps.push(step); workOn(thinking, step);
           let args = {}; try { args = JSON.parse(c.arguments || '{}'); } catch (e) {}
           const result = await runTool(c.name, args);
           input.push({ type: 'function_call_output', call_id: c.call_id, output: JSON.stringify(result).slice(0, 11000) });
         }
-        log.appendChild(thinking); scroll(); status('Thinking…');
+        log.appendChild(thinking); scroll(); // the last step stays on the line until the next one or the answer
       }
       next = turnChoices ? turnChoices.map(c => 'Take me to ' + c.label).slice(0, 5) : withTellMore(next, turnSubject); if (next.length) pills(next);
       // a tall answer with cards: start at the first card rather than the bottom, so its headline numbers are in view
       let c1 = mine.nextElementSibling; while (c1 && !c1.classList.contains('ccard')) c1 = c1.nextElementSibling;
       if (c1 && log.scrollHeight - (c1.offsetTop - log.offsetTop) > log.clientHeight) log.scrollTop = c1.offsetTop - log.offsetTop - 8;
     } catch (e) { bubble('bot err', esc(e.message)); }
-    finally { thinking.remove(); status(''); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
+    finally { thinking.remove(); if (steps.length && mine.isConnected) stepsLine(steps, mine); busy = false; $('aiSend').disabled = false; history = history.slice(-40); }
   }
   const LABEL = { describe_view: 'Looking at the map…', move_camera: 'Moving the camera…', add_site_note: 'Saving the note…', watch: 'Updating the watchlist…', air_traffic: 'Checking the air traffic…', aircraft_registration: 'Looking up the FAA registry…', flight_path: 'Tracing the flight…', market_data: 'Reading the market numbers…', market_prices: 'Checking market prices…', market_correlation: 'Measuring the correlation…', crime_stats: 'Counting incidents…', crime_by_city: 'Reading the FBI’s crime figures…', crime_rankings: 'Ranking departments…', drive_time_map: 'Mapping drive times…', traffic_report: 'Reading traffic counts…', airport_info: 'Looking up the airport…', air_traffic_report: 'Reading the air traffic history…', flight_report: 'Building the flight report…', fema_report: 'Checking FEMA flood and hazard data…', field_notes: 'Looking through field notes…', data_sources: 'Checking the data sources…', filter_map: 'Filtering the map…', query_filings: 'Looking through the filings…', highlight_filings: 'Highlighting…', open_filing: 'Opening the filing…', fly_to: 'Moving the map…', stop_orbit: 'Stopping…', set_map_options: 'Changing the map…', highlight_area: 'Outlining the area…', nearby_places: 'Looking up what’s nearby…', compare_areas: 'Setting up the comparison…', show_view: 'Switching view…', reset_map: 'Resetting…', distance_and_drive_time: 'Routing…', set_live_layers: 'Changing the map…', weather_at: 'Checking the weather…', project_news: 'Searching the news…', web_search: 'Searching the web…', site_imagery: 'Searching NASA imagery…', demographics: 'Looking up census data…', follow_aircraft: 'Finding the plane…', weather_forecast: 'Getting the forecast…', summarize_filings: 'Summarizing…', show_chart: 'Building the chart…', location_info: 'Looking up the location…' };
 

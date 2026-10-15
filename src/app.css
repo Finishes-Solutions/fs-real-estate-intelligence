@@ -3259,3 +3259,80 @@ table.who tr.nomatch td{border:0}
   #card .sp-save{justify-self:start;margin-top:2px}
   #card .sp-save:not(.bad){display:none}
 }
+
+/* ---------- market + assistant (round 2) ---------- */
+/* Market tab: charts are drawn at their box's measured width (src/area.js measure()), so viewBox units are CSS pixels and
+   one type scale holds everywhere: axis ticks 11px, chart labels and legends 12px, stat values 16px, stat labels 11px */
+#view-market{scrollbar-gutter:stable}
+.mk-probe{height:0;overflow:hidden;visibility:hidden;pointer-events:none}
+.mk-cw{display:block;height:0}
+#view-market .mk-ax,#view-market .mx-ax{font-size:11px}
+#view-market .mk-leg,#view-market .mx-leg{font-size:12px}
+#view-market .mk-hint{font-size:11px}
+/* headline tiles: area.js sets the columns so every row is full; tiles share one height, sparklines sit on the bottom */
+#view-market .mk-kpis2{gap:10px}
+@media (min-width:701px){ #view-market .mk-kpis2{grid-auto-rows:1fr} }
+#view-market .mk-kpi{padding:12px 14px 10px;min-height:118px}
+#view-market .mk-kpi .mk-kl{font-size:11px;letter-spacing:.1em}
+#view-market .mk-kpi .mk-kspk{margin-top:auto;padding-top:8px;height:auto}
+#view-market .mk-ks{font-size:12px}
+/* stat cells */
+#view-market .kgrid.mk-kg4 b,#view-market .mx-kg b{font-size:16px}
+#view-market .kgrid.mk-kg4 span,#view-market .mx-kg span{font-size:11px;letter-spacing:.06em}
+#view-market .kgrid.mk-kg4>div{padding:9px 12px}
+/* horizontal-bar lists: 26px rows, one label column, values right-aligned in their own column */
+#view-market .mk-hbars{gap:2px}
+#view-market .mk-hb{grid-template-columns:minmax(0,min(38%,240px)) minmax(0,1fr) 84px;gap:10px;min-height:26px;font-size:12px}
+#view-market .mk-hb i{height:12px}
+#view-market .mk-hb em{font-size:12px;text-align:right;color:var(--text)}
+#view-market .mk-hb small{font-size:11px}
+/* small multiples: area.js sets the columns (3 a row on a desktop, 2 on a tablet, 1 on a phone, rows always full) */
+#view-market .mk-sms{gap:12px}
+#view-market .mk-sm{padding:10px 12px 8px}
+#view-market .mk-smh span{font-size:12px}
+#view-market .mk-smh b{font-size:15px}
+#view-market .mk-smf{font-size:11px;margin-top:2px}
+/* tables (body text 12.5px), change badges and small print (12px) */
+#view-market .mk-tbl td,#view-market .mx-table td{font-size:12.5px}
+#view-market .mk-d,#view-market .mx-asof,#view-market .mk-more summary,#view-market .chitem em{font-size:12px}
+#view-market .mk-tbl th,#view-market .mx-table th{font-size:11px;white-space:nowrap}
+#view-market .kgrid.mk-kg4.k3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){ #view-market .kgrid.mk-kg4.k3{grid-template-columns:repeat(2,minmax(0,1fr))} }
+#view-market .mx-sym{font-size:11px}
+#view-market .mx-sub{font-size:11px}
+#view-market .mx-side .mx-ctl label>span{font-size:11px}
+/* Markets: a wider sparkline with one hover strip and a dot that follows the mouse */
+#view-market .mx-sp{width:auto}
+#view-market .mx-spark{width:auto;height:28px}
+.mx-sdot{pointer-events:none}.mx-spark.up .mx-sdot{fill:var(--mx-up)}.mx-spark.dn .mx-sdot{fill:var(--mx-dn)}
+/* line charts' single hover strip (src/mkcharts.js hx): area.js moves the dot and cross line and shows them */
+.mk-hxc,.mk-hxd{pointer-events:none}
+.hx-on .mk-hxc,.hx-on .mk-hxd{opacity:1}
+.mx-spark .mk-hxd{opacity:0}.mx-spark.hx-on .mk-hxd{opacity:1}
+/* Correlation explorer: a fixed control column, the chart takes the rest */
+#view-market .mx-wrap{grid-template-columns:280px minmax(0,1fr)}
+@media (max-width:980px){ #view-market .mx-wrap{grid-template-columns:minmax(0,1fr)} }
+/* Ask AI: no status in the header while it works; the pending bubble at the bottom shows a quiet live line instead
+   ("Thinking", then the step it's on) with a soft shimmer, and a finished turn's steps fold into one muted line above
+   its answer that opens to list them */
+.ai-m.pending{padding:2px 0}
+.ai-work{display:inline-flex;align-items:center;font-size:13px;line-height:1.5;color:var(--text-2)}
+.ai-wl{background:linear-gradient(90deg,var(--muted) 0%,var(--muted) 35%,var(--text) 50%,var(--muted) 65%,var(--muted) 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ai-shimmer 1.8s linear infinite}
+@keyframes ai-shimmer{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.ai-wl{animation:none;background:none;color:var(--text-2)}}
+.ai-steps{align-self:flex-start;max-width:100%;margin:-4px 0 -2px;font-size:12px;color:var(--muted)}
+.ai-steps summary{display:inline-flex;align-items:center;gap:4px;cursor:var(--cur-pointer,pointer);list-style:none;border-radius:4px;padding:1px 2px;margin-left:-2px}
+.ai-steps summary::-webkit-details-marker{display:none}
+.ai-steps summary::after{content:"›";font-size:14px;line-height:1;transition:transform 150ms}
+.ai-steps[open] summary::after{transform:rotate(90deg)}
+.ai-steps summary:hover{color:var(--text-2)}
+.ai-steps ol{margin:4px 0 2px;padding-left:18px;display:grid;gap:1px}
+.ai-steps li span{font-family:var(--font-mono);font-size:11px}
+@media (prefers-reduced-motion:reduce){.ai-steps summary::after{transition:none}}
+/* Market on a phone: a wider label column for the bar lists, the Correlate link goes (the row opens it), full tile rows */
+@media (max-width:700px){
+  #view-market .mk-hb{grid-template-columns:minmax(0,46%) minmax(0,1fr) 68px;gap:8px}
+  #view-market .mx-table th:last-child,#view-market .mx-table td:last-child{display:none}
+  #view-market .mx-side .mx-kg>div:last-child{grid-column:auto}
+  #view-market .mk-kpi{min-height:0}
+}
