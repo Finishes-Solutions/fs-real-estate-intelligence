@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
-### 12:46 PM CT: Drag pieces onto the site, draw any building shape, change a building's use; re-fit no longer over-parks (HASH)
+### 12:46 PM CT: Drag pieces onto the site, draw any building shape, change a building's use; re-fit no longer over-parks (e840b22)
 - **Drag and drop from Add:** drag a tile from the tool bar's **Add** palette, or from the panel's Add section, onto the map.
   - The piece's outline follows the pointer at its real size, turned the way it will land.
   - The outline turns red off the site.
