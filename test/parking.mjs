@@ -85,5 +85,36 @@ for (const [what, plan, prog] of cases) {
     assert.ok(m.spaces >= m.required && m.spaces <= Math.ceil(m.required * 1.15) + 4, use + ' pinned: ' + m.spaces + ' spaces for ' + m.required + ' needed (layout had ' + m0.spaces + ' for ' + m0.required + ')');
   }
 }
+// ---- one smooth paved surface: an exact union, no staircase on a row turned a fraction of a degree, curbs rounded ----
+{
+  const row = { id: 'r', kind: 'parking', x: 0, y: 0, w: 270, d: 18, rot: 90.676 }, aisle = { id: 'a', kind: 'drive', x: 21, y: 0.25, w: 270, d: 24, rot: 90.676 };
+  const pv = S.pavement({ ...small, elements: [row, aisle] }); assert.equal(pv.length, 1, 'a row and its aisle pour as one');
+  const o = pv[0].outer, A = S.ringArea(o); assert.ok(Math.abs(A - 270 * 42) < 270 * 42 * 0.02, 'the area of the two, not a grid of cells: ' + A);
+  const short = o.filter((p, k) => { const q = o[(k + 1) % o.length]; return Math.hypot(q[0] - p[0], q[1] - p[1]) < 2; }).length;
+  assert.ok(o.length < 60 && short <= 4 * 19, 'four rounded corners and four long sides, no steps: ' + o.length + ' points, ' + short + ' short sides');
+  const loop = { id: 'd', kind: 'drive', path: [[0, 0], [200, 0], [200, 150], [0, 150]], width: 26, r: 40 }, pl = S.pavement({ ...small, elements: [loop] })[0].outer;
+  for (let k = 0; k < pl.length; k++) { const a = pl[(k - 1 + pl.length) % pl.length], b = pl[k], c = pl[(k + 1) % pl.length], t = Math.abs(Math.atan2((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]), (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1])));
+    assert.ok(t < Math.PI / 2 + 0.01, 'a curved drive stays smooth: no corner sharper than the drive’s own (' + (t * 180 / Math.PI).toFixed(0) + '°)'); }
+}
+// ---- every aisle ends where its stalls (or a connection, or the entry) end: no stubs of asphalt to nowhere ----
+{
+  const irregular = lot(0, 0, { ring: [[144, 442], [45, 190], [-278, 161], [-274, -268], [230, -261], [222, 420]], front: 4 }); // a real 5.9 ac tract: street on one side, a dog-leg at the back
+  for (const [site, ask] of [[small, '25,000 sf retail strip'], [irregular, '30,000 sf office'], [irregular, '30,000 sf retail strip with 2 pads']]) {
+    const o = L.layoutOptions(site, S.guessProgram(ask))[0], els = o.elements, paved = els.filter(e => S.PAVED.includes(e.kind));
+    for (const d of els.filter(e => e.kind === 'drive' && /drive aisle$/.test(e.note || '') && !S.isFree(e))) {
+      const u = [Math.cos((d.rot || 0) * Math.PI / 180), Math.sin((d.rot || 0) * Math.PI / 180)], others = paved.filter(q => q !== d).map(S.outline);
+      for (const end of [-1, 1]) { const p = [d.x + u[0] * end * (d.w / 2 - 20), d.y + u[1] * end * (d.w / 2 - 20)], gap = Math.min(...others.map(r => r.reduce((m, a, k) => Math.min(m, S.segDist(p, a, r[(k + 1) % r.length])), Infinity)));
+        assert.ok(gap < d.d / 2 + 8, ask + ': an aisle end ' + gap.toFixed(0) + ' ft from any stall or drive (a stub)'); }
+    }
+  }
+  // a re-fit after the building is slid along the street: the drives and parking are laid out again round it, not lost
+  // (6 spaces of 120 before)
+  const o = L.layoutOptions(irregular, S.guessProgram('30,000 sf retail strip with 2 pads'))[0], p = { ...irregular, program: o.program, elements: structuredClone(o.elements), recipe: o.recipe };
+  const b = p.elements.find(e => e.kind === 'building'), f = p.ring[4], g = p.ring[5], L0 = Math.hypot(g[0] - f[0], g[1] - f[1]); // slid 50 ft along the street
+  b.x += (g[0] - f[0]) / L0 * 50; b.y += (g[1] - f[1]) / L0 * 50; b.pinned = true;
+  const r = L.refit(p, { amount: 'current' }), m = S.metrics({ ...p, elements: r.elements });
+  assert.ok(m.spaces >= m.required && m.spaces <= Math.ceil(m.required * 1.15) + 4, 'moved building re-fitted: ' + m.spaces + ' spaces for ' + m.required);
+  assert.ok(!S.check({ ...p, elements: r.elements }).some(i => i.level === 'bad'), 'and nothing overlaps it');
+}
 if (process.env.PARKING_TABLE) console.log(table.map(r => r.join(' | ')).join('\n'));
 console.log('parking ok');
