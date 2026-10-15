@@ -5,6 +5,21 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-14
 
+### 11:32 PM CT: Site plans park what they need, not three times it (277105c)
+- **Sensible parking totals:** layouts now park what their buildings need plus about 5% (and the accessible stalls). The default ratios were already normal: retail 4 per 1,000 sf, restaurant 10, office 3.5, medical 5, warehouse 0.6, apartments 1.6 per unit. The layout engine was adding far more than they called for.
+  - **Parking garages** are sized to the share of parking they carry. Before, every garage was at least 180 ft long, so a 25,000 sf retail plan showed 323 spaces for 100 needed; it now shows about 105 for 100.
+  - **Mixed-use plans** now trim their spare parking rows, as single-use plans already did.
+  - **Small programs** land at about 107 for 100 needed.
+- **Phase 1 parking:** the plan now works out parking for what you asked for (Phase 1) separately from the whole site with Phase 2. The plan panel will show it in the next update.
+- **Every building has its own name:** Building A, B, C… across shops, restaurants and offices. Before, a plan could have two or three "Building A"s.
+- **Mixed use on a smaller lot works:** shops, a restaurant and offices on about 6 acres used to fall back to three "Simple layout" options with no parking at all. They now lay out properly, sharing one row of buildings and one parking field when they don't fit one behind the other.
+- **Better layouts without the AI:** layouts with storefronts facing the street, and with parking close to the doors, now rank higher.
+- **New uses and defaults:**
+  - **Hotel:** about 1 space per room ("120-room hotel" reads as about 66,000 sf).
+  - **Church:** 10 spaces per 1,000 sf ("600-seat church" reads as about 20,000 sf).
+  - **Townhomes:** a quarter of a guest space per home, which fits a few fewer homes.
+  - **Parking ratio:** capped at 15 per 1,000 sf.
+
 ### 11:15 PM CT: Market page faster and easier to read; Ask AI shows its work quietly (1c54539, 14f9feb)
 - **Faster Market page:**
   - Opening it no longer freezes the page: the longest pause went from about 1.3 s to under 0.7 s on a busy test machine.
