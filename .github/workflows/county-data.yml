@@ -1,0 +1,50 @@
+name: County data (Supabase)
+
+# Development activity for the seven counties into Supabase (build/county-data.mjs): Harris County building permits
+# (HCAD's weekly files), plats and new subdivisions, TxDOT projects, water districts (MUDs) with creation dates and
+# bonds, and TEA school enrollment. Nightly; each source is skipped or kept as it was when it fails or hasn't changed.
+# Needs supabase/migrations/20261021000000_county_data.sql applied once.
+on:
+  schedule:
+    - cron: "53 9 * * *" # nightly 09:53 UTC (4:53 am Central), after "Refresh data" commits the county outlines
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Subset: permits,plats,txdot,districts,schools (blank = all)"
+        required: false
+      force:
+        description: "Reload files that haven't changed (1 = yes)"
+        required: false
+      allow_shrink:
+        description: "Accept a load with under half the rows before (1 = yes)"
+        required: false
+
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC for the Supabase pipeline edge function when no secret key is stored
+
+concurrency:
+  group: county-data
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: Production # the secrets live in this GitHub environment
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Load county data into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_KEY }}
+          ONLY: ${{ inputs.only }}
+          FORCE: ${{ inputs.force }}
+          ALLOW_SHRINK: ${{ inputs.allow_shrink }}
+        run: node build/county-data.mjs

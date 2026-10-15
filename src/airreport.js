@@ -5,8 +5,7 @@
 //   area, nearby airports and whether the area is under a runway's approach path, and the planes overhead right now.
 //   Flight Report for one aircraft (plane card → Export Flight Report): photo, registration, route, the flight path map,
 //   the altitude and speed profile, today's earlier flights; HTML (print to PDF) and CSV of the track points.
-import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf } from './reportkit.js';
-import { readJSON } from './lib/http.mjs';
+import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, getJSON, errorBox, friendly, nearHouston, unavailable } from './reportkit.js';
 
 const HOUR = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p');
 const KIND = { jet: ['Jets', '#1d4ed8'], prop: ['Props and small planes', '#16a34a'], heli: ['Helicopters', '#a855f7'], mil: ['Military', '#b45309'] };
@@ -38,11 +37,10 @@ export function initAirReport(ctx) {
 
   async function data({ geometry, months = 3 }) {
     const center = centerOf(geometry), mi = radiusOf(geometry);
-    const prof = fetch('api/planes?report=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, months }), signal: AbortSignal.timeout(30000) })
-      .then(readJSON).catch(e => ({ error: e.message }));
-    const near = fetch('api/airports?near=' + center[1].toFixed(4) + ',' + center[0].toFixed(4) + '&km=50&n=6&path=1').then(r => r.ok ? r.json() : null).catch(() => null);
+    const prof = getJSON('api/planes?report=1', { what: 'Air traffic history', method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, months }), signal: AbortSignal.timeout(30000) }).catch(e => ({ error: friendly(e, 'Air traffic history') }));
+    const near = getJSON('api/airports?near=' + center[1].toFixed(4) + ',' + center[0].toFixed(4) + '&km=50&n=6&path=1', { what: 'Nearby airports' }).catch(() => null);
     const low = ctx.airHistory ? ctx.airHistory(center, Math.min(5, Math.max(1, Math.round(mi * 1.609)))).catch(() => null) : null;
-    const live = ctx.planesNear ? ctx.planesNear(center, Math.min(15, Math.max(2, mi))).catch(e => ({ error: e.message })) : null;
+    const live = ctx.planesNear ? ctx.planesNear(center, Math.min(15, Math.max(2, mi))).catch(e => ({ error: friendly(e, 'Live plane data') })) : null;
     const [p, a, l, n] = await Promise.all([prof, near, low, live]);
     return { center, radius_mi: Math.round(mi * 10) / 10, profile: p?.error ? p : p?.history === false ? { error: p.note } : { ...profileOf(p), by_month: p.by_month || [], since: p.since }, airports: a?.airports || [], path: a?.path || null, low: l, live: n };
   }
@@ -51,9 +49,11 @@ export function initAirReport(ctx) {
   async function report({ geometry, label }) {
     if (ctx.view !== 'map') ctx.setView?.('map');
     const card = openCard(ctx, { kicker: 'Air traffic report', title: label, loading: 'Reading the air traffic history…' });
-    let d; try { d = await data({ geometry }); } catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
+    let d; try { d = await data({ geometry }); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Air traffic data')); return; }
     last = { d, label, geometry };
     const p = d.profile, live = d.live?.aircraft || [], lowNow = live.filter(x => !x.ground && x.alt != null && x.alt < 3000);
+    // neither the history nor the live planes came back: one sentence with Retry, and nothing to export
+    const dead = !!p.error && !!d.live?.error, unavail = unavailable('Air traffic data');
     fillCard(ctx, card, cardTop('Air traffic report', label, p.error ? '' : 'Since ' + esc(p.since || '') + ' · ~5 km cells around the area') +
       '<div class="bsec">' + (p.error ? '<div class="rnote">' + esc(p.error) + '</div>' : kgrid([[p.per_day != null ? fmt(p.per_day) : '—', 'Aircraft sightings a day'], [p.busiest_hour != null ? HOUR(p.busiest_hour) : '—', 'Busiest hour'], [p.low_pct != null ? p.low_pct + '%' : '—', 'Under 3,000 ft'], [fmt(live.length), 'Overhead now']])) +
       (d.path ? '<div class="apt-path"><b>Under the approach path</b> to ' + esc(d.path.code) + ' runway ' + esc(d.path.landing_runway) + ' (' + d.path.beyond_nm + ' nm from the runway end).</div>' : '') + '</div>' +
@@ -63,9 +63,10 @@ export function initAirReport(ctx) {
       (d.low?.history ? '<div class="bsec"><div class="lt">Low flights at the center</div><div>' + fmt(d.low.low_per_day) + ' low sightings a day within ~' + Math.min(5, Math.max(1, Math.round(d.radius_mi * 1.609))) + ' km, lowest ' + (d.low.lowest_ft != null ? fmt(d.low.lowest_ft) + ' ft' : '—') + '.</div></div>' : '') +
       (d.airports.length ? '<div class="bsec"><div class="lt">Airports nearby</div>' + d.airports.slice(0, 5).map(a => '<div class="pl"><b><button class="lnk" type="button" data-apt="' + esc(a.ident) + '">' + esc(a.name) + '</button></b><span>' + esc((a.iata || a.icao || a.ident) + ' · ' + (a.km * 0.621371).toFixed(1) + ' mi') + '</span></div>').join('') + '</div>' : '') +
       '<div class="bsec"><div class="lt">Right now</div>' + (d.live?.error ? '<div class="rnote">' + esc(d.live.error) + '</div>' : '<div>' + fmt(live.length) + ' aircraft within ' + fmt(Math.max(2, d.radius_mi)) + ' mi, ' + fmt(lowNow.length) + ' under 3,000 ft.</div>' + (live.length ? '<div class="rnote">' + live.slice(0, 8).map(x => esc((x.flight || x.reg || x.hex) + (x.desc ? ' · ' + x.desc : '') + (x.alt != null ? ' · ' + fmt(x.alt) + ' ft' : ''))).join('; ') + '</div>' : '')) + '</div>' +
-      '<div class="bacts"><button class="btn primary" id="arPdf" type="button">Export PDF</button><button class="btn" id="arCsv" type="button">Export CSV</button><button class="btn" id="arLive" type="button">Show Live Planes</button></div>' +
+      '<div class="bacts"><button class="btn primary" id="arPdf" type="button"' + (dead ? ' disabled title="Nothing to export yet"' : '') + '>Export PDF</button><button class="btn" id="arCsv" type="button"' + (dead ? ' disabled title="Nothing to export yet"' : '') + '>Export CSV</button><button class="btn" id="arLive" type="button">Show Live Planes</button></div>' +
       '<div class="rnote bsec">A sighting is one aircraft seen in the area at one of our once-a-minute samples, so a plane that circles counts more than one that passes. Coverage: ~100 nm around Houston, from community ADS-B receivers (some military and private aircraft are hidden). History starts October 2026.<span class="src"> adsb.lol; OurAirports.</span></div>');
     card.querySelector('#arPdf').onclick = exportReport; card.querySelector('#arCsv').onclick = exportCsv;
+    if (dead) { const sec = card.querySelector('.bsec'); sec.replaceChildren(errorBox(unavail, () => report({ geometry, label }), 'Air traffic data')); [...card.querySelectorAll('.bsec')].forEach(b => { if (/Right now/.test(b.textContent)) b.remove(); }); }
     card.querySelector('#arLive').onclick = () => ctx.live?.set?.({ planes: true });
     card.querySelectorAll('[data-apt]').forEach(b => b.onclick = () => ctx.airportCard?.(b.dataset.apt, { fly: true }));
   }
@@ -77,7 +78,7 @@ export function initAirReport(ctx) {
     for (const [k, [n]] of Object.entries(KIND)) if (p.mix?.[k] != null) rows.push({ Table: 'Mix', Item: n, Value: p.mix[k], Unit: '% of sightings', Samples: '' });
     for (const a of d.airports) rows.push({ Table: 'Airport nearby', Item: a.name + ' (' + (a.iata || a.icao || a.ident) + ')', Value: (a.km * 0.621371).toFixed(1), Unit: 'miles', Samples: '' });
     for (const x of d.live?.aircraft || []) rows.push({ Table: 'Overhead now', Item: (x.flight || x.reg || x.hex) + (x.desc ? ' · ' + x.desc : ''), Value: x.alt ?? '', Unit: 'ft', Samples: '' });
-    saveCsv(ctx, 'airtraffic', label, rows);
+    saveCsv(ctx, 'airtraffic', label, rows, { geom: last.geometry });
   }
   async function exportReport() {
     if (!last) return; const { d, label, geometry } = last, p = d.profile, live = d.live?.aircraft || [];
@@ -91,9 +92,10 @@ export function initAirReport(ctx) {
       (d.airports.length ? '<h2>Airports nearby</h2>' + table(['Airport', 'Code', { t: 'Miles', r: 1 }], d.airports.map(a => [esc(a.name), esc(a.iata || a.icao || a.ident), (a.km * 0.621371).toFixed(1)])) : '') +
       (live.length ? '<h2>Aircraft overhead when the report was made</h2>' + table(['Flight', 'Aircraft', { t: 'Altitude ft', r: 1 }, { t: 'Miles away', r: 1 }], live.map(x => [esc(x.flight || x.reg || x.hex), esc(x.desc || x.type || ''), x.ground ? 'ground' : fmt(x.alt), fmt(x.miles)])) : '');
     await savePdf(ctx, 'airtraffic', label, reportDoc({ kicker: 'Air traffic report', title: label, meta: p.since ? 'History since ' + esc(p.since) : '', body,
-      sources: 'Community ADS-B receivers (adsb.lol, ODbL), sampled once a minute within ~100 nm of Houston into ~5 km cells; OurAirports (airports, runways). A sighting is one aircraft seen at one sample: an exposure measure, not a count of distinct flights.' }));
+      sources: 'Community ADS-B receivers (adsb.lol, ODbL), sampled once a minute within ~100 nm of Houston into ~5 km cells; OurAirports (airports, runways). A sighting is one aircraft seen at one sample: an exposure measure, not a count of distinct flights.' }), { meta: { geom: geometry } });
   }
-  ctx.addAreaReport?.({ key: 'airtraffic', label: 'Air Traffic Report', desc: 'Plane traffic over an area: sightings a day, the busiest hours, how much is low, jets vs props vs helicopters, nearby airports and approach paths, and what’s overhead right now. Export as a PDF report or CSV.',
+  ctx.addAreaReport?.({ key: 'airtraffic', label: 'Air Traffic Report', desc: 'Plane traffic over an area: sightings a day, busiest hours, how much is low, the mix of aircraft, nearby airports and what’s overhead now. PDF or CSV.',
+    cover: { test: c => nearHouston(c, 100), short: 'Houston area only', why: 'Air traffic history covers about 100 nautical miles around Houston. Move the map there, or pick an area in the Houston region.' },
     note: 'Houston region (~100 nm). Select an area, or use the map view', run: ({ geometry, label }) => report({ geometry, label }) });
 
   // ---------- flight report (one aircraft) ----------

@@ -7,6 +7,69 @@ export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ESC[c]);
 export const slug = s => String(s || 'area').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'area';
 export const fmt = v => v == null || v === '' || Number.isNaN(+v) ? '—' : (+v).toLocaleString('en-US', { maximumFractionDigits: Math.abs(+v) < 10 ? 1 : 0 });
 export const today = () => new Date().toISOString().slice(0, 10);
+// every saved file is named fs-{report}-{scope}-{date}.{ext}
+export const fileBase = (kind, scope, date = today()) => 'fs-' + slug(kind).slice(0, 24) + '-' + slug(scope) + '-' + date;
+
+// ---------- one friendly error path for every data call ----------
+// getJSON(url, { what, ...fetch options }) is the one way a data call fails. It checks the status and the content type,
+// catches parse errors, and throws an Error whose message is a plain sentence ("Flood data isn’t available right now. Try
+// again in a minute."): never "Unexpected token", "HTTP 404" or "Failed to execute". err.status keeps the status, err.detail the raw
+// text (console only), err.friendly marks the message as fit to show. A JSON { error } on a 4xx is the server explaining a
+// refusal in words ("That area is too large…"), so that sentence is kept. An aborted request is rethrown as it is.
+// A few failures have a more useful sentence than "isn’t available": a big area that ran out of time (Vercel's 504 /
+// FUNCTION_INVOCATION_TIMEOUT page, or our own 5xx "…took too long…" from a database time limit), an outline too detailed
+// to send (413) and too many requests (429). The wording is lib/http.mjs's httpMessage (test/reportsux.mjs checks they
+// match); it is repeated here because this file is also loaded by the server (api/pdf.js) with no lib/ beside it.
+export const SPECIFIC = {
+  timeout: 'The server took too long on this area. Try again (a second run is usually faster) or pick a smaller area.',
+  tooBig: 'That area outline is too detailed to send. Try a simpler shape.',
+  busy: 'Too many requests. Try again in a minute.',
+};
+const specific = (status, text, body) => {
+  const said = typeof body?.error === 'string' ? body.error.trim() : '';
+  if (said && said.length < 240 && (status < 500 || /took too long/i.test(said))) return said;
+  if (status === 504 || /FUNCTION_INVOCATION_TIMEOUT/i.test(text)) return SPECIFIC.timeout;
+  if (status === 413 || /FUNCTION_PAYLOAD_TOO_LARGE/i.test(text)) return SPECIFIC.tooBig;
+  return status === 429 ? SPECIFIC.busy : '';
+};
+export const unavailable = what => { const w = String(what || 'This').trim() || 'This'; return w.charAt(0).toUpperCase() + w.slice(1) + ' isn’t available right now. Try again in a minute.'; };
+export const friendly = (e, what) => e?.friendly ? e.message : unavailable(what);
+export async function getJSON(url, { what = 'This', ...init } = {}) {
+  const fail = (status, detail, say) => { const e = new Error(say || unavailable(what)); e.status = status; e.detail = String(detail ?? '').slice(0, 600); e.friendly = true; e.what = what; try { console.warn('[data]', what, status, e.detail); } catch (x) {} return e; };
+  let r; try { r = await fetch(url, init); } catch (e) { if (e?.name === 'AbortError') throw e; throw fail(0, e?.message || e); }
+  const text = await r.text().catch(() => ''), type = r.headers?.get?.('content-type') || '';
+  let body, parsed = false; if (!type || /json/i.test(type)) { try { body = JSON.parse(text); parsed = true; } catch (e) {} }
+  if (!r.ok) throw fail(r.status, parsed && body?.error || text, specific(r.status, text, parsed ? body : null));
+  if (!parsed) throw fail(r.status, text);
+  return body;
+}
+// the sentence with a Retry button: an element to put in a card or a section
+export function errorBox(msg, onRetry, what) {
+  const d = document.createElement('div'); d.className = 'rnote err eb', d.setAttribute('role', 'alert');
+  const s = document.createElement('span'); s.textContent = msg instanceof Error ? friendly(msg, what) : String(msg || unavailable(what)); d.append(s);
+  if (onRetry) { const b = document.createElement('button'); b.type = 'button'; b.className = 'lnk eb-retry'; b.textContent = 'Retry'; b.onclick = () => { b.disabled = true; onRetry(); }; d.append(' ', b); }
+  return d;
+}
+// a map layer that couldn't load: the same sentence in one toast and under its switch, and the switch goes back to off
+export function layerFailed(ctx, e, { what, off, note } = {}) {
+  if (e?.name === 'AbortError') return '';
+  const msg = friendly(e, what); try { console.warn('[layer]', what, e?.detail || e?.message); } catch (x) {}
+  ctx.toast?.(msg); try { off?.(); } catch (x) { console.error(x); }
+  try { ctx.syncQuickLayers?.(); } catch (x) {}
+  if (note) { note.textContent = msg; note.hidden = false; note.classList.add('err'); }
+  return msg;
+}
+export const layerOK = note => { note?.classList.remove('err'); };
+
+// ---------- where each report has data ----------
+const HOU = [-95.37, 29.76];
+export const inTexas = c => !!c && c[0] > -106.7 && c[0] < -93.4 && c[1] > 25.8 && c[1] < 36.6;
+export const inHouston = c => !!c && c[0] > -95.95 && c[0] < -95.0 && c[1] > 29.5 && c[1] < 30.15; // the City of Houston Police file
+export const nearHouston = (c, nm = 100) => { if (!c) return false; const R = Math.PI / 180, h = Math.sin((c[1] - HOU[1]) * R / 2) ** 2 + Math.cos(c[1] * R) * Math.cos(HOU[1] * R) * Math.sin((c[0] - HOU[0]) * R / 2) ** 2; return 7917.6 * Math.asin(Math.sqrt(h)) <= nm * 1.15078; };
+// the middle of a Polygon / MultiPolygon's bounding box
+export const middleOf = g => { let w = 180, s = 90, e = -180, n = -90; const walk = a => typeof a[0] === 'number' ? (w = Math.min(w, a[0]), e = Math.max(e, a[0]), s = Math.min(s, a[1]), n = Math.max(n, a[1])) : a.forEach(walk); if (!g?.coordinates) return null; walk(g.coordinates); return e < w ? null : [(w + e) / 2, (s + n) / 2]; };
+// 'Map view near Katy', or plain 'Map view' where no place is known (never a guessed town)
+export const viewLabel = ctx => { const p = ctx.viewPlace?.(); return p ? 'Map view near ' + p : 'Map view'; };
 
 // ---------- the Finishes Solutions report look (every report, on screen and as a PDF) ----------
 // Letter, portrait unless a report needs the width (a wide filing list). Montserrat for text, IBM Plex Mono for labels and
@@ -144,29 +207,30 @@ async function inlineImages(html) {
 // a report as a PDF (rendered on the server in the report's own layout). If the PDF service can't be reached the
 // report is saved as a web page instead (it has a Print or Save as PDF button), and the toast says so.
 // meta: what the Reports tab records with it (report kind, scope, counts)
-export async function savePdf(ctx, kind, label, html, { landscape = false, meta = {}, name = kind + '-report-' + slug(label) + '-' + today() } = {}) {
+export async function savePdf(ctx, kind, label, html, { landscape = false, meta = {}, name = fileBase(kind, label) } = {}) {
   const title = (/<title>([^<]*)<\/title>/.exec(html)?.[1] || label).replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
   ctx.toast?.('Preparing the PDF…');
-  let blob = null, why = '';
+  let blob = null;
   try {
     const r = await fetch('api/pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ html: await inlineImages(html), landscape, title }) });
-    if (r.ok && /pdf/.test(r.headers.get('content-type') || '')) blob = await r.blob(); else why = (await r.json().catch(() => ({}))).error || 'HTTP ' + r.status;
-  } catch (e) { why = e.message; }
-  ctx.exportMeta = { report: kind, scope: label, ...meta, format: blob ? 'pdf' : 'html' };
+    if (r.ok && /pdf/.test(r.headers.get('content-type') || '')) blob = await r.blob(); else console.warn('[pdf]', r.status, await r.text().catch(() => ''));
+  } catch (e) { console.warn('[pdf]', e?.message || e); }
+  // a PDF that fell back to a web page keeps the same file name (.html) and is marked on its Recent exports row
+  ctx.exportMeta = { report: kind, scope: label, ...meta, format: blob ? 'pdf' : 'html', fallback: !blob };
   try {
     if (blob) await ctx.saveFile(name + '.pdf', blob, 'application/pdf');
-    else { await ctx.saveFile(name + '.html', html, 'text/html'); ctx.toast?.('The PDF couldn’t be made (' + why + '). Saved as a web page instead: open it and use Print → Save as PDF.'); }
+    else { await ctx.saveFile(name + '.html', html, 'text/html'); ctx.toast?.('The PDF service isn’t available right now, so this was saved as a web page. Open it and use Print → Save as PDF.'); }
   } finally { ctx.exportMeta = null; }
 }
 // the same report as a web page
 export async function saveHtml(ctx, kind, label, html, meta = {}) {
   ctx.exportMeta = { report: kind, format: 'html', scope: label, ...meta };
-  try { await ctx.saveFile(kind + '-report-' + slug(label) + '-' + today() + '.html', html, 'text/html'); } finally { ctx.exportMeta = null; }
+  try { await ctx.saveFile(fileBase(kind, label) + '.html', html, 'text/html'); } finally { ctx.exportMeta = null; }
 }
-export function saveCsv(ctx, kind, label, rows) {
+export function saveCsv(ctx, kind, label, rows, meta = {}) {
   if (!rows?.length) { ctx.toast?.('Nothing to export.'); return; }
-  ctx.exportMeta = { report: kind, format: 'csv', scope: label, filings: rows.length, unit: 'rows' };
-  try { ctx.exportCsv(rows, kind + '-' + slug(label) + '-' + today()); } finally { ctx.exportMeta = null; }
+  ctx.exportMeta = { report: kind, format: 'csv', scope: label, filings: rows.length, unit: 'rows', ...meta };
+  try { ctx.exportCsv(rows, fileBase(kind, label)); } finally { ctx.exportMeta = null; }
 }
 // the side card: a header (kicker, title, sub) and a loading note; returns the card element
 export function openCard(ctx, { kicker, title, sub = '', loading = 'Loading…' }) {
@@ -186,28 +250,57 @@ export const viewBox = map => { const b = map.getBounds(), w = b.getWest(), s = 
 export const centerOf = g => { const r = (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates[0][0]) || []; let x = 0, y = 0; r.forEach(p => { x += p[0]; y += p[1]; }); return r.length ? [x / r.length, y / r.length] : null; };
 
 // ---------- area report registry ----------
-// ctx.addAreaReport({ key, label, desc, note, run({ geometry, label, center }) }): a button in the Site section's "Area
-// reports" (a circle of the chosen radius around the building), a card in the Reports tab (selected area, map view or
-// draw an area) and a row under "Reports for this area" in the Map panel (the selection, or the map view without one).
-const SHORT = { drivetime: '10–30 minute drives', traffic: 'Busiest roads, speeds', airtraffic: 'Planes overhead' };
+// ctx.addAreaReport({ key, label, desc, note, run({ geometry, label, center }), cover, modes, noPanel, noSite }): a button in the
+// Site section's "Area reports" (a circle of the chosen radius around the building), a card in the Reports tab (selected
+// area, map view and/or draw an area, per `modes`) and a row under "Reports for this area" in the Map panel (the selection, or
+// the map view without one).
+//   cover: { test([lon, lat]) -> bool, short: 'Texas only', why: 'sentence' }: where the report has data. Outside it the
+//          buttons are disabled with the short note, and a run is refused with the sentence.
+//   modes: which ways to pick the area the Reports tab offers (default all three: 'selection', 'view', 'pick')
+//   noPanel / noSite: the Map panel / the Site section already have their own button for it
+const SHORT = { drivetime: '10–30 minute drives', traffic: 'Busiest roads, speeds', airtraffic: 'Planes overhead', fema: 'Flood zones, claims', environmental: 'Cleanup sites, permits' };
 export function initAreaReports(ctx) {
   const list = ctx.areaReports = [];
   const grid = document.getElementById('arepGrid');
-  const syncSel = () => list.forEach(r => { if (r.sb) r.sb.querySelector('.ar-d').textContent = ctx.sel?.feature ? SHORT[r.key] || r.label : 'Run on map view'; });
+  ctx.getJSON = getJSON; ctx.errorBox = errorBox; ctx.unavailable = unavailable;
+  // where the next report would be about: the selection's middle, else the middle of the map
+  ctx.areaCenter = () => { const s = ctx.sel; if (s?.feature) return s.center || middleOf(s.feature.geometry || s.feature); const c = ctx.map.getCenter(); return [c.lng, c.lat]; };
+  const covered = (r, c) => !r.cover || r.cover.test(c);
+  const syncSel = () => list.forEach(r => { if (!r.sb) return; let ok = true; try { ok = covered(r, ctx.areaCenter()); } catch (e) {}
+    r.sb.disabled = !ok; r.sb.setAttribute('aria-disabled', String(!ok));
+    r.sb.querySelector('.ar-d').textContent = !ok ? r.cover.short : ctx.sel?.feature ? SHORT[r.key] || r.label : 'Run on map view'; r.sb.title = ok ? r.desc || r.label : r.cover.why; });
   ctx.addAreaReport = r => {
     if (list.some(x => x.key === r.key)) return; list.push(r);
-    if (grid) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ar-row'; b.dataset.ic = r.key; b.title = r.desc || r.label;
+    if (grid && !r.noPanel) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ar-row'; b.dataset.ic = r.key; b.title = r.desc || r.label;
       b.innerHTML = '<span class="ar-i" aria-hidden="true"></span><b>' + esc(r.label) + '</b><span class="ar-d"></span>';
-      b.onclick = () => ctx.runAreaReport(r.key, ctx.sel?.feature ? 'selection' : 'view'); grid.appendChild(b); r.sb = b; }
+      b.onclick = () => { if (!b.disabled) ctx.runAreaReport(r.key, ctx.sel?.feature ? 'selection' : 'view'); }; grid.appendChild(b); r.sb = b; }
     syncSel();
   };
   // which: 'selection' | 'view' | { geometry, label, center }
   ctx.runAreaReport = (key, which) => {
     const r = list.find(x => x.key === key); if (!r) return false;
+    let job;
+    if (which === 'selection') { const s = ctx.sel; if (!s?.feature) { ctx.toast?.('Select an area first (Box, Shape, Radius or County).'); return false; } const g = s.feature.geometry || s.feature; job = { geometry: g, label: s.label || 'Selected area', center: s.center || centerOf(g) }; }
+    else if (which === 'view') { const g = viewBox(ctx.map); job = { geometry: g, label: viewLabel(ctx), center: ctx.map.getCenter().toArray() }; }
+    else job = which;
+    if (r.cover && !covered(r, job.center || centerOf(job.geometry))) { ctx.toast?.(r.cover.why); return false; }
     if (ctx.view !== 'map') ctx.setView?.('map');
-    if (which === 'selection') { const s = ctx.sel; if (!s?.feature) { ctx.toast?.('Select an area first (Area, Shape, Radius or County).'); return false; } const g = s.feature.geometry || s.feature; r.run({ geometry: g, label: s.label || 'Selected area', center: s.center || centerOf(g) }); return true; }
-    if (which === 'view') { const g = viewBox(ctx.map); r.run({ geometry: g, label: 'Map view near ' + (ctx.viewPlace?.() || 'Houston'), center: ctx.map.getCenter().toArray() }); return true; }
-    r.run(which); return true;
+    r.run(job); return true;
   };
-  ctx.onChange?.(syncSel);
+
+  // "Draw an area": remember which report was asked for, switch to the box tool, keep a banner up, and run it when the next
+  // box, shape or radius is finished. Cancel (or picking something else to do) drops it. Every report uses the same wording.
+  let want = null;
+  const bar = document.createElement('div'); bar.className = 'draw-banner'; bar.hidden = true; bar.setAttribute('role', 'status');
+  bar.innerHTML = '<span class="db-t"></span><button type="button" class="lnk db-x">Cancel</button>'; (ctx.viewport || document.body).appendChild(bar);
+  const stop = () => { want = null; bar.hidden = true; };
+  bar.querySelector('.db-x').onclick = () => { stop(); ctx.setMode?.('pan'); };
+  ctx.drawAreaFor = (name, run) => {
+    ctx.setView?.('map'); ctx.setMode?.('area');
+    want = { run, base: ctx.sel?.feature || null, name }; bar.querySelector('.db-t').textContent = 'Draw an area for ' + name + ' · drag a box on the map, or pick Shape or Radius'; bar.hidden = false;
+  };
+  ctx.drawAreaPending = () => want?.name || null;
+  ctx.onChange?.(() => { if (!want) return; const s = ctx.sel; if (!s?.feature || s.feature === want.base || s.kind === 'county') return; const w = want; stop(); w.run(s); });
+
+  ctx.onChange?.(syncSel); ctx.map?.on?.('moveend', syncSel);
 }

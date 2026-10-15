@@ -7,10 +7,10 @@ import { categoryOf, CATEGORIES, overpassQuery, parsePlaces, businessQuery } fro
 
 const OVERPASS = [process.env.OVERPASS_URL, 'https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'].filter(Boolean);
 // the main public server is often busy: try a mirror before giving up
-async function overpass(body) {
+async function overpass(body, ms = 14000) {
   let last;
   for (const url of OVERPASS) {
-    try { const resp = await fetch(url, { method: 'POST', headers: UA, body, signal: AbortSignal.timeout(14000) }); if (resp.ok) return resp.json(); last = new Error('OpenStreetMap search failed (HTTP ' + resp.status + ')'); }
+    try { const resp = await fetch(url, { method: 'POST', headers: UA, body, signal: AbortSignal.timeout(ms) }); if (resp.ok) return resp.json(); last = new Error('OpenStreetMap search failed (HTTP ' + resp.status + ')'); }
     catch (e) { last = e; }
   }
   throw last;
@@ -23,12 +23,14 @@ export default async function handler(req, res) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 85 || Math.abs(lon) > 180) return res.status(400).json({ error: 'lat/lon out of range' });
   const business = req.query.mode === 'business', name = String(req.query.name || '').slice(0, 60);
   if (business ? name.trim().length < 2 : !what.trim()) return res.status(400).json({ error: business ? 'Type at least 2 letters of the business name.' : 'Say what to look for.' });
-  const cat = business ? null : categoryOf(what), radii = business ? [8000, 30000, 80000] : (cat && CATEGORIES[cat].radius) || [3000, 12000, 40000];
+  // fast=1 (the map search, while typing): one 30 km look with a short timeout, so a busy server can't hold the list up
+  const fast = business && req.query.fast === '1';
+  const cat = business ? null : categoryOf(what), radii = fast ? [30000] : business ? [8000, 30000, 80000] : (cat && CATEGORIES[cat].radius) || [3000, 12000, 40000];
   let places = [], used = 0;
   try {
     for (const r of radii) {
       used = r;
-      const d = await overpass(new URLSearchParams({ data: business ? businessQuery(name, lat, lon, r, limit) : overpassQuery(cat, what, lat, lon, r, limit) }));
+      const d = await overpass(new URLSearchParams({ data: business ? businessQuery(name, lat, lon, r, limit) : overpassQuery(cat, what, lat, lon, r, limit) }), fast ? 5000 : 14000);
       places = parsePlaces(d.elements, [lat, lon], cat, limit);
       if (places.length >= Math.min(limit, 3)) break;
     }

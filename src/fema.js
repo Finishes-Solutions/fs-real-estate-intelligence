@@ -4,8 +4,7 @@
 //   share of the area in high / moderate / minimal flood risk, NFIP flood insurance claims paid nearby (by year and storm),
 //   federal disaster declarations since 2000, and FEMA's National Risk Index (expected annual loss by hazard).
 //   The report opens in the card and exports as a PDF report or CSV.
-import { reportDoc, savePdf, areaMap } from './reportkit.js';
-import { readJSON } from './lib/http.mjs';
+import { reportDoc, savePdf, saveCsv, areaMap, getJSON, errorBox, unavailable } from './reportkit.js';
 import { reveal } from './motion.js';
 const SRC = 'fema-nfhl';
 const RISK_COL = { high: '#1d4ed8', moderate: '#f59e0b', minimal: '#9ca3af', undetermined: '#a78bfa', water: '#38bdf8', unmapped: '#e5e7eb' };
@@ -28,7 +27,7 @@ export function initFema(ctx) {
     if (!on) { ctx.setLegend?.('fema', ''); return; }
     const c = cls, head = '<div class="t">Flood zones (FEMA)</div>';
     ctx.setLegend?.('fema', head + '<div class="lg-note">Loading FEMA’s legend…</div>');
-    try { legends[c] ||= fetch('api/fema?legend=1' + (c === 'high' ? '&cls=high' : '')).then(readJSON);
+    try { legends[c] ||= getJSON('api/fema?legend=1' + (c === 'high' ? '&cls=high' : ''), { what: 'The flood zone legend' });
       const d = await legends[c]; if (!on || c !== cls) return;
       ctx.setLegend?.('fema', head + d.items.map(x => '<div class="li"><img class="lg-sw" src="' + esc(x.img) + '" alt="" title="' + esc(x.fema) + '"><span>' + esc(x.label) + '</span></div>').join('') +
         '<div class="lg-note">Unshaded: minimal risk or not mapped. Zones show from neighborhood zoom.</div>'); }
@@ -48,10 +47,7 @@ export function initFema(ctx) {
   ctx.femaClassNow = () => cls;
 
   // ---------- report ----------
-  const reportFor = async (geometry, label) => {
-    const r = await fetch('api/fema', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) });
-    return readJSON(r);
-  };
+  const reportFor = (geometry, label) => getJSON('api/fema', { what: 'Flood and hazard data', method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) });
   ctx.femaReportData = reportFor;
   const shareBar = sh => { const order = ['high', 'moderate', 'minimal', 'undetermined', 'water', 'unmapped'].filter(k => sh[k]); return '<div class="fm-bar m-hbar">' + order.map(k => '<i style="width:' + sh[k] + '%;background:' + RISK_COL[k] + '" title="' + esc(RISK_SHORT[k] + ': ' + sh[k] + '%') + '"></i>').join('') + '</div><div class="fm-leg">' + order.map(k => '<span><i style="background:' + RISK_COL[k] + '"></i>' + esc(RISK_SHORT[k]) + ' <b>' + sh[k] + '%</b></span>').join('') + '</div>'; };
   function yearBars(rows) {
@@ -61,17 +57,17 @@ export function initFema(ctx) {
     return '<svg class="cr-bars" viewBox="0 0 ' + W + ' ' + (H + 12) + '" role="img" aria-label="Flood claims paid per year">' + all.map((r, i) => '<g><title>' + esc(r.year + ': ' + r.claims + ' claims, ' + fmtM(r.paid) + ' paid') + '</title><rect class="m-bar" x="' + (i * bw + .5).toFixed(1) + '" y="' + (H - r.paid / max * H).toFixed(1) + '" width="' + Math.max(1, bw - 1).toFixed(1) + '" height="' + (r.paid / max * H).toFixed(1) + '" fill="#1d4ed8"/>' +
       ((r.year % 5 === 0 || i === 0) ? '<text x="' + (i * bw).toFixed(1) + '" y="' + (H + 10) + '" font-size="8.5" fill="currentColor" opacity=".6">' + r.year + '</text>' : '') + '</g>').join('') + '</svg>';
   }
-  const err = x => x?.error ? '<div class="rnote err">Unavailable right now (' + esc(x.error) + ').</div>' : '';
+  const err = (x, what = 'This part of the report') => x?.error ? '<div class="rnote err">' + esc(/in time/.test(x.error) ? 'Didn’t finish in time; run the report again.' : unavailable(what)) + '</div>' : '';
   function body(d) {
     const z = d.flood_zones || {}, c = d.nfip_claims || {}, s = d.disasters || {}, n = d.risk_index;
-    return '<div class="bsec"><div class="lt">Flood zones</div>' + (z.shares ? shareBar(z.shares) + '<div class="rnote">' + [z.zones?.length ? 'FEMA zones here: ' + z.zones.map(x => x.zone + ' ' + x.pct + '%').join(', ') : '', z.floodway ? 'Includes regulatory floodway (building is restricted).' : '', z.bfe ? 'Base flood elevation ' + (z.bfe.min === z.bfe.max ? z.bfe.min : z.bfe.min + '–' + z.bfe.max) + ' ft.' : '', z.truncated ? 'Area has many zone shapes; shares are approximate.' : '', z.method === 'points' ? 'Shares are measured at ' + fmtN(z.samples) + ' evenly spaced points across the area.' : ''].filter(Boolean).map(esc).join(' ') + '</div>' : z.skipped ? '<div class="rnote">' + esc(z.skipped) + '</div>' : err(z)) + '</div>' +
-      '<div class="bsec"><div class="lt">Flood insurance claims (NFIP)</div>' + (c.error ? err(c) : '<div class="kgrid"><div><b>' + fmtN(c.claims || 0) + '</b><span>Claims paid</span></div><div><b>' + fmtM(c.paid || 0) + '</b><span>Total paid</span></div><div><b>' + (c.avg_paid ? fmtM(c.avg_paid) : '—') + '</b><span>Average claim</span></div><div><b>' + fmtN(c.last_10_years || 0) + '</b><span>Last 10 years</span></div></div>' +
+    return '<div class="bsec"><div class="lt">Flood zones</div>' + (z.shares ? shareBar(z.shares) + '<div class="rnote">' + [z.zones?.length ? 'FEMA zones here: ' + z.zones.map(x => x.zone + ' ' + x.pct + '%').join(', ') : '', z.floodway ? 'Includes regulatory floodway (building is restricted).' : '', z.bfe ? 'Base flood elevation ' + (z.bfe.min === z.bfe.max ? z.bfe.min : z.bfe.min + '–' + z.bfe.max) + ' ft.' : '', z.truncated ? 'Area has many zone shapes; shares are approximate.' : '', z.method === 'points' ? 'Shares are measured at ' + fmtN(z.samples) + ' evenly spaced points across the area.' : ''].filter(Boolean).map(esc).join(' ') + '</div>' : z.skipped ? '<div class="rnote">' + esc(z.skipped) + '</div>' : err(z, 'Flood zone data')) + '</div>' +
+      '<div class="bsec"><div class="lt">Flood insurance claims (NFIP)</div>' + (c.error ? err(c, 'Flood insurance claims') : '<div class="kgrid"><div><b>' + fmtN(c.claims || 0) + '</b><span>Claims paid</span></div><div><b>' + fmtM(c.paid || 0) + '</b><span>Total paid</span></div><div><b>' + (c.avg_paid ? fmtM(c.avg_paid) : '—') + '</b><span>Average claim</span></div><div><b>' + fmtN(c.last_10_years || 0) + '</b><span>Last 10 years</span></div></div>' +
         yearBars(c.by_year) + (c.top_events?.length ? '<dl>' + c.top_events.slice(0, 5).map(e => '<dt>' + esc(e.event) + '</dt><dd class="mono">' + fmtN(e.claims) + ' · ' + fmtM(e.paid) + '</dd>').join('') + '</dl>' : '') +
         '<div class="rnote">Claims in the ' + fmtN(c.tracts_searched || 0) + ' census tract' + (c.tracts_searched === 1 ? '' : 's') + ' touching this area' + (c.in_high_risk_zone_pct != null ? '; ' + c.in_high_risk_zone_pct + '% were rated in a high-risk zone, so flooding hits outside the mapped floodplain too' : '') + '. Only insured properties appear.' +
         (c.tracts_skipped ? ' <b>' + fmtN(c.tracts_skipped) + ' more tract' + (c.tracts_skipped === 1 ? '' : 's') + ' couldn’t be read in time</b>, so the totals are low; run the report again for a complete count.' : '') + '</div>') + '</div>' +
-      '<div class="bsec"><div class="lt">Federal disaster declarations since 2000</div>' + (s.error ? err(s) : '<div class="rnote">' + fmtN(s.count || 0) + ' declarations for ' + esc((d.counties || []).join(', ') || 'this area') + (s.major != null ? ' (' + s.major + ' major disasters)' : '') + (s.by_type ? ': ' + Object.entries(s.by_type).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + ' ' + v).join(', ') : '') + '.</div>' +
+      '<div class="bsec"><div class="lt">Federal disaster declarations since 2000</div>' + (s.error ? err(s, 'Disaster declarations') : '<div class="rnote">' + fmtN(s.count || 0) + ' declarations for ' + esc((d.counties || []).join(', ') || 'this area') + (s.major != null ? ' (' + s.major + ' major disasters)' : '') + (s.by_type ? ': ' + Object.entries(s.by_type).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + ' ' + v).join(', ') : '') + '.</div>' +
         (s.list?.length ? s.list.slice(0, 6).map(x => '<div class="pl"><b>' + esc(x.title) + '</b><span>' + esc(x.date + ' · ' + x.type + ' · ' + x.kind) + '</span></div>').join('') : '')) + '</div>' +
-      '<div class="bsec"><div class="lt">FEMA National Risk Index</div>' + (!n ? '<div class="rnote">No risk index data here.</div>' : n.error ? err(n) : '<div class="kgrid"><div><b>' + esc(n.risk_rating || '—') + '</b><span>Overall risk · ' + n.risk_score + ' / 100</span></div><div><b>' + fmtM(n.expected_annual_loss) + '</b><span>Expected annual loss</span></div></div>' +
+      '<div class="bsec"><div class="lt">FEMA National Risk Index</div>' + (!n ? '<div class="rnote">No risk index data here.</div>' : n.error ? err(n, 'The FEMA risk index') : '<div class="kgrid"><div><b>' + esc(n.risk_rating || '—') + '</b><span>Overall risk · ' + n.risk_score + ' / 100</span></div><div><b>' + fmtM(n.expected_annual_loss) + '</b><span>Expected annual loss</span></div></div>' +
         '<dl>' + n.hazards.slice(0, 6).map(h => '<dt>' + esc(h.hazard) + '</dt><dd class="mono">' + fmtM(h.eal) + '/yr <span class="sc">' + esc(h.rating || '') + '</span></dd>').join('') + '</dl>' +
         '<div class="rnote">For the ' + n.tracts + ' census tract' + (n.tracts === 1 ? '' : 's') + ' touching this area (' + fmtN(n.population) + ' people, ' + fmtM(n.building_value) + ' of buildings). Scores are percentiles among US tracts. Social vulnerability: ' + esc(n.social_vulnerability.rating || '—') + '; community resilience: ' + esc(n.community_resilience.rating || '—') + '.</div>') + '</div>';
   }
@@ -79,7 +75,7 @@ export function initFema(ctx) {
     const card = ctx.card || document.getElementById('card');
     ctx.closeCard?.(); card.innerHTML = '<div class="top"><div><div class="kicker">FEMA report</div><h2>' + esc(label) + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote loading">Checking flood zones, insurance claims, disasters and risk…</div></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
-    let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return; }
+    let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Flood and hazard data')); return; }
     last = { d, label, geometry };
     card.innerHTML = '<div class="top"><div><div class="kicker">FEMA report</div><h2>' + esc(label) + '</h2><div class="bsub">' + (d.area_sqmi < 10 ? d.area_sqmi.toFixed(2) : fmtN(d.area_sqmi)) + ' sq mi</div></div><button class="x" aria-label="Close">×</button></div>' + body(d) +
       '<div class="bacts"><button class="btn" id="fmLayer" type="button">Show Flood Zones on Map</button><button class="btn primary" id="fmPdf" type="button">Export PDF</button><button class="btn" id="fmCsv" type="button">Export CSV</button></div>' +
@@ -91,7 +87,6 @@ export function initFema(ctx) {
   }
   ctx.femaReport = report;
 
-  const slug = s => String(s || 'area').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'area';
   function exportCsv() {
     if (!last) return; const { d } = last, rows = [], z = d.flood_zones || {}, c = d.nfip_claims || {}, n = d.risk_index, s = d.disasters || {};
     for (const [k, v] of Object.entries(z.shares || {})) rows.push({ Table: 'Flood zone share', Item: RISK_SHORT[k] || k, Year: '', Count: '', 'Amount ($)': '', Percent: v, Detail: '' });
@@ -100,7 +95,7 @@ export function initFema(ctx) {
     for (const x of s.list || []) rows.push({ Table: 'Disaster declaration', Item: x.title, Year: x.date, Count: '', 'Amount ($)': '', Percent: '', Detail: x.type + ' · ' + x.kind + ' #' + x.number });
     for (const h of n?.hazards || []) rows.push({ Table: 'Risk index: expected annual loss', Item: h.hazard, Year: '', Count: '', 'Amount ($)': h.eal, Percent: '', Detail: h.rating || '' });
     for (const t of n?.by_tract || []) rows.push({ Table: 'Risk index: tract', Item: t.tract, Year: '', Count: t.population, 'Amount ($)': t.eal, Percent: t.risk_score, Detail: t.risk_rating + ' · ' + t.county + ' County' });
-    ctx.exportCsv(rows, 'fema-' + slug(last.label) + '-' + new Date().toISOString().slice(0, 10));
+    saveCsv(ctx, 'fema', last.label, rows, { geom: last.geometry });
   }
   // the area on a street map (narrow column beside the figures)
   const areaMapOf = g => areaMap([{ geometry: g, stroke: '#1d4ed8', fill: 'rgba(29,78,216,.10)', dash: true }], { W: 360, H: 260, px: 300 });
@@ -115,9 +110,13 @@ export function initFema(ctx) {
       (d.risk_index?.by_tract?.length ? '<div class="lt">Census tracts</div>' + d.risk_index.by_tract.map(t => '<div class="pl"><b>' + esc(t.tract) + '</b><span>' + esc(t.risk_rating || '') + ' · ' + fmtM(t.eal) + '/yr</span></div>').join('') : '') + '</div></div>' +
       (d.disasters?.list?.length > 6 ? '<div class="bsec"><div class="lt">All disaster declarations since 2000</div>' + d.disasters.list.map(x => '<div class="pl"><b>' + esc(x.title) + '</b><span>' + esc(x.date + ' · ' + x.type + ' · ' + x.kind + ' #' + x.number) + '</span></div>').join('') + '</div>' : '') +
       '' });
-    return savePdf(ctx, 'fema', label, html);
+    return savePdf(ctx, 'fema', label, html, { meta: { geom: geometry } });
   }
 
+  // the Reports tab: the selected area, or draw one (it has its own row in the Map panel and button in the Site section)
+  ctx.addAreaReport?.({ key: 'fema', label: 'FEMA Report', noPanel: true, noSite: true, modes: ['selection', 'pick'],
+    desc: 'Flood risk for an area: the share in high, moderate and minimal flood zones, flood insurance claims paid nearby, federal disaster declarations since 2000 and FEMA’s National Risk Index. PDF or CSV.',
+    note: 'Select an area on the Map, or draw one', run: ({ geometry, label }) => report({ geometry, label }) });
   // entry point: the Map panel's "Reports for this area" row (shown while an area is selected)
   const run = () => { const s = ctx.sel; if (s?.feature) report({ geometry: s.feature.geometry || s.feature, label: s.label || 'Selected area' }); };
   const sb = document.getElementById('selFema'), sync = () => { if (sb) sb.style.display = ctx.sel?.feature ? '' : 'none'; };

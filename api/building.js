@@ -1,5 +1,6 @@
 // Building lookup for the click-in panel: GET /api/building?lat=..&lon=..
-//   parcel: Texas GIO StratMap land parcels (statewide county appraisal data, free ArcGIS service)
+//   parcel: Texas GIO StratMap land parcels (statewide county appraisal data, free ArcGIS service); where StratMap has no
+//           parcel (all of Harris and Waller counties) the county appraisal district's own public parcel layer
 //   places: named businesses within ~80 m from OpenStreetMap (Overpass API, free)
 //   photo:  nearest Mapillary street-level image (free; only when MAPILLARY_TOKEN is set)
 //   height: roof height from USGS 3DEP lidar (Planetary Computer) over the footprint (&fp=lon,lat;lon,lat;…)
@@ -30,7 +31,9 @@ function fmtDate(v) {
   const s = String(v).trim();
   // Fort Bend (and others) send spreadsheet day numbers: 46082 = 2026-03-01
   if (/^\d{5}$/.test(s) && +s > 20000 && +s < 80000) return new Date(Date.UTC(1899, 11, 30) + +s * 864e5).toISOString().slice(0, 10);
-  if (/^\d{8}$/.test(s)) return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6); return s.slice(0, 20);
+  if (/^\d{8}$/.test(s)) return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6);
+  const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (us) return us[3] + '-' + us[1].padStart(2, '0') + '-' + us[2].padStart(2, '0'); // the appraisal districts' 01/24/2025
+  return s.slice(0, 20);
 }
 export function normalizeParcel(attrs, geometry) {
   const a = attrs || {}, area = num(pick(a, 'GIS_AREA', 'LEGAL_AREA')), unit = pick(a, 'GIS_AREA_UNIT', 'LGL_AREA_UNIT');
@@ -51,7 +54,63 @@ export function normalizeParcel(attrs, geometry) {
   };
 }
 
+// County appraisal districts' own public parcel layers, asked when StratMap has nothing at the point. Harris (HCAD) and
+// the BIS-hosted districts (Waller, Austin, Washington, Grimes; checked 2026-10-14 with build/probe-county2/3.mjs).
+// box: a generous outline of the county, so only the likely district is asked (a point outside it finds nothing anyway).
+export const CADS = [
+  { county: 'Harris', name: 'Harris Central Appraisal District', url: 'https://arcweb.hcad.org/server/rest/services/public/public_query/MapServer/0', box: [-96.0, 29.48, -94.88, 30.19], kind: 'hcad' },
+  { county: 'Waller', name: 'Waller County Appraisal District', url: 'https://services3.arcgis.com/KKhSlBnH1Rm0YK62/arcgis/rest/services/WallerCADWebService/FeatureServer/0', box: [-96.21, 29.72, -95.79, 30.36], kind: 'bis' },
+  { county: 'Austin', name: 'Austin County Appraisal District', url: 'https://services7.arcgis.com/rNakmFefTO1XjYg4/arcgis/rest/services/AustinCADWebService/FeatureServer/0', box: [-96.64, 29.59, -95.99, 30.18], kind: 'bis' },
+  { county: 'Washington', name: 'Washington County Appraisal District', url: 'https://services3.arcgis.com/42lb4t0mpCcD1zg8/arcgis/rest/services/WashingtonCADMatixService/FeatureServer/0', box: [-96.81, 29.97, -96.07, 30.43], kind: 'bis' },
+  { county: 'Grimes', name: 'Grimes Central Appraisal District', url: 'https://services8.arcgis.com/fpr21jaV02YtR7tv/arcgis/rest/services/GrimesCADWebService/FeatureServer/0', box: [-96.21, 30.26, -95.79, 30.66], kind: 'bis' }
+];
+const t = v => v == null ? '' : String(v).trim();
+const caseName = v => t(v).toLowerCase().replace(/\s+/g, ' ').replace(/\b([a-z])/g, c => c.toUpperCase()).replace(/\b(Llc|Lp|Ltd|Inc|Tx|Us|Fm|Sh|Ih|Cr|Ii|Iii|Iv)\b/g, w => w.toUpperCase());
+// a CAD record in the same shape as normalizeParcel, plus where it came from
+export function normalizeCad(cad, attrs, geometry, shared = 1) {
+  const a = attrs || {}, raw = Object.fromEntries(Object.entries(a).filter(([k, v]) => v != null && t(v) !== '' && !/^(objectid|shape|globalid|fid|creat|last_ed|edit)/i.test(k)).slice(0, 60).map(([k, v]) => [k, t(v).slice(0, 200)]));
+  const base = { county: cad.county, source: cad.name, sourceUrl: cad.url.replace(/\/\d+$/, ''), geometry: geometry?.rings ? { type: 'Polygon', coordinates: geometry.rings } : null, raw, stories: null, buildingSqft: null, shared: shared > 1 ? shared : undefined };
+  if (cad.kind === 'hcad') {
+    const situs = caseName(a.address && !/^0\s/.test(t(a.address)) ? a.address : ''), city = caseName(a.city);
+    return { ...base, propId: t(a.HCAD_NUM) || null, owner: t(a.owner) || null, mailing: null, situs: situs ? situs + (city ? ', ' + city : '') : null, situsStreet: situs || null, situsCity: city || null,
+      situsZip: (t(a.zip).match(/\d{5}/) || [null])[0], landUse: t(a.state_class) || null, marketValue: num(a.mkt_val) || num(a.appr_val), landValue: num(a.land_val), improvementValue: num(a.impr_val),
+      yearBuilt: null, acquired: null, taxYear: null, area: null, legal: t(a.legal_lines).replace(/\|/g, ' · ') || null, subdivision: caseName(a.subdivision) || null };
+  }
+  const street = [t(a.situs_num), t(a.situs_street_prefx), t(a.situs_street), t(a.situs_street_sufix)].filter(Boolean).join(' '), city = caseName(a.situs_city);
+  const mail = [t(a.addr_line1), t(a.addr_line2), t(a.addr_line3), [t(a.addr_city), t(a.addr_state), t(a.zip)].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  const acres = num(a.legal_acreage);
+  return { ...base, propId: t(a.prop_id_text || a.propidtxt || a.prop_id) || null, owner: t(a.file_as_name) || null, mailing: mail || null,
+    situs: street ? caseName(street) + (city ? ', ' + city : '') : null, situsStreet: street ? caseName(street) : null, situsCity: city || null, situsZip: (t(a.situs_zip).match(/\d{5}/) || [null])[0],
+    landUse: t(a.statecode).split(',')[0] || null, marketValue: num(a.market), landValue: num(a.land_val), improvementValue: num(a.imprv_val), yearBuilt: null,
+    acquired: fmtDate(a.Deed_Date), taxYear: t(a.owner_tax_yr) || null, area: acres ? Math.round(acres * 100) / 100 + ' acres' : null,
+    legal: [t(a.legal_desc), t(a.legal_desc2), t(a.legal_desc3)].filter(Boolean).join(' ') || null, buildingSqft: num(a.livarea) };
+}
+// the CAD parcel under the point: the point itself, then a few meters around it (a click on a lot line); condominium units
+// share one outline, so the record says how many do
+async function cadParcel(lat, lon) {
+  for (const cad of CADS.filter(c => lon >= c.box[0] && lon <= c.box[2] && lat >= c.box[1] && lat <= c.box[3])) {
+    for (const pad of [0, 0.00006]) {
+      const g = pad ? { geometry: [lon - pad, lat - pad, lon + pad, lat + pad].join(','), geometryType: 'esriGeometryEnvelope' } : { geometry: JSON.stringify({ x: lon, y: lat, spatialReference: { wkid: 4326 } }), geometryType: 'esriGeometryPoint' };
+      const q = new URLSearchParams({ f: 'json', ...g, inSR: '4326', spatialRel: 'esriSpatialRelIntersects', outFields: '*', returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', resultRecordCount: '25' });
+      const d = await getJSON(cad.url + '/query?' + q, {}, 7000);
+      if (d.error) throw new Error(cad.name + ': ' + (d.error.message || 'service error'));
+      const fs = (d.features || []).filter(f => f.attributes && (f.attributes.owner || f.attributes.file_as_name || f.attributes.HCAD_NUM));
+      if (!fs.length) continue;
+      const hit = fs.find(f => f.geometry?.rings?.some(r => inRing(r, [lon, lat]))) || fs[0];
+      const ring = JSON.stringify(hit.geometry?.rings?.[0]?.[0]), same = fs.filter(f => JSON.stringify(f.geometry?.rings?.[0]?.[0]) === ring).length;
+      return normalizeCad(cad, hit.attributes, hit.geometry, same);
+    }
+  }
+  return null;
+}
+
 async function parcel(lat, lon) {
+  const p = await stratParcel(lat, lon);
+  if (p) return p;
+  // StratMap has nothing here (all of Harris and Waller): the county appraisal district's own layer
+  return cadParcel(lat, lon);
+}
+async function stratParcel(lat, lon) {
   // the StratMap service refuses /query; map-click "identify" on the service is what it answers
   const q = new URLSearchParams({ geometry: lon + ',' + lat, geometryType: 'esriGeometryPoint', sr: '4326', layers: 'all:' + (PARCELS.match(/\/(\d+)$/) || [0, 0])[1], tolerance: '1',
     mapExtent: [lon - .002, lat - .002, lon + .002, lat + .002].join(','), imageDisplay: '400,400,96', returnGeometry: 'true', f: 'json' });

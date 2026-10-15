@@ -2,6 +2,7 @@ import { pickPlace, districtFor, splitWithin, applyPlaceAlias, mentions, extentM
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
 import { mergeBusinesses } from './lib/nearby.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
+import { looksLikeAddress } from './lib/urlstate.mjs';
 // Map search (under the map tools): real street addresses, places (counties, towns, neighborhoods, landmarks, roads),
 // projects by name, companies and people (owners, developers, architects, contractors) and filings at matching addresses. Results appear while typing, 10 at a time, with more loading as you
 // scroll. Picking a place outlines it on the map: city / county / neighborhood boundaries and building footprints
@@ -91,40 +92,49 @@ export function initMapSearch(ctx) {
   // ---------- results: Addresses · Places · Projects · Companies & people · Filings at matching addresses ----------
   let names = [], addrs = [], ents = [], shownA = 0;
   // ---------- businesses by name: Overture / Foursquare places and OpenStreetMap near the map center + Texas Comptroller sales-tax permits in nearby towns ----------
-  let biz = [], bizPending = false, bizT = 0; const bizCache = new Map();
+  let biz = [], bizPending = false, bizT = 0; const bizCache = new Map(), geoCache = new Map(); // geoCache: this visit's address answers, so retyping or backspacing is instant
   // Google place suggestions (only when the site has a Google key; src/google.js)
   let gs = [], gsT = 0;
   const bizWorthy = t => t.length >= 3 && !COORDS.test(t) && !/^\d/.test(t) && !/^\d{5}$/.test(t);
-  async function businesses(text) {
+  // each source shows as soon as it answers (the Overture / Foursquare table is quick; OpenStreetMap and the Comptroller can
+  // take seconds): onPart(list, done) runs after every answer. A newer search aborts the older one's requests.
+  let bizCtl = null;
+  function businesses(text, onPart) {
     const c = map.getCenter(), lat = +c.lat.toFixed(2), lon = +c.lng.toFixed(2), key = low(text) + '|' + lat + ',' + lon;
-    if (bizCache.has(key)) return bizCache.get(key);
+    bizCtl?.abort(); bizCtl = null;
+    if (bizCache.has(key)) { onPart(bizCache.get(key), true); return; }
+    const ctl = bizCtl = new AbortController();
     const towns = (DATA.places || []).map(p => [p[0], (p[1] - lon) ** 2 + (p[2] - lat) ** 2]).sort((a, b) => a[1] - b[1]).slice(0, 25).map(p => p[0]);
-    const get = u => fetch(u).then(r => r.ok ? r.json() : null).catch(() => null);
-    // Overture / Foursquare places first (fast, complete in the suburbs), then OpenStreetMap, then the Comptroller
-    const [p, o, t] = await Promise.all([get('api/places?' + new URLSearchParams({ q: text, near: lat + ',' + lon, n: '8' })), get('api/nearby?' + new URLSearchParams({ mode: 'business', name: text, lat, lon, limit: '8' })), get('api/tenants?' + new URLSearchParams({ name: text, cities: towns.join(',') }))]);
-    const open = (p?.places || []).map(x => ({ src: 'places', name: x.name, kind: x.cat || '', address: [x.addr, x.city].filter(Boolean).join(', '), lat: x.lat, lon: x.lon, miles: x.km != null ? +(x.km * 0.6214).toFixed(2) : undefined }));
-    const out = mergeBusinesses([...open, ...(o?.places || [])], t?.tenants || [], 8); if (p || o || t) bizCache.set(key, out); return out;
+    const get = u => fetch(u, { signal: ctl.signal }).then(r => r.ok ? r.json() : null).catch(() => null);
+    const got = {}; let left = 3;
+    const merge = () => mergeBusinesses([...(got.p?.places || []).map(x => ({ src: 'places', name: x.name, kind: x.cat || '', address: [x.addr, x.city].filter(Boolean).join(', '), lat: x.lat, lon: x.lon, miles: x.km != null ? +(x.km * 0.6214).toFixed(2) : undefined })), ...(got.o?.places || [])], got.t?.tenants || [], 8);
+    const land = k => v => { if (ctl.signal.aborted) return; got[k] = v; left--; const out = merge(); if (!left) { bizCtl = null; if (got.p || got.o || got.t) bizCache.set(key, out); } onPart(out, !left); };
+    get('api/places?' + new URLSearchParams({ q: text, near: lat + ',' + lon, n: '8' })).then(land('p'));
+    get('api/nearby?' + new URLSearchParams({ mode: 'business', fast: '1', name: text, lat, lon, limit: '8' })).then(land('o'));
+    get('api/tenants?' + new URLSearchParams({ name: text, cities: towns.join(',') })).then(land('t'));
   }
   function run(text) {
     q = text.trim(); clearB.hidden = !q; remote = []; enterWait = false; biz = []; clearTimeout(bizT); gs = []; clearTimeout(gsT);
-    if (q.length >= 3 && !COORDS.test(q) && ctx.google?.enabled()) { const my0 = seq + 1, c = map.getCenter(); gsT = setTimeout(async () => { const g = await ctx.google.suggest(q, [c.lng, c.lat]).catch(() => []); if (my0 !== seq) return; gs = g.slice(0, 5); render(); }, 380); }
+    if (q.length >= 3 && !COORDS.test(q) && ctx.google?.enabled()) { const my0 = seq + 1, c = map.getCenter(); gsT = setTimeout(async () => { const g = await ctx.google.suggest(q, [c.lng, c.lat]).catch(() => []); if (my0 !== seq) return; gs = g.slice(0, 5); render(); }, 200); }
     bizPending = !!q && bizWorthy(q);
-    if (bizPending) { const my0 = seq + 1; bizT = setTimeout(async () => { const b = await businesses(q); if (my0 !== seq) return; biz = b; bizPending = false; render(); }, 450); }
+    if (!bizPending) { bizCtl?.abort(); bizCtl = null; }
+    if (bizPending) { const my0 = seq + 1; bizT = setTimeout(() => businesses(q, (b, done) => { if (my0 !== seq) return; biz = b; bizPending = !done; render(); }), 200); }
     if (!q) { pending = false; close(); return; }
     ({ names, addrs } = searchFilings(q)); ents = searchEntities(q);
     clearTimeout(geoT); const my = ++seq;
     pending = q.length >= 3 && !COORDS.test(q);
     shown = Math.min(PAGE, names.length); shownA = Math.min(names.length ? 3 : PAGE, addrs.length); active = -1; render();
     if (pending) geoT = setTimeout(async () => {
-      let g = await ctx.geocode(q, { limit: 10 }); if (my !== seq) return;
-      // nothing back for an abbreviated street ("1004 Priya Ln")? ask again with it spelled out
-      const full = expandAbbr(q);
-      if (!g.some(x => x.type === 'address') && full !== q) { const g2 = await ctx.geocode(full, { limit: 10 }); if (my !== seq) return; if (g2.length) g = g2.concat(g.filter(x => !g2.some(y => y.t === x.t))); }
+      // an abbreviated street ("1004 Priya Ln") is also asked spelled out, at the same time, in case only that form finds it
+      const full = expandAbbr(q), cached = t => geoCache.get(t);
+      const ask = (t, slot) => cached(t) ? Promise.resolve(cached(t)) : ctx.geocode(t, { limit: 10, slot }).then(g => { if (g.length) { geoCache.set(t, g); if (geoCache.size > 300) geoCache.delete(geoCache.keys().next().value); } return g; });
+      const [g1, g2] = await Promise.all([ask(q, 'search'), full !== q ? ask(full, 'search2') : []]); if (my !== seq) return;
+      const g = !g1.some(x => x.type === 'address') && g2.length ? g2.concat(g1.filter(x => !g2.some(y => y.t === x.t))) : g1;
       const have = new Set(localPlaces(q).map(p => low(p.label)));
       remote = g.filter(x => !have.has(low(x.name) + ', tx')).map(x => ({ label: x.t, name: x.name, kind: kindFromMaptiler(x.type), c: x.c, bbox: x.bbox }));
       pending = false; render();
       if (enterWait) { enterWait = false; if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); }
-    }, 220);
+    }, 60);
   }
   const sec = (title, extra = '') => '<div class="ms-sec"><span>' + title + '</span>' + extra + '</div>';
   function render() {
@@ -166,15 +176,15 @@ export function initMapSearch(ctx) {
   function setActive(i, scroll = true) { active = i; res.querySelectorAll('.ms-it').forEach(b => b.classList.toggle('on', +b.dataset.i === i)); if (scroll) res.querySelector('.ms-it.on')?.scrollIntoView({ block: 'nearest' }); }
   function open() { res.classList.add('on'); input.setAttribute('aria-expanded', 'true'); }
   function close() { res.classList.remove('on'); input.setAttribute('aria-expanded', 'false'); }
-  function applyKeyword() { seq++; clearTimeout(geoT); ctx.state.q = q; ctx.applyFilters(); close(); ctx.setView('map'); ctx.fitToVisible(); ctx.toast('Filtered to ' + fmtN(ctx.visible.length) + ' filings matching “' + q + '”.'); }
+  function applyKeyword() { seq++; clearTimeout(geoT); ctx.state.q = q; ctx.applyFilters(); close(); ctx.setView('map'); ctx.showFilings(); ctx.fitToVisible(); ctx.toast('Filtered to ' + fmtN(ctx.visible.length) + ' filings matching “' + q + '”.'); }
   // a company or person: the Activity filter when it covers all their projects, otherwise a keyword search on the name
   function showEntity(e) {
     ctx.setView('map'); ctx.state.q = '';
     const pick = ['dev', 'arch', 'gc'].map(k => ({ k, n: F.filter(f => ctx.entityKey(k === 'dev' ? (f.dev || f.owner) : f[k]) === e.k).length })).sort((a, b) => b.n - a.n)[0];
     if (pick.n >= e.ids.size) ctx.state.who = { k: pick.k, v: e.k, label: e.label };
     else { ctx.state.who = null; ctx.state.q = e.label; }
-    ctx.applyFilters(); ctx.fitToVisible(); input.value = e.label; clearB.hidden = false;
-    ctx.toast('Showing ' + fmtN(ctx.visible.length) + ' filings for ' + e.label + (ctx.visible.length < e.ids.size ? ' (some are outside the current date or type filters)' : '') + '.');
+    ctx.applyFilters(); ctx.showFilings(); ctx.fitToVisible(); input.value = e.label; clearB.hidden = false; // the filter is about the filings: they go on the map
+    ctx.toast('Showing ' + fmtN(ctx.visible.length) + ' filing' + (ctx.visible.length === 1 ? '' : 's') + ' for ' + e.label + (ctx.visible.length < e.ids.size ? ' (some are outside the current date or type filters)' : '') + '.');
   }
   function pick(i) {
     const it = items[i]; if (!it) return; seq++; clearTimeout(geoT); close(); input.blur();
@@ -199,7 +209,12 @@ export function initMapSearch(ctx) {
   input.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') { e.preventDefault(); if (active >= items.length - 1) more(); setActive(Math.min(items.length - 1, active + 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(0, active - 1)); }
-    else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0) pick(active); else if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); else { if (input.value.trim() !== q) { clearTimeout(it0); run(input.value); } enterWait = pending; } } // address lookup still running: pick its first hit when it lands
+    else if (e.key === 'Enter') { e.preventDefault();
+      if (active >= 0) { pick(active); return; }
+      if (input.value.trim() !== q) { clearTimeout(it0); run(input.value); } // typed faster than the search: catch up first
+      // "1004 Priya Ln" while the address lookup is still out: wait for it, so Enter lands on the address and not a filing
+      if (pending && (looksLikeAddress(q) || !items.length && !names.length && !addrs.length)) enterWait = true;
+      else if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); else enterWait = pending; }
     else if (e.key === 'Escape') { e.preventDefault(); close(); input.blur(); }
   });
   clearB.onclick = () => { input.value = ''; run(''); clearPlace(); if (ctx.state.q) { ctx.state.q = ''; ctx.applyFilters(); } input.focus(); };
@@ -238,14 +253,14 @@ export function initMapSearch(ctx) {
   const isLine = g => g && /LineString/.test(g.type);
   async function nominatim(text, extra = '', world = false) {
     const u = NOMINATIM + '?format=geojson&polygon_geojson=1&polygon_threshold=0.0002&limit=6' + (world ? '' : '&countrycodes=us&viewbox=' + TX_VIEWBOX + '&bounded=1') + extra + '&q=' + encodeURIComponent(text);
-    try { const r = await fetch(u, { headers: { Accept: 'application/json' } }); if (!r.ok) return []; return (await r.json()).features || []; } catch (e) { return []; }
+    try { const r = await fetch(u, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(6000) }); if (!r.ok) return []; return (await r.json()).features || []; } catch (e) { return []; }
   }
   // the whole road: every OpenStreetMap way with that name within ~15 miles of the hit
   async function roadGeom(name, c) {
     if (!name) return null;
     const s = c[1] - .22, n = c[1] + .22, w = c[0] - .26, e = c[0] + .26, nm = name.replace(/["\\]/g, '');
     const body = '[out:json][timeout:25];way["highway"]["name"="' + nm + '"](' + [s, w, n, e].map(x => x.toFixed(4)).join(',') + ');out geom 2500;';
-    try { const r = await fetch(OVERPASS, { method: 'POST', body: 'data=' + encodeURIComponent(body), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }); if (!r.ok) return null;
+    try { const r = await fetch(OVERPASS, { method: 'POST', body: 'data=' + encodeURIComponent(body), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(8000) }); if (!r.ok) return null;
       const d = await r.json(), lines = (d.elements || []).filter(x => x.geometry?.length > 1).map(x => x.geometry.map(p => [p.lon, p.lat]));
       return lines.length ? { type: 'MultiLineString', coordinates: lines } : null; } catch (e) { return null; }
   }
@@ -257,10 +272,25 @@ export function initMapSearch(ctx) {
   // pick the Nominatim feature that best matches: wanted geometry type, closest to the point we already have
   const best = (feats, c, want) => feats.filter(f => want(f.geometry)).sort((a, b) => (c ? near(centerOf(a.geometry), c) : 0) - (c ? near(centerOf(b.geometry), c) : 0))[0];
 
+  const dur = ms => ctx.reduceMotion ? 0 : ms;
+  // fly in close to one building, then open the building panel (footprint highlight, parcel, businesses) once the map settles
+  function flyToBuilding(mine, pt) {
+    map.flyTo({ center: pt, zoom: 18, pitch: 55, duration: dur(900) });
+    map.once('idle', () => { if (place === mine && !isArea(place.geom)) { const b = ctx.buildingAt?.(pt); if (b?.footprint) { place.geom = b.footprint; place.kind = 'building'; syncPlace(); placeCard(); } } });
+  }
   async function showPlace(p) {
     ctx.setView('map'); ctx.closeCard?.();
-    place = { label: p.label, kind: p.kind, c: p.c, geom: null, ...(p.via ? { via: p.via, approx: !!p.approx } : {}), ...(p.within ? { within: p.within } : {}) }; setPlacePin(p.c, p.label);
+    const mine = place = { label: p.label, kind: p.kind, c: p.c, geom: null, ...(p.via ? { via: p.via, approx: !!p.approx } : {}), ...(p.within ? { within: p.within } : {}) }; setPlacePin(p.c, p.label);
     bar.innerHTML = '<div class="pb-k">' + esc(KIND_LABEL[p.kind] || 'Place') + '</div><div class="pb-t">' + esc(p.label) + '</div><div class="pb-s">Finding the outline…</div>'; bar.classList.add('on');
+    // move now with what the search already knows (the point, or the geocoder's box). The outline from OpenStreetMap can take
+    // seconds; when it lands it only sharpens the frame.
+    const spot = /address|poi|coords|business/.test(p.kind), loadedCounty = p.kind === 'county' && DATA.counties.some(x => x.name === p.name);
+    let framed = '';
+    if (!p.geom && !loadedCounty) {
+      if (spot && p.c && !(p.bbox && extentMeters(p.bbox) > BIG_PLACE_M)) { flyToBuilding(mine, p.c); framed = 'spot'; }
+      else if (p.bbox && /area|town|zip|county/.test(p.kind)) { ctx.fitBox([[p.bbox[0], p.bbox[1]], [p.bbox[2], p.bbox[3]]], { maxZoom: 17.5 }); framed = 'box'; }
+      else if (p.c) { map.flyTo({ center: p.c, zoom: p.kind === 'town' ? 12 : 14, duration: dur(800) }); framed = 'point'; }
+    }
     let geom = null, note = '';
     if (p.geom) geom = p.geom;
     else if (p.kind === 'county') {
@@ -270,28 +300,27 @@ export function initMapSearch(ctx) {
     } else if (p.kind === 'road') {
       geom = await roadGeom(p.name || p.label.split(',')[0], p.c);
       if (!geom) { const n = best(await nominatim(p.label), p.c, isLine); geom = n?.geometry || null; }
-    } else if (p.kind === 'coords') {
-      geom = null;
+    } else if (p.kind === 'coords' || p.kind === 'address' || p.kind === 'business') {
+      geom = null; // one building: its footprint comes from the map itself once the map settles (flyToBuilding)
     } else {
       const feats = await nominatim(p.kind === 'town' ? (p.name || p.label.split(',')[0]) + ', Texas' : p.label);
       const hit = best(feats, p.c, isArea);
       // a town search must land on that town, not a polygon miles away
       if (hit && (!p.c || near(centerOf(hit.geometry), p.c) < (p.kind === 'town' || p.kind === 'zip' ? .35 : p.kind === 'area' ? .1 : .02))) geom = hit.geometry;
     }
-    if (place?.label !== p.label) return; // a newer pick won
+    if (place !== mine) return; // a newer pick won
     if (!geom && p.bbox && /area|town|zip|county/.test(p.kind)) { const [w, s2, e, n] = p.bbox; geom = { type: 'Polygon', coordinates: [[[w, s2], [e, s2], [e, n], [w, n], [w, s2]]] }; note = 'Approximate outline (the area’s bounding box): OpenStreetMap has no boundary for it.'; }
-    place.geom = geom ? (isArea(geom) ? ctx.fixWinding(geom) : geom) : null; syncPlace();
+    const box = geom ? flat(bounds(geom)) : p.bbox, big = extentMeters(box) > BIG_PLACE_M;
+    // the map already found the building's own footprint while the outline was on its way: keep it
+    if (place.kind === 'building' && !big) { placeCard(note); return place; }
+    place.kind = p.kind; place.geom = geom ? (isArea(geom) ? ctx.fixWinding(geom) : geom) : null; syncPlace();
     const pt = p.c || (geom && centerOf(geom)); setPlacePin(pt, p.label);
     // an airport, campus, mall or park is bigger than one building: frame all of it (clear of the chat panel and card)
-    const box = geom ? flat(bounds(geom)) : p.bbox, big = extentMeters(box) > BIG_PLACE_M;
-    if (!big && (geom && isArea(geom) && /address|poi|building|business/.test(p.kind) || !geom && /address|poi|coords|business/.test(p.kind))) {
-      // a single building: fly in close, then open the building panel (footprint highlight, parcel, businesses)
-      map.flyTo({ center: pt, zoom: 18, pitch: 55, duration: ctx.reduceMotion ? 0 : 1600 });
-      map.once('idle', () => { if (place?.label === p.label && !isArea(place.geom)) { const b = ctx.buildingAt?.(pt); if (b?.footprint) { place.geom = b.footprint; place.kind = 'building'; syncPlace(); placeCard(); } } });
-    } else if (geom || big) ctx.fitBox([[box[0], box[1]], [box[2], box[3]]], { maxZoom: 17.5 });
-    else if (pt) map.flyTo({ center: pt, zoom: p.kind === 'town' ? 12 : 14, duration: ctx.reduceMotion ? 0 : 1200 });
+    if (!big && (geom && isArea(geom) && /address|poi|building|business/.test(p.kind) || !geom && spot)) { if (framed !== 'spot') flyToBuilding(mine, pt); }
+    else if (geom || big) { if (!(framed === 'box' && note)) ctx.fitBox([[box[0], box[1]], [box[2], box[3]]], { maxZoom: 17.5 }); } // the box fallback is where we already are
+    else if (pt && !framed) map.flyTo({ center: pt, zoom: p.kind === 'town' ? 12 : 14, duration: dur(800) });
     if (p.via === 'web') note = [note, 'Found with a web search' + (p.approx ? '; the spot is approximate (OpenStreetMap has no outline for it).' : ' and matched in OpenStreetMap.')].filter(Boolean).join(' ');
-    if (!geom && !/address|poi|coords|business/.test(p.kind)) note = 'No outline found for this place in OpenStreetMap, so it is shown as a point.';
+    if (!geom && !spot) note = 'No outline found for this place in OpenStreetMap, so it is shown as a point.';
     placeCard(note);
     return place;
   }
@@ -321,11 +350,14 @@ export function initMapSearch(ctx) {
 
   function placeCard(note = '') {
     if (!place) return;
-    const { list, how } = placeHits(), v = list.reduce((s, f) => s + f.cost, 0), area = isArea(place.geom) && !/building|business/.test(place.kind);
+    let { list, how } = placeHits(); const area = isArea(place.geom) && !/building|business/.test(place.kind);
+    // a town, county, neighborhood or ZIP with no outline is only a point: "filings within 0.25 mile" of its middle would mislead, so no count
+    const bare = !area && /^(town|county|area|zip)$/.test(place.kind); if (bare) list = [];
+    const v = list.reduce((s, f) => s + f.cost, 0);
     const inCmp = ctx.compare?.list().some(a => a.key === 'place:' + place.label);
     bar.innerHTML = '<button class="x" aria-label="Clear" id="pbX">×</button><div class="pb-k">' + esc(KIND_LABEL[place.kind] || 'Place') + '</div><div class="pb-t">' + esc(place.label) + '</div>' +
-      '<div class="pb-s">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' ' + how + ' · est. ' + fmtM(v) + (ctx.filterText() ? '<span> (current filters)</span>' : '') + '</div>' + (note ? '<div class="pb-n">' + esc(note) + '</div>' : '') +
-      '<div class="pb-a"><button class="btn primary" id="pbInfo">More Information</button>' + (area ? '<button class="btn" id="pbFilter">Filter to This Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>' : '') +
+      (bare ? '' : '<div class="pb-s">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' ' + how + ' · est. ' + fmtM(v) + (ctx.filterText() ? '<span> (current filters)</span>' : '') + '</div>') + (note ? '<div class="pb-n">' + esc(note) + '</div>' : '') +
+      '<div class="pb-a"><button class="btn primary" id="pbInfo" title="' + (area ? 'Headline numbers, top uses and the largest projects inside it' : 'Owner, value, site and area details for the parcel here') + '">' + (area ? 'Area Summary' : 'Property Card') + '</button>' + (area ? '<button class="btn" id="pbFilter" title="Make this the picked area: the panel, Compare and Save search then use it">Use as Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>' : '') +
         (list.length ? '<button class="btn" id="pbHl">Highlight ' + (list.length > 50 ? 'Top 50' : 'Them') + '</button>' : '') + '</div>';
     bar.classList.add('on');
     bar.querySelector('#pbX').onclick = clearPlace;
@@ -336,14 +368,14 @@ export function initMapSearch(ctx) {
   }
   ctx.onChange(() => { if (place && bar.classList.contains('on') && place.geom !== undefined) placeCard(); });
 
-  // "More Information" on an address, landmark, building or coordinates: the location card (parcel, size, lidar height,
+  // "Property Card" on an address, landmark, building or coordinates: the location card (parcel, size, lidar height,
   // filings, businesses, Drive Time, Weather, Site Imagery, News), using the building footprint under the point when there is one
   function pointInfo() {
     const pt = place.c || centerOf(place.geom);
     const fp = /building|business/.test(place.kind) && isArea(place.geom) ? place.geom : ctx.buildingAt?.(pt)?.footprint || null;
     ctx.openBuildingAt(pt, fp);
   }
-  // "More Information" on a town, county, neighborhood or ZIP: an area summary card with the headline metrics,
+  // "Area Summary" on a town, county, neighborhood or ZIP: an area summary card with the headline metrics,
   // top uses and the largest projects inside it
   function areaCard() {
     const pl = place, card = ctx.card, { list } = placeHits(), keys = ctx.kpiKeys?.() || DEFAULT_KPIS;
@@ -353,7 +385,7 @@ export function initMapSearch(ctx) {
     ctx.closeCard();
     card.innerHTML = '<div class="top"><div><div class="kicker">' + esc(KIND_LABEL[pl.kind] || 'Area') + ' summary</div><h2>' + esc(pl.label) + '</h2><div class="bsub">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' inside' + (ctx.filterText() ? ' (current filters)' : '') + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
-      '<div class="bacts"><button class="btn primary" id="acFilter">Filter to This Area</button><button class="btn" id="acCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button></div>' +
+      '<div class="bacts"><button class="btn primary" id="acFilter" title="Make this the picked area: the panel, Compare and Save search then use it">Use as Area</button><button class="btn" id="acCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button></div>' +
       '<div class="acm">' + keys.map(k => { const m = BY_KEY.get(k); if (!m) return ''; const v = m.fmt(m.fn(list)); return '<div><b title="' + esc(v) + '">' + esc(v) + '</b><span>' + esc(m.short || m.label) + '</span></div>'; }).join('') + '</div>' +
       (topUses.length ? '<div class="bsec"><div class="lt">Top uses by value</div>' + topUses.map(u => '<div class="acu"><span>' + esc(u[0]) + '</span><i style="width:' + Math.max(2, Math.round(u[2] / tot * 100)) + '%"></i><b>' + fmtN(u[1]) + ' · ' + fmtM(u[2]) + '</b></div>').join('') + '</div>' : '') +
       (top.length ? '<div class="bsec"><div class="lt">Largest projects</div>' + top.map((f, i) => '<button class="acp" data-i="' + i + '"><b>' + esc(f.name) + '</b><span>' + esc([f.use || ctx.TYPE_LABEL?.[f.type], f.city, f.reg].filter(Boolean).join(' · ')) + '</span><em>' + fmtM(f.cost) + '</em></button>').join('') + '</div>'

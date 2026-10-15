@@ -1,9 +1,11 @@
 
 import './cursors.js';
 import { makeMatcher, encode, decode, describe } from './lib/filter.mjs';
+import { camStr as camFmt, parseCam, parseLatLng, parsePlanRef, startHash, showsFilings, hasSpec } from './lib/urlstate.mjs';
 import { USES, entityKey } from './lib/taxonomy.mjs';
 import { recentChanges } from './lib/changes.mjs';
 import { dockSide } from './lib/planview.mjs';
+import { aiErrorMessage, spotQuestion } from './lib/assist-logic.mjs';
 import { initTimeline } from './timeline.js';
 import { initWho, initChanges } from './views.js';
 import { initAssistant } from './assistant.js';
@@ -41,11 +43,12 @@ import { initQuickLayers } from './quicklayers.js';
 import { initLayerFilters } from './layerfilters.js';
 import { initCardTabs } from './cardtabs.js';
 import { initPlaces } from './places.js';
+import { initDevLayers } from './devlayers.js';
 import { initEnv } from './env.js';
 import { initOwner } from './owner.js';
 import { initGoogle } from './google.js';
 import { initSitePlan } from './siteplan.js';
-import { initSettings } from './settings.js';
+import { initSettings, BASES } from './settings.js';
 import { renderNav, syncNav as syncNavTabs, leafFor, pathOf, labelOf, parentOf } from './nav.js';
 import { plainText, textBlocks } from './lib/assist-logic.mjs';
 import { contains as inArea } from './lib/geomatch.mjs';
@@ -81,6 +84,7 @@ const BY_ID=new Map(F.map(f=>[f.id,f]));
 const state={counties:new Set(COUNTIES),types:new Set(TYPES),min:0,max:0,q:'',uses:null,who:null,d:null,chg:null,st:null,sqmin:0,sqmax:0,co:'',exact:0,umin:0,month:null,sel:null,shown:150};
 const sel={kind:null,label:'',feature:null,counties:new Set(),center:null};
 // registration period presets; the default view is the last 12 months of filings
+let lastFilN=0, datePicked=false; // the Dates row was set by hand (src/app.js, syncFilterUI)
 const PERIODS=[['3m','3 mo',3],['12m','12 mo',12],['2y','2 yr',24],['5y','5 yr',60],['all','All',0]];
 function periodSpec(k){ const p=PERIODS.find(x=>x[0]===k)||PERIODS[1]; if(!p[2]) return {f:'all',from:'',to:''}; const d=new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth()-p[2]+1); return {f:'reg',from:ym(d),to:''}; }
 const periodOf=d=>{ if(!d) return 'all'; if(d.f==='all') return 'all'; if(d.f!=='reg'||d.to) return null; const hit=PERIODS.find(p=>p[2]&&periodSpec(p[0]).from===d.from); return hit?hit[0]:null; };
@@ -322,7 +326,7 @@ function curSpec(withSel=true){ const s={};
 function selSpec(){ if(!sel.feature) return null;
   if(sel.kind==='radius') return {k:'r',c:sel.center,mi:radiusMiles,label:sel.place||''};
   if(sel.kind==='county') return {k:'c',names:COUNTIES.filter(n=>sel.counties.has(n))};
-  return {k:'p',ring:urlRing(sel.feature),label:sel.label}; }
+  return {k:'p',ring:urlRing(sel.feature),label:sel.label,...(sel.kind==='area'?{box:1}:{})}; }
 function urlRing(g){ let ring=g.coordinates[0];
   if(g.type==='MultiPolygon') ring=g.coordinates.map(p=>p[0]).sort((a,b)=>Math.abs(d3.geoArea({type:'Polygon',coordinates:[b]})-2*Math.PI)-Math.abs(d3.geoArea({type:'Polygon',coordinates:[a]})-2*Math.PI))[0]||[];
   ring=ring.slice(0,-1); const step=Math.max(1,Math.ceil(ring.length/160)); return ring.filter((p,i)=>i%step===0).map(p=>[+p[0].toFixed(4),+p[1].toFixed(4)]); }
@@ -348,11 +352,15 @@ function syncSelBar(){
   document.getElementById('selKind').innerHTML=sel.feature?'<span class="sk-l">Selected area · </span>'+(SEL_KIND[sel.kind]||'Area'):'<span class="sk-l">No area picked</span>'; // phones show only the kind
   const vp=sel.feature?null:viewPlaceSafe(); document.getElementById('selName').textContent=sel.feature?sel.label:vp?'Map view near '+vp:'Map view';
   if(selIcK!==k){ selIcK=k; document.getElementById('selIcon').innerHTML='<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+SEL_IC[k]+'</svg>'; }
-  document.getElementById('selStats').textContent=fmtN(visible.length)+' filing'+(visible.length===1?'':'s')+' · '+fmtM(visible.reduce((s,f)=>s+f.cost,0));
+  // with no area picked the count is for the whole region (and your filters), not what's in view: say so
+  const stEl=document.getElementById('selStats'); stEl.textContent=fmtN(visible.length)+' filing'+(visible.length===1?'':'s')+(sel.feature?'':' region-wide')+' · '+fmtM(visible.reduce((s,f)=>s+f.cost,0));
+  stEl.title=sel.feature?'':'Every filing in the region that matches your filters, wherever the map is looking. Pick an area to count one place.';
   document.getElementById('selPick').hidden=!!sel.feature;
   // Save search and alerts only mean something once there is a filter or an area; Copy link always works
   const custom=filterChips({area:true}).some(c=>!c.fixed);
-  ['saveSearch','rssLink'].forEach(id=>{ document.getElementById(id).hidden=!custom; }); if(!custom) document.getElementById('saveForm').hidden=true;
+  // (shown but off with nothing to save, so the menu doesn't change shape)
+  for(const id of ['saveSearch','rssLink']){ const b=document.getElementById(id); b.removeAttribute('hidden'); b.toggleAttribute('disabled',!custom&&id==='saveSearch'); b.setAttribute('aria-disabled',String(!custom)); b.classList.toggle('is-off',!custom); b.title=custom?'':'Pick an area or set a filter first'; }
+  if(!custom) document.getElementById('saveForm').hidden=true;
   syncFilingsHead();
 }
 // the Construction Filings header: the live count for the panel's scope, the data period, and an honest "On map" switch
@@ -377,7 +385,7 @@ function applyFilters(){
 }
 const cRow=document.getElementById('countyRow'), tRow=document.getElementById('typeRow'), pRow=document.getElementById('periodRow');
 PERIODS.forEach(([k,label])=>{ const b=document.createElement('button'); b.className='chip'; b.dataset.p=k; b.textContent=label; b.setAttribute('aria-pressed','false');
-  b.onclick=()=>{ state.d=periodSpec(k); applyFilters(); }; pRow.appendChild(b); });
+  b.onclick=()=>{ state.d=periodSpec(k); datePicked=false; applyFilters(); }; pRow.appendChild(b); });
 COUNTIES.forEach(c=>{
   const b=document.createElement('button'); b.className='chip'; b.setAttribute('aria-pressed','true');
   b.innerHTML=c+' <span class="n">'+F.filter(f=>f.county===c).length+'</span>';
@@ -392,8 +400,10 @@ TYPES.forEach(t=>{
   b.onclick=()=>{ state.types.has(t)&&state.types.size>1?state.types.delete(t):state.types.add(t); b.setAttribute('aria-pressed',state.types.has(t)); applyFilters(); };
   tRow.appendChild(b);
 });
-document.getElementById('minCost').onchange=e=>{state.min=+e.target.value; applyFilters();};
-document.getElementById('maxCost').onchange=e=>{state.max=+e.target.value; applyFilters();};
+// a minimum above the maximum (value, sq ft, dates) is swapped, so the result is never silently empty
+const swapped=what=>ctx.toast?.('The minimum was above the maximum, so '+what+' were swapped.');
+const costChange=e=>{ state.min=+document.getElementById('minCost').value; state.max=+document.getElementById('maxCost').value; if(state.min&&state.max&&state.min>state.max){ [state.min,state.max]=[state.max,state.min]; swapped('the two values'); } applyFilters(); };
+document.getElementById('minCost').onchange=costChange; document.getElementById('maxCost').onchange=costChange;
 // multi-select chip rows (use, status): nothing pressed = no filter
 function chipRow(rowId,values,key,label=v=>v){ const row=document.getElementById(rowId); const n={}; F.forEach(f=>{ const v=key==='uses'?(f.use||'Unclassified'):(f.status||'Unknown'); n[v]=(n[v]||0)+1; });
   values.filter(v=>n[v]).forEach(v=>{ const b=document.createElement('button'); b.className='chip'; b.type='button'; b.dataset.v=v; b.setAttribute('aria-pressed','false'); b.innerHTML=esc(label(v))+' <span class="n">'+fmtN(n[v])+'</span>';
@@ -402,13 +412,17 @@ function chipRow(rowId,values,key,label=v=>v){ const row=document.getElementById
 chipRow('useRow',[...USES,'Unclassified'],'uses');
 chipRow('statusRow',['Registered','Review complete','Inspection complete','Closed','Unknown'],'st');
 const sqMin=document.getElementById('sqMin'), sqMax=document.getElementById('sqMax'), uMin=document.getElementById('uMin'), coQ=document.getElementById('coQ'), exactBtn=document.getElementById('exactBtn');
-let numT; [sqMin,sqMax].forEach(i=>i.addEventListener('input',()=>{ clearTimeout(numT); numT=setTimeout(()=>{ state.sqmin=Math.max(0,+sqMin.value||0); state.sqmax=Math.max(0,+sqMax.value||0); applyFilters(); },350); }));
+let numT; const readSq=(commit=false)=>{ let a=Math.max(0,+sqMin.value||0), b=Math.max(0,+sqMax.value||0);
+  if(a&&b&&a>b){ if(!commit) return; [a,b]=[b,a]; sqMin.value=a; sqMax.value=b; swapped('the two sizes'); } // typing: wait until the boxes are left, then swap
+  state.sqmin=a; state.sqmax=b; applyFilters(); };
+[sqMin,sqMax].forEach(i=>{ i.addEventListener('input',()=>{ clearTimeout(numT); numT=setTimeout(()=>readSq(false),350); });
+  i.addEventListener('change',()=>{ clearTimeout(numT); readSq(true); }); });
 uMin.onchange=()=>{ state.umin=+uMin.value; applyFilters(); };
 let coT; coQ.addEventListener('input',()=>{ clearTimeout(coT); coT=setTimeout(()=>{ state.co=coQ.value; applyFilters(); },250); });
 exactBtn.onclick=()=>{ state.exact=state.exact?0:1; applyFilters(); };
 // Construction Filings: collapsible (remembered in this browser; starts collapsed). Opening it by hand puts the filing dots
 // on the map; a section restored open from an earlier visit leaves the map alone, and the header's "On map" switch says
-// which it is. The phone's Explore tab opens it for the visit without saving (src/mobile.js).
+// which it is. It sits last in the panel, under the area and its reports.
 const secF=document.getElementById('secFilings'), secFBody=document.getElementById('filingsBody');
 function setFilingsOpen(open,{save=false,dots=false}={}){
   secF.setAttribute('aria-expanded',open); secFBody.classList.toggle('collapsed',!open); document.getElementById('panel').classList.toggle('list-collapsed',!open);
@@ -416,14 +430,14 @@ function setFilingsOpen(open,{save=false,dots=false}={}){
   if(save) try{ localStorage.setItem('fs-sec-filings',open?'1':'0'); }catch(e){}
 }
 { let open=false; try{ open=(localStorage.getItem('fs-sec-filings')??'0')!=='0'; }catch(e){} setFilingsOpen(open); }
-secF.onclick=()=>setFilingsOpen(secF.getAttribute('aria-expanded')!=='true',{save:true,dots:true});
+secF.onclick=()=>setFilingsOpen(secF.getAttribute('aria-expanded')!=='true',{save:true}); // opening or closing the list never touches the map: only the On map switch does
 document.getElementById('filingsOnMap').onchange=e=>setFilingsShown(e.target.checked);
 // use, dates, updates, active-filter summary
 const dField=document.getElementById('dField'), dFrom=document.getElementById('dFrom'), dTo=document.getElementById('dTo');
 
 const dPeriod=[DATA.period.start.slice(0,7), ym(new Date(Date.now()+3*365*864e5))];
 [dFrom,dTo].forEach(i=>{ i.min=dPeriod[0].slice(0,4)+'-01'; i.max=dPeriod[1]; });
-function readDates(){ const f=dField.value; dFrom.disabled=dTo.disabled=!f; state.d=f?{f,from:dFrom.value||'',to:dTo.value||''}:{f:'all',from:'',to:''}; applyFilters(); }
+function readDates(){ const f=dField.value; dFrom.disabled=dTo.disabled=!f; if(f&&dFrom.value&&dTo.value&&dFrom.value>dTo.value){ [dFrom.value,dTo.value]=[dTo.value,dFrom.value]; swapped('the two dates'); } datePicked=!!f; state.d=f?{f,from:dFrom.value||'',to:dTo.value||''}:{f:'all',from:'',to:''}; applyFilters(); }
 dField.onchange=()=>{ if(dField.value&&!dFrom.value&&!dTo.value){ const t=ym(new Date()); dFrom.value=dField.value==='reg'?dPeriod[0]:t; } readDates(); };
 dFrom.onchange=readDates; dTo.onchange=readDates;
 const chgRow=document.getElementById('chgRow');
@@ -443,9 +457,10 @@ function syncFilterUI(){
   const maxEl=document.getElementById('maxCost'); if(state.max&&![...maxEl.options].some(o=>+o.value===state.max)){ const o=document.createElement('option'); o.value=state.max; o.textContent=fmtM(state.max); maxEl.appendChild(o); } maxEl.value=String(state.max||0);
   if(document.activeElement!==sqMin) sqMin.value=state.sqmin||''; if(document.activeElement!==sqMax) sqMax.value=state.sqmax||'';
   uMin.value=String(state.umin||0); if(document.activeElement!==coQ) coQ.value=state.co||''; exactBtn.setAttribute('aria-pressed',!!state.exact);
-  const dd=state.d&&state.d.f!=='all'?state.d:null; dField.value=dd?dd.f:''; dFrom.value=dd?.from||''; dTo.value=dd?.to||''; dFrom.disabled=dTo.disabled=!dd;
+  // the Filed chips already say a preset period: the Dates row shows only a range of your own (or one picked by hand)
+  const dd=state.d&&state.d.f!=='all'&&(!pk||datePicked)?state.d:null; dField.value=dd?dd.f:''; dFrom.value=dd?.from||''; dTo.value=dd?.to||''; dFrom.disabled=dTo.disabled=!dd;
   const nMore=(state.uses?1:0)+(state.d&&!pk?1:0)+(state.chg?1:0)+(state.st?1:0)+(state.sqmin||state.sqmax?1:0)+(state.umin?1:0)+(state.co.trim()?1:0)+(state.exact?1:0); document.getElementById('moreN').textContent=nMore?'· '+nMore+' on':''; if(nMore) document.getElementById('moreF').open=true;
-  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const nBadge=nAll+ctx_lfCount(); const fN=document.getElementById('filterN'); fN.textContent=nBadge||''; fN.hidden=!nBadge; syncClear(); try{ ctx.syncFilterFooter?.(); }catch(e){}
+  const nAll=Object.keys(curSpec(false)).filter(k=>k!=='d').length+(pk&&pk!=='12m'?1:0); const nBadge=nAll+ctx_lfCount(); { /* the Filings section starts folded; a new filter opens it */ const fe=document.getElementById('filingsSecN'); if(fe) fe.textContent=nAll?'· '+nAll+' on':''; if(nAll>lastFilN) document.getElementById('lfFilings').open=true; lastFilN=nAll; } const fN=document.getElementById('filterN'); fN.textContent=nBadge||''; fN.hidden=!nBadge; syncClear(); try{ ctx.syncFilterFooter?.(); }catch(e){}
   document.getElementById('filterBtn').classList.toggle('on',!!nBadge);
   let lt=''; try{ lt=ctx.layerFilterText?.()||''; }catch(e){}
   // only the default period set: "No filters on" and no Clear All
@@ -532,8 +547,8 @@ function filterChips({area=true}={}){
   for(const k of Object.keys(s)){ if(k==='d'||!RESET[k]) continue; const g=k==='max'?'min':k==='sqmax'?'sqmin':k; if(seen.has(g)) continue; seen.add(g);
     const part=g==='min'?{min:s.min,max:s.max}:g==='sqmin'?{sqmin:s.sqmin,sqmax:s.sqmax}:{[k]:s[k]};
     out.push({label:describe(part,fmtM),remove:drop(RESET[k])}); }
-  if(state.month) out.push({label:'Under construction · '+monthLabel(state.month),remove:()=>showTime(false)});
-  if(area&&sel.feature) out.push({label:'Area: '+sel.label,remove:()=>clearSelection()});
+  if(state.month) out.push({label:'Under construction '+monthLabel(state.month),remove:()=>showTime(false)});
+  if(area&&sel.feature) out.push({label:(['area','shape','radius'].includes(sel.kind)?'':'Area: ')+sel.label,remove:()=>clearSelection()});
   return out;
 }
 // the bar under a page header: "5,291 filings · $16.3B", the filters as chips, [Edit filters] [Reset]
@@ -568,12 +583,12 @@ function fromSpec(spec,{fly=true}={}){
   state.counties=new Set(spec.c&&spec.c.length?spec.c.filter(c=>COUNTIES.includes(c)):COUNTIES); if(!state.counties.size) state.counties=new Set(COUNTIES);
   state.types=new Set(spec.t&&spec.t.length?spec.t:TYPES);
   state.uses=spec.u&&spec.u.length?new Set(spec.u):null; state.min=spec.min||0; state.max=spec.max||0; state.q=spec.q||'';
-  state.who=spec.who||null; state.d=spec.d||null; state.chg=spec.chg||null;
+  state.who=spec.who||null; state.d=spec.d||null; datePicked=false; state.chg=spec.chg||null;
   state.st=spec.st&&spec.st.length?new Set(spec.st):null; state.sqmin=spec.sqmin||0; state.sqmax=spec.sqmax||0; state.co=spec.co||''; state.exact=spec.exact?1:0; state.umin=spec.umin||0;
   const s=spec.sel;
   if(s&&s.k==='r'){ setMiles(s.mi,false,true); setRadiusCenter(s.c,s.label||'pin',fly); }
   else if(s&&s.k==='c'){ const set=new Set(s.names.filter(n=>COUNTIES.includes(n))); if(set.size){ setCountySel(set); if(fly) fitGeom(sel.feature); } else clearSelection(); }
-  else if(s&&s.k==='p'){ setSelection('shape',s.label||'Custom shape',ringFeature(s.ring)); if(fly) fitGeom(sel.feature); }
+  else if(s&&s.k==='p'){ setSelection(s.box?'area':'shape',(!s.label||/^(Area selection|Custom shape)/.test(s.label))?areaName(s.box?'Box':'Shape',ringCenter(s.ring)):s.label,ringFeature(s.ring)); if(fly) fitGeom(sel.feature); }
   else if(sel.feature) clearSelection();
   else applyFilters();
 }
@@ -582,6 +597,9 @@ const colorOf=f=>{ const c=C(); return f.type==='New'?c.new:f.type==='Reno'?c.re
 function renderList(){
   document.getElementById('listCount').textContent=(sel.kind==='radius'?'Nearest first · ':'Largest first · ')+fmtN(visible.length);
   const frag=document.createDocumentFragment();
+  if(!visible.length){ const narrowed=filterChips({area:false}).some(c=>!c.fixed);
+    listEl.innerHTML=vempty({icon:'search',title:sel.feature?'No filings in this area':'No filings match',text:narrowed?'Your filters leave nothing here. Clear them to see everything in '+(sel.feature?'this area':'the region')+'.':sel.feature?'Nothing was registered here in the current period. Pick another area, or widen the period under Filters.':'Widen the period under Filters.',actions:narrowed?[{label:'Clear filters',id:'listClearF'}]:[]});
+    document.getElementById('listClearF')?.addEventListener('click',()=>resetFilings({area:false})); return; }
   visible.slice(0,state.shown).forEach(f=>{
     const b=document.createElement('button'); b.className='item'+(state.sel===f?' on':''); b.setAttribute('role','listitem');
     const ds=f.type==='Addition'?'border:2px solid '+colorOf(f):'background:'+colorOf(f);
@@ -628,6 +646,7 @@ function spy(){ spyRaf=0; if(!card.classList.contains('open')) return;
   const y=card.scrollTop, room=card.scrollHeight-card.clientHeight;
   const was=card.classList.contains('compact'), fold=y>40&&room>160?true:y<=2?false:was; if(fold!==was) card.classList.toggle('compact',fold);
   if(performance.now()<spyHold) return; // a chip was just clicked: it stays lit while the card scrolls to it
+  if(card.classList.contains('sp-mode')) return; // the site plan panel lights its own chips (src/siteplan.js)
   const nav=card.querySelector('.bnav'); if(!nav) return;
   const chips=[...nav.querySelectorAll('[data-sec]:not([hidden])')]; if(!chips.length) return;
   const off=(card.querySelector('.ctabs')?.offsetHeight||0)+(card.querySelector(':scope>.top')?.offsetHeight||0)+16;
@@ -651,12 +670,12 @@ function select(f,fly){
   if(cpOpening) stopAllOrbits(); else { cpush=null; cardCloseHooks.forEach(fn=>fn()); }
   state.sel=f; syncHighlight(); [...listEl.querySelectorAll('.item')].forEach((b,i)=>b.classList.toggle('on',visible[i]===f));
   const fld=(k,v,w)=>'<div class="f'+(w?' w':'')+'"><div class="fl">'+k+'</div><div class="fv">'+v+'</div></div>';
-  const people=[['Owner',esc(f.owner||'—')],f.dev&&f.dev.toLowerCase()!==String(f.owner).toLowerCase()?['Developer',whoLink('dev',f.dev||f.owner,f.dev)]:null,f.arch?['Architect',whoLink('arch',f.arch,f.arch)]:null,f.gc?['General contractor',whoLink('gc',f.gc,f.gc)]:null].filter(Boolean);
+  const people=[['Owner',f.owner?whoLink('own',f.owner,f.owner):'—'],f.dev&&f.dev.toLowerCase()!==String(f.owner).toLowerCase()?['Developer',whoLink('dev',f.dev||f.owner,f.dev)]:null,f.arch?['Architect',whoLink('arch',f.arch,f.arch)]:null,f.gc?['General contractor',whoLink('gc',f.gc,f.gc)]:null].filter(Boolean);
   const gsv='https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+f.lat.toFixed(6)+','+f.lon.toFixed(6);
   card.innerHTML='<div class="top"><div><div class="kicker">'+esc(f.county)+' County · '+esc(TYPE_LABEL[f.type])+'</div><h2>'+esc(f.name)+'</h2>'+(f.addr?'<div class="bsub">'+esc(f.addr)+'</div>':'')+'<button class="btn sm cshow" type="button" id="fShowMap">Show on map</button></div>'+
     '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>'+
-    cardActs('<button class="btn sm askai" type="button" id="fAsk">'+SPARK+'Ask AI</button><a class="btn sm" id="fTabs" href="'+tabsUrl(f.id)+'" target="_blank" rel="noopener" title="The filing on the TDLR TABS site">TABS record ↗</a>',
-      [{href:gsv,label:'Street View ↗',sub:'Google Street View at the site'},['Add site note',' id="fNote" data-push'],{divider:true},['Select more',' id="fMulti" title="Then click or tap more filings, buildings or parcels to compare them in tabs (or Shift-click)"'],['Copy link',' id="fLink"']].map(x=>Array.isArray(x)?{label:x[0],attrs:x[1]}:x))+
+    cardActs('<button class="btn sm askai" type="button" id="fAsk">'+SPARK+'Ask AI</button><button class="btn sm" type="button" id="fProp" data-push title="Open the property card: owner, value, zoning and the building at this spot">Property card</button>',
+      [['Open property card',' id="fProp2" data-push'],{href:tabsUrl(f.id),label:'TABS record ↗',sub:'The filing on the TDLR TABS site'},{href:gsv,label:'Street View ↗',sub:'Google Street View at the site'},['Add site note',' id="fNote" data-push'],{divider:true},['Select more',' id="fMulti" title="Then click or tap more filings, buildings or parcels to compare them in tabs (or Shift-click)"'],['Copy link',' id="fLink"']].map(x=>Array.isArray(x)?{label:x[0],attrs:x[1]}:x))+
     cardNav([['fProj','Project'],['fSched','Schedule'],['fPeople','People'],['fScope','Scope'],['airSec','Air'],['briefBox','AI Brief'],['liveSec','From Here']])+'</div>'+
     (f.sum?'<div class="bover"><div class="kicker">Overview</div><div>'+esc(f.sum)+'</div></div>':'')+
     (f.approx?'<div class="note">Location is approximate: the address didn’t geocode, so this marker sits at the city center (shaded circle), not on the site.</div>':'')+
@@ -682,7 +701,9 @@ function select(f,fly){
   card.querySelectorAll('[data-who]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const [k,v]=a.dataset.who.split('|'); state.who={k,v,label:a.textContent}; applyFilters(); setView('map'); });
   card.querySelector('#briefBtn').onclick=()=>loadBrief(f);
   card.querySelector('#fShowMap').onclick=()=>{ setView('map',{user:true}); select(f,true); }; // over a page (Timeline, Changes…): only shown there
-  card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat]}); // data-push: "← <filing>" goes back with its tabs
+  card.querySelector('#fNote').onclick=()=>ctx.addNote?.({at:[f.lon,f.lat],label:f.addr||f.name}); // data-push: "← <filing>" goes back with its tabs
+  // the property at the filing's spot, in front of this card (data-push: "← <filing>" comes back)
+  for(const id of ['#fProp','#fProp2']) card.querySelector(id).onclick=()=>{ if(f.approx){ toast('This filing’s address didn’t geocode, so its marker is at the city center: there’s no property to open.'); return; } ctx.openBuildingAt([f.lon,f.lat]); };
   card.querySelector('#fAsk').onclick=()=>ctx.assistant?.ask('Tell me more about '+f.name);
   card.querySelector('#fMulti').onclick=()=>ctx.tabs?.setAdding(true);
   card.querySelector('#fLink').onclick=()=>copyCardLink();
@@ -698,10 +719,11 @@ function historyHtml(f){
   return '<div class="fhist"><div class="fl">History</div>'+rows.map(([d,x])=>'<div><span class="m">'+esc(d)+'</span> '+(x.k==='new'?'First seen':esc(x.label)+': '+esc(fv(x.k,x.from))+' → '+esc(fv(x.k,x.to)))+'</div>').join('')+'</div>'; }
 async function loadBrief(f){
   const box=card.querySelector('#briefBox'); if(!box) return; box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote loading">Writing a brief from the filing, nearby activity and census data…</div>';
-  try{ const r=await fetch('api/brief?id='+encodeURIComponent(f.id)); const d=await r.json().catch(()=>({}));
-    if(state.sel!==f) return; if(!r.ok) throw new Error(d.error||('Error '+r.status));
+  try{ let r; try{ r=await fetch('api/brief?id='+encodeURIComponent(f.id)); }catch(e){ throw new Error(aiErrorMessage({network:true,offline:navigator.onLine===false})); }
+    const d=await r.json().catch(()=>({}));
+    if(state.sel!==f) return; if(!r.ok) throw new Error(aiErrorMessage({status:r.status,error:d.error}));
     box.innerHTML='<div class="lt">AI Project Brief</div><div class="btext">'+richText(d.brief)+'</div><div class="ssrc src">AI-written from the data on this page. Verify before relying on it.</div>'; wireCites(box); }
-  catch(e){ if(state.sel===f) box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote">'+esc(e.message)+'</div><button class="btn" id="briefBtn">Try Again</button>', box.querySelector('#briefBtn').onclick=()=>loadBrief(f); }
+  catch(e){ if(state.sel===f) box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote">'+esc(e.message)+' <button class="lnk" id="briefBtn" type="button">Retry</button></div>', box.querySelector('#briefBtn').onclick=()=>loadBrief(f); }
 }
 // AI text -> safe HTML: escaped, paragraphs, [TABS…] citations become buttons that select the filing
 function richText(t){ return textBlocks(esc(plainText(t||''))).replace(/\[(TABS[0-9A-Za-z-]+)\]/g,(m,id)=>BY_ID.has(id)?'<button class="cite" data-id="'+id+'">'+id+'</button>':id); }
@@ -734,6 +756,9 @@ function decorateBack(){ if(!cpush||cpOpening) return; const head=cardTopEl()?.f
   const b=document.createElement('button'); b.type='button'; b.className='cback'; b.innerHTML=BACK+'<span></span>'; b.querySelector('span').textContent=cpush.label; b.title='Back to '+cpush.label+' (Esc)';
   b.onclick=e=>{ e.stopPropagation(); cardBack(); }; head.prepend(b); }
 new MutationObserver(decorateBack).observe(card,{childList:true});
+// every card's × is the property card's icon button (reports, places and child cards wrote a bare "×" that rendered small and faint)
+const X_ICON='<svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+new MutationObserver(()=>{ const x=card.querySelector(':scope>.top>.x'); if(x&&!x.firstElementChild&&x.textContent.trim()==='×') x.innerHTML=X_ICON; }).observe(card,{childList:true});
 function cardBack(){ const p=cpush; if(!p) return false; cpush=null;
   if(!(p.tabId&&ctx.tabs?.reopen?.(p.tabId))) p.reopen();
   const y=p.scroll; requestAnimationFrame(()=>{ card.scrollTop=y; setTimeout(()=>{ if(card.scrollTop<y-2) card.scrollTop=y; },400); });
@@ -772,11 +797,14 @@ function placeMenu(pt,ll){
   const w=220, x=Math.min(pt.x, viewport.clientWidth-w-8), y=Math.min(pt.y, viewport.clientHeight-190);
   pmenu.style.left=Math.max(8,x)+'px'; pmenu.style.top=Math.max(8,y)+'px'; pmenu.classList.add('on');
   pmenu.querySelector('[data-a=note]').onclick=()=>{ hideMenu(); ctx.addNote?.({at:c}); };
-  pmenu.querySelector('[data-a=radius]').onclick=()=>{ hideMenu(); setMiles(1,false,true); setRadiusCenter(c,'Pin ('+c[1].toFixed(4)+', '+c[0].toFixed(4)+')',true); };
-  pmenu.querySelector('[data-a=ask]').onclick=()=>{ hideMenu(); ctx.assistant?.ask('What is being built within 1 mile of '+c[1].toFixed(5)+', '+c[0].toFixed(5)+'? Show it on the map.'); };
+  pmenu.querySelector('[data-a=radius]').onclick=()=>{ hideMenu(); setMiles(1,false,true); setRadiusCenter(c,pinLabel(c),true); };
+  pmenu.querySelector('[data-a=ask]').onclick=async()=>{ hideMenu(); const a=await spotAddress(c); ctx.assistant?.ask(spotQuestion(a||nearName(c),c,!!a)); };
   pmenu.querySelector('a').onclick=hideMenu;
 }
 const hideMenu=()=>pmenu.classList.remove('on');
+// the street address at a right-clicked spot (MapTiler reverse geocoding), for "Ask AI about this spot"; null when there is none nearby
+async function spotAddress(c){ try{ const r=await fetch('https://api.maptiler.com/geocoding/'+c[0]+','+c[1]+'.json?key='+MAPTILER_KEY+'&limit=1&types=address,poi',{signal:AbortSignal.timeout(2500)});
+  const f=r.ok?(await r.json())?.features?.[0]:null; return f?(f.place_name||f.text||'').replace(/, United States$/,'')||null:null; }catch(e){ return null; } }
 map.on('contextmenu',e=>{ e.preventDefault(); if(mode==='pan'&&!ctx.planOpen?.()) placeMenu(e.point,e.lngLat); }); // a site plan open: its own menu (src/siteplan.js)
 { let lp=0,start=null; // long-press on touch screens
   map.on('touchstart',e=>{ clearTimeout(lp); if(e.points.length!==1||mode!=='pan'||ctx.planOpen?.()) return; start=e.point; lp=setTimeout(()=>{ placeMenu(e.point,e.lngLat); swallowClick=true; },550); });
@@ -789,7 +817,7 @@ map.on('movestart',hideMenu);
 let mode='pan', draft=[], boxA=null, boxB=null;
 const hintEl=document.getElementById('hint'), radiusEl=document.getElementById('radius');
 const isTouch=window.matchMedia('(pointer: coarse)').matches;
-const HINTS={area:'Drag a box over the area you want.',poly:isTouch?'Tap to drop points. Tap the first point to close the shape.':'Click to drop points. Click the first point or double-click to close. Backspace undoes, Esc cancels.',county:'Click counties to add or remove them from the selection.'};
+const HINTS={area:'Drag a box over the area you want.'+(isTouch?'':' Esc to cancel.'),poly:isTouch?'Tap to drop points. Tap the first point to close the shape.':'Click to drop points. Click the first point or double-click to close. Backspace undoes. Esc to cancel.',county:'Click counties to add or remove them from the selection.'+(isTouch?'':' Esc to cancel.')};
 function setMode(m){
   mode=m; draft=[]; boxA=null; drawDraft();
   document.querySelectorAll('.tools button[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));
@@ -834,6 +862,12 @@ function drawDraft(cursor){
   s.setData(fc(feats));
   p.setData(fc(mode==='poly'?draft.map((c,i)=>({type:'Feature',properties:{first:i===0&&draft.length>=3?1:0},geometry:{type:'Point',coordinates:c}})):[]));
 }
+// drawn areas are named for where they are: "Box near Tomball", "Shape near Katy" (the nearest place we know, else the map's own name for the view)
+const ringCenter=r=>{ let x=0,y=0; for(const p of r){ x+=p[0]; y+=p[1]; } return [x/r.length,y/r.length]; };
+const nearName=c=>nearestPlace(c)||viewPlaceSafe();
+const areaName=(kind,c)=>{ const n=nearName(c); return n?kind+' near '+n:kind; };
+// a dropped pin: the nearest place by name; coordinates only where we know of none
+const pinLabel=ll=>nearName(ll)||ll[1].toFixed(4)+', '+ll[0].toFixed(4);
 function boxRing(a,b){ // a,b are screen points
   const pts=[], N=10, edge=(x0,y0,x1,y1)=>{ for(let i=0;i<N;i++){ const ll=map.unproject([x0+(x1-x0)*i/N,y0+(y1-y0)*i/N]); if(ll) pts.push([ll.lng,ll.lat]); } };
   edge(a.x,a.y,b.x,a.y); edge(b.x,a.y,b.x,b.y); edge(b.x,b.y,a.x,b.y); edge(a.x,b.y,a.x,a.y);
@@ -845,7 +879,7 @@ const moveDraft=e=>{ if(mode==='area'&&boxA){ boxB=e.point; drawDraft(e.point); 
 map.on('mousemove',moveDraft); map.on('touchmove',moveDraft);
 const endBox=e=>{ if(mode!=='area'||!boxA) return; const a=boxA, b=boxB||e.point; boxA=null; boxB=null; drawDraft();
   if(!b||Math.hypot(b.x-a.x,b.y-a.y)<8) return; const r=boxRing(a,b); if(!r){ toast('That box is off the globe. Zoom in and try again.'); return; }
-  setSelection('area','Area selection',ringFeature(r.slice(0,-1))); setMode('pan'); };
+  setSelection('area',areaName('Box',ringCenter(r)),ringFeature(r.slice(0,-1))); setMode('pan'); };
 map.on('mouseup',endBox); map.on('touchend',endBox);
 map.on('click',e=>{
   if(swallowClick){ swallowClick=false; return; }
@@ -858,16 +892,23 @@ map.on('click',e=>{
     const set=new Set(sel.kind==='county'?sel.counties:[]); set.has(c.name)?set.delete(c.name):set.add(c.name);
     if(!set.size){ clearSelection(); return; }
     setCountySel(set);
-  } else if(mode==='radius'){ setRadiusCenter(ll,'Dropped pin ('+ll[1].toFixed(4)+', '+ll[0].toFixed(4)+')',false); }
+  } else if(mode==='radius'){ setRadiusCenter(ll,pinLabel(ll),false); }
 });
 map.on('dblclick',e=>{ if(mode==='poly'&&draft.length>=3){ e.preventDefault(); finishPoly(); } });
 function setCountySel(set){ const names=COUNTIES.filter(n=>set.has(n));
   setSelection('county',names.length>2?names.length+' counties':names.join(' + ')+(names.length>1?' counties':' County'),{type:'MultiPolygon',coordinates:DATA.counties.filter(x=>set.has(x.name)).flatMap(x=>x.outline)},set); }
 function finishPoly(){ const pts=draft.filter((p,i)=>i===0||d3.geoDistance(p,draft[i-1])>1e-7); draft=[]; drawDraft();
   if(pts.length<3){ toast('A shape needs at least three points.'); return; }
-  setSelection('shape','Custom shape ('+pts.length+' points)',ringFeature(pts)); setMode('pan'); }
-document.addEventListener('keydown',e=>{ if(e.target.closest&&e.target.closest('input,select,textarea')) return;
-  if(mode==='poly'&&draft.length){ if(e.key==='Enter'){e.preventDefault(); finishPoly();} else if(e.key==='Backspace'){e.preventDefault(); draft.pop(); drawDraft();} else if(e.key==='Escape'){ e.preventDefault(); draft=[]; drawDraft(); } } });
+  setSelection('shape',areaName('Shape',ringCenter(pts)),ringFeature(pts)); setMode('pan'); }
+document.addEventListener('keydown',e=>{
+  // Esc: a shape in progress is dropped first; otherwise any area tool (box, shape, radius, county) goes back to Move
+  if(e.key==='Escape'&&mode!=='pan'&&!e.defaultPrevented&&!document.getElementById('layers')?.classList.contains('on')){
+    const t=e.target.closest?e.target:null, typing=t&&t.closest('input,select,textarea,[contenteditable="true"]')&&!t.closest('#radius');
+    if(!typing&&!document.querySelector('details.vmenu[open]')){
+      if(mode==='radius'&&e.target===rq&&sugs.length){ sugs=[]; renderSugs(); e.preventDefault(); return; } // the suggestions close first
+      e.preventDefault(); if(draft.length||boxA){ draft=[]; boxA=null; boxB=null; drawDraft(); if(mode==='poly') return; } setMode('pan'); return; } }
+  if(e.target.closest&&e.target.closest('input,select,textarea')) return;
+  if(mode==='poly'&&draft.length){ if(e.key==='Enter'){e.preventDefault(); finishPoly();} else if(e.key==='Backspace'){e.preventDefault(); draft.pop(); drawDraft();} } });
 // the box around an area's own coordinates: d3.geoBounds reads a ring wound the "wrong" way (drive-time bands, circles)
 // as the whole world minus the area, which zoomed the map all the way out
 function fitGeom(g){ g=g?.geometry||g; let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
@@ -877,7 +918,9 @@ function fitGeom(g){ g=g?.geometry||g; let x0=Infinity,y0=Infinity,x1=-Infinity,
 
 // ---------- radius search (MapTiler geocoding + local index) ----------
 const rq=document.getElementById('rq'), rsug=document.getElementById('rsug'), rmi=document.getElementById('rmi'), rrange=document.getElementById('rrange');
-let radiusMiles=3, sugs=[], sugI=-1, picked=false, geoCtl=null;
+const MAX_MI=60; // the slider, the number box and links all stop here
+rrange.max=rmi.max=MAX_MI;
+let radiusMiles=3, sugs=[], sugI=-1, picked=false, geoCtl={};
 const LOCAL=[]; F.forEach(f=>{ LOCAL.push({t:f.name,k:'Filing',c:[f.lon,f.lat],sub:f.addr}); });
 DATA.places.forEach(([n,lon,lat])=>LOCAL.push({t:n+', TX',k:'Town',c:[lon,lat]}));
 LOCAL.forEach(o=>o.l=o.t.toLowerCase());
@@ -890,7 +933,8 @@ function localSearch(q){
 // search box: region-biased autocomplete. The assistant passes {exact:true}: whole-Texas, no autocomplete, own request;
 // {world:true}: anywhere on Earth, biased to the map center (the assistant, for places outside Texas)
 async function geocode(q,o={}){
-  let ctl; if(!o.exact&&!o.world){ if(geoCtl) geoCtl.abort(); ctl=geoCtl=new AbortController(); }
+  // each box has its own slot (o.slot; the radius box is 'radius'): a newer request cancels the older one in the same slot only
+  let ctl; if(!o.exact&&!o.world){ const k=o.slot||'radius'; geoCtl[k]?.abort(); ctl=geoCtl[k]=new AbortController(); }
   const c=map.getCenter(), prox=o.exact||o.world?c.lng.toFixed(4)+','+c.lat.toFixed(4):'-95.9,30.0', bbox=o.exact?'-106.7,25.8,-93.5,36.5':'-97.6,28.6,-94.2,31.4';
   const u='https://api.maptiler.com/geocoding/'+encodeURIComponent(q)+'.json?key='+MAPTILER_KEY+'&limit='+(o.limit||6)+'&proximity='+prox+'&autocomplete='+!(o.exact||o.world)+(o.world?'':'&country=us&bbox='+bbox);
   const c2=ctl||new AbortController(), tm=setTimeout(()=>c2.abort(),8000); // a geocoder that hangs must not hang the assistant
@@ -913,7 +957,7 @@ rq.addEventListener('keydown',e=>{
   else if(e.key==='ArrowUp'&&sugs.length){e.preventDefault(); sugI=(sugI-1+sugs.length)%sugs.length; renderSugs();}
   else if(e.key==='Enter'&&sugs.length){e.preventDefault(); pickSug(sugs[Math.max(0,sugI)]);} });
 function pickSug(o){ picked=true; rq.value=o.t; sugs=[]; renderSugs(); setRadiusCenter(o.c,o.t,true); }
-function setMiles(v,fromRange,silent){ v=Math.max(0.1,Math.min(60,+v||0)); radiusMiles=v; if(!fromRange) rrange.value=Math.min(25,v); rmi.value=v;
+function setMiles(v,fromRange,silent){ v=Math.max(0.1,Math.min(MAX_MI,+v||0)); radiusMiles=v; if(!fromRange) rrange.value=v; rmi.value=v;
   document.querySelectorAll('.rpre button').forEach(b=>b.classList.toggle('on',+b.dataset.mi===v)); if(sel.kind==='radius'&&!silent) updateRadius(false); }
 rrange.addEventListener('input',()=>setMiles(rrange.value,true)); rmi.addEventListener('change',()=>setMiles(rmi.value));
 document.querySelectorAll('.rpre button').forEach(b=>b.onclick=()=>{ setMiles(b.dataset.mi); if(sel.kind==='radius') updateRadius(true); });
@@ -954,7 +998,7 @@ addEventListener('resize',placeLayers); if(layersOpen&&window.ResizeObserver) ne
 let swallowClick=false;
 document.addEventListener('pointerdown',e=>{ if(layersEl.classList.contains('on')&&!layersEl.contains(e.target)&&!layersBtn.contains(e.target)&&!layersOpen?.contains(e.target)){ setLayersOpen(false); if(map.getCanvas().contains(e.target)) swallowClick=true; } });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&layersEl.classList.contains('on')){ e.preventDefault(); setLayersOpen(false); } });
-document.querySelectorAll('#styleSeg button').forEach(b=>{ b.onclick=()=>setBasemap(b.dataset.style); b.setAttribute('aria-pressed',b.dataset.style===layers.style); });
+document.querySelectorAll('#styleSeg button').forEach(b=>{ if(BASES[b.dataset.style]) b.textContent=BASES[b.dataset.style]; /* one list of base-map names, shared with Settings */ b.onclick=()=>setBasemap(b.dataset.style); b.setAttribute('aria-pressed',b.dataset.style===layers.style); });
 document.querySelectorAll('#sizeSeg button').forEach(b=>b.onclick=()=>{ layers.size=b.dataset.size; saveLayers(); styleFilings(); });
 document.querySelectorAll('#heatSeg button').forEach(b=>b.onclick=()=>{ layers.heat=b.dataset.heat; saveLayers(); styleFilings(); });
 document.getElementById('lyFilings').onchange=e=>{ layers.dots=e.target.checked; saveLayers(); styleFilings(); if(!map.getLayer('filings')) syncLegend(); };
@@ -1023,7 +1067,7 @@ const fmtD=s=>new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',
 const PERIOD=fmtD(DATA.period.start)+' – '+fmtD(DATA.period.end), today=new Date(), stamp=today.toISOString().slice(0,10);
 const slug=s=>(s||'all-filings').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'selection';
 const scopeLabel=()=>sel.feature?sel.label:'All filings shown';
-function filterText(){ const t=describe(curSpec(false),fmtM); const mo=state.month?'Under construction in '+monthLabel(state.month):''; return [t,mo].filter(Boolean).join(' · '); }
+function filterText(){ const t=describe(curSpec(false),fmtM); const mo=state.month?'Under construction '+monthLabel(state.month):''; return [t,mo].filter(Boolean).join(' · '); }
 function monthLabel(m){ return new Date(m+'-15T12:00:00Z').toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
 let downloads=null; const inViewer=!!(window.claude&&window.claude.use);
 if(inViewer) window.claude.use('downloads').then(d=>{downloads=d;}).catch(()=>{});
@@ -1039,10 +1083,10 @@ const rowsFor=list=>list.map(f=>({'TABS #':f.id,'Project':f.name,'County':f.coun
   'Est. value (USD)':+(+f.cost).toFixed(2),'Sq ft':f.sqft||'','Owner':f.owner,'Developer':f.dev||'','Architect':f.arch||'','GC':f.gc||'','Registered':f.reg,'Status':f.status,'Est. start':f.start,'Est. end':f.end,
   'Timeline start':f.ts,'Timeline end':f.te,'Timeline dates':f.tsE||f.teE?'Partly estimated':'As filed','Change this week':f._chg||'','AI summary':f.sum||'','Scope':f.scope,
   ...(sel.kind==='radius'?{'Distance (mi)':Math.round(f._d*100)/100}:{}),'Location':f.approx?'Approximate (city)':f.prec==='street'?'Street (house not found)':f.prec==='intersection'?'Intersection':'Address','Latitude':f.lat,'Longitude':f.lon,'TABS link':tabsUrl(f.id)}));
-const csvText=rows=>{ if(!rows.length) return ''; const cols=Object.keys(rows[0]), q=v=>{ const s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
-  return '\ufeff'+[cols.join(','),...rows.map(r=>cols.map(c=>q(r[c])).join(','))].join('\r\n'); };
+const csvText=(rows,pre=[])=>{ if(!rows.length) return ''; const cols=Object.keys(rows[0]), q=v=>{ const s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  return '\ufeff'+[...pre.map(r=>r.map(q).join(',')),cols.join(','),...rows.map(r=>cols.map(c=>q(r[c])).join(','))].join('\r\n'); };
 const fileBase=(kind,label)=>'fs-'+kind+'-'+slug(label||scopeLabel())+'-'+stamp;
-function exportCsv(rows,name){ saveFile(name+'.csv',csvText(rows),'text/csv'); }
+function exportCsv(rows,name,pre){ saveFile(name+'.csv',csvText(rows,pre),'text/csv'); } // pre: [[...cells]] lines above the header (e.g. a filters line)
 // Excel: one or more sheets [{name, rows|aoa, link}] (link: column holding a URL to hyperlink)
 function exportXlsx(sheets,name){
   if(!window.XLSX){ toast('Excel export is still loading. Try again in a moment.'); return; }
@@ -1066,7 +1110,7 @@ function summaryAoa(list,label){
   return sum; }
 function exportGeoJSON(list,name){ const rows=rowsFor(list);
   saveFile(name+'.geojson',JSON.stringify(fc(list.map((f,i)=>({type:'Feature',properties:rows[i],geometry:{type:'Point',coordinates:[f.lon,f.lat]}})))),'application/geo+json'); }
-document.getElementById('selClear').onclick=()=>{ clearSelection(); if(mode==='county') setMode('pan'); };
+document.getElementById('selClear').onclick=()=>{ clearSelection(); setMode('pan'); }; // whichever tool made the area is done with: the radius dialog closes too
 // the filings on a street map, framed on the selection (or the filings), for the Summary report
 function reportMap(list){
   const pts=list.slice().sort((a,b)=>b.cost-a.cost).map(f=>{ const col=f.type==='New'?'#006527':f.type==='Reno'?'#6b7174':'#1f9249';
@@ -1079,14 +1123,14 @@ function reportMap(list){
 // ---------- views ----------
 let view='map'; const appEl=document.querySelector('.app'), viewHooks={}, viewChangeHooks=[], cardRenderHooks=[];
 function setView(v,{user}={}){
-  // every page id works (#v=who, saved reports, the assistant); a group id (filings, marketgrp, work) opens its last-used page
+  // every page id works (#v=who, #v=projects, saved reports, the assistant); a group id (filings, marketgrp, work) opens its last-used page
   if(!document.getElementById('view-'+v)&&v!=='map') v=leafFor(v);
   if(!document.getElementById('view-'+v)&&v!=='map') v='map'; const was=view;
   // "← Back to <page>": only when the user clicked something on the page (or on the card over it) that lands on the Map;
   // the app bar, the assistant, links and boot never leave one. Any other page choice clears it.
   if(v==='map'&&was!=='map'){ if(user??(pageAct&&pageAct.from===was&&performance.now()-pageAct.t<1500)) setBack(was); }
   else if(v!=='map') setBack(null);
-  pageAct=null; if(v!==was) closeFilters(); view=v;
+  pageAct=null; if(v!==was) closeFilters(); view=v; if(v!==was&&v!==prevView) prevView=was;
   syncNavTabs(v); // app bar tab, sub-tab row (src/nav.js)
   document.querySelectorAll('.view').forEach(el=>el.classList.toggle('on',el.id==='view-'+v));
   stage.dataset.view=v; appEl.dataset.view=v; // pages (not the Map) hide the list panel and use the full width (app.css)
@@ -1095,23 +1139,26 @@ function setView(v,{user}={}){
   if(v==='map'){ appEl.classList.remove('pview-open'); if(was!=='map') map.resize(); setTimeout(()=>map.resize(),0); } else viewHooks[v]?.();
   if(v==='changes') changesSeen();
   viewChangeHooks.forEach(fn=>fn(v));
-  // a new page is a new browser history entry (Back returns to the page before); boot and Back/Forward themselves don't add one
-  const moved=v!==was; scheduleHash({push:moved});
+  syncTitle(); const moved=v!==was; scheduleHash(moved&&!popping);
   if(moved&&!navBoot) pageArrived(v);
 }
-// Back/Forward and boot switch pages without pushing; navKb: this navigation came from a keyboard press on a nav button
-let navQuiet=0, navBoot=false, navKb=false;
+let pageAct=null, back=null, prevView=null, popping=false;
+// boot switches pages without announcing them; navKb: this navigation came from a keyboard press on a nav button
+let navBoot=false, navKb=false;
 document.addEventListener('click',e=>{ navKb=e.isTrusted&&e.detail===0&&!!e.target.closest?.('#viewbar,#vtabs,#helpBtn,#mnav,#msheet'); if(navKb) setTimeout(()=>{ navKb=false; }); },true); // Enter/Space clicks have detail 0
 // say which page opened; from the keyboard, focus lands on its heading (mouse and touch users keep their place)
 function pageArrived(v){ cardStatus((document.getElementById('view-'+v)?.getAttribute('aria-label')||labelOf(v))+' page'); if(!navKb) return; navKb=false;
   requestAnimationFrame(()=>{ if(view!==v) return; const sec=document.getElementById('view-'+v);
     const h=v==='map'?map.getCanvas():sec&&(sec.querySelector('h1,h2')||sec); if(!h) return;
     if(h!==map.getCanvas()&&!h.hasAttribute('tabindex')){ h.setAttribute('tabindex','-1'); h.classList.add('pg-focus'); } h.focus({preventScroll:true}); }); }
-// Back/Forward: the page (and the open project) from the address; filters stay as they are
-addEventListener('popstate',()=>{ const p=new URLSearchParams(location.hash.slice(1)); navQuiet++; try{ setView(p.get('v')||'map'); syncProject(p.get('pj')); } finally{ navQuiet--; } });
-// My Work › Projects: the project page in the address (#pj=<id>), when src/siteplan.js offers ctx.currentProject / ctx.openProject
-function syncProject(pj){ if(view!=='projects'||!ctx.openProject) return; if((ctx.currentProject?.()||null)!==(pj||null)) ctx.openProject(pj||null); }
-let pageAct=null, back=null;
+// My Work › Projects: the project page follows the address (#pj=) on Back/Forward
+function syncProject(pj){ if(view!=='projects') return; const cur=ctx.currentProject?.()??ctx.sitePlan?.where?.project??null; if(cur===(pj||null)) return;
+  if(ctx.openProject) ctx.openProject(pj||null); else if(pj) ctx.sitePlan?.show?.(pj); }
+// the tab title names the page ("Reports · Real Estate Intelligence Platform"), so history and tab lists make sense
+const APP_NAME='Real Estate Intelligence Platform';
+function syncTitle(){ document.title=pathOf(view)+' · '+APP_NAME; }
+// the ? button: opens Data & help, and (pressed) goes back to the page it was opened from
+function helpToggle(){ if(view==='sources') setView(prevView&&prevView!=='sources'?prevView:'map'); else setView('sources'); }
 // a click anywhere else (the app bar's Map tab, the phone tab bar, the assistant) forgets the page click, so it can't leave a chip
 document.addEventListener('click',e=>{ if(e.isTrusted) pageAct=view!=='map'&&e.target.closest?.('.view,#card')?{t:performance.now(),from:view}:null; },true);
 const backEl=document.createElement('div'); backEl.className='backchip'; backEl.hidden=true;
@@ -1132,7 +1179,7 @@ const CHG_SEEN='fs-chg-seen';
 function changesBadge(){
   let seen=null; try{ seen=localStorage.getItem(CHG_SEEN); }catch(e){}
   const ids=new Set(); for(const r of DATA.changes.runs||[]){ if(seen&&r.built<=seen) break; for(const x of r.items) if(CHANGED.has(x.id)) ids.add(x.id); }
-  ctx.setBadge('changes',ids.size,{alert:true,title:'New and changed filings since your last visit'});
+  ctx.setBadge('changes',ids.size,{alert:true,roll:false,title:'New and changed filings since your last visit'}); // on the Changes sub-tab only, not the Filings tab
 }
 function changesSeen(){ const last=DATA.changes.runs?.[0]?.built; if(!last) return; try{ localStorage.setItem(CHG_SEEN,last); }catch(e){} changesBadge(); }
 
@@ -1158,12 +1205,32 @@ tPlay.onclick=()=>{ if(playT){ stopPlay(); return; } tPlay.classList.add('on'); 
 
 // ---------- URL state (shareable links, saved searches) ----------
 let hashT=0, booting=true;
-function hashStr(){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id);
-  const pj=view==='projects'&&ctx.currentProject?.(); if(pj) p.set('pj',pj); return p.toString(); }
-// filters, the map and the month replace the current history entry (debounced); a page change ({push:true}) adds one, at once
-function writeHash(push){ const h=hashStr(), u=h?'#'+h:location.pathname+location.search; history[push?'pushState':'replaceState'](null,'',u); document.getElementById('rssLink').href='api/feed?'+encode(curSpec()); }
-function scheduleHash(o){ if(booting) return; clearTimeout(hashT); if(o?.push&&!navQuiet){ writeHash(true); return; } hashT=setTimeout(()=>writeHash(false),250); } // never pushes during Back/Forward or boot
-document.getElementById('copyLink').onclick=async()=>{ const u=location.href.split('#')[0]+'#'+hashStr(); try{ await navigator.clipboard.writeText(u); toast('Link copied. It opens with these filters.'); }catch(e){ prompt('Copy this link',u); } };
+// the address carries the filters, the page (v=) and an open card. A copied link adds "ml" (map center and zoom) when
+// nothing is selected. The live address (o.live) also keeps where you are, so a reload comes back to it: the camera
+// (ml=lat,lng,zoom[,bearing,pitch]), an open property card (b=lat,lng), the open site plan (sp=project.plan) or the
+// project on the Projects page (pj=). Saved searches and copied links leave those out.
+const LAST_KEY='fs-last-hash';
+let camReady=false; // the camera goes in the address only once the map has been put somewhere (not the whole-world start before the fly-in)
+const camStr=()=>{ const c=map.getCenter(); return camFmt({lat:c.lat,lng:c.lng,zoom:map.getZoom(),bearing:map.getBearing(),pitch:map.getPitch()}); };
+function hashStr({map:withMap=false,live=false}={}){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id);
+  if(withMap&&!sel.feature&&!state.sel&&view==='map'){ const c=map.getCenter(); p.set('ml',[c.lat.toFixed(5),c.lng.toFixed(5),map.getZoom().toFixed(2)].join(',')); }
+  if(live){ const w=ctx.sitePlan?.where||{};
+    const pj=w.project||(view==='projects'&&ctx.currentProject?.()); if(w.plan) p.set('sp',w.plan); else if(pj) p.set('pj',pj);
+    if(view==='map'){ const b=!state.sel&&!w.plan&&ctx.currentBuilding?.(); if(b?.center) p.set('b',b.center[1].toFixed(6)+','+b.center[0].toFixed(6)); }
+    if(camReady) p.set('ml',camStr()); } // on every page, so coming back to the map after a reload finds it where it was
+  return p.toString(); }
+// a new page is a new history entry (so the browser's Back button steps back through pages and then leaves the app);
+// filter, card and map moves only rewrite the current entry. The last address is also kept on this device, so the bare
+// page (the installed app opening, a bookmark) comes back to it.
+function commitHash(push){ const h=hashStr({live:true}), url=h?'#'+h:location.pathname+location.search;
+  try{ push?history.pushState(null,'',url):history.replaceState(null,'',url); }catch(e){}
+  try{ localStorage.setItem(LAST_KEY,h); }catch(e){}
+  document.getElementById('rssLink').href='api/feed?'+encode(curSpec()); }
+function scheduleHash(o=false){ if(booting) return; const push=typeof o==='object'?!!o?.push&&!popping:!!o; clearTimeout(hashT); if(push){ commitHash(true); return; } hashT=setTimeout(()=>commitHash(false),250); } // push: a boolean, or {push} (src/siteplan.js)
+// Back / Forward: show the page (and the project on the Projects page) the address names, without adding history
+addEventListener('popstate',()=>{ if(booting) return; const p=new URLSearchParams(location.hash.slice(1)), v=p.get('v')||'map';
+  popping=true; try{ if(v!==view) setView(v); syncProject(p.get('pj')); }finally{ popping=false; } });
+document.getElementById('copyLink').onclick=async()=>{ const u=location.href.split('#')[0]+'#'+hashStr({map:true}); try{ await navigator.clipboard.writeText(u); toast('Link copied. It opens with these filters.'); }catch(e){ prompt('Copy this link',u); } };
 
 // ---------- the Map panel: pick buttons, "…" menu, links, first-visit tip ----------
 // no area yet: Box / Shape / Radius / County start the same tools as the map's toolbar (on a phone, from the Map tab)
@@ -1174,9 +1241,12 @@ document.querySelectorAll('#selPick [data-pick]').forEach(b=>b.onclick=()=>{
   // the menu opens fresh each time: the name field only after "Save search"
   menu.addEventListener('toggle',()=>{ if(!menu.open) form.hidden=true; });
   document.getElementById('saveSearch').addEventListener('click',e=>{ e.stopPropagation(); // keep the menu open for the name field
-    form.hidden=false; nameEl.value=filterChips({area:true}).filter(c=>!c.fixed).map(c=>c.label.replace(/^Area: /,'')).join(' · ').slice(0,60)||'All filings'; nameEl.focus(); nameEl.select(); });
-  form.onsubmit=e=>{ e.preventDefault(); const name=nameEl.value.trim(); if(!name){ nameEl.focus(); return; } ctx.saveSearch?.(name); menu.open=false; };
+    noErr(); form.hidden=false; nameEl.value=filterChips({area:true}).filter(c=>!c.fixed).map(c=>c.label.replace(/^Area: /,'')).join(' · ').slice(0,60)||'All filings'; nameEl.focus(); nameEl.select(); });
+  const errEl=document.getElementById('saveErr'), noErr=()=>{ errEl.hidden=true; nameEl.removeAttribute('aria-invalid'); };
+  nameEl.addEventListener('input',noErr);
+  form.onsubmit=e=>{ e.preventDefault(); const name=nameEl.value.trim(); if(!name){ errEl.hidden=false; nameEl.setAttribute('aria-invalid','true'); nameEl.focus(); return; } if(ctx.saveSearch?.(name)===false) return; menu.open=false; };
   nameEl.addEventListener('keydown',e=>{ if(e.key==='Escape'){ e.stopPropagation(); form.hidden=true; document.getElementById('saveSearch').focus(); } }); }
+document.getElementById('rssLink').addEventListener('click',e=>{ if(e.currentTarget.getAttribute('aria-disabled')==='true') e.preventDefault(); });
 document.getElementById('savedAll').onclick=()=>setView('saved');
 document.getElementById('arepAll').onclick=()=>setView('reports');
 document.getElementById('footSources').onclick=()=>setView('sources');
@@ -1243,8 +1313,8 @@ function viewLabels(radius=140){
 }
 function vocab(){ const n=new Map(); visible.forEach(f=>{ if(f.city) n.set(f.city,(n.get(f.city)||0)+1); if(f.dev) n.set(f.dev,(n.get(f.dev)||0)+1); });
   return [...n.entries()].sort((a,b)=>b[1]-a[1]).slice(0,30).map(x=>x[0]).join(', '); } // the busiest cities and developers on screen (the voice transcriber's hint list takes the first few)
-ctx.scheduleHash=o=>scheduleHash(o); ctx.cardPush=cardPush; ctx.cardBack=cardBack; ctx.cardChild=()=>cpush?(cpOpening?'opening':'open'):null; ctx.cardChildDrop=()=>{ cpush=null; }; ctx.cardActs=cardActs; ctx.cardStatus=cardStatus; ctx.copyCardLink=copyCardLink; ctx.SPARK=SPARK;
-ctx.setMode=setMode; ctx.setFilingsOpen=setFilingsOpen; ctx.showIntro=showIntro; ctx.filterChips=filterChips; ctx.scopeBar=scopeBar; ctx.resetFilings=resetFilings; ctx.vempty=vempty; ctx.exportMenu=exportMenu; ctx.openFilters=o=>openFilters(o); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
+ctx.cardPush=cardPush; ctx.cardBack=cardBack; ctx.cardChild=()=>cpush?(cpOpening?'opening':'open'):null; ctx.cardChildDrop=()=>{ cpush=null; }; ctx.cardActs=cardActs; ctx.cardStatus=cardStatus; ctx.copyCardLink=copyCardLink; ctx.SPARK=SPARK;
+ctx.setMode=setMode; ctx.helpToggle=helpToggle; ctx.setFilingsOpen=setFilingsOpen; ctx.showIntro=showIntro; ctx.filterChips=filterChips; ctx.scopeBar=scopeBar; ctx.resetFilings=resetFilings; ctx.vempty=vempty; ctx.exportMenu=exportMenu; ctx.openFilters=o=>openFilters(o); ctx.closeFilters=()=>closeFilters(); ctx.syncClear=syncClear; ctx.syncFilterUI=()=>syncFilterUI(); ctx.fitBox=fitBox;
 // map legends (bottom left, next to the Filings one): any layer that colours its data adds one while it's on
 ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box) return; let el=box.querySelector('[data-lg="'+id+'"]');
   if(!html){ el?.remove(); return; } if(!el){ el=document.createElement('div'); el.className='xlegend'; el.dataset.lg=id; box.appendChild(el); } if(el.innerHTML!==html) el.innerHTML=html; };
@@ -1278,7 +1348,8 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
 renderNav(ctx); changesBadge(); // menus first: modules look up the badge spans and the sub-tab rows
-for (const init of [initCardTabs,initGoogle,initPlaces,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan,initSettings]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+ctx.scheduleHash=scheduleHash;
+for (const init of [initCardTabs,initGoogle,initPlaces,initDevLayers,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan,initSettings]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- the card's dock ----------
 // Desktop: an open card is a full-height column at the right edge of the map (src/app.css, "property card dock"); the
@@ -1289,18 +1360,35 @@ new MutationObserver(()=>{ if(!card.classList.contains('open')&&card.classList.c
 { const s=new Date(DATA.period.start+'T12:00:00'), e=new Date(DATA.period.end+'T12:00:00'); const m=d=>d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
   document.getElementById('filingsPeriod').textContent='TDLR · '+m(s)+' – '+m(e);
   document.getElementById('periodTxt').textContent=PERIOD; const miss=DATA.unmapped||0; document.getElementById('missTxt').textContent=miss>0?fmtN(miss)+' filing'+(miss>1?'s':'')+' with no mappable address '+(miss>1?'are':'is')+' left off the map. ':''; }
-{ const h=location.hash.slice(1), p=new URLSearchParams(h);
+{ let h=location.hash.slice(1);
+  // the bare page (a reload of it, the installed app opening, a bookmark): come back to where you were. A link with
+  // anything in it wins; a first visit has nothing kept and flies in to the region.
+  if(!h){ let kept=''; try{ kept=localStorage.getItem(LAST_KEY)||''; }catch(e){} h=startHash(h,kept); if(h) try{ history.replaceState(null,'','#'+h); }catch(e){} }
+  const p=new URLSearchParams(h), keys=[...p.keys()];
   // a link with filters puts the filing dots on; the date range alone (which the app writes into the address itself) doesn't,
   // so a reload opens like a fresh start: no filings until you turn them on
-  if(h&&[...p.keys()].some(k=>!['v','f','b','pj'].includes(k))){ if([...p.keys()].some(k=>!['v','f','d','b','pj'].includes(k))) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
+  if(h&&hasSpec(keys)){ if(showsFilings(keys)) showFilings(); fromSpec(decode(h),{fly:false}); if(p.get('m')&&MONTHS.includes(p.get('m'))) setMonth(p.get('m')); } else fromSpec(DEFAULT_SPEC(),{fly:false});
   booting=false;
-  navQuiet++; navBoot=true; try{ if(p.get('v')) setView(p.get('v')); if(p.get('pj')) syncProject(p.get('pj')); } finally{ navQuiet--; navBoot=false; } // the page the link names, without a new history entry
-  const f=p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));
-  // a copied property link (#b=lat,lng): that building, or the parcel there
-  const bc=!f&&(p.get('b')||'').split(',').map(Number), bll=bc&&bc.length===2&&bc.every(Number.isFinite)&&Math.abs(bc[0])<=90&&Math.abs(bc[1])<=180?[bc[1],bc[0]]:null;
-  if(bll) map.once('load',()=>{ map.jumpTo({center:bll,zoom:17.5}); map.once('idle',()=>{ if(!ctx.buildingAt?.(bll)) ctx.openBuildingAt(bll); }); });
+  if(p.get('v')){ popping=true; navBoot=true; try{ setView(p.get('v')); }finally{ popping=false; navBoot=false; } } // the page a link opens on is the first history entry, not a new one
+  syncTitle();
+  // the project open on the Projects page
+  if(p.get('pj')&&view==='projects') ctx.sitePlan?.show(p.get('pj'));
+  // the camera goes in the address (debounced), so a reload keeps the view: from the first move after the map loads (the fly-in, a link's card)
+  map.once('load',()=>map.on('moveend',()=>{ camReady=true; scheduleHash(); }));
+  // the map position (#ml=lat,lng,zoom[,bearing,pitch]): a copied link, or where you were before the reload
+  const mll=parseCam(p.get('ml'));
+  if(mll){ camReady=true; map.jumpTo(mll); }
+  // the open site plan (#sp=project.plan): it frames its own site
+  const sp=parsePlanRef(p.get('sp')), spOk=view==='map'&&!!sp&&!!ctx.sitePlan?.has(sp[0],sp[1]);
+  if(spOk) map.once('load',()=>{ try{ ctx.sitePlan.open(sp[0],sp[1]); }catch(e){ console.error(e); } });
+  const f=!spOk&&p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));
+  // a property card (#b=lat,lng): that building, or the parcel there. With a kept map position, that view (the building
+  // is in it unless you panned away with the card open), else close in on it.
+  const bll=!f&&!spOk?parseLatLng(p.get('b')):null;
+  if(bll) map.once('load',()=>{ if(!mll||!map.getBounds().contains(bll)) map.jumpTo({center:bll,zoom:17.5}); map.once('idle',()=>{ if(!ctx.buildingAt?.(bll)) ctx.openBuildingAt(bll); }); });
   scheduleHash();
-  map.once('load',()=>{ if(f||bll) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>map.flyTo({...HOME,duration:2600,essential:true}),300); else map.jumpTo(HOME); });
+  map.once('load',()=>{ if(f||bll||mll||spOk) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>map.flyTo({...HOME,duration:2600,essential:true}),300); else map.jumpTo(HOME); });
+  cardRenderHooks.push(()=>scheduleHash()); // a property card opening (b=)
 }
 
 // installable app + offline shell (served over https only)

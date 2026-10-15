@@ -67,3 +67,30 @@ console.log('building api tests passed');
   assert.deepEqual(res.body.parcels.map(p => p.propId), ['A', 'B'], 'both lots, each once');
   assert.ok(ids.filter(t => t === 'esriGeometryPolygon').length === 2, 'the clipped footprint first, then the whole outline');
   console.log('whole building outline and parcels ok'); }
+// Harris and Waller: StratMap has no parcel, so the county appraisal district's own layer answers, in the same shape;
+// a click on a lot line finds the parcel a few meters away; condominium units sharing an outline are counted
+{ const { normalizeCad, CADS } = await import('../api/building.js');
+  const sq = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]];
+  const asked = [];
+  globalThis.fetch = async (url) => {
+    url = String(url); const json = o => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }), u = new URL(url);
+    if (url.includes('/MapServer/identify')) return json({ results: [] }); // StratMap: nothing in Harris
+    if (u.host === 'arcweb.hcad.org') { asked.push(u.searchParams.get('geometryType'));
+      if (u.searchParams.get('geometryType') === 'esriGeometryPoint') return json({ features: [] }); // the click is on the lot line
+      const a = { HCAD_NUM: '1205380000001', owner: 'IA LODGING HOUSTON GALLERIA LP', address: '5115 WESTHEIMER RD', city: 'HOUSTON', zip: '77056', state_class: 'F1', mkt_val: 59159643, land_val: 10125150, impr_val: 49034493, legal_lines: 'UNITS 1 & 1D|(WESTIN GALLERIA HOTEL)' };
+      return json({ features: [{ attributes: a, geometry: { rings: [sq(-95.4612, 29.7390, -95.4600, 29.7400)] } }, { attributes: { ...a, HCAD_NUM: '1205380000002' }, geometry: { rings: [sq(-95.4612, 29.7390, -95.4600, 29.7400)] } }] }); }
+    return new Response('nope', { status: 500 });
+  };
+  const res = mock(); await building({ query: { lat: '29.7392', lon: '-95.4610', part: 'parcel' }, headers: { 'x-forwarded-for': '9.9.9.8' } }, res);
+  const p = res.body.parcel;
+  assert.deepEqual(asked, ['esriGeometryPoint', 'esriGeometryEnvelope'], 'the point, then a few meters around it');
+  assert.equal(p.source, 'Harris Central Appraisal District'); assert.equal(p.owner, 'IA LODGING HOUSTON GALLERIA LP'); assert.equal(p.situs, '5115 Westheimer Rd, Houston');
+  assert.equal(p.marketValue, 59159643); assert.equal(p.propId, '1205380000001'); assert.equal(p.shared, 2); assert.equal(p.geometry.type, 'Polygon'); assert.equal(p.legal, 'UNITS 1 & 1D · (WESTIN GALLERIA HOTEL)');
+  // a Waller County (BIS-hosted) record
+  const w = normalizeCad(CADS.find(c => c.county === 'Waller'), { prop_id_text: '274402', file_as_name: 'MILLROSE PROPERTIES TEXAS LLC', legal_acreage: 195.347, legal_desc: 'ABS A314300 A-143 H & T C R R CO TRACT 1-10', land_val: 6251100, imprv_val: 0, market: 6251100,
+    situs_street: 'FM 362', situs_city: 'BROOKSHIRE', situs_zip: '77423', addr_line2: '600 BRICKELL', addr_line3: 'SUITE 1400', addr_city: 'MIAMI', addr_state: 'FL', zip: '33131', Deed_Date: '01/24/2025', owner_tax_yr: 2027 }, null);
+  assert.deepEqual([w.owner, w.situs, w.area, w.acquired, w.marketValue, w.mailing, w.county], ['MILLROSE PROPERTIES TEXAS LLC', 'FM 362, Brookshire', '195.35 acres', '2025-01-24', 6251100, '600 BRICKELL, SUITE 1400, MIAMI FL 33131', 'Waller']);
+  // outside every district's box (Fort Bend, which StratMap covers): no appraisal district is asked
+  asked.length = 0; const r2 = mock(); await building({ query: { lat: '29.40', lon: '-95.75', part: 'parcel' }, headers: { 'x-forwarded-for': '9.9.9.7' } }, r2);
+  assert.equal(r2.body.parcel, null); assert.equal(asked.length, 0);
+  console.log('county appraisal district fallback ok'); }

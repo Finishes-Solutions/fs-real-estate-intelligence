@@ -4,8 +4,7 @@
 //   on the map, the FAA airport diagram, takeoffs and landings per day (counted from our own ADS-B sampling around
 //   Houston), the airlines that fly there and statistics (Wikipedia), radio frequencies; Export PDF / CSV.
 //   Building and filing cards: the nearest airports, and whether the site is under a runway's approach path.
-import { esc, fmt, kgrid, table, bars, areaMap, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard } from './reportkit.js';
-import { readJSON } from './lib/http.mjs';
+import { esc, fmt, kgrid, table, bars, areaMap, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, getJSON, errorBox, friendly, layerFailed, layerOK } from './reportkit.js';
 
 const TYPE = { large_airport: 'Large airport', medium_airport: 'Medium airport', small_airport: 'Small airport', heliport: 'Heliport', seaplane_base: 'Seaplane base', balloonport: 'Balloonport' };
 const COL = { large_airport: '#1d4ed8', medium_airport: '#2563eb', small_airport: '#64748b', heliport: '#a855f7', seaplane_base: '#0891b2', balloonport: '#94a3b8' };
@@ -45,9 +44,9 @@ export function initAirports(ctx) {
     if ((bb[2] - bb[0]) * (bb[3] - bb[1]) > 2500) { if (note) note.textContent = 'Zoom in a little to see airports.'; return; }
     const key = bb.join(',') + '&types=' + typesFor(z); if (key === lastKey && map.getSource(SRC)) return; // same area as what's drawn
     ctl?.abort(); ctl = new AbortController();
-    try { const res = await fetch('api/airports?box=' + key, { signal: ctl.signal }), d = await readJSON(res); if (my !== seq) return; lastKey = key;
+    try { const d = await getJSON('api/airports?box=' + key, { what: 'Airport data', signal: ctl.signal }); if (my !== seq) return; lastKey = key;
       setData(d.airports || []); if (note) note.textContent = fmt((d.airports || []).length) + ' airports in view. ' + (z < 11 ? 'Zoom in for small fields and heliports. ' : '') + 'Click one for its card.'; }
-    catch (e) { if (e.name !== 'AbortError' && note) note.textContent = e.message; }
+    catch (e) { if (e.name !== 'AbortError') layerFailed(ctx, e, { what: 'Airport data', off: () => setOn(false), note }); }
   }
   // click and hover handlers once (adding them with the layer stacked another set on every toggle and basemap change,
   // so one click opened the card several times)
@@ -65,7 +64,7 @@ export function initAirports(ctx) {
     } catch (e) { /* style loading */ }
   }
   function setOn(v) {
-    on = !!v; if (box) box.checked = on; if (note) note.hidden = !on;
+    on = !!v; if (box) box.checked = on; if (note) note.hidden = !on; if (on) layerOK(note);
     if (!on) { ctl?.abort(); lastKey = ''; try { for (const id of [SRC + '-lbl', SRC]) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource(SRC)) map.removeSource(SRC); } catch (e) {} ctx.setLegend?.('airports', ''); return; }
     ctx.setLegend?.('airports', '<div class="t">Airports</div>' + ['large_airport', 'medium_airport', 'small_airport', 'heliport'].map(t => '<div class="li"><i style="background:' + COL[t] + '"></i>' + TYPE[t] + '</div>').join(''));
     load();
@@ -95,7 +94,7 @@ export function initAirports(ctx) {
   ctx.onCardClose?.(() => { if (last) { last.osm = null; clearOsm(); } });
 
   // ---------- the airport card ----------
-  async function fetchAirport(id) { const r = await fetch('api/airports?id=' + encodeURIComponent(id), { signal: AbortSignal.timeout(30000) }), d = await readJSON(r); return d; }
+  const fetchAirport = id => getJSON('api/airports?id=' + encodeURIComponent(id), { what: 'Airport data', signal: AbortSignal.timeout(30000) });
   ctx.airportData = fetchAirport;
   const opsSummary = ops => { const days = (ops || []).filter(o => o.source === 'adsb'), last30 = days.slice(-30);
     if (!last30.length) return null; const tot = last30.map(o => o.departures + o.arrivals);
@@ -105,7 +104,7 @@ export function initAirports(ctx) {
     const card = openCard(ctx, { kicker: 'Airport', title: String(id), loading: 'Looking up the airport…' }), tid = 'a:' + id;
     ctx.tabs?.track({ id: tid, kind: 'airport', label: String(id), reopen: () => show(id), leave: () => { if (last) { last.osm = null; clearOsm(); } } });
     const gone = () => ctx.tabs && ctx.tabs.active()?.id !== tid; // closed, or another tab picked while loading
-    let d; try { d = await fetchAirport(id); } catch (e) { if (!gone()) card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return { error: e.message }; }
+    let d; try { d = await fetchAirport(id); } catch (e) { if (!gone()) card.querySelector('.bsec').replaceChildren(errorBox(e, () => show(id, { fly }), 'Airport data')); return { error: e.message }; }
     if (gone()) return d;
     last = { d, osm: null }; const a = d.airport, rw = d.runways || [], w = d.wiki || {}, m = d.metar, ops = opsSummary(d.ops);
     if (fly) map.flyTo({ center: [a.lon, a.lat], zoom: a.type === 'large_airport' ? 12 : 13.5, duration: ctx.reduceMotion ? 0 : 1200 });
@@ -131,11 +130,11 @@ export function initAirports(ctx) {
         '<span class="src"> Sources: OurAirports (runways, codes), FAA (diagram), aviationweather.gov (weather), Wikipedia / Wikidata (photo, airlines, statistics), OpenStreetMap (layout), adsb.lol (aircraft).</span></div>');
     ctx.tabs?.mount(); ctx.tabs?.label(tid, a.iata || a.icao || a.gps_code || a.name);
     card.querySelector('#aptMap').onclick = async ev => { const b = ev.currentTarget; b.disabled = true; b.textContent = 'Loading the layout…';
-      try { const r = await fetch('api/airports?osm=' + encodeURIComponent(a.ident)), fc = await readJSON(r); last.osm = fc; drawOsm(fc);
+      try { const fc = await getJSON('api/airports?osm=' + encodeURIComponent(a.ident), { what: 'The airport layout' }); last.osm = fc; drawOsm(fc);
         ctx.setMapOptions?.({ basemap: 'sat' }); const xs = [a.lon], ys = [a.lat]; rw.forEach(r => { if (r.le_lon != null) { xs.push(r.le_lon, r.he_lon); ys.push(r.le_lat, r.he_lat); } });
         map.fitBounds([[Math.min(...xs) - .005, Math.min(...ys) - .005], [Math.max(...xs) + .005, Math.max(...ys) + .005]], { padding: 40, duration: ctx.reduceMotion ? 0 : 900 });
         b.textContent = fc.features.length ? 'Airport Map Shown' : 'No layout mapped here'; }
-      catch (e) { b.textContent = 'Show Airport Map'; b.disabled = false; ctx.toast?.(e.message); } };
+      catch (e) { b.textContent = 'Show Airport Map'; b.disabled = false; ctx.toast?.(friendly(e, 'The airport layout')); } };
     card.querySelector('#aptPdf').onclick = () => exportReport(); card.querySelector('#aptCsv').onclick = () => exportCsv();
     // live: planes on the ground or arriving within 4 miles
     ctx.planesNear?.([a.lon, a.lat], 4).then(n => {

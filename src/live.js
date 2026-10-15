@@ -3,7 +3,7 @@
 //   NOAA nowCOAST + NHC (via /api/tile), Open-Meteo (/api/weather), TomTom traffic (/api/tile, optional key), Mapterhorn terrain,
 //   NASA GIBS + CMR (browser direct), news via Google News / GDELT (/api/news), OSRM or TomTom routing (/api/drive).
 import { NASA, hlsPasses } from './lib/nasa.mjs';
-import { fetchJSON, readJSON } from './lib/http.mjs';
+import { getJSON, errorBox, friendly, unavailable } from './reportkit.js';
 const KEY = 'fs-live-v1';
 const RASTER = { // proxied through api/tile; refreshed every few minutes
   radar: { label: 'Rain Radar', maxzoom: 12, opacity: .7, every: 4, attr: 'Radar: NWS NEXRAD via Iowa Environmental Mesonet' },
@@ -28,6 +28,8 @@ export function initLive(ctx) {
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(on)); } catch (e) {} };
   let trafficOK = null, windData = null, nasa = null, route = null, lastCard = null;
   const stamp = {};
+  let lastFail = null; // { k, msg }: the newest failure, also written in the note under the switches
+  const failMsg = {}; // a layer that couldn't load: the sentence stays under the switches (in the note) until it is tried again
 
   // ---------- layers panel ----------
   // rows go into the panel's named groups: weather, traffic and other live feeds (and planes.js's layers) under Live
@@ -37,7 +39,10 @@ export function initLive(ctx) {
   let box = group('live'), baseBox = group('base');
   if (!box) { box = document.createElement('div'); box.className = 'live-ly'; box.innerHTML = '<div class="lt">Live Conditions</div>'; panel.appendChild(box); }
   const row = k => { const lab = document.createElement('label'); lab.className = 'tg2'; lab.innerHTML = '<input type="checkbox" data-live="' + k + '"><span>' + esc(LABEL[k]) + '</span>'; return lab; };
-  for (const k of ORDER) (BASE.has(k) && baseBox ? baseBox : box).appendChild(row(k));
+  // High-Res Site Imagery can't be switched on from here (it needs a version picked in a property card), so while it is off the
+  // row is a hint line; once a version is on the map the row is a switch again, to take it off
+  const hiresHint = document.createElement('div'); hiresHint.className = 'rnote ly-hint'; hiresHint.textContent = 'High-Res Site Imagery: open a property, tap Site Imagery, pick a version and choose Show on Map.';
+  for (const k of ORDER) { const host = BASE.has(k) && baseBox ? baseBox : box, r = row(k); host.appendChild(r); if (k === 'hires') host.appendChild(hiresHint); }
   const note = document.createElement('div'); note.className = 'rnote'; note.id = 'liveNote'; box.appendChild(note);
   panel.querySelectorAll('input[data-live]').forEach(i => i.onchange = () => set({ [i.dataset.live]: i.checked }));
   // rain radar legend (bottom left): NWS base reflectivity colors, as the radar tiles draw them (api/tile)
@@ -52,13 +57,17 @@ export function initLive(ctx) {
   }
   function syncUI() {
     ctx.setLegend?.('radar', on.radar ? RADAR_LEGEND : '');
-    panel.querySelectorAll('input[data-live]').forEach(i => { i.checked = on[i.dataset.live]; if (i.dataset.live === 'traffic') { i.disabled = trafficOK === false && !on.traffic; syncNA(i, i.disabled); } });
+    { const lab = panel.querySelector('input[data-live="hires"]')?.closest('label'); if (lab) lab.hidden = !on.hires; hiresHint.hidden = !!on.hires; }
+    panel.querySelectorAll('input[data-live]').forEach(i => { const k = i.dataset.live; i.checked = on[k]; if (k === 'traffic') { i.disabled = trafficOK === false && !on.traffic; syncNA(i, i.disabled); }
+      // a layer that couldn't load says so under its own name until it is switched on again
+      const lab = i.closest('label'), m = !on[k] && failMsg[k]; let f = lab.querySelector('.ly-fail');
+      if (m) { if (!f) { f = document.createElement('span'); f.className = 'ly-na ly-fail'; lab.querySelector('span').appendChild(f); } if (f.textContent !== m) f.textContent = m; } else f?.remove(); });
     const bits = [];
     if (on.wind && windData?.time) bits.push('Wind as of ' + new Date(windData.time + ':00').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ' (Open-Meteo).');
     if (on.terrain && map.getZoom() < TERRAIN_Z) bits.push('3D terrain appears once you zoom in to town level.');
     if (on.nasa && nasa) bits.push(nasa.day ? 'NASA ' + nasa.name + ' pass ' + nasa.day + (nasa.cloud != null ? ' · ' + Math.round(nasa.cloud) + '% cloud in the scene' : '') + '.' : 'No clear NASA pass found here in the last 60 days.');
     for (const [k, x] of Object.entries(EXT)) { const t = on[k] && x.note?.(); if (t) bits.push(t); }
-    note.textContent = bits.join(' ');
+    note.textContent = bits.concat(lastFail && !on[lastFail.k] ? [lastFail.msg] : []).join(' ');
   }
   fetch('api/tile').then(r => r.ok ? r.json() : { traffic: false }).then(d => { trafficOK = !!d.traffic; if (!trafficOK && on.traffic) { on.traffic = false; removeRaster('traffic'); } syncUI(); }).catch(() => { trafficOK = false; syncUI(); });
 
@@ -95,12 +104,12 @@ export function initLive(ctx) {
   function removeWind() { if (map.getLayer('live-wind')) map.removeLayer('live-wind'); if (map.getSource('live-wind')) map.removeSource('live-wind'); }
   let windT = 0, windCtl = null;
   async function loadWind() {
-    if (!on.wind) return;
+    if (!on.wind) return true;
     const b = map.getBounds(), z = map.getZoom(), bbox = z < 6 ? [-97.6, 28.6, -94.2, 31.4] : [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
     windCtl?.abort(); windCtl = new AbortController();
-    try { const r = await fetch('api/weather?kind=wind&bbox=' + bbox.map(v => v.toFixed(2)).join(','), { signal: windCtl.signal }); const d = await readJSON(r);
-      windData = d; map.getSource('live-wind')?.setData(windFC()); syncUI(); if (!d.points.length && z >= 6) toast('Wind arrows cover Texas and nearby states only.'); }
-    catch (e) { if (e.name !== 'AbortError') toast('Wind data didn’t load: ' + e.message); }
+    try { const d = await getJSON('api/weather?kind=wind&bbox=' + bbox.map(v => v.toFixed(2)).join(','), { what: 'Wind data', signal: windCtl.signal });
+      windData = d; map.getSource('live-wind')?.setData(windFC()); syncUI(); if (!d.points.length && z >= 6) toast('Wind arrows cover Texas and nearby states only.'); return true; }
+    catch (e) { if (e.name !== 'AbortError') { await fail('wind', friendly(e, 'Wind data')); return false; } return true; }
   }
   map.on('moveend', () => { if (!on.wind) return; clearTimeout(windT); windT = setTimeout(loadWind, 700); });
   setInterval(() => on.wind && loadWind(), 15 * 60e3);
@@ -160,22 +169,30 @@ export function initLive(ctx) {
     if (x.persist && saved[k] === true) { const go = () => set({ [k]: true }); map.loaded() ? go() : map.once('load', go); }
     syncUI();
   }
+  // a layer that couldn't load: off again, one toast, and the same sentence in the note under the switches
+  async function fail(k, msg) {
+    await set({ [k]: false }); failMsg[k] = msg; lastFail = { k, msg }; toast(msg); syncUI(); return msg;
+  }
   async function set(a) {
     const done = [];
+    // the layer couldn't be shown: off again, one toast, and the sentence in the note (the assistant gets it in `done`)
+    const refuse = (k, msg) => { on[k] = false; failMsg[k] = msg; lastFail = { k, msg }; toast(msg); done.push(msg); };
     if (a.all_off) allKeys().forEach(k => { if (on[k]) a[k] = false; });
     for (const k of allKeys()) {
       const v = a[k === 'nasa' ? (k in a ? k : 'nasa_imagery') : k]; if (typeof v !== 'boolean') continue;
+      if (v) { delete failMsg[k]; if (lastFail?.k === k) lastFail = null; }
       if (k === 'traffic' && v && trafficOK === false) { done.push('live traffic isn’t available on this site'); continue; }
-      if (EXT[k]) { on[k] = v; const r = await EXT[k].set(v); if (r === false || typeof r === 'string') { on[k] = false; done.push(typeof r === 'string' ? r : EXT[k].label + ' unavailable'); } else done.push(EXT[k].label + (v ? ' on' : ' off')); continue; }
+      if (EXT[k]) { on[k] = v; let r; try { r = await EXT[k].set(v); } catch (e) { r = friendly(e, EXT[k].label); }
+        if (r === false || typeof r === 'string') refuse(k, typeof r === 'string' ? r : unavailable(EXT[k].label)); else done.push(EXT[k].label + (v ? ' on' : ' off')); continue; }
       on[k] = v; done.push(LABEL[k].replace(/ \(.*\)$/, '') + (v ? ' on' : ' off'));
       if (RASTER[k]) v ? addRaster(k) : removeRaster(k);
-      else if (k === 'wind') { if (v) { addWind(); await loadWind(); } else removeWind(); }
+      else if (k === 'wind') { if (v) { addWind(); if (!await loadWind()) { done.pop(); done.push(failMsg.wind || unavailable('Wind data')); } } else removeWind(); }
       else if (k === 'terrain') { if (v) { addTerrain(); if (map.getZoom() >= TERRAIN_Z && map.getPitch() < 30) map.easeTo({ pitch: 55, duration: ctx.reduceMotion ? 0 : 700 }); else if (map.getZoom() < TERRAIN_Z) done.push('terrain shows once zoomed in to town level'); } else removeTerrain(); }
       else if (k === 'hires') { if (v && hires) showHires(hires); else if (v) { on.hires = false; done.push('high-res imagery: open a property, tap Site Imagery and pick a version first'); toast('Open a property, tap Site Imagery, then pick a high-res version and Show on Map.'); } else removeHires(); }
-      else if (k === 'nasa') { if (v) { try { await nasaForView(); } catch (e) { on.nasa = false; done.push('NASA imagery failed: ' + e.message); } } else removeNasa(); }
+      else if (k === 'nasa') { if (v) { try { await nasaForView(); } catch (e) { done.pop(); refuse('nasa', friendly(e, 'NASA imagery')); removeNasa(); } } else removeNasa(); }
     }
-    if (a.storms === true) { try { const d = await fetchJSON('api/weather?kind=storms'); if (!d.storms?.length) done.push('no active hurricanes or tropical storms right now'); } catch (e) {} }
-    save(); syncUI(); return done.length ? done : ['no change'];
+    if (a.storms === true) { try { const d = await getJSON('api/weather?kind=storms', { what: 'Storm data' }); if (!d.storms?.length) done.push('no active hurricanes or tropical storms right now'); } catch (e) {} }
+    save(); syncUI(); try { ctx.syncQuickLayers?.(); } catch (e) {} return done.length ? done : ['no change'];
   }
   if (Object.values(on).some(Boolean)) map.once('load', () => { if (on.wind) loadWind(); syncUI(); });
 
@@ -204,7 +221,9 @@ export function initLive(ctx) {
     const g = await ctx.geocode(name + (/texas|\btx\b/i.test(name) ? '' : ', Texas')); return g[0] ? { c: g[0].c, name: g[0].t } : null;
   }
   const nearest = c => ctx.F.reduce((b, f) => { const d = milesBetween(c, [f.lon, f.lat]); return d < b.d ? { f, d } : b; }, { f: null, d: Infinity });
-  async function me() { if (!ctx.locate) throw new Error('This browser can’t share its location.'); return { c: await ctx.locate(), name: 'your location' }; }
+  // a place-finding failure is already in words (ctx.locate rejects with a sentence), so it is shown as it is
+  const said = m => Object.assign(new Error(m), { friendly: true });
+  async function me() { if (!ctx.locate) throw said('This browser can’t share its location.'); try { return { c: await ctx.locate(), name: 'your location' }; } catch (e) { throw said(e?.message || 'Couldn’t find your location.'); } }
 
   async function drive(a = {}) {
     const t = a.target || (a.filing_id ? 'filing' : a.to_place ? 'place' : 'selected');
@@ -223,12 +242,12 @@ export function initLive(ctx) {
     if (straight < 0.1) { out.at_property = true; out.summary = 'You are at ' + to.name + ' (about ' + Math.round(straight * 5280) + ' ft away).'; return out; }
     const q = 'from=' + from.c[1].toFixed(5) + ',' + from.c[0].toFixed(5) + '&to=' + to.c[1].toFixed(5) + ',' + to.c[0].toFixed(5);
     try {
-      const d = await fetchJSON('api/drive?' + q);
+      const d = await getJSON('api/drive?' + q, { what: 'The driving route' });
       Object.assign(out, { road_miles: d.miles, drive_minutes_now: d.minutes, typical_minutes: d.typical_minutes, traffic_delay_minutes: d.delay_minutes, live_traffic: d.traffic, routing_source: d.source, routing_note: d.note });
       out.summary = to.name + ': ' + d.miles + ' mi by road (' + straight.toFixed(1) + ' mi straight), about ' + d.minutes + ' min' + (d.traffic ? (d.delay_minutes > 1 ? ' with ' + d.delay_minutes + ' min of traffic delay' : ', traffic is light') : ' (no live traffic data)') + '.';
       if (a.show_route !== false && gone()) out.note = [out.note, 'The card was closed before the route came back, so it isn’t drawn.'].filter(Boolean).join(' ');
       else if (a.show_route !== false) { drawRoute(d); const xs = d.line.map(p => p[0]), ys = d.line.map(p => p[1]); if (xs.length) map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 70, maxZoom: 15, duration: ctx.reduceMotion ? 0 : 900 }); }
-    } catch (e) { out.road_error = e.message; out.summary = to.name + ' is ' + straight.toFixed(1) + ' mi away in a straight line (driving route unavailable: ' + e.message + ').'; }
+    } catch (e) { out.road_error = e.message; out.summary = to.name + ' is ' + straight.toFixed(1) + ' mi away in a straight line. ' + friendly(e, 'The driving route'); }
     out.google_maps = 'https://www.google.com/maps/dir/?api=1&origin=' + from.c[1].toFixed(5) + ',' + from.c[0].toFixed(5) + '&destination=' + to.c[1].toFixed(5) + ',' + to.c[0].toFixed(5) + '&travelmode=driving';
     return out;
   }
@@ -237,9 +256,8 @@ export function initLive(ctx) {
     const where = a.where || (a.place ? 'place' : cardPoint() ? 'selected' : 'me');
     const p = where === 'place' ? await place(a.place || '') : where === 'selected' ? cardPoint() : await me();
     if (!p) return { error: where === 'selected' ? 'No property card is open.' : 'Couldn’t find that place.' };
-    const [r, s] = await Promise.all([fetch('api/weather?kind=here&at=' + p.c[1].toFixed(4) + ',' + p.c[0].toFixed(4)), fetch('api/weather?kind=storms').catch(() => null)]);
-    let d; try { d = await readJSON(r); } catch (e) { return { error: e.message }; }
-    const st = s?.ok ? (await s.json().catch(() => ({}))).storms || [] : null;
+    let d; try { d = await getJSON('api/weather?kind=here&at=' + p.c[1].toFixed(4) + ',' + p.c[0].toFixed(4), { what: 'Weather data' }); } catch (e) { return { error: friendly(e, 'Weather data') }; }
+    const st = await getJSON('api/weather?kind=storms', { what: 'Storm data' }).then(x => x.storms || []).catch(() => null);
     return { place: p.name, ...d, active_tropical_storms: st == null ? 'unavailable' : st.map(x => ({ name: x.name, type: x.classification, wind_mph: x.wind_mph, moving: x.moving, miles_away: Math.round(milesBetween(p.c, [x.lon, x.lat])) })), source: 'Open-Meteo; NOAA NHC' };
   }
 
@@ -248,8 +266,7 @@ export function initLive(ctx) {
     const where = a.where || (a.place ? 'place' : cardPoint() ? 'selected' : 'me');
     const p = where === 'place' ? await place(a.place || '') : where === 'selected' ? cardPoint() : await me();
     if (!p) return { error: where === 'selected' ? 'No property card is open.' : 'Couldn’t find that place.' };
-    const r = await fetch('api/weather?kind=forecast&at=' + p.c[1].toFixed(4) + ',' + p.c[0].toFixed(4)), d = await r.json();
-    if (!r.ok) return { error: d.error || 'Forecast unavailable.' };
+    let d; try { d = await getJSON('api/weather?kind=forecast&at=' + p.c[1].toFixed(4) + ',' + p.c[0].toFixed(4), { what: 'The forecast' }); } catch (e) { return { error: friendly(e, 'The forecast') }; }
     return { place: p.name, days: d.days.slice(0, Math.max(1, Math.min(7, a.days || 7))), source: 'Open-Meteo' };
   }
 
@@ -279,7 +296,7 @@ export function initLive(ctx) {
     for (const [k, v] of Object.entries({ project: s.project, owner: s.owner, addr: s.addr, legal: s.legal, city: s.city, county: s.county })) if (v) q.set(k, String(v).slice(0, k === 'legal' ? 200 : 100));
     (s.company || []).slice(0, 4).forEach(v => q.append('company', v)); (s.business || []).slice(0, 6).forEach(v => q.append('biz', v));
     if (f && !a.query) q.set('filing', f.id);
-    let d; try { d = await fetchJSON('api/news?' + q); } catch (e) { return { error: e.message }; }
+    let d; try { d = await getJSON('api/news?' + q, { what: 'The news search' }); } catch (e) { return { error: friendly(e, 'The news search') }; }
     return { searched: (d.searched || []).map(x => x.label), articles: d.articles.map(x => ({ title: x.title, url: x.url, domain: x.domain, date: x.date, about: x.about || (x.saved ? 'Saved earlier' : '') })), source: d.source || 'Google News',
       note: d.articles.length ? undefined : 'No coverage found in the last year for the project, the companies, the businesses there or the town. Single-asset LLC names rarely appear in news.' };
   }
@@ -322,26 +339,24 @@ export function initLive(ctx) {
   function renderCardTools(info) {
     const card = document.getElementById('card'); card.querySelector('#liveSec')?.remove();
     const sec = document.createElement('div'); sec.className = 'bsec live-sec'; sec.id = 'liveSec';
-    sec.innerHTML = '<div class="lt">From Here</div><div class="btnrow"><button class="btn" data-a="drive">Drive Time From Me</button><button class="btn" data-push data-a="iso">Drive-Time Map</button><button class="btn" data-a="wx">Weather</button><button class="btn" data-a="img">Site Imagery</button><button class="btn" data-a="news">News</button></div><div class="live-out" aria-live="polite"></div>';
+    sec.innerHTML = '<div class="lt">From Here</div><div class="btnrow"><button class="btn" data-a="drive">Drive time from my location</button><button class="btn" data-push data-a="iso">Drive-Time Map</button><button class="btn" data-a="wx">Weather</button><button class="btn" data-a="img">Site Imagery</button><button class="btn" data-a="news">News</button></div><div class="live-out" aria-live="polite"></div>';
     const brief = card.querySelector('#briefBox'); if (brief) brief.after(sec); else (card.querySelector('.bsrc') || card.lastElementChild)?.before(sec);
     const out = sec.querySelector('.live-out'), mine = () => lastCard === info;
     const busy = t => { out.innerHTML = '<div class="rnote">' + esc(t) + '</div>'; };
-    const fail = e => { if (mine()) out.innerHTML = '<div class="rnote err">' + esc(e.message || e) + '</div>'; };
-    sec.querySelector('[data-a=drive]').onclick = async () => { busy('Finding you and routing…'); try { const d = await drive({ target: 'selected' }); if (!mine()) return; if (d.error) throw new Error(d.error);
-      out.innerHTML = driveHTML(d); } catch (e) { fail(e); } };
+    // a failure is one sentence with Retry (the same click again)
+    const fail = (e, retry, what) => { if (mine()) out.replaceChildren(errorBox(e, retry, what)); };
+    const tool = (name, say, fn) => { const go = async () => { busy(say); try { await fn(go); } catch (e) { fail(e, go); } }; sec.querySelector('[data-a=' + name + ']').onclick = go; };
+    tool('drive', 'Finding you and routing…', async go => { const d = await drive({ target: 'selected' }); if (!mine()) return; if (d.error) return fail(d.error, go); out.innerHTML = driveHTML(d); });
     sec.querySelector('[data-a=iso]').onclick = () => { const c = info.kind === 'filing' ? [info.f.lon, info.f.lat] : info.center;
       ctx.driveTime?.({ center: c, label: info.kind === 'filing' ? info.f.addr || info.f.name : info.label?.() || info.title || c[1].toFixed(4) + ', ' + c[0].toFixed(4) }); };
-    sec.querySelector('[data-a=wx]').onclick = async () => { busy('Checking the weather…'); try { const d = await weather({ where: 'selected' }); if (!mine()) return; if (d.error) throw new Error(d.error);
-      out.innerHTML = weatherHTML(d); } catch (e) { fail(e); } };
-    sec.querySelector('[data-a=img]').onclick = async () => { busy('Looking for high-res aerial imagery and recent NASA passes…'); try {
+    tool('wx', 'Checking the weather…', async go => { const d = await weather({ where: 'selected' }); if (!mine()) return; if (d.error) return fail(d.error, go); out.innerHTML = weatherHTML(d); });
+    tool('img', 'Looking for high-res aerial imagery and recent NASA passes…', async () => {
       const c = info.kind === 'filing' ? [info.f.lon, info.f.lat] : info.center;
       const [list, hi] = await Promise.all([passes([c[0] - .01, c[1] - .01, c[0] + .01, c[1] + .01]).catch(() => []), hiresCatalog(c)]); if (!mine()) return;
-      renderCardImagery(c, list, hi);
-    } catch (e) { fail(e); } };
-    sec.querySelector('[data-a=news]').onclick = async () => { busy('Searching news about the project, the businesses there, the owner and the area…'); try {
-      const d = info.kind === 'filing' ? await news({ filing_id: info.f.id }) : await news(); if (!mine()) return; if (d.error) throw new Error(d.error);
-      out.innerHTML = newsHTML(d);
-    } catch (e) { fail(e); } };
+      renderCardImagery(c, list, hi); });
+    tool('news', 'Searching news about the project, the businesses there, the owner and the area…', async go => {
+      const d = info.kind === 'filing' ? await news({ filing_id: info.f.id }) : await news(); if (!mine()) return; if (d.error) return fail(d.error, go);
+      out.innerHTML = newsHTML(d); });
   }
 
   // ---------- high-res site imagery (api/imagery: Esri World Imagery Wayback + USDA NAIP) ----------
@@ -352,7 +367,7 @@ export function initLive(ctx) {
   const hiresCache = new Map();
   async function hiresCatalog(c) {
     const k = c.map(v => v.toFixed(4)).join(','); if (hiresCache.has(k)) return hiresCache.get(k);
-    const p = fetch('api/imagery?at=' + k).then(r => r.ok ? r.json() : { wayback: [], naip: [] }).catch(() => ({ wayback: [], naip: [] }));
+    const p = getJSON('api/imagery?at=' + k, { what: 'Site imagery' }).catch(() => ({ wayback: [], naip: [] }));
     hiresCache.set(k, p); return p;
   }
   const hiItems = hi => [...(hi?.wayback || []).slice(0, 6).map(x => ({ kind: 'wb', ...x })), ...(hi?.naip || []).slice(0, 3).map(x => ({ kind: 'naip', ...x }))];
@@ -448,6 +463,6 @@ export function initLive(ctx) {
   // for the Sources tab: what is on, how often it refreshes, and the latest data time we know of
   const status = () => ({ ext: Object.fromEntries(Object.entries(EXT).map(([k, x]) => [k, { on: !!on[k], ...(x.status?.() || {}) }])), hires: hires ? { kind: hires.kind, date: hiDate(hires) } : null, on: { ...on }, trafficOK, terrainMesh: !!map.getTerrain?.(), terrainZoom: TERRAIN_Z, windTime: windData?.time || null, nasa: nasa?.day ? { day: nasa.day, name: nasa.name, cloud: nasa.cloud } : null,
     raster: Object.fromEntries(Object.entries(RASTER).map(([k, v]) => [k, { every: v.every, requested: stamp[k] != null ? stamp[k] * v.every * 60e3 : null }])) });
-  ctx.live = { register, syncUI, set, label: k => LABEL[k] || EXT[k]?.label || k, drive, weather, forecast, forecastHTML, news, imagery, clearRoute, state: () => ({ ...on }), status, driveHTML, weatherHTML, newsHTML,
+  ctx.live = { register, syncUI, set, fail, label: k => LABEL[k] || EXT[k]?.label || k, drive, weather, forecast, forecastHTML, news, imagery, clearRoute, state: () => ({ ...on }), status, driveHTML, weatherHTML, newsHTML,
     imageryInto: el => { if (lastImagery) renderCardImagery(lastImagery.c, lastImagery.list, lastImagery.hi, el); } };
 }

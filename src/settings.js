@@ -4,7 +4,7 @@
 // Options shown elsewhere (the Layers panel's map display, the panel's headline metrics) stay where they are and are
 // linked from here. Nothing here deletes notes, projects or the team's sync queue.
 const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help']];
-const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
+export const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
 const BASE_KEY = 'fs-basemap';
 // Reset layout clears only these (never localStorage.clear()): panel open/closed and width, assistant width, which
 // panel sections are open, headline metrics, timeline options, export dialog choices and the Projects cards/list view
@@ -110,7 +110,13 @@ export function initSettings(ctx) {
       const phone = matchMedia('(max-width:700px)').matches;
       if (a === 'layers') {
         if (phone) document.querySelector('#mnav [data-tab=map]')?.click();
-        setTimeout(() => { if (!document.getElementById('layers')?.classList.contains('on')) document.getElementById('layersBtn')?.click(); }, 60);
+        // the Layers panel with its Map display group open and in view (that is where the options this link names live)
+        setTimeout(() => {
+          const L = document.getElementById('layers'); if (!L) return;
+          if (!L.classList.contains('on')) document.getElementById('layersBtn')?.click();
+          const d = L.querySelector('[data-lyg="display"]'); if (!d) return;
+          d.open = true; requestAnimationFrame(() => d.scrollIntoView({ block: 'nearest', behavior: ctx.reduceMotion ? 'auto' : 'smooth' }));
+        }, 60);
       } else if (a === 'kpis') {
         // the metrics sit in the panel's Construction Filings section: show the panel, open the section, then the picker
         if (phone) document.querySelector('#mnav [data-tab=list]')?.click();
@@ -161,6 +167,11 @@ export function initSettings(ctx) {
   // Esc closes the sheet first (and only the sheet), wherever the focus is
   addEventListener('keydown', e => { if (e.key === 'Escape' && !sheet.hidden) { e.preventDefault(); e.stopImmediatePropagation(); close(); } }, true);
   sheet.addEventListener('keydown', e => ctx.trapTab(sheet, e)); // Tab stays in the sheet (app.js; Export uses the same)
+  // the sheet is modal: the search (Ctrl+K) and Ask AI (Ctrl+/) shortcuts do nothing behind it
+  addEventListener('keydown', e => {
+    if (sheet.hidden || !(e.metaKey || e.ctrlKey) || e.altKey) return;
+    if ((e.key || '').toLowerCase() === 'k' || e.key === '/' || e.code === 'Slash') { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
   addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === ',' || e.code === 'Comma')) { e.preventDefault(); if (sheet.hidden) open(); else close(); }
   });

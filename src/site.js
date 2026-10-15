@@ -2,14 +2,15 @@
 // crime nearby (Houston), bar and restaurant alcohol sales at the address, county unemployment and ZIP rents.
 // Facts come from api/site (live, cached a week) and data/area.json (nightly). Sources are listed only when the
 // "Show sources on cards" setting is on (Settings › Appearance), and always in exported reports.
-import { readJSON } from './lib/http.mjs';
+import { getJSON, errorBox } from './reportkit.js';
+
 export function initSite(ctx) {
   let repMi = 1; // radius for the Site section's Crime / FEMA reports, kept while the app is open
   const { esc, fmtN, fmtM } = ctx;
   const cache = new Map();
   ctx.siteAt = (center, addr, zip) => {
     const q = new URLSearchParams({ lat: center[1].toFixed(5), lon: center[0].toFixed(5), ...(addr && zip ? { addr, zip } : {}) }), k = q.toString();
-    if (!cache.has(k)) { const p = fetch('api/site?' + q).then(readJSON); p.catch(() => cache.delete(k)); cache.set(k, p); }
+    if (!cache.has(k)) { const p = getJSON('api/site?' + q, { what: 'Site data' }); p.catch(() => cache.delete(k)); cache.set(k, p); }
     return cache.get(k);
   };
   // a 0.5-mile circle (64 points) around a point, for the crime report
@@ -33,9 +34,9 @@ export function initSite(ctx) {
     if (!el) return;
     el.innerHTML = '<div class="lt">Site</div><div class="rnote loading">Checking flood zone, traffic and districts…</div>';
     const addr = /^\d/.test(parcel?.situsStreet || '') ? parcel.situsStreet : '', zip = parcel?.situsZip || '';
-    const [d, area] = await Promise.all([ctx.siteAt(center, addr, zip).catch(e => ({ error: e.message })), ctx.areaData ? ctx.areaData().catch(() => null) : null]);
+    const [d, area] = await Promise.all([ctx.siteAt(center, addr, zip).catch(e => ({ error: e })), ctx.areaData ? ctx.areaData().catch(() => null) : null]);
     if (!el.isConnected) return;
-    if (d.error) { el.innerHTML = '<div class="lt">Site</div><div class="rnote err">Site lookup unavailable (' + esc(d.error) + ').</div>' + (econRows(area, parcel) ? '<dl>' + econRows(area, parcel) + '</dl>' : ''); return; }
+    if (d.error) { el.innerHTML = '<div class="lt">Site</div>'; el.append(errorBox(d.error, () => ctx.renderSite(el, center, parcel), 'Site data')); if (econRows(area, parcel)) el.insertAdjacentHTML('beforeend', '<dl>' + econRows(area, parcel) + '</dl>'); return; }
     const f = d.flood, t = d.traffic, ds = d.districts || {}, env = d.environment, cr = d.crime, tr = d.transit;
     const flood = f && !f.error && f.zone ? '<b class="' + (f.risk === 'high' ? 'risk-hi' : f.risk === 'moderate' ? 'risk-md' : '') + '">Zone ' + esc(f.zone) + '</b> <span class="sc">' + esc(f.note) + '</span>' : f?.note ? esc(f.note) : '';
     const traffic = t?.roads?.length ? t.roads.map(r => esc(r.road) + ' <b>' + fmtN(r.aadt) + '</b>').join(' · ') + ' <span class="sc">vehicles/day</span>' : t && !t.error ? '<span class="sc">No counted roads within 300 m</span>' : '';
@@ -57,7 +58,7 @@ export function initSite(ctx) {
       // area reports for a circle around the site: pick a radius, then Crime Report or FEMA Report
       (ctx.crimeReport || ctx.femaReport || ctx.areaReports?.length ? '<div class="site-rep"><div class="fl">Area reports</div><div class="mi-chips" role="radiogroup" aria-label="Report radius">' +
         [1, 3, 5, 10].map(mi => '<button type="button" class="chip" role="radio" data-mi="' + mi + '" aria-checked="' + (mi === repMi) + '">' + mi + ' mi</button>').join('') + '</div><div class="bacts">' +
-        (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep" data-push>Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep" data-push>FEMA Report</button>' : '') + (ctx.envReport ? '<button class="btn" type="button" id="siteEnvRep" data-push>Environmental Report</button>' : '') + (ctx.areaReports || []).filter(r => !r.noSite).map(r => '<button class="btn" type="button" data-push data-ar="' + r.key + '">' + esc(r.label) + '</button>').join('') + '</div>' +
+        (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep" data-push>Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep" data-push>FEMA Report</button>' : '') + (ctx.envReport ? '<button class="btn" type="button" id="siteEnvRep" data-push>Environmental Report</button>' : '') + (ctx.areaReports || []).filter(r => !r.noSite).map(r => { const ok = !r.cover || r.cover.test(center); return '<button class="btn" type="button" data-push data-ar="' + r.key + '"' + (ok ? '' : ' disabled title="' + esc(r.cover.why) + '"') + '>' + esc(r.label) + (ok ? '' : ' · ' + esc(r.cover.short)) + '</button>'; }).join('') + '</div>' +
         '<div class="rnote">Crime: City of Houston only (Houston Police). FEMA: flood zones, flood insurance claims, disasters and hazard risk. Environmental: cleanup sites, tanks, wells, pipelines, wetlands and soils around the parcel.</div></div>' : '');
     ctx.renderUtilities?.(el.querySelector('.util-slot'), center, parcel);
     const where = () => parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4), lab = () => repMi + ' mi around ' + where();

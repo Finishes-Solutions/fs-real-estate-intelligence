@@ -19,20 +19,21 @@ export function initExport(ctx) {
   const dlg = document.createElement('div'); dlg.className = 'xdlg'; dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true'); dlg.setAttribute('aria-labelledby', 'xTitle');
   document.body.appendChild(dlg);
   let st = { report: 'summary', scope: 'filters', format: 'pdf', map: true, scope_text: false, ai: true, full: false };
-  try { st = { ...st, ...JSON.parse(localStorage.getItem('fs-export') || '{}') }; } catch (e) {}
-  const save = () => { try { localStorage.setItem('fs-export', JSON.stringify(st)); } catch (e) {} };
+  // only the format is remembered between visits; the report, the filings (always "From your filters" to start) and the options start fresh
+  try { const j = JSON.parse(localStorage.getItem('fs-export') || '{}'); if (FORMATS[j.format]) st.format = j.format; } catch (e) {}
+  const save = () => { try { localStorage.setItem('fs-export', JSON.stringify({ format: st.format })); } catch (e) {} };
 
   const inView = () => { const b = ctx.map.getBounds(); return ctx.visible.filter(f => f.lon >= b.getWest() && f.lon <= b.getEast() && f.lat >= b.getSouth() && f.lat <= b.getNorth()); };
   const highlighted = () => ctx.highlighted().map(id => ctx.BY_ID.get(id)).filter(Boolean);
-  const scopes = () => [['filters', 'Current Filters & Selection', ctx.visible.length], ['view', 'Only What’s on the Map Now', inView().length], ['highlight', 'Highlighted Filings', highlighted().length]];
+  // "Only what's on the map now" depends on where the map happens to be, so it isn't offered from the Reports page
+  const scopes = () => [['filters', 'From your filters', ctx.visible.length], ...(ctx.view === 'reports' ? [] : [['view', 'Only What’s on the Map Now', inView().length]]), ['highlight', 'Highlighted Filings', highlighted().length]];
   const listFor = s => s === 'view' ? inView() : s === 'highlight' ? highlighted() : ctx.visible;
 
   function render() {
-    // a choice redraws the dialog: focus stays on the same control (else it falls to the page, outside the dialog)
-    const a = dlg.contains(document.activeElement) ? document.activeElement : null, key = a && (a.id ? '#' + a.id : a.name ? '[name="' + a.name + '"][value="' + a.value + '"]' : a.dataset.f ? '[data-f="' + a.dataset.f + '"]' : a.dataset.k ? '[data-k="' + a.dataset.k + '"]' : null);
     const R = REPORTS[st.report], cmp = ctx.compare?.list() || [];
     if (!R.formats.includes(st.format)) st.format = R.formats[0];
-    if (st.scope !== 'filters' && !scopes().find(x => x[0] === st.scope)[2]) st.scope = 'filters';
+    if (st.scope !== 'filters' && !scopes().find(x => x[0] === st.scope)?.[2]) st.scope = 'filters';
+    const af = document.activeElement, keep = af && dlg.contains(af) ? (af.id ? '#' + af.id : af.name ? '[name="' + af.name + '"][value="' + af.value + '"]' : af.dataset?.f ? '.xfmt [data-f="' + af.dataset.f + '"]' : af.dataset?.k ? '[data-k="' + af.dataset.k + '"]' : '') : '';
     const n = st.report === 'compare' ? cmp.length : listFor(st.scope).length;
     const blocked = st.report === 'compare' ? (cmp.length ? '' : 'Add areas to Compare first (select an area on the map, then “+ Compare”).') : n ? '' : 'No filings match. Change the filters or pick other filings.';
     dlg.innerHTML = '<div class="xbox"><div class="xh"><div><div class="kicker">Reports &amp; data</div><h2 id="xTitle">New report</h2></div><button class="x" id="xClose" aria-label="Close">×</button></div>' +
@@ -52,66 +53,106 @@ export function initExport(ctx) {
     dlg.querySelectorAll('.xfmt button').forEach(b => b.onclick = () => { st.format = b.dataset.f; save(); render(); });
     dlg.querySelectorAll('.xopts input').forEach(i => i.onchange = () => { st[i.dataset.k] = i.checked; save(); });
     dlg.querySelector('#xGo').onclick = go;
-    dlg.querySelector('#xMore')?.addEventListener('click', () => { dlg.classList.remove('on'); lastFocus = null; ctx.setView('reports'); });
-    if (key) (dlg.querySelector(key + ':not([disabled])') || dlg.querySelector('#xClose'))?.focus();
+    dlg.querySelector('#xMore')?.addEventListener('click', () => { dlg.classList.remove('on'); dropToast(); lastFocus = null; ctx.setView('reports'); });
+    if (keep) (dlg.querySelector(keep + ':not([disabled])') || dlg.querySelector('#xClose'))?.focus(); // a re-draw must not drop the keyboard out of the dialog (a control that's now disabled: Close)
   }
   const opt = (k, label, show) => show ? '<label class="tg2"><input type="checkbox" data-k="' + k + '"' + (st[k] ? ' checked' : '') + '><span>' + label + '</span></label>' : '';
   let lastFocus = null;
   // open(report, { format, scope }): the Reports tab and the assistant's cards open it preset
-  function open(report, o = {}) { if (report && REPORTS[report]) st.report = report; if (o.format && REPORTS[st.report].formats.includes(o.format)) st.format = o.format; if (o.scope) st.scope = o.scope; lastFocus = document.activeElement; render(); dlg.classList.add('on'); setTimeout(() => (dlg.querySelector('#xGo:not([disabled])') || dlg.querySelector('#xClose'))?.focus(), 30); }
-  function close() { if (!dlg.classList.contains('on')) return; dlg.classList.remove('on'); if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true }); lastFocus = null; }
-  // Tab and Shift+Tab stay inside the dialog while it's open (the same trap as Settings)
-  dlg.addEventListener('keydown', e => ctx.trapTab?.(dlg.querySelector('.xbox') || dlg, e));
+  function open(report, o = {}) { if (report && REPORTS[report]) st.report = report; if (o.format && REPORTS[st.report].formats.includes(o.format)) st.format = o.format; st.scope = o.scope || 'filters'; lastFocus = document.activeElement; render(); dlg.classList.add('on'); liftToast();
+    // focus lands on Export, or (nothing to export) on the first report choice, so Tab never starts behind the dialog
+    setTimeout(() => (dlg.querySelector('#xGo:not([disabled])') || dlg.querySelector('[name=xrep]:checked') || dlg.querySelector('[name=xrep]') || dlg.querySelector('#xClose'))?.focus(), 30); }
+  // the note with Undo ("Filters and area set to match this export") lives in the map stage, which sits under the dialog: while the dialog is open it moves to the page body so the button can be clicked
+  let toastHome = null; const toastEl = () => document.getElementById('toast');
+  const liftToast = () => { const t = toastEl(); if (t && t.parentNode !== document.body) { toastHome = [t.parentNode, t.nextSibling]; document.body.append(t); } };
+  const dropToast = () => { const t = toastEl(); if (toastHome?.[0]?.isConnected && t?.parentNode === document.body) toastHome[0].insertBefore(t, toastHome[1]?.parentNode === toastHome[0] ? toastHome[1] : null); toastHome = null; };
+  function close() { if (!dlg.classList.contains('on')) return; dlg.classList.remove('on'); dropToast(); if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true }); lastFocus = null; }
   dlg.addEventListener('pointerdown', e => { if (e.target === dlg) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && dlg.classList.contains('on')) { e.preventDefault(); close(); } });
+  // Tab stays inside the dialog: from the last control it wraps to the first, and from the first (Shift+Tab) to the last
+  dlg.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || !dlg.classList.contains('on')) return;
+    const f = [...dlg.querySelectorAll('.xbox button, .xbox input, .xbox select, .xbox [href], .xbox [tabindex]')].filter(x => !x.disabled && x.tabIndex >= 0 && x.getClientRects().length && !(x.type === 'radio' && !x.checked && dlg.querySelector('[name="' + x.name + '"]:checked')));
+    if (!f.length) { e.preventDefault(); return; }
+    const first = f[0], last = f[f.length - 1], at = document.activeElement;
+    if (!dlg.contains(at)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && at === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
+  });
   document.getElementById('exportBtn').onclick = () => open();
-  ctx.openExport = open;
+  ctx.openExport = open; ctx.closeExport = close;
 
+  // the Export button: run it, then close the dialog
   async function go() {
     const btn = dlg.querySelector('#xGo'); btn.disabled = true; btn.textContent = 'Preparing…';
-    try {
-      const list = listFor(st.scope).slice().sort((a, b) => b.cost - a.cost);
-      const label = st.scope === 'highlight' ? 'Highlighted Filings' : st.scope === 'view' ? 'Map view' : ctx.scopeLabel();
-      const name = ctx.fileBase(st.report, st.report === 'compare' ? 'areas' : label);
-      // what the Reports tab records with the file
-      ctx.exportMeta = { report: st.report, reportLabel: REPORTS[st.report].label, format: st.format, filings: st.report === 'compare' ? (ctx.compare?.list() || []).length : list.length,
-        unit: st.report === 'compare' ? 'areas' : 'filings', scope: label, filters: ctx.filterText(), hash: ctx.hashStr() };
-      if (st.report === 'summary') {
-        if (st.format === 'pdf') await pdf('summary', label, summaryDoc(list, label), name);
-        else if (st.format === 'xlsx') ctx.exportXlsx([{ name: 'Summary', aoa: ctx.summaryAoa(list, label) }, { name: 'Filings', rows: rows(list) }], name);
-        else await saveHtml(ctx, 'summary', label, summaryDoc(list, label), meta());
-      } else if (st.report === 'list') {
-        if (st.format === 'pdf') await pdf('list', label, listDoc(list, label), name, true);
-        else if (st.format === 'xlsx') ctx.exportXlsx([{ name: 'Filings', rows: rows(list) }, { name: 'Summary', aoa: ctx.summaryAoa(list, label) }], name);
-        else if (st.format === 'csv') ctx.exportCsv(rows(list), name);
-        else ctx.exportGeoJSON(list, name);
-      } else if (st.report === 'compare') {
-        const t = compareTable();
-        if (st.format === 'pdf') await pdf('compare', 'areas', compareDoc(t), name, t.areas.length > 3);
-        else if (st.format === 'xlsx') ctx.exportXlsx([{ name: 'Comparison', aoa: [t.head, ...t.body] }, ...t.areas.map((a, i) => ({ name: (i + 1) + ' ' + a.label.replace(/[\\/?*[\]:]/g, ' '), rows: ctx.rowsFor(t.lists[i]) })).filter(s => s.rows.length)], name);
-        else ctx.exportCsv(t.body.map(r => Object.fromEntries(t.head.map((h, i) => [h, r[i]]))), name);
-      } else {
-        const groups = activity(list);
-        if (st.format === 'pdf') await pdf('activity', label, activityDoc(groups, list, label), name);
-        else { const flat = groups.flatMap(g => g.rows.map(r => ({ Role: g.label, Name: r.label, Projects: r.n, 'Est. value (USD)': +r.v.toFixed(2), 'New builds': r.nw, 'Mostly': r.use, 'Counties': r.cos, 'Latest filing': r.last })));
-          if (st.format === 'xlsx') ctx.exportXlsx(groups.map(g => ({ name: g.label, rows: g.rows.map(r => ({ Name: r.label, Projects: r.n, 'Est. value (USD)': +r.v.toFixed(2), 'New builds': r.nw, Mostly: r.use, Counties: r.cos, 'Latest filing': r.last })) })).filter(s => s.rows.length), name);
-          else ctx.exportCsv(flat, name); }
-      }
-      close();
-    } catch (e) { console.error(e); ctx.toast('Export failed: ' + e.message); }
+    try { await perform(); close(); } catch (e) { console.error(e); ctx.toast('Export failed. Try again in a minute.'); }
     finally { ctx.exportMeta = null; if (dlg.classList.contains('on')) render(); }
   }
+  // one export with the current settings (st): what the dialog's button and the Reports page's PDF / Excel / CSV buttons do
+  async function perform() {
+    const list = listFor(st.scope).slice().sort((a, b) => b.cost - a.cost);
+    const label = st.scope === 'highlight' ? 'Highlighted Filings' : st.scope === 'view' ? 'Map view' : ctx.scopeLabel();
+    const names = st.report === 'compare' ? compareNames() : '';
+    const name = ctx.fileBase(st.report, st.report === 'compare' ? names : label);
+    // what the Reports tab records with the file. A comparison is recorded by the areas in it ("Harris vs Waller"), without the filing
+    // filters; the others by what was exported, with the filters, selection and (map view / highlighted) so "Set up again" can restore them
+    const b = st.scope === 'view' ? ctx.map.getBounds() : null;
+    ctx.exportMeta = { report: st.report, reportLabel: REPORTS[st.report].label, format: st.format, filings: st.report === 'compare' ? (ctx.compare?.list() || []).length : list.length,
+      unit: st.report === 'compare' ? 'areas' : 'filings', scope: st.report === 'compare' ? names : label, filters: st.report === 'compare' ? '' : ctx.filterText(), hash: st.report === 'compare' ? '' : ctx.hashStr(),
+      ...(st.report === 'compare' ? {} : { pick: st.scope, ...(b ? { view: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map(v => +v.toFixed(4)) } : {}), ...(st.scope === 'highlight' ? { ids: ctx.highlighted().slice(0, 400) } : {}) }) };
+    if (st.report === 'summary') {
+      if (st.format === 'pdf') await pdf('summary', label, summaryDoc(list, label), name);
+      else if (st.format === 'xlsx') ctx.exportXlsx([{ name: 'Summary', aoa: ctx.summaryAoa(list, label) }, { name: 'Filings', rows: rows(list) }], name);
+      else await saveHtml(ctx, 'summary', label, summaryDoc(list, label), meta());
+    } else if (st.report === 'list') {
+      if (st.format === 'pdf') await pdf('list', label, listDoc(list, label), name, true);
+      else if (st.format === 'xlsx') ctx.exportXlsx([{ name: 'Filings', rows: rows(list) }, { name: 'Summary', aoa: ctx.summaryAoa(list, label) }], name);
+      else if (st.format === 'csv') ctx.exportCsv(rows(list), name);
+      else ctx.exportGeoJSON(list, name);
+    } else if (st.report === 'compare') {
+      await compareOut(st.format, name);
+    } else {
+      const groups = activity(list);
+      if (st.format === 'pdf') await pdf('activity', label, activityDoc(groups, list, label), name);
+      else { const flat = groups.flatMap(g => g.rows.map(r => ({ Role: g.label, Name: r.label, Projects: r.n, 'Est. value (USD)': +r.v.toFixed(2), 'New builds': r.nw, 'Mostly': r.use, 'Counties': r.cos, 'Latest filing': r.last })));
+        if (st.format === 'xlsx') ctx.exportXlsx(groups.map(g => ({ name: g.label, rows: g.rows.map(r => ({ Name: r.label, Projects: r.n, 'Est. value (USD)': +r.v.toFixed(2), 'New builds': r.nw, Mostly: r.use, Counties: r.cos, 'Latest filing': r.last })) })).filter(s => s.rows.length), name);
+        else ctx.exportCsv(flat, name); }
+    }
+  }
+  // the Reports page's PDF / Excel / CSV buttons: straight to the file with the current filters (Customize… opens the dialog)
+  ctx.exportDirect = async (report, format) => {
+    if (!REPORTS[report]?.formats.includes(format)) return false;
+    if (report === 'compare' ? !(ctx.compare?.list() || []).length : !ctx.visible.length) { ctx.toast(report === 'compare' ? 'Add areas to Compare first.' : 'No filings match. Change the filters first.'); return false; }
+    const keep = st; st = { ...st, report, format, scope: 'filters' };
+    try { await perform(); return true; } catch (e) { console.error(e); ctx.toast('Export failed. Try again in a minute.'); return false; }
+    finally { st = keep; ctx.exportMeta = null; }
+  };
   const rows = list => ctx.rowsFor(list).map(r => { const o = { ...r }; if (!st.scope_text) delete o.Scope; if (!st.ai) { delete o['AI summary']; delete o.Use; delete o.Subtype; delete o.Tenant; delete o.Developer; } return o; });
 
   // ---------- data for reports ----------
-  function compareTable() {
-    const areas = ctx.compare.list(), base = ctx.filtered(), lists = areas.map(a => base.filter(f => inArea(a.geom, [f.lon, f.lat])));
-    const keys = ['count', 'value', 'new', 'newValue', 'reno', 'add', 'avg', 'median', 'big', 'active', 'starting', 'last30', 'sqft', 'psf', 'units', 'devs', 'topUse', 'topCity', 'topDev'];
-    const sq = a => d3.geoArea(a.geom) * 3958.8 ** 2;
-    const body = [['Area (sq mi)', ...areas.map(a => +sq(a).toFixed(1))], ...keys.map(k => { const m = BY_KEY.get(k); return [m.label, ...lists.map(l => m.fmt(m.fn(l)))]; }),
-      ['Filings per sq mi', ...areas.map((a, i) => +(lists[i].length / Math.max(sq(a), .01)).toFixed(2))]];
-    return { areas, lists, head: ['Metric', ...areas.map(a => a.label)], body };
+  // the Compare page's table (census numbers, then the filings), as rows for each format. Excel and CSV hold raw numbers
+  // (units in the row names) under a line saying which filters applied; the PDF shows the page's text.
+  async function compareTable() {
+    const M = await ctx.compare.model(), head = ['Metric', ...M.areas.map(a => a.label)], flat = [];
+    for (const sec of M.sections) { flat.push({ section: sec.title }); for (const r of sec.rows) flat.push({ label: r.label, unit: r.unit, cells: r.cells }); }
+    return { areas: M.areas, lists: M.lists, head, flat, note: M.note, filters: ctx.filterText() || 'None' };
   }
+  async function compareOut(format, name) {
+    const t = await compareTable(), raw = r => r.cells.map(c => c.v == null ? '' : c.v), nm = r => r.label + (r.unit ? ' (' + r.unit + ')' : '');
+    const pre = [['Area comparison'], ['Filing filters', t.filters], ['Census numbers are for the tracts centred in each area; filing numbers follow the filters above.']];
+    if (format === 'pdf') await pdf('compare', 'areas', compareDoc(t), name, t.areas.length > 3);
+    else if (format === 'xlsx') ctx.exportXlsx([{ name: 'Comparison', aoa: [...pre, [], t.head, ...t.flat.map(r => r.section ? [r.section] : [nm(r), ...raw(r)])] }, ...t.areas.map((a, i) => ({ name: (i + 1) + ' ' + a.label.replace(/[\\/?*[\]:]/g, ' '), rows: ctx.rowsFor(t.lists[i]) })).filter(s => s.rows.length)], name);
+    else ctx.exportCsv(t.flat.filter(r => !r.section).map(r => Object.fromEntries(t.head.map((h, i) => [h, i ? raw(r)[i - 1] : nm(r)]))), name, pre.slice(1, 2));
+  }
+  // the Compare page's Export menu: straight to a file in the chosen format
+  const compareNames = () => (ctx.compare?.list() || []).map(a => a.label).join(' vs ') || 'areas';
+  ctx.exportCompare = async format => {
+    const n = (ctx.compare?.list() || []).length; if (!n) { ctx.toast('Add areas to Compare first.'); return; }
+    try {
+      ctx.exportMeta = { report: 'compare', reportLabel: REPORTS.compare.label, format, filings: n, unit: 'areas', scope: compareNames(), filters: '', hash: '' };
+      await compareOut(format, ctx.fileBase('compare', compareNames()));
+    } catch (e) { console.error(e); ctx.toast('Export failed. Try again in a minute.'); } finally { ctx.exportMeta = null; }
+  };
   function activity(list) {
     const roles = [['dev', 'Developers & owners', f => f.dev || f.owner], ['arch', 'Architects & designers', f => f.arch], ['gc', 'General contractors', f => f.gc]];
     return roles.map(([k, label, get]) => {
@@ -183,12 +224,13 @@ export function initExport(ctx) {
       '<div class="lg">' + list.map((a, i) => '<span><i style="background:' + ctx.compare.colorOf(i) + '"></i>' + (i + 1) + '. ' + esc(a.label) + '</span>').join('') + '</div>';
   }
   function compareDoc(t) {
-    const n = t.areas.length, cols = Math.min(n, n > 3 ? 4 : 3);
+    const n = t.areas.length, cols = Math.min(n, n > 3 ? 4 : 3), blank = t.areas.map(() => '');
+    const rows = t.flat.map(r => r.section ? ['<b>' + esc(r.section) + '</b>', ...blank] : [esc(r.label), ...r.cells.map(c => '<span class="m">' + esc(c.t) + '</span>')]);
     return doc('Area comparison', t.areas.map(a => a.label).join(' vs. '),
-      compareMap() + '<h2>Side by side</h2>' + tbl(t.head, t.body.map(r => r.map((c, i) => i ? '<span class="m">' + esc(String(c)) + '</span>' : esc(String(c)))), t.areas.map((a, i) => i + 1)) +
+      compareMap() + '<h2>Side by side</h2>' + tbl(t.head, rows, t.areas.map((a, i) => i + 1)) + (t.note ? '<p class="rnote">' + esc(t.note) + ' Filing numbers follow your filters, so they can differ from the Market page.</p>' : '') +
       '<h2>Largest filings in each area</h2><div style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:16px">' + t.areas.map((a, i) => '<div><h3>' + esc(a.label) + '</h3>' +
         tbl(['Project', 'Est. value'], t.lists[i].slice().sort((x, y) => y.cost - x.cost).slice(0, 12).map(f => [project(f) + '<div class="sc">' + esc(f.city || f.county) + '</div>', money(f.cost)]), [1]) + '</div>').join('') + '</div>',
-      { landscape: n > 3 });
+      { landscape: n > 3, sources: SOURCES + ' Census numbers: US Census ACS 5-year and LEHD LODES.' });
   }
   const activityDoc = (groups, list, label) => doc('Activity report', label, kpis(list) + groups.filter(g => g.rows.length).map((g, i) => '<div' + (i ? ' class="full"' : '') + '><h2>' + esc(g.label) + '</h2>' +
     tbl(['#', 'Name', 'Projects', 'Est. value', 'New', 'Mostly', 'Where', 'Latest'], g.rows.slice(0, 40).map((r, j) => ['<span class="m">' + (j + 1) + '</span>', '<b>' + esc(r.label) + '</b>', fmtN(r.n), money(r.v), fmtN(r.nw), esc(r.use), esc(r.cos), '<span class="m">' + esc(r.last) + '</span>']), [2, 3, 4]) + '</div>').join(''),

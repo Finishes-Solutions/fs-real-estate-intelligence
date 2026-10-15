@@ -95,6 +95,9 @@
     "api/places.js": {
       "maxDuration": 15
     },
+    "api/devdata.js": {
+      "maxDuration": 15
+    },
     "api/env.js": {
       "maxDuration": 120
     },

@@ -96,7 +96,7 @@ export function initTeam(ctx) {
       (n ? ' · ' + n + ' change' + (n > 1 ? 's' : '') + ' waiting' : '') + '</span><button class="btn sm" type="button" id="tSync">Sync now</button></div>';
     const showCode = needCode || editCode || !code;
     return status +
-      '<label class="set-field"><span class="set-l">Your name</span><input id="tName" maxlength="60" autocomplete="name" placeholder="e.g. Matthew" value="' + esc(name()) + '"><span class="set-hint">Shown on notes and site plans you add or edit.</span></label>' +
+      '<label class="set-field"><span class="set-l">Your name</span><input id="tName" maxlength="60" autocomplete="name" placeholder="Your name" value="' + esc(name()) + '"><span class="set-hint">Shown on notes and site plans you add or edit.</span></label>' +
       (showCode ? '<form class="set-field" id="tForm"><label class="set-l" for="tCode">Team passcode</label><span class="set-inline"><input id="tCode" type="password" autocomplete="current-password" placeholder="Team passcode"><button class="btn primary sm">' + (needCode ? 'Unlock' : 'Save') + '</button>' +
           (editCode ? '<button class="btn sm" type="button" id="tCodeCancel">Cancel</button>' : '') + '</span><span class="set-hint">Only needed if your team uses one. Ask a teammate for it.</span></form>'
         : '<div class="set-field"><span class="set-l">Team passcode</span><span class="set-inline"><span class="set-mask" aria-label="Passcode saved">••••••••</span><button class="btn sm" type="button" id="tCodeEdit">Change</button></span></div>') +

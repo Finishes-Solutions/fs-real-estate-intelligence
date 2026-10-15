@@ -1,6 +1,7 @@
 // Utilities: the "Utilities" row on a property card (nearest power lines and substation, the water and sewer service
 // providers, public mains where published) and the "Power, Water & Sewer Lines" map layer. Data from api/utilities.
 import { summaryLines, distText, sizeText } from './lib/utilities.mjs';
+import { getJSON, errorBox, friendly, unavailable, layerFailed, layerOK } from './reportkit.js';
 
 export function initUtilities(ctx) {
   const { map, esc } = ctx, cache = new Map();
@@ -8,8 +9,7 @@ export function initUtilities(ctx) {
   ctx.utilitiesAt = (center, geometry) => {
     const k = geometry ? JSON.stringify(geometry).slice(0, 2000) : center[0].toFixed(5) + ',' + center[1].toFixed(5);
     if (!cache.has(k)) {
-      const p = (geometry ? fetch('api/utilities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry }) }) : fetch('api/utilities?lat=' + center[1].toFixed(5) + '&lon=' + center[0].toFixed(5)))
-        .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'lookup failed'); return d; });
+      const p = geometry ? getJSON('api/utilities', { what: 'Utility data', method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry }) }) : getJSON('api/utilities?lat=' + center[1].toFixed(5) + '&lon=' + center[0].toFixed(5), { what: 'Utility data' });
       p.catch(() => cache.delete(k)); cache.set(k, p);
     }
     return cache.get(k);
@@ -20,11 +20,11 @@ export function initUtilities(ctx) {
   ctx.renderUtilities = async (slot, center, parcel) => {
     if (!slot) return;
     slot.innerHTML = '<span class="sc">Checking power, water and sewer…</span>';
-    let d; try { d = await ctx.utilitiesAt(center, parcel?.geometry || null); } catch (e) { if (slot.isConnected) slot.innerHTML = '<span class="sc">Utility lookup unavailable (' + esc(e.message) + ').</span>'; return; }
+    let d; try { d = await ctx.utilitiesAt(center, parcel?.geometry || null); } catch (e) { if (slot.isConnected) { slot.replaceChildren(errorBox(e, () => ctx.renderUtilities(slot, center, parcel), 'Utility data')); } return; }
     if (!slot.isConnected) return;
     const p = d.power || {}, n = p.nearest || {}, out = [];
     const line = (l, what) => '<b>' + esc(distText(l.ft)) + '</b> ' + esc(what) + (l.kvText ? ' <span class="sc">' + esc(l.kvText) + '</span>' : '') + (l.operator ? ' <span class="sc">' + esc(l.operator) + '</span>' : '');
-    if (p.error) out.push('<span class="sc">Power lines: unavailable (' + esc(p.error) + ')</span>');
+    if (p.error) out.push('<span class="sc">' + esc(unavailable('Power line data')) + '</span>');
     else {
       if (n.transmission) out.push('Power: ' + line(n.transmission, 'to a transmission line'));
       if (n.distribution) out.push((n.transmission ? '' : 'Power: ') + line(n.distribution, 'to a distribution line'));
@@ -71,17 +71,17 @@ export function initUtilities(ctx) {
     const key = bb.join(',') + '&z=' + zz; if (key === lastKey) return;
     ctl?.abort(); ctl = new AbortController(); say('Loading utility lines…');
     try {
-      const res = await fetch('api/utilities?box=' + key, { signal: ctl.signal }), d = await res.json().catch(() => ({})); if (!res.ok) throw new Error(d.error || 'unavailable');
+      const d = await getJSON('api/utilities?box=' + key, { what: 'Utility line data', signal: ctl.signal });
       if (my !== seq) return; lastKey = key; data = d; addLayers(); map.getSource(SRC)?.setData(d);
       const c = {}; for (const f of d.features) c[f.properties.k] = (c[f.properties.k] || 0) + 1;
       say(['Red: transmission lines (kV on the line)' + (c.transmission ? '' : ', none here'), 'orange: distribution lines' + (c.distribution ? '' : ', none mapped here'), 'dots: substations'].join('; ') +
         (zz >= 15 && (c.sewer || c.water) ? '; brown: public sewer mains' + (c.water ? ', blue: water mains' : '') + ' (City of Houston)' : zz < 15 ? '. Zoom in more for Houston sewer and water mains.' : '') +
         '. Power lines from OpenStreetMap: street lines are often unmapped.' + (d.errors?.length ? ' Some sources didn’t answer: ' + d.errors.join('; ') + '.' : ''));
-    } catch (e) { if (e.name !== 'AbortError') say(e.message); }
+    } catch (e) { if (e.name !== 'AbortError') layerFailed(ctx, e, { what: 'Utility line data', off: () => set(false), note }); }
   }
   function set(v) {
     on = !!v; try { localStorage.setItem('fs-util', on ? '1' : '0'); } catch (e) {}
-    if (box) box.checked = on; if (note) note.hidden = !on;
+    if (box) box.checked = on; if (note) note.hidden = !on; if (on) layerOK(note);
     if (!on) { removeLayers(); lastKey = ''; return; }
     addLayers(); load();
   }

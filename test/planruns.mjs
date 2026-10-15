@@ -33,6 +33,7 @@ assert.deepEqual(matchLayout([], 'x', 'y'), { index: -1, exact: false });
 
 // ---- what's saved ----
 const big = { ask: 'x', at: 1, variants: Array.from({ length: 8 }, (_, i) => ({ key: 'k' + i, name: 'Layout ' + (i + 1) + ' · R', m: m(1, 1), elements: [{ id: 'e' + i, kind: 'building', pad: 'y'.repeat(1000) }], junk: 1 })) };
+{ const st = slimRun({ variants: [{ key: 'a', name: 'Layout 1', stale: 'site', elements: [{ id: 'x' }] }, { key: 'b', name: 'Layout 2', stale: 'street' }] }, 'a'); assert.deepEqual(st.variants.map(v => v.stale), ['site', 'street'], 'the out-of-date mark is kept with the saved layouts'); }
 let s = slimRun(big, 'k7');
 assert.equal(s.variants.length, 6); assert.ok(s.variants.some(v => v.key === 'k7'), 'the layout on the map is always kept');
 assert.deepEqual(s.variants.filter(v => v.elements).map(v => v.key), ['k0', 'k1', 'k2', 'k7']);

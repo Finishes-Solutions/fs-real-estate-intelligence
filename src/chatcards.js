@@ -75,7 +75,7 @@ export function initChatCards(ctx) {
     const d = el(head(r.kind ? r.kind[0].toUpperCase() + r.kind.slice(1) : 'Area', r.place, fmtN(r.filings) + ' filings ' + (r.how || '') + ' · est. ' + fmtM(r.total_value)) +
       (uses.length > 1 ? sec('Top uses', hbars(uses.map(g => ({ label: g.name, value: g.v, text: fmtM(g.v) })))) : '') +
       (list?.length ? sec('Largest projects', list.slice().sort((a, b) => b.cost - a.cost).slice(0, 3).map(filingRow).join('')) : '') +
-      btns([['info', 'More Information', true], list && !r.filtered ? ['filter', 'Filter to This Area'] : null]) + src('Sources: OpenStreetMap outline · Texas TDLR TABS filings'));
+      btns([['info', list ? 'Area Summary' : 'More Information', true], list && !r.filtered ? ['filter', 'Use as Area'] : null]) + src('Sources: OpenStreetMap outline · Texas TDLR TABS filings'));
     wireRows(d);
     on(d, 'info', () => document.getElementById('pbInfo')?.click());
     on(d, 'filter', () => { const p = ctx.currentPlace?.(); if (p?.geom) { ctx.setSelection('place', p.label, p.geom); ctx.clearPlace(); ctx.fitGeom(p.geom); } });
@@ -108,7 +108,7 @@ export function initChatCards(ctx) {
       (t.length ? tiles(t, 'c3') : '') +
       (r.businesses?.length ? sec('Businesses here', '<div class="cc-tags">' + r.businesses.slice(0, 12).map(b => '<span>' + esc(b.name) + (b.kind ? ' <em>' + esc(b.kind) + '</em>' : '') + '</span>').join('') + '</div>') : '') +
       (fs.length ? sec('Construction filings here', fs.slice(0, 5).map(filingRow).join('')) : '') +
-      (r.note ? '<div class="rnote">' + esc(r.note) + '</div>' : '') + btns([['info', 'More Information', true]]) + src('Sources: ' + (r.source || 'Texas GIO parcels, OpenStreetMap, USGS lidar, TDLR TABS')));
+      (r.note ? '<div class="rnote">' + esc(r.note) + '</div>' : '') + btns([['info', 'Property Card', true]]) + src('Sources: ' + (r.source || 'Texas GIO parcels, OpenStreetMap, USGS lidar, TDLR TABS')));
     wireRows(d);
     on(d, 'info', () => { ctx.setView('map'); ctx.map.flyTo({ center: r.center, zoom: 17.5, duration: ctx.reduceMotion ? 0 : 900 }); ctx.map.once('idle', () => { const b = ctx.buildingAt?.(r.center); if (!b) ctx.openBuildingAt(r.center); }); });
     return d;

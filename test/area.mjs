@@ -1,7 +1,7 @@
 // Offline tests for the area context (build/area.mjs) and the tenants endpoint (api/tenants.js).
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { parseWac, parseBps, mergeJobs, countyJobs, buildArea, newsQuery, cptCode } from '../build/area.mjs';
+import { parseWac, parseBps, mergeJobs, countyJobs, buildArea, newsQuery, newsFilter, cptCode } from '../build/area.mjs';
 import { sectorOf, SECTORS } from '../lib/sectors.mjs';
 import { addressKey, tenantQuery, shapeTenants } from '../api/tenants.js';
 
@@ -90,7 +90,7 @@ globalThis.fetch = async (url, opts = {}) => {
 const regions = { counties: [{ name: 'Waller', tabsId: '2237', fips: '48473' }, { name: 'Harris', tabsId: '2101', fips: '48201' }] };
 const filings = [{ city: 'Katy', county: 'Harris' }, { city: 'Katy', county: 'Harris' }, { city: 'Brookshire', county: 'Waller' }, { city: 'Waller', county: 'Waller', approx: true }];
 process.env.AREA_NEWS_TOWNS = '3';
-const prevNews = { 'town:Brookshire': [{ title: 'Old story', url: 'https://x/old', date: new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10) }, { title: 'Ancient', url: 'https://x/a', date: '2020-01-01' }] };
+const prevNews = { 'town:Brookshire': [{ title: 'Brookshire plans new warehouse development', url: 'https://x/old', date: new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10) }, { title: 'Ancient', url: 'https://x/a', date: '2020-01-01' }] };
 const area = await buildArea(regions, filings, { news: prevNews });
 assert.equal(area.jobs.year, lodesYear); assert.equal(area.jobs.baseYear, lodesYear - 5); assert.equal(area.countyJobs['48473'].jobs, 650);
 assert.ok(Object.keys(area.permits.years).length >= 5, 'several permit years'); assert.equal(area.permits.years[year - 1]['48201'].sf, 9000); assert.ok(area.permits.ytd?.cur['48473'], 'year to date');
@@ -98,7 +98,19 @@ assert.equal(area.businesses.months['48473'][ym(new Date())], 12); assert.equal(
 assert.equal(area.businesses.latest['48473'][0].name, 'NEW CAFE'); assert.equal(SECTORS[area.businesses.latest['48473'][0].sec][1], 'Hotels & restaurants');
 assert.deepEqual(area.newsPlaces.map(p => p.key), ['county:Waller', 'county:Harris', 'town:Katy', 'town:Brookshire'], 'counties, then busiest towns (city-level guesses skipped)');
 assert.equal(area.news['county:Waller'][0].title, 'Waller County approves new retail center');
-assert.deepEqual(area.news['town:Brookshire'].map(a => a.title), ['Old story'], 'a failed search keeps recent saved articles, drops ones past 120 days');
+assert.deepEqual(area.news['town:Brookshire'].map(a => a.title), ['Brookshire plans new warehouse development'], 'a failed search keeps recent saved articles, drops ones past 120 days');
+// news relevance: Houston-area (or Texas) AND construction / development / real estate
+const nf = newsFilter({ counties: ['Waller', 'Harris', 'Montgomery'], cities: ['Katy', 'Waller', 'Spring', 'Sugar Land'] }), T = title => ({ title });
+assert.ok(nf(T('Katy ISD breaks ground on new elementary school campus')), 'town + development');
+assert.ok(nf(T('Rapid growth in Waller County driving need for Highway 36A')), 'county + growth');
+assert.ok(nf(T('Spring, Texas apartment complex gets rezoning approval')), 'ambiguous name with a Texas anchor');
+assert.ok(!nf(T('Fed Governor Waller says rates could fall; real estate agents react')), 'a person, no Texas anchor');
+assert.ok(!nf(T('A Waller County rancher says there is a bigger problem behind high beef prices')), 'off topic');
+assert.ok(!nf(T('Montgomery County, Maryland approves new housing development')), 'another state');
+assert.ok(!nf(T('Montgomery County approves new housing development')), 'ambiguous county, no Texas anchor');
+assert.ok(nf(T('Montgomery County, Texas approves new housing development')), 'ambiguous county with Texas');
+assert.ok(!nf(T('New Orleans, Louisiana warehouse development expands')), 'out of state');
+assert.ok(nf({ title: 'New warehouse development announced', domain: 'Houston Business Journal' }), 'a Houston outlet counts as the place');
 // a source that fails keeps last run's numbers
 comptrollerDown = true;
 const again = await buildArea(regions, filings, { ...area, jobs: { year: lodesYear, tracts: {} } });

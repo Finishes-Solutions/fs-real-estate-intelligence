@@ -1,6 +1,6 @@
 // Assistant tool helpers: filter clean-up, geocoder result picking and framing.
 import assert from 'node:assert/strict';
-import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, frame, ZOOM, splitFollowups, plainText, textBlocks, placeCandidates, kindOf, pickAircraft, aircraftName, splitWithin, applyPlaceAlias, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from '../lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, aiErrorMessage, spotQuestion, frame, ZOOM, splitFollowups, plainText, textBlocks, placeCandidates, kindOf, pickAircraft, aircraftName, splitWithin, applyPlaceAlias, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from '../lib/assist-logic.mjs';
 import { pruneReports, fmtBytes } from '../lib/reports.mjs';
 import { tractsFor, summarizeTracts, inGeom } from '../lib/demographics.mjs';
 import { nameQuery } from '../api/tenants.js';
@@ -84,8 +84,28 @@ const sf = suggestQuestions({ card: { kind: 'filing', name: 'George R Brown Conv
 assert.ok(sf.length >= 3 && sf.length <= 5); assert.match(sf[0], /^Tell me more about George R Brown/); assert.ok(sf.some(q => /Houston First/.test(q)));
 assert.ok(sf.every(q => q.length <= 60), 'short enough for a pill: ' + sf.join(' | '));
 const sb = suggestQuestions({ card: { kind: 'building', label: '2200 Texas Ave, Houston, TX 77003' } }); assert.equal(sb[0], 'Who owns 2200 Texas Ave?');
+// parcel, area and market prompts lead; filing prompts only while the filings layer is on or a filter is set
 const sm = suggestQuestions({ near: 'Katy', zoom: 12, inView: 41, changed: 3 });
-assert.ok(sm.includes('What is being built near Katy?') && sm.includes('Summarize the 41 filings in view') && sm.length <= 5);
+assert.equal(sm[0], 'What is the area like around Katy?'); assert.ok(sm.length <= 5);
+assert.ok(!sm.some(q => /filing|being built|developers|changed|projects/i.test(q)), 'no filing prompts with the filings layer off: ' + sm.join(' | '));
+const smf = suggestQuestions({ near: 'Katy', zoom: 12, inView: 41, changed: 3, filings: true });
+assert.ok(smf.slice(0, 3).every(q => !/filing|being built/i.test(q)), 'area prompts still lead: ' + smf.join(' | '));
+assert.ok(smf.includes('What is being built near Katy?') && smf.includes('Summarize the 41 filings in view') && smf.length <= 5, smf.join(' | '));
+const smg = suggestQuestions({ near: 'Katy', zoom: 12, inView: 41, filtered: true }); assert.ok(smg.some(q => /filings in view|top developers/.test(q)), 'a filter set shows filing prompts');
+const sbf = suggestQuestions({ card: { kind: 'building', label: '2200 Texas Ave, Houston, TX 77003' } });
+assert.deepEqual(sbf.slice(0, 2), ['Who owns 2200 Texas Ave?', 'Flood risk and value of 2200 Texas Ave']); assert.ok(sbf.includes('Start a site plan here') && !sbf.some(q => /being built/.test(q)));
+assert.ok(suggestQuestions({ card: { kind: 'building', label: '2200 Texas Ave' }, filings: true }).length <= 5);
+const sbl = suggestQuestions({ card: { kind: 'building', label: 'Loading parcel…' } }); assert.equal(sbl[0], 'Who owns this parcel?'); assert.equal(sbl[1], 'Flood risk and value of the selected property');
+assert.ok(suggestQuestions({ zoom: 6 }).every(q => !/filing|being built|construction/i.test(q)), 'region view: no filing prompts by default');
+// a failed assistant call is a sentence, never "Error 501", "Failed to fetch" or HTML
+assert.match(aiErrorMessage({ status: 429 }), /^Too many questions right now, try again in a minute/);
+for (const st of [500, 501, 502, 503]) assert.equal(aiErrorMessage({ status: st, error: '<html>Bad gateway</html>' }), 'The assistant couldn’t answer. Try again.');
+assert.equal(aiErrorMessage({ status: 500, error: 'Upstream said no' }), 'The assistant couldn’t answer. Try again.', '5xx details stay out of the chat');
+assert.match(aiErrorMessage({ network: true, offline: true }), /^You appear to be offline/); assert.match(aiErrorMessage({ network: true }), /connection/);
+assert.equal(aiErrorMessage({ status: 400, error: 'That message is too long.' }), 'That message is too long.'); assert.doesNotMatch(aiErrorMessage({ status: 404 }), /404|Error/);
+// right-click "Ask AI about this spot": the property there, by address or the nearest place, not bare coordinates
+assert.equal(spotQuestion('24500 Katy Fwy, Katy, TX', [-95.76, 29.79], true), 'Tell me about the property at 24500 Katy Fwy, Katy, TX: owner, value, site risks and the area around it.');
+assert.match(spotQuestion('Katy', [-95.76, 29.79], false), /^Tell me about the property at the spot I picked near Katy \(map point 29\.79000, -95\.76000\): owner, value, site risks and the area around it\.$/);
 // anywhere in the world: ask when several places fit a bare name
 const NM = (name, type, lat, lon, imp, cc, state, country, extra = '') => ({ name, addresstype: type, lat: String(lat), lon: String(lon), importance: imp, address: { country_code: cc, state, country },
   display_name: [name, extra, state, cc === 'us' ? 'United States' : country].filter(Boolean).join(', ') });
@@ -99,7 +119,7 @@ assert.deepEqual(placeCandidates('Georgia', fromNominatim([NM('Georgia', 'countr
 assert.equal(placeCandidates('Dallas', fromNominatim([NM('Dallas', 'city', 32.78, -96.8, 0.78, 'us', 'Texas', 'United States'), NM('Dallas', 'city', 33.92, -84.84, 0.4, 'us', 'Georgia', 'United States')])), null, 'Dallas is Dallas');
 const de = fromNominatim([NM('Germany', 'country', 51.1, 10.4, 0.92, 'de', null, 'Germany')]); assert.equal(pickPlace('Germany', de).kind, 'country'); assert.ok(ZOOM.country < 6 && ZOOM.region <= 6.5);
 const sfar = suggestQuestions({ far: 'Lyon, Auvergne-Rhône-Alpes, France', zoom: 11, inView: 0 });
-assert.deepEqual(sfar.slice(0, 2), ['Tell me about Lyon', 'What is being built in Lyon?'], 'outside Texas: questions about that place');
+assert.deepEqual(sfar.slice(0, 2), ['Tell me about Lyon', 'What is the economy like in Lyon?'], 'outside Texas: questions about that place');
 const sw = suggestQuestions({ zoom: 6 }); assert.ok(sw.length >= 1 && sw.length <= 5 && !sw.some(q => /near undefined|in view/.test(q)));
 
 // framing several filings
@@ -140,8 +160,22 @@ assert.equal(ids({ st: ['Registered', 'Unknown'] }), 'AC');
 assert.equal(ids({ sqmin: 10000 }), 'A'); assert.equal(ids({ sqmax: 10000 }), 'B', 'no sq ft is not under the max');
 assert.equal(ids({ co: 'tellepsen' }), 'A'); assert.equal(ids({ co: 'gensler' }), 'C'); assert.equal(ids({ co: 'tower' }), '', 'company text skips project names');
 assert.equal(ids({ exact: 1 }), 'A'); assert.equal(ids({ umin: 100 }), 'A');
+// the filing card's People > Owner link: the filing's owner exactly (the 'dev' kind follows the developer first)
+const own = { id: 'D', county: 'Harris', type: 'New', cost: 3e6, owner: 'Hines Interests', dev: 'Acme Development', name: 'Mixed use' };
+fs.push(own);
+assert.equal(ids({ who: { k: 'own', v: 'hines interests' } }), 'AD', 'the owner link lists filings by owner, developer or not');
+assert.equal(ids({ who: { k: 'dev', v: 'hines interests' } }), 'A', 'the developer kind prefers the developer');
+assert.deepEqual(decode(encode({ who: { k: 'own', v: 'hines interests', label: 'Hines Interests' } })).who, { k: 'own', v: 'hines interests', label: 'Hines Interests' });
+assert.match(describe({ who: { k: 'own', v: 'x', label: 'Hines Interests' } }), /Owner: Hines Interests/);
+fs.pop();
 const spec = { st: ['Registered', 'Review complete'], sqmin: 5000, sqmax: 90000, co: 'hines', exact: 1, umin: 50 };
 assert.deepEqual(decode(encode(spec)), spec, 'new fields survive a link round trip');
+// a drawn box and a drawn shape come back as what they were (the link carries which), and links from before the names existed still read
+{ const ring = [[-95.7, 30.0], [-95.6, 30.0], [-95.6, 30.1], [-95.7, 30.1]];
+  assert.deepEqual(decode(encode({ sel: { k: 'p', ring, label: 'Box near Tomball', box: 1 } })).sel, { k: 'p', ring, label: 'Box near Tomball', box: 1 }, 'a box stays a box');
+  assert.deepEqual(decode(encode({ sel: { k: 'p', ring, label: 'Shape near Katy' } })).sel, { k: 'p', ring, label: 'Shape near Katy' }, 'a shape has no box mark');
+  assert.equal(decode('p=-95.7,30.0;-95.6,30.0;-95.6,30.1|Area selection').sel.box, 1, 'an older link\'s "Area selection" was a box');
+  assert.equal(decode('p=-95.7,30.0;-95.6,30.0;-95.6,30.1|Custom shape (3 points)').sel.box, undefined, 'an older shape stays a shape'); }
 assert.match(describe(spec), /5,000–90,000 sq ft.*50\+ units.*Company: “hines”.*Exact addresses only/);
 a = cleanFilterArgs({ sqft_min: 0, sqft_max: 5000, status: ['Registered', 'Review complete', 'Inspection complete', 'Closed'], company: ' ', exact_only: false, min_units: -1 });
 assert.deepEqual(a, { sqft_max: 5000 }, 'empty / all-status / false filters dropped');
@@ -234,7 +268,7 @@ console.log('assistant voice turns ok');
   assert.equal(names.size, TOOLS.length, 'tool names are unique');
   for (const [title, rules] of SECTIONS) { assert.ok(title && rules.length, 'section ' + title); for (const r of rules) assert.ok(r.length < 900, 'rule stays one readable line: ' + r.slice(0, 40)); }
   const p = systemPrompt({ coverage: 'x', filters: 'none', screen: 'View: map', followups: true });
-  assert.ok(p.includes(RULEBOOK) && /Pick the right tool:/.test(p) && /double square brackets/.test(p)); assert.ok(p.length < 12000, 'prompt stays bounded: ' + p.length);
+  assert.ok(p.includes(RULEBOOK) && /Pick the right tool:/.test(p) && /double square brackets/.test(p)); assert.ok(p.length < 12200, 'prompt stays bounded: ' + p.length); // 12,000 until Oct 2026; +200 for the development_activity rule
   assert.ok(!/double square brackets/.test(systemPrompt({})), 'no pills unless asked'); assert.match(VOICE_STYLE, /confirm what changed/);
   const c = { center: [-95.7, 30], zoom: 12, bearing: 170, pitch: 60, bounds: [-96, 29.8, -95.4, 30.2] };
   assert.equal(cameraMove(c, { action: 'zoom_out', amount: 'little' }).zoom, 11.3);
