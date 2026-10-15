@@ -5,6 +5,22 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 11:55 AM CT: Merged with the latest main; right-click menu fix (89b1a01, 1b6a1f9, 9f283be)
+- **Merged with everything else that landed today:**
+  - the development pipeline layers;
+  - Ask AI fixes;
+  - faster search, and a reload that keeps your place;
+  - site plan safety fixes;
+  - Market and Compare clarity;
+  - the Reports page;
+  - the free-map fallback when MapTiler is over its limit.
+
+  Nothing from either side was dropped.
+- **Back and Forward:** these step through your pages and the project you had open. Reloading still brings back the map view, the open property card, the site plan or the project.
+- **Site plan wording:** the map chip's button reads **Stop Editing** (or **Stop Measuring**, **Finish**), so **Done** in the panel is the only Done. The option button reads **+ Copy Option**, and out-of-date layouts say **Layouts out of date**.
+- **Site plans open on the free map:** a site plan now opens even when MapTiler refuses its key. Before, the plan wouldn't open at all.
+- **Right-click menu:** in a site plan it no longer disappears straight after it opens.
+
 ### 10:42 AM CT: The map keeps working when MapTiler is over its limit (1bddf09)
 - MapTiler (the Default, Streets, Satellite and Topo base maps, and part of search) ran out of its monthly quota and suspended the account, which left the map blank and address search empty.
 - Now, when MapTiler stops serving, the map switches by itself to the free OpenStreetMap map in the same style: a plain light or dark map for Default, a street map for Streets and Topo, ESRI imagery for Satellite. A note says so once, and Data sources shows which map is in use.
