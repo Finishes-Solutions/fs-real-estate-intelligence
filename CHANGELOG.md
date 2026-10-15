@@ -5,6 +5,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 6:26 PM CT: The AI plans the site before placing anything (4bb6db8)
+- **Thinking before placing.** On Medium, High and Ultra, the AI now thinks the site through before the layout engine places anything. Before, the effort levels mostly changed the review after the layouts were drawn. The plan covers:
+  - what goes at the front, in the middle and at the back, and why;
+  - where the ways in go;
+  - how the parking and the pond work;
+  - whether the building, parking and pond fit the acres.
+- **Ultra drafts three different plans** at the AI's deepest thinking, checks each, and picks one. If the model doesn't offer that level, it uses the next one down.
+- **The plan steers the build.** It sets the program and the layout settings, and the review judges each layout by whether it carries the plan out.
+- **Planned first:** a folded box under **Read as** shows the plan. Ultra's version also shows the plans it set aside and why it picked this one. **Ask** can explain the plan.
+- **Longer builds.** Builds take about a minute longer at each level, and Ultra about three to six minutes. The server's time limit for site plan AI calls went from 3 to 5 minutes.
+- **Not yet tested against the live AI:** the planning step was checked with the AI faked, so the quality of its plans hasn't been seen yet.
+
 ### 5:27 PM CT: AI effort levels, a one-click layout update, questions about a plan, and the Development mix view (b3d6460, a938129, 194c6e1, 15459bd)
 - **AI effort: Low, Medium, High and Ultra** replace Quick / AI-reviewed under Build, each saying what it does and about how long it takes.
   - Low: the AI reads the request, with no review.
