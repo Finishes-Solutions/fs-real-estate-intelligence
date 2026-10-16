@@ -5,6 +5,29 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 8:41 PM CT: Billed shows only this app's OpenAI key (2365d39)
+- **The Billed column now covers only the Real Estate Intelligence key**, never the OpenAI account's other keys or projects.
+  - The app finds its own key in your OpenAI projects using the read-only admin key.
+  - The note under the table names the key and the project.
+- **If OpenAI only bills the key's project as a whole** and that project has other keys too, the note says so. It then shows this key's own cost separately, from OpenAI's token counts for the key at list prices.
+- **If the key can't be found,** no billed amounts show, and the note explains why.
+
+### 8:06 PM CT: AI usage and cost in Settings (c41a7fa, 13faf6e)
+- **Settings › AI model › Usage:** a table of AI use for the chosen period: This month, Last 30 or 7 days, Today or This year.
+  - For each model it shows requests, tokens in, tokens out (including the model's reasoning) and estimated cost, then a total.
+  - A line under the table splits the cost by feature: site plans, Ask AI, filing briefs, place search and the nightly data.
+- **Counted from now on:** the app adds up every AI answer's token counts from tonight. Voice isn't counted, because it talks to OpenAI directly.
+- **Costs are estimates at OpenAI's list prices.** They come from public price listings, because OpenAI's own page couldn't be read from here.
+  - Models where the listings disagreed are marked with a *, and models with no known price show a dash.
+  - **Edit prices** corrects any of them on your device.
+- **Billed amounts:** with an OpenAI admin key on the server, a **Billed** column shows what OpenAI actually charged per model, voice included.
+- Behind the scenes, a new usage table in the database, readable and writable only by the server.
+
+### 7:30 PM CT: The AI model list only shows models that work (2a0e413)
+- **Settings › AI model now lists only models that work with every AI feature:** 25 of the 40 OpenAI models your key can use.
+  - Left out: the "pro" models, the ChatGPT "chat-latest" ones, the live voice model, GPT-4, GPT-4 Turbo and GPT-3.5. Picking one of these could have made a build fail.
+- **A picked model that can't answer a request no longer breaks it:** the server's default model answers instead, and Settings shows which model did.
+
 ### 7:04 PM CT: Pick the AI model in Settings (53c8cb8)
 - **Settings › AI model:** a new section to choose which AI answers.
   - **Provider:** OpenAI for now. Anthropic (Claude) is listed as coming later and can't be picked yet.

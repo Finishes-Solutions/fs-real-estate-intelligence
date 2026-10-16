@@ -4,6 +4,7 @@
 // Options shown elsewhere (the Layers panel's map display, the panel's headline metrics) stay where they are and are
 // linked from here. Nothing here deletes notes, projects or the team's sync queue.
 import { PROVIDERS, MODEL_KEY, pickedModel } from './lib/aimodels.mjs';
+import { summarize, priceOf, checkPrice, costOf, PRICES_AS_OF } from './lib/aiprices.mjs';
 const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help']];
 export const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
 const BASE_KEY = 'fs-basemap';
@@ -35,6 +36,61 @@ export function initSettings(ctx) {
   let models = null, modelsP = null, modelsErr = '';
   const loadModels = () => modelsP ||= fetch('api/models').then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'The model list isn’t available.'); models = d; })
     .catch(e => { modelsErr = e.message; modelsP = null; }).finally(() => paintSec('ai'));
+
+  // ---------- AI usage (Settings › AI model › Usage): tokens by model and feature, and the cost at list prices ----------
+  // The server keeps the counts (api/aiusage); prices can be corrected here (kept on this device), and with an OpenAI
+  // admin key on the server the billed amounts show beside the estimate
+  const PRICE_KEY = 'fs-ai-prices', PERIODS = [['month', 'This month'], ['30', 'Last 30 days'], ['7', 'Last 7 days'], ['today', 'Today'], ['year', 'This year']];
+  const usage = { period: 'month', data: {}, busy: {}, err: {} };
+  const prices = () => { try { const o = JSON.parse(localStorage.getItem(PRICE_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } };
+  const dayCT = (t = Date.now()) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  const rangeOf = per => { const to = dayCT(); return { to, from: per === 'month' ? to.slice(0, 8) + '01' : per === 'year' ? to.slice(0, 5) + '01-01' : per === 'today' ? to : dayCT(Date.now() - (+per - 1) * 864e5) }; };
+  const loadUsage = (per, force) => { if (usage.busy[per] || (usage.data[per] && !force)) return; usage.busy[per] = true; usage.err[per] = '';
+    const { from, to } = rangeOf(per); fetch('api/aiusage?' + new URLSearchParams({ from, to })).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Usage isn’t available here.'); usage.data[per] = d; })
+      .catch(e => { usage.err[per] = e.message; }).finally(() => { usage.busy[per] = false; paintSec('ai'); }); };
+  const tok = n => n >= 1e9 ? (n / 1e9).toFixed(2) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 1 : 2) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : String(n);
+  const usd = v => v == null ? '—' : v > 0 && v < 0.01 ? '<$0.01' : '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function usageHtml() {
+    const per = usage.period, d = usage.data[per]; if (!d && !usage.busy[per] && !usage.err[per]) loadUsage(per);
+    const sel = '<select class="chip" id="setUsePer" aria-label="Usage period">' + PERIODS.map(([v, l]) => '<option value="' + v + '"' + (v === per ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>';
+    let body = '';
+    if (!d) body = '<div class="set-note">' + (usage.err[per] ? esc(usage.err[per]) : 'Adding up the usage…') + '</div>';
+    else {
+      const S = summarize(d.rows || [], prices()), billed = new Map((d.billed?.byModel || []).map(x => [x.model, x.amount]));
+      const th = '<tr><th>Model</th><th title="Requests">Req</th><th title="Tokens sent (cached ones included)">In</th><th title="Tokens back, the model’s reasoning included">Out</th><th title="Estimated at list prices">Cost</th>' + (d.billed ? '<th title="What OpenAI billed">Billed</th>' : '') + '</tr>';
+      const tr = (r, model) => '<tr><td>' + esc(r.label) + (model && checkPrice(model) && !prices()[model] ? '<sup title="Price sources disagreed: check it under Edit prices">*</sup>' : '') + (model && !priceOf(model, prices()) ? '<sup title="No price known: set one under Edit prices">?</sup>' : '') + '</td><td>' + r.requests.toLocaleString('en-US') + '</td><td>' + tok(r.input) + '</td><td' + (r.reasoning ? ' title="' + tok(r.reasoning) + ' of it reasoning"' : '') + '>' + tok(r.output) + '</td><td>' + usd(r.cost) + (r.priced === false && r.cost ? '+' : '') + '</td>' + (d.billed ? '<td>' + usd(model ? billed.get(model) ?? 0 : d.billed.total) + '</td>' : '') + '</tr>';
+      const rows = S.byModel.map(r => tr(r, r.key)).join(''), total = S.byModel.length > 1 ? tr({ ...S.total, label: 'Total', priced: S.byModel.every(r => r.priced) }, null).replace('<tr>', '<tr class="tot">') : '';
+      const extra = d.billed ? [...billed].filter(([m]) => !S.byModel.some(r => r.key === m)).map(([m, v]) => '<tr class="dim"><td>' + esc(m) + '</td><td colspan="4">' + (d.billed.scope === 'key' ? 'this key, outside the counted features (voice)' : 'billed to the project, not counted here (voice, or its other keys)') + '</td><td>' + usd(v) + '</td></tr>').join('') : '';
+      body = (S.byModel.length || extra ? '<div class="set-ut-w"><table class="set-ut">' + th + rows + extra + total + '</table></div>' : '<div class="set-note">No AI usage recorded ' + (per === 'today' ? 'today' : 'in this period') + '.</div>') +
+        (S.byFeature.length ? '<div class="set-uf">' + S.byFeature.map(f => '<span><b>' + esc(f.label) + '</b> ' + usd(f.cost) + (f.priced === false && f.cost ? '+' : '') + ' · ' + f.requests.toLocaleString('en-US') + ' req</span>').join('') + '</div>' : '') +
+        '<div class="set-note">' + (S.total.reasoning ? 'Out includes ' + tok(S.total.reasoning) + ' tokens of the model’s reasoning (billed as output). ' : '') + (d.tracking ? 'Counted by the app from OpenAI’s token figures (from Oct 16, 2026). ' : esc(d.trackError || 'Usage counting needs the database on the server.') + ' ') +
+          'Costs are estimates at OpenAI’s list prices (as of ' + new Date(PRICES_AS_OF + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '; * means the published figures disagreed). ' +
+          (d.billed ? billedNote(d.billed) : d.billedError ? esc(d.billedError) : 'For what OpenAI billed for this app’s key, add a read-only OpenAI admin key to the server (OPENAI_ADMIN_KEY).') + '</div>';
+      const models = [...new Set([...S.byModel.map(r => r.key), ...(models0())])].slice(0, 30), P = prices();
+      body += '<details class="set-prices"><summary>Edit prices</summary><p class="set-hint">USD per 1M tokens: input, cached input, output. Kept on this device; blank uses the list price.</p><table class="set-pt"><tr><th>Model</th><th>Input</th><th>Cached</th><th>Output</th></tr>' +
+        models.map(m => { const lp = priceOf(m, {}) || [], o = P[m] || []; const f = (i, ph) => '<input type="number" min="0" step="0.001" inputmode="decimal" data-pm="' + esc(m) + '" data-pi="' + i + '" value="' + (o[i] ?? '') + '" placeholder="' + (ph ?? '') + '" aria-label="' + esc(m) + ' ' + ['input', 'cached input', 'output'][i] + ' price">';
+          return '<tr><td>' + esc(m) + (checkPrice(m) ? '<sup>*</sup>' : '') + '</td><td>' + f(0, lp[0]) + '</td><td>' + f(1, lp[1]) + '</td><td>' + f(2, lp[2]) + '</td></tr>'; }).join('') + '</table>' +
+        '<div class="set-pa"><button type="button" class="btn sm" id="setPriceReset">Use list prices</button></div></details>';
+    }
+    return '<div class="set-usage"><div class="set-uh"><span class="set-l">Usage</span>' + sel + '<button type="button" class="btn sm ghost" id="setUseRe" title="Refresh">Refresh</button></div>' + body + '</div>';
+  }
+  const models0 = () => (models?.models || []).map(m => m.id).slice(0, 12);
+  // whose bill Billed is: this app's own key (never the rest of the organization's keys and projects)
+  function billedNote(b) {
+    const proj = b.project?.name ? '“' + esc(b.project.name) + '”' : 'its project', key = b.key?.name ? '“' + esc(b.key.name) + '”' : 'this app’s key';
+    if (b.scope === 'key') return 'Billed is what OpenAI charged for ' + key + ' (in ' + proj + ') over these days; the organization’s other keys aren’t included.';
+    if ((b.project?.keys || 0) <= 1) return 'Billed is what OpenAI charged for ' + proj + ', which holds only ' + key + '.';
+    const own = (b.keyTokens || []).reduce((t, r) => { const c = costOf(r.model, r, prices()); return c == null ? t : t + c; }, 0), n = (b.keyTokens || []).reduce((t, r) => t + r.requests, 0);
+    return 'OpenAI bills ' + proj + ' as a whole and it has ' + b.project.keys + ' keys, so Billed includes the others. ' + key + ' alone: about ' + usd(own) + ' (' + n.toLocaleString('en-US') + ' requests, OpenAI’s token counts for the key at list prices). Moving this app’s key to a project of its own makes Billed exact.';
+  }
+  function wireUsage(el) {
+    const per = el.querySelector('#setUsePer'); if (per) per.onchange = e => { usage.period = e.target.value; paintSec('ai'); };
+    const re = el.querySelector('#setUseRe'); if (re) re.onclick = () => { loadUsage(usage.period, true); paintSec('ai'); };
+    el.querySelectorAll('[data-pm]').forEach(inp => inp.onchange = () => { const P = prices(), m = inp.dataset.pm, i = +inp.dataset.pi, cur = (P[m] || priceOf(m, {}) || [null, null, null]).slice(0, 3);
+      cur[i] = inp.value === '' ? (priceOf(m, {}) || [])[i] ?? null : +inp.value; P[m] = cur; if (cur.every((v, k) => v === ((priceOf(m, {}) || [])[k] ?? null))) delete P[m];
+      try { localStorage.setItem(PRICE_KEY, JSON.stringify(P)); } catch (e) {} const open = el.querySelector('.set-prices')?.open; paintSec('ai'); if (open) { const dd = secEl('ai').querySelector('.set-prices'); if (dd) dd.open = true; } });
+    const rs = el.querySelector('#setPriceReset'); if (rs) rs.onclick = () => { try { localStorage.removeItem(PRICE_KEY); } catch (e) {} paintSec('ai'); ctx.toast('Prices back to the list prices.'); };
+  }
 
   // ---------- voice log (also linked from Data & help) ----------
   ctx.saveVoiceLog = () => {
@@ -87,7 +143,8 @@ export function initSettings(ctx) {
         row('Model', '<select class="chip" id="setModel" aria-label="AI model">' + opts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
           'For site plans, Ask AI and filing briefs. Kept on this device.') +
         '<div class="set-note" id="setModelNote">' + (modelsP && !models ? 'Checking which models the server’s OpenAI key can use…' : modelsErr && !models ? esc(modelsErr) + ' The server’s default model answers.' : models ? list.length + ' OpenAI chat models available, newest first.' : '') +
-          (last ? ' The last answer came from <b>' + esc(last) + '</b>.' : '') + ' Voice and place search keep their own models. ' + esc(PROVIDERS.find(p => !p.on)?.note || '') + '</div>';
+          (last ? ' The last answer came from <b>' + esc(last) + '</b>.' : '') + ' Voice and place search keep their own models. ' + esc(PROVIDERS.find(p => !p.on)?.note || '') + '</div>' + usageHtml();
+      wireUsage(el);
       el.querySelector('#setModel').onchange = e => { try { if (e.target.value) localStorage.setItem(MODEL_KEY, e.target.value); else localStorage.removeItem(MODEL_KEY); } catch (err) {} ctx.toast(e.target.value ? 'The AI will use ' + e.target.value + ' on this device.' : 'The AI will use the server’s default model' + (def ? ' (' + def + ')' : '') + '.'); };
     },
     saved(el) {

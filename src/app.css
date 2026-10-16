@@ -2322,6 +2322,30 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .set-rc .set-hint{text-align:right}
 .set-ok{font-size:13px;font-weight:600;color:var(--brand)}
 .set-note{font-size:12.5px;line-height:1.45;color:var(--text-2);background:var(--panel-2);border-radius:var(--r-sm);padding:9px 11px}
+.set-usage{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.set-uh{display:flex;align-items:center;gap:8px}
+.set-uh .set-l{margin-right:auto}
+.set-ut-w{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-sm)}
+.set-ut{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.set-ut th{font:500 10.5px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:right;padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.set-ut td{text-align:right;padding:6px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.set-ut th:first-child,.set-ut td:first-child{text-align:left}
+.set-ut tr:last-child td{border-bottom:0}
+.set-ut tr.tot td{font-weight:600;background:var(--panel-2)}
+.set-ut tr.dim td{color:var(--muted)}
+.set-ut td[colspan]{white-space:normal;text-align:left}
+.set-ut sup{color:var(--muted);margin-left:2px}
+.set-ut-r{color:var(--muted);font-size:11px}
+.set-uf{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--text-2)}
+.set-uf b{font-weight:600;color:var(--text)}
+.set-prices>summary{cursor:var(--cur-pointer,pointer);font-size:12.5px;font-weight:600;color:var(--brand)}
+.set-prices .set-hint{margin:6px 0}
+.set-pt{width:100%;border-collapse:collapse;font-size:12px}
+.set-pt th{font:500 10.5px var(--font-mono);text-transform:uppercase;color:var(--muted);text-align:left;padding:4px}
+.set-pt td{padding:3px 4px}
+.set-pt td:first-child{white-space:nowrap;padding-right:8px}
+.set-pt input{width:100%;min-width:56px;font:inherit;padding:4px 6px;border:1px solid var(--line-2);border-radius:6px;background:var(--panel)}
+.set-pa{margin-top:6px;display:flex;justify-content:flex-end}
 .set-note.warn{color:var(--text);box-shadow:inset 3px 0 0 var(--warn)}
 .set-note.err{color:var(--danger)}
 .setsheet .seg{grid-template-columns:repeat(3,auto);border-radius:var(--r-sm)}

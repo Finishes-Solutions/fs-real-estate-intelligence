@@ -113,6 +113,9 @@
     "api/models.js": {
       "maxDuration": 15
     },
+    "api/aiusage.js": {
+      "maxDuration": 30
+    },
     "api/projects.js": {
       "maxDuration": 20
     }

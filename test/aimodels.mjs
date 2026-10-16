@@ -10,6 +10,10 @@ const list = [{ id: 'gpt-6-luna', created: 300 }, { id: 'gpt-5-mini', created: 2
   { id: 'gpt-4o-search-preview', created: 40 }, { id: 'omni-moderation-latest', created: 30 }, { id: 'gpt-image-1', created: 20 }, { id: 'gpt-4o-transcribe', created: 10 }, { id: 'codex-mini-latest', created: 5 }];
 assert.deepEqual(A.chatModels(list).map(m => m.id), ['gpt-6-luna', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini'], 'chat models only, newest first: no speech, images, embeddings, search, moderation, code-only or dated snapshots');
 assert.deepEqual(A.chatModels(null), []);
+// the production key's list (Oct 16): the ones every feature works with, and not the -pro, -chat-latest, live or old ones
+const prod = ['gpt-6.1-sol', 'gpt-6-luna', 'gpt-6-sol', 'gpt-live-1', 'gpt-6-astra', 'gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-5.5-pro', 'gpt-5.5', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4', 'gpt-5.4-pro', 'gpt-5.3-chat-latest', 'gpt-5.2-chat-latest', 'gpt-5.2-pro', 'gpt-5.2', 'gpt-5.1', 'gpt-5.1-chat-latest', 'gpt-5-pro', 'gpt-5-nano', 'gpt-5-mini', 'gpt-5', 'gpt-5-chat-latest', 'o3-pro', 'gpt-4.1-nano', 'gpt-4.1-mini', 'gpt-4.1', 'o4-mini', 'o3', 'o1-pro', 'o3-mini', 'o1', 'gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo-16k', 'gpt-3.5-turbo'];
+assert.deepEqual(A.chatModels(prod.map((id, i) => ({ id, created: 1000 - i }))).map(m => m.id), ['gpt-6.1-sol', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6-astra', 'gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-5.5', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4', 'gpt-5.2', 'gpt-5.1', 'gpt-5-nano', 'gpt-5-mini', 'gpt-5', 'gpt-4.1-nano', 'gpt-4.1-mini', 'gpt-4.1', 'o4-mini', 'o3', 'o3-mini', 'o1', 'gpt-4o-mini', 'gpt-4o']);
+assert.equal(A.pickedModel('gpt-5.5-pro'), '', 'a -pro model picked before: the default');
 assert.equal(A.providerOf('claude-opus-5-5'), 'anthropic'); assert.equal(A.providerOf('gpt-5-mini'), 'openai'); assert.equal(A.providerOf('llama-3'), null);
 assert.equal(A.isChatModel('claude-opus-5-5'), false, 'an Anthropic model isn’t sent to OpenAI');
 assert.equal(A.pickedModel(' gpt-5-mini '), 'gpt-5-mini'); assert.equal(A.pickedModel('rm -rf /'), ''); assert.equal(A.pickedModel(null), ''); assert.equal(A.pickedModel('gpt-4o-mini-tts'), '', 'a speech model: the default');
@@ -44,4 +48,15 @@ res = await call({ mode: 'ask', question: 'Why?', plan: facts }); assert.equal(s
 const { default: models } = await import('../api/models.js');
 const mr = mock(); await models({ method: 'GET', headers: { 'x-forwarded-for': '9.9.8.1' } }, mr);
 assert.equal(mr.code, 200); assert.equal(mr.body.default, 'gpt-6-luna'); assert.deepEqual(mr.body.models.map(m => m.id), ['gpt-6-luna', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini']); assert.equal(mr.body.providers[1].on, false);
+// a picked model that can't serve the call (OpenAI 400): made again with the default, and the header says so
+{ let tries = []; globalThis.fetch = async (url, opts = {}) => {
+    if (String(url).endsWith('/models')) return Response.json({ data: list });
+    if (String(url).includes('/models/')) return Response.json({ id: 'gpt-6-luna' });
+    const b = JSON.parse(opts.body); tries.push(b.model);
+    if (b.model === 'o4-mini') return Response.json({ error: { message: "This model doesn't support that input." } }, { status: 400 });
+    return Response.json({ choices: [{ message: { content: JSON.stringify({ answer: 'ok', followups: [] }) } }] }); };
+  const r = await call({ mode: 'ask', question: 'Why?', plan: facts, model: 'o4-mini' });
+  assert.equal(r.code, 200, JSON.stringify(r.body)); assert.deepEqual(tries, ['o4-mini', 'gpt-6-luna'], 'tried, then the default'); assert.equal(r.headers['X-AI-Model'], 'gpt-6-luna');
+  tries = []; globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('/models')) return Response.json(String(url).endsWith('/models') ? { data: list } : { id: 'gpt-6-luna' }); tries.push(JSON.parse(opts.body).model); return Response.json({ error: { message: 'bad' } }, { status: 400 }); };
+  const r2 = await call({ mode: 'ask', question: 'Why?', plan: facts }); assert.equal(r2.code, 502); assert.deepEqual(tries, ['gpt-6-luna'], 'the default failing isn’t tried twice'); }
 console.log('ai models ok');

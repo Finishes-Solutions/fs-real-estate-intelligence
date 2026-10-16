@@ -36,7 +36,7 @@ export async function enrich(rows, cache, { onSave } = {}) {
   await pool(chunks, +(process.env.AI_CONCURRENCY || 6), async ch => {
     try {
       const { data, usage } = proxy ? await viaProxy(ch.map(inputOf))
-        : await chatJSON({ key, model, system: SYSTEM, user: JSON.stringify(ch.map(inputOf)), name: 'filings', schema: SCHEMA, maxTokens: 24000 });
+        : await chatJSON({ key, model, feature: 'pipeline', system: SYSTEM, user: JSON.stringify(ch.map(inputOf)), name: 'filings', schema: SCHEMA, maxTokens: 24000 });
       tin += usage?.prompt_tokens || 0; tout += usage?.completion_tokens || 0;
       const byId = Object.fromEntries((data.items || []).map(x => [x.id, x]));
       const got = {};
