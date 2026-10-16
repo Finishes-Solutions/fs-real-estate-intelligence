@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 8:59 PM CT: AI usage shows one row per model, and says why some charges aren't counted (05184b1)
+- **One row per model:** the Billed column grouped OpenAI's charges by its line-item names, so voice showed up as separate "text" and "audio" rows. Each model now has one row.
+- **Charges the app doesn't count itself now say why:**
+  - voice, which talks to OpenAI directly;
+  - web search fees, which are charged per search rather than per token;
+  - use from before the app began counting on October 16.
+- **The total row always shows the billed total.**
+- First live reading for the Real Estate Intelligence key: $14.74 billed so far this month, $9.77 of it voice.
+
 ### 8:41 PM CT: Billed shows only this app's OpenAI key (2365d39)
 - **The Billed column now covers only the Real Estate Intelligence key**, never the OpenAI account's other keys or projects.
   - The app finds its own key in your OpenAI projects using the read-only admin key.
