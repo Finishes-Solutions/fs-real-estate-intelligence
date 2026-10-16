@@ -3,6 +3,11 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-16
+
+### 9:12 AM CT: No more "Cannot find name 'Deno'" in the Vercel build (2e6f1d1)
+- **Behind the scenes:** Vercel's build skips the Supabase folder. The Supabase edge function there runs on Supabase, not Vercel, and every build was reporting three false TypeScript errors about it. The build always passed, and nothing on the site changes.
+
 ## 2026-10-15
 
 ### 8:59 PM CT: AI usage shows one row per model, and says why some charges aren't counted (05184b1)
