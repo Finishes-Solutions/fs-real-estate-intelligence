@@ -3,6 +3,7 @@
 // POST { query, near? } -> { answer, sources: [{ title, url }] }
 // POST { mode: 'locate', query } -> { name, within, address, city, lat, lon, sources }: where a place is, for the map when
 //   OpenStreetMap doesn't know it by the words used ("Terminal B at George Bush airport"); the app checks it against the map.
+import { recordUsage } from '../lib/aiusage.mjs';
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
 
 const MODELS = [process.env.OPENAI_SEARCH_MODEL, 'gpt-5-mini', 'gpt-4.1-mini'].filter(Boolean);
@@ -45,6 +46,7 @@ export async function webSearch(key, query, near, local = true, instructions) {
           input: query + (near ? ' (context: ' + near + ')' : '') })
       });
       const d = await r.json().catch(() => ({}));
+      if (r.ok) await recordUsage(d.model || model, d.usage, 'search');
       if (r.ok) { const out = parseSearch(d); if (out.answer) return out; last = 'empty answer'; break; }
       last = d.error?.message || 'HTTP ' + r.status;
       if (r.status === 401) throw new Error('OpenAI rejected the API key');

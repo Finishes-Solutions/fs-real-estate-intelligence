@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   const ctx = body.context || {};
   try {
     // Settings › AI model, when the key can use it (and the default if it can't serve the call)
-    const r = await withModel(key, typeof body.model === 'string' ? body.model : null, () => model(key), m => respond({ key, model: m, tools: responseTools(), input, previousResponseId: prev, maxTokens: 8000,
+    const r = await withModel(key, typeof body.model === 'string' ? body.model : null, () => model(key), m => respond({ key, model: m, feature: 'chat', tools: responseTools(), input, previousResponseId: prev, maxTokens: 8000,
       effort: process.env.OPENAI_CHAT_REASONING_EFFORT || undefined,
       instructions: systemPrompt({ coverage: clip(ctx.coverage, 600), filters: clip(ctx.filters, 400), screen: clip(ctx.screen, 2500), followups: true }) }), m => res.setHeader?.('X-AI-Model', m));
     return res.json({ id: r.id, text: r.text, calls: r.calls.filter(c => NAMES.has(c.name)) });

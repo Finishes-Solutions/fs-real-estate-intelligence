@@ -192,7 +192,7 @@ async function strategy(b, key, res) {
   const count = +b.count === 3 ? 3 : 1;
   const user = siteText(b.site, prompt, b.program, b.facts).replace(/}$/, ',"asked":' + JSON.stringify(count === 3 ? 'three different strategies, then pick one' : 'one strategy') + '}');
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, system: STRATEGY_SYSTEM, user, name: 'site_strategy', schema: STRATEGY_SCHEMA, maxTokens: count === 3 ? 32000 : 16000, effort: effortIn(b.effort, 'high') }));
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: STRATEGY_SYSTEM, user, name: 'site_strategy', schema: STRATEGY_SCHEMA, maxTokens: count === 3 ? 32000 : 16000, effort: effortIn(b.effort, 'high') }));
     const d = r.data, strategies = (Array.isArray(d.strategies) ? d.strategies : []).slice(0, count).map(strategyFrom).filter(x => x.concept || x.placement.length);
     if (!strategies.length) throw new Error('no strategy');
     const pick = Number.isInteger(d.pick) && d.pick >= 0 && d.pick < strategies.length ? d.pick : 0;
@@ -216,7 +216,7 @@ export default async function handler(req, res) {
   if (b.mode === 'strategy') return strategy(b, key, res);
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, system: SYSTEM, user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy)), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: effortIn(b.effort, 'high') })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: SYSTEM, user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy)), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: effortIn(b.effort, 'high') })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
     const d = r.data, sb = Object.fromEntries(Object.entries(d.setbacks || {}).filter(([, v]) => v != null && v >= 0 && v <= 300)), program = programFrom(d, prompt);
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ program, setbacks: { ...SETBACKS, ...sb }, summary: clip(d.summary, 400), assumptions: (d.assumptions || []).slice(0, 4).map(a => clip(a, 200)) });
@@ -237,7 +237,7 @@ async function review(b, key, res) {
     options: opts.map((o, i) => ({ option: i, name: clip(o.name, 120), drawing: images[i] ? 'image ' + (images.slice(0, i + 1).filter(Boolean).length) : 'none', metrics: Object.fromEntries(Object.entries(o.metrics || {}).slice(0, 16).map(([k, v]) => [clip(k, 30), num(v)])),
       issues: (o.issues || []).slice(0, 8).map(t => clip(t, 160)), notes: (o.notes || []).slice(0, 6).map(t => clip(t, 240)) })) });
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, system: REVIEW_SYSTEM, user: text, name: 'site_review', schema: REVIEW_SCHEMA, maxTokens: 20000, effort: effortIn(b.effort, 'high'), images: images.filter(Boolean) }));
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: REVIEW_SYSTEM, user: text, name: 'site_review', schema: REVIEW_SCHEMA, maxTokens: 20000, effort: effortIn(b.effort, 'high'), images: images.filter(Boolean) }));
     const d = r.data, n = opts.length, ok = i => Number.isInteger(i) && i >= 0 && i < n;
     const ranking = [...new Set((d.ranking || []).filter(ok))]; for (let i = 0; i < n; i++) if (!ranking.includes(i)) ranking.push(i);
     const reviews = (d.reviews || []).filter(x => ok(x.option)).map(x => ({ option: x.option, score: Math.max(0, Math.min(100, Math.round(+x.score || 0))), verdict: clip(x.verdict, 300), strengths: (x.strengths || []).slice(0, 3).map(t => clip(t, 200)), problems: (x.problems || []).slice(0, 4).map(t => clip(t, 220)) }));
@@ -257,7 +257,7 @@ async function bestUse(b, key, res) {
   const nearby = Object.fromEntries(Object.entries(b.nearby && typeof b.nearby === 'object' ? b.nearby : {}).slice(0, 14).map(([k, v]) => [clip(k, 30), (Array.isArray(v) ? v : []).slice(0, 4).map(x => ({ name: clip(x?.name, 80), miles: num(x?.miles) }))]));
   const market = Object.fromEntries(Object.entries(b.market && typeof b.market === 'object' ? b.market : {}).slice(0, 12).map(([k, v]) => [clip(k, 40), typeof v === 'number' ? v : clip(v, 160)]));
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, system: BESTUSE_SYSTEM, user: JSON.stringify({ goal: s.request || null, site: s.site, nearby, market }), name: 'site_best_use', schema: BESTUSE_SCHEMA, maxTokens: 16000, effort: 'high' }));
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: BESTUSE_SYSTEM, user: JSON.stringify({ goal: s.request || null, site: s.site, nearby, market }), name: 'site_best_use', schema: BESTUSE_SCHEMA, maxTokens: 16000, effort: 'high' }));
     const d = r.data, ideas = (d.ideas || []).slice(0, 5).map(x => ({ title: clip(x.title, 120), use: USES[x.use] ? x.use : 'other', fit: Math.max(0, Math.min(100, Math.round(+x.fit || 0))), why: clip(x.why, 600), risks: (x.risks || []).slice(0, 3).map(t => clip(t, 200)), request: clip(x.request, 400) })).filter(x => x.request);
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ ideas, summary: clip(d.summary, 500) });
@@ -315,7 +315,7 @@ async function edit(b, key, res) {
   const ids = new Set(pieces.map(p => p.id)), image = typeof b.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(b.image) && b.image.length < 600000 ? b.image : null;
   const text = JSON.stringify({ request: prompt, site: { ...JSON.parse(siteText(b.site, '', null, null)).site, ...(plan.site || {}) }, totals: plan.totals || null, parking: plan.parking || null, houses: plan.houses ? clip(plan.houses, 80) : undefined, places: placesIn(plan.places), selected: pieces.find(p => p.selected)?.id || null, pieces }) + '\n\nBuilding library (type id = name):\n' + catalogText();
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, system: EDIT_SYSTEM, user: text, name: 'site_edit', schema: EDIT_SCHEMA, maxTokens: 16000, effort: 'high', images: image ? [image] : [] }));
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: EDIT_SYSTEM, user: text, name: 'site_edit', schema: EDIT_SCHEMA, maxTokens: 16000, effort: 'high', images: image ? [image] : [] }));
     const d = r.data, kinds = new Set(['building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio', 'entrance']);
     const ops = (d.ops || []).slice(0, 30).filter(o => ['change', 'remove', 'add', 'move', 'swap'].includes(o.action) && (o.action === 'add' || ids.has(o.target)) && (o.action !== 'swap' || ids.has(o.with))).map(o => ({
       action: o.action, target: ids.has(o.target) ? o.target : null, with: ids.has(o.with) ? o.with : null, type: o.type && typeById(o.type) ? o.type : null, kind: kinds.has(o.kind) ? o.kind : null, use: USES[o.use] ? o.use : null, name: o.name ? clip(o.name, 60) : null,
@@ -361,7 +361,7 @@ async function ask(b, key, res) {
   const history = (Array.isArray(b.history) ? b.history : []).slice(-6).map(t => ({ q: clip(t?.q, 600), a: clip(t?.a, 1500) })).filter(t => t.q && t.a);
   const user = 'Fact sheet for the plan on the screen:\n' + facts + (history.length ? '\n\nEarlier in this conversation:\n' + history.map(t => 'Q: ' + t.q + '\nA: ' + t.a).join('\n\n') : '') + '\n\nQuestion: ' + question;
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, system: ASK_SYSTEM, user, name: 'plan_answer', schema: ASK_SCHEMA, maxTokens: 12000, effort: effortIn(b.effort, 'medium') }));
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: ASK_SYSTEM, user, name: 'plan_answer', schema: ASK_SCHEMA, maxTokens: 12000, effort: effortIn(b.effort, 'medium') }));
     const d = r.data, answer = clip(d.answer, 2400).trim();
     if (!answer) throw new Error('empty answer');
     res.setHeader('Cache-Control', 'no-store');

@@ -54,7 +54,7 @@ export default async function handler(req, res) {
 Use ONLY the facts provided (a Texas TDLR TABS accessibility registration plus derived context). Values and dates are filer estimates; inferred dates are our own estimates and must be called "estimated".
 Format exactly these sections as plain text with the heading on its own line: What it is / Timing / Who's involved / Area context / Why it matters. 2-3 sentences each, under 220 words total. If a fact is missing, say so briefly rather than guessing. Cite related filings by id in square brackets.`;
     // Settings › AI model (its own cache entry by URL), and the default if it can't serve the call
-    const text = await withModel(key, typeof req.query.model === 'string' ? req.query.model : null, () => model(key), m => chatText({ key, model: m, system, user: JSON.stringify(facts), maxTokens: 8000 }), m => res.setHeader?.('X-AI-Model', m));
+    const text = await withModel(key, typeof req.query.model === 'string' ? req.query.model : null, () => model(key), m => chatText({ key, model: m, feature: 'brief', system, user: JSON.stringify(facts), maxTokens: 8000 }), m => res.setHeader?.('X-AI-Model', m));
     res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
     return res.json({ brief: text, built: data.built });
   } catch (e) {

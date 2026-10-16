@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const items = Array.isArray(body.items) ? body.items.slice(0, CHUNK + 5) : [];
   if (!items.length) return res.status(400).json({ error: 'items required' });
   try {
-    const r = await chatJSON({ key, model: await model(key), system: SYSTEM, user: JSON.stringify(items).slice(0, 60000), name: 'filings', schema: SCHEMA, maxTokens: 24000 });
+    const r = await chatJSON({ key, model: await model(key), feature: 'pipeline', system: SYSTEM, user: JSON.stringify(items).slice(0, 60000), name: 'filings', schema: SCHEMA, maxTokens: 24000 });
     return res.json({ data: r.data, usage: r.usage });
   } catch (e) {
     console.error('pipeline-ai failed', e.message);
