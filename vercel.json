@@ -110,6 +110,9 @@
     "api/siteplan.js": {
       "maxDuration": 300
     },
+    "api/models.js": {
+      "maxDuration": 15
+    },
     "api/projects.js": {
       "maxDuration": 20
     }

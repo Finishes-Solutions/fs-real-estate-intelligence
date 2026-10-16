@@ -2316,7 +2316,7 @@ export function initSitePlan(ctx) {
   }
   const effOn = id => { const e = id && ASK.EFFORTS.find(x => x.id === id); return e ? ' <span class="sp-effon' + (e.id === 'ultra' ? ' u' : '') + '" title="How hard the AI worked on it">' + (e.id === 'ultra' ? SPARK : '') + e.label + '</span>' : ''; };
   const factsFor = pl => (ed.facts?.id === pl.id + ':' + pl.ring.length ? ed.facts.p : (ed.facts = { id: pl.id + ':' + pl.ring.length, p: siteFacts(pl).catch(() => []) }).p); // flood, roads, districts, utilities: asked once per site
-  const post = async (body, signal) => { const r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal }); const d = await r.json().catch(() => ({})); if (!r.ok) { const e = Object.assign(new Error(d.error || 'AI unavailable'), { status: r.status }); aiSaw(e); throw e; } ctx.spAiOff = 0; return d; };
+  const post = async (body, signal) => { const md = ctx.aiModel?.(), r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(md ? { ...body, model: md } : body), signal }); ctx.noteModel?.(r); const d = await r.json().catch(() => ({})); if (!r.ok) { const e = Object.assign(new Error(d.error || 'AI unavailable'), { status: r.status }); aiSaw(e); throw e; } ctx.spAiOff = 0; return d; };
   // an option as the AI sees it: the plan drawing as a picture, its numbers and what the checks found
   async function planImage(plan) {
     const svg = planSVG(plan, { px: 1000 }).svg, img = new Image();
