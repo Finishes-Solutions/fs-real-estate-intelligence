@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 8:41 PM CT: Billed shows only this app's OpenAI key (2365d39)
+- **The Billed column now covers only the Real Estate Intelligence key**, never the OpenAI account's other keys or projects.
+  - The app finds its own key in your OpenAI projects using the read-only admin key.
+  - The note under the table names the key and the project.
+- **If OpenAI only bills the key's project as a whole** and that project has other keys too, the note says so. It then shows this key's own cost separately, from OpenAI's token counts for the key at list prices.
+- **If the key can't be found,** no billed amounts show, and the note explains why.
+
 ### 8:06 PM CT: AI usage and cost in Settings (c41a7fa, 13faf6e)
 - **Settings › AI model › Usage:** a table of AI use for the chosen period: This month, Last 30 or 7 days, Today or This year.
   - For each model it shows requests, tokens in, tokens out (including the model's reasoning) and estimated cost, then a total.
