@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 7:30 PM CT: The AI model list only shows models that work (2a0e413)
+- **Settings › AI model now lists only models that work with every AI feature:** 25 of the 40 OpenAI models your key can use.
+  - Left out: the "pro" models, the ChatGPT "chat-latest" ones, the live voice model, GPT-4, GPT-4 Turbo and GPT-3.5. Picking one of these could have made a build fail.
+- **A picked model that can't answer a request no longer breaks it:** the server's default model answers instead, and Settings shows which model did.
+
 ### 7:04 PM CT: Pick the AI model in Settings (53c8cb8)
 - **Settings › AI model:** a new section to choose which AI answers.
   - **Provider:** OpenAI for now. Anthropic (Claude) is listed as coming later and can't be picked yet.
