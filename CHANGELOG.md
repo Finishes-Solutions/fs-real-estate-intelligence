@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
-### 8:06 PM CT: AI usage and cost in Settings (c41a7fa)
+### 8:06 PM CT: AI usage and cost in Settings (c41a7fa, 13faf6e)
 - **Settings › AI model › Usage:** a table of AI use for the chosen period: This month, Last 30 or 7 days, Today or This year.
   - For each model it shows requests, tokens in, tokens out (including the model's reasoning) and estimated cost, then a total.
   - A line under the table splits the cost by feature: site plans, Ask AI, filing briefs, place search and the nightly data.
