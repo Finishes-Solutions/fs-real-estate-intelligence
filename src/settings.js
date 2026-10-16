@@ -1,9 +1,10 @@
 // Settings: one sheet for everything you set once and forget. The app-bar gear, the phone's More › Settings and
 // Explore gear, ⌘, / Ctrl+, and ctx.openSettings(section) all open it. Desktop: a 420px sheet on the right over a scrim;
-// phones: full screen. Sections: You & your team · Map · Saved on this device · App · Help. (The app is light only.)
+// phones: full screen. Sections: You & your team · Map · AI model · Saved on this device · App · Help. (The app is light only.)
 // Options shown elsewhere (the Layers panel's map display, the panel's headline metrics) stay where they are and are
 // linked from here. Nothing here deletes notes, projects or the team's sync queue.
-const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help']];
+import { PROVIDERS, MODEL_KEY, pickedModel } from './lib/aimodels.mjs';
+const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help']];
 export const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
 const BASE_KEY = 'fs-basemap';
 // Reset layout clears only these (never localStorage.clear()): panel open/closed and width, assistant width, which
@@ -26,6 +27,14 @@ export function initSettings(ctx) {
     get available() { return !!installEvt; },
     async prompt() { if (!installEvt) return false; const e = installEvt; installEvt = null; e.prompt(); const r = await e.userChoice.catch(() => null); if (r?.outcome === 'accepted') installed = true; paintSec('app'); return r?.outcome === 'accepted'; }
   };
+
+  // ---------- the AI model (Settings › AI model): picked on this device, sent with each AI request ----------
+  // The server uses it only when its key can (else its default), and says which model answered (X-AI-Model)
+  ctx.aiModel = () => pickedModel(get(MODEL_KEY) || '');
+  ctx.noteModel = r => { const m = r?.headers?.get?.('X-AI-Model'); if (m && /^[\w.:-]{1,80}$/.test(m)) { try { localStorage.setItem('fs-ai-last', m); } catch (e) {} if (!sheet.hidden) paintSec('ai'); } };
+  let models = null, modelsP = null, modelsErr = '';
+  const loadModels = () => modelsP ||= fetch('api/models').then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'The model list isn’t available.'); models = d; })
+    .catch(e => { modelsErr = e.message; modelsP = null; }).finally(() => paintSec('ai'));
 
   // ---------- voice log (also linked from Data & help) ----------
   ctx.saveVoiceLog = () => {
@@ -67,6 +76,19 @@ export function initSettings(ctx) {
       el.querySelector('#setSources').onchange = e => { ctx.showSources?.(e.target.checked); ctx.refreshSources?.(); };
       el.querySelector('#setPw').onclick = () => { ctx.resetPanelWidth?.(); ctx.toast('Panel width reset.'); PAINT.map(el); el.querySelector('#setBase')?.focus(); };
       wireActs(el);
+    },
+    ai(el) {
+      if (!models && !modelsP && !modelsErr) loadModels();
+      const cur = ctx.aiModel(), last = get('fs-ai-last'), list = models?.models || [], def = models?.default;
+      const opts = [['', 'Server default' + (def ? ' (' + def + ')' : '')], ...list.map(m => [m.id, m.id])];
+      if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, cur + (models ? ' (not available to this key: the default is used)' : '')]);
+      el.innerHTML = row('Provider', '<select class="chip" id="setProv" aria-label="AI provider">' + PROVIDERS.map(p => '<option value="' + p.id + '"' + (p.on ? '' : ' disabled') + (p.id === 'openai' ? ' selected' : '') + '>' + esc(p.label) + (p.on ? '' : ' · coming later') + '</option>').join('') + '</select>',
+          'OpenAI for now. Anthropic comes later.') +
+        row('Model', '<select class="chip" id="setModel" aria-label="AI model">' + opts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
+          'For site plans, Ask AI and filing briefs. Kept on this device.') +
+        '<div class="set-note" id="setModelNote">' + (modelsP && !models ? 'Checking which models the server’s OpenAI key can use…' : modelsErr && !models ? esc(modelsErr) + ' The server’s default model answers.' : models ? list.length + ' OpenAI chat models available, newest first.' : '') +
+          (last ? ' The last answer came from <b>' + esc(last) + '</b>.' : '') + ' Voice and place search keep their own models. ' + esc(PROVIDERS.find(p => !p.on)?.note || '') + '</div>';
+      el.querySelector('#setModel').onchange = e => { try { if (e.target.value) localStorage.setItem(MODEL_KEY, e.target.value); else localStorage.removeItem(MODEL_KEY); } catch (err) {} ctx.toast(e.target.value ? 'The AI will use ' + e.target.value + ' on this device.' : 'The AI will use the server’s default model' + (def ? ' (' + def + ')' : '') + '.'); };
     },
     saved(el) {
       const n = { searches: count('fs-saved-searches'), compare: count('fs-compare'), notes: ctx.field?.db?.notes?.length || 0, watch: ctx.field?.db?.watch?.length || 0, projects: ctx.sitePlan?.projects?.length || 0, files: count('fs-reports') };

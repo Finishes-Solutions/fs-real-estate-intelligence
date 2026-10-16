@@ -11,6 +11,11 @@ for (const e of EFFORTS) { assert.ok(['low', 'medium', 'high'].includes(e.effort
 const [lo, me, hi, ul] = EFFORTS;
 assert.equal(lo.rounds, 0, 'Low: no review'); assert.equal(me.rounds, 1, 'Medium: one review, no revise'); assert.ok(hi.rounds === 2 && hi.revise, 'High: may revise once (the old AI-reviewed)');
 assert.ok(ul.rounds > hi.rounds && ul.pool > hi.pool && ul.layout.count > 3 && ul.images > hi.images, 'Ultra does more of what High does');
+// thinking before placing: none on Low; one plan on Medium and High (at their own effort); three compared at the deepest on Ultra
+assert.equal(lo.plan, null, 'Low: no planning step');
+assert.deepEqual([me.plan, hi.plan], [{ effort: 'medium', count: 1 }, { effort: 'high', count: 1 }]);
+assert.deepEqual(ul.plan, { effort: 'xhigh', count: 3 }, 'Ultra: three plans at xhigh (steps down to high on a model without it)');
+for (const e of EFFORTS.slice(1)) assert.match(e.tip, /before placing/, e.id + ': says it plans before placing');
 assert.equal(effortOf('nope').id, 'high');
 assert.equal(effortLevel('ultra', null), 'ultra'); assert.equal(effortLevel('medium', '0'), 'medium', 'the new setting wins over the old one');
 assert.equal(effortLevel(null, '0'), 'low', 'old Quick → Low'); assert.equal(effortLevel('', '1'), 'high', 'old AI-reviewed → High'); assert.equal(effortLevel(null, null), 'high', 'default: High, as AI-reviewed was');
@@ -24,7 +29,7 @@ const json = f => JSON.stringify(f);
 
 // apartments on 10 acres: parking by the unit, detention sized from the developed land, the money, the AI's review
 { const pl0 = build(site(800, 545, { use: 'multifamily', units: 200 })), o = pl0._o; delete pl0._o;
-  const pl = { ...pl0, lastRun: { ask: '200 garden apartments', note: 'Three-story garden apartments.', summary: 'Layout 1 is best: parking by the doors.', effort: 'ultra', read: { chips: ['Multifamily', '200 units'], assumed: ['1.6 spaces per unit (typical)'], miss: [] },
+  const pl = { ...pl0, lastRun: { ask: '200 garden apartments', note: 'Three-story garden apartments.', summary: 'Layout 1 is best: parking by the doors.', effort: 'ultra', read: { chips: ['Multifamily', '200 units'], assumed: ['1.6 spaces per unit (typical)'], miss: [], plan: { name: 'Apartments round a central clubhouse', concept: 'Three-story bars around a clubhouse, the pond at the back on the low land.', placement: [{ what: 'clubhouse and pool', where: 'middle', why: 'central to every building' }, { what: 'detention pond', where: 'back', why: 'the low corner' }], entrances: { count: 2, where: 'the main road and the side street', why: 'fire access for 200 units' }, parking: { approach: 'rows along the buildings' }, stormwater: { type: 'detention', where: 'back', why: 'the low corner' }, numbers: { check: '200 units in 3 stories is about 70,000 sf of footprint; 320 spaces; fits on 10 acres.' }, alts: ['Bars along the street'], why: 'Quieter homes.', rejected: [], risks: [] } },
     variants: [{ key: 'k0', name: pl0.variant.name, notes: o.notes, ai: { score: 82, verdict: 'Good', strengths: ['Clubhouse by the entry'], problems: ['Pond far from the homes'] } }, { key: 'k1', name: 'Layout 2 · other', m: { gfa: 1000, units: 190, spaces: 300, required: 304 }, ai: { score: 64 } }] } };
   const m = S.metrics(pl), st = S.stormOf(pl), R = PF.run(pl, PF.defaults(pl)), pieces = ED.describePlan(pl).pieces;
   const f = planFacts(pl, { site: { acres: 10.01, frontageFt: 800, widthFt: 800, depthFt: 545, city: 'Katy' }, pieces, pf: R, project: 'Katy test' });
@@ -36,6 +41,8 @@ const json = f => JSON.stringify(f);
   assert.ok(st.volume > 0 && /0\.55 acre-feet/.test(f.stormwater.rule), 'detention needed, and the rule it was sized by');
   assert.equal(f.proForma.budget.totalCost, Math.round(R.budget.total)); assert.ok(f.proForma.returns.yieldOnCostPct != null && f.proForma.assumptions.exitCapPct > 0, 'returns and the assumptions behind them');
   assert.equal(f.lastBuild.thisLayout.aiScore, 82); assert.deepEqual(f.lastBuild.thisLayout.aiProblems, ['Pond far from the homes']); assert.equal(f.lastBuild.effort, 'ultra');
+  const pf = f.lastBuild.plannedFirst; assert.ok(pf && /clubhouse/.test(pf.concept), 'the plan made before placing goes along');
+  assert.deepEqual(pf.placement, ['middle: clubhouse and pool (central to every building)', 'back: detention pond (the low corner)']); assert.match(pf.stormwater, /^detention at the back/); assert.deepEqual(pf.otherPlansDrafted, ['Bars along the street']);
   assert.equal(f.lastBuild.otherLayouts[0].parking, '300 / 304'); assert.ok(f.lastBuild.thisLayout.engineNotes.length > 0, 'the engine’s notes on this layout');
   const club = f.pieces.find(p => /club/i.test(p.name || '')); assert.ok(club && club.at.length === 2, 'where the clubhouse sits, in street terms');
   assert.ok(f.pieces.every(p => !('id' in p)), 'no ids: the model talks in names');

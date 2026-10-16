@@ -221,7 +221,7 @@ export function initAssistant(ctx) {
   // a failed call is a sentence (never "Error 501" or "Failed to fetch"); the details go to the console
   const aiErr = o => Object.assign(new Error(aiErrorMessage(o)), { friendly: true, status: o.status || 0 });
   async function post(input) {
-    let r; try { r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, previous_response_id: thread, context: context() }) }); }
+    let r; try { r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, previous_response_id: thread, context: context(), ...(ctx.aiModel?.() ? { model: ctx.aiModel() } : {}) }) }); ctx.noteModel?.(r); }
     catch (e) { console.warn('[assistant]', e); throw aiErr({ network: true, offline: navigator.onLine === false }); }
     const d = await r.json().catch(() => ({}));
     if (r.status === 409) thread = null;

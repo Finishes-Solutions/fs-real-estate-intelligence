@@ -3108,6 +3108,15 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 .sp-rc.miss{background:color-mix(in srgb,var(--amber) 14%,transparent);color:var(--text);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--amber) 45%,transparent)}
 .sp-readas .sp-link{font-size:12px;padding:0 0 0 4px}
 .sp-assumed{margin-top:4px}
+.sp-planned{margin-top:8px;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:6px 9px}
+.sp-planned>summary{cursor:var(--cur-pointer,pointer);list-style:none;display:flex;align-items:center;gap:6px;font-weight:500}
+.sp-planned>summary::-webkit-details-marker{display:none}
+.sp-planned>summary::after{content:'';margin-left:auto;width:7px;height:7px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
+.sp-planned[open]>summary::after{transform:rotate(-135deg)}
+.sp-planned p{margin:6px 0 0;line-height:1.45}
+.sp-planned ul{margin:6px 0 0;padding-left:16px;line-height:1.45}
+.sp-planned li{margin:2px 0}
+.sp-pf-why{color:var(--muted)}
 /* folded once there are layouts: one line */
 .sp-built-l{font-size:13px;line-height:1.45;color:var(--text-2)}
 .sp-built-l q{color:var(--text);font-weight:600}
