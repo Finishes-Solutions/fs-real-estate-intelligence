@@ -5,6 +5,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 8:06 PM CT: AI usage and cost in Settings (c41a7fa)
+- **Settings › AI model › Usage:** a table of AI use for the chosen period: This month, Last 30 or 7 days, Today or This year.
+  - For each model it shows requests, tokens in, tokens out (including the model's reasoning) and estimated cost, then a total.
+  - A line under the table splits the cost by feature: site plans, Ask AI, filing briefs, place search and the nightly data.
+- **Counted from now on:** the app adds up every AI answer's token counts from tonight. Voice isn't counted, because it talks to OpenAI directly.
+- **Costs are estimates at OpenAI's list prices.** They come from public price listings, because OpenAI's own page couldn't be read from here.
+  - Models where the listings disagreed are marked with a *, and models with no known price show a dash.
+  - **Edit prices** corrects any of them on your device.
+- **Billed amounts:** with an OpenAI admin key on the server, a **Billed** column shows what OpenAI actually charged per model, voice included.
+- Behind the scenes, a new usage table in the database, readable and writable only by the server.
+
 ### 7:30 PM CT: The AI model list only shows models that work (2a0e413)
 - **Settings › AI model now lists only models that work with every AI feature:** 25 of the 40 OpenAI models your key can use.
   - Left out: the "pro" models, the ChatGPT "chat-latest" ones, the live voice model, GPT-4, GPT-4 Turbo and GPT-3.5. Picking one of these could have made a build fail.
