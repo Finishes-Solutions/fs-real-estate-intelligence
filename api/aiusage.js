@@ -42,6 +42,13 @@ export async function findKey(adminKey, apiKey, env = process.env, fetchFn = fet
   }
   found = { at: Date.now(), for: apiKey.slice(-6), v }; return v;
 }
+// a cost line item as its model: OpenAI writes them "gpt-6-luna, input", "gpt-realtime-2.1 audio", "gpt-4o-mini-
+// transcribe-2025-12-15 text" or "web search tool calls"; the token kind and a dated snapshot are dropped
+export function modelOfLine(item) {
+  let m = String(item || '').split(',')[0].trim().replace(/\s+(cached input|input|output|text|audio|image|cached)$/i, '').trim().replace(/-\d{4}-\d{2}-\d{2}$/, '');
+  if (/^web search/i.test(m)) m = 'Web search'; else if (/^file search/i.test(m)) m = 'File search';
+  return m || 'Other';
+}
 // what OpenAI billed for this app's key over the days asked (its Costs API by line item, "gpt-6-astra, input", summed by
 // model). Asked for the key alone; when OpenAI won't split costs by key, the key's project, and then (when the project
 // has other keys too) OpenAI's own token counts for the key alone come along to be priced. Never the whole organization.
@@ -55,7 +62,7 @@ export async function billed(adminKey, apiKey, from, to, env = process.env, fetc
       const d = await adminGet(adminKey, '/costs?' + q, fetchFn);
       for (const b of d.data || []) for (const x of b.results || []) {
         const v = +x.amount?.value || 0; if (!v) continue; total += v; currency = x.amount?.currency || currency;
-        const model = String(x.line_item || 'Other').split(',')[0].trim().replace(/-\d{4}-\d{2}-\d{2}$/, '') || 'Other'; by.set(model, (by.get(model) || 0) + v);
+        const model = modelOfLine(x.line_item); by.set(model, (by.get(model) || 0) + v);
       }
       if (!d.has_more || !d.next_page) break; page = d.next_page;
     }

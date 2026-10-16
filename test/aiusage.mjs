@@ -60,6 +60,8 @@ assert.equal(res.code, 200); assert.equal(res.body.tracking, true); assert.equal
 res = mock(); await handler({ method: 'GET', query: { from: 'yesterday', to: '2026-10-31' }, headers: { 'x-forwarded-for': '5.5.5.2' } }, res); assert.equal(res.body.from, '2026-10-01', 'a bad date: the start of that month');
 // billed: only this app's key (OPENAI_API_KEY), found among the organization's projects by its redacted form; never the
 // rest of the organization
+assert.deepEqual(['gpt-6-luna, input', 'gpt-realtime-2.1 text', 'gpt-realtime-2.1 audio', 'gpt-4o-mini-transcribe-2025-12-15 audio', 'gpt-6-astra-2026-09-01, cached input', 'web search tool calls', '', null].map(A2.modelOfLine),
+  ['gpt-6-luna', 'gpt-realtime-2.1', 'gpt-realtime-2.1', 'gpt-4o-mini-transcribe', 'gpt-6-astra', 'Web search', 'Other', 'Other'], 'cost line items as models (production’s own, Oct 16)');
 assert.ok(A2.sameKey('sk-proj-abc…wxyz', 'sk-proj-abcDEF123wxyz') && A2.sameKey('sk-...wxyz', 'sk-anything-wxyz') && !A2.sameKey('sk-proj-abc…wxyz', 'sk-proj-abcDEF123wxyA') && !A2.sameKey('sk-…yz', 'sk-ayz'), 'redacted keys: start and end must match (4+ characters at the end)');
 const org = { projects: [{ id: 'proj_A', name: 'Estimating tools' }, { id: 'proj_B', name: 'Real Estate Intelligence' }, { id: 'proj_C', name: 'Old', status: 'archived' }],
   keys: { proj_A: [{ id: 'key_1', name: 'estimator', redacted_value: 'sk-proj-zzz…aaaa' }], proj_B: [{ id: 'key_2', name: 'RE intelligence', redacted_value: 'sk-proj-abc…wxyz' }, { id: 'key_3', name: 'intern', redacted_value: 'sk-proj-qqq…bbbb' }, { id: 'key_4', name: 'ci', redacted_value: 'sk-proj-rrr…cccc' }] } };
