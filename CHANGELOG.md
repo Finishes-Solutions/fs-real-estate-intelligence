@@ -5,6 +5,16 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-15
 
+### 7:04 PM CT: Pick the AI model in Settings (53c8cb8)
+- **Settings › AI model:** a new section to choose which AI answers.
+  - **Provider:** OpenAI for now. Anthropic (Claude) is listed as coming later and can't be picked yet.
+  - **Model:** lists the OpenAI chat models the app's key can use, newest first, after **Server default**, which names the model used when you don't pick one.
+  - Your pick is kept on this device.
+- **Where it applies:** site plans (Build, Change With AI, Ask about this plan, What Should Go Here?), Ask AI and filing briefs.
+  - If the key can't use the picked model, the server's default answers instead.
+  - Voice and place search keep their own models.
+- **Which model answered:** a line under the picker names the model that gave the last answer.
+
 ### 6:26 PM CT: The AI plans the site before placing anything (4bb6db8)
 - **Thinking before placing.** On Medium, High and Ultra, the AI now thinks the site through before the layout engine places anything. Before, the effort levels mostly changed the review after the layouts were drawn. The plan covers:
   - what goes at the front, in the middle and at the back, and why;
