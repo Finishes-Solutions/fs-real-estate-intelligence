@@ -47,7 +47,7 @@ await O.chatText({ key: 'k', model: 'gpt-6-luna', system: 's', user: 'u', featur
 fail = true; const r = await O.chatJSON({ key: 'k', model: 'gpt-6-astra', system: 's', user: 'u', name: 'n', schema: { type: 'object' }, feature: 'siteplan' }); assert.deepEqual(r.data, { ok: 1 }, 'no table yet: the answer still comes back'); fail = false;
 
 // ---- api/aiusage: the counts for the days asked, and the billed amounts with an admin key ----
-const { default: handler, billed } = await import('../api/aiusage.js');
+const A2 = await import('../api/aiusage.js'), handler = A2.default;
 const mock = () => { const x = { code: 200, headers: {}, status(c) { x.code = c; return x; }, json(o) { x.body = o; return x; }, setHeader(k, v) { x.headers[k] = v; } }; return x; };
 let asked = '';
 globalThis.fetch = async (url, opts = {}) => { url = String(url);
@@ -58,10 +58,42 @@ globalThis.fetch = async (url, opts = {}) => { url = String(url);
 let res = mock(); await handler({ method: 'GET', query: { from: '2026-10-01', to: '2026-10-31' }, headers: { 'x-forwarded-for': '5.5.5.1' } }, res);
 assert.equal(res.code, 200); assert.equal(res.body.tracking, true); assert.equal(res.body.rows.length, 4); assert.match(asked, /day=gte\.2026-10-01&day=lte\.2026-10-31/); assert.equal(res.body.billed, null, 'no admin key: no billed amounts'); assert.equal(res.body.admin, false);
 res = mock(); await handler({ method: 'GET', query: { from: 'yesterday', to: '2026-10-31' }, headers: { 'x-forwarded-for': '5.5.5.2' } }, res); assert.equal(res.body.from, '2026-10-01', 'a bad date: the start of that month');
-process.env.OPENAI_ADMIN_KEY = 'admin-key';
+// billed: only this app's key (OPENAI_API_KEY), found among the organization's projects by its redacted form; never the
+// rest of the organization
+assert.ok(A2.sameKey('sk-proj-abc…wxyz', 'sk-proj-abcDEF123wxyz') && A2.sameKey('sk-...wxyz', 'sk-anything-wxyz') && !A2.sameKey('sk-proj-abc…wxyz', 'sk-proj-abcDEF123wxyA') && !A2.sameKey('sk-…yz', 'sk-ayz'), 'redacted keys: start and end must match (4+ characters at the end)');
+const org = { projects: [{ id: 'proj_A', name: 'Estimating tools' }, { id: 'proj_B', name: 'Real Estate Intelligence' }, { id: 'proj_C', name: 'Old', status: 'archived' }],
+  keys: { proj_A: [{ id: 'key_1', name: 'estimator', redacted_value: 'sk-proj-zzz…aaaa' }], proj_B: [{ id: 'key_2', name: 'RE intelligence', redacted_value: 'sk-proj-abc…wxyz' }, { id: 'key_3', name: 'intern', redacted_value: 'sk-proj-qqq…bbbb' }, { id: 'key_4', name: 'ci', redacted_value: 'sk-proj-rrr…cccc' }] } };
+const calls = []; let perKeyCosts = true;
+const orgFetch = async (url, opts = {}) => { url = String(url); calls.push(url);
+  if (url.startsWith('https://db.example/rest/v1/ai_usage')) return Response.json(rows);
+  assert.equal(opts.headers.Authorization, 'Bearer admin-key', 'the admin key, never the app key, for the organization API');
+  const u = new URL(url), path = u.pathname.replace('/v1/organization', '');
+  if (path === '/projects') return Response.json({ data: org.projects, has_more: false });
+  const mk = path.match(/^\/projects\/(\w+)\/api_keys$/); if (mk) return Response.json({ data: org.keys[mk[1]] || [], has_more: false });
+  if (path === '/costs') { assert.equal(u.searchParams.get('project_ids'), 'proj_B', 'costs always limited to the app’s project');
+    if (u.searchParams.get('api_key_ids')) { if (!perKeyCosts) return Response.json({ error: { message: 'Unknown parameter: api_key_ids' } }, { status: 400 }); assert.equal(u.searchParams.get('api_key_ids'), 'key_2');
+      return Response.json({ data: [{ results: [{ amount: { value: 3.1, currency: 'usd' }, line_item: 'gpt-6-astra, output' }, { amount: { value: 0.31, currency: 'usd' }, line_item: 'gpt-6-astra-2026-09-01, input' }, { amount: { value: 0.5, currency: 'usd' }, line_item: 'gpt-realtime, input' }] }], has_more: false }); }
+    return Response.json({ data: [{ results: [{ amount: { value: 9.75, currency: 'usd' }, line_item: 'gpt-6-astra, output' }, { amount: { value: 1.2, currency: 'usd' }, line_item: 'gpt-5-mini, input' }] }], has_more: false }); }
+  if (path === '/usage/completions') { assert.equal(u.searchParams.get('api_key_ids'), 'key_2'); assert.equal(u.searchParams.get('project_ids'), 'proj_B');
+    return Response.json({ data: [{ results: [{ model: 'gpt-6-astra-2026-09-01', num_model_requests: 6, input_tokens: 40000, input_cached_tokens: 10000, output_tokens: 70000 }, { model: 'gpt-6-luna', num_model_requests: 30, input_tokens: 200000, input_cached_tokens: 0, output_tokens: 30000 }] }], has_more: false }); }
+  throw new Error('unexpected ' + url); };
+process.env.OPENAI_ADMIN_KEY = 'admin-key'; process.env.OPENAI_API_KEY = 'sk-proj-abcDEF123wxyz'; globalThis.fetch = orgFetch;
 res = mock(); await handler({ method: 'GET', query: { from: '2026-10-01', to: '2026-10-31' }, headers: { 'x-forwarded-for': '5.5.5.3' } }, res);
-assert.ok(Math.abs(res.body.billed.total - 3.93) < 1e-9); assert.deepEqual(res.body.billed.byModel.map(x => [x.model, +x.amount.toFixed(2)]), [['gpt-6-astra', 3.41], ['gpt-realtime', 0.5], ['gpt-6-luna', 0.02]], 'by model, snapshots folded in, every page');
-globalThis.fetch = async url => String(url).includes('organization') ? Response.json({ error: { message: 'no' } }, { status: 403 }) : Response.json(rows);
+assert.equal(res.code, 200, JSON.stringify(res.body)); const bk = res.body.billed;
+assert.equal(bk.scope, 'key'); assert.deepEqual([bk.project.name, bk.project.keys, bk.key.id, bk.key.name], ['Real Estate Intelligence', 3, 'key_2', 'RE intelligence'], 'the app’s key found in its project');
+assert.ok(Math.abs(bk.total - 3.91) < 1e-9); assert.deepEqual(bk.byModel.map(x => [x.model, +x.amount.toFixed(2)]), [['gpt-6-astra', 3.41], ['gpt-realtime', 0.5]]);
+assert.ok(calls.filter(c => c.includes('/costs')).every(c => /project_ids=proj_B/.test(c)), 'no organization-wide costs call');
+// OpenAI won't split costs by key: the project's costs, said as such, and this key's own tokens from OpenAI to price
+perKeyCosts = false; calls.length = 0;
+res = mock(); await handler({ method: 'GET', query: { from: '2026-10-01', to: '2026-10-31' }, headers: { 'x-forwarded-for': '5.5.5.6' } }, res); const bp = res.body.billed;
+assert.equal(bp.scope, 'project'); assert.ok(Math.abs(bp.total - 10.95) < 1e-9); assert.equal(bp.project.keys, 3);
+assert.deepEqual(bp.keyTokens, [{ model: 'gpt-6-astra', requests: 6, input: 40000, cached: 10000, output: 70000 }, { model: 'gpt-6-luna', requests: 30, input: 200000, cached: 0, output: 30000 }], 'this key alone, by model');
+assert.equal(calls.filter(c => c.includes('/projects')).length, 0, 'the key’s project is remembered (an hour)');
+// a key that isn't in any project: nothing billed shown (never the organization), and the counts still come back
+process.env.OPENAI_API_KEY = 'sk-proj-nope000000000'; calls.length = 0;
+res = mock(); await handler({ method: 'GET', query: {}, headers: { 'x-forwarded-for': '5.5.5.7' } }, res);
+assert.equal(res.body.billed, null); assert.match(res.body.billedError, /wasn’t found/); assert.equal(res.body.rows.length, 4); assert.ok(!calls.some(c => c.includes('/costs')), 'no costs asked for at all');
+globalThis.fetch = async url => String(url).includes('organization') ? Response.json({ error: { message: 'no' } }, { status: 403 }) : Response.json(rows); process.env.OPENAI_API_KEY = 'sk-proj-other11111111';
 res = mock(); await handler({ method: 'GET', query: {}, headers: { 'x-forwarded-for': '5.5.5.4' } }, res); assert.equal(res.body.billed, null); assert.match(res.body.billedError, /refused the admin key/); assert.equal(res.body.rows.length, 4, 'the counts still come back');
 globalThis.fetch = async () => new Response('{"code":"42P01","message":"relation \\"public.ai_usage\\" does not exist"}', { status: 404 }); delete process.env.OPENAI_ADMIN_KEY;
 res = mock(); await handler({ method: 'GET', query: {}, headers: { 'x-forwarded-for': '5.5.5.5' } }, res); assert.equal(res.body.tracking, false); assert.match(res.body.trackError, /isn’t set up/);

@@ -4,7 +4,7 @@
 // Options shown elsewhere (the Layers panel's map display, the panel's headline metrics) stay where they are and are
 // linked from here. Nothing here deletes notes, projects or the team's sync queue.
 import { PROVIDERS, MODEL_KEY, pickedModel } from './lib/aimodels.mjs';
-import { summarize, priceOf, checkPrice, PRICES_AS_OF } from './lib/aiprices.mjs';
+import { summarize, priceOf, checkPrice, costOf, PRICES_AS_OF } from './lib/aiprices.mjs';
 const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help']];
 export const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
 const BASE_KEY = 'fs-basemap';
@@ -60,12 +60,12 @@ export function initSettings(ctx) {
       const th = '<tr><th>Model</th><th title="Requests">Req</th><th title="Tokens sent (cached ones included)">In</th><th title="Tokens back, the model’s reasoning included">Out</th><th title="Estimated at list prices">Cost</th>' + (d.billed ? '<th title="What OpenAI billed">Billed</th>' : '') + '</tr>';
       const tr = (r, model) => '<tr><td>' + esc(r.label) + (model && checkPrice(model) && !prices()[model] ? '<sup title="Price sources disagreed: check it under Edit prices">*</sup>' : '') + (model && !priceOf(model, prices()) ? '<sup title="No price known: set one under Edit prices">?</sup>' : '') + '</td><td>' + r.requests.toLocaleString('en-US') + '</td><td>' + tok(r.input) + '</td><td' + (r.reasoning ? ' title="' + tok(r.reasoning) + ' of it reasoning"' : '') + '>' + tok(r.output) + '</td><td>' + usd(r.cost) + (r.priced === false && r.cost ? '+' : '') + '</td>' + (d.billed ? '<td>' + usd(model ? billed.get(model) ?? 0 : d.billed.total) + '</td>' : '') + '</tr>';
       const rows = S.byModel.map(r => tr(r, r.key)).join(''), total = S.byModel.length > 1 ? tr({ ...S.total, label: 'Total', priced: S.byModel.every(r => r.priced) }, null).replace('<tr>', '<tr class="tot">') : '';
-      const extra = d.billed ? [...billed].filter(([m]) => !S.byModel.some(r => r.key === m)).map(([m, v]) => '<tr class="dim"><td>' + esc(m) + '</td><td colspan="4">not through this app’s AI features (voice, other tools on the account)</td><td>' + usd(v) + '</td></tr>').join('') : '';
+      const extra = d.billed ? [...billed].filter(([m]) => !S.byModel.some(r => r.key === m)).map(([m, v]) => '<tr class="dim"><td>' + esc(m) + '</td><td colspan="4">' + (d.billed.scope === 'key' ? 'this key, outside the counted features (voice)' : 'billed to the project, not counted here (voice, or its other keys)') + '</td><td>' + usd(v) + '</td></tr>').join('') : '';
       body = (S.byModel.length || extra ? '<div class="set-ut-w"><table class="set-ut">' + th + rows + extra + total + '</table></div>' : '<div class="set-note">No AI usage recorded ' + (per === 'today' ? 'today' : 'in this period') + '.</div>') +
         (S.byFeature.length ? '<div class="set-uf">' + S.byFeature.map(f => '<span><b>' + esc(f.label) + '</b> ' + usd(f.cost) + (f.priced === false && f.cost ? '+' : '') + ' · ' + f.requests.toLocaleString('en-US') + ' req</span>').join('') + '</div>' : '') +
         '<div class="set-note">' + (S.total.reasoning ? 'Out includes ' + tok(S.total.reasoning) + ' tokens of the model’s reasoning (billed as output). ' : '') + (d.tracking ? 'Counted by the app from OpenAI’s token figures (from Oct 16, 2026). ' : esc(d.trackError || 'Usage counting needs the database on the server.') + ' ') +
           'Costs are estimates at OpenAI’s list prices (as of ' + new Date(PRICES_AS_OF + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '; * means the published figures disagreed). ' +
-          (d.billed ? 'Billed is what OpenAI charged for the whole account over these days.' : d.billedError ? esc(d.billedError) : 'For OpenAI’s billed amounts, add an OpenAI admin key to the server (OPENAI_ADMIN_KEY).') + '</div>';
+          (d.billed ? billedNote(d.billed) : d.billedError ? esc(d.billedError) : 'For what OpenAI billed for this app’s key, add a read-only OpenAI admin key to the server (OPENAI_ADMIN_KEY).') + '</div>';
       const models = [...new Set([...S.byModel.map(r => r.key), ...(models0())])].slice(0, 30), P = prices();
       body += '<details class="set-prices"><summary>Edit prices</summary><p class="set-hint">USD per 1M tokens: input, cached input, output. Kept on this device; blank uses the list price.</p><table class="set-pt"><tr><th>Model</th><th>Input</th><th>Cached</th><th>Output</th></tr>' +
         models.map(m => { const lp = priceOf(m, {}) || [], o = P[m] || []; const f = (i, ph) => '<input type="number" min="0" step="0.001" inputmode="decimal" data-pm="' + esc(m) + '" data-pi="' + i + '" value="' + (o[i] ?? '') + '" placeholder="' + (ph ?? '') + '" aria-label="' + esc(m) + ' ' + ['input', 'cached input', 'output'][i] + ' price">';
@@ -75,6 +75,14 @@ export function initSettings(ctx) {
     return '<div class="set-usage"><div class="set-uh"><span class="set-l">Usage</span>' + sel + '<button type="button" class="btn sm ghost" id="setUseRe" title="Refresh">Refresh</button></div>' + body + '</div>';
   }
   const models0 = () => (models?.models || []).map(m => m.id).slice(0, 12);
+  // whose bill Billed is: this app's own key (never the rest of the organization's keys and projects)
+  function billedNote(b) {
+    const proj = b.project?.name ? '“' + esc(b.project.name) + '”' : 'its project', key = b.key?.name ? '“' + esc(b.key.name) + '”' : 'this app’s key';
+    if (b.scope === 'key') return 'Billed is what OpenAI charged for ' + key + ' (in ' + proj + ') over these days; the organization’s other keys aren’t included.';
+    if ((b.project?.keys || 0) <= 1) return 'Billed is what OpenAI charged for ' + proj + ', which holds only ' + key + '.';
+    const own = (b.keyTokens || []).reduce((t, r) => { const c = costOf(r.model, r, prices()); return c == null ? t : t + c; }, 0), n = (b.keyTokens || []).reduce((t, r) => t + r.requests, 0);
+    return 'OpenAI bills ' + proj + ' as a whole and it has ' + b.project.keys + ' keys, so Billed includes the others. ' + key + ' alone: about ' + usd(own) + ' (' + n.toLocaleString('en-US') + ' requests, OpenAI’s token counts for the key at list prices). Moving this app’s key to a project of its own makes Billed exact.';
+  }
   function wireUsage(el) {
     const per = el.querySelector('#setUsePer'); if (per) per.onchange = e => { usage.period = e.target.value; paintSec('ai'); };
     const re = el.querySelector('#setUseRe'); if (re) re.onclick = () => { loadUsage(usage.period, true); paintSec('ai'); };
