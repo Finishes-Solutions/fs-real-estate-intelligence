@@ -515,6 +515,26 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 
 **Single-family homes:** choose **Single-family homes** (or say "single-family homes, mostly 2-story"). Homes go on lots along 28 ft streets, both sides of each street, with lot lines, driveways and a cul-de-sac at a dead end. The streets curve gently the way a neighbourhood's do, with the lots and homes following them, and the rows along the lot lines stay straight so curving costs almost no lots; **Neighbourhood streets** under Site parameters switches them to straight. Set the **home mix** (the share of 1-, 2- and 3-story homes) and the lot depth under Site parameters; each home type takes its own lot width (about 60, 50 and 40 ft).
 
+**Self storage:** say it the way you would to a developer ("self storage: a 3-story, 90,000 sf climate-controlled building plus drive-up units and 30 RV spaces", "drive-up only mini storage") or choose **Self storage** under Site parameters.
+- **How it's laid out:**
+  - The climate-controlled building sits at the street with its leasing office and a few customer spaces in front, behind a landscaped strip.
+  - Drive-up rows run behind it on 26 ft drive aisles, with doors straight onto the aisle. Rows are 40 ft deep back to back, 30 ft along the back. Cross drives cut through rows longer than about 250 ft.
+  - RV and boat stalls (12 × 40 ft) go along the back when you ask for them.
+  - A security fence runs from the building's corners around the yard, with a keypad gate wherever a drive goes through it. A detention pond at the front edge stays outside the fence.
+- **On a small lot** (about an acre), the building goes right on the street with visitor spaces just inside the gate, so the yard still gets its rows.
+- **Drive-up only:** a small leasing office replaces the climate-controlled building. **Climate-controlled only:** no drive-up rows and no fence.
+- **Site parameters › Program** for self storage:
+  - parking per 1,000 sf (about 1 space per 100 units);
+  - climate-controlled floors and size (0 = drive-up only, blank = sized to the site);
+  - drive-up size (blank = as much as fits);
+  - drive-up row depth, drive aisle width and RV / boat spaces;
+  - **Fence and keypad gate** on or off.
+- **Unit mixes:** two tables, one for climate-controlled units and one for drive-up units. Change a size's square feet or share, remove it, or add one with **+ Add a Size**. The averages set the unit counts.
+- **The numbers:** the layout card leads with rentable square feet and about how many units. **Numbers** has a **Storage** tile (rentable sf, units split climate / drive-up, RV / boat spaces) and a table of units by size. RV and boat stalls don't count as parking.
+- **Selected building:** a **Storage** field (Climate-controlled, Drive-up units or Leasing office) and a line with its rentable sf and units.
+- **Pro forma:** self storage is gross rent (about $15 a rentable sf a year, about $1.25 a month) with the owner paying the operating costs, not billed back. It assumes about 10% vacancy and two to three years to fill. All of this is editable.
+- If the climate-controlled building or the RV stalls don't fully fit, the layout says how much did.
+
 **The plan panel** is a full-height column beside the map buttons. Its header stays put while the sections scroll:
 - **Where you are:** **Projects › the project › the option's name**. Click **Projects** for the Projects page or the project's name for its page; click the option's name (it has a dotted underline, and a pencil when you point at it) to rename it. The option's button follows what you type, and a blank name goes back to the one it had. Under it, the address and acres (just the acres when the project is named after the address).
 - **Undo** and **Redo** buttons, **Edit Layout** (once there's a layout), **Done** and **×**. Done and × close the plan; it's saved as you go. The map chip's buttons read **Stop Editing**, **Stop Measuring** or **Finish**, so **Done** here is the only Done. A small icon beside Undo says where the plan is: a laptop for **saved on this device**, a cloud with a tick for **synced with the team** (hover it for when), or a red warning when the team copy couldn't be updated; click it to try again (your work is still saved on this device).
@@ -546,7 +566,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - Sites up to about 300 acres work; a large layout takes up to a minute while the map stays usable, and the AI may think for up to a minute first.
 
 **The building library**
-- About 230 building types: garden, breezeway, corridor, senior, L-shaped, courtyard, podium and tower apartments; townhome rows; duplexes; 24 house plans; restaurants from a coffee drive-thru to a brewpub; shop strips, pharmacies, grocery and big box; medical and office buildings; flex, warehouses and self storage; hotels, churches and more.
+- About 240 building types: garden, breezeway, corridor, senior, L-shaped, courtyard, podium and tower apartments; townhome rows; duplexes; 24 house plans; restaurants from a coffee drive-thru to a brewpub; shop strips, pharmacies, grocery and big box; medical and office buildings; flex and warehouses; a **Self storage** group (climate-controlled buildings of 1 to 4 stories, drive-up rows 30 or 40 ft deep and 100 to 250 ft long, a leasing office); hotels, churches and more.
 - **From the building library** in the Draw section adds one in the nearest clear spot to the middle of the view; **Type** in the Selected box swaps a placed building for another type in the same spot. Neighbourhood streets mix the house plans home to home.
 
 **Getting the most out of a site**
@@ -773,6 +793,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Self storage site plans:** ask for self storage (climate-controlled, drive-up, RV and boat) and the layout draws it the way storage is built: the climate-controlled building and office at the street, drive-up rows on drive aisles behind it, a fence with keypad gates, and RV stalls at the back. Settings has the storage sizes, row depth, aisle, RV spaces, the fence switch and two unit mixes you can add sizes to. Numbers show rentable sf and units, and the pro forma treats it as storage (gross rent, owner-paid costs, a longer fill-up). The building library has a Self storage group.
 - **Photoreal renderings of a site plan:** a **Render** section on an open plan paints the option as a photograph from four preset views (the whole parcel in frame, from a marketing-aerial height), in your choice of materials and light, 1920 × 1080, from the map's 3D model, so the buildings stay where the plan puts them. Compare each with the massing, download it, and the two newest go on the Site Plan PDF. Concept illustrations, kept on this device.
 - **AI usage and cost in Settings:** Settings › AI model › **Usage** shows each model's requests, tokens and estimated cost for the month (or the last 30 or 7 days, today, the year), split by feature, with OpenAI's billed amounts when an admin key is set.
 - **Pick the AI model:** Settings › **AI model** lists the OpenAI models the app can use and says which one gave the last answer; Anthropic is shown as coming later.
