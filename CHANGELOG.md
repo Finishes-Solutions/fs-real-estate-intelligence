@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 2:16 PM CT: Renderings frame the whole site, from a better angle (2be81fe)
+- **No more cut-off buildings:** the picture the AI paints from now has the whole parcel in the frame with room around it. Before, the camera came from a formula and never checked what landed in the frame; now it checks the parcel's corners against the frame through the map's own camera and moves until they all fit, with space at the sides, below, and above for the roofs and sky.
+- **Less of a snapshot:** the four views are lower and wider, like a marketing aerial; **From the corner** comes first and is the default. The AI is asked for a brochure-style composition with a level horizon.
+- **Model:** renderings use **GPT Image 2.5 Sunburst** when the app's key has it, otherwise the newest GPT Image model the key lists.
+- **PDF:** the rendering pages fill the sheet instead of printing as a small picture in the middle.
+
 ### 1:52 PM CT: Photoreal 3D renderings of a site plan (8cf94b5)
 - **Render on an open plan:** a new **Render** section (between Add and Export) paints the option as a photograph. Pick a view (**From the street**, **From the corner**, **Low, at the entry**, **From the back**, or all four), the materials (to suit each use, brick and stone, stucco and stone, modern glass and metal, tilt-wall) and the light (midday, late afternoon, dusk), then **Render 3D View**. About a minute a picture, at 1920 × 1080 when the image model offers it; **Cancel** stops it.
 - **How:** the map points its 3D model of the plan at the site from that view, takes a picture, and the newest GPT Image model the app's key can use paints it photographically. Buildings, drives, parking, pond and trees stay where the plan puts them at their heights; materials, windows, landscaping, cars and sky are the AI's. Switch the base map to Satellite first and the surroundings come out as they are.
