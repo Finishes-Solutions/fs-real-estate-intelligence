@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 3:59 PM CT: Cancelling a rendering no longer bills for it (2b4190e)
+- **Cancel** under Render now stops the AI's work on the server as well as in the browser, so a picture you cancelled isn't painted and charged to the monthly budget for nobody. A picture the AI had already started is dropped, not kept.
+
 ### 3:58 PM CT: Review fixes: renderings kept when you leave, budget off switch, project page polish (0ecdfa9)
 - **A rendering is never lost:** closing the plan, switching options or going to Projects while a picture was being painted used to drop it quietly. It's now saved on the option it was taken of, and the toast names it ("Rendering of Option A ready."). Cancel still drops it.
 - **Each picture's "plan changed since" is judged from the moment it was taken,** not from the start of an All site views run. A failure after a success is reported, not hidden.
