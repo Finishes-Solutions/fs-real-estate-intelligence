@@ -297,6 +297,8 @@ for (const v of [0, 1, 2]) {
   assert.ok(res.body.answer.length <= 3000, 'answer clipped'); assert.deepEqual(res.body.followups, ['What approvals?', 'x']);
   sent = []; await call({ mode: 'askProject', question: 'Why?', project: { ...sheet, options: Array.from({ length: 60 }, (_, i) => ({ option: 'O' + i, note: 'x'.repeat(5000) })) } });
   assert.ok(sent[0].messages[1].content.length < 70000, 'an oversized project sheet is cut down');
+  const longNotes = 'Broker call: ' + 'n'.repeat(1100) + ' END'; sent = []; await call({ mode: 'askProject', question: 'Summarise this project for an email', project: { ...sheet, project: { ...sheet.project, notes: longNotes } } });
+  assert.ok(sent[0].messages[1].content.includes(' END'), 'the project’s notes reach the AI whole (up to 1,500 characters)');
   res = await call({ mode: 'askProject', question: ' ', project: sheet }); assert.equal(res.code, 400);
   res = await call({ mode: 'askProject', question: 'Why?', project: null }); assert.equal(res.code, 400);
   res = await call({ mode: 'askProject', question: 'Why?', project: [1] }); assert.equal(res.code, 400);

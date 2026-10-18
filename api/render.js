@@ -8,7 +8,7 @@
 // views one after another, so a slow model never runs past Vercel's limit.
 // A monthly budget caps it (RENDER_MONTHLY_CAP_USD, $100 by default, per US Central calendar month): before painting,
 // this month's Renderings rows are costed (lib/aiusage.mjs monthSpend) and a spent budget answers 402 without asking
-// OpenAI. A failed read never blocks a picture. GET -> { budget: { spent, cap, month, images, priced } } for the panel.
+// OpenAI. A failed read never blocks a picture, except that a $0 cap (renderings off) refuses without reading. GET -> { budget: { spent, cap, month, images, priced } } for the panel.
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
 import { availableModels } from '../lib/openai.mjs';
 import { recordUsage, monthSpend, tokensOf, fallbackPerImage } from '../lib/aiusage.mjs';
@@ -52,7 +52,7 @@ export async function paint(key, { model, prompt, image, sizes = SIZES, fidelity
 // the month's cap in dollars: RENDER_MONTHLY_CAP_USD (0 turns renderings off), $100 when unset or not a number
 export const capOf = (env = process.env) => { const v = parseFloat(env.RENDER_MONTHLY_CAP_USD); return Number.isFinite(v) && v >= 0 ? v : 100; };
 const usd = v => '$' + (v % 1 ? v.toFixed(2) : String(v));
-export const budgetMessage = cap => 'This month’s rendering budget (' + usd(cap) + ') is used up. It resets on the 1st.';
+export const budgetMessage = cap => cap === 0 ? 'Renderings are turned off on this site.' : 'This month’s rendering budget (' + usd(cap) + ') is used up. It resets on the 1st.';
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
   const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const image = dataImage(b.image); if (!image) return res.status(400).json({ error: 'Send the massing picture as a JPEG, PNG or WebP data URL under 3 MB.' });
   const cap = capOf(), spend = await monthSpend('render'); // spent null: couldn't read it, so paint anyway
-  if (spend.spent != null && spend.spent >= cap) return res.status(402).json({ error: budgetMessage(cap), spent: spend.spent, cap, month: spend.month });
+  if (cap === 0 || (spend.spent != null && spend.spent >= cap)) return res.status(402).json({ error: budgetMessage(cap), spent: spend.spent, cap, month: spend.month });
   const view = byId(VIEWS, b.view).id, brief = cleanBrief(b.brief), prompt = renderPrompt(brief, view);
   let model = process.env.OPENAI_IMAGE_MODEL || '';
   if (!model) { try { model = pickImageModel(await availableModels(key)); } catch (e) { model = pickImageModel([]); } }

@@ -169,6 +169,9 @@ assert.equal(res.code, 402, '40 × $2.50 = $100: the cap'); delete process.env.R
 supaFail = true; calls.length = 0; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.8.8' }), res);
 assert.equal(res.code, 200, JSON.stringify(res.body)); assert.equal(calls.length, 1, 'painted though the budget couldn’t be read'); assert.equal(res.body.budget.spent, null);
 res = mockRes(); await render(req({ method: 'GET', ip: '9.9.8.9' }), res); assert.equal(res.code, 200); assert.equal(res.body.budget.spent, null); assert.equal(res.body.budget.cap, 100);
+// a $0 budget turns renderings off, even when the usage can't be read (no fail open), and says so plainly
+process.env.RENDER_MONTHLY_CAP_USD = '0'; calls.length = 0; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.8.10' }), res);
+assert.equal(res.code, 402); assert.equal(calls.length, 0, 'no OpenAI call with renderings off'); assert.equal(res.body.error, 'Renderings are turned off on this site.'); delete process.env.RENDER_MONTHLY_CAP_USD;
 supaFail = false; usage = [];
 
 // the model's refusal reaches the user in words; a network failure is a plain retry message

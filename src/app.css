@@ -2249,8 +2249,8 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:12px}
 .pj-rth{margin:0;cursor:var(--cur-pointer,pointer);border:1px solid var(--line-2);border-radius:8px;overflow:hidden;background:var(--panel);transition:border-color 120ms,box-shadow 120ms}
 .pj-rth:hover{border-color:var(--brand);box-shadow:0 2px 12px rgba(11,13,12,.08)}
-.pj-rimg{display:grid;place-items:center;aspect-ratio:16/9;background:#e6e9eb}
-.pj-rimg img{display:block;width:100%;height:100%;object-fit:cover}
+.pj-rimg{position:relative;display:grid;place-items:center;aspect-ratio:16/9;background:#e6e9eb}
+.pj-rimg img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover} /* a square or 3:2 picture (a model without 1080p) keeps the tile 16:9 */
 .pj-rimg i{font-style:normal;font-size:12px;color:var(--muted);text-align:center;padding:8px}
 .pj-rth figcaption{padding:7px 10px;font:600 12.5px/1.35 var(--font-display);color:var(--text)}
 .pj-rth figcaption span{display:block;font-weight:400;color:var(--text-2);font-size:11.5px}
@@ -3972,18 +3972,20 @@ html.sp-dragging,html.sp-dragging *{cursor:var(--cur-grabbing,grabbing)!importan
 .sp-ad-t{touch-action:none}
 
 /* site plan renderings: the picks, the busy line, the gallery and the full-size viewer */
-#card .sp-rsel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+#card .sp-rsel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}#card .sp-rsel>:first-child{grid-column:1/-1} /* the View names its building: the whole width */
+.sp-hint{font-size:12px;line-height:1.45;color:var(--muted);margin-top:8px}#card .sp-rbudget.used{color:var(--danger)}
 #card .sp-rbusy{display:flex;align-items:center;gap:8px}#card .sp-rbusy::before{content:'';width:12px;height:12px;border-radius:50%;border:2px solid var(--brand);border-right-color:transparent;animation:sp-spin 1s linear infinite;flex:none}
 @keyframes sp-spin{to{transform:rotate(360deg)}}
 #card .sp-rgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
 #card .sp-rth{margin:0;cursor:var(--cur-pointer,pointer);border:1px solid var(--line-2);border-radius:var(--r-sm);overflow:hidden;background:var(--panel)}
 #card .sp-rth img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#e6e9eb}
 #card .sp-rth figcaption{padding:6px 8px;font:600 12px var(--font-display);color:var(--text)}#card .sp-rth figcaption span{display:block;font-weight:400;color:var(--text-2);font-size:11px}
+#card .sp-rth .sp-rgone{display:grid;place-items:center;aspect-ratio:16/9;padding:6px;background:#e6e9eb;color:var(--muted);font-size:11px;text-align:center}
 #card .sp-rth.stale img{filter:grayscale(.5)}#card .sp-rth.stale figcaption span{color:var(--danger)}#card .sp-rth.gone{opacity:.55}
 #card .sp-rth:hover,#card .sp-rth:focus-visible{border-color:var(--brand)}
 .sp-rview{position:fixed;inset:0;z-index:1200;background:rgba(10,14,16,.86);display:grid;place-items:center;padding:16px}
 .sp-rvin{width:min(1400px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--panel,#fff);border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)}
 .sp-rvtop{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line-2)}.sp-rvtop b{font:600 14px var(--font-display)}.sp-rvtop span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2);font-size:12px}
 .sp-rvimg{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#111}.sp-rvimg img{max-width:100%;max-height:min(78vh,900px);object-fit:contain}
-.sp-rvbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-top:1px solid var(--line-2)}.sp-rvbtns{display:flex;gap:8px}
+.sp-rvbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-top:1px solid var(--line-2)}.sp-rvbtns{display:flex;gap:8px}.sp-rvbar .sp-hint{margin:0}.sp-rvbar [data-del]{color:var(--danger)}
 @media (max-width:600px){#card .sp-rsel{grid-template-columns:1fr}#card .sp-rgrid{grid-template-columns:1fr}}

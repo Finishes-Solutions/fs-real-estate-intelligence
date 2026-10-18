@@ -106,7 +106,8 @@ export function initSitePlan(ctx) {
   badge();
 
   const P = () => db.projects.find(p => p.id === ed?.pid), PL = () => P()?.plans.find(x => x.id === ed?.plid) || (ed?.draftPlan && ed.draftPlan.id === ed.plid ? ed.draftPlan : undefined); // a draft isn't in the project until its site is finished
-  const nextName = p => 'Option ' + String.fromCharCode(65 + Math.min(25, p.plans.length));
+  // the next option's name: the next letter not already used (after a delete, Copy or New Option never repeats a name)
+  const nextName = p => { const used = new Set(p.plans.map(x => x.name)); for (let i = p.plans.length; i < 26; i++) { const n = 'Option ' + String.fromCharCode(65 + i); if (!used.has(n)) return n; } let k = p.plans.length + 1; while (used.has('Option ' + k)) k++; return 'Option ' + k; };
   const newPlan = (p, extra = {}) => ({ id: uid(), name: nextName(p), origin: null, ring: [], src: null, front: null, frontGuess: true, setbacks: { ...SP.SETBACKS }, program: { use: 'retail' }, zoning: null, elements: [], created: new Date().toISOString(), ...extra });
   const parcelKey = pc => pc.propId ? 'pid:' + pc.propId : 'pt:' + pc.center.map(v => v.toFixed(5)).join(',');
 
@@ -2984,16 +2985,16 @@ export function initSitePlan(ctx) {
   // this month's rendering budget (api/render GET; the server refuses a render once it's spent): one line under the
   // button, read when the section shows and after each render, kept a minute. Unknown (no usage database) shows nothing.
   let rbudget = null, rbAt = 0, rbBusy = false;
-  const rbUsed = () => !!rbudget && rbudget.spent != null && rbudget.spent >= rbudget.cap;
+  const rbUsed = () => !!rbudget && (rbudget.cap === 0 || (rbudget.spent != null && rbudget.spent >= rbudget.cap)); // a $0 budget: renderings are off
   const rbUsd = v => '$' + (v % 1 ? v.toFixed(2) : String(v));
-  const budgetLine = () => { const b = rbudget; if (aiOff() || !b || b.spent == null || !(b.cap >= 0)) return '';
+  const budgetLine = () => { const b = rbudget; if (aiOff() || !b) return ''; if (b.cap === 0) return 'Renderings are turned off on this site.'; if (b.spent == null || !(b.cap >= 0)) return '';
     if (rbUsed()) return 'This month’s rendering budget (' + rbUsd(b.cap) + ') is used up, so rendering is paused. It resets on the 1st.';
     return 'Renderings this month: ' + (b.priced === false ? 'about ' : '') + '$' + b.spent.toFixed(2) + ' of ' + rbUsd(b.cap) + (b.images != null ? ' · ' + f0(b.images) + ' picture' + (b.images === 1 ? '' : 's') : ''); };
-  function budgetHtml() { const t = budgetLine(); return '<div class="sp-hint sp-rbudget" id="spRBudget"' + (t ? '' : ' hidden') + ' title="' + (rbudget?.priced === false ? 'Estimated: the image model’s price isn’t known, so each picture is counted at a flat amount' : 'At the image model’s list price') + '">' + esc(t) + '</div>'; }
+  function budgetHtml() { const t = budgetLine(); return '<div class="sp-hint sp-rbudget' + (rbUsed() ? ' used' : '') + '" id="spRBudget"' + (t ? '' : ' hidden') + ' title="' + (rbudget?.priced === false ? 'Estimated: the image model’s price isn’t known, so each picture is counted at a flat amount' : 'At the image model’s list price') + '">' + esc(t) + '</div>'; }
   // fill the line in place (no redraw) and hold the button while the budget is spent
   function showBudget() {
-    const el = card.querySelector('#spRBudget'); if (el) { const t = budgetLine(); el.textContent = t; el.hidden = !t; }
-    const go = card.querySelector('#spRenderGo'); if (go && rbUsed() && !ed?.rendering) { go.disabled = true; go.title = 'This month’s rendering budget is used up. It resets on the 1st.'; }
+    const el = card.querySelector('#spRBudget'); if (el) { const t = budgetLine(); el.textContent = t; el.hidden = !t; el.classList.toggle('used', rbUsed()); }
+    const go = card.querySelector('#spRenderGo'); if (go && rbUsed() && !ed?.rendering) { go.disabled = true; go.title = rbudget.cap === 0 ? 'Renderings are turned off on this site.' : 'This month’s rendering budget is used up. It resets on the 1st.'; }
   }
   async function loadBudget() {
     if (aiOff() || rbBusy || Date.now() - rbAt < 60e3) { showBudget(); return; }
@@ -3004,6 +3005,8 @@ export function initSitePlan(ctx) {
   }
   // one picture a view, in turn: capture, ask the server, keep the picture and the massing it came from
   // target: the building a close-up frames (an element of pl), for the 'hero' view
+  // A picture already being painted when the plan closes, another option opens or the page changes is still kept, on
+  // the option it was taken of (it has been paid for); no further views are taken. Cancel drops it.
   async function renderViews(p, pl, views, look, time, target = null) {
     if (ed.rendering) return;
     const run = ed.rendering = { n: views.length, i: 0, view: views[0], msg: '', abort: new AbortController() }; panel();
@@ -3011,11 +3014,11 @@ export function initSitePlan(ctx) {
     let made = 0, why = '', capped = false;
     try {
       const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
-      const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' }), sig = planSig(pl);
+      const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' });
       const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map', focus: target });
       for (let i = 0; i < views.length && live(); i++) {
         run.i = i; run.view = views[i]; run.msg = 'Taking the picture from the map…'; panel();
-        const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero;
+        const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero, sig = planSig(pl); // the plan as this picture shows it
         const cap = await captureView(pl, views[i], isHero ? target : null); if (!live()) break;
         run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; panel();
         const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i] }), signal: run.abort.signal });
@@ -3023,18 +3026,20 @@ export function initSitePlan(ctx) {
         if (r.status === 402) { rbudget = { ...(rbudget || {}), spent: d.spent, cap: d.cap, month: d.month }; rbAt = Date.now(); capped = true; } // the month's budget is spent
         if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
         if (d.budget?.spent != null) { rbudget = { ...(rbudget || {}), ...d.budget, images: (rbudget?.images || 0) + 1 }; rbAt = Date.now(); }
-        if (!live()) break;
+        if (run.abort.signal.aborted) break;
+        // the option it was taken of, looked up now (not the one open now, and not a copy a sync has since replaced); gone: deleted meanwhile
+        const P1 = db.projects.find(x => x.id === p.id), cur = P1?.plans.find(x => x.id === pl.id); if (!cur) break;
         const id = pl.id + '/' + Date.now().toString(36) + '-' + views[i];
         await rput(id, await toBlob(d.image)); await rput(id + ':m', await toBlob(cap.image)).catch(() => {});
-        const cur = PL(); if (!cur) break;
         cur.renders = (cur.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '', ...(isHero ? { target: hero } : {}) }]);
         while (cur.renders.length > 16) { const old = cur.renders.shift(); rdel(old.id); rdel(old.id + ':m'); } // the newest sixteen are kept
-        save(p); made++; panel();
+        save(P1); made++; panel();
       }
     } catch (e) { why = e.name === 'AbortError' ? '' : e.message; }
     finally {
-      if (ed?.rendering === run) ed.rendering = null; if (!capped) rbAt = 0; panel(); // the budget is read again after a render
-      if (made) ctx.toast(made === 1 ? 'Rendering ready.' : made + ' renderings ready.' + (why ? ' The last one failed: ' + why : ''));
+      const here = ed?.rendering === run; if (here) ed.rendering = null; if (!capped) rbAt = 0; panel(); // the budget is read again after a render
+      const of = here ? '' : ' of ' + pl.name; // finished while another option, or another page, was open
+      if (made) ctx.toast((made === 1 ? 'Rendering' + of + ' ready.' : made + ' renderings' + of + ' ready.') + (why ? ' The next one failed: ' + why : ''));
       else if (why) ctx.toast(capped ? why : 'No rendering: ' + why);
     }
   }
@@ -3071,7 +3076,7 @@ export function initSitePlan(ctx) {
     on('#spRenderStop', () => { ed.rendering?.abort.abort(); });
     loadBudget();
     card.querySelectorAll('.sp-rth').forEach(f => { const r = (pl.renders || []).find(x => x.id === f.dataset.rid); if (!r) return;
-      renderSrc(r.id).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { img.alt = 'Picture not on this device'; f.classList.add('gone'); } });
+      renderSrc(r.id).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { const g = document.createElement('span'); g.className = 'sp-rgone'; g.textContent = 'Not on this device' + (r.by ? ' (made by ' + r.by + ')' : ''); img.replaceWith(g); f.classList.add('gone'); } }); // a teammate's: a plain placeholder, not a broken picture
       f.onclick = () => openRender(p, pl, r); });
   }
   // the picture full size, with the massing it was made from a click away, Download and Delete
@@ -3092,7 +3097,7 @@ export function initSitePlan(ctx) {
     box.querySelector('[data-x]').onclick = close;
     const cmp = box.querySelector('[data-cmp]'); if (cmp) cmp.onclick = () => { const onM = cmp.getAttribute('aria-pressed') !== 'true'; cmp.setAttribute('aria-pressed', String(onM)); img.src = onM ? msrc : src; cmp.textContent = onM ? 'Show the rendering' : 'Show the massing'; };
     box.querySelector('[data-dl]').onclick = async () => { const b = await rget(r.id); if (b instanceof Blob) ctx.saveFile(fileName(p, pl) + '-' + r.view + '-rendering.jpg', b, 'image/jpeg'); };
-    box.querySelector('[data-del]').onclick = () => { if (!confirm('Delete this rendering?')) return; const cur = p.plans.find(x => x.id === pl.id) || (PL()?.id === pl.id ? PL() : null); if (cur) { cur.renders = (cur.renders || []).filter(x => x.id !== r.id); save(p); } rdel(r.id); rdel(r.id + ':m'); close(); if (ed) panel(); };
+    box.querySelector('[data-del]').onclick = () => { if (!confirm('Delete this rendering?')) return; const P1 = db.projects.find(x => x.id === p.id) || p, cur = P1.plans.find(x => x.id === pl.id) || (PL()?.id === pl.id ? PL() : null); if (cur) { cur.renders = (cur.renders || []).filter(x => x.id !== r.id); save(P1); } rdel(r.id); rdel(r.id + ':m'); close(); if (ed) panel(); }; // (the project as it is now: a sync may have replaced the copy the viewer was opened from)
   }
   // the two newest renderings that still match the plan, as data URLs for the PDF sheet, at up to 1600 px wide so the
   // sheet stays under the PDF service's request limit
@@ -3336,7 +3341,9 @@ export function initSitePlan(ctx) {
     const ready = p.plans.filter(laidOut), groups = p.plans.filter(pl => pl.renders?.length || laidOut(pl));
     if (!rendersOf(p).length) return '<div class="pj-empty pj-rempty"><b>No renderings yet</b><p>A rendering is a photoreal picture of an option, painted by the AI from its 3D massing on the map: the buildings stay where the plan puts them, the materials and landscaping are the AI’s.</p>' +
       '<ol><li>Open an option that has buildings laid out.</li><li>In its panel, go to <b>Render</b> (a chip at the top of the panel).</li><li>Pick a view, the materials and the light, and press <b>Render 3D View</b>. Each takes about a minute.</li></ol>' +
-      (ready.length ? '<div class="btnrow">' + ready.slice(0, 4).map(pl => '<button type="button" class="btn" data-rmore="' + esc(pl.id) + '">Render ' + esc(pl.name) + '</button>').join('') + '</div>' : '<p>None of this project’s options has buildings yet: lay one out first.</p>') + '</div>';
+      (ready.length ? '<div class="btnrow">' + ready.slice(0, 4).map(pl => '<button type="button" class="btn" data-rmore="' + esc(pl.id) + '">Render ' + esc(pl.name) + '</button>').join('') + '</div>' : (p.plans.length ? '<p>None of this project’s options has buildings yet: lay one out first.</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Options</button></div>'
+        : siteFor(p) ? '<p>This project has no site plan options yet.</p><div class="btnrow"><button type="button" class="btn primary" data-add="1">New Option</button></div>'
+        : '<p>This project has no site yet: add its parcel or draw it first.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div>')) + '</div>'; // never a dead end
     return groups.map(pl => { const list = (pl.renders || []).slice().reverse(), sig = planSig(pl);
       return '<section class="pj-rg" aria-labelledby="pjRg-' + esc(pl.id) + '"><div class="pj-rgh"><h3 class="pj-h3" id="pjRg-' + esc(pl.id) + '">' + esc(pl.name) + ' <span class="pj-tn">' + (list.length ? plural(list.length, 'rendering') : 'none yet') + '</span></h3>' +
         '<span class="pj-rgl"><button type="button" class="lnk" data-plan="' + esc(pl.id) + '">Open plan</button>' + (laidOut(pl) ? '<button type="button" class="lnk" data-rmore="' + esc(pl.id) + '">Render more</button>' : '') + '</span></div>' +
@@ -3350,7 +3357,7 @@ export function initSitePlan(ctx) {
     root.querySelectorAll('.pj-rth').forEach(f => { const pl = p.plans.find(x => x.id === f.dataset.pl), r = pl?.renders?.find(x => x.id === f.dataset.rid); if (!r) return;
       renderSrc(r.id).then(u => { if (!f.isConnected) return; const img = f.querySelector('img'), ph = f.querySelector('.pj-rimg i');
         if (u) { img.src = u; img.alt = rLabel(r) + ' rendering'; img.hidden = false; ph?.remove(); }
-        else { f.classList.add('gone'); ph.textContent = 'Not on this device' + (r.by ? ': ' + r.by + ' made it on theirs' : ': it was made on another one'); f.setAttribute('aria-disabled', 'true'); } });
+        else { f.classList.add('gone'); ph.textContent = 'Not on this device' + (r.by && r.by !== get(NAME_KEY) ? ': ' + r.by + ' made it on theirs' : ': it was made on another one'); f.setAttribute('aria-disabled', 'true'); } });
       const go = () => { if (f.classList.contains('gone')) { ctx.toast('That picture isn’t on this device: renderings stay on the device they were made on.'); return; } openRender(p, pl, r, f); };
       f.onclick = go; f.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
   }
@@ -3487,12 +3494,16 @@ export function initSitePlan(ctx) {
       const c = { ...clone(pl), id: uid(), name: nextName(p), created: new Date().toISOString() }; delete c.renders; if (c.lastRun) c.lastRun = { ...c.lastRun, ask: '' };
       p.plans.push(c); save(p); ctx.toast('Copied ' + pl.name + ' as ' + c.name + '.'); root.querySelector('[data-plan="' + CSS.escape(c.id) + '"]')?.focus(); });
     root.querySelectorAll('[data-delpl]').forEach(b => b.onclick = () => { const pl = planOf2(b.dataset.delpl); if (!pl || !confirm('Delete ' + pl.name + ' from ' + p.name + '?' + (pl.renders?.length ? ' Its renderings on this device go too.' : ''))) return;
+      if (away?.plid === pl.id) hideAway(); if (resume?.plid === pl.id) clearResume(); // the "Editing … · Return to plan" banner would lead nowhere
       if (ed?.pid === p.id && ed.plid === pl.id) ctx.closeCard(); // it was open on the map
       for (const r of pl.renders || []) { rdel(r.id); rdel(r.id + ':m'); }
       p.plans = p.plans.filter(x => x.id !== pl.id); save(p); ctx.toast('Deleted ' + pl.name + ' from ' + p.name + '.'); });
     root.querySelectorAll('[data-rmore]').forEach(b => b.onclick = () => { const pl = planOf2(b.dataset.rmore); if (pl) renderMore(p, pl); });
+    on('[data-tabgo]', e => setTab(p, e.currentTarget.dataset.tabgo, true));
     on('[data-jref]', () => { siteFail.delete(p.id); gatherSite(p); render(true); });
-    on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? ' + (shared === true ? 'This removes it for the team too.' : 'This removes it from this device.'))) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null; save(); ctx.scheduleHash?.(); });
+    on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? ' + (shared === true ? 'This removes it for the team too.' : 'This removes it from this device.'))) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null;
+      for (const pl of p.plans) for (const r of pl.renders || []) { rdel(r.id); rdel(r.id + ':m'); } // its pictures on this device
+      if (away?.pid === p.id) hideAway(); if (resume?.pid === p.id) clearResume(); save(); ctx.scheduleHash?.(); });
     if (tab === 'overview') { // Regrid fetched on one of the parcels' cards since: its city and zoning count now; the jurisdiction is looked up once
       let ch = false; for (const x of p.parcels) ch = regridOn(x) || ch; if (ch) { quietSave(p); setTimeout(() => render()); }
       if (needSite(p)) gatherSite(p); // (the card already says Checking…)

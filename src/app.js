@@ -1168,7 +1168,8 @@ function pageArrived(v){ cardStatus((document.getElementById('view-'+v)?.getAttr
     const h=v==='map'?map.getCanvas():sec&&(sec.querySelector('h1,h2')||sec); if(!h) return;
     if(h!==map.getCanvas()&&!h.hasAttribute('tabindex')){ h.setAttribute('tabindex','-1'); h.classList.add('pg-focus'); } h.focus({preventScroll:true}); }); }
 // My Work › Projects: the project page follows the address (#pj=) on Back/Forward
-function syncProject(pj,pt){ if(view!=='projects') return; const cur=ctx.currentProject?.()??ctx.sitePlan?.where?.project??null; if(cur===(pj||null)) return;
+function syncProject(pj,pt){ if(view!=='projects') return; const cur=ctx.currentProject?.()??ctx.sitePlan?.where?.project??null;
+  if(cur===(pj||null)){ const t=ctx.sitePlan?.where?.tab; if(pj&&t&&t!==(pt||'overview')) ctx.sitePlan.show(pj,pt||'overview'); return; } // the same project, another tab (#pt= edited or pasted)
   if(ctx.openProject) ctx.openProject(pj||null,pt); else if(pj) ctx.sitePlan?.show?.(pj,pt); }
 // the tab title names the page ("Reports · Real Estate Intelligence Platform"), so history and tab lists make sense
 const APP_NAME='Real Estate Intelligence Platform';

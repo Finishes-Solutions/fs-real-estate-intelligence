@@ -350,15 +350,15 @@ export const ASK_SYSTEM = `You are a land planner and development analyst explai
 - Parking ratios, the 0.55 acre-feet a developed acre of storage and the pro forma's numbers are typical starting assumptions in this tool, not a city's requirement or a quote: say so when it matters, and where to change them (Settings, the Pro forma assumptions, Change with AI).
 - Short and plain, as you'd say it to a developer: two to five sentences, or a short list. No headings, no markdown beyond "- " list lines. Never claim code compliance; this is a concept.
 - If the question isn't about this plan or site, say briefly that you can only answer about the plan that's open.`;
-// the fact sheet as sent: plain values only, strings, arrays and depth kept short
-function tidy(v, d = 0) {
+// the fact sheet as sent: plain values only, strings (to n characters), arrays and depth kept short
+function tidy(v, d = 0, n = 700) {
   if (v == null) return null;
   if (typeof v === 'number') return Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null;
   if (typeof v === 'boolean') return v;
-  if (typeof v === 'string') return clip(v, 700);
+  if (typeof v === 'string') return clip(v, n);
   if (d >= 6 || typeof v !== 'object') return null;
-  if (Array.isArray(v)) return v.slice(0, 80).map(x => tidy(x, d + 1));
-  return Object.fromEntries(Object.entries(v).slice(0, 40).map(([k, x]) => [clip(k, 48), tidy(x, d + 1)]));
+  if (Array.isArray(v)) return v.slice(0, 80).map(x => tidy(x, d + 1, n));
+  return Object.fromEntries(Object.entries(v).slice(0, 40).map(([k, x]) => [clip(k, 48), tidy(x, d + 1, n)]));
 }
 async function ask(b, key, res) {
   const question = clip(b.question, 600).trim(), plan = b.plan && typeof b.plan === 'object' && !Array.isArray(b.plan) ? tidy(b.plan) : null;
@@ -396,7 +396,7 @@ export const PROJECT_ASK_SYSTEM = `You are a land planner and development analys
 - Short and plain, as you'd say it to a developer: two to six sentences, or a short list. An email summary may run a little longer, in plain sentences. No headings, no markdown beyond "- " list lines.
 - If the question isn't about this project or its site, say briefly that you can only answer about the project that's open.`;
 async function askProject(b, key, res) {
-  const question = clip(b.question, 600).trim(), project = b.project && typeof b.project === 'object' && !Array.isArray(b.project) ? tidy(b.project) : null;
+  const question = clip(b.question, 600).trim(), project = b.project && typeof b.project === 'object' && !Array.isArray(b.project) ? tidy(b.project, 0, 1500) : null; // (the project's notes run to 1,500 characters: lib/project.mjs)
   if (!question) return res.status(400).json({ error: 'Ask a question about the project.' });
   if (!project) return res.status(400).json({ error: 'Open a project first.' });
   let facts = JSON.stringify(project); if (facts.length > 48000 && Array.isArray(project.options)) { project.options = project.options.slice(0, 8); facts = JSON.stringify(project); }
