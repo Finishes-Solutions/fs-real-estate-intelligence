@@ -341,4 +341,12 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
   const bent = { kind: 'drive', path: [[0, 0], [0, 100], [100, 100]], width: 26, r: 60 }, tight = { ...bent, r: 5 };
   assert.ok(S.ringArea(S.outline(bent)) < S.ringArea(S.outline(tight)), 'a bigger Curve rounds the bend off more');
 }
+// a site drawn on the map (Redraw Site): a bow-tie is refused (it measured 0.00 acres and laid out a 1,000 sf box), and a
+// flat outline (corners in a line) has no boundary at all; both now get a toast instead of nothing
+{ assert.ok(T.selfIntersects([[0, 0], [500, 350], [500, 0], [0, 350]]), 'the corners clicked out of order cross');
+  assert.ok(!T.selfIntersects([[0, 0], [500, 0], [500, 350], [0, 350]]) && !T.selfIntersects([[0, 0], [400, 0], [200, 300]]), 'a plain outline or a triangle is fine');
+  assert.equal(S.ringArea([[0, 0], [400, 300], [400, 0], [0, 300]]), 0, 'a bow-tie\'s halves cancel out: 0 acres');
+  const F = S.frame([-95.8245, 29.7855]), bf = pts => { const ll = pts.map(F.toLL); return S.boundaryFrom({ type: 'Polygon', coordinates: [ll.concat([ll[0]])] }); };
+  assert.equal(bf([[0, 0], [200, 0], [400, 0]]), null, 'three corners in a line: no site');
+  assert.ok(S.ringArea(bf([[0, 0], [200, 1], [400, 0]]).ring) < 1000, 'all but in a line: a sliver under the 1,000 sf the editor asks for'); }
 console.log('site tools ok');
