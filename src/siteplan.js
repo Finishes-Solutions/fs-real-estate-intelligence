@@ -2939,13 +2939,34 @@ export function initSitePlan(ctx) {
       map.jumpTo({ center: centre, zoom: Math.max(13, Math.min(19, z + step)) });
     }
   }
+  // this month's rendering budget (api/render GET; the server refuses a render once it's spent): one line under the
+  // button, read when the section shows and after each render, kept a minute. Unknown (no usage database) shows nothing.
+  let rbudget = null, rbAt = 0, rbBusy = false;
+  const rbUsed = () => !!rbudget && rbudget.spent != null && rbudget.spent >= rbudget.cap;
+  const rbUsd = v => '$' + (v % 1 ? v.toFixed(2) : String(v));
+  const budgetLine = () => { const b = rbudget; if (aiOff() || !b || b.spent == null || !(b.cap >= 0)) return '';
+    if (rbUsed()) return 'This month’s rendering budget (' + rbUsd(b.cap) + ') is used up, so rendering is paused. It resets on the 1st.';
+    return 'Renderings this month: ' + (b.priced === false ? 'about ' : '') + '$' + b.spent.toFixed(2) + ' of ' + rbUsd(b.cap) + (b.images != null ? ' · ' + f0(b.images) + ' picture' + (b.images === 1 ? '' : 's') : ''); };
+  function budgetHtml() { const t = budgetLine(); return '<div class="sp-hint sp-rbudget" id="spRBudget"' + (t ? '' : ' hidden') + ' title="' + (rbudget?.priced === false ? 'Estimated: the image model’s price isn’t known, so each picture is counted at a flat amount' : 'At the image model’s list price') + '">' + esc(t) + '</div>'; }
+  // fill the line in place (no redraw) and hold the button while the budget is spent
+  function showBudget() {
+    const el = card.querySelector('#spRBudget'); if (el) { const t = budgetLine(); el.textContent = t; el.hidden = !t; }
+    const go = card.querySelector('#spRenderGo'); if (go && rbUsed() && !ed?.rendering) { go.disabled = true; go.title = 'This month’s rendering budget is used up. It resets on the 1st.'; }
+  }
+  async function loadBudget() {
+    if (aiOff() || rbBusy || Date.now() - rbAt < 60e3) { showBudget(); return; }
+    rbBusy = true;
+    try { const r = await fetch('api/render'), d = await r.json().catch(() => ({})); if (r.ok && d.budget) rbudget = d.budget; } catch (e) { /* no line, the button still works */ }
+    finally { rbAt = Date.now(); rbBusy = false; }
+    showBudget();
+  }
   // one picture a view, in turn: capture, ask the server, keep the picture and the massing it came from
   // target: the building a close-up frames (an element of pl), for the 'hero' view
   async function renderViews(p, pl, views, look, time, target = null) {
     if (ed.rendering) return;
     const run = ed.rendering = { n: views.length, i: 0, view: views[0], msg: '', abort: new AbortController() }; panel();
     const live = () => ed?.rendering === run && !run.abort.signal.aborted;
-    let made = 0, why = '';
+    let made = 0, why = '', capped = false;
     try {
       const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
       const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' }), sig = planSig(pl);
@@ -2956,7 +2977,10 @@ export function initSitePlan(ctx) {
         const cap = await captureView(pl, views[i], isHero ? target : null); if (!live()) break;
         run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; panel();
         const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i] }), signal: run.abort.signal });
-        const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        const d = await r.json().catch(() => ({}));
+        if (r.status === 402) { rbudget = { ...(rbudget || {}), spent: d.spent, cap: d.cap, month: d.month }; rbAt = Date.now(); capped = true; } // the month's budget is spent
+        if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        if (d.budget?.spent != null) { rbudget = { ...(rbudget || {}), ...d.budget, images: (rbudget?.images || 0) + 1 }; rbAt = Date.now(); }
         if (!live()) break;
         const id = pl.id + '/' + Date.now().toString(36) + '-' + views[i];
         await rput(id, await toBlob(d.image)); await rput(id + ':m', await toBlob(cap.image)).catch(() => {});
@@ -2967,9 +2991,9 @@ export function initSitePlan(ctx) {
       }
     } catch (e) { why = e.name === 'AbortError' ? '' : e.message; }
     finally {
-      if (ed?.rendering === run) ed.rendering = null; panel();
+      if (ed?.rendering === run) ed.rendering = null; if (!capped) rbAt = 0; panel(); // the budget is read again after a render
       if (made) ctx.toast(made === 1 ? 'Rendering ready.' : made + ' renderings ready.' + (why ? ' The last one failed: ' + why : ''));
-      else if (why) ctx.toast('No rendering: ' + why);
+      else if (why) ctx.toast(capped ? why : 'No rendering: ' + why);
     }
   }
   const RLOOK_KEY = 'fs-render-look', RTIME_KEY = 'fs-render-time';
@@ -2990,6 +3014,7 @@ export function initSitePlan(ctx) {
       '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + viewOptions(pl, sel) + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + ' title="The four views of the whole site, one after another (not the building close-up)">All site views</option></select></label>' +
         '<label class="sp-f"><span class="sp-fl">Materials</span><select id="spRLook">' + sel(RD.LOOKS, pr.look) + '</select></label><label class="sp-f"><span class="sp-fl">Light</span><select id="spRTime">' + sel(RD.TIMES, pr.time) + '</select></label></div>' +
       '<div class="sp-go2"><button type="button" class="btn askai" id="spRenderGo"' + (R || off ? ' disabled' : '') + ' title="' + (off ? 'AI isn’t set up on this site' : 'Point the map’s 3D massing at the site and have the AI paint it as a photograph (1920 × 1080)') + '">' + (R ? 'Rendering ' + (R.i + 1) + ' of ' + R.n + '…' : 'Render 3D View') + '</button>' + (R ? '<button type="button" class="btn" id="spRenderStop">Cancel</button>' : '') + '</div>' +
+      budgetHtml() +
       (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : imageryBase() ? '' : '<div class="sp-hint">Tip: switch the base map to <b>Satellite</b> first (Map layers) and the surroundings come out as they really are.</div>') +
       (list.length ? '<div class="sp-rgrid">' + list.map(r => { const V = { label: RD.renderLabel(r.view, r.target) }, stale = r.sig && r.sig !== sig; return '<figure class="sp-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" title="' + esc(V.label + (stale ? ' · the plan has changed since this was made' : '')) + '"><img alt="' + esc(V.label + ' rendering') + '"><figcaption>' + esc(V.label) + ' <span>' + esc(rWhen(r.at)) + (stale ? ' · plan changed since' : '') + '</span></figcaption></figure>'; }).join('') + '</div>' +
         '<div class="sp-hint">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. Click one to see it full size, compare it with the massing, download or delete it. The two newest go on the Site Plan PDF.</div>' : '') + '</div>';
@@ -3002,6 +3027,7 @@ export function initSitePlan(ctx) {
     const tm = $('#spRTime'); if (tm) tm.onchange = () => keep(RTIME_KEY, tm.value);
     on('#spRenderGo', () => { const v = $('#spRView')?.value || 'corner', pr = rPrefs(), hero = RD.byId(RD.VIEWS, v, null)?.hero; renderViews(p, pl, v === 'all' ? RD.SITE_VIEWS : [v], pr.look, pr.time, hero ? heroFor(pl) : null); });
     on('#spRenderStop', () => { ed.rendering?.abort.abort(); });
+    loadBudget();
     card.querySelectorAll('.sp-rth').forEach(f => { const r = (pl.renders || []).find(x => x.id === f.dataset.rid); if (!r) return;
       renderSrc(r.id).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { img.alt = 'Picture not on this device'; f.classList.add('gone'); } });
       f.onclick = () => openRender(p, pl, r); });

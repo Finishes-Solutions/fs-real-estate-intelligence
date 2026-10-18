@@ -6,9 +6,13 @@
 // API's edit endpoint, which keeps the input picture's geometry and camera and paints it photographically. Its token
 // use is recorded under the Renderings feature (lib/aiusage.mjs). One picture a request: the browser asks for the
 // views one after another, so a slow model never runs past Vercel's limit.
+// A monthly budget caps it (RENDER_MONTHLY_CAP_USD, $100 by default, per US Central calendar month): before painting,
+// this month's Renderings rows are costed (lib/aiusage.mjs monthSpend) and a spent budget answers 402 without asking
+// OpenAI. A failed read never blocks a picture. GET -> { budget: { spent, cap, month, images, priced } } for the panel.
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
 import { availableModels } from '../lib/openai.mjs';
-import { recordUsage } from '../lib/aiusage.mjs';
+import { recordUsage, monthSpend, tokensOf, fallbackPerImage } from '../lib/aiusage.mjs';
+import { costOf } from '../lib/aiprices.mjs';
 import { VIEWS, SIZES, byId, renderPrompt, pickImageModel } from '../lib/render.mjs';
 
 const BASE = 'https://api.openai.com/v1', MAX_IN = 3_200_000; // Vercel's body limit is 4.5 MB
@@ -45,12 +49,24 @@ export async function paint(key, { model, prompt, image, sizes = SIZES, fidelity
   throw lastErr || new Error('OpenAI kept failing');
 }
 
+// the month's cap in dollars: RENDER_MONTHLY_CAP_USD (0 turns renderings off), $100 when unset or not a number
+export const capOf = (env = process.env) => { const v = parseFloat(env.RENDER_MONTHLY_CAP_USD); return Number.isFinite(v) && v >= 0 ? v : 100; };
+const usd = v => '$' + (v % 1 ? v.toFixed(2) : String(v));
+export const budgetMessage = cap => 'This month’s rendering budget (' + usd(cap) + ') is used up. It resets on the 1st.';
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  if (req.method === 'GET') {
+    if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 30, perDay: 600 })) return;
+    const b = await monthSpend('render'); res.setHeader('Cache-Control', 'no-store');
+    return res.json({ budget: { spent: b.spent, cap: capOf(), month: b.month, images: b.images, priced: b.priced } });
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'GET or POST only' });
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 6, perDay: 80 })) return;
   const key = needKey(res); if (!key) return;
   const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const image = dataImage(b.image); if (!image) return res.status(400).json({ error: 'Send the massing picture as a JPEG, PNG or WebP data URL under 3 MB.' });
+  const cap = capOf(), spend = await monthSpend('render'); // spent null: couldn't read it, so paint anyway
+  if (spend.spent != null && spend.spent >= cap) return res.status(402).json({ error: budgetMessage(cap), spent: spend.spent, cap, month: spend.month });
   const view = byId(VIEWS, b.view).id, brief = cleanBrief(b.brief), prompt = renderPrompt(brief, view);
   let model = process.env.OPENAI_IMAGE_MODEL || '';
   if (!model) { try { model = pickImageModel(await availableModels(key)); } catch (e) { model = pickImageModel([]); } }
@@ -59,7 +75,9 @@ export default async function handler(req, res) {
   try {
     const out = await paint(key, { model, prompt, image });
     res.setHeader('Cache-Control', 'no-store');
-    return res.json({ image: 'data:image/jpeg;base64,' + out.b64, model: out.model, size: out.size, view, prompt });
+    const t = tokensOf(out.usage), est = (t && costOf(out.model, t)) ?? fallbackPerImage(); // this picture, best guess
+    const budget = { spent: spend.spent == null ? null : Math.round((spend.spent + est) * 1e4) / 1e4, cap, month: spend.month };
+    return res.json({ image: 'data:image/jpeg;base64,' + out.b64, model: out.model, size: out.size, view, prompt, budget });
   } catch (e) {
     console.error('render', e.message);
     const m = /OpenAI 4\d\d: (.*)/.exec(e.message);

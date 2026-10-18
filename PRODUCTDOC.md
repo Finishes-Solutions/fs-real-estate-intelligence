@@ -703,6 +703,7 @@ While a plan is open, a small tool bar sits at the bottom left of the map (on ph
 - **They are concept illustrations, not designs.** Placement, counts and heights follow the plan; everything else is made up, and two renderings of one plan will differ. Check a picture against the massing before showing it to anyone; if a building came out wrong, render again.
 - The pictures stay on the device they were made on (they're too big to share through the project). Teammates see that a rendering exists, not the picture. The newest sixteen are kept per option.
 - Renderings count toward the AI's use in Settings › AI model › **Usage** under **Renderings**; the price of the image model can be set there when the app doesn't know it.
+- **A monthly budget for renderings.** The administrators set how much renderings may cost each calendar month ($100 a month to start). A line under **Render 3D View** shows how much of it has been used and how many pictures were made (it says "about" when the image model's price is only estimated). When the budget is spent, the button is paused with a note, and rendering starts again on the 1st of the next month. Ask AI and site plan builds are not affected.
 
 **Exports**
 - **Site Plan PDF:** a conceptual site plan sheet on **11 × 17** or **24 × 36** paper:
@@ -775,6 +776,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 ## Recently added
 
 - **Building close-up renderings:** a fifth **View** under Renderings frames one building closely, as a hero shot, with its parking and landscaping around it. Select a building on the plan first to choose which one; otherwise it takes the building nearest the street. The picture is titled with the building's name (**Building close-up · Building A**). **All four views** is now **All site views**.
+- **A monthly budget for renderings:** the Render section shows how much of this month's rendering budget ($100 to start) has been used; once it's spent, rendering pauses until the 1st. Nothing else is affected.
 - **Photoreal renderings of a site plan:** a **Render** section on an open plan paints the option as a photograph from four preset views (the whole parcel in frame, from a marketing-aerial height), in your choice of materials and light, 1920 × 1080, from the map's 3D model, so the buildings stay where the plan puts them. Compare each with the massing, download it, and the two newest go on the Site Plan PDF. Concept illustrations, kept on this device.
 - **AI usage and cost in Settings:** Settings › AI model › **Usage** shows each model's requests, tokens and estimated cost for the month (or the last 30 or 7 days, today, the year), split by feature, with OpenAI's billed amounts when an admin key is set.
 - **Pick the AI model:** Settings › **AI model** lists the OpenAI models the app can use and says which one gave the last answer; Anthropic is shown as coming later.
