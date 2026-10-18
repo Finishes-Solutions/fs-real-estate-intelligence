@@ -528,7 +528,9 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: ['all', kind('lot'), ['!=', ['get', 'site'], 1]], minzoom: 17, layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.lots, 'line-width': 1, 'line-dasharray': [0.1, 2.4] } }); // house lots, dotted, close in
     add({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': Ln.walk, 'fill-opacity': .85 } });
     add({ id: 'fs-sp-yard', type: 'fill', source: SRC, filter: kind('yard'), minzoom: 16, paint: { 'fill-color': Ln.yard, 'fill-opacity': .9 } });
-    add({ id: 'fs-sp-fence', type: 'line', source: SRC, filter: kind('fence'), minzoom: 16, paint: { 'line-color': Ln.fence, 'line-width': 1 } });
+    add({ id: 'fs-sp-fence', type: 'line', source: SRC, filter: ['all', kind('fence'), ['!', ['has', 'id']]], minzoom: 16, paint: { 'line-color': Ln.fence, 'line-width': 1 } }); // back-yard fences
+    add({ id: 'fs-sp-sfence', type: 'fill', source: SRC, filter: ['all', kind('fence'), ['has', 'id']], paint: { 'fill-color': ['case', ['==', ['get', 'gate'], 1], Ln.gate, Ln.secure], 'fill-opacity': ['case', sel1, 1, .9] } }); // a security fence, its gates
+    add({ id: 'fs-sp-sfencel', type: 'line', source: SRC, filter: ['all', kind('fence'), ['has', 'id']], layout: { 'line-join': 'round' }, paint: { 'line-color': ['case', ['==', ['get', 'gate'], 1], Ln.gate, Ln.secure], 'line-width': ['interpolate', ['linear'], ['zoom'], 16, ['case', ['==', ['get', 'gate'], 1], 2, 1], 19, ['case', ['==', ['get', 'gate'], 1], 4, 2]] } }); // (a line too, so it reads at any zoom)
     add({ id: 'fs-sp-stall', type: 'line', source: SRC, filter: kind('stall'), minzoom: 16, paint: { 'line-color': Ln.stall, 'line-width': 1, 'line-opacity': .9 } });
     add({ id: 'fs-sp-isl', type: 'fill', source: SRC, filter: kind('island'), paint: { 'fill-color': C.green, 'fill-opacity': .9 } });
     add({ id: 'fs-sp-ada', type: 'fill', source: SRC, filter: kind('ada'), minzoom: 16, paint: { 'fill-color': '#2f6db5', 'fill-opacity': .9 } });
@@ -743,7 +745,7 @@ export function initSitePlan(ctx) {
   // ---------- pointer: select, move, resize, rotate ----------
   const ftAt = (pl, lngLat) => SP.frame(pl.origin).toFt([lngLat.lng, lngLat.lat]);
   const SHAPEABLE = ['building', 'plaza', 'green', 'pond', 'court', 'pool', 'patio', 'play', 'garage']; // pieces whose outline can be edited point by point
-  const ORDER = ['trash', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'pond', 'keepout', 'drive', 'truck', 'parking', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
+  const ORDER = ['trash', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'pond', 'keepout', 'fence', 'drive', 'truck', 'parking', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
   function hit(pl, e) {
     let best = null, bd = coarse() ? 22 : 12; for (const h of handles(pl)) { const p = map.project(h.at), dd = Math.hypot(p.x - e.point.x, p.y - e.point.y); if (dd < bd) { bd = dd; best = h; } } if (best) return { h: best.i, hd: best }; // the nearest handle; a finger needs more room than a mouse
     const ft = ftAt(pl, e.lngLat);
@@ -1860,7 +1862,7 @@ export function initSitePlan(ctx) {
       '<div class="sp-tgs">' + sw('auto', 'Update layouts as I change settings', ed.autoSolve !== false, 'New layouts each time a setting changes, never over a layout you’ve edited') + sw('refit', 'Re-fit the site after each edit', pl.view?.autoRefit !== false, 'After you move, resize or add a piece, the rest of the site is laid out again around it') + '</div>' +
       (ed.solveBar ? '<div class="sp-solvebar" id="spSolveBar" role="status"><b>Settings changed.</b> The layout on the map has your edits, so it wasn’t replaced.<span class="btnrow">' + (pl.recipe ? '<button type="button" class="btn sm primary" id="spRefitMine" title="Lay out everything else again with these settings, keeping the pieces you placed">Re-fit around my changes</button>' : '') + '<button type="button" class="btn sm" id="spNewLay" title="New layouts from these settings; the layout on the map, with your changes, is replaced (Undo brings it back)">New layouts (replaces your edits)</button></span></div>' : '') +
       grp('Program', fld('Use', '<select id="spUse">' + Object.entries(SP.USES).map(([k, x]) => '<option value="' + k + '"' + (k === u ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select>') +
-        (u === 'multifamily' ? num('perUnit', 'Parking', prog.perUnit, 0.05, '/ unit') + num('floors', 'Floors', prog.floors, 1) + num('eff', 'Efficiency', prog.eff, 0.01, '', { hint: 'net ÷ gross' })
+        (u === 'storage' ? storageFields(prog) : u === 'multifamily' ? num('perUnit', 'Parking', prog.perUnit, 0.05, '/ unit') + num('floors', 'Floors', prog.floors, 1) + num('eff', 'Efficiency', prog.eff, 0.01, '', { hint: 'net ÷ gross' })
           : SP.USES[u]?.garage ? num('perUnit', 'Parking', prog.perUnit, 0.25, '/ home') : num('ratio', 'Parking', prog.ratio, 0.1, '/ 1k sf') + num('floors', 'Floors', prog.floors, 1) + num('depth', 'Building depth', prog.depth, 5, 'ft')) +
         sw('fill', 'Fill the rest of the site (Phase 2)', pp.fill !== false, 'What you ask for is Phase 1; the rest of the land holds more of the same as Phase 2', 'w2'),
         infoBtn('Typical suburban numbers to start with. Check the city’s or county’s rules (Houston has no zoning but has building lines and parking rules).', 'About these numbers')) +
@@ -1869,7 +1871,24 @@ export function initSitePlan(ctx) {
       grp('Parking', num('pp-stallW', 'Stall width', pp.stallW, 0.5, 'ft') + num('pp-stallD', 'Stall depth', pp.stallD, 0.5, 'ft') + num('pp-aisle', 'Drive aisle', pp.aisle, 1, 'ft')) +
       grp('Buildings', pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) + pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Curving'], ['straight', 'Straight']]) +
         num('pp-bldgDepth', 'Apartment depth', pp.bldgDepth, 1, 'ft') + num('pp-maxLen', 'Longest building', pp.maxLen, 10, 'ft') + num('pp-bldgGap', 'Space between', pp.bldgGap, 1, 'ft')) +
-      stormHtml(pl, prog, pp) + mix + homes + look + '</details>';
+      stormHtml(pl, prog, pp) + mix + storageMixes(prog) + homes + look + '</details>';
+  }
+  // self storage's own settings: the climate-controlled building, the drive-up rows, RV / boat stalls, the fence; blank
+  // sizes mean "as the site allows"
+  function storageFields(prog) {
+    const st = prog.storage || {}, sto = (k, label, v, step, unit, o = {}) => fld(label, numCtl('min="0" data-sto="' + k + '"', v, step, unit, o.ph), o);
+    return fld('Parking', numCtl('min="0" data-k="ratio"', prog.ratio, 0.05, '/ 1k sf'), { hint: '~1 per 100 units' }) + fld('Climate floors', numCtl('min="1" max="6" data-k="floors"', prog.floors, 1)) +
+      sto('climateSf', 'Climate-controlled', st.climateSf, 1000, 'sf', { ph: 'auto', hint: '0 = drive-up only' }) + sto('driveSf', 'Drive-up', st.driveSf, 1000, 'sf', { ph: 'as fits' }) +
+      sto('rowD', 'Drive-up row depth', st.rowD, 5, 'ft', { hint: 'back to back' }) + sto('aisle', 'Drive aisle', st.aisle, 1, 'ft') + sto('rv', 'RV / boat spaces', st.rv, 1, '', { hint: '12 × 40 ft' }) +
+      tog('data-sto="fence"', 'Fence and keypad gate', st.fence !== false, { tip: 'A security fence round the drive-up yard, from the climate building to the back, with a gate at each drive' });
+  }
+  // the two storage unit mixes (by count): sizes can be added, changed or removed; the averages set the unit counts
+  function storageMixes(prog) {
+    if (prog.use !== 'storage') return '';
+    const st = prog.storage || {}, one = (k, title, list) => '<div class="sp-sub">' + title + '</div><table class="sp-mix"><tr><th>Size</th><th>SF</th><th>%</th><th><span class="vh">Remove</span></th></tr>' + list.map((t, i) =>
+      '<tr><td><input data-smix="' + k + ':' + i + ':name" value="' + esc(t.name) + '" aria-label="Unit size name"></td><td><input type="number" min="10" step="5" data-smix="' + k + ':' + i + ':sf" value="' + t.sf + '" aria-label="' + esc(t.name) + ' square feet"></td><td><input type="number" min="0" max="100" step="1" data-smix="' + k + ':' + i + ':pct" value="' + t.pct + '" aria-label="' + esc(t.name) + ' share (%)"></td><td><button type="button" class="sp-x" data-smixdel="' + k + ':' + i + '" title="Remove" aria-label="Remove this size">×</button></td></tr>').join('') +
+      '</table><div class="sp-mix-f"><span class="rnote">Average ' + f0(SP.storageAvg(list)) + ' sf · ' + list.reduce((s, t) => s + +t.pct, 0) + '%</span><button type="button" class="btn sm ghost" data-smixadd="' + k + '">+ Add a Size</button></div>';
+    return one('climate', 'Climate-controlled units', st.climateMix || SP.STORAGE_MIX.climate) + one('drive', 'Drive-up units', st.driveMix || SP.STORAGE_MIX.drive);
   }
   // stormwater (detention, retention, underground or none) and trash enclosures
   function stormHtml(pl, prog, pp) {
@@ -1888,7 +1907,7 @@ export function initSitePlan(ctx) {
   function wireParams(pl) {
     const $ = s => card.querySelector(s), after = i => { if (ed.autoSolve !== false && (pl.recipe || ed.variants)) resolveSoon(i && settingLabel(i)); };
     $('.sp-prog').ontoggle = e => { ed.progOpen = e.target.open; };
-    $('#spUse').onchange = e => { change(x => { x.program = { ...x.program, use: e.target.value, ratio: null, perUnit: null, floors: null, depth: null, truck: null, mix: null, homeMix: null }; }); after(e.target); };
+    $('#spUse').onchange = e => { change(x => { x.program = { ...x.program, use: e.target.value, ratio: null, perUnit: null, floors: null, depth: null, truck: null, mix: null, homeMix: null, storage: null }; }); after(e.target); };
     card.querySelectorAll('.sp-prog input[data-k]').forEach(i => i.onchange = () => { change(x => { const k = i.dataset.k, v = i.value === '' ? null : +i.value;
       if (k.startsWith('sb-')) x.setbacks = { ...SP.SETBACKS, ...(x.setbacks || {}), [k.slice(3)]: v ?? SP.SETBACKS[k.slice(3)] ?? x.setbacks?.paving };
       else if (k.startsWith('pp-')) x.params = { ...(x.params || {}), [k.slice(3)]: v };
@@ -1904,6 +1923,12 @@ export function initSitePlan(ctx) {
     const mixOf = x => clone(SP.normalizeProgram(x.program).mix || SP.UNIT_MIX);
     card.querySelectorAll('[data-mix]').forEach(i => i.onchange = () => { const [n, f] = i.dataset.mix.split(':'); change(x => { const m = mixOf(x); m[+n][f] = f === 'name' ? i.value : +i.value; x.program = { ...x.program, mix: m }; }); after(i); });
     card.querySelectorAll('[data-mixdel]').forEach(b => b.onclick = () => { change(x => { const m = mixOf(x); m.splice(+b.dataset.mixdel, 1); x.program = { ...x.program, mix: m }; }); after(); });
+    const stoSet = (x, k, v) => { const p = x.program || {}; x.program = { ...p, gfa: null, storage: { ...(p.storage || {}), ...(SP.normalizeProgram(p).storage || {}), [k]: v } }; }; // (a total size no longer splits once the parts are set)
+    card.querySelectorAll('.sp-prog [data-sto]').forEach(i => i.onchange = () => { change(x => stoSet(x, i.dataset.sto, i.type === 'checkbox' ? i.checked : i.value === '' ? null : +i.value)); after(i); });
+    const sMix = (x, k) => clone(SP.normalizeProgram(x.program).storage?.[k + 'Mix'] || SP.STORAGE_MIX[k]);
+    card.querySelectorAll('[data-smix]').forEach(i => i.onchange = () => { const [k, n, f] = i.dataset.smix.split(':'); change(x => { const m = sMix(x, k); m[+n][f] = f === 'name' ? i.value : +i.value; stoSet(x, k + 'Mix', m); }); });
+    card.querySelectorAll('[data-smixdel]').forEach(b => b.onclick = () => { const [k, n] = b.dataset.smixdel.split(':'); change(x => { const m = sMix(x, k); m.splice(+n, 1); stoSet(x, k + 'Mix', m); }); });
+    card.querySelectorAll('[data-smixadd]').forEach(b => b.onclick = () => { const k = b.dataset.smixadd; change(x => { const m = sMix(x, k); m.push({ name: '10×' + (k === 'drive' ? 40 : 30), sf: k === 'drive' ? 400 : 300, pct: 0 }); stoSet(x, k + 'Mix', m); }); });
     const add = $('#spMixAdd'); if (add) add.onclick = () => change(x => { const m = mixOf(x); m.push({ name: 'New', sf: 900, pct: 0, beds: 2 }); x.program = { ...x.program, mix: m }; });
     card.querySelectorAll('[data-home]').forEach(i => i.onchange = () => { change(x => { const m = clone(SP.normalizeProgram(x.program).homeMix || SP.HOME_MIX), t = m.find(h => h.stories === +i.dataset.home); if (t) t.pct = +i.value; else m.push({ stories: +i.dataset.home, pct: +i.value }); x.program = { ...x.program, homeMix: m }; }); after(i); });
     const rs = $('#spResolve'); if (rs) rs.onclick = () => askReplace(() => resolve({ force: true }));
@@ -2020,7 +2045,7 @@ export function initSitePlan(ctx) {
       '<div class="sp-fg">' + (e.path && T.routeable(e) ? n('width', 'Width', Math.round(e.width || 26), { min: 6, max: 80, unit: 'ft' }) + n('r', 'Curve', Math.round(e.r ?? 30), { min: 0, max: 200, unit: 'ft' }) + (T.isEntrance(e) ? n('flare', 'Mouth flare', Math.round(e.flare || 0), { min: 0, max: 60, unit: 'ft' }) : '') : '') + (e.kind === 'building' ? pick('data-use="1"', 'Use', Object.entries(SP.USES).map(([k, u]) => [k, u.label]), e.use || prog.use) + n('floors', 'Floors', e.floors || 1, { min: 1, max: 40 }) +
           fld('Type', '<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '') + '</select>', { wide: true }) : '') + // what it is first: use and type can change any time
         (free ? '' : n('w', 'Width', Math.round(e.w), { min: 8, unit: 'ft' }) + n('d', 'Depth', Math.round(e.d), { min: 8, unit: 'ft' }) + n('rot', 'Turn', (Math.round(e.rot || 0) % 360 + 360) % 360, { unit: '°' })) +
-        (e.kind === 'building' ? (SP.USES[e.use || prog.use]?.garage ? n('units', 'Homes', e.units || 1, { min: 1, max: 40 }) : '') +
+        (e.kind === 'building' && (e.use || prog.use) === 'storage' ? pick('data-stok="1"', 'Storage', [['climate', 'Climate-controlled'], ['drive', 'Drive-up units'], ['office', 'Leasing office']], SP.storageKind(e)) : e.kind === 'building' ? (SP.USES[e.use || prog.use]?.garage ? n('units', 'Homes', e.units || 1, { min: 1, max: 40 }) : '') +
           pick('data-form="1"', 'Building shape', e.poly ? [['custom', 'Custom outline'], ...FORMS] : FORMS, e.poly ? 'custom' : e.form || 'bar') + (e.form === 'tower' && !e.poly ? n('podium', 'Podium floors', e.podium || 2, { min: 1, max: 6 }) : '') : '') +
         (e.kind === 'garage' ? n('levels', 'Levels', e.levels || 4, { min: 1, max: 12 }) : '') +
         (['pond', 'pool', 'green', 'plaza', 'court'].includes(e.kind) ? pick('data-shape="1"', 'Shape', [['organic', 'Natural curves'], ['rounded', 'Rounded rectangle'], ['square', 'Rectangle']], e.poly ? 'organic' : e.shape === 'round' ? 'rounded' : 'square') : '') +
@@ -2050,7 +2075,8 @@ export function initSitePlan(ctx) {
   }
   function readout(e) {
     const el = card.querySelector('#spRead'); if (!el || !e) return;
-    el.textContent = e.kind === 'building' ? f0(SP.footArea(e)) + ' sf footprint · ' + f0(SP.gfaOf(e)) + ' sf total' : e.kind === 'parking' ? SP.stalls(e).count + ' spaces (' + (e.sw || SP.STALL.w) + ' × ' + (e.sd || SP.STALL.d) + ' ft stalls, ' + (e.sa || SP.STALL.aisle) + ' ft aisles)' : e.kind === 'pond' ? (SP.elArea(e) / 43560).toFixed(2) + ' acres' : f0(SP.elArea(e)) + ' sf' + (SP.isFree(e) ? ' · drag to move it' : '');
+    const sq = e.kind === 'building' && (e.use || SP.normalizeProgram(PL()?.program).use) === 'storage' ? SP.storageOf([{ ...e, use: 'storage' }], SP.normalizeProgram(PL()?.program)) : null; // storage: what it rents
+    el.textContent = sq ? f0(SP.gfaOf(e)) + ' sf' + ((e.floors || 1) > 1 ? ' over ' + e.floors + ' floors' : '') + (sq.nrsf ? ' · ' + f0(sq.nrsf) + ' sf rentable · ~' + f0(sq.units) + ' units' : '') : e.kind === 'building' ? f0(SP.footArea(e)) + ' sf footprint · ' + f0(SP.gfaOf(e)) + ' sf total' : e.kind === 'parking' && e.rv ? SP.stalls(e).count + ' RV / boat spaces (' + (e.sw || 12) + ' × ' + (e.sd || 40) + ' ft)' : e.kind === 'parking' ? SP.stalls(e).count + ' spaces (' + (e.sw || SP.STALL.w) + ' × ' + (e.sd || SP.STALL.d) + ' ft stalls, ' + (e.sa || SP.STALL.aisle) + ' ft aisles)' : e.kind === 'pond' ? (SP.elArea(e) / 43560).toFixed(2) + ' acres' : f0(SP.elArea(e)) + ' sf' + (SP.isFree(e) ? ' · drag to move it' : '');
     for (const k of ['w', 'd']) { const i = card.querySelector('[data-e="' + k + '"]'); if (i && document.activeElement !== i) i.value = Math.round(e[k]); }
     const r = card.querySelector('[data-e="rot"]'); if (r && document.activeElement !== r) r.value = (Math.round(e.rot || 0) % 360 + 360) % 360;
     if (!drag) nums();
@@ -2062,8 +2088,9 @@ export function initSitePlan(ctx) {
     card.querySelector('[data-shape]')?.addEventListener('change', ev => { change(() => { SP.reshape(e, ev.target.value); e.pinned = true; }); refitSoon(); });
     const up1 = card.querySelector('#spUnpin'); if (up1) up1.onclick = () => change(() => { delete e.pinned; });
     const rf = card.querySelector('#spRefit'); if (rf) rf.onclick = () => refitNow(true);
-    card.querySelector('[data-type]')?.addEventListener('change', ev => { const t = typeById(ev.target.value); if (!t) return; change(() => { const keep = { id: e.id, name: e.name, rot: e.rot }; for (const k of ['poly', 'form', 'wing', 'podium', 'unitW', 'sf', 'units', 'jog', 'shape']) delete e[k]; Object.assign(e, fromType(t, [e.x, e.y], e.rot || 0), keep, { pinned: true }); makeRoom(e); }); ed.shape = null; draw(); panel(); }); // the same spot, another building from the library
+    card.querySelector('[data-type]')?.addEventListener('change', ev => { const t = typeById(ev.target.value); if (!t) return; change(() => { const keep = { id: e.id, name: e.name, rot: e.rot }; for (const k of ['poly', 'form', 'wing', 'podium', 'unitW', 'sf', 'units', 'jog', 'shape', 'storage']) delete e[k]; Object.assign(e, fromType(t, [e.x, e.y], e.rot || 0), keep, { pinned: true }); makeRoom(e); }); ed.shape = null; draw(); panel(); }); // the same spot, another building from the library
     card.querySelector('[data-use]')?.addEventListener('change', ev => setUse([e.id], ev.target.value));
+    card.querySelector('[data-stok]')?.addEventListener('change', ev => change(() => { e.storage = ev.target.value; if (e.storage !== 'climate') e.floors = 1; e.note = SP.storageNote(e); }));
     card.querySelector('[data-form]')?.addEventListener('change', ev => { if (ev.target.value === 'custom') return; change(() => { const f = ev.target.value; delete e.poly; if (f === 'bar') delete e.form; else e.form = f; if (f === 'tower') { e.podium = e.podium || 2; e.floors = Math.max(e.floors || 1, 8); } if ((f === 'L' || f === 'U') && e.d < 100) e.d = Math.min(150, e.d * 2); e.pinned = true; }); panel(); refitSoon(); });
     card.querySelector('[data-name]')?.addEventListener('change', ev => change(() => { e.name = ev.target.value.trim().slice(0, 40); }, true));
     if (card.querySelector('#spRot')) card.querySelector('#spRot').onclick = () => turnEl(e);
@@ -2092,6 +2119,7 @@ export function initSitePlan(ctx) {
       tile('Site', m.acres.toFixed(2) + ' ac', f0(m.siteSf) + ' sf') +
       two('Floor area', x => x.gfa ? f0(x.gfa) + ' sf' : '—', m.gfa ? plural(m.buildings, 'building') + (m.nrsf ? ' · ' + f0(m.nrsf) + ' net rentable' : '') : '') +
       (m.units ? two('Units', x => f0(x.units || 0), m.duAc.toFixed(1) + ' per acre' + (m.beds ? ' · ' + f0(m.beds) + ' beds' : '')) : '') +
+      (m.storage ? two('Storage', x => x.storage ? f0(x.storage.nrsf) + ' sf' : '—', 'rentable · ~' + f0(m.storage.units) + ' units (' + f0(m.storage.climateUnits) + ' climate, ' + f0(m.storage.driveUnits) + ' drive-up)' + (m.storage.rv ? ' · ' + m.storage.rv + ' RV / boat' : '')) : '') +
       (whole ? pair('Parking (spaces / needed)', f0(pk.stalls) + ' / ' + f0(pk.need), f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad) : tile('Parking', f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad)) +
       two('Coverage', x => pct(x.coverage) + (x === m ? max(m.coverage * 100, z.max_coverage_pct, v => v + '%') : ''), '', +z.max_coverage_pct && m.coverage * 100 > +z.max_coverage_pct ? ' bad' : '') +
       two('FAR', x => x.far.toFixed(2) + (x === m ? max(m.far, z.max_far, v => String(v)) : ''), '', +z.max_far && m.far > +z.max_far ? ' bad' : '') +
@@ -2099,10 +2127,17 @@ export function initSitePlan(ctx) {
       tile('Paved + roofs', pct(m.impervious)) + tile('Open space', pct(m.green)) +
       (m.heightFt ? tile('Height', 'about ' + m.heightFt + ' ft', +z.max_building_height_ft ? 'max ' + z.max_building_height_ft + ' ft' : '', +z.max_building_height_ft && m.heightFt > +z.max_building_height_ft ? ' bad' : '') : '') + '</div>' +
       (m.mix.length ? '<table class="sp-mixt"><tr><th>Unit</th><th>SF</th><th>Units</th><th>%</th><th>Net sf</th></tr>' + m.mix.map(t => '<tr><td>' + esc(t.name) + '</td><td>' + f0(t.sf) + '</td><td>' + f0(t.n) + '</td><td>' + pct(t.n / Math.max(1, m.mix.reduce((s, x) => s + x.n, 0))) + '</td><td>' + f0(t.n * t.sf) + '</td></tr>').join('') + '</table>' : '') +
+      (m.storage?.units ? storageTable(m.storage, prog) : '') +
       (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + n + '-story</td><td>' + f0(SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
       (issues.length ? '<ul class="sp-issues">' + issues.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul>' : m.gfa ? '<div class="rnote sp-ok">Fits the setbacks' + (m.spaces >= m.required ? ' and parks' : '') + '.</div>' : '');
   }
 
+  // storage units by size: each mix split by count over its rentable area
+  function storageTable(q, prog) {
+    const st = prog.storage || {}, rows = [];
+    for (const [k, label, n] of [['climate', 'Climate', q.climateUnits], ['drive', 'Drive-up', q.driveUnits]]) { const mix = st[k + 'Mix'] || SP.STORAGE_MIX[k], tot = mix.reduce((s, t) => s + +t.pct, 0) || 1; if (n) for (const t of mix) if (+t.pct > 0) rows.push([label, t.name, t.sf, Math.round(n * t.pct / tot)]); }
+    return '<table class="sp-mixt"><tr><th>Storage</th><th>Size</th><th>SF</th><th>Units</th></tr>' + rows.map(r => '<tr><td>' + r[0] + '</td><td>' + esc(r[1]) + '</td><td>' + f0(r[2]) + '</td><td>' + f0(r[3]) + '</td></tr>').join('') + '</table>';
+  }
   // ---------- pro forma ----------
   const PROFIT_TIP = 'What the equity investors net: rent collected through the hold, less loan payments and interest, plus the sale price after sale costs and the loan payoff, less the equity put in. It isn’t the stabilized value minus the cost.';
   const landGuess = (p, pl) => { const recs = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean), v = recs.map(r => r.marketValue || r.landValue);
@@ -2904,15 +2939,17 @@ export function initSitePlan(ctx) {
   // The massing as the AI gets it: the map pointed at the site from the view's camera (lib/render.mjs cameraFor) in the
   // part of the map the panels leave free, the drawing marks hidden, read off the canvas on the next frame (the canvas
   // keeps no buffer between frames) and cut to 16:9 at up to 1600 px wide. The map is put back exactly as it was.
-  async function captureView(pl, view) {
+  // A close-up ('hero') frames one building (`target`, from RD.heroTarget): the camera and the fit use the building grown
+  // by RD.HERO_PAD feet each side instead of the parcel.
+  async function captureView(pl, view, target = null) {
     const F = SP.frame(pl.origin), was = { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing(), padding: map.getPadding() };
     const free = freeRect({ key: false }), m = free.m, canvas = map.getCanvas(), dpr = canvas.width / Math.max(1, m.width);
-    const cam = RD.cameraFor(view, pl, { px: Math.max(320, (free.r - free.l) * dpr), lat: pl.origin[1] });
+    const cam = RD.cameraFor(view, pl, { px: Math.max(320, (free.r - free.l) * dpr), lat: pl.origin[1], target }), T = RD.byId(RD.VIEWS, view).hero && target;
     const hidden = HIDE_FOR_RENDER.filter(id => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none');
     try {
       for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'none');
       map.jumpTo({ center: F.toLL(cam.center), zoom: cam.zoom, pitch: Math.min(cam.pitch, map.getMaxPitch()), bearing: cam.bearing, padding: fitPadding(free, m, 0) });
-      fitSiteInFrame(pl, free, m); // the formula is a start; the real camera decides: the whole parcel in the free part of the frame, with room around it
+      fitSiteInFrame(pl, free, m, T ? { points: RD.heroPoints(T), tall: [T] } : {}); // the formula is a start; the real camera decides: the whole parcel (or the close-up's building and its surroundings) in the free part of the frame, with room around it
       await idle();
       const png = await new Promise((ok, no) => { map.once('render', () => { try { ok(canvas.toDataURL('image/png')); } catch (e) { no(e); } }); map.triggerRepaint(); });
       const img = new Image(); await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = png; });
@@ -2926,11 +2963,13 @@ export function initSitePlan(ctx) {
   // Project the parcel's corners through the map's own camera (pitch and bearing included) and move the camera until
   // they all sit inside the free part of the frame: 8% clear at the sides, 9% below, and room above for the tallest
   // building and a strip of sky. Zoom steps by the overflow each round; the view is re-centred on the parcel each round.
-  function fitSiteInFrame(pl, free, m) {
-    const ll = ringLL(pl); if (!ll) return;
+  // points: what to fit instead of the parcel (plan feet, e.g. a close-up's building grown by its margin); tall: the
+  // buildings whose height needs room above (all of them by default).
+  function fitSiteInFrame(pl, free, m, { points = null, tall: tallEls = null } = {}) {
+    const ll = points?.length >= 3 && pl?.origin ? points.map(SP.frame(pl.origin).toLL) : ringLL(pl); if (!ll) return;
     const W = free.r - free.l, H = free.b - free.t, aspect = 16 / 9, fw = Math.min(W, H * aspect), fh = fw / aspect; // the 16:9 cut the picture keeps
     const fl = free.l - m.left + (W - fw) / 2, ft = free.t - m.top + (H - fh) / 2, cx = fl + fw / 2, cy = ft + fh / 2;
-    const tall = Math.max(14, ...pl.elements.filter(e => e.kind === 'building').map(e => (e.floors || 1) * (SP.USES[e.use]?.floorH || 12))) * 0.3048;
+    const tall = Math.max(14, ...(tallEls || pl.elements.filter(e => e.kind === 'building')).map(e => (e.floors || 1) * (SP.USES[e.use]?.floorH || 12))) * 0.3048;
     for (let i = 0; i < 14; i++) {
       const px = ll.map(p => map.project(p)), xs = px.map(q => q.x), ys = px.map(q => q.y), bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
       const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (256 * 2 ** map.getZoom()), tallPx = tall / mpp * Math.sin(map.getPitch() * Math.PI / 180) * 1.3;
@@ -2942,47 +2981,84 @@ export function initSitePlan(ctx) {
       map.jumpTo({ center: centre, zoom: Math.max(13, Math.min(19, z + step)) });
     }
   }
+  // this month's rendering budget (api/render GET; the server refuses a render once it's spent): one line under the
+  // button, read when the section shows and after each render, kept a minute. Unknown (no usage database) shows nothing.
+  let rbudget = null, rbAt = 0, rbBusy = false;
+  const rbUsed = () => !!rbudget && rbudget.spent != null && rbudget.spent >= rbudget.cap;
+  const rbUsd = v => '$' + (v % 1 ? v.toFixed(2) : String(v));
+  const budgetLine = () => { const b = rbudget; if (aiOff() || !b || b.spent == null || !(b.cap >= 0)) return '';
+    if (rbUsed()) return 'This month’s rendering budget (' + rbUsd(b.cap) + ') is used up, so rendering is paused. It resets on the 1st.';
+    return 'Renderings this month: ' + (b.priced === false ? 'about ' : '') + '$' + b.spent.toFixed(2) + ' of ' + rbUsd(b.cap) + (b.images != null ? ' · ' + f0(b.images) + ' picture' + (b.images === 1 ? '' : 's') : ''); };
+  function budgetHtml() { const t = budgetLine(); return '<div class="sp-hint sp-rbudget" id="spRBudget"' + (t ? '' : ' hidden') + ' title="' + (rbudget?.priced === false ? 'Estimated: the image model’s price isn’t known, so each picture is counted at a flat amount' : 'At the image model’s list price') + '">' + esc(t) + '</div>'; }
+  // fill the line in place (no redraw) and hold the button while the budget is spent
+  function showBudget() {
+    const el = card.querySelector('#spRBudget'); if (el) { const t = budgetLine(); el.textContent = t; el.hidden = !t; }
+    const go = card.querySelector('#spRenderGo'); if (go && rbUsed() && !ed?.rendering) { go.disabled = true; go.title = 'This month’s rendering budget is used up. It resets on the 1st.'; }
+  }
+  async function loadBudget() {
+    if (aiOff() || rbBusy || Date.now() - rbAt < 60e3) { showBudget(); return; }
+    rbBusy = true;
+    try { const r = await fetch('api/render'), d = await r.json().catch(() => ({})); if (r.ok && d.budget) rbudget = d.budget; } catch (e) { /* no line, the button still works */ }
+    finally { rbAt = Date.now(); rbBusy = false; }
+    showBudget();
+  }
   // one picture a view, in turn: capture, ask the server, keep the picture and the massing it came from
-  async function renderViews(p, pl, views, look, time) {
+  // target: the building a close-up frames (an element of pl), for the 'hero' view
+  async function renderViews(p, pl, views, look, time, target = null) {
     if (ed.rendering) return;
     const run = ed.rendering = { n: views.length, i: 0, view: views[0], msg: '', abort: new AbortController() }; panel();
     const live = () => ed?.rendering === run && !run.abort.signal.aborted;
-    let made = 0, why = '';
+    let made = 0, why = '', capped = false;
     try {
       const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
       const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' }), sig = planSig(pl);
+      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map', focus: target });
       for (let i = 0; i < views.length && live(); i++) {
         run.i = i; run.view = views[i]; run.msg = 'Taking the picture from the map…'; panel();
-        const cap = await captureView(pl, views[i]); if (!live()) break;
-        run.msg = 'The AI is painting ' + RD.byId(RD.VIEWS, views[i]).label.toLowerCase() + ' (about a minute)…'; panel();
-        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief, view: views[i] }), signal: run.abort.signal });
-        const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero;
+        const cap = await captureView(pl, views[i], isHero ? target : null); if (!live()) break;
+        run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; panel();
+        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i] }), signal: run.abort.signal });
+        const d = await r.json().catch(() => ({}));
+        if (r.status === 402) { rbudget = { ...(rbudget || {}), spent: d.spent, cap: d.cap, month: d.month }; rbAt = Date.now(); capped = true; } // the month's budget is spent
+        if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        if (d.budget?.spent != null) { rbudget = { ...(rbudget || {}), ...d.budget, images: (rbudget?.images || 0) + 1 }; rbAt = Date.now(); }
         if (!live()) break;
         const id = pl.id + '/' + Date.now().toString(36) + '-' + views[i];
         await rput(id, await toBlob(d.image)); await rput(id + ':m', await toBlob(cap.image)).catch(() => {});
         const cur = PL(); if (!cur) break;
-        cur.renders = (cur.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '' }]);
+        cur.renders = (cur.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '', ...(isHero ? { target: hero } : {}) }]);
         while (cur.renders.length > 16) { const old = cur.renders.shift(); rdel(old.id); rdel(old.id + ':m'); } // the newest sixteen are kept
         save(p); made++; panel();
       }
     } catch (e) { why = e.name === 'AbortError' ? '' : e.message; }
     finally {
-      if (ed?.rendering === run) ed.rendering = null; panel();
+      if (ed?.rendering === run) ed.rendering = null; if (!capped) rbAt = 0; panel(); // the budget is read again after a render
       if (made) ctx.toast(made === 1 ? 'Rendering ready.' : made + ' renderings ready.' + (why ? ' The last one failed: ' + why : ''));
-      else if (why) ctx.toast('No rendering: ' + why);
+      else if (why) ctx.toast(capped ? why : 'No rendering: ' + why);
     }
   }
   const RLOOK_KEY = 'fs-render-look', RTIME_KEY = 'fs-render-time';
   const rPrefs = () => ({ look: RD.byId(RD.LOOKS, get(RLOOK_KEY)).id, time: RD.byId(RD.TIMES, get(RTIME_KEY)).id });
   const rWhen = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+  // the building a close-up would frame now: the one selected on the plan when it is a building, else the one nearest the street
+  const heroFor = pl => RD.heroTarget(pl, ed?.sel);
+  // the View choices: the four site views, then the close-up named after its building (and saying so when it's the selected one)
+  function viewOptions(pl, sel) {
+    const T = heroFor(pl), picked = !!T && T.id === ed?.sel, v = ed.rview || 'corner';
+    return sel(RD.VIEWS.filter(x => !x.hero), v) + RD.VIEWS.filter(x => x.hero).map(x => '<option value="' + x.id + '"' + (x.id === v && T ? ' selected' : '') + (T ? '' : ' disabled') +
+      ' title="' + esc(!T ? 'There is no building on this plan to frame' : picked ? 'A close-up of ' + RD.buildingName(T) + ', the building selected on the plan' : 'A close-up of ' + RD.buildingName(T) + ', the building nearest the street. Select a building on the plan first to frame that one instead.') + '">' +
+      esc(RD.renderLabel(x.id, T) + (picked ? ' (selected)' : '')) + '</option>').join('');
+  }
   function renderHtml(p, pl) {
     const R = ed.rendering, pr = rPrefs(), list = (pl.renders || []).slice().reverse(), sig = planSig(pl), off = aiOff(), sel = (list2, v) => list2.map(x => '<option value="' + x.id + '"' + (x.id === v ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
     return '<div class="bsec" id="spRender"><div class="lt">Renderings' + infoBtn('A photoreal picture of this option, painted by the AI from the 3D massing on the map: the buildings, drives, parking, pond and trees stay where the plan puts them, at their heights; the materials, windows, landscaping, cars, people and sky are the AI’s. It is a concept illustration, not a design, and two renderings of one plan will differ. About a minute a view. The pictures are kept on this device; teammates see that they exist, not the pictures.', 'About renderings') + '</div>' +
-      '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + sel(RD.VIEWS, ed.rview || 'corner') + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + '>All four views</option></select></label>' +
+      '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + viewOptions(pl, sel) + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + ' title="The four views of the whole site, one after another (not the building close-up)">All site views</option></select></label>' +
         '<label class="sp-f"><span class="sp-fl">Materials</span><select id="spRLook">' + sel(RD.LOOKS, pr.look) + '</select></label><label class="sp-f"><span class="sp-fl">Light</span><select id="spRTime">' + sel(RD.TIMES, pr.time) + '</select></label></div>' +
       '<div class="sp-go2"><button type="button" class="btn askai" id="spRenderGo"' + (R || off ? ' disabled' : '') + ' title="' + (off ? 'AI isn’t set up on this site' : 'Point the map’s 3D massing at the site and have the AI paint it as a photograph (1920 × 1080)') + '">' + (R ? 'Rendering ' + (R.i + 1) + ' of ' + R.n + '…' : 'Render 3D View') + '</button>' + (R ? '<button type="button" class="btn" id="spRenderStop">Cancel</button>' : '') + '</div>' +
+      budgetHtml() +
       (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : imageryBase() ? '' : '<div class="sp-hint">Tip: switch the base map to <b>Satellite</b> first (Map layers) and the surroundings come out as they really are.</div>') +
-      (list.length ? '<div class="sp-rgrid">' + list.map(r => { const V = RD.byId(RD.VIEWS, r.view), stale = r.sig && r.sig !== sig; return '<figure class="sp-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" title="' + esc(V.label + (stale ? ' · the plan has changed since this was made' : '')) + '"><img alt="' + esc(V.label + ' rendering') + '"><figcaption>' + esc(V.label) + ' <span>' + esc(rWhen(r.at)) + (stale ? ' · plan changed since' : '') + '</span></figcaption></figure>'; }).join('') + '</div>' +
+      (list.length ? '<div class="sp-rgrid">' + list.map(r => { const V = { label: RD.renderLabel(r.view, r.target) }, stale = r.sig && r.sig !== sig; return '<figure class="sp-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" title="' + esc(V.label + (stale ? ' · the plan has changed since this was made' : '')) + '"><img alt="' + esc(V.label + ' rendering') + '"><figcaption>' + esc(V.label) + ' <span>' + esc(rWhen(r.at)) + (stale ? ' · plan changed since' : '') + '</span></figcaption></figure>'; }).join('') + '</div>' +
         '<div class="sp-hint">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. Click one to see it full size, compare it with the massing, download or delete it. The two newest go on the Site Plan PDF.</div>' : '') + '</div>';
   }
   function wireRender(p, pl) {
@@ -2991,8 +3067,9 @@ export function initSitePlan(ctx) {
     const vw = $('#spRView'); if (vw) vw.onchange = () => { ed.rview = vw.value; };
     const lk = $('#spRLook'); if (lk) lk.onchange = () => keep(RLOOK_KEY, lk.value);
     const tm = $('#spRTime'); if (tm) tm.onchange = () => keep(RTIME_KEY, tm.value);
-    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'corner', pr = rPrefs(); renderViews(p, pl, v === 'all' ? RD.VIEWS.map(x => x.id) : [v], pr.look, pr.time); });
+    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'corner', pr = rPrefs(), hero = RD.byId(RD.VIEWS, v, null)?.hero; renderViews(p, pl, v === 'all' ? RD.SITE_VIEWS : [v], pr.look, pr.time, hero ? heroFor(pl) : null); });
     on('#spRenderStop', () => { ed.rendering?.abort.abort(); });
+    loadBudget();
     card.querySelectorAll('.sp-rth').forEach(f => { const r = (pl.renders || []).find(x => x.id === f.dataset.rid); if (!r) return;
       renderSrc(r.id).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { img.alt = 'Picture not on this device'; f.classList.add('gone'); } });
       f.onclick = () => openRender(p, pl, r); });
@@ -3000,7 +3077,7 @@ export function initSitePlan(ctx) {
   // the picture full size, with the massing it was made from a click away, Download and Delete
   // (from the plan's Render section or the project page's Renderings tab; from: the thumbnail, which gets the focus back)
   async function openRender(p, pl, r, from) {
-    const V = RD.byId(RD.VIEWS, r.view), src = await renderSrc(r.id), msrc = await renderSrc(r.id + ':m');
+    const V = { label: RD.renderLabel(r.view, r.target) }, src = await renderSrc(r.id), msrc = await renderSrc(r.id + ':m');
     if (!src) { ctx.toast('That picture isn’t on this device (renderings stay where they were made).'); return; }
     document.getElementById('spRView2')?.remove();
     const box = document.createElement('div'); box.id = 'spRView2'; box.className = 'sp-rview'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', V.label + ' rendering');
@@ -3022,7 +3099,7 @@ export function initSitePlan(ctx) {
   async function rendersForSheet(pl) {
     const sig = planSig(pl), out = [];
     const small = async b => { try { const bmp = await createImageBitmap(b), k = Math.min(1, 1600 / bmp.width), c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85); } catch (e) { return blobToData(b); } };
-    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= 2 || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.byId(RD.VIEWS, r.view).label + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
+    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= 2 || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.renderLabel(r.view, r.target) + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
     return out;
   }
   function geojson(p, pl) {
@@ -3140,7 +3217,7 @@ export function initSitePlan(ctx) {
   // (questions about the whole project). The tab is kept per project for this visit and in the address (pt=).
   const ptab = new Map(), pasks = new Map(), siteRuns = new Map(), siteFail = new Map();
   const tabFor = p => PJ.tabOf(ptab.get(p.id));
-  const rLabel = r => RD.renderLabel ? RD.renderLabel(r.view, r.target) : RD.byId(RD.VIEWS, r.view).label; // (lib/render.mjs names a rendering by its view, and its target when it has one)
+  const rLabel = r => RD.renderLabel(r.view, r.target); // a rendering by its view, and the building it frames when it has one
   const laidOut = pl => pl.ring.length >= 3 && pl.elements.some(e => e.kind === 'building');
   // facts the app looked up (the site's jurisdiction, Regrid's city) aren't anyone's edit: kept and shared with the team
   // without changing who updated the project or when

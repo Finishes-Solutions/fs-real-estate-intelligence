@@ -38,9 +38,9 @@ const ai = (key, b, res, run) => withModel(key, typeof b?.model === 'string' ? b
 const n = description => ({ type: ['number', 'null'], description });
 export const SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'compare', 'trash', 'entrances', 'product', 'extras', 'setbacks', 'zones', 'summary', 'assumptions'],
+  required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'compare', 'trash', 'entrances', 'product', 'extras', 'storage', 'setbacks', 'zones', 'summary', 'assumptions'],
   properties: {
-    use: { type: 'string', enum: Object.keys(USES), description: 'Main use. other = anything that fits none of these (self storage, school…).' },
+    use: { type: 'string', enum: Object.keys(USES), description: 'Main use. storage = self storage (climate-controlled, drive-up, mini-storage, RV / boat storage). other = anything that fits none of these (school…).' },
     gfa: n('Total building floor area in square feet across all floors. null when the request gives no size (the tool then uses a typical size for the use and site) or asks for as much as fits.'),
     floors: { type: ['integer', 'null'], description: 'Floors per building.' },
     units: { type: ['integer', 'null'], description: 'Dwelling units (apartments, townhomes, duplex units, homes).' },
@@ -57,6 +57,8 @@ export const SCHEMA = {
     entrances: { type: ['integer', 'null'], description: 'How many driveways in from the street(s) when the request says ("two entrances", "a second entrance"); null for the usual one. Extra ones go on the front or a side street, about 150 ft apart.' },
     extras: { type: 'array', items: { type: 'string', enum: ['patio', 'playground', 'lawn', 'drivethru'] }, description: 'Small things asked for beside a single main use: outdoor seating (patio), a playground, a lawn or grass area, a drive-thru. Empty when none.' },
     product: { type: ['string', 'null'], enum: ['lots', 'court', 'court6', null], description: 'Townhomes and duplexes only: lots = homes on their own lots along a new street; court6 = six-unit two-story townhome rows on a shared parking court (one tract, usually rental); court = two-unit duplex buildings on a shared parking court. null = the tool picks by what fits.' },
+    storage: { type: 'object', additionalProperties: false, required: ['climateSf', 'driveSf', 'rv'], description: 'Self storage only (use storage); all null otherwise.',
+      properties: { climateSf: n('Climate-controlled building floor area, all floors, sq ft. 0 = drive-up only (a small leasing office instead). null = sized to the site.'), driveSf: n('Drive-up (single-story, doors on the drive aisle) floor area, sq ft. 0 = none. null = as much as fits.'), rv: { type: ['integer', 'null'], description: 'RV / boat parking spaces (12 x 40 ft). null or 0 = none.' } } },
     setbacks: { type: 'object', additionalProperties: false, required: ['front', 'side', 'rear', 'paving'], description: 'Feet. null keeps the default.',
       properties: { front: n('Building setback from the street.'), side: n('Side setback.'), rear: n('Rear setback.'), paving: n('Landscape buffer between paving and the lot lines.') } },
     zones: { type: 'array', description: 'Mixed use only: 2 to 5 zones from the street back (commercial in front, amenity/commons in the middle, apartments, then townhomes, then duplexes/cottages at the back). Empty for a single use.',
@@ -81,7 +83,8 @@ export const SYSTEM = `You set up a development program for a site-planning tool
 - Feasibility: one-story shops or restaurants with surface parking hold about 9,000-12,000 sq ft an acre; two-story offices about 14,000; garden apartments about 18-24 units an acre; homes on lots 4-6 an acre. If the ask is bigger than the land, still give the ask: the layout fits the most that works and says so.
 - Small extras with one main use (outdoor seating, a playground, a lawn, a drive-thru) go in extras, not in zones. "A single" building means buildings 1.
 - The goal is the most valuable plan the site holds within the rules and the market. Sizes you give are the first phase: the engine fills land left over with more of the same (more homes, longer shop and office buildings, more warehouse) up to what the parking and stormwater allow, so don't shrink a request to leave land empty. Don't add uses they didn't ask for.
-- A parking garage: a zone of use "garage" (floors = levels, usually 4-5) where they want it in the order ("a parking garage behind the offices"); offer one for dense offices, medical or shops on tight land. Industrial, warehouse, flex and storage are use "industrial" (a truck court goes behind them), never homes.
+- A parking garage: a zone of use "garage" (floors = levels, usually 4-5) where they want it in the order ("a parking garage behind the offices"); offer one for dense offices, medical or shops on tight land. Industrial, warehouse and flex are use "industrial" (a truck court goes behind them), never homes.
+- Self storage (climate-controlled, drive-up, mini-storage, RV / boat storage) is use "storage", never "industrial": floors is the climate-controlled building's (usually 3), storage.climateSf its floor area over all floors, storage.driveSf the drive-up rows', storage.rv the RV / boat spaces. Leave driveSf null to fill the site with drive-up rows (the usual: maximize rentable area), climateSf null to size the building to the site. Parking is a few spaces at the office (about 1 per 10,000 sf, ratio 0.1). The engine draws the building at the street with the office, drive-up rows behind on 26 ft aisles, and a fence with a keypad gate.
 - Housing asked for in general ("multifamily", "rental housing", "build-to-rent") with no product named: use multifamily with compare true; the engine lays out garden apartments, studio/1-bed apartments, townhomes and duplexes and ranks them by value. When they name a product, use it.
 - Trash enclosures only when they ask for them (trash true).
 - Never claim code compliance. Assumptions are short phrases, e.g. "4 spaces per 1,000 sf (typical retail)".
@@ -99,7 +102,8 @@ export function siteText(site = {}, prompt = '', program = null, facts = null, s
 
 // the model's program, made safe: unknown values dropped, the words' own reading filling gaps, zones normalized
 function programFrom(d, prompt) {
-  const program = { ...normalizeProgram({ ...guessProgram(prompt), ...Object.fromEntries(Object.entries(d).filter(([k, v]) => v != null && !['setbacks', 'summary', 'assumptions', 'zones'].includes(k))) }), ...(d.gfa == null && d.units == null ? { gfa: null } : {}) };
+  const g0 = guessProgram(prompt), sto = d.use === 'storage' || (!d.use && g0.use === 'storage') ? { storage: { ...(g0.storage || {}), ...Object.fromEntries(Object.entries(d.storage || {}).filter(([, v]) => v != null)) } } : {}; // storage: the words fill what the model left open
+  const program = { ...normalizeProgram({ ...g0, ...Object.fromEntries(Object.entries(d).filter(([k, v]) => v != null && !['setbacks', 'summary', 'assumptions', 'zones', 'storage'].includes(k))), ...sto }), ...(d.gfa == null && d.units == null && d.use !== 'storage' ? { gfa: null } : {}) };
   const guess = guessProgram(prompt), zs = d.zones?.length > 1 ? d.zones : guess.zones; // the model's zones, else the ones read from the words
   if (zs?.length > 1) { const nz = normalizeProgram({ use: zs[0].use, zones: zs }).zones; program.zones = nz; program.use = nz[0].use; }
   return program;

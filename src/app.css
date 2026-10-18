@@ -2148,7 +2148,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-plans{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 .pj-plan{position:relative;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:7px;text-align:left;border:1px solid var(--line-2);background:var(--panel);border-radius:8px;padding:7px 7px 10px;color:var(--text);font:inherit;cursor:var(--cur-pointer,pointer);transition:border-color 120ms,box-shadow 120ms}
 /* an option's tile: the drawing and its numbers open it; Copy and Delete sit under them */
-.pj-plan:not(.pj-add){display:flex;flex-direction:column;padding:0;cursor:default}
+.pj-plan:not(.pj-add){display:flex;flex-direction:column;padding:0;cursor:var(--cur-default,default)}
 .pj-popen{position:relative;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:7px;width:100%;text-align:left;border:0;border-radius:8px;background:none;padding:7px 7px 8px;color:inherit;font:inherit;cursor:var(--cur-pointer,pointer)}
 .pj-oline{padding:0 4px;font-size:12px;line-height:1.45;color:var(--text-2)}
 .pj-oline .short{color:var(--amber);font-weight:600}

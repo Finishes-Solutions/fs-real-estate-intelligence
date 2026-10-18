@@ -99,4 +99,16 @@ globalThis.fetch = async url => String(url).includes('organization') ? Response.
 res = mock(); await handler({ method: 'GET', query: {}, headers: { 'x-forwarded-for': '5.5.5.4' } }, res); assert.equal(res.body.billed, null); assert.match(res.body.billedError, /refused the admin key/); assert.equal(res.body.rows.length, 4, 'the counts still come back');
 globalThis.fetch = async () => new Response('{"code":"42P01","message":"relation \\"public.ai_usage\\" does not exist"}', { status: 404 }); delete process.env.OPENAI_ADMIN_KEY;
 res = mock(); await handler({ method: 'GET', query: {}, headers: { 'x-forwarded-for': '5.5.5.5' } }, res); assert.equal(res.body.tracking, false); assert.match(res.body.trackError, /isn’t set up/);
+// ---- monthSpend: this month's cost of one feature (the Renderings cap, api/render) ----
+let q = ''; const sRows = [{ model: 'gpt-image-1', requests: 10, input_tokens: 10000, cached_tokens: 2000, output_tokens: 50000 }, { model: 'gpt-image-zz', requests: 4, input_tokens: 1, cached_tokens: 0, output_tokens: 1 }];
+globalThis.fetch = async url => { q = String(url); return Response.json(sRows); };
+const env = { SUPABASE_URL: 'https://db.example', SUPABASE_SECRET_KEY: 'sb_secret_test' }, nov1 = Date.parse('2026-11-01T04:00:00Z'); // 11 pm Oct 31 in Houston
+let ms = await U.monthSpend('render', { env, now: nov1 });
+assert.match(q, /ai_usage\?select=.*&feature=eq\.render&day=gte\.2026-10-01&day=lte\.2026-10-31$/, 'the US Central month: ' + q);
+// gpt-image-1: 8,000 × $10 + 2,000 × $2.50 + 50,000 × $40 per 1M = $2.085; the unpriced model: 4 × $0.25
+assert.deepEqual(ms, { month: '2026-10', spent: 3.085, images: 14, priced: false });
+ms = await U.monthSpend('render', { env: { ...env, RENDER_FALLBACK_USD_PER_IMAGE: '1' }, now: nov1, prices: { 'gpt-image-1': [0, 0, 0] } }); assert.deepEqual([ms.spent, ms.priced], [4, false], 'the fallback from the environment; Settings-style price overrides apply');
+sRows.pop(); ms = await U.monthSpend('render', { env, now: nov1 }); assert.equal(ms.priced, true);
+globalThis.fetch = async () => new Response('nope', { status: 401 }); ms = await U.monthSpend('render', { env, now: nov1 }); assert.equal(ms.spent, null); assert.ok(ms.error, 'a failed read: no figure and an error');
+ms = await U.monthSpend('render', { env: {}, now: nov1 }); assert.deepEqual([ms.spent, ms.month, !!ms.error], [null, '2026-10', true], 'no database: no figure');
 console.log('ai usage ok');
