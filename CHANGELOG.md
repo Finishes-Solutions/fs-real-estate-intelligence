@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 4:29 PM CT: Fixes found by testing every building type on odd lots (f26932c)
+- **No more drives over detention ponds.** On some corner and clipped-corner lots, a drive could run over the edge of the pond and the layout failed its own checks. Retail, office, medical and church layouts were affected.
+- **A mix that doesn't fit still gets layouts.** Shops plus 120 apartments on a wedge-shaped lot used to come back with nothing. Now you get the same mix at a smaller size, or the main use alone, and the layout says so.
+- **Duplexes no longer read "parking short".** Each front-load duplex's driveway holds its second car, and Numbers now shows those driveway spaces.
+- **Re-fitting after moving a building no longer loses parking on a busy computer.** Before, it could come out with about half the spaces it needed.
+
 ### 2:28 PM CT: Renderings know what self storage looks like (fc0d058)
 - **A render of a storage plan** now shows a climate-controlled building with a glassy leasing office, metal drive-up buildings with rows of roll-up doors, and the fence with its gate, instead of a generic commercial building.
 - Brought the latest renderings work into the self storage changes, with nothing lost on either side.
