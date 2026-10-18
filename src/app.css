@@ -2206,8 +2206,12 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-st[data-st="hold"]{--sc:var(--muted);--sb:var(--panel-2)}
 .pj-st[data-st="dead"]{--sc:var(--danger);--sb:color-mix(in srgb,var(--danger) 9%,var(--panel))}
 .pj-st select option{color:var(--text);background:var(--panel)}
+.pj-stp{display:inline-block;width:max-content;border:1px solid color-mix(in srgb,var(--sc) 35%,transparent);background:var(--sb);color:var(--sc);border-radius:999px;padding:1px 9px;font:600 11px/1.5 var(--font-display)}
+.pj-cb>.pj-st,.pj-rmain>.pj-st{justify-self:start}
 .mx-tabs.pj-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 0 16px;padding:2px 2px 10px;border-bottom:1px solid var(--line)}
 .pj-tabs::-webkit-scrollbar{display:none}
+.mx-tabs.pj-tabs.more{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)} /* fades out on the right while more tabs are off-screen (phones) */
+@media (pointer:coarse){.pj-kbhint{display:none}} /* Enter-to-ask means nothing on a touch screen */
 .mx-tabs.pj-tabs button{flex:none;padding:6px 14px;font-size:13px}
 .pj-tabs button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pj-tn{font-weight:400;opacity:.8}
@@ -3981,6 +3985,7 @@ html.sp-dragging,html.sp-dragging *{cursor:var(--cur-grabbing,grabbing)!importan
 #card .sp-rth img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#e6e9eb}
 #card .sp-rth figcaption{padding:6px 8px;font:600 12px var(--font-display);color:var(--text)}#card .sp-rth figcaption span{display:block;font-weight:400;color:var(--text-2);font-size:11px}
 #card .sp-rth .sp-rgone{display:grid;place-items:center;aspect-ratio:16/9;padding:6px;background:#e6e9eb;color:var(--muted);font-size:11px;text-align:center}
+.sp-rvtop .sp-rvold{font-style:normal;color:var(--danger)}
 #card .sp-rth.stale img{filter:grayscale(.5)}#card .sp-rth.stale figcaption span{color:var(--danger)}#card .sp-rth.gone{opacity:.55}
 #card .sp-rth:hover,#card .sp-rth:focus-visible{border-color:var(--brand)}
 .sp-rview{position:fixed;inset:0;z-index:1200;background:rgba(10,14,16,.86);display:grid;place-items:center;padding:16px}
