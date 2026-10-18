@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 3:23 PM CT: A proper project page: Overview, Options, Renderings and Ask (d4bb78d)
+- **Each project now has a real home.** The project page has a header with the name, address, acreage and a **status** (Prospect, Under review, Under contract, Owned, On hold, Dead), and four tabs. Your last tab is remembered and kept in the address, so reload and Back work.
+- **Overview:** project information (site, parcels, owners, appraised value, options) with **Client / prepared for**, **Target use** and **Notes** you can edit in place, and a **Jurisdiction & site** card gathered from the app's own sources: county, city or unincorporated, zoning (when Regrid has been fetched for the parcel), FEMA floodplain, water / utility district, school district, TIRZ, Opportunity Zone, busiest road and traffic, EPA-regulated facilities nearby and utilities, each with its source and a **Refresh** link.
+- **Options:** every site plan option with its drawing, a one-line summary (use, floor area, units, parking, coverage), the pro forma line, issues, when it was last opened and how many renderings it has, plus Copy and Delete.
+- **Renderings:** every rendering in the project, grouped by option, so you always know which picture belongs to which plan. **Render more** opens that option's plan at its Render section. Pictures made on another device are shown greyed with who made them.
+- **Ask:** ask questions about the whole project. The AI gets the project information, the jurisdiction facts and each option's numbers, and says when something isn't in them. Suggested questions get you started ("Which option fits this site best?", "What approvals will this site need?").
+- **Behind the scenes:** the site lookup now also says whether a point is inside a city's limits (US Census places); Regrid's city is kept with the parcel. Fixed the rendering viewer swallowing Escape after it was closed.
+
 ### 2:45 PM CT: Building close-up renderings, and a monthly rendering budget (8d167a5)
 - **Building close-up:** a fifth **View** under Renderings frames one building as a hero shot, with its parking and landscaping around it and the rest of the site continuing beyond. Select a building on the plan first to choose it; otherwise it takes the building nearest the street. The option names the building it will use; **All site views** stays the four whole-site pictures.
 - **A monthly budget for renderings:** the Render section shows this month's rendering spend against the budget ($100 a month to start, set by the administrators) and how many pictures that was. When it's spent, rendering pauses until the 1st; Ask AI and site plan builds aren't affected. The check runs on the server before each picture.
