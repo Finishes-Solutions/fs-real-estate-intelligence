@@ -285,8 +285,24 @@ for (const v of [0, 1, 2]) {
   res = await call({ mode: 'ask', question: '  ', plan: facts }); assert.equal(res.code, 400);
   res = await call({ mode: 'ask', question: 'Why?', plan: null }); assert.equal(res.code, 400);
   res = await call({ mode: 'ask', question: 'Why?', plan: [1, 2] }); assert.equal(res.code, 400);
+  // askProject: a question about the whole project, from its fact sheet (lib/project.mjs projectFacts)
+  const PJ = await import('../lib/project.mjs'), { PROJECT_ASK_SCHEMA } = await import('../api/siteplan.js');
+  assert.deepEqual(PROJECT_ASK_SCHEMA.required.slice().sort(), Object.keys(PROJECT_ASK_SCHEMA.properties).sort(), 'strict schema');
+  const sheet = PJ.projectFacts({ name: 'Katy pad', status: 'contract', client: 'Acme', parcels: [{ label: '1 Main St', owner: 'Smith', acres: 5.79 }] }, { acres: 5.79, jurisdiction: { county: 'Harris', place: null, flood: { zone: 'AE', risk: 'high' } }, options: [{ facts, name: 'Option A', renderings: 2, drawn: true }] });
+  reply = () => ({ answer: 'Option A fits: 25,000 sq ft on 5.79 acres. '.repeat(100), followups: ['What approvals?', '', 'x'] });
+  sent = []; res = await call({ mode: 'askProject', question: 'Which option fits this site best?', history: [{ q: 'Status?', a: 'Under contract.' }], project: sheet });
+  assert.equal(res.code, 200, JSON.stringify(res.body)); assert.equal(sent[0].response_format.json_schema.name, 'project_answer'); assert.equal(sent[0].reasoning_effort, 'medium');
+  const pq = sent[0].messages[1].content; assert.match(pq, /Fact sheet for the project/); assert.match(pq, /Unincorporated/); assert.match(pq, /"status":"Under contract"/); assert.match(pq, /"renderings":2/); assert.match(pq, /Q: Status\?\nA: Under contract\./); assert.match(pq, /Question: Which option fits this site best\?$/);
+  assert.match(sent[0].messages[0].content, /several|each site plan option/i); assert.match(sent[0].messages[0].content, /isn't in the project's facts/);
+  assert.ok(res.body.answer.length <= 3000, 'answer clipped'); assert.deepEqual(res.body.followups, ['What approvals?', 'x']);
+  sent = []; await call({ mode: 'askProject', question: 'Why?', project: { ...sheet, options: Array.from({ length: 60 }, (_, i) => ({ option: 'O' + i, note: 'x'.repeat(5000) })) } });
+  assert.ok(sent[0].messages[1].content.length < 70000, 'an oversized project sheet is cut down');
+  res = await call({ mode: 'askProject', question: ' ', project: sheet }); assert.equal(res.code, 400);
+  res = await call({ mode: 'askProject', question: 'Why?', project: null }); assert.equal(res.code, 400);
+  res = await call({ mode: 'askProject', question: 'Why?', project: [1] }); assert.equal(res.code, 400);
   globalThis.fetch = async url => String(url).includes('/models/') ? Response.json({ id: 'm' }) : Response.json({ error: { message: 'boom' } }, { status: 400 });
-  res = await call({ mode: 'ask', question: 'Why?', plan: facts }); assert.equal(res.code, 502); assert.match(res.body.error, /didn’t answer/); }
+  res = await call({ mode: 'ask', question: 'Why?', plan: facts }); assert.equal(res.code, 502); assert.match(res.body.error, /didn’t answer/);
+  res = await call({ mode: 'askProject', question: 'Why?', project: { project: { name: 'x' } } }); assert.equal(res.code, 502); }
 
 // ---- /api/projects ----
 { const store = []; let table = true;

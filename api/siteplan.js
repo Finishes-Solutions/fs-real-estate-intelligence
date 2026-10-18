@@ -12,6 +12,9 @@
 //        why, the ways in, the parking and the pond, a check of the numbers. The program call and the review then follow it
 //   POST { mode: 'ask', question, history: [{ q, a }], plan: {...facts}, effort } -> { answer, followups }
 //        a question about the open plan, answered from the fact sheet the browser computed (lib/planask.mjs planFacts)
+//   POST { mode: 'askProject', question, history: [{ q, a }], project: {...facts}, effort } -> { answer, followups }
+//        a question about a whole project (the Projects page's Ask tab): its information, the site's jurisdiction facts
+//        and every option's headline numbers (lib/project.mjs projectFacts)
 // effort (strategy, program, review and ask): how hard the model thinks, 'low' | 'medium' | 'high' | 'xhigh' (the effort
 // level picked under Build; Ultra plans at xhigh, which steps down to high on a model that doesn't take it); missing or
 // unknown keeps the default (high, medium for ask). review also takes rounds (1-3, default 2): the last round never
@@ -213,6 +216,7 @@ export default async function handler(req, res) {
   if (b.mode === 'bestuse') return bestUse(b, key, res);
   if (b.mode === 'edit') return edit(b, key, res);
   if (b.mode === 'ask') return ask(b, key, res);
+  if (b.mode === 'askProject') return askProject(b, key, res);
   if (b.mode === 'strategy') return strategy(b, key, res);
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
@@ -368,6 +372,41 @@ async function ask(b, key, res) {
     return res.json({ answer, followups: (d.followups || []).map(t => clip(t, 160).trim()).filter(Boolean).slice(0, 3) });
   } catch (e) {
     console.error('siteplan ask', e.message);
+    return res.status(502).json({ error: 'The AI didn’t answer just now. Try again in a moment.' });
+  }
+}
+
+// ---------- questions about a whole project ----------
+export const PROJECT_ASK_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['answer', 'followups'],
+  properties: {
+    answer: str('The answer, in plain words: two to six sentences, or a short list (lines starting "- ") for a breakdown or an email summary.'),
+    followups: strs('Up to 3 short questions the user might ask next about this project, answerable from the same facts, in their words. Empty when none.')
+  }
+};
+export const PROJECT_ASK_SYSTEM = `You are a land planner and development analyst advising on one development project in a site-planning tool used by a commercial construction company in the Houston region. You get a fact sheet the tool put together: the project (name, status, client, target use, notes, the parcels with owners, acres and appraised values), the site's jurisdiction facts looked up from public map services (county, city limits, zoning when known, FEMA floodplain, water or utility district, school district, TIRZ, Opportunity Zone, the busiest road and its traffic, EPA-regulated facilities nearby, utilities), and each site plan option's key numbers (use, floor area, units, coverage, parking needed and provided, stormwater, the checks, the pro forma's headline, how many renderings it has).
+- Answer from those facts and explain the why: the number, fact or rule behind it. When comparing options, name them and give the numbers that separate them.
+- Use only the facts given. Never invent numbers, approvals, codes, costs, owners or dates. When the facts don't say (a city's own requirement, utility capacity, title, environmental history), say plainly that it isn't in the project's facts, then say what would settle it (the city or county, the utility district, a survey, a title company, a Phase I ESA, a civil engineer, a market study).
+- Approvals and due diligence: reason from the facts (inside a city or unincorporated, floodplain, MUD or no district, several parcels needing a replat, a busy state road needing a driveway permit, EPA facilities nearby) and say these are the usual steps to confirm, not a complete list. The City of Houston has no zoning but has building lines, parking rules and platting; Texas counties generally can't zone.
+- Parking ratios, stormwater storage and the pro forma's numbers are the tool's typical starting assumptions, not a city's requirement or a quote: say so when it matters. Never claim code compliance; the plans are concept test-fits.
+- Short and plain, as you'd say it to a developer: two to six sentences, or a short list. An email summary may run a little longer, in plain sentences. No headings, no markdown beyond "- " list lines.
+- If the question isn't about this project or its site, say briefly that you can only answer about the project that's open.`;
+async function askProject(b, key, res) {
+  const question = clip(b.question, 600).trim(), project = b.project && typeof b.project === 'object' && !Array.isArray(b.project) ? tidy(b.project) : null;
+  if (!question) return res.status(400).json({ error: 'Ask a question about the project.' });
+  if (!project) return res.status(400).json({ error: 'Open a project first.' });
+  let facts = JSON.stringify(project); if (facts.length > 48000 && Array.isArray(project.options)) { project.options = project.options.slice(0, 8); facts = JSON.stringify(project); }
+  if (facts.length > 60000) facts = facts.slice(0, 60000); // still too big: cut (the model reads what's there)
+  const history = (Array.isArray(b.history) ? b.history : []).slice(-6).map(t => ({ q: clip(t?.q, 600), a: clip(t?.a, 1500) })).filter(t => t.q && t.a);
+  const user = 'Fact sheet for the project on the screen:\n' + facts + (history.length ? '\n\nEarlier in this conversation:\n' + history.map(t => 'Q: ' + t.q + '\nA: ' + t.a).join('\n\n') : '') + '\n\nQuestion: ' + question;
+  try {
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: PROJECT_ASK_SYSTEM, user, name: 'project_answer', schema: PROJECT_ASK_SCHEMA, maxTokens: 12000, effort: effortIn(b.effort, 'medium') }));
+    const d = r.data, answer = clip(d.answer, 3000).trim();
+    if (!answer) throw new Error('empty answer');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ answer, followups: (d.followups || []).map(t => clip(t, 160).trim()).filter(Boolean).slice(0, 3) });
+  } catch (e) {
+    console.error('siteplan askProject', e.message);
     return res.status(502).json({ error: 'The AI didn’t answer just now. Try again in a moment.' });
   }
 }

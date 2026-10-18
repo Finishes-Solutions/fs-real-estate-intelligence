@@ -13,6 +13,7 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.pathname.endsWith('COH_Tax_Incentive_Reinvestment_Zones_view/FeatureServer/3/query')) return j({ features: [{ attributes: { NAME: 'Downtown', TIRZ_NO: 3 } }] });
   if (u.pathname.endsWith('COH_METRO_Bus_Stops_view/FeatureServer')) return j({ layers: [{ id: 0 }] });
   if (u.pathname.endsWith('COH_METRO_Bus_Stops_view/FeatureServer/0/query')) { assert.equal(u.searchParams.get('returnCountOnly'), 'true'); return j({ count: 14 }); }
+  if (u.host === 'tigerweb.geo.census.gov' && u.pathname.includes('/Places_CouSub_ConCity_SubMCD/MapServer/4/')) return j({ features: +u.searchParams.get('geometry').split(',')[0] > -96 ? [{ attributes: { BASENAME: 'Houston', NAME: 'Houston city' } }] : [] });
   if (u.host === 'tigerweb.geo.census.gov') return j({ features: u.pathname.includes('/School/MapServer/0/') ? [{ attributes: { NAME: 'Houston Independent School District' } }] : [] });
   if (u.pathname.endsWith('get_facilities')) return j({ Results: { QueryID: '985', QueryRows: '3' } });
   if (u.pathname.endsWith('get_qid')) return j({ Results: { Facilities: [{ FacName: 'CLEAN CO', FacSNCFlg: 'N', FacQtrsWithNC: '0', TRIFlag: 'N' }, { FacName: 'SPILL CO', FacStreet: '1 MAIN', FacSNCFlg: 'Y', TRIFlag: 'Y' }, { FacName: 'DRY CLEAN', RCRAComplianceStatus: 'No Violation Identified' }, { FacName: 'OFFICE', RCRAComplianceStatus: 'Not Applicable' }] } });
@@ -32,12 +33,14 @@ assert.deepEqual(d.traffic.roads.map(r => r.road + ' ' + r.aadt), ['I-10 250000'
 assert.deepEqual(d.districts.water.map(w => w.name), ['Harris County MUD 61', 'West Harris County RWA'], 'river authorities dropped');
 assert.equal(d.districts.opportunityZone, true); assert.deepEqual(d.districts.tirz, ['Downtown (TIRZ 3)']); assert.deepEqual(d.districts.schools, ['Houston Independent School District']);
 assert.equal(d.transit.stops, 14);
+assert.deepEqual(d.place, { name: 'Houston', full: 'Houston city' }, 'inside the city limits');
 assert.equal(d.environment.total, 3); assert.deepEqual(d.environment.flagged[1].flags, ['handles hazardous waste']); assert.equal(d.environment.flaggedCount, 2); assert.deepEqual(d.environment.flagged[0].flags, ['violations', 'toxic releases']);
 assert.equal(d.crime.last12.total, 100); assert.equal(d.crime.prior12.total, 110); assert.equal(d.crime.change.v, 20); assert.equal(d.crime.change.p, -20); assert.equal(d.crime.latest, '2026-08-31');
 assert.equal(d.bars.length, 1, 'only the last 12 months'); assert.equal(d.bars[0].total, 190001); assert.equal(d.bars[0].months, 2); assert.equal(d.bars[0].last, '2026-08');
 // outside Houston: no TIRZ / METRO / crime calls
 const before = calls.length; const k = await site(-97.74, 30.27); const extra = calls.slice(before);
 assert.ok(!extra.some(c => /COH_|db\.test/.test(c)), 'Houston-only sources skipped elsewhere'); assert.deepEqual(k.districts.tirz, []); assert.equal(k.crime, null); assert.equal(k.bars, null);
+assert.equal(k.place, null, 'outside every city: null (unincorporated)');
 // one failing source doesn't sink the rest
 const real = globalThis.fetch; globalThis.fetch = async (url, o) => String(url).includes('hazards.fema.gov') ? new Response('down', { status: 503 }) : real(url, o);
 const e = await site(-95.36, 29.76); assert.match(e.flood.error, /503/); assert.equal(e.traffic.roads[0].road, 'I-10'); globalThis.fetch = real;
