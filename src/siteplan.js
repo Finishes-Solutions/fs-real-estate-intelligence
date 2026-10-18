@@ -2905,6 +2905,7 @@ export function initSitePlan(ctx) {
     try {
       for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'none');
       map.jumpTo({ center: F.toLL(cam.center), zoom: cam.zoom, pitch: Math.min(cam.pitch, map.getMaxPitch()), bearing: cam.bearing, padding: fitPadding(free, m, 0) });
+      fitSiteInFrame(pl, free, m); // the formula is a start; the real camera decides: the whole parcel in the free part of the frame, with room around it
       await idle();
       const png = await new Promise((ok, no) => { map.once('render', () => { try { ok(canvas.toDataURL('image/png')); } catch (e) { no(e); } }); map.triggerRepaint(); });
       const img = new Image(); await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = png; });
@@ -2914,6 +2915,25 @@ export function initSitePlan(ctx) {
       const g = c.getContext('2d'); g.fillStyle = '#dfe6ea'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, l, t, w, h, 0, 0, c.width, c.height);
       return { image: c.toDataURL('image/jpeg', 0.88), camera: cam, w: c.width, h: c.height };
     } finally { for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'visible'); map.jumpTo(was); }
+  }
+  // Project the parcel's corners through the map's own camera (pitch and bearing included) and move the camera until
+  // they all sit inside the free part of the frame: 8% clear at the sides, 9% below, and room above for the tallest
+  // building and a strip of sky. Zoom steps by the overflow each round; the view is re-centred on the parcel each round.
+  function fitSiteInFrame(pl, free, m) {
+    const ll = ringLL(pl); if (!ll) return;
+    const W = free.r - free.l, H = free.b - free.t, aspect = 16 / 9, fw = Math.min(W, H * aspect), fh = fw / aspect; // the 16:9 cut the picture keeps
+    const fl = free.l - m.left + (W - fw) / 2, ft = free.t - m.top + (H - fh) / 2, cx = fl + fw / 2, cy = ft + fh / 2;
+    const tall = Math.max(14, ...pl.elements.filter(e => e.kind === 'building').map(e => (e.floors || 1) * (SP.USES[e.use]?.floorH || 12))) * 0.3048;
+    for (let i = 0; i < 14; i++) {
+      const px = ll.map(p => map.project(p)), xs = px.map(q => q.x), ys = px.map(q => q.y), bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
+      const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (256 * 2 ** map.getZoom()), tallPx = tall / mpp * Math.sin(map.getPitch() * Math.PI / 180) * 1.3;
+      const availW = fw * 0.84, availH = fh - fh * 0.09 - Math.max(fh * 0.16, tallPx); // sides 8% each; sky and the roofs above; 9% below
+      const ratio = Math.max((bx1 - bx0) / availW, (by1 - by0) / availH);
+      const dx = (bx0 + bx1) / 2 - cx, dy = (by0 + by1) / 2 - (ft + Math.max(fh * 0.16, tallPx) + availH / 2); // where the parcel's box is against where it should be
+      const centre = map.unproject([cx + dx, cy + dy]), z = map.getZoom(), step = ratio > 1.02 ? -Math.log2(ratio) : ratio < 0.9 && z < 19 ? Math.min(0.5, Math.log2(0.95 / ratio) * 0.6) : 0;
+      if (Math.abs(step) < 0.01 && Math.hypot(dx, dy) < 2) break;
+      map.jumpTo({ center: centre, zoom: Math.max(13, Math.min(19, z + step)) });
+    }
   }
   // one picture a view, in turn: capture, ask the server, keep the picture and the massing it came from
   async function renderViews(p, pl, views, look, time) {
@@ -2951,7 +2971,7 @@ export function initSitePlan(ctx) {
   function renderHtml(p, pl) {
     const R = ed.rendering, pr = rPrefs(), list = (pl.renders || []).slice().reverse(), sig = planSig(pl), off = aiOff(), sel = (list2, v) => list2.map(x => '<option value="' + x.id + '"' + (x.id === v ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
     return '<div class="bsec" id="spRender"><div class="lt">Renderings' + infoBtn('A photoreal picture of this option, painted by the AI from the 3D massing on the map: the buildings, drives, parking, pond and trees stay where the plan puts them, at their heights; the materials, windows, landscaping, cars, people and sky are the AI’s. It is a concept illustration, not a design, and two renderings of one plan will differ. About a minute a view. The pictures are kept on this device; teammates see that they exist, not the pictures.', 'About renderings') + '</div>' +
-      '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + sel(RD.VIEWS, ed.rview || 'front') + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + '>All four views</option></select></label>' +
+      '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + sel(RD.VIEWS, ed.rview || 'corner') + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + '>All four views</option></select></label>' +
         '<label class="sp-f"><span class="sp-fl">Materials</span><select id="spRLook">' + sel(RD.LOOKS, pr.look) + '</select></label><label class="sp-f"><span class="sp-fl">Light</span><select id="spRTime">' + sel(RD.TIMES, pr.time) + '</select></label></div>' +
       '<div class="sp-go2"><button type="button" class="btn askai" id="spRenderGo"' + (R || off ? ' disabled' : '') + ' title="' + (off ? 'AI isn’t set up on this site' : 'Point the map’s 3D massing at the site and have the AI paint it as a photograph (1920 × 1080)') + '">' + (R ? 'Rendering ' + (R.i + 1) + ' of ' + R.n + '…' : 'Render 3D View') + '</button>' + (R ? '<button type="button" class="btn" id="spRenderStop">Cancel</button>' : '') + '</div>' +
       (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : imageryBase() ? '' : '<div class="sp-hint">Tip: switch the base map to <b>Satellite</b> first (Map layers) and the surroundings come out as they really are.</div>') +
@@ -2964,7 +2984,7 @@ export function initSitePlan(ctx) {
     const vw = $('#spRView'); if (vw) vw.onchange = () => { ed.rview = vw.value; };
     const lk = $('#spRLook'); if (lk) lk.onchange = () => keep(RLOOK_KEY, lk.value);
     const tm = $('#spRTime'); if (tm) tm.onchange = () => keep(RTIME_KEY, tm.value);
-    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'front', pr = rPrefs(); renderViews(p, pl, v === 'all' ? RD.VIEWS.map(x => x.id) : [v], pr.look, pr.time); });
+    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'corner', pr = rPrefs(); renderViews(p, pl, v === 'all' ? RD.VIEWS.map(x => x.id) : [v], pr.look, pr.time); });
     on('#spRenderStop', () => { ed.rendering?.abort.abort(); });
     card.querySelectorAll('.sp-rth').forEach(f => { const r = (pl.renders || []).find(x => x.id === f.dataset.rid); if (!r) return;
       renderSrc(r.id).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { img.alt = 'Picture not on this device'; f.classList.add('gone'); } });

@@ -2,7 +2,7 @@
 //   image: a data URL (JPEG/PNG/WebP, up to ~3 MB) of the plan's 3D massing on the map from the view's camera (the
 //          browser takes it; lib/render.mjs cameraFor); brief: briefOf() from the same lib; view: one of VIEWS
 //   -> image: a data URL (JPEG) of the rendering, 1920 × 1080 when the model can do it, else the nearest size it offers
-// The picture is made by the newest GPT Image model the key can use (OPENAI_IMAGE_MODEL overrides) through the Images
+// The picture is made by gpt-image-2.5-sunburst when the key has it, else the newest GPT Image model it lists (OPENAI_IMAGE_MODEL overrides) through the Images
 // API's edit endpoint, which keeps the input picture's geometry and camera and paints it photographically. Its token
 // use is recorded under the Renderings feature (lib/aiusage.mjs). One picture a request: the browser asks for the
 // views one after another, so a slow model never runs past Vercel's limit.
@@ -53,6 +53,7 @@ export default async function handler(req, res) {
   const view = byId(VIEWS, b.view).id, brief = cleanBrief(b.brief), prompt = renderPrompt(brief, view);
   let model = process.env.OPENAI_IMAGE_MODEL || '';
   if (!model) { try { model = pickImageModel(await availableModels(key)); } catch (e) { model = pickImageModel([]); } }
+  if (!model) model = pickImageModel([]);
   res.setHeader('X-AI-Model', model);
   try {
     const out = await paint(key, { model, prompt, image });

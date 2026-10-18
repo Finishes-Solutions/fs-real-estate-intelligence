@@ -13,13 +13,13 @@ const plan = { origin: [-95.78, 29.78], ring: [[0, 0], [300, 0], [300, 200], [0,
 assert.equal(Math.round(R.streetBearing(plan)), 0, 'front view looks north from the street');
 assert.equal(Math.round(R.streetBearing({ ...plan, front: 2 })), 180, 'a site fronting the north edge is looked at from the north');
 const cam = R.cameraFor('front', plan);
-assert.equal(cam.bearing, 0); assert.equal(cam.pitch, 56);
+assert.equal(cam.bearing, 0); assert.equal(cam.pitch, 48);
 assert.ok(cam.zoom > 16 && cam.zoom <= 19, 'a 300 ft lot is framed at the map’s closest zoom: ' + cam.zoom);
 assert.ok(cam.center[1] > 100, 'the pitched camera aims past the middle so the whole site sits in the frame: ' + cam.center);
-const corner = R.cameraFor('corner', plan); assert.equal(corner.bearing, 322, 'the corner view turns toward the left corner');
+const corner = R.cameraFor('corner', plan); assert.equal(corner.bearing, 325, 'the corner view turns toward the left corner');
 const rear = R.cameraFor('rear', plan); assert.equal(rear.bearing, 205, 'the rear view looks back toward the street');
 const big = R.cameraFor('front', { ...plan, ring: [[0, 0], [3000, 0], [3000, 2000], [0, 2000]] }); big.ring = [[0, 0], [3000, 0], [3000, 2000], [0, 2000]]; assert.ok(big.zoom < cam.zoom - 2, 'a 140-acre site zooms out: ' + big.zoom);
-assert.equal(R.cameraFor('nonsense', plan).view, 'front', 'an unknown view is the front one');
+assert.equal(R.cameraFor('nonsense', plan).view, 'corner', 'an unknown view is the corner one, the default');
 // the camera sizes the frame to the canvas: a narrower canvas needs to zoom out
 assert.ok(R.cameraFor('front', { ...plan, ring: big.ring }, { px: 600 }).zoom < big.zoom, 'narrower canvas, lower zoom');
 
@@ -36,13 +36,18 @@ for (const s of ['must not change', '1 1-storey retail building', '1 1-storey re
   assert.ok(pr.includes(s), 'prompt says: ' + s + '\n' + pr);
 assert.ok(!pr.includes('undefined') && !pr.includes('null'), 'no holes in the prompt');
 const pr2 = R.renderPrompt({ ...brief, look: 'auto', basemap: 'map', facts: [] }, 'low');
-assert.ok(pr2.includes('garden-style apartments') && pr2.includes('retail strip'), 'no look picked: materials by use'); assert.ok(pr2.includes('replace the flat map graphics'), 'map base: invent the surroundings'); assert.ok(pr2.includes('from a car arriving'), 'the low view is from the entry drive');
+assert.ok(pr2.includes('garden-style apartments') && pr2.includes('retail strip'), 'no look picked: materials by use'); assert.ok(pr2.includes('replace the flat map graphics'), 'map base: invent the surroundings'); assert.ok(pr2.includes('low aerial from over the entry drive'), 'the low view is from the entry drive'); assert.ok(pr.includes('whole site in the frame'), 'composed wide');
 assert.ok(R.renderPrompt({}, 'front').length > 200, 'an empty brief still makes a usable prompt');
 
-// the model: the newest GPT Image this key lists, never a mini; the environment's pick wins; gpt-image-1 when nothing is known
+// the model: gpt-image-2.5-sunburst when the key lists it; else the newest GPT Image it lists, never a mini; the
+// environment's pick wins; the preferred one when nothing is known
+assert.equal(R.PREFERRED_IMAGE_MODEL, 'gpt-image-2.5-sunburst');
+assert.equal(R.pickImageModel([{ id: 'gpt-image-1' }, { id: 'gpt-image-2.5-sunburst' }, { id: 'gpt-image-2' }]), 'gpt-image-2.5-sunburst');
 assert.equal(R.pickImageModel([{ id: 'gpt-image-1' }, { id: 'gpt-image-2' }, { id: 'gpt-image-1-mini' }, { id: 'gpt-image-1.5' }, { id: 'gpt-5' }]), 'gpt-image-2');
 assert.equal(R.pickImageModel(['gpt-image-1', 'gpt-image-1.5']), 'gpt-image-1.5');
-assert.equal(R.pickImageModel(['gpt-image-1-mini', 'gpt-4o']), 'gpt-image-1');
+assert.equal(R.pickImageModel(['gpt-image-2', 'gpt-image-2-aurora']), 'gpt-image-2-aurora', 'a named edition edges out the plain one');
+assert.equal(R.pickImageModel(['gpt-image-1-mini', 'gpt-4o']), 'gpt-image-2.5-sunburst', 'nothing usable listed: try the preferred one');
+assert.equal(R.pickImageModel([]), 'gpt-image-2.5-sunburst');
 assert.equal(R.pickImageModel([], 'gpt-image-9'), 'gpt-image-9');
 
 // ---------- the endpoint, with OpenAI mocked ----------
@@ -50,7 +55,7 @@ const calls = [], PNG = 'data:image/png;base64,' + Buffer.from('fake-png-bytes')
 let refuseSize = 1, refuseFidelity = 1, fail500 = 0;
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url); const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });
-  if (url.endsWith('/models')) return json({ data: [{ id: 'gpt-image-1' }, { id: 'gpt-image-2' }, { id: 'gpt-5' }] });
+  if (url.endsWith('/models')) return json({ data: [{ id: 'gpt-image-1' }, { id: 'gpt-image-2' }, { id: 'gpt-image-2.5-sunburst' }, { id: 'gpt-5' }] });
   if (url.endsWith('/images/edits')) {
     const f = opts.body, rec = { model: f.get('model'), size: f.get('size'), quality: f.get('quality'), fidelity: f.get('input_fidelity'), prompt: f.get('prompt'), img: f.get('image[]'), n: f.get('n'), fmt: f.get('output_format') }; calls.push(rec);
     if (fail500 > 0) { fail500--; return json({ error: { message: 'overloaded' } }, 500); }
@@ -67,11 +72,11 @@ const { default: render, cleanBrief, dataImage } = await import('../api/render.j
 let res = mockRes(); await render(req({ body: { image: PNG, brief, view: 'corner' } }), res);
 assert.equal(res.code, 200, JSON.stringify(res.body));
 assert.ok(res.body.image.startsWith('data:image/jpeg;base64,'), 'the picture comes back as a JPEG data URL');
-assert.equal(res.body.model, 'gpt-image-2', 'the newest image model the key lists'); assert.equal(res.headers['X-AI-Model'], 'gpt-image-2');
+assert.equal(res.body.model, 'gpt-image-2.5-sunburst', 'the preferred image model, which the key lists'); assert.equal(res.headers['X-AI-Model'], 'gpt-image-2.5-sunburst');
 assert.equal(res.body.size, '1536x1024', 'a model that refuses 1080p gets the next size'); assert.equal(res.body.view, 'corner');
 assert.equal(calls.length, 3, 'fidelity refused, size refused, then painted: ' + calls.map(c => c.size + '/' + c.fidelity).join(' '));
 assert.deepEqual(calls.map(c => c.fidelity), ['high', null, null]); assert.deepEqual(calls.map(c => c.size), ['1920x1080', '1920x1080', '1536x1024']);
-assert.equal(calls[2].quality, 'high'); assert.equal(calls[2].n, '1'); assert.equal(calls[2].fmt, 'jpeg'); assert.equal(calls[2].model, 'gpt-image-2');
+assert.equal(calls[2].quality, 'high'); assert.equal(calls[2].n, '1'); assert.equal(calls[2].fmt, 'jpeg'); assert.equal(calls[2].model, 'gpt-image-2.5-sunburst');
 assert.ok(calls[2].img && calls[2].img.size === 'fake-png-bytes'.length && calls[2].img.type === 'image/png', 'the massing picture is sent as the image to edit');
 assert.ok(calls[2].prompt.includes('must not change') && calls[2].prompt.includes('From the corner'.toLowerCase().split(' ')[0]) && calls[2].prompt.includes('red and tan brick'), 'the prompt is the lib’s, from the brief');
 
