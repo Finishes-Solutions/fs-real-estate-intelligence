@@ -3,6 +3,11 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-18
+
+### 1:23 PM CT: Plan for photorealistic 3D renderings of site plans (c416f27)
+- **Planning only, nothing in the app changes.** A new `RENDERINGS-PLAN.md` lays out how renderings could be made from a site plan: first a proper 3D massing view and aerial capture on the map and the PDF sheet, then AI-generated photoreal views in the site's real surroundings, with a later option for a walkable 3D model if people ask for it. It is honest about what AI renders get right (placement, counts, heights, mostly) and wrong (windows, materials, details), and about cost and storage.
+
 ## 2026-10-16
 
 ### 9:12 AM CT: No more "Cannot find name 'Deno'" in the Vercel build (2e6f1d1)
