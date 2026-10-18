@@ -1,0 +1,3 @@
+# Supabase edge functions and migrations run on Supabase (Deno), not Vercel: kept out of the Vercel build so its
+# TypeScript check stops reporting "Cannot find name 'Deno'" for supabase/functions/pipeline/index.ts
+supabase/
