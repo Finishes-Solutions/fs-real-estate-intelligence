@@ -34,7 +34,7 @@ export async function paint(key, { model, prompt, image, sizes = SIZES, fidelity
     const f = new FormData(); f.append('model', model); f.append('prompt', prompt); f.append('n', '1'); f.append('size', size); f.append('quality', 'high'); f.append('output_format', 'jpeg'); if (fid) f.append('input_fidelity', 'high');
     f.append('image[]', new Blob([image.bytes], { type: image.type }), 'massing.' + (image.type === 'image/jpeg' ? 'jpg' : image.type.split('/')[1]));
     const r = await fetch(BASE + '/images/edits', { method: 'POST', signal, headers: { Authorization: 'Bearer ' + key }, body: f });
-    if (r.status === 429 || r.status >= 500) { lastErr = new Error('OpenAI ' + r.status); await new Promise(res => setTimeout(res, 2000 * (i + 1))); continue; }
+    if (r.status === 429 || r.status >= 500) { lastErr = new Error('OpenAI ' + r.status); if (signal?.aborted) throw new Error('cancelled'); await new Promise(res => setTimeout(res, 2000 * (i + 1))); continue; }
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       const msg = d.error?.message || 'error';
@@ -72,13 +72,17 @@ export default async function handler(req, res) {
   if (!model) { try { model = pickImageModel(await availableModels(key)); } catch (e) { model = pickImageModel([]); } }
   if (!model) model = pickImageModel([]);
   res.setHeader('X-AI-Model', model);
+  // Cancel in the browser aborts its request; when that reaches here before the picture is finished, the OpenAI call is
+  // dropped too, so a cancelled picture isn't painted (and billed) for nobody. Best effort: a proxy may hold the connection.
+  const ac = new AbortController(); if (typeof res.on === 'function') res.on('close', () => { if (!res.writableEnded) ac.abort(); });
   try {
-    const out = await paint(key, { model, prompt, image });
+    const out = await paint(key, { model, prompt, image, signal: ac.signal });
     res.setHeader('Cache-Control', 'no-store');
     const t = tokensOf(out.usage), est = (t && costOf(out.model, t)) ?? fallbackPerImage(); // this picture, best guess
     const budget = { spent: spend.spent == null ? null : Math.round((spend.spent + est) * 1e4) / 1e4, cap, month: spend.month };
     return res.json({ image: 'data:image/jpeg;base64,' + out.b64, model: out.model, size: out.size, view, prompt, budget });
   } catch (e) {
+    if (ac.signal.aborted) { console.warn('render cancelled by the browser'); try { res.status(499).json({ error: 'Cancelled.' }); } catch (e2) { /* the connection is gone */ } return; }
     console.error('render', e.message);
     const m = /OpenAI 4\d\d: (.*)/.exec(e.message);
     return res.status(502).json({ error: m ? 'The image model refused: ' + clip(m[1], 200) : 'The rendering didn’t come back just now. Try again in a moment.' });

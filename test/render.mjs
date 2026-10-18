@@ -179,3 +179,22 @@ globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: '
 res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.9.7' }), res);
 assert.equal(res.code, 502); assert.ok(/refused: Your request was rejected/.test(res.body.error), res.body.error);
 console.log('render tests passed: camera presets, brief, prompt, model pick and the endpoint');
+
+// Cancel: when the browser drops the request before the picture is done, the OpenAI call is aborted and nothing is billed
+{
+  let seenSignal = null, closeFn = null;
+  globalThis.fetch = async (url, opts = {}) => {
+    url = String(url); const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });
+    if (url.endsWith('/models')) return json({ data: [{ id: 'gpt-image-2.5-sunburst' }] });
+    if (url.includes('supabase')) return json([]);
+    if (url.endsWith('/images/edits')) { seenSignal = opts.signal; return new Promise((ok, no) => { opts.signal.addEventListener('abort', () => no(Object.assign(new Error('aborted'), { name: 'AbortError' }))); setTimeout(() => ok(json({ data: [{ b64_json: 'QUJD' }], usage: { input_tokens: 1, output_tokens: 1 } })), 400); }); }
+    throw new Error('unexpected fetch ' + url);
+  };
+  const r = mockRes(); r.writableEnded = false; r.on = (ev, fn) => { if (ev === 'close') closeFn = fn; };
+  const done = render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.9.21' }), r);
+  await new Promise(ok => setTimeout(ok, 50)); assert.ok(closeFn, 'listens for the connection closing'); closeFn();
+  await done;
+  assert.ok(seenSignal?.aborted, 'the OpenAI request is aborted when the browser cancels');
+  assert.equal(r.code, 499, 'answers cancelled, not 502');
+}
+console.log('render cancel test passed');
