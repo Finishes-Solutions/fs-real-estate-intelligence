@@ -16,6 +16,7 @@ import * as ASK from './lib/planask.mjs';
 import * as K from './lib/planpick.mjs';
 import * as MAP from './lib/planmap.mjs';
 import * as T from './lib/sitetools.mjs';
+import * as RD from './lib/render.mjs';
 const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 import { readJSON } from './lib/http.mjs';
@@ -1638,6 +1639,7 @@ export function initSitePlan(ctx) {
         '<div class="sp-addg">' + ADD_GROUPS.map(([g, ks]) => '<div class="sp-add-g" role="group" aria-label="' + esc(g) + '"><div class="sp-sub">' + esc(g) + '</div><div class="sp-add-r">' + ks.map(k => '<button type="button" class="sp-add" data-add="' + k + '" style="--ac:' + addAccent(k) + '" title="Add ' + esc(ADD_LABEL[k] || SP.KINDS[k]?.label || ADD_SHORT[k]) + '">' + ADD_ICON[k] + '<span>' + esc(ADD_SHORT[k]) + '</span></button>').join('') + '</div></div>').join('') + '</div>' +
         '<label class="sp-f sp-lib"><span class="sp-fl">From the building library <small>' + BUILDING_TYPES.length + ' types</small></span><span class="sp-libw">' + SI.find + '<select id="spLib"><option value="">Pick a building type to add…</option>' + typeOptions('') + '</select></span></label></div>',
       spParams: () => paramsHtml(pl, prog),
+      spRender: () => renderHtml(p, pl),
       spExport: () => '<div class="bsec" id="spExport"><div class="lt">Export</div><div class="sp-g2 sp-exp"><button type="button" class="btn askai" id="spPdf" title="A conceptual site plan sheet: the plan to scale with title block, site data, program and parking, parcels, notes and legend">Site Plan PDF</button>' +
         '<select id="spSheet" aria-label="Sheet size"><option value="tabloid">11 × 17 sheet</option><option value="archd">24 × 36 sheet</option></select>' +
         '<button type="button" class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button type="button" class="btn" id="spGeo" title="The plan as map shapes (GeoJSON)">Map File (GeoJSON)</button><button type="button" class="btn" id="spSum" title="The site and its numbers as text, for an email or a note">Copy Summary</button></div></div>'
@@ -1698,6 +1700,7 @@ export function initSitePlan(ctx) {
     wireParams(pl); wirePf(p, pl);
     wireSel(sel);
     on('#spPdf', () => exportPdf(p, pl, card.querySelector('#spSheet').value));
+    wireRender(p, pl);
     on('#spDxf', () => ctx.saveFile(fileName(p, pl) + '.dxf', SP.toDXF(pl, p.name + ' - ' + pl.name), 'application/dxf'));
     on('#spGeo', () => ctx.saveFile(fileName(p, pl) + '.geojson', JSON.stringify(geojson(p, pl), null, 1), 'application/geo+json'));
     on('#spSum', async () => { const s = summary(p, pl); try { await navigator.clipboard.writeText(s); ctx.toast('Summary copied.'); } catch (e) { prompt('Copy the summary', s); } });
@@ -2861,9 +2864,9 @@ export function initSitePlan(ctx) {
       const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), parcels = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), F = SP.frame(pl.origin);
       const site = { type: 'Polygon', coordinates: [pl.ring.concat([pl.ring[0]]).map(F.toLL)] };
       let vicinity = ''; try { vicinity = areaMap([{ geometry: site, stroke: '#c0392b', fill: 'rgba(192,57,43,.25)', width: 2 }], { W: 320, H: 190, px: 320, minSpanM: 3500, maxTiles: 16 }); } catch (e) {}
-      const facts = await siteFacts(pl), notes = SP.check(pl).map(i => i.text);
+      const facts = await siteFacts(pl), notes = SP.check(pl).map(i => i.text), renders = await rendersForSheet(pl).catch(() => []);
       const county = (ctx.DATA?.counties || []).find(c => (c.outline || []).some(poly => SP.inRing(F.toLL(SP.centroid(pl.ring)), poly[0])))?.name;
-      const html = sheetHTML({ plan: pl, planName: pl.name, project: p, size, parcels, facts, notes, vicinity, address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '',
+      const html = sheetHTML({ plan: pl, planName: pl.name, project: p, size, parcels, facts, notes, vicinity, renders, address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '',
         date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), preparedFor: '', boundarySource: pl.src === 'drawn' ? 'a boundary drawn on the map' : pl.src === 'regrid' ? 'the Regrid parcel outline' : (keys.length > 1 ? keys.length + ' county appraisal district parcel outlines, merged' : 'the county appraisal district parcel outline') });
       const name = fileName(p, pl) + '-site-plan';
       ctx.toast('Preparing the PDF…');
@@ -2872,6 +2875,127 @@ export function initSitePlan(ctx) {
       if (blob) await ctx.saveFile(name + '.pdf', blob, 'application/pdf');
       else { await ctx.saveFile(name + '.html', html, 'text/html'); ctx.toast('The PDF couldn’t be made (' + why + '). Saved as a web page instead: open it and print it on ' + (size === 'archd' ? '24 × 36' : '11 × 17') + ' paper.'); }
     } finally { if (btn) { btn.disabled = false; btn.textContent = 'Site Plan PDF'; } }
+  }
+  // ---------- photoreal renderings (lib/render.mjs, api/render) ----------
+  // The AI paints the map's 3D massing of the option into a photograph. The pictures are 1080p JPEGs, far too big for
+  // the project record, so they live in IndexedDB on this device; the option keeps only a list of them (id, view, look,
+  // light, when, model, a signature of the plan they were made from), which syncs with the team like the numbers do.
+  let rdb = null;
+  const ridb = () => rdb || (rdb = new Promise((res, rej) => { const r = indexedDB.open('fs-renders', 1); r.onupgradeneeded = () => r.result.createObjectStore('img'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }));
+  const rtx = async (mode, fn) => { const d = await ridb(); return new Promise((res, rej) => { const t = d.transaction('img', mode), q = fn(t.objectStore('img')); t.oncomplete = () => res(q?.result); t.onerror = () => rej(t.error); }); };
+  const rput = (id, v) => rtx('readwrite', st => st.put(v, id)), rget = id => rtx('readonly', st => st.get(id)).catch(() => undefined), rdel = id => rtx('readwrite', st => st.delete(id)).catch(() => {});
+  const rurl = new Map(); // id -> object URL, for the pictures shown this visit
+  async function renderSrc(id) { if (rurl.has(id)) return rurl.get(id); const v = await rget(id); if (!(v instanceof Blob)) return null; const u = URL.createObjectURL(v); rurl.set(id, u); return u; }
+  const toBlob = async url => (await fetch(url)).blob();
+  const blobToData = b => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsDataURL(b); });
+  // what a rendering was made from: the pieces' places, sizes and floors (a change to any of them makes it "plan changed since")
+  const planSig = pl => RUN.hash((pl.elements || []).map(e => [e.kind, Math.round(e.x), Math.round(e.y), Math.round(e.w), Math.round(e.d), Math.round(e.rot || 0), e.floors || 0, e.use || ''].join(':')).join('|'));
+  // drawing marks that aren't part of a photograph: labels, dimensions, setback and parcel lines, the boundary, handles, easement hatching
+  const HIDE_FOR_RENDER = ['fs-sp-lot', 'fs-sp-grid', 'fs-sp-zone', 'fs-sp-sb', 'fs-sp-pl', 'fs-sp-front', 'fs-sp-selc', 'fs-sp-sell', 'fs-sp-flash', 'fs-sp-gone', 'fs-sp-lab-p', 'fs-sp-lab', 'fs-sp-lab-sel', 'fs-sp-dim', 'fs-sp-hv', 'fs-sp-mf', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-ml', 'fs-sp-h', 'fs-sp-hs', 'fs-sp-lotl', 'fs-sp-p2', 'fs-sp-ko', 'fs-sp-koh', 'fs-sp-kol'];
+  const imageryBase = () => /^(sat|gsat|esri)$/.test(ctx.basemap?.() || '');
+  const idle = () => new Promise(ok => { let done = false; const fin = () => { if (!done) { done = true; ok(); } }; map.once('idle', fin); setTimeout(fin, 9000); });
+  // The massing as the AI gets it: the map pointed at the site from the view's camera (lib/render.mjs cameraFor) in the
+  // part of the map the panels leave free, the drawing marks hidden, read off the canvas on the next frame (the canvas
+  // keeps no buffer between frames) and cut to 16:9 at up to 1600 px wide. The map is put back exactly as it was.
+  async function captureView(pl, view) {
+    const F = SP.frame(pl.origin), was = { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing(), padding: map.getPadding() };
+    const free = freeRect({ key: false }), m = free.m, canvas = map.getCanvas(), dpr = canvas.width / Math.max(1, m.width);
+    const cam = RD.cameraFor(view, pl, { px: Math.max(320, (free.r - free.l) * dpr), lat: pl.origin[1] });
+    const hidden = HIDE_FOR_RENDER.filter(id => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none');
+    try {
+      for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'none');
+      map.jumpTo({ center: F.toLL(cam.center), zoom: cam.zoom, pitch: Math.min(cam.pitch, map.getMaxPitch()), bearing: cam.bearing, padding: fitPadding(free, m, 0) });
+      await idle();
+      const png = await new Promise((ok, no) => { map.once('render', () => { try { ok(canvas.toDataURL('image/png')); } catch (e) { no(e); } }); map.triggerRepaint(); });
+      const img = new Image(); await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = png; });
+      let l = (free.l - m.left) * dpr, t = (free.t - m.top) * dpr, w = (free.r - free.l) * dpr, h = (free.b - free.t) * dpr; // the free part, then 16:9 inside it
+      if (w / h > 16 / 9) { const w2 = h * 16 / 9; l += (w - w2) / 2; w = w2; } else { const h2 = w * 9 / 16; t += (h - h2) / 2; h = h2; }
+      const k = Math.min(1, 1600 / w), c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+      const g = c.getContext('2d'); g.fillStyle = '#dfe6ea'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, l, t, w, h, 0, 0, c.width, c.height);
+      return { image: c.toDataURL('image/jpeg', 0.88), camera: cam, w: c.width, h: c.height };
+    } finally { for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'visible'); map.jumpTo(was); }
+  }
+  // one picture a view, in turn: capture, ask the server, keep the picture and the massing it came from
+  async function renderViews(p, pl, views, look, time) {
+    if (ed.rendering) return;
+    const run = ed.rendering = { n: views.length, i: 0, view: views[0], msg: '', abort: new AbortController() }; panel();
+    const live = () => ed?.rendering === run && !run.abort.signal.aborted;
+    let made = 0, why = '';
+    try {
+      const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
+      const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' }), sig = planSig(pl);
+      for (let i = 0; i < views.length && live(); i++) {
+        run.i = i; run.view = views[i]; run.msg = 'Taking the picture from the map…'; panel();
+        const cap = await captureView(pl, views[i]); if (!live()) break;
+        run.msg = 'The AI is painting ' + RD.byId(RD.VIEWS, views[i]).label.toLowerCase() + ' (about a minute)…'; panel();
+        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief, view: views[i] }), signal: run.abort.signal });
+        const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        if (!live()) break;
+        const id = pl.id + '/' + Date.now().toString(36) + '-' + views[i];
+        await rput(id, await toBlob(d.image)); await rput(id + ':m', await toBlob(cap.image)).catch(() => {});
+        const cur = PL(); if (!cur) break;
+        cur.renders = (cur.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '' }]);
+        while (cur.renders.length > 16) { const old = cur.renders.shift(); rdel(old.id); rdel(old.id + ':m'); } // the newest sixteen are kept
+        save(p); made++; panel();
+      }
+    } catch (e) { why = e.name === 'AbortError' ? '' : e.message; }
+    finally {
+      if (ed?.rendering === run) ed.rendering = null; panel();
+      if (made) ctx.toast(made === 1 ? 'Rendering ready.' : made + ' renderings ready.' + (why ? ' The last one failed: ' + why : ''));
+      else if (why) ctx.toast('No rendering: ' + why);
+    }
+  }
+  const RLOOK_KEY = 'fs-render-look', RTIME_KEY = 'fs-render-time';
+  const rPrefs = () => ({ look: RD.byId(RD.LOOKS, get(RLOOK_KEY)).id, time: RD.byId(RD.TIMES, get(RTIME_KEY)).id });
+  const rWhen = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+  function renderHtml(p, pl) {
+    const R = ed.rendering, pr = rPrefs(), list = (pl.renders || []).slice().reverse(), sig = planSig(pl), off = aiOff(), sel = (list2, v) => list2.map(x => '<option value="' + x.id + '"' + (x.id === v ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
+    return '<div class="bsec" id="spRender"><div class="lt">Renderings' + infoBtn('A photoreal picture of this option, painted by the AI from the 3D massing on the map: the buildings, drives, parking, pond and trees stay where the plan puts them, at their heights; the materials, windows, landscaping, cars, people and sky are the AI’s. It is a concept illustration, not a design, and two renderings of one plan will differ. About a minute a view. The pictures are kept on this device; teammates see that they exist, not the pictures.', 'About renderings') + '</div>' +
+      '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + sel(RD.VIEWS, ed.rview || 'front') + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + '>All four views</option></select></label>' +
+        '<label class="sp-f"><span class="sp-fl">Materials</span><select id="spRLook">' + sel(RD.LOOKS, pr.look) + '</select></label><label class="sp-f"><span class="sp-fl">Light</span><select id="spRTime">' + sel(RD.TIMES, pr.time) + '</select></label></div>' +
+      '<div class="sp-go2"><button type="button" class="btn askai" id="spRenderGo"' + (R || off ? ' disabled' : '') + ' title="' + (off ? 'AI isn’t set up on this site' : 'Point the map’s 3D massing at the site and have the AI paint it as a photograph (1920 × 1080)') + '">' + (R ? 'Rendering ' + (R.i + 1) + ' of ' + R.n + '…' : 'Render 3D View') + '</button>' + (R ? '<button type="button" class="btn" id="spRenderStop">Cancel</button>' : '') + '</div>' +
+      (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : imageryBase() ? '' : '<div class="sp-hint">Tip: switch the base map to <b>Satellite</b> first (Map layers) and the surroundings come out as they really are.</div>') +
+      (list.length ? '<div class="sp-rgrid">' + list.map(r => { const V = RD.byId(RD.VIEWS, r.view), stale = r.sig && r.sig !== sig; return '<figure class="sp-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" title="' + esc(V.label + (stale ? ' · the plan has changed since this was made' : '')) + '"><img alt="' + esc(V.label + ' rendering') + '"><figcaption>' + esc(V.label) + ' <span>' + esc(rWhen(r.at)) + (stale ? ' · plan changed since' : '') + '</span></figcaption></figure>'; }).join('') + '</div>' +
+        '<div class="sp-hint">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. Click one to see it full size, compare it with the massing, download or delete it. The two newest go on the Site Plan PDF.</div>' : '') + '</div>';
+  }
+  function wireRender(p, pl) {
+    const $ = q => card.querySelector(q), on = (q, fn) => { const el = $(q); if (el) el.onclick = fn; };
+    const keep = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+    const vw = $('#spRView'); if (vw) vw.onchange = () => { ed.rview = vw.value; };
+    const lk = $('#spRLook'); if (lk) lk.onchange = () => keep(RLOOK_KEY, lk.value);
+    const tm = $('#spRTime'); if (tm) tm.onchange = () => keep(RTIME_KEY, tm.value);
+    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'front', pr = rPrefs(); renderViews(p, pl, v === 'all' ? RD.VIEWS.map(x => x.id) : [v], pr.look, pr.time); });
+    on('#spRenderStop', () => { ed.rendering?.abort.abort(); });
+    card.querySelectorAll('.sp-rth').forEach(f => { const r = (pl.renders || []).find(x => x.id === f.dataset.rid); if (!r) return;
+      renderSrc(r.id).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { img.alt = 'Picture not on this device'; f.classList.add('gone'); } });
+      f.onclick = () => openRender(p, pl, r); });
+  }
+  // the picture full size, with the massing it was made from a click away, Download and Delete
+  async function openRender(p, pl, r) {
+    const V = RD.byId(RD.VIEWS, r.view), src = await renderSrc(r.id), msrc = await renderSrc(r.id + ':m');
+    if (!src) { ctx.toast('That picture isn’t on this device (renderings stay where they were made).'); return; }
+    document.getElementById('spRView2')?.remove();
+    const box = document.createElement('div'); box.id = 'spRView2'; box.className = 'sp-rview'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', V.label + ' rendering');
+    box.innerHTML = '<div class="sp-rvin"><div class="sp-rvtop"><b>' + esc(pl.name) + ' · ' + esc(V.label) + '</b><span>' + esc(RD.byId(RD.LOOKS, r.look).label) + ' · ' + esc(RD.byId(RD.TIMES, r.time).label) + (r.model ? ' · ' + esc(r.model) : '') + ' · ' + esc(rWhen(r.at)) + '</span><button type="button" class="sp-lb" data-x aria-label="Close">✕</button></div>' +
+      '<div class="sp-rvimg"><img src="' + src + '" alt="' + esc(V.label + ' rendering') + '"></div>' +
+      '<div class="sp-rvbar"><span class="sp-hint">AI concept illustration, not a design.</span><span class="sp-rvbtns">' + (msrc ? '<button type="button" class="btn sm" data-cmp aria-pressed="false">Show the massing</button>' : '') + '<button type="button" class="btn sm" data-dl>Download</button><button type="button" class="btn sm ghost" data-del>Delete</button></span></div></div>';
+    document.body.appendChild(box);
+    const img = box.querySelector('img'), close = () => { box.remove(); document.removeEventListener('keydown', key); };
+    const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    document.addEventListener('keydown', key, true);
+    box.onclick = e => { if (e.target === box) close(); };
+    box.querySelector('[data-x]').onclick = close;
+    const cmp = box.querySelector('[data-cmp]'); if (cmp) cmp.onclick = () => { const onM = cmp.getAttribute('aria-pressed') !== 'true'; cmp.setAttribute('aria-pressed', String(onM)); img.src = onM ? msrc : src; cmp.textContent = onM ? 'Show the rendering' : 'Show the massing'; };
+    box.querySelector('[data-dl]').onclick = async () => { const b = await rget(r.id); if (b instanceof Blob) ctx.saveFile(fileName(p, pl) + '-' + r.view + '-rendering.jpg', b, 'image/jpeg'); };
+    box.querySelector('[data-del]').onclick = () => { if (!confirm('Delete this rendering?')) return; const cur = PL(); if (cur) { cur.renders = (cur.renders || []).filter(x => x.id !== r.id); save(p); } rdel(r.id); rdel(r.id + ':m'); close(); panel(); };
+  }
+  // the two newest renderings that still match the plan, as data URLs for the PDF sheet, at up to 1600 px wide so the
+  // sheet stays under the PDF service's request limit
+  async function rendersForSheet(pl) {
+    const sig = planSig(pl), out = [];
+    const small = async b => { try { const bmp = await createImageBitmap(b), k = Math.min(1, 1600 / bmp.width), c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85); } catch (e) { return blobToData(b); } };
+    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= 2 || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.byId(RD.VIEWS, r.view).label + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
+    return out;
   }
   function geojson(p, pl) {
     const fc = SP.planFeatures(pl, null);

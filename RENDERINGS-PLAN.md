@@ -1,6 +1,6 @@
 # Plan: photorealistic 3D renderings from a site plan
 
-Status: proposal, October 18, 2026. Nothing here is built yet.
+Status: proposal, October 18, 2026. Phase A's capture and Phase B1's AI renderings shipped in a first form the same day (the **Render** section on an open plan); the rest of this document is the road ahead.
 
 ## What we have to build on
 

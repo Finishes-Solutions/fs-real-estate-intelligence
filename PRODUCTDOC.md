@@ -694,6 +694,15 @@ While a plan is open, a small tool bar sits at the bottom left of the map (on ph
 - **Pro Forma (Excel):** a workbook with the assumptions, the one-page pro forma with live formulas, the month-by-month cash flows with IRR formulas, and the budget.
 - The default numbers are typical Houston-area starting points, not quotes.
 
+**Renderings**
+- Once an option is laid out, the **Render** section of the plan panel makes a photoreal picture of it. Pick a **View** (**From the street**, **From the corner**, **Low, at the entry**, **From the back**, or all four), the **Materials** (to suit each building's use, or brick and stone, stucco and stone, modern glass and metal, tilt-wall concrete) and the **Light** (midday, late afternoon, dusk), then **Render 3D View**.
+- How it works: the map points its 3D model of the plan (buildings at their heights, the paving, pond and trees) at the site from that view, takes a picture of it, and the AI paints that picture as a photograph. The buildings, drives, parking rows, pond and trees stay where the plan puts them, at their heights and shapes; the materials, windows, landscaping, cars, people, sky and the surroundings are the AI's. A picture takes about a minute and comes out at 1920 × 1080 (or the nearest size the model offers); the panel shows which step it's on, and **Cancel** stops it. Nothing else on the map moves: the view goes back to where it was.
+- **Tip:** switch the base map to **Satellite** first (Map layers) and the surroundings in the picture come out as they really are; on a street map the AI invents suburban surroundings instead.
+- The pictures appear under the button, newest first. Click one to see it full size, **Show the massing** to compare it with the 3D model it was painted from, **Download** it (JPEG) or **Delete** it. When the plan changes after a picture was made, it says **plan changed since** and goes grey.
+- **They are concept illustrations, not designs.** Placement, counts and heights follow the plan; everything else is made up, and two renderings of one plan will differ. Check a picture against the massing before showing it to anyone; if a building came out wrong, render again.
+- The pictures stay on the device they were made on (they're too big to share through the project). Teammates see that a rendering exists, not the picture. The newest sixteen are kept per option.
+- Renderings count toward the AI's use in Settings › AI model › **Usage** under **Renderings**; the price of the image model can be set there when the app doesn't know it.
+
 **Exports**
 - **Site Plan PDF:** a conceptual site plan sheet on **11 × 17** or **24 × 36** paper:
   - the plan to a standard scale (1" = 50', 100', 150'…), turned so the street is at the bottom, with a north arrow and scale bar;
@@ -702,6 +711,7 @@ While a plan is open, a small tool bar sits at the bottom left of the map (on ph
   - notes on constraints and due diligence from the site's own data (flood zone, water district, school district, the busiest road and its traffic, EPA-regulated facilities nearby, a replat for several parcels) plus any problems on the plan;
   - a legend and a "conceptual, for feasibility only" disclaimer.
   - If the PDF can't be made, it's saved as a web page to print instead.
+  - The two newest renderings that still match the plan follow the sheet, one to a page (SP-2, SP-3), each captioned as an AI concept illustration.
 - **CAD (DXF):** opens in AutoCAD, CADCraft, LibreCAD and most CAD programs, in feet, with layers for the lot, setback line, buildings, parking, stripes, drives, detention, the curb line round all the paving, accessible stalls, pavement markings and trash enclosures, and a notes block.
 - **Map File (GeoJSON)** and **Copy Summary** (the numbers as text).
 
@@ -763,6 +773,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Photoreal renderings of a site plan:** a **Render** section on an open plan paints the option as a photograph from four preset views, in your choice of materials and light, 1920 × 1080, from the map's 3D model, so the buildings stay where the plan puts them. Compare each with the massing, download it, and the two newest go on the Site Plan PDF. Concept illustrations, kept on this device.
 - **AI usage and cost in Settings:** Settings › AI model › **Usage** shows each model's requests, tokens and estimated cost for the month (or the last 30 or 7 days, today, the year), split by feature, with OpenAI's billed amounts when an admin key is set.
 - **Pick the AI model:** Settings › **AI model** lists the OpenAI models the app can use and says which one gave the last answer; Anthropic is shown as coming later.
 - **The AI plans the site before placing anything:** on Medium, High and Ultra, the AI first works out what goes where and why, the ways in, the parking, the pond and whether the numbers fit; Ultra drafts three plans at its deepest thinking and picks one. The layouts follow that plan, the review judges them against it, and a **Planned first** box shows it.
