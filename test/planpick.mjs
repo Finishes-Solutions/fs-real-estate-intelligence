@@ -122,3 +122,14 @@ assert.deepEqual(K.mixFoot(S.STORAGE_MIX.climate, 100), { text: 'Average 97 sf Â
 assert.ok(K.mixFoot([], 200).warn && K.mixFoot(null, 200).warn, 'no sizes at all');
 console.log('planpick ok (nothing fits, storage mix)');
 
+// ---- check() and details() keep their last answer for an unchanged plan (lib/siteplan.mjs): the same answer, never a
+// stale one, and a caller changing its copy changes nothing ----
+{ const pl = { origin: [-95.5, 29.8], ring: [[0, 0], [600, 0], [600, 420], [0, 420]], front: 0, setbacks: { ...S.SETBACKS }, elements: [] }, o = L.layoutOptions(pl, { use: 'retail', gfa: 25000 })[0];
+  const p = { ...pl, program: o.program, elements: JSON.parse(JSON.stringify(o.elements)) }, J = JSON.stringify;
+  const c0 = J(S.check(p)), d0 = J(S.details(p)), c1 = S.check(p); c1.push({ level: 'bad', text: 'junk' }); S.details(p).trees.length = 0;
+  assert.equal(J(S.check(p)), c0, 'a second call: the same issues, untouched by what the first caller did'); assert.equal(J(S.details(p)), d0);
+  const b = p.elements.find(e => e.kind === 'building'); b.x += 2000; // moved off the lot: the answer is worked out again
+  assert.ok(S.check(p).some(i => i.level === 'bad' && i.id === b.id), 'a change is seen at once'); b.x -= 2000;
+  assert.equal(J(S.check(p)), c0, 'moved back: the first answer again');
+  assert.equal(J(S.check({ ...p, lastRun: { ask: 'anything' } })), c0, 'a past run on the plan doesn\'t matter'); }
+console.log('planpick ok (kept check answers)');
