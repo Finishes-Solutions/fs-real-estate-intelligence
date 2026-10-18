@@ -3062,7 +3062,7 @@ export function initSitePlan(ctx) {
         '<label class="sp-f"><span class="sp-fl">Materials</span><select id="spRLook">' + sel(RD.LOOKS, pr.look) + '</select></label><label class="sp-f"><span class="sp-fl">Light</span><select id="spRTime">' + sel(RD.TIMES, pr.time) + '</select></label></div>' +
       '<div class="sp-go2"><button type="button" class="btn askai" id="spRenderGo"' + (R || off ? ' disabled' : '') + ' title="' + (off ? 'AI isn’t set up on this site' : 'Point the map’s 3D massing at the site and have the AI paint it as a photograph (1920 × 1080)') + '">' + (R ? 'Rendering ' + (R.i + 1) + ' of ' + R.n + '…' : 'Render 3D View') + '</button>' + (R ? '<button type="button" class="btn" id="spRenderStop">Cancel</button>' : '') + '</div>' +
       budgetHtml() +
-      (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : imageryBase() ? '' : '<div class="sp-hint">Tip: switch the base map to <b>Satellite</b> first (Map layers) and the surroundings come out as they really are.</div>') +
+      (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : imageryBase() || rbUsed() ? '' : '<div class="sp-hint">Tip: switch the base map to <b>Satellite</b> first (Map layers) and the surroundings come out as they really are.</div>') +
       (list.length ? '<div class="sp-rgrid">' + list.map(r => { const V = { label: RD.renderLabel(r.view, r.target) }, stale = r.sig && r.sig !== sig; return '<figure class="sp-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" title="' + esc(V.label + (stale ? ' · the plan has changed since this was made' : '')) + '"><img alt="' + esc(V.label + ' rendering') + '"><figcaption>' + esc(V.label) + ' <span>' + esc(rWhen(r.at)) + (stale ? ' · plan changed since' : '') + '</span></figcaption></figure>'; }).join('') + '</div>' +
         '<div class="sp-hint">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. Click one to see it full size, compare it with the massing, download or delete it. The two newest go on the Site Plan PDF.</div>' : '') + '</div>';
   }
@@ -3086,7 +3086,7 @@ export function initSitePlan(ctx) {
     if (!src) { ctx.toast('That picture isn’t on this device (renderings stay where they were made).'); return; }
     document.getElementById('spRView2')?.remove();
     const box = document.createElement('div'); box.id = 'spRView2'; box.className = 'sp-rview'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', V.label + ' rendering');
-    box.innerHTML = '<div class="sp-rvin"><div class="sp-rvtop"><b>' + esc(pl.name) + ' · ' + esc(V.label) + '</b><span>' + esc(RD.byId(RD.LOOKS, r.look).label) + ' · ' + esc(RD.byId(RD.TIMES, r.time).label) + (r.model ? ' · ' + esc(r.model) : '') + ' · ' + esc(rWhen(r.at)) + '</span><button type="button" class="sp-lb" data-x aria-label="Close">✕</button></div>' +
+    box.innerHTML = '<div class="sp-rvin"><div class="sp-rvtop"><b>' + esc(pl.name) + ' · ' + esc(V.label) + '</b><span>' + esc(RD.byId(RD.LOOKS, r.look).label) + ' · ' + esc(RD.byId(RD.TIMES, r.time).label) + (r.model ? ' · ' + esc(r.model) : '') + ' · ' + esc(rWhen(r.at)) + (r.sig && r.sig !== planSig(pl) ? ' · <em class="sp-rvold">plan changed since this was made</em>' : '') + '</span><button type="button" class="sp-lb" data-x aria-label="Close">✕</button></div>' +
       '<div class="sp-rvimg"><img src="' + src + '" alt="' + esc(V.label + ' rendering') + '"></div>' +
       '<div class="sp-rvbar"><span class="sp-hint">AI concept illustration, not a design.</span><span class="sp-rvbtns">' + (msrc ? '<button type="button" class="btn sm" data-cmp aria-pressed="false">Show the massing</button>' : '') + '<button type="button" class="btn sm" data-dl>Download</button><button type="button" class="btn sm ghost" data-del>Delete</button></span></div></div>';
     document.body.appendChild(box); box.querySelector('[data-x]').focus({ preventScroll: true }); // the keyboard lands in the viewer
@@ -3125,7 +3125,7 @@ export function initSitePlan(ctx) {
   // drawn with its numbers), Renderings and Ask. Text wraps rather than being cut off. A sync never redraws under someone typing (it waits
   // until they leave the field), so half-typed notes or a name aren't lost.
   const VIEW_KEY = 'fs-projects-view';
-  const SORTS = { updated: 'Recently updated', name: 'Name', acres: 'Largest site', options: 'Most options' };
+  const SORTS = { updated: 'Recently updated', name: 'Name', acres: 'Largest site', options: 'Most options', status: 'Status' };
   const PIN = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 14.5s4.5-4.2 4.5-7.8a4.5 4.5 0 0 0-9 0c0 3.6 4.5 7.8 4.5 7.8z"/><circle cx="8" cy="6.6" r="1.6"/></svg>';
   const ICON_CARDS = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>';
   const ICON_LIST = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5.5 4h8.5M5.5 8h8.5M5.5 12h8.5"/><circle cx="2.6" cy="4" r=".6"/><circle cx="2.6" cy="8" r=".6"/><circle cx="2.6" cy="12" r=".6"/></svg>';
@@ -3177,13 +3177,15 @@ export function initSitePlan(ctx) {
 
   // ----- all projects -----
   function shown() {
-    const q = pq.trim().toLowerCase(), by = { updated: (a, b) => t(b.updated) - t(a.updated), name: (a, b) => a.name.localeCompare(b.name), acres: (a, b) => acresOf(b) - acresOf(a), options: (a, b) => b.plans.length - a.plans.length || t(b.updated) - t(a.updated) }[psort];
+    const q = pq.trim().toLowerCase(), by = { updated: (a, b) => t(b.updated) - t(a.updated), name: (a, b) => a.name.localeCompare(b.name), acres: (a, b) => acresOf(b) - acresOf(a), options: (a, b) => b.plans.length - a.plans.length || t(b.updated) - t(a.updated), status: (a, b) => PJ.STATUSES.indexOf(PJ.statusOf(a)) - PJ.STATUSES.indexOf(PJ.statusOf(b)) || a.name.localeCompare(b.name) }[psort];
     return db.projects.filter(p => !q || [p.name, p.notes, p.by, ...p.parcels.flatMap(x => [x.label, x.owner]), ...p.plans.map(x => x.name)].join(' ').toLowerCase().includes(q)).sort(by);
   }
+  // the status as the small coloured pill from the project page's header (nothing for a project that has none set)
+  const stPill = p => p.status ? '<span class="pj-st" data-st="' + PJ.statusOf(p).id + '"><span class="pj-stp">' + esc(PJ.statusOf(p).label) + '</span></span>' : '';
   function cardHtml(p) {
     const ac = acresOf(p), big = biggest(p), addr = addrOf(p), c = cover(p);
     return '<button type="button" class="pj-card" data-open="' + esc(p.id) + '"><span class="pj-thumb">' + (c || '<i>No site yet</i>') + '</span><span class="pj-cb">' +
-      '<b class="pj-cn">' + esc(p.name) + '</b>' + (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') +
+      '<b class="pj-cn">' + esc(p.name) + '</b>' + stPill(p) + (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') +
       '<span class="pj-facts">' + (ac ? '<span class="pj-fact"><b>' + ac.toFixed(2) + '</b> acres</span>' : '') + '<span class="pj-fact"><b>' + f0(p.plans.length) + '</b> option' + (p.plans.length === 1 ? '' : 's') + '</span>' +
         (big ? '<span class="pj-fact"><b>' + f0(big.m.gfa) + '</b> sq ft max</span>' : '') + '</span>' +
       '<span class="pj-upd">Updated ' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + '</span></span></button>';
@@ -3191,7 +3193,7 @@ export function initSitePlan(ctx) {
   function rowHtml(p) {
     const ac = acresOf(p), big = biggest(p), addr = addrOf(p), c = cover(p);
     return '<button type="button" class="pj-row" data-open="' + esc(p.id) + '"><span class="pj-thumb pj-rthumb">' + (c || '<i>No site</i>') + '</span>' +
-      '<span class="pj-rmain"><b>' + esc(p.name) + '</b>' + (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + '</span>' +
+      '<span class="pj-rmain"><b>' + esc(p.name) + '</b>' + stPill(p) + (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + '</span>' +
       '<span class="pj-rstats"><span class="pj-rc">' + (ac ? '<b>' + ac.toFixed(2) + '</b> acres' : '<em>No site</em>') + '</span><span class="pj-rc"><b>' + f0(p.plans.length) + '</b> option' + (p.plans.length === 1 ? '' : 's') + '</span>' +
         '<span class="pj-rc">' + (big ? '<b>' + f0(big.m.gfa) + '</b> sq ft' : '<em>Not laid out</em>') + '</span><span class="pj-rc pj-rupd">' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + '</span></span>' +
       '<span class="pj-chev" aria-hidden="true">›</span></button>';
@@ -3224,7 +3226,7 @@ export function initSitePlan(ctx) {
   const tabFor = p => PJ.tabOf(ptab.get(p.id));
   const rLabel = r => RD.renderLabel(r.view, r.target); // a rendering by its view, and the building it frames when it has one
   const laidOut = pl => pl.ring.length >= 3 && pl.elements.some(e => e.kind === 'building');
-  // facts the app looked up (the site's jurisdiction, Regrid's city) aren't anyone's edit: kept and shared with the team
+  // facts the app looked up (the site's jurisdiction, Regrid's city) aren't anyone's edit: looked up on each device and kept with the project on that device (teammates look it up themselves)
   // without changing who updated the project or when
   function quietSave(p) { if (!db.dirty.includes(p.id)) db.dirty.push(p.id); persist(); clearTimeout(syncT); syncT = setTimeout(sync, 1500); }
 
@@ -3239,7 +3241,7 @@ export function initSitePlan(ctx) {
         (fin ? '<span class="pj-fin" title="From this option’s Pro forma (land at ' + $M(fin.land) + ')">' + (fin.forSale ? $M(fin.cost) + ' cost · ' + pc2(fin.margin) + ' margin' : '≈ ' + $M(fin.value) + ' value · ' + pc2(fin.yoc) + ' yield on cost') + '</span>' : '')
         : '<span class="pj-none">' + (drawn ? m.acres.toFixed(2) + ' acres, nothing laid out yet' : 'Open it to draw the site on the map') + '</span>') + '</button>' +
       '<div class="pj-pact"><span class="pj-rn">' + (nR ? plural(nR, 'rendering') : drawn ? 'No renderings' : '') + '</span>' +
-        '<button type="button" class="lnk" data-copy="' + esc(pl.id) + '" title="A copy of ' + esc(pl.name) + ' as a new option, its layouts included">Copy</button><button type="button" class="lnk pj-pdel" data-delpl="' + esc(pl.id) + '">Delete</button></div></div>';
+        (pl.ring.length < 3 ? '' : '<button type="button" class="lnk" data-copy="' + esc(pl.id) + '" title="A copy of ' + esc(pl.name) + ' as a new option, its layouts included">Copy</button>') + '<button type="button" class="lnk pj-pdel" data-delpl="' + esc(pl.id) + '">Delete</button></div></div>';
   }
   function headHtml(p) {
     const ac = acresOf(p), st = PJ.statusOf(p), addr = addrOf(p);
@@ -3375,7 +3377,7 @@ export function initSitePlan(ctx) {
         : '<div class="rnote">Which option fits, what approvals the site needs, what to check before going under contract: the AI answers from this project’s own facts (its parcels and notes, the site’s jurisdiction, every option’s numbers) and says when something isn’t in them.</div>') +
       (chips.length && !off ? '<div class="sp-sugs sp-qsugs" role="group" aria-label="' + (A.turns.length ? 'Ask next' : 'Questions to try') + '">' + chips.map(q => '<button type="button" class="chip" data-askq="' + esc(q) + '" title="Ask this">' + esc(q) + '</button>').join('') + '</div>' : '') +
       '<textarea id="pjQ" rows="2" placeholder="' + (A.turns.length ? 'Ask a follow-up…' : 'e.g. which option has the best yield?') + '"' + (off ? ' disabled' : '') + '>' + esc(A.draft || '') + '</textarea>' +
-      '<div class="sp-go2"><button type="button" class="btn primary askai' + (busy ? ' busy' : '') + '" id="pjQGo"' + (off || busy ? ' disabled' : '') + (busy ? ' aria-busy="true"' : '') + (off ? ' title="AI isn’t set up on this site"' : '') + '>' + (busy ? 'Answering…' : 'Ask') + '</button><span class="rnote">Enter asks; Shift+Enter for a new line.</span></div>' +
+      '<div class="sp-go2"><button type="button" class="btn primary askai' + (busy ? ' busy' : '') + '" id="pjQGo"' + (off || busy ? ' disabled' : '') + (busy ? ' aria-busy="true"' : '') + (off ? ' title="AI isn’t set up on this site"' : '') + '>' + (busy ? 'Answering…' : 'Ask') + '</button><span class="rnote pj-kbhint">Enter asks; Shift+Enter for a new line.</span></div>' +
       (off ? '<div class="rnote sp-aioff">AI isn’t set up on this site</div>' : '') + '</section>';
   }
   function wirePAsk(p) {
@@ -3443,7 +3445,10 @@ export function initSitePlan(ctx) {
     tl.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { if (b.dataset.tab !== tabFor(p)) setTab(p, b.dataset.tab, true); });
     tl.onkeydown = e => { const ids = PJ.TABS.map(t => t.id), i = ids.indexOf(tabFor(p)), to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: ids.length - 1 }[e.key]; if (to == null) return;
       e.preventDefault(); setTab(p, ids[(to + ids.length) % ids.length], true); };
-    tl.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    // a fade on the right edge while the strip can scroll further (phones), and the open tab scrolled into view
+    const fade = () => tl.classList.toggle('more', tl.scrollLeft + tl.clientWidth < tl.scrollWidth - 2);
+    const on1 = tl.querySelector('[aria-selected="true"]'); if (on1 && tl.scrollWidth > tl.clientWidth) tl.scrollLeft = Math.max(0, on1.offsetLeft + on1.offsetWidth / 2 - tl.clientWidth / 2);
+    tl.onscroll = fade; fade(); requestAnimationFrame(fade);
   }
   function wire(p) {
     const $ = s => root.querySelector(s), on = (s, f) => root.querySelectorAll(s).forEach(b => b.addEventListener('click', f));
