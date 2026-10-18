@@ -2107,7 +2107,7 @@ export function initSitePlan(ctx) {
     const max = (v, lim, fmt) => +lim ? ' <span class="sc' + (v > +lim ? ' over' : '') + '">/ max ' + fmt(+lim) + '</span>' : '';
     const ratioAt = new Set(pl.elements.filter(e => e.kind === 'building').map(e => e.use || prog.use)).size > 1 ? 'each use’s ratio' : prog.use === 'multifamily' ? prog.perUnit + '/unit' : prog.ratio + '/1,000 sf';
     const homes = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr'), byStory = [1, 2, 3].map(n => [n, homes.filter(e => e.floors === n).length]).filter(([, c]) => c);
-    const pSub = (m.gfa ? 'needed at ' + ratioAt + ' · ' : '') + (m.units ? m.perUnit.toFixed(2) + ' / unit' : m.per1k.toFixed(1) + ' / 1,000 sf') + (m.garages ? ' · ' + f0(m.garages) + ' in garages' : ''), pBad = m.gfa && pk.stalls < pk.need ? ' bad' : '';
+    const pSub = (m.gfa ? 'needed at ' + ratioAt + ' · ' : '') + (m.units ? m.perUnit.toFixed(2) + ' / unit' : m.per1k.toFixed(1) + ' / 1,000 sf') + (m.garages ? ' · ' + f0(m.garages) + ' in garages' : '') + (m.driveways ? ' · ' + f0(m.driveways) + ' on driveways' : ''), pBad = m.gfa && pk.stalls < pk.need ? ' bad' : '';
     el.innerHTML = '<div class="lt">Numbers' + infoBtn((whole ? 'Phase 1 is what was asked for; the whole site includes Phase 2. Paving and ponds are counted for the whole site. ' : '') + 'A planning sketch from the parcel outline: not a survey, and no engineering (grading, utilities, fire lanes, code review).', 'About these numbers') + '</div><div class="sp-tiles">' +
       tile('Site', m.acres.toFixed(2) + ' ac', f0(m.siteSf) + ' sf') +
       two('Floor area', x => x.gfa ? f0(x.gfa) + ' sf' : '—', m.gfa ? plural(m.buildings, 'building') + (m.nrsf ? ' · ' + f0(m.nrsf) + ' net rentable' : '') : '') +
