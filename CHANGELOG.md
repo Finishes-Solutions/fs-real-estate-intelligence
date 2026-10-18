@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 4:15 PM CT: Project status on the Projects list, and small project page polish (b8f4567)
+- **Status on the list:** each project card and list row shows its status pill (Prospect, Under contract…), and **Status** is a new sort choice.
+- **Phones:** the project page's tab strip fades at its right edge when there's more to scroll, and the open tab is scrolled into view. The "Enter asks" hint is hidden on touch screens.
+- **Renderings:** the full-size viewer says when the plan has changed since the picture was made; the Satellite tip is hidden while rendering is paused; Copy isn't offered on an option whose site isn't drawn yet.
+- **Wording:** the Jurisdiction & site facts are looked up on each device and kept with the project there; the doc no longer says they're shared.
+
 ### 3:59 PM CT: Cancelling a rendering no longer bills for it (2b4190e)
 - **Cancel** under Render now stops the AI's work on the server as well as in the browser, so a picture you cancelled isn't painted and charged to the monthly budget for nobody. A picture the AI had already started is dropped, not kept.
 
