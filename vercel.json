@@ -118,6 +118,9 @@
     },
     "api/projects.js": {
       "maxDuration": 20
+    },
+    "api/render.js": {
+      "maxDuration": 300
     }
   },
   "crons": [

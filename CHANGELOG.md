@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 2:16 PM CT: Renderings frame the whole site, from a better angle (2be81fe)
+- **No more cut-off buildings:** the picture the AI paints from now has the whole parcel in the frame with room around it. Before, the camera came from a formula and never checked what landed in the frame; now it checks the parcel's corners against the frame through the map's own camera and moves until they all fit, with space at the sides, below, and above for the roofs and sky.
+- **Less of a snapshot:** the four views are lower and wider, like a marketing aerial; **From the corner** comes first and is the default. The AI is asked for a brochure-style composition with a level horizon.
+- **Model:** renderings use **GPT Image 2.5 Sunburst** when the app's key has it, otherwise the newest GPT Image model the key lists.
+- **PDF:** the rendering pages fill the sheet instead of printing as a small picture in the middle.
+
 ### 2:09 PM CT: Self storage site plans (a38f4db)
 - **Ask for self storage and get a storage layout, not a warehouse box.**
   - The climate-controlled building and leasing office sit at the street with a few customer spaces in front.
@@ -24,6 +30,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Numbers:** the layout card and Numbers show rentable square feet and about how many units, split between climate-controlled and drive-up. RV and boat stalls don't count as parking.
 - **Pro forma:** treats storage as storage, with gross rent, owner-paid costs and a two-to-three-year fill-up.
 - **Building library:** a Self storage group (climate-controlled buildings, drive-up rows, a leasing office). The map key and PDF sheet show storage and the fence.
+### 1:52 PM CT: Photoreal 3D renderings of a site plan (8cf94b5)
+- **Render on an open plan:** a new **Render** section (between Add and Export) paints the option as a photograph. Pick a view (**From the street**, **From the corner**, **Low, at the entry**, **From the back**, or all four), the materials (to suit each use, brick and stone, stucco and stone, modern glass and metal, tilt-wall) and the light (midday, late afternoon, dusk), then **Render 3D View**. About a minute a picture, at 1920 × 1080 when the image model offers it; **Cancel** stops it.
+- **How:** the map points its 3D model of the plan at the site from that view, takes a picture, and the newest GPT Image model the app's key can use paints it photographically. Buildings, drives, parking, pond and trees stay where the plan puts them at their heights; materials, windows, landscaping, cars and sky are the AI's. Switch the base map to Satellite first and the surroundings come out as they are.
+- **Afterwards:** the pictures appear under the button, newest first. Click one to see it full size, **Show the massing** to compare it with the model it came from, **Download** or **Delete**. A picture made before the plan changed says so. The two newest that still match the plan go on the Site Plan PDF, one to a page, captioned as AI concept illustrations.
+- **Good to know:** they are concept illustrations, not designs: check each against the massing. Pictures stay on the device they were made on; teammates see that one exists, not the picture. Renderings show in Settings › AI model › Usage as their own line.
+
+### 1:23 PM CT: Plan for photorealistic 3D renderings of site plans (4d0e2dd)
+- **Planning only, nothing in the app changes.** A new `RENDERINGS-PLAN.md` lays out how renderings could be made from a site plan: first a proper 3D massing view and aerial capture on the map and the PDF sheet, then AI-generated photoreal views in the site's real surroundings, with a later option for a walkable 3D model if people ask for it. It is honest about what AI renders get right (placement, counts, heights, mostly) and wrong (windows, materials, details), and about cost and storage.
 
 ## 2026-10-16
 
