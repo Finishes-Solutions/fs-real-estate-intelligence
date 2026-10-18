@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 3:58 PM CT: Review fixes: renderings kept when you leave, budget off switch, project page polish (0ecdfa9)
+- **A rendering is never lost:** closing the plan, switching options or going to Projects while a picture was being painted used to drop it quietly. It's now saved on the option it was taken of, and the toast names it ("Rendering of Option A ready."). Cancel still drops it.
+- **Each picture's "plan changed since" is judged from the moment it was taken,** not from the start of an All site views run. A failure after a success is reported, not hidden.
+- **Renderings can be turned off** by the administrators (a zero budget); the panel then says so instead of showing a $0 budget.
+- **Project page:** deleting a project removes its pictures from this device; option names no longer repeat after a delete (no second "Option C"); the empty Renderings tab offers a next step; changing the tab in the address switches the tab; Ask keeps the full notes when summarising for an email.
+- **Polish:** the small notes under Render (budget, tips) are styled like the app's other notes; the View picker no longer cuts off its labels; a teammate's picture shows a "Not on this device" placeholder instead of a broken image; Delete in the viewer is red; picture tiles stay 16:9.
+
 ### 3:23 PM CT: A proper project page: Overview, Options, Renderings and Ask (d4bb78d)
 - **Each project now has a real home.** The project page has a header with the name, address, acreage and a **status** (Prospect, Under review, Under contract, Owned, On hold, Dead), and four tabs. Your last tab is remembered and kept in the address, so reload and Back work.
 - **Overview:** project information (site, parcels, owners, appraised value, options) with **Client / prepared for**, **Target use** and **Notes** you can edit in place, and a **Jurisdiction & site** card gathered from the app's own sources: county, city or unincorporated, zoning (when Regrid has been fetched for the parcel), FEMA floodplain, water / utility district, school district, TIRZ, Opportunity Zone, busiest road and traffic, EPA-regulated facilities nearby and utilities, each with its source and a **Refresh** link.
