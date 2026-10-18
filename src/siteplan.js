@@ -2897,15 +2897,17 @@ export function initSitePlan(ctx) {
   // The massing as the AI gets it: the map pointed at the site from the view's camera (lib/render.mjs cameraFor) in the
   // part of the map the panels leave free, the drawing marks hidden, read off the canvas on the next frame (the canvas
   // keeps no buffer between frames) and cut to 16:9 at up to 1600 px wide. The map is put back exactly as it was.
-  async function captureView(pl, view) {
+  // A close-up ('hero') frames one building (`target`, from RD.heroTarget): the camera and the fit use the building grown
+  // by RD.HERO_PAD feet each side instead of the parcel.
+  async function captureView(pl, view, target = null) {
     const F = SP.frame(pl.origin), was = { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing(), padding: map.getPadding() };
     const free = freeRect({ key: false }), m = free.m, canvas = map.getCanvas(), dpr = canvas.width / Math.max(1, m.width);
-    const cam = RD.cameraFor(view, pl, { px: Math.max(320, (free.r - free.l) * dpr), lat: pl.origin[1] });
+    const cam = RD.cameraFor(view, pl, { px: Math.max(320, (free.r - free.l) * dpr), lat: pl.origin[1], target }), T = RD.byId(RD.VIEWS, view).hero && target;
     const hidden = HIDE_FOR_RENDER.filter(id => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none');
     try {
       for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'none');
       map.jumpTo({ center: F.toLL(cam.center), zoom: cam.zoom, pitch: Math.min(cam.pitch, map.getMaxPitch()), bearing: cam.bearing, padding: fitPadding(free, m, 0) });
-      fitSiteInFrame(pl, free, m); // the formula is a start; the real camera decides: the whole parcel in the free part of the frame, with room around it
+      fitSiteInFrame(pl, free, m, T ? { points: RD.heroPoints(T), tall: [T] } : {}); // the formula is a start; the real camera decides: the whole parcel (or the close-up's building and its surroundings) in the free part of the frame, with room around it
       await idle();
       const png = await new Promise((ok, no) => { map.once('render', () => { try { ok(canvas.toDataURL('image/png')); } catch (e) { no(e); } }); map.triggerRepaint(); });
       const img = new Image(); await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = png; });
@@ -2919,11 +2921,13 @@ export function initSitePlan(ctx) {
   // Project the parcel's corners through the map's own camera (pitch and bearing included) and move the camera until
   // they all sit inside the free part of the frame: 8% clear at the sides, 9% below, and room above for the tallest
   // building and a strip of sky. Zoom steps by the overflow each round; the view is re-centred on the parcel each round.
-  function fitSiteInFrame(pl, free, m) {
-    const ll = ringLL(pl); if (!ll) return;
+  // points: what to fit instead of the parcel (plan feet, e.g. a close-up's building grown by its margin); tall: the
+  // buildings whose height needs room above (all of them by default).
+  function fitSiteInFrame(pl, free, m, { points = null, tall: tallEls = null } = {}) {
+    const ll = points?.length >= 3 && pl?.origin ? points.map(SP.frame(pl.origin).toLL) : ringLL(pl); if (!ll) return;
     const W = free.r - free.l, H = free.b - free.t, aspect = 16 / 9, fw = Math.min(W, H * aspect), fh = fw / aspect; // the 16:9 cut the picture keeps
     const fl = free.l - m.left + (W - fw) / 2, ft = free.t - m.top + (H - fh) / 2, cx = fl + fw / 2, cy = ft + fh / 2;
-    const tall = Math.max(14, ...pl.elements.filter(e => e.kind === 'building').map(e => (e.floors || 1) * (SP.USES[e.use]?.floorH || 12))) * 0.3048;
+    const tall = Math.max(14, ...(tallEls || pl.elements.filter(e => e.kind === 'building')).map(e => (e.floors || 1) * (SP.USES[e.use]?.floorH || 12))) * 0.3048;
     for (let i = 0; i < 14; i++) {
       const px = ll.map(p => map.project(p)), xs = px.map(q => q.x), ys = px.map(q => q.y), bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
       const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (256 * 2 ** map.getZoom()), tallPx = tall / mpp * Math.sin(map.getPitch() * Math.PI / 180) * 1.3;
@@ -2936,7 +2940,8 @@ export function initSitePlan(ctx) {
     }
   }
   // one picture a view, in turn: capture, ask the server, keep the picture and the massing it came from
-  async function renderViews(p, pl, views, look, time) {
+  // target: the building a close-up frames (an element of pl), for the 'hero' view
+  async function renderViews(p, pl, views, look, time, target = null) {
     if (ed.rendering) return;
     const run = ed.rendering = { n: views.length, i: 0, view: views[0], msg: '', abort: new AbortController() }; panel();
     const live = () => ed?.rendering === run && !run.abort.signal.aborted;
@@ -2944,17 +2949,19 @@ export function initSitePlan(ctx) {
     try {
       const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
       const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' }), sig = planSig(pl);
+      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map', focus: target });
       for (let i = 0; i < views.length && live(); i++) {
         run.i = i; run.view = views[i]; run.msg = 'Taking the picture from the map…'; panel();
-        const cap = await captureView(pl, views[i]); if (!live()) break;
-        run.msg = 'The AI is painting ' + RD.byId(RD.VIEWS, views[i]).label.toLowerCase() + ' (about a minute)…'; panel();
-        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief, view: views[i] }), signal: run.abort.signal });
+        const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero;
+        const cap = await captureView(pl, views[i], isHero ? target : null); if (!live()) break;
+        run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; panel();
+        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i] }), signal: run.abort.signal });
         const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
         if (!live()) break;
         const id = pl.id + '/' + Date.now().toString(36) + '-' + views[i];
         await rput(id, await toBlob(d.image)); await rput(id + ':m', await toBlob(cap.image)).catch(() => {});
         const cur = PL(); if (!cur) break;
-        cur.renders = (cur.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '' }]);
+        cur.renders = (cur.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '', ...(isHero ? { target: hero } : {}) }]);
         while (cur.renders.length > 16) { const old = cur.renders.shift(); rdel(old.id); rdel(old.id + ':m'); } // the newest sixteen are kept
         save(p); made++; panel();
       }
@@ -2968,14 +2975,23 @@ export function initSitePlan(ctx) {
   const RLOOK_KEY = 'fs-render-look', RTIME_KEY = 'fs-render-time';
   const rPrefs = () => ({ look: RD.byId(RD.LOOKS, get(RLOOK_KEY)).id, time: RD.byId(RD.TIMES, get(RTIME_KEY)).id });
   const rWhen = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+  // the building a close-up would frame now: the one selected on the plan when it is a building, else the one nearest the street
+  const heroFor = pl => RD.heroTarget(pl, ed?.sel);
+  // the View choices: the four site views, then the close-up named after its building (and saying so when it's the selected one)
+  function viewOptions(pl, sel) {
+    const T = heroFor(pl), picked = !!T && T.id === ed?.sel, v = ed.rview || 'corner';
+    return sel(RD.VIEWS.filter(x => !x.hero), v) + RD.VIEWS.filter(x => x.hero).map(x => '<option value="' + x.id + '"' + (x.id === v && T ? ' selected' : '') + (T ? '' : ' disabled') +
+      ' title="' + esc(!T ? 'There is no building on this plan to frame' : picked ? 'A close-up of ' + RD.buildingName(T) + ', the building selected on the plan' : 'A close-up of ' + RD.buildingName(T) + ', the building nearest the street. Select a building on the plan first to frame that one instead.') + '">' +
+      esc(RD.renderLabel(x.id, T) + (picked ? ' (selected)' : '')) + '</option>').join('');
+  }
   function renderHtml(p, pl) {
     const R = ed.rendering, pr = rPrefs(), list = (pl.renders || []).slice().reverse(), sig = planSig(pl), off = aiOff(), sel = (list2, v) => list2.map(x => '<option value="' + x.id + '"' + (x.id === v ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
     return '<div class="bsec" id="spRender"><div class="lt">Renderings' + infoBtn('A photoreal picture of this option, painted by the AI from the 3D massing on the map: the buildings, drives, parking, pond and trees stay where the plan puts them, at their heights; the materials, windows, landscaping, cars, people and sky are the AI’s. It is a concept illustration, not a design, and two renderings of one plan will differ. About a minute a view. The pictures are kept on this device; teammates see that they exist, not the pictures.', 'About renderings') + '</div>' +
-      '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + sel(RD.VIEWS, ed.rview || 'corner') + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + '>All four views</option></select></label>' +
+      '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + viewOptions(pl, sel) + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + ' title="The four views of the whole site, one after another (not the building close-up)">All site views</option></select></label>' +
         '<label class="sp-f"><span class="sp-fl">Materials</span><select id="spRLook">' + sel(RD.LOOKS, pr.look) + '</select></label><label class="sp-f"><span class="sp-fl">Light</span><select id="spRTime">' + sel(RD.TIMES, pr.time) + '</select></label></div>' +
       '<div class="sp-go2"><button type="button" class="btn askai" id="spRenderGo"' + (R || off ? ' disabled' : '') + ' title="' + (off ? 'AI isn’t set up on this site' : 'Point the map’s 3D massing at the site and have the AI paint it as a photograph (1920 × 1080)') + '">' + (R ? 'Rendering ' + (R.i + 1) + ' of ' + R.n + '…' : 'Render 3D View') + '</button>' + (R ? '<button type="button" class="btn" id="spRenderStop">Cancel</button>' : '') + '</div>' +
       (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : imageryBase() ? '' : '<div class="sp-hint">Tip: switch the base map to <b>Satellite</b> first (Map layers) and the surroundings come out as they really are.</div>') +
-      (list.length ? '<div class="sp-rgrid">' + list.map(r => { const V = RD.byId(RD.VIEWS, r.view), stale = r.sig && r.sig !== sig; return '<figure class="sp-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" title="' + esc(V.label + (stale ? ' · the plan has changed since this was made' : '')) + '"><img alt="' + esc(V.label + ' rendering') + '"><figcaption>' + esc(V.label) + ' <span>' + esc(rWhen(r.at)) + (stale ? ' · plan changed since' : '') + '</span></figcaption></figure>'; }).join('') + '</div>' +
+      (list.length ? '<div class="sp-rgrid">' + list.map(r => { const V = { label: RD.renderLabel(r.view, r.target) }, stale = r.sig && r.sig !== sig; return '<figure class="sp-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" title="' + esc(V.label + (stale ? ' · the plan has changed since this was made' : '')) + '"><img alt="' + esc(V.label + ' rendering') + '"><figcaption>' + esc(V.label) + ' <span>' + esc(rWhen(r.at)) + (stale ? ' · plan changed since' : '') + '</span></figcaption></figure>'; }).join('') + '</div>' +
         '<div class="sp-hint">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. Click one to see it full size, compare it with the massing, download or delete it. The two newest go on the Site Plan PDF.</div>' : '') + '</div>';
   }
   function wireRender(p, pl) {
@@ -2984,7 +3000,7 @@ export function initSitePlan(ctx) {
     const vw = $('#spRView'); if (vw) vw.onchange = () => { ed.rview = vw.value; };
     const lk = $('#spRLook'); if (lk) lk.onchange = () => keep(RLOOK_KEY, lk.value);
     const tm = $('#spRTime'); if (tm) tm.onchange = () => keep(RTIME_KEY, tm.value);
-    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'corner', pr = rPrefs(); renderViews(p, pl, v === 'all' ? RD.VIEWS.map(x => x.id) : [v], pr.look, pr.time); });
+    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'corner', pr = rPrefs(), hero = RD.byId(RD.VIEWS, v, null)?.hero; renderViews(p, pl, v === 'all' ? RD.SITE_VIEWS : [v], pr.look, pr.time, hero ? heroFor(pl) : null); });
     on('#spRenderStop', () => { ed.rendering?.abort.abort(); });
     card.querySelectorAll('.sp-rth').forEach(f => { const r = (pl.renders || []).find(x => x.id === f.dataset.rid); if (!r) return;
       renderSrc(r.id).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { img.alt = 'Picture not on this device'; f.classList.add('gone'); } });
@@ -2992,7 +3008,7 @@ export function initSitePlan(ctx) {
   }
   // the picture full size, with the massing it was made from a click away, Download and Delete
   async function openRender(p, pl, r) {
-    const V = RD.byId(RD.VIEWS, r.view), src = await renderSrc(r.id), msrc = await renderSrc(r.id + ':m');
+    const V = { label: RD.renderLabel(r.view, r.target) }, src = await renderSrc(r.id), msrc = await renderSrc(r.id + ':m');
     if (!src) { ctx.toast('That picture isn’t on this device (renderings stay where they were made).'); return; }
     document.getElementById('spRView2')?.remove();
     const box = document.createElement('div'); box.id = 'spRView2'; box.className = 'sp-rview'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', V.label + ' rendering');
@@ -3014,7 +3030,7 @@ export function initSitePlan(ctx) {
   async function rendersForSheet(pl) {
     const sig = planSig(pl), out = [];
     const small = async b => { try { const bmp = await createImageBitmap(b), k = Math.min(1, 1600 / bmp.width), c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85); } catch (e) { return blobToData(b); } };
-    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= 2 || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.byId(RD.VIEWS, r.view).label + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
+    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= 2 || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.renderLabel(r.view, r.target) + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
     return out;
   }
   function geojson(p, pl) {

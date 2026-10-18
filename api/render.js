@@ -1,6 +1,6 @@
 // Photoreal renderings of a site plan: POST { image, brief, view } -> { image, model, size, prompt }
 //   image: a data URL (JPEG/PNG/WebP, up to ~3 MB) of the plan's 3D massing on the map from the view's camera (the
-//          browser takes it; lib/render.mjs cameraFor); brief: briefOf() from the same lib; view: one of VIEWS
+//          browser takes it; lib/render.mjs cameraFor); brief: briefOf() from the same lib (with focus, the building, for the close-up); view: one of VIEWS
 //   -> image: a data URL (JPEG) of the rendering, 1920 × 1080 when the model can do it, else the nearest size it offers
 // The picture is made by gpt-image-2.5-sunburst when the key has it, else the newest GPT Image model it lists (OPENAI_IMAGE_MODEL overrides) through the Images
 // API's edit endpoint, which keeps the input picture's geometry and camera and paints it photographically. Its token
@@ -19,7 +19,8 @@ export function cleanBrief(b = {}) {
   const uses = (Array.isArray(b.uses) ? b.uses : []).slice(0, 8).map(u => ({ use: clip(u?.use, 20), label: clip(u?.label, 40), count: Math.max(1, Math.min(500, Math.round(+u?.count) || 1)), floors: (Array.isArray(u?.floors) ? u.floors : []).slice(0, 4).map(f => Math.max(1, Math.min(60, Math.round(+f) || 1))), forms: (Array.isArray(u?.forms) ? u.forms : []).filter(f => ['bar', 'L', 'U', 'tower'].includes(f)), units: +u?.units > 0 ? Math.round(+u.units) : undefined }));
   const n = (v, hi) => Number.isFinite(+v) && +v > 0 ? Math.min(hi, +v) : undefined;
   return { address: clip(b.address, 120), acres: n(b.acres, 5000), uses, buildings: n(b.buildings, 2000), parking: n(b.parking, 50000), pond: !!b.pond, pool: !!b.pool, truckCourt: !!b.truckCourt, garage: !!b.garage, homes: n(b.homes, 5000),
-    trees: b.trees !== false, look: clip(b.look, 20), time: clip(b.time, 20), basemap: b.basemap === 'satellite' ? 'satellite' : 'map', facts: (Array.isArray(b.facts) ? b.facts : []).slice(0, 6).map(s => clip(s, 200)) };
+    trees: b.trees !== false, look: clip(b.look, 20), time: clip(b.time, 20), basemap: b.basemap === 'satellite' ? 'satellite' : 'map', facts: (Array.isArray(b.facts) ? b.facts : []).slice(0, 6).map(s => clip(s, 200)),
+    focus: b.focus && typeof b.focus === 'object' ? { name: clip(b.focus.name, 40) || 'Building', use: clip(b.focus.use, 20), floors: Math.max(1, Math.min(60, Math.round(+b.focus.floors) || 1)), label: clip(b.focus.label, 40) } : undefined }; // the building a close-up frames
 }
 
 // one edit call; a 400 about the size steps down to the next size, one about input_fidelity drops that parameter

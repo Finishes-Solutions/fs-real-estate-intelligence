@@ -23,6 +23,27 @@ assert.equal(R.cameraFor('nonsense', plan).view, 'corner', 'an unknown view is t
 // the camera sizes the frame to the canvas: a narrower canvas needs to zoom out
 assert.ok(R.cameraFor('front', { ...plan, ring: big.ring }, { px: 600 }).zoom < big.zoom, 'narrower canvas, lower zoom');
 
+// the building close-up: the selected building wins; else the building nearest the street (the front edge is y = 0:
+// b3's front wall is 35 ft back, b2's 40 ft, b1's 120 ft); a selected piece that isn't a building doesn't count
+assert.equal(R.heroTarget(plan).id, 'b3', 'nothing selected: the building nearest the street');
+assert.equal(R.heroTarget(plan, 'b1').id, 'b1', 'the selected building wins');
+assert.equal(R.heroTarget(plan, 'p').id, 'b3', 'a selected parking row is not a building: nearest the street');
+assert.equal(R.heroTarget({ ...plan, front: 2 }).id, 'b1', 'a site fronting the north edge: the back building is now the front one');
+assert.equal(R.heroTarget({ ...plan, elements: plan.elements.filter(e => e.kind !== 'building') }), null, 'no buildings, no close-up');
+assert.ok(!R.SITE_VIEWS.includes('hero') && R.SITE_VIEWS.length === 4, 'All site views is the four whole-site views');
+const hero = R.cameraFor('hero', plan);
+assert.equal(hero.pitch, 45); assert.equal(hero.bearing, corner.bearing, 'the close-up turns like the corner view'); assert.deepEqual(hero.target, { id: 'b3', name: 'Building' }, 'unnamed: Building');
+assert.ok(hero.zoom >= cam.zoom, 'closer than the whole-site view: ' + hero.zoom + ' vs ' + cam.zoom);
+const bigSite = { ...plan, ring: [[0, 0], [3000, 0], [3000, 2000], [0, 2000]], elements: plan.elements.map(e => e.id === 'b1' ? { ...e, name: 'Building A' } : e) };
+const heroBig = R.cameraFor('hero', bigSite, { target: 'b1' }), wideBig = R.cameraFor('corner', bigSite);
+assert.equal(heroBig.target.name, 'Building A'); assert.ok(heroBig.zoom > wideBig.zoom + 2, 'on a big site the close-up is far closer: ' + heroBig.zoom + ' vs ' + wideBig.zoom);
+assert.ok(Math.hypot(heroBig.center[0] - 150, heroBig.center[1] - 150) < 60, 'aimed at the chosen building: ' + heroBig.center);
+assert.equal(R.cameraFor('hero', plan, { target: plan.elements[0] }).target.id, 'b1', 'the target can be the element itself');
+// the framed box: the building's footprint grown 45 ft each side, along the building's own axes
+const hp = R.heroPoints({ x: 0, y: 0, w: 100, d: 50, rot: 90 }), xs = hp.map(p => p[0]), ys = hp.map(p => p[1]);
+assert.ok(Math.abs(Math.max(...xs) - 70) < 1e-6 && Math.abs(Math.max(...ys) - 95) < 1e-6, 'a 100 × 50 building turned 90° frames 140 × 190 ft: ' + JSON.stringify(hp));
+assert.equal(R.renderLabel('hero', { name: 'Building A' }), 'Building close-up · Building A'); assert.equal(R.renderLabel('hero', null), 'Building close-up · Building'); assert.equal(R.renderLabel('front', { name: 'x' }), 'From the street');
+
 // the brief: uses grouped with their floors and forms, what else is on the site
 const brief = R.briefOf(plan, { metrics: { acres: 1.377, spaces: 112.4 }, address: '123 Main St, Katy', facts: ['FEMA flood zone X.'], look: 'brick', time: 'dusk', basemap: 'sat' });
 assert.equal(brief.buildings, 3); assert.equal(brief.parking, 112); assert.equal(brief.acres, 1.38); assert.equal(brief.pond, true); assert.equal(brief.pool, undefined);
@@ -38,6 +59,15 @@ assert.ok(!pr.includes('undefined') && !pr.includes('null'), 'no holes in the pr
 const pr2 = R.renderPrompt({ ...brief, look: 'auto', basemap: 'map', facts: [] }, 'low');
 assert.ok(pr2.includes('garden-style apartments') && pr2.includes('retail strip'), 'no look picked: materials by use'); assert.ok(pr2.includes('replace the flat map graphics'), 'map base: invent the surroundings'); assert.ok(pr2.includes('low aerial from over the entry drive'), 'the low view is from the entry drive'); assert.ok(pr.includes('whole site in the frame'), 'composed wide');
 assert.ok(R.renderPrompt({}, 'front').length > 200, 'an empty brief still makes a usable prompt');
+// the close-up's prompt: about the focused building, the rest of the site around it, still nothing changed and no text
+const hb = R.briefOf(plan, { metrics: { acres: 1.377, spaces: 112.4 }, look: 'auto', focus: { ...plan.elements[2], name: 'Building C' } });
+assert.deepEqual(hb.focus, { name: 'Building C', use: 'multifamily', floors: 3, label: R.briefOf(plan).uses[2].label }); assert.equal(brief.focus, undefined, 'no focus unless asked');
+const hpr = R.renderPrompt(hb, 'hero');
+for (const s of ['hero photograph', 'close-up aerial of Building C', '3-storey multifamily building', 'rest of the site continues around it', 'Materials for Building C: garden-style apartments', 'must not change', 'No text, labels'])
+  assert.ok(hpr.includes(s), 'close-up prompt says: ' + s + '\n' + hpr);
+assert.ok(!hpr.includes('whole site in the frame') && !hpr.includes('undefined'), 'the close-up is not composed wide');
+assert.ok(!R.renderPrompt(hb, 'corner').includes('close-up'), 'a site view ignores the focus');
+assert.ok(R.renderPrompt({}, 'hero').includes('close-up aerial of Building,'), 'a close-up with no focus still makes a usable prompt');
 
 // the model: gpt-image-2.5-sunburst when the key lists it; else the newest GPT Image it lists, never a mini; the
 // environment's pick wins; the preferred one when nothing is known
@@ -96,6 +126,9 @@ assert.equal(dataImage('data:image/jpeg;base64,' + 'A'.repeat(4_000_000)), null,
 // the brief is cleaned, not trusted
 const cb = cleanBrief({ address: 'x'.repeat(500), acres: -4, uses: [{ use: 'retail', count: 1e9, floors: [0, 999, 'a'], forms: ['bar', 'blob'], units: '12' }], buildings: 'many', parking: 1e9, facts: Array(40).fill('f'.repeat(900)), look: 'brick', basemap: 'hacked' });
 assert.equal(cb.address.length, 120); assert.equal(cb.acres, undefined); assert.equal(cb.uses[0].count, 500); assert.deepEqual(cb.uses[0].floors, [1, 60, 1]); assert.deepEqual(cb.uses[0].forms, ['bar']); assert.equal(cb.uses[0].units, 12);
+const cf = cleanBrief({ focus: { name: 'B'.repeat(300), use: 'retail', floors: 999, label: 'Retail', evil: 'x' } });
+assert.deepEqual(cf.focus, { name: 'B'.repeat(40), use: 'retail', floors: 60, label: 'Retail' }, 'the focus is kept, clipped'); assert.equal(cb.focus, undefined); assert.equal(cleanBrief({ focus: 'Building A' }).focus, undefined);
+assert.ok(R.renderPrompt(cleanBrief(hb), 'hero').includes('close-up aerial of Building C'), 'the focus survives the trip to the server');
 assert.equal(cb.buildings, undefined); assert.equal(cb.parking, 50000); assert.equal(cb.facts.length, 6); assert.equal(cb.facts[0].length, 200); assert.equal(cb.basemap, 'map');
 // the environment's model pick wins and no model list is read
 process.env.OPENAI_IMAGE_MODEL = 'gpt-image-7'; calls.length = 0;
