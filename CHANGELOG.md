@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 2:28 PM CT: Renderings know what self storage looks like (fc0d058)
+- **A render of a storage plan** now shows a climate-controlled building with a glassy leasing office, metal drive-up buildings with rows of roll-up doors, and the fence with its gate, instead of a generic commercial building.
+- Brought the latest renderings work into the self storage changes, with nothing lost on either side.
+
 ### 2:16 PM CT: Renderings frame the whole site, from a better angle (2be81fe)
 - **No more cut-off buildings:** the picture the AI paints from now has the whole parcel in the frame with room around it. Before, the camera came from a formula and never checked what landed in the frame; now it checks the parcel's corners against the frame through the map's own camera and moves until they all fit, with space at the sides, below, and above for the roofs and sky.
 - **Less of a snapshot:** the four views are lower and wider, like a marketing aerial; **From the corner** comes first and is the default. The AI is asked for a brochure-style composition with a level horizon.
