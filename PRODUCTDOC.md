@@ -535,6 +535,30 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - **Pro forma:** self storage is gross rent (about $15 a rentable sf a year, about $1.25 a month) with the owner paying the operating costs, not billed back. It assumes about 10% vacancy and two to three years to fill. All of this is editable.
 - If the climate-controlled building or the RV stalls don't fully fit, the layout says how much did.
 
+**Food truck parks:** say it plainly ("a food truck park with 12 trucks, a covered pavilion, restrooms and a small bar", "food truck court with 8 truck stalls, no bar") or choose **Food truck park** under Site parameters.
+- **How it's laid out:**
+  - Customers park on the street side and walk straight into the park. No parking sits at the mouth of the entrance.
+  - The trucks stand on concrete stalls (15 × 35 ft, each with a power and water pedestal) around a gathering area: along the back and down both sides (**Trucks round the commons**), or in one row along the back (**Trucks along the back**). Each truck's serving window faces the seating, with a strip of plaza in front for people to queue and order.
+  - A **service lane** runs behind the stalls, up one side, across the back and down the other. Trucks pull in and out along it without crossing the seating. It joins the end of the parking aisle at both ends, so nothing has to back out.
+  - On a corner lot, the lane also gets its own **Service entry** from the side street, so the trucks come and go without driving through the customer parking.
+  - In the middle: a covered **pavilion** with picnic seating on a lawn (room for lawn games and shade trees), **restrooms**, a **bar** with a **beer garden** patio at the front corner, and a **playground** away from the bar.
+  - A dumpster and grease enclosure sits on the lane, its gate facing the lane.
+  - Detention goes on the land left over (at the back, the front or a side). When there isn't room for all of it, the layout says how much the pond holds and that the rest goes underground.
+- **Site parameters › Program** for a food truck park:
+  - number of food trucks (blank = as many as fit, as many as the parking carries);
+  - parking per truck (about 5) and bar parking per 1,000 sf;
+  - pavilion, bar and restroom sizes (0 for the pavilion leaves it out);
+  - **Bar or beer garden** and **Playground** on or off.
+- **The numbers:** the layout card leads with the trucks and about how many seats. **Numbers** has a **Food trucks** tile (trucks, seats at about 15 sf of covered or patio seating each) and a **Park buildings** tile (pavilion, restrooms, bar and patio sizes). Parking needed is the trucks' share plus the bar's.
+- **Selected:** a truck stall shows its size, its pedestal and the parking it brings. A pavilion, bar or restrooms building has a **Part** field and a line with its size (and seats, for the pavilion).
+- **Pro forma:**
+  - stall rent per truck per month (about $1,200);
+  - the bar either run by the owner (sales a sf and a net margin) or leased triple net (rent a sf);
+  - the park's costs per truck and a fixed amount a year (a manager, insurance, events);
+  - the cost of each stall's pad and hookups.
+  - It assumes about 10% vacancy and six months to fill. All of this is editable.
+- If not all the trucks asked for fit, or there's no room for the bar or playground, the layout says so.
+
 **The plan panel** is a full-height column beside the map buttons. Its header stays put while the sections scroll:
 - **Where you are:** **Projects › the project › the option's name**. Click **Projects** for the Projects page or the project's name for its page; click the option's name (it has a dotted underline, and a pencil when you point at it) to rename it. The option's button follows what you type, and a blank name goes back to the one it had. Under it, the address and acres (just the acres when the project is named after the address).
 - **Undo** and **Redo** buttons, **Edit Layout** (once there's a layout), **Done** and **×**. Done and × close the plan; it's saved as you go. The map chip's buttons read **Stop Editing**, **Stop Measuring** or **Finish**, so **Done** here is the only Done. A small icon beside Undo says where the plan is: a laptop for **saved on this device**, a cloud with a tick for **synced with the team** (hover it for when), or a red warning when the team copy couldn't be updated; click it to try again (your work is still saved on this device).
@@ -566,7 +590,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
 - Sites up to about 300 acres work; a large layout takes up to a minute while the map stays usable, and the AI may think for up to a minute first.
 
 **The building library**
-- About 240 building types: garden, breezeway, corridor, senior, L-shaped, courtyard, podium and tower apartments; townhome rows; duplexes; 24 house plans; restaurants from a coffee drive-thru to a brewpub; shop strips, pharmacies, grocery and big box; medical and office buildings; flex and warehouses; a **Self storage** group (climate-controlled buildings of 1 to 4 stories, drive-up rows 30 or 40 ft deep and 100 to 250 ft long, a leasing office); hotels, churches and more.
+- About 240 building types: garden, breezeway, corridor, senior, L-shaped, courtyard, podium and tower apartments; townhome rows; duplexes; 24 house plans; restaurants from a coffee drive-thru to a brewpub; shop strips, pharmacies, grocery and big box; medical and office buildings; flex and warehouses; a **Self storage** group (climate-controlled buildings of 1 to 4 stories, drive-up rows 30 or 40 ft deep and 100 to 250 ft long, a leasing office); a **Food trucks** group (pavilions from 1,500 to 6,000 sf with their seats, restrooms, bars); hotels, churches and more.
 - **From the building library** in the Draw section adds one in the nearest clear spot to the middle of the view; **Type** in the Selected box swaps a placed building for another type in the same spot. Neighbourhood streets mix the house plans home to home.
 
 **Getting the most out of a site**
