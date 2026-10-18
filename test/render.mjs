@@ -1,7 +1,7 @@
 // Offline tests for renderings: lib/render.mjs (the camera presets, the brief, the prompt, the model pick) and
-// api/render.js with a mocked OpenAI Images API. Run: node test/render.mjs
+// api/render.js with a mocked OpenAI Images API and a mocked Supabase (the monthly budget). Run: node test/render.mjs
 import assert from 'node:assert/strict';
-process.env.OPENAI_API_KEY = 'sk-test';
+process.env.OPENAI_API_KEY = 'sk-test'; process.env.SUPABASE_URL = 'https://x.supabase.co'; process.env.SUPABASE_SECRET_KEY = 'sb_secret_test';
 const R = await import('../lib/render.mjs');
 
 // a 300 × 200 ft lot, street along the south side (front edge 0: (0,0)→(300,0)), three buildings
@@ -53,8 +53,12 @@ assert.equal(R.pickImageModel([], 'gpt-image-9'), 'gpt-image-9');
 // ---------- the endpoint, with OpenAI mocked ----------
 const calls = [], PNG = 'data:image/png;base64,' + Buffer.from('fake-png-bytes').toString('base64');
 let refuseSize = 1, refuseFidelity = 1, fail500 = 0;
+// this month's Renderings rows in ai_usage (the budget read), and whether that read fails
+let usage = [], supaFail = false; const reads = [];
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url); const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });
+  if (url.startsWith('https://x.supabase.co/rest/v1/rpc/ai_usage_add')) return new Response(null, { status: 204 });
+  if (url.startsWith('https://x.supabase.co/rest/v1/ai_usage?')) { reads.push(url); return supaFail ? new Response('{"message":"bad gateway"}', { status: 503 }) : json(usage); }
   if (url.endsWith('/models')) return json({ data: [{ id: 'gpt-image-1' }, { id: 'gpt-image-2' }, { id: 'gpt-image-2.5-sunburst' }, { id: 'gpt-5' }] });
   if (url.endsWith('/images/edits')) {
     const f = opts.body, rec = { model: f.get('model'), size: f.get('size'), quality: f.get('quality'), fidelity: f.get('input_fidelity'), prompt: f.get('prompt'), img: f.get('image[]'), n: f.get('n'), fmt: f.get('output_format') }; calls.push(rec);
@@ -91,7 +95,7 @@ assert.equal(res.code, 200); assert.equal(calls.length, 2, 'one retry after a 50
 // bad input
 res = mockRes(); await render(req({ body: { image: 'https://evil.example/x.png', brief: {} }, ip: '9.9.9.4' }), res); assert.equal(res.code, 400, 'only data URLs');
 res = mockRes(); await render(req({ body: { image: 'data:image/svg+xml;base64,AAAA', brief: {} }, ip: '9.9.9.5' }), res); assert.equal(res.code, 400, 'no SVG');
-res = mockRes(); await render(req({ method: 'GET' }), res); assert.equal(res.code, 405);
+res = mockRes(); await render(req({ method: 'PUT' }), res); assert.equal(res.code, 405);
 assert.equal(dataImage('data:image/jpeg;base64,' + 'A'.repeat(4_000_000)), null, 'too big');
 // the brief is cleaned, not trusted
 const cb = cleanBrief({ address: 'x'.repeat(500), acres: -4, uses: [{ use: 'retail', count: 1e9, floors: [0, 999, 'a'], forms: ['bar', 'blob'], units: '12' }], buildings: 'many', parking: 1e9, facts: Array(40).fill('f'.repeat(900)), look: 'brick', basemap: 'hacked' });
@@ -101,6 +105,39 @@ assert.equal(cb.buildings, undefined); assert.equal(cb.parking, 50000); assert.e
 process.env.OPENAI_IMAGE_MODEL = 'gpt-image-7'; calls.length = 0;
 res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'rear' }, ip: '9.9.9.6' }), res);
 assert.equal(res.body.model, 'gpt-image-7'); assert.equal(calls[0].model, 'gpt-image-7');
+// ---------- the monthly budget (RENDER_MONTHLY_CAP_USD, $100 by default) ----------
+const { dayOf } = await import('../lib/aiusage.mjs'), month = dayOf().slice(0, 7);
+assert.ok(reads.length === 4 && reads.every(u => u.includes('feature=eq.render') && u.includes('day=gte.' + month + '-01')), 'each render reads this month’s Renderings rows first: ' + reads[0]);
+// under the cap: paints, and says what's spent including this picture (gpt-image-7 has no price: the $0.25 estimate)
+usage = [{ model: 'gpt-image-2.5-sunburst', requests: 30, input_tokens: 36000, cached_tokens: 0, output_tokens: 180000 }]; // 30 × $0.192 + $0.288 = $6.048
+calls.length = 0; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.8.1' }), res);
+assert.equal(res.code, 200); assert.equal(calls.length, 1, 'under the cap: painted');
+assert.deepEqual(res.body.budget, { spent: 6.298, cap: 100, month }, 'spent includes this picture’s estimate');
+// GET: the budget, for the panel before rendering
+res = mockRes(); await render(req({ method: 'GET', ip: '9.9.8.2' }), res);
+assert.equal(res.code, 200); assert.deepEqual(res.body.budget, { spent: 6.048, cap: 100, month, images: 30, priced: true });
+// at the cap: 402 with the reason, and OpenAI is never asked
+usage = [{ model: 'gpt-image-2.5-sunburst', requests: 500, input_tokens: 600000, cached_tokens: 0, output_tokens: 3_000_000 }]; // $4.80 + $96 = $100.80
+calls.length = 0; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.8.3' }), res);
+assert.equal(res.code, 402); assert.equal(calls.length, 0, 'no OpenAI call once the budget is spent');
+assert.equal(res.body.error, 'This month’s rendering budget ($100) is used up. It resets on the 1st.'); assert.equal(res.body.cap, 100); assert.equal(res.body.month, month); assert.ok(res.body.spent >= 100);
+// the cap from the environment
+process.env.RENDER_MONTHLY_CAP_USD = '250'; calls.length = 0; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.8.4' }), res);
+assert.equal(res.code, 200); assert.equal(res.body.budget.cap, 250); assert.equal(calls.length, 1);
+process.env.RENDER_MONTHLY_CAP_USD = '12.5'; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.8.5' }), res);
+assert.equal(res.code, 402); assert.match(res.body.error, /\(\$12\.50\)/); delete process.env.RENDER_MONTHLY_CAP_USD;
+// a model with no known price: $0.25 a picture (RENDER_FALLBACK_USD_PER_IMAGE overrides), and said to be an estimate
+usage = [{ model: 'gpt-image-9', requests: 40, input_tokens: 48000, cached_tokens: 0, output_tokens: 240000 }, { model: 'gpt-image-2.5-sunburst', requests: 1, input_tokens: 1200, cached_tokens: 0, output_tokens: 6000 }];
+res = mockRes(); await render(req({ method: 'GET', ip: '9.9.8.6' }), res);
+assert.deepEqual(res.body.budget, { spent: 10.2016, cap: 100, month, images: 41, priced: false }, '40 × $0.25 + $0.2016');
+process.env.RENDER_FALLBACK_USD_PER_IMAGE = '2.5'; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.8.7' }), res);
+assert.equal(res.code, 402, '40 × $2.50 = $100: the cap'); delete process.env.RENDER_FALLBACK_USD_PER_IMAGE;
+// Supabase failing: the budget can't be read, so the picture is painted anyway (fail open), with no spent figure
+supaFail = true; calls.length = 0; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.8.8' }), res);
+assert.equal(res.code, 200, JSON.stringify(res.body)); assert.equal(calls.length, 1, 'painted though the budget couldn’t be read'); assert.equal(res.body.budget.spent, null);
+res = mockRes(); await render(req({ method: 'GET', ip: '9.9.8.9' }), res); assert.equal(res.code, 200); assert.equal(res.body.budget.spent, null); assert.equal(res.body.budget.cap, 100);
+supaFail = false; usage = [];
+
 // the model's refusal reaches the user in words; a network failure is a plain retry message
 globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: 'Your request was rejected by the safety system.' } }), { status: 400 });
 res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.9.7' }), res);
