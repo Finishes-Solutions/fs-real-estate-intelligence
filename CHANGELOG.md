@@ -3,6 +3,28 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-18
+
+### 2:09 PM CT: Self storage site plans (a38f4db)
+- **Ask for self storage and get a storage layout, not a warehouse box.**
+  - The climate-controlled building and leasing office sit at the street with a few customer spaces in front.
+  - Drive-up rows run behind it on drive aisles, with doors straight onto the aisle and cross drives through long rows.
+  - RV and boat stalls go along the back when asked for.
+  - A security fence runs around the yard with a keypad gate at each drive. A pond at the front stays outside the fence.
+- **Different sites:**
+  - About 1 acre: a compact version, with visitor spaces just inside the gate.
+  - Drive-up only: a small leasing office replaces the climate-controlled building.
+  - Climate-controlled only: no drive-up rows and no fence.
+- **Settings** for storage:
+  - climate-controlled size and floors;
+  - drive-up size (blank = as much as fits);
+  - row depth, aisle width and RV/boat spaces;
+  - a fence switch;
+  - two unit mixes you can add sizes to.
+- **Numbers:** the layout card and Numbers show rentable square feet and about how many units, split between climate-controlled and drive-up. RV and boat stalls don't count as parking.
+- **Pro forma:** treats storage as storage, with gross rent, owner-paid costs and a two-to-three-year fill-up.
+- **Building library:** a Self storage group (climate-controlled buildings, drive-up rows, a leasing office). The map key and PDF sheet show storage and the fence.
+
 ## 2026-10-16
 
 ### 9:12 AM CT: No more "Cannot find name 'Deno'" in the Vercel build (2e6f1d1)
