@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 2:45 PM CT: Building close-up renderings, and a monthly rendering budget (8d167a5)
+- **Building close-up:** a fifth **View** under Renderings frames one building as a hero shot, with its parking and landscaping around it and the rest of the site continuing beyond. Select a building on the plan first to choose it; otherwise it takes the building nearest the street. The option names the building it will use; **All site views** stays the four whole-site pictures.
+- **A monthly budget for renderings:** the Render section shows this month's rendering spend against the budget ($100 a month to start, set by the administrators) and how many pictures that was. When it's spent, rendering pauses until the 1st; Ask AI and site plan builds aren't affected. The check runs on the server before each picture.
+
 ### 2:16 PM CT: Renderings frame the whole site, from a better angle (2be81fe)
 - **No more cut-off buildings:** the picture the AI paints from now has the whole parcel in the frame with room around it. Before, the camera came from a formula and never checked what landed in the frame; now it checks the parcel's corners against the frame through the map's own camera and moves until they all fit, with space at the sides, below, and above for the roofs and sky.
 - **Less of a snapshot:** the four views are lower and wider, like a marketing aerial; **From the corner** comes first and is the default. The AI is asked for a brochure-style composition with a level horizon.
