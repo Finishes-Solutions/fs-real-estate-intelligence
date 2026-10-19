@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 4:12 PM CT: Make renderings from the project page (31e0120)
+- **Renderings tab:** a new **Make renderings** form at the top. Pick the option, the view (corner, street, entry, back, a close-up of the building nearest the street, or all four), the materials and the light, then press **Render**.
+- The picture is still taken from the option's 3D view on the map, so the option opens there and the progress shows in its panel. When the pictures are ready you're brought back to the Renderings tab.
+
 ### 3:26 PM CT: Plan sets, phase 1, and Options renamed Sites (de1d75f)
 - **New Plans tab on each project:** it makes a schematic design drawing set from one option, every sheet on the Finishes Solutions title block, 24 × 36.
 - **Pick your sections first:** tick the sections you want before making the set, and each box shows how many sheets it adds.
