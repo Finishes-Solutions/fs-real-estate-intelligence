@@ -61,8 +61,10 @@ const ftOf = ask => S.normalizeProgram(S.guessProgram(ask));
     assert.equal(m.required, Math.ceil(f.trucks * 5 + f.barSf / 1000 * 8 - 0.01), 'parking: 5 a truck plus the bar');
     assert.equal(f.seats, Math.floor((f.pavilionSf + f.patioSf) / 15), 'seats: 15 sf of covered and patio seating each');
   }
-  const o = opts[0], pl = of(plan, o), m = S.metrics(pl);
-  assert.equal(m.foodtrucks.trucks, 12, 'the recommended layout has the 12 trucks'); assert.ok(m.spaces >= m.required, 'and parks them: ' + m.spaces + '/' + m.required);
+  // the recommended one keeps detention on the surface when that costs no more than two trucks; the 12 are an option, parked
+  const m0 = S.metrics(of(plan, opts[0])); assert.ok(m0.pond > 0 && m0.foodtrucks.trucks >= 10 && m0.spaces >= m0.required, 'recommended: a pond, within two trucks of the ask: ' + m0.foodtrucks.trucks + ' trucks, pond ' + Math.round(m0.pond));
+  const o = opts.find(x => S.metrics(of(plan, x)).foodtrucks.trucks === 12), pl = of(plan, o), m = S.metrics(pl);
+  assert.ok(o, 'a layout with the 12 trucks'); assert.ok(m.spaces >= m.required, 'and parks them: ' + m.spaces + '/' + m.required);
   assert.ok(m.foodtrucks.pavilionSf >= 2900 && m.foodtrucks.barSf >= 1400 && m.foodtrucks.restroomSf >= 600, 'pavilion, bar and restrooms: ' + JSON.stringify(m.foodtrucks));
   assert.ok(o.elements.some(e => e.kind === 'patio' && e.name === 'Beer garden') && o.elements.some(e => e.kind === 'play'), 'a beer garden and a playground');
   assert.deepEqual(['Pavilion', 'Restrooms', 'Bar'].filter(n => o.elements.some(e => e.name === n)), ['Pavilion', 'Restrooms', 'Bar'], 'named parts');
@@ -108,6 +110,27 @@ const ftOf = ask => S.normalizeProgram(S.guessProgram(ask));
 { const { plan, opts } = lot([[0, 0], [260, 0], [262, 250], [0, 252]], ftOf('food truck park with 8 trucks'));
   assert.ok(opts.length >= 1, '1.5 ac: layouts');
   for (const [i, o] of opts.entries()) { const m = sound('1.5 ac #' + i, plan, o); if (m.foodtrucks.trucks < 8) assert.ok(o.notes.some(n => /of the 8 food trucks asked for/.test(n))); if (m.spaces < m.required) assert.ok(o.notes.some(n => /Parking is/.test(n))); } }
+// small lots with the app's default setbacks (10 ft buffers all round): the trucks come first, so the bar shrinks or goes
+// (its switch stays on) and the seating area gets smaller, and every layout is fully parked
+const SB0 = { setbacks: { front: 25, side: 10, rear: 20, paving: 10 } }, best = {};
+for (const [name, ring] of [['1 ac', [[0, 0], [210, 0], [210, 205], [0, 205]]], ['1.5 ac', [[0, 0], [260, 0], [262, 250], [0, 252]]]]) for (const ask of ['a food truck park', 'a food truck park with 6 trucks', ASK]) {
+  const p = ftOf(ask), { plan, opts } = lot(ring, p, SB0), tag = name + ' / ' + ask;
+  assert.ok(opts.length >= 2, tag + ': layouts (as many as fit used to give none)');
+  for (const [i, o] of opts.entries()) { const m = sound(tag + ' #' + i, plan, o); assert.ok(m.spaces >= m.required, tag + ' #' + i + ': fully parked: ' + m.spaces + '/' + m.required);
+    if (m.foodtrucks.barSf < (p.foodtrucks.barSf || 0) * 0.97) assert.ok(o.notes.some(n => /bar/i.test(n)), tag + ' #' + i + ': says what happened to the bar');
+    if (/pond/.test(o.name)) assert.ok(m.pond > 0, tag + ' #' + i + ': named for a pond it has'); }
+  const m = S.metrics(of(plan, opts[0])); best[name] = Math.max(best[name] || 0, m.foodtrucks.trucks);
+  assert.ok(m.foodtrucks.trucks >= (name === '1 ac' ? 4 : 5), tag + ': the recommended layout holds ' + m.foodtrucks.trucks + ' trucks');
+  assert.ok(m.foodtrucks.seats >= 60, tag + ': a covered pavilion, smaller: ~' + m.foodtrucks.seats + ' seats');
+  assert.equal(opts[0].program.foodtrucks.bar, true, tag + ': the bar switch stays on');
+  assert.ok(m.foodtrucks.restroomSf >= 400, tag + ': restrooms: ' + m.foodtrucks.restroomSf);
+}
+assert.ok(best['1.5 ac'] > best['1 ac'], '1.5 acres holds more trucks than 1: ' + JSON.stringify(best));
+// 2.5 acres, as many as fit: the most trucks that still keep half the detention on the surface first (10), a pond option too
+{ const { plan, opts } = lot([[0, 0], [330, 0], [334, 330], [4, 328]], ftOf('a food truck park'), SB0), ms = opts.map(o => S.metrics(of(plan, o)));
+  for (const [i, o] of opts.entries()) sound('2.5 ac fit #' + i, plan, o);
+  assert.ok(ms[0].foodtrucks.trucks >= 10 && ms[0].spaces >= ms[0].required && ms[0].pond > 0, '2.5 ac as many as fit: ' + ms.map(m => m.foodtrucks.trucks + (m.pond > 0 ? ' with a pond' : '')).join(', '));
+  assert.ok(ms.every(m => m.foodtrucks.trucks >= 6 && m.spaces >= m.required), 'every option a real park, parked'); }
 // a re-fit keeps a stall and the pavilion where they were put by hand
 { const { plan, opts } = lot([[0, 0], [330, 0], [334, 330], [4, 328]], ftOf(ASK)), o = opts[0];
   const els = o.elements.map(e => e.kind === 'foodtruck' && e.name === 'Truck 1' || e.ft === 'pavilion' ? { ...e, pinned: true } : { ...e }), pins = els.filter(e => e.pinned);
