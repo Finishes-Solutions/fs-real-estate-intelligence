@@ -3,6 +3,21 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-19
+
+### 9:49 AM CT: Any building type the AI can describe, and a shared team building library (7da2412, c42fa30, merged b246482)
+- **No more plain boxes for a daycare, a pickleball club or an RV park.** When a request names a kind of place the planner has no setting for, the AI now writes a recipe for it: its buildings, its outdoor pieces (courts, a playground, a pool, a lawn, a plaza, a patio, a pavilion), its parking rule and the figures to show. The planner lays it out with its usual machinery, so drives, parking, entrances, detention, trash and the checks work as for any other use.
+- **Four ways to lay one out:** a building facing its parking (a car wash), a few freestanding buildings (a school's classrooms and gym), a building with its outdoor pieces together on their own ground behind or beside it (a daycare and its playground, a club and its courts), or rows of sites on drive aisles like RV storage (an RV park, with sites both sides of each aisle, an office at the street and a fence).
+- **Marked AI-sized:** the layout card, the Selected box and Numbers say which sizes the AI chose, so nobody takes them for a product sheet. Sizes far out of range are brought back in, and the plan says so.
+- **The parking rule on the plan:** Numbers shows the rule worked out ("0.25 a child × 120 children = 30 spaces", "4 a court × 8 courts + 3 per 1,000 sf = 50 spaces") with the AI's other assumptions; each layout's notes say it too. Courts and RV sites carry their own parking, so a smaller clubhouse doesn't shrink the courts' parking.
+- **When it doesn't all fit:** fewer courts or sites, and the layout says how many ("Room for 4 of the 8 pickleball courts asked for").
+- **If the AI answers nonsense,** the plan is laid out as a plain building at 3 spaces per 1,000 sf, with a note saying so; if it doesn't answer, your words are read directly as before.
+- **Save to Library:** any building on a plan, or a whole AI-crafted type with its recipe, can be saved to a shared **Team** group in the building library. The panel lists each with its size, who saved it and when, and Add, Build One, Rename and Delete (with Undo). Until the team library is set up on the site, saved types stay on the device and the panel says so.
+- **"Another one like our pickleball club":** the team's saved types and their recipes go to the AI with every request, so it can reuse one.
+- **Outdoor pieces next to their building (polish):** a playground, courts, a pavilion or a lawn now sit about 10 ft from the building with a 6 ft walk from it to them (and along the courts so each is reached); the courts stay by the clubhouse. Layouts without a dead-end parking aisle and with the pieces next to the building come first; land left over is plain open space rather than a later-phase pad.
+- **Buildings at their own sizes (polish):** a school's two-storey classroom building and one-storey gym are each drawn at their share of the floor area where there's room; where there isn't, they're drawn alike and the layout says to resize them by hand. When a building had to be drawn smaller, the parking rule counts what it holds ("about 105 children (the building as drawn)").
+- **Shared with the team:** the team library is stored in the new `site_building_types` table (added to the database on Oct 19, additive only).
+
 ## 2026-10-18
 
 ### 11:26 PM CT: Plan for a 3D massing scene behind the renderings (b105481)
