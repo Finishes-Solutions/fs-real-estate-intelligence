@@ -3869,6 +3869,11 @@ button.sp-mx-r:hover{background:var(--chip)}
 .sp-pf input.sp-bad{border-color:var(--danger);outline-color:var(--danger)}
 .sp-pf .sp-inerr{display:block;color:var(--danger);font-weight:600}
 .sp-pf .sp-inerr[hidden]{display:none}
+.sp-pf .sp-pfnote{display:block;margin-top:3px;font-size:11px;line-height:1.35;color:var(--amber)} /* a number outside the usual range here: a calm note, still applied */
+.sp-pfflags{margin:6px 0 0;padding-left:18px;font-size:12px;line-height:1.45;color:var(--amber)}
+.sp-tag{display:inline-block;padding:1px 6px;border:1px solid var(--line-2);border-radius:999px;font-size:10px;font-weight:600;letter-spacing:.02em;text-transform:none;color:var(--text-2);background:var(--panel-2);vertical-align:1px}
+.sp-pfbasis{margin-top:8px;line-height:1.45}
+.sp-pfarea td small{display:block;font-size:10.5px;color:var(--muted)}
 .sp-vc i em{white-space:nowrap}
 
 /* ---- Compare (B3): rename, section rows, part-quarter notes, use colours ---- */
