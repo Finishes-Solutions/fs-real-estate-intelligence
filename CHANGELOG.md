@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 2:56 PM CT: Plan sets plan: your choices recorded (78d55a0)
+- **Planning only.** More decisions are now in `PLANSET-PLAN.md`:
+  - The project page's Options tab will be renamed **Sites**. Old links still work.
+  - Before making a set, you tick the sections you want: site and civil, landscape, architecture, structural, mechanical, plumbing, electrical, fire, renderings and telecom. Each shows how many sheets it adds, and the cost estimate updates as you tick. Telecom starts unticked.
+  - The title block will be used without the AutoCAD plot stamp and without the firm number, for now.
+  - Claude Opus 5.5 is the default model.
+
 ### 2:46 PM CT: Plan sets plan: medium effort, $100 a month (f857098)
 - **Planning only.** Two decisions are now in `PLANSET-PLAN.md`: plan sets will use Claude at medium effort by default (changeable in Settings), with a budget of $100 a month. When the month's budget is spent, new sets wait for the next month. That's roughly 5 to 12 large sets a month, and more for small sites or sets that reuse saved building designs.
 
