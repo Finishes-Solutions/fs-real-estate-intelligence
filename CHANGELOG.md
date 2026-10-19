@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
-### 11:15 PM CT: Mixed plans keep their space on a re-fit, a turnaround at the L, the truck count asked for comes first (369bbbf, merged a7bd977, then the follow-up commit)
+### 11:15 PM CT: Mixed plans keep their space on a re-fit, a turnaround at the L, the truck count asked for comes first (369bbbf, merged a7bd977; c22b1d9)
 - **Mixed plans re-fit without losing space:** moving a building in a mixed plan (shops and apartments, say) and letting the site re-fit used to lay out far less than you had, sometimes nearly nothing. Each part of the mix now keeps its floor area and units, on the automatic re-fit and on Re-fit Plan alike.
 - **Changing a building's use by hand:** turn an apartment building into offices and Re-fit Plan now lays out the apartments asked for round it, instead of counting the offices as apartments.
 - **L-shaped shops on a corner:** the parking lane the shops' side wing cuts short now ends with room to turn round, instead of a dead end.
