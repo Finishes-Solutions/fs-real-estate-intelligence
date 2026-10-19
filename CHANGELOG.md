@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 11:26 PM CT: Plan for a 3D massing scene behind the renderings (b105481)
+- **Planning only, nothing in the app changes.** `MASSING-PLAN.md` sets out how a lit 3D model of each option would be built from the plan (buildings with roofs, window bands and canopies, paving, pond, trees, sun and shadows) on the real map, so renderings start from a much better picture and can send the AI a depth image that keeps every building in place. Same Render flow for users, plus a 3D toggle on the plan.
+
+## 2026-10-18
+
 ### 4:15 PM CT: Project status on the Projects list, and small project page polish (b8f4567)
 - **Status on the list:** each project card and list row shows its status pill (Prospect, Under contract…), and **Status** is a new sort choice.
 - **Phones:** the project page's tab strip fades at its right edge when there's more to scroll, and the open tab is scrolled into view. The "Enter asks" hint is hidden on touch screens.
