@@ -1170,8 +1170,9 @@ function pageArrived(v){ cardStatus((document.getElementById('view-'+v)?.getAttr
     const h=v==='map'?map.getCanvas():sec&&(sec.querySelector('h1,h2')||sec); if(!h) return;
     if(h!==map.getCanvas()&&!h.hasAttribute('tabindex')){ h.setAttribute('tabindex','-1'); h.classList.add('pg-focus'); } h.focus({preventScroll:true}); }); }
 // My Work › Projects: the project page follows the address (#pj=) on Back/Forward
-function syncProject(pj){ if(view!=='projects') return; const cur=ctx.currentProject?.()??ctx.sitePlan?.where?.project??null; if(cur===(pj||null)) return;
-  if(ctx.openProject) ctx.openProject(pj||null); else if(pj) ctx.sitePlan?.show?.(pj); }
+function syncProject(pj,pt){ if(view!=='projects') return; const cur=ctx.currentProject?.()??ctx.sitePlan?.where?.project??null;
+  if(cur===(pj||null)){ const t=ctx.sitePlan?.where?.tab; if(pj&&t&&t!==(pt||'overview')) ctx.sitePlan.show(pj,pt||'overview'); return; } // the same project, another tab (#pt= edited or pasted)
+  if(ctx.openProject) ctx.openProject(pj||null,pt); else if(pj) ctx.sitePlan?.show?.(pj,pt); }
 // the tab title names the page ("Reports · Real Estate Intelligence Platform"), so history and tab lists make sense
 const APP_NAME='Real Estate Intelligence Platform';
 function syncTitle(){ document.title=pathOf(view)+' · '+APP_NAME; }
@@ -1233,7 +1234,7 @@ const camStr=()=>{ const c=map.getCenter(); return camFmt({lat:c.lat,lng:c.lng,z
 function hashStr({map:withMap=false,live=false}={}){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id);
   if(withMap&&!sel.feature&&!state.sel&&view==='map'){ const c=map.getCenter(); p.set('ml',[c.lat.toFixed(5),c.lng.toFixed(5),map.getZoom().toFixed(2)].join(',')); }
   if(live){ const w=ctx.sitePlan?.where||{};
-    const pj=w.project||(view==='projects'&&ctx.currentProject?.()); if(w.plan) p.set('sp',w.plan); else if(pj) p.set('pj',pj);
+    const pj=w.project||(view==='projects'&&ctx.currentProject?.()); if(w.plan) p.set('sp',w.plan); else if(pj){ p.set('pj',pj); if(w.tab&&w.tab!=='overview') p.set('pt',w.tab); } // pt: the project page's tab
     if(view==='map'){ const b=!state.sel&&!w.plan&&ctx.currentBuilding?.(); if(b?.center) p.set('b',b.center[1].toFixed(6)+','+b.center[0].toFixed(6)); }
     if(camReady) p.set('ml',camStr()); } // on every page, so coming back to the map after a reload finds it where it was
   return p.toString(); }
@@ -1247,7 +1248,7 @@ function commitHash(push){ const h=hashStr({live:true}), url=h?'#'+h:location.pa
 function scheduleHash(o=false){ if(booting) return; const push=typeof o==='object'?!!o?.push&&!popping:!!o; clearTimeout(hashT); if(push){ commitHash(true); return; } hashT=setTimeout(()=>commitHash(false),250); } // push: a boolean, or {push} (src/siteplan.js)
 // Back / Forward: show the page (and the project on the Projects page) the address names, without adding history
 addEventListener('popstate',()=>{ if(booting) return; const p=new URLSearchParams(location.hash.slice(1)), v=p.get('v')||'map';
-  popping=true; try{ if(v!==view) setView(v); syncProject(p.get('pj')); }finally{ popping=false; } });
+  popping=true; try{ if(v!==view) setView(v); syncProject(p.get('pj'),p.get('pt')); }finally{ popping=false; } });
 document.getElementById('copyLink').onclick=async()=>{ const u=location.href.split('#')[0]+'#'+hashStr({map:true}); try{ await navigator.clipboard.writeText(u); toast('Link copied. It opens with these filters.'); }catch(e){ prompt('Copy this link',u); } };
 
 // ---------- the Map panel: pick buttons, "…" menu, links, first-visit tip ----------
@@ -1394,7 +1395,7 @@ new MutationObserver(()=>{ if(!card.classList.contains('open')&&card.classList.c
   if(p.get('v')){ popping=true; navBoot=true; try{ setView(p.get('v')); }finally{ popping=false; navBoot=false; } } // the page a link opens on is the first history entry, not a new one
   syncTitle();
   // the project open on the Projects page
-  if(p.get('pj')&&view==='projects') ctx.sitePlan?.show(p.get('pj'));
+  if(p.get('pj')&&view==='projects') ctx.sitePlan?.show(p.get('pj'),p.get('pt'));
   // the camera goes in the address (debounced), so a reload keeps the view: from the first move after the map loads (the fly-in, a link's card)
   map.once('load',()=>map.on('moveend',()=>{ camReady=true; scheduleHash(); }));
   // the map position (#ml=lat,lng,zoom[,bearing,pitch]): a copied link, or where you were before the reload

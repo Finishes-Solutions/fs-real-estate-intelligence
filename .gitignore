@@ -3,3 +3,6 @@ public/
 .vercel/
 .DS_Store
 test/.data/
+
+# Claude Code session scaffolding (sub-agent worktrees)
+.claude/worktrees/
