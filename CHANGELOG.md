@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 11:26 PM CT: Plan for a 3D massing scene behind the renderings (b105481)
+- **Planning only, nothing in the app changes.** `MASSING-PLAN.md` sets out how a lit 3D model of each option would be built from the plan (buildings with roofs, window bands and canopies, paving, pond, trees, sun and shadows) on the real map, so renderings start from a much better picture and can send the AI a depth image that keeps every building in place. Same Render flow for users, plus a 3D toggle on the plan.
+
 ### 11:15 PM CT: Mixed plans keep their space on a re-fit, a turnaround at the L, the truck count asked for comes first (369bbbf, merged a7bd977; c22b1d9)
 - **Mixed plans re-fit without losing space:** moving a building in a mixed plan (shops and apartments, say) and letting the site re-fit used to lay out far less than you had, sometimes nearly nothing. Each part of the mix now keeps its floor area and units, on the automatic re-fit and on Re-fit Plan alike.
 - **Changing a building's use by hand:** turn an apartment building into offices and Re-fit Plan now lays out the apartments asked for round it, instead of counting the offices as apartments.
