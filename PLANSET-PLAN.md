@@ -57,7 +57,9 @@ The set is defined in code (`lib/planset/setdef.mjs`) as rules that turn a plan 
 | E-001 / E-1xx / E-2xx / E-6xx | Electrical notes and legend, site lighting, power and lighting plans, one-line and panel schedules | Rules + Claude | Always |
 | FP-101 | Fire access and hydrant plan (IFC Appendix D) | Plan + rules | Always |
 | FP-2xx / FA-2xx | Sprinkler plans and fire alarm plans | Rules | Sprinklered or alarmed buildings |
-| T-0xx–T-5xx | Telecom and fiber: backbone, lot drops, MPOE, risers | Rules | When **Telecom** is ticked (the example had it; off by default?) |
+| T-0xx–T-5xx | Telecom and fiber: backbone, lot drops, MPOE, risers | Rules | Only when **Telecom** is ticked; it is off by default (decided Oct 19) |
+
+**Sections are picked before a set is made.** The rules above say which sheets *can* be in the set. The person making it ticks which **sections** they want (see Product), and only those are drawn, indexed and billed. General (G) is always in.
 
 **Building types.** A plan's buildings are grouped into distinct types by use, footprint (rounded to 1 ft), floors and form. The Waller plan has 209 homes on three lot widths, three retail shells and one restaurant pad: three home types plus up to four commercial types. Building sheets are drawn once per type, not once per building. Site sheets show every building.
 
@@ -133,7 +135,11 @@ The template (`A-XREF-BORD-V01`, AutoCAD Architecture, 24 × 36 landscape) has:
 - "Finishes Solutions LLC. All rights reserved" under the frame.
 
 - **Use the PDF itself, not a redraw.** The template page is embedded as vector artwork under every sheet, so the logo, line weights and layout match the CAD original exactly. Only the field values are written by the app. Field positions live in one table (`lib/planset/titleblock.mjs`) measured from the template, so a new template version means updating one table.
-- **We need a clean export.** The file sent has the red AutoCAD plot stamp (the `C:\Users\…` path and date) down the left margin. Re-plot it with the plot stamp off, or the app has to mask that strip.
+- **The app removes the plot stamp (decided Oct 19).** The file has the red AutoCAD plot stamp (the `C:\Users\…` path and date) down the left margin, outside the drawing frame.
+  - A one-time build script (`build/titleblock.mjs`) strips the plot stamp's drawing commands from the template page and saves the clean template in the repo.
+  - If the stamp's commands can't be told apart from the rest, it falls back to a white mask over the left margin, which holds nothing else.
+  - Either way the result is checked by rendering the clean template to an image before it's committed.
+- **The firm number is off for now (decided Oct 19).** F-23876 is removed from the template the same way. One setting (`showFirmNumber`, off) brings it back later without a new template.
 - **Where the fields come from.** These fields are new on the project:
   - client / owner;
   - project number;
@@ -147,7 +153,7 @@ The template (`A-XREF-BORD-V01`, AutoCAD Architecture, 24 × 36 landscape) has:
 
 ## Licensure: say it plainly on every sheet
 
-The template carries a firm registration number. Under Texas rules, unsealed preliminary engineering documents must say they are for interim review and not for construction, bidding or permit. MEP and structural sheets made by an AI are exactly that.
+The firm number comes off the sheets for now (decided Oct 19), which makes the sheets look less like engineering work. The statement below stays regardless. Under Texas rules, unsealed preliminary engineering documents must say they are for interim review and not for construction, bidding or permit. MEP and structural sheets made by an AI are exactly that.
 
 - **Proposal:** every sheet carries a fixed box with this text: *"PRELIMINARY — NOT FOR CONSTRUCTION, BIDDING OR PERMIT. Schematic design generated from a conceptual site plan with AI assistance. Not prepared or sealed by a licensed architect or engineer."*
 - There is a blank space for a seal that the app never fills.
@@ -160,7 +166,7 @@ The template carries a firm registration number. Under Texas rules, unsealed pre
   | Variable | Default | What it does |
   |---|---|---|
   | `ANTHROPIC_API_KEY` | none, required | Type Sensitive. Without it, Plans says "Plan sets need the Claude key on the server" and the site-only sheets still work. |
-  | `ANTHROPIC_MODEL` | `claude-opus-5-5` | The server's default model. |
+  | `ANTHROPIC_MODEL` | `claude-opus-5-5` | The server's default model (decided Oct 19). |
   | `ANTHROPIC_EFFORT` | `medium` | Effort level (decided Oct 19). It is sent explicitly on every request rather than relying on the model's own default. |
   | `PLANSET_MONTHLY_CAP_USD` | $100 | Monthly budget (decided Oct 19), per US Central calendar month, like `RENDER_MONTHLY_CAP_USD`. A spent budget answers 402 before calling Claude; $0 turns plan sets off. |
 
@@ -198,14 +204,30 @@ The template carries a firm registration number. Under Texas rules, unsealed pre
 
 ## Product
 
-- **Project page tabs:** Overview · **Sites** (today's Options, renamed) · Renderings · **Plans** (new) · Ask.
+- **Project page tabs:** Overview · **Sites** (today's Options, renamed; decided Oct 19) · Renderings · **Plans** (new) · Ask. Old links with `pt=options` still open the Sites tab.
 - **Plans tab:** one row per issued set, showing:
   - the option, level, date, sheet count and who made it;
   - **Download PDF** and **Sheet list**;
   - "Plan changed since this set was made" when the option's plan hash differs, as the renders do.
 - **Make plan set** (on the Plans tab and next to the option's Site Plan PDF). It asks for:
   - the option;
-  - the disciplines (all ticked except Telecom);
+  - **the sections, as checkboxes** (decided Oct 19):
+
+    | Section | Ticked at the start |
+    |---|---|
+    | General | Always in, can't be unticked |
+    | Site & civil | Yes |
+    | Landscape | Yes |
+    | Architecture | Yes |
+    | Structural | Yes |
+    | Mechanical | Yes |
+    | Plumbing | Yes |
+    | Electrical | Yes |
+    | Fire protection & life safety | Yes |
+    | Renderings | Yes, when the option has any |
+    | Telecom / fiber | **No**: only when asked for |
+
+    Next to each box: how many sheets it adds for this option (for example "Architecture: 14 sheets, 7 building types"). The cost estimate and the sheet index update as boxes change. A section that doesn't apply (no buildings the set can design yet, say) is shown greyed out with the reason. Unticking Architecture also unticks Structural, MEP and Fire, since they are drawn on the building designs; the dialog says so.
   - the sheet size;
   - the title block fields;
   - the model and its estimate.
@@ -254,15 +276,19 @@ That is about **8 to 10 weeks** to a set comparable to the Waller example, with 
 
 ## Open questions
 
-1. **Tabs:** rename Options to **Sites** and add **Plans** (proposed above), or keep Options and add Plans?
-2. **Title block:**
-   - Can you re-plot `A-XREF-BORD-V01` without the plot stamp?
+**Decided (Oct 19):**
+
+- Options is renamed **Sites**.
+- The app removes the plot stamp from the template.
+- The firm number is off the sheets for now.
+- Telecom is only in a set when ticked, and every section is a checkbox before a set is made.
+- The default model is `claude-opus-5-5`, at medium effort.
+- The budget is $100 a month.
+
+**Still open:**
+
+1. **Title block:**
    - What goes in the two unlabelled boxes under the logo: project name and address, client, or a seal?
    - What format does the project number take?
-3. **Licensure:**
-   - Should the firm number F-23876 appear on AI-generated MEP and structural sheets?
-   - Whose wording goes in the preliminary statement?
-   - Is there an engineer of record who will review sets before they go out?
-4. **Telecom:** is the T-series (fiber / FTTH) part of every set, or only when asked for?
-5. **Default model:** Opus 5.5 (best) or Sonnet 5.5 (about half the cost)? Effort (medium) and the cap ($100 a month) are decided.
-6. **Approval:** can anyone approve a building design into the team library, or only certain people?
+2. **Statement:** whose wording goes in the preliminary statement, and does anyone review sets before they go out?
+3. **Approval:** can anyone approve a building design into the team library, or only certain people?
