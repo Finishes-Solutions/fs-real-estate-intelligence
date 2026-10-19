@@ -3456,14 +3456,41 @@ export function initSitePlan(ctx) {
 
   // ----- Renderings: every option's pictures, grouped by option. The pictures live on the device they were made on
   // (IndexedDB, see renderSrc); one a teammate made shows greyed, saying so. Click one for the full-size viewer.
+  // Make renderings from here: pick the option, view, materials and light, and Render. The picture is taken from the
+  // map's 3D massing, so the option opens on the map, renders there (progress in its panel) and comes back to this tab.
+  const rsForm = new Map(); // per project: { plid, view }
+  function rFormHtml(p) {
+    const ready = p.plans.filter(laidOut); if (!ready.length) return '';
+    const f = rsForm.get(p.id) || {}, pl = ready.find(x => x.id === f.plid) || ready[ready.length - 1], pr = rPrefs(), off = aiOff(), busy = !!ed?.rendering, T = RD.heroTarget(pl), v = f.view || 'corner';
+    const opt = (list, cur) => list.map(x => '<option value="' + esc(x.id) + '"' + (x.id === cur ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
+    const views = RD.VIEWS.filter(x => !x.hero).map(x => ({ id: x.id, label: x.label, tip: x.tip })).concat(T ? RD.VIEWS.filter(x => x.hero).map(x => ({ id: x.id, label: RD.renderLabel(x.id, T) })) : []).concat([{ id: 'all', label: 'All site views (four pictures)' }]);
+    return '<section class="pj-box ps-form" aria-labelledby="rsH"><h3 class="pj-h3" id="rsH">Make renderings</h3>' +
+      '<div class="ps-row2"><div class="ps-row"><label for="rsOpt">Option</label><select id="rsOpt">' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
+        '<div class="ps-row"><label for="rsView">View</label><select id="rsView">' + opt(views, views.some(x => x.id === v) ? v : 'corner') + '</select></div>' +
+        '<div class="ps-row"><label for="rsLook">Materials</label><select id="rsLook">' + opt(RD.LOOKS, pr.look) + '</select></div>' +
+        '<div class="ps-row"><label for="rsTime">Light</label><select id="rsTime">' + opt(RD.TIMES, pr.time) + '</select></div></div>' +
+      '<p class="rnote">' + (off ? 'Renderings need the AI, which isn’t set up on this site.' : 'The option opens on the map, where the picture is taken from its 3D view; the AI paints it in about a minute a picture, and you come back here when it’s done.') + (budgetLine() ? ' ' + esc(budgetLine()) : '') + '</p>' +
+      '<div class="btnrow"><button type="button" class="btn primary" id="rsGo"' + (off || busy || rbUsed() ? ' disabled' : '') + '>' + (busy ? 'Rendering…' : 'Render') + '</button></div></section>';
+  }
+  async function renderFromProject(p, plid, view, look, time) {
+    if (!map.isStyleLoaded()) { ctx.toast('Waiting for the map to load…'); if (ctx.view !== 'map') ctx.setView('map'); await new Promise(res => { map.once('idle', res); setTimeout(res, 20000); }); } // (the app opened straight on Projects)
+    if (!map.isStyleLoaded()) { ctx.toast('The map didn’t load, so the picture can’t be taken. Try again in a moment.'); return; }
+    open(p.id, plid);
+    const ready = await new Promise(res => { let n = 0; const tick = () => { if (PL()?.id === plid && ed) { map.once('idle', () => res(true)); setTimeout(() => res(true), 8000); } else if (++n > 120) res(false); else requestAnimationFrame(tick); }; tick(); });
+    const pl = PL(); if (!ready || !pl || pl.id !== plid) { ctx.toast('Couldn’t open the option on the map to render it.'); return; }
+    jump('spRender');
+    const hero = RD.byId(RD.VIEWS, view, null)?.hero;
+    await renderViews(p, pl, view === 'all' ? RD.SITE_VIEWS : [view], look, time, hero ? heroFor(pl) : null);
+    if (ctx.view === 'map' && ed?.plid === plid && !ed.rendering) ctx.openProject?.(p.id, 'renderings'); // back to the tab, where the new pictures are
+  }
   function rendersHtml(p) {
     const ready = p.plans.filter(laidOut), groups = p.plans.filter(pl => pl.renders?.length || laidOut(pl));
-    if (!rendersOf(p).length) return '<div class="pj-empty pj-rempty"><b>No renderings yet</b><p>A rendering is a photoreal picture of an option, painted by the AI from its 3D massing on the map: the buildings stay where the plan puts them, the materials and landscaping are the AI’s.</p>' +
-      '<ol><li>Open an option that has buildings laid out.</li><li>In its panel, go to <b>Render</b> (a chip at the top of the panel).</li><li>Pick a view, the materials and the light, and press <b>Render 3D View</b>. Each takes about a minute.</li></ol>' +
-      (ready.length ? '<div class="btnrow">' + ready.slice(0, 4).map(pl => '<button type="button" class="btn" data-rmore="' + esc(pl.id) + '">Render ' + esc(pl.name) + '</button>').join('') + '</div>' : (p.plans.length ? '<p>None of this project’s options has buildings yet: lay one out first.</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Options</button></div>'
+    if (!rendersOf(p).length) return rFormHtml(p) + '<div class="pj-empty pj-rempty"><b>No renderings yet</b><p>A rendering is a photoreal picture of an option, painted by the AI from its 3D massing on the map: the buildings stay where the plan puts them, the materials and landscaping are the AI’s.</p>' +
+      (ready.length ? '<p>Pick the option, view, materials and light above and press <b>Render</b>. Each picture takes about a minute. You can also render from the option’s own panel on the map (<b>Render</b>, a chip at the top of the panel).</p>' : '') +
+      (ready.length ? '' : (p.plans.length ? '<p>None of this project’s options has buildings yet: lay one out first.</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Options</button></div>'
         : siteFor(p) ? '<p>This project has no site plan options yet.</p><div class="btnrow"><button type="button" class="btn primary" data-add="1">New Option</button></div>'
         : '<p>This project has no site yet: add its parcel or draw it first.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div>')) + '</div>'; // never a dead end
-    return groups.map(pl => { const list = (pl.renders || []).slice().reverse(), sig = planSig(pl);
+    return rFormHtml(p) + groups.map(pl => { const list = (pl.renders || []).slice().reverse(), sig = planSig(pl);
       return '<section class="pj-rg" aria-labelledby="pjRg-' + esc(pl.id) + '"><div class="pj-rgh"><h3 class="pj-h3" id="pjRg-' + esc(pl.id) + '">' + esc(pl.name) + ' <span class="pj-tn">' + (list.length ? plural(list.length, 'rendering') : 'none yet') + '</span></h3>' +
         '<span class="pj-rgl"><button type="button" class="lnk" data-plan="' + esc(pl.id) + '">Open plan</button>' + (laidOut(pl) ? '<button type="button" class="lnk" data-rmore="' + esc(pl.id) + '">Render more</button>' : '') + '</span></div>' +
         (list.length ? '<div class="pj-rgrid">' + list.map(r => { const stale = r.sig && r.sig !== sig, lab = rLabel(r);
@@ -3473,6 +3500,12 @@ export function initSitePlan(ctx) {
       '<p class="rnote pj-rnote">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. The pictures are kept on the device they were made on; teammates see that they exist. Click one to see it full size, compare it with the massing, download or delete it.</p>';
   }
   function wireRenders(p) {
+    const $ = q => root.querySelector(q), f = rsForm.get(p.id) || {}; rsForm.set(p.id, f);
+    $('#rsOpt')?.addEventListener('change', e => { f.plid = e.target.value; render(true); });
+    $('#rsView')?.addEventListener('change', e => { f.view = e.target.value; });
+    $('#rsLook')?.addEventListener('change', e => { try { localStorage.setItem(RLOOK_KEY, e.target.value); } catch (er) {} });
+    $('#rsTime')?.addEventListener('change', e => { try { localStorage.setItem(RTIME_KEY, e.target.value); } catch (er) {} });
+    $('#rsGo')?.addEventListener('click', () => { const pr = rPrefs(); renderFromProject(p, $('#rsOpt').value, $('#rsView').value || 'corner', pr.look, pr.time); });
     root.querySelectorAll('.pj-rth').forEach(f => { const pl = p.plans.find(x => x.id === f.dataset.pl), r = pl?.renders?.find(x => x.id === f.dataset.rid); if (!r) return;
       renderSrc(r.id).then(u => { if (!f.isConnected) return; const img = f.querySelector('img'), ph = f.querySelector('.pj-rimg i');
         if (u) { img.src = u; img.alt = rLabel(r) + ' rendering'; img.hidden = false; ph?.remove(); }
