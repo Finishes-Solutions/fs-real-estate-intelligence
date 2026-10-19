@@ -545,6 +545,14 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
   - In the middle: a covered **pavilion** with picnic seating on a lawn (room for lawn games and shade trees), **restrooms**, a **bar** with a **beer garden** patio at the front corner, and a **playground** away from the bar.
   - A dumpster and grease enclosure sits on the lane, its gate facing the lane.
   - Detention goes on the land left over (at the back, the front or a side). When there isn't room for all of it, the layout says how much the pond holds and that the rest goes underground.
+  - Layouts that keep detention in a pond come first when they hold nearly as many trucks as one without a pond. There's always at least one pond layout among the choices to compare.
+  - The choices are different from each other. Two layouts with the same trucks, about the same seats, and the same bar and pond count as one. Then you may see only two layouts.
+- **On a small lot** (about an acre), the trucks come first and every layout is fully parked:
+  - The bar shrinks, or is left out, so the parking can carry the trucks. The layout says so. The **Bar** switch stays on, so a bigger site gets the bar back.
+  - Then the pavilion gets smaller, so the restrooms still fit beside it.
+  - Every layout has restrooms, because the health code requires them. If they don't fit, the bar gives up its room, then a truck at a time. If they still don't fit, the site gets no food truck layout.
+  - On a narrow frontage the entrance can sit toward one end, which leaves room for more parking along the street.
+  - About an acre holds 4 trucks round a smaller pavilion (about 90 seats). An acre and a half holds 5 or 6. If you asked for more trucks than fit, the layout says how many it found room for.
 - **Site parameters › Program** for a food truck park:
   - number of food trucks (blank = as many as fit, as many as the parking carries);
   - parking per truck (about 5) and bar parking per 1,000 sf;
