@@ -9,6 +9,8 @@ import * as S from '../lib/siteplan.mjs';
 import * as L from '../lib/sitelayout.mjs';
 import * as PF from '../lib/proforma.mjs';
 import { cornerOf } from '../lib/sitefuel.mjs';
+import * as TOOLS from '../lib/sitetools.mjs';
+import { placeWing } from '../lib/sitecorner.mjs';
 import { readAs, notUnderstood } from '../lib/planruns.mjs';
 import { headline } from '../lib/planpick.mjs';
 import { keyItems } from '../lib/planmap.mjs';
@@ -189,7 +191,33 @@ for (const [name, ring, extra, words, want] of [
     assert.ok(m.spaces >= m.required * 0.97 && m.units >= 140, what + ': parks, and the apartments are there: ' + m.spaces + '/' + m.required + ', ' + m.units + ' units'); }
   const Lb = all.find(x => /L-shaped shops/.test(x.name)).elements.find(e => e.kind === 'building' && e.use === 'retail' && e.poly); assert.ok(Lb && Lb.poly.length === 6, 'an L-shaped shop building');
   const pd = all.find(x => /pad at the corner/.test(x.name)).elements.find(e => /Corner pad/.test(e.note || '')), cn = cornerOf(plan).at; assert.ok(pd && Math.hypot(pd.x - cn[0], pd.y - cn[1]) < 250, 'the pad by the corner');
-  assert.ok(!L.layoutOptions({ ...plan, streets: [] }, prog, { count: 6 }).some(o => /on the corner|at the corner/.test(o.name)), 'an inside lot: no corner shapes in a mixed plan'); }
+  assert.ok(!L.layoutOptions({ ...plan, streets: [] }, prog, { count: 6 }).some(o => /on the corner|at the corner/.test(o.name)), 'an inside lot: no corner shapes in a mixed plan');
+  // the wing on its own (frame feet): an aisle with stalls to its end, run under the wing, stops at the wing's walk
+  // with its last 18 ft clear of stalls (a hammerhead), so it doesn't dead-end; its other end joins a drive
+  { const els = [{ kind: 'drive', id: 'a', x: 250, y: 40, w: 400, d: 24, name: '', note: '' }, { kind: 'parking', id: 'p', x: 248, y: 61, w: 396, d: 18, row: -1 }, { kind: 'drive', id: 'c', x: 462, y: 110, w: 24, d: 180, name: '', note: '' },
+      { kind: 'building', id: 'b', zone: 0, use: 'retail', floors: 1, x: 300, y: 135, w: 400, d: 100 }];
+    assert.ok(placeWing(els, { s: 1, zone: 0, D: 100, x: 100, y0: 10, use: 'retail', floors: 1 }), 'the wing fits');
+    const a = els.find(e => e.id === 'a'), p = els.find(e => e.id === 'p'), Lw = els.find(e => e.cornerL);
+    assert.ok(Lw && Lw.poly.length === 6 && Math.abs(a.x - a.w / 2 - (200 + 12)) < 0.01, 'the aisle ends at the wing’s walk');
+    assert.ok(p.x - p.w / 2 >= a.x - a.w / 2 + 18 - 0.01, 'its stalls stop 18 ft short of that end');
+    assert.equal(S.deadEnds(els, 1).length, 0, 'no dead end'); }
+  // the aisle that now stops at the L's side wing has room to turn (a hammerhead: no stalls on its last 18 ft), not a dead end
+  const oL = all.find(x => /L-shaped shops/.test(x.name)), wing = S.shapeOf(Lb), near = p => S.distToPoly ? S.distToPoly(p, wing) : Math.min(...wing.map(q => Math.hypot(q[0] - p[0], q[1] - p[1])));
+  const dead = S.deadEnds(oL.elements, 1).filter(d => near(d.end) < 60); assert.equal(dead.length, 0, 'the L: no aisle dead-ends at the wing: ' + dead.map(d => d.stalls + ' stalls'));
+  assert.ok(!S.check({ ...plan, program: oL.program, elements: oL.elements }).some(i => /dead-ends/.test(i.text)), 'the L: no dead-end warning');
+  // a hand edit, then the auto re-fit: the buildings keep their zones, so each zone keeps what it has (the shops' L too),
+  // and Re-fit Plan agrees
+  assert.ok(oL.elements.filter(e => e.kind === 'building' && e.use !== 'amenity').every(e => e.zone != null), 'mixed buildings keep their zone in the plan');
+  const m0 = S.metrics({ ...plan, program: oL.program, elements: oL.elements }), retail = els => els.filter(e => e.kind === 'building' && e.use === 'retail').reduce((t, e) => t + S.gfaOf(e), 0);
+  const els = JSON.parse(JSON.stringify(oL.elements)), apt = els.filter(e => e.use === 'multifamily').sort((a, b) => b.y - a.y)[0]; S.moveBy(apt, 0, -8); apt.pinned = true;
+  const p1 = { ...plan, program: oL.program, recipe: oL.recipe, elements: els };
+  for (const [nm, r] of [['auto re-fit', L.refit(p1, { amount: 'current' })], ['Re-fit Plan', L.refit(p1)]]) {
+    assert.ok(r?.elements?.length, nm + ': re-fits'); const q = { ...p1, elements: r.elements }, m = S.metrics(q), bad = S.check(q).filter(i => i.level === 'bad');
+    assert.equal(bad.length, 0, nm + ': passes: ' + bad.map(i => i.text));
+    assert.ok(Math.abs(retail(r.elements) - retail(oL.elements)) <= retail(oL.elements) * 0.03, nm + ': the shops keep their floor area: ' + Math.round(retail(r.elements)) + ' of ' + Math.round(retail(oL.elements)));
+    assert.ok(m.units >= m0.units * 0.97, nm + ': the apartments keep their units: ' + m.units + ' of ' + m0.units);
+    assert.ok(r.elements.some(e => e.cornerL && e.poly), nm + ': the L stays'); assert.ok(r.elements.some(e => e.id === apt.id && e.y === apt.y), nm + ': the moved building stays where it was put');
+    assert.ok(TOOLS.refitVerdict({ m: S.metrics(p1), issues: S.check(p1) }, { m, issues: S.check(q) }).ok, nm + ': the editor would take it'); } }
 
 // ---------- Site parameters: only what the plan's uses read ----------
 { const f = w => { const u = S.usesOf(S.guessProgram(w)), has = l => l.some(x => u.includes(x)); return { form: has(S.FORM_USES), apts: u.includes('multifamily'), streets: u.includes('sfr'), trash: !u.every(x => S.CART_USES.includes(x)), perSf: u.some(S.PER_SF_TRASH) }; };
