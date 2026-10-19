@@ -23,6 +23,7 @@ import { USES, SETBACKS, guessProgram, normalizeProgram } from '../lib/siteplan.
 import { AMENITIES } from '../lib/sitecompose.mjs';
 import { catalogText } from '../lib/siteedit.mjs';
 import { typeById } from '../lib/buildings.mjs';
+import { recipeIn, programOf, customOf, teamTypesForAI, OUTDOOR, PER, PATTERNS } from '../lib/customtypes.mjs';
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
 
 let modelP = null;
@@ -33,11 +34,28 @@ const model0 = key => (modelP ||= pickModel(key, process.env.OPENAI_MODEL).catch
 const ai = (key, b, res, run) => withModel(key, typeof b?.model === 'string' ? b.model : null, () => model0(key), run, m => res?.setHeader?.('X-AI-Model', m)); // (a picked model that can't serve the call: the default answers)
 
 const n = description => ({ type: ['number', 'null'], description });
+// an AI-crafted building type's recipe (lib/customtypes.mjs): how the engine lays out a type it has no use of its own for
+const int = description => ({ type: ['integer', 'null'], description }), s0 = description => ({ type: ['string', 'null'], description });
+const CUSTOM = { type: 'object', additionalProperties: false, required: ['name', 'pattern', 'buildings', 'outdoor', 'sites', 'parking', 'figures'], description: 'A building type none of the uses covers (use other): its recipe. name null, the lists empty and sites / parking all null otherwise.',
+  properties: {
+    name: s0('What it is, short: "Daycare", "Pickleball club", "RV park".'),
+    pattern: { type: ['string', 'null'], enum: [...Object.keys(PATTERNS), null], description: 'How the layout engine lays it out: row = a building row facing its parking (like shops); pads = several freestanding buildings; commons = a building with its outdoor pieces beside it (playground, courts, lawn, pool, pavilion, plaza, patio); yard = rows of sites on drive aisles, like self storage (an RV park, boat or truck parking).' },
+    buildings: { type: 'array', description: 'Its buildings (1-6 kinds). For a yard, the office.', items: { type: 'object', additionalProperties: false, required: ['label', 'type', 'w', 'd', 'floors', 'count'], properties: {
+      label: { type: 'string', description: 'E.g. "Daycare", "Clubhouse", "Classroom building", "Gym".' }, type: s0('A building library type id when one fits (see libraryTypes), else null and give its size.'),
+      w: n('Feet along its front.'), d: n('Feet deep.'), floors: int('Floors.'), count: int('How many of this building.') } } },
+    outdoor: { type: 'array', description: 'Its outdoor pieces (commons). Empty when none.', items: { type: 'object', additionalProperties: false, required: ['kind', 'label', 'w', 'd', 'count'], properties: {
+      kind: { type: 'string', enum: Object.keys(OUTDOOR), description: 'court (one court with its run-out: pickleball 30 × 60, tennis 60 × 120, basketball 50 × 84, sand volleyball 40 × 70), play (a playground or fenced play yard), pool, plaza, green (a lawn, field or dog run), patio (outdoor seating, a beer garden), pavilion (a covered open-air shelter).' },
+      label: { type: 'string', description: 'E.g. "Pickleball courts", "Fenced playground", "Event lawn".' }, w: n('Feet, one piece.'), d: n('Feet, one piece.'), count: int('How many.') } } },
+    sites: { type: 'object', additionalProperties: false, required: ['label', 'w', 'd', 'count'], description: 'A yard only: its sites (an RV site about 24 × 55 ft back-in); all null otherwise.', properties: { label: s0('E.g. "RV site", "Boat slip", "Truck space".'), w: n('Feet wide.'), d: n('Feet deep.'), count: int('How many sites.') } },
+    parking: { type: 'object', additionalProperties: false, required: ['per', 'rate', 'basis', 'label', 'plus1k'], description: 'Its parking rule.', properties: {
+      per: { type: ['string', 'null'], enum: [...Object.keys(PER), null], description: 'What the rate counts: 1000sf (per 1,000 sq ft of building), seat, court, child, space (a site in a yard) or pad.' }, rate: n('Spaces per one of them.'),
+      basis: n('How many of them (children, seats); null for 1000sf, court, space and pad (counted from the plan).'), label: s0('Their name, plural: "children", "seats", "courts".'), plus1k: n('Spaces per 1,000 sf of building on top, for a rule per court or per site (the clubhouse, the office). 0 or null otherwise.') } },
+    figures: { type: 'array', items: { type: 'string' }, description: '2-4 short figures for the Numbers panel: "120 children", "8 courts", "60 RV sites".' } } };
 export const SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'compare', 'trash', 'entrances', 'product', 'extras', 'storage', 'foodtrucks', 'fuel', 'setbacks', 'zones', 'summary', 'assumptions'],
+  required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'compare', 'trash', 'entrances', 'product', 'extras', 'storage', 'foodtrucks', 'fuel', 'custom', 'setbacks', 'zones', 'summary', 'assumptions'],
   properties: {
-    use: { type: 'string', enum: Object.keys(USES), description: 'Main use. storage = self storage (climate-controlled, drive-up, mini-storage, RV / boat storage). foodtrucks = a food truck park (food truck court, truck stalls round a pavilion, beer garden). fuel = a gas station / convenience store (c-store, fueling station, pumps, a QT or Buc-ee\'s style store; a truck stop or travel center too, laid out as the car version). other = anything that fits none of these (school…).' },
+    use: { type: 'string', enum: Object.keys(USES), description: 'Main use. storage = self storage (climate-controlled, drive-up, mini-storage, RV / boat storage). foodtrucks = a food truck park (food truck court, truck stalls round a pavilion, beer garden). fuel = a gas station / convenience store (c-store, fueling station, pumps, a QT or Buc-ee\'s style store; a truck stop or travel center too, laid out as the car version). other = anything that fits none of these: a daycare, a school, a pickleball club, an RV park, an event venue… (then custom holds its recipe).' },
     gfa: n('Total building floor area in square feet across all floors. null when the request gives no size (the tool then uses a typical size for the use and site) or asks for as much as fits.'),
     floors: { type: ['integer', 'null'], description: 'Floors per building.' },
     units: { type: ['integer', 'null'], description: 'Dwelling units (apartments, townhomes, duplex units, homes).' },
@@ -65,6 +83,7 @@ export const SCHEMA = {
         wash: { type: ['boolean', 'null'], description: 'A car wash tunnel with its stacking lane, when asked for.' }, vac: { type: ['boolean', 'null'], description: 'Air / vacuum stalls. false only when they say none; null = yes.' },
         canopy: { type: ['string', 'null'], enum: ['auto', 'front', 'side', null], description: 'Which street the canopy runs along: front (the busier street), side (the side street of a corner lot), auto or null = the front unless only the side fits.' },
         truckStop: { type: ['boolean', 'null'], description: 'true when they ask for a truck stop, travel center or diesel lanes for trucks (laid out as the car version for now).' } } },
+    custom: CUSTOM,
     setbacks: { type: 'object', additionalProperties: false, required: ['front', 'side', 'rear', 'paving'], description: 'Feet. null keeps the default.',
       properties: { front: n('Building setback from the street.'), side: n('Side setback.'), rear: n('Rear setback.'), paving: n('Landscape buffer between paving and the lot lines.') } },
     zones: { type: 'array', description: 'Mixed use only: 2 to 5 zones from the street back (commercial in front, amenity/commons in the middle, apartments, then townhomes, then duplexes/cottages at the back). Empty for a single use.',
@@ -95,17 +114,22 @@ export const SYSTEM = `You set up a development program for a site-planning tool
 - A gas station, fueling station, convenience store or c-store with pumps is use "fuel" (never retail): fuel.pumps the MPDs (4, 6, 8 or 12; two fueling positions each), fuel.storeSf the store and gfa the same, fuel.wash for a car wash, fuel.vac false only if they say no air / vacuum, fuel.canopy only when they say which street. A QT, RaceTrac, Wawa or Buc-ee's style store means 12 pumps and a 5,000-6,000 sf store. A truck stop or travel center: use fuel with truckStop true, and say in the assumptions that it is laid out as a gas station for cars (no diesel lanes, truck parking or scales yet). The engine puts the canopy between the store and the busier street, drive lanes round it, the tanks where the fuel truck reaches them, and on a corner lot a driveway on each street kept back from the corner. Parking ratio is per 1,000 sf of the store (about 4).
 - Housing asked for in general ("multifamily", "rental housing", "build-to-rent") with no product named: use multifamily with compare true; the engine lays out garden apartments, studio/1-bed apartments, townhomes and duplexes and ranks them by value. When they name a product, use it.
 - Trash enclosures only when they ask for them (trash true).
+- A building type none of these uses covers (a daycare, a pickleball or tennis club, an RV park, a car wash on its own, an event venue, a school, mini golf, a dog daycare, a brewery with a beer garden…) is use "other" with its recipe in custom, never a bare box: custom.name what it is; custom.pattern the engine's layout that suits it (row: a building row facing its parking; pads: several freestanding buildings; commons: a building with outdoor pieces beside it; yard: rows of sites on drive aisles); custom.buildings each with a label and a library type id when one fits (libraryTypes) or its size w × d ft, floors and count; custom.outdoor the outdoor pieces with counts and sizes; custom.sites a yard's sites; custom.parking its rule, the way a city counts it: per seat (a venue or school: 1 a 3 seats, 1 a 4 students), per child (a daycare: about 0.2-0.25 a child, staff and drop-off), per court (3-4 a court, plus plus1k for the clubhouse), per site (an RV park: 0.1-0.2 a site for visitors, each site holds its own car, plus plus1k for the office), per pad, or per 1,000 sf; custom.figures 2-4 short figures ("120 children", "8 courts"). Size from typical practice (a daycare about 85 sf a child inside and 75 sf a child of playground; a pickleball club's clubhouse 3,000-6,000 sf; an RV park about 15-20 sites an acre). gfa is the buildings' total, ratio null. Other uses leave custom empty (name null).
+- When teamTypes are given, they are building types the team saved before: when the request names or describes one ("another one like our pickleball club", "our daycare"), reuse its recipe and sizes (its name, pattern, buildings, outdoor pieces, sites and parking rule), changing only what the request changes.
 - Never claim code compliance. Assumptions are short phrases, e.g. "4 spaces per 1,000 sf (typical retail)".
 - When a plannedStrategy is given, the site was thought through before this step: follow it. Its placement sets the zone order (front, middle, back), its entrances the entrances count, its stormwater the storm type, its buildings the building count and floors. Only where it contradicts the request does the request win (say so in assumptions).`;
 
 const factsOf = facts => (Array.isArray(facts) ? facts : []).slice(0, 14).map(t => clip(t, 300)).filter(Boolean);
-export function siteText(site = {}, prompt = '', program = null, facts = null, strategy = null) {
+// a few library types an AI-crafted type often uses (custom.buildings[].type)
+const LIBRARY_HINTS = ['retail-daycare-10-000-sf', 'retail-fitness-20-000-sf', 'other-event-hall-8-000-sf', 'other-community-center-7-700-sf', 'other-pavilion-4-000-sf', 'clubhouse-clubhouse-4-500-sf', 'clubhouse-clubhouse-7-500-sf', 'other-church-12-000-sf', 'restaurant-brewpub-10-000-sf', 'fuel-wash-car-wash-express-tunnel-110-ft', 'storage-office-leasing-office-1-200-sf'].filter(id => typeById(id));
+export function siteText(site = {}, prompt = '', program = null, facts = null, strategy = null, teamTypes = null) {
   const s = site || {}, f = v => v == null || v === '' ? null : String(v).slice(0, 200);
   const z = s.zoning && typeof s.zoning === 'object' ? Object.fromEntries(Object.entries(s.zoning).filter(([, v]) => v != null && v !== '').slice(0, 12).map(([k, v]) => [k, String(v).slice(0, 120)])) : null;
   const side = (Array.isArray(s.sideStreetsFt) ? s.sideStreetsFt : []).map(v => Math.round(+v)).filter(v => v > 0).slice(0, 4);
   return JSON.stringify({ request: clip(prompt, 1200), site: { acres: +s.acres || null, approxWidthFt: +s.widthFt || null, approxDepthFt: +s.depthFt || null, streetFrontageFt: +s.frontageFt || null,
     ...(side.length ? { sideStreetsFt: side } : {}), ...(s.shape ? { shape: f(s.shape) } : {}),
-    address: f(s.address), city: f(s.city), county: f(s.county), zoning: z, facts: factsOf(facts) }, currentProgram: program || null, ...(strategy ? { plannedStrategy: strategy } : {}) });
+    address: f(s.address), city: f(s.city), county: f(s.county), zoning: z, facts: factsOf(facts) }, currentProgram: program || null, ...(strategy ? { plannedStrategy: strategy } : {}),
+    ...(teamTypes?.length ? { teamTypes } : {}), ...(teamTypes ? { libraryTypes: LIBRARY_HINTS } : {}) });
 }
 
 // the model's program, made safe: unknown values dropped, the words' own reading filling gaps, zones normalized
@@ -113,10 +137,18 @@ function programFrom(d, prompt) {
   const g0 = guessProgram(prompt), sto = d.use === 'storage' || (!d.use && g0.use === 'storage') ? { storage: { ...(g0.storage || {}), ...Object.fromEntries(Object.entries(d.storage || {}).filter(([, v]) => v != null)) } } : {}; // storage: the words fill what the model left open
   const ftk = d.use === 'foodtrucks' || (!d.use && g0.use === 'foodtrucks') ? { foodtrucks: { ...(g0.foodtrucks || {}), ...Object.fromEntries(Object.entries(d.foodtrucks || {}).filter(([, v]) => v != null)) } } : {}; // a food truck park: the words fill what the model left open
   const fu = d.use === 'fuel' || (!d.use && g0.use === 'fuel') ? { fuel: { ...(g0.fuel || {}), ...Object.fromEntries(Object.entries(d.fuel || {}).filter(([, v]) => v != null)) } } : {}; // a gas station: the same
-  const program = { ...normalizeProgram({ ...g0, ...Object.fromEntries(Object.entries(d).filter(([k, v]) => v != null && !['setbacks', 'summary', 'assumptions', 'zones', 'storage', 'foodtrucks', 'fuel'].includes(k))), ...sto, ...ftk, ...fu }), ...(d.gfa == null && d.units == null && d.use !== 'storage' && d.use !== 'fuel' ? { gfa: null } : {}) };
+  const program = { ...normalizeProgram({ ...g0, ...Object.fromEntries(Object.entries(d).filter(([k, v]) => v != null && !['setbacks', 'summary', 'assumptions', 'zones', 'storage', 'foodtrucks', 'fuel', 'custom'].includes(k))), ...sto, ...ftk, ...fu }), ...(d.gfa == null && d.units == null && d.use !== 'storage' && d.use !== 'fuel' ? { gfa: null } : {}) };
   const guess = guessProgram(prompt), zs = d.zones?.length > 1 ? d.zones : guess.zones; // the model's zones, else the ones read from the words
   if (zs?.length > 1 && program.use !== 'foodtrucks') { const nz = normalizeProgram({ use: zs[0].use, zones: zs }).zones; program.zones = nz; program.use = nz[0].use; }
   return program;
+}
+// an AI-crafted type: the recipe made safe and laid out as its program (lib/customtypes.mjs). A recipe that makes no
+// sense (no name kept, nothing to draw) falls back to a plain building, with a note saying so.
+export function customFrom(d, program) {
+  const raw = d?.custom, name = typeof raw?.name === 'string' ? raw.name.trim() : '';
+  if (program.use !== 'other' || program.zones || !name) return { program };
+  const r = recipeIn(raw); if (r) return { program: { ...programOf(r, program), ...(program.setbacks ? { setbacks: program.setbacks } : {}) } };
+  return { program: { ...program, custom: undefined }, note: 'The AI’s recipe for “' + clip(name, 60) + '” didn’t make sense, so it’s laid out as a plain building (3 spaces / 1,000 sf).' };
 }
 const PROG = Object.fromEntries(Object.entries(SCHEMA.properties).filter(([k]) => !['summary', 'assumptions'].includes(k)));
 const str = description => ({ type: 'string', description }), strs = description => ({ type: 'array', items: { type: 'string' }, description });
@@ -233,10 +265,10 @@ export default async function handler(req, res) {
   if (b.mode === 'strategy') return strategy(b, key, res);
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: SYSTEM, user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy)), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: effortIn(b.effort, 'high') })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
-    const d = r.data, sb = Object.fromEntries(Object.entries(d.setbacks || {}).filter(([, v]) => v != null && v >= 0 && v <= 300)), program = programFrom(d, prompt);
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: SYSTEM, user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy), teamTypesForAI(b.teamTypes)), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: effortIn(b.effort, 'high') })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
+    const d = r.data, sb = Object.fromEntries(Object.entries(d.setbacks || {}).filter(([, v]) => v != null && v >= 0 && v <= 300)), cu = customFrom(d, programFrom(d, prompt)), program = cu.program;
     res.setHeader('Cache-Control', 'no-store');
-    return res.json({ program, setbacks: { ...SETBACKS, ...sb }, summary: clip(d.summary, 400), assumptions: (d.assumptions || []).slice(0, 4).map(a => clip(a, 200)) });
+    return res.json({ program, setbacks: { ...SETBACKS, ...sb }, summary: clip(d.summary, 400), assumptions: [...(cu.note ? [cu.note] : []), ...(d.assumptions || []).slice(0, 4).map(a => clip(a, 200))].slice(0, 5) });
   } catch (e) {
     console.error('siteplan', e.message);
     return res.status(502).json({ error: 'The AI didn’t answer just now. Try again, or build without AI.' });
@@ -261,7 +293,8 @@ async function review(b, key, res) {
     const revise = !last && !!d.revise, p = d.params || {};
     const params = Object.fromEntries(Object.entries({ fill: typeof p.fill === 'boolean' ? p.fill : null, streets: ['curved', 'straight'].includes(p.streets) ? p.streets : null, form: ['bar', 'L', 'U', 'tower'].includes(p.form) ? p.form : null, storm: ['detention', 'retention', 'underground', 'none'].includes(p.storm) ? p.storm : null }).filter(([, v]) => v != null));
     res.setHeader('Cache-Control', 'no-store');
-    return res.json({ reviews, ranking, revise, program: revise ? programFrom(d.program || {}, prompt) : null, params: revise ? params : {}, why: revise ? clip(d.why, 300) : '', summary: clip(d.summary, 600) });
+    const keepCustom = p => { const cu = customFrom(d.program || {}, p); if (cu.program.custom || !customOf(b.program || {})) return cu.program; const r0 = recipeIn(b.program.custom); return r0 && (p.use === 'other' || p.use === (r0.pattern === 'yard' ? 'storage' : 'other')) ? { ...programOf(r0, p) } : cu.program; }; // a revised custom type keeps its recipe unless the AI rewrote it
+    return res.json({ reviews, ranking, revise, program: revise ? keepCustom(programFrom(d.program || {}, prompt)) : null, params: revise ? params : {}, why: revise ? clip(d.why, 300) : '', summary: clip(d.summary, 600) });
   } catch (e) {
     console.error('siteplan review', e.message);
     return res.status(502).json({ error: 'The AI review didn’t answer just now; the options stand as the engine ranked them.' });

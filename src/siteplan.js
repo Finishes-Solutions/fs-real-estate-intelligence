@@ -17,7 +17,9 @@ import * as K from './lib/planpick.mjs';
 import * as MAP from './lib/planmap.mjs';
 import * as T from './lib/sitetools.mjs';
 import * as RD from './lib/render.mjs';
-const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
+import * as CU from './lib/customtypes.mjs';
+import { teamLibrary } from './teamlib.js';
+const typeOptions = (cur, team = []) => (team.length ? '<optgroup label="Team">' + team.map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>' : '') + BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 import { readJSON } from './lib/http.mjs';
 
@@ -103,6 +105,46 @@ export function initSitePlan(ctx) {
   setTimeout(sync, 4000);
   function badge() { ctx.setBadge?.('projects', db.projects.length); } // a muted count beside the Projects sub-tab
   badge();
+
+  // ---------- the team's building library (src/teamlib.js): Save to Library, the Team group, rename and delete ----------
+  const TL = teamLibrary({ onChange: () => teamRefresh() });
+  const AIS_TIP = 'Sized by the AI from typical practice, not a product sheet: check it against the real building before relying on it';
+  const teamTypes = () => TL.list().map(CU.libraryTypeOf); // the Team group, as library types
+  const anyType = id => String(id || '').startsWith('team:') ? (t => t ? CU.libraryTypeOf(t) : null)(TL.get(String(id).slice(5))) : typeById(id);
+  const fromAny = (t, at, rot) => ({ ...fromType(t, at, rot), ...(t.custom ? { custom: t.custom } : {}), ...(t.aiSized ? { aiSized: true } : {}) });
+  const tlSize = t => t.w + ' × ' + t.d + ' ft' + (t.floors > 1 ? ' · ' + t.floors + '-story' : '') + (t.recipe ? ' · ' + [CU.PATTERNS[t.recipe.pattern]?.label.toLowerCase(), ...t.recipe.figures.slice(0, 2)].filter(Boolean).join(' · ') : '');
+  const tlSaved = t => 'Saved by ' + (t.by || 'someone on this device') + ' · ' + new Date(t.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const tlWhere = () => { const s = TL.status(); return s.shared ? 'Shared with your team' : s.shared === false ? (s.why === 'passcode' ? 'On this device only: enter the team passcode (Settings) to share them' : s.why === 'setup' ? 'On this device only: the team library isn’t set up on this site yet' : 'On this device for now: they go to the team when it’s back online') : 'Saved on this device; sharing with the team…'; };
+  function teamHtml() {
+    const list = TL.list();
+    if (!list.length) return '<div class="sp-team" id="spTeamLib"><div class="sp-sub">Team library</div><div class="rnote">Nothing saved yet: select a building and press <b>Save to Library</b> (an AI-crafted type saves with its recipe). ' + esc(tlWhere()) + '.</div></div>';
+    return '<details class="sp-team" id="spTeamLib"' + (ed.teamOpen === false ? '' : ' open') + '><summary class="sp-sub">Team library · ' + list.length + '</summary><div class="rnote sp-1l">' + esc(tlWhere()) + '.</div><ul class="sp-tl">' + list.map(t =>
+      '<li data-tl="' + esc(t.id) + '"><span class="sp-tl-h">' + (ed.tlEdit === t.id ? '<input type="text" maxlength="60" data-tlname="' + esc(t.id) + '" value="' + esc(t.name) + '" aria-label="New name for ' + esc(t.name) + '">' : '<b>' + esc(t.name) + '</b>') + (t.recipe?.ai ? '<i class="sp-ais" title="' + esc(AIS_TIP) + '">AI-sized</i>' : '') + '</span>' +
+      '<small>' + esc(tlSize(t)) + '</small><small>' + esc(tlSaved(t)) + '</small><span class="sp-tl-a"><button type="button" class="btn sm" data-tladd="' + esc(t.id) + '" title="Add one to the plan">Add</button>' + (t.recipe ? '<button type="button" class="btn sm" data-tlbuild="' + esc(t.id) + '" title="Lay out another one with Build: the AI is given this recipe">Build One</button>' : '') +
+      '<button type="button" class="btn sm ghost" data-tlren="' + esc(t.id) + '">Rename</button><button type="button" class="btn sm ghost sp-del" data-tldel="' + esc(t.id) + '">Delete</button></span></li>').join('') + '</ul></details>';
+  }
+  function wireTeam() {
+    const box = card.querySelector('#spTeamLib'); if (!box) return;
+    if (box.tagName === 'DETAILS') box.ontoggle = () => { ed.teamOpen = box.open; };
+    box.querySelectorAll('[data-tladd]').forEach(b => b.onclick = () => { const t = anyType('team:' + b.dataset.tladd); if (t) { ed.editing = true; addType(t); } });
+    box.querySelectorAll('[data-tlbuild]').forEach(b => b.onclick = () => { const t = TL.get(b.dataset.tlbuild); if (t) { fillAsk('Another ' + t.name.toLowerCase() + ' like the one in our team library', true); card.querySelector('#spAiSec')?.scrollIntoView({ block: 'nearest' }); } });
+    box.querySelectorAll('[data-tlren]').forEach(b => b.onclick = () => { ed.tlEdit = b.dataset.tlren; teamRefresh(); const i = card.querySelector('[data-tlname]'); if (i) { i.focus(); i.select(); } });
+    box.querySelectorAll('[data-tlname]').forEach(i => { const done = ok => { if (ed.tlEdit !== i.dataset.tlname) return; ed.tlEdit = null; if (ok) TL.rename(i.dataset.tlname, i.value); teamRefresh(); };
+      i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); done(true); } else if (e.key === 'Escape') { e.preventDefault(); done(false); } }; i.onblur = () => done(true); });
+    box.querySelectorAll('[data-tldel]').forEach(b => b.onclick = () => { const t = TL.remove(b.dataset.tldel); if (t) ctx.toast('Deleted “' + t.name + '” from the team library.', { action: { label: 'Undo', run: () => TL.restore(t) } }); });
+  }
+  // the library's own pieces of the panel, after a save, a rename or the team's copy arriving (not the whole panel: a box being typed in keeps its focus)
+  function teamRefresh() {
+    if (!ed || !card.classList.contains('sp-mode')) return;
+    const box = card.querySelector('#spTeamLib'); if (box) { box.outerHTML = teamHtml(); wireTeam(); }
+    const lib = card.querySelector('#spLib'); if (lib && document.activeElement !== lib) lib.innerHTML = '<option value="">Pick a building type to add…</option>' + typeOptions('', teamTypes());
+    const n = card.querySelector('.sp-lib small'); if (n) n.textContent = (BUILDING_TYPES.length + TL.list().length) + ' types';
+  }
+  // Save to Library: a building on the plan (its size, use and type; with its recipe when it is part of an AI-crafted type), or the whole AI-crafted type
+  const libSaved = t => ctx.toast('Saved “' + t.name + '” to the team library' + (TL.status().shared === false ? ' on this device (the team library isn’t shared on this site yet)' : '') + '.');
+  function saveToLib(e) { const pl = PL(); if (!pl || !e) return; const t = CU.teamTypeFrom(e, pl.program, { id: 'b' + uid() }); const s = t && TL.save(t); if (s) libSaved(s); }
+  function saveTypeToLib() { const pl = PL(), cs = pl && CU.customStats(pl); if (!cs) return; const r = cs.recipe, b = r.buildings.slice().sort((x, y) => y.w * y.d - x.w * x.d)[0];
+    const s = TL.save({ name: r.name, w: b.w, d: b.d, floors: b.floors, use: 'other', note: r.name, recipe: r, source: 'ai' }); if (s) libSaved(s); }
 
   const P = () => db.projects.find(p => p.id === ed?.pid), PL = () => P()?.plans.find(x => x.id === ed?.plid) || (ed?.draftPlan && ed.draftPlan.id === ed.plid ? ed.draftPlan : undefined); // a draft isn't in the project until its site is finished
   const nextName = p => 'Option ' + String.fromCharCode(65 + Math.min(25, p.plans.length));
@@ -1646,7 +1688,7 @@ export function initSitePlan(ctx) {
       spSiteSec: () => siteHtml(p, pl),
       spDrawSec: () => '<div class="bsec" id="spDrawSec"><div class="lt">Add to the plan' + infoBtn('A piece goes in the middle of the view, clear of the rest; parking under it gives way. Edit Layout turns on so you can drag it into place.', 'About adding pieces') + '</div>' +
         '<div class="sp-addg">' + ADD_GROUPS.map(([g, ks]) => '<div class="sp-add-g" role="group" aria-label="' + esc(g) + '"><div class="sp-sub">' + esc(g) + '</div><div class="sp-add-r">' + ks.map(k => '<button type="button" class="sp-add" data-add="' + k + '" style="--ac:' + addAccent(k) + '" title="Add ' + esc(ADD_LABEL[k] || SP.KINDS[k]?.label || ADD_SHORT[k]) + '">' + ADD_ICON[k] + '<span>' + esc(ADD_SHORT[k]) + '</span></button>').join('') + '</div></div>').join('') + '</div>' +
-        '<label class="sp-f sp-lib"><span class="sp-fl">From the building library <small>' + BUILDING_TYPES.length + ' types</small></span><span class="sp-libw">' + SI.find + '<select id="spLib"><option value="">Pick a building type to add…</option>' + typeOptions('') + '</select></span></label></div>',
+        '<label class="sp-f sp-lib"><span class="sp-fl">From the building library <small>' + (BUILDING_TYPES.length + TL.list().length) + ' types</small></span><span class="sp-libw">' + SI.find + '<select id="spLib"><option value="">Pick a building type to add…</option>' + typeOptions('', teamTypes()) + '</select></span></label>' + teamHtml() + '</div>',
       spParams: () => paramsHtml(pl, prog),
       spRender: () => renderHtml(p, pl),
       spExport: () => '<div class="bsec" id="spExport"><div class="lt">Export</div><div class="sp-g2 sp-exp"><button type="button" class="btn askai" id="spPdf" title="A conceptual site plan sheet: the plan to scale with title block, site data, program and parking, parcels, notes and legend">Site Plan PDF</button>' +
@@ -1698,7 +1740,7 @@ export function initSitePlan(ctx) {
     wireVariants();
     on('#spStaleRefit', () => refitNow(true)); on('#spStaleNew', () => resolve({ force: true, src: '#spStaleNew' }));
     card.querySelectorAll('[data-add]').forEach(b => { b.onclick = () => { ed.editing = true; addEl(b.dataset.add); }; dragToAdd(b, b.dataset.add); }); // adding a piece is editing
-    const lib = $('#spLib'); if (lib) lib.onchange = () => { const t = typeById(lib.value); if (t) { ed.editing = true; addType(t); } };
+    const lib = $('#spLib'); if (lib) lib.onchange = () => { const t = anyType(lib.value); if (t) { ed.editing = true; addType(t); } }; wireTeam();
     on('#spEdit', () => { ed.editing = !ed.editing; draw(); panel(); });
     on('#spFront', () => { ed.mode = ed.mode === 'front' ? null : 'front'; panel(); });
     on('#spStreet', () => { ed.mode = ed.mode === 'street' ? null : 'street'; panel(); });
@@ -1922,7 +1964,7 @@ export function initSitePlan(ctx) {
   function wireParams(pl) {
     const $ = s => card.querySelector(s), after = i => { if (ed.autoSolve !== false && (pl.recipe || ed.variants)) resolveSoon(i && settingLabel(i)); };
     $('.sp-prog').ontoggle = e => { ed.progOpen = e.target.open; };
-    $('#spUse').onchange = e => { change(x => { x.program = { ...x.program, use: e.target.value, ratio: null, perUnit: null, floors: null, depth: null, truck: null, mix: null, homeMix: null, storage: null, foodtrucks: null, fuel: null }; }); after(e.target); };
+    $('#spUse').onchange = e => { change(x => { x.program = { ...x.program, use: e.target.value, custom: null, ratio: null, perUnit: null, floors: null, depth: null, truck: null, mix: null, homeMix: null, storage: null, foodtrucks: null, fuel: null }; }); after(e.target); };
     card.querySelectorAll('.sp-prog input[data-k]').forEach(i => i.onchange = () => { change(x => { const k = i.dataset.k, v = i.value === '' ? null : +i.value;
       if (k.startsWith('sb-')) x.setbacks = { ...SP.SETBACKS, ...(x.setbacks || {}), [k.slice(3)]: v ?? SP.SETBACKS[k.slice(3)] ?? x.setbacks?.paving };
       else if (k.startsWith('pp-')) x.params = { ...(x.params || {}), [k.slice(3)]: v };
@@ -2049,19 +2091,22 @@ export function initSitePlan(ctx) {
   }
 
   // the piece that's picked: its name and size, what can be done to it (a row of buttons), then its fields
+  // an AI-sized piece says so (and which AI-crafted type it belongs to); a building can be saved to the team library
+  const selCustom = e => (e.aiSized || e.custom ? '<div class="sp-cust">' + (e.aiSized ? '<i class="sp-ais" title="' + esc(AIS_TIP) + '">AI-sized</i>' : '') + (e.custom ? '<span>' + esc(e.custom) + (e.aiSized ? ': the AI’s size, not a product sheet' : '') + '</span>' : '') + '</div>' : '') +
+    (e.kind === 'building' ? '<div class="sp-row sp-savelib"><button type="button" class="btn sm" id="spSaveLib" title="Keep this building in the team library: everyone on the team can add it from the building library' + (e.custom ? ', and the AI can build another ' + esc(e.custom) + ' from its recipe' : '') + '">Save to Library</button></div>' : '');
   function selHtml(e, prog) {
     if (e && sels().length > 1) return multiHtml();
     if (!e) return '<div class="lt">Selected</div><div class="rnote sp-1l">Click a piece on the map to see it.' + infoBtn(ed.editing ? 'Drag a piece to move it; a white corner resizes it, the green dot turns it. It lines up with its neighbours and stays out of the setbacks (hold Alt to move it freely). Arrow keys nudge it, R turns it 90°, Delete removes it. Only that piece moves; parking under a building gives way.' : 'Turn on Edit Layout to move, resize or turn pieces.', 'How to change a piece') + '</div>';
     const free = SP.isFree(e), rc = !!PL()?.recipe;
     const n = (k, label, v, o = {}) => fld(label, numCtl((o.min != null ? 'min="' + o.min + '" ' : '') + (o.max ? 'max="' + o.max + '" ' : '') + 'data-e="' + k + '"', v, 1, o.unit || ''));
     const pick = (attr, label, opts, v, wide) => fld(label, selCtl(attr, opts, v), { wide });
-    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free && e.kind !== 'keepout' ? (SHAPEABLE.includes(e.kind) && !['pond', 'green', 'pool'].includes(e.kind) ? ' · custom shape' : e.path ? (T.isEntrance(e) ? ' · entrance' : ' · route') : ' · curved') : '') + '</div><div class="rnote sp-1l" id="spRead"></div>' +
+    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free && e.kind !== 'keepout' ? (SHAPEABLE.includes(e.kind) && !['pond', 'green', 'pool'].includes(e.kind) ? ' · custom shape' : e.path ? (T.isEntrance(e) ? ' · entrance' : ' · route') : ' · curved') : '') + '</div><div class="rnote sp-1l" id="spRead"></div>' + selCustom(e) +
       '<fieldset class="sp-fs"' + (ed.editing ? '' : ' disabled') + '>' +
       '<div class="sp-acts">' + (free ? '' : '<button type="button" class="btn sm" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) || T.routeable(e) ? '<button type="button" class="btn sm" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="' + (T.routeable(e) ? 'Bend it: drag its points along the drive; a blue + adds a point; double-click a point to remove it' : 'Drag its points; drag a blue + to add a point; double-click a point to remove it') + '">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') +
         (rc ? '<button type="button" class="btn sm" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button type="button" class="btn sm" id="spDup" title="Copy it beside itself (⌘D / Ctrl+D)">Duplicate</button><button type="button" class="btn sm" id="spAskSel" title="Say what to change about this piece">Change With AI</button><button type="button" class="btn sm ghost sp-del" id="spDel" title="Delete it (Delete)">Delete</button></div>' +
       (!ed.editing ? '<div class="rnote sp-1l">Turn on <b>Edit Layout</b> to change it.</div>' : rc && e.pinned ? '<div class="sp-pin"><span class="rnote">Pinned: <b>Re-fit Plan</b> keeps it where it is.</span><button type="button" class="btn sm" id="spUnpin" title="Re-fit Plan may move it again">Let It Move</button></div>' : '') +
       '<div class="sp-fg">' + (e.path && T.routeable(e) ? n('width', 'Width', Math.round(e.width || 26), { min: 6, max: 80, unit: 'ft' }) + n('r', 'Curve', Math.round(e.r ?? 30), { min: 0, max: 200, unit: 'ft' }) + (T.isEntrance(e) ? n('flare', 'Mouth flare', Math.round(e.flare || 0), { min: 0, max: 60, unit: 'ft' }) : '') : '') + (e.kind === 'building' ? pick('data-use="1"', 'Use', Object.entries(SP.USES).map(([k, u]) => [k, u.label]), e.use || prog.use) + n('floors', 'Floors', e.floors || 1, { min: 1, max: 40 }) +
-          fld('Type', '<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '') + '</select>', { wide: true }) : '') + // what it is first: use and type can change any time
+          fld('Type', '<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '', teamTypes()) + '</select>', { wide: true }) : '') + // what it is first: use and type can change any time
         (free ? '' : n('w', 'Width', Math.round(e.w), { min: 8, unit: 'ft' }) + n('d', 'Depth', Math.round(e.d), { min: 8, unit: 'ft' }) + n('rot', 'Turn', (Math.round(e.rot || 0) % 360 + 360) % 360, { unit: '°' })) +
         (e.kind === 'building' && (e.use || prog.use) === 'foodtrucks' ? pick('data-ftk="1"', 'Part', [['pavilion', 'Covered pavilion'], ['bar', 'Bar / beer garden'], ['restroom', 'Restrooms']], SP.ftKind(e)) : e.kind === 'building' && (e.use || prog.use) === 'storage' ? pick('data-stok="1"', 'Storage', [['climate', 'Climate-controlled'], ['drive', 'Drive-up units'], ['office', 'Leasing office']], SP.storageKind(e)) : e.kind === 'building' && (e.use || prog.use) === 'fuel' ? pick('data-fuelk="1"', 'Gas station', [['store', 'Convenience store'], ['wash', 'Car wash']], SP.fuelKind(e)) : e.kind === 'building' ? (SP.USES[e.use || prog.use]?.garage ? n('units', 'Homes', e.units || 1, { min: 1, max: 40 }) : '') +
           pick('data-form="1"', 'Building shape', e.poly ? [['custom', 'Custom outline'], ...FORMS] : FORMS, e.poly ? 'custom' : e.form || 'bar') + (e.form === 'tower' && !e.poly ? n('podium', 'Podium floors', e.podium || 2, { min: 1, max: 6 }) : '') : '') +
@@ -2110,7 +2155,8 @@ export function initSitePlan(ctx) {
     card.querySelector('[data-shape]')?.addEventListener('change', ev => { change(() => { SP.reshape(e, ev.target.value); e.pinned = true; }); refitSoon(); });
     const up1 = card.querySelector('#spUnpin'); if (up1) up1.onclick = () => change(() => { delete e.pinned; });
     const rf = card.querySelector('#spRefit'); if (rf) rf.onclick = () => refitNow(true);
-    card.querySelector('[data-type]')?.addEventListener('change', ev => { const t = typeById(ev.target.value); if (!t) return; change(() => { const keep = { id: e.id, name: e.name, rot: e.rot }; for (const k of ['poly', 'form', 'wing', 'podium', 'unitW', 'sf', 'units', 'jog', 'shape', 'storage', 'ft', 'fuel']) delete e[k]; Object.assign(e, fromType(t, [e.x, e.y], e.rot || 0), keep, { pinned: true }); makeRoom(e); }); ed.shape = null; draw(); panel(); }); // the same spot, another building from the library
+    card.querySelector('#spSaveLib')?.addEventListener('click', () => saveToLib(e));
+    card.querySelector('[data-type]')?.addEventListener('change', ev => { const t = anyType(ev.target.value); if (!t) return; change(() => { const keep = { id: e.id, name: e.name, rot: e.rot }; for (const k of ['poly', 'form', 'wing', 'podium', 'unitW', 'sf', 'units', 'jog', 'shape', 'storage', 'ft', 'fuel', 'custom', 'aiSized']) delete e[k]; Object.assign(e, fromAny(t, [e.x, e.y], e.rot || 0), keep, { pinned: true }); makeRoom(e); }); ed.shape = null; draw(); panel(); }); // the same spot, another building from the library
     card.querySelector('[data-use]')?.addEventListener('change', ev => setUse([e.id], ev.target.value));
     card.querySelector('[data-ftk]')?.addEventListener('change', ev => change(() => { e.ft = ev.target.value; e.note = { pavilion: 'Covered · picnic seating', bar: 'Bar · beer garden', restroom: 'Men’s · women’s · family' }[e.ft]; }));
     card.querySelector('[data-stok]')?.addEventListener('change', ev => change(() => { e.storage = ev.target.value; if (e.storage !== 'climate') e.floors = 1; e.note = SP.storageNote(e); }));
@@ -2131,13 +2177,13 @@ export function initSitePlan(ctx) {
   function nums() {
     const el = card.querySelector('#spNums'), pl = PL(); if (!el || !pl) return;
     if (pl.ring.length < 3) { el.innerHTML = ''; return; }
-    const m = SP.metrics(pl), issues = SP.check(pl), prog = SP.normalizeProgram(pl.program), z = pl.zoning || {}, ph = pl.elements.some(e => e.phase === 2);
+    const m = SP.metrics(pl), issues = SP.check(pl), prog = SP.normalizeProgram(pl.program), z = pl.zoning || {}, ph = pl.elements.some(e => e.phase === 2), cs = CU.customStats(pl);
     const m1 = ph ? SP.metrics({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, pk = parkOf(m, m1), whole = twoPhase(m, m1);
     const tile = (k, v, sub, cls = '') => '<div class="sp-tile' + cls + '"><span>' + k + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
     const pair = (k, a, b, sub, cls = '') => '<div class="sp-tile two' + cls + '"><span>' + k + '</span><div class="sp-tv"><b>' + a + '<small>Phase 1</small></b><b>' + b + '<small>Whole site</small></b></div>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
     const two = (k, f, sub, cls = '') => m1 ? pair(k, f(m1), f(m), sub, cls) : tile(k, f(m), sub, cls);
     const max = (v, lim, fmt) => +lim ? ' <span class="sc' + (v > +lim ? ' over' : '') + '">/ max ' + fmt(+lim) + '</span>' : '';
-    const ratioAt = prog.use === 'foodtrucks' ? prog.foodtrucks.perTruck + ' / truck + ' + prog.ratio + ' / 1,000 sf of bar' : new Set(pl.elements.filter(e => e.kind === 'building').map(e => e.use || prog.use)).size > 1 ? 'each use’s ratio' : prog.use === 'multifamily' ? prog.perUnit + '/unit' : prog.ratio + '/1,000 sf';
+    const ratioAt = cs ? 'the AI’s rule' : prog.use === 'foodtrucks' ? prog.foodtrucks.perTruck + ' / truck + ' + prog.ratio + ' / 1,000 sf of bar' : new Set(pl.elements.filter(e => e.kind === 'building').map(e => e.use || prog.use)).size > 1 ? 'each use’s ratio' : prog.use === 'multifamily' ? prog.perUnit + '/unit' : prog.ratio + '/1,000 sf';
     const homes = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr'), byStory = [1, 2, 3].map(n => [n, homes.filter(e => e.floors === n).length]).filter(([, c]) => c);
     const pSub = (m.gfa ? 'needed at ' + ratioAt + ' · ' : '') + (m.units ? m.perUnit.toFixed(2) + ' / unit' : m.per1k.toFixed(1) + ' / 1,000 sf') + (m.garages ? ' · ' + f0(m.garages) + ' in garages' : '') + (m.driveways ? ' · ' + f0(m.driveways) + ' on driveways' : ''), pBad = m.gfa && pk.stalls < pk.need ? ' bad' : '';
     el.innerHTML = '<div class="lt">Numbers' + infoBtn((whole ? 'Phase 1 is what was asked for; the whole site includes Phase 2. Paving and ponds are counted for the whole site. ' : '') + 'A planning sketch from the parcel outline: not a survey, and no engineering (grading, utilities, fire lanes, code review).', 'About these numbers') + '</div><div class="sp-tiles">' +
@@ -2145,7 +2191,7 @@ export function initSitePlan(ctx) {
       two('Floor area', x => x.gfa ? f0(x.gfa) + ' sf' : '—', m.gfa ? plural(m.buildings, 'building') + (m.nrsf ? ' · ' + f0(m.nrsf) + ' net rentable' : '') : '') +
       (m.units ? two('Units', x => f0(x.units || 0), m.duAc.toFixed(1) + ' per acre' + (m.beds ? ' · ' + f0(m.beds) + ' beds' : '')) : '') +
       (m.fuel ? tile('Fuel', f0(m.fuel.positions) + ' positions', m.fuel.mpds + ' pumps · ' + f0(m.fuel.canopySf) + ' sf canopy · ' + f0(m.fuel.storeSf) + ' sf store' + (m.fuel.washSf ? ' · car wash' : '') + (m.fuel.vac ? ' · ' + m.fuel.vac + ' air / vac' : '')) : '') +
-      (m.storage ? two('Storage', x => x.storage ? f0(x.storage.nrsf) + ' sf' : '—', 'rentable · ~' + f0(m.storage.units) + ' units (' + f0(m.storage.climateUnits) + ' climate, ' + f0(m.storage.driveUnits) + ' drive-up)' + (m.storage.rv ? ' · ' + m.storage.rv + ' RV / boat' : '')) : '') +
+      (cs ? customTile(cs, tile) : '') + (m.storage && !cs ? two('Storage', x => x.storage ? f0(x.storage.nrsf) + ' sf' : '—', 'rentable · ~' + f0(m.storage.units) + ' units (' + f0(m.storage.climateUnits) + ' climate, ' + f0(m.storage.driveUnits) + ' drive-up)' + (m.storage.rv ? ' · ' + m.storage.rv + ' RV / boat' : '')) : '') +
       (m.foodtrucks ? tile('Food trucks', f0(m.foodtrucks.trucks), '~' + f0(m.foodtrucks.seats) + ' seats (covered and patio)') + tile('Park buildings', f0(m.foodtrucks.pavilionSf) + ' sf pavilion', f0(m.foodtrucks.restroomSf) + ' sf restrooms · ' + (m.foodtrucks.barSf ? f0(m.foodtrucks.barSf) + ' sf bar' + (m.foodtrucks.patioSf ? ' + ' + f0(m.foodtrucks.patioSf) + ' sf patio' : '') : 'no bar')) : '') +
       (whole ? pair('Parking (spaces / needed)', f0(pk.stalls) + ' / ' + f0(pk.need), f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad) : tile('Parking', f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad)) +
       two('Coverage', x => pct(x.coverage) + (x === m ? max(m.coverage * 100, z.max_coverage_pct, v => v + '%') : ''), '', +z.max_coverage_pct && m.coverage * 100 > +z.max_coverage_pct ? ' bad' : '') +
@@ -2156,7 +2202,22 @@ export function initSitePlan(ctx) {
       (m.mix.length ? '<table class="sp-mixt"><tr><th>Unit</th><th>SF</th><th>Units</th><th>%</th><th>Net sf</th></tr>' + m.mix.map(t => '<tr><td>' + esc(t.name) + '</td><td>' + f0(t.sf) + '</td><td>' + f0(t.n) + '</td><td>' + pct(t.n / Math.max(1, m.mix.reduce((s, x) => s + x.n, 0))) + '</td><td>' + f0(t.n * t.sf) + '</td></tr>').join('') + '</table>' : '') +
       (m.storage?.units ? storageTable(m.storage, prog) : '') +
       (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + n + '-story</td><td>' + f0(SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
+      (cs ? customBlock(cs) : '') +
       (issues.length ? '<ul class="sp-issues">' + issues.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul>' : m.gfa ? '<div class="rnote sp-ok">Fits the setbacks' + (m.spaces >= m.required ? ' and parks' : '') + '.</div>' : '');
+    el.querySelector('#spSaveType')?.addEventListener('click', saveTypeToLib);
+  }
+  // an AI-crafted type in Numbers: its figures, what was drawn of its outdoor pieces or sites, its parking rule and the
+  // AI's assumptions, and Save to Library
+  function customTile(cs, tile) {
+    const drawn = cs.recipe.pattern === 'yard' ? [plural(cs.sites, cs.recipe.sites.label.replace(/^[A-Z](?=[a-z])/, c => c.toLowerCase())) + (cs.sites < cs.recipe.sites.count ? ' of ' + cs.recipe.sites.count : '')] : cs.outdoor.map(o => (o.count < o.asked ? o.count + ' of ' + o.asked : o.count) + ' ' + o.label.replace(/^[A-Z](?=[a-z])/, c => c.toLowerCase()));
+    return tile(esc(cs.name) + ' <i class="sp-ais" title="' + esc(AIS_TIP) + '">AI-sized</i>', esc(cs.figures[0] || drawn[0] || cs.name), esc([...cs.figures.slice(1), ...drawn].join(' · ')), ' wide');
+  }
+  function customBlock(cs) {
+    const r = cs.recipe;
+    return '<div class="sp-custom" id="spCustom"><div class="sp-sub">' + esc(cs.name) + ' · an AI-crafted type</div><ul class="sp-cu">' +
+      '<li>Laid out as ' + esc(cs.pattern.toLowerCase()) + '; the buildings' + (r.outdoor.length ? ', outdoor pieces' : '') + (r.sites ? ', sites' : '') + ' and parking rule are the AI’s, from typical practice.</li>' +
+      '<li><b>Parking rule:</b> ' + esc(cs.rule.text) + '.</li>' + r.assumptions.map(a => '<li>' + esc(a) + '</li>').join('') + (r.fixed.length ? '<li>Brought into range: ' + esc(r.fixed.join(', ')) + '.</li>' : '') + '</ul>' +
+      '<div class="sp-row"><button type="button" class="btn sm" id="spSaveType" title="Keep this type, with its recipe, in the team library: everyone on the team can add it, and the AI can build another from it">Save to Library</button></div></div>';
   }
 
   // storage units by size: each mix split by count over its rentable area
@@ -2285,7 +2346,7 @@ export function initSitePlan(ctx) {
   const noRoom = how => { if (how === 'drive') ctx.toast('The site is full: it sits over a drive (in red). Turn on Edit Layout to move it, or remove something first.'); else if (how === 'none') ctx.toast('No room for it on the site: it overlaps another piece (in red).'); };
   function addType(t) { // a building from the library at the middle of the view, squared with the lot, parking under it giving way
     const pl = PL(); if (!pl || pl.ring.length < 3) return;
-    const { at, rot } = addAt(pl), e = { id: uid(), ...fromType(t, at, rot), ...(pl.recipe ? { pinned: true } : {}) };
+    const { at, rot } = addAt(pl), e = { id: uid(), ...fromAny(t, at, rot), ...(pl.recipe ? { pinned: true } : {}) };
     let how = 'clear'; change(x => { how = placeClear(x, e); x.elements.push(e); makeRoom(e); }); ed.sel = e.id; draw(); panel(); showPiece(e); noRoom(how);
   }
   function addEl(kind, at0) {
@@ -2442,7 +2503,7 @@ export function initSitePlan(ctx) {
     if (!live(run) || PL() !== pl) return;
     if (thinks) runStep(run, 2, 'Reading your request' + (strategy ? ' (following the plan)' : ''));
     if (ai) try {
-      const d = await post({ prompt: ask, site, facts, program: pl.program, effort: L.effort, ...(strategy ? { strategy } : {}) }, run.ctl.signal);
+      const d = await post({ prompt: ask, site, facts, program: pl.program, effort: L.effort, teamTypes: CU.teamTypesForAI(TL.list()), ...(strategy ? { strategy } : {}) }, run.ctl.signal);
       prog = d.program || prog; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
     } catch (e) { if (!live(run)) return; note = e.status === 503 ? '' : navigator.onLine ? 'The AI didn’t answer, so this read your words directly.' : 'Offline: this read your words directly.'; }
     if (!live(run) || PL() !== pl) return;
@@ -2798,7 +2859,7 @@ export function initSitePlan(ctx) {
           : cell('Value / cost', M(f.value) + ' / ' + M(f.cost), profitSub(f), hot('profit'), finTip(v, pl)) +
             cell('Yield on cost', K.fmtPct(f.yoc), f.spread != null ? 'spread <em class="' + neg(f.spread) + '">' + K.fmtPct(f.spread) + '</em>' : '', neg(f.yoc) + hot('yoc'), finTip(v, pl)))
           : cell('Value / cost', '—', has ? 'no buildings to price' : 'when laid out', '') + cell('Yield on cost', '—', '', '')) + '</span>';
-      const pills = (here ? '<i class="sp-onmap">On map' + (edited ? ' · edited' : '') + '</i>' : '') + (v.stale ? [] : badge[i]).map(b => '<i class="sp-badge' + (b === 'Recommended' ? ' rec' : '') + '">' + b + '</i>').join('') +
+      const cu = CU.customOf(SP.normalizeProgram(v.program || pl.program)), pills = (here ? '<i class="sp-onmap">On map' + (edited ? ' · edited' : '') + '</i>' : '') + (cu && !none ? '<i class="sp-ais" title="' + esc(cu.name + ': ' + AIS_TIP) + '">AI-sized · ' + esc(cu.name) + '</i>' : '') + (v.stale ? [] : badge[i]).map(b => '<i class="sp-badge' + (b === 'Recommended' ? ' rec' : '') + '">' + b + '</i>').join('') +
         (none ? '' : v.stale ? '<i class="sp-ck stale" title="Made for the old site. Use this layout to fit it to the new one.">Out of date · ' + staleOf(v)[0] + '</i>' : '<i class="sp-ck ' + cl.level + '" title="' + (ckTip ? esc(ckTip) : cl.level === 'ok' ? 'Inside the lot and setbacks, no overlaps, enough parking' : 'What the checks found; the details are on the map in red once it’s on the map') + '">' + esc(cl.text) + '</i>') +
         (v.ai ? '<i class="sp-score ' + scoreBand(v.ai.score) + hot('ai') + '" title="The AI review’s score, out of 100">AI ' + v.ai.score + '</i>' : '') + (ed.reviewing && has && !v.ai ? '<i class="sp-skel" aria-label="The AI is reviewing this layout">AI reviewing…</i>' : '');
       const reason = isRec && !v.stale ? (rec.by === 'ai' ? (aiFirst ? K.firstSentence(ed.aiSummary) : v.ai?.verdict || '') : K.engineReason(vs, i)) : '';
