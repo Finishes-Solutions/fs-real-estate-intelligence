@@ -119,6 +119,9 @@
     "api/projects.js": {
       "maxDuration": 20
     },
+    "api/buildingtypes.js": {
+      "maxDuration": 20
+    },
     "api/render.js": {
       "maxDuration": 300
     }
