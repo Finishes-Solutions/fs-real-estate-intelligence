@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 4:39 PM CT: Tidier Make renderings form (ec75352)
+- The Option, View, Materials and Light dropdowns on the Renderings tab no longer run into each other. They sit in an even row of four on a computer, two by two on a tablet and one under another on a phone, with space between the form and what's below it. The Plans tab's form gets the same fix.
+
 ### 4:31 PM CT: Full plan sets, part 1: the engine (7d59f39)
 - **Plans can now make a whole set** (up to about a hundred sheets) from an option: general and code sheets, site and civil, landscape, and for each building type the architecture, structural, mechanical, plumbing, electrical and fire sheets, plus telecom when ticked and the renderings.
 - **Building types:** the option's buildings are grouped into types A, B, C… (each distinct building, or one townhome / duplex unit), up to eight. Claude designs each one's floor plans. Every design is checked for fit, overlaps, access, bedroom sizes and windows, and exits; if it fails, Claude is told what's wrong and tries again, up to twice, before a standard rule-based design is used.
