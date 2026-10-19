@@ -5,6 +5,25 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 3:26 PM CT: Plan sets, phase 1, and Options renamed Sites (de1d75f)
+- **New Plans tab on each project:** it makes a schematic design drawing set from one option, every sheet on the Finishes Solutions title block, 24 × 36.
+- **Pick your sections first:** tick the sections you want before making the set, and each box shows how many sheets it adds.
+  - General is always in.
+  - Site & civil and Renderings are ready now.
+  - Architecture, structural, MEP, fire and landscape are listed and greyed out until their phases.
+  - Telecom starts unticked.
+- **The sheets so far:**
+  - **G-001 Cover:** the project's name, a key plan, project data, program and parking, the sheet index, the project team and the vicinity map. Claude writes the project description, general notes, codes and next steps.
+  - **C-101 Overall site plan:** drawn to scale with north arrow, scale bar, legend, tables and notes.
+  - **A-901 to A-904:** one AI rendering a sheet.
+- **Your title block:** your AutoCAD border with the plot stamp and the firm number taken off. The app fills in the project, client, phase, date, scale, drawn by, project number (blank is fine), sheet title and number, and the issue / revision table.
+  - Every sheet says "Preliminary — not for construction, bidding or permit", and that the drawings are schematic, made with AI assistance and not sealed.
+- **Issues:** each new set of an option is the next issue (0, 1, 2…), and the revision table lists them all. **Sets made** lists every set with **Download PDF** and **Delete**, and says "plan changed since" when the option has changed. The PDF stays on the device that made it, like renderings.
+- **Claude settings:** Settings › AI model › **Plan sets** picks Claude's model (default Claude Opus 5.5) and effort (default Medium), and shows this month's spend against the $100 plan set budget.
+  - Without the Claude key, or with the budget spent, sets are still made and the cover says the notes were left out.
+  - The cover notes cost cents per set.
+- **Options is now Sites** on the project page. Old links still open it.
+
 ### 2:56 PM CT: Plan sets plan: your choices recorded (78d55a0)
 - **Planning only.** More decisions are now in `PLANSET-PLAN.md`:
   - The project page's Options tab will be renamed **Sites**. Old links still work.
