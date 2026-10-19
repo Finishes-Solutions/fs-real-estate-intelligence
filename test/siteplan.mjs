@@ -408,4 +408,63 @@ for (const v of [0, 1, 2]) {
   { const pl = { ring: [[0, 0], [300, 0], [300, 300], [0, 300]], front: 0, setbacks: { ...S.SETBACKS }, program: { use: 'retail' }, elements: [{ id: 'a', kind: 'building', x: 150, y: 150, w: 80, d: 60, name: 'Building A' }, { id: 'b', kind: 'building', x: 170, y: 160, w: 80, d: 60, name: 'Building B' }] };
     assert.ok(S.check(pl).some(i => i.text === 'Building A overlaps Building B'), S.check(pl).map(i => i.text).join(' | ')); } }
 
+// ---- parks are places (Oct 19): a park, lawn or open space is in the way of a street, a building and an entrance; a
+// boulevard's median and plain leftover lawn aren't ----
+{
+  assert.ok(S.isPark({ kind: 'green', name: 'Lawn' }) && S.isPark({ kind: 'green', name: 'Open space', poly: [[0, 0], [9, 0], [9, 9]] }), 'a named lawn or open space is a park');
+  for (const g of [{ kind: 'green', name: '' }, { kind: 'green', name: '', median: true }, { kind: 'green', name: 'x', island: true }, { kind: 'green', name: 'Future development', future: true }, { kind: 'pond', name: 'Lake' }]) assert.ok(!S.isPark(g), JSON.stringify(g));
+  assert.ok(S.isMedian({ kind: 'green', name: '', median: true }) && S.isMedian({ kind: 'green', island: true }) && !S.isMedian({ kind: 'green', name: 'Park' }));
+  // the checks: a park across a 28 ft street is flagged (the park, not the street); the same lawn unnamed, a planted island
+  // inside the drive, a park that only touches the street, and a pavilion standing in the park aren't
+  const ring = [[0, 0], [800, 0], [800, 600], [0, 600]], st = { id: 'st', kind: 'drive', x: 400, y: 300, w: 700, d: 28, rot: 0, name: 'Street' };
+  const on = (...els) => S.check({ ring, front: 0, setbacks: { ...S.SETBACKS }, program: { use: 'sfr' }, elements: [st, ...els] }).filter(i => i.level === 'bad' && /overlaps/.test(i.text));
+  const park = { id: 'pk', kind: 'green', name: 'Park', x: 400, y: 330, w: 120, d: 100, rot: 0 };
+  assert.deepEqual(on(park).map(i => [i.id, i.text]), [['pk', 'Park overlaps Street']]);
+  assert.deepEqual(on({ ...park, name: '' }), [], 'plain lawn under a street: not a problem');
+  assert.deepEqual(on({ id: 'is', kind: 'green', name: 'Island', poly: [[380, 296], [420, 296], [420, 304], [380, 304]] }), [], 'a planted island inside the drive');
+  assert.deepEqual(on({ ...park, y: 364 }), [], 'edge to edge');
+  assert.deepEqual(on({ ...park, y: 400 }, { id: 'pv', kind: 'building', use: 'amenity', name: 'Pavilion', x: 400, y: 400, w: 40, d: 30, rot: 0 }), [], 'a pavilion standing in the park');
+  assert.deepEqual(on({ ...park, y: 400 }, { id: 'cc', kind: 'building', use: 'amenity', name: 'Center', x: 460, y: 400, w: 60, d: 40, rot: 0 }).map(i => i.id), ['pk'], 'a building half in it');
+  // entrances: an open space between the street and the drive is in the way; past its edge, or slid along the street, it's not
+  const drive = { id: 'dr', kind: 'drive', x: 400, y: 214, w: 760, d: 28, rot: 0 }, os = { id: 'os', kind: 'green', name: 'Open space', x: 400, y: 100, w: 300, d: 160, rot: 0 };
+  const lot = { ring, front: 0, setbacks: { ...S.SETBACKS }, program: { use: 'retail' }, elements: [drive, os] };
+  const mid = S.addEntrance(lot, [400, 0]); assert.match(mid.error || '', /would cross Open space/, 'asked in its middle: says what is in the way'); assert.equal(mid.park?.id, 'os');
+  const why = {}; assert.equal(S.entranceAt(lot, [400, 0], { why }), null); assert.equal(why.hit?.id, 'os');
+  const past = S.addEntrance(lot, [205, 0]); assert.ok(!past.error, past.error); assert.ok(!S.rectsOverlap(past.entrance, os), 'just past its edge: in, clear of it');
+  const slid = S.addEntrance(lot, [400, 0], { slide: 400 }); assert.ok(!slid.error && !S.rectsOverlap(slid.entrance, os) && Math.abs(slid.at[0] - 400) > 150, 'slid along the street past it: ' + slid.at);
+  assert.ok(S.addEntrance({ ...lot, elements: [drive, { ...os, name: '' }] }, [400, 0]).entrance, 'plain lawn: the driveway goes through it');
+  // the map: a median is marked so it draws over its paving
+  const fc = S.planFeatures({ ...lot, origin: [-95.78, 29.78], elements: [drive, os, { id: 'md', kind: 'green', name: '', median: true, island: true, poly: [[390, 205], [410, 205], [410, 222], [390, 222]], x: 400, y: 214 }] }, null), pr = id => fc.features.find(f => f.properties.id === id)?.properties;
+  assert.equal(pr('md').med, 1); assert.equal(pr('os').med, undefined);
+  // a park placed among homes: the homes under it (and their lots and driveways) are what makes way; drives never do
+  const h = { id: 'h1', kind: 'building', use: 'sfr', x: 100, y: 450, w: 40, d: 50, rot: 0 }, l1 = { id: 'l1', kind: 'lot', x: 100, y: 450, w: 60, d: 115, rot: 0 }, dw = { id: 'dw', kind: 'plaza', note: 'Driveway', x: 100, y: 412, w: 16, d: 26, rot: 0 }, h2 = { ...h, id: 'h2', x: 300 }, l2 = { ...l1, id: 'l2', x: 300 };
+  const P2 = { ring, front: 0, setbacks: { ...S.SETBACKS }, elements: [st, h, l1, dw, h2, l2] }, pk2 = { id: 'p2', kind: 'green', name: 'Park', x: 110, y: 470, w: 60, d: 60, rot: 0 };
+  assert.deepEqual([...S.homesUnder(P2, pk2, 4)].map(e => e.id).sort(), ['dw', 'h1', 'l1']);
+  assert.deepEqual(S.placeObs(P2, pk2).map(o => o.o.id), ['st'], 'a park keeps off the street; the homes make way');
+  // the clear space is part of each outline (the spot search only tests for overlap): a park lands 8 ft off a street, not flush
+  { const near = { ...pk2, y: 345 }, c = S.clearSpot(P2, near, { obs: S.placeObs(P2, near), reach: 80 }); assert.ok(c, 'a spot'); const q = S.moveBy(structuredClone(near), c[0], c[1]);
+    assert.ok(S.gapBetween(S.shapeOf(q), S.shapeOf(st)) >= 7.9, 'off the street: ' + S.gapBetween(S.shapeOf(q), S.shapeOf(st))); }
+  // a home 3 ft off a rectangular park makes way (the margin is square off its sides, not 0.7 of it); the lot of a home
+  // that stays is cut back off the park
+  { const pk3 = { ...pk2, x: 100, y: 540 - 25 - 3 - 30 }; assert.deepEqual([...S.homesUnder({ ...P2, elements: [st, { ...h, y: 540 }, l1] }, pk3, 4)].map(e => e.id), ['h1'], 'within 4 ft');
+    const lot = { ...l2, y: 480 }, hh = { ...h2, y: 500 }, pk4 = { ...pk2, x: 300, y: 410 }, t = S.trimLots([lot, hh], pk4), tl = t.find(e => e.id === 'l2');
+    assert.ok(tl.poly && S.ringArea(tl.poly) < S.ringArea(S.shapeOf(lot)) - 900 && !S.rectsOverlap(tl, pk4) && S.inRing([hh.x, hh.y], tl.poly), 'trimmed, the home still on it'); assert.equal(t.length, 2); }
+  // a parking row cut under a park doesn't grow back under it when something nearby moves away
+  { const ext = { x: 400, y: 460, w: 300, d: 18, rot: 0 }, row = { id: 'r', kind: 'parking', ...ext, ext }, pk5 = { id: 'p5', kind: 'green', name: 'Park', x: 400, y: 470, w: 60, d: 60, rot: 0 };
+    const cut = S.cutRows([row, pk5], S.outline(pk5), 1), back = S.regrowRows(cut, [[240, 440], [300, 440], [300, 480], [240, 480]], 5);
+    assert.ok(back.some(e => e.kind === 'parking') && !back.some(e => e.kind === 'parking' && S.rectsOverlap(e, pk5)), 'the stalls stay off the park'); }
+  // dragged, resized or turned where it stands (was: its outline there): a park against its street slides along it, and
+  // the pavilion standing in its lawn isn't in its way (any small drag used to be "blocked"); it still can't cross the street
+  { const pk6 = { id: 'p6', kind: 'green', name: 'Lawn', x: 400, y: 364, w: 120, d: 100, rot: 0 }, pv = { id: 'pv', kind: 'building', use: 'foodtrucks', ft: 'pavilion', name: 'Pavilion', x: 400, y: 370, w: 40, d: 30, rot: 0 }, P6 = { ring, front: 0, setbacks: { ...S.SETBACKS }, elements: [st, pk6, pv] };
+    assert.ok(S.isCommons(P6.elements, pk6) && !S.isCommons([st, pk6], pk6), 'a lawn holding a pavilion is a commons');
+    const obs = S.placeObs(P6, pk6, [], S.shapeOf(pk6)), slid = S.moveBy(structuredClone(pk6), 30, 0); assert.deepEqual(obs.map(o => o.o.id), ['st'], 'its pavilion is its own');
+    assert.deepEqual(S.clearSpot(P6, slid, { obs, reach: 0 }), [0, 0], 'along the street: clear'); assert.ok(!S.clearSpot(P6, S.moveBy(structuredClone(pk6), 0, -40), { obs, reach: 0 }), 'onto it: not');
+    assert.equal(S.clearSpot(P6, slid, { obs: S.placeObs(P6, pk6), reach: 0 }), null, '(placed afresh it keeps 8 ft off the street and off the pavilion)'); }
+  // an area drawn with the area tool (Landscape 3) is an island or a strip until it's named
+  assert.ok(!S.isPark({ kind: 'green', name: 'Landscape 3', poly: [[0, 0], [9, 0], [9, 9]] }) && S.isPark({ kind: 'green', name: 'Landscape park' }));
+  // the stop bar at a driveway in near a corner runs along the lot line its mouth is on (it read as coming from the other one)
+  { const lot2 = { ring, front: 0, setbacks: { ...S.SETBACKS }, program: { use: 'retail' }, elements: [{ id: 'dr2', kind: 'drive', x: 400, y: 214, w: 760, d: 28, rot: 0 }] }, a = S.addEntrance(lot2, [50, 0]);
+    assert.ok(a.entrance, a.error); const bar = S.entryMarks({ ...lot2, elements: a.elements }).find(m => m.color === '#ffffff'); assert.ok(bar && Math.abs(bar.line[0][1] - bar.line[1][1]) < 1 && Math.abs(bar.line[0][1] - 12) < 2, JSON.stringify(bar)); }
+}
+
 console.log('site plans ok');

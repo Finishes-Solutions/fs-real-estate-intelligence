@@ -151,7 +151,12 @@ for (const [wd, ring] of [[180, [[0, 0], [180, 0], [185, 900], [0, 890]]], [150,
   const els = o.elements.map(e => e.kind === 'foodtruck' && e.name === 'Truck 1' || e.ft === 'pavilion' ? { ...e, pinned: true } : { ...e }), pins = els.filter(e => e.pinned);
   const r = L.refit({ ...plan, program: o.program, elements: els, recipe: o.recipe }); assert.ok(r && r.elements.length, 'a re-fit');
   for (const p of pins) assert.ok(r.elements.some(e => e.id === p.id && e.x === p.x && e.y === p.y), 'the pinned ' + (p.name || p.kind) + ' stays put');
-  assert.equal(S.check({ ...plan, program: o.program, elements: r.elements }).filter(i => i.level === 'bad').length, 0, 'the re-fit passes the checks'); }
+  assert.equal(S.check({ ...plan, program: o.program, elements: r.elements }).filter(i => i.level === 'bad').length, 0, 'the re-fit passes the checks');
+  // the lawn round the pavilion, bar and restrooms pinned (renamed by Change With AI, or dragged 10 ft): it's the ground
+  // they stand on, not land the re-fit keeps off (pinned, it lost half the trucks, or nothing re-fitted at all) (Oct 19)
+  const lawn = o.elements.find(e => e.kind === 'green' && e.name), n0 = o.elements.filter(e => e.kind === 'foodtruck').length; assert.ok(lawn && S.isCommons(o.elements, lawn), 'the lawn holds the pavilion');
+  for (const dx of [0, 10]) for (const ro of [{ amount: 'current', keep: true }, {}]) { const els2 = o.elements.map(e => e.id === lawn.id ? { ...S.moveBy(structuredClone(e), dx, 0), name: 'Beer garden lawn', pinned: true } : { ...e }), q = L.refit({ ...plan, program: o.program, elements: els2, recipe: o.recipe }, ro);
+    assert.ok(q, 'the lawn moved ' + dx + ' ft: a re-fit'); const m = S.metrics({ ...plan, program: o.program, elements: q.elements }); assert.equal(m.foodtrucks.trucks, n0, 'every truck: ' + m.foodtrucks.trucks); assert.ok(m.spaces >= m.required); assert.ok(q.elements.some(e => e.name === 'Beer garden lawn')); } }
 
 // ---------- read-out, AI, library, geometry ----------
 { const p = ftOf(ASK); assert.deepEqual(readAs(p, S.USES), ['Food truck park', '12 trucks', '3,000 sf pavilion', '1,500 sf bar', 'Playground', '5/truck parking']);

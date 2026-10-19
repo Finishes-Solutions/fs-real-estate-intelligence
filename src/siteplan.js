@@ -563,11 +563,16 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-zone', type: 'line', source: SRC, filter: kind('zone'), layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.zone, 'line-width': 1.1, 'line-dasharray': [0.1, 2.6] } }); // dotted
     // paving is drawn once as a whole (one colour, one curb line round it); the pieces under it stay clear, and show
     // only when picked, so drives and parking rows read as one surface without seams or darker overlaps
+    // lawns and parks under the paving: a drive is never hidden under a park (where one overlaps, the park is flagged red
+    // and the drive shows on top); a boulevard's median is drawn over its paving, below
+    add({ id: 'fs-sp-green', type: 'fill', source: SRC, filter: ['all', kind('green'), ['!=', ['get', 'med'], 1]], paint: { 'fill-color': C.green, 'fill-opacity': ['case', sel1, .5, ['==', ['get', 'nm'], 0], 0.01, .75] } });
     add({ id: 'fs-sp-pave', type: 'fill', source: SRC, filter: kind('paved'), paint: { 'fill-color': C.parking, 'fill-opacity': .82 } });
     add({ id: 'fs-sp-curb', type: 'line', source: SRC, filter: kind('paved'), paint: { 'line-color': Ln.curb, 'line-width': 1.2, 'line-opacity': .9 } });
-    add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
+    add({ id: 'fs-sp-med', type: 'fill', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'fill-color': C.green, 'fill-opacity': ['case', sel1, .6, .9] } }); // the entry's planted median
+    add({ id: 'fs-sp-medl', type: 'line', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'line-color': Ln.curb, 'line-width': 1 } });
+    add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
       paint: { 'fill-color': ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'pond', C.pond, 'plaza', C.plaza, 'court', C.court, 'pool', C.pool, 'play', C.play, C.green],
-        'fill-opacity': ['case', sel1, .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, ['all', ['==', ['get', 'k'], 'green'], ['==', ['get', 'nm'], 0]], 0.01, .75] } });
+        'fill-opacity': ['case', sel1, .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, .75] } });
     add({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: ['all', kind('lot'), ['!=', ['get', 'site'], 1]], minzoom: 17, layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.lots, 'line-width': 1, 'line-dasharray': [0.1, 2.4] } }); // house lots, dotted, close in
     add({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': Ln.walk, 'fill-opacity': .85 } });
     add({ id: 'fs-sp-yard', type: 'fill', source: SRC, filter: kind('yard'), minzoom: 16, paint: { 'fill-color': Ln.yard, 'fill-opacity': .9 } });
@@ -831,7 +836,7 @@ export function initSitePlan(ctx) {
     if (t === 'e' || t === 'm') { drag = { type: t === 'e' ? 'side' : 'edge', k: k0, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false }; return; }
     const hs = t === 's' ? h.hd : null;
     drag = { type: h.h == null ? 'move' : h.h === 'r' ? 'rot' : hs ? 'scale' : 'size', k: h.h, corner: hs?.ft, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false };
-    if (drag.type === 'move') { const att = SP.attachedTo(pl, el); drag.att = att.map(a => ({ id: a.id, orig: clone(a) })); if (el.kind === 'building' || el.kind === 'garage') drag.obs = SP.spotObstacles(pl, el, att); } // what moves with it, and what it has to stay clear of
+    if (drag.type === 'move') { const att = SP.attachedTo(pl, el); drag.att = att.map(a => ({ id: a.id, orig: clone(a) })); if (el.kind === 'building' || el.kind === 'garage') drag.obs = SP.spotObstacles(pl, el, att); else if (SP.isPark(el)) drag.obs = SP.placeObs(pl, el, att, SP.shapeOf(el)); } // what moves with it, and what it has to stay clear of (a park: not what stands in it, nor more room than it has now)
   }
   // the grid, when it's on and Alt isn't held: where a point or a piece lands (a corner square with the grid, else its middle)
   const gridOf = (pl, ev) => { const V = T.viewOf(pl); return V.grid && !ev?.altKey ? { step: V.grid, a: frameAngle(pl) } : null; };
@@ -2021,8 +2026,10 @@ export function initSitePlan(ctx) {
   // delete a piece; the rest of a parking row it was part of stays as it is now (it doesn't grow back over the gap)
   function dropEl(x, el) { const k = el.ext && JSON.stringify(el.ext); x.elements = x.elements.filter(y => y.id !== el.id); if (k) for (const y of x.elements) if (y.ext && JSON.stringify(y.ext) === k) delete y.ext; }
   // left: where it was (and what moved with it); parking it had cut there grows back
+  // (a park, lawn or open space: the homes under it make way too, with their lots and driveways)
   function makeRoom(el, left = []) {
-    const pl = PL(); if (!pl || !el || ['parking', 'green', 'lot', 'trail', 'keepout'].includes(el.kind)) return;
+    const pl = PL(); if (!pl || !el || ['parking', 'lot', 'trail', 'keepout'].includes(el.kind) || el.kind === 'green' && !SP.isPark(el)) return;
+    if (SP.isPark(el)) { const gone = SP.homesUnder(pl, el, 4); if (gone.size) pl.elements = pl.elements.filter(x => !gone.has(x)); pl.elements = SP.trimLots(pl.elements, el); } // (the lots of the homes that stay come back off it)
     const pad = el.kind === 'building' || el.kind === 'garage' ? 5 : 1, spare = pl.spareRows = (pl.spareRows || []).slice(-40); // rows cut away whole, kept to grow back
     pl.elements = SP.cutRows(pl.elements, SP.outline(el), pad, spare);
     for (const o of left) pl.elements = SP.regrowRows(pl.elements, SP.outline(o), 5, spare);
@@ -2047,7 +2054,7 @@ export function initSitePlan(ctx) {
     let r = null; ctx.toast('Re-fitting the plan around the pieces you placed…'); try { r = await refitOf(pl); } catch (err) { console.warn('refit', err); } if (PL() !== pl) return;
     if (!r) { if (asked) ctx.toast('Couldn’t re-fit the plan around that; it stays as you left it.' + (refitNo ? ' ' + refitNo : '')); return; }
     ed.undo.push(snapshot()); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = []; useRefit(pl, r);
-    if (asked) ctx.toast('Re-fitted around the pieces you placed.', { action: { label: 'Undo', run: () => { if (ed && PL() === pl) undo(true); } } });
+    if (asked) ctx.toast(r.fresh ? 'The site was laid out afresh round the pieces you placed (new streets).' : 'Re-fitted around the pieces you placed.', { action: { label: 'Undo', run: () => { if (ed && PL() === pl) undo(true); } } });
   }
   function useRefit(pl, r) {
     pl.elements = r.elements; pl.spareRows = []; if (r.recipe) pl.recipe = clone(r.recipe); markEdited(pl); ed.solveBar = false; ed.refitNote = (r.notes || []).join(' '); pl.stale = null; { const cv = ed.variants?.find(v => v.key === pl.variant?.key); if (cv) delete cv.stale; }
@@ -2075,7 +2082,7 @@ export function initSitePlan(ctx) {
     if (!r?.elements?.length || !same()) return; // something changed meanwhile: that change re-fits on its own
     const at = els => ({ m: SP.metrics({ ...pl, elements: els }), issues: SP.check({ ...pl, elements: els }) }), v = T.refitVerdict(at(pl.elements), at(r.elements));
     if (!v.ok) { ctx.toast('Kept your change; re-fitting would ' + (v.why === 'problems' ? 'add problems' : 'lose ' + (v.why === 'units' ? 'units' : 'space')), { action: { label: 'Re-fit anyway', run: () => { if (same()) useRefit(pl, r); else if (ed === e0) refitNow(true); } } }); return; }
-    useRefit(pl, r); ctx.toast(what + ' · rest of the site re-fitted', { action: { label: 'Undo', run: () => { if (ed === e0 && PL() === pl && ed.undo.length === mark) undo(true); } } });
+    useRefit(pl, r); ctx.toast(what + (r.fresh ? ' · the site was laid out afresh round it (new streets)' : ' · rest of the site re-fitted'), { action: { label: 'Undo', run: () => { if (ed === e0 && PL() === pl && ed.undo.length === mark) undo(true); } } });
   }
   // lay the options out again with the plan's own program and settings (no AI call)
   // Never over hand edits: with a changed layout on the map, new settings show a bar instead (re-fit around the changes,
@@ -2321,7 +2328,7 @@ export function initSitePlan(ctx) {
   function turnEl(el) {
     let blocked = false;
     change(x => { const o = clone(el); el.rot = ((el.rot || 0) + 90) % 360; el.pinned = true;
-      if (el.kind === 'building' || el.kind === 'garage') { const att = SP.attachedTo(x, el), c = SP.clearSpot(x, el, { carry: att, reach: Math.max(el.w || 0, el.d || 0) + 60 }); if (c && (c[0] || c[1])) for (const t of [el, ...att]) SP.moveBy(t, c[0], c[1]); blocked = !c; }
+      if (el.kind === 'building' || el.kind === 'garage' || SP.isPark(el) && !SP.isFree(el)) { const att = SP.attachedTo(x, el), c = SP.clearSpot(x, el, { carry: att, reach: Math.max(el.w || 0, el.d || 0) + 60, ...(SP.isPark(el) ? { obs: SP.placeObs(x, el, att, SP.shapeOf(o)) } : {}) }); if (c && (c[0] || c[1])) for (const t of [el, ...att]) SP.moveBy(t, c[0], c[1]); blocked = !c; }
       makeRoom(el, [o]); });
     refitSoon('Turned', ED.labelOf(el));
     if (blocked) ctx.toast('No clear spot for it turned that way: it overlaps (in red). Turn it again or drag it.', { action: { label: 'Undo', run: () => { if (ed) undo(true); } } });
@@ -2333,7 +2340,7 @@ export function initSitePlan(ctx) {
   const CLEAR = ['building', 'garage', 'pool', 'court', 'play', 'pond', 'patio', 'trash', 'foodtruck'];
   const boxOf = r => [Math.min(...r.map(p => p[0])), Math.min(...r.map(p => p[1])), Math.max(...r.map(p => p[0])), Math.max(...r.map(p => p[1]))];
   function obstacles(x, e, carry, { parking = false, kinds = null, gap = 4 } = {}) { // gap: clear space kept round a parking lot (a piece placed on a lot cuts the rows within 5 ft of it)
-    const o = SP.spotObstacles(x, e, carry, kinds); if (!parking) return o;
+    const o = SP.isPark(e) && !kinds ? SP.placeObs(x, e, carry) : SP.spotObstacles(x, e, carry, kinds); if (!parking) return o; // (a park: the homes make way, they aren't in the way)
     return o.concat(x.elements.filter(q => q.kind === 'parking' && !carry.includes(q)).map(q => { const sh = gap > 4 ? SP.offsetRing(SP.shapeOf(q), gap) : SP.shapeOf(q); return { s: sh, b: boxOf(sh), g: gap }; })); // a wider gap is part of the outline: the spot search only tests for overlap
   }
   function gridSpot(x, e, carry, obs) {
@@ -2344,7 +2351,7 @@ export function initSitePlan(ctx) {
     return null;
   }
   function placeClear(x, e, carry = [], keepLots = false) { // keepLots: every spot that leaves the parking alone before one over it
-    if (!CLEAR.includes(e.kind)) return 'clear';
+    if (!CLEAR.includes(e.kind) && !SP.isPark(e)) return 'clear';
     const open = obstacles(x, e, carry, { parking: true, gap: keepLots ? 6 : 4 }), std = obstacles(x, e, carry);
     let how = 'clear', c = SP.clearSpot(x, e, { carry, obs: open, reach: 200 }) || (keepLots ? gridSpot(x, e, carry, open) : null) || SP.clearSpot(x, e, { carry, obs: std, reach: 120 }) || gridSpot(x, e, carry, open) || gridSpot(x, e, carry, std);
     if (!c) { c = gridSpot(x, e, carry, obstacles(x, e, carry, { kinds: ['building', 'garage', 'pond', 'pool', 'court', 'play'] })); how = c ? 'drive' : 'none'; }
@@ -2602,7 +2609,7 @@ export function initSitePlan(ctx) {
   // AI call and drops whatever arrives after (a layout already running in the worker finishes, unused).
   let runTok = 0, runTick = 0;
   const LAYS = ['build', 'more', 'resolve']; // runs that put layouts on the map: a hand edit before they land cancels them
-  const LOCK = ['#spGo', '#spBest', '[data-idea]', '[data-sug]', '#spMore', '#spResolve', '#spNewLay', '#spRefitMine', '#spStaleRefit', '#spStaleNew', '#spReReview', '#spChgGo', '[data-eff]', '#spOvUpd'];
+  const LOCK = ['#spGo', '#spBest', '[data-idea]', '[data-sug]', '#spMore', '#spResolve', '#spNewLay', '#spRefitMine', '#spStaleRefit', '#spStaleNew', '#spReReview', '#spChgGo', '#spChgNew', '[data-eff]', '#spOvUpd'];
   const live = r => !!(r && ed && ed.run === r && !r.cancelled);
   const mmss = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   const pillEl = document.createElement('div'); pillEl.className = 'sp-runpill'; pillEl.hidden = true; document.body.appendChild(pillEl);
@@ -2705,8 +2712,12 @@ export function initSitePlan(ctx) {
     if (mix && !hm) r.skipped.push('This plan was drawn by hand, so its homes can’t be laid out again with a new mix: change the Home mix in Settings and build new layouts.');
     const gone = was.filter(e => !['parking', 'green', 'lot', 'trail'].includes(e.kind) && !pl.elements.some(x => x.id === e.id)); // removed (not parking rows that gave way)
     if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; draw(); // Edit Layout stays as it was
-    let held = null; if (full) { run.steps = [...run.steps, 'Re-fitting the rest of the site']; runStep(run, 3); let rf = null; try { rf = await refitOf(PL(), { amount: 'current' }); } catch (e) { console.warn('refit', e); }
+    // the re-fit keeps the streets as they are (keep): it never quietly starts the whole site over with new streets; when
+    // that leaves a problem or short parking it says so and offers New Layouts
+    let held = null, newLay = false; if (full) { run.steps = [...run.steps, 'Re-fitting the rest of the site']; runStep(run, 3); let rf = null; try { rf = await refitOf(PL(), { amount: 'current', keep: true }); } catch (e) { console.warn('refit', e); }
       if (!live(run)) return;
+      let kept = null; if (rf?.kept && PL() === pl) { const pin = new Set(rf.elements.filter(e => e.pinned).map(e => e.id)), m = SP.metrics({ ...pl, elements: rf.elements }), bad = SP.check({ ...pl, elements: rf.elements }).filter(i => i.level === 'bad' && !pin.has(i.id)).length, short = Math.max(0, Math.round(m.required - m.spaces));
+        kept = 'Kept the street arrangement: re-fitting round the change left ' + (bad ? (bad === 1 ? 'a problem' : bad + ' problems') + (short ? ' and parking ' + SP.spacesWord(short) + ' short' : '') : 'parking ' + SP.spacesWord(short) + ' short') + '. New Layouts lays the whole site out afresh.'; newLay = true; }
       // the same guard as re-fitting after a hand edit: a re-fit that would lose homes, units or floor area (a whole street
       // of houses dropped round a moved community center) or add problems isn't taken; the change stays and Re-fit
       // anyway is offered
@@ -2719,10 +2730,11 @@ export function initSitePlan(ctx) {
         else { pl.program = prog0; pl.recipe = recipe0; r.skipped.push('The homes couldn’t be laid out again with that mix, so their stories didn’t change.' + (refitNo ? ' ' + refitNo : '')); } }
       else if (v && !v.ok) { r.skipped.push('Re-fitting the rest of the site would have ' + (v.why === 'problems' ? 'added problems' : v.why === 'units' ? 'lost homes or units' : 'lost floor area') + ', so only those pieces changed.'); held = rf; rf = null; }
       else if (PL() === pl && rf) { pl.elements = rf.elements; pl.spareRows = []; if (rf.recipe) pl.recipe = clone(rf.recipe); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; }
-      else if (!rf && !held) r.skipped.push('The rest couldn’t be re-fitted around it, so only those pieces changed.'); }
+      else if (!rf && !held) { r.skipped.push('The rest couldn’t be re-fitted around it, so only those pieces changed.'); newLay = true; }
+      if (kept && rf) r.skipped.push(kept); } // (held back: the line above says why)
     // what it did as a checklist, with Undo this change, and (parking short) Re-fit around my changes; on the map, what
     // it touched flashes and what it removed fades out
-    ed.chgNote = ''; ed.chgDone = { items: MAP.checklist(r.done), skipped: r.skipped, note, depth, after: ed.undo.length, held };
+    ed.chgNote = ''; ed.chgDone = { items: MAP.checklist(r.done), skipped: r.skipped, note, depth, after: ed.undo.length, held, newLay };
     ed.chg = ''; pl.updated = new Date().toISOString(); save(P()); endRun(run);
     flash(r.touched.filter(id => pl.elements.some(x => x.id === id))); fadeGone(gone, pl);
     card.querySelector('#spChgDone')?.scrollIntoView({ block: 'nearest' });
@@ -2735,6 +2747,7 @@ export function initSitePlan(ctx) {
       '<ul class="sp-chk">' + D.items.map(t => '<li>' + esc(t) + '</li>').join('') + D.skipped.map(t => '<li class="skip">' + esc(t) + '</li>').join('') + '</ul>' +
       (short > 0 && m.gfa ? '<div class="rnote sp-warn">Parking is now ' + SP.spacesWord(short) + ' short.</div>' : '') +
       '<div class="sp-row sp-chg-acts">' + (D.held && still ? '<button type="button" class="btn sm" id="spChgHeld" title="Take the re-fit anyway: the rest of the site laid out again around the change">Re-fit Anyway</button>' : '') + (short > 0 && m.gfa && pl.recipe && !D.held ? '<button type="button" class="btn sm primary" id="spChgRefit" title="Lay the parking and the rest out again around what changed">Re-fit Around My Changes</button>' : '') +
+      (D.newLay && still ? '<button type="button" class="btn sm" id="spChgNew" title="Lay the whole site out afresh from its program, with new streets: the pieces placed by hand (this change too) aren’t carried over. Undo brings this plan back">New Layouts</button>' : '') +
       (still ? '<button type="button" class="btn sm" id="spChgUndo">Undo This Change</button>' : '') + '<button type="button" class="btn sm ghost" id="spChgOk">Dismiss</button></div></div>';
   }
   function wireChg() {
@@ -2742,6 +2755,7 @@ export function initSitePlan(ctx) {
     if ($('#spChgRefit')) $('#spChgRefit').onclick = () => refitNow(true);
     if ($('#spChgHeld')) $('#spChgHeld').onclick = () => { const pl = PL(); if (!D?.held || !pl || ed.undo.length !== D.after) return; const rf = D.held; change(x => { x.elements = rf.elements; x.spareRows = []; if (rf.recipe) x.recipe = clone(rf.recipe); }); D.held = null; D.after = ed.undo.length; if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; draw(); panel(); ctx.toast('Re-fitted the rest of the site.', { action: { label: 'Undo', run: () => undo(true) } }); };
     if ($('#spChgUndo')) $('#spChgUndo').onclick = () => { if (!D || ed.undo.length !== D.after) return; while (ed.undo.length > D.depth) undo(true); ed.chgDone = null; clearGone(); panel(); ctx.toast('Change undone.'); };
+    if ($('#spChgNew')) $('#spChgNew').onclick = () => resolve({ force: true, src: '#spChgNew' });
     if ($('#spChgOk')) $('#spChgOk').onclick = () => { ed.chgDone = null; panel(); };
   }
   // Change With AI on the map: the pieces it touched flash a few times; the ones it removed leave a dashed footprint that fades

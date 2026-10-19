@@ -334,13 +334,13 @@ export const EDIT_SCHEMA = {
       floorsOver: nul('integer', { description: 'with every: only the ones with more floors than this now (2 picks the 3-story and taller ones).' }),
       with: nul('string', { description: 'swap: the other piece. add / move: a piece to put it beside (when no x, y).' }),
       type: nul('string', { description: 'A building type id from the library: the building it becomes (change) or the one added (add).' }),
-      kind: nul('string', { enum: ['building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio', 'entrance', null], description: 'add without a library type: what kind of piece. entrance: a driveway in from the street at x, y (a point on the lot line, y about 0 for the front), or with no x, y where it helps most.' }),
+      kind: nul('string', { enum: ['building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio', 'entrance', null], description: 'add without a library type: what kind of piece. green: a park, lawn or open space (give it a name: Park, Open space…). entrance: a driveway in from the street at x, y (a point on the lot line, y about 0 for the front), on the lot line beside the piece given in with, or with neither where it helps most.' }),
       use: nul('string', { enum: [...Object.keys(USES), null] }), name: nul('string'),
       floors: nul('integer'), units: nul('integer'), w: nul('number', { description: 'feet across its front' }), d: nul('number', { description: 'feet deep' }),
       x: nul('number', { description: 'where its centre goes: feet across the frontage from the street’s left end, as on the drawing' }), y: nul('number', { description: 'feet back from the street' }),
       turn: nul('number', { description: 'its angle on the drawing in degrees (0 = its long side along the street, 90 = running back from it)' }) } } },
     homeMix: { type: 'array', description: 'The single-family homes on lots by stories, when the request changes their stories across the site (e.g. no 3-story homes: the 1- and 2-story shares only). Empty for no change.', items: { type: 'object', additionalProperties: false, required: ['stories', 'pct'], properties: { stories: { type: 'integer', enum: [1, 2, 3] }, pct: { type: 'number', description: 'share of the homes, %' } } } },
-    refit: { type: 'string', enum: ['none', 'full'], description: 'none: change just these pieces; parking under them gives way and comes back where they leave (the usual). full: also lay out everything else again around them (when the user asks for a re-fit or re-layout, or after adding or removing several buildings, or moving one into land without drives).' },
+    refit: { type: 'string', enum: ['none', 'full'], description: 'none: change just these pieces; parking under them gives way and comes back where they leave (the usual). full: also lay out the parking and lots again along the same streets around them (when the user asks for a re-fit or re-layout, or after adding or removing several buildings, or moving one into land without drives). Nothing re-lays the streets (for that the user picks New Layouts).' },
     summary: { type: 'string', description: 'One or two sentences on what you changed, for the user.' },
     question: nul('string', { description: 'Only when you can’t tell what they mean: one short question (and no ops).' })
   }
@@ -352,6 +352,9 @@ export const EDIT_SYSTEM = `You edit a concept site plan the way a land planner 
 - add: a library type (or a kind with a size) at x, y or beside "with". remove: the piece (its pool, patio or drive-thru go with it).
 - swap: two pieces trade places.
 - Entrances: add kind "entrance" at a point on the lot line where they want it (y = 0 is the front street; a side lot line becomes a street), or without x, y to put it where it helps most; remove one by its id. Driveways want about 150 ft between them and a clear line in to a drive.
+- Parks, lawns and open space (kind green with a name) are real places: never put a piece across a drive or a park. To put a park or amenity beside something, give with and no x, y: the app tries each side and keeps the first spot clear of drives, buildings and the lot line, or says there's no room.
+- An entrance can't cross a park, open space or pond: put x, y on the street lot line beside it, not through it. If they ask for one "at the open space", give with (its id) and no x, y: the app slides it along the street past it or says it can't.
+- A re-fit keeps the streets as they are. If the request needs a different street arrangement, say so in the summary and suggest New Layouts; don't claim the streets changed.
 - More floors on apartments add units; give units only when they name a number.
 - If they ask for something the plan can't hold (no room, outside the setbacks), do the nearest sensible thing and say so in the summary.
 - refit: "none" unless they ask for the site to re-fit or re-lay, or the change needs new drives and parking (a building added in open land, several buildings removed); then "full".
