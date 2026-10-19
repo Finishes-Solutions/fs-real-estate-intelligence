@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 2:46 PM CT: Plan sets plan: medium effort, $100 a month (f857098)
+- **Planning only.** Two decisions are now in `PLANSET-PLAN.md`: plan sets will use Claude at medium effort by default (changeable in Settings), with a budget of $100 a month. When the month's budget is spent, new sets wait for the next month. That's roughly 5 to 12 large sets a month, and more for small sites or sets that reuse saved building designs.
+
 ### 2:35 PM CT: Plan for full plan sets from a site plan (431cdcb)
 - **Planning only, nothing in the app changes.** `PLANSET-PLAN.md` sets out how an option's site plan would become a schematic design set of drawings, all on the Finishes Solutions title block: cover, civil and site, landscape, architecture, structure, mechanical, plumbing, electrical, fire, and telecom if wanted. Project pages would read Sites · Renderings · Plans.
 - It defines what a "full set" contains: which sheets, their numbers, and when each one is included. It also covers how Claude would design each building type for a person to approve and save to the team library, how code would draw and cross-check every sheet from the plan, and the settings for the Claude API key and model, with costs and a monthly cap.
