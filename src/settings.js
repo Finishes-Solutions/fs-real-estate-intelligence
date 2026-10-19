@@ -167,7 +167,7 @@ export function initSettings(ctx) {
         : 'Opens in its own window and keeps working offline. In Chrome or Edge, use the install button in the address bar; other browsers may not offer it.';
       el.innerHTML = row('Install the app', inst, how) +
         '<div class="set-keys set-desk"><span class="set-l">Keyboard shortcuts</span><dl>' +
-        [[mod + 'K', 'Search the map'], [mod + '/', 'Ask AI'], [mod + ',', 'Settings'], ['Esc', 'Close a card, menu or this sheet']].map(([k, d]) => '<div><dt><kbd>' + esc(k) + '</kbd></dt><dd>' + esc(d) + '</dd></div>').join('') + '</dl></div>' +
+        [[mod + 'K', 'Search the map'], [mod + '/', 'Ask AI'], [mod + ',', 'Settings'], ['Esc', 'Close a card, menu or this sheet'], ['R', 'Site plan: turn the selected piece 90°'], ['Shift', 'Site plan: while turning, 15° steps; while dragging a face or point, whole feet and square corners']].map(([k, d]) => '<div><dt><kbd>' + esc(k) + '</kbd></dt><dd>' + esc(d) + '</dd></div>').join('') + '</dl></div>' +
         row('Reset layout', '<button type="button" class="btn sm" id="setReset">Reset…</button>', 'Puts the panel, its sections, headline metrics, timeline and export choices back to how they started. Your notes, projects, saved searches and settings stay.');
       el.querySelector('#setInstall')?.addEventListener('click', () => ctx.install.prompt());
       el.querySelector('#setReset').onclick = resetLayout;
