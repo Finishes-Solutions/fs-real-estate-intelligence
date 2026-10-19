@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 11:29 AM CT: Neighbourhood plan: first decisions (fe3d1c1)
+- **Planning only, nothing in the app changes.** `NEIGHBORHOOD-PLAN.md` now records:
+  - street rules that follow the site's city, ETJ or county, read from that place's codes by the AI, cited and confirmed by a person
+  - sidewalks on both sides by default
+  - an optional street-names toggle, with the AI naming streets from a theme you give it (aviation, Pokémon…)
+  - monument signs in the median by default, with the sides as options
+  - a hand-marked low side for detention until elevation data is added
+- The phases stay open while the plan is worked out.
+
 ### 11:23 AM CT: Plan for real neighbourhoods, mixed sites, entrances and editable streets (f9ee898)
 - **Planning only, nothing in the app changes.** `NEIGHBORHOOD-PLAN.md` sets out how the planner gets to subdivisions like the Houston-area references sent:
   - curved streets off a collector loop or spine
