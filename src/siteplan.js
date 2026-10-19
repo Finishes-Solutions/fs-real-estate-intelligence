@@ -149,7 +149,7 @@ export function initSitePlan(ctx) {
 
   const P = () => db.projects.find(p => p.id === ed?.pid), PL = () => P()?.plans.find(x => x.id === ed?.plid) || (ed?.draftPlan && ed.draftPlan.id === ed.plid ? ed.draftPlan : undefined); // a draft isn't in the project until its site is finished
   // the next option's name: the next letter not already used (after a delete, Copy or New Option never repeats a name)
-  const nextName = p => { const used = new Set(p.plans.map(x => x.name)); for (let i = p.plans.length; i < 26; i++) { const n = 'Option ' + String.fromCharCode(65 + i); if (!used.has(n)) return n; } let k = p.plans.length + 1; while (used.has('Option ' + k)) k++; return 'Option ' + k; };
+  const nextName = p => SP.nextOptionName(p.plans);
   const newPlan = (p, extra = {}) => ({ id: uid(), name: nextName(p), origin: null, ring: [], src: null, front: null, frontGuess: true, setbacks: { ...SP.SETBACKS }, program: { use: 'retail' }, zoning: null, elements: [], created: new Date().toISOString(), ...extra });
   const parcelKey = pc => pc.propId ? 'pid:' + pc.propId : 'pt:' + pc.center.map(v => v.toFixed(5)).join(',');
 
@@ -406,7 +406,7 @@ export function initSitePlan(ctx) {
   const dropMode = () => { ed.mode = null; ed.draft = []; ed.hover = null; ed.meas = null; ed.dp = null; ed.cursor = null; };
   function paintMode() {
     placeMapUi(); syncDblZoom(); const m = modeOf(), k = m ? m.k : '';
-    if (k !== modeKey) { modeKey = k; if (k) ctx.clearToast?.(); if (ed && ed.mode !== 'front' && ed.mode !== 'street') ed.hover = null; } // a new mode: an old instruction toast goes
+    if (k !== modeKey) { modeKey = k; if (k && !document.getElementById('toast')?.classList.contains('act')) ctx.clearToast?.(); if (ed && ed.mode !== 'front' && ed.mode !== 'street') ed.hover = null; } // a new mode: an old instruction toast goes (not one with Undo in it)
     if (!m) { pillMode.hidden = true; pillMode.innerHTML = ''; placeMix(); return; }
     const html = '<span class="sp-mp-dot k-' + m.k + '" aria-hidden="true"></span><b class="sp-mp-t">' + esc(m.t) + '</b>' + (m.d ? '<span class="sp-mp-d" title="' + esc(m.d) + '">' + esc(m.d) + '</span>' : '') +
       m.b.map(([l, a]) => '<button type="button" class="sp-mp-b' + (l !== 'Cancel' ? ' done' : '') + '" data-mb="' + a + '"' + (a === 'finish' && !canFinish() ? ' disabled' : '') + '>' + l + '</button>').join('');
@@ -519,7 +519,12 @@ export function initSitePlan(ctx) {
   // say: the person asked (the buttons, ⌘Z / Ctrl+Y): a short toast with the way back ("Undone · Redo")
   function undo(back = true, say = false) {
     const pl = PL(), from = back ? ed.undo : ed.redo, to = back ? ed.redo : ed.undo; if (!pl || !from.length) { if (say) ctx.toast(back ? 'Nothing to undo.' : 'Nothing to redo.'); return; }
-    to.push(snapshot()); Object.assign(pl, from.pop()); for (const k of ['pf', 'parcels', 'parcel']) if (pl[k] == null) delete pl[k]; syncStale(pl);
+    const top = from[from.length - 1], full = !!top._full; // Clear and start over: the whole option, its last build included (SP.undoState)
+    if (full && ed.run) { ctx.toast(WAIT + '.'); return; } // a build under way would land on the layouts coming back
+    to.push(full ? { _full: SP.undoState(pl) } : snapshot()); from.pop();
+    if (full) { SP.restoreState(pl, top._full); stopPending(); freshRun(); delete ed.buildOpen; restoreRun(pl); }
+    else { Object.assign(pl, top); for (const k of ['pf', 'parcels', 'parcel']) if (pl[k] == null) delete pl[k]; }
+    syncStale(pl);
     if (ed.run) ed.pickedByUser = true; if (ed.sel && !pl.elements.some(e => e.id === ed.sel)) ed.sel = null; ed.multi = (ed.multi || []).filter(id => pl.elements.some(e => e.id === id));
     save(P()); draw(); panel(); refreshFin();
     if (say) ctx.toast(back ? 'Undone.' : 'Redone.', { action: { label: back ? 'Redo' : 'Undo', run: () => { if (ed) undo(!back, true); } } });
@@ -1409,7 +1414,7 @@ export function initSitePlan(ctx) {
   const cm = document.createElement('div'); cm.className = 'sp-cm'; cm.hidden = true; cm.setAttribute('role', 'menu'); cm.setAttribute('aria-label', 'Plan actions');
   const cmSub = document.createElement('div'); cmSub.className = 'sp-cm sp-cm-sub'; cmSub.hidden = true; cmSub.setAttribute('role', 'menu'); cmSub.setAttribute('aria-label', 'Add here');
   document.body.append(cm, cmSub);
-  let cmFt = null, cmEl = null, cmBack = null, lpAt = 0, clip = null;
+  let cmFt = null, cmEl = null, cmBack = null, cmFor = null, lpAt = 0, clip = null; // cmFor: the New Option button the menu is open from
   const ensureEdit = () => { if (ed && !ed.editing) { ed.editing = true; draw(); panel(); } };
   function openMenu(point, lngLat, o = {}) {
     const pl = ed && PL(); if (!pl || pl.ring.length < 3 || ctx.view !== 'map') return;
@@ -1464,7 +1469,9 @@ export function initSitePlan(ctx) {
     draw(); panel(); const lbl = ids.length > 1 ? plural(ids.length, 'building') : ED.labelOf(pl.elements.find(q => q.id === ids[0]));
     ctx.toast(lbl + ' is now ' + SP.USES[use].label.toLowerCase() + '.'); refitSoon('Changed', lbl);
   }
-  function closeMenu(refocus) { if (cm.hidden) return; closeSub(); cm.hidden = true; cm.innerHTML = ''; if (refocus && cmBack?.isConnected) try { cmBack.focus({ preventScroll: true }); } catch (e) {} cmBack = null; }
+  function closeMenu(refocus) { if (cm.hidden) return; closeSub(); cm.hidden = true; cm.innerHTML = ''; cm.setAttribute('aria-label', 'Plan actions'); cm.classList.remove('sp-cm-opt');
+    if (cmFor) { cmFor.setAttribute('aria-expanded', 'false'); if (!cmBack?.isConnected) cmBack = [...card.querySelectorAll('[data-newopt]')].find(x => x.offsetParent) || null; cmFor = null; } // (the panel was drawn again under it)
+    if (refocus && cmBack?.isConnected) try { cmBack.focus({ preventScroll: true }); } catch (e) {} cmBack = null; }
   function menuAct(id, b) {
     const pl = PL(), ft = cmFt, el = cmEl; if (!pl) return;
     if (id === 'add' || id === 'use') { openSub(b); cmSub.querySelector('[data-ak], [aria-checked="true"], [data-uk]')?.focus({ preventScroll: true }); return; }
@@ -1503,6 +1510,85 @@ export function initSitePlan(ctx) {
     const b = set.length ? T.bboxOf(pl.elements.filter(e => set.includes(e.id))) : null, ll = b ? F.toLL([(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]) : map.unproject([(f.l + f.r) / 2 - m.left, (f.t + f.b) / 2 - m.top]).toArray();
     const q = map.project(ll); openMenu(q, { lng: ll[0], lat: ll[1] }, { sel: set.length > 0, keys: true });
   }
+  // ----- + New Option (the last button in the option row): a menu, in the right-click menu's box and with its keys —
+  // Blank site (first: a new option on this lot and its street sides, nothing laid out, the Build box ready), Copy of this
+  // option (its layouts included), and set apart, Clear this option and start over (one undo step, no question asked:
+  // the toast's Undo is the way back). The site / design split is lib/siteplan.mjs's (SP.blankOf, SP.clearDesign).
+  const optMenuFor = b => !cm.hidden && cmFor === b;
+  function openOptMenu(b) {
+    const p = P(), pl = PL(); if (!p || !pl) return;
+    closePops(); closeMenu();
+    const drawn = pl.ring.length >= 3, nm = pl.name, items = [
+      { id: 'blank', label: 'Blank site', sub: drawn ? 'This lot and its street sides, nothing laid out' : 'The project’s site, nothing laid out' },
+      { id: 'copy', label: 'Copy of ' + nm, sub: 'Its layouts included', off: drawn ? '' : 'Draw the site first' }, 0,
+      { id: 'clear', label: 'Clear ' + nm + ' and start over', sub: 'Keeps the site · Undo brings it back', off: designed(pl) ? '' : 'Nothing laid out yet' },
+      { id: 'delete', label: 'Delete ' + nm, sub: (shared === true ? 'For the team too · ' : '') + 'Undo brings it back', danger: true }];
+    cm.innerHTML = '<div class="sp-cm-h">New option</div>' + items.map(x => !x ? '<hr><div class="sp-cm-h">' + esc(nm) + '</div>' : '<button type="button" role="menuitem" data-o="' + x.id + '"' + (x.danger ? ' class="sp-cm-danger"' : '') + (x.off ? ' aria-disabled="true"' : '') + '><span><b>' + esc(x.label) + '</b><em>' + esc(x.off || x.sub) + '</em></span></button>').join('');
+    cm.setAttribute('aria-label', 'Options'); cm.classList.add('sp-cm-opt');
+    cm.querySelectorAll('[data-o]').forEach(x => { x.onclick = () => { if (x.getAttribute('aria-disabled')) return; const id = x.dataset.o; closeMenu(); if (id === 'blank') newBlank(); else if (id === 'copy') copyOption(); else if (id === 'clear') clearOption(); else delOpen(); }; });
+    cmFor = b; cmBack = b; cmFt = null; cmEl = null; b.setAttribute('aria-expanded', 'true');
+    cm.hidden = false; const a = b.getBoundingClientRect(), w = cm.offsetWidth, h = cm.offsetHeight, nav = document.getElementById('mnav')?.getBoundingClientRect(); // under the button, else over it; never off the screen or over the phone's tab bar
+    const floor = (nav?.height && nav.top > innerHeight / 2 ? nav.top : innerHeight) - 8;
+    let x = Math.max(8, Math.min(a.left, innerWidth - w - 8)), y = a.bottom + 4; if (y + h > floor) y = a.top - h - 4 >= 8 ? a.top - h - 4 : Math.max(8, floor - h);
+    Object.assign(cm.style, { left: Math.round(x) + 'px', top: Math.round(y) + 'px' });
+    cm.querySelector('[data-o]:not([aria-disabled])')?.focus({ preventScroll: true }); // Blank site: Enter takes the default
+  }
+  // anything to clear: pieces other than easements, or a build's layouts, recipe or zones
+  const designed = pl => SP.hasDesign(pl) || !!(pl.lastRun || pl.recipe || pl.variant || pl.zones?.length || ed?.variants?.length);
+  // the timers that would act on the option after it's cleared or put back: a re-fit after an edit, new layouts after a setting, the money
+  function stopPending() { clearTimeout(refitTimer); clearTimeout(autoT); autoSeq++; clearTimeout(solveTimer); solveMark = null; solveLabel = ''; clearTimeout(finT); }
+  // the editor's memory of the option's last build (its layouts, the request, the AI's note and ideas, a change under way): gone
+  const RUN_STATE = ['variants', 'aiNote', 'aiSummary', 'sortBy', 'ask', 'runMeta', 'ideas', 'readAs', 'aiPick', 'reviewCleared', 'pickedByUser', 'reviewing', 'solveBar', 'solveLater', 'refitNote', 'chg', 'chgNote', 'chgDone', 'confirm', 'runSrc', 'nudged', 'shape', 'flash', 'refitting', 'updBusy', 'shownSel', 'ovOpen'];
+  function freshRun() { for (const k of RUN_STATE) delete ed[k]; ed.variants = null; ed.sel = null; ed.multi = []; ed.editing = false; ed.buildOpen = true; }
+  // the Build box ready for a request: focused on a computer; on a phone in view (the keyboard comes up only when it's tapped)
+  function readyBuild() {
+    const sec = card.querySelector('#spAiSec'), ta = card.querySelector('#spAsk'); if (!sec) return;
+    if (phone()) { if (!card.classList.contains('half') && !card.classList.contains('full')) { card.classList.remove('min'); card.classList.add('half'); } requestAnimationFrame(() => jump('spAiSec')); return; } // (as its chip does: clear of the header; the map fits the site again once the sheet is up)
+    if (ta) { try { ta.focus({ preventScroll: true }); } catch (e) {} } sec.scrollIntoView({ block: 'nearest' });
+  }
+  function newBlank() {
+    const p = P(), pl = PL(); if (!p || !pl || ed.draftPlan) return; if (ed.run) { ctx.toast(WAIT + '.'); return; }
+    if (pl.ring.length < 3) { addOption(p); return; } // no site drawn on this one yet: the project's site (its newest drawn option's, else its parcels'), or draw one
+    const c = SP.blankOf(pl, { id: uid(), name: nextName(p) }); p.plans.push(c); save(p); openReady(p, c, pl.name);
+  }
+  function openReady(p, c, from) { open(p.id, c.id); readyBuild(); if (from) ctx.toast(c.name + ': the same site as ' + from + ', nothing laid out yet. Say what to build.'); }
+  function copyOption() { // the copy keeps the layouts, not the request in the Build box, nor the renderings (the pictures are the original's)
+    const p = P(), pl = PL(); if (!p || !pl || ed.draftPlan || pl.ring.length < 3) return; if (ed.run) { ctx.toast(WAIT + '.'); return; }
+    const c = { ...clone(pl), id: uid(), name: nextName(p), created: new Date().toISOString() }; delete c.renders; if (c.lastRun) c.lastRun = { ...c.lastRun, ask: '' };
+    p.plans.push(c); save(p); open(p.id, c.id); ctx.toast('Copied ' + pl.name + ' as ' + c.name + '.');
+  }
+  function clearOption() {
+    const p = P(), pl = PL(); if (!p || !pl || ed.draftPlan) return; if (ed.run) { ctx.toast(WAIT + '.'); return; }
+    if (!designed(pl)) { ctx.toast('Nothing is laid out on ' + pl.name + ' yet.'); readyBuild(); return; }
+    stopPending(); const step = { _full: SP.undoState(pl) }; ed.undo.push(step); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = [];
+    SP.clearDesign(pl); freshRun(); save(p); draw(); panel(); readyBuild();
+    ctx.toast('Cleared ' + pl.name + '.', { ms: 10000, action: { label: 'Undo', run: () => { if (ed && PL() === pl && ed.undo[ed.undo.length - 1] === step) undo(true); } } }); // (longer than most: it's the way back, with no question first)
+  }
+  // ----- deleting an option (New Option's menu, Delete This Option at the foot of the panel, Delete on the project page):
+  // no question first. The message's Undo (8 seconds) puts it back exactly where it was; its pictures on this device go
+  // only once Undo can't happen any more (or the page is closed). From the editor the next option opens, or after the last
+  // one the project page, where New Option starts again from the same site (p.keptSite).
+  const delPending = new Map(); // option id → { t (the timer), keys (its pictures) }
+  const dropImages = keys => { for (const k of keys) rdel(k); };
+  function flushDeletes() { for (const d of delPending.values()) { clearTimeout(d.t); dropImages(d.keys); } delPending.clear(); }
+  window.addEventListener('pagehide', flushDeletes);
+  function delOpen() { const p = P(), pl = PL(); if (!p || !pl || ed.draftPlan) return; if (ed.run) { ctx.toast(WAIT + '.'); return; } deleteOption(p, pl); }
+  function deleteOption(p, pl) {
+    if (ed?.run && ed.pid === p.id) { ctx.toast(WAIT + '.'); return; }
+    const wasOpen = ed?.pid === p.id && ed.plid === pl.id, r = PJ.removeOption(p, pl.id); if (!r) return;
+    if (pl.ring.length >= 3 && !p.plans.some(x => x.ring.length >= 3)) p.keptSite = SP.blankOf(pl, {}); // the site, for the next New Option
+    if (away?.plid === pl.id) hideAway(); if (resume?.plid === pl.id) clearResume(); // the "Editing … · Return to plan" banner would lead nowhere
+    save(p);
+    if (wasOpen) { if (r.next) open(p.id, r.next.id); else { ctx.closeCard(); cur = p.id; ptab.set(p.id, 'options'); ctx.setView('projects'); show(p.id, 'options'); } }
+    const d = { t: setTimeout(() => { delPending.delete(pl.id); dropImages(r.keys); }, 12000), keys: r.keys }; delPending.set(pl.id, d); // (well after the message has gone)
+    ctx.toast('Deleted ' + pl.name + ' from ' + p.name + (shared === true ? ' (for the team too)' : '') + '.', { ms: 8000, action: { label: 'Undo', run: () => undoDelete(p.id, r, wasOpen) } });
+  }
+  function undoDelete(pid, r, reopen) {
+    const p = db.projects.find(x => x.id === pid), d = delPending.get(r.plan.id); if (!p) { ctx.toast('The project has gone, so ' + r.plan.name + ' can’t come back.'); return; }
+    if (d) { clearTimeout(d.t); delPending.delete(r.plan.id); }
+    if (!PJ.restoreOption(p, r.plan, r.index)) return; save(p);
+    if (reopen) open(p.id, r.plan.id); ctx.toast(r.plan.name + ' is back.');
+  }
   // Copy (⌘C, or the menu): the piece or the set, with what's attached, kept for Paste; Paste puts copies centred where
   // you right-clicked (⌘V: the middle of the view), settled in the nearest clear spot, picked. One undo step.
   function copySel() { const pl = PL(), ids = sels(); if (!pl || !ids.length) return; clip = clone(T.withAttached(pl, ids)); const lead = pl.elements.find(e => e.id === ids[0]);
@@ -1517,7 +1603,7 @@ export function initSitePlan(ctx) {
     map.on('touchstart', e => { clearTimeout(lp); if (!ed || ed.mode || e.points.length !== 1 || !(PL()?.ring.length >= 3)) return; at = e.point; const ll = e.lngLat; lp = setTimeout(() => { if (!cm.hidden && performance.now() - lpAt < 600) return; lpAt = performance.now(); openMenu(at, ll); }, 550); });
     map.on('touchmove', e => { if (at && Math.hypot(e.point.x - at.x, e.point.y - at.y) > 10) clearTimeout(lp); });
     map.on('touchend', () => clearTimeout(lp)); }
-  document.addEventListener('pointerdown', e => { if (!cm.hidden && !cm.contains(e.target) && !cmSub.contains(e.target)) closeMenu(); }, true);
+  document.addEventListener('pointerdown', e => { if (!cm.hidden && !cm.contains(e.target) && !cmSub.contains(e.target) && !cmFor?.contains(e.target)) closeMenu(); }, true); // (New Option's own button closes it with its click)
   for (const ev of ['movestart', 'zoomstart', 'rotatestart']) map.on(ev, e => { if (e.originalEvent) closeMenu(); }); // your own pan or zoom; not the map resizing as the panel redraws
   window.addEventListener('blur', () => closeMenu()); window.addEventListener('resize', () => closeMenu());
   ctx.planOpen = () => !!ed && ctx.view === 'map'; // the map's own right-click menu stays away while a plan is open (app.js)
@@ -1618,8 +1704,8 @@ export function initSitePlan(ctx) {
   // the dark summary under the header: which layout is on the map, then Phase 1 first, parking for what was asked for,
   // coverage and the money, and whether it passes. A kicker only for a real status (building) or the first step.
   function overview(pl, prog) {
-    if (!pl.elements.length && ed.run?.kind === 'build') return '<div class="kicker">Building…</div><div class="sp-ov-msg"><b>Laying out “' + esc(ed.run.ask) + '”</b><span>The layouts appear here as soon as they’re drawn.</span></div>';
-    if (!pl.elements.length) return '<div class="kicker">Step 1 of 3</div><div class="sp-ov-msg"><b>Describe what to build</b><span>Type it under Build, then Build Layouts, or <button type="button" class="sp-link sp-quiet" data-jump="spDrawSec">add pieces by hand</button>.</span></div>';
+    if (!SP.hasDesign(pl) && ed.run?.kind === 'build') return '<div class="kicker">Building…</div><div class="sp-ov-msg"><b>Laying out “' + esc(ed.run.ask) + '”</b><span>The layouts appear here as soon as they’re drawn.</span></div>';
+    if (!SP.hasDesign(pl)) return '<div class="kicker">Step 1 of 3</div><div class="sp-ov-msg"><b>Describe what to build</b><span>Type it under Build, then Build Layouts, or <button type="button" class="sp-link sp-quiet" data-jump="spDrawSec">add pieces by hand</button>.</span></div>';
     const m = SP.metrics(pl), issues = SP.check(pl), cl = K.checkLabel(K.checksOf(issues, m)), ph = pl.elements.some(e => e.phase === 2);
     const m1 = ph ? SP.metrics({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, h = K.headline(m, m1, K.askedOf(prog)), pk = parkOf(m, m1), whole = twoPhase(m, m1);
     let f = null; try { f = RUN.finOf(pfRun(P(), pl)); } catch (e) { f = null; }
@@ -1662,7 +1748,7 @@ export function initSitePlan(ctx) {
   const WAIT = 'Wait for the build to finish or Cancel it';
   const plansHtml = (p, pl, extra) => { const busy = !!ed?.run, list = ed?.draftPlan ? p.plans.concat(ed.draftPlan) : p.plans; // a build under way: switching options would end it
     return '<div class="sp-plans' + (extra ? ' ' + extra : '') + '" role="group" aria-label="Options">' + list.map(x => '<button type="button" class="chip" aria-pressed="' + (x.id === pl.id) + '" data-plan="' + esc(x.id) + '"' + (busy ? ' disabled title="' + WAIT + '"' : ' title="' + esc(x.name + ': ' + optTip(p, x)) + '"') + '>' + esc(x.name) + '</button>').join('') +
-      '<button type="button" class="chip sp-newopt" data-newopt="1"' + (busy ? ' disabled title="' + WAIT + '"' : ' title="Start another option from this one"') + '>+ Copy Option</button></div>'; };
+      '<button type="button" class="chip sp-newopt" data-newopt="1" aria-haspopup="menu" aria-expanded="false"' + (busy ? ' disabled title="' + WAIT + '"' : ed?.draftPlan ? ' disabled title="Finish drawing the site first (or Cancel)"' : ' title="Another option on this site, blank or a copy of this one; or clear this one and start over, or delete it"') + '>+ New Option</button></div>'; };
   // to a section by its chip (which opens it if it folds: Settings, Pro forma)
   function jump(id) { card.querySelector('.bnav [data-sec="' + id + '"]')?.click(); }
   // icons for the Site section's buttons and the library picker
@@ -1672,8 +1758,8 @@ export function initSitePlan(ctx) {
     find: IC('<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3.5 3.5"/>')
   };
   function panel() {
-    const p = P(), pl = PL(); if (!p || !pl) return;
-    const sel = pl.elements.find(e => e.id === ed.sel), prog = SP.normalizeProgram(pl.program), noRing = pl.ring.length < 3, drawing = noRing || ed.mode === 'draw', has = pl.elements.length > 0;
+    const p = P(), pl = PL(); if (!p || !pl) return; if (cmFor) closeMenu(); // the New Option menu names this option: not over a panel drawn again
+    const sel = pl.elements.find(e => e.id === ed.sel), prog = SP.normalizeProgram(pl.program), noRing = pl.ring.length < 3, drawing = noRing || ed.mode === 'draw', has = pl.elements.length > 0, laid = SP.hasDesign(pl); // (easements alone are the site: nothing laid out yet)
     const parcel = p.parcels.find(x => x.key === pl.parcel), addr = parcel?.label || '', acres = noRing ? '' : (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' acres';
     const selNew = !!sel && sel.id !== ed.shownSel; ed.shownSel = sel?.id || null; // a new piece picked: the card goes to the top, where Selected is
     const scroll = selNew ? 0 : card.classList.contains('sp-mode') ? card.scrollTop : 0;
@@ -1703,7 +1789,7 @@ export function initSitePlan(ctx) {
         '<select id="spSheet" aria-label="Sheet size"><option value="tabloid">11 × 17 sheet</option><option value="archd">24 × 36 sheet</option></select>' +
         '<button type="button" class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button type="button" class="btn" id="spGeo" title="The plan as map shapes (GeoJSON)">Map File (GeoJSON)</button><button type="button" class="btn" id="spSum" title="The site and its numbers as text, for an email or a note">Copy Summary</button></div></div>'
     };
-    const secs = planSections({ drawing, selected: !!sel, layouts: !!ed.variants, laidOut: has }).map(x => ({ ...x, html: HTML[x.id] }));
+    const secs = planSections({ drawing, selected: !!sel, layouts: !!ed.variants, laidOut: laid }).map(x => ({ ...x, html: HTML[x.id] }));
     const editBtn = has && !noRing ? '<button type="button" class="btn sm sp-edit' + (ed.editing ? ' on' : '') + '" aria-pressed="' + !!ed.editing + '" id="spEdit" title="Move, resize and turn pieces of the plan; only the piece you move changes (E)">' + ICO.edit + '<span>' + (ed.editing ? 'Stop Editing' : 'Edit Layout') + '</span></button>' : '';
     // the header: Projects › the project (with Undo, Redo, the save status and ×), then the option's name and its address
     // with Edit Layout and Done. A long project name is cut short, the whole of it in the tooltip.
@@ -1731,9 +1817,7 @@ export function initSitePlan(ctx) {
       nm.onkeydown = e => { if (e.key === 'Enter') nm.blur(); }; }
     card.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { if (b.dataset.plan === pl.id) return; if (ed.run) { ctx.toast(WAIT + '.'); return; } open(p.id, b.dataset.plan); });
     card.querySelectorAll('.sp-plans').forEach(r => { const b = r.querySelector('[aria-pressed="true"]'), d = b ? b.getBoundingClientRect().right - r.getBoundingClientRect().right : 0; if (d > 0) r.scrollLeft += d + 16; }); // the open option in view in its row
-    card.querySelectorAll('[data-newopt]').forEach(b => b.onclick = () => { if (ed.run) { ctx.toast(WAIT + '.'); return; } if (ed.draftPlan) return;
-      const c = { ...clone(pl), id: uid(), name: nextName(p), created: new Date().toISOString() }; if (c.lastRun) c.lastRun = { ...c.lastRun, ask: '' }; // the copy keeps the layouts, not the request in the Build box
-      p.plans.push(c); save(p); open(p.id, c.id); });
+    card.querySelectorAll('[data-newopt]').forEach(b => b.onclick = () => { if (ed.run) { ctx.toast(WAIT + '.'); return; } if (ed.draftPlan) return; if (optMenuFor(b)) closeMenu(true); else openOptMenu(b); });
     card.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => jump(b.dataset.jump));
     card.querySelectorAll('.bnav [data-sec]').forEach(b => b.addEventListener('click', () => { const d = card.querySelector('#' + b.dataset.sec); if (d?.tagName === 'DETAILS' && !d.open) d.open = true; }, true)); // a folded section's chip opens it (before the scroll to it)
     const wireOver = () => { on('#spOvUpd', updateNow); card.querySelectorAll('#spOver [data-issue]').forEach(b => b.onclick = () => { ed.sel = b.dataset.issue; draw(); panel(); }); const ck = card.querySelector('#spOvCk'); if (ck) ck.onclick = () => { if (ck.getAttribute('aria-disabled')) return; ed.ovOpen = !ed.ovOpen; card.querySelector('#spOver').innerHTML = overview(pl, prog); wireOver(); card.querySelector('#spOvCk')?.focus(); }; card.querySelectorAll('#spOver [data-jump]').forEach(b => b.onclick = () => jump(b.dataset.jump)); };
@@ -1764,7 +1848,7 @@ export function initSitePlan(ctx) {
     on('#spGeo', () => ctx.saveFile(fileName(p, pl) + '.geojson', JSON.stringify(geojson(p, pl), null, 1), 'application/geo+json'));
     on('#spSum', async () => { const s = summary(p, pl); try { await navigator.clipboard.writeText(s); ctx.toast('Summary copied.'); } catch (e) { prompt('Copy the summary', s); } });
     card.querySelectorAll('details.bsec').forEach(d => d.addEventListener('toggle', tailRoom));
-    on('#spDelPlan', () => { if (!confirm('Delete ' + pl.name + ' from ' + p.name + '?')) return; p.plans = p.plans.filter(x => x.id !== pl.id); save(p); ctx.closeCard(); ctx.setView('projects'); ctx.toast('Deleted ' + pl.name + ' from ' + p.name + '.'); });
+    on('#spDelPlan', delOpen);
     nums(); tailRoom(); lockRun(); paintMode(); wireConfirm(); paintSave(); requestAnimationFrame(spyWatch);
   }
   // A layout you've changed is never replaced without asking (Build Layouts, Use this layout, New layouts from these
@@ -3239,7 +3323,23 @@ export function initSitePlan(ctx) {
     box.querySelector('[data-x]').onclick = close;
     const cmp = box.querySelector('[data-cmp]'); if (cmp) cmp.onclick = () => { const onM = cmp.getAttribute('aria-pressed') !== 'true'; cmp.setAttribute('aria-pressed', String(onM)); img.src = onM ? msrc : src; cmp.textContent = onM ? 'Show the rendering' : 'Show the massing'; };
     box.querySelector('[data-dl]').onclick = async () => { const b = await rget(r.id); if (b instanceof Blob) ctx.saveFile(fileName(p, pl) + '-' + r.view + '-rendering.jpg', b, 'image/jpeg'); };
-    box.querySelector('[data-del]').onclick = () => { if (!confirm('Delete this rendering?')) return; const P1 = db.projects.find(x => x.id === p.id) || p, cur = P1.plans.find(x => x.id === pl.id) || (PL()?.id === pl.id ? PL() : null); if (cur) { cur.renders = (cur.renders || []).filter(x => x.id !== r.id); save(P1); } rdel(r.id); rdel(r.id + ':m'); close(); if (ed) panel(); }; // (the project as it is now: a sync may have replaced the copy the viewer was opened from)
+    box.querySelector('[data-del]').onclick = () => { if (!confirm('Delete this rendering?')) return; deleteRenders(p.id, pl.id, [r.id]); close(); };
+  }
+  // renderings off an option (ids; all of them with none), from the plan's Render section, the viewer and the project
+  // page alike: the list on the option (which syncs) and the pictures and massing on this device. The project as it is
+  // now: a sync may have replaced the copy a viewer was opened from. Returns how many went.
+  function deleteRenders(pid, plid, ids = null) {
+    const P1 = db.projects.find(x => x.id === pid), pl = P1?.plans.find(x => x.id === plid) || (ed?.draftPlan?.id === plid ? ed.draftPlan : null); if (!pl) return 0;
+    const keys = PJ.removeRenders(pl, ids); if (!keys.length) return 0;
+    dropImages(keys); for (const k of keys) { const u = rurl.get(k); if (u) { URL.revokeObjectURL(u); rurl.delete(k); } }
+    if (P1) save(P1); if (ed) panel(); return keys.length / 2;
+  }
+  // Delete all on the Renderings tab (the project's, or one option's): one question naming how many, then gone
+  function deleteAllRenders(p, pl) {
+    const list = pl ? [pl] : p.plans, n = list.reduce((s, x) => s + (x.renders || []).length, 0); if (!n) return;
+    const theirs = list.reduce((s, x) => s + (x.renders || []).filter(r => r.by && r.by !== get(NAME_KEY)).length, 0);
+    if (!confirm('Delete ' + (n === 1 ? 'the rendering' : 'all ' + n + ' renderings') + ' of ' + (pl ? pl.name : p.name) + '?' + (shared === true ? ' They go for the team too' + (theirs ? ', including ' + plural(theirs, 'picture') + ' teammates made' : '') + '.' : '') + ' This can’t be undone.')) return;
+    let gone = 0; for (const x of list) gone += deleteRenders(p.id, x.id); ctx.toast('Deleted ' + plural(gone, 'rendering') + ' of ' + (pl ? pl.name : p.name) + '.');
   }
   // the two newest renderings that still match the plan, as data URLs for the PDF sheet, at up to 1600 px wide so the
   // sheet stays under the PDF service's request limit
@@ -3297,8 +3397,10 @@ export function initSitePlan(ctx) {
     return s;
   }
   // where a new option goes: the newest drawn option's site (with its street side and setbacks), else the project's parcels
+  const newestDrawn = p => p.plans.filter(x => x.ring.length >= 3).sort((a, b) => t(b.created) - t(a.created))[0];
+  const keptOf = p => p.keptSite?.ring?.length >= 3 ? p.keptSite : null; // the site of the last drawn option deleted
   function siteFor(p) {
-    const last = p.plans.filter(x => x.ring.length >= 3).sort((a, b) => t(b.created) - t(a.created))[0];
+    const last = newestDrawn(p) || keptOf(p);
     if (last) return { origin: last.origin, ring: clone(last.ring), src: last.src, front: last.front, frontGuess: last.frontGuess, setbacks: { ...last.setbacks }, parcel: last.parcel, parcels: last.parcels, zoning: last.zoning || null, program: { use: SP.normalizeProgram(last.program).use } };
     const recs = p.parcels.filter(x => x.geometry), b = recs.length ? siteOf(recs) : null;
     return b?.ring?.length >= 3 ? { origin: b.origin, ring: b.ring, src: recs.length > 1 ? 'parcels' : 'parcel', parcel: recs[0].key, parcels: recs.map(r => r.key) } : null;
@@ -3312,7 +3414,10 @@ export function initSitePlan(ctx) {
   // the biggest option by floor area, for the summary
   function biggest(p) { let best = null; for (const pl of p.plans) { const { m } = info(p, pl); if (m?.gfa && (!best || m.gfa > best.m.gfa)) best = { pl, m }; } return best; }
   const addrOf = p => p.parcels.length ? esc(p.parcels[0].label) + (p.parcels.length > 1 ? ' and ' + plural(p.parcels.length - 1, 'more parcel') : '') : '';
-  function addOption(p) { const s = siteFor(p); if (!s) return drawSite(p); const pl = newPlan(p, s); p.plans.push(pl); save(p); open(p.id, pl.id); }
+  // New Option: a blank site from the newest drawn option (its lot, street sides, setbacks and easements; SP.blankOf), else
+  // the parcels' outline, else the site is drawn first; it opens with the Build box ready
+  function addOption(p) { const last = newestDrawn(p) || keptOf(p), s = last ? null : siteFor(p); if (!last && !s) return drawSite(p);
+    const pl = last ? SP.blankOf(last, { id: uid(), name: nextName(p) }) : newPlan(p, s); p.plans.push(pl); save(p); openReady(p, pl, last?.name); }
   function drawSite(p) { // the map goes to the project's site first; the option is made when the drawing is finished (Cancel leaves nothing behind)
     const s = siteFor(p), c = map.getCenter(), at = s?.origin || p.parcels.find(x => x.center)?.center || [+c.lng.toFixed(6), +c.lat.toFixed(6)], pl = newPlan(p, { origin: at });
     open(p.id, pl.id, { draw: true, draftPlan: pl }); }
@@ -3474,7 +3579,7 @@ export function initSitePlan(ctx) {
   function optionsHtml(p) {
     const can = !!siteFor(p);
     return '<section class="pj-sec pj-sec0"><div class="lt">Site plan options · ' + f0(p.plans.length) + '</div><div class="pj-plans">' + p.plans.map(pl => planTile(p, pl)).join('') +
-        (can ? '<button type="button" class="pj-plan pj-add" data-add="1"><span class="pj-plus" aria-hidden="true">+</span><b>New Option</b><span class="pj-none">' + (p.plans.some(x => x.ring.length >= 3) ? 'A blank plan on the same site' : 'A blank plan on ' + (p.parcels.length > 1 ? 'these parcels' : 'this parcel')) + '</span></button>'
+        (can ? '<button type="button" class="pj-plan pj-add" data-add="1"><span class="pj-plus" aria-hidden="true">+</span><b>New Option</b><span class="pj-none">' + (p.plans.some(x => x.ring.length >= 3) || keptOf(p) ? 'A blank site: the same lot and street sides, nothing laid out' : 'A blank plan on ' + (p.parcels.length > 1 ? 'these parcels' : 'this parcel')) + '</span></button>'
           : p.parcels.length ? '<div class="pj-start"><b>No site outline</b><p>These parcels have no outline from the county. Click the corners of the site on the map.</p><div class="btnrow"><button type="button" class="btn" data-draw="1">Draw a Site</button></div></div>' : startHtml(p)) + '</div></section>' +
       (can ? '<div class="pj-foot"><span class="btnrow"><button type="button" class="btn" data-draw="1" title="Click the corners of a different site on the map">Draw a Different Site</button></span></div>' : '');
   }
@@ -3490,12 +3595,13 @@ export function initSitePlan(ctx) {
         : '<p>This project has no site yet: add its parcel or draw it first.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div>')) + '</div>'; // never a dead end
     return groups.map(pl => { const list = (pl.renders || []).slice().reverse(), sig = planSig(pl);
       return '<section class="pj-rg" aria-labelledby="pjRg-' + esc(pl.id) + '"><div class="pj-rgh"><h3 class="pj-h3" id="pjRg-' + esc(pl.id) + '">' + esc(pl.name) + ' <span class="pj-tn">' + (list.length ? plural(list.length, 'rendering') : 'none yet') + '</span></h3>' +
-        '<span class="pj-rgl"><button type="button" class="lnk" data-plan="' + esc(pl.id) + '">Open plan</button>' + (laidOut(pl) ? '<button type="button" class="lnk" data-rmore="' + esc(pl.id) + '">Render more</button>' : '') + '</span></div>' +
+        '<span class="pj-rgl"><button type="button" class="lnk" data-plan="' + esc(pl.id) + '">Open plan</button>' + (laidOut(pl) ? '<button type="button" class="lnk" data-rmore="' + esc(pl.id) + '">Render more</button>' : '') + (list.length ? '<button type="button" class="lnk pj-pdel" data-rdelall="' + esc(pl.id) + '" title="Delete every rendering of ' + esc(pl.name) + '">Delete all</button>' : '') + '</span></div>' +
         (list.length ? '<div class="pj-rgrid">' + list.map(r => { const stale = r.sig && r.sig !== sig, lab = rLabel(r);
           return '<figure class="pj-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" data-pl="' + esc(pl.id) + '" tabindex="0" role="button" aria-label="' + esc(lab + ' rendering of ' + pl.name + ', ' + rWhen(r.at) + (stale ? ', the plan has changed since' : '')) + '">' +
             '<span class="pj-rimg"><img alt="" hidden><i>Loading…</i></span><figcaption>' + esc(lab) + '<span>' + esc(rWhen(r.at)) + (r.by ? ' · ' + esc(r.by) : '') + (stale ? ' · <em>plan changed since</em>' : '') + '</span></figcaption></figure>'; }).join('') + '</div>'
           : '<p class="rnote">No renderings of this option yet.</p>') + '</section>'; }).join('') +
-      '<p class="rnote pj-rnote">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. The pictures are kept on the device they were made on; teammates see that they exist. Click one to see it full size, compare it with the massing, download or delete it.</p>';
+      '<p class="rnote pj-rnote">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. The pictures are kept on the device they were made on; teammates see that they exist. Click one to see it full size, compare it with the massing, download or delete it.</p>' +
+      '<div class="pj-foot"><span class="btnrow"><button type="button" class="btn ghost pj-pdel" data-rdelall="*">Delete All Renderings</button></span></div>';
   }
   function wireRenders(p) {
     root.querySelectorAll('.pj-rth').forEach(f => { const pl = p.plans.find(x => x.id === f.dataset.pl), r = pl?.renders?.find(x => x.id === f.dataset.rid); if (!r) return;
@@ -3640,12 +3746,9 @@ export function initSitePlan(ctx) {
     root.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => { const pl = planOf2(b.dataset.copy); if (!pl) return;
       const c = { ...clone(pl), id: uid(), name: nextName(p), created: new Date().toISOString() }; delete c.renders; if (c.lastRun) c.lastRun = { ...c.lastRun, ask: '' };
       p.plans.push(c); save(p); ctx.toast('Copied ' + pl.name + ' as ' + c.name + '.'); root.querySelector('[data-plan="' + CSS.escape(c.id) + '"]')?.focus(); });
-    root.querySelectorAll('[data-delpl]').forEach(b => b.onclick = () => { const pl = planOf2(b.dataset.delpl); if (!pl || !confirm('Delete ' + pl.name + ' from ' + p.name + '?' + (pl.renders?.length ? ' Its renderings on this device go too.' : ''))) return;
-      if (away?.plid === pl.id) hideAway(); if (resume?.plid === pl.id) clearResume(); // the "Editing … · Return to plan" banner would lead nowhere
-      if (ed?.pid === p.id && ed.plid === pl.id) ctx.closeCard(); // it was open on the map
-      for (const r of pl.renders || []) { rdel(r.id); rdel(r.id + ':m'); }
-      p.plans = p.plans.filter(x => x.id !== pl.id); save(p); ctx.toast('Deleted ' + pl.name + ' from ' + p.name + '.'); });
+    root.querySelectorAll('[data-delpl]').forEach(b => b.onclick = () => { const pl = planOf2(b.dataset.delpl); if (pl) deleteOption(p, pl); });
     root.querySelectorAll('[data-rmore]').forEach(b => b.onclick = () => { const pl = planOf2(b.dataset.rmore); if (pl) renderMore(p, pl); });
+    root.querySelectorAll('[data-rdelall]').forEach(b => b.onclick = () => { const id = b.dataset.rdelall, pl = id === '*' ? null : planOf2(id); if (id === '*' || pl) deleteAllRenders(p, pl); });
     on('[data-tabgo]', e => setTab(p, e.currentTarget.dataset.tabgo, true));
     on('[data-jref]', () => { siteFail.delete(p.id); gatherSite(p); render(true); });
     on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? ' + (shared === true ? 'This removes it for the team too.' : 'This removes it from this device.'))) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null;
@@ -3684,8 +3787,21 @@ export function initSitePlan(ctx) {
 
   // the projects a property card's parcel is already in (its Site plan button reads "Open site plan" then)
   function projectsFor(parcel, center) { if (!parcel && !center) return []; try { return RUN.projectsWith(db.projects, [parcelOf(parcel || {}, center || parcel?.center).key]); } catch (e) { return []; } }
+  // Settings › Testing › Delete all projects: every project and option, their pictures on this device, the banners and
+  // the address. With team sharing on (or set up and offline) they go for the team too, through the same tombstones
+  // a single project's Delete uses, so other devices drop them; local: only this device's copies (the team's download
+  // again on the next sync)
+  const teamMode = () => shared === true || (shared == null && !!get(CODE_KEY));
+  function deleteAll({ local = false } = {}) {
+    if (ed) ctx.closeCard(); hideAway(); clearResume(); flushDeletes();
+    const team = !local && teamMode(), r = PJ.deleteAll(db, { team }); dropImages(r.keys);
+    cur = null; pending = null; lastOpen = null; ptab.clear(); pasks.clear(); thumbs.clear?.();
+    save(); ctx.setView('projects'); show(null); ctx.scheduleHash?.();
+    return r;
+  }
   ctx.sitePlan = { start, open, close, get editing() { return !!ed; }, show: (id, tab) => { if (db.projects.some(x => x.id === id)) show(id, tab); }, has: (pid, plid) => !!db.projects.find(x => x.id === pid)?.plans.some(x => x.id === plid),
     // what the address keeps (reload, reopening the installed app): the open plan, else the project on the Projects page
     get where() { return ed && !ed.draftPlan ? { plan: ed.pid + '.' + ed.plid } : cur && ctx.view === 'projects' ? { project: cur, tab: PJ.tabOf(ptab.get(cur)) } : {}; }, forAssistant, get projects() { return db.projects; }, sync, projectsFor, // sync: Settings runs it after a new team passcode
+    counts: () => ({ ...PJ.projectCounts(db.projects), team: teamMode() }), deleteAll,
     get pendingProject() { return pendingProject() && pending; }, set pendingProject(v) { pending = v?.id ? { id: v.id, t: v.t || Date.now() } : null; } };
 }

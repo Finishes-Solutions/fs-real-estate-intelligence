@@ -3835,6 +3835,11 @@ button.sp-mx-r:hover{background:var(--chip)}
 @media (min-width:701px){.app.planning .toast{bottom:104px}}
 .sp-cm-sub{max-height:calc(100vh - 16px);overflow:auto}
 @media (pointer:coarse){.sp-cm>button{min-height:42px}.sp-ad-t{padding:9px 2px 8px}}
+/* + New Option's menu: each choice with a line under it saying what it keeps */
+.sp-cm-opt{min-width:256px}
+.sp-cm-opt>button{padding:7px 10px}
+.sp-cm-opt b{font-weight:600}
+.sp-cm-opt em{white-space:normal}
 @media (max-width:700px){.sp-tpop[data-kind="add"]{width:min(316px,calc(100vw - 16px))}
   .app.planning:has(#card.open.full) .sp-mapui{display:none}} /* the sheet pulled to full height: the strip, the chip and their pop-overs step away (they'd sit over its header) */
 /* the property card's Development section (src/devlayers.js) */
@@ -4013,3 +4018,14 @@ html.sp-dragging,html.sp-dragging *{cursor:var(--cur-grabbing,grabbing)!importan
 .sp-tl-h{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}.sp-tl-h b{font-size:13px}.sp-tl small{font-size:11px;color:var(--muted);line-height:1.35}
 .sp-tl-h input{font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line-2);border-radius:4px;background:var(--panel);color:var(--text);min-width:0;flex:1}
 .sp-tl-a{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+/* Option delete in + New Option's menu, and Settings › Testing (Delete all projects…) */
+.sp-cm-opt>button.sp-cm-danger b{color:var(--danger)}
+.set-sec[data-sec="danger"] h3{color:var(--danger)}
+.btn.set-danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--line-2))}
+.btn.set-danger:not(:disabled):hover{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.set-danger:disabled{opacity:.5}
+.set-confirm{display:grid;gap:8px;padding:12px;border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line));border-radius:var(--r-sm);background:color-mix(in srgb,var(--danger) 5%,var(--panel))}
+.set-confirm p{margin:0;font-size:12.5px;line-height:1.45;color:var(--text-2)}
+.set-confirm input{width:100%;max-width:220px;box-sizing:border-box;padding:7px 9px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel);color:var(--text);font:600 13px var(--font-mono);letter-spacing:.06em}
+.set-confirm .btnrow{display:flex;flex-wrap:wrap;gap:6px}
+.pj-foot .btn.pj-pdel{color:var(--danger)}

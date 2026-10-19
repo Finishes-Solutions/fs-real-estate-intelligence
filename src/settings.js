@@ -5,7 +5,7 @@
 // linked from here. Nothing here deletes notes, projects or the team's sync queue.
 import { PROVIDERS, MODEL_KEY, pickedModel } from './lib/aimodels.mjs';
 import { summarize, priceOf, checkPrice, costOf, PRICES_AS_OF } from './lib/aiprices.mjs';
-const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help']];
+const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help'], ['danger', 'Testing · danger zone', 'Testing']];
 export const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
 const BASE_KEY = 'fs-basemap';
 // Reset layout clears only these (never localStorage.clear()): panel open/closed and width, assistant width, which
@@ -171,6 +171,31 @@ export function initSettings(ctx) {
         row('Reset layout', '<button type="button" class="btn sm" id="setReset">Reset…</button>', 'Puts the panel, its sections, headline metrics, timeline and export choices back to how they started. Your notes, projects, saved searches and settings stay.');
       el.querySelector('#setInstall')?.addEventListener('click', () => ctx.install.prompt());
       el.querySelector('#setReset').onclick = resetLayout;
+    },
+    // Testing · danger zone: Delete all projects… opens a step that says what goes (and whether for the whole team);
+    // typing DELETE turns on the final button. With the team: optionally only this device's copies.
+    danger(el, step = false) {
+      const c = ctx.sitePlan?.counts?.() || { projects: 0, options: 0, renderings: 0, team: false }, none = !c.projects;
+      const what = fmtN(c.projects) + (c.projects === 1 ? ' project' : ' projects') + ', ' + fmtN(c.options) + (c.options === 1 ? ' option' : ' options') + (c.renderings ? ' and ' + fmtN(c.renderings) + (c.renderings === 1 ? ' rendering' : ' renderings') : '');
+      if (!step) {
+        el.innerHTML = row('Delete all projects', '<button type="button" class="btn sm set-danger" id="setDelAll"' + (none ? ' disabled' : '') + '>Delete all projects…</button>',
+          none ? 'There are no projects to delete.' : 'For testing: removes every project in the system (' + esc(what) + '). You confirm on the next step.');
+        el.querySelector('#setDelAll').onclick = () => { PAINT.danger(el, true); el.querySelector('#setDelTxt')?.focus(); };
+        return;
+      }
+      el.innerHTML = '<div class="set-confirm" role="group" aria-labelledby="setDelH"><b id="setDelH">Delete ' + esc(what) + '?</b>' +
+        '<p>' + (c.team ? 'Team sharing is on: they’re removed <b>for the whole team</b>, on every device.' : 'Team sharing isn’t on here, so only <b>this device’s</b> projects go; any team copies are left alone.') + ' Renderings saved on this device go too. This can’t be undone.</p>' +
+        '<label class="set-l" for="setDelTxt">Type DELETE to confirm</label><input id="setDelTxt" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE">' +
+        '<div class="btnrow"><button type="button" class="btn sm set-danger" id="setDelGo" disabled>' + (c.team ? 'Delete for the whole team' : 'Delete all projects') + '</button>' +
+        (c.team ? '<button type="button" class="btn sm" id="setDelLocal" disabled title="The team’s copies stay and download to this device again on the next sync; changes not yet synced are lost">Only this device’s copies</button>' : '') +
+        '<button type="button" class="btn sm ghost" id="setDelX">Cancel</button></div></div>';
+      const t = el.querySelector('#setDelTxt'), go = el.querySelector('#setDelGo'), loc = el.querySelector('#setDelLocal');
+      t.oninput = () => { const ok = t.value.trim() === 'DELETE'; go.disabled = !ok; if (loc) loc.disabled = !ok; };
+      t.onkeydown = e => { if (e.key === 'Enter' && !go.disabled) go.click(); };
+      el.querySelector('#setDelX').onclick = () => { PAINT.danger(el); el.querySelector('#setDelAll')?.focus(); };
+      const run = local => { const r = ctx.sitePlan.deleteAll({ local }); close();
+        ctx.toast('Deleted ' + fmtN(r.projects) + (r.projects === 1 ? ' project' : ' projects') + ' and ' + fmtN(r.options) + (r.options === 1 ? ' option' : ' options') + (r.team ? ' for the whole team.' : local ? ' from this device (the team’s copies stay).' : ' from this device.')); };
+      go.onclick = () => run(false); if (loc) loc.onclick = () => run(true);
     },
     help(el) {
       el.innerHTML = '<div class="set-links">' + go('Getting started', 'data-act="intro"', 'The short tip on what the app does, at the top of the Map panel') + go('Data sources &amp; freshness', 'data-act="sources"', 'Where every number comes from and when it was last refreshed') +
