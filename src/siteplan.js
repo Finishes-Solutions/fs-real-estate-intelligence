@@ -1685,7 +1685,7 @@ export function initSitePlan(ctx) {
       spDrawSite: () => '<div class="bsec sp-draw" id="spDrawSite"><div class="lt">Draw the site</div><p>Click each corner of the site on the map; click the first corner again, double-click or press Enter to finish.' + (ed.draft.length ? ' <b>' + plural(ed.draft.length, 'corner') + ' so far.</b>' : '') + '</p><div class="sp-row"><button type="button" class="btn sm primary" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button type="button" class="btn sm" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button type="button" class="btn sm ghost" id="spCancelDraw">Keep the Old Site</button>') + (ed.draftPlan ? '<button type="button" class="btn sm ghost" id="spCancelDraft" title="Throw the drawing away; no option is added">Cancel</button>' : '') + '</div></div>',
       spSel: () => '<div class="bsec" id="spSel">' + selHtml(sel, prog) + '</div>',
       spLayouts: () => '<div class="bsec" id="spLayouts">' + layoutsHead() + '<div id="spVariants">' + variantsHtml() + '</div></div>',
-      spChgSec: () => '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change with AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Building A two stories · remove Bldg 3 · swap Bldg 2 and Bldg 5">' + esc(ed.chg || '') + '</textarea>' +
+      spChgSec: () => '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change with AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Building A two stories · remove Bldg 3 · all the apartments 3 stories · no 3-story homes">' + esc(ed.chg || '') + '</textarea>' +
         (sel ? '<div class="rnote">About <b>' + esc(ED.labelOf(sel)) + '</b> (selected), or name any piece as it’s labelled.</div>' : '') +
         '<div class="sp-go2"><button type="button" class="btn askai" id="spChgGo">Make Changes</button>' + (pl.recipe ? tog('id="spChgFit"', 'Re-fit the rest of the site', ed.chgFit, { tip: 'Lay the rest of the site out again around the changes; off, only those pieces change' }) : '') + '</div>' +
         chgHtml(pl) + '</div>',
@@ -2678,25 +2678,31 @@ export function initSitePlan(ctx) {
   const aiOff = () => !!(ctx.spAiOff && Date.now() - ctx.spAiOff < 3e5);
   const aiSaw = e => { if (e?.status === 503) ctx.spAiOff = Date.now(); };
   // changes by name: the AI reads the plan (its pieces, a picture of it) and the words, and answers with edits on those
-  // pieces; they're applied here, pinned, and the rest re-fits round them when asked. Without the AI the words are read
-  // directly ("make bldg 7 four stories", "remove bldg 3").
+  // pieces, or on every piece of a sort ("all the apartments 3 stories"); they're applied here, pinned, and the rest
+  // re-fits round them when asked. Homes on lots change stories through the home mix ("no 3-story homes"): the program
+  // and recipe take the new mix and the site re-fits, the lots laid out again along the same streets at the widths
+  // those homes need. Without the AI the words are read directly ("make bldg 7 four stories", "remove bldg 3").
   async function aiChange() {
     const p = P(), pl = PL(); if (!pl?.elements.length) return;
     const ask = (ed.chg || '').trim(); if (!ask) { ctx.toast('Say what to change, e.g. “make Apt Bldg 7 four stories”.'); card.querySelector('#spChg')?.focus(); return; }
     if (ed.run) { ctx.toast('Wait for the run under way, or Cancel it.'); return; }
     const off = aiOff(), run = startRun('change', [off ? 'Reading your words' : 'Reading the plan and your request', 'Making the changes'], '#spChgGo'); if (!run) return;
-    const sel = ed.sel; let ops = [], full = false, note = '', question = null, byAi = false;
+    const sel = ed.sel; let ops = [], mix = null, full = false, note = '', question = null, byAi = false;
     try {
       if (off) throw Object.assign(new Error('AI off'), { status: 503 });
       let image = null; try { image = await planImage(pl); } catch (e) { /* words and numbers only */ }
       const d = await post({ mode: 'edit', prompt: ask, site: siteInfo(p, pl), plan: ED.describePlan(pl, sel), image }, run.ctl.signal);
-      ops = d.ops || []; full = d.refit === 'full'; note = d.summary || ''; question = d.question; byAi = true;
-    } catch (e) { if (!live(run)) return; ops = ED.guessEdits(ask, pl, sel); full = /\bre-?(?:fit|lay)/i.test(ask); note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this read your words directly.'; }
+      ops = d.ops || []; mix = d.homeMix?.length ? d.homeMix : null; full = d.refit === 'full'; note = d.summary || ''; question = d.question; byAi = true;
+    } catch (e) { if (!live(run)) return; ops = ED.guessEdits(ask, pl, sel); mix = ED.guessMix(ask, pl); full = /\bre-?(?:fit|lay)/i.test(ask); note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this read your words directly.'; }
     if (!live(run) || PL() !== pl) return;
-    if (!ops.length) { ed.chgDone = null; ed.chgNote = question || (note ? note + ' ' : '') + 'Couldn’t tell what to change: name the piece as it’s labelled (“Apt Bldg 7”), or select it and say “it”.'; endRun(run); return; }
-    full = (full || ed.chgFit) && !!pl.recipe; runStep(run, 2);
-    const depth = ed.undo.length, was = pl.elements.slice(); // to undo it, and to show what went
-    let r = null; change(x => { r = ED.applyEdits(x, ops, { refit: full, spare: x.spareRows = (x.spareRows || []).slice(-40) }); x.elements = r.elements; if (r.streets !== (x.streets || [])) x.streets = r.streets; });
+    const hm = mix && pl.recipe ? ED.withHomeMix(pl, mix) : null; // (a plan drawn by hand has no layout to lay the lots out again with)
+    if (!ops.length && !hm) { ed.chgDone = null; ed.chgNote = question || (mix ? 'This plan was drawn by hand, so its homes can’t be laid out again with a new mix: change the Home mix in Settings and build new layouts.' : (byAi ? 'The AI didn’t find anything on the plan to change for that.' : note) + ' Name the piece as it’s labelled (“Apt Bldg 7”), select it and say “it”, or say what to change across the site (“all the apartments 3 stories”, “no 3-story homes”).'); endRun(run); return; }
+    full = (full || ed.chgFit || !!hm) && !!pl.recipe; runStep(run, 2);
+    const depth = ed.undo.length, was = pl.elements.slice(), prog0 = pl.program, recipe0 = pl.recipe; // to undo it, and to show what went
+    const homeOk = e => !(e.kind === 'building' && e.use === 'sfr' && e.pinned && !hm.mix.some(t => t.stories === (e.floors || 1))); // a home placed by hand that the new mix leaves out is laid out again
+    let r = null; change(x => { r = ED.applyEdits(x, ops, { refit: full, spare: x.spareRows = (x.spareRows || []).slice(-40) }); x.elements = r.elements; if (r.streets !== (x.streets || [])) x.streets = r.streets;
+      if (hm) { x.program = hm.program; x.recipe = hm.recipe; x.elements = x.elements.map(e => homeOk(e) ? e : { ...e, pinned: false }); } });
+    if (mix && !hm) r.skipped.push('This plan was drawn by hand, so its homes can’t be laid out again with a new mix: change the Home mix in Settings and build new layouts.');
     const gone = was.filter(e => !['parking', 'green', 'lot', 'trail'].includes(e.kind) && !pl.elements.some(x => x.id === e.id)); // removed (not parking rows that gave way)
     if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; draw(); // Edit Layout stays as it was
     let held = null; if (full) { run.steps = [...run.steps, 'Re-fitting the rest of the site']; runStep(run, 3); let rf = null; try { rf = await refitOf(PL(), { amount: 'current' }); } catch (e) { console.warn('refit', e); }
@@ -2705,7 +2711,13 @@ export function initSitePlan(ctx) {
       // of houses dropped round a moved community center) or add problems isn't taken; the change stays and Re-fit
       // anyway is offered
       const at = els => ({ m: SP.metrics({ ...pl, elements: els }), issues: SP.check({ ...pl, elements: els }) }), v = rf && PL() === pl ? T.refitVerdict(at(pl.elements), at(rf.elements)) : null;
-      if (v && !v.ok) { r.skipped.push('Re-fitting the rest of the site would have ' + (v.why === 'problems' ? 'added problems' : v.why === 'units' ? 'lost homes or units' : 'lost floor area') + ', so only those pieces changed.'); held = rf; rf = null; }
+      if (hm) { // a new home mix is only real once the lots are laid out again: fewer homes on wider lots is what was asked for
+        if (rf && PL() === pl) { pl.elements = rf.elements; pl.spareRows = []; if (rf.recipe) pl.recipe = clone(rf.recipe); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null;
+          const n0 = was.filter(e => e.kind === 'building' && e.use === 'sfr').length, n1 = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr').length;
+          r.done.push('Home mix: ' + ED.mixText(hm.mix) + '; ' + (n0 === n1 ? n1 + ' homes' : n0 + ' → ' + n1 + ' homes') + ', the lots laid out again along the same streets.');
+          if (v?.why === 'problems') r.skipped.push('Laying the homes out again left a problem or two: see the checks.'); }
+        else { pl.program = prog0; pl.recipe = recipe0; r.skipped.push('The homes couldn’t be laid out again with that mix, so their stories didn’t change.' + (refitNo ? ' ' + refitNo : '')); } }
+      else if (v && !v.ok) { r.skipped.push('Re-fitting the rest of the site would have ' + (v.why === 'problems' ? 'added problems' : v.why === 'units' ? 'lost homes or units' : 'lost floor area') + ', so only those pieces changed.'); held = rf; rf = null; }
       else if (PL() === pl && rf) { pl.elements = rf.elements; pl.spareRows = []; if (rf.recipe) pl.recipe = clone(rf.recipe); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; }
       else if (!rf && !held) r.skipped.push('The rest couldn’t be re-fitted around it, so only those pieces changed.'); }
     // what it did as a checklist, with Undo this change, and (parking short) Re-fit around my changes; on the map, what

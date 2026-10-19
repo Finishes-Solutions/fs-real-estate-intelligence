@@ -22,9 +22,9 @@
 // site: { acres, widthFt, depthFt, frontageFt, address, city, county, zoning }; facts: short lines (flood zone, roads
 // and traffic, districts, utilities, environmental records).
 import { chatJSON, pickModel, withModel } from '../lib/openai.mjs';
-import { USES, SETBACKS, guessProgram, normalizeProgram } from '../lib/siteplan.mjs';
+import { USES, SETBACKS, HOME_MIX, guessProgram, normalizeProgram } from '../lib/siteplan.mjs';
 import { AMENITIES } from '../lib/sitecompose.mjs';
-import { catalogText } from '../lib/siteedit.mjs';
+import { catalogText, keepStories } from '../lib/siteedit.mjs';
 import { typeById } from '../lib/buildings.mjs';
 import { recipeIn, programOf, customOf, teamTypesForAI, OUTDOOR, PER, PATTERNS } from '../lib/customtypes.mjs';
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
@@ -323,12 +323,15 @@ async function bestUse(b, key, res) {
 
 // ---------- changes to a laid-out plan, by name ----------
 const nul = (t, extra = {}) => ({ type: [t, 'null'], ...extra });
+const EVERY = [...Object.keys(USES), 'building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio']; // what an edit on every piece of a sort can name
 export const EDIT_SCHEMA = {
-  type: 'object', additionalProperties: false, required: ['ops', 'refit', 'summary', 'question'],
+  type: 'object', additionalProperties: false, required: ['ops', 'homeMix', 'refit', 'summary', 'question'],
   properties: {
-    ops: { type: 'array', description: 'The edits, in order.', items: { type: 'object', additionalProperties: false, required: ['action', 'target', 'with', 'type', 'kind', 'use', 'name', 'floors', 'units', 'w', 'd', 'x', 'y', 'turn'], properties: {
+    ops: { type: 'array', description: 'The edits, in order.', items: { type: 'object', additionalProperties: false, required: ['action', 'target', 'every', 'floorsOver', 'with', 'type', 'kind', 'use', 'name', 'floors', 'units', 'w', 'd', 'x', 'y', 'turn'], properties: {
       action: { type: 'string', enum: ['change', 'remove', 'add', 'move', 'swap'] },
-      target: nul('string', { description: 'id of the piece to change, remove, move or swap (null for add).' }),
+      target: nul('string', { description: 'id of the piece to change, remove, move or swap (null for add, or with every).' }),
+      every: nul('string', { enum: [...EVERY, null], description: 'change / remove with no target: every piece of this use (a building use, e.g. multifamily, townhomes) or kind (pool, court…), listed or not.' }),
+      floorsOver: nul('integer', { description: 'with every: only the ones with more floors than this now (2 picks the 3-story and taller ones).' }),
       with: nul('string', { description: 'swap: the other piece. add / move: a piece to put it beside (when no x, y).' }),
       type: nul('string', { description: 'A building type id from the library: the building it becomes (change) or the one added (add).' }),
       kind: nul('string', { enum: ['building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio', 'entrance', null], description: 'add without a library type: what kind of piece. entrance: a driveway in from the street at x, y (a point on the lot line, y about 0 for the front), or with no x, y where it helps most.' }),
@@ -336,6 +339,7 @@ export const EDIT_SCHEMA = {
       floors: nul('integer'), units: nul('integer'), w: nul('number', { description: 'feet across its front' }), d: nul('number', { description: 'feet deep' }),
       x: nul('number', { description: 'where its centre goes: feet across the frontage from the street’s left end, as on the drawing' }), y: nul('number', { description: 'feet back from the street' }),
       turn: nul('number', { description: 'its angle on the drawing in degrees (0 = its long side along the street, 90 = running back from it)' }) } } },
+    homeMix: { type: 'array', description: 'The single-family homes on lots by stories, when the request changes their stories across the site (e.g. no 3-story homes: the 1- and 2-story shares only). Empty for no change.', items: { type: 'object', additionalProperties: false, required: ['stories', 'pct'], properties: { stories: { type: 'integer', enum: [1, 2, 3] }, pct: { type: 'number', description: 'share of the homes, %' } } } },
     refit: { type: 'string', enum: ['none', 'full'], description: 'none: change just these pieces; parking under them gives way and comes back where they leave (the usual). full: also lay out everything else again around them (when the user asks for a re-fit or re-layout, or after adding or removing several buildings, or moving one into land without drives).' },
     summary: { type: 'string', description: 'One or two sentences on what you changed, for the user.' },
     question: nul('string', { description: 'Only when you can’t tell what they mean: one short question (and no ops).' })
@@ -353,6 +357,9 @@ export const EDIT_SYSTEM = `You edit a concept site plan the way a land planner 
 - refit: "none" unless they ask for the site to re-fit or re-lay, or the change needs new drives and parking (a building added in open land, several buildings removed); then "full".
 - Places: plan.places says where things are, in the same feet as "at" (x across the frontage from its left end, y back from the street). "The front" / "by the street" is small y, "the back" / "the rear" the largest y, "the middle" / "the center" the middle of the site; "left" and "right" as on the drawing. "The middle of the homes" (or of any use: the apartments, the shops, the single-family lots) is that area's middle in places.areas; "in front of" a piece or area is toward the street from it, "behind" it away from the street; a named zone ("the back zone", "the commons") is in places.zones. Use these for x, y when they say where, without asking them to be more exact.
 - Moving or adding an amenity, clubhouse or pool among houses: the houses under its new spot give way by themselves (the app removes them); keep refit "none" so the rest of the neighbourhood stays as it is.
+- Changes across the whole site ("all the apartments", "every pool", "no 3-story buildings") are one op with every (a use or a kind) and no target, with floorsOver to pick only the taller ones: "nothing over 3 stories" is change every multifamily, floorsOver 3, floors 3. Never answer a site-wide request with a handful of the pieces listed.
+- Homes on lots (use sfr): houses.byStories counts them by stories and houses.mix is their mix; on a big neighbourhood they aren't listed. Their stories change through homeMix, never by ops: each home's lot is sized for its stories, so the app lays the lots out again along the same streets. "Only 1- and 2-story homes, no 3-story" is homeMix with the 1- and 2-story shares of houses.mix scaled up to 100 and no 3-story; "all single-story" is 1-story at 100. Townhomes and duplexes are buildings: use every.
+- The summary says only what the ops and homeMix do. If nothing you can do matches the request, give no ops, say so in question, and never claim a change you didn't make.
 - Never invent ids. If it's unclear which piece they mean, ask one short question instead.`;
 // where things are on the drawing (lib/siteedit.mjs placesOf), as the browser sent it: points and names only, kept small
 const pt = v => Array.isArray(v) && v.length >= 2 && v.slice(0, 2).every(x => Number.isFinite(+x)) ? v.slice(0, 2).map(x => Math.round(+x)) : null;
@@ -363,19 +370,31 @@ function placesIn(p) {
   return { site, areas: (Array.isArray(p.areas) ? p.areas : []).slice(0, 20).map(area).filter(a => a.middle), zones: (Array.isArray(p.zones) ? p.zones : []).slice(0, 8).map(area).filter(a => a.middle) };
 }
 const opt = v => v == null || v === '' ? null : num(v); // a number that may be left out (null stays null, not 0)
+// the homes on lots as the browser counted them (lib/siteedit.mjs describePlan): how many, by stories, and their mix
+const mixIn = m => (Array.isArray(m) ? m : []).filter(t => [1, 2, 3].includes(t?.stories) && Number.isFinite(+t.pct) && +t.pct > 0).slice(0, 3).map(t => ({ stories: t.stories, pct: Math.min(100, Math.round(+t.pct)) }));
+function housesIn(h) {
+  if (!h || typeof h !== 'object') return undefined;
+  return { count: num(h.count), listed: !!h.listed, byStories: Object.fromEntries(Object.entries(h.byStories && typeof h.byStories === 'object' ? h.byStories : {}).filter(([k]) => ['1', '2', '3'].includes(k)).map(([k, v]) => [k, num(v)])), mix: mixIn(h.mix) };
+}
 async function edit(b, key, res) {
   const prompt = clip(b.prompt, 1200).trim(), plan = b.plan && typeof b.plan === 'object' ? b.plan : null; if (!prompt || !plan) return res.status(400).json({ error: 'Say what to change.' });
   const pieces = (Array.isArray(plan.pieces) ? plan.pieces : []).slice(0, 500).map(p => ({ id: clip(p.id, 40), name: clip(p.name, 60), kind: clip(p.kind, 20), use: p.use ? clip(p.use, 20) : null, at: Array.isArray(p.at) ? p.at.slice(0, 2).map(num) : null, size: Array.isArray(p.size) ? p.size.slice(0, 2).map(num) : null, turn: num(p.turn), floors: num(p.floors), units: num(p.units), type: p.type ? clip(p.type, 90) : null, note: p.note ? clip(p.note, 80) : null, ...(p.selected ? { selected: true } : {}), ...(p.pinned ? { pinned: true } : {}) }));
   const ids = new Set(pieces.map(p => p.id)), image = typeof b.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(b.image) && b.image.length < 600000 ? b.image : null;
-  const text = JSON.stringify({ request: prompt, site: { ...JSON.parse(siteText(b.site, '', null, null)).site, ...(plan.site || {}) }, totals: plan.totals || null, parking: plan.parking || null, houses: plan.houses ? clip(plan.houses, 80) : undefined, places: placesIn(plan.places), selected: pieces.find(p => p.selected)?.id || null, pieces }) + '\n\nBuilding library (type id = name):\n' + catalogText();
+  const text = JSON.stringify({ request: prompt, site: { ...JSON.parse(siteText(b.site, '', null, null)).site, ...(plan.site || {}) }, totals: plan.totals || null, parking: plan.parking || null, houses: housesIn(plan.houses), places: placesIn(plan.places), selected: pieces.find(p => p.selected)?.id || null, pieces }) + '\n\nBuilding library (type id = name):\n' + catalogText();
   try {
     const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: EDIT_SYSTEM, user: text, name: 'site_edit', schema: EDIT_SCHEMA, maxTokens: 16000, effort: 'high', images: image ? [image] : [] }));
     const d = r.data, kinds = new Set(['building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio', 'entrance']);
-    const ops = (d.ops || []).slice(0, 30).filter(o => ['change', 'remove', 'add', 'move', 'swap'].includes(o.action) && (o.action === 'add' || ids.has(o.target)) && (o.action !== 'swap' || ids.has(o.with))).map(o => ({
-      action: o.action, target: ids.has(o.target) ? o.target : null, with: ids.has(o.with) ? o.with : null, type: o.type && typeById(o.type) ? o.type : null, kind: kinds.has(o.kind) ? o.kind : null, use: USES[o.use] ? o.use : null, name: o.name ? clip(o.name, 60) : null,
+    const every = o => (o.action === 'change' || o.action === 'remove') && !ids.has(o.target) && EVERY.includes(o.every);
+    let homeMix = mixIn(d.homeMix);
+    const ops = (d.ops || []).slice(0, 30).filter(o => ['change', 'remove', 'add', 'move', 'swap'].includes(o.action) && (o.action === 'add' || ids.has(o.target) || every(o)) && (o.action !== 'swap' || ids.has(o.with))).filter(o => {
+      if (!(every(o) && o.every === 'sfr' && o.action === 'change' && [1, 2, 3].includes(o.floors))) return true; // homes on lots by stories: that's the home mix
+      if (!homeMix.length) homeMix = Number.isInteger(o.floorsOver) ? keepStories(mixIn(plan.houses?.mix).length ? mixIn(plan.houses.mix) : HOME_MIX, [1, 2, 3].filter(n => n <= o.floorsOver || n === o.floors)) || [] : [{ stories: o.floors, pct: 100 }]; return false; // (only the taller ones: the rest keep their shares)
+    }).map(o => ({
+      action: o.action, target: ids.has(o.target) ? o.target : null, every: every(o) ? o.every : null, floorsOver: every(o) && Number.isInteger(o.floorsOver) && o.floorsOver >= 0 && o.floorsOver < 60 ? o.floorsOver : null, with: ids.has(o.with) ? o.with : null, type: o.type && typeById(o.type) ? o.type : null, kind: kinds.has(o.kind) ? o.kind : null, use: USES[o.use] ? o.use : null, name: o.name ? clip(o.name, 60) : null,
       floors: Number.isInteger(o.floors) && o.floors >= 1 && o.floors <= 60 ? o.floors : null, units: Number.isInteger(o.units) && o.units >= 1 && o.units <= 2000 ? o.units : null, w: num(o.w) > 4 && o.w < 2000 ? +o.w : null, d: num(o.d) > 4 && o.d < 2000 ? +o.d : null, x: opt(o.x), y: opt(o.y), turn: opt(o.turn) }));
     res.setHeader('Cache-Control', 'no-store');
-    return res.json({ ops, refit: d.refit === 'full' ? 'full' : 'none', summary: clip(d.summary, 500), question: ops.length ? null : clip(d.question || '', 300) || null });
+    const any = ops.length || homeMix.length;
+    return res.json({ ops, homeMix, refit: d.refit === 'full' ? 'full' : 'none', summary: any ? clip(d.summary, 500) : '', question: any ? null : clip(d.question || '', 300) || null });
   } catch (e) {
     console.error('siteplan edit', e.message);
     return res.status(502).json({ error: 'The AI didn’t answer just now.' });

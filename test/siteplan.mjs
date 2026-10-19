@@ -208,17 +208,31 @@ for (const v of [0, 1, 2]) {
   const it = EDIT_SCHEMA.properties.ops.items; assert.deepEqual(it.required.slice().sort(), Object.keys(it.properties).sort(), 'strict op schema');
   const call = async body => { const res = mock(); await handler({ method: 'POST', body, headers: { 'x-forwarded-for': '7.7.7.9' } }, res); return res; };
   const plan = { site: { acres: 21.3 }, totals: { units: 240 }, pieces: [{ id: 'b7', name: 'Apt Bldg 7', kind: 'building', use: 'multifamily', at: [300, 400], size: [180, 60], turn: 0, floors: 3, units: 24, selected: true }, { id: 'c1', name: 'Clubhouse', kind: 'building', use: 'amenity', at: [100, 80], size: [90, 60] }] };
-  const op = o => ({ action: 'change', target: null, with: null, type: null, kind: null, use: null, name: null, floors: null, units: null, w: null, d: null, x: null, y: null, turn: null, ...o });
-  reply = () => ({ ops: [op({ target: 'b7', floors: 4 }), op({ target: 'nope', floors: 2 }), op({ target: 'c1', type: 'clubhouse-clubhouse-7-500-sf' }), op({ target: 'c1', type: 'made-up-type', floors: 99 }), op({ action: 'swap', target: 'b7', with: 'ghost' })], refit: 'full', summary: 'Bldg 7 goes to four stories; a bigger clubhouse.', question: null });
+  const op = o => ({ action: 'change', target: null, every: null, floorsOver: null, with: null, type: null, kind: null, use: null, name: null, floors: null, units: null, w: null, d: null, x: null, y: null, turn: null, ...o });
+  reply = () => ({ homeMix: [], ops: [op({ target: 'b7', floors: 4 }), op({ target: 'nope', floors: 2 }), op({ target: 'c1', type: 'clubhouse-clubhouse-7-500-sf' }), op({ target: 'c1', type: 'made-up-type', floors: 99 }), op({ action: 'swap', target: 'b7', with: 'ghost' })], refit: 'full', summary: 'Bldg 7 goes to four stories; a bigger clubhouse.', question: null });
   let res = await call({ mode: 'edit', prompt: 'make it four stories and give us a bigger clubhouse', plan, image: 'data:image/jpeg;base64,' + Buffer.from('x').toString('base64') });
   assert.equal(res.code, 200, JSON.stringify(res.body));
   assert.deepEqual(res.body.ops.map(o => [o.target, o.floors, o.type]), [['b7', 4, null], ['c1', null, 'clubhouse-clubhouse-7-500-sf'], ['c1', null, null]], 'only known pieces, library types and sane numbers');
   assert.equal(res.body.refit, 'full'); const u = sent.messages[1].content; assert.ok(Array.isArray(u) && u[1].type === 'image_url', 'the drawing goes to the model');
   assert.ok(/Apt Bldg 7/.test(u[0].text) && /clubhouse-clubhouse-7-500-sf = Clubhouse/.test(u[0].text), 'the plan and the library go to the model');
-  reply = () => ({ ops: [op({ action: 'add', kind: 'entrance', x: 300, y: 0 }), op({ action: 'add', kind: 'helipad' })], refit: 'none', summary: 'A second driveway.', question: null });
+  reply = () => ({ homeMix: [], ops: [op({ action: 'add', kind: 'entrance', x: 300, y: 0 }), op({ action: 'add', kind: 'helipad' })], refit: 'none', summary: 'A second driveway.', question: null });
   res = await call({ mode: 'edit', prompt: 'add a second entrance', plan }); assert.deepEqual(res.body.ops.map(o => [o.kind, o.x, o.y]), [['entrance', 300, 0], [null, null, null]], 'an entrance, at a point on the street');
-  reply = () => ({ ops: [], refit: 'none', summary: '', question: 'Which building: Bldg 7 or Bldg 17?' });
+  reply = () => ({ homeMix: [], ops: [], refit: 'none', summary: '', question: 'Which building: Bldg 7 or Bldg 17?' });
   res = await call({ mode: 'edit', prompt: 'make that one taller', plan }); assert.equal(res.body.question, 'Which building: Bldg 7 or Bldg 17?');
+  // across the whole site: every piece of a use at once, and the homes on lots (not listed) by their mix of stories
+  const big = { ...plan, houses: { count: 570, listed: false, byStories: { 1: 170, 2: 340, 3: 60 }, mix: [{ stories: 1, pct: 30 }, { stories: 2, pct: 60 }, { stories: 3, pct: 10 }] } };
+  reply = () => ({ homeMix: [{ stories: 1, pct: 33 }, { stories: 2, pct: 67 }, { stories: 4, pct: 5 }], ops: [op({ every: 'multifamily', floorsOver: 3, floors: 3 }), op({ action: 'remove', every: 'pool' }), op({ every: 'spaceship', floors: 2 })], refit: 'none', summary: 'No 3-story homes; apartments capped at 3 stories; pools removed.', question: null });
+  res = await call({ mode: 'edit', prompt: 'Residential homes should only be 1 story and two-story homes, no 3 story homes.', plan: big });
+  assert.deepEqual(res.body.homeMix, [{ stories: 1, pct: 33 }, { stories: 2, pct: 67 }], 'the home mix, sane stories only');
+  assert.deepEqual(res.body.ops.map(o => [o.action, o.every, o.floorsOver, o.floors, o.target]), [['change', 'multifamily', 3, 3, null], ['remove', 'pool', null, null, null]], 'every piece of a use or kind; unknown sorts dropped');
+  assert.deepEqual(JSON.parse(sent.messages[1].content[0]?.text ?? sent.messages[1].content.split('\n\nBuilding library')[0]).houses, big.houses, 'the AI sees the homes by stories and their mix');
+  assert.ok(EDIT_SCHEMA.properties.homeMix && EDIT_SCHEMA.properties.ops.items.properties.every.enum.includes('sfr'));
+  // the homes by stories as an op on every home: read as the mix (the 1- and 2-story keep their shares)
+  reply = () => ({ homeMix: [], ops: [op({ every: 'sfr', floorsOver: 2, floors: 2 })], refit: 'none', summary: 'No 3-story homes.', question: null });
+  res = await call({ mode: 'edit', prompt: 'no 3 story homes', plan: big }); assert.deepEqual(res.body.homeMix, [{ stories: 1, pct: 33 }, { stories: 2, pct: 67 }]); assert.equal(res.body.ops.length, 0);
+  // nothing it could do: no summary claiming a change, a question instead
+  reply = () => ({ homeMix: [], ops: [op({ target: 'ghost', floors: 2 })], refit: 'none', summary: 'Changed all 3-story residential homes to 1 or 2-story homes.', question: null });
+  res = await call({ mode: 'edit', prompt: 'no 3 story homes', plan: big }); assert.equal(res.body.summary, '', 'never a summary of changes that weren’t made'); assert.equal(res.body.ops.length, 0);
   res = await call({ mode: 'edit', prompt: '', plan }); assert.equal(res.code, 400); }
 
 // ---- /api/siteplan: the effort picked under Build, and questions about the open plan ----

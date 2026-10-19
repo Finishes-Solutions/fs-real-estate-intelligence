@@ -500,6 +500,46 @@ function usable(plan, o, what) {
   const hm = P.areas.find(a => a.name === 'Single-family homes').middle; assert.deepEqual([g[0].x, g[0].y], hm, 'the middle of the homes');
   const bk = E.guessEdits('move the community center to the back', base)[0]; assert.ok(bk && bk.y === P.site.back[1], 'the back of the site');
 }
+// ---- changes across the whole site (Oct 19): "Residential homes should only be 1 story and two-story homes, no 3 story
+// homes" on a 100-acre mixed plan (retail out front, a few hundred homes on lots, a lake and commons) did nothing: the
+// houses weren't listed for the AI (too many) and it could only change pieces one by one. Homes on lots now change
+// stories through the home mix (their lots are sized for them: the lots are laid out again along the same streets), and
+// every piece of a use or kind can change at once ----
+{
+  const E = await import('../lib/siteedit.mjs'), N = S.unionParcels([mk([-95.96, 30.07], [[0, 0], [2600, 0], [2600, 1700], [0, 1700]])]), site = { ...N, front: N.ring.findIndex((p, i) => S.outwardOf(N.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } };
+  const o = L.layoutOptions(site, { use: 'mixed', zones: [{ use: 'retail', gfa: 60000 }, { use: 'sfr', units: 250 }, { use: 'amenity', items: ['lake', 'center', 'pool', 'playground'] }] }, { count: 1 })[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe };
+  const homes = els => els.filter(e => e.kind === 'building' && e.use === 'sfr'), storiesOf = els => [...new Set(homes(els).map(e => e.floors))].sort(), retail = els => els.filter(e => e.kind === 'building' && e.use === 'retail');
+  assert.ok(homes(o.elements).length > 120 && storiesOf(o.elements).includes(3), 'a big neighbourhood with some 3-story homes: ' + homes(o.elements).length + ' ' + storiesOf(o.elements));
+  const d = E.describePlan(base); assert.ok(d.houses && !d.houses.listed && d.houses.count === homes(o.elements).length && d.houses.byStories[3] > 0 && d.houses.mix.length === 3 && !d.pieces.some(p => p.use === 'sfr'), 'the AI is told how many homes there are by stories, and their mix: ' + JSON.stringify(d.houses));
+  // the request word for word, read without the AI: 1- and 2-story only, in the shares they had
+  const mix = E.guessMix('Residential homes should only be 1 story and two-story homes, no 3 story homes.', base); assert.deepEqual(mix.map(t => t.stories), [1, 2]); assert.equal(mix.reduce((t, x) => t + x.pct, 0), 100);
+  assert.equal(E.guessMix('make lot 12 two stories', base), null, 'one home named: an edit on it, not the mix'); assert.equal(E.guessMix('make bldg 7 four stories', base), null);
+  assert.deepEqual(E.guessMix('no 3-story houses', base).map(t => t.stories), [1, 2]); assert.deepEqual(E.guessMix('make all the homes single story', base) || [], [], '(no number: not read as a mix)');
+  const hm = E.withHomeMix(base, mix), p2 = { ...base, program: hm.program, recipe: hm.recipe }, rf = L.refit(p2, { amount: 'current' });
+  assert.ok(rf?.elements?.length, 'the site re-fits with the new mix');
+  const p3 = { ...p2, elements: rf.elements }, n0 = homes(o.elements).length, n1 = homes(rf.elements).length;
+  assert.deepEqual(storiesOf(rf.elements), [1, 2], 'no 3-story homes left: ' + storiesOf(rf.elements));
+  assert.ok(n1 >= n0 * 0.85 && n1 <= n0, 'a few homes fewer on the wider lots, not streets of them: ' + n0 + ' → ' + n1);
+  assert.equal(retail(rf.elements).reduce((t, e) => t + S.gfaOf(e), 0), retail(o.elements).reduce((t, e) => t + S.gfaOf(e), 0), 'the retail is untouched');
+  assert.ok(rf.elements.some(e => e.kind === 'pond') && rf.elements.some(e => e.kind === 'building' && e.use === 'amenity'), 'the lake and commons stay');
+  for (const h of homes(rf.elements)) { const lot = rf.elements.find(l => l.kind === 'lot' && S.inRing(S.centroid(S.shapeOf(h)), S.shapeOf(l))); assert.ok(lot && Math.min(lot.w, lot.d) >= h.w, 'each home on a lot as wide as it needs'); }
+  assert.deepEqual(S.check(p3).filter(i => i.level === 'bad').map(i => i.text), S.check(base).filter(i => i.level === 'bad').map(i => i.text), 'no new problems');
+  assert.equal(E.withHomeMix(base, [{ stories: 3, pct: 0 }]), null, 'a mix with no homes is no mix');
+  assert.ok(hm.program.zones.find(z => z.use === 'sfr').homeMix.every(t => t.stories < 3) && JSON.stringify(hm.recipe.seq).includes('"homeMix":[{"stories":1'), 'the program and the recipe both carry it, so a later re-fit keeps it');
+  // every piece of a use or kind at once, listed or not
+  const r1 = E.applyEdits(base, [{ action: 'change', every: 'retail', floors: 2 }]);
+  assert.ok(retail(r1.elements).length && retail(r1.elements).every(e => e.floors === 2) && r1.done.length === 1 && /All \d+ retail buildings: 2 stories/.test(r1.done[0]), r1.done.join(' '));
+  const r2 = E.applyEdits(base, [{ action: 'change', every: 'building', floorsOver: 2, floors: 2 }]);
+  assert.ok(r2.skipped.some(t => /home mix/.test(t)) && storiesOf(r2.elements).includes(3), 'homes on lots never change stories one by one (their lots wouldn’t fit them): ' + r2.skipped.join(' '));
+  const pools = o.elements.filter(e => e.kind === 'pool').length, r3 = E.applyEdits(base, [{ action: 'remove', every: 'pool' }]);
+  assert.ok(!r3.elements.some(e => e.kind === 'pool') && (pools ? r3.done[0].startsWith('Removed ' + pools + ' pool') : r3.skipped.includes('No pools on the plan.')), r3.done.concat(r3.skipped).join(' '));
+  assert.deepEqual(E.applyEdits(base, [{ action: 'change', every: 'multifamily', floors: 4 }]).skipped, ['No apartment buildings on the plan.']);
+  // a neighbourhood of homes only: the same
+  const sf = { origin: [-95.93, 30.09], ring: [[-700, -500], [700, -500], [700, 500], [-700, 500]], front: 0, setbacks: { ...S.SETBACKS } }, os = L.layoutOptions(sf, { use: 'sfr' })[0], bs = { ...sf, program: os.program, elements: os.elements, recipe: os.recipe };
+  assert.ok(storiesOf(os.elements).includes(3), 'some 3-story homes: ' + storiesOf(os.elements));
+  const hs = E.withHomeMix(bs, E.guessMix('no 3 story homes', bs)), rs = L.refit({ ...bs, program: hs.program, recipe: hs.recipe }, { amount: 'current' });
+  assert.deepEqual(storiesOf(rs.elements), [1, 2], 'homes only: no 3-story left'); assert.ok(homes(rs.elements).length >= homes(os.elements).length * 0.85, homes(os.elements).length + ' → ' + homes(rs.elements).length);
+}
 // ---- how many ways in, when the request doesn't say: a corner lot gets one on each street, a big apartment community a
 // second for fire access, an inside lot one ----
 {
