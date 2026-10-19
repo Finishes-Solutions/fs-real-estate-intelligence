@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 11:07 AM CT: Change With AI makes whole-site changes, including the homes' stories (dc01624)
+- **"No 3-story homes" now works.** On a big neighbourhood the AI couldn't see the individual homes and could only change pieces one at a time, so a request like "Residential homes should only be 1 story and two-story homes, no 3 story homes" changed nothing, yet the reply still described the change. The AI now sees how many homes there are of each height and changes the neighbourhood's home mix instead.
+- **The lots are laid out again along the same streets.** Each home's lot is sized for it (3-story on 40 ft lots, 2-story on 50 ft, 1-story on 60 ft), so dropping 3-story homes means wider lots and a few fewer homes. The result says how many there were and how many there are now. The shops, lake, commons and anything you placed by hand stay as they are, the new mix shows in Settings, and **Undo This Change** puts it all back.
+- **Every piece of a kind at once:** "make all the apartments 3 stories", "nothing over 3 stories", "remove every pool".
+- **No more made-up results:** when the AI can't find anything on the plan to change, it says so instead of describing a change it didn't make.
+- Without the AI, "no 3-story homes" and similar wording is read directly.
+
 ### 9:49 AM CT: Any building type the AI can describe, and a shared team building library (7da2412, c42fa30, merged b246482)
 - **No more plain boxes for a daycare, a pickleball club or an RV park.** When a request names a kind of place the planner has no setting for, the AI now writes a recipe for it: its buildings, its outdoor pieces (courts, a playground, a pool, a lawn, a plaza, a patio, a pavilion), its parking rule and the figures to show. The planner lays it out with its usual machinery, so drives, parking, entrances, detention, trash and the checks work as for any other use.
 - **Four ways to lay one out:** a building facing its parking (a car wash), a few freestanding buildings (a school's classrooms and gym), a building with its outdoor pieces together on their own ground behind or beside it (a daycare and its playground, a club and its courts), or rows of sites on drive aisles like RV storage (an RV park, with sites both sides of each aisle, an office at the street and a fence).
