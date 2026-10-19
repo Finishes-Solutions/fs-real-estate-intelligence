@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 5:03 PM CT: Plan set drawings refined, with tests (36f764e)
+- Sheets: the architectural sheets are refined further.
+- Tests now check every site/civil, architectural and engineering sheet on ten realistic plans: shops, a restaurant, townhomes, 71 homes, a warehouse, a 3-story office, medical, a c-store, duplexes and a church.
+
 ### 4:58 PM CT: Full plan sets, part 2: the drawings, first draft (320cca2)
 - **The placeholder sheets are now real drawings:**
   - **Site & civil and landscape:** existing conditions with the boundary's bearings and lengths, dimension and paving, typical lot plans, grading and drainage, detention, utilities, erosion control, civil details, landscape plan and details.
