@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 2:35 PM CT: Plan for full plan sets from a site plan (431cdcb)
+- **Planning only, nothing in the app changes.** `PLANSET-PLAN.md` sets out how an option's site plan would become a schematic design set of drawings, all on the Finishes Solutions title block: cover, civil and site, landscape, architecture, structure, mechanical, plumbing, electrical, fire, and telecom if wanted. Project pages would read Sites · Renderings · Plans.
+- It defines what a "full set" contains: which sheets, their numbers, and when each one is included. It also covers how Claude would design each building type for a person to approve and save to the team library, how code would draw and cross-check every sheet from the plan, and the settings for the Claude API key and model, with costs and a monthly cap.
+
 ### 9:49 AM CT: Any building type the AI can describe, and a shared team building library (7da2412, c42fa30, merged b246482)
 - **No more plain boxes for a daycare, a pickleball club or an RV park.** When a request names a kind of place the planner has no setting for, the AI now writes a recipe for it: its buildings, its outdoor pieces (courts, a playground, a pool, a lawn, a plaza, a patio, a pavilion), its parking rule and the figures to show. The planner lays it out with its usual machinery, so drives, parking, entrances, detention, trash and the checks work as for any other use.
 - **Four ways to lay one out:** a building facing its parking (a car wash), a few freestanding buildings (a school's classrooms and gym), a building with its outdoor pieces together on their own ground behind or beside it (a daycare and its playground, a club and its courts), or rows of sites on drive aisles like RV storage (an RV park, with sites both sides of each aisle, an office at the street and a fence).
