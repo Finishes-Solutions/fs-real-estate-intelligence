@@ -136,6 +136,15 @@ assert.ok(best['1.5 ac'] > best['1 ac'], '1.5 acres holds more trucks than 1: ' 
   for (const [i, o] of opts.entries()) sound('2.5 ac fit #' + i, plan, o);
   assert.ok(ms[0].foodtrucks.trucks >= 10 && ms[0].spaces >= ms[0].required && ms[0].pond > 0, '2.5 ac as many as fit: ' + ms.map(m => m.foodtrucks.trucks + (m.pond > 0 ? ' with a pond' : '')).join(', '));
   assert.ok(ms.every(m => m.foodtrucks.trucks >= 6 && m.spaces >= m.required), 'every option a real park, parked'); }
+// narrow, deep lots (150 and 180 ft wide, ~900 ft deep): too narrow for trucks on both sides, so they run down one long
+// side (they used to get one back row of 2 trucks, or nothing at 150 ft)
+for (const [wd, ring] of [[180, [[0, 0], [180, 0], [185, 900], [0, 890]]], [150, [[0, 0], [150, 0], [155, 900], [0, 890]]]]) for (const ask of ['a food truck park', ASK]) {
+  const { plan, opts } = lot(ring, ftOf(ask), SB0), tag = wd + ' ft deep / ' + ask, ms = opts.map(o => S.metrics(of(plan, o)));
+  assert.ok(opts.length >= 2, tag + ': layouts');
+  for (const [i, o] of opts.entries()) { sound(tag + ' #' + i, plan, o); assert.ok(ms[i].spaces >= ms[i].required, tag + ' #' + i + ': parked ' + ms[i].spaces + '/' + ms[i].required); assert.ok(ms[i].foodtrucks.trucks >= 8, tag + ' #' + i + ': ' + ms[i].foodtrucks.trucks + ' trucks'); }
+  assert.ok(ms[0].foodtrucks.trucks >= (ask === ASK ? 12 : 10), tag + ': the recommended layout holds ' + ms[0].foodtrucks.trucks);
+  assert.equal(opts[0].name.split(' · ')[0].replace(/^Layout \d+ · /, ''), 'Trucks down one side', tag);
+}
 // a re-fit keeps a stall and the pavilion where they were put by hand
 { const { plan, opts } = lot([[0, 0], [330, 0], [334, 330], [4, 328]], ftOf(ASK)), o = opts[0];
   const els = o.elements.map(e => e.kind === 'foodtruck' && e.name === 'Truck 1' || e.ft === 'pavilion' ? { ...e, pinned: true } : { ...e }), pins = els.filter(e => e.pinned);
