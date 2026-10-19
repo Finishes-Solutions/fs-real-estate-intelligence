@@ -19,6 +19,7 @@ import * as T from './lib/sitetools.mjs';
 import * as RD from './lib/render.mjs';
 import * as PJ from './lib/project.mjs';
 import * as PS from './lib/planset.mjs';
+import * as PD from './lib/plandesign.mjs';
 import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, pickedClaude, pickedEffort } from './lib/aimodels.mjs';
 import * as CU from './lib/customtypes.mjs';
 import { teamLibrary } from './teamlib.js';
@@ -3516,61 +3517,120 @@ export function initSitePlan(ctx) {
   // Render more: the option opens on the map with its panel at the Render section (the panel's section chip, as a click)
   function renderMore(p, pl) { open(p.id, pl.id); requestAnimationFrame(() => requestAnimationFrame(() => { if (PL()?.id === pl.id) jump('spRender'); })); }
 
-  // ----- Plans: schematic design sets made from an option (lib/planset.mjs, api/planset.js, PLANSET-PLAN.md) -----
-  // Pick an option and the sections to include, then Make Plan Set: Claude writes the cover's notes, the sheets are drawn
-  // from the plan, printed on the Finishes Solutions title block and downloaded. The PDF stays on the device it was made
-  // on (IndexedDB, like the renderings); the option keeps a short record of each set (issue, sheets, who, when, model),
-  // which syncs with the team. Each new set of an option is the next issue, listed in the title block's revision table.
-  const psForm = new Map(); // per project: { plid, sections: Set, busy, step, err, ctl }
+  // ----- Plans: schematic design sets made from an option (lib/planset.mjs, lib/plandesign.mjs, api/planset.js) -----
+  // Pick an option and the sections, then Make Plan Set. A set is a job of steps run in turn, shown as it goes:
+  //   1. Claude writes the cover's notes and each discipline's notes and design criteria;
+  //   2. Claude designs each building type's floor plans, checked here (PD.placeDesign) and sent back with the problems
+  //      at most twice; a type that still fails, or any step without Claude, uses the rule-based design;
+  //   3. every sheet is drawn here and printed on the title block by the server, three at a time;
+  //   4. the pages are put together into one PDF here (pdf-lib), kept on this device and downloaded.
+  // A big set (a hundred sheets, eight building types) can take most of an hour. Each finished step is saved on this
+  // device (IndexedDB: the job, and each printed page), so a reload, a closed tab or Pause leaves it to Resume where it
+  // stopped. The option keeps a short record of each issue (sheets, who, when, model), which syncs with the team.
+  const psForm = new Map(); // per project: { plid, sections: Set, by, err }
   let psInfo = null, psInfoP = null; // api/planset GET: is Claude set up, the server's model and effort, this month's spend
   const loadPsInfo = (force) => { if (force) psInfoP = null; return psInfoP ||= fetch('api/planset').then(r => r.ok ? r.json() : null).catch(() => null).then(d => { psInfo = d || { error: true }; if (!d) setTimeout(() => { psInfoP = null; }, 6e4); /* asked again a minute later */ if (ctx.view === 'projects' && cur && tabFor(db.projects.find(x => x.id === cur) || {}) === 'plans') render(); return d; }); };
   const psModel = () => PS_PICK.model() || psInfo?.model || 'claude-opus-5-5', psEffort = () => PS_PICK.effort() || psInfo?.effort || 'medium';
   const setsOf = p => p.plans.flatMap(pl => (pl.sets || []).map(s => ({ pl, s })));
   const usd = v => '$' + (v >= 100 ? Math.round(v) : v.toFixed(2));
+  const initials = n => String(n || '').split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).join('').slice(0, 4);
+  const dur = ms => { const m = Math.round(ms / 60000); return m < 1 ? 'under a minute' : m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; };
   function psState(p) {
     let s = psForm.get(p.id); const ready = p.plans.filter(laidOut);
-    if (!s) { s = { plid: ready[ready.length - 1]?.id || '', sections: new Set(PS.defaultSections()), busy: false, step: '', err: '' }; psForm.set(p.id, s); }
+    if (!s) { s = { plid: ready[ready.length - 1]?.id || '', sections: new Set(PS.defaultSections()), err: '' }; psForm.set(p.id, s); }
     if (!ready.some(pl => pl.id === s.plid)) s.plid = ready[ready.length - 1]?.id || '';
     return s;
   }
   // the renderings a set can show: the newest that still match the plan, on this device (up to four)
   const setRenders = pl => (pl.renders || []).filter(r => !r.sig || r.sig === planSig(pl)).slice(-4);
+  const typesOf = new Map(); // per plan signature: lib/plandesign.mjs buildingTypes (the form draws often)
+  const typesFor = pl => { const k = pl.id + '|' + planSig(pl); if (!typesOf.has(k)) { typesOf.set(k, PD.buildingTypes(pl)); if (typesOf.size > 20) typesOf.delete(typesOf.keys().next().value); } return typesOf.get(k); };
+
+  // ---- the job (one a project at a time), kept in IndexedDB as 'job:<project>' with its pages as 'jp:<job>:<sheet>' ----
+  const jobs = new Map(); // project id -> job (in memory while it runs or after it was loaded)
+  let jobLoaded = new Set(), jobTimer = 0;
+  const saveJob = j => rput('job:' + j.pid, JSON.parse(JSON.stringify({ ...j, ctl: undefined, running: undefined }))).catch(() => {});
+  async function loadJob(pid) { if (jobLoaded.has(pid)) return; jobLoaded.add(pid); const j = await rget('job:' + pid); if (j && !jobs.has(pid)) { jobs.set(pid, { ...j, running: false }); if (ctx.view === 'projects' && cur === pid) render(); } }
+  const stepIcon = st => ({ todo: '○', doing: '◐', done: '●', failed: '✕', skipped: '–' }[st] || '○');
+  function jobStats(j) {
+    const steps = j.steps, by = k => steps.filter(s => s.kind === k), done = s => s.status === 'done' || s.status === 'skipped' || s.status === 'failed';
+    const sheetsDone = by('sheet').filter(done), claudeDone = by('claude').filter(done), t = Date.now(), el = (j.elapsed || 0) + (j.running ? t - j.resumedAt : 0);
+    const avg = (list, def) => { const ms = list.filter(s => s.ms).map(s => s.ms); return ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : def; };
+    const left = by('claude').length - claudeDone.length, sLeft = by('sheet').length - sheetsDone.length;
+    const eta = left * avg(claudeDone, 90000) / 2 + sLeft * avg(sheetsDone, 8000) / 3 + (steps.find(s => s.kind === 'merge')?.status === 'done' ? 0 : 20000);
+    const w = s => s.kind === 'claude' ? 10 : s.kind === 'merge' ? 4 : 1, total = steps.reduce((a, s) => a + w(s), 0), got = steps.filter(done).reduce((a, s) => a + w(s), 0);
+    return { el, eta, pct: total ? got / total : 0, sheets: by('sheet').length, sheetsDone: sheetsDone.length, failed: steps.filter(s => s.status === 'failed').length };
+  }
+  function jobHtml(j) {
+    const pl = db.projects.find(x => x.id === j.pid)?.plans.find(x => x.id === j.plid), S = jobStats(j), doing = j.steps.filter(s => s.status === 'doing');
+    const groups = [['claude', 'Claude: notes and building designs'], ['sheet', 'Sheets'], ['merge', 'Putting the set together']];
+    return '<section class="pj-box ps-job" id="psJob" aria-labelledby="psJobH" aria-busy="' + !!j.running + '"><h3 class="pj-h3" id="psJobH">' + (j.running ? 'Making the plan set' : j.state === 'done' ? 'Plan set finished' : 'Plan set paused') + ' · ' + esc(pl?.name || 'option') + ', issue ' + esc(j.no) + '</h3>' +
+      '<div class="ps-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(S.pct * 100) + '"><i style="width:' + (S.pct * 100).toFixed(1) + '%"></i></div>' +
+      '<div class="ps-stat"><b>' + Math.round(S.pct * 100) + '%</b><span>' + S.sheetsDone + ' of ' + S.sheets + ' sheets drawn</span><span>' + dur(S.el) + ' so far</span>' + (j.running ? '<span>about ' + dur(S.eta) + ' to go</span>' : '') + (S.failed ? '<span class="err">' + S.failed + ' failed</span>' : '') + '</div>' +
+      (j.running ? '<div class="rnote loading" role="status">' + esc(doing.length ? doing.map(s => s.label + (s.note ? ' (' + s.note + ')' : '')).join(' · ') : 'Working…') + '</div>' : j.error ? '<p class="rnote err" role="alert">' + esc(j.error) + '</p>' : j.state !== 'done' ? '<p class="rnote">Stopped at ' + S.sheetsDone + ' of ' + S.sheets + ' sheets. Everything finished so far is kept on this device: <b>Resume</b> carries on from here.</p>' : '') +
+      '<div class="btnrow">' + (j.running ? '<button type="button" class="btn" id="psPause">Pause</button>' : j.state !== 'done' ? '<button type="button" class="btn primary" id="psResume">Resume</button><button type="button" class="btn" id="psDiscard">Discard</button>' : '') + '</div>' +
+      '<details class="ps-steps"' + (j.open ? ' open' : '') + '><summary>Every step (' + j.steps.length + ')</summary>' + groups.map(([k, label]) => { const list = j.steps.filter(s => s.kind === k); if (!list.length) return '';
+        return '<div class="ps-sg"><b>' + label + '</b><ul>' + list.map(s => '<li class="st-' + s.status + '"><i aria-hidden="true">' + stepIcon(s.status) + '</i><span>' + esc(s.label) + '</span>' + (s.note ? '<em>' + esc(s.note) + '</em>' : '') + (s.ms ? '<small>' + Math.round(s.ms / 1000) + ' s</small>' : '') + '</li>').join('') + '</ul></div>'; }).join('') + '</details></section>';
+  }
+  // the job's panel and the tab's title, every second while it runs (the rest of the page isn't redrawn)
+  function tickJob(p) {
+    clearInterval(jobTimer); jobTimer = setInterval(() => {
+      const j = jobs.get(p.id), el = root.querySelector('#psJob');
+      if (j?.running) { const S = jobStats(j); document.title = '(' + S.sheetsDone + '/' + S.sheets + ') ' + (document.title.replace(/^\(\d+\/\d+\) /, '')); }
+      if (!j?.running) { document.title = document.title.replace(/^\(\d+\/\d+\) /, ''); }
+      if (el && j) { const open = el.querySelector('details')?.open; j.open = open; const t = document.createElement('div'); t.innerHTML = jobHtml(j); el.replaceWith(t.firstElementChild); wireJob(p); }
+      if (!j?.running && !el) clearInterval(jobTimer);
+    }, 1000);
+  }
+
   function setsHtml(p) {
     const ready = p.plans.filter(laidOut);
     if (!psInfo && !psInfoP) loadPsInfo();
-    if (!ready.length) return '<div class="pj-empty"><b>No plan sets yet</b><p>A plan set is a schematic design drawing set made from one of this project’s site plan options: a cover sheet with the sheet index and project data, the overall site plan and the renderings, on the Finishes Solutions title block. Floor plans, elevations and the engineering sheets come in later phases.</p>' +
+    loadJob(p.id);
+    if (!ready.length) return '<div class="pj-empty"><b>No plan sets yet</b><p>A plan set is a schematic design drawing set made from one of this project’s site plan options, on the Finishes Solutions title block: cover and general notes, site and civil, landscape, floor plans, elevations, sections and schedules for each building type, structural, mechanical, plumbing, electrical, fire protection and life safety, and the renderings.</p>' +
       '<p>' + (p.plans.length ? 'None of this project’s options has buildings yet: lay one out first.' : 'This project has no site plan options yet.') + '</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Sites</button></div></div>';
-    const s = psState(p), pl = ready.find(x => x.id === s.plid) || ready[0], nR = setRenders(pl).length, counts = PS.sectionCounts(pl, nR), I = psInfo;
+    const s = psState(p), pl = ready.find(x => x.id === s.plid) || ready[0], nR = setRenders(pl).length, types = typesFor(pl), counts = PS.sectionCounts(pl, nR, types), I = psInfo, j = jobs.get(p.id);
+    const busy = !!j && j.state !== 'done';
     const box = sec => { const none = sec.id === 'renderings' && !nR, on = (s.sections.has(sec.id) || sec.always) && !none, can = PS.built(sec) && !none, base = sec.needs && !s.sections.has(sec.needs), n = counts[sec.id];
       const why = none ? 'No renderings of this option on this device' : !can ? 'Coming in a later phase' : base ? 'Needs ' + PS.sectionById(sec.needs).label : '';
-      return '<label class="ps-sec' + (can ? '' : ' off') + '"><input type="checkbox" data-pssec="' + sec.id + '"' + (on && can ? ' checked' : '') + (sec.always || !can || s.busy ? ' disabled' : '') + '>' +
+      return '<label class="ps-sec' + (can ? '' : ' off') + '"><input type="checkbox" data-pssec="' + sec.id + '"' + (on && can ? ' checked' : '') + (sec.always || !can || busy ? ' disabled' : '') + '>' +
         '<span><b>' + esc(sec.label) + '</b>' + (can && n ? '<em>' + plural(n, 'sheet') + '</em>' : '') + '<small>' + esc(why || sec.note || '') + '</small></span></label>'; };
-    const sheets = PS.sheetList(pl, { sections: [...s.sections], renders: nR });
-    const ai = !I ? 'Checking Claude…' : I.error ? 'Couldn’t check Claude just now: the set is made with its notes if Claude answers.' : !I.configured ? 'Claude isn’t set up on this site (ANTHROPIC_API_KEY), so the cover’s notes are left out. The drawings are made anyway.'
-      : 'Notes by <b>' + esc(psModel()) + '</b> at ' + esc(psEffort()) + ' effort (Settings › AI model)' + (I.budget?.spent != null ? ' · this month ' + usd(I.budget.spent) + ' of ' + usd(I.budget.cap) : '') + '. About $0.05–0.30 a set.';
+    const sheets = PS.sheetList(pl, { sections: [...s.sections], renders: nR, types }), sup = types.filter(t => t.supported), later = types.filter(t => !t.supported);
+    const discs = PS.pickSections([...s.sections]).filter(x => PS.SECTION_DISC[x]).length, calls = 1 + discs + (s.sections.has('arch') ? sup.length * 1.4 : 0);
+    const mins = Math.max(1, Math.round((calls * 90 / 2 + sheets.length * 8 / 3 + 20) / 60)), cost = 0.12 + discs * 0.12 + (s.sections.has('arch') ? sup.length * 0.55 : 0);
+    const ai = !I ? 'Checking Claude…' : I.error ? 'Couldn’t check Claude just now: the set is made with Claude’s notes and designs if it answers.' : !I.configured ? 'Claude isn’t set up on this site (ANTHROPIC_API_KEY): the set uses rule-based building designs and standard notes.'
+      : 'Claude: <b>' + esc(psModel()) + '</b> at ' + esc(psEffort()) + ' effort (Settings › AI model)' + (I.budget?.spent != null ? ' · this month ' + usd(I.budget.spent) + ' of ' + usd(I.budget.cap) : '') + '. About ' + usd(cost) + ' for this set.';
     const form = '<section class="pj-box ps-form" aria-labelledby="psH"><h3 class="pj-h3" id="psH">Make a plan set</h3>' +
-      '<div class="ps-row"><label for="psOpt">Option</label><select id="psOpt"' + (s.busy ? ' disabled' : '') + '>' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
+      '<div class="ps-row"><label for="psOpt">Option</label><select id="psOpt"' + (busy ? ' disabled' : '') + '>' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
+      (types.length ? '<div class="ps-types"><b>Building types</b> ' + sup.map(t => '<span class="tag">' + esc(t.id) + '</span> ' + esc(t.label) + ' ' + t.W + '′ × ' + t.D + '′, ' + t.floors + ' fl · ' + t.count + (t.similar ? ' (incl. ' + t.similar + ' similar)' : '')).join(' &nbsp; ') +
+        (later.length ? '<small>' + esc(later.map(t => t.label + ': ' + t.why).join('; ')) + ' (site sheets only).</small>' : '') + '</div>' : '') +
       '<fieldset class="ps-secs"><legend>Sections</legend>' + PS.SECTIONS.map(box).join('') + '</fieldset>' +
-      '<div class="ps-row2"><div class="ps-row"><label for="psBy">Drawn by</label><input id="psBy" maxlength="12" autocomplete="off" value="' + esc(s.by ?? initials(get(NAME_KEY))) + '"' + (s.busy ? ' disabled' : '') + '></div>' +
-        '<div class="ps-row"><label for="psNo">Project number</label><input id="psNo" maxlength="30" autocomplete="off" placeholder="Left blank" value="' + esc(p.projectNumber || '') + '"' + (s.busy ? ' disabled' : '') + '></div></div>' +
-      '<p class="rnote">' + plural(sheets.length, 'sheet') + ' on 24 × 36: ' + esc(sheets.map(x => x.number).join(', ')) + '. ' + ai + '</p>' +
+      '<div class="ps-row2"><div class="ps-row"><label for="psBy">Drawn by</label><input id="psBy" maxlength="12" autocomplete="off" value="' + esc(s.by ?? initials(get(NAME_KEY))) + '"' + (busy ? ' disabled' : '') + '></div>' +
+        '<div class="ps-row"><label for="psNo">Project number</label><input id="psNo" maxlength="30" autocomplete="off" placeholder="Left blank" value="' + esc(p.projectNumber || '') + '"' + (busy ? ' disabled' : '') + '></div></div>' +
+      '<p class="rnote"><b>' + plural(sheets.length, 'sheet') + '</b> on 24 × 36, about ' + dur(mins * 60000) + ' to make. ' + ai + ' You can leave this page while it works; keep the app open (or Resume later).</p>' +
       (s.err ? '<p class="rnote err" role="alert">' + esc(s.err) + '</p>' : '') +
-      '<div class="btnrow">' + (s.busy ? '<span class="rnote loading" role="status">' + esc(s.step || 'Working…') + '</span><button type="button" class="btn" id="psStop">Cancel</button>' : '<button type="button" class="btn primary" id="psMake">Make Plan Set</button>') + '</div></section>';
+      '<div class="btnrow"><button type="button" class="btn primary" id="psMake"' + (busy ? ' disabled title="A set is being made for this project: finish or discard it first"' : '') + '>Make Plan Set</button></div></section>';
     const made = setsOf(p).sort((a, b) => String(b.s.at).localeCompare(String(a.s.at)));
     const list = made.length ? '<section class="pj-sec"><div class="lt">Sets made · ' + made.length + '</div><div class="ps-list">' + made.map(({ pl: q, s: x }) => { const stale = x.sig && x.sig !== planSig(q);
-      return '<div class="ps-item"><div><b>' + esc(q.name) + ' · Issue ' + esc(x.no) + '</b><span>' + esc(rWhen(x.at)) + (x.by ? ' · ' + esc(x.by) : '') + ' · ' + plural((x.sheets || []).length, 'sheet') + (x.model ? ' · notes by ' + esc(x.model) : x.noNotes ? ' · no notes' : '') + (stale ? ' · <em>plan changed since</em>' : '') + '</span>' +
+      return '<div class="ps-item"><div><b>' + esc(q.name) + ' · Issue ' + esc(x.no) + '</b><span>' + esc(rWhen(x.at)) + (x.by ? ' · ' + esc(x.by) : '') + ' · ' + plural((x.sheets || []).length, 'sheet') + (x.model ? ' · Claude ' + esc(x.model) : x.noNotes ? ' · no Claude' : '') + (x.mins ? ' · made in ' + esc(dur(x.mins * 60000)) : '') + (stale ? ' · <em>plan changed since</em>' : '') + '</span>' +
         '<small>' + esc((x.sheets || []).join(', ')) + '</small></div><span class="btnrow"><button type="button" class="btn" data-psget="' + esc(q.id) + '|' + esc(x.id) + '">Download PDF</button><button type="button" class="lnk pj-pdel" data-psdel="' + esc(q.id) + '|' + esc(x.id) + '">Delete</button></span></div>'; }).join('') + '</div></section>' : '';
-    return form + list + '<p class="rnote pj-rnote">Every sheet says “Preliminary — not for construction, bidding or permit”: these are schematic drawings for feasibility, pricing and coordination, reviewed but not sealed. The PDF is kept on the device it was made on; teammates see that the set exists.</p>';
+    return (j ? jobHtml(j) : '') + form + list + '<p class="rnote pj-rnote">Every sheet says “Preliminary — not for construction, bidding or permit”: schematic drawings for feasibility, pricing and coordination, made with AI assistance and rule-based engineering layouts, reviewed but not sealed. The PDF is kept on the device it was made on; teammates see that the set exists.</p>';
   }
-  const initials = n => String(n || '').split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).join('').slice(0, 4);
+  function wireJob(p) {
+    const $ = q => root.querySelector(q), j = jobs.get(p.id); if (!j) return;
+    $('#psPause')?.addEventListener('click', () => { j.ctl?.abort(); });
+    $('#psResume')?.addEventListener('click', () => runJob(p, j));
+    $('#psDiscard')?.addEventListener('click', async () => { if (!confirm('Discard this unfinished plan set? The sheets made so far go too.')) return; for (const s of j.steps) if (s.kind === 'sheet') rdel('jp:' + j.id + ':' + s.key); rdel('job:' + p.id); jobs.delete(p.id); render(true); });
+    const d = root.querySelector('#psJob details'); if (d) d.ontoggle = () => { j.open = d.open; };
+  }
   function wirePlans(p) {
     const s = psState(p), $ = q => root.querySelector(q);
     $('#psOpt')?.addEventListener('change', e => { s.plid = e.target.value; render(true); });
     root.querySelectorAll('[data-pssec]').forEach(b => b.onchange = () => { const id = b.dataset.pssec; if (b.checked) s.sections.add(id); else { s.sections.delete(id); for (const x of PS.SECTIONS) if (x.needs === id) s.sections.delete(x.id); } render(true); });
     const by = $('#psBy'); if (by) by.onchange = () => { s.by = by.value.trim().slice(0, 12); };
     const no = $('#psNo'); if (no) no.onchange = () => { const v = no.value.trim().slice(0, 30); if (v !== (p.projectNumber || '')) { p.projectNumber = v; save(p); } };
-    $('#psMake')?.addEventListener('click', () => { if (by) s.by = by.value.trim().slice(0, 12); makeSet(p); });
-    $('#psStop')?.addEventListener('click', () => s.ctl?.abort());
+    $('#psMake')?.addEventListener('click', () => { if (by) s.by = by.value.trim().slice(0, 12); startJob(p); });
+    wireJob(p); if (jobs.get(p.id)?.running) tickJob(p);
     const find = v => { const [a, b] = v.split('|'), q = p.plans.find(x => x.id === a); return { q, x: q?.sets?.find(y => y.id === b) }; };
     root.querySelectorAll('[data-psget]').forEach(b => b.onclick = async () => { const { q, x } = find(b.dataset.psget); if (!x) return;
       const blob = await rget('set:' + x.id); if (!(blob instanceof Blob)) { ctx.toast('That set’s PDF isn’t on this device: sets stay on the device they were made on' + (x.by ? ' (' + x.by + ' made it)' : '') + '. Make it again here.'); return; }
@@ -3578,50 +3638,116 @@ export function initSitePlan(ctx) {
     root.querySelectorAll('[data-psdel]').forEach(b => b.onclick = () => { const { q, x } = find(b.dataset.psdel); if (!x || !confirm('Delete issue ' + x.no + ' of ' + q.name + '’s plan set?')) return;
       q.sets = q.sets.filter(y => y.id !== x.id); rdel('set:' + x.id); save(p); });
   }
-  async function makeSet(p) {
-    const s = psState(p), pl = p.plans.find(x => x.id === s.plid); if (!pl || s.busy) return;
-    const ctl = new AbortController(); Object.assign(s, { busy: true, err: '', step: 'Gathering the site facts…', ctl }); render(true);
-    const step = t => { s.step = t; const el = root.querySelector('.ps-form .loading'); if (el) el.textContent = t; };
+  window.addEventListener('beforeunload', e => { if ([...jobs.values()].some(j => j.running)) { e.preventDefault(); e.returnValue = ''; } }); // a set is being made: the browser asks first (Resume picks it up anyway)
+
+  // a new job: the inputs gathered once (site facts, parcels, the vicinity map) and the list of steps
+  async function startJob(p) {
+    const s = psState(p), pl = p.plans.find(x => x.id === s.plid); if (!pl || (jobs.get(p.id) && jobs.get(p.id).state !== 'done')) return;
+    s.err = ''; ctx.toast('Starting the plan set: gathering the site facts…');
+    const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), parcels = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), F = SP.frame(pl.origin);
+    const site = { type: 'Polygon', coordinates: [pl.ring.concat([pl.ring[0]]).map(F.toLL)] };
+    let vicinity = ''; try { vicinity = areaMap([{ geometry: site, stroke: '#c0392b', fill: 'rgba(192,57,43,.25)', width: 2 }], { W: 400, H: 230, px: 400, minSpanM: 3500, maxTiles: 16 }); } catch (e) { /* no map */ }
+    const facts = await siteFacts(pl).catch(() => []), county = (ctx.DATA?.counties || []).find(c => (c.outline || []).some(poly => SP.inRing(F.toLL(SP.centroid(pl.ring)), poly[0])))?.name;
+    const types = PD.buildingTypes(pl), sections = PS.pickSections([...s.sections].filter(x => x !== 'renderings' || setRenders(pl).length)), nR = sections.includes('renderings') ? setRenders(pl).length : 0;
+    const sheets = PS.sheetList(pl, { sections, renders: nR, types, renderLabels: setRenders(pl).slice().reverse().map(r => RD.renderLabel(r.view, r.target)) });
+    const prev = (pl.sets || []), no = String(prev.length ? Math.max(...prev.map(x => +x.no || 0)) + 1 : 0), day = new Date(), short = d => new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+    const revisions = prev.slice().sort((a, b) => (+a.no) - (+b.no)).map(x => ({ no: x.no, date: short(x.at), desc: x.desc || 'Schematic design set' })).concat([{ no, date: short(day), desc: no === '0' ? 'Schematic design set' : 'Schematic design set, re-issued' }]);
+    const steps = [{ key: 'notes', kind: 'claude', label: 'Cover notes' }];
+    for (const sec of sections) if (PS.SECTION_DISC[sec]) steps.push({ key: 'disc:' + PS.SECTION_DISC[sec], kind: 'claude', label: PS.sectionById(sec).label + ' notes' });
+    if (sections.includes('arch')) for (const t of types.filter(t => t.supported)) steps.push({ key: 'design:' + t.id, kind: 'claude', label: 'Design: ' + PD.typeName(t) });
+    for (const sh of sheets) steps.push({ key: sh.number, kind: 'sheet', label: sh.number + ' ' + sh.title });
+    steps.push({ key: 'merge', kind: 'merge', label: 'Put ' + sheets.length + ' sheets together' });
+    for (const x of steps) x.status = 'todo';
+    const j = { id: uid(), pid: p.id, plid: pl.id, no, sig: planSig(pl), sections, by: s.by ?? initials(get(NAME_KEY)), madeBy: get(NAME_KEY) || '', projectNumber: p.projectNumber || '', at: day.toISOString(), date: day.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      revisions, types, sheets, steps, designs: {}, designBy: {}, disc: {}, text: null, model: '', base: { client: p.client || '', address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '', parcels, facts, notes: SP.check(pl).map(i => i.text), vicinity,
+        boundarySource: pl.src === 'drawn' ? 'a boundary drawn on the map' : pl.src === 'regrid' ? 'the Regrid parcel outline' : (keys.length > 1 ? keys.length + ' county appraisal district parcel outlines, merged' : 'the county appraisal district parcel outline') }, elapsed: 0, state: 'paused', open: false };
+    jobs.set(p.id, j); await saveJob(j); runJob(p, j);
+  }
+  // a small pool: run fn over items, n at a time, stopping when the signal aborts
+  async function pool(items, n, fn, signal) { let i = 0; await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length && !signal.aborted) await fn(items[i++]); })); }
+  async function claudeCall(body, signal) {
+    const r = await fetch('api/planset', { method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, model: PS_PICK.model(), effort: PS_PICK.effort() }) });
+    const d = await r.json().catch(() => ({})); if (psInfo && d.budget) psInfo.budget = d.budget;
+    if (!r.ok) throw Object.assign(new Error(d.error || 'HTTP ' + r.status), { status: r.status });
+    return d;
+  }
+  // run (or resume) a job's remaining steps; Pause aborts and keeps what's done
+  async function runJob(p, j) {
+    if (j.running) return; const ctl = new AbortController(); j.ctl = ctl; j.running = true; j.state = 'running'; j.error = ''; j.resumedAt = Date.now();
+    const P1 = () => db.projects.find(x => x.id === p.id) || p, pl = P1().plans.find(x => x.id === j.plid);
+    if (!pl) { j.running = false; j.error = 'That option was deleted.'; render(true); return; }
+    render(true); tickJob(p);
+    const st = key => j.steps.find(x => x.key === key), mark = async (x, status, note) => { x.status = status; if (note != null) x.note = note; await saveJob(j); };
+    let claudeOff = '';
     try {
-      const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), parcels = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), F = SP.frame(pl.origin);
-      const site = { type: 'Polygon', coordinates: [pl.ring.concat([pl.ring[0]]).map(F.toLL)] };
-      let vicinity = ''; try { vicinity = areaMap([{ geometry: site, stroke: '#c0392b', fill: 'rgba(192,57,43,.25)', width: 2 }], { W: 400, H: 230, px: 400, minSpanM: 3500, maxTiles: 16 }); } catch (e) { /* no map */ }
-      const facts = await siteFacts(pl), notes = SP.check(pl).map(i => i.text);
-      const county = (ctx.DATA?.counties || []).find(c => (c.outline || []).some(poly => SP.inRing(F.toLL(SP.centroid(pl.ring)), poly[0])))?.name;
-      const wantR = s.sections.has('renderings'), rl = wantR ? setRenders(pl) : [];
-      step('Preparing the renderings…');
-      const renders = wantR ? await rendersForSheet(pl, 4).catch(() => []) : [];
-      const sheets = PS.sheetList(pl, { sections: [...s.sections], renders: renders.length, renderLabels: renders.map(r => r.caption) });
-      const base = { plan: pl, project: p, client: p.client || '', address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '', parcels, facts, notes, sheets,
-        boundarySource: pl.src === 'drawn' ? 'a boundary drawn on the map' : pl.src === 'regrid' ? 'the Regrid parcel outline' : (keys.length > 1 ? keys.length + ' county appraisal district parcel outlines, merged' : 'the county appraisal district parcel outline') };
-      // Claude's notes: a set is still made without them (no key, budget spent, a slow answer), and the cover says so
-      let text = null, model = '', why = '';
-      const info = psInfo?.configured ? psInfo : await loadPsInfo(true);
-      if (info?.configured) {
-        step('Claude is writing the notes… (up to a couple of minutes)');
-        try { const r = await fetch('api/planset', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'notes', brief: PS.notesBrief(base), model: PS_PICK.model(), effort: PS_PICK.effort() }) });
-          const d = await r.json().catch(() => ({})); if (r.ok && d.notes) { text = d.notes; model = d.model || ''; if (psInfo && d.budget) psInfo.budget = d.budget; } else why = d.error || 'HTTP ' + r.status;
-        } catch (e) { if (ctl.signal.aborted) throw e; why = 'Claude didn’t answer'; }
-      } else why = info ? 'Claude isn’t set up on this site' : 'Couldn’t reach the server';
-      const day = new Date(), prev = (pl.sets || []).slice().sort((a, b) => (+a.no) - (+b.no)), no = String(prev.length ? Math.max(...prev.map(x => +x.no || 0)) + 1 : 0);
-      const short = d => new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
-      const revisions = prev.map(x => ({ no: x.no, date: short(x.at), desc: x.desc || 'Schematic design set' })).concat([{ no, date: short(day), desc: no === '0' ? 'Schematic design set' : 'Schematic design set, re-issued' }]);
-      step('Drawing ' + plural(sheets.length, 'sheet') + ' on the title block…');
-      const html = PS.setHTML({ ...base, renders, text, date: day.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), drawnBy: s.by ?? initials(get(NAME_KEY)), projectNumber: p.projectNumber || '', revisions });
-      const r = await fetch('api/planset', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'pdf', html, title: p.name + ' — ' + pl.name + ' — Schematic design set' }) });
-      if (!r.ok || !/pdf/.test(r.headers.get('content-type') || '')) throw new Error((await r.json().catch(() => ({}))).error || 'The PDF couldn’t be made (HTTP ' + r.status + ').');
-      const blob = await r.blob(), id = uid();
-      await rput('set:' + id, blob);
-      const P1 = db.projects.find(x => x.id === p.id) || p, q = P1.plans.find(x => x.id === pl.id) || pl; // (a sync may have replaced the copy)
-      q.sets = (q.sets || []).concat([{ id, no, at: day.toISOString(), by: get(NAME_KEY) || '', sheets: sheets.map(x => x.number), sections: [...s.sections], model, noNotes: !text || undefined, sig: planSig(pl), desc: revisions[revisions.length - 1].desc }]);
-      while (q.sets.length > 12) rdel('set:' + q.sets.shift().id); // the newest twelve issues are kept
-      Object.assign(s, { busy: false, step: '', ctl: null }); save(P1);
-      await ctx.saveFile(fileName(p, pl) + '-plan-set-issue-' + no + '.pdf', blob, 'application/pdf');
-      ctx.toast('Plan set issue ' + no + ' of ' + pl.name + ': ' + plural(sheets.length, 'sheet') + '.' + (text ? '' : ' The cover’s notes were left out (' + why + ').'));
+      const info = psInfo?.configured ? psInfo : await loadPsInfo(true); if (!info?.configured) claudeOff = info ? 'Claude isn’t set up' : 'the server didn’t answer';
+      const base = { plan: pl, project: P1(), ...j.base, types: j.types }, brief = PS.notesBrief({ ...base, sheets: j.sheets });
+      const ask = async (x, body, keep) => { // one Claude step: done, or skipped with the reason (the sheets use their defaults)
+        if (x.status === 'done' || x.status === 'skipped') return; if (claudeOff) { await mark(x, 'skipped', claudeOff); return; }
+        x.status = 'doing'; x.note = ''; const t0 = Date.now();
+        try { const d = await claudeCall(body, ctl.signal); keep(d); j.model = d.model || j.model; x.ms = Date.now() - t0; await mark(x, 'done', d.fellBack ? 'answered by a fallback model' : ''); }
+        catch (e) { if (ctl.signal.aborted) { x.status = 'todo'; throw e; } x.ms = Date.now() - t0; if (e.status === 402 || e.status === 503) claudeOff = e.status === 402 ? 'this month’s budget is used up' : 'Claude isn’t set up'; await mark(x, 'skipped', e.status === 402 || e.status === 503 ? claudeOff : 'no answer: ' + e.message.slice(0, 80)); }
+      };
+      // 1. notes: the cover, then each discipline (three at a time)
+      await ask(st('notes'), { mode: 'notes', brief }, d => { j.text = d.notes; });
+      await pool(j.steps.filter(x => x.key.startsWith('disc:')), 3, x => { const k = x.key.slice(5); return ask(x, { mode: 'disc', discipline: k, brief: PS.discBrief({ ...base, sheets: j.sheets }, k, j.types) }, d => { j.disc[k] = d.disc; }); }, ctl.signal);
+      // 2. a design per building type (two at a time): Claude's, checked and fixed, else the rule-based one
+      await pool(j.steps.filter(x => x.key.startsWith('design:')), 2, async x => {
+        const t = j.types.find(y => y.id === x.key.slice(7)); if (!t || x.status === 'done' || x.status === 'skipped') return;
+        const seed = PD.fallbackDesign(t), fallback = why => { j.designs[t.id] = PD.placeDesign(seed, t).design; j.designBy[t.id] = 'rule-based (' + why + ')'; };
+        if (claudeOff) { fallback(claudeOff); await mark(x, 'skipped', 'rule-based design: ' + claudeOff); return; }
+        x.status = 'doing'; const t0 = Date.now(); let prev = null, problems = [], ok = false, tries = 0;
+        try {
+          const brief2 = PD.designBrief(t, { county: j.base.county, address: j.base.address });
+          for (; tries < 3 && !ok; tries++) {
+            x.note = tries ? 'fixing ' + problems.length + ' problem' + (problems.length === 1 ? '' : 's') + ', try ' + (tries + 1) : 'Claude is drawing it';
+            const d = await claudeCall({ mode: 'design', type: t.id, brief: brief2, seed, previous: prev, problems }, ctl.signal); j.model = d.model || j.model;
+            const r = PD.placeDesign(d.design, t); if (!r.problems.length) { j.designs[t.id] = r.design; j.designBy[t.id] = 'Claude'; ok = true; } else { prev = d.design; problems = r.problems; }
+          }
+          if (!ok) fallback('Claude’s plan kept failing ' + problems.length + ' check' + (problems.length === 1 ? '' : 's'));
+          x.ms = Date.now() - t0; await mark(x, ok ? 'done' : 'skipped', ok ? (tries > 1 ? 'fixed in ' + tries + ' tries' : '') : 'rule-based design used: ' + problems[0]);
+        } catch (e) { if (ctl.signal.aborted) { x.status = 'todo'; x.note = ''; throw e; } if (e.status === 402 || e.status === 503) claudeOff = e.status === 402 ? 'this month’s budget is used up' : 'Claude isn’t set up';
+          fallback(claudeOff || 'no answer'); x.ms = Date.now() - t0; await mark(x, 'skipped', 'rule-based design: ' + (claudeOff || e.message.slice(0, 80))); }
+      }, ctl.signal);
+      for (const t of j.types.filter(t => t.supported)) if (!j.designs[t.id]) { j.designs[t.id] = PD.placeDesign(PD.fallbackDesign(t), t).design; j.designBy[t.id] = 'rule-based'; }
+      await saveJob(j);
+      // 3. the sheets, drawn here and printed on the title block, three at a time (a failure is tried again twice)
+      const renders = j.sheets.some(sh => sh.kind === 'render') ? await rendersForSheet(pl, 4).catch(() => []) : [];
+      const c = PS.setContext({ ...base, project: P1(), text: j.text, disc: j.disc, designs: j.designs, designBy: j.designBy, renders, date: j.date, drawnBy: j.by, projectNumber: j.projectNumber, revisions: j.revisions }, j.sheets);
+      await pool(j.steps.filter(x => x.kind === 'sheet' && x.status !== 'done'), 3, async x => {
+        const sh = j.sheets.find(y => y.number === x.key); x.status = 'doing'; x.note = ''; const t0 = Date.now(); let last = '';
+        for (let k = 0; k < 3; k++) {
+          try {
+            const r = await fetch('api/planset', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'sheet', html: PS.docHTML(c, PS.sheetPage(c, sh)), title: P1().name + ' — ' + sh.number }) });
+            if (r.ok && /pdf/.test(r.headers.get('content-type') || '')) { await rput('jp:' + j.id + ':' + x.key, await r.blob()); x.ms = Date.now() - t0; await mark(x, 'done', ''); return; }
+            last = (await r.json().catch(() => ({}))).error || 'HTTP ' + r.status; if (r.status === 429) await new Promise(res => setTimeout(res, 15000));
+          } catch (e) { if (ctl.signal.aborted) { x.status = 'todo'; throw e; } last = e.message; }
+          x.note = 'trying again'; await new Promise(res => setTimeout(res, 3000));
+        }
+        x.ms = Date.now() - t0; await mark(x, 'failed', last.slice(0, 120));
+      }, ctl.signal);
+      if (ctl.signal.aborted) throw new DOMException('paused', 'AbortError');
+      // 4. one PDF, in sheet order
+      const m = st('merge'); m.status = 'doing'; const t0 = Date.now();
+      const { PDFDocument } = await import('./lib/vendor/pdf-lib.esm.min.js'), out = await PDFDocument.create(), made = [];
+      for (const sh of j.sheets) { const b = await rget('jp:' + j.id + ':' + sh.number); if (!(b instanceof Blob)) continue; const src = await PDFDocument.load(await b.arrayBuffer()); for (const pg of await out.copyPages(src, src.getPageIndices())) out.addPage(pg); made.push(sh.number); }
+      out.setTitle(P1().name + ' — ' + pl.name + ' — Schematic design set, issue ' + j.no); out.setCreator('Finishes Solutions'); out.setProducer('Finishes Solutions plan sets');
+      const blob = new Blob([await out.save()], { type: 'application/pdf' }), id = uid(); await rput('set:' + id, blob); m.ms = Date.now() - t0; m.status = 'done';
+      const q = P1().plans.find(x => x.id === pl.id) || pl, mins = Math.round(((j.elapsed || 0) + Date.now() - j.resumedAt) / 60000);
+      q.sets = (q.sets || []).concat([{ id, no: j.no, at: j.at, by: j.madeBy, sheets: made, sections: j.sections, model: j.model, noNotes: !j.text || undefined, sig: j.sig, desc: j.revisions[j.revisions.length - 1].desc, mins, designs: { ...j.designBy } }]);
+      while (q.sets.length > 12) rdel('set:' + q.sets.shift().id);
+      for (const sh of j.sheets) rdel('jp:' + j.id + ':' + sh.number); rdel('job:' + p.id);
+      j.running = false; j.state = 'done'; j.elapsed = (j.elapsed || 0) + Date.now() - j.resumedAt; save(P1());
+      const failed = j.steps.filter(x => x.status === 'failed').length;
+      await ctx.saveFile(fileName(P1(), pl) + '-plan-set-issue-' + j.no + '.pdf', blob, 'application/pdf');
+      ctx.toast('Plan set issue ' + j.no + ' of ' + pl.name + ' is ready: ' + plural(made.length, 'sheet') + ' in ' + dur(j.elapsed) + '.' + (failed ? ' ' + plural(failed, 'sheet') + ' couldn’t be printed and ' + (failed === 1 ? 'is' : 'are') + ' left out.' : ''));
+      setTimeout(() => { if (jobs.get(p.id) === j) { jobs.delete(p.id); if (ctx.view === 'projects' && cur === p.id) render(); } }, 20000); // the finished panel stays a moment
     } catch (e) {
-      Object.assign(s, { busy: false, step: '', ctl: null, err: ctl.signal.aborted ? '' : (e.message || 'The set couldn’t be made.') }); render(true);
-      if (ctl.signal.aborted) ctx.toast('Plan set cancelled.');
-    }
+      j.running = false; j.elapsed = (j.elapsed || 0) + Date.now() - j.resumedAt;
+      for (const x of j.steps) if (x.status === 'doing') { x.status = 'todo'; x.note = ''; }
+      j.state = 'paused'; if (!(e?.name === 'AbortError' || ctl.signal.aborted)) j.error = 'Stopped: ' + (e.message || 'something went wrong') + '. Resume to carry on.';
+      await saveJob(j); if (ctl.signal.aborted) ctx.toast('Plan set paused. Resume carries on where it stopped.');
+    } finally { document.title = document.title.replace(/^\(\d+\/\d+\) /, ''); if (ctx.view === 'projects' && cur === p.id) render(true); }
   }
 
   // ----- Ask: questions about the whole project, answered from its facts (lib/project.mjs projectFacts) -----

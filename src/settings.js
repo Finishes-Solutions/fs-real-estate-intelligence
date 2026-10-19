@@ -155,7 +155,7 @@ export function initSettings(ctx) {
       const money = v => '$' + (v >= 100 ? Math.round(v) : (+v).toFixed(2));
       el.querySelector('#setPsSlot').outerHTML = ('<div class="set-l" style="margin:18px 0 6px">Plan sets</div>' +
         row('Claude model', '<select class="chip" id="setPsModel" aria-label="Claude model for plan sets"' + (on ? '' : ' disabled') + '>' + pOpts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === pm ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
-          'Writes the plan set’s cover notes. Kept on this device.') +
+          'Writes each plan set’s notes and designs its building types. Kept on this device.') +
         row('Effort', '<select class="chip" id="setPsEffort" aria-label="Claude effort for plan sets"' + (on ? '' : ' disabled') + '>' + [['', 'Server default (' + (ps?.effort || 'medium') + ')'], ...EFFORTS.map(x => [x, x[0].toUpperCase() + x.slice(1) + ' · ' + EFFORT_HINT[x]])].map(([v, l]) => '<option value="' + v + '"' + (v === pe ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
           'How hard Claude thinks. Higher costs more and takes longer.') +
         '<div class="set-note">' + (!ps ? 'Checking Claude…' : ps.error ? esc(ps.error) : !on ? 'Claude isn’t set up on this site: add ANTHROPIC_API_KEY on Vercel (Production and Preview), then redeploy. Plan sets are still made, without the cover notes.'

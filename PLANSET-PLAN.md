@@ -1,14 +1,14 @@
 # Plan: a full set of plans from a project's site plan
 
-Status: Phase 1 shipped October 19, 2026 (Projects › a project › **Plans**). The rest of this document is the road ahead.
+Status: Phases 1 to 4 built October 19, 2026 (Projects › a project › **Plans**). Phase 5 (apartments, self storage, hotels, batch mode, Claude for the other AI features) is the road ahead.
 
-**Phase 1 as built** differs from the plan below in three places, to ship sooner:
+**As built**, compared with the plan below:
 
-- The set's PDF is kept on the device that made it (IndexedDB, like the renderings). Supabase Storage, a `plan_sets` table and signed links come with phase 2, when sets outgrow a single request.
-- The whole set is printed in one request, on one border-stamping pass (`api/planset.js`, mode `pdf`). That is fine for three to six sheets; phase 2 moves to one sheet a request.
-- Claude writes only the cover's words: description, general notes, codes and next steps. Every number on the sheets comes from the plan. Builds on the site plan sheet (`lib/sitesheet.mjs`), the renderings (`RENDERINGS-PLAN.md`) and the massing scene (`MASSING-PLAN.md`).
-
-Goal: from an option on the project page, press **Make plan set** and get a multi-sheet PDF (cover, site and civil, architecture, structure, MEP, fire, telecom) on the Finishes Solutions title block. The project page then reads **Sites · Renderings · Plans**.
+- **Storage:** sets and their pages are kept on the device that made them (IndexedDB), not in Supabase Storage. A long set is a job saved step by step (`job:<project>`, `jp:<job>:<sheet>`), so it survives a reload and resumes. Shared online storage is still to do.
+- **Printing and merging:** one sheet is printed a request (`api/planset.js` mode `sheet`, three at a time), and the pages are merged in the browser with pdf-lib. A hundred-sheet set is about 20 to 40 MB.
+- **The review gate:** not built. Claude's designs are checked by code (`lib/plandesign.mjs placeDesign`) and corrected up to twice, then fall back to the rule-based design. People don't approve designs one by one, and approved designs aren't saved to the team library yet.
+- **Building types:** grouped by use, footprint and stories, at most eight a set. Townhomes and duplexes are designed as one unit and repeated.
+- **Drawing modules:** the drawings are in `lib/sheets/site.mjs` (civil, landscape, site lighting, fire access, site fiber), `lib/sheets/arch.mjs` (plans, elevations, sections, schedules, details, life safety, code analysis) and `lib/sheets/eng.mjs` (structural, mechanical, plumbing, electrical, sprinkler, fire alarm, telecom), all rule-based on the plan and the designs. The shared kit is `lib/sheetkit.mjs`.
 
 ## The bar to clear: the Indican / Waller example
 

@@ -16,27 +16,35 @@ const laid = (site, prog, name) => { const o = L.layoutOptions(site, prog)[0]; a
 const retail = laid(fm362, { use: 'retail', gfa: 40000 }, 'Option A'), town = laid(fm362, { use: 'townhomes' }, 'Option B'), mixed = laid(tract, { use: 'multifamily', units: 240 }, 'Option C');
 
 // ---------- sections ----------
-assert.deepEqual(P.defaultSections(), ['general', 'civil', 'renderings'], 'phase 1: the built sections, ticked');
+assert.deepEqual(P.defaultSections(), ['general', 'civil', 'landscape', 'arch', 'structural', 'mechanical', 'plumbing', 'electrical', 'fire', 'renderings'], 'every section built and ticked except telecom');
 assert.equal(P.sectionById('telecom').on, false, 'telecom only when asked for (decided Oct 19)');
-assert.ok(P.SECTIONS.filter(s => !P.built(s)).every(s => s.phase > 1), 'the rest are listed for later phases');
-assert.deepEqual(P.pickSections(['civil', 'arch', 'telecom', 'nope']), ['general', 'civil'], 'unbuilt and unknown sections are dropped; General is always in');
+assert.ok(P.SECTIONS.every(P.built), 'phases 1 to 4 built');
+assert.deepEqual(P.pickSections(['civil', 'structural', 'telecom', 'nope']), ['general', 'civil', 'telecom'], 'unknown sections dropped; General always in; structural goes without architecture');
 assert.deepEqual(P.pickSections([]), ['general']);
 assert.deepEqual(P.pickSections(null), ['general']);
-// a section drawn on another's work goes when that one is left out (structural needs architecture)
-assert.ok(P.SECTIONS.filter(s => s.needs).every(s => s.needs === 'arch'));
+assert.ok(P.SECTIONS.filter(s => s.needs).every(s => s.needs === 'arch'), 'the engineering sections are drawn on the building designs');
 
 // ---------- the sheets ----------
+const PD = await import('../lib/plandesign.mjs');
 for (const plan of [retail, town, mixed]) {
-  const all = P.sheetList(plan, { sections: P.defaultSections(), renders: 2, renderLabels: ['Aerial', 'Street'] });
-  assert.deepEqual(all.map(s => s.number), ['G-001', 'C-101', 'A-901', 'A-902'], plan.name + ': cover, site plan, two renderings');
-  assert.equal(all[2].sub, 'Aerial');
-  assert.deepEqual(P.sheetList(plan, { sections: ['general'], renders: 3 }).map(s => s.number), ['G-001'], 'General alone: the cover');
-  assert.equal(P.sheetList(plan, { sections: ['renderings'], renders: 9 }).length, 5, 'four renderings at most');
-  assert.deepEqual(P.sectionCounts(plan, 0), { general: 1, civil: 1, landscape: 0, arch: 0, structural: 0, mechanical: 0, plumbing: 0, electrical: 0, fire: 0, renderings: 0, telecom: 0 });
-  // C-101's scale: a standard one, and the drawing fits the space beside the tables at it
+  const types = PD.buildingTypes(plan), sup = types.filter(t => t.supported), all = P.sheetList(plan, { sections: P.defaultSections(), renders: 2, renderLabels: ['Aerial', 'Street'], types }), nums = all.map(s => s.number);
+  assert.equal(new Set(nums).size, nums.length, plan.name + ': sheet numbers are unique');
+  assert.deepEqual(nums.slice(0, 2), ['G-001', 'G-002']); assert.ok(nums.includes('C-101') && nums.includes('C-001') && nums.includes('L-101'), plan.name + ': site sheets');
+  assert.equal(all.filter(s => s.kind === 'a-plans').length, sup.length, plan.name + ': floor plans for each building type the set can design');
+  assert.ok(all.filter(s => s.typeId).every(s => sup.some(t => t.id === s.typeId)), 'building sheets only for supported types');
+  assert.deepEqual(all.filter(s => s.kind === 'render').map(s => s.number), ['A-901', 'A-902']); assert.equal(all.find(s => s.number === 'A-901').sub, 'Aerial');
+  assert.ok(!nums.some(n => n.startsWith('T-')), 'no telecom unless ticked');
+  assert.ok(P.sheetList(plan, { sections: [...P.defaultSections(), 'telecom'], types }).some(s => s.number === 'T-101'), 'telecom when ticked');
+  assert.deepEqual(P.sheetList(plan, { sections: ['general'], renders: 3, types }).map(s => s.kind).filter(k => k !== 'g-code'), ['cover', 'g-notes'], 'General alone: cover and notes (and code analysis for commercial)');
+  assert.equal(P.sheetList(plan, { sections: ['renderings'], renders: 9, types }).filter(s => s.kind === 'render').length, 4, 'four renderings at most');
+  const c = P.sectionCounts(plan, 0, types); assert.equal(c.general + c.civil + c.landscape + c.arch + c.structural + c.mechanical + c.plumbing + c.electrical + c.fire + c.telecom, P.sheetList(plan, { sections: P.SECTIONS.map(s => s.id), types }).length);
   const s = P.fitScale(plan, 21, 21); assert.ok([10, 20, 30, 40, 50, 60, 80, 100, 150, 200, 300].includes(s), plan.name + ' at 1" = ' + s + "'");
 }
-assert.deepEqual(P.sheetList({ ring: [] }, {}).map(s => s.number), ['G-001'], 'no site drawn: no site plan sheet');
+{ const mf = P.sheetList(mixed, { sections: P.defaultSections() }); assert.ok(mf.every(s => !s.typeId || PD.buildingTypes(mixed).find(t => t.id === s.typeId)?.supported), 'apartments: no building sheets yet'); }
+assert.deepEqual(P.sheetList({ ring: [] }, {}).map(s => s.number), ['G-001', 'G-002'], 'no site drawn: the general sheets only');
+// Claude's discipline notes, cleaned to fit
+{ const x = P.cleanDisc({ notes: ['a', '', 3, 'b'.repeat(500)], criteria: [{ item: 'Wind', value: '140 mph' }, { item: '', value: 'x' }], extra: 1 }); assert.deepEqual(x.notes.length, 2); assert.equal(x.notes[1].length, 360); assert.deepEqual(x.criteria, [{ item: 'Wind', value: '140 mph' }]); }
+assert.equal(P.DISC_SCHEMA.additionalProperties, false); assert.ok(Object.values(P.SECTION_DISC).every(k => P.DISCIPLINES[k]));
 
 // ---------- the set's HTML ----------
 const text = P.cleanNotes({ description: 'A retail center <b>on FM 362</b>.', general_notes: ['One.', '', 'Two.', 7, 'x'.repeat(900)], codes: ['IBC'], next_steps: ['Survey'], extra: 'dropped' });
@@ -45,15 +53,15 @@ assert.deepEqual(text.general_notes.length, 3, 'empty and non-text notes dropped
 const d = { plan: retail, project: { name: 'Indican <script>alert(1)</script> Waller' }, client: 'FM 362 Development LLC', address: '0 FM 362 Rd, Waller, TX 77484', county: 'Waller County, Texas', parcels: [{ label: 'a' }, { label: 'b' }],
   facts: ['FEMA flood zone X — outside the 100-year floodplain.'], notes: S.check(retail).map(i => i.text), renders: [{ src: 'data:image/jpeg;base64,AAAA', caption: 'Aerial' }], text,
   date: 'October 19, 2026', drawnBy: 'MS', projectNumber: '', revisions: [{ no: '0', date: '10/19/26', desc: 'Schematic design set' }] };
-d.sheets = P.sheetList(retail, { sections: P.defaultSections(), renders: 1, renderLabels: ['Aerial'] });
+d.sheets = P.sheetList(retail, { sections: ['general', 'civil', 'renderings'], renders: 1, renderLabels: ['Aerial'] }).filter(s => ['cover', 'siteplan', 'render', 'g-notes'].includes(s.kind));
 const html = P.setHTML(d);
 assert.ok(/^<!doctype html>/.test(html));
-assert.equal((html.match(/<section class="pg">/g) || []).length, 3, 'one page a sheet');
+assert.equal((html.match(/<section class="pg">/g) || []).length, d.sheets.length, 'one page a sheet');
 assert.ok(!/NaN|undefined/.test(html), 'no NaN or undefined on the sheets');
 assert.ok(!html.includes('<script>'), 'the project name is escaped');
 assert.ok(html.includes('@page{size:36in 24in;margin:0}'), '24 x 36 pages with no margin: the border is laid under them');
 for (const n of ['G-001', 'C-101', 'A-901']) assert.ok(html.includes('<div class="tb-num">' + n + '</div>'), n + ' in its title block');
-assert.equal((html.match(/PRELIMINARY — NOT FOR CONSTRUCTION, BIDDING OR PERMIT\./g) || []).length, 3, 'the preliminary statement on every sheet');
+assert.equal((html.match(/PRELIMINARY — NOT FOR CONSTRUCTION, BIDDING OR PERMIT\./g) || []).length, d.sheets.length, 'the preliminary statement on every sheet');
 assert.ok(html.includes('&lt;b&gt;on FM 362&lt;/b&gt;'), 'Claude’s words are escaped too');
 assert.ok(/1(&quot;|") = \d+'-0(&quot;|")/.test(html), 'C-101 says its scale');
 assert.ok(html.includes('FM 362 Development LLC') && html.includes('Schematic design · Option A'), 'client and phase in the title block');
@@ -135,4 +143,13 @@ assert.equal((await call('PUT')).code, 405);
 { const c = await PDFDocument.create(); for (let i = 0; i < 2; i++) c.addPage([2592, 1728]).drawRectangle({ x: 200, y: 200, width: 100, height: 100 }); // (Chromium's pages always have content)
   const out = await PDFDocument.load(await onBorder(await c.save(), border));
   assert.equal(out.getPageCount(), 2); assert.deepEqual([out.getPage(1).getWidth(), out.getPage(1).getHeight()], [2592, 1728]); }
+// the long job's modes: a discipline's notes, a building design, one sheet
+reply = { model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ notes: ['Civil note.'], criteria: [{ item: 'Storm', value: '100-yr' }] }) }], usage: { input_tokens: 10, output_tokens: 20 } };
+{ const r = await call('POST', { mode: 'disc', discipline: 'civil', brief }); assert.equal(r.code, 200); assert.deepEqual(r.body.disc, { notes: ['Civil note.'], criteria: [{ item: 'Storm', value: '100-yr' }] }); assert.ok(sent.at(-1).user === undefined && JSON.stringify(sent.at(-1).messages).includes('civil')); }
+assert.equal((await call('POST', { mode: 'disc', discipline: 'astrology', brief })).code, 400);
+{ const t = PD.buildingTypes(retail)[0], seed = PD.fallbackDesign(t); reply = { ...reply, content: [{ type: 'text', text: JSON.stringify(seed) }] };
+  const r = await call('POST', { mode: 'design', type: t.id, brief: PD.designBrief(t), seed, previous: seed, problems: ['Room "x" overlaps'] });
+  assert.equal(r.code, 200); assert.deepEqual(r.body.design, seed, 'the design comes back as Claude wrote it (the browser checks it)');
+  const msg = JSON.stringify(sent.at(-1).messages); assert.ok(msg.includes('failed these checks') && msg.includes('overlaps'), 'the problems go back to Claude'); assert.deepEqual(sent.at(-1).output_config.format.schema, PD.DESIGN_SCHEMA); }
+assert.equal((await call('POST', { mode: 'sheet', html: 'nope' })).code, 400, 'one sheet needs a whole document');
 console.log('plan sets ok');

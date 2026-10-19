@@ -2256,6 +2256,15 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .ps-sec b{font-weight:600}.ps-sec em{font-style:normal;color:var(--text-2);margin-left:6px;font-size:12px}.ps-sec small{display:block;color:var(--text-2);font-size:12px}
 .ps-sec.off{cursor:var(--cur-default,default);opacity:.62}
 .ps-list{display:grid;gap:8px}.ps-item{display:flex;justify-content:space-between;align-items:center;gap:10px 16px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:13px}
+.ps-job{display:grid;gap:10px;max-width:880px;margin-bottom:16px;border-color:var(--green-300)}
+.ps-bar{height:10px;border-radius:5px;background:var(--ink-100);overflow:hidden}.ps-bar i{display:block;height:100%;background:var(--green-700);transition:width .6s}
+.ps-stat{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--text-2)}.ps-stat b{color:var(--text);font-size:15px}.ps-stat .err{color:#b3261e}
+.ps-steps summary{cursor:var(--cur-pointer,pointer);font-size:13px;font-weight:600;color:var(--text-2)}.ps-sg{margin-top:8px}.ps-sg>b{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2)}
+.ps-sg ul{list-style:none;margin:4px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px 14px;max-height:340px;overflow:auto}
+.ps-sg li{display:flex;gap:6px;align-items:baseline;font-size:12.5px;line-height:1.35;min-width:0}.ps-sg li i{font-style:normal;flex:none;width:12px;color:var(--text-2)}.ps-sg li span{min-width:0;overflow-wrap:anywhere}
+.ps-sg li em{font-style:normal;color:var(--text-2);font-size:11.5px}.ps-sg li small{margin-left:auto;color:var(--text-2);flex:none}
+.ps-sg li.st-done i{color:var(--green-700)}.ps-sg li.st-doing i{color:var(--green-600)}.ps-sg li.st-doing span{font-weight:600}.ps-sg li.st-failed i,.ps-sg li.st-failed em{color:#b3261e}.ps-sg li.st-skipped{opacity:.8}
+.ps-types{font-size:12.5px;line-height:1.7;color:var(--text-2)}.ps-types>b{color:var(--text);margin-right:6px}.ps-types .tag{display:inline-block;border:1px solid var(--line-2);border-radius:4px;padding:0 5px;font-weight:700;color:var(--text);font-size:11px}.ps-types small{display:block;font-size:12px}
 .ps-item b{display:block}.ps-item span{color:var(--text-2)}.ps-item small{display:block;color:var(--text-2);font-size:12px;margin-top:2px;word-break:break-word}
 .pj-rgh{display:flex;justify-content:space-between;align-items:baseline;gap:6px 16px;flex-wrap:wrap;margin-bottom:10px}
 .pj-rgh .pj-h3{margin:0}
