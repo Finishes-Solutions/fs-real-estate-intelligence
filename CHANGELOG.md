@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 4:56 PM CT: Renderings made in the background (a25d280)
+- **Render on the Renderings tab no longer takes you to the map.** The option's 3D view is set up on a hidden map behind the scenes and the picture is taken from that, so you stay on the project page or carry on elsewhere in the app.
+- The form shows **Rendering 1 of 4** and what's happening, with **Cancel**. The new pictures appear below when they're ready, and a message says so wherever you are in the app.
+- The **Open plan** and **Render more** links beside each option's renderings are gone.
+
 ### 4:39 PM CT: Tidier Make renderings form (ec75352)
 - The Option, View, Materials and Light dropdowns on the Renderings tab no longer run into each other. They sit in an even row of four on a computer, two by two on a tablet and one under another on a phone, with space between the form and what's below it. The Plans tab's form gets the same fix.
 
