@@ -8,7 +8,71 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 ### 11:26 PM CT: Plan for a 3D massing scene behind the renderings (b105481)
 - **Planning only, nothing in the app changes.** `MASSING-PLAN.md` sets out how a lit 3D model of each option would be built from the plan (buildings with roofs, window bands and canopies, paving, pond, trees, sun and shadows) on the real map, so renderings start from a much better picture and can send the AI a depth image that keeps every building in place. Same Render flow for users, plus a 3D toggle on the plan.
 
-## 2026-10-18
+### 11:15 PM CT: Mixed plans keep their space on a re-fit, a turnaround at the L, the truck count asked for comes first (369bbbf, merged a7bd977; c22b1d9)
+- **Mixed plans re-fit without losing space:** moving a building in a mixed plan (shops and apartments, say) and letting the site re-fit used to lay out far less than you had, sometimes nearly nothing. Each part of the mix now keeps its floor area and units, on the automatic re-fit and on Re-fit Plan alike.
+- **Changing a building's use by hand:** turn an apartment building into offices and Re-fit Plan now lays out the apartments asked for round it, instead of counting the offices as apartments.
+- **L-shaped shops on a corner:** the parking lane the shops' side wing cuts short now ends with room to turn round, instead of a dead end.
+- **Food truck parks:** when you ask for a number of trucks, a layout with that many comes first. A layout keeping detention in a pond is still among the choices.
+
+### 11:00 PM CT: Gas station re-fit, corner shapes in mixed plans, settings that fit the plan (7a22bdf, merged eec65d5)
+- **Move the canopy and the station follows:** drag the fuel canopy along the street, turn it, or move the c-store, and a moment later the drive lanes go back round the canopy, the store sits behind it, and the parking, tank pad and driveways are laid out again. Re-fit Plan does the same. Before, a gas station couldn't be re-fitted at all.
+- **When it can't fit, it says why:** drop the canopy where its lanes won't go and your move stays as it is, with a message like "the canopy needs a drive lane all round it". Undo puts it back.
+- **Mixed plans on a corner:** shops at the front of a mixed plan now also get an L of shops wrapping their parking, and a drive-thru pad at the corner, as layouts to compare. Inside lots are unchanged.
+- **Site parameters only shows what applies:** apartment depth, longest building and spacing only with apartments; neighbourhood streets only with single-family homes; the building shape only for shops, offices and apartments; trash settings only for what the plan has.
+- Re-fitting the L-shaped strip keeps its L.
+
+### 10:46 PM CT: Food truck parks on narrow, deep lots (97844d2, merged 0ad994a)
+- On a narrow, deep lot the trucks now run down one long side, with the seating, pavilion, restrooms and bar beside them. A 180 ft wide lot about 900 ft deep holds 12 to 13 trucks, where it used to get 2. A 150 ft wide lot holds 11 to 12, where it used to get no layout.
+- A choice with less than half the trucks of the first one is no longer offered, except the one with the bar on a small lot.
+
+### 10:26 PM CT: Food truck parks: restrooms always, small lots, distinct choices (84a404a, 70909be, merged 409f630)
+- On a small lot (about an acre) the trucks come first and every layout is fully parked. The bar shrinks or is left out, then the pavilion gets smaller, and the layout says so. About an acre now holds 4 trucks, or 2 trucks with a small bar, where it used to get no layout.
+- Every food truck layout has restrooms. When they don't fit, the bar gives up its room, then a truck at a time.
+- The choices offered are different from each other. Two layouts with the same trucks, about the same seats, and the same bar and pond count as one, so you may see two choices instead of three.
+- Layouts that keep detention in a pond come first when they hold nearly as many trucks as one without a pond.
+
+### 9:22 PM CT: Food truck parks (35bb30a, merged f729165)
+- Ask for a food truck park ("a food truck park with 12 trucks, a covered pavilion, restrooms and a small bar") and the layout draws one, instead of a few "other" boxes: truck stalls (15 × 35 ft, each with a power and water pedestal) around a gathering area, a covered pavilion with picnic seating on a lawn, restrooms, a bar with a beer garden patio, a playground, and a dumpster and grease enclosure.
+- The trucks stand along a service lane behind their stalls, so they pull in and out without crossing the seating; their serving windows face the seating. Customers park on the street side and walk in, with no parking at the entrance's mouth.
+- Two arrangements: trucks round the commons (back and both sides) or along the back. On a corner lot the trucks get their own service entry from the side street.
+- Settings › Program: number of trucks (blank = as many as fit), parking per truck, pavilion, bar and restroom sizes, bar and playground on or off.
+- Numbers show the trucks, about how many seats, and the pavilion, restroom and bar sizes; the layout card leads with trucks and seats. Selecting a stall shows its size and pedestal; a pavilion, bar or restrooms building has a Part field.
+- Pro forma: stall rent per truck (about $1,200 a month), the bar run by the owner or leased triple net, the park's own costs, and each stall's pad and hookups. All editable.
+- The building library has a Food trucks group (pavilions, restrooms, bars). The map, plan key, PDF sheet and renderings know food trucks.
+
+### 9:22 PM CT: Gas stations, c-stores and corner sites (1f050c0, merged ad81d35)
+- **Ask for a gas station and get one:** "gas station with 8 pumps and a 4,500 sf c-store on the corner" now lays out a fuel canopy along the busier street with its pumps in one or two rows and 24 to 30 ft lanes all round it, the store behind it facing the pumps with parking along its front, and three air / vacuum stalls. Before, it came out as a small retail strip.
+- **Fuel tanks:** a keep-clear pad for the underground tanks, placed where a tanker can pull straight alongside on a wide drive from an entrance. Parking over the tanks is flagged as a problem.
+- **Car wash:** ask for one and a tunnel goes beside the store, with its stacking lane wrapping round the back so the line doesn't block the pumps.
+- **Corner driveways:** one on each street, each at least 100 ft from the corner where the frontage allows (the layout says so when it can't). Inside lots get one or two on the front.
+- **Odd lots:** wedge, clipped-corner and many-sided parcels (like 19730 FM 362) are laid out too.
+- **Settings › Program** for a gas station: pumps (4, 6, 8 or 12), store size, parking, which street the canopy runs along, car wash and air / vacuum switches. **Numbers** has a Fuel tile (fueling positions, pumps, canopy, store). Pick the canopy to see and change its pumps and rows.
+- **Pro forma:** ground-leased to a fuel retailer (about $25,000 a pump a year) or built and run by the owner (fuel, inside sales and car wash margins, store costs, canopy, pumps and tanks), all editable. Truck stops are drawn as a car station for now, and the layout says so.
+- **Shops on a corner lot:** the planner also tries an L-shaped strip round the parking and a strip with a drive-thru pad at the corner, and keeps whichever scores best. Inside lots are unchanged.
+- **Map, PDF sheet and DXF** draw the canopy, pumps and tank pad; the legend and building library have them too.
+- A future pad site's name no longer sits on top of the detention pond beside it.
+
+### 9:22 PM CT: Faster to open; clearer site plans on unusual sites (79f1aae, 4fdafc7, 42b2fa8, merged d02ada9)
+- Opening a site plan right after the page loads no longer gets the map carried off to the whole region by the first-visit fly-in.
+- Big plans redraw faster: opening a saved 86-acre neighbourhood plan takes about 40% less script time, because the plan's checks are no longer worked out two or three times over for each redraw.
+- The app opens faster: the map data starts downloading alongside the app's code instead of after it, the map and chart libraries no longer hold up the rest of the page, and the Excel library (about 880 KB) loads a few seconds after the app is up instead of before it. On a simulated 40 Mbps connection the app was ready in about 1.8 s instead of 2.5 s.
+- Build Layouts and re-fits are faster: about 20% less time on 3–10 acre sites and about half on big neighbourhoods (20 acres: 8.5 s → 4.2 s; 86 acres: 38 s → 22 s), because the site's open land is now worked out once instead of on every try. The layouts themselves are exactly the same.
+- When nothing fits a request (say 100,000 sf of self storage on a third of an acre), the Layouts section now says so and stays that way — "Nothing fits … on this 0.30-acre site", with what to try and an Edit request button — instead of an empty list after a toast that was gone in seconds.
+- Redraw Site refuses an outline that crosses itself (corners clicked out of order) or has almost no area (corners in a line), and says why; the drawing stays open so Backspace can fix it. Before, a crossed outline was kept as a 0.00-acre site and laid out a 1,000 sf box.
+- Self-storage unit mixes: the line under each table now warns when the shares don't add up to 100% (they're scaled) and, with every share at 0%, says what each unit is counted at, instead of "Average 0 sf · 0%".
+- The toast after changing a setting names the setting, not its hint, and shows the value it's read as: "RV / boat spaces 0" instead of "RV / boat spaces 12 × 40 ft -3"; a blank size reads "auto".
+- If the AI answers without a program, Build Layouts reads your words directly instead of failing with a technical error.
+
+### 9:22 PM CT: Gas stations and food truck parks on about an acre (d9df189)
+- **Gas stations on narrow lots:** a lot about 210 ft wide used to lay out nothing because the fuel tank pad had no room beside the canopy. The tanks now go under an end drive lane, where cars can pass over them but never park.
+- **Fewer pumps when parking runs short:** if the pumps you asked for can't all be parked, a layout with fewer pumps and full parking is offered as well.
+- **Small food truck parks:** trucks lined along the back of a small lot get a shallower seating area, instead of no layout at all.
+
+### 4:29 PM CT: Fixes found by testing every building type on odd lots (f26932c)
+- **No more drives over detention ponds.** On some corner and clipped-corner lots, a drive could run over the edge of the pond and the layout failed its own checks. Retail, office, medical and church layouts were affected.
+- **A mix that doesn't fit still gets layouts.** Shops plus 120 apartments on a wedge-shaped lot used to come back with nothing. Now you get the same mix at a smaller size, or the main use alone, and the layout says so.
+- **Duplexes no longer read "parking short".** Each front-load duplex's driveway holds its second car, and Numbers now shows those driveway spaces.
+- **Re-fitting after moving a building no longer loses parking on a busy computer.** Before, it could come out with about half the spaces it needed.
 
 ### 4:15 PM CT: Project status on the Projects list, and small project page polish (b8f4567)
 - **Status on the list:** each project card and list row shows its status pill (Prospect, Under contract…), and **Status** is a new sort choice.

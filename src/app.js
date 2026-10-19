@@ -59,7 +59,9 @@ const MAPTILER_KEY = 'vA28jXazwpYesC2b1Ccp';
 // Photon until it's been DOWN_HOURS (lib/maptiler.mjs). Remembered across reloads so each load doesn't fail first.
 let mtDown=false; try{ mtDown=!!downSince(localStorage); }catch(e){}
 function setMtDown(){ if(mtDown) return false; mtDown=true; try{ markDown(localStorage); }catch(e){} return true; }
-const getJSON=(u,optional)=>fetch(u,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error(u+' '+r.status); return r.json(); }).catch(e=>{ if(optional) return null; throw e; });
+// index.html starts the data downloads before any module has loaded; each is taken over once (a later call fetches again)
+const boot=u=>{ const q=window.__boot?.[u]; if(q) delete window.__boot[u]; return q; };
+const getJSON=(u,optional)=>(boot(u)||fetch(u,{cache:'no-cache'})).then(r=>{ if(!r.ok) throw new Error(u+' '+r.status); return r.json(); }).catch(e=>{ if(optional) return null; throw e; });
 const [GEO,FIL,CHG]=await Promise.all([getJSON('data/geo.json'),getJSON('data/filings.json'),getJSON('data/changes.json',true)]);
 const DATA={...GEO,...FIL,changes:CHG||{runs:[]}};
 const R2D=180/Math.PI, EARTH_MI=3958.8;
@@ -1105,7 +1107,7 @@ const fileBase=(kind,label)=>'fs-'+kind+'-'+slug(label||scopeLabel())+'-'+stamp;
 function exportCsv(rows,name,pre){ saveFile(name+'.csv',csvText(rows,pre),'text/csv'); } // pre: [[...cells]] lines above the header (e.g. a filters line)
 // Excel: one or more sheets [{name, rows|aoa, link}] (link: column holding a URL to hyperlink)
 function exportXlsx(sheets,name){
-  if(!window.XLSX){ toast('Excel export is still loading. Try again in a moment.'); return; }
+  if(!window.XLSX){ toast('Getting Excel export ready…'); loadXlsx().then(()=>exportXlsx(sheets,name),()=>toast('Excel export couldn’t load. Check your connection and try again.')); return; }
   const wb=XLSX.utils.book_new();
   for(const sh of sheets){
     const ws=sh.aoa?XLSX.utils.aoa_to_sheet(sh.aoa):XLSX.utils.json_to_sheet(sh.rows);
@@ -1366,7 +1368,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
   BOOT_BASES,
   setSelection, clearAreaSelection:clearSelection, fixWinding, fc, countyGeo, HOME_C, PERIOD, stamp, scopeLabel, fileBase, rowsFor, summaryAoa, reportMap,
-  exportCsv, exportXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
+  exportCsv, exportXlsx, loadXlsx, exportGeoJSON, entityKey, get layersState(){ return layers; },
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
 renderNav(ctx); changesBadge(); // menus first: modules look up the badge spans and the sub-tab rows
 ctx.scheduleHash=scheduleHash;
@@ -1408,9 +1410,17 @@ new MutationObserver(()=>{ if(!card.classList.contains('open')&&card.classList.c
   const bll=!f&&!spOk?parseLatLng(p.get('b')):null;
   if(bll) map.once('load',()=>{ if(!mll||!map.getBounds().contains(bll)) map.jumpTo({center:bll,zoom:17.5}); map.once('idle',()=>{ if(!ctx.buildingAt?.(bll)) ctx.openBuildingAt(bll); }); });
   scheduleHash();
-  map.once('load',()=>{ if(f||bll||mll||spOk) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>map.flyTo({...HOME,duration:2600,essential:true}),300); else map.jumpTo(HOME); });
+  // (not when a site plan was opened before the map finished loading: the fly-in used to carry the map off the site)
+  map.once('load',()=>{ if(f||bll||mll||spOk||ctx.planOpen?.()) return; if(sel.feature) fitGeom(sel.feature); else if(!reduceMotion) setTimeout(()=>{ if(!ctx.planOpen?.()) map.flyTo({...HOME,duration:2600,essential:true}); },300); else map.jumpTo(HOME); });
   cardRenderHooks.push(()=>scheduleHash()); // a property card opening (b=)
 }
+
+// the Excel library (about 880 KB, only the Excel exports use it): fetched a few seconds after the app is up, when the
+// page is idle, or straight away by the first export that needs it
+var xlsxP=null; // var: an export can call loadXlsx before this line has run
+function loadXlsx(){ if(window.XLSX) return Promise.resolve(); return xlsxP||(xlsxP=new Promise((ok,no)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.async=true;
+  s.onload=()=>window.XLSX?ok():no(new Error('xlsx')); s.onerror=()=>{ xlsxP=null; s.remove(); no(new Error('xlsx')); }; document.head.appendChild(s); })); }
+setTimeout(()=>{ const go=()=>loadXlsx().catch(()=>{}); window.requestIdleCallback?requestIdleCallback(go,{timeout:5000}):go(); },3000);
 
 // installable app + offline shell (served over https only)
 // The offline cache serves the app files it has, so a new release used to show only after a second reload. When a new

@@ -22,7 +22,7 @@ export const dataImage = s => { const m = /^data:image\/(png|jpeg|webp);base64,(
 export function cleanBrief(b = {}) {
   const uses = (Array.isArray(b.uses) ? b.uses : []).slice(0, 8).map(u => ({ use: clip(u?.use, 20), label: clip(u?.label, 40), count: Math.max(1, Math.min(500, Math.round(+u?.count) || 1)), floors: (Array.isArray(u?.floors) ? u.floors : []).slice(0, 4).map(f => Math.max(1, Math.min(60, Math.round(+f) || 1))), forms: (Array.isArray(u?.forms) ? u.forms : []).filter(f => ['bar', 'L', 'U', 'tower'].includes(f)), units: +u?.units > 0 ? Math.round(+u.units) : undefined }));
   const n = (v, hi) => Number.isFinite(+v) && +v > 0 ? Math.min(hi, +v) : undefined;
-  return { address: clip(b.address, 120), acres: n(b.acres, 5000), uses, buildings: n(b.buildings, 2000), parking: n(b.parking, 50000), pond: !!b.pond, pool: !!b.pool, truckCourt: !!b.truckCourt, garage: !!b.garage, homes: n(b.homes, 5000),
+  return { address: clip(b.address, 120), acres: n(b.acres, 5000), uses, buildings: n(b.buildings, 2000), parking: n(b.parking, 50000), pond: !!b.pond, pool: !!b.pool, truckCourt: !!b.truckCourt, foodTrucks: n(b.foodTrucks, 500), canopy: n(b.canopy, 200), garage: !!b.garage, homes: n(b.homes, 5000),
     trees: b.trees !== false, look: clip(b.look, 20), time: clip(b.time, 20), basemap: b.basemap === 'satellite' ? 'satellite' : 'map', facts: (Array.isArray(b.facts) ? b.facts : []).slice(0, 6).map(s => clip(s, 200)),
     focus: b.focus && typeof b.focus === 'object' ? { name: clip(b.focus.name, 40) || 'Building', use: clip(b.focus.use, 20), floors: Math.max(1, Math.min(60, Math.round(+b.focus.floors) || 1)), label: clip(b.focus.label, 40) } : undefined }; // the building a close-up frames
 }

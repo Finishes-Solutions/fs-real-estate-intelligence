@@ -105,3 +105,31 @@ const ap = [{ key: 'x', rank: 0, m: { gfa: 9e5, units: 1213, spaces: 1958, requi
 assert.ok(K.badges(ap, K.recommended(ap))[1].includes('Most units'));
 assert.deepEqual(K.deltas(ap[1], ap[0]), ['+2 units in Phase 1', '−32 spaces']);
 console.log('planpick ok (homes)');
+
+// ---- nothing fits: what shows where the layouts would be ----
+{ const n = K.noFit('100,000 sf self storage', 0.303);
+  assert.equal(n.title, 'Nothing fits “100,000 sf self storage” on this 0.30-acre site.'); assert.match(n.tip, /Ask for less/);
+  assert.match(K.noFit('', 86.2).title, /that request on this 86\.2-acre site/);
+  assert.match(K.noFit('20,000 sf retail', 0).title, /outline has no area/, 'a crossed or flat outline: redraw it'); }
+// real engine output: a 120 × 110 ft lot asked for 100,000 sf of storage gives no layout at all (the banner's case)
+{ const out = L.layoutOptions({ origin: [-95.5, 29.8], ring: [[0, 0], [120, 0], [120, 110], [0, 110]], front: 0, setbacks: { ...S.SETBACKS }, elements: [] }, { use: 'storage', gfa: 100000 });
+  assert.equal(out.length, 0, 'nothing fits: no layouts'); }
+// ---- a storage unit mix's footer ----
+assert.deepEqual(K.mixFoot(S.STORAGE_MIX.climate, 100), { text: 'Average 97 sf · 100%', warn: false });
+{ const z = K.mixFoot(S.STORAGE_MIX.climate.map(t => ({ ...t, pct: 0 })), 100); assert.ok(z.warn && /counted at 100 sf/.test(z.text), 'every share 0%: says what the units are counted at, not "Average 0 sf"'); }
+{ const m = K.mixFoot([{ name: '10×10', sf: 100, pct: 80 }, { name: '10×20', sf: 200, pct: 90 }], 200); assert.ok(m.warn); assert.equal(m.text, 'Average 153 sf · the shares add up to 170%, so they’re scaled to 100%');
+  assert.equal(Math.round(S.storageAvg([{ sf: 100, pct: 80 }, { sf: 200, pct: 90 }])), 153, 'the same average the unit counts use'); }
+assert.ok(K.mixFoot([], 200).warn && K.mixFoot(null, 200).warn, 'no sizes at all');
+console.log('planpick ok (nothing fits, storage mix)');
+
+// ---- check() and details() keep their last answer for an unchanged plan (lib/siteplan.mjs): the same answer, never a
+// stale one, and a caller changing its copy changes nothing ----
+{ const pl = { origin: [-95.5, 29.8], ring: [[0, 0], [600, 0], [600, 420], [0, 420]], front: 0, setbacks: { ...S.SETBACKS }, elements: [] }, o = L.layoutOptions(pl, { use: 'retail', gfa: 25000 })[0];
+  const p = { ...pl, program: o.program, elements: JSON.parse(JSON.stringify(o.elements)) }, J = JSON.stringify;
+  const c0 = J(S.check(p)), d0 = J(S.details(p)), c1 = S.check(p); c1.push({ level: 'bad', text: 'junk' }); S.details(p).trees.length = 0;
+  assert.equal(J(S.check(p)), c0, 'a second call: the same issues, untouched by what the first caller did'); assert.equal(J(S.details(p)), d0);
+  const b = p.elements.find(e => e.kind === 'building'); b.x += 2000; // moved off the lot: the answer is worked out again
+  assert.ok(S.check(p).some(i => i.level === 'bad' && i.id === b.id), 'a change is seen at once'); b.x -= 2000;
+  assert.equal(J(S.check(p)), c0, 'moved back: the first answer again');
+  assert.equal(J(S.check({ ...p, lastRun: { ask: 'anything' } })), c0, 'a past run on the plan doesn\'t matter'); }
+console.log('planpick ok (kept check answers)');
