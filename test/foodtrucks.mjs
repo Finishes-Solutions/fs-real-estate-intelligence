@@ -28,8 +28,13 @@ assert.equal(S.guessProgram('a warehouse with a truck court').use, 'industrial',
   assert.equal(p.gfa, null); assert.deepEqual(p.extras, [], 'no stray extras or size'); }
 
 // ---------- layouts on real shapes ----------
-const lot = (ring, prog, extra = {}) => { const plan = { ring, origin: [-95.8245, 29.7855], front: 0, setbacks: { ...S.SETBACKS, paveFront: 10, paveSide: 5, paveRear: 5 }, program: prog, elements: [], ...extra }; return { plan, opts: L.layoutOptions(plan, prog, {}) }; };
 const of = (plan, o) => ({ ...plan, program: o.program, elements: o.elements });
+// every lot: every option has restrooms (the health code wants them), and no two options are the same choice (same trucks,
+// seats within 10%, the bar and a pond both there or both not)
+const lot = (ring, prog, extra = {}) => { const plan = { ring, origin: [-95.8245, 29.7855], front: 0, setbacks: { ...S.SETBACKS, paveFront: 10, paveSide: 5, paveRear: 5 }, program: prog, elements: [], ...extra }, opts = L.layoutOptions(plan, prog, {});
+  const sig = opts.map(o => { const m = S.metrics(of(plan, o)), f = m.foodtrucks; assert.ok(f.restroomSf > 0 && o.elements.some(e => e.name === 'Restrooms'), 'restrooms in ' + o.name + ' (' + JSON.stringify(ring[2]) + ')'); return { n: f.trucks, seats: f.seats, bar: f.barSf > 0, pond: m.pond > 0 }; });
+  sig.forEach((a, i) => sig.slice(0, i).forEach((b, j) => assert.ok(!(a.n === b.n && a.bar === b.bar && a.pond === b.pond && Math.abs(a.seats - b.seats) <= 0.1 * Math.max(a.seats, b.seats)), 'options ' + j + ' and ' + i + ' are the same choice: ' + JSON.stringify([b, a]))));
+  return { plan, opts }; };
 const touches = (a, b, g = 1.5) => S.rectsOverlap({ poly: S.grow(S.shapeOf(a), g) }, { poly: S.shapeOf(b) }, 0);
 function sound(name, plan, o) {
   const pl = of(plan, o), els = pl.elements, issues = S.check(pl), bad = issues.filter(i => i.level === 'bad');
