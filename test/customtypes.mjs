@@ -82,15 +82,31 @@ function sound(name, plan, o, { parked = true } = {}) {
   assert.ok(o.notes.some(n => /AI-crafted type/.test(n)) && o.notes.some(n => /^Spaces needed by the AI’s rule: /.test(n)), name + ': the rule and the AI’s sizing are on the plan');
   assert.ok(C.customStats(pl), name + ': Numbers reads it'); return { pl, m, B };
 }
+// the recommended layout of a commons: no aisle that dead-ends, every kind of outdoor piece within about 40 ft of the
+// building (its nearest piece), and a walk joined up from the building to a piece of every kind
+function byTheBuilding(name, plan, o) {
+  const pl = of(plan, o), dead = S.check(pl).filter(i => / dead-ends with /.test(i.text)); assert.equal(dead.length, 0, name + ': no dead-end aisle: ' + dead.map(i => i.text).join('; '));
+  const B = o.elements.filter(e => e.kind === 'building' && e.custom && e.use !== 'amenity').sort((a, b) => S.gfaOf(b) - S.gfaOf(a))[0], walks = o.elements.filter(e => e.part === 'walk');
+  const kinds = [...new Set(o.elements.filter(e => e.custom && e.part && !['walk', 'deck', 'house', 'green'].includes(e.part)).map(e => e.part))]; assert.ok(kinds.length >= 1, name + ': the outdoor pieces');
+  assert.ok(walks.length >= 1 && walks.every(w => w.kind === 'plaza' && w.pinned && w.custom), name + ': walks, kept on a re-fit');
+  const touch = (a, b) => S.gapBetween(S.shapeOf(a), S.shapeOf(b)) < 1.5, reached = new Set(walks.filter(w => touch(w, B)));
+  for (let grew = true; grew;) { grew = false; for (const w of walks) if (!reached.has(w) && [...reached].some(x => touch(w, x))) { reached.add(w); grew = true; } }
+  for (const k of kinds) { const mine = o.elements.filter(e => e.custom && e.part === k), gap = Math.min(...mine.map(e => S.gapBetween(S.shapeOf(e), S.shapeOf(B))));
+    assert.ok(gap <= 40, name + ': the ' + k + ' by the building: ' + Math.round(gap) + ' ft');
+    assert.ok(mine.some(e => [...reached].some(w => touch(w, e))), name + ': a walk from the building to the ' + k); }
+  assert.ok(!o.elements.some(e => e.future), name + ': land left over is open space, not a later phase');
+}
 // commons: the daycare, its playground behind it, on the 3 acre lot and FM 362
 for (const lot of ['3 ac', 'FM 362']) {
   const t0 = Date.now(), { plan, opts } = lay(DAYCARE, lot); assert.ok(opts.length >= 2, lot + ': several layouts'); assert.ok(Date.now() - t0 < 30000, 'laid out in reasonable time');
   for (const [i, o] of opts.entries()) { const { pl, m, B } = sound('daycare ' + lot + ' #' + i, plan, o);
-    assert.equal(B.length, 1); assert.equal(B[0].name, 'Daycare'); assert.ok(B[0].aiSized && /AI-sized/.test(B[0].note)); assert.ok(Math.abs(S.gfaOf(B[0]) - 10625) < 300, 'the size the recipe gives: ' + S.gfaOf(B[0]));
+    assert.equal(B.length, 1); assert.equal(B[0].name, 'Daycare'); assert.ok(B[0].aiSized && /AI-sized/.test(B[0].note)); assert.ok(Math.abs(S.gfaOf(B[0]) - 10625) < 300 || i > 0 && o.notes.some(n => n.startsWith('Fits about ' + Math.round(S.gfaOf(B[0])).toLocaleString('en-US') + ' of the 10,625')), 'the size the recipe gives (or, after the first, smaller and said): ' + S.gfaOf(B[0]) + ' ' + o.notes.join(' | '));
     const play = o.elements.filter(e => e.kind === 'play'); assert.equal(play.length, 1); assert.ok(play[0].pinned && play[0].aiSized && play[0].name === 'Fenced playground');
-    assert.ok(S.gapBetween(S.shapeOf(play[0]), S.shapeOf(B[0])) < 160, 'the playground by the building: ' + Math.round(S.gapBetween(S.shapeOf(play[0]), S.shapeOf(B[0]))));
-    assert.ok(!o.elements.some(e => e.kind === 'keepout'), 'the ground held for it is gone'); assert.equal(m.required, 30, 'parked for 120 children');
-    assert.equal(C.customStats(pl).rule.text, '0.25 a child × 120 children = 30 spaces'); }
+    assert.ok(S.gapBetween(S.shapeOf(play[0]), S.shapeOf(B[0])) < 160, 'the playground by the building: ' + Math.round(S.gapBetween(S.shapeOf(play[0]), S.shapeOf(B[0])))); if (i === 0) byTheBuilding('daycare ' + lot, plan, o);
+    assert.ok(!o.elements.some(e => e.kind === 'keepout'), 'the ground held for it is gone');
+    if (Math.abs(S.gfaOf(B[0]) - 10625) < 300) { assert.equal(m.required, 30, 'parked for 120 children'); assert.equal(C.customStats(pl).rule.text, '0.25 a child × 120 children = 30 spaces'); }
+    else { const q = C.customStats(pl).rule; assert.equal(q.spaces, m.required, 'a smaller building: the rule counts the children it holds, as the plan does'); assert.ok(/^0\.25 a child × about \d+ children \(the building as drawn\) = /.test(q.text), q.text); }
+  }
 }
 // commons on the corner lot (a side street): the pickleball club, 8 courts with their own parking
 { const { plan, opts } = lay(PICKLE, 'corner'); assert.ok(opts.length >= 2);
@@ -100,21 +116,29 @@ for (const lot of ['3 ac', 'FM 362']) {
     assert.ok(o.elements.some(e => e.kind === 'building' && e.name === 'Shade pavilion' && e.use === 'amenity'), 'the pavilion');
     for (const a of courts) for (const b of o.elements.filter(e => ['drive', 'parking', 'pond'].includes(e.kind))) assert.ok(!S.rectsOverlap({ poly: S.shapeOf(a) }, { poly: S.shapeOf(b) }, 0.5), 'no drive, parking or pond on a court');
     assert.equal(C.customStats(pl).courts, 8); }
+  byTheBuilding('pickleball corner', plan, opts[0]);
   // a re-fit: the courts are pinned, the rest lays out round them
   const o = opts[0], pl = { ...of(plan, o), recipe: o.recipe }, rf = L.refit(pl, {}), courts = rf.elements.filter(e => e.kind === 'court');
   assert.equal(courts.length, 8, 're-fit keeps the courts'); assert.deepEqual(courts.map(c => [c.x, c.y]), o.elements.filter(e => e.kind === 'court').map(c => [c.x, c.y]), 'where they were');
   assert.equal(S.check({ ...pl, elements: rf.elements }).filter(i => i.level === 'bad').length, 0, 're-fit passes the checks'); }
 // commons on a narrow lot: fewer courts when all 8 won't go, and it says so
 { const { plan, opts } = lay(PICKLE, 'narrow'); assert.ok(opts.length >= 1);
-  const o = opts[0], { pl } = sound('pickleball narrow', plan, o), n = o.elements.filter(e => e.kind === 'court').length;
+  const o = opts[0], { pl } = sound('pickleball narrow', plan, o), n = o.elements.filter(e => e.kind === 'court').length; byTheBuilding('pickleball narrow', plan, o);
   assert.ok(n >= 2 && n < 8, 'fewer courts: ' + n); assert.ok(o.notes.some(t => t === 'Room for ' + n + ' of the 8 pickleball courts asked for.'), o.notes.join(' | '));
   assert.equal(C.customStats(pl).recipe.outdoor[0].count, n, 'the plan’s recipe holds what was drawn'); assert.equal(S.metrics(pl).required, Math.ceil(4 * n + S.gfaOf(o.elements.find(e => e.custom && e.use === 'other')) * 3 / 1000 - 0.01), 'and parks what was drawn'); }
+// and on the other lots: the daycare on the corner and narrow lots, the pickleball club on the 3 acre lot and FM 362
+for (const [rec, lot] of [[DAYCARE, 'corner'], [DAYCARE, 'narrow'], [PICKLE, '3 ac'], [PICKLE, 'FM 362']]) { const { plan, opts } = lay(rec, lot); sound(rec.name + ' ' + lot, plan, opts[0]); byTheBuilding(rec.name + ' ' + lot, plan, opts[0]); }
 // row: a car wash on the narrow lot, its depth as the recipe gives it
 { const { plan, opts } = lay(WASH, 'narrow'); assert.ok(opts.length >= 2);
   for (const [i, o] of opts.entries()) { const { B } = sound('car wash narrow #' + i, plan, o); assert.equal(B[0].name, 'Express car wash'); assert.ok(Math.abs(Math.min(B[0].w, B[0].d) - 30) < 1, 'the recipe’s depth: ' + B[0].d); } }
 // pads: a school's two buildings on FM 362
 { const { plan, opts } = lay(SCHOOL, 'FM 362'); assert.ok(opts.length >= 2);
-  for (const [i, o] of opts.entries()) { const { B, m } = sound('school FM 362 #' + i, plan, o); assert.equal(B.length, 2, 'two buildings'); assert.deepEqual(B.map(e => e.name).sort(), ['Classroom building', 'Gym']); assert.equal(m.required, 75); } }
+  for (const [i, o] of opts.entries()) { const { B, m } = sound('school FM 362 #' + i, plan, o); assert.equal(B.length, 2, 'two buildings'); assert.deepEqual(B.map(e => e.name).sort(), ['Classroom building', 'Gym']); assert.equal(m.required, 75);
+    const cl = B.find(e => e.name === 'Classroom building'), gym = B.find(e => e.name === 'Gym'); // each its own share, at its own floors, where there's room (FM 362 has it)
+    assert.ok(Math.abs(S.gfaOf(cl) - 32000) < 50 && cl.floors === 2 && Math.abs(S.gfaOf(gym) - 12000) < 50 && gym.floors === 1, 'the classroom building and gym at the recipe’s sizes: ' + S.gfaOf(cl) + ' / ' + S.gfaOf(gym)); } }
+// pads on the narrow lot: no room to size them apart as laid out, and it says so (or they are)
+{ const { plan, opts } = lay(SCHOOL, 'narrow'); for (const o of opts) { const B = o.elements.filter(e => e.kind === 'building' && e.custom), cl = B.find(e => e.name === 'Classroom building'), gym = B.find(e => e.name === 'Gym');
+    assert.ok(S.gfaOf(cl) / S.gfaOf(gym) > 2 || o.notes.some(n => /^The classroom building and gym aren’t drawn at the recipe’s sizes/.test(n)), 'sized apart or said: ' + o.notes.join(' | ')); } }
 // yard: an RV park on FM 362 (rows of sites both sides of the aisles) and on the 3 acre lot (fewer, said)
 { const { plan, opts } = lay(RV, 'FM 362'); assert.ok(opts.length >= 2);
   for (const [i, o] of opts.entries()) { const { pl, m, B } = sound('RV park FM 362 #' + i, plan, o), rv = o.elements.filter(e => e.rv), n = rv.reduce((t, e) => t + S.stalls(e).count, 0);
