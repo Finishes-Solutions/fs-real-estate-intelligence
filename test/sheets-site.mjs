@@ -5,11 +5,12 @@
 // every building has one near, C-301 and FP-101 show the same hydrants, C-202 asks for storage. Then plans the layouts
 // don't make: an easement, no pond, no drives at all.
 import assert from 'node:assert/strict';
-import { ctxFor, CASES } from './helpers/setctx.mjs';
+import { ctxFor, CASES, terrainFor, planFor } from './helpers/setctx.mjs';
 import * as P from '../lib/planset.mjs';
 import * as S from '../lib/siteplan.mjs';
 import { streetDown, turned } from '../lib/sitesheet.mjs';
 import { RENDERERS, bearing } from '../lib/sheets/site.mjs';
+import * as T from '../lib/terrain.mjs';
 
 const KINDS = Object.keys(RENDERERS), un = s => s.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 assert.equal(bearing([0, 0], [100, 100]), 'N 45°00\'00" E');
@@ -102,5 +103,21 @@ for (const name of Object.keys(CASES)) {
   assert.ok(g.includes('Civil note from Claude.') && g.includes('100-year, Atlas 14') && f.includes('Fire note from Claude.'), 'the discipline notes and criteria are shown when present');
   assert.ok(/SCHEMATIC/.test(g) && /Atlas 14/.test(g), 'C-201 notes: schematic, Atlas 14');
 }
+// ---------- the ground from lidar (lib/terrain.mjs) under C-001 and C-201 ----------
+{ const text = h => h.replace(/<[^>]+>/g, ' '), page = (c, k) => P.sheetPage(c, c.sheets.find(x => x.kind === k));
+  for (const name of ['retail', 'sfr']) {
+    const t = terrainFor(name), c = ctxFor(name, { terrain: t }), ex = text(page(c, 'c-existing')), gr = text(page(c, 'c-grading'));
+    assert.ok(!/TOPOGRAPHY NOT SURVEYED/.test(ex) && /Existing ground contour/.test(ex) && /LOW \d+\.\d/.test(ex) && /HIGH \d+\.\d/.test(ex), name + ' C-001: lidar contours and the low and high points');
+    assert.match(ex, /USGS 3DEP \(1 m lidar\)/); assert.match(ex, /not a survey/);
+    assert.ok(/NAVD 88/.test(gr) && /Earthwork \(rough\)/.test(gr) && /Existing ground contour/.test(gr) && !/Assumed 100\.00/.test(gr), name + ' C-201 on the real datum');
+    assert.ok(!/NaN|undefined/.test(ex + gr), name + ': no NaN');
+    // finished floors a foot over the ground (in the turned frame the sheets draw in)
+    const ffs = [...gr.matchAll(/FF (\d+\.\d)/g)].map(m => +m[1]), sum = T.summary(t, planFor(name).ring); assert.ok(ffs.length && ffs.every(f => f > sum.min + 0.9 && f < sum.max + 4), name + ': floors on the ground: ' + ffs.slice(0, 5).join(', '));
+  }
+  // a terrain for another boundary, or a rough one: ignored
+  for (const bad of [{ ...terrainFor('retail'), sig: 'x' }, { ...terrainFor('retail'), coarse: true }]) { const c = ctxFor('retail', { terrain: bad }); assert.match(text(page(c, 'c-existing')), /TOPOGRAPHY NOT SURVEYED/); assert.match(text(page(c, 'c-grading')), /Assumed 100\.00/); }
+  // the pond on high ground is called out
+  const up = ctxFor('retail', { terrain: terrainFor('retail', (x, y) => 150 + 0.01 * Math.hypot(x - 117, y - 6) * -1) }); assert.match(text(page(up, 'c-grading')), /falls away from the pond/); }
+
 console.log('slowest site sheet (first draw, geometry included): ' + slow + ' ms');
 console.log('site sheets ok');

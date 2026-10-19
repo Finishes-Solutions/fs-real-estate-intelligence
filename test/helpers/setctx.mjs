@@ -7,6 +7,7 @@ import * as S from '../../lib/siteplan.mjs';
 import * as L from '../../lib/sitelayout.mjs';
 import * as PD from '../../lib/plandesign.mjs';
 import * as P from '../../lib/planset.mjs';
+import * as TR from '../../lib/terrain.mjs';
 
 const mk = (o, pts) => { const k = 364567 * Math.cos(o[1] * Math.PI / 180); return { type: 'Polygon', coordinates: [pts.concat([pts[0]]).map(([x, y]) => [o[0] + x / k, o[1] + y / 364567])] }; };
 const siteOf = (g, west) => { const b = S.unionParcels([g]); return { ...b, front: west ? b.ring.findIndex((p, i) => S.outwardOf(b.ring, i)[0] < -0.9) : null, setbacks: { ...S.SETBACKS } }; };
@@ -26,4 +27,11 @@ export function ctxFor(name, extra = {}) {
   return P.setContext({ plan, project: { name: 'Test project — ' + name }, client: 'FM 362 Development LLC', address: '0 FM 362 Rd, Waller, TX 77484', county: 'Waller County, Texas', parcels: [{ label: '0 FM 362 Rd', owner: 'FM 362 Development LLC', acres: 7.72 }],
     facts: ['FEMA flood zone X — outside the 100-year floodplain.', 'No water or utility district (MUD) found here: water and sewer service needs to be confirmed.'], notes: [], types, designs, date: 'October 19, 2026', drawnBy: 'MS',
     revisions: [{ no: '0', date: '10/19/26', desc: 'Schematic design set' }], boundarySource: 'the county appraisal district parcel outline', ...extra }, P.sheetList(plan, { types, sections: P.SECTIONS.map(s => s.id), renders: 0 }));
+}
+// lidar-like ground for a case's site (lib/terrain.mjs): by default about 6 ft of fall toward the south-east with a swale
+// and some roughness, signed for the plan's boundary
+export function terrainFor(name, f = (x, y) => 152 - 0.006 * x + 0.004 * y - 1.6 * Math.exp(-((y + 0.25 * x + 60) ** 2) / 2500) + 0.15 * Math.sin(x / 23) * Math.cos(y / 31)) {
+  const plan = planFor(name), sp = TR.gridSpec(plan.ring), z = [];
+  for (let j = 0; j < sp.ny; j++) for (let i = 0; i < sp.nx; i++) z.push(Math.round(f(sp.x0 + i * sp.cell, sp.y0 + j * sp.cell) * 100) / 100);
+  return { ...sp, z, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1, coarse: false, sig: TR.terrainSig(plan.origin, plan.ring), at: '2026-10-19T00:00:00Z' };
 }

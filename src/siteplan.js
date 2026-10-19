@@ -20,6 +20,7 @@ import * as RD from './lib/render.mjs';
 import * as PJ from './lib/project.mjs';
 import * as PS from './lib/planset.mjs';
 import * as PD from './lib/plandesign.mjs';
+import * as TR from './lib/terrain.mjs';
 import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, pickedClaude, pickedEffort } from './lib/aimodels.mjs';
 import * as CU from './lib/customtypes.mjs';
 import { teamLibrary } from './teamlib.js';
@@ -677,6 +678,7 @@ export function initSitePlan(ctx) {
   // layouts run in a worker (sp-worker.js) so the page stays responsive; straight in the page if workers aren't there
   let worker = null, wseq = 0; const wait = new Map();
   function laid(fn, ...args) {
+    if (fn === 'options' && args[0]?.ring?.length >= 3 && !args[0].terrain) { const t = terrainNow(args[0]); if (t) args[0] = { ...args[0], terrain: t }; else terrainOf(args[0]); } // the pond goes on the low side (lib/sitelayout.mjs)
     try { if (!worker) { worker = new Worker(new URL('./sp-worker.js', import.meta.url), { type: 'module' }); worker.onmessage = ({ data }) => { const w = wait.get(data.id); if (!w) return; wait.delete(data.id); data.ok ? w.ok(data.result) : w.no(new Error(data.error)); }; worker.onerror = e => { for (const w of wait.values()) w.no(new Error(e.message || 'layout worker failed')); wait.clear(); worker = null; }; } }
     catch (e) { worker = null; }
     if (!worker) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'refit' ? refit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
@@ -2520,6 +2522,7 @@ export function initSitePlan(ctx) {
     const run = startRun('build', thinks ? [planStep, ...steps0] : steps0, src, { ask, effort: lvl }); if (!run) return;
     let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '', aiOk = false, assumed = [], strategy = null;
     const site = ai ? siteInfo(p, pl) : null, facts = ai ? await factsFor(pl) : null; if (!live(run)) return;
+    if (!terrainNow(pl)) { await Promise.race([terrainOf(pl), new Promise(res => setTimeout(res, 6000))]); if (!live(run)) return; } // (asked once per boundary; usually here already)
     if (thinks) try {
       const s = await post({ mode: 'strategy', prompt: ask, site, facts, program: pl.program, effort: L.plan.effort, count: L.plan.count }, run.ctl.signal), pk = s.strategies?.[s.pick] || s.strategies?.[0];
       if (pk) strategy = { ...pk, why: s.why || '', alts: (s.strategies || []).filter(x => x !== pk).map(x => x.name).filter(Boolean) };
@@ -3001,7 +3004,7 @@ export function initSitePlan(ctx) {
   // notes for the sheet from the Site facts (flood zone, districts, roads, environmental records) at the middle of the site
   async function siteFacts(pl, parcel) {
     if (!ctx.siteAt) return [];
-    const c = SP.frame(pl.origin).toLL(SP.centroid(pl.ring)), out = [];
+    const c = SP.frame(pl.origin).toLL(SP.centroid(pl.ring)), out = [], ground = Promise.race([terrainOf(pl), new Promise(res => setTimeout(() => res(null), 15000))]);
     try {
       const d = await Promise.race([ctx.siteAt(c, '', ''), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 9000))]), f = d.flood;
       if (f?.zone) out.push('FEMA flood zone ' + f.zone + (f.risk === 'high' ? ' — in the 100-year floodplain; expect fill, elevated slabs and floodplain permits.' : f.risk === 'moderate' ? ' — moderate risk (500-year floodplain).' : ' — outside the 100-year floodplain.') + ' (FEMA NFHL; at the middle of the site)');
@@ -3018,7 +3021,26 @@ export function initSitePlan(ctx) {
       const lines = ctx.utilityFacts(u); if (lines.length) out.push(lines.slice(0, 4).join('. ') + '. Confirm capacity and service with each provider (OpenStreetMap, PUC Texas, City of Houston).');
     } catch (e) { /* no utility note */ }
     if ((pl.parcels || []).length > 1) out.push((pl.parcels.length) + ' parcels: a replat into one reserve or lot is likely needed.');
+    const t = await ground; if (t) { const l = TR.factLine(t, pl.ring); if (l) out.splice(1, 0, l); }
     return out;
+  }
+  // ---------- ground elevations (lib/terrain.mjs, api/terrain) ----------
+  // Asked once per boundary and kept on this device (IndexedDB, with the renderings): a grid of up to 3,600 bare-ground
+  // elevations from USGS lidar. The project keeps only the few numbers the Jurisdiction & site box shows.
+  const terrains = new Map(); // signature -> { t, p }
+  const terrainNow = pl => pl?.ring?.length >= 3 ? terrains.get(TR.terrainSig(pl.origin, pl.ring))?.t || null : null;
+  function terrainOf(pl) {
+    if (!(pl?.ring?.length >= 3)) return Promise.resolve(null);
+    const sig = TR.terrainSig(pl.origin, pl.ring), have = terrains.get(sig); if (have) return have.p;
+    const box = { t: null, p: null }; terrains.set(sig, box);
+    box.p = (async () => {
+      const kept = await rget('terrain:' + sig); // a rough fallback answer is asked for again after a day
+      if (kept?.z && kept.sig === sig && !(kept.coarse && Date.now() - Date.parse(kept.at) > 864e5)) return box.t = kept;
+      const r = await fetch('api/terrain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origin: pl.origin, ring: pl.ring }) }), d = await r.json().catch(() => ({}));
+      if (!r.ok || !Array.isArray(d.z)) throw new Error(d.error || 'HTTP ' + r.status);
+      rput('terrain:' + sig, d).catch(() => {}); return box.t = d;
+    })().catch(e => { console.warn('terrain', e.message); setTimeout(() => { if (terrains.get(sig) === box) terrains.delete(sig); }, 60000); return null; }); // (a failure is asked again in a minute)
+    return box.p;
   }
   async function exportPdf(p, pl, size) {
     const btn = card.querySelector('#spPdf'); if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
@@ -3479,17 +3501,18 @@ export function initSitePlan(ctx) {
   }
   const countyAt = c => (ctx.DATA?.counties || []).find(k => (k.outline || []).some(poly => SP.inRing(c, poly[0])))?.name || '';
   const factsOf = p => p.site?.facts ? { ...p.site.facts, ...PJ.regridFacts(p.parcels, p.plans) } : null;
-  const needSite = p => { const at = siteSpot(p), f = siteFail.get(p.id); return !!at && !siteRuns.has(p.id) && (!p.site || p.site.key !== at.key) && !(f && Date.now() - f < 6e4); };
+  const SITE_V = 2; // 2: ground elevations (Oct 19)
+  const needSite = p => { const at = siteSpot(p), f = siteFail.get(p.id); return !!at && !siteRuns.has(p.id) && (!p.site || p.site.key !== at.key || (p.site.v || 1) < SITE_V) && !(f && Date.now() - f < 6e4); };
   function gatherSite(p) {
     if (siteRuns.has(p.id)) return siteRuns.get(p.id);
     const at = siteSpot(p); if (!at) return Promise.resolve(null);
     const run = (async () => {
-      const [d, u] = await Promise.all([ctx.siteAt ? race(ctx.siteAt(at.c, '', ''), 15000).catch(e => ({ error: e.message || 'failed' })) : { error: 'none' },
-        ctx.utilitiesAt ? race(ctx.utilitiesAt(at.c, at.geom), 15000).catch(() => null) : null]);
+      const s0 = siteFor(p), [d, u, t] = await Promise.all([ctx.siteAt ? race(ctx.siteAt(at.c, '', ''), 15000).catch(e => ({ error: e.message || 'failed' })) : { error: 'none' },
+        ctx.utilitiesAt ? race(ctx.utilitiesAt(at.c, at.geom), 15000).catch(() => null) : null, s0 ? race(terrainOf(s0), 55000).catch(() => null) : null]);
       let lines = null; try { lines = u ? ctx.utilityFacts(u) : null; } catch (e) { lines = null; }
       if (d?.error && !lines) throw new Error(d.error); // nothing came back: keep what was there and say so
       const x = db.projects.find(y => y.id === p.id); if (!x) return null;
-      x.site = { at: new Date().toISOString(), key: at.key, facts: PJ.siteFactsFrom(d, { county: countyAt(at.c), utilities: lines, parcels: x.parcels.length }) }; siteFail.delete(p.id); quietSave(x);
+      x.site = { v: SITE_V, at: new Date().toISOString(), key: at.key, facts: PJ.siteFactsFrom(d, { county: countyAt(at.c), utilities: lines, parcels: x.parcels.length, ground: t ? TR.groundFacts(t, s0.ring) : null }) }; siteFail.delete(p.id); quietSave(x);
       return x.site;
     })();
     siteRuns.set(p.id, run);
@@ -3766,7 +3789,8 @@ export function initSitePlan(ctx) {
       await saveJob(j);
       // 3. the sheets, drawn here and printed on the title block, three at a time (a failure is tried again twice)
       const renders = j.sheets.some(sh => sh.kind === 'render') ? await rendersForSheet(pl, 4).catch(() => []) : [];
-      const c = PS.setContext({ ...base, project: P1(), text: j.text, disc: j.disc, designs: j.designs, designBy: j.designBy, renders, date: j.date, drawnBy: j.by, projectNumber: j.projectNumber, revisions: j.revisions }, j.sheets);
+      const terrain = await Promise.race([terrainOf(pl), new Promise(res => setTimeout(() => res(null), 30000))]);
+      const c = PS.setContext({ ...base, project: P1(), text: j.text, disc: j.disc, designs: j.designs, designBy: j.designBy, renders, date: j.date, drawnBy: j.by, projectNumber: j.projectNumber, revisions: j.revisions, terrain }, j.sheets);
       await pool(j.steps.filter(x => x.kind === 'sheet' && x.status !== 'done'), 3, async x => {
         const sh = j.sheets.find(y => y.number === x.key); x.status = 'doing'; x.note = ''; const t0 = Date.now(); let last = '';
         for (let k = 0; k < 3; k++) {

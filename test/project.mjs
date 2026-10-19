@@ -65,4 +65,12 @@ assert.ok(JSON.stringify(big).length <= 40000, 'kept under 40 KB: ' + JSON.strin
 const huge = Array.from({ length: 120 }, (_, i) => ({ facts: { ...F, option: 'Option ' + i }, name: 'Option ' + i, drawn: true }));
 big = PJ.projectFacts(p, { jurisdiction: f, options: huge }); assert.ok(JSON.stringify(big).length <= 40000); assert.ok(big.options.length < 120 && big.options.length > 20); assert.match(big.optionsLeftOut, /more options not included/);
 assert.equal(PJ.ASK_STARTERS.length, 4); assert.ok(PJ.ASK_STARTERS.includes('What approvals will this site need?'));
+// the ground (lib/terrain.mjs groundFacts): its range, its fall and the base flood elevation
+{ const gr = { min: 141.2, max: 146.9, relief: 5.7, slope: 0.8, toward: 'south-east', flat: false, rough: false, src: 'USGS 3DEP (1 m lidar)', coarse: false };
+  const r1 = PJ.jurisdictionRows(PJ.siteFactsFrom({ flood: { zone: 'AE', risk: 'high', bfe: 144 } }, { ground: gr })).find(r => r.id === 'ground');
+  assert.equal(r1.value, '141 ft to 147 ft · falls about 5.7 ft to the south-east'); assert.match(r1.sub, /about 3 ft below the base flood elevation \(144 ft\)/); assert.equal(r1.tone, 'warn'); assert.equal(r1.src, 'USGS 3DEP (1 m lidar)');
+  const r2 = PJ.jurisdictionRows(PJ.siteFactsFrom({ flood: { zone: 'X', risk: 'minimal' } }, { ground: { ...gr, flat: true, relief: 1.1 } })).find(r => r.id === 'ground');
+  assert.match(r2.value, /nearly flat/); assert.ok(!r2.tone); assert.ok(!/base flood/.test(r2.sub));
+  assert.ok(!PJ.jurisdictionRows(PJ.siteFactsFrom({}, { ground: { min: NaN } })).some(r => r.id === 'ground'), 'no numbers: no row');
+  assert.ok(PJ.jurisdictionText(PJ.siteFactsFrom({}, { ground: gr })).some(l => /^Ground elevation/.test(l)), 'the AI reads it too'); }
 console.log('project page ok');

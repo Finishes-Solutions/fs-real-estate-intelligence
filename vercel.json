@@ -73,6 +73,9 @@
     "api/site.js": {
       "maxDuration": 25
     },
+    "api/terrain.js": {
+      "maxDuration": 60
+    },
     "api/crime.js": {
       "maxDuration": 60
     },
