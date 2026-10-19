@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 12:40 PM CT: New Option (blank site, copy, clear and start over), and deleting options, renderings and test projects (ab0f8f3, merged a2340bc)
+- **+ New Option** (it was + Copy Option) opens a short menu. **Blank site** makes a new option on the same lot: its street sides, setbacks, parcels, zoning and easements, but nothing laid out. It opens with the Build box ready. **Copy of (option)** still copies it, layouts included (its renderings now stay with the original).
+- **Clear (option) and start over** empties the option you're in and keeps the site. No question first: **Cleared Option A · Undo** brings it all back, layouts included. Its renderings stay.
+- **Delete (option)**, in the same menu, at the foot of the panel or on the project page, deletes straight away with **Undo** for a few seconds, and says so when it goes for the team too. The next option opens; after the last one, the project page, where **New Option** still starts from the same site.
+- The project page's **New Option** now keeps the street sides and easements.
+- The Renderings tab has **Delete all** for each option and **Delete All Renderings** for the project; the pictures are removed from this device too.
+- **Settings › Testing · danger zone › Delete all projects…** says what will go and whether it's for the whole team, and needs DELETE typed to confirm. "Only this device's copies" leaves the team's projects alone.
+
 ### 11:56 AM CT: A pro forma you can trust more (63c9ddf, merged b3eecf4)
 - Every pro forma default re-checked for 2026 Houston, Katy and Waller, each with its basis, and labelled "Market assumption, not verified".
 - Rent and the yield now use leasable area: shops 97% of the building, offices and medical their rentable area with a load factor, apartments the units' net sf, storage its rentable units, hotels their rooms. Numbers and the Pro forma show gross and leasable sf side by side, and the shares can be changed.
