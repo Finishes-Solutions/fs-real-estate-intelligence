@@ -85,6 +85,17 @@ S.restoreState(A, snap); assert.equal(JSON.stringify({ ...A, renders: optionA.re
 const C = clone(optionA), s2 = S.undoState(C); S.clearDesign(C); C.elements.push({ id: 'x', kind: 'building', x: 1, y: 1, w: 1, d: 1, rot: 0 }); C.ring[0][0] = 9;
 S.restoreState(C, s2); assert.equal(JSON.stringify(C), JSON.stringify(optionA));
 // clearing an option with nothing on it is harmless
+// a Waller site (lib/guardrails.mjs): its jurisdiction and its guardrail settings (outfall, margin, ROW reserve) are the
+// site's and stay; the scenario laid out and the rest of the layout settings are the design's and go
+{ const W = { ...clone(optionA), jur: { waller: true, how: 'inside', cls: 'VERIFIED', reason: 'Inside the City of Waller' }, laidAs: 'C',
+    params: { stallW: 9.5, guard: { mode: 'on', outfall: 'ditch', factor: 0.05, row: 12, scenario: 'C' } } };
+  assert.deepEqual(Object.keys(W).filter(k => !known.has(k)), [], 'the guardrails\u2019 fields are sorted too');
+  const b = S.blankOf(W, { id: 'w2', name: 'Option B' });
+  assert.deepEqual(b.jur, W.jur, 'blank: the jurisdiction stays'); assert.ok(!('laidAs' in b), 'blank: the scenario laid out goes');
+  assert.deepEqual(b.params, { guard: { mode: 'on', outfall: 'ditch', factor: 0.05, row: 12 } }, 'blank: the site\u2019s guardrail settings stay, the layout settings and the scenario go');
+  const c = clone(W), u = S.undoState(c); S.clearDesign(c);
+  assert.deepEqual(c.jur, W.jur); assert.ok(!('laidAs' in c)); assert.deepEqual(c.params, { guard: { mode: 'on', outfall: 'ditch', factor: 0.05, row: 12 } }, 'clear: the same');
+  S.restoreState(c, u); assert.equal(JSON.stringify(c), JSON.stringify(W), 'clear then undo: exact, guardrails included'); }
 const E = S.clearDesign({ id: 'e', name: 'Option A', ring: [], elements: [] }); assert.deepEqual(E.elements, []); assert.deepEqual(E.program, { use: 'retail' }); assert.ok(!('pf' in E));
 
 console.log('newoption: ok (' + layouts.length + ' layouts, ' + optionA.elements.length + ' pieces)');
