@@ -39,6 +39,16 @@ for (const name of Object.keys(CASES)) {
   for (const sh of c2.sheets.filter(s => KINDS.includes(s.kind))) { const html2 = P.sheetPage(c2, sh); assert.ok(!/NaN|undefined|couldn’t be drawn/.test(html2), sh.number); if (sh.typeId) assert.ok(/Design not available/.test(html2), sh.number + ' says the design is missing'); }
 }
 
+// a building three times the fixture warehouse (over 1,500 heads): a typical bay of heads, every sheet still small
+{
+  const c = ctxFor('industrial'), d = c.designs.A, k = 3, sc = o => { for (const key of ['x', 'y', 'w', 'd', 'x1', 'y1', 'x2', 'y2']) if (key in o) o[key] *= k; };
+  d.rooms.forEach(r => { sc(r); r.area = r.w * r.d; }); d.doors.forEach(sc); d.windows.forEach(sc); d.W *= k; d.D *= k; c.types[0] = { ...c.types[0], W: d.W, D: d.D, unitGsf: d.W * d.D, buildingGsf: d.W * d.D };
+  for (const sh of c.sheets.filter(s => KINDS.includes(s.kind))) {
+    const html = P.sheetPage(c, sh); assert.ok(!/NaN|undefined|Infinity|couldn’t be/.test(html) && html.length < 1.5e6, 'huge warehouse ' + sh.number + ' (' + html.length + ')');
+    if (sh.kind === 'fp-sprinkler') assert.ok(/TYPICAL BAY/.test(html), 'a typical bay of heads');
+  }
+}
+
 // ---------- the rules ----------
 const room = (type, w, d, x = 0, y = 0, o = {}) => ({ id: type + x + '_' + y, name: type, type, floor: 1, x, y, w, d, area: w * d, ext: { front: y === 0, back: false, left: x === 0, right: false }, ...o });
 

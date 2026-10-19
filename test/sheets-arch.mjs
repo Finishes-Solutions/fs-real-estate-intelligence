@@ -84,4 +84,18 @@ assert.deepEqual([...all].sort(), KINDS.slice().sort(), 'the fixtures cover ever
   assert.deepEqual([...seen].sort(), ['a-details', 'a-elev', 'a-plans', 'a-sched', 'a-section'], 'a house set has the residential architecture sheets');
 }
 
+// every roof form and both kinds of footprint draw: gable both ways, hip, shed, flat, on a house, a townhome row and a shop
+{
+  for (const name of ['sfr', 'townhomes', 'fuel']) {
+    const base = ctxFor(name), t = base.types[0];
+    for (const roof of [{ type: 'gable', pitch: 8, ridge: 'front_to_back', overhang: 1 }, { type: 'hip', pitch: 5, ridge: 'along_front', overhang: 2 }, { type: 'shed', pitch: 3, ridge: 'along_front', overhang: 1.5 }, { type: 'flat', pitch: 0, ridge: 'along_front', overhang: 0 }]) {
+      const { design } = PD.placeDesign({ ...PD.fallbackDesign(t), roof }, t), ctx = { ...base, designs: { ...base.designs, [t.id]: design } };
+      check({ ...ctx, sheets: ctx.sheets.filter(s => s.typeId === t.id || s.kind === 'a-details') }, name + ' ' + roof.type + ' roof');
+    }
+  }
+  // a bare one-room design (no windows, one door) still draws every sheet
+  const base = ctxFor('fuel'), t = base.types[0], { design } = PD.placeDesign({ rooms: [{ id: 's', name: 'Sales', type: 'sales', floor: 1, x: 0, y: 0, w: t.W, d: t.D }], doors: [{ a: 's', b: 'outside', width: 6, kind: 'storefront', side: 'front' }], windows: [] }, t);
+  check({ ...base, designs: { [t.id]: design } }, 'one-room shop');
+}
+
 console.log('arch sheets ok');
