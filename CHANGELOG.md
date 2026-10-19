@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 10:26 PM CT: Food truck parks: restrooms always, small lots, distinct choices (84a404a, 70909be, merged 409f630)
+- On a small lot (about an acre) the trucks come first and every layout is fully parked. The bar shrinks or is left out, then the pavilion gets smaller, and the layout says so. About an acre now holds 4 trucks, or 2 trucks with a small bar, where it used to get no layout.
+- Every food truck layout has restrooms. When they don't fit, the bar gives up its room, then a truck at a time.
+- The choices offered are different from each other. Two layouts with the same trucks, about the same seats, and the same bar and pond count as one, so you may see two choices instead of three.
+- Layouts that keep detention in a pond come first when they hold nearly as many trucks as one without a pond.
+
 ### 9:22 PM CT: Food truck parks (35bb30a, merged f729165)
 - Ask for a food truck park ("a food truck park with 12 trucks, a covered pavilion, restrooms and a small bar") and the layout draws one, instead of a few "other" boxes: truck stalls (15 × 35 ft, each with a power and water pedestal) around a gathering area, a covered pavilion with picnic seating on a lawn, restrooms, a bar with a beer garden patio, a playground, and a dumpster and grease enclosure.
 - The trucks stand along a service lane behind their stalls, so they pull in and out without crossing the seating; their serving windows face the seating. Customers park on the street side and walk in, with no parking at the entrance's mouth.
