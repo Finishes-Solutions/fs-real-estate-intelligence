@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 11:56 AM CT: A pro forma you can trust more (63c9ddf, merged b3eecf4)
+- Every pro forma default re-checked for 2026 Houston, Katy and Waller, each with its basis, and labelled "Market assumption, not verified".
+- Rent and the yield now use leasable area: shops 97% of the building, offices and medical their rentable area with a load factor, apartments the units' net sf, storage its rentable units, hotels their rooms. Numbers and the Pro forma show gross and leasable sf side by side, and the shares can be changed.
+- Fixed yields that read too low: tenants on NNN leases now pay back property taxes, site work follows what's built instead of the whole lot (parking paving was counted twice), no developer fee on land, and an AI-crafted type's courts and pavilion are priced and earn rent.
+- Now counted: detention ponds, parking garages, leasing commissions and hotel furniture. Hotels run on room rate and occupancy; storage rents climate-controlled, drive-up and RV spaces separately.
+- A calm note when a number is outside the usual range here, and flags for a yield on cost under 5% or over 12%, an unusual cap rate, a negative spread or thin debt coverage.
+
 ### 9:49 AM CT: Any building type the AI can describe, and a shared team building library (7da2412, c42fa30, merged b246482)
 - **No more plain boxes for a daycare, a pickleball club or an RV park.** When a request names a kind of place the planner has no setting for, the AI now writes a recipe for it: its buildings, its outdoor pieces (courts, a playground, a pool, a lawn, a plaza, a patio, a pavilion), its parking rule and the figures to show. The planner lays it out with its usual machinery, so drives, parking, entrances, detention, trash and the checks work as for any other use.
 - **Four ways to lay one out:** a building facing its parking (a car wash), a few freestanding buildings (a school's classrooms and gym), a building with its outdoor pieces together on their own ground behind or beside it (a daycare and its playground, a club and its courts), or rows of sites on drive aisles like RV storage (an RV park, with sites both sides of each aisle, an office at the street and a fence).
