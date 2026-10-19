@@ -2471,6 +2471,7 @@ export function initSitePlan(ctx) {
   const PF_LIM = { exitCap: [0.5, 20], marketCap: [0.5, 20], vacancyPct: [0, 100], creditPct: [0, 100], softPct: [0, 100], contPct: [0, 100], feePct: [0, 100], lcPct: [0, 100], recoveryPct: [0, 100], mgmtPct: [0, 100], ltc: [0, 100], taxPct: [0, 20], taxBasisPct: [0, 100], rate: [0, 30], permRate: [0, 30], amort: [1, 60], hold: [0, 30], landPrice: [0, null], 'hotel.occ': [0, 100], 'hotel.opexPct': [0, 100], 'hotel.otherPct': [0, 100] };
   const pfPct = k => /^eff\./.test(k), pfLim = k => PF_LIM[k] || (pfPct(k) ? [40, 100] : /^load\./.test(k) ? [1, 1.6] : /Growth$/.test(k) ? [-20, 20] : [0, null]);
   // a plan's leasable area as the Pro forma reads it (its efficiencies, with any the user set)
+  const areaFor = x => { try { const user = PL()?.pf || {}; return PF.areaOf(PF.metricsOf(x), pfMerge(PF.defaults(x), user), user); } catch (e) { console.warn('leasable area', e); return null; } };
   function pfHtml(p, pl) {
     let R = null; try { R = pfRun(p, pl); } catch (e) { console.warn('pro forma', e); }
     if (!R) return '<details class="bsec sp-pf" id="spPfSec"><summary class="lt">Pro forma</summary><div class="rnote">Lay out a plan first (Build Layouts or by hand); the pro forma reads its buildings, units and parking.</div></details>';
