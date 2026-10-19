@@ -5,6 +5,19 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 4:30 PM CT: Parks stay off the streets, entrances go round them, re-fits keep the streets (7bce16b)
+- **Parks and open space are real places now.** "Add a park beside the community center" puts the park on a clear side of it, a few feet off the streets and clear of buildings, other parks and the lot line. If the usual size doesn't fit, a smaller one goes there and the message says so. If there's no room at all, nothing is added and the message says that too. Homes under a park make way, and the lots of the homes beside it are cut back to its edge. Dragging a park works the same way.
+- **The checks flag a park, named lawn or open space under a drive or a building** in red. Plain lawn under paving, the entry median and a pavilion standing in a park aren't flagged. Lawn now draws under the drives, and the entry median shows as a green strip.
+- **Entrances never run through a park.** Add Entrance names the park in the way. Change With AI moves the driveway along the street past it and says how far. "Add an entrance by Pad B" comes in from the nearest street, not a side lot line, and two asked for by the same piece no longer stack.
+- **Re-fits keep the streets.** Re-fitting a plan with nothing changed now keeps every street (89 of 89 on the 246 ac test site, where it used to keep 84). Added entrances no longer shuffle the streets, and no parking is laid across them. Change With AI never quietly lays the site out again with new streets: if keeping them leaves a problem, it says so and offers **New Layouts**. Re-fits are also faster (about 1.8 s instead of 3.5 s on the 246 ac site).
+- **Food truck parks keep their trucks** when the Lawn is renamed or moved and pinned. A pool or playground asked for beside a community center can stand on its lawn instead of taking homes.
+- Fresh layouts are unchanged on all 12 test sites.
+- **Not done yet:**
+  - On an L-shaped mixed site, "add an entrance at the open space" can still put the entrance on the front street about 1,000 ft away, and the message doesn't say how far. A nearer lot line that would work isn't tried yet.
+  - On an L-shaped site, a park dropped on a street and then re-fitted can still lose one short drive next to it.
+  - Pickleball courts beside a community center still take 2 or 3 homes when there's no clear lawn within 130 ft.
+  - The new park drag and turn behaviour in the editor hasn't been tried in a live browser yet.
+
 ### 11:37 AM CT: Neighbourhood plan: how local rules are found (b209ff3)
 - **Planning only, nothing in the app changes.** `NEIGHBORHOOD-PLAN.md` now records how local rules are found:
   - the jurisdiction comes from the city limits and county data the app already has
