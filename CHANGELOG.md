@@ -5,6 +5,16 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 12:48 PM CT: Waller guardrails (74e9484, 7679147, 3d49721, 0b4e808, 23a7ab5, 86ead22, merged 56135b7; 1efc95a)
+- Sites inside the City of Waller, or within half a mile of its limits (its ETJ, unverified), are now planned under the Finishes Solutions Waller site-planning standard. Every other site is planned exactly as before. Site parameters has a **Waller guardrails: Auto / On / Off** switch.
+- The **Finishes base case** is drawn on the map: 5% over each minimum, 3–5% more parking than required, Waller lot sizes and setbacks for homes, 2 spaces a unit for apartments, a 26 ft fire lane, and detention of at least 1.00 acre-foot per developed acre with the pond sized from that volume (depth, side slopes, freeboard and a maintenance bench).
+- The **maximum code envelope** and a **conservative case** sit beside it in Numbers, and either can be laid out in one click. The yield is shown as a range while survey, title, flood, outfall, utilities and access are unresolved.
+- Numbers has a **land-use table** from gross acres down to net usable land, an **unresolved-risk list** and the standard's 18-item checklist; every number carries a tag: Verified, Owner guardrail, Engineering assumption or Unverified.
+- The concept label is on the plan, the PDF (with a new land-use sheet, SP-1A) and the exports; **Land Use (CSV)** is new under Export. Layouts read **Passes the planning checks**.
+- The AI is given the standard's instructions and values, and its answers never call a plan permit-ready, approved, engineered or code-compliant.
+- Site parameters adds the outfall, the owner's margin, a right-of-way reserve, and the pond's storage depth and side slopes.
+- New Option and Clear keep a Waller site's jurisdiction and its guardrail settings.
+
 ### 12:40 PM CT: New Option (blank site, copy, clear and start over), and deleting options, renderings and test projects (ab0f8f3, merged a2340bc)
 - **+ New Option** (it was + Copy Option) opens a short menu. **Blank site** makes a new option on the same lot: its street sides, setbacks, parcels, zoning and easements, but nothing laid out. It opens with the Build box ready. **Copy of (option)** still copies it, layouts included (its renderings now stay with the original).
 - **Clear (option) and start over** empties the option you're in and keeps the site. No question first: **Cleared Option A · Undo** brings it all back, layouts included. Its renderings stay.
