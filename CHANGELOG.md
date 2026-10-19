@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 5:38 PM CT: Engineering sheets follow the building's shape; much smaller sheets (efc4d39)
+- **Structural, mechanical, plumbing, electrical, fire and telecom sheets now draw L-shaped, U-shaped and stepped buildings by their real outline:** the slab edge and beams run along every wall, ducts and pipes stay inside the building, sprinkler heads and rooftop units never land in the open corner, and meters, the fire department connection and other outside equipment sit on a real outside wall. Exit signs and pull stations face the right way at an L's inside corner.
+- **The biggest engineering sheets are 4 to 9 times smaller** (the largest is now about 0.6 MB, down from as much as 3.4 MB), so a big set downloads and opens much faster and a sheet is far less likely to fail for being too big. Hatched areas on the foundation and detail sheets are now light tints.
+
 ### 5:35 PM CT: Plan sets follow the building's shape; smaller set files (2e6d942, 44abfcf)
 - **L-shaped, U-shaped and stepped buildings are now designed as that shape**, not as the rectangle around them. The building type's name says so ("L-shape, 150' × 100' overall"), the rooms fill the real outline, the open corner or courtyard stays open, and the area is the outline's. Claude is told the corners and where the open ground is, and the checks catch a room in the wrong place. The drawings that follow the outline (walls, roof, elevations, foundation, MEP and sprinklers) arrive in the next push.
 - **Smaller PDFs:** the title block is now stored once for the whole set instead of on every sheet, about 160 KB less per sheet. Sets already under way finish the old way.
