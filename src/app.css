@@ -4029,3 +4029,34 @@ html.sp-dragging,html.sp-dragging *{cursor:var(--cur-grabbing,grabbing)!importan
 .set-confirm input{width:100%;max-width:220px;box-sizing:border-box;padding:7px 9px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel);color:var(--text);font:600 13px var(--font-mono);letter-spacing:.06em}
 .set-confirm .btnrow{display:flex;flex-wrap:wrap;gap:6px}
 .pj-foot .btn.pj-pdel{color:var(--danger)}
+/* the Waller guardrails on a plan (lib/guardrails.mjs): the concept label, classification tags, scenarios, the land-use
+   reconciliation, unresolved risks and the required plan content */
+.sp-cls{display:inline-block;font:600 9.5px/15px var(--font-display);font-style:normal;letter-spacing:.02em;border-radius:var(--r-pill);padding:0 6px;white-space:nowrap;vertical-align:middle;text-transform:none}
+.sp-cls.v{color:var(--green-800);background:var(--green-100);box-shadow:inset 0 0 0 1px var(--green-300)}
+.sp-cls.o{color:#5b3c99;background:#f0ebfa;box-shadow:inset 0 0 0 1px #cdbdf0}
+.sp-cls.e{color:#24538a;background:#e8f0fa;box-shadow:inset 0 0 0 1px #b6cdea}
+.sp-cls.u{color:#8a4b00;background:#fdf1df;box-shadow:inset 0 0 0 1px #efc98f}
+.sp-tile .sp-cls{font-size:9px;line-height:14px;padding:0 5px;margin-left:2px}
+#card .sp-guard{margin:12px 14px 0;padding:10px 12px;border:1.5px solid var(--danger);border-radius:6px;background:var(--panel);font-size:12px;line-height:1.45;display:grid;gap:6px;color:var(--text)}
+@media (max-width:700px){#card .sp-guard{margin:10px 10px 0}}
+.sp-gl b{color:var(--danger);font-weight:700;letter-spacing:.01em}.sp-glf{margin:0;font-size:11px;font-weight:700;color:var(--danger);letter-spacing:.02em}
+.sp-gj{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;color:var(--text-2)}.sp-gstale{color:var(--amber);font-weight:600}
+.sp-gnums{display:grid;gap:4px;min-width:0}.sp-gsec{min-width:0}.sp-gsec>summary{cursor:var(--cur-pointer)}.sp-gsec>summary::marker{color:var(--muted)}
+.sp-gtw{overflow-x:auto;max-width:100%}
+.sp-gt{width:100%;border-collapse:collapse;font-size:11.5px;margin:4px 0;table-layout:auto}
+.sp-gt th,.sp-gt td{padding:4px 5px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+.sp-gt th[scope=row]{text-align:left}.sp-gt th[scope=row]{font-weight:600;color:var(--text-2)}
+.sp-gscen th[scope=col]{text-align:center;font-weight:600;vertical-align:bottom}.sp-gscen th[scope=col] b{display:block;font-size:13px}.sp-gscen th[scope=col] small{display:block;font-size:10px;color:var(--muted);font-weight:500}
+.sp-gscen th[scope=col] em{display:block;font-style:normal;font-size:10px;color:var(--brand);margin-top:2px}.sp-gscen th[scope=col] em.neg{color:var(--danger)}.sp-gscen th[scope=col] .btn{margin-top:4px;padding:2px 8px;min-height:26px;font-size:11px}
+.sp-gscen .on{background:var(--green-50)}.sp-gscen td small{display:block;font-size:10px;color:var(--muted)}
+.sp-gland th[scope=row] small{display:block;font-weight:400;font-size:10.5px;color:var(--muted);line-height:1.35;margin-top:1px}.sp-gland td{white-space:nowrap}.sp-gland tr.q td{white-space:normal;text-align:right}.sp-gland tr:first-child th:first-child{text-align:left}
+.sp-gland tr.tot th,.sp-gland tr.tot td{font-weight:700;color:var(--text);border-top:1.5px solid var(--text-2)}
+.sp-grange{margin:4px 0;font-size:12.5px}.sp-grange small{color:var(--muted)}.sp-gbusy{font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)}
+.sp-grisk,.sp-gcl{list-style:none;margin:4px 0;padding:0;display:grid;gap:6px;font-size:12px}
+.sp-grisk li{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;border-left:3px solid var(--amber);padding:2px 0 2px 8px}.sp-grisk li span{flex-basis:100%;color:var(--text-2);line-height:1.4}
+.sp-gstop{font:700 9.5px/15px var(--font-display);font-style:normal;color:#fff;background:var(--danger);border-radius:var(--r-pill);padding:0 6px}
+.sp-gcl li{display:grid;grid-template-columns:84px 1fr;gap:0 8px;align-items:baseline}.sp-gcl li i{font-style:normal;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.sp-gcl li span{grid-column:2;color:var(--text-2);font-size:11.5px;line-height:1.35}.sp-gcl li.shown i{color:var(--brand)}.sp-gcl li.unresolved i{color:var(--danger)}.sp-gcl li.na i{color:var(--muted)}
+.sp-ov-rg{color:var(--ink-200)}
+.sp-gscen td{white-space:nowrap}.sp-gscen td small{white-space:normal}
+@media (max-width:700px){.sp-gscen td,.sp-gscen th{padding:4px 3px}.sp-gscen td{font-size:11px}}

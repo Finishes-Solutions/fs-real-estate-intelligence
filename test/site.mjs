@@ -33,7 +33,7 @@ assert.deepEqual(d.traffic.roads.map(r => r.road + ' ' + r.aadt), ['I-10 250000'
 assert.deepEqual(d.districts.water.map(w => w.name), ['Harris County MUD 61', 'West Harris County RWA'], 'river authorities dropped');
 assert.equal(d.districts.opportunityZone, true); assert.deepEqual(d.districts.tirz, ['Downtown (TIRZ 3)']); assert.deepEqual(d.districts.schools, ['Houston Independent School District']);
 assert.equal(d.transit.stops, 14);
-assert.deepEqual(d.place, { name: 'Houston', full: 'Houston city' }, 'inside the city limits');
+assert.deepEqual(d.place, { name: 'Houston', full: 'Houston city' }, 'inside the city limits'); assert.deepEqual(d.near, [], 'the cities within 0.5 mile, the one it is in left out (an ETJ test)');
 assert.equal(d.environment.total, 3); assert.deepEqual(d.environment.flagged[1].flags, ['handles hazardous waste']); assert.equal(d.environment.flaggedCount, 2); assert.deepEqual(d.environment.flagged[0].flags, ['violations', 'toxic releases']);
 assert.equal(d.crime.last12.total, 100); assert.equal(d.crime.prior12.total, 110); assert.equal(d.crime.change.v, 20); assert.equal(d.crime.change.p, -20); assert.equal(d.crime.latest, '2026-08-31');
 assert.equal(d.bars.length, 1, 'only the last 12 months'); assert.equal(d.bars[0].total, 190001); assert.equal(d.bars[0].months, 2); assert.equal(d.bars[0].last, '2026-08');
