@@ -161,8 +161,8 @@ The template carries a firm registration number. Under Texas rules, unsealed pre
   |---|---|---|
   | `ANTHROPIC_API_KEY` | none, required | Type Sensitive. Without it, Plans says "Plan sets need the Claude key on the server" and the site-only sheets still work. |
   | `ANTHROPIC_MODEL` | `claude-opus-5-5` | The server's default model. |
-  | `ANTHROPIC_EFFORT` | `high` | Effort level. Opus 5.5 defaults to `medium`, so it is set explicitly. |
-  | `PLANSET_MONTHLY_CAP_USD` | e.g. $200 | Monthly budget, like `RENDER_MONTHLY_CAP_USD`. A spent budget answers 402 before calling Claude. |
+  | `ANTHROPIC_EFFORT` | `medium` | Effort level (decided Oct 19). It is sent explicitly on every request rather than relying on the model's own default. |
+  | `PLANSET_MONTHLY_CAP_USD` | $100 | Monthly budget (decided Oct 19), per US Central calendar month, like `RENDER_MONTHLY_CAP_USD`. A spent budget answers 402 before calling Claude; $0 turns plan sets off. |
 
   The README's setup table gets these rows.
 - **Client.** `lib/anthropic.mjs` wraps the official `@anthropic-ai/sdk`. The OpenAI client in this repo is hand-rolled with `fetch`; the SDK gives streaming with `finalMessage()`, retries on 429/5xx and typed errors, all of which these long requests need.
@@ -172,7 +172,8 @@ The template carries a firm registration number. Under Texas rules, unsealed pre
   - Use is recorded with `recordUsage` under a new **Plan sets** feature.
 - **Which models (Settings › AI model).**
   - The Anthropic provider, listed today as "coming later", turns on when the server has the key.
-  - A new **Plan sets** row has a model picker filled from Anthropic's `GET /v1/models` (Claude models only, newest first), with "Server default (claude-opus-5-5)" first, and an effort picker (low / medium / high / xhigh).
+  - A new **Plan sets** row has a model picker filled from Anthropic's `GET /v1/models` (Claude models only, newest first), with "Server default (claude-opus-5-5)" first, and an effort picker (low / **medium**, the default / high / xhigh). It also shows this month's spend against the $100 cap.
+  - Medium effort trades some reliability for cost. The building-design validator and its repair rounds catch bad floor plans either way. If repairs become frequent, raise effort for design calls only, not for notes.
   - It is kept on the device and sent with each request, and the server uses it only if the key can, the same rules as the OpenAI pick (`lib/aimodels.mjs`, `api/models.js`).
   - The existing OpenAI model keeps serving site plans, Ask AI and briefs. Letting Claude answer those too is a separate, later step: they use OpenAI-specific calls.
 - **Prices (`lib/aiprices.mjs`, USD per 1M tokens: input / cache read / output, list prices as of Oct 2026):**
@@ -188,7 +189,8 @@ The template carries a firm registration number. Under Texas rules, unsealed pre
 - **Cost per set, an estimate to replace with measured figures after the first ten sets:**
   - each building-type design: about 15K tokens in, 20K to 40K out with thinking, about $0.50 to $1 on Opus 5.5, more with repair rounds;
   - notes and schedules: about $2 to $4 for a 45-sheet set with the brief cached;
-  - a Waller-sized project with about 7 types: **roughly $8 to $20 on Opus 5.5, about half on Sonnet 5.5**;
+  - a Waller-sized project with about 7 types: **roughly $8 to $20 on Opus 5.5, about half on Sonnet 5.5**, likely towards the low end at medium effort;
+  - with the $100 cap, that is about 5 to 12 large sets a month on Opus 5.5, and more for small sites or sets that reuse library designs;
   - designs taken from the library cost nothing.
 
   The set dialog shows the estimate before it starts. A **Batch** option (half price, results within hours) suits overnight sets later.
@@ -262,7 +264,5 @@ That is about **8 to 10 weeks** to a set comparable to the Waller example, with 
    - Whose wording goes in the preliminary statement?
    - Is there an engineer of record who will review sets before they go out?
 4. **Telecom:** is the T-series (fiber / FTTH) part of every set, or only when asked for?
-5. **Model and budget:**
-   - Opus 5.5 (best) or Sonnet 5.5 (about half the cost) as the default?
-   - What monthly cap?
+5. **Default model:** Opus 5.5 (best) or Sonnet 5.5 (about half the cost)? Effort (medium) and the cap ($100 a month) are decided.
 6. **Approval:** can anyone approve a building design into the team library, or only certain people?
