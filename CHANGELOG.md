@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 4:31 PM CT: Full plan sets, part 1: the engine (7d59f39)
+- **Plans can now make a whole set** (up to about a hundred sheets) from an option: general and code sheets, site and civil, landscape, and for each building type the architecture, structural, mechanical, plumbing, electrical and fire sheets, plus telecom when ticked and the renderings.
+- **Building types:** the option's buildings are grouped into types A, B, C… (each distinct building, or one townhome / duplex unit), up to eight. Claude designs each one's floor plans. Every design is checked for fit, overlaps, access, bedroom sizes and windows, and exits; if it fails, Claude is told what's wrong and tries again, up to twice, before a standard rule-based design is used.
+- **Progress you can see:** a panel shows a progress bar, sheets drawn, time so far and time left, what's happening now, and every step. The browser tab's title shows the count. **Pause** and **Resume** carry on where it stopped, even after closing the app.
+- **G-002 General notes:** general notes, codes, every symbol and line type used in the set, and abbreviations.
+- In this push the drawings for the other sheets are still placeholders: they follow in the next push.
+
 ### 4:12 PM CT: Make renderings from the project page (31e0120)
 - **Renderings tab:** a new **Make renderings** form at the top. Pick the option, the view (corner, street, entry, back, a close-up of the building nearest the street, or all four), the materials and the light, then press **Render**.
 - The picture is still taken from the option's 3D view on the map, so the option opens there and the progress shows in its panel. When the pictures are ready you're brought back to the Renderings tab.
