@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 6:41 PM CT: Ground elevations: creeks aren't counted as the fall (8624d15)
+- Checked against real USGS lidar on the test deployment: a 7.7 acre site near Waller came back as 1 m lidar in about 2 seconds, and a 200 acre tract near Katy too.
+- That tract read 76 to 100 ft but slopes only 0.1% overall: the low point is a channel. The ground row and the plan set now give **how far the land as a whole falls** across the site, show where most of the ground sits, and **call out a creek, ditch or pond** that dips well below the rest, with a reminder to check for a floodway or drainage easement. The pond placement uses the same range, so a creek bed doesn't skew it.
+
 ### 6:25 PM CT: Ground elevations from USGS lidar (6a714fd)
 - **Each project's Jurisdiction & site box now shows the ground elevation:** the lowest and highest ground (feet above sea level), how far and which way it falls ("falls about 5.5 ft to the south-east"), and, where FEMA gives a base flood elevation, whether any of the ground is below it (marked in amber). Projects checked before today look again once by themselves.
 - **Build puts the detention pond on the low side** of the site when the land falls more than a foot and a half, and the AI planner is told which way the land falls.
