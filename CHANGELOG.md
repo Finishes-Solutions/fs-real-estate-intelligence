@@ -71,6 +71,34 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Duplexes no longer read "parking short".** Each front-load duplex's driveway holds its second car, and Numbers now shows those driveway spaces.
 - **Re-fitting after moving a building no longer loses parking on a busy computer.** Before, it could come out with about half the spaces it needed.
 
+### 4:15 PM CT: Project status on the Projects list, and small project page polish (b8f4567)
+- **Status on the list:** each project card and list row shows its status pill (Prospect, Under contract…), and **Status** is a new sort choice.
+- **Phones:** the project page's tab strip fades at its right edge when there's more to scroll, and the open tab is scrolled into view. The "Enter asks" hint is hidden on touch screens.
+- **Renderings:** the full-size viewer says when the plan has changed since the picture was made; the Satellite tip is hidden while rendering is paused; Copy isn't offered on an option whose site isn't drawn yet.
+- **Wording:** the Jurisdiction & site facts are looked up on each device and kept with the project there; the doc no longer says they're shared.
+
+### 3:59 PM CT: Cancelling a rendering no longer bills for it (2b4190e)
+- **Cancel** under Render now stops the AI's work on the server as well as in the browser, so a picture you cancelled isn't painted and charged to the monthly budget for nobody. A picture the AI had already started is dropped, not kept.
+
+### 3:58 PM CT: Review fixes: renderings kept when you leave, budget off switch, project page polish (0ecdfa9)
+- **A rendering is never lost:** closing the plan, switching options or going to Projects while a picture was being painted used to drop it quietly. It's now saved on the option it was taken of, and the toast names it ("Rendering of Option A ready."). Cancel still drops it.
+- **Each picture's "plan changed since" is judged from the moment it was taken,** not from the start of an All site views run. A failure after a success is reported, not hidden.
+- **Renderings can be turned off** by the administrators (a zero budget); the panel then says so instead of showing a $0 budget.
+- **Project page:** deleting a project removes its pictures from this device; option names no longer repeat after a delete (no second "Option C"); the empty Renderings tab offers a next step; changing the tab in the address switches the tab; Ask keeps the full notes when summarising for an email.
+- **Polish:** the small notes under Render (budget, tips) are styled like the app's other notes; the View picker no longer cuts off its labels; a teammate's picture shows a "Not on this device" placeholder instead of a broken image; Delete in the viewer is red; picture tiles stay 16:9.
+
+### 3:23 PM CT: A proper project page: Overview, Options, Renderings and Ask (d4bb78d)
+- **Each project now has a real home.** The project page has a header with the name, address, acreage and a **status** (Prospect, Under review, Under contract, Owned, On hold, Dead), and four tabs. Your last tab is remembered and kept in the address, so reload and Back work.
+- **Overview:** project information (site, parcels, owners, appraised value, options) with **Client / prepared for**, **Target use** and **Notes** you can edit in place, and a **Jurisdiction & site** card gathered from the app's own sources: county, city or unincorporated, zoning (when Regrid has been fetched for the parcel), FEMA floodplain, water / utility district, school district, TIRZ, Opportunity Zone, busiest road and traffic, EPA-regulated facilities nearby and utilities, each with its source and a **Refresh** link.
+- **Options:** every site plan option with its drawing, a one-line summary (use, floor area, units, parking, coverage), the pro forma line, issues, when it was last opened and how many renderings it has, plus Copy and Delete.
+- **Renderings:** every rendering in the project, grouped by option, so you always know which picture belongs to which plan. **Render more** opens that option's plan at its Render section. Pictures made on another device are shown greyed with who made them.
+- **Ask:** ask questions about the whole project. The AI gets the project information, the jurisdiction facts and each option's numbers, and says when something isn't in them. Suggested questions get you started ("Which option fits this site best?", "What approvals will this site need?").
+- **Behind the scenes:** the site lookup now also says whether a point is inside a city's limits (US Census places); Regrid's city is kept with the parcel. Fixed the rendering viewer swallowing Escape after it was closed.
+
+### 2:45 PM CT: Building close-up renderings, and a monthly rendering budget (8d167a5)
+- **Building close-up:** a fifth **View** under Renderings frames one building as a hero shot, with its parking and landscaping around it and the rest of the site continuing beyond. Select a building on the plan first to choose it; otherwise it takes the building nearest the street. The option names the building it will use; **All site views** stays the four whole-site pictures.
+- **A monthly budget for renderings:** the Render section shows this month's rendering spend against the budget ($100 a month to start, set by the administrators) and how many pictures that was. When it's spent, rendering pauses until the 1st; Ask AI and site plan builds aren't affected. The check runs on the server before each picture.
+
 ### 2:28 PM CT: Renderings know what self storage looks like (fc0d058)
 - **A render of a storage plan** now shows a climate-controlled building with a glassy leasing office, metal drive-up buildings with rows of roll-up doors, and the fence with its gate, instead of a generic commercial building.
 - Brought the latest renderings work into the self storage changes, with nothing lost on either side.

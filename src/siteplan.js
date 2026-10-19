@@ -17,6 +17,7 @@ import * as K from './lib/planpick.mjs';
 import * as MAP from './lib/planmap.mjs';
 import * as T from './lib/sitetools.mjs';
 import * as RD from './lib/render.mjs';
+import * as PJ from './lib/project.mjs';
 const typeOptions = cur => BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 import { readJSON } from './lib/http.mjs';
@@ -105,7 +106,8 @@ export function initSitePlan(ctx) {
   badge();
 
   const P = () => db.projects.find(p => p.id === ed?.pid), PL = () => P()?.plans.find(x => x.id === ed?.plid) || (ed?.draftPlan && ed.draftPlan.id === ed.plid ? ed.draftPlan : undefined); // a draft isn't in the project until its site is finished
-  const nextName = p => 'Option ' + String.fromCharCode(65 + Math.min(25, p.plans.length));
+  // the next option's name: the next letter not already used (after a delete, Copy or New Option never repeats a name)
+  const nextName = p => { const used = new Set(p.plans.map(x => x.name)); for (let i = p.plans.length; i < 26; i++) { const n = 'Option ' + String.fromCharCode(65 + i); if (!used.has(n)) return n; } let k = p.plans.length + 1; while (used.has('Option ' + k)) k++; return 'Option ' + k; };
   const newPlan = (p, extra = {}) => ({ id: uid(), name: nextName(p), origin: null, ring: [], src: null, front: null, frontGuess: true, setbacks: { ...SP.SETBACKS }, program: { use: 'retail' }, zoning: null, elements: [], created: new Date().toISOString(), ...extra });
   const parcelKey = pc => pc.propId ? 'pid:' + pc.propId : 'pt:' + pc.center.map(v => v.toFixed(5)).join(',');
 
@@ -164,6 +166,7 @@ export function initSitePlan(ctx) {
     card.querySelector('#spBack').onclick = () => { if (!(ctx.cardChild?.() === 'open' && ctx.cardBack?.())) ctx.openBuildingAt(center); };
     const begin = p => {
       for (const r of recs) { const i = p.parcels.findIndex(x => x.key === r.key); if (i < 0) p.parcels.push(r); else if (!p.parcels[i].geometry && r.geometry) p.parcels[i] = r; }
+      for (const x of p.parcels) regridOn(x); // the address city and zoning, when Regrid was fetched on the card
       if (pending?.id === p.id) pending = null; // used
       const z = ctx.lastRegrid?.zoning && list.some(x => x.regrid) ? zoningOf(ctx.lastRegrid.zoning) : null;
       const plan = newPlan(p, b ? { origin: b.origin, ring: b.ring, src: many ? 'parcels' : list[0]?.regrid ? 'regrid' : 'parcel', parcel: recs[0].key, parcels: recs.map(r => r.key), zoning: z } : { parcel: recs[0]?.key, parcels: recs.map(r => r.key), origin: center });
@@ -180,6 +183,11 @@ export function initSitePlan(ctx) {
   }
   const inGeom = (pt, g) => (g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : []).some(p => SP.inRing(pt, p[0]));
   const zoningOf = z => Object.fromEntries(['zoning', 'zoning_description', 'max_far', 'max_coverage_pct', 'max_building_height_ft', 'max_density_du_per_acre'].filter(k => z[k] != null && z[k] !== '').map(k => [k, z[k]]));
+  // Regrid's record for a parcel, when someone fetched it on that parcel's property card (src/regrid.js): its address city
+  // and zoning are kept on the parcel for the project page's Jurisdiction card. Says whether anything changed.
+  const regridOn = rec => { const R = ctx.lastRegrid; if (!R?.center || !rec?.geometry || !inGeom(R.center, rec.geometry)) return false;
+    const v = { city: R.city || null, zoning: R.zoning ? zoningOf(R.zoning) : null }; if (rec.regrid && JSON.stringify([rec.regrid.city, rec.regrid.zoning]) === JSON.stringify([v.city, v.zoning])) return false;
+    rec.regrid = { ...v, at: new Date().toISOString().slice(0, 10) }; return true; };
   const xBtn = () => '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>';
 
   // ---------- the editor ----------
@@ -2984,15 +2992,17 @@ export function initSitePlan(ctx) {
   // The massing as the AI gets it: the map pointed at the site from the view's camera (lib/render.mjs cameraFor) in the
   // part of the map the panels leave free, the drawing marks hidden, read off the canvas on the next frame (the canvas
   // keeps no buffer between frames) and cut to 16:9 at up to 1600 px wide. The map is put back exactly as it was.
-  async function captureView(pl, view) {
+  // A close-up ('hero') frames one building (`target`, from RD.heroTarget): the camera and the fit use the building grown
+  // by RD.HERO_PAD feet each side instead of the parcel.
+  async function captureView(pl, view, target = null) {
     const F = SP.frame(pl.origin), was = { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing(), padding: map.getPadding() };
     const free = freeRect({ key: false }), m = free.m, canvas = map.getCanvas(), dpr = canvas.width / Math.max(1, m.width);
-    const cam = RD.cameraFor(view, pl, { px: Math.max(320, (free.r - free.l) * dpr), lat: pl.origin[1] });
+    const cam = RD.cameraFor(view, pl, { px: Math.max(320, (free.r - free.l) * dpr), lat: pl.origin[1], target }), T = RD.byId(RD.VIEWS, view).hero && target;
     const hidden = HIDE_FOR_RENDER.filter(id => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none');
     try {
       for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'none');
       map.jumpTo({ center: F.toLL(cam.center), zoom: cam.zoom, pitch: Math.min(cam.pitch, map.getMaxPitch()), bearing: cam.bearing, padding: fitPadding(free, m, 0) });
-      fitSiteInFrame(pl, free, m); // the formula is a start; the real camera decides: the whole parcel in the free part of the frame, with room around it
+      fitSiteInFrame(pl, free, m, T ? { points: RD.heroPoints(T), tall: [T] } : {}); // the formula is a start; the real camera decides: the whole parcel (or the close-up's building and its surroundings) in the free part of the frame, with room around it
       await idle();
       const png = await new Promise((ok, no) => { map.once('render', () => { try { ok(canvas.toDataURL('image/png')); } catch (e) { no(e); } }); map.triggerRepaint(); });
       const img = new Image(); await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = png; });
@@ -3006,11 +3016,13 @@ export function initSitePlan(ctx) {
   // Project the parcel's corners through the map's own camera (pitch and bearing included) and move the camera until
   // they all sit inside the free part of the frame: 8% clear at the sides, 9% below, and room above for the tallest
   // building and a strip of sky. Zoom steps by the overflow each round; the view is re-centred on the parcel each round.
-  function fitSiteInFrame(pl, free, m) {
-    const ll = ringLL(pl); if (!ll) return;
+  // points: what to fit instead of the parcel (plan feet, e.g. a close-up's building grown by its margin); tall: the
+  // buildings whose height needs room above (all of them by default).
+  function fitSiteInFrame(pl, free, m, { points = null, tall: tallEls = null } = {}) {
+    const ll = points?.length >= 3 && pl?.origin ? points.map(SP.frame(pl.origin).toLL) : ringLL(pl); if (!ll) return;
     const W = free.r - free.l, H = free.b - free.t, aspect = 16 / 9, fw = Math.min(W, H * aspect), fh = fw / aspect; // the 16:9 cut the picture keeps
     const fl = free.l - m.left + (W - fw) / 2, ft = free.t - m.top + (H - fh) / 2, cx = fl + fw / 2, cy = ft + fh / 2;
-    const tall = Math.max(14, ...pl.elements.filter(e => e.kind === 'building').map(e => (e.floors || 1) * (SP.USES[e.use]?.floorH || 12))) * 0.3048;
+    const tall = Math.max(14, ...(tallEls || pl.elements.filter(e => e.kind === 'building')).map(e => (e.floors || 1) * (SP.USES[e.use]?.floorH || 12))) * 0.3048;
     for (let i = 0; i < 14; i++) {
       const px = ll.map(p => map.project(p)), xs = px.map(q => q.x), ys = px.map(q => q.y), bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
       const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (256 * 2 ** map.getZoom()), tallPx = tall / mpp * Math.sin(map.getPitch() * Math.PI / 180) * 1.3;
@@ -3022,47 +3034,88 @@ export function initSitePlan(ctx) {
       map.jumpTo({ center: centre, zoom: Math.max(13, Math.min(19, z + step)) });
     }
   }
+  // this month's rendering budget (api/render GET; the server refuses a render once it's spent): one line under the
+  // button, read when the section shows and after each render, kept a minute. Unknown (no usage database) shows nothing.
+  let rbudget = null, rbAt = 0, rbBusy = false;
+  const rbUsed = () => !!rbudget && (rbudget.cap === 0 || (rbudget.spent != null && rbudget.spent >= rbudget.cap)); // a $0 budget: renderings are off
+  const rbUsd = v => '$' + (v % 1 ? v.toFixed(2) : String(v));
+  const budgetLine = () => { const b = rbudget; if (aiOff() || !b) return ''; if (b.cap === 0) return 'Renderings are turned off on this site.'; if (b.spent == null || !(b.cap >= 0)) return '';
+    if (rbUsed()) return 'This month’s rendering budget (' + rbUsd(b.cap) + ') is used up, so rendering is paused. It resets on the 1st.';
+    return 'Renderings this month: ' + (b.priced === false ? 'about ' : '') + '$' + b.spent.toFixed(2) + ' of ' + rbUsd(b.cap) + (b.images != null ? ' · ' + f0(b.images) + ' picture' + (b.images === 1 ? '' : 's') : ''); };
+  function budgetHtml() { const t = budgetLine(); return '<div class="sp-hint sp-rbudget' + (rbUsed() ? ' used' : '') + '" id="spRBudget"' + (t ? '' : ' hidden') + ' title="' + (rbudget?.priced === false ? 'Estimated: the image model’s price isn’t known, so each picture is counted at a flat amount' : 'At the image model’s list price') + '">' + esc(t) + '</div>'; }
+  // fill the line in place (no redraw) and hold the button while the budget is spent
+  function showBudget() {
+    const el = card.querySelector('#spRBudget'); if (el) { const t = budgetLine(); el.textContent = t; el.hidden = !t; el.classList.toggle('used', rbUsed()); }
+    const go = card.querySelector('#spRenderGo'); if (go && rbUsed() && !ed?.rendering) { go.disabled = true; go.title = rbudget.cap === 0 ? 'Renderings are turned off on this site.' : 'This month’s rendering budget is used up. It resets on the 1st.'; }
+  }
+  async function loadBudget() {
+    if (aiOff() || rbBusy || Date.now() - rbAt < 60e3) { showBudget(); return; }
+    rbBusy = true;
+    try { const r = await fetch('api/render'), d = await r.json().catch(() => ({})); if (r.ok && d.budget) rbudget = d.budget; } catch (e) { /* no line, the button still works */ }
+    finally { rbAt = Date.now(); rbBusy = false; }
+    showBudget();
+  }
   // one picture a view, in turn: capture, ask the server, keep the picture and the massing it came from
-  async function renderViews(p, pl, views, look, time) {
+  // target: the building a close-up frames (an element of pl), for the 'hero' view
+  // A picture already being painted when the plan closes, another option opens or the page changes is still kept, on
+  // the option it was taken of (it has been paid for); no further views are taken. Cancel drops it.
+  async function renderViews(p, pl, views, look, time, target = null) {
     if (ed.rendering) return;
     const run = ed.rendering = { n: views.length, i: 0, view: views[0], msg: '', abort: new AbortController() }; panel();
     const live = () => ed?.rendering === run && !run.abort.signal.aborted;
-    let made = 0, why = '';
+    let made = 0, why = '', capped = false;
     try {
       const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
-      const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' }), sig = planSig(pl);
+      const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' });
+      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map', focus: target });
       for (let i = 0; i < views.length && live(); i++) {
         run.i = i; run.view = views[i]; run.msg = 'Taking the picture from the map…'; panel();
-        const cap = await captureView(pl, views[i]); if (!live()) break;
-        run.msg = 'The AI is painting ' + RD.byId(RD.VIEWS, views[i]).label.toLowerCase() + ' (about a minute)…'; panel();
-        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief, view: views[i] }), signal: run.abort.signal });
-        const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
-        if (!live()) break;
+        const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero, sig = planSig(pl); // the plan as this picture shows it
+        const cap = await captureView(pl, views[i], isHero ? target : null); if (!live()) break;
+        run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; panel();
+        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i] }), signal: run.abort.signal });
+        const d = await r.json().catch(() => ({}));
+        if (r.status === 402) { rbudget = { ...(rbudget || {}), spent: d.spent, cap: d.cap, month: d.month }; rbAt = Date.now(); capped = true; } // the month's budget is spent
+        if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        if (d.budget?.spent != null) { rbudget = { ...(rbudget || {}), ...d.budget, images: (rbudget?.images || 0) + 1 }; rbAt = Date.now(); }
+        if (run.abort.signal.aborted) break;
+        // the option it was taken of, looked up now (not the one open now, and not a copy a sync has since replaced); gone: deleted meanwhile
+        const P1 = db.projects.find(x => x.id === p.id), cur = P1?.plans.find(x => x.id === pl.id); if (!cur) break;
         const id = pl.id + '/' + Date.now().toString(36) + '-' + views[i];
         await rput(id, await toBlob(d.image)); await rput(id + ':m', await toBlob(cap.image)).catch(() => {});
-        const cur = PL(); if (!cur) break;
-        cur.renders = (cur.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '' }]);
+        cur.renders = (cur.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '', ...(isHero ? { target: hero } : {}) }]);
         while (cur.renders.length > 16) { const old = cur.renders.shift(); rdel(old.id); rdel(old.id + ':m'); } // the newest sixteen are kept
-        save(p); made++; panel();
+        save(P1); made++; panel();
       }
     } catch (e) { why = e.name === 'AbortError' ? '' : e.message; }
     finally {
-      if (ed?.rendering === run) ed.rendering = null; panel();
-      if (made) ctx.toast(made === 1 ? 'Rendering ready.' : made + ' renderings ready.' + (why ? ' The last one failed: ' + why : ''));
-      else if (why) ctx.toast('No rendering: ' + why);
+      const here = ed?.rendering === run; if (here) ed.rendering = null; if (!capped) rbAt = 0; panel(); // the budget is read again after a render
+      const of = here ? '' : ' of ' + pl.name; // finished while another option, or another page, was open
+      if (made) ctx.toast((made === 1 ? 'Rendering' + of + ' ready.' : made + ' renderings' + of + ' ready.') + (why ? ' The next one failed: ' + why : ''));
+      else if (why) ctx.toast(capped ? why : 'No rendering: ' + why);
     }
   }
   const RLOOK_KEY = 'fs-render-look', RTIME_KEY = 'fs-render-time';
   const rPrefs = () => ({ look: RD.byId(RD.LOOKS, get(RLOOK_KEY)).id, time: RD.byId(RD.TIMES, get(RTIME_KEY)).id });
   const rWhen = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+  // the building a close-up would frame now: the one selected on the plan when it is a building, else the one nearest the street
+  const heroFor = pl => RD.heroTarget(pl, ed?.sel);
+  // the View choices: the four site views, then the close-up named after its building (and saying so when it's the selected one)
+  function viewOptions(pl, sel) {
+    const T = heroFor(pl), picked = !!T && T.id === ed?.sel, v = ed.rview || 'corner';
+    return sel(RD.VIEWS.filter(x => !x.hero), v) + RD.VIEWS.filter(x => x.hero).map(x => '<option value="' + x.id + '"' + (x.id === v && T ? ' selected' : '') + (T ? '' : ' disabled') +
+      ' title="' + esc(!T ? 'There is no building on this plan to frame' : picked ? 'A close-up of ' + RD.buildingName(T) + ', the building selected on the plan' : 'A close-up of ' + RD.buildingName(T) + ', the building nearest the street. Select a building on the plan first to frame that one instead.') + '">' +
+      esc(RD.renderLabel(x.id, T) + (picked ? ' (selected)' : '')) + '</option>').join('');
+  }
   function renderHtml(p, pl) {
     const R = ed.rendering, pr = rPrefs(), list = (pl.renders || []).slice().reverse(), sig = planSig(pl), off = aiOff(), sel = (list2, v) => list2.map(x => '<option value="' + x.id + '"' + (x.id === v ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
     return '<div class="bsec" id="spRender"><div class="lt">Renderings' + infoBtn('A photoreal picture of this option, painted by the AI from the 3D massing on the map: the buildings, drives, parking, pond and trees stay where the plan puts them, at their heights; the materials, windows, landscaping, cars, people and sky are the AI’s. It is a concept illustration, not a design, and two renderings of one plan will differ. About a minute a view. The pictures are kept on this device; teammates see that they exist, not the pictures.', 'About renderings') + '</div>' +
-      '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + sel(RD.VIEWS, ed.rview || 'corner') + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + '>All four views</option></select></label>' +
+      '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + viewOptions(pl, sel) + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + ' title="The four views of the whole site, one after another (not the building close-up)">All site views</option></select></label>' +
         '<label class="sp-f"><span class="sp-fl">Materials</span><select id="spRLook">' + sel(RD.LOOKS, pr.look) + '</select></label><label class="sp-f"><span class="sp-fl">Light</span><select id="spRTime">' + sel(RD.TIMES, pr.time) + '</select></label></div>' +
       '<div class="sp-go2"><button type="button" class="btn askai" id="spRenderGo"' + (R || off ? ' disabled' : '') + ' title="' + (off ? 'AI isn’t set up on this site' : 'Point the map’s 3D massing at the site and have the AI paint it as a photograph (1920 × 1080)') + '">' + (R ? 'Rendering ' + (R.i + 1) + ' of ' + R.n + '…' : 'Render 3D View') + '</button>' + (R ? '<button type="button" class="btn" id="spRenderStop">Cancel</button>' : '') + '</div>' +
-      (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : imageryBase() ? '' : '<div class="sp-hint">Tip: switch the base map to <b>Satellite</b> first (Map layers) and the surroundings come out as they really are.</div>') +
-      (list.length ? '<div class="sp-rgrid">' + list.map(r => { const V = RD.byId(RD.VIEWS, r.view), stale = r.sig && r.sig !== sig; return '<figure class="sp-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" title="' + esc(V.label + (stale ? ' · the plan has changed since this was made' : '')) + '"><img alt="' + esc(V.label + ' rendering') + '"><figcaption>' + esc(V.label) + ' <span>' + esc(rWhen(r.at)) + (stale ? ' · plan changed since' : '') + '</span></figcaption></figure>'; }).join('') + '</div>' +
+      budgetHtml() +
+      (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : imageryBase() || rbUsed() ? '' : '<div class="sp-hint">Tip: switch the base map to <b>Satellite</b> first (Map layers) and the surroundings come out as they really are.</div>') +
+      (list.length ? '<div class="sp-rgrid">' + list.map(r => { const V = { label: RD.renderLabel(r.view, r.target) }, stale = r.sig && r.sig !== sig; return '<figure class="sp-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" title="' + esc(V.label + (stale ? ' · the plan has changed since this was made' : '')) + '"><img alt="' + esc(V.label + ' rendering') + '"><figcaption>' + esc(V.label) + ' <span>' + esc(rWhen(r.at)) + (stale ? ' · plan changed since' : '') + '</span></figcaption></figure>'; }).join('') + '</div>' +
         '<div class="sp-hint">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. Click one to see it full size, compare it with the massing, download or delete it. The two newest go on the Site Plan PDF.</div>' : '') + '</div>';
   }
   function wireRender(p, pl) {
@@ -3071,37 +3124,39 @@ export function initSitePlan(ctx) {
     const vw = $('#spRView'); if (vw) vw.onchange = () => { ed.rview = vw.value; };
     const lk = $('#spRLook'); if (lk) lk.onchange = () => keep(RLOOK_KEY, lk.value);
     const tm = $('#spRTime'); if (tm) tm.onchange = () => keep(RTIME_KEY, tm.value);
-    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'corner', pr = rPrefs(); renderViews(p, pl, v === 'all' ? RD.VIEWS.map(x => x.id) : [v], pr.look, pr.time); });
+    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'corner', pr = rPrefs(), hero = RD.byId(RD.VIEWS, v, null)?.hero; renderViews(p, pl, v === 'all' ? RD.SITE_VIEWS : [v], pr.look, pr.time, hero ? heroFor(pl) : null); });
     on('#spRenderStop', () => { ed.rendering?.abort.abort(); });
+    loadBudget();
     card.querySelectorAll('.sp-rth').forEach(f => { const r = (pl.renders || []).find(x => x.id === f.dataset.rid); if (!r) return;
-      renderSrc(r.id).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { img.alt = 'Picture not on this device'; f.classList.add('gone'); } });
+      renderSrc(r.id).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { const g = document.createElement('span'); g.className = 'sp-rgone'; g.textContent = 'Not on this device' + (r.by ? ' (made by ' + r.by + ')' : ''); img.replaceWith(g); f.classList.add('gone'); } }); // a teammate's: a plain placeholder, not a broken picture
       f.onclick = () => openRender(p, pl, r); });
   }
   // the picture full size, with the massing it was made from a click away, Download and Delete
-  async function openRender(p, pl, r) {
-    const V = RD.byId(RD.VIEWS, r.view), src = await renderSrc(r.id), msrc = await renderSrc(r.id + ':m');
+  // (from the plan's Render section or the project page's Renderings tab; from: the thumbnail, which gets the focus back)
+  async function openRender(p, pl, r, from) {
+    const V = { label: RD.renderLabel(r.view, r.target) }, src = await renderSrc(r.id), msrc = await renderSrc(r.id + ':m');
     if (!src) { ctx.toast('That picture isn’t on this device (renderings stay where they were made).'); return; }
     document.getElementById('spRView2')?.remove();
     const box = document.createElement('div'); box.id = 'spRView2'; box.className = 'sp-rview'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', V.label + ' rendering');
-    box.innerHTML = '<div class="sp-rvin"><div class="sp-rvtop"><b>' + esc(pl.name) + ' · ' + esc(V.label) + '</b><span>' + esc(RD.byId(RD.LOOKS, r.look).label) + ' · ' + esc(RD.byId(RD.TIMES, r.time).label) + (r.model ? ' · ' + esc(r.model) : '') + ' · ' + esc(rWhen(r.at)) + '</span><button type="button" class="sp-lb" data-x aria-label="Close">✕</button></div>' +
+    box.innerHTML = '<div class="sp-rvin"><div class="sp-rvtop"><b>' + esc(pl.name) + ' · ' + esc(V.label) + '</b><span>' + esc(RD.byId(RD.LOOKS, r.look).label) + ' · ' + esc(RD.byId(RD.TIMES, r.time).label) + (r.model ? ' · ' + esc(r.model) : '') + ' · ' + esc(rWhen(r.at)) + (r.sig && r.sig !== planSig(pl) ? ' · <em class="sp-rvold">plan changed since this was made</em>' : '') + '</span><button type="button" class="sp-lb" data-x aria-label="Close">✕</button></div>' +
       '<div class="sp-rvimg"><img src="' + src + '" alt="' + esc(V.label + ' rendering') + '"></div>' +
       '<div class="sp-rvbar"><span class="sp-hint">AI concept illustration, not a design.</span><span class="sp-rvbtns">' + (msrc ? '<button type="button" class="btn sm" data-cmp aria-pressed="false">Show the massing</button>' : '') + '<button type="button" class="btn sm" data-dl>Download</button><button type="button" class="btn sm ghost" data-del>Delete</button></span></div></div>';
-    document.body.appendChild(box);
-    const img = box.querySelector('img'), close = () => { box.remove(); document.removeEventListener('keydown', key); };
+    document.body.appendChild(box); box.querySelector('[data-x]').focus({ preventScroll: true }); // the keyboard lands in the viewer
+    const img = box.querySelector('img'), close = () => { box.remove(); document.removeEventListener('keydown', key, true); (from?.isConnected ? from : document.querySelector('[data-rid="' + CSS.escape(r.id) + '"]'))?.focus?.(); };
     const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
     document.addEventListener('keydown', key, true);
     box.onclick = e => { if (e.target === box) close(); };
     box.querySelector('[data-x]').onclick = close;
     const cmp = box.querySelector('[data-cmp]'); if (cmp) cmp.onclick = () => { const onM = cmp.getAttribute('aria-pressed') !== 'true'; cmp.setAttribute('aria-pressed', String(onM)); img.src = onM ? msrc : src; cmp.textContent = onM ? 'Show the rendering' : 'Show the massing'; };
     box.querySelector('[data-dl]').onclick = async () => { const b = await rget(r.id); if (b instanceof Blob) ctx.saveFile(fileName(p, pl) + '-' + r.view + '-rendering.jpg', b, 'image/jpeg'); };
-    box.querySelector('[data-del]').onclick = () => { if (!confirm('Delete this rendering?')) return; const cur = PL(); if (cur) { cur.renders = (cur.renders || []).filter(x => x.id !== r.id); save(p); } rdel(r.id); rdel(r.id + ':m'); close(); panel(); };
+    box.querySelector('[data-del]').onclick = () => { if (!confirm('Delete this rendering?')) return; const P1 = db.projects.find(x => x.id === p.id) || p, cur = P1.plans.find(x => x.id === pl.id) || (PL()?.id === pl.id ? PL() : null); if (cur) { cur.renders = (cur.renders || []).filter(x => x.id !== r.id); save(P1); } rdel(r.id); rdel(r.id + ':m'); close(); if (ed) panel(); }; // (the project as it is now: a sync may have replaced the copy the viewer was opened from)
   }
   // the two newest renderings that still match the plan, as data URLs for the PDF sheet, at up to 1600 px wide so the
   // sheet stays under the PDF service's request limit
   async function rendersForSheet(pl) {
     const sig = planSig(pl), out = [];
     const small = async b => { try { const bmp = await createImageBitmap(b), k = Math.min(1, 1600 / bmp.width), c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85); } catch (e) { return blobToData(b); } };
-    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= 2 || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.byId(RD.VIEWS, r.view).label + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
+    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= 2 || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.renderLabel(r.view, r.target) + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
     return out;
   }
   function geojson(p, pl) {
@@ -3118,11 +3173,11 @@ export function initSitePlan(ctx) {
 
   // ---------- the Projects view ----------
   // All projects as cards or a list (the choice is kept in this browser), with search and sort. Click one for its page:
-  // a summary card (site area, parcels, owners, appraised value, options), the parcels, each option drawn with its
-  // numbers, and notes. Text wraps rather than being cut off. A sync never redraws under someone typing (it waits
+  // a header with its status, then tabs: Overview (information, the site's jurisdiction, parcels), Options (each option
+  // drawn with its numbers), Renderings and Ask. Text wraps rather than being cut off. A sync never redraws under someone typing (it waits
   // until they leave the field), so half-typed notes or a name aren't lost.
   const VIEW_KEY = 'fs-projects-view';
-  const SORTS = { updated: 'Recently updated', name: 'Name', acres: 'Largest site', options: 'Most options' };
+  const SORTS = { updated: 'Recently updated', name: 'Name', acres: 'Largest site', options: 'Most options', status: 'Status' };
   const PIN = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 14.5s4.5-4.2 4.5-7.8a4.5 4.5 0 0 0-9 0c0 3.6 4.5 7.8 4.5 7.8z"/><circle cx="8" cy="6.6" r="1.6"/></svg>';
   const ICON_CARDS = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>';
   const ICON_LIST = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5.5 4h8.5M5.5 8h8.5M5.5 12h8.5"/><circle cx="2.6" cy="4" r=".6"/><circle cx="2.6" cy="8" r=".6"/><circle cx="2.6" cy="12" r=".6"/></svg>';
@@ -3174,13 +3229,15 @@ export function initSitePlan(ctx) {
 
   // ----- all projects -----
   function shown() {
-    const q = pq.trim().toLowerCase(), by = { updated: (a, b) => t(b.updated) - t(a.updated), name: (a, b) => a.name.localeCompare(b.name), acres: (a, b) => acresOf(b) - acresOf(a), options: (a, b) => b.plans.length - a.plans.length || t(b.updated) - t(a.updated) }[psort];
+    const q = pq.trim().toLowerCase(), by = { updated: (a, b) => t(b.updated) - t(a.updated), name: (a, b) => a.name.localeCompare(b.name), acres: (a, b) => acresOf(b) - acresOf(a), options: (a, b) => b.plans.length - a.plans.length || t(b.updated) - t(a.updated), status: (a, b) => PJ.STATUSES.indexOf(PJ.statusOf(a)) - PJ.STATUSES.indexOf(PJ.statusOf(b)) || a.name.localeCompare(b.name) }[psort];
     return db.projects.filter(p => !q || [p.name, p.notes, p.by, ...p.parcels.flatMap(x => [x.label, x.owner]), ...p.plans.map(x => x.name)].join(' ').toLowerCase().includes(q)).sort(by);
   }
+  // the status as the small coloured pill from the project page's header (nothing for a project that has none set)
+  const stPill = p => p.status ? '<span class="pj-st" data-st="' + PJ.statusOf(p).id + '"><span class="pj-stp">' + esc(PJ.statusOf(p).label) + '</span></span>' : '';
   function cardHtml(p) {
     const ac = acresOf(p), big = biggest(p), addr = addrOf(p), c = cover(p);
     return '<button type="button" class="pj-card" data-open="' + esc(p.id) + '"><span class="pj-thumb">' + (c || '<i>No site yet</i>') + '</span><span class="pj-cb">' +
-      '<b class="pj-cn">' + esc(p.name) + '</b>' + (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') +
+      '<b class="pj-cn">' + esc(p.name) + '</b>' + stPill(p) + (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') +
       '<span class="pj-facts">' + (ac ? '<span class="pj-fact"><b>' + ac.toFixed(2) + '</b> acres</span>' : '') + '<span class="pj-fact"><b>' + f0(p.plans.length) + '</b> option' + (p.plans.length === 1 ? '' : 's') + '</span>' +
         (big ? '<span class="pj-fact"><b>' + f0(big.m.gfa) + '</b> sq ft max</span>' : '') + '</span>' +
       '<span class="pj-upd">Updated ' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + '</span></span></button>';
@@ -3188,7 +3245,7 @@ export function initSitePlan(ctx) {
   function rowHtml(p) {
     const ac = acresOf(p), big = biggest(p), addr = addrOf(p), c = cover(p);
     return '<button type="button" class="pj-row" data-open="' + esc(p.id) + '"><span class="pj-thumb pj-rthumb">' + (c || '<i>No site</i>') + '</span>' +
-      '<span class="pj-rmain"><b>' + esc(p.name) + '</b>' + (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + '</span>' +
+      '<span class="pj-rmain"><b>' + esc(p.name) + '</b>' + stPill(p) + (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + '</span>' +
       '<span class="pj-rstats"><span class="pj-rc">' + (ac ? '<b>' + ac.toFixed(2) + '</b> acres' : '<em>No site</em>') + '</span><span class="pj-rc"><b>' + f0(p.plans.length) + '</b> option' + (p.plans.length === 1 ? '' : 's') + '</span>' +
         '<span class="pj-rc">' + (big ? '<b>' + f0(big.m.gfa) + '</b> sq ft' : '<em>Not laid out</em>') + '</span><span class="pj-rc pj-rupd">' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + '</span></span>' +
       '<span class="pj-chev" aria-hidden="true">›</span></button>';
@@ -3214,57 +3271,237 @@ export function initSitePlan(ctx) {
   }
 
   // ----- one project -----
+  // A header (name, status, address, acres, who updated it) and four tabs: Overview (the project's information, the
+  // site's jurisdiction and the parcels), Options (the site plan options), Renderings (every option's pictures) and Ask
+  // (questions about the whole project). The tab is kept per project for this visit and in the address (pt=).
+  const ptab = new Map(), pasks = new Map(), siteRuns = new Map(), siteFail = new Map();
+  const tabFor = p => PJ.tabOf(ptab.get(p.id));
+  const rLabel = r => RD.renderLabel(r.view, r.target); // a rendering by its view, and the building it frames when it has one
+  const laidOut = pl => pl.ring.length >= 3 && pl.elements.some(e => e.kind === 'building');
+  // facts the app looked up (the site's jurisdiction, Regrid's city) aren't anyone's edit: looked up on each device and kept with the project on that device (teammates look it up themselves)
+  // without changing who updated the project or when
+  function quietSave(p) { if (!db.dirty.includes(p.id)) db.dirty.push(p.id); persist(); clearTimeout(syncT); syncT = setTimeout(sync, 1500); }
+
+  // the option's one-line summary: use, floor area, units, parking against what's needed, coverage
   function planTile(p, pl) {
-    const { drawn, m, m1, bad, fin } = info(p, pl), use = SP.USES[SP.normalizeProgram(pl.program).use], a = m1 || m, p2 = m1 ? K.headline(m, m1, null).p2 : '';
-    const stat = (v, l, cls) => '<span' + (cls ? ' class="' + cls + '"' : '') + '><b>' + v + '</b>' + l + '</span>';
-    return '<button type="button" class="pj-plan" data-plan="' + esc(pl.id) + '" title="Open ' + esc(pl.name) + ' on the map">' +
+    const { drawn, m, m1, bad, fin } = info(p, pl), use = SP.USES[SP.normalizeProgram(pl.program).use], a = m1 || m, p2 = m1 ? K.headline(m, m1, null).p2 : '', nR = (pl.renders || []).length;
+    const line = m?.gfa ? [esc(use.label), f0(a.gfa) + ' sq ft' + (m1 ? ' in Phase 1' : ''), a.units ? plural(a.units, 'unit') : '', '<span' + (m.spaces < m.required ? ' class="short"' : '') + '>' + f0(m.spaces) + ' of ' + f0(m.required) + ' spaces</span>', pct(m.coverage) + ' coverage'].filter(Boolean).join(' · ') : '';
+    return '<div class="pj-plan"><button type="button" class="pj-popen" data-plan="' + esc(pl.id) + '" title="Open ' + esc(pl.name) + ' on the map">' +
       '<span class="pj-thumb">' + (drawn ? thumb(p, pl) : '<i>No site drawn</i>') + (bad ? '<span class="pj-iss">' + plural(bad, 'issue') + '</span>' : '') + (lastOpen?.plid === pl.id ? '<span class="pj-live" title="The option you had open last">Last opened</span>' : '') + '</span>' +
-      '<span class="pj-ph"><b>' + esc(pl.name) + '</b>' + (m?.gfa ? '<em>' + esc(use.label) + (a.units ? ' · ' + plural(a.units, 'unit') + (m1 ? ' in Phase 1' : '') : '') + '</em>' : '') + '</span>' +
-      (m?.gfa ? '<span class="pj-stats">' + stat(f0(a.gfa), m1 ? 'sq ft, Phase 1' : 'sq ft') + stat(f0(m.spaces), 'spaces, ' + f0(m.required) + ' needed', m.spaces < m.required ? 'short' : '') + stat(pct(m.coverage), 'coverage') + '</span>' +
-        (p2 ? '<span class="pj-p2">' + esc(p2) + '</span>' : '') + (fin ? '<span class="pj-fin" title="From this option’s Pro forma (land at ' + $M(fin.land) + ')">' + (fin.forSale ? $M(fin.cost) + ' cost · ' + pc2(fin.margin) + ' margin' : '≈ ' + $M(fin.value) + ' value · ' + pc2(fin.yoc) + ' yield on cost') + '</span>' : '')
-        : '<span class="pj-none">' + (drawn ? m.acres.toFixed(2) + ' acres, nothing laid out yet' : 'Open it to draw the site on the map') + '</span>') + '</button>';
+      '<span class="pj-ph"><b>' + esc(pl.name) + '</b></span>' +
+      (line ? '<span class="pj-oline">' + line + '</span>' + (p2 ? '<span class="pj-p2">' + esc(p2) + '</span>' : '') +
+        (fin ? '<span class="pj-fin" title="From this option’s Pro forma (land at ' + $M(fin.land) + ')">' + (fin.forSale ? $M(fin.cost) + ' cost · ' + pc2(fin.margin) + ' margin' : '≈ ' + $M(fin.value) + ' value · ' + pc2(fin.yoc) + ' yield on cost') + '</span>' : '')
+        : '<span class="pj-none">' + (drawn ? m.acres.toFixed(2) + ' acres, nothing laid out yet' : 'Open it to draw the site on the map') + '</span>') + '</button>' +
+      '<div class="pj-pact"><span class="pj-rn">' + (nR ? plural(nR, 'rendering') : drawn ? 'No renderings' : '') + '</span>' +
+        (pl.ring.length < 3 ? '' : '<button type="button" class="lnk" data-copy="' + esc(pl.id) + '" title="A copy of ' + esc(pl.name) + ' as a new option, its layouts included">Copy</button>') + '<button type="button" class="lnk pj-pdel" data-delpl="' + esc(pl.id) + '">Delete</button></div></div>';
+  }
+  function headHtml(p) {
+    const ac = acresOf(p), st = PJ.statusOf(p), addr = addrOf(p);
+    return '<button type="button" class="lnk pj-back" data-back="1">‹ All projects</button><header class="pj-head"><div class="kicker">Project</div>' +
+      (renaming ? '<form class="pj-ren" id="pjRenForm"><label class="sr" for="pjRen">Project name</label><textarea id="pjRen" rows="1" maxlength="120">' + esc(p.name) + '</textarea><span class="btnrow"><button class="btn primary">Save</button><button type="button" class="btn" id="pjRenX">Cancel</button></span></form>'
+        : '<div class="pj-title"><h2>' + esc(p.name) + '</h2><button type="button" class="lnk" id="pjRename">Rename</button></div>') +
+      '<div class="pj-hmeta"><span class="pj-st" data-st="' + st.id + '"><label class="sr" for="pjStatus">Status</label><select id="pjStatus" title="The project’s status (shared with the team)">' + PJ.STATUSES.map(x => '<option value="' + x.id + '"' + (x.id === st.id ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select></span>' +
+        (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + (ac ? '<span class="pj-hac"><b>' + ac.toFixed(2) + '</b> acres</span>' : '') +
+        '<span class="pj-upd">Updated ' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + (p.created ? ' · started ' + when(p.created) : '') + '</span></div></header>';
+  }
+  const rendersOf = p => p.plans.flatMap(pl => (pl.renders || []).map(r => ({ pl, r })));
+  function tabsHtml(p, tab) {
+    const n = { options: p.plans.length, renderings: rendersOf(p).length }, busy = pasks.get(p.id)?.busy;
+    return '<div class="mx-tabs pj-tabs" role="tablist" aria-label="Project sections">' + PJ.TABS.map(t => { const on = t.id === tab;
+      return '<button type="button" role="tab" id="pjTab-' + t.id + '" data-tab="' + t.id + '" aria-selected="' + on + '" aria-controls="pjPanel" tabindex="' + (on ? 0 : -1) + '">' + t.label +
+        (n[t.id] ? '<span class="pj-tn"> · ' + f0(n[t.id]) + '</span>' : '') + (t.id === 'ask' && busy ? '<span class="pj-tn"> · answering…</span>' : '') + '</button>'; }).join('') + '</div>';
   }
   function detailHtml(p) {
-    const ac = acresOf(p), big = biggest(p), can = !!siteFor(p), c = cover(p);
+    const tab = tabFor(p), body = { overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, ask: pAskHtml }[tab](p);
+    return headHtml(p) + tabsHtml(p, tab) + '<div class="pj-panel pj-p-' + tab + '" id="pjPanel" role="tabpanel" aria-labelledby="pjTab-' + tab + '">' + body + '</div>';
+  }
+
+  // ----- Overview: the project's information, the site's jurisdiction, the parcels -----
+  function overviewHtml(p) {
+    const ac = acresOf(p), big = biggest(p), c = cover(p);
     const owners = [...new Set(p.parcels.map(x => x.owner).filter(Boolean))], value = p.parcels.reduce((s, x) => s + (x.marketValue || 0), 0), land = p.parcels.reduce((s, x) => s + (x.landValue || 0), 0);
     const fact = (k, v, sub) => '<div><dt>' + k + '</dt><dd>' + v + (sub ? '<small>' + sub + '</small>' : '') + '</dd></div>';
-    return '<button type="button" class="lnk pj-back" data-back="1">‹ All projects</button>' +
-      '<section class="pj-sum"><div class="pj-thumb pj-sthumb">' + (c || '<i>No site yet</i>') + '</div><div class="pj-sb"><div class="kicker">Project</div>' +
-        (renaming ? '<form class="pj-ren" id="pjRenForm"><label class="sr" for="pjRen">Project name</label><textarea id="pjRen" rows="1" maxlength="120">' + esc(p.name) + '</textarea><span class="btnrow"><button class="btn primary">Save</button><button type="button" class="btn" id="pjRenX">Cancel</button></span></form>'
-          : '<div class="pj-title"><h2>' + esc(p.name) + '</h2><button type="button" class="lnk" id="pjRename">Rename</button></div>') +
-        '<div class="vsub">Updated ' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + (p.created ? ' · started ' + when(p.created) : '') + '</div>' +
-        '<dl class="pj-dl">' + fact('Site area', ac ? ac.toFixed(2) + ' acres' : 'Not set', ac ? f0(ac * 43560) + ' sq ft' : '') + fact('Parcels', f0(p.parcels.length)) +
+    const field = (id, label, input) => '<div class="pj-f"><label for="' + id + '">' + label + '</label>' + input + '</div>';
+    return '<div class="pj-ov"><section class="pj-box pj-info" aria-labelledby="pjInfoH"><h3 class="pj-h3" id="pjInfoH">Project information</h3>' +
+        '<div class="pj-ib"><div class="pj-thumb">' + (c || '<i>No site yet</i>') + '</div><dl class="pj-dl">' + fact('Site area', ac ? ac.toFixed(2) + ' acres' : 'Not set', ac ? f0(ac * 43560) + ' sq ft' : '') + fact('Parcels', f0(p.parcels.length)) +
           (owners.length ? fact(owners.length > 1 ? 'Owners' : 'Owner', esc(owners[0]), owners.length > 1 ? 'and ' + plural(owners.length - 1, 'other') : '') : '') +
           (value ? fact('Appraised value', money(value), land ? 'land ' + money(land) : '') : '') + fact('Site plan options', f0(p.plans.length)) +
-          (big ? fact('Largest option', f0(big.m.gfa) + ' sq ft', esc(big.pl.name) + ' · ' + esc(SP.USES[SP.normalizeProgram(big.pl.program).use].label) + (big.m.units ? ' · ' + plural(big.m.units, 'unit') : '')) : '') + '</dl></div></section>' +
+          (big ? fact('Largest option', f0(big.m.gfa) + ' sq ft', esc(big.pl.name) + ' · ' + esc(SP.USES[SP.normalizeProgram(big.pl.program).use].label) + (big.m.units ? ' · ' + plural(big.m.units, 'unit') : '')) : '') + '</dl></div>' +
+        '<div class="pj-fields">' + field('pjClient', 'Client / prepared for', '<input id="pjClient" maxlength="120" autocomplete="off" placeholder="Who it’s for" value="' + esc(p.client || '') + '">') +
+          field('pjUse', 'Target use', '<input id="pjUse" maxlength="160" autocomplete="off" placeholder="e.g. Retail strip with two pads" value="' + esc(p.use || '') + '">') +
+          '<div class="pj-f pj-fw">' + '<label for="pjNotes">Notes</label><textarea class="pj-notes" id="pjNotes" rows="' + Math.min(10, Math.max(3, (p.notes || '').split('\n').length + 1)) + '" placeholder="Asking price, broker, next steps…">' + esc(p.notes || '') + '</textarea></div>' +
+          '<div class="rnote pj-fw">Saved as you go, and shared with the team.</div></div></section>' +
+      jurHtml(p) + '</div>' +
       '<section class="pj-sec"><div class="lt">Parcels' + (p.parcels.length ? ' · ' + f0(p.parcels.length) : '') + '</div>' + (p.parcels.length ? '<div class="pj-prows">' + p.parcels.map(x => '<div class="pj-prow"><span class="pj-pi">' + PIN + '</span><div class="pj-pm"><b>' + esc(x.label) + '</b><span>' +
           [x.owner ? esc(x.owner) : '', x.acres ? x.acres.toFixed(2) + ' acres' : '', x.marketValue ? 'appraised ' + money(x.marketValue) : ''].filter(Boolean).join(' · ') + '</span></div><button type="button" class="btn" data-parcel="' + esc(x.key) + '">Show on Map</button></div>').join('') + '</div>'
-        : '<div class="pj-start"><b>No parcels yet</b><p>Find the parcel on the map, click it, then <b>Site plan</b> at the top of its card and choose <b>Add to ' + esc(p.name) + '</b>. Or click the corners of the site yourself.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div></div>') + '</section>' +
-      '<section class="pj-sec"><div class="lt">Site plan options · ' + f0(p.plans.length) + '</div><div class="pj-plans">' + p.plans.map(pl => planTile(p, pl)).join('') +
+        : startHtml(p)) + '</section>' +
+      '<div class="pj-foot"><span></span><button type="button" class="lnk pj-del" data-delp="1">Delete Project</button></div>';
+  }
+  const startHtml = p => '<div class="pj-start"><b>No parcels yet</b><p>Find the parcel on the map, click it, then <b>Site plan</b> at the top of its card and choose <b>Add to ' + esc(p.name) + '</b>. Or click the corners of the site yourself.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div></div>';
+
+  // ----- the site's jurisdiction: looked up once (flood zone, districts, roads, EPA, utilities, the county and the city
+  // limits) at the middle of the site and kept on the project (p.site), so the page never waits on it; Refresh asks again
+  const race = (pr, ms) => Promise.race([pr, new Promise((_, no) => setTimeout(() => no(new Error('slow')), ms))]);
+  const spots = new Map(); // per project version: siteFor merges the parcels' outlines, which is too slow to do several times a draw
+  function siteSpot(p) { const k = p.id + '|' + ver(p) + '|' + p.parcels.length + '|' + p.plans.length; if (!spots.has(k)) { spots.set(k, spotOf(p)); if (spots.size > 60) spots.delete(spots.keys().next().value); } return spots.get(k); }
+  function spotOf(p) { // the middle of the site (the newest drawn option's, else the parcels'), and its outline for the utilities
+    const s = siteFor(p); let c = null, geom = null;
+    if (s?.ring?.length >= 3) { const F = SP.frame(s.origin); c = F.toLL(SP.centroid(s.ring)); geom = { type: 'Polygon', coordinates: [s.ring.concat([s.ring[0]]).map(F.toLL)] }; }
+    else { const x = p.parcels.find(y => y.center); if (x) { c = x.center; geom = x.geometry || null; } }
+    if (!c) return null; c = c.map(v => +v.toFixed(5)); return { c, geom, key: c.join(',') };
+  }
+  const countyAt = c => (ctx.DATA?.counties || []).find(k => (k.outline || []).some(poly => SP.inRing(c, poly[0])))?.name || '';
+  const factsOf = p => p.site?.facts ? { ...p.site.facts, ...PJ.regridFacts(p.parcels, p.plans) } : null;
+  const needSite = p => { const at = siteSpot(p), f = siteFail.get(p.id); return !!at && !siteRuns.has(p.id) && (!p.site || p.site.key !== at.key) && !(f && Date.now() - f < 6e4); };
+  function gatherSite(p) {
+    if (siteRuns.has(p.id)) return siteRuns.get(p.id);
+    const at = siteSpot(p); if (!at) return Promise.resolve(null);
+    const run = (async () => {
+      const [d, u] = await Promise.all([ctx.siteAt ? race(ctx.siteAt(at.c, '', ''), 15000).catch(e => ({ error: e.message || 'failed' })) : { error: 'none' },
+        ctx.utilitiesAt ? race(ctx.utilitiesAt(at.c, at.geom), 15000).catch(() => null) : null]);
+      let lines = null; try { lines = u ? ctx.utilityFacts(u) : null; } catch (e) { lines = null; }
+      if (d?.error && !lines) throw new Error(d.error); // nothing came back: keep what was there and say so
+      const x = db.projects.find(y => y.id === p.id); if (!x) return null;
+      x.site = { at: new Date().toISOString(), key: at.key, facts: PJ.siteFactsFrom(d, { county: countyAt(at.c), utilities: lines, parcels: x.parcels.length }) }; siteFail.delete(p.id); quietSave(x);
+      return x.site;
+    })();
+    siteRuns.set(p.id, run);
+    run.catch(() => siteFail.set(p.id, Date.now())).finally(() => { siteRuns.delete(p.id); if (ctx.view === 'projects' && cur === p.id && tabFor(p) === 'overview') render(); });
+    return run;
+  }
+  function jurHtml(p) {
+    const at = siteSpot(p), S = p.site, f = factsOf(p), run = siteRuns.has(p.id) || needSite(p), failed = siteFail.has(p.id);
+    const body = !S && !at ? '<p class="rnote">Add a parcel or draw the site, and its county, city, floodplain and districts are looked up here.</p>'
+      : !S ? (run ? '<p class="rnote loading">Checking the county, city, floodplain and districts…</p>' : '<p class="rnote err">Couldn’t check the site just now. <button type="button" class="lnk" data-jref="1">Try again</button></p>')
+      : '<dl class="pj-jur">' + PJ.jurisdictionRows(f).map(r => '<div class="pj-jr' + (r.tone ? ' ' + r.tone : '') + '"><dt>' + esc(r.label) + '</dt><dd><b>' + esc(r.value) + '</b>' +
+          (r.list?.length > 1 ? '<ul>' + r.list.slice(1).map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + (r.src ? '<span class="pj-src">' + esc(r.src) + '</span>' : '') + '</dd></div>').join('') + '</dl>';
+    const foot = S ? '<div class="pj-jfoot"><span>Checked ' + when(S.at) + ' at the middle of the site' + (at && S.key !== at.key ? '; the site has changed since' : '') + (failed ? '; the last check failed' : '') + '</span><button type="button" class="lnk" data-jref="1"' + (run ? ' disabled' : '') + '>' + (run ? 'Checking…' : 'Refresh') + '</button></div>' : '';
+    return '<section class="pj-box pj-jbox" aria-labelledby="pjJurH"' + (run ? ' aria-busy="true"' : '') + '><h3 class="pj-h3" id="pjJurH">Jurisdiction &amp; site</h3>' + body + foot +
+      (S ? '<p class="rnote pj-jnote">From public map services, for a first look: confirm with the city, the county and a title company before relying on it.</p>' : '') + '</section>';
+  }
+
+  // ----- Options: the site plan options, each with its one-line summary and renderings -----
+  function optionsHtml(p) {
+    const can = !!siteFor(p);
+    return '<section class="pj-sec pj-sec0"><div class="lt">Site plan options · ' + f0(p.plans.length) + '</div><div class="pj-plans">' + p.plans.map(pl => planTile(p, pl)).join('') +
         (can ? '<button type="button" class="pj-plan pj-add" data-add="1"><span class="pj-plus" aria-hidden="true">+</span><b>New Option</b><span class="pj-none">' + (p.plans.some(x => x.ring.length >= 3) ? 'A blank plan on the same site' : 'A blank plan on ' + (p.parcels.length > 1 ? 'these parcels' : 'this parcel')) + '</span></button>'
-          : p.parcels.length ? '<div class="pj-start"><b>No site outline</b><p>These parcels have no outline from the county. Click the corners of the site on the map.</p><div class="btnrow"><button type="button" class="btn" data-draw="1">Draw a Site</button></div></div>' : '<div class="pj-none">No options yet: add a parcel or draw the site first.</div>') + '</div></section>' +
-      '<section class="pj-sec"><div class="lt"><label for="pjNotes">Notes</label></div><textarea class="pj-notes" id="pjNotes" rows="' + Math.min(10, Math.max(3, (p.notes || '').split('\n').length + 1)) + '" placeholder="Asking price, broker, next steps…">' + esc(p.notes || '') + '</textarea></section>' +
-      '<div class="pj-foot"><span class="btnrow">' + (can ? '<button type="button" class="btn" data-draw="1" title="Click the corners of a different site on the map">Draw a Different Site</button>' : '') + '</span><button type="button" class="lnk pj-del" data-delp="1">Delete Project</button></div>';
+          : p.parcels.length ? '<div class="pj-start"><b>No site outline</b><p>These parcels have no outline from the county. Click the corners of the site on the map.</p><div class="btnrow"><button type="button" class="btn" data-draw="1">Draw a Site</button></div></div>' : startHtml(p)) + '</div></section>' +
+      (can ? '<div class="pj-foot"><span class="btnrow"><button type="button" class="btn" data-draw="1" title="Click the corners of a different site on the map">Draw a Different Site</button></span></div>' : '');
+  }
+
+  // ----- Renderings: every option's pictures, grouped by option. The pictures live on the device they were made on
+  // (IndexedDB, see renderSrc); one a teammate made shows greyed, saying so. Click one for the full-size viewer.
+  function rendersHtml(p) {
+    const ready = p.plans.filter(laidOut), groups = p.plans.filter(pl => pl.renders?.length || laidOut(pl));
+    if (!rendersOf(p).length) return '<div class="pj-empty pj-rempty"><b>No renderings yet</b><p>A rendering is a photoreal picture of an option, painted by the AI from its 3D massing on the map: the buildings stay where the plan puts them, the materials and landscaping are the AI’s.</p>' +
+      '<ol><li>Open an option that has buildings laid out.</li><li>In its panel, go to <b>Render</b> (a chip at the top of the panel).</li><li>Pick a view, the materials and the light, and press <b>Render 3D View</b>. Each takes about a minute.</li></ol>' +
+      (ready.length ? '<div class="btnrow">' + ready.slice(0, 4).map(pl => '<button type="button" class="btn" data-rmore="' + esc(pl.id) + '">Render ' + esc(pl.name) + '</button>').join('') + '</div>' : (p.plans.length ? '<p>None of this project’s options has buildings yet: lay one out first.</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Options</button></div>'
+        : siteFor(p) ? '<p>This project has no site plan options yet.</p><div class="btnrow"><button type="button" class="btn primary" data-add="1">New Option</button></div>'
+        : '<p>This project has no site yet: add its parcel or draw it first.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div>')) + '</div>'; // never a dead end
+    return groups.map(pl => { const list = (pl.renders || []).slice().reverse(), sig = planSig(pl);
+      return '<section class="pj-rg" aria-labelledby="pjRg-' + esc(pl.id) + '"><div class="pj-rgh"><h3 class="pj-h3" id="pjRg-' + esc(pl.id) + '">' + esc(pl.name) + ' <span class="pj-tn">' + (list.length ? plural(list.length, 'rendering') : 'none yet') + '</span></h3>' +
+        '<span class="pj-rgl"><button type="button" class="lnk" data-plan="' + esc(pl.id) + '">Open plan</button>' + (laidOut(pl) ? '<button type="button" class="lnk" data-rmore="' + esc(pl.id) + '">Render more</button>' : '') + '</span></div>' +
+        (list.length ? '<div class="pj-rgrid">' + list.map(r => { const stale = r.sig && r.sig !== sig, lab = rLabel(r);
+          return '<figure class="pj-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" data-pl="' + esc(pl.id) + '" tabindex="0" role="button" aria-label="' + esc(lab + ' rendering of ' + pl.name + ', ' + rWhen(r.at) + (stale ? ', the plan has changed since' : '')) + '">' +
+            '<span class="pj-rimg"><img alt="" hidden><i>Loading…</i></span><figcaption>' + esc(lab) + '<span>' + esc(rWhen(r.at)) + (r.by ? ' · ' + esc(r.by) : '') + (stale ? ' · <em>plan changed since</em>' : '') + '</span></figcaption></figure>'; }).join('') + '</div>'
+          : '<p class="rnote">No renderings of this option yet.</p>') + '</section>'; }).join('') +
+      '<p class="rnote pj-rnote">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. The pictures are kept on the device they were made on; teammates see that they exist. Click one to see it full size, compare it with the massing, download or delete it.</p>';
+  }
+  function wireRenders(p) {
+    root.querySelectorAll('.pj-rth').forEach(f => { const pl = p.plans.find(x => x.id === f.dataset.pl), r = pl?.renders?.find(x => x.id === f.dataset.rid); if (!r) return;
+      renderSrc(r.id).then(u => { if (!f.isConnected) return; const img = f.querySelector('img'), ph = f.querySelector('.pj-rimg i');
+        if (u) { img.src = u; img.alt = rLabel(r) + ' rendering'; img.hidden = false; ph?.remove(); }
+        else { f.classList.add('gone'); ph.textContent = 'Not on this device' + (r.by && r.by !== get(NAME_KEY) ? ': ' + r.by + ' made it on theirs' : ': it was made on another one'); f.setAttribute('aria-disabled', 'true'); } });
+      const go = () => { if (f.classList.contains('gone')) { ctx.toast('That picture isn’t on this device: renderings stay on the device they were made on.'); return; } openRender(p, pl, r, f); };
+      f.onclick = go; f.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
+  }
+  // Render more: the option opens on the map with its panel at the Render section (the panel's section chip, as a click)
+  function renderMore(p, pl) { open(p.id, pl.id); requestAnimationFrame(() => requestAnimationFrame(() => { if (PL()?.id === pl.id) jump('spRender'); })); }
+
+  // ----- Ask: questions about the whole project, answered from its facts (lib/project.mjs projectFacts) -----
+  const pAskLog = p => { let A = pasks.get(p.id); if (!A) pasks.set(p.id, A = { turns: [], draft: '' }); return A; };
+  function pAskHtml(p) {
+    const A = pAskLog(p), off = aiOff(), busy = !!A.busy, last = A.turns[A.turns.length - 1];
+    const turns = A.turns.map(t => '<div class="sp-qa"><div class="sp-q">' + esc(t.q) + '</div><div class="sp-a">' + (t.a ? answerHtml(t.a) : t.err ? '<p class="sp-aerr">' + esc(t.err) + '</p>' : '<span class="ai-work" role="status"><span class="ai-wl">Thinking</span></span>') + '</div></div>').join('');
+    const chips = busy ? [] : A.turns.length ? last?.followups || [] : PJ.ASK_STARTERS;
+    return '<section class="pj-box sp-ai pj-ask" id="pjAskSec"><div class="sp-ai-h"><label class="pj-h3" for="pjQ">Ask about this project</label>' + (A.turns.length ? '<button type="button" class="sp-link" id="pjQClear"' + (busy ? ' disabled' : '') + ' title="Forget these questions and answers">Clear</button>' : '') + '</div>' +
+      (A.turns.length ? '<div class="sp-convo" id="pjConvo" role="log" aria-live="polite" aria-label="Questions and answers about this project">' + turns + '</div>'
+        : '<div class="rnote">Which option fits, what approvals the site needs, what to check before going under contract: the AI answers from this project’s own facts (its parcels and notes, the site’s jurisdiction, every option’s numbers) and says when something isn’t in them.</div>') +
+      (chips.length && !off ? '<div class="sp-sugs sp-qsugs" role="group" aria-label="' + (A.turns.length ? 'Ask next' : 'Questions to try') + '">' + chips.map(q => '<button type="button" class="chip" data-askq="' + esc(q) + '" title="Ask this">' + esc(q) + '</button>').join('') + '</div>' : '') +
+      '<textarea id="pjQ" rows="2" placeholder="' + (A.turns.length ? 'Ask a follow-up…' : 'e.g. which option has the best yield?') + '"' + (off ? ' disabled' : '') + '>' + esc(A.draft || '') + '</textarea>' +
+      '<div class="sp-go2"><button type="button" class="btn primary askai' + (busy ? ' busy' : '') + '" id="pjQGo"' + (off || busy ? ' disabled' : '') + (busy ? ' aria-busy="true"' : '') + (off ? ' title="AI isn’t set up on this site"' : '') + '>' + (busy ? 'Answering…' : 'Ask') + '</button><span class="rnote pj-kbhint">Enter asks; Shift+Enter for a new line.</span></div>' +
+      (off ? '<div class="rnote sp-aioff">AI isn’t set up on this site</div>' : '') + '</section>';
+  }
+  function wirePAsk(p) {
+    const sec = root.querySelector('#pjAskSec'); if (!sec) return; const A = pAskLog(p), ta = sec.querySelector('#pjQ');
+    if (ta) { ta.oninput = () => { A.draft = ta.value; }; ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); askProject(p); } }; }
+    const go = sec.querySelector('#pjQGo'); if (go) go.onclick = () => askProject(p);
+    sec.querySelectorAll('[data-askq]').forEach(b => b.onclick = () => askProject(p, b.dataset.askq));
+    const cl = sec.querySelector('#pjQClear'); if (cl) cl.onclick = () => { A.turns = []; paintPAsk(p); root.querySelector('#pjQ')?.focus({ preventScroll: true }); };
+    const c = sec.querySelector('#pjConvo'); if (c) c.scrollTop = c.scrollHeight; // the latest turn in view
+  }
+  // just the Ask section and its tab again (the rest of the page stays as it is)
+  function paintPAsk(p) {
+    if (ctx.view !== 'projects' || cur !== p.id) return;
+    const tb = root.querySelector('.pj-tabs'); if (tb) { const t = document.createElement('div'), had = document.activeElement?.closest?.('.pj-tabs') ? document.activeElement.id : ''; t.innerHTML = tabsHtml(p, tabFor(p)); tb.replaceWith(t.firstElementChild); wireTabs(p); if (had) root.querySelector('#' + had)?.focus(); }
+    const el = root.querySelector('#pjAskSec'); if (!el) return;
+    const typing = document.activeElement?.id === 'pjQ', t = document.createElement('div'); t.innerHTML = pAskHtml(p); el.replaceWith(t.firstElementChild); wirePAsk(p);
+    if (typing) root.querySelector('#pjQ')?.focus({ preventScroll: true });
+    root.querySelector('#pjAskSec .sp-qa:last-child')?.scrollIntoView({ block: 'nearest' });
+  }
+  // the fact sheet: the project, the site's jurisdiction (looked up now if it hasn't been, for up to 8 seconds) and each
+  // option's numbers (lib/planask.mjs planFacts, cut down to its headline numbers by lib/project.mjs)
+  async function projectSheet(p) {
+    const at = siteSpot(p); if (at && (!p.site || p.site.key !== at.key)) await race(gatherSite(p), 8000).catch(() => null);
+    const options = p.plans.map(pl => { const drawn = pl.ring.length >= 3; if (!drawn) return { name: pl.name, drawn: false };
+      let pf = null, F = { option: pl.name }; try { pf = pfRun(p, pl); } catch (e) { pf = null; } try { F = ASK.planFacts(pl, { site: siteInfo(p, pl), pf, project: p.name }); } catch (e) { /* the name only */ }
+      return { facts: F, name: pl.name, renderings: (pl.renders || []).length, drawn }; });
+    const regrid = PJ.regridFacts(p.parcels, p.plans);
+    return PJ.projectFacts(p, { acres: acresOf(p), jurisdiction: factsOf(p) || (Object.keys(regrid).length ? regrid : null), checkedAt: p.site?.at, options });
+  }
+  async function askProject(p, qIn) {
+    const A = pAskLog(p), q = String(qIn ?? A.draft ?? '').trim();
+    if (!q) { ctx.toast('Ask a question about this project, e.g. “which option fits best?”'); root.querySelector('#pjQ')?.focus(); return; }
+    if (A.busy) return; if (aiOff()) { ctx.toast('AI isn’t set up on this site.'); return; }
+    const turn = { q }; A.turns.push(turn); A.turns = A.turns.slice(-6); if (qIn == null) A.draft = ''; A.busy = true; paintPAsk(p);
+    try {
+      const project = await projectSheet(p), history = A.turns.filter(t => t !== turn && t.a).slice(-4).map(t => ({ q: t.q, a: t.a }));
+      const d = await post({ mode: 'askProject', question: q, history, project, effort: ASK.effortOf(effortNow()).effort });
+      turn.a = d.answer || 'No answer came back. Try asking another way.'; turn.followups = d.followups || [];
+    } catch (e) { turn.err = e.status === 503 ? 'AI isn’t set up on this site.' : e.status === 429 ? 'Too many questions at once: try again in a minute.' : 'The AI didn’t answer just now. Try again in a moment.'; }
+    A.busy = false; paintPAsk(p);
   }
 
   // now: the person asked for this redraw (a click, a sort); otherwise (a save or a sync) it waits while they type
   function render(now) {
     if (!root) return;
     const a = document.activeElement;
-    if (now !== true && a && root.contains(a) && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT')) { waiting = true; return; } // redraw once they leave the field
+    if (now !== true && a && root.contains(a) && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT' || a.tagName === 'SELECT')) { waiting = true; return; } // redraw once they leave the field
     waiting = false;
-    const key = a && root.contains(a) ? (a.id ? '#' + a.id : ['open', 'plan', 'v', 'parcel'].map(k => a.dataset[k] != null ? '[data-' + k + '="' + CSS.escape(a.dataset[k]) + '"]' : '').find(Boolean) || (a.classList[0] ? '.' + a.classList[0] : null)) : null;
+    const key = a && root.contains(a) ? (a.id ? '#' + a.id : ['open', 'plan', 'v', 'parcel', 'rid', 'copy', 'rmore'].map(k => a.dataset[k] != null ? '[data-' + k + '="' + CSS.escape(a.dataset[k]) + '"]' : '').find(Boolean) || (a.classList[0] ? '.' + a.classList[0] : null)) : null;
     const p = cur && db.projects.find(x => x.id === cur); if (!p) { cur = null; renaming = false; }
-    root.innerHTML = '<div class="pj-wrap">' + (p ? detailHtml(p) : indexHtml()) + '</div>'; ctx.scheduleHash?.(); // the open project goes in the address (pj=), so a reload comes back to it
+    root.innerHTML = '<div class="pj-wrap">' + (p ? detailHtml(p) : indexHtml()) + '</div>'; ctx.scheduleHash?.(); // the open project (pj=) and its tab (pt=) go in the address, so a reload comes back to them
     ctx.team?.chip?.(root.querySelector('#pjTeam')); // who you are and whether projects are shared; opens Settings
     wire(p);
     if (key) try { root.querySelector(key)?.focus(); } catch (e) { /* the control is gone */ }
   }
   // the project page is in the address (#pj=<id>): opening one adds a history entry, so Back returns to the list (src/app.js)
   const pjMoved = was => { if (was !== cur) ctx.scheduleHash?.(ctx.view === 'projects' ? { push: true } : undefined); };
-  function show(id) { const was = cur; cur = id; renaming = false; adding = false; render(true); root.scrollTop = 0; pjMoved(was); }
+  function show(id, tab) { const was = cur; cur = id; renaming = false; adding = false; if (id && tab) ptab.set(id, PJ.tabOf(tab)); render(true); root.scrollTop = 0; pjMoved(was); }
   ctx.currentProject = () => ctx.view === 'projects' ? cur : null;
-  ctx.openProject = id => { if (ctx.view !== 'projects') ctx.setView('projects'); if (!id || db.projects.some(x => x.id === id)) show(id || null); };
+  ctx.openProject = (id, tab) => { if (ctx.view !== 'projects') ctx.setView('projects'); if (!id || db.projects.some(x => x.id === id)) show(id || null, tab); };
+  function setTab(p, id, focus) { ptab.set(p.id, PJ.tabOf(id)); render(true); if (focus) root.querySelector('#pjTab-' + PJ.tabOf(id))?.focus(); }
+  // the tabs: a click, or the arrow keys, Home and End along the row (the tab follows the focus)
+  function wireTabs(p) {
+    const tl = root.querySelector('.pj-tabs'); if (!tl) return;
+    tl.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { if (b.dataset.tab !== tabFor(p)) setTab(p, b.dataset.tab, true); });
+    tl.onkeydown = e => { const ids = PJ.TABS.map(t => t.id), i = ids.indexOf(tabFor(p)), to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: ids.length - 1 }[e.key]; if (to == null) return;
+      e.preventDefault(); setTab(p, ids[(to + ids.length) % ids.length], true); };
+    // a fade on the right edge while the strip can scroll further (phones), and the open tab scrolled into view
+    const fade = () => tl.classList.toggle('more', tl.scrollLeft + tl.clientWidth < tl.scrollWidth - 2);
+    const on1 = tl.querySelector('[aria-selected="true"]'); if (on1 && tl.scrollWidth > tl.clientWidth) tl.scrollLeft = Math.max(0, on1.offsetLeft + on1.offsetWidth / 2 - tl.clientWidth / 2);
+    tl.onscroll = fade; fade(); requestAnimationFrame(fade);
+  }
   function wire(p) {
     const $ = s => root.querySelector(s), on = (s, f) => root.querySelectorAll(s).forEach(b => b.addEventListener('click', f));
     const grow = el => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; };
@@ -3288,6 +3525,7 @@ export function initSitePlan(ctx) {
       wireList();
       return;
     }
+    const tab = tabFor(p), planOf2 = id => p.plans.find(x => x.id === id);
     on('[data-back]', () => show(null));
     on('#pjRename', () => { renaming = true; render(true); const r = $('#pjRen'); if (r) { grow(r); r.focus(); r.select(); } });
     const rf = $('#pjRenForm');
@@ -3297,15 +3535,38 @@ export function initSitePlan(ctx) {
       r.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); rf.requestSubmit(); } else if (e.key === 'Escape') $('#pjRenX').click(); };
       $('#pjRenX').onclick = () => { renaming = false; render(true); };
     }
-    const nt = $('#pjNotes');
-    nt.oninput = () => { if (nt.scrollHeight > nt.clientHeight + 2) grow(nt); };
-    nt.onchange = () => { p.notes = nt.value.slice(0, 8000); save(p); };
-    root.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const pl = p.plans.find(x => x.id === b.dataset.plan), none = pl && pl.ring.length < 3; open(p.id, b.dataset.plan, { draw: none }); });
+    const st = $('#pjStatus'); if (st) st.onchange = () => { p.status = st.value; st.parentElement.dataset.st = st.value; save(p); };
+    wireTabs(p);
+    // the fields save when you leave them (Enter in a one-line field leaves it), like the notes always have
+    const keep = (id, k, n) => { const el = $(id); if (!el) return; el.onchange = () => { const v = el.value.slice(0, n); if (v !== (p[k] || '')) { p[k] = v; save(p); } }; if (el.tagName === 'INPUT') el.onkeydown = e => { if (e.key === 'Enter') el.blur(); }; };
+    keep('#pjClient', 'client', 120); keep('#pjUse', 'use', 160); keep('#pjNotes', 'notes', 8000);
+    const nt = $('#pjNotes'); if (nt) nt.oninput = () => { if (nt.scrollHeight > nt.clientHeight + 2) grow(nt); };
+    root.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const pl = planOf2(b.dataset.plan), none = pl && pl.ring.length < 3; open(p.id, b.dataset.plan, { draw: none }); });
     root.querySelectorAll('[data-parcel]').forEach(b => b.onclick = () => { const x = p.parcels.find(y => y.key === b.dataset.parcel); ctx.setView('map'); map.easeTo({ center: x.center, zoom: Math.max(map.getZoom(), 17) }); ctx.openBuildingAt(x.center); });
     on('[data-add]', () => addOption(p));
     on('[data-draw]', () => drawSite(p));
     on('[data-find]', () => { pending = { id: p.id, t: Date.now() }; ctx.setView('map'); ctx.toast('Zoom in and click the parcel, then Site plan at the top of its card: it goes into ' + p.name + '.'); });
-    on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? ' + (shared === true ? 'This removes it for the team too.' : 'This removes it from this device.'))) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null; save(); ctx.scheduleHash?.(); });
+    // an option copied stays on the page (its layouts come along, its renderings don't: the pictures belong to the original)
+    root.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => { const pl = planOf2(b.dataset.copy); if (!pl) return;
+      const c = { ...clone(pl), id: uid(), name: nextName(p), created: new Date().toISOString() }; delete c.renders; if (c.lastRun) c.lastRun = { ...c.lastRun, ask: '' };
+      p.plans.push(c); save(p); ctx.toast('Copied ' + pl.name + ' as ' + c.name + '.'); root.querySelector('[data-plan="' + CSS.escape(c.id) + '"]')?.focus(); });
+    root.querySelectorAll('[data-delpl]').forEach(b => b.onclick = () => { const pl = planOf2(b.dataset.delpl); if (!pl || !confirm('Delete ' + pl.name + ' from ' + p.name + '?' + (pl.renders?.length ? ' Its renderings on this device go too.' : ''))) return;
+      if (away?.plid === pl.id) hideAway(); if (resume?.plid === pl.id) clearResume(); // the "Editing … · Return to plan" banner would lead nowhere
+      if (ed?.pid === p.id && ed.plid === pl.id) ctx.closeCard(); // it was open on the map
+      for (const r of pl.renders || []) { rdel(r.id); rdel(r.id + ':m'); }
+      p.plans = p.plans.filter(x => x.id !== pl.id); save(p); ctx.toast('Deleted ' + pl.name + ' from ' + p.name + '.'); });
+    root.querySelectorAll('[data-rmore]').forEach(b => b.onclick = () => { const pl = planOf2(b.dataset.rmore); if (pl) renderMore(p, pl); });
+    on('[data-tabgo]', e => setTab(p, e.currentTarget.dataset.tabgo, true));
+    on('[data-jref]', () => { siteFail.delete(p.id); gatherSite(p); render(true); });
+    on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? ' + (shared === true ? 'This removes it for the team too.' : 'This removes it from this device.'))) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null;
+      for (const pl of p.plans) for (const r of pl.renders || []) { rdel(r.id); rdel(r.id + ':m'); } // its pictures on this device
+      if (away?.pid === p.id) hideAway(); if (resume?.pid === p.id) clearResume(); save(); ctx.scheduleHash?.(); });
+    if (tab === 'overview') { // Regrid fetched on one of the parcels' cards since: its city and zoning count now; the jurisdiction is looked up once
+      let ch = false; for (const x of p.parcels) ch = regridOn(x) || ch; if (ch) { quietSave(p); setTimeout(() => render()); }
+      if (needSite(p)) gatherSite(p); // (the card already says Checking…)
+    }
+    if (tab === 'renderings') wireRenders(p);
+    if (tab === 'ask') wirePAsk(p);
   }
   root?.addEventListener('focusout', () => setTimeout(() => { if (waiting && ctx.view === 'projects') render(); }));
   ctx.onView?.('projects', render);
@@ -3333,8 +3594,8 @@ export function initSitePlan(ctx) {
 
   // the projects a property card's parcel is already in (its Site plan button reads "Open site plan" then)
   function projectsFor(parcel, center) { if (!parcel && !center) return []; try { return RUN.projectsWith(db.projects, [parcelOf(parcel || {}, center || parcel?.center).key]); } catch (e) { return []; } }
-  ctx.sitePlan = { start, open, close, get editing() { return !!ed; }, show: id => { if (db.projects.some(x => x.id === id)) show(id); }, has: (pid, plid) => !!db.projects.find(x => x.id === pid)?.plans.some(x => x.id === plid),
+  ctx.sitePlan = { start, open, close, get editing() { return !!ed; }, show: (id, tab) => { if (db.projects.some(x => x.id === id)) show(id, tab); }, has: (pid, plid) => !!db.projects.find(x => x.id === pid)?.plans.some(x => x.id === plid),
     // what the address keeps (reload, reopening the installed app): the open plan, else the project on the Projects page
-    get where() { return ed && !ed.draftPlan ? { plan: ed.pid + '.' + ed.plid } : cur && ctx.view === 'projects' ? { project: cur } : {}; }, forAssistant, get projects() { return db.projects; }, sync, projectsFor, // sync: Settings runs it after a new team passcode
+    get where() { return ed && !ed.draftPlan ? { plan: ed.pid + '.' + ed.plid } : cur && ctx.view === 'projects' ? { project: cur, tab: PJ.tabOf(ptab.get(cur)) } : {}; }, forAssistant, get projects() { return db.projects; }, sync, projectsFor, // sync: Settings runs it after a new team passcode
     get pendingProject() { return pendingProject() && pending; }, set pendingProject(v) { pending = v?.id ? { id: v.id, t: v.t || Date.now() } : null; } };
 }
