@@ -1855,6 +1855,11 @@ export function initSitePlan(ctx) {
       '</table><div class="sp-mix-f"><span class="rnote">Average ' + f0(prog.unitSf) + ' sf · ' + mixL.reduce((s, t) => s + +t.pct, 0) + '%</span><button type="button" class="btn sm ghost" id="spMixAdd">+ Add a Type</button></div>' : '';
     const homes = u === 'sfr' ? grp('Home mix', [1, 2, 3].map(n => { const t = (prog.homeMix || SP.HOME_MIX).find(h => h.stories === n), T = SP.HOME_TYPES[n];
       return fld(n + '-story homes', numCtl('min="0" max="100" data-home="' + n + '"', t?.pct ?? 0, 5, '%'), { hint: f0(T.sf) + ' sf · ' + T.lotW + ' ft lot' }); }).join('') + num('lotD', 'Lot depth', prog.lotD, 5, 'ft')) : '';
+    // only the settings the plan's uses (its zones too) read: the building shape for shops, offices and apartments, the
+    // apartment bars' depth, length and spacing for apartments, curving streets for single-family homes
+    const uses = SP.usesOf(prog), has = list => list.some(x => uses.includes(x)), only = { sfr: uses.length === 1 && uses[0] === 'sfr' };
+    const bldg = (has(SP.FORM_USES) ? pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) : '') + (has(['sfr']) ? pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Curving'], ['straight', 'Straight']]) : '') +
+      (has(['multifamily']) ? num('pp-bldgDepth', 'Apartment depth', pp.bldgDepth, 1, 'ft') + num('pp-maxLen', 'Longest building', pp.maxLen, 10, 'ft') + num('pp-bldgGap', 'Space between', pp.bldgGap, 1, 'ft') : '');
     const look = grp('Look', sw('trees', 'Trees', pp.trees !== false, 'Trees on the plan, the map and the PDF') + pick('ponds', 'Ponds and pools', pp.style.ponds, [['organic', 'Natural curves'], ['rounded', 'Rounded rectangles'], ['square', 'Rectangles']]) +
       pick('islands', 'Parking row ends', pp.style.islands, [['rounded', 'Rounded islands'], ['square', 'Square']]) + pick('corners', 'Drive corners', pp.style.corners, [['curved', 'Curved'], ['square', 'Square']]));
     return '<details class="bsec sp-prog" id="spParams"' + (ed.progOpen ? ' open' : '') + '><summary class="lt">Site parameters</summary>' +
@@ -1868,10 +1873,9 @@ export function initSitePlan(ctx) {
         infoBtn('Typical suburban numbers to start with. Check the city’s or county’s rules (Houston has no zoning but has building lines and parking rules).', 'About these numbers')) +
       grp('Setbacks', sw('buildOn', 'Building setbacks', sb.buildOn !== false) + sw('paveOn', 'Landscape buffer', sb.paveOn !== false) +
         [['front', 'paveFront', 'Front'], ['side', 'paveSide', 'Side'], ['rear', 'paveRear', 'Rear']].map(([k, b, l]) => num('sb-' + k, l + ' setback', sb[k], 1, 'ft') + num('sb-' + b, l + ' buffer', sb[b] ?? sb.paving, 1, 'ft')).join('')) +
-      grp('Parking', num('pp-stallW', 'Stall width', pp.stallW, 0.5, 'ft') + num('pp-stallD', 'Stall depth', pp.stallD, 0.5, 'ft') + num('pp-aisle', 'Drive aisle', pp.aisle, 1, 'ft')) +
-      grp('Buildings', pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) + pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Curving'], ['straight', 'Straight']]) +
-        num('pp-bldgDepth', 'Apartment depth', pp.bldgDepth, 1, 'ft') + num('pp-maxLen', 'Longest building', pp.maxLen, 10, 'ft') + num('pp-bldgGap', 'Space between', pp.bldgGap, 1, 'ft')) +
-      stormHtml(pl, prog, pp) + mix + storageMixes(prog) + homes + look + '</details>';
+      (only.sfr ? '' : grp('Parking', num('pp-stallW', 'Stall width', pp.stallW, 0.5, 'ft') + num('pp-stallD', 'Stall depth', pp.stallD, 0.5, 'ft') + num('pp-aisle', 'Drive aisle', pp.aisle, 1, 'ft'))) +
+      (bldg ? grp('Buildings', bldg) : '') +
+      stormHtml(pl, prog, pp, uses) + mix + storageMixes(prog) + homes + look + '</details>';
   }
   // self storage's own settings: the climate-controlled building, the drive-up rows, RV / boat stalls, the fence; blank
   // sizes mean "as the site allows"
@@ -1906,7 +1910,7 @@ export function initSitePlan(ctx) {
     return one('climate', 'Climate-controlled units', st.climateMix || SP.STORAGE_MIX.climate) + one('drive', 'Drive-up units', st.driveMix || SP.STORAGE_MIX.drive);
   }
   // stormwater (detention, retention, underground or none) and trash enclosures
-  function stormHtml(pl, prog, pp) {
+  function stormHtml(pl, prog, pp, uses = SP.usesOf(prog)) {
     const st = { ...SP.STORM, ...(pp.storm || {}) }, tr = pp.trash || {}, sn = pl.elements?.length ? SP.stormOf(pl) : null;
     const sel = (attr, label, v, opts) => fld(label, selCtl(attr, opts, v ?? ''));
     const pnum = (k, label, v, step, unit, ph = '') => fld(label, numCtl('min="0" data-k="' + k + '"', v, step, unit, ph));
@@ -1915,9 +1919,10 @@ export function initSitePlan(ctx) {
         sel('data-pr="storm"', 'Method', prog.storm, [['', 'Detention pond'], ['retention', 'Retention (wet) pond'], ['underground', 'Underground vaults'], ['none', 'None (regional)']]) +
         pnum('ps-storm.rate', 'Storage', st.rate, 0.05, 'ac-ft/ac') + pnum('ps-storm.depth', 'Pond depth', st.depth, 0.5, 'ft') + pnum('detentionPct', 'Pond size', prog.detentionPct, 1, '%', 'auto') + '</div>' +
         (need ? '<div class="rnote sp-1l" title="' + esc(need) + '">' + esc(need) + '</div>' : '') +
+      (uses.every(x => SP.CART_USES.includes(x)) ? '' : // (homes roll carts to the curb: no enclosures to set)
       '<div class="sp-sub">Trash' + infoBtn('Homes roll carts to the curb. Apartments: a double enclosure (trash and recycling) per about 50 units, a compactor from 200. Shops and offices: one per about 25,000 sf, none more than about 250 ft away. Add or move them under Add.', 'About trash enclosures') + '</div><div class="sp-fg">' +
         sel('data-ps="trash.mode"', 'Enclosures', tr.mode || (SP.normalizeProgram(pl.program).trash ? 'commercial' : 'none'), [['none', 'None (add by hand)'], ['commercial', 'Shops, restaurants, offices'], ['auto', 'Every building by the rules']]) +
-        pnum('ps-trash.perUnits', 'Apartments each', tr.perUnits ?? 50, 5, 'units') + pnum('ps-trash.perSf', 'Commercial each', tr.perSf ?? 25000, 1000, 'sf') + '</div>';
+        (uses.includes('multifamily') ? pnum('ps-trash.perUnits', 'Apartments each', tr.perUnits ?? 50, 5, 'units') : '') + (uses.some(x => SP.PER_SF_TRASH(x)) ? pnum('ps-trash.perSf', 'Commercial each', tr.perSf ?? 25000, 1000, 'sf') : '') + '</div>');
   }
   function wireParams(pl) {
     const $ = s => card.querySelector(s), after = i => { if (ed.autoSolve !== false && (pl.recipe || ed.variants)) resolveSoon(i && settingLabel(i)); };
@@ -1981,12 +1986,16 @@ export function initSitePlan(ctx) {
     ed.updBusy = true; panel();
     try { await refitNow(true); } finally { if (ed === e0) { ed.updBusy = false; if (PL() === pl) panel(); } }
   }
+  // a re-fit in the worker; null when nothing re-fits round the pieces placed (refitNo: why, when the layout says, e.g.
+  // a gas station's canopy with no room for its lanes where it was put)
+  let refitNo = '';
+  async function refitOf(...args) { const r = await laid('refit', ...args); refitNo = r && !r.elements?.length ? r.why || '' : ''; return r?.elements?.length ? r : null; }
   // Re-fit Plan (the button, Re-fit around my changes): everything not pinned laid out again around the pinned pieces;
   // one undo step
   async function refitNow(asked) {
     const pl = PL(); if (!pl?.recipe) return; clearTimeout(autoT); autoSeq++; ed.refitting = false;
-    let r = null; ctx.toast('Re-fitting the plan around the pieces you placed…'); try { r = await laid('refit', pl); } catch (err) { console.warn('refit', err); } if (PL() !== pl) return;
-    if (!r) { if (asked) ctx.toast('Couldn’t re-fit the plan around that; it stays as you left it.'); return; }
+    let r = null; ctx.toast('Re-fitting the plan around the pieces you placed…'); try { r = await refitOf(pl); } catch (err) { console.warn('refit', err); } if (PL() !== pl) return;
+    if (!r) { if (asked) ctx.toast('Couldn’t re-fit the plan around that; it stays as you left it.' + (refitNo ? ' ' + refitNo : '')); return; }
     ed.undo.push(snapshot()); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = []; useRefit(pl, r);
     if (asked) ctx.toast('Re-fitted around the pieces you placed.', { action: { label: 'Undo', run: () => { if (ed && PL() === pl) undo(true); } } });
   }
@@ -2009,9 +2018,10 @@ export function initSitePlan(ctx) {
   async function runAuto(e0, pl, what) {
     if (ed !== e0 || PL() !== pl || drag || ed.run && !ed.run.applied) return;
     const mark = ed.undo.length, top = ed.undo[mark - 1], was = JSON.stringify(pl.elements), seq = ++autoSeq; ed.refitting = true; paintMode();
-    let r = null; try { r = await laid('refit', pl, { amount: 'current' }); } catch (err) { console.warn('auto re-fit', err); }
+    let r = null; try { r = await refitOf(pl, { amount: 'current' }); } catch (err) { console.warn('auto re-fit', err); }
     if (seq !== autoSeq) return; if (ed === e0) { ed.refitting = false; paintMode(); }
     const same = () => ed === e0 && PL() === pl && ed.undo.length === mark && ed.undo[mark - 1] === top && JSON.stringify(pl.elements) === was && !drag && !(ed.run && !ed.run.applied);
+    if (!r && refitNo && same()) { ctx.toast('Kept your change; the rest of the site couldn’t be re-fitted round it. ' + refitNo); return; } // (the plan stays as the edit left it)
     if (!r?.elements?.length || !same()) return; // something changed meanwhile: that change re-fits on its own
     const at = els => ({ m: SP.metrics({ ...pl, elements: els }), issues: SP.check({ ...pl, elements: els }) }), v = T.refitVerdict(at(pl.elements), at(r.elements));
     if (!v.ok) { ctx.toast('Kept your change; re-fitting would ' + (v.why === 'problems' ? 'add problems' : 'lose ' + (v.why === 'units' ? 'units' : 'space')), { action: { label: 'Re-fit anyway', run: () => { if (same()) useRefit(pl, r); else if (ed === e0) refitNow(true); } } }); return; }
@@ -2620,7 +2630,7 @@ export function initSitePlan(ctx) {
     let r = null; change(x => { r = ED.applyEdits(x, ops, { refit: full, spare: x.spareRows = (x.spareRows || []).slice(-40) }); x.elements = r.elements; if (r.streets !== (x.streets || [])) x.streets = r.streets; });
     const gone = was.filter(e => !['parking', 'green', 'lot', 'trail'].includes(e.kind) && !pl.elements.some(x => x.id === e.id)); // removed (not parking rows that gave way)
     if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; draw(); // Edit Layout stays as it was
-    let held = null; if (full) { run.steps = [...run.steps, 'Re-fitting the rest of the site']; runStep(run, 3); let rf = null; try { rf = await laid('refit', PL(), { amount: 'current' }); } catch (e) { console.warn('refit', e); }
+    let held = null; if (full) { run.steps = [...run.steps, 'Re-fitting the rest of the site']; runStep(run, 3); let rf = null; try { rf = await refitOf(PL(), { amount: 'current' }); } catch (e) { console.warn('refit', e); }
       if (!live(run)) return;
       // the same guard as re-fitting after a hand edit: a re-fit that would lose homes, units or floor area (a whole street
       // of houses dropped round a moved community center) or add problems isn't taken; the change stays and Re-fit

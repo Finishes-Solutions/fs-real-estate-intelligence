@@ -121,8 +121,37 @@ for (const [name, ring, extra, words, want] of [
 { const { plan, opts } = lot([[0, 0], [240, 0], [240, 340], [0, 340]], 'gas station with 8 pumps and a 4,500 sf c-store, canopy along the side street', { streets: [1] });
   assert.ok(opts.length && opts.every(o => /side street/.test(o.name)), 'canopy along the side street, as asked');
   const c = opts[0].elements.find(e => e.kind === 'canopy'), along = c.w >= c.d ? c.rot : c.rot + 90; assert.ok(Math.abs(((along - 90) % 180 + 270) % 180 - 90) < 6, 'it runs along the side street (north-south)'); }
-// a re-fit leaves a gas station as it is (no recipe to lay out round pinned pieces)
-assert.deepEqual(L.layoutOptions({ ring: [[0, 0], [300, 0], [300, 240], [0, 240]], origin: [-95.8, 29.8], front: 0, streets: [1], setbacks: { ...S.SETBACKS } }, S.guessProgram('gas station'), { pinned: [{ id: 'x', kind: 'building', x: 150, y: 180, w: 75, d: 60, rot: 0 }] }), []);
+// ---------- re-fit round pieces placed by hand ----------
+// the canopy dragged along the street (a drag pins it, as the editor does): it stays exactly there and the lanes, the
+// store, its parking, the tanks and the driveways are laid out again round it; the same after the store is moved, after a
+// pad is added at the back, and with the canopy turned to run back from the street; dragged off where its lanes can't
+// go, nothing changes and the re-fit says why
+{ const { plan, opts } = lot([[0, 0], [300, 0], [300, 240], [0, 240]], 'gas station with 8 pumps and a 4,500 sf c-store on the corner', { streets: [1] }), o = opts[0];
+  assert.deepEqual(o.recipe, { fuel: true }, 'a gas station layout can be re-fitted');
+  const edit = (pick, act, more = []) => { const els = JSON.parse(JSON.stringify(o.elements)), e = els.find(pick); act(e); e.pinned = true; return { p: { ...plan, program: o.program, recipe: o.recipe, elements: els.concat(more) }, e }; };
+  const isC = e => e.kind === 'canopy', isS = e => e.kind === 'building' && e.fuel === 'store';
+  for (const [name, pick, act] of [['canopy dragged 20 ft', isC, e => S.moveBy(e, 20, 0)], ['canopy dragged back 15 ft', isC, e => S.moveBy(e, -15, 6)], ['store dragged 25 ft', isS, e => S.moveBy(e, 25, 0)]]) {
+    const { p, e } = edit(pick, act), r = L.refit(p, { amount: 'current' }); assert.ok(r?.elements?.length, name + ': re-fits');
+    const m = sound('re-fit, ' + name, plan, { ...o, elements: r.elements }, { pumps: 8, storeSf: 4500 }); assert.ok(m.spaces >= m.required, name + ': parked: ' + m.spaces + '/' + m.required);
+    const kept = r.elements.find(x => x.id === e.id); assert.ok(kept && kept.pinned && kept.x === e.x && kept.y === e.y && kept.rot === e.rot, name + ': stays where it was put');
+    assert.equal(r.elements.filter(isC).length + r.elements.filter(isS).length, 2, name + ': one canopy, one store');
+    assert.deepEqual([...new Set(corner(plan, { elements: r.elements }).map(x => x.k))].sort(), [0, 1], name + ': a driveway on each street still');
+    assert.ok(L.refit(p)?.elements?.length, name + ': Re-fit Plan too'); }
+  // a pad building placed at the back by hand: the station keeps clear of it
+  { const pad = { id: 'pad1', kind: 'building', use: 'retail', x: 60, y: 195, w: 60, d: 40, rot: 0, floors: 1, name: 'Pad', pinned: true }, { p } = edit(isC, () => {}, [pad]), r = L.refit(p, { amount: 'current' });
+    assert.ok(r?.elements?.length, 'a pad placed by hand: re-fits'); const pl = { ...p, elements: r.elements }; assert.equal(S.check(pl).filter(i => i.level === 'bad').length, 0, 'round the pad: passes: ' + S.check(pl).filter(i => i.level === 'bad').map(i => i.text));
+    assert.ok(r.elements.some(e => e.id === 'pad1') && !r.elements.some(e => e.id !== 'pad1' && e.kind !== 'green' && e.kind !== 'tree' && S.rectsOverlap(e, pad, 0)), 'nothing laid over the pad'); }
+  // off where its lanes can't go: nothing changes, and why
+  { const { p } = edit(isC, e => S.moveBy(e, 120, 0)), r = L.refit(p, { amount: 'current' }); assert.ok(r && !r.elements.length && /drive lane all round/.test(r.why), 'no room for its lanes: says so: ' + r?.why); }
+}
+// the canopy turned to run back from the street (and set back so its lanes fit): lanes all round it, the store behind
+{ const { plan, opts } = lot([[0, 0], [340, 0], [340, 300], [0, 300]], 'gas station with 8 pumps and a 4,500 sf c-store on the corner', { streets: [1] }), o = opts[0];
+  const els = JSON.parse(JSON.stringify(o.elements)), c = els.find(e => e.kind === 'canopy'); c.rot = (c.rot || 0) + 90; S.moveBy(c, 0, 40); c.pinned = true;
+  const p = { ...plan, program: o.program, recipe: o.recipe, elements: els }, r = L.refit(p, { amount: 'current' }); assert.ok(r?.elements?.length, 'a turned canopy re-fits');
+  const pl = { ...p, elements: r.elements }, iss = S.check(pl); assert.equal(iss.filter(i => i.level === 'bad').length, 0, 'turned canopy: passes: ' + iss.filter(i => i.level === 'bad').map(i => i.text));
+  const t = r.elements.find(e => e.kind === 'tanks'); assert.ok(t && S.tankerReach(pl, t), 'turned canopy: the fuel truck reaches the tanks');
+  const c2 = r.elements.find(e => e.kind === 'canopy'), drives = r.elements.filter(e => e.kind === 'drive');
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const q = S.rotPt([dx * (c2.w / 2 + 12), dy * (c2.d / 2 + 12)], c2.rot); assert.ok(drives.some(d => S.hitRect(d, [c2.x + q[0], c2.y + q[1]])), 'turned canopy: a lane on each side'); } }
 
 // ---------- the library ----------
 { const lib = BUILDING_TYPES.filter(t => t.group === 'Gas station'); assert.ok(lib.length >= 6 && lib.every(t => t.use === 'fuel' && t.fuel)); const e = fromType(lib.find(t => t.fuel === 'wash'), [0, 0]); assert.equal(e.fuel, 'wash');
@@ -144,5 +173,30 @@ assert.deepEqual(L.layoutOptions({ ring: [[0, 0], [300, 0], [300, 240], [0, 240]
   assert.equal(S.check(of(plan, pad)).filter(i => i.level === 'bad').length, 0, 'the pad layout passes the checks');
   // an inside lot never gets them
   const inside = lot(ring, words); assert.ok(!inside.opts.some(o => /L-shaped|pad at the corner/.test(o.name)), 'an inside lot: no corner shapes');
+  // the L re-fits: the rows laid out again, the L back where it was
+  const r = L.refit({ ...pl, recipe: o.recipe }); assert.ok(r?.elements?.length, 'the L layout re-fits');
+  const L2 = r.elements.find(e => e.kind === 'building' && e.poly); assert.ok(L2 && Math.abs(S.gfaOf(L2) - S.gfaOf(Lb)) < 1, 'with its L');
+  assert.equal(S.check({ ...pl, elements: r.elements }).filter(i => i.level === 'bad').length, 0, 'and passes');
 }
+// shops at the front of a mixed plan on a corner lot: an L of shops round their parking, and a pad at the corner, ranked
+// with the usual layouts; the same plan on an inside lot gets neither
+{ const ring = [[0, 0], [700, 0], [700, 900], [0, 900]], words = '30,000 sf retail and 150 apartments', prog = S.guessProgram(words);
+  const plan = { ring, origin: [-95.8245, 29.7855], front: 0, streets: [1], setbacks: { ...S.SETBACKS, paveFront: 10, paveSide: 5, paveRear: 5 }, program: prog, elements: [] };
+  const all = L.layoutOptions(plan, prog, { count: 6 }), names = all.map(o => o.name);
+  for (const [re, what] of [[/L-shaped shops on the corner/, 'an L of shops'], [/pad at the corner/, 'a pad at the corner']]) {
+    const o = all.find(x => re.test(x.name)); assert.ok(o, 'mixed corner lot: ' + what + ': ' + names);
+    const pl = { ...plan, program: o.program, elements: o.elements }, m = S.metrics(pl); assert.equal(S.check(pl).filter(i => i.level === 'bad').length, 0, what + ': passes');
+    assert.ok(m.spaces >= m.required * 0.97 && m.units >= 140, what + ': parks, and the apartments are there: ' + m.spaces + '/' + m.required + ', ' + m.units + ' units'); }
+  const Lb = all.find(x => /L-shaped shops/.test(x.name)).elements.find(e => e.kind === 'building' && e.use === 'retail' && e.poly); assert.ok(Lb && Lb.poly.length === 6, 'an L-shaped shop building');
+  const pd = all.find(x => /pad at the corner/.test(x.name)).elements.find(e => /Corner pad/.test(e.note || '')), cn = cornerOf(plan).at; assert.ok(pd && Math.hypot(pd.x - cn[0], pd.y - cn[1]) < 250, 'the pad by the corner');
+  assert.ok(!L.layoutOptions({ ...plan, streets: [] }, prog, { count: 6 }).some(o => /on the corner|at the corner/.test(o.name)), 'an inside lot: no corner shapes in a mixed plan'); }
+
+// ---------- Site parameters: only what the plan's uses read ----------
+{ const f = w => { const u = S.usesOf(S.guessProgram(w)), has = l => l.some(x => u.includes(x)); return { form: has(S.FORM_USES), apts: u.includes('multifamily'), streets: u.includes('sfr'), trash: !u.every(x => S.CART_USES.includes(x)), perSf: u.some(S.PER_SF_TRASH) }; };
+  assert.deepEqual(f('gas station with 8 pumps'), { form: false, apts: false, streets: false, trash: true, perSf: true }, 'a gas station: no building shape or apartment settings');
+  assert.deepEqual(f('self storage, 90,000 sf climate controlled'), { form: false, apts: false, streets: false, trash: true, perSf: true }, 'self storage');
+  assert.deepEqual(f('20,000 sf retail strip'), { form: true, apts: false, streets: false, trash: true, perSf: true }, 'shops: the building shape');
+  assert.deepEqual(f('200 apartments'), { form: true, apts: true, streets: false, trash: true, perSf: false }, 'apartments');
+  assert.deepEqual(f('40 single-family homes'), { form: false, apts: false, streets: true, trash: false, perSf: false }, 'homes: streets, carts at the curb');
+  assert.deepEqual(f('30,000 sf retail and 150 apartments'), { form: true, apts: true, streets: false, trash: true, perSf: true }, 'a mixed plan: both'); }
 console.log('fuel ok');
