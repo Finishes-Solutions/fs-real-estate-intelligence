@@ -3466,7 +3466,7 @@ export function initSitePlan(ctx) {
     const opt = (list, cur) => list.map(x => '<option value="' + esc(x.id) + '"' + (x.id === cur ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
     const views = RD.VIEWS.filter(x => !x.hero).map(x => ({ id: x.id, label: x.label, tip: x.tip })).concat(T ? RD.VIEWS.filter(x => x.hero).map(x => ({ id: x.id, label: RD.renderLabel(x.id, T) })) : []).concat([{ id: 'all', label: 'All site views (four pictures)' }]);
     return '<section class="pj-box ps-form" aria-labelledby="rsH"><h3 class="pj-h3" id="rsH">Make renderings</h3>' +
-      '<div class="ps-row2"><div class="ps-row"><label for="rsOpt">Option</label><select id="rsOpt">' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
+      '<div class="ps-row2 rs-grid"><div class="ps-row"><label for="rsOpt">Option</label><select id="rsOpt">' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
         '<div class="ps-row"><label for="rsView">View</label><select id="rsView">' + opt(views, views.some(x => x.id === v) ? v : 'corner') + '</select></div>' +
         '<div class="ps-row"><label for="rsLook">Materials</label><select id="rsLook">' + opt(RD.LOOKS, pr.look) + '</select></div>' +
         '<div class="ps-row"><label for="rsTime">Light</label><select id="rsTime">' + opt(RD.TIMES, pr.time) + '</select></div></div>' +
