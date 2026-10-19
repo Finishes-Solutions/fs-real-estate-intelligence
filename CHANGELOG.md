@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 10:46 PM CT: Food truck parks on narrow, deep lots (97844d2, merged 0ad994a)
+- On a narrow, deep lot the trucks now run down one long side, with the seating, pavilion, restrooms and bar beside them. A 180 ft wide lot about 900 ft deep holds 12 to 13 trucks, where it used to get 2. A 150 ft wide lot holds 11 to 12, where it used to get no layout.
+- A choice with less than half the trucks of the first one is no longer offered, except the one with the bar on a small lot.
+
 ### 10:26 PM CT: Food truck parks: restrooms always, small lots, distinct choices (84a404a, 70909be, merged 409f630)
 - On a small lot (about an acre) the trucks come first and every layout is fully parked. The bar shrinks or is left out, then the pavilion gets smaller, and the layout says so. About an acre now holds 4 trucks, or 2 trucks with a small bar, where it used to get no layout.
 - Every food truck layout has restrooms. When they don't fit, the bar gives up its room, then a truck at a time.
