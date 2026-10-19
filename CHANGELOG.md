@@ -5,6 +5,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 11:23 AM CT: Plan for real neighbourhoods, mixed sites, entrances and editable streets (f9ee898)
+- **Planning only, nothing in the app changes.** `NEIGHBORHOOD-PLAN.md` sets out how the planner gets to subdivisions like the Houston-area references sent:
+  - curved streets off a collector loop or spine
+  - roundabouts, cul-de-sacs and circle drives
+  - mixed sites laid out as pods instead of stacked bands
+  - boulevard entrances with monument sign space
+  - turning and bending any piece by hand
+  - split detention with trails and sidewalks
+  - names for the community and its parts
+- It starts with two bugs from today: a park added beside the community center that crossed a road and scrambled the streets, and an entrance that landed under the open space.
+
 ### 11:07 AM CT: Change With AI makes whole-site changes, including the homes' stories (dc01624)
 - **"No 3-story homes" now works.** On a big neighbourhood the AI couldn't see the individual homes and could only change pieces one at a time, so a request like "Residential homes should only be 1 story and two-story homes, no 3 story homes" changed nothing, yet the reply still described the change. The AI now sees how many homes there are of each height and changes the neighbourhood's home mix instead.
 - **The lots are laid out again along the same streets.** Each home's lot is sized for it (3-story on 40 ft lots, 2-story on 50 ft, 1-story on 60 ft), so dropping 3-story homes means wider lots and a few fewer homes. The result says how many there were and how many there are now. The shops, lake, commons and anything you placed by hand stay as they are, the new mix shows in Settings, and **Undo This Change** puts it all back.
