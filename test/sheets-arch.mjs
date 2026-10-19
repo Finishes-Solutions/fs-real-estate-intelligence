@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { ctxFor } from './helpers/setctx.mjs';
 import * as P from '../lib/planset.mjs';
 import * as PD from '../lib/plandesign.mjs';
-import { RENDERERS } from '../lib/sheets/arch.mjs';
+import { RENDERERS, wallRuns, sectionCut } from '../lib/sheets/arch.mjs';
 
 const KINDS = ['a-plans', 'a-elev', 'a-section', 'a-sched', 'a-details', 'ls-plan', 'g-code'];
 assert.deepEqual(Object.keys(RENDERERS).sort(), KINDS.slice().sort(), 'a renderer for every architecture kind');
@@ -20,7 +20,9 @@ function check(ctx, label) {
     seen.add(sh.kind);
     assert.ok(!/NaN|undefined|Infinity/.test(html), what + ': no NaN / undefined / Infinity');
     assert.ok(!/couldn’t be drawn|isn’t drawn yet|Design not available/.test(html), what + ': drawn');
-    assert.ok(html.length < 1.5e6, what + ': under 1.5 MB (' + html.length + ')');
+    assert.ok(html.length < 6e5, what + ': HTML under 600 KB (' + html.length + ')');
+    // no SVG pattern fills: Chromium expands them into PDFs of many MB (an sfr section printed at 11.6 MB); hatching is drawn as lines
+    assert.ok(!/(fill|stroke)="url\(#/.test(html), what + ': no pattern fills');
     assert.ok(Date.now() - t0 < 3000, what + ': drawn quickly');
     const d = sh.typeId ? ctx.designs[sh.typeId] : null;
     const s2 = { ...sheet }; RENDERERS[sh.kind](ctx, s2); assert.ok(s2.scale && !/NaN|undefined/.test(s2.scale), what + ': states the scale it drew at (' + s2.scale + ')');
@@ -42,8 +44,30 @@ function check(ctx, label) {
 }
 
 const all = new Set();
-for (const name of ['retail', 'restaurant', 'townhomes', 'sfr', 'industrial', 'office3', 'medical', 'fuel', 'duplex', 'church']) for (const k of check(ctxFor(name), name)) all.add(k);
+for (const name of ['retail', 'restaurant', 'townhomes', 'sfr', 'industrial', 'office3', 'medical', 'fuel', 'duplex', 'church', 'shaped']) for (const k of check(ctxFor(name), name)) all.add(k);
 assert.deepEqual([...all].sort(), KINDS.slice().sort(), 'the fixtures cover every kind');
+
+// shaped buildings (an L and a stepped front) are drawn by their outline, not their bounding box
+{
+  const ctx = ctxFor('shaped'), inNotch = (d, x, y) => (d.notches || []).some(n => x > n.x + .01 && x < n.x + n.w - .01 && y > n.y + .01 && y < n.y + n.d - .01);
+  assert.deepEqual(ctx.types.map(t => t.shape).sort(), ['L-shape', 'stepped front'], 'the fixture has an L and a stepped front');
+  for (const t of ctx.types) {
+    const d = ctx.designs[t.id], what = 'shaped type ' + t.id + ' (' + t.shape + ')', sh = n => ({ ...ctx.sheets.find(s => s.kind === n && s.typeId === t.id) });
+    assert.ok(d.footprint.length >= 6 && d.notches.length >= 1, what + ': a real outline with open ground');
+    // the plan's exterior wall is one path along the outline: as many corners as the footprint
+    const plan = P.sheetPage(ctx, sh('a-plans')), ring = (plan.match(/class="ar-walls" d="M([^Z]*)Z/) || [])[1] || '';
+    assert.equal(ring.split('L').length, d.footprint.length, what + ': the wall path turns at every corner of the outline');
+    // nothing drawn in the open ground: no room, no interior wall
+    for (const r of d.rooms) assert.ok(!inNotch(d, r.x + r.w / 2, r.y + r.d / 2), what + ': room ' + r.name + ' outside the notches');
+    for (let f = 1; f <= d.floors; f++) for (const w of wallRuns(d, f)) for (const [a, b] of w.iv) { const m = (a + b) / 2; assert.ok(!inNotch(d, ...(w.o === 'h' ? [m, w.a] : [w.a, m])), what + ': interior wall at ' + w.o + ' ' + w.a + ' is inside the building'); }
+    // sections cut through the building, never across open ground
+    for (const axis of ['y', 'x']) { const c = sectionCut(d, axis), mid = c.s0 + c.L / 2; assert.ok(PD.inPoly(axis === 'y' ? [c.c, mid] : [mid, c.c], d.footprint) && c.L <= (axis === 'y' ? d.D : d.W), what + ': the ' + axis + ' cut runs inside the outline'); }
+    // set-back faces show on the elevations; areas come from the outline, not the bounding box
+    assert.ok(P.sheetPage(ctx, sh('a-elev')).includes('fill="#eceeed"'), what + ': set-back faces drawn as their own panels');
+    assert.ok(P.sheetPage(ctx, sh('ls-plan')).includes(Math.round(d.footArea * d.floors).toLocaleString('en-US') + ' sf'), what + ': life safety area from the outline');
+    assert.ok(plan.includes(Math.round(d.footArea).toLocaleString('en-US') + ' sf'), what + ': floor area from the outline');
+  }
+}
 
 // a type with no design draws a plain message instead of failing
 {
