@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 11:00 PM CT: Gas station re-fit, corner shapes in mixed plans, settings that fit the plan (7a22bdf, merged eec65d5)
+- **Move the canopy and the station follows:** drag the fuel canopy along the street, turn it, or move the c-store, and a moment later the drive lanes go back round the canopy, the store sits behind it, and the parking, tank pad and driveways are laid out again. Re-fit Plan does the same. Before, a gas station couldn't be re-fitted at all.
+- **When it can't fit, it says why:** drop the canopy where its lanes won't go and your move stays as it is, with a message like "the canopy needs a drive lane all round it". Undo puts it back.
+- **Mixed plans on a corner:** shops at the front of a mixed plan now also get an L of shops wrapping their parking, and a drive-thru pad at the corner, as layouts to compare. Inside lots are unchanged.
+- **Site parameters only shows what applies:** apartment depth, longest building and spacing only with apartments; neighbourhood streets only with single-family homes; the building shape only for shops, offices and apartments; trash settings only for what the plan has.
+- Re-fitting the L-shaped strip keeps its L.
+
 ### 10:46 PM CT: Food truck parks on narrow, deep lots (97844d2, merged 0ad994a)
 - On a narrow, deep lot the trucks now run down one long side, with the seating, pavilion, restrooms and bar beside them. A 180 ft wide lot about 900 ft deep holds 12 to 13 trucks, where it used to get 2. A 150 ft wide lot holds 11 to 12, where it used to get no layout.
 - A choice with less than half the trucks of the first one is no longer offered, except the one with the bar on a small lot.
