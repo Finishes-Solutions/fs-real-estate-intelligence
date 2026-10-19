@@ -1,6 +1,6 @@
 # Plan: real neighbourhoods, mixed sites, entrances and editable streets
 
-Status: proposal, October 19, 2026. Nothing here is built yet except where it says so. It answers the asks of Oct 19:
+Status: proposal, October 19, 2026, still being planned: the phases below are a working order, not a commitment, and stay open until the plan settles. Nothing here is built yet except where it says so. Decisions made so far are under "Decided". It answers the asks of Oct 19:
 - mixed programs that really mix
 - entrances that fit, with two-lane boulevard entries and room for monument signs
 - bending and turning entrances and other pieces by hand
@@ -85,8 +85,11 @@ Fixes:
 ## Entrances that fit (phase 1)
 
 - **Boulevard entry:**
-  - two lanes each way-in and way-out (about 18–24 ft each) with a landscaped median of 10–30 ft
-  - a **monument sign pad** in the median nose or on one or both sides at the corners
+  - two lanes, way-in and way-out (about 18–24 ft each, or the local rule), with a landscaped median of 10–30 ft
+  - a **monument sign pad** (decided):
+    - in the median by default
+    - on one or both sides at the corners as options
+    - the planner may pick the sides when the site calls for it (a median too short or narrow for the sign plus sight lines, a right-in/right-out entry with no median) and says why
   - a deceleration lane where the frontage road speed calls for it
   - widths, median and sign placement in Settings, with typical starting values
 - **Placement rules:**
@@ -108,7 +111,12 @@ Fixes:
 - **How names are set:**
   - **name it yourself** in Settings or in Change With AI ("call the neighbourhood Beacon Hill Estates")
   - **or ask the AI for names** that fit the place (two or three choices)
-- Street names later, if wanted.
+- **Street names (decided): off by default, a toggle.**
+  - When it's on, the AI names every street from a theme you give it ("aviation", "Pokémon", "Texas rivers", "old Hockley families"), or picks one that suits the community's name.
+  - Names follow the street hierarchy: the entry boulevard and collectors get the grander names (Parkway, Boulevard), locals and cul-de-sacs the smaller ones (Lane, Court, Way).
+  - No two streets share a name; names are checked against the streets nearby and the county's list where it can be found, since duplicates are usually refused for 911 addressing.
+  - Names show along each street on the map and the PDF sheet. Each can be edited, and "rename the streets with a golf theme" works in Change With AI.
+  - Streets only exist as named things once the network generator (phase 4) is in. Until then the toggle names the drives the planner already has.
 
 ## Mixed sites that really mix (phase 3)
 
@@ -150,11 +158,7 @@ A new street-network generator for homes on lots. It's the hardest part and most
   - marched by distance along each street's edge, each lot square to the street
   - wedge lots on the outside of bends and round cul-de-sac bulbs
   - the home mix and lot widths as today
-- **Rules, as settings with typical values:**
-  - longest block, longest cul-de-sac, bulb radius
-  - intersection spacing, how close a T may be to another
-  - right-of-way and pavement widths
-  - these vary by city and county (Houston's Chapter 42 differs from Waller County's rules), so they're typical starting values to confirm, never a claim of compliance
+- **Rules from the site's own jurisdiction** (see "Street rules by location" below): block length, cul-de-sac length and bulb radius, intersection spacing, right-of-way and pavement widths. The layout follows them and shows which rule set it used.
 - **Finding the best layout:**
   - generate many networks: skeleton type × street direction per pod × cul-de-sac choices
   - score them: homes delivered, street length per home, cul-de-sac share, block lengths within limits, open space and detention met, every lot reached
@@ -163,21 +167,47 @@ A new street-network generator for homes on lots. It's the hardest part and most
 - **Roundabouts** (a pavement ring and a landscaped island) at collector junctions, at the entry, or where asked ("add a roundabout at the main intersection").
 - **Circle drives** for drop-off at the clubhouse, a school, a retail anchor or a hotel.
 
+## Street rules by location (with phase 4)
+
+Rules depend on where the site is, and the AI reads the codes for that place.
+
+1. **Find the jurisdiction.** The app already knows:
+   - which city limits a site is in (from Census places)
+   - which county it's in
+
+   New: the extraterritorial jurisdictions (ETJ), starting with Houston's from the city's GIS. A site can sit inside a city, inside a city's ETJ (the city's subdivision rules usually apply), or in unincorporated county. Utility districts (MUDs) and drainage districts come from the county data the app already has.
+2. **The AI reads the codes.** Using the web search the app already has, it finds and reads the subdivision and development rules for that city or county, and the drainage criteria (the county flood control district's detention rate, for example). Sources are the city's code of ordinances (often on Municode), the county's subdivision regulations, and the drainage criteria manual. Out of them it writes one **rule sheet**, with each value cited and linked:
+   - right-of-way and pavement widths by street type
+   - longest block
+   - longest cul-de-sac and bulb radius
+   - intersection and driveway spacing, corner clearance
+   - sidewalk requirement and width
+   - smallest lot and frontage, building lines
+   - detention rate
+   - the second entrance rule
+3. **People confirm it.** The rule sheet shows in the plan's Settings with its sources. Any value can be edited, and a value the AI couldn't find falls back to a typical one, marked as such.
+4. **One sheet per place, shared.** It's kept per jurisdiction and shared by the team, so the second site in Waller County doesn't look it up again. It's refreshed when someone asks or when it's old.
+5. **Every layout says which rule set it used.** Any value the plan breaks shows in the checks. It is never a compliance claim: the rule sheet is the AI's reading of the code, to be confirmed by the engineer and the city or county.
+
+Today's fixed 0.55 acre-feet per acre becomes the fallback when the local rate isn't found.
+
 ## Detention, trails and sidewalks (phase 5)
 
 - **Split detention:**
   - the volume is shared among several ponds placed where they work: a lake in the commons, linear ponds along a greenbelt or between pods, a pond at the low corner
   - organic shapes by default for neighbourhoods
   - the total always meets the need, and Numbers shows each pond's share
-- **Low side:** without ground elevations the planner can't know where water runs. The plan can take a hint ("drains to the south-east corner" or a click on the map). Elevation data for the site is a later step.
+- **Low side (decided):** until elevation data is pulled in, the low side is given by hand: a click on the map, or words ("drains to the south-east corner"). Ponds go there first, and the outfall is drawn to it. Without a hint, the planner places ponds as today and says the low side wasn't given. When elevation data arrives it fills the hint in, and a hand hint still wins.
 - **Trails:**
   - round every pond
   - along greenbelts
   - linking pods to the commons, amenity center and school
   - drawn as 6–10 ft paths with their length in Numbers
   - "add a trail round the lake" and "connect the trails" in Change With AI
-- **Sidewalks:**
-  - 5 ft along both sides of every street (or one side, in Settings)
+- **Sidewalks (decided):**
+  - both sides of every street by default
+  - one side as a setting, per street type (local streets one side, collectors both)
+  - width from the local rule sheet (5 ft when it's not found)
   - drawn on the plan and counted in paved area and cost
 
 ## Change With AI keeps up (with each phase)
@@ -193,7 +223,7 @@ A new street-network generator for homes on lots. It's the hardest part and most
 - Anything the AI places gets a clear spot and the same checks as a hand edit. No kind of piece is exempt again.
 - A change that would re-lay the streets says so first and keeps the old arrangement one Undo away.
 
-## Order and size
+## Order and size (a working draft, still open)
 
 | Phase | What | Size |
 |---|---|---|
@@ -227,13 +257,19 @@ The rule in this repo stands: realistic data and a look at a real map before eac
 - **Curvilinear layout quality is hard.** Designers spend days on a subdivision. The generator will produce good starting concepts, not engineered plats, and some sites will need hand fitting. Editable streets (phase 1 and 4) are what make that acceptable.
 - **Speed.** A real search on 250 acres is heavy. Without a budget and progressive results it will feel slow.
 - **No ground elevations yet**, so detention placement is a guess unless someone gives the low side.
-- **Rules differ by jurisdiction** (Houston, the ETJ, Waller, Harris and Montgomery counties). Values are typical and editable, never a compliance claim.
+- **Rules differ by jurisdiction** (Houston, the ETJ, Waller, Harris and Montgomery counties), and **the AI's reading of a code can be wrong or out of date.** Some codes aren't online or sit in scanned PDFs, and amendments get missed. Every value carries its source so a person can check it; nothing is a compliance claim.
 - **Regression risk** to today's layouts. The old styles stay as options, and the tests compare them.
 
-## Questions to settle
+## Decided (Oct 19)
 
-1. Which jurisdiction's street rules should be the defaults (Houston Chapter 42, or county rules for unincorporated sites like Waller)?
-2. Sidewalks on both sides of every street, or one side on local streets?
-3. Should the planner name streets too, or only the community and its parts?
-4. Monument signs: in the median, at both corners, or either (a setting)?
-5. For detention, is a hand hint of the low side acceptable until elevation data is wired in?
+1. **Street rules depend on the location;** the AI reads the codes for that area (see "Street rules by location").
+2. **Sidewalks** on one or both sides, both by default.
+3. **Names:** the planner names the community and its parts. Street names are an optional toggle, with the AI naming the streets from a theme you give it.
+4. **Monument signs** in the median by default, with the sides as options, or whatever is best for the site (and it says why).
+5. **Detention:** a hand hint of the low side until elevation data is pulled in.
+
+## Still open
+
+- The order and size of the phases (kept open while planning).
+- Where the ETJ boundaries for cities other than Houston come from, and what to do when the AI can't find a jurisdiction's code online (a typical rule set, marked, and a link for someone to fill it in).
+- How much of the rule sheet a person must confirm before a layout uses it (all of it, or only the values the AI marked unsure).
