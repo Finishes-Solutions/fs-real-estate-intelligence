@@ -18,6 +18,8 @@ import * as MAP from './lib/planmap.mjs';
 import * as T from './lib/sitetools.mjs';
 import * as RD from './lib/render.mjs';
 import * as PJ from './lib/project.mjs';
+import * as PS from './lib/planset.mjs';
+import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, pickedClaude, pickedEffort } from './lib/aimodels.mjs';
 import * as CU from './lib/customtypes.mjs';
 import { teamLibrary } from './teamlib.js';
 const typeOptions = (cur, team = []) => (team.length ? '<optgroup label="Team">' + team.map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>' : '') + BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
@@ -53,6 +55,7 @@ export const ADD_ICON = Object.fromEntries(Object.entries({
 }).map(([k, d]) => [k, '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>']));
 export const addAccent = k => k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building;
 const get = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const PS_PICK = { model: () => pickedClaude(get(PLANSET_MODEL_KEY)), effort: () => pickedEffort(get(PLANSET_EFFORT_KEY)) }; // Settings › AI model › Plan sets
 // Ultra's mark (the effort levels under Build): a four-point spark and a small one beside it
 const SPARK = '<svg class="sp-spark" width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7 1.5c.45 3.35 1.95 4.85 5.3 5.3-3.35.45-4.85 1.95-5.3 5.3-.45-3.35-1.95-4.85-5.3-5.3C5.05 6.35 6.55 4.85 7 1.5z"/><path fill="currentColor" opacity=".7" d="M13 10.3c.17 1.25.73 1.8 1.97 1.97-1.24.17-1.8.72-1.97 1.97-.17-1.25-.73-1.8-1.97-1.97 1.24-.17 1.8-.72 1.97-1.97z"/></svg>';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -3214,10 +3217,10 @@ export function initSitePlan(ctx) {
   }
   // the two newest renderings that still match the plan, as data URLs for the PDF sheet, at up to 1600 px wide so the
   // sheet stays under the PDF service's request limit
-  async function rendersForSheet(pl) {
+  async function rendersForSheet(pl, max = 2) {
     const sig = planSig(pl), out = [];
     const small = async b => { try { const bmp = await createImageBitmap(b), k = Math.min(1, 1600 / bmp.width), c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85); } catch (e) { return blobToData(b); } };
-    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= 2 || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.renderLabel(r.view, r.target) + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
+    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= max || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.renderLabel(r.view, r.target) + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
     return out;
   }
   function geojson(p, pl) {
@@ -3234,7 +3237,7 @@ export function initSitePlan(ctx) {
 
   // ---------- the Projects view ----------
   // All projects as cards or a list (the choice is kept in this browser), with search and sort. Click one for its page:
-  // a header with its status, then tabs: Overview (information, the site's jurisdiction, parcels), Options (each option
+  // a header with its status, then tabs: Overview (information, the site's jurisdiction, parcels), Sites (each option
   // drawn with its numbers), Renderings and Ask. Text wraps rather than being cut off. A sync never redraws under someone typing (it waits
   // until they leave the field), so half-typed notes or a name aren't lost.
   const VIEW_KEY = 'fs-projects-view';
@@ -3332,8 +3335,9 @@ export function initSitePlan(ctx) {
   }
 
   // ----- one project -----
-  // A header (name, status, address, acres, who updated it) and four tabs: Overview (the project's information, the
-  // site's jurisdiction and the parcels), Options (the site plan options), Renderings (every option's pictures) and Ask
+  // A header (name, status, address, acres, who updated it) and five tabs: Overview (the project's information, the
+  // site's jurisdiction and the parcels), Sites (the site plan options; id 'options'), Renderings (every option's
+  // pictures), Plans (plan sets made from an option) and Ask
   // (questions about the whole project). The tab is kept per project for this visit and in the address (pt=).
   const ptab = new Map(), pasks = new Map(), siteRuns = new Map(), siteFail = new Map();
   const tabFor = p => PJ.tabOf(ptab.get(p.id));
@@ -3367,13 +3371,13 @@ export function initSitePlan(ctx) {
   }
   const rendersOf = p => p.plans.flatMap(pl => (pl.renders || []).map(r => ({ pl, r })));
   function tabsHtml(p, tab) {
-    const n = { options: p.plans.length, renderings: rendersOf(p).length }, busy = pasks.get(p.id)?.busy;
+    const n = { options: p.plans.length, renderings: rendersOf(p).length, plans: setsOf(p).length }, busy = pasks.get(p.id)?.busy;
     return '<div class="mx-tabs pj-tabs" role="tablist" aria-label="Project sections">' + PJ.TABS.map(t => { const on = t.id === tab;
       return '<button type="button" role="tab" id="pjTab-' + t.id + '" data-tab="' + t.id + '" aria-selected="' + on + '" aria-controls="pjPanel" tabindex="' + (on ? 0 : -1) + '">' + t.label +
         (n[t.id] ? '<span class="pj-tn"> · ' + f0(n[t.id]) + '</span>' : '') + (t.id === 'ask' && busy ? '<span class="pj-tn"> · answering…</span>' : '') + '</button>'; }).join('') + '</div>';
   }
   function detailHtml(p) {
-    const tab = tabFor(p), body = { overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, ask: pAskHtml }[tab](p);
+    const tab = tabFor(p), body = { overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, ask: pAskHtml }[tab](p);
     return headHtml(p) + tabsHtml(p, tab) + '<div class="pj-panel pj-p-' + tab + '" id="pjPanel" role="tabpanel" aria-labelledby="pjTab-' + tab + '">' + body + '</div>';
   }
 
@@ -3478,6 +3482,114 @@ export function initSitePlan(ctx) {
   }
   // Render more: the option opens on the map with its panel at the Render section (the panel's section chip, as a click)
   function renderMore(p, pl) { open(p.id, pl.id); requestAnimationFrame(() => requestAnimationFrame(() => { if (PL()?.id === pl.id) jump('spRender'); })); }
+
+  // ----- Plans: schematic design sets made from an option (lib/planset.mjs, api/planset.js, PLANSET-PLAN.md) -----
+  // Pick an option and the sections to include, then Make Plan Set: Claude writes the cover's notes, the sheets are drawn
+  // from the plan, printed on the Finishes Solutions title block and downloaded. The PDF stays on the device it was made
+  // on (IndexedDB, like the renderings); the option keeps a short record of each set (issue, sheets, who, when, model),
+  // which syncs with the team. Each new set of an option is the next issue, listed in the title block's revision table.
+  const psForm = new Map(); // per project: { plid, sections: Set, busy, step, err, ctl }
+  let psInfo = null, psInfoP = null; // api/planset GET: is Claude set up, the server's model and effort, this month's spend
+  const loadPsInfo = (force) => { if (force) psInfoP = null; return psInfoP ||= fetch('api/planset').then(r => r.ok ? r.json() : null).catch(() => null).then(d => { psInfo = d || { error: true }; if (!d) setTimeout(() => { psInfoP = null; }, 6e4); /* asked again a minute later */ if (ctx.view === 'projects' && cur && tabFor(db.projects.find(x => x.id === cur) || {}) === 'plans') render(); return d; }); };
+  const psModel = () => PS_PICK.model() || psInfo?.model || 'claude-opus-5-5', psEffort = () => PS_PICK.effort() || psInfo?.effort || 'medium';
+  const setsOf = p => p.plans.flatMap(pl => (pl.sets || []).map(s => ({ pl, s })));
+  const usd = v => '$' + (v >= 100 ? Math.round(v) : v.toFixed(2));
+  function psState(p) {
+    let s = psForm.get(p.id); const ready = p.plans.filter(laidOut);
+    if (!s) { s = { plid: ready[ready.length - 1]?.id || '', sections: new Set(PS.defaultSections()), busy: false, step: '', err: '' }; psForm.set(p.id, s); }
+    if (!ready.some(pl => pl.id === s.plid)) s.plid = ready[ready.length - 1]?.id || '';
+    return s;
+  }
+  // the renderings a set can show: the newest that still match the plan, on this device (up to four)
+  const setRenders = pl => (pl.renders || []).filter(r => !r.sig || r.sig === planSig(pl)).slice(-4);
+  function setsHtml(p) {
+    const ready = p.plans.filter(laidOut);
+    if (!psInfo && !psInfoP) loadPsInfo();
+    if (!ready.length) return '<div class="pj-empty"><b>No plan sets yet</b><p>A plan set is a schematic design drawing set made from one of this project’s site plan options: a cover sheet with the sheet index and project data, the overall site plan and the renderings, on the Finishes Solutions title block. Floor plans, elevations and the engineering sheets come in later phases.</p>' +
+      '<p>' + (p.plans.length ? 'None of this project’s options has buildings yet: lay one out first.' : 'This project has no site plan options yet.') + '</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Sites</button></div></div>';
+    const s = psState(p), pl = ready.find(x => x.id === s.plid) || ready[0], nR = setRenders(pl).length, counts = PS.sectionCounts(pl, nR), I = psInfo;
+    const box = sec => { const none = sec.id === 'renderings' && !nR, on = (s.sections.has(sec.id) || sec.always) && !none, can = PS.built(sec) && !none, base = sec.needs && !s.sections.has(sec.needs), n = counts[sec.id];
+      const why = none ? 'No renderings of this option on this device' : !can ? 'Coming in a later phase' : base ? 'Needs ' + PS.sectionById(sec.needs).label : '';
+      return '<label class="ps-sec' + (can ? '' : ' off') + '"><input type="checkbox" data-pssec="' + sec.id + '"' + (on && can ? ' checked' : '') + (sec.always || !can || s.busy ? ' disabled' : '') + '>' +
+        '<span><b>' + esc(sec.label) + '</b>' + (can && n ? '<em>' + plural(n, 'sheet') + '</em>' : '') + '<small>' + esc(why || sec.note || '') + '</small></span></label>'; };
+    const sheets = PS.sheetList(pl, { sections: [...s.sections], renders: nR });
+    const ai = !I ? 'Checking Claude…' : I.error ? 'Couldn’t check Claude just now: the set is made with its notes if Claude answers.' : !I.configured ? 'Claude isn’t set up on this site (ANTHROPIC_API_KEY), so the cover’s notes are left out. The drawings are made anyway.'
+      : 'Notes by <b>' + esc(psModel()) + '</b> at ' + esc(psEffort()) + ' effort (Settings › AI model)' + (I.budget?.spent != null ? ' · this month ' + usd(I.budget.spent) + ' of ' + usd(I.budget.cap) : '') + '. About $0.05–0.30 a set.';
+    const form = '<section class="pj-box ps-form" aria-labelledby="psH"><h3 class="pj-h3" id="psH">Make a plan set</h3>' +
+      '<div class="ps-row"><label for="psOpt">Option</label><select id="psOpt"' + (s.busy ? ' disabled' : '') + '>' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
+      '<fieldset class="ps-secs"><legend>Sections</legend>' + PS.SECTIONS.map(box).join('') + '</fieldset>' +
+      '<div class="ps-row2"><div class="ps-row"><label for="psBy">Drawn by</label><input id="psBy" maxlength="12" autocomplete="off" value="' + esc(s.by ?? initials(get(NAME_KEY))) + '"' + (s.busy ? ' disabled' : '') + '></div>' +
+        '<div class="ps-row"><label for="psNo">Project number</label><input id="psNo" maxlength="30" autocomplete="off" placeholder="Left blank" value="' + esc(p.projectNumber || '') + '"' + (s.busy ? ' disabled' : '') + '></div></div>' +
+      '<p class="rnote">' + plural(sheets.length, 'sheet') + ' on 24 × 36: ' + esc(sheets.map(x => x.number).join(', ')) + '. ' + ai + '</p>' +
+      (s.err ? '<p class="rnote err" role="alert">' + esc(s.err) + '</p>' : '') +
+      '<div class="btnrow">' + (s.busy ? '<span class="rnote loading" role="status">' + esc(s.step || 'Working…') + '</span><button type="button" class="btn" id="psStop">Cancel</button>' : '<button type="button" class="btn primary" id="psMake">Make Plan Set</button>') + '</div></section>';
+    const made = setsOf(p).sort((a, b) => String(b.s.at).localeCompare(String(a.s.at)));
+    const list = made.length ? '<section class="pj-sec"><div class="lt">Sets made · ' + made.length + '</div><div class="ps-list">' + made.map(({ pl: q, s: x }) => { const stale = x.sig && x.sig !== planSig(q);
+      return '<div class="ps-item"><div><b>' + esc(q.name) + ' · Issue ' + esc(x.no) + '</b><span>' + esc(rWhen(x.at)) + (x.by ? ' · ' + esc(x.by) : '') + ' · ' + plural((x.sheets || []).length, 'sheet') + (x.model ? ' · notes by ' + esc(x.model) : x.noNotes ? ' · no notes' : '') + (stale ? ' · <em>plan changed since</em>' : '') + '</span>' +
+        '<small>' + esc((x.sheets || []).join(', ')) + '</small></div><span class="btnrow"><button type="button" class="btn" data-psget="' + esc(q.id) + '|' + esc(x.id) + '">Download PDF</button><button type="button" class="lnk pj-pdel" data-psdel="' + esc(q.id) + '|' + esc(x.id) + '">Delete</button></span></div>'; }).join('') + '</div></section>' : '';
+    return form + list + '<p class="rnote pj-rnote">Every sheet says “Preliminary — not for construction, bidding or permit”: these are schematic drawings for feasibility, pricing and coordination, reviewed but not sealed. The PDF is kept on the device it was made on; teammates see that the set exists.</p>';
+  }
+  const initials = n => String(n || '').split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).join('').slice(0, 4);
+  function wirePlans(p) {
+    const s = psState(p), $ = q => root.querySelector(q);
+    $('#psOpt')?.addEventListener('change', e => { s.plid = e.target.value; render(true); });
+    root.querySelectorAll('[data-pssec]').forEach(b => b.onchange = () => { const id = b.dataset.pssec; if (b.checked) s.sections.add(id); else { s.sections.delete(id); for (const x of PS.SECTIONS) if (x.needs === id) s.sections.delete(x.id); } render(true); });
+    const by = $('#psBy'); if (by) by.onchange = () => { s.by = by.value.trim().slice(0, 12); };
+    const no = $('#psNo'); if (no) no.onchange = () => { const v = no.value.trim().slice(0, 30); if (v !== (p.projectNumber || '')) { p.projectNumber = v; save(p); } };
+    $('#psMake')?.addEventListener('click', () => { if (by) s.by = by.value.trim().slice(0, 12); makeSet(p); });
+    $('#psStop')?.addEventListener('click', () => s.ctl?.abort());
+    const find = v => { const [a, b] = v.split('|'), q = p.plans.find(x => x.id === a); return { q, x: q?.sets?.find(y => y.id === b) }; };
+    root.querySelectorAll('[data-psget]').forEach(b => b.onclick = async () => { const { q, x } = find(b.dataset.psget); if (!x) return;
+      const blob = await rget('set:' + x.id); if (!(blob instanceof Blob)) { ctx.toast('That set’s PDF isn’t on this device: sets stay on the device they were made on' + (x.by ? ' (' + x.by + ' made it)' : '') + '. Make it again here.'); return; }
+      ctx.saveFile(fileName(p, q) + '-plan-set-issue-' + x.no + '.pdf', blob, 'application/pdf'); });
+    root.querySelectorAll('[data-psdel]').forEach(b => b.onclick = () => { const { q, x } = find(b.dataset.psdel); if (!x || !confirm('Delete issue ' + x.no + ' of ' + q.name + '’s plan set?')) return;
+      q.sets = q.sets.filter(y => y.id !== x.id); rdel('set:' + x.id); save(p); });
+  }
+  async function makeSet(p) {
+    const s = psState(p), pl = p.plans.find(x => x.id === s.plid); if (!pl || s.busy) return;
+    const ctl = new AbortController(); Object.assign(s, { busy: true, err: '', step: 'Gathering the site facts…', ctl }); render(true);
+    const step = t => { s.step = t; const el = root.querySelector('.ps-form .loading'); if (el) el.textContent = t; };
+    try {
+      const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), parcels = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), F = SP.frame(pl.origin);
+      const site = { type: 'Polygon', coordinates: [pl.ring.concat([pl.ring[0]]).map(F.toLL)] };
+      let vicinity = ''; try { vicinity = areaMap([{ geometry: site, stroke: '#c0392b', fill: 'rgba(192,57,43,.25)', width: 2 }], { W: 400, H: 230, px: 400, minSpanM: 3500, maxTiles: 16 }); } catch (e) { /* no map */ }
+      const facts = await siteFacts(pl), notes = SP.check(pl).map(i => i.text);
+      const county = (ctx.DATA?.counties || []).find(c => (c.outline || []).some(poly => SP.inRing(F.toLL(SP.centroid(pl.ring)), poly[0])))?.name;
+      const wantR = s.sections.has('renderings'), rl = wantR ? setRenders(pl) : [];
+      step('Preparing the renderings…');
+      const renders = wantR ? await rendersForSheet(pl, 4).catch(() => []) : [];
+      const sheets = PS.sheetList(pl, { sections: [...s.sections], renders: renders.length, renderLabels: renders.map(r => r.caption) });
+      const base = { plan: pl, project: p, client: p.client || '', address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '', parcels, facts, notes, sheets,
+        boundarySource: pl.src === 'drawn' ? 'a boundary drawn on the map' : pl.src === 'regrid' ? 'the Regrid parcel outline' : (keys.length > 1 ? keys.length + ' county appraisal district parcel outlines, merged' : 'the county appraisal district parcel outline') };
+      // Claude's notes: a set is still made without them (no key, budget spent, a slow answer), and the cover says so
+      let text = null, model = '', why = '';
+      const info = psInfo?.configured ? psInfo : await loadPsInfo(true);
+      if (info?.configured) {
+        step('Claude is writing the notes… (up to a couple of minutes)');
+        try { const r = await fetch('api/planset', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'notes', brief: PS.notesBrief(base), model: PS_PICK.model(), effort: PS_PICK.effort() }) });
+          const d = await r.json().catch(() => ({})); if (r.ok && d.notes) { text = d.notes; model = d.model || ''; if (psInfo && d.budget) psInfo.budget = d.budget; } else why = d.error || 'HTTP ' + r.status;
+        } catch (e) { if (ctl.signal.aborted) throw e; why = 'Claude didn’t answer'; }
+      } else why = info ? 'Claude isn’t set up on this site' : 'Couldn’t reach the server';
+      const day = new Date(), prev = (pl.sets || []).slice().sort((a, b) => (+a.no) - (+b.no)), no = String(prev.length ? Math.max(...prev.map(x => +x.no || 0)) + 1 : 0);
+      const short = d => new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+      const revisions = prev.map(x => ({ no: x.no, date: short(x.at), desc: x.desc || 'Schematic design set' })).concat([{ no, date: short(day), desc: no === '0' ? 'Schematic design set' : 'Schematic design set, re-issued' }]);
+      step('Drawing ' + plural(sheets.length, 'sheet') + ' on the title block…');
+      const html = PS.setHTML({ ...base, renders, text, date: day.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), drawnBy: s.by ?? initials(get(NAME_KEY)), projectNumber: p.projectNumber || '', revisions });
+      const r = await fetch('api/planset', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'pdf', html, title: p.name + ' — ' + pl.name + ' — Schematic design set' }) });
+      if (!r.ok || !/pdf/.test(r.headers.get('content-type') || '')) throw new Error((await r.json().catch(() => ({}))).error || 'The PDF couldn’t be made (HTTP ' + r.status + ').');
+      const blob = await r.blob(), id = uid();
+      await rput('set:' + id, blob);
+      const P1 = db.projects.find(x => x.id === p.id) || p, q = P1.plans.find(x => x.id === pl.id) || pl; // (a sync may have replaced the copy)
+      q.sets = (q.sets || []).concat([{ id, no, at: day.toISOString(), by: get(NAME_KEY) || '', sheets: sheets.map(x => x.number), sections: [...s.sections], model, noNotes: !text || undefined, sig: planSig(pl), desc: revisions[revisions.length - 1].desc }]);
+      while (q.sets.length > 12) rdel('set:' + q.sets.shift().id); // the newest twelve issues are kept
+      Object.assign(s, { busy: false, step: '', ctl: null }); save(P1);
+      await ctx.saveFile(fileName(p, pl) + '-plan-set-issue-' + no + '.pdf', blob, 'application/pdf');
+      ctx.toast('Plan set issue ' + no + ' of ' + pl.name + ': ' + plural(sheets.length, 'sheet') + '.' + (text ? '' : ' The cover’s notes were left out (' + why + ').'));
+    } catch (e) {
+      Object.assign(s, { busy: false, step: '', ctl: null, err: ctl.signal.aborted ? '' : (e.message || 'The set couldn’t be made.') }); render(true);
+      if (ctl.signal.aborted) ctx.toast('Plan set cancelled.');
+    }
+  }
 
   // ----- Ask: questions about the whole project, answered from its facts (lib/project.mjs projectFacts) -----
   const pAskLog = p => { let A = pasks.get(p.id); if (!A) pasks.set(p.id, A = { turns: [], draft: '' }); return A; };
@@ -3627,6 +3739,7 @@ export function initSitePlan(ctx) {
       if (needSite(p)) gatherSite(p); // (the card already says Checking…)
     }
     if (tab === 'renderings') wireRenders(p);
+    if (tab === 'plans') wirePlans(p);
     if (tab === 'ask') wirePAsk(p);
   }
   root?.addEventListener('focusout', () => setTimeout(() => { if (waiting && ctx.view === 'projects') render(); }));

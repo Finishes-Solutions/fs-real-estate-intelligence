@@ -35,8 +35,9 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 export const footer = title => '<div style="width:100%;padding:0 0.5in;font-family:\'IBM Plex Mono\',monospace;font-size:7px;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;display:flex;justify-content:space-between;align-items:center">' +
   '<span><b style="color:#006527;font-weight:600">Finishes Solutions</b>&nbsp;&nbsp;·&nbsp;&nbsp;' + esc(title).slice(0, 90) + '</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>';
 
-// sheet: 'tabloid' (11 x 17) or 'archd' (24 x 36), landscape, for drawings like the site plan: no footer, small margins
-export const SHEETS = { tabloid: ['17in', '11in'], archd: ['36in', '24in'] };
+// sheet: 'tabloid' (11 x 17) or 'archd' (24 x 36), landscape, for drawings like the site plan: no footer, small margins;
+// 'set' (24 x 36, no margin at all) for plan set sheets, whose border is laid under them afterwards (api/planset.js)
+export const SHEETS = { tabloid: ['17in', '11in'], archd: ['36in', '24in'], set: ['36in', '24in'] };
 export async function render(html, { landscape = false, title = 'Report', sheet = null } = {}) {
   const b = await browser(), page = await b.newPage();
   try {
@@ -46,7 +47,7 @@ export async function render(html, { landscape = false, title = 'Report', sheet 
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 20000 });
     // tagged: false: Chromium's accessibility tags make a long report about 5x bigger (a 1,000-row list: 5.4 MB vs ~1 MB),
     // past the 4.5 MB a response can be
-    if (SHEETS[sheet]) return await page.pdf({ width: SHEETS[sheet][0], height: SHEETS[sheet][1], printBackground: true, displayHeaderFooter: false, tagged: false, outline: false, margin: { top: '0.25in', bottom: '0.25in', left: '0.25in', right: '0.25in' }, timeout: 30000 });
+    if (SHEETS[sheet]) { const mg = sheet === 'set' ? '0' : '0.25in'; return await page.pdf({ width: SHEETS[sheet][0], height: SHEETS[sheet][1], printBackground: true, displayHeaderFooter: false, tagged: false, outline: false, margin: { top: mg, bottom: mg, left: mg, right: mg }, timeout: 60000 }); }
     return await page.pdf({ format: 'letter', landscape, printBackground: true, preferCSSPageSize: false, displayHeaderFooter: true, tagged: false, outline: false,
       headerTemplate: '<span></span>', footerTemplate: footer(title), margin: { top: '0.5in', bottom: '0.6in', left: '0.5in', right: '0.5in' }, timeout: 30000 });
   } finally { page.close().catch(() => {}); }
@@ -70,7 +71,7 @@ export default async function handler(req, res) {
   const html = typeof b.html === 'string' ? b.html : '';
   if (!/^\s*<!doctype html>/i.test(html) || html.length > MAX) return res.status(400).json({ error: 'Send { html } (a whole HTML document, under 4 MB).' });
   try {
-    const pdf = await render(html, { landscape: !!b.landscape, title: String(b.title || 'Report').slice(0, 120), sheet: SHEETS[b.sheet] ? b.sheet : null });
+    const pdf = await render(html, { landscape: !!b.landscape, title: String(b.title || 'Report').slice(0, 120), sheet: SHEETS[b.sheet] && b.sheet !== 'set' ? b.sheet : null });
     if (pdf.length > 4_400_000) return res.status(413).json({ error: 'the PDF is ' + (pdf.length / 1048576).toFixed(1) + ' MB, over the 4.5 MB a download from here can be' });
     res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Cache-Control', 'no-store');
     return res.status(200).send(Buffer.from(pdf));

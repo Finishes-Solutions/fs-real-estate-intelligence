@@ -1,6 +1,12 @@
 # Plan: a full set of plans from a project's site plan
 
-Status: proposal, October 19, 2026. Nothing here is built yet. Builds on the site plan sheet (`lib/sitesheet.mjs`), the renderings (`RENDERINGS-PLAN.md`) and the massing scene (`MASSING-PLAN.md`).
+Status: Phase 1 shipped October 19, 2026 (Projects › a project › **Plans**). The rest of this document is the road ahead.
+
+**Phase 1 as built** differs from the plan below in three places, to ship sooner:
+
+- The set's PDF is kept on the device that made it (IndexedDB, like the renderings). Supabase Storage, a `plan_sets` table and signed links come with phase 2, when sets outgrow a single request.
+- The whole set is printed in one request, on one border-stamping pass (`api/planset.js`, mode `pdf`). That is fine for three to six sheets; phase 2 moves to one sheet a request.
+- Claude writes only the cover's words: description, general notes, codes and next steps. Every number on the sheets comes from the plan. Builds on the site plan sheet (`lib/sitesheet.mjs`), the renderings (`RENDERINGS-PLAN.md`) and the massing scene (`MASSING-PLAN.md`).
 
 Goal: from an option on the project page, press **Make plan set** and get a multi-sheet PDF (cover, site and civil, architecture, structure, MEP, fire, telecom) on the Finishes Solutions title block. The project page then reads **Sites · Renderings · Plans**.
 
