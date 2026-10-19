@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 4:58 PM CT: Full plan sets, part 2: the drawings, first draft (320cca2)
+- **The placeholder sheets are now real drawings:**
+  - **Site & civil and landscape:** existing conditions with the boundary's bearings and lengths, dimension and paving, typical lot plans, grading and drainage, detention, utilities, erosion control, civil details, landscape plan and details.
+  - **Each building type:** floor and roof plans, elevations, sections, door / window / finish schedules, foundation and framing plans, HVAC, plumbing, power and lighting, and for commercial buildings sprinkler, fire alarm and life safety plans.
+  - **Sheets for the whole set:** wall sections and details, code analysis, the engineering notes and schedules, riser and one-line diagrams, site lighting, fire access and hydrants, and telecom when ticked.
+- This is a first draft: the drawings are still being refined, and a final version follows.
+
 ### 4:56 PM CT: Renderings made in the background (a25d280)
 - **Render on the Renderings tab no longer takes you to the map.** The option's 3D view is set up on a hidden map behind the scenes and the picture is taken from that, so you stay on the project page or carry on elsewhere in the app.
 - The form shows **Rendering 1 of 4** and what's happening, with **Cancel**. The new pictures appear below when they're ready, and a message says so wherever you are in the app.
