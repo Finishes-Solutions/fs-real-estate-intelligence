@@ -25,6 +25,12 @@ const plane = (sp, f = (x, y) => 160 - 0.01 * x + 0.005 * y) => { const z = []; 
 { const sp = T.gridSpec(fm362.ring), t = plane(sp, () => 150.3), s = T.summary(t, fm362.ring); assert.ok(s.flat); assert.equal(s.toward, ''); assert.match(T.factLine(t, fm362.ring), /nearly flat/); assert.equal(T.heightShare(t, fm362.ring, [10, 10]), null); }
 { const sp = T.gridSpec([[0, 0], [300, 0], [300, 300], [0, 300]]), t = plane(sp, (x, y) => 150 - 6 * Math.exp(-((x - 150) ** 2 + (y - 150) ** 2) / 6000)), s = T.summary(t, [[0, 0], [300, 0], [300, 300], [0, 300]]);
   assert.ok(s.rough, 'a hole in the middle: the plane misses'); assert.ok(Math.hypot(s.low[0] - 150, s.low[1] - 150) < 15); }
+// a gentle tract with a creek through it (like the 200 acres near Katy: 76 to 100 ft, 0.1% overall): the fall is the
+// land's, the creek is called out, and the layout's scale isn't stretched by the creek bed
+{ const ring = [[0, 0], [3000, 0], [3000, 3000], [0, 3000]], sp = T.gridSpec(ring), t = plane(sp, (x, y) => 98 - 0.001 * x - Math.max(0, 20 - Math.abs(y - 1500) / 3)), s = T.summary(t, ring);
+  assert.ok(s.relief > 15 && s.fall < 4, 'relief ' + s.relief.toFixed(1) + ', fall ' + s.fall.toFixed(1)); assert.ok(s.dip != null && s.dip < s.lo - 3);
+  const line = T.factLine(t, ring); assert.match(line, /mostly 9\d to 9\d ft/); assert.match(line, /low channel or pond/); assert.match(line, /falls about [0-3]\.\d ft toward the east/);
+  assert.ok(T.heightShare(t, ring, [2900, 200]) < 0.35 && T.heightShare(t, ring, [100, 200]) > 0.65, 'east is low on the bank, west high'); }
 // holes filled from the neighbours; too few points: nothing
 { const sp = { x0: 0, y0: 0, cell: 10, nx: 4, ny: 4 }, z = Array.from({ length: 16 }, (_, k) => k % 5 ? 100 + k : null), f = T.fillGaps({ ...sp, z }); assert.ok(f.z.every(v => v != null)); assert.equal(f.z[1], 101, 'data kept');
   assert.equal(T.fillGaps({ ...sp, z: z.map((v, k) => k < 2 ? 100 : null) }), null); }

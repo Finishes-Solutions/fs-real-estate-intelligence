@@ -72,5 +72,7 @@ assert.equal(PJ.ASK_STARTERS.length, 4); assert.ok(PJ.ASK_STARTERS.includes('Wha
   const r2 = PJ.jurisdictionRows(PJ.siteFactsFrom({ flood: { zone: 'X', risk: 'minimal' } }, { ground: { ...gr, flat: true, relief: 1.1 } })).find(r => r.id === 'ground');
   assert.match(r2.value, /nearly flat/); assert.ok(!r2.tone); assert.ok(!/base flood/.test(r2.sub));
   assert.ok(!PJ.jurisdictionRows(PJ.siteFactsFrom({}, { ground: { min: NaN } })).some(r => r.id === 'ground'), 'no numbers: no row');
+  const r3 = PJ.jurisdictionRows(PJ.siteFactsFrom({ flood: { zone: 'AE', risk: 'high', bfe: 90 } }, { ground: { min: 76.2, max: 100, lo: 88.4, hi: 97.6, relief: 23.8, fall: 3.1, slope: 0.1, toward: 'south-east', flat: false, dip: 76.2, rough: false, src: 'USGS 3DEP (1 m lidar)' } })).find(r => r.id === 'ground');
+  assert.equal(r3.value, '88 ft to 98 ft · falls about 3.1 ft to the south-east', 'the land, not the creek bed'); assert.match(r3.sub, /lowest ground, 76 ft, is a low channel/); assert.match(r3.sub, /Much of the ground is about 2 ft below the base flood elevation/);
   assert.ok(PJ.jurisdictionText(PJ.siteFactsFrom({}, { ground: gr })).some(l => /^Ground elevation/.test(l)), 'the AI reads it too'); }
 console.log('project page ok');
