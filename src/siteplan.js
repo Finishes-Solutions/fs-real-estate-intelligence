@@ -19,6 +19,7 @@ import * as T from './lib/sitetools.mjs';
 import * as RD from './lib/render.mjs';
 import * as PJ from './lib/project.mjs';
 import * as CU from './lib/customtypes.mjs';
+import * as G from './lib/guardrails.mjs';
 import { teamLibrary } from './teamlib.js';
 const typeOptions = (cur, team = []) => (team.length ? '<optgroup label="Team">' + team.map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>' : '') + BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
@@ -63,6 +64,9 @@ export function initSitePlan(ctx) {
   const { map, esc, fmtN } = ctx, card = ctx.card, root = document.getElementById('view-projects');
   let db = load(), ed = null, shared = null, syncT = 0, syncing = false, raf = 0;
   const f0 = v => Math.round(v).toLocaleString('en-US'), pct = v => (v * 100).toFixed(v < 0.1 ? 1 : 0) + '%';
+  // the numbers and checks of a plan, under the Waller guardrails when they're on for it (lib/guardrails.mjs); exactly
+  // lib/siteplan.mjs's for every other plan
+  const GM = x => G.metrics(x), GC = x => G.check(x), GON = x => !!x && G.isOn(x);
 
   // ---------- storage and team sync ----------
   function load() { try { const d = JSON.parse(localStorage.getItem(KEY) || '{}'); return { projects: d.projects || [], dirty: d.dirty || [], gone: d.gone || [] }; } catch (e) { return { projects: [], dirty: [], gone: [] }; } }
@@ -671,7 +675,15 @@ export function initSitePlan(ctx) {
   const ftPerPx = () => 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (512 * 2 ** map.getZoom()) * 3.28084;
   // layouts run in a worker (sp-worker.js) so the page stays responsive; straight in the page if workers aren't there
   let worker = null, wseq = 0; const wait = new Map();
+  // a Waller plan's layouts: the engine gets the scenario's inputs (lib/guardrails.mjs forLayout) and what comes back is
+  // kept with the plan's own working numbers (unapply); every other plan goes to the engine as it is
   function laid(fn, ...args) {
+    const g = fn === 'refit' ? G.forLayout(args[0], args[0]?.program, {}) : G.forLayout(args[0], args[1], args[2] || {});
+    if (!g) return laid0(fn, ...args);
+    const base = fn === 'refit' ? args[0] : { ...args[0], program: args[1] };
+    return laid0(fn, ...(fn === 'refit' ? [g.plan, args[1] || {}] : [g.plan, g.program, g.opts])).then(r => fn === 'refit' ? G.unapply(r, base) : (r || []).map(o => G.unapply(o, base)));
+  }
+  function laid0(fn, ...args) {
     try { if (!worker) { worker = new Worker(new URL('./sp-worker.js', import.meta.url), { type: 'module' }); worker.onmessage = ({ data }) => { const w = wait.get(data.id); if (!w) return; wait.delete(data.id); data.ok ? w.ok(data.result) : w.no(new Error(data.error)); }; worker.onerror = e => { for (const w of wait.values()) w.no(new Error(e.message || 'layout worker failed')); wait.clear(); worker = null; }; } }
     catch (e) { worker = null; }
     if (!worker) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'refit' ? refit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
@@ -681,7 +693,7 @@ export function initSitePlan(ctx) {
   function draw() {
     cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
       const pl = ed && PL(), s = map.getSource(SRC); if (!s) return;
-      let fc = pl?.ring.length >= 3 ? SP.planFeatures(pl, ed.sel, drag?.moved ? lastKeep : null) : EMPTY; const P0 = P(); lastKeep = fc.keep || null; // mid-drag: last planting and checks
+      let fc = pl?.ring.length >= 3 ? SP.planFeatures(G.effective(pl), ed.sel, drag?.moved ? lastKeep : null) : EMPTY; const P0 = P(); lastKeep = fc.keep || null; // mid-drag: last planting and checks
       const set = fc !== EMPTY ? sels() : [];
       if (set.length > 1) { const on = new Set(set); for (const f of fc.features) { const q = f.properties; if (q?.id != null && on.has(q.id)) q.sel = 1; } } // every piece of a set lit up
       if (set.length === 1) { const one = pl.elements.find(e => e.id === set[0]), F = SP.frame(pl.origin); for (const d of T.dimLabels(one, Math.max(10, (ed.editing ? 17 : 11) * ftPerPx()))) fc.features.push({ type: 'Feature', properties: { k: 'dim', t: d.text, r: d.rot, kind: one.kind }, geometry: { type: 'Point', coordinates: F.toLL(d.at) } }); } // its width and depth
@@ -1620,8 +1632,8 @@ export function initSitePlan(ctx) {
   function overview(pl, prog) {
     if (!pl.elements.length && ed.run?.kind === 'build') return '<div class="kicker">Building…</div><div class="sp-ov-msg"><b>Laying out “' + esc(ed.run.ask) + '”</b><span>The layouts appear here as soon as they’re drawn.</span></div>';
     if (!pl.elements.length) return '<div class="kicker">Step 1 of 3</div><div class="sp-ov-msg"><b>Describe what to build</b><span>Type it under Build, then Build Layouts, or <button type="button" class="sp-link sp-quiet" data-jump="spDrawSec">add pieces by hand</button>.</span></div>';
-    const m = SP.metrics(pl), issues = SP.check(pl), cl = K.checkLabel(K.checksOf(issues, m)), ph = pl.elements.some(e => e.phase === 2);
-    const m1 = ph ? SP.metrics({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, h = K.headline(m, m1, K.askedOf(prog)), pk = parkOf(m, m1), whole = twoPhase(m, m1);
+    const m = GM(pl), issues = GC(pl), cl = K.checkLabel(K.checksOf(issues, m), { waller: GON(pl) }), ph = pl.elements.some(e => e.phase === 2);
+    const m1 = ph ? GM({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, h = K.headline(m, m1, K.askedOf(prog)), pk = parkOf(m, m1), whole = twoPhase(m, m1);
     let f = null; try { f = RUN.finOf(pfRun(P(), pl)); } catch (e) { f = null; }
     const v = pl.variant, neg = x => x != null && x < 0 ? ' class="neg"' : '', d = f ? K.moneyDigits([f.cost, f.value]) : 1, arr = v ? RUN.baseName(v.name) : 'Drawn by hand';
     const st = (k, big, sub, tip, cls = '') => '<div class="sp-ov-s' + cls + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '><small>' + k + '</small><b>' + big + '</b>' + (sub ? '<i>' + sub + '</i>' : '') + '</div>';
@@ -1637,10 +1649,15 @@ export function initSitePlan(ctx) {
         st('Coverage', pct(m.coverage), 'FAR ' + m.far.toFixed(2)) +
         (f ? f.forSale ? st('Margin', '<span' + neg(f.margin) + '>' + K.fmtPct(f.margin) + '</span>', 'cost ' + K.fmtM(f.cost, d), 'From the Pro forma: profit margin on sales, and the total cost with land')
           : st('Yield on cost', '<span' + neg(f.yoc) + '>' + K.fmtPct(f.yoc) + '</span>', '<span' + (f.value < f.cost ? ' class="neg"' : '') + '>' + K.fmtM(f.value, d) + '</span> / ' + K.fmtM(f.cost, d), 'From the Pro forma: yield on cost' + (f.spread != null ? ' (' + K.fmtPct(f.spread) + ' spread over the market cap rate)' : '') + '; under it the stabilized value / total cost with land') : '') + '</div>' +
-      (h.p2 ? '<div class="sp-ov-p2">' + esc(h.p2) + '</div>' : '') +
+      (h.p2 ? '<div class="sp-ov-p2">' + esc(h.p2) + '</div>' : '') + ovRange(pl) +
       '<div class="sp-ov-a"><button type="button" class="sp-ovb sp-ck ' + cl.level + '" id="spOvCk"' + (cl.level === 'ok' ? ' aria-disabled="true" title="Inside the lot and setbacks, no overlaps, enough parking"' : ' aria-expanded="' + open + '" aria-controls="spOvProbs" title="Show what to fix"') + '>' + (cl.level === 'ok' ? OK_IC : BAD_IC) + '<span>' + esc(cl.text) + '</span>' + (cl.level === 'ok' ? '' : CHEV) + '</button>' +
         (ed.variants?.length > 1 ? '<button type="button" class="sp-ovb" data-jump="spLayouts">Compare layouts</button>' : '') + '</div>' +
       (open ? '<ul class="sp-ov-probs" id="spOvProbs">' + probs.map(i => '<li>' + (i.id ? '<button type="button" data-issue="' + esc(i.id) + '" title="Select it on the map">' + esc(i.text) + '</button>' : '<span>' + esc(i.text) + '</span>') + '</li>').join('') + '</ul>' : '');
+  }
+  // a Waller plan's yield as a range over the scenarios (never one precise number while inputs are unresolved)
+  function ovRange(pl) {
+    if (!GON(pl)) return ''; const sc = scenarios(pl) || {}, yl = ['A', 'B', 'C'].map(k => sc[k]).filter(Boolean), r = G.range(yl, 'leasableSf');
+    return '<div class="sp-ov-p2 sp-ov-rg" title="Scenarios A (maximum code envelope) to C (conservative): Numbers has each">Leasable ' + esc(G.rangeText(r, ' sf')) + ' across scenarios A–C' + (sc.busy ? ' (working out the others…)' : '') + '</div>';
   }
   const SYNC_IC = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 6.4A5.4 5.4 0 0 0 3.4 4.6"/><path d="M3.1 1.9v2.9H6"/><path d="M2.8 9.6a5.4 5.4 0 0 0 9.8 1.8"/><path d="M12.9 14.1v-2.9H10"/></svg>';
   const ICO = {
@@ -1673,6 +1690,7 @@ export function initSitePlan(ctx) {
   };
   function panel() {
     const p = P(), pl = PL(); if (!p || !pl) return;
+    if (guardSite(p, pl)) draw(); // the site's jurisdiction (the Waller guardrails) kept up to date on the option
     const sel = pl.elements.find(e => e.id === ed.sel), prog = SP.normalizeProgram(pl.program), noRing = pl.ring.length < 3, drawing = noRing || ed.mode === 'draw', has = pl.elements.length > 0;
     const parcel = p.parcels.find(x => x.key === pl.parcel), addr = parcel?.label || '', acres = noRing ? '' : (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' acres';
     const selNew = !!sel && sel.id !== ed.shownSel; ed.shownSel = sel?.id || null; // a new piece picked: the card goes to the top, where Selected is
@@ -1701,7 +1719,7 @@ export function initSitePlan(ctx) {
       spRender: () => renderHtml(p, pl),
       spExport: () => '<div class="bsec" id="spExport"><div class="lt">Export</div><div class="sp-g2 sp-exp"><button type="button" class="btn askai" id="spPdf" title="A conceptual site plan sheet: the plan to scale with title block, site data, program and parking, parcels, notes and legend">Site Plan PDF</button>' +
         '<select id="spSheet" aria-label="Sheet size"><option value="tabloid">11 × 17 sheet</option><option value="archd">24 × 36 sheet</option></select>' +
-        '<button type="button" class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button type="button" class="btn" id="spGeo" title="The plan as map shapes (GeoJSON)">Map File (GeoJSON)</button><button type="button" class="btn" id="spSum" title="The site and its numbers as text, for an email or a note">Copy Summary</button></div></div>'
+        '<button type="button" class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button type="button" class="btn" id="spGeo" title="The plan as map shapes (GeoJSON)">Map File (GeoJSON)</button><button type="button" class="btn" id="spSum" title="The site and its numbers as text, for an email or a note">Copy Summary</button>' + (GON(pl) ? '<button type="button" class="btn" id="spLandCsv" title="The Waller land-use reconciliation, scenarios, unresolved risks and required plan content, with the concept label (opens in Excel)">Land Use (CSV)</button>' : '') + '</div></div>'
     };
     const secs = planSections({ drawing, selected: !!sel, layouts: !!ed.variants, laidOut: has }).map(x => ({ ...x, html: HTML[x.id] }));
     const editBtn = has && !noRing ? '<button type="button" class="btn sm sp-edit' + (ed.editing ? ' on' : '') + '" aria-pressed="' + !!ed.editing + '" id="spEdit" title="Move, resize and turn pieces of the plan; only the piece you move changes (E)">' + ICO.edit + '<span>' + (ed.editing ? 'Stop Editing' : 'Edit Layout') + '</span></button>' : '';
@@ -1715,7 +1733,7 @@ export function initSitePlan(ctx) {
       plansHtml(p, pl) + (ed.run ? runHtml(ed.run) : '') +
       ctx.cardNav(secs.map(x => [x.id, x.label])) + '</div>' +
       (noRing ? '' : '<div class="bover" id="spOver">' + overview(pl, prog) + '</div>') + plansHtml(p, pl, 'sp-plans-ph') +
-      '<div class="sp-body">' + confirmHtml(pl) + staleBar(pl) + secs.map(x => x.html()).join('') +
+      '<div class="sp-body">' + guardBanner(pl) + confirmHtml(pl) + staleBar(pl) + secs.map(x => x.html()).join('') +
       (drawing ? '' : '<div class="sp-foot"><button type="button" class="btn sm ghost sp-del" id="spDelPlan">Delete This Option</button></div>') + '</div>';
     card.classList.add('open', 'sp-mode');
     const $ = q => card.querySelector(q), on = (q, fn) => { const el = $(q); if (el) el.onclick = fn; };
@@ -1760,8 +1778,9 @@ export function initSitePlan(ctx) {
     wireSel(sel);
     on('#spPdf', () => exportPdf(p, pl, card.querySelector('#spSheet').value));
     wireRender(p, pl);
-    on('#spDxf', () => ctx.saveFile(fileName(p, pl) + '.dxf', SP.toDXF(pl, p.name + ' - ' + pl.name), 'application/dxf'));
+    on('#spDxf', () => ctx.saveFile(fileName(p, pl) + '.dxf', SP.toDXF(G.effective(pl), p.name + ' - ' + pl.name + (GON(pl) ? '. ' + G.LABEL : '')), 'application/dxf'));
     on('#spGeo', () => ctx.saveFile(fileName(p, pl) + '.geojson', JSON.stringify(geojson(p, pl), null, 1), 'application/geo+json'));
+    on('#spLandCsv', () => ctx.saveFile(fileName(p, pl) + '-land-use.csv', G.csv(pl, scenYields(pl)), 'text/csv'));
     on('#spSum', async () => { const s = summary(p, pl); try { await navigator.clipboard.writeText(s); ctx.toast('Summary copied.'); } catch (e) { prompt('Copy the summary', s); } });
     card.querySelectorAll('details.bsec').forEach(d => d.addEventListener('toggle', tailRoom));
     on('#spDelPlan', () => { if (!confirm('Delete ' + pl.name + ' from ' + p.name + '?')) return; p.plans = p.plans.filter(x => x.id !== pl.id); save(p); ctx.closeCard(); ctx.setView('projects'); ctx.toast('Deleted ' + pl.name + ' from ' + p.name + '.'); });
@@ -1916,6 +1935,7 @@ export function initSitePlan(ctx) {
       '<div class="sp-prm-a"><button type="button" class="btn sm" id="spResolve"' + (pl.recipe || ed.variants ? '' : ' disabled') + ' title="Lays the layouts out again with these settings. It replaces the layout on the map, including any changes you made by hand (Undo brings them back).">New Layouts From These Settings</button></div>' +
       '<div class="sp-tgs">' + sw('auto', 'Update layouts as I change settings', ed.autoSolve !== false, 'New layouts each time a setting changes, never over a layout you’ve edited') + sw('refit', 'Re-fit the site after each edit', pl.view?.autoRefit !== false, 'After you move, resize or add a piece, the rest of the site is laid out again around it') + '</div>' +
       (ed.solveBar ? '<div class="sp-solvebar" id="spSolveBar" role="status"><b>Settings changed.</b> The layout on the map has your edits, so it wasn’t replaced.<span class="btnrow">' + (pl.recipe ? '<button type="button" class="btn sm primary" id="spRefitMine" title="Lay out everything else again with these settings, keeping the pieces you placed">Re-fit around my changes</button>' : '') + '<button type="button" class="btn sm" id="spNewLay" title="New layouts from these settings; the layout on the map, with your changes, is replaced (Undo brings it back)">New layouts (replaces your edits)</button></span></div>' : '') +
+      guardParams(pl) +
       grp('Program', fld('Use', '<select id="spUse">' + Object.entries(SP.USES).map(([k, x]) => '<option value="' + k + '"' + (k === u ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select>') +
         (u === 'storage' ? storageFields(prog) : u === 'foodtrucks' ? foodTruckFields(prog) : u === 'fuel' ? fuelFields(prog) : u === 'multifamily' ? num('perUnit', 'Parking', prog.perUnit, 0.05, '/ unit') + num('floors', 'Floors', prog.floors, 1) + num('eff', 'Efficiency', prog.eff, 0.01, '', { hint: 'net ÷ gross' })
           : SP.USES[u]?.garage ? num('perUnit', 'Parking', prog.perUnit, 0.25, '/ home') : num('ratio', 'Parking', prog.ratio, 0.1, '/ 1k sf') + num('floors', 'Floors', prog.floors, 1) + num('depth', 'Building depth', prog.depth, 5, 'ft')) +
@@ -1961,13 +1981,14 @@ export function initSitePlan(ctx) {
   }
   // stormwater (detention, retention, underground or none) and trash enclosures
   function stormHtml(pl, prog, pp, uses = SP.usesOf(prog)) {
-    const st = { ...SP.STORM, ...(pp.storm || {}) }, tr = pp.trash || {}, sn = pl.elements?.length ? SP.stormOf(pl) : null;
+    const gOn = GON(pl), R = gOn ? G.rulesOf(pl) : null, st = { ...SP.STORM, ...(pp.storm || {}) }, tr = pp.trash || {}, sn = pl.elements?.length ? SP.stormOf(G.effective(pl)) : null;
     const sel = (attr, label, v, opts) => fld(label, selCtl(attr, opts, v ?? ''));
     const pnum = (k, label, v, step, unit, ph = '') => fld(label, numCtl('min="0" data-k="' + k + '"', v, step, unit, ph));
     const need = sn ? (sn.mode === 'none' ? 'No storage on site' : 'Needs about ' + sn.volume.toFixed(1) + ' ac-ft' + (sn.mode === 'underground' ? ', all in vaults under the parking' : ' · pond ' + (sn.pond / 43560).toFixed(2) + ' ac' + (sn.vault > 0.05 ? ' · ' + sn.vault.toFixed(1) + ' ac-ft more underground' : ''))) : '';
-    return '<div class="sp-sub">Stormwater' + infoBtn((sn && sn.mode !== 'none' ? 'Sized for ' + sn.acres.toFixed(1) + ' developed acres. ' : '') + 'Local drainage rules (Harris County, the city) set the real number.', 'About stormwater') + '</div><div class="sp-fg">' +
+    return '<div class="sp-sub">Stormwater' + infoBtn((sn && sn.mode !== 'none' ? 'Sized for ' + sn.acres.toFixed(1) + ' developed acres. ' : '') + (gOn ? 'Waller guardrails: ' + R.det.why + ' (' + R.det.rate.toFixed(2) + ' ac-ft/ac). Acre-feet are volume: the pond’s footprint comes from it, the storage depth and side slopes (under Waller guardrails), 1 ft of freeboard, a 15 ft maintenance bench and an allowance for the outfall structure. A higher Storage here (a drainage study) wins.' : 'Local drainage rules (Harris County, the city) set the real number.'), 'About stormwater') + '</div><div class="sp-fg">' +
         sel('data-pr="storm"', 'Method', prog.storm, [['', 'Detention pond'], ['retention', 'Retention (wet) pond'], ['underground', 'Underground vaults'], ['none', 'None (regional)']]) +
-        pnum('ps-storm.rate', 'Storage', st.rate, 0.05, 'ac-ft/ac') + pnum('ps-storm.depth', 'Pond depth', st.depth, 0.5, 'ft') + pnum('detentionPct', 'Pond size', prog.detentionPct, 1, '%', 'auto') + '</div>' +
+        (gOn ? fld('Storage', numCtl('min="0" data-k="ps-storm.rate"', pp.storm?.rate ?? '', 0.05, 'ac-ft/ac', R.det.rate.toFixed(2)), { hint: 'at least ' + R.det.rate.toFixed(2) }) + '</div>'
+          : pnum('ps-storm.rate', 'Storage', st.rate, 0.05, 'ac-ft/ac') + pnum('ps-storm.depth', 'Pond depth', st.depth, 0.5, 'ft') + pnum('detentionPct', 'Pond size', prog.detentionPct, 1, '%', 'auto') + '</div>') +
         (need ? '<div class="rnote sp-1l" title="' + esc(need) + '">' + esc(need) + '</div>' : '') +
       (uses.every(x => SP.CART_USES.includes(x)) ? '' : // (homes roll carts to the curb: no enclosures to set)
       '<div class="sp-sub">Trash' + infoBtn('Homes roll carts to the curb. Apartments: a double enclosure (trash and recycling) per about 50 units, a compactor from 200. Shops and offices: one per about 25,000 sf, none more than about 250 ft away. Add or move them under Add.', 'About trash enclosures') + '</div><div class="sp-fg">' +
@@ -2004,6 +2025,8 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('[data-smixadd]').forEach(b => b.onclick = () => { const k = b.dataset.smixadd; change(x => { const m = sMix(x, k); m.push({ name: '10×' + (k === 'drive' ? 40 : 30), sf: k === 'drive' ? 400 : 300, pct: 0 }); stoSet(x, k + 'Mix', m); }); });
     const add = $('#spMixAdd'); if (add) add.onclick = () => change(x => { const m = mixOf(x); m.push({ name: 'New', sf: 900, pct: 0, beds: 2 }); x.program = { ...x.program, mix: m }; });
     card.querySelectorAll('[data-home]').forEach(i => i.onchange = () => { change(x => { const m = clone(SP.normalizeProgram(x.program).homeMix || SP.HOME_MIX), t = m.find(h => h.stories === +i.dataset.home); if (t) t.pct = +i.value; else m.push({ stories: +i.dataset.home, pct: +i.value }); x.program = { ...x.program, homeMix: m }; }); after(i); });
+    card.querySelectorAll('.sp-prog [data-gd]').forEach(i => i.onchange = () => { const k = i.dataset.gd, v = i.tagName === 'SELECT' ? i.value : i.value === '' ? null : +i.value; // the Waller guardrails' settings
+      change(x => { x.params = { ...(x.params || {}), guard: { ...(x.params?.guard || {}), [k]: v } }; }); if (k !== 'mode' || GON(PL()) || pl.laidAs) after(i); });
     const rs = $('#spResolve'); if (rs) rs.onclick = () => askReplace(() => resolve({ force: true }));
     const rm = $('#spRefitMine'); if (rm) rm.onclick = () => { ed.solveBar = false; refitNow(true); };
     const nl = $('#spNewLay'); if (nl) nl.onclick = () => resolve({ force: true, src: '#spNewLay' });
@@ -2073,7 +2096,7 @@ export function initSitePlan(ctx) {
     const same = () => ed === e0 && PL() === pl && ed.undo.length === mark && ed.undo[mark - 1] === top && JSON.stringify(pl.elements) === was && !drag && !(ed.run && !ed.run.applied);
     if (!r && refitNo && same()) { ctx.toast('Kept your change; the rest of the site couldn’t be re-fitted round it. ' + refitNo); return; } // (the plan stays as the edit left it)
     if (!r?.elements?.length || !same()) return; // something changed meanwhile: that change re-fits on its own
-    const at = els => ({ m: SP.metrics({ ...pl, elements: els }), issues: SP.check({ ...pl, elements: els }) }), v = T.refitVerdict(at(pl.elements), at(r.elements));
+    const at = els => ({ m: GM({ ...pl, elements: els }), issues: GC({ ...pl, elements: els }) }), v = T.refitVerdict(at(pl.elements), at(r.elements));
     if (!v.ok) { ctx.toast('Kept your change; re-fitting would ' + (v.why === 'problems' ? 'add problems' : 'lose ' + (v.why === 'units' ? 'units' : 'space')), { action: { label: 'Re-fit anyway', run: () => { if (same()) useRefit(pl, r); else if (ed === e0) refitNow(true); } } }); return; }
     useRefit(pl, r); ctx.toast(what + ' · rest of the site re-fitted', { action: { label: 'Undo', run: () => { if (ed === e0 && PL() === pl && ed.undo.length === mark) undo(true); } } });
   }
@@ -2093,7 +2116,7 @@ export function initSitePlan(ctx) {
     if (ed.run) { if (o.force) ctx.toast('Wait for the run under way, or Cancel it.'); else ed.solveLater = true; return; } // after it ends
     if (!o.force && dirty(pl)) { solveMark = null; showSolveBar(); return; }
     const label = solveLabel, mark = o.force ? null : solveMark; solveLabel = ''; solveMark = null; ed.solveBar = false;
-    const before = pl.elements.some(e => e.kind === 'building') ? SP.metrics(pl) : null, was = pl.variant ? { ...pl.variant } : null, hadAi = !!ed.variants?.some(v => v.ai);
+    const before = pl.elements.some(e => e.kind === 'building') ? GM(pl) : null, was = pl.variant ? { ...pl.variant } : null, hadAi = !!ed.variants?.some(v => v.ai);
     const run = startRun('resolve', ['Laying out new layouts with these settings'], o.src || '#spResolve'); if (!run) return;
     let out = []; try { out = await laid('options', { ...pl }, pl.program, { count: ed.variants?.length > 3 ? 12 : 3, ...koOpts(pl) }); } catch (e) { console.warn('layout', e); }
     if (!live(run) || PL() !== pl) return;
@@ -2105,7 +2128,7 @@ export function initSitePlan(ctx) {
     const ok = await useVariant(r.index >= 0 ? r.index : variants.findIndex(v => v.elements.length)); endRun(run); if (!ok) return;
     const now = PL()?.variant, lost = was?.key && !r.exact ? numOf(was) + ' no longer fits; showing the nearest (' + numOf(now) + '). ' : '';
     const depth = ed.undo.length, back = () => { if (!ed || PL() !== pl) return; if (mark != null && ed.undo.length === depth) { while (ed.undo.length > mark) undo(true); } else undo(true); }; // the new layout and, after a setting change, the setting
-    ctx.toast(lost + RUN.deltaText(label || 'New settings', before, SP.metrics(PL())), { action: { label: 'Undo', run: back } });
+    ctx.toast(lost + RUN.deltaText(label || 'New settings', before, GM(PL())), { action: { label: 'Undo', run: back } });
   }
 
   // the piece that's picked: its name and size, what can be done to it (a row of buttons), then its fields
@@ -2192,11 +2215,115 @@ export function initSitePlan(ctx) {
   }
   // Numbers: one grid of tiles, the zoning limit beside its figure; with a Phase 2, Phase 1 and the whole site side by side
   // (parking too: what was asked for first)
+  // ---------- the Waller guardrails (lib/guardrails.mjs) on the panel ----------
+  // The site's jurisdiction is kept on each option (pl.jur), from the project's facts (looked up once for the site, the
+  // project page's Jurisdiction & site). Inside Waller's limits or its 0.5-mile ETJ, or with the guardrails switched On
+  // in Site parameters, the option is laid out and reported under them: the concept label, a classification tag on each
+  // material number, the three scenarios, the land-use reconciliation, the unresolved risks and the section 10
+  // checklist. Every other option shows none of it.
+  const jurKey = j => j ? JSON.stringify([j.status, j.cls, j.reason, j.flood, j.road, j.water, j.utilities]) : '';
+  function syncJur(p, pl) {
+    if (!p || !pl || !(pl.ring?.length >= 3) || !pl.origin) return false;
+    let j = null; try { const f = factsOf(p), at = SP.frame(pl.origin).toLL(SP.centroid(pl.ring)); if (!f && !pl.jur && G.milesBetween(at, G.WALLER.center) >= 8) return false; j = G.jurisdictionOf(f, at); } catch (e) { return false; } // (far from Waller with nothing looked up: nothing to keep)
+    if (jurKey(j) === jurKey(pl.jur)) return false;
+    pl.jur = j; if (p.plans.includes(pl)) quietSave(p); return true;
+  }
+  // the facts for the site: what the project has, else (near Waller only: nowhere else needs them here) looked up now,
+  // and the option is drawn again if that changed it
+  function guardSite(p, pl) {
+    const ch = syncJur(p, pl), at = pl?.origin && pl.ring?.length >= 3 ? SP.frame(pl.origin).toLL(SP.centroid(pl.ring)) : null;
+    if (p && pl && at && G.milesBetween(at, G.WALLER.center) < 8 && needSite(p)) gatherSite(p).then(() => { const pl2 = PL(); if (pl2 && pl2.id === pl.id && syncJur(P(), pl2)) { draw(); panel(); } }).catch(() => {});
+    return ch;
+  }
+  const CLS_K = { [G.CLS.V]: 'v', [G.CLS.O]: 'o', [G.CLS.E]: 'e', [G.CLS.U]: 'u' };
+  const tagH = (t, src) => { const c = t?.cls || t; return c && CLS_K[c] ? '<i class="sp-cls ' + CLS_K[c] + '" title="' + esc(c + ((src ?? t?.src) ? ': ' + (src ?? t.src) : '')) + '">' + esc(G.CLS_SHORT[c]) + '</i>' : ''; };
+  // the concept label (short, the whole of it a click away), where the guardrails come from and the scenario laid out
+  function guardBanner(pl) {
+    if (!GON(pl)) return '';
+    const g = G.settingsOf(pl), J = pl.jur || {}, sc = G.SCENARIOS[g.scenario];
+    const where = J.status === 'city' ? 'Inside the City of Waller' : J.status === 'etj' ? 'In Waller’s ETJ (within 0.5 mile of the city limits)' : 'Switched on in Site parameters';
+    const stale = pl.recipe && pl.elements.length && pl.laidAs !== g.scenario ? '<div class="sp-gstale">The layout on the map was made ' + (pl.laidAs ? 'for scenario ' + esc(pl.laidAs) : 'before the guardrails applied') + '. <button type="button" class="sp-link" data-gscen="' + g.scenario + '">Lay out ' + g.scenario + ' (' + esc(sc.short.toLowerCase()) + ')</button></div>' : '';
+    return '<div class="sp-guard" id="spGuard" role="note" aria-label="Concept label"><div class="sp-gl"><b>' + esc(G.LABEL_SHORT) + '</b> <button type="button" class="sp-link" id="spGLab" aria-expanded="' + !!ed.gLabel + '" aria-controls="spGLabF">' + (ed.gLabel ? 'Less' : 'Full label') + '</button></div>' +
+      '<p class="sp-glf" id="spGLabF"' + (ed.gLabel ? '' : ' hidden') + '>' + esc(G.LABEL) + '</p>' +
+      '<div class="sp-gj"><span>Waller guardrails on · ' + esc(where) + '</span> ' + tagH(J.cls || G.CLS.U, J.reason || '') + '<span>Laid out as <b>' + sc.id + ' · ' + esc(sc.name) + '</b></span></div>' + stale + '</div>';
+  }
+  // the guardrails' own settings in Site parameters: the switch on every plan; the rest when they're on
+  function guardParams(pl) {
+    const g = G.settingsOf(pl), on = GON(pl), J = pl.jur || {}, d = pl.params?.guard || {};
+    const sel = (k, label, v, opts, o = {}) => fld(label, selCtl('data-gd="' + k + '"', opts, v), o), n = (k, label, v, step, unit, o = {}) => fld(label, numCtl('min="' + (o.min ?? 0) + '"' + (o.max != null ? ' max="' + o.max + '"' : '') + ' data-gd="' + k + '"', v, step, unit, o.ph), o);
+    const auto = J.status === 'city' ? 'Auto (inside Waller: on)' : J.status === 'etj' ? 'Auto (Waller ETJ: on)' : J.status === 'unknown' ? 'Auto (not checked yet: off)' : 'Auto (not Waller: off)';
+    return '<div class="sp-sub">Waller guardrails' + infoBtn('The Finishes Solutions site-planning standard for the City of Waller and its extraterritorial jurisdiction (0.5 mile past the city limits; unverified). Auto turns it on there; On tries it anywhere. ' + (J.reason || ''), 'About the Waller guardrails') + '</div><div class="sp-fg">' +
+      sel('mode', 'Waller guardrails', g.mode, G.MODES.map(([k, t]) => [k, k === 'auto' ? auto : t])) +
+      (on ? sel('scenario', 'Scenario laid out', g.scenario, Object.values(G.SCENARIOS).map(x => [x.id, x.id + ' · ' + x.name])) + n('factor', 'Owner factor', d.factor ?? '', 1, '%', { max: 5, ph: '5', hint: '0–5%' }) +
+        sel('outfall', 'Outfall', g.outfall, G.OUTFALLS) + n('row', 'ROW reserve along frontage', d.row ?? '', 1, 'ft', { ph: '0', hint: 'C: 10 ft or more' }) +
+        n('depth', 'Storage depth (avg)', d.depth ?? '', 0.5, 'ft', { min: 1, ph: String(G.WALLER.detention.depth.value) }) + n('slope', 'Side slopes', d.slope ?? '', 0.5, ': 1', { min: 2, ph: String(G.WALLER.detention.slope.value) }) : '') + '</div>';
+  }
+  // the scenarios A, B and C: the one on the map from its own layouts, the others laid out in the background (the
+  // worker) once for each set of settings; every figure pooled as lib/guardrails.mjs bestByScenario says
+  const scen = new Map(); let scenT = 0, scenOn = '';
+  const scenKey = pl => RUN.hash(JSON.stringify([pl.ring, pl.front, pl.streets, pl.program, pl.setbacks, pl.zoning, { ...(pl.params || {}), guard: { ...(pl.params?.guard || {}), scenario: null } }, pl.jur, (pl.elements || []).filter(e => e.kind === 'keepout')]));
+  function scenarios(pl) {
+    if (!GON(pl)) return null;
+    const k = scenKey(pl), cur = G.settingsOf(pl).scenario; let S0 = scen.get(k);
+    if (!S0) { S0 = { runs: {}, busy: true }; scen.set(k, S0); if (scen.size > 24) scen.delete(scen.keys().next().value); }
+    if (S0.busy && scenOn !== k) { scenOn = k; clearTimeout(scenT); scenT = setTimeout(() => runScen(pl.id, k), 900); }
+    const mine = (ed?.variants || []).filter(v => v.elements?.length && v.laidAs === cur).slice(0, 3).map(v => ({ plan: planFor(v, pl), scenario: cur }));
+    const cands = [{ plan: pl, scenario: pl.laidAs || cur, onMap: true }, ...mine, ...Object.values(S0.runs).flat()];
+    const sig = k + '|' + planSig(pl) + '|' + cur + '|' + (pl.laidAs || '') + '|' + mine.length + '|' + Object.keys(S0.runs).join('');
+    if (S0.sig !== sig) { S0.sig = sig; try { S0.best = G.bestByScenario(cands); } catch (e) { console.warn('scenarios', e); S0.best = {}; } }
+    return { ...S0.best, busy: S0.busy, cur };
+  }
+  async function runScen(plid, k) {
+    const S0 = scen.get(k); if (!S0) return;
+    for (const s of ['A', 'B', 'C']) {
+      while (ed?.run) await new Promise(r => setTimeout(r, 700)); // never ahead of the person's own layouts
+      const pl = PL(); if (!pl || pl.id !== plid || scenKey(pl) !== k) { S0.busy = true; scenOn = ''; return; }
+      if (S0.runs[s]) continue;
+      const p2 = G.withScenario({ ...pl }, s);
+      let out = []; try { out = await laid('options', p2, p2.program, { count: 3, ...koOpts(p2) }); } catch (e) { console.warn('scenario ' + s, e); }
+      S0.runs[s] = out.filter(o => o.elements?.length).slice(0, 2).map(o => ({ plan: { ...p2, program: o.program || p2.program, params: o.params || p2.params, elements: o.elements }, scenario: s }));
+    }
+    S0.busy = false; scenOn = ''; const pl = PL(); if (pl?.id !== plid || scenKey(pl) !== k) return;
+    const typing = card.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName); if (typing || drag || ed?.run) nums(); else panel(); // the overview's range too, unless someone's typing
+  }
+  // one click: lay the option out as scenario s (the layout on the map with your edits asks first, as always)
+  function layScenario(s) {
+    const pl = PL(); if (!pl || !G.SCENARIOS[s]) return;
+    askReplace(() => { change(x => { x.params = { ...(x.params || {}), guard: { ...(x.params?.guard || {}), scenario: s } }; }, true); resolve({ force: true, src: '[data-gscen="' + s + '"]' }); });
+  }
+  const FMT = { sf: v => v ? f0(v) + ' sf' : '—', n: v => v ? f0(v) : '—', pct: v => v.toFixed(1) + '%', af: v => v ? v.toFixed(2) + ' ac-ft' : '—', ac: v => v ? (v / 43560).toFixed(2) + ' ac' : '—' };
+  function guardNums(pl) {
+    const sc = scenarios(pl), T = G.landTable(pl), R = G.risks(pl), C = G.checklist(pl), g = G.settingsOf(pl), Rr = G.rulesOf(pl);
+    const ys = ['A', 'B', 'C'].map(k => sc?.[k]), yl = ys.filter(Boolean), lr = G.range(yl, 'leasableSf'), br = G.range(yl, 'buildingSf'), ur = G.range(yl, 'units');
+    const row = (label, key, f, tag) => '<tr><th scope="row">' + label + (tag ? ' ' + tagH(tag) : '') + '</th>' + ys.map((y, i) => '<td' + (['A', 'B', 'C'][i] === sc?.cur ? ' class="on"' : '') + '>' + (y ? f(y[key], y) : sc?.busy ? '…' : '—') + '</td>').join('') + '</tr>';
+    const head = '<tr><th></th>' + ['A', 'B', 'C'].map(k => { const S1 = G.SCENARIOS[k], y = sc?.[k], here = k === sc?.cur; return '<th scope="col"' + (here ? ' class="on"' : '') + ' title="' + esc(S1.name + ': ' + S1.what) + '"><b>' + k + '</b><small>' + esc(S1.short) + '</small>' + (here ? '<em' + (y && !y.onMap ? ' title="A better layout for ' + k + ' was found than the one on the map: these are its numbers. Layouts lists them all.">On the map; best shown' : '>On the map') + '</em>' : '<button type="button" class="btn sm" data-gscen="' + k + '" title="Lay the option out as ' + esc(S1.name.toLowerCase()) + '">Lay out ' + k + '</button>') + (y && !y.ok ? '<em class="neg">Doesn’t pass</em>' : y && y.from !== k ? '<em title="The best layout that fits these rules was made for scenario ' + y.from + ' (it holds this scenario’s rules too)">uses ' + y.from + '’s layout</em>' : '') + '</th>'; }).join('') + '</tr>';
+    const scenH = '<div class="sp-gsec" id="spScen"><div class="sp-sub">Scenarios' + infoBtn('A: verified minimums, no owner factor. B: the Finishes base case (5% directional factor, at least 1.00 ac-ft per developed acre). C: B plus reserves for what is unresolved (ROW, flood, easement buffers, detention while the outfall is unknown). Each column is the best layout found that passes its rules; a layout made for a stricter scenario counts for a looser one.', 'About the scenarios') + (sc?.busy ? ' <span class="sp-gbusy" role="status">laying out the others…</span>' : '') + '</div>' +
+      '<p class="sp-grange" id="spRange"><b>Leasable ' + esc(G.rangeText(lr, ' sf')) + '</b>' + (ur && ur.hi ? ' · ' + esc(G.rangeText(ur, ' units', x => x)) : '') + ' · building ' + esc(G.rangeText(br, ' sf')) + ' <small>(a range: survey, title, flood, outfall, utilities and access are unresolved)</small></p>' +
+      '<div class="sp-gtw"><table class="sp-gt sp-gscen">' + head + row('Building', 'buildingSf', FMT.sf) + row('Leasable', 'leasableSf', FMT.sf) + (yl.some(y => y.lots) ? row('Lots', 'lots', FMT.n, G.CLS.O) : yl.some(y => y.units) ? row('Units', 'units', FMT.n, G.CLS.U) : '') + row('Parking req.', 'parkingRequired', FMT.n, G.tagsOf(pl).parking) + row('Parking provided', 'parkingProvided', FMT.n) + row('Impervious', 'imperviousPct', FMT.pct, G.CLS.E) +
+        row('Detention', 'detentionAcFt', (v, y) => FMT.af(v) + (y.detentionRate ? '<small>' + y.detentionRate.toFixed(2) + ' / ac</small>' : ''), Rr.det.cls) + row('Pond footprint', 'detentionFootprintSf', (v, y) => FMT.ac(v) + '<small>' + FMT.ac(y.detentionDrawnSf) + ' drawn</small>', G.CLS.E) + '</table></div></div>';
+    const bas = (b, c) => '<small>' + esc(b) + ' ' + tagH(c) + '</small>'; // each row's basis and classification under its name
+    const landH = '<details class="sp-gsec" id="spLand" open><summary class="sp-sub">Land-use reconciliation · ' + esc(G.SCENARIOS[g.scenario].id) + '</summary><div class="sp-gtw"><table class="sp-gt sp-gland"><tr><th>Metric · basis</th><th>Acres</th><th>%</th></tr>' +
+      T.rows.map(r => '<tr' + (r.total || r.key === 'gross' ? ' class="tot"' : '') + '><th scope="row">' + esc(r.label) + bas(r.basis, r.cls) + '</th><td>' + (r.key === 'gross' || r.key === 'net' || !r.acres ? '' : '−') + Math.abs(r.acres).toFixed(2) + '</td><td>' + (Math.abs(r.pct) * 100).toFixed(1) + '%</td></tr>').join('') +
+      T.qty.map(q => '<tr class="q"><th scope="row">' + esc(q.label) + bas(q.basis, q.cls) + '</th><td colspan="2">' + esc(q.qty) + '</td></tr>').join('') + '</table></div></details>';
+    const riskH = '<details class="sp-gsec" id="spRisks" open><summary class="sp-sub">Unresolved risks · ' + R.length + '</summary><ul class="sp-grisk">' + R.map(r => '<li><b>' + esc(r.title) + '</b> ' + tagH(r.cls) + (r.stop ? ' <i class="sp-gstop">Stop condition</i>' : '') + '<span>' + esc(r.why) + '</span></li>').join('') + '</ul></details>';
+    const cnt = k => C.filter(c => c.status === k).length;
+    const listH = '<details class="sp-gsec" id="spCheck"' + (ed.gCheck ? ' open' : '') + '><summary class="sp-sub">Required plan content · ' + cnt('shown') + ' shown, ' + cnt('unresolved') + ' unresolved' + (cnt('na') ? ', ' + cnt('na') + ' N/A' : '') + '</summary><ul class="sp-gcl">' + C.map(c => '<li class="' + c.status + '"><i>' + (c.status === 'shown' ? 'Shown' : c.status === 'na' ? 'N/A' : 'Unresolved') + '</i><b>' + esc(c.item) + '</b><span>' + esc(c.note) + '</span></li>').join('') + '</ul></details>';
+    return '<div class="sp-gnums" id="spGuardNums">' + scenH + landH + riskH + listH + '</div>';
+  }
+  function wireGuard() {
+    card.querySelectorAll('[data-gscen]').forEach(b => b.onclick = () => layScenario(b.dataset.gscen));
+    const lb = card.querySelector('#spGLab'); if (lb) lb.onclick = () => { ed.gLabel = !ed.gLabel; const f = card.querySelector('#spGLabF'); if (f) f.hidden = !ed.gLabel; lb.textContent = ed.gLabel ? 'Less' : 'Full label'; lb.setAttribute('aria-expanded', String(!!ed.gLabel)); };
+    const ck = card.querySelector('#spCheck'); if (ck) ck.ontoggle = () => { ed.gCheck = ck.open; };
+  }
+  // AI text shown on a Waller plan: prohibited conclusions rewritten (lib/guardrails.mjs scrub)
+  const KEEP_AI = new Set(['id', 'ids', 'use', 'kind', 'type', 'model', 'form', 'streets', 'storm', 'where', 'pattern', 'product', 'key']);
+  const scrubDeep = v => Array.isArray(v) ? v.map(scrubDeep) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, KEEP_AI.has(k) ? x : scrubDeep(x)])) : typeof v === 'string' ? G.scrubText(v) : v;
   function nums() {
     const el = card.querySelector('#spNums'), pl = PL(); if (!el || !pl) return;
     if (pl.ring.length < 3) { el.innerHTML = ''; return; }
-    const m = SP.metrics(pl), issues = SP.check(pl), prog = SP.normalizeProgram(pl.program), z = pl.zoning || {}, ph = pl.elements.some(e => e.phase === 2), cs = CU.customStats(pl);
-    const m1 = ph ? SP.metrics({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, pk = parkOf(m, m1), whole = twoPhase(m, m1);
+    const m = GM(pl), issues = GC(pl), prog = SP.normalizeProgram(pl.program), z = pl.zoning || {}, ph = pl.elements.some(e => e.phase === 2), cs = CU.customStats(pl);
+    const m1 = ph ? GM({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, pk = parkOf(m, m1), whole = twoPhase(m, m1);
+    const gOn = GON(pl), gT = gOn ? G.tagsOf(pl) : null, TG = k => gT ? ' ' + tagH(gT[k]) : ''; // a Waller plan: each number's classification
     const tile = (k, v, sub, cls = '') => '<div class="sp-tile' + cls + '"><span>' + k + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
     const pair = (k, a, b, sub, cls = '') => '<div class="sp-tile two' + cls + '"><span>' + k + '</span><div class="sp-tv"><b>' + a + '<small>Phase 1</small></b><b>' + b + '<small>Whole site</small></b></div>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
     const two = (k, f, sub, cls = '') => m1 ? pair(k, f(m1), f(m), sub, cls) : tile(k, f(m), sub, cls);
@@ -2205,24 +2332,25 @@ export function initSitePlan(ctx) {
     const homes = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr'), byStory = [1, 2, 3].map(n => [n, homes.filter(e => e.floors === n).length]).filter(([, c]) => c);
     const pSub = (m.gfa ? 'needed at ' + ratioAt + ' · ' : '') + (m.units ? m.perUnit.toFixed(2) + ' / unit' : m.per1k.toFixed(1) + ' / 1,000 sf') + (m.garages ? ' · ' + f0(m.garages) + ' in garages' : '') + (m.driveways ? ' · ' + f0(m.driveways) + ' on driveways' : ''), pBad = m.gfa && pk.stalls < pk.need ? ' bad' : '';
     el.innerHTML = '<div class="lt">Numbers' + infoBtn((whole ? 'Phase 1 is what was asked for; the whole site includes Phase 2. Paving and ponds are counted for the whole site. ' : '') + 'A planning sketch from the parcel outline: not a survey, and no engineering (grading, utilities, fire lanes, code review).', 'About these numbers') + '</div><div class="sp-tiles">' +
-      tile('Site', m.acres.toFixed(2) + ' ac', f0(m.siteSf) + ' sf') +
-      two('Floor area', x => x.gfa ? f0(x.gfa) + ' sf' : '—', m.gfa ? plural(m.buildings, 'building') + (m.nrsf ? ' · ' + f0(m.nrsf) + ' net rentable' : '') : '') +
-      (m.units ? two('Units', x => f0(x.units || 0), m.duAc.toFixed(1) + ' per acre' + (m.beds ? ' · ' + f0(m.beds) + ' beds' : '')) : '') +
+      tile('Site' + TG('site'), m.acres.toFixed(2) + ' ac', f0(m.siteSf) + ' sf') +
+      two('Floor area' + TG('gfa'), x => x.gfa ? f0(x.gfa) + ' sf' : '—', m.gfa ? plural(m.buildings, 'building') + (m.nrsf ? ' · ' + f0(m.nrsf) + ' net rentable' : '') : '') +
+      (m.units ? two('Units' + TG('units'), x => f0(x.units || 0), m.duAc.toFixed(1) + ' per acre' + (m.beds ? ' · ' + f0(m.beds) + ' beds' : '')) : '') +
       (m.fuel ? tile('Fuel', f0(m.fuel.positions) + ' positions', m.fuel.mpds + ' pumps · ' + f0(m.fuel.canopySf) + ' sf canopy · ' + f0(m.fuel.storeSf) + ' sf store' + (m.fuel.washSf ? ' · car wash' : '') + (m.fuel.vac ? ' · ' + m.fuel.vac + ' air / vac' : '')) : '') +
       (cs ? customTile(cs, tile) : '') + (m.storage && !cs ? two('Storage', x => x.storage ? f0(x.storage.nrsf) + ' sf' : '—', 'rentable · ~' + f0(m.storage.units) + ' units (' + f0(m.storage.climateUnits) + ' climate, ' + f0(m.storage.driveUnits) + ' drive-up)' + (m.storage.rv ? ' · ' + m.storage.rv + ' RV / boat' : '')) : '') +
       (m.foodtrucks ? tile('Food trucks', f0(m.foodtrucks.trucks), '~' + f0(m.foodtrucks.seats) + ' seats (covered and patio)') + tile('Park buildings', f0(m.foodtrucks.pavilionSf) + ' sf pavilion', f0(m.foodtrucks.restroomSf) + ' sf restrooms · ' + (m.foodtrucks.barSf ? f0(m.foodtrucks.barSf) + ' sf bar' + (m.foodtrucks.patioSf ? ' + ' + f0(m.foodtrucks.patioSf) + ' sf patio' : '') : 'no bar')) : '') +
-      (whole ? pair('Parking (spaces / needed)', f0(pk.stalls) + ' / ' + f0(pk.need), f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad) : tile('Parking', f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad)) +
-      two('Coverage', x => pct(x.coverage) + (x === m ? max(m.coverage * 100, z.max_coverage_pct, v => v + '%') : ''), '', +z.max_coverage_pct && m.coverage * 100 > +z.max_coverage_pct ? ' bad' : '') +
-      two('FAR', x => x.far.toFixed(2) + (x === m ? max(m.far, z.max_far, v => String(v)) : ''), '', +z.max_far && m.far > +z.max_far ? ' bad' : '') +
-      tile('Detention', m.pond ? (m.pond / 43560).toFixed(2) + ' ac' : '—', m.pond ? pct(m.pond / m.siteSf) + ' of the site' : '') +
-      tile('Paved + roofs', pct(m.impervious)) + tile('Open space', pct(m.green)) +
-      (m.heightFt ? tile('Height', 'about ' + m.heightFt + ' ft', +z.max_building_height_ft ? 'max ' + z.max_building_height_ft + ' ft' : '', +z.max_building_height_ft && m.heightFt > +z.max_building_height_ft ? ' bad' : '') : '') + '</div>' +
+      (whole ? pair('Parking (spaces / needed)' + TG('parking'), f0(pk.stalls) + ' / ' + f0(pk.need), f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad) : tile('Parking' + TG('parking'), f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad)) +
+      two('Coverage' + TG('coverage'), x => pct(x.coverage) + (x === m ? max(m.coverage * 100, z.max_coverage_pct, v => v + '%') : ''), '', +z.max_coverage_pct && m.coverage * 100 > +z.max_coverage_pct ? ' bad' : '') +
+      two('FAR' + TG('far'), x => x.far.toFixed(2) + (x === m ? max(m.far, z.max_far, v => String(v)) : ''), '', +z.max_far && m.far > +z.max_far ? ' bad' : '') +
+      tile('Detention' + TG('detention'), m.pond ? (m.pond / 43560).toFixed(2) + ' ac' : '—', m.pond ? pct(m.pond / m.siteSf) + ' of the site' : '') +
+      tile('Paved + roofs' + TG('impervious'), pct(m.impervious)) + tile('Open space' + TG('open'), pct(m.green)) +
+      (m.heightFt ? tile('Height' + TG('height'), 'about ' + m.heightFt + ' ft', +z.max_building_height_ft ? 'max ' + z.max_building_height_ft + ' ft' : '', +z.max_building_height_ft && m.heightFt > +z.max_building_height_ft ? ' bad' : '') : '') + '</div>' +
       (m.mix.length ? '<table class="sp-mixt"><tr><th>Unit</th><th>SF</th><th>Units</th><th>%</th><th>Net sf</th></tr>' + m.mix.map(t => '<tr><td>' + esc(t.name) + '</td><td>' + f0(t.sf) + '</td><td>' + f0(t.n) + '</td><td>' + pct(t.n / Math.max(1, m.mix.reduce((s, x) => s + x.n, 0))) + '</td><td>' + f0(t.n * t.sf) + '</td></tr>').join('') + '</table>' : '') +
       (m.storage?.units ? storageTable(m.storage, prog) : '') +
       (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + n + '-story</td><td>' + f0(SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
       (cs ? customBlock(cs) : '') +
-      (issues.length ? '<ul class="sp-issues">' + issues.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul>' : m.gfa ? '<div class="rnote sp-ok">Fits the setbacks' + (m.spaces >= m.required ? ' and parks' : '') + '.</div>' : '');
-    el.querySelector('#spSaveType')?.addEventListener('click', saveTypeToLib);
+      (issues.length ? '<ul class="sp-issues">' + issues.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul>' : m.gfa ? '<div class="rnote sp-ok">Fits the setbacks' + (m.spaces >= m.required ? ' and parks' : '') + (gOn ? ', within the planning checks' : '') + '.</div>' : '') +
+      (gOn ? guardNums(pl) : '');
+    el.querySelector('#spSaveType')?.addEventListener('click', saveTypeToLib); if (gOn) wireGuard();
   }
   // an AI-crafted type in Numbers: its figures, what was drawn of its outdoor pieces or sites, its parking rule and the
   // AI's assumptions, and Save to Library
@@ -2249,7 +2377,7 @@ export function initSitePlan(ctx) {
   const landGuess = (p, pl) => { const recs = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean), v = recs.map(r => r.marketValue || r.landValue);
     return recs.length && v.every(x => +x > 0) ? Math.round(v.reduce((s, x) => s + +x, 0)) : null; };
   const pfMerge = (d, o) => { const out = { ...d }; for (const [k, v] of Object.entries(o || {})) out[k] = v && typeof v === 'object' && !Array.isArray(v) ? { ...(d[k] || {}), ...v } : v; return out; };
-  function pfRun(p, pl) { if (!pl.elements.some(e => e.kind === 'building')) return null; const d = PF.defaults(pl, landGuess(p, pl)); return PF.run(pl, pfMerge(d, pl.pf)); }
+  function pfRun(p, pl) { if (!pl.elements.some(e => e.kind === 'building')) return null; const e = G.effective(pl), d = PF.defaults(e, landGuess(p, pl)); return PF.run(e, pfMerge(d, pl.pf)); } // (a Waller plan: priced with its scenario's parking and detention)
   const PF_LIM = { exitCap: [0.5, 20], marketCap: [0.5, 20], vacancyPct: [0, 100], softPct: [0, 100], contPct: [0, 100], feePct: [0, 100], ltc: [0, 100], taxPct: [0, 20], rate: [0, 30], permRate: [0, 30], amort: [1, 60], hold: [0, 30], landPrice: [0, null] };
   function pfHtml(p, pl) {
     let R = null; try { R = pfRun(p, pl); } catch (e) { console.warn('pro forma', e); }
@@ -2312,6 +2440,7 @@ export function initSitePlan(ctx) {
       if (!window.XLSX) { ctx.toast('Excel export is still loading. Try again in a moment.'); ctx.loadXlsx?.(); return; }
       const R = pfRun(p, PL()); if (!R) return; const wb = XLSX.utils.book_new(), sheets = PF.workbook(R, p.name + ' · ' + pl.name);
       for (const [name, rows] of Object.entries(sheets)) { const ws = XLSX.utils.aoa_to_sheet(rows.map(r => r.map(c => c && typeof c === 'object' ? { t: 'n', v: 0, f: c.f } : c))); ws['!cols'] = [{ wch: 34 }, ...Array(12).fill({ wch: 15 })]; XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31)); }
+      if (GON(PL())) { const ws = XLSX.utils.aoa_to_sheet(G.rowsOf(PL(), scenYields(PL()))); ws['!cols'] = [{ wch: 40 }, { wch: 16 }, { wch: 12 }, { wch: 70 }, { wch: 24 }]; XLSX.utils.book_append_sheet(wb, ws, 'Waller land use'); } // the label, the land-use reconciliation, scenarios, risks and checklist
       ctx.saveFile(fileName(p, pl) + '-pro-forma.xlsx', new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' })), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     };
   }
@@ -2433,7 +2562,11 @@ export function initSitePlan(ctx) {
   async function askFacts(p, pl) {
     let R = null, pieces = [], known = []; try { R = pfRun(p, pl); } catch (e) { /* no pro forma */ } try { pieces = ED.describePlan(pl).pieces; } catch (e) { /* totals only */ }
     try { known = await Promise.race([factsFor(pl), new Promise(res => setTimeout(() => res([]), 4000))]) || []; } catch (e) { known = []; }
-    return ASK.planFacts(pl, { site: siteInfo(p, pl), siteFacts: known, pieces, pf: R, variants: ed.variants, project: p.name });
+    const F = ASK.planFacts(pl, { site: siteInfo(p, pl), siteFacts: known, pieces, pf: R, variants: ed.variants, project: p.name });
+    if (GON(pl)) try { const sc = scenarios(pl) || {}, T = G.landTable(pl); F.wallerGuardrails = { label: G.LABEL, scenario: G.settingsOf(pl).scenario, jurisdiction: pl.jur?.reason || '', // what the guardrails make of the plan
+      scenarios: Object.fromEntries(['A', 'B', 'C'].map(k => [k, sc[k] ? { buildingSf: sc[k].buildingSf, leasableSf: sc[k].leasableSf, units: sc[k].units, lots: sc[k].lots, parkingRequired: sc[k].parkingRequired, detentionAcFt: sc[k].detentionAcFt } : null])),
+      landUse: T.rows.map(r => ({ metric: r.label, acres: +r.acres.toFixed(2), basis: r.basis, classification: r.cls })), unresolvedRisks: G.risks(pl).map(r => r.title + (r.stop ? ' (stop condition)' : '')) }; } catch (e) { /* the plan's own facts are enough */ }
+    return F;
   }
   async function askPlan(qIn) {
     const p = P(), pl = PL(); if (!pl?.elements.length) return; const A = askLog(pl), e0 = ed;
@@ -2474,7 +2607,10 @@ export function initSitePlan(ctx) {
   }
   const effOn = id => { const e = id && ASK.EFFORTS.find(x => x.id === id); return e ? ' <span class="sp-effon' + (e.id === 'ultra' ? ' u' : '') + '" title="How hard the AI worked on it">' + (e.id === 'ultra' ? SPARK : '') + e.label + '</span>' : ''; };
   const factsFor = pl => (ed.facts?.id === pl.id + ':' + pl.ring.length ? ed.facts.p : (ed.facts = { id: pl.id + ':' + pl.ring.length, p: siteFacts(pl).catch(() => []) }).p); // flood, roads, districts, utilities: asked once per site
-  const post = async (body, signal) => { const md = ctx.aiModel?.(), r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(md ? { ...body, model: md } : body), signal }); ctx.noteModel?.(r); const d = await r.json().catch(() => ({})); if (!r.ok) { const e = Object.assign(new Error(d.error || 'AI unavailable'), { status: r.status }); aiSaw(e); throw e; } ctx.spAiOff = 0; return d; };
+  // a Waller plan's requests carry its guardrails (the server adds their instruction and values to the AI's), and what
+  // comes back has the prohibited conclusions rewritten before it's shown
+  const post = async (body, signal) => { const ga = ['bestuse', 'askProject'].includes(body.mode) ? null : G.forAI(PL() || {}); if (ga) body = { ...body, guardrails: ga };
+    const md = ctx.aiModel?.(), r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(md ? { ...body, model: md } : body), signal }); ctx.noteModel?.(r); const d = await r.json().catch(() => ({})); if (!r.ok) { const e = Object.assign(new Error(d.error || 'AI unavailable'), { status: r.status }); aiSaw(e); throw e; } ctx.spAiOff = 0; return ga ? scrubDeep(d) : d; };
   // an option as the AI sees it: the plan drawing as a picture, its numbers and what the checks found
   async function planImage(plan) {
     const svg = planSVG(plan, { px: 1000 }).svg, img = new Image();
@@ -2484,8 +2620,8 @@ export function initSitePlan(ctx) {
   }
   async function forReview(v, plan, withImage) {
     const p2 = { ...plan, elements: v.elements, program: v.program || plan.program, params: v.params || plan.params }, m = v.m, B = v.elements.filter(e => e.kind === 'building');
-    let image = null; if (withImage) try { image = await planImage(p2); } catch (e) { /* numbers only */ }
-    return { name: v.name || v.arr, notes: v.notes, issues: SP.check(p2).map(i => i.text).slice(0, 8), image,
+    let image = null; if (withImage) try { image = await planImage(G.effective(p2)); } catch (e) { /* numbers only */ }
+    return { name: v.name || v.arr, notes: v.notes, issues: GC(p2).map(i => i.text).slice(0, 8), image,
       metrics: { acres: +m.acres.toFixed(2), buildings: B.length, floorAreaSf: Math.round(m.gfa), units: m.units || 0, unitsPerAcre: +(m.duAc || 0).toFixed(1), parkingSpaces: m.spaces, parkingRequired: m.required, coveragePct: Math.round(m.coverage * 100), far: +m.far.toFixed(2), pondAcres: +(m.pond / 43560).toFixed(2), openSpacePct: Math.round(m.green * 100), ...(v.fin ? { valueM: +(v.fin.value / 1e6).toFixed(1), costM: +(v.fin.cost / 1e6).toFixed(1), yieldOnCostPct: +((v.fin.yoc || 0) * 100).toFixed(2) } : {}) } };
   }
   // L: the effort level (lib/planask.mjs): how hard the model thinks, how many review rounds in all (the last never
@@ -2704,7 +2840,7 @@ export function initSitePlan(ctx) {
       // the same guard as re-fitting after a hand edit: a re-fit that would lose homes, units or floor area (a whole street
       // of houses dropped round a moved community center) or add problems isn't taken; the change stays and Re-fit
       // anyway is offered
-      const at = els => ({ m: SP.metrics({ ...pl, elements: els }), issues: SP.check({ ...pl, elements: els }) }), v = rf && PL() === pl ? T.refitVerdict(at(pl.elements), at(rf.elements)) : null;
+      const at = els => ({ m: GM({ ...pl, elements: els }), issues: GC({ ...pl, elements: els }) }), v = rf && PL() === pl ? T.refitVerdict(at(pl.elements), at(rf.elements)) : null;
       if (v && !v.ok) { r.skipped.push('Re-fitting the rest of the site would have ' + (v.why === 'problems' ? 'added problems' : v.why === 'units' ? 'lost homes or units' : 'lost floor area') + ', so only those pieces changed.'); held = rf; rf = null; }
       else if (PL() === pl && rf) { pl.elements = rf.elements; pl.spareRows = []; if (rf.recipe) pl.recipe = clone(rf.recipe); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; }
       else if (!rf && !held) r.skipped.push('The rest couldn’t be re-fitted around it, so only those pieces changed.'); }
@@ -2718,7 +2854,7 @@ export function initSitePlan(ctx) {
   function chgHtml(pl) {
     const D = ed.chgDone, note = ed.chgNote ? '<div class="rnote sp-ainote" id="spChgNote">' + esc(ed.chgNote) + '</div>' : '';
     if (!D) return note;
-    const m = SP.metrics(pl), short = Math.max(0, Math.round(m.required - m.spaces)), still = ed.undo.length === D.after; // nothing else changed since
+    const m = GM(pl), short = Math.max(0, Math.round(m.required - m.spaces)), still = ed.undo.length === D.after; // nothing else changed since
     return note + '<div class="sp-chgdone" id="spChgDone" role="status">' + (D.note ? '<div class="rnote">' + esc(D.note) + '</div>' : '') +
       '<ul class="sp-chk">' + D.items.map(t => '<li>' + esc(t) + '</li>').join('') + D.skipped.map(t => '<li class="skip">' + esc(t) + '</li>').join('') + '</ul>' +
       (short > 0 && m.gfa ? '<div class="rnote sp-warn">Parking is now ' + SP.spacesWord(short) + ' short.</div>' : '') +
@@ -2790,22 +2926,22 @@ export function initSitePlan(ctx) {
   // the money for a layout, from the same land price and assumptions as the Pro forma
   function finFor(v, pl) {
     const p = projOf(pl); if (!p || !v.elements?.some(e => e.kind === 'building' && e.use !== 'amenity')) return null;
-    try { const x = planFor(v, pl); return RUN.finOf(PF.run(x, pfMerge(PF.defaults(x, landGuess(p, x)), pl.pf))); } catch (e) { console.warn('layout money', e); return null; }
+    try { const x = G.effective(planFor(v, pl)); return RUN.finOf(PF.run(x, pfMerge(PF.defaults(x, landGuess(p, x)), pl.pf))); } catch (e) { console.warn('layout money', e); return null; }
   }
   const finStamp = pl => { const p = projOf(pl); return RUN.hash(JSON.stringify(pl?.pf || {}) + '|' + (p && pl ? landGuess(p, pl) || '' : '')); };
   // engine output → layouts: numbers, money, a key and a name. extra: fields every one carries (the AI's revised params)
   function named(list, plan, extra = {}) {
-    const stamp = finStamp(plan), vs = list.map(r => { const v = { ...r, ...extra, arr: r.arr || RUN.baseName(r.name), setbacks: r.setbacks || plan.setbacks };
-      v.m = SP.metrics({ ...plan, program: v.program || plan.program, elements: v.elements }); v.fin = finFor(v, plan); v.finAt = stamp; return derive(v, plan); });
+    const stamp = finStamp(plan), laidAs = GON(plan) ? G.settingsOf(plan).scenario : null, vs = list.map(r => { const v = { ...r, ...extra, arr: r.arr || RUN.baseName(r.name), setbacks: r.setbacks || plan.setbacks, laidAs }; // laidAs: the Waller scenario it was laid out for
+      v.m = GM({ ...plan, program: v.program || plan.program, elements: v.elements }); v.fin = finFor(v, plan); v.finAt = stamp; return derive(v, plan); });
     const keys = RUN.layoutKeys(vs), names = RUN.layoutNames(vs);
     return vs.map((v, i) => ({ ...v, rank: -i, key: keys[i], name: names[i] }));
   }
   // once per layout: what the checks find (the same levels as the overview) and Phase 1's numbers when it has a Phase 2
   function derive(v, plan) {
     if (!v.elements?.length) { if (!v.chk && v.m) v.chk = { bad: null, short: K.checksOf([], v.m).short }; return v; }
-    const p2 = planFor(v, plan); if (!v.m) v.m = SP.metrics(p2);
-    if (!v.chk || v.chk.bad == null) v.chk = K.checksOf(SP.check(p2), v.m);
-    if (v.m1 === undefined) v.m1 = v.elements.some(e => e.phase === 2) ? SP.metrics({ ...p2, elements: v.elements.filter(e => e.phase !== 2) }) : null;
+    const p2 = planFor(v, plan); if (!v.m) v.m = GM(p2);
+    if (!v.chk || v.chk.bad == null) v.chk = K.checksOf(GC(p2), v.m);
+    if (v.m1 === undefined) v.m1 = v.elements.some(e => e.phase === 2) ? GM({ ...p2, elements: v.elements.filter(e => e.phase !== 2) }) : null;
     return v;
   }
   const pickIdx = () => { const k = PL()?.variant?.key; return k && ed?.variants ? ed.variants.findIndex(v => v.key === k) : -1; };
@@ -2849,12 +2985,12 @@ export function initSitePlan(ctx) {
   function variantsHtml() {
     if (!ed?.variants) return '';
     if (!ed.variants.length) { if (ed.run) return ''; const nf = K.noFit(ed.runMeta?.ask || ed.readAs?.ask || '', SP.ringArea(PL()?.ring || []) / 43560); return '<div class="sp-lbanner" role="note"><div><b>' + esc(nf.title) + '</b> ' + esc(nf.tip) + '</div><button type="button" class="btn sm" data-layedit="1">Edit request</button></div>'; } // nothing fit: say so where the layouts would be (the toast was gone in seconds)
-    const pl = PL(), vs = ed.variants, on = pickIdx(), edited = !!pl?.variant?.edited, by = K.SORTS.some(([k]) => k === ed.sortBy) ? ed.sortBy : 'rec';
+    const pl = PL(), vs = ed.variants, on = pickIdx(), edited = !!pl?.variant?.edited, by = K.SORTS.some(([k]) => k === ed.sortBy) ? ed.sortBy : 'rec', wl = GON(pl);
     for (const v of vs) if (!v.chk || v.elements?.length && (v.chk.bad == null || v.m1 === undefined)) derive(v, pl); // an older saved run
     const rec = K.recommended(vs, ed.aiPick), recV = rec ? vs[rec.index] : null, badge = K.badges(vs, rec), sim = K.similar(vs), digits = K.moneyDigits(vs.flatMap(v => v.fin ? [v.fin.cost, v.fin.value, v.fin.profit] : []));
     const alive = vs.map(v => !(Array.isArray(v.elements) && !v.elements.length)), notes = K.splitNotes(vs.map((v, i) => alive[i] ? v.notes : null));
     const named1 = (K.firstSentence(ed.aiSummary).match(/\bLayout \d+/g) || []), aiFirst = rec?.by === 'ai' && !!ed.aiSummary && (!named1.length || named1.includes(numOf(recV))); // the summary's first sentence is about the recommended one
-    const liveChk = on >= 0 && pl?.elements?.length ? K.checksOf(SP.check(pl), SP.metrics(pl)) : null; // the On map card's checks: the plan as it is now, the same as the overview's
+    const liveChk = on >= 0 && pl?.elements?.length ? K.checksOf(GC(pl), GM(pl)) : null; // the On map card's checks: the plan as it is now, the same as the overview's
     const order = K.sortOrder(vs, by, rec ? rec.index : -1), M = x => K.fmtM(x, digits), neg = x => x != null && x < 0 ? ' neg' : '';
     const simOpen = ed.simOpen || (ed.simOpen = new Set()), whyOpen = ed.whyOpen || (ed.whyOpen = new Set());
     const followers = i => vs.map((v, j) => j).filter(j => j !== i && sim[j] === i);
@@ -2864,8 +3000,8 @@ export function initSitePlan(ctx) {
     const baseProg = (vs.find(v => !v.revisedBy) || {}).program;
     const whyBox = (v, html) => '<details class="sp-why" data-why="' + esc(v.key) + '"' + (whyOpen.has(v.key) ? ' open' : '') + '><summary>' + (v.ai ? 'Why' : 'Details') + '</summary>' + html + '</details>';
     const card1 = i => {
-      const v = vs[i], has = !!v.elements?.length, none = !alive[i], here = on === i, f = v.fin, m = v.m || {}, cl = K.checkLabel(here && liveChk ? liveChk : v.chk), isRec = rec && rec.index === i;
-      const ckTip = here && liveChk && K.checkLabel(v.chk).text !== cl.text ? 'The plan on the map now; as laid out it read “' + K.checkLabel(v.chk).text + '”' : '';
+      const v = vs[i], has = !!v.elements?.length, none = !alive[i], here = on === i, f = v.fin, m = v.m || {}, cl = K.checkLabel(here && liveChk ? liveChk : v.chk, { waller: wl }), isRec = rec && rec.index === i;
+      const ckTip = here && liveChk && K.checkLabel(v.chk, { waller: wl }).text !== cl.text ? 'The plan on the map now; as laid out it read “' + K.checkLabel(v.chk, { waller: wl }).text + '”' : '';
       const h = K.headline(v.m, v.m1, K.askedOf(SP.normalizeProgram(v.program || pl.program))), hot = k => by === k ? ' hot' : '';
       const cell = (k, big, sub, cls = '', tip = '') => '<span class="sp-vc' + cls + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '><small>' + k + '</small><b>' + big + '</b>' + (sub ? '<i>' + sub + '</i>' : '') + '</span>';
       const profitSub = f => '<span title="' + esc(PROFIT_TIP) + '">profit after hold &amp; sale <em class="' + neg(f.profit) + '">' + M(f.profit) + '</em></span>';
@@ -2899,7 +3035,7 @@ export function initSitePlan(ctx) {
     };
     const main = order.filter(i => !vs[i].revisedBy && shown(i)), revd = order.filter(i => vs[i].revisedBy && shown(i));
     const known = vs.filter((v, i) => alive[i] && v.m?.gfa), allFail = known.length && !known.some(v => K.passes(v.chk)) && known.some(v => K.passes(v.chk) === false);
-    const gap = allFail ? K.acreageGap(vs.flatMap(v => v.notes || [])) : null, firstBad = allFail ? K.checkLabel(known[0].chk).text : '';
+    const gap = allFail ? K.acreageGap(vs.flatMap(v => v.notes || [])) : null, firstBad = allFail ? K.checkLabel(known[0].chk, { waller: wl }).text : '';
     const rest = aiFirst ? K.restSentences(ed.aiSummary) : ed.aiSummary || '';
     const revV = revd.length ? vs[revd[0]] : null, chg = revV ? K.programChange(SP.normalizeProgram(baseProg || pl.program), SP.normalizeProgram(revV.program || pl.program)) : '';
     const mainHtml = main.length ? (revd.length ? '<div class="sp-lgrp"><b>From your request</b></div>' : '') + '<div class="sp-vars">' + main.map(card1).join('') + '</div>' : '';
@@ -2948,7 +3084,7 @@ export function initSitePlan(ctx) {
     let v = ed.variants?.[i]; if (!v || Array.isArray(v.elements) && !v.elements.length) return false;
     const was = v.stale; if (!v.elements || was) { v = await relay(i, was); if (!v) return false; i = ed.variants.indexOf(v); } // out of date, or numbers only: laid out again for this site first
     applying = true;
-    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; }); }
+    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; if (v.laidAs || x.laidAs) x.laidAs = v.laidAs || null; }); }
     finally { applying = false; }
     ed.sel = null; ed.solveBar = false; if (was) PL().stale = null; saveRun(); if (!o.quiet) { draw(); panel(); }
     requestAnimationFrame(() => { if (ed && !planInView(true)) planFit(); }); // only when the site isn't all in view already (or the Plan key covers it)
@@ -2973,7 +3109,7 @@ export function initSitePlan(ctx) {
     if (!v.elements || v.stale) { v = await relay(i, v.stale); if (!v || PL() !== pl) return; }
     const now = new Date().toISOString(), name = nextName(p) + ' · ' + (v.arr || RUN.baseName(v.name));
     const c = { ...clone(pl), id: uid(), name, created: now, updated: now, elements: withKeepouts(v.elements, pl.elements), spareRows: [], program: { ...(v.program || pl.program) }, setbacks: clone(v.setbacks || pl.setbacks), params: v.params ? clone(v.params) : pl.params ? clone(pl.params) : null,
-      zones: clone(v.zones || []), recipe: v.recipe ? clone(v.recipe) : null, variant: { key: v.key, name: v.name, at: now }, stale: null, lastRun: pl.lastRun ? RUN.slimRun({ ...clone(pl.lastRun), variants: ed.variants }, v.key) : null };
+      zones: clone(v.zones || []), recipe: v.recipe ? clone(v.recipe) : null, variant: { key: v.key, name: v.name, at: now }, stale: null, laidAs: v.laidAs || null, lastRun: pl.lastRun ? RUN.slimRun({ ...clone(pl.lastRun), variants: ed.variants }, v.key) : null };
     p.plans.push(c); save(p); panel();
     ctx.toast('Saved as ' + c.name + ' in ' + p.name + '.', { action: { label: 'Open ' + c.name.split(' · ')[0], run: () => { if (db.projects.some(x => x.id === p.id)) open(p.id, c.id); } } });
   }
@@ -3020,9 +3156,9 @@ export function initSitePlan(ctx) {
       const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), parcels = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), F = SP.frame(pl.origin);
       const site = { type: 'Polygon', coordinates: [pl.ring.concat([pl.ring[0]]).map(F.toLL)] };
       let vicinity = ''; try { vicinity = areaMap([{ geometry: site, stroke: '#c0392b', fill: 'rgba(192,57,43,.25)', width: 2 }], { W: 320, H: 190, px: 320, minSpanM: 3500, maxTiles: 16 }); } catch (e) {}
-      const facts = await siteFacts(pl), notes = SP.check(pl).map(i => i.text), renders = await rendersForSheet(pl).catch(() => []);
+      const facts = await siteFacts(pl), notes = GC(pl).map(i => i.text), renders = await rendersForSheet(pl).catch(() => []);
       const county = (ctx.DATA?.counties || []).find(c => (c.outline || []).some(poly => SP.inRing(F.toLL(SP.centroid(pl.ring)), poly[0])))?.name;
-      const html = sheetHTML({ plan: pl, planName: pl.name, project: p, size, parcels, facts, notes, vicinity, renders, address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '',
+      const html = sheetHTML({ plan: pl, planName: pl.name, project: p, size, parcels, facts, notes, vicinity, renders, ...(GON(pl) ? { guard: { scen: scenYields(pl) } } : {}), address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '',
         date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), preparedFor: '', boundarySource: pl.src === 'drawn' ? 'a boundary drawn on the map' : pl.src === 'regrid' ? 'the Regrid parcel outline' : (keys.length > 1 ? keys.length + ' county appraisal district parcel outlines, merged' : 'the county appraisal district parcel outline') });
       const name = fileName(p, pl) + '-site-plan';
       ctx.toast('Preparing the PDF…');
@@ -3127,8 +3263,8 @@ export function initSitePlan(ctx) {
     let made = 0, why = '', capped = false;
     try {
       const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
-      const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' });
-      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map', focus: target });
+      const brief = RD.briefOf(pl, { metrics: GM(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' });
+      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: GM(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map', focus: target });
       for (let i = 0; i < views.length && live(); i++) {
         run.i = i; run.view = views[i]; run.msg = 'Taking the picture from the map…'; panel();
         const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero, sig = planSig(pl); // the plan as this picture shows it
@@ -3223,14 +3359,22 @@ export function initSitePlan(ctx) {
   function geojson(p, pl) {
     const fc = SP.planFeatures(pl, null);
     fc.features = fc.features.filter(f => f.properties.k !== 'label').map(f => ({ ...f, properties: { ...f.properties, project: p.name, plan: pl.name } }));
-    return { ...fc, properties: { project: p.name, plan: pl.name, ...SP.metrics(pl) } };
+    return { ...fc, properties: { project: p.name, plan: pl.name, ...GM(pl), ...(GON(pl) ? { label: G.LABEL, guardrails: 'Waller, scenario ' + G.settingsOf(pl).scenario } : {}) } };
   }
   function summary(p, pl) {
-    const m = SP.metrics(pl), prog = SP.normalizeProgram(pl.program), parcel = p.parcels.find(x => x.key === pl.parcel);
+    const m = GM(pl), prog = SP.normalizeProgram(pl.program), parcel = p.parcels.find(x => x.key === pl.parcel);
     return [p.name + ' · ' + pl.name, parcel?.label, SP.USES[prog.use].label + ': ' + f0(m.gfa) + ' sf' + (m.units ? ' (about ' + m.units + ' units)' : '') + ' on ' + m.acres.toFixed(2) + ' acres',
       'Coverage ' + pct(m.coverage) + ', FAR ' + m.far.toFixed(2), 'Parking ' + m.spaces + ' spaces (' + m.required + ' needed)', m.pond ? 'Detention ' + (m.pond / 43560).toFixed(2) + ' acres' : '',
-      ...SP.check(pl).map(i => '• ' + i.text)].filter(Boolean).join('\n');
+      ...GC(pl).map(i => '• ' + i.text), ...(GON(pl) ? guardSummary(pl) : [])].filter(Boolean).join('\n');
   }
+  // a Waller plan's summary: the label, the scenarios as a range, the land-use reconciliation and the open risks
+  function guardSummary(pl) {
+    const sc = scenarios(pl) || {}, yl = ['A', 'B', 'C'].map(k => sc[k]).filter(Boolean), T = G.landTable(pl);
+    return ['', G.LABEL, 'Waller guardrails · laid out as ' + G.settingsOf(pl).scenario + ' (' + G.SCENARIOS[G.settingsOf(pl).scenario].name + ')', 'Leasable ' + G.rangeText(G.range(yl, 'leasableSf'), ' sf') + ' across scenarios A–C (a range while inputs are unresolved)',
+      'Land use:', ...T.rows.map(r => '  ' + r.label + ': ' + Math.abs(r.acres).toFixed(2) + ' ac · ' + r.basis + ' [' + r.cls + ']'), ...T.qty.map(q => '  ' + q.label + ': ' + q.qty + ' [' + q.cls + ']'),
+      'Unresolved risks:', ...G.risks(pl).map(r => '  • ' + r.title + (r.stop ? ' (stop condition)' : ''))];
+  }
+  const scenYields = pl => { const sc = scenarios(pl) || {}; return Object.fromEntries(['A', 'B', 'C'].map(k => [k, sc[k] || null])); };
 
   // ---------- the Projects view ----------
   // All projects as cards or a list (the choice is kept in this browser), with search and sort. Click one for its page:
@@ -3253,9 +3397,9 @@ export function initSitePlan(ctx) {
   // an option's numbers and the count of problems that block it; kept until the project changes
   function info(p, pl) {
     const k = pl.id + '|' + ver(p); let v = infos.get(k);
-    if (!v) { const drawn = pl.ring.length >= 3, m = drawn ? SP.metrics(pl) : null; let fin = null; if (m?.gfa) try { fin = RUN.finOf(pfRun(p, pl)); } catch (e) { fin = null; } // the money as its Pro forma shows it
-      const m1 = m?.gfa && pl.elements.some(e => e.phase === 2) ? SP.metrics({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null; // Phase 1 first, as on the plan
-      v = { drawn, m, m1, fin, bad: drawn ? SP.check(pl).filter(i => i.level === 'bad').length : 0 }; infos.set(k, v); if (infos.size > 400) infos.delete(infos.keys().next().value); }
+    if (!v) { const drawn = pl.ring.length >= 3, m = drawn ? GM(pl) : null; let fin = null; if (m?.gfa) try { fin = RUN.finOf(pfRun(p, pl)); } catch (e) { fin = null; } // the money as its Pro forma shows it
+      const m1 = m?.gfa && pl.elements.some(e => e.phase === 2) ? GM({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null; // Phase 1 first, as on the plan
+      v = { drawn, m, m1, fin, bad: drawn ? GC(pl).filter(i => i.level === 'bad').length : 0 }; infos.set(k, v); if (infos.size > 400) infos.delete(infos.keys().next().value); }
     return v;
   }
   // the drawing for an option, street side down; kept until the project changes
@@ -3648,7 +3792,7 @@ export function initSitePlan(ctx) {
     if (ed.run) return { error: 'A build is already running on this plan. Wait for it to finish, or Cancel it in the plan panel.' };
     ed.ask = request; panel(); if (await build() === 'ask') return { started: true, needsConfirm: true, note: 'The layout on the map has the user’s own edits, so the plan panel now asks them whether to replace those edits (or save them as a new option first) before building.' };
     if (!PL()) return { error: 'The plan was closed before the layouts came back.' };
-    const m = SP.metrics(PL()), issues = SP.check(PL());
+    const m = GM(PL()), issues = GC(PL());
     return { built: true, project: P().name, plan: PL().name, options: (ed.variants || []).map(v => ({ name: v.name, building_sf: Math.round(v.m.gfa), spaces: v.m.spaces, required: v.m.required, coverage_pct: Math.round(v.m.coverage * 100), passes_checks: K.passes(v.chk), notes: v.notes })),
       shown: { building_sf: Math.round(m.gfa), units: m.units, spaces: m.spaces, required: m.required, coverage_pct: Math.round(m.coverage * 100), far: +m.far.toFixed(2), detention_acres: +(m.pond / 43560).toFixed(2) }, issues: issues.map(i => i.text), note: ed.aiNote || '' };
   }
