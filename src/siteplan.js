@@ -993,8 +993,9 @@ export function initSitePlan(ctx) {
   }
   function finishDraw() {
     const pl = PL(); if (!pl || ed.draft.length < 3) { ctx.toast('Click at least three corners of the site.'); return; }
+    if (T.selfIntersects(ed.draft)) { ctx.toast('The outline crosses itself. Click the corners in order round the site (Backspace takes a point back).'); return; } // a bow-tie has no real area: its layouts were nonsense
     const F = SP.frame(pl.origin), ll = ed.draft.map(F.toLL), b = SP.boundaryFrom({ type: 'Polygon', coordinates: [ll.concat([ll[0]])] });
-    if (!b) return;
+    if (!b || SP.ringArea(b.ring) < 1000) { ctx.toast('That outline has almost no area: click at least three corners that aren’t in a line.'); return; }
     if (ed.draftPlan) { P().plans.push(ed.draftPlan); ed.draftPlan = null; ctx.scheduleHash?.(); } // the option exists from here (and goes in the address)
     change(x => reorigin(x, b, 'drawn'));
     ed.mode = null; ed.draft = []; draw(); panel(); map.once('idle', () => PL() === pl && detectFront(pl));
@@ -1901,7 +1902,7 @@ export function initSitePlan(ctx) {
     if (prog.use !== 'storage') return '';
     const st = prog.storage || {}, one = (k, title, list) => '<div class="sp-sub">' + title + '</div><table class="sp-mix"><tr><th>Size</th><th>SF</th><th>%</th><th><span class="vh">Remove</span></th></tr>' + list.map((t, i) =>
       '<tr><td><input data-smix="' + k + ':' + i + ':name" value="' + esc(t.name) + '" aria-label="Unit size name"></td><td><input type="number" min="10" step="5" data-smix="' + k + ':' + i + ':sf" value="' + t.sf + '" aria-label="' + esc(t.name) + ' square feet"></td><td><input type="number" min="0" max="100" step="1" data-smix="' + k + ':' + i + ':pct" value="' + t.pct + '" aria-label="' + esc(t.name) + ' share (%)"></td><td><button type="button" class="sp-x" data-smixdel="' + k + ':' + i + '" title="Remove" aria-label="Remove this size">×</button></td></tr>').join('') +
-      '</table><div class="sp-mix-f"><span class="rnote">Average ' + f0(SP.storageAvg(list)) + ' sf · ' + list.reduce((s, t) => s + +t.pct, 0) + '%</span><button type="button" class="btn sm ghost" data-smixadd="' + k + '">+ Add a Size</button></div>';
+      '</table><div class="sp-mix-f">' + (m => '<span class="rnote' + (m.warn ? ' sp-warn' : '') + '">' + esc(m.text) + '</span>')(K.mixFoot(list, k === 'drive' ? 200 : 100)) + '<button type="button" class="btn sm ghost" data-smixadd="' + k + '">+ Add a Size</button></div>';
     return one('climate', 'Climate-controlled units', st.climateMix || SP.STORAGE_MIX.climate) + one('drive', 'Drive-up units', st.driveMix || SP.STORAGE_MIX.drive);
   }
   // stormwater (detention, retention, underground or none) and trash enclosures
@@ -1954,9 +1955,9 @@ export function initSitePlan(ctx) {
   }
   // a setting as words for the toast after new layouts: "Front setback 35 ft", "Floors 4", "Trees off"
   function settingLabel(i) {
-    const lab = i.closest('label'), t = (lab?.querySelector('.sp-fl, .sp-tl')?.textContent || '').replace(/\s+/g, ' ').trim(), unit = lab?.querySelector('.sp-u')?.textContent || '';
-    const v = i.type === 'checkbox' ? (i.checked ? 'on' : 'off') : i.tagName === 'SELECT' ? i.selectedOptions[0]?.textContent || i.value : i.value;
-    return (t || 'Setting') + ' ' + v + (i.type === 'number' && unit ? (unit === '%' ? '%' : ' ' + unit) : '');
+    const lab = i.closest('label'), fl = lab?.querySelector('.sp-fl, .sp-tl'), t = ((fl?.firstChild?.nodeType === 3 ? fl.firstChild.textContent : fl?.textContent) || '').replace(/\s+/g, ' ').trim(), unit = lab?.querySelector('.sp-u')?.textContent || ''; // the label, not its hint ("12 × 40 ft")
+    const v = i.type === 'checkbox' ? (i.checked ? 'on' : 'off') : i.tagName === 'SELECT' ? i.selectedOptions[0]?.textContent || i.value : i.value === '' ? (i.placeholder || 'blank') : i.min !== '' && +i.value < +i.min ? i.min : i.value; // blank: as the box says (auto); below its minimum: the minimum it's read as
+    return (t || 'Setting') + ' ' + v + (i.type === 'number' && unit && i.value !== '' ? (unit === '%' ? '%' : ' ' + unit) : '');
   }
   // re-fit: everything not pinned is laid out again around the pinned pieces
   let refitTimer = 0;
@@ -2229,7 +2230,7 @@ export function initSitePlan(ctx) {
     box.querySelectorAll('[data-pfb]').forEach(i => i.onchange = () => { set(i.dataset.pfb, i.checked); redraw(); });
     const rs = box.querySelector('#spPfReset'); if (rs) rs.onclick = () => { change(x => { delete x.pf; }, true); refreshFin(); redraw(); };
     const xb = box.querySelector('#spPfX'); if (xb) xb.onclick = () => {
-      if (!window.XLSX) { ctx.toast('Excel export is still loading. Try again in a moment.'); return; }
+      if (!window.XLSX) { ctx.toast('Excel export is still loading. Try again in a moment.'); ctx.loadXlsx?.(); return; }
       const R = pfRun(p, PL()); if (!R) return; const wb = XLSX.utils.book_new(), sheets = PF.workbook(R, p.name + ' · ' + pl.name);
       for (const [name, rows] of Object.entries(sheets)) { const ws = XLSX.utils.aoa_to_sheet(rows.map(r => r.map(c => c && typeof c === 'object' ? { t: 'n', v: 0, f: c.f } : c))); ws['!cols'] = [{ wch: 34 }, ...Array(12).fill({ wch: 15 })]; XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31)); }
       ctx.saveFile(fileName(p, pl) + '-pro-forma.xlsx', new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' })), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -2442,7 +2443,7 @@ export function initSitePlan(ctx) {
     if (thinks) runStep(run, 2, 'Reading your request' + (strategy ? ' (following the plan)' : ''));
     if (ai) try {
       const d = await post({ prompt: ask, site, facts, program: pl.program, effort: L.effort, ...(strategy ? { strategy } : {}) }, run.ctl.signal);
-      prog = d.program; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
+      prog = d.program || prog; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
     } catch (e) { if (!live(run)) return; note = e.status === 503 ? '' : navigator.onLine ? 'The AI didn’t answer, so this read your words directly.' : 'Offline: this read your words directly.'; }
     if (!live(run) || PL() !== pl) return;
     if (!aiOk) { run.steps = run.steps.slice(0, 2 + o0); strategy = null; } // the AI is off: no review either
@@ -2768,6 +2769,7 @@ export function initSitePlan(ctx) {
   const scoreBand = n => n >= 80 ? 'hi' : n >= 65 ? 'mid' : 'lo';
   function variantsHtml() {
     if (!ed?.variants) return '';
+    if (!ed.variants.length) { if (ed.run) return ''; const nf = K.noFit(ed.runMeta?.ask || ed.readAs?.ask || '', SP.ringArea(PL()?.ring || []) / 43560); return '<div class="sp-lbanner" role="note"><div><b>' + esc(nf.title) + '</b> ' + esc(nf.tip) + '</div><button type="button" class="btn sm" data-layedit="1">Edit request</button></div>'; } // nothing fit: say so where the layouts would be (the toast was gone in seconds)
     const pl = PL(), vs = ed.variants, on = pickIdx(), edited = !!pl?.variant?.edited, by = K.SORTS.some(([k]) => k === ed.sortBy) ? ed.sortBy : 'rec';
     for (const v of vs) if (!v.chk || v.elements?.length && (v.chk.bad == null || v.m1 === undefined)) derive(v, pl); // an older saved run
     const rec = K.recommended(vs, ed.aiPick), recV = rec ? vs[rec.index] : null, badge = K.badges(vs, rec), sim = K.similar(vs), digits = K.moneyDigits(vs.flatMap(v => v.fin ? [v.fin.cost, v.fin.value, v.fin.profit] : []));
