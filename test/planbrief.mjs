@@ -40,9 +40,9 @@ const raw = o => ({ buildings: [{ use: 'retail', gfa: 18000, floors: 1, w: null,
 // the browser's part of a build, as src/siteplan.js does it: each layout's numbers and checks, the AI's plan marked
 const asV = (plan, o, i, extra = {}) => { const p = { ...plan, elements: o.elements, program: o.program }, m = S.metrics(p); return { ...o, ...extra, m, chk: K.checksOf(S.check(p), m), key: (extra.aiBrief ? 'ai|' : '') + 'k' + i, name: 'Layout ' + (i + 1) + ' · ' + (o.name || '') }; };
 const engineOf = (plan, prog, opts = {}) => L.layoutOptions(plan, prog, opts).map((o, i) => asV(plan, o, i));
-function aiOf(plan, prog, ab) {
-  const o = L.layoutOptions(plan, prog, { count: 2, brief: ab.brief }).find(x => x.elements.length); if (!o) return null;
-  const v = asV(plan, o, 99, { aiBrief: ab }); v.aiBrief = { ...ab, changed: BR.changedNotes(v.notes), met: BR.briefMet(v) }; return v;
+function aiOf(plan, prog, ab) { // the AI's plan, only when the engine kept its buildings and pads (else null, as the browser shows none)
+  const pk = BR.pickBriefLayout(L.layoutOptions(plan, prog, { count: 2, brief: ab.brief }), ab.brief); if (!pk.o) return null;
+  const v = asV(plan, pk.o, 99, { aiBrief: ab }); v.aiBrief = { ...ab, changed: BR.changedNotes(v.notes), met: BR.briefMet(v) }; return v;
 }
 const pads = o => o.elements.filter(e => e.kind === 'building' && e.note === 'QSR / coffee · drive-thru');
 
@@ -108,29 +108,46 @@ assert.deepEqual(API.BRIEF_SCHEMA.properties.buildings.items.properties.at.enum,
   assert.equal(qa.code, 200); assert.match(sent[0].messages[1].content, /"aiPlan":\{/); assert.match(sent[0].messages[1].content, /Pond at the side: The pond at the side sits on the low corner/); assert.match(sent[0].messages[0].content, /lastBuild\.aiPlan/);
 }
 
-// ---- 2. a brief the engine can't meet, then the one revision round ----
+// ---- 2. a brief the engine can't meet: never shown as the AI's plan when the engine drew its own program; the
+// engine's reason goes to the review, which revises the brief once ----
 {
-  const ask = '60,000 sf retail', plan = planOf('square2ac'), prog = { use: 'retail', gfa: 60000 };
-  const first = BR.briefFrom(raw({ buildings: [{ use: 'retail', gfa: 30000, floors: 1, w: null, d: null, at: 'front', facing: 'street', why: 'Big boxes at the street.' }, { use: 'retail', gfa: 30000, floors: 1, w: null, d: null, at: 'front', facing: 'street', why: 'A second box.' }], parking: 'back', pads: 0 }), { prompt: ask, siteSf: S.ringArea(plan.ring) });
-  const ai = aiOf(plan, prog, first); assert.ok(ai, 'something still comes back');
-  assert.equal(ai.aiBrief.met, false, 'not as written'); assert.ok(ai.aiBrief.changed.some(t => /brief/.test(t)), 'the engine says what it changed: ' + ai.aiBrief.changed.join(' / '));
-  const options = [{ name: 'Layout 1 · AI’s plan', metrics: { floorAreaSf: Math.round(ai.m.gfa), parkingSpaces: ai.m.spaces, parkingRequired: ai.m.required }, issues: S.check({ ...plan, elements: ai.elements }).map(i => i.text).slice(0, 8), notes: ai.notes }, { name: 'Layout 2', metrics: { floorAreaSf: 11000 }, issues: [], notes: [] }];
-  const rev = raw({ buildings: [{ use: 'retail', gfa: 9000, floors: null, w: null, d: null, at: 'back', facing: 'parking', why: 'One strip the lot can park.' }], parking: 'front', pads: 0, serviceDrive: true, why: { ...why, count: 'One building: two big boxes don’t park on two acres.' } });
-  reply = () => ({ reviews: [{ option: 0, score: 40, verdict: 'Doesn’t park.', strengths: [], problems: ['Parking short'] }, { option: 1, score: 70, verdict: 'Works.', strengths: [], problems: [] }], ranking: [1, 0], revise: false, program: null, params: { fill: null, streets: null, form: null, storm: null }, why: '', summary: 'Layout 2.', brief: rev, briefWhy: 'Two 30,000 sf boxes don’t park on two acres: one 9,000 sf strip does.' });
-  const bc = { option: 0, brief: ai.aiBrief.brief, reasons: ai.aiBrief.reasons, met: false, mayRevise: true };
-  sent = []; let res = await call({ mode: 'review', prompt: ask, site: { acres: 2 }, program: prog, round: 1, rounds: 2, effort: 'high', options, briefCheck: bc });
+  const ask = '25,000 sf retail with 2 pad sites', plan = planOf('lot5ac'), prog = { use: 'retail', gfa: 25000 }, siteSf = S.ringArea(plan.ring);
+  // two 60,000 sf boxes at the street with the parking behind, on 5.3 acres: the engine can only lay out its own program
+  const first = BR.briefFrom(raw({ buildings: [{ use: 'retail', gfa: 60000, floors: 1, w: null, d: null, at: 'front', facing: 'street', why: 'Big boxes at the street.' }, { use: 'retail', gfa: 60000, floors: 1, w: null, d: null, at: 'front', facing: 'street', why: 'A second box.' }], parking: 'back', pond: 'back' }), { prompt: ask, siteSf });
+  const out = L.layoutOptions(plan, prog, { count: 2, brief: first.brief }), pk = BR.pickBriefLayout(out, first.brief);
+  assert.ok(out.length && out.every(o => o.notes.some(t => /this is the engine’s own layout for the program/.test(t)) || o.elements.filter(e => e.kind === 'building' && e.note !== 'QSR / coffee · drive-thru').length < 2 || pads(o).length < 2), 'the engine fell back to its own program (or dropped buildings or pads)');
+  assert.equal(pk.o, undefined, 'so there is no AI’s plan to show'); assert.equal(aiOf(plan, prog, first), null);
+  assert.match(pk.reason, /of the 120,000 sq ft parks/, 'the engine’s own reason: ' + pk.reason);
+  const line = BR.droppedNote(first.brief, pk.reason);
+  assert.match(line, /^The AI’s plan \(2 buildings, 120,000 sq ft, 2 pads, parking behind\) didn’t fit: only [\d,]+ of the 120,000 sq ft parks.*; these are the planner’s layouts\.$/, 'one line under Build: ' + line);
+  const own = engineOf(plan, prog, { brief: BR.wordsBrief(ask) }), list = own; assert.ok(!list.some(v => v.aiBrief), 'the list holds only the planner’s layouts');
+  // the review still hears why, and may revise once
+  const options = own.slice(0, 3).map(v => ({ name: v.name, metrics: { floorAreaSf: Math.round(v.m.gfa), parkingSpaces: v.m.spaces, parkingRequired: v.m.required }, issues: [], notes: v.notes }));
+  const rev = raw({ buildings: [{ use: 'retail', gfa: 22000, floors: null, w: null, d: null, at: 'back', facing: 'parking', why: 'One strip the lot can park.' }], parking: 'front', pond: 'side', pads: 2, why: { ...why, count: 'One strip and two pads: two 60,000 sf boxes don’t park on 5.3 acres.' } });
+  reply = () => ({ reviews: options.map((o, i) => ({ option: i, score: 70 - i, verdict: 'Works.', strengths: [], problems: [] })), ranking: [0, 1, 2], revise: false, program: null, params: { fill: null, streets: null, form: null, storm: null }, why: '', summary: 'Layout 1.', brief: rev, briefWhy: 'Two 60,000 sf boxes don’t park on 5.3 acres: one 22,000 sf strip and the two pads do.' });
+  const bc = { option: null, brief: first.brief, reasons: first.reasons, met: false, mayRevise: true, dropped: pk.reason };
+  sent = []; let res = await call({ mode: 'review', prompt: ask, site: { acres: 5.28 }, program: prog, round: 1, rounds: 2, effort: 'high', options, briefCheck: bc });
   assert.equal(res.code, 200, JSON.stringify(res.body)); const u = userOf(sent[0]);
-  assert.equal(u.briefCheck.option, 0); assert.equal(u.briefCheck.mayRevise, true); assert.equal(u.briefCheck.metAsWritten, false); assert.ok(u.options[0].notes.some(t => /brief/.test(t)) && u.options[0].metrics.parkingRequired > 0, 'the engine’s notes, the metrics and the checks go to the AI');
-  assert.match(sent[0].messages[0].content, /no credit for being the planner's/); assert.match(sent[0].messages[0].content, /briefCheck.mayRevise true/);
-  assert.ok(res.body.brief?.brief?.buildings?.length === 1 && res.body.brief.brief.buildings[0].gfa === 9000, 'the revised brief'); assert.match(res.body.briefWhy, /one 9,000 sf strip/);
-  assert.ok(res.body.brief.reasons.some(r => /two big boxes don’t park/.test(r.why)), 'with its reasons');
+  assert.equal(u.briefCheck.option, null, 'none of the options is the AI’s'); assert.equal(u.briefCheck.notLaidOutBecause, pk.reason, 'the engine’s reason goes to the AI'); assert.equal(u.briefCheck.mayRevise, true); assert.equal(u.briefCheck.metAsWritten, false);
+  assert.ok(u.options[0].metrics.parkingRequired > 0, 'with the engine’s options’ numbers');
+  assert.match(sent[0].messages[0].content, /no credit for being the planner's/); assert.match(sent[0].messages[0].content, /briefCheck.option null/); assert.match(sent[0].messages[0].content, /briefCheck.mayRevise true/);
+  assert.ok(res.body.brief?.brief?.buildings?.length === 1 && res.body.brief.brief.buildings[0].gfa === 22000 && res.body.brief.brief.pads === 2, 'the revised brief'); assert.match(res.body.briefWhy, /one 22,000 sf strip/);
+  assert.ok(res.body.brief.reasons.some(r => /two 60,000 sf boxes don’t park/.test(r.why)), 'with its reasons');
   const ai2 = aiOf(plan, prog, { ...res.body.brief, revised: true, why: res.body.briefWhy });
-  assert.ok(ai2.aiBrief.met, 'the revision fits as written: ' + ai2.notes.join(' / ')); assert.ok(ai2.m.spaces >= ai2.m.required);
+  assert.ok(ai2, 'the revision keeps its building and pads: the AI’s plan'); assert.equal(pads(ai2).length, 2); assert.ok(ai2.m.spaces >= ai2.m.required, 'and parks');
+  // a brief laid out but not quite as written (the nearest fit) is still the AI's plan, and the review may revise it
+  const near = aiOf(plan, prog, BR.briefFrom(raw({ pond: 'back' }), { prompt: ask, siteSf })); assert.ok(near && !near.aiBrief.met, 'the nearest fit: the AI’s plan, not met');
+  const bc2 = { option: 0, brief: near.aiBrief.brief, reasons: near.aiBrief.reasons, met: false, mayRevise: true };
+  res = await call({ mode: 'review', prompt: ask, site: { acres: 5.28 }, program: prog, round: 1, rounds: 2, options, briefCheck: bc2 }); assert.ok(res.body.brief, 'a nearest fit may be revised');
+  assert.equal(userOf(sent[sent.length - 1]).briefCheck.option, 0);
   // once only: the last round, a brief already met, or the browser not asking (it asked once already) never revise
-  for (const [b, w] of [[{ round: 2, rounds: 2, briefCheck: bc }, 'the last round'], [{ round: 1, rounds: 2, briefCheck: { ...bc, met: true } }, 'met as written'], [{ round: 1, rounds: 3, briefCheck: { ...bc, mayRevise: false } }, 'already revised once'], [{ round: 1, rounds: 1, briefCheck: bc }, 'Medium: one round']]) {
+  for (const [b, w] of [[{ round: 2, rounds: 2, briefCheck: bc }, 'the last round'], [{ round: 2, rounds: 2, briefCheck: bc2 }, 'the last round (laid out)'], [{ round: 1, rounds: 2, briefCheck: { ...bc2, met: true } }, 'met as written'], [{ round: 1, rounds: 3, briefCheck: { ...bc, mayRevise: false } }, 'already revised once'], [{ round: 1, rounds: 1, briefCheck: bc }, 'Medium: one round'], [{ round: 1, rounds: 2, briefCheck: { ...bc, dropped: '' } }, 'not among the options and no reason: no check']]) {
     res = await call({ mode: 'review', prompt: ask, program: prog, options, ...b }); assert.equal(res.body.brief, null, w + ': no revised brief'); assert.equal(res.body.briefWhy, ''); }
-  res = await call({ mode: 'review', prompt: ask, program: prog, options, round: 1 }); assert.equal(res.body.brief, null, 'no AI’s plan among them: none');
   assert.ok(!('briefCheck' in userOf(sent[sent.length - 1])), 'and nothing about one is sent');
+  res = await call({ mode: 'review', prompt: ask, program: prog, options, round: 1 }); assert.equal(res.body.brief, null, 'no AI’s plan at all: none');
+  // the fact sheet says what happened
+  const pl = { ...plan, name: 'Option A', elements: own[0].elements, program: own[0].program, variant: { key: own[0].key, name: own[0].name }, lastRun: { ask, effort: 'high', read: { ask, brief: first, briefNote: line }, variants: own } };
+  const ap = ASK.planFacts(pl, {}).lastBuild.aiPlan; assert.equal(ap.note, line, 'Ask knows the AI’s plan didn’t fit, and why'); assert.ok(!ap.laidOutAs && ap.reasons.length, 'with what it asked for and its reasons');
 }
 
 // ---- 3. nonsense, or a failed AI ----

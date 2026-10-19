@@ -14,7 +14,8 @@
 //        parking-field engine, { brief, reasons, leasableSf, check } (lib/planbrief.mjs briefFrom), or briefNote when the
 //        brief it gave made no sense. The browser lays the brief out beside the engine's own search ("AI's plan").
 //        review takes briefCheck { option, brief, reasons, met, mayRevise }: the AI's plan among the options; when the
-//        engine couldn't do it as written and mayRevise, the answer's brief is the AI's revised one (once, High and Ultra)
+//        engine couldn't do it as written and mayRevise, the answer's brief is the AI's revised one (once, High and Ultra).
+//        option null with dropped (the engine's reason): the plan didn't fit at all, so none of the options is the AI's
 //   POST { mode: 'ask', question, history: [{ q, a }], plan: {...facts}, effort } -> { answer, followups }
 //        a question about the open plan, answered from the fact sheet the browser computed (lib/planask.mjs planFacts)
 //   POST { mode: 'askProject', question, history: [{ q, a }], project: {...facts}, effort } -> { answer, followups }
@@ -226,8 +227,8 @@ export const REVIEW_SYSTEM = `You are a senior land planner and developer review
 - Scores: 85+ ready to show a client; 70-84 good with small fixes; 50-69 workable but weak; below 50 misses the request or doesn't work.
 - Never claim code compliance; these are concepts.
 - When a plannedStrategy is given, the site was thought through before the layouts were drawn: judge whether each layout carries it out (what sits at the front, middle and back, the ways in, the parking, the pond). A layout that strays from it is weaker unless the change is plainly better; say which.
-- When briefCheck is given, option briefCheck.option was laid out from the planner's own brief (briefCheck.brief, with its reasons); the rest are the engine's own. Judge it on exactly the same terms: no credit for being the planner's. Its notes say what the engine changed from the brief and why.
-- briefCheck.mayRevise true (the engine couldn't do the brief as written: parking short, it didn't fit, or a check failed): give brief, the brief revised so this lot holds it, from the engine's notes, that option's metrics and its checks, maximising the leasable floor area that parks and passes the checks; every decision with a one-line reason in plain words; briefWhy one sentence on what changed and why. Otherwise brief is null and briefWhy empty. A revised brief follows the same rules as the first: buildings 1-6, pads 0-4 (the number the request asks for, when it does), floors null unless the request fixes them or another floor clearly fits more.`;
+- When briefCheck is given, option briefCheck.option was laid out from the planner's own brief (briefCheck.brief, with its reasons); the rest are the engine's own. Judge it on exactly the same terms: no credit for being the planner's. Its notes say what the engine changed from the brief and why. briefCheck.option null: the engine couldn't lay the brief out at all (briefCheck.notLaidOutBecause, in its own words) and none of the options is the planner's; they are all the engine's own.
+- briefCheck.mayRevise true (the engine couldn't do the brief as written: parking short, it didn't fit, or a check failed): give brief, the brief revised so this lot holds it, from the engine's notes (or notLaidOutBecause), that option's metrics and its checks (or the engine's options' numbers), maximising the leasable floor area that parks and passes the checks; every decision with a one-line reason in plain words; briefWhy one sentence on what changed and why. Otherwise brief is null and briefWhy empty. A revised brief follows the same rules as the first: buildings 1-6, pads 0-4 (the number the request asks for, when it does), floors null unless the request fixes them or another floor clearly fits more.`;
 export const BESTUSE_SCHEMA = {
   type: 'object', additionalProperties: false, required: ['ideas', 'summary'],
   properties: {
@@ -351,9 +352,12 @@ async function review(b, key, res) {
   const prompt = clip(b.prompt, 1200).trim(), opts = (Array.isArray(b.options) ? b.options : []).slice(0, 6);
   if (!opts.length) return res.status(400).json({ error: 'Nothing to review.' });
   const images = opts.map(o => typeof o.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(o.image) && o.image.length < 600000 ? o.image : null);
+  // the AI's plan: one of the options (option), or, when the engine couldn't lay it out at all and drew its own program,
+  // none of them, with the engine's reason (dropped)
   const bc = b.briefCheck && typeof b.briefCheck === 'object' ? b.briefCheck : null, bk = bc ? BR.briefIn(bc) : null, bOpt = bk && Number.isInteger(bc.option) && bc.option >= 0 && bc.option < opts.length ? bc.option : -1;
-  const mayRevise = bOpt >= 0 && !last && bc.mayRevise === true && bc.met !== true; // (once: the browser stops asking after the first revision)
-  const briefCheck = bOpt >= 0 ? { option: bOpt, brief: bk.brief, reasons: bk.reasons, metAsWritten: bc.met === true, mayRevise, ...(b.briefFor && typeof b.briefFor === 'object' ? { briefFor: tidy(b.briefFor, 0, 300) } : {}) } : null;
+  const dropped = bk && bOpt < 0 && typeof bc.dropped === 'string' && bc.dropped.trim() ? clip(bc.dropped, 300) : null, has = bOpt >= 0 || !!dropped;
+  const mayRevise = has && !last && bc.mayRevise === true && (!!dropped || bc.met !== true); // (once: the browser stops asking after the first revision)
+  const briefCheck = has ? { option: bOpt >= 0 ? bOpt : null, brief: bk.brief, reasons: bk.reasons, metAsWritten: bOpt >= 0 && bc.met === true, ...(dropped ? { notLaidOutBecause: dropped } : {}), mayRevise, ...(b.briefFor && typeof b.briefFor === 'object' ? { briefFor: tidy(b.briefFor, 0, 300) } : {}) } : null;
   const text = JSON.stringify({ request: prompt || null, round: last ? 'last (do not revise)' : round === 1 ? 'first' : round + ' of ' + rounds + ' (revise again only if it clearly helps)', site: JSON.parse(siteText(b.site, '', null, b.facts)).site, currentProgram: b.program || null, ...(strategyIn(b.strategy) ? { plannedStrategy: strategyIn(b.strategy) } : {}), ...(briefCheck ? { briefCheck } : {}),
     options: opts.map((o, i) => ({ option: i, name: clip(o.name, 120), drawing: images[i] ? 'image ' + (images.slice(0, i + 1).filter(Boolean).length) : 'none', metrics: Object.fromEntries(Object.entries(o.metrics || {}).slice(0, 16).map(([k, v]) => [clip(k, 30), num(v)])),
       issues: (o.issues || []).slice(0, 8).map(t => clip(t, 160)), notes: (o.notes || []).slice(0, 6).map(t => clip(t, 240)) })) });
