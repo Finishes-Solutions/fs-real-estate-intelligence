@@ -403,8 +403,8 @@ export function initSitePlan(ctx) {
       case 'drawpiece': { const Dp = ed.dp || {}; return { k: 'drawpiece', t: Dp.label || 'Draw', d: Dp.line ? cl + ' points along it' : cl + ' each corner, then the first again', b: [X, F] }; }
     }
     const busy = ed.refitting ? 'Re-fitting the site…' : '';
-    if (ed.shape && ed.editing) return { k: 'shape', t: 'Shape', d: busy || (touch ? 'Drag a point or an edge · + adds a point' : 'Drag points or edges · + adds a point · double-click removes one'), b: [D] };
-    if (ed.editing) return { k: 'edit', t: 'Editing', d: busy, b: [D] };
+    if (ed.shape && ed.editing) return { k: 'shape', t: 'Shape', d: busy || (touch ? 'Drag a point or a face · + adds a point' : 'Drag points or faces · + adds a point · double-click removes one · Shift: whole feet, square corners'), b: [D] };
+    if (ed.editing) return { k: 'edit', t: 'Editing', d: busy || (ed.sel && !(ed.multi?.length > 1) ? (touch ? 'Drag a face to resize · the dot turns it' : 'Drag a face to resize · the dot turns it · Shift: 15° turns, whole feet') : ''), b: [D] };
     return null;
   }
   const dropMode = () => { ed.mode = null; ed.draft = []; ed.hover = null; ed.meas = null; ed.dp = null; ed.cursor = null; };
@@ -635,7 +635,7 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-mf', type: 'fill', source: DSRC, filter: ['==', ['get', 'k'], 'mfill'], paint: { 'fill-color': Ln.accent, 'fill-opacity': .14 } }); // an area being drawn or measured
     add({ id: 'fs-sp-dl', type: 'line', source: DSRC, filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'hv'], 1]], paint: { 'line-color': Ln.accent, 'line-width': ['case', ['==', ['get', 'rb'], 1], 1.6, 2.5], 'line-dasharray': [2, 1.5] } });
     add({ id: 'fs-sp-dp', type: 'circle', source: DSRC, filter: ['all', ['==', ['geometry-type'], 'Point'], ['!', ['has', 'k']]], paint: { 'circle-radius': big ? 7 : 5, 'circle-color': Ln.accent, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
-    add({ id: 'fs-sp-ml', type: 'symbol', source: DSRC, filter: ['in', ['get', 'k'], ['literal', ['mlab', 'mtot']]], layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': ['case', ['==', ['get', 'k'], 'mtot'], 13, 11], 'text-offset': ['case', ['==', ['get', 'k'], 'mtot'], ['literal', [0, -1.4]], ['literal', [0, 0]]], 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': Lb.ink, 'text-halo-color': Lb.halo, 'text-halo-width': 2 } }); // lengths, the total, the area
+    add({ id: 'fs-sp-ml', type: 'symbol', source: DSRC, filter: ['in', ['get', 'k'], ['literal', ['mlab', 'mtot']]], layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': ['case', ['==', ['get', 'k'], 'mtot'], 13, 11], 'text-offset': ['case', ['==', ['get', 'k'], 'mtot'], ['literal', [0, -1.4]], ['literal', [0, 0]]], 'text-rotate': ['coalesce', ['get', 'r'], 0], 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': Lb.ink, 'text-halo-color': Lb.halo, 'text-halo-width': 2 } }); // lengths, the total, the area
     // handles: the turn dot and a shape's points (circles); a rectangle's corners (squares), its sides and a shape's
     // edges (white bars along them, to drag that side alone), and the + beside an edge that adds a point
     handleImages(big, Ln.accent);
@@ -671,11 +671,19 @@ export function initSitePlan(ctx) {
         const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], n = T.edgeNormal(P, i), o = (big ? 24 : 17) * px, pp = [m[0] + n[0] * o, m[1] + n[1] * o];
         out.push({ i: 'm' + i, t: 'm', at: F.toLL(m), ft: m, a: deg(p, q) }, { i: 'p' + i, t: 'p', at: F.toLL(pp), ft: pp }); });
       return out; }
-    if (SP.isFree(e)) { const o = SP.outline(e), xs = o.map(p => p[0]), ys = o.map(p => p[1]); // curved pieces: corner handles scale the whole shape
-      return [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)], [Math.min(...xs), Math.max(...ys)]].map((p, i) => ({ i: 's' + i, t: 's', at: F.toLL(p), ft: p })); }
-    const c = SP.corners(e), top = [e.x, e.y], a = (e.rot || 0) * Math.PI / 180, L = e.d / 2 + Math.max(14, e.d * 0.15) + (big ? 26 * px : 0); // fingers: the turn dot further out
+    // the turn dot: above the piece's top (its own +v), or below it when the top's spot is on another building (the
+    // drag turns from where it's grabbed, so either works); fingers get it further out
+    const onB = q => pl.elements.some(x => x !== e && (x.kind === 'building' || x.kind === 'garage') && SP.hitRect(x, q));
+    const dotAt = (up, dn) => { const a = (e.rot || 0) * Math.PI / 180, ex = big ? 26 * px : 0, at = (s, L) => [e.x - Math.sin(a) * L * s, e.y + Math.cos(a) * L * s], A = at(1, up + ex), B = at(-1, dn + ex); return { i: 'r', t: 'r', at: F.toLL(onB(A) && !onB(B) ? B : A) }; };
+    const turnDot = P => { const vs = P.map(p => SP.toLocal(e, p)[1]), top = Math.max(...vs), bot = -Math.min(...vs); return dotAt(top + Math.max(14, top * 0.3), bot + Math.max(14, bot * 0.3)); };
+    if (e.poly && faceted(e)) { const P = e.poly, out = []; // a custom outline: a bar on each face long enough on screen (drag it straight out or in) and the turn dot
+      P.forEach((p, i) => { const q = P[(i + 1) % P.length]; if (Math.hypot(q[0] - p[0], q[1] - p[1]) / px < (big ? 56 : 40)) return; const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; out.push({ i: 'm' + i, t: 'm', at: F.toLL(m), ft: m, a: deg(p, q) }); });
+      return out.concat([turnDot(P)]); }
+    if (SP.isFree(e)) { const o = SP.outline(e), xs = o.map(p => p[0]), ys = o.map(p => p[1]); // curved pieces: corner handles scale the whole shape; an outline turns too
+      return [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)], [Math.min(...xs), Math.max(...ys)]].map((p, i) => ({ i: 's' + i, t: 's', at: F.toLL(p), ft: p })).concat(e.poly ? [turnDot(e.poly)] : []); }
+    const c = SP.corners(e), L = e.d / 2 + Math.max(14, e.d * 0.15);
     const sides = [0, 1, 2, 3].filter(k => (k % 2 ? e.d : e.w) / px >= (big ? 56 : 40)).map(k => ({ i: 'e' + k, t: 'e', at: F.toLL(T.sideMid(e, k)), ft: T.sideMid(e, k), a: deg(c[k], c[(k + 1) % 4]) })); // a side long enough on screen for a bar between its corners
-    return c.map((p, i) => ({ i, t: 'c', at: F.toLL(p), ft: p, a: -(e.rot || 0) })).concat(sides, [{ i: 'r', t: 'r', at: F.toLL([top[0] - Math.sin(a) * L, top[1] + Math.cos(a) * L]) }]);
+    return c.map((p, i) => ({ i, t: 'c', at: F.toLL(p), ft: p, a: -(e.rot || 0) })).concat(sides, [dotAt(L, L)]);
   }
   const ftPerPx = () => 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (512 * 2 ** map.getZoom()) * 3.28084;
   // layouts run in a worker (sp-worker.js) so the page stays responsive; straight in the page if workers aren't there
@@ -810,14 +818,24 @@ export function initSitePlan(ctx) {
 
   // ---------- pointer: select, move, resize, rotate ----------
   const ftAt = (pl, lngLat) => SP.frame(pl.origin).toFt([lngLat.lng, lngLat.lat]);
-  const SHAPEABLE = ['building', 'plaza', 'green', 'pond', 'court', 'pool', 'patio', 'play', 'garage']; // pieces whose outline can be edited point by point
+  const SHAPEABLE = ['building', 'plaza', 'green', 'pond', 'court', 'pool', 'patio', 'play', 'garage', 'parking']; // pieces whose outline can be edited point by point
+  const faceted = e => !!e.poly && (e.poly.length <= 16 || ['building', 'garage', 'parking'].includes(e.kind)); // a drawn or reshaped outline (its faces can be dragged), not a pond's natural curve (that scales)
   const ORDER = ['trash', 'foodtruck', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'canopy', 'tanks', 'pond', 'keepout', 'fence', 'drive', 'truck', 'parking', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
+  // what's under the pointer: the selected piece's nearest handle (a finger gets more room than a mouse), else the piece
+  // (plan pieces in feet, turned or not: never map tiles). A face bar is caught only along the bar as drawn, and a
+  // handle the pointer is merely near gives way to another piece it's on, so a click meant for a neighbour picks it.
   function hit(pl, e) {
-    let best = null, bd = coarse() ? 22 : 12; for (const h of handles(pl)) { const p = map.project(h.at), dd = Math.hypot(p.x - e.point.x, p.y - e.point.y); if (dd < bd) { bd = dd; best = h; } } if (best) return { h: best.i, hd: best }; // the nearest handle; a finger needs more room than a mouse
-    const ft = ftAt(pl, e.lngLat);
-    const V = T.viewOf(pl); // hidden and locked layers can't be picked
-    for (const k of ORDER) { const el = pl.elements.slice().reverse().find(x => x.kind === k && T.editable(V, x) && SP.hitRect(x, ft)); if (el) return { el }; }
-    return null;
+    const big = coarse(), k = big ? 1.4 : 1, F = SP.frame(pl.origin); let best = null, bd = Infinity;
+    for (const h of handles(pl)) { const p = map.project(h.at), dx = e.point.x - p.x, dy = e.point.y - p.y; let dd, tight;
+      if (h.t === 'e' || h.t === 'm') { const r = -(h.a || 0) * Math.PI / 180, q = map.project(F.toLL([h.ft[0] + Math.cos(r) * 5, h.ft[1] + Math.sin(r) * 5])), L = Math.hypot(q.x - p.x, q.y - p.y) || 1, ux = (q.x - p.x) / L, uy = (q.y - p.y) / L;
+        const s = Math.abs(dx * ux + dy * uy), t = Math.abs(dx * uy - dy * ux), hl = 11 * k, ht = 4.5 * k; if (s > hl + (big ? 8 : 3) || t > ht + (big ? 10 : 5)) continue; // the bar, drawn along its face
+        dd = Math.max(0, s - hl) + t; tight = s <= hl + 1 && t <= ht + 1; }
+      else { dd = Math.hypot(dx, dy); if (dd >= (big ? 22 : 12)) continue; tight = dd <= (big ? 12 : 7); }
+      if (dd < bd) { bd = dd; best = { h, tight }; } }
+    const ft = ftAt(pl, e.lngLat), V = T.viewOf(pl); // hidden and locked layers can't be picked
+    const piece = () => { for (const kd of ORDER) { const el = pl.elements.slice().reverse().find(x => x.kind === kd && T.editable(V, x) && SP.hitRect(x, ft)); if (el) return el; } return null; };
+    if (best) { if (!best.tight) { const el = piece(); if (el && el.id !== ed.sel) return { el }; } return { h: best.h.i, hd: best.h }; }
+    const el = piece(); return el ? { el } : null;
   }
   let drag = null;
   // Shift-click: a piece in or out of the set (the last one picked is the primary)
@@ -848,11 +866,23 @@ export function initSitePlan(ctx) {
     if (t === 'e' || t === 'm') { drag = { type: t === 'e' ? 'side' : 'edge', k: k0, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false }; return; }
     const hs = t === 's' ? h.hd : null;
     drag = { type: h.h == null ? 'move' : h.h === 'r' ? 'rot' : hs ? 'scale' : 'size', k: h.h, corner: hs?.ft, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false };
+    if (drag.type === 'rot') { drag.targets = T.turnTargets(pl, el); const f = drag.from, g = Math.atan2(f[1] - el.y, f[0] - el.x) * 180 / Math.PI - 90; drag.off = ((((el.rot || 0) - g) % 360) + 540) % 360 - 180; } // what a turn lines up with (the street, the site's edges, the buildings' faces); it turns from where the dot was grabbed
     if (drag.type === 'move') { const att = SP.attachedTo(pl, el); drag.att = att.map(a => ({ id: a.id, orig: clone(a) })); if (el.kind === 'building' || el.kind === 'garage') drag.obs = SP.spotObstacles(pl, el, att); } // what moves with it, and what it has to stay clear of
   }
   // the grid, when it's on and Alt isn't held: where a point or a piece lands (a corner square with the grid, else its middle)
   const gridOf = (pl, ev) => { const V = T.viewOf(pl); return V.grid && !ev?.altKey ? { step: V.grid, a: frameAngle(pl) } : null; };
   const onGrid = (G, e) => { const sq = !SP.isFree(e) && Math.abs((((e.rot || 0) - G.a) % 90 + 135) % 90 - 45) < 1, c = sq ? SP.corners(e)[0] : [e.x, e.y], q = T.snapPt(c, G.step, G.a); return [q[0] - c[0], q[1] - c[1]]; };
+  // while a face, a point or the turn dot is dragged: live labels (the face's length and how far it's moved, the sides
+  // either side of a point, the turn and what it's square to) and a thin guide line, drawn with the measuring layers
+  const guide = list => { if (ed) { ed.guide = list && list.length ? list : null; drawD(); } };
+  const offPx = n => n * ftPerPx() * (coarse() ? 1.4 : 1);
+  const along = (a, b) => { const F = SP.frame(PL().origin), p = map.project(F.toLL(a)), q = map.project(F.toLL(b)); let d = Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI; if (d > 90) d -= 180; if (d <= -90) d += 180; return +d.toFixed(1); }; // a label's turn on screen to run along a face, kept upright
+  const edgeLabel = (P, i, t) => { const f = T.faceInfo(P, i), n = T.edgeNormal(P, i), o = offPx(17); return { at: [f.mid[0] + n[0] * o, f.mid[1] + n[1] * o], t, r: along(P[i], P[(i + 1) % P.length]) }; };
+  const sideLabel = (el, k, t) => { const m = T.sideMid(el, k), n = T.sideNormal(el, k), o = offPx(17), c = SP.corners(el); return { at: [m[0] + n[0] * o, m[1] + n[1] * o], t, r: along(c[k], c[(k + 1) % 4]) }; };
+  const cornerLabel = (P, k, t) => { const c = SP.centroid(P), v = [P[k][0] - c[0], P[k][1] - c[1]], L = Math.hypot(...v) || 1, o = offPx(20); return { at: [P[k][0] + v[0] / L * o, P[k][1] + v[1] / L * o], t }; };
+  const ftTxt = v => { const a = Math.abs(v); return (Math.abs(a - Math.round(a)) < 0.05 ? Math.round(a) : a.toFixed(1)) + ' ft'; };
+  const offTxt = d => Math.abs(d) < 0.05 ? 'not moved' : ftTxt(d) + (d > 0 ? ' out' : ' in');
+  const degTxt = r => (Math.abs(r - Math.round(r)) < 0.05 ? Math.round(r) % 360 : (+r).toFixed(1)) + '°';
   function move(e) {
     if (drag?.type === 'box') { drag.p1 = e.point; drag.moved = drag.moved || Math.hypot(e.point.x - drag.p0.x, e.point.y - drag.p0.y) > 3; paintBox(); return; }
     if (drag?.type === 'set') { // the set follows the pointer; with the grid on, the piece under the pointer lands on it
@@ -865,10 +895,13 @@ export function initSitePlan(ctx) {
       const P = el.path, k = drag.k; let q = G ? T.snapPt(p, G.step, G.a) : p; if (k === 0 && T.isEntrance(el)) { const m = T.lotLineAt(pl.ring, q); q = m.at; if (el.mouth) el.mouth = m.mouth; }
       P[k] = q.map(v => +v.toFixed(2)); const mid = P[Math.floor((P.length - 1) / 2)], nx = P[Math.ceil((P.length - 1) / 2)]; el.x = +((mid[0] + nx[0]) / 2).toFixed(2); el.y = +((mid[1] + nx[1]) / 2).toFixed(2); draw(); readout(el); return;
     }
-    if (drag.type === 'vertex') { // the point follows the pointer, lining up with its neighbours (within 3 ft, square to the piece) unless Alt is held
-      const P = el.poly, n = P.length, k = drag.k, r = (el.rot || 0), loc = q => SP.rotPt(q, -r), back = q => SP.rotPt(q, r); let q = loc(p);
-      if (G) q = loc(T.snapPt(p, G.step, G.a)); else if (!e.originalEvent?.altKey && V.snap) for (const nb of [P[(k - 1 + n) % n], P[(k + 1) % n]]) { const b = loc(nb); if (Math.abs(q[0] - b[0]) < 3) q = [b[0], q[1]]; if (Math.abs(q[1] - b[1]) < 3) q = [q[0], b[1]]; }
-      P[k] = back(q).map(v => +v.toFixed(2)); const c = SP.centroid(P); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2); draw(); readout(el); return;
+    if (drag.type === 'vertex') { // the point follows the pointer, lining up with its neighbours (within 3 ft, square to the piece) unless Alt is held; Shift: whole feet and square (or 45°) corners
+      const P = el.poly, n = P.length, k = drag.k, r = (el.rot || 0), loc = q => SP.rotPt(q, -r), back = q => SP.rotPt(q, r); let q = loc(p), sq = false;
+      if (e.originalEvent?.shiftKey) { const s = T.snapPoint(P, k, p, r); q = loc(s.q); sq = s.square; }
+      else if (G) q = loc(T.snapPt(p, G.step, G.a)); else if (!e.originalEvent?.altKey && V.snap) for (const nb of [P[(k - 1 + n) % n], P[(k + 1) % n]]) { const b = loc(nb); if (Math.abs(q[0] - b[0]) < 3) q = [b[0], q[1]]; if (Math.abs(q[1] - b[1]) < 3) q = [q[0], b[1]]; }
+      P[k] = back(q).map(v => +v.toFixed(2)); const c = SP.centroid(P); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2);
+      guide([(k - 1 + n) % n, k].map(i => edgeLabel(P, i, T.fmtFt(T.faceInfo(P, i).len))).concat(sq ? [cornerLabel(P, k, '90°')] : []));
+      draw(); readout(el); return;
     }
     if (drag.type === 'move') { // snaps to its neighbours' edges, stays out of the setbacks and (a building) off the drives and other buildings; hold Alt for a free move
       const free = e.originalEvent?.altKey, carry = () => (drag.att || []).map(a => pl.elements.find(x => x.id === a.id)).filter(Boolean);
@@ -880,34 +913,40 @@ export function initSitePlan(ctx) {
       if (!free && drag.obs) { const c = SP.clearSpot(pl, el, { carry: carry(), obs: drag.obs }); if (c) { if (c[0] || c[1]) { SP.moveBy(el, c[0], c[1]); mv(); } } else drag.blocked = true; } // the nearest clear spot to the pointer
       drag.last = p; drag.alt = !!free; if (SP.inRing(p, pl.ring) && !drag.blocked) drag.good = { el: clone(el), att: carry().map(clone) }; // the last clear spot with the pointer on the site
     }
-    else if (drag.type === 'side') { // one side out or in, the opposite one fixed: on the grid, else lined up with a neighbour's edge (unless Alt), and never past the setback
-      const k = drag.k, n = T.sideNormal(o, k), alt = e.originalEvent?.altKey, d0 = (p[0] - drag.from[0]) * n[0] + (p[1] - drag.from[1]) * n[1]; let d = d0;
-      const along = dd => ({ ...o, ...T.dragSide(o, k, dd) }), sq = G && Math.abs((((o.rot || 0) - G.a) % 90 + 135) % 90 - 45) < 1;
-      if (sq) { const m = T.sideMid(along(d), k), q = T.snapPt(m, G.step, G.a); d += (q[0] - m[0]) * n[0] + (q[1] - m[1]) * n[1]; }
+    else if (drag.type === 'side') { // one side out or in, the opposite one fixed: on the grid, else lined up with a neighbour's edge (unless Alt), and never past the setback; Shift: a whole number of feet across
+      const k = drag.k, n = T.sideNormal(o, k), alt = e.originalEvent?.altKey, sh = e.originalEvent?.shiftKey, d0 = (p[0] - drag.from[0]) * n[0] + (p[1] - drag.from[1]) * n[1]; let d = d0;
+      const along = dd => ({ ...o, ...T.dragSide(o, k, dd) }), sq = G && Math.abs((((o.rot || 0) - G.a) % 90 + 135) % 90 - 45) < 1, was = k % 2 ? o.w : o.d;
+      if (sh) d = Math.round(was + d) - was;
+      else if (sq) { const m = T.sideMid(along(d), k), q = T.snapPt(m, G.step, G.a); d += (q[0] - m[0]) * n[0] + (q[1] - m[1]) * n[1]; }
       else if (!alt && V.snap) d += T.sideSnap(pl, along(d), k, 3);
       if (!alt && d > 0) { const [sx, sy] = SP.settleShift(pl, along(d), 0), back = sx * n[0] + sy * n[1]; if (back < -0.01) d = Math.max(Math.min(0, d), d + back); } // the setback stops it
       Object.assign(el, T.dragSide(o, k, d)); drag.moved = Math.abs(d) > 0.05;
+      const got = (k % 2 ? el.w : el.d) - was; guide([sideLabel(el, k, T.fmtFt(k % 2 ? el.d : el.w) + ' face · ' + offTxt(got))]);
     }
-    else if (drag.type === 'edge') { // a shape's edge, both its points together along its normal (it stays parallel); a move that would cross the outline over itself is skipped
+    else if (drag.type === 'edge') { // a face of an outline straight out or in along its normal; the faces either side keep their direction (T.dragFace), cut back where it would fold over or pinch; Shift: whole feet
       const k = drag.k, n = T.edgeNormal(o.poly, k); let d = (p[0] - drag.from[0]) * n[0] + (p[1] - drag.from[1]) * n[1];
-      if (G) { const a = o.poly[k], b = o.poly[(k + 1) % o.poly.length], m = [(a[0] + b[0]) / 2 + n[0] * d, (a[1] + b[1]) / 2 + n[1] * d], q = T.snapPt(m, G.step, G.a); d += (q[0] - m[0]) * n[0] + (q[1] - m[1]) * n[1]; }
-      const P = T.dragEdge(o.poly, k, d); if (!T.selfIntersects(P) && SP.ringArea(P) >= 50) { el.poly = P; const c = SP.centroid(P); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2); }
-      drag.moved = Math.abs(d) > 0.05;
+      if (e.originalEvent?.shiftKey) d = Math.round(d);
+      else if (G) { const a = o.poly[k], b = o.poly[(k + 1) % o.poly.length], m = [(a[0] + b[0]) / 2 + n[0] * d, (a[1] + b[1]) / 2 + n[1] * d], q = T.snapPt(m, G.step, G.a); d += (q[0] - m[0]) * n[0] + (q[1] - m[1]) * n[1]; }
+      const r = T.dragFace(o.poly, k, d); el.poly = r.poly; const c = SP.centroid(r.poly); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2);
+      drag.moved = Math.abs(r.d) > 0.05; guide([edgeLabel(r.poly, k, T.fmtFt(T.faceInfo(r.poly, k).len) + ' face · ' + offTxt(r.d))]);
     }
     else if (drag.type === 'scale') { const c = [o.x, o.y], f = Math.max(0.2, Math.min(5, Math.hypot(p[0] - c[0], p[1] - c[1]) / (Math.hypot(drag.corner[0] - c[0], drag.corner[1] - c[1]) || 1))); Object.assign(el, SP.scaleBy(clone(o), f, c)); }
     else if (drag.type === 'size') {
       const sx = [-1, 1, 1, -1][drag.k], sy = [-1, -1, 1, 1][drag.k], opp = [-sx * o.w / 2, -sy * o.d / 2], q = SP.toLocal(o, p);
       const w = Math.max(8, Math.abs(q[0] - opp[0])), d = Math.max(8, Math.abs(q[1] - opp[1])), mid = [opp[0] + sx * w / 2, opp[1] + sy * d / 2], a = (o.rot || 0) * Math.PI / 180;
       Object.assign(el, { w: +w.toFixed(2), d: +d.toFixed(2), x: +(o.x + mid[0] * Math.cos(a) - mid[1] * Math.sin(a)).toFixed(2), y: +(o.y + mid[0] * Math.sin(a) + mid[1] * Math.cos(a)).toFixed(2) });
-    } else {
-      let r = Math.atan2(p[1] - o.y, p[0] - o.x) * 180 / Math.PI - 90; const base = frameAngle(pl);
-      if (!e.originalEvent?.shiftKey && V.snap) { const rel = ((r - base) % 90 + 90) % 90; r = rel < 4 ? r - rel : rel > 86 ? r + 90 - rel : Math.round(r / 5) * 5; }
-      el.rot = +(((r % 360) + 360) % 360).toFixed(2);
+    } else { // the turn dot: Shift, 15° steps; else free to the degree, settling square to the street, a site edge or a building's face within 2° (not with Alt or edge snapping off), a guide line along it
+      const raw = Math.atan2(p[1] - o.y, p[0] - o.x) * 180 / Math.PI - 90 + (drag.off || 0), s = T.snapTurn(raw, !e.originalEvent?.altKey && V.snap ? drag.targets : [], { shift: !!e.originalEvent?.shiftKey });
+      Object.assign(el, T.turnPiece(o, s.r)); drag.turn = s;
+      const c = [o.x, o.y], R = Math.max(o.w || 0, o.d || 0) * 0.8 + 30, g = [];
+      if (s.snap) { const t = s.snap.a * Math.PI / 180, u = [Math.cos(t), Math.sin(t)]; g.push({ line: [[c[0] - u[0] * R, c[1] - u[1] * R], [c[0] + u[0] * R, c[1] + u[1] * R]] }, { line: s.snap.seg }); } // through its middle along what it lines up with, and that edge
+      g.push({ at: [c[0] + (p[0] - c[0]) * 1.25, c[1] + (p[1] - c[1]) * 1.25], t: degTxt(s.r) + (s.snap ? ' · square to ' + s.snap.what : '') });
+      guide(g);
     }
     draw(); readout(el);
   }
   function up(ev) {
-    if (!drag) return; const d = drag; drag = null;
+    if (!drag) return; const d = drag; drag = null; if (ed?.guide) { ed.guide = null; drawD(); }
     if (d.type === 'box') { boxEl.hidden = true; const pl = PL(); if (!pl) return; if (!d.moved) { if (d.on != null) toggleSel(d.on); return; } // the pieces wholly inside the box join the set
       const q = [[d.p0.x, d.p0.y], [d.p1.x, d.p0.y], [d.p1.x, d.p1.y], [d.p0.x, d.p1.y]].map(([x, y]) => ftAt(pl, map.unproject([x, y])));
       const got = T.boxSelect(pl, q, T.viewOf(pl)); if (!got.length) { ctx.toast('No pieces wholly inside that box.'); return; }
@@ -1027,7 +1066,7 @@ export function initSitePlan(ctx) {
       ctx.toast('Point added to ' + ED.labelOf(el) + ': drag it to bend the drive. Curve in the panel rounds the bends.'); return; }
     if (!SHAPEABLE.includes(el.kind)) return; const r = T.addPoint(el, ft);
     ed.editing = true; ed.sel = el.id; ed.multi = []; ed.shape = el.id; if (!r) { draw(); panel(); return; } // on a point already there: just shaping
-    change(() => { el.poly = r.poly; for (const k of ['form', 'jog', 'shape', 'path']) delete el[k]; const c = SP.centroid(r.poly); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2); el.pinned = true; });
+    change(() => { const o = T.asOutline(el); Object.assign(el, o.set, { poly: r.poly }); for (const k of o.drop) delete el[k]; const c = SP.centroid(r.poly); el.x = +c[0].toFixed(2); el.y = +c[1].toFixed(2); el.pinned = true; });
     ctx.toast('Point added to ' + ED.labelOf(el) + ': drag it to change the shape.');
   }
   // move a plan to a new boundary (and origin), keeping every piece where it is on the ground
@@ -1115,6 +1154,7 @@ export function initSitePlan(ctx) {
         if (M.kind === 'area' && Q.length >= 3) pt(SP.centroid(Q), { k: 'mtot', t: T.fmtArea(T.polyArea(Q)) });
       }
       if (ed.hover != null && (ed.mode === 'front' || ed.mode === 'street') && pl.ring.length >= 3) line([pl.ring[ed.hover], pl.ring[(ed.hover + 1) % pl.ring.length]].filter(Boolean), { hv: 1 });
+      if (ed.guide && drag) for (const g of ed.guide) { if (g.line) line(g.line, { rb: 1 }); else if (g.at) pt(g.at, { k: 'mlab', t: g.t, r: g.r || 0 }); } // a drag's guide line and live labels (along the face they measure)
     }
     src.setData({ type: 'FeatureCollection', features: feats });
   }); }
@@ -1442,7 +1482,8 @@ export function initSitePlan(ctx) {
       it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); if (rc) it('pin', pins ? 'Let them move' : 'Pin them', '', { tip: pins ? 'Re-fitting may move them again' : 'Re-fitting keeps them where they are' }); sep(); it('fitsel', 'Fit selection', 'F'); }
     else if (el) { const nm = ED.labelOf(el), kl = SP.KINDS[el.kind]?.label || ''; head = nm + (kl && !nm.toLowerCase().includes(kl.toLowerCase()) ? ' · ' + kl.toLowerCase() : '');
       if (el.kind === 'building') { it('use', 'Change use', '', { sub: 1 }); sep(); } // retail, office, restaurant…: its parking need follows
-      it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); if (!SP.isFree(el)) it('turn', 'Turn 90°', 'R');
+      it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); if (!SP.isFree(el) || el.poly) it('turn', 'Turn 90°', 'R');
+      if (el.kind === 'parking') { sep(); it('stalldir', 'Stall direction', '', { tip: 'Turn the stalls 90° inside the same outline' }); it('faceb', 'Face the building', '', { tip: 'Turn the stalls toward the nearest building face' }); }
       if (SHAPEABLE.includes(el.kind) || T.routeable(el)) { sep(); it('shape', ed.shape === el.id ? 'Done shaping' : T.routeable(el) ? 'Bend it (edit shape)' : 'Edit shape'); it('addpt', 'Add point here', 'Double-click'); }
       if (rc) { sep(); it('pin', el.pinned ? 'Let it move' : 'Pin it', '', { tip: el.pinned ? 'Re-fitting may move it again' : 'Re-fitting keeps it where it is' }); }
       sep(); it('fitsel', 'Fit selection', 'F'); if (card.querySelector('#spChg')) it('ai', 'Change with AI…');
@@ -1490,6 +1531,7 @@ export function initSitePlan(ctx) {
     closeMenu();
     if (id === 'dup') { ensureEdit(); dupSel(); } else if (id === 'copy') copySel(); else if (id === 'del') { ensureEdit(); delEls(sels()); }
     else if (id === 'turn' && el) { ensureEdit(); turnEl(el); }
+    else if (id === 'stalldir' && el) stallDir(el); else if (id === 'faceb' && el) faceB(el);
     else if (id === 'shape' && el) { ensureEdit(); if (ed.shape === el.id) { ed.shape = null; draw(); panel(); } else shapeOn(el); }
     else if (id === 'addpt' && el) addPointAt(el, ft);
     else if (id === 'pin') { const ids = sels(), all = ids.every(i => pl.elements.find(x => x.id === i)?.pinned); change(x => { for (const q of x.elements) if (ids.includes(q.id)) { if (all) delete q.pinned; else q.pinned = true; } }); ctx.toast(all ? 'Re-fitting may move ' + (ids.length > 1 ? 'them' : 'it') + ' again.' : 'Pinned: re-fitting keeps ' + (ids.length > 1 ? 'them' : 'it') + ' where ' + (ids.length > 1 ? 'they are.' : 'it is.')); }
@@ -1502,7 +1544,7 @@ export function initSitePlan(ctx) {
   // a drive or an entrance becomes a route instead: its centre line's points, its width and its Curve (T.routeOf)
   function shapeOn(el) { const ring = PL()?.ring || []; change(() => {
     if (T.routeable(el)) { if (!el.path) { const r = T.routeOf(el, ring); for (const k of Object.keys(el)) delete el[k]; Object.assign(el, r); } }
-    else if (!el.poly) { el.poly = SP.outline(el).map(q => q.map(v => +v.toFixed(2))); for (const k of ['form', 'jog', 'shape', 'path']) delete el[k]; }
+    else if (!el.poly) { const o = T.asOutline(el); Object.assign(el, o.set); for (const k of o.drop) delete el[k]; } // (parking keeps its stalls running the way they did)
     el.pinned = true; }); ed.shape = el.id; draw(); panel(); }
   // keys while the menu is open: arrows and Home/End move, → and ← open and close Add here, Esc closes, Tab leaves
   function menuKey(e) {
@@ -1612,7 +1654,7 @@ export function initSitePlan(ctx) {
   }
   map.on('contextmenu', e => { if (!ed || !(PL()?.ring.length >= 3)) return; e.preventDefault(); if (ed.mode && ed.mode !== 'measure') return; openMenu(e.point, e.lngLat); }); // drawing: right-click does nothing (the generic map menu stays away too)
   { let lp = 0, at = null; // a long press on touch screens
-    map.on('touchstart', e => { clearTimeout(lp); if (!ed || ed.mode || e.points.length !== 1 || !(PL()?.ring.length >= 3)) return; at = e.point; const ll = e.lngLat; lp = setTimeout(() => { if (!cm.hidden && performance.now() - lpAt < 600) return; lpAt = performance.now(); openMenu(at, ll); }, 550); });
+    map.on('touchstart', e => { clearTimeout(lp); if (!ed || ed.mode || e.points.length !== 1 || !(PL()?.ring.length >= 3)) return; at = e.point; const ll = e.lngLat; lp = setTimeout(() => { if (!cm.hidden && performance.now() - lpAt < 600) return; if (drag && (drag.moved || !['move', 'set', 'box'].includes(drag.type))) return; /* a finger resting on a handle before it drags: no menu */ lpAt = performance.now(); openMenu(at, ll); }, 550); });
     map.on('touchmove', e => { if (at && Math.hypot(e.point.x - at.x, e.point.y - at.y) > 10) clearTimeout(lp); });
     map.on('touchend', () => clearTimeout(lp)); }
   document.addEventListener('pointerdown', e => { if (!cm.hidden && !cm.contains(e.target) && !cmSub.contains(e.target) && !cmFor?.contains(e.target)) closeMenu(); }, true); // (New Option's own button closes it with its click)
@@ -1674,7 +1716,7 @@ export function initSitePlan(ctx) {
     if (mv) { used(); const dx = step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), dy = step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a));
       if (set.length > 1) { change(x => { const before = clone(x.elements.filter(q => set.includes(q.id))); x.elements = T.moveSet(x, set, dx, dy).elements; ed.nudged = [...(ed.nudged || []), ...before].slice(-24); }, true); refitSoon('Moved', plural(set.length, 'piece')); return; } // the set, each with what's attached
       const pl0 = PL(), att = pl0 ? SP.attachedTo(pl0, el) : []; change(() => { ed.nudged = [...(ed.nudged || []), clone(el), ...att.map(clone)].slice(-12); for (const t of [el, ...att]) { SP.moveBy(t, dx, dy); t.pinned = true; } }, true); refitSoon('Moved', ED.labelOf(el)); return; } // what belongs to it moves too; a burst of nudges re-fits once, after the last
-    if ((k === 'r' || k === 'R') && set.length === 1 && !SP.isFree(el)) { used(); turnEl(el); }
+    if ((k === 'r' || k === 'R') && set.length === 1 && (!SP.isFree(el) || el.poly)) { used(); turnEl(el); }
   }, true);
 
   // Esc steps back one thing at a time and never closes the plan (× or Done does): a pop-over from the tool strip →
@@ -2217,22 +2259,25 @@ export function initSitePlan(ctx) {
 
   // the piece that's picked: its name and size, what can be done to it (a row of buttons), then its fields
   // an AI-sized piece says so (and which AI-crafted type it belongs to); a building can be saved to the team library
+  const turnVal = e => { const r = (((e.rot || 0) % 360) + 360) % 360; return Math.abs(r - Math.round(r)) < 0.05 ? Math.round(r) % 360 : +r.toFixed(1); }; // the Turn field: whole degrees, or one place when it's between
   const selCustom = e => (e.aiSized || e.custom ? '<div class="sp-cust">' + (e.aiSized ? '<i class="sp-ais" title="' + esc(AIS_TIP) + '">AI-sized</i>' : '') + (e.custom ? '<span>' + esc(e.custom) + (e.aiSized ? ': the AI’s size, not a product sheet' : '') + '</span>' : '') + '</div>' : '') +
     (e.kind === 'building' ? '<div class="sp-row sp-savelib"><button type="button" class="btn sm" id="spSaveLib" title="Keep this building in the team library: everyone on the team can add it from the building library' + (e.custom ? ', and the AI can build another ' + esc(e.custom) + ' from its recipe' : '') + '">Save to Library</button></div>' : '');
   function selHtml(e, prog) {
     if (e && sels().length > 1) return multiHtml();
-    if (!e) return '<div class="lt">Selected</div><div class="rnote sp-1l">Click a piece on the map to see it.' + infoBtn(ed.editing ? 'Drag a piece to move it; a white corner resizes it, the green dot turns it. It lines up with its neighbours and stays out of the setbacks (hold Alt to move it freely). Arrow keys nudge it, R turns it 90°, Delete removes it. Only that piece moves; parking under a building gives way.' : 'Turn on Edit Layout to move, resize or turn pieces.', 'How to change a piece') + '</div>';
+    if (!e) return '<div class="lt">Selected</div><div class="rnote sp-1l">Click a piece on the map to see it.' + infoBtn(ed.editing ? 'Drag a piece to move it; a white corner resizes it, a white bar on a side drags that face straight out or in, the green dot turns it. Turning settles square to the street, the site’s edges and the buildings when it comes within 2°; hold Shift to turn in 15° steps, or to size in whole feet and keep corners square. It lines up with its neighbours and stays out of the setbacks (hold Alt to move it freely). Arrow keys nudge it, R turns it 90°, Delete removes it. Only that piece moves; parking under a building gives way.' : 'Turn on Edit Layout to move, resize or turn pieces.', 'How to change a piece') + '</div>';
     const free = SP.isFree(e), rc = !!PL()?.recipe;
-    const n = (k, label, v, o = {}) => fld(label, numCtl((o.min != null ? 'min="' + o.min + '" ' : '') + (o.max ? 'max="' + o.max + '" ' : '') + 'data-e="' + k + '"', v, 1, o.unit || ''));
+    const n = (k, label, v, o = {}) => fld(label, numCtl((o.id ? 'id="' + o.id + '" ' : '') + (o.min != null ? 'min="' + o.min + '" ' : '') + (o.max ? 'max="' + o.max + '" ' : '') + 'data-e="' + k + '"', v, o.step || 1, o.unit || ''), o.tip ? { tip: o.tip } : {});
+    const turnF = () => n('rot', 'Turn', turnVal(e), { id: 'spTurn', unit: '°', tip: 'Any number of degrees. The arrows step 1°; with Shift, 15°.' }); // typed degrees, any number (52.5 too: nothing checks it against the arrows' 1° step)
     const pick = (attr, label, opts, v, wide) => fld(label, selCtl(attr, opts, v), { wide });
     return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free && e.kind !== 'keepout' ? (SHAPEABLE.includes(e.kind) && !['pond', 'green', 'pool'].includes(e.kind) ? ' · custom shape' : e.path ? (T.isEntrance(e) ? ' · entrance' : ' · route') : ' · curved') : '') + '</div><div class="rnote sp-1l" id="spRead"></div>' + selCustom(e) +
       '<fieldset class="sp-fs"' + (ed.editing ? '' : ' disabled') + '>' +
-      '<div class="sp-acts">' + (free ? '' : '<button type="button" class="btn sm" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) || T.routeable(e) ? '<button type="button" class="btn sm" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="' + (T.routeable(e) ? 'Bend it: drag its points along the drive; a blue + adds a point; double-click a point to remove it' : 'Drag its points; drag a blue + to add a point; double-click a point to remove it') + '">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') +
+      '<div class="sp-acts">' + (free && !e.poly ? '' : '<button type="button" class="btn sm" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) || T.routeable(e) ? '<button type="button" class="btn sm" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="' + (T.routeable(e) ? 'Bend it: drag its points along the drive; a blue + adds a point; double-click a point to remove it' : 'Drag its points or its faces; drag a blue + to add a point; double-click a point to remove it. Hold Shift for whole feet and square corners.') + '">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') +
         (rc ? '<button type="button" class="btn sm" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button type="button" class="btn sm" id="spDup" title="Copy it beside itself (⌘D / Ctrl+D)">Duplicate</button><button type="button" class="btn sm" id="spAskSel" title="Say what to change about this piece">Change With AI</button><button type="button" class="btn sm ghost sp-del" id="spDel" title="Delete it (Delete)">Delete</button></div>' +
+      (e.kind === 'parking' ? '<div class="sp-acts sp-stalls"><button type="button" class="btn sm" id="spStallDir" title="Turn the stalls 90° inside the same outline: the rows run the other way">Stall Direction</button><button type="button" class="btn sm" id="spFaceB" title="Turn the stalls to face the nearest building: cars pull in toward it, the aisle runs along it, and the parking sits a walk’s width off it">Face the Building</button></div>' : '') +
       (!ed.editing ? '<div class="rnote sp-1l">Turn on <b>Edit Layout</b> to change it.</div>' : rc && e.pinned ? '<div class="sp-pin"><span class="rnote">Pinned: <b>Re-fit Plan</b> keeps it where it is.</span><button type="button" class="btn sm" id="spUnpin" title="Re-fit Plan may move it again">Let It Move</button></div>' : '') +
       '<div class="sp-fg">' + (e.path && T.routeable(e) ? n('width', 'Width', Math.round(e.width || 26), { min: 6, max: 80, unit: 'ft' }) + n('r', 'Curve', Math.round(e.r ?? 30), { min: 0, max: 200, unit: 'ft' }) + (T.isEntrance(e) ? n('flare', 'Mouth flare', Math.round(e.flare || 0), { min: 0, max: 60, unit: 'ft' }) : '') : '') + (e.kind === 'building' ? pick('data-use="1"', 'Use', Object.entries(SP.USES).map(([k, u]) => [k, u.label]), e.use || prog.use) + n('floors', 'Floors', e.floors || 1, { min: 1, max: 40 }) +
           fld('Type', '<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '', teamTypes()) + '</select>', { wide: true }) : '') + // what it is first: use and type can change any time
-        (free ? '' : n('w', 'Width', Math.round(e.w), { min: 8, unit: 'ft' }) + n('d', 'Depth', Math.round(e.d), { min: 8, unit: 'ft' }) + n('rot', 'Turn', (Math.round(e.rot || 0) % 360 + 360) % 360, { unit: '°' })) +
+        (free ? (e.poly ? turnF() : '') : n('w', 'Width', Math.round(e.w), { min: 8, unit: 'ft' }) + n('d', 'Depth', Math.round(e.d), { min: 8, unit: 'ft' }) + turnF()) +
         (e.kind === 'building' && (e.use || prog.use) === 'foodtrucks' ? pick('data-ftk="1"', 'Part', [['pavilion', 'Covered pavilion'], ['bar', 'Bar / beer garden'], ['restroom', 'Restrooms']], SP.ftKind(e)) : e.kind === 'building' && (e.use || prog.use) === 'storage' ? pick('data-stok="1"', 'Storage', [['climate', 'Climate-controlled'], ['drive', 'Drive-up units'], ['office', 'Leasing office']], SP.storageKind(e)) : e.kind === 'building' && (e.use || prog.use) === 'fuel' ? pick('data-fuelk="1"', 'Gas station', [['store', 'Convenience store'], ['wash', 'Car wash']], SP.fuelKind(e)) : e.kind === 'building' ? (SP.USES[e.use || prog.use]?.garage ? n('units', 'Homes', e.units || 1, { min: 1, max: 40 }) : '') +
           pick('data-form="1"', 'Building shape', e.poly ? [['custom', 'Custom outline'], ...FORMS] : FORMS, e.poly ? 'custom' : e.form || 'bar') + (e.form === 'tower' && !e.poly ? n('podium', 'Podium floors', e.podium || 2, { min: 1, max: 6 }) : '') : '') +
         (e.kind === 'garage' ? n('levels', 'Levels', e.levels || 4, { min: 1, max: 12 }) : '') +
@@ -2270,13 +2315,20 @@ export function initSitePlan(ctx) {
     else if (ftb) el.textContent = f0(SP.gfaOf(e)) + ' sf' + (ftb === 'pavilion' ? ' covered · ~' + f0(SP.gfaOf(e) / SP.FOODTRUCK.seatSf) + ' seats at picnic tables' : ftb === 'bar' ? ' · ' + f0(SP.gfaOf(e) / 1000 * pp.ratio) + ' parking spaces' : ' restrooms');
     else el.textContent = e.kind === 'canopy' ? (e.pumps || 0) + ' pumps · ' + 2 * (e.pumps || 0) + ' fueling positions · ' + f0(SP.elArea(e)) + ' sf canopy (no floor area)' : e.kind === 'tanks' ? 'Underground fuel tanks · ' + f0(SP.elArea(e)) + ' sf pad, kept clear for the fuel truck' : e.kind === 'parking' && e.vac ? SP.stalls(e).count + ' air / vacuum stalls (not counted as parking)' : sq ? f0(SP.gfaOf(e)) + ' sf' + ((e.floors || 1) > 1 ? ' over ' + e.floors + ' floors' : '') + (sq.nrsf ? ' · ' + f0(sq.nrsf) + ' sf rentable · ~' + f0(sq.units) + ' units' : '') : e.kind === 'building' ? f0(SP.footArea(e)) + ' sf footprint · ' + f0(SP.gfaOf(e)) + ' sf total' : e.kind === 'parking' && e.rv ? SP.stalls(e).count + ' RV / boat spaces (' + (e.sw || 12) + ' × ' + (e.sd || 40) + ' ft)' : e.kind === 'parking' ? SP.stalls(e).count + ' spaces (' + (e.sw || SP.STALL.w) + ' × ' + (e.sd || SP.STALL.d) + ' ft stalls, ' + (e.sa || SP.STALL.aisle) + ' ft aisles)' : e.kind === 'pond' ? (SP.elArea(e) / 43560).toFixed(2) + ' acres' : f0(SP.elArea(e)) + ' sf' + (SP.isFree(e) ? ' · drag to move it' : '');
     for (const k of ['w', 'd']) { const i = card.querySelector('[data-e="' + k + '"]'); if (i && document.activeElement !== i) i.value = Math.round(e[k]); }
-    const r = card.querySelector('[data-e="rot"]'); if (r && document.activeElement !== r) r.value = (Math.round(e.rot || 0) % 360 + 360) % 360;
+    const r = card.querySelector('[data-e="rot"]'); if (r && document.activeElement !== r) r.value = turnVal(e);
     if (!drag) nums();
   }
   function wireSel(e) {
     if (e && sels().length > 1) { wireMulti(); return; }
     if (!e) return; readout(e);
-    card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v)) return; change(() => { const k = i.dataset.e; e[k] = k === 'floors' || k === 'units' || k === 'levels' || k === 'podium' ? Math.max(1, Math.round(v)) : k === 'rot' ? ((v % 360) + 360) % 360 : k === 'r' || k === 'flare' ? Math.max(0, v) : k === 'width' ? Math.max(6, v) : Math.max(8, v); e.pinned = true; }, true); readout(e); refitSoon(); });
+    card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v) || i.value === '') return; const k = i.dataset.e; if (k === 'rot' && Math.abs(T.turnPiece(e, v).rot - (e.rot || 0)) < 0.005) return; // (the same turn typed again: nothing to undo)
+      change(() => { if (k === 'rot') Object.assign(e, T.turnPiece(e, v)); else e[k] = k === 'floors' || k === 'units' || k === 'levels' || k === 'podium' ? Math.max(1, Math.round(v)) : k === 'r' || k === 'flare' ? Math.max(0, v) : k === 'width' ? Math.max(6, v) : Math.max(8, v); e.pinned = true; }, true); readout(e); refitSoon(k === 'rot' ? 'Turned' : undefined); });
+    const ri = card.querySelector('[data-e="rot"]'); if (ri) { // Shift with the Turn field's arrows (keys or the little spinner): 15° steps
+      ri.addEventListener('keydown', ev => { if (ev.shiftKey && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) { ev.preventDefault(); ri.value = T.turnStep(+ri.value || 0, ev.key === 'ArrowUp'); ri.onchange(); } });
+      ri.addEventListener('pointerdown', ev => { ri._sh = ev.shiftKey; ri._was = +ri.value || 0; }); ri.addEventListener('pointerup', () => { ri._sh = false; });
+      ri.addEventListener('input', () => { if (!ri._sh) return; const v = +ri.value; if (v !== ri._was && Math.abs(v - ri._was) <= 1 + 1e-6) { ri.value = T.turnStep(ri._was, v > ri._was); ri._was = +ri.value; } }); }
+    card.querySelector('#spStallDir')?.addEventListener('click', () => stallDir(e));
+    card.querySelector('#spFaceB')?.addEventListener('click', () => faceB(e));
     card.querySelector('[data-shape]')?.addEventListener('change', ev => { change(() => { SP.reshape(e, ev.target.value); e.pinned = true; }); refitSoon(); });
     const up1 = card.querySelector('#spUnpin'); if (up1) up1.onclick = () => change(() => { delete e.pinned; });
     const rf = card.querySelector('#spRefit'); if (rf) rf.onclick = () => refitNow(true);
@@ -2562,11 +2614,31 @@ export function initSitePlan(ctx) {
   // under it gives way and grows back where it was
   function turnEl(el) {
     let blocked = false;
-    change(x => { const o = clone(el); el.rot = ((el.rot || 0) + 90) % 360; el.pinned = true;
+    change(x => { const o = clone(el); Object.assign(el, T.turnPiece(el, (el.rot || 0) + 90)); el.pinned = true; // (a custom outline turns about its middle)
       if (el.kind === 'building' || el.kind === 'garage') { const att = SP.attachedTo(x, el), c = SP.clearSpot(x, el, { carry: att, reach: Math.max(el.w || 0, el.d || 0) + 60 }); if (c && (c[0] || c[1])) for (const t of [el, ...att]) SP.moveBy(t, c[0], c[1]); blocked = !c; }
       makeRoom(el, [o]); });
     refitSoon('Turned', ED.labelOf(el));
     if (blocked) ctx.toast('No clear spot for it turned that way: it overlaps (in red). Turn it again or drag it.', { action: { label: 'Undo', run: () => { if (ed) undo(true); } } });
+  }
+  // a parking piece's stalls: Stall Direction turns them 90° inside the same outline; Face the Building squares them to
+  // the nearest building face (lib/sitetools.mjs faceBuilding). Each one undo step, the count said, then the auto re-fit.
+  const ROW1 = 'This is a single row of stalls along the aisle beside it: its stalls face that aisle. Give it an outline of its own first (Edit Shape), deep enough for a row and an aisle.';
+  function stallDir(el) {
+    const pl = PL(); if (!pl || !el || el.kind !== 'parking') return; ensureEdit(); const n0 = SP.stalls(el).count, mark = ed.undo.length, t = T.turnStalls(el);
+    if (el.row && !el.poly) { ctx.toast(ROW1); return; }
+    if (!SP.stalls({ ...el, ...t }).count && n0) { ctx.toast('No whole stalls fit this outline the other way; it stays as it is.'); return; }
+    change(() => { Object.assign(el, t); el.pinned = true; });
+    const n1 = SP.stalls(el).count; ctx.toast('Stalls turned: ' + SP.spacesWord(n1) + (n1 !== n0 ? ' (was ' + n0 + ')' : '') + '.', { action: { label: 'Undo', run: () => { if (ed && PL() === pl && ed.undo.length === mark + 1) undo(true); } } });
+    autoRefit('Turned the stalls in', ED.labelOf(el));
+  }
+  function faceB(el) {
+    const pl = PL(); if (!pl || !el || el.kind !== 'parking') return; ensureEdit(); if (el.row && !el.poly) { ctx.toast(ROW1); return; }
+    const r = T.faceBuilding(pl, el); if (!r) { ctx.toast('There’s no building on the plan to face.'); return; }
+    const n0 = SP.stalls(el).count, mark = ed.undo.length, b = ED.labelOf(r.face.b);
+    if (!SP.stalls({ ...el, ...r.set }).count && n0) { ctx.toast('No whole stalls fit this outline facing ' + b + '; it stays as it is.'); return; }
+    change(() => { Object.assign(el, r.set); el.pinned = true; delete el.ext; });
+    const n1 = SP.stalls(el).count; ctx.toast('Stalls face ' + b + ': ' + SP.spacesWord(n1) + (n1 !== n0 ? ' (was ' + n0 + ')' : '') + (r.moved ? ', a walk’s width off it' : '') + '.', { action: { label: 'Undo', run: () => { if (ed && PL() === pl && ed.undo.length === mark + 1) undo(true); } } });
+    autoRefit('Turned', ED.labelOf(el) + ' to face ' + b);
   }
   // a new piece lands in the nearest clear spot to the middle of the view (as a drag does): off the other buildings,
   // drives, ponds and amenities and inside the setbacks, on open ground before parking (parking under it gives way, but
