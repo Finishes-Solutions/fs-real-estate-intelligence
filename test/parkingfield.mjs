@@ -29,7 +29,7 @@ const P = {
 const CASES = [
   ['retail', 'lot5ac', 25000], ['retail', 'square2ac', 11246], ['retail', 'corner3ac', 25000], ['retail', 'clipped', 25000], ['retail', 'wedge', 25000], ['retail', 'fm362', 50000], ['retail', 'big20', 200000],
   ['retailMax', 'lot5ac', 35434], ['retailMax', 'corner3ac', 19521], ['retailMax', 'fm362', 59250],
-  ['restaurant', 'lot5ac', 12000], ['restaurant', 'square2ac', 5600 /* (the older stacks put 6,000 here only with a dead-end aisle and stalls at the mouth of the entry) */], ['restaurant', 'corner3ac', 6000], ['restaurant', 'big20', 89145],
+  ['restaurant', 'lot5ac', 12000], ['restaurant', 'square2ac', 4700 /* (the older stacks put 6,000 here only with a dead-end aisle and stalls at the mouth of the entry; with its service drive and every aisle through, about 4,700 parks: 5,350 without the drive, the second option) */], ['restaurant', 'corner3ac', 6000], ['restaurant', 'big20', 89145],
   ['office', 'lot5ac', 40000], ['office', 'clipped', 27233], ['office', 'wedge', 40000],
   ['medical', 'square2ac', 9564], ['medical', 'lot5ac', 20000], ['medical', 'fm362', 40000],
   ['hotel', 'lot5ac', 55000], ['hotel', 'corner3ac', 55000], ['hotel', 'big20', 494999],
@@ -45,6 +45,10 @@ function sound(plan, o, what, use) {
   assert.deepEqual(iss.filter(i => i.level === 'bad').map(i => i.text), [], what + ': no rule broken');
   assert.deepEqual(iss.filter(i => / dead-ends /.test(i.text)).map(i => i.text), [], what + ': no aisle dead-ends');
   assert.deepEqual(iss.filter(i => /is at the mouth of/.test(i.text)).map(i => i.text), [], what + ': nothing at the mouth of the entry');
+  // every aisle and service drive meets another drive at both ends (a stall-free tip is not a way through), and no stall
+  // at all sits past where the network goes on (the checker's own rule, down to a single stall)
+  assert.deepEqual(PK.aisleEnds(p, o.elements).map(x => x.end.map(Math.round)), [], what + ': every aisle end meets a drive');
+  assert.deepEqual(S.deadEnds(o.elements, 1).map(d => d.stalls), [], what + ': no stall past the end of the network');
   const th = PK.throatOf(p, o.elements); assert.ok(th, what + ': a main entry');
   assert.deepEqual(th.stalls, [], what + ': no stall beside the entry throat');
   assert.ok(th.len >= 45, what + ': a clear stacking distance (' + Math.round(th.len) + ' ft)');
@@ -70,6 +74,13 @@ for (const [pn, lk, before] of CASES) {
   assert.ok(m.gfa >= before - 1, what + ': ' + Math.round(m.gfa) + ' sq ft, at least the ' + before + ' laid out before');
   assert.ok(ms < 20000, what + ': ' + ms + ' ms');
   seen.push(what + ' ' + Math.round(m.gfa) + ' sf ' + m.spaces + '/' + m.required + ' ' + ms + ' ms');
+}
+// the 2-acre square: the first two options of each, as asked in words and with the floors fixed, every aisle through
+for (const p0 of [{ use: 'retail', gfa: 12000 }, { use: 'restaurant', gfa: 6000 }, { use: 'restaurant', gfa: 6000, extras: ['drivethru'] }, { use: 'medical', gfa: 20000 }, { use: 'office', gfa: 20000, floors: 2 }]) for (const pin of [p0, S.normalizeProgram(p0)]) {
+  const plan = planOf('square2ac'), opts = L.layoutOptions(plan, pin);
+  for (const [i, o] of opts.slice(0, 2).entries()) { const what = p0.use + (pin === p0 ? '' : ' (floors set)') + ' #' + i + ' on the 2-acre square';
+    assert.deepEqual(PK.aisleEnds({ ...plan, elements: o.elements }, o.elements).map(x => x.end.map(Math.round)), [], what + ': every aisle end meets a drive that goes on');
+    assert.deepEqual(S.deadEnds(o.elements, 1).map(d => d.stalls), [], what + ': no stall past the end of the network'); }
 }
 // the corner lot is reached from both streets
 { const plan = planOf('corner3ac'), o = L.layoutOptions(plan, P.retail)[0];
