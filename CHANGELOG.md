@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 5:54 PM CT: Floor plans, elevations and sections follow the building's shape (14954c0)
+- **The architectural sheets now draw L-shaped, U-shaped and stepped buildings as they are on the site plan:** the floor plan's outside wall follows every corner, with a dimension for each jog; the roof plan follows the outline; each elevation shows the set-back walls as their own panels behind the nearer ones; and the sections cut across the actual wing (50 ft across an L's wing, not the 100 ft box around it). Areas on the plans, code analysis and life safety sheets are the building's real area.
+- **Much smaller sheets:** brick, siding, shingles, concrete and insulation are drawn with light line work instead of fill patterns. The biggest architectural sheet went from 11.9 MB to under 0.8 MB. That size is what made one sheet fail in the first full set; it shouldn't happen now.
+
 ### 5:38 PM CT: Engineering sheets follow the building's shape; much smaller sheets (efc4d39)
 - **Structural, mechanical, plumbing, electrical, fire and telecom sheets now draw L-shaped, U-shaped and stepped buildings by their real outline:** the slab edge and beams run along every wall, ducts and pipes stay inside the building, sprinkler heads and rooftop units never land in the open corner, and meters, the fire department connection and other outside equipment sit on a real outside wall. Exit signs and pull stations face the right way at an L's inside corner.
 - **The biggest engineering sheets are 4 to 9 times smaller** (the largest is now about 0.6 MB, down from as much as 3.4 MB), so a big set downloads and opens much faster and a sheet is far less likely to fail for being too big. Hatched areas on the foundation and detail sheets are now light tints.
