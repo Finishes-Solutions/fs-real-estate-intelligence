@@ -550,14 +550,15 @@ export function initSitePlan(ctx) {
   const SRC = 'fs-sp', HSRC = 'fs-sp-h', DSRC = 'fs-sp-d', XSRC = 'fs-sp-x', GRSRC = 'fs-sp-g', EMPTY = { type: 'FeatureCollection', features: [] };
   const coarse = () => matchMedia('(pointer:coarse)').matches; // fingers: bigger handles, a wider reach, the turn dot further out
   let ids = [], dimmed = null;
-  function addLayers() {
-    if (map.getSource(SRC)) return;
+  // mp: the map to draw on: the page's, or a hidden one a background rendering takes its picture from (renderInBackground)
+  function addLayers(mp = map) {
+    if (mp.getSource(SRC)) return;
     const kind = k => ['==', ['get', 'k'], k], P = MAP.palette(), C = P.col, Ln = P.lines, Lb = P.label, big = coarse();
-    const add = def => { map.addLayer(def); ids.push(def.id); };
-    ids = []; dimmed = null;
-    map.addSource(SRC, { type: 'geojson', data: EMPTY }); map.addSource(HSRC, { type: 'geojson', data: EMPTY }); map.addSource(DSRC, { type: 'geojson', data: EMPTY }); map.addSource(XSRC, { type: 'geojson', data: EMPTY }); map.addSource(GRSRC, { type: 'geojson', data: EMPTY }); gridKey = '';
-    const hatch = 'sp-hatch'; if (!map.hasImage(hatch)) { const n = 12, px = new Uint8Array(n * n * 4), [r, g, b] = [1, 3, 5].map(i => parseInt(Ln.keepout.slice(i, i + 2), 16)); // an easement's diagonal stripes
-      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const on = (x + y) % n < 2, i = (y * n + x) * 4; px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = on ? 200 : 0; } try { map.addImage(hatch, { width: n, height: n, data: px }); } catch (e) { /* plain fill below */ } }
+    const add = def => { mp.addLayer(def); if (mp === map) ids.push(def.id); };
+    if (mp === map) { ids = []; dimmed = null; }
+    mp.addSource(SRC, { type: 'geojson', data: EMPTY }); mp.addSource(HSRC, { type: 'geojson', data: EMPTY }); mp.addSource(DSRC, { type: 'geojson', data: EMPTY }); mp.addSource(XSRC, { type: 'geojson', data: EMPTY }); mp.addSource(GRSRC, { type: 'geojson', data: EMPTY }); gridKey = '';
+    const hatch = 'sp-hatch'; if (!mp.hasImage(hatch)) { const n = 12, px = new Uint8Array(n * n * 4), [r, g, b] = [1, 3, 5].map(i => parseInt(Ln.keepout.slice(i, i + 2), 16)); // an easement's diagonal stripes
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const on = (x + y) % n < 2, i = (y * n + x) * 4; px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = on ? 200 : 0; } try { mp.addImage(hatch, { width: n, height: n, data: px }); } catch (e) { /* plain fill below */ } }
     const sel1 = ['==', ['get', 'sel'], 1], ph2 = ['==', ['get', 'ph'], 2], bk = ['in', ['get', 'k'], ['literal', ['building', 'garage']]];
     const useCol = f => ['match', ['get', 'use'], ...Object.entries(P.use).map(([k, v]) => [k, f(v)]).flat(), f(C.building)];
     const bcol = f => ['case', ['==', ['get', 'bad'], 1], Ln.bad, ['==', ['get', 'k'], 'garage'], f(C.garage), ph2, useCol(c => f(P.p2(c))), useCol(f)];
@@ -590,7 +591,7 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-canopyl', type: 'line', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['canopy', 'tanks']]], paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, ['==', ['get', 'k'], 'tanks'], Ln.tanks, Ln.canopy], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1.4], 'line-dasharray': ['literal', [3, 1.5]] } });
     // easements: stripes over a faint red-grey wash and a dashed outline, so they never read as a setback line
     add({ id: 'fs-sp-ko', type: 'fill', source: SRC, filter: kind('keepout'), paint: { 'fill-color': Ln.keepout, 'fill-opacity': ['case', sel1, .22, .12] } });
-    if (map.hasImage(hatch)) add({ id: 'fs-sp-koh', type: 'fill', source: SRC, filter: kind('keepout'), paint: { 'fill-pattern': hatch, 'fill-opacity': .9 } });
+    if (mp.hasImage(hatch)) add({ id: 'fs-sp-koh', type: 'fill', source: SRC, filter: kind('keepout'), paint: { 'fill-pattern': hatch, 'fill-opacity': .9 } });
     add({ id: 'fs-sp-kol', type: 'line', source: SRC, filter: kind('keepout'), paint: { 'line-color': Ln.keepout, 'line-width': 1.6, 'line-dasharray': [3, 2] } });
     add({ id: 'fs-sp-pl', type: 'line', source: SRC, filter: kind('pline'), paint: { 'line-color': Ln.parcel, 'line-width': 1, 'line-dasharray': [4, 3], 'line-opacity': .8 } });
     add({ id: 'fs-sp-sb', type: 'line', source: SRC, filter: kind('setback'), paint: { 'line-color': Ln.setback, 'line-width': 1.3, 'line-dasharray': [3, 2] } });
@@ -633,17 +634,17 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-ml', type: 'symbol', source: DSRC, filter: ['in', ['get', 'k'], ['literal', ['mlab', 'mtot']]], layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': ['case', ['==', ['get', 'k'], 'mtot'], 13, 11], 'text-offset': ['case', ['==', ['get', 'k'], 'mtot'], ['literal', [0, -1.4]], ['literal', [0, 0]]], 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': Lb.ink, 'text-halo-color': Lb.halo, 'text-halo-width': 2 } }); // lengths, the total, the area
     // handles: the turn dot and a shape's points (circles); a rectangle's corners (squares), its sides and a shape's
     // edges (white bars along them, to drag that side alone), and the + beside an edge that adds a point
-    handleImages(big, Ln.accent);
+    handleImages(big, Ln.accent, mp);
     const hr = big ? [10, 9] : [7, 6]; // the turn dot, a point or a scaling corner
     add({ id: 'fs-sp-h', type: 'circle', source: HSRC, filter: ['in', ['get', 't'], ['literal', ['r', 'v', 's']]], paint: { 'circle-radius': ['case', ['==', ['get', 't'], 'r'], hr[0], hr[1]], 'circle-color': ['case', ['==', ['get', 't'], 'r'], Ln.accent, '#ffffff'], 'circle-stroke-color': ['case', ['==', ['get', 't'], 'r'], '#ffffff', '#0b0d0c'], 'circle-stroke-width': big ? 2 : 1.5 } });
     add({ id: 'fs-sp-hs', type: 'symbol', source: HSRC, filter: ['in', ['get', 't'], ['literal', ['c', 'e', 'm', 'p']]], layout: { 'icon-image': ['match', ['get', 't'], 'c', 'sp-h-sq', 'p', 'sp-h-plus', 'sp-h-bar'], 'icon-rotate': ['get', 'a'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
-    draw();
+    if (mp === map) draw();
   }
   // the handle images, drawn once per style (2× for sharp edges): a corner square, a side bar (drawn east-west, turned
   // along its side by icon-rotate) and the + that adds a point; fingers get them larger
-  function handleImages(big, accent) {
-    const img = (id, w, h, paint) => { if (map.hasImage(id)) return; const r = 2, c = document.createElement('canvas'); c.width = w * r; c.height = h * r; const g = c.getContext('2d'); g.scale(r, r); paint(g, w, h);
-      try { map.addImage(id, g.getImageData(0, 0, w * r, h * r), { pixelRatio: r }); } catch (e) { /* the circles still show */ } };
+  function handleImages(big, accent, mp = map) {
+    const img = (id, w, h, paint) => { if (mp.hasImage(id)) return; const r = 2, c = document.createElement('canvas'); c.width = w * r; c.height = h * r; const g = c.getContext('2d'); g.scale(r, r); paint(g, w, h);
+      try { mp.addImage(id, g.getImageData(0, 0, w * r, h * r), { pixelRatio: r }); } catch (e) { /* the circles still show */ } };
     const k = big ? 1.4 : 1, ink = '#0b0d0c';
     const rr = (g, x, y, w, h, q) => { g.beginPath(); g.moveTo(x + q, y); g.arcTo(x + w, y, x + w, y + h, q); g.arcTo(x + w, y + h, x, y + h, q); g.arcTo(x, y + h, x, y, q); g.arcTo(x, y, x + w, y, q); g.closePath(); };
     img('sp-h-sq', Math.round(11 * k), Math.round(11 * k), (g, w, h) => { g.fillStyle = '#fff'; g.strokeStyle = ink; g.lineWidth = 1.5; g.fillRect(1.5, 1.5, w - 3, h - 3); g.strokeRect(1.5, 1.5, w - 3, h - 3); });
@@ -2477,7 +2478,8 @@ export function initSitePlan(ctx) {
     card.querySelector('[data-eff="' + id + '"]')?.focus({ preventScroll: true });
   }
   const effOn = id => { const e = id && ASK.EFFORTS.find(x => x.id === id); return e ? ' <span class="sp-effon' + (e.id === 'ultra' ? ' u' : '') + '" title="How hard the AI worked on it">' + (e.id === 'ultra' ? SPARK : '') + e.label + '</span>' : ''; };
-  const factsFor = pl => (ed.facts?.id === pl.id + ':' + pl.ring.length ? ed.facts.p : (ed.facts = { id: pl.id + ':' + pl.ring.length, p: siteFacts(pl).catch(() => []) }).p); // flood, roads, districts, utilities: asked once per site
+  const factsKept = new Map(); // with no plan open (a rendering made from the project page)
+  const factsFor = pl => { const id = pl.id + ':' + pl.ring.length, box = ed || { facts: factsKept.get(pl.id) }; if (box.facts?.id === id) return box.facts.p; const f = { id, p: siteFacts(pl).catch(() => []) }; if (ed) ed.facts = f; else factsKept.set(pl.id, f); return f.p; }; // flood, roads, districts, utilities: asked once per site
   const post = async (body, signal) => { const md = ctx.aiModel?.(), r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(md ? { ...body, model: md } : body), signal }); ctx.noteModel?.(r); const d = await r.json().catch(() => ({})); if (!r.ok) { const e = Object.assign(new Error(d.error || 'AI unavailable'), { status: r.status }); aiSaw(e); throw e; } ctx.spAiOff = 0; return d; };
   // an option as the AI sees it: the plan drawing as a picture, its numbers and what the checks found
   async function planImage(plan) {
@@ -3078,25 +3080,84 @@ export function initSitePlan(ctx) {
       return { image: c.toDataURL('image/jpeg', 0.88), camera: cam, w: c.width, h: c.height };
     } finally { for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'visible'); map.jumpTo(was); }
   }
+  // The same picture without the page's map: a hidden map of the same base style, sized 1600 x 900, with the option drawn
+  // on it, framed by the same camera rules, then thrown away. The Renderings tab uses it, so you stay where you are.
+  async function captureOffscreen(pl, view, target = null) {
+    const W = 1600, H = 900, box = document.createElement('div'), close = RD.byId(RD.VIEWS, view).hero && target;
+    if (!map.isStyleLoaded()) await new Promise(ok => { map.once('idle', ok); setTimeout(ok, 20000); }); // the base style comes from the page's map (the app may have opened on Projects)
+    if (!map.isStyleLoaded()) throw new Error('the map didn’t load, so the picture can’t be taken. Try again in a moment');
+    box.style.cssText = 'position:fixed;left:0;top:0;width:' + W + 'px;height:' + H + 'px;opacity:0;pointer-events:none;z-index:-1'; document.body.append(box);
+    const st = map.getStyle(); st.layers = st.layers.filter(l => !/^fs-/.test(l.id)); // the base map only: filings, parcels, buildings and any open plan stay off
+    const used = new Set(st.layers.map(l => l.source).filter(Boolean)); for (const k of Object.keys(st.sources || {})) if (!used.has(k)) delete st.sources[k];
+    const F = SP.frame(pl.origin), cam = RD.cameraFor(view, pl, { px: W, lat: pl.origin[1], target });
+    const m2 = new maplibregl.Map({ container: box, style: st, center: F.toLL(cam.center), zoom: cam.zoom, pitch: Math.min(cam.pitch, map.getMaxPitch()), bearing: cam.bearing, maxPitch: map.getMaxPitch(),
+      interactive: false, attributionControl: false, preserveDrawingBuffer: true, fadeDuration: 0, pixelRatio: 1 });
+    const settle = (ev, ms) => new Promise(ok => { let d = false; const f = () => { if (!d) { d = true; ok(); } }; m2.once(ev, f); setTimeout(f, ms); });
+    try {
+      await settle('load', 20000);
+      addLayers(m2);
+      let fc = SP.planFeatures(pl, null, null); MAP.decorate(fc, pl, {}); fc = T.visibleFeatures(fc, T.viewOf(pl)); m2.getSource(SRC).setData(fc);
+      for (const id of HIDE_FOR_RENDER) if (m2.getLayer(id)) m2.setLayoutProperty(id, 'visibility', 'none');
+      fitSiteInFrame(pl, { l: 0, t: 0, r: W, b: H }, { left: 0, top: 0, width: W, height: H }, close ? { points: RD.heroPoints(close), tall: [close] } : {}, m2);
+      await settle('idle', 25000);
+      const image = await new Promise((ok, no) => { m2.once('render', () => { try { ok(m2.getCanvas().toDataURL('image/jpeg', 0.88)); } catch (e) { no(e); } }); m2.triggerRepaint(); });
+      return { image, camera: cam, w: W, h: H };
+    } finally { try { m2.remove(); } catch (e) { /* gone */ } box.remove(); }
+  }
+  // renderings made from the project page, one project at a time: { plid, n, i, msg, abort }
+  const bgRender = new Map();
+  async function renderInBackground(p, pl, views, look, time, target = null) {
+    if (bgRender.get(p.id)) return;
+    const run = { plid: pl.id, n: views.length, i: 0, msg: 'Getting ready…', abort: new AbortController() }; bgRender.set(p.id, run);
+    const show = () => { if (ctx.view === 'projects' && cur === p.id && tabFor(p) === 'renderings') render(); };
+    let made = 0, why = '', capped = false; show();
+    try {
+      const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
+      const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' });
+      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map', focus: target });
+      for (let i = 0; i < views.length && !run.abort.signal.aborted; i++) {
+        const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero, sig = planSig(pl);
+        run.i = i; run.msg = 'Taking the picture ' + (isHero ? 'of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + '…'; show();
+        const cap = await captureOffscreen(pl, views[i], isHero ? target : null); if (run.abort.signal.aborted) break;
+        run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; show();
+        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i] }), signal: run.abort.signal });
+        const d = await r.json().catch(() => ({}));
+        if (r.status === 402) { rbudget = { ...(rbudget || {}), spent: d.spent, cap: d.cap, month: d.month }; rbAt = Date.now(); capped = true; }
+        if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        if (d.budget?.spent != null) { rbudget = { ...(rbudget || {}), ...d.budget, images: (rbudget?.images || 0) + 1 }; rbAt = Date.now(); }
+        const P1 = db.projects.find(x => x.id === p.id), q = P1?.plans.find(x => x.id === pl.id); if (!q) break;
+        const id = pl.id + '/' + Date.now().toString(36) + '-' + views[i];
+        await rput(id, await toBlob(d.image)); await rput(id + ':m', await toBlob(cap.image)).catch(() => {});
+        q.renders = (q.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '', ...(isHero ? { target: hero } : {}) }]);
+        while (q.renders.length > 16) { const old = q.renders.shift(); rdel(old.id); rdel(old.id + ':m'); }
+        save(P1); made++;
+      }
+    } catch (e) { why = e.name === 'AbortError' ? '' : e.message; }
+    finally {
+      bgRender.delete(p.id); if (!capped) rbAt = 0; show();
+      if (made) ctx.toast((made === 1 ? 'Rendering of ' + pl.name + ' ready.' : made + ' renderings of ' + pl.name + ' ready.') + (why ? ' The next one failed: ' + why : ''));
+      else if (why) ctx.toast(capped ? why : 'No rendering: ' + why);
+    }
+  }
   // Project the parcel's corners through the map's own camera (pitch and bearing included) and move the camera until
   // they all sit inside the free part of the frame: 8% clear at the sides, 9% below, and room above for the tallest
   // building and a strip of sky. Zoom steps by the overflow each round; the view is re-centred on the parcel each round.
   // points: what to fit instead of the parcel (plan feet, e.g. a close-up's building grown by its margin); tall: the
   // buildings whose height needs room above (all of them by default).
-  function fitSiteInFrame(pl, free, m, { points = null, tall: tallEls = null } = {}) {
+  function fitSiteInFrame(pl, free, m, { points = null, tall: tallEls = null } = {}, mp = map) {
     const ll = points?.length >= 3 && pl?.origin ? points.map(SP.frame(pl.origin).toLL) : ringLL(pl); if (!ll) return;
     const W = free.r - free.l, H = free.b - free.t, aspect = 16 / 9, fw = Math.min(W, H * aspect), fh = fw / aspect; // the 16:9 cut the picture keeps
     const fl = free.l - m.left + (W - fw) / 2, ft = free.t - m.top + (H - fh) / 2, cx = fl + fw / 2, cy = ft + fh / 2;
     const tall = Math.max(14, ...(tallEls || pl.elements.filter(e => e.kind === 'building')).map(e => (e.floors || 1) * (SP.USES[e.use]?.floorH || 12))) * 0.3048;
     for (let i = 0; i < 14; i++) {
-      const px = ll.map(p => map.project(p)), xs = px.map(q => q.x), ys = px.map(q => q.y), bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
-      const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (256 * 2 ** map.getZoom()), tallPx = tall / mpp * Math.sin(map.getPitch() * Math.PI / 180) * 1.3;
+      const px = ll.map(p => mp.project(p)), xs = px.map(q => q.x), ys = px.map(q => q.y), bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
+      const mpp = 40075016.686 * Math.cos(mp.getCenter().lat * Math.PI / 180) / (256 * 2 ** mp.getZoom()), tallPx = tall / mpp * Math.sin(mp.getPitch() * Math.PI / 180) * 1.3;
       const availW = fw * 0.84, availH = fh - fh * 0.09 - Math.max(fh * 0.16, tallPx); // sides 8% each; sky and the roofs above; 9% below
       const ratio = Math.max((bx1 - bx0) / availW, (by1 - by0) / availH);
       const dx = (bx0 + bx1) / 2 - cx, dy = (by0 + by1) / 2 - (ft + Math.max(fh * 0.16, tallPx) + availH / 2); // where the parcel's box is against where it should be
-      const centre = map.unproject([cx + dx, cy + dy]), z = map.getZoom(), step = ratio > 1.02 ? -Math.log2(ratio) : ratio < 0.9 && z < 19 ? Math.min(0.5, Math.log2(0.95 / ratio) * 0.6) : 0;
+      const centre = mp.unproject([cx + dx, cy + dy]), z = mp.getZoom(), step = ratio > 1.02 ? -Math.log2(ratio) : ratio < 0.9 && z < 19 ? Math.min(0.5, Math.log2(0.95 / ratio) * 0.6) : 0;
       if (Math.abs(step) < 0.01 && Math.hypot(dx, dy) < 2) break;
-      map.jumpTo({ center: centre, zoom: Math.max(13, Math.min(19, z + step)) });
+      mp.jumpTo({ center: centre, zoom: Math.max(13, Math.min(19, z + step)) });
     }
   }
   // this month's rendering budget (api/render GET; the server refuses a render once it's spent): one line under the
@@ -3462,7 +3523,7 @@ export function initSitePlan(ctx) {
   const rsForm = new Map(); // per project: { plid, view }
   function rFormHtml(p) {
     const ready = p.plans.filter(laidOut); if (!ready.length) return '';
-    const f = rsForm.get(p.id) || {}, pl = ready.find(x => x.id === f.plid) || ready[ready.length - 1], pr = rPrefs(), off = aiOff(), busy = !!ed?.rendering, T = RD.heroTarget(pl), v = f.view || 'corner';
+    const f = rsForm.get(p.id) || {}, pl = ready.find(x => x.id === f.plid) || ready[ready.length - 1], pr = rPrefs(), off = aiOff(), busy = !!ed?.rendering, T = RD.heroTarget(pl), v = f.view || 'corner', bg = bgRender.get(p.id);
     const opt = (list, cur) => list.map(x => '<option value="' + esc(x.id) + '"' + (x.id === cur ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
     const views = RD.VIEWS.filter(x => !x.hero).map(x => ({ id: x.id, label: x.label, tip: x.tip })).concat(T ? RD.VIEWS.filter(x => x.hero).map(x => ({ id: x.id, label: RD.renderLabel(x.id, T) })) : []).concat([{ id: 'all', label: 'All site views (four pictures)' }]);
     return '<section class="pj-box ps-form" aria-labelledby="rsH"><h3 class="pj-h3" id="rsH">Make renderings</h3>' +
@@ -3470,30 +3531,20 @@ export function initSitePlan(ctx) {
         '<div class="ps-row"><label for="rsView">View</label><select id="rsView">' + opt(views, views.some(x => x.id === v) ? v : 'corner') + '</select></div>' +
         '<div class="ps-row"><label for="rsLook">Materials</label><select id="rsLook">' + opt(RD.LOOKS, pr.look) + '</select></div>' +
         '<div class="ps-row"><label for="rsTime">Light</label><select id="rsTime">' + opt(RD.TIMES, pr.time) + '</select></div></div>' +
-      '<p class="rnote">' + (off ? 'Renderings need the AI, which isn’t set up on this site.' : 'The option opens on the map, where the picture is taken from its 3D view; the AI paints it in about a minute a picture, and you come back here when it’s done.') + (budgetLine() ? ' ' + esc(budgetLine()) : '') + '</p>' +
-      '<div class="btnrow"><button type="button" class="btn primary" id="rsGo"' + (off || busy || rbUsed() ? ' disabled' : '') + '>' + (busy ? 'Rendering…' : 'Render') + '</button></div></section>';
-  }
-  async function renderFromProject(p, plid, view, look, time) {
-    if (!map.isStyleLoaded()) { ctx.toast('Waiting for the map to load…'); if (ctx.view !== 'map') ctx.setView('map'); await new Promise(res => { map.once('idle', res); setTimeout(res, 20000); }); } // (the app opened straight on Projects)
-    if (!map.isStyleLoaded()) { ctx.toast('The map didn’t load, so the picture can’t be taken. Try again in a moment.'); return; }
-    open(p.id, plid);
-    const ready = await new Promise(res => { let n = 0; const tick = () => { if (PL()?.id === plid && ed) { map.once('idle', () => res(true)); setTimeout(() => res(true), 8000); } else if (++n > 120) res(false); else requestAnimationFrame(tick); }; tick(); });
-    const pl = PL(); if (!ready || !pl || pl.id !== plid) { ctx.toast('Couldn’t open the option on the map to render it.'); return; }
-    jump('spRender');
-    const hero = RD.byId(RD.VIEWS, view, null)?.hero;
-    await renderViews(p, pl, view === 'all' ? RD.SITE_VIEWS : [view], look, time, hero ? heroFor(pl) : null);
-    if (ctx.view === 'map' && ed?.plid === plid && !ed.rendering) ctx.openProject?.(p.id, 'renderings'); // back to the tab, where the new pictures are
+      '<p class="rnote">' + (off ? 'Renderings need the AI, which isn’t set up on this site.' : 'The picture is taken from the option’s 3D view behind the scenes and the AI paints it, about a minute a picture. You can stay here or use the rest of the app meanwhile.') + (budgetLine() ? ' ' + esc(budgetLine()) : '') + '</p>' +
+      (bg ? '<p class="rnote loading" role="status">Rendering ' + (bg.i + 1) + ' of ' + bg.n + ' · ' + esc(bg.msg) + '</p>' : '') +
+      '<div class="btnrow">' + (bg ? '<button type="button" class="btn" id="rsStop">Cancel</button>' : '<button type="button" class="btn primary" id="rsGo"' + (off || busy || rbUsed() ? ' disabled' : '') + '>' + (busy ? 'Rendering…' : 'Render') + '</button>') + '</div></section>';
   }
   function rendersHtml(p) {
     const ready = p.plans.filter(laidOut), groups = p.plans.filter(pl => pl.renders?.length || laidOut(pl));
     if (!rendersOf(p).length) return rFormHtml(p) + '<div class="pj-empty pj-rempty"><b>No renderings yet</b><p>A rendering is a photoreal picture of an option, painted by the AI from its 3D massing on the map: the buildings stay where the plan puts them, the materials and landscaping are the AI’s.</p>' +
-      (ready.length ? '<p>Pick the option, view, materials and light above and press <b>Render</b>. Each picture takes about a minute. You can also render from the option’s own panel on the map (<b>Render</b>, a chip at the top of the panel).</p>' : '') +
+      (ready.length ? '<p>Pick the option, view, materials and light above and press <b>Render</b>. Each picture takes about a minute, made behind the scenes while you carry on.</p>' : '') +
       (ready.length ? '' : (p.plans.length ? '<p>None of this project’s options has buildings yet: lay one out first.</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Options</button></div>'
         : siteFor(p) ? '<p>This project has no site plan options yet.</p><div class="btnrow"><button type="button" class="btn primary" data-add="1">New Option</button></div>'
         : '<p>This project has no site yet: add its parcel or draw it first.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div>')) + '</div>'; // never a dead end
     return rFormHtml(p) + groups.map(pl => { const list = (pl.renders || []).slice().reverse(), sig = planSig(pl);
       return '<section class="pj-rg" aria-labelledby="pjRg-' + esc(pl.id) + '"><div class="pj-rgh"><h3 class="pj-h3" id="pjRg-' + esc(pl.id) + '">' + esc(pl.name) + ' <span class="pj-tn">' + (list.length ? plural(list.length, 'rendering') : 'none yet') + '</span></h3>' +
-        '<span class="pj-rgl"><button type="button" class="lnk" data-plan="' + esc(pl.id) + '">Open plan</button>' + (laidOut(pl) ? '<button type="button" class="lnk" data-rmore="' + esc(pl.id) + '">Render more</button>' : '') + '</span></div>' +
+        '</div>' +
         (list.length ? '<div class="pj-rgrid">' + list.map(r => { const stale = r.sig && r.sig !== sig, lab = rLabel(r);
           return '<figure class="pj-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" data-pl="' + esc(pl.id) + '" tabindex="0" role="button" aria-label="' + esc(lab + ' rendering of ' + pl.name + ', ' + rWhen(r.at) + (stale ? ', the plan has changed since' : '')) + '">' +
             '<span class="pj-rimg"><img alt="" hidden><i>Loading…</i></span><figcaption>' + esc(lab) + '<span>' + esc(rWhen(r.at)) + (r.by ? ' · ' + esc(r.by) : '') + (stale ? ' · <em>plan changed since</em>' : '') + '</span></figcaption></figure>'; }).join('') + '</div>'
@@ -3506,7 +3557,9 @@ export function initSitePlan(ctx) {
     $('#rsView')?.addEventListener('change', e => { f.view = e.target.value; });
     $('#rsLook')?.addEventListener('change', e => { try { localStorage.setItem(RLOOK_KEY, e.target.value); } catch (er) {} });
     $('#rsTime')?.addEventListener('change', e => { try { localStorage.setItem(RTIME_KEY, e.target.value); } catch (er) {} });
-    $('#rsGo')?.addEventListener('click', () => { const pr = rPrefs(); renderFromProject(p, $('#rsOpt').value, $('#rsView').value || 'corner', pr.look, pr.time); });
+    $('#rsGo')?.addEventListener('click', () => { const pr = rPrefs(), pl = p.plans.find(x => x.id === $('#rsOpt').value), v = $('#rsView').value || 'corner'; if (!pl) return;
+      const hero = RD.byId(RD.VIEWS, v, null)?.hero; renderInBackground(p, pl, v === 'all' ? RD.SITE_VIEWS : [v], pr.look, pr.time, hero ? RD.heroTarget(pl) : null); });
+    $('#rsStop')?.addEventListener('click', () => bgRender.get(p.id)?.abort.abort());
     root.querySelectorAll('.pj-rth').forEach(f => { const pl = p.plans.find(x => x.id === f.dataset.pl), r = pl?.renders?.find(x => x.id === f.dataset.rid); if (!r) return;
       renderSrc(r.id).then(u => { if (!f.isConnected) return; const img = f.querySelector('img'), ph = f.querySelector('.pj-rimg i');
         if (u) { img.src = u; img.alt = rLabel(r) + ' rendering'; img.hidden = false; ph?.remove(); }
