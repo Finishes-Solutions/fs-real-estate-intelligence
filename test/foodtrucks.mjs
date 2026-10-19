@@ -66,8 +66,9 @@ const ftOf = ask => S.normalizeProgram(S.guessProgram(ask));
     assert.equal(m.required, Math.ceil(f.trucks * 5 + f.barSf / 1000 * 8 - 0.01), 'parking: 5 a truck plus the bar');
     assert.equal(f.seats, Math.floor((f.pavilionSf + f.patioSf) / 15), 'seats: 15 sf of covered and patio seating each');
   }
-  // the recommended one keeps detention on the surface when that costs no more than two trucks; the 12 are an option, parked
-  const m0 = S.metrics(of(plan, opts[0])); assert.ok(m0.pond > 0 && m0.foodtrucks.trucks >= 10 && m0.spaces >= m0.required, 'recommended: a pond, within two trucks of the ask: ' + m0.foodtrucks.trucks + ' trucks, pond ' + Math.round(m0.pond));
+  // the count asked for comes first (parked); a layout keeping detention in a pond is always among the choices
+  const m0 = S.metrics(of(plan, opts[0])); assert.ok(m0.foodtrucks.trucks === 12 && m0.spaces >= m0.required, 'recommended: the 12 trucks asked for, parked: ' + m0.foodtrucks.trucks + ' trucks');
+  assert.ok(opts.some(x => S.metrics(of(plan, x)).pond > 0), 'a pond layout among the choices');
   const o = opts.find(x => S.metrics(of(plan, x)).foodtrucks.trucks === 12), pl = of(plan, o), m = S.metrics(pl);
   assert.ok(o, 'a layout with the 12 trucks'); assert.ok(m.spaces >= m.required, 'and parks them: ' + m.spaces + '/' + m.required);
   assert.ok(m.foodtrucks.pavilionSf >= 2900 && m.foodtrucks.barSf >= 1400 && m.foodtrucks.restroomSf >= 600, 'pavilion, bar and restrooms: ' + JSON.stringify(m.foodtrucks));

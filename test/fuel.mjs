@@ -217,7 +217,16 @@ for (const [name, ring, extra, words, want] of [
     assert.ok(Math.abs(retail(r.elements) - retail(oL.elements)) <= retail(oL.elements) * 0.03, nm + ': the shops keep their floor area: ' + Math.round(retail(r.elements)) + ' of ' + Math.round(retail(oL.elements)));
     assert.ok(m.units >= m0.units * 0.97, nm + ': the apartments keep their units: ' + m.units + ' of ' + m0.units);
     assert.ok(r.elements.some(e => e.cornerL && e.poly), nm + ': the L stays'); assert.ok(r.elements.some(e => e.id === apt.id && e.y === apt.y), nm + ': the moved building stays where it was put');
-    assert.ok(TOOLS.refitVerdict({ m: S.metrics(p1), issues: S.check(p1) }, { m, issues: S.check(q) }).ok, nm + ': the editor would take it'); } }
+    assert.ok(TOOLS.refitVerdict({ m: S.metrics(p1), issues: S.check(p1) }, { m, issues: S.check(q) }).ok, nm + ': the editor would take it'); }
+  // an apartment building turned into offices by hand (Change use pins it and drops its units): it no longer counts
+  // toward the apartment zone, so Re-fit Plan lays out the apartments asked for round it (141 of 150 when it still did)
+  { const e2 = JSON.parse(JSON.stringify(oL.elements)), t = e2.filter(e => e.use === 'multifamily').sort((a, b) => b.y - a.y)[0], ask = S.normalizeProgram(oL.program).zones.find(z => z.use === 'multifamily').units;
+    t.use = 'office'; delete t.units; t.pinned = true;
+    const p2 = { ...plan, program: oL.program, recipe: oL.recipe, elements: e2 }, r = L.refit(p2); assert.ok(r?.elements?.length, 'use changed: re-fits');
+    const u = r.elements.filter(e => e.kind === 'building' && e.use === 'multifamily').reduce((s, e) => s + (e.units || 0), 0), q = { ...p2, elements: r.elements };
+    assert.ok(u >= ask * 0.97, 'use changed: the apartments asked for, round the offices: ' + u + ' of ' + ask);
+    assert.deepEqual(S.check(q).filter(x => x.level === 'bad').map(x => x.text), [], 'use changed: passes');
+    assert.ok(r.elements.some(e => e.id === t.id && e.use === 'office'), 'use changed: the offices stay'); } }
 
 // ---------- Site parameters: only what the plan's uses read ----------
 { const f = w => { const u = S.usesOf(S.guessProgram(w)), has = l => l.some(x => u.includes(x)); return { form: has(S.FORM_USES), apts: u.includes('multifamily'), streets: u.includes('sfr'), trash: !u.every(x => S.CART_USES.includes(x)), perSf: u.some(S.PER_SF_TRASH) }; };

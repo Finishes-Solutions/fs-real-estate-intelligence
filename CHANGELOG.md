@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-18
 
+### 11:15 PM CT: Mixed plans keep their space on a re-fit, a turnaround at the L, the truck count asked for comes first (369bbbf, merged a7bd977, then the follow-up commit)
+- **Mixed plans re-fit without losing space:** moving a building in a mixed plan (shops and apartments, say) and letting the site re-fit used to lay out far less than you had, sometimes nearly nothing. Each part of the mix now keeps its floor area and units, on the automatic re-fit and on Re-fit Plan alike.
+- **Changing a building's use by hand:** turn an apartment building into offices and Re-fit Plan now lays out the apartments asked for round it, instead of counting the offices as apartments.
+- **L-shaped shops on a corner:** the parking lane the shops' side wing cuts short now ends with room to turn round, instead of a dead end.
+- **Food truck parks:** when you ask for a number of trucks, a layout with that many comes first. A layout keeping detention in a pond is still among the choices.
+
 ### 11:00 PM CT: Gas station re-fit, corner shapes in mixed plans, settings that fit the plan (7a22bdf, merged eec65d5)
 - **Move the canopy and the station follows:** drag the fuel canopy along the street, turn it, or move the c-store, and a moment later the drive lanes go back round the canopy, the store sits behind it, and the parking, tank pad and driveways are laid out again. Re-fit Plan does the same. Before, a gas station couldn't be re-fitted at all.
 - **When it can't fit, it says why:** drop the canopy where its lanes won't go and your move stays as it is, with a message like "the canopy needs a drive lane all round it". Undo puts it back.

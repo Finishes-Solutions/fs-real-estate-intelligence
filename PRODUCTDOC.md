@@ -545,7 +545,7 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
   - In the middle: a covered **pavilion** with picnic seating on a lawn (room for lawn games and shade trees), **restrooms**, a **bar** with a **beer garden** patio at the front corner, and a **playground** away from the bar.
   - A dumpster and grease enclosure sits on the lane, its gate facing the lane.
   - Detention goes on the land left over (at the back, the front or a side). When there isn't room for all of it, the layout says how much the pond holds and that the rest goes underground.
-  - Layouts that keep detention in a pond come first when they hold nearly as many trucks as one without a pond. There's always at least one pond layout among the choices to compare.
+  - When you ask for a number of trucks, a layout with that many comes first. Otherwise, layouts that keep detention in a pond come first when they hold nearly as many trucks as one without a pond. There's always at least one pond layout among the choices to compare.
   - The choices are different from each other. Two layouts with the same trucks, about the same seats, and the same bar and pond count as one. Then you may see only two layouts.
 - **On a small lot** (about an acre), the trucks come first and every layout is fully parked:
   - The bar shrinks, or is left out, so the parking can carry the trucks. The layout says so. The **Bar** switch stays on, so a bigger site gets the bar back.
