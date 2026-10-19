@@ -171,11 +171,12 @@ A new street-network generator for homes on lots. It's the hardest part and most
 
 Rules depend on where the site is, and the AI reads the codes for that place.
 
-1. **Find the jurisdiction.** The app already knows:
-   - which city limits a site is in (from Census places)
-   - which county it's in
+1. **Find the jurisdiction from data the app already has (decided):**
+   - the city limits a site is in (Census places, already looked up for every site)
+   - its county
+   - its utility and drainage districts (the nightly county data)
 
-   New: the extraterritorial jurisdictions (ETJ), starting with Houston's from the city's GIS. A site can sit inside a city, inside a city's ETJ (the city's subdivision rules usually apply), or in unincorporated county. Utility districts (MUDs) and drainage districts come from the county data the app already has.
+   One gap: the app has no ETJ outlines. A site in a city's extraterritorial jurisdiction (Houston's reaches into Waller County) usually falls under that city's subdivision rules. Until ETJ outlines are added, the AI checks while reading the codes whether the site is in an ETJ, and the rule sheet says which way it decided.
 2. **The AI reads the codes.** Using the web search the app already has, it finds and reads the subdivision and development rules for that city or county, and the drainage criteria (the county flood control district's detention rate, for example). Sources are the city's code of ordinances (often on Municode), the county's subdivision regulations, and the drainage criteria manual. Out of them it writes one **rule sheet**, with each value cited and linked:
    - right-of-way and pavement widths by street type
    - longest block
@@ -185,11 +186,12 @@ Rules depend on where the site is, and the AI reads the codes for that place.
    - smallest lot and frontage, building lines
    - detention rate
    - the second entrance rule
-3. **People confirm it.** The rule sheet shows in the plan's Settings with its sources. Any value can be edited, and a value the AI couldn't find falls back to a typical one, marked as such.
-4. **One sheet per place, shared.** It's kept per jurisdiction and shared by the team, so the second site in Waller County doesn't look it up again. It's refreshed when someone asks or when it's old.
-5. **Every layout says which rule set it used.** Any value the plan breaks shows in the checks. It is never a compliance claim: the rule sheet is the AI's reading of the code, to be confirmed by the engineer and the city or county.
+3. **When the code can't be found (decided):** Waller County's rules are the default rule set. Every value taken from them is marked "Waller default", so nobody mistakes it for the local rule.
+4. **People confirm only what's unsure (decided).** The rule sheet shows in the plan's Settings with its sources, and any value can be edited. A layout uses values the AI read with confidence straight away. Values the AI marked unsure, and Waller defaults standing in for a missing local rule, are flagged for a person to confirm. Layouts can still be built while they're flagged, and they say so.
+5. **One sheet per place, shared.** It's kept per jurisdiction and shared by the team, so the second site in Waller County doesn't look it up again. It's refreshed when someone asks or when it's old.
+6. **Every layout says which rule set it used.** Any value the plan breaks shows in the checks. It is never a compliance claim: the rule sheet is the AI's reading of the code, to be confirmed by the engineer and the city or county.
 
-Today's fixed 0.55 acre-feet per acre becomes the fallback when the local rate isn't found.
+Waller County's detention rate replaces today's fixed 0.55 acre-feet per acre as the fallback when the local rate isn't found. The Waller rule set itself is read once, cited and kept in the app.
 
 ## Detention, trails and sidewalks (phase 5)
 
@@ -267,9 +269,11 @@ The rule in this repo stands: realistic data and a look at a real map before eac
 3. **Names:** the planner names the community and its parts. Street names are an optional toggle, with the AI naming the streets from a theme you give it.
 4. **Monument signs** in the median by default, with the sides as options, or whatever is best for the site (and it says why).
 5. **Detention:** a hand hint of the low side until elevation data is pulled in.
+6. **Jurisdiction** from the city limits and county data the app already has.
+7. **No code found online:** Waller County defaults, marked as such.
+8. **Confirmation:** a person confirms only the values marked unsure (and Waller defaults standing in).
 
 ## Still open
 
 - The order and size of the phases (kept open while planning).
-- Where the ETJ boundaries for cities other than Houston come from, and what to do when the AI can't find a jurisdiction's code online (a typical rule set, marked, and a link for someone to fill it in).
-- How much of the rule sheet a person must confirm before a layout uses it (all of it, or only the values the AI marked unsure).
+- ETJ outlines: whether to add them to the app's boundary data (Houston's first), or rely on the AI's reading of the code.
