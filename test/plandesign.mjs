@@ -58,3 +58,26 @@ assert.ok(PD.placeDesign(null, T).problems.length, 'no answer at all');
 { const t = PD.buildingTypes(planFor('restaurant'))[0], d = PD.placeDesign(PD.fallbackDesign(t), t).design, ol = PD.occupantLoad(d); assert.ok(ol.total > 50, 'a restaurant\'s dining room holds many people'); }
 assert.equal(PD.occupantLoad(PD.placeDesign(ok, T).design).total, 0, 'occupant load is for commercial buildings');
 console.log('plan designs ok');
+
+// ---------- buildings that aren't rectangles (an L drawn on Oct 19 came out as a box) ----------
+{ const S = await import('../lib/siteplan.mjs'), base = planFor('retail'), b0 = base.elements.find(e => e.kind === 'building');
+  for (const [form, extra, corners] of [['L', {}, 6], ['U', {}, 8], ['bar', { jog: 6, w: 240 }, 8]]) for (const rot of [0, 90, 270]) {
+    const b = { ...b0, form, rot, w: 150, d: 100, ...extra }, plan = { ...base, elements: [b, ...base.elements.filter(e => e.kind !== 'building')] }, t = PD.buildingTypes(plan)[0], tag = form + ' at ' + rot + '°';
+    assert.ok(t.fp && t.fp.length >= corners, tag + ': the type keeps the outline (' + (t.fp || []).length + ' corners)');
+    assert.ok(Math.abs(t.footArea - S.footArea(b)) / S.footArea(b) < 0.02, tag + ': footprint area is the outline\'s, not the bounding box\'s');
+    assert.ok(Math.abs(PD.polyArea(t.fp) - t.footArea) < 2); assert.match(PD.typeName(t), /overall/);
+    assert.ok(PD.notchesOf(t).length >= 1, tag + ': the notch is open ground');
+    assert.match(PD.designBrief(t), /outline through these corners/, tag + ': Claude is told the shape');
+    const { design, problems } = PD.placeDesign(PD.fallbackDesign(t), t);
+    assert.deepEqual(problems, [], tag + ': the rule-based design fits the outline');
+    assert.deepEqual(design.footprint, t.fp); assert.equal(design.footArea, t.footArea);
+    for (const r of design.rooms) assert.ok(PD.inPoly([r.x + r.w / 2, r.y + r.d / 2], t.fp), tag + ': ' + r.name + ' sits inside the building');
+    const rooms = design.rooms.filter(r => r.floor === 1).reduce((s, r) => s + r.w * r.d, 0); assert.ok(rooms > 0.9 * t.footArea && rooms < 1.02 * t.footArea, tag + ': rooms fill the outline');
+    for (const w of design.windows) { const o = { front: [0, -0.5], back: [0, 0.5], left: [-0.5, 0], right: [0.5, 0] }[w.side]; assert.ok(!PD.inPoly([(w.x1 + w.x2) / 2 + o[0], (w.y1 + w.y2) / 2 + o[1]], t.fp), tag + ': window ' + w.id + ' looks out on open ground'); }
+  }
+  // a room in the notch of an L is caught
+  const b = { ...b0, form: 'L', rot: 0, w: 150, d: 100 }, t = PD.buildingTypes({ ...base, elements: [b, ...base.elements.filter(e => e.kind !== 'building')] })[0], n = PD.notchesOf(t)[0], raw = PD.fallbackDesign(t);
+  raw.rooms.push({ id: 'shed', name: 'Storage', type: 'storage', floor: 1, x: n.x + 1, y: n.y + 1, w: Math.min(10, n.w - 2), d: Math.min(10, n.d - 2) });
+  assert.ok(PD.placeDesign(raw, t).problems.some(x => /notch|outside|open ground/i.test(x)), 'a room in the notch is a problem');
+}
+{ const t = PD.buildingTypes(planFor('shaped')); assert.ok(t.some(x => x.shape === 'L-shape') && t.some(x => x.shape === 'stepped front'), 'the shaped test plan has an L and a stepped front'); }

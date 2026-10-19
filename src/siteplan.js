@@ -3711,7 +3711,7 @@ export function initSitePlan(ctx) {
     for (const sh of sheets) steps.push({ key: sh.number, kind: 'sheet', label: sh.number + ' ' + sh.title });
     steps.push({ key: 'merge', kind: 'merge', label: 'Put ' + sheets.length + ' sheets together' });
     for (const x of steps) x.status = 'todo';
-    const j = { id: uid(), pid: p.id, plid: pl.id, no, sig: planSig(pl), sections, by: s.by ?? initials(get(NAME_KEY)), madeBy: get(NAME_KEY) || '', projectNumber: p.projectNumber || '', at: day.toISOString(), date: day.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+    const j = { id: uid(), pid: p.id, plid: pl.id, no, sig: planSig(pl), sections, bare: true, by: s.by ?? initials(get(NAME_KEY)), madeBy: get(NAME_KEY) || '', projectNumber: p.projectNumber || '', at: day.toISOString(), date: day.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       revisions, types, sheets, steps, designs: {}, designBy: {}, disc: {}, text: null, model: '', base: { client: p.client || '', address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '', parcels, facts, notes: SP.check(pl).map(i => i.text), vicinity,
         boundarySource: pl.src === 'drawn' ? 'a boundary drawn on the map' : pl.src === 'regrid' ? 'the Regrid parcel outline' : (keys.length > 1 ? keys.length + ' county appraisal district parcel outlines, merged' : 'the county appraisal district parcel outline') }, elapsed: 0, state: 'paused', open: false };
     jobs.set(p.id, j); await saveJob(j); runJob(p, j);
@@ -3771,7 +3771,7 @@ export function initSitePlan(ctx) {
         const sh = j.sheets.find(y => y.number === x.key); x.status = 'doing'; x.note = ''; const t0 = Date.now(); let last = '';
         for (let k = 0; k < 3; k++) {
           try {
-            const r = await fetch('api/planset', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'sheet', html: PS.docHTML(c, PS.sheetPage(c, sh)), title: P1().name + ' — ' + sh.number }) });
+            const r = await fetch('api/planset', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'sheet', bare: !!j.bare, html: PS.docHTML(c, PS.sheetPage(c, sh)), title: P1().name + ' — ' + sh.number }) });
             if (r.ok && /pdf/.test(r.headers.get('content-type') || '')) { await rput('jp:' + j.id + ':' + x.key, await r.blob()); x.ms = Date.now() - t0; await mark(x, 'done', ''); return; }
             last = (await r.json().catch(() => ({}))).error || 'HTTP ' + r.status; if (r.status === 429) await new Promise(res => setTimeout(res, 15000));
           } catch (e) { if (ctl.signal.aborted) { x.status = 'todo'; throw e; } last = e.message; }
@@ -3783,7 +3783,12 @@ export function initSitePlan(ctx) {
       // 4. one PDF, in sheet order
       const m = st('merge'); m.status = 'doing'; const t0 = Date.now();
       const { PDFDocument } = await import('./lib/vendor/pdf-lib.esm.min.js'), out = await PDFDocument.create(), made = [];
-      for (const sh of j.sheets) { const b = await rget('jp:' + j.id + ':' + sh.number); if (!(b instanceof Blob)) continue; const src = await PDFDocument.load(await b.arrayBuffer()); for (const pg of await out.copyPages(src, src.getPageIndices())) out.addPage(pg); made.push(sh.number); }
+      // bare sheets (jobs started since Oct 19) go on one copy of the border, shared by every page
+      let bd = null; if (j.bare) { const r = await fetch('api/planset?border=1'); if (!r.ok) throw new Error('the title block border didn’t load (HTTP ' + r.status + ')'); [bd] = await out.embedPdf(await r.arrayBuffer(), [0]); }
+      for (const sh of j.sheets) { const b = await rget('jp:' + j.id + ':' + sh.number); if (!(b instanceof Blob)) continue; const bytes = await b.arrayBuffer();
+        if (bd) { const src = await PDFDocument.load(bytes); for (const pg of await out.embedPdf(src, src.getPageIndices())) { const w = pg.width, h = pg.height, page = out.addPage([w, h]); page.drawPage(bd, { x: 0, y: 0, width: w, height: h }); page.drawPage(pg, { x: 0, y: 0, width: w, height: h }); } }
+        else { const src = await PDFDocument.load(bytes); for (const pg of await out.copyPages(src, src.getPageIndices())) out.addPage(pg); }
+        made.push(sh.number); }
       out.setTitle(P1().name + ' — ' + pl.name + ' — Schematic design set, issue ' + j.no); out.setCreator('Finishes Solutions'); out.setProducer('Finishes Solutions plan sets');
       const blob = new Blob([await out.save()], { type: 'application/pdf' }), id = uid(); await rput('set:' + id, blob); m.ms = Date.now() - t0; m.status = 'done';
       const q = P1().plans.find(x => x.id === pl.id) || pl, mins = Math.round(((j.elapsed || 0) + Date.now() - j.resumedAt) / 60000);

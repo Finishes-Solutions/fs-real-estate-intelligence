@@ -152,4 +152,7 @@ assert.equal((await call('POST', { mode: 'disc', discipline: 'astrology', brief 
   assert.equal(r.code, 200); assert.deepEqual(r.body.design, seed, 'the design comes back as Claude wrote it (the browser checks it)');
   const msg = JSON.stringify(sent.at(-1).messages); assert.ok(msg.includes('failed these checks') && msg.includes('overlaps'), 'the problems go back to Claude'); assert.deepEqual(sent.at(-1).output_config.format.schema, PD.DESIGN_SCHEMA); }
 assert.equal((await call('POST', { mode: 'sheet', html: 'nope' })).code, 400, 'one sheet needs a whole document');
+// the border alone, which the browser lays once under a long set's bare sheets
+{ const res = mock(); await handler({ method: 'GET', query: { border: '1' }, headers: { 'x-forwarded-for': '7.7.8.1' } }, res);
+  assert.equal(res.headers['Content-Type'], 'application/pdf'); const bd = await PDFDocument.load(res.sent); assert.deepEqual([bd.getPage(0).getWidth(), bd.getPage(0).getHeight()], [2592, 1728]); }
 console.log('plan sets ok');

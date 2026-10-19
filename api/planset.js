@@ -10,7 +10,9 @@
 //   POST { mode: 'design', type, brief, seed, previous?, problems?, model?, effort? } -> { design (raw), model, effort, budget }
 //        one building type's floor plan (lib/plandesign.mjs DESIGN_SCHEMA). The browser checks it (placeDesign) and asks
 //        again with the problems, at most twice; `seed` is the rule-based design it starts from
-//   POST { mode: 'sheet', html } -> application/pdf: one sheet, laid on the border (a long set is printed a sheet at a time)
+//   GET ?border=1 -> application/pdf: the border alone, for the browser to lay under bare sheets once per set
+//   POST { mode: 'sheet', html, bare? } -> application/pdf: one sheet, laid on the border (a long set is printed a sheet at a time);
+//        bare: without the border, which the browser then embeds once for the whole set instead of once a sheet (170 KB each)
 //   POST { mode: 'pdf', html } -> application/pdf
 //        the set's HTML (lib/planset.mjs setHTML, one 36 x 24 page a sheet) printed by headless Chromium (api/pdf.js) and
 //        laid on the Finishes Solutions border (templates/titleblock.pdf, made by build/titleblock.mjs) with pdf-lib
@@ -47,6 +49,11 @@ export async function onBorder(content, borderBytes) {
 export default async function handler(req, res) {
   if (!sameOrigin(req, res)) return;
   const key = process.env.ANTHROPIC_API_KEY || '';
+  if (req.method === 'GET' && req.query?.border) {
+    if (!rateLimit(req, res, { perMinute: 30, perDay: 600 })) return;
+    res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.status(200).send(Buffer.from(await border()));
+  }
   if (req.method === 'GET') {
     if (!rateLimit(req, res, { perMinute: 30, perDay: 600 })) return;
     let models = [], modelsError = '';
@@ -62,7 +69,8 @@ export default async function handler(req, res) {
     const html = typeof b.html === 'string' ? b.html : '';
     if (!/^\s*<!doctype html>/i.test(html) || html.length > MAX_HTML) return res.status(400).json({ error: 'Send { html } (the whole set as one HTML document, under 4 MB).' });
     try {
-      const pdf = await onBorder(await render(html, { sheet: 'set', title: clip(b.title, 120) || 'Plan set' }), await border());
+      const bare = b.mode === 'sheet' && b.bare === true, content = await render(html, { sheet: 'set', title: clip(b.title, 120) || 'Plan set' });
+      const pdf = bare ? content : await onBorder(content, await border());
       if (pdf.length > 4_400_000) return res.status(413).json({ error: 'The set is ' + (pdf.length / 1048576).toFixed(1) + ' MB, over the 4.5 MB a download from here can be. Leave out a rendering or two.' });
       res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Cache-Control', 'no-store');
       return res.status(200).send(Buffer.from(pdf));
