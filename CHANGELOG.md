@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 11:37 AM CT: Neighbourhood plan: how local rules are found (b209ff3)
+- **Planning only, nothing in the app changes.** `NEIGHBORHOOD-PLAN.md` now records how local rules are found:
+  - the jurisdiction comes from the city limits and county data the app already has
+  - Waller County's rules are the default when a place's code can't be found online
+  - a person confirms only the values the AI marked unsure
+
 ### 11:29 AM CT: Neighbourhood plan: first decisions (fe3d1c1)
 - **Planning only, nothing in the app changes.** `NEIGHBORHOOD-PLAN.md` now records:
   - street rules that follow the site's city, ETJ or county, read from that place's codes by the AI, cited and confirmed by a person
