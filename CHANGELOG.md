@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 6:23 PM CT: The AI decides what's built on commercial sites (fdf013e, 5b6e987, a38845c, merged 7eb3363; and the scenario wording)
+- On **Medium, High and Ultra**, for shops, restaurants, offices, medical offices, hotels and churches, the AI now says exactly what to build: how many buildings and pad sites, their sizes and floors, where they sit and which way they face, how the parking is arranged, which side the pond goes on and whether there's a service drive, each with a one-line reason.
+- The planner draws it as **AI's plan** beside its own layouts and ranks it the same way, by the leasable floor area that parks and passes the checks; it's recommended only when it does best. Its card lists the AI's reasons and anything the planner had to change.
+- On **High and Ultra**, when the planner can't do the AI's plan as written, the AI revises it once and the new version is compared too. When the AI's plan can't be laid out at all, it isn't shown as a layout; a line under Build says what the AI asked for and why it didn't fit.
+- **Ask** can now explain the AI's choices ("why did you put the pond there?").
+- "With 2 pad sites" or "an outparcel" now places the pads at every effort level, and offices and medical offices can go to two floors unless you asked for one story.
+- On Waller plans, when all three scenarios come out the same, Numbers says so (the unresolved items could still change it) instead of calling one number a range.
+
 ### 5:10 PM CT: Drag faces, shape parking, face the building, precise turns (ae15452, 7780aa0, merged 42caa3e)
 - A selected building shows a bar on each side, a custom L included. Drag it and that face moves straight out or in, the sides beside it keep their direction, and a label shows the face's length and how far it moved.
 - Parking takes **Edit Shape**: add and drag points or faces, and the stalls refill the outline with whole stalls in rows on an aisle, none cut by the edge. Every count and drawing follows: Numbers, the pro forma, the PDF, the DXF and the Waller parking checks.
