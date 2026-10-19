@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 6:25 PM CT: Ground elevations from USGS lidar (6a714fd)
+- **Each project's Jurisdiction & site box now shows the ground elevation:** the lowest and highest ground (feet above sea level), how far and which way it falls ("falls about 5.5 ft to the south-east"), and, where FEMA gives a base flood elevation, whether any of the ground is below it (marked in amber). Projects checked before today look again once by themselves.
+- **Build puts the detention pond on the low side** of the site when the land falls more than a foot and a half, and the AI planner is told which way the land falls.
+- **Plan sets use the real ground:** the existing conditions sheet (C-001) draws contours with the low and high points instead of "Topography not surveyed", and the grading sheet (C-201) grades from real elevations: existing contours under the proposed ones, the pond's bank at the real ground, finished floors a foot over the ground, a rough cut and fill estimate, and a warning when the pond sits on high ground.
+- The elevations are USGS lidar of the bare ground (1 m detail where flown, most of Texas), asked for once per site and kept on your device. They're good for planning, not a survey. If USGS is down, a rougher model is used and marked approximate (it isn't drawn as contours).
+
 ### 5:54 PM CT: Floor plans, elevations and sections follow the building's shape (14954c0)
 - **The architectural sheets now draw L-shaped, U-shaped and stepped buildings as they are on the site plan:** the floor plan's outside wall follows every corner, with a dimension for each jog; the roof plan follows the outline; each elevation shows the set-back walls as their own panels behind the nearer ones; and the sections cut across the actual wing (50 ft across an L's wing, not the 100 ft box around it). Areas on the plans, code analysis and life safety sheets are the building's real area.
 - **Much smaller sheets:** brick, siding, shingles, concrete and insulation are drawn with light line work instead of fill patterns. The biggest architectural sheet went from 11.9 MB to under 0.8 MB. That size is what made one sheet fail in the first full set; it shouldn't happen now.
