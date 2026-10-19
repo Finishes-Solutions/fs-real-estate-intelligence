@@ -127,5 +127,19 @@ const lot5 = planOf('lot5ac'), mainOf = o => o.elements.filter(e => e.kind === '
   assert.deepEqual(PK.fireReach(r.elements).map(f => Math.round(f.d)), [], 'still within reach of a fire lane');
 }
 
+// dragged toward the street, along it, and to a side of the lot: the field is laid out again to face it (in front of it,
+// or behind it when it's moved up to the street), never an empty row of lawn where the building was
+{
+  const lot = { origin: [-95.8245, 29.7855], front: 0, setbacks: { ...S.SETBACKS }, elements: [], ring: [[0, 0], [600, 0], [600, 420], [0, 420]] }, o = L.layoutOptions(lot, P.retail, { count: 1 })[0];
+  for (const [dx, dy] of [[60, 0], [-80, 0], [0, -30], [0, 40]]) {
+    const p = { ...lot, elements: structuredClone(o.elements), program: o.program, recipe: o.recipe }, B = p.elements.find(e => e.kind === 'building'); B.x += dx; B.y += dy; B.pinned = true;
+    const r = L.refit(p, { amount: 'current' }), q = { ...p, elements: r.elements }, m = S.metrics(q), iss = S.check(q), what = 'moved ' + dx + ',' + dy;
+    assert.equal(r.recipe?.pat, 'stand', what + ': the field laid out round the building where it now is');
+    assert.deepEqual(iss.filter(i => i.level === 'bad' || / dead-ends /.test(i.text)).map(i => i.text), [], what + ': no problems, no dead ends');
+    assert.ok(m.spaces >= m.required && PK.fireReach(r.elements).length === 0 && PK.throatOf(q, r.elements).stalls.length === 0, what + ': parked ' + m.spaces + '/' + m.required + ', fire lanes in reach, a clear throat');
+    assert.equal(r.elements.filter(e => e.kind === 'building').length, 1, what + ': just the one building');
+  }
+}
+
 console.log('parkingfield: ' + seen.length + ' layouts sound');
 for (const s of seen) console.log('  ' + s);
