@@ -21,6 +21,8 @@ for (const name of Object.keys(CASES)) {
     assert.ok(!/couldn’t be drawn|isn’t drawn yet|couldn’t be laid out|Design not available/.test(html), where + ': drawn');
     assert.ok(html.length < 1.5e6, where + ': under 1.5 MB (' + html.length + ')');
     assert.ok(/Basis of design/.test(html), where + ': says it is a schematic basis of design');
+    // printable size: no SVG pattern fills and no stroked text halos (Chromium prints both as megabytes of PDF)
+    const body = E.RENDERERS[sh.kind](ctx, { ...sh }); assert.ok(!/fill="url\(#/.test(body) && !/paint-order/.test(body), where + ': no pattern fills or stroked text');
     if (sh === mine.find(x => x.kind === sh.kind)) { const s2 = { ...sh, scale: '' }; E.RENDERERS[sh.kind](ctx, s2); assert.match(s2.scale, sh.typeId ? /^\d+\/\d+" = 1'-0"$/ : /N\.T\.S\.|As noted/, where + ': sets its scale'); }
   }
 }
@@ -47,6 +49,28 @@ for (const name of Object.keys(CASES)) {
     const html = P.sheetPage(c, sh); assert.ok(!/NaN|undefined|Infinity|couldn’t be/.test(html) && html.length < 1.5e6, 'huge warehouse ' + sh.number + ' (' + html.length + ')');
     if (sh.kind === 'fp-sprinkler') assert.ok(/TYPICAL BAY/.test(html), 'a typical bay of heads');
   }
+}
+
+// buildings that aren't rectangles (an L and a stepped front): the slab edge follows the outline, and nothing inside the
+// building lands in a notch or runs through one
+{
+  const c = ctxs.shaped, shapes = c.types.map(t => c.designs[t.id].shape);
+  assert.ok(shapes.includes('L-shape') && shapes.includes('stepped front'), 'shaped fixture: ' + shapes);
+  for (const t of c.types) {
+    const d = c.designs[t.id], sh = c.sheets.find(s => s.kind === 's-found' && s.typeId === t.id), html = E.RENDERERS['s-found'](c, { ...sh });
+    const m = html.match(/<path d="([^"]+)" class="slab-edge"/); assert.ok(m, t.id + ': slab edge drawn');
+    assert.equal(m[1].split('L').length, d.footprint.length, t.id + ': slab edge has a corner for every outline corner');
+    if (d.shape === 'L-shape') assert.ok(d.footprint.length >= 6, 'the L has six corners');
+    assert.ok(E.notchList(d).length >= 1, t.id + ': has notches');
+    for (const r of d.rooms) { const G = E.sprinklerGrid(r, E.hazardOf(d.use, r.type)); for (const x of G.xs) for (const y of G.ys) assert.ok(!E.inNotch(d, x, y), t.id + ': sprinkler head in a notch'); }
+    for (const sy of E.hvacLayout(t, d).systems) assert.ok(!E.inNotch(d, sy.unit.x, sy.unit.y) && E.onOrIn(d, sy.unit.x, sy.unit.y), t.id + ': ' + sy.tag + ' on the roof');
+    // runs between far corners of the building stay inside it
+    const pts = d.rooms.map(r => ({ x: r.x + r.w / 2, y: r.y + r.d / 2 })), runs = E.treeRuns(d, pts[0], pts.slice(1));
+    for (const [x1, y1, x2, y2] of runs) for (let u = 0; u <= 1; u += 0.1) assert.ok(E.onOrIn(d, x1 + (x2 - x1) * u, y1 + (y2 - y1) * u, 0.3), t.id + ': run through open ground at ' + [x1, y1, x2, y2]);
+    for (const side of ['front', 'back']) { const w = E.wallSpot(d, { x: d.W / 2, y: side === 'front' ? 0 : d.D }, [side]); assert.ok(E.edgesOf(d).some(e => e.side === side && Math.abs((e.x2 - e.x1) * (w.y - e.y1) - (e.y2 - e.y1) * (w.x - e.x1)) < 1e-6 && Math.min(e.x1, e.x2) - 1e-6 <= w.x && w.x <= Math.max(e.x1, e.x2) + 1e-6), t.id + ': wall spot on a ' + side + ' edge of the outline'); }
+  }
+  const L = c.designs[c.types.find(t => c.designs[t.id].shape === 'L-shape').id], cl = E.clipLine(L, 25, true); assert.deepEqual(cl, [[0, 50]], 'a line through the L stops at the notch');
+  assert.equal(E.insetOutline(L, 1).length, L.footprint.length);
 }
 
 // ---------- the rules ----------
