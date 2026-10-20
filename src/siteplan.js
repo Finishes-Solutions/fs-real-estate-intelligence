@@ -4187,6 +4187,7 @@ export function initSitePlan(ctx) {
       await pool(j.steps.filter(x => x.key.startsWith('design:')), 2, async x => {
         const t = j.types.find(y => y.id === x.key.slice(7)); if (!t || x.status === 'done' || x.status === 'skipped') return;
         const seed = PD.fallbackDesign(t), fallback = why => { j.designs[t.id] = PD.placeDesign(seed, t).design; j.designBy[t.id] = 'rule-based (' + why + ')'; };
+        if (!PD.claudeDesigns(t)) { j.designs[t.id] = PD.placeDesign(seed, t).design; j.designBy[t.id] = 'rule-based (corridor building)'; await mark(x, 'done', j.designs[t.id].corridor ? j.designs[t.id].corridor.units + ' units, ' + Object.keys(j.designs[t.id].unitPlans || {}).length + ' unit types' : ''); return; } // apartments and hotels: laid out by rule, unit by unit
         if (claudeOff) { fallback(claudeOff); await mark(x, 'skipped', 'rule-based design: ' + claudeOff); return; }
         x.status = 'doing'; const t0 = Date.now(); let prev = null, problems = [], ok = false, tries = 0;
         try {

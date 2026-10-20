@@ -3,7 +3,7 @@
 // sizes and as apartments), the rule-based design passing every check for every type, and the checks catching what a
 // bad answer from Claude would get wrong.
 import assert from 'node:assert/strict';
-const PD = await import('../lib/plandesign.mjs'), { planFor } = await import('./helpers/setctx.mjs');
+const PD = await import('../lib/plandesign.mjs'), { planFor } = await import('./helpers/setctx.mjs'), S0 = await import('../lib/siteplan.mjs');
 
 // ---------- types ----------
 { const t = PD.buildingTypes(planFor('townhomes')); assert.equal(t.length, 1); assert.equal(t[0].attached, true); assert.deepEqual([t[0].W, t[0].D, t[0].floors, t[0].unitsPer], [24, 40, 3, 6], 'a townhome row is designed as one 24 ft unit');
@@ -12,8 +12,22 @@ const PD = await import('../lib/plandesign.mjs'), { planFor } = await import('./
   assert.ok(t.every(x => x.use === 'sfr' && x.supported && x.garage === 2)); assert.deepEqual(t.map(x => x.id), t.map((x, i) => String.fromCharCode(65 + i))); }
 { const t = PD.buildingTypes(planFor('industrial'))[0]; assert.equal(t.occupancy, 'S-1'); assert.match(t.construction, /II-B/); assert.equal(t.sprinklered, true, 'a 78,000 sf warehouse is sprinklered'); }
 { const p = planFor('retail'), t = PD.buildingTypes(p); assert.equal(t.reduce((s, x) => s + x.count, 0), p.elements.filter(e => e.kind === 'building').length, 'every shop building is drawn as one of the types'); assert.ok(t.every(x => x.occupancy === 'M' && x.sprinklered), 'retail shells over 12,000 sf are sprinklered'); }
-{ const t = PD.buildingTypes(planFor('restaurant')); assert.ok(t.every(x => x.occupancy === 'A-2' && x.sprinklered === x.buildingGsf > 5000)); }
-assert.equal(PD.sprinklerRule('office', 60000, 3).on, false, 'a 3-story business occupancy needs none by area'); assert.equal(PD.sprinklerRule('office', 9000, 4).on, true);
+{ const t = PD.buildingTypes(planFor('restaurant')); assert.ok(t.every(x => x.occupancy === 'A-2' && x.sprinklered === (x.buildingGsf > 5000 || x.occupantsEst >= 100)), 'A-2: over 5,000 sf or 100 occupants (IBC 903.2.1.2)'); }
+// the code's triggers (IBC 903.2), then the allowable area (IBC 506) — the Oct 20 review caught a blanket "assembly over 5,000 sf"
+assert.equal(PD.sprinklerRule('office', 60000, 3).on, false, 'Group B: no area trigger in 903.2'); assert.equal(PD.sprinklerRule('office', 9000, 4).on, false);
+{ const r = PD.sprinklerRule('amenity', 5400, 1, 160); assert.equal(r.on, false, 'A-3 clubhouse: under 12,000 sf and 300 occupants'); assert.match(r.ref, /903\.2\.1\.3/); assert.match(r.why, /12,000/); }
+assert.equal(PD.sprinklerRule('amenity', 5400, 1, 320).on, true, 'A-3 with 300 or more occupants'); assert.equal(PD.sprinklerRule('restaurant', 3600, 1, 120).on, true, 'A-2 with 100 or more occupants');
+{ const r = PD.sprinklerRule('multifamily', 40000, 3); assert.equal(r.system, 'NFPA 13R', 'R-2 up to 4 stories: 13R'); assert.equal(PD.sprinklerRule('multifamily', 80000, 5).system, 'NFPA 13'); }
+{ const BC = await import('../lib/buildcode.mjs');
+  assert.equal(BC.frontageIf(1, 30), 0.75); assert.equal(BC.frontageIf(0.5, 30), 0.25); assert.equal(BC.frontageIf(0.2, 30), 0);
+  const a = BC.codeBasis('retail', { gsf: 10000, storyArea: 10000, floors: 1, heightFt: 21, If: 0.75, sprinkler: BC.sprinklerFor('retail', { gsf: 10000, floors: 1 }) });
+  assert.equal(a.ok, true); assert.match(a.construction, /^V-B/); assert.equal(a.sprinkler.on, false, '10,000 sf of M on V-B: 9,000 + 6,750 frontage, no sprinklers (the reviewed "Revise")');
+  const b = BC.codeBasis('retail', { gsf: 10000, storyArea: 10000, floors: 1, heightFt: 21, If: 0, sprinkler: BC.sprinklerFor('retail', { gsf: 10000, floors: 1 }) });
+  assert.equal(b.sprinkler.system, 'NFPA 13', 'no frontage: sprinklered to fit V-B'); assert.match(b.changed, /allowable area/);
+  const m = BC.codeBasis('multifamily', { gsf: 38000, storyArea: 12700, floors: 3, heightFt: 39, If: 0.75, sprinkler: BC.sprinklerFor('multifamily', { gsf: 38000, floors: 3, heightFt: 39 }) });
+  assert.match(m.construction, /^V-A/); assert.equal(m.sprinkler.system, 'NFPA 13R', 'a garden apartment building: V-A with 13R'); }
+// occupant load (IBC Table 1004.5): exercise 50 gross, unconcentrated assembly 15 net
+{ const BC = await import('../lib/buildcode.mjs'); assert.deepEqual(BC.LOAD.fitness.slice(0, 2), [50, 'gross']); assert.deepEqual(BC.LOAD.lounge.slice(0, 2), [15, 'net']); assert.deepEqual(BC.LOAD.unit.slice(0, 2), [200, 'gross']); }
 assert.match(PD.sprinklerRule('townhomes', 3000, 3).why, /R313/);
 
 // ---------- the rule-based design passes for every type of every case ----------
@@ -81,3 +95,30 @@ console.log('plan designs ok');
   assert.ok(PD.placeDesign(raw, t).problems.some(x => /notch|outside|open ground/i.test(x)), 'a room in the notch is a problem');
 }
 { const t = PD.buildingTypes(planFor('shaped')); assert.ok(t.some(x => x.shape === 'L-shape') && t.some(x => x.shape === 'stepped front'), 'the shaped test plan has an L and a stepped front'); }
+
+// ---------- apartments and hotels: a double-loaded corridor, unit by unit (the Oct 20 set had 298 units and no unit drawn) ----------
+{ const p = planFor('mixed'), types = PD.buildingTypes(p), mf = types.filter(t => t.use === 'multifamily');
+  assert.ok(mf.length >= 2 && types.some(t => t.use === 'amenity') && types.some(t => t.use === 'retail'), 'apartments, the shops and the clubhouse each have their own types');
+  assert.ok(mf.every(t => t.supported && t.occupancy === 'R-2' && t.sprinklered && t.sprinklerSystem === 'NFPA 13R' && /^V-A/.test(t.construction)), 'R-2: sprinklered (13R) on V-A');
+  assert.equal(mf.reduce((s, t) => s + t.units, 0), S0.metrics(p).units, 'the types carry every unit the plan counts');
+  for (const t of mf) {
+    const { design, problems } = PD.placeDesign(PD.fallbackDesign(t), t); assert.deepEqual(problems, [], PD.typeName(t) + ' passes the checks');
+    const units = design.rooms.filter(r => r.type === 'unit'); assert.ok(Math.abs(units.length / t.floors - t.unitsPer / t.floors) <= Math.max(2, t.unitsPer / t.floors * 0.15), PD.typeName(t) + ': ' + units.length + ' units drawn for ' + t.unitsPer + ' planned');
+    for (let f = 1; f <= t.floors; f++) { const fl = design.rooms.filter(r => r.floor === f); assert.equal(fl.filter(r => r.type === 'stair').length, 2, 'two exit stairs on floor ' + f); assert.ok(fl.some(r => r.type === 'corridor')); if (t.floors >= 3) assert.ok(fl.some(r => r.type === 'elevator'), 'an elevator at 3 stories'); }
+    for (const u of units) {
+      const L = PD.unitLayout(design, u); assert.ok(L, u.name + ' has a plan');
+      for (const r of L.rooms) assert.ok(r.x >= u.x - 0.01 && r.y >= u.y - 0.01 && r.x + r.w <= u.x + u.w + 0.01 && r.y + r.d <= u.y + u.d + 0.01, u.name + ': ' + r.name + ' stays in the unit');
+      const ua = L.rooms.reduce((s, r) => s + r.w * r.d, 0); assert.ok(Math.abs(ua - u.w * u.d) < 2, u.name + ': rooms fill the unit');
+      assert.ok(L.plan.baths >= 1 && L.plan.kitchen, u.name + ': a kitchen and a bath');
+      for (const r of L.plan.rooms.filter(r => /bedroom/.test(r.type))) assert.ok(L.plan.windows.some(w => w.room === r.id), u.name + ': ' + r.name + ' has a window (egress)');
+    }
+    for (const P of Object.values(design.unitPlans)) for (const dr of P.doors) { // every door on a wall its two rooms share (the front door on the corridor wall)
+      const A = P.rooms.find(r => r.id === dr.a), B = P.rooms.find(r => r.id === dr.b), mid = [(dr.x1 + dr.x2) / 2, (dr.y1 + dr.y2) / 2], on = (r, [x, y]) => (Math.abs(x - r.x) < 0.01 || Math.abs(x - r.x - r.w) < 0.01) && y >= r.y - 0.01 && y <= r.y + r.d + 0.01 || (Math.abs(y - r.y) < 0.01 || Math.abs(y - r.y - r.d) < 0.01) && x >= r.x - 0.01 && x <= r.x + r.w + 0.01;
+      assert.ok(on(A, mid) && (dr.b === 'corridor' ? Math.abs(mid[1]) < 0.01 : on(B, mid)), P.code + ': door ' + dr.a + '–' + dr.b + ' on a shared wall'); }
+  }
+  // a hotel and an end-on building
+  for (const t of [{ id: 'H', use: 'hotel', W: 260, D: 60, floors: 4, floorH: 10, unitsPer: 120, supported: true, occupancy: 'R-1', sprinklered: true, code: { cons: 'V-A' }, mix: PD.HOTEL_MIX },
+    { id: 'Y', use: 'multifamily', W: 60, D: 220, floors: 3, floorH: 10, unitsPer: 30, supported: true, occupancy: 'R-2', sprinklered: true, code: { cons: 'V-A' } }]) {
+    const { design, problems } = PD.placeDesign(PD.fallbackDesign(t), t); assert.deepEqual(problems, [], t.use + ' ' + t.W + 'x' + t.D + ' passes'); assert.ok(design.rooms.filter(r => r.type === 'unit').every(u => PD.unitLayout(design, u))); }
+  assert.ok(!PD.claudeDesigns(mf[0]) && PD.claudeDesigns(types.find(t => t.use === 'retail')), 'apartments are laid out by rule, the shops by Claude');
+}

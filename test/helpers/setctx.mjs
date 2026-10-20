@@ -2,7 +2,7 @@
 // 7.7 acre FM 362 lot (920 x 378 ft, a notch out of the east end, frontage on the west) and a 27 acre tract, every
 // building type designed by the rule-based designer (lib/plandesign.mjs fallbackDesign), so a test sees what a set made
 // without Claude would draw. ctxFor(name): 'retail', 'restaurant', 'townhomes', 'sfr', 'industrial', 'office3', 'medical', 'fuel', 'duplex', 'church',
-// and 'shaped': the shops as an L (Building A) and a strip with a staggered front (Building B), as the planner draws them on a corner.
+// 'mixed': about 300 apartments in three building sizes behind a strip of shops, with a clubhouse; and 'shaped': the shops as an L (Building A) and a strip with a staggered front (Building B), as the planner draws them on a corner.
 import * as S from '../../lib/siteplan.mjs';
 import * as L from '../../lib/sitelayout.mjs';
 import * as PD from '../../lib/plandesign.mjs';
@@ -15,6 +15,7 @@ export const fm362 = siteOf(mk([-95.98, 30.06], [[0, 0], [920, 0], [920, 259], [
 export const tract = siteOf(mk([-95.6954, 29.6657], [[0, 0], [716, 25], [759, 1244], [-47, 1219]]));
 export const CASES = { retail: [fm362, { use: 'retail', gfa: 40000 }], restaurant: [fm362, { use: 'restaurant' }], townhomes: [fm362, { use: 'townhomes' }], sfr: [tract, { use: 'sfr' }], industrial: [fm362, { use: 'industrial' }],
   office3: [fm362, { use: 'office', gfa: 60000, floors: 3 }], medical: [fm362, { use: 'medical', gfa: 20000 }], fuel: [fm362, { use: 'fuel' }], duplex: [fm362, { use: 'duplex' }], church: [fm362, { use: 'church' }],
+  mixed: [tract, { use: 'multifamily', zones: [{ use: 'retail', gfa: 30000 }, { use: 'multifamily', units: 300 }] }], // (like the FM 362 / Betka Rd set reviewed Oct 20: apartments behind shops, a clubhouse)
   shaped: [fm362, { use: 'retail', gfa: 40000 }, plan => { const [a, b] = plan.elements.filter(e => e.kind === 'building'); Object.assign(a, { form: 'L', w: 150, d: 100 }); if (b) Object.assign(b, { jog: 6 }); return plan; }] };
 const cache = new Map();
 export function planFor(name) {
