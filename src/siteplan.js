@@ -16,6 +16,7 @@ import * as ASK from './lib/planask.mjs';
 import * as K from './lib/planpick.mjs';
 import * as MAP from './lib/planmap.mjs';
 import * as T from './lib/sitetools.mjs';
+import { netRules } from './lib/streetnet.mjs';
 import * as RD from './lib/render.mjs';
 import * as PJ from './lib/project.mjs';
 import * as CU from './lib/customtypes.mjs';
@@ -1647,12 +1648,17 @@ export function initSitePlan(ctx) {
   const twoPhase = (m, m1) => !!m1 || !!(m?.p1 && (m.p1.need !== m.required || m.p1.stalls !== m.spaces));
   const OK_IC = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>';
   const BAD_IC = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><path d="M8 4.8v3.8"/><circle cx="8" cy="11.2" r=".3" fill="currentColor"/></svg>';
+  // the plan's checks, and on a neighbourhood with subdivision streets the street rules it breaks (a block or cul-de-sac
+  // too long, junctions too close: warnings, kept while its drives are as they were: a street bent, moved, added or
+  // deleted by hand, in place or not, gets its warnings again)
+  const netSig = pl => pl.elements.filter(e => e.kind === 'drive').map(e => e.id + ':' + (e.name || '') + ':' + (e.width || '') + ':' + (e.path || e.poly || [e.x, e.y, e.w, e.d, e.rot]).join(';')).join('|');
+  let netMemo = null; const checkAll = pl => { const base = SP.check(pl); if (!pl.recipe?.net) return base; const k = netSig(pl); if (netMemo?.k !== k) { let w; try { w = netRules(pl); } catch (e) { w = []; } netMemo = { k, w }; } return base.concat(netMemo.w); };
   // the dark summary under the header: which layout is on the map, then Phase 1 first, parking for what was asked for,
   // coverage and the money, and whether it passes. A kicker only for a real status (building) or the first step.
   function overview(pl, prog) {
     if (!pl.elements.length && ed.run?.kind === 'build') return '<div class="kicker">Building…</div><div class="sp-ov-msg"><b>Laying out “' + esc(ed.run.ask) + '”</b><span>The layouts appear here as soon as they’re drawn.</span></div>';
     if (!pl.elements.length) return '<div class="kicker">Step 1 of 3</div><div class="sp-ov-msg"><b>Describe what to build</b><span>Type it under Build, then Build Layouts, or <button type="button" class="sp-link sp-quiet" data-jump="spDrawSec">add pieces by hand</button>.</span></div>';
-    const m = SP.metrics(pl), issues = SP.check(pl), cl = K.checkLabel(K.checksOf(issues, m)), ph = pl.elements.some(e => e.phase === 2);
+    const m = SP.metrics(pl), issues = checkAll(pl), cl = K.checkLabel(K.checksOf(issues, m)), ph = pl.elements.some(e => e.phase === 2);
     const m1 = ph ? SP.metrics({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, h = K.headline(m, m1, K.askedOf(prog)), pk = parkOf(m, m1), whole = twoPhase(m, m1);
     let f = null; try { f = RUN.finOf(pfRun(P(), pl)); } catch (e) { f = null; }
     const v = pl.variant, neg = x => x != null && x < 0 ? ' class="neg"' : '', d = f ? K.moneyDigits([f.cost, f.value]) : 1, arr = v ? RUN.baseName(v.name) : 'Drawn by hand';
@@ -1940,7 +1946,7 @@ export function initSitePlan(ctx) {
     // only the settings the plan's uses (its zones too) read: the building shape for shops, offices and apartments, the
     // apartment bars' depth, length and spacing for apartments, curving streets for single-family homes
     const uses = SP.usesOf(prog), has = list => list.some(x => uses.includes(x)), only = { sfr: uses.length === 1 && uses[0] === 'sfr' };
-    const bldg = (has(SP.FORM_USES) ? pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) : '') + (has(['sfr']) ? pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Curving'], ['straight', 'Straight']]) : '') +
+    const bldg = (has(SP.FORM_USES) ? pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) : '') + (has(['sfr']) ? pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Like a subdivision, and gentle curves (best first)'], ['network', 'Like a subdivision: loops and cul-de-sacs'], ['wave', 'Parallel, gently curving'], ['straight', 'Straight']]) + '<div class="sp-hint w2">Subdivision streets follow the site: a loop road one lot in from the edge or a main street, curved local streets meeting it at T’s, cul-de-sacs where land is left. Typical street rules for now (blocks up to 1,400 ft, cul-de-sacs up to 800 ft).</div>' : '') +
       (has(['multifamily']) ? num('pp-bldgDepth', 'Apartment depth', pp.bldgDepth, 1, 'ft') + num('pp-maxLen', 'Longest building', pp.maxLen, 10, 'ft') + num('pp-bldgGap', 'Space between', pp.bldgGap, 1, 'ft') : '');
     // names: the community's and each part's (no re-solve: they change the labels, not the layout)
     const parts = SP.partsOf({ ...pl, program: prog }, false), nmIn = (k, label, v, ph) => fld(label, '<input type="text" maxlength="60" data-nm="' + k + '" value="' + esc(v || '') + '" placeholder="' + esc(ph) + '">', { wide: true });
@@ -2078,7 +2084,8 @@ export function initSitePlan(ctx) {
   // a local edit: the piece stays where it was put and parking under it gives way (whole stalls); nothing else moves.
   // Laying out everything else again is the Re-fit Plan button's job, never automatic.
   // delete a piece; the rest of a parking row it was part of stays as it is now (it doesn't grow back over the gap)
-  function dropEl(x, el) { const k = el.ext && JSON.stringify(el.ext); x.elements = SP.isRing(el) ? SP.dropRing(x, x.elements.find(y => y.id === el.id) || el) : SP.isLoop(el) ? SP.dropLoop(x, x.elements.find(y => y.id === el.id) || el) : el.kind === 'sign' ? SP.dropSign(x, x.elements.find(y => y.id === el.id)) : x.elements.filter(y => y.id !== el.id); /* (an entrance's sign: it remembers it's gone) */ if (k) for (const y of x.elements) if (y.ext && JSON.stringify(y.ext) === k) delete y.ext; }
+  function dropEl(x, el) { const k = el.ext && JSON.stringify(el.ext); x.elements = SP.isRing(el) ? SP.dropRing(x, x.elements.find(y => y.id === el.id) || el) : SP.isLoop(el) ? SP.dropLoop(x, x.elements.find(y => y.id === el.id) || el) : el.kind === 'sign' ? SP.dropSign(x, x.elements.find(y => y.id === el.id)) : x.elements.filter(y => y.id !== el.id); /* (an entrance's sign: it remembers it's gone) */ if (k) for (const y of x.elements) if (y.ext && JSON.stringify(y.ext) === k) delete y.ext;
+    if (el.kind === 'building' && el.use === 'sfr') for (const l of x.elements) if (l.kind === 'lot' && Math.abs(l.x - el.x) < 250 && Math.abs(l.y - el.y) < 250 && SP.inRing([el.x, el.y], SP.shapeOf(l))) l.vacant = true; } // (a home deleted from its lot: the lot stays, vacant, and re-fits leave its place empty)
   // left: where it was (and what moved with it); parking it had cut there grows back
   // (a park, lawn or open space: the homes under it make way too, with their lots and driveways)
   // (a roundabout or a drop-off loop joins the streets again where it lands: free, Alt-dragged, it stays where it was put)
@@ -2299,7 +2306,7 @@ export function initSitePlan(ctx) {
   function nums() {
     const el = card.querySelector('#spNums'), pl = PL(); if (!el || !pl) return;
     if (pl.ring.length < 3) { el.innerHTML = ''; return; }
-    const m = SP.metrics(pl), issues = SP.check(pl), prog = SP.normalizeProgram(pl.program), z = pl.zoning || {}, ph = pl.elements.some(e => e.phase === 2), cs = CU.customStats(pl);
+    const m = SP.metrics(pl), issues = checkAll(pl), prog = SP.normalizeProgram(pl.program), z = pl.zoning || {}, ph = pl.elements.some(e => e.phase === 2), cs = CU.customStats(pl);
     const m1 = ph ? SP.metrics({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, pk = parkOf(m, m1), whole = twoPhase(m, m1);
     const tile = (k, v, sub, cls = '') => '<div class="sp-tile' + cls + '"><span>' + k + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
     const pair = (k, a, b, sub, cls = '') => '<div class="sp-tile two' + cls + '"><span>' + k + '</span><div class="sp-tv"><b>' + a + '<small>Phase 1</small></b><b>' + b + '<small>Whole site</small></b></div>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';

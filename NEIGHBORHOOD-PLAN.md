@@ -1,6 +1,6 @@
 # Plan: real neighbourhoods, mixed sites, entrances and editable streets
 
-Status: proposal, October 19, 2026, still being planned: the phases below are a working order, not a commitment, and stay open until the plan settles. Nothing here is built yet except where it says so (phase 2, roundabouts and circle drives, is built: Oct 20; step 1 of phase 3, pods with straight streets, is built: Oct 20). Decisions made so far are under "Decided". It answers the asks of Oct 19:
+Status: proposal, October 19, 2026, still being planned: the phases below are a working order, not a commitment, and stay open until the plan settles. Nothing here is built yet except where it says so (phase 2, roundabouts and circle drives, is built: Oct 20; step 1 of phase 3, pods with straight streets, is built: Oct 20; phase 4a, subdivision streets for homes, is built: Oct 20). Decisions made so far are under "Decided". It answers the asks of Oct 19:
 - mixed programs that really mix
 - entrances that fit, with two-lane boulevard entries and room for monument signs
 - bending and turning entrances and other pieces by hand
@@ -233,7 +233,7 @@ Waller County's detention rate replaces today's fixed 0.55 acre-feet per acre as
 | 1 | Turn any piece, entrance editing polish, boulevard entries with monument sign space, names | Medium: about a week |
 | 2 | Roundabouts and circle drives as pieces you add (on today's streets) | Medium (built Oct 20) |
 | 3 | Pods for mixed sites (with today's straight streets inside each pod first) | Large: two to three weeks (step 1, pods with straight streets, built Oct 20) |
-| 4 | The curved street-network generator for neighbourhoods, editable streets, cul-de-sacs, search and scoring | Largest: four to six weeks, and the most uncertain |
+| 4 | The curved street-network generator for neighbourhoods, editable streets, cul-de-sacs, search and scoring | Largest: four to six weeks, and the most uncertain (4a, subdivision streets for homes with typical street rules, built Oct 20; 4b, the local codes, next) |
 | 5 | Split detention, trails and sidewalks | Medium |
 
 Phases 0–2 are worth doing now; they fix what's broken and unblock hand fitting. Phases 3 and 4 are one track (pods need the skeleton), so it's built in steps that each ship something usable:
