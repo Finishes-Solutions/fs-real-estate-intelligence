@@ -241,4 +241,61 @@ assert.deepEqual(API.BRIEF_SCHEMA.properties.buildings.items.properties.at.enum,
   assert.ok(r2.body.brief && !G.hasProhibited(JSON.stringify(r2.body)), 'the revised brief’s words filtered too');
 }
 
+// ---- 8. one retail building with a drive-thru is one use, not a mix (owner-reported, Ultra) ----
+{
+  const ask = '6000+ sf L-shaped retail building with a drive thru drive and adequate parking';
+  // the words alone
+  const g = S.guessProgram(ask);
+  assert.equal(g.use, 'retail'); assert.equal(g.gfa, 6000, '"6000+ sf" read as 6,000'); assert.ok(!g.zones, 'no zones: ' + JSON.stringify(g.zones)); assert.deepEqual(g.extras, ['drivethru']);
+  assert.equal(g.max, true, 'a minimum: grown where it fits'); assert.equal(g.atLeast, true); assert.deepEqual(g.asked, { gfa: 6000 }); assert.equal(g.form, 'L', 'L-shaped');
+  for (const [t, want] of [
+    ['QSR pad with drive-thru', { use: 'restaurant', zones: false, drivethru: true }],
+    ['8,000 sf strip with an endcap drive-thru', { use: 'retail', gfa: 8000, zones: false, drivethru: true }],
+    ['retail strip with coffee drive-thru endcap', { use: 'retail', zones: false, drivethru: true }],
+    ['coffee shop with drive-thru', { use: 'restaurant', zones: false, drivethru: true }],
+    ['at least 6,000 sf retail', { use: 'retail', gfa: 6000, max: true }], ['10,000 sf retail or more', { use: 'retail', gfa: 10000, max: true }], ['about 6,000 sf retail', { use: 'retail', gfa: 6000, max: false }],
+    ['U-shaped office building 40,000 sf', { use: 'office', gfa: 40000, form: 'U' }],
+    ['a 10,000 sf strip and a 2,500 sf restaurant pad with drive-thru', { use: 'retail', zones: [['retail', 10000], ['restaurant', 2500]], drivethru: true }],
+    ['20,000 sf retail and 200 apartments', { use: 'retail', zones: [['retail', 20000], ['multifamily', null]] }]]) {
+    const p = S.guessProgram(t);
+    assert.equal(p.use, want.use, t + ': use'); if ('gfa' in want) assert.equal(p.gfa, want.gfa, t + ': size'); if ('max' in want) assert.equal(!!p.max, want.max, t + ': a minimum?'); if (want.form) assert.equal(p.form, want.form, t + ': shape');
+    if (want.zones === false) assert.ok(!p.zones, t + ': one use, no zones'); else if (want.zones) assert.deepEqual(p.zones.map(z => [z.use, z.gfa ?? null]), want.zones, t + ': a mix, with its sizes');
+    if (want.drivethru) assert.ok(p.extras?.includes('drivethru'), t + ': the drive-thru extra'); }
+  // exactly what the AI returned in production goes in; one retail building of 6,000 sf with the drive-thru and an L comes out
+  const P0 = Object.fromEntries(Object.keys(API.SCHEMA.properties).map(k => [k, null])), bad = { ...P0, use: 'retail', gfa: 6000, extras: ['drivethru'], buildings: 1, entrances: 2, zones: [{ use: 'retail', gfa: null, units: null, floors: null, buildings: null, pads: null, items: [], name: null }, { use: 'restaurant', gfa: null, units: null, floors: null, buildings: null, pads: null, items: [], name: null }], setbacks: { front: null, side: null, rear: null, paving: null }, summary: 'Retail with a restaurant.', assumptions: [] };
+  for (const effort of ['medium', 'high', 'xhigh']) {
+    reply = () => bad; const res = await call({ prompt: ask, effort });
+    assert.equal(res.code, 200); const p = res.body.program;
+    assert.equal(p.use, 'retail', effort + ': retail'); assert.equal(p.zones, null, effort + ': no zones'); assert.equal(p.gfa, 6000, effort + ': 6,000 sf'); assert.equal(p.buildings, 1, 'one building'); assert.deepEqual(p.extras, ['drivethru'], 'with its drive-thru');
+    assert.equal(p.form, 'L', 'L-shaped'); assert.equal(p.max, true, 'grown where it fits'); assert.equal(p.atLeast, true); assert.equal(p.asked?.gfa, 6000, '6,000 sf is the minimum asked'); assert.equal(p.entrances, 2);
+  }
+  assert.match(sent[sent.length - 1].messages[0].content, /HARD RULE, a drive-thru is an extra, not a second use/); assert.match(sent[sent.length - 1].messages[0].content, /is a minimum/);
+  assert.ok(API.SCHEMA.required.includes('atLeast') && API.SCHEMA.required.includes('form'));
+  // the review can't put the zones back
+  reply = () => ({ reviews: [], ranking: [0], revise: true, program: { ...bad }, params: { fill: null, streets: null, form: null, storm: null }, why: 'A restaurant beside it.', summary: 'ok', brief: null, briefWhy: '' });
+  const rr = await call({ mode: 'review', prompt: ask, program: { use: 'retail', gfa: 6000 }, options: [{ name: 'L1' }], round: 1, rounds: 2 });
+  assert.ok(rr.body.revise && rr.body.program.zones == null && rr.body.program.use === 'retail' && rr.body.program.gfa === 6000, 'review: still one retail building: ' + JSON.stringify(rr.body.program.zones));
+  // zones never go out without sizes: a known total is shared; shops alone with no total are one use; a real mix keeps them
+  assert.deepEqual(API.cleanZones([{ use: 'retail' }, { use: 'restaurant' }], { gfa: 12000, words: [{ use: 'retail' }, { use: 'restaurant' }] }).map(z => [z.use, z.gfa]), [['retail', 6000], ['restaurant', 6000]], 'the total split');
+  assert.deepEqual(API.cleanZones([{ use: 'retail' }, { use: 'restaurant' }], { words: [{ use: 'retail', gfa: 10000 }, { use: 'restaurant', gfa: 2500 }] }).map(z => [z.use, z.gfa]), [['retail', 10000], ['restaurant', 2500]], 'the sizes the words give');
+  assert.equal(API.cleanZones([{ use: 'retail' }, { use: 'restaurant' }], { words: [{ use: 'retail' }, { use: 'restaurant' }] }), null, 'shops alone, no sizes: one use');
+  assert.equal(API.cleanZones([{ use: 'retail', gfa: 6000 }, { use: 'restaurant' }], { gfa: 6000 }), null, 'the words name one use: an unsized restaurant zone goes');
+  assert.deepEqual(API.cleanZones([{ use: 'retail', gfa: 20000 }, { use: 'multifamily' }], { units: 200, words: [{ use: 'retail' }, { use: 'multifamily' }] }).map(z => [z.use, z.gfa ?? z.units]), [['retail', 20000], ['multifamily', 200]], 'a real mix, its homes sized from the total');
+  reply = () => ({ ...bad, gfa: null }); const mix = (await call({ prompt: 'a 10,000 sf strip and a 2,500 sf restaurant pad with drive-thru', effort: 'high' })).body.program;
+  assert.deepEqual(mix.zones.map(z => [z.use, z.gfa]), [['retail', 10000], ['restaurant', 2500]], 'the strip and its pad stay a mix, with their sizes');
+  // the brief is asked for at every AI level, it takes the program now, and the shape reaches it
+  for (const id of ['medium', 'high', 'ultra']) assert.ok(BR.asksBrief(ASK.effortOf(id), ask), id + ': a brief is asked for');
+  assert.equal(BR.asksBrief(ASK.effortOf('low'), ask), false);
+  reply = () => bad; const prog = (await call({ prompt: ask, effort: 'high' })).body.program;
+  const b = BR.briefFrom(raw({ buildings: [{ use: 'retail', gfa: 7200, floors: null, w: null, d: null, at: 'back', facing: 'parking', form: null, why: 'One L-shaped building wrapping the drive-thru lane.' }], pads: 0, why: { ...why, pads: 'No pads: the drive-thru is the endcap.' } }), { prompt: ask, siteSf: S.ringArea(LOTS.square2ac.ring) });
+  assert.equal(b.brief.buildings[0].form, 'L', 'the shape the words name on the brief’s building'); assert.equal(BR.briefForm(b.brief), 'L'); assert.match(b.reasons[1].what, /7,200 sq ft L-shaped retail/);
+  assert.ok(BR.takesBrief(prog, b.brief), 'one retail building takes the brief (a mix didn’t)');
+  assert.equal(PK.normalizeBrief({ buildings: [{ use: 'retail', form: 'Z' }] }).buildings[0].form, undefined, 'an unknown shape dropped');
+  const plan = planOf('square2ac'), o = L.layoutOptions({ ...plan, params: { form: BR.briefForm(b.brief) } }, prog, { brief: b.brief })[0];
+  const m = S.metrics({ ...plan, elements: o.elements }); assert.ok(m.gfa >= 6000 * 0.97 && m.spaces >= m.required, 'the AI’s plan: at least the 6,000 sf asked, parked: ' + Math.round(m.gfa) + ' sf ' + m.spaces + '/' + m.required);
+  const own = L.layoutOptions({ ...plan, params: { form: prog.form } }, prog)[0], mo = S.metrics({ ...plan, elements: own.elements });
+  assert.ok(mo.gfa >= 6000 && mo.spaces >= mo.required, 'the engine’s own: at least 6,000 sf (grown where it fits), parked: ' + Math.round(mo.gfa) + ' sf');
+  console.log('  "' + ask + '": engine ' + Math.round(mo.gfa) + ' sf in ' + own.elements.filter(e => e.kind === 'building').length + ' building(s), AI’s plan ' + Math.round(m.gfa) + ' sf; shapes ' + [...new Set(own.elements.filter(e => e.kind === 'building').map(e => e.form || 'bar'))].join(','));
+}
+
 console.log('planbrief ok: the AI’s brief written, laid out, ranked, revised once, explained; Low never asks; floors open; pads from words; Waller values in the prompt');

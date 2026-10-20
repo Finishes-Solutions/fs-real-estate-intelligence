@@ -67,10 +67,12 @@ const CUSTOM = { type: 'object', additionalProperties: false, required: ['name',
     figures: { type: 'array', items: { type: 'string' }, description: '2-4 short figures for the Numbers panel: "120 children", "8 courts", "60 RV sites".' } } };
 export const SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'compare', 'trash', 'entrances', 'product', 'extras', 'storage', 'foodtrucks', 'fuel', 'custom', 'setbacks', 'zones', 'summary', 'assumptions'],
+  required: ['use', 'gfa', 'atLeast', 'form', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'compare', 'trash', 'entrances', 'product', 'extras', 'storage', 'foodtrucks', 'fuel', 'custom', 'setbacks', 'zones', 'summary', 'assumptions'],
   properties: {
     use: { type: 'string', enum: Object.keys(USES), description: 'Main use. storage = self storage (climate-controlled, drive-up, mini-storage, RV / boat storage). foodtrucks = a food truck park (food truck court, truck stalls round a pavilion, beer garden). fuel = a gas station / convenience store (c-store, fueling station, pumps, a QT or Buc-ee\'s style store; a truck stop or travel center too, laid out as the car version). other = anything that fits none of these: a daycare, a school, a pickleball club, an RV park, an event venue… (then custom holds its recipe).' },
     gfa: n('Total building floor area in square feet across all floors. null when the request gives no size (the tool then uses a typical size for the use and site) or asks for as much as fits.'),
+    atLeast: { type: ['boolean', 'null'], description: 'true when the size is a minimum ("6000+ sf", "at least 6,000 sf", "6,000 sf or more"): gfa is that minimum and the layout grows past it where it fits. null otherwise (a size is what was asked).' },
+    form: { type: ['string', 'null'], enum: ['bar', 'L', 'U', 'tower', null], description: 'The building shape when the request names one: L ("L-shaped"), U ("U-shaped", a courtyard building), tower (a tower on a podium), bar (a straight bar). null when it doesn\'t say.' },
     floors: { type: ['integer', 'null'], description: 'Floors per building.' },
     units: { type: ['integer', 'null'], description: 'Dwelling units (apartments, townhomes, duplex units, homes).' },
     buildings: { type: ['integer', 'null'], description: 'Number of separate buildings, only when the request implies it (pad sites, apartment bars). null = let the layout decide.' },
@@ -120,6 +122,9 @@ export const SYSTEM = `You set up a development program for a site-planning tool
 - Townhomes and duplexes: homes on their own lots with a public street fit about 6-10 units an acre; denser than that, use product court6 (or court), rows on a shared parking court, rather than cutting the count.
 - A neighbourhood, subdivision or "residential" with no count: a zone of use sfr with units null; it fills whatever land the other zones leave. Give sized zones (shops, apartments) their sizes; a community center or commons is an amenity zone (items may include center, pool, playground, pavilion, courts, lake), placed last when they say "at the back". Apartments of 80+ units already get their own clubhouse and pool by the entry: don't add a center or pool to a commons beside them unless for-sale homes (sfr, townhomes, duplexes) share it; one pool per community. A pool always comes with its center.
 - Feasibility: one-story shops or restaurants with surface parking hold about 9,000-12,000 sq ft an acre; two-story offices about 14,000; garden apartments about 18-24 units an acre; homes on lots 4-6 an acre. If the ask is bigger than the land, still give the ask: the layout fits the most that works and says so.
+- HARD RULE, a drive-thru is an extra, not a second use: "a retail building / center / strip with a drive-thru", an endcap coffee or QSR tenant with a drive-thru, is ONE use (retail) with extras ["drivethru"] and no zones. Use zones only when the request names separate uses as separate buildings or areas ("a 10,000 sf strip and a 2,500 sf restaurant pad", "shops with apartments above", "retail in front, townhomes behind"). Every zone you give has its size (gfa for commercial, units for homes) whenever the request gives a total; split the total between them. A pad named with the shops ("with 2 pads") is the shop zone's pads or the buildings count, not a restaurant zone.
+- A size with + or "at least" ("6000+ sf", "at least 6,000 sf", "6,000 sf or more") is a minimum: gfa is that number and atLeast true, so the layout grows past it where it fits. Never read it as "about".
+- A building shape in the words goes in form: "L-shaped" L, "U-shaped" or a courtyard building U, a tower on a podium tower. null when the request names none.
 - Small extras with one main use (outdoor seating, a playground, a lawn, a drive-thru) go in extras, not in zones. "A single" building means buildings 1.
 - The goal is the most valuable plan the site holds within the rules and the market. Sizes you give are the first phase: the engine fills land left over with more of the same (more homes, longer shop and office buildings, more warehouse) up to what the parking and stormwater allow, so don't shrink a request to leave land empty. Don't add uses they didn't ask for.
 - A parking garage: a zone of use "garage" (floors = levels, usually 4-5) where they want it in the order ("a parking garage behind the offices"); offer one for dense offices, medical or shops on tight land. Industrial, warehouse and flex are use "industrial" (a truck court goes behind them), never homes.
@@ -152,12 +157,37 @@ function programFrom(d, prompt) {
   const ftk = d.use === 'foodtrucks' || (!d.use && g0.use === 'foodtrucks') ? { foodtrucks: { ...(g0.foodtrucks || {}), ...Object.fromEntries(Object.entries(d.foodtrucks || {}).filter(([, v]) => v != null)) } } : {}; // a food truck park: the words fill what the model left open
   const fu = d.use === 'fuel' || (!d.use && g0.use === 'fuel') ? { fuel: { ...(g0.fuel || {}), ...Object.fromEntries(Object.entries(d.fuel || {}).filter(([, v]) => v != null)) } } : {}; // a gas station: the same
   const program = { ...normalizeProgram({ ...g0, ...Object.fromEntries(Object.entries(d).filter(([k, v]) => v != null && !['setbacks', 'summary', 'assumptions', 'zones', 'storage', 'foodtrucks', 'fuel', 'custom'].includes(k))), ...sto, ...ftk, ...fu }), ...(d.gfa == null && d.units == null && d.use !== 'storage' && d.use !== 'fuel' ? { gfa: null } : {}) };
-  const guess = guessProgram(prompt), zs = d.zones?.length > 1 ? d.zones : guess.zones; // the model's zones, else the ones read from the words
+  const guess = guessProgram(prompt), zs = cleanZones(d.zones?.length > 1 ? d.zones : guess.zones, { gfa: d.gfa ?? g0.gfa, units: d.units ?? g0.units, words: guess.zones }); // the model's zones, else the ones read from the words; never a mix the words don't name, never one without sizes
   if (zs?.length > 1 && program.use !== 'foodtrucks') { const nz = normalizeProgram({ use: zs[0].use, zones: zs }).zones; program.zones = nz; program.use = nz[0].use; }
+  else if (program.zones) { program.zones = null; program.use = USES[d.use] ? d.use : guess.use; if (program.gfa == null && (d.gfa ?? g0.gfa)) program.gfa = d.gfa ?? g0.gfa; } // (the zones dropped: the one use, with its size)
+  // a size that's a minimum ("6000+ sf"): that much, grown where it fits; a building shape named in the words or by the AI
+  if ((d.atLeast === true || g0.atLeast) && program.gfa && !program.zones) { program.max = true; program.atLeast = true; program.asked = { ...(program.asked || {}), gfa: program.gfa }; }
+  const form = ['bar', 'L', 'U', 'tower'].includes(g0.form) ? g0.form : ['bar', 'L', 'U', 'tower'].includes(d.form) ? d.form : null; if (form) program.form = form; else delete program.form;
   // floors the words don't fix stay open for an office or a medical office (unless the AI asks for more than usual), so
   // the engine tries a floor more before it builds less (normalizeProgram fills them in, which would lock them)
   if (!program.zones && (program.use === 'office' || program.use === 'medical') && BR.floorsFromWords(prompt) == null && !(+d.floors > USES[program.use].floors)) program.floors = null;
   return BR.withWordsPads(program, prompt); // (a mix: the pads the words ask for on its shop zone)
+}
+// a mix's zones made safe (the program call and the review): a drive-thru or an endcap tenant on one building is its
+// extra, not a second use, so when the words name one use (words: the zones read from them, none) a commercial zone the
+// model gave no size to goes; commercial zones left without a size share the total when it's known (else the mix of
+// shops alone is dropped: the one use stands); fewer than two zones left: no zones. Homes that fill the land the others
+// leave (single-family, units null) and amenity zones keep their own rules.
+const COMM = ['retail', 'restaurant', 'office', 'medical', 'hotel', 'church', 'other', 'industrial', 'storage', 'fuel'];
+export function cleanZones(zones, { gfa = null, units = null, words = null } = {}) {
+  if (!Array.isArray(zones) || zones.length < 2) return null;
+  const sized = z => +z?.gfa > 0 || +z?.units > 0; let zs = zones.filter(z => z && typeof z === 'object').map(z => ({ ...z }));
+  if (!(words?.length > 1)) zs = zs.filter(z => !COMM.includes(z.use) || sized(z)); // (the words name one use: an unsized second shop or restaurant zone is a misreading)
+  else for (const z of zs) if (!sized(z)) { const w = words.find(x => x.use === z.use && sized(x)); if (w) { if (+w.gfa > 0) z.gfa = +w.gfa; if (+w.units > 0) z.units = +w.units; } } // (the sizes the words give each)
+  const open = zs.filter(z => COMM.includes(z.use) && !sized(z));
+  if (open.length) {
+    const left = (+gfa || 0) - zs.filter(z => COMM.includes(z.use) && +z.gfa > 0).reduce((t, z) => t + +z.gfa, 0);
+    if (left >= 500 * open.length) { const each = Math.round(left / open.length / 100) * 100; for (const z of open) z.gfa = each; }
+    else if (zs.every(z => COMM.includes(z.use))) return null; // shops alone, no sizes to give them: one use, not a mix
+  }
+  const openH = zs.filter(z => ['multifamily', 'townhomes', 'duplex'].includes(z.use) && !sized(z)), hu = (+units || 0) - zs.filter(z => +z.units > 0).reduce((t, z) => t + +z.units, 0);
+  if (openH.length && hu >= openH.length) { const each = Math.floor(hu / openH.length); for (const z of openH) z.units = each; }
+  return zs.length > 1 ? zs : null;
 }
 // an AI-crafted type: the recipe made safe and laid out as its program (lib/customtypes.mjs). A recipe that makes no
 // sense (no name kept, nothing to draw) falls back to a plain building, with a note saying so.
@@ -177,12 +207,13 @@ export const BRIEF_SCHEMA = {
   type: 'object', additionalProperties: false, required: ['buildings', 'parking', 'pond', 'serviceDrive', 'pads', 'why', 'leasableSf', 'check'],
   description: 'What the layout engine should build on this commercial site, exactly.',
   properties: {
-    buildings: { type: 'array', description: '1 to 6 buildings (not the pads), front to back.', items: { type: 'object', additionalProperties: false, required: ['use', 'gfa', 'floors', 'w', 'd', 'at', 'facing', 'why'], properties: {
+    buildings: { type: 'array', description: '1 to 6 buildings (not the pads), front to back.', items: { type: 'object', additionalProperties: false, required: ['use', 'gfa', 'floors', 'w', 'd', 'at', 'facing', 'form', 'why'], properties: {
       use: { type: 'string', enum: FIELD_USES }, gfa: n('Floor area over all its floors, sq ft.'),
       floors: int('Floors. null = leave it to the engine (it tries one more for an office or a medical office before building less). Never 1 for an office or medical office unless the request says one story.'),
       w: n('Feet along its row (the storefront length); null = from the floor area.'), d: n('Feet deep; null = the use\'s usual depths.'),
       at: { type: 'string', enum: ['front', 'back', 'middle', 'corner', 'left', 'right'], description: 'front: at the street (parking behind it); back: behind a parking field (the usual); middle: between two fields; left / right: along the row as seen from the street; corner: toward the side street.' },
-      facing: { type: 'string', enum: ['street', 'parking'], description: 'Which way its storefront looks.' }, why: why1('Why this size, floors and spot.') } } },
+      facing: { type: 'string', enum: ['street', 'parking'], description: 'Which way its storefront looks.' },
+      form: { type: ['string', 'null'], enum: ['bar', 'L', 'U', 'tower', null], description: 'Its shape: L, U (a courtyard), tower (on a podium), bar; the shape the request names ("L-shaped"), else null.' }, why: why1('Why this size, floors and spot.') } } },
     parking: { type: 'string', enum: ['front', 'wrap', 'sides', 'back'], description: 'front: a field in front of the buildings; wrap: round their fronts and sides; sides: rows running back from the street either side; back: behind the buildings, which sit at the street.' },
     pond: { type: 'string', enum: ['back', 'front', 'side', 'none'], description: 'The detention pond\'s spot; none only for underground or regional detention.' },
     serviceDrive: { type: 'boolean', description: 'A rear service and loading drive behind the buildings (shops and restaurants usually want one).' },
@@ -197,6 +228,7 @@ const BRIEF_OR_NULL = d => ({ anyOf: [BRIEF_SCHEMA, { type: 'null' }], descripti
 export const BRIEF_RULES = `- When briefFor is given (a commercial site), each strategy also carries a brief: exactly what the layout engine should build. The engine lays the brief out as written when it fits and otherwise the nearest layout that does, saying what it changed; that layout is then ranked against the engine's own on one score, the leasable floor area that parks and passes the checks, so a brief only wins by fitting more.
 - Maximise the properly leasable floor area within the rules: every building parked at its use's ratio (briefFor.parking: spaces per 1,000 sq ft, about sqFtPerSpaceWithAisles a space with its aisle), inside the setbacks (briefFor.setbacksFt), with the detention briefFor.detention says the lot needs (its pond comes off the usable land; on a Waller site the guardrails' storage per developed acre, the footprint from that volume), and clear of briefFor.keepOuts.
 - You choose: how many buildings (1-6) and pads (0-4: restaurant or coffee pads with a drive-thru, about 81 ft deep along the street beside the entry; briefFor.asked.pads, when set, is what the request asks for: give exactly that many), each building's use, floor area, floors (null unless the request fixes them or another floor clearly fits more; a second floor is how an office or medical office fits more on tight land), where it sits and which way it faces, the parking arrangement, the pond's side and a rear service drive.
+- The same reading of the request as the program: a drive-thru on a building is that building's (a retail building with a drive-thru is one building, not a restaurant beside it); a size with + or "at least" is a minimum, so give at least that much; a shape the request names ("L-shaped") is each of its buildings' form.
 - Use the lot: its width along the street and depth (a parking bay is briefFor.parking.bayFt deep; 26 ft drives run up both sides), the frontage, a corner (a building or pad toward the side street), its shape.
 - Every decision gets a one-line reason in plain words a developer would say (why.count, why.parking, why.pond, why.serviceDrive, why.pads and each building's why), e.g. "Parking in front: shoppers see the spaces from FM 362 and walk straight in."
 - check: the arithmetic; leasableSf: what you expect it holds. With no briefFor, brief is null.`;
