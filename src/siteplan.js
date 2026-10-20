@@ -2884,7 +2884,8 @@ export function initSitePlan(ctx) {
     const np = SP.normalizeProgram(prog);
     const readAs = { ask, chips: RUN.readAs(np, SP.USES), miss: RUN.notUnderstood(ask, np), assumed, by: aiOk ? 'ai' : 'words', ...(strategy ? { plan: strategy } : {}), ...(aiB ? { brief: aiB } : {}), ...(aiBNote ? { briefNote: aiBNote } : {}) }; // shown once the layouts land, so a cancelled build keeps the last one's
     // the plan's layout settings (neighbourhood streets, leaving a later phase open, the apartment building form) for this run's layouts
-    const st0 = strategy?.settings || {}, params0 = strategy ? { ...(pl.params || {}), ...(st0.streets ? { streets: st0.streets } : {}), ...(st0.fill != null ? { fill: st0.fill } : {}), ...(strategy.buildings?.form ? { form: strategy.buildings.form } : {}) } : null;
+    const st0 = strategy?.settings || {}; let params0 = strategy ? { ...(pl.params || {}), ...(st0.streets ? { streets: st0.streets } : {}), ...(st0.fill != null ? { fill: st0.fill } : {}), ...(strategy.buildings?.form ? { form: strategy.buildings.form } : {}) } : null;
+    if (np.form) params0 = { ...(params0 || pl.params || {}), form: np.form }; // the shape the request names ("L-shaped"): the layout reads params.form
     runStep(run, 2 + o0, lay);
     const wb = BR.wordsBrief(ask); // pads asked for in words ("with 2 pad sites", "an outparcel"): the engine places them, at every level
     let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, ...koOpts(pl), ...(wb ? { brief: wb } : {}) }); } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
@@ -2896,7 +2897,8 @@ export function initSitePlan(ctx) {
     if (aiB && !failed) {
       if (BR.takesBrief(prog, aiB.brief)) {
         runStep(run, 2 + o0, 'Laying out the AI’s plan'); let got = null;
-        try { got = aiLayout(await laid('options', plan, prog, { count: 2, ...koOpts(pl), brief: aiB.brief }), plan, prog, aiB, params0 ? { params: params0 } : {}); } catch (e) { console.warn('AI plan layout', e); }
+        const bf = BR.briefForm(aiB.brief), pA = bf ? { ...(plan.params || {}), form: bf } : plan.params, planA = { ...plan, ...(pA ? { params: pA } : {}) }; // (its buildings' shape, "L")
+        try { got = aiLayout(await laid('options', planA, prog, { count: 2, ...koOpts(pl), brief: aiB.brief }), planA, prog, aiB, pA ? { params: pA } : {}); } catch (e) { console.warn('AI plan layout', e); }
         if (!live(run) || PL() !== pl) return;
         if (got?.v) variants = renumber(BR.placeAi(variants, got.v));
         else { aiDrop = { brief: aiB, reason: got?.reason || 'the layout engine couldn’t lay it out' }; aiBNote = BR.droppedNote(aiB.brief, aiDrop.reason); readAs.briefNote = aiBNote; } // (not shown as the AI's plan: nothing of it is in the engine's own layout)
@@ -2938,7 +2940,8 @@ export function initSitePlan(ctx) {
         if (rv.brief && !briefDone) {
           briefDone = true; runStep(run, 4 + o0, 'The AI is revising its plan: ' + (rv.briefWhy || 'the engine couldn’t do it as written').replace(/\.$/, ''));
           const ab2 = { ...rv.brief, revised: true, why: rv.briefWhy || '' }; let a2 = null;
-          if (BR.takesBrief(prog, ab2.brief)) try { a2 = aiLayout(await laid('options', plan, prog, { count: 2, ...koOpts(pl), brief: ab2.brief }), plan, prog, ab2, params0 ? { params: params0 } : {}); } catch (e) { console.warn('AI plan layout', e); }
+          const bf2 = BR.briefForm(ab2.brief), pB = bf2 ? { ...(plan.params || {}), form: bf2 } : plan.params, planB = { ...plan, ...(pB ? { params: pB } : {}) };
+          if (BR.takesBrief(prog, ab2.brief)) try { a2 = aiLayout(await laid('options', planB, prog, { count: 2, ...koOpts(pl), brief: ab2.brief }), planB, prog, ab2, pB ? { params: pB } : {}); } catch (e) { console.warn('AI plan layout', e); }
           if (!live(run)) return;
           if (a2?.v) { add.push(a2.v); briefRev = rv.briefWhy || 'the engine couldn’t do its first plan as written'; }
           else dropRev = BR.droppedNote(ab2.brief, a2?.reason || 'the layout engine couldn’t lay it out', true); // (the revision didn't fit either: said in one line, nothing shown as the AI's)
