@@ -5,6 +5,19 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-20
 
+### 10:55 AM CT: Plan sets, accuracy round 2: the sheets agree with each other (b6ad19e, 1bac536, e7e17b0, 272d7e4, dca0176, and the product guide)
+- **Apartments are drawn:** floor plans for every apartment type with the corridor, exit stairs, elevator, lobby and service rooms, and a sheet of unit plans (bedrooms, baths, kitchen, doors, windows) for each unit type, with unit counts that match the cover and the site plan.
+- **Fire protection matches across sheets:** FP-101 lists each apartment building as sprinklered (NFPA 13R) with the same reason as the code sheet, the utility plan gives each sprinklered building its own fire service, and FP-101's access check (one or two ways in, with the code section) is the same one the cover and the Plans tab warning use.
+- **One height per building:** the code sheet, elevations, sections and FP-101 show the same building height (to the roof deck or mean roof) and the same fire-access height (to the parapet or eave).
+- **Detention from a stage-storage table:** live storage between the normal and high water levels, with freeboard on top, compared with what's required; a shortfall is shown, not hidden.
+- **Parking and paving add up:** the stall labels on the site plan sum to the parking schedule, and one area schedule (buildings, paving, sidewalks, pond, landscape) feeds the impervious cover, drainage and the cover sheet.
+- **Accessible parking per parking area** (TAS 208.2), with residents' parking counted separately, and the stalls drawn where the schedule says.
+- **Structure matches the architecture:** each building type's foundation, roof framing and columns are decided once, so the structural notes and schedules can't say steel joists where the architecture says wood trusses.
+- **Mechanical matches the roof plan:** the number of rooftop units on the roof plan, the mechanical schedule and the fire alarm's duct detectors is the same; the electrical one-line uses the panel ratings from the schedule.
+- **Shell space is labelled:** shop and office suites show the landlord's work (demising walls, a restroom and back room, a rooftop unit and power per suite), with interior rooms marked as a typical layout for pricing, built by the tenant.
+- **Clubhouse code basis:** occupant load by room (fitness 50 sf gross, lounge 15 sf net) and sprinklers by the assembly triggers (over 12,000 sf, 300 people or off the exit level), shown the same on the life-safety, code and plumbing sheets.
+- The cover's open issues now include what the site sheets find (fire lane spacing, aerial access, hose reach, detention shortfall, pond on high ground).
+
 ### 10:20 AM CT: Plan sets, accuracy round 1: one code basis, apartments designed, honest notes (298dd94, 686c9a3, 0f8389b, 28c61f6, 2666df4, adef01b)
 - From a professional review of the FM 362 & Betka Rd set: each building type's **sprinklers, construction type, heights, structure and scope are now decided once** and shared by every sheet, so the set can't say a building is sprinklered on one sheet and not on another, or give two heights.
   - Sprinklers follow the code's own triggers for the use (IBC 903.2) with the reason and section: every apartment building (NFPA 13R up to four stories), a restaurant over 5,000 sf or 100 people, a clubhouse over 12,000 sf or 300 people, shops and warehouses over 12,000 sf. The old blanket "assembly over 5,000 sf" is gone.
