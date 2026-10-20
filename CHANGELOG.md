@@ -5,6 +5,22 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 11:57 PM CT: Roundabouts and drop-off loops (aa618b3)
+- **Add a roundabout where streets meet:** the new **Add Roundabout** tool (Site section, beside Add Entrance) marks the junctions with room with small dashed circles; click one and a roundabout with a planted island goes there, 100 ft across (120 ft where a boulevard or wider street meets it). The streets are cut back to it so the paving reads as one; the homes in its way make way, and only the parking spaces under it give way. Where something can't move (a park, the lake, a building, a street running alongside too close) it tries a smaller one, down to 80 ft, goes to the nearest junction with room, or says what's in the way. It's also in the Add palette.
+- **Drop-off loops (circle drives):** pick a clubhouse, school, shop, hotel or office and press **Add Drop-off Loop** (or use **Drop-off** in the Add palette). A one-way loop with an island and arrows goes between the building and its drive, a compact one where the building stands close to its drive (the parking row in front gives way). It tries the other sides when the front is too close, takes a strip of a park when most of the park stays, and otherwise says how far the building would have to move back.
+- **Editing:** both move, turn, nudge and resize like any piece. A dragged roundabout settles on the nearest junction and joins those streets (Alt leaves it where you put it); the **Across** and **Lane** boxes change its size. Deleting a roundabout puts the streets back exactly, with the parking and an entrance's median and signs (two roundabouts on one street can go in either order); deleting a loop gives back the parking and park strip it took.
+- **Re-fits keep them:** the automatic re-fit and Change With AI keep a roundabout joined to the streets, and keep a loop's drive and building in place in front of it.
+- **Checks:** anything on an island, parking on a lane, and a street running across a roundabout's or a loop's lane are problems; a roundabout no street meets, a loop that doesn't reach a drive at both ends, and a loop whose building has moved away are warnings.
+- **Change With AI:** "add a roundabout at the main intersection", "add a roundabout at the entry", "make the main intersection a 120 ft roundabout", "add 2 roundabouts", "add a circle drive in front of the clubhouse", "make the drop-off loop 140 ft long" and "remove the roundabout". When the junction asked for has no room it says where the roundabout went instead.
+- Drawn on the map, the PDF sheet (with the loop's arrows) and the CAD file; the lanes count as paving.
+- **Numbers on today's sites:** layouts without a roundabout or loop are unchanged on all 12 test sites.
+- **Not done yet / known rough edges:**
+  - **Re-fit Plan** can sometimes pick a new street layout (when it fits more homes) whose streets miss a roundabout; the check then only warns "Roundabout isn't on a street". Undo, or drag it back onto a junction. On one test site an Entrance 2 with a roundabout can also end up cut off from the main entry after Re-fit Plan, with no warning.
+  - Turning a compact drop-off loop by even a few degrees usually puts it against its building or its drive; it says what it runs into but doesn't avoid it.
+  - On a mixed plan, re-fitting with a loop can hold its building in place and cost a few homes, as moving a building by hand does.
+  - On the 246 ac test site the main intersection has no room (a parallel drive runs too close), so a roundabout asked for there goes to the nearest junction with room, about 370 ft away, and says so.
+  - Homes that made way for a roundabout come back only after a re-fit.
+
 ### 8:36 PM CT: Turn any piece, boulevard entries with monument signs, names for the plan and its parts (8e6ac67)
 - **Every piece turns now:** curved ponds, lawns, drawn outlines, custom buildings, bent drives, medians and entrances, with Turn 90°, R (Shift+R the other way), the Turn box and the green dot. They turn about their middle and keep their shape.
 - **Turning and moving an entrance:** it turns 15° a press, its mouth sliding along the street and coming in no more than 60° off square, and it stops short rather than run outside the lot. Its median is drawn again along it and its signs follow. A selected entrance shows its bend points and + markers straight away, and dragging it slides its mouth along the street (Alt moves it freely).
