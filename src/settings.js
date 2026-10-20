@@ -3,7 +3,7 @@
 // phones: full screen. Sections: You & your team · Map · AI model · Saved on this device · App · Help. (The app is light only.)
 // Options shown elsewhere (the Layers panel's map display, the panel's headline metrics) stay where they are and are
 // linked from here. Nothing here deletes notes, projects or the team's sync queue.
-import { PROVIDERS, MODEL_KEY, pickedModel } from './lib/aimodels.mjs';
+import { PROVIDERS, MODEL_KEY, pickedModel, PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, EFFORTS, pickedClaude, pickedEffort } from './lib/aimodels.mjs';
 import { summarize, priceOf, checkPrice, costOf, PRICES_AS_OF } from './lib/aiprices.mjs';
 const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help'], ['danger', 'Testing · danger zone', 'Testing']];
 export const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
@@ -34,6 +34,10 @@ export function initSettings(ctx) {
   ctx.aiModel = () => pickedModel(get(MODEL_KEY) || '');
   ctx.noteModel = r => { const m = r?.headers?.get?.('X-AI-Model'); if (m && /^[\w.:-]{1,80}$/.test(m)) { try { localStorage.setItem('fs-ai-last', m); } catch (e) {} if (!sheet.hidden) paintSec('ai'); } };
   let models = null, modelsP = null, modelsErr = '';
+  // Plan sets answer with Claude (api/planset GET): is its key set, the server's model and effort, the key's models, this month's spend
+  let ps = null, psP = null;
+  const loadPs = () => psP ||= fetch('api/planset').then(r => r.json()).then(d => { ps = d; }).catch(() => { ps = { error: 'Couldn’t check Claude just now.' }; psP = null; }).finally(() => paintSec('ai'));
+  const EFFORT_HINT = { low: 'fastest, cheapest', medium: 'the default: good notes at a fair cost', high: 'more thorough', xhigh: 'most thorough, slowest' };
   const loadModels = () => modelsP ||= fetch('api/models').then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'The model list isn’t available.'); models = d; })
     .catch(e => { modelsErr = e.message; modelsP = null; }).finally(() => paintSec('ai'));
 
@@ -139,11 +143,25 @@ export function initSettings(ctx) {
       const opts = [['', 'Server default' + (def ? ' (' + def + ')' : '')], ...list.map(m => [m.id, m.id])];
       if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, cur + (models ? ' (not available to this key: the default is used)' : '')]);
       el.innerHTML = row('Provider', '<select class="chip" id="setProv" aria-label="AI provider">' + PROVIDERS.map(p => '<option value="' + p.id + '"' + (p.on ? '' : ' disabled') + (p.id === 'openai' ? ' selected' : '') + '>' + esc(p.label) + (p.on ? '' : ' · coming later') + '</option>').join('') + '</select>',
-          'OpenAI for now. Anthropic comes later.') +
+          'OpenAI for site plans, Ask AI and briefs. Claude (Anthropic) makes plan sets: see Plan sets below.') +
         row('Model', '<select class="chip" id="setModel" aria-label="AI model">' + opts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
           'For site plans, Ask AI and filing briefs. Kept on this device.') +
         '<div class="set-note" id="setModelNote">' + (modelsP && !models ? 'Checking which models the server’s OpenAI key can use…' : modelsErr && !models ? esc(modelsErr) + ' The server’s default model answers.' : models ? list.length + ' OpenAI chat models available, newest first.' : '') +
-          (last ? ' The last answer came from <b>' + esc(last) + '</b>.' : '') + ' Voice and place search keep their own models. ' + esc(PROVIDERS.find(p => !p.on)?.note || '') + '</div>' + usageHtml();
+          (last ? ' The last answer came from <b>' + esc(last) + '</b>.' : '') + ' Voice and place search keep their own models. ' + esc(PROVIDERS.find(p => !p.on)?.note || '') + '</div><div id="setPsSlot"></div>' + usageHtml();
+      if (!ps && !psP) loadPs();
+      const pm = pickedClaude(get(PLANSET_MODEL_KEY)), pe = pickedEffort(get(PLANSET_EFFORT_KEY)), on = !!ps?.configured;
+      const pOpts = [['', 'Server default' + (ps?.model ? ' (' + ps.model + ')' : '')], ...(ps?.models || []).map(m => [m.id, m.name && m.name !== m.id ? m.name + ' · ' + m.id : m.id])];
+      if (pm && !pOpts.some(o => o[0] === pm)) pOpts.push([pm, pm + (ps ? ' (not available to this key: the default is used)' : '')]);
+      const money = v => '$' + (v >= 100 ? Math.round(v) : (+v).toFixed(2));
+      el.querySelector('#setPsSlot').outerHTML = ('<div class="set-l" style="margin:18px 0 6px">Plan sets</div>' +
+        row('Claude model', '<select class="chip" id="setPsModel" aria-label="Claude model for plan sets"' + (on ? '' : ' disabled') + '>' + pOpts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === pm ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
+          'Writes each plan set’s notes and designs its building types. Kept on this device.') +
+        row('Effort', '<select class="chip" id="setPsEffort" aria-label="Claude effort for plan sets"' + (on ? '' : ' disabled') + '>' + [['', 'Server default (' + (ps?.effort || 'medium') + ')'], ...EFFORTS.map(x => [x, x[0].toUpperCase() + x.slice(1) + ' · ' + EFFORT_HINT[x]])].map(([v, l]) => '<option value="' + v + '"' + (v === pe ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
+          'How hard Claude thinks. Higher costs more and takes longer.') +
+        '<div class="set-note">' + (!ps ? 'Checking Claude…' : ps.error ? esc(ps.error) : !on ? 'Claude isn’t set up on this site: add ANTHROPIC_API_KEY on Vercel (Production and Preview), then redeploy. Plan sets are still made, without the cover notes.'
+          : (ps.models?.length ? ps.models.length + ' Claude models available. ' : esc(ps.modelsError || '')) + (ps.budget?.spent != null ? 'This month: ' + money(ps.budget.spent) + ' of the ' + money(ps.budget.cap) + ' plan set budget.' : 'Monthly budget ' + money(ps.budget?.cap ?? 100) + '.')) + '</div>');
+      const keepPick = (id, key, what) => el.querySelector(id).onchange = e => { try { if (e.target.value) localStorage.setItem(key, e.target.value); else localStorage.removeItem(key); } catch (err) {} ctx.toast(e.target.value ? 'Plan sets will use ' + e.target.value + ' ' + what + ' on this device.' : 'Plan sets will use the server’s ' + what + '.'); };
+      keepPick('#setPsModel', PLANSET_MODEL_KEY, 'as the model'); keepPick('#setPsEffort', PLANSET_EFFORT_KEY, 'effort');
       wireUsage(el);
       el.querySelector('#setModel').onchange = e => { try { if (e.target.value) localStorage.setItem(MODEL_KEY, e.target.value); else localStorage.removeItem(MODEL_KEY); } catch (err) {} ctx.toast(e.target.value ? 'The AI will use ' + e.target.value + ' on this device.' : 'The AI will use the server’s default model' + (def ? ' (' + def + ')' : '') + '.'); };
     },

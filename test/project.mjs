@@ -7,7 +7,7 @@ const S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayo
 // ---- status and tabs ----
 assert.deepEqual(PJ.STATUSES.map(s => s.label), ['Prospect', 'Under review', 'Under contract', 'Owned', 'On hold', 'Dead']);
 assert.equal(PJ.statusOf({}).label, 'Prospect', 'no status yet: a prospect'); assert.equal(PJ.statusOf({ status: 'owned' }).label, 'Owned'); assert.equal(PJ.statusOf({ status: 'bogus' }).id, 'prospect');
-assert.deepEqual(PJ.TABS.map(t => t.id), ['overview', 'options', 'renderings', 'ask']); assert.equal(PJ.tabOf('ask'), 'ask'); assert.equal(PJ.tabOf('<x>'), 'overview'); assert.equal(PJ.tabOf(undefined), 'overview');
+assert.deepEqual(PJ.TABS.map(t => t.id), ['overview', 'options', 'renderings', 'plans', 'ask']); assert.equal(PJ.TABS[1].label, 'Sites', 'Options is called Sites; its id stays for old links'); assert.equal(PJ.tabOf('plans'), 'plans'); assert.equal(PJ.tabOf('ask'), 'ask'); assert.equal(PJ.tabOf('<x>'), 'overview'); assert.equal(PJ.tabOf(undefined), 'overview');
 
 // ---- facts from /api/site's answer (shaped like test/site.mjs) ----
 const site = { flood: { zone: 'AE', subtype: null, risk: 'high', bfe: 51.2 }, traffic: { roads: [{ road: 'I-10', aadt: 250000 }, { road: 'City street', aadt: 11969 }] },
@@ -65,4 +65,14 @@ assert.ok(JSON.stringify(big).length <= 40000, 'kept under 40 KB: ' + JSON.strin
 const huge = Array.from({ length: 120 }, (_, i) => ({ facts: { ...F, option: 'Option ' + i }, name: 'Option ' + i, drawn: true }));
 big = PJ.projectFacts(p, { jurisdiction: f, options: huge }); assert.ok(JSON.stringify(big).length <= 40000); assert.ok(big.options.length < 120 && big.options.length > 20); assert.match(big.optionsLeftOut, /more options not included/);
 assert.equal(PJ.ASK_STARTERS.length, 4); assert.ok(PJ.ASK_STARTERS.includes('What approvals will this site need?'));
+// the ground (lib/terrain.mjs groundFacts): its range, its fall and the base flood elevation
+{ const gr = { min: 141.2, max: 146.9, relief: 5.7, slope: 0.8, toward: 'south-east', flat: false, rough: false, src: 'USGS 3DEP (1 m lidar)', coarse: false };
+  const r1 = PJ.jurisdictionRows(PJ.siteFactsFrom({ flood: { zone: 'AE', risk: 'high', bfe: 144 } }, { ground: gr })).find(r => r.id === 'ground');
+  assert.equal(r1.value, '141 ft to 147 ft · falls about 5.7 ft to the south-east'); assert.match(r1.sub, /about 3 ft below the base flood elevation \(144 ft\)/); assert.equal(r1.tone, 'warn'); assert.equal(r1.src, 'USGS 3DEP (1 m lidar)');
+  const r2 = PJ.jurisdictionRows(PJ.siteFactsFrom({ flood: { zone: 'X', risk: 'minimal' } }, { ground: { ...gr, flat: true, relief: 1.1 } })).find(r => r.id === 'ground');
+  assert.match(r2.value, /nearly flat/); assert.ok(!r2.tone); assert.ok(!/base flood/.test(r2.sub));
+  assert.ok(!PJ.jurisdictionRows(PJ.siteFactsFrom({}, { ground: { min: NaN } })).some(r => r.id === 'ground'), 'no numbers: no row');
+  const r3 = PJ.jurisdictionRows(PJ.siteFactsFrom({ flood: { zone: 'AE', risk: 'high', bfe: 90 } }, { ground: { min: 76.2, max: 100, lo: 88.4, hi: 97.6, relief: 23.8, fall: 3.1, slope: 0.1, toward: 'south-east', flat: false, dip: 76.2, rough: false, src: 'USGS 3DEP (1 m lidar)' } })).find(r => r.id === 'ground');
+  assert.equal(r3.value, '88 ft to 98 ft · falls about 3.1 ft to the south-east', 'the land, not the creek bed'); assert.match(r3.sub, /lowest ground, 76 ft, is a low channel/); assert.match(r3.sub, /Much of the ground is about 2 ft below the base flood elevation/);
+  assert.ok(PJ.jurisdictionText(PJ.siteFactsFrom({}, { ground: gr })).some(l => /^Ground elevation/.test(l)), 'the AI reads it too'); }
 console.log('project page ok');
