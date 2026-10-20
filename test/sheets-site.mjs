@@ -11,6 +11,9 @@ import * as S from '../lib/siteplan.mjs';
 import { streetDown, turned } from '../lib/sitesheet.mjs';
 import { RENDERERS, bearing } from '../lib/sheets/site.mjs';
 import * as T from '../lib/terrain.mjs';
+import * as Q from '../lib/sitequant.mjs';
+import { sheetData } from '../lib/sitesheet.mjs';
+import { accessNeed } from '../lib/plandesign.mjs';
 
 const KINDS = Object.keys(RENDERERS), un = s => s.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 assert.equal(bearing([0, 0], [100, 100]), 'N 45°00\'00" E');
@@ -70,7 +73,61 @@ function check(ctx, name, { lots = false, sheets } = {}) {
   if (lots) { const n = (plan.elements || []).filter(e => e.kind === 'lot').length, rows = [...out['c-lots'].matchAll(/<td>\d+' × \d+'<\/td><td class="r">(\d+)<\/td>/g)];
     assert.equal(rows.reduce((s, m) => s + +m[1], 0), n, name + ': C-103 counts every lot'); }
   const pl = un(out['l-plan']); assert.ok(/Live oak|Cedar elm|Shumard/.test(pl) && /one tree per 10 parking spaces/i.test(pl), name + ': L-101 plant schedule and the ordinance note');
+  cross(ctx, name, out);
   return times;
+}
+// ---------- the numbers more than one sheet shows agree (Oct 20 review) ----------
+const f0 = v => Math.round(v).toLocaleString('en-US'), txt = h => un(h.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ');
+function cross(ctx, name, out) {
+  const plan = ctx.plan, page = k => P.sheetPage(ctx, ctx.sheets.find(s => s.kind === k)), cover = txt(page('cover')), c101h = page('siteplan'), c101 = txt(c101h), sd = sheetData(plan);
+  // one area schedule: disjoint rows that add up to the site in sf and in acres; impervious is the sum of its hard rows;
+  // G-001, C-101 (sheetData), C-102's paving schedule and C-202's drainage areas all show those numbers
+  const A = Q.areaSchedule(plan);
+  assert.equal(A.rows.reduce((s, r) => s + r.sf, 0), A.siteSf, name + ': the area schedule adds up to the site (sf)');
+  assert.equal(A.rows.reduce((s, r) => s + Math.round(+r.ac * 100), 0), Math.round(+A.siteAc * 100), name + ': and in acres');
+  assert.equal(A.impervious, A.rows.filter(r => r.imp).reduce((s, r) => s + r.sf, 0), name + ': impervious = buildings + paving + walks');
+  assert.ok(A.rows.every(r => r.sf >= 0), name + ': no negative area');
+  for (const r of A.rows) for (const [w, h] of [['G-001', cover], ['C-101', c101]]) assert.ok(h.includes(r.ac + ' ac ' + f0(r.sf) + ' sf'), name + ' ' + w + ': ' + r.label);
+  assert.ok(cover.includes(f0(A.impervious) + ' sf') && c101.includes(f0(A.impervious) + ' sf'), name + ': G-001 and C-101 impervious');
+  const c102 = txt(out['c-dims']); for (const k of ['heavy', 'parking', 'walks']) assert.ok(c102.includes(f0(A.get(k)) + ' sf'), name + ': C-102 paving ' + k);
+  assert.ok(c102.includes(f0(A.impervious) + ' sf'), name + ': C-102 impervious');
+  const c202 = txt(out['c-detention']); assert.ok(c202.includes('Impervious (roofs, paving, walks) ' + (A.impervious / 43560).toFixed(2) + ' ac'), name + ': C-202 runoff uses the same impervious area');
+  // parking: every field labelled on C-101 and C-102, the labels add up to the schedule's surface line, and the total is
+  // the surface line plus the spaces not drawn as stalls
+  const PS = Q.parkingSchedule(plan), labels = h => [...h.matchAll(/<text class="pk" data-n="(\d+)"[^>]*>(?:<tspan[^>]*>)?(\d+)/g)].map(m => { assert.equal(m[1], m[2], name + ': a parking label reads its number'); return +m[1]; });
+  for (const [w, h] of [['C-101', c101h], ['C-102', out['c-dims']]]) { const L = labels(h); assert.equal(L.length, PS.fields.filter(f => f.count > 0).length, name + ' ' + w + ': every parking field labelled'); assert.equal(L.reduce((s, v) => s + v, 0), PS.surface, name + ' ' + w + ': the labels add up to the surface stalls'); }
+  assert.equal(PS.total, PS.surface + PS.other.reduce((s, o) => s + o.n, 0), name + ': total = labels + the lines not drawn as stalls');
+  const row = re => sd.parking.find(r => re.test(r[0]))?.[1];
+  assert.equal(row(/^Surface stalls/), f0(PS.surface), name + ': sheetData surface line'); assert.equal(row(/^Total provided/), f0(PS.total), name + ': sheetData total');
+  assert.ok(cover.includes('Total provided ' + f0(PS.total)) && c101.includes('Total provided ' + f0(PS.total)) && c102.includes('Total provided ' + f0(PS.total)), name + ': G-001, C-101 and C-102 give the same total');
+  // accessible parking per facility (TAS 208.2): the table on C-102, and an honest line when the drawn stalls fall short
+  const AP = Q.accessibleParking(plan);
+  for (const r of AP.rows) { assert.ok(r.required >= 1 && r.vanReq === Math.ceil(r.required / 6), name + ': ' + r.name + ' required'); assert.ok(c102.includes(r.name + ' ' + f0(r.spaces)), name + ': C-102 lists ' + r.name); }
+  if (PS.fields.length) assert.ok(c102.includes(AP.ok ? 'meet TAS 208.2' : 'do not meet TAS 208.2'), name + ': C-102 says whether the accessible stalls meet TAS 208.2');
+  // detention: C-201's pond labels and C-202's section and table are the same stage-storage
+  const pq = h => (h.match(/class="pondq" data-top="([\d.]+)" data-hwl="([\d.]+)" data-nwl="([\d.]+)" data-acft="([\d.]+)"/) || []).slice(1);
+  if ((plan.elements || []).some(e => e.kind === 'pond')) {
+    const a = pq(out['c-grading']), b = pq(out['c-detention']); assert.ok(a.length === 4, name + ': C-201 pond levels'); assert.deepEqual(a, b, name + ': C-201 and C-202 show the same pond levels and storage');
+    assert.ok(+a[0] - +a[1] === 1 || Math.abs(+a[0] - +a[1] - 1) < 0.011, name + ': 1 ft freeboard');
+    assert.ok(c202.includes('Total provided ' + (+a[3] + Q.pondStorage(plan).vault).toFixed(2) + ' ac-ft'), name + ': C-202 total from the stage-storage');
+    const g = txt(out['c-grading']); assert.ok(g.includes('LIVE STORAGE ' + a[3] + ' AC-FT') && c202.includes(a[3] + ' AC-FT'), name + ': live storage on C-201 and the C-202 section');
+  }
+  // FP-101: sprinklered as each type's code basis says (with the system), access roads exactly accessNeed's
+  const fp = txt(out['fp-access'] || ''), types = (ctx.types || []).filter(t => (t.elementIds || []).length);
+  if (out['fp-access']) {
+    for (const t of types) { const m = fp.match(new RegExp('Type ' + t.id + '(?: ×\\d+)? — [^]*?(Yes — NFPA 13[RD]?|Yes — [\\w ()]+?|No) \\d+\'')); assert.ok(m, name + ': FP-101 row for type ' + t.id);
+      assert.equal(m[1].startsWith('Yes'), !!t.sprinklered, name + ': FP-101 sprinklered for type ' + t.id); if (t.sprinklered) assert.ok(m[1].includes(t.sprinklerSystem || 'NFPA'), name + ': FP-101 system for type ' + t.id); }
+    const AN = accessNeed(plan, ctx.types, ctx.tf), acc = out['fp-access'].match(/class="blk acc" data-have="(\d+)" data-need="(\d+)"/);
+    assert.ok(acc && +acc[1] === AN.have && +acc[2] === AN.need, name + ': FP-101 access roads = accessNeed'); for (const r of AN.reasons) assert.ok(fp.includes(r.ref), name + ': FP-101 gives ' + r.ref);
+    assert.ok(fp.includes(AN.have + ' provided, ' + AN.need + ' needed'), name + ': FP-101 have vs need');
+  }
+  // C-301: a fire service for every sprinklered building (buildings, not types), a domestic service for every building
+  const spr = types.filter(t => t.sprinklered).reduce((s, t) => s + t.count, 0), fs = [...out['c-utility'].matchAll(/class="fsvc" data-b="([^"]*)"/g)].map(m => m[1]);
+  if (types.reduce((s, t) => s + t.count, 0) === (plan.elements || []).filter(e => e.kind === 'building').length) assert.equal(fs.length, spr, name + ': C-301 fire services = sprinklered buildings (' + spr + ')');
+  assert.equal(new Set(fs).size, fs.length, name + ': one fire service a building'); assert.ok(txt(out['c-utility']).includes(fs.length + ' ea'), name + ': C-301 counts them');
+  assert.match(txt(out['c-utility']), /ASSUMED HERE — CONFIRM PROVIDER/, name + ': C-301 mains are assumptions');
+  // L-101: frontage trees required and shown by the same rule, and a reason where they fall short
+  const lp = txt(out['l-plan']); for (const m of lp.matchAll(/1 canopy tree per 40 LF, within 30 ft of the line (\d+) (\d+)( — short \d+)?/g)) assert.ok(+m[2] >= +m[1] || /trees fit/.test(lp), name + ': L-101 frontage trees ' + m[2] + ' of ' + m[1]);
 }
 
 let slow = 0;
@@ -116,8 +173,13 @@ for (const name of Object.keys(CASES)) {
   }
   // a terrain for another boundary, or a rough one: ignored
   for (const bad of [{ ...terrainFor('retail'), sig: 'x' }, { ...terrainFor('retail'), coarse: true }]) { const c = ctxFor('retail', { terrain: bad }); assert.match(text(page(c, 'c-existing')), /TOPOGRAPHY NOT SURVEYED/); assert.match(text(page(c, 'c-grading')), /Assumed 100\.00/); }
-  // the pond on high ground is called out
-  const up = ctxFor('retail', { terrain: terrainFor('retail', (x, y) => 150 + 0.01 * Math.hypot(x - 117, y - 6) * -1) }); assert.match(text(page(up, 'c-grading')), /falls away from the pond/); }
+  // where the pond sits on the ground: C-201 uses the same words as the cover notes (lib/terrain.mjs pondSide)
+  for (const tf of [undefined, (x, y) => 150 + 0.01 * Math.hypot(x - 117, y - 6) * -1]) { const tr = terrainFor('retail', tf), up = ctxFor('retail', { terrain: tr }), ps = T.pondSide(up.plan, tr); assert.ok(ps && text(page(up, 'c-grading')).includes(ps.text), 'C-201 shows pondSide: ' + ps?.text); }
+  // the mixed site on lidar ground: the proposed surface follows the ground, so the earthwork is near balance (the Oct 20
+  // set's fixed slope from the pond bank made 238,700 CY of fill), and C-201 says the net honestly
+  { const c = ctxFor('mixed', { terrain: terrainFor('mixed') }), gr = text(page(c, 'c-grading')).replace(/\s+/g, ' '), m = gr.match(/Earthwork \(rough\) ~([\d,]+) CY cut \(pond ~([\d,]+)\), ~([\d,]+) CY fill[^:]*: net (balanced|~[\d,]+ CY (import|export))/), n = v => +v.replace(/,/g, '');
+    assert.ok(m, 'mixed C-201 earthwork: ' + (gr.match(/Earthwork.{0,200}/) || [''])[0]); assert.ok(n(m[3]) < 2 * n(m[1]) + 5000 && n(m[2]) > 0, 'mixed: fill near the cut (' + m[1] + ' cut, ' + m[3] + ' fill)');
+    const cr = sheetsOf(c, 'mixed on lidar'); cross(c, 'mixed on lidar', cr.out); } }
 
 console.log('slowest site sheet (first draw, geometry included): ' + slow + ' ms');
 console.log('site sheets ok');
