@@ -489,8 +489,14 @@ function usable(plan, o, what) {
 // nothing else is lost, and the detention stays the size it was (a re-fit used to drop whole streets of homes) ----
 {
   const E = await import('../lib/siteedit.mjs'), site = { origin: [-95.93, 30.09], ring: [[-600, -450], [600, -450], [600, 450], [-600, 450]], front: 0, setbacks: { ...S.SETBACKS } };
-  const home = { use: 'sfr', name: 'Single-story homes', floors: 1 }, prog = { use: 'sfr', max: true, storm: 'detention', unitSf: 2400, floors: 1, zones: [home, { use: 'amenity', name: 'Central community center and park', items: ['center', 'pool', 'playground', 'lawn'] }, home] }, o = L.layoutOptions(site, prog)[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe };
+  const home = { use: 'sfr', name: 'Single-story homes', floors: 1 }, prog = { use: 'sfr', max: true, storm: 'detention', unitSf: 2400, floors: 1, zones: [home, { use: 'amenity', name: 'Central community center and park', items: ['center', 'pool', 'playground', 'lawn'] }, home] }, o = L.layoutOptions({ ...site, params: { entry: { style: 'narrow' } } }, prog)[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe };
+  // (laid out with the narrow entry, the plan these edits were written on: by default the 73-home layout with the full
+  // boulevard and the second way in fire access needs goes first, ahead of this 75-home one with one way in)
   const m0 = S.metrics(base), cc = o.elements.find(e => e.kind === 'building' && e.use === 'amenity'); assert.ok(cc && m0.units > 50, 'a neighbourhood with its center: ' + m0.units + ' homes');
+  { const all = L.layoutOptions(site, prog), on = L.layoutOptions({ ...site, params: { entry: { style: 'narrow' } } }, prog), un = q => S.metrics({ ...site, program: q.program, elements: q.elements }).units; // the full boulevard where it costs no more than 2% of the homes; else the narrow one and the notes say what it would cost
+    assert.ok(un(all[0]) >= un(on[0]) || S.entrancesOf(all[0].elements).length > S.entrancesOf(on[0].elements).length && un(all[0]) >= un(on[0]) * 0.9, 'the first layout has no fewer homes, or has the second way in fire access needs: ' + un(all[0]) + ' vs ' + un(on[0])); // (the fire-access ranking, not the boulevard, puts it first)
+    for (const q of all) { if (q.elements.find(e => e.name === 'Main entry').blvd) assert.ok(on.some(n => n.name === q.name && un(q) >= un(n) * 0.98), q.name + ': a boulevard, ' + un(q) + ' homes');
+      else assert.ok(/narrow median: a full boulevard .* (would cost \d+ homes here|would leave less room for the detention|doesn’t fit here)/.test(q.notes.join(' ')), q.name + ': narrow, and says why: ' + q.notes.join(' / ')); } }
   const f = E.sheetFrame(base), homes = o.elements.filter(e => e.kind === 'building' && e.use === 'sfr').map(e => f.to([e.x, e.y])), back = homes.filter(h => h[1] > f.depth * 0.6), mid = [back.reduce((t, h) => t + h[0], 0) / back.length, back.reduce((t, h) => t + h[1], 0) / back.length];
   const r = E.applyEdits(base, [{ action: 'move', target: cc.id, x: Math.round(mid[0]), y: Math.round(mid[1]) }, { action: 'add', kind: 'pool', with: cc.id, w: 60, d: 30 }]), p = { ...base, elements: r.elements }, m = S.metrics(p);
   const c2 = r.elements.find(e => e.id === cc.id), pool = r.elements.find(e => e.kind === 'pool' && !o.elements.some(x => x.id === e.id));
@@ -546,6 +552,15 @@ function usable(plan, o, what) {
   assert.deepEqual(S.check(p3).filter(i => i.level === 'bad').map(i => i.text), S.check(base).filter(i => i.level === 'bad').map(i => i.text), 'no new problems');
   assert.equal(E.withHomeMix(base, [{ stories: 3, pct: 0 }]), null, 'a mix with no homes is no mix');
   assert.ok(hm.program.zones.find(z => z.use === 'sfr').homeMix.every(t => t.stories < 3) && JSON.stringify(hm.recipe.seq).includes('"homeMix":[{"stories":1'), 'the program and the recipe both carry it, so a later re-fit keeps it');
+  // "make the main entry a boulevard" on a plan laid out with the narrow entry (the shops in front: the first drive 38 ft
+  // in): no room for a median, so it stays as it is and says why (a 50 ft throat with nothing down its middle gained
+  // nothing, and its note claimed a median that wasn't there); the checks say the first drive is too close
+  { const nb = L.layoutOptions({ ...site, params: { entry: { style: 'narrow' } } }, base.program, { count: 1 })[0], np = { ...site, program: nb.program, elements: nb.elements, recipe: nb.recipe }, me = nb.elements.find(e => e.name === 'Main entry');
+    assert.ok(!me.blvd, 'narrow: ' + me.note); const ops = E.guessEdits('make the main entry a boulevard', np); assert.deepEqual(ops, [{ action: 'change', target: me.id, boulevard: true, signs: null }]);
+    const q = E.applyEdits(np, [{ ...ops[0], signs: null, x: null, y: null, turnBy: null }]), p4 = { ...np, elements: q.elements }, e4 = q.elements.find(e => e.id === me.id), why = q.done.concat(q.skipped).join(' ');
+    assert.ok(!e4.blvd && e4.note === me.note && JSON.stringify(S.shapeOf(e4)) === JSON.stringify(S.shapeOf(me)) && JSON.stringify(S.entryParts(p4, e4).map(x => x.id)) === JSON.stringify(S.entryParts(np, me).map(x => x.id)), 'it stays as it is: ' + why);
+    assert.ok(q.skipped.some(t => /^No room for a boulevard there: it meets the first drive \d+ ft in from the street, too soon for a planted median/.test(t)) && !/median\)/.test(q.done.join(' ')), 'and says why: ' + why);
+    assert.ok(S.entryIssues(p4).some(i => i.id === me.id && /meets the first drive \d+ ft in from the street/.test(i.text)), 'the first drive too close to the street'); }
   // every piece of a use or kind at once, listed or not
   const r1 = E.applyEdits(base, [{ action: 'change', every: 'retail', floors: 2 }]);
   assert.ok(retail(r1.elements).length && retail(r1.elements).every(e => e.floors === 2) && r1.done.length === 1 && /All \d+ retail buildings: 2 stories/.test(r1.done[0]), r1.done.join(' '));
@@ -629,6 +644,23 @@ function usable(plan, o, what) {
   entered(E.applyEdits(b2, [{ action: 'add', kind: 'entrance', x: 0, y: oy }]), 'at x, y');
   const g = E.guessEdits('add an entrance at the open space', b2); assert.deepEqual(g, [{ action: 'add', kind: 'entrance', with: os.id }]);
   entered(E.applyEdits(b2, g), 'with the open space');
+  // the main entry a real boulevard by default: 50 ft, two 18 ft lanes either side of a 14 ft median at least 60 ft long,
+  // the monument sign in it; no fewer homes than with the narrow entry, the same arrangement
+  { const me = o.elements.find(e => e.name === 'Main entry'), parts = S.entryParts(base, me), md = parts.find(S.isMedian), sg = parts.filter(x => x.kind === 'sign'), rt = S.routeOf(me, base.ring);
+    assert.ok(me.blvd && rt.width === 50 && md, me.note); const ax = md.poly, far = Math.max(...ax.flatMap(a => ax.map(b => Math.hypot(a[0] - b[0], a[1] - b[1]))));
+    const n = rt.mouth, ws = ax.map(q => q[0] * n[1] - q[1] * n[0]); assert.ok(Math.abs(Math.max(...ws) - Math.min(...ws) - 14) < 0.5 && far >= 60, 'a 14 ft median, ' + far.toFixed(0) + ' ft long');
+    const es = S.shapeOf(me); assert.ok(ax.every(q => S.inRing(q, es)), 'inside the drive');
+    assert.ok(sg.length === 1 && sg[0].sign === 'median' && S.corners(sg[0]).every(q => S.inRing(q, ax)) || sg.length && o.notes.some(t => /monument signs stand at the corners/.test(t)), 'a sign in the median (or the corners, and why)');
+    const on = L.layoutOptions({ ...site, params: { entry: { style: 'narrow' } } }, base.program, { count: 1 })[0]; assert.equal(on.name, o.name, 'the same arrangement'); assert.ok(homes(o.elements) >= homes(on.elements) * 0.98, homes(o.elements) + ' vs ' + homes(on.elements) + ' with the narrow entry');
+    assert.ok(!on.elements.find(e => e.name === 'Main entry').blvd, 'narrow: the 40 ft entry'); }
+  // the main entry turned 15° by hand, then the site re-fitted: its mouth on the lot line, its median inside it, the
+  // streets kept, the homes kept
+  { const p = structuredClone(base), me = p.elements.find(e => e.name === 'Main entry'), t = S.turnPiece(p, me, 15); p.elements = t.elements; assert.equal(t.deg, 15);
+    const rq = L.refit(p, { amount: 'current', keep: true }), pin = new Set(rq.elements.filter(e => e.pinned).map(e => e.id)), e2 = rq.elements.find(e => e.id === me.id);
+    assert.deepEqual(S.check({ ...p, elements: rq.elements }).filter(i => i.level === 'bad' && !pin.has(i.id)).map(i => i.text), [], 'no problems outside what was placed by hand');
+    assert.ok(e2 && S.segDist(e2.path[0], p.ring[p.front], p.ring[(p.front + 1) % p.ring.length]) < 0.05, 'the entrance kept, its mouth on the street'); const es = S.shapeOf(e2), md = S.entryParts({ ...p, elements: rq.elements }, e2).find(S.isMedian);
+    assert.ok(md && md.poly.every(q => S.inRing(q, es) || Math.min(...es.map((a, i) => S.segDist(q, a, es[(i + 1) % es.length]))) <= 2), 'its median inside it');
+    const s1 = streets(rq.elements); assert.ok(s0.filter(x => s1.includes(x)).length >= s0.length * 0.9, 'the streets kept: ' + s0.filter(x => s1.includes(x)).length + ' of ' + s0.length); assert.ok(homes(rq.elements) >= n0 * 0.97, homes(rq.elements) + ' homes'); }
 }
 // ---- beside a piece that runs across the sheet (Oct 19): on an irregular 144-acre tract turned 17° the lake is a long
 // strip along the skewed back lot line, and "a park beside the lake" was measured from the lake's box on the sheet: it

@@ -25,12 +25,12 @@ import { areaMap } from './reportkit.js';
 import { readJSON } from './lib/http.mjs';
 
 const KEY = 'fs-projects-v1', CODE_KEY = 'fs-team-code', NAME_KEY = 'fs-team-name';
-const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash'];
-const ADD_LABEL = { pad: 'Restaurant pad (drive-thru)', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Outdoor seating', garage: 'Parking garage' };
+const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash', 'sign'];
+const ADD_LABEL = { sign: 'Monument sign', pad: 'Restaurant pad (drive-thru)', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Outdoor seating', garage: 'Parking garage' };
 // the pieces you can add, grouped the same way in the panel's Add section and the tool strip's Add palette
-const ADD_GROUPS = [['Buildings', ['building', 'pad', 'garage']], ['Paving', ['parking', 'drive', 'truck']], ['Water & landscape', ['pond', 'green']], ['Amenities', ['play', 'court', 'pool', 'patio']], ['Site', ['trash']]];
-const ADD_SHORT = { building: 'Building', pad: 'Restaurant pad', garage: 'Garage', parking: 'Parking', drive: 'Drive', truck: 'Truck court', pond: 'Detention', green: 'Landscape', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Seating', trash: 'Trash' };
-const SIZE = { building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
+const ADD_GROUPS = [['Buildings', ['building', 'pad', 'garage']], ['Paving', ['parking', 'drive', 'truck']], ['Water & landscape', ['pond', 'green']], ['Amenities', ['play', 'court', 'pool', 'patio']], ['Site', ['trash', 'sign']]];
+const ADD_SHORT = { building: 'Building', pad: 'Restaurant pad', garage: 'Garage', parking: 'Parking', drive: 'Drive', truck: 'Truck court', pond: 'Detention', green: 'Landscape', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Seating', trash: 'Trash', sign: 'Sign' };
+const SIZE = { building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], sign: [10, 5], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
 const PAVED = ['parking', 'drive', 'truck'];
 const FORMS = [['bar', 'Bar'], ['L', 'L-shaped'], ['U', 'Courtyard (U)'], ['tower', 'Tower on a podium']];
 const { COL, USE_COL } = MAP; // one palette for the map, the Plan key and the Draw buttons (lib/planmap.mjs)
@@ -49,7 +49,8 @@ export const ADD_ICON = Object.fromEntries(Object.entries({
   court: '<rect x="3.5" y="5.5" width="17" height="13" rx="1"/><path d="M12 3.5v17"/><path d="M7.5 5.5v13M16.5 5.5v13" stroke-dasharray="1.6 1.6"/>',
   pool: '<path d="M8 16.5V6a2 2 0 0 1 4 0M14 16.5V6a2 2 0 0 1 4 0M8 9.5h6M8 13h6"/><path d="M3 19.5c1.5-1.1 3-1.1 4.5 0s3 1.1 4.5 0 3-1.1 4.5 0 3 1.1 4.5 0"/>',
   patio: '<path d="M3.5 9 12 4.5 20.5 9z"/><path d="M12 9v11.5M8 20.5h8M6.5 14.5h11"/>',
-  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13.5h9l1-13.5"/><path d="M10 10.5V17M14 10.5V17"/>'
+  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13.5h9l1-13.5"/><path d="M10 10.5V17M14 10.5V17"/>',
+  sign: '<path d="M3.5 19.5h17M5.5 19.5v-8h13v8"/><path d="M8 11.5V8.5h8v3M9 15.5h6"/>'
 }).map(([k, d]) => [k, '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>']));
 export const addAccent = k => k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building;
 const get = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
@@ -570,6 +571,7 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-curb', type: 'line', source: SRC, filter: kind('paved'), paint: { 'line-color': Ln.curb, 'line-width': 1.2, 'line-opacity': .9 } });
     add({ id: 'fs-sp-med', type: 'fill', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'fill-color': C.green, 'fill-opacity': ['case', sel1, .6, .9] } }); // the entry's planted median
     add({ id: 'fs-sp-medl', type: 'line', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'line-color': Ln.curb, 'line-width': 1 } });
+    add({ id: 'fs-sp-sign', type: 'fill-extrusion', source: SRC, filter: kind('sign'), paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, sel1, P.sel(C.sign || '#8b8073'), C.sign || '#8b8073'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .95 } }); // a monument sign: a low stone wall
     add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
       paint: { 'fill-color': ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'pond', C.pond, 'plaza', C.plaza, 'court', C.court, 'pool', C.pool, 'play', C.play, C.green],
         'fill-opacity': ['case', sel1, .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, .75] } });
@@ -609,7 +611,7 @@ export function initSitePlan(ctx) {
       'fill-extrusion-color': ['match', ['get', 'part'], 'tower', ['case', ph2, useCol(c => f(P.p2(c))), useCol(f)], 'parapet', ['case', ['==', ['get', 'g'], 1], '#8b9092', '#6d635a'], ['case', ['==', ['get', 'g'], 1], '#6f7476', '#4f453c']] });
     add({ id: 'fs-sp-b3', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), ['!', sel1]], paint: b3(id) });
     add({ id: 'fs-sp-b3s', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), sel1], paint: b3(lit) });
-    add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
+    add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck', 'sign']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
       paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, 'rgba(11,13,12,.45)'], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1] } });
     add({ id: 'fs-sp-p2', type: 'line', source: SRC, filter: ['all', kind('building'), ph2, ['!', sel1], ['!=', ['get', 'bad'], 1]], paint: { 'line-color': Ln.p2, 'line-width': 1.3, 'line-dasharray': [2, 1.6] } }); // Phase 2: dashed
     // the selection: green on a white casing (a red casing when it's also a problem)
@@ -621,6 +623,8 @@ export function initSitePlan(ctx) {
     // labels: the most important first (lib/planmap.mjs); parking counts only close in; the selected piece's always
     const txt = { 'text-field': ['step', ['zoom'], ['get', 't1'], 17.5, ['get', 't2'], 18.25, ['get', 't']], 'text-font': ['Noto Sans Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], 16, ['case', ['==', ['get', 'big'], 1], 9, 8.5], 18, ['case', ['==', ['get', 'big'], 1], 12, 11], 20, 15], 'text-max-width': 18, 'text-padding': 4, 'symbol-sort-key': ['get', 'pri'] };
     const ink = { 'text-color': Lb.ink, 'text-halo-color': Lb.halo, 'text-halo-width': 1.6 };
+    // the names of the plan's parts, big and faint over their zones (they never push a piece's label off)
+    add({ id: 'fs-sp-zlab', type: 'symbol', source: SRC, minzoom: 14, filter: kind('zlabel'), layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-transform': 'uppercase', 'text-letter-spacing': .25, 'text-size': ['interpolate', ['linear'], ['zoom'], 14, 13, 16, 20, 18, 30], 'text-max-width': 14, 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': Lb.ink, 'text-opacity': .32, 'text-halo-color': Lb.halo, 'text-halo-width': 1, 'text-halo-blur': 1 } });
     add({ id: 'fs-sp-lab-p', type: 'symbol', source: SRC, minzoom: 17.5, filter: ['all', kind('label'), ['==', ['get', 'lp'], 1], ['!', sel1]], layout: { ...txt, 'text-allow-overlap': false }, paint: ink });
     add({ id: 'fs-sp-lab', type: 'symbol', source: SRC, filter: ['all', kind('label'), ['!=', ['get', 'lp'], 1], ['!', sel1]], layout: { ...txt, 'text-allow-overlap': false }, paint: ink });
     add({ id: 'fs-sp-lab-sel', type: 'symbol', source: SRC, filter: ['all', kind('label'), sel1], layout: { ...txt, 'text-allow-overlap': true }, paint: ink }); // always, and the others make way for it (it's on top, so placed first); as short as the others zoomed out, so it doesn't hide the outline it names
@@ -659,16 +663,19 @@ export function initSitePlan(ctx) {
     const e = ed.editing && sels().length === 1 && pl.elements.find(x => x.id === ed.sel); if (!e || !T.editable(T.viewOf(pl), e)) return []; // one piece, on a layer that isn't hidden or locked
     const F = SP.frame(pl.origin), px = ftPerPx(), big = coarse(), deg = (p, q) => +(-Math.atan2(q[1] - p[1], q[0] - p[0]) * 180 / Math.PI).toFixed(1); // a bar's turn on the map (clockwise from east)
     // t: what the handle is (c corner, r turn, e a side, s scale, v a point, m an edge, p add a point); a: a bar's turn
-    if (ed.shape === e.id && e.path && T.routeable(e)) { const P = e.path, out = P.map((p, i) => ({ i: 'v' + i, t: 'v', at: F.toLL(p), ft: p })); // a route: its points, and a + in the middle of each stretch long enough
-      for (let i = 0; i + 1 < P.length; i++) { const q = P[i + 1]; if (Math.hypot(q[0] - P[i][0], q[1] - P[i][1]) / px < (big ? 44 : 30)) continue; const m = [(P[i][0] + q[0]) / 2, (P[i][1] + q[1]) / 2]; out.push({ i: 'p' + i, t: 'p', at: F.toLL(m), ft: m }); }
-      return out; }
+    // the green turn dot of a curved or drawn piece: above its middle, clear of its outline, turned with it
+    const turnDot = (x, conv) => { const o = SP.outline(x), c = SP.centroid(o), L = Math.max(...o.map(p => Math.hypot(p[0] - c[0], p[1] - c[1]))) + 14 + (big ? 26 * px : 0), q = SP.rotPt([0, L], x.rot || 0); return { i: 'r', t: 'r', at: F.toLL([c[0] + q[0], c[1] + q[1]]), conv }; };
+    const ent = T.isEntrance(e); // an entrance shows its bend points without Edit Shape (an outline from the layout is read as its route; the first drag makes it one)
+    if (ed.shape === e.id && e.path && T.routeable(e) || ent) { const R = e.path ? e : SP.routeOf(e, pl.ring), conv = !e.path, P = R.path, out = P.map((p, i) => ({ i: 'v' + i, t: 'v', at: F.toLL(p), ft: p, conv })); // a route: its points, and a + in the middle of each stretch long enough
+      for (let i = 0; i + 1 < P.length; i++) { const q = P[i + 1]; if (Math.hypot(q[0] - P[i][0], q[1] - P[i][1]) / px < (big ? 44 : 30)) continue; const m = [(P[i][0] + q[0]) / 2, (P[i][1] + q[1]) / 2]; out.push({ i: 'p' + i, t: 'p', at: F.toLL(m), ft: m, conv }); }
+      return ent ? out.concat([turnDot(R, conv)]) : out; }
     if (ed.shape === e.id && e.poly) { const P = e.poly, out = P.map((p, i) => ({ i: 'v' + i, t: 'v', at: F.toLL(p), ft: p })); // shape editing: every point; on each edge long enough, a bar to drag it and a + beside it to add a point
       P.forEach((p, i) => { const q = P[(i + 1) % P.length], L = Math.hypot(q[0] - p[0], q[1] - p[1]) / px; if (L < (big ? 44 : 30)) return;
         const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], n = T.edgeNormal(P, i), o = (big ? 24 : 17) * px, pp = [m[0] + n[0] * o, m[1] + n[1] * o];
         out.push({ i: 'm' + i, t: 'm', at: F.toLL(m), ft: m, a: deg(p, q) }, { i: 'p' + i, t: 'p', at: F.toLL(pp), ft: pp }); });
       return out; }
     if (SP.isFree(e)) { const o = SP.outline(e), xs = o.map(p => p[0]), ys = o.map(p => p[1]); // curved pieces: corner handles scale the whole shape
-      return [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)], [Math.min(...xs), Math.max(...ys)]].map((p, i) => ({ i: 's' + i, t: 's', at: F.toLL(p), ft: p })); }
+      return [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)], [Math.min(...xs), Math.max(...ys)]].map((p, i) => ({ i: 's' + i, t: 's', at: F.toLL(p), ft: p })).concat([turnDot(e)]); }
     const c = SP.corners(e), top = [e.x, e.y], a = (e.rot || 0) * Math.PI / 180, L = e.d / 2 + Math.max(14, e.d * 0.15) + (big ? 26 * px : 0); // fingers: the turn dot further out
     const sides = [0, 1, 2, 3].filter(k => (k % 2 ? e.d : e.w) / px >= (big ? 56 : 40)).map(k => ({ i: 'e' + k, t: 'e', at: F.toLL(T.sideMid(e, k)), ft: T.sideMid(e, k), a: deg(c[k], c[(k + 1) % 4]) })); // a side long enough on screen for a bar between its corners
     return c.map((p, i) => ({ i, t: 'c', at: F.toLL(p), ft: p, a: -(e.rot || 0) })).concat(sides, [{ i: 'r', t: 'r', at: F.toLL([top[0] - Math.sin(a) * L, top[1] + Math.cos(a) * L]) }]);
@@ -799,7 +806,7 @@ export function initSitePlan(ctx) {
   // ---------- pointer: select, move, resize, rotate ----------
   const ftAt = (pl, lngLat) => SP.frame(pl.origin).toFt([lngLat.lng, lngLat.lat]);
   const SHAPEABLE = ['building', 'plaza', 'green', 'pond', 'court', 'pool', 'patio', 'play', 'garage']; // pieces whose outline can be edited point by point
-  const ORDER = ['trash', 'foodtruck', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'canopy', 'tanks', 'pond', 'keepout', 'fence', 'drive', 'truck', 'parking', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
+  const ORDER = ['sign', 'trash', 'foodtruck', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'canopy', 'tanks', 'pond', 'keepout', 'fence', 'drive', 'truck', 'parking', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
   function hit(pl, e) {
     let best = null, bd = coarse() ? 22 : 12; for (const h of handles(pl)) { const p = map.project(h.at), dd = Math.hypot(p.x - e.point.x, p.y - e.point.y); if (dd < bd) { bd = dd; best = h; } } if (best) return { h: best.i, hd: best }; // the nearest handle; a finger needs more room than a mouse
     const ft = ftAt(pl, e.lngLat);
@@ -827,15 +834,18 @@ export function initSitePlan(ctx) {
     const set = sels(); // a piece of the set: the whole set moves (each with what's attached to it)
     if (h.el && h.h == null && set.length > 1 && set.includes(h.el.id)) { ed.sel = h.el.id; drag = { type: 'set', ids: T.withAttached(pl, set).map(x => x.id), id: el.id, from: ftAt(pl, e.lngLat), orig: clone(pl.elements), lead: clone(el), snap: snapshot(), moved: false }; return; }
     if (h.el && (ed.sel !== el.id || set.length > 1)) { pickOne(el.id); panel(); draw(); }
-    const t = h.hd?.t, k0 = typeof h.h === 'string' ? +h.h.slice(1) : h.h;
+    const t = h.hd?.t, k0 = typeof h.h === 'string' ? +h.h.slice(1) : h.h, snap0 = h.hd?.conv && !el.path ? snapshot() : null, pre = snap0 ? clone(el) : null; if (snap0) SP.toRoute(el, pl.ring); // an entrance drawn as an outline: a route from its first drag (one undo step with it; let go unmoved, it's put back)
+    const parts = T.isEntrance(el) ? SP.entryParts(pl, el).map(x => x.id) : null; // its median and signs: drawn again for where it ends up
     if (t === 'v' || t === 'p') { // a point of the shape (the + beside an edge adds one in the middle of it first, and drags it)
-      let k = k0; const snap = snapshot(); if (t === 'p' && el.path && !el.poly) { const P = el.path, q = P[k + 1]; P.splice(k + 1, 0, [+((P[k][0] + q[0]) / 2).toFixed(2), +((P[k][1] + q[1]) / 2).toFixed(2)]); k++; }
+      let k = k0; const snap = snap0 || snapshot(); if (t === 'p' && el.path && !el.poly) { const P = el.path, q = P[k + 1]; P.splice(k + 1, 0, [+((P[k][0] + q[0]) / 2).toFixed(2), +((P[k][1] + q[1]) / 2).toFixed(2)]); k++; }
       else if (t === 'p') { const P = el.poly, q = P[(k + 1) % P.length]; P.splice(k + 1, 0, [+((P[k][0] + q[0]) / 2).toFixed(2), +((P[k][1] + q[1]) / 2).toFixed(2)]); k++; }
-      drag = { type: 'vertex', k, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap, moved: t === 'p' }; draw(); return; }
+      drag = { type: 'vertex', k, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap, moved: t === 'p', parts, pre }; draw(); return; }
     // a side of a rectangle or an edge of a shape: only it moves, straight out or in
     if (t === 'e' || t === 'm') { drag = { type: t === 'e' ? 'side' : 'edge', k: k0, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false }; return; }
     const hs = t === 's' ? h.hd : null;
-    drag = { type: h.h == null ? 'move' : h.h === 'r' ? 'rot' : hs ? 'scale' : 'size', k: h.h, corner: hs?.ft, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false };
+    drag = { type: h.h == null ? 'move' : h.h === 'r' ? 'rot' : hs ? 'scale' : 'size', k: h.h, corner: hs?.ft, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snap0 || snapshot(), moved: false, parts, pre };
+    if (drag.type === 'rot' && (SP.isFree(el) || T.isEntrance(el))) { drag.grp = [el, ...SP.attachedTo(pl, el)].map(clone); drag.c = SP.centroid(SP.outline(el)); } // a curved piece or an entrance turns about its middle (SP.turnPiece), what goes with it put back each time
+    if (drag.type === 'move' && T.isEntrance(el)) drag.m0 = (el.path || SP.routeOf(el, pl.ring).path)[0]; // its mouth: slides along the street
     if (drag.type === 'move') { const att = SP.attachedTo(pl, el); drag.att = att.map(a => ({ id: a.id, orig: clone(a) })); if (el.kind === 'building' || el.kind === 'garage') drag.obs = SP.spotObstacles(pl, el, att); else if (SP.isPark(el)) drag.obs = SP.placeObs(pl, el, att, SP.shapeOf(el)); } // what moves with it, and what it has to stay clear of (a park: not what stands in it, nor more room than it has now)
   }
   // the grid, when it's on and Alt isn't held: where a point or a piece lands (a corner square with the grid, else its middle)
@@ -860,7 +870,8 @@ export function initSitePlan(ctx) {
     }
     if (drag.type === 'move') { // snaps to its neighbours' edges, stays out of the setbacks and (a building) off the drives and other buildings; hold Alt for a free move
       const free = e.originalEvent?.altKey, carry = () => (drag.att || []).map(a => pl.elements.find(x => x.id === a.id)).filter(Boolean);
-      if (SP.isFree(o)) { Object.assign(el, SP.moveBy(clone(o), p[0] - drag.from[0], p[1] - drag.from[1])); if (G) { const [sx, sy] = onGrid(G, el); SP.moveBy(el, sx, sy); } }
+      if (drag.m0 && !free) { const m0 = drag.m0, q = SP.lotLineAt(pl.ring, [m0[0] + p[0] - drag.from[0], m0[1] + p[1] - drag.from[1]]); Object.assign(el, SP.moveBy(clone(o), q.at[0] - m0[0], q.at[1] - m0[1])); if (el.path) { el.path[0] = q.at; el.mouth = q.mouth; } } // an entrance: its mouth slides along the street (Alt: anywhere)
+      else if (SP.isFree(o)) { Object.assign(el, SP.moveBy(clone(o), p[0] - drag.from[0], p[1] - drag.from[1])); if (G) { const [sx, sy] = onGrid(G, el); SP.moveBy(el, sx, sy); } }
       else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); if (G) { const [gx, gy] = onGrid(G, el); el.x = +(el.x + gx).toFixed(2); el.y = +(el.y + gy).toFixed(2); }
         if (!free) { const [sx, sy] = SP.settleShift(pl, el, G || !V.snap ? 0 : 3); el.x = +(el.x + sx).toFixed(2); el.y = +(el.y + sy).toFixed(2); } } // lines up with its neighbours' edges unless the grid's on or edge snapping is off; always out of the setbacks
       const mv = () => { const dx = el.x - o.x, dy = el.y - o.y; for (const a of drag.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) Object.assign(t, SP.moveBy(clone(a.orig), dx, dy)); } };
@@ -888,8 +899,10 @@ export function initSitePlan(ctx) {
       const w = Math.max(8, Math.abs(q[0] - opp[0])), d = Math.max(8, Math.abs(q[1] - opp[1])), mid = [opp[0] + sx * w / 2, opp[1] + sy * d / 2], a = (o.rot || 0) * Math.PI / 180;
       Object.assign(el, { w: +w.toFixed(2), d: +d.toFixed(2), x: +(o.x + mid[0] * Math.cos(a) - mid[1] * Math.sin(a)).toFixed(2), y: +(o.y + mid[0] * Math.sin(a) + mid[1] * Math.cos(a)).toFixed(2) });
     } else {
-      let r = Math.atan2(p[1] - o.y, p[0] - o.x) * 180 / Math.PI - 90; const base = frameAngle(pl);
+      const c0 = drag.c || [o.x, o.y]; let r = Math.atan2(p[1] - c0[1], p[0] - c0[0]) * 180 / Math.PI - 90; const base = frameAngle(pl);
       if (!e.originalEvent?.shiftKey && V.snap) { const rel = ((r - base) % 90 + 90) % 90; r = rel < 4 ? r - rel : rel > 86 ? r + 90 - rel : Math.round(r / 5) * 5; }
+      if (drag.grp) { const ids = new Set(drag.grp.map(x => x.id)); pl.elements = pl.elements.filter(x => !ids.has(x.id)).concat(drag.grp.map(clone)); const el2 = pl.elements.find(x => x.id === drag.id), d = ((r - (o.rot || 0)) % 360 + 540) % 360 - 180;
+        pl.elements = SP.turnPiece(pl, el2, d).elements; draw(); readout(el2); return; } // (from where it was each time: an entrance's turn is held to 60° off square)
       el.rot = +(((r % 360) + 360) % 360).toFixed(2);
     }
     draw(); readout(el);
@@ -904,7 +917,7 @@ export function initSitePlan(ctx) {
       ed.undo.push(d.snap); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = []; markEdited(pl); handEdit();
       for (const id of d.ids) { const el = pl.elements.find(x => x.id === id), o = d.orig.find(x => x.id === id); if (el && o) { if (el.kind === 'parking') delete el.ext; makeRoom(el, [o]); } }
       pl.updated = new Date().toISOString(); save(P()); draw(); panel(); autoRefit('Moved', plural(sels().length, 'piece')); return; }
-    if (!d.moved) return;
+    if (!d.moved) { const el = d.pre && PL()?.elements.find(x => x.id === d.id); if (el) { for (const k of Object.keys(el)) delete el[k]; Object.assign(el, d.pre); draw(); } return; } // (an outline entrance pressed but not dragged: as it was)
     let off = false;
     { const pl0 = PL(), el0 = pl0?.elements.find(x => x.id === d.id); // dropped off the site (Alt places it anyway): back to the last clear spot on it
       if (d.type === 'move' && !d.alt && el0 && d.last && !SP.inRing(d.last, pl0.ring)) {
@@ -914,7 +927,8 @@ export function initSitePlan(ctx) {
     ed.undo.push(d.snap); ed.redo = []; const pl = PL(), el = pl.elements.find(x => x.id === d.id); markEdited(pl); handEdit();
     if (el) { el.pinned = true; if (el.kind === 'parking') delete el.ext; /* placed by hand: this is its length now */
       const went = d.type === 'move' ? [d.orig, ...(d.att || []).map(a => a.orig)] : [d.orig]; makeRoom(el, went);
-      for (const a of d.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) { t.pinned = true; makeRoom(t); } } }
+      for (const a of d.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) { t.pinned = true; makeRoom(t); } }
+      if (d.parts && (d.type === 'vertex' || d.type === 'move')) { const had = pl.elements.filter(x => d.parts.includes(x.id)), r = SP.refreshEntry(pl, el, null, had); pl.elements = r.elements; if (r.why) ctx.toast(r.why); } } // an entrance's median follows its bend, its signs its mouth
     if (off) ctx.toast('That\'s outside the site'); else if (d.blocked) ctx.toast('No clear spot there: it overlaps a drive or another building. Hold Alt (Option) to place it anyway.');
     pl.updated = new Date().toISOString(); save(P()); draw(); panel();
     if (el && !d.blocked) autoRefit({ move: 'Moved', rot: 'Turned', vertex: 'Reshaped', edge: 'Reshaped' }[d.type] || 'Resized', ED.labelOf(el));
@@ -987,10 +1001,12 @@ export function initSitePlan(ctx) {
     if (ed?.mode === 'drawpiece') { e.preventDefault(); finishPiece(); return; }
     if (ed?.mode === 'measure') { e.preventDefault(); finishMeasure(); return; }
     const pl = ed?.editing && PL(); if (!pl || pl.ring.length < 3) return; e.preventDefault(); // editing: a double-click never zooms
-    const h = hit(pl, e), sh = ed.shape && pl.elements.find(x => x.id === ed.shape);
-    if (h?.hd?.t === 'v' && sh?.path && !sh.poly) { if (sh.path.length <= 2) { ctx.toast('A drive needs two points.'); return; }
+    // (an entrance shows its route's points without Edit Shape; one drawn as an outline is read as its route, so the
+    // point is a route point: never one of its outline's, a curb flare)
+    const h = hit(pl, e), ent = h?.hd?.t === 'v' && pl.elements.find(x => x.id === ed.sel && T.isEntrance(x)), sh = ent || ed.shape && pl.elements.find(x => x.id === ed.shape);
+    if (h?.hd?.t === 'v' && (ent || sh?.path && !sh.poly)) { const P = sh.path && !sh.poly ? sh.path : SP.routeOf(sh, pl.ring).path; if (P.length <= 2) { ctx.toast('A drive needs two points.'); return; }
       const k = +h.h.slice(1); if (k === 0 && T.isEntrance(sh)) { ctx.toast('That’s where the entrance meets the street: drag it along the lot line instead.'); return; }
-      change(() => { sh.path.splice(k, 1); }); draw(); autoRefit('Reshaped', ED.labelOf(sh)); return; }
+      change(() => { SP.toRoute(sh, pl.ring); sh.path.splice(k, 1); }); draw(); autoRefit('Reshaped', ED.labelOf(sh)); return; }
     if (h?.hd?.t === 'v' && sh?.poly) { if (sh.poly.length <= 3) { ctx.toast('A shape needs at least three points.'); return; } // a point removed
       change(() => { sh.poly.splice(+h.h.slice(1), 1); const c = SP.centroid(sh.poly); sh.x = +c[0].toFixed(2); sh.y = +c[1].toFixed(2); }); draw(); autoRefit('Reshaped', ED.labelOf(sh)); return; }
     // on a drive: a bend there (the drive under the pointer wins over an outline a few pixels away, unless that outline
@@ -1430,7 +1446,7 @@ export function initSitePlan(ctx) {
       it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); if (rc) it('pin', pins ? 'Let them move' : 'Pin them', '', { tip: pins ? 'Re-fitting may move them again' : 'Re-fitting keeps them where they are' }); sep(); it('fitsel', 'Fit selection', 'F'); }
     else if (el) { const nm = ED.labelOf(el), kl = SP.KINDS[el.kind]?.label || ''; head = nm + (kl && !nm.toLowerCase().includes(kl.toLowerCase()) ? ' · ' + kl.toLowerCase() : '');
       if (el.kind === 'building') { it('use', 'Change use', '', { sub: 1 }); sep(); } // retail, office, restaurant…: its parking need follows
-      it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); if (!SP.isFree(el)) it('turn', 'Turn 90°', 'R');
+      it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); it('turn', T.isEntrance(el) ? 'Turn 15°' : 'Turn 90°', 'R');
       if (SHAPEABLE.includes(el.kind) || T.routeable(el)) { sep(); it('shape', ed.shape === el.id ? 'Done shaping' : T.routeable(el) ? 'Bend it (edit shape)' : 'Edit shape'); it('addpt', 'Add point here', 'Double-click'); }
       if (rc) { sep(); it('pin', el.pinned ? 'Let it move' : 'Pin it', '', { tip: el.pinned ? 'Re-fitting may move it again' : 'Re-fitting keeps it where it is' }); }
       sep(); it('fitsel', 'Fit selection', 'F'); if (card.querySelector('#spChg')) it('ai', 'Change with AI…');
@@ -1581,7 +1597,7 @@ export function initSitePlan(ctx) {
     if (mv) { used(); const dx = step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), dy = step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a));
       if (set.length > 1) { change(x => { const before = clone(x.elements.filter(q => set.includes(q.id))); x.elements = T.moveSet(x, set, dx, dy).elements; ed.nudged = [...(ed.nudged || []), ...before].slice(-24); }, true); refitSoon('Moved', plural(set.length, 'piece')); return; } // the set, each with what's attached
       const pl0 = PL(), att = pl0 ? SP.attachedTo(pl0, el) : []; change(() => { ed.nudged = [...(ed.nudged || []), clone(el), ...att.map(clone)].slice(-12); for (const t of [el, ...att]) { SP.moveBy(t, dx, dy); t.pinned = true; } }, true); refitSoon('Moved', ED.labelOf(el)); return; } // what belongs to it moves too; a burst of nudges re-fits once, after the last
-    if ((k === 'r' || k === 'R') && set.length === 1 && !SP.isFree(el)) { used(); turnEl(el); }
+    if ((k === 'r' || k === 'R') && set.length === 1) { used(); turnEl(el, (T.isEntrance(el) ? 15 : 90) * (e.shiftKey ? -1 : 1)); }
   }, true);
 
   // Esc steps back one thing at a time and never closes the plan (× or Done does): a pop-over from the tool strip →
@@ -1915,13 +1931,21 @@ export function initSitePlan(ctx) {
     const uses = SP.usesOf(prog), has = list => list.some(x => uses.includes(x)), only = { sfr: uses.length === 1 && uses[0] === 'sfr' };
     const bldg = (has(SP.FORM_USES) ? pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) : '') + (has(['sfr']) ? pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Curving'], ['straight', 'Straight']]) : '') +
       (has(['multifamily']) ? num('pp-bldgDepth', 'Apartment depth', pp.bldgDepth, 1, 'ft') + num('pp-maxLen', 'Longest building', pp.maxLen, 10, 'ft') + num('pp-bldgGap', 'Space between', pp.bldgGap, 1, 'ft') : '');
+    // names: the community's and each part's (no re-solve: they change the labels, not the layout)
+    const parts = SP.partsOf({ ...pl, program: prog }, false), nmIn = (k, label, v, ph) => fld(label, '<input type="text" maxlength="60" data-nm="' + k + '" value="' + esc(v || '') + '" placeholder="' + esc(ph) + '">', { wide: true });
+    const names = grp('Names', nmIn('community', 'Community name', prog.community, 'e.g. Beacon Hill') + parts.map(q => nmIn(q.i, q.word + ' name', q.name, parts.length > 1 ? q.word : 'e.g. The Reserve at Beacon Hill')).join(''), infoBtn('The community’s name goes on the map, the monument sign and the PDF sheet; each part’s name over its zone and in Numbers. Suggest Names asks the AI for names that fit the place.', 'About names')) +
+      '<div class="sp-prm-a"><button type="button" class="btn sm" id="spNameAsk">Suggest Names</button></div>' + (ed.nameChoices?.length ? '<div class="sp-names" role="group" aria-label="Suggested names">' + ed.nameChoices.map((c, i) => '<button type="button" class="btn sm ghost" data-nmc="' + i + '" title="' + esc(c.why || '') + '">' + esc([c.community, ...c.parts.map(x => x.name)].filter((v, j, a) => a.indexOf(v) === j).join(' · ')) + '</button>').join('') + (ed.nameNote ? '<div class="rnote">' + esc(ed.nameNote) + '</div>' : '') + '</div>' : '');
+    // the way in: a boulevard (two lanes and a planted median) for homes, apartments and mixed plans, its monument sign, and where entrances may go
+    const er = SP.entryRules({ params: pp }), entry = has(['multifamily', 'townhomes', 'duplex', 'sfr']) || prog.zones ? grp('Entrance', fld('Entry', selCtl('data-ps="entry.style"', [['auto', 'Boulevard where it fits'], ['boulevard', 'Always a boulevard'], ['narrow', 'Driveway with a small median'], ['driveway', 'Plain driveway']], er.style)) +
+      num('ps-entry.lane', 'Lane width', er.lane, 1, 'ft', { hint: 'each way' }) + num('ps-entry.median', 'Median', er.median, 1, 'ft') + fld('Monument sign', selCtl('data-ps="entry.sign"', [['median', 'In the median'], ['both', 'Both corners'], ['one', 'One corner'], ['none', 'None']], er.sign)) +
+      num('ps-entry.corner', 'Corner clearance', er.corner, 10, 'ft') + num('ps-entry.spacing', 'Driveway spacing', er.spacing, 10, 'ft') + num('ps-entry.cross', 'First cross street', er.cross, 10, 'ft', { hint: 'in from the street' }), infoBtn('Typical starting values; the city’s or county’s rules set the real ones. Boulevard where it fits: a full boulevard unless it would cost more than 2% of the homes or floor area (the notes say what it would cost).', 'About entrances')) : '';
     const look = grp('Look', sw('trees', 'Trees', pp.trees !== false, 'Trees on the plan, the map and the PDF') + pick('ponds', 'Ponds and pools', pp.style.ponds, [['organic', 'Natural curves'], ['rounded', 'Rounded rectangles'], ['square', 'Rectangles']]) +
       pick('islands', 'Parking row ends', pp.style.islands, [['rounded', 'Rounded islands'], ['square', 'Square']]) + pick('corners', 'Drive corners', pp.style.corners, [['curved', 'Curved'], ['square', 'Square']]));
     return '<details class="bsec sp-prog" id="spParams"' + (ed.progOpen ? ' open' : '') + '><summary class="lt">Site parameters</summary>' +
       '<div class="sp-prm-a"><button type="button" class="btn sm" id="spResolve"' + (pl.recipe || ed.variants ? '' : ' disabled') + ' title="Lays the layouts out again with these settings. It replaces the layout on the map, including any changes you made by hand (Undo brings them back).">New Layouts From These Settings</button></div>' +
       '<div class="sp-tgs">' + sw('auto', 'Update layouts as I change settings', ed.autoSolve !== false, 'New layouts each time a setting changes, never over a layout you’ve edited') + sw('refit', 'Re-fit the site after each edit', pl.view?.autoRefit !== false, 'After you move, resize or add a piece, the rest of the site is laid out again around it') + '</div>' +
       (ed.solveBar ? '<div class="sp-solvebar" id="spSolveBar" role="status"><b>Settings changed.</b> The layout on the map has your edits, so it wasn’t replaced.<span class="btnrow">' + (pl.recipe ? '<button type="button" class="btn sm primary" id="spRefitMine" title="Lay out everything else again with these settings, keeping the pieces you placed">Re-fit around my changes</button>' : '') + '<button type="button" class="btn sm" id="spNewLay" title="New layouts from these settings; the layout on the map, with your changes, is replaced (Undo brings it back)">New layouts (replaces your edits)</button></span></div>' : '') +
-      grp('Program', fld('Use', '<select id="spUse">' + Object.entries(SP.USES).map(([k, x]) => '<option value="' + k + '"' + (k === u ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select>') +
+      names + grp('Program', fld('Use', '<select id="spUse">' + Object.entries(SP.USES).map(([k, x]) => '<option value="' + k + '"' + (k === u ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select>') +
         (u === 'storage' ? storageFields(prog) : u === 'foodtrucks' ? foodTruckFields(prog) : u === 'fuel' ? fuelFields(prog) : u === 'multifamily' ? num('perUnit', 'Parking', prog.perUnit, 0.05, '/ unit') + num('floors', 'Floors', prog.floors, 1) + num('eff', 'Efficiency', prog.eff, 0.01, '', { hint: 'net ÷ gross' })
           : SP.USES[u]?.garage ? num('perUnit', 'Parking', prog.perUnit, 0.25, '/ home') : num('ratio', 'Parking', prog.ratio, 0.1, '/ 1k sf') + num('floors', 'Floors', prog.floors, 1) + num('depth', 'Building depth', prog.depth, 5, 'ft')) +
         (u === 'foodtrucks' || u === 'fuel' ? '' : sw('fill', 'Fill the rest of the site (Phase 2)', pp.fill !== false, 'What you ask for is Phase 1; the rest of the land holds more of the same as Phase 2', 'w2')), // (a food truck park is sized by its trucks)
@@ -1929,7 +1953,7 @@ export function initSitePlan(ctx) {
       grp('Setbacks', sw('buildOn', 'Building setbacks', sb.buildOn !== false) + sw('paveOn', 'Landscape buffer', sb.paveOn !== false) +
         [['front', 'paveFront', 'Front'], ['side', 'paveSide', 'Side'], ['rear', 'paveRear', 'Rear']].map(([k, b, l]) => num('sb-' + k, l + ' setback', sb[k], 1, 'ft') + num('sb-' + b, l + ' buffer', sb[b] ?? sb.paving, 1, 'ft')).join('')) +
       (only.sfr ? '' : grp('Parking', num('pp-stallW', 'Stall width', pp.stallW, 0.5, 'ft') + num('pp-stallD', 'Stall depth', pp.stallD, 0.5, 'ft') + num('pp-aisle', 'Drive aisle', pp.aisle, 1, 'ft'))) +
-      (bldg ? grp('Buildings', bldg) : '') +
+      (bldg ? grp('Buildings', bldg) : '') + entry +
       stormHtml(pl, prog, pp, uses) + mix + storageMixes(prog) + homes + look + '</details>';
   }
   // self storage's own settings: the climate-controlled building, the drive-up rows, RV / boat stalls, the fence; blank
@@ -1979,6 +2003,17 @@ export function initSitePlan(ctx) {
         sel('data-ps="trash.mode"', 'Enclosures', tr.mode || (SP.normalizeProgram(pl.program).trash ? 'commercial' : 'none'), [['none', 'None (add by hand)'], ['commercial', 'Shops, restaurants, offices'], ['auto', 'Every building by the rules']]) +
         (uses.includes('multifamily') ? pnum('ps-trash.perUnits', 'Apartments each', tr.perUnits ?? 50, 5, 'units') : '') + (uses.some(x => SP.PER_SF_TRASH(x)) ? pnum('ps-trash.perSf', 'Commercial each', tr.perSf ?? 25000, 1000, 'sf') : '') + '</div>');
   }
+  // Suggest Names: two or three sets from the AI that fit the place (its creeks, roads, town and county); with no AI, from
+  // the street and town names (ED.localNames), and it says so
+  async function suggestNames(btn) {
+    const p = P(), pl = PL(); if (!pl) return; btn.disabled = true; btn.textContent = 'Finding names…';
+    const parts = SP.partsOf(pl).map(q => ({ part: q.i, use: q.use, label: q.word, acres: q.acres, units: q.units || null })), cur = SP.normalizeProgram(pl.program);
+    try { if (aiOff()) throw Object.assign(new Error('AI off'), { status: 503 });
+      const d = await post({ mode: 'names', site: siteInfo(p, pl), facts: await factsFor(pl), parts, current: { community: cur.community, parts: SP.partsOf(pl, false).filter(q => q.name).map(q => ({ part: q.i, name: q.name })) }, theme: '' });
+      ed.nameChoices = d.choices || []; ed.nameNote = ''; }
+    catch (e) { ed.nameChoices = ED.localNames(pl, siteInfo(p, pl)).choices; ed.nameNote = 'The AI didn’t answer, so these come from the street and town names.'; }
+    if (PL() === pl) panel();
+  }
   function wireParams(pl) {
     const $ = s => card.querySelector(s), after = i => { if (ed.autoSolve !== false && (pl.recipe || ed.variants)) resolveSoon(i && settingLabel(i)); };
     $('.sp-prog').ontoggle = e => { ed.progOpen = e.target.open; };
@@ -2009,6 +2044,10 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('[data-smixadd]').forEach(b => b.onclick = () => { const k = b.dataset.smixadd; change(x => { const m = sMix(x, k); m.push({ name: '10×' + (k === 'drive' ? 40 : 30), sf: k === 'drive' ? 400 : 300, pct: 0 }); stoSet(x, k + 'Mix', m); }); });
     const add = $('#spMixAdd'); if (add) add.onclick = () => change(x => { const m = mixOf(x); m.push({ name: 'New', sf: 900, pct: 0, beds: 2 }); x.program = { ...x.program, mix: m }; });
     card.querySelectorAll('[data-home]').forEach(i => i.onchange = () => { change(x => { const m = clone(SP.normalizeProgram(x.program).homeMix || SP.HOME_MIX), t = m.find(h => h.stories === +i.dataset.home); if (t) t.pct = +i.value; else m.push({ stories: +i.dataset.home, pct: +i.value }); x.program = { ...x.program, homeMix: m }; }); after(i); });
+    // names: typed, or a suggested set picked (one undo step); the labels change, the layout doesn't
+    card.querySelectorAll('.sp-prog [data-nm]').forEach(i => i.onchange = () => { const k = i.dataset.nm; change(x => { x.program = SP.withNames(x.program, k === 'community' ? { community: i.value } : { parts: [{ part: +k, name: i.value }] }); }); });
+    card.querySelectorAll('.sp-prog [data-nmc]').forEach(b => b.onclick = () => { const c = ed.nameChoices?.[+b.dataset.nmc]; if (!c) return; change(x => { x.program = SP.withNames(x.program, { community: c.community, parts: c.parts }); }); ctx.toast('Named the community ' + c.community + '.', { action: { label: 'Undo', run: () => { if (ed) undo(true); } } }); });
+    const na = $('#spNameAsk'); if (na) na.onclick = () => suggestNames(na);
     const rs = $('#spResolve'); if (rs) rs.onclick = () => askReplace(() => resolve({ force: true }));
     const rm = $('#spRefitMine'); if (rm) rm.onclick = () => { ed.solveBar = false; refitNow(true); };
     const nl = $('#spNewLay'); if (nl) nl.onclick = () => resolve({ force: true, src: '#spNewLay' });
@@ -2024,7 +2063,7 @@ export function initSitePlan(ctx) {
   // a local edit: the piece stays where it was put and parking under it gives way (whole stalls); nothing else moves.
   // Laying out everything else again is the Re-fit Plan button's job, never automatic.
   // delete a piece; the rest of a parking row it was part of stays as it is now (it doesn't grow back over the gap)
-  function dropEl(x, el) { const k = el.ext && JSON.stringify(el.ext); x.elements = x.elements.filter(y => y.id !== el.id); if (k) for (const y of x.elements) if (y.ext && JSON.stringify(y.ext) === k) delete y.ext; }
+  function dropEl(x, el) { const k = el.ext && JSON.stringify(el.ext); x.elements = el.kind === 'sign' ? SP.dropSign(x, x.elements.find(y => y.id === el.id)) : x.elements.filter(y => y.id !== el.id); /* (an entrance's sign: it remembers it's gone) */ if (k) for (const y of x.elements) if (y.ext && JSON.stringify(y.ext) === k) delete y.ext; }
   // left: where it was (and what moved with it); parking it had cut there grows back
   // (a park, lawn or open space: the homes under it make way too, with their lots and driveways)
   function makeRoom(el, left = []) {
@@ -2125,19 +2164,21 @@ export function initSitePlan(ctx) {
     const free = SP.isFree(e), rc = !!PL()?.recipe;
     const n = (k, label, v, o = {}) => fld(label, numCtl((o.min != null ? 'min="' + o.min + '" ' : '') + (o.max ? 'max="' + o.max + '" ' : '') + 'data-e="' + k + '"', v, 1, o.unit || ''));
     const pick = (attr, label, opts, v, wide) => fld(label, selCtl(attr, opts, v), { wide });
-    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free && e.kind !== 'keepout' ? (SHAPEABLE.includes(e.kind) && !['pond', 'green', 'pool'].includes(e.kind) ? ' · custom shape' : e.path ? (T.isEntrance(e) ? ' · entrance' : ' · route') : ' · curved') : '') + '</div><div class="rnote sp-1l" id="spRead"></div>' + selCustom(e) +
+    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free && e.kind !== 'keepout' ? (T.isEntrance(e) ? (e.blvd ? ' · boulevard entrance' : ' · entrance') : SHAPEABLE.includes(e.kind) && !['pond', 'green', 'pool'].includes(e.kind) ? ' · custom shape' : e.path ? ' · route' : ' · curved') : '') + '</div><div class="rnote sp-1l" id="spRead"></div>' + selCustom(e) +
       '<fieldset class="sp-fs"' + (ed.editing ? '' : ' disabled') + '>' +
-      '<div class="sp-acts">' + (free ? '' : '<button type="button" class="btn sm" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) || T.routeable(e) ? '<button type="button" class="btn sm" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="' + (T.routeable(e) ? 'Bend it: drag its points along the drive; a blue + adds a point; double-click a point to remove it' : 'Drag its points; drag a blue + to add a point; double-click a point to remove it') + '">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') +
+      '<div class="sp-acts"><button type="button" class="btn sm" id="spRot" title="Shift+R turns it the other way">' + (T.isEntrance(e) ? 'Turn 15°' : 'Turn 90°') + '</button>' + (SHAPEABLE.includes(e.kind) || T.routeable(e) ? '<button type="button" class="btn sm" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="' + (T.routeable(e) ? 'Bend it: drag its points along the drive; a blue + adds a point; double-click a point to remove it' : 'Drag its points; drag a blue + to add a point; double-click a point to remove it') + '">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') +
+        (T.isEntrance(e) && !e.blvd ? '<button type="button" class="btn sm" id="spBlvd" title="Two lanes and a planted median, straight in from where its mouth is (Settings › Entrance sets the widths and the sign)">Make It a Boulevard</button>' : '') +
         (rc ? '<button type="button" class="btn sm" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button type="button" class="btn sm" id="spDup" title="Copy it beside itself (⌘D / Ctrl+D)">Duplicate</button><button type="button" class="btn sm" id="spAskSel" title="Say what to change about this piece">Change With AI</button><button type="button" class="btn sm ghost sp-del" id="spDel" title="Delete it (Delete)">Delete</button></div>' +
       (!ed.editing ? '<div class="rnote sp-1l">Turn on <b>Edit Layout</b> to change it.</div>' : rc && e.pinned ? '<div class="sp-pin"><span class="rnote">Pinned: <b>Re-fit Plan</b> keeps it where it is.</span><button type="button" class="btn sm" id="spUnpin" title="Re-fit Plan may move it again">Let It Move</button></div>' : '') +
       '<div class="sp-fg">' + (e.path && T.routeable(e) ? n('width', 'Width', Math.round(e.width || 26), { min: 6, max: 80, unit: 'ft' }) + n('r', 'Curve', Math.round(e.r ?? 30), { min: 0, max: 200, unit: 'ft' }) + (T.isEntrance(e) ? n('flare', 'Mouth flare', Math.round(e.flare || 0), { min: 0, max: 60, unit: 'ft' }) : '') : '') + (e.kind === 'building' ? pick('data-use="1"', 'Use', Object.entries(SP.USES).map(([k, u]) => [k, u.label]), e.use || prog.use) + n('floors', 'Floors', e.floors || 1, { min: 1, max: 40 }) +
           fld('Type', '<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '', teamTypes()) + '</select>', { wide: true }) : '') + // what it is first: use and type can change any time
-        (free ? '' : n('w', 'Width', Math.round(e.w), { min: 8, unit: 'ft' }) + n('d', 'Depth', Math.round(e.d), { min: 8, unit: 'ft' }) + n('rot', 'Turn', (Math.round(e.rot || 0) % 360 + 360) % 360, { unit: '°' })) +
+        (free ? '' : n('w', 'Width', Math.round(e.w), { min: 8, unit: 'ft' }) + n('d', 'Depth', Math.round(e.d), { min: 8, unit: 'ft' })) + n('rot', 'Turn', (Math.round(e.rot || 0) % 360 + 360) % 360, { unit: '°' }) +
         (e.kind === 'building' && (e.use || prog.use) === 'foodtrucks' ? pick('data-ftk="1"', 'Part', [['pavilion', 'Covered pavilion'], ['bar', 'Bar / beer garden'], ['restroom', 'Restrooms']], SP.ftKind(e)) : e.kind === 'building' && (e.use || prog.use) === 'storage' ? pick('data-stok="1"', 'Storage', [['climate', 'Climate-controlled'], ['drive', 'Drive-up units'], ['office', 'Leasing office']], SP.storageKind(e)) : e.kind === 'building' && (e.use || prog.use) === 'fuel' ? pick('data-fuelk="1"', 'Gas station', [['store', 'Convenience store'], ['wash', 'Car wash']], SP.fuelKind(e)) : e.kind === 'building' ? (SP.USES[e.use || prog.use]?.garage ? n('units', 'Homes', e.units || 1, { min: 1, max: 40 }) : '') +
           pick('data-form="1"', 'Building shape', e.poly ? [['custom', 'Custom outline'], ...FORMS] : FORMS, e.poly ? 'custom' : e.form || 'bar') + (e.form === 'tower' && !e.poly ? n('podium', 'Podium floors', e.podium || 2, { min: 1, max: 6 }) : '') : '') +
         (e.kind === 'garage' ? n('levels', 'Levels', e.levels || 4, { min: 1, max: 12 }) : '') +
         (e.kind === 'canopy' ? pick('data-pumps="1"', 'Pumps', SP.PUMPS.map(k => [String(k), k + ' · ' + 2 * k + ' fueling positions']), String(e.pumps || 8)) + pick('data-prows="1"', 'Rows', [['1', '1 row'], ['2', '2 rows'], ['3', '3 rows']], String(e.rows || 2)) : '') +
         (['pond', 'pool', 'green', 'plaza', 'court'].includes(e.kind) ? pick('data-shape="1"', 'Shape', [['organic', 'Natural curves'], ['rounded', 'Rounded rectangle'], ['square', 'Rectangle']], e.poly ? 'organic' : e.shape === 'round' ? 'rounded' : 'square') : '') +
+        (T.isEntrance(e) && (e.blvd || PL() && SP.entryParts(PL(), e).length) ? pick('data-signs="1"', 'Monument signs', [['median', 'In the median'], ['both', 'Both corners'], ['one', 'One corner'], ['none', 'None']], (g => !g.length ? 'none' : g[0].want || (g.some(x => x.sign === 'median') ? 'median' : g.length > 1 ? 'both' : 'one'))(SP.entryParts(PL(), e).filter(x => x.kind === 'sign'))) : '') +
         fld('Name', '<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A">', { wide: true }) + '</div></fieldset>';
   }
   // several pieces picked: how many, what they cover, and what can be done to all of them at once (each one undo step)
@@ -2176,7 +2217,7 @@ export function initSitePlan(ctx) {
   function wireSel(e) {
     if (e && sels().length > 1) { wireMulti(); return; }
     if (!e) return; readout(e);
-    card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v)) return; change(() => { const k = i.dataset.e; e[k] = k === 'floors' || k === 'units' || k === 'levels' || k === 'podium' ? Math.max(1, Math.round(v)) : k === 'rot' ? ((v % 360) + 360) % 360 : k === 'r' || k === 'flare' ? Math.max(0, v) : k === 'width' ? Math.max(6, v) : Math.max(8, v); e.pinned = true; }, true); readout(e); refitSoon(); });
+    card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v)) return; if (i.dataset.e === 'rot' && (SP.isFree(e) || T.isEntrance(e))) { turnEl(e, ((v - (e.rot || 0)) % 360 + 540) % 360 - 180); return; } change(() => { const k = i.dataset.e; e[k] = k === 'floors' || k === 'units' || k === 'levels' || k === 'podium' ? Math.max(1, Math.round(v)) : k === 'rot' ? ((v % 360) + 360) % 360 : k === 'r' || k === 'flare' ? Math.max(0, v) : k === 'width' ? Math.max(6, v) : Math.max(8, v); e.pinned = true; }, true); readout(e); refitSoon(); });
     card.querySelector('[data-shape]')?.addEventListener('change', ev => { change(() => { SP.reshape(e, ev.target.value); e.pinned = true; }); refitSoon(); });
     const up1 = card.querySelector('#spUnpin'); if (up1) up1.onclick = () => change(() => { delete e.pinned; });
     const rf = card.querySelector('#spRefit'); if (rf) rf.onclick = () => refitNow(true);
@@ -2190,6 +2231,8 @@ export function initSitePlan(ctx) {
     card.querySelector('[data-form]')?.addEventListener('change', ev => { if (ev.target.value === 'custom') return; change(() => { const f = ev.target.value; delete e.poly; if (f === 'bar') delete e.form; else e.form = f; if (f === 'tower') { e.podium = e.podium || 2; e.floors = Math.max(e.floors || 1, 8); } if ((f === 'L' || f === 'U') && e.d < 100) e.d = Math.min(150, e.d * 2); e.pinned = true; }); panel(); refitSoon(); });
     card.querySelector('[data-name]')?.addEventListener('change', ev => change(() => { e.name = ev.target.value.trim().slice(0, 40); }, true));
     if (card.querySelector('#spRot')) card.querySelector('#spRot').onclick = () => turnEl(e);
+    card.querySelector('#spBlvd')?.addEventListener('click', () => { let r = null; change(x => { r = SP.makeBoulevard(x, e); if (!r.error) x.elements = r.elements; }); if (r?.error) { ctx.toast(r.error); return; } const t = [r.note, r.why].filter(Boolean).join(' '); if (t) ctx.toast(t); autoRefit('Widened', ED.labelOf(e)); });
+    card.querySelector('[data-signs]')?.addEventListener('change', ev => { let why = ''; change(x => { const r = SP.refreshEntry(x, e, ev.target.value); x.elements = r.elements; why = r.why; }); if (why) ctx.toast(why); });
     const shp = card.querySelector('#spShape'); if (shp) shp.onclick = () => { // its outline as points to drag: any shape, in plan
       if (ed.shape === e.id) { ed.shape = null; draw(); panel(); return; }
       shapeOn(e); };
@@ -2199,6 +2242,15 @@ export function initSitePlan(ctx) {
   }
   // Numbers: one grid of tiles, the zoning limit beside its figure; with a Phase 2, Phase 1 and the whole site side by side
   // (parking too: what was asked for first)
+  // Numbers by name: each part (a mixed plan's neighbourhood, retail center, apartments…) with its acres, homes or units
+  // and floor area, parts with the same name together, the community's name over it; only when there's more than one
+  // part or a name
+  function partsTable(pl, prog) {
+    const ps = SP.partsOf(pl); if (ps.length < 2 && !ps.some(q => q.name)) return '';
+    const rows = new Map(); for (const q of ps) { const k = (q.show || q.word) + '|' + q.use, r = rows.get(k) || { name: q.show || q.word, use: SP.USES[q.use]?.label.split(' / ')[0] || q.use, acres: 0, units: 0, gfa: 0 }; r.acres += q.acres || 0; r.units += q.units || 0; r.gfa += q.gfa || 0; rows.set(k, r); }
+    return '<table class="sp-parts">' + (prog.community ? '<caption>' + esc(prog.community) + '</caption>' : '') + '<tr><th>Part</th><th>Use</th><th class="r">Acres</th><th class="r">Homes / units</th><th class="r">Floor area</th></tr>' +
+      [...rows.values()].map(r => '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.use) + '</td><td class="r">' + (r.acres ? r.acres.toFixed(1) : '—') + '</td><td class="r">' + (r.units ? f0(r.units) : '—') + '</td><td class="r">' + (r.gfa ? f0(r.gfa) + ' sf' : '—') + '</td></tr>').join('') + '</table>';
+  }
   function nums() {
     const el = card.querySelector('#spNums'), pl = PL(); if (!el || !pl) return;
     if (pl.ring.length < 3) { el.innerHTML = ''; return; }
@@ -2226,6 +2278,7 @@ export function initSitePlan(ctx) {
       (m.heightFt ? tile('Height', 'about ' + m.heightFt + ' ft', +z.max_building_height_ft ? 'max ' + z.max_building_height_ft + ' ft' : '', +z.max_building_height_ft && m.heightFt > +z.max_building_height_ft ? ' bad' : '') : '') + '</div>' +
       (m.mix.length ? '<table class="sp-mixt"><tr><th>Unit</th><th>SF</th><th>Units</th><th>%</th><th>Net sf</th></tr>' + m.mix.map(t => '<tr><td>' + esc(t.name) + '</td><td>' + f0(t.sf) + '</td><td>' + f0(t.n) + '</td><td>' + pct(t.n / Math.max(1, m.mix.reduce((s, x) => s + x.n, 0))) + '</td><td>' + f0(t.n * t.sf) + '</td></tr>').join('') + '</table>' : '') +
       (m.storage?.units ? storageTable(m.storage, prog) : '') +
+      partsTable(pl, prog) +
       (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + n + '-story</td><td>' + f0(SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
       (cs ? customBlock(cs) : '') +
       (issues.length ? '<ul class="sp-issues">' + issues.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul>' : m.gfa ? '<div class="rnote sp-ok">Fits the setbacks' + (m.spaces >= m.required ? ' and parks' : '') + '.</div>' : '');
@@ -2323,14 +2376,16 @@ export function initSitePlan(ctx) {
     };
   }
 
-  // Turn 90° (or R): like a drag, it stays clear of the other buildings and drives (the nearest clear spot), the parking
-  // under it gives way and grows back where it was
-  function turnEl(el) {
-    let blocked = false;
-    change(x => { const o = clone(el); el.rot = ((el.rot || 0) + 90) % 360; el.pinned = true;
-      if (el.kind === 'building' || el.kind === 'garage' || SP.isPark(el) && !SP.isFree(el)) { const att = SP.attachedTo(x, el), c = SP.clearSpot(x, el, { carry: att, reach: Math.max(el.w || 0, el.d || 0) + 60, ...(SP.isPark(el) ? { obs: SP.placeObs(x, el, att, SP.shapeOf(o)) } : {}) }); if (c && (c[0] || c[1])) for (const t of [el, ...att]) SP.moveBy(t, c[0], c[1]); blocked = !c; }
+  // Turn 90° (or R; Shift+R the other way): like a drag, it stays clear of the other buildings and drives (the nearest
+  // clear spot), the parking under it gives way and grows back where it was. Any piece turns, curved and drawn ones too;
+  // an entrance 15° a press (a quarter turn would lay it along the street), swinging about its middle with its mouth
+  // sliding along the street, its median and signs drawn again with it
+  function turnEl(el, deg = T.isEntrance(el) ? 15 : 90) {
+    let blocked = false, why = '';
+    change(x => { const o = clone(el), r = SP.turnPiece(x, el, deg); x.elements = r.elements; why = [r.why, r.note].filter(Boolean).join(' '); el.pinned = true;
+      if (el.kind === 'building' || el.kind === 'garage' || el.kind === 'pond' || SP.isPark(el)) { const att = SP.attachedTo(x, el), c = SP.clearSpot(x, el, { carry: att, reach: Math.max(el.w || 0, el.d || 0) + 60, ...(SP.isPark(el) || el.kind === 'pond' ? { obs: SP.placeObs(x, el, att, SP.shapeOf(o)) } : {}) }); /* (a pond: homes make way, the drives don't, as Change With AI turns one) */ if (c && (c[0] || c[1])) for (const t of [el, ...att]) SP.moveBy(t, c[0], c[1]); blocked = !c; }
       makeRoom(el, [o]); });
-    refitSoon('Turned', ED.labelOf(el));
+    refitSoon('Turned', ED.labelOf(el)); if (why) ctx.toast(why);
     if (blocked) ctx.toast('No clear spot for it turned that way: it overlaps (in red). Turn it again or drag it.', { action: { label: 'Undo', run: () => { if (ed) undo(true); } } });
   }
   // a new piece lands in the nearest clear spot to the middle of the view (as a drag does): off the other buildings,
@@ -2387,7 +2442,7 @@ export function initSitePlan(ctx) {
       const lane = { id: uid(), kind: 'drive', path: [L(-34, 60), L(-34, -37), L(50, -37), L(50, 60)], width: 12, r: 14, name: '', note: 'Drive-thru lane', ...pin };
       change(x => { how = placeClear(x, b, [patio, lane]); x.elements.push(b, patio, lane); }); ed.sel = b.id; ed.multi = []; draw(); panel(); refitSoon('Added', ADD_SHORT.pad); noRoom(how); return;
     }
-    const e = { id: uid(), kind, x: +at[0].toFixed(2), y: +at[1].toFixed(2), w, d, rot, ...(kind === 'building' ? { floors: prog.floors } : {}), ...(kind === 'garage' ? { levels: 4, name: 'Parking garage' } : {}), ...(kind === 'play' ? { name: 'Playground' } : {}), ...(kind === 'court' ? { name: 'Pickleball courts' } : {}), ...(kind === 'patio' ? { note: 'Outdoor seating' } : {}), ...stall, ...pin };
+    const e = { id: uid(), kind, x: +at[0].toFixed(2), y: +at[1].toFixed(2), w, d, rot, ...(kind === 'building' ? { floors: prog.floors } : {}), ...(kind === 'garage' ? { levels: 4, name: 'Parking garage' } : {}), ...(kind === 'play' ? { name: 'Playground' } : {}), ...(kind === 'court' ? { name: 'Pickleball courts' } : {}), ...(kind === 'patio' ? { note: 'Outdoor seating' } : {}), ...(kind === 'sign' ? { name: 'Monument sign' } : {}), ...stall, ...pin };
     const lots0 = kind === 'garage' ? pl.elements.filter(x => x.kind === 'parking').length : 0;
     change(x => { how = placeClear(x, e, [], kind === 'garage'); x.elements.push(e); if (kind === 'garage') makeRoom(e); }); ed.sel = e.id; ed.multi = []; draw(); panel(); refitSoon('Added', ADD_SHORT[kind] || ED.labelOf(e)); noRoom(how); // no camera move: it lands in view (the middle of it, or where you clicked)
     if (lots0 && PL().elements.filter(x => x.kind === 'parking').length < lots0) ctx.toast('Replaced Parking with Parking garage', { action: { label: 'Undo', run: () => { if (ed) undo(true); } } }); // no room beside it: the lot gave way
@@ -2519,7 +2574,7 @@ export function initSitePlan(ctx) {
     const thinks = ai && !!L.plan, o0 = thinks ? 1 : 0, planStep = L.plan?.count > 1 ? 'Thinking through ' + L.plan.count + ' plans for the site' : 'Thinking the site through';
     const steps0 = !review ? ['Reading your request', lay] : L.rounds === 1 ? ['Reading your request', lay, 'AI review'] : ['Reading your request', lay, 'AI review', 'Comparing'];
     const run = startRun('build', thinks ? [planStep, ...steps0] : steps0, src, { ask, effort: lvl }); if (!run) return;
-    let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '', aiOk = false, assumed = [], strategy = null;
+    let prog = SP.keepNames(SP.guessProgram(ask), pl.program), setbacks = pl.setbacks, /* (a new program keeps the plan's names) */ note = '', aiOk = false, assumed = [], strategy = null;
     const site = ai ? siteInfo(p, pl) : null, facts = ai ? await factsFor(pl) : null; if (!live(run)) return;
     if (thinks) try {
       const s = await post({ mode: 'strategy', prompt: ask, site, facts, program: pl.program, effort: L.plan.effort, count: L.plan.count }, run.ctl.signal), pk = s.strategies?.[s.pick] || s.strategies?.[0];
@@ -2529,7 +2584,7 @@ export function initSitePlan(ctx) {
     if (thinks) runStep(run, 2, 'Reading your request' + (strategy ? ' (following the plan)' : ''));
     if (ai) try {
       const d = await post({ prompt: ask, site, facts, program: pl.program, effort: L.effort, teamTypes: CU.teamTypesForAI(TL.list()), ...(strategy ? { strategy } : {}) }, run.ctl.signal);
-      prog = d.program || prog; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
+      prog = SP.keepNames(d.program || prog, pl.program); setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
     } catch (e) { if (!live(run)) return; note = e.status === 503 ? '' : navigator.onLine ? 'The AI didn’t answer, so this read your words directly.' : 'Offline: this read your words directly.'; }
     if (!live(run) || PL() !== pl) return;
     if (!aiOk) { run.steps = run.steps.slice(0, 2 + o0); strategy = null; } // the AI is off: no review either
@@ -2546,7 +2601,7 @@ export function initSitePlan(ctx) {
     if (ed.ideas?.list?.length) { if (!ed.ideas.list.some(it => it.request === ask)) ed.ideas = { ...ed.ideas, used: null }; else if (ed.ideas.used != null) ed.ideasOpen = false; } // the idea laid out: the ideas fold to a line
     run.applied = true;
     const rec0 = K.recommended(variants, null), best = rec0 ? rec0.index : variants.findIndex(v => v.elements.length); // never a failing layout when one passes
-    if (best >= 0) await useVariant(best, { quiet: true }); else saveRun(pl);
+    if (best >= 0) await useVariant(best, { quiet: true, fresh: true }); else saveRun(pl);
     if (!live(run)) return;
     if (!doReview) { endRun(run); if (best < 0 && !failed) ctx.toast('Nothing fits that request on this site.'); return; } // (a failed layout already said so)
     panel(); showLayouts(run);
@@ -2598,7 +2653,7 @@ export function initSitePlan(ctx) {
   async function pickAi() {
     const k = ed.aiPick, pl = PL(), i = k && ed.variants ? ed.variants.findIndex(v => v.key === k) : -1; if (i < 0 || pl?.variant?.key === k) return;
     const failing = K.passes(ed.variants[i].chk) === false && ed.variants.some(v => K.passes(v.chk)); // a failing layout never goes on the map by itself when one passes
-    if (!ed.pickedByUser && !dirty(pl) && !failing) { await useVariant(i, { quiet: true }); return; }
+    if (!ed.pickedByUser && !dirty(pl) && !failing) { await useVariant(i, { quiet: true, fresh: true }); return; }
     const n = numOf(ed.variants[i]); ctx.toast('The AI recommends ' + n + (failing ? ', though it doesn’t pass every check' : '') + '.', { action: { label: 'Use it', run: () => { const j = ed?.variants?.findIndex(v => v.key === k); if (j >= 0) askReplace(() => useVariant(j)); } } });
   }
   // easements on the plan go into every layout run: the layouts keep off them and carry them along
@@ -2694,21 +2749,23 @@ export function initSitePlan(ctx) {
     const ask = (ed.chg || '').trim(); if (!ask) { ctx.toast('Say what to change, e.g. “make Apt Bldg 7 four stories”.'); card.querySelector('#spChg')?.focus(); return; }
     if (ed.run) { ctx.toast('Wait for the run under way, or Cancel it.'); return; }
     const off = aiOff(), run = startRun('change', [off ? 'Reading your words' : 'Reading the plan and your request', 'Making the changes'], '#spChgGo'); if (!run) return;
-    const sel = ed.sel; let ops = [], mix = null, full = false, note = '', question = null, byAi = false;
+    const sel = ed.sel; let ops = [], mix = null, names = null, full = false, note = '', question = null, byAi = false;
     try {
       if (off) throw Object.assign(new Error('AI off'), { status: 503 });
       let image = null; try { image = await planImage(pl); } catch (e) { /* words and numbers only */ }
       const d = await post({ mode: 'edit', prompt: ask, site: siteInfo(p, pl), plan: ED.describePlan(pl, sel), image }, run.ctl.signal);
-      ops = d.ops || []; mix = d.homeMix?.length ? d.homeMix : null; full = d.refit === 'full'; note = d.summary || ''; question = d.question; byAi = true;
-    } catch (e) { if (!live(run)) return; ops = ED.guessEdits(ask, pl, sel); mix = ED.guessMix(ask, pl); full = /\bre-?(?:fit|lay)/i.test(ask); note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this read your words directly.'; }
+      ops = d.ops || []; mix = d.homeMix?.length ? d.homeMix : null; names = d.names?.community || d.names?.parts?.length ? d.names : null; full = d.refit === 'full'; note = d.summary || ''; question = d.question; byAi = true;
+    } catch (e) { if (!live(run)) return; names = ED.guessNames(ask, pl, sel); const said = names ? names.rest : ask; ops = said ? ED.guessEdits(said, pl, sel) : []; mix = said ? ED.guessMix(said, pl) : null; full = /\bre-?(?:fit|lay)/i.test(ask); note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this read your words directly.'; } // (names first: "call the neighbourhood…" never renames a piece; the rest of the words are edits)
     if (!live(run) || PL() !== pl) return;
     const hm = mix && pl.recipe ? ED.withHomeMix(pl, mix) : null; // (a plan drawn by hand has no layout to lay the lots out again with)
-    if (!ops.length && !hm) { ed.chgDone = null; ed.chgNote = question || (mix ? 'This plan was drawn by hand, so its homes can’t be laid out again with a new mix: change the Home mix in Settings and build new layouts.' : (byAi ? 'The AI didn’t find anything on the plan to change for that.' : note) + ' Name the piece as it’s labelled (“Apt Bldg 7”), select it and say “it”, or say what to change across the site (“all the apartments 3 stories”, “no 3-story homes”).'); endRun(run); return; }
+    if (!ops.length && !hm && !names) { ed.chgDone = null; ed.chgNote = question || (mix ? 'This plan was drawn by hand, so its homes can’t be laid out again with a new mix: change the Home mix in Settings and build new layouts.' : (byAi ? 'The AI didn’t find anything on the plan to change for that.' : note) + ' Name the piece as it’s labelled (“Apt Bldg 7”), select it and say “it”, or say what to change across the site (“all the apartments 3 stories”, “no 3-story homes”).'); endRun(run); return; }
     full = (full || ed.chgFit || !!hm) && !!pl.recipe; runStep(run, 2);
     const depth = ed.undo.length, was = pl.elements.slice(), prog0 = pl.program, recipe0 = pl.recipe; // to undo it, and to show what went
     const homeOk = e => !(e.kind === 'building' && e.use === 'sfr' && e.pinned && !hm.mix.some(t => t.stories === (e.floors || 1))); // a home placed by hand that the new mix leaves out is laid out again
+    if (!ops.length && !hm) full = false; // (names alone never re-fit)
     let r = null; change(x => { r = ED.applyEdits(x, ops, { refit: full, spare: x.spareRows = (x.spareRows || []).slice(-40) }); x.elements = r.elements; if (r.streets !== (x.streets || [])) x.streets = r.streets;
-      if (hm) { x.program = hm.program; x.recipe = hm.recipe; x.elements = x.elements.map(e => homeOk(e) ? e : { ...e, pinned: false }); } });
+      if (hm) { x.program = hm.program; x.recipe = hm.recipe; x.elements = x.elements.map(e => homeOk(e) ? e : { ...e, pinned: false }); }
+      if (names) { const n = ED.applyNames(x, names); x.program = n.program; r.done.push(...n.done); r.skipped.push(...n.skipped); } }); // the community's and the parts' names, in the same undo step (after the home mix's program, so it keeps them)
     if (mix && !hm) r.skipped.push('This plan was drawn by hand, so its homes can’t be laid out again with a new mix: change the Home mix in Settings and build new layouts.');
     const gone = was.filter(e => !['parking', 'green', 'lot', 'trail'].includes(e.kind) && !pl.elements.some(x => x.id === e.id)); // removed (not parking rows that gave way)
     if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; draw(); // Edit Layout stays as it was
@@ -2915,6 +2972,7 @@ export function initSitePlan(ctx) {
       return '<div class="sp-var' + (here ? ' on' : '') + (v.stale ? ' stale' : '') + (none ? ' none' : '') + (K.passes(v.chk) === false ? ' fail' : '') + '" data-key="' + esc(v.key) + '">' +
         '<button type="button" class="sp-var-use" aria-pressed="' + here + '" data-var="' + i + '"' + (none ? ' disabled' : '') + ' title="' + (here ? 'On the map' : v.stale ? 'Fit this layout to the new site and put it on the map' : has ? 'Put this layout on the map' : none ? 'Nothing fits' : 'Lay this layout out again and put it on the map') + '">' +
           '<span class="sp-vthumb"' + (has ? ' data-thumb="' + i + '"' : '') + '>' + (has && vthumbs.has(thumbKey(v)) ? vthumbs.get(thumbKey(v)) : '') + (!has ? '<i>' + (none ? 'Nothing fits' : 'Numbers only') + '</i>' : '') + '</span>' +
+          (pl.program?.community ? '<span class="sp-vname">' + esc(pl.program.community) + '</span>' : '') + // (the community is the plan's: every card says it)
           '<span class="sp-vhead" title="' + esc(numOf(v) + ' · ' + arr) + '"><b>' + esc(numOf(v)) + '</b> <span>' + esc(arr) + '</span></span>' +
           (pills ? '<span class="sp-vpills">' + pills + '</span>' : '') + grid +
           (h.p2 ? '<span class="sp-vp2">' + esc(h.p2) + '</span>' : '') + (by === 'open' && !none ? '<span class="sp-vp2 hot">Open space ' + pct(m.green || 0) + '</span>' : '') +
@@ -2969,12 +3027,13 @@ export function initSitePlan(ctx) {
     thumbIO = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) { thumbIO?.unobserve(e.target); add(e.target); } }, { root: card, rootMargin: '160px 0px' });
     slots.forEach(el => thumbIO.observe(el));
   }
-  // put a layout on the map; one kept as numbers only is laid out again first
+  // put a layout on the map; one kept as numbers only is laid out again first. o.fresh: the layouts a build just made (their
+  // program's names are the build's), else the plan's names as they are now win over the layout's copy
   async function useVariant(i, o = {}) {
     let v = ed.variants?.[i]; if (!v || Array.isArray(v.elements) && !v.elements.length) return false;
     const was = v.stale; if (!v.elements || was) { v = await relay(i, was); if (!v) return false; i = ed.variants.indexOf(v); } // out of date, or numbers only: laid out again for this site first
     applying = true;
-    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; }); }
+    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; x.program = SP.keepNames({ ...(v.program || x.program) }, x.program, !o.fresh); /* (the names as they are now: the layout's copy is from when it was laid out; a build's own new layouts carry its names) */ x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; }); }
     finally { applying = false; }
     ed.sel = null; ed.solveBar = false; if (was) PL().stale = null; saveRun(); if (!o.quiet) { draw(); panel(); }
     requestAnimationFrame(() => { if (ed && !planInView(true)) planFit(); }); // only when the site isn't all in view already (or the Plan key covers it)
@@ -3073,7 +3132,7 @@ export function initSitePlan(ctx) {
   // what a rendering was made from: the pieces' places, sizes and floors (a change to any of them makes it "plan changed since")
   const planSig = pl => RUN.hash((pl.elements || []).map(e => [e.kind, Math.round(e.x), Math.round(e.y), Math.round(e.w), Math.round(e.d), Math.round(e.rot || 0), e.floors || 0, e.use || ''].join(':')).join('|'));
   // drawing marks that aren't part of a photograph: labels, dimensions, setback and parcel lines, the boundary, handles, easement hatching
-  const HIDE_FOR_RENDER = ['fs-sp-lot', 'fs-sp-grid', 'fs-sp-zone', 'fs-sp-sb', 'fs-sp-pl', 'fs-sp-front', 'fs-sp-selc', 'fs-sp-sell', 'fs-sp-flash', 'fs-sp-gone', 'fs-sp-lab-p', 'fs-sp-lab', 'fs-sp-lab-sel', 'fs-sp-dim', 'fs-sp-hv', 'fs-sp-mf', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-ml', 'fs-sp-h', 'fs-sp-hs', 'fs-sp-lotl', 'fs-sp-p2', 'fs-sp-ko', 'fs-sp-koh', 'fs-sp-kol'];
+  const HIDE_FOR_RENDER = ['fs-sp-zlab', 'fs-sp-lot', 'fs-sp-grid', 'fs-sp-zone', 'fs-sp-sb', 'fs-sp-pl', 'fs-sp-front', 'fs-sp-selc', 'fs-sp-sell', 'fs-sp-flash', 'fs-sp-gone', 'fs-sp-lab-p', 'fs-sp-lab', 'fs-sp-lab-sel', 'fs-sp-dim', 'fs-sp-hv', 'fs-sp-mf', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-ml', 'fs-sp-h', 'fs-sp-hs', 'fs-sp-lotl', 'fs-sp-p2', 'fs-sp-ko', 'fs-sp-koh', 'fs-sp-kol'];
   const imageryBase = () => /^(sat|gsat|esri)$/.test(ctx.basemap?.() || '');
   const idle = () => new Promise(ok => { let done = false; const fin = () => { if (!done) { done = true; ok(); } }; map.once('idle', fin); setTimeout(fin, 9000); });
   // The massing as the AI gets it: the map pointed at the site from the view's camera (lib/render.mjs cameraFor) in the

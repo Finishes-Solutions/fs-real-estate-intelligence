@@ -60,6 +60,12 @@ const shop = { program: { use: 'retail' }, elements: [{ id: 'b', kind: 'building
 assert.doesNotMatch(M.keyHtml(shop), /Phase 2|Multifamily/); assert.match(M.keyHtml(shop), /Truck court/);
 assert.equal(M.keySig(plan), M.keySig({ ...plan, elements: plan.elements.slice() }));
 
+// a monument sign in the key; the parts' names over their zones keep no label priority (they never push a piece's label off)
+{ const signed = { program: { use: 'multifamily', community: 'Beacon Hill' }, elements: [{ id: 's', kind: 'sign', x: 0, y: 0, w: 10, d: 5, rot: 0, name: 'Monument sign' }] };
+  assert.ok(M.keyItems(signed).kinds.includes('sign') && /Monument sign/.test(M.keyHtml(signed)), 'the sign in the key'); assert.equal(M.labelPri('sign'), 4);
+  const fc = { features: [{ type: 'Feature', properties: { k: 'sign', id: 's', sel: 0, bad: 0 } }, { type: 'Feature', properties: { k: 'label', t: 'BEACON HILL' } }, { type: 'Feature', properties: { k: 'zlabel', t: 'Beacon Hill Market' } }] };
+  M.decorate(fc, signed); const z = fc.features[2].properties; assert.ok(z.pri == null && z.lp == null && z.id == null && z.t === 'Beacon Hill Market', 'a zone name is left as it is'); assert.equal(fc.features[1].properties.pri, 4, 'the sign’s label'); }
+
 // ---- Change With AI's checklist ----
 assert.deepEqual(M.checklist(['Building A: 3 stories.', 'Removed Building F.', 'Added Pool.', 'Moved Pad A.', 'Swapped Bldg 2 and Bldg 5.', 'Nothing to change on Bldg 9.', 'Added Main Entry from the street. It meets the drive.', 'Removed Clubhouse and its pool, plaza.']),
   ['Building A → 3 stories', 'Building F removed', 'Pool added', 'Pad A moved', 'Bldg 2 ⇄ Bldg 5', 'Main Entry added', 'Clubhouse removed (with its pool, plaza)']);

@@ -234,6 +234,32 @@ for (const v of [0, 1, 2]) {
   reply = () => ({ homeMix: [], ops: [op({ target: 'ghost', floors: 2 })], refit: 'none', summary: 'Changed all 3-story residential homes to 1 or 2-story homes.', question: null });
   res = await call({ mode: 'edit', prompt: 'no 3 story homes', plan: big }); assert.equal(res.body.summary, '', 'never a summary of changes that weren’t made'); assert.equal(res.body.ops.length, 0);
   res = await call({ mode: 'edit', prompt: '', plan }); assert.equal(res.code, 400); }
+// turning, boulevards, signs and names in Change With AI; Suggest Names (its own small mode); every schema strict all the way down
+{ const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
+  let sent = null, reply = null, fail = false; process.env.OPENAI_API_KEY = 'test-key';
+  globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('/models/')) return Response.json({ id: 'm' }); sent = JSON.parse(opts.body); if (fail) return new Response('down', { status: 500 }); return Response.json({ choices: [{ message: { content: JSON.stringify(reply()) } }] }); };
+  const { default: handler, EDIT_SCHEMA, NAMES_SCHEMA } = await import('../api/siteplan.js');
+  const strict = (o, at = '') => { if (!o || typeof o !== 'object') return; if (o.type === 'object' || Array.isArray(o.type) && o.type.includes('object')) { assert.equal(o.additionalProperties, false, at + ': no other keys'); assert.deepEqual((o.required || []).slice().sort(), Object.keys(o.properties || {}).sort(), at + ': every key required'); }
+    for (const [k, v] of Object.entries(o)) if (v && typeof v === 'object') strict(v, at + '.' + k); };
+  strict(EDIT_SCHEMA, 'edit'); strict(NAMES_SCHEMA, 'names');
+  const opP = EDIT_SCHEMA.properties.ops.items.properties; assert.ok(opP.turnBy && opP.boulevard && opP.signs && EDIT_SCHEMA.properties.names, 'turnBy, boulevard, signs and names');
+  const call = async body => { const res = mock(); await handler({ method: 'POST', body, headers: { 'x-forwarded-for': '7.7.8.1' } }, res); return res; };
+  const plan = { site: { acres: 21.3, streets: [{ side: 'front', name: 'FM 362', from: [0, 0], to: [700, 0] }] }, community: 'Beacon Hill', parts: [{ part: 0, use: 'retail', label: 'Retail center', name: null }, { part: 2, use: 'sfr', label: 'Neighbourhood', name: null }], pieces: [{ id: 'p1', name: 'Detention pond', kind: 'pond', at: [300, 400], turn: 12 }, { id: 'me', name: 'Main entry', kind: 'drive', at: [350, 40], boulevard: false, width: 40 }, { id: 'md', name: 'Median', kind: 'green', at: [350, 60], of: 'me' }] };
+  const op = o => ({ action: 'change', target: null, every: null, floorsOver: null, with: null, type: null, kind: null, use: null, name: null, floors: null, units: null, w: null, d: null, x: null, y: null, turn: null, turnBy: null, boulevard: null, signs: null, ...o });
+  reply = () => ({ homeMix: [], names: { community: null, parts: [] }, ops: [op({ target: 'p1', turnBy: 20 }), op({ target: 'me', boulevard: true, signs: 'both' }), op({ target: 'p1', turnBy: 9000 }), op({ action: 'add', kind: 'entrance', x: 200, y: 0, boulevard: true, signs: 'sideways' })], refit: 'none', summary: 'Turned the pond; the main entry a boulevard.', question: null });
+  let res = await call({ mode: 'edit', prompt: 'turn the pond 20 degrees and make the main entry a boulevard', plan }); assert.equal(res.code, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body.ops.map(o => [o.target, o.turnBy, o.boulevard, o.signs]), [['p1', 20, null, null], ['me', null, true, 'both'], ['p1', null, null, null], [null, null, true, null]], 'turnBy, boulevard and signs passed on, sane values only');
+  const u = JSON.parse(sent.messages[1].content.split('\n\nBuilding library')[0]); assert.equal(u.community, 'Beacon Hill'); assert.deepEqual(u.parts.map(x => x.part), [0, 2]); assert.equal(u.pieces.find(x => x.id === 'md').of, 'me'); assert.equal(u.site.streets[0].name, 'FM 362');
+  // names alone are an answer; a part that isn't there and an empty name are dropped, long names clipped
+  reply = () => ({ homeMix: [], ops: [], names: { community: '  Beacon Hill  ', parts: [{ part: 2, name: 'Beacon Hill Estates' }, { part: 99, name: 'Nowhere' }, { part: 0, name: '   ' }, { part: 0, name: 'M'.repeat(90) }] }, refit: 'none', summary: 'Named the neighbourhood.', question: null });
+  res = await call({ mode: 'edit', prompt: 'call the neighbourhood Beacon Hill Estates', plan });
+  assert.equal(res.body.names.community, 'Beacon Hill'); assert.deepEqual(res.body.names.parts.map(x => [x.part, x.name.length]), [[2, 19], [0, 60]]); assert.equal(res.body.summary, 'Named the neighbourhood.', 'a names-only answer counts');
+  // Suggest Names: at most three cleaned choices, parts by index only; the AI down: 502 (the browser falls back to street names)
+  reply = () => ({ choices: [{ community: 'Spring Creek Landing', parts: [{ part: 0, name: 'Spring Creek Market' }, { part: 7, name: 'Ghost' }], why: 'From Spring Creek, which runs along the back.' }, { community: 'Hockley Crossing', parts: [], why: 'The town.' }, { community: 'The Reserve at Pine Hollow', parts: [], why: 'The pines.' }, { community: 'Fourth', parts: [], why: '' }, { community: '', parts: [], why: 'nameless' }] });
+  res = await call({ mode: 'names', site: { acres: 40, address: 'Stokes Rd' }, parts: [{ part: 0, use: 'retail', label: 'Retail center', acres: 6 }, { part: 2, use: 'sfr', label: 'Neighbourhood', acres: 30, units: 120 }], current: { community: null, parts: [] }, theme: 'Texas rivers' });
+  assert.equal(res.code, 200, JSON.stringify(res.body)); assert.deepEqual(res.body.choices.map(c => c.community), ['Spring Creek Landing', 'Hockley Crossing', 'The Reserve at Pine Hollow']); assert.deepEqual(res.body.choices[0].parts, [{ part: 0, name: 'Spring Creek Market' }]);
+  const nu = JSON.parse(sent.messages[1].content); assert.equal(nu.theme, 'Texas rivers'); assert.equal(nu.parts.length, 2); assert.equal(sent.response_format?.json_schema?.name || 'site_names', 'site_names');
+  fail = true; res = await call({ mode: 'names', site: { acres: 40 }, parts: [] }); assert.equal(res.code, 502); fail = false; }
 
 // ---- /api/siteplan: the effort picked under Build, and questions about the open plan ----
 { const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
