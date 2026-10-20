@@ -43,13 +43,13 @@ for (const plan of [retail, town, mixed]) {
 { const mf = P.sheetList(mixed, { sections: P.defaultSections() }); assert.ok(mf.every(s => !s.typeId || PD.buildingTypes(mixed).find(t => t.id === s.typeId)?.supported), 'apartments: no building sheets yet'); }
 assert.deepEqual(P.sheetList({ ring: [] }, {}).map(s => s.number), ['G-001', 'G-002'], 'no site drawn: the general sheets only');
 // Claude's discipline notes, cleaned to fit
-{ const x = P.cleanDisc({ notes: ['a', '', 3, 'b'.repeat(500)], criteria: [{ item: 'Wind', value: '140 mph' }, { item: '', value: 'x' }], extra: 1 }); assert.deepEqual(x.notes.length, 2); assert.equal(x.notes[1].length, 360); assert.deepEqual(x.criteria, [{ item: 'Wind', value: '140 mph' }]); }
+{ const x = P.cleanDisc({ notes: ['a', '', 3, 'b'.repeat(500)], criteria: [{ item: 'Wind', value: '140 mph' }, { item: '', value: 'x' }], extra: 1 }); assert.deepEqual(x.notes.length, 2); assert.ok(x.notes[1].length <= 421 && x.notes[1].endsWith('…'), 'a run-on note cut with an ellipsis'); assert.deepEqual(x.criteria, [{ item: 'Wind', value: '140 mph' }]); }
 assert.equal(P.DISC_SCHEMA.additionalProperties, false); assert.ok(Object.values(P.SECTION_DISC).every(k => P.DISCIPLINES[k]));
 
 // ---------- the set's HTML ----------
 const text = P.cleanNotes({ description: 'A retail center <b>on FM 362</b>.', general_notes: ['One.', '', 'Two.', 7, 'x'.repeat(900)], codes: ['IBC'], next_steps: ['Survey'], extra: 'dropped' });
 assert.deepEqual(Object.keys(text), ['description', 'general_notes', 'codes', 'next_steps']);
-assert.deepEqual(text.general_notes.length, 3, 'empty and non-text notes dropped'); assert.equal(text.general_notes[2].length, 320, 'long notes cut to fit');
+assert.deepEqual(text.general_notes.length, 3, 'empty and non-text notes dropped'); assert.ok(text.general_notes[2].length <= 421, 'long notes cut to fit');
 const d = { plan: retail, project: { name: 'Indican <script>alert(1)</script> Waller' }, client: 'FM 362 Development LLC', address: '0 FM 362 Rd, Waller, TX 77484', county: 'Waller County, Texas', parcels: [{ label: 'a' }, { label: 'b' }],
   facts: ['FEMA flood zone X — outside the 100-year floodplain.'], notes: S.check(retail).map(i => i.text), renders: [{ src: 'data:image/jpeg;base64,AAAA', caption: 'Aerial' }], text,
   date: 'October 19, 2026', drawnBy: 'MS', projectNumber: '', revisions: [{ no: '0', date: '10/19/26', desc: 'Schematic design set' }] };
@@ -155,4 +155,27 @@ assert.equal((await call('POST', { mode: 'sheet', html: 'nope' })).code, 400, 'o
 // the border alone, which the browser lays once under a long set's bare sheets
 { const res = mock(); await handler({ method: 'GET', query: { border: '1' }, headers: { 'x-forwarded-for': '7.7.8.1' } }, res);
   assert.equal(res.headers['Content-Type'], 'application/pdf'); const bd = await PDFDocument.load(res.sent); assert.deepEqual([bd.getPage(0).getWidth(), bd.getPage(0).getHeight()], [2592, 1728]); }
+// ---------- notes that match the drawings, and the open issues (Oct 20 review) ----------
+{ const H = await import('./helpers/setctx.mjs'), SS = await import('../lib/sitesheet.mjs');
+  const c = H.ctxFor('mixed', { terrain: H.terrainFor('mixed') }), brief = P.notesBrief(c);
+  assert.match(brief, /Buildings on the plan \(the only buildings; nothing else is proposed\): .*Multifamily: 12 buildings/, 'the brief lists what is built');
+  for (const t of c.types) { assert.ok(brief.includes('Type ' + t.id + ' ('), 'type ' + t.id + ' in the brief'); assert.ok(brief.includes(t.construction), t.id + ' construction stated'); assert.ok(brief.includes(c.tf[t.id].structure.summary), t.id + ' structure stated'); }
+  assert.match(brief, /sprinklers: NFPA 13R/); assert.match(brief, /building height \d+ ft, fire access height \d+ ft \(to the eave\)/);
+  assert.match(P.NOTES_SYSTEM, /drive-throughs, townhomes/); assert.match(P.NOTES_SYSTEM, /unresolved/); assert.match(P.DISC_SYSTEM, /name exactly those/);
+  assert.equal(P.discBrief(c, 'structural', c.types).includes(c.tf.A.structure.summary), true, 'each discipline gets the decided systems');
+  // zones are named by what's built in them (the reviewed set said "Drive-thru buildings" over plain retail)
+  const plan = { ...c.plan, zones: c.plan.zones.map((z, i) => ({ ...z, name: i ? 'Back — Apartments and townhomes' : 'Front — Drive-thru buildings' })) }, rows = SS.sheetData(plan).land.map(r => r[0]).join(' | ');
+  assert.ok(!/townhome|drive-thru/i.test(rows), rows); assert.match(rows, /Front — Retail \(1 building\)/); assert.match(rows, /Back — .*Multifamily \(12 buildings\)/);
+  // open issues: a missing second access is critical, on the cover and in the brief; a plan that's fine has none of that
+  const o3 = H.ctxFor('office3'), iss = P.openIssues(o3); assert.equal(iss[0].level, 'critical'); assert.match(iss[0].text, /Fire access: 1 way in; 2 needed \(IFC D104\.1/);
+  assert.match(P.notesBrief(o3), /Open issue \(critical\): Fire access/); assert.match(P.sheetPage(o3, o3.sheets[0]), /Open issues/);
+  assert.ok(!P.openIssues(c).some(i => /Fire access/.test(i.text)), 'two ways in for 288 units: no access issue');
+  assert.deepEqual(P.preflight(H.planFor('mixed')), [], 'nothing blocks the mixed plan'); assert.equal(P.preflight(H.planFor('office3'))[0].level, 'critical');
+  assert.ok(P.openIssues({ ...c, facts: ['No water or utility district (MUD) found here: water and sewer service needs to be confirmed.'] }).some(i => /Water and sewer/.test(i.text)));
+  // the cover's building types table says how each type was designed
+  const cov = P.sheetPage(c, c.sheets.find(s => s.kind === 'cover')); assert.match(cov, /Building types/); assert.match(cov, /NFPA 13R/); assert.match(cov, /Rule-based/);
+  // notes are cut at a sentence, never mid-sentence
+  assert.equal(P.clipText('First sentence here. Second one is long and keeps going on and on.', 40), 'First sentence here.');
+  assert.ok(!/\w$/.test(P.clipText('a b c d e f g h i j k l m n o p q r s t u v w x y z', 20)));
+  const long = 'The pond outlet is a restrictor plate. ' + 'x'.repeat(500); assert.equal(P.cleanNotes({ general_notes: [long] }).general_notes[0], 'The pond outlet is a restrictor plate.'); }
 console.log('plan sets ok');

@@ -4088,14 +4088,17 @@ export function initSitePlan(ctx) {
       return '<label class="ps-sec' + (can ? '' : ' off') + '"><input type="checkbox" data-pssec="' + sec.id + '"' + (on && can ? ' checked' : '') + (sec.always || !can || busy ? ' disabled' : '') + '>' +
         '<span><b>' + esc(sec.label) + '</b>' + (can && n ? '<em>' + plural(n, 'sheet') + '</em>' : '') + '<small>' + esc(why || sec.note || '') + '</small></span></label>'; };
     const sheets = PS.sheetList(pl, { sections: [...s.sections], renders: nR, types }), sup = types.filter(t => t.supported), later = types.filter(t => !t.supported);
-    const discs = PS.pickSections([...s.sections]).filter(x => PS.SECTION_DISC[x]).length, calls = 1 + discs + (s.sections.has('arch') ? sup.length * 1.4 : 0);
-    const mins = Math.max(1, Math.round((calls * 90 / 2 + sheets.length * 8 / 3 + 20) / 60)), cost = 0.12 + discs * 0.12 + (s.sections.has('arch') ? sup.length * 0.55 : 0);
+    const byClaude = sup.filter(PD.claudeDesigns).length, discs = PS.pickSections([...s.sections]).filter(x => PS.SECTION_DISC[x]).length, calls = 1 + discs + (s.sections.has('arch') ? byClaude * 1.4 : 0); // (apartments and hotels are laid out by rule)
+    const mins = Math.max(1, Math.round((calls * 90 / 2 + sheets.length * 8 / 3 + 20) / 60)), cost = 0.12 + discs * 0.12 + (s.sections.has('arch') ? byClaude * 0.55 : 0);
+    // what the option leaves open that the set can't fix (a missing second access, a pond on high ground...): said before it's made
+    const pre = PS.preflight(pl, types, { terrain: terrainNow(pl) });
     const ai = !I ? 'Checking Claude…' : I.error ? 'Couldn’t check Claude just now: the set is made with Claude’s notes and designs if it answers.' : !I.configured ? 'Claude isn’t set up on this site (ANTHROPIC_API_KEY): the set uses rule-based building designs and standard notes.'
       : 'Claude: <b>' + esc(psModel()) + '</b> at ' + esc(psEffort()) + ' effort (Settings › AI model)' + (I.budget?.spent != null ? ' · this month ' + usd(I.budget.spent) + ' of ' + usd(I.budget.cap) : '') + '. About ' + usd(cost) + ' for this set.';
     const form = '<section class="pj-box ps-form" aria-labelledby="psH"><h3 class="pj-h3" id="psH">Make a plan set</h3>' +
       '<div class="ps-row"><label for="psOpt">Option</label><select id="psOpt"' + (busy ? ' disabled' : '') + '>' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
       (types.length ? '<div class="ps-types"><b>Building types</b> ' + sup.map(t => '<span class="tag">' + esc(t.id) + '</span> ' + esc(t.label) + ' ' + t.W + '′ × ' + t.D + '′, ' + t.floors + ' fl · ' + t.count + (t.similar ? ' (incl. ' + t.similar + ' similar)' : '')).join(' &nbsp; ') +
         (later.length ? '<small>' + esc(later.map(t => t.label + ': ' + t.why).join('; ')) + ' (site sheets only).</small>' : '') + '</div>' : '') +
+      (pre.length ? '<div class="ps-pre" role="note"><b>Before you make this set</b><ul>' + pre.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul><small>Fix these on the site plan first for a set that holds up, or make it anyway: they’re listed on the cover as open issues.</small></div>' : '') +
       '<fieldset class="ps-secs"><legend>Sections</legend>' + PS.SECTIONS.map(box).join('') + '</fieldset>' +
       '<div class="ps-row2"><div class="ps-row"><label for="psBy">Drawn by</label><input id="psBy" maxlength="12" autocomplete="off" value="' + esc(s.by ?? initials(get(NAME_KEY))) + '"' + (busy ? ' disabled' : '') + '></div>' +
         '<div class="ps-row"><label for="psNo">Project number</label><input id="psNo" maxlength="30" autocomplete="off" placeholder="Left blank" value="' + esc(p.projectNumber || '') + '"' + (busy ? ' disabled' : '') + '></div></div>' +
@@ -4144,9 +4147,10 @@ export function initSitePlan(ctx) {
     const sheets = PS.sheetList(pl, { sections, renders: nR, types, renderLabels: setRenders(pl).slice().reverse().map(r => RD.renderLabel(r.view, r.target)) });
     const prev = (pl.sets || []), no = String(prev.length ? Math.max(...prev.map(x => +x.no || 0)) + 1 : 0), day = new Date(), short = d => new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
     const revisions = prev.slice().sort((a, b) => (+a.no) - (+b.no)).map(x => ({ no: x.no, date: short(x.at), desc: x.desc || 'Schematic design set' })).concat([{ no, date: short(day), desc: no === '0' ? 'Schematic design set' : 'Schematic design set, re-issued' }]);
-    const steps = [{ key: 'notes', kind: 'claude', label: 'Cover notes' }];
-    for (const sec of sections) if (PS.SECTION_DISC[sec]) steps.push({ key: 'disc:' + PS.SECTION_DISC[sec], kind: 'claude', label: PS.sectionById(sec).label + ' notes' });
+    const steps = []; // (in the order they run: the designs, then the notes that describe them)
     if (sections.includes('arch')) for (const t of types.filter(t => t.supported)) steps.push({ key: 'design:' + t.id, kind: 'claude', label: 'Design: ' + PD.typeName(t) });
+    steps.push({ key: 'notes', kind: 'claude', label: 'Cover notes' });
+    for (const sec of sections) if (PS.SECTION_DISC[sec]) steps.push({ key: 'disc:' + PS.SECTION_DISC[sec], kind: 'claude', label: PS.sectionById(sec).label + ' notes' });
     for (const sh of sheets) steps.push({ key: sh.number, kind: 'sheet', label: sh.number + ' ' + sh.title });
     steps.push({ key: 'merge', kind: 'merge', label: 'Put ' + sheets.length + ' sheets together' });
     for (const x of steps) x.status = 'todo';
@@ -4173,17 +4177,14 @@ export function initSitePlan(ctx) {
     let claudeOff = '';
     try {
       const info = psInfo?.configured ? psInfo : await loadPsInfo(true); if (!info?.configured) claudeOff = info ? 'Claude isn’t set up' : 'the server didn’t answer';
-      const base = { plan: pl, project: P1(), ...j.base, types: j.types }, brief = PS.notesBrief({ ...base, sheets: j.sheets });
+      const base = { plan: pl, project: P1(), ...j.base, types: j.types };
       const ask = async (x, body, keep) => { // one Claude step: done, or skipped with the reason (the sheets use their defaults)
         if (x.status === 'done' || x.status === 'skipped') return; if (claudeOff) { await mark(x, 'skipped', claudeOff); return; }
         x.status = 'doing'; x.note = ''; const t0 = Date.now();
         try { const d = await claudeCall(body, ctl.signal); keep(d); j.model = d.model || j.model; x.ms = Date.now() - t0; await mark(x, 'done', d.fellBack ? 'answered by a fallback model' : ''); }
         catch (e) { if (ctl.signal.aborted) { x.status = 'todo'; throw e; } x.ms = Date.now() - t0; if (e.status === 402 || e.status === 503) claudeOff = e.status === 402 ? 'this month’s budget is used up' : 'Claude isn’t set up'; await mark(x, 'skipped', e.status === 402 || e.status === 503 ? claudeOff : 'no answer: ' + e.message.slice(0, 80)); }
       };
-      // 1. notes: the cover, then each discipline (three at a time)
-      await ask(st('notes'), { mode: 'notes', brief }, d => { j.text = d.notes; });
-      await pool(j.steps.filter(x => x.key.startsWith('disc:')), 3, x => { const k = x.key.slice(5); return ask(x, { mode: 'disc', discipline: k, brief: PS.discBrief({ ...base, sheets: j.sheets }, k, j.types) }, d => { j.disc[k] = d.disc; }); }, ctl.signal);
-      // 2. a design per building type (two at a time): Claude's, checked and fixed, else the rule-based one
+      // 1. a design per building type (two at a time): Claude's, checked and fixed, else the rule-based one
       await pool(j.steps.filter(x => x.key.startsWith('design:')), 2, async x => {
         const t = j.types.find(y => y.id === x.key.slice(7)); if (!t || x.status === 'done' || x.status === 'skipped') return;
         const seed = PD.fallbackDesign(t), fallback = why => { j.designs[t.id] = PD.placeDesign(seed, t).design; j.designBy[t.id] = 'rule-based (' + why + ')'; };
@@ -4203,10 +4204,15 @@ export function initSitePlan(ctx) {
           fallback(claudeOff || 'no answer'); x.ms = Date.now() - t0; await mark(x, 'skipped', 'rule-based design: ' + (claudeOff || e.message.slice(0, 80))); }
       }, ctl.signal);
       for (const t of j.types.filter(t => t.supported)) if (!j.designs[t.id]) { j.designs[t.id] = PD.placeDesign(PD.fallbackDesign(t), t).design; j.designBy[t.id] = 'rule-based'; }
+      // 2. the notes, written after the designs so they state each type's decided sprinklers, structure, heights and scope,
+      // and the set's open issues as open (lib/planset.mjs notesBrief): the cover, then each discipline (three at a time)
+      const terrain = await Promise.race([terrainOf(pl), new Promise(res => setTimeout(() => res(null), 30000))]);
+      const ctx0 = PS.setContext({ ...base, designs: j.designs, terrain }, j.sheets), brief = PS.notesBrief(ctx0);
+      await ask(st('notes'), { mode: 'notes', brief }, d => { j.text = d.notes; });
+      await pool(j.steps.filter(x => x.key.startsWith('disc:')), 3, x => { const k = x.key.slice(5); return ask(x, { mode: 'disc', discipline: k, brief: PS.discBrief(ctx0, k, j.types) }, d => { j.disc[k] = d.disc; }); }, ctl.signal);
       await saveJob(j);
       // 3. the sheets, drawn here and printed on the title block, three at a time (a failure is tried again twice)
       const renders = j.sheets.some(sh => sh.kind === 'render') ? await rendersForSheet(pl, 4).catch(() => []) : [];
-      const terrain = await Promise.race([terrainOf(pl), new Promise(res => setTimeout(() => res(null), 30000))]);
       const c = PS.setContext({ ...base, project: P1(), text: j.text, disc: j.disc, designs: j.designs, designBy: j.designBy, renders, date: j.date, drawnBy: j.by, projectNumber: j.projectNumber, revisions: j.revisions, terrain }, j.sheets);
       await pool(j.steps.filter(x => x.kind === 'sheet' && x.status !== 'done'), 3, async x => {
         const sh = j.sheets.find(y => y.number === x.key); x.status = 'doing'; x.note = ''; const t0 = Date.now(); let last = '';

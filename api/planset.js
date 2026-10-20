@@ -80,7 +80,7 @@ export default async function handler(req, res) {
   if (!['notes', 'disc', 'design'].includes(b.mode)) return res.status(400).json({ error: 'mode must be notes, disc, design, sheet or pdf' });
   if (!rateLimit(req, res, b.mode === 'notes' ? { perMinute: 4, perDay: 80 } : { perMinute: 30, perDay: 800 })) return;
   if (!key) return res.status(503).json({ error: 'Claude isn’t set up on this site (ANTHROPIC_API_KEY is missing), so the set’s notes can’t be written.' });
-  const brief = typeof b.brief === 'string' ? b.brief.slice(0, 14000) : '';
+  const brief = typeof b.brief === 'string' ? b.brief.slice(0, 24000) : '';
   if (brief.length < 20) return res.status(400).json({ error: 'Send the project brief.' });
   const cap = capOf(), spend = await monthSpend('planset'); // spent null: couldn't read it, so go ahead
   if (cap === 0 || (spend.spent != null && spend.spent >= cap)) return res.status(402).json({ error: budgetMessage(cap), spent: spend.spent, cap, month: spend.month });
