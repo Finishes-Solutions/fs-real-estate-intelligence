@@ -52,7 +52,7 @@ for (const v of [0, 1, 2]) {
   assert.match(html, /^<!doctype html>/i); assert.match(html, /@page\{size:17in 11in/); assert.match(html, /SCALE: 1" = \d+' ON 11" × 17"/);
   for (const h of ['Site data &amp; land use', 'Development program &amp; parking', 'Parcels', 'Notes — constraints & due diligence', 'Legend', 'CONCEPTUAL — FOR FEASIBILITY ONLY', 'SP-1']) assert.ok(html.includes(h), 'sheet has ' + h);
   assert.ok(html.includes('Westmoor &lt;Commons&gt;') && !html.includes('<Commons>'), 'names are escaped'); assert.ok(html.includes('MADDEN PARTNERS LLC') && html.includes('FEMA flood zone X'));
-  const d = G.sheetData(plan); assert.ok(d.land.some(r => r[0] === 'Front — Retail'), 'land use by zone'); assert.ok(d.program.some(r => /Townhomes — 3 bldgs/.test(r[0])));
+  const d = G.sheetData(plan); assert.ok(d.land.some(r => /^Front — Retail \(\d+ buildings?\)$/.test(r[0])), 'land use by zone, named by what is built in it'); assert.ok(d.program.some(r => /Townhomes — 3 bldgs/.test(r[0])));
   assert.match(G.sheetHTML({ plan, size: 'archd' }), /@page\{size:36in 24in/, 'ARCH D'); }
 
 console.log('mixed-use site plans ok');
