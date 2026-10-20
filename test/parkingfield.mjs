@@ -152,5 +152,42 @@ const lot5 = planOf('lot5ac'), mainOf = o => o.elements.filter(e => e.kind === '
   }
 }
 
+// ---- small pads: a retail building with a drive-thru on an acre or two (lib/sitepad.mjs) ----
+// The owner's request, as the app sends it ("6000+ sf L-shaped retail building with a drive thru drive and adequate
+// parking"): one L-shaped building of at least 6,000 sq ft, its drive-thru lane one way round it with the window on the
+// driver's side, eight or more cars of stacking behind the order point and a bypass lane, parked, every aisle through.
+// On the owner's own lot (0.93 acres, a corner, its street slanting across its side lot lines; under the Waller
+// guardrails: 26 ft fire lanes, the 5% stall reserve, detention from its volume) 6,000 sq ft doesn't park: the most that
+// does, and the note says the parking binds.
+const G = await import('../lib/guardrails.mjs');
+const OWNER = { ring: [[-97.73, 131.18], [-95.26, -78.01], [97.57, -131.62], [95.2, 78.41]], origin: [-95.9343541, 30.0575926], front: 3, streets: [2], streetsSet: true, setbacks: { rear: 20, side: 10, front: 25, paving: 10 }, elements: [] };
+const ASK = { use: 'retail', gfa: 6000, extras: ['drivethru'], form: 'L', atLeast: true, max: true, asked: { gfa: 6000 } };
+const sq = (w, d) => [[0, 0], [w, 0], [w, d], [0, d]];
+const padLots = { owner: OWNER, ac1: { ...OWNER, ring: sq(200, 218), front: 0, streets: [], streetsSet: false }, ac15: { ...OWNER, ring: sq(250, 261), front: 0, streets: [], streetsSet: false }, ac2: { ...OWNER, ring: sq(295, 295), front: 0, streets: [], streetsSet: false } };
+for (const [ln, lot] of Object.entries(padLots)) for (const waller of [false, true]) {
+  const what = 'the owner’s request on ' + ln + (waller ? ' (Waller)' : ''), plan = { ...lot, params: { fill: false, form: 'L', ...(waller ? { guard: { mode: 'on' } } : {}) }, program: S.normalizeProgram(ASK) };
+  const g = G.forLayout(plan, plan.program, {}), t0 = Date.now(), opts = L.layoutOptions(g ? g.plan : plan, g ? g.program : plan.program, g ? g.opts : {}), ms = Date.now() - t0, o = opts[0];
+  const p = g ? { ...g.plan, elements: o.elements, program: o.program } : { ...plan, elements: o.elements, program: o.program };
+  const m = sound(p, o, what, 'retail'), B = o.elements.filter(e => e.kind === 'building');
+  assert.equal(B.length, 1, what + ': one building'); assert.equal(B[0].form, 'L', what + ': L-shaped');
+  const lane = o.elements.find(e => e.note === 'Drive-thru lane'); assert.ok(lane, what + ': a drive-thru lane');
+  assert.ok(lane.stack >= 8 && lane.windowAt > lane.orderAt, what + ': ' + lane.stack + ' cars behind the order point, the window after it');
+  assert.ok(o.elements.some(e => e.kind === 'drive' && /Bypass lane/.test(e.note || '')), what + ': a bypass lane to leave the line');
+  // the window on the driver's (left) side: the building's wall 2 to 8 ft past the lane's left edge there
+  const at = S.driveThruMarks([lane]).find(q => q.line); assert.ok(at && S.inRing([(at.line[0][0] + at.line[1][0]) / 2 + (at.line[0][1] - at.line[1][1]) / 8 * 4, (at.line[0][1] + at.line[1][1]) / 2 + (at.line[1][0] - at.line[0][0]) / 8 * 4], S.outline(B[0])), what + ': the window on the driver’s side, on the wall');
+  if (ln === 'owner') { assert.ok(m.gfa >= (waller ? 5000 : 5400), what + ': ' + Math.round(m.gfa) + ' sq ft'); assert.ok(o.notes.some(t => /the parking is what binds/.test(t)), what + ': says what binds: ' + o.notes.join(' / ')); }
+  else assert.ok(m.gfa >= 6000 - 1, what + ': at least the 6,000 sq ft (' + Math.round(m.gfa) + ')');
+  assert.ok(ms < 20000, what + ': ' + ms + ' ms');
+  seen.push(what + ' ' + Math.round(m.gfa) + ' sf L ' + m.spaces + '/' + m.required + ' stack ' + lane.stack + ' ' + ms + ' ms');
+}
+// the L is drawn as asked from Site parameters alone, and from the brief; a mix's unsized shops share the total
+{ const plan = { ...padLots.ac1, params: { fill: false, form: 'L' } }, o = L.layoutOptions(plan, { use: 'retail', gfa: 6000 })[0];
+  assert.equal(o.elements.find(e => e.kind === 'building')?.form, 'L', 'Site parameters › L-shaped: an L'); }
+{ const z = S.normalizeProgram({ use: 'retail', gfa: 6000, zones: [{ use: 'retail', gfa: null }, { use: 'restaurant', gfa: null }] }).zones;
+  assert.deepEqual(z.map(q => q.gfa), [3000, 3000], 'unsized zones share the total'); }
+// a restaurant's drive-thru on the 2-acre square: one way round it, the window on the driver's side, 8 cars behind the order
+{ const plan = planOf('square2ac'), o = L.layoutOptions(plan, { use: 'restaurant', gfa: 4000, extras: ['drivethru'] })[0], lanes = o.elements.filter(e => e.note === 'Drive-thru lane');
+  assert.ok(lanes.length && lanes.every(e => e.stack >= 8), 'a restaurant on the 2-acre square: its drive-thru stacks 8 (' + lanes.map(e => e.stack).join(',') + ')'); }
+
 console.log('parkingfield: ' + seen.length + ' layouts sound');
 for (const s of seen) console.log('  ' + s);
