@@ -217,6 +217,12 @@ for (const v of [0, 1, 2]) {
   assert.ok(/Apt Bldg 7/.test(u[0].text) && /clubhouse-clubhouse-7-500-sf = Clubhouse/.test(u[0].text), 'the plan and the library go to the model');
   reply = () => ({ homeMix: [], ops: [op({ action: 'add', kind: 'entrance', x: 300, y: 0 }), op({ action: 'add', kind: 'helipad' })], refit: 'none', summary: 'A second driveway.', question: null });
   res = await call({ mode: 'edit', prompt: 'add a second entrance', plan }); assert.deepEqual(res.body.ops.map(o => [o.kind, o.x, o.y]), [['entrance', 300, 0], [null, null, null]], 'an entrance, at a point on the street');
+  // roundabouts and drop-off loops (phase 2): the plan's junctions go to the model (sanitized), and a roundabout with its size and a loop at a building come back
+  reply = () => ({ homeMix: [], ops: [op({ action: 'add', kind: 'roundabout', x: 410, y: 520, w: 120 }), op({ action: 'add', kind: 'loop', with: 'c1' })], refit: 'none', summary: 'A roundabout and a drop-off loop.', question: null });
+  res = await call({ mode: 'edit', prompt: 'add a roundabout at the main intersection and a circle drive in front of the clubhouse', plan: { ...plan, junctions: [{ at: [410.4, 519.6], legs: 4, meets: ['Main drive', 'Street · 28 ft'], main: true, ids: ['x'] }, { at: 'here', legs: 3 }] } });
+  assert.deepEqual(res.body.ops.map(o => [o.action, o.kind, o.x, o.y, o.w, o.with]), [['add', 'roundabout', 410, 520, 120, null], ['add', 'loop', null, null, null, 'c1']], 'a roundabout and a loop');
+  assert.deepEqual(JSON.parse(sent.messages[1].content.split('\n\nBuilding library')[0]).junctions, [{ at: [410, 520], legs: 4, meets: ['Main drive', 'Street · 28 ft'], main: true }], 'the junctions, as points and names');
+  assert.ok(['roundabout', 'loop'].every(k => it.properties.kind.enum.includes(k)) && /plan\.junctions/.test(it.properties.kind.description), 'the kinds in the schema');
   reply = () => ({ homeMix: [], ops: [], refit: 'none', summary: '', question: 'Which building: Bldg 7 or Bldg 17?' });
   res = await call({ mode: 'edit', prompt: 'make that one taller', plan }); assert.equal(res.body.question, 'Which building: Bldg 7 or Bldg 17?');
   // across the whole site: every piece of a use at once, and the homes on lots (not listed) by their mix of stories

@@ -69,4 +69,7 @@ assert.equal(M.keySig(plan), M.keySig({ ...plan, elements: plan.elements.slice()
 // ---- Change With AI's checklist ----
 assert.deepEqual(M.checklist(['Building A: 3 stories.', 'Removed Building F.', 'Added Pool.', 'Moved Pad A.', 'Swapped Bldg 2 and Bldg 5.', 'Nothing to change on Bldg 9.', 'Added Main Entry from the street. It meets the drive.', 'Removed Clubhouse and its pool, plaza.']),
   ['Building A → 3 stories', 'Building F removed', 'Pool added', 'Pad A moved', 'Bldg 2 ⇄ Bldg 5', 'Main Entry added', 'Clubhouse removed (with its pool, plaza)']);
+// a note that starts with a number is a sentence of its own too ("14 spaces gave way"), not part of what was added
+assert.deepEqual(M.checklist(['Added Roundabout (120 ft across) where Main entry and a 24 ft drive aisle meet. 14 spaces gave way.', 'Removed Roundabout. The streets run through the junction again.', 'Added a drop-off loop on the back of Community center. On the back facing the 24 ft drive: its front is 28 ft from the street.']),
+  ['Roundabout (120 ft across) where Main entry and a 24 ft drive aisle meet added', 'Roundabout removed', 'a drop-off loop on the back of Community center added']);
 console.log('planmap ok');

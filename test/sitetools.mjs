@@ -537,4 +537,126 @@ const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, 
   const F = S.frame([-95.8245, 29.7855]), bf = pts => { const ll = pts.map(F.toLL); return S.boundaryFrom({ type: 'Polygon', coordinates: [ll.concat([ll[0]])] }); };
   assert.equal(bf([[0, 0], [200, 0], [400, 0]]), null, 'three corners in a line: no site');
   assert.ok(S.ringArea(bf([[0, 0], [200, 1], [400, 0]]).ring) < 1000, 'all but in a line: a sliver under the 1,000 sf the editor asks for'); }
+// ---- roundabouts and drop-off loops on a real neighbourhood (phase 2): the community-center neighbourhood as
+// test/sitelayout.mjs lays it out (1200 × 900 ft, 75 homes on wave-free streets, a community park and a lake). A
+// roundabout at a junction joins its streets into one paving with a planted island, every lot stays reached; it turns,
+// moves, grows and comes off again leaving the streets exactly as they were; a drop-off loop goes where there's room ----
+{
+  const E = await import('../lib/siteedit.mjs'), site = { origin: [-95.93, 30.09], ring: [[-600, -450], [600, -450], [600, 450], [-600, 450]], front: 0, setbacks: { ...S.SETBACKS } }, home = { use: 'sfr', name: 'Single-story homes', floors: 1 };
+  const prog = { use: 'sfr', max: true, storm: 'detention', unitSf: 2400, floors: 1, zones: [home, { use: 'amenity', name: 'Central community center and park', items: ['center', 'pool', 'playground', 'lawn'] }, home] };
+  const o = L.layoutOptions(site, prog, { count: 1 })[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe }, cc = base.elements.find(e => e.kind === 'building' && e.use === 'amenity');
+  const grownE = e => e.poly ? { ...e, poly: S.grow(e.poly, 1.5) } : e.path ? { ...e, width: (e.width || 26) + 3 } : { ...e, w: e.w + 3, d: e.d + 3 };
+  const reached = els => { const D = els.filter(e => e.kind === 'drive' || e.kind === 'truck'), seen = new Set(D.filter(e => e.name === 'Main entry').map(e => e.id)), st = D.filter(e => seen.has(e.id)); while (st.length) { const e = st.pop(); for (const f of D) if (!seen.has(f.id) && S.rectsOverlap(grownE(e), grownE(f), 0)) { seen.add(f.id); st.push(f); } } return { seen, D }; };
+  const allReached = els => { const { seen, D } = reached(els); return D.filter(d => !seen.has(d.id)).map(d => d.name || d.note || d.id); };
+  const homesReached = els => { const { seen, D } = reached(els), R = D.filter(d => seen.has(d.id)).map(S.shapeOf); return els.filter(e => e.kind === 'building' && e.use === 'sfr').filter(h => !R.some(s => S.gapBetween(S.shapeOf(h), s) <= 60)).map(h => h.name); };
+  const ov = (a, b) => S.rectsOverlap({ poly: a }, { poly: b }, 0.5), homes = els => els.filter(e => e.kind === 'building' && e.use === 'sfr').length, bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text);
+  // what's over a roundabout's or a loop's lane or island: a drive across the island (the streets joined to it meet its lane), or anything else on either
+  const over = (e, els) => { const lane = S.shapeOf(e), isl = S.islandOf(e), inner = S.grow(isl, -1);
+    return els.filter(o => o !== e && (o.kind === 'drive' ? ov(S.shapeOf(o), inner) : ['truck', 'parking', 'building', 'garage', 'pond', 'pool', 'plaza'].includes(o.kind) ? ov(S.shapeOf(o), lane) || ov(S.shapeOf(o), inner) : o.kind === 'lot' ? (s => ov(s, lane) || ov(s, inner))(S.grow(S.shapeOf(o), -2)) : S.isPark(o) && (s => ov(s, lane) || ov(s, inner))(S.grow(S.shapeOf(o), -1)))).map(o => o.kind + ' ' + (o.name || '')); };
+  const geo = e => JSON.stringify(S.shapeOf(e).map(p => p.map(v => Math.round(v * 10) / 10))), drives = els => els.filter(e => e.kind === 'drive').map(geo).sort();
+  assert.ok(cc && homes(base.elements) >= 70 && !bad(base.elements).length, 'the neighbourhood: ' + homes(base.elements) + ' homes');
+  // 1. where streets meet: the T's and crossings, one main (here the main entry's), the main entry's junction marked
+  const J = S.junctionsOf(base), me = base.elements.find(e => e.name === 'Main entry');
+  assert.ok(J.length >= 6 && J.every(j => j.legs >= 3), J.length + ' junctions'); assert.equal(J.filter(j => j.main).length, 1, 'one main junction');
+  assert.ok(J.some(j => j.entry === me.id), 'the main entry ends at one'); assert.ok(J.every(j => Math.hypot(j.at[0] - cc.x, j.at[1] - cc.y) > 50), 'none in the community center');
+  // 2. a roundabout at a T on the back street (the one farthest from the community center): joined, nothing on it
+  const j = J.filter(j => j.at[1] > 250).sort((a, b) => Math.hypot(b.at[0] - cc.x, b.at[1] - cc.y) - Math.hypot(a.at[0] - cc.x, a.at[1] - cc.y))[0]; assert.ok(j, 'a junction on the back street');
+  const r = S.addRoundabout(base, [j.at[0] + 30, j.at[1] - 20], { id: 'rb1' }), rb = r.roundabout; assert.ok(rb, r.error); const g = S.ringOf(rb), P1 = { ...base, elements: r.elements };
+  assert.ok(Math.hypot(g.c[0] - j.at[0], g.c[1] - j.at[1]) <= 0.5 && Math.abs(g.R - 50) < 0.5 && rb.width === 20 && rb.pinned && rb.name === 'Roundabout', 'at the junction, 100 ft across, a 20 ft lane');
+  const stubs = r.elements.filter(e => e.cut === rb.id); assert.ok(stubs.length >= 2 && stubs.every(s => S.gapBetween(S.shapeOf(s), S.shapeOf(rb)) === 0), stubs.length + ' streets meet it');
+  assert.deepEqual(over(rb, r.elements), [], 'nothing on its lane or island'); assert.deepEqual(bad(r.elements), []); assert.deepEqual(allReached(r.elements), [], 'every drive reached from the main entry'); assert.deepEqual(homesReached(r.elements), [], 'every home on a reached street');
+  const lost = homes(base.elements) - homes(r.elements); assert.ok(lost <= 4 && (lost === 0 || r.note.includes(lost + (lost === 1 ? ' home' : ' homes') + ' made way')), lost + ' homes: ' + r.note);
+  const holes = S.pavement(P1).flatMap(pv => pv.holes).filter(h => S.inRing(g.c, h)); assert.equal(holes.length, 1, 'one surface round one island'); assert.ok(Math.abs(S.ringArea(holes[0]) / (Math.PI * 30 * 30) - 1) < 0.05, 'the island ' + Math.round(S.ringArea(holes[0])) + ' sf');
+  const dp = S.metrics(P1).paved - S.metrics(base).paved; assert.ok(dp > 0 && dp < Math.PI * (50 * 50 - 30 * 30), 'paving +' + Math.round(dp) + ' sf');
+  const D1 = S.details(P1), isl = D1.islands.find(i => i.poly && S.inRing(g.c, i.poly)); assert.ok(isl && D1.trees.some(t => S.inRing(t, isl.poly)), 'its island planted, a tree in it');
+  const fc = S.planFeatures(P1, rb.id).features; assert.ok(fc.some(f => f.properties.k === 'island') && fc.find(f => f.properties.id === rb.id).geometry.coordinates.length === 2, 'the map: the island, the ring with a hole');
+  assert.ok(!/NaN/.test(G.planSVG(P1, { px: 900 }).svg) && !/NaN/.test(S.toDXF(P1)), 'the sheet and the DXF');
+  assert.ok(T.itemSub(rb, P1) === rb.note && /100 ft across/.test(rb.note), T.itemSub(rb, P1)); assert.ok(S.hitRect(rb, g.c) && !S.hitRect(rb, [g.c[0] + 60, g.c[1]]), 'clicking its island picks it');
+  // a street that runs alongside, over its lane but too far out to be cut back to it: the check says so, and none is added there
+  { const sv = { id: 'sv', kind: 'drive', name: 'Service drive', x: g.c[0], y: g.c[1] + 45, w: 300, d: 24, rot: 0 };
+    assert.ok(S.check({ ...P1, elements: [...r.elements, sv] }).some(i => i.id === rb.id && i.level === 'bad' && i.text === 'Service drive runs across the lane of Roundabout'), 'a drive across its lane');
+    assert.match(S.addRoundabout({ ...base, elements: [...base.elements, sv] }, j.at).error || '', /: Service drive is in the way/); }
+  // 3. turned, nudged off the junction, made bigger, moved away (Alt-drag: where it's put): it joins the streets where it lands
+  { const p = structuredClone(P1), e = p.elements.find(x => x.id === rb.id), t = S.turnPiece(p, e, 30); p.elements = t.elements;
+    assert.equal(t.deg, 30); assert.ok(Math.hypot(e.x - g.c[0], e.y - g.c[1]) < 0.1 && p.elements.filter(x => x.cut === e.id).length === stubs.length, 'turned: in place, still joined'); assert.deepEqual(bad(p.elements), []);
+    S.moveBy(e, 25, 10); let q = S.reseat(p, e); p.elements = q.elements; assert.ok(Math.hypot(e.x - j.at[0], e.y - j.at[1]) <= 1, 'nudged: back on the junction'); assert.equal(p.elements.filter(x => x.kind === 'drive').length, r.elements.filter(x => x.kind === 'drive').length);
+    S.resizeRing(e, 60); q = S.reseat(p, e); p.elements = q.elements; assert.ok(Math.abs(S.ringOf(e).R - 60) < 0.5 && e.width === 20 && /120 ft across/.test(e.note), 'bigger: 120 ft across'); assert.ok(p.elements.filter(x => x.cut === e.id).length >= 2 && !over(e, p.elements).length, 'still joined, nothing on it: ' + over(e, p.elements).join(', '));
+    assert.deepEqual(bad(p.elements), [], 'bigger: ' + q.why); assert.deepEqual(allReached(p.elements), []);
+    const hard = base.elements.filter(x => ['drive', 'pond', 'pool', 'play', 'court', 'plaza'].includes(x.kind) && x.note !== 'Driveway' || x.kind === 'building' && x.use !== 'sfr' || S.isPark(x)).map(S.shapeOf), spots = []; // (a block of homes 300 ft or more away)
+    for (let x = -480; x <= 480; x += 30) for (let y = -320; y <= 320; y += 30) spots.push([x, y]);
+    const spot = spots.find(s => Math.hypot(s[0] - j.at[0], s[1] - j.at[1]) >= 300 && hard.every(h => S.gapBetween(h, S.ringDisc(s, 66)) > 0));
+    assert.ok(spot, 'somewhere off the streets'); S.moveBy(e, spot[0] - e.x, spot[1] - e.y); q = S.reseat(p, e, { free: true }); p.elements = q.elements;
+    const back = new Set(drives(p.elements.filter(x => x !== e))); assert.ok(drives(base.elements).every(k => back.has(k)), 'moved away: the junction\'s streets as they were');
+    assert.ok(S.check(p).some(i => i.id === e.id && /isn’t on a street/.test(i.text)), 'and it says it isn\'t on a street'); }
+  // 4. taken away: every street exactly as it was
+  { const els = S.dropRing(P1, rb); assert.deepEqual(drives(els), drives(base.elements), 'the streets back'); assert.ok(!els.some(e => S.isRing(e) || e.cut)); }
+  // 5. at the junction beside the community park: no room, and it says what's in the way
+  { const jp = J.find(j => j.at[0] < -150 && Math.abs(j.at[1] - 23) < 30), q = S.addRoundabout(base, jp.at); assert.match(q.error || '', /No room for a roundabout at that junction: Community park is in the way/); }
+  assert.deepEqual(T.boxSelect(P1, S.ringDisc(g.c, 70, 8)).filter(id => id === rb.id), [rb.id], 'a box round it picks it');
+  assert.deepEqual(T.dupPieces(P1, [rb.id]).ids, [], 'it isn\'t copied');
+  // 6. a drop-off loop at the community center as laid out: its front is 28 ft from the street, so it goes on the back,
+  // facing the drive past the community park (the park gives up the strip it needs)
+  const homesAt = els => homes(els), lp = S.addLoop(base, cc, { id: 'lp1' }), loop = lp.loop; assert.ok(loop, lp.error);
+  const ends = (e, els) => [e.path[0], e.path[e.path.length - 1]].every(p => els.some(x => x !== e && x.kind === 'drive' && S.inRing(p, S.shapeOf(x)))), Pl = { ...base, elements: lp.elements };
+  assert.ok(ends(loop, lp.elements) && S.ringArea(S.islandOf(loop)) >= 600, 'both ends in a drive, an island ' + Math.round(S.ringArea(S.islandOf(loop))) + ' sf');
+  assert.match(lp.note, /^On the back facing .*: its front is \d+ ft from the street, too close for a loop and its island/); assert.deepEqual(over(loop, lp.elements), []); assert.deepEqual(bad(lp.elements), []); assert.deepEqual(homesReached(lp.elements), []);
+  assert.equal(S.loopMarks(Pl).length, 6, 'three one-way arrows'); assert.ok(!/NaN/.test(G.planSVG(Pl, { px: 900 }).svg));
+  // then the community center moved into the middle of the homes (as test/sitelayout.mjs moves it): a loop in front of it, to the street
+  { const f = E.sheetFrame(base), hs = base.elements.filter(e => e.kind === 'building' && e.use === 'sfr').map(e => f.to([e.x, e.y])), bk = hs.filter(h => h[1] > f.depth * 0.6), mid = [bk.reduce((t, h) => t + h[0], 0) / bk.length, bk.reduce((t, h) => t + h[1], 0) / bk.length];
+    const mv = E.applyEdits(base, [{ action: 'move', target: cc.id, x: Math.round(mid[0]), y: Math.round(mid[1]) }]), P2 = { ...base, elements: mv.elements }, c2 = mv.elements.find(e => e.id === cc.id), q = S.addLoop(P2, c2, { id: 'lp2' }), l2 = q.loop;
+    assert.ok(l2, q.error); assert.ok(!/^On the/.test(q.note), 'in front: ' + q.note); assert.ok(ends(l2, q.elements), 'both ends in the street'); assert.deepEqual(over(l2, q.elements), []); assert.deepEqual(bad(q.elements), []); assert.deepEqual(homesReached(q.elements), []);
+    const p = { ...P2, elements: q.elements }, t = S.turnPiece(p, l2, 10); p.elements = t.elements; assert.ok(!t.why && ends(l2, p.elements), 'turned 10°: its ends still in the street');
+    const u = S.rotPt([1, 0], c2.rot || 0); S.moveBy(l2, 15 * u[0], 15 * u[1]); const s = S.reseat(p, l2); assert.ok(!s.why && ends(l2, s.elements), 'slid 15 ft along: its ends still in the street'); }
+  // a home isn't a building a loop goes in front of
+  assert.match(S.addLoop(base, base.elements.find(e => e.use === 'sfr')).error, /goes in front of a clubhouse/);
+}
+// ---- a drop-off loop in front of the apartment plan's clubhouse as laid out: 30 ft from the drive, too close for a full
+// loop and its island (44 ft), so a compact one (a 16 ft lane by the building's own walk, a narrow island) and the front
+// parking row gives way; Change With AI adds it and makes it longer ----
+{ const E = await import('../lib/siteedit.mjs'), cl = plan.elements.find(e => e.name === 'Clubhouse'), q = S.addLoop(plan, cl, { id: 'lc' }), l = q.loop, P = { ...plan, elements: q.elements }, bad = p => S.check(p).filter(i => i.level === 'bad').map(i => i.text), st = els => els.filter(e => e.kind === 'parking').reduce((t, e) => t + S.stalls(e).count, 0);
+  assert.ok(l, q.error); assert.ok(q.side === 'front' && l.width === 16 && /^A compact loop: its front is \d+ ft from/.test(q.note), q.note);
+  assert.ok([l.path[0], l.path[l.path.length - 1]].every(p => q.elements.some(x => x !== l && x.kind === 'drive' && S.inRing(p, S.shapeOf(x)))) && S.ringArea(S.islandOf(l)) >= 300, 'both ends in the drive, an island');
+  assert.deepEqual(bad(P).filter(x => !bad(plan).includes(x)), []); assert.ok(!S.check(P).some(i => i.id === l.id), 'no warning on it'); const gave = st(plan.elements) - st(q.elements); assert.ok(gave > 0 && q.note.includes(gave + ' spaces gave way'), gave + ' spaces: ' + q.note);
+  const a = E.applyEdits(plan, [{ action: 'add', kind: 'loop', with: cl.id }], { newId: () => 'lc2' }); assert.match(a.done[0] || '', /^Added a drop-off loop in front of Clubhouse\. A compact loop/); assert.equal(st(a.elements), st(q.elements), 'the same spaces give way');
+  const w = E.applyEdits({ ...plan, elements: a.elements }, [{ action: 'change', target: 'lc2', w: 120 }]), l2 = w.elements.find(e => e.id === 'lc2'); assert.ok(l2 && Math.abs(l2.w - 120) < 0.5 && /120 ft long/.test(w.done[0]), w.done.concat(w.skipped).join(' '));
+  const mv = structuredClone(P), c2 = mv.elements.find(e => e.id === cl.id); S.moveBy(c2, 0, 250); assert.ok(S.check(mv).some(i => i.id === l.id && /isn’t in front of Clubhouse any more/.test(i.text)), 'its building moved away: it says so');
+  // taken away: every space it took back, as by Change With AI
+  assert.equal(st(S.dropLoop(P, l)), st(plan.elements), 'taken away: its spaces back'); assert.equal(st(E.applyEdits({ ...plan, elements: a.elements }, [{ action: 'remove', target: 'lc2' }]).elements), st(plan.elements), 'removed by Change With AI: the same');
+  // a drive laid across its lane (not the one it hangs off) is a problem
+  { const d = { id: 'dx', kind: 'drive', name: 'Cut-through', x: (l.path[1][0] + l.path[2][0]) / 2, y: (l.path[1][1] + l.path[2][1]) / 2, w: 24, d: 200, rot: cl.rot || 0 }; assert.ok(S.check({ ...P, elements: [...q.elements, d] }).some(i => i.id === l.id && i.level === 'bad' && i.net && i.text === 'Cut-through runs across the lane of Drop-off loop'), 'a drive across its lane'); }
+  // re-fitted with the loop pinned (the editor's re-fit after an edit, the Re-fit Plan button, Change With AI's): the
+  // clubhouse and the drive the loop hangs off are where they were, the loop exactly as it was, nothing across it, and
+  // the editor keeps the re-fit (it lost nothing the plan had)
+  for (const opts of [{ amount: 'current' }, undefined, { amount: 'current', keep: true }]) { const rf = L.refit(P, opts), P2 = { ...plan, elements: rf.elements }, l2 = rf.elements.find(e => e.id === l.id), c3 = S.loopOf(P2, l2), w = JSON.stringify(opts);
+    assert.ok(l2 && JSON.stringify(l2.path) === JSON.stringify(l.path), w + ': the loop as it was'); assert.ok(c3 && c3.name === 'Clubhouse' && Math.hypot(c3.x - cl.x, c3.y - cl.y) < 1 && l2.loop.of === c3.id, w + ': its clubhouse where it was (laid out again there, or held)');
+    assert.ok([l2.path[0], l2.path[3]].every(p => rf.elements.some(x => x !== l2 && x.kind === 'drive' && S.inRing(p, S.shapeOf(x)))), w + ': both ends in a drive'); assert.deepEqual(S.check(P2).filter(i => i.id === l.id).map(i => i.text), [], w);
+    assert.deepEqual(bad(P2).filter(x => !bad(plan).includes(x)), [], w); assert.ok(T.refitVerdict({ m: S.metrics(P), issues: S.check(P) }, { m: S.metrics(P2), issues: S.check(P2) }).ok, w + ': kept by the editor'); }
+  // and the editor doesn't keep a re-fit that leaves a loop hanging off no drive (or away from its building)
+  { const hung = P.elements.filter(e => !(e.kind === 'drive' && e !== l && [l.path[0], l.path[3]].some(p => S.inRing(p, S.shapeOf(e))))); assert.equal(T.refitVerdict({ m: S.metrics(P), issues: S.check(P) }, { m: S.metrics(P), issues: S.check({ ...P, elements: hung }) }).why, 'problems', 'its drive gone: not kept'); } }
+// ---- two roundabouts on one street, and one at an entry whose median it took (240 homes asked on the 20-acre tract,
+// its streets bent): taken away in either order, or moved off, the streets come back whole, every drive reached; the
+// entry gets its median and sign back, the corner sign the roundabout put up goes ----
+{
+  const t2 = { ...S.unionParcels([mk([-95.6954, 29.6657], [[0, 0], [716, 25], [759, 1244], [-47, 1219]])]), front: null, setbacks: { ...S.SETBACKS } }, o2 = L.layoutOptions(t2, { use: 'sfr', units: 240 })[0], base = { ...t2, program: o2.program, elements: o2.elements, recipe: o2.recipe };
+  const grownE = e => e.poly ? { ...e, poly: S.grow(e.poly, 1.5) } : e.path ? { ...e, width: (e.width || 26) + 3 } : { ...e, w: e.w + 3, d: e.d + 3 };
+  const lost = els => { const D = els.filter(e => e.kind === 'drive' || e.kind === 'truck'), seen = new Set(D.filter(e => e.name === 'Main entry').map(e => e.id)), st = D.filter(e => seen.has(e.id)); while (st.length) { const e = st.pop(); for (const f of D) if (!seen.has(f.id) && S.rectsOverlap(grownE(e), grownE(f), 0)) { seen.add(f.id); st.push(f); } } return D.filter(d => !seen.has(d.id)).map(d => d.name || d.note || d.id); };
+  const geo = e => JSON.stringify(S.shapeOf(e).map(p => p.map(v => Math.round(v * 10) / 10))), drives = els => els.filter(e => e.kind === 'drive').map(geo).sort(), bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text);
+  const parts = els => S.entryParts({ ...base, elements: els }, els.find(e => e.name === 'Main entry')).map(x => (S.isMedian(x) ? 'median ' : x.kind + ' ') + x.id + ' ' + geo(x)).sort(), at = (els, c) => els.some(e => e.kind === 'drive' && !S.isRing(e) && S.inRing(c, S.shapeOf(e)));
+  const J = S.junctionsOf(base), je = J.find(j => j.entry), p0 = parts(base.elements); assert.ok(je && p0.some(x => /^median/.test(x)), 'the main entry has a median');
+  // at the entry: its median goes (too little room left), the signs stand at the corners; taken away or moved, they're as they were
+  const r = S.addRoundabout(base, je.at, { id: 'E' }), P1 = { ...base, elements: r.elements }; assert.ok(r.roundabout && !parts(r.elements).some(x => /^median/.test(x)) && /corners/.test(r.note), r.error || r.note);
+  { const d = S.dropRing(P1, r.roundabout); assert.deepEqual(parts(d), p0, 'taken away: the median and the sign back, the corner sign gone'); assert.deepEqual(drives(d), drives(base.elements)); assert.deepEqual(bad(d), []); }
+  { const p = structuredClone(P1), e = p.elements.find(x => x.id === 'E'), jn = J.filter(j => j !== je && !S.addRoundabout(base, j.at).error).sort((a, b) => Math.hypot(a.at[0] - je.at[0], a.at[1] - je.at[1]) - Math.hypot(b.at[0] - je.at[0], b.at[1] - je.at[1]))[0];
+    S.moveBy(e, jn.at[0] - e.x + 10, jn.at[1] - e.y + 5); p.elements = S.reseat(p, e).elements; assert.ok(Math.hypot(e.x - jn.at[0], e.y - jn.at[1]) < 0.5, 'moved: on the next junction'); assert.deepEqual(parts(p.elements), p0, 'moved off the entry: its median and sign back'); assert.deepEqual(lost(p.elements), []); assert.deepEqual(bad(p.elements), []); }
+  // a second one down the street from it (it cuts a piece the first one cut): either taken away first, the other stays joined
+  const jb = J.filter(j => j !== je).find(j => { const q = S.addRoundabout(P1, j.at, { id: 'B' }); return q.roundabout && q.roundabout.rb.cuts.some(k => k.was.cut === 'E'); }); assert.ok(jb, 'a junction on a street the first one cut');
+  const r2 = S.addRoundabout(P1, jb.at, { id: 'B' }), P2 = { ...base, elements: r2.elements }; assert.deepEqual(lost(r2.elements), []); assert.deepEqual(bad(r2.elements), []);
+  { const ids = r2.elements.map(e => e.id); assert.equal(new Set(ids).size, ids.length, 'every piece its own id (the second one\'s stubs too)'); }
+  for (const [a, b] of [['E', 'B'], ['B', 'E']]) {
+    const d1 = S.dropRing(P2, r2.elements.find(e => e.id === a)), rb = d1.find(e => e.id === b), c = S.ringOf(r2.elements.find(e => e.id === a)).c;
+    assert.deepEqual(lost(d1), [], a + ' taken away first: every drive reached'); assert.deepEqual(bad(d1), [], a + ' first'); assert.ok(at(d1, c), a + ' first: the street runs through where it was');
+    assert.ok(d1.filter(e => e.cut === b).length >= 2 && S.gapBetween(S.shapeOf(d1.find(e => e.cut === b)), S.shapeOf(rb)) === 0, 'the other still joined');
+    const d2 = S.dropRing({ ...base, elements: d1 }, rb); assert.deepEqual(drives(d2), drives(base.elements), 'then ' + b + ': the streets exactly as they were'); assert.deepEqual(parts(d2), p0); }
+  { const p = structuredClone(P2), e = p.elements.find(x => x.id === 'E'), c = S.ringOf(e).c; S.moveBy(e, 0, -2000); p.elements = S.reseat(p, e, { free: true }).elements; assert.deepEqual(lost(p.elements.filter(x => x !== e)), [], 'the first moved away (off the lot): every street reached'); assert.ok(at(p.elements, c), 'the street runs through where it was'); }
+}
 console.log('site tools ok');
