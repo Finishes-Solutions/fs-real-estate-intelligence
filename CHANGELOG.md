@@ -3,6 +3,30 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-20
+
+### 4:39 AM CT: Mixed sites in pods (30c4502)
+- **Mixed sites can now be laid out in pods**, the way master-planned communities are drawn. On a mixed site of 40 acres or more (or from 15 acres when you say where a use goes, or when the usual layouts can't fit the program), a collector road goes in first: the main entry boulevard, then a loop road round a central commons and lake, a loop road one block in from the lot lines, or a spine road (with a T on bigger sites, a cul-de-sac on small ones). Side streets get a connector with their own way in. Greenbelts with a trail run between the pods.
+- **Each pod gets one use and its own street direction**, so apartments can face the highway while the homes run another way. Every use is sized by a quick trial first, so a pod takes about the land its use needs. Shops get a block about as deep as it is wide. Land a pod doesn't need is open space, never blank, and when the lake is short the larger open spaces become simple rounded ponds clear of the buildings and lots. Streets inside each pod are straight for now.
+- **Say where things go and the pods follow it:** "retail at the corner of FM 362 and Bauer Road", "apartments along the highway" (or "along Highway 6", by name), "the commons in the middle", "homes at the back", "townhomes between the retail and the homes", "600 homes around a lake". This works with the AI and without it. Road names are read from the map, and the AI is told them. The notes say which placements were met and which weren't, and why.
+- **Ranking:** pods layouts are ranked with the usual zones-from-the-street layouts. A pods layout only goes ahead of one when it scores better and keeps every use within 3% of it (counted up to what you asked for). The best zones-from-the-street layout always stays in the list. A pods layout where a whole use came to nothing isn't offered.
+- **Re-lay a pod or swap two:** select a piece in a pod and the Selected box says which pod it's in, with **Re-lay This Pod** and **Swap With…** (one Undo takes it back). Change With AI understands "re-lay the apartments", "redo this pod", "swap the apartments and the retail", "make the apartments pod 4 stories", "make the retail pod 80,000 sf" and "call the north section The Lakes".
+- **Re-fits keep the pods:** after you move or add a piece, only the pod it's in is laid out again; a new home mix re-lays the pods of homes. A collector road moved off its junction gets a short drive back; a deleted one leaves each pod joined to the nearest street still reached from a way in. The notes say when a pod ends up holding noticeably less, and count the homes that made way.
+- **Settings › Mixed sites › Layout style** (shown where pods can be laid out): pods and bands, best first (the default); pods round a loop road; or bands from the street back.
+- **Map and PDF:** a part laid out in several pods is named in sections ("Homes · Section 2"), with a smaller Section label on each extra pod. On the PDF sheet, part names on every mixed plan are now sized to fit inside their part (a little larger than before), and a part in several pods gets a total row before its sections.
+- **Also fixed:** "600 homes around a lake" no longer puts the 600 units on the commons. A commons said with a lake and other things keeps its lake. Big plans check overlaps faster, so a 246-acre build with three options takes about 31 s instead of 41 s.
+- **Numbers on today's sites:** the first layout is the same as before on every test site. Building now takes longer where pods are tried: the 101-acre test site goes from about 3 s to 15 s, and a 250-acre mixed build with pods takes up to about a minute.
+- **Not done yet / known rough edges:**
+  - **Pods round a loop road** in Settings runs the pods search, but its layouts are still ranked and checked as in the default, so on some sites no pods layout is offered.
+  - On the loop-road layout, a commons placed "at the back" can be split over two or three pods, each with its own lake, pavilion, courts and playground.
+  - A townhome pod with a number can hold more than asked (197 of 150 on one test site) at the homes' expense, so a pods plan that keeps every placement can rank last.
+  - The pods layout can still go first with about 30% fewer homes than the other layouts when the homes have no number.
+  - In a plain comma list ("20,000 sf retail, 200 apartments, homes at the back") a placement can also be read onto the use named before it. Without the AI, "apartment homes around a courtyard" is now read as houses.
+  - On one turned 154-acre test site the detention pond takes more land than it needs, one homes pod is left with a single home, and the shops have lawn left over.
+  - A pod renamed with Change With AI takes its old name back after a re-fit, re-lay or swap, and the new name doesn't show on the map.
+  - Pods plans on the 101- and 160-acre test sites have two ways in where the other layouts have three. Saved pods plans made before this push can re-lay one pod on a re-fit even with nothing moved.
+  - The new editor buttons and Settings row have only partly been tried in a browser.
+
 ## 2026-10-19
 
 ### 11:57 PM CT: Roundabouts and drop-off loops (aa618b3)
