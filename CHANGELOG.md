@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-20
 
+### 5:07 PM CT: Driveways come in square to the street (a150312)
+- On a lot whose street slants across the layout (like the 0.93-acre Waller corner lot), the main entrance used to run in at the layout's angle: it met the street crooked, with one curb return tiny and the other long. It now leaves the street at a right angle with even curb returns, then curves round a few car lengths in to meet the drive square.
+- An entrance added with **Add Entrance** (or a second way in the planner adds) does the same, so it no longer hits the drive at an angle with a corner of pavement sticking out past it; its end sits inside the drive.
+- The stop bar and the double yellow centre line follow the driveway's curve, and **Edit Shape** on a curved entrance bends it along its real centre line.
+- Where a street runs square to the layout, or the curve doesn't fit, driveways are drawn straight in as before.
+
 ### 10:17 AM CT: The site plan work joins main's plan sets, renderings and ground elevations (merged 8af0e2a)
 - The small-lot, L-shaped building and drive-thru fixes now sit on top of main's plan sets, project-page renderings and lidar ground elevations; nothing from either side changes.
 
