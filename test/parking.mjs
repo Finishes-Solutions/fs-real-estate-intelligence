@@ -132,8 +132,11 @@ for (const [what, plan, prog] of cases) {
 {
   const o = L.layoutOptions(small, S.guessProgram('25,000 sf retail strip'))[0], p = { ...small, elements: structuredClone(o.elements) };
   assert.deepEqual(S.check(p).filter(i => /no aisle/.test(i.text)), [], 'every generated row faces an aisle');
-  const row = p.elements.filter(e => e.kind === 'parking' && e.row).sort((a, b) => b.w - a.w)[0], u = [-Math.sin((row.rot || 0) * Math.PI / 180), Math.cos((row.rot || 0) * Math.PI / 180)], sg = row.row > 0 ? -1 : 1;
-  row.x += u[0] * sg * 60; row.y += u[1] * sg * 60; // 60 ft back, away from the aisle it faced
+  // (the longest row at the edge of the field: rows inside it sit a whole module apart, so one moved 60 ft back would just
+  // face the next aisle over)
+  const back = e => { const u = [-Math.sin((e.rot || 0) * Math.PI / 180), Math.cos((e.rot || 0) * Math.PI / 180)], sg = e.row > 0 ? -1 : 1; return { ...e, x: e.x + u[0] * sg * 60, y: e.y + u[1] * sg * 60 }; };
+  const paved = p.elements.filter(e => S.PAVED.includes(e.kind)), onPaving = e => paved.some(q => q.id !== e.id && S.rectsOverlap(e, q, 1));
+  const row = p.elements.filter(e => e.kind === 'parking' && e.row).sort((a, b) => b.w - a.w).find(e => !onPaving(back(e))), moved = back(row); row.x = moved.x; row.y = moved.y; // 60 ft back, away from the aisle it faced
   assert.ok(S.check(p).some(i => i.id === row.id && /has no aisle to drive in from/.test(i.text)), 'the moved row is flagged: ' + S.check(p).map(i => i.text).join('; '));
 }
 // ---- a way through: aisles don't stop at a curb with stalls along them ----
