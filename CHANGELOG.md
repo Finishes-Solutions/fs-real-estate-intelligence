@@ -5,6 +5,20 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 8:28 PM CT: Plan sets, renderings from the project page and ground elevations go to main (bb5ed4f)
+- Everything from this branch joins the main app: **Sites / Renderings / Plans** tabs, full schematic plan sets on the title block, renderings made in the background from the project page, buildings drawn in their real shape, and ground elevations from USGS lidar.
+- Merged with the latest main (parking fields, the AI's commercial brief, Waller guardrails, New Option and deleting): the Renderings tab keeps **Delete all** without **Open plan** / **Render more**, Waller plans also get the ground, and the new parking-field layouts put the pond on the low side too.
+
+### 6:41 PM CT: Ground elevations: creeks aren't counted as the fall (8624d15)
+- Checked against real USGS lidar on the test deployment: a 7.7 acre site near Waller came back as 1 m lidar in about 2 seconds, and a 200 acre tract near Katy too.
+- That tract read 76 to 100 ft but slopes only 0.1% overall: the low point is a channel. The ground row and the plan set now give **how far the land as a whole falls** across the site, show where most of the ground sits, and **call out a creek, ditch or pond** that dips well below the rest, with a reminder to check for a floodway or drainage easement. The pond placement uses the same range, so a creek bed doesn't skew it.
+
+### 6:25 PM CT: Ground elevations from USGS lidar (6a714fd)
+- **Each project's Jurisdiction & site box now shows the ground elevation:** the lowest and highest ground (feet above sea level), how far and which way it falls ("falls about 5.5 ft to the south-east"), and, where FEMA gives a base flood elevation, whether any of the ground is below it (marked in amber). Projects checked before today look again once by themselves.
+- **Build puts the detention pond on the low side** of the site when the land falls more than a foot and a half, and the AI planner is told which way the land falls.
+- **Plan sets use the real ground:** the existing conditions sheet (C-001) draws contours with the low and high points instead of "Topography not surveyed", and the grading sheet (C-201) grades from real elevations: existing contours under the proposed ones, the pond's bank at the real ground, finished floors a foot over the ground, a rough cut and fill estimate, and a warning when the pond sits on high ground.
+- The elevations are USGS lidar of the bare ground (1 m detail where flown, most of Texas), asked for once per site and kept on your device. They're good for planning, not a survey. If USGS is down, a rougher model is used and marked approximate (it isn't drawn as contours).
+
 ### 6:23 PM CT: The AI decides what's built on commercial sites (fdf013e, 5b6e987, a38845c, merged 7eb3363; and the scenario wording)
 - On **Medium, High and Ultra**, for shops, restaurants, offices, medical offices, hotels and churches, the AI now says exactly what to build: how many buildings and pad sites, their sizes and floors, where they sit and which way they face, how the parking is arranged, which side the pond goes on and whether there's a service drive, each with a one-line reason.
 - The planner draws it as **AI's plan** beside its own layouts and ranks it the same way, by the leasable floor area that parks and passes the checks; it's recommended only when it does best. Its card lists the AI's reasons and anything the planner had to change.
@@ -13,12 +27,41 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - "With 2 pad sites" or "an outparcel" now places the pads at every effort level, and offices and medical offices can go to two floors unless you asked for one story.
 - On Waller plans, when all three scenarios come out the same, Numbers says so (the unresolved items could still change it) instead of calling one number a range.
 
+### 5:54 PM CT: Floor plans, elevations and sections follow the building's shape (14954c0)
+- **The architectural sheets now draw L-shaped, U-shaped and stepped buildings as they are on the site plan:** the floor plan's outside wall follows every corner, with a dimension for each jog; the roof plan follows the outline; each elevation shows the set-back walls as their own panels behind the nearer ones; and the sections cut across the actual wing (50 ft across an L's wing, not the 100 ft box around it). Areas on the plans, code analysis and life safety sheets are the building's real area.
+- **Much smaller sheets:** brick, siding, shingles, concrete and insulation are drawn with light line work instead of fill patterns. The biggest architectural sheet went from 11.9 MB to under 0.8 MB. That size is what made one sheet fail in the first full set; it shouldn't happen now.
+
+### 5:38 PM CT: Engineering sheets follow the building's shape; much smaller sheets (efc4d39)
+- **Structural, mechanical, plumbing, electrical, fire and telecom sheets now draw L-shaped, U-shaped and stepped buildings by their real outline:** the slab edge and beams run along every wall, ducts and pipes stay inside the building, sprinkler heads and rooftop units never land in the open corner, and meters, the fire department connection and other outside equipment sit on a real outside wall. Exit signs and pull stations face the right way at an L's inside corner.
+- **The biggest engineering sheets are 4 to 9 times smaller** (the largest is now about 0.6 MB, down from as much as 3.4 MB), so a big set downloads and opens much faster and a sheet is far less likely to fail for being too big. Hatched areas on the foundation and detail sheets are now light tints.
+
+### 5:35 PM CT: Plan sets follow the building's shape; smaller set files (2e6d942, 44abfcf)
+- **L-shaped, U-shaped and stepped buildings are now designed as that shape**, not as the rectangle around them. The building type's name says so ("L-shape, 150' × 100' overall"), the rooms fill the real outline, the open corner or courtyard stays open, and the area is the outline's. Claude is told the corners and where the open ground is, and the checks catch a room in the wrong place. The drawings that follow the outline (walls, roof, elevations, foundation, MEP and sprinklers) arrive in the next push.
+- **Smaller PDFs:** the title block is now stored once for the whole set instead of on every sheet, about 160 KB less per sheet. Sets already under way finish the old way.
+- In homes made by the standard rule-based design, every upper floor now has a bathroom.
+
 ### 5:10 PM CT: Drag faces, shape parking, face the building, precise turns (ae15452, 7780aa0, merged 42caa3e)
 - A selected building shows a bar on each side, a custom L included. Drag it and that face moves straight out or in, the sides beside it keep their direction, and a label shows the face's length and how far it moved.
 - Parking takes **Edit Shape**: add and drag points or faces, and the stalls refill the outline with whole stalls in rows on an aisle, none cut by the edge. Every count and drawing follows: Numbers, the pro forma, the PDF, the DXF and the Waller parking checks.
 - **Stall Direction** turns the stalls 90° inside the same outline. **Face the Building** points them at the nearest building face, the L's inner face included, with the aisle along it and a walk's width off it.
 - Turning is free to the degree and settles square to the street, the site edges and nearby buildings within 2°, with a guide line. **Shift** turns in 15° steps (45°, 90° and so on); it used to do the opposite. The Turn field takes any degrees, and custom shapes can be turned.
 - Shift while dragging a face or point gives whole feet and square corners. Handles no longer steal clicks meant for the piece next door, and on a phone a finger resting on a handle no longer opens the menu.
+
+### 5:03 PM CT: Plan set drawings refined, with tests (36f764e)
+- Sheets: the architectural sheets are refined further.
+- Tests now check every site/civil, architectural and engineering sheet on ten realistic plans: shops, a restaurant, townhomes, 71 homes, a warehouse, a 3-story office, medical, a c-store, duplexes and a church.
+
+### 4:58 PM CT: Full plan sets, part 2: the drawings, first draft (320cca2)
+- **The placeholder sheets are now real drawings:**
+  - **Site & civil and landscape:** existing conditions with the boundary's bearings and lengths, dimension and paving, typical lot plans, grading and drainage, detention, utilities, erosion control, civil details, landscape plan and details.
+  - **Each building type:** floor and roof plans, elevations, sections, door / window / finish schedules, foundation and framing plans, HVAC, plumbing, power and lighting, and for commercial buildings sprinkler, fire alarm and life safety plans.
+  - **Sheets for the whole set:** wall sections and details, code analysis, the engineering notes and schedules, riser and one-line diagrams, site lighting, fire access and hydrants, and telecom when ticked.
+- This is a first draft: the drawings are still being refined, and a final version follows.
+
+### 4:56 PM CT: Renderings made in the background (a25d280)
+- **Render on the Renderings tab no longer takes you to the map.** The option's 3D view is set up on a hidden map behind the scenes and the picture is taken from that, so you stay on the project page or carry on elsewhere in the app.
+- The form shows **Rendering 1 of 4** and what's happening, with **Cancel**. The new pictures appear below when they're ready, and a message says so wherever you are in the app.
+- The **Open plan** and **Render more** links beside each option's renderings are gone.
 
 ### 4:56 PM CT: Parking fields for shops, offices and the like (aae331f, 5f3bd7d, d397bc4, 4b4fae1, 2eaf3ed, 3dcbf5f, 09a8f8e, merged e97cc60)
 - Layouts for retail, restaurants, offices, medical offices, hotels and churches now come out the way a civil engineer would sketch them: whole, straight rows on both sides of every aisle; a drive round both ends of every aisle, so there are no dead ends; a fire lane that puts every wall within reach of a fire truck; a clear entry drive with no stalls backing into it; a service drive behind shops and restaurants with the trash enclosures on it; planted islands at row ends and along long rows; and one pond on the land left over.
@@ -27,6 +70,53 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - Dragging a building re-fits the parking to face it where it now is.
 - Layouts come back faster: about 1–4 seconds on 5 acres.
 - A few small or oddly shaped lots now get less floor area than before, because the old layouts there had dead ends, cars in the entry drive or walls out of fire-truck reach (for example a restaurant on a 2-acre square: 6,000 → 4,822 sf with a service drive; 5,357 sf without it as the second choice).
+
+### 4:39 PM CT: Tidier Make renderings form (ec75352)
+- The Option, View, Materials and Light dropdowns on the Renderings tab no longer run into each other. They sit in an even row of four on a computer, two by two on a tablet and one under another on a phone, with space between the form and what's below it. The Plans tab's form gets the same fix.
+
+### 4:31 PM CT: Full plan sets, part 1: the engine (7d59f39)
+- **Plans can now make a whole set** (up to about a hundred sheets) from an option: general and code sheets, site and civil, landscape, and for each building type the architecture, structural, mechanical, plumbing, electrical and fire sheets, plus telecom when ticked and the renderings.
+- **Building types:** the option's buildings are grouped into types A, B, C… (each distinct building, or one townhome / duplex unit), up to eight. Claude designs each one's floor plans. Every design is checked for fit, overlaps, access, bedroom sizes and windows, and exits; if it fails, Claude is told what's wrong and tries again, up to twice, before a standard rule-based design is used.
+- **Progress you can see:** a panel shows a progress bar, sheets drawn, time so far and time left, what's happening now, and every step. The browser tab's title shows the count. **Pause** and **Resume** carry on where it stopped, even after closing the app.
+- **G-002 General notes:** general notes, codes, every symbol and line type used in the set, and abbreviations.
+- In this push the drawings for the other sheets are still placeholders: they follow in the next push.
+
+### 4:12 PM CT: Make renderings from the project page (31e0120)
+- **Renderings tab:** a new **Make renderings** form at the top. Pick the option, the view (corner, street, entry, back, a close-up of the building nearest the street, or all four), the materials and the light, then press **Render**.
+- The picture is still taken from the option's 3D view on the map, so the option opens there and the progress shows in its panel. When the pictures are ready you're brought back to the Renderings tab.
+
+### 3:26 PM CT: Plan sets, phase 1, and Options renamed Sites (de1d75f)
+- **New Plans tab on each project:** it makes a schematic design drawing set from one option, every sheet on the Finishes Solutions title block, 24 × 36.
+- **Pick your sections first:** tick the sections you want before making the set, and each box shows how many sheets it adds.
+  - General is always in.
+  - Site & civil and Renderings are ready now.
+  - Architecture, structural, MEP, fire and landscape are listed and greyed out until their phases.
+  - Telecom starts unticked.
+- **The sheets so far:**
+  - **G-001 Cover:** the project's name, a key plan, project data, program and parking, the sheet index, the project team and the vicinity map. Claude writes the project description, general notes, codes and next steps.
+  - **C-101 Overall site plan:** drawn to scale with north arrow, scale bar, legend, tables and notes.
+  - **A-901 to A-904:** one AI rendering a sheet.
+- **Your title block:** your AutoCAD border with the plot stamp and the firm number taken off. The app fills in the project, client, phase, date, scale, drawn by, project number (blank is fine), sheet title and number, and the issue / revision table.
+  - Every sheet says "Preliminary — not for construction, bidding or permit", and that the drawings are schematic, made with AI assistance and not sealed.
+- **Issues:** each new set of an option is the next issue (0, 1, 2…), and the revision table lists them all. **Sets made** lists every set with **Download PDF** and **Delete**, and says "plan changed since" when the option has changed. The PDF stays on the device that made it, like renderings.
+- **Claude settings:** Settings › AI model › **Plan sets** picks Claude's model (default Claude Opus 5.5) and effort (default Medium), and shows this month's spend against the $100 plan set budget.
+  - Without the Claude key, or with the budget spent, sets are still made and the cover says the notes were left out.
+  - The cover notes cost cents per set.
+- **Options is now Sites** on the project page. Old links still open it.
+
+### 2:56 PM CT: Plan sets plan: your choices recorded (78d55a0)
+- **Planning only.** More decisions are now in `PLANSET-PLAN.md`:
+  - The project page's Options tab will be renamed **Sites**. Old links still work.
+  - Before making a set, you tick the sections you want: site and civil, landscape, architecture, structural, mechanical, plumbing, electrical, fire, renderings and telecom. Each shows how many sheets it adds, and the cost estimate updates as you tick. Telecom starts unticked.
+  - The title block will be used without the AutoCAD plot stamp and without the firm number, for now.
+  - Claude Opus 5.5 is the default model.
+
+### 2:46 PM CT: Plan sets plan: medium effort, $100 a month (f857098)
+- **Planning only.** Two decisions are now in `PLANSET-PLAN.md`: plan sets will use Claude at medium effort by default (changeable in Settings), with a budget of $100 a month. When the month's budget is spent, new sets wait for the next month. That's roughly 5 to 12 large sets a month, and more for small sites or sets that reuse saved building designs.
+
+### 2:35 PM CT: Plan for full plan sets from a site plan (431cdcb)
+- **Planning only, nothing in the app changes.** `PLANSET-PLAN.md` sets out how an option's site plan would become a schematic design set of drawings, all on the Finishes Solutions title block: cover, civil and site, landscape, architecture, structure, mechanical, plumbing, electrical, fire, and telecom if wanted. Project pages would read Sites · Renderings · Plans.
+- It defines what a "full set" contains: which sheets, their numbers, and when each one is included. It also covers how Claude would design each building type for a person to approve and save to the team library, how code would draw and cross-check every sheet from the plan, and the settings for the Claude API key and model, with costs and a monthly cap.
 
 ### 12:48 PM CT: Waller guardrails (74e9484, 7679147, 3d49721, 0b4e808, 23a7ab5, 86ead22, merged 56135b7; 1efc95a)
 - Sites inside the City of Waller, or within half a mile of its limits (its ETJ, unverified), are now planned under the Finishes Solutions Waller site-planning standard. Every other site is planned exactly as before. Site parameters has a **Waller guardrails: Auto / On / Off** switch.

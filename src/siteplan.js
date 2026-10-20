@@ -18,6 +18,10 @@ import * as MAP from './lib/planmap.mjs';
 import * as T from './lib/sitetools.mjs';
 import * as RD from './lib/render.mjs';
 import * as PJ from './lib/project.mjs';
+import * as PS from './lib/planset.mjs';
+import * as PD from './lib/plandesign.mjs';
+import * as TR from './lib/terrain.mjs';
+import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, pickedClaude, pickedEffort } from './lib/aimodels.mjs';
 import * as CU from './lib/customtypes.mjs';
 import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
@@ -55,6 +59,7 @@ export const ADD_ICON = Object.fromEntries(Object.entries({
 }).map(([k, d]) => [k, '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>']));
 export const addAccent = k => k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building;
 const get = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const PS_PICK = { model: () => pickedClaude(get(PLANSET_MODEL_KEY)), effort: () => pickedEffort(get(PLANSET_EFFORT_KEY)) }; // Settings › AI model › Plan sets
 // Ultra's mark (the effort levels under Build): a four-point spark and a small one beside it
 const SPARK = '<svg class="sp-spark" width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7 1.5c.45 3.35 1.95 4.85 5.3 5.3-3.35.45-4.85 1.95-5.3 5.3-.45-3.35-1.95-4.85-5.3-5.3C5.05 6.35 6.55 4.85 7 1.5z"/><path fill="currentColor" opacity=".7" d="M13 10.3c.17 1.25.73 1.8 1.97 1.97-1.24.17-1.8.72-1.97 1.97-.17-1.25-.73-1.8-1.97-1.97 1.24-.17 1.8-.72 1.97-1.97z"/></svg>';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -556,14 +561,15 @@ export function initSitePlan(ctx) {
   const SRC = 'fs-sp', HSRC = 'fs-sp-h', DSRC = 'fs-sp-d', XSRC = 'fs-sp-x', GRSRC = 'fs-sp-g', EMPTY = { type: 'FeatureCollection', features: [] };
   const coarse = () => matchMedia('(pointer:coarse)').matches; // fingers: bigger handles, a wider reach, the turn dot further out
   let ids = [], dimmed = null;
-  function addLayers() {
-    if (map.getSource(SRC)) return;
+  // mp: the map to draw on: the page's, or a hidden one a background rendering takes its picture from (renderInBackground)
+  function addLayers(mp = map) {
+    if (mp.getSource(SRC)) return;
     const kind = k => ['==', ['get', 'k'], k], P = MAP.palette(), C = P.col, Ln = P.lines, Lb = P.label, big = coarse();
-    const add = def => { map.addLayer(def); ids.push(def.id); };
-    ids = []; dimmed = null;
-    map.addSource(SRC, { type: 'geojson', data: EMPTY }); map.addSource(HSRC, { type: 'geojson', data: EMPTY }); map.addSource(DSRC, { type: 'geojson', data: EMPTY }); map.addSource(XSRC, { type: 'geojson', data: EMPTY }); map.addSource(GRSRC, { type: 'geojson', data: EMPTY }); gridKey = '';
-    const hatch = 'sp-hatch'; if (!map.hasImage(hatch)) { const n = 12, px = new Uint8Array(n * n * 4), [r, g, b] = [1, 3, 5].map(i => parseInt(Ln.keepout.slice(i, i + 2), 16)); // an easement's diagonal stripes
-      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const on = (x + y) % n < 2, i = (y * n + x) * 4; px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = on ? 200 : 0; } try { map.addImage(hatch, { width: n, height: n, data: px }); } catch (e) { /* plain fill below */ } }
+    const add = def => { mp.addLayer(def); if (mp === map) ids.push(def.id); };
+    if (mp === map) { ids = []; dimmed = null; }
+    mp.addSource(SRC, { type: 'geojson', data: EMPTY }); mp.addSource(HSRC, { type: 'geojson', data: EMPTY }); mp.addSource(DSRC, { type: 'geojson', data: EMPTY }); mp.addSource(XSRC, { type: 'geojson', data: EMPTY }); mp.addSource(GRSRC, { type: 'geojson', data: EMPTY }); gridKey = '';
+    const hatch = 'sp-hatch'; if (!mp.hasImage(hatch)) { const n = 12, px = new Uint8Array(n * n * 4), [r, g, b] = [1, 3, 5].map(i => parseInt(Ln.keepout.slice(i, i + 2), 16)); // an easement's diagonal stripes
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const on = (x + y) % n < 2, i = (y * n + x) * 4; px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = on ? 200 : 0; } try { mp.addImage(hatch, { width: n, height: n, data: px }); } catch (e) { /* plain fill below */ } }
     const sel1 = ['==', ['get', 'sel'], 1], ph2 = ['==', ['get', 'ph'], 2], bk = ['in', ['get', 'k'], ['literal', ['building', 'garage']]];
     const useCol = f => ['match', ['get', 'use'], ...Object.entries(P.use).map(([k, v]) => [k, f(v)]).flat(), f(C.building)];
     const bcol = f => ['case', ['==', ['get', 'bad'], 1], Ln.bad, ['==', ['get', 'k'], 'garage'], f(C.garage), ph2, useCol(c => f(P.p2(c))), useCol(f)];
@@ -596,7 +602,7 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-canopyl', type: 'line', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['canopy', 'tanks']]], paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, ['==', ['get', 'k'], 'tanks'], Ln.tanks, Ln.canopy], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1.4], 'line-dasharray': ['literal', [3, 1.5]] } });
     // easements: stripes over a faint red-grey wash and a dashed outline, so they never read as a setback line
     add({ id: 'fs-sp-ko', type: 'fill', source: SRC, filter: kind('keepout'), paint: { 'fill-color': Ln.keepout, 'fill-opacity': ['case', sel1, .22, .12] } });
-    if (map.hasImage(hatch)) add({ id: 'fs-sp-koh', type: 'fill', source: SRC, filter: kind('keepout'), paint: { 'fill-pattern': hatch, 'fill-opacity': .9 } });
+    if (mp.hasImage(hatch)) add({ id: 'fs-sp-koh', type: 'fill', source: SRC, filter: kind('keepout'), paint: { 'fill-pattern': hatch, 'fill-opacity': .9 } });
     add({ id: 'fs-sp-kol', type: 'line', source: SRC, filter: kind('keepout'), paint: { 'line-color': Ln.keepout, 'line-width': 1.6, 'line-dasharray': [3, 2] } });
     add({ id: 'fs-sp-pl', type: 'line', source: SRC, filter: kind('pline'), paint: { 'line-color': Ln.parcel, 'line-width': 1, 'line-dasharray': [4, 3], 'line-opacity': .8 } });
     add({ id: 'fs-sp-sb', type: 'line', source: SRC, filter: kind('setback'), paint: { 'line-color': Ln.setback, 'line-width': 1.3, 'line-dasharray': [3, 2] } });
@@ -639,17 +645,17 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-ml', type: 'symbol', source: DSRC, filter: ['in', ['get', 'k'], ['literal', ['mlab', 'mtot']]], layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': ['case', ['==', ['get', 'k'], 'mtot'], 13, 11], 'text-offset': ['case', ['==', ['get', 'k'], 'mtot'], ['literal', [0, -1.4]], ['literal', [0, 0]]], 'text-rotate': ['coalesce', ['get', 'r'], 0], 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': Lb.ink, 'text-halo-color': Lb.halo, 'text-halo-width': 2 } }); // lengths, the total, the area
     // handles: the turn dot and a shape's points (circles); a rectangle's corners (squares), its sides and a shape's
     // edges (white bars along them, to drag that side alone), and the + beside an edge that adds a point
-    handleImages(big, Ln.accent);
+    handleImages(big, Ln.accent, mp);
     const hr = big ? [10, 9] : [7, 6]; // the turn dot, a point or a scaling corner
     add({ id: 'fs-sp-h', type: 'circle', source: HSRC, filter: ['in', ['get', 't'], ['literal', ['r', 'v', 's']]], paint: { 'circle-radius': ['case', ['==', ['get', 't'], 'r'], hr[0], hr[1]], 'circle-color': ['case', ['==', ['get', 't'], 'r'], Ln.accent, '#ffffff'], 'circle-stroke-color': ['case', ['==', ['get', 't'], 'r'], '#ffffff', '#0b0d0c'], 'circle-stroke-width': big ? 2 : 1.5 } });
     add({ id: 'fs-sp-hs', type: 'symbol', source: HSRC, filter: ['in', ['get', 't'], ['literal', ['c', 'e', 'm', 'p']]], layout: { 'icon-image': ['match', ['get', 't'], 'c', 'sp-h-sq', 'p', 'sp-h-plus', 'sp-h-bar'], 'icon-rotate': ['get', 'a'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
-    draw();
+    if (mp === map) draw();
   }
   // the handle images, drawn once per style (2× for sharp edges): a corner square, a side bar (drawn east-west, turned
   // along its side by icon-rotate) and the + that adds a point; fingers get them larger
-  function handleImages(big, accent) {
-    const img = (id, w, h, paint) => { if (map.hasImage(id)) return; const r = 2, c = document.createElement('canvas'); c.width = w * r; c.height = h * r; const g = c.getContext('2d'); g.scale(r, r); paint(g, w, h);
-      try { map.addImage(id, g.getImageData(0, 0, w * r, h * r), { pixelRatio: r }); } catch (e) { /* the circles still show */ } };
+  function handleImages(big, accent, mp = map) {
+    const img = (id, w, h, paint) => { if (mp.hasImage(id)) return; const r = 2, c = document.createElement('canvas'); c.width = w * r; c.height = h * r; const g = c.getContext('2d'); g.scale(r, r); paint(g, w, h);
+      try { mp.addImage(id, g.getImageData(0, 0, w * r, h * r), { pixelRatio: r }); } catch (e) { /* the circles still show */ } };
     const k = big ? 1.4 : 1, ink = '#0b0d0c';
     const rr = (g, x, y, w, h, q) => { g.beginPath(); g.moveTo(x + q, y); g.arcTo(x + w, y, x + w, y + h, q); g.arcTo(x + w, y + h, x, y + h, q); g.arcTo(x, y + h, x, y, q); g.arcTo(x, y, x + w, y, q); g.closePath(); };
     img('sp-h-sq', Math.round(11 * k), Math.round(11 * k), (g, w, h) => { g.fillStyle = '#fff'; g.strokeStyle = ink; g.lineWidth = 1.5; g.fillRect(1.5, 1.5, w - 3, h - 3); g.strokeRect(1.5, 1.5, w - 3, h - 3); });
@@ -692,6 +698,7 @@ export function initSitePlan(ctx) {
   // a Waller plan's layouts: the engine gets the scenario's inputs (lib/guardrails.mjs forLayout) and what comes back is
   // kept with the plan's own working numbers (unapply); every other plan goes to the engine as it is
   function laid(fn, ...args) {
+    if (fn === 'options' && args[0]?.ring?.length >= 3 && !args[0].terrain) { const t = terrainNow(args[0]); if (t) args[0] = { ...args[0], terrain: t }; else terrainOf(args[0]); } // the pond goes on the low side (lib/sitelayout.mjs)
     const g = fn === 'refit' ? G.forLayout(args[0], args[0]?.program, {}) : G.forLayout(args[0], args[1], args[2] || {});
     if (!g) return laid0(fn, ...args);
     const base = fn === 'refit' ? args[0] : { ...args[0], program: args[1] };
@@ -2792,7 +2799,8 @@ export function initSitePlan(ctx) {
     card.querySelector('[data-eff="' + id + '"]')?.focus({ preventScroll: true });
   }
   const effOn = id => { const e = id && ASK.EFFORTS.find(x => x.id === id); return e ? ' <span class="sp-effon' + (e.id === 'ultra' ? ' u' : '') + '" title="How hard the AI worked on it">' + (e.id === 'ultra' ? SPARK : '') + e.label + '</span>' : ''; };
-  const factsFor = pl => (ed.facts?.id === pl.id + ':' + pl.ring.length ? ed.facts.p : (ed.facts = { id: pl.id + ':' + pl.ring.length, p: siteFacts(pl).catch(() => []) }).p); // flood, roads, districts, utilities: asked once per site
+  const factsKept = new Map(); // with no plan open (a rendering made from the project page)
+  const factsFor = pl => { const id = pl.id + ':' + pl.ring.length, box = ed || { facts: factsKept.get(pl.id) }; if (box.facts?.id === id) return box.facts.p; const f = { id, p: siteFacts(pl).catch(() => []) }; if (ed) ed.facts = f; else factsKept.set(pl.id, f); return f.p; }; // flood, roads, districts, utilities: asked once per site
   // a Waller plan's requests carry its guardrails (the server adds their instruction and values to the AI's), and what
   // comes back has the prohibited conclusions rewritten before it's shown
   const post = async (body, signal) => { const ga = ['bestuse', 'askProject'].includes(body.mode) ? null : G.forAI(PL() || {}); if (ga) body = { ...body, guardrails: ga };
@@ -2855,6 +2863,7 @@ export function initSitePlan(ctx) {
     const run = startRun('build', thinks ? [planStep, ...steps0] : steps0, src, { ask, effort: lvl }); if (!run) return;
     let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '', aiOk = false, assumed = [], strategy = null;
     const site = ai ? siteInfo(p, pl) : null, facts = ai ? await factsFor(pl) : null; if (!live(run)) return;
+    if (!terrainNow(pl)) { await Promise.race([terrainOf(pl), new Promise(res => setTimeout(res, 6000))]); if (!live(run)) return; } // (asked once per boundary; usually here already)
     // a commercial site (Medium and up): the planning step also writes the AI's brief for the parking-field engine, decided
     // from the lot, the setbacks, the parking rules, the detention it needs and the easements (lib/planbrief.mjs)
     const briefFor = thinks && BR.asksBrief(L, ask) ? BR.briefContext(pl, SP.guessProgram(ask), { ask }) : null;
@@ -3381,7 +3390,7 @@ export function initSitePlan(ctx) {
   // notes for the sheet from the Site facts (flood zone, districts, roads, environmental records) at the middle of the site
   async function siteFacts(pl, parcel) {
     if (!ctx.siteAt) return [];
-    const c = SP.frame(pl.origin).toLL(SP.centroid(pl.ring)), out = [];
+    const c = SP.frame(pl.origin).toLL(SP.centroid(pl.ring)), out = [], ground = Promise.race([terrainOf(pl), new Promise(res => setTimeout(() => res(null), 15000))]);
     try {
       const d = await Promise.race([ctx.siteAt(c, '', ''), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 9000))]), f = d.flood;
       if (f?.zone) out.push('FEMA flood zone ' + f.zone + (f.risk === 'high' ? ' — in the 100-year floodplain; expect fill, elevated slabs and floodplain permits.' : f.risk === 'moderate' ? ' — moderate risk (500-year floodplain).' : ' — outside the 100-year floodplain.') + ' (FEMA NFHL; at the middle of the site)');
@@ -3398,7 +3407,26 @@ export function initSitePlan(ctx) {
       const lines = ctx.utilityFacts(u); if (lines.length) out.push(lines.slice(0, 4).join('. ') + '. Confirm capacity and service with each provider (OpenStreetMap, PUC Texas, City of Houston).');
     } catch (e) { /* no utility note */ }
     if ((pl.parcels || []).length > 1) out.push((pl.parcels.length) + ' parcels: a replat into one reserve or lot is likely needed.');
+    const t = await ground; if (t) { const l = TR.factLine(t, pl.ring); if (l) out.splice(1, 0, l); }
     return out;
+  }
+  // ---------- ground elevations (lib/terrain.mjs, api/terrain) ----------
+  // Asked once per boundary and kept on this device (IndexedDB, with the renderings): a grid of up to 3,600 bare-ground
+  // elevations from USGS lidar. The project keeps only the few numbers the Jurisdiction & site box shows.
+  const terrains = new Map(); // signature -> { t, p }
+  const terrainNow = pl => pl?.ring?.length >= 3 ? terrains.get(TR.terrainSig(pl.origin, pl.ring))?.t || null : null;
+  function terrainOf(pl) {
+    if (!(pl?.ring?.length >= 3)) return Promise.resolve(null);
+    const sig = TR.terrainSig(pl.origin, pl.ring), have = terrains.get(sig); if (have) return have.p;
+    const box = { t: null, p: null }; terrains.set(sig, box);
+    box.p = (async () => {
+      const kept = await rget('terrain:' + sig); // a rough fallback answer is asked for again after a day
+      if (kept?.z && kept.sig === sig && !(kept.coarse && Date.now() - Date.parse(kept.at) > 864e5)) return box.t = kept;
+      const r = await fetch('api/terrain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origin: pl.origin, ring: pl.ring }) }), d = await r.json().catch(() => ({}));
+      if (!r.ok || !Array.isArray(d.z)) throw new Error(d.error || 'HTTP ' + r.status);
+      rput('terrain:' + sig, d).catch(() => {}); return box.t = d;
+    })().catch(e => { console.warn('terrain', e.message); setTimeout(() => { if (terrains.get(sig) === box) terrains.delete(sig); }, 60000); return null; }); // (a failure is asked again in a minute)
+    return box.p;
   }
   async function exportPdf(p, pl, size) {
     const btn = card.querySelector('#spPdf'); if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
@@ -3460,25 +3488,84 @@ export function initSitePlan(ctx) {
       return { image: c.toDataURL('image/jpeg', 0.88), camera: cam, w: c.width, h: c.height };
     } finally { for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'visible'); map.jumpTo(was); }
   }
+  // The same picture without the page's map: a hidden map of the same base style, sized 1600 x 900, with the option drawn
+  // on it, framed by the same camera rules, then thrown away. The Renderings tab uses it, so you stay where you are.
+  async function captureOffscreen(pl, view, target = null) {
+    const W = 1600, H = 900, box = document.createElement('div'), close = RD.byId(RD.VIEWS, view).hero && target;
+    if (!map.isStyleLoaded()) await new Promise(ok => { map.once('idle', ok); setTimeout(ok, 20000); }); // the base style comes from the page's map (the app may have opened on Projects)
+    if (!map.isStyleLoaded()) throw new Error('the map didn’t load, so the picture can’t be taken. Try again in a moment');
+    box.style.cssText = 'position:fixed;left:0;top:0;width:' + W + 'px;height:' + H + 'px;opacity:0;pointer-events:none;z-index:-1'; document.body.append(box);
+    const st = map.getStyle(); st.layers = st.layers.filter(l => !/^fs-/.test(l.id)); // the base map only: filings, parcels, buildings and any open plan stay off
+    const used = new Set(st.layers.map(l => l.source).filter(Boolean)); for (const k of Object.keys(st.sources || {})) if (!used.has(k)) delete st.sources[k];
+    const F = SP.frame(pl.origin), cam = RD.cameraFor(view, pl, { px: W, lat: pl.origin[1], target });
+    const m2 = new maplibregl.Map({ container: box, style: st, center: F.toLL(cam.center), zoom: cam.zoom, pitch: Math.min(cam.pitch, map.getMaxPitch()), bearing: cam.bearing, maxPitch: map.getMaxPitch(),
+      interactive: false, attributionControl: false, preserveDrawingBuffer: true, fadeDuration: 0, pixelRatio: 1 });
+    const settle = (ev, ms) => new Promise(ok => { let d = false; const f = () => { if (!d) { d = true; ok(); } }; m2.once(ev, f); setTimeout(f, ms); });
+    try {
+      await settle('load', 20000);
+      addLayers(m2);
+      let fc = SP.planFeatures(pl, null, null); MAP.decorate(fc, pl, {}); fc = T.visibleFeatures(fc, T.viewOf(pl)); m2.getSource(SRC).setData(fc);
+      for (const id of HIDE_FOR_RENDER) if (m2.getLayer(id)) m2.setLayoutProperty(id, 'visibility', 'none');
+      fitSiteInFrame(pl, { l: 0, t: 0, r: W, b: H }, { left: 0, top: 0, width: W, height: H }, close ? { points: RD.heroPoints(close), tall: [close] } : {}, m2);
+      await settle('idle', 25000);
+      const image = await new Promise((ok, no) => { m2.once('render', () => { try { ok(m2.getCanvas().toDataURL('image/jpeg', 0.88)); } catch (e) { no(e); } }); m2.triggerRepaint(); });
+      return { image, camera: cam, w: W, h: H };
+    } finally { try { m2.remove(); } catch (e) { /* gone */ } box.remove(); }
+  }
+  // renderings made from the project page, one project at a time: { plid, n, i, msg, abort }
+  const bgRender = new Map();
+  async function renderInBackground(p, pl, views, look, time, target = null) {
+    if (bgRender.get(p.id)) return;
+    const run = { plid: pl.id, n: views.length, i: 0, msg: 'Getting ready…', abort: new AbortController() }; bgRender.set(p.id, run);
+    const show = () => { if (ctx.view === 'projects' && cur === p.id && tabFor(p) === 'renderings') render(); };
+    let made = 0, why = '', capped = false; show();
+    try {
+      const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
+      const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' });
+      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map', focus: target });
+      for (let i = 0; i < views.length && !run.abort.signal.aborted; i++) {
+        const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero, sig = planSig(pl);
+        run.i = i; run.msg = 'Taking the picture ' + (isHero ? 'of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + '…'; show();
+        const cap = await captureOffscreen(pl, views[i], isHero ? target : null); if (run.abort.signal.aborted) break;
+        run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; show();
+        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i] }), signal: run.abort.signal });
+        const d = await r.json().catch(() => ({}));
+        if (r.status === 402) { rbudget = { ...(rbudget || {}), spent: d.spent, cap: d.cap, month: d.month }; rbAt = Date.now(); capped = true; }
+        if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        if (d.budget?.spent != null) { rbudget = { ...(rbudget || {}), ...d.budget, images: (rbudget?.images || 0) + 1 }; rbAt = Date.now(); }
+        const P1 = db.projects.find(x => x.id === p.id), q = P1?.plans.find(x => x.id === pl.id); if (!q) break;
+        const id = pl.id + '/' + Date.now().toString(36) + '-' + views[i];
+        await rput(id, await toBlob(d.image)); await rput(id + ':m', await toBlob(cap.image)).catch(() => {});
+        q.renders = (q.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '', ...(isHero ? { target: hero } : {}) }]);
+        while (q.renders.length > 16) { const old = q.renders.shift(); rdel(old.id); rdel(old.id + ':m'); }
+        save(P1); made++;
+      }
+    } catch (e) { why = e.name === 'AbortError' ? '' : e.message; }
+    finally {
+      bgRender.delete(p.id); if (!capped) rbAt = 0; show();
+      if (made) ctx.toast((made === 1 ? 'Rendering of ' + pl.name + ' ready.' : made + ' renderings of ' + pl.name + ' ready.') + (why ? ' The next one failed: ' + why : ''));
+      else if (why) ctx.toast(capped ? why : 'No rendering: ' + why);
+    }
+  }
   // Project the parcel's corners through the map's own camera (pitch and bearing included) and move the camera until
   // they all sit inside the free part of the frame: 8% clear at the sides, 9% below, and room above for the tallest
   // building and a strip of sky. Zoom steps by the overflow each round; the view is re-centred on the parcel each round.
   // points: what to fit instead of the parcel (plan feet, e.g. a close-up's building grown by its margin); tall: the
   // buildings whose height needs room above (all of them by default).
-  function fitSiteInFrame(pl, free, m, { points = null, tall: tallEls = null } = {}) {
+  function fitSiteInFrame(pl, free, m, { points = null, tall: tallEls = null } = {}, mp = map) {
     const ll = points?.length >= 3 && pl?.origin ? points.map(SP.frame(pl.origin).toLL) : ringLL(pl); if (!ll) return;
     const W = free.r - free.l, H = free.b - free.t, aspect = 16 / 9, fw = Math.min(W, H * aspect), fh = fw / aspect; // the 16:9 cut the picture keeps
     const fl = free.l - m.left + (W - fw) / 2, ft = free.t - m.top + (H - fh) / 2, cx = fl + fw / 2, cy = ft + fh / 2;
     const tall = Math.max(14, ...(tallEls || pl.elements.filter(e => e.kind === 'building')).map(e => (e.floors || 1) * (SP.USES[e.use]?.floorH || 12))) * 0.3048;
     for (let i = 0; i < 14; i++) {
-      const px = ll.map(p => map.project(p)), xs = px.map(q => q.x), ys = px.map(q => q.y), bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
-      const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (256 * 2 ** map.getZoom()), tallPx = tall / mpp * Math.sin(map.getPitch() * Math.PI / 180) * 1.3;
+      const px = ll.map(p => mp.project(p)), xs = px.map(q => q.x), ys = px.map(q => q.y), bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
+      const mpp = 40075016.686 * Math.cos(mp.getCenter().lat * Math.PI / 180) / (256 * 2 ** mp.getZoom()), tallPx = tall / mpp * Math.sin(mp.getPitch() * Math.PI / 180) * 1.3;
       const availW = fw * 0.84, availH = fh - fh * 0.09 - Math.max(fh * 0.16, tallPx); // sides 8% each; sky and the roofs above; 9% below
       const ratio = Math.max((bx1 - bx0) / availW, (by1 - by0) / availH);
       const dx = (bx0 + bx1) / 2 - cx, dy = (by0 + by1) / 2 - (ft + Math.max(fh * 0.16, tallPx) + availH / 2); // where the parcel's box is against where it should be
-      const centre = map.unproject([cx + dx, cy + dy]), z = map.getZoom(), step = ratio > 1.02 ? -Math.log2(ratio) : ratio < 0.9 && z < 19 ? Math.min(0.5, Math.log2(0.95 / ratio) * 0.6) : 0;
+      const centre = mp.unproject([cx + dx, cy + dy]), z = mp.getZoom(), step = ratio > 1.02 ? -Math.log2(ratio) : ratio < 0.9 && z < 19 ? Math.min(0.5, Math.log2(0.95 / ratio) * 0.6) : 0;
       if (Math.abs(step) < 0.01 && Math.hypot(dx, dy) < 2) break;
-      map.jumpTo({ center: centre, zoom: Math.max(13, Math.min(19, z + step)) });
+      mp.jumpTo({ center: centre, zoom: Math.max(13, Math.min(19, z + step)) });
     }
   }
   // this month's rendering budget (api/render GET; the server refuses a render once it's spent): one line under the
@@ -3616,10 +3703,10 @@ export function initSitePlan(ctx) {
   }
   // the two newest renderings that still match the plan, as data URLs for the PDF sheet, at up to 1600 px wide so the
   // sheet stays under the PDF service's request limit
-  async function rendersForSheet(pl) {
+  async function rendersForSheet(pl, max = 2) {
     const sig = planSig(pl), out = [];
     const small = async b => { try { const bmp = await createImageBitmap(b), k = Math.min(1, 1600 / bmp.width), c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85); } catch (e) { return blobToData(b); } };
-    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= 2 || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.renderLabel(r.view, r.target) + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
+    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= max || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.renderLabel(r.view, r.target) + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
     return out;
   }
   function geojson(p, pl) {
@@ -3644,7 +3731,7 @@ export function initSitePlan(ctx) {
 
   // ---------- the Projects view ----------
   // All projects as cards or a list (the choice is kept in this browser), with search and sort. Click one for its page:
-  // a header with its status, then tabs: Overview (information, the site's jurisdiction, parcels), Options (each option
+  // a header with its status, then tabs: Overview (information, the site's jurisdiction, parcels), Sites (each option
   // drawn with its numbers), Renderings and Ask. Text wraps rather than being cut off. A sync never redraws under someone typing (it waits
   // until they leave the field), so half-typed notes or a name aren't lost.
   const VIEW_KEY = 'fs-projects-view';
@@ -3747,8 +3834,9 @@ export function initSitePlan(ctx) {
   }
 
   // ----- one project -----
-  // A header (name, status, address, acres, who updated it) and four tabs: Overview (the project's information, the
-  // site's jurisdiction and the parcels), Options (the site plan options), Renderings (every option's pictures) and Ask
+  // A header (name, status, address, acres, who updated it) and five tabs: Overview (the project's information, the
+  // site's jurisdiction and the parcels), Sites (the site plan options; id 'options'), Renderings (every option's
+  // pictures), Plans (plan sets made from an option) and Ask
   // (questions about the whole project). The tab is kept per project for this visit and in the address (pt=).
   const ptab = new Map(), pasks = new Map(), siteRuns = new Map(), siteFail = new Map();
   const tabFor = p => PJ.tabOf(ptab.get(p.id));
@@ -3782,13 +3870,13 @@ export function initSitePlan(ctx) {
   }
   const rendersOf = p => p.plans.flatMap(pl => (pl.renders || []).map(r => ({ pl, r })));
   function tabsHtml(p, tab) {
-    const n = { options: p.plans.length, renderings: rendersOf(p).length }, busy = pasks.get(p.id)?.busy;
+    const n = { options: p.plans.length, renderings: rendersOf(p).length, plans: setsOf(p).length }, busy = pasks.get(p.id)?.busy;
     return '<div class="mx-tabs pj-tabs" role="tablist" aria-label="Project sections">' + PJ.TABS.map(t => { const on = t.id === tab;
       return '<button type="button" role="tab" id="pjTab-' + t.id + '" data-tab="' + t.id + '" aria-selected="' + on + '" aria-controls="pjPanel" tabindex="' + (on ? 0 : -1) + '">' + t.label +
         (n[t.id] ? '<span class="pj-tn"> · ' + f0(n[t.id]) + '</span>' : '') + (t.id === 'ask' && busy ? '<span class="pj-tn"> · answering…</span>' : '') + '</button>'; }).join('') + '</div>';
   }
   function detailHtml(p) {
-    const tab = tabFor(p), body = { overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, ask: pAskHtml }[tab](p);
+    const tab = tabFor(p), body = { overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, ask: pAskHtml }[tab](p);
     return headHtml(p) + tabsHtml(p, tab) + '<div class="pj-panel pj-p-' + tab + '" id="pjPanel" role="tabpanel" aria-labelledby="pjTab-' + tab + '">' + body + '</div>';
   }
 
@@ -3828,17 +3916,18 @@ export function initSitePlan(ctx) {
   }
   const countyAt = c => (ctx.DATA?.counties || []).find(k => (k.outline || []).some(poly => SP.inRing(c, poly[0])))?.name || '';
   const factsOf = p => p.site?.facts ? { ...p.site.facts, ...PJ.regridFacts(p.parcels, p.plans) } : null;
-  const needSite = p => { const at = siteSpot(p), f = siteFail.get(p.id); return !!at && !siteRuns.has(p.id) && (!p.site || p.site.key !== at.key) && !(f && Date.now() - f < 6e4); };
+  const SITE_V = 2; // 2: ground elevations (Oct 19)
+  const needSite = p => { const at = siteSpot(p), f = siteFail.get(p.id); return !!at && !siteRuns.has(p.id) && (!p.site || p.site.key !== at.key || (p.site.v || 1) < SITE_V) && !(f && Date.now() - f < 6e4); };
   function gatherSite(p) {
     if (siteRuns.has(p.id)) return siteRuns.get(p.id);
     const at = siteSpot(p); if (!at) return Promise.resolve(null);
     const run = (async () => {
-      const [d, u] = await Promise.all([ctx.siteAt ? race(ctx.siteAt(at.c, '', ''), 15000).catch(e => ({ error: e.message || 'failed' })) : { error: 'none' },
-        ctx.utilitiesAt ? race(ctx.utilitiesAt(at.c, at.geom), 15000).catch(() => null) : null]);
+      const s0 = siteFor(p), [d, u, t] = await Promise.all([ctx.siteAt ? race(ctx.siteAt(at.c, '', ''), 15000).catch(e => ({ error: e.message || 'failed' })) : { error: 'none' },
+        ctx.utilitiesAt ? race(ctx.utilitiesAt(at.c, at.geom), 15000).catch(() => null) : null, s0 ? race(terrainOf(s0), 55000).catch(() => null) : null]);
       let lines = null; try { lines = u ? ctx.utilityFacts(u) : null; } catch (e) { lines = null; }
       if (d?.error && !lines) throw new Error(d.error); // nothing came back: keep what was there and say so
       const x = db.projects.find(y => y.id === p.id); if (!x) return null;
-      x.site = { at: new Date().toISOString(), key: at.key, facts: PJ.siteFactsFrom(d, { county: countyAt(at.c), utilities: lines, parcels: x.parcels.length }) }; siteFail.delete(p.id); quietSave(x);
+      x.site = { v: SITE_V, at: new Date().toISOString(), key: at.key, facts: PJ.siteFactsFrom(d, { county: countyAt(at.c), utilities: lines, parcels: x.parcels.length, ground: t ? TR.groundFacts(t, s0.ring) : null }) }; siteFail.delete(p.id); quietSave(x);
       return x.site;
     })();
     siteRuns.set(p.id, run);
@@ -3867,16 +3956,33 @@ export function initSitePlan(ctx) {
 
   // ----- Renderings: every option's pictures, grouped by option. The pictures live on the device they were made on
   // (IndexedDB, see renderSrc); one a teammate made shows greyed, saying so. Click one for the full-size viewer.
+  // Make renderings from here: pick the option, view, materials and light, and Render. The picture is taken from the
+  // map's 3D massing, so the option opens on the map, renders there (progress in its panel) and comes back to this tab.
+  const rsForm = new Map(); // per project: { plid, view }
+  function rFormHtml(p) {
+    const ready = p.plans.filter(laidOut); if (!ready.length) return '';
+    const f = rsForm.get(p.id) || {}, pl = ready.find(x => x.id === f.plid) || ready[ready.length - 1], pr = rPrefs(), off = aiOff(), busy = !!ed?.rendering, T = RD.heroTarget(pl), v = f.view || 'corner', bg = bgRender.get(p.id);
+    const opt = (list, cur) => list.map(x => '<option value="' + esc(x.id) + '"' + (x.id === cur ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
+    const views = RD.VIEWS.filter(x => !x.hero).map(x => ({ id: x.id, label: x.label, tip: x.tip })).concat(T ? RD.VIEWS.filter(x => x.hero).map(x => ({ id: x.id, label: RD.renderLabel(x.id, T) })) : []).concat([{ id: 'all', label: 'All site views (four pictures)' }]);
+    return '<section class="pj-box ps-form" aria-labelledby="rsH"><h3 class="pj-h3" id="rsH">Make renderings</h3>' +
+      '<div class="ps-row2 rs-grid"><div class="ps-row"><label for="rsOpt">Option</label><select id="rsOpt">' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
+        '<div class="ps-row"><label for="rsView">View</label><select id="rsView">' + opt(views, views.some(x => x.id === v) ? v : 'corner') + '</select></div>' +
+        '<div class="ps-row"><label for="rsLook">Materials</label><select id="rsLook">' + opt(RD.LOOKS, pr.look) + '</select></div>' +
+        '<div class="ps-row"><label for="rsTime">Light</label><select id="rsTime">' + opt(RD.TIMES, pr.time) + '</select></div></div>' +
+      '<p class="rnote">' + (off ? 'Renderings need the AI, which isn’t set up on this site.' : 'The picture is taken from the option’s 3D view behind the scenes and the AI paints it, about a minute a picture. You can stay here or use the rest of the app meanwhile.') + (budgetLine() ? ' ' + esc(budgetLine()) : '') + '</p>' +
+      (bg ? '<p class="rnote loading" role="status">Rendering ' + (bg.i + 1) + ' of ' + bg.n + ' · ' + esc(bg.msg) + '</p>' : '') +
+      '<div class="btnrow">' + (bg ? '<button type="button" class="btn" id="rsStop">Cancel</button>' : '<button type="button" class="btn primary" id="rsGo"' + (off || busy || rbUsed() ? ' disabled' : '') + '>' + (busy ? 'Rendering…' : 'Render') + '</button>') + '</div></section>';
+  }
   function rendersHtml(p) {
     const ready = p.plans.filter(laidOut), groups = p.plans.filter(pl => pl.renders?.length || laidOut(pl));
-    if (!rendersOf(p).length) return '<div class="pj-empty pj-rempty"><b>No renderings yet</b><p>A rendering is a photoreal picture of an option, painted by the AI from its 3D massing on the map: the buildings stay where the plan puts them, the materials and landscaping are the AI’s.</p>' +
-      '<ol><li>Open an option that has buildings laid out.</li><li>In its panel, go to <b>Render</b> (a chip at the top of the panel).</li><li>Pick a view, the materials and the light, and press <b>Render 3D View</b>. Each takes about a minute.</li></ol>' +
-      (ready.length ? '<div class="btnrow">' + ready.slice(0, 4).map(pl => '<button type="button" class="btn" data-rmore="' + esc(pl.id) + '">Render ' + esc(pl.name) + '</button>').join('') + '</div>' : (p.plans.length ? '<p>None of this project’s options has buildings yet: lay one out first.</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Options</button></div>'
+    if (!rendersOf(p).length) return rFormHtml(p) + '<div class="pj-empty pj-rempty"><b>No renderings yet</b><p>A rendering is a photoreal picture of an option, painted by the AI from its 3D massing on the map: the buildings stay where the plan puts them, the materials and landscaping are the AI’s.</p>' +
+      (ready.length ? '<p>Pick the option, view, materials and light above and press <b>Render</b>. Each picture takes about a minute, made behind the scenes while you carry on.</p>' : '') +
+      (ready.length ? '' : (p.plans.length ? '<p>None of this project’s options has buildings yet: lay one out first.</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Options</button></div>'
         : siteFor(p) ? '<p>This project has no site plan options yet.</p><div class="btnrow"><button type="button" class="btn primary" data-add="1">New Option</button></div>'
         : '<p>This project has no site yet: add its parcel or draw it first.</p><div class="btnrow"><button type="button" class="btn primary" data-find="1">Find a Parcel</button><button type="button" class="btn" data-draw="1">Draw a Site</button></div>')) + '</div>'; // never a dead end
-    return groups.map(pl => { const list = (pl.renders || []).slice().reverse(), sig = planSig(pl);
+    return rFormHtml(p) + groups.map(pl => { const list = (pl.renders || []).slice().reverse(), sig = planSig(pl);
       return '<section class="pj-rg" aria-labelledby="pjRg-' + esc(pl.id) + '"><div class="pj-rgh"><h3 class="pj-h3" id="pjRg-' + esc(pl.id) + '">' + esc(pl.name) + ' <span class="pj-tn">' + (list.length ? plural(list.length, 'rendering') : 'none yet') + '</span></h3>' +
-        '<span class="pj-rgl"><button type="button" class="lnk" data-plan="' + esc(pl.id) + '">Open plan</button>' + (laidOut(pl) ? '<button type="button" class="lnk" data-rmore="' + esc(pl.id) + '">Render more</button>' : '') + (list.length ? '<button type="button" class="lnk pj-pdel" data-rdelall="' + esc(pl.id) + '" title="Delete every rendering of ' + esc(pl.name) + '">Delete all</button>' : '') + '</span></div>' +
+        '<span class="pj-rgl">' + (list.length ? '<button type="button" class="lnk pj-pdel" data-rdelall="' + esc(pl.id) + '" title="Delete every rendering of ' + esc(pl.name) + '">Delete all</button>' : '') + '</span></div>' +
         (list.length ? '<div class="pj-rgrid">' + list.map(r => { const stale = r.sig && r.sig !== sig, lab = rLabel(r);
           return '<figure class="pj-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" data-pl="' + esc(pl.id) + '" tabindex="0" role="button" aria-label="' + esc(lab + ' rendering of ' + pl.name + ', ' + rWhen(r.at) + (stale ? ', the plan has changed since' : '')) + '">' +
             '<span class="pj-rimg"><img alt="" hidden><i>Loading…</i></span><figcaption>' + esc(lab) + '<span>' + esc(rWhen(r.at)) + (r.by ? ' · ' + esc(r.by) : '') + (stale ? ' · <em>plan changed since</em>' : '') + '</span></figcaption></figure>'; }).join('') + '</div>'
@@ -3885,6 +3991,14 @@ export function initSitePlan(ctx) {
       '<div class="pj-foot"><span class="btnrow"><button type="button" class="btn ghost pj-pdel" data-rdelall="*">Delete All Renderings</button></span></div>';
   }
   function wireRenders(p) {
+    const $ = q => root.querySelector(q), f = rsForm.get(p.id) || {}; rsForm.set(p.id, f);
+    $('#rsOpt')?.addEventListener('change', e => { f.plid = e.target.value; render(true); });
+    $('#rsView')?.addEventListener('change', e => { f.view = e.target.value; });
+    $('#rsLook')?.addEventListener('change', e => { try { localStorage.setItem(RLOOK_KEY, e.target.value); } catch (er) {} });
+    $('#rsTime')?.addEventListener('change', e => { try { localStorage.setItem(RTIME_KEY, e.target.value); } catch (er) {} });
+    $('#rsGo')?.addEventListener('click', () => { const pr = rPrefs(), pl = p.plans.find(x => x.id === $('#rsOpt').value), v = $('#rsView').value || 'corner'; if (!pl) return;
+      const hero = RD.byId(RD.VIEWS, v, null)?.hero; renderInBackground(p, pl, v === 'all' ? RD.SITE_VIEWS : [v], pr.look, pr.time, hero ? RD.heroTarget(pl) : null); });
+    $('#rsStop')?.addEventListener('click', () => bgRender.get(p.id)?.abort.abort());
     root.querySelectorAll('.pj-rth').forEach(f => { const pl = p.plans.find(x => x.id === f.dataset.pl), r = pl?.renders?.find(x => x.id === f.dataset.rid); if (!r) return;
       renderSrc(r.id).then(u => { if (!f.isConnected) return; const img = f.querySelector('img'), ph = f.querySelector('.pj-rimg i');
         if (u) { img.src = u; img.alt = rLabel(r) + ' rendering'; img.hidden = false; ph?.remove(); }
@@ -3894,6 +4008,245 @@ export function initSitePlan(ctx) {
   }
   // Render more: the option opens on the map with its panel at the Render section (the panel's section chip, as a click)
   function renderMore(p, pl) { open(p.id, pl.id); requestAnimationFrame(() => requestAnimationFrame(() => { if (PL()?.id === pl.id) jump('spRender'); })); }
+
+  // ----- Plans: schematic design sets made from an option (lib/planset.mjs, lib/plandesign.mjs, api/planset.js) -----
+  // Pick an option and the sections, then Make Plan Set. A set is a job of steps run in turn, shown as it goes:
+  //   1. Claude writes the cover's notes and each discipline's notes and design criteria;
+  //   2. Claude designs each building type's floor plans, checked here (PD.placeDesign) and sent back with the problems
+  //      at most twice; a type that still fails, or any step without Claude, uses the rule-based design;
+  //   3. every sheet is drawn here and printed on the title block by the server, three at a time;
+  //   4. the pages are put together into one PDF here (pdf-lib), kept on this device and downloaded.
+  // A big set (a hundred sheets, eight building types) can take most of an hour. Each finished step is saved on this
+  // device (IndexedDB: the job, and each printed page), so a reload, a closed tab or Pause leaves it to Resume where it
+  // stopped. The option keeps a short record of each issue (sheets, who, when, model), which syncs with the team.
+  const psForm = new Map(); // per project: { plid, sections: Set, by, err }
+  let psInfo = null, psInfoP = null; // api/planset GET: is Claude set up, the server's model and effort, this month's spend
+  const loadPsInfo = (force) => { if (force) psInfoP = null; return psInfoP ||= fetch('api/planset').then(r => r.ok ? r.json() : null).catch(() => null).then(d => { psInfo = d || { error: true }; if (!d) setTimeout(() => { psInfoP = null; }, 6e4); /* asked again a minute later */ if (ctx.view === 'projects' && cur && tabFor(db.projects.find(x => x.id === cur) || {}) === 'plans') render(); return d; }); };
+  const psModel = () => PS_PICK.model() || psInfo?.model || 'claude-opus-5-5', psEffort = () => PS_PICK.effort() || psInfo?.effort || 'medium';
+  const setsOf = p => p.plans.flatMap(pl => (pl.sets || []).map(s => ({ pl, s })));
+  const usd = v => '$' + (v >= 100 ? Math.round(v) : v.toFixed(2));
+  const initials = n => String(n || '').split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).join('').slice(0, 4);
+  const dur = ms => { const m = Math.round(ms / 60000); return m < 1 ? 'under a minute' : m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; };
+  function psState(p) {
+    let s = psForm.get(p.id); const ready = p.plans.filter(laidOut);
+    if (!s) { s = { plid: ready[ready.length - 1]?.id || '', sections: new Set(PS.defaultSections()), err: '' }; psForm.set(p.id, s); }
+    if (!ready.some(pl => pl.id === s.plid)) s.plid = ready[ready.length - 1]?.id || '';
+    return s;
+  }
+  // the renderings a set can show: the newest that still match the plan, on this device (up to four)
+  const setRenders = pl => (pl.renders || []).filter(r => !r.sig || r.sig === planSig(pl)).slice(-4);
+  const typesOf = new Map(); // per plan signature: lib/plandesign.mjs buildingTypes (the form draws often)
+  const typesFor = pl => { const k = pl.id + '|' + planSig(pl); if (!typesOf.has(k)) { typesOf.set(k, PD.buildingTypes(pl)); if (typesOf.size > 20) typesOf.delete(typesOf.keys().next().value); } return typesOf.get(k); };
+
+  // ---- the job (one a project at a time), kept in IndexedDB as 'job:<project>' with its pages as 'jp:<job>:<sheet>' ----
+  const jobs = new Map(); // project id -> job (in memory while it runs or after it was loaded)
+  let jobLoaded = new Set(), jobTimer = 0;
+  const saveJob = j => rput('job:' + j.pid, JSON.parse(JSON.stringify({ ...j, ctl: undefined, running: undefined }))).catch(() => {});
+  async function loadJob(pid) { if (jobLoaded.has(pid)) return; jobLoaded.add(pid); const j = await rget('job:' + pid); if (j && !jobs.has(pid)) { jobs.set(pid, { ...j, running: false }); if (ctx.view === 'projects' && cur === pid) render(); } }
+  const stepIcon = st => ({ todo: '○', doing: '◐', done: '●', failed: '✕', skipped: '–' }[st] || '○');
+  function jobStats(j) {
+    const steps = j.steps, by = k => steps.filter(s => s.kind === k), done = s => s.status === 'done' || s.status === 'skipped' || s.status === 'failed';
+    const sheetsDone = by('sheet').filter(done), claudeDone = by('claude').filter(done), t = Date.now(), el = (j.elapsed || 0) + (j.running ? t - j.resumedAt : 0);
+    const avg = (list, def) => { const ms = list.filter(s => s.ms).map(s => s.ms); return ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : def; };
+    const left = by('claude').length - claudeDone.length, sLeft = by('sheet').length - sheetsDone.length;
+    const eta = left * avg(claudeDone, 90000) / 2 + sLeft * avg(sheetsDone, 8000) / 3 + (steps.find(s => s.kind === 'merge')?.status === 'done' ? 0 : 20000);
+    const w = s => s.kind === 'claude' ? 10 : s.kind === 'merge' ? 4 : 1, total = steps.reduce((a, s) => a + w(s), 0), got = steps.filter(done).reduce((a, s) => a + w(s), 0);
+    return { el, eta, pct: total ? got / total : 0, sheets: by('sheet').length, sheetsDone: sheetsDone.length, failed: steps.filter(s => s.status === 'failed').length };
+  }
+  function jobHtml(j) {
+    const pl = db.projects.find(x => x.id === j.pid)?.plans.find(x => x.id === j.plid), S = jobStats(j), doing = j.steps.filter(s => s.status === 'doing');
+    const groups = [['claude', 'Claude: notes and building designs'], ['sheet', 'Sheets'], ['merge', 'Putting the set together']];
+    return '<section class="pj-box ps-job" id="psJob" aria-labelledby="psJobH" aria-busy="' + !!j.running + '"><h3 class="pj-h3" id="psJobH">' + (j.running ? 'Making the plan set' : j.state === 'done' ? 'Plan set finished' : 'Plan set paused') + ' · ' + esc(pl?.name || 'option') + ', issue ' + esc(j.no) + '</h3>' +
+      '<div class="ps-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(S.pct * 100) + '"><i style="width:' + (S.pct * 100).toFixed(1) + '%"></i></div>' +
+      '<div class="ps-stat"><b>' + Math.round(S.pct * 100) + '%</b><span>' + S.sheetsDone + ' of ' + S.sheets + ' sheets drawn</span><span>' + dur(S.el) + ' so far</span>' + (j.running ? '<span>about ' + dur(S.eta) + ' to go</span>' : '') + (S.failed ? '<span class="err">' + S.failed + ' failed</span>' : '') + '</div>' +
+      (j.running ? '<div class="rnote loading" role="status">' + esc(doing.length ? doing.map(s => s.label + (s.note ? ' (' + s.note + ')' : '')).join(' · ') : 'Working…') + '</div>' : j.error ? '<p class="rnote err" role="alert">' + esc(j.error) + '</p>' : j.state !== 'done' ? '<p class="rnote">Stopped at ' + S.sheetsDone + ' of ' + S.sheets + ' sheets. Everything finished so far is kept on this device: <b>Resume</b> carries on from here.</p>' : '') +
+      '<div class="btnrow">' + (j.running ? '<button type="button" class="btn" id="psPause">Pause</button>' : j.state !== 'done' ? '<button type="button" class="btn primary" id="psResume">Resume</button><button type="button" class="btn" id="psDiscard">Discard</button>' : '') + '</div>' +
+      '<details class="ps-steps"' + (j.open ? ' open' : '') + '><summary>Every step (' + j.steps.length + ')</summary>' + groups.map(([k, label]) => { const list = j.steps.filter(s => s.kind === k); if (!list.length) return '';
+        return '<div class="ps-sg"><b>' + label + '</b><ul>' + list.map(s => '<li class="st-' + s.status + '"><i aria-hidden="true">' + stepIcon(s.status) + '</i><span>' + esc(s.label) + '</span>' + (s.note ? '<em>' + esc(s.note) + '</em>' : '') + (s.ms ? '<small>' + Math.round(s.ms / 1000) + ' s</small>' : '') + '</li>').join('') + '</ul></div>'; }).join('') + '</details></section>';
+  }
+  // the job's panel and the tab's title, every second while it runs (the rest of the page isn't redrawn)
+  function tickJob(p) {
+    clearInterval(jobTimer); jobTimer = setInterval(() => {
+      const j = jobs.get(p.id), el = root.querySelector('#psJob');
+      if (j?.running) { const S = jobStats(j); document.title = '(' + S.sheetsDone + '/' + S.sheets + ') ' + (document.title.replace(/^\(\d+\/\d+\) /, '')); }
+      if (!j?.running) { document.title = document.title.replace(/^\(\d+\/\d+\) /, ''); }
+      if (el && j) { const open = el.querySelector('details')?.open; j.open = open; const t = document.createElement('div'); t.innerHTML = jobHtml(j); el.replaceWith(t.firstElementChild); wireJob(p); }
+      if (!j?.running && !el) clearInterval(jobTimer);
+    }, 1000);
+  }
+
+  function setsHtml(p) {
+    const ready = p.plans.filter(laidOut);
+    if (!psInfo && !psInfoP) loadPsInfo();
+    loadJob(p.id);
+    if (!ready.length) return '<div class="pj-empty"><b>No plan sets yet</b><p>A plan set is a schematic design drawing set made from one of this project’s site plan options, on the Finishes Solutions title block: cover and general notes, site and civil, landscape, floor plans, elevations, sections and schedules for each building type, structural, mechanical, plumbing, electrical, fire protection and life safety, and the renderings.</p>' +
+      '<p>' + (p.plans.length ? 'None of this project’s options has buildings yet: lay one out first.' : 'This project has no site plan options yet.') + '</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Sites</button></div></div>';
+    const s = psState(p), pl = ready.find(x => x.id === s.plid) || ready[0], nR = setRenders(pl).length, types = typesFor(pl), counts = PS.sectionCounts(pl, nR, types), I = psInfo, j = jobs.get(p.id);
+    const busy = !!j && j.state !== 'done';
+    const box = sec => { const none = sec.id === 'renderings' && !nR, on = (s.sections.has(sec.id) || sec.always) && !none, can = PS.built(sec) && !none, base = sec.needs && !s.sections.has(sec.needs), n = counts[sec.id];
+      const why = none ? 'No renderings of this option on this device' : !can ? 'Coming in a later phase' : base ? 'Needs ' + PS.sectionById(sec.needs).label : '';
+      return '<label class="ps-sec' + (can ? '' : ' off') + '"><input type="checkbox" data-pssec="' + sec.id + '"' + (on && can ? ' checked' : '') + (sec.always || !can || busy ? ' disabled' : '') + '>' +
+        '<span><b>' + esc(sec.label) + '</b>' + (can && n ? '<em>' + plural(n, 'sheet') + '</em>' : '') + '<small>' + esc(why || sec.note || '') + '</small></span></label>'; };
+    const sheets = PS.sheetList(pl, { sections: [...s.sections], renders: nR, types }), sup = types.filter(t => t.supported), later = types.filter(t => !t.supported);
+    const discs = PS.pickSections([...s.sections]).filter(x => PS.SECTION_DISC[x]).length, calls = 1 + discs + (s.sections.has('arch') ? sup.length * 1.4 : 0);
+    const mins = Math.max(1, Math.round((calls * 90 / 2 + sheets.length * 8 / 3 + 20) / 60)), cost = 0.12 + discs * 0.12 + (s.sections.has('arch') ? sup.length * 0.55 : 0);
+    const ai = !I ? 'Checking Claude…' : I.error ? 'Couldn’t check Claude just now: the set is made with Claude’s notes and designs if it answers.' : !I.configured ? 'Claude isn’t set up on this site (ANTHROPIC_API_KEY): the set uses rule-based building designs and standard notes.'
+      : 'Claude: <b>' + esc(psModel()) + '</b> at ' + esc(psEffort()) + ' effort (Settings › AI model)' + (I.budget?.spent != null ? ' · this month ' + usd(I.budget.spent) + ' of ' + usd(I.budget.cap) : '') + '. About ' + usd(cost) + ' for this set.';
+    const form = '<section class="pj-box ps-form" aria-labelledby="psH"><h3 class="pj-h3" id="psH">Make a plan set</h3>' +
+      '<div class="ps-row"><label for="psOpt">Option</label><select id="psOpt"' + (busy ? ' disabled' : '') + '>' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
+      (types.length ? '<div class="ps-types"><b>Building types</b> ' + sup.map(t => '<span class="tag">' + esc(t.id) + '</span> ' + esc(t.label) + ' ' + t.W + '′ × ' + t.D + '′, ' + t.floors + ' fl · ' + t.count + (t.similar ? ' (incl. ' + t.similar + ' similar)' : '')).join(' &nbsp; ') +
+        (later.length ? '<small>' + esc(later.map(t => t.label + ': ' + t.why).join('; ')) + ' (site sheets only).</small>' : '') + '</div>' : '') +
+      '<fieldset class="ps-secs"><legend>Sections</legend>' + PS.SECTIONS.map(box).join('') + '</fieldset>' +
+      '<div class="ps-row2"><div class="ps-row"><label for="psBy">Drawn by</label><input id="psBy" maxlength="12" autocomplete="off" value="' + esc(s.by ?? initials(get(NAME_KEY))) + '"' + (busy ? ' disabled' : '') + '></div>' +
+        '<div class="ps-row"><label for="psNo">Project number</label><input id="psNo" maxlength="30" autocomplete="off" placeholder="Left blank" value="' + esc(p.projectNumber || '') + '"' + (busy ? ' disabled' : '') + '></div></div>' +
+      '<p class="rnote"><b>' + plural(sheets.length, 'sheet') + '</b> on 24 × 36, about ' + dur(mins * 60000) + ' to make. ' + ai + ' You can leave this page while it works; keep the app open (or Resume later).</p>' +
+      (s.err ? '<p class="rnote err" role="alert">' + esc(s.err) + '</p>' : '') +
+      '<div class="btnrow"><button type="button" class="btn primary" id="psMake"' + (busy ? ' disabled title="A set is being made for this project: finish or discard it first"' : '') + '>Make Plan Set</button></div></section>';
+    const made = setsOf(p).sort((a, b) => String(b.s.at).localeCompare(String(a.s.at)));
+    const list = made.length ? '<section class="pj-sec"><div class="lt">Sets made · ' + made.length + '</div><div class="ps-list">' + made.map(({ pl: q, s: x }) => { const stale = x.sig && x.sig !== planSig(q);
+      return '<div class="ps-item"><div><b>' + esc(q.name) + ' · Issue ' + esc(x.no) + '</b><span>' + esc(rWhen(x.at)) + (x.by ? ' · ' + esc(x.by) : '') + ' · ' + plural((x.sheets || []).length, 'sheet') + (x.model ? ' · Claude ' + esc(x.model) : x.noNotes ? ' · no Claude' : '') + (x.mins ? ' · made in ' + esc(dur(x.mins * 60000)) : '') + (stale ? ' · <em>plan changed since</em>' : '') + '</span>' +
+        '<small>' + esc((x.sheets || []).join(', ')) + '</small></div><span class="btnrow"><button type="button" class="btn" data-psget="' + esc(q.id) + '|' + esc(x.id) + '">Download PDF</button><button type="button" class="lnk pj-pdel" data-psdel="' + esc(q.id) + '|' + esc(x.id) + '">Delete</button></span></div>'; }).join('') + '</div></section>' : '';
+    return (j ? jobHtml(j) : '') + form + list + '<p class="rnote pj-rnote">Every sheet says “Preliminary — not for construction, bidding or permit”: schematic drawings for feasibility, pricing and coordination, made with AI assistance and rule-based engineering layouts, reviewed but not sealed. The PDF is kept on the device it was made on; teammates see that the set exists.</p>';
+  }
+  function wireJob(p) {
+    const $ = q => root.querySelector(q), j = jobs.get(p.id); if (!j) return;
+    $('#psPause')?.addEventListener('click', () => { j.ctl?.abort(); });
+    $('#psResume')?.addEventListener('click', () => runJob(p, j));
+    $('#psDiscard')?.addEventListener('click', async () => { if (!confirm('Discard this unfinished plan set? The sheets made so far go too.')) return; for (const s of j.steps) if (s.kind === 'sheet') rdel('jp:' + j.id + ':' + s.key); rdel('job:' + p.id); jobs.delete(p.id); render(true); });
+    const d = root.querySelector('#psJob details'); if (d) d.ontoggle = () => { j.open = d.open; };
+  }
+  function wirePlans(p) {
+    const s = psState(p), $ = q => root.querySelector(q);
+    $('#psOpt')?.addEventListener('change', e => { s.plid = e.target.value; render(true); });
+    root.querySelectorAll('[data-pssec]').forEach(b => b.onchange = () => { const id = b.dataset.pssec; if (b.checked) s.sections.add(id); else { s.sections.delete(id); for (const x of PS.SECTIONS) if (x.needs === id) s.sections.delete(x.id); } render(true); });
+    const by = $('#psBy'); if (by) by.onchange = () => { s.by = by.value.trim().slice(0, 12); };
+    const no = $('#psNo'); if (no) no.onchange = () => { const v = no.value.trim().slice(0, 30); if (v !== (p.projectNumber || '')) { p.projectNumber = v; save(p); } };
+    $('#psMake')?.addEventListener('click', () => { if (by) s.by = by.value.trim().slice(0, 12); startJob(p); });
+    wireJob(p); if (jobs.get(p.id)?.running) tickJob(p);
+    const find = v => { const [a, b] = v.split('|'), q = p.plans.find(x => x.id === a); return { q, x: q?.sets?.find(y => y.id === b) }; };
+    root.querySelectorAll('[data-psget]').forEach(b => b.onclick = async () => { const { q, x } = find(b.dataset.psget); if (!x) return;
+      const blob = await rget('set:' + x.id); if (!(blob instanceof Blob)) { ctx.toast('That set’s PDF isn’t on this device: sets stay on the device they were made on' + (x.by ? ' (' + x.by + ' made it)' : '') + '. Make it again here.'); return; }
+      ctx.saveFile(fileName(p, q) + '-plan-set-issue-' + x.no + '.pdf', blob, 'application/pdf'); });
+    root.querySelectorAll('[data-psdel]').forEach(b => b.onclick = () => { const { q, x } = find(b.dataset.psdel); if (!x || !confirm('Delete issue ' + x.no + ' of ' + q.name + '’s plan set?')) return;
+      q.sets = q.sets.filter(y => y.id !== x.id); rdel('set:' + x.id); save(p); });
+  }
+  window.addEventListener('beforeunload', e => { if ([...jobs.values()].some(j => j.running)) { e.preventDefault(); e.returnValue = ''; } }); // a set is being made: the browser asks first (Resume picks it up anyway)
+
+  // a new job: the inputs gathered once (site facts, parcels, the vicinity map) and the list of steps
+  async function startJob(p) {
+    const s = psState(p), pl = p.plans.find(x => x.id === s.plid); if (!pl || (jobs.get(p.id) && jobs.get(p.id).state !== 'done')) return;
+    s.err = ''; ctx.toast('Starting the plan set: gathering the site facts…');
+    const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), parcels = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), F = SP.frame(pl.origin);
+    const site = { type: 'Polygon', coordinates: [pl.ring.concat([pl.ring[0]]).map(F.toLL)] };
+    let vicinity = ''; try { vicinity = areaMap([{ geometry: site, stroke: '#c0392b', fill: 'rgba(192,57,43,.25)', width: 2 }], { W: 400, H: 230, px: 400, minSpanM: 3500, maxTiles: 16 }); } catch (e) { /* no map */ }
+    const facts = await siteFacts(pl).catch(() => []), county = (ctx.DATA?.counties || []).find(c => (c.outline || []).some(poly => SP.inRing(F.toLL(SP.centroid(pl.ring)), poly[0])))?.name;
+    const types = PD.buildingTypes(pl), sections = PS.pickSections([...s.sections].filter(x => x !== 'renderings' || setRenders(pl).length)), nR = sections.includes('renderings') ? setRenders(pl).length : 0;
+    const sheets = PS.sheetList(pl, { sections, renders: nR, types, renderLabels: setRenders(pl).slice().reverse().map(r => RD.renderLabel(r.view, r.target)) });
+    const prev = (pl.sets || []), no = String(prev.length ? Math.max(...prev.map(x => +x.no || 0)) + 1 : 0), day = new Date(), short = d => new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+    const revisions = prev.slice().sort((a, b) => (+a.no) - (+b.no)).map(x => ({ no: x.no, date: short(x.at), desc: x.desc || 'Schematic design set' })).concat([{ no, date: short(day), desc: no === '0' ? 'Schematic design set' : 'Schematic design set, re-issued' }]);
+    const steps = [{ key: 'notes', kind: 'claude', label: 'Cover notes' }];
+    for (const sec of sections) if (PS.SECTION_DISC[sec]) steps.push({ key: 'disc:' + PS.SECTION_DISC[sec], kind: 'claude', label: PS.sectionById(sec).label + ' notes' });
+    if (sections.includes('arch')) for (const t of types.filter(t => t.supported)) steps.push({ key: 'design:' + t.id, kind: 'claude', label: 'Design: ' + PD.typeName(t) });
+    for (const sh of sheets) steps.push({ key: sh.number, kind: 'sheet', label: sh.number + ' ' + sh.title });
+    steps.push({ key: 'merge', kind: 'merge', label: 'Put ' + sheets.length + ' sheets together' });
+    for (const x of steps) x.status = 'todo';
+    const j = { id: uid(), pid: p.id, plid: pl.id, no, sig: planSig(pl), sections, bare: true, by: s.by ?? initials(get(NAME_KEY)), madeBy: get(NAME_KEY) || '', projectNumber: p.projectNumber || '', at: day.toISOString(), date: day.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      revisions, types, sheets, steps, designs: {}, designBy: {}, disc: {}, text: null, model: '', base: { client: p.client || '', address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '', parcels, facts, notes: SP.check(pl).map(i => i.text), vicinity,
+        boundarySource: pl.src === 'drawn' ? 'a boundary drawn on the map' : pl.src === 'regrid' ? 'the Regrid parcel outline' : (keys.length > 1 ? keys.length + ' county appraisal district parcel outlines, merged' : 'the county appraisal district parcel outline') }, elapsed: 0, state: 'paused', open: false };
+    jobs.set(p.id, j); await saveJob(j); runJob(p, j);
+  }
+  // a small pool: run fn over items, n at a time, stopping when the signal aborts
+  async function pool(items, n, fn, signal) { let i = 0; await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length && !signal.aborted) await fn(items[i++]); })); }
+  async function claudeCall(body, signal) {
+    const r = await fetch('api/planset', { method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, model: PS_PICK.model(), effort: PS_PICK.effort() }) });
+    const d = await r.json().catch(() => ({})); if (psInfo && d.budget) psInfo.budget = d.budget;
+    if (!r.ok) throw Object.assign(new Error(d.error || 'HTTP ' + r.status), { status: r.status });
+    return d;
+  }
+  // run (or resume) a job's remaining steps; Pause aborts and keeps what's done
+  async function runJob(p, j) {
+    if (j.running) return; const ctl = new AbortController(); j.ctl = ctl; j.running = true; j.state = 'running'; j.error = ''; j.resumedAt = Date.now();
+    const P1 = () => db.projects.find(x => x.id === p.id) || p, pl = P1().plans.find(x => x.id === j.plid);
+    if (!pl) { j.running = false; j.error = 'That option was deleted.'; render(true); return; }
+    render(true); tickJob(p);
+    const st = key => j.steps.find(x => x.key === key), mark = async (x, status, note) => { x.status = status; if (note != null) x.note = note; await saveJob(j); };
+    let claudeOff = '';
+    try {
+      const info = psInfo?.configured ? psInfo : await loadPsInfo(true); if (!info?.configured) claudeOff = info ? 'Claude isn’t set up' : 'the server didn’t answer';
+      const base = { plan: pl, project: P1(), ...j.base, types: j.types }, brief = PS.notesBrief({ ...base, sheets: j.sheets });
+      const ask = async (x, body, keep) => { // one Claude step: done, or skipped with the reason (the sheets use their defaults)
+        if (x.status === 'done' || x.status === 'skipped') return; if (claudeOff) { await mark(x, 'skipped', claudeOff); return; }
+        x.status = 'doing'; x.note = ''; const t0 = Date.now();
+        try { const d = await claudeCall(body, ctl.signal); keep(d); j.model = d.model || j.model; x.ms = Date.now() - t0; await mark(x, 'done', d.fellBack ? 'answered by a fallback model' : ''); }
+        catch (e) { if (ctl.signal.aborted) { x.status = 'todo'; throw e; } x.ms = Date.now() - t0; if (e.status === 402 || e.status === 503) claudeOff = e.status === 402 ? 'this month’s budget is used up' : 'Claude isn’t set up'; await mark(x, 'skipped', e.status === 402 || e.status === 503 ? claudeOff : 'no answer: ' + e.message.slice(0, 80)); }
+      };
+      // 1. notes: the cover, then each discipline (three at a time)
+      await ask(st('notes'), { mode: 'notes', brief }, d => { j.text = d.notes; });
+      await pool(j.steps.filter(x => x.key.startsWith('disc:')), 3, x => { const k = x.key.slice(5); return ask(x, { mode: 'disc', discipline: k, brief: PS.discBrief({ ...base, sheets: j.sheets }, k, j.types) }, d => { j.disc[k] = d.disc; }); }, ctl.signal);
+      // 2. a design per building type (two at a time): Claude's, checked and fixed, else the rule-based one
+      await pool(j.steps.filter(x => x.key.startsWith('design:')), 2, async x => {
+        const t = j.types.find(y => y.id === x.key.slice(7)); if (!t || x.status === 'done' || x.status === 'skipped') return;
+        const seed = PD.fallbackDesign(t), fallback = why => { j.designs[t.id] = PD.placeDesign(seed, t).design; j.designBy[t.id] = 'rule-based (' + why + ')'; };
+        if (claudeOff) { fallback(claudeOff); await mark(x, 'skipped', 'rule-based design: ' + claudeOff); return; }
+        x.status = 'doing'; const t0 = Date.now(); let prev = null, problems = [], ok = false, tries = 0;
+        try {
+          const brief2 = PD.designBrief(t, { county: j.base.county, address: j.base.address });
+          for (; tries < 3 && !ok; tries++) {
+            x.note = tries ? 'fixing ' + problems.length + ' problem' + (problems.length === 1 ? '' : 's') + ', try ' + (tries + 1) : 'Claude is drawing it';
+            const d = await claudeCall({ mode: 'design', type: t.id, brief: brief2, seed, previous: prev, problems }, ctl.signal); j.model = d.model || j.model;
+            const r = PD.placeDesign(d.design, t); if (!r.problems.length) { j.designs[t.id] = r.design; j.designBy[t.id] = 'Claude'; ok = true; } else { prev = d.design; problems = r.problems; }
+          }
+          if (!ok) fallback('Claude’s plan kept failing ' + problems.length + ' check' + (problems.length === 1 ? '' : 's'));
+          x.ms = Date.now() - t0; await mark(x, ok ? 'done' : 'skipped', ok ? (tries > 1 ? 'fixed in ' + tries + ' tries' : '') : 'rule-based design used: ' + problems[0]);
+        } catch (e) { if (ctl.signal.aborted) { x.status = 'todo'; x.note = ''; throw e; } if (e.status === 402 || e.status === 503) claudeOff = e.status === 402 ? 'this month’s budget is used up' : 'Claude isn’t set up';
+          fallback(claudeOff || 'no answer'); x.ms = Date.now() - t0; await mark(x, 'skipped', 'rule-based design: ' + (claudeOff || e.message.slice(0, 80))); }
+      }, ctl.signal);
+      for (const t of j.types.filter(t => t.supported)) if (!j.designs[t.id]) { j.designs[t.id] = PD.placeDesign(PD.fallbackDesign(t), t).design; j.designBy[t.id] = 'rule-based'; }
+      await saveJob(j);
+      // 3. the sheets, drawn here and printed on the title block, three at a time (a failure is tried again twice)
+      const renders = j.sheets.some(sh => sh.kind === 'render') ? await rendersForSheet(pl, 4).catch(() => []) : [];
+      const terrain = await Promise.race([terrainOf(pl), new Promise(res => setTimeout(() => res(null), 30000))]);
+      const c = PS.setContext({ ...base, project: P1(), text: j.text, disc: j.disc, designs: j.designs, designBy: j.designBy, renders, date: j.date, drawnBy: j.by, projectNumber: j.projectNumber, revisions: j.revisions, terrain }, j.sheets);
+      await pool(j.steps.filter(x => x.kind === 'sheet' && x.status !== 'done'), 3, async x => {
+        const sh = j.sheets.find(y => y.number === x.key); x.status = 'doing'; x.note = ''; const t0 = Date.now(); let last = '';
+        for (let k = 0; k < 3; k++) {
+          try {
+            const r = await fetch('api/planset', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'sheet', bare: !!j.bare, html: PS.docHTML(c, PS.sheetPage(c, sh)), title: P1().name + ' — ' + sh.number }) });
+            if (r.ok && /pdf/.test(r.headers.get('content-type') || '')) { await rput('jp:' + j.id + ':' + x.key, await r.blob()); x.ms = Date.now() - t0; await mark(x, 'done', ''); return; }
+            last = (await r.json().catch(() => ({}))).error || 'HTTP ' + r.status; if (r.status === 429) await new Promise(res => setTimeout(res, 15000));
+          } catch (e) { if (ctl.signal.aborted) { x.status = 'todo'; throw e; } last = e.message; }
+          x.note = 'trying again'; await new Promise(res => setTimeout(res, 3000));
+        }
+        x.ms = Date.now() - t0; await mark(x, 'failed', last.slice(0, 120));
+      }, ctl.signal);
+      if (ctl.signal.aborted) throw new DOMException('paused', 'AbortError');
+      // 4. one PDF, in sheet order
+      const m = st('merge'); m.status = 'doing'; const t0 = Date.now();
+      const { PDFDocument } = await import('./lib/vendor/pdf-lib.esm.min.js'), out = await PDFDocument.create(), made = [];
+      // bare sheets (jobs started since Oct 19) go on one copy of the border, shared by every page
+      let bd = null; if (j.bare) { const r = await fetch('api/planset?border=1'); if (!r.ok) throw new Error('the title block border didn’t load (HTTP ' + r.status + ')'); [bd] = await out.embedPdf(await r.arrayBuffer(), [0]); }
+      for (const sh of j.sheets) { const b = await rget('jp:' + j.id + ':' + sh.number); if (!(b instanceof Blob)) continue; const bytes = await b.arrayBuffer();
+        if (bd) { const src = await PDFDocument.load(bytes); for (const pg of await out.embedPdf(src, src.getPageIndices())) { const w = pg.width, h = pg.height, page = out.addPage([w, h]); page.drawPage(bd, { x: 0, y: 0, width: w, height: h }); page.drawPage(pg, { x: 0, y: 0, width: w, height: h }); } }
+        else { const src = await PDFDocument.load(bytes); for (const pg of await out.copyPages(src, src.getPageIndices())) out.addPage(pg); }
+        made.push(sh.number); }
+      out.setTitle(P1().name + ' — ' + pl.name + ' — Schematic design set, issue ' + j.no); out.setCreator('Finishes Solutions'); out.setProducer('Finishes Solutions plan sets');
+      const blob = new Blob([await out.save()], { type: 'application/pdf' }), id = uid(); await rput('set:' + id, blob); m.ms = Date.now() - t0; m.status = 'done';
+      const q = P1().plans.find(x => x.id === pl.id) || pl, mins = Math.round(((j.elapsed || 0) + Date.now() - j.resumedAt) / 60000);
+      q.sets = (q.sets || []).concat([{ id, no: j.no, at: j.at, by: j.madeBy, sheets: made, sections: j.sections, model: j.model, noNotes: !j.text || undefined, sig: j.sig, desc: j.revisions[j.revisions.length - 1].desc, mins, designs: { ...j.designBy } }]);
+      while (q.sets.length > 12) rdel('set:' + q.sets.shift().id);
+      for (const sh of j.sheets) rdel('jp:' + j.id + ':' + sh.number); rdel('job:' + p.id);
+      j.running = false; j.state = 'done'; j.elapsed = (j.elapsed || 0) + Date.now() - j.resumedAt; save(P1());
+      const failed = j.steps.filter(x => x.status === 'failed').length;
+      await ctx.saveFile(fileName(P1(), pl) + '-plan-set-issue-' + j.no + '.pdf', blob, 'application/pdf');
+      ctx.toast('Plan set issue ' + j.no + ' of ' + pl.name + ' is ready: ' + plural(made.length, 'sheet') + ' in ' + dur(j.elapsed) + '.' + (failed ? ' ' + plural(failed, 'sheet') + ' couldn’t be printed and ' + (failed === 1 ? 'is' : 'are') + ' left out.' : ''));
+      setTimeout(() => { if (jobs.get(p.id) === j) { jobs.delete(p.id); if (ctx.view === 'projects' && cur === p.id) render(); } }, 20000); // the finished panel stays a moment
+    } catch (e) {
+      j.running = false; j.elapsed = (j.elapsed || 0) + Date.now() - j.resumedAt;
+      for (const x of j.steps) if (x.status === 'doing') { x.status = 'todo'; x.note = ''; }
+      j.state = 'paused'; if (!(e?.name === 'AbortError' || ctl.signal.aborted)) j.error = 'Stopped: ' + (e.message || 'something went wrong') + '. Resume to carry on.';
+      await saveJob(j); if (ctl.signal.aborted) ctx.toast('Plan set paused. Resume carries on where it stopped.');
+    } finally { document.title = document.title.replace(/^\(\d+\/\d+\) /, ''); if (ctx.view === 'projects' && cur === p.id) render(true); }
+  }
 
   // ----- Ask: questions about the whole project, answered from its facts (lib/project.mjs projectFacts) -----
   const pAskLog = p => { let A = pasks.get(p.id); if (!A) pasks.set(p.id, A = { turns: [], draft: '' }); return A; };
@@ -4040,6 +4393,7 @@ export function initSitePlan(ctx) {
       if (needSite(p)) gatherSite(p); // (the card already says Checking…)
     }
     if (tab === 'renderings') wireRenders(p);
+    if (tab === 'plans') wirePlans(p);
     if (tab === 'ask') wirePAsk(p);
   }
   root?.addEventListener('focusout', () => setTimeout(() => { if (waiting && ctx.view === 'projects') render(); }));
