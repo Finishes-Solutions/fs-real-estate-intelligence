@@ -178,4 +178,12 @@ assert.equal((await call('POST', { mode: 'sheet', html: 'nope' })).code, 400, 'o
   assert.equal(P.clipText('First sentence here. Second one is long and keeps going on and on.', 40), 'First sentence here.');
   assert.ok(!/\w$/.test(P.clipText('a b c d e f g h i j k l m n o p q r s t u v w x y z', 20)));
   const long = 'The pond outlet is a restrictor plate. ' + 'x'.repeat(500); assert.equal(P.cleanNotes({ general_notes: [long] }).general_notes[0], 'The pond outlet is a restrictor plate.'); }
+// every lib module the browser loads is copied by the build and cached by the service worker (lib/buildcode.mjs was
+// missed on Oct 20 and the whole projects page failed to load)
+{ const fs = await import('node:fs'), seen = new Set(), todo = fs.readdirSync('src').filter(f => f.endsWith('.js')).map(f => 'src/' + f);
+  while (todo.length) { const f = todo.pop(); let t = ''; try { t = fs.readFileSync(f, 'utf8'); } catch (e) { continue; }
+    for (const m of t.matchAll(/(?:import|from)\s*\(?\s*['"](\.{1,2}\/[^'"]+\.mjs)['"]/g)) { const p = new URL(m[1], 'file:///r/' + f).pathname.slice(3).replace(/^src\/lib\//, 'lib/'); if (p.startsWith('lib/') && !seen.has(p)) { seen.add(p); todo.push(p); } } }
+  const build = fs.readFileSync('build.mjs', 'utf8'), sw = fs.readFileSync('src/sw.js', 'utf8');
+  for (const p of seen) if (!p.startsWith('lib/sheets/') && !p.startsWith('lib/vendor/')) { assert.ok(build.includes("'" + p.slice(4) + "'"), p + ' is copied by build.mjs'); assert.ok(sw.includes("'" + p + "'"), p + ' is in the service worker cache list'); }
+  assert.ok(seen.has('lib/buildcode.mjs') && seen.has('lib/terrain.mjs')); }
 console.log('plan sets ok');
