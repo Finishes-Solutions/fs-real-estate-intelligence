@@ -169,8 +169,12 @@ assert.equal((await call('POST', { mode: 'sheet', html: 'nope' })).code, 400, 'o
   // open issues: a missing second access is critical, on the cover and in the brief; a plan that's fine has none of that
   const o3 = H.ctxFor('office3'), iss = P.openIssues(o3); assert.equal(iss[0].level, 'critical'); assert.match(iss[0].text, /Fire access: 1 way in; 2 needed \(IFC D104\.1/);
   assert.match(P.notesBrief(o3), /Open issue \(critical\): Fire access/); assert.match(P.sheetPage(o3, o3.sheets[0]), /Open issues/);
-  assert.ok(!P.openIssues(c).some(i => /Fire access/.test(i.text)), 'two ways in for 288 units: no access issue');
-  assert.deepEqual(P.preflight(H.planFor('mixed')), [], 'nothing blocks the mixed plan'); assert.equal(P.preflight(H.planFor('office3'))[0].level, 'critical');
+  // the mixed plan has its two ways in, but too close together; the cover and FP-101 say the same
+  const mi = P.openIssues(c); assert.ok(!mi.some(i => /way(s)? in; \d needed/.test(i.text)), 'two ways in for 288 units: the count is met');
+  const sp = mi.find(i => /entrances are \d+ ft apart/.test(i.text)); assert.ok(sp && sp.level === 'critical'); const ft = sp.text.match(/are (\d+) ft apart/)[1];
+  assert.ok(P.sheetPage(c, c.sheets.find(s => s.kind === 'fp-access')).includes(ft + ' ft apart'), 'FP-101 gives the same spacing');
+  assert.ok(mi.some(i => /Aerial fire apparatus access/.test(i.text)) && mi.some(i => /^Detention: .* short \(C-202\)/.test(i.text)), 'aerial access and the detention shortfall from the site sheets');
+  const pf = P.preflight(H.planFor('mixed')); assert.ok(pf.some(i => /entrances are \d+ ft apart/.test(i.text)), 'said before the set is made too'); assert.equal(P.preflight(H.planFor('office3'))[0].level, 'critical');
   assert.ok(P.openIssues({ ...c, facts: ['No water or utility district (MUD) found here: water and sewer service needs to be confirmed.'] }).some(i => /Water and sewer/.test(i.text)));
   // the cover's building types table says how each type was designed
   const cov = P.sheetPage(c, c.sheets.find(s => s.kind === 'cover')); assert.match(cov, /Building types/); assert.match(cov, /NFPA 13R/); assert.match(cov, /Rule-based/);
