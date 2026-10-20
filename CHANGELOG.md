@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-20
 
-### 10:20 AM CT: Plan sets, accuracy round 1: one code basis, apartments designed, honest notes (0b097c4, 298dd94, 686c9a3, 0f8389b, 28c61f6, 2666df4, adef01b)
+### 10:20 AM CT: Plan sets, accuracy round 1: one code basis, apartments designed, honest notes (298dd94, 686c9a3, 0f8389b, 28c61f6, 2666df4, adef01b)
 - From a professional review of the FM 362 & Betka Rd set: each building type's **sprinklers, construction type, heights, structure and scope are now decided once** and shared by every sheet, so the set can't say a building is sprinklered on one sheet and not on another, or give two heights.
   - Sprinklers follow the code's own triggers for the use (IBC 903.2) with the reason and section: every apartment building (NFPA 13R up to four stories), a restaurant over 5,000 sf or 100 people, a clubhouse over 12,000 sf or 300 people, shops and warehouses over 12,000 sf. The old blanket "assembly over 5,000 sf" is gone.
   - The construction type is the least costly that meets the allowable height, stories and area (IBC 504 and 506), with the frontage increase measured from the space around the building. A building that's over gets sprinklers or, failing that, the set says fire walls are needed — never just "Revise".
