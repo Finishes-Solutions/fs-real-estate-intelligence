@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-19
 
+### 11:34 PM CT: Small commercial lots: L-shaped buildings and real drive-thru lanes (74a5f9f, merged 56d8516)
+- On a lot of about an acre to three, a shop, bank or coffee building with a drive-thru now gets one building at the back (an L when asked, its storefronts facing the parking), parking in front and a drive round it that every aisle joins.
+- The drive-thru lane runs one way round the building with the pickup window on the driver's side, the order point before the window, at least 8 cars of stacking and a bypass lane. The plan and the PDF mark the window and the order point and show the lane's direction.
+- "At least" sizes (like "6,000+ sf") are laid out at that size and grown where the parking allows; when the size doesn't park, the note says parking is the limit and by how many spaces. Examples: 6,000+ sf L with a drive-thru on a 1-acre square gets 7,251 sf; on the 0.93-acre Waller corner lot that prompted this, 5,397 sf parked (6,000 sf would need 26 spaces and the lot holds about 20 with the drive-thru, fire lanes and clear entry).
+- Small lots get much more building: retail on 1 acre 3,563 → 6,699 sf, office 5,356 → 10,286 sf, church 1,400 → 3,600 sf.
+- Where a pond would cost the building on a small lot, the stormwater goes in underground vaults and the note says how much.
+- The checks warn when a drive-thru lane stacks fewer than 8 cars, or when a drive-thru was asked for and isn't drawn. Parts of a mix with no size of their own now share the total floor area.
+
 ### 8:43 PM CT: One building with a drive-thru stays one building (bf8716c)
 - "6000+ sf L-shaped retail building with a drive thru" is now read as one L-shaped retail building of at least 6,000 sf with its drive-thru, instead of a small shop and a restaurant side by side. (The words reader counted "drive-thru" as a restaurant, and missed the "+".)
 - A plus sign or "at least" on a size means at least that much, more where the site allows; "L-shaped" or "U-shaped" sets the building shape.
