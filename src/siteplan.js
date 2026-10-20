@@ -1081,7 +1081,7 @@ export function initSitePlan(ctx) {
   function reorigin(x, b, src) {
     const G = SP.frame(x.origin), N = SP.frame(b.origin);
     const to = p => N.toFt(G.toLL(p)).map(v => +v.toFixed(2));
-    x.elements.forEach(e => { [e.x, e.y] = to([e.x, e.y]); if (e.path) e.path = e.path.map(to); if (e.poly) e.poly = e.poly.map(to); });
+    x.elements.forEach(e => { [e.x, e.y] = to([e.x, e.y]); if (e.path) e.path = e.path.map(to); if (e.poly) e.poly = e.poly.map(to); if (e.cl) e.cl = e.cl.map(to); });
     x.origin = b.origin; x.ring = b.ring; x.src = src; x.front = null; x.frontGuess = true; x.streets = []; x.streetsSet = false; x.zones = []; // the layout's zone lines were drawn on the old outline
   }
   function setParcels(keys) {

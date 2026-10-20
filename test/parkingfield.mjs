@@ -185,6 +185,37 @@ for (const [ln, lot] of Object.entries(padLots)) for (const waller of [false, tr
   assert.equal(o.elements.find(e => e.kind === 'building')?.form, 'L', 'Site parameters › L-shaped: an L'); }
 { const z = S.normalizeProgram({ use: 'retail', gfa: 6000, zones: [{ use: 'retail', gfa: null }, { use: 'restaurant', gfa: null }] }).zones;
   assert.deepEqual(z.map(q => q.gfa), [3000, 3000], 'unsized zones share the total'); }
+// ---- driveways meet the street square and the drive square ----
+// The owner's lot again: its front slants about 15° across the layout. The Main entry leaves the street square, its curb
+// returns as long either side, and curves round to run square into the drive (it was drawn square to the layout, so it
+// met the street crooked, its returns about 3 ft and 40 ft along the street). A second way in added on that street the
+// same, its end inside the drive (square to the street only, it met the drive crooked with a corner sticking out past
+// it). The stop bar and centre line follow the turn.
+{
+  const plan0 = { ...OWNER, params: { fill: false, form: 'L', guard: { mode: 'on' } }, program: S.normalizeProgram({ use: 'retail', gfa: 6000, form: 'L', atLeast: true, max: true }) };
+  const g = G.forLayout(plan0, plan0.program, {}), o = L.layoutOptions(g.plan, g.program, g.opts)[0], plan = { ...g.plan, elements: o.elements, program: o.program }, ring = plan.ring, n = ring.length;
+  const dir = (a, b) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; }, dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+  const square = (p, e, what) => {
+    const cl = S.clOf(e); assert.ok(cl, what + ': turns off the street, its centre line kept');
+    const k = S.nearestEdge(ring, cl[0]), s = dir(ring[k], ring[(k + 1) % n]), first = dir(cl[0], cl[1]), last = dir(cl[cl.length - 2], cl[cl.length - 1]);
+    assert.ok(k === p.front || (p.streets || []).includes(k), what + ': in from a street');
+    assert.ok(Math.abs(dot(first, s)) < 0.02, what + ': square to the street (' + (Math.asin(Math.abs(dot(first, s))) * 180 / Math.PI).toFixed(1) + '° off)');
+    const along = e.poly.filter(q => S.segDist(q, ring[k], ring[(k + 1) % n]) < 1.5).map(q => dot([q[0] - cl[0][0], q[1] - cl[0][1]], s));
+    assert.ok(Math.abs(Math.max(...along) + Math.min(...along)) < 1, what + ': its curb returns as long either side (' + Math.min(...along).toFixed(1) + ', ' + Math.max(...along).toFixed(1) + ' ft)');
+    assert.ok(e.poly.every(q => S.inRing(q, ring) || S.segDist(q, ring[k], ring[(k + 1) % n]) < 1.5), what + ': in the lot');
+    const others = p.elements.filter(d => (d.kind === 'drive' || d.kind === 'truck') && d !== e && !S.entrancesOf([d]).length).map(d => S.shapeOf(d)), end = cl[cl.length - 1], nn = [-last[1], last[0]];
+    assert.ok([12, -12].every(w => others.some(q => S.inRing([end[0] + nn[0] * w, end[1] + nn[1] * w], q))), what + ': its end inside the drive, no corner sticking out');
+    const pre = [end[0] - last[0] * 16, end[1] - last[1] * 16], edges = others.flatMap(q => q.map((a, i) => [a, q[(i + 1) % q.length]])).filter(([a, b]) => S.segsCross(pre, end, a, b));
+    assert.ok(edges.length && edges.every(([a, b]) => Math.abs(dot(last, dir(a, b))) < 0.03), what + ': meets the drive square');
+    const marks = S.entryMarks(p).filter(m => m.color !== '#ffffff' && S.inRing(m.line[0], e.poly));
+    assert.ok(marks.length > 2 && marks.every(m => m.line.every(q => S.inRing(q, e.poly))), what + ': its centre line follows the turn, inside the driveway');
+  };
+  square(plan, o.elements.find(e => e.name === 'Main entry'), 'the Main entry off the owner’s slanting front');
+  const a = ring[3], b = ring[0], r = S.addEntrance(plan, [a[0] + (b[0] - a[0]) * 0.3, a[1] + (b[1] - a[1]) * 0.3]); assert.ok(!r.error, r.error);
+  square({ ...plan, elements: r.elements }, r.entrance, 'a second way in on the same street');
+  // a street square to the layout: straight in, as before
+  const c = ring[2], d = ring[3], r2 = S.addEntrance(plan, [c[0] + (d[0] - c[0]) * 0.5, c[1] + (d[1] - c[1]) * 0.5]); assert.ok(!r2.error && !r2.entrance.cl, 'off the side street (square to the layout): straight in');
+}
 // a restaurant's drive-thru on the 2-acre square: one way round it, the window on the driver's side, 8 cars behind the order
 { const plan = planOf('square2ac'), o = L.layoutOptions(plan, { use: 'restaurant', gfa: 4000, extras: ['drivethru'] })[0], lanes = o.elements.filter(e => e.note === 'Drive-thru lane');
   assert.ok(lanes.length && lanes.every(e => e.stack >= 8), 'a restaurant on the 2-acre square: its drive-thru stacks 8 (' + lanes.map(e => e.stack).join(',') + ')'); }
