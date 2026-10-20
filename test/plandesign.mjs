@@ -11,7 +11,7 @@ const PD = await import('../lib/plandesign.mjs'), { planFor } = await import('./
 { const t = PD.buildingTypes(planFor('sfr')); assert.ok(t.length <= PD.MAX_TYPES); assert.equal(t.reduce((s, x) => s + x.count, 0), 71, 'every home is drawn as one of the types');
   assert.ok(t.every(x => x.use === 'sfr' && x.supported && x.garage === 2)); assert.deepEqual(t.map(x => x.id), t.map((x, i) => String.fromCharCode(65 + i))); }
 { const t = PD.buildingTypes(planFor('industrial'))[0]; assert.equal(t.occupancy, 'S-1'); assert.match(t.construction, /II-B/); assert.equal(t.sprinklered, true, 'a 78,000 sf warehouse is sprinklered'); }
-{ const t = PD.buildingTypes(planFor('retail')); assert.equal(t.length, 2); assert.ok(t.every(x => x.occupancy === 'M' && x.sprinklered), 'retail shells over 12,000 sf are sprinklered'); }
+{ const p = planFor('retail'), t = PD.buildingTypes(p); assert.equal(t.reduce((s, x) => s + x.count, 0), p.elements.filter(e => e.kind === 'building').length, 'every shop building is drawn as one of the types'); assert.ok(t.every(x => x.occupancy === 'M' && x.sprinklered), 'retail shells over 12,000 sf are sprinklered'); }
 { const t = PD.buildingTypes(planFor('restaurant')); assert.ok(t.every(x => x.occupancy === 'A-2' && x.sprinklered === x.buildingGsf > 5000)); }
 assert.equal(PD.sprinklerRule('office', 60000, 3).on, false, 'a 3-story business occupancy needs none by area'); assert.equal(PD.sprinklerRule('office', 9000, 4).on, true);
 assert.match(PD.sprinklerRule('townhomes', 3000, 3).why, /R313/);

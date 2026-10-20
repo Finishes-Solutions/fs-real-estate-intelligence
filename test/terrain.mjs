@@ -40,8 +40,9 @@ const plane = (sp, f = (x, y) => 160 - 0.01 * x + 0.005 * y) => { const z = []; 
 { const L = await import('../lib/sitelayout.mjs');
   for (const [prog, f, dir] of [[{ use: 'retail', gfa: 40000 }, (x, y) => 150 + 0.01 * y, 'south'], [{ use: 'townhomes' }, (x, y) => 150 - 0.01 * x, 'east']]) {
     const sp = T.gridSpec(fm362.ring), z = []; for (let j = 0; j < sp.ny; j++) for (let i = 0; i < sp.nx; i++) z.push(f(sp.x0 + i * sp.cell, sp.y0 + j * sp.cell));
-    const plan = { ...fm362, terrain: { ...sp, z } }, top = L.layoutOptions(plan, prog)[0], ps = top.elements.filter(e => e.kind === 'pond');
-    assert.ok(ps.length && ps.every(e => T.heightShare(plan.terrain, fm362.ring, [e.x, e.y]) < 0.3), prog.use + ' on land falling to the ' + dir + ': the first option\'s pond is on the low side'); } }
+    const plan = { ...fm362, terrain: { ...sp, z } }, out = L.layoutOptions(plan, prog), h = o => { const ps = o.elements.filter(e => e.kind === 'pond'); return ps.length ? Math.max(...ps.map(e => T.heightShare(plan.terrain, fm362.ring, [e.x, e.y]))) : null; };
+    const hs = out.map(h).filter(v => v != null); // (the parking-field engine has only a few places a pond can go on a lot: the first option takes the lowest of them)
+    assert.ok(hs.length && h(out[0]) != null && h(out[0]) <= Math.min(...hs) + 0.05 && h(out[0]) < 0.5, prog.use + ' on land falling to the ' + dir + ': the first option\'s pond is the lowest offered (' + hs.map(v => v.toFixed(2)).join(', ') + ')'); } }
 
 // ---------- the endpoint ----------
 const api = await import('../api/terrain.js'), real = globalThis.fetch;

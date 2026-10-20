@@ -15,6 +15,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Plan sets use the real ground:** the existing conditions sheet (C-001) draws contours with the low and high points instead of "Topography not surveyed", and the grading sheet (C-201) grades from real elevations: existing contours under the proposed ones, the pond's bank at the real ground, finished floors a foot over the ground, a rough cut and fill estimate, and a warning when the pond sits on high ground.
 - The elevations are USGS lidar of the bare ground (1 m detail where flown, most of Texas), asked for once per site and kept on your device. They're good for planning, not a survey. If USGS is down, a rougher model is used and marked approximate (it isn't drawn as contours).
 
+### 6:23 PM CT: The AI decides what's built on commercial sites (fdf013e, 5b6e987, a38845c, merged 7eb3363; and the scenario wording)
+- On **Medium, High and Ultra**, for shops, restaurants, offices, medical offices, hotels and churches, the AI now says exactly what to build: how many buildings and pad sites, their sizes and floors, where they sit and which way they face, how the parking is arranged, which side the pond goes on and whether there's a service drive, each with a one-line reason.
+- The planner draws it as **AI's plan** beside its own layouts and ranks it the same way, by the leasable floor area that parks and passes the checks; it's recommended only when it does best. Its card lists the AI's reasons and anything the planner had to change.
+- On **High and Ultra**, when the planner can't do the AI's plan as written, the AI revises it once and the new version is compared too. When the AI's plan can't be laid out at all, it isn't shown as a layout; a line under Build says what the AI asked for and why it didn't fit.
+- **Ask** can now explain the AI's choices ("why did you put the pond there?").
+- "With 2 pad sites" or "an outparcel" now places the pads at every effort level, and offices and medical offices can go to two floors unless you asked for one story.
+- On Waller plans, when all three scenarios come out the same, Numbers says so (the unresolved items could still change it) instead of calling one number a range.
+
 ### 5:54 PM CT: Floor plans, elevations and sections follow the building's shape (14954c0)
 - **The architectural sheets now draw L-shaped, U-shaped and stepped buildings as they are on the site plan:** the floor plan's outside wall follows every corner, with a dimension for each jog; the roof plan follows the outline; each elevation shows the set-back walls as their own panels behind the nearer ones; and the sections cut across the actual wing (50 ft across an L's wing, not the 100 ft box around it). Areas on the plans, code analysis and life safety sheets are the building's real area.
 - **Much smaller sheets:** brick, siding, shingles, concrete and insulation are drawn with light line work instead of fill patterns. The biggest architectural sheet went from 11.9 MB to under 0.8 MB. That size is what made one sheet fail in the first full set; it shouldn't happen now.
@@ -27,6 +35,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **L-shaped, U-shaped and stepped buildings are now designed as that shape**, not as the rectangle around them. The building type's name says so ("L-shape, 150' × 100' overall"), the rooms fill the real outline, the open corner or courtyard stays open, and the area is the outline's. Claude is told the corners and where the open ground is, and the checks catch a room in the wrong place. The drawings that follow the outline (walls, roof, elevations, foundation, MEP and sprinklers) arrive in the next push.
 - **Smaller PDFs:** the title block is now stored once for the whole set instead of on every sheet, about 160 KB less per sheet. Sets already under way finish the old way.
 - In homes made by the standard rule-based design, every upper floor now has a bathroom.
+
+### 5:10 PM CT: Drag faces, shape parking, face the building, precise turns (ae15452, 7780aa0, merged 42caa3e)
+- A selected building shows a bar on each side, a custom L included. Drag it and that face moves straight out or in, the sides beside it keep their direction, and a label shows the face's length and how far it moved.
+- Parking takes **Edit Shape**: add and drag points or faces, and the stalls refill the outline with whole stalls in rows on an aisle, none cut by the edge. Every count and drawing follows: Numbers, the pro forma, the PDF, the DXF and the Waller parking checks.
+- **Stall Direction** turns the stalls 90° inside the same outline. **Face the Building** points them at the nearest building face, the L's inner face included, with the aisle along it and a walk's width off it.
+- Turning is free to the degree and settles square to the street, the site edges and nearby buildings within 2°, with a guide line. **Shift** turns in 15° steps (45°, 90° and so on); it used to do the opposite. The Turn field takes any degrees, and custom shapes can be turned.
+- Shift while dragging a face or point gives whole feet and square corners. Handles no longer steal clicks meant for the piece next door, and on a phone a finger resting on a handle no longer opens the menu.
 
 ### 5:03 PM CT: Plan set drawings refined, with tests (36f764e)
 - Sheets: the architectural sheets are refined further.
@@ -43,6 +58,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Render on the Renderings tab no longer takes you to the map.** The option's 3D view is set up on a hidden map behind the scenes and the picture is taken from that, so you stay on the project page or carry on elsewhere in the app.
 - The form shows **Rendering 1 of 4** and what's happening, with **Cancel**. The new pictures appear below when they're ready, and a message says so wherever you are in the app.
 - The **Open plan** and **Render more** links beside each option's renderings are gone.
+
+### 4:56 PM CT: Parking fields for shops, offices and the like (aae331f, 5f3bd7d, d397bc4, 4b4fae1, 2eaf3ed, 3dcbf5f, 09a8f8e, merged e97cc60)
+- Layouts for retail, restaurants, offices, medical offices, hotels and churches now come out the way a civil engineer would sketch them: whole, straight rows on both sides of every aisle; a drive round both ends of every aisle, so there are no dead ends; a fire lane that puts every wall within reach of a fire truck; a clear entry drive with no stalls backing into it; a service drive behind shops and restaurants with the trash enclosures on it; planted islands at row ends and along long rows; and one pond on the land left over.
+- "As much as fits" grows the building until the parking, setbacks, fire lanes, detention or zoning stop it, and the layout says which one. Offices and medical offices try a second floor before building less. Examples on the test lots: retail at most on 5 acres 35,434 → 44,621 sf; on the FM 362 parcel 59,250 → 70,942 sf; a 40,000 sf office on a clipped corner lot now fits whole (27,233 before).
+- A lot too small or narrow for a drive round both ends of the aisles gets aisles that stop at one end with room to turn, and the layout says so.
+- Dragging a building re-fits the parking to face it where it now is.
+- Layouts come back faster: about 1–4 seconds on 5 acres.
+- A few small or oddly shaped lots now get less floor area than before, because the old layouts there had dead ends, cars in the entry drive or walls out of fire-truck reach (for example a restaurant on a 2-acre square: 6,000 → 4,822 sf with a service drive; 5,357 sf without it as the second choice).
 
 ### 4:39 PM CT: Tidier Make renderings form (ec75352)
 - The Option, View, Materials and Light dropdowns on the Renderings tab no longer run into each other. They sit in an even row of four on a computer, two by two on a tablet and one under another on a phone, with space between the form and what's below it. The Plans tab's form gets the same fix.
@@ -90,6 +113,31 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 ### 2:35 PM CT: Plan for full plan sets from a site plan (431cdcb)
 - **Planning only, nothing in the app changes.** `PLANSET-PLAN.md` sets out how an option's site plan would become a schematic design set of drawings, all on the Finishes Solutions title block: cover, civil and site, landscape, architecture, structure, mechanical, plumbing, electrical, fire, and telecom if wanted. Project pages would read Sites · Renderings · Plans.
 - It defines what a "full set" contains: which sheets, their numbers, and when each one is included. It also covers how Claude would design each building type for a person to approve and save to the team library, how code would draw and cross-check every sheet from the plan, and the settings for the Claude API key and model, with costs and a monthly cap.
+
+### 12:48 PM CT: Waller guardrails (74e9484, 7679147, 3d49721, 0b4e808, 23a7ab5, 86ead22, merged 56135b7; 1efc95a)
+- Sites inside the City of Waller, or within half a mile of its limits (its ETJ, unverified), are now planned under the Finishes Solutions Waller site-planning standard. Every other site is planned exactly as before. Site parameters has a **Waller guardrails: Auto / On / Off** switch.
+- The **Finishes base case** is drawn on the map: 5% over each minimum, 3–5% more parking than required, Waller lot sizes and setbacks for homes, 2 spaces a unit for apartments, a 26 ft fire lane, and detention of at least 1.00 acre-foot per developed acre with the pond sized from that volume (depth, side slopes, freeboard and a maintenance bench).
+- The **maximum code envelope** and a **conservative case** sit beside it in Numbers, and either can be laid out in one click. The yield is shown as a range while survey, title, flood, outfall, utilities and access are unresolved.
+- Numbers has a **land-use table** from gross acres down to net usable land, an **unresolved-risk list** and the standard's 18-item checklist; every number carries a tag: Verified, Owner guardrail, Engineering assumption or Unverified.
+- The concept label is on the plan, the PDF (with a new land-use sheet, SP-1A) and the exports; **Land Use (CSV)** is new under Export. Layouts read **Passes the planning checks**.
+- The AI is given the standard's instructions and values, and its answers never call a plan permit-ready, approved, engineered or code-compliant.
+- Site parameters adds the outfall, the owner's margin, a right-of-way reserve, and the pond's storage depth and side slopes.
+- New Option and Clear keep a Waller site's jurisdiction and its guardrail settings.
+
+### 12:40 PM CT: New Option (blank site, copy, clear and start over), and deleting options, renderings and test projects (ab0f8f3, merged a2340bc)
+- **+ New Option** (it was + Copy Option) opens a short menu. **Blank site** makes a new option on the same lot: its street sides, setbacks, parcels, zoning and easements, but nothing laid out. It opens with the Build box ready. **Copy of (option)** still copies it, layouts included (its renderings now stay with the original).
+- **Clear (option) and start over** empties the option you're in and keeps the site. No question first: **Cleared Option A · Undo** brings it all back, layouts included. Its renderings stay.
+- **Delete (option)**, in the same menu, at the foot of the panel or on the project page, deletes straight away with **Undo** for a few seconds, and says so when it goes for the team too. The next option opens; after the last one, the project page, where **New Option** still starts from the same site.
+- The project page's **New Option** now keeps the street sides and easements.
+- The Renderings tab has **Delete all** for each option and **Delete All Renderings** for the project; the pictures are removed from this device too.
+- **Settings › Testing · danger zone › Delete all projects…** says what will go and whether it's for the whole team, and needs DELETE typed to confirm. "Only this device's copies" leaves the team's projects alone.
+
+### 11:56 AM CT: A pro forma you can trust more (63c9ddf, merged b3eecf4)
+- Every pro forma default re-checked for 2026 Houston, Katy and Waller, each with its basis, and labelled "Market assumption, not verified".
+- Rent and the yield now use leasable area: shops 97% of the building, offices and medical their rentable area with a load factor, apartments the units' net sf, storage its rentable units, hotels their rooms. Numbers and the Pro forma show gross and leasable sf side by side, and the shares can be changed.
+- Fixed yields that read too low: tenants on NNN leases now pay back property taxes, site work follows what's built instead of the whole lot (parking paving was counted twice), no developer fee on land, and an AI-crafted type's courts and pavilion are priced and earn rent.
+- Now counted: detention ponds, parking garages, leasing commissions and hotel furniture. Hotels run on room rate and occupancy; storage rents climate-controlled, drive-up and RV spaces separately.
+- A calm note when a number is outside the usual range here, and flags for a yield on cost under 5% or over 12%, an unusual cap rate, a negative spread or thin debt coverage.
 
 ### 9:49 AM CT: Any building type the AI can describe, and a shared team building library (7da2412, c42fa30, merged b246482)
 - **No more plain boxes for a daycare, a pickleball club or an RV park.** When a request names a kind of place the planner has no setting for, the AI now writes a recipe for it: its buildings, its outdoor pieces (courts, a playground, a pool, a lawn, a plaza, a patio, a pavilion), its parking rule and the figures to show. The planner lays it out with its usual machinery, so drives, parking, entrances, detention, trash and the checks work as for any other use.
