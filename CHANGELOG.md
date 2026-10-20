@@ -3,6 +3,19 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-20
+
+### 10:20 AM CT: Plan sets, accuracy round 1: one code basis, apartments designed, honest notes (0b097c4, 298dd94, 686c9a3, 0f8389b, 28c61f6, 2666df4, adef01b)
+- From a professional review of the FM 362 & Betka Rd set: each building type's **sprinklers, construction type, heights, structure and scope are now decided once** and shared by every sheet, so the set can't say a building is sprinklered on one sheet and not on another, or give two heights.
+  - Sprinklers follow the code's own triggers for the use (IBC 903.2) with the reason and section: every apartment building (NFPA 13R up to four stories), a restaurant over 5,000 sf or 100 people, a clubhouse over 12,000 sf or 300 people, shops and warehouses over 12,000 sf. The old blanket "assembly over 5,000 sf" is gone.
+  - The construction type is the least costly that meets the allowable height, stories and area (IBC 504 and 506), with the frontage increase measured from the space around the building. A building that's over gets sprinklers or, failing that, the set says fire walls are needed — never just "Revise".
+  - Occupant loads use the IBC's factor for each room (exercise 50 sf gross, lounges and dining 15 sf net…).
+- **Apartment buildings and hotels are designed now**, not site-only: a corridor, an exit stair at each end, an elevator at three stories and up, a lobby and trash and electrical rooms, and units from the project's unit mix, each unit type with its own plan. Similar-sized buildings are one type, and a clubhouse is never drawn as an apartment building.
+- **Notes match the drawings:** Claude writes them after the designs, from a list of only what's built and each type's decided basis, so they can't promise drive-throughs or townhomes the plan doesn't have, and open issues stay open. Notes are kept to whole sentences.
+- **Open issues on the cover** (fire access, allowable area, units that don't fit, a pond on high ground, unconfirmed water and sewer, survey), a **building types** table saying how each type was designed, and land use rows that name what's actually built in each area.
+- **The Plans tab warns before you make a set** when the option has a problem the set can't fix, such as one way in where two are needed.
+- The sheets themselves (site and civil quantities, apartments' floor and unit plans, engineering) follow in the next push.
+
 ## 2026-10-19
 
 ### 8:28 PM CT: Plan sets, renderings from the project page and ground elevations go to main (bb5ed4f)
