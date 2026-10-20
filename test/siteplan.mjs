@@ -499,4 +499,69 @@ for (const v of [0, 1, 2]) {
     assert.ok(a.entrance, a.error); const bar = S.entryMarks({ ...lot2, elements: a.elements }).find(m => m.color === '#ffffff'); assert.ok(bar && Math.abs(bar.line[0][1] - bar.line[1][1]) < 1 && Math.abs(bar.line[0][1] - 12) < 2, JSON.stringify(bar)); }
 }
 
+// ---- placement in words (phase 3, lib/sitepods.mjs): each zone's place, kept by normalizeProgram, read from the words and from the AI ----
+{ const N = q => S.normalizeProgram(q).zones;
+  const z = N({ use: 'retail', zones: [{ use: 'retail', gfa: 60000, place: { where: 'corner', road: '  FM 362 ', next: [], side: 'left' } }, { use: 'amenity', place: { where: 'middle' } }, { use: 'sfr', place: { where: 'around', next: [1, 2, 1, 7, -1, 'x'] } }] });
+  assert.deepEqual(z[0].place, { where: 'corner', road: 'FM 362', next: [], side: 'left' }); assert.deepEqual(z[1].place, { where: 'middle', road: null, next: [], side: null });
+  assert.deepEqual(z[2].place.next, [1], 'next: other zones only, once each, in range');
+  assert.ok(!('place' in N({ use: 'retail', zones: [{ use: 'retail', place: { where: 'nowhere' } }, { use: 'sfr', place: 'back' }] })[0]), 'junk: no hint');
+  assert.ok(N({ use: 'retail', zones: [{ use: 'retail' }, { use: 'sfr', place: { where: 'between', next: [0, 0, 0] } }, { use: 'amenity', place: { where: 'beside', next: [0, 1, 3] } }] }).every((q, i) => i === 0 ? !q.place : q.place.next.length <= 2), 'two next at most');
+  assert.deepEqual(N({ use: 'retail', zones: [{ use: 'retail', gfa: 20000 }, { use: 'multifamily', units: 200 }] }).map(q => Object.keys(q).includes('place')), [false, false], 'no hints: no key (saved plans compare the same)');
+  const g = N({ use: 'office', garage: true, zones: [{ use: 'office', gfa: 80000 }, { use: 'retail', gfa: 20000 }, { use: 'multifamily', units: 200, place: { where: 'beside', next: [1] } }] }); // a garage put in after the offices moves the zones behind it along one
+  assert.deepEqual(g.map(q => q.use), ['office', 'garage', 'retail', 'multifamily']); assert.deepEqual(g[3].place.next, [2], 'beside the retail, as said');
+  // the words
+  const P = t => S.guessProgram(t).zones, at = (Z, u) => Z.find(q => q.use === u)?.place;
+  const W = P('60,000 sf retail with 2 pads at the corner of FM 362 and Bauer Road, 300 apartments along FM 362, about 600 homes around a lake, and a commons with a community center, pool and playground');
+  assert.deepEqual(W.map(q => q.use + (q.units || q.gfa || '')), ['retail60000', 'amenity', 'multifamily300', 'sfr600']); assert.equal(W[0].pads, 2);
+  assert.equal(at(W, 'retail').where, 'corner'); assert.match(at(W, 'retail').road, /fm 362|bauer/); assert.deepEqual([at(W, 'multifamily').where, at(W, 'multifamily').road], ['along', 'fm 362']);
+  assert.deepEqual([at(W, 'sfr').where, at(W, 'sfr').next], ['around', [1]], 'homes round the commons'); assert.ok(W[1].items.includes('lake') && at(W, 'amenity').where === 'middle', 'the commons holds the lake, in the middle');
+  const B = P('20,000 sf retail, 40 townhomes as a buffer between the retail and the homes, 200 homes'); assert.deepEqual([at(B, 'townhomes').where, at(B, 'townhomes').next], ['between', [0, 2]]);
+  assert.deepEqual([at(P('retail and 200 apartments facing the highway'), 'multifamily').where, at(P('30,000 sf retail on the frontage and 300 homes'), 'retail').where, at(P('300 homes, the commons in the middle'), 'amenity').where, at(P('retail at the front, 200 homes at the back'), 'sfr').where], ['along', 'along', 'middle', 'back']);
+  assert.deepEqual(at(P('20,000 sf shops on the left corner and 150 apartments'), 'retail'), { where: 'corner', road: null, next: [], side: 'left' });
+  assert.deepEqual(P('37,700 sf retail with 2 pads, a commons with a lake, 120 apartments, 18 townhomes and 12 duplex units').map(q => q.use + (q.place ? '@' : '')), ['retail', 'amenity', 'multifamily', 'townhomes', 'duplex'], 'no placement words: no hints, the zones as before');
+  // the AI: placement in the program schema (strict), read back as place; the words fill a zone the model left open
+  const { default: handler, SCHEMA, EDIT_SCHEMA } = await import('../api/siteplan.js'), strict = (sc, w) => { if (sc?.type === 'object' && sc.properties) { assert.deepEqual(sc.required.slice().sort(), Object.keys(sc.properties).sort(), 'strict: ' + w); for (const [k, v] of Object.entries(sc.properties)) strict(v, w + '.' + k); } if (sc?.items) strict(sc.items, w + '[]'); };
+  strict(SCHEMA, 'program'); assert.ok(SCHEMA.properties.zones.items.properties.placement.properties.where.enum.includes('around')); strict(EDIT_SCHEMA, 'edit');
+  assert.ok(EDIT_SCHEMA.properties.ops.items.properties.action.enum.includes('relay') && EDIT_SCHEMA.properties.ops.items.properties.kind.enum.includes('pod'));
+  const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; }; let sent = null, reply = null; process.env.OPENAI_API_KEY = 'test-key';
+  globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('/models/')) return Response.json({ id: 'm' }); sent = JSON.parse(opts.body); return Response.json({ choices: [{ message: { content: JSON.stringify(reply()) } }] }); };
+  const call = async body => { const res = mock(); await handler({ method: 'POST', body, headers: { 'x-forwarded-for': '7.7.7.21' } }, res); return res; }, none = { where: null, road: null, next: [], side: null };
+  const zone = o => ({ use: 'retail', gfa: null, units: null, floors: null, buildings: null, pads: null, items: [], name: null, placement: none, ...o });
+  reply = () => ({ use: 'retail', gfa: null, units: null, floors: null, buildings: null, zones: [zone({ gfa: 60000, placement: { where: 'corner', road: 'FM 362', next: [], side: null } }), zone({ use: 'amenity', items: ['lake'] }), zone({ use: 'sfr', units: 600 })], setbacks: { front: null, side: null, rear: null, paving: null }, summary: 'x', assumptions: [] });
+  let res = await call({ prompt: '60,000 sf retail at the corner of FM 362, 600 homes around a lake', site: { acres: 246, streets: [{ side: 'front', name: 'FM 362', highway: true }, { side: 'side', name: 'Bauer Road' }, { side: 'nope', name: { x: 1 } }] } });
+  assert.equal(res.code, 200, JSON.stringify(res.body)); const pz = res.body.program.zones; assert.deepEqual(pz[0].place, { where: 'corner', road: 'FM 362', next: [], side: null }, 'the model’s placement');
+  assert.deepEqual([pz[2].place.where, pz[2].place.next], ['around', [1]], 'the words’ placement where the model left one open (next by use)'); assert.ok(!pz[1].place || pz[1].place.where === 'middle');
+  assert.deepEqual(JSON.parse(sent.messages[1].content).site.streets, [{ side: 'front', name: 'FM 362', highway: true }, { side: 'side', name: 'Bauer Road', highway: false }, { side: 'front', name: null, highway: false }], 'the roads by name go to the model, clipped');
+  // Change With AI on a plan in pods: the pods go to the model; relay and swap on pod ids come back
+  const op = o => ({ action: 'change', target: null, every: null, floorsOver: null, with: null, type: null, kind: null, use: null, name: null, floors: null, units: null, w: null, d: null, x: null, y: null, turn: null, turnBy: null, boulevard: null, signs: null, ...o });
+  reply = () => ({ homeMix: [], ops: [op({ action: 'relay', target: 'pod:p3' }), op({ action: 'swap', target: 'pod:p3', with: 'pod:p2' }), op({ action: 'relay', target: 'b1' }), op({ action: 'relay', target: 'pod:p99' })], names: { community: null, parts: [] }, refit: 'none', summary: 'Re-laid.', question: null });
+  res = await call({ mode: 'edit', prompt: 'redo the apartments, then swap them with the retail', plan: { pieces: [{ id: 'b1', name: 'Apt Bldg 1', kind: 'building', use: 'multifamily', at: [1, 2] }], pods: [{ id: 'pod:p3', name: 'Apartments', use: 'multifamily', acres: 18.8, at: [1445, 273], faces: ['FM 362', 'the spine road'], units: 300 }, { id: 'pod:p2', name: 'Retail', use: 'retail', acres: 8.1, at: [333, 266], faces: ['FM 362'] }, { id: 'p7', name: 'not a pod' }] } });
+  assert.equal(res.code, 200, JSON.stringify(res.body)); assert.deepEqual(res.body.ops.map(o => [o.action, o.target, o.with]), [['relay', 'pod:p3', null], ['swap', 'pod:p3', 'pod:p2']], 'pods by their ids only');
+  assert.deepEqual(JSON.parse(sent.messages[1].content.split('\n\nBuilding library')[0]).pods.map(p => p.id), ['pod:p3', 'pod:p2'], 'the pods go to the model');
+  reply = () => ({ homeMix: [], ops: [op({ action: 'relay', target: 'pod:p2', gfa: 80000 }), op({ action: 'relay', target: 'pod:p3', gfa: 'lots' })], names: { community: null, parts: [] }, refit: 'none', summary: 'Bigger.', question: null });
+  res = await call({ mode: 'edit', prompt: 'make the retail pod 80,000 sf', plan: { pieces: [], pods: [{ id: 'pod:p2', name: 'Retail', use: 'retail', acres: 8.1, at: [333, 266], faces: ['FM 362'] }, { id: 'pod:p3', name: 'Apartments', use: 'multifamily', acres: 18.8, at: [1, 1], faces: [] }] } });
+  assert.deepEqual(res.body.ops.map(o => o.gfa), [80000, null], 'a pod’s floor area, sq ft');
+  // the words: placement after the zones are in their order (a commons said to go at the back moves to the end); uses
+  // named together share a placement; a commons' items wherever they're said; uses named only as what a zone is beside
+  const H = P('300 homes around a lake and a clubhouse at the back, 200 apartments along the highway'); assert.deepEqual(H.map(q => q.use), ['multifamily', 'sfr', 'amenity']); assert.deepEqual(at(H, 'sfr').next, [2], 'round the commons, not the apartments');
+  const H2 = P('Retail at the corner, 200 apartments, 300 homes around the commons, with a community center at the back'); assert.equal(H2[at(H2, 'sfr').next[0]].use, 'amenity');
+  assert.deepEqual(P('medical and office in the middle, 200 homes').filter(q => q.place).map(q => q.use + ':' + q.place.where).sort(), ['medical:middle', 'office:middle']);
+  assert.deepEqual(P('retail, 300 homes and a commons with a pool and playground').find(q => q.use === 'amenity').items, ['pool', 'playground']);
+  const L4 = P('400 homes around a lake with a clubhouse and pool'); assert.deepEqual(L4.map(q => q.use), ['amenity', 'sfr']); assert.ok(['center', 'pool', 'lake'].every(k => L4[0].items.includes(k)), 'the clubhouse and pool kept'); assert.deepEqual(at(L4, 'sfr').next, [0]);
+  const BT = P('apartments beside the retail, homes between the apartments and the park'); assert.deepEqual(BT.map(q => q.use), ['retail', 'amenity', 'multifamily', 'sfr']);
+  assert.deepEqual([at(BT, 'multifamily').where, at(BT, 'multifamily').next, at(BT, 'sfr').where, at(BT, 'sfr').next], ['beside', [0], 'between', [2, 1]]);
+  assert.deepEqual(P('200 apartments along the highway and 80 homes').map(q => q.use + q.units), ['multifamily200', 'sfr80']);
+  // a lake said with other things is one of them (a commons of only those has none); a lake alone: the commons as it comes, its lake among the rest
+  const am = t => P(t).find(q => q.use === 'amenity')?.items ?? null;
+  for (const t of ['a neighborhood of 500 homes with a lake, a pool and a playground', '400 homes, a commons with a lake, pool and playground', '30,000 sf retail, 200 apartments, 300 homes and a park with a lake and a pool', '300 homes, 100 apartments and a commons with a lake and a pool', '150 townhomes and 20,000 sf retail with a lake and a playground', 'homes on lots with a lake, and a clubhouse']) assert.ok(am(t)?.includes('lake'), t + ': ' + am(t));
+  assert.ok(am('homes on lots with a lake, and a clubhouse').includes('center') && am('homes on lots with a lake, and a clubhouse').includes('playground'), 'a clubhouse with its playground, said after');
+  assert.equal(am('300 homes and a commons with a lake'), null); assert.equal(am('300 homes around a lake'), null, 'homes round a lake: the usual commons, lake and all');
+  // what a zone is beside or round, with its numbers; homes said with no number but a place
+  assert.deepEqual(P('120 apartments next to 20,000 sf of retail').map(q => q.use + (q.units || q.gfa)), ['retail20000', 'multifamily120']);
+  assert.deepEqual(am('100 homes around 2 pickleball courts and a pool'), ['courts', 'pool']);
+  const BH = P('120 townhomes as a buffer between the apartments and the homes, homes at the back'); assert.deepEqual(BH.map(q => q.use), ['multifamily', 'townhomes', 'sfr']);
+  assert.deepEqual([at(BH, 'townhomes').where, at(BH, 'townhomes').next, at(BH, 'sfr').where, at(BH, 'multifamily')], ['between', [0, 2], 'back', undefined], 'the homes at the back, not the apartments');
+  // a numbered highway is that road, not "the highway" (the front)
+  assert.equal(at(P('200 apartments along Highway 6 and 300 homes'), 'multifamily').road, 'highway 6'); assert.equal(at(P('retail along the highway and 300 homes'), 'retail').road, 'highway'); }
+
 console.log('site plans ok');

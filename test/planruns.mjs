@@ -75,6 +75,9 @@ assert.ok(two[0].plans[0].lastRun.variants.every(v => !v.elements), 'options not
 assert.ok(two[1].plans[0].lastRun.variants.some(v => v.elements), 'the open one keeps them');
 assert.equal(lightenRuns(two, 'o4'), false, 'nothing left to slim');
 
+// a plan laid out in pods is known by its skeleton, not its pieces' ids (they're new each time it's laid out)
+{ const pod = (id, at) => ({ name: 'Pods · loop road round the lake', recipe: { pods: { kind: 'core', at, D: 0, list: [] } }, elements: [{ id, w: 1, d: 1 }] });
+  assert.equal(layoutKeys([pod('a', 0.5)])[0], layoutKeys([pod('b', 0.5)])[0]); assert.notEqual(layoutKeys([pod('a', 0.5)])[0], layoutKeys([pod('a', 0.65)])[0]); }
 console.log('planruns ok: layout names and keys, matching after a re-solve, saved runs, Pro forma money, parcels in projects, team copy and full-store slimming');
 
 // More layouts keeps the layout on the map when the new run doesn't hold it
