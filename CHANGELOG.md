@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-21
 
-### 12:30 PM CT: The neighbourhood work joins main: square driveways, drive-thrus, L-shaped buildings, plan sets (MERGE_SHA)
+### 12:30 PM CT: The neighbourhood work joins main: square driveways, drive-thrus, L-shaped buildings, plan sets (c60fadd)
 - Everything from main is here alongside the street rules, editable streets, pods, roundabouts, boulevard entries and turning of this branch.
 - **Driveways meet the street square everywhere:** added entrances and the planner's main entries leave the street at a right angle and, where the street slants across the layout, curve round to meet the drive square. A **boulevard** does the same when its planted median still fits on the straight past the curve (the median and monument sign go there); where it doesn't, the boulevard comes straight in as before. **Make It a Boulevard** follows the same rule.
 - **Turning:** the green dot now turns freely with main's 2° settling and Shift for 15° steps on every piece, curved ponds, lawns, bent drives and entrances included (those still turn about their middle; an entrance's mouth slides along the street). A drawn parking outline's stall direction turns with it whichever way it's turned.
