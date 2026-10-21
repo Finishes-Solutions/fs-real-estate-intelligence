@@ -91,7 +91,8 @@ assert.equal(RF.floorPlanType(files[0].facts[1]), null, 'only floor plans');
 { const own = [{ id: 'a1b2c3d4', path: 'projects/p-abc1/a1b2c3d4__Survey.pdf', name: 'Survey.pdf', facts: [{ id: 'f1', status: 'ok' }] }, { id: 'zzzzzz99', path: 'projects/p-abc1/zzzzzz99__Old.png', name: 'Old.png', facts: [] }];
   const got = RF.reconcile(own, [{ path: 'projects/p-abc1/a1b2c3d4__Survey.pdf', size: 1000 }, { path: 'projects/p-abc1/q9w8e7r6__Plans.pdf', size: 2000, at: '2026-10-20T10:00:00Z' }]);
   assert.equal(got.length, 3); assert.equal(got[0].missing, false); assert.equal(got[1].missing, true, 'gone from storage: marked, its facts kept'); assert.equal(got[2].name, 'Plans.pdf'); assert.equal(got[2].read, null, 'a file only storage knew joins, unread');
-  assert.equal(got[0].facts[0].status, 'ok'); }
+  assert.equal(got[0].facts[0].status, 'ok');
+  assert.ok(RF.reconcile(own, []).every(f => !f.missing), 'an empty listing marks nothing missing (more likely a listing that failed)'); }
 console.log('sitefiles lib ok: paths, strict read schema, kept answer, DXF words, confirmed facts for the AI, floor plan types, easement strips on a real parcel, reconcile');
 
 // ---- /api/sitefiles: an in-memory Supabase storage and a mocked OpenAI ----

@@ -23,7 +23,7 @@ export function siteFiles({ ctx, esc, project, save, render, library, optionsOf,
   const st = { setup: null, why: '', listed: new Set(), busy: new Map(), pct: new Map(), err: new Map(), editing: null, place: new Map() };
   const headers = () => ({ 'Content-Type': 'application/json', 'x-field-code': get(CODE_KEY) });
   async function call(pid, body, q) {
-    const r = await fetch('api/sitefiles' + (q ? '?pid=' + encodeURIComponent(pid) + q : ''), body ? { method: 'POST', headers: headers(), body: JSON.stringify({ pid, ...body, ...(ctx.aiModel?.() && body.read ? { model: ctx.aiModel() } : {}) }) } : { headers: headers() });
+    const r = await fetch('api/sitefiles' + (body ? '' : '?pid=' + encodeURIComponent(pid) + (q || '')), body ? { method: 'POST', headers: headers(), body: JSON.stringify({ pid, ...body, ...(ctx.aiModel?.() && body.read ? { model: ctx.aiModel() } : {}) }) } : { headers: headers() });
     const d = await r.json().catch(() => ({}));
     if (r.status === 503 && d.setup) { st.setup = d.setup; st.why = d.error || ''; }
     else if (r.status === 401) { st.setup = 'passcode'; st.why = d.error || 'Enter the team passcode under Settings.'; }
@@ -91,7 +91,7 @@ export function siteFiles({ ctx, esc, project, save, render, library, optionsOf,
   // ---------- the tab ----------
   function setupNote() {
     if (!st.setup) return '';
-    const msg = st.setup === 'key' ? 'Reference files aren’t set up on this site: they need the team’s storage (SUPABASE_SECRET_KEY on the site). Facts already read stay here and still go to the AI.'
+    const msg = st.setup === 'key' ? 'Reference files aren’t set up on this site: the team’s file storage isn’t connected. Facts already read stay here and still go to the AI.'
       : st.setup === 'bucket' ? 'Reference files aren’t set up on this site yet: the storage for them (the site-files bucket) hasn’t been created. Facts already read stay here and still go to the AI.'
       : st.why || 'Reference files aren’t available right now.';
     return '<p class="rnote pj-fsetup" role="status">' + esc(msg) + '</p>';
