@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-20
 
+### 11:34 PM CT: Phase 5 paused, saved for later (this commit)
+- **Nothing in the app changes.** The build of Phase 5 (split detention, trails, sidewalks) was stopped part-way on request. Its unfinished work is saved in `wip/` so it can be picked up later; the app stays exactly as Phase 4b left it.
+
 ### 9:42 PM CT: Street rules for the place, editable streets and street names (3b0be35)
 - **Street rules for the place:** Site parameters › **Street rules** has the AI read the subdivision rules and drainage criteria where the site is (the city's, or for a site outside a city it first works out whether it's in a city's ETJ, says what it decided and why, then reads that place's rules). It takes a minute or two and can be cancelled. Each value links to its source (hover for the words quoted); a value the AI couldn't quote is marked **Unsure**, one it couldn't find is filled from Waller County's rules and marked **Waller default**, and either can be **Confirm**ed or typed over. **Use Waller Defaults** fills the sheet without the AI; **Use Typical Values** goes back to the typical rules.
 - **The layouts follow the sheet:** street widths, block and cul-de-sac lengths, the cul-de-sac bulb, junction spacing, the narrowest lot and smallest lot area, the front and side building lines and when a second way in is needed shape the subdivision streets and the parallel streets alike (homes pods too; a lot on a curving street is made wider where the curve narrows it, so it still holds the smallest lot area). Driveway spacing and corner distance shape the entrances, the detention rate sizes the pond, and sidewalks show in Numbers. The rules followed show in the layout notes and on the PDF sheet, with any breaks in the checks. It is the AI's reading of the code, never a compliance claim.
