@@ -24,7 +24,7 @@ export function conn(env = process.env) {
   const json = async (path, opts) => { const t = await (await call(path, opts)).text(); return t ? JSON.parse(t) : null; };
   const write = (path, body, prefer) => call('/rest/v1/' + path, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json', Prefer: prefer || 'resolution=merge-duplicates,return=minimal' } });
   return {
-    call, json, // raw PostgREST access (api/projects.js)
+    url, call, json, // raw PostgREST and storage access (api/projects.js, api/sitefiles.js)
     notes: () => json('/rest/v1/field_notes?select=client_id,lng,lat,title,body,tag,photos,created_by_email,updated_by_email,created_at,updated_at&order=updated_at.desc&limit=5000'),
     watch: () => json('/rest/v1/team_watchlist?select=*&order=added_at.desc&limit=2000'),
     upsertNotes: rows => write('field_notes?on_conflict=client_id', rows),

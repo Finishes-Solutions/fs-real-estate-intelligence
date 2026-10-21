@@ -27,6 +27,8 @@
 // level picked under Build; Ultra plans at xhigh, which steps down to high on a model that doesn't take it); missing or
 // unknown keeps the default (high, medium for ask). review also takes rounds (1-3, default 2): the last round never
 // revises. program and review take the strategy the planning step chose (strategy), and follow or judge against it.
+// refs (strategy, program, review, edit, ask, askProject, bestuse): the facts the team confirmed from the project's
+// reference files (a survey, floor plans: lib/sitefiles.mjs refsForAI), short lines added after the user text (refBlock).
 // site: { acres, widthFt, depthFt, frontageFt, address, city, county, zoning }; facts: short lines (flood zone, roads
 // and traffic, districts, utilities, environmental records).
 import { chatJSON, pickModel, withModel, withRoom } from '../lib/openai.mjs';
@@ -42,6 +44,7 @@ import { SUFFIXES, namesFor } from '../lib/streetnames.mjs';
 import * as G from '../lib/guardrails.mjs';
 import * as BR from '../lib/planbrief.mjs';
 import { FIELD_USES } from '../lib/siteparking.mjs';
+import { refBlock } from '../lib/sitefiles.mjs';
 
 let modelP = null;
 const EFFORTS = ['low', 'medium', 'high', 'xhigh'], effortIn = (v, d) => EFFORTS.includes(v) ? v : d; // OpenAI reasoning_effort, from an allow-list
@@ -364,7 +367,7 @@ export function briefOut(raw, ctx) {
 async function strategy(b, key, res) {
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   const count = +b.count === 3 ? 3 : 1, briefFor = b.briefFor && typeof b.briefFor === 'object' && !Array.isArray(b.briefFor) ? tidy(b.briefFor, 0, 300) : null; // (a commercial site: what the AI's brief is decided from)
-  const user = siteText(b.site, prompt, b.program, b.facts).replace(/}$/, ',"asked":' + JSON.stringify(count === 3 ? 'three different strategies, then pick one' : 'one strategy') + (briefFor ? ',"briefFor":' + JSON.stringify(briefFor) : '') + '}');
+  const user = siteText(b.site, prompt, b.program, b.facts).replace(/}$/, ',"asked":' + JSON.stringify(count === 3 ? 'three different strategies, then pick one' : 'one strategy') + (briefFor ? ',"briefFor":' + JSON.stringify(briefFor) : '') + '}') + refBlock(b.refs); // (refBlock: the facts the team confirmed from its reference files, lib/sitefiles.mjs)
   const bctx = briefFor ? { prompt, siteSf: +briefFor.lot?.siteSf || (+b.site?.acres || 0) * 43560, use: guessProgram(prompt).use } : null;
   try {
     const t0 = Date.now(), r = await ai(key, b, res, m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, STRATEGY_SYSTEM), user, name: 'site_strategy', schema: STRATEGY_SCHEMA, ...o }), { maxTokens: count === 3 ? 40000 : 20000, effort: effortIn(b.effort, 'high'), t0 })); // (Ultra thinks at xhigh: its thinking can use up the room, so it's asked again once with more room, a notch lower, lib/openai.mjs withRoom)
@@ -401,7 +404,7 @@ export default async function handler(req, res) {
   if (b.mode === 'streetNames') return streetNames(b, key, res);
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
-    const t0 = Date.now(), r = await ai(key, b, res, m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, SYSTEM), user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy), teamTypesForAI(b.teamTypes)), name: 'site_program', schema: SCHEMA, ...o }), { maxTokens: 16000, effort: effortIn(b.effort, 'high'), t0 })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
+    const t0 = Date.now(), r = await ai(key, b, res, m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, SYSTEM), user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy), teamTypesForAI(b.teamTypes)) + refBlock(b.refs), name: 'site_program', schema: SCHEMA, ...o }), { maxTokens: 16000, effort: effortIn(b.effort, 'high'), t0 })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
     const d = r.data, sb = Object.fromEntries(Object.entries(d.setbacks || {}).filter(([, v]) => v != null && v >= 0 && v <= 300)), cu = customFrom(d, programFrom(d, prompt)), program = cu.program;
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ program, setbacks: { ...SETBACKS, ...sb }, summary: clip(d.summary, 400), assumptions: [...(cu.note ? [cu.note] : []), ...(d.assumptions || []).slice(0, 4).map(a => clip(a, 200))].slice(0, 5) });
@@ -428,7 +431,7 @@ async function review(b, key, res) {
     options: opts.map((o, i) => ({ option: i, name: clip(o.name, 120), drawing: images[i] ? 'image ' + (images.slice(0, i + 1).filter(Boolean).length) : 'none', metrics: Object.fromEntries(Object.entries(o.metrics || {}).slice(0, 16).map(([k, v]) => [clip(k, 30), num(v)])),
       issues: (o.issues || []).slice(0, 8).map(t => clip(t, 160)), notes: (o.notes || []).slice(0, 6).map(t => clip(t, 240)) })) });
   try {
-    const t0 = Date.now(), r = await ai(key, b, res, m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, REVIEW_SYSTEM), user: text, name: 'site_review', schema: REVIEW_SCHEMA, images: images.filter(Boolean), ...o }), { maxTokens: 20000, effort: effortIn(b.effort, 'high'), t0 }));
+    const t0 = Date.now(), r = await ai(key, b, res, m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, REVIEW_SYSTEM), user: text + refBlock(b.refs), name: 'site_review', schema: REVIEW_SCHEMA, images: images.filter(Boolean), ...o }), { maxTokens: 20000, effort: effortIn(b.effort, 'high'), t0 }));
     const d = r.data, n = opts.length, ok = i => Number.isInteger(i) && i >= 0 && i < n;
     const ranking = [...new Set((d.ranking || []).filter(ok))]; for (let i = 0; i < n; i++) if (!ranking.includes(i)) ranking.push(i);
     const reviews = (d.reviews || []).filter(x => ok(x.option)).map(x => ({ option: x.option, score: Math.max(0, Math.min(100, Math.round(+x.score || 0))), verdict: clip(x.verdict, 300), strengths: (x.strengths || []).slice(0, 3).map(t => clip(t, 200)), problems: (x.problems || []).slice(0, 4).map(t => clip(t, 220)) }));
@@ -450,7 +453,7 @@ async function bestUse(b, key, res) {
   const nearby = Object.fromEntries(Object.entries(b.nearby && typeof b.nearby === 'object' ? b.nearby : {}).slice(0, 14).map(([k, v]) => [clip(k, 30), (Array.isArray(v) ? v : []).slice(0, 4).map(x => ({ name: clip(x?.name, 80), miles: num(x?.miles) }))]));
   const market = Object.fromEntries(Object.entries(b.market && typeof b.market === 'object' ? b.market : {}).slice(0, 12).map(([k, v]) => [clip(k, 40), typeof v === 'number' ? v : clip(v, 160)]));
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: BESTUSE_SYSTEM, user: JSON.stringify({ goal: s.request || null, site: s.site, nearby, market }), name: 'site_best_use', schema: BESTUSE_SCHEMA, maxTokens: 16000, effort: 'high' }));
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: BESTUSE_SYSTEM, user: JSON.stringify({ goal: s.request || null, site: s.site, nearby, market }) + refBlock(b.refs), name: 'site_best_use', schema: BESTUSE_SCHEMA, maxTokens: 16000, effort: 'high' }));
     const d = r.data, ideas = (d.ideas || []).slice(0, 5).map(x => ({ title: clip(x.title, 120), use: USES[x.use] ? x.use : 'other', fit: Math.max(0, Math.min(100, Math.round(+x.fit || 0))), why: clip(x.why, 600), risks: (x.risks || []).slice(0, 3).map(t => clip(t, 200)), request: clip(x.request, 400) })).filter(x => x.request);
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ ideas, summary: clip(d.summary, 500) });
@@ -550,7 +553,7 @@ async function edit(b, key, res) {
   const ids = new Set([...pieces.map(p => p.id), ...pods.map(p => p.id), ...nst.map(x => x.id)]), image = typeof b.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(b.image) && b.image.length < 600000 ? b.image : null;
   const text = JSON.stringify({ request: prompt, site: { ...JSON.parse(siteText(b.site, '', null, null)).site, ...(plan.site || {}) }, totals: plan.totals || null, parking: plan.parking || null, community: plan.community ? clip(plan.community, 60) : null, parts, houses: housesIn(plan.houses), places: placesIn(plan.places), junctions: junctionsIn(plan.junctions), ...(pods.length ? { pods } : {}), ...(nst.length ? { streets: nst, streetNames: sn0 } : {}), selected: pieces.find(p => p.selected)?.id || nst.find(x => x.selected)?.id || null, pieces }) + '\n\nBuilding library (type id = name):\n' + catalogText();
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, EDIT_SYSTEM), user: text, name: 'site_edit', schema: EDIT_SCHEMA, maxTokens: 16000, effort: 'high', images: image ? [image] : [] }));
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, EDIT_SYSTEM), user: text + refBlock(b.refs), name: 'site_edit', schema: EDIT_SCHEMA, maxTokens: 16000, effort: 'high', images: image ? [image] : [] }));
     const d = r.data, kinds = new Set(['building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio', 'entrance', 'roundabout', 'loop']);
     const every = o => (o.action === 'change' || o.action === 'remove') && !ids.has(o.target) && EVERY.includes(o.every);
     let homeMix = mixIn(d.homeMix);
@@ -707,7 +710,7 @@ async function ask(b, key, res) {
   let facts = JSON.stringify(plan); if (facts.length > 48000 && Array.isArray(plan.pieces)) { plan.pieces = plan.pieces.slice(0, 25); facts = JSON.stringify(plan); }
   if (facts.length > 60000) facts = facts.slice(0, 60000); // still too big: cut (the model reads what's there)
   const history = (Array.isArray(b.history) ? b.history : []).slice(-6).map(t => ({ q: clip(t?.q, 600), a: clip(t?.a, 1500) })).filter(t => t.q && t.a);
-  const user = 'Fact sheet for the plan on the screen:\n' + facts + (history.length ? '\n\nEarlier in this conversation:\n' + history.map(t => 'Q: ' + t.q + '\nA: ' + t.a).join('\n\n') : '') + '\n\nQuestion: ' + question;
+  const user = 'Fact sheet for the plan on the screen:\n' + facts + (history.length ? '\n\nEarlier in this conversation:\n' + history.map(t => 'Q: ' + t.q + '\nA: ' + t.a).join('\n\n') : '') + refBlock(b.refs) + '\n\nQuestion: ' + question;
   try {
     const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, ASK_SYSTEM), user, name: 'plan_answer', schema: ASK_SCHEMA, maxTokens: 12000, effort: effortIn(b.effort, 'medium') }));
     const d = r.data, answer = clip(d.answer, 2400).trim();
@@ -742,7 +745,7 @@ async function askProject(b, key, res) {
   let facts = JSON.stringify(project); if (facts.length > 48000 && Array.isArray(project.options)) { project.options = project.options.slice(0, 8); facts = JSON.stringify(project); }
   if (facts.length > 60000) facts = facts.slice(0, 60000); // still too big: cut (the model reads what's there)
   const history = (Array.isArray(b.history) ? b.history : []).slice(-6).map(t => ({ q: clip(t?.q, 600), a: clip(t?.a, 1500) })).filter(t => t.q && t.a);
-  const user = 'Fact sheet for the project on the screen:\n' + facts + (history.length ? '\n\nEarlier in this conversation:\n' + history.map(t => 'Q: ' + t.q + '\nA: ' + t.a).join('\n\n') : '') + '\n\nQuestion: ' + question;
+  const user = 'Fact sheet for the project on the screen:\n' + facts + (history.length ? '\n\nEarlier in this conversation:\n' + history.map(t => 'Q: ' + t.q + '\nA: ' + t.a).join('\n\n') : '') + refBlock(b.refs) + '\n\nQuestion: ' + question;
   try {
     const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: PROJECT_ASK_SYSTEM, user, name: 'project_answer', schema: PROJECT_ASK_SCHEMA, maxTokens: 12000, effort: effortIn(b.effort, 'medium') }));
     const d = r.data, answer = clip(d.answer, 3000).trim();

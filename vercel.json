@@ -132,6 +132,9 @@
     "api/rulesheets.js": {
       "maxDuration": 20
     },
+    "api/sitefiles.js": {
+      "maxDuration": 300
+    },
     "api/render.js": {
       "maxDuration": 300
     }

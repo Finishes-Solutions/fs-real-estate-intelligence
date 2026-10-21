@@ -89,3 +89,54 @@ console.log('planruns ok: layout names and keys, matching after a re-solve, save
   assert.ok(/^Layout 2 · Simple layout · 52 units$/.test(out[1].name), out[1].name); assert.equal(out[2].name, 'Layout 3 · Parking beside'); assert.deepEqual(out.map(v => v.rank), [-0, -1, -2]);
   assert.equal(keepCurrent({ ...cur, key: 'k1' }, nv), nv, 'already there: the new list as it is'); assert.equal(keepCurrent(null, nv), nv); }
 console.log('planruns keepCurrent ok');
+
+// ---- a build's layouts held back until the AI has reviewed them (src/siteplan.js build) ----
+// On the real engine layouts of the 4.7-acre retail lot above (A, with their real metrics and checks), a review that
+// ranks Layout 3 first, a revised program's layout from round 2, and a review that never came back.
+{ const { holdsForReview, reviewLimitMs, unreviewedNote, isUnreviewedNote, attachReviews, mergeReviewed, landing, reviewBatches } = await import('../lib/planruns.mjs');
+  const { checksOf, passes } = await import('../lib/planpick.mjs');
+  const real = A.map(v => ({ ...v, chk: checksOf(S.check({ ...plan, program: v.program, elements: v.elements }), v.m) }));
+  assert.ok(real.every(v => v.elements.length && v.m.gfa > 0 && v.chk.bad != null), 'real layouts with numbers and checks');
+  // whether they wait: only with the AI answering, a level that reviews and something laid out
+  assert.equal(holdsForReview({ ai: true, rounds: 1, any: true }), true);
+  assert.equal(holdsForReview({ ai: true, rounds: 0, any: true }), false, 'Low: no review, shown at once');
+  assert.equal(holdsForReview({ ai: false, rounds: 2, any: true }), false, 'AI off: shown at once');
+  assert.equal(holdsForReview({ ai: true, rounds: 3, any: false }), false, 'nothing fits: nothing to hold');
+  assert.ok(reviewLimitMs(1) >= 285000, 'the limit leaves room for one full review call (the server allows ~285 s)'); assert.ok(reviewLimitMs(3) > reviewLimitMs(1));
+  // the AI's review: option i is pool[i]; it ranks option 2 (Layout 3) first and speaks of "Option C"
+  const pool = real.slice(), rv = { ranking: [2, 0, 1], summary: 'Option C keeps the pads on the street; Option A is close.',
+    reviews: [{ option: 0, score: 71, verdict: 'Solid, but Option C parks better.', strengths: ['Shops face the street'], problems: ['Long walk from the back row'] },
+      { option: 1, score: 58, verdict: 'Pond is awkward.', strengths: [], problems: ['Pond splits the parking'] }, { option: 2, score: 84, verdict: 'Best of the three.', strengths: ['Both pads on the frontage'], problems: [] }] };
+  const r = mergeReviewed(real, pool, rv);
+  assert.deepEqual(r.variants.map(v => v.key), [real[2].key, real[0].key, real[1].key], 'ranked by the AI');
+  assert.deepEqual(r.variants.map(v => v.name), [real[2].name, real[0].name, real[1].name], 'names unchanged: Layout 3 is still Layout 3');
+  assert.deepEqual(r.variants.map(v => v.ai.score), [84, 71, 58], 'each with its rating');
+  assert.equal(r.variants[1].ai.verdict, 'Solid, but Layout 3 parks better.', '"Option C" becomes the layout\'s own name');
+  assert.ok(/^Layout 3 keeps the pads/.test(r.summary), r.summary); assert.deepEqual(r.first, [real[2].key, real[0].key, real[1].key]);
+  assert.ok(real.every(v => !v.ai), 'the engine\'s list is untouched (nothing shown has a half-merged review)');
+  // a revised program's layout (round 2), in the pool with the same key as one already listed: made unique, named on
+  const rev = { ...real[0], revisedBy: 'more parking', name: 'x' }, pool2 = [real[2], real[0], rev], rv2 = { ranking: [2, 0], summary: '', reviews: [{ option: 2, score: 90, verdict: 'Better', strengths: [], problems: [] }, { option: 0, score: 84, verdict: 'Good', strengths: [], problems: [] }] };
+  const r2 = mergeReviewed(real, pool2, rv2, [rev]);
+  assert.equal(r2.variants.length, 4); assert.equal(r2.variants[0].revisedBy, 'more parking', 'the revised layout first when the AI ranks it first');
+  assert.equal(r2.variants[0].key, real[0].key + '+', 'its key made unique'); assert.ok(/^Layout 4 · /.test(r2.variants[0].name), r2.variants[0].name);
+  assert.equal(r2.variants[0].ai.score, 90); assert.equal(r2.variants.find(v => v.key === real[0].key).ai, undefined, 'the original with the same arrangement keeps no borrowed score');
+  // what goes on the map: the AI's pick
+  const L1 = landing(r.variants, real[2].key); assert.equal(L1.put, 0); assert.equal(L1.offer, -1, 'nothing to offer: it goes on the map');
+  // the plan changed by hand while the AI looked: nothing replaces it; the pick is offered
+  const L2 = landing(r.variants, real[2].key, { edited: true }); assert.equal(L2.put, -1); assert.equal(L2.offer, 0);
+  // the AI's pick fails a check while another passes: the best that passes goes on the map, the pick is offered
+  const failing = r.variants.map((v, i) => i === 0 ? { ...v, chk: { bad: 2, short: 0 } } : { ...v, chk: { bad: 0, short: 0 } });
+  const L3 = landing(failing, real[2].key); assert.equal(L3.failing, true); assert.notEqual(L3.put, 0); assert.ok(passes(failing[L3.put].chk)); assert.equal(L3.offer, 0);
+  // the review didn't come back: the engine's layouts, its best that passes on the map, the note says they weren't reviewed
+  const L4 = landing(real, null); assert.ok(L4.put >= 0 && passes(real[L4.put].chk) !== false); assert.equal(L4.offer, -1);
+  for (const why of ['failed', 'timeout', 'cancelled', 'edit', 'closed']) { const n = unreviewedNote(why, 'Read as retail.'); assert.ok(isUnreviewedNote(n), why); assert.ok(n.startsWith('Read as retail. '), 'the build\'s own note first'); }
+  assert.ok(/took too long/.test(unreviewedNote('timeout'))); assert.ok(/cancelled/.test(unreviewedNote('cancelled'))); assert.equal(isUnreviewedNote('After its first look the AI changed the program.'), false);
+  // More layouts: the new ones the AI hasn't seen, in batches with the AI's pick for scale; the pick keeps its own review
+  const twelve = Array.from({ length: 12 }, (_, i) => ({ ...real[i % 3], key: 'm' + i, name: 'Layout ' + (i + 1) + ' · x' })).concat([{ key: 'none', name: 'Layout 13 · y', elements: [] }]);
+  twelve[0] = { ...twelve[0], ai: { score: 84 } };
+  const bs = reviewBatches(twelve, 'm0'); assert.deepEqual(bs.map(b => b.length), [6, 6], 'ten new ones, five a call, each with the pick');
+  assert.ok(bs.every(b => b[0].key === 'm0')); assert.ok(!bs.flat().some(v => v.key === 'none'), 'nothing-fits layouts aren\'t sent');
+  const at = attachReviews(twelve, bs[0], { reviews: [{ option: 0, score: 10, verdict: 'v', strengths: [], problems: [] }, { option: 1, score: 77, verdict: 'v', strengths: [], problems: [] }] }, { keep: true }).list;
+  assert.equal(at[0].ai.score, 84, 'the pick sent for scale keeps its first review'); assert.equal(at[1].ai.score, 77);
+  assert.deepEqual(reviewBatches(twelve, null).map(b => b.length), [5, 5], 'no pick reviewed: just the new ones'); }
+console.log('planruns held review ok: hold rules, merge by key and AI rank, revised layouts, landing (pick, hand edit, failing pick, no review), More layouts batches');
