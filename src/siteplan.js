@@ -2015,12 +2015,12 @@ export function initSitePlan(ctx) {
     if (!ed.buildOpen && asked && (ed.variants || building))
       return '<div class="bsec sp-ai sp-built" id="spAiSec"><div class="sp-ai-h"><div class="lt">Build with AI</div>' + fold(false) + '</div><div class="sp-built-l">' + (building ? 'Building from ' : 'Built from ') + '<q>' + esc(asked) + '</q>' + effOn(building ? ed.run.effort : ed.runMeta?.effort) + '</div>' +
         '<div class="sp-row"><button type="button" class="btn sm" data-bedit="1">Edit request</button><button type="button" class="btn sm" data-bnew="1">New request</button></div>' + readHtml(asked) + ideas + note + why + '</div>';
-    const acres = SP.ringArea(pl.ring) / 43560, sugs = RUN.presets(acres, SP.edgeLen(pl.ring, pl.front ?? SP.longestEdge(pl.ring)), { aiOff: off }), fillOn = pl.params?.fill !== false;
+    const acres = SP.ringArea(pl.ring) / 43560, sugs = RUN.presets(acres, SP.edgeLen(pl.ring, pl.front ?? SP.longestEdge(pl.ring)), { aiOff: off }), lo = RUN.leftoverOf(RUN.fillParams(pl.params, { ask: ed.ask || '' }));
     return '<div class="bsec sp-ai" id="spAiSec"><div class="sp-ai-h"><label class="lt" for="spAsk">Build with AI</label>' + (asked && ed.variants ? fold(true) : '') + '</div>' +
       '<textarea id="spAsk" rows="2" placeholder="What should go here? e.g. ' + esc(sugs[0]?.text || '25,000 sf retail strip') + '">' + esc(ed.ask || '') + '</textarea>' +
       '<div class="sp-sugs" role="group" aria-label="Suggestions for this ' + acres.toFixed(1) + '-acre site">' + sugs.map(x => '<button type="button" class="chip" data-sug="' + esc(x.text) + '" title="Put this in the box; then Build Layouts (or Enter)">' + esc(x.text) + '</button>').join('') + '</div>' +
       '<div class="sp-runopts"><span class="sp-effl" id="spEffL">AI effort</span>' +
-        '<button type="button" class="sp-fillnote" data-jump="spParams" title="What you ask for is Phase 1; with this on, the rest of the land holds more of the same as Phase 2. Change it under Settings.">Phase 2 fill <b>' + (fillOn ? 'On' : 'Off') + '</b>' + CHEV + '</button></div>' +
+        '<button type="button" class="sp-fillnote" data-jump="spParams" title="The land what you ask for doesn’t need gets more of the program (more homes, more shops, a bigger building) unless your request or Settings asks to hold it for later. Change it under Settings.">Leftover land <b>' + ({ fill: 'Filled', phase: 'Phase 2', hold: 'Held' })[lo] + '</b>' + CHEV + '</button></div>' +
       '<div class="sp-effort" role="radiogroup" aria-labelledby="spEffL" aria-describedby="spEffHint">' + ASK.EFFORTS.map(e => { const on = e.id === lvl, dis = off && e.id !== 'low';
         return '<button type="button" role="radio" data-eff="' + e.id + '" class="sp-eff' + (e.id === 'ultra' ? ' sp-eff-ultra' + (ed.effShine ? ' sp-shine' : '') : '') + '" aria-checked="' + on + '" tabindex="' + (on ? 0 : -1) + '"' +
           (dis ? ' disabled title="AI isn’t set up on this site"' : ' title="' + esc(e.label + ' · ' + e.time + ': ' + (off ? 'Layouts in seconds, read from your words.' : e.tip)) + '"') + '><b>' + (e.id === 'ultra' ? SPARK : '') + e.label + '</b><small>' + e.time + '</small></button>'; }).join('') + '</div>' +
@@ -2151,7 +2151,7 @@ export function initSitePlan(ctx) {
       grp('Program', fld('Use', '<select id="spUse">' + Object.entries(SP.USES).map(([k, x]) => '<option value="' + k + '"' + (k === u ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select>') +
         (u === 'storage' ? storageFields(prog) : u === 'foodtrucks' ? foodTruckFields(prog) : u === 'fuel' ? fuelFields(prog) : u === 'multifamily' ? num('perUnit', 'Parking', prog.perUnit, 0.05, '/ unit') + num('floors', 'Floors', prog.floors, 1) + num('eff', 'Efficiency', prog.eff, 0.01, '', { hint: 'net ÷ gross' })
           : SP.USES[u]?.garage ? num('perUnit', 'Parking', prog.perUnit, 0.25, '/ home') : num('ratio', 'Parking', prog.ratio, 0.1, '/ 1k sf') + num('floors', 'Floors', prog.floors, 1) + num('depth', 'Building depth', prog.depth, 5, 'ft')) +
-        (u === 'foodtrucks' || u === 'fuel' ? '' : sw('fill', 'Fill the rest of the site (Phase 2)', pp.fill !== false, 'What you ask for is Phase 1; the rest of the land holds more of the same as Phase 2', 'w2')), // (a food truck park is sized by its trucks)
+        (u === 'foodtrucks' || u === 'fuel' ? '' : fld('Leftover land', selCtl('data-lo="1" title="The land what you asked for doesn’t need: filled with more of the program (more homes, longer shop rows, more buildings) as one plan, the default; the same marked Phase 2; or held for later as Future development"', RUN.LEFTOVER, RUN.leftoverOf(RUN.fillParams(pl.params, { ask: ed.runMeta?.ask || pl.lastRun?.ask || '' }))))), // (a food truck park is sized by its trucks; what applies: what you set, else what your words asked, else filled)
         infoBtn('Typical suburban numbers to start with. Check the city’s or county’s rules (Houston has no zoning but has building lines and parking rules).', 'About these numbers')) +
       grp('Setbacks', sw('buildOn', 'Building setbacks', sb.buildOn !== false) + sw('paveOn', 'Landscape buffer', sb.paveOn !== false) +
         [['front', 'paveFront', 'Front'], ['side', 'paveSide', 'Side'], ['rear', 'paveRear', 'Rear']].map(([k, b, l]) => num('sb-' + k, l + ' setback', sb[k], 1, 'ft') + num('sb-' + b, l + ' buffer', sb[b] ?? sb.paving, 1, 'ft')).join('')) +
@@ -2321,7 +2321,8 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('.sp-prog [data-sw]').forEach(i => i.onchange = () => { const k = i.dataset.sw;
       if (k === 'auto') { ed.autoSolve = i.checked; return; }
       if (k === 'refit') { setView(v => { v.autoRefit = i.checked; }); return; } // how hand edits behave, not a setting of the layout
-      change(x => { if (k === 'trees' || k === 'fill') x.params = { ...(x.params || {}), [k]: i.checked }; else x.setbacks = { ...SP.SETBACKS, ...(x.setbacks || {}), [k]: i.checked }; }); if (k !== 'trees') after(i); });
+      change(x => { if (k === 'trees') x.params = { ...(x.params || {}), [k]: i.checked }; else x.setbacks = { ...SP.SETBACKS, ...(x.setbacks || {}), [k]: i.checked }; }); if (k !== 'trees') after(i); });
+    card.querySelectorAll('.sp-prog [data-lo]').forEach(i => i.onchange = () => { change(x => { x.params = { ...(x.params || {}), fill: RUN.leftoverParam(i.value), fillBy: 'you' }; }); after(i); }); // Leftover land: what you set stands over the words and the AI
     card.querySelectorAll('.sp-prog [data-pr]').forEach(i => i.onchange = () => { change(x => { x.program = { ...x.program, [i.dataset.pr]: i.value || null }; }); after(i); });
     card.querySelectorAll('.sp-prog [data-ps]').forEach(i => i.onchange = () => { const [g, f] = i.dataset.ps.split('.'); change(x => { x.params = { ...(x.params || {}), [g]: { ...(x.params?.[g] || {}), [f]: i.value } }; }); after(i); });
     card.querySelectorAll('.sp-prog [data-st]').forEach(i => i.onchange = () => { change(x => { x.params = ['form', 'streets', 'mixStyle'].includes(i.dataset.st) ? { ...(x.params || {}), [i.dataset.st]: i.value } : { ...(x.params || {}), style: { ...(x.params?.style || {}), [i.dataset.st]: i.value } }; }); after(i); });
@@ -2445,7 +2446,7 @@ export function initSitePlan(ctx) {
     const label = solveLabel, mark = o.force ? null : solveMark; solveLabel = ''; solveMark = null; ed.solveBar = false;
     const before = pl.elements.some(e => e.kind === 'building') ? GM(pl) : null, was = pl.variant ? { ...pl.variant } : null, hadAi = !!ed.variants?.some(v => v.ai);
     const run = startRun('resolve', ['Laying out new layouts with these settings'], o.src || '#spResolve'); if (!run) return;
-    let out = []; try { out = await laid('options', { ...pl }, pl.program, { count: ed.variants?.length > 3 ? 12 : 3, ...koOpts(pl) }); } catch (e) { console.warn('layout', e); }
+    let out = []; try { out = await laid('options', { ...pl, params: RUN.fillParams(pl.params, { ask: ed.runMeta?.ask || pl.lastRun?.ask || '' }) }, pl.program, { count: ed.variants?.length > 3 ? 12 : 3, deeper: true, ...koOpts(pl) }); } catch (e) { console.warn('layout', e); }
     if (!live(run) || PL() !== pl) return;
     const variants = named(out, { ...pl });
     if (!variants.some(v => v.elements.length)) { endRun(run); ctx.toast('Nothing fits with these settings.'); return; }
@@ -2757,6 +2758,12 @@ export function initSitePlan(ctx) {
     return '<table class="sp-parts">' + (prog.community ? '<caption>' + esc(prog.community) + '</caption>' : '') + '<tr><th>Part</th><th>Use</th><th class="r">Acres</th><th class="r">Homes / units</th><th class="r">Floor area</th></tr>' +
       [...rows.values()].map(r => '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.use) + '</td><td class="r">' + (r.acres ? r.acres.toFixed(1) : '—') + '</td><td class="r">' + (r.units ? f0(r.units) : '—') + '</td><td class="r">' + (r.gfa ? f0(r.gfa) + ' sf' : '—') + '</td></tr>').join('') + '</table>';
   }
+  // the pond depth a plan assumes, said with the detention: deeper than the usual one (a deeper-pond layout used), an
+  // engineering assumption a civil engineer has to confirm
+  function pondDepthNote(pl) {
+    const gOn = GON(pl), d = gOn ? G.settingsOf(pl).depth : SP.stormDepth(pl.params || {}), d0 = gOn ? G.WALLER.detention.depth.value : SP.stormDepth({ code: pl.params?.code });
+    return ' · ' + d + ' ft deep (assumed)' + (d > d0 + 0.5 ? ': deeper than the usual ' + d0 + ' ft, confirm with your civil engineer' : '');
+  }
   function nums() {
     const el = card.querySelector('#spNums'), pl = PL(); if (!el || !pl) return;
     if (pl.ring.length < 3) { el.innerHTML = ''; return; }
@@ -2775,6 +2782,7 @@ export function initSitePlan(ctx) {
       tile('Site' + TG('site'), m.acres.toFixed(2) + ' ac', f0(m.siteSf) + ' sf') +
       two('Gross building' + TG('gfa'), x => x.gfa ? f0(x.gfa) + ' sf' : '—', m.gfa ? plural(m.buildings, 'building') : '') +
       (la && (la.nrsf || !la.keys) ? two('Leasable / rentable', x => (x === m1 ? la1 : la)?.nrsf ? f0((x === m1 ? la1 : la).nrsf) + ' sf' : '—', la.nrsf && la.gsf ? pct(la.nrsf / la.gsf) + ' of gross · ' + leasableWhy(la) : la.keys ? '' : 'nothing leased') : '') +
+      (SP.lsfOf(m) > 0 ? tile('Leasable + sellable', f0(SP.lsfOf(m)) + ' sf', [m.leasable > 0 ? f0(m.leasable) + ' sf to lease' : '', m.sellable > 0 ? f0(m.sellable) + ' sf of homes to sell' : ''].filter(Boolean).join(' · ') + ' · what the layouts are ranked by') : '') + // the owner's goal (lib/siteplan.mjs lsfOf)
       (la?.keys ? tile('Hotel keys', f0(la.keys), 'about ' + f0(la.uses.hotel.gsf / la.keys) + ' gross sf a key') : '') +
       (m.units ? two('Units' + TG('units'), x => f0(x.units || 0), m.duAc.toFixed(1) + ' per acre' + (m.beds ? ' · ' + f0(m.beds) + ' beds' : '')) : '') +
       (m.fuel ? tile('Fuel', f0(m.fuel.positions) + ' positions', m.fuel.mpds + ' pumps · ' + f0(m.fuel.canopySf) + ' sf canopy · ' + f0(m.fuel.storeSf) + ' sf store' + (m.fuel.washSf ? ' · car wash' : '') + (m.fuel.vac ? ' · ' + m.fuel.vac + ' air / vac' : '')) : '') +
@@ -2783,7 +2791,7 @@ export function initSitePlan(ctx) {
       (whole ? pair('Parking (spaces / needed)' + TG('parking'), f0(pk.stalls) + ' / ' + f0(pk.need), f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad) : tile('Parking' + TG('parking'), f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad)) +
       two('Coverage' + TG('coverage'), x => pct(x.coverage) + (x === m ? max(m.coverage * 100, z.max_coverage_pct, v => v + '%') : ''), '', +z.max_coverage_pct && m.coverage * 100 > +z.max_coverage_pct ? ' bad' : '') +
       two('FAR' + TG('far'), x => x.far.toFixed(2) + (x === m ? max(m.far, z.max_far, v => String(v)) : ''), '', +z.max_far && m.far > +z.max_far ? ' bad' : '') +
-      tile('Detention' + TG('detention'), m.pond ? (m.pond / 43560).toFixed(2) + ' ac' : '—', m.pond ? pct(m.pond / m.siteSf) + ' of the site' : '') +
+      tile('Detention' + TG('detention'), m.pond ? (m.pond / 43560).toFixed(2) + ' ac' : '—', m.pond ? pct(m.pond / m.siteSf) + ' of the site' + pondDepthNote(pl) : '') +
       tile('Paved + roofs' + TG('impervious'), pct(m.impervious)) + tile('Open space' + TG('open'), pct(m.green)) +
       (m.heightFt ? tile('Height' + TG('height'), 'about ' + m.heightFt + ' ft', +z.max_building_height_ft ? 'max ' + z.max_building_height_ft + ' ft' : '', +z.max_building_height_ft && m.heightFt > +z.max_building_height_ft ? ' bad' : '') : '') + '</div>' +
       (m.mix.length ? '<table class="sp-mixt"><tr><th>Unit</th><th>SF</th><th>Units</th><th>%</th><th>Net sf</th></tr>' + m.mix.map(t => '<tr><td>' + esc(t.name) + '</td><td>' + f0(t.sf) + '</td><td>' + f0(t.n) + '</td><td>' + pct(t.n / Math.max(1, m.mix.reduce((s, x) => s + x.n, 0))) + '</td><td>' + f0(t.n * t.sf) + '</td></tr>').join('') + '</table>' : '') +
@@ -3132,7 +3140,7 @@ export function initSitePlan(ctx) {
     const p2 = { ...plan, elements: v.elements, program: v.program || plan.program, params: v.params || plan.params }, m = v.m, B = v.elements.filter(e => e.kind === 'building');
     let image = null; if (withImage) try { image = await planImage(G.effective(p2)); } catch (e) { /* numbers only */ }
     return { name: v.name || v.arr, notes: v.notes, issues: GC(p2).map(i => i.text).slice(0, 8), image,
-      metrics: { acres: +m.acres.toFixed(2), buildings: B.length, floorAreaSf: Math.round(m.gfa), units: m.units || 0, unitsPerAcre: +(m.duAc || 0).toFixed(1), parkingSpaces: m.spaces, parkingRequired: m.required, coveragePct: Math.round(m.coverage * 100), far: +m.far.toFixed(2), pondAcres: +(m.pond / 43560).toFixed(2), openSpacePct: Math.round(m.green * 100), ...(v.fin ? { valueM: +(v.fin.value / 1e6).toFixed(1), costM: +(v.fin.cost / 1e6).toFixed(1), yieldOnCostPct: +((v.fin.yoc || 0) * 100).toFixed(2) } : {}) } };
+      metrics: { acres: +m.acres.toFixed(2), buildings: B.length, floorAreaSf: Math.round(m.gfa), units: m.units || 0, unitsPerAcre: +(m.duAc || 0).toFixed(1), parkingSpaces: m.spaces, parkingRequired: m.required, coveragePct: Math.round(m.coverage * 100), far: +m.far.toFixed(2), pondAcres: +(m.pond / 43560).toFixed(2), openSpacePct: Math.round(m.green * 100), leasableSf: Math.round(m.leasable || 0), sellableSf: Math.round(m.sellable || 0), leasablePlusSellableSf: Math.round(SP.lsfOf(m)), ...(v.pondDepth ? { pondDepthFtAssumed: v.pondDepth } : {}), ...(v.fin ? { valueM: +(v.fin.value / 1e6).toFixed(1), costM: +(v.fin.cost / 1e6).toFixed(1), yieldOnCostPct: +((v.fin.yoc || 0) * 100).toFixed(2) } : {}) } };
   }
   // L: the effort level (lib/planask.mjs): how hard the model thinks, how many review rounds in all (the last never
   // revises) and how many layouts go with their drawings
@@ -3200,11 +3208,13 @@ export function initSitePlan(ctx) {
     const np = SP.normalizeProgram(prog);
     const readAs = { ask, chips: RUN.readAs(np, SP.USES), miss: RUN.notUnderstood(ask, np), assumed, by: aiOk ? 'ai' : 'words', ...(strategy ? { plan: strategy } : {}), ...(aiB ? { brief: aiB } : {}), ...(aiBNote ? { briefNote: aiBNote } : {}) }; // shown once the layouts land, so a cancelled build keeps the last one's
     // the plan's layout settings (neighbourhood streets, leaving a later phase open, the apartment building form) for this run's layouts
-    const st0 = strategy?.settings || {}; let params0 = strategy ? { ...(pl.params || {}), ...(st0.streets ? { streets: st0.streets } : {}), ...(st0.fill != null ? { fill: st0.fill } : {}), ...(strategy.buildings?.form ? { form: strategy.buildings.form } : {}) } : null;
+    // (the land the program doesn't need is filled unless the words or Settings ask to hold it: an AI plan's or an earlier
+    // build's "leave it for later" alone doesn't, lib/planruns.mjs fillParams)
+    const st0 = strategy?.settings || {}; let params0 = RUN.fillParams({ ...(pl.params || {}), ...(st0.streets ? { streets: st0.streets } : {}), ...(strategy?.buildings?.form ? { form: strategy.buildings.form } : {}) }, { ask });
     if (np.form) params0 = { ...(params0 || pl.params || {}), form: np.form }; // the shape the request names ("L-shaped"): the layout reads params.form
     runStep(run, 2 + o0, lay);
     const wb = BR.wordsBrief(ask); // pads asked for in words ("with 2 pad sites", "an outparcel"): the engine places them, at every level
-    let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, ...koOpts(pl), ...(wb ? { brief: wb } : {}) }); } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
+    let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, deeper: true, ...koOpts(pl), ...(wb ? { brief: wb } : {}) }); /* (deeper: the same layouts again with a 6 and an 8 ft deep pond, each labelled with the depth it assumes) */ } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
     if (!live(run) || PL() !== pl) return;
     const plan = { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) };
     let variants = named(out, { ...plan, program: prog }, params0 ? { params: params0 } : {});
@@ -3247,7 +3257,7 @@ export function initSitePlan(ctx) {
         const first = rv; let add = [], progR = prog;
         if (rv.revise && rv.program) {
           runStep(run, 4 + o0, (revised.length ? 'Revising again: ' : 'Revising: ') + (rv.why || 'a better program').replace(/\.$/, ''));
-          const params2 = { ...params1, ...(rv.params?.fill != null ? { fill: rv.params.fill } : {}), ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}) };
+          const params2 = RUN.fillParams({ ...params1, ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, { ask }), prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}) }; // (its "fill" never holds land the words didn't ask to hold)
           let out2 = []; try { out2 = await laid('options', { ...pl, setbacks, params: params2 }, prog2, { ...(L.revise || { count: 3, depth: 6, budgetMs: 6000 }), ...koOpts(pl), ...(wb ? { brief: wb } : {}) }); } catch (e) { console.warn('layout', e); }
           if (!live(run)) return;
           const v2 = named(out2, { ...plan, params: params2, program: prog2 }, { params: params2, revisedBy: rv.why || 'the AI review' }).filter(v => v.elements.length);
@@ -3544,7 +3554,8 @@ export function initSitePlan(ctx) {
   // engine output → layouts: numbers, money, a key and a name. extra: fields every one carries (the AI's revised params)
   function named(list, plan, extra = {}) {
     const stamp = finStamp(plan), laidAs = GON(plan) ? G.settingsOf(plan).scenario : null, vs = list.map(r => { const v = { ...r, ...extra, arr: r.arr || RUN.baseName(r.name), setbacks: r.setbacks || plan.setbacks, laidAs }; // laidAs: the Waller scenario it was laid out for
-      v.m = GM({ ...plan, program: v.program || plan.program, elements: v.elements }); v.fin = finFor(v, plan); v.finAt = stamp; return derive(v, plan); });
+      if (r.pondDepth) v.params = G.withPondDepth({ ...plan, params: v.params || plan.params }, r.pondDepth).params; // a deeper pond's layout: its depth goes on the plan's stormwater (or guardrail) setting when it's used, so its detention is measured at that depth
+      v.m = GM({ ...plan, program: v.program || plan.program, params: v.params || plan.params, elements: v.elements }); v.fin = finFor(v, plan); v.finAt = stamp; return derive(v, plan); });
     const keys = RUN.layoutKeys(vs), names = RUN.layoutNames(vs);
     return vs.map((v, i) => ({ ...v, rank: -i, key: keys[i], name: names[i] }));
   }
@@ -3625,12 +3636,14 @@ export function initSitePlan(ctx) {
       const ratio = m.units ? (m.spaces / m.units).toFixed(2) + ' / unit' : m.gfa ? (m.spaces / m.gfa * 1000).toFixed(1) + ' / 1,000 sf' : '', pk = parkOf(m, v.m1), wh = twoPhase(m, v.m1);
       const grid = none ? '' : '<span class="sp-vgrid">' +
         cell(v.m1 ? 'Phase 1' : h.units ? 'Units' : 'Floor area', esc(h.big), h.fit ? '<em class="neg">Fits ' + esc(h.fit) + '</em>' : esc(h.sub), hot('size')) +
+        (SP.lsfOf(m) > 0 ? cell('Leasable + sellable', f0(SP.lsfOf(m)) + ' sf', [m.leasable > 0 ? f0(m.leasable) + ' lease' : '', m.sellable > 0 ? f0(m.sellable) + ' sell' : ''].filter(Boolean).join(' · '), hot('lsf'), 'Leasable floor area (shops, offices, apartments) plus the homes’ sellable living area: the owner’s goal, what the planner ranks layouts by after the rules') : '') +
         cell(wh ? 'Parking (asked for)' : 'Parking', f0(pk.stalls) + ' / ' + f0(pk.need), wh ? 'whole site ' + f0(m.spaces || 0) + ' / ' + f0(m.required || 0) : ratio, (pk.stalls < pk.need ? ' short' : '') + hot('ratio'), 'Spaces / needed' + (wh ? ' for Phase 1, what was asked for; the whole site, with Phase 2, under it' : '')) +
         (f ? (f.forSale ? cell('Cost', M(f.cost), profitSub(f), hot('profit'), finTip(v, pl)) + cell('Margin', K.fmtPct(f.margin), '', neg(f.margin) + hot('yoc'), finTip(v, pl))
           : cell('Value / cost', M(f.value) + ' / ' + M(f.cost), profitSub(f), hot('profit'), finTip(v, pl)) +
             cell('Yield on cost', K.fmtPct(f.yoc), f.spread != null ? 'spread <em class="' + neg(f.spread) + '">' + K.fmtPct(f.spread) + '</em>' : '', neg(f.yoc) + hot('yoc'), finTip(v, pl)))
           : cell('Value / cost', '—', has ? 'no buildings to price' : 'when laid out', '') + cell('Yield on cost', '—', '', '')) + '</span>';
       const cu = CU.customOf(SP.normalizeProgram(v.program || pl.program)), pills = (here ? '<i class="sp-onmap">On map' + (edited ? ' · edited' : '') + '</i>' : '') + (cu && !none ? '<i class="sp-ais" title="' + esc(cu.name + ': ' + AIS_TIP) + '">AI-sized · ' + esc(cu.name) + '</i>' : '') +
+        (v.pondDepth && !none ? '<i class="sp-ais" title="' + esc('Assumes a ' + v.pondDepth + ' ft deep pond (average storage depth), deeper than the usual: the same storage in less land. An engineering assumption: confirm with your civil engineer (a dry pond needs an outfall deep enough to drain it; a wet-bottom pond holds the storage above its normal pool).') + '">' + v.pondDepth + ' ft pond · assumed</i>' : '') +
         (v.aiBrief && !none ? '<i class="sp-aip" title="The AI decided what is built here (its brief); the layout engine drew it, ranked it against its own layouts on the same score, and notes what it changed">' + AIP + (v.aiBrief.revised ? ' · revised' : '') + '</i>' : '') + (v.stale ? [] : badge[i]).map(b => '<i class="sp-badge' + (b === 'Recommended' ? ' rec' : '') + '">' + b + '</i>').join('') +
         (none ? '' : v.stale ? '<i class="sp-ck stale" title="Made for the old site. Use this layout to fit it to the new one.">Out of date · ' + staleOf(v)[0] + '</i>' : '<i class="sp-ck ' + cl.level + '" title="' + (ckTip ? esc(ckTip) : cl.level === 'ok' ? 'Inside the lot and setbacks, no overlaps, enough parking' : 'What the checks found; the details are on the map in red once it’s on the map') + '">' + esc(cl.text) + '</i>') +
         (v.ai ? '<i class="sp-score ' + scoreBand(v.ai.score) + hot('ai') + '" title="The AI review’s score, out of 100">AI ' + v.ai.score + '</i>' : '') + (ed.reviewing && has && !v.ai ? '<i class="sp-skel" aria-label="The AI is reviewing this layout">AI reviewing…</i>' : '');
