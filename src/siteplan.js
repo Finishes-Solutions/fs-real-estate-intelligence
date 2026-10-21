@@ -2105,6 +2105,14 @@ export function initSitePlan(ctx) {
   // New layouts from these settings and how the plan updates first, then Program, Setbacks and Parking (changed most),
   // Buildings, Stormwater, Trash, the unit or home mix and the Look: each group a small-caps row over a two-column grid of
   // fields, the label above the box and the unit inside it
+  // the homes as asked (single-family, alone or in a mix): one home's size, how many floor plans, the smallest lot. The
+  // engine builds the homes from that many house plans in the size range, each lot at least that big (and the place's
+  // own lot rules, when stricter); empty: the stories mix decides
+  function homeSpecHtml(prog, on) {
+    if (!on) return ''; const hp = SP.homeProgram(prog, (prog.zones || []).find(z => z.use === 'sfr')), num = (k, label, v, step, unit, hint) => fld(label, numCtl('min="0" data-k="hs-' + k + '"', v ?? '', step, unit), { hint });
+    return '<div class="sp-sub">Homes</div><div class="sp-fg">' + num('homeSfMin', 'Smallest home', hp.homeSfMin, 50, 'sf', 'e.g. 1,600') + num('homeSfMax', 'Largest home', hp.homeSfMax, 50, 'sf', 'e.g. 2,100') +
+      num('floorPlans', 'Floor plans', hp.floorPlans, 1, '', 'different house plans') + num('minLotSf', 'Smallest lot', hp.minLotSf, 100, 'sf', 'e.g. 6,600') + '</div>';
+  }
   function paramsHtml(pl, prog) {
     const sb = { ...SP.SETBACKS, ...(pl.setbacks || {}) }, pp = { ...PARAMS, ...(pl.params || {}), style: { ...PARAMS.style, ...(pl.params?.style || {}) } }, u = prog.use;
     const sw = (k, label, on, tip, cls) => tog('data-sw="' + k + '"', label, on, { tip, cls });
@@ -2149,7 +2157,7 @@ export function initSitePlan(ctx) {
         [['front', 'paveFront', 'Front'], ['side', 'paveSide', 'Side'], ['rear', 'paveRear', 'Rear']].map(([k, b, l]) => num('sb-' + k, l + ' setback', sb[k], 1, 'ft') + num('sb-' + b, l + ' buffer', sb[b] ?? sb.paving, 1, 'ft')).join('')) +
       (only.sfr ? '' : grp('Parking', num('pp-stallW', 'Stall width', pp.stallW, 0.5, 'ft') + num('pp-stallD', 'Stall depth', pp.stallD, 0.5, 'ft') + num('pp-aisle', 'Drive aisle', pp.aisle, 1, 'ft'))) +
       (bldg ? grp('Buildings', bldg) : '') + entry + rulesHtml(pl, prog, has(['sfr']) || !!pl.recipe?.net) + mixed +
-      stormHtml(pl, prog, pp, uses) + mix + storageMixes(prog) + homes + look + '</details>';
+      stormHtml(pl, prog, pp, uses) + mix + storageMixes(prog) + homes + homeSpecHtml(prog, has(['sfr'])) + look + '</details>';
   }
   // ----- street rules by location (lib/rulesheet.mjs): the place's rule sheet, read by the AI from the codes, shared with
   // the team (src/rulesheets.js), each value with its source; Unsure values and Waller defaults standing in wait for a person
@@ -2308,6 +2316,7 @@ export function initSitePlan(ctx) {
       if (k.startsWith('sb-')) x.setbacks = { ...SP.SETBACKS, ...(x.setbacks || {}), [k.slice(3)]: v ?? SP.SETBACKS[k.slice(3)] ?? x.setbacks?.paving };
       else if (k.startsWith('pp-')) x.params = { ...(x.params || {}), [k.slice(3)]: v };
       else if (k.startsWith('ps-')) { const [g, f] = k.slice(3).split('.'); x.params = { ...(x.params || {}), [g]: { ...(x.params?.[g] || {}), [f]: v } }; }
+      else if (k.startsWith('hs-')) { const f = k.slice(3); x.program = { ...x.program, [f]: v, ...(x.program.zones ? { zones: x.program.zones.map(z => SP.USES[z.use] && ['sfr', 'townhomes', 'duplex'].includes(z.use) ? { ...z, [f]: null } : z) } : {}) }; } // (the homes' size, plans and smallest lot: the program's, for every home zone)
       else x.program = { ...x.program, [k]: v }; }); after(i); });
     card.querySelectorAll('.sp-prog [data-sw]').forEach(i => i.onchange = () => { const k = i.dataset.sw;
       if (k === 'auto') { ed.autoSolve = i.checked; return; }

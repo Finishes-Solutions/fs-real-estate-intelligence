@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-21
 
+### 3:09 PM CT: Retail with homes behind it on shallow sites; home sizes, floor plans and minimum lots (6c5995c)
+- **Homes no longer vanish behind retail.** On a shallow site (the 20.6-acre Waller Tomball Rd tract, about 630 ft deep), asking for retail along the road with a neighbourhood behind came back with shops and an empty neighbourhood, because the pond, the shops and the rows of homes didn't all fit one behind the other. The planner now moves detention to strips at the ends of the rows or into open land, makes the shop strip shallower, and only then holds less detention, and says how much is short. A layout that ends up with no homes now says why.
+- **Home sizes, floor plans and lot sizes are understood.** "1600–2100 SF homes across 3 floorplans" and "a minimum of 6600 SF per lot" are read, by the AI and without it: homes come from three plans in the library within that size range, and every lot is at least that big. Under the Waller guardrails the stricter 59 × 118 ft (6,962 sf) lots win. They can also be set under Site parameters › Homes. "3 floorplans" is no longer read as 3 stories.
+- **On that tract:** retail along FM 2920 with 32 homes behind it under the Waller guardrails (6,962 sf lots, about 6–7 acres of detention at 1.00 acre-foot per acre), or 43–48 without them.
+- **Ultra's planning step** no longer fails when the AI runs out of room to answer: it tries once more with more room.
+- **Not done yet:** the first row of homes faces the shops' service drive, the two-pond layout leaves a lawn beside the shops, and shop parking on mixed plans isn't trimmed. Filling leftover land, ranking by leasable area, deeper-pond options and AI-reviewed-only results come next.
+
 ### 12:30 PM CT: The neighbourhood work joins main: square driveways, drive-thrus, L-shaped buildings, plan sets (c60fadd)
 - Everything from main is here alongside the street rules, editable streets, pods, roundabouts, boulevard entries and turning of this branch.
 - **Driveways meet the street square everywhere:** added entrances and the planner's main entries leave the street at a right angle and, where the street slants across the layout, curve round to meet the drive square. A **boulevard** does the same when its planted median still fits on the straight past the curve (the median and monument sign go there); where it doesn't, the boulevard comes straight in as before. **Make It a Boulevard** follows the same rule.

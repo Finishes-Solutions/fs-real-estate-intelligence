@@ -29,7 +29,7 @@
 // revises. program and review take the strategy the planning step chose (strategy), and follow or judge against it.
 // site: { acres, widthFt, depthFt, frontageFt, address, city, county, zoning }; facts: short lines (flood zone, roads
 // and traffic, districts, utilities, environmental records).
-import { chatJSON, pickModel, withModel } from '../lib/openai.mjs';
+import { chatJSON, pickModel, withModel, withRoom } from '../lib/openai.mjs';
 import { USES, SETBACKS, HOME_MIX, PLACES, guessProgram, normalizeProgram } from '../lib/siteplan.mjs';
 import { AMENITIES } from '../lib/sitecompose.mjs';
 import { catalogText, keepStories } from '../lib/siteedit.mjs';
@@ -69,9 +69,18 @@ const CUSTOM = { type: 'object', additionalProperties: false, required: ['name',
       basis: n('How many of them (children, seats); null for 1000sf, court, space and pad (counted from the plan).'), label: s0('Their name, plural: "children", "seats", "courts".'), plus1k: n('Spaces per 1,000 sf of building on top, for a rule per court or per site (the clubhouse, the office). 0 or null otherwise.') } },
     figures: { type: 'array', items: { type: 'string' }, description: '2-4 short figures for the Numbers panel: "120 children", "8 courts", "60 RV sites".' } } };
 const STREETS = ['curved', 'network', 'wave', 'straight']; // Settings › Neighbourhood streets
+// the homes' own numbers (single-family, townhomes, duplexes), on the program and on a mix's home zone (lib/siteplan.mjs
+// homeSpec): one home's size, the number of floor plans, the smallest lot, a lot's width and depth
+const HOME_FIELDS = who => ({
+  homeSfMin: n('Homes only' + who + ': the smallest home, sq ft of ONE home ("1,600-2,100 SF homes": 1600; "2,400 sf homes": 2400). Never a total. null when not said.'),
+  homeSfMax: n('Homes only' + who + ': the largest home, sq ft of ONE home ("1,600-2,100 SF homes": 2100; "2,400 sf homes": 2400). null when not said.'),
+  floorPlans: int('Homes only' + who + ': how many different floor plans, house plans or models the builder offers ("3 floorplans": 3). Never floors or stories. null when not said.'),
+  minLotSf: n('Homes only' + who + ': the smallest lot, sq ft ("lots need a minimum of 6,600 SF": 6600; "7,000 sf lots": 7000). null when not said.'),
+  lotW: n('Homes only' + who + ': the narrowest lot, ft ("60 ft lots", "60 x 120 lots": 60). null when not said.'),
+  lotD: n('Homes only' + who + ': the lot depth, ft ("60 x 120 lots": 120). null when not said.') });
 export const SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['use', 'gfa', 'atLeast', 'form', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'compare', 'trash', 'entrances', 'product', 'extras', 'storage', 'foodtrucks', 'fuel', 'custom', 'setbacks', 'zones', 'summary', 'assumptions'],
+  required: ['use', 'gfa', 'atLeast', 'form', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'compare', 'trash', 'entrances', 'product', 'extras', 'storage', 'foodtrucks', 'fuel', 'custom', 'setbacks', 'homeSfMin', 'homeSfMax', 'floorPlans', 'minLotSf', 'lotW', 'lotD', 'zones', 'summary', 'assumptions'],
   properties: {
     use: { type: 'string', enum: Object.keys(USES), description: 'Main use. storage = self storage (climate-controlled, drive-up, mini-storage, RV / boat storage). foodtrucks = a food truck park (food truck court, truck stalls round a pavilion, beer garden). fuel = a gas station / convenience store (c-store, fueling station, pumps, a QT or Buc-ee\'s style store; a truck stop or travel center too, laid out as the car version). other = anything that fits none of these: a daycare, a school, a pickleball club, an RV park, an event venue… (then custom holds its recipe).' },
     gfa: n('Total building floor area in square feet across all floors. null when the request gives no size (the tool then uses a typical size for the use and site) or asks for as much as fits.'),
@@ -106,9 +115,11 @@ export const SCHEMA = {
     custom: CUSTOM,
     setbacks: { type: 'object', additionalProperties: false, required: ['front', 'side', 'rear', 'paving'], description: 'Feet. null keeps the default.',
       properties: { front: n('Building setback from the street.'), side: n('Side setback.'), rear: n('Rear setback.'), paving: n('Landscape buffer between paving and the lot lines.') } },
+    ...HOME_FIELDS(' (the whole program; on a mix, the same as its home zone)'),
     zones: { type: 'array', description: 'Mixed use only: 2 to 5 zones from the street back (commercial in front, amenity/commons in the middle, apartments, then townhomes, then duplexes/cottages at the back). Empty for a single use.',
-      items: { type: 'object', additionalProperties: false, required: ['use', 'gfa', 'units', 'floors', 'buildings', 'pads', 'items', 'name', 'placement'], properties: {
-        use: { type: 'string', enum: [...Object.keys(USES), 'garage'], description: 'garage: a parking garage at this point in the order (floors = levels).' }, gfa: n('Floor area for commercial uses, sq ft.'), units: { type: ['integer', 'null'], description: 'Homes in this zone (apartments, townhomes, duplex units).' },
+      items: { type: 'object', additionalProperties: false, required: ['use', 'gfa', 'units', 'floors', 'buildings', 'pads', 'items', 'name', 'placement', 'homeSfMin', 'homeSfMax', 'floorPlans', 'minLotSf', 'lotW', 'lotD'], properties: {
+        use: { type: 'string', enum: [...Object.keys(USES), 'garage'], description: 'garage: a parking garage at this point in the order (floors = levels).' }, gfa: n('Total floor area for commercial uses, sq ft. null for homes (one home\'s size goes in homeSfMin / homeSfMax).'),
+        ...HOME_FIELDS(' (this zone\'s homes)'), units: { type: ['integer', 'null'], description: 'Homes in this zone (apartments, townhomes, duplex units).' },
         floors: { type: ['integer', 'null'] }, buildings: { type: ['integer', 'null'] }, pads: { type: ['integer', 'null'], description: 'Pad sites at the street (restaurants, coffee) for a retail zone, 0-4.' },
         items: { type: 'array', items: { type: 'string', enum: AMENITIES }, description: 'For an amenity zone: what it holds (lake = wet detention).' }, name: { type: ['string', 'null'], description: 'A short zone name, e.g. "Retail", "Commons".' },
         placement: { type: 'object', additionalProperties: false, required: ['where', 'road', 'next', 'side'], description: 'Where this zone goes, as they said it; all null (next empty) when they don\'t say.', properties: {
@@ -129,6 +140,7 @@ export const SYSTEM = `You set up a development program for a site-planning tool
 - Where they say things go: keep the zones in street-to-back order ("on the front" / "by the road" first, "at the back" last, "in the middle" between: the bands style reads it), and give each zone its placement in words the layout honours: corner (at the corner of two roads; road: one of them), along (along a road; road as they said it), front, back, middle, beside (next [j]), between (next [i, j]: a buffer between two zones), around (next [j]: homes round a lake or commons). "Homes round a lake" is a sfr zone around the amenity zone that holds the lake (its items include lake). Leave placement all null when they don't say. Name each zone for where it is and what it holds ("Retail at the corner", "Commons and lake", "Homes round the lake").
 - A number of buildings ("4 buildings", "two pads") goes in buildings, with gfa the total across them. Stormwater: retention when they ask for a wet pond or lake, underground when they ask for vaults or no pond, none for regional detention.
 - Townhomes and duplexes: homes on their own lots with a public street fit about 6-10 units an acre; denser than that, use product court6 (or court), rows on a shared parking court, rather than cutting the count.
+- Homes' own numbers never go in gfa, floors or units: the size of ONE home goes in homeSfMin / homeSfMax ("1,600-2,100 SF homes": 1600 and 2100; "2,400 sf homes": 2400 and 2400); "3 floorplans" (house plans, models) is floorPlans 3, never floors or stories; "lots need a minimum of 6,600 SF" is minLotSf 6600; "60 x 120 lots" is lotW 60 and lotD 120. On a mix put them on the home zone and the top level alike. A home zone's gfa stays null.
 - A neighbourhood, subdivision or "residential" with no count: a zone of use sfr with units null; it fills whatever land the other zones leave. Give sized zones (shops, apartments) their sizes; a community center or commons is an amenity zone (items may include center, pool, playground, pavilion, courts, lake), placed last when they say "at the back". Apartments of 80+ units already get their own clubhouse and pool by the entry: don't add a center or pool to a commons beside them unless for-sale homes (sfr, townhomes, duplexes) share it; one pool per community. A pool always comes with its center.
 - Feasibility: one-story shops or restaurants with surface parking hold about 9,000-12,000 sq ft an acre; two-story offices about 14,000; garden apartments about 18-24 units an acre; homes on lots 4-6 an acre. If the ask is bigger than the land, still give the ask: the layout fits the most that works and says so.
 - HARD RULE, a drive-thru is an extra, not a second use: "a retail building / center / strip with a drive-thru", an endcap coffee or QSR tenant with a drive-thru, is ONE use (retail) with extras ["drivethru"] and no zones. Use zones only when the request names separate uses as separate buildings or areas ("a 10,000 sf strip and a 2,500 sf restaurant pad", "shops with apartments above", "retail in front, townhomes behind"). Every zone you give has its size (gfa for commercial, units for homes) whenever the request gives a total; split the total between them. A pad named with the shops ("with 2 pads") is the shop zone's pads or the buildings count, not a restaurant zone.
@@ -355,7 +367,7 @@ async function strategy(b, key, res) {
   const user = siteText(b.site, prompt, b.program, b.facts).replace(/}$/, ',"asked":' + JSON.stringify(count === 3 ? 'three different strategies, then pick one' : 'one strategy') + (briefFor ? ',"briefFor":' + JSON.stringify(briefFor) : '') + '}');
   const bctx = briefFor ? { prompt, siteSf: +briefFor.lot?.siteSf || (+b.site?.acres || 0) * 43560, use: guessProgram(prompt).use } : null;
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, STRATEGY_SYSTEM), user, name: 'site_strategy', schema: STRATEGY_SCHEMA, maxTokens: count === 3 ? 40000 : 20000, effort: effortIn(b.effort, 'high') }));
+    const t0 = Date.now(), r = await ai(key, b, res, m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, STRATEGY_SYSTEM), user, name: 'site_strategy', schema: STRATEGY_SCHEMA, ...o }), { maxTokens: count === 3 ? 40000 : 20000, effort: effortIn(b.effort, 'high'), t0 })); // (Ultra thinks at xhigh: its thinking can use up the room, so it's asked again once with more room, a notch lower, lib/openai.mjs withRoom)
     const d = r.data, raw = (Array.isArray(d.strategies) ? d.strategies : []).slice(0, count), strategies = raw.map(x => ({ ...strategyFrom(x), ...briefOut(x?.brief, bctx) })).filter(x => x.concept || x.placement.length);
     if (!strategies.length) throw new Error('no strategy');
     const pick = Number.isInteger(d.pick) && d.pick >= 0 && d.pick < strategies.length ? d.pick : 0;
@@ -389,7 +401,7 @@ export default async function handler(req, res) {
   if (b.mode === 'streetNames') return streetNames(b, key, res);
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, SYSTEM), user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy), teamTypesForAI(b.teamTypes)), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: effortIn(b.effort, 'high') })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
+    const t0 = Date.now(), r = await ai(key, b, res, m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, SYSTEM), user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy), teamTypesForAI(b.teamTypes)), name: 'site_program', schema: SCHEMA, ...o }), { maxTokens: 16000, effort: effortIn(b.effort, 'high'), t0 })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
     const d = r.data, sb = Object.fromEntries(Object.entries(d.setbacks || {}).filter(([, v]) => v != null && v >= 0 && v <= 300)), cu = customFrom(d, programFrom(d, prompt)), program = cu.program;
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ program, setbacks: { ...SETBACKS, ...sb }, summary: clip(d.summary, 400), assumptions: [...(cu.note ? [cu.note] : []), ...(d.assumptions || []).slice(0, 4).map(a => clip(a, 200))].slice(0, 5) });
@@ -416,7 +428,7 @@ async function review(b, key, res) {
     options: opts.map((o, i) => ({ option: i, name: clip(o.name, 120), drawing: images[i] ? 'image ' + (images.slice(0, i + 1).filter(Boolean).length) : 'none', metrics: Object.fromEntries(Object.entries(o.metrics || {}).slice(0, 16).map(([k, v]) => [clip(k, 30), num(v)])),
       issues: (o.issues || []).slice(0, 8).map(t => clip(t, 160)), notes: (o.notes || []).slice(0, 6).map(t => clip(t, 240)) })) });
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, REVIEW_SYSTEM), user: text, name: 'site_review', schema: REVIEW_SCHEMA, maxTokens: 20000, effort: effortIn(b.effort, 'high'), images: images.filter(Boolean) }));
+    const t0 = Date.now(), r = await ai(key, b, res, m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, REVIEW_SYSTEM), user: text, name: 'site_review', schema: REVIEW_SCHEMA, images: images.filter(Boolean), ...o }), { maxTokens: 20000, effort: effortIn(b.effort, 'high'), t0 }));
     const d = r.data, n = opts.length, ok = i => Number.isInteger(i) && i >= 0 && i < n;
     const ranking = [...new Set((d.ranking || []).filter(ok))]; for (let i = 0; i < n; i++) if (!ranking.includes(i)) ranking.push(i);
     const reviews = (d.reviews || []).filter(x => ok(x.option)).map(x => ({ option: x.option, score: Math.max(0, Math.min(100, Math.round(+x.score || 0))), verdict: clip(x.verdict, 300), strengths: (x.strengths || []).slice(0, 3).map(t => clip(t, 200)), problems: (x.problems || []).slice(0, 4).map(t => clip(t, 220)) }));
