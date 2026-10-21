@@ -7,7 +7,7 @@ const S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayo
 // ---- status and tabs ----
 assert.deepEqual(PJ.STATUSES.map(s => s.label), ['Prospect', 'Under review', 'Under contract', 'Owned', 'On hold', 'Dead']);
 assert.equal(PJ.statusOf({}).label, 'Prospect', 'no status yet: a prospect'); assert.equal(PJ.statusOf({ status: 'owned' }).label, 'Owned'); assert.equal(PJ.statusOf({ status: 'bogus' }).id, 'prospect');
-assert.deepEqual(PJ.TABS.map(t => t.id), ['overview', 'options', 'renderings', 'plans', 'ask']); assert.equal(PJ.TABS[1].label, 'Sites', 'Options is called Sites; its id stays for old links'); assert.equal(PJ.tabOf('plans'), 'plans'); assert.equal(PJ.tabOf('ask'), 'ask'); assert.equal(PJ.tabOf('<x>'), 'overview'); assert.equal(PJ.tabOf(undefined), 'overview');
+assert.deepEqual(PJ.TABS.map(t => t.id), ['overview', 'options', 'renderings', 'plans', 'files', 'ask']); assert.equal(PJ.tabOf('files'), 'files', 'reference files have a tab of their own'); assert.equal(PJ.TABS[1].label, 'Sites', 'Options is called Sites; its id stays for old links'); assert.equal(PJ.tabOf('plans'), 'plans'); assert.equal(PJ.tabOf('ask'), 'ask'); assert.equal(PJ.tabOf('<x>'), 'overview'); assert.equal(PJ.tabOf(undefined), 'overview');
 
 // ---- facts from /api/site's answer (shaped like test/site.mjs) ----
 const site = { flood: { zone: 'AE', subtype: null, risk: 'high', bfe: 51.2 }, traffic: { roads: [{ road: 'I-10', aadt: 250000 }, { road: 'City street', aadt: 11969 }] },

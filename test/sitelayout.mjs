@@ -170,10 +170,19 @@ function usable(plan, o, what) {
 // ---- what was asked for: 28,000 sf across 4 buildings, parking trimmed to the need, detention sized to the land used ----
 {
   const plan0 = siteOf(fm362, true), prog = { use: 'retail', gfa: 28000, buildings: 4 };
-  // the default fills the site: the four asked for are Phase 1, the same size of building fills the rest as Phase 2
+  // the default fills the site (the owner wants the most leasable floor area the land holds): the same size of building
+  // fills the rest as one plan, no Phase 2 marked, the ask kept on the program and said in the notes
   const filled = L.layoutOptions(plan0, prog); assert.ok(filled.length >= 2, filled.length + ' options');
   for (const o of filled) {
-    usable(plan0, o, 'filled'); const B = o.elements.filter(e => e.kind === 'building'), P1 = B.filter(e => e.phase !== 2);
+    usable(plan0, o, 'filled'); const B = o.elements.filter(e => e.kind === 'building');
+    assert.ok(B.length > 4 && B.every(b => Math.abs(S.footArea(b) - 7000) < 400), o.name + ': ' + B.length + ' buildings of about 7,000 sf'); assert.ok(!B.some(e => e.phase === 2 || /Phase 2/.test(e.note || '')), o.name + ': nothing marked Phase 2 unless asked');
+    assert.ok(!o.elements.some(e => e.future), o.name + ': no land held for later');
+    assert.deepEqual(o.program.asked, { gfa: 28000, units: null, buildings: 4 }, 'what was asked for is kept'); assert.match(o.notes[0], /^Asked for 4 buildings, 28,000 sq ft; the land holds \d+ buildings, [\d,]+ sq ft with their parking and detention, so the plan builds them all/);
+  }
+  // Phase 2 asked for (Settings › Leftover land › marked Phase 2): the four asked for are Phase 1, the same size of building fills the rest as Phase 2
+  const phased = L.layoutOptions({ ...plan0, params: { fill: 'phase' } }, prog); assert.ok(phased.length >= 2, phased.length + ' options');
+  for (const o of phased) {
+    usable(plan0, o, 'phased'); const B = o.elements.filter(e => e.kind === 'building'), P1 = B.filter(e => e.phase !== 2);
     assert.equal(P1.length, 4, o.name + ': four Phase 1 buildings'); assert.ok(B.length > 4 && B.every(b => Math.abs(S.footArea(b) - 7000) < 400), o.name + ': ' + B.length + ' buildings of about 7,000 sf');
     assert.deepEqual(o.program.asked, { gfa: 28000, units: null, buildings: 4 }, 'what was asked for is kept'); assert.match(o.notes[0], /Phase 1 is what was asked for: 4 buildings, 28,000 sq ft/);
   }
@@ -488,11 +497,12 @@ function usable(plan, o, what) {
   const og = L.layoutOptions(hk, { ...g, zones: g.zones.map(z => ({ ...z, gfa: { retail: 60000, office: 80000, medical: 60000, industrial: 120000 }[z.use] ?? null })) }, { count: 1 })[0], pg = { ...hk, elements: og.elements, program: og.program }, mg = S.metrics(pg), gar = og.elements.filter(e => e.kind === 'garage');
   assert.ok(gar.length === 1 && S.garageStalls(gar[0]) >= 200, 'a parking garage: ' + gar.map(e => S.garageStalls(e)).join());
   assert.ok(mg.spaces >= mg.required && !S.check(pg).some(i => i.level === 'bad'), 'parked, garage counted: ' + mg.spaces + '/' + mg.required);
-  // homes with a count on a big tract: the count is phase 1, the land fills, and the detention still fits (or the plan says so)
+  // homes with a count on a big tract: the land fills past the count (one plan, not a phase 1 and a later phase, unless
+  // Phase 2 is asked for), and the detention still fits (or the plan says so)
   const N = S.unionParcels([mk([-95.96, 30.07], [[0, 0], [2600, 0], [2600, 1700], [0, 1700]])]), nb = { ...N, front: N.ring.findIndex((p, i) => S.outwardOf(N.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } };
   const prog = { use: 'mixed', zones: [{ use: 'retail', gfa: 60000 }, { use: 'sfr', units: 250 }, { use: 'amenity', items: ['lake', 'center', 'pool', 'playground'] }] }, on = L.layoutOptions(nb, prog, { count: 1 })[0], mn = S.metrics({ ...nb, elements: on.elements, program: on.program });
   const need = S.stormNeed(S.ringArea(N.ring) / 43560, {}, S.normalizeProgram(prog)).area;
-  assert.ok(mn.units > 250 * 1.1 && on.notes.some(t => /phase 1/.test(t)), 'more homes than the first phase: ' + mn.units);
+  assert.ok(mn.units > 250 * 1.1 && on.notes.some(t => /250 homes asked for; the land holds [\d,]+, so the plan builds them all/.test(t)), 'more homes than asked, as one plan: ' + mn.units + ' · ' + on.notes.join(' / '));
   assert.ok(mn.pond >= need * 0.9 || on.notes.some(t => /detention the site needs/.test(t)), 'the detention fits, or the plan says how much doesn’t');
   // housing in general: the types a developer would weigh, ranked by value
   assert.ok(S.guessProgram('a multifamily rental community').compare && !S.guessProgram('240 apartments').compare);
