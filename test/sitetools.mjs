@@ -13,7 +13,7 @@ let n = 0; const newId = () => 'n' + (++n);
 
 // ---- a real apartment plan: moving and copying sets, with what's attached ----
 const tract = siteOf(mk([-95.6954, 29.6657], [[0, 0], [716, 25], [759, 1244], [-47, 1219]]));
-const o = L.layoutOptions(tract, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], plan = { ...tract, elements: o.elements, program: o.program, recipe: o.recipe };
+const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], plan = { ...tract, elements: o.elements, program: o.program, recipe: o.recipe }; // (the rest of the site filled and marked Phase 2, as Settings › Leftover land asks: the Phase 2 counts below)
 {
   const club = plan.elements.find(e => e.name === 'Clubhouse'), deck = plan.elements.find(e => /pool deck/i.test(e.note || '')), pool = plan.elements.find(e => e.kind === 'pool');
   assert.ok(club && deck && pool, 'the clubhouse, its deck and pool');

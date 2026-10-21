@@ -8,7 +8,7 @@ const S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayo
 
 // ---- real engine output: 200 apartments on a big site (the rest filled as Phase 2) ----
 const mk = (o, pts) => { const k = 364567 * Math.cos(o[1] * Math.PI / 180); return { type: 'Polygon', coordinates: [pts.concat([pts[0]]).map(([x, y]) => [o[0] + x / k, o[1] + y / 364567])] }; };
-const big = S.unionParcels([mk([-95.98, 30.06], [[0, 0], [1400, 0], [1400, 1350], [0, 1350]])]), site = { ...big, front: 0, setbacks: { ...S.SETBACKS } };
+const big = S.unionParcels([mk([-95.98, 30.06], [[0, 0], [1400, 0], [1400, 1350], [0, 1350]])]), site = { ...big, front: 0, setbacks: { ...S.SETBACKS }, params: { fill: 'phase' } }; // (Phase 2 asked for: Settings › Leftover land › marked Phase 2)
 const o = L.layoutOptions(site, S.guessProgram('200 apartments, 3 stories'))[0], plan = { ...site, program: o.program, elements: o.elements };
 const bldgs = plan.elements.filter(e => e.kind === 'building'), sel = bldgs[3].id;
 const raw = S.planFeatures(plan, sel), before = JSON.stringify(S.planFeatures(plan, sel));

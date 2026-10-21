@@ -37,7 +37,7 @@ assert.equal(K.acreageGap(['Parking is short']), null);
 
 // ---- Phase 1 first, on real engine output: 200 apartments on a big site, the rest filled as Phase 2 ----
 const mk = (o, pts) => { const k = 364567 * Math.cos(o[1] * Math.PI / 180); return { type: 'Polygon', coordinates: [pts.concat([pts[0]]).map(([x, y]) => [o[0] + x / k, o[1] + y / 364567])] }; };
-const big = S.unionParcels([mk([-95.98, 30.06], [[0, 0], [1400, 0], [1400, 1350], [0, 1350]])]), plan = { ...big, front: 0, setbacks: { ...S.SETBACKS } };
+const big = S.unionParcels([mk([-95.98, 30.06], [[0, 0], [1400, 0], [1400, 1350], [0, 1350]])]), plan = { ...big, front: 0, setbacks: { ...S.SETBACKS }, params: { fill: 'phase' } }; // (Phase 2 asked for: Settings › Leftover land › marked Phase 2; the site is filled as one plan otherwise)
 const out = L.layoutOptions(plan, S.guessProgram('200 apartments, 3 stories'));
 const vs = out.map((o, i) => { const p = { ...plan, program: o.program, elements: o.elements }, m = S.metrics(p), ph = o.elements.some(e => e.phase === 2);
   return { ...o, rank: -i, key: 'k' + i, m, m1: ph ? S.metrics({ ...p, elements: o.elements.filter(e => e.phase !== 2) }) : null, chk: K.checksOf(S.check(p), m) }; });
@@ -81,7 +81,7 @@ assert.deepEqual(K.sortOrder(set, 'rec', 1), [1, 2, 3, 0]);
 assert.deepEqual(K.sortOrder(set, 'profit', 1), [2, 3, 1, 0]);
 assert.deepEqual(K.sortOrder(set, 'yoc', 1), [1, 2, 3, 0]);
 assert.deepEqual(K.sortOrder(set, 'ratio', 1), [2, 3, 1, 0]);
-assert.equal(K.SORTS.length, 7); assert.ok(!K.SORTS.some(([k]) => k === 'value'), 'no gross Value sort');
+assert.equal(K.SORTS.length, 8); assert.ok(!K.SORTS.some(([k]) => k === 'value'), 'no gross Value sort'); assert.ok(K.SORTS.some(([k, l]) => k === 'lsf' && l === 'Leasable + sellable sf'), 'the owner’s objective as a sort');
 
 // ---- money ----
 assert.equal(K.moneyDigits([14.28e6, 14.25e6, 14.31e6]), 2, 'three costs that read $14.3M need two decimals');
