@@ -208,18 +208,64 @@ for (const v of [0, 1, 2]) {
   const it = EDIT_SCHEMA.properties.ops.items; assert.deepEqual(it.required.slice().sort(), Object.keys(it.properties).sort(), 'strict op schema');
   const call = async body => { const res = mock(); await handler({ method: 'POST', body, headers: { 'x-forwarded-for': '7.7.7.9' } }, res); return res; };
   const plan = { site: { acres: 21.3 }, totals: { units: 240 }, pieces: [{ id: 'b7', name: 'Apt Bldg 7', kind: 'building', use: 'multifamily', at: [300, 400], size: [180, 60], turn: 0, floors: 3, units: 24, selected: true }, { id: 'c1', name: 'Clubhouse', kind: 'building', use: 'amenity', at: [100, 80], size: [90, 60] }] };
-  const op = o => ({ action: 'change', target: null, with: null, type: null, kind: null, use: null, name: null, floors: null, units: null, w: null, d: null, x: null, y: null, turn: null, ...o });
-  reply = () => ({ ops: [op({ target: 'b7', floors: 4 }), op({ target: 'nope', floors: 2 }), op({ target: 'c1', type: 'clubhouse-clubhouse-7-500-sf' }), op({ target: 'c1', type: 'made-up-type', floors: 99 }), op({ action: 'swap', target: 'b7', with: 'ghost' })], refit: 'full', summary: 'Bldg 7 goes to four stories; a bigger clubhouse.', question: null });
+  const op = o => ({ action: 'change', target: null, every: null, floorsOver: null, with: null, type: null, kind: null, use: null, name: null, floors: null, units: null, w: null, d: null, x: null, y: null, turn: null, ...o });
+  reply = () => ({ homeMix: [], ops: [op({ target: 'b7', floors: 4 }), op({ target: 'nope', floors: 2 }), op({ target: 'c1', type: 'clubhouse-clubhouse-7-500-sf' }), op({ target: 'c1', type: 'made-up-type', floors: 99 }), op({ action: 'swap', target: 'b7', with: 'ghost' })], refit: 'full', summary: 'Bldg 7 goes to four stories; a bigger clubhouse.', question: null });
   let res = await call({ mode: 'edit', prompt: 'make it four stories and give us a bigger clubhouse', plan, image: 'data:image/jpeg;base64,' + Buffer.from('x').toString('base64') });
   assert.equal(res.code, 200, JSON.stringify(res.body));
   assert.deepEqual(res.body.ops.map(o => [o.target, o.floors, o.type]), [['b7', 4, null], ['c1', null, 'clubhouse-clubhouse-7-500-sf'], ['c1', null, null]], 'only known pieces, library types and sane numbers');
   assert.equal(res.body.refit, 'full'); const u = sent.messages[1].content; assert.ok(Array.isArray(u) && u[1].type === 'image_url', 'the drawing goes to the model');
   assert.ok(/Apt Bldg 7/.test(u[0].text) && /clubhouse-clubhouse-7-500-sf = Clubhouse/.test(u[0].text), 'the plan and the library go to the model');
-  reply = () => ({ ops: [op({ action: 'add', kind: 'entrance', x: 300, y: 0 }), op({ action: 'add', kind: 'helipad' })], refit: 'none', summary: 'A second driveway.', question: null });
+  reply = () => ({ homeMix: [], ops: [op({ action: 'add', kind: 'entrance', x: 300, y: 0 }), op({ action: 'add', kind: 'helipad' })], refit: 'none', summary: 'A second driveway.', question: null });
   res = await call({ mode: 'edit', prompt: 'add a second entrance', plan }); assert.deepEqual(res.body.ops.map(o => [o.kind, o.x, o.y]), [['entrance', 300, 0], [null, null, null]], 'an entrance, at a point on the street');
-  reply = () => ({ ops: [], refit: 'none', summary: '', question: 'Which building: Bldg 7 or Bldg 17?' });
+  // roundabouts and drop-off loops (phase 2): the plan's junctions go to the model (sanitized), and a roundabout with its size and a loop at a building come back
+  reply = () => ({ homeMix: [], ops: [op({ action: 'add', kind: 'roundabout', x: 410, y: 520, w: 120 }), op({ action: 'add', kind: 'loop', with: 'c1' })], refit: 'none', summary: 'A roundabout and a drop-off loop.', question: null });
+  res = await call({ mode: 'edit', prompt: 'add a roundabout at the main intersection and a circle drive in front of the clubhouse', plan: { ...plan, junctions: [{ at: [410.4, 519.6], legs: 4, meets: ['Main drive', 'Street · 28 ft'], main: true, ids: ['x'] }, { at: 'here', legs: 3 }] } });
+  assert.deepEqual(res.body.ops.map(o => [o.action, o.kind, o.x, o.y, o.w, o.with]), [['add', 'roundabout', 410, 520, 120, null], ['add', 'loop', null, null, null, 'c1']], 'a roundabout and a loop');
+  assert.deepEqual(JSON.parse(sent.messages[1].content.split('\n\nBuilding library')[0]).junctions, [{ at: [410, 520], legs: 4, meets: ['Main drive', 'Street · 28 ft'], main: true }], 'the junctions, as points and names');
+  assert.ok(['roundabout', 'loop'].every(k => it.properties.kind.enum.includes(k)) && /plan\.junctions/.test(it.properties.kind.description), 'the kinds in the schema');
+  reply = () => ({ homeMix: [], ops: [], refit: 'none', summary: '', question: 'Which building: Bldg 7 or Bldg 17?' });
   res = await call({ mode: 'edit', prompt: 'make that one taller', plan }); assert.equal(res.body.question, 'Which building: Bldg 7 or Bldg 17?');
+  // across the whole site: every piece of a use at once, and the homes on lots (not listed) by their mix of stories
+  const big = { ...plan, houses: { count: 570, listed: false, byStories: { 1: 170, 2: 340, 3: 60 }, mix: [{ stories: 1, pct: 30 }, { stories: 2, pct: 60 }, { stories: 3, pct: 10 }] } };
+  reply = () => ({ homeMix: [{ stories: 1, pct: 33 }, { stories: 2, pct: 67 }, { stories: 4, pct: 5 }], ops: [op({ every: 'multifamily', floorsOver: 3, floors: 3 }), op({ action: 'remove', every: 'pool' }), op({ every: 'spaceship', floors: 2 })], refit: 'none', summary: 'No 3-story homes; apartments capped at 3 stories; pools removed.', question: null });
+  res = await call({ mode: 'edit', prompt: 'Residential homes should only be 1 story and two-story homes, no 3 story homes.', plan: big });
+  assert.deepEqual(res.body.homeMix, [{ stories: 1, pct: 33 }, { stories: 2, pct: 67 }], 'the home mix, sane stories only');
+  assert.deepEqual(res.body.ops.map(o => [o.action, o.every, o.floorsOver, o.floors, o.target]), [['change', 'multifamily', 3, 3, null], ['remove', 'pool', null, null, null]], 'every piece of a use or kind; unknown sorts dropped');
+  assert.deepEqual(JSON.parse(sent.messages[1].content[0]?.text ?? sent.messages[1].content.split('\n\nBuilding library')[0]).houses, big.houses, 'the AI sees the homes by stories and their mix');
+  assert.ok(EDIT_SCHEMA.properties.homeMix && EDIT_SCHEMA.properties.ops.items.properties.every.enum.includes('sfr'));
+  // the homes by stories as an op on every home: read as the mix (the 1- and 2-story keep their shares)
+  reply = () => ({ homeMix: [], ops: [op({ every: 'sfr', floorsOver: 2, floors: 2 })], refit: 'none', summary: 'No 3-story homes.', question: null });
+  res = await call({ mode: 'edit', prompt: 'no 3 story homes', plan: big }); assert.deepEqual(res.body.homeMix, [{ stories: 1, pct: 33 }, { stories: 2, pct: 67 }]); assert.equal(res.body.ops.length, 0);
+  // nothing it could do: no summary claiming a change, a question instead
+  reply = () => ({ homeMix: [], ops: [op({ target: 'ghost', floors: 2 })], refit: 'none', summary: 'Changed all 3-story residential homes to 1 or 2-story homes.', question: null });
+  res = await call({ mode: 'edit', prompt: 'no 3 story homes', plan: big }); assert.equal(res.body.summary, '', 'never a summary of changes that weren’t made'); assert.equal(res.body.ops.length, 0);
   res = await call({ mode: 'edit', prompt: '', plan }); assert.equal(res.code, 400); }
+// turning, boulevards, signs and names in Change With AI; Suggest Names (its own small mode); every schema strict all the way down
+{ const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
+  let sent = null, reply = null, fail = false; process.env.OPENAI_API_KEY = 'test-key';
+  globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('/models/')) return Response.json({ id: 'm' }); sent = JSON.parse(opts.body); if (fail) return new Response('down', { status: 500 }); return Response.json({ choices: [{ message: { content: JSON.stringify(reply()) } }] }); };
+  const { default: handler, EDIT_SCHEMA, NAMES_SCHEMA } = await import('../api/siteplan.js');
+  const strict = (o, at = '') => { if (!o || typeof o !== 'object') return; if (o.type === 'object' || Array.isArray(o.type) && o.type.includes('object')) { assert.equal(o.additionalProperties, false, at + ': no other keys'); assert.deepEqual((o.required || []).slice().sort(), Object.keys(o.properties || {}).sort(), at + ': every key required'); }
+    for (const [k, v] of Object.entries(o)) if (v && typeof v === 'object') strict(v, at + '.' + k); };
+  strict(EDIT_SCHEMA, 'edit'); strict(NAMES_SCHEMA, 'names');
+  const opP = EDIT_SCHEMA.properties.ops.items.properties; assert.ok(opP.turnBy && opP.boulevard && opP.signs && EDIT_SCHEMA.properties.names, 'turnBy, boulevard, signs and names');
+  const call = async body => { const res = mock(); await handler({ method: 'POST', body, headers: { 'x-forwarded-for': '7.7.8.1' } }, res); return res; };
+  const plan = { site: { acres: 21.3, streets: [{ side: 'front', name: 'FM 362', from: [0, 0], to: [700, 0] }] }, community: 'Beacon Hill', parts: [{ part: 0, use: 'retail', label: 'Retail center', name: null }, { part: 2, use: 'sfr', label: 'Neighbourhood', name: null }], pieces: [{ id: 'p1', name: 'Detention pond', kind: 'pond', at: [300, 400], turn: 12 }, { id: 'me', name: 'Main entry', kind: 'drive', at: [350, 40], boulevard: false, width: 40 }, { id: 'md', name: 'Median', kind: 'green', at: [350, 60], of: 'me' }] };
+  const op = o => ({ action: 'change', target: null, every: null, floorsOver: null, with: null, type: null, kind: null, use: null, name: null, floors: null, units: null, w: null, d: null, x: null, y: null, turn: null, turnBy: null, boulevard: null, signs: null, ...o });
+  reply = () => ({ homeMix: [], names: { community: null, parts: [] }, ops: [op({ target: 'p1', turnBy: 20 }), op({ target: 'me', boulevard: true, signs: 'both' }), op({ target: 'p1', turnBy: 9000 }), op({ action: 'add', kind: 'entrance', x: 200, y: 0, boulevard: true, signs: 'sideways' })], refit: 'none', summary: 'Turned the pond; the main entry a boulevard.', question: null });
+  let res = await call({ mode: 'edit', prompt: 'turn the pond 20 degrees and make the main entry a boulevard', plan }); assert.equal(res.code, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body.ops.map(o => [o.target, o.turnBy, o.boulevard, o.signs]), [['p1', 20, null, null], ['me', null, true, 'both'], ['p1', null, null, null], [null, null, true, null]], 'turnBy, boulevard and signs passed on, sane values only');
+  const u = JSON.parse(sent.messages[1].content.split('\n\nBuilding library')[0]); assert.equal(u.community, 'Beacon Hill'); assert.deepEqual(u.parts.map(x => x.part), [0, 2]); assert.equal(u.pieces.find(x => x.id === 'md').of, 'me'); assert.equal(u.site.streets[0].name, 'FM 362');
+  // names alone are an answer; a part that isn't there and an empty name are dropped, long names clipped
+  reply = () => ({ homeMix: [], ops: [], names: { community: '  Beacon Hill  ', parts: [{ part: 2, name: 'Beacon Hill Estates' }, { part: 99, name: 'Nowhere' }, { part: 0, name: '   ' }, { part: 0, name: 'M'.repeat(90) }] }, refit: 'none', summary: 'Named the neighbourhood.', question: null });
+  res = await call({ mode: 'edit', prompt: 'call the neighbourhood Beacon Hill Estates', plan });
+  assert.equal(res.body.names.community, 'Beacon Hill'); assert.deepEqual(res.body.names.parts.map(x => [x.part, x.name.length]), [[2, 19], [0, 60]]); assert.equal(res.body.summary, 'Named the neighbourhood.', 'a names-only answer counts');
+  // Suggest Names: at most three cleaned choices, parts by index only; the AI down: 502 (the browser falls back to street names)
+  reply = () => ({ choices: [{ community: 'Spring Creek Landing', parts: [{ part: 0, name: 'Spring Creek Market' }, { part: 7, name: 'Ghost' }], why: 'From Spring Creek, which runs along the back.' }, { community: 'Hockley Crossing', parts: [], why: 'The town.' }, { community: 'The Reserve at Pine Hollow', parts: [], why: 'The pines.' }, { community: 'Fourth', parts: [], why: '' }, { community: '', parts: [], why: 'nameless' }] });
+  res = await call({ mode: 'names', site: { acres: 40, address: 'Stokes Rd' }, parts: [{ part: 0, use: 'retail', label: 'Retail center', acres: 6 }, { part: 2, use: 'sfr', label: 'Neighbourhood', acres: 30, units: 120 }], current: { community: null, parts: [] }, theme: 'Texas rivers' });
+  assert.equal(res.code, 200, JSON.stringify(res.body)); assert.deepEqual(res.body.choices.map(c => c.community), ['Spring Creek Landing', 'Hockley Crossing', 'The Reserve at Pine Hollow']); assert.deepEqual(res.body.choices[0].parts, [{ part: 0, name: 'Spring Creek Market' }]);
+  const nu = JSON.parse(sent.messages[1].content); assert.equal(nu.theme, 'Texas rivers'); assert.equal(nu.parts.length, 2); assert.equal(sent.response_format?.json_schema?.name || 'site_names', 'site_names');
+  fail = true; res = await call({ mode: 'names', site: { acres: 40 }, parts: [] }); assert.equal(res.code, 502); fail = false; }
 
 // ---- /api/siteplan: the effort picked under Build, and questions about the open plan ----
 { const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
@@ -393,5 +439,129 @@ for (const v of [0, 1, 2]) {
   // problem names keep their capitals
   { const pl = { ring: [[0, 0], [300, 0], [300, 300], [0, 300]], front: 0, setbacks: { ...S.SETBACKS }, program: { use: 'retail' }, elements: [{ id: 'a', kind: 'building', x: 150, y: 150, w: 80, d: 60, name: 'Building A' }, { id: 'b', kind: 'building', x: 170, y: 160, w: 80, d: 60, name: 'Building B' }] };
     assert.ok(S.check(pl).some(i => i.text === 'Building A overlaps Building B'), S.check(pl).map(i => i.text).join(' | ')); } }
+
+// ---- parks are places (Oct 19): a park, lawn or open space is in the way of a street, a building and an entrance; a
+// boulevard's median and plain leftover lawn aren't ----
+{
+  assert.ok(S.isPark({ kind: 'green', name: 'Lawn' }) && S.isPark({ kind: 'green', name: 'Open space', poly: [[0, 0], [9, 0], [9, 9]] }), 'a named lawn or open space is a park');
+  for (const g of [{ kind: 'green', name: '' }, { kind: 'green', name: '', median: true }, { kind: 'green', name: 'x', island: true }, { kind: 'green', name: 'Future development', future: true }, { kind: 'pond', name: 'Lake' }]) assert.ok(!S.isPark(g), JSON.stringify(g));
+  assert.ok(S.isMedian({ kind: 'green', name: '', median: true }) && S.isMedian({ kind: 'green', island: true }) && !S.isMedian({ kind: 'green', name: 'Park' }));
+  // the checks: a park across a 28 ft street is flagged (the park, not the street); the same lawn unnamed, a planted island
+  // inside the drive, a park that only touches the street, and a pavilion standing in the park aren't
+  const ring = [[0, 0], [800, 0], [800, 600], [0, 600]], st = { id: 'st', kind: 'drive', x: 400, y: 300, w: 700, d: 28, rot: 0, name: 'Street' };
+  const on = (...els) => S.check({ ring, front: 0, setbacks: { ...S.SETBACKS }, program: { use: 'sfr' }, elements: [st, ...els] }).filter(i => i.level === 'bad' && /overlaps/.test(i.text));
+  const park = { id: 'pk', kind: 'green', name: 'Park', x: 400, y: 330, w: 120, d: 100, rot: 0 };
+  assert.deepEqual(on(park).map(i => [i.id, i.text]), [['pk', 'Park overlaps Street']]);
+  assert.deepEqual(on({ ...park, name: '' }), [], 'plain lawn under a street: not a problem');
+  assert.deepEqual(on({ id: 'is', kind: 'green', name: 'Island', poly: [[380, 296], [420, 296], [420, 304], [380, 304]] }), [], 'a planted island inside the drive');
+  assert.deepEqual(on({ ...park, y: 364 }), [], 'edge to edge');
+  assert.deepEqual(on({ ...park, y: 400 }, { id: 'pv', kind: 'building', use: 'amenity', name: 'Pavilion', x: 400, y: 400, w: 40, d: 30, rot: 0 }), [], 'a pavilion standing in the park');
+  assert.deepEqual(on({ ...park, y: 400 }, { id: 'cc', kind: 'building', use: 'amenity', name: 'Center', x: 460, y: 400, w: 60, d: 40, rot: 0 }).map(i => i.id), ['pk'], 'a building half in it');
+  // entrances: an open space between the street and the drive is in the way; past its edge, or slid along the street, it's not
+  const drive = { id: 'dr', kind: 'drive', x: 400, y: 214, w: 760, d: 28, rot: 0 }, os = { id: 'os', kind: 'green', name: 'Open space', x: 400, y: 100, w: 300, d: 160, rot: 0 };
+  const lot = { ring, front: 0, setbacks: { ...S.SETBACKS }, program: { use: 'retail' }, elements: [drive, os] };
+  const mid = S.addEntrance(lot, [400, 0]); assert.match(mid.error || '', /would cross Open space/, 'asked in its middle: says what is in the way'); assert.equal(mid.park?.id, 'os');
+  const why = {}; assert.equal(S.entranceAt(lot, [400, 0], { why }), null); assert.equal(why.hit?.id, 'os');
+  const past = S.addEntrance(lot, [205, 0]); assert.ok(!past.error, past.error); assert.ok(!S.rectsOverlap(past.entrance, os), 'just past its edge: in, clear of it');
+  const slid = S.addEntrance(lot, [400, 0], { slide: 400 }); assert.ok(!slid.error && !S.rectsOverlap(slid.entrance, os) && Math.abs(slid.at[0] - 400) > 150, 'slid along the street past it: ' + slid.at);
+  assert.ok(S.addEntrance({ ...lot, elements: [drive, { ...os, name: '' }] }, [400, 0]).entrance, 'plain lawn: the driveway goes through it');
+  // the map: a median is marked so it draws over its paving
+  const fc = S.planFeatures({ ...lot, origin: [-95.78, 29.78], elements: [drive, os, { id: 'md', kind: 'green', name: '', median: true, island: true, poly: [[390, 205], [410, 205], [410, 222], [390, 222]], x: 400, y: 214 }] }, null), pr = id => fc.features.find(f => f.properties.id === id)?.properties;
+  assert.equal(pr('md').med, 1); assert.equal(pr('os').med, undefined);
+  // a park placed among homes: the homes under it (and their lots and driveways) are what makes way; drives never do
+  const h = { id: 'h1', kind: 'building', use: 'sfr', x: 100, y: 450, w: 40, d: 50, rot: 0 }, l1 = { id: 'l1', kind: 'lot', x: 100, y: 450, w: 60, d: 115, rot: 0 }, dw = { id: 'dw', kind: 'plaza', note: 'Driveway', x: 100, y: 412, w: 16, d: 26, rot: 0 }, h2 = { ...h, id: 'h2', x: 300 }, l2 = { ...l1, id: 'l2', x: 300 };
+  const P2 = { ring, front: 0, setbacks: { ...S.SETBACKS }, elements: [st, h, l1, dw, h2, l2] }, pk2 = { id: 'p2', kind: 'green', name: 'Park', x: 110, y: 470, w: 60, d: 60, rot: 0 };
+  assert.deepEqual([...S.homesUnder(P2, pk2, 4)].map(e => e.id).sort(), ['dw', 'h1', 'l1']);
+  assert.deepEqual(S.placeObs(P2, pk2).map(o => o.o.id), ['st'], 'a park keeps off the street; the homes make way');
+  // the clear space is part of each outline (the spot search only tests for overlap): a park lands 8 ft off a street, not flush
+  { const near = { ...pk2, y: 345 }, c = S.clearSpot(P2, near, { obs: S.placeObs(P2, near), reach: 80 }); assert.ok(c, 'a spot'); const q = S.moveBy(structuredClone(near), c[0], c[1]);
+    assert.ok(S.gapBetween(S.shapeOf(q), S.shapeOf(st)) >= 7.9, 'off the street: ' + S.gapBetween(S.shapeOf(q), S.shapeOf(st))); }
+  // a home 3 ft off a rectangular park makes way (the margin is square off its sides, not 0.7 of it); the lot of a home
+  // that stays is cut back off the park
+  { const pk3 = { ...pk2, x: 100, y: 540 - 25 - 3 - 30 }; assert.deepEqual([...S.homesUnder({ ...P2, elements: [st, { ...h, y: 540 }, l1] }, pk3, 4)].map(e => e.id), ['h1'], 'within 4 ft');
+    const lot = { ...l2, y: 480 }, hh = { ...h2, y: 500 }, pk4 = { ...pk2, x: 300, y: 410 }, t = S.trimLots([lot, hh], pk4), tl = t.find(e => e.id === 'l2');
+    assert.ok(tl.poly && S.ringArea(tl.poly) < S.ringArea(S.shapeOf(lot)) - 900 && !S.rectsOverlap(tl, pk4) && S.inRing([hh.x, hh.y], tl.poly), 'trimmed, the home still on it'); assert.equal(t.length, 2); }
+  // a parking row cut under a park doesn't grow back under it when something nearby moves away
+  { const ext = { x: 400, y: 460, w: 300, d: 18, rot: 0 }, row = { id: 'r', kind: 'parking', ...ext, ext }, pk5 = { id: 'p5', kind: 'green', name: 'Park', x: 400, y: 470, w: 60, d: 60, rot: 0 };
+    const cut = S.cutRows([row, pk5], S.outline(pk5), 1), back = S.regrowRows(cut, [[240, 440], [300, 440], [300, 480], [240, 480]], 5);
+    assert.ok(back.some(e => e.kind === 'parking') && !back.some(e => e.kind === 'parking' && S.rectsOverlap(e, pk5)), 'the stalls stay off the park'); }
+  // dragged, resized or turned where it stands (was: its outline there): a park against its street slides along it, and
+  // the pavilion standing in its lawn isn't in its way (any small drag used to be "blocked"); it still can't cross the street
+  { const pk6 = { id: 'p6', kind: 'green', name: 'Lawn', x: 400, y: 364, w: 120, d: 100, rot: 0 }, pv = { id: 'pv', kind: 'building', use: 'foodtrucks', ft: 'pavilion', name: 'Pavilion', x: 400, y: 370, w: 40, d: 30, rot: 0 }, P6 = { ring, front: 0, setbacks: { ...S.SETBACKS }, elements: [st, pk6, pv] };
+    assert.ok(S.isCommons(P6.elements, pk6) && !S.isCommons([st, pk6], pk6), 'a lawn holding a pavilion is a commons');
+    const obs = S.placeObs(P6, pk6, [], S.shapeOf(pk6)), slid = S.moveBy(structuredClone(pk6), 30, 0); assert.deepEqual(obs.map(o => o.o.id), ['st'], 'its pavilion is its own');
+    assert.deepEqual(S.clearSpot(P6, slid, { obs, reach: 0 }), [0, 0], 'along the street: clear'); assert.ok(!S.clearSpot(P6, S.moveBy(structuredClone(pk6), 0, -40), { obs, reach: 0 }), 'onto it: not');
+    assert.equal(S.clearSpot(P6, slid, { obs: S.placeObs(P6, pk6), reach: 0 }), null, '(placed afresh it keeps 8 ft off the street and off the pavilion)'); }
+  // an area drawn with the area tool (Landscape 3) is an island or a strip until it's named
+  assert.ok(!S.isPark({ kind: 'green', name: 'Landscape 3', poly: [[0, 0], [9, 0], [9, 9]] }) && S.isPark({ kind: 'green', name: 'Landscape park' }));
+  // the stop bar at a driveway in near a corner runs along the lot line its mouth is on (it read as coming from the other one)
+  { const lot2 = { ring, front: 0, setbacks: { ...S.SETBACKS }, program: { use: 'retail' }, elements: [{ id: 'dr2', kind: 'drive', x: 400, y: 214, w: 760, d: 28, rot: 0 }] }, a = S.addEntrance(lot2, [50, 0]);
+    assert.ok(a.entrance, a.error); const bar = S.entryMarks({ ...lot2, elements: a.elements }).find(m => m.color === '#ffffff'); assert.ok(bar && Math.abs(bar.line[0][1] - bar.line[1][1]) < 1 && Math.abs(bar.line[0][1] - 12) < 2, JSON.stringify(bar)); }
+}
+
+// ---- placement in words (phase 3, lib/sitepods.mjs): each zone's place, kept by normalizeProgram, read from the words and from the AI ----
+{ const N = q => S.normalizeProgram(q).zones;
+  const z = N({ use: 'retail', zones: [{ use: 'retail', gfa: 60000, place: { where: 'corner', road: '  FM 362 ', next: [], side: 'left' } }, { use: 'amenity', place: { where: 'middle' } }, { use: 'sfr', place: { where: 'around', next: [1, 2, 1, 7, -1, 'x'] } }] });
+  assert.deepEqual(z[0].place, { where: 'corner', road: 'FM 362', next: [], side: 'left' }); assert.deepEqual(z[1].place, { where: 'middle', road: null, next: [], side: null });
+  assert.deepEqual(z[2].place.next, [1], 'next: other zones only, once each, in range');
+  assert.ok(!('place' in N({ use: 'retail', zones: [{ use: 'retail', place: { where: 'nowhere' } }, { use: 'sfr', place: 'back' }] })[0]), 'junk: no hint');
+  assert.ok(N({ use: 'retail', zones: [{ use: 'retail' }, { use: 'sfr', place: { where: 'between', next: [0, 0, 0] } }, { use: 'amenity', place: { where: 'beside', next: [0, 1, 3] } }] }).every((q, i) => i === 0 ? !q.place : q.place.next.length <= 2), 'two next at most');
+  assert.deepEqual(N({ use: 'retail', zones: [{ use: 'retail', gfa: 20000 }, { use: 'multifamily', units: 200 }] }).map(q => Object.keys(q).includes('place')), [false, false], 'no hints: no key (saved plans compare the same)');
+  const g = N({ use: 'office', garage: true, zones: [{ use: 'office', gfa: 80000 }, { use: 'retail', gfa: 20000 }, { use: 'multifamily', units: 200, place: { where: 'beside', next: [1] } }] }); // a garage put in after the offices moves the zones behind it along one
+  assert.deepEqual(g.map(q => q.use), ['office', 'garage', 'retail', 'multifamily']); assert.deepEqual(g[3].place.next, [2], 'beside the retail, as said');
+  // the words
+  const P = t => S.guessProgram(t).zones, at = (Z, u) => Z.find(q => q.use === u)?.place;
+  const W = P('60,000 sf retail with 2 pads at the corner of FM 362 and Bauer Road, 300 apartments along FM 362, about 600 homes around a lake, and a commons with a community center, pool and playground');
+  assert.deepEqual(W.map(q => q.use + (q.units || q.gfa || '')), ['retail60000', 'amenity', 'multifamily300', 'sfr600']); assert.equal(W[0].pads, 2);
+  assert.equal(at(W, 'retail').where, 'corner'); assert.match(at(W, 'retail').road, /fm 362|bauer/); assert.deepEqual([at(W, 'multifamily').where, at(W, 'multifamily').road], ['along', 'fm 362']);
+  assert.deepEqual([at(W, 'sfr').where, at(W, 'sfr').next], ['around', [1]], 'homes round the commons'); assert.ok(W[1].items.includes('lake') && at(W, 'amenity').where === 'middle', 'the commons holds the lake, in the middle');
+  const B = P('20,000 sf retail, 40 townhomes as a buffer between the retail and the homes, 200 homes'); assert.deepEqual([at(B, 'townhomes').where, at(B, 'townhomes').next], ['between', [0, 2]]);
+  assert.deepEqual([at(P('retail and 200 apartments facing the highway'), 'multifamily').where, at(P('30,000 sf retail on the frontage and 300 homes'), 'retail').where, at(P('300 homes, the commons in the middle'), 'amenity').where, at(P('retail at the front, 200 homes at the back'), 'sfr').where], ['along', 'along', 'middle', 'back']);
+  assert.deepEqual(at(P('20,000 sf shops on the left corner and 150 apartments'), 'retail'), { where: 'corner', road: null, next: [], side: 'left' });
+  assert.deepEqual(P('37,700 sf retail with 2 pads, a commons with a lake, 120 apartments, 18 townhomes and 12 duplex units').map(q => q.use + (q.place ? '@' : '')), ['retail', 'amenity', 'multifamily', 'townhomes', 'duplex'], 'no placement words: no hints, the zones as before');
+  // the AI: placement in the program schema (strict), read back as place; the words fill a zone the model left open
+  const { default: handler, SCHEMA, EDIT_SCHEMA } = await import('../api/siteplan.js'), strict = (sc, w) => { if (sc?.type === 'object' && sc.properties) { assert.deepEqual(sc.required.slice().sort(), Object.keys(sc.properties).sort(), 'strict: ' + w); for (const [k, v] of Object.entries(sc.properties)) strict(v, w + '.' + k); } if (sc?.items) strict(sc.items, w + '[]'); };
+  strict(SCHEMA, 'program'); assert.ok(SCHEMA.properties.zones.items.properties.placement.properties.where.enum.includes('around')); strict(EDIT_SCHEMA, 'edit');
+  assert.ok(EDIT_SCHEMA.properties.ops.items.properties.action.enum.includes('relay') && EDIT_SCHEMA.properties.ops.items.properties.kind.enum.includes('pod'));
+  const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; }; let sent = null, reply = null; process.env.OPENAI_API_KEY = 'test-key';
+  globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('/models/')) return Response.json({ id: 'm' }); sent = JSON.parse(opts.body); return Response.json({ choices: [{ message: { content: JSON.stringify(reply()) } }] }); };
+  const call = async body => { const res = mock(); await handler({ method: 'POST', body, headers: { 'x-forwarded-for': '7.7.7.21' } }, res); return res; }, none = { where: null, road: null, next: [], side: null };
+  const zone = o => ({ use: 'retail', gfa: null, units: null, floors: null, buildings: null, pads: null, items: [], name: null, placement: none, ...o });
+  reply = () => ({ use: 'retail', gfa: null, units: null, floors: null, buildings: null, zones: [zone({ gfa: 60000, placement: { where: 'corner', road: 'FM 362', next: [], side: null } }), zone({ use: 'amenity', items: ['lake'] }), zone({ use: 'sfr', units: 600 })], setbacks: { front: null, side: null, rear: null, paving: null }, summary: 'x', assumptions: [] });
+  let res = await call({ prompt: '60,000 sf retail at the corner of FM 362, 600 homes around a lake', site: { acres: 246, streets: [{ side: 'front', name: 'FM 362', highway: true }, { side: 'side', name: 'Bauer Road' }, { side: 'nope', name: { x: 1 } }] } });
+  assert.equal(res.code, 200, JSON.stringify(res.body)); const pz = res.body.program.zones; assert.deepEqual(pz[0].place, { where: 'corner', road: 'FM 362', next: [], side: null }, 'the model’s placement');
+  assert.deepEqual([pz[2].place.where, pz[2].place.next], ['around', [1]], 'the words’ placement where the model left one open (next by use)'); assert.ok(!pz[1].place || pz[1].place.where === 'middle');
+  assert.deepEqual(JSON.parse(sent.messages[1].content).site.streets, [{ side: 'front', name: 'FM 362', highway: true }, { side: 'side', name: 'Bauer Road', highway: false }, { side: 'front', name: null, highway: false }], 'the roads by name go to the model, clipped');
+  // Change With AI on a plan in pods: the pods go to the model; relay and swap on pod ids come back
+  const op = o => ({ action: 'change', target: null, every: null, floorsOver: null, with: null, type: null, kind: null, use: null, name: null, floors: null, units: null, w: null, d: null, x: null, y: null, turn: null, turnBy: null, boulevard: null, signs: null, ...o });
+  reply = () => ({ homeMix: [], ops: [op({ action: 'relay', target: 'pod:p3' }), op({ action: 'swap', target: 'pod:p3', with: 'pod:p2' }), op({ action: 'relay', target: 'b1' }), op({ action: 'relay', target: 'pod:p99' })], names: { community: null, parts: [] }, refit: 'none', summary: 'Re-laid.', question: null });
+  res = await call({ mode: 'edit', prompt: 'redo the apartments, then swap them with the retail', plan: { pieces: [{ id: 'b1', name: 'Apt Bldg 1', kind: 'building', use: 'multifamily', at: [1, 2] }], pods: [{ id: 'pod:p3', name: 'Apartments', use: 'multifamily', acres: 18.8, at: [1445, 273], faces: ['FM 362', 'the spine road'], units: 300 }, { id: 'pod:p2', name: 'Retail', use: 'retail', acres: 8.1, at: [333, 266], faces: ['FM 362'] }, { id: 'p7', name: 'not a pod' }] } });
+  assert.equal(res.code, 200, JSON.stringify(res.body)); assert.deepEqual(res.body.ops.map(o => [o.action, o.target, o.with]), [['relay', 'pod:p3', null], ['swap', 'pod:p3', 'pod:p2']], 'pods by their ids only');
+  assert.deepEqual(JSON.parse(sent.messages[1].content.split('\n\nBuilding library')[0]).pods.map(p => p.id), ['pod:p3', 'pod:p2'], 'the pods go to the model');
+  reply = () => ({ homeMix: [], ops: [op({ action: 'relay', target: 'pod:p2', gfa: 80000 }), op({ action: 'relay', target: 'pod:p3', gfa: 'lots' })], names: { community: null, parts: [] }, refit: 'none', summary: 'Bigger.', question: null });
+  res = await call({ mode: 'edit', prompt: 'make the retail pod 80,000 sf', plan: { pieces: [], pods: [{ id: 'pod:p2', name: 'Retail', use: 'retail', acres: 8.1, at: [333, 266], faces: ['FM 362'] }, { id: 'pod:p3', name: 'Apartments', use: 'multifamily', acres: 18.8, at: [1, 1], faces: [] }] } });
+  assert.deepEqual(res.body.ops.map(o => o.gfa), [80000, null], 'a pod’s floor area, sq ft');
+  // the words: placement after the zones are in their order (a commons said to go at the back moves to the end); uses
+  // named together share a placement; a commons' items wherever they're said; uses named only as what a zone is beside
+  const H = P('300 homes around a lake and a clubhouse at the back, 200 apartments along the highway'); assert.deepEqual(H.map(q => q.use), ['multifamily', 'sfr', 'amenity']); assert.deepEqual(at(H, 'sfr').next, [2], 'round the commons, not the apartments');
+  const H2 = P('Retail at the corner, 200 apartments, 300 homes around the commons, with a community center at the back'); assert.equal(H2[at(H2, 'sfr').next[0]].use, 'amenity');
+  assert.deepEqual(P('medical and office in the middle, 200 homes').filter(q => q.place).map(q => q.use + ':' + q.place.where).sort(), ['medical:middle', 'office:middle']);
+  assert.deepEqual(P('retail, 300 homes and a commons with a pool and playground').find(q => q.use === 'amenity').items, ['pool', 'playground']);
+  const L4 = P('400 homes around a lake with a clubhouse and pool'); assert.deepEqual(L4.map(q => q.use), ['amenity', 'sfr']); assert.ok(['center', 'pool', 'lake'].every(k => L4[0].items.includes(k)), 'the clubhouse and pool kept'); assert.deepEqual(at(L4, 'sfr').next, [0]);
+  const BT = P('apartments beside the retail, homes between the apartments and the park'); assert.deepEqual(BT.map(q => q.use), ['retail', 'amenity', 'multifamily', 'sfr']);
+  assert.deepEqual([at(BT, 'multifamily').where, at(BT, 'multifamily').next, at(BT, 'sfr').where, at(BT, 'sfr').next], ['beside', [0], 'between', [2, 1]]);
+  assert.deepEqual(P('200 apartments along the highway and 80 homes').map(q => q.use + q.units), ['multifamily200', 'sfr80']);
+  // a lake said with other things is one of them (a commons of only those has none); a lake alone: the commons as it comes, its lake among the rest
+  const am = t => P(t).find(q => q.use === 'amenity')?.items ?? null;
+  for (const t of ['a neighborhood of 500 homes with a lake, a pool and a playground', '400 homes, a commons with a lake, pool and playground', '30,000 sf retail, 200 apartments, 300 homes and a park with a lake and a pool', '300 homes, 100 apartments and a commons with a lake and a pool', '150 townhomes and 20,000 sf retail with a lake and a playground', 'homes on lots with a lake, and a clubhouse']) assert.ok(am(t)?.includes('lake'), t + ': ' + am(t));
+  assert.ok(am('homes on lots with a lake, and a clubhouse').includes('center') && am('homes on lots with a lake, and a clubhouse').includes('playground'), 'a clubhouse with its playground, said after');
+  assert.equal(am('300 homes and a commons with a lake'), null); assert.equal(am('300 homes around a lake'), null, 'homes round a lake: the usual commons, lake and all');
+  // what a zone is beside or round, with its numbers; homes said with no number but a place
+  assert.deepEqual(P('120 apartments next to 20,000 sf of retail').map(q => q.use + (q.units || q.gfa)), ['retail20000', 'multifamily120']);
+  assert.deepEqual(am('100 homes around 2 pickleball courts and a pool'), ['courts', 'pool']);
+  const BH = P('120 townhomes as a buffer between the apartments and the homes, homes at the back'); assert.deepEqual(BH.map(q => q.use), ['multifamily', 'townhomes', 'sfr']);
+  assert.deepEqual([at(BH, 'townhomes').where, at(BH, 'townhomes').next, at(BH, 'sfr').where, at(BH, 'multifamily')], ['between', [0, 2], 'back', undefined], 'the homes at the back, not the apartments');
+  // a numbered highway is that road, not "the highway" (the front)
+  assert.equal(at(P('200 apartments along Highway 6 and 300 homes'), 'multifamily').road, 'highway 6'); assert.equal(at(P('retail along the highway and 300 homes'), 'retail').road, 'highway'); }
 
 console.log('site plans ok');

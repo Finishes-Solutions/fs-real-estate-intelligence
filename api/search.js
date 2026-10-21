@@ -33,15 +33,18 @@ export function parseLocate(text) {
   return out.name || out.lat != null ? out : null;
 }
 
-export async function webSearch(key, query, near, local = true, instructions) {
+// o: { maxTokens, size, timeout (ms a try), by (a time it must answer by: no try runs past it, none starts too near it) } for a
+// longer read (the street rules: lib/rulesheet.mjs); defaults as for a quick answer
+export async function webSearch(key, query, near, local = true, instructions, o = {}) {
   let last = '';
   for (const model of MODELS) {
     for (const tool of ['web_search', 'web_search_preview']) {
+      const left = o.by ? o.by - Date.now() : Infinity; if (left < 15000) throw new Error(last ? last + '; out of time' : 'out of time');
       const r = await fetch('https://api.openai.com/v1/responses', {
-        method: 'POST', signal: AbortSignal.timeout(45000), headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+        method: 'POST', signal: AbortSignal.timeout(Math.min(o.timeout || 45000, left)), headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, // Houston bias only while the user is looking at the home region; a question about Lyon gets no US slant
-          tools: [{ type: tool, search_context_size: 'low', ...(local ? { user_location: { type: 'approximate', country: 'US', region: 'Texas', city: 'Houston' } } : {}) }],
-          tool_choice: 'required', max_output_tokens: 1200, store: false, ...(/^gpt-5|^o\d/.test(model) ? { reasoning: { effort: 'low' } } : {}),
+          tools: [{ type: tool, search_context_size: ['low', 'medium', 'high'].includes(o.size) ? o.size : 'low', ...(local ? { user_location: { type: 'approximate', country: 'US', region: 'Texas', city: 'Houston' } } : {}) }],
+          tool_choice: 'required', max_output_tokens: o.maxTokens || 1200, store: false, ...(/^gpt-5|^o\d/.test(model) ? { reasoning: { effort: 'low' } } : {}),
           instructions: instructions || 'Search the web and answer in 2-4 plain sentences (no markdown). Give specific facts with dates and figures when sources have them, and say when sources disagree or a figure is an estimate. Prefer official, news and primary sources.',
           input: query + (near ? ' (context: ' + near + ')' : '') })
       });

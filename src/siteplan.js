@@ -5,7 +5,7 @@
 // Projects are kept on this device and shared with the team through /api/projects once it's set up. Exports DXF
 // (AutoCAD, CADCraft and other CAD programs) and GeoJSON.
 import * as SP from './lib/siteplan.mjs';
-import { layoutOptions, refit, PARAMS } from './lib/sitelayout.mjs';
+import { layoutOptions, refit, relayPods, netEdit, wantPods, PARAMS } from './lib/sitelayout.mjs';
 import * as PF from './lib/proforma.mjs';
 import { sheetHTML, planSVG } from './lib/sitesheet.mjs';
 import { BUILDING_TYPES, BUILDING_GROUPS, typeById, fromType } from './lib/buildings.mjs';
@@ -16,6 +16,10 @@ import * as ASK from './lib/planask.mjs';
 import * as K from './lib/planpick.mjs';
 import * as MAP from './lib/planmap.mjs';
 import * as T from './lib/sitetools.mjs';
+import { netRules, codeRules, chainsOf, streetRules } from './lib/streetnet.mjs';
+import * as SE from './lib/streetedit.mjs';
+import * as SNm from './lib/streetnames.mjs';
+import * as RSL from './lib/rulesheet.mjs';
 import * as RD from './lib/render.mjs';
 import * as PJ from './lib/project.mjs';
 import * as PS from './lib/planset.mjs';
@@ -26,17 +30,18 @@ import * as CU from './lib/customtypes.mjs';
 import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
 import { teamLibrary } from './teamlib.js';
+import { ruleSheets } from './rulesheets.js';
 const typeOptions = (cur, team = []) => (team.length ? '<optgroup label="Team">' + team.map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>' : '') + BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 import { readJSON } from './lib/http.mjs';
 
 const KEY = 'fs-projects-v1', CODE_KEY = 'fs-team-code', NAME_KEY = 'fs-team-name';
-const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash'];
-const ADD_LABEL = { pad: 'Restaurant pad (drive-thru)', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Outdoor seating', garage: 'Parking garage' };
+const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'roundabout', 'loop', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash', 'sign'];
+const ADD_LABEL = { roundabout: 'Roundabout', loop: 'Drop-off loop (circle drive)', sign: 'Monument sign', pad: 'Restaurant pad (drive-thru)', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Outdoor seating', garage: 'Parking garage' };
 // the pieces you can add, grouped the same way in the panel's Add section and the tool strip's Add palette
-const ADD_GROUPS = [['Buildings', ['building', 'pad', 'garage']], ['Paving', ['parking', 'drive', 'truck']], ['Water & landscape', ['pond', 'green']], ['Amenities', ['play', 'court', 'pool', 'patio']], ['Site', ['trash']]];
-const ADD_SHORT = { building: 'Building', pad: 'Restaurant pad', garage: 'Garage', parking: 'Parking', drive: 'Drive', truck: 'Truck court', pond: 'Detention', green: 'Landscape', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Seating', trash: 'Trash' };
-const SIZE = { building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
+const ADD_GROUPS = [['Buildings', ['building', 'pad', 'garage']], ['Paving', ['parking', 'drive', 'truck', 'roundabout', 'loop']], ['Water & landscape', ['pond', 'green']], ['Amenities', ['play', 'court', 'pool', 'patio']], ['Site', ['trash', 'sign']]];
+const ADD_SHORT = { building: 'Building', pad: 'Restaurant pad', garage: 'Garage', parking: 'Parking', drive: 'Drive', truck: 'Truck court', roundabout: 'Roundabout', loop: 'Drop-off', pond: 'Detention', green: 'Landscape', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Seating', trash: 'Trash', sign: 'Sign' };
+const SIZE = { roundabout: [100, 100], loop: [120, 70], building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], sign: [10, 5], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
 const PAVED = ['parking', 'drive', 'truck'];
 const FORMS = [['bar', 'Bar'], ['L', 'L-shaped'], ['U', 'Courtyard (U)'], ['tower', 'Tower on a podium']];
 const { COL, USE_COL } = MAP; // one palette for the map, the Plan key and the Draw buttons (lib/planmap.mjs)
@@ -48,6 +53,8 @@ export const ADD_ICON = Object.fromEntries(Object.entries({
   garage: '<rect x="4" y="4" width="16" height="4.2" rx="1"/><rect x="4" y="9.9" width="16" height="4.2" rx="1"/><rect x="4" y="15.8" width="16" height="4.2" rx="1"/>',
   parking: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M10 16.5v-9h3a2.5 2.5 0 0 1 0 5h-3"/>',
   drive: '<path d="M8.5 3.5 5 20.5M15.5 3.5l3.5 17"/><path d="M12 4.5V7M12 10.5v3M12 17v3"/>',
+  roundabout: '<circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2.5V6M12 18v3.5M2.5 12H6"/>',
+  loop: '<rect x="8.5" y="3.5" width="7" height="5" rx=".8"/><path d="M5.5 20.5V14a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v6.5"/><path d="M2.5 20.5h19"/>',
   truck: '<path d="M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7"/><circle cx="6.5" cy="17" r="1.8"/><circle cx="17" cy="17" r="1.8"/>',
   pond: '<path d="M3 9.5c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0M3 14.5c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0"/>',
   green: '<path d="M5 19.5C5 11 10 5.5 19.5 4.5 19 14 13.5 19.5 5 19.5z"/><path d="M5 19.5l8.5-8.5"/>',
@@ -55,9 +62,10 @@ export const ADD_ICON = Object.fromEntries(Object.entries({
   court: '<rect x="3.5" y="5.5" width="17" height="13" rx="1"/><path d="M12 3.5v17"/><path d="M7.5 5.5v13M16.5 5.5v13" stroke-dasharray="1.6 1.6"/>',
   pool: '<path d="M8 16.5V6a2 2 0 0 1 4 0M14 16.5V6a2 2 0 0 1 4 0M8 9.5h6M8 13h6"/><path d="M3 19.5c1.5-1.1 3-1.1 4.5 0s3 1.1 4.5 0 3-1.1 4.5 0 3 1.1 4.5 0"/>',
   patio: '<path d="M3.5 9 12 4.5 20.5 9z"/><path d="M12 9v11.5M8 20.5h8M6.5 14.5h11"/>',
-  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13.5h9l1-13.5"/><path d="M10 10.5V17M14 10.5V17"/>'
+  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13.5h9l1-13.5"/><path d="M10 10.5V17M14 10.5V17"/>',
+  sign: '<path d="M3.5 19.5h17M5.5 19.5v-8h13v8"/><path d="M8 11.5V8.5h8v3M9 15.5h6"/>'
 }).map(([k, d]) => [k, '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>']));
-export const addAccent = k => k === 'pad' ? USE_COL.restaurant : COL[k] || COL.building;
+export const addAccent = k => k === 'pad' ? USE_COL.restaurant : k === 'roundabout' || k === 'loop' ? COL.drive : COL[k] || COL.building;
 const get = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
 const PS_PICK = { model: () => pickedClaude(get(PLANSET_MODEL_KEY)), effort: () => pickedEffort(get(PLANSET_EFFORT_KEY)) }; // Settings › AI model › Plan sets
 // Ultra's mark (the effort levels under Build): a four-point spark and a small one beside it
@@ -119,6 +127,7 @@ export function initSitePlan(ctx) {
 
   // ---------- the team's building library (src/teamlib.js): Save to Library, the Team group, rename and delete ----------
   const TL = teamLibrary({ onChange: () => teamRefresh() });
+  const RS = ruleSheets({ onChange: () => { if (ed && card.classList.contains('sp-mode') && !card.querySelector('.sp-rules :focus')) rulesRefresh(); } }); // the team's street rule sheets (lib/rulesheet.mjs), one per place
   const AIS_TIP = 'Sized by the AI from typical practice, not a product sheet: check it against the real building before relying on it';
   const teamTypes = () => TL.list().map(CU.libraryTypeOf); // the Team group, as library types
   const anyType = id => String(id || '').startsWith('team:') ? (t => t ? CU.libraryTypeOf(t) : null)(TL.get(String(id).slice(5))) : typeById(id);
@@ -277,7 +286,7 @@ export function initSitePlan(ctx) {
     }
     cur = pid; renaming = false; lastOpen = { pid, plid }; if (switching && ed?.run) ctx.toast(ed.run.kind === 'build' ? 'Build cancelled' : 'Cancelled'); killRun();
     ed = { pid, plid, sel: null, multi: [], undo: [], redo: [], mode: o.draw || !(db.projects.find(x => x.id === pid)?.plans.find(x => x.id === plid)?.ring?.length >= 3) ? 'draw' : null, draft: [], variants: null, editing: false, run: null, draftPlan: o.draftPlan || null }; // editing: pieces can be moved only in Edit Layout
-    restoreRun(PL());
+    restoreRun(PL()); try { autoRules(P(), PL()); } catch (e) { /* (the team's rule sheet for its place: used before the first layout) */ }
     hideMapBits();
     addLayers(); draw(); panel();
     requestAnimationFrame(() => requestAnimationFrame(() => planFit()));
@@ -402,6 +411,8 @@ export function initSitePlan(ctx) {
       case 'front': return { k: 'front', t: 'Street side', d: cl + ' the lot line along the street', b: [X] };
       case 'street': return { k: 'street', t: 'Side street', d: cl + ' a lot line to add or remove one', b: [D] };
       case 'entrance': return { k: 'entrance', t: 'Add entrance', d: cl + ' the lot line where the drive comes in', b: [X] };
+      case 'roundabout': return { k: 'roundabout', t: 'Add roundabout', d: cl + ' where streets meet', b: [X] };
+      case 'loop': return { k: 'loop', t: 'Add drop-off loop', d: cl + ' the building the drop-off loop is for', b: [X] };
       case 'parcels': return { k: 'parcels', t: 'Parcels', d: cl + ' one next to the site to add it, or in it to take it out', b: [D] };
       case 'measure': { const M = ed.meas || { pts: [] }, Q = M.pts, area = M.kind === 'area';
         const tot = area ? (Q.length >= 3 ? T.fmtArea(T.polyArea(Q)) : '') : Q.length > 1 ? T.fmtFt(T.pathLen(Q)) : '';
@@ -498,6 +509,10 @@ export function initSitePlan(ctx) {
     if (!pl.streetsSet) pl.streets = found;
     // street sides kept from the old check plus one the person added: theirs to fix, so say which sides the map now supports
     else if (was && [...own].sort().join() !== [...found].sort().join() && own.some(i => !found.includes(i))) ctx.toast(`This plan has ${own.length} side street${own.length === 1 ? '' : 's'} marked; the map shows ${found.length ? found.length : 'none'} beside the lot. Side Street on the toolbar: click a side to take it off.`);
+    if (!pl.streetNamesSet && src) { try { // the roads' names (the map's labels), for "apartments along FM 362"
+      const named = []; for (const q of map.querySourceFeatures(src, { sourceLayer: 'transportation_name' })) { const nm = q.properties?.name || q.properties?.ref, g = q.geometry; if (!nm) continue; for (const c of g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []) { const ft = c.map(F.toFt); if (ft.some(([x, y]) => Math.abs(x) < 2500 && Math.abs(y) < 2500)) named.push({ nm: String(nm).slice(0, 40), ft }); } }
+      const names = {}; for (const k of [f, ...pl.streets.filter(i => i !== f)]) { const a = pl.ring[k], b = pl.ring[(k + 1) % pl.ring.length], m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; let best = null; for (const x of named) for (let i = 1; i < x.ft.length; i++) { const d = SP.segDist(m, x.ft[i - 1], x.ft[i]); if (d < 150 && (!best || d < best.d)) best = { d, nm: x.nm }; } if (best) names[k] = best.nm; }
+      if (Object.keys(names).length) pl.streetNames = names; } catch (e) { /* no names in the tiles: "along the highway" means the front */ } }
     pl.streetsBy = 2;
     if (was && siteParts(pl).street !== was) { siteChanged(pl, 'street'); ctx.toast(`Street sides re-checked against the map: ${pl.streets.length ? `the front and ${pl.streets.length} side street${pl.streets.length > 1 ? 's' : ''}` : 'the front only'}. Side Street on the toolbar changes them.`); }
     save(P()); draw(); panel();
@@ -579,11 +594,17 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-zone', type: 'line', source: SRC, filter: kind('zone'), layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.zone, 'line-width': 1.1, 'line-dasharray': [0.1, 2.6] } }); // dotted
     // paving is drawn once as a whole (one colour, one curb line round it); the pieces under it stay clear, and show
     // only when picked, so drives and parking rows read as one surface without seams or darker overlaps
+    // lawns and parks under the paving: a drive is never hidden under a park (where one overlaps, the park is flagged red
+    // and the drive shows on top); a boulevard's median is drawn over its paving, below
+    add({ id: 'fs-sp-green', type: 'fill', source: SRC, filter: ['all', kind('green'), ['!=', ['get', 'med'], 1]], paint: { 'fill-color': C.green, 'fill-opacity': ['case', sel1, .5, ['==', ['get', 'nm'], 0], 0.01, .75] } });
     add({ id: 'fs-sp-pave', type: 'fill', source: SRC, filter: kind('paved'), paint: { 'fill-color': C.parking, 'fill-opacity': .82 } });
     add({ id: 'fs-sp-curb', type: 'line', source: SRC, filter: kind('paved'), paint: { 'line-color': Ln.curb, 'line-width': 1.2, 'line-opacity': .9 } });
-    add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
+    add({ id: 'fs-sp-med', type: 'fill', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'fill-color': C.green, 'fill-opacity': ['case', sel1, .6, .9] } }); // the entry's planted median
+    add({ id: 'fs-sp-medl', type: 'line', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'line-color': Ln.curb, 'line-width': 1 } });
+    add({ id: 'fs-sp-sign', type: 'fill-extrusion', source: SRC, filter: kind('sign'), paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, sel1, P.sel(C.sign || '#8b8073'), C.sign || '#8b8073'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .95 } }); // a monument sign: a low stone wall
+    add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
       paint: { 'fill-color': ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'pond', C.pond, 'plaza', C.plaza, 'court', C.court, 'pool', C.pool, 'play', C.play, C.green],
-        'fill-opacity': ['case', sel1, .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, ['all', ['==', ['get', 'k'], 'green'], ['==', ['get', 'nm'], 0]], 0.01, .75] } });
+        'fill-opacity': ['case', sel1, .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, .75] } });
     add({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: ['all', kind('lot'), ['!=', ['get', 'site'], 1]], minzoom: 17, layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.lots, 'line-width': 1, 'line-dasharray': [0.1, 2.4] } }); // house lots, dotted, close in
     add({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': Ln.walk, 'fill-opacity': .85 } });
     add({ id: 'fs-sp-yard', type: 'fill', source: SRC, filter: kind('yard'), minzoom: 16, paint: { 'fill-color': Ln.yard, 'fill-opacity': .9 } });
@@ -620,7 +641,7 @@ export function initSitePlan(ctx) {
       'fill-extrusion-color': ['match', ['get', 'part'], 'tower', ['case', ph2, useCol(c => f(P.p2(c))), useCol(f)], 'parapet', ['case', ['==', ['get', 'g'], 1], '#8b9092', '#6d635a'], ['case', ['==', ['get', 'g'], 1], '#6f7476', '#4f453c']] });
     add({ id: 'fs-sp-b3', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), ['!', sel1]], paint: b3(id) });
     add({ id: 'fs-sp-b3s', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), sel1], paint: b3(lit) });
-    add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
+    add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck', 'sign']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
       paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, 'rgba(11,13,12,.45)'], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1] } });
     add({ id: 'fs-sp-p2', type: 'line', source: SRC, filter: ['all', kind('building'), ph2, ['!', sel1], ['!=', ['get', 'bad'], 1]], paint: { 'line-color': Ln.p2, 'line-width': 1.3, 'line-dasharray': [2, 1.6] } }); // Phase 2: dashed
     // the selection: green on a white casing (a red casing when it's also a problem)
@@ -632,6 +653,9 @@ export function initSitePlan(ctx) {
     // labels: the most important first (lib/planmap.mjs); parking counts only close in; the selected piece's always
     const txt = { 'text-field': ['step', ['zoom'], ['get', 't1'], 17.5, ['get', 't2'], 18.25, ['get', 't']], 'text-font': ['Noto Sans Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], 16, ['case', ['==', ['get', 'big'], 1], 9, 8.5], 18, ['case', ['==', ['get', 'big'], 1], 12, 11], 20, 15], 'text-max-width': 18, 'text-padding': 4, 'symbol-sort-key': ['get', 'pri'] };
     const ink = { 'text-color': Lb.ink, 'text-halo-color': Lb.halo, 'text-halo-width': 1.6 };
+    // the names of the plan's parts, big and faint over their zones (they never push a piece's label off)
+    add({ id: 'fs-sp-zlab', type: 'symbol', source: SRC, minzoom: 14, filter: kind('zlabel'), layout: { 'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-transform': 'uppercase', 'text-letter-spacing': .25, 'text-size': ['interpolate', ['linear'], ['zoom'], 14, ['case', ['==', ['get', 'small'], 1], 8, 13], 16, ['case', ['==', ['get', 'small'], 1], 12, 20], 18, ['case', ['==', ['get', 'small'], 1], 18, 30]], /* (a part's other sections smaller) */ 'text-max-width': 14, 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': Lb.ink, 'text-opacity': .32, 'text-halo-color': Lb.halo, 'text-halo-width': 1, 'text-halo-blur': 1 } });
+    add({ id: 'fs-sp-sname', type: 'symbol', source: SRC, minzoom: 16, filter: kind('sname'), layout: { 'symbol-placement': 'line', 'text-field': ['get', 't'], 'text-font': ['Noto Sans Regular'], 'text-size': ['interpolate', ['linear'], ['zoom'], 16, 10, 19, 13], 'text-max-angle': 35, 'text-padding': 2, 'symbol-spacing': 400 }, paint: ink }); // the street names, along their streets (when they're on)
     add({ id: 'fs-sp-lab-p', type: 'symbol', source: SRC, minzoom: 17.5, filter: ['all', kind('label'), ['==', ['get', 'lp'], 1], ['!', sel1]], layout: { ...txt, 'text-allow-overlap': false }, paint: ink });
     add({ id: 'fs-sp-lab', type: 'symbol', source: SRC, filter: ['all', kind('label'), ['!=', ['get', 'lp'], 1], ['!', sel1]], layout: { ...txt, 'text-allow-overlap': false }, paint: ink });
     add({ id: 'fs-sp-lab-sel', type: 'symbol', source: SRC, filter: ['all', kind('label'), sel1], layout: { ...txt, 'text-allow-overlap': true }, paint: ink }); // always, and the others make way for it (it's on top, so placed first); as short as the others zoomed out, so it doesn't hide the outline it names
@@ -670,9 +694,14 @@ export function initSitePlan(ctx) {
     const e = ed.editing && sels().length === 1 && pl.elements.find(x => x.id === ed.sel); if (!e || !T.editable(T.viewOf(pl), e)) return []; // one piece, on a layer that isn't hidden or locked
     const F = SP.frame(pl.origin), px = ftPerPx(), big = coarse(), deg = (p, q) => +(-Math.atan2(q[1] - p[1], q[0] - p[0]) * 180 / Math.PI).toFixed(1); // a bar's turn on the map (clockwise from east)
     // t: what the handle is (c corner, r turn, e a side, s scale, v a point, m an edge, p add a point); a: a bar's turn
-    if (ed.shape === e.id && e.path && T.routeable(e)) { const P = e.path, out = P.map((p, i) => ({ i: 'v' + i, t: 'v', at: F.toLL(p), ft: p })); // a route: its points, and a + in the middle of each stretch long enough
-      for (let i = 0; i + 1 < P.length; i++) { const q = P[i + 1]; if (Math.hypot(q[0] - P[i][0], q[1] - P[i][1]) / px < (big ? 44 : 30)) continue; const m = [(P[i][0] + q[0]) / 2, (P[i][1] + q[1]) / 2]; out.push({ i: 'p' + i, t: 'p', at: F.toLL(m), ft: m }); }
-      return out; }
+    // the green turn dot of a curved or drawn piece: above its middle, clear of its outline, turned with it
+    const freeDot = (x, conv) => { const o = SP.outline(x), c = SP.centroid(o), L = Math.max(...o.map(p => Math.hypot(p[0] - c[0], p[1] - c[1]))) + 14 + (big ? 26 * px : 0), q = SP.rotPt([0, L], x.rot || 0); return { i: 'r', t: 'r', at: F.toLL([c[0] + q[0], c[1] + q[1]]), conv }; };
+    const ent = T.isEntrance(e), nst = isNetStreet(pl, e); // an entrance (or a street of a neighbourhood's network) shows its bend points without Edit Shape (an outline from the layout is read as its route; the first drag makes it one)
+    if (nst && ed.shape !== e.id) { const P = e.path, st = netStep(px), c = [0]; for (let i = 1; i < P.length; i++) c.push(c[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1])); const L = c[c.length - 1], k = [0]; // a street of the network: a handle every so often along it (its line is drawn with a point every 10 ft), each dragging the street round it in a smooth bend
+      for (let i = 1; i < P.length - 1; i++) if (c[i] - c[k[k.length - 1]] >= st && L - c[i] >= st / 2) k.push(i); k.push(P.length - 1); return k.map(i => ({ i: 'v' + i, t: 'v', at: F.toLL(P[i]), ft: P[i] })); }
+    if (ed.shape === e.id && e.path && T.routeable(e) || ent || nst) { const R = e.path ? e : SP.routeOf(e, pl.ring), conv = !e.path, P = R.path, out = P.map((p, i) => ({ i: 'v' + i, t: 'v', at: F.toLL(p), ft: p, conv })); // a route: its points, and a + in the middle of each stretch long enough
+      for (let i = 0; i + 1 < P.length; i++) { const q = P[i + 1]; if (Math.hypot(q[0] - P[i][0], q[1] - P[i][1]) / px < (big ? 44 : 30)) continue; const m = [(P[i][0] + q[0]) / 2, (P[i][1] + q[1]) / 2]; out.push({ i: 'p' + i, t: 'p', at: F.toLL(m), ft: m, conv }); }
+      return ent ? out.concat([freeDot(R, conv)]) : out; }
     if (ed.shape === e.id && e.poly) { const P = e.poly, out = P.map((p, i) => ({ i: 'v' + i, t: 'v', at: F.toLL(p), ft: p })); // shape editing: every point; on each edge long enough, a bar to drag it and a + beside it to add a point
       P.forEach((p, i) => { const q = P[(i + 1) % P.length], L = Math.hypot(q[0] - p[0], q[1] - p[1]) / px; if (L < (big ? 44 : 30)) return;
         const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], n = T.edgeNormal(P, i), o = (big ? 24 : 17) * px, pp = [m[0] + n[0] * o, m[1] + n[1] * o];
@@ -687,11 +716,19 @@ export function initSitePlan(ctx) {
       P.forEach((p, i) => { const q = P[(i + 1) % P.length]; if (Math.hypot(q[0] - p[0], q[1] - p[1]) / px < (big ? 56 : 40)) return; const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; out.push({ i: 'm' + i, t: 'm', at: F.toLL(m), ft: m, a: deg(p, q) }); });
       return out.concat([turnDot(P)]); }
     if (SP.isFree(e)) { const o = SP.outline(e), xs = o.map(p => p[0]), ys = o.map(p => p[1]); // curved pieces: corner handles scale the whole shape; an outline turns too
-      return [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)], [Math.min(...xs), Math.max(...ys)]].map((p, i) => ({ i: 's' + i, t: 's', at: F.toLL(p), ft: p })).concat(e.poly ? [turnDot(e.poly)] : []); }
+      return [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)], [Math.min(...xs), Math.max(...ys)]].map((p, i) => ({ i: 's' + i, t: 's', at: F.toLL(p), ft: p })).concat([e.poly ? turnDot(e.poly) : freeDot(e)]); } // (every piece turns: a curved one about its middle)
     const c = SP.corners(e), L = e.d / 2 + Math.max(14, e.d * 0.15);
     const sides = [0, 1, 2, 3].filter(k => (k % 2 ? e.d : e.w) / px >= (big ? 56 : 40)).map(k => ({ i: 'e' + k, t: 'e', at: F.toLL(T.sideMid(e, k)), ft: T.sideMid(e, k), a: deg(c[k], c[(k + 1) % 4]) })); // a side long enough on screen for a bar between its corners
     return c.map((p, i) => ({ i, t: 'c', at: F.toLL(p), ft: p, a: -(e.rot || 0) })).concat(sides, [dotAt(L, L)]);
   }
+  // a street of the network moved by hand (a point dragged, added or taken out): the streets that T into it carried along
+  // (lib/streetedit.mjs carryTees), and a toast when one of its own ends no longer meets the street it met
+  function carryNet(pl, el, before, els0) {
+    pl.elements = SE.carryTees(pl.elements, el.id, before, el.path); const lost = SE.teesLost({ ...pl, elements: els0 }, pl, el.id);
+    if (lost.length) ctx.toast('That end no longer meets ' + lost[0].replace(/^The /, 'the ') + ': it’s a dead end now (Make It a Cul-de-sac, or drag it back).');
+  }
+  const netStep = (px = ftPerPx()) => Math.max(80, 56 * px); // (the spacing of a network street's handles, and how far a drag of one bends it either way)
+  const isNetStreet = (pl, e) => !!(e && pl?.recipe?.net && e.kind === 'drive' && e.net && e.path && !e.bulb && !e.closed); // a street of a neighbourhood's network (lib/streetedit.mjs)
   const ftPerPx = () => 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (512 * 2 ** map.getZoom()) * 3.28084;
   // layouts run in a worker (sp-worker.js) so the page stays responsive; straight in the page if workers aren't there
   let worker = null, wseq = 0; const wait = new Map();
@@ -707,7 +744,7 @@ export function initSitePlan(ctx) {
   function laid0(fn, ...args) {
     try { if (!worker) { worker = new Worker(new URL('./sp-worker.js', import.meta.url), { type: 'module' }); worker.onmessage = ({ data }) => { const w = wait.get(data.id); if (!w) return; wait.delete(data.id); data.ok ? w.ok(data.result) : w.no(new Error(data.error)); }; worker.onerror = e => { for (const w of wait.values()) w.no(new Error(e.message || 'layout worker failed')); wait.clear(); worker = null; }; } }
     catch (e) { worker = null; }
-    if (!worker) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'refit' ? refit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
+    if (!worker) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'refit' ? refit(...args) : fn === 'pods' ? relayPods(...args) : fn === 'net' ? netEdit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
     const id = ++wseq; return new Promise((ok, no) => { wait.set(id, { ok, no }); worker.postMessage({ id, fn, args: JSON.parse(JSON.stringify(args)) }); });
   }
   let lastKeep = null, keySig = '';
@@ -828,7 +865,7 @@ export function initSitePlan(ctx) {
   const ftAt = (pl, lngLat) => SP.frame(pl.origin).toFt([lngLat.lng, lngLat.lat]);
   const SHAPEABLE = ['building', 'plaza', 'green', 'pond', 'court', 'pool', 'patio', 'play', 'garage', 'parking']; // pieces whose outline can be edited point by point
   const faceted = e => !!e.poly && (e.poly.length <= 16 || ['building', 'garage', 'parking'].includes(e.kind)); // a drawn or reshaped outline (its faces can be dragged), not a pond's natural curve (that scales)
-  const ORDER = ['trash', 'foodtruck', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'canopy', 'tanks', 'pond', 'keepout', 'fence', 'drive', 'truck', 'parking', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
+  const ORDER = ['sign', 'trash', 'foodtruck', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'canopy', 'tanks', 'pond', 'keepout', 'fence', 'drive', 'truck', 'parking', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
   // what's under the pointer: the selected piece's nearest handle (a finger gets more room than a mouse), else the piece
   // (plan pieces in feet, turned or not: never map tiles). A face bar is caught only along the bar as drawn, and a
   // handle the pointer is merely near gives way to another piece it's on, so a click meant for a neighbour picks it.
@@ -854,7 +891,7 @@ export function initSitePlan(ctx) {
   function down(e) {
     const pl = ed && PL(); if (!pl || ed.mode || ctx.view !== 'map' || pl.ring.length < 3) return;
     const oe = e.originalEvent; if (oe?.button > 0 || oe?.touches?.length > 1) return;
-    const h = hit(pl, e);
+    const h = hit(pl, e); ed.clickFt = ftAt(pl, e.lngLat); ed.clickOn = h?.el?.id ?? null; // (where it was clicked, and on what: Delete This Stretch takes the stretch there)
     if (oe?.shiftKey && !(h && h.h != null)) { e.preventDefault(); // Shift: a piece in or out of the set, or a box drawn on open map (Edit or not)
       drag = { type: 'box', p0: e.point, p1: e.point, moved: false, on: h?.el?.id ?? null }; // a click toggles the piece under it; a drag draws a box
       return; }
@@ -865,17 +902,20 @@ export function initSitePlan(ctx) {
     const set = sels(); // a piece of the set: the whole set moves (each with what's attached to it)
     if (h.el && h.h == null && set.length > 1 && set.includes(h.el.id)) { ed.sel = h.el.id; drag = { type: 'set', ids: T.withAttached(pl, set).map(x => x.id), id: el.id, from: ftAt(pl, e.lngLat), orig: clone(pl.elements), lead: clone(el), snap: snapshot(), moved: false }; return; }
     if (h.el && (ed.sel !== el.id || set.length > 1)) { pickOne(el.id); panel(); draw(); }
-    const t = h.hd?.t, k0 = typeof h.h === 'string' ? +h.h.slice(1) : h.h;
+    const t = h.hd?.t, k0 = typeof h.h === 'string' ? +h.h.slice(1) : h.h, snap0 = h.hd?.conv && !el.path ? snapshot() : null, pre = snap0 ? clone(el) : null; if (snap0) SP.toRoute(el, pl.ring); // an entrance drawn as an outline: a route from its first drag (one undo step with it; let go unmoved, it's put back)
+    const parts = T.isEntrance(el) ? SP.entryParts(pl, el).map(x => x.id) : null; // its median and signs: drawn again for where it ends up
     if (t === 'v' || t === 'p') { // a point of the shape (the + beside an edge adds one in the middle of it first, and drags it)
-      let k = k0; const snap = snapshot(); if (t === 'p' && el.path && !el.poly) { const P = el.path, q = P[k + 1]; P.splice(k + 1, 0, [+((P[k][0] + q[0]) / 2).toFixed(2), +((P[k][1] + q[1]) / 2).toFixed(2)]); k++; }
+      let k = k0; const snap = snap0 || snapshot(); if (t === 'p' && el.path && !el.poly) { const P = el.path, q = P[k + 1]; P.splice(k + 1, 0, [+((P[k][0] + q[0]) / 2).toFixed(2), +((P[k][1] + q[1]) / 2).toFixed(2)]); k++; }
       else if (t === 'p') { const P = el.poly, q = P[(k + 1) % P.length]; P.splice(k + 1, 0, [+((P[k][0] + q[0]) / 2).toFixed(2), +((P[k][1] + q[1]) / 2).toFixed(2)]); k++; }
-      drag = { type: 'vertex', k, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap, moved: t === 'p' }; draw(); return; }
+      drag = { type: 'vertex', k, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap, moved: t === 'p', parts, pre, soft: isNetStreet(pl, el) && ed.shape !== el.id ? netStep() : 0 }; draw(); return; }
     // a side of a rectangle or an edge of a shape: only it moves, straight out or in
     if (t === 'e' || t === 'm') { drag = { type: t === 'e' ? 'side' : 'edge', k: k0, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false }; return; }
     const hs = t === 's' ? h.hd : null;
-    drag = { type: h.h == null ? 'move' : h.h === 'r' ? 'rot' : hs ? 'scale' : 'size', k: h.h, corner: hs?.ft, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snapshot(), moved: false };
-    if (drag.type === 'rot') { drag.targets = T.turnTargets(pl, el); const f = drag.from, g = Math.atan2(f[1] - el.y, f[0] - el.x) * 180 / Math.PI - 90; drag.off = ((((el.rot || 0) - g) % 360) + 540) % 360 - 180; } // what a turn lines up with (the street, the site's edges, the buildings' faces); it turns from where the dot was grabbed
-    if (drag.type === 'move') { const att = SP.attachedTo(pl, el); drag.att = att.map(a => ({ id: a.id, orig: clone(a) })); if (el.kind === 'building' || el.kind === 'garage') drag.obs = SP.spotObstacles(pl, el, att); } // what moves with it, and what it has to stay clear of
+    drag = { type: h.h == null ? 'move' : h.h === 'r' ? 'rot' : hs ? 'scale' : 'size', k: h.h, corner: hs?.ft, id: el.id, from: ftAt(pl, e.lngLat), orig: clone(el), snap: snap0 || snapshot(), moved: false, parts, pre };
+    if (drag.type === 'rot') { if (T.isEntrance(el) || SP.isFree(el) && !faceted(el)) { drag.grp = [el, ...SP.attachedTo(pl, el)].map(clone); drag.c = SP.centroid(SP.outline(el)); } // a curved piece or an entrance turns about its middle (SP.turnPiece), what goes with it put back each time; a rectangle or a drawn outline as T.turnPiece turns it
+      drag.targets = T.turnTargets(pl, el); const f = drag.from, c0 = drag.c || [el.x, el.y], g = Math.atan2(f[1] - c0[1], f[0] - c0[0]) * 180 / Math.PI - 90; drag.off = ((((el.rot || 0) - g) % 360) + 540) % 360 - 180; } // what a turn lines up with (the street, the site's edges, the buildings' faces); it turns from where the dot was grabbed
+    if (drag.type === 'move' && T.isEntrance(el)) drag.m0 = (el.path || SP.routeOf(el, pl.ring).path)[0]; // its mouth: slides along the street
+    if (drag.type === 'move') { const att = SP.attachedTo(pl, el); drag.att = att.map(a => ({ id: a.id, orig: clone(a) })); if (el.kind === 'building' || el.kind === 'garage') drag.obs = SP.spotObstacles(pl, el, att); else if (SP.isPark(el)) drag.obs = SP.placeObs(pl, el, att, SP.shapeOf(el)); } // what moves with it, and what it has to stay clear of (a park: not what stands in it, nor more room than it has now)
   }
   // the grid, when it's on and Alt isn't held: where a point or a piece lands (a corner square with the grid, else its middle)
   const gridOf = (pl, ev) => { const V = T.viewOf(pl); return V.grid && !ev?.altKey ? { step: V.grid, a: frameAngle(pl) } : null; };
@@ -901,7 +941,9 @@ export function initSitePlan(ctx) {
     const p = ftAt(pl, e.lngLat), o = drag.orig, V = T.viewOf(pl), G = gridOf(pl, e.originalEvent); drag.moved = true;
     if (drag.type === 'vertex' && el.path && !el.poly) { // a route's point follows the pointer (on the grid when it's on); an entrance's mouth slides along the lot line
       const P = el.path, k = drag.k; let q = G ? T.snapPt(p, G.step, G.a) : p; if (k === 0 && T.isEntrance(el)) { const m = T.lotLineAt(pl.ring, q); q = m.at; if (el.mouth) el.mouth = m.mouth; }
-      P[k] = q.map(v => +v.toFixed(2)); const mid = P[Math.floor((P.length - 1) / 2)], nx = P[Math.ceil((P.length - 1) / 2)]; el.x = +((mid[0] + nx[0]) / 2).toFixed(2); el.y = +((mid[1] + nx[1]) / 2).toFixed(2); draw(); readout(el); return;
+      if (drag.soft) { const O = drag.orig.path, c = [0]; for (let i = 1; i < O.length; i++) c.push(c[i - 1] + Math.hypot(O[i][0] - O[i - 1][0], O[i][1] - O[i - 1][1])); const d = [q[0] - O[k][0], q[1] - O[k][1]]; // a network street: the points round it follow, less the farther they are (a smooth bend, its ends held unless dragged)
+        for (let i = 0; i < O.length; i++) { const f = Math.abs(c[i] - c[k]) / drag.soft, w = i === k ? 1 : (i === 0 || i === O.length - 1) ? 0 : f >= 1 ? 0 : (1 + Math.cos(Math.PI * f)) / 2; P[i] = [+(O[i][0] + d[0] * w).toFixed(2), +(O[i][1] + d[1] * w).toFixed(2)]; } }
+      else P[k] = q.map(v => +v.toFixed(2)); const mid = P[Math.floor((P.length - 1) / 2)], nx = P[Math.ceil((P.length - 1) / 2)]; el.x = +((mid[0] + nx[0]) / 2).toFixed(2); el.y = +((mid[1] + nx[1]) / 2).toFixed(2); draw(); readout(el); return;
     }
     if (drag.type === 'vertex') { // the point follows the pointer, lining up with its neighbours (within 3 ft, square to the piece) unless Alt is held; Shift: whole feet and square (or 45°) corners
       const P = el.poly, n = P.length, k = drag.k, r = (el.rot || 0), loc = q => SP.rotPt(q, -r), back = q => SP.rotPt(q, r); let q = loc(p), sq = false;
@@ -913,7 +955,8 @@ export function initSitePlan(ctx) {
     }
     if (drag.type === 'move') { // snaps to its neighbours' edges, stays out of the setbacks and (a building) off the drives and other buildings; hold Alt for a free move
       const free = e.originalEvent?.altKey, carry = () => (drag.att || []).map(a => pl.elements.find(x => x.id === a.id)).filter(Boolean);
-      if (SP.isFree(o)) { Object.assign(el, SP.moveBy(clone(o), p[0] - drag.from[0], p[1] - drag.from[1])); if (G) { const [sx, sy] = onGrid(G, el); SP.moveBy(el, sx, sy); } }
+      if (drag.m0 && !free) { const m0 = drag.m0, q = SP.lotLineAt(pl.ring, [m0[0] + p[0] - drag.from[0], m0[1] + p[1] - drag.from[1]]); Object.assign(el, SP.moveBy(clone(o), q.at[0] - m0[0], q.at[1] - m0[1])); if (el.path) { el.path[0] = q.at; el.mouth = q.mouth; } } // an entrance: its mouth slides along the street (Alt: anywhere)
+      else if (SP.isFree(o)) { Object.assign(el, SP.moveBy(clone(o), p[0] - drag.from[0], p[1] - drag.from[1])); if (G) { const [sx, sy] = onGrid(G, el); SP.moveBy(el, sx, sy); } }
       else { el.x = +(o.x + p[0] - drag.from[0]).toFixed(2); el.y = +(o.y + p[1] - drag.from[1]).toFixed(2); if (G) { const [gx, gy] = onGrid(G, el); el.x = +(el.x + gx).toFixed(2); el.y = +(el.y + gy).toFixed(2); }
         if (!free) { const [sx, sy] = SP.settleShift(pl, el, G || !V.snap ? 0 : 3); el.x = +(el.x + sx).toFixed(2); el.y = +(el.y + sy).toFixed(2); } } // lines up with its neighbours' edges unless the grid's on or edge snapping is off; always out of the setbacks
       const mv = () => { const dx = el.x - o.x, dy = el.y - o.y; for (const a of drag.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) Object.assign(t, SP.moveBy(clone(a.orig), dx, dy)); } };
@@ -944,12 +987,14 @@ export function initSitePlan(ctx) {
       const w = Math.max(8, Math.abs(q[0] - opp[0])), d = Math.max(8, Math.abs(q[1] - opp[1])), mid = [opp[0] + sx * w / 2, opp[1] + sy * d / 2], a = (o.rot || 0) * Math.PI / 180;
       Object.assign(el, { w: +w.toFixed(2), d: +d.toFixed(2), x: +(o.x + mid[0] * Math.cos(a) - mid[1] * Math.sin(a)).toFixed(2), y: +(o.y + mid[0] * Math.sin(a) + mid[1] * Math.cos(a)).toFixed(2) });
     } else { // the turn dot: Shift, 15° steps; else free to the degree, settling square to the street, a site edge or a building's face within 2° (not with Alt or edge snapping off), a guide line along it
-      const raw = Math.atan2(p[1] - o.y, p[0] - o.x) * 180 / Math.PI - 90 + (drag.off || 0), s = T.snapTurn(raw, !e.originalEvent?.altKey && V.snap ? drag.targets : [], { shift: !!e.originalEvent?.shiftKey });
-      Object.assign(el, T.turnPiece(o, s.r)); drag.turn = s;
-      const c = [o.x, o.y], R = Math.max(o.w || 0, o.d || 0) * 0.8 + 30, g = [];
+      const c0 = drag.c || [o.x, o.y], raw = Math.atan2(p[1] - c0[1], p[0] - c0[0]) * 180 / Math.PI - 90 + (drag.off || 0), s = T.snapTurn(raw, !e.originalEvent?.altKey && V.snap ? drag.targets : [], { shift: !!e.originalEvent?.shiftKey }); drag.turn = s;
+      const c = c0, R = Math.max(o.w || 0, o.d || 0) * 0.8 + 30, g = [];
       if (s.snap) { const t = s.snap.a * Math.PI / 180, u = [Math.cos(t), Math.sin(t)]; g.push({ line: [[c[0] - u[0] * R, c[1] - u[1] * R], [c[0] + u[0] * R, c[1] + u[1] * R]] }, { line: s.snap.seg }); } // through its middle along what it lines up with, and that edge
       g.push({ at: [c[0] + (p[0] - c[0]) * 1.25, c[1] + (p[1] - c[1]) * 1.25], t: degTxt(s.r) + (s.snap ? ' · square to ' + s.snap.what : '') });
       guide(g);
+      if (drag.grp) { const ids = new Set(drag.grp.map(x => x.id)); pl.elements = pl.elements.filter(x => !ids.has(x.id)).concat(drag.grp.map(clone)); const el2 = pl.elements.find(x => x.id === drag.id), d = ((s.r - (o.rot || 0)) % 360 + 540) % 360 - 180;
+        pl.elements = SP.turnPiece(pl, el2, d).elements; draw(); readout(el2); return; } // (from where it was each time: an entrance's turn is held to 60° off square)
+      Object.assign(el, T.turnPiece(o, s.r));
     }
     draw(); readout(el);
   }
@@ -963,7 +1008,7 @@ export function initSitePlan(ctx) {
       ed.undo.push(d.snap); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = []; markEdited(pl); handEdit();
       for (const id of d.ids) { const el = pl.elements.find(x => x.id === id), o = d.orig.find(x => x.id === id); if (el && o) { if (el.kind === 'parking') delete el.ext; makeRoom(el, [o]); } }
       pl.updated = new Date().toISOString(); save(P()); draw(); panel(); autoRefit('Moved', plural(sels().length, 'piece')); return; }
-    if (!d.moved) return;
+    if (!d.moved) { const el = d.pre && PL()?.elements.find(x => x.id === d.id); if (el) { for (const k of Object.keys(el)) delete el[k]; Object.assign(el, d.pre); draw(); } return; } // (an outline entrance pressed but not dragged: as it was)
     let off = false;
     { const pl0 = PL(), el0 = pl0?.elements.find(x => x.id === d.id); // dropped off the site (Alt places it anyway): back to the last clear spot on it
       if (d.type === 'move' && !d.alt && el0 && d.last && !SP.inRing(d.last, pl0.ring)) {
@@ -972,8 +1017,10 @@ export function initSitePlan(ctx) {
         put(d.good); off = true; d.blocked = false; } } // it moved to the last clear spot: saved like any other move (undo, pinned)
     ed.undo.push(d.snap); ed.redo = []; const pl = PL(), el = pl.elements.find(x => x.id === d.id); markEdited(pl); handEdit();
     if (el) { el.pinned = true; if (el.kind === 'parking') delete el.ext; /* placed by hand: this is its length now */
-      const went = d.type === 'move' ? [d.orig, ...(d.att || []).map(a => a.orig)] : [d.orig]; makeRoom(el, went);
-      for (const a of d.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) { t.pinned = true; makeRoom(t); } } }
+      const went = d.type === 'move' ? [d.orig, ...(d.att || []).map(a => a.orig)] : [d.orig]; makeRoom(el, went, !!d.alt);
+      for (const a of d.att || []) { const t = pl.elements.find(x => x.id === a.id); if (t) { t.pinned = true; makeRoom(t); } }
+      if (d.parts && (d.type === 'vertex' || d.type === 'move')) { const had = pl.elements.filter(x => d.parts.includes(x.id)), r = SP.refreshEntry(pl, el, null, had); pl.elements = r.elements; if (r.why) ctx.toast(r.why); } // an entrance's median follows its bend, its signs its mouth
+      if (d.type === 'vertex' && isNetStreet(pl, el)) carryNet(pl, el, d.orig.path, d.snap.elements); } // a street's junctions hold: the streets that meet it come along
     if (off) ctx.toast('That\'s outside the site'); else if (d.blocked) ctx.toast('No clear spot there: it overlaps a drive or another building. Hold Alt (Option) to place it anyway.');
     pl.updated = new Date().toISOString(); save(P()); draw(); panel();
     if (el && !d.blocked) autoRefit({ move: 'Moved', rot: 'Turned', vertex: 'Reshaped', edge: 'Reshaped' }[d.type] || 'Resized', ED.labelOf(el));
@@ -1025,6 +1072,8 @@ export function initSitePlan(ctx) {
       drawD(); paintMode(); return true; }
     if (ed.mode === 'parcels') { pickParcel(e.lngLat); return true; }
     if (ed.mode === 'front') { const p = ftAt(pl, e.lngLat); change(x => { x.front = SP.nearestEdge(x.ring, p); x.frontGuess = false; }); ed.mode = null; panel(); return true; }
+    if (ed.mode === 'roundabout') { ringAt(ftAt(pl, e.lngLat), true); return true; } // a roundabout at the junction clicked (one-shot, as Add Entrance)
+    if (ed.mode === 'loop') { const p = ftAt(pl, e.lngLat), b = pl.elements.find(x => loopFor(x) && SP.hitRect(x, p)); if (!b) { ctx.toast('Click a clubhouse, school, shop, hotel or office: a drop-off loop goes in front of one.'); return true; } loopAt(b); return true; }
     if (ed.mode === 'entrance') { // a driveway in from the street where the lot line was clicked
       const p = ftAt(pl, e.lngLat), k = SP.nearestEdge(pl.ring, p), d = SP.segDist(p, pl.ring[k], pl.ring[(k + 1) % pl.ring.length]);
       if (d > 60) { ctx.toast('Click on the lot line along the street, where the driveway should come in.'); return true; }
@@ -1046,15 +1095,17 @@ export function initSitePlan(ctx) {
     if (ed?.mode === 'drawpiece') { e.preventDefault(); finishPiece(); return; }
     if (ed?.mode === 'measure') { e.preventDefault(); finishMeasure(); return; }
     const pl = ed?.editing && PL(); if (!pl || pl.ring.length < 3) return; e.preventDefault(); // editing: a double-click never zooms
-    const h = hit(pl, e), sh = ed.shape && pl.elements.find(x => x.id === ed.shape);
-    if (h?.hd?.t === 'v' && sh?.path && !sh.poly) { if (sh.path.length <= 2) { ctx.toast('A drive needs two points.'); return; }
+    // (an entrance shows its route's points without Edit Shape; one drawn as an outline is read as its route, so the
+    // point is a route point: never one of its outline's, a curb flare)
+    const h = hit(pl, e), ent = h?.hd?.t === 'v' && pl.elements.find(x => x.id === ed.sel && T.isEntrance(x)), sh = ent || ed.shape && pl.elements.find(x => x.id === ed.shape);
+    if (h?.hd?.t === 'v' && (ent || sh?.path && !sh.poly)) { const P = sh.path && !sh.poly ? sh.path : SP.routeOf(sh, pl.ring).path; if (P.length <= 2) { ctx.toast('A drive needs two points.'); return; }
       const k = +h.h.slice(1); if (k === 0 && T.isEntrance(sh)) { ctx.toast('That’s where the entrance meets the street: drag it along the lot line instead.'); return; }
-      change(() => { sh.path.splice(k, 1); }); draw(); autoRefit('Reshaped', ED.labelOf(sh)); return; }
+      change(x => { SP.toRoute(sh, pl.ring); const was = sh.path.map(q => q.slice()), els0 = clone(x.elements); sh.path.splice(k, 1); if (isNetStreet(x, sh)) carryNet(x, sh, was, els0); }); draw(); autoRefit('Reshaped', ED.labelOf(sh)); return; }
     if (h?.hd?.t === 'v' && sh?.poly) { if (sh.poly.length <= 3) { ctx.toast('A shape needs at least three points.'); return; } // a point removed
       change(() => { sh.poly.splice(+h.h.slice(1), 1); const c = SP.centroid(sh.poly); sh.x = +c[0].toFixed(2); sh.y = +c[1].toFixed(2); }); draw(); autoRefit('Reshaped', ED.labelOf(sh)); return; }
     // on a drive: a bend there (the drive under the pointer wins over an outline a few pixels away, unless that outline
     // is the one being shaped); on or near a building's outline: a point there
-    const on = h?.el || (h?.h != null ? pl.elements.find(x => x.id === ed.sel) : null), near = nearOutline(pl, e), dr = on && T.routeable(on) && T.editable(T.viewOf(pl), on) ? on : null, /* (a narrow aisle's side bar sits on its middle) */ el = near && (near.id === ed.shape || !dr) ? near : dr;
+    const on = h?.el || (h?.h != null ? pl.elements.find(x => x.id === ed.sel) : null), near = nearOutline(pl, e), dr = on && T.routeable(on) && !(isNetStreet(pl, on) && ed.shape !== on.id) && T.editable(T.viewOf(pl), on) ? on : null, /* (a network street bends by its handles: Edit Shape for every point) */ /* (a narrow aisle's side bar sits on its middle) */ el = near && (near.id === ed.shape || !dr) ? near : dr;
     if (el) addPointAt(el, ftAt(pl, e.lngLat));
   });
   // the piece whose outline is under the pointer (within a few pixels): the selected one first, then any whose shape can be edited
@@ -1161,6 +1212,7 @@ export function initSitePlan(ctx) {
         if (M.kind === 'dist' && Q.length > 1) pt(Q[Q.length - 1], { k: 'mtot', t: 'Total ' + T.fmtFt(T.pathLen(Q)) });
         if (M.kind === 'area' && Q.length >= 3) pt(SP.centroid(Q), { k: 'mtot', t: T.fmtArea(T.polyArea(Q)) });
       }
+      if (ed.mode === 'roundabout' && pl.ring.length >= 3) for (const at of SP.ringSpots(pl)) { const c = SP.ringDisc(at, 24, 24); line(c.concat([c[0]]), { rb: 1 }); } // where one can go: a small dashed circle at each street junction with room (nothing built in the way)
       if (ed.hover != null && (ed.mode === 'front' || ed.mode === 'street') && pl.ring.length >= 3) line([pl.ring[ed.hover], pl.ring[(ed.hover + 1) % pl.ring.length]].filter(Boolean), { hv: 1 });
       if (ed.guide && drag) for (const g of ed.guide) { if (g.line) line(g.line, { rb: 1 }); else if (g.at) pt(g.at, { k: 'mlab', t: g.t, r: g.r || 0 }); } // a drag's guide line and live labels (along the face they measure)
     }
@@ -1315,7 +1367,7 @@ export function initSitePlan(ctx) {
         const pl = PL(), mc = map.getContainer(), r = mc.getBoundingClientRect(), t = document.elementFromPoint(x, y);
         spot = null; ghost.classList.remove('on', 'off'); if (!pl || !t || !t.classList.contains('maplibregl-canvas')) { chip.classList.remove('on'); return; }
         const F = SP.frame(pl.origin), at = F.toFt(map.unproject([x - r.left, y - r.top]).toArray()), inSite = SP.inRing(at, pl.ring), { rot } = addAt(pl, at), [w, d] = addSize(pl, kind);
-        const pts = SP.outline({ kind: kind === 'pad' ? 'building' : kind, x: at[0], y: at[1], w, d, rot }).map(q => { const p = map.project(F.toLL(q)); return (p.x + r.left).toFixed(1) + ',' + (p.y + r.top).toFixed(1); });
+        const pts = SP.outline({ kind: kind === 'pad' ? 'building' : kind, x: at[0], y: at[1], w, d, rot, ...(kind === 'roundabout' ? { shape: 'circle' } : {}) }).map(q => { const p = map.project(F.toLL(q)); return (p.x + r.left).toFixed(1) + ',' + (p.y + r.top).toFixed(1); });
         ghost.firstChild.setAttribute('points', pts.join(' ')); ghost.classList.add(inSite ? 'on' : 'off'); chip.classList.add('on'); spot = { at, inSite };
       };
       const move = e => { if (e.pointerId !== e0.pointerId) return; if (!on) { if (Math.hypot(e.clientX - x0, e.clientY - y0) < 6) return; start(); } e.preventDefault(); place(e.clientX, e.clientY); };
@@ -1490,7 +1542,7 @@ export function initSitePlan(ctx) {
       it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); if (rc) it('pin', pins ? 'Let them move' : 'Pin them', '', { tip: pins ? 'Re-fitting may move them again' : 'Re-fitting keeps them where they are' }); sep(); it('fitsel', 'Fit selection', 'F'); }
     else if (el) { const nm = ED.labelOf(el), kl = SP.KINDS[el.kind]?.label || ''; head = nm + (kl && !nm.toLowerCase().includes(kl.toLowerCase()) ? ' · ' + kl.toLowerCase() : '');
       if (el.kind === 'building') { it('use', 'Change use', '', { sub: 1 }); sep(); } // retail, office, restaurant…: its parking need follows
-      it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); if (!SP.isFree(el) || el.poly) it('turn', 'Turn 90°', 'R');
+      it('dup', 'Duplicate', MOD + 'D'); it('copy', 'Copy', MOD + 'C'); it('del', 'Delete', 'Del'); it('turn', T.isEntrance(el) ? 'Turn 15°' : 'Turn 90°', 'R');
       if (el.kind === 'parking') { sep(); it('stalldir', 'Stall direction', '', { tip: 'Turn the stalls 90° inside the same outline' }); it('faceb', 'Face the building', '', { tip: 'Turn the stalls toward the nearest building face' }); }
       if (SHAPEABLE.includes(el.kind) || T.routeable(el)) { sep(); it('shape', ed.shape === el.id ? 'Done shaping' : T.routeable(el) ? 'Bend it (edit shape)' : 'Edit shape'); it('addpt', 'Add point here', 'Double-click'); }
       if (rc) { sep(); it('pin', el.pinned ? 'Let it move' : 'Pin it', '', { tip: el.pinned ? 'Re-fitting may move it again' : 'Re-fitting keeps it where it is' }); }
@@ -1653,7 +1705,7 @@ export function initSitePlan(ctx) {
   }
   // Copy (⌘C, or the menu): the piece or the set, with what's attached, kept for Paste; Paste puts copies centred where
   // you right-clicked (⌘V: the middle of the view), settled in the nearest clear spot, picked. One undo step.
-  function copySel() { const pl = PL(), ids = sels(); if (!pl || !ids.length) return; clip = clone(T.withAttached(pl, ids)); const lead = pl.elements.find(e => e.id === ids[0]);
+  function copySel() { const pl = PL(), ids = sels(); if (!pl || !ids.length) return; if (ownPiece(pl, ids)) return; clip = clone(T.withAttached(pl, ids)); const lead = pl.elements.find(e => e.id === ids[0]);
     ctx.toast('Copied ' + (ids.length > 1 ? plural(ids.length, 'piece') : ED.labelOf(lead)) + ' · right-click open ground to paste it there (' + MOD + 'V pastes in the middle of the view).'); }
   function pasteAt(ft) {
     const pl = PL(); if (!pl || !clip?.length) return; ensureEdit(); const at = ft || addAt(pl).at, copies = T.copiesAt(clip, at, uid), lead = copies.find(c => ['building', 'garage'].includes(c.kind)) || copies[0];
@@ -1724,7 +1776,7 @@ export function initSitePlan(ctx) {
     if (mv) { used(); const dx = step * (mv[0] * Math.cos(a) - mv[1] * Math.sin(a)), dy = step * (mv[0] * Math.sin(a) + mv[1] * Math.cos(a));
       if (set.length > 1) { change(x => { const before = clone(x.elements.filter(q => set.includes(q.id))); x.elements = T.moveSet(x, set, dx, dy).elements; ed.nudged = [...(ed.nudged || []), ...before].slice(-24); }, true); refitSoon('Moved', plural(set.length, 'piece')); return; } // the set, each with what's attached
       const pl0 = PL(), att = pl0 ? SP.attachedTo(pl0, el) : []; change(() => { ed.nudged = [...(ed.nudged || []), clone(el), ...att.map(clone)].slice(-12); for (const t of [el, ...att]) { SP.moveBy(t, dx, dy); t.pinned = true; } }, true); refitSoon('Moved', ED.labelOf(el)); return; } // what belongs to it moves too; a burst of nudges re-fits once, after the last
-    if ((k === 'r' || k === 'R') && set.length === 1 && (!SP.isFree(el) || el.poly)) { used(); turnEl(el); }
+    if ((k === 'r' || k === 'R') && set.length === 1) { used(); turnEl(el, (T.isEntrance(el) ? 15 : 90) * (e.shiftKey ? -1 : 1)); }
   }, true);
 
   // Esc steps back one thing at a time and never closes the plan (× or Done does): a pop-over from the tool strip →
@@ -1763,12 +1815,18 @@ export function initSitePlan(ctx) {
   const twoPhase = (m, m1) => !!m1 || !!(m?.p1 && (m.p1.need !== m.required || m.p1.stalls !== m.spaces));
   const OK_IC = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>';
   const BAD_IC = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><path d="M8 4.8v3.8"/><circle cx="8" cy="11.2" r=".3" fill="currentColor"/></svg>';
+  // the plan's checks, and on a neighbourhood with subdivision streets the street rules it breaks (a block or cul-de-sac
+  // too long, junctions too close: warnings, kept while its drives are as they were: a street bent, moved, added or
+  // deleted by hand, in place or not, gets its warnings again)
+  const netSig = pl => pl.elements.filter(e => e.kind === 'drive').map(e => e.id + ':' + (e.name || '') + ':' + (e.width || '') + ':' + (e.path || e.poly || [e.x, e.y, e.w, e.d, e.rot]).join(';')).join('|');
+  let netMemo = null; const checkAll = pl => { const base = GC(pl), code = pl.params?.code, homes = code ? pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr') : []; if (!pl.recipe?.net && !homes.length) return base; // (homes on parallel streets under a rule sheet: its checks too)
+    const k = netSig(pl) + '|' + (code?.updated || '') + '|' + pl.elements.length + '|' + homes.map(h => Math.round(h.x) + ',' + Math.round(h.y)).join(';'); if (netMemo?.k !== k) { let w; try { w = pl.recipe?.net ? netRules(pl) : codeRules(pl); } catch (e) { w = []; } netMemo = { k, w }; } return base.concat(netMemo.w); }; // (a rule sheet's checks read the lots and homes too)
   // the dark summary under the header: which layout is on the map, then Phase 1 first, parking for what was asked for,
   // coverage and the money, and whether it passes. A kicker only for a real status (building) or the first step.
   function overview(pl, prog) {
     if (!SP.hasDesign(pl) && ed.run?.kind === 'build') return '<div class="kicker">Building…</div><div class="sp-ov-msg"><b>Laying out “' + esc(ed.run.ask) + '”</b><span>The layouts appear here as soon as they’re drawn.</span></div>';
     if (!SP.hasDesign(pl)) return '<div class="kicker">Step 1 of 3</div><div class="sp-ov-msg"><b>Describe what to build</b><span>Type it under Build, then Build Layouts, or <button type="button" class="sp-link sp-quiet" data-jump="spDrawSec">add pieces by hand</button>.</span></div>';
-    const m = GM(pl), issues = GC(pl), cl = K.checkLabel(K.checksOf(issues, m), { waller: GON(pl) }), ph = pl.elements.some(e => e.phase === 2);
+    const m = GM(pl), issues = checkAll(pl), cl = K.checkLabel(K.checksOf(issues, m), { waller: GON(pl) }), ph = pl.elements.some(e => e.phase === 2);
     const m1 = ph ? GM({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, h = K.headline(m, m1, K.askedOf(prog)), pk = parkOf(m, m1), whole = twoPhase(m, m1);
     let f = null; try { f = RUN.finOf(pfRun(P(), pl)); } catch (e) { f = null; }
     const v = pl.variant, neg = x => x != null && x < 0 ? ' class="neg"' : '', d = f ? K.moneyDigits([f.cost, f.value]) : 1, arr = v ? RUN.baseName(v.name) : 'Drawn by hand';
@@ -1821,7 +1879,7 @@ export function initSitePlan(ctx) {
   // icons for the Site section's buttons and the library picker
   const SI = {
     parcels: IC('<path d="M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z"/><path d="M8.5 2.5h5v5M2.5 8.5v5h5" stroke-dasharray="1.5 1.5"/>'), front: IC('<path d="M1.5 12.5h13"/><path d="M5 9.5l3-3 3 3M8 6.5v-4"/>'),
-    street: IC('<path d="M3.5 1.5v13M3.5 12.5h11"/><path d="M7 9h4.5M7 5.5h4.5" stroke-dasharray="1.5 1.5"/>'), entr: IC('<path d="M1.5 13.5h13"/><path d="M8 13.5V4M5 7l3-3 3 3"/>'), redraw: IC('<path d="M2.5 11.5l2-8 8 2-1.5 7.5z" stroke-dasharray="2 1.6"/><path d="M9 13.5l4.5-4.5"/>'),
+    street: IC('<path d="M3.5 1.5v13M3.5 12.5h11"/><path d="M7 9h4.5M7 5.5h4.5" stroke-dasharray="1.5 1.5"/>'), entr: IC('<path d="M1.5 13.5h13"/><path d="M8 13.5V4M5 7l3-3 3 3"/>'), ring: IC('<circle cx="8" cy="8" r="4.2"/><circle cx="8" cy="8" r="1.4"/><path d="M8 1.5v2.3M8 12.2v2.3M1.5 8h2.3"/>'), redraw: IC('<path d="M2.5 11.5l2-8 8 2-1.5 7.5z" stroke-dasharray="2 1.6"/><path d="M9 13.5l4.5-4.5"/>'),
     find: IC('<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3.5 3.5"/>')
   };
   function panel() {
@@ -1839,7 +1897,7 @@ export function initSitePlan(ctx) {
       spDrawSite: () => '<div class="bsec sp-draw" id="spDrawSite"><div class="lt">Draw the site</div><p>Click each corner of the site on the map; click the first corner again, double-click or press Enter to finish.' + (ed.draft.length ? ' <b>' + plural(ed.draft.length, 'corner') + ' so far.</b>' : '') + '</p><div class="sp-row"><button type="button" class="btn sm primary" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button type="button" class="btn sm" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button type="button" class="btn sm ghost" id="spCancelDraw">Keep the Old Site</button>') + (ed.draftPlan ? '<button type="button" class="btn sm ghost" id="spCancelDraft" title="Throw the drawing away; no option is added">Cancel</button>' : '') + '</div></div>',
       spSel: () => '<div class="bsec" id="spSel">' + selHtml(sel, prog) + '</div>',
       spLayouts: () => '<div class="bsec" id="spLayouts">' + layoutsHead() + '<div id="spVariants">' + variantsHtml() + '</div></div>',
-      spChgSec: () => '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change with AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Building A two stories · remove Bldg 3 · swap Bldg 2 and Bldg 5">' + esc(ed.chg || '') + '</textarea>' +
+      spChgSec: () => '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change with AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Building A two stories · remove Bldg 3 · all the apartments 3 stories · no 3-story homes">' + esc(ed.chg || '') + '</textarea>' +
         (sel ? '<div class="rnote">About <b>' + esc(ED.labelOf(sel)) + '</b> (selected), or name any piece as it’s labelled.</div>' : '') +
         '<div class="sp-go2"><button type="button" class="btn askai" id="spChgGo">Make Changes</button>' + (pl.recipe ? tog('id="spChgFit"', 'Re-fit the rest of the site', ed.chgFit, { tip: 'Lay the rest of the site out again around the changes; off, only those pieces change' }) : '') + '</div>' +
         chgHtml(pl) + '</div>',
@@ -1904,11 +1962,11 @@ export function initSitePlan(ctx) {
     on('#spEdit', () => { ed.editing = !ed.editing; draw(); panel(); });
     on('#spFront', () => { ed.mode = ed.mode === 'front' ? null : 'front'; panel(); });
     on('#spStreet', () => { ed.mode = ed.mode === 'street' ? null : 'street'; panel(); });
-    on('#spEntr', () => { ed.mode = ed.mode === 'entrance' ? null : 'entrance'; panel(); }); // the pill on the map says what to do
+    on('#spEntr', () => { ed.mode = ed.mode === 'entrance' ? null : 'entrance'; panel(); }); on('#spRing', () => { ed.mode = ed.mode === 'roundabout' ? null : 'roundabout'; if (ed.mode) ed.editing = true; draw(); panel(); }); // the pill on the map says what to do
     on('#spRedraw', () => { ed.mode = 'draw'; ed.draft = []; ed.sel = null; draw(); panel(); });
     on('#spParcels', () => { ed.mode = ed.mode === 'parcels' ? null : 'parcels'; ed.sel = null; draw(); panel(); });
     card.querySelectorAll('[data-rmp]').forEach(b => b.onclick = () => { const keys = (pl.parcels || []).filter(k => k !== b.dataset.rmp); if (keys.length) setParcels(keys); });
-    wireParams(pl); wirePf(p, pl);
+    wireParams(pl); wireRules(); wirePf(p, pl);
     wireSel(sel);
     on('#spPdf', () => exportPdf(p, pl, card.querySelector('#spSheet').value));
     wireRender(p, pl);
@@ -2034,7 +2092,7 @@ export function initSitePlan(ctx) {
     return '<div class="bsec" id="spSiteSec"><div class="lt">Site<span class="src">' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' ac' + head + '</span></div>' +
       '<div class="sp-g2">' + b('spParcels', 'parcels', on ? 'Done With Parcels' : 'Change Parcels', 'Click parcels on the map to add them to the site (up to ' + MAXP + ') or take them out', on) +
         b('spFront', 'front', 'Street Side', 'Then click the lot line along the street; front setbacks and drives follow it', ed.mode === 'front') + b('spStreet', 'street', 'Side Street', 'A second street along the lot (a corner lot): click its lot line to add it, or again to remove it', ed.mode === 'street') +
-        b('spEntr', 'entr', 'Add Entrance', 'A driveway in from the street: click the lot line where it should come in; it runs straight in to the nearest drive', ed.mode === 'entrance') + b('spRedraw', 'redraw', 'Redraw Site', 'Draw the site’s outline again, corner by corner') + '</div>' +
+        b('spEntr', 'entr', 'Add Entrance', 'A driveway in from the street: click the lot line where it should come in; it runs straight in to the nearest drive', ed.mode === 'entrance') + b('spRing', 'ring', 'Add Roundabout', 'A ring with a planted island where streets meet: click a junction (the small circles); the streets are cut back to it and the homes in its way make way', ed.mode === 'roundabout') + b('spRedraw', 'redraw', 'Redraw Site', 'Draw the site’s outline again, corner by corner') + '</div>' +
       (recs.length > 1 ? '<div class="sp-parcels">' + recs.map(r => { const off = out.includes(r); return '<span class="chip' + (off ? ' sp-off' : '') + '" title="' + esc(off ? r.label + ': not part of the site (' + why(r) + ')' : r.label) + '"><span>' + esc(r.label) + (r.acres ? ' · ' + r.acres.toFixed(2) + ' ac' : '') + '</span><button type="button" class="sp-x" data-rmp="' + esc(r.key) + '" aria-label="Remove ' + esc(r.label) + ' from the site">×</button></span>'; }).join('') + '</div>' : '') +
       (pl.src !== 'drawn' && left > 0 ? '<div class="rnote sp-warn">' + (left === 1 ? 'A parcel doesn’t' : left + ' parcels don’t') + ' touch the rest (a road or a gap wider than 6 ft between them), so ' + (left === 1 ? 'it’s' : 'they’re') + ' left out of the site.</div>' : '') +
       (pl.src !== 'drawn' && noGeom ? '<div class="rnote sp-warn">' + noGeom + ' of the parcels ' + (noGeom === 1 ? 'has' : 'have') + ' no outline from the county and ' + (noGeom === 1 ? 'is' : 'are') + ' left out.</div>' : '') +
@@ -2061,15 +2119,27 @@ export function initSitePlan(ctx) {
     // only the settings the plan's uses (its zones too) read: the building shape for shops, offices and apartments, the
     // apartment bars' depth, length and spacing for apartments, curving streets for single-family homes
     const uses = SP.usesOf(prog), has = list => list.some(x => uses.includes(x)), only = { sfr: uses.length === 1 && uses[0] === 'sfr' };
-    const bldg = (has(SP.FORM_USES) ? pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) : '') + (has(['sfr']) ? pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Curving'], ['straight', 'Straight']]) : '') +
+    const bldg = (has(SP.FORM_USES) ? pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) : '') + (has(['sfr']) ? pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Like a subdivision, and gentle curves (best first)'], ['network', 'Like a subdivision: loops and cul-de-sacs'], ['wave', 'Parallel, gently curving'], ['straight', 'Straight']]) + '<div class="sp-hint w2">Subdivision streets follow the site: a loop road one lot in from the edge or a main street, curved local streets meeting it at T’s, cul-de-sacs where land is left. They follow the place’s rule sheet (Street rules, below), else typical values (blocks up to 1,400 ft, cul-de-sacs up to 800 ft).</div>' + namesHtml(pl) : '') +
       (has(['multifamily']) ? num('pp-bldgDepth', 'Apartment depth', pp.bldgDepth, 1, 'ft') + num('pp-maxLen', 'Longest building', pp.maxLen, 10, 'ft') + num('pp-bldgGap', 'Space between', pp.bldgGap, 1, 'ft') : '');
+    // names: the community's and each part's (no re-solve: they change the labels, not the layout)
+    const parts = SP.partsOf({ ...pl, program: prog }, false), nmIn = (k, label, v, ph) => fld(label, '<input type="text" maxlength="60" data-nm="' + k + '" value="' + esc(v || '') + '" placeholder="' + esc(ph) + '">', { wide: true });
+    const names = grp('Names', nmIn('community', 'Community name', prog.community, 'e.g. Beacon Hill') + parts.map(q => nmIn(q.i, q.word + ' name', q.name, parts.length > 1 ? q.word : 'e.g. The Reserve at Beacon Hill')).join(''), infoBtn('The community’s name goes on the map, the monument sign and the PDF sheet; each part’s name over its zone and in Numbers. Suggest Names asks the AI for names that fit the place.', 'About names')) +
+      '<div class="sp-prm-a"><button type="button" class="btn sm" id="spNameAsk">Suggest Names</button></div>' + (ed.nameChoices?.length ? '<div class="sp-names" role="group" aria-label="Suggested names">' + ed.nameChoices.map((c, i) => '<button type="button" class="btn sm ghost" data-nmc="' + i + '" title="' + esc(c.why || '') + '">' + esc([c.community, ...c.parts.map(x => x.name)].filter((v, j, a) => a.indexOf(v) === j).join(' · ')) + '</button>').join('') + (ed.nameNote ? '<div class="rnote">' + esc(ed.nameNote) + '</div>' : '') + '</div>' : '');
+    // the way in: a boulevard (two lanes and a planted median) for homes, apartments and mixed plans, its monument sign, and where entrances may go
+    const er = SP.entryRules({ params: pp }), entry = has(['multifamily', 'townhomes', 'duplex', 'sfr']) || prog.zones ? grp('Entrance', fld('Entry', selCtl('data-ps="entry.style"', [['auto', 'Boulevard where it fits'], ['boulevard', 'Always a boulevard'], ['narrow', 'Driveway with a small median'], ['driveway', 'Plain driveway']], er.style)) +
+      num('ps-entry.lane', 'Lane width', er.lane, 1, 'ft', { hint: 'each way' }) + num('ps-entry.median', 'Median', er.median, 1, 'ft') + fld('Monument sign', selCtl('data-ps="entry.sign"', [['median', 'In the median'], ['both', 'Both corners'], ['one', 'One corner'], ['none', 'None']], er.sign)) +
+      num('ps-entry.corner', 'Corner clearance', er.corner, 10, 'ft') + num('ps-entry.spacing', 'Driveway spacing', er.spacing, 10, 'ft') + num('ps-entry.cross', 'First cross street', er.cross, 10, 'ft', { hint: 'in from the street' }), infoBtn('Typical starting values; the city’s or county’s rules set the real ones. Boulevard where it fits: a full boulevard unless it would cost more than 2% of the homes or floor area (the notes say what it would cost).', 'About entrances')) : '';
+    // a mixed site of several uses: pods (each use its own piece and street direction) or bands from the street back; the
+    // row only where pods can be laid (homes or apartments among two or more built uses, 15 acres and up, no garage,
+    // warehouse, storage, fuel or food trucks)
+    const mixed = prog.zones && wantPods({ ring: pl.ring, params: { ...(pl.params || {}), mixStyle: 'pods' } }, prog) ? grp('Mixed sites', pick('mixStyle', 'Layout style', pp.mixStyle || 'auto', [['auto', 'Pods and bands (best first)'], ['pods', 'Pods round a loop road'], ['bands', 'Bands from the street back']]), infoBtn('Pods give each use its own piece of the site and its own street direction, placed as the request says (retail at the corner, homes round the lake); bands stack the uses from the street back. Pods are tried on mixed sites of 40 acres or more, or when the request places a use at a corner, along a road, beside, between or round another.', 'About the layout styles')) : '';
     const look = grp('Look', sw('trees', 'Trees', pp.trees !== false, 'Trees on the plan, the map and the PDF') + pick('ponds', 'Ponds and pools', pp.style.ponds, [['organic', 'Natural curves'], ['rounded', 'Rounded rectangles'], ['square', 'Rectangles']]) +
       pick('islands', 'Parking row ends', pp.style.islands, [['rounded', 'Rounded islands'], ['square', 'Square']]) + pick('corners', 'Drive corners', pp.style.corners, [['curved', 'Curved'], ['square', 'Square']]));
     return '<details class="bsec sp-prog" id="spParams"' + (ed.progOpen ? ' open' : '') + '><summary class="lt">Site parameters</summary>' +
       '<div class="sp-prm-a"><button type="button" class="btn sm" id="spResolve"' + (pl.recipe || ed.variants ? '' : ' disabled') + ' title="Lays the layouts out again with these settings. It replaces the layout on the map, including any changes you made by hand (Undo brings them back).">New Layouts From These Settings</button></div>' +
       '<div class="sp-tgs">' + sw('auto', 'Update layouts as I change settings', ed.autoSolve !== false, 'New layouts each time a setting changes, never over a layout you’ve edited') + sw('refit', 'Re-fit the site after each edit', pl.view?.autoRefit !== false, 'After you move, resize or add a piece, the rest of the site is laid out again around it') + '</div>' +
       (ed.solveBar ? '<div class="sp-solvebar" id="spSolveBar" role="status"><b>Settings changed.</b> The layout on the map has your edits, so it wasn’t replaced.<span class="btnrow">' + (pl.recipe ? '<button type="button" class="btn sm primary" id="spRefitMine" title="Lay out everything else again with these settings, keeping the pieces you placed">Re-fit around my changes</button>' : '') + '<button type="button" class="btn sm" id="spNewLay" title="New layouts from these settings; the layout on the map, with your changes, is replaced (Undo brings it back)">New layouts (replaces your edits)</button></span></div>' : '') +
-      guardParams(pl) +
+      names + guardParams(pl) +
       grp('Program', fld('Use', '<select id="spUse">' + Object.entries(SP.USES).map(([k, x]) => '<option value="' + k + '"' + (k === u ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select>') +
         (u === 'storage' ? storageFields(prog) : u === 'foodtrucks' ? foodTruckFields(prog) : u === 'fuel' ? fuelFields(prog) : u === 'multifamily' ? num('perUnit', 'Parking', prog.perUnit, 0.05, '/ unit') + num('floors', 'Floors', prog.floors, 1) + num('eff', 'Efficiency', prog.eff, 0.01, '', { hint: 'net ÷ gross' })
           : SP.USES[u]?.garage ? num('perUnit', 'Parking', prog.perUnit, 0.25, '/ home') : num('ratio', 'Parking', prog.ratio, 0.1, '/ 1k sf') + num('floors', 'Floors', prog.floors, 1) + num('depth', 'Building depth', prog.depth, 5, 'ft')) +
@@ -2078,9 +2148,99 @@ export function initSitePlan(ctx) {
       grp('Setbacks', sw('buildOn', 'Building setbacks', sb.buildOn !== false) + sw('paveOn', 'Landscape buffer', sb.paveOn !== false) +
         [['front', 'paveFront', 'Front'], ['side', 'paveSide', 'Side'], ['rear', 'paveRear', 'Rear']].map(([k, b, l]) => num('sb-' + k, l + ' setback', sb[k], 1, 'ft') + num('sb-' + b, l + ' buffer', sb[b] ?? sb.paving, 1, 'ft')).join('')) +
       (only.sfr ? '' : grp('Parking', num('pp-stallW', 'Stall width', pp.stallW, 0.5, 'ft') + num('pp-stallD', 'Stall depth', pp.stallD, 0.5, 'ft') + num('pp-aisle', 'Drive aisle', pp.aisle, 1, 'ft'))) +
-      (bldg ? grp('Buildings', bldg) : '') +
+      (bldg ? grp('Buildings', bldg) : '') + entry + rulesHtml(pl, prog, has(['sfr']) || !!pl.recipe?.net) + mixed +
       stormHtml(pl, prog, pp, uses) + mix + storageMixes(prog) + homes + look + '</details>';
   }
+  // ----- street rules by location (lib/rulesheet.mjs): the place's rule sheet, read by the AI from the codes, shared with
+  // the team (src/rulesheets.js), each value with its source; Unsure values and Waller defaults standing in wait for a person
+  // to confirm, and layouts can be built meanwhile (they say so). Never a compliance claim.
+  const whoName = () => get(NAME_KEY) || 'someone on this device', day = t => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const jurOf = (p, f = factsOf(p)) => f?.county ? RSL.jurisdictionOf(f, p.rules?.etj ? { city: p.rules.etj.city, decided: p.rules.etj.decided } : null) : null;
+  const sheetOf = (p, pl) => { const k = pl.params?.code?.key || p.rules?.key || jurOf(p)?.key; return k ? RS.get(k) : null; }; // the sheet the plan follows, else the one for its place
+  function rulesHtml(pl, prog, full) {
+    const p = P(), code = pl.params?.code, sh = sheetOf(p, pl), jur = jurOf(p), busy = !!ed.rulesBusy, rs = RS.status(), use = code ? sh && sh.key === code.key ? sh : null : null, team = !code && sh && !RSL.old(sh) ? sh : null;
+    const fl = use ? RSL.flagged(use) : code?.flagged || [], who = (code?.name || jur?.name || 'This place');
+    const head = code ? esc(code.name) + ' · read ' + day(use?.at || code.at) + (use?.by ? ' by ' + esc(use.by) : '') + ' · ' + (fl.length ? plural(fl.length, 'value') + ' to confirm' : 'every value read or confirmed') : 'No rule sheet: typical values' + (jur ? ' (' + esc(jur.name) + ')' : '');
+    const btn = busy ? '<span class="rnote loading">Reading ' + esc(who.replace(/^City of /, '')) + '’s rules…</span><button type="button" class="btn sm ghost" id="spRulesStop">Cancel</button>'
+      : aiOff() ? '<span class="rnote">AI isn’t set up on this site: Waller County’s rules can be used as defaults.</span><button type="button" class="btn sm" id="spRulesWaller">Use Waller Defaults</button>'
+      : '<button type="button" class="btn sm" id="spRulesRead" title="The AI reads the subdivision rules and the drainage criteria for this place, each value with its source (a minute or two)">' + (code || sh ? 'Refresh' : 'Read the Local Rules') + '</button>';
+    const notice = team ? '<div class="sp-pin"><span class="rnote">The team has a ' + esc(team.name) + ' rule sheet' + (!p.rules?.key && team.kind === 'county' ? ' (whether this site is in a city’s ETJ hasn’t been checked: Read the Local Rules does)' : '') + '.</span><button type="button" class="btn sm" id="spRulesUse">Use It</button></div>' : use && Date.parse(use.updated) > Date.parse(code.updated || 0) ? '<div class="sp-pin"><span class="rnote">The team updated these rules.</span><button type="button" class="btn sm" id="spRulesUse">Use the Update</button></div>' : '';
+    const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
+    const chip = (k, x) => !x ? '' : x.ok ? '<span class="sp-rchip ok">' + (x.from === 'hand' ? 'Edited' : '✓ Confirmed') + ' by ' + esc(x.ok.by || 'someone') + '</span>' : x.from === 'waller' && use.key !== RSL.WALLER.key ? '<span class="sp-rchip">Waller default</span><button type="button" class="btn sm ghost" data-rok="' + k + '">Confirm</button>' : !x.sure ? '<span class="sp-rchip">Unsure</span><button type="button" class="btn sm ghost" data-rok="' + k + '">Confirm</button>' : '';
+    const ctl = (f, v) => f.choice ? '<select data-rk="' + f.k + '" aria-label="' + esc(f.label) + '">' + f.choice.map(c => '<option value="' + c + '"' + (c === v ? ' selected' : '') + '>' + RSL.valueText(f.k, c) + '</option>').join('') + '</select>' : numCtl('min="' + f.lo + '" max="' + f.hi + '" data-rk="' + f.k + '" aria-label="' + esc(f.label) + '"', v, f.unit === 'ac-ft/ac' ? 0.01 : f.unit === 'sf' ? 100 : 1, f.unit);
+    const rows = use ? RSL.FIELDS.filter(f => full || f.k === 'detention').map(f => { const x = use.values[f.k]; return '<div class="sp-rrow"><span class="sp-rl">' + esc(f.label) + '</span>' + ctl(f, x?.v) + '<span class="sp-rs">' + (x?.url ? '<a href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc([x.cite, x.quote && '“' + x.quote + '”'].filter(Boolean).join(' · ')) + '">' + esc(host(x.url)) + '</a>' : x?.was?.url ? '<span title="' + esc(x.was.cite || '') + '">was ' + esc(host(x.was.url)) + '</span>' : '') + chip(f.k, x) + '</span></div>'; }).join('')
+      : code ? '<div class="rnote">' + esc(RSL.rulesLine(code)) + ' The sheet itself isn’t on this device yet.</div>' : '';
+    const e = use?.etj, etj = use && use.kind !== 'city' && e ? '<div class="rnote">' + (e.decided === 'in' ? 'In ' + esc(e.city) + '’s ETJ' : e.decided === 'out' ? 'Not in a city’s ETJ' : 'ETJ not settled') + ' (the AI’s reading' + (e.why ? ': ' + esc(e.why) : '') + '; confirm)</div>' : '';
+    const where = rs.shared ? 'Shared with your team' : rs.shared === false ? 'On this device only' : 'Saved on this device; sharing with the team…';
+    return '<div class="sp-rules" id="spRules"><div class="sp-sub">Street rules' + infoBtn('The AI reads this place’s subdivision rules and drainage criteria (the city’s, the county’s, a city’s ETJ, a drainage district’s), each value with its source. Values it isn’t sure of, and Waller County defaults standing in for rules it couldn’t find, are marked for someone to confirm. The street layouts, the entries, the sidewalks and the detention follow the sheet; the checks say what a plan breaks. It is the AI’s reading of the code, not a compliance check.', 'About street rules') + '</div>' +
+      '<div class="rnote sp-1l" title="' + head.replace(/<[^>]+>/g, '') + '">' + head + '</div>' + notice + '<div class="sp-prm-a">' + btn + (code && !busy ? '<button type="button" class="btn sm ghost" id="spRulesOff" title="Lay out with typical values instead of this sheet">Use Typical Values</button>' : '') + '</div>' + etj + rows +
+      (use || code ? '<div class="rnote">The AI’s reading of the code, not a compliance check: confirm with the engineer and ' + (code?.kind === 'county' ? 'the county' : 'the city') + '. ' + where + '.</div>' : '') + '</div>';
+  }
+  function rulesRefresh() { const box = card.querySelector('#spRules'), pl = PL(); if (!box || !pl) return; const prog = SP.normalizeProgram(pl.program); box.outerHTML = rulesHtml(pl, prog, SP.usesOf(prog).includes('sfr') || !!pl.recipe?.net); wireRules(); }
+  // a sheet put on the plan (its numbers: the worker has no network), laid out again with it unless the layout has hand edits
+  // (a value confirmed, or the same numbers again: the plan's snapshot only, nothing laid out again)
+  const codeNums = c => c ? JSON.stringify([c.key, c.streetRules, c.entry, c.storm, c.sidewalk]) : '';
+  function applySheet(sh, quiet) { const pl = PL(); if (!pl || !sh) return; const c0 = pl.params?.code, c1 = RSL.codeParams(sh); change(x => { x.params = { ...(x.params || {}), code: c1 }; }); if (!quiet) ctx.toast('Street rules: ' + sh.name + (RSL.flagged(sh).length ? ' (' + plural(RSL.flagged(sh).length, 'value') + ' to confirm)' : '') + '.'); if ((pl.recipe || ed.variants) && codeNums(c0) !== codeNums(c1)) resolveSoon('Street rules'); else rulesRefresh(); }
+  async function readRules(refresh) {
+    const p = P(), pl = PL(); if (!p || !pl || ed.rulesBusy) return; let f = factsOf(p);
+    if (!f?.county) { try { await gatherSite(p); } catch (e) { /* said below */ } f = factsOf(p) || { county: siteInfo(p, pl).county }; }
+    if (!f?.county) { ctx.toast('The site’s county isn’t known yet: open the project page’s Jurisdiction box, then try again.'); return; }
+    const k0 = p.rules?.key || jurOf(p, f)?.key, have = !refresh && k0 && RS.get(k0); if (have && !RSL.old(have)) { applySheet(have); return; }
+    const e0 = ed, ac = new AbortController(); ed.rulesBusy = ac; rulesRefresh(); const sp = siteSpot(p);
+    try {
+      const d = await post({ mode: 'rules', jurisdiction: { county: f.county, city: f.place?.name || null, districts: (f.water || []).map(w => w.name + (w.type ? ' (' + w.type + ')' : '')), address: siteInfo(p, pl).address, lat: sp?.c?.[1] ?? null, lon: sp?.c?.[0] ?? null }, known: RS.list().map(x => x.key), refresh: !!refresh }, ac.signal);
+      if (ed !== e0) return; const was = !d.cached && d.sheet?.key ? RS.get(d.sheet.key) : null, m = was && RSL.merge(was, d.sheet), kept = was && m === was; // (read again: the team's edits, confirmations and values read before kept; a failed read changes nothing)
+      const sh = d.cached ? RS.get(d.key) : kept ? was : RS.save(m || d.sheet); if (!sh) throw new Error('no sheet');
+      p.rules = { key: sh.key, etj: d.etj || sh.etj || null }; save(p); ed.rulesBusy = null; applySheet(sh);
+      if (kept) ctx.toast('The AI couldn’t read the code just now, so the team’s ' + sh.name + ' sheet stays as it was.'); else if (sh.src === 'waller') ctx.toast('The local code couldn’t be found or read, so Waller County’s rules stand in (each marked for you to confirm).'); else if (was) ctx.toast('Read again: values edited or confirmed by the team, and those read before that the AI couldn’t find this time, kept.');
+    } catch (e) { if (ed !== e0) return; ed.rulesBusy = null; if (e.name !== 'AbortError') ctx.toast(e.status === 503 ? 'AI isn’t set up on this site: use Waller County’s rules as defaults.' : 'Couldn’t read the rules just now: try again.'); rulesRefresh(); }
+  }
+  function wireRules() {
+    const $ = q => card.querySelector('#spRules ' + q), p = P();
+    const keep = (sh, how) => { const s2 = RS.save(sh); if (!s2) { ctx.toast('That value isn’t one the sheet takes.'); return; } if (how) ctx.toast(how); applySheet(s2, true); };
+    $('#spRulesRead')?.addEventListener('click', () => readRules(!!PL()?.params?.code || !!sheetOf(P(), PL())));
+    $('#spRulesStop')?.addEventListener('click', () => { ed.rulesBusy?.abort(); ed.rulesBusy = null; rulesRefresh(); });
+    $('#spRulesUse')?.addEventListener('click', () => applySheet(sheetOf(P(), PL())));
+    $('#spRulesOff')?.addEventListener('click', () => { change(x => { const { code, ...q } = x.params || {}; x.params = q; }); ctx.toast('Typical street rules.'); if (PL().recipe || ed.variants) resolveSoon('Typical street rules'); });
+    // (the team's own sheet for the place, read or edited: kept, not replaced by the defaults)
+    $('#spRulesWaller')?.addEventListener('click', () => { const pl = PL(), j = jurOf(p) || { key: RSL.WALLER.key, name: RSL.WALLER.name, kind: 'county' }, fresh = j.key === RSL.WALLER.key ? { ...RSL.WALLER, by: whoName() } : RSL.standIn({ key: j.key, name: j.name, kind: j.kind, by: whoName() }), was = RS.get(j.key), m = RSL.merge(was, fresh), sh = was && m === was ? was : RS.save(m); if (!sh) return; p.rules = { key: sh.key, etj: null }; save(p); applySheet(sh); });
+    card.querySelectorAll('#spRules [data-rok]').forEach(b => b.onclick = () => { const sh = sheetOf(P(), PL()); if (sh) keep(RSL.confirm(sh, b.dataset.rok, whoName())); });
+    card.querySelectorAll('#spRules [data-rk]').forEach(i => i.onchange = () => { const sh = sheetOf(P(), PL()), f = RSL.FIELDS.find(x => x.k === i.dataset.rk); if (!sh || !f) return; const v = f.choice ? i.value : +i.value, s2 = RSL.edit(sh, f.k, v, whoName()); if (!s2) { ctx.toast(f.label + ' takes ' + f.lo + '–' + f.hi + ' ' + f.unit + '.'); rulesRefresh(); return; } keep(s2, f.label + ': ' + RSL.valueText(f.k, s2.values[f.k].v) + ' (shared with the team).'); });
+  }
+  // a plan opened with no rule sheet when the team has one for its place: used before its first layout, else offered
+  // (only once this site's place is settled: read here, so its ETJ was looked at, or inside a city; a county's sheet for a site
+  // that may be in a city's ETJ is offered instead)
+  function autoRules(p, pl) { if (!pl || pl.params?.code || pl.recipe || ed.variants?.length || !p.rules?.key && jurOf(p)?.kind !== 'city') return; const sh = sheetOf(p, pl); if (sh && !RSL.old(sh)) pl.params = { ...(pl.params || {}), code: RSL.codeParams(sh) }; }
+  // ----- street names (lib/streetnames.mjs): off by default; on, every street named from a theme (the AI, else a plain list),
+  // never two alike or like the streets nearby on the map
+  const chainsMemo = pl => { const k = netSig(pl) + '#' + pl.elements.filter(e => e.kind === 'drive' && e.street).map(e => e.id + ':' + e.street).join('|'); if (ed.chMemo?.k !== k) { let c = []; try { c = pl.recipe?.net ? chainsOf(pl) : []; } catch (e) { c = []; } ed.chMemo = { k, c }; } return ed.chMemo.c; };
+  function namesHtml(pl) {
+    if (!pl.recipe?.net || !chainsMemo(pl).length) return ''; const on = SNm.namesOn(pl) || !!ed.namingSt, th = pl.params?.streetNames?.theme || '';
+    return tog('data-snm="on"', 'Street names', on, { tip: 'Every street named, the boulevard and collectors grander (Parkway, Boulevard), the locals Lane or Way, cul-de-sacs Court or Circle', cls: 'w2' }) +
+      fld('Theme', '<input type="text" maxlength="80" data-snm="theme" value="' + esc(th) + '" placeholder="e.g. golf, Texas rivers">', { wide: true }) + '<div class="sp-prm-a w2"><button type="button" class="btn sm" id="spNameSt"' + (ed.namingSt ? ' disabled' : '') + ' title="Name every street again from the theme">' + (ed.namingSt ? 'Naming…' : 'Name the Streets') + '</button></div>' +
+      '<div class="sp-hint w2">Checked against the streets nearby on the map; the county’s 911 list should be checked too.</div>';
+  }
+  // the road names on the map within about a mile of the site (avoided: 911 refuses duplicates)
+  function nearRoads(pl) {
+    const s = map.getStyle()?.sources || {}, src = Object.keys(s).find(id => s[id].type === 'vector' && /maptiler|openmaptiles|planet/i.test(id + (s[id].url || ''))), F = SP.frame(pl.origin), c = SP.centroid(pl.ring), out = new Set();
+    try { for (const q of src ? map.querySourceFeatures(src, { sourceLayer: 'transportation_name' }) : []) { const nm = q.properties?.name, g = q.geometry; if (!nm) continue; for (const ln of g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []) if (ln.some(ll => { const f = F.toFt(ll); return Math.hypot(f[0] - c[0], f[1] - c[1]) < 6500; })) out.add(String(nm).slice(0, 40)); } } catch (e) { /* no names in the tiles */ }
+    return [...out].slice(0, 120);
+  }
+  // the names for a plan's streets (all: every street again but those named in hold, else the ones not named yet): the AI's
+  // from the theme, else the plain list. { names: Map, count, note } or null
+  async function streetNamesOf(p, pl, all, hold = []) {
+    const ch = chainsMemo(pl); if (!ch.length) return null; const keep = new Map(ch.filter(c => c.name && (!all || hold.includes(c.name))).map(c => [c.key, c.name])), todo = ch.filter(c => !keep.has(c.key) && !((c.role === 'boulevard' || c.role === 'entry') && c.L < 400));
+    const n0 = nearRoads(pl), avoid = pl.nearRoads = n0.length ? n0 : pl.nearRoads || [], theme = pl.params?.streetNames?.theme || ''; if (!todo.length) return { names: keep, count: 0, note: '' };
+    try { if (aiOff()) throw Object.assign(new Error('AI off'), { status: 503 }); const d = await post({ mode: 'streetNames', theme, community: SP.normalizeProgram(pl.program).community || '', site: siteInfo(p, pl), streets: todo.map(c => ({ id: c.key, kind: c.role, lengthFt: c.L })), avoid, current: [...keep.values()] }); return { names: SNm.namesFor(todo, d.names || [], { avoid, keep }), count: todo.length, note: '' }; }
+    catch (e) { return { names: SNm.namesFor(todo, null, { avoid, keep }), count: todo.length, note: (e.status === 503 ? 'AI isn’t set up on this site' : 'The AI didn’t answer') + ', so these are plain names.' }; }
+  }
+  const namedSay = (x, theme) => (x.count ? 'Named ' + plural(x.count, 'street') + (theme ? ' (' + theme + ')' : '') + '.' : 'Street names on.') + (x.note ? ' ' + x.note : '') + ' Checked against the streets nearby on the map; check the county’s 911 list too.';
+  async function nameStreets(all) {
+    const p = P(), pl = PL(); if (!pl || ed.namingSt) return; const e0 = ed; ed.namingSt = true; panel(); const x = await streetNamesOf(p, pl, all); if (ed !== e0) return; ed.namingSt = false; if (PL() !== pl || !x) { panel(); return; }
+    change(y => { const r = SNm.applyNames(y, x.names); y.elements = r.elements; y.recipe = r.recipe; y.params = { ...(y.params || {}), streetNames: { ...(y.params?.streetNames || {}), on: true } }; });
+    ctx.toast(namedSay(x, pl.params?.streetNames?.theme || ''));
+  }
+
   // self storage's own settings: the climate-controlled building, the drive-up rows, RV / boat stalls, the fence; blank
   // sizes mean "as the site allows"
   function storageFields(prog) {
@@ -2115,11 +2275,11 @@ export function initSitePlan(ctx) {
   }
   // stormwater (detention, retention, underground or none) and trash enclosures
   function stormHtml(pl, prog, pp, uses = SP.usesOf(prog)) {
-    const gOn = GON(pl), R = gOn ? G.rulesOf(pl) : null, st = { ...SP.STORM, ...(pp.storm || {}) }, tr = pp.trash || {}, sn = pl.elements?.length ? SP.stormOf(G.effective(pl)) : null;
+    const gOn = GON(pl), R = gOn ? G.rulesOf(pl) : null, st = { ...SP.STORM, ...(pp.code?.storm || {}), ...(pp.storm || {}) }, tr = pp.trash || {}, sn = pl.elements?.length ? SP.stormOf(G.effective(pl)) : null; // (the rule sheet's detention rate, unless set here)
     const sel = (attr, label, v, opts) => fld(label, selCtl(attr, opts, v ?? ''));
     const pnum = (k, label, v, step, unit, ph = '') => fld(label, numCtl('min="0" data-k="' + k + '"', v, step, unit, ph));
     const need = sn ? (sn.mode === 'none' ? 'No storage on site' : 'Needs about ' + sn.volume.toFixed(1) + ' ac-ft' + (sn.mode === 'underground' ? ', all in vaults under the parking' : ' · pond ' + (sn.pond / 43560).toFixed(2) + ' ac' + (sn.vault > 0.05 ? ' · ' + sn.vault.toFixed(1) + ' ac-ft more underground' : ''))) : '';
-    return '<div class="sp-sub">Stormwater' + infoBtn((sn && sn.mode !== 'none' ? 'Sized for ' + sn.acres.toFixed(1) + ' developed acres. ' : '') + (gOn ? 'Waller guardrails: ' + R.det.why + ' (' + R.det.rate.toFixed(2) + ' ac-ft/ac). Acre-feet are volume: the pond’s footprint comes from it, the storage depth and side slopes (under Waller guardrails), 1 ft of freeboard, a 15 ft maintenance bench and an allowance for the outfall structure. A higher Storage here (a drainage study) wins.' : 'Local drainage rules (Harris County, the city) set the real number.'), 'About stormwater') + '</div><div class="sp-fg">' +
+    return '<div class="sp-sub">Stormwater' + infoBtn((sn && sn.mode !== 'none' ? 'Sized for ' + sn.acres.toFixed(1) + ' developed acres. ' : '') + (gOn ? 'Waller guardrails: ' + R.det.why + ' (' + R.det.rate.toFixed(2) + ' ac-ft/ac). Acre-feet are volume: the pond’s footprint comes from it, the storage depth and side slopes (under Waller guardrails), 1 ft of freeboard, a 15 ft maintenance bench and an allowance for the outfall structure. A higher Storage here (a drainage study) wins.' : ((pp.code?.storm ? 'Storage follows the ' + pp.code.name + ' rule sheet (Settings › Street rules) unless set here. ' : 'Storage: Waller County’s default (0.55 ac-ft/ac until its rate is read) unless a rule sheet or this box says otherwise. ') + 'The county’s or city’s drainage rules set the real number.')), 'About stormwater') + '</div><div class="sp-fg">' +
         sel('data-pr="storm"', 'Method', prog.storm, [['', 'Detention pond'], ['retention', 'Retention (wet) pond'], ['underground', 'Underground vaults'], ['none', 'None (regional)']]) +
         (gOn ? fld('Storage', numCtl('min="0" data-k="ps-storm.rate"', pp.storm?.rate ?? '', 0.05, 'ac-ft/ac', R.det.rate.toFixed(2)), { hint: 'at least ' + R.det.rate.toFixed(2) }) + '</div>'
           : pnum('ps-storm.rate', 'Storage', st.rate, 0.05, 'ac-ft/ac') + pnum('ps-storm.depth', 'Pond depth', st.depth, 0.5, 'ft') + pnum('detentionPct', 'Pond size', prog.detentionPct, 1, '%', 'auto') + '</div>') +
@@ -2128,6 +2288,17 @@ export function initSitePlan(ctx) {
       '<div class="sp-sub">Trash' + infoBtn('Homes roll carts to the curb. Apartments: a double enclosure (trash and recycling) per about 50 units, a compactor from 200. Shops and offices: one per about 25,000 sf, none more than about 250 ft away. Add or move them under Add.', 'About trash enclosures') + '</div><div class="sp-fg">' +
         sel('data-ps="trash.mode"', 'Enclosures', tr.mode || (SP.normalizeProgram(pl.program).trash ? 'commercial' : 'none'), [['none', 'None (add by hand)'], ['commercial', 'Shops, restaurants, offices'], ['auto', 'Every building by the rules']]) +
         (uses.includes('multifamily') ? pnum('ps-trash.perUnits', 'Apartments each', tr.perUnits ?? 50, 5, 'units') : '') + (uses.some(x => SP.PER_SF_TRASH(x)) ? pnum('ps-trash.perSf', 'Commercial each', tr.perSf ?? 25000, 1000, 'sf') : '') + '</div>');
+  }
+  // Suggest Names: two or three sets from the AI that fit the place (its creeks, roads, town and county); with no AI, from
+  // the street and town names (ED.localNames), and it says so
+  async function suggestNames(btn) {
+    const p = P(), pl = PL(); if (!pl) return; btn.disabled = true; btn.textContent = 'Finding names…';
+    const parts = SP.partsOf(pl).map(q => ({ part: q.i, use: q.use, label: q.word, acres: q.acres, units: q.units || null })), cur = SP.normalizeProgram(pl.program);
+    try { if (aiOff()) throw Object.assign(new Error('AI off'), { status: 503 });
+      const d = await post({ mode: 'names', site: siteInfo(p, pl), facts: await factsFor(pl), parts, current: { community: cur.community, parts: SP.partsOf(pl, false).filter(q => q.name).map(q => ({ part: q.i, name: q.name })) }, theme: '' });
+      ed.nameChoices = d.choices || []; ed.nameNote = ''; }
+    catch (e) { ed.nameChoices = ED.localNames(pl, siteInfo(p, pl)).choices; ed.nameNote = 'The AI didn’t answer, so these come from the street and town names.'; }
+    if (PL() === pl) panel();
   }
   function wireParams(pl) {
     const $ = s => card.querySelector(s), after = i => { if (ed.autoSolve !== false && (pl.recipe || ed.variants)) resolveSoon(i && settingLabel(i)); };
@@ -2144,7 +2315,7 @@ export function initSitePlan(ctx) {
       change(x => { if (k === 'trees' || k === 'fill') x.params = { ...(x.params || {}), [k]: i.checked }; else x.setbacks = { ...SP.SETBACKS, ...(x.setbacks || {}), [k]: i.checked }; }); if (k !== 'trees') after(i); });
     card.querySelectorAll('.sp-prog [data-pr]').forEach(i => i.onchange = () => { change(x => { x.program = { ...x.program, [i.dataset.pr]: i.value || null }; }); after(i); });
     card.querySelectorAll('.sp-prog [data-ps]').forEach(i => i.onchange = () => { const [g, f] = i.dataset.ps.split('.'); change(x => { x.params = { ...(x.params || {}), [g]: { ...(x.params?.[g] || {}), [f]: i.value } }; }); after(i); });
-    card.querySelectorAll('.sp-prog [data-st]').forEach(i => i.onchange = () => { change(x => { x.params = i.dataset.st === 'form' || i.dataset.st === 'streets' ? { ...(x.params || {}), [i.dataset.st]: i.value } : { ...(x.params || {}), style: { ...(x.params?.style || {}), [i.dataset.st]: i.value } }; }); after(i); });
+    card.querySelectorAll('.sp-prog [data-st]').forEach(i => i.onchange = () => { change(x => { x.params = ['form', 'streets', 'mixStyle'].includes(i.dataset.st) ? { ...(x.params || {}), [i.dataset.st]: i.value } : { ...(x.params || {}), style: { ...(x.params?.style || {}), [i.dataset.st]: i.value } }; }); after(i); });
     const mixOf = x => clone(SP.normalizeProgram(x.program).mix || SP.UNIT_MIX);
     card.querySelectorAll('[data-mix]').forEach(i => i.onchange = () => { const [n, f] = i.dataset.mix.split(':'); change(x => { const m = mixOf(x); m[+n][f] = f === 'name' ? i.value : +i.value; x.program = { ...x.program, mix: m }; }); after(i); });
     card.querySelectorAll('[data-mixdel]').forEach(b => b.onclick = () => { change(x => { const m = mixOf(x); m.splice(+b.dataset.mixdel, 1); x.program = { ...x.program, mix: m }; }); after(); });
@@ -2161,6 +2332,14 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('[data-home]').forEach(i => i.onchange = () => { change(x => { const m = clone(SP.normalizeProgram(x.program).homeMix || SP.HOME_MIX), t = m.find(h => h.stories === +i.dataset.home); if (t) t.pct = +i.value; else m.push({ stories: +i.dataset.home, pct: +i.value }); x.program = { ...x.program, homeMix: m }; }); after(i); });
     card.querySelectorAll('.sp-prog [data-gd]').forEach(i => i.onchange = () => { const k = i.dataset.gd, v = i.tagName === 'SELECT' ? i.value : i.value === '' ? null : +i.value; // the Waller guardrails' settings
       change(x => { x.params = { ...(x.params || {}), guard: { ...(x.params?.guard || {}), [k]: v } }; }); if (k !== 'mode' || GON(PL()) || pl.laidAs) after(i); });
+    // names: typed, or a suggested set picked (one undo step); the labels change, the layout doesn't
+    card.querySelectorAll('.sp-prog [data-nm]').forEach(i => i.onchange = () => { const k = i.dataset.nm; change(x => { x.program = SP.withNames(x.program, k === 'community' ? { community: i.value } : { parts: [{ part: +k, name: i.value }] }); }); });
+    card.querySelectorAll('.sp-prog [data-nmc]').forEach(b => b.onclick = () => { const c = ed.nameChoices?.[+b.dataset.nmc]; if (!c) return; change(x => { x.program = SP.withNames(x.program, { community: c.community, parts: c.parts }); }); ctx.toast('Named the community ' + c.community + '.', { action: { label: 'Undo', run: () => { if (ed) undo(true); } } }); });
+    const na = $('#spNameAsk'); if (na) na.onclick = () => suggestNames(na);
+    // street names: on names the streets not named yet (off hides them, kept for next time); the theme for the next naming
+    $('[data-snm="on"]')?.addEventListener('change', ev => { const sn = x => ({ ...(x.params?.streetNames || {}) }); if (ev.target.checked && chainsMemo(PL()).some(c => !c.name && !((c.role === 'boulevard' || c.role === 'entry') && c.L < 400))) nameStreets(false); else change(x => { x.params = { ...(x.params || {}), streetNames: { ...sn(x), on: ev.target.checked } }; }); });
+    $('[data-snm="theme"]')?.addEventListener('change', ev => change(x => { x.params = { ...(x.params || {}), streetNames: { ...(x.params?.streetNames || {}), theme: ev.target.value.trim().slice(0, 80) } }; }, true));
+    const ns = $('#spNameSt'); if (ns) ns.onclick = () => nameStreets(true);
     const rs = $('#spResolve'); if (rs) rs.onclick = () => askReplace(() => resolve({ force: true }));
     const rm = $('#spRefitMine'); if (rm) rm.onclick = () => { ed.solveBar = false; refitNow(true); };
     const nl = $('#spNewLay'); if (nl) nl.onclick = () => resolve({ force: true, src: '#spNewLay' });
@@ -2176,17 +2355,22 @@ export function initSitePlan(ctx) {
   // a local edit: the piece stays where it was put and parking under it gives way (whole stalls); nothing else moves.
   // Laying out everything else again is the Re-fit Plan button's job, never automatic.
   // delete a piece; the rest of a parking row it was part of stays as it is now (it doesn't grow back over the gap)
-  function dropEl(x, el) { const k = el.ext && JSON.stringify(el.ext); x.elements = x.elements.filter(y => y.id !== el.id); if (k) for (const y of x.elements) if (y.ext && JSON.stringify(y.ext) === k) delete y.ext; }
+  function dropEl(x, el) { const k = el.ext && JSON.stringify(el.ext); x.elements = SP.isRing(el) ? SP.dropRing(x, x.elements.find(y => y.id === el.id) || el) : SP.isLoop(el) ? SP.dropLoop(x, x.elements.find(y => y.id === el.id) || el) : el.kind === 'sign' ? SP.dropSign(x, x.elements.find(y => y.id === el.id)) : x.elements.filter(y => y.id !== el.id); /* (an entrance's sign: it remembers it's gone) */ if (k) for (const y of x.elements) if (y.ext && JSON.stringify(y.ext) === k) delete y.ext;
+    if (el.kind === 'building' && el.use === 'sfr') for (const l of x.elements) if (l.kind === 'lot' && Math.abs(l.x - el.x) < 250 && Math.abs(l.y - el.y) < 250 && SP.inRing([el.x, el.y], SP.shapeOf(l))) l.vacant = true; } // (a home deleted from its lot: the lot stays, vacant, and re-fits leave its place empty)
   // left: where it was (and what moved with it); parking it had cut there grows back
-  function makeRoom(el, left = []) {
-    const pl = PL(); if (!pl || !el || ['parking', 'green', 'lot', 'trail', 'keepout'].includes(el.kind)) return;
+  // (a park, lawn or open space: the homes under it make way too, with their lots and driveways)
+  // (a roundabout or a drop-off loop joins the streets again where it lands: free, Alt-dragged, it stays where it was put)
+  function makeRoom(el, left = [], free = false) {
+    if (SP.isRing(el) || SP.isLoop(el)) { const pl = PL(); if (!pl) return; const r = SP.reseat(pl, el, { free }); pl.elements = r.elements; const t = [r.why, r.note].filter(Boolean).join(' '); if (t) ctx.toast(t); return; }
+    const pl = PL(); if (!pl || !el || ['parking', 'lot', 'trail', 'keepout'].includes(el.kind) || el.kind === 'green' && !SP.isPark(el)) return;
+    if (SP.isPark(el)) { const gone = SP.homesUnder(pl, el, 4); if (gone.size) pl.elements = pl.elements.filter(x => !gone.has(x)); pl.elements = SP.trimLots(pl.elements, el); } // (the lots of the homes that stay come back off it)
     const pad = el.kind === 'building' || el.kind === 'garage' ? 5 : 1, spare = pl.spareRows = (pl.spareRows || []).slice(-40); // rows cut away whole, kept to grow back
     pl.elements = SP.cutRows(pl.elements, SP.outline(el), pad, spare);
     for (const o of left) pl.elements = SP.regrowRows(pl.elements, SP.outline(o), 5, spare);
   }
   // after an edit in the Selected box or a nudge (verb, name: what the toast says, e.g. "Moved", "Building A"): the
   // piece makes room locally first, then the rest re-fits round it (autoRefit)
-  function refitSoon(verb, name) { clearTimeout(refitTimer); clearTimeout(autoT); refitTimer = setTimeout(() => { const pl = PL(), el = pl?.elements.find(x => x.id === ed.sel); if (!el) return; makeRoom(el, ed.nudged || []); ed.nudged = null; pl.updated = new Date().toISOString(); save(P()); draw(); panel(); autoRefit(verb || 'Changed', name || ED.labelOf(el), 100); }, 250); }
+  function refitSoon(verb, name) { clearTimeout(refitTimer); clearTimeout(autoT); refitTimer = setTimeout(() => { const pl = PL(), el = pl?.elements.find(x => x.id === ed.sel); if (!el) return; makeRoom(el, ed.nudged || []); for (const o of pl.elements.filter(x => x !== el && (ed.multi || []).includes(x.id) && (SP.isRing(x) || SP.isLoop(x)))) makeRoom(o); /* (a roundabout nudged with others joins the streets again too) */ ed.nudged = null; pl.updated = new Date().toISOString(); save(P()); draw(); panel(); autoRefit(verb || 'Changed', name || ED.labelOf(el), 100); }, 250); }
   // the layout card's update icon: Re-fit Around My Changes, the icon turning (and the others locked out) until it's done
   async function updateNow() {
     if (!ed || ed.updBusy || ed.run) return; const e0 = ed, pl = PL();
@@ -2204,10 +2388,10 @@ export function initSitePlan(ctx) {
     let r = null; ctx.toast('Re-fitting the plan around the pieces you placed…'); try { r = await refitOf(pl); } catch (err) { console.warn('refit', err); } if (PL() !== pl) return;
     if (!r) { if (asked) ctx.toast('Couldn’t re-fit the plan around that; it stays as you left it.' + (refitNo ? ' ' + refitNo : '')); return; }
     ed.undo.push(snapshot()); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = []; useRefit(pl, r);
-    if (asked) ctx.toast('Re-fitted around the pieces you placed.', { action: { label: 'Undo', run: () => { if (ed && PL() === pl) undo(true); } } });
+    if (asked) ctx.toast(r.fresh ? 'The site was laid out afresh round the pieces you placed (new streets).' : 'Re-fitted around the pieces you placed.', { action: { label: 'Undo', run: () => { if (ed && PL() === pl) undo(true); } } });
   }
   function useRefit(pl, r) {
-    pl.elements = r.elements; pl.spareRows = []; if (r.recipe) pl.recipe = clone(r.recipe); markEdited(pl); ed.solveBar = false; ed.refitNote = (r.notes || []).join(' '); pl.stale = null; { const cv = ed.variants?.find(v => v.key === pl.variant?.key); if (cv) delete cv.stale; }
+    pl.elements = r.elements; pl.spareRows = []; if (r.recipe) pl.recipe = clone(r.recipe); if (r.zones) pl.zones = clone(r.zones); markEdited(pl); ed.solveBar = false; ed.refitNote = (r.notes || []).join(' '); pl.stale = null; { const cv = ed.variants?.find(v => v.key === pl.variant?.key); if (cv) delete cv.stale; }
     if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; ed.multi = (ed.multi || []).filter(id => pl.elements.some(x => x.id === id)); if (ed.multi.length < 2) ed.multi = [];
     pl.updated = new Date().toISOString(); save(P()); draw(); panel();
   }
@@ -2232,7 +2416,7 @@ export function initSitePlan(ctx) {
     if (!r?.elements?.length || !same()) return; // something changed meanwhile: that change re-fits on its own
     const at = els => ({ m: GM({ ...pl, elements: els }), issues: GC({ ...pl, elements: els }) }), v = T.refitVerdict(at(pl.elements), at(r.elements));
     if (!v.ok) { ctx.toast('Kept your change; re-fitting would ' + (v.why === 'problems' ? 'add problems' : 'lose ' + (v.why === 'units' ? 'units' : 'space')), { action: { label: 'Re-fit anyway', run: () => { if (same()) useRefit(pl, r); else if (ed === e0) refitNow(true); } } }); return; }
-    useRefit(pl, r); ctx.toast(what + ' · rest of the site re-fitted', { action: { label: 'Undo', run: () => { if (ed === e0 && PL() === pl && ed.undo.length === mark) undo(true); } } });
+    useRefit(pl, r); ctx.toast(what + (r.fresh ? ' · the site was laid out afresh round it (new streets)' : ' · rest of the site re-fitted'), { action: { label: 'Undo', run: () => { if (ed === e0 && PL() === pl && ed.undo.length === mark) undo(true); } } });
   }
   // lay the options out again with the plan's own program and settings (no AI call)
   // Never over hand edits: with a changed layout on the map, new settings show a bar instead (re-fit around the changes,
@@ -2277,21 +2461,96 @@ export function initSitePlan(ctx) {
     const n = (k, label, v, o = {}) => fld(label, numCtl((o.id ? 'id="' + o.id + '" ' : '') + (o.min != null ? 'min="' + o.min + '" ' : '') + (o.max ? 'max="' + o.max + '" ' : '') + 'data-e="' + k + '"', v, o.step || 1, o.unit || ''), o.tip ? { tip: o.tip } : {});
     const turnF = () => n('rot', 'Turn', turnVal(e), { id: 'spTurn', unit: '°', tip: 'Any number of degrees. The arrows step 1°; with Shift, 15°.' }); // typed degrees, any number (52.5 too: nothing checks it against the arrows' 1° step)
     const pick = (attr, label, opts, v, wide) => fld(label, selCtl(attr, opts, v), { wide });
-    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free && e.kind !== 'keepout' ? (SHAPEABLE.includes(e.kind) && !['pond', 'green', 'pool'].includes(e.kind) ? ' · custom shape' : e.path ? (T.isEntrance(e) ? ' · entrance' : ' · route') : ' · curved') : '') + '</div><div class="rnote sp-1l" id="spRead"></div>' + selCustom(e) +
+    return '<div class="lt">' + esc(SP.KINDS[e.kind]?.label || e.kind) + (free && e.kind !== 'keepout' ? (SP.isRing(e) ? ' · roundabout' : SP.isLoop(e) ? ' · drop-off loop' : T.isEntrance(e) ? (e.blvd ? ' · boulevard entrance' : ' · entrance') : SHAPEABLE.includes(e.kind) && !['pond', 'green', 'pool'].includes(e.kind) ? ' · custom shape' : e.path ? ' · route' : ' · curved') : '') + '</div><div class="rnote sp-1l" id="spRead"></div>' + selCustom(e) +
       '<fieldset class="sp-fs"' + (ed.editing ? '' : ' disabled') + '>' +
-      '<div class="sp-acts">' + (free && !e.poly ? '' : '<button type="button" class="btn sm" id="spRot">Turn 90°</button>') + (SHAPEABLE.includes(e.kind) || T.routeable(e) ? '<button type="button" class="btn sm" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="' + (T.routeable(e) ? 'Bend it: drag its points along the drive; a blue + adds a point; double-click a point to remove it' : 'Drag its points or its faces; drag a blue + to add a point; double-click a point to remove it. Hold Shift for whole feet and square corners.') + '">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') +
+      '<div class="sp-acts"><button type="button" class="btn sm" id="spRot" title="Shift+R turns it the other way">' + (T.isEntrance(e) ? 'Turn 15°' : 'Turn 90°') + '</button>' + (e.kind === 'building' && !['sfr', 'townhomes', 'duplex'].includes(e.use || prog.use) ? '<button type="button" class="btn sm" id="spLoop" title="A one-way loop with a planted island between the building and the nearest drive">Add Drop-off Loop</button>' : '') + ((SHAPEABLE.includes(e.kind) || T.routeable(e)) && !SP.isRing(e) ? '<button type="button" class="btn sm" id="spShape" aria-pressed="' + (ed.shape === e.id) + '" title="' + (T.routeable(e) ? 'Bend it: drag its points along the drive; a blue + adds a point; double-click a point to remove it' : 'Drag its points or its faces; drag a blue + to add a point; double-click a point to remove it. Hold Shift for whole feet and square corners.') + '">' + (ed.shape === e.id ? 'Done Shaping' : 'Edit Shape') + '</button>' : '') +
+        (T.isEntrance(e) && !e.blvd ? '<button type="button" class="btn sm" id="spBlvd" title="Two lanes and a planted median in from where its mouth is, square to the street (Settings › Entrance sets the widths and the sign)">Make It a Boulevard</button>' : '') +
         (rc ? '<button type="button" class="btn sm" id="spRefit" title="Lay out everything else again around the pieces you placed">Re-fit Plan</button>' : '') + '<button type="button" class="btn sm" id="spDup" title="Copy it beside itself (⌘D / Ctrl+D)">Duplicate</button><button type="button" class="btn sm" id="spAskSel" title="Say what to change about this piece">Change With AI</button><button type="button" class="btn sm ghost sp-del" id="spDel" title="Delete it (Delete)">Delete</button></div>' +
       (e.kind === 'parking' ? '<div class="sp-acts sp-stalls"><button type="button" class="btn sm" id="spStallDir" title="Turn the stalls 90° inside the same outline: the rows run the other way">Stall Direction</button><button type="button" class="btn sm" id="spFaceB" title="Turn the stalls to face the nearest building: cars pull in toward it, the aisle runs along it, and the parking sits a walk’s width off it">Face the Building</button></div>' : '') +
-      (!ed.editing ? '<div class="rnote sp-1l">Turn on <b>Edit Layout</b> to change it.</div>' : rc && e.pinned ? '<div class="sp-pin"><span class="rnote">Pinned: <b>Re-fit Plan</b> keeps it where it is.</span><button type="button" class="btn sm" id="spUnpin" title="Re-fit Plan may move it again">Let It Move</button></div>' : '') +
-      '<div class="sp-fg">' + (e.path && T.routeable(e) ? n('width', 'Width', Math.round(e.width || 26), { min: 6, max: 80, unit: 'ft' }) + n('r', 'Curve', Math.round(e.r ?? 30), { min: 0, max: 200, unit: 'ft' }) + (T.isEntrance(e) ? n('flare', 'Mouth flare', Math.round(e.flare || 0), { min: 0, max: 60, unit: 'ft' }) : '') : '') + (e.kind === 'building' ? pick('data-use="1"', 'Use', Object.entries(SP.USES).map(([k, u]) => [k, u.label]), e.use || prog.use) + n('floors', 'Floors', e.floors || 1, { min: 1, max: 40 }) +
+      podHtml(e) + netHtml(e) + (!ed.editing ? '<div class="rnote sp-1l">Turn on <b>Edit Layout</b> to change it.</div>' : rc && e.pinned ? '<div class="sp-pin"><span class="rnote">Pinned: <b>Re-fit Plan</b> keeps it where it is.</span><button type="button" class="btn sm" id="spUnpin" title="Re-fit Plan may move it again">Let It Move</button></div>' : '') +
+      '<div class="sp-fg">' + (SP.isRing(e) ? n('across', 'Across', Math.round(2 * SP.ringOf(e).R), { min: 2 * SP.RING.min, max: 2 * SP.RING.max, unit: 'ft' }) + n('width', 'Lane', Math.round(e.width || 20), { min: 14, max: 30, unit: 'ft' }) : e.path && T.routeable(e) ? n('width', 'Width', Math.round(e.width || 26), { min: 6, max: 80, unit: 'ft' }) + n('r', 'Curve', Math.round(e.r ?? 30), { min: 0, max: 200, unit: 'ft' }) + (T.isEntrance(e) ? n('flare', 'Mouth flare', Math.round(e.flare || 0), { min: 0, max: 60, unit: 'ft' }) : '') : '') + (e.kind === 'building' ? pick('data-use="1"', 'Use', Object.entries(SP.USES).map(([k, u]) => [k, u.label]), e.use || prog.use) + n('floors', 'Floors', e.floors || 1, { min: 1, max: 40 }) +
           fld('Type', '<select data-type="1">' + (e.type ? '' : '<option value="" selected>Custom (drawn or sized by hand)</option>') + typeOptions(e.type || '', teamTypes()) + '</select>', { wide: true }) : '') + // what it is first: use and type can change any time
-        (free ? (e.poly ? turnF() : '') : n('w', 'Width', Math.round(e.w), { min: 8, unit: 'ft' }) + n('d', 'Depth', Math.round(e.d), { min: 8, unit: 'ft' }) + turnF()) +
+        (free ? '' : n('w', 'Width', Math.round(e.w), { min: 8, unit: 'ft' }) + n('d', 'Depth', Math.round(e.d), { min: 8, unit: 'ft' })) + turnF() + // (every piece turns, curved ones too)
         (e.kind === 'building' && (e.use || prog.use) === 'foodtrucks' ? pick('data-ftk="1"', 'Part', [['pavilion', 'Covered pavilion'], ['bar', 'Bar / beer garden'], ['restroom', 'Restrooms']], SP.ftKind(e)) : e.kind === 'building' && (e.use || prog.use) === 'storage' ? pick('data-stok="1"', 'Storage', [['climate', 'Climate-controlled'], ['drive', 'Drive-up units'], ['office', 'Leasing office']], SP.storageKind(e)) : e.kind === 'building' && (e.use || prog.use) === 'fuel' ? pick('data-fuelk="1"', 'Gas station', [['store', 'Convenience store'], ['wash', 'Car wash']], SP.fuelKind(e)) : e.kind === 'building' ? (SP.USES[e.use || prog.use]?.garage ? n('units', 'Homes', e.units || 1, { min: 1, max: 40 }) : '') +
           pick('data-form="1"', 'Building shape', e.poly ? [['custom', 'Custom outline'], ...FORMS] : FORMS, e.poly ? 'custom' : e.form || 'bar') + (e.form === 'tower' && !e.poly ? n('podium', 'Podium floors', e.podium || 2, { min: 1, max: 6 }) : '') : '') +
         (e.kind === 'garage' ? n('levels', 'Levels', e.levels || 4, { min: 1, max: 12 }) : '') +
         (e.kind === 'canopy' ? pick('data-pumps="1"', 'Pumps', SP.PUMPS.map(k => [String(k), k + ' · ' + 2 * k + ' fueling positions']), String(e.pumps || 8)) + pick('data-prows="1"', 'Rows', [['1', '1 row'], ['2', '2 rows'], ['3', '3 rows']], String(e.rows || 2)) : '') +
         (['pond', 'pool', 'green', 'plaza', 'court'].includes(e.kind) ? pick('data-shape="1"', 'Shape', [['organic', 'Natural curves'], ['rounded', 'Rounded rectangle'], ['square', 'Rectangle']], e.poly ? 'organic' : e.shape === 'round' ? 'rounded' : 'square') : '') +
-        fld('Name', '<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A">', { wide: true }) + '</div></fieldset>';
+        (T.isEntrance(e) && (e.blvd || PL() && SP.entryParts(PL(), e).length) ? pick('data-signs="1"', 'Monument signs', [['median', 'In the median'], ['both', 'Both corners'], ['one', 'One corner'], ['none', 'None']], (g => !g.length ? 'none' : g[0].want || (g.some(x => x.sign === 'median') ? 'median' : g.length > 1 ? 'both' : 'one'))(SP.entryParts(PL(), e).filter(x => x.kind === 'sign'))) : '') +
+        (e.kind === 'drive' && e.net && PL()?.recipe?.net && !T.isEntrance(e) ? '' : fld('Name', '<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A">', { wide: true })) + '</div></fieldset>'; // (a neighbourhood street: its street name above)
+  }
+  // a piece of a plan laid out in pods: the pod it's in, and laying that pod out again or swapping it with another
+  function podHtml(e) {
+    const pl = PL(), z = e.pod && pl?.recipe?.pods ? (pl.zones || []).find(q => q.pod === e.pod) : null; if (!z) return '';
+    const others = (pl.zones || []).filter(q => q.pod && q.pod !== z.pod && !['amenity'].includes(q.use) && z.use !== 'amenity');
+    return '<div class="sp-pin"><span class="rnote">In <b>' + esc(z.name) + '</b> · ' + esc((SP.USES[z.use]?.label || z.use).split(' / ')[0]) + ' · ' + (+z.acres).toFixed(1) + ' ac</span>' + (z.use === 'amenity' ? '' : '<button type="button" class="btn sm" id="spRelay"' + (ed.podBusy ? ' disabled' : '') + ' title="Lay this pod out again from scratch, keeping the rest of the plan">Re-lay This Pod</button>' +
+      (others.length ? '<select id="spSwapPod" class="sp-swap" aria-label="Swap this pod with another" title="This pod and the one picked trade uses; both are laid out again"' + (ed.podBusy ? ' disabled' : '') + '><option value="">Swap With…</option>' + others.map(q => '<option value="' + esc(q.pod) + '">' + esc(q.name) + '</option>').join('') + '</select>' : '')) + '</div>';
+  }
+  // re-lay or swap pods (lib/sitepods.mjs relayPods, in the worker): one undo step; the notes say what moved and which
+  // placement no longer holds
+  async function podChange(req, what) {
+    const pl = PL(); if (!ed || !pl?.recipe?.pods || ed.podBusy) return; const e0 = ed; ed.podBusy = true; panel(); ctx.toast(what + '…');
+    const snap = snapshot(), u0 = ed.undo.length, at0 = pl.updated; // (the plan as it was asked of: an edit made meanwhile isn't overwritten)
+    let r = null; try { r = await laid('pods', pl, req); } catch (err) { console.warn('pods', err); } if (ed === e0) ed.podBusy = false; if (ed !== e0 || PL() !== pl) return;
+    if (ed.undo.length !== u0 || pl.updated !== at0) { panel(); ctx.toast('The plan changed while that pod was being laid out, so nothing was replaced; try again.'); return; }
+    if (!r || r.error || !r.elements?.length) { panel(); ctx.toast(r?.error || 'Couldn’t lay that out again; the plan stays as it was.'); return; }
+    ed.undo.push(snap); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = [];
+    pl.elements = r.elements; pl.zones = r.zones; pl.recipe = clone(r.recipe); if (r.program) pl.program = r.program; pl.spareRows = []; markEdited(pl); ed.refitNote = (r.notes || []).join(' '); pl.stale = null;
+    if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; pl.updated = new Date().toISOString(); save(P()); draw(); panel();
+    ctx.toast((r.notes || []).slice(0, 3).join(' ') || 'Done.', { action: { label: 'Undo', run: () => { if (ed === e0 && PL() === pl) undo(true); } } });
+  }
+  // a street of a neighbourhood's network (lib/streetedit.mjs): what it is and how it ends, and what can be done to it (a
+  // cul-de-sac, a stretch deleted, a bow, its block laid out again) and its name
+  const END_WORD = c => c.cyc ? 'a loop' : (k => k.bulb === 2 ? 'a cul-de-sac at each end' : k.bulb ? 'ends in a cul-de-sac' : k.free ? 'a dead end' : k.street ? 'in from the street' : 'T’s at both ends')(c.ends.reduce((o, x) => { if (x) o[x.kind] = (o[x.kind] || 0) + 1; return o; }, {}));
+  function netHtml(e) {
+    const pl = PL(); if (!pl?.recipe?.net || e.kind !== 'drive' || !e.net) return ''; const c = chainsMemo(pl).find(x => x.ids.includes(e.id) || x.bulbs.includes(e.id)); if (!c) return '';
+    const own = c.parts.find(x => x.id === e.id), along = own && c.J.some(j => j > own.off + 20 && j < own.off + own.L - 20), way = c.role === 'boulevard' || c.role === 'entry', dis = ed.netBusy || !ed.editing ? ' disabled' : '', side = c.role === 'local' || c.role === 'court' || !!clickOf(e); // (a collector or a way in: the block on the side it was clicked)
+    const cul = !way && !c.cyc && (c.ends.some(x => x?.kind === 'free') || c.role === 'local' && c.ends.every(x => x?.kind === 'tee')), b = (id, label, tip) => '<button type="button" class="btn sm" id="' + id + '"' + dis + ' title="' + esc(tip) + '">' + label + '</button>';
+    return '<div class="sp-pin sp-net"><span class="rnote">Street · <b>' + esc(c.name || c.label || { collector: 'Collector', local: 'Local street', court: 'Cul-de-sac street', boulevard: 'Main entry', entry: 'Way in' }[c.role]) + '</b> · ' + f0(c.L) + ' ft · ' + END_WORD(c) + '</span><span class="btnrow">' +
+      (cul ? b('spCul', 'Make It a Cul-de-sac', 'Ends it in a cul-de-sac (a dead end gets a bulb; a street T-ing in at both ends is cut back at the end farther from the main entry); its lots re-flow') : '') +
+      (along && !e.bulb ? b('spCutSt', 'Delete This Stretch', 'Takes out the stretch between the two streets that meet it either side of where you clicked (or of this piece’s middle); its lots go') : '') +
+      (!way && !c.cyc && c.L >= 200 ? b('spCurve', 'Curve It', 'A gentle bow, its ends where they are; the streets that meet it come along (Shift: the other way)') : '') +
+      (side ? b('spRelayNet', 'Re-Lay This Block', 'Lays the local streets of the block ' + (c.role === 'local' || c.role === 'court' ? 'it’s in' : 'on the side you clicked') + ' out again another way, keeping the collectors and the rest of the plan; each press another way') : '') + '</span></div>' +
+      (!way ? '<div class="sp-fg">' + fld('Street name', '<input type="text" maxlength="40" data-street="' + esc(c.key) + '" value="' + esc(c.name || '') + '" placeholder="e.g. Heritage Parkway"' + (ed.editing ? '' : ' disabled') + '>', { wide: true }) + '</div>' : '');
+  }
+  // a street edited (lib/streetedit.mjs): the change, then its lots re-flowed (the re-fit in the worker), one undo step
+  async function streetEdit(r, name) {
+    const pl = PL(); if (!pl) return; if (r.error) { ctx.toast(r.error); return; } const e0 = ed, n0 = pl.elements.filter(x => x.kind === 'building' && x.use === 'sfr').length;
+    change(x => { x.elements = r.elements; }); const u0 = ed.undo.length, at0 = pl.updated; ed.netBusy = true; panel(); ctx.toast(r.note + ' Re-flowing the lots…');
+    let f = null; try { f = await refitOf(pl, { amount: 'current' }); } catch (err) { console.warn('street re-fit', err); } if (ed !== e0) return; ed.netBusy = false;
+    if (PL() !== pl || ed.undo.length !== u0 || pl.updated !== at0) { panel(); return; } // (changed meanwhile: that change re-fits on its own)
+    if (f) useRefit(pl, f); else panel(); const n1 = pl.elements.filter(x => x.kind === 'building' && x.use === 'sfr').length;
+    ctx.toast(r.note + (f ? ' ' + f0(n1) + ' homes' + (n1 !== n0 ? ' (' + f0(n0) + ' before)' : '') + '.' : ' The lots couldn’t be re-flowed: Re-fit Plan tries again.'), { action: { label: 'Undo', run: () => { if (ed === e0 && PL() === pl) undo(true); } } });
+  }
+  // the block a street or home is in laid out again in the worker (lib/streetnet.mjs relayBlock): one undo step
+  async function netChange(req) {
+    const pl = PL(); if (!ed || !pl?.recipe?.net || ed.netBusy) return; const e0 = ed; ed.netBusy = true; panel(); ctx.toast('Laying that block’s streets out again…');
+    const snap = snapshot(), u0 = ed.undo.length, at0 = pl.updated;
+    let r = null; try { r = await laid('net', pl, req); } catch (err) { console.warn('relay', err); } if (ed === e0) ed.netBusy = false; if (ed !== e0 || PL() !== pl) return;
+    if (ed.undo.length !== u0 || pl.updated !== at0) { panel(); ctx.toast('The plan changed while that block was being laid out, so nothing was replaced; try again.'); return; }
+    if (!r || r.error || !r.elements?.length) { panel(); ctx.toast(r?.error || 'Couldn’t lay that block out again; the plan stays as it was.'); return; }
+    ed.undo.push(snap); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = []; useRefit(pl, r); if (ed.relayK && r.block) ed.relayK.block = r.block;
+    const back = { action: { label: 'Undo', run: () => { if (ed === e0 && PL() === pl) undo(true); } } }; ctx.toast((r.notes || []).slice(0, 2).join(' ') || 'Done.', back);
+    const u1 = ed.undo.length, at1 = pl.updated, x = await newNames(pl); if (!x || ed !== e0 || PL() !== pl || ed.undo.length !== u1 || pl.updated !== at1) return; // (street names on: its new streets named, in the same undo step, unless the plan changed meanwhile)
+    const n = SNm.applyNames(pl, x.names); pl.elements = n.elements; pl.recipe = n.recipe; pl.updated = new Date().toISOString(); save(P()); draw(); panel(); ctx.toast('Named the block’s new streets.' + (x.note ? ' ' + x.note : ''), back);
+  }
+  // street names on and a layout picked or laid out afresh (its streets carry no names): named, unless the plan changes meanwhile
+  async function nameNew(pl) { const e0 = ed, u1 = ed?.undo.length, at1 = pl?.updated; if (!pl) return; const x = await newNames(pl); if (!x || ed !== e0 || PL() !== pl || ed.undo.length !== u1 || pl.updated !== at1) return;
+    const n = SNm.applyNames(pl, x.names); pl.elements = n.elements; pl.recipe = n.recipe; save(P()); draw(); panel(); }
+  // street names on and streets laid out again with none (a block re-laid): names for those only, the rest as they are
+  const newNames = async pl => SNm.namesOn(pl) && chainsMemo(pl).some(c => !c.name && !((c.role === 'boulevard' || c.role === 'entry') && c.L < 400)) ? streetNamesOf(P(), pl, false).then(x => x?.count ? x : null, () => null) : null;
+  // where the selected street was clicked (null when it was picked another way: the list, Change With AI, undo)
+  const clickOf = e => ed.clickOn === e.id && ed.clickFt ? ed.clickFt : null;
+  // each press on one block another way of laying it out (k 1, 2, …); another block starts again at the best
+  const relayNext = at => { const k = ed.relayK?.block && SP.inRing(at, ed.relayK.block) ? ed.relayK.k + 1 : 1; ed.relayK = { k, block: null }; return k; }; // (the block itself noted once it's laid: netChange)
+  function wireNet(e) {
+    const $ = q => card.querySelector(q), pl = PL(), c = pl && chainsMemo(pl).find(x => x.ids.includes(e.id) || x.bulbs.includes(e.id)), nm = c ? c.name || c.label || 'the street' : 'the street';
+    $('#spCul')?.addEventListener('click', () => streetEdit(SE.culDeSac(PL(), e.id, { id: uid() }), nm));
+    $('#spCutSt')?.addEventListener('click', () => streetEdit(SE.cutStretch(PL(), e.id, clickOf(e) || [e.x, e.y]), nm));
+    $('#spCurve')?.addEventListener('click', ev => streetEdit(SE.bendStreet(PL(), e.id, ev.shiftKey ? -1 : null), nm));
+    $('#spRelayNet')?.addEventListener('click', () => { const at = SE.blockAt(PL(), e.id, clickOf(e)); if (at) netChange({ op: 'relay', at, k: relayNext(at) }); });
+    $('[data-street]')?.addEventListener('change', ev => { const x0 = PL(), r = SNm.rename(x0, ev.target.dataset.street, ev.target.value); if (r.error) { ctx.toast(r.error); ev.target.value = c?.name || ''; return; }
+      change(x => { x.elements = r.elements; x.recipe = r.recipe; if (!SNm.namesOn(x)) x.params = { ...(x.params || {}), streetNames: { ...(x.params?.streetNames || {}), on: true } }; }); ctx.toast(r.name ? 'Named ' + nm + ' ' + r.name + '.' : 'Name taken off.'); });
   }
   // several pieces picked: how many, what they cover, and what can be done to all of them at once (each one undo step)
   function multiHtml() {
@@ -2307,9 +2566,12 @@ export function initSitePlan(ctx) {
     if ($('#spMPin')) $('#spMPin').onclick = () => { const pl = PL(), all = pl.elements.filter(e => ids.includes(e.id)).every(e => e.pinned); change(x => { for (const e of x.elements) if (ids.includes(e.id)) { if (all) delete e.pinned; else e.pinned = true; } }); };
   }
   // Duplicate (⌘D): copies of the piece or the set beside it, with what's attached, in the nearest clear spot; the copies picked
+  // a roundabout or a drop-off loop isn't copied (it belongs to its junction or its building): says so, true when one's picked
+  function ownPiece(pl, ids) { const own = pl.elements.find(e => ids.includes(e.id) && (SP.isRing(e) || SP.isLoop(e))); if (own) ctx.toast(SP.isRing(own) ? 'A roundabout belongs to its junction: add another with Add Roundabout.' : 'A drop-off loop belongs to its building: add one in front of another building with Add Drop-off Loop.'); return !!own; }
   function dupSel() {
     const pl = PL(), ids = sels(); if (!pl || !ids.length) return; if (!ed.editing) { ctx.toast('Turn on Edit Layout to copy pieces.'); return; }
     if (!ids.every(id => T.editable(T.viewOf(pl), pl.elements.find(e => e.id === id)))) { ctx.toast('That layer is locked.'); return; }
+    if (ownPiece(pl, ids)) return;
     let r = null; const n = ed.undo.length; change(x => { r = T.dupPieces(x, ids, { newId: uid }); x.elements = r.elements; for (const id of r.all) { const e = x.elements.find(q => q.id === id); if (e) makeRoom(e); } });
     if (!r?.ids.length) return; ed.sel = r.ids[0]; ed.multi = r.ids.length > 1 ? r.ids : []; ed.shape = null; draw(); panel();
     const what = ids.length > 1 ? plural(ids.length, 'piece') : ED.labelOf(pl.elements.find(e => e.id === r.ids[0]));
@@ -2319,17 +2581,21 @@ export function initSitePlan(ctx) {
     const el = card.querySelector('#spRead'); if (!el || !e) return;
     const sq = e.kind === 'building' && (e.use || SP.normalizeProgram(PL()?.program).use) === 'storage' ? SP.storageOf([{ ...e, use: 'storage' }], SP.normalizeProgram(PL()?.program)) : null; // storage: what it rents
     const pp = SP.normalizeProgram(PL()?.program), ftb = e.kind === 'building' && (e.use || pp.use) === 'foodtrucks' ? SP.ftKind(e) : null; // a food truck park: what each piece holds
-    if (e.kind === 'foodtruck') el.textContent = 'Food truck stall · ' + f0(e.w) + ' × ' + f0(e.d) + ' ft · power and water pedestal · ' + (pp.foodtrucks?.perTruck ?? SP.FOODTRUCK.perTruck) + ' parking spaces';
+    if (SP.isRing(e) || SP.isLoop(e)) { const isl = SP.islandOf(e); el.textContent = SP.isRing(e) ? 'Roundabout · ' + f0(2 * SP.ringOf(e).R) + ' ft across · ' + f0(e.width) + ' ft lane · ' + f0(SP.elArea(e)) + ' sf paving' : 'One way · ' + f0(e.width) + ' ft lane' + (isl ? ' · island ' + f0(SP.ringArea(isl)) + ' sf' : ''); }
+    else if (e.kind === 'drive' && e.net && PL()?.recipe?.net) el.textContent = e.bulb ? 'Cul-de-sac · ' + f0(2 * Math.max(...SP.shapeOf(e).map(p => Math.hypot(p[0] - e.x, p[1] - e.y)))) + ' ft across · ' + f0(SP.elArea(e)) + ' sf paving' : (e.coll ? 'Collector' : 'Street') + ' · ' + f0(e.width || 28) + ' ft pavement · ' + f0(SP.elArea(e)) + ' sf paving' + (ed.editing ? ' · Edit Shape bends it' : ''); // (a neighbourhood street: what it is, not "drag to move it")
+    else if (e.kind === 'foodtruck') el.textContent = 'Food truck stall · ' + f0(e.w) + ' × ' + f0(e.d) + ' ft · power and water pedestal · ' + (pp.foodtrucks?.perTruck ?? SP.FOODTRUCK.perTruck) + ' parking spaces';
     else if (ftb) el.textContent = f0(SP.gfaOf(e)) + ' sf' + (ftb === 'pavilion' ? ' covered · ~' + f0(SP.gfaOf(e) / SP.FOODTRUCK.seatSf) + ' seats at picnic tables' : ftb === 'bar' ? ' · ' + f0(SP.gfaOf(e) / 1000 * pp.ratio) + ' parking spaces' : ' restrooms');
     else el.textContent = e.kind === 'canopy' ? (e.pumps || 0) + ' pumps · ' + 2 * (e.pumps || 0) + ' fueling positions · ' + f0(SP.elArea(e)) + ' sf canopy (no floor area)' : e.kind === 'tanks' ? 'Underground fuel tanks · ' + f0(SP.elArea(e)) + ' sf pad, kept clear for the fuel truck' : e.kind === 'parking' && e.vac ? SP.stalls(e).count + ' air / vacuum stalls (not counted as parking)' : sq ? f0(SP.gfaOf(e)) + ' sf' + ((e.floors || 1) > 1 ? ' over ' + e.floors + ' floors' : '') + (sq.nrsf ? ' · ' + f0(sq.nrsf) + ' sf rentable · ~' + f0(sq.units) + ' units' : '') : e.kind === 'building' ? f0(SP.footArea(e)) + ' sf footprint · ' + f0(SP.gfaOf(e)) + ' sf total' : e.kind === 'parking' && e.rv ? SP.stalls(e).count + ' RV / boat spaces (' + (e.sw || 12) + ' × ' + (e.sd || 40) + ' ft)' : e.kind === 'parking' ? SP.stalls(e).count + ' spaces (' + (e.sw || SP.STALL.w) + ' × ' + (e.sd || SP.STALL.d) + ' ft stalls, ' + (e.sa || SP.STALL.aisle) + ' ft aisles)' : e.kind === 'pond' ? (SP.elArea(e) / 43560).toFixed(2) + ' acres' : f0(SP.elArea(e)) + ' sf' + (SP.isFree(e) ? ' · drag to move it' : '');
     for (const k of ['w', 'd']) { const i = card.querySelector('[data-e="' + k + '"]'); if (i && document.activeElement !== i) i.value = Math.round(e[k]); }
+    const ac = card.querySelector('[data-e="across"]'); if (ac && SP.isRing(e) && document.activeElement !== ac) ac.value = Math.round(2 * SP.ringOf(e).R);
     const r = card.querySelector('[data-e="rot"]'); if (r && document.activeElement !== r) r.value = turnVal(e);
     if (!drag) nums();
   }
   function wireSel(e) {
     if (e && sels().length > 1) { wireMulti(); return; }
     if (!e) return; readout(e);
-    card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v) || i.value === '') return; const k = i.dataset.e; if (k === 'rot' && Math.abs(T.turnPiece(e, v).rot - (e.rot || 0)) < 0.005) return; // (the same turn typed again: nothing to undo)
+    card.querySelectorAll('[data-e]').forEach(i => i.onchange = () => { const v = +i.value; if (!isFinite(v) || i.value === '') return; const k = i.dataset.e; if (i.dataset.e === 'across' || i.dataset.e === 'width' && SP.isRing(e)) { change(() => { if (i.dataset.e === 'across') SP.resizeRing(e, v / 2); else SP.resizeRing(e, null, v); e.pinned = true; }, true); readout(e); refitSoon('Resized', ED.labelOf(e)); return; } /* (a roundabout's lane: inside the same circle, held to 14–30 ft) */ if (k === 'rot' && Math.abs(T.turnPiece(e, v).rot - (e.rot || 0)) < 0.005) return; // (the same turn typed again: nothing to undo)
+      if (k === 'rot' && (T.isEntrance(e) || SP.isFree(e) && !faceted(e))) { turnEl(e, ((v - (e.rot || 0)) % 360 + 540) % 360 - 180); return; } // (a curved piece or an entrance: about its middle, SP.turnPiece)
       change(() => { if (k === 'rot') Object.assign(e, T.turnPiece(e, v)); else e[k] = k === 'floors' || k === 'units' || k === 'levels' || k === 'podium' ? Math.max(1, Math.round(v)) : k === 'r' || k === 'flare' ? Math.max(0, v) : k === 'width' ? Math.max(6, v) : Math.max(8, v); e.pinned = true; }, true); readout(e); refitSoon(k === 'rot' ? 'Turned' : undefined); });
     const ri = card.querySelector('[data-e="rot"]'); if (ri) { // Shift with the Turn field's arrows (keys or the little spinner): 15° steps
       ri.addEventListener('keydown', ev => { if (ev.shiftKey && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) { ev.preventDefault(); ri.value = T.turnStep(+ri.value || 0, ev.key === 'ArrowUp'); ri.onchange(); } });
@@ -2340,7 +2606,10 @@ export function initSitePlan(ctx) {
     card.querySelector('[data-shape]')?.addEventListener('change', ev => { change(() => { SP.reshape(e, ev.target.value); e.pinned = true; }); refitSoon(); });
     const up1 = card.querySelector('#spUnpin'); if (up1) up1.onclick = () => change(() => { delete e.pinned; });
     const rf = card.querySelector('#spRefit'); if (rf) rf.onclick = () => refitNow(true);
+    const rl = card.querySelector('#spRelay'); if (rl) rl.onclick = () => podChange([{ op: 'relay', pod: e.pod }], 'Laying ' + ((PL().zones || []).find(q => q.pod === e.pod)?.name || 'this pod') + ' out again');
+    const sw = card.querySelector('#spSwapPod'); if (sw) sw.onchange = () => { if (!sw.value) return; const zs = PL().zones || [], a = zs.find(q => q.pod === e.pod), b = zs.find(q => q.pod === sw.value); podChange([{ op: 'swap', a: e.pod, b: sw.value }], 'Swapping ' + (a?.name || 'this pod') + ' and ' + (b?.name || 'that one')); };
     card.querySelector('#spSaveLib')?.addEventListener('click', () => saveToLib(e));
+    wireNet(e);
     card.querySelector('[data-type]')?.addEventListener('change', ev => { const t = anyType(ev.target.value); if (!t) return; change(() => { const keep = { id: e.id, name: e.name, rot: e.rot }; for (const k of ['poly', 'form', 'wing', 'podium', 'unitW', 'sf', 'units', 'jog', 'shape', 'storage', 'ft', 'fuel', 'custom', 'aiSized']) delete e[k]; Object.assign(e, fromAny(t, [e.x, e.y], e.rot || 0), keep, { pinned: true }); makeRoom(e); }); ed.shape = null; draw(); panel(); }); // the same spot, another building from the library
     card.querySelector('[data-use]')?.addEventListener('change', ev => setUse([e.id], ev.target.value));
     card.querySelector('[data-ftk]')?.addEventListener('change', ev => change(() => { e.ft = ev.target.value; e.note = { pavilion: 'Covered · picnic seating', bar: 'Bar · beer garden', restroom: 'Men’s · women’s · family' }[e.ft]; }));
@@ -2350,6 +2619,9 @@ export function initSitePlan(ctx) {
     card.querySelector('[data-form]')?.addEventListener('change', ev => { if (ev.target.value === 'custom') return; change(() => { const f = ev.target.value; delete e.poly; if (f === 'bar') delete e.form; else e.form = f; if (f === 'tower') { e.podium = e.podium || 2; e.floors = Math.max(e.floors || 1, 8); } if ((f === 'L' || f === 'U') && e.d < 100) e.d = Math.min(150, e.d * 2); e.pinned = true; }); panel(); refitSoon(); });
     card.querySelector('[data-name]')?.addEventListener('change', ev => change(() => { e.name = ev.target.value.trim().slice(0, 40); }, true));
     if (card.querySelector('#spRot')) card.querySelector('#spRot').onclick = () => turnEl(e);
+    card.querySelector('#spLoop')?.addEventListener('click', () => loopAt(e));
+    card.querySelector('#spBlvd')?.addEventListener('click', () => { let r = null; change(x => { r = SP.makeBoulevard(x, e); if (!r.error) x.elements = r.elements; }); if (r?.error) { ctx.toast(r.error); return; } const t = [r.note, r.why].filter(Boolean).join(' '); if (t) ctx.toast(t); autoRefit('Widened', ED.labelOf(e)); });
+    card.querySelector('[data-signs]')?.addEventListener('change', ev => { let why = ''; change(x => { const r = SP.refreshEntry(x, e, ev.target.value); x.elements = r.elements; why = r.why; }); if (why) ctx.toast(why); });
     const shp = card.querySelector('#spShape'); if (shp) shp.onclick = () => { // its outline as points to drag: any shape, in plan
       if (ed.shape === e.id) { ed.shape = null; draw(); panel(); return; }
       shapeOn(e); };
@@ -2462,10 +2734,24 @@ export function initSitePlan(ctx) {
   // AI text shown on a Waller plan: prohibited conclusions rewritten (lib/guardrails.mjs scrub)
   const KEEP_AI = new Set(['id', 'ids', 'use', 'kind', 'type', 'model', 'form', 'streets', 'storm', 'where', 'pattern', 'product', 'key']);
   const scrubDeep = v => Array.isArray(v) ? v.map(scrubDeep) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, KEEP_AI.has(k) ? x : scrubDeep(x)])) : typeof v === 'string' ? G.scrubText(v) : v;
+  // Numbers by name: each part (a mixed plan's neighbourhood, retail center, apartments…) with its acres, homes or units
+  // and floor area, parts with the same name together, the community's name over it; only when there's more than one
+  // part or a name
+  // the sidewalks a rule sheet asks for (phase 5 draws them): its sides and width, and about how much walk the streets need
+  function walkLine(pl) {
+    const sw = pl.params?.code?.sidewalk; if (!sw || !pl.recipe?.net) return ''; const L = (pl.elements || []).filter(e => e.kind === 'drive' && e.net && e.path && !SP.isEntrance(e)).reduce((t, e) => t + e.path.reduce((a, q, i) => i ? a + Math.hypot(q[0] - e.path[i - 1][0], q[1] - e.path[i - 1][1]) : 0, 0), 0), k = { both: 2, one: 1, none: 0 }[sw.sides] ?? 2;
+    return '<div class="rnote">Sidewalks (rule sheet): ' + RSL.valueText('sidewalk', sw.sides) + (k ? ', ' + sw.w + ' ft · about ' + f0(Math.round(L * k / 1000) * 1000) + ' ft of walk' : '') + '. Not drawn or counted in paved area yet.</div>';
+  }
+  function partsTable(pl, prog) {
+    const ps = SP.partsOf(pl); if (ps.length < 2 && !ps.some(q => q.name)) return '';
+    const rows = new Map(); for (const q of ps) { const k = (q.show || q.word) + '|' + q.use, r = rows.get(k) || { name: q.show || q.word, use: SP.USES[q.use]?.label.split(' / ')[0] || q.use, acres: 0, units: 0, gfa: 0 }; r.acres += q.acres || 0; r.units += q.units || 0; r.gfa += q.gfa || 0; rows.set(k, r); }
+    return '<table class="sp-parts">' + (prog.community ? '<caption>' + esc(prog.community) + '</caption>' : '') + '<tr><th>Part</th><th>Use</th><th class="r">Acres</th><th class="r">Homes / units</th><th class="r">Floor area</th></tr>' +
+      [...rows.values()].map(r => '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.use) + '</td><td class="r">' + (r.acres ? r.acres.toFixed(1) : '—') + '</td><td class="r">' + (r.units ? f0(r.units) : '—') + '</td><td class="r">' + (r.gfa ? f0(r.gfa) + ' sf' : '—') + '</td></tr>').join('') + '</table>';
+  }
   function nums() {
     const el = card.querySelector('#spNums'), pl = PL(); if (!el || !pl) return;
     if (pl.ring.length < 3) { el.innerHTML = ''; return; }
-    const m = GM(pl), issues = GC(pl), prog = SP.normalizeProgram(pl.program), z = pl.zoning || {}, ph = pl.elements.some(e => e.phase === 2), cs = CU.customStats(pl);
+    const m = GM(pl), issues = checkAll(pl), prog = SP.normalizeProgram(pl.program), z = pl.zoning || {}, ph = pl.elements.some(e => e.phase === 2), cs = CU.customStats(pl);
     const m1 = ph ? GM({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, pk = parkOf(m, m1), whole = twoPhase(m, m1);
     const la = m.gfa ? areaFor(pl) : null, la1 = la && m1 ? areaFor({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null; // what's leased, as the Pro forma counts it
     const gOn = GON(pl), gT = gOn ? G.tagsOf(pl) : null, TG = k => gT ? ' ' + tagH(gT[k]) : ''; // a Waller plan: each number's classification
@@ -2493,8 +2779,9 @@ export function initSitePlan(ctx) {
       (m.heightFt ? tile('Height' + TG('height'), 'about ' + m.heightFt + ' ft', +z.max_building_height_ft ? 'max ' + z.max_building_height_ft + ' ft' : '', +z.max_building_height_ft && m.heightFt > +z.max_building_height_ft ? ' bad' : '') : '') + '</div>' +
       (m.mix.length ? '<table class="sp-mixt"><tr><th>Unit</th><th>SF</th><th>Units</th><th>%</th><th>Net sf</th></tr>' + m.mix.map(t => '<tr><td>' + esc(t.name) + '</td><td>' + f0(t.sf) + '</td><td>' + f0(t.n) + '</td><td>' + pct(t.n / Math.max(1, m.mix.reduce((s, x) => s + x.n, 0))) + '</td><td>' + f0(t.n * t.sf) + '</td></tr>').join('') + '</table>' : '') +
       (m.storage?.units ? storageTable(m.storage, prog) : '') +
+      partsTable(pl, prog) +
       (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + n + '-story</td><td>' + f0(SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
-      (cs ? customBlock(cs) : '') +
+      (cs ? customBlock(cs) : '') + walkLine(pl) +
       (issues.length ? '<ul class="sp-issues">' + issues.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul>' : m.gfa ? '<div class="rnote sp-ok">Fits the setbacks' + (m.spaces >= m.required ? ' and parks' : '') + (gOn ? ', within the planning checks' : '') + '.</div>' : '') +
       (gOn ? guardNums(pl) : '');
     el.querySelector('#spSaveType')?.addEventListener('click', saveTypeToLib); if (gOn) wireGuard();
@@ -2618,14 +2905,16 @@ export function initSitePlan(ctx) {
     };
   }
 
-  // Turn 90° (or R): like a drag, it stays clear of the other buildings and drives (the nearest clear spot), the parking
-  // under it gives way and grows back where it was
-  function turnEl(el) {
-    let blocked = false;
-    change(x => { const o = clone(el); Object.assign(el, T.turnPiece(el, (el.rot || 0) + 90)); el.pinned = true; // (a custom outline turns about its middle)
-      if (el.kind === 'building' || el.kind === 'garage') { const att = SP.attachedTo(x, el), c = SP.clearSpot(x, el, { carry: att, reach: Math.max(el.w || 0, el.d || 0) + 60 }); if (c && (c[0] || c[1])) for (const t of [el, ...att]) SP.moveBy(t, c[0], c[1]); blocked = !c; }
+  // Turn 90° (or R; Shift+R the other way): like a drag, it stays clear of the other buildings and drives (the nearest
+  // clear spot), the parking under it gives way and grows back where it was. Any piece turns, curved and drawn ones too;
+  // an entrance 15° a press (a quarter turn would lay it along the street), swinging about its middle with its mouth
+  // sliding along the street, its median and signs drawn again with it
+  function turnEl(el, deg = T.isEntrance(el) ? 15 : 90) {
+    let blocked = false, why = '';
+    change(x => { const o = clone(el), r = SP.turnPiece(x, el, deg); x.elements = r.elements; why = [r.why, r.note].filter(Boolean).join(' '); el.pinned = true;
+      if (el.kind === 'building' || el.kind === 'garage' || el.kind === 'pond' || SP.isPark(el)) { const att = SP.attachedTo(x, el), c = SP.clearSpot(x, el, { carry: att, reach: Math.max(el.w || 0, el.d || 0) + 60, ...(SP.isPark(el) || el.kind === 'pond' ? { obs: SP.placeObs(x, el, att, SP.shapeOf(o)) } : {}) }); /* (a pond: homes make way, the drives don't, as Change With AI turns one) */ if (c && (c[0] || c[1])) for (const t of [el, ...att]) SP.moveBy(t, c[0], c[1]); blocked = !c; }
       makeRoom(el, [o]); });
-    refitSoon('Turned', ED.labelOf(el));
+    refitSoon('Turned', ED.labelOf(el)); if (why) ctx.toast(why);
     if (blocked) ctx.toast('No clear spot for it turned that way: it overlaps (in red). Turn it again or drag it.', { action: { label: 'Undo', run: () => { if (ed) undo(true); } } });
   }
   // a parking piece's stalls: Stall Direction turns them 90° inside the same outline; Face the Building squares them to
@@ -2655,7 +2944,7 @@ export function initSitePlan(ctx) {
   const CLEAR = ['building', 'garage', 'pool', 'court', 'play', 'pond', 'patio', 'trash', 'foodtruck'];
   const boxOf = r => [Math.min(...r.map(p => p[0])), Math.min(...r.map(p => p[1])), Math.max(...r.map(p => p[0])), Math.max(...r.map(p => p[1]))];
   function obstacles(x, e, carry, { parking = false, kinds = null, gap = 4 } = {}) { // gap: clear space kept round a parking lot (a piece placed on a lot cuts the rows within 5 ft of it)
-    const o = SP.spotObstacles(x, e, carry, kinds); if (!parking) return o;
+    const o = SP.isPark(e) && !kinds ? SP.placeObs(x, e, carry) : SP.spotObstacles(x, e, carry, kinds); if (!parking) return o; // (a park: the homes make way, they aren't in the way)
     return o.concat(x.elements.filter(q => q.kind === 'parking' && !carry.includes(q)).map(q => { const sh = gap > 4 ? SP.offsetRing(SP.shapeOf(q), gap) : SP.shapeOf(q); return { s: sh, b: boxOf(sh), g: gap }; })); // a wider gap is part of the outline: the spot search only tests for overlap
   }
   function gridSpot(x, e, carry, obs) {
@@ -2666,7 +2955,7 @@ export function initSitePlan(ctx) {
     return null;
   }
   function placeClear(x, e, carry = [], keepLots = false) { // keepLots: every spot that leaves the parking alone before one over it
-    if (!CLEAR.includes(e.kind)) return 'clear';
+    if (!CLEAR.includes(e.kind) && !SP.isPark(e)) return 'clear';
     const open = obstacles(x, e, carry, { parking: true, gap: keepLots ? 6 : 4 }), std = obstacles(x, e, carry);
     let how = 'clear', c = SP.clearSpot(x, e, { carry, obs: open, reach: 200 }) || (keepLots ? gridSpot(x, e, carry, open) : null) || SP.clearSpot(x, e, { carry, obs: std, reach: 120 }) || gridSpot(x, e, carry, open) || gridSpot(x, e, carry, std);
     if (!c) { c = gridSpot(x, e, carry, obstacles(x, e, carry, { kinds: ['building', 'garage', 'pond', 'pool', 'court', 'play'] })); how = c ? 'drive' : 'none'; }
@@ -2689,12 +2978,29 @@ export function initSitePlan(ctx) {
     const { at, rot } = addAt(pl), e = { id: uid(), ...fromAny(t, at, rot), ...(pl.recipe ? { pinned: true } : {}) };
     let how = 'clear'; change(x => { how = placeClear(x, e); x.elements.push(e); makeRoom(e); }); ed.sel = e.id; draw(); panel(); showPiece(e); noRoom(how);
   }
+  // a roundabout at the junction nearest p (the middle of the view, the spot it was dropped on or clicked: near, a tighter
+  // snap), or the next one along when that has no room; a drop-off loop in front of building b. Each one undo step, picked,
+  // and the rest re-fits round it
+  const loopFor = b => b?.kind === 'building' && !['sfr', 'townhomes', 'duplex'].includes(b.use || SP.normalizeProgram(PL()?.program).use);
+  function ringAt(p, near) {
+    const pl = PL(); if (!pl) return; const r = SP.addRoundabout(pl, p, { id: uid(), snap: near ? 400 : 600, near: true }); if (r.error) { ctx.toast(r.error); return; }
+    change(x => { x.elements = r.elements; }); ed.sel = r.roundabout.id; ed.multi = []; ed.mode = null; ed.editing = true; ed.shape = null; draw(); panel(); showPiece(r.roundabout);
+    ctx.toast(r.roundabout.name + ' added where ' + SP.meetsWord(r.meets) + ' meet.' + (r.note ? ' ' + r.note : '')); refitSoon('Added', r.roundabout.name);
+  }
+  function loopAt(b) {
+    const pl = PL(); if (!pl || !b) return; const r = SP.addLoop(pl, b, { id: uid() }); if (r.error) { ctx.toast(r.error); return; }
+    change(x => { x.elements = r.elements; }); ed.sel = r.loop.id; ed.multi = []; ed.mode = null; ed.editing = true; ed.shape = null; draw(); panel(); showPiece(r.loop);
+    ctx.toast('Drop-off loop added at ' + ED.labelOf(b) + '.' + (r.note ? ' ' + r.note : '')); refitSoon('Added', r.loop.name);
+  }
   function addEl(kind, at0) {
     const pl = PL(); if (!pl || pl.ring.length < 3) return;
     const { at, rot } = addAt(pl, at0), prog = SP.normalizeProgram(pl.program), [w, d] = kind === 'building' ? [Math.round(Math.max(40, Math.min(240, 12000 / prog.depth))), Math.round(Math.min(prog.depth, 160))] : SIZE[kind];
     const pin = PL().recipe ? { pinned: true } : {}, pp = { ...PARAMS, ...(pl.params || {}) };
     const stall = kind === 'parking' && (+pp.stallW !== SP.STALL.w || +pp.stallD !== SP.STALL.d || +pp.aisle !== SP.STALL.aisle) ? { sw: +pp.stallW || SP.STALL.w, sd: +pp.stallD || SP.STALL.d, sa: +pp.aisle || SP.STALL.aisle } : {}; // the plan's stall and aisle sizes (Site parameters)
     let how = 'clear';
+    if (kind === 'roundabout') { ringAt(at, !!at0); return; }
+    if (kind === 'loop') { const sel = pl.elements.find(e => e.id === ed.sel), b = loopFor(sel) ? sel : pl.elements.filter(loopFor).map(b => ({ b, d: Math.hypot(b.x - at[0], b.y - at[1]) })).filter(q => q.d <= 300).sort((p, q) => p.d - q.d)[0]?.b;
+      if (b) loopAt(b); else { ed.mode = 'loop'; draw(); panel(); } return; } // (none picked or near: click the building)
     if (kind === 'pad') { // a restaurant pad: the building, its outdoor seating by the door and a drive-thru lane round it
       const L = (u, v) => { const q = SP.rotPt([u, v], rot); return [+(at[0] + q[0]).toFixed(2), +(at[1] + q[1]).toFixed(2)]; };
       const b = { id: uid(), kind: 'building', ...Object.fromEntries(['x', 'y'].map((k2, i) => [k2, L(0, 0)[i]])), w: 44, d: 50, rot, use: 'restaurant', floors: 1, name: 'Pad', note: 'Restaurant · drive-thru', ...pin };
@@ -2702,7 +3008,7 @@ export function initSitePlan(ctx) {
       const lane = { id: uid(), kind: 'drive', path: [L(-34, 60), L(-34, -37), L(50, -37), L(50, 60)], width: 12, r: 14, name: '', note: 'Drive-thru lane', ...pin };
       change(x => { how = placeClear(x, b, [patio, lane]); x.elements.push(b, patio, lane); }); ed.sel = b.id; ed.multi = []; draw(); panel(); refitSoon('Added', ADD_SHORT.pad); noRoom(how); return;
     }
-    const e = { id: uid(), kind, x: +at[0].toFixed(2), y: +at[1].toFixed(2), w, d, rot, ...(kind === 'building' ? { floors: prog.floors } : {}), ...(kind === 'garage' ? { levels: 4, name: 'Parking garage' } : {}), ...(kind === 'play' ? { name: 'Playground' } : {}), ...(kind === 'court' ? { name: 'Pickleball courts' } : {}), ...(kind === 'patio' ? { note: 'Outdoor seating' } : {}), ...stall, ...pin };
+    const e = { id: uid(), kind, x: +at[0].toFixed(2), y: +at[1].toFixed(2), w, d, rot, ...(kind === 'building' ? { floors: prog.floors } : {}), ...(kind === 'garage' ? { levels: 4, name: 'Parking garage' } : {}), ...(kind === 'play' ? { name: 'Playground' } : {}), ...(kind === 'court' ? { name: 'Pickleball courts' } : {}), ...(kind === 'patio' ? { note: 'Outdoor seating' } : {}), ...(kind === 'sign' ? { name: 'Monument sign' } : {}), ...stall, ...pin };
     const lots0 = kind === 'garage' ? pl.elements.filter(x => x.kind === 'parking').length : 0;
     change(x => { how = placeClear(x, e, [], kind === 'garage'); x.elements.push(e); if (kind === 'garage') makeRoom(e); }); ed.sel = e.id; ed.multi = []; draw(); panel(); refitSoon('Added', ADD_SHORT[kind] || ED.labelOf(e)); noRoom(how); // no camera move: it lands in view (the middle of it, or where you clicked)
     if (lots0 && PL().elements.filter(x => x.kind === 'parking').length < lots0) ctx.toast('Replaced Parking with Parking garage', { action: { label: 'Undo', run: () => { if (ed) undo(true); } } }); // no room beside it: the lot gave way
@@ -2781,6 +3087,7 @@ export function initSitePlan(ctx) {
     const side = (pl.streets || []).filter(k => k !== f && k < pl.ring.length).map(k => Math.round(SP.edgeLen(pl.ring, k))), boxA = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
     return { acres: +(SP.ringArea(pl.ring) / 43560).toFixed(3), widthFt: Math.round(Math.max(...xs) - Math.min(...xs)), depthFt: Math.round(Math.max(...ys) - Math.min(...ys)), frontageFt: Math.round(SP.edgeLen(pl.ring, f)),
       sideStreetsFt: side, shape: pl.ring.length <= 4 && SP.ringArea(pl.ring) > boxA * 0.92 ? 'rectangular' : SP.ringArea(pl.ring) > boxA * 0.8 ? 'mostly rectangular, ' + pl.ring.length + ' sides' : 'irregular, ' + pl.ring.length + ' sides (about ' + Math.round(SP.ringArea(pl.ring) / boxA * 100) + '% of its bounding box)',
+      streets: [f, ...(pl.streets || []).filter(k => k !== f)].filter(k => k < pl.ring.length).map(k => { const nm = pl.streetNames?.[k] || null; return { side: k === f ? 'front' : 'side', name: nm, highway: /\b(?:hwy|highway|fm|us|sh|i-?\d|interstate|freeway|parkway|tollway|loop)\b/i.test(nm || '') }; }),
       address: parcel?.label || '', city: ctx.nearestPlace?.(pl.origin) || '', county: (ctx.DATA?.counties || []).find(c => SP.inRing(pl.origin, c.outline?.[0]?.[0] || []))?.name || '', zoning: pl.zoning };
   }
   // ---------- AI: what to build, then the engine's layouts reviewed and revised ----------
@@ -2861,7 +3168,7 @@ export function initSitePlan(ctx) {
     const thinks = ai && !!L.plan, o0 = thinks ? 1 : 0, planStep = L.plan?.count > 1 ? 'Thinking through ' + L.plan.count + ' plans for the site' : 'Thinking the site through';
     const steps0 = !review ? ['Reading your request', lay] : L.rounds === 1 ? ['Reading your request', lay, 'AI review'] : ['Reading your request', lay, 'AI review', 'Comparing'];
     const run = startRun('build', thinks ? [planStep, ...steps0] : steps0, src, { ask, effort: lvl }); if (!run) return;
-    let prog = SP.guessProgram(ask), setbacks = pl.setbacks, note = '', aiOk = false, assumed = [], strategy = null;
+    let prog = SP.keepNames(SP.guessProgram(ask), pl.program), setbacks = pl.setbacks, /* (a new program keeps the plan's names) */ note = '', aiOk = false, assumed = [], strategy = null;
     const site = ai ? siteInfo(p, pl) : null, facts = ai ? await factsFor(pl) : null; if (!live(run)) return;
     if (!terrainNow(pl)) { await Promise.race([terrainOf(pl), new Promise(res => setTimeout(res, 6000))]); if (!live(run)) return; } // (asked once per boundary; usually here already)
     // a commercial site (Medium and up): the planning step also writes the AI's brief for the parking-field engine, decided
@@ -2876,7 +3183,7 @@ export function initSitePlan(ctx) {
     if (thinks) runStep(run, 2, 'Reading your request' + (strategy ? ' (following the plan)' : ''));
     if (ai) try {
       const d = await post({ prompt: ask, site, facts, program: pl.program, effort: L.effort, teamTypes: CU.teamTypesForAI(TL.list()), ...(strategy ? { strategy } : {}) }, run.ctl.signal);
-      prog = d.program || prog; setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
+      prog = SP.keepNames(d.program || prog, pl.program); setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
     } catch (e) { if (!live(run)) return; note = e.status === 503 ? '' : navigator.onLine ? 'The AI didn’t answer, so this read your words directly.' : 'Offline: this read your words directly.'; }
     if (!live(run) || PL() !== pl) return;
     if (!aiOk) { run.steps = run.steps.slice(0, 2 + o0); strategy = null; if (aiB) aiBNote = ''; aiB = null; } // the AI is off: no review either (nor its plan: the note above says it didn't answer)
@@ -2911,7 +3218,7 @@ export function initSitePlan(ctx) {
     if (ed.ideas?.list?.length) { if (!ed.ideas.list.some(it => it.request === ask)) ed.ideas = { ...ed.ideas, used: null }; else if (ed.ideas.used != null) ed.ideasOpen = false; } // the idea laid out: the ideas fold to a line
     run.applied = true;
     const rec0 = K.recommended(variants, null), best = rec0 ? rec0.index : variants.findIndex(v => v.elements.length); // never a failing layout when one passes
-    if (best >= 0) await useVariant(best, { quiet: true }); else saveRun(pl);
+    if (best >= 0) await useVariant(best, { quiet: true, fresh: true }); else saveRun(pl);
     if (!live(run)) return;
     if (!doReview) { endRun(run); if (best < 0 && !failed) ctx.toast('Nothing fits that request on this site.'); return; } // (a failed layout already said so)
     panel(); showLayouts(run);
@@ -2981,7 +3288,7 @@ export function initSitePlan(ctx) {
   async function pickAi() {
     const k = ed.aiPick, pl = PL(), i = k && ed.variants ? ed.variants.findIndex(v => v.key === k) : -1; if (i < 0 || pl?.variant?.key === k) return;
     const failing = K.passes(ed.variants[i].chk) === false && ed.variants.some(v => K.passes(v.chk)); // a failing layout never goes on the map by itself when one passes
-    if (!ed.pickedByUser && !dirty(pl) && !failing) { await useVariant(i, { quiet: true }); return; }
+    if (!ed.pickedByUser && !dirty(pl) && !failing) { await useVariant(i, { quiet: true, fresh: true }); return; }
     const n = numOf(ed.variants[i]); ctx.toast('The AI recommends ' + n + (failing ? ', though it doesn’t pass every check' : '') + '.', { action: { label: 'Use it', run: () => { const j = ed?.variants?.findIndex(v => v.key === k); if (j >= 0) askReplace(() => useVariant(j)); } } });
   }
   // easements on the plan go into every layout run: the layouts keep off them and carry them along
@@ -2992,7 +3299,7 @@ export function initSitePlan(ctx) {
   // AI call and drops whatever arrives after (a layout already running in the worker finishes, unused).
   let runTok = 0, runTick = 0;
   const LAYS = ['build', 'more', 'resolve']; // runs that put layouts on the map: a hand edit before they land cancels them
-  const LOCK = ['#spGo', '#spBest', '[data-idea]', '[data-sug]', '#spMore', '#spResolve', '#spNewLay', '#spRefitMine', '#spStaleRefit', '#spStaleNew', '#spReReview', '#spChgGo', '[data-eff]', '#spOvUpd'];
+  const LOCK = ['#spGo', '#spBest', '[data-idea]', '[data-sug]', '#spMore', '#spResolve', '#spNewLay', '#spRefitMine', '#spStaleRefit', '#spStaleNew', '#spReReview', '#spChgGo', '#spChgNew', '[data-eff]', '#spOvUpd'];
   const live = r => !!(r && ed && ed.run === r && !r.cancelled);
   const mmss = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   const pillEl = document.createElement('div'); pillEl.className = 'sp-runpill'; pillEl.hidden = true; document.body.appendChild(pillEl);
@@ -3068,39 +3375,79 @@ export function initSitePlan(ctx) {
   const aiOff = () => !!(ctx.spAiOff && Date.now() - ctx.spAiOff < 3e5);
   const aiSaw = e => { if (e?.status === 503) ctx.spAiOff = Date.now(); };
   // changes by name: the AI reads the plan (its pieces, a picture of it) and the words, and answers with edits on those
-  // pieces; they're applied here, pinned, and the rest re-fits round them when asked. Without the AI the words are read
-  // directly ("make bldg 7 four stories", "remove bldg 3").
+  // pieces, or on every piece of a sort ("all the apartments 3 stories"); they're applied here, pinned, and the rest
+  // re-fits round them when asked. Homes on lots change stories through the home mix ("no 3-story homes"): the program
+  // and recipe take the new mix and the site re-fits, the lots laid out again along the same streets at the widths
+  // those homes need. Without the AI the words are read directly ("make bldg 7 four stories", "remove bldg 3").
   async function aiChange() {
     const p = P(), pl = PL(); if (!pl?.elements.length) return;
     const ask = (ed.chg || '').trim(); if (!ask) { ctx.toast('Say what to change, e.g. “make Apt Bldg 7 four stories”.'); card.querySelector('#spChg')?.focus(); return; }
     if (ed.run) { ctx.toast('Wait for the run under way, or Cancel it.'); return; }
     const off = aiOff(), run = startRun('change', [off ? 'Reading your words' : 'Reading the plan and your request', 'Making the changes'], '#spChgGo'); if (!run) return;
-    const sel = ed.sel; let ops = [], full = false, note = '', question = null, byAi = false;
+    const sel = ed.sel; let ops = [], mix = null, names = null, stn = null, full = false, note = '', question = null, byAi = false; // (stn: street names on or off, and a theme)
     try {
       if (off) throw Object.assign(new Error('AI off'), { status: 503 });
       let image = null; try { image = await planImage(pl); } catch (e) { /* words and numbers only */ }
       const d = await post({ mode: 'edit', prompt: ask, site: siteInfo(p, pl), plan: ED.describePlan(pl, sel), image }, run.ctl.signal);
-      ops = d.ops || []; full = d.refit === 'full'; note = d.summary || ''; question = d.question; byAi = true;
-    } catch (e) { if (!live(run)) return; ops = ED.guessEdits(ask, pl, sel); full = /\bre-?(?:fit|lay)/i.test(ask); note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this read your words directly.'; }
+      ops = d.ops || []; mix = d.homeMix?.length ? d.homeMix : null; names = d.names?.community || d.names?.parts?.length ? d.names : null; stn = typeof d.streetNames?.on === 'boolean' ? d.streetNames : null; full = d.refit === 'full'; note = d.summary || ''; question = d.question; byAi = true;
+    } catch (e) { if (!live(run)) return; names = ED.guessNames(ask, pl, sel); const said = names ? names.rest : ask; ops = said ? ED.guessEdits(said, pl, sel) : []; mix = said ? ED.guessMix(said, pl) : null; full = /\bre-?(?:fit|lay)/i.test(ask); note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this read your words directly.'; } // (names first: "call the neighbourhood…" never renames a piece; the rest of the words are edits)
     if (!live(run) || PL() !== pl) return;
-    if (!ops.length) { ed.chgDone = null; ed.chgNote = question || (note ? note + ' ' : '') + 'Couldn’t tell what to change: name the piece as it’s labelled (“Apt Bldg 7”), or select it and say “it”.'; endRun(run); return; }
-    full = (full || ed.chgFit) && !!pl.recipe; runStep(run, 2);
-    const depth = ed.undo.length, was = pl.elements.slice(); // to undo it, and to show what went
-    let r = null; change(x => { r = ED.applyEdits(x, ops, { refit: full, spare: x.spareRows = (x.spareRows || []).slice(-40) }); x.elements = r.elements; if (r.streets !== (x.streets || [])) x.streets = r.streets; });
+    const hm = mix && pl.recipe ? ED.withHomeMix(pl, mix) : null; // (a plan drawn by hand has no layout to lay the lots out again with)
+    if (!ops.length && !hm && !names && !stn) { ed.chgDone = null; ed.chgNote = question || (mix ? 'This plan was drawn by hand, so its homes can’t be laid out again with a new mix: change the Home mix in Settings and build new layouts.' : (byAi ? 'The AI didn’t find anything on the plan to change for that.' : note) + ' Name the piece as it’s labelled (“Apt Bldg 7”), select it and say “it”, or say what to change across the site (“all the apartments 3 stories”, “no 3-story homes”).'); endRun(run); return; }
+    full = (full || ed.chgFit || !!hm) && !!pl.recipe; runStep(run, 2);
+    const depth = ed.undo.length, was = pl.elements.slice(), prog0 = pl.program, recipe0 = pl.recipe; // to undo it, and to show what went
+    const homeOk = e => !(e.kind === 'building' && e.use === 'sfr' && e.pinned && !hm.mix.some(t => t.stories === (e.floors || 1))); // a home placed by hand that the new mix leaves out is laid out again
+    if (!ops.length && !hm) full = false; // (names alone never re-fit)
+    const net0 = pl.recipe?.net ? netSig(pl) : null; // (a neighbourhood's streets changed: its lots re-flow along them)
+    let r = null; change(x => { r = ED.applyEdits(x, ops, { refit: full, spare: x.spareRows = (x.spareRows || []).slice(-40) }); x.elements = r.elements; if (r.zones) x.zones = r.zones; if (r.streets !== (x.streets || [])) x.streets = r.streets; if (r.recipe) x.recipe = r.recipe;
+      if (hm) { x.program = hm.program; x.recipe = hm.recipe; x.elements = x.elements.map(e => homeOk(e) ? e : { ...e, pinned: false }); }
+      if (names) { const n = ED.applyNames(x, names); x.program = n.program; r.done.push(...n.done); r.skipped.push(...n.skipped); } }); // the community's and the parts' names, in the same undo step (after the home mix's program, so it keeps them)
+    if (mix && !hm) r.skipped.push('This plan was drawn by hand, so its homes can’t be laid out again with a new mix: change the Home mix in Settings and build new layouts.');
+    if (!hm && ops.length && ops.every(o => /^pod:/.test(o.target || '') || o.action === 'relay' || o.action === 'swap' && o.kind === 'pod')) full = false; // (pods only: laid out again below, or renamed; nothing else to re-fit)
+    if (r.pods?.length && pl.recipe?.pods) { // pods laid out again or swapped, in the same undo step: merged and checked there, so no re-fit after
+      run.steps = [...run.steps, 'Laying those pods out again']; runStep(run, 3); let rp = null; try { rp = await laid('pods', PL(), r.pods); } catch (e) { console.warn('pods', e); } if (!live(run)) return;
+      if (rp && !rp.error && rp.elements?.length && PL() === pl) { pl.elements = rp.elements; pl.zones = rp.zones; pl.recipe = clone(rp.recipe); if (rp.program) pl.program = rp.program; pl.spareRows = []; markEdited(pl); handEdit(); /* (after change(), which saw nothing move: the plan is edited, so a Settings change asks before replacing it) */ r.done = r.done.map(t => t.replace(/^Re-laying (.+)…$/, 'Re-laid $1.').replace(/^Swapping (.+)…$/, 'Swapped $1.'));
+        for (const t of rp.notes || []) if (/isn’t|aren’t|fits about|nothing lays|no drive reaches|stay where/.test(t)) r.skipped.push(t); }
+      else r.skipped.push(rp?.error || 'Those pods couldn’t be laid out again; they stay as they were.');
+      if (!hm && !ops.some(o => !/^pod:/.test(o.target || '') && o.action !== 'relay' && !(o.action === 'swap' && o.kind === 'pod'))) full = false; }
+    if (r.blocks?.length && pl.recipe?.net) { // a neighbourhood's blocks laid out again (lib/streetnet.mjs relayBlock), in the same undo step
+      run.steps = [...run.steps, 'Laying the block’s streets out again']; runStep(run, 3);
+      for (const b of r.blocks) { let rb = null; try { rb = await laid('net', PL(), { ...b, k: relayNext(b.at) }); } catch (e) { console.warn('relay', e); } if (!live(run)) return;
+        if (rb && !rb.error && rb.elements?.length && PL() === pl) { pl.elements = rb.elements; pl.recipe = clone(rb.recipe); pl.spareRows = []; markEdited(pl); handEdit(); if (ed.relayK && rb.block) ed.relayK.block = rb.block; const i = r.done.indexOf('Laying that block’s streets out again…'); if (i >= 0) r.done[i] = (rb.notes || [])[0] || 'Laid that block’s streets out again.'; }
+        else { r.done = r.done.filter(t => t !== 'Laying that block’s streets out again…'); r.skipped.push(rb?.error || 'That block couldn’t be laid out again; it stays as it was.'); } }
+      if (!hm && ops.every(o => o.action === 'relay')) full = false;
+      if (!stn && !r.streetNames && PL() === pl) { const x = await newNames(pl); if (!live(run)) return; if (x && PL() === pl) { const n = SNm.applyNames(pl, x.names); pl.elements = n.elements; pl.recipe = n.recipe; r.done.push('Named the block’s new streets.' + (x.note ? ' ' + x.note : '')); } } } // (street names on: the new streets named too)
+    const netMoved = net0 != null && net0 !== netSig(pl) && !r.blocks?.length; if (netMoved) full = true; // (a street ended, bowed or taken out: its lots re-flow, and losing the homes on it is what was asked)
     const gone = was.filter(e => !['parking', 'green', 'lot', 'trail'].includes(e.kind) && !pl.elements.some(x => x.id === e.id)); // removed (not parking rows that gave way)
     if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; draw(); // Edit Layout stays as it was
-    let held = null; if (full) { run.steps = [...run.steps, 'Re-fitting the rest of the site']; runStep(run, 3); let rf = null; try { rf = await refitOf(PL(), { amount: 'current' }); } catch (e) { console.warn('refit', e); }
+    // the re-fit keeps the streets as they are (keep): it never quietly starts the whole site over with new streets; when
+    // that leaves a problem or short parking it says so and offers New Layouts
+    let held = null, newLay = false; if (full) { run.steps = [...run.steps, 'Re-fitting the rest of the site']; runStep(run, 3); let rf = null; try { rf = await refitOf(PL(), { amount: 'current', keep: true }); } catch (e) { console.warn('refit', e); }
       if (!live(run)) return;
+      let kept = null; if (rf?.kept && PL() === pl) { const pin = new Set(rf.elements.filter(e => e.pinned).map(e => e.id)), m = SP.metrics({ ...pl, elements: rf.elements }), bad = SP.check({ ...pl, elements: rf.elements }).filter(i => i.level === 'bad' && !pin.has(i.id)).length, short = Math.max(0, Math.round(m.required - m.spaces));
+        kept = 'Kept the street arrangement: re-fitting round the change left ' + (bad ? (bad === 1 ? 'a problem' : bad + ' problems') + (short ? ' and parking ' + SP.spacesWord(short) + ' short' : '') : 'parking ' + SP.spacesWord(short) + ' short') + '. New Layouts lays the whole site out afresh.'; newLay = true; }
       // the same guard as re-fitting after a hand edit: a re-fit that would lose homes, units or floor area (a whole street
       // of houses dropped round a moved community center) or add problems isn't taken; the change stays and Re-fit
       // anyway is offered
       const at = els => ({ m: GM({ ...pl, elements: els }), issues: GC({ ...pl, elements: els }) }), v = rf && PL() === pl ? T.refitVerdict(at(pl.elements), at(rf.elements)) : null;
-      if (v && !v.ok) { r.skipped.push('Re-fitting the rest of the site would have ' + (v.why === 'problems' ? 'added problems' : v.why === 'units' ? 'lost homes or units' : 'lost floor area') + ', so only those pieces changed.'); held = rf; rf = null; }
-      else if (PL() === pl && rf) { pl.elements = rf.elements; pl.spareRows = []; if (rf.recipe) pl.recipe = clone(rf.recipe); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; }
-      else if (!rf && !held) r.skipped.push('The rest couldn’t be re-fitted around it, so only those pieces changed.'); }
+      if (hm) { // a new home mix is only real once the lots are laid out again: fewer homes on wider lots is what was asked for
+        if (rf && PL() === pl) { pl.elements = rf.elements; pl.spareRows = []; if (rf.recipe) pl.recipe = clone(rf.recipe); if (rf.zones) pl.zones = clone(rf.zones); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null;
+          const n0 = was.filter(e => e.kind === 'building' && e.use === 'sfr').length, n1 = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr').length;
+          r.done.push('Home mix: ' + ED.mixText(hm.mix) + '; ' + (n0 === n1 ? n1 + ' homes' : n0 + ' → ' + n1 + ' homes') + ', the lots laid out again along the same streets.');
+          if (v?.why === 'problems') r.skipped.push('Laying the homes out again left a problem or two: see the checks.'); }
+        else { pl.program = prog0; pl.recipe = recipe0; r.skipped.push('The homes couldn’t be laid out again with that mix, so their stories didn’t change.' + (refitNo ? ' ' + refitNo : '')); } }
+      else if (v && !v.ok && !netMoved) { r.skipped.push('Re-fitting the rest of the site would have ' + (v.why === 'problems' ? 'added problems' : v.why === 'units' ? 'lost homes or units' : 'lost floor area') + ', so only those pieces changed.'); held = rf; rf = null; }
+      else if (PL() === pl && rf) { pl.elements = rf.elements; pl.spareRows = []; if (rf.recipe) pl.recipe = clone(rf.recipe); if (rf.zones) pl.zones = clone(rf.zones); if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; }
+      else if (!rf && !held) { r.skipped.push('The rest couldn’t be re-fitted around it, so only those pieces changed.'); newLay = true; }
+      if (kept && rf) r.skipped.push(kept); } // (held back: the line above says why)
+    const asked = stn || (r.streetNames?.hand ? null : r.streetNames || null); stn ||= r.streetNames || null; // street names: on (the streets named, every one again for a theme), off (hidden, kept), or switched on by a street named here (named, nothing else)
+    if (stn && pl.recipe?.net && PL() === pl) { const sn = { ...(pl.params?.streetNames || {}), on: stn.on !== false, ...(stn.theme ? { theme: stn.theme } : {}) }; pl.params = { ...(pl.params || {}), streetNames: sn };
+      if (stn.on === false) r.done.push('Street names off (kept for when they’re turned on again).');
+      else if (asked) { run.steps = [...run.steps, 'Naming the streets']; runStep(run, run.steps.length - 1); const x = await streetNamesOf(p, pl, !!asked.theme, r.named || []); if (!live(run)) return; // (a street named in the same words keeps that name)
+        if (x && PL() === pl) { const n = SNm.applyNames(pl, x.names); pl.elements = n.elements; pl.recipe = n.recipe; r.done.push(namedSay(x, sn.theme || '')); } } }
     // what it did as a checklist, with Undo this change, and (parking short) Re-fit around my changes; on the map, what
     // it touched flashes and what it removed fades out
-    ed.chgNote = ''; ed.chgDone = { items: MAP.checklist(r.done), skipped: r.skipped, note, depth, after: ed.undo.length, held };
+    ed.chgNote = ''; ed.chgDone = { items: MAP.checklist(r.done), skipped: r.skipped, note, depth, after: ed.undo.length, held, newLay };
     ed.chg = ''; pl.updated = new Date().toISOString(); save(P()); endRun(run);
     flash(r.touched.filter(id => pl.elements.some(x => x.id === id))); fadeGone(gone, pl);
     card.querySelector('#spChgDone')?.scrollIntoView({ block: 'nearest' });
@@ -3113,13 +3460,15 @@ export function initSitePlan(ctx) {
       '<ul class="sp-chk">' + D.items.map(t => '<li>' + esc(t) + '</li>').join('') + D.skipped.map(t => '<li class="skip">' + esc(t) + '</li>').join('') + '</ul>' +
       (short > 0 && m.gfa ? '<div class="rnote sp-warn">Parking is now ' + SP.spacesWord(short) + ' short.</div>' : '') +
       '<div class="sp-row sp-chg-acts">' + (D.held && still ? '<button type="button" class="btn sm" id="spChgHeld" title="Take the re-fit anyway: the rest of the site laid out again around the change">Re-fit Anyway</button>' : '') + (short > 0 && m.gfa && pl.recipe && !D.held ? '<button type="button" class="btn sm primary" id="spChgRefit" title="Lay the parking and the rest out again around what changed">Re-fit Around My Changes</button>' : '') +
+      (D.newLay && still ? '<button type="button" class="btn sm" id="spChgNew" title="Lay the whole site out afresh from its program, with new streets: the pieces placed by hand (this change too) aren’t carried over. Undo brings this plan back">New Layouts</button>' : '') +
       (still ? '<button type="button" class="btn sm" id="spChgUndo">Undo This Change</button>' : '') + '<button type="button" class="btn sm ghost" id="spChgOk">Dismiss</button></div></div>';
   }
   function wireChg() {
     const D = ed.chgDone, $ = q => card.querySelector(q);
     if ($('#spChgRefit')) $('#spChgRefit').onclick = () => refitNow(true);
-    if ($('#spChgHeld')) $('#spChgHeld').onclick = () => { const pl = PL(); if (!D?.held || !pl || ed.undo.length !== D.after) return; const rf = D.held; change(x => { x.elements = rf.elements; x.spareRows = []; if (rf.recipe) x.recipe = clone(rf.recipe); }); D.held = null; D.after = ed.undo.length; if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; draw(); panel(); ctx.toast('Re-fitted the rest of the site.', { action: { label: 'Undo', run: () => undo(true) } }); };
+    if ($('#spChgHeld')) $('#spChgHeld').onclick = () => { const pl = PL(); if (!D?.held || !pl || ed.undo.length !== D.after) return; const rf = D.held; change(x => { x.elements = rf.elements; x.spareRows = []; if (rf.recipe) x.recipe = clone(rf.recipe); if (rf.zones) x.zones = clone(rf.zones); }); D.held = null; D.after = ed.undo.length; if (ed.sel && !pl.elements.some(x => x.id === ed.sel)) ed.sel = null; draw(); panel(); ctx.toast('Re-fitted the rest of the site.', { action: { label: 'Undo', run: () => undo(true) } }); };
     if ($('#spChgUndo')) $('#spChgUndo').onclick = () => { if (!D || ed.undo.length !== D.after) return; while (ed.undo.length > D.depth) undo(true); ed.chgDone = null; clearGone(); panel(); ctx.toast('Change undone.'); };
+    if ($('#spChgNew')) $('#spChgNew').onclick = () => resolve({ force: true, src: '#spChgNew' });
     if ($('#spChgOk')) $('#spChgOk').onclick = () => { ed.chgDone = null; panel(); };
   }
   // Change With AI on the map: the pieces it touched flash a few times; the ones it removed leave a dashed footprint that fades
@@ -3285,6 +3634,7 @@ export function initSitePlan(ctx) {
       return '<div class="sp-var' + (here ? ' on' : '') + (v.stale ? ' stale' : '') + (none ? ' none' : '') + (K.passes(v.chk) === false ? ' fail' : '') + '" data-key="' + esc(v.key) + '">' +
         '<button type="button" class="sp-var-use" aria-pressed="' + here + '" data-var="' + i + '"' + (none ? ' disabled' : '') + ' title="' + (here ? 'On the map' : v.stale ? 'Fit this layout to the new site and put it on the map' : has ? 'Put this layout on the map' : none ? 'Nothing fits' : 'Lay this layout out again and put it on the map') + '">' +
           '<span class="sp-vthumb"' + (has ? ' data-thumb="' + i + '"' : '') + '>' + (has && vthumbs.has(thumbKey(v)) ? vthumbs.get(thumbKey(v)) : '') + (!has ? '<i>' + (none ? 'Nothing fits' : 'Numbers only') + '</i>' : '') + '</span>' +
+          (pl.program?.community ? '<span class="sp-vname">' + esc(pl.program.community) + '</span>' : '') + // (the community is the plan's: every card says it)
           '<span class="sp-vhead" title="' + esc(numOf(v) + ' · ' + arr) + '"><b>' + esc(numOf(v)) + '</b> <span>' + esc(arr) + '</span></span>' +
           (pills ? '<span class="sp-vpills">' + pills + '</span>' : '') + grid +
           (h.p2 ? '<span class="sp-vp2">' + esc(h.p2) + '</span>' : '') + (by === 'open' && !none ? '<span class="sp-vp2 hot">Open space ' + pct(m.green || 0) + '</span>' : '') +
@@ -3339,14 +3689,16 @@ export function initSitePlan(ctx) {
     thumbIO = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) { thumbIO?.unobserve(e.target); add(e.target); } }, { root: card, rootMargin: '160px 0px' });
     slots.forEach(el => thumbIO.observe(el));
   }
-  // put a layout on the map; one kept as numbers only is laid out again first
+  // put a layout on the map; one kept as numbers only is laid out again first. o.fresh: the layouts a build just made (their
+  // program's names are the build's), else the plan's names as they are now win over the layout's copy
   async function useVariant(i, o = {}) {
     let v = ed.variants?.[i]; if (!v || Array.isArray(v.elements) && !v.elements.length) return false;
     const was = v.stale; if (!v.elements || was) { v = await relay(i, was); if (!v) return false; i = ed.variants.indexOf(v); } // out of date, or numbers only: laid out again for this site first
     applying = true;
-    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; x.program = { ...(v.program || x.program) }; x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; if (v.laidAs || x.laidAs) x.laidAs = v.laidAs || null; }); }
+    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; x.program = SP.keepNames({ ...(v.program || x.program) }, x.program, !o.fresh); /* (the names as they are now: the layout's copy is from when it was laid out; a build's own new layouts carry its names) */ x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; if (v.laidAs || x.laidAs) x.laidAs = v.laidAs || null; }); }
     finally { applying = false; }
     ed.sel = null; ed.solveBar = false; if (was) PL().stale = null; saveRun(); if (!o.quiet) { draw(); panel(); }
+    nameNew(PL()); // (street names on: a new layout's streets named too, in the same undo step)
     requestAnimationFrame(() => { if (ed && !planInView(true)) planFit(); }); // only when the site isn't all in view already (or the Plan key covers it)
     return true;
   }
@@ -3464,7 +3816,7 @@ export function initSitePlan(ctx) {
   // what a rendering was made from: the pieces' places, sizes and floors (a change to any of them makes it "plan changed since")
   const planSig = pl => RUN.hash((pl.elements || []).map(e => [e.kind, Math.round(e.x), Math.round(e.y), Math.round(e.w), Math.round(e.d), Math.round(e.rot || 0), e.floors || 0, e.use || ''].join(':')).join('|'));
   // drawing marks that aren't part of a photograph: labels, dimensions, setback and parcel lines, the boundary, handles, easement hatching
-  const HIDE_FOR_RENDER = ['fs-sp-lot', 'fs-sp-grid', 'fs-sp-zone', 'fs-sp-sb', 'fs-sp-pl', 'fs-sp-front', 'fs-sp-selc', 'fs-sp-sell', 'fs-sp-flash', 'fs-sp-gone', 'fs-sp-lab-p', 'fs-sp-lab', 'fs-sp-lab-sel', 'fs-sp-dim', 'fs-sp-hv', 'fs-sp-mf', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-ml', 'fs-sp-h', 'fs-sp-hs', 'fs-sp-lotl', 'fs-sp-p2', 'fs-sp-ko', 'fs-sp-koh', 'fs-sp-kol'];
+  const HIDE_FOR_RENDER = ['fs-sp-zlab', 'fs-sp-lot', 'fs-sp-grid', 'fs-sp-zone', 'fs-sp-sb', 'fs-sp-pl', 'fs-sp-front', 'fs-sp-selc', 'fs-sp-sell', 'fs-sp-flash', 'fs-sp-gone', 'fs-sp-lab-p', 'fs-sp-lab', 'fs-sp-lab-sel', 'fs-sp-dim', 'fs-sp-hv', 'fs-sp-mf', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-ml', 'fs-sp-h', 'fs-sp-hs', 'fs-sp-lotl', 'fs-sp-p2', 'fs-sp-ko', 'fs-sp-koh', 'fs-sp-kol'];
   const imageryBase = () => /^(sat|gsat|esri)$/.test(ctx.basemap?.() || '');
   const idle = () => new Promise(ok => { let done = false; const fin = () => { if (!done) { done = true; ok(); } }; map.once('idle', fin); setTimeout(fin, 9000); });
   // The massing as the AI gets it: the map pointed at the site from the view's camera (lib/render.mjs cameraFor) in the

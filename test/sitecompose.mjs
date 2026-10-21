@@ -55,4 +55,9 @@ for (const v of [0, 1, 2]) {
   const d = G.sheetData(plan); assert.ok(d.land.some(r => r[0] === 'Front — Retail'), 'land use by zone'); assert.ok(d.program.some(r => /Townhomes — 3 bldgs/.test(r[0])));
   assert.match(G.sheetHTML({ plan, size: 'archd' }), /@page\{size:36in 24in/, 'ARCH D'); }
 
+// a garage step stays one in the program a simple layout gives back: read as 'other' it was laid out again with another
+// garage each time (and named as a part of its own)
+{ const pg = S.normalizeProgram({ use: 'mixed', garage: true, zones: [{ use: 'retail', gfa: 40000 }, { use: 'multifamily', units: 200 }, { use: 'office', gfa: 30000 }] }), r = C.composeSite(tract, pg, 0);
+  assert.deepEqual(r.program.zones.map(z => z.use), pg.zones.map(z => z.use)); assert.deepEqual(S.normalizeProgram(r.program).zones.map(z => z.use), pg.zones.map(z => z.use), 'no second garage'); }
+
 console.log('mixed-use site plans ok');

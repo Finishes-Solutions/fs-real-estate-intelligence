@@ -3,7 +3,45 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-21
+
+### 12:30 PM CT: The neighbourhood work joins main: square driveways, drive-thrus, L-shaped buildings, plan sets (c60fadd)
+- Everything from main is here alongside the street rules, editable streets, pods, roundabouts, boulevard entries and turning of this branch.
+- **Driveways meet the street square everywhere:** added entrances and the planner's main entries leave the street at a right angle and, where the street slants across the layout, curve round to meet the drive square. A **boulevard** does the same when its planted median still fits on the straight past the curve (the median and monument sign go there); where it doesn't, the boulevard comes straight in as before. **Make It a Boulevard** follows the same rule.
+- **Turning:** the green dot now turns freely with main's 2° settling and Shift for 15° steps on every piece, curved ponds, lawns, bent drives and entrances included (those still turn about their middle; an entrance's mouth slides along the street). A drawn parking outline's stall direction turns with it whichever way it's turned.
+- **Waller guardrails on neighbourhoods:** Waller's narrowest and shallowest lot and its front setback now also apply to homes along curved subdivision streets (the stricter of them and a place's rule sheet), not only to the parallel-street layouts. On a 28-acre test tract under the guardrails the curved-street layout holds 39 homes on lots at least 59 × 118 ft (83 without them). The checks on the panel include both the guardrails' and the rule sheet's.
+- Shop and office pods inside a mixed plan keep being laid out the way pods are (main's new parking-field engine is used for whole commercial sites).
+- **Curved subdivision streets, steadier:**
+  - A loop road round a commons now lays out where the main street meets the loop on a bend: the commons faces the loop's longer side.
+  - Cul-de-sacs added to fill leftover land keep the spacing between street junctions.
+  - Every kind of street network is tried before the time runs out, so a slower computer still gets a choice of layouts.
+  - A layout that fails the checks isn't offered when one that passes is.
+- **Not in this merge:** the unfinished Phase 5 (split detention, trails, sidewalks) is left out of main. Its saved work stays in this branch's history (commit 8423b25, `wip/`) to pick up later, on top of main's new ground elevations.
+
 ## 2026-10-20
+
+### 11:34 PM CT: Phase 5 paused, saved for later (this commit)
+- **Nothing in the app changes.** The build of Phase 5 (split detention, trails, sidewalks) was stopped part-way on request. Its unfinished work is saved in `wip/` so it can be picked up later; the app stays exactly as Phase 4b left it.
+
+### 9:42 PM CT: Street rules for the place, editable streets and street names (3b0be35)
+- **Street rules for the place:** Site parameters › **Street rules** has the AI read the subdivision rules and drainage criteria where the site is (the city's, or for a site outside a city it first works out whether it's in a city's ETJ, says what it decided and why, then reads that place's rules). It takes a minute or two and can be cancelled. Each value links to its source (hover for the words quoted); a value the AI couldn't quote is marked **Unsure**, one it couldn't find is filled from Waller County's rules and marked **Waller default**, and either can be **Confirm**ed or typed over. **Use Waller Defaults** fills the sheet without the AI; **Use Typical Values** goes back to the typical rules.
+- **The layouts follow the sheet:** street widths, block and cul-de-sac lengths, the cul-de-sac bulb, junction spacing, the narrowest lot and smallest lot area, the front and side building lines and when a second way in is needed shape the subdivision streets and the parallel streets alike (homes pods too; a lot on a curving street is made wider where the curve narrows it, so it still holds the smallest lot area). Driveway spacing and corner distance shape the entrances, the detention rate sizes the pond, and sidewalks show in Numbers. The rules followed show in the layout notes and on the PDF sheet, with any breaks in the checks. It is the AI's reading of the code, never a compliance claim.
+- **Shared with the team:** a sheet read for a place is kept for everyone on the team, so the next plan there starts with it (confirmations and edits travel with it). A sheet over a year old offers **Refresh**, which keeps what the team typed in and confirmed and anything the new search couldn't find; a failed search leaves the sheet as it was. When a teammate updates a sheet your plan uses, it offers **Use the Update**. Confirming a value no longer lays the plan out again; only a changed number does.
+- **Editing the streets:** select a neighbourhood street and the Selected box says what it is ("Street · Oak Lane · 820 ft · T's at both ends"), with:
+  - **Make It a Cul-de-sac** (a street that's the only way to somewhere says so and stays);
+  - **Delete This Stretch**, between the two streets meeting it either side of where you clicked (refused when it's the only link to the streets beyond);
+  - **Curve It**, a gentle bow (Shift for the other way), made gentler when it would run into another street;
+  - **Re-Lay This Block**, the block's local streets another way, with the collectors, the entry and every home outside the block exactly where they were; each press on the same block tries the next way.
+  - Dragging a street's point bends it smoothly and keeps the streets meeting it joined. Each edit is one Undo, and the lots re-flow round it. A street left ending more than 150 ft past its last junction with no cul-de-sac shows in the checks. Change With AI understands the same in words ("make this street a cul-de-sac", "bend Oak Lane 60 ft to the left", "re-lay this block", "remove this street").
+- **Street names:** turn on **Street names** under Site parameters (with an optional theme such as "Texas rivers") and press **Name the Streets**: collectors and the entry get Parkway or Boulevard, local streets Lane, Way or Drive, cul-de-sacs Court or Circle. Without the AI it uses a list of plain names (and one-word ones like Oakwood past that list). Names are never repeated or too like a road on the map nearby. Rename a street in the Selected box's **Street name** field, or with Change With AI ("rename Oak Lane to Pecan Way", "street names off"). Names run along the streets on the map (zoomed in), on the PDF sheet and in the DXF. A new layout, or another option picked, gets its streets named too while names are on.
+- **Also changed:** a cleared Storage or Pond depth field under Stormwater now uses the rule sheet's value or the usual one (0.55 acre-feet per acre, 5 ft) instead of meaning no storage or a 1 ft pond.
+- **Numbers on today's sites:** plans without a rule sheet lay out exactly as before (Waller 955 and 911 homes, irregular 570 and 540, pentagon 411, narrow rows 176 first). With Waller County's sheet the pentagon gets about 300 to 370 homes against 411, as expected for stricter rules. Re-laying a block usually ends with fewer homes in it (Waller 463 down to 437 to 445; irregular 430 down to 360 to 384).
+- **Not done yet / known rough edges:**
+  - **A rural sheet with big lots (an acre or more) gives nonsense layouts:** lots are only made wider, never deeper, so a 1-acre sheet on the 110-acre pentagon gives 12 to 30 lots about 400 ft wide by 115 ft deep where a real subdivision would hold 70 to 90, and nothing warns about it. Don't trust layouts under such a sheet yet.
+  - **Curve It can move homes well away from the street:** the corner lot where the curved street meets another shifts, and the lots along the whole block it meets re-flow (up to about 6% of the far homes on the irregular site, 11% on one pentagon collector). Make It a Cul-de-sac and Delete This Stretch can do the same on a few streets. The toast gives the count.
+  - Re-Lay This Block takes about 13 s and often holds fewer homes than the block's first layout.
+  - Waller County's detention rate hasn't been read from its drainage criteria yet: 0.55 acre-feet per acre stands in, marked to confirm. The ETJ is the AI's judgement from a web search, not a map of ETJ outlines.
+  - Lots cut below the sheet's smallest area by something added later (a roundabout, a turnaround) aren't merged or dropped; the checks flag them.
 
 ### 5:07 PM CT: Driveways come in square to the street (a150312)
 - On a lot whose street slants across the layout (like the 0.93-acre Waller corner lot), the main entrance used to run in at the layout's angle: it met the street crooked, with one curb return tiny and the other long. It now leaves the street at a right angle with even curb returns, then curves round a few car lengths in to meet the drive square.
@@ -11,10 +49,71 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - The stop bar and the double yellow centre line follow the driveway's curve, and **Edit Shape** on a curved entrance bends it along its real centre line.
 - Where a street runs square to the layout, or the curve doesn't fit, driveways are drawn straight in as before.
 
+### 3:18 PM CT: Neighbourhoods laid out like real subdivisions (7f8162e)
+- **Single-family layouts on 8 acres or more now come with subdivision streets**, offered next to the parallel streets of before. A collector goes in first: a loop road one lot in from the edge, a main street, or a loop road round a central lake and commons. The entry boulevard meets it at a T (on deep sites a little along from the entry, so the boulevard keeps its median), and no homes front the entry street before its first junction.
+- **Local streets inside each block of land** follow the loop or curve with the land, meet the collector at T's, get cross streets where a block runs long, and end in cul-de-sacs where a street dead-ends or a pocket of land is left. Where the land between two streets is too thin for homes, one street runs up the middle instead. Streets never fold back on themselves or run into each other.
+- **Lots are marched along every street**, square to it, wedge-shaped round cul-de-sacs, each home facing its street with a driveway. The pond sits on land kept at the back with a trail round it (or is the lake in the middle); the rest is open space.
+- **Ways in:** more than 30 homes get a second way in, more than 300 homes (or over 60 acres) a third, each meeting a street square-on and clear of other junctions, or opening a cul-de-sac's end out to the street. A layout without the ways its homes need isn't put first, and the notes say so.
+- **Two versions of the loop:** streets following the loop (the most homes), and the same streets winding gently with cul-de-sacs in the pockets they leave ("· winding streets", a few percent fewer homes).
+- **Ranking:** a subdivision layout goes first only when it holds at least 90% of the homes of today's first layout, has no bad checks, has the ways in it needs and keeps to the street rules.
+- **Street rules:** typical values for now (blocks up to 1,400 ft, cul-de-sacs up to 800 ft, junctions 125 ft apart, 300 ft on a collector). Breaks show as warnings in the overview and Numbers, and update as soon as a street is bent, moved, added or deleted. The notes say which rules a layout followed.
+- **Re-fits keep the streets:** an unchanged re-fit comes back identical; moving a home, adding a park or changing the home mix (through Change With AI) lays the homes out again along the same streets. Bending a street re-flows only the lots along that stretch. A deleted home leaves its lot empty rather than pulling homes in from elsewhere. A park dropped on a street cuts it back to a cul-de-sac either side. Deleting a street takes its homes and its cul-de-sac with it; streets left with no way in get no homes; deleting the main entry makes another entrance the main one. Re-fit Plan no longer swaps a subdivision for parallel streets.
+- **"300 homes" on a big site:** the homes go nearest the entry and only the streets they need are built; the loop road waits for a later phase.
+- **Settings › Neighbourhood streets** now has four choices: like a subdivision and gentle curves (the default, best first), like a subdivision only, parallel gently curving (the old default) and straight. Change With AI points "make the streets curvy like a subdivision" or "loops and cul-de-sacs" to New Layouts; a sentence about one street ("add a pool next to the winding street") is still an edit.
+- **Also:** a street drawn in pieces is labelled once on the map and sheet. Today's layout search runs faster after a subdivision search (an irregular parallel-streets build went from about 44 s to 30 s).
+- **Numbers on today's sites:** every non-homes case, and every homes case on parallel streets, is unchanged. Waller with default settings goes from 936 homes to 955 on a subdivision loop road with 3 ways in (the winding version 911). The irregular site gets 570 and 540 against today's 537; the pentagon 411 against 397. On the narrow site today's rows (176) stay first, because its subdivision layout (177) has one way in where two are wanted. Building a homes layout takes longer, since the street search runs too.
+- **Not done yet / known rough edges:**
+  - **Easements and no-build areas are ignored by fresh subdivision layouts:** on a test site with a pipeline easement, both subdivision options put a street and 44–49 lots on it (the checks flag them). Today's layouts and re-fits do respect them. Until this is fixed, pick Parallel streets in Settings on a site with an easement.
+  - **Re-fit around my changes ignores Settings changes on a subdivision plan:** a new home mix, lot depth or home count set in Settings has no effect, though the message says it re-fitted. Change With AI's home mix ("no 3-story homes") works; otherwise build New Layouts.
+  - **A first phase ("300 homes") re-fitted with nothing changed can move homes** (39 of 300 on one test site, about 50 on another); a full-site plan doesn't.
+  - **Homes pods of a mixed plan don't get subdivision streets yet:** a pod's layout is held to the whole site's count of ways in, which it can't meet, so pods keep straight streets.
+  - **A commons on the pentagon test site can lose its subdivision option on a slow or busy machine** (the search runs out of time), and the notes then wrongly say no loop fits the parcel.
+  - The 9-acre square and the 30-acre shallow test sites get no subdivision option (a main street there can't beat today's rows). The 85-acre L-shaped site has no room for a loop round the lake and commons (the notes say so).
+  - The narrow site has one way in where two are wanted. Some thin strips of 1–3 acres are left behind lots on Waller's winding option. The irregular site's first option has no cul-de-sacs.
+  - Bending a street right up to a junction re-lays the next block too. A first phase can keep a connector street with no homes. Sharp bends are avoided rather than given knuckles. One lot label on the narrow plan is garbled.
+
 ### 10:17 AM CT: The site plan work joins main's plan sets, renderings and ground elevations (merged 8af0e2a)
 - The small-lot, L-shaped building and drive-thru fixes now sit on top of main's plan sets, project-page renderings and lidar ground elevations; nothing from either side changes.
 
+### 4:39 AM CT: Mixed sites in pods (30c4502)
+- **Mixed sites can now be laid out in pods**, the way master-planned communities are drawn. On a mixed site of 40 acres or more (or from 15 acres when you say where a use goes, or when the usual layouts can't fit the program), a collector road goes in first: the main entry boulevard, then a loop road round a central commons and lake, a loop road one block in from the lot lines, or a spine road (with a T on bigger sites, a cul-de-sac on small ones). Side streets get a connector with their own way in. Greenbelts with a trail run between the pods.
+- **Each pod gets one use and its own street direction**, so apartments can face the highway while the homes run another way. Every use is sized by a quick trial first, so a pod takes about the land its use needs. Shops get a block about as deep as it is wide. Land a pod doesn't need is open space, never blank, and when the lake is short the larger open spaces become simple rounded ponds clear of the buildings and lots. Streets inside each pod are straight for now.
+- **Say where things go and the pods follow it:** "retail at the corner of FM 362 and Bauer Road", "apartments along the highway" (or "along Highway 6", by name), "the commons in the middle", "homes at the back", "townhomes between the retail and the homes", "600 homes around a lake". This works with the AI and without it. Road names are read from the map, and the AI is told them. The notes say which placements were met and which weren't, and why.
+- **Ranking:** pods layouts are ranked with the usual zones-from-the-street layouts. A pods layout only goes ahead of one when it scores better and keeps every use within 3% of it (counted up to what you asked for). The best zones-from-the-street layout always stays in the list. A pods layout where a whole use came to nothing isn't offered.
+- **Re-lay a pod or swap two:** select a piece in a pod and the Selected box says which pod it's in, with **Re-lay This Pod** and **Swap With…** (one Undo takes it back). Change With AI understands "re-lay the apartments", "redo this pod", "swap the apartments and the retail", "make the apartments pod 4 stories", "make the retail pod 80,000 sf" and "call the north section The Lakes".
+- **Re-fits keep the pods:** after you move or add a piece, only the pod it's in is laid out again; a new home mix re-lays the pods of homes. A collector road moved off its junction gets a short drive back; a deleted one leaves each pod joined to the nearest street still reached from a way in. The notes say when a pod ends up holding noticeably less, and count the homes that made way.
+- **Settings › Mixed sites › Layout style** (shown where pods can be laid out): pods and bands, best first (the default); pods round a loop road; or bands from the street back.
+- **Map and PDF:** a part laid out in several pods is named in sections ("Homes · Section 2"), with a smaller Section label on each extra pod. On the PDF sheet, part names on every mixed plan are now sized to fit inside their part (a little larger than before), and a part in several pods gets a total row before its sections.
+- **Also fixed:** "600 homes around a lake" no longer puts the 600 units on the commons. A commons said with a lake and other things keeps its lake. Big plans check overlaps faster, so a 246-acre build with three options takes about 31 s instead of 41 s.
+- **Numbers on today's sites:** the first layout is the same as before on every test site. Building now takes longer where pods are tried: the 101-acre test site goes from about 3 s to 15 s, and a 250-acre mixed build with pods takes up to about a minute.
+- **Not done yet / known rough edges:**
+  - **Pods round a loop road** in Settings runs the pods search, but its layouts are still ranked and checked as in the default, so on some sites no pods layout is offered.
+  - On the loop-road layout, a commons placed "at the back" can be split over two or three pods, each with its own lake, pavilion, courts and playground.
+  - A townhome pod with a number can hold more than asked (197 of 150 on one test site) at the homes' expense, so a pods plan that keeps every placement can rank last.
+  - The pods layout can still go first with about 30% fewer homes than the other layouts when the homes have no number.
+  - In a plain comma list ("20,000 sf retail, 200 apartments, homes at the back") a placement can also be read onto the use named before it. Without the AI, "apartment homes around a courtyard" is now read as houses.
+  - On one turned 154-acre test site the detention pond takes more land than it needs, one homes pod is left with a single home, and the shops have lawn left over.
+  - A pod renamed with Change With AI takes its old name back after a re-fit, re-lay or swap, and the new name doesn't show on the map.
+  - Pods plans on the 101- and 160-acre test sites have two ways in where the other layouts have three. Saved pods plans made before this push can re-lay one pod on a re-fit even with nothing moved.
+  - The new editor buttons and Settings row have only partly been tried in a browser.
+
 ## 2026-10-19
+
+### 11:57 PM CT: Roundabouts and drop-off loops (aa618b3)
+- **Add a roundabout where streets meet:** the new **Add Roundabout** tool (Site section, beside Add Entrance) marks the junctions with room with small dashed circles; click one and a roundabout with a planted island goes there, 100 ft across (120 ft where a boulevard or wider street meets it). The streets are cut back to it so the paving reads as one; the homes in its way make way, and only the parking spaces under it give way. Where something can't move (a park, the lake, a building, a street running alongside too close) it tries a smaller one, down to 80 ft, goes to the nearest junction with room, or says what's in the way. It's also in the Add palette.
+- **Drop-off loops (circle drives):** pick a clubhouse, school, shop, hotel or office and press **Add Drop-off Loop** (or use **Drop-off** in the Add palette). A one-way loop with an island and arrows goes between the building and its drive, a compact one where the building stands close to its drive (the parking row in front gives way). It tries the other sides when the front is too close, takes a strip of a park when most of the park stays, and otherwise says how far the building would have to move back.
+- **Editing:** both move, turn, nudge and resize like any piece. A dragged roundabout settles on the nearest junction and joins those streets (Alt leaves it where you put it); the **Across** and **Lane** boxes change its size. Deleting a roundabout puts the streets back exactly, with the parking and an entrance's median and signs (two roundabouts on one street can go in either order); deleting a loop gives back the parking and park strip it took.
+- **Re-fits keep them:** the automatic re-fit and Change With AI keep a roundabout joined to the streets, and keep a loop's drive and building in place in front of it.
+- **Checks:** anything on an island, parking on a lane, and a street running across a roundabout's or a loop's lane are problems; a roundabout no street meets, a loop that doesn't reach a drive at both ends, and a loop whose building has moved away are warnings.
+- **Change With AI:** "add a roundabout at the main intersection", "add a roundabout at the entry", "make the main intersection a 120 ft roundabout", "add 2 roundabouts", "add a circle drive in front of the clubhouse", "make the drop-off loop 140 ft long" and "remove the roundabout". When the junction asked for has no room it says where the roundabout went instead.
+- Drawn on the map, the PDF sheet (with the loop's arrows) and the CAD file; the lanes count as paving.
+- **Numbers on today's sites:** layouts without a roundabout or loop are unchanged on all 12 test sites.
+- **Not done yet / known rough edges:**
+  - **Re-fit Plan** can sometimes pick a new street layout (when it fits more homes) whose streets miss a roundabout; the check then only warns "Roundabout isn't on a street". Undo, or drag it back onto a junction. On one test site an Entrance 2 with a roundabout can also end up cut off from the main entry after Re-fit Plan, with no warning.
+  - Turning a compact drop-off loop by even a few degrees usually puts it against its building or its drive; it says what it runs into but doesn't avoid it.
+  - On a mixed plan, re-fitting with a loop can hold its building in place and cost a few homes, as moving a building by hand does.
+  - On the 246 ac test site the main intersection has no room (a parallel drive runs too close), so a roundabout asked for there goes to the nearest junction with room, about 370 ft away, and says so.
+  - Homes that made way for a roundabout come back only after a re-fit.
 
 ### 11:34 PM CT: Small commercial lots: L-shaped buildings and real drive-thru lanes (74a5f9f, merged 56d8516)
 - On a lot of about an acre to three, a shop, bank or coffee building with a drive-thru now gets one building at the back (an L when asked, its storefronts facing the parking), parking in front and a drive round it that every aisle joins.
@@ -28,6 +127,23 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - "6000+ sf L-shaped retail building with a drive thru" is now read as one L-shaped retail building of at least 6,000 sf with its drive-thru, instead of a small shop and a restaurant side by side. (The words reader counted "drive-thru" as a restaurant, and missed the "+".)
 - A plus sign or "at least" on a size means at least that much, more where the site allows; "L-shaped" or "U-shaped" sets the building shape.
 - Separate uses are only laid out as a mix when you name them, and each part gets its size; the AI can no longer send a mix without sizes.
+
+### 8:36 PM CT: Turn any piece, boulevard entries with monument signs, names for the plan and its parts (8e6ac67)
+- **Every piece turns now:** curved ponds, lawns, drawn outlines, custom buildings, bent drives, medians and entrances, with Turn 90°, R (Shift+R the other way), the Turn box and the green dot. They turn about their middle and keep their shape.
+- **Turning and moving an entrance:** it turns 15° a press, its mouth sliding along the street and coming in no more than 60° off square, and it stops short rather than run outside the lot. Its median is drawn again along it and its signs follow. A selected entrance shows its bend points and + markers straight away, and dragging it slides its mouth along the street (Alt moves it freely).
+- **Real boulevard entries:** neighbourhoods, apartments, townhomes and mixed plans get a two-lane entry with a planted median wherever it costs no more than 2% of the homes, units or floor area (and no parking, detention or checks). Where it would cost more, the narrow entry stays and the notes say what the boulevard would have cost. Where the first drive is too near the street for a median, the entry stays narrow and the notes say how far in the drive is.
+- **Monument signs:** the community's sign stands in the median by default, or at the entry's corners when the median can't hold one (the notes say why). Settings can choose both corners, one or none, and a new **Monument sign** piece can be added by hand.
+- **Entrance settings and warnings:** Site parameters › Entrance sets the entry style, lane width, median, sign placement, corner clearance, driveway spacing and first cross street. The checks warn when driveways are too close, too near a corner, or meet a drive too soon, and flag a sign on paving or a median sticking out of its drive. **Make It a Boulevard** widens an entrance where there's room for a median.
+- **Names:** give the development and each part (neighbourhood, retail center, apartments, business park) a name in Settings, or ask **Suggest Names** for two or three choices (offline it suggests names from the nearby streets and town). The names show over each zone on the map, on the monument sign, the layout cards, the PDF sheet and in Numbers, broken out by part, and they stay through new layouts, Use This Layout and Build with AI.
+- **Change With AI:** "turn the pond 20 degrees", "turn the main entry 15 degrees", "make the main entry a boulevard", "add a boulevard entrance off the side street with monument signs on both sides", "call the neighbourhood Beacon Hill Estates", "name the retail center Beacon Hill Market". An entrance asked for off a street that already has one too close goes to the nearest spot that keeps the spacing, or says there's no room. A turned pond moves to the nearest clear spot, or stays put and says why.
+- **Numbers on today's sites:** the fixture layouts keep their arrangement and program. Most big sites gain the full boulevard at no cost; one large apartment test site lost about 0.3% of its units (576 to 574). Layouts on small sites take a fraction of a second longer.
+- **Not done yet / known rough edges:**
+  - "Turn the pond 20 degrees" is refused on most real layouts, because ponds sit between the drives and the lot line with no clear spot nearby; smaller turns work more often. In the editor the pond turns and shows red instead.
+  - An entrance near a corner of the lot can, when turned 15–25°, end up coming in from the side lot line that isn't a street, with only a buffer warning.
+  - Deleting an entrance in the editor leaves its median and signs behind (Change With AI removes them).
+  - After you move or add a monument sign by hand, a re-fit may not put back the main entry's other signs; and deleting one corner sign can bring it back on the other corner after a re-fit.
+  - Make It a Boulevard is still offered where there's no room for a median (it explains why when clicked). Street names (the toggle) and editable street networks come in a later phase.
+
 ### 8:28 PM CT: Plan sets, renderings from the project page and ground elevations go to main (bb5ed4f)
 - Everything from this branch joins the main app: **Sites / Renderings / Plans** tabs, full schematic plan sets on the title block, renderings made in the background from the project page, buildings drawn in their real shape, and ground elevations from USGS lidar.
 - Merged with the latest main (parking fields, the AI's commercial brief, Waller guardrails, New Option and deleting): the Renderings tab keeps **Delete all** without **Open plan** / **Render more**, Waller plans also get the ground, and the new parking-field layouts put the pond on the low side too.
@@ -104,6 +220,19 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **G-002 General notes:** general notes, codes, every symbol and line type used in the set, and abbreviations.
 - In this push the drawings for the other sheets are still placeholders: they follow in the next push.
 
+### 4:30 PM CT: Parks stay off the streets, entrances go round them, re-fits keep the streets (7bce16b)
+- **Parks and open space are real places now.** "Add a park beside the community center" puts the park on a clear side of it, a few feet off the streets and clear of buildings, other parks and the lot line. If the usual size doesn't fit, a smaller one goes there and the message says so. If there's no room at all, nothing is added and the message says that too. Homes under a park make way, and the lots of the homes beside it are cut back to its edge. Dragging a park works the same way.
+- **The checks flag a park, named lawn or open space under a drive or a building** in red. Plain lawn under paving, the entry median and a pavilion standing in a park aren't flagged. Lawn now draws under the drives, and the entry median shows as a green strip.
+- **Entrances never run through a park.** Add Entrance names the park in the way. Change With AI moves the driveway along the street past it and says how far. "Add an entrance by Pad B" comes in from the nearest street, not a side lot line, and two asked for by the same piece no longer stack.
+- **Re-fits keep the streets.** Re-fitting a plan with nothing changed now keeps every street (89 of 89 on the 246 ac test site, where it used to keep 84). Added entrances no longer shuffle the streets, and no parking is laid across them. Change With AI never quietly lays the site out again with new streets: if keeping them leaves a problem, it says so and offers **New Layouts**. Re-fits are also faster (about 1.8 s instead of 3.5 s on the 246 ac site).
+- **Food truck parks keep their trucks** when the Lawn is renamed or moved and pinned. A pool or playground asked for beside a community center can stand on its lawn instead of taking homes.
+- Fresh layouts are unchanged on all 12 test sites.
+- **Not done yet:**
+  - On an L-shaped mixed site, "add an entrance at the open space" can still put the entrance on the front street about 1,000 ft away, and the message doesn't say how far. A nearer lot line that would work isn't tried yet.
+  - On an L-shaped site, a park dropped on a street and then re-fitted can still lose one short drive next to it.
+  - Pickleball courts beside a community center still take 2 or 3 homes when there's no clear lawn within 130 ft.
+  - The new park drag and turn behaviour in the editor hasn't been tried in a live browser yet.
+
 ### 4:12 PM CT: Make renderings from the project page (31e0120)
 - **Renderings tab:** a new **Make renderings** form at the top. Pick the option, the view (corner, street, entry, back, a close-up of the building nearest the street, or all four), the materials and the light, then press **Render**.
 - The picture is still taken from the option's 3D view on the map, so the option opens there and the progress shows in its panel. When the pictures are ready you're brought back to the Renderings tab.
@@ -165,6 +294,39 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - Fixed yields that read too low: tenants on NNN leases now pay back property taxes, site work follows what's built instead of the whole lot (parking paving was counted twice), no developer fee on land, and an AI-crafted type's courts and pavilion are priced and earn rent.
 - Now counted: detention ponds, parking garages, leasing commissions and hotel furniture. Hotels run on room rate and occupancy; storage rents climate-controlled, drive-up and RV spaces separately.
 - A calm note when a number is outside the usual range here, and flags for a yield on cost under 5% or over 12%, an unusual cap rate, a negative spread or thin debt coverage.
+
+### 11:37 AM CT: Neighbourhood plan: how local rules are found (b209ff3)
+- **Planning only, nothing in the app changes.** `NEIGHBORHOOD-PLAN.md` now records how local rules are found:
+  - the jurisdiction comes from the city limits and county data the app already has
+  - Waller County's rules are the default when a place's code can't be found online
+  - a person confirms only the values the AI marked unsure
+
+### 11:29 AM CT: Neighbourhood plan: first decisions (fe3d1c1)
+- **Planning only, nothing in the app changes.** `NEIGHBORHOOD-PLAN.md` now records:
+  - street rules that follow the site's city, ETJ or county, read from that place's codes by the AI, cited and confirmed by a person
+  - sidewalks on both sides by default
+  - an optional street-names toggle, with the AI naming streets from a theme you give it (aviation, Pokémon…)
+  - monument signs in the median by default, with the sides as options
+  - a hand-marked low side for detention until elevation data is added
+- The phases stay open while the plan is worked out.
+
+### 11:23 AM CT: Plan for real neighbourhoods, mixed sites, entrances and editable streets (f9ee898)
+- **Planning only, nothing in the app changes.** `NEIGHBORHOOD-PLAN.md` sets out how the planner gets to subdivisions like the Houston-area references sent:
+  - curved streets off a collector loop or spine
+  - roundabouts, cul-de-sacs and circle drives
+  - mixed sites laid out as pods instead of stacked bands
+  - boulevard entrances with monument sign space
+  - turning and bending any piece by hand
+  - split detention with trails and sidewalks
+  - names for the community and its parts
+- It starts with two bugs from today: a park added beside the community center that crossed a road and scrambled the streets, and an entrance that landed under the open space.
+
+### 11:07 AM CT: Change With AI makes whole-site changes, including the homes' stories (dc01624)
+- **"No 3-story homes" now works.** On a big neighbourhood the AI couldn't see the individual homes and could only change pieces one at a time, so a request like "Residential homes should only be 1 story and two-story homes, no 3 story homes" changed nothing, yet the reply still described the change. The AI now sees how many homes there are of each height and changes the neighbourhood's home mix instead.
+- **The lots are laid out again along the same streets.** Each home's lot is sized for it (3-story on 40 ft lots, 2-story on 50 ft, 1-story on 60 ft), so dropping 3-story homes means wider lots and a few fewer homes. The result says how many there were and how many there are now. The shops, lake, commons and anything you placed by hand stay as they are, the new mix shows in Settings, and **Undo This Change** puts it all back.
+- **Every piece of a kind at once:** "make all the apartments 3 stories", "nothing over 3 stories", "remove every pool".
+- **No more made-up results:** when the AI can't find anything on the plan to change, it says so instead of describing a change it didn't make.
+- Without the AI, "no 3-story homes" and similar wording is read directly.
 
 ### 9:49 AM CT: Any building type the AI can describe, and a shared team building library (7da2412, c42fa30, merged b246482)
 - **No more plain boxes for a daycare, a pickleball club or an RV park.** When a request names a kind of place the planner has no setting for, the AI now writes a recipe for it: its buildings, its outdoor pieces (courts, a playground, a pool, a lawn, a plaza, a patio, a pavilion), its parking rule and the figures to show. The planner lays it out with its usual machinery, so drives, parking, entrances, detention, trash and the checks work as for any other use.

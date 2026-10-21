@@ -19,6 +19,12 @@ function reached(els) {
   while (st.length) { const e = st.pop(); for (const f of D) if (!seen.has(f.id) && S.rectsOverlap(grow(e), grow(f), 0)) { seen.add(f.id); st.push(f); } }
   return { seen, D };
 }
+// what's on a roundabout's lane or island: a drive across its island (the streets cut back to it meet its lane), or
+// anything else on either; and the homes not on a street reached from the main entry (within 60 ft of one)
+const overRing = (e, els) => { const lane = S.shapeOf(e), inner = S.grow(S.islandOf(e), -1), ov = (a, b) => S.rectsOverlap({ poly: a }, { poly: b }, 0.5);
+  return els.filter(o => o !== e && (o.kind === 'drive' ? ov(S.shapeOf(o), inner) : ['truck', 'parking', 'building', 'garage', 'pond', 'pool', 'plaza'].includes(o.kind) ? ov(S.shapeOf(o), lane) || ov(S.shapeOf(o), inner) : o.kind === 'lot' && (q => ov(q, lane) || ov(q, inner))(S.grow(S.shapeOf(o), -2)))).map(o => o.kind + ' ' + (o.name || '')); };
+const offStreet = els => { const { seen, D } = reached(els), R = D.filter(d => seen.has(d.id)).map(d => { const q = S.shapeOf(d), xs = q.map(p => p[0]), ys = q.map(p => p[1]); return { q, b: [Math.min(...xs) - 60, Math.min(...ys) - 60, Math.max(...xs) + 60, Math.max(...ys) + 60] }; });
+  return els.filter(e => e.kind === 'building' && e.use === 'sfr').filter(h => !R.some(r => h.x > r.b[0] && h.x < r.b[2] && h.y > r.b[1] && h.y < r.b[3] && S.gapBetween(S.shapeOf(h), r.q) <= 60)).map(h => h.name); };
 function usable(plan, o, what) {
   const p = { ...plan, elements: o.elements, zones: o.zones, program: o.program }, m = S.metrics(p), bad = S.check(p).filter(i => i.level === 'bad');
   assert.deepEqual(bad.map(i => i.text), [], what + ': ' + o.name);
@@ -278,6 +284,16 @@ function usable(plan, o, what) {
   const r = L.refit({ ...plan, program: { use: 'sfr' }, elements: cv[0].elements.map((e, i) => i === cv[0].elements.findIndex(x => x.use === 'sfr') ? { ...e, pinned: true } : e), recipe: cv[0].recipe });
   assert.ok(r && r.elements.filter(e => e.use === 'sfr').length >= homes(cv[0]) - 3, 're-fits a bent plan');
   assert.deepEqual(S.fillet([[0, 0], [10, 0], [10, 10]], 0), [[0, 0], [10, 0], [10, 10]], 'r 0: no rounding');
+  // a roundabout where two bent streets meet (phase 2): they're cut back to it as bent paths still, joined to it, every
+  // drive and home reached; a re-fit (the wave recipe, bent) keeps it there and joined
+  { const base = { ...plan, program: { use: 'sfr' }, elements: cv[0].elements, recipe: cv[0].recipe }, bent = e => e?.kind === 'drive' && e.path?.length > 8, bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text);
+    const j = S.junctionsOf(base).find(j => j.ids.filter(id => bent(base.elements.find(e => e.id === id))).length >= 2 && !S.addRoundabout(base, j.at).error); assert.ok(j, 'a junction of two bent streets with room');
+    const r = S.addRoundabout(base, j.at), rb = r.roundabout, stubs = r.elements.filter(e => e.cut === rb.id), { seen, D } = reached(r.elements);
+    assert.ok(stubs.length >= 2 && stubs.every(e => e.path && e.r === 0) && stubs.filter(e => e.path.length > 8).length >= 2, 'the bent streets cut back to it, bent still'); assert.deepEqual(overRing(rb, r.elements), []); assert.deepEqual(bad(r.elements), []);
+    assert.deepEqual(D.filter(d => !seen.has(d.id)).map(d => d.id), [], 'every drive reached'); assert.deepEqual(offStreet(r.elements), [], 'every home on a street');
+    const rf = L.refit({ ...base, elements: r.elements }, { keep: true }), rb2 = rf.elements.find(e => e.id === rb.id);
+    assert.ok(rb2 && rb2.x === rb.x && rb2.y === rb.y && rf.elements.filter(e => e.cut === rb.id).length >= 2, 're-fitted: there, joined'); assert.deepEqual(overRing(rb2, rf.elements), []); assert.deepEqual(bad(rf.elements), []);
+    assert.ok(homes(rf) >= homes({ elements: r.elements }) - 2 && !offStreet(rf.elements).length, homes(rf) + ' homes'); }
 }
 
 // ---- a restaurant on a 2.35-acre wedge with a curved highway frontage (squared with the street, not the long lot
@@ -400,6 +416,12 @@ function usable(plan, o, what) {
   const rm = E.applyEdits(base, [{ action: 'move', target: club.id, x: back.at[0], y: back.at[1] - 150 }], { refit: true }), mc = rm.elements.find(e => e.id === club.id);
   assert.ok(f.to([mc.x, mc.y])[1] > f.to([club.x, club.y])[1] + 100 && rm.elements.filter(e => e.kind === 'pool').every(p => S.gapBetween(S.shapeOf(p), S.shapeOf(mc)) <= 30), 'moved back, its pool with it');
   const rf = L.refit({ ...base, elements: rm.elements }, { amount: 'current' }); assert.ok(rf, 'the rest re-fits');
+  assert.equal(!!rf.fresh, !!rf.recipe, 'a re-fit from the from-scratch search (new drives, a recipe of its own) says so');
+  // Change With AI keeps the arrangement: never the from-scratch search; when its own re-fit isn't clean it says so and
+  // points to New Layouts (Oct 19)
+  { const rk = L.refit({ ...base, elements: rm.elements }, { amount: 'current', keep: true }), pin = new Set(rm.elements.filter(e => e.pinned).map(e => e.id));
+    assert.ok(rk && !rk.fresh && !rk.recipe, 'kept: the layout’s own recipe'); const pk = { ...base, elements: rk.elements }, mk2 = S.metrics(pk), clean = mk2.spaces >= mk2.required && !S.check(pk).some(i => i.level === 'bad' && !pin.has(i.id));
+    assert.equal(!!rk.kept, !clean, 'marked kept only when it isn’t clean'); if (rk.kept) assert.ok(rk.notes.some(t => /New Layouts/.test(t)), rk.notes.join(' ')); }
   const names = rf.elements.filter(e => e.kind === 'building' && e.name).map(e => e.name); assert.equal(new Set(names).size, names.length, 'no two buildings share a name');
   const kept = rf.elements.find(e => e.id === club.id); assert.ok(kept && Math.hypot(kept.x - mc.x, kept.y - mc.y) < 0.5, 'the changed piece stays where it was put');
   const m0 = S.metrics(base), m1 = S.metrics({ ...base, elements: rf.elements });
@@ -483,8 +505,14 @@ function usable(plan, o, what) {
 // nothing else is lost, and the detention stays the size it was (a re-fit used to drop whole streets of homes) ----
 {
   const E = await import('../lib/siteedit.mjs'), site = { origin: [-95.93, 30.09], ring: [[-600, -450], [600, -450], [600, 450], [-600, 450]], front: 0, setbacks: { ...S.SETBACKS } };
-  const home = { use: 'sfr', name: 'Single-story homes', floors: 1 }, prog = { use: 'sfr', max: true, storm: 'detention', unitSf: 2400, floors: 1, zones: [home, { use: 'amenity', name: 'Central community center and park', items: ['center', 'pool', 'playground', 'lawn'] }, home] }, o = L.layoutOptions(site, prog)[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe };
+  const home = { use: 'sfr', name: 'Single-story homes', floors: 1 }, prog = { use: 'sfr', max: true, storm: 'detention', unitSf: 2400, floors: 1, zones: [home, { use: 'amenity', name: 'Central community center and park', items: ['center', 'pool', 'playground', 'lawn'] }, home] }, o = L.layoutOptions({ ...site, params: { entry: { style: 'narrow' } } }, prog)[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe };
+  // (laid out with the narrow entry, the plan these edits were written on: by default the 73-home layout with the full
+  // boulevard and the second way in fire access needs goes first, ahead of this 75-home one with one way in)
   const m0 = S.metrics(base), cc = o.elements.find(e => e.kind === 'building' && e.use === 'amenity'); assert.ok(cc && m0.units > 50, 'a neighbourhood with its center: ' + m0.units + ' homes');
+  { const all = L.layoutOptions(site, prog), on = L.layoutOptions({ ...site, params: { entry: { style: 'narrow' } } }, prog), un = q => S.metrics({ ...site, program: q.program, elements: q.elements }).units; // the full boulevard where it costs no more than 2% of the homes; else the narrow one and the notes say what it would cost
+    assert.ok(un(all[0]) >= un(on[0]) || S.entrancesOf(all[0].elements).length > S.entrancesOf(on[0].elements).length && un(all[0]) >= un(on[0]) * 0.9, 'the first layout has no fewer homes, or has the second way in fire access needs: ' + un(all[0]) + ' vs ' + un(on[0])); // (the fire-access ranking, not the boulevard, puts it first)
+    for (const q of all) { if (q.elements.find(e => e.name === 'Main entry').blvd) assert.ok(on.some(n => n.name === q.name && un(q) >= un(n) * 0.98), q.name + ': a boulevard, ' + un(q) + ' homes');
+      else assert.ok(/narrow median: a full boulevard .* (would cost \d+ homes here|would leave less room for the detention|doesn’t fit here)/.test(q.notes.join(' ')), q.name + ': narrow, and says why: ' + q.notes.join(' / ')); } }
   const f = E.sheetFrame(base), homes = o.elements.filter(e => e.kind === 'building' && e.use === 'sfr').map(e => f.to([e.x, e.y])), back = homes.filter(h => h[1] > f.depth * 0.6), mid = [back.reduce((t, h) => t + h[0], 0) / back.length, back.reduce((t, h) => t + h[1], 0) / back.length];
   const r = E.applyEdits(base, [{ action: 'move', target: cc.id, x: Math.round(mid[0]), y: Math.round(mid[1]) }, { action: 'add', kind: 'pool', with: cc.id, w: 60, d: 30 }]), p = { ...base, elements: r.elements }, m = S.metrics(p);
   const c2 = r.elements.find(e => e.id === cc.id), pool = r.elements.find(e => e.kind === 'pool' && !o.elements.some(x => x.id === e.id));
@@ -492,6 +520,12 @@ function usable(plan, o, what) {
   assert.ok(r.done.some(t => /homes? made way/.test(t)) && m.units >= m0.units - 12 && m.units < m0.units, 'a handful of homes made way, not streets of them: ' + m0.units + ' → ' + m.units);
   assert.ok(!S.check(p).some(i => i.level === 'bad' && (i.id === cc.id || i.id === pool.id)), 'the center and pool sit clear: ' + S.check(p).filter(i => i.level === 'bad').map(i => i.text).join('; '));
   assert.equal(Math.round(m.pond), Math.round(m0.pond), 'the detention is untouched');
+  // a pool or playground beside the center goes on the community lawn (an amenity may stand in a park), not over homes;
+  // and the community park pinned where it is (renamed by Change With AI) re-fits with every home (its lots run up to it)
+  for (const kind of ['pool', 'play']) { const q = E.applyEdits(base, [{ action: 'add', kind, with: cc.id }]), x = q.elements.find(e => e.kind === kind && !o.elements.some(y => y.id === e.id));
+    assert.ok(x && S.metrics({ ...base, elements: q.elements }).units === m0.units && Math.hypot(x.x - cc.x, x.y - cc.y) < 200, kind + ': ' + q.done.join(' ')); }
+  for (const g of o.elements.filter(e => e.kind === 'green' && e.name === 'Community park')) { const q = E.applyEdits(base, [{ action: 'change', target: g.id, name: 'Big park' }], { refit: true }), rf = L.refit({ ...base, elements: q.elements }, { amount: 'current', keep: true });
+    assert.equal(S.metrics({ ...base, elements: rf.elements }).units, m0.units, 'the park pinned: every home'); assert.equal(rf.elements.filter(e => e.kind === 'green' && /park/i.test(e.name || '')).length, o.elements.filter(e => e.kind === 'green' && e.name === 'Community park').length, 'not doubled'); }
   // places in words: the plan's places, and the words read without the AI
   const P = E.placesOf(base); assert.ok(P.site.front[1] < P.site.middle[1] && P.site.middle[1] < P.site.back[1], 'front, middle, back run away from the street');
   assert.ok(P.areas.some(a => a.name === 'Single-family homes' && a.count === m0.units), 'the homes are an area: ' + JSON.stringify(P.areas.map(a => a.name + ' ' + a.count)));
@@ -499,6 +533,189 @@ function usable(plan, o, what) {
   assert.equal(g.length, 2); assert.ok(g[0].action === 'move' && g[0].target === cc.id && g[1].action === 'add' && g[1].kind === 'pool' && g[1].with === cc.id, JSON.stringify(g));
   const hm = P.areas.find(a => a.name === 'Single-family homes').middle; assert.deepEqual([g[0].x, g[0].y], hm, 'the middle of the homes');
   const bk = E.guessEdits('move the community center to the back', base)[0]; assert.ok(bk && bk.y === P.site.back[1], 'the back of the site');
+}
+// ---- changes across the whole site (Oct 19): "Residential homes should only be 1 story and two-story homes, no 3 story
+// homes" on a 100-acre mixed plan (retail out front, a few hundred homes on lots, a lake and commons) did nothing: the
+// houses weren't listed for the AI (too many) and it could only change pieces one by one. Homes on lots now change
+// stories through the home mix (their lots are sized for them: the lots are laid out again along the same streets), and
+// every piece of a use or kind can change at once ----
+{
+  const E = await import('../lib/siteedit.mjs'), N = S.unionParcels([mk([-95.96, 30.07], [[0, 0], [2600, 0], [2600, 1700], [0, 1700]])]), site = { ...N, front: N.ring.findIndex((p, i) => S.outwardOf(N.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } };
+  const o = L.layoutOptions(site, { use: 'mixed', zones: [{ use: 'retail', gfa: 60000 }, { use: 'sfr', units: 250 }, { use: 'amenity', items: ['lake', 'center', 'pool', 'playground'] }] }, { count: 1 })[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe };
+  const homes = els => els.filter(e => e.kind === 'building' && e.use === 'sfr'), storiesOf = els => [...new Set(homes(els).map(e => e.floors))].sort(), retail = els => els.filter(e => e.kind === 'building' && e.use === 'retail');
+  assert.ok(homes(o.elements).length > 120 && storiesOf(o.elements).includes(3), 'a big neighbourhood with some 3-story homes: ' + homes(o.elements).length + ' ' + storiesOf(o.elements));
+  // a re-fit with nothing changed keeps every street (its added entrances used to be taken for the way in, or kept off
+  // like buildings, and 17 of 39 streets moved), and a park beside each named piece lands clear or says there's no room
+  { const st = els => els.filter(e => e.kind === 'drive' || e.kind === 'truck').map(e => JSON.stringify(S.shapeOf(e).map(p => p.map(v => Math.round(v))))).sort(), rf0 = L.refit(base, { amount: 'current', keep: true });
+    assert.deepEqual(st(rf0.elements), st(o.elements), 'nothing changed: the same streets'); assert.equal(homes(rf0.elements).length, homes(o.elements).length);
+    for (const a of o.elements.filter(e => e.name && ['building', 'pond', 'pool', 'play'].includes(e.kind) && e.use !== 'sfr')) { const q = E.applyEdits(base, [{ action: 'add', kind: 'green', with: a.id, name: 'Park' }]), pk = q.elements.find(e => e.name === 'Park');
+      if (!pk) { assert.ok(q.skipped.some(t => /^No room beside/.test(t)), q.skipped.join(' ')); continue; }
+      assert.deepEqual(q.elements.filter(e => ['drive', 'truck', 'building', 'garage', 'pond', 'pool'].includes(e.kind) && S.rectsOverlap(pk, e)).map(e => e.name || e.kind), [], 'a park beside ' + a.name + ' lands clear');
+      assert.ok(S.gapBetween(S.shapeOf(pk), S.shapeOf(a)) <= 150, 'and beside it'); } }
+  const d = E.describePlan(base); assert.ok(d.houses && !d.houses.listed && d.houses.count === homes(o.elements).length && d.houses.byStories[3] > 0 && d.houses.mix.length === 3 && !d.pieces.some(p => p.use === 'sfr'), 'the AI is told how many homes there are by stories, and their mix: ' + JSON.stringify(d.houses));
+  // the request word for word, read without the AI: 1- and 2-story only, in the shares they had
+  const mix = E.guessMix('Residential homes should only be 1 story and two-story homes, no 3 story homes.', base); assert.deepEqual(mix.map(t => t.stories), [1, 2]); assert.equal(mix.reduce((t, x) => t + x.pct, 0), 100);
+  assert.equal(E.guessMix('make lot 12 two stories', base), null, 'one home named: an edit on it, not the mix'); assert.equal(E.guessMix('make bldg 7 four stories', base), null);
+  assert.deepEqual(E.guessMix('no 3-story houses', base).map(t => t.stories), [1, 2]); assert.deepEqual(E.guessMix('make all the homes single story', base) || [], [], '(no number: not read as a mix)');
+  const hm = E.withHomeMix(base, mix), p2 = { ...base, program: hm.program, recipe: hm.recipe }, rf = L.refit(p2, { amount: 'current' });
+  assert.ok(rf?.elements?.length, 'the site re-fits with the new mix');
+  const p3 = { ...p2, elements: rf.elements }, n0 = homes(o.elements).length, n1 = homes(rf.elements).length;
+  assert.deepEqual(storiesOf(rf.elements), [1, 2], 'no 3-story homes left: ' + storiesOf(rf.elements));
+  assert.ok(n1 >= n0 * 0.85 && n1 <= n0, 'a few homes fewer on the wider lots, not streets of them: ' + n0 + ' → ' + n1);
+  assert.equal(retail(rf.elements).reduce((t, e) => t + S.gfaOf(e), 0), retail(o.elements).reduce((t, e) => t + S.gfaOf(e), 0), 'the retail is untouched');
+  assert.ok(rf.elements.some(e => e.kind === 'pond') && rf.elements.some(e => e.kind === 'building' && e.use === 'amenity'), 'the lake and commons stay');
+  for (const h of homes(rf.elements)) { const lot = rf.elements.find(l => l.kind === 'lot' && S.inRing(S.centroid(S.shapeOf(h)), S.shapeOf(l))); assert.ok(lot && Math.min(lot.w, lot.d) >= h.w, 'each home on a lot as wide as it needs'); }
+  assert.deepEqual(S.check(p3).filter(i => i.level === 'bad').map(i => i.text), S.check(base).filter(i => i.level === 'bad').map(i => i.text), 'no new problems');
+  assert.equal(E.withHomeMix(base, [{ stories: 3, pct: 0 }]), null, 'a mix with no homes is no mix');
+  assert.ok(hm.program.zones.find(z => z.use === 'sfr').homeMix.every(t => t.stories < 3) && JSON.stringify(hm.recipe.seq).includes('"homeMix":[{"stories":1'), 'the program and the recipe both carry it, so a later re-fit keeps it');
+  // "make the main entry a boulevard" on a plan laid out with the narrow entry (the shops in front: the first drive 38 ft
+  // in): no room for a median, so it stays as it is and says why (a 50 ft throat with nothing down its middle gained
+  // nothing, and its note claimed a median that wasn't there); the checks say the first drive is too close
+  { const nb = L.layoutOptions({ ...site, params: { entry: { style: 'narrow' } } }, base.program, { count: 1 })[0], np = { ...site, program: nb.program, elements: nb.elements, recipe: nb.recipe }, me = nb.elements.find(e => e.name === 'Main entry');
+    assert.ok(!me.blvd, 'narrow: ' + me.note); const ops = E.guessEdits('make the main entry a boulevard', np); assert.deepEqual(ops, [{ action: 'change', target: me.id, boulevard: true, signs: null }]);
+    const q = E.applyEdits(np, [{ ...ops[0], signs: null, x: null, y: null, turnBy: null }]), p4 = { ...np, elements: q.elements }, e4 = q.elements.find(e => e.id === me.id), why = q.done.concat(q.skipped).join(' ');
+    assert.ok(!e4.blvd && e4.note === me.note && JSON.stringify(S.shapeOf(e4)) === JSON.stringify(S.shapeOf(me)) && JSON.stringify(S.entryParts(p4, e4).map(x => x.id)) === JSON.stringify(S.entryParts(np, me).map(x => x.id)), 'it stays as it is: ' + why);
+    assert.ok(q.skipped.some(t => /^No room for a boulevard there: it meets the first drive \d+ ft in from the street, too soon for a planted median/.test(t)) && !/median\)/.test(q.done.join(' ')), 'and says why: ' + why);
+    assert.ok(S.entryIssues(p4).some(i => i.id === me.id && /meets the first drive \d+ ft in from the street/.test(i.text)), 'the first drive too close to the street'); }
+  // every piece of a use or kind at once, listed or not
+  const r1 = E.applyEdits(base, [{ action: 'change', every: 'retail', floors: 2 }]);
+  assert.ok(retail(r1.elements).length && retail(r1.elements).every(e => e.floors === 2) && r1.done.length === 1 && /All \d+ retail buildings: 2 stories/.test(r1.done[0]), r1.done.join(' '));
+  const r2 = E.applyEdits(base, [{ action: 'change', every: 'building', floorsOver: 2, floors: 2 }]);
+  assert.ok(r2.skipped.some(t => /home mix/.test(t)) && storiesOf(r2.elements).includes(3), 'homes on lots never change stories one by one (their lots wouldn’t fit them): ' + r2.skipped.join(' '));
+  const pools = o.elements.filter(e => e.kind === 'pool').length, r3 = E.applyEdits(base, [{ action: 'remove', every: 'pool' }]);
+  assert.ok(!r3.elements.some(e => e.kind === 'pool') && (pools ? r3.done[0].startsWith('Removed ' + pools + ' pool') : r3.skipped.includes('No pools on the plan.')), r3.done.concat(r3.skipped).join(' '));
+  assert.deepEqual(E.applyEdits(base, [{ action: 'change', every: 'multifamily', floors: 4 }]).skipped, ['No apartment buildings on the plan.']);
+  // a neighbourhood of homes only: the same
+  const sf = { origin: [-95.93, 30.09], ring: [[-700, -500], [700, -500], [700, 500], [-700, 500]], front: 0, setbacks: { ...S.SETBACKS } }, os = L.layoutOptions(sf, { use: 'sfr' })[0], bs = { ...sf, program: os.program, elements: os.elements, recipe: os.recipe };
+  assert.ok(storiesOf(os.elements).includes(3), 'some 3-story homes: ' + storiesOf(os.elements));
+  const hs = E.withHomeMix(bs, E.guessMix('no 3 story homes', bs)), rs = L.refit({ ...bs, program: hs.program, recipe: hs.recipe }, { amount: 'current' });
+  assert.deepEqual(storiesOf(rs.elements), [1, 2], 'homes only: no 3-story left'); assert.ok(homes(rs.elements).length >= homes(os.elements).length * 0.85, homes(os.elements).length + ' → ' + homes(rs.elements).length);
+}
+// ---- a park beside the community center, an entrance at the open space (Oct 19). On a Waller-sized tract (about 246
+// acres, the back corner clipped off) with shops and pads out front, some 800 homes on lots, a lake and a commons, "add a
+// park beside the community center" put the park across a street (beside() only checked the sheet's box), nothing
+// flagged it, and the re-fit after laid the streets through it and moved the rest; an entrance asked for at the open
+// space ran under it, drawn hidden below the lawn. Parks are places now: clear of the streets or not added, homes under
+// them make way, re-fits keep the streets, entrances go round them or say they can't ----
+{
+  const E = await import('../lib/siteedit.mjs'), W = S.unionParcels([mk([-95.93, 30.06], [[0, 0], [3400, 0], [3400, 2400], [2300, 3300], [0, 3300]])]), site = { ...W, front: W.ring.findIndex((p, i) => S.outwardOf(W.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS } };
+  const o = L.layoutOptions(site, { use: 'mixed', zones: [{ use: 'retail', gfa: 60000, pads: 2 }, { use: 'sfr', units: 600 }, { use: 'amenity', items: ['lake', 'center', 'pool', 'playground'] }] }, { count: 1 })[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe };
+  const streets = els => els.filter(e => e.kind === 'drive' || e.kind === 'truck').map(e => JSON.stringify(S.shapeOf(e).map(p => p.map(v => Math.round(v))))).sort(), s0 = streets(o.elements);
+  const over = (pk, els) => els.filter(e => e.id !== pk.id && ['drive', 'truck', 'building', 'garage', 'lot', 'pond', 'pool'].includes(e.kind) && S.rectsOverlap(pk, e)).map(e => e.kind + ' ' + (e.name || ''));
+  const homes = els => els.filter(e => e.kind === 'building' && e.use === 'sfr').length, n0 = homes(o.elements), bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad');
+  assert.ok(n0 > 600 && S.entrancesOf(o.elements).length >= 3 && s0.length > 60, 'a big mixed plan: ' + n0 + ' homes, ' + s0.length + ' drives'); assert.deepEqual(bad(o.elements).map(i => i.text), []);
+  // a re-fit with nothing changed: every street where it was
+  const rf0 = L.refit(base, { amount: 'current', keep: true }); assert.deepEqual(streets(rf0.elements), s0, 'nothing changed: the same streets'); assert.equal(homes(rf0.elements), n0); assert.ok(!rf0.kept && !rf0.fresh);
+  // "add a park beside the community center": the words, then the edit as the AI gives it (no re-fit)
+  const cc = o.elements.find(e => e.kind === 'building' && e.use === 'amenity'); assert.ok(cc, 'the community center');
+  for (const t of ['add a park beside the community center', 'add a park beside the community center and re-fit', 'Add a park beside the community center, then re-fit the rest']) assert.deepEqual(E.guessEdits(t, base), [{ action: 'add', kind: 'green', with: cc.id, name: 'Park' }], t);
+  const r = E.applyEdits(base, [{ action: 'add', kind: 'green', with: cc.id, name: 'Park' }]), park = r.elements.find(e => e.name === 'Park');
+  assert.ok(park?.pinned, r.done.concat(r.skipped).join(' ')); assert.deepEqual(over(park, r.elements), [], 'clear of every street, building and lot');
+  assert.ok(Math.hypot(park.x - cc.x, park.y - cc.y) <= 300, 'beside it'); assert.deepEqual(streets(r.elements), s0, 'the streets are unchanged');
+  assert.ok(!bad(r.elements).some(i => i.id === park.id) && homes(r.elements) >= n0 - 12, 'no problem with it, a handful of homes at most made way');
+  // …then re-fitted (the AI said full, or Re-fit was ticked): the park stays, the streets stay, nothing under it
+  const rf = L.refit({ ...base, elements: r.elements }, { amount: 'current', keep: true }), p2 = rf.elements.find(e => e.id === park.id);
+  assert.ok(p2 && p2.x === park.x && p2.y === park.y, 'the park where it was put'); assert.deepEqual(over(p2, rf.elements), [], 'nothing laid over it');
+  assert.deepEqual(streets(rf.elements), s0, 'the re-fit keeps every street'); assert.ok(!rf.kept && !rf.fresh && homes(rf.elements) >= n0 - 12, homes(rf.elements) + ' homes');
+  assert.deepEqual(bad(rf.elements).map(i => i.text), [], 'no new problems');
+  // a park put in the middle of the homes: the homes under it make way, the streets don't
+  { const f = E.sheetFrame(base), hm = E.placesOf(base).areas.find(a => a.name === 'Single-family homes').middle, q = E.applyEdits(base, [{ action: 'add', kind: 'green', name: 'Park', x: hm[0], y: hm[1], w: 160, d: 120 }]), pk = q.elements.find(e => e.name === 'Park');
+    assert.ok(pk, q.skipped.join(' ')); assert.deepEqual(over(pk, q.elements), [], 'no street, home or lot under it'); assert.deepEqual(streets(q.elements), s0);
+    assert.ok(Math.hypot(...f.to([pk.x, pk.y]).map((v, i) => v - hm[i])) < 250 && homes(q.elements) < n0 && homes(q.elements) >= n0 - 16 && q.done.some(t => /made way/.test(t)), q.done.join(' '));
+    // with room to spare round it (a park flush against a street had the re-fit cut that street to keep its margin), no
+    // home within 4 ft of it, and the lots of the homes that stay cut back off it; then the re-fit keeps every street
+    const gap = Math.min(...q.elements.filter(e => e.kind === 'drive' || e.kind === 'truck').map(e => S.gapBetween(S.shapeOf(pk), S.shapeOf(e)))); assert.ok(gap >= 7.5, 'off the streets: ' + gap.toFixed(1));
+    assert.ok(q.elements.filter(e => e.kind === 'building' && e.use === 'sfr').every(h => S.gapBetween(S.shapeOf(pk), S.shapeOf(h)) >= 3.9));
+    const rq = L.refit({ ...base, elements: q.elements }, { amount: 'current', keep: true }); assert.deepEqual(streets(rq.elements), s0, 'the re-fit keeps every street'); assert.deepEqual(over(rq.elements.find(e => e.id === pk.id), rq.elements), []); }
+  // an entrance asked for by Pad A comes in from the front street (not the side lot line beside it, made a street), and
+  // a re-fit after keeps the streets and lays no parking across it (it used to lay a row over a driveway added by hand)
+  { const pad = o.elements.find(e => e.name === 'Pad A'), g = E.guessEdits('add an entrance by Pad A', base); assert.deepEqual(g, [{ action: 'add', kind: 'entrance', with: pad.id }]);
+    const q = E.applyEdits(base, g), ent = q.elements.find(e => q.touched.includes(e.id) && e.kind === 'drive'); assert.ok(ent, q.skipped.join(' ')); assert.deepEqual(q.streets || [], base.streets || [], 'no lot line made a street');
+    const rq = L.refit({ ...base, elements: q.elements, streets: q.streets }, { amount: 'current', keep: true });
+    assert.deepEqual(rq.elements.filter(e => e.kind === 'parking' && S.rectsOverlap(e, ent, 1)).length, 0, 'no stalls on the driveway'); assert.ok(rq.elements.some(e => e.id === ent.id)); }
+  // beside every named piece: a clear spot, or it says there's no room (it used to land on Pad A and a drive)
+  for (const a of o.elements.filter(e => e.name && ['building', 'pond', 'pool', 'play'].includes(e.kind) && e.use !== 'sfr')) {
+    const q = E.applyEdits(base, [{ action: 'add', kind: 'green', with: a.id, name: 'Park' }]), pk = q.elements.find(e => e.name === 'Park');
+    if (!pk) { assert.ok(q.skipped.some(t => t.startsWith('No room beside ' + a.name)), q.skipped.join(' ')); continue; }
+    assert.deepEqual(over(pk, q.elements).filter(t => !t.startsWith('lot')), [], 'a park beside ' + a.name); assert.ok(!bad(q.elements).some(i => i.id === pk.id));
+    assert.ok(S.gapBetween(S.shapeOf(pk), S.shapeOf(a)) <= 150, 'beside ' + a.name + ', not across the site from it'); }
+  // the park renamed and made far too big (or moved onto the lake): it stays as it was, its new name kept, and says so
+  // by that name (the whole change used to be put back without a word about the name)
+  { const lake = o.elements.find(e => e.kind === 'pond' && e.name === 'Amenity lake'), P1 = { ...base, elements: r.elements }, lc = E.sheetFrame(P1).to(S.centroid(S.shapeOf(lake)));
+    for (const [op, word] of [[{ w: 900, d: 900 }, 'resized'], [{ x: lc[0], y: lc[1] }, 'moved']]) { const q = E.applyEdits(P1, [{ action: 'change', target: park.id, name: 'Big park', ...op }]), pk = q.elements.find(e => e.id === park.id);
+      assert.ok(pk.name === 'Big park' && pk.x === park.x && pk.y === park.y && pk.w === park.w, word + ': ' + JSON.stringify(pk)); assert.deepEqual(q.done, ['Park: named Big park.']);
+      assert.deepEqual(q.skipped, ['Big park doesn’t fit there clear of the streets and buildings, so it wasn’t ' + word + '.' + (word === 'resized' ? ' Try a smaller one, or another spot.' : '')]); } }
+  // two entrances asked for by Pad A: the second comes in along the street from the first, not on top of it
+  { const q = E.applyEdits(base, E.guessEdits('add 2 entrances by Pad A', base)), ents = q.elements.filter(e => q.touched.includes(e.id) && e.kind === 'drive');
+    assert.equal(ents.length, 2, q.skipped.join(' ')); assert.ok(S.gapBetween(S.shapeOf(ents[0]), S.shapeOf(ents[1])) >= 80, 'apart: ' + S.gapBetween(S.shapeOf(ents[0]), S.shapeOf(ents[1]))); }
+  // an open space on the west side, between two streets (as a person would draw it), then an entrance asked for at it
+  // on the west lot line: it goes along the street past it (and says how far), or says the open space is in the way
+  const f = E.sheetFrame(base); let os = null, ro = null;
+  for (let y = 300; y < 3000 && !os; y += 70) { ro = E.applyEdits(base, [{ action: 'add', kind: 'green', name: 'Open space', x: 60, y, w: 110, d: 200 }]); const g = ro.elements.find(e => e.name === 'Open space'); if (g && f.to([g.x, g.y])[0] < 150) os = g; }
+  assert.ok(os, 'room for an open space along the west lot line'); const oy = Math.round(f.to([os.x, os.y])[1]), b2 = { ...base, elements: ro.elements, streets: ro.streets };
+  const entered = (q, how) => { const ent = q.elements.find(e => q.touched.includes(e.id) && e.kind === 'drive'), osIssues = S.check({ ...b2, elements: q.elements, streets: q.streets }).filter(i => i.id === os.id && /overlaps/.test(i.text));
+    assert.deepEqual(osIssues.map(i => i.text), [], how + ': the open space isn’t under anything');
+    if (ent) assert.ok(!S.rectsOverlap(ent, os) && q.done.some(t => /ft along the street from where it was asked, clear of Open space/.test(t)), how + ': round it: ' + q.done.join(' '));
+    else assert.ok(q.skipped.some(t => /Open space/.test(t)), how + ': says it’s in the way: ' + q.skipped.join(' ')); };
+  entered(E.applyEdits(b2, [{ action: 'add', kind: 'entrance', x: 0, y: oy }]), 'at x, y');
+  const g = E.guessEdits('add an entrance at the open space', b2); assert.deepEqual(g, [{ action: 'add', kind: 'entrance', with: os.id }]);
+  entered(E.applyEdits(b2, g), 'with the open space');
+  // the main entry a real boulevard by default: 50 ft, two 18 ft lanes either side of a 14 ft median at least 60 ft long,
+  // the monument sign in it; no fewer homes than with the narrow entry, the same arrangement
+  { const me = o.elements.find(e => e.name === 'Main entry'), parts = S.entryParts(base, me), md = parts.find(S.isMedian), sg = parts.filter(x => x.kind === 'sign'), rt = S.routeOf(me, base.ring);
+    assert.ok(me.blvd && rt.width === 50 && md, me.note); const ax = md.poly, far = Math.max(...ax.flatMap(a => ax.map(b => Math.hypot(a[0] - b[0], a[1] - b[1]))));
+    const n = rt.mouth, ws = ax.map(q => q[0] * n[1] - q[1] * n[0]); assert.ok(Math.abs(Math.max(...ws) - Math.min(...ws) - 14) < 0.5 && far >= 60, 'a 14 ft median, ' + far.toFixed(0) + ' ft long');
+    const es = S.shapeOf(me); assert.ok(ax.every(q => S.inRing(q, es)), 'inside the drive');
+    assert.ok(sg.length === 1 && sg[0].sign === 'median' && S.corners(sg[0]).every(q => S.inRing(q, ax)) || sg.length && o.notes.some(t => /monument signs stand at the corners/.test(t)), 'a sign in the median (or the corners, and why)');
+    const on = L.layoutOptions({ ...site, params: { entry: { style: 'narrow' } } }, base.program, { count: 1 })[0]; assert.equal(on.name, o.name, 'the same arrangement'); assert.ok(homes(o.elements) >= homes(on.elements) * 0.98, homes(o.elements) + ' vs ' + homes(on.elements) + ' with the narrow entry');
+    assert.ok(!on.elements.find(e => e.name === 'Main entry').blvd, 'narrow: the 40 ft entry'); }
+  // the main entry turned 15° by hand, then the site re-fitted: its mouth on the lot line, its median inside it, the
+  // streets kept, the homes kept
+  { const p = structuredClone(base), me = p.elements.find(e => e.name === 'Main entry'), t = S.turnPiece(p, me, 15); p.elements = t.elements; assert.equal(t.deg, 15);
+    const rq = L.refit(p, { amount: 'current', keep: true }), pin = new Set(rq.elements.filter(e => e.pinned).map(e => e.id)), e2 = rq.elements.find(e => e.id === me.id);
+    assert.deepEqual(S.check({ ...p, elements: rq.elements }).filter(i => i.level === 'bad' && !pin.has(i.id)).map(i => i.text), [], 'no problems outside what was placed by hand');
+    assert.ok(e2 && S.segDist(e2.path[0], p.ring[p.front], p.ring[(p.front + 1) % p.ring.length]) < 0.05, 'the entrance kept, its mouth on the street'); const es = S.shapeOf(e2), md = S.entryParts({ ...p, elements: rq.elements }, e2).find(S.isMedian);
+    assert.ok(md && md.poly.every(q => S.inRing(q, es) || Math.min(...es.map((a, i) => S.segDist(q, a, es[(i + 1) % es.length]))) <= 2), 'its median inside it');
+    const s1 = streets(rq.elements); assert.ok(s0.filter(x => s1.includes(x)).length >= s0.length * 0.9, 'the streets kept: ' + s0.filter(x => s1.includes(x)).length + ' of ' + s0.length); assert.ok(homes(rq.elements) >= n0 * 0.97, homes(rq.elements) + ' homes'); }
+  // roundabouts and drop-off loops (phase 2): "add a roundabout at the main intersection" goes at the main junction and
+  // joins its streets, every drive reached, a handful of homes at most made way; a re-fit keeps it joined and the streets;
+  // "at the entry" keeps the main entry the main entry, its mouth on the street; "remove the roundabout" puts the streets
+  // back; a circle drive at the community center says why there's no room (its front is 28 ft from the street)
+  { let t = Date.now(); const J = S.junctionsOf(base), ms = Date.now() - t, jm = J.find(j => j.main), f = E.sheetFrame(base); assert.ok(ms < 200, 'junctions in ' + ms + ' ms'); assert.ok(jm && !jm.parking && J.length > 20);
+    const g = E.guessEdits('add a roundabout at the main intersection', base), at = f.to(jm.at).map(Math.round); assert.deepEqual(g, [{ action: 'add', kind: 'roundabout', x: at[0], y: at[1] }]);
+    t = Date.now(); const r = E.applyEdits(base, g), ams = Date.now() - t, rb = r.elements.find(S.isRing); assert.ok(ams < 1500, 'added in ' + ams + ' ms');
+    assert.ok(rb && (Math.hypot(rb.x - jm.at[0], rb.y - jm.at[1]) < 0.5 || r.done.some(x => /no room \(.+ in the way\), so it’s at the next one/.test(x))) && r.done.some(x => /^Added Roundabout \(\d+ ft across\) where .+ meet\./.test(x)), r.done.concat(r.skipped).join(' ')); // (here Main drive runs beside the main junction, over where its lane would be: it's at Main drive's own junction, next to it)
+    assert.deepEqual(bad(r.elements).map(i => i.text), []); const { seen, D } = reached(r.elements); assert.deepEqual(D.filter(d => !seen.has(d.id) && d.note !== 'Drive-thru lane').map(d => d.id), [], 'every drive reached');
+    assert.ok(homes(r.elements) >= n0 - 6, n0 - homes(r.elements) + ' homes made way'); assert.deepEqual(overRing(rb, r.elements), []);
+    const s1 = streets(r.elements), cut = new Set(rb.rb.cuts.flatMap(k => streets([k.was]))); assert.ok(cut.size >= 2 && s0.every(x => s1.includes(x) || cut.has(x)), 'every street kept but the ones cut back to it');
+    const rf = L.refit({ ...base, elements: r.elements }, { amount: 'current', keep: true }), rb2 = rf.elements.find(e => e.id === rb.id);
+    assert.ok(!rf.kept && !rf.fresh && rb2 && rb2.x === rb.x && rb2.y === rb.y && rf.elements.filter(e => e.cut === rb.id).length >= 2, 're-fitted: there, joined'); assert.deepEqual(overRing(rb2, rf.elements), []);
+    assert.deepEqual(bad(rf.elements).map(i => i.text), []); assert.ok(homes(rf.elements) >= homes(r.elements) - 2, homes(rf.elements) + ' homes'); const s2 = streets(rf.elements); assert.ok(s0.filter(x => s2.includes(x)).length >= s0.length * 0.95, 'the streets kept');
+    const rm = E.applyEdits({ ...base, elements: r.elements }, E.guessEdits('remove the roundabout', { ...base, elements: r.elements })); assert.match(rm.done[0] || '', /^Removed Roundabout/); assert.deepEqual(streets(rm.elements), s0, 'removed: the streets back');
+    const me = base.elements.find(e => e.name === 'Main entry'), ge = E.guessEdits('add a roundabout at the entry', base); assert.deepEqual(ge, [{ action: 'add', kind: 'roundabout', with: me.id }]);
+    const q = E.applyEdits(base, ge), me2 = q.elements.find(e => e.name === 'Main entry'), es = me2 && S.shapeOf(me2), st = els => els.filter(e => e.kind === 'parking').reduce((t, e) => t + S.stalls(e).count, 0), gave = +(q.done.join(' ').match(/(\d+) spaces gave way/)?.[1] || 0);
+    assert.equal(st(q.elements), st(base.elements) - gave, 'only the spaces under it give way (' + gave + '), not the rows along the aisle it cut'); assert.ok(q.elements.some(S.isRing) && me2?.id === me.id && q.elements.filter(e => e.name === 'Main entry').length === 1, q.done.concat(q.skipped).join(' '));
+    assert.ok(S.segDist(S.routeOf(me2, base.ring).path[0], base.ring[base.front], base.ring[(base.front + 1) % base.ring.length]) < 0.05, 'the main entry\'s mouth on the street'); assert.deepEqual(bad(q.elements).map(i => i.text), []);
+    const md = S.entryParts({ ...base, elements: q.elements }, me2).find(S.isMedian); assert.ok(md ? md.poly.every(p => S.inRing(p, es) || Math.min(...es.map((a, i) => S.segDist(p, a, es[(i + 1) % es.length]))) <= 2) : q.done.some(x => /median|corners/.test(x)), 'its median in it, or it says where the signs went');
+    { const rq = q.elements.find(S.isRing), back = E.applyEdits({ ...base, elements: q.elements }, [{ action: 'remove', target: rq.id }]); assert.equal(st(back.elements), st(base.elements), 'taken away: the spaces back'); assert.deepEqual(streets(back.elements), s0); assert.deepEqual(bad(back.elements).map(i => i.text), []); }
+    const gl = E.guessEdits('add a circle drive in front of the community center', base); assert.deepEqual(gl, [{ action: 'add', kind: 'loop', with: cc.id }]);
+    const ql = E.applyEdits(base, gl); assert.match(ql.skipped.join(' '), /its front is 2\d ft from the street .*Move it back about \d+ ft/); assert.ok(!ql.done.length && ql.elements.length === base.elements.length && !ql.elements.some(S.isLoop), 'nothing changed'); }
+}
+// ---- beside a piece that runs across the sheet (Oct 19): on an irregular 144-acre tract turned 17° the lake is a long
+// strip along the skewed back lot line, and "a park beside the lake" was measured from the lake's box on the sheet: it
+// landed 640 ft from the water and still said "Added Park." Beside is measured from the piece's own outline now; where
+// the default size doesn't fit a smaller park goes, else it says there's no room ----
+{
+  const E = await import('../lib/siteedit.mjs'), a = 17 * Math.PI / 180, I = S.unionParcels([mk([-96.01, 30.02], [[0, 0], [2900, 0], [3100, 900], [2600, 2100], [1300, 2300], [200, 1900], [-150, 900]].map(([x, y]) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)]))]);
+  const site = { ...I, front: I.ring.reduce((b, p, i) => S.outwardOf(I.ring, i)[1] < S.outwardOf(I.ring, b)[1] ? i : b, 0), setbacks: { ...S.SETBACKS } };
+  const o = L.layoutOptions(site, { use: 'mixed', zones: [{ use: 'retail', gfa: 40000, pads: 2 }, { use: 'sfr', units: 450 }, { use: 'amenity', items: ['lake', 'center', 'pool', 'playground'] }] }, { count: 1 })[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe };
+  const homes = els => els.filter(e => e.kind === 'building' && e.use === 'sfr').length, n0 = homes(o.elements), named = o.elements.filter(e => e.name && ['building', 'pond', 'pool', 'play', 'green'].includes(e.kind) && e.use !== 'sfr');
+  assert.ok(named.some(e => e.name === 'Amenity lake') && named.some(e => e.name === 'Open space'), named.map(e => e.name).join(', '));
+  for (const x of named) { const q = E.applyEdits(base, [{ action: 'add', kind: 'green', with: x.id, name: 'Park' }]), pk = q.elements.find(e => e.name === 'Park');
+    if (!pk) { assert.ok(q.skipped.some(t => t.startsWith('No room beside ' + x.name)), q.skipped.join(' ')); continue; }
+    assert.ok(S.gapBetween(S.shapeOf(pk), S.shapeOf(x)) <= 150, 'a park beside ' + x.name + ' is beside it: ' + S.gapBetween(S.shapeOf(pk), S.shapeOf(x)).toFixed(0) + ' ft');
+    assert.deepEqual(q.elements.filter(e => e.id !== pk.id && ['drive', 'truck', 'building', 'garage', 'pond', 'pool'].includes(e.kind) && S.rectsOverlap(pk, e)).map(e => e.name || e.kind), [], 'clear');
+    assert.ok(homes(q.elements) >= n0 - 12, q.done.join(' ')); if (pk.w < 120) assert.ok(q.done.some(t => /didn’t fit beside/.test(t)), 'a smaller one says so: ' + q.done.join(' ')); }
 }
 // ---- how many ways in, when the request doesn't say: a corner lot gets one on each street, a big apartment community a
 // second for fire access, an inside lot one ----
