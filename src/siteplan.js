@@ -29,6 +29,8 @@ import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, pickedClaude, pickedEffort } fro
 import * as CU from './lib/customtypes.mjs';
 import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
+import * as RF from './lib/sitefiles.mjs';
+import { siteFiles } from './sitefiles.js';
 import { teamLibrary } from './teamlib.js';
 import { ruleSheets } from './rulesheets.js';
 const typeOptions = (cur, team = []) => (team.length ? '<optgroup label="Team">' + team.map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>' : '') + BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
@@ -128,6 +130,21 @@ export function initSitePlan(ctx) {
   // ---------- the team's building library (src/teamlib.js): Save to Library, the Team group, rename and delete ----------
   const TL = teamLibrary({ onChange: () => teamRefresh() });
   const RS = ruleSheets({ onChange: () => { if (ed && card.classList.contains('sp-mode') && !card.querySelector('.sp-rules :focus')) rulesRefresh(); } }); // the team's street rule sheets (lib/rulesheet.mjs), one per place
+  // ---------- a project's reference files (src/sitefiles.js): the project page's Files tab; confirmed facts go to the AI ----------
+  const SF = siteFiles({ ctx, esc, project: id => db.projects.find(x => x.id === id), save: p => save(p), render: () => { if (ctx.view === 'projects') render(true); }, library: TL, when: s => when(s),
+    optionsOf: p => (p?.plans || []).filter(pl => pl.ring.length >= 3).map(pl => ({ id: pl.id, name: pl.name, kos: pl.elements.filter(e => e.kind === 'keepout').map(e => e.name) })), addEasement: (p, plid, x, file) => easementFrom(p, plid, x, file) });
+  // a confirmed easement (its width and the side of the lot it runs along) drawn on an option as a no-build area: a strip
+  // inside that lot line (lib/sitefiles.mjs easementStrip). The layouts then keep off it, like one drawn by hand.
+  function easementFrom(p, plid, x, file) {
+    const pl = p.plans.find(q => q.id === plid); if (!pl || pl.ring.length < 3) throw new Error('That option has no site drawn yet.');
+    const pts = RF.easementStrip(pl.ring, x.side, x.widthFt, Number.isInteger(pl.front) ? pl.front : SP.longestEdge(pl.ring));
+    if (!pts) throw new Error('Couldn’t fit a ' + x.widthFt + ' ft strip along the ' + x.side + ' side of ' + pl.name + '. Open it and draw the easement by hand (Add › Easement).');
+    const err = T.areaError(pl, pts, 'keepout'); if (err) throw new Error(err);
+    const e = { ...T.areaPiece(pl, 'keepout', pts, uid()), name: String(x.label || 'Easement').slice(0, 60), note: 'From ' + String(file || 'a reference file').slice(0, 60) + ': check against the survey' };
+    if (ed && ed.pid === p.id && ed.plid === plid) change(q => { q.elements.push(e); }); // the option is open: one undo step, drawn now
+    else { pl.elements.push(e); pl.updated = new Date().toISOString(); save(p); }
+    return x.label + ' is drawn on ' + pl.name + ' along the ' + x.side + ' side (' + x.widthFt + ' ft). Re-fit the plan to lay the rest out around it.';
+  }
   const AIS_TIP = 'Sized by the AI from typical practice, not a product sheet: check it against the real building before relying on it';
   const teamTypes = () => TL.list().map(CU.libraryTypeOf); // the Team group, as library types
   const anyType = id => String(id || '').startsWith('team:') ? (t => t ? CU.libraryTypeOf(t) : null)(TL.get(String(id).slice(5))) : typeById(id);
@@ -1824,7 +1841,7 @@ export function initSitePlan(ctx) {
   // the dark summary under the header: which layout is on the map, then Phase 1 first, parking for what was asked for,
   // coverage and the money, and whether it passes. A kicker only for a real status (building) or the first step.
   function overview(pl, prog) {
-    if (!SP.hasDesign(pl) && ed.run?.kind === 'build') return '<div class="kicker">Building…</div><div class="sp-ov-msg"><b>Laying out “' + esc(ed.run.ask) + '”</b><span>The layouts appear here as soon as they’re drawn.</span></div>';
+    if (!SP.hasDesign(pl) && ed.run?.kind === 'build') return '<div class="kicker">Building…</div><div class="sp-ov-msg"><b>Laying out “' + esc(ed.run.ask) + '”</b><span>' + (holding(ed.run) ? 'The layouts appear once the AI has checked and rated them.' : 'The layouts appear here as soon as they’re drawn.') + '</span></div>';
     if (!SP.hasDesign(pl)) return '<div class="kicker">Step 1 of 3</div><div class="sp-ov-msg"><b>Describe what to build</b><span>Type it under Build, then Build Layouts, or <button type="button" class="sp-link sp-quiet" data-jump="spDrawSec">add pieces by hand</button>.</span></div>';
     const m = GM(pl), issues = checkAll(pl), cl = K.checkLabel(K.checksOf(issues, m), { waller: GON(pl) }), ph = pl.elements.some(e => e.phase === 2);
     const m1 = ph ? GM({ ...pl, elements: pl.elements.filter(e => e.phase !== 2) }) : null, h = K.headline(m, m1, K.askedOf(prog)), pk = parkOf(m, m1), whole = twoPhase(m, m1);
@@ -1915,7 +1932,7 @@ export function initSitePlan(ctx) {
         '<select id="spSheet" aria-label="Sheet size"><option value="tabloid">11 × 17 sheet</option><option value="archd">24 × 36 sheet</option></select>' +
         '<button type="button" class="btn" id="spDxf" title="Opens in AutoCAD, CADCraft, LibreCAD and most CAD programs">CAD (DXF)</button><button type="button" class="btn" id="spGeo" title="The plan as map shapes (GeoJSON)">Map File (GeoJSON)</button><button type="button" class="btn" id="spSum" title="The site and its numbers as text, for an email or a note">Copy Summary</button>' + (GON(pl) ? '<button type="button" class="btn" id="spLandCsv" title="The Waller land-use reconciliation, scenarios, unresolved risks and required plan content, with the concept label (opens in Excel)">Land Use (CSV)</button>' : '') + '</div></div>'
     };
-    const secs = planSections({ drawing, selected: !!sel, layouts: !!ed.variants, laidOut: laid }).map(x => ({ ...x, html: HTML[x.id] }));
+    const secs = planSections({ drawing, selected: !!sel, layouts: !!ed.variants || holding(ed.run), laidOut: laid }).map(x => ({ ...x, html: HTML[x.id] }));
     const editBtn = has && !noRing ? '<button type="button" class="btn sm sp-edit' + (ed.editing ? ' on' : '') + '" aria-pressed="' + !!ed.editing + '" id="spEdit" title="Move, resize and turn pieces of the plan; only the piece you move changes (E)">' + ICO.edit + '<span>' + (ed.editing ? 'Stop Editing' : 'Edit Layout') + '</span></button>' : '';
     // the header: Projects › the project (with Undo, Redo, the save status and ×), then the option's name and its address
     // with Edit Layout and Done. A long project name is cut short, the whole of it in the tooltip.
@@ -1936,6 +1953,7 @@ export function initSitePlan(ctx) {
     if (focusId) { const f = card.querySelector('#' + CSS.escape(focusId)); if (f && f !== document.activeElement) try { f.focus({ preventScroll: true }); } catch (e) {} }
     on('.x', closePlan); on('#spDone', closePlan); on('.sp-cback', closePlan);
     card.querySelectorAll('[data-crumb]').forEach(b => b.onclick = () => { const to = b.dataset.crumb === 'project' ? p.id : null; cur = to; ctx.setView('projects'); show(to); }); // cur first: the page change and the project are one history entry
+    card.querySelectorAll('[data-reffiles]').forEach(b => b.onclick = () => { cur = p.id; ctx.setView('projects'); show(p.id, 'files'); }); // the project's reference files (its Files tab)
     { const nm = $('#spPlanName'), chips = () => card.querySelectorAll('[data-plan="' + CSS.escape(pl.id) + '"]');
       nm.oninput = () => { const v = nm.value.trim(); chips().forEach(c => { c.textContent = v || pl.name; }); }; // the option's chip says what you're typing
       nm.onchange = () => { const v = nm.value.trim(); if (!v) { nm.value = pl.name; chips().forEach(c => { c.textContent = pl.name; }); return; } change(x => { x.name = v; }); }; // the whole panel: the option buttons show the new name
@@ -2006,6 +2024,11 @@ export function initSitePlan(ctx) {
   // Phase 2 is set under Settings; a note here says which way and goes there. A suggestion only fills the box; Enter or
   // Build Layouts runs it. Once there are layouts it folds to the request with Edit request and New request; the chevron
   // opens or folds it.
+  // one line under Build: how many facts from the project's reference files the AI uses, and the way to them
+  function refNote() {
+    const p = P(), n = SF.confirmed(p), k = (p?.files || []).length, go = t => ' <button type="button" class="lnk" data-reffiles="1">' + t + '</button>';
+    return '<div class="rnote sp-refs">' + (n ? 'The AI also uses ' + plural(n, 'confirmed fact') + ' from this project’s reference files.' + go('Reference files') : k ? 'This project’s reference files have facts still to check: only confirmed ones go to the AI.' + go('Check them') : 'A survey or floor plans to go by?' + go('Add reference files') + ' for the AI to use.') + '</div>';
+  }
   function buildHtml(pl) {
     const off = aiOff(), lvl = effortNow(), building = ed.run?.kind === 'build', asked = building ? ed.run.ask : ed.runMeta?.ask || '';
     const why = off ? '<div class="rnote sp-aioff" id="spAiOff">AI isn’t set up on this site</div>' : ''; // the one line that says so (no note repeating it)
@@ -2014,7 +2037,7 @@ export function initSitePlan(ctx) {
     const fold = o => '<button type="button" class="sp-tgl sp-tgl-i" data-bfold="' + (o ? 1 : 0) + '" aria-expanded="' + o + '" aria-label="' + (o ? 'Fold the request box away' : 'Open the request box') + '" title="' + (o ? 'Fold the request box away (the last request stays)' : 'Open the request box') + '">' + CHEV + '</button>';
     if (!ed.buildOpen && asked && (ed.variants || building))
       return '<div class="bsec sp-ai sp-built" id="spAiSec"><div class="sp-ai-h"><div class="lt">Build with AI</div>' + fold(false) + '</div><div class="sp-built-l">' + (building ? 'Building from ' : 'Built from ') + '<q>' + esc(asked) + '</q>' + effOn(building ? ed.run.effort : ed.runMeta?.effort) + '</div>' +
-        '<div class="sp-row"><button type="button" class="btn sm" data-bedit="1">Edit request</button><button type="button" class="btn sm" data-bnew="1">New request</button></div>' + readHtml(asked) + ideas + note + why + '</div>';
+        '<div class="sp-row"><button type="button" class="btn sm" data-bedit="1">Edit request</button><button type="button" class="btn sm" data-bnew="1">New request</button></div>' + readHtml(asked) + ideas + note + why + refNote() + '</div>';
     const acres = SP.ringArea(pl.ring) / 43560, sugs = RUN.presets(acres, SP.edgeLen(pl.ring, pl.front ?? SP.longestEdge(pl.ring)), { aiOff: off }), fillOn = pl.params?.fill !== false;
     return '<div class="bsec sp-ai" id="spAiSec"><div class="sp-ai-h"><label class="lt" for="spAsk">Build with AI</label>' + (asked && ed.variants ? fold(true) : '') + '</div>' +
       '<textarea id="spAsk" rows="2" placeholder="What should go here? e.g. ' + esc(sugs[0]?.text || '25,000 sf retail strip') + '">' + esc(ed.ask || '') + '</textarea>' +
@@ -2026,7 +2049,7 @@ export function initSitePlan(ctx) {
           (dis ? ' disabled title="AI isn’t set up on this site"' : ' title="' + esc(e.label + ' · ' + e.time + ': ' + (off ? 'Layouts in seconds, read from your words.' : e.tip)) + '"') + '><b>' + (e.id === 'ultra' ? SPARK : '') + e.label + '</b><small>' + e.time + '</small></button>'; }).join('') + '</div>' +
       '<div class="rnote sp-effhint" id="spEffHint">' + esc(off ? 'Layouts in seconds, read from your words.' : ASK.effortOf(lvl).tip) + '</div>' +
       '<div class="bacts sp-go"><button class="btn askai" id="spGo"><span>Build Layouts</span>' + (off ? '<small>From your words (AI off)</small>' : '') + '</button><button class="btn" id="spBest"' + (off ? ' disabled title="AI isn’t set up on this site"' : ' title="The AI reads what the app knows about this site and its surroundings and suggests what to build"') + '>What Should Go Here?</button></div>' +
-      why + (asked && ed.variants ? readHtml(asked) : '') + ideas + note + '</div>';
+      why + (asked && ed.variants ? readHtml(asked) : '') + ideas + note + refNote() + '</div>';
   }
   // what the last request was read as: the program as chips, anything named in it that the program doesn't have, and Edit
   function readHtml(asked) {
@@ -3119,7 +3142,11 @@ export function initSitePlan(ctx) {
   const factsFor = pl => { const id = pl.id + ':' + pl.ring.length, box = ed || { facts: factsKept.get(pl.id) }; if (box.facts?.id === id) return box.facts.p; const f = { id, p: siteFacts(pl).catch(() => []) }; if (ed) ed.facts = f; else factsKept.set(pl.id, f); return f.p; }; // flood, roads, districts, utilities: asked once per site
   // a Waller plan's requests carry its guardrails (the server adds their instruction and values to the AI's), and what
   // comes back has the prohibited conclusions rewritten before it's shown
+  // every AI call about the open plan also carries the facts the team confirmed from the project's reference files
+  // (lib/sitefiles.mjs refsForAI: a survey's easements, a floor plan's size…), unless the call brings its own
+  const REF_MODES = ['program', 'strategy', 'review', 'edit', 'ask', 'bestuse'];
   const post = async (body, signal) => { const ga = ['bestuse', 'askProject'].includes(body.mode) ? null : G.forAI(PL() || {}); if (ga) body = { ...body, guardrails: ga };
+    if (!body.refs && REF_MODES.includes(body.mode || 'program')) { const rf = RF.refsForAI(P()?.files); if (rf.length) body = { ...body, refs: rf }; }
     const md = ctx.aiModel?.(), r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(md ? { ...body, model: md } : body), signal }); ctx.noteModel?.(r); const d = await r.json().catch(() => ({})); if (!r.ok) { const e = Object.assign(new Error(d.error || 'AI unavailable'), { status: r.status }); aiSaw(e); throw e; } ctx.spAiOff = 0; return ga ? scrubDeep(d) : d; };
   // an option as the AI sees it: the plan drawing as a picture, its numbers and what the checks found
   async function planImage(plan) {
@@ -3160,9 +3187,12 @@ export function initSitePlan(ctx) {
   const briefCheckOf = (pool, mayRevise, briefFor, dropped = null) => { const i = pool.findIndex(v => v.aiBrief), ab = i >= 0 ? pool[i].aiBrief : dropped?.brief;
     if (!ab) return {};
     return { briefCheck: { option: i >= 0 ? i : null, brief: ab.brief, reasons: ab.reasons, met: i >= 0 && !!ab.met, mayRevise: !!mayRevise && !(i >= 0 && ab.met), ...(i < 0 ? { dropped: dropped.reason } : {}) }, ...(briefFor ? { briefFor } : {}) }; };
-  // Build: describe → watch it run → choose. The engine's layouts go on the map and into the list as soon as they're
-  // drawn; with the AI on, its review then fills in their scores (matched by key, not position), puts its pick first and
-  // adds any layouts from a revised program. The AI's pick is put on the map only if the person hasn't picked one meanwhile.
+  // Build: describe → watch it run → choose. With the AI on (Medium and up), the engine's layouts are held back, unseen
+  // and off the map, while the AI reviews them: the panel shows only the run (its steps, the time, Cancel). Then they come
+  // in ranked by the AI, each with its score, verdict, strengths and problems, with any layouts from a revised program, and
+  // the AI's pick goes on the map (unless the plan was changed by hand meanwhile: then it's offered). A review that fails,
+  // runs too long or is cancelled shows the engine's layouts, said not to be AI-reviewed (lib/planruns.mjs). With the AI
+  // off, or on Low, the layouts go on the map and into the list as soon as they're drawn.
   // The effort level sets the work: Low reads the request and stops; Medium reviews once; High may revise once; Ultra
   // starts from a wider search (five layouts), reviews up to six and may revise twice.
   async function build(o = {}) {
@@ -3176,7 +3206,7 @@ export function initSitePlan(ctx) {
     // layout settings and the review then follow that plan
     const thinks = ai && !!L.plan, o0 = thinks ? 1 : 0, planStep = L.plan?.count > 1 ? 'Thinking through ' + L.plan.count + ' plans for the site' : 'Thinking the site through';
     const steps0 = !review ? ['Reading your request', lay] : L.rounds === 1 ? ['Reading your request', lay, 'AI review'] : ['Reading your request', lay, 'AI review', 'Comparing'];
-    const run = startRun('build', thinks ? [planStep, ...steps0] : steps0, src, { ask, effort: lvl }); if (!run) return;
+    const run = startRun('build', thinks ? [planStep, ...steps0] : steps0, src, { ask, effort: lvl, holds: review }); if (!run) return; // (holds: the layouts wait for the AI's review, the panel showing the run)
     let prog = SP.keepNames(SP.guessProgram(ask), pl.program), setbacks = pl.setbacks, /* (a new program keeps the plan's names) */ note = '', aiOk = false, assumed = [], strategy = null;
     const site = ai ? siteInfo(p, pl) : null, facts = ai ? await factsFor(pl) : null; if (!live(run)) return;
     if (!terrainNow(pl)) { await Promise.race([terrainOf(pl), new Promise(res => setTimeout(res, 6000))]); if (!live(run)) return; } // (asked once per boundary; usually here already)
@@ -3195,7 +3225,7 @@ export function initSitePlan(ctx) {
       prog = SP.keepNames(d.program || prog, pl.program); setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
     } catch (e) { if (!live(run)) return; note = e.status === 503 ? '' : navigator.onLine ? 'The AI didn’t answer, so this read your words directly.' : 'Offline: this read your words directly.'; }
     if (!live(run) || PL() !== pl) return;
-    if (!aiOk) { run.steps = run.steps.slice(0, 2 + o0); strategy = null; if (aiB) aiBNote = ''; aiB = null; } // the AI is off: no review either (nor its plan: the note above says it didn't answer)
+    if (!aiOk) { run.steps = run.steps.slice(0, 2 + o0); run.holds = false; strategy = null; if (aiB) aiBNote = ''; aiB = null; paintRun(); } // the AI is off: no review either, the layouts shown as they come (nor its plan: the note above says it didn't answer)
     if (aiB && prog?.zones?.length) { prog = BR.withPads(prog, aiB.brief.pads); aiB = null; } // a mix: the AI's pads go on its shop zone; the rest of the brief has no engine of its own there
     const np = SP.normalizeProgram(prog);
     const readAs = { ask, chips: RUN.readAs(np, SP.USES), miss: RUN.notUnderstood(ask, np), assumed, by: aiOk ? 'ai' : 'words', ...(strategy ? { plan: strategy } : {}), ...(aiB ? { brief: aiB } : {}), ...(aiBNote ? { briefNote: aiBNote } : {}) }; // shown once the layouts land, so a cancelled build keeps the last one's
@@ -3221,17 +3251,23 @@ export function initSitePlan(ctx) {
       } else { readAs.briefNote = 'The AI’s plan is for shops and offices; this request reads as something else, so these are the engine’s own layouts.'; }
     }
     if (aiBNote) note = (note ? note + ' ' : '') + aiBNote;
-    const doReview = aiOk && review && variants.some(v => v.elements.length);
-    // the layouts, at once: on the map and in the list
-    ed.variants = variants; ed.readAs = readAs; ed.aiNote = note; ed.aiSummary = ''; ed.reviewCleared = false; ed.runMeta = { ask, at: new Date().toISOString(), effort: aiOk ? lvl : 'low' }; ed.pickedByUser = false; ed.reviewing = doReview; ed.aiPick = null;
+    const doReview = RUN.holdsForReview({ ai: aiOk, rounds: review ? L.rounds : 0, any: variants.some(v => v.elements.length) });
+    const meta = { ask, at: new Date().toISOString(), effort: aiOk ? lvl : 'low' };
     if (ed.ideas?.list?.length) { if (!ed.ideas.list.some(it => it.request === ask)) ed.ideas = { ...ed.ideas, used: null }; else if (ed.ideas.used != null) ed.ideasOpen = false; } // the idea laid out: the ideas fold to a line
-    run.applied = true;
-    const rec0 = K.recommended(variants, null), best = rec0 ? rec0.index : variants.findIndex(v => v.elements.length); // never a failing layout when one passes
-    if (best >= 0) await useVariant(best, { quiet: true, fresh: true }); else saveRun(pl);
-    if (!live(run)) return;
-    if (!doReview) { endRun(run); if (best < 0 && !failed) ctx.toast('Nothing fits that request on this site.'); return; } // (a failed layout already said so)
-    panel(); showLayouts(run);
+    run.applied = true; // (a hand edit from here on doesn't stop the run: what lands then is offered, not put on the map)
+    if (!doReview) { // the AI is off, Low, or nothing fits: the layouts at once, on the map and in the list
+      ed.variants = variants; ed.readAs = readAs; ed.aiNote = review && ai && !aiOk && note ? note + ' These layouts were not reviewed by the AI.' : note; ed.aiSummary = ''; ed.reviewCleared = false; ed.runMeta = meta; ed.pickedByUser = false; ed.reviewing = false; ed.aiPick = null;
+      const rec0 = K.recommended(variants, null), best = rec0 ? rec0.index : variants.findIndex(v => v.elements.length); // never a failing layout when one passes
+      if (best >= 0) await useVariant(best, { quiet: true, fresh: true }); else saveRun(pl);
+      if (!live(run)) return;
+      endRun(run); if (best < 0 && !failed) ctx.toast('Nothing fits that request on this site.'); return; // (a failed layout already said so)
+    }
+    // the AI on: the layouts wait here, unseen and off the map, until its review is back (the panel shows the run)
+    run.hold = variants; run.landing = { readAs, meta, note }; run.u0 = ed.undo.length; run.top = ed.undo[run.u0 - 1];
     runStep(run, 3 + o0, strategy ? 'The AI is reviewing the layouts against its plan' : 'The AI is reviewing the layouts');
+    // the review has a time limit of its own: past it, the layouts are shown as the engine ranked them (RUN.reviewLimitMs)
+    const rctl = new AbortController(), sig = AbortSignal.any ? AbortSignal.any([run.ctl.signal, rctl.signal]) : run.ctl.signal; let late = false;
+    const tmo = setTimeout(() => { late = true; rctl.abort(); }, RUN.reviewLimitMs(L.rounds));
     let pool = variants.filter(v => v.elements.length).slice(0, L.pool), extra = [], revised = [], rv = null, params1 = plan.params || {};
     { const a = variants.find(v => v.aiBrief && v.elements.length); if (a && !pool.includes(a)) pool = pool.slice(0, Math.max(0, L.pool - 1)).concat([a]); } // the AI's plan is always among those reviewed
     // the AI's plan, when the engine couldn't do it as written (parking short, it didn't fit, a check failed): High and
@@ -3239,11 +3275,11 @@ export function initSitePlan(ctx) {
     // compared in the next round like a revised program's layouts (Medium's one round never revises)
     let briefDone = false, briefRev = '', dropRev = '';
     try {
-      rv = await aiReview(plan, prog, pool, 1, ask, run.ctl.signal, L, briefCheckOf(pool, L.rounds >= 2, briefFor, aiDrop));
+      rv = await aiReview(plan, prog, pool, 1, ask, sig, L, briefCheckOf(pool, L.rounds >= 2, briefFor, aiDrop));
       if (!live(run)) return;
       // each round the AI may change the program (never on the last): the new program is laid out, and the best three so
       // far (by its ranking) and the new layouts go back to it to compare
-      for (let round = 2; round <= L.rounds && (rv.revise && rv.program || rv.brief && !briefDone); round++) {
+      for (let round = 2; round <= L.rounds && !late && (rv.revise && rv.program || rv.brief && !briefDone); round++) {
         const first = rv; let add = [], progR = prog;
         if (rv.revise && rv.program) {
           runStep(run, 4 + o0, (revised.length ? 'Revising again: ' : 'Revising: ') + (rv.why || 'a better program').replace(/\.$/, ''));
@@ -3263,35 +3299,45 @@ export function initSitePlan(ctx) {
           else dropRev = BR.droppedNote(ab2.brief, a2?.reason || 'the layout engine couldn’t lay it out', true); // (the revision didn't fit either: said in one line, nothing shown as the AI's)
         }
         if (!add.length) break;
-        const nm = RUN.layoutNames([...ed.variants, ...extra, ...add]); add.forEach((v, k) => { v.name = nm[ed.variants.length + extra.length + k]; }); extra = extra.concat(add);
+        const nm = RUN.layoutNames([...variants, ...extra, ...add]); add.forEach((v, k) => { v.name = nm[variants.length + extra.length + k]; }); extra = extra.concat(add);
         const keep = [...new Set([...(first.ranking || []), ...pool.map((_, i) => i)])].filter(i => pool[i]).slice(0, 3), kept = keep.map(i => pool[i]);
         pool = kept.concat(add); runStep(run, 4 + o0, 'The AI is comparing the revised layouts');
-        try { rv = await aiReview(plan, progR, pool, round, ask, run.ctl.signal, L, briefCheckOf(pool, false, briefFor)); }
-        catch (e) { if (!live(run)) return; rv = { ...first, revise: false, brief: null, reviews: (first.reviews || []).filter(r => keep.includes(r.option)).map(r => ({ ...r, option: keep.indexOf(r.option) })), ranking: keep.map((_, k) => k).concat(add.map((_, k) => kept.length + k)) }; }
+        try { rv = await aiReview(plan, progR, pool, round, ask, sig, L, briefCheckOf(pool, false, briefFor)); }
+        catch (e) { if (!live(run)) return; rv = { ...first, revise: false, brief: null, reviews: (first.reviews || []).filter(r => keep.includes(r.option)).map(r => ({ ...r, option: keep.indexOf(r.option) })), ranking: keep.map((_, k) => k).concat(add.map((_, k) => kept.length + k)) }; } // (the revised layouts come after the reviewed ones, without a score)
         if (!live(run)) return;
       }
       if (!revised.length && !briefRev) runStep(run, 4 + o0, 'Comparing');
     } catch (e) { if (!live(run)) return; console.warn('review', e); rv = null; }
+    clearTimeout(tmo);
     if (!live(run) || PL() !== pl) return;
-    ed.reviewing = false;
-    if (rv) { mergeReview(rv, pool, extra); ed.aiNote = [revised.length ? 'After its first look the AI changed the program: ' + revised.map(w => w.replace(/\.$/, '')).join('; then again: ') + '.' + (aiBNote ? ' ' + aiBNote : '') : note, dropRev, briefRev ? 'The engine couldn’t do the AI’s first plan as written, so the AI revised it once: ' + briefRev.replace(/\.$/, '') + '.' : ''].filter(Boolean).join(' '); }
-    else ed.aiNote = (note ? note + ' ' : '') + 'The AI review didn’t answer, so these are as the engine ranked them.';
-    await pickAi();
+    const aiNote = rv ? [revised.length ? 'After its first look the AI changed the program: ' + revised.map(w => w.replace(/\.$/, '')).join('; then again: ') + '.' + (aiBNote ? ' ' + aiBNote : '') : note, dropRev, briefRev ? 'The engine couldn’t do the AI’s first plan as written, so the AI revised it once: ' + briefRev.replace(/\.$/, '') + '.' : ''].filter(Boolean).join(' ') : '';
+    const h = heldIn(run, rv ? { rv, pool, extra, aiNote } : { why: late ? 'timeout' : 'failed' });
+    await heldOut(h, { quiet: true });
     if (!live(run)) return;
     saveRun(pl); endRun(run);
   }
-  // the AI's review into the layouts: scores by key, its order (best first), and the layouts from its revised program after
-  // the others (numbered on from them). Names don't change, so "Layout 3" is still Layout 3 after the review.
+  // held layouts into the list: reviewed (ranked by the AI, its pick first, lib/planruns.mjs mergeReviewed) or not (as
+  // the engine ranked them, said so), and what goes on the map (RUN.landing). Synchronous, so Cancel can show them
+  // before the run ends.
+  function heldIn(run, o) {
+    const vs = run?.hold, L0 = run?.landing || {}; if (!ed || !vs) return null; run.hold = null;
+    ed.variants = vs; ed.readAs = L0.readAs || ed.readAs; ed.runMeta = L0.meta || ed.runMeta; ed.aiSummary = ''; ed.reviewCleared = false; ed.pickedByUser = false; ed.reviewing = false; ed.aiPick = null;
+    if (o.rv) { mergeReview(o.rv, o.pool, o.extra); ed.aiNote = o.aiNote || ''; } else ed.aiNote = RUN.unreviewedNote(o.why, L0.note || '');
+    const edited = o.why === 'edit' || ed.undo.length !== run.u0 || ed.undo[run.u0 - 1] !== run.top; // changed by hand while the AI looked: nothing replaces it
+    return { ...RUN.landing(ed.variants, ed.aiPick, { edited }), edited, reviewed: !!o.rv };
+  }
+  async function heldOut(h, { quiet = false } = {}) {
+    if (!h || !ed) return; const pl = PL(), vs = ed.variants;
+    if (h.put >= 0) await useVariant(h.put, { quiet, fresh: true }); else saveRun(pl);
+    if (h.offer < 0 || !ed?.variants) return;
+    const k = vs[h.offer]?.key, n = numOf(vs[h.offer]), why = h.edited ? ' You changed the plan while the AI was looking, so yours stays on the map.' : '';
+    ctx.toast((h.reviewed && h.offer === h.ai ? 'The AI recommends ' + n + (h.failing ? ', though it doesn’t pass every check' : '') + '.' : 'The new layouts are ready: ' + n + ' is the best of them.') + why, { action: { label: 'Use it', run: () => { const j = ed?.variants?.findIndex(v => v.key === k); if (j >= 0) askReplace(() => useVariant(j)); } } });
+  }
+  // the AI's review into the layouts on the list (lib/planruns.mjs mergeReviewed): scores by key, its order (best first),
+  // and the layouts from its revised program after the others. Names don't change, so "Layout 3" is still Layout 3.
   function mergeReview(rv, pool, extra = []) {
-    const list = ed.variants || [], byKey = new Map(list.map(v => [v.key, v]));
-    if (extra.length) { const names = RUN.layoutNames([...list, ...extra]), seen = new Set(list.map(v => v.key));
-      extra.forEach((v, k) => { let key = v.key; while (seen.has(key)) key += '+'; seen.add(key); v.key = key; v.name = names[list.length + k]; byKey.set(key, v); }); }
-    const names = pool.map(v => numOf(byKey.get(v.key) || v)), tx = t => K.aiText(t, names); // "Option A", "option 1" → the layout's own name
-    for (const r of rv.reviews || []) { const v = pool[r.option] && byKey.get(pool[r.option].key); if (v) v.ai = { ...r, verdict: tx(r.verdict), strengths: (r.strengths || []).map(tx), problems: (r.problems || []).map(tx) }; }
-    ed.aiSummary = tx(rv.summary || '');
-    const first = (rv.ranking || []).map(i => pool[i]?.key).filter(k => byKey.has(k)), seen = new Set(first);
-    const order = [...first, ...list.map(v => v.key).filter(k => !seen.has(k)), ...extra.map(v => v.key).filter(k => !seen.has(k))];
-    ed.variants = order.map((k, i) => ({ ...byKey.get(k), rank: -i })); ed.aiPick = BR.fairPick(ed.variants, first) || null; ed.reviewCleared = false; // (the AI's own plan isn't recommended over one of the engine's that holds clearly more: lib/planbrief.mjs)
+    const r = RUN.mergeReviewed(ed.variants || [], pool, rv, extra);
+    ed.variants = r.variants; ed.aiSummary = r.summary; ed.aiPick = BR.fairPick(ed.variants, r.first) || null; ed.reviewCleared = false; // (the AI's own plan isn't recommended over one of the engine's that holds clearly more: lib/planbrief.mjs)
   }
   // the AI's pick on the map, unless the person picked another layout (or changed the one on the map) meanwhile
   async function pickAi() {
@@ -3325,14 +3371,24 @@ export function initSitePlan(ctx) {
     if (ed.solveLater && !r.cancelled) { ed.solveLater = false; resolveSoon(); } // a setting changed while it ran
     return true;
   }
-  // Cancel: the AI call stops; layouts already back stay (the engine's, when the AI was still reviewing them)
+  // Cancel: the AI call stops; layouts already back stay (the engine's, when the AI was still reviewing them: a build's
+  // held layouts come in then, said not to be AI-reviewed, the engine's best on the map, so a cancel never leaves nothing)
   function cancelRun(why) {
     const r = ed?.run; if (!r) return; r.cancelled = true; r.ctl.abort();
-    const mid = ed.reviewing && ed.variants?.length; ed.reviewing = false;
-    if (mid) { ed.aiNote = 'AI review cancelled: these are the layouts as the engine ranked them.'; saveRun(); }
-    endRun(r); if (why || !mid) ctx.toast(why || (r.kind === 'best' ? 'Ideas cancelled.' : r.kind === 'change' ? 'Change cancelled.' : r.kind === 'build' ? 'Build cancelled' : r.kind === 'review' ? 'Review cancelled.' : 'Cancelled: the layouts stay as they were.'));
+    const held = r.hold ? heldIn(r, { why: 'cancelled' }) : null;
+    const mid = !held && ed.reviewing && ed.variants?.length; ed.reviewing = false;
+    if (mid) { ed.aiNote = RUN.unreviewedNote('cancelled'); saveRun(); }
+    endRun(r); if (why || !mid) ctx.toast(why || (held ? 'AI review cancelled: the layouts are shown as the engine ranked them, not reviewed by the AI.' : r.kind === 'best' ? 'Ideas cancelled.' : r.kind === 'change' ? 'Change cancelled.' : r.kind === 'build' ? 'Build cancelled' : r.kind === 'review' ? 'Review cancelled.' : 'Cancelled: the layouts stay as they were.'));
+    if (held) heldOut(held);
   }
-  function killRun() { const r = ed?.run; if (!r) return; r.cancelled = true; r.ctl.abort(); ed.run = null; clearInterval(runTick); runTick = 0; pillEl.hidden = true; } // the plan closes or another option opens
+  // the plan closes or another option opens: a build's held layouts are kept with the option (its saved run, said not to
+  // be AI-reviewed), the plan on the map as it was
+  function killRun() { const r = ed?.run; if (!r) return; r.cancelled = true; r.ctl.abort(); if (r.hold) keepHeld(r); ed.run = null; clearInterval(runTick); runTick = 0; pillEl.hidden = true; }
+  function keepHeld(r) {
+    const pl = PL(), L0 = r.landing || {}, vs = r.hold; r.hold = null; if (!pl || !vs?.length) return;
+    pl.lastRun = RUN.slimRun({ ask: L0.meta?.ask || '', note: RUN.unreviewedNote('closed', L0.note || ''), ...(L0.readAs ? { read: L0.readAs } : {}), at: L0.meta?.at || new Date().toISOString(), ...(L0.meta?.effort ? { effort: L0.meta.effort } : {}), aiReviewed: false, variants: vs }, pl.variant?.key);
+    save(projOf(pl));
+  }
   // a hand edit while layouts are still coming: they'd replace it, so the run stops instead
   function handEdit() { const r = ed?.run; if (r && !r.applied && LAYS.includes(r.kind) && !applying) cancelRun('Build cancelled: you changed the plan while it was laying out.'); }
   // after a run: the Layouts section in view, right under the overview when it fits, else scrolled up under the header
@@ -3352,6 +3408,16 @@ export function initSitePlan(ctx) {
   }
   for (const ev of ['wheel', 'touchmove', 'keydown']) card.addEventListener(ev, e => { if (ed?.run && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && (ev !== 'keydown' || /^(PageUp|PageDown|ArrowUp|ArrowDown|Home|End| )$/.test(e.key))) ed.run.userScrolled = true; }, { passive: true });
   const runText = r => (r.steps.length > 1 ? 'Step ' + r.step + ' of ' + r.steps.length + ' · ' : '') + r.label;
+  // a build whose layouts wait for the AI review: the Layouts section is this card, the run's steps (done, under way, to
+  // come), the time and Cancel, until the reviewed layouts come in
+  function holding(r) { return !!(r && r.kind === 'build' && (r.hold || r.holds)); }
+  function runCardBody(r) {
+    const steps = r.steps.map((t, i) => { const n = i + 1, st = n < r.step ? 'done' : n === r.step ? 'now' : 'todo'; return '<li class="' + st + '"' + (st === 'now' ? ' aria-current="step"' : '') + '>' + esc(st === 'now' ? r.label : t) + '</li>'; }).join('');
+    return '<p class="sp-rc-h">The new layouts show here once the AI has checked, confirmed and rated them.</p><ol class="sp-rc-steps">' + steps + '</ol>' +
+      '<div class="sp-rc-f"><span>Step ' + r.step + ' of ' + r.steps.length + ' · <span class="sp-rt" data-rt>' + mmss(Date.now() - r.t0) + '</span></span><button type="button" class="btn sm" data-cancel>Cancel</button></div>' +
+      '<p class="rnote">If the AI’s review doesn’t come back, the engine’s layouts are shown instead, marked as not reviewed.</p>';
+  }
+  function runCardHtml(r) { return '<div class="sp-runcard" id="spRunCard">' + runCardBody(r) + '</div>'; }
   function runHtml(r) {
     return '<div class="sp-run" id="spRun"><span class="sp-run-dot" aria-hidden="true"></span><span class="sp-run-t" role="status">' + esc(runText(r)) + '</span>' +
       '<span class="sp-rt" data-rt aria-label="elapsed">' + mmss(Date.now() - r.t0) + '</span><button type="button" class="sp-run-x" data-cancel>Cancel</button>' +
@@ -3361,6 +3427,7 @@ export function initSitePlan(ctx) {
   function paintRun() {
     const r = ed?.run; if (!r) { pillEl.hidden = true; return; }
     const strip = card.querySelector('#spRun'); if (strip) { strip.querySelector('.sp-run-t').textContent = runText(r); strip.querySelector('.sp-run-bar')?.style.setProperty('--p', (r.step - 1) / r.steps.length); }
+    const rc = card.querySelector('#spRunCard'); if (rc) { if (holding(r)) { rc.innerHTML = runCardBody(r); rc.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => cancelRun()); } else redrawLayouts(); } // (the card follows the steps; a build that stopped holding shows its layouts)
     if (phone() && card.classList.contains('sp-mode')) {
       pillEl.innerHTML = '<span class="sp-run-dot" aria-hidden="true"></span><span class="sp-run-t" role="status">' + esc(r.steps.length > 1 ? r.step + '/' + r.steps.length + ' · ' + r.steps[r.step - 1] : r.label) + '</span><span class="sp-rt" data-rt>' + mmss(Date.now() - r.t0) + '</span><button type="button" class="sp-run-x" data-cancel aria-label="Cancel">Cancel</button>';
       pillEl.querySelector('[data-cancel]').onclick = () => cancelRun(); pillEl.hidden = false; placePill();
@@ -3595,6 +3662,7 @@ export function initSitePlan(ctx) {
   }
   const scoreBand = n => n >= 80 ? 'hi' : n >= 65 ? 'mid' : 'lo';
   function variantsHtml() {
+    if (holding(ed?.run)) return runCardHtml(ed.run); // a build's layouts wait for the AI's review: only the run until then
     if (!ed?.variants) return '';
     if (!ed.variants.length) { if (ed.run) return ''; const nf = K.noFit(ed.runMeta?.ask || ed.readAs?.ask || '', SP.ringArea(PL()?.ring || []) / 43560); return '<div class="sp-lbanner" role="note"><div><b>' + esc(nf.title) + '</b> ' + esc(nf.tip) + '</div><button type="button" class="btn sm" data-layedit="1">Edit request</button></div>'; } // nothing fit: say so where the layouts would be (the toast was gone in seconds)
     const pl = PL(), vs = ed.variants, on = pickIdx(), edited = !!pl?.variant?.edited, by = K.SORTS.some(([k]) => k === ed.sortBy) ? ed.sortBy : 'rec', wl = GON(pl);
@@ -3659,7 +3727,9 @@ export function initSitePlan(ctx) {
     const revV = revd.length ? vs[revd[0]] : null, chg = revV ? K.programChange(SP.normalizeProgram(baseProg || pl.program), SP.normalizeProgram(revV.program || pl.program)) : '';
     const mainHtml = main.length ? (revd.length ? '<div class="sp-lgrp"><b>From your request</b></div>' : '') + '<div class="sp-vars">' + main.map(card1).join('') + '</div>' : '';
     const revHtml = revd.length ? '<div class="sp-lgrp"><b>AI’s revision</b> <span>(' + esc([chg, revV.revisedBy ? 'why: ' + revV.revisedBy.replace(/\.$/, '') : ''].filter(Boolean).join(' · ')) + ')</span></div><div class="sp-vars">' + revd.map(card1).join('') + '</div>' : '';
-    return (ed.reviewCleared ? '<div class="sp-rvc"><span class="rnote sp-warn">Settings changed: the AI review was cleared.</span><button type="button" class="btn sm" id="spReReview">Review Again</button></div>' : '') +
+    const unrev = !ed.reviewCleared && RUN.isUnreviewedNote(ed.aiNote) && !vs.some(v => v.ai); // a build whose review didn't come back: said where the layouts are, with a way to have them reviewed
+    return (unrev ? '<div class="sp-lbanner sp-unrev" role="note"><div><b>Not reviewed by the AI.</b> ' + esc((ed.aiNote.match(/[^.]*were not reviewed by the AI[^.]*\./) || [''])[0].trim()) + '</div>' + (aiOff() ? '' : '<button type="button" class="btn sm" id="spReReview">Review Now</button>') + '</div>' : '') +
+      (ed.reviewCleared ? '<div class="sp-rvc"><span class="rnote sp-warn">Settings changed: the AI review was cleared.</span><button type="button" class="btn sm" id="spReReview">Review Again</button></div>' : '') +
       (allFail ? '<div class="sp-lbanner" role="note"><div><b>None of these layouts passes every check.</b> ' + (gap ? 'This asks for about ' + gap.need.toFixed(1) + ' ac; the site is ' + gap.site.toFixed(1) + ' ac.' : esc(firstBad) + ' on ' + (known.length > 1 ? 'the best of them' : 'it') + '.') + '</div><button type="button" class="btn sm" data-layedit="1">Edit request</button></div>' : '') +
       (rest ? '<div class="sp-callout"><b>From the AI’s review</b>' + esc(rest) + '</div>' : '') +
       (notes.shared.length ? (K.byLevel(notes.shared).some(n => n.level !== 'info') ? '<div class="sp-lnotes"><span class="sp-lnh">Every layout</span>' + notesHtml(notes.shared) + (K.byLevel(notes.shared).some(n => n.level === 'info') ? '<details class="sp-ninfo"><summary>Details</summary>' + infoHtml(notes.shared) + '</details>' : '') + '</div>'
@@ -3668,6 +3738,7 @@ export function initSitePlan(ctx) {
   }
   // the Layouts heading: how many, the sort and More layouts
   function layoutsHead() {
+    if (holding(ed?.run)) return '<div class="sp-lay-h"><div class="lt">Layouts<span class="sp-lcount"> · being checked by the AI</span></div></div>';
     const by = K.SORTS.some(([k]) => k === ed.sortBy) ? ed.sortBy : 'rec', tip = K.SORTS.find(([k]) => k === by)[2];
     return '<div class="sp-lay-h"><div class="lt">Layouts<span class="sp-lcount"> · ' + (ed.variants?.length || 0) + '</span></div><div class="sp-lay-ctl">' +
       '<label class="sp-sortl" title="' + esc(tip) + '"><span>Sort</span><select id="spSort">' + K.SORTS.map(([k, t, tt]) => '<option value="' + k + '" title="' + esc(tt) + '"' + (by === k ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' +
@@ -3680,12 +3751,36 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => { const k = b.dataset.sim; if (ed.simOpen.has(k)) ed.simOpen.delete(k); else ed.simOpen.add(k); redrawLayouts(); });
     card.querySelectorAll('details[data-why]').forEach(d => d.ontoggle = () => { if (d.open) ed.whyOpen.add(d.dataset.why); else ed.whyOpen.delete(d.dataset.why); });
     card.querySelectorAll('[data-layedit]').forEach(b => b.onclick = () => { fillAsk(ed.runMeta?.ask || ed.readAs?.ask || ed.ask || ''); card.querySelector('#spAiSec')?.scrollIntoView({ block: 'nearest' }); });
-    const mo = $('#spMore'); if (mo) mo.onclick = async () => { const pl2 = PL(), run = startRun('more', ['Looking for more layouts'], '#spMore'); if (!run) return; let more = []; try { more = await laid('options', { ...pl2 }, pl2.program, { count: 12, ...koOpts(pl2) }); } catch (e) { console.warn('layout', e); } if (!live(run) || PL() !== pl2) return;
-      if (more.length) { const old = new Map((ed.variants || []).map(v => [v.key, v])), nv = named(more, pl2); for (const v of nv) { const o = old.get(v.key); if (o?.ai) v.ai = o.ai; }
-        ed.variants = RUN.keepCurrent(pl2.variant?.key && old.get(pl2.variant.key), nv); ed.reviewCleared = false; saveRun(pl2); } endRun(run); }; // the AI's scores stay on the layouts it saw; the one on the map stays in the list (first) when the new run doesn't hold it
+    const mo = $('#spMore'); if (mo) mo.onclick = moreLayouts;
     const so = $('#spSort'); if (so) so.onchange = () => { ed.sortBy = so.value; saveRun(); redrawLayouts(); so.closest('label').title = K.SORTS.find(([k]) => k === so.value)?.[2] || ''; };
     const rr = $('#spReReview'); if (rr) rr.onclick = reviewAgain;
     lazyThumbs();
+  }
+  // More layouts: every usable layout the engine finds, not just the top few. The AI's scores stay on the layouts it saw;
+  // the one on the map stays in the list (first) when the new run doesn't hold it. With the AI on and a reviewed run, the
+  // new layouts are reviewed before they're shown (up to ten, in two calls at once, each with the AI's pick for scale:
+  // RUN.reviewBatches); only those it rated join the list. When that review doesn't come back, they're shown, said so.
+  async function moreLayouts() {
+    const pl2 = PL(), ask = (ed?.runMeta?.ask || pl2?.lastRun?.ask || '').trim(), withAi = !aiOff() && !!ask && !!ed?.variants?.some(v => v.ai);
+    const run = startRun('more', withAi ? ['Looking for more layouts', 'The AI is reviewing the new layouts'] : ['Looking for more layouts'], '#spMore'); if (!run) return;
+    let more = []; try { more = await laid('options', { ...pl2 }, pl2.program, { count: 12, ...koOpts(pl2) }); } catch (e) { console.warn('layout', e); }
+    if (!live(run) || PL() !== pl2) return;
+    if (!more.length) { endRun(run); return; }
+    const old = new Map((ed.variants || []).map(v => [v.key, v])), nv = named(more, pl2); for (const v of nv) { const o = old.get(v.key); if (o?.ai) v.ai = o.ai; }
+    let list = RUN.keepCurrent(pl2.variant?.key && old.get(pl2.variant.key), nv), note = '';
+    const batches = withAi ? RUN.reviewBatches(list, ed.aiPick || pl2.variant?.key) : [];
+    if (batches.length) {
+      runStep(run, 2);
+      const L0 = ASK.effortOf(effortNow()), L = { ...L0, rounds: 1, effort: L0.rounds ? L0.effort : 'medium', images: 6 }; // one look, no revising (Low: at medium)
+      const rctl = new AbortController(), sig = AbortSignal.any ? AbortSignal.any([run.ctl.signal, rctl.signal]) : run.ctl.signal; let late = false;
+      const tmo = setTimeout(() => { late = true; rctl.abort(); }, RUN.reviewLimitMs(1));
+      const got = await Promise.all(batches.map(b => aiReview({ ...pl2 }, pl2.program, b, 1, ask, sig, L).catch(e => { console.warn('review', e); return null; })));
+      clearTimeout(tmo); if (!live(run) || PL() !== pl2) return;
+      batches.forEach((b, k) => { if (got[k]) list = RUN.attachReviews(list, b, got[k], { keep: true }).list; });
+      if (got.some(Boolean)) list = list.filter(v => v.ai || v.key === pl2.variant?.key); // only what the AI has rated (and the one on the map)
+      else note = RUN.unreviewedNote(late ? 'timeout' : 'failed').replace('these layouts', 'the new layouts');
+    }
+    ed.variants = list; if (note) ed.aiNote = note; ed.reviewCleared = false; saveRun(pl2); endRun(run);
   }
   function redrawLayouts() { const box = card.querySelector('#spVariants'); if (!box || !ed) return; box.innerHTML = variantsHtml(); wireVariants(); lockRun(); }
   // the drawings, after the cards are on screen: only the ones scrolled into view, a few a frame
@@ -3745,7 +3840,7 @@ export function initSitePlan(ctx) {
     if (aiOff()) { ctx.toast('AI isn’t set up on this site, so the layouts can’t be reviewed.'); return; }
     const run = startRun('review', ['The AI is reviewing the layouts'], '#spReReview'); if (!run) return; ed.reviewing = true; ed.pickedByUser = false; panel();
     try { const rv = await aiReview({ ...pl }, pl.program, pool, 1, ask, run.ctl.signal, L); if (!live(run) || PL() !== pl) return;
-      ed.reviewing = false; mergeReview(rv, pool); await pickAi();
+      ed.reviewing = false; mergeReview(rv, pool); if (RUN.isUnreviewedNote(ed.aiNote)) ed.aiNote = ''; await pickAi();
     } catch (e) { if (!live(run)) return; ed.reviewing = false; ctx.toast(e.status === 503 ? 'AI isn’t set up on this site, so the layouts can’t be reviewed.' : 'The AI review didn’t answer. Try again in a moment.'); }
     if (!live(run)) return; saveRun(pl); endRun(run);
   }
@@ -4234,13 +4329,13 @@ export function initSitePlan(ctx) {
   }
   const rendersOf = p => p.plans.flatMap(pl => (pl.renders || []).map(r => ({ pl, r })));
   function tabsHtml(p, tab) {
-    const n = { options: p.plans.length, renderings: rendersOf(p).length, plans: setsOf(p).length }, busy = pasks.get(p.id)?.busy;
+    const n = { options: p.plans.length, renderings: rendersOf(p).length, plans: setsOf(p).length, files: (p.files || []).length }, busy = pasks.get(p.id)?.busy;
     return '<div class="mx-tabs pj-tabs" role="tablist" aria-label="Project sections">' + PJ.TABS.map(t => { const on = t.id === tab;
       return '<button type="button" role="tab" id="pjTab-' + t.id + '" data-tab="' + t.id + '" aria-selected="' + on + '" aria-controls="pjPanel" tabindex="' + (on ? 0 : -1) + '">' + t.label +
         (n[t.id] ? '<span class="pj-tn"> · ' + f0(n[t.id]) + '</span>' : '') + (t.id === 'ask' && busy ? '<span class="pj-tn"> · answering…</span>' : '') + '</button>'; }).join('') + '</div>';
   }
   function detailHtml(p) {
-    const tab = tabFor(p), body = { overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, ask: pAskHtml }[tab](p);
+    const tab = tabFor(p), body = { overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, files: SF.html, ask: pAskHtml }[tab](p);
     return headHtml(p) + tabsHtml(p, tab) + '<div class="pj-panel pj-p-' + tab + '" id="pjPanel" role="tabpanel" aria-labelledby="pjTab-' + tab + '">' + body + '</div>';
   }
 
@@ -4660,7 +4755,7 @@ export function initSitePlan(ctx) {
     const turn = { q }; A.turns.push(turn); A.turns = A.turns.slice(-6); if (qIn == null) A.draft = ''; A.busy = true; paintPAsk(p);
     try {
       const project = await projectSheet(p), history = A.turns.filter(t => t !== turn && t.a).slice(-4).map(t => ({ q: t.q, a: t.a }));
-      const d = await post({ mode: 'askProject', question: q, history, project, effort: ASK.effortOf(effortNow()).effort });
+      const rf = RF.refsForAI(p.files), d = await post({ mode: 'askProject', question: q, history, project, effort: ASK.effortOf(effortNow()).effort, ...(rf.length ? { refs: rf } : {}) }); // (with the facts confirmed from its reference files)
       turn.a = d.answer || 'No answer came back. Try asking another way.'; turn.followups = d.followups || [];
     } catch (e) { turn.err = e.status === 503 ? 'AI isn’t set up on this site.' : e.status === 429 ? 'Too many questions at once: try again in a minute.' : 'The AI didn’t answer just now. Try again in a moment.'; }
     A.busy = false; paintPAsk(p);
@@ -4759,6 +4854,7 @@ export function initSitePlan(ctx) {
     if (tab === 'renderings') wireRenders(p);
     if (tab === 'plans') wirePlans(p);
     if (tab === 'ask') wirePAsk(p);
+    if (tab === 'files') SF.wire(p, root);
   }
   root?.addEventListener('focusout', () => setTimeout(() => { if (waiting && ctx.view === 'projects') render(); }));
   ctx.onView?.('projects', render);
