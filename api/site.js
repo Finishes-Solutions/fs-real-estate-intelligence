@@ -3,6 +3,8 @@
 //   traffic    TxDOT annual average daily traffic (AADT) on the roads within ~300 m, busiest first
 //   districts  TCEQ water districts (MUD, WCID, …), Houston TIRZ, federal Opportunity Zone, school district
 //   place      the city whose limits the point is inside ({ name, full }), or null outside every city (US Census places)
+//   near       the cities whose limits come within 0.5 mile of the point, the one it's inside left out ([{ name, full }]): a
+//              small Texas city's extraterritorial jurisdiction reaches that far (Local Government Code §42.021)
 //   transit    Houston METRO bus stops within 400 m
 //   environment EPA ECHO regulated facilities within 0.25 mile, with violation and hazardous-waste flags
 //   crime      Houston Police NIBRS incidents within 0.5 mile, last 12 months vs the 12 before (Supabase, loaded nightly)
@@ -110,7 +112,7 @@ const inHouston = (lon, lat) => lon > -95.95 && lon < -95.0 && lat > 29.5 && lat
 export async function site(lon, lat, { addr, zip } = {}) {
   const part = async fn => { try { return await fn(); } catch (e) { return { error: e.message }; } };
   const db = supa();
-  const [flood, traffic, water, oz, tirz, schools, transit, environment, crime, barsAt, place] = await Promise.all([
+  const [flood, traffic, water, oz, tirz, schools, transit, environment, crime, barsAt, place, nearAll] = await Promise.all([
     part(async () => floodInfo(await query(SRC.flood, lon, lat, { fields: 'FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE' }))),
     part(async () => trafficInfo(await query(SRC.aadt, lon, lat, { m: 300, fields: 'RTE_NM,RTE_PRFX,RTE_NBR,AADT_CUR,SYSTEM' }))),
     part(async () => waterDistricts(await query(SRC.water, lon, lat, { fields: 'NAME,TYPE,TYPE_DESCRIPTION,STATUS,Area_SqMi' }))),
@@ -121,10 +123,12 @@ export async function site(lon, lat, { addr, zip } = {}) {
     part(() => echo(lon, lat)),
     part(async () => db && inHouston(lon, lat) ? crimeSummary(await db.rpc('crime_near', { p_lon: lon, p_lat: lat, p_m: 805 }, { deadline: Date.now() + 15000 }), 0.5) : null),
     part(() => addr ? bars(addr, zip) : null),
-    part(async () => { const a = (await query(SRC.place, lon, lat, { fields: 'BASENAME,NAME' }))[0]; return a?.BASENAME ? { name: String(a.BASENAME).trim(), full: String(a.NAME || a.BASENAME).trim() } : null; })
+    part(async () => { const a = (await query(SRC.place, lon, lat, { fields: 'BASENAME,NAME' }))[0]; return a?.BASENAME ? { name: String(a.BASENAME).trim(), full: String(a.NAME || a.BASENAME).trim() } : null; }),
+    part(async () => (await query(SRC.place, lon, lat, { m: 805, fields: 'BASENAME,NAME' })).filter(a => a.BASENAME).map(a => ({ name: String(a.BASENAME).trim(), full: String(a.NAME || a.BASENAME).trim() })))
   ]);
+  const nearBy = Array.isArray(nearAll) ? nearAll.filter(x => !place || place.error || x.name !== place.name).slice(0, 6) : nearAll;
   const districts = { water, tirz, opportunityZone: oz, schools };
-  return { lon, lat, flood, traffic, districts, transit, environment, crime, bars: barsAt, place };
+  return { lon, lat, flood, traffic, districts, transit, environment, crime, bars: barsAt, place, near: nearBy };
 }
 
 export default async function handler(req, res) {

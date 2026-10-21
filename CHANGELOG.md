@@ -3,6 +3,21 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-21
+
+### 12:30 PM CT: The neighbourhood work joins main: square driveways, drive-thrus, L-shaped buildings, plan sets (MERGE_SHA)
+- Everything from main is here alongside the street rules, editable streets, pods, roundabouts, boulevard entries and turning of this branch.
+- **Driveways meet the street square everywhere:** added entrances and the planner's main entries leave the street at a right angle and, where the street slants across the layout, curve round to meet the drive square. A **boulevard** does the same when its planted median still fits on the straight past the curve (the median and monument sign go there); where it doesn't, the boulevard comes straight in as before. **Make It a Boulevard** follows the same rule.
+- **Turning:** the green dot now turns freely with main's 2° settling and Shift for 15° steps on every piece, curved ponds, lawns, bent drives and entrances included (those still turn about their middle; an entrance's mouth slides along the street). A drawn parking outline's stall direction turns with it whichever way it's turned.
+- **Waller guardrails on neighbourhoods:** Waller's narrowest and shallowest lot and its front setback now also apply to homes along curved subdivision streets (the stricter of them and a place's rule sheet), not only to the parallel-street layouts. On a 28-acre test tract under the guardrails the curved-street layout holds 39 homes on lots at least 59 × 118 ft (83 without them). The checks on the panel include both the guardrails' and the rule sheet's.
+- Shop and office pods inside a mixed plan keep being laid out the way pods are (main's new parking-field engine is used for whole commercial sites).
+- **Curved subdivision streets, steadier:**
+  - A loop road round a commons now lays out where the main street meets the loop on a bend: the commons faces the loop's longer side.
+  - Cul-de-sacs added to fill leftover land keep the spacing between street junctions.
+  - Every kind of street network is tried before the time runs out, so a slower computer still gets a choice of layouts.
+  - A layout that fails the checks isn't offered when one that passes is.
+- **Not in this merge:** the unfinished Phase 5 (split detention, trails, sidewalks) is left out of main. Its saved work stays in this branch's history (commit 8423b25, `wip/`) to pick up later, on top of main's new ground elevations.
+
 ## 2026-10-20
 
 ### 11:34 PM CT: Phase 5 paused, saved for later (this commit)
@@ -28,6 +43,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - Waller County's detention rate hasn't been read from its drainage criteria yet: 0.55 acre-feet per acre stands in, marked to confirm. The ETJ is the AI's judgement from a web search, not a map of ETJ outlines.
   - Lots cut below the sheet's smallest area by something added later (a roundabout, a turnaround) aren't merged or dropped; the checks flag them.
 
+### 5:07 PM CT: Driveways come in square to the street (a150312)
+- On a lot whose street slants across the layout (like the 0.93-acre Waller corner lot), the main entrance used to run in at the layout's angle: it met the street crooked, with one curb return tiny and the other long. It now leaves the street at a right angle with even curb returns, then curves round a few car lengths in to meet the drive square.
+- An entrance added with **Add Entrance** (or a second way in the planner adds) does the same, so it no longer hits the drive at an angle with a corner of pavement sticking out past it; its end sits inside the drive.
+- The stop bar and the double yellow centre line follow the driveway's curve, and **Edit Shape** on a curved entrance bends it along its real centre line.
+- Where a street runs square to the layout, or the curve doesn't fit, driveways are drawn straight in as before.
+
 ### 3:18 PM CT: Neighbourhoods laid out like real subdivisions (7f8162e)
 - **Single-family layouts on 8 acres or more now come with subdivision streets**, offered next to the parallel streets of before. A collector goes in first: a loop road one lot in from the edge, a main street, or a loop road round a central lake and commons. The entry boulevard meets it at a T (on deep sites a little along from the entry, so the boulevard keeps its median), and no homes front the entry street before its first junction.
 - **Local streets inside each block of land** follow the loop or curve with the land, meet the collector at T's, get cross streets where a block runs long, and end in cul-de-sacs where a street dead-ends or a pocket of land is left. Where the land between two streets is too thin for homes, one street runs up the middle instead. Streets never fold back on themselves or run into each other.
@@ -50,6 +71,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - The 9-acre square and the 30-acre shallow test sites get no subdivision option (a main street there can't beat today's rows). The 85-acre L-shaped site has no room for a loop round the lake and commons (the notes say so).
   - The narrow site has one way in where two are wanted. Some thin strips of 1–3 acres are left behind lots on Waller's winding option. The irregular site's first option has no cul-de-sacs.
   - Bending a street right up to a junction re-lays the next block too. A first phase can keep a connector street with no homes. Sharp bends are avoided rather than given knuckles. One lot label on the narrow plan is garbled.
+
+### 10:17 AM CT: The site plan work joins main's plan sets, renderings and ground elevations (merged 8af0e2a)
+- The small-lot, L-shaped building and drive-thru fixes now sit on top of main's plan sets, project-page renderings and lidar ground elevations; nothing from either side changes.
 
 ### 4:39 AM CT: Mixed sites in pods (30c4502)
 - **Mixed sites can now be laid out in pods**, the way master-planned communities are drawn. On a mixed site of 40 acres or more (or from 15 acres when you say where a use goes, or when the usual layouts can't fit the program), a collector road goes in first: the main entry boulevard, then a loop road round a central commons and lake, a loop road one block in from the lot lines, or a spine road (with a T on bigger sites, a cul-de-sac on small ones). Side streets get a connector with their own way in. Greenbelts with a trail run between the pods.
@@ -91,6 +115,19 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - On the 246 ac test site the main intersection has no room (a parallel drive runs too close), so a roundabout asked for there goes to the nearest junction with room, about 370 ft away, and says so.
   - Homes that made way for a roundabout come back only after a re-fit.
 
+### 11:34 PM CT: Small commercial lots: L-shaped buildings and real drive-thru lanes (74a5f9f, merged 56d8516)
+- On a lot of about an acre to three, a shop, bank or coffee building with a drive-thru now gets one building at the back (an L when asked, its storefronts facing the parking), parking in front and a drive round it that every aisle joins.
+- The drive-thru lane runs one way round the building with the pickup window on the driver's side, the order point before the window, at least 8 cars of stacking and a bypass lane. The plan and the PDF mark the window and the order point and show the lane's direction.
+- "At least" sizes (like "6,000+ sf") are laid out at that size and grown where the parking allows; when the size doesn't park, the note says parking is the limit and by how many spaces. Examples: 6,000+ sf L with a drive-thru on a 1-acre square gets 7,251 sf; on the 0.93-acre Waller corner lot that prompted this, 5,397 sf parked (6,000 sf would need 26 spaces and the lot holds about 20 with the drive-thru, fire lanes and clear entry).
+- Small lots get much more building: retail on 1 acre 3,563 → 6,699 sf, office 5,356 → 10,286 sf, church 1,400 → 3,600 sf.
+- Where a pond would cost the building on a small lot, the stormwater goes in underground vaults and the note says how much.
+- The checks warn when a drive-thru lane stacks fewer than 8 cars, or when a drive-thru was asked for and isn't drawn. Parts of a mix with no size of their own now share the total floor area.
+
+### 8:43 PM CT: One building with a drive-thru stays one building (bf8716c)
+- "6000+ sf L-shaped retail building with a drive thru" is now read as one L-shaped retail building of at least 6,000 sf with its drive-thru, instead of a small shop and a restaurant side by side. (The words reader counted "drive-thru" as a restaurant, and missed the "+".)
+- A plus sign or "at least" on a size means at least that much, more where the site allows; "L-shaped" or "U-shaped" sets the building shape.
+- Separate uses are only laid out as a mix when you name them, and each part gets its size; the AI can no longer send a mix without sizes.
+
 ### 8:36 PM CT: Turn any piece, boulevard entries with monument signs, names for the plan and its parts (8e6ac67)
 - **Every piece turns now:** curved ponds, lawns, drawn outlines, custom buildings, bent drives, medians and entrances, with Turn 90°, R (Shift+R the other way), the Turn box and the green dot. They turn about their middle and keep their shape.
 - **Turning and moving an entrance:** it turns 15° a press, its mouth sliding along the street and coming in no more than 60° off square, and it stops short rather than run outside the lot. Its median is drawn again along it and its signs follow. A selected entrance shows its bend points and + markers straight away, and dragging it slides its mouth along the street (Alt moves it freely).
@@ -107,6 +144,82 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - After you move or add a monument sign by hand, a re-fit may not put back the main entry's other signs; and deleting one corner sign can bring it back on the other corner after a re-fit.
   - Make It a Boulevard is still offered where there's no room for a median (it explains why when clicked). Street names (the toggle) and editable street networks come in a later phase.
 
+### 8:28 PM CT: Plan sets, renderings from the project page and ground elevations go to main (bb5ed4f)
+- Everything from this branch joins the main app: **Sites / Renderings / Plans** tabs, full schematic plan sets on the title block, renderings made in the background from the project page, buildings drawn in their real shape, and ground elevations from USGS lidar.
+- Merged with the latest main (parking fields, the AI's commercial brief, Waller guardrails, New Option and deleting): the Renderings tab keeps **Delete all** without **Open plan** / **Render more**, Waller plans also get the ground, and the new parking-field layouts put the pond on the low side too.
+
+### 6:41 PM CT: Ground elevations: creeks aren't counted as the fall (8624d15)
+- Checked against real USGS lidar on the test deployment: a 7.7 acre site near Waller came back as 1 m lidar in about 2 seconds, and a 200 acre tract near Katy too.
+- That tract read 76 to 100 ft but slopes only 0.1% overall: the low point is a channel. The ground row and the plan set now give **how far the land as a whole falls** across the site, show where most of the ground sits, and **call out a creek, ditch or pond** that dips well below the rest, with a reminder to check for a floodway or drainage easement. The pond placement uses the same range, so a creek bed doesn't skew it.
+
+### 6:25 PM CT: Ground elevations from USGS lidar (6a714fd)
+- **Each project's Jurisdiction & site box now shows the ground elevation:** the lowest and highest ground (feet above sea level), how far and which way it falls ("falls about 5.5 ft to the south-east"), and, where FEMA gives a base flood elevation, whether any of the ground is below it (marked in amber). Projects checked before today look again once by themselves.
+- **Build puts the detention pond on the low side** of the site when the land falls more than a foot and a half, and the AI planner is told which way the land falls.
+- **Plan sets use the real ground:** the existing conditions sheet (C-001) draws contours with the low and high points instead of "Topography not surveyed", and the grading sheet (C-201) grades from real elevations: existing contours under the proposed ones, the pond's bank at the real ground, finished floors a foot over the ground, a rough cut and fill estimate, and a warning when the pond sits on high ground.
+- The elevations are USGS lidar of the bare ground (1 m detail where flown, most of Texas), asked for once per site and kept on your device. They're good for planning, not a survey. If USGS is down, a rougher model is used and marked approximate (it isn't drawn as contours).
+
+### 6:23 PM CT: The AI decides what's built on commercial sites (fdf013e, 5b6e987, a38845c, merged 7eb3363; and the scenario wording)
+- On **Medium, High and Ultra**, for shops, restaurants, offices, medical offices, hotels and churches, the AI now says exactly what to build: how many buildings and pad sites, their sizes and floors, where they sit and which way they face, how the parking is arranged, which side the pond goes on and whether there's a service drive, each with a one-line reason.
+- The planner draws it as **AI's plan** beside its own layouts and ranks it the same way, by the leasable floor area that parks and passes the checks; it's recommended only when it does best. Its card lists the AI's reasons and anything the planner had to change.
+- On **High and Ultra**, when the planner can't do the AI's plan as written, the AI revises it once and the new version is compared too. When the AI's plan can't be laid out at all, it isn't shown as a layout; a line under Build says what the AI asked for and why it didn't fit.
+- **Ask** can now explain the AI's choices ("why did you put the pond there?").
+- "With 2 pad sites" or "an outparcel" now places the pads at every effort level, and offices and medical offices can go to two floors unless you asked for one story.
+- On Waller plans, when all three scenarios come out the same, Numbers says so (the unresolved items could still change it) instead of calling one number a range.
+
+### 5:54 PM CT: Floor plans, elevations and sections follow the building's shape (14954c0)
+- **The architectural sheets now draw L-shaped, U-shaped and stepped buildings as they are on the site plan:** the floor plan's outside wall follows every corner, with a dimension for each jog; the roof plan follows the outline; each elevation shows the set-back walls as their own panels behind the nearer ones; and the sections cut across the actual wing (50 ft across an L's wing, not the 100 ft box around it). Areas on the plans, code analysis and life safety sheets are the building's real area.
+- **Much smaller sheets:** brick, siding, shingles, concrete and insulation are drawn with light line work instead of fill patterns. The biggest architectural sheet went from 11.9 MB to under 0.8 MB. That size is what made one sheet fail in the first full set; it shouldn't happen now.
+
+### 5:38 PM CT: Engineering sheets follow the building's shape; much smaller sheets (efc4d39)
+- **Structural, mechanical, plumbing, electrical, fire and telecom sheets now draw L-shaped, U-shaped and stepped buildings by their real outline:** the slab edge and beams run along every wall, ducts and pipes stay inside the building, sprinkler heads and rooftop units never land in the open corner, and meters, the fire department connection and other outside equipment sit on a real outside wall. Exit signs and pull stations face the right way at an L's inside corner.
+- **The biggest engineering sheets are 4 to 9 times smaller** (the largest is now about 0.6 MB, down from as much as 3.4 MB), so a big set downloads and opens much faster and a sheet is far less likely to fail for being too big. Hatched areas on the foundation and detail sheets are now light tints.
+
+### 5:35 PM CT: Plan sets follow the building's shape; smaller set files (2e6d942, 44abfcf)
+- **L-shaped, U-shaped and stepped buildings are now designed as that shape**, not as the rectangle around them. The building type's name says so ("L-shape, 150' × 100' overall"), the rooms fill the real outline, the open corner or courtyard stays open, and the area is the outline's. Claude is told the corners and where the open ground is, and the checks catch a room in the wrong place. The drawings that follow the outline (walls, roof, elevations, foundation, MEP and sprinklers) arrive in the next push.
+- **Smaller PDFs:** the title block is now stored once for the whole set instead of on every sheet, about 160 KB less per sheet. Sets already under way finish the old way.
+- In homes made by the standard rule-based design, every upper floor now has a bathroom.
+
+### 5:10 PM CT: Drag faces, shape parking, face the building, precise turns (ae15452, 7780aa0, merged 42caa3e)
+- A selected building shows a bar on each side, a custom L included. Drag it and that face moves straight out or in, the sides beside it keep their direction, and a label shows the face's length and how far it moved.
+- Parking takes **Edit Shape**: add and drag points or faces, and the stalls refill the outline with whole stalls in rows on an aisle, none cut by the edge. Every count and drawing follows: Numbers, the pro forma, the PDF, the DXF and the Waller parking checks.
+- **Stall Direction** turns the stalls 90° inside the same outline. **Face the Building** points them at the nearest building face, the L's inner face included, with the aisle along it and a walk's width off it.
+- Turning is free to the degree and settles square to the street, the site edges and nearby buildings within 2°, with a guide line. **Shift** turns in 15° steps (45°, 90° and so on); it used to do the opposite. The Turn field takes any degrees, and custom shapes can be turned.
+- Shift while dragging a face or point gives whole feet and square corners. Handles no longer steal clicks meant for the piece next door, and on a phone a finger resting on a handle no longer opens the menu.
+
+### 5:03 PM CT: Plan set drawings refined, with tests (36f764e)
+- Sheets: the architectural sheets are refined further.
+- Tests now check every site/civil, architectural and engineering sheet on ten realistic plans: shops, a restaurant, townhomes, 71 homes, a warehouse, a 3-story office, medical, a c-store, duplexes and a church.
+
+### 4:58 PM CT: Full plan sets, part 2: the drawings, first draft (320cca2)
+- **The placeholder sheets are now real drawings:**
+  - **Site & civil and landscape:** existing conditions with the boundary's bearings and lengths, dimension and paving, typical lot plans, grading and drainage, detention, utilities, erosion control, civil details, landscape plan and details.
+  - **Each building type:** floor and roof plans, elevations, sections, door / window / finish schedules, foundation and framing plans, HVAC, plumbing, power and lighting, and for commercial buildings sprinkler, fire alarm and life safety plans.
+  - **Sheets for the whole set:** wall sections and details, code analysis, the engineering notes and schedules, riser and one-line diagrams, site lighting, fire access and hydrants, and telecom when ticked.
+- This is a first draft: the drawings are still being refined, and a final version follows.
+
+### 4:56 PM CT: Renderings made in the background (a25d280)
+- **Render on the Renderings tab no longer takes you to the map.** The option's 3D view is set up on a hidden map behind the scenes and the picture is taken from that, so you stay on the project page or carry on elsewhere in the app.
+- The form shows **Rendering 1 of 4** and what's happening, with **Cancel**. The new pictures appear below when they're ready, and a message says so wherever you are in the app.
+- The **Open plan** and **Render more** links beside each option's renderings are gone.
+
+### 4:56 PM CT: Parking fields for shops, offices and the like (aae331f, 5f3bd7d, d397bc4, 4b4fae1, 2eaf3ed, 3dcbf5f, 09a8f8e, merged e97cc60)
+- Layouts for retail, restaurants, offices, medical offices, hotels and churches now come out the way a civil engineer would sketch them: whole, straight rows on both sides of every aisle; a drive round both ends of every aisle, so there are no dead ends; a fire lane that puts every wall within reach of a fire truck; a clear entry drive with no stalls backing into it; a service drive behind shops and restaurants with the trash enclosures on it; planted islands at row ends and along long rows; and one pond on the land left over.
+- "As much as fits" grows the building until the parking, setbacks, fire lanes, detention or zoning stop it, and the layout says which one. Offices and medical offices try a second floor before building less. Examples on the test lots: retail at most on 5 acres 35,434 → 44,621 sf; on the FM 362 parcel 59,250 → 70,942 sf; a 40,000 sf office on a clipped corner lot now fits whole (27,233 before).
+- A lot too small or narrow for a drive round both ends of the aisles gets aisles that stop at one end with room to turn, and the layout says so.
+- Dragging a building re-fits the parking to face it where it now is.
+- Layouts come back faster: about 1–4 seconds on 5 acres.
+- A few small or oddly shaped lots now get less floor area than before, because the old layouts there had dead ends, cars in the entry drive or walls out of fire-truck reach (for example a restaurant on a 2-acre square: 6,000 → 4,822 sf with a service drive; 5,357 sf without it as the second choice).
+
+### 4:39 PM CT: Tidier Make renderings form (ec75352)
+- The Option, View, Materials and Light dropdowns on the Renderings tab no longer run into each other. They sit in an even row of four on a computer, two by two on a tablet and one under another on a phone, with space between the form and what's below it. The Plans tab's form gets the same fix.
+
+### 4:31 PM CT: Full plan sets, part 1: the engine (7d59f39)
+- **Plans can now make a whole set** (up to about a hundred sheets) from an option: general and code sheets, site and civil, landscape, and for each building type the architecture, structural, mechanical, plumbing, electrical and fire sheets, plus telecom when ticked and the renderings.
+- **Building types:** the option's buildings are grouped into types A, B, C… (each distinct building, or one townhome / duplex unit), up to eight. Claude designs each one's floor plans. Every design is checked for fit, overlaps, access, bedroom sizes and windows, and exits; if it fails, Claude is told what's wrong and tries again, up to twice, before a standard rule-based design is used.
+- **Progress you can see:** a panel shows a progress bar, sheets drawn, time so far and time left, what's happening now, and every step. The browser tab's title shows the count. **Pause** and **Resume** carry on where it stopped, even after closing the app.
+- **G-002 General notes:** general notes, codes, every symbol and line type used in the set, and abbreviations.
+- In this push the drawings for the other sheets are still placeholders: they follow in the next push.
+
 ### 4:30 PM CT: Parks stay off the streets, entrances go round them, re-fits keep the streets (7bce16b)
 - **Parks and open space are real places now.** "Add a park beside the community center" puts the park on a clear side of it, a few feet off the streets and clear of buildings, other parks and the lot line. If the usual size doesn't fit, a smaller one goes there and the message says so. If there's no room at all, nothing is added and the message says that too. Homes under a park make way, and the lots of the homes beside it are cut back to its edge. Dragging a park works the same way.
 - **The checks flag a park, named lawn or open space under a drive or a building** in red. Plain lawn under paving, the entry median and a pavilion standing in a park aren't flagged. Lawn now draws under the drives, and the entry median shows as a green strip.
@@ -119,6 +232,68 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - On an L-shaped site, a park dropped on a street and then re-fitted can still lose one short drive next to it.
   - Pickleball courts beside a community center still take 2 or 3 homes when there's no clear lawn within 130 ft.
   - The new park drag and turn behaviour in the editor hasn't been tried in a live browser yet.
+
+### 4:12 PM CT: Make renderings from the project page (31e0120)
+- **Renderings tab:** a new **Make renderings** form at the top. Pick the option, the view (corner, street, entry, back, a close-up of the building nearest the street, or all four), the materials and the light, then press **Render**.
+- The picture is still taken from the option's 3D view on the map, so the option opens there and the progress shows in its panel. When the pictures are ready you're brought back to the Renderings tab.
+
+### 3:26 PM CT: Plan sets, phase 1, and Options renamed Sites (de1d75f)
+- **New Plans tab on each project:** it makes a schematic design drawing set from one option, every sheet on the Finishes Solutions title block, 24 × 36.
+- **Pick your sections first:** tick the sections you want before making the set, and each box shows how many sheets it adds.
+  - General is always in.
+  - Site & civil and Renderings are ready now.
+  - Architecture, structural, MEP, fire and landscape are listed and greyed out until their phases.
+  - Telecom starts unticked.
+- **The sheets so far:**
+  - **G-001 Cover:** the project's name, a key plan, project data, program and parking, the sheet index, the project team and the vicinity map. Claude writes the project description, general notes, codes and next steps.
+  - **C-101 Overall site plan:** drawn to scale with north arrow, scale bar, legend, tables and notes.
+  - **A-901 to A-904:** one AI rendering a sheet.
+- **Your title block:** your AutoCAD border with the plot stamp and the firm number taken off. The app fills in the project, client, phase, date, scale, drawn by, project number (blank is fine), sheet title and number, and the issue / revision table.
+  - Every sheet says "Preliminary — not for construction, bidding or permit", and that the drawings are schematic, made with AI assistance and not sealed.
+- **Issues:** each new set of an option is the next issue (0, 1, 2…), and the revision table lists them all. **Sets made** lists every set with **Download PDF** and **Delete**, and says "plan changed since" when the option has changed. The PDF stays on the device that made it, like renderings.
+- **Claude settings:** Settings › AI model › **Plan sets** picks Claude's model (default Claude Opus 5.5) and effort (default Medium), and shows this month's spend against the $100 plan set budget.
+  - Without the Claude key, or with the budget spent, sets are still made and the cover says the notes were left out.
+  - The cover notes cost cents per set.
+- **Options is now Sites** on the project page. Old links still open it.
+
+### 2:56 PM CT: Plan sets plan: your choices recorded (78d55a0)
+- **Planning only.** More decisions are now in `PLANSET-PLAN.md`:
+  - The project page's Options tab will be renamed **Sites**. Old links still work.
+  - Before making a set, you tick the sections you want: site and civil, landscape, architecture, structural, mechanical, plumbing, electrical, fire, renderings and telecom. Each shows how many sheets it adds, and the cost estimate updates as you tick. Telecom starts unticked.
+  - The title block will be used without the AutoCAD plot stamp and without the firm number, for now.
+  - Claude Opus 5.5 is the default model.
+
+### 2:46 PM CT: Plan sets plan: medium effort, $100 a month (f857098)
+- **Planning only.** Two decisions are now in `PLANSET-PLAN.md`: plan sets will use Claude at medium effort by default (changeable in Settings), with a budget of $100 a month. When the month's budget is spent, new sets wait for the next month. That's roughly 5 to 12 large sets a month, and more for small sites or sets that reuse saved building designs.
+
+### 2:35 PM CT: Plan for full plan sets from a site plan (431cdcb)
+- **Planning only, nothing in the app changes.** `PLANSET-PLAN.md` sets out how an option's site plan would become a schematic design set of drawings, all on the Finishes Solutions title block: cover, civil and site, landscape, architecture, structure, mechanical, plumbing, electrical, fire, and telecom if wanted. Project pages would read Sites · Renderings · Plans.
+- It defines what a "full set" contains: which sheets, their numbers, and when each one is included. It also covers how Claude would design each building type for a person to approve and save to the team library, how code would draw and cross-check every sheet from the plan, and the settings for the Claude API key and model, with costs and a monthly cap.
+
+### 12:48 PM CT: Waller guardrails (74e9484, 7679147, 3d49721, 0b4e808, 23a7ab5, 86ead22, merged 56135b7; 1efc95a)
+- Sites inside the City of Waller, or within half a mile of its limits (its ETJ, unverified), are now planned under the Finishes Solutions Waller site-planning standard. Every other site is planned exactly as before. Site parameters has a **Waller guardrails: Auto / On / Off** switch.
+- The **Finishes base case** is drawn on the map: 5% over each minimum, 3–5% more parking than required, Waller lot sizes and setbacks for homes, 2 spaces a unit for apartments, a 26 ft fire lane, and detention of at least 1.00 acre-foot per developed acre with the pond sized from that volume (depth, side slopes, freeboard and a maintenance bench).
+- The **maximum code envelope** and a **conservative case** sit beside it in Numbers, and either can be laid out in one click. The yield is shown as a range while survey, title, flood, outfall, utilities and access are unresolved.
+- Numbers has a **land-use table** from gross acres down to net usable land, an **unresolved-risk list** and the standard's 18-item checklist; every number carries a tag: Verified, Owner guardrail, Engineering assumption or Unverified.
+- The concept label is on the plan, the PDF (with a new land-use sheet, SP-1A) and the exports; **Land Use (CSV)** is new under Export. Layouts read **Passes the planning checks**.
+- The AI is given the standard's instructions and values, and its answers never call a plan permit-ready, approved, engineered or code-compliant.
+- Site parameters adds the outfall, the owner's margin, a right-of-way reserve, and the pond's storage depth and side slopes.
+- New Option and Clear keep a Waller site's jurisdiction and its guardrail settings.
+
+### 12:40 PM CT: New Option (blank site, copy, clear and start over), and deleting options, renderings and test projects (ab0f8f3, merged a2340bc)
+- **+ New Option** (it was + Copy Option) opens a short menu. **Blank site** makes a new option on the same lot: its street sides, setbacks, parcels, zoning and easements, but nothing laid out. It opens with the Build box ready. **Copy of (option)** still copies it, layouts included (its renderings now stay with the original).
+- **Clear (option) and start over** empties the option you're in and keeps the site. No question first: **Cleared Option A · Undo** brings it all back, layouts included. Its renderings stay.
+- **Delete (option)**, in the same menu, at the foot of the panel or on the project page, deletes straight away with **Undo** for a few seconds, and says so when it goes for the team too. The next option opens; after the last one, the project page, where **New Option** still starts from the same site.
+- The project page's **New Option** now keeps the street sides and easements.
+- The Renderings tab has **Delete all** for each option and **Delete All Renderings** for the project; the pictures are removed from this device too.
+- **Settings › Testing · danger zone › Delete all projects…** says what will go and whether it's for the whole team, and needs DELETE typed to confirm. "Only this device's copies" leaves the team's projects alone.
+
+### 11:56 AM CT: A pro forma you can trust more (63c9ddf, merged b3eecf4)
+- Every pro forma default re-checked for 2026 Houston, Katy and Waller, each with its basis, and labelled "Market assumption, not verified".
+- Rent and the yield now use leasable area: shops 97% of the building, offices and medical their rentable area with a load factor, apartments the units' net sf, storage its rentable units, hotels their rooms. Numbers and the Pro forma show gross and leasable sf side by side, and the shares can be changed.
+- Fixed yields that read too low: tenants on NNN leases now pay back property taxes, site work follows what's built instead of the whole lot (parking paving was counted twice), no developer fee on land, and an AI-crafted type's courts and pavilion are priced and earn rent.
+- Now counted: detention ponds, parking garages, leasing commissions and hotel furniture. Hotels run on room rate and occupancy; storage rents climate-controlled, drive-up and RV spaces separately.
+- A calm note when a number is outside the usual range here, and flags for a yield on cost under 5% or over 12%, an unusual cap rate, a negative spread or thin debt coverage.
 
 ### 11:37 AM CT: Neighbourhood plan: how local rules are found (b209ff3)
 - **Planning only, nothing in the app changes.** `NEIGHBORHOOD-PLAN.md` now records how local rules are found:

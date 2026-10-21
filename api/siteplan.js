@@ -7,14 +7,22 @@
 //        the engine's options judged as a land planner would (drawings and numbers); a revised program to lay out again
 //   POST { mode: 'bestuse', prompt?, site, facts, nearby, market } -> { ideas: [{ title, use, fit, why, risks, request }], summary }
 //        what should go on the site, from what's known about it, each idea a request the builder can lay out
-//   POST { mode: 'strategy', prompt, site, facts, program, effort, count } -> { strategies: [...], pick, why }
+//   POST { mode: 'strategy', prompt, site, facts, program, effort, count, briefFor? } -> { strategies: [...], pick, why }
 //        the site thought through before anything is placed (one plan, or three compared for Ultra): what goes where and
-//        why, the ways in, the parking and the pond, a check of the numbers. The program call and the review then follow it
+//        why, the ways in, the parking and the pond, a check of the numbers. The program call and the review then follow it.
+//        briefFor (a commercial site: lib/planbrief.mjs briefContext): each strategy also carries the AI's brief for the
+//        parking-field engine, { brief, reasons, leasableSf, check } (lib/planbrief.mjs briefFrom), or briefNote when the
+//        brief it gave made no sense. The browser lays the brief out beside the engine's own search ("AI's plan").
+//        review takes briefCheck { option, brief, reasons, met, mayRevise }: the AI's plan among the options; when the
+//        engine couldn't do it as written and mayRevise, the answer's brief is the AI's revised one (once, High and Ultra).
+//        option null with dropped (the engine's reason): the plan didn't fit at all, so none of the options is the AI's
 //   POST { mode: 'ask', question, history: [{ q, a }], plan: {...facts}, effort } -> { answer, followups }
 //        a question about the open plan, answered from the fact sheet the browser computed (lib/planask.mjs planFacts)
 //   POST { mode: 'askProject', question, history: [{ q, a }], project: {...facts}, effort } -> { answer, followups }
 //        a question about a whole project (the Projects page's Ask tab): its information, the site's jurisdiction facts
 //        and every option's headline numbers (lib/project.mjs projectFacts)
+// guardrails (strategy, program, review, edit and ask; lib/guardrails.mjs forAI): a plan under the Waller guardrails. Their
+// instruction and the active profile values join the system prompt, and the answer's text is filtered for prohibited conclusions.
 // effort (strategy, program, review and ask): how hard the model thinks, 'low' | 'medium' | 'high' | 'xhigh' (the effort
 // level picked under Build; Ultra plans at xhigh, which steps down to high on a model that doesn't take it); missing or
 // unknown keeps the default (high, medium for ask). review also takes rounds (1-3, default 2): the last round never
@@ -31,6 +39,9 @@ import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
 import { webSearch } from './search.js';
 import * as RS from '../lib/rulesheet.mjs';
 import { SUFFIXES, namesFor } from '../lib/streetnames.mjs';
+import * as G from '../lib/guardrails.mjs';
+import * as BR from '../lib/planbrief.mjs';
+import { FIELD_USES } from '../lib/siteparking.mjs';
 
 let modelP = null;
 const EFFORTS = ['low', 'medium', 'high', 'xhigh'], effortIn = (v, d) => EFFORTS.includes(v) ? v : d; // OpenAI reasoning_effort, from an allow-list
@@ -60,10 +71,12 @@ const CUSTOM = { type: 'object', additionalProperties: false, required: ['name',
 const STREETS = ['curved', 'network', 'wave', 'straight']; // Settings › Neighbourhood streets
 export const SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['use', 'gfa', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'compare', 'trash', 'entrances', 'product', 'extras', 'storage', 'foodtrucks', 'fuel', 'custom', 'setbacks', 'zones', 'summary', 'assumptions'],
+  required: ['use', 'gfa', 'atLeast', 'form', 'floors', 'units', 'buildings', 'ratio', 'perUnit', 'depth', 'detentionPct', 'storm', 'truck', 'through', 'compare', 'trash', 'entrances', 'product', 'extras', 'storage', 'foodtrucks', 'fuel', 'custom', 'setbacks', 'zones', 'summary', 'assumptions'],
   properties: {
     use: { type: 'string', enum: Object.keys(USES), description: 'Main use. storage = self storage (climate-controlled, drive-up, mini-storage, RV / boat storage). foodtrucks = a food truck park (food truck court, truck stalls round a pavilion, beer garden). fuel = a gas station / convenience store (c-store, fueling station, pumps, a QT or Buc-ee\'s style store; a truck stop or travel center too, laid out as the car version). other = anything that fits none of these: a daycare, a school, a pickleball club, an RV park, an event venue… (then custom holds its recipe).' },
     gfa: n('Total building floor area in square feet across all floors. null when the request gives no size (the tool then uses a typical size for the use and site) or asks for as much as fits.'),
+    atLeast: { type: ['boolean', 'null'], description: 'true when the size is a minimum ("6000+ sf", "at least 6,000 sf", "6,000 sf or more"): gfa is that minimum and the layout grows past it where it fits. null otherwise (a size is what was asked).' },
+    form: { type: ['string', 'null'], enum: ['bar', 'L', 'U', 'tower', null], description: 'The building shape when the request names one: L ("L-shaped"), U ("U-shaped", a courtyard building), tower (a tower on a podium), bar (a straight bar). null when it doesn\'t say.' },
     floors: { type: ['integer', 'null'], description: 'Floors per building.' },
     units: { type: ['integer', 'null'], description: 'Dwelling units (apartments, townhomes, duplex units, homes).' },
     buildings: { type: ['integer', 'null'], description: 'Number of separate buildings, only when the request implies it (pad sites, apartment bars). null = let the layout decide.' },
@@ -118,6 +131,9 @@ export const SYSTEM = `You set up a development program for a site-planning tool
 - Townhomes and duplexes: homes on their own lots with a public street fit about 6-10 units an acre; denser than that, use product court6 (or court), rows on a shared parking court, rather than cutting the count.
 - A neighbourhood, subdivision or "residential" with no count: a zone of use sfr with units null; it fills whatever land the other zones leave. Give sized zones (shops, apartments) their sizes; a community center or commons is an amenity zone (items may include center, pool, playground, pavilion, courts, lake), placed last when they say "at the back". Apartments of 80+ units already get their own clubhouse and pool by the entry: don't add a center or pool to a commons beside them unless for-sale homes (sfr, townhomes, duplexes) share it; one pool per community. A pool always comes with its center.
 - Feasibility: one-story shops or restaurants with surface parking hold about 9,000-12,000 sq ft an acre; two-story offices about 14,000; garden apartments about 18-24 units an acre; homes on lots 4-6 an acre. If the ask is bigger than the land, still give the ask: the layout fits the most that works and says so.
+- HARD RULE, a drive-thru is an extra, not a second use: "a retail building / center / strip with a drive-thru", an endcap coffee or QSR tenant with a drive-thru, is ONE use (retail) with extras ["drivethru"] and no zones. Use zones only when the request names separate uses as separate buildings or areas ("a 10,000 sf strip and a 2,500 sf restaurant pad", "shops with apartments above", "retail in front, townhomes behind"). Every zone you give has its size (gfa for commercial, units for homes) whenever the request gives a total; split the total between them. A pad named with the shops ("with 2 pads") is the shop zone's pads or the buildings count, not a restaurant zone.
+- A size with + or "at least" ("6000+ sf", "at least 6,000 sf", "6,000 sf or more") is a minimum: gfa is that number and atLeast true, so the layout grows past it where it fits. Never read it as "about".
+- A building shape in the words goes in form: "L-shaped" L, "U-shaped" or a courtyard building U, a tower on a podium tower. null when the request names none.
 - Small extras with one main use (outdoor seating, a playground, a lawn, a drive-thru) go in extras, not in zones. "A single" building means buildings 1.
 - The goal is the most valuable plan the site holds within the rules and the market. Sizes you give are the first phase: the engine fills land left over with more of the same (more homes, longer shop and office buildings, more warehouse) up to what the parking and stormwater allow, so don't shrink a request to leave land empty. Don't add uses they didn't ask for.
 - A parking garage: a zone of use "garage" (floors = levels, usually 4-5) where they want it in the order ("a parking garage behind the offices"); offer one for dense offices, medical or shops on tight land. Industrial, warehouse and flex are use "industrial" (a truck court goes behind them), never homes.
@@ -151,9 +167,37 @@ function programFrom(d, prompt) {
   const ftk = d.use === 'foodtrucks' || (!d.use && g0.use === 'foodtrucks') ? { foodtrucks: { ...(g0.foodtrucks || {}), ...Object.fromEntries(Object.entries(d.foodtrucks || {}).filter(([, v]) => v != null)) } } : {}; // a food truck park: the words fill what the model left open
   const fu = d.use === 'fuel' || (!d.use && g0.use === 'fuel') ? { fuel: { ...(g0.fuel || {}), ...Object.fromEntries(Object.entries(d.fuel || {}).filter(([, v]) => v != null)) } } : {}; // a gas station: the same
   const program = { ...normalizeProgram({ ...g0, ...Object.fromEntries(Object.entries(d).filter(([k, v]) => v != null && !['setbacks', 'summary', 'assumptions', 'zones', 'storage', 'foodtrucks', 'fuel', 'custom'].includes(k))), ...sto, ...ftk, ...fu }), ...(d.gfa == null && d.units == null && d.use !== 'storage' && d.use !== 'fuel' ? { gfa: null } : {}) };
-  const guess = guessProgram(prompt), zs = d.zones?.length > 1 ? d.zones : guess.zones; // the model's zones, else the ones read from the words
-  if (zs?.length > 1 && program.use !== 'foodtrucks') { const nz = normalizeProgram({ use: zs[0].use, zones: placed(zs, zs === guess.zones ? null : guess.zones) }).zones; program.zones = nz; program.use = nz[0].use; }
-  return program;
+  const guess = guessProgram(prompt), mine = d.zones?.length > 1, zs = cleanZones(d.zones?.length > 1 ? d.zones : guess.zones, { gfa: d.gfa ?? g0.gfa, units: d.units ?? g0.units, words: guess.zones }); // the model's zones, else the ones read from the words; never a mix the words don't name, never one without sizes
+  if (zs?.length > 1 && program.use !== 'foodtrucks') { const nz = normalizeProgram({ use: zs[0].use, zones: placed(zs, mine ? guess.zones : null) }).zones; program.zones = nz; program.use = nz[0].use; }
+  else if (program.zones) { program.zones = null; program.use = USES[d.use] ? d.use : guess.use; if (program.gfa == null && (d.gfa ?? g0.gfa)) program.gfa = d.gfa ?? g0.gfa; } // (the zones dropped: the one use, with its size)
+  // a size that's a minimum ("6000+ sf"): that much, grown where it fits; a building shape named in the words or by the AI
+  if ((d.atLeast === true || g0.atLeast) && program.gfa && !program.zones) { program.max = true; program.atLeast = true; program.asked = { ...(program.asked || {}), gfa: program.gfa }; }
+  const form = ['bar', 'L', 'U', 'tower'].includes(g0.form) ? g0.form : ['bar', 'L', 'U', 'tower'].includes(d.form) ? d.form : null; if (form) program.form = form; else delete program.form;
+  // floors the words don't fix stay open for an office or a medical office (unless the AI asks for more than usual), so
+  // the engine tries a floor more before it builds less (normalizeProgram fills them in, which would lock them)
+  if (!program.zones && (program.use === 'office' || program.use === 'medical') && BR.floorsFromWords(prompt) == null && !(+d.floors > USES[program.use].floors)) program.floors = null;
+  return BR.withWordsPads(program, prompt); // (a mix: the pads the words ask for on its shop zone)
+}
+// a mix's zones made safe (the program call and the review): a drive-thru or an endcap tenant on one building is its
+// extra, not a second use, so when the words name one use (words: the zones read from them, none) a commercial zone the
+// model gave no size to goes; commercial zones left without a size share the total when it's known (else the mix of
+// shops alone is dropped: the one use stands); fewer than two zones left: no zones. Homes that fill the land the others
+// leave (single-family, units null) and amenity zones keep their own rules.
+const COMM = ['retail', 'restaurant', 'office', 'medical', 'hotel', 'church', 'other', 'industrial', 'storage', 'fuel'];
+export function cleanZones(zones, { gfa = null, units = null, words = null } = {}) {
+  if (!Array.isArray(zones) || zones.length < 2) return null;
+  const sized = z => +z?.gfa > 0 || +z?.units > 0; let zs = zones.filter(z => z && typeof z === 'object').map(z => ({ ...z }));
+  if (!(words?.length > 1)) zs = zs.filter(z => !COMM.includes(z.use) || sized(z)); // (the words name one use: an unsized second shop or restaurant zone is a misreading)
+  else for (const z of zs) if (!sized(z)) { const w = words.find(x => x.use === z.use && sized(x)); if (w) { if (+w.gfa > 0) z.gfa = +w.gfa; if (+w.units > 0) z.units = +w.units; } } // (the sizes the words give each)
+  const open = zs.filter(z => COMM.includes(z.use) && !sized(z));
+  if (open.length) {
+    const left = (+gfa || 0) - zs.filter(z => COMM.includes(z.use) && +z.gfa > 0).reduce((t, z) => t + +z.gfa, 0);
+    if (left >= 500 * open.length) { const each = Math.round(left / open.length / 100) * 100; for (const z of open) z.gfa = each; }
+    else if (zs.every(z => COMM.includes(z.use))) return null; // shops alone, no sizes to give them: one use, not a mix
+  }
+  const openH = zs.filter(z => ['multifamily', 'townhomes', 'duplex'].includes(z.use) && !sized(z)), hu = (+units || 0) - zs.filter(z => +z.units > 0).reduce((t, z) => t + +z.units, 0);
+  if (openH.length && hu >= openH.length) { const each = Math.floor(hu / openH.length); for (const z of openH) z.units = each; }
+  return zs.length > 1 ? zs : null;
 }
 // the model's placement on each zone (place), else the words' for a zone of the same use (its next indexes moved to the
 // model's zones by use)
@@ -173,8 +217,42 @@ export function customFrom(d, program) {
 }
 const PROG = Object.fromEntries(Object.entries(SCHEMA.properties).filter(([k]) => !['summary', 'assumptions'].includes(k)));
 const str = description => ({ type: 'string', description }), strs = description => ({ type: 'array', items: { type: 'string' }, description });
+// ---------- the AI's brief for the parking-field engine (lib/siteparking.mjs normalizeBrief) ----------
+// what to build on a commercial site, exactly: the buildings (each with its use, size, floors, spot and which way it
+// faces), the parking arrangement, the pond's side, a rear service drive and the pads, every decision with its reason
+const why1 = d => str(d + ' One line, plain words.');
+export const BRIEF_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['buildings', 'parking', 'pond', 'serviceDrive', 'pads', 'why', 'leasableSf', 'check'],
+  description: 'What the layout engine should build on this commercial site, exactly.',
+  properties: {
+    buildings: { type: 'array', description: '1 to 6 buildings (not the pads), front to back.', items: { type: 'object', additionalProperties: false, required: ['use', 'gfa', 'floors', 'w', 'd', 'at', 'facing', 'form', 'why'], properties: {
+      use: { type: 'string', enum: FIELD_USES }, gfa: n('Floor area over all its floors, sq ft.'),
+      floors: int('Floors. null = leave it to the engine (it tries one more for an office or a medical office before building less). Never 1 for an office or medical office unless the request says one story.'),
+      w: n('Feet along its row (the storefront length); null = from the floor area.'), d: n('Feet deep; null = the use\'s usual depths.'),
+      at: { type: 'string', enum: ['front', 'back', 'middle', 'corner', 'left', 'right'], description: 'front: at the street (parking behind it); back: behind a parking field (the usual); middle: between two fields; left / right: along the row as seen from the street; corner: toward the side street.' },
+      facing: { type: 'string', enum: ['street', 'parking'], description: 'Which way its storefront looks.' },
+      form: { type: ['string', 'null'], enum: ['bar', 'L', 'U', 'tower', null], description: 'Its shape: L, U (a courtyard), tower (on a podium), bar; the shape the request names ("L-shaped"), else null.' }, why: why1('Why this size, floors and spot.') } } },
+    parking: { type: 'string', enum: ['front', 'wrap', 'sides', 'back'], description: 'front: a field in front of the buildings; wrap: round their fronts and sides; sides: rows running back from the street either side; back: behind the buildings, which sit at the street.' },
+    pond: { type: 'string', enum: ['back', 'front', 'side', 'none'], description: 'The detention pond\'s spot; none only for underground or regional detention.' },
+    serviceDrive: { type: 'boolean', description: 'A rear service and loading drive behind the buildings (shops and restaurants usually want one).' },
+    pads: { type: 'integer', description: '0 to 4 restaurant or coffee pads with a drive-thru, along the street beside the entry.' },
+    why: { type: 'object', additionalProperties: false, required: ['count', 'parking', 'pond', 'serviceDrive', 'pads'], properties: {
+      count: why1('Why this many buildings and pads.'), parking: why1('Why this parking arrangement.'), pond: why1('Why the pond goes there.'), serviceDrive: why1('Why a service drive or none.'), pads: why1('Why these pads or none.') } },
+    leasableSf: { type: ['integer', 'null'], description: 'The leasable floor area you expect it to hold.' },
+    check: str('One or two sentences: the arithmetic that says it fits (footprint, spaces at the ratio times the sq ft a space, the pond, against the acres less the setbacks and drives).')
+  }
+};
+const BRIEF_OR_NULL = d => ({ anyOf: [BRIEF_SCHEMA, { type: 'null' }], description: d });
+export const BRIEF_RULES = `- When briefFor is given (a commercial site), each strategy also carries a brief: exactly what the layout engine should build. The engine lays the brief out as written when it fits and otherwise the nearest layout that does, saying what it changed; that layout is then ranked against the engine's own on one score, the leasable floor area that parks and passes the checks, so a brief only wins by fitting more.
+- Maximise the properly leasable floor area within the rules: every building parked at its use's ratio (briefFor.parking: spaces per 1,000 sq ft, about sqFtPerSpaceWithAisles a space with its aisle), inside the setbacks (briefFor.setbacksFt), with the detention briefFor.detention says the lot needs (its pond comes off the usable land; on a Waller site the guardrails' storage per developed acre, the footprint from that volume), and clear of briefFor.keepOuts.
+- You choose: how many buildings (1-6) and pads (0-4: restaurant or coffee pads with a drive-thru, about 81 ft deep along the street beside the entry; briefFor.asked.pads, when set, is what the request asks for: give exactly that many), each building's use, floor area, floors (null unless the request fixes them or another floor clearly fits more; a second floor is how an office or medical office fits more on tight land), where it sits and which way it faces, the parking arrangement, the pond's side and a rear service drive.
+- The same reading of the request as the program: a drive-thru on a building is that building's (a retail building with a drive-thru is one building, not a restaurant beside it); a size with + or "at least" is a minimum, so give at least that much; a shape the request names ("L-shaped") is each of its buildings' form.
+- Use the lot: its width along the street and depth (a parking bay is briefFor.parking.bayFt deep; 26 ft drives run up both sides), the frontage, a corner (a building or pad toward the side street), its shape.
+- Every decision gets a one-line reason in plain words a developer would say (why.count, why.parking, why.pond, why.serviceDrive, why.pads and each building's why), e.g. "Parking in front: shoppers see the spaces from FM 362 and walk straight in."
+- check: the arithmetic; leasableSf: what you expect it holds. With no briefFor, brief is null.`;
+
 export const REVIEW_SCHEMA = {
-  type: 'object', additionalProperties: false, required: ['reviews', 'ranking', 'revise', 'program', 'params', 'why', 'summary'],
+  type: 'object', additionalProperties: false, required: ['reviews', 'ranking', 'revise', 'program', 'params', 'why', 'summary', 'brief', 'briefWhy'],
   properties: {
     reviews: { type: 'array', description: 'One per option, in the order given.', items: { type: 'object', additionalProperties: false, required: ['option', 'score', 'verdict', 'strengths', 'problems'], properties: {
       option: { type: 'integer', description: 'The option number given (0-based).' }, score: { type: 'integer', description: '0-100: how well it does what was asked and how buildable and marketable it is.' },
@@ -186,7 +264,9 @@ export const REVIEW_SCHEMA = {
       fill: { type: ['boolean', 'null'], description: 'Fill the leftover land with more of the same buildings (Phase 2).' }, streets: { type: ['string', 'null'], enum: ['curved', 'network', 'wave', 'straight', null], description: 'Neighbourhood streets (homes on lots): curved = subdivision streets (a loop road or main street, curved local streets meeting it at T’s, cul-de-sacs) and gentle waves, best first; network = subdivision streets only; wave = parallel curving streets; straight = a grid.' },
       form: { type: ['string', 'null'], enum: ['bar', 'L', 'U', 'tower', null], description: 'Building shape for apartments and offices.' }, storm: { type: ['string', 'null'], enum: ['detention', 'retention', 'underground', 'none', null], description: 'Stormwater.' } } },
     why: str('When revising: what the change fixes, in one sentence. Otherwise empty.'),
-    summary: str('Two or three sentences for the user: which option is best and why, and what to watch for.')
+    summary: str('Two or three sentences for the user: which option is best and why, and what to watch for.'),
+    brief: BRIEF_OR_NULL('Only when briefCheck.mayRevise is true: the planner\'s brief, revised so this lot holds it. null otherwise.'),
+    briefWhy: str('With a revised brief: what changed and why, in one sentence. Otherwise empty.')
   }
 };
 export const REVIEW_SYSTEM = `You are a senior land planner and developer reviewing concept site plans. A layout engine drew the options from a development program; you see each one as a drawing (north is up on the sheet; the street side is labelled MAIN ENTRY; buildings are brown or tan, paving grey, ponds blue, lawns green) with its numbers and the rule checks.
@@ -196,7 +276,9 @@ export const REVIEW_SYSTEM = `You are a senior land planner and developer review
 - You can't move pieces: you change the program the engine lays out (use, sizes, units, buildings, floors, parking ratio, product, zones and their order and sizes, extras, stormwater) and a few settings (fill the site, curving streets, building shape). Revise only when that would clearly make a better plan, e.g. the options waste land, miss what was asked, or are infeasible; keep what was asked unless it can't work.
 - Scores: 85+ ready to show a client; 70-84 good with small fixes; 50-69 workable but weak; below 50 misses the request or doesn't work.
 - Never claim code compliance; these are concepts.
-- When a plannedStrategy is given, the site was thought through before the layouts were drawn: judge whether each layout carries it out (what sits at the front, middle and back, the ways in, the parking, the pond). A layout that strays from it is weaker unless the change is plainly better; say which.`;
+- When a plannedStrategy is given, the site was thought through before the layouts were drawn: judge whether each layout carries it out (what sits at the front, middle and back, the ways in, the parking, the pond). A layout that strays from it is weaker unless the change is plainly better; say which.
+- When briefCheck is given, option briefCheck.option was laid out from the planner's own brief (briefCheck.brief, with its reasons); the rest are the engine's own. Judge it on exactly the same terms: no credit for being the planner's. Its notes say what the engine changed from the brief and why. briefCheck.option null: the engine couldn't lay the brief out at all (briefCheck.notLaidOutBecause, in its own words) and none of the options is the planner's; they are all the engine's own.
+- briefCheck.mayRevise true (the engine couldn't do the brief as written: parking short, it didn't fit, or a check failed): give brief, the brief revised so this lot holds it, from the engine's notes (or notLaidOutBecause), that option's metrics and its checks (or the engine's options' numbers), maximising the leasable floor area that parks and passes the checks; every decision with a one-line reason in plain words; briefWhy one sentence on what changed and why. Otherwise brief is null and briefWhy empty. A revised brief follows the same rules as the first: buildings 1-6, pads 0-4 (the number the request asks for, when it does), floors null unless the request fixes them or another floor clearly fits more.`;
 export const BESTUSE_SCHEMA = {
   type: 'object', additionalProperties: false, required: ['ideas', 'summary'],
   properties: {
@@ -218,7 +300,7 @@ export const STRATEGY_SCHEMA = {
   type: 'object', additionalProperties: false, required: ['strategies', 'pick', 'why'],
   properties: {
     strategies: { type: 'array', description: 'The site plans thought through, as many as asked for (1 or 3). Three must differ in a real way (where the main use sits, how the parking or the pond works, how many buildings), not in wording.', items: {
-      type: 'object', additionalProperties: false, required: ['name', 'concept', 'placement', 'entrances', 'parking', 'stormwater', 'buildings', 'numbers', 'settings', 'risks', 'rejected'],
+      type: 'object', additionalProperties: false, required: ['name', 'concept', 'placement', 'entrances', 'parking', 'stormwater', 'buildings', 'numbers', 'settings', 'risks', 'rejected', 'brief'],
       properties: {
         name: str('A short name, e.g. "Retail on FM 362, apartments behind".'),
         concept: str('Two or three sentences: the idea of the plan and why it suits this site and request.'),
@@ -231,7 +313,8 @@ export const STRATEGY_SCHEMA = {
         numbers: { type: 'object', additionalProperties: false, required: ['buildingSf', 'units', 'coveragePct', 'fits', 'check'], properties: { buildingSf: { type: ['integer', 'null'] }, units: { type: ['integer', 'null'] }, coveragePct: { type: ['number', 'null'], description: 'Building footprint as a share of the site.' }, fits: { type: 'boolean' }, check: str('One or two sentences: the arithmetic that says it fits (footprint plus parking at about 330 sq ft a space plus the pond against the acres), or what has to give.') } },
         settings: { type: 'object', additionalProperties: false, required: ['streets', 'fill'], properties: { streets: { type: ['string', 'null'], enum: ['curved', 'network', 'wave', 'straight', null], description: 'Neighbourhood streets (homes on lots): curved = subdivision streets (a loop road or main street, curved local streets meeting it at T’s, cul-de-sacs) and gentle waves, best first; network = subdivision streets only; wave = parallel curving streets; straight = a grid.' }, fill: { type: ['boolean', 'null'], description: 'false to leave the rest of a big site open as a later phase instead of filling it with more of the same; null = the usual.' } } },
         risks: strs('Up to 3 things that could break this plan (floodplain fill, a short frontage, a utility district).'),
-        rejected: strs('Up to 2 other ways you considered and why you didn\'t take them.')
+        rejected: strs('Up to 2 other ways you considered and why you didn\'t take them.'),
+        brief: BRIEF_OR_NULL('A commercial site (briefFor given): what the layout engine should build, exactly. null otherwise.')
       } } },
     pick: { type: 'integer', description: 'The index of the strategy to lay out (0 when there is one).' },
     why: str('One or two sentences: why that one (with three: what it does better than the others).')
@@ -244,7 +327,8 @@ export const STRATEGY_SYSTEM = `You are a senior land planner for a commercial c
 - Ways in: one for an ordinary lot; two on a corner (one on each street), for more than 200 apartments or 30 homes (fire access) or a big parking field; drives at least 150 ft apart, never at a pad's door.
 - Check the numbers before you commit: building footprint, parking (retail 4/1,000 sf, restaurant 10, office 3.5, medical 5, apartments 1.5-1.75 a unit, at about 330 sq ft a space with its aisle) and detention (about 8-12% of the site for detention in Harris County) against the acres. If it doesn't fit, say what gives (fewer units, a second floor, structured parking).
 - When asked for three, make them genuinely different plans, judge each against the site and the request, and pick the one a developer would take forward; say why in plain words.
-- Concept level only: no code compliance claims.`;
+- Concept level only: no code compliance claims.
+${BRIEF_RULES}`;
 const strategyFrom = d => { const t = (v, n = 300) => clip(v, n), list = (v, n, k = 240) => (Array.isArray(v) ? v : []).slice(0, n).map(x => t(x, k)).filter(Boolean), pl = v => PLACE.includes(v) ? v : null, int = (v, lo, hi) => Number.isFinite(+v) && v != null ? Math.max(lo, Math.min(hi, Math.round(+v))) : null;
   return { name: t(d?.name, 120), concept: t(d?.concept, 600),
     placement: (Array.isArray(d?.placement) ? d.placement : []).slice(0, 8).map(q => ({ what: t(q?.what, 120), where: pl(q?.where), why: t(q?.why, 240) })).filter(q => q.what && q.where),
@@ -258,13 +342,21 @@ const strategyFrom = d => { const t = (v, n = 300) => clip(v, n), list = (v, n, 
 };
 // a strategy coming back in from the browser (to the program and the review): the same shape, cleaned again
 export const strategyIn = v => v && typeof v === 'object' ? strategyFrom(v) : null;
+// the AI's brief on the way out (lib/planbrief.mjs briefFrom): { brief: { brief, reasons, leasableSf, check } }, or a
+// one-line note when what it gave makes no sense (the engine's own layouts stand), or nothing (not a commercial site)
+export function briefOut(raw, ctx) {
+  if (!ctx || raw == null) return {};
+  const r = BR.briefFrom(raw, ctx);
+  return r?.brief ? { brief: r } : r?.nonsense ? { briefNote: clip('The AI’s plan didn’t make sense (' + r.nonsense + '), so these are the engine’s own layouts.', 300) } : {};
+}
 async function strategy(b, key, res) {
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
-  const count = +b.count === 3 ? 3 : 1;
-  const user = siteText(b.site, prompt, b.program, b.facts).replace(/}$/, ',"asked":' + JSON.stringify(count === 3 ? 'three different strategies, then pick one' : 'one strategy') + '}');
+  const count = +b.count === 3 ? 3 : 1, briefFor = b.briefFor && typeof b.briefFor === 'object' && !Array.isArray(b.briefFor) ? tidy(b.briefFor, 0, 300) : null; // (a commercial site: what the AI's brief is decided from)
+  const user = siteText(b.site, prompt, b.program, b.facts).replace(/}$/, ',"asked":' + JSON.stringify(count === 3 ? 'three different strategies, then pick one' : 'one strategy') + (briefFor ? ',"briefFor":' + JSON.stringify(briefFor) : '') + '}');
+  const bctx = briefFor ? { prompt, siteSf: +briefFor.lot?.siteSf || (+b.site?.acres || 0) * 43560, use: guessProgram(prompt).use } : null;
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: STRATEGY_SYSTEM, user, name: 'site_strategy', schema: STRATEGY_SCHEMA, maxTokens: count === 3 ? 32000 : 16000, effort: effortIn(b.effort, 'high') }));
-    const d = r.data, strategies = (Array.isArray(d.strategies) ? d.strategies : []).slice(0, count).map(strategyFrom).filter(x => x.concept || x.placement.length);
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, STRATEGY_SYSTEM), user, name: 'site_strategy', schema: STRATEGY_SCHEMA, maxTokens: count === 3 ? 40000 : 20000, effort: effortIn(b.effort, 'high') }));
+    const d = r.data, raw = (Array.isArray(d.strategies) ? d.strategies : []).slice(0, count), strategies = raw.map(x => ({ ...strategyFrom(x), ...briefOut(x?.brief, bctx) })).filter(x => x.concept || x.placement.length);
     if (!strategies.length) throw new Error('no strategy');
     const pick = Number.isInteger(d.pick) && d.pick >= 0 && d.pick < strategies.length ? d.pick : 0;
     res.setHeader('Cache-Control', 'no-store');
@@ -275,11 +367,17 @@ async function strategy(b, key, res) {
   }
 }
 
+// a Waller plan (lib/guardrails.mjs): the guardrails' instruction (appendix A) and the active profile values go with the
+// system prompt, and what comes back has the conclusions the AI must never draw rewritten ("code compliant", "approved"…)
+export const guardSys = (b, sys) => { const g = G.fromAI(b?.guardrails); return g ? sys + '\n\n' + G.promptFor(g) : sys; };
+const KEEP = new Set(['id', 'ids', 'use', 'kind', 'type', 'model', 'form', 'streets', 'storm', 'where', 'pattern', 'product']);
+export const guardOut = v => Array.isArray(v) ? v.map(guardOut) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, KEEP.has(k) ? x : guardOut(x)])) : typeof v === 'string' ? G.scrubText(v) : v;
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 12, perDay: 400 })) return;
   const key = needKey(res); if (!key) return;
   const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  if (G.fromAI(b.guardrails) && b.mode !== 'bestuse' && b.mode !== 'askProject') { const json = res.json.bind(res); res.json = d => json(res.statusCode >= 400 ? d : guardOut(d)); }
   if (b.mode === 'review') return review(b, key, res);
   if (b.mode === 'bestuse') return bestUse(b, key, res);
   if (b.mode === 'edit') return edit(b, key, res);
@@ -291,7 +389,7 @@ export default async function handler(req, res) {
   if (b.mode === 'streetNames') return streetNames(b, key, res);
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: SYSTEM, user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy), teamTypesForAI(b.teamTypes)), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: effortIn(b.effort, 'high') })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, SYSTEM), user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy), teamTypesForAI(b.teamTypes)), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: effortIn(b.effort, 'high') })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
     const d = r.data, sb = Object.fromEntries(Object.entries(d.setbacks || {}).filter(([, v]) => v != null && v >= 0 && v <= 300)), cu = customFrom(d, programFrom(d, prompt)), program = cu.program;
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ program, setbacks: { ...SETBACKS, ...sb }, summary: clip(d.summary, 400), assumptions: [...(cu.note ? [cu.note] : []), ...(d.assumptions || []).slice(0, 4).map(a => clip(a, 200))].slice(0, 5) });
@@ -308,11 +406,17 @@ async function review(b, key, res) {
   const prompt = clip(b.prompt, 1200).trim(), opts = (Array.isArray(b.options) ? b.options : []).slice(0, 6);
   if (!opts.length) return res.status(400).json({ error: 'Nothing to review.' });
   const images = opts.map(o => typeof o.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(o.image) && o.image.length < 600000 ? o.image : null);
-  const text = JSON.stringify({ request: prompt || null, round: last ? 'last (do not revise)' : round === 1 ? 'first' : round + ' of ' + rounds + ' (revise again only if it clearly helps)', site: JSON.parse(siteText(b.site, '', null, b.facts)).site, currentProgram: b.program || null, ...(strategyIn(b.strategy) ? { plannedStrategy: strategyIn(b.strategy) } : {}),
+  // the AI's plan: one of the options (option), or, when the engine couldn't lay it out at all and drew its own program,
+  // none of them, with the engine's reason (dropped)
+  const bc = b.briefCheck && typeof b.briefCheck === 'object' ? b.briefCheck : null, bk = bc ? BR.briefIn(bc) : null, bOpt = bk && Number.isInteger(bc.option) && bc.option >= 0 && bc.option < opts.length ? bc.option : -1;
+  const dropped = bk && bOpt < 0 && typeof bc.dropped === 'string' && bc.dropped.trim() ? clip(bc.dropped, 300) : null, has = bOpt >= 0 || !!dropped;
+  const mayRevise = has && !last && bc.mayRevise === true && (!!dropped || bc.met !== true); // (once: the browser stops asking after the first revision)
+  const briefCheck = has ? { option: bOpt >= 0 ? bOpt : null, brief: bk.brief, reasons: bk.reasons, metAsWritten: bOpt >= 0 && bc.met === true, ...(dropped ? { notLaidOutBecause: dropped } : {}), mayRevise, ...(b.briefFor && typeof b.briefFor === 'object' ? { briefFor: tidy(b.briefFor, 0, 300) } : {}) } : null;
+  const text = JSON.stringify({ request: prompt || null, round: last ? 'last (do not revise)' : round === 1 ? 'first' : round + ' of ' + rounds + ' (revise again only if it clearly helps)', site: JSON.parse(siteText(b.site, '', null, b.facts)).site, currentProgram: b.program || null, ...(strategyIn(b.strategy) ? { plannedStrategy: strategyIn(b.strategy) } : {}), ...(briefCheck ? { briefCheck } : {}),
     options: opts.map((o, i) => ({ option: i, name: clip(o.name, 120), drawing: images[i] ? 'image ' + (images.slice(0, i + 1).filter(Boolean).length) : 'none', metrics: Object.fromEntries(Object.entries(o.metrics || {}).slice(0, 16).map(([k, v]) => [clip(k, 30), num(v)])),
       issues: (o.issues || []).slice(0, 8).map(t => clip(t, 160)), notes: (o.notes || []).slice(0, 6).map(t => clip(t, 240)) })) });
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: REVIEW_SYSTEM, user: text, name: 'site_review', schema: REVIEW_SCHEMA, maxTokens: 20000, effort: effortIn(b.effort, 'high'), images: images.filter(Boolean) }));
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, REVIEW_SYSTEM), user: text, name: 'site_review', schema: REVIEW_SCHEMA, maxTokens: 20000, effort: effortIn(b.effort, 'high'), images: images.filter(Boolean) }));
     const d = r.data, n = opts.length, ok = i => Number.isInteger(i) && i >= 0 && i < n;
     const ranking = [...new Set((d.ranking || []).filter(ok))]; for (let i = 0; i < n; i++) if (!ranking.includes(i)) ranking.push(i);
     const reviews = (d.reviews || []).filter(x => ok(x.option)).map(x => ({ option: x.option, score: Math.max(0, Math.min(100, Math.round(+x.score || 0))), verdict: clip(x.verdict, 300), strengths: (x.strengths || []).slice(0, 3).map(t => clip(t, 200)), problems: (x.problems || []).slice(0, 4).map(t => clip(t, 220)) }));
@@ -320,7 +424,8 @@ async function review(b, key, res) {
     const params = Object.fromEntries(Object.entries({ fill: typeof p.fill === 'boolean' ? p.fill : null, streets: STREETS.includes(p.streets) ? p.streets : null, form: ['bar', 'L', 'U', 'tower'].includes(p.form) ? p.form : null, storm: ['detention', 'retention', 'underground', 'none'].includes(p.storm) ? p.storm : null }).filter(([, v]) => v != null));
     res.setHeader('Cache-Control', 'no-store');
     const keepCustom = p => { const cu = customFrom(d.program || {}, p); if (cu.program.custom || !customOf(b.program || {})) return cu.program; const r0 = recipeIn(b.program.custom); return r0 && (p.use === 'other' || p.use === (r0.pattern === 'yard' ? 'storage' : 'other')) ? { ...programOf(r0, p) } : cu.program; }; // a revised custom type keeps its recipe unless the AI rewrote it
-    return res.json({ reviews, ranking, revise, program: revise ? keepCustom(programFrom(d.program || {}, prompt)) : null, params: revise ? params : {}, why: revise ? clip(d.why, 300) : '', summary: clip(d.summary, 600) });
+    const nb = mayRevise ? BR.briefFrom(d.brief, { prompt, siteSf: (+b.site?.acres || 0) * 43560, use: guessProgram(prompt).use }) : null, brief = nb?.brief ? nb : null; // (a revised brief that makes no sense: none, the first one stands)
+    return res.json({ reviews, ranking, revise, program: revise ? keepCustom(programFrom(d.program || {}, prompt)) : null, params: revise ? params : {}, why: revise ? clip(d.why, 300) : '', summary: clip(d.summary, 600), brief, briefWhy: brief ? clip(d.briefWhy, 300) : '' });
   } catch (e) {
     console.error('siteplan review', e.message);
     return res.status(502).json({ error: 'The AI review didn’t answer just now; the options stand as the engine ranked them.' });
@@ -433,7 +538,7 @@ async function edit(b, key, res) {
   const ids = new Set([...pieces.map(p => p.id), ...pods.map(p => p.id), ...nst.map(x => x.id)]), image = typeof b.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(b.image) && b.image.length < 600000 ? b.image : null;
   const text = JSON.stringify({ request: prompt, site: { ...JSON.parse(siteText(b.site, '', null, null)).site, ...(plan.site || {}) }, totals: plan.totals || null, parking: plan.parking || null, community: plan.community ? clip(plan.community, 60) : null, parts, houses: housesIn(plan.houses), places: placesIn(plan.places), junctions: junctionsIn(plan.junctions), ...(pods.length ? { pods } : {}), ...(nst.length ? { streets: nst, streetNames: sn0 } : {}), selected: pieces.find(p => p.selected)?.id || nst.find(x => x.selected)?.id || null, pieces }) + '\n\nBuilding library (type id = name):\n' + catalogText();
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: EDIT_SYSTEM, user: text, name: 'site_edit', schema: EDIT_SCHEMA, maxTokens: 16000, effort: 'high', images: image ? [image] : [] }));
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, EDIT_SYSTEM), user: text, name: 'site_edit', schema: EDIT_SCHEMA, maxTokens: 16000, effort: 'high', images: image ? [image] : [] }));
     const d = r.data, kinds = new Set(['building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio', 'entrance', 'roundabout', 'loop']);
     const every = o => (o.action === 'change' || o.action === 'remove') && !ids.has(o.target) && EVERY.includes(o.every);
     let homeMix = mixIn(d.homeMix);
@@ -571,7 +676,8 @@ export const ASK_SYSTEM = `You are a land planner and development analyst explai
 - Use only the facts given. Never invent numbers, codes, costs or reasons. When the facts don't say (why a piece sits where it does, a city's own requirement), say plainly that the plan doesn't record it, then give what the facts do show and what would settle it (the city's code, a survey, a civil engineer, a market study).
 - Parking ratios, the 0.55 acre-feet a developed acre of storage and the pro forma's numbers are typical starting assumptions in this tool, not a city's requirement or a quote: say so when it matters, and where to change them (Settings, the Pro forma assumptions, Change with AI).
 - Short and plain, as you'd say it to a developer: two to five sentences, or a short list. No headings, no markdown beyond "- " list lines. Never claim code compliance; this is a concept.
-- If the question isn't about this plan or site, say briefly that you can only answer about the plan that's open.`;
+- If the question isn't about this plan or site, say briefly that you can only answer about the plan that's open.
+- lastBuild.aiPlan is the AI's own brief for the site (what it asked the layout engine to build), with its reason for each decision and what the engine changed from it: for "why is the pond there?", "why two pads?" and the like, give the AI's reason from it and say whether the layout on the screen is the AI's plan (thisLayoutIsAiPlan) or one of the engine's, and what the engine changed and why.`;
 // the fact sheet as sent: plain values only, strings (to n characters), arrays and depth kept short
 function tidy(v, d = 0, n = 700) {
   if (v == null) return null;
@@ -591,7 +697,7 @@ async function ask(b, key, res) {
   const history = (Array.isArray(b.history) ? b.history : []).slice(-6).map(t => ({ q: clip(t?.q, 600), a: clip(t?.a, 1500) })).filter(t => t.q && t.a);
   const user = 'Fact sheet for the plan on the screen:\n' + facts + (history.length ? '\n\nEarlier in this conversation:\n' + history.map(t => 'Q: ' + t.q + '\nA: ' + t.a).join('\n\n') : '') + '\n\nQuestion: ' + question;
   try {
-    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: ASK_SYSTEM, user, name: 'plan_answer', schema: ASK_SCHEMA, maxTokens: 12000, effort: effortIn(b.effort, 'medium') }));
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, ASK_SYSTEM), user, name: 'plan_answer', schema: ASK_SCHEMA, maxTokens: 12000, effort: effortIn(b.effort, 'medium') }));
     const d = r.data, answer = clip(d.answer, 2400).trim();
     if (!answer) throw new Error('empty answer');
     res.setHeader('Cache-Control', 'no-store');

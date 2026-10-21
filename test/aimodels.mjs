@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const A = await import('../lib/aimodels.mjs');
 
 // ---- the catalog ----
-assert.deepEqual(A.PROVIDERS.map(p => [p.id, p.on]), [['openai', true], ['anthropic', false]], 'OpenAI on; Anthropic listed, not yet on');
+assert.deepEqual(A.PROVIDERS.map(p => [p.id, p.on]), [['openai', true], ['anthropic', false]], 'OpenAI answers the general features; Claude only plan sets (its own picker)');
 const list = [{ id: 'gpt-6-luna', created: 300 }, { id: 'gpt-5-mini', created: 200 }, { id: 'gpt-4.1-mini', created: 100 }, { id: 'o4-mini', created: 250 }, { id: 'gpt-4o-2024-08-06', created: 90 },
   { id: 'gpt-4o-realtime-preview', created: 95 }, { id: 'gpt-4o-mini-tts', created: 80 }, { id: 'text-embedding-3-large', created: 70 }, { id: 'dall-e-3', created: 60 }, { id: 'whisper-1', created: 50 },
   { id: 'gpt-4o-search-preview', created: 40 }, { id: 'omni-moderation-latest', created: 30 }, { id: 'gpt-image-1', created: 20 }, { id: 'gpt-4o-transcribe', created: 10 }, { id: 'codex-mini-latest', created: 5 }];

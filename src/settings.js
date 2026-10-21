@@ -3,9 +3,9 @@
 // phones: full screen. Sections: You & your team · Map · AI model · Saved on this device · App · Help. (The app is light only.)
 // Options shown elsewhere (the Layers panel's map display, the panel's headline metrics) stay where they are and are
 // linked from here. Nothing here deletes notes, projects or the team's sync queue.
-import { PROVIDERS, MODEL_KEY, pickedModel } from './lib/aimodels.mjs';
+import { PROVIDERS, MODEL_KEY, pickedModel, PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, EFFORTS, pickedClaude, pickedEffort } from './lib/aimodels.mjs';
 import { summarize, priceOf, checkPrice, costOf, PRICES_AS_OF } from './lib/aiprices.mjs';
-const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help']];
+const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help'], ['danger', 'Testing · danger zone', 'Testing']];
 export const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
 const BASE_KEY = 'fs-basemap';
 // Reset layout clears only these (never localStorage.clear()): panel open/closed and width, assistant width, which
@@ -34,6 +34,10 @@ export function initSettings(ctx) {
   ctx.aiModel = () => pickedModel(get(MODEL_KEY) || '');
   ctx.noteModel = r => { const m = r?.headers?.get?.('X-AI-Model'); if (m && /^[\w.:-]{1,80}$/.test(m)) { try { localStorage.setItem('fs-ai-last', m); } catch (e) {} if (!sheet.hidden) paintSec('ai'); } };
   let models = null, modelsP = null, modelsErr = '';
+  // Plan sets answer with Claude (api/planset GET): is its key set, the server's model and effort, the key's models, this month's spend
+  let ps = null, psP = null;
+  const loadPs = () => psP ||= fetch('api/planset').then(r => r.json()).then(d => { ps = d; }).catch(() => { ps = { error: 'Couldn’t check Claude just now.' }; psP = null; }).finally(() => paintSec('ai'));
+  const EFFORT_HINT = { low: 'fastest, cheapest', medium: 'the default: good notes at a fair cost', high: 'more thorough', xhigh: 'most thorough, slowest' };
   const loadModels = () => modelsP ||= fetch('api/models').then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'The model list isn’t available.'); models = d; })
     .catch(e => { modelsErr = e.message; modelsP = null; }).finally(() => paintSec('ai'));
 
@@ -139,11 +143,25 @@ export function initSettings(ctx) {
       const opts = [['', 'Server default' + (def ? ' (' + def + ')' : '')], ...list.map(m => [m.id, m.id])];
       if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, cur + (models ? ' (not available to this key: the default is used)' : '')]);
       el.innerHTML = row('Provider', '<select class="chip" id="setProv" aria-label="AI provider">' + PROVIDERS.map(p => '<option value="' + p.id + '"' + (p.on ? '' : ' disabled') + (p.id === 'openai' ? ' selected' : '') + '>' + esc(p.label) + (p.on ? '' : ' · coming later') + '</option>').join('') + '</select>',
-          'OpenAI for now. Anthropic comes later.') +
+          'OpenAI for site plans, Ask AI and briefs. Claude (Anthropic) makes plan sets: see Plan sets below.') +
         row('Model', '<select class="chip" id="setModel" aria-label="AI model">' + opts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
           'For site plans, Ask AI and filing briefs. Kept on this device.') +
         '<div class="set-note" id="setModelNote">' + (modelsP && !models ? 'Checking which models the server’s OpenAI key can use…' : modelsErr && !models ? esc(modelsErr) + ' The server’s default model answers.' : models ? list.length + ' OpenAI chat models available, newest first.' : '') +
-          (last ? ' The last answer came from <b>' + esc(last) + '</b>.' : '') + ' Voice and place search keep their own models. ' + esc(PROVIDERS.find(p => !p.on)?.note || '') + '</div>' + usageHtml();
+          (last ? ' The last answer came from <b>' + esc(last) + '</b>.' : '') + ' Voice and place search keep their own models. ' + esc(PROVIDERS.find(p => !p.on)?.note || '') + '</div><div id="setPsSlot"></div>' + usageHtml();
+      if (!ps && !psP) loadPs();
+      const pm = pickedClaude(get(PLANSET_MODEL_KEY)), pe = pickedEffort(get(PLANSET_EFFORT_KEY)), on = !!ps?.configured;
+      const pOpts = [['', 'Server default' + (ps?.model ? ' (' + ps.model + ')' : '')], ...(ps?.models || []).map(m => [m.id, m.name && m.name !== m.id ? m.name + ' · ' + m.id : m.id])];
+      if (pm && !pOpts.some(o => o[0] === pm)) pOpts.push([pm, pm + (ps ? ' (not available to this key: the default is used)' : '')]);
+      const money = v => '$' + (v >= 100 ? Math.round(v) : (+v).toFixed(2));
+      el.querySelector('#setPsSlot').outerHTML = ('<div class="set-l" style="margin:18px 0 6px">Plan sets</div>' +
+        row('Claude model', '<select class="chip" id="setPsModel" aria-label="Claude model for plan sets"' + (on ? '' : ' disabled') + '>' + pOpts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === pm ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
+          'Writes each plan set’s notes and designs its building types. Kept on this device.') +
+        row('Effort', '<select class="chip" id="setPsEffort" aria-label="Claude effort for plan sets"' + (on ? '' : ' disabled') + '>' + [['', 'Server default (' + (ps?.effort || 'medium') + ')'], ...EFFORTS.map(x => [x, x[0].toUpperCase() + x.slice(1) + ' · ' + EFFORT_HINT[x]])].map(([v, l]) => '<option value="' + v + '"' + (v === pe ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
+          'How hard Claude thinks. Higher costs more and takes longer.') +
+        '<div class="set-note">' + (!ps ? 'Checking Claude…' : ps.error ? esc(ps.error) : !on ? 'Claude isn’t set up on this site: add ANTHROPIC_API_KEY on Vercel (Production and Preview), then redeploy. Plan sets are still made, without the cover notes.'
+          : (ps.models?.length ? ps.models.length + ' Claude models available. ' : esc(ps.modelsError || '')) + (ps.budget?.spent != null ? 'This month: ' + money(ps.budget.spent) + ' of the ' + money(ps.budget.cap) + ' plan set budget.' : 'Monthly budget ' + money(ps.budget?.cap ?? 100) + '.')) + '</div>');
+      const keepPick = (id, key, what) => el.querySelector(id).onchange = e => { try { if (e.target.value) localStorage.setItem(key, e.target.value); else localStorage.removeItem(key); } catch (err) {} ctx.toast(e.target.value ? 'Plan sets will use ' + e.target.value + ' ' + what + ' on this device.' : 'Plan sets will use the server’s ' + what + '.'); };
+      keepPick('#setPsModel', PLANSET_MODEL_KEY, 'as the model'); keepPick('#setPsEffort', PLANSET_EFFORT_KEY, 'effort');
       wireUsage(el);
       el.querySelector('#setModel').onchange = e => { try { if (e.target.value) localStorage.setItem(MODEL_KEY, e.target.value); else localStorage.removeItem(MODEL_KEY); } catch (err) {} ctx.toast(e.target.value ? 'The AI will use ' + e.target.value + ' on this device.' : 'The AI will use the server’s default model' + (def ? ' (' + def + ')' : '') + '.'); };
     },
@@ -167,10 +185,35 @@ export function initSettings(ctx) {
         : 'Opens in its own window and keeps working offline. In Chrome or Edge, use the install button in the address bar; other browsers may not offer it.';
       el.innerHTML = row('Install the app', inst, how) +
         '<div class="set-keys set-desk"><span class="set-l">Keyboard shortcuts</span><dl>' +
-        [[mod + 'K', 'Search the map'], [mod + '/', 'Ask AI'], [mod + ',', 'Settings'], ['Esc', 'Close a card, menu or this sheet']].map(([k, d]) => '<div><dt><kbd>' + esc(k) + '</kbd></dt><dd>' + esc(d) + '</dd></div>').join('') + '</dl></div>' +
+        [[mod + 'K', 'Search the map'], [mod + '/', 'Ask AI'], [mod + ',', 'Settings'], ['Esc', 'Close a card, menu or this sheet'], ['R', 'Site plan: turn the selected piece 90°'], ['Shift', 'Site plan: while turning, 15° steps; while dragging a face or point, whole feet and square corners']].map(([k, d]) => '<div><dt><kbd>' + esc(k) + '</kbd></dt><dd>' + esc(d) + '</dd></div>').join('') + '</dl></div>' +
         row('Reset layout', '<button type="button" class="btn sm" id="setReset">Reset…</button>', 'Puts the panel, its sections, headline metrics, timeline and export choices back to how they started. Your notes, projects, saved searches and settings stay.');
       el.querySelector('#setInstall')?.addEventListener('click', () => ctx.install.prompt());
       el.querySelector('#setReset').onclick = resetLayout;
+    },
+    // Testing · danger zone: Delete all projects… opens a step that says what goes (and whether for the whole team);
+    // typing DELETE turns on the final button. With the team: optionally only this device's copies.
+    danger(el, step = false) {
+      const c = ctx.sitePlan?.counts?.() || { projects: 0, options: 0, renderings: 0, team: false }, none = !c.projects;
+      const what = fmtN(c.projects) + (c.projects === 1 ? ' project' : ' projects') + ', ' + fmtN(c.options) + (c.options === 1 ? ' option' : ' options') + (c.renderings ? ' and ' + fmtN(c.renderings) + (c.renderings === 1 ? ' rendering' : ' renderings') : '');
+      if (!step) {
+        el.innerHTML = row('Delete all projects', '<button type="button" class="btn sm set-danger" id="setDelAll"' + (none ? ' disabled' : '') + '>Delete all projects…</button>',
+          none ? 'There are no projects to delete.' : 'For testing: removes every project in the system (' + esc(what) + '). You confirm on the next step.');
+        el.querySelector('#setDelAll').onclick = () => { PAINT.danger(el, true); el.querySelector('#setDelTxt')?.focus(); };
+        return;
+      }
+      el.innerHTML = '<div class="set-confirm" role="group" aria-labelledby="setDelH"><b id="setDelH">Delete ' + esc(what) + '?</b>' +
+        '<p>' + (c.team ? 'Team sharing is on: they’re removed <b>for the whole team</b>, on every device.' : 'Team sharing isn’t on here, so only <b>this device’s</b> projects go; any team copies are left alone.') + ' Renderings saved on this device go too. This can’t be undone.</p>' +
+        '<label class="set-l" for="setDelTxt">Type DELETE to confirm</label><input id="setDelTxt" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE">' +
+        '<div class="btnrow"><button type="button" class="btn sm set-danger" id="setDelGo" disabled>' + (c.team ? 'Delete for the whole team' : 'Delete all projects') + '</button>' +
+        (c.team ? '<button type="button" class="btn sm" id="setDelLocal" disabled title="The team’s copies stay and download to this device again on the next sync; changes not yet synced are lost">Only this device’s copies</button>' : '') +
+        '<button type="button" class="btn sm ghost" id="setDelX">Cancel</button></div></div>';
+      const t = el.querySelector('#setDelTxt'), go = el.querySelector('#setDelGo'), loc = el.querySelector('#setDelLocal');
+      t.oninput = () => { const ok = t.value.trim() === 'DELETE'; go.disabled = !ok; if (loc) loc.disabled = !ok; };
+      t.onkeydown = e => { if (e.key === 'Enter' && !go.disabled) go.click(); };
+      el.querySelector('#setDelX').onclick = () => { PAINT.danger(el); el.querySelector('#setDelAll')?.focus(); };
+      const run = local => { const r = ctx.sitePlan.deleteAll({ local }); close();
+        ctx.toast('Deleted ' + fmtN(r.projects) + (r.projects === 1 ? ' project' : ' projects') + ' and ' + fmtN(r.options) + (r.options === 1 ? ' option' : ' options') + (r.team ? ' for the whole team.' : local ? ' from this device (the team’s copies stay).' : ' from this device.')); };
+      go.onclick = () => run(false); if (loc) loc.onclick = () => run(true);
     },
     help(el) {
       el.innerHTML = '<div class="set-links">' + go('Getting started', 'data-act="intro"', 'The short tip on what the app does, at the top of the Map panel') + go('Data sources &amp; freshness', 'data-act="sources"', 'Where every number comes from and when it was last refreshed') +
