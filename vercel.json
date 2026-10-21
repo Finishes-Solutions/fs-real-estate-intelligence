@@ -122,6 +122,9 @@
     "api/buildingtypes.js": {
       "maxDuration": 20
     },
+    "api/rulesheets.js": {
+      "maxDuration": 20
+    },
     "api/render.js": {
       "maxDuration": 300
     }

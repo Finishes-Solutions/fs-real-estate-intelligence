@@ -28,6 +28,9 @@ import { catalogText, keepStories } from '../lib/siteedit.mjs';
 import { typeById } from '../lib/buildings.mjs';
 import { recipeIn, programOf, customOf, teamTypesForAI, OUTDOOR, PER, PATTERNS } from '../lib/customtypes.mjs';
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
+import { webSearch } from './search.js';
+import * as RS from '../lib/rulesheet.mjs';
+import { SUFFIXES, namesFor } from '../lib/streetnames.mjs';
 
 let modelP = null;
 const EFFORTS = ['low', 'medium', 'high', 'xhigh'], effortIn = (v, d) => EFFORTS.includes(v) ? v : d; // OpenAI reasoning_effort, from an allow-list
@@ -284,6 +287,8 @@ export default async function handler(req, res) {
   if (b.mode === 'askProject') return askProject(b, key, res);
   if (b.mode === 'strategy') return strategy(b, key, res);
   if (b.mode === 'names') return names(b, key, res);
+  if (b.mode === 'rules') return rules(b, key, res);
+  if (b.mode === 'streetNames') return streetNames(b, key, res);
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
     const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: SYSTEM, user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy), teamTypesForAI(b.teamTypes)), name: 'site_program', schema: SCHEMA, maxTokens: 16000, effort: effortIn(b.effort, 'high') })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
@@ -342,11 +347,11 @@ async function bestUse(b, key, res) {
 const nul = (t, extra = {}) => ({ type: [t, 'null'], ...extra });
 const EVERY = [...Object.keys(USES), 'building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio']; // what an edit on every piece of a sort can name
 export const EDIT_SCHEMA = {
-  type: 'object', additionalProperties: false, required: ['ops', 'homeMix', 'names', 'refit', 'summary', 'question'],
+  type: 'object', additionalProperties: false, required: ['ops', 'homeMix', 'names', 'streetNames', 'refit', 'summary', 'question'],
   properties: {
-    ops: { type: 'array', description: 'The edits, in order.', items: { type: 'object', additionalProperties: false, required: ['action', 'target', 'every', 'floorsOver', 'with', 'type', 'kind', 'use', 'name', 'floors', 'units', 'gfa', 'w', 'd', 'x', 'y', 'turn', 'turnBy', 'boulevard', 'signs'], properties: {
-      action: { type: 'string', enum: ['change', 'remove', 'add', 'move', 'swap', 'relay'] },
-      target: nul('string', { description: 'id of the piece to change, remove, move or swap (null for add, or with every), or a pod id from plan.pods ("pod:…") to re-lay, change or swap.' }),
+    ops: { type: 'array', description: 'The edits, in order.', items: { type: 'object', additionalProperties: false, required: ['action', 'target', 'every', 'floorsOver', 'with', 'type', 'kind', 'use', 'name', 'floors', 'units', 'gfa', 'w', 'd', 'x', 'y', 'turn', 'turnBy', 'boulevard', 'signs', 'curve', 'end', 'street'], properties: {
+      action: { type: 'string', enum: ['change', 'remove', 'add', 'move', 'swap', 'relay', 'culdesac', 'bend'] },
+      target: nul('string', { description: 'id of the piece to change, remove, move or swap (null for add, or with every), a pod id from plan.pods ("pod:…") to re-lay, change or swap, or a street id from plan.streets (culdesac, bend, relay its block, remove, change with street).' }),
       every: nul('string', { enum: [...EVERY, null], description: 'change / remove with no target: every piece of this use (a building use, e.g. multifamily, townhomes) or kind (pool, court…), listed or not.' }),
       floorsOver: nul('integer', { description: 'with every: only the ones with more floors than this now (2 picks the 3-story and taller ones).' }),
       with: nul('string', { description: 'swap: the other piece, or the other pod ("pod:…"). add / move: a piece to put it beside (when no x, y).' }),
@@ -358,11 +363,15 @@ export const EDIT_SCHEMA = {
       turn: nul('number', { description: 'its angle on the drawing in degrees (0 = its long side along the street, 90 = running back from it)' }),
       turnBy: nul('number', { description: 'degrees to turn it by on the drawing, + counter-clockwise, − clockwise: any piece, curved ponds, lawns, drawn outlines and entrances too (an entrance turns about its middle, its mouth slides along the street, at most 60° off square)' }),
       boulevard: nul('boolean', { description: 'an entrance: true for a two-lane divided entry with a planted median (add kind entrance: a new one; change: widen this one)' }),
-      signs: nul('string', { enum: ['median', 'both', 'one', 'none', null], description: 'an entrance: where its monument signs go (median: in the median nose; both / one: at the corners); null leaves them' }) } } },
+      signs: nul('string', { enum: ['median', 'both', 'one', 'none', null], description: 'an entrance: where its monument signs go (median: in the median nose; both / one: at the corners); null leaves them' }),
+      curve: nul('number', { description: 'bend: how far the street bows sideways at its middle, ft, + to the left of its way on the drawing; null for the usual (about 6% of its length)' }),
+      end: nul('string', { enum: ['start', 'end', null], description: 'culdesac: which end (plan.streets from / to); null: a dead end, else the end farther from the main entry' }),
+      street: nul('string', { description: 'change on a street from plan.streets: its new street name, base and suffix ("Heritage Parkway")' }) } } },
     homeMix: { type: 'array', description: 'The single-family homes on lots by stories, when the request changes their stories across the site (e.g. no 3-story homes: the 1- and 2-story shares only). Empty for no change.', items: { type: 'object', additionalProperties: false, required: ['stories', 'pct'], properties: { stories: { type: 'integer', enum: [1, 2, 3] }, pct: { type: 'number', description: 'share of the homes, %' } } } },
     names: { type: 'object', additionalProperties: false, required: ['community', 'parts'], description: 'names for the development and its parts (plan.parts); community null and parts empty when the request doesn’t name anything', properties: {
       community: nul('string', { description: 'the whole development’s name ("call it Beacon Hill"), or null' }),
       parts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['part', 'name'], properties: { part: { type: 'integer', description: 'plan.parts index (part)' }, name: { type: 'string' } } } } } },
+    streetNames: { type: 'object', additionalProperties: false, required: ['on', 'theme'], description: 'the neighbourhood’s street names (plan.streetNames): on true to name every street (from theme, or one that suits the community when null), false to hide them; both null for no change', properties: { on: nul('boolean'), theme: nul('string', { description: 'a few words: "golf", "Texas rivers"' }) } },
     refit: { type: 'string', enum: ['none', 'full'], description: 'none: change just these pieces; parking under them gives way and comes back where they leave (the usual). full: also lay out the parking and lots again along the same streets around them (when the user asks for a re-fit or re-layout, or after adding or removing several buildings, or moving one into land without drives). Nothing re-lays the streets (for that the user picks New Layouts).' },
     summary: { type: 'string', description: 'One or two sentences on what you changed, for the user.' },
     question: nul('string', { description: 'Only when you can’t tell what they mean: one short question (and no ops).' })
@@ -381,8 +390,9 @@ export const EDIT_SYSTEM = `You edit a concept site plan the way a land planner 
 - Names: the development has a name (community) and each part in plan.parts its own (part, label, name). "Call the neighbourhood Beacon Hill Estates", "name the retail center Beacon Hill Market" are names, not ops: names.parts with the part's index (every part of that kind when there are two, as two neighbourhoods either side of a commons); the whole development ("call it Beacon Hill", "the community") is names.community. Never rename pieces for these. Keep the user's capitals.
 - Parks, lawns and open space (kind green with a name) are real places: never put a piece across a drive or a park. To put a park or amenity beside something, give with and no x, y: the app tries each side and keeps the first spot clear of drives, buildings and the lot line, or says there's no room.
 - An entrance can't cross a park, open space or pond: put x, y on the street lot line beside it, not through it. If they ask for one "at the open space", give with (its id) and no x, y: the app slides it along the street past it or says it can't.
-- A re-fit keeps the streets as they are. If the request needs a different street arrangement, say so in the summary and suggest New Layouts; don't claim the streets changed.
-- Streets of a neighbourhood stay as they are on a re-fit; homes are laid out again along them. A different street pattern is New Layouts (say so in the summary).
+- A re-fit keeps the streets as they are. A different street pattern for the whole site is New Layouts (say so in the summary); don't claim the streets changed unless an op below changes them.
+- Streets of a neighbourhood (plan.streets: each street's id, name, kind, length, ends and where it runs): 'make this street a cul-de-sac' is culdesac on that street (the selected one for 'this'; end only when they say which); 'curve the main street' is bend on it (curve null unless they give feet; the main street is the one named Main street or Spine road, else the longest collector); 'remove / delete this street' is remove on it; 're-lay this pod / block' is relay with the selected piece or street (the app lays that block's local streets out again; the collectors stay); 'call the main street Heritage Parkway' is change on it with street. Homes are laid out again along the changed streets.
+- Street names: 'rename the streets with a golf theme' is streetNames on true, theme golf; 'name the streets' is on true, theme null; 'turn off street names' is on false. Otherwise both null.
 - More floors on apartments add units; give units only when they name a number.
 - If they ask for something the plan can't hold (no room, outside the setbacks), do the nearest sensible thing and say so in the summary.
 - refit: "none" unless they ask for the site to re-fit or re-lay, or the change needs new drives and parking (a building added in open land, several buildings removed); then "full".
@@ -418,24 +428,27 @@ async function edit(b, key, res) {
   const pieces = (Array.isArray(plan.pieces) ? plan.pieces : []).slice(0, 500).map(p => ({ id: clip(p.id, 40), name: clip(p.name, 60), kind: clip(p.kind, 20), use: p.use ? clip(p.use, 20) : null, at: Array.isArray(p.at) ? p.at.slice(0, 2).map(num) : null, size: Array.isArray(p.size) ? p.size.slice(0, 2).map(num) : null, turn: num(p.turn), floors: num(p.floors), units: num(p.units), type: p.type ? clip(p.type, 90) : null, note: p.note ? clip(p.note, 80) : null, ...(typeof p.boulevard === 'boolean' ? { boulevard: p.boulevard, width: num(p.width) } : {}), ...(p.of ? { of: clip(p.of, 40) } : {}), ...(Number.isFinite(+p.across) && p.across != null ? { across: num(p.across) } : {}), ...(p.selected ? { selected: true } : {}), ...(p.pinned ? { pinned: true } : {}) }));
   const parts = (Array.isArray(plan.parts) ? plan.parts : []).slice(0, 8).filter(x => Number.isInteger(x?.part)).map(x => ({ part: x.part, use: clip(x.use, 20), label: clip(x.label, 30), name: x.name ? clip(x.name, 60) : null }));
   const pods = (Array.isArray(plan.pods) ? plan.pods : []).slice(0, 24).map(p => ({ id: clip(p?.id, 40), name: clip(p?.name, 60), use: USES[p?.use] ? p.use : 'other', acres: num(p?.acres), at: pt(p?.at), faces: (Array.isArray(p?.faces) ? p.faces : []).slice(0, 4).map(f => clip(f, 40)), ...(Number.isFinite(+p?.homes) ? { homes: num(p.homes) } : {}), ...(Number.isFinite(+p?.units) ? { units: num(p.units) } : {}), ...(Number.isFinite(+p?.floorAreaSf) ? { floorAreaSf: num(p.floorAreaSf) } : {}) })).filter(p => /^pod:/.test(p.id)); // a plan laid out in pods (lib/siteedit.mjs describePlan)
-  const ids = new Set([...pieces.map(p => p.id), ...pods.map(p => p.id)]), image = typeof b.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(b.image) && b.image.length < 600000 ? b.image : null;
-  const text = JSON.stringify({ request: prompt, site: { ...JSON.parse(siteText(b.site, '', null, null)).site, ...(plan.site || {}) }, totals: plan.totals || null, parking: plan.parking || null, community: plan.community ? clip(plan.community, 60) : null, parts, houses: housesIn(plan.houses), places: placesIn(plan.places), junctions: junctionsIn(plan.junctions), ...(pods.length ? { pods } : {}), selected: pieces.find(p => p.selected)?.id || null, pieces }) + '\n\nBuilding library (type id = name):\n' + catalogText();
+  const nst = (Array.isArray(plan.streets) ? plan.streets : []).slice(0, 80).map(x => ({ id: clip(x?.id, 40), name: clip(x?.name, 60), kind: ['boulevard', 'entry', 'collector', 'local', 'court'].includes(x?.kind) ? x.kind : 'local', lengthFt: num(x?.lengthFt), ends: (Array.isArray(x?.ends) ? x.ends : []).slice(0, 2).map(e => clip(e, 20)), ...(pt(x?.from) ? { from: pt(x.from), to: pt(x.to) } : {}), mid: pt(x?.mid), ...(x?.selected ? { selected: true } : {}) })).filter(x => x.id); // a neighbourhood's streets (lib/siteedit.mjs describePlan)
+  const sn0 = plan.streetNames && typeof plan.streetNames === 'object' ? { on: !!plan.streetNames.on, theme: clip(plan.streetNames.theme, 80) } : null;
+  const ids = new Set([...pieces.map(p => p.id), ...pods.map(p => p.id), ...nst.map(x => x.id)]), image = typeof b.image === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(b.image) && b.image.length < 600000 ? b.image : null;
+  const text = JSON.stringify({ request: prompt, site: { ...JSON.parse(siteText(b.site, '', null, null)).site, ...(plan.site || {}) }, totals: plan.totals || null, parking: plan.parking || null, community: plan.community ? clip(plan.community, 60) : null, parts, houses: housesIn(plan.houses), places: placesIn(plan.places), junctions: junctionsIn(plan.junctions), ...(pods.length ? { pods } : {}), ...(nst.length ? { streets: nst, streetNames: sn0 } : {}), selected: pieces.find(p => p.selected)?.id || nst.find(x => x.selected)?.id || null, pieces }) + '\n\nBuilding library (type id = name):\n' + catalogText();
   try {
     const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: EDIT_SYSTEM, user: text, name: 'site_edit', schema: EDIT_SCHEMA, maxTokens: 16000, effort: 'high', images: image ? [image] : [] }));
     const d = r.data, kinds = new Set(['building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio', 'entrance', 'roundabout', 'loop']);
     const every = o => (o.action === 'change' || o.action === 'remove') && !ids.has(o.target) && EVERY.includes(o.every);
     let homeMix = mixIn(d.homeMix);
-    const ops = (d.ops || []).slice(0, 30).filter(o => ['change', 'remove', 'add', 'move', 'swap', 'relay'].includes(o.action) && (o.action === 'add' || ids.has(o.target) || every(o)) && (o.action !== 'swap' || ids.has(o.with)) && (o.action !== 'relay' || /^pod:/.test(o.target))).filter(o => {
+    const st = new Set(nst.map(x => x.id)), ops = (d.ops || []).slice(0, 30).filter(o => ['change', 'remove', 'add', 'move', 'swap', 'relay', 'culdesac', 'bend'].includes(o.action) && (o.action === 'add' || ids.has(o.target) || every(o)) && (o.action !== 'swap' || ids.has(o.with)) && (o.action !== 'relay' || /^pod:/.test(o.target) || nst.length && ids.has(o.target)) && (!['culdesac', 'bend'].includes(o.action) || st.has(o.target) || nst.length && ids.has(o.target))).filter(o => {
       if (!(every(o) && o.every === 'sfr' && o.action === 'change' && [1, 2, 3].includes(o.floors))) return true; // homes on lots by stories: that's the home mix
       if (!homeMix.length) homeMix = Number.isInteger(o.floorsOver) ? keepStories(mixIn(plan.houses?.mix).length ? mixIn(plan.houses.mix) : HOME_MIX, [1, 2, 3].filter(n => n <= o.floorsOver || n === o.floors)) || [] : [{ stories: o.floors, pct: 100 }]; return false; // (only the taller ones: the rest keep their shares)
     }).map(o => ({
       action: o.action, target: ids.has(o.target) ? o.target : null, every: every(o) ? o.every : null, floorsOver: every(o) && Number.isInteger(o.floorsOver) && o.floorsOver >= 0 && o.floorsOver < 60 ? o.floorsOver : null, with: ids.has(o.with) ? o.with : null, type: o.type && typeById(o.type) ? o.type : null, kind: kinds.has(o.kind) || o.kind === 'pod' ? o.kind : null, use: USES[o.use] ? o.use : null, name: o.name ? clip(o.name, 60) : null,
       floors: Number.isInteger(o.floors) && o.floors >= 1 && o.floors <= 60 ? o.floors : null, units: Number.isInteger(o.units) && o.units >= 1 && o.units <= 2000 ? o.units : null, gfa: Number.isInteger(o.gfa) && o.gfa >= 500 && o.gfa <= 2000000 ? o.gfa : null, w: num(o.w) > 4 && o.w < 2000 ? +o.w : null, d: num(o.d) > 4 && o.d < 2000 ? +o.d : null, x: opt(o.x), y: opt(o.y), turn: opt(o.turn),
-      turnBy: Number.isFinite(+o.turnBy) && o.turnBy != null && Math.abs(+o.turnBy) <= 360 ? +o.turnBy : null, boulevard: typeof o.boulevard === 'boolean' ? o.boulevard : null, signs: ['median', 'both', 'one', 'none'].includes(o.signs) ? o.signs : null }));
-    const names = namesIn(d.names);
+      turnBy: Number.isFinite(+o.turnBy) && o.turnBy != null && Math.abs(+o.turnBy) <= 360 ? +o.turnBy : null, boulevard: typeof o.boulevard === 'boolean' ? o.boulevard : null, signs: ['median', 'both', 'one', 'none'].includes(o.signs) ? o.signs : null,
+      curve: o.curve != null && Number.isFinite(+o.curve) && Math.abs(+o.curve) <= 400 ? +o.curve : null, end: ['start', 'end'].includes(o.end) ? o.end : null, street: typeof o.street === 'string' && o.street.trim() ? clip(o.street.trim().replace(/\s+/g, ' '), 40) : null }));
+    const names = namesIn(d.names), streetNames = typeof d.streetNames?.on === 'boolean' && nst.length ? { on: d.streetNames.on, theme: clip(d.streetNames.theme || '', 80) } : null;
     res.setHeader('Cache-Control', 'no-store');
-    const any = ops.length || homeMix.length || names.community || names.parts.length;
-    return res.json({ ops, homeMix, names, refit: d.refit === 'full' ? 'full' : 'none', summary: any ? clip(d.summary, 500) : '', question: any ? null : clip(d.question || '', 300) || null });
+    const any = ops.length || homeMix.length || names.community || names.parts.length || streetNames;
+    return res.json({ ops, homeMix, names, streetNames, refit: d.refit === 'full' ? 'full' : 'none', summary: any ? clip(d.summary, 500) : '', question: any ? null : clip(d.question || '', 300) || null });
   } catch (e) {
     console.error('siteplan edit', e.message);
     return res.status(502).json({ error: 'The AI didn’t answer just now.' });
@@ -467,6 +480,82 @@ async function names(b, key, res) {
     console.error('siteplan names', e.message);
     return res.status(502).json({ error: 'The AI didn’t answer just now.' });
   }
+}
+
+// ---------- street rules by location: the AI reads the codes (lib/rulesheet.mjs) ----------
+// POST { mode: 'rules', jurisdiction: { county, city|null, districts: [names], address, lat, lon }, known: [keys], refresh }
+//   -> { sheet } or { key, name, etj, cached: true } (the team has that place's sheet already). No city: the AI first decides
+// whether the site is in a city's ETJ (the app has no ETJ outlines). Then two searches in parallel (the subdivision and
+// development rules; the drainage criteria) and a structuring call; a value is sure only when it was read and quoted from
+// a page the search found. A search or call that fails: Waller County's rules stand in, every value flagged (status 200,
+// so the app always gets a sheet).
+export const ETJ = 'Decide whether the site is inside the extraterritorial jurisdiction (ETJ) of a Texas city, from the city\'s ETJ map or ordinance, the county\'s or the appraisal district\'s maps, or a reliable source. Reply with ONLY a JSON object, no other text: ' +
+  '{"etj": the city\'s name or null, "decided": "in" | "out" | "unsure", "why": one short sentence on what you read, "url": the page you read it on or null}. Never guess: "unsure" when the sources don\'t settle it.';
+const READ = 'Read the official rules and quote them. For each value give the number, the section and the page URL you read it on, quoting the words; say NOT FOUND for what isn\'t there. Never guess and never give a number you didn\'t read. Plain text, no markdown.';
+export const RULES_SCHEMA = { type: 'object', additionalProperties: false, required: ['jurisdiction', 'summary', 'values'], properties: {
+  jurisdiction: { type: 'object', additionalProperties: false, required: ['name', 'kind'], properties: { name: str('Whose rules these are: "City of Katy", "Houston ETJ in Waller County", "Waller County".'), kind: { type: 'string', enum: ['city', 'county', 'etj'] } } },
+  summary: str('Two or three sentences: which documents were read (and their dates), which way the ETJ was decided and why, and what wasn\'t found.'),
+  values: { type: 'array', description: 'One per value found in the research; leave out what wasn\'t found.', items: { type: 'object', additionalProperties: false, required: ['field', 'value', 'choice', 'url', 'cite', 'quote', 'sure'], properties: {
+    field: { type: 'string', enum: RS.KEYS, description: RS.FIELDS.map(f => f.k + ' = ' + f.label + (f.unit ? ' (' + f.unit + ')' : '')).join('; ') },
+    value: nul('number', { description: 'The number, in the field\'s unit (null for sidewalk).' }), choice: nul('string', { enum: ['both', 'one', 'none', null], description: 'sidewalk only: which sides of a local street.' }),
+    url: nul('string', { description: 'The page it was read on, exactly as the research gave it; null when none.' }), cite: nul('string', { description: 'Its section, e.g. "§4.2.2" or "Appendix E §5".' }), quote: nul('string', { description: 'The words quoted, at most 200 characters.' }),
+    sure: { type: 'boolean', description: 'true only when the research read and quoted it from that page; false for anything inferred, from a summary, or unclear.' } } } } } };
+export const RULES_SYSTEM = `You turn research notes on a Texas city's or county's subdivision and development rules and its drainage criteria into a rule sheet for a site-planning tool. The values: ` + RS.FIELDS.map(f => f.k + ' (' + f.label + (f.unit ? ', ' + f.unit : '') + ')').join(', ') + `.
+- Take values only from the research notes. sure is true only when the notes quote the text from a page; anything inferred, summarised or unclear is sure false. Never invent a URL: use only the URLs the notes give.
+- Right-of-way and pavement: a local (residential) street and a collector. Longest block and cul-de-sac (to the end of the bulb), the bulb's right-of-way and pavement radius. Intersection spacing (centre to centre on one street; on a collector). Driveway spacing and corner clearance (a driveway from an intersection). Sidewalks: which sides of a local street (both, one, none) and the width. Smallest lot (sq ft) and frontage (ft at the right-of-way line), the front building line and the side building line on a street. Detention: acre-feet per acre of development (convert a rate in inches of runoff: inches / 12). Second way in: the number of lots over which a second entrance is required.
+- In a city's ETJ, streets and lots follow the city's subdivision rules and drainage follows the county's or the drainage district's. Say in the summary which way the ETJ was decided and on what.
+- Leave out what the notes don't give. Never claim compliance; this is a reading of the code for an engineer to confirm.`;
+const ETJ_NONE = why => ({ etj: null, decided: 'unsure', why, url: null });
+async function rules(b, key, res) {
+  const j = b.jurisdiction && typeof b.jurisdiction === 'object' ? b.jurisdiction : {}, county = clip(String(j.county || '').replace(/\s+county$/i, ''), 60).trim(), city = j.city ? clip(String(j.city), 60).trim() : null;
+  if (!county) return res.status(400).json({ error: 'The county the site is in isn’t known yet: open the project’s Jurisdiction box first.' });
+  const water = (Array.isArray(j.districts) ? j.districts : []).slice(0, 6).map(d => typeof d === 'string' ? { name: clip(d, 80), type: /drainage/i.test(d) ? 'drainage district' : '' } : { name: clip(d?.name, 80), type: clip(d?.type, 60) }).filter(d => d.name);
+  const where = [clip(j.address, 160), Number.isFinite(+j.lat) && Number.isFinite(+j.lon) && j.lat != null && j.lon != null ? (+j.lat).toFixed(5) + ', ' + (+j.lon).toFixed(5) : ''].filter(Boolean).join(' · '), known = new Set((Array.isArray(b.known) ? b.known : []).map(String).slice(0, 500));
+  res.setHeader('Cache-Control', 'no-store'); const t0 = Date.now(), by = t0 + 150000, end = t0 + 270000; // (the reads done by 150 s, the answer by 270 s: always inside the function's 300 s, so a slow read still answers with the stand-in sheet)
+  // 1. the ETJ (no city limits round it): the AI decides, and the sheet says which way
+  let etj = null; if (!city) { try { const r = await webSearch(key, 'Is this site in the extraterritorial jurisdiction (ETJ) of a city? ' + (where || 'A site') + ' in ' + county + ' County, Texas (outside any city limits).', '', true, ETJ, { maxTokens: 1500, size: 'medium', by: t0 + 50000 }); const d = RS.parseEtj(r.answer); etj = d ? { city: d.etj, decided: d.decided, why: d.why, url: d.url || r.sources[0]?.url || null } : ETJ_NONE('The ETJ answer couldn’t be read: treated as not in one.'); } catch (e) { console.error('siteplan rules etj', e.message); etj = ETJ_NONE('The ETJ check didn’t answer: treated as not in one.'); } }
+  const jur = RS.jurisdictionOf({ county, place: city ? { name: city } : null, water }, etj), base = { key: jur.key, name: jur.name, kind: jur.kind, etj };
+  if (known.has(jur.key) && !b.refresh) return res.json({ ...base, cached: true });
+  // 2. the research: the subdivision rules (the city's in an ETJ) and the drainage criteria, read in parallel
+  const who = jur.kind === 'county' ? county + ' County, Texas' : jur.city + ', Texas' + (jur.kind === 'etj' ? ' (its extraterritorial jurisdiction, in ' + county + ' County)' : ''), dd = jur.dd ? ' and the ' + jur.dd : '';
+  const q = [['Subdivision and development regulations of ' + who + ': street right-of-way and pavement widths for local and collector streets, maximum block length, maximum cul-de-sac length and bulb radius, intersection and driveway spacing, corner clearance, sidewalk requirement and width, minimum lot size and frontage, building lines, and when a second entrance is required.', 'municode or the official code of ordinances, or the county subdivision regulations PDF'],
+    ['Drainage criteria manual for ' + county + ' County, Texas' + dd + ': required detention storage rate (acre-feet per acre) for new residential subdivisions.', 'the county flood control or drainage district criteria manual']];
+  const reads = await Promise.allSettled(q.map(([text, near]) => webSearch(key, text, near, true, READ, { maxTokens: 5000, size: 'medium', timeout: 120000, by })));
+  const got = reads.filter(r => r.status === 'fulfilled' && r.value.answer).map(r => r.value), sources = got.flatMap(r => r.sources.map(x => x.url));
+  if (!got.length) { console.error('siteplan rules search', reads.map(r => r.reason?.message).join('; ')); return res.json({ sheet: RS.standIn({ ...base, why: 'The web search didn’t answer.' }) }); }
+  // 3. structured: each value with its page, section, quote and sure flag (lib/rulesheet.mjs sheetFrom checks the pages)
+  try {
+    const user = JSON.stringify({ jurisdiction: { name: jur.name, kind: jur.kind, county, city: jur.city, etj }, notes: got.map((r, i) => ({ topic: i ? 'drainage' : 'subdivision rules', text: clip(r.answer, 12000), sources: r.sources.map(x => ({ title: x.title, url: x.url })) })) });
+    let tm = null; const late = new Promise((_, no) => { tm = setTimeout(() => no(new Error('out of time')), Math.max(1000, end - Date.now())); });
+    const call = ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: RULES_SYSTEM, user, name: 'rule_sheet', schema: RULES_SCHEMA, maxTokens: 8000, effort: 'low' })); call.catch(() => {}); // (one that answers after the stand-in has gone: dropped)
+    const r = await Promise.race([call, late]).finally(() => clearTimeout(tm));
+    return res.json({ sheet: RS.sheetFrom(r.data, { ...base, sources }) });
+  } catch (e) { console.error('siteplan rules', e.message); return res.json({ sheet: RS.standIn({ ...base, why: 'The AI couldn’t read the code just now.' }) }); }
+}
+
+// ---------- street names from a theme (lib/streetnames.mjs) ----------
+// POST { mode: 'streetNames', theme, community, site, streets: [{ id, kind, lengthFt }], avoid: [names], current: [names] }
+//   -> { theme, names: [{ id, base, suffix }] } (checked: a base a street here or nearby has already, or a suffix its kind
+// doesn't take, is replaced from the plain list)
+export const STREETNAMES_SCHEMA = { type: 'object', additionalProperties: false, required: ['theme', 'names'], properties: {
+  theme: str('The theme followed, in a few words ("golf", "Texas rivers").'),
+  names: { type: 'array', description: 'One per street given.', items: { type: 'object', additionalProperties: false, required: ['id', 'base', 'suffix'], properties: { id: str('The street\'s id as given.'), base: str('The name without its suffix: one or two short words.'), suffix: { type: 'string', enum: SUFFIXES } } } } } };
+export const STREETNAMES_SYSTEM = `You name the streets of a planned neighbourhood in the Houston region for a site-planning tool.
+- Follow the theme given; with none, pick one that suits the community's name and the place (its creeks, prairie, trees, history) and say it in theme.
+- Grander names for the boulevard and the collectors (suffix Parkway or Boulevard, a collector may be a Drive); the local streets Lane, Way, Drive or Trail; the cul-de-sacs (kind court) Court or Circle.
+- No two streets share a base name or one that sounds alike (Oak and Oaks, Lake and Lakes), and none is in avoid (the streets nearby): 911 addressing refuses duplicates.
+- Short, easy to say and to spell over the phone: one or two words, no numbers, no directions (North, East).
+- No trademarks and no real people's full names.`;
+async function streetNames(b, key, res) {
+  const streets = (Array.isArray(b.streets) ? b.streets : []).slice(0, 120).map(x => ({ id: clip(String(x?.id ?? ''), 40), kind: ['boulevard', 'entry', 'collector', 'local', 'court'].includes(x?.kind) ? x.kind : 'local', lengthFt: Math.max(0, Math.round(num(x?.lengthFt) || 0)) })).filter(x => x.id);
+  if (!streets.length) return res.status(400).json({ error: 'No streets to name.' });
+  const avoid = (Array.isArray(b.avoid) ? b.avoid : []).slice(0, 150).map(n => clip(String(n), 40)).filter(Boolean), theme = clip(b.theme, 120).trim();
+  try {
+    const r = await ai(key, b, res, m => chatJSON({ key, model: m, feature: 'siteplan', system: STREETNAMES_SYSTEM, user: JSON.stringify({ theme: theme || null, community: clip(b.community, 60) || null, site: JSON.parse(siteText(b.site, '', null, null)).site, streets, avoid, current: (Array.isArray(b.current) ? b.current : []).slice(0, 120).map(n => clip(String(n), 40)) }), name: 'street_names', schema: STREETNAMES_SCHEMA, maxTokens: 6000, effort: 'low' }));
+    const ok = namesFor(streets.map(x => ({ key: x.id, role: x.kind, L: x.lengthFt })), r.data?.names || [], { avoid });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ theme: clip(r.data?.theme || theme, 120), names: [...ok].map(([id, n]) => { const w = n.split(' '); return { id, base: w.slice(0, -1).join(' '), suffix: w[w.length - 1] }; }) });
+  } catch (e) { console.error('siteplan streetNames', e.message); return res.status(502).json({ error: 'The AI didn’t answer just now.' }); }
 }
 
 // ---------- questions about the open plan ----------

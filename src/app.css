@@ -4011,3 +4011,17 @@ html.sp-dragging,html.sp-dragging *{cursor:var(--cur-grabbing,grabbing)!importan
 .sp-tl-h{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}.sp-tl-h b{font-size:13px}.sp-tl small{font-size:11px;color:var(--muted);line-height:1.35}
 .sp-tl-h input{font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line-2);border-radius:4px;background:var(--panel);color:var(--text);min-width:0;flex:1}
 .sp-tl-a{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+/* street rules by location (Settings › Street rules) and a street of a neighbourhood (Selected) */
+#card .sp-rules .sp-prm-a{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+#card .sp-rrow{display:grid;grid-template-columns:minmax(0,1.15fr) 104px minmax(0,1fr);gap:4px 8px;align-items:center;padding:5px 0;border-top:1px solid var(--line-2)}
+#card .sp-rrow .sp-rl{font-size:12.5px;line-height:1.3}
+#card .sp-rrow select{width:100%}
+#card .sp-rrow .sp-rs{display:flex;flex-wrap:nowrap;align-items:center;gap:4px 6px;font-size:12px;color:var(--muted);min-width:0}
+#card .sp-rrow .sp-rs a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;flex:0 1 auto;min-width:0}
+#card .sp-rrow .sp-rs .sp-rchip,#card .sp-rrow .sp-rs .btn{flex:none}
+#card .sp-rrow .sp-ctl{width:104px;min-width:0;max-width:104px}#card .sp-rrow .sp-ctl input{width:100%;min-width:0}
+#card .sp-rchip{font:600 10.5px/18px var(--font-display);border-radius:var(--r-pill);padding:0 7px;white-space:nowrap;color:var(--amber);background:color-mix(in srgb,var(--amber) 14%,transparent)}
+#card .sp-rchip.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+#card .sp-net .btnrow{display:flex;flex-wrap:wrap;gap:6px}
+@media (max-width:420px){#card .sp-rrow{grid-template-columns:minmax(0,1fr) 96px}#card .sp-rrow .sp-ctl{width:96px;max-width:96px}#card .sp-rrow .sp-rs{grid-column:1/-1}}
+#card .sp-net .btnrow .btn{width:auto;flex:0 0 auto}

@@ -195,7 +195,8 @@ const streets = els => JSON.stringify(els.filter(e => e.kind === 'drive' && e.ne
   const long = { ...site, elements: [entry, st('A', [[-650, -800], [650, -800]]), st('B', [[-650, -786], [-650, 886]]), st('C', [[650, -786], [650, 886]]), st('D', [[-650, 900], [650, 900]])], recipe: { net: {} } };
   assert.deepEqual(N.netRules(long).map(i => i.text), ['A block on B runs 1,672 ft (longest 1,400 ft)', 'A block on C runs 1,672 ft (longest 1,400 ft)'], 'blocks of 1,672 ft on B and C: warned');
   const cul = { ...site, elements: [entry, st('A', [[-400, -800], [400, -800]]), st('B', [[150, -786], [150, 214]]), { id: 'b', kind: 'drive', poly: S.ringDisc([150, 214], 42, 32), bulb: true, net: 'b', note: 'Cul-de-sac · 84 ft', x: 150, y: 214, w: 84, d: 84 }] };
-  assert.deepEqual(N.netRules(cul).map(i => i.text).filter(t => /cul-de-sac/.test(t)), ['A cul-de-sac runs 1042 ft (longest 800 ft)'], 'a 1,000 ft cul-de-sac: warned');
+  assert.deepEqual(N.netRules(cul).filter(i => i.kind === 'cul').map(i => i.text), ['A cul-de-sac runs 1042 ft (longest 800 ft)'], 'a 1,000 ft cul-de-sac: warned');
+  assert.deepEqual(N.netRules(cul).filter(i => i.kind === 'dead').map(i => i.text.match(/^A ends (\d+) ft past/)?.[1]).sort(), ['250', '400'], 'A’s two ends, 250 and 400 ft past B with no turnaround: dead ends');
   const close = { ...site, elements: [entry, st('A', [[-900, -800], [900, -800]]), st('B', [[-300, -786], [-300, -100]]), st('C', [[-220, -786], [-220, -100]]), st('D', [[-300, -100], [-220, -100]])] };
   assert.ok(N.netRules(close).some(i => /meet A 80 ft apart/.test(i.text)), 'two T’s 80 ft apart: warned');
   assert.equal(N.streetRules({ params: { streetRules: { culMax: 600 } } }).culMax, 600); assert.equal(N.streetRules({ params: { streetRules: { culMax: 5, blockMax: 'x', bulbR: 900 } } }).culMax, 300, 'held to its range'); assert.equal(N.streetRules({ params: { streetRules: { blockMax: 'x' } } }).blockMax, 1400); assert.equal(N.streetRules({ params: { streetRules: { bulbR: 900 } } }).bulbR, 60); }
@@ -214,5 +215,148 @@ const streets = els => JSON.stringify(els.filter(e => e.kind === 'drive' && e.ne
 { const API = await import('../api/siteplan.js'), txt = JSON.stringify(API); assert.ok(/'network'|"network"/.test(JSON.stringify(Object.values(API).filter(v => v && typeof v === 'object'))), 'network in the schemas');
   const walk = (o, f) => { if (o && typeof o === 'object') { f(o); for (const v of Object.values(o)) walk(v, f); } }; let n = 0; for (const v of Object.values(API)) walk(v, o => { if (o.properties?.streets?.enum) { n++; assert.deepEqual(o.properties.streets.enum, ['curved', 'network', 'wave', 'straight', null]); assert.equal(o.additionalProperties, false); } });
   assert.ok(n >= 1 && txt.length > 0, 'the streets setting in the schemas'); }
+
+
+// ---- 10. the street network edited by hand (phase 4b, lib/streetedit.mjs): a cul-de-sac, a bow, a point dragged by a
+// junction, a stretch deleted, a block laid out again; the lots re-flow along the changed streets, the rest stays ----
+const SE = await import('../lib/streetedit.mjs'), SN = await import('../lib/streetnames.mjs'), RS = await import('../lib/rulesheet.mjs');
+const key = h => Math.round(h.x) + ',' + Math.round(h.y), staying = (h0, h1, near) => { const a = homes(h0).filter(h => !near([h.x, h.y])), s1 = new Set(homes(h1).map(key)); return { moved: a.filter(h => !s1.has(key(h))).length, of: a.length }; };
+const edited = (els, what, o = {}) => { // every drive and home reached, lots clear, no bad check, no street running into another
+  const R = reachedAll(els); assert.deepEqual(R.D.filter(d => !R.seen.has(d.id)).map(d => d.name || d.note), [], what + ': every drive reached from a way in'); assert.deepEqual(offStreet(els, R), [], what + ': every home on a reached street');
+  assert.deepEqual(lotIssues(els), [], what + ': lots clear'); assert.deepEqual(S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text), [], what + ': no bad check'); assert.deepEqual(N.clashes(els), [], what + ': no street runs into another');
+  const extra = N.netRules({ ...base, elements: els }).filter(i => !(o.allow || []).includes(i.kind)); assert.deepEqual(extra.map(i => i.text), [], what + ': within the street rules'); };
+const chains = N.chainsOf(base), court = chains.filter(c => c.role === 'court' && !c.cyc && c.ends.every(e => e?.kind === 'bulb') && c.tees).sort((a, b) => b.L - a.L)[0];
+assert.ok(chains.length > 10 && chains.some(c => c.role === 'collector' && c.cyc) && chains.some(c => c.role === 'boulevard'), 'the streets as named things: a loop road, a boulevard in');
+assert.ok(court, 'a cul-de-sac street with streets meeting it along it');
+{ // a dead end made a cul-de-sac: its bulb gone first (a street that ends in nothing)
+  const bl = court.bulbs[1], p0 = { ...base, elements: base.elements.filter(e => e.id !== bl) }; assert.ok(N.chainsOf(p0).find(c => c.ids.includes(court.ids[0])).ends.some(e => e.kind === 'free'), 'its end is a dead end now');
+  assert.ok(!N.netRules(base).some(i => i.kind === 'dead'), 'no dead end on the plan as laid');
+  const r = SE.culDeSac(p0, court.ids[0]); assert.ok(!r.error, r.error); assert.match(r.note, /ends in a cul-de-sac now/);
+  const f = L.refit({ ...base, elements: r.elements }, { amount: 'current' }), end = f.elements.find(e => e.id === r.bulb);
+  assert.ok(end?.bulb && f.recipe.net.discs.some(d => d.id === end.net), 'the bulb drawn, and a disc of the network now'); edited(f.elements, 'a cul-de-sac made', { allow: ['cul'] });
+  const near = q => dist(q, [end.x, end.y]) < 400, st = staying(base.elements, f.elements, near); assert.ok(st.moved <= st.of * 0.02, 'homes away from it stay: ' + st.moved + ' of ' + st.of + ' moved');
+  const f2 = L.refit({ ...base, elements: f.elements, recipe: f.recipe }, { amount: 'current' }); assert.ok(f2.elements.some(e => e.id === r.bulb && e.bulb), 'the bulb kept by a second re-fit'); assert.equal(homes(f2.elements).length, homes(f.elements).length, 'and every home'); }
+{ // a street T-ing in at both ends (a loop lane opened up by deleting a piece) ends at its far end; nothing is cut off
+  const lp = chains.filter(c => c.role === 'local' && c.cyc).sort((a, b) => b.L - a.L)[0], p0 = { ...base, elements: base.elements.filter(e => e.id !== lp.ids[3]) }, c0 = N.chainsOf(p0).find(c => c.ids.includes(lp.ids[0]));
+  assert.deepEqual(c0.ends.map(e => e.kind), ['tee', 'tee'], 'the loop lane opened: a T at each end');
+  const r = SE.culDeSac(p0, lp.ids[0]); assert.ok(!r.error, r.error); const f = L.refit({ ...base, elements: r.elements }, { amount: 'current' }); edited(f.elements, 'a through street ended', { allow: ['cul', 'dead'] });
+  const dd = N.netRules({ ...base, elements: f.elements, recipe: f.recipe }).filter(i => i.kind === 'dead'); assert.ok(dd.every(i => !lp.ids.includes(i.id) && !/^\d/.test(i.text)), 'a dead end only where a street met the piece deleted (the checks say so), not the street ended: ' + dd.map(i => i.text).join('; '));
+  const R = reachedAll(f.elements); assert.ok(f.elements.filter(e => e.kind === 'drive' && e.net).every(e => R.seen.has(e.id)), 'nothing cut off'); }
+{ // the only way to the streets beyond: refused (the main street of a narrow site, the street across its end beyond it)
+  const sp = L.netOnly(narrow, { use: 'sfr' }, { netKinds: ['spine'], count: 1 })[0], ps = { ...narrow, elements: sp.elements, recipe: sp.recipe, program: sp.program }, ms = N.chainsOf(ps).find(c => c.label === 'Main street');
+  assert.match(SE.culDeSac(ps, ms.ids[0]).error || '', /only way to the streets beyond it/, 'the only link: refused');
+  // the main street curved (a spine: it bows; the loop road of Waller is a loop: refused, with why)
+  const b = SE.bendStreet(ps, ms.ids[0], null); assert.ok(!b.error, b.error); const f = L.refit({ ...ps, elements: b.elements }, { amount: 'current' }); assert.deepEqual(lotIssues(f.elements), [], 'the main street curved: its lots clear'); assert.deepEqual(N.clashes(f.elements), [], 'and no street runs into another');
+  assert.match(SE.bendStreet(base, chains.find(c => c.role === 'collector' && c.cyc).ids[0]).error, /loop/, 'a loop road: refused, and why');
+  // a stretch of it deleted: refused when it's the only way to the streets beyond, else nothing is cut off
+  const mp = ps.elements.find(e => e.id === ms.ids[0]).path, cs = SE.cutStretch(ps, ms.ids[0], mp[Math.floor(mp.length / 3)]);
+  if (cs.error) assert.match(cs.error, /only way to the streets beyond it/); else assert.ok(!L.refit({ ...ps, elements: cs.elements }, { amount: 'current' }).notes.some(t => /no longer reach/.test(t)), 'a stretch deleted: nothing cut off'); }
+{ // a street with T's along it bowed 60 ft: every street that met it still does; homes away from it stay
+  const b = SE.bendStreet(base, court.ids[0], 60); assert.ok(!b.error, b.error); assert.equal(b.curve, 60);
+  const f = L.refit({ ...base, elements: b.elements }, { amount: 'current' }), c1 = N.chainsOf({ ...base, elements: f.elements }).find(c => c.ids.includes(court.ids[0]));
+  assert.equal(c1.tees, court.tees, 'every street that met it still meets it'); edited(f.elements, 'a street bowed');
+  const was = base.elements.find(e => e.id === court.ids[0]).path, st = staying(base.elements, f.elements, q => was.some(p => dist(p, q) < 400)); assert.ok(st.moved <= st.of * 0.02, 'homes away from it stay: ' + st.moved + ' of ' + st.of);
+  const big = SE.bendStreet(base, court.ids[0], 400); assert.ok(big.error || Math.abs(big.curve) < 400, 'a bow into the next street: refused or less: ' + (big.error || big.curve)); }
+{ // a point dragged 30 ft by a junction: the street T-ing in there comes along (carryTees) and the next block stays
+  const dr = base.elements.find(e => e.id === court.ids[0]), P = dr.path, m = N.measured(P), part = court.parts.find(x => x.id === dr.id), j = court.J.map(a => part.rev ? part.L - (a - part.off) : a - part.off).find(a => a > 60 && a < m.L - 60);
+  const k = P.reduce((b, q, i) => Math.abs(m.c[i] - j - 20) < Math.abs(m.c[b] - j - 20) ? i : b, 0), t = m.tan(m.c[k]), nrm = [-t[1], t[0]], after = P.map((q, i) => { const f = Math.max(0, 1 - Math.abs(m.c[i] - m.c[k]) / 80); return [q[0] + nrm[0] * 30 * f, q[1] + nrm[1] * 30 * f]; });
+  let els = base.elements.map(e => e.id === dr.id ? { ...e, path: after, pinned: true } : e); els = SE.carryTees(els, dr.id, P, after);
+  assert.ok(els.some((e, i) => e !== base.elements[i] && e.id !== dr.id), 'the street T-ing in there carried along'); assert.deepEqual(SE.teesLost(base, { ...base, elements: els }, dr.id), [], 'its own ends still meet');
+  const f = L.refit({ ...base, elements: els }, { amount: 'current' }), c1 = N.chainsOf({ ...base, elements: f.elements }).find(c => c.ids.includes(dr.id)); assert.equal(c1.tees, court.tees, 'the T holds');
+  edited(f.elements, 'a point dragged by a junction'); const st = staying(base.elements, f.elements, q => dist(q, P[k]) < 400); assert.ok(st.moved <= st.of * 0.02, 'the next block’s homes stay: ' + st.moved + ' of ' + st.of); }
+{ // a stretch deleted between two junctions: its homes go, the rest stay reached and clear
+  const dr = base.elements.find(e => e.id === court.ids[0]), r = SE.cutStretch(base, dr.id, dr.path[Math.floor(dr.path.length / 2)]); assert.ok(!r.error, r.error); assert.match(r.note, /^Deleted a \d+ ft stretch/);
+  const f = L.refit({ ...base, elements: r.elements }, { amount: 'current' }); assert.ok(homes(f.elements).length < homes(base.elements).length, 'its homes go'); edited(f.elements, 'a stretch deleted');
+  assert.ok(!f.notes.some(t => /no longer reach/.test(t)), 'nothing cut off'); assert.match(SE.cutStretch(base, chains.find(c => c.role === 'local' && !c.cyc && !c.tees).ids[0], [0, 0]).error, /No streets meet/, 'a street with nothing meeting it: delete it whole'); }
+{ // a block laid out again: the streets outside it as they were, its own another way; k: 2 a third way
+  const H = homes(base.elements), mid = H.reduce((m, h) => [m[0] + h.x / H.length, m[1] + h.y / H.length], [0, 0]), at = H.slice().sort((a, b) => dist([a.x, a.y], mid) - dist([b.x, b.y], mid))[0];
+  const t0 = Date.now(), r1 = L.netEdit(base, { op: 'relay', at: [at.x, at.y], k: 1 }), ms = Date.now() - t0; assert.ok(!r1.error, r1.error); assert.match(r1.notes[0], /^Laid the block’s streets out again: \d+ homes \(\d+ before\)\.$/);
+  const keys = els => new Set(els.filter(e => e.kind === 'drive' && e.net && e.path).map(e => e.net + '|' + JSON.stringify(e.path))), k0 = keys(base.elements), k1 = keys(r1.elements), gone = [...k0].filter(x => !k1.has(x)), added = [...k1].filter(x => !k0.has(x));
+  assert.ok(gone.length && added.length, 'its streets laid out another way'); const kept = base.recipe.net.streets.filter(s => !gone.some(g => g.startsWith(s.id + '|'))), ids1 = new Set(r1.recipe.net.streets.map(s => s.id));
+  assert.ok(kept.length > 5 && kept.every(s => ids1.has(s.id)), 'the streets outside it as they were'); assert.ok(r1.recipe.net.streets.filter(s => s.role === 'coll').every(s => base.recipe.net.streets.some(o => o.id === s.id && JSON.stringify(o.path) === JSON.stringify(s.path))), 'the collectors as they were');
+  edited(r1.elements, 'a block re-laid'); const inside = q => S.inRing(q, r1.block) || r1.block.some((p, i) => S.segDist(q, p, r1.block[(i + 1) % r1.block.length]) < 20); // (in the block, its outline from the collectors' pavement edges)
+  const st = staying(base.elements, r1.elements, inside); assert.ok(st.moved <= st.of * 0.02, 'homes outside the block stay: ' + st.moved + ' of ' + st.of);
+  // and it holds: the next re-fit (an edit anywhere) leaves every home outside the block where it was, and the count (the
+  // far side of the loop road keeps the junctions its lots ran between before)
+  const f1 = L.refit({ ...base, elements: r1.elements, recipe: r1.recipe }, { amount: 'current' }), sf = staying(base.elements, f1.elements, inside); assert.equal(sf.moved, 0, 'a re-fit after: homes outside the block stay (' + sf.moved + ' of ' + sf.of + ' moved)'); assert.equal(homes(f1.elements).length, homes(r1.elements).length, 'and the count');
+  const r2 = L.netEdit(base, { op: 'relay', at: [at.x, at.y], k: 2 }); assert.ok(!r2.error, r2.error); const k2 = keys(r2.elements); assert.ok([...k2].some(x => !k1.has(x) && !k0.has(x)), 'k: 2, a third way'); edited(r2.elements, 'a block re-laid a third way');
+  console.log('re-lay a block: ' + ms + ' ms; ' + r1.notes[0] + ' / ' + r2.notes[0]); }
+
+// ---- 11. Change With AI on the streets (offline words and the schemas) ----
+{ const sel = court.ids[0], G = t => E.guessEdits(t, base, sel);
+  assert.deepEqual(G('make this street a cul-de-sac'), [{ action: 'culdesac', target: court.key }]); assert.deepEqual(G('curve the main street').map(o => o.action), ['bend']); assert.equal(G('curve the main street')[0].target, chains.find(c => c.label === 'Spine road').key, 'the main street: the spine');
+  assert.deepEqual(G('re-lay this pod'), [{ action: 'relay', target: sel }]); assert.deepEqual(G('rename the streets with a golf theme'), [{ action: 'streetNames', on: true, theme: 'golf' }]); assert.deepEqual(G('turn off street names'), [{ action: 'streetNames', on: false, theme: '' }]);
+  assert.deepEqual(G('call the loop road Heritage Parkway'), [{ action: 'change', target: chains.find(c => c.label === 'Loop road').key, street: 'Heritage Parkway' }]); assert.deepEqual(G('make the streets curvy'), [{ action: 'streets' }], 'a new street pattern: still New Layouts');
+  assert.deepEqual(G('bend this street 80 ft to the right'), [{ action: 'bend', target: court.key, curve: -80 }]); assert.deepEqual(G('delete this street'), [{ action: 'remove', target: court.key }]);
+  const d = E.describePlan(base, sel); assert.ok(d.streets.length >= 10 && d.streets.some(x => x.selected && x.id === court.key), 'the AI sees the streets, the selected one marked'); assert.deepEqual(d.streetNames, { on: false, theme: '' });
+  // culdesac and bend end to end, then the re-fit
+  const a = E.applyEdits(base, [{ action: 'bend', target: court.key, curve: 50 }, { action: 'culdesac', target: chains.find(c => c.label === 'Spine road').key }]); assert.equal(a.skipped.length, 0, a.skipped.join(' ')); assert.equal(a.done.length, 2);
+  const f = L.refit({ ...base, elements: a.elements }, { amount: 'current' }); edited(f.elements, 'Change With AI on the streets', { allow: ['cul'] });
+  const rm = E.applyEdits(base, [{ action: 'remove', target: court.key }]); assert.ok(!rm.elements.some(e => court.ids.includes(e.id) || court.bulbs.includes(e.id)), 'remove on a street: all of it and its cul-de-sacs');
+  assert.deepEqual(E.applyEdits(base, [{ action: 'relay', target: sel }]).blocks.length, 1, 'relay on a neighbourhood: its block, run by the caller');
+  const API = await import('../api/siteplan.js'), it = API.EDIT_SCHEMA.properties.ops.items; for (const k of ['curve', 'end', 'street']) assert.ok(it.required.includes(k) && it.properties[k], 'the op schema has ' + k);
+  assert.ok(it.properties.action.enum.includes('culdesac') && it.properties.action.enum.includes('bend')); assert.ok(API.EDIT_SCHEMA.required.includes('streetNames') && API.EDIT_SCHEMA.properties.streetNames.required.join() === 'on,theme'); }
+{ // a court (a bulb at one end, a T at the other) is a cul-de-sac already; "re-lay this block" with the loop road and no
+  // click can't tell which block; a dead end left by an edit stays in the checks after the re-fit; a lot round a bulb is
+  // measured for its frontage; a street named by hand only switches the names on; street names need subdivision streets
+  const tb = chains.find(c => c.role === 'court' && !c.cyc && c.ends.some(e => e?.kind === 'bulb') && c.ends.some(e => e?.kind === 'tee'));
+  assert.ok(tb, 'a court with a T at its other end'); assert.match(SE.culDeSac(base, tb.ids[0]).error || '', /already ends in a cul-de-sac/);
+  const loop = chains.find(c => c.role === 'collector' && c.cyc), rl = E.applyEdits(base, [{ action: 'relay', target: loop.key }]); assert.equal(SE.blockAt(base, loop.key), null); assert.equal(rl.blocks.length, 0); assert.match(rl.skipped[0] || '', /runs between blocks/);
+  let dead = null; for (const c of chains.filter(c => c.role === 'local' && !c.cyc && c.parts.length === 1)) { const e = c.ends.find(x => x?.kind === 'tee' && x.id === c.ids[0]), dr = e && base.elements.find(x => x.id === e.id); if (!dr) continue;
+    const m = N.measured(dr.path), P = e.k ? dr.path.filter((q, i) => m.c[i] < m.L - 30).concat([m.at(m.L - 30).p]) : [m.at(30).p].concat(dr.path.filter((q, i) => m.c[i] > 30)), p0 = { ...base, elements: base.elements.map(x => x.id === dr.id ? { ...x, path: P, pinned: true } : x) };
+    if (N.netRules(p0).some(i => i.kind === 'dead')) { dead = p0; break; } }
+  assert.ok(dead, 'a street’s end pulled off its junction: a dead end in the checks'); const fd = L.refit(dead, { amount: 'current' }); assert.ok(N.netRules({ ...base, elements: fd.elements, recipe: fd.recipe }).some(i => i.kind === 'dead'), 'and still after the re-fit');
+  const code = RS.codeParams(RS.WALLER), wide = N.codeRules({ ...base, params: { code: { ...code, streetRules: { ...code.streetRules, minLotW: 200 } } } }).find(i => i.kind === 'frontage');
+  assert.equal(+wide.text.match(/^\d+/)[0], base.elements.filter(e => e.kind === 'lot').length, 'every lot measured, those round the bulbs too');
+  const nm = E.applyEdits(base, [{ action: 'change', target: loop.key, street: 'Heritage Parkway' }]); assert.deepEqual(nm.named, ['Heritage Parkway']); assert.ok(nm.streetNames?.on && nm.streetNames.hand, 'names switched on, none given anew');
+  assert.match(E.applyEdits({ ...base, recipe: null }, [{ action: 'streetNames', on: true, theme: 'golf' }]).skipped[0] || '', /own streets/, 'no subdivision streets: said so'); }
+
+// ---- 12. a rule sheet: the generator follows it (pentagon, 110 acres) ----
+{ const sheet = RS.sheetFrom({ values: Object.entries({ localRow: 60, localPave: 28, frontBL: 25, minLotW: 50, minLotSf: 6000, culMax: 600, blockMax: 1200, bulbR: 50, bulbRow: 70, secondAt: 50, detention: 0.65 }).map(([field, value]) => ({ field, value, url: 'https://code.example.gov/sub', sure: true })) }, { key: 'county:test', name: 'Test County', kind: 'county', sources: ['https://code.example.gov/sub'] }), code = RS.codeParams(sheet);
+  const site = { ...pentagon, params: { code } }, t0 = Date.now(), o = L.netOnly(site, { use: 'sfr' }, { count: 1, netBudgetMs: 12000 })[0], ms = Date.now() - t0, plan = { ...site, elements: o.elements, recipe: o.recipe, program: o.program };
+  console.log('pentagon with a rule sheet: ' + homes(o.elements).length + ' homes (' + runs.pentagon.nets[0].elements.filter(e => e.kind === 'building' && e.use === 'sfr').length + ' with typical rules) in ' + ms + ' ms');
+  const loc = o.recipe.net.streets.filter(s => s.role !== 'coll'); assert.ok(loc.length && loc.every(s => s.row === 60), 'local streets: a 60 ft right-of-way');
+  const locD = o.elements.filter(e => e.kind === 'drive' && e.net && e.path && !e.coll), lots = o.elements.filter(e => e.kind === 'lot');
+  assert.ok(lots.every(l => l.poly.every(q => locD.every(d => d.path.every((a, i) => !i || S.segDist(q, d.path[i - 1], a) >= 29.5)))), 'no lot within 30 ft of a local street’s centre line');
+  assert.deepEqual(N.netRules(plan).map(i => i.text), [], 'within the sheet: lots 50 ft wide at the front and 6,000 sq ft, homes 25 ft back, bulbs and blocks and cul-de-sacs as it says');
+  assert.ok(o.recipe.net.discs.length && o.recipe.net.discs.every(d => d.R === 50), 'bulbs of 50 ft'); assert.ok(o.notes.some(t => /^Street rules: Test County rule sheet \(\d+ values still to confirm; Waller defaults stand in for \d+\)/.test(t)), 'the notes say which rules, and what’s still to confirm');
+  const need = S.stormNeed(S.ringArea(pentagon.ring) / 43560, site.params, o.program), need0 = S.stormNeed(S.ringArea(pentagon.ring) / 43560, {}, o.program); assert.ok(Math.abs(need.volume / need0.volume - 0.65 / 0.55) < 1e-9, 'detention at the sheet’s rate');
+  assert.ok(S.metrics(plan).pond >= need.area * 0.9 || o.notes.some(t => /holds about/.test(t)), 'the pond sized for it');
+  const sq = { ring: [[-470, -470], [470, -470], [470, 470], [-470, 470]], front: 0, setbacks: { ...S.SETBACKS } }, ways = sa => N.contextOf({ ...sq, params: { code: { ...code, streetRules: { ...code.streetRules, secondAt: sa } } } }, { use: 'sfr' }).ways;
+  assert.deepEqual([ways(50), ways(100)], [1, 0], 'a second way in over the sheet’s count of homes (about 73 on 20 acres)'); assert.equal(N.contextOf(sq, { use: 'sfr' }).ways, 1, 'typical: over 30');
+  // a sheet's breaks shown (a home moved up to its street, a narrow lot): warnings, never a compliance claim
+  const onSt = h => { const l = lots.find(l => S.inRing([h.x, h.y], l.poly)); return l && o.elements.some(e => e.kind === 'drive' && e.path && e.net === l.on); }, h = homes(o.elements).filter(onSt)[10], els = o.elements.map(e => e.id === h.id ? { ...e, ...(m => ({ x: m[0], y: m[1] }))((() => { const l = lots.find(l => S.inRing([h.x, h.y], l.poly)), d = locD.concat(o.elements.filter(e => e.kind === 'drive' && e.coll)).find(x => x.net === l.on), q = d && N.measured(d.path).proj([h.x, h.y]).p; return q ? [h.x + (q[0] - h.x) * 0.35, h.y + (q[1] - h.y) * 0.35] : [h.x, h.y]; })()) } : e);
+  assert.ok(N.netRules({ ...plan, elements: els }).some(i => i.kind === 'bl'), 'a home moved up to its street: the building line flagged');
+  assert.ok(o.notes.some(t => /^\d+ homes: .*% on 50 ft lots/.test(t)) && !o.notes.some(t => /on 40 ft lots/.test(t)), 'the lot mix says the widths the lots have (the narrowest widened to the sheet’s 50 ft)');
+  // homes on parallel streets follow it too (the narrow tract, straight streets): their lots and right-of-way, and they say
+  // which rules they used and what they still break of it (curving rows squeeze a few lots on the inside of a bend: said)
+  const t1 = Date.now(), rw = L.layoutOptions({ ...narrow, params: { code, streets: 'straight' } }, { use: 'sfr' }, { count: 3 }).filter(x => x.style !== 'net' && homes(x.elements).length); assert.ok(rw.length, 'parallel-street layouts under the sheet');
+  for (const x of rw) { const lw = x.elements.filter(e => e.kind === 'lot').map(e => +e.note.match(/^(\d+) ×/)?.[1]); assert.ok(lw.length && lw.every(w => w >= 50), 'lots 50 ft wide or more: ' + Math.min(...lw));
+    const br = N.codeRules({ ...narrow, params: { code }, elements: x.elements }); assert.ok(x.notes.some(t => /^Street rules: Test County rule sheet/.test(t)), 'the notes say which rules'); assert.ok(br.every(b => x.notes.includes(b.text + '.')), 'and what they still break of it');
+    assert.ok(!br.some(b => ['lotsize', 'row', 'sidewalk'].includes(b.kind)), 'lots, streets and right-of-way as the sheet asks: ' + br.map(b => b.text).join('; '));
+    assert.ok(x.elements.filter(e => e.kind === 'drive' && /^Street · /.test(e.note || '')).every(d => +d.note.match(/^Street · (\d+)/)[1] >= 28), 'the sheet’s pavement'); }
+  console.log('narrow with a rule sheet, parallel streets: ' + rw.map(x => homes(x.elements).length).join(', ') + ' homes in ' + (Date.now() - t1) + ' ms'); }
+
+// ---- 13. street names ----
+{ const ch = N.chainsOf(base), m = SN.plainNames(ch, ['Oak Ln']), named = ch.filter(c => !((c.role === 'boulevard' || c.role === 'entry') && c.L < 400));
+  assert.ok(named.every(c => m.has(c.key)), 'every street named'); assert.equal(new Set([...m.values()].map(n => SN.baseOf(n).toLowerCase())).size, m.size, 'no two alike'); assert.ok(![...m.values()].some(n => /^Oak /.test(n)), 'none like a street nearby');
+  for (const c of ch) { const n = m.get(c.key); if (!n) continue; if (c.role === 'collector' || c.role === 'boulevard') assert.match(n, / (Parkway|Boulevard|Drive)$/, 'grander: ' + n); if (c.role === 'court') assert.match(n, / (Court|Circle)$/, 'a cul-de-sac street: ' + n); }
+  const a = SN.applyNames(base, m), on = { ...base, elements: a.elements, recipe: a.recipe, params: { streetNames: { on: true, theme: '' } } };
+  assert.ok(on.elements.filter(e => e.kind === 'drive' && e.net && e.path && !e.bulb).every(e => e.street), 'every street drive carries its name'); assert.ok(on.elements.filter(e => S.isEntrance(e) && e.name === 'Main entry').every(e => e.street), 'the main entry the name of the street it meets');
+  assert.ok(on.elements.every(e => !e.street || e.name !== e.street), 'names in street, never in name');
+  // re-fits keep them, a loop street broken in pieces too
+  const lp = ch.filter(c => c.role === 'local' && c.cyc).sort((x, y) => y.L - x.L)[0], f = L.refit({ ...on, elements: on.elements.filter(e => e.id !== lp.ids[2]) }, { amount: 'current' }), f2 = L.refit({ ...on, elements: f.elements, recipe: f.recipe }, { amount: 'current' });
+  for (const r of [f, f2]) { const ds = r.elements.filter(e => e.kind === 'drive' && e.net && e.path && !e.bulb); assert.ok(ds.every(e => e.street), 'the names kept by the re-fit'); assert.ok(r.elements.filter(e => lp.ids.includes(e.id)).every(e => e.street === m.get(lp.key)), 'every piece of the broken loop keeps its name'); }
+  assert.ok(f.recipe.net.streets.filter(s => !s.pseudo).every(s => s.street), 'the recipe’s streets too');
+  // the map and the sheet: along the streets when on, none when off
+  const sn = S.planFeatures(on).features.filter(x => x.properties.k === 'sname'); assert.ok(sn.length >= named.length * 0.8 && sn.every(x => x.geometry.type === 'LineString'), 'names along the streets on the map: ' + sn.length);
+  assert.equal(S.planFeatures({ ...on, params: { streetNames: { on: false } } }).features.filter(x => x.properties.k === 'sname').length, 0, 'off: none (kept for when it’s on again)');
+  assert.ok(G.planSVG(on, { px: 1400 }).svg.includes(m.get(lp.key)), 'on the PDF sheet'); assert.ok(!G.planSVG({ ...on, params: {} }, { px: 1400 }).svg.includes(m.get(lp.key)), 'not when off'); assert.ok(!nan(S.toDXF(on)), 'the DXF draws');
+  // renamed by hand: the whole street; a name another street has is refused
+  const rn = SN.rename(on, lp.ids[0], 'Heritage Lane'); assert.ok(on.elements.filter(e => lp.ids.includes(e.id)).length > 1 && rn.elements.filter(e => lp.ids.includes(e.id)).every(e => e.street === 'Heritage Lane'), 'every piece renamed');
+  assert.match(SN.rename(on, lp.ids[0], m.get(ch.find(c => c.role === 'collector' && c.cyc).key).replace(/ \w+$/, ' Court')).error, /already a street here/, 'a name another street has: refused');
+  const bk = m.get(ch.find(c => c.role === 'collector' && c.cyc).key).split(' ')[0]; assert.match(SN.rename(on, lp.ids[0], bk + ' Hill Way').error, /too like it/, 'a name too like another street’s (Bunker Hill beside Bunker): refused, as the generator would');
+  assert.match(SN.rename({ ...on, nearRoads: ['Heritage Rd'] }, lp.ids[0], 'Heritage Lane').error, /road nearby/, 'a road nearby on the map: refused');
+  const av = SN.plainNames(ch, ['Cedar Rd', 'Pecan St', 'Magnolia Blvd']); assert.ok(![...av.values()].some(n => /^(Cedar|Pecan|Magnolia) /.test(n)), 'the streets nearby avoided'); }
 
 console.log('street networks ok');
