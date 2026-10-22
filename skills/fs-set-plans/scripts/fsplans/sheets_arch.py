@@ -240,6 +240,16 @@ def draw_plan(c, t, d, f, X, Y, k, tags=True):
     ol = outline(t)
     tw, pw = wall_thick(t) * k, max(1.2, partition(t) * k)
     c.saveState()
+    # the open ground in an L / U outline's notches: hatched and named, so it never reads as an empty room
+    if t.get('fp'):
+        from .seed import notches_of
+        for n_ in notches_of(t):
+            P = [(X(n_['x']), Y(n_['y'])), (X(n_['x'] + n_['w']), Y(n_['y'])), (X(n_['x'] + n_['w']), Y(n_['y'] + n_['d'])), (X(n_['x']), Y(n_['y'] + n_['d']))]
+            c.setFillColorRGB(0.96, 0.97, 0.95)
+            c.rect(P[0][0], P[0][1], n_['w'] * k, n_['d'] * k, stroke=0, fill=1)
+            DR.hatch(c, P, 'diag', k, color=(0.78, 0.80, 0.76))
+            if n_['w'] * k > 60 and n_['d'] * k > 30:
+                K.label(c, (P[0][0] + P[2][0]) / 2, (P[0][1] + P[2][1]) / 2, 'OPEN — OUTSIDE THE BUILDING', max(6, min(10, k * 0.9)), F, K.GREY)
     # slab-tone fill for garages / warehouses / porches
     for r in rooms:
         if r['type'] in ('garage', 'porch', 'warehouse'):

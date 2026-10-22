@@ -65,6 +65,9 @@ occupant load and finishes, so pick it carefully (e.g. a restaurant's dining is 
 
 ## Process
 
+0. Run `scripts/seed_designs.py project.json` first. The seed already passes rules 1–6 and follows 7–9 in a plain way;
+   the steps below are for improving it, not for starting over.
+
 1. Sketch the layout as bands front-to-back (front band: garage / entry / front rooms; middle: kitchen, hall, baths;
    back: living, primary suite). Make each band's rooms add up to W exactly, and band depths add up to D.
 2. Add every connecting door, then exterior doors, then windows.

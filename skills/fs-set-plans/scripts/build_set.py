@@ -24,6 +24,7 @@ from reportlab.pdfgen import canvas  # noqa: E402
 from pypdf import PdfReader, PdfWriter, Transformation  # noqa: E402
 from fsplans import kit as K  # noqa: E402
 from fsplans.design import normalize_type, validate, RESIDENTIAL, foot_area  # noqa: E402
+from fsplans.seed import fallback_design, SUPPORTED  # noqa: E402
 from fsplans.setdef import sheet_list  # noqa: E402
 from fsplans.site import Site  # noqa: E402
 from fsplans import sheets_general, sheets_site, sheets_arch, sheets_eng  # noqa: E402
@@ -48,6 +49,12 @@ def load(path):
 
 def prepare(p):
     types = [normalize_type(t) for t in p.get('types') or []]
+    for t in types:  # as in the app: a type it can design but that has no design gets the rule-based one
+        if not t.get('design') and t['use'] in SUPPORTED and t.get('W') and t.get('D'):
+            t['design'] = fallback_design(t)
+            t['design_by'] = 'rule-based (no design was written)'
+        elif t.get('design'):
+            t.setdefault('design_by', 'rule-based seed (seed_designs.py), not improved' if t['design'].get('source') == 'rule-based seed' else 'the agent')
     site = Site(p, types) if len((p.get('site') or {}).get('boundary') or []) >= 3 else None
     # count each type's buildings from the site plan when it shows them
     if site:
@@ -271,6 +278,13 @@ def main():
     if ctx.site and p['site'].get('coord_units') == 'pixels':
         sys.exit('The site is still in traced pixels: run scripts/fit_site.py project.json --acres <total acreage> first.')
     probs = design_problems(ctx)
+    if not a.validate_only:  # a design that fails its checks is not drawn: the rule-based one is, as in the app
+        for tid in probs:
+            t = ctx.types[tid]
+            t['design'] = fallback_design(t)
+            t['design_by'] = 'rule-based (the written design failed %d check%s)' % (len(probs[tid]), '' if len(probs[tid]) == 1 else 's')
+    for t in ctx.types.values():
+        print('Type %s floor plan: %s.' % (t['id'], t.get('design_by', 'the agent')))
     for t in ctx.others:
         print('Type %s (%s) has no design: site sheets only, "building sheets by others".' % (t['id'], t['label']))
     for tid, P in probs.items():
@@ -310,7 +324,8 @@ def main():
     with open(os.path.join(a.out, 'set-check.txt'), 'w') as f:
         f.write('Set: %s — %d sheets\n' % (pr.get('name'), len(ctx.sheets)))
         for tid, P in probs.items():
-            f.write('\nType %s design:\n' % tid + ''.join('  - %s\n' % x for x in P))
+            f.write('\nType %s design (failed; the rule-based design was drawn instead):\n' % tid + ''.join('  - %s\n' % x for x in P))
+        f.write('\nFloor plans: ' + '; '.join('type %s %s' % (t['id'], t.get('design_by', 'the agent')) for t in ctx.types.values()) + '\n')
         f.write('\nSet checks: ' + ('ALL PASS\n' if not checks else '\n' + ''.join('  - %s\n' % x for x in checks)))
     size = os.path.getsize(out_pdf) / 1048576
     print('Wrote %s (%d sheets, %.1f MB)%s' % (out_pdf, len(ctx.sheets), size, (' and ' + half) if half else ''))

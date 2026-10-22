@@ -31,6 +31,8 @@ plans, elevations, sections, roof plans, details, MEP layouts, schedules and che
 - `scripts/build_set.py` — validates the building designs, picks the sheets, draws them, runs the set checks.
   `--validate-only`, `--list`, `--half` (adds an 11 x 17 copy), `--contact` (writes `contact-N.png`, six sheets per
   image, for a cheap look at the whole set).
+- `scripts/seed_designs.py` — writes a rule-based seed floor plan (the app's own designer) into each building type
+  without one, and prints its brief. Improve the seed; don't start from a blank page.
 - `scripts/read_model.py` — takes the project model out of an SP-1 (or plan-set) PDF, which carries it as an
   attachment, and prints a short summary instead of the JSON.
 - `scripts/extract_geometry.py` — reads a DXF, DWG (via a converter), vector or scanned PDF, or image; ranks the closed
@@ -108,8 +110,19 @@ Group the buildings into types (use, footprint to the foot, stories, shape; at m
 widths measured along the walls of the site poly. A skewed or angled footprint is drawn exactly on the site sheets;
 its architectural sheets use the squared outline of the same leg lengths and area. Say so on the cover notes.
 
-Write each type's `design` per `references/building-design.md` and run
-`python3 <skill>/scripts/build_set.py project.json --validate-only` until it says ALL PASS. A multi-tenant retail
+**Start from the seed, as the app does.** Never write a floor plan from scratch:
+
+```
+python3 <skill>/scripts/seed_designs.py project.json      # a rule-based plan that passes every check, per type
+```
+
+It prints each type's brief and its seed (one tenant bay per ~30 ft of frontage, each with a restroom and back of
+house; a restaurant's dining, kitchen and restrooms; a home's garage, living and bedrooms; an L laid out wing by wing).
+Then improve the seed as an architect would, in small edits with a few lines of Python, for what the program needs
+(per `references/building-design.md`): bay widths that suit the tenants, a larger end cap, a walk-in cooler, a primary
+suite. Run `python3 <skill>/scripts/build_set.py project.json --validate-only` after each round until it says ALL PASS.
+If an improvement keeps failing, go back to the seed for that type: a plain plan that passes beats a clever one that
+doesn't. The build itself never draws a failing design; it draws the seed instead and says so. A multi-tenant retail
 building gets one `tenant` room per bay, each with its own restroom and rear door; the generator gives every tenant
 its own RTU, panel and meter, leaves the shell's lights and outlets to the tenant, and draws the meter centre. A use
 it can't design (apartments, hotels, self storage) gets no `design`; say "building sheets by others".
