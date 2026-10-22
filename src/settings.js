@@ -3,7 +3,7 @@
 // phones: full screen. Sections: You & your team · Map · AI model · Saved on this device · App · Help. (The app is light only.)
 // Options shown elsewhere (the Layers panel's map display, the panel's headline metrics) stay where they are and are
 // linked from here. Nothing here deletes notes, projects or the team's sync queue.
-import { PROVIDERS, MODEL_KEY, pickedModel, PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, EFFORTS, pickedClaude, pickedEffort } from './lib/aimodels.mjs';
+import { PROVIDERS, MODEL_KEY, pickedModel, PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, EFFORTS, pickedClaude, pickedEffort, SITEPLAN_PROVIDER_KEY, SITEPLAN_CLAUDE_KEY, pickedProvider } from './lib/aimodels.mjs';
 import { summarize, priceOf, checkPrice, costOf, PRICES_AS_OF } from './lib/aiprices.mjs';
 const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help'], ['danger', 'Testing · danger zone', 'Testing']];
 export const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
@@ -143,16 +143,26 @@ export function initSettings(ctx) {
       const opts = [['', 'Server default' + (def ? ' (' + def + ')' : '')], ...list.map(m => [m.id, m.id])];
       if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, cur + (models ? ' (not available to this key: the default is used)' : '')]);
       el.innerHTML = row('Provider', '<select class="chip" id="setProv" aria-label="AI provider">' + PROVIDERS.map(p => '<option value="' + p.id + '"' + (p.on ? '' : ' disabled') + (p.id === 'openai' ? ' selected' : '') + '>' + esc(p.label) + (p.on ? '' : ' · coming later') + '</option>').join('') + '</select>',
-          'OpenAI for site plans, Ask AI and briefs. Claude (Anthropic) makes plan sets: see Plan sets below.') +
+          'OpenAI for Ask AI and briefs, and for site plans unless Claude is picked under Site plans below. Claude (Anthropic) makes plan sets.') +
         row('Model', '<select class="chip" id="setModel" aria-label="AI model">' + opts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
-          'For site plans, Ask AI and filing briefs. Kept on this device.') +
+          'For Ask AI, filing briefs and site plans on OpenAI. Kept on this device.') +
         '<div class="set-note" id="setModelNote">' + (modelsP && !models ? 'Checking which models the server’s OpenAI key can use…' : modelsErr && !models ? esc(modelsErr) + ' The server’s default model answers.' : models ? list.length + ' OpenAI chat models available, newest first.' : '') +
-          (last ? ' The last answer came from <b>' + esc(last) + '</b>.' : '') + ' Voice and place search keep their own models. ' + esc(PROVIDERS.find(p => !p.on)?.note || '') + '</div><div id="setPsSlot"></div>' + usageHtml();
+          (last ? ' The last answer came from <b>' + esc(last) + '</b>.' : '') + ' Voice and place search keep their own models. ' + esc(PROVIDERS.find(p => !p.on)?.note || '') + '</div><div id="setSpSlot"></div><div id="setPsSlot"></div>' + usageHtml();
       if (!ps && !psP) loadPs();
       const pm = pickedClaude(get(PLANSET_MODEL_KEY)), pe = pickedEffort(get(PLANSET_EFFORT_KEY)), on = !!ps?.configured;
       const pOpts = [['', 'Server default' + (ps?.model ? ' (' + ps.model + ')' : '')], ...(ps?.models || []).map(m => [m.id, m.name && m.name !== m.id ? m.name + ' · ' + m.id : m.id])];
       if (pm && !pOpts.some(o => o[0] === pm)) pOpts.push([pm, pm + (ps ? ' (not available to this key: the default is used)' : '')]);
       const money = v => '$' + (v >= 100 ? Math.round(v) : (+v).toFixed(2));
+      // Site plans: OpenAI (the model above) or Claude, and which Claude model (the list the plan set check brought back)
+      const sp = pickedProvider(get(SITEPLAN_PROVIDER_KEY)), sm = pickedClaude(get(SITEPLAN_CLAUDE_KEY)), spOn = sp && on;
+      const sOpts = [['', 'Server default (' + (ps?.model || 'claude-opus-5-5') + ')'], ...(ps?.models || []).map(m => [m.id, m.name && m.name !== m.id ? m.name + ' · ' + m.id : m.id])];
+      if (sm && !sOpts.some(o => o[0] === sm)) sOpts.push([sm, sm + (ps ? ' (not available to this key: the default is used)' : '')]);
+      el.querySelector('#setSpSlot').outerHTML = '<div class="set-l" style="margin:18px 0 6px">Site plans</div>' +
+        row('AI', '<select class="chip" id="setSpProv" aria-label="AI for site plans">' + [['', 'OpenAI (the model above)'], ['anthropic', 'Claude (Anthropic)']].map(([v, l]) => '<option value="' + v + '"' + (v === sp ? ' selected' : '') + (v && ps && !on ? ' disabled' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
+          'Reads the request, plans the site, sets the program and judges the options. The layouts themselves are measured by the engine either way. Kept on this device.') +
+        row('Claude model', '<select class="chip" id="setSpModel" aria-label="Claude model for site plans"' + (spOn ? '' : ' disabled') + '>' + sOpts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === sm ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
+          'Used when the AI above is Claude. Its effort follows the level picked under Build.') +
+        '<div class="set-note">' + (!sp ? 'Site plans use OpenAI.' : !ps ? 'Checking Claude…' : !on ? 'Claude isn’t set up on this site (ANTHROPIC_API_KEY), so OpenAI answers site plans.' : 'Site plans use Claude. The rule sheet’s and best-use web searches stay on OpenAI.') + '</div>';
       el.querySelector('#setPsSlot').outerHTML = ('<div class="set-l" style="margin:18px 0 6px">Plan sets</div>' +
         row('Claude model', '<select class="chip" id="setPsModel" aria-label="Claude model for plan sets"' + (on ? '' : ' disabled') + '>' + pOpts.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === pm ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>',
           'Writes each plan set’s notes and designs its building types. Kept on this device.') +
@@ -162,6 +172,9 @@ export function initSettings(ctx) {
           : (ps.models?.length ? ps.models.length + ' Claude models available. ' : esc(ps.modelsError || '')) + (ps.budget?.spent != null ? 'This month: ' + money(ps.budget.spent) + ' of the ' + money(ps.budget.cap) + ' plan set budget.' : 'Monthly budget ' + money(ps.budget?.cap ?? 100) + '.')) + '</div>');
       const keepPick = (id, key, what) => el.querySelector(id).onchange = e => { try { if (e.target.value) localStorage.setItem(key, e.target.value); else localStorage.removeItem(key); } catch (err) {} ctx.toast(e.target.value ? 'Plan sets will use ' + e.target.value + ' ' + what + ' on this device.' : 'Plan sets will use the server’s ' + what + '.'); };
       keepPick('#setPsModel', PLANSET_MODEL_KEY, 'as the model'); keepPick('#setPsEffort', PLANSET_EFFORT_KEY, 'effort');
+      const keep = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (err) {} };
+      el.querySelector('#setSpProv').onchange = e => { keep(SITEPLAN_PROVIDER_KEY, e.target.value); ctx.toast(e.target.value ? 'Site plans will use Claude on this device.' : 'Site plans will use OpenAI on this device.'); paintSec('ai'); el.querySelector('#setSpProv')?.focus(); };
+      el.querySelector('#setSpModel').onchange = e => { keep(SITEPLAN_CLAUDE_KEY, e.target.value); ctx.toast(e.target.value ? 'Site plans will use ' + e.target.value + ' on this device.' : 'Site plans will use the server’s Claude model.'); };
       wireUsage(el);
       el.querySelector('#setModel').onchange = e => { try { if (e.target.value) localStorage.setItem(MODEL_KEY, e.target.value); else localStorage.removeItem(MODEL_KEY); } catch (err) {} ctx.toast(e.target.value ? 'The AI will use ' + e.target.value + ' on this device.' : 'The AI will use the server’s default model' + (def ? ' (' + def + ')' : '') + '.'); };
     },
