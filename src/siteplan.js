@@ -2778,15 +2778,14 @@ export function initSitePlan(ctx) {
   }
   const CLS_K = { [G.CLS.V]: 'v', [G.CLS.O]: 'o', [G.CLS.E]: 'e', [G.CLS.U]: 'u' };
   const tagH = (t, src) => { const c = t?.cls || t; return c && CLS_K[c] ? '<i class="sp-cls ' + CLS_K[c] + '" title="' + esc(c + ((src ?? t?.src) ? ': ' + (src ?? t.src) : '')) + '">' + esc(G.CLS_SHORT[c]) + '</i>' : ''; };
-  // the concept label (short, the whole of it a click away), where the guardrails come from and the scenario laid out
+  // a Waller plan whose layout on the map was made for another scenario: says so, with the one-click re-layout (the
+  // concept label and the guardrails' jurisdiction line aren't shown on the panel, removed Oct 22; the label stays on the
+  // PDF, the drawing and the exports)
   function guardBanner(pl) {
     if (!GON(pl)) return '';
-    const g = G.settingsOf(pl), J = pl.jur || {}, sc = G.SCENARIOS[g.scenario];
-    const where = J.status === 'city' ? 'Inside the City of Waller' : J.status === 'etj' ? 'In Waller’s ETJ (within 0.5 mile of the city limits)' : 'Switched on in Site parameters';
-    const stale = pl.recipe && pl.elements.length && pl.laidAs !== g.scenario ? '<div class="sp-gstale">The layout on the map was made ' + (pl.laidAs ? 'for scenario ' + esc(pl.laidAs) : 'before the guardrails applied') + '. <button type="button" class="sp-link" data-gscen="' + g.scenario + '">Lay out ' + g.scenario + ' (' + esc(sc.short.toLowerCase()) + ')</button></div>' : '';
-    return '<div class="sp-guard" id="spGuard" role="note" aria-label="Concept label"><div class="sp-gl"><b>' + esc(G.LABEL_SHORT) + '</b> <button type="button" class="sp-link" id="spGLab" aria-expanded="' + !!ed.gLabel + '" aria-controls="spGLabF">' + (ed.gLabel ? 'Less' : 'Full label') + '</button></div>' +
-      '<p class="sp-glf" id="spGLabF"' + (ed.gLabel ? '' : ' hidden') + '>' + esc(G.LABEL) + '</p>' +
-      '<div class="sp-gj"><span>Waller guardrails on · ' + esc(where) + '</span> ' + tagH(J.cls || G.CLS.U, J.reason || '') + '<span>Laid out as <b>' + sc.id + ' · ' + esc(sc.name) + '</b></span></div>' + stale + '</div>';
+    const g = G.settingsOf(pl), sc = G.SCENARIOS[g.scenario];
+    if (!(pl.recipe && pl.elements.length && pl.laidAs !== g.scenario)) return '';
+    return '<div class="sp-gonly" role="note"><div class="sp-gstale">The layout on the map was made ' + (pl.laidAs ? 'for scenario ' + esc(pl.laidAs) : 'before the guardrails applied') + '. <button type="button" class="sp-link" data-gscen="' + g.scenario + '">Lay out ' + g.scenario + ' (' + esc(sc.short.toLowerCase()) + ')</button></div></div>';
   }
   // the guardrails' own settings in Site parameters: the switch on every plan; the rest when they're on
   function guardParams(pl) {
@@ -2853,7 +2852,6 @@ export function initSitePlan(ctx) {
   }
   function wireGuard() {
     card.querySelectorAll('[data-gscen]').forEach(b => b.onclick = () => layScenario(b.dataset.gscen));
-    const lb = card.querySelector('#spGLab'); if (lb) lb.onclick = () => { ed.gLabel = !ed.gLabel; const f = card.querySelector('#spGLabF'); if (f) f.hidden = !ed.gLabel; lb.textContent = ed.gLabel ? 'Less' : 'Full label'; lb.setAttribute('aria-expanded', String(!!ed.gLabel)); };
     const ck = card.querySelector('#spCheck'); if (ck) ck.ontoggle = () => { ed.gCheck = ck.open; };
   }
   // AI text shown on a Waller plan: prohibited conclusions rewritten (lib/guardrails.mjs scrub)
