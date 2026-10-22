@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 5:37 PM CT: Plan set skill designs buildings the way the app does (dc928a6)
+- **Why the skill's plans were weaker than the app's:** the app never asks Claude to design a building from a blank page. It hands Claude a plain floor plan that already passes every check (one tenant bay per ~30 ft of frontage, each with a restroom and back of house) and asks it to improve that. When Claude's version fails the checks, the app draws the plain plan instead. The skill had none of this, so its agent invented floor plans by hand.
+- **Now the skill does the same:** it builds the app's starting plan for every building type, and the agent improves it. A building with no plan, or whose plan fails the checks, is drawn from the starting plan, and the run says which plan each building used. A site layout handed over with no building designs now gives a full set (47 sheets on the example) instead of site sheets only.
+- **L-shaped buildings:** the open corner of an L is now hatched and labelled "open — outside the building" on the floor plan, so it no longer looks like a giant empty room.
+- **Agent instructions:** `skills/AGENT-INSTRUCTIONS.md` has the text to paste into each of the three agents, what to attach to each run, and the settings that matter.
+
 ### 5:28 PM CT: Pass agents the PDF only: the site model now travels inside it (9114664)
 - **Why:** attaching the site model file next to the site layout PDF made one plan set run fail with "prompt is too long". The platform put the whole file into the agent's prompt.
 - **Site layout skill:** the SP-1 PDF now carries its model inside it as an attachment, so it is the only file to pass on. The model itself is much smaller (8 KB instead of 20 KB on the example), with long outlines simplified, and the build warns if it ever gets large.
