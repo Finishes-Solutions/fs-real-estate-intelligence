@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-21
 
+### 7:07 PM CT: Site plans in four steps: Site › Layout › Pro forma › Renderings & plans (4287ddb)
+- **One step at a time.** A site plan option now has four steps in a row under the options: **Site**, **Layout**, **Pro forma** and **Renderings & plans**. The panel shows only the step you're on, with a **Confirm** button at the top, instead of every tool in one long list.
+- **Confirm the site first.** The Site step holds the parcels, street side, side street and Redraw Site. **Confirm Site** puts those tools away (**Reopen** brings them back) and opens Layout.
+- **Start blank, or as a parking lot.** Layout starts from the empty confirmed site. Add buildings yourself, or press **Start as a Parking Lot** to fill the site inside its paving setbacks with parking rows and a drive along the front and up both ends, then drop buildings in: the stalls under them give way (on a 400 × 300 ft lot: 284 spaces, 220 once a 12,000 sf building goes in). Build with AI and Change With AI are still there. Entrances and roundabouts moved to a **Ways in** section here.
+- **Then the pro forma, then the deliverables.** Pro forma opens the base pro forma from the layout, ready to edit, with **Confirm Pro Forma**. Renderings & plans has the renderings, the exports and **Make a Plan Set**, which opens the project's Plans tab with this option picked.
+- **Changes after confirming are flagged.** Move a building or change a pro forma input after confirming and that step reads **Changed since it was confirmed** and the steps after it wait for it to be confirmed again (putting it back as it was counts). The plan can only be changed in the Layout step.
+- Existing options open at Layout with their site counted as confirmed. **New Option › Blank site** keeps the site's confirmation.
+- **Not done yet:** the steps are within the plan panel (not separate pages), the parking lot start uses straight rows along the street side only, and the phone layout of the steps hasn't been checked on a real phone.
+
 ### 6:31 PM CT: The site fills by default, layouts rank by leasable + sellable square feet, deeper ponds as options (c531a8c)
 - **No Phase 2 by default.** Land the request doesn't need now gets more of the program (more homes, longer shop rows, another building) instead of "Future development · not in this phase". Settings › **Leftover land** chooses: fill the site (the default), fill it and mark the extra Phase 2, or hold it for later. Words like "hold the back for a future phase" or "with the rest as phase 2" still do that. An AI's suggestion alone never holds land back.
 - **Ranked by what you can lease and sell.** After the rules (checks clean, parking met, detention met or stated), layouts are ranked by **leasable + sellable square feet**: the floor area you can lease plus the homes' living area you can sell. It's shown on each layout card and in Numbers, and the AI's review is told it's the owner's goal.
