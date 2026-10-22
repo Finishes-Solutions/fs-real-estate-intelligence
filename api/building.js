@@ -35,6 +35,21 @@ function fmtDate(v) {
   const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (us) return us[3] + '-' + us[1].padStart(2, '0') + '-' + us[2].padStart(2, '0'); // the appraisal districts' 01/24/2025
   return s.slice(0, 20);
 }
+// ArcGIS polygon rings as GeoJSON. rings can hold several OUTER rings (a parcel drawn in separate pieces, clockwise) as
+// well as holes (counter-clockwise, inside an outer ring); reading every ring after the first as a hole lost the other
+// pieces. Each outer ring is a polygon with the holes that fall in it: a Polygon for one piece, a MultiPolygon for more.
+// (A service that winds every ring the same way: the rings inside another ring are its holes, the rest are pieces.)
+export function esriPolygon(geometry) {
+  const rings = (geometry?.rings || []).filter(r => Array.isArray(r) && r.length >= 4); if (!rings.length) return null;
+  const area2 = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return s; }; // > 0: counter-clockwise
+  const inside = (a, b) => a !== b && Math.abs(area2(a)) < Math.abs(area2(b)) && inRing(b, a[0]) && inRing(b, a[Math.floor(a.length / 2)]);
+  const mixed = rings.some(r => area2(r) < 0) && rings.some(r => area2(r) > 0);
+  let outer = rings.filter(r => mixed ? area2(r) < 0 : !rings.some(o => inside(r, o)));
+  const holes = rings.filter(r => !outer.includes(r)), polys = outer.map(o => [o]);
+  for (const h of holes) { const host = polys.filter(p => inside(h, p[0])).sort((a, b) => Math.abs(area2(a[0])) - Math.abs(area2(b[0])))[0];
+    if (host) host.push(h); else polys.push([h]); } // a counter-clockwise ring inside no piece is a piece of its own
+  return polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] } : { type: 'MultiPolygon', coordinates: polys };
+}
 export function normalizeParcel(attrs, geometry) {
   const a = attrs || {}, area = num(pick(a, 'GIS_AREA', 'LEGAL_AREA')), unit = pick(a, 'GIS_AREA_UNIT', 'LGL_AREA_UNIT');
   const mail = [pick(a, 'MAIL_LINE1', 'MAIL_ADDR'), pick(a, 'MAIL_LINE2'), [pick(a, 'MAIL_CITY'), pick(a, 'MAIL_STAT', 'MAIL_STATE'), pick(a, 'MAIL_ZIP')].filter(Boolean).join(' ')].filter(Boolean).join(', ');
@@ -50,7 +65,7 @@ export function normalizeParcel(attrs, geometry) {
     area: area ? Math.round(area * 100) / 100 + ' ' + (unit ? String(unit).toLowerCase() : 'acres') : null, raw, // StratMap areas are acres unless a unit says otherwise
     buildingSqft: num(pick(a, 'BLDG_SQFT', 'IMPRV_SQFT', 'IMP_SQFT', 'LIVING_AREA', 'LIV_AREA', 'BLD_AREA', 'BLDG_AREA', 'TOT_SQFT', 'SQ_FT', 'SQFT')),
     stories: num(pick(a, 'STORIES', 'NUM_STORIES', 'NO_STORIES', 'FLOORS')),
-    geometry: geometry?.rings ? { type: 'Polygon', coordinates: geometry.rings } : null
+    geometry: esriPolygon(geometry)
   };
 }
 
@@ -69,7 +84,7 @@ const caseName = v => t(v).toLowerCase().replace(/\s+/g, ' ').replace(/\b([a-z])
 // a CAD record in the same shape as normalizeParcel, plus where it came from
 export function normalizeCad(cad, attrs, geometry, shared = 1) {
   const a = attrs || {}, raw = Object.fromEntries(Object.entries(a).filter(([k, v]) => v != null && t(v) !== '' && !/^(objectid|shape|globalid|fid|creat|last_ed|edit)/i.test(k)).slice(0, 60).map(([k, v]) => [k, t(v).slice(0, 200)]));
-  const base = { county: cad.county, source: cad.name, sourceUrl: cad.url.replace(/\/\d+$/, ''), geometry: geometry?.rings ? { type: 'Polygon', coordinates: geometry.rings } : null, raw, stories: null, buildingSqft: null, shared: shared > 1 ? shared : undefined };
+  const base = { county: cad.county, source: cad.name, sourceUrl: cad.url.replace(/\/\d+$/, ''), geometry: esriPolygon(geometry), raw, stories: null, buildingSqft: null, shared: shared > 1 ? shared : undefined };
   if (cad.kind === 'hcad') {
     const situs = caseName(a.address && !/^0\s/.test(t(a.address)) ? a.address : ''), city = caseName(a.city);
     return { ...base, propId: t(a.HCAD_NUM) || null, owner: t(a.owner) || null, mailing: null, situs: situs ? situs + (city ? ', ' + city : '') : null, situsStreet: situs || null, situsCity: city || null,
@@ -130,7 +145,7 @@ async function parcelsIn(g) {
   const d = await getJSON(PARCELS.replace(/\/\d+$/, '') + '/identify?' + q);
   if (d.error) throw new Error(d.error.message || 'service error');
   const seen = new Set(), out = [];
-  for (const f of d.results || []) { const p = normalizeParcel(f.attributes, f.geometry), k = p.propId || JSON.stringify(p.geometry?.coordinates?.[0]?.[0]); if (seen.has(k)) continue; seen.add(k); out.push(p); if (out.length >= 10) break; }
+  for (const f of d.results || []) { const p = normalizeParcel(f.attributes, f.geometry), k = p.propId || JSON.stringify(f.geometry?.rings?.[0]?.[0]); if (seen.has(k)) continue; seen.add(k); out.push(p); if (out.length >= 10) break; }
   return out;
 }
 const ringArea = r => { let s2 = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s2 += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return Math.abs(s2) / 2; };

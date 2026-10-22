@@ -197,8 +197,28 @@ export function initSitePlan(ctx) {
   const parcelOf = (pc, center) => { const g = pc.geometry, r = g && (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates?.[0]?.[0]); const cc = r ? SP.centroid(r) : center;
     const rec = { key: '', label: pc.situs || pc.owner || 'Parcel', owner: pc.owner || '', propId: pc.propId || null, marketValue: pc.marketValue || null, landValue: pc.landValue || null, acres: g ? +(SP.ringArea(SP.boundaryFrom(g, center)?.ring || []) / 43560).toFixed(3) : null, center: cc.map(v => +v.toFixed(6)), geometry: llRound(g) || null };
     rec.key = parcelKey(rec); return rec; };
-  // the site boundary for a set of parcels (one outline, or several merged)
-  function siteOf(recs) { const g = recs.map(r => r.geometry).filter(Boolean); return g.length > 1 ? SP.unionParcels(g) : g.length ? { ...SP.boundaryFrom(g[0], recs[0].center), pieces: 1 } : null; }
+  // the site boundary for a set of parcels (one outline, or several merged). Parcels that don't touch are joined across
+  // the gap between them (SP.bridgeParcels): filled in as site, or, where the map shows a road in it, kept as a no-build
+  // road strip (gapPieces)
+  function siteOf(recs) { const g = recs.map(r => r.geometry).filter(Boolean); if (g.length < 2) return g.length ? { ...SP.boundaryFrom(g[0], recs[0].center), pieces: 1, strips: [] } : null;
+    const br = SP.bridgeParcels(g, { roads: mapRoads() }), u = SP.unionParcels(br.geoms); return u && { ...u, strips: br.strips }; }
+  // the map's streets (lon/lat lines) where its tiles are loaded (the same classes detectFront counts as streets)
+  function mapRoads() {
+    const s = map.getStyle?.()?.sources || {}, src = Object.keys(s).find(id => s[id].type === 'vector' && /maptiler|openmaptiles|planet/i.test(id + (s[id].url || ''))), out = []; if (!src) return out;
+    try { for (const f of map.querySourceFeatures(src, { sourceLayer: 'transportation' })) { if (/path|track|rail|transit|ferry|cable|bridleway|pier|service|raceway/.test(f.properties?.class || '')) continue;
+      const g = f.geometry; for (const c of g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []) out.push(c); } } catch (e) {}
+    return out; }
+  // the road strips between parcels as no-build areas on a plan whose site is b (the ones in the site: a strip between
+  // two parcels left out isn't); marked gap so a change of parcels replaces them. Gaps without a road are just site.
+  function gapPieces(b, pl) {
+    const F = SP.frame(b.origin), out = [], roads = (b.strips || []).filter(s => s.road);
+    for (const s of roads) { const pts = s.ll.slice(0, -1).map(F.toFt); if (!SP.inRing(SP.centroid(pts), b.ring)) continue;
+      const e = T.areaPiece({ ...pl, ring: b.ring, elements: out }, 'keepout', pts, uid());
+      out.push({ ...e, name: 'Road between parcels' + (roads.length > 1 ? ' ' + (out.length + 1) : ''), note: 'About ' + s.gapFt + ' ft wide, with a road on the map, and not in the parcels picked, so nothing is built or paved on it. Delete it if the road is being closed or the land is yours to build on.', gap: true }); }
+    return out; }
+  const gapNote = b => { const st = b?.strips || [], fill = st.filter(s => !s.road), road = st.filter(s => s.road), w = l => Math.max(...l.map(s => s.gapFt));
+    return (fill.length ? '<div class="rnote">The gaps between parcels that border each other (up to ' + w(fill) + ' ft in the county’s outlines) are filled in as part of the site.</div>' : '') +
+      (road.length ? '<div class="rnote">' + (road.length === 1 ? 'A road runs between two of the parcels (about ' + road[0].gapFt + ' ft): it’s' : road.length + ' roads run between the parcels: they’re') + ' in the site as a no-build area, so every parcel is in.</div>' : ''); };
   // Projects › a project › Find a Parcel: that project waits for the parcel picked next (for 10 minutes, or until used)
   let pending = null;
   const pendingProject = () => { const x = pending && Date.now() - pending.t < 6e5 && db.projects.find(p => p.id === pending.id); if (!x) pending = null; return x || null; };
@@ -212,7 +232,7 @@ export function initSitePlan(ctx) {
     if (!info?.center && !list.length) { ctx.toast('Open a parcel first: click a building or open ground at street zoom.'); return; }
     const rg = ctx.lastRegrid?.geom, center = info.center || list[0]?.center;
     if (list.length <= 1 && !list[0]?.geometry && rg && inGeom(center, rg)) list = [{ ...(list[0] || {}), geometry: rg, regrid: true }]; // Harris and Waller: Regrid's outline
-    const recs = list.map(pc => parcelOf(pc, center)), b = siteOf(recs), many = recs.length > 1;
+    const recs = list.map(pc => parcelOf(pc, pc.center || center)), b = siteOf(recs), many = recs.length > 1;
     const label = many ? recs.length + ' parcels' + (recs[0].label ? ' · ' + recs[0].label : '') : recs[0]?.label || info.title || 'Site';
     const acres = b ? SP.ringArea(b.ring) / 43560 : null, noGeom = recs.filter(r => !r.geometry).length;
     // the projects these parcels are already in (newest first), and a project waiting for a parcel (Find a Parcel)
@@ -231,8 +251,8 @@ export function initSitePlan(ctx) {
       '<div class="bsec sp-start"><div class="lt sp-lt-proj">' + (have.length ? 'Or start another plan' : 'Project') + '</div>' +
       radio('', 'New project <input id="spName" class="sp-in" value="' + esc(recs[0]?.label || label) + '" aria-label="Project name">', !pre) +
       recent.map(p => radio(p.id, 'Add to <b>' + esc(p.name) + '</b> <span class="rnote">' + p.plans.length + ' plan' + (p.plans.length === 1 ? '' : 's') + (have.some(h => h.p === p) ? ' · has this parcel' : p === want ? ' · waiting for a parcel' : '') + '</span>', p === pre)).join('') +
-      '<div class="lt sp-lt-site" style="margin-top:12px">Site</div><div class="rnote">' + (b ? (many ? recs.length + ' parcel outlines from the county appraisal district, merged into one site (small gaps and overlaps between them are closed up).' : 'The parcel outline from ' + (list[0]?.regrid ? 'Regrid' : 'the county appraisal district') + ', dashed on the map.') + ' You can add or remove parcels, or redraw the site, in the plan.' : 'There’s no parcel outline here (in Harris and Waller County, use “Get owner, value &amp; zoning from Regrid” on the property card first). You’ll draw the site on the map.') + '</div>' +
-      (b?.pieces > 1 ? '<div class="rnote sp-warn">Some parcels don’t touch the rest (a road or a gap wider than 6 ft between them), so they’re left out of the site.</div>' : '') +
+      '<div class="lt sp-lt-site" style="margin-top:12px">Site</div><div class="rnote">' + (b ? (many ? recs.length + ' parcel outlines from the county appraisal district, merged into one site (small gaps and overlaps between them are closed up, and parcels apart are joined over the gap between them).' : 'The parcel outline from ' + (list[0]?.regrid ? 'Regrid' : 'the county appraisal district') + ', dashed on the map.') + ' You can add or remove parcels, or redraw the site, in the plan.' : 'There’s no parcel outline here (in Harris and Waller County, use “Get owner, value &amp; zoning from Regrid” on the property card first). You’ll draw the site on the map.') + '</div>' +
+      gapNote(b) + (b?.pieces > 1 ? '<div class="rnote sp-warn">Some parcels are more than ' + SP.BRIDGE_FT + ' ft from the rest, so they’re left out of the site.</div>' : '') +
       (noGeom && b ? '<div class="rnote sp-warn">' + noGeom + ' of the parcels have no outline from the county and are left out.</div>' : '') +
       '<div class="bacts" style="padding:12px 0 0"><button class="btn askai" id="spStart">Start Site Plan</button><button class="btn" id="spBack">Back</button></div></div>';
       card.classList.add('open'); card.scrollTop = 0; };
@@ -249,6 +269,7 @@ export function initSitePlan(ctx) {
       if (pending?.id === p.id) pending = null; // used
       const z = ctx.lastRegrid?.zoning && list.some(x => x.regrid) ? zoningOf(ctx.lastRegrid.zoning) : null;
       const plan = newPlan(p, b ? { origin: b.origin, ring: b.ring, src: many ? 'parcels' : list[0]?.regrid ? 'regrid' : 'parcel', parcel: recs[0].key, parcels: recs.map(r => r.key), zoning: z } : { parcel: recs[0]?.key, parcels: recs.map(r => r.key), origin: center });
+      if (b) plan.elements = gapPieces(b, plan);
       p.plans.push(plan); save(p); open(p.id, plan.id, { draw: !b });
     };
     card.querySelector('#spStart').onclick = () => {
@@ -1156,8 +1177,10 @@ export function initSitePlan(ctx) {
   function setParcels(keys) {
     const p = P(), recs = keys.map(k => p.parcels.find(x => x.key === k)).filter(r => r?.geometry), b = siteOf(recs);
     if (!b) { ctx.toast('Those parcels have no outline to plan on.'); return; }
-    const pl = PL(); change(x => { reorigin(x, b, recs.length > 1 ? 'parcels' : 'parcel'); x.parcels = recs.map(r => r.key); x.parcel = recs[0].key; });
-    if (b.pieces > 1) ctx.toast('Some parcels don’t touch the rest (a road or a gap wider than 6 ft), so they’re left out of the site.');
+    const pl = PL(); change(x => { reorigin(x, b, recs.length > 1 ? 'parcels' : 'parcel'); x.parcels = recs.map(r => r.key); x.parcel = recs[0].key; x.elements = x.elements.filter(e => !e.gap).concat(gapPieces(b, x)); });
+    if (b.pieces > 1) ctx.toast('Some parcels are more than ' + SP.BRIDGE_FT + ' ft from the rest, so they’re left out of the site.');
+    else if (b.strips.some(s => s.road)) ctx.toast('The road between the parcels is in the site as a no-build area; the other gaps between them are filled in as site.');
+    else if (b.strips.length) ctx.toast('The gaps between the parcels are filled in as part of the site.');
     map.once('idle', () => PL() === pl && detectFront(pl));
   }
   async function pickParcel(lngLat) {
@@ -2188,7 +2211,7 @@ export function initSitePlan(ctx) {
     // the parcels that make up the site: the ones whose outline lies in the site's (a parcel across a road, or with no outline, is left out)
     const rings = g => g ? (g.type === 'Polygon' ? [g.coordinates[0]] : (g.coordinates || []).map(q => q[0])) : [], near = q => pl.ring.some((a, k) => SP.segDist(q, a, pl.ring[(k + 1) % pl.ring.length]) < 8);
     const part = r => rings(r.geometry).some(rg => { const ft = rg.map(F.toFt); return SP.inRing(SP.centroid(ft), pl.ring) || ft.filter(q => SP.inRing(q, pl.ring) || near(q)).length >= ft.length / 2; });
-    const why = r => !r.geometry ? 'no outline' : pl.src === 'drawn' ? 'outside the drawn site' : "doesn't touch the rest", used = recs.filter(r => r.geometry && part(r)), out = recs.filter(r => !used.includes(r)), noGeom = recs.filter(r => !r.geometry).length, left = out.length - noGeom;
+    const why = r => !r.geometry ? 'no outline' : pl.src === 'drawn' ? 'outside the drawn site' : 'more than ' + SP.BRIDGE_FT + ' ft from the rest', used = recs.filter(r => r.geometry && part(r)), out = recs.filter(r => !used.includes(r)), noGeom = recs.filter(r => !r.geometry).length, left = out.length - noGeom;
     const head = pl.src === 'drawn' && !used.length ? ' · drawn on the map' : used.length ? ' · ' + plural(used.length, 'parcel') : '';
     const b = (id, ic, label, tip, pressed) => '<button type="button" class="btn sp-stb" id="' + id + '"' + (pressed == null ? '' : ' aria-pressed="' + pressed + '"') + ' title="' + esc(tip) + '">' + SI[ic] + '<span>' + label + '</span></button>';
     return '<div class="bsec" id="spSiteSec"><div class="lt">Site<span class="src">' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' ac' + head + '</span></div>' +
@@ -2196,9 +2219,9 @@ export function initSitePlan(ctx) {
         b('spFront', 'front', 'Street Side', 'Then click the lot line along the street; front setbacks and drives follow it', ed.mode === 'front') + b('spStreet', 'street', 'Side Street', 'A second street along the lot (a corner lot): click its lot line to add it, or again to remove it', ed.mode === 'street') +
         (stage === 'site' ? '' : b('spEntr', 'entr', 'Add Entrance', 'A driveway in from the street: click the lot line where it should come in; it runs straight in to the nearest drive', ed.mode === 'entrance') + b('spRing', 'ring', 'Add Roundabout', 'A ring with a planted island where streets meet: click a junction (the small circles); the streets are cut back to it and the homes in its way make way', ed.mode === 'roundabout')) + b('spRedraw', 'redraw', 'Redraw Site', 'Draw the site’s outline again, corner by corner') + '</div>') +
       (recs.length > 1 ? '<div class="sp-parcels">' + recs.map(r => { const off = out.includes(r); return '<span class="chip' + (off ? ' sp-off' : '') + '" title="' + esc(off ? r.label + ': not part of the site (' + why(r) + ')' : r.label) + '"><span>' + esc(r.label) + (r.acres ? ' · ' + r.acres.toFixed(2) + ' ac' : '') + '</span><button type="button" class="sp-x" data-rmp="' + esc(r.key) + '" aria-label="Remove ' + esc(r.label) + ' from the site">×</button></span>'; }).join('') + '</div>' : '') +
-      (pl.src !== 'drawn' && left > 0 ? '<div class="rnote sp-warn">' + (left === 1 ? 'A parcel doesn’t' : left + ' parcels don’t') + ' touch the rest (a road or a gap wider than 6 ft between them), so ' + (left === 1 ? 'it’s' : 'they’re') + ' left out of the site.</div>' : '') +
+      (pl.src !== 'drawn' && left > 0 ? '<div class="rnote sp-warn">' + (left === 1 ? 'A parcel is' : left + ' parcels are') + ' more than ' + SP.BRIDGE_FT + ' ft from the rest, so ' + (left === 1 ? 'it’s' : 'they’re') + ' left out of the site.</div>' : '') +
       (pl.src !== 'drawn' && noGeom ? '<div class="rnote sp-warn">' + noGeom + ' of the parcels ' + (noGeom === 1 ? 'has' : 'have') + ' no outline from the county and ' + (noGeom === 1 ? 'is' : 'are') + ' left out.</div>' : '') +
-      (on ? '<div class="rnote sp-1l">Click parcels on the map to add or take them out.' + infoBtn('Small gaps between parcels are closed up; parcels across a road stay separate.', 'About adding parcels') + '</div>' : '') +
+      (on ? '<div class="rnote sp-1l">Click parcels on the map to add or take them out.' + infoBtn('Gaps between parcels (up to ' + SP.BRIDGE_FT + ' ft) are filled in as part of the site; where the map shows a road in the gap, the road is kept as a no-build area.', 'About adding parcels') + '</div>' : '') +
       (pl.frontGuess ? '<div class="rnote sp-warn sp-1l">The street side (orange line) is a guess: set it with Street Side.</div>' : '') + '</div>';
   }
   const fileName = (p, pl) => (p.name + ' ' + pl.name).replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'site-plan';
@@ -4324,7 +4347,7 @@ export function initSitePlan(ctx) {
     const last = newestDrawn(p) || keptOf(p);
     if (last) return { origin: last.origin, ring: clone(last.ring), src: last.src, front: last.front, frontGuess: last.frontGuess, setbacks: { ...last.setbacks }, parcel: last.parcel, parcels: last.parcels, zoning: last.zoning || null, program: { use: SP.normalizeProgram(last.program).use } };
     const recs = p.parcels.filter(x => x.geometry), b = recs.length ? siteOf(recs) : null;
-    return b?.ring?.length >= 3 ? { origin: b.origin, ring: b.ring, src: recs.length > 1 ? 'parcels' : 'parcel', parcel: recs[0].key, parcels: recs.map(r => r.key) } : null;
+    return b?.ring?.length >= 3 ? { origin: b.origin, ring: b.ring, src: recs.length > 1 ? 'parcels' : 'parcel', parcel: recs[0].key, parcels: recs.map(r => r.key), elements: gapPieces(b, { elements: [] }) } : null;
   }
   // a project's picture: its newest option with buildings, else its newest drawn site, else the parcel outline
   function cover(p) {
