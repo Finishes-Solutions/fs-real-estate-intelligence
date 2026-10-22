@@ -10,3 +10,7 @@ test/.data/
 # Python bytecode from running the skills/ scripts
 __pycache__/
 *.pyc
+
+# OpenAI keys dropped into a skill folder for another platform: never commit them
+skills/**/openai.key
+skills/**/.env

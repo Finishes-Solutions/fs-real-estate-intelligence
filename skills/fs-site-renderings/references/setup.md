@@ -2,8 +2,9 @@
 
 The renderings need two things where the agent runs:
 
-1. **The key in the environment** as `OPENAI_API_KEY`. The script reads it from there (or from a file named with
-   `--key-file`) and sends it only to `api.openai.com` in the request header. It never prints or saves it.
+1. **The key**, in the first of these the script finds: the `OPENAI_API_KEY` environment variable, a file named with
+   `--key-file`, or a key file in the skill's own folder (`openai.key` holding just the key, or `.env` with
+   `OPENAI_API_KEY=sk-…`). It sends the key only to `api.openai.com` in the request header and never prints or saves it.
 2. **Network access to `api.openai.com`** (HTTPS, port 443).
 
 Everything before the paid step (the massing, the references, the prompts) works without either, so you can check a project
@@ -36,6 +37,22 @@ In the environment's settings (the cloud environment menu in the session's title
 The code there runs in a sandbox whose internet access is set by your organisation's code-execution settings. It may not be
 able to reach `api.openai.com`, and there's no safe place to keep a key. If the run says it can't reach the API, do the
 paid step in Claude Code instead, using the same skill and the same files.
+
+## Agents on another platform: a key file inside the skill
+
+When the platform running the agent can't set environment variables, put the key in the skill itself:
+
+1. Unzip the skill, create `fs-site-renderings/openai.key` containing only the key (one line), zip it again and upload
+   that copy to the platform. (`.env` with `OPENAI_API_KEY=sk-…` also works.)
+2. Use a key made for this: in the OpenAI dashboard, a **separate project** with a **monthly budget limit**, and a
+   **restricted key** that only allows the Images endpoint (plus Models, read only, so it can pick the model).
+3. Keep that zip private. Anyone who can download the skill or see its files has the key; never commit it to git
+   (this repository ignores `openai.key` and `.env` under `skills/`) and never post it in chat.
+4. Rotate the key in the dashboard if the zip is shared further than intended or anything looks off in the usage.
+
+The platform's sandbox must also be able to reach `api.openai.com`. Some sandboxes have no internet access at all (for
+example code run through Anthropic's API code-execution tool); there a key file can't help, and the paid step needs a
+platform that allows that host, or Claude Code.
 
 ## Checking it
 

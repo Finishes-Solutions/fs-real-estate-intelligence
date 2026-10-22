@@ -1,7 +1,8 @@
 """The OpenAI Images API, edit endpoint, with the standard library only (no SDK needed).
 
-The key is read from the OPENAI_API_KEY environment variable (or a file named by --key-file). It is sent only to
-api.openai.com in the Authorization header and is never printed, logged or written to disk."""
+The key is read from, in order: the OPENAI_API_KEY environment variable, a file named by --key-file, or a key file
+in the skill's own folder (`openai.key` holding just the key, or `.env` with a line OPENAI_API_KEY=...). It is sent
+only to api.openai.com in the Authorization header and is never printed, logged or written anywhere."""
 import http.client
 import json
 import os
@@ -24,15 +25,39 @@ class OpenAIError(Exception):
         self.status, self.message = status, message
 
 
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _from_file(path):
+    """the key from a file: the whole file (openai.key) or its OPENAI_API_KEY= line (.env)"""
+    try:
+        text = open(path).read()
+    except OSError:
+        return ''
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith('export '):
+            line = line[7:].strip()
+        if line.startswith('OPENAI_API_KEY='):
+            return line.split('=', 1)[1].strip().strip('"').strip("'")
+    return text.strip() if '=' not in text else ''
+
+
 def get_key(key_file=None):
+    """-> (key, where it came from). Never returns or prints anything but the source's name alongside the key."""
+    k = os.environ.get('OPENAI_API_KEY', '').strip()
+    if k:
+        return k, 'the OPENAI_API_KEY environment variable'
     if key_file:
-        k = open(key_file).read().strip()
-    else:
-        k = os.environ.get('OPENAI_API_KEY', '').strip()
-    if not k:
-        raise SystemExit('No OpenAI key: set the OPENAI_API_KEY environment variable (see references/setup.md). '
-                         'Never paste the key into the chat.')
-    return k
+        k = _from_file(key_file)
+        if k:
+            return k, 'the --key-file'
+    for name in ('openai.key', '.env'):
+        k = _from_file(os.path.join(SKILL_DIR, name))
+        if k:
+            return k, 'the skill folder\'s %s' % name
+    raise SystemExit('No OpenAI key: set OPENAI_API_KEY, or put the key in the skill folder as openai.key (see '
+                     'references/setup.md). Never paste the key into the chat.')
 
 
 def _request(req, timeout):

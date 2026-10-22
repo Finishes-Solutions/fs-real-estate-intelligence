@@ -14,7 +14,7 @@ the massing outlines on each result and scores how closely it kept them (fidelit
 
 Writes per view: <view>-massing.png, <view>.jpg (the rendering), <view>-prompt.txt, <view>-compare.png (massing |
 rendering | overlay), plus scene.txt and renders.json (model, size, cost estimate, scores). Needs numpy and Pillow.
-The key comes from OPENAI_API_KEY (or --key-file); it is never printed or saved."""
+The key comes from OPENAI_API_KEY, --key-file, or openai.key / .env in the skill folder; it is never printed or saved."""
 import argparse
 import base64
 import io
@@ -102,7 +102,8 @@ def main():
               'roughly $0.20-0.50 each (an estimate). Confirm with the user, then re-run with --yes.' % (
                   len(jobs), model or OA.PREFERRED, a.size, len(refs), len(jobs)))
         return
-    key = OA.get_key(a.key_file)
+    key, src = OA.get_key(a.key_file)
+    print('OpenAI key: from %s.' % src)
     if not model:
         try:
             model = OA.pick_image_model(OA.list_models(key))

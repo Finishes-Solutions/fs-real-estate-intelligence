@@ -50,8 +50,9 @@ Work in a folder like `./renderings/<project-slug>/`.
 
 ### 1. Check the setup
 
-Follow `references/setup.md`. The paid step needs `OPENAI_API_KEY` in the environment and network access to
-`api.openai.com`. **Never ask the user to paste the key into the chat**, and never print or save it. If the key or the
+Follow `references/setup.md`. The paid step needs an OpenAI key (`OPENAI_API_KEY` in the environment, or an
+`openai.key` / `.env` file the owner put in this skill's folder; the script finds it) and network access to
+`api.openai.com`. Never open, print or copy a key file; just run the script, which says where it found the key. **Never ask the user to paste the key into the chat**, and never print or save it. If the key or the
 network is missing, do steps 2–4 (no key needed), tell the user exactly what to set up, and stop before step 5.
 
 ### 2. Gather the inputs
@@ -138,7 +139,7 @@ Give the user the five JPEGs, the R-1 PDF and the updated project file. Then sum
 
 ## Rules
 
-- The key stays in the environment. Never ask for it in chat, echo it, write it to a file, or put it in a command line.
+- The key stays where the owner put it (the environment or the skill's key file). Never ask for it in chat, read or echo it, write it anywhere else, or put it in a command line.
 - Never spend on API calls without the user's go-ahead for this run; each re-paint after the first round needs a fresh okay.
 - The massing comes only from the project file. Don't add buildings, floors or features to make a prettier picture. If
   the design is wrong, it gets fixed in the set, not in the rendering.
