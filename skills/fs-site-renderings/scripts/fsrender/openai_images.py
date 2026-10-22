@@ -52,10 +52,17 @@ def get_key(key_file=None):
         k = _from_file(key_file)
         if k:
             return k, 'the --key-file'
+    placeholder = None
     for name in ('openai.key', '.env'):
         k = _from_file(os.path.join(SKILL_DIR, name))
+        if k and not k.startswith('sk-'):  # still the shipped placeholder (OpenAI keys start with sk-)
+            placeholder = name
+            continue
         if k:
             return k, 'the skill folder\'s %s' % name
+    if placeholder:
+        raise SystemExit('The skill folder\'s %s still holds the placeholder, not a key. The skill\'s owner replaces it with '
+                         'the real key (see references/setup.md). Never paste the key into the chat.' % placeholder)
     raise SystemExit('No OpenAI key: set OPENAI_API_KEY, or put the key in the skill folder as openai.key (see '
                      'references/setup.md). Never paste the key into the chat.')
 
