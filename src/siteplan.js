@@ -4652,7 +4652,7 @@ export function initSitePlan(ctx) {
       return '<label class="ps-sec' + (can ? '' : ' off') + '"><input type="checkbox" data-pssec="' + sec.id + '"' + (on && can ? ' checked' : '') + (sec.always || !can || busy ? ' disabled' : '') + '>' +
         '<span><b>' + esc(sec.label) + '</b>' + (can && n ? '<em>' + plural(n, 'sheet') + '</em>' : '') + '<small>' + esc(why || sec.note || '') + '</small></span></label>'; };
     const sheets = PS.sheetList(pl, { sections: [...s.sections], renders: nR, types }), sup = types.filter(t => t.supported), later = types.filter(t => !t.supported);
-    const discs = PS.pickSections([...s.sections]).filter(x => PS.SECTION_DISC[x]).length, calls = 1 + discs + (s.sections.has('arch') ? sup.length * 1.4 : 0);
+    const discs = PS.pickSections([...s.sections]).filter(x => PS.SECTION_DISC[x] && sheets.some(q => q.section === x)).length, calls = 1 + discs + (s.sections.has('arch') ? sup.length * 1.4 : 0);
     const mins = Math.max(1, Math.round((calls * 90 / 2 + sheets.length * 8 / 3 + 20) / 60)), cost = 0.12 + discs * 0.12 + (s.sections.has('arch') ? sup.length * 0.55 : 0);
     const ai = !I ? 'Checking Claude…' : I.error ? 'Couldn’t check Claude just now: the set is made with Claude’s notes and designs if it answers.' : !I.configured ? 'Claude isn’t set up on this site (ANTHROPIC_API_KEY): the set uses rule-based building designs and standard notes.'
       : 'Claude: <b>' + esc(psModel()) + '</b> at ' + esc(psEffort()) + ' effort (Settings › AI model)' + (I.budget?.spent != null ? ' · this month ' + usd(I.budget.spent) + ' of ' + usd(I.budget.cap) : '') + '. About ' + usd(cost) + ' for this set.';
@@ -4709,7 +4709,7 @@ export function initSitePlan(ctx) {
     const prev = (pl.sets || []), no = String(prev.length ? Math.max(...prev.map(x => +x.no || 0)) + 1 : 0), day = new Date(), short = d => new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
     const revisions = prev.slice().sort((a, b) => (+a.no) - (+b.no)).map(x => ({ no: x.no, date: short(x.at), desc: x.desc || 'Schematic design set' })).concat([{ no, date: short(day), desc: no === '0' ? 'Schematic design set' : 'Schematic design set, re-issued' }]);
     const steps = [{ key: 'notes', kind: 'claude', label: 'Cover notes' }];
-    for (const sec of sections) if (PS.SECTION_DISC[sec]) steps.push({ key: 'disc:' + PS.SECTION_DISC[sec], kind: 'claude', label: PS.sectionById(sec).label + ' notes' });
+    for (const sec of sections) if (PS.SECTION_DISC[sec] && sheets.some(q => q.section === sec)) steps.push({ key: 'disc:' + PS.SECTION_DISC[sec], kind: 'claude', label: PS.sectionById(sec).label + ' notes' });
     if (sections.includes('arch')) for (const t of types.filter(t => t.supported)) steps.push({ key: 'design:' + t.id, kind: 'claude', label: 'Design: ' + PD.typeName(t) });
     for (const sh of sheets) steps.push({ key: sh.number, kind: 'sheet', label: sh.number + ' ' + sh.title });
     steps.push({ key: 'merge', kind: 'merge', label: 'Put ' + sheets.length + ' sheets together' });

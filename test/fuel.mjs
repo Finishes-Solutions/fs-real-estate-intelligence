@@ -17,6 +17,10 @@ import { keyItems } from '../lib/planmap.mjs';
 import { planSVG, LEGEND } from '../lib/sitesheet.mjs';
 import { BUILDING_TYPES, fromType } from '../lib/buildings.mjs';
 import { SCHEMA, cleanZones } from '../api/siteplan.js';
+import * as PS from '../lib/planset.mjs';
+import * as PD from '../lib/plandesign.mjs';
+import { stationOf, systemOf, checksOf, lightsOf } from '../lib/sheets/fuel.mjs';
+import { fm362 } from './helpers/setctx.mjs';
 
 // ---------- the words ----------
 { const g = S.guessProgram('gas station with 8 pumps and a 4,500 sf c-store on the corner');
@@ -302,4 +306,37 @@ for (const o of mixOut) {
   for (const q of by('column')) assert.ok(S.pumpsOf(e).some(i => S.inRing(S.centroid(q.ring), S.corners(i))), 'each column stands on an island');
   const fc = S.planFeatures({ ...WTR, elements: [e] }, null), c3 = fc.features.filter(f => f.properties.k === 'c3');
   assert.equal(c3.length, parts.length, 'on the map'); assert.ok(c3.every(f => f.properties.h > f.properties.b), 'each piece has height'); assert.equal(c3.find(f => f.properties.part === 'fascia').geometry.coordinates.length, 2, 'the fascia a ring with a hole'); }
+
+// ---------- the plan set: the canopy, the pumps and the tanks get sheets of their own; every building its own type ----------
+const setOf = (plan, sections = PS.SECTIONS.map(x => x.id)) => { const types = PD.buildingTypes(plan), designs = {}; for (const t of types.filter(t => t.supported)) designs[t.id] = PD.placeDesign(PD.fallbackDesign(t), t).design;
+  const sheets = PS.sheetList(plan, { types, sections }); return { types, sheets, ctx: PS.setContext({ plan, project: { name: 'Test' }, address: '0 Waller Tomball Rd', county: 'Harris County, Texas', parcels: [], facts: [], notes: [], types, designs, date: 'October 22, 2026', revisions: [] }, sheets) }; };
+const F_SHEETS = ['F-001', 'F-101', 'F-102', 'F-201', 'F-301', 'F-401', 'F-501'];
+{ // the Waller mixed plan: a station among shops and apartments
+  const o = mixOut[0], plan = { ...WTR, name: 'Option A', program: o.program, elements: o.elements, zones: o.zones, recipe: o.recipe }, { types, sheets, ctx } = setOf(plan);
+  assert.deepEqual(sheets.filter(x => x.section === 'fuel').map(x => x.number), F_SHEETS, 'a gas station: its fuel system and canopy sheets');
+  const store = types.find(t => t.use === 'fuel'); assert.ok(store && store.supported && !store.wash, 'the c-store keeps a building type of its own among the apartments and shops (its plans, elevations, structure, MEP)');
+  assert.ok(sheets.some(x => x.typeId === store.id && x.kind === 'a-plans') && sheets.some(x => x.typeId === store.id && x.kind === 's-found') && sheets.some(x => x.typeId === store.id && x.kind === 'e-plan'), 'the c-store’s A, S and E sheets');
+  for (const u of new Set(plan.elements.filter(e => e.kind === 'building').map(e => e.use))) assert.ok(types.some(t => t.use === u), 'every use keeps a type: ' + u);
+  for (const sh of sheets.filter(x => x.section === 'fuel')) { const html = PS.sheetPage(ctx, sh); assert.ok(!/couldn’t be drawn|isn’t drawn yet/.test(html), sh.number + ' draws'); assert.ok(html.length > 3000, sh.number + ' has a drawing'); assert.match(html, /1&quot; = \d+'-0&quot;|&quot; = 1'-0&quot;|N\.T\.S\.|As noted/, sh.number + ' says its scale'); }
+  const st = stationOf(plan), sys = systemOf(st);
+  assert.equal(st.islands.length, 10, 'ten dispensers'); assert.equal(st.cols.length, 10, 'a column on each island'); assert.ok(Math.abs(st.W - Math.max(o.elements.find(e => e.kind === 'canopy').w, o.elements.find(e => e.kind === 'canopy').d)) < 0.01);
+  assert.equal(sys.tanks.length, 3, 'a tank for each product'); for (const t of sys.tanks) assert.ok(t.x0 >= st.tank.x0 - 0.01 && t.x1 <= st.tank.x1 + 0.01 && t.y0 >= st.tank.y0 - 0.01 && t.y1 <= st.tank.y1 + 0.01 && t.cap >= 6000, t.tag + ' in the tank pad, ' + t.cap + ' gal');
+  for (const c of checksOf(st)) assert.ok(c.ok, 'separation: ' + c.item + ' ' + c.have.toFixed(1) + (c.have2 != null ? '–' + c.have2.toFixed(1) : '') + ' ft');
+  const L = lightsOf(st); assert.ok(L.fc >= 20 && L.fc <= 40, 'canopy lighting about 20–40 fc: ' + L.fc.toFixed(0));
+  assert.ok(PS.DISCIPLINES.fuel && PS.SECTION_DISC.fuel === 'fuel', 'the fuel section has its own notes from the AI'); }
+{ // a station with a car wash: the wash is designed as a car wash, not a second store
+  const o = L.layoutOptions(fm362, { use: 'fuel', fuel: { pumps: 10, wash: true } })[0], plan = { ...fm362, name: 'Option A', program: o.program, elements: o.elements, zones: o.zones }, { types, sheets, ctx } = setOf(plan);
+  const wash = types.find(t => t.wash), store = types.find(t => t.use === 'fuel' && !t.wash); assert.ok(wash && store, 'the store and the car wash, each a type');
+  assert.equal(wash.label, 'Car wash'); assert.equal(wash.occupancy, 'B');
+  const d = PD.placeDesign(PD.fallbackDesign(wash), wash); assert.deepEqual(d.problems, [], 'the car wash design passes the checks'); assert.ok(d.design.rooms.some(r => r.name === 'Wash tunnel') && d.design.doors.filter(x => x.kind === 'overhead').length === 2, 'a tunnel with an overhead door at each end');
+  assert.ok(!d.design.rooms.some(r => r.type === 'sales'), 'no sales floor in the car wash');
+  assert.match(PD.designBrief(wash), /car wash tunnel/, 'the AI is asked for a car wash'); assert.match(PD.designBrief(store), /convenience store/);
+  for (const sh of sheets.filter(x => x.section === 'fuel')) assert.ok(!/couldn’t be drawn/.test(PS.sheetPage(ctx, sh)), sh.number + ' draws');
+  for (const c of checksOf(stationOf(plan))) assert.ok(c.ok, 'separation (10 pumps, store far back): ' + c.item); }
+{ // a canopy drawn by hand, no pumps, store or tanks yet: every F sheet still draws
+  const plan = { ring: [[0, 0], [300, 0], [300, 250], [0, 250]], front: 0, origin: [-95.8, 29.7], setbacks: {}, program: { use: 'fuel' }, elements: [{ id: 'c', kind: 'canopy', x: 150, y: 60, w: 120, d: 60, rot: 0, pumps: 0, rows: 1 }] }, { sheets, ctx } = setOf(plan);
+  assert.equal(sheets.filter(x => x.section === 'fuel').length, 7); for (const sh of sheets.filter(x => x.section === 'fuel')) assert.ok(!/couldn’t be drawn/.test(PS.sheetPage(ctx, sh)), 'bare canopy: ' + sh.number + ' draws'); }
+{ // no canopy, no fuel sheets
+  const o = L.layoutOptions(fm362, { use: 'retail', gfa: 20000 })[0], plan = { ...fm362, program: o.program, elements: o.elements };
+  assert.ok(!PS.sheetList(plan, { types: PD.buildingTypes(plan) }).some(x => x.section === 'fuel'), 'a shopping center: no fuel sheets'); assert.equal(PS.sectionCounts(plan, 0, PD.buildingTypes(plan)).fuel, 0); }
 console.log('fuel ok');
