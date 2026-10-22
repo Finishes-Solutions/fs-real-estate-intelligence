@@ -5,12 +5,17 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 4:06 PM CT: The Waller label box is off the plan panel (c1db6f2)
+- **Removed from the top of the site plan panel:** the red box with "AI-assisted conceptual site plan · for feasibility and planning only · not for permit or construction" and its **Full label** link, the "Waller guardrails on · Inside the City of Waller" line with its **Verified** / **Unverified** tag, and "Laid out as B · Finishes base case".
+- **Still there:** the label on the PDF, the drawing and the exports; the guardrail settings (on/off, scenario) under Site parameters; the scenario columns and tags in Numbers. When the layout on the map was made for a different scenario, a single line at the top still says so, with the button to lay it out again.
+
 ### 3:47 PM CT: Site plans can run on Claude, Opus 5.5 by default (d218152)
 - **Pick the AI for site plans.** Settings › AI model › **Site plans** now has an **AI** choice: **OpenAI** (as before) or **Claude (Anthropic)**, and a **Claude model** list. The default is Claude Opus 5.5; any other Claude model the site's key can use is listed. Both picks are kept on this device.
 - **What Claude does when picked:** everything the site planner asks the AI: thinking the site through, turning the request into a program, reviewing the layouts (it sees their drawings), Change With AI, Ask about the plan, What Should Go Here?, and the names. It thinks at the effort picked under Build. The layouts themselves are still drawn and measured by the planner, not by the AI.
 - **Stays on OpenAI:** the jurisdiction (ETJ) and best-use web lookups, Ask AI, filing briefs.
 - **Never stuck:** if the site has no Claude key, or Claude turns a particular request away, OpenAI answers instead, and Settings says which model gave the last answer.
 - **Not checked yet against the live service:** the answers' quality and speed on Claude against OpenAI on real sites; the bigger requests (the program, the review, Change With AI) send Claude their answer format in the instructions, since it's too detailed for Claude's strict-format mode.
+
 ### 3:40 PM CT: Gas stations brought up to date with the re-fit fix (merge of main)
 - **Checked together:** with the 2:54 PM re-fit fix, moving or pinning the big shop building beside a gas station's corner outparcel on the 0 Waller Tomball Rd tract now keeps all the apartments (216; it used to drop to about 106 and the app kept your edit instead). A test now covers it.
 
