@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
-### 5:00 PM CT: fs-set-plans skill v2: plan sets that follow the layout and look like real drawings (HASH)
+### 5:00 PM CT: fs-set-plans skill v2: plan sets that follow the layout and look like real drawings (df35aff)
 - **New zip, outside the app:** `skills/fs-set-plans.zip` replaces the plan set skill that was installed. It was rebuilt after a test run on 0 US 290, Waller (0.93 ac, Option B), where the set redrew the site instead of following it.
 - **Follows the site layout exactly:** the agent is told the layout is the design. Every building keeps its real shape and position, including a skewed L. Parking is drawn as the rows the layout shows, and the stalls are counted from the drawing. The set flags any stall count that differs from the layout's. Stalls a building sits on are left off and reported, and no pond is invented when the layout has none. Problems like these go on the cover and in the summary instead of being "fixed".
 - **Reads the app's plan-set PDF:** the cover and site plan (G-001 + C-101) are a supported input. The scale, boundary, building, parking field, stall count and project data are taken straight off them. An fs-site-plan hand-off still works as before.
