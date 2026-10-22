@@ -99,8 +99,9 @@ for (const r of Object.values(runs)) for (const o of r.nets) draws({ ...r.site, 
   for (const o of nets) { checkNet(pentagon, o, 'commons ' + o.name, { draw: false }); const ways = S.entrancesOf(o.elements); assert.equal(ways.length, 1 + o.recipe.net.ways.length, 'commons: every way in is the network’s own');
     const plan = { ...pentagon, program: o.program, elements: o.elements, recipe: o.recipe }, r = L.refit(structuredClone(plan), { amount: 'current' }); assert.equal(homes(r.elements).length, homes(o.elements).length, 'commons: an unchanged re-fit keeps every home'); } }
 
-// ---- 3. a count asked for: that many homes nearest the entry, the rest land for later ----
-{ const o = L.netOnly(waller, { use: 'sfr', units: 300 }, { count: 1, netBudgetMs: 25000 })[0], n = homes(o.elements).length; // (time for every kind: the clock alone mustn't decide which first phase is checked)
+// ---- 3. a count asked for with the land held for later (Settings › Leftover land › Hold it for later; the site is filled
+// otherwise, below): that many homes nearest the entry, the rest land for later ----
+{ const o = L.netOnly({ ...waller, params: { fill: false } }, { use: 'sfr', units: 300 }, { count: 1, netBudgetMs: 25000 })[0], n = homes(o.elements).length; // (time for every kind: the clock alone mustn't decide which first phase is checked)
   assert.ok(Math.abs(n - 300) <= 3, '300 homes asked: ' + n); checkNet(waller, o, '300 homes', { phase: true });
   assert.ok(o.elements.some(e => e.future && e.name === 'Future development') || o.notes.some(t => /future phase/.test(t)), 'the rest is land for a later phase');
   // (one network: every home and every way in reached from the main entry; a street with no homes on it is built only when
@@ -109,6 +110,10 @@ for (const r of Object.values(runs)) for (const o of r.nets) draws({ ...r.site, 
   assert.ok(needs(o.elements), 'every home and way in reached from the main entry');
   for (const s of o.recipe.net.streets.filter(s => !s.pseudo)) { const d = o.recipe.net.discs.filter(x => x.of === s.id).map(x => x.id); if (on.has(s.id) || d.some(x => on.has(x))) continue;
     assert.ok(!needs(o.elements.filter(e => !(e.kind === 'drive' && (e.net === s.id || d.includes(e.net))))), 'a street with no homes on it (' + (s.name || s.role) + ') joins others'); } }
+// the same count with the site filled (the default): at least that many, the land past them more streets of homes as one plan
+{ const o = L.netOnly(waller, { use: 'sfr', units: 300 }, { count: 1, netBudgetMs: 8000 })[0], n = homes(o.elements).length;
+  assert.ok(n > 330, '300 homes asked, the site filled: ' + n); assert.ok(!o.elements.some(e => e.future || e.name === 'Future development'), 'no land held for later');
+  assert.ok(o.notes.some(t => /^300 homes asked for; the land holds \d+, so the plan builds them all\.$/.test(t)), o.notes.join(' / ')); checkNet(waller, o, '300 homes, filled', { draw: false }); }
 
 // ---- 4. re-fits of the best Waller network ----
 const best = runs.Waller.nets[0], base = { ...waller, program: best.program, elements: best.elements, recipe: best.recipe };

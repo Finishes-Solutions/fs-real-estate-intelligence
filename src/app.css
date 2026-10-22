@@ -2225,6 +2225,34 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-h3{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0 0 12px;font:700 14px/1.3 var(--font-display);color:var(--text)}
 .pj-h3 .pj-tn{font-size:12px;color:var(--muted)}
 .pj-box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+/* Files: reference files for the AI (src/sitefiles.js) */
+.pj-files .rnote{margin:0 0 10px}
+.pj-drop{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:4px 0 14px;padding:16px;border:1.5px dashed var(--line-2);border-radius:10px;background:var(--panel-2);font-size:13px}
+.pj-drop.over{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,var(--panel))}
+.pj-drop small{flex-basis:100%;color:var(--muted);font-size:11.5px}
+.pj-flist{display:grid;gap:12px}
+.pj-file{border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
+.pj-fh{display:flex;align-items:flex-start;gap:10px}
+.pj-fic{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:6px;background:var(--chip);font:700 10.5px var(--font-mono);color:var(--text-2)}
+.pj-fm{flex:1;min-width:0;display:grid;gap:2px}.pj-fm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}.pj-fm span{color:var(--muted);font-size:12px}
+.pj-fa{flex:none;display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+.pj-fsum{margin:8px 0 4px;font-size:13px;color:var(--text-2)}
+.pj-facts{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.pj-fact{padding:8px 10px;border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:6px;font-size:12.5px;min-width:0}
+.pj-fact.s-ok{border-left-color:var(--brand)}.pj-fact.s-no{opacity:.65}
+.pj-ft{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px}.pj-ft b{font:600 13px var(--font-display)}
+.pj-fcat{font:600 10.5px var(--font-display);text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.pj-conf{font-style:normal;font-size:10.5px;padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--warn) 18%,var(--panel));color:var(--text)}.pj-conf.ed{background:var(--chip)}
+.pj-fx{margin:3px 0 2px;overflow-wrap:anywhere}.pj-fsrc{color:var(--muted);font-size:11px}
+.pj-fact-a{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
+.pj-fst{font-size:11.5px;color:var(--muted)}.pj-fst.ok{color:var(--brand);font-weight:600}
+.pj-fplace{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}.pj-fplace select{max-width:180px}
+.pj-fedit .pj-fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:8px}
+.pj-fedit label{display:grid;gap:3px;font-size:11.5px;color:var(--text-2)}.pj-fedit .pj-fw{grid-column:1/-1}
+.pj-fedit input,.pj-fedit textarea,.pj-fedit select{width:100%;box-sizing:border-box;font:inherit;font-size:13px}
+.pj-fgone{margin-top:6px;font-size:12px}.pj-fgone summary{cursor:var(--cur-pointer,pointer);color:var(--muted)}
+#card .sp-refs{margin-top:8px}
+@media (max-width:700px){.pj-fh{flex-wrap:wrap}.pj-fa{flex-basis:100%;justify-content:flex-start}}
 .pj-sec0{margin-top:0}
 /* Overview: the project's information beside the site's jurisdiction, then the parcels */
 .pj-ov{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px;align-items:start}
@@ -3211,6 +3239,18 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
 .sp-runpill .sp-run-dot{background:var(--green-300)}
 .sp-runpill .sp-run-x{border-radius:999px;border-color:rgba(255,255,255,.25);background:transparent;color:#fff}
 @media (max-width:700px){#card .sp-run{display:none}}
+/* a build whose layouts wait for the AI's review: the Layouts section is the run's steps, the time and Cancel */
+.sp-runcard{margin-top:8px;padding:10px 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--panel-2);font-size:12.5px;line-height:1.45}
+.sp-rc-h{margin:0 0 6px;font-weight:600;color:var(--text)}
+.sp-rc-steps{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.sp-rc-steps li{position:relative;padding-left:20px;color:var(--muted);overflow-wrap:anywhere}
+.sp-rc-steps li::before{content:"";position:absolute;left:3px;top:5px;width:8px;height:8px;border-radius:50%;border:1.5px solid var(--line-2)}
+.sp-rc-steps li.done{color:var(--text-2)}.sp-rc-steps li.done::before{background:var(--brand);border-color:var(--brand)}
+.sp-rc-steps li.now{color:var(--text);font-weight:600}.sp-rc-steps li.now::before{background:var(--brand);border-color:var(--brand);animation:sp-blink 1.2s ease-in-out infinite}
+.sp-rc-f{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;color:var(--text-2)}
+.sp-runcard .rnote{margin:6px 0 0}
+@media (prefers-reduced-motion:reduce){.sp-rc-steps li.now::before{animation:none}}
+.sp-lbanner.sp-unrev{background:color-mix(in srgb,var(--warn) 10%,var(--panel));border-color:color-mix(in srgb,var(--warn) 40%,transparent)}.sp-lbanner.sp-unrev b{color:var(--text)}
 /* a control that started a run that isn't a button (More layouts…, Review again): a small spinner after it */
 .sp-link.busy::after{content:"";display:inline-block;width:10px;height:10px;margin-left:6px;vertical-align:-1px;border-radius:50%;border:2px solid var(--line-2);border-top-color:var(--brand);animation:sp-spin .7s linear infinite}
 #card .sp-sugs .chip:disabled,#card [data-idea]:disabled{opacity:.45;cursor:var(--cur-default,default)}
