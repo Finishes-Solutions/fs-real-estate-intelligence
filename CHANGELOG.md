@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 6:52 PM CT: A demographics report for your project app's agents (a582127)
+- **New report:** the agents can make a Demographics report PDF for a property: 1, 3 and 5-mile rings (or any radii up to 25 miles), or a whole county or drawn area. It has population and growth, households, median income, home value and rent (approximate where tracts are combined), vacancy, median age, households by income band, jobs located there and estimated spending by category, on a street map with the rings, in the Finishes Solutions style, with a CSV when asked.
+- **Growth says what it is measured against:** population growth in the agents' answers now reads "since 2020" (the census survey it is compared with) and jobs growth "since 2018", instead of "5 years".
+- **Not on the website yet:** the report is built so the Reports page can offer it later.
+
 ### 6:28 PM CT: Your project app's agents can make the PDF reports (8d167ef)
 - **Four reports for the agents:** the FEMA flood & hazard report, the Environmental report, the Crime report (Houston) and the City / County Crime Report, for a property (its parcel), a radius, a county or a drawn area. Each comes back as the same PDF the Reports page makes, in the Finishes Solutions style, with a short summary and, when asked, the data as a CSV.
 - **Kept small enough to send:** the agents' copies use smaller street maps and list the newest 500 incidents (the CSV has all of them). A report that still can't fit in one answer says so plainly instead of sending a cut-off file.
