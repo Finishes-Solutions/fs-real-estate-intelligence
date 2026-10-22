@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 5:31 PM CT: Huntsville no longer listed under Waller County's sales tax (5eec8f5, 7d77060)
+- **City sales tax by county is corrected.** Huntsville showed under Waller County because one remodel filed with the state under Waller has a Huntsville address. Filings whose address is outside the county they were filed under no longer decide which county a city belongs to.
+- **Same fix for three other towns outside the area:** Livingston (was under Montgomery), Freeport and La Marque (were under Harris) drop out of the sales tax figures.
+- **Area news** no longer searches a town just because of a misfiled filing.
+- **On the site now:** the four towns were removed from the published figures right away; the nightly refresh keeps them out from here on.
+
 ### 4:59 PM CT: Site Plan for All uses every parcel picked (3a8f26a)
 - **Every parcel you pick is in the site.** Before, parcels whose county outlines didn't quite touch were treated as separate, and only the biggest connected group went into the plan. On Waller Tomball Rd that dropped a 20.8-acre tract 60 ft from the 128-acre tract beside it.
 - **Gaps between neighbours are filled in.** The slivers and gaps the county's outlines leave between parcels that border each other are now part of the site, with no slits between lots (tested on a block of four lots drawn 12 ft apart: one plain rectangle).
