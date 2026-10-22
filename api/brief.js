@@ -1,14 +1,13 @@
 // AI project brief: GET /api/brief?id=TABS...  -> { brief, built }
 // Grounded in the filing, nearby activity, the same developer's other filings, tract demographics and change history.
 // Responses are CDN-cached per id for a week (and invalidated by each data deploy), so repeat views cost nothing.
-import { chatText, pickModel, withModel } from '../lib/openai.mjs';
+import { router, chatText, wantsClaude } from '../lib/airoute.mjs';
 import { entityKey } from '../lib/taxonomy.mjs';
 import { miles } from '../lib/filter.mjs';
 import { load } from './_lib/data.mjs';
 import { rateLimit, needKey } from './_lib/guard.mjs';
 
-let modelP = null;
-const model = key => (modelP ||= pickModel(key, process.env.OPENAI_MODEL).catch(e => { modelP = null; throw e; }));
+const { ai } = router(() => process.env.OPENAI_MODEL); // Settings › AI model › Filing briefs: OpenAI or Claude (lib/airoute.mjs)
 
 function inPoly(pt, geom) {
   const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates;
@@ -31,7 +30,8 @@ export default async function handler(req, res) {
   const id = String(req.query.id || '').slice(0, 40);
   if (!/^[A-Za-z0-9-]+$/.test(id)) return res.status(400).json({ error: 'Bad id' });
   if (!rateLimit(req, res, { perMinute: 6, perDay: 40 })) return;
-  const key = needKey(res); if (!key) return;
+  const pick = { provider: req.query.provider === 'anthropic' ? 'anthropic' : null, model: typeof req.query.model === 'string' ? req.query.model : null };
+  const key = wantsClaude(pick) ? process.env.OPENAI_API_KEY || '' : needKey(res); if (key == null) return;
   try {
     const [data, market, changes, area] = await Promise.all([load('filings.json'), load('market.json').catch(() => null), load('changes.json').catch(() => null), load('area.json').catch(() => null)]);
     const f = data.filings.find(x => x.id === id); if (!f) return res.status(404).json({ error: 'Not found' });
@@ -54,7 +54,7 @@ export default async function handler(req, res) {
 Use ONLY the facts provided (a Texas TDLR TABS accessibility registration plus derived context). Values and dates are filer estimates; inferred dates are our own estimates and must be called "estimated".
 Format exactly these sections as plain text with the heading on its own line: What it is / Timing / Who's involved / Area context / Why it matters. 2-3 sentences each, under 220 words total. If a fact is missing, say so briefly rather than guessing. Cite related filings by id in square brackets.`;
     // Settings › AI model (its own cache entry by URL), and the default if it can't serve the call
-    const text = await withModel(key, typeof req.query.model === 'string' ? req.query.model : null, () => model(key), m => chatText({ key, model: m, feature: 'brief', system, user: JSON.stringify(facts), maxTokens: 8000 }), m => res.setHeader?.('X-AI-Model', m));
+    const text = await ai(key, pick, res, m => chatText({ key, model: m, feature: 'brief', system, user: JSON.stringify(facts), maxTokens: 8000, effort: 'medium' }));
     res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
     return res.json({ brief: text, built: data.built });
   } catch (e) {

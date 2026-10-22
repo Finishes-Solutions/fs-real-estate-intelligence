@@ -1,8 +1,11 @@
 // Voice: mints a short-lived OpenAI Realtime client secret so the browser can talk to the model over WebRTC directly.
 // The session carries the same map tools as the text chat; the browser executes them.
-// POST { context: { coverage, filters } } -> { value: 'ek_…', model, expires_at }
+// POST { context: { coverage, filters }, model? } -> { value: 'ek_…', model, expires_at }   model: Settings › AI model ›
+//   Voice (an OpenAI realtime model the key has; tried first, then the usual ones)
 import { realtimeTools, systemPrompt, VOICE_STYLE } from '../lib/agent-tools.mjs';
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
+import { pickedFor } from '../lib/openai.mjs';
+import { isRealtimeModel } from '../lib/aimodels.mjs';
 
 const MODELS = [process.env.OPENAI_REALTIME_MODEL, 'gpt-realtime-2.1', 'gpt-realtime'].filter(Boolean);
 
@@ -20,7 +23,8 @@ export default async function handler(req, res) {
   const extra = String(ctx.vocab || '').split(',').map(x => x.trim()).filter(x => x && x.length < 40 && !/county$/i.test(x)).slice(0, 6);
   const vocab = clip(['Houston, Texas commercial real estate. Katy, Cypress, Sugar Land, The Woodlands, Pearland, Conroe, Tomball, Fulshear', ...extra, 'TDLR, TABS, multifamily'].join(', '), 400);
   let last = '';
-  for (const model of MODELS) {
+  const picked = await pickedFor(key, typeof body.model === 'string' ? body.model : null, isRealtimeModel);
+  for (const model of [...new Set([picked, ...MODELS].filter(Boolean))]) {
     const r = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
       method: 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ expires_after: { anchor: 'created_at', seconds: 120 }, session: {

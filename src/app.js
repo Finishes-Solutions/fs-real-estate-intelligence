@@ -727,7 +727,7 @@ function historyHtml(f){
   return '<div class="fhist"><div class="fl">History</div>'+rows.map(([d,x])=>'<div><span class="m">'+esc(d)+'</span> '+(x.k==='new'?'First seen':esc(x.label)+': '+esc(fv(x.k,x.from))+' → '+esc(fv(x.k,x.to)))+'</div>').join('')+'</div>'; }
 async function loadBrief(f){
   const box=card.querySelector('#briefBox'); if(!box) return; box.innerHTML='<div class="lt">AI Project Brief</div><div class="rnote loading">Writing a brief from the filing, nearby activity and census data…</div>';
-  try{ let r; try{ const md=ctx.aiModel?.(); r=await fetch('api/brief?id='+encodeURIComponent(f.id)+(md?'&model='+encodeURIComponent(md):'')); ctx.noteModel?.(r); }catch(e){ throw new Error(aiErrorMessage({network:true,offline:navigator.onLine===false})); }
+  try{ let r; try{ const ai=ctx.aiFor?.('brief')||{}; r=await fetch('api/brief?id='+encodeURIComponent(f.id)+(ai.provider?'&provider='+ai.provider:'')+(ai.model?'&model='+encodeURIComponent(ai.model):'')); ctx.noteModel?.(r); }catch(e){ throw new Error(aiErrorMessage({network:true,offline:navigator.onLine===false})); }
     const d=await r.json().catch(()=>({}));
     if(state.sel!==f) return; if(!r.ok) throw new Error(aiErrorMessage({status:r.status,error:d.error}));
     box.innerHTML='<div class="lt">AI Project Brief</div><div class="btext">'+richText(d.brief)+'</div><div class="ssrc src">AI-written from the data on this page. Verify before relying on it.</div>'; wireCites(box); }

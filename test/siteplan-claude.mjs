@@ -6,13 +6,24 @@ import * as AN from '../lib/anthropic.mjs';
 import * as A from '../lib/aimodels.mjs';
 import { NOTES_SCHEMA } from '../lib/planset.mjs';
 
-// ---- the browser's side: what a request carries ----
-assert.deepEqual(A.siteplanAI('', '', ''), {}, 'nothing picked: the server’s OpenAI default');
-assert.deepEqual(A.siteplanAI('', 'claude-opus-5-5', 'gpt-5-mini'), { model: 'gpt-5-mini' }, 'OpenAI: the model picked above');
-assert.deepEqual(A.siteplanAI('anthropic', '', 'gpt-5-mini'), { provider: 'anthropic' }, 'Claude, the server’s Claude model');
-assert.deepEqual(A.siteplanAI('anthropic', 'claude-sonnet-5-5', 'gpt-5-mini'), { provider: 'anthropic', model: 'claude-sonnet-5-5' });
-assert.deepEqual(A.siteplanAI('anthropic', 'gpt-5', ''), { provider: 'anthropic' }, 'never an OpenAI id sent as the Claude model');
-assert.equal(A.pickedProvider('openai'), ''); assert.equal(A.pickedProvider('anthropic'), 'anthropic'); assert.equal(A.pickedProvider(null), '');
+// ---- the browser's side: each feature's pick, and what a request carries ----
+const J = o => JSON.stringify(o);
+assert.deepEqual(A.aiRequest(A.readPick('siteplan', null)), {}, 'nothing picked: the server’s OpenAI default');
+assert.deepEqual(A.aiRequest(A.readPick('siteplan', null, { model: 'gpt-5-mini' })), { model: 'gpt-5-mini' }, 'the one OpenAI model picked before per-feature picks');
+assert.deepEqual(A.aiRequest(A.readPick('siteplan', null, { siteplanProvider: 'anthropic', siteplanClaude: 'claude-sonnet-5-5' })), { provider: 'anthropic', model: 'claude-sonnet-5-5' }, 'site plans switched to Claude before');
+assert.deepEqual(A.aiRequest(A.readPick('siteplan', J({ provider: 'anthropic' }))), { provider: 'anthropic' }, 'Claude, the server’s Claude model');
+assert.deepEqual(A.aiRequest(A.readPick('chat', J({ provider: 'anthropic', model: 'claude-sonnet-5-5' }), { model: 'gpt-5-mini' })), { provider: 'anthropic', model: 'claude-sonnet-5-5' }, 'a pick of its own wins over the old one');
+assert.deepEqual(A.aiRequest(A.readPick('chat', J({ provider: 'anthropic', model: 'gpt-5' }))), { provider: 'anthropic' }, 'never an OpenAI id sent as the Claude model');
+assert.deepEqual(A.readPick('voice', J({ provider: 'anthropic', model: 'claude-opus-5-5' })), { provider: 'openai', model: '' }, 'voice is OpenAI only');
+assert.deepEqual(A.readPick('voice', J({ provider: 'openai', model: 'gpt-realtime-2.1' })), { provider: 'openai', model: 'gpt-realtime-2.1' });
+assert.deepEqual(A.readPick('voice', J({ provider: 'openai', model: 'gpt-5-mini' })), { provider: 'openai', model: '' }, 'a chat model isn’t a voice model');
+assert.deepEqual(A.readPick('render', J({ model: 'gpt-image-2' })), { provider: 'openai', model: 'gpt-image-2' }); assert.equal(A.readPick('render', J({ model: 'dall-e-3' })).model, '');
+assert.deepEqual(A.readPick('voice', null, { model: 'gpt-5-mini' }), { provider: 'openai', model: '' }, 'the old chat model pick doesn’t reach voice');
+assert.deepEqual(A.readPick('search', null, { model: 'gpt-5-mini' }), { provider: 'openai', model: '' }, 'nor place search');
+assert.deepEqual(A.readPick('chat', '{not json'), { provider: 'openai', model: '' }); assert.deepEqual(A.readPick('nope', null), { provider: 'openai', model: '' });
+assert.deepEqual(A.kindModels([{ id: 'gpt-realtime', created: 2 }, { id: 'gpt-realtime-2.1', created: 3 }, { id: 'gpt-realtime-2025-08-28', created: 1 }, { id: 'gpt-5', created: 4 }], 'realtime').map(m => m.id), ['gpt-realtime-2.1', 'gpt-realtime']);
+assert.deepEqual(A.kindModels([{ id: 'gpt-image-1', created: 1 }, { id: 'gpt-image-2', created: 2 }, { id: 'dall-e-3', created: 3 }], 'image').map(m => m.id), ['gpt-image-2', 'gpt-image-1']);
+assert.ok(A.PROVIDERS.every(p => p.on), 'Claude is selectable (the key is set on the site)');
 
 // ---- which schemas fit Claude's structured output, and reading an answer given as text ----
 const { SCHEMA, REVIEW_SCHEMA, EDIT_SCHEMA, STRATEGY_SCHEMA, NAMES_SCHEMA, default: handler } = await import('../api/siteplan.js');

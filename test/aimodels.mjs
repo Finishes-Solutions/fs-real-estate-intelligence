@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const A = await import('../lib/aimodels.mjs');
 
 // ---- the catalog ----
-assert.deepEqual(A.PROVIDERS.map(p => [p.id, p.on]), [['openai', true], ['anthropic', false]], 'OpenAI answers the general features; Claude only plan sets (its own picker)');
+assert.deepEqual(A.PROVIDERS.map(p => [p.id, p.on]), [['openai', true], ['anthropic', true]], 'both providers can be picked (per feature, Settings › AI model)');
 const list = [{ id: 'gpt-6-luna', created: 300 }, { id: 'gpt-5-mini', created: 200 }, { id: 'gpt-4.1-mini', created: 100 }, { id: 'o4-mini', created: 250 }, { id: 'gpt-4o-2024-08-06', created: 90 },
   { id: 'gpt-4o-realtime-preview', created: 95 }, { id: 'gpt-4o-mini-tts', created: 80 }, { id: 'text-embedding-3-large', created: 70 }, { id: 'dall-e-3', created: 60 }, { id: 'whisper-1', created: 50 },
   { id: 'gpt-4o-search-preview', created: 40 }, { id: 'omni-moderation-latest', created: 30 }, { id: 'gpt-image-1', created: 20 }, { id: 'gpt-4o-transcribe', created: 10 }, { id: 'codex-mini-latest', created: 5 }];
@@ -47,7 +47,9 @@ res = await call({ mode: 'ask', question: 'Why?', plan: facts }); assert.equal(s
 // api/models: the picker's list
 const { default: models } = await import('../api/models.js');
 const mr = mock(); await models({ method: 'GET', headers: { 'x-forwarded-for': '9.9.8.1' } }, mr);
-assert.equal(mr.code, 200); assert.equal(mr.body.default, 'gpt-6-luna'); assert.deepEqual(mr.body.models.map(m => m.id), ['gpt-6-luna', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini']); assert.equal(mr.body.providers[1].on, false);
+assert.equal(mr.code, 200); assert.equal(mr.body.default, 'gpt-6-luna'); assert.deepEqual(mr.body.models.map(m => m.id), ['gpt-6-luna', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini']); assert.equal(mr.body.providers[1].on, true);
+assert.deepEqual(mr.body.realtime, [], 'no live voice models in this list'); assert.equal(mr.body.defaults.siteplan, 'gpt-6-luna'); assert.equal(mr.body.defaults.search, 'gpt-5-mini', 'place search starts from its own list');
+assert.equal(mr.body.defaults.voice, 'gpt-realtime-2.1', 'a voice model the key doesn’t list: the first of its own list');
 // a picked model that can't serve the call (OpenAI 400): made again with the default, and the header says so
 { let tries = []; globalThis.fetch = async (url, opts = {}) => {
     if (String(url).endsWith('/models')) return Response.json({ data: list });

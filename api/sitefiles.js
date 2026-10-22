@@ -12,7 +12,8 @@
 // Uses the same optional team passcode as the notes and projects (FIELD_ACCESS_CODE, header x-field-code).
 import { rateLimit, sameOrigin, clip } from './_lib/guard.mjs';
 import { conn as fieldConn } from './field.js';
-import { chatJSON, pickModel, withModel, withRoom } from '../lib/openai.mjs';
+import { withRoom } from '../lib/openai.mjs';
+import { router, chatJSON, wantsClaude } from '../lib/airoute.mjs';
 import * as RF from '../lib/sitefiles.mjs';
 
 const B = RF.BUCKET, MAX_FILES = 50, PID = /^[\w-]{3,60}$/;
@@ -31,8 +32,7 @@ const noBucket = e => /bucket not found/i.test(e?.message || '');
 const newId = () => (Date.now().toString(36) + Math.random().toString(36).slice(2, 10)).slice(0, 20);
 
 // ---------- the AI reads one file ----------
-let modelP = null;
-const model0 = key => (modelP ||= pickModel(key, process.env.OPENAI_MODEL).catch(e => { modelP = null; throw e; }));
+const { ai } = router(() => process.env.OPENAI_MODEL); // Settings › AI model › Reference files: OpenAI or Claude (lib/airoute.mjs)
 const isPdf = b => b.length > 4 && b.slice(0, 5).toString('latin1') === '%PDF-', isPng = b => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47, isJpg = b => b[0] === 0xff && b[1] === 0xd8;
 // what goes to the model for a file: a PDF as the document, a picture as an image, a DXF or text file as its words;
 // null when the bytes aren't what the name says
@@ -43,10 +43,10 @@ export function contentFor(buf, name) {
   const s = buf.toString('utf8'); if (/\u0000/.test(s.slice(0, 2000))) return null; // a binary DXF, or not text at all
   return { text: t.ext === 'dxf' ? RF.dxfDigest(s) : s.slice(0, 60000) };
 }
-export async function readFile(buf, name, { key, model = null, res = null } = {}) {
+export async function readFile(buf, name, { key, model = null, provider = null, res = null } = {}) {
   const c = contentFor(buf, name); if (!c) { const e = new Error('That file isn’t a ' + (RF.typeOf(name)?.ext || '').toUpperCase() + ' the AI can read (it may be damaged, or saved in another format).'); e.status = 422; throw e; }
   const user = 'Reference file: ' + clip(name, 120) + ' (' + RF.typeOf(name).how + '). Read it and list its facts.' + (c.text ? '\n\n' + c.text : '');
-  const t0 = Date.now(), r = await withModel(key, typeof model === 'string' ? model : null, () => model0(key), m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: RF.READ_SYSTEM, user, name: 'reference_facts', schema: RF.READ_SCHEMA, images: c.images || [], files: c.files || [], ...o }), { maxTokens: 16000, effort: 'medium', t0 }), m => res?.setHeader?.('X-AI-Model', m));
+  const t0 = Date.now(), r = await ai(key, { provider, model }, res, m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: RF.READ_SYSTEM, user, name: 'reference_facts', schema: RF.READ_SCHEMA, images: c.images || [], files: c.files || [], ...o }), { maxTokens: 16000, effort: 'medium', t0 }));
   return RF.readOut(r.data);
 }
 
@@ -78,10 +78,10 @@ export default async function handler(req, res) {
     }
     if (b.read) {
       const path = String(b.read.path || ''), pp = RF.parsePath(path, pid); if (!pp) return res.status(400).json({ error: 'bad path' });
-      const key = process.env.OPENAI_API_KEY; if (!key) return res.status(503).json({ error: 'AI isn’t set up on this site, so the file can’t be read (it’s kept).', ai: false });
+      const key = process.env.OPENAI_API_KEY || ''; if (!key && !wantsClaude(b)) return res.status(503).json({ error: 'AI isn’t set up on this site, so the file can’t be read (it’s kept).', ai: false });
       const r = await st.get(path), len = +r.headers.get('content-length') || 0; if (len > RF.MAX_BYTES) return res.status(413).json({ error: 'Files can be up to 20 MB.' });
       const buf = Buffer.from(await r.arrayBuffer()); if (buf.length > RF.MAX_BYTES) return res.status(413).json({ error: 'Files can be up to 20 MB.' });
-      try { return res.json(await readFile(buf, pp.name, { key, model: b.model, res })); }
+      try { return res.json(await readFile(buf, pp.name, { key, model: b.model, provider: b.provider, res })); }
       catch (e) { if (e.status === 422) return res.status(422).json({ error: e.message }); console.error('sitefiles read', e.message); return res.status(502).json({ error: 'The AI couldn’t read this file just now. Try again in a moment.' }); }
     }
     if (b.remove) {

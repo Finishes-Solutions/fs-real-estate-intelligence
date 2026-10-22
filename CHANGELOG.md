@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
-### 4:30 PM CT: Site Plan for All uses every parcel picked (3a8f26a)
+### 4:59 PM CT: Site Plan for All uses every parcel picked (3a8f26a)
 - **Every parcel you pick is in the site.** Before, parcels whose county outlines didn't quite touch were treated as separate, and only the biggest connected group went into the plan. On Waller Tomball Rd that dropped a 20.8-acre tract 60 ft from the 128-acre tract beside it.
 - **Gaps between neighbours are filled in.** The slivers and gaps the county's outlines leave between parcels that border each other are now part of the site, with no slits between lots (tested on a block of four lots drawn 12 ft apart: one plain rectangle).
 - **Roads stay roads.** Where the map shows a road in the gap, the parcels are still joined, but the road is a no-build **Road between parcels** in the site. Parcels more than 200 ft from the rest are still left out, with a note.
@@ -13,12 +13,25 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Parcels in several pieces keep every piece.** Some county records hold a parcel in separate pieces (the First Street right-of-way in Katy is two). The extra pieces were read as holes and lost; now the map, the card and site plans use them all.
 - **Not checked yet:** a look on the real map (this was tested on recorded parcel outlines, not in the browser). And when a road runs the full length between two parcels, Build may still lay out only one side, because drives can't cross the no-build road.
 
+### 4:47 PM CT: Pick the AI for each feature: OpenAI or Claude, and the model (c6b9d34)
+- **One row per AI feature** in Settings › AI model: **Site plans**, **Ask AI**, **Filing briefs**, **Reference files**, **Place search**, **Voice** and **Renderings**, each with its own provider and model, kept on this device. Plan sets keep their own Claude model and effort below.
+- **Claude can now be picked** for site plans, Ask AI, filing briefs and reference files (the site has its Anthropic key). Its default is Claude Opus 5.5; the list shows every Claude model the key can use. The "coming later" label is gone.
+- **OpenAI only, with a model choice:** Voice lists OpenAI's live voice models, Renderings its image models, Place search its chat models. Claude has no live voice and doesn't make images, and place search uses OpenAI's web search.
+- **Nothing breaks on a bad pick:** a model the key can't use, or one that can't answer a request, falls back to that feature's default; Claude picked without a Claude key on the site uses OpenAI. The note under the rows says which model gave the last answer. If you'd picked one OpenAI model before, the text features start from it.
+- **Ask AI on Claude** keeps the conversation on your device and sends it with each question, since Claude doesn't hold conversations. A very long one has to be started again with **New**.
+- **Not checked yet against the live services:** none of the Claude paths (Ask AI with its map tools, briefs, reading reference files) or the picked voice and image models have been run against the real APIs; they're tested with stand-ins.
+
+### 4:06 PM CT: The Waller label box is off the plan panel (c1db6f2)
+- **Removed from the top of the site plan panel:** the red box with "AI-assisted conceptual site plan · for feasibility and planning only · not for permit or construction" and its **Full label** link, the "Waller guardrails on · Inside the City of Waller" line with its **Verified** / **Unverified** tag, and "Laid out as B · Finishes base case".
+- **Still there:** the label on the PDF, the drawing and the exports; the guardrail settings (on/off, scenario) under Site parameters; the scenario columns and tags in Numbers. When the layout on the map was made for a different scenario, a single line at the top still says so, with the button to lay it out again.
+
 ### 3:47 PM CT: Site plans can run on Claude, Opus 5.5 by default (d218152)
 - **Pick the AI for site plans.** Settings › AI model › **Site plans** now has an **AI** choice: **OpenAI** (as before) or **Claude (Anthropic)**, and a **Claude model** list. The default is Claude Opus 5.5; any other Claude model the site's key can use is listed. Both picks are kept on this device.
 - **What Claude does when picked:** everything the site planner asks the AI: thinking the site through, turning the request into a program, reviewing the layouts (it sees their drawings), Change With AI, Ask about the plan, What Should Go Here?, and the names. It thinks at the effort picked under Build. The layouts themselves are still drawn and measured by the planner, not by the AI.
 - **Stays on OpenAI:** the jurisdiction (ETJ) and best-use web lookups, Ask AI, filing briefs.
 - **Never stuck:** if the site has no Claude key, or Claude turns a particular request away, OpenAI answers instead, and Settings says which model gave the last answer.
 - **Not checked yet against the live service:** the answers' quality and speed on Claude against OpenAI on real sites; the bigger requests (the program, the review, Change With AI) send Claude their answer format in the instructions, since it's too detailed for Claude's strict-format mode.
+
 ### 3:40 PM CT: Gas stations brought up to date with the re-fit fix (merge of main)
 - **Checked together:** with the 2:54 PM re-fit fix, moving or pinning the big shop building beside a gas station's corner outparcel on the 0 Waller Tomball Rd tract now keeps all the apartments (216; it used to drop to about 106 and the app kept your edit instead). A test now covers it.
 
