@@ -5,9 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
-### 5:01 PM CT: Renderings skill can keep its OpenAI key in the skill folder (5f16310)
+### 5:01 PM CT: Renderings skill can keep its OpenAI key in the skill folder (5f16310, 73dcec0)
 - **For agents on other platforms:** if the platform can't set an environment variable, put the key in a file named `openai.key` (or a `.env` file) inside the `fs-site-renderings` folder before zipping and uploading it. The skill finds the key there, says where it found it, and never prints it.
 - The setup guide recommends a separate, budget-capped OpenAI key that can only make images, and keeping that zip private. The platform must still let the agent reach OpenAI. Key files in the skills folder are never committed to this repository.
+- If `openai.key` still holds the placeholder text instead of a key, the skill says so plainly rather than failing at OpenAI.
 
 ### 5:00 PM CT: fs-set-plans skill v2: plan sets that follow the layout and look like real drawings (df35aff)
 - **New zip, outside the app:** `skills/fs-set-plans.zip` replaces the plan set skill that was installed. It was rebuilt after a test run on 0 US 290, Waller (0.93 ac, Option B), where the set redrew the site instead of following it.
