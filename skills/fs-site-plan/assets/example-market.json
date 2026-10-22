@@ -1,0 +1,55 @@
+{
+ "retail": {
+  "rent_psf_yr": 26,
+  "vacancy": 0.07,
+  "opex_pct": 0.12,
+  "cap_rate": 0.07,
+  "hard_psf": 165,
+  "site_per_ac": 250000,
+  "soft_pct": 0.18,
+  "profit_pct": 0.12
+ },
+ "restaurant": {
+  "rent_psf_yr": 45,
+  "vacancy": 0.03,
+  "opex_pct": 0.05,
+  "cap_rate": 0.06,
+  "hard_psf": 220,
+  "site_per_ac": 300000,
+  "soft_pct": 0.15,
+  "profit_pct": 0.12,
+  "max_sf": 12000,
+  "source": "EXAMPLE"
+ },
+ "storage": {
+  "rent_psf_yr": 14,
+  "vacancy": 0.12,
+  "opex_pct": 0.38,
+  "cap_rate": 0.065,
+  "hard_psf": 70,
+  "site_per_ac": 180000,
+  "soft_pct": 0.15,
+  "profit_pct": 0.12
+ },
+ "multifamily": {
+  "rent_unit_mo": 1450,
+  "vacancy": 0.07,
+  "opex_pct": 0.42,
+  "cap_rate": 0.055,
+  "hard_per_unit": 165000,
+  "site_per_ac": 220000,
+  "soft_pct": 0.2,
+  "profit_pct": 0.12
+ },
+ "office": {
+  "rent_psf_yr": 27,
+  "vacancy": 0.18,
+  "opex_pct": 0.35,
+  "cap_rate": 0.08,
+  "hard_psf": 230,
+  "site_per_ac": 220000,
+  "soft_pct": 0.2,
+  "profit_pct": 0.12
+ },
+ "_note": "EXAMPLE numbers only. Replace every value with sourced market data (app Market page, broker comps, CoStar, cost estimator) and keep the source per use. max_sf / max_units cap a use at what the market can absorb."
+}
