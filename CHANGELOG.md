@@ -5,11 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
-### 5:31 PM CT: Huntsville no longer listed under Waller County's sales tax (5eec8f5)
+### 5:31 PM CT: Huntsville no longer listed under Waller County's sales tax (5eec8f5, 7d77060)
 - **City sales tax by county is corrected.** Huntsville showed under Waller County because one remodel filed with the state under Waller has a Huntsville address. Filings whose address is outside the county they were filed under no longer decide which county a city belongs to.
 - **Same fix for three other towns outside the area:** Livingston (was under Montgomery), Freeport and La Marque (were under Harris) drop out of the sales tax figures.
 - **Area news** no longer searches a town just because of a misfiled filing.
-- **When you'll see it:** the corrected numbers appear after the next nightly data refresh.
+- **On the site now:** the four towns were removed from the published figures right away; the nightly refresh keeps them out from here on.
 
 ### 4:47 PM CT: Pick the AI for each feature: OpenAI or Claude, and the model (c6b9d34)
 - **One row per AI feature** in Settings › AI model: **Site plans**, **Ask AI**, **Filing briefs**, **Reference files**, **Place search**, **Voice** and **Renderings**, each with its own provider and model, kept on this device. Plan sets keep their own Claude model and effort below.
