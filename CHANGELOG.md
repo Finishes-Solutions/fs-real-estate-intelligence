@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 4:47 PM CT: Pick the AI for each feature: OpenAI or Claude, and the model (c6b9d34)
+- **One row per AI feature** in Settings › AI model: **Site plans**, **Ask AI**, **Filing briefs**, **Reference files**, **Place search**, **Voice** and **Renderings**, each with its own provider and model, kept on this device. Plan sets keep their own Claude model and effort below.
+- **Claude can now be picked** for site plans, Ask AI, filing briefs and reference files (the site has its Anthropic key). Its default is Claude Opus 5.5; the list shows every Claude model the key can use. The "coming later" label is gone.
+- **OpenAI only, with a model choice:** Voice lists OpenAI's live voice models, Renderings its image models, Place search its chat models. Claude has no live voice and doesn't make images, and place search uses OpenAI's web search.
+- **Nothing breaks on a bad pick:** a model the key can't use, or one that can't answer a request, falls back to that feature's default; Claude picked without a Claude key on the site uses OpenAI. The note under the rows says which model gave the last answer. If you'd picked one OpenAI model before, the text features start from it.
+- **Ask AI on Claude** keeps the conversation on your device and sends it with each question, since Claude doesn't hold conversations. A very long one has to be started again with **New**.
+- **Not checked yet against the live services:** none of the Claude paths (Ask AI with its map tools, briefs, reading reference files) or the picked voice and image models have been run against the real APIs; they're tested with stand-ins.
+
 ### 4:06 PM CT: The Waller label box is off the plan panel (c1db6f2)
 - **Removed from the top of the site plan panel:** the red box with "AI-assisted conceptual site plan · for feasibility and planning only · not for permit or construction" and its **Full label** link, the "Waller guardrails on · Inside the City of Waller" line with its **Verified** / **Unverified** tag, and "Laid out as B · Finishes base case".
 - **Still there:** the label on the PDF, the drawing and the exports; the guardrail settings (on/off, scenario) under Site parameters; the scenario columns and tags in Numbers. When the layout on the map was made for a different scenario, a single line at the top still says so, with the button to lay it out again.
