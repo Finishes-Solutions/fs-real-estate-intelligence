@@ -6,3 +6,4 @@ test/.data/
 
 # Claude Code session scaffolding (sub-agent worktrees)
 .claude/worktrees/
+__pycache__/
