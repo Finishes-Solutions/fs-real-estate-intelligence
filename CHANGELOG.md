@@ -5,6 +5,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 3:10 PM CT: Plan sets for gas stations: canopy, pumps and tanks (420925b)
+- **A gas station's plan set now covers the canopy, the pumps and the tanks,** not just the c-store. A new **Fuel canopy & fuel system** section adds seven sheets whenever the option has a fuel canopy:
+  - **F-001** notes and schedules: the tanks, each dispenser and its fueling positions, the pumps, gauge, emergency shutoff, piping and vents, the codes, and separation checks measured from the plan.
+  - **F-101** fuel system plan: a tank for each product with its pump sump, fill and gauge, the product lines to each dispenser, vents to risers beside the store, monitoring wells and the emergency shutoffs.
+  - **F-102** the classified (hazardous) areas round the dispensers, fills and vents, and the conduit to the dispensers, pumps and canopy lights.
+  - **F-201** canopy plan (islands, dispensers, columns on a numbered grid, dimensions) and reflected ceiling plan (lights, with a lighting estimate).
+  - **F-301** front and side elevations and a section at a column; **F-401** foundation and framing plans; **F-501** nine details (tank installation, dispenser island, piping trench, fill and overfill, vent riser, column base, emergency shutoff, monitoring well, pump sump).
+- **The car wash is designed as a car wash:** a tunnel with an overhead door at each end and its equipment and chemical rooms, instead of a second convenience store.
+- **Every kind of building gets its own sheets.** A set draws at most eight building types; on a mixed plan with many apartment shapes, the c-store, a restaurant pad or the clubhouse used to be folded into another type and got no plans of their own. Each kind now keeps a type first.
+- **On the 0 Waller Tomball Rd tract:** the gas station, retail and apartments plan makes an 81-sheet set (every section ticked) with the c-store's full building sheets and the seven F sheets; all its separation checks pass.
+- **Not done yet:** tank sizes, products, pipe routes, canopy member sizes and footings are rule-of-thumb placeholders, marked for the fuel retailer's engineer, the canopy manufacturer and the petroleum contractor; apartment buildings still get site sheets only.
+
 ### 2:34 PM CT: Gas stations in mixed plans, a 3D canopy, pump island orientation (50135e6)
 - **A gas station beside other uses.** Ask for a gas station with shops, apartments, homes or any mix ("gas station with 10 pumps and a 4,500 sf c-store on the corner, 40,000 sf of retail behind it and 200 apartments at the back") and the station now gets its own outparcel at the front corner (at one end of the frontage on an inside lot), sized for its pumps, store and car wash. It's laid out as a full station (canopy along the street, store behind, tank pad, its own driveways) with the rest of the plan behind and beside it, the site's detention, and a cross-access drive between the station and the center where a straight one fits. Before, the gas station became a plain shop building with no canopy, pumps or tanks.
 - **On the 0 Waller Tomball Rd tract (20.78 ac):** that request now gives a 10-pump station on a 1.85-acre corner outparcel, about 271,000 sf of shops and apartments (211 apartments) behind it, parking met and no rule broken.
