@@ -3,6 +3,15 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-22
+
+### 3:47 PM CT: Site plans can run on Claude, Opus 5.5 by default (d218152)
+- **Pick the AI for site plans.** Settings › AI model › **Site plans** now has an **AI** choice: **OpenAI** (as before) or **Claude (Anthropic)**, and a **Claude model** list. The default is Claude Opus 5.5; any other Claude model the site's key can use is listed. Both picks are kept on this device.
+- **What Claude does when picked:** everything the site planner asks the AI: thinking the site through, turning the request into a program, reviewing the layouts (it sees their drawings), Change With AI, Ask about the plan, What Should Go Here?, and the names. It thinks at the effort picked under Build. The layouts themselves are still drawn and measured by the planner, not by the AI.
+- **Stays on OpenAI:** the jurisdiction (ETJ) and best-use web lookups, Ask AI, filing briefs.
+- **Never stuck:** if the site has no Claude key, or Claude turns a particular request away, OpenAI answers instead, and Settings says which model gave the last answer.
+- **Not checked yet against the live service:** the answers' quality and speed on Claude against OpenAI on real sites; the bigger requests (the program, the review, Change With AI) send Claude their answer format in the instructions, since it's too detailed for Claude's strict-format mode.
+
 ## 2026-10-21
 
 ### 7:07 PM CT: Site plans in four steps: Site › Layout › Pro forma › Renderings & plans (4287ddb)
