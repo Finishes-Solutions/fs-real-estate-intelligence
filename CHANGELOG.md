@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 6:43 PM CT: Renderings skill no longer asks for a budget (f9ded54)
+- Asking the agent for renderings is now the go-ahead to paint them: five views at roughly $0.20–0.50 each, plus up to two re-paints a view. It no longer stops to ask for a budget, and STATUS.md no longer lists one as missing.
+
 ### 6:31 PM CT: Renderings skill says what's missing; paint renderings in a browser; the model survives text-only attachments (67be240)
 - **No more silent runs:** every renderings run now checks for an OpenAI key and whether OpenAI can be reached from where it runs. It prints the result and writes a STATUS.md saying whether renderings were made. If they weren't, it says exactly what is missing and what to do next. The agent is told to start its reply with this.
 - **Paint without Python:** the paint package now includes paint.html. Open it in a browser, paste your OpenAI key (it stays in that tab), click Paint, download painted.zip, and send it back to the agent.
