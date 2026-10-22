@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 5:39 PM CT: Your project app's agents can pull this app's data (aedcbc3)
+- **A connection for the project app's AI agents** (an MCP server at `/api/mcp`): its agents can ask about any property or area without anyone opening the map. Everything they can do is read-only.
+- **What they can look up:** a property (match quality of the address, county, inside city limits or within half a mile of a city, the appraisal parcel with owner, values, acreage and outline), site facts, flood zones and flood history, ground elevations and slopes, environmental records, utilities, traffic counts, demographics in rings, the county's market figures, businesses, development activity, construction filings and the busiest developers, architects and contractors, crime (Houston street-level, or any US police department's yearly figures), stored local news and nearby airports. One "area overview" call gets most of it at once.
+- **Every answer says where it came from:** the source, how current it is, a link, and what it covers. Outside a source's coverage the answer says "not covered here" instead of reporting nothing; a service that doesn't answer is named in one sentence and the rest still comes back.
+- **The Market page's numbers** now come from the same shared code the agents use; they read exactly as before.
+- **Not done yet:** the PDF reports for the agents (next), and AMP can't reach the site until Vercel's login protection lets it through (see the README). Not checked against the live services from here (this environment can't reach them); tested with stand-ins shaped like their real answers.
+
 ### 4:47 PM CT: Pick the AI for each feature: OpenAI or Claude, and the model (c6b9d34)
 - **One row per AI feature** in Settings › AI model: **Site plans**, **Ask AI**, **Filing briefs**, **Reference files**, **Place search**, **Voice** and **Renderings**, each with its own provider and model, kept on this device. Plan sets keep their own Claude model and effort below.
 - **Claude can now be picked** for site plans, Ask AI, filing briefs and reference files (the site has its Anthropic key). Its default is Claude Opus 5.5; the list shows every Claude model the key can use. The "coming later" label is gone.
