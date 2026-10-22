@@ -18,9 +18,13 @@ def describe(p, scene):
     proj = p.get('project') or {}
     types = {t['id']: t for t in p.get('types', [])}
     groups = {}
-    for b in scene.buildings:
-        groups.setdefault(b['type'], []).append(b)
     bl = []
+    for b in scene.buildings:
+        if b['use'] == 'fuel canopy':  # open structure: say so, or the model walls it in
+            bl.append('an open fuel canopy (%s, about {:,} sf): a flat roof with a plain white fascia on slim columns, no walls, '
+                      'over pump islands with fuel dispensers ({})'.format(b['footprint'], b['facades']) % b['name'])
+            continue
+        groups.setdefault(b['type'], []).append(b)
     mat = []
     for tid, bs in groups.items():
         t = types.get(tid) or {}

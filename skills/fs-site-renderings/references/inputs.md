@@ -31,3 +31,23 @@ block (its issue / revision rows). When in doubt, ask.
 - **Canopies** over storefronts when the design's exterior notes mention a canopy or awning.
 - **Facades:** placed exactly as the elevation sheets place them (`window_positions` / `door_geometry` in fs-set-plans).
   A type without a `design` gets a generic pattern, and `scene.txt` says so.
+
+## From SP-1 alone (no project file)
+
+When all you have is the site layout PDF (fs-site-plan's SP-1 / SP-1A, or the app's C-101):
+
+1. `python3 <skill>/scripts/extract_geometry.py SP-1.pdf --acres <ac> --out intake/`. The sheet prints its scale, so the
+   shapes come out in feet and the boundary is the top candidate. Print only the largest closed shapes with a short
+   script; match them to the plan by area and position (look at `intake/preview.png` once): the building footprints
+   (their areas are on the sheet, e.g. "5,000 sf c-store", "7,812 sf canopy"), the paving, ponds.
+2. Write `project.json` with: `site.boundary`; `site.buildings` as `{name, type, poly}`; one type per building
+   `{id, use, floors, floor_h}` (a fuel canopy: name it "... canopy" or give it `use: "canopy"` and `pumps`; it is drawn
+   open on columns over pump islands); `site.paving` (parking / drive / walk polys); `site.ponds`; `north_deg` from the
+   north arrow; `site.parking.provided` from the sheet's stall count; `project` name and address.
+3. **The street.** If the sheet draws no road but states the frontage ("838 ft of frontage on FM 362"), put the street
+   along the boundary edge (or edges) on that side whose length matches it: centreline 40–60 ft outside the edge
+   (half the right-of-way), `row_width` 80–120 ft, the name from the sheet. Say in your summary that the road was placed
+   from the frontage note. If the frontage side isn't clear, ask.
+4. Fuel tanks, utilities and signs the sheet notes but doesn't draw stay out (tanks are underground anyway).
+
+Everything is in the layout's own frame, so the cameras, the sun and the key plan work as with a full project file.

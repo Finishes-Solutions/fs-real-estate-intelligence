@@ -5,6 +5,8 @@
     python3 scripts/render_views.py project.json --out renders/ --refs refs/refs.json    # 2. what it would cost (no call)
     python3 scripts/render_views.py project.json --out renders/ --refs refs/refs.json --yes   # 3. paint them
     python3 scripts/render_views.py project.json --out renders/ --views street --yes     # re-paint one view
+    python3 scripts/render_views.py project.json --out renders/ --refs refs/refs.json --package   # no network here: a package for paint.py
+    python3 scripts/render_views.py project.json --out renders/ --import painted.zip     # bring the painted package back
 
 project.json: the fs-set-plans project (the fs-site-plan hand-off, with the building designs the set agent added).
 Builds the 3D massing from it, renders each view (scripts/fsrender/views.py), and sends the massing (plus the drawing-set
@@ -52,6 +54,9 @@ def main():
     ap.add_argument('--sun-az', type=float, default=190, help='sun azimuth, degrees from true north (190: just past solar noon)')
     ap.add_argument('--sun-el', type=float, default=62, help='sun elevation, degrees (62: a Texas midday from spring to fall)')
     ap.add_argument('--no-trees', action='store_true')
+    ap.add_argument('--budget', type=float, help='pre-approved spend in US dollars: stop before a call that could go over it')
+    ap.add_argument('--package', action='store_true', help='no API call here: write paint-package.zip to run paint.py where OpenAI is reachable')
+    ap.add_argument('--import', dest='imp', help='a painted package folder (or zip) from paint.py: check each picture and record it')
     a = ap.parse_args()
 
     p = json.load(open(a.project))
@@ -96,6 +101,10 @@ def main():
     if a.massing_only:
         print('\nMassing only: look at every *-massing.png before painting (SKILL.md, step 4).')
         return
+    if a.package:
+        return write_package(a, p, jobs, refs, massing)
+    if a.imp:
+        return import_package(a, p, scene, views, massing)
     model = a.model
     if not a.yes:
         print('\nReady to paint %d view(s) with %s at high quality (%s), %d reference image(s) each. That is %d paid API call(s), '
@@ -128,6 +137,9 @@ def main():
     ref_files = [(os.path.basename(r['path']), open(r['path'], 'rb').read(), 'image/png' if r['path'].lower().endswith('.png') else 'image/jpeg') for r in refs]
     total = 0.0
     for V, mp, ids, cam in jobs:
+        if a.budget is not None and total + 0.5 > a.budget:
+            print('Stopping before %s: the next call could take the total (about $%.2f) over the $%.2f budget.' % (V['id'], total, a.budget))
+            break
         sizes = OA.SIZES[OA.SIZES.index(a.size):]
         text = open(os.path.join(a.out, V['id'] + '-prompt.txt')).read()
         res = None
@@ -169,6 +181,87 @@ def main():
     if any(v.get('error') for v in manifest['views']):
         print('Some views failed (see above); re-run them with --views <ids> --yes.')
     print('\nWrote %s. Total about $%.2f (estimate). Now look at every *-compare.png.' % (old, total))
+
+
+def write_package(a, p, jobs, refs, massing):
+    """the paid step as a portable folder + zip: massing at every size the model may take, prompts, references,
+    paint.py and the API client; no key goes in it"""
+    import shutil
+    import zipfile
+    pk = os.path.join(a.out, 'paint-package')
+    shutil.rmtree(pk, ignore_errors=True)
+    os.makedirs(pk)
+    meta = dict(project=(p.get('project') or {}).get('name'), model=a.model, size=a.size, views=[], refs=[])
+    for r in refs:
+        f = 'ref-' + os.path.basename(r['path'])
+        shutil.copy(r['path'], os.path.join(pk, f))
+        meta['refs'].append(f)
+    for V, mp, ids, cam in jobs:
+        shutil.copy(os.path.join(a.out, V['id'] + '-prompt.txt'), os.path.join(pk, V['id'] + '-prompt.txt'))
+        m = {}
+        for size in OA.SIZES[OA.SIZES.index(a.size):]:
+            f, _, _ = massing(V, size)
+            m[size] = '%s-%s-massing.png' % (V['id'], size)
+            shutil.copy(f, os.path.join(pk, m[size]))
+        massing(V, a.size)  # leave the default-size massing in place
+        meta['views'].append(dict(id=V['id'], label=V['label'], prompt=V['id'] + '-prompt.txt', massing=m))
+    json.dump(meta, open(os.path.join(pk, 'jobs.json'), 'w'), indent=1)
+    shutil.copy(os.path.join(HERE, 'paint.py'), pk)
+    shutil.copy(os.path.join(HERE, 'fsrender', 'openai_images.py'), pk)
+    open(os.path.join(pk, 'README.txt'), 'w').write(
+        'Paint package for %s: %d view(s).\n\n1. Put your OpenAI key in OPENAI_API_KEY, or in a file named openai.key in this folder.\n'
+        '2. python3 paint.py          (shows the plan and the estimate)\n3. python3 paint.py --yes    (paints; roughly $0.20-0.50 a view)\n'
+        '4. Send this folder (or a zip of it) back to the agent for the fidelity check and the R-1 sheet.\n' % (meta['project'] or 'the project', len(jobs)))
+    zp = os.path.join(a.out, 'paint-package.zip')
+    with zipfile.ZipFile(zp, 'w', zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(os.listdir(pk)):
+            z.write(os.path.join(pk, f), os.path.join('paint-package', f))
+    print('\nWrote %s (%d views, no key inside). Run paint.py from it where api.openai.com is reachable, then bring the folder back '
+          'with --import.' % (zp, len(jobs)))
+
+
+def import_package(a, p, scene, views, massing):
+    """the pictures painted elsewhere: check each against its massing at the size it was painted, write the compare
+    images and renders.json as a direct run would"""
+    import shutil
+    import zipfile
+    src = a.imp
+    if src.lower().endswith('.zip'):
+        dst = os.path.join(a.out, 'painted')
+        with zipfile.ZipFile(src) as z:
+            z.extractall(dst)
+        hits = [r for r, _, fs in os.walk(dst) if 'painted.json' in fs]
+        if not hits:
+            raise SystemExit('No painted.json in %s: run paint.py --yes in the package first.' % src)
+        src = hits[0]
+    done = json.load(open(os.path.join(src, 'painted.json')))
+    by_id = {V['id']: V for V in views}
+    out_json = os.path.join(a.out, 'renders.json')
+    prev = json.load(open(out_json)) if os.path.exists(out_json) else {}
+    man = dict(prev, project=(p.get('project') or {}).get('name'))
+    man['views'] = [v for v in prev.get('views', []) if v['id'] not in {d['id'] for d in done['views']}]
+    total = 0.0
+    for d in done['views']:
+        V = by_id.get(d['id'])
+        if not V:
+            continue
+        mp, ids, cam = massing(V, d['size'])
+        jp = os.path.join(a.out, V['id'] + '.jpg')
+        shutil.copy(os.path.join(src, d['file']), jp)
+        score, per = check(mp, ids, jp, os.path.join(a.out, V['id'] + '-compare.png'))
+        weak = {scene.objects.get(k, str(k)): round(v, 2) for k, v in per.items() if v < FLAG_BUILDING}
+        flag = (score is not None and score < FLAG_SCORE) or bool(weak)
+        total += d.get('cost_usd') or 0
+        man['views'].append(dict(id=V['id'], label=V['label'], file=os.path.basename(jp), massing=os.path.basename(mp), model=d['model'],
+                                 size=d['size'], input_fidelity=d.get('input_fidelity'), cost_usd=d.get('cost_usd'),
+                                 fidelity=round(score, 3) if score is not None else None, weak_buildings=weak, flagged=flag,
+                                 camera=cam.as_dict(), made=d.get('made'), painted_elsewhere=True))
+        print('%-13s %s  fidelity %s%s' % (V['id'], jp, ('%.0f%%' % (100 * score)) if score is not None else 'n/a', '  << LOOK CLOSELY' if flag else ''))
+    order = [v['id'] for v in VIEWS]
+    man['views'].sort(key=lambda v: order.index(v['id']) if v['id'] in order else 99)
+    man['total_cost_usd_estimate'] = round(sum(v.get('cost_usd') or 0 for v in man['views']), 2)
+    json.dump(man, open(out_json, 'w'), indent=1)
+    print('\nWrote %s. Now look at every *-compare.png.' % out_json)
 
 
 if __name__ == '__main__':

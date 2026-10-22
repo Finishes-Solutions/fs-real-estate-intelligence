@@ -1,6 +1,6 @@
 ---
 name: fs-site-renderings
-description: Make five photoreal midday renderings of a planned property, from five different angles, true to its site layout and schematic design set, using OpenAI's gpt-image-2.5-sunburst at high quality. Builds an exact 3D massing model from the project (the fs-site-plan hand-off with the fs-set-plans building designs), renders the five camera views, has the image model paint each one photographically while keeping the geometry, checks every picture against its massing, and puts them on a renderings sheet and back into the plan set. Use when the user asks for "renderings", "3D views", "what will it look like", "marketing images" or "/fs-site-renderings" for a project that has a site layout and a plan set.
+description: Make five photoreal midday renderings of a planned property, from five different angles, true to its site layout (and schematic design set when there is one), using OpenAI's gpt-image-2.5-sunburst at high quality. Builds an exact 3D massing model from the project (the fs-site-plan hand-off with the fs-set-plans building designs), renders the five camera views, has the image model paint each one photographically while keeping the geometry, checks every picture against its massing, and puts them on a renderings sheet and back into the plan set. Use when the user asks for "renderings", "3D views", "what will it look like", "marketing images" or "/fs-site-renderings" for a project that has a site layout and a plan set.
 ---
 
 # fs-site-renderings: five midday renderings that match the drawings
@@ -33,7 +33,9 @@ people and the surroundings are the model's interpretation of the plans' notes. 
 
 | File | What it does |
 |---|---|
-| `scripts/render_views.py` | Builds the scene, renders the five massing views, and (with `--yes`) paints them through the API. Checks each result, and writes the pictures, prompts and `renders.json`. |
+| `scripts/render_views.py` | Builds the scene, renders the five massing views, and (with `--yes`) paints them through the API. Checks each result, and writes the pictures, prompts and `renders.json`. `--budget` caps a pre-approved spend; `--package` writes the paid step as a zip for `paint.py` when this sandbox can't reach OpenAI; `--import` brings the painted pictures back for the check. |
+| `scripts/paint.py` | The paid step on its own (standard library only), run from the paint package wherever OpenAI is reachable. |
+| `scripts/extract_geometry.py` | Takes the site off the SP-1 PDF (or a DXF / CAD PDF) in feet, when there is no project file. |
 | `scripts/plan_refs.py` | Crops the exterior elevations out of the plan-set PDF as reference images. |
 | `scripts/render_sheet.py` | Lays out the R-1 renderings sheet (24 x 36 title block, key plan of the cameras). `--update` adds the pictures to the project's `renders` for fs-set-plans (A-901 to A-905). |
 | `scripts/fsrender/` | The scene builder, renderer, cameras, prompt, API client and fidelity check. |
@@ -52,16 +54,31 @@ Work in a folder like `./renderings/<project-slug>/`.
 
 Follow `references/setup.md`. The paid step needs an OpenAI key (`OPENAI_API_KEY` in the environment, or an
 `openai.key` / `.env` file the owner put in this skill's folder; the script finds it) and network access to
-`api.openai.com`. Never open, print or copy a key file; just run the script, which says where it found the key. **Never ask the user to paste the key into the chat**, and never print or save it. If the key or the
-network is missing, do steps 2–4 (no key needed), tell the user exactly what to set up, and stop before step 5.
+`api.openai.com`. Never open, print or copy a key file; just run the script, which says where it found the key.
+**Never ask the user to paste the key into the chat**, and never print or save it.
+
+Missing pieces don't stop the job; they change how far it goes:
+
+| Missing | What you do |
+|---|---|
+| Network to `api.openai.com` (a test request fails) | Do steps 2–4, then `--package` (step 5) and deliver `paint-package.zip` with the massing views. The user runs `python3 paint.py --yes` from it on any computer with internet, and sends the folder back; `--import` then checks the pictures and step 6–8 go on. |
+| The key | The same package route (the key goes next to `paint.py` or in the environment where it runs), or the owner adds `openai.key` to the skill. |
+| The go-ahead to spend | The task instructions count: "renderings approved", "budget $5" or similar is the go-ahead; pass `--budget` with the amount (or $3 for "approved" with no amount: five views at the top estimate). Without it, deliver the massing views and the package, and ask. |
 
 ### 2. Gather the inputs
 
-Follow `references/inputs.md`. You need:
-- **the project file the set was built from:** the fs-site-plan hand-off (`<slug>-site-model.json`) as the fs-set-plans
-  agent left it, with each building type's `design`;
-- **the plan-set PDF and its `sheet-index.csv`;**
-- **SP-1, the site layout PDF**, to cross-check.
+Follow `references/inputs.md`. Best to worst, use what you have:
+- **the project file**: the fs-site-plan hand-off (`<slug>-site-model.json`), ideally as the fs-set-plans agent left
+  it with each building type's `design`;
+- **the plan-set PDF and its `sheet-index.csv`**, for the elevation references;
+- **SP-1, the site layout PDF**, to cross-check, or **as the only input**: take the site off it with
+  `extract_geometry.py` and write a small project file (inputs.md, "From SP-1 alone"). The buildings get generic
+  facades for their use, which is fine for concept renderings; say so.
+
+Never refuse for lack of designs or a plan set: render what the layout defines, and say what was generic. Never invent
+what isn't there either (an extra building, a second storey, a drive the plan doesn't draw).
+An approximate figure in the task ("~20 acres") that the drawing's exact one (20.78 ac) rounds to is not a conflict:
+use the drawing's and mention it.
 
 Compare them before rendering: the same buildings in the same places (C-101 against SP-1), the same types and storeys
 (A-1xx and A-2xx), and the exterior materials (the table on each A-2xx sheet) matching each type's `design.exterior`.
@@ -93,10 +110,17 @@ will keep, so fix problems here, not after paying for a rendering.
 ### 5. Confirm the cost, then paint
 
 Run the same command without `--massing-only`. It prints what it would do, and the estimate (five paid calls, roughly
-$0.20–0.50 each). **Ask the user to confirm**, then:
+$0.20–0.50 each). **Get the go-ahead** (the user's, or a pre-approval in the task instructions, step 1), then:
 
 ```
-python3 <skill>/scripts/render_views.py project.json --out renders/ --refs refs/refs.json --yes
+python3 <skill>/scripts/render_views.py project.json --out renders/ --refs refs/refs.json --yes [--budget 3]
+```
+
+No network here? Write the package instead, deliver it, and stop until the painted folder comes back:
+
+```
+python3 <skill>/scripts/render_views.py project.json --out renders/ --refs refs/refs.json --package
+python3 <skill>/scripts/render_views.py project.json --out renders/ --import painted.zip     # when it comes back
 ```
 
 It uses `gpt-image-2.5-sunburst` when the key has it, or the newest GPT Image model the key lists, and says so. It asks for
@@ -140,7 +164,8 @@ Give the user the five JPEGs, the R-1 PDF and the updated project file. Then sum
 ## Rules
 
 - The key stays where the owner put it (the environment or the skill's key file). Never ask for it in chat, read or echo it, write it anywhere else, or put it in a command line.
-- Never spend on API calls without the user's go-ahead for this run; each re-paint after the first round needs a fresh okay.
+- Never spend on API calls without a go-ahead for this run (the user's, or a pre-approval in the task instructions, kept
+  within its budget with `--budget`); each re-paint beyond that needs a fresh okay.
 - The massing comes only from the project file. Don't add buildings, floors or features to make a prettier picture. If
   the design is wrong, it gets fixed in the set, not in the rendering.
 - Use generic signage only: no real tenant brands, logos or readable names.

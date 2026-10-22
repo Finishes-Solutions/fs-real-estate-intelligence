@@ -6,6 +6,7 @@ Geometry in feet in the model's own frame (x right, y up), z up. Nothing here is
 except trees (placed by rule in open space and front buffers) and rooftop units on flat commercial roofs; both are
 stated in the scene report."""
 import math
+import re
 import numpy as np
 from PIL import Image, ImageDraw
 from . import geom as G
@@ -28,6 +29,11 @@ MEMBRANE = (0.90, 0.90, 0.88)
 SHINGLE = (0.36, 0.34, 0.33)
 METAL_ROOF = (0.56, 0.58, 0.59)
 CANOPY = (0.30, 0.31, 0.33)
+FASCIA = (0.93, 0.93, 0.92)  # fuel canopy: white fascia, light soffit, columns, islands, dispensers
+CANOPY_TOP = (0.80, 0.80, 0.79)
+COLUMN = (0.75, 0.75, 0.74)
+ISLAND = (0.78, 0.77, 0.74)
+DISPENSER = (0.55, 0.57, 0.60)
 TREE = (0.24, 0.38, 0.17)
 TRUNK = (0.33, 0.26, 0.19)
 C_FIELD = (0.55, 0.60, 0.42)
@@ -105,6 +111,7 @@ class Scene:
         self.objects = {0: 'ground'}
         self.notes = []
         self.footprints = []  # (poly, height) for shadows and the tree rules
+        self.canopies = []  # (poly, clear height): open canopies, shadowed as a raised slab
         self.buildings = []
         self.front_n, self.front_mid = self._front()
         for i, b in enumerate(s.get('buildings', [])):
@@ -159,6 +166,8 @@ class Scene:
     def _building(self, b, obj):
         t = self.types.get(b.get('type')) or {}
         use = t.get('use', b.get('use', 'other'))
+        if is_canopy(b, t):
+            return self._canopy(b, t, obj)
         des = t.get('design') or {}
         floors = int(b.get('floors') or t.get('floors', 1))
         fh = float(t.get('floor_h', 10 if use in RES_USES else 14))
@@ -196,6 +205,48 @@ class Scene:
         if rect:
             info['facades'] = self._openings(b, t, des, fh, obj, use)
         self.buildings.append(info)
+
+    def _canopy(self, b, t, obj):
+        """an open fuel canopy: a 3 ft fascia slab at 16 ft clear on columns, over pump islands with dispensers.
+        Pumps from the building or type ('pumps' / 'mpds'), or the number in its name ("8-pump canopy"), else 8."""
+        rect = not b.get('poly') and 'w' in b
+        P = ccw(G.rect_poly(b['x'], b['y'], b['w'], b['d'], b.get('rot', 0)) if rect else [tuple(q) for q in b['poly']])
+        name = b.get('name') or 'Fuel canopy'
+        self.objects[obj] = name
+        clear = float(b.get('clearance_ft') or t.get('clearance_ft') or 16)
+        top = clear + 3.0
+        self._prism(P, clear, top, FASCIA, obj, top=CANOPY_TOP)
+        # the canopy's own frame: along its longest edge
+        i = max(range(len(P)), key=lambda k: G.dist(P[k], P[(k + 1) % len(P)]))
+        a_, b_ = P[i], P[(i + 1) % len(P)]
+        L = G.dist(a_, b_) or 1
+        u = ((b_[0] - a_[0]) / L, (b_[1] - a_[1]) / L)
+        v = (-u[1], u[0])
+        us = [(q[0] - a_[0]) * u[0] + (q[1] - a_[1]) * u[1] for q in P]
+        vs = [(q[0] - a_[0]) * v[0] + (q[1] - a_[1]) * v[1] for q in P]
+        u0, u1, v0, v1 = min(us), max(us), min(vs), max(vs)
+        W = lambda uu, vv: (a_[0] + u[0] * uu + v[0] * vv, a_[1] + u[1] * uu + v[1] * vv)
+
+        def box(uc, vc, du, dv, z0, z1, col):
+            self._prism(ccw([W(uc - du / 2, vc - dv / 2), W(uc + du / 2, vc - dv / 2), W(uc + du / 2, vc + dv / 2), W(uc - du / 2, vc + dv / 2)]),
+                        z0, z1, col, obj)
+        m = re.search(r'(\d+)\s*-?\s*(?:pump|mpd|dispenser)', (name + ' ' + str(t.get('label', ''))).lower())
+        pumps = int(b.get('pumps') or b.get('mpds') or t.get('pumps') or t.get('mpds') or (m.group(1) if m else 8))
+        islands = max(1, math.ceil(pumps / 2))
+        span = u1 - u0
+        for k in range(islands):  # islands across the canopy, two dispensers each
+            uc = u0 + span * (k + 0.5) / islands
+            vc = (v0 + v1) / 2
+            box(uc, vc, 4, min(24, (v1 - v0) * 0.6), 0, 0.5, ISLAND)
+            for side in (-1, 1):
+                box(uc, vc + side * min(6, (v1 - v0) * 0.15), 2.5, 3.5, 0.5, 6.5, DISPENSER)
+            for side in (-1, 1):  # a column at each end of the island
+                box(uc, vc + side * min(13, (v1 - v0) * 0.33), 2, 2, 0, clear, COLUMN)
+        self.canopies.append((P, clear))
+        self.buildings.append(dict(name=name, use='fuel canopy', type=b.get('type'), floors=1, height=round(top, 1), poly=P, obj=obj,
+                                   footprint=round(G.area(P)), facades='open canopy, %d pumps on %d islands' % (pumps, islands)))
+        self.notes.append('%s: drawn as an open canopy (%d ft clear, 3 ft fascia) over %d pump islands; underground tanks are not visible.' % (
+            name, clear, islands))
 
     def _local(self, b, lx, ly, z):
         q = G.rotate((lx, ly), b.get('rot', 0))
@@ -545,6 +596,9 @@ class Scene:
             else:
                 hull = convex_hull(list(P) + [(q[0] + off[0], q[1] + off[1]) for q in P])
                 md.polygon([T(q) for q in hull], fill=150)
+        for P, h in self.canopies:  # the slab's shadow, shifted by the sun from its height
+            off = (-sx / sz * (h + 1.5), -sy / sz * (h + 1.5))
+            md.polygon([T((q[0] + off[0], q[1] + off[1])) for q in P], fill=150)
         a = np.asarray(img).astype(np.float32) / 255.0
         m = np.asarray(mask).astype(np.float32)[..., None] / 255.0
         rng = np.random.default_rng(7)
@@ -579,12 +633,15 @@ class Scene:
         for P, h in self.footprints:
             if h > 0:
                 pts += [(q[0], q[1], h) for q in P]
+        for P, h in self.canopies:
+            pts += [(q[0], q[1], h + 3) for q in P]
         return np.array(pts)
 
     def main_building(self):
         if not self.buildings:
             return None
-        return max(self.buildings, key=lambda b: b['footprint'] * b['floors'])
+        solid = [b for b in self.buildings if b['use'] != 'fuel canopy'] or self.buildings  # a canopy isn't the main building
+        return max(solid, key=lambda b: b['footprint'] * b['floors'])
 
     def report(self):
         lines = ['Scene: %d buildings, %d trees (placed by rule), sun %s.' % (len(self.buildings), len(self.trees), 'midday')]
@@ -592,6 +649,13 @@ class Scene:
             lines.append('  %s (type %s, %s): %s sf footprint, %d floor(s), %.0f ft to the top, facades %s' % (
                 b['name'], b['type'], b['use'], '{:,}'.format(b['footprint']), b['floors'], b['height'], b['facades']))
         return '\n'.join(lines + ['  NOTE: ' + n for n in self.notes])
+
+
+def is_canopy(b, t):
+    """an open canopy (fuel canopy, drive-through or porte-cochere roof): by use, kind or name"""
+    if (t.get('use') or b.get('use')) in ('canopy', 'fuel_canopy') or 'canopy' in (b.get('kind'), t.get('kind')):
+        return True
+    return 'canopy' in ((b.get('name') or '') + ' ' + (t.get('label') or '')).lower()
 
 
 def convex_hull(P):

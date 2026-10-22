@@ -54,7 +54,8 @@ plans, elevations, sections, roof plans, details, MEP layouts, schedules and che
 Read every document the user gave (`pdftotext -layout` for text; `pdftoppm -r 40` to look at a page, `-r 80` and
 `-x/-y/-W/-H` to crop into a detail). **You must have the total site acreage before modelling the site.** If the user
 hasn't stated it, ask. If a document shows one (G-001's project data, a plat, a survey), use it when the user's task
-names the same acreage; otherwise quote it back and ask them to confirm.
+names the same acreage, including a rounded one ("~20 acres" for 20.78 ac: use 20.78 and mention it); otherwise quote it
+back and ask them to confirm.
 
 Ask in one message only for what you can't find: project name, client / owner, project number, option name,
 drawn-by initials, sections wanted (default: everything except Telecom). If the user said "just do it", use sensible

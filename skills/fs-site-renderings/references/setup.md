@@ -54,6 +54,21 @@ The platform's sandbox must also be able to reach `api.openai.com`. Some sandbox
 example code run through Anthropic's API code-execution tool); there a key file can't help, and the paid step needs a
 platform that allows that host, or Claude Code.
 
+## No network where the agent runs: the paint package
+
+If the sandbox can't reach `api.openai.com`, the agent writes `paint-package.zip` (`render_views.py --package`): the
+massing views at each size the model may take, the prompts, the references, `paint.py` and the API client. No key is in
+it. On any computer with Python 3 and internet:
+
+```
+unzip paint-package.zip && cd paint-package
+python3 paint.py              # the plan and the estimate
+python3 paint.py --yes        # paints (key from OPENAI_API_KEY, or openai.key in this folder)
+```
+
+Zip the folder back up and give it to the agent (`render_views.py --import painted.zip`), which checks every picture
+against its massing and makes the R-1 sheet. Only the standard library is needed for `paint.py`.
+
 ## Checking it
 
 ```
