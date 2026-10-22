@@ -102,6 +102,31 @@ function why(m, where) {
   return null;
 }
 
+// the department for a point (or one by its FBI agency ID) and its report: { status, body } with the same body the
+// endpoint sends (shared by the endpoint and the MCP server)
+export async function agencyReport({ lat, lon, ori = '' } = {}) {
+  const hasPoint = isFinite(lat) && isFinite(lon) && lat != null && lon != null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+  if (!hasPoint && !ori) return { status: 400, body: { error: 'Send lat and lon, or an FBI agency ID (ori).' } };
+  let where = null, st = ori ? ori.slice(0, 2) : null;
+  if (hasPoint) {
+    where = await locate(Math.round(lon * 1e4) / 1e4, Math.round(lat * 1e4) / 1e4);
+    if (!where?.state) return { status: 404, body: { error: 'Crime by city and county covers the United States only.' }, cache: 'long' };
+    st = where.state;
+  }
+  if (!STATE_NAMES[st]) return { status: 400, body: { error: 'Unknown state for agency ' + ori + '.' } };
+  const list = await directory(st);
+  let m;
+  if (ori) { const a = list.find(x => x.ori === ori); if (!a) return { status: 404, body: { error: 'No FBI agency ' + ori + ' in ' + STATE_NAMES[st] + '.' } }; m = { agency: a, why: 'chosen' }; }
+  else m = matchAgency(list, where);
+  const county = where?.county || m.agency?.counties?.[0] || null;
+  const others = list.filter(a => (a.type === 'City' || a.type === 'County') && a.ori !== m.agency?.ori && county && a.counties.some(c => c.toLowerCase() === county.toLowerCase().replace(/\s(county|parish)$/, '')))
+    .sort((a, b) => (a.type === 'County') - (b.type === 'County') || a.name.localeCompare(b.name)).slice(0, 40).map(a => ({ ori: a.ori, name: a.name, type: a.type }));
+  if (!m.agency) return { status: 200, body: { where, agency: null, others, note: 'No city or county police department for this spot reports to the FBI.', coverage: COVERAGE }, cache: 'short' };
+  const rep = await departmentReport(m.agency, st);
+  return { status: 200, body: { where, why: m.why, note: why(m, where), ...rep, others, coverage: COVERAGE }, cache: 'week' };
+}
+export { rankings };
+
 export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 30, perDay: 800 })) return;
   const q = req.query || {};
@@ -110,31 +135,11 @@ export default async function handler(req, res) {
     try { const r = await rankings(db, q); if (r.code === 200) res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400'); return res.status(r.code).json(r.body); }
     catch (e) { console.error('crimeus rank', e.message); return res.status(502).json({ error: 'Crime rankings are unavailable right now.' }); }
   }
-  const lat = +q.lat, lon = +q.lon, ori = String(q.ori || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9);
-  const hasPoint = isFinite(lat) && isFinite(lon) && q.lat != null && q.lon != null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
-  if (!hasPoint && !ori) return res.status(400).json({ error: 'Send lat and lon, or an FBI agency ID (ori).' });
+  const ori = String(q.ori || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9);
   try {
-    let where = null, st = ori ? ori.slice(0, 2) : null;
-    if (hasPoint) {
-      where = await locate(Math.round(lon * 1e4) / 1e4, Math.round(lat * 1e4) / 1e4);
-      if (!where?.state) { res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800'); return res.status(404).json({ error: 'Crime by city and county covers the United States only.' }); }
-      st = where.state;
-    }
-    if (!STATE_NAMES[st]) return res.status(400).json({ error: 'Unknown state for agency ' + ori + '.' });
-    const list = await directory(st);
-    let m;
-    if (ori) { const a = list.find(x => x.ori === ori); if (!a) return res.status(404).json({ error: 'No FBI agency ' + ori + ' in ' + STATE_NAMES[st] + '.' }); m = { agency: a, why: 'chosen' }; }
-    else m = matchAgency(list, where);
-    const county = where?.county || m.agency?.counties?.[0] || null;
-    const others = list.filter(a => (a.type === 'City' || a.type === 'County') && a.ori !== m.agency?.ori && county && a.counties.some(c => c.toLowerCase() === county.toLowerCase().replace(/\s(county|parish)$/, '')))
-      .sort((a, b) => (a.type === 'County') - (b.type === 'County') || a.name.localeCompare(b.name)).slice(0, 40).map(a => ({ ori: a.ori, name: a.name, type: a.type }));
-    if (!m.agency) {
-      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
-      return res.json({ where, agency: null, others, note: 'No city or county police department for this spot reports to the FBI.', coverage: COVERAGE });
-    }
-    const rep = await departmentReport(m.agency, st);
-    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=604800, stale-while-revalidate=604800');
-    return res.json({ where, why: m.why, note: why(m, where), ...rep, others, coverage: COVERAGE });
+    const r = await agencyReport({ lat: q.lat == null ? null : +q.lat, lon: q.lon == null ? null : +q.lon, ori });
+    if (r.cache) res.setHeader('Cache-Control', { long: 'public, max-age=86400, s-maxage=604800', short: 'public, max-age=3600, s-maxage=86400', week: 'public, max-age=3600, s-maxage=604800, stale-while-revalidate=604800' }[r.cache]);
+    return res.status(r.status).json(r.body);
   } catch (e) {
     console.error('crimeus', e.message); res.setHeader('Cache-Control', 'no-store');
     return res.status(502).json({ error: 'FBI crime data is unavailable right now (' + e.message + ').' });

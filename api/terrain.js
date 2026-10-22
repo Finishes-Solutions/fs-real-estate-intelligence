@@ -56,7 +56,8 @@ export async function meteoSamples(pts, t0 = Date.now()) {
 const coarseSpec = (spec, n) => { const W = (spec.nx - 1) * spec.cell, H = (spec.ny - 1) * spec.cell, cell = Math.ceil(Math.max(W, H) / (n - 1)); return { x0: spec.x0, y0: spec.y0, cell, nx: Math.ceil(W / cell) + 1, ny: Math.ceil(H / cell) + 1 }; };
 const median = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : null; };
 
-export async function terrainFor(origin, ring, t0 = Date.now()) {
+// meteo: false leaves out the Open-Meteo fallback (the MCP server: Open-Meteo's free API is for non-commercial use)
+export async function terrainFor(origin, ring, t0 = Date.now(), { meteo = true } = {}) {
   const spec = gridSpec(ring), sig = terrainSig(origin, ring), at = new Date().toISOString(), lat = origin[1], why = [];
   try {
     const { z, res } = await usgsSamples(gridLL(spec, origin), t0), T = fillGaps({ ...spec, z });
@@ -64,7 +65,7 @@ export async function terrainFor(origin, ring, t0 = Date.now()) {
       return { ...T, z: T.z.map(v => Math.round(v * 100) / 100), source: 'USGS 3DEP', detail: m == null ? '' : m < 2.5 ? (m < 1.5 ? '1 m' : Math.round(m) + ' m') + ' lidar' : '~' + Math.round(m) + ' m', resM: m && +m.toFixed(1), coarse: false, sig, at }; }
     why.push('USGS image service had too little data here');
   } catch (e) { why.push(e.message); }
-  for (const [name, fn, n, detail] of [['USGS 3DEP', epqsSamples, 10, 'point samples'], ['Copernicus DEM', meteoSamples, 12, '90 m, via Open-Meteo']]) {
+  for (const [name, fn, n, detail] of [['USGS 3DEP', epqsSamples, 10, 'point samples'], ['Copernicus DEM', meteoSamples, 12, '90 m, via Open-Meteo']].filter(x => meteo || x[0] !== 'Copernicus DEM')) {
     if (timeLeft(t0) < 4000) break;
     try { const cs = coarseSpec(spec, n), { z } = await fn(gridLL(cs, origin), t0), T = fillGaps({ ...cs, z });
       if (T) return { ...T, z: T.z.map(v => Math.round(v * 100) / 100), source: name, detail, resM: null, coarse: true, sig, at, why: why.join('; ') };

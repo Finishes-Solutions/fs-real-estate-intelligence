@@ -445,6 +445,18 @@ While it works, a quiet line at the bottom of the chat says what it's doing ("Th
 
 ---
 
+## Your project app's agents
+
+The AI agents in your project app can now pull this app's data directly, without anyone opening the map. For a property (by address, parcel number or coordinates), a radius around it, a county or a drawn area, they can get:
+
+- the property itself: where it is, how good the address match was, its county, whether it is inside city limits or within half a mile of a city, and the appraisal parcel (owner, values, land use, acreage, outline);
+- the site: flood zone and flood history, ground elevations and slopes, environmental records nearby, utilities, traffic counts, water and school districts;
+- the area: demographics in rings around it, the county's market figures, businesses, development activity, construction filings and the most active developers, architects and contractors, crime (Houston street-level, or any US police department's yearly figures), local news and nearby airports.
+
+Every answer names its sources, says how current they are and what they cover. Where a source doesn't cover a place (Houston crime outside Houston, demographics outside the seven counties) the answer says so plainly instead of reporting nothing. The agents can only read; they never change anything here.
+
+---
+
 ## Notes and watchlist
 
 Find them under **My Work → Notes & watchlist**.
@@ -1032,6 +1044,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Your project app's agents can pull this data:** the AI agents in your project app can look up a property, its site facts, flood, terrain, environmental records, utilities and traffic, an area's demographics, market, businesses, development activity, construction filings, crime and news, each answer with its sources and what they cover. See **Your project app's agents**.
 - **Pick the AI for each feature:** Settings › AI model has a row for each AI feature (site plans, Ask AI, filing briefs, reference files, place search, voice, renderings) with its own provider and model. Claude (Claude Opus 5.5 by default) can do site plans, Ask AI, filing briefs and reference files; voice, renderings and place search pick among OpenAI's models.
 - **Plan sets for gas stations:** a plan set from an option with a gas station now has a **Fuel canopy & fuel system** section (F-001 to F-501): the tanks, product piping, vents and emergency shutoffs, the hazardous areas and canopy electrical, the canopy plan, ceiling, elevations, section, foundation and framing, and nine details, with separation checks measured from the plan. The car wash is designed as a car wash. Every kind of building keeps a building type, so a c-store, a restaurant pad or a clubhouse among many apartment buildings now gets its own floor plans, elevations and engineering sheets.
 - **Gas stations in mixed plans, a 3D canopy and pump orientation:** a gas station asked for with shops, apartments, homes or any mix now gets its own outparcel at the front corner, laid out as a full station (canopy, store, tanks, driveways), with the rest of the plan behind and beside it and a cross-access drive between them; before, it turned into a plain shop building. Pumps now come in 10 and 16 as well. **Pump islands** can run along the street or across it (in Site parameters and on a selected canopy). Tilt the map and the canopy shows in 3D with its columns, dispensers and fascia.

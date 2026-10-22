@@ -1,15 +1,18 @@
 // Abuse and cost guards for the public AI endpoints. The in-memory limiter is per function instance
 // (best effort); the Vercel Firewall rate-limit rule and the OpenAI project budget are the hard limits.
 const hits = new Map();
-export function rateLimit(req, res, { perMinute = 6, perDay = 60 } = {}) {
-  const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '?').split(',')[0].trim();
-  const now = Date.now(), h = (hits.get(ip) || []).filter(t => now - t < 864e5);
-  if (h.filter(t => now - t < 6e4).length >= perMinute || h.length >= perDay) {
-    res.setHeader('Retry-After', '60'); res.status(429).json({ error: 'Too many requests. Try again in a minute.' }); return false;
-  }
-  h.push(now); hits.set(ip, h);
+// one hit for key, unless it is over the limits (perMinute in the last minute, perDay in the last day): true when allowed
+export function allow(key, { perMinute = 6, perDay = 60 } = {}) {
+  const now = Date.now(), h = (hits.get(key) || []).filter(t => now - t < 864e5);
+  if (h.filter(t => now - t < 6e4).length >= perMinute || h.length >= perDay) return false;
+  h.push(now); hits.set(key, h);
   if (hits.size > 5000) for (const [k, v] of hits) if (now - v[v.length - 1] > 864e5) hits.delete(k);
   return true;
+}
+export const clientIp = req => String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '?').split(',')[0].trim();
+export function rateLimit(req, res, limits = {}) {
+  if (allow(clientIp(req), limits)) return true;
+  res.setHeader('Retry-After', '60'); res.status(429).json({ error: 'Too many requests. Try again in a minute.' }); return false;
 }
 export function sameOrigin(req, res) {
   const o = req.headers.origin, host = req.headers['x-forwarded-host'] || req.headers.host;

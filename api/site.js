@@ -108,6 +108,11 @@ async function bars(addr, zip) {
   return barsInfo(await r.json());
 }
 
+// the city whose limits the point is inside, and every city whose limits come within 0.5 mile (a small Texas city's ETJ)
+export async function placeAt(lon, lat) { const a = (await query(SRC.place, lon, lat, { fields: 'BASENAME,NAME' }))[0]; return a?.BASENAME ? { name: String(a.BASENAME).trim(), full: String(a.NAME || a.BASENAME).trim() } : null; }
+export const placesNear = async (lon, lat) => (await query(SRC.place, lon, lat, { m: 805, fields: 'BASENAME,NAME' })).filter(a => a.BASENAME).map(a => ({ name: String(a.BASENAME).trim(), full: String(a.NAME || a.BASENAME).trim() }));
+export const SITE_SOURCES = SRC;
+
 const inHouston = (lon, lat) => lon > -95.95 && lon < -95.0 && lat > 29.5 && lat < 30.15;
 export async function site(lon, lat, { addr, zip } = {}) {
   const part = async fn => { try { return await fn(); } catch (e) { return { error: e.message }; } };
@@ -123,8 +128,7 @@ export async function site(lon, lat, { addr, zip } = {}) {
     part(() => echo(lon, lat)),
     part(async () => db && inHouston(lon, lat) ? crimeSummary(await db.rpc('crime_near', { p_lon: lon, p_lat: lat, p_m: 805 }, { deadline: Date.now() + 15000 }), 0.5) : null),
     part(() => addr ? bars(addr, zip) : null),
-    part(async () => { const a = (await query(SRC.place, lon, lat, { fields: 'BASENAME,NAME' }))[0]; return a?.BASENAME ? { name: String(a.BASENAME).trim(), full: String(a.NAME || a.BASENAME).trim() } : null; }),
-    part(async () => (await query(SRC.place, lon, lat, { m: 805, fields: 'BASENAME,NAME' })).filter(a => a.BASENAME).map(a => ({ name: String(a.BASENAME).trim(), full: String(a.NAME || a.BASENAME).trim() })))
+    part(() => placeAt(lon, lat)), part(() => placesNear(lon, lat))
   ]);
   const nearBy = Array.isArray(nearAll) ? nearAll.filter(x => !place || place.error || x.name !== place.name).slice(0, 6) : nearAll;
   const districts = { water, tirz, opportunityZone: oz, schools };
