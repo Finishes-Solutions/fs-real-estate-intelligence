@@ -200,7 +200,7 @@ def draw(ctx, meta):
     return buf.getvalue(), c.texts, failed
 
 
-def on_border(content, out_path, half=False):
+def on_border(content, out_path, half=False, attach=()):
     border = PdfReader(BORDER).pages[0]
     src = PdfReader(io.BytesIO(content))
     w = PdfWriter()
@@ -210,6 +210,8 @@ def on_border(content, out_path, half=False):
         page.merge_page(pg)
     w.add_metadata({'/Title': src.metadata.get('/Title', 'Plan set') if src.metadata else 'Plan set', '/Creator': 'Finishes Solutions', '/Producer': 'fs-set-plans'})
     w.compress_identical_objects(remove_duplicates=True, remove_unreferenced=True)
+    for name, data in attach:  # the model and the sheet index travel inside the set (read_model.py takes them out)
+        w.add_attachment(name, data)
     with open(out_path, 'wb') as f:
         w.write(f)
     if half:
@@ -292,7 +294,13 @@ def main():
     content, texts, failed = draw(ctx, meta)
     slug = re.sub(r'[^a-z0-9]+', '-', pr.get('name', 'project').lower()).strip('-')
     out_pdf = os.path.join(a.out, slug + '-plan-set.pdf')
-    half = on_border(content, out_pdf, a.half)
+    idx = io.StringIO()
+    wr_ = csv.writer(idx)
+    wr_.writerow(['Sheet', 'Title', 'Subtitle', 'Section', 'Scale'])
+    for s_ in ctx.sheets:
+        wr_.writerow([s_['number'], s_['title'], s_['sub'], s_['section'], s_['scale']])
+    half = on_border(content, out_pdf, a.half, attach=[('project.json', json.dumps(p, separators=(',', ':')).encode()),
+                                                       ('sheet-index.csv', idx.getvalue().encode())])
     checks = set_checks(ctx, {s['number']: t for s, t in zip(ctx.sheets, texts)}) + ['Sheet ' + f for f in failed]
     with open(os.path.join(a.out, 'sheet-index.csv'), 'w', newline='') as f:
         wr = csv.writer(f)

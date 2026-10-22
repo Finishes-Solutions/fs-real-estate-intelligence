@@ -35,7 +35,8 @@ people and the surroundings are the model's interpretation of the plans' notes. 
 |---|---|
 | `scripts/render_views.py` | Builds the scene, renders the five massing views, and (with `--yes`) paints them through the API. Checks each result, and writes the pictures, prompts and `renders.json`. `--budget` caps a pre-approved spend; `--package` writes the paid step as a zip for `paint.py` when this sandbox can't reach OpenAI; `--import` brings the painted pictures back for the check. |
 | `scripts/paint.py` | The paid step on its own (standard library only), run from the paint package wherever OpenAI is reachable. |
-| `scripts/extract_geometry.py` | Takes the site off the SP-1 PDF (or a DXF / CAD PDF) in feet, when there is no project file. |
+| `scripts/read_model.py` | Takes the project model out of the plan-set or SP-1 PDF (they carry it as an attachment) and prints a short summary. |
+| `scripts/extract_geometry.py` | Takes the site off the SP-1 PDF (or a DXF / CAD PDF) in feet, when the PDF carries no model. |
 | `scripts/plan_refs.py` | Crops the exterior elevations out of the plan-set PDF as reference images. |
 | `scripts/render_sheet.py` | Lays out the R-1 renderings sheet (24 x 36 title block, key plan of the cameras). `--update` adds the pictures to the project's `renders` for fs-set-plans (A-901 to A-905). |
 | `scripts/fsrender/` | The scene builder, renderer, cameras, prompt, API client and fidelity check. |
@@ -68,9 +69,12 @@ Missing pieces don't stop the job; they change how far it goes:
 ### 2. Gather the inputs
 
 Follow `references/inputs.md`. Best to worst, use what you have:
-- **the project file**: the fs-site-plan hand-off (`<slug>-site-model.json`), ideally as the fs-set-plans agent left
-  it with each building type's `design`;
-- **the plan-set PDF and its `sheet-index.csv`**, for the elevation references;
+- **the plan-set PDF** from fs-set-plans: it carries the final project model (with each building type's `design`) and
+  its sheet index. `python3 <skill>/scripts/read_model.py <set>.pdf --out project.json` takes the model out and prints
+  a summary; `plan_refs.py` finds the elevations from the embedded index. This one PDF is all you need;
+- or **the SP-1 PDF** from fs-site-plan, which carries the site model (no designs): `read_model.py` works on it too;
+- a model `.json` given as a file: run it through `read_model.py` as well. **Never open, cat or print a model file**:
+  reading a large one into the conversation overflows the prompt;
 - **SP-1, the site layout PDF**, to cross-check, or **as the only input**: take the site off it with
   `extract_geometry.py` and write a small project file (inputs.md, "From SP-1 alone"). The buildings get generic
   facades for their use, which is fine for concept renderings; say so.

@@ -1,7 +1,8 @@
 # Taking the site off the reference drawing
 
-**Have an fs-site-plan hand-off (`<slug>-site-model.json`)?** Skip this page: it is already a `project.json` in feet
-with parking rows, ponds and stated values. Copy it and go to the building designs.
+**Have an SP-1 from fs-site-plan (or its `<slug>-site-model.json`)?** Run `python3 <skill>/scripts/read_model.py SP-1.pdf
+--out project.json` and skip this page: the PDF carries the model, already a `project.json` in feet with parking rows,
+ponds and stated values. Only an exit code 3 (no model in the PDF) brings you back here.
 
 The total site acreage is the basis for everything. **Get it from the user before modelling the site** (or from a
 survey / plat they supplied, then confirm it with them). It goes in `site.stated.acres`; `build_set.py` refuses to

@@ -526,6 +526,50 @@ def handoff(L, pdf_name):
     return p
 
 
+HANDOFF_DROP = ('hbu', 'code', 'risks', 'guardrails', 'layout_notes', 'accepted_warnings', 'market')  # folded into facts / notes, or SP-1 only
+
+
+def simplify(pts, tol=0.25):
+    """Douglas-Peucker in feet: survey and parcel outlines with thousands of vertices lose nothing at drawing scale"""
+    if len(pts) < 3:
+        return pts
+    a, b = pts[0], pts[-1]
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L = math.hypot(dx, dy) or 1e-9
+    i, dm = 0, -1.0
+    for k in range(1, len(pts) - 1):
+        d = abs(dy * (pts[k][0] - a[0]) - dx * (pts[k][1] - a[1])) / L
+        if d > dm:
+            i, dm = k, d
+    if dm <= tol:
+        return [a, b]
+    return simplify(pts[:i + 1], tol)[:-1] + simplify(pts[i:], tol)
+
+
+def compact(o):
+    """the hand-off kept small (it is often attached to an agent's prompt): coordinates to 0.01 ft, long outlines
+    simplified to 0.25 ft, the planning-only sections dropped"""
+    if isinstance(o, float):
+        return round(o, 2)
+    if isinstance(o, list):
+        if len(o) > 60 and all(isinstance(q, list) and len(q) == 2 and all(isinstance(v, (int, float)) for v in q) for q in o):
+            o = simplify(o)
+        return [compact(v) for v in o]
+    if isinstance(o, dict):
+        return {k: compact(v) for k, v in o.items()}
+    return o
+
+
+def embed(pdf_path, name, data):
+    """the hand-off travels inside SP-1 as a PDF attachment: one file to pass on, and PDF readers (people and models)
+    see only the sheet"""
+    r = PdfReader(pdf_path)
+    w = PdfWriter(clone_from=r)
+    w.add_attachment(name, data)
+    with open(pdf_path, 'wb') as f:
+        w.write(f)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('model')
@@ -552,7 +596,16 @@ def main():
     content, scale = render(L, bool(fails))
     half = on_border(content, pdf, a.half)
     model_path = os.path.join(a.out, name + '-site-model.json')
-    json.dump(handoff(L, os.path.basename(pdf)), open(model_path, 'w'), indent=1)
+    hm = handoff(L, os.path.basename(pdf))
+    for k in HANDOFF_DROP:
+        hm.pop(k, None)
+    data = json.dumps(compact(hm), separators=(',', ':')).encode()
+    open(model_path, 'wb').write(data)
+    embed(pdf, 'site-model.json', data)
+    print('Hand-off model: %.0f KB (about %dk tokens), embedded in the PDF as site-model.json.' % (len(data) / 1024, len(data) / 3500))
+    if len(data) > 300 * 1024:
+        print('WARNING: the hand-off is over 300 KB. Look for a bloated field (an outline with thousands of points, a copied '
+              'export) and drop it from the model: the next agent should get a small file.')
     open(os.path.join(a.out, name + '-checks.txt'), 'w').write(report + '\n')
     print('\nWrote %s (1" = %d\')%s, %s and %s-checks.txt' % (pdf, scale, (', ' + half) if half else '', model_path, name))
     if fails:

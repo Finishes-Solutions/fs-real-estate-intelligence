@@ -31,6 +31,8 @@ plans, elevations, sections, roof plans, details, MEP layouts, schedules and che
 - `scripts/build_set.py` — validates the building designs, picks the sheets, draws them, runs the set checks.
   `--validate-only`, `--list`, `--half` (adds an 11 x 17 copy), `--contact` (writes `contact-N.png`, six sheets per
   image, for a cheap look at the whole set).
+- `scripts/read_model.py` — takes the project model out of an SP-1 (or plan-set) PDF, which carries it as an
+  attachment, and prints a short summary instead of the JSON.
 - `scripts/extract_geometry.py` — reads a DXF, DWG (via a converter), vector or scanned PDF, or image; ranks the closed
   shapes against the acreage; writes `geometry.json` and a preview, or a pixel grid to trace sketches on.
 - `scripts/fit_site.py` — scales a model traced in pixels (or unscaled PDF points) to the real acreage.
@@ -65,8 +67,13 @@ defaults and list them in your summary.
 
 Work in `./plan-set/<project-slug>/`. Pick the path by what you were given (details in `references/intake.md`):
 
-- **An fs-site-plan hand-off (`<slug>-site-model.json`)**: it *is* a `project.json` with exact geometry, parking
-  rows, ponds, stated values and facts. Copy it and build from it. Don't trace its PDF.
+- **An SP-1 site layout PDF from fs-site-plan**: it carries its model. Run
+  `python3 <skill>/scripts/read_model.py SP-1.pdf --out project.json` first: it writes the `project.json` (exact
+  geometry, parking rows, ponds, stated values, facts) and prints a short summary. Build from that; don't trace the
+  PDF. Exit code 3 means this PDF has no model (an older or other sheet): take the site off the drawing as below.
+- **A `<slug>-site-model.json`** given as a file: the same model. Pass it through `read_model.py` too (it copies it and
+  prints the summary). **Never open, cat or print a model file**: it can be large, and reading it into the conversation
+  is what overflows the prompt.
 - **The app's plan-set PDF (G-001 cover + C-101 site plan)** or any vector site-plan PDF:
   `python3 <skill>/scripts/extract_geometry.py <pdf> --acres <ac> --page <C-101 page> --out intake/`.
   The C-101 prints its scale, so shapes come out in feet: the boundary is the top candidate (within 2 %), and the
@@ -138,7 +145,9 @@ Zoom in (`pdftoppm -f N -l N -r 80`) only on a sheet that looks wrong. Fix the m
 
 ### 6. Deliver
 
-Give the user the PDF path (and the 11 x 17 if made), the sheet count, and a short summary:
+Give the user the PDF path (and the 11 x 17 if made), the sheet count, and a short summary. The set PDF carries the
+final `project.json` (with the building designs) and its sheet index as attachments, so the renderings agent needs only
+the PDF.
 
 - where the site came from and how the scale was set;
 - what the set contains (sections, building types) and that the layout was followed as given;
@@ -157,7 +166,8 @@ the conversation, so:
 - Look at pages at `-r 40` (a 36 x 24 sheet is then 1440 px wide). Crop to zoom; don't re-render whole pages at high
   resolution.
 - Use `--contact` instead of rendering sheets one by one; look at each contact image once per build.
-- Read `geometry.json`, `set-check.txt` and the reference text with short scripts and `head`, never whole.
+- Read `geometry.json`, `project.json`, `set-check.txt` and the reference text with short scripts and `head`, never
+  whole. To change a field of the model, edit it with a few lines of Python, not by printing and rewriting the file.
 - Don't rebuild to check a typo in the notes; batch your fixes, then rebuild.
 
 ## Rules

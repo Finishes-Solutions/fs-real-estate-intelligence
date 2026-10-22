@@ -34,7 +34,8 @@ block (its issue / revision rows). When in doubt, ask.
 
 ## From SP-1 alone (no project file)
 
-When all you have is the site layout PDF (fs-site-plan's SP-1 / SP-1A, or the app's C-101):
+First try `read_model.py SP-1.pdf --out project.json`: SP-1 sheets from fs-site-plan carry their model. Only when it
+says there is none (exit code 3), or for the app's C-101, take the site off the drawing:
 
 1. `python3 <skill>/scripts/extract_geometry.py SP-1.pdf --acres <ac> --out intake/`. The sheet prints its scale, so the
    shapes come out in feet and the boundary is the top candidate. Print only the largest closed shapes with a short

@@ -142,7 +142,8 @@ sheet. Then **look at both images**:
 
 Give the user:
 - `out/<slug>-site-layout.pdf`: the sheet.
-- `out/<slug>-site-model.json`: the hand-off model (an fs-set-plans `project.json`).
+- `out/<slug>-site-model.json`: the hand-off model (an fs-set-plans `project.json`), compact (a few KB). The same model
+  is embedded in the PDF as the attachment `site-model.json`, so **the PDF alone carries it**.
 - `out/<slug>-checks.txt`: the measured checks.
 
 Then add a short summary:
@@ -150,7 +151,8 @@ Then add a short summary:
 - the yield (building sf, units, lots), parking, detention and land use;
 - every requirement that is UNVERIFIED and every stop condition;
 - the accepted warnings;
-- the next step: give the PDF **and** the `-site-model.json` to the agent running fs-set-plans
+- the next step: give **the PDF only** to the agent running fs-set-plans (its `read_model.py` takes the model out of it;
+  attaching the JSON as well can overflow an agent's prompt when a platform pastes attachments in)
   (`references/handoff.md` has the message to pass on).
 
 Keep `site-model.json` with the outputs. Revising the layout means editing it and rebuilding, and a re-issue gets a new

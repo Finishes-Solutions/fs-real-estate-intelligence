@@ -6,7 +6,7 @@ landscape, architecture, structural, MEP, fire, renderings). Every build writes 
 | File | For the next agent |
 |---|---|
 | `<slug>-site-layout.pdf` | The reference site plan: a vector PDF at a printed engineering scale (`1" = 40'-0"` and so on), with the boundary, every building, pond and paving area as closed shapes. fs-set-plans' `extract_geometry.py` reads the scale and finds the boundary within 0.1% of the acreage. |
-| `<slug>-site-model.json` | **The model to build from.** An fs-set-plans `project.json` with the exact geometry (feet, reference frame, `north_deg`, `display_rotate_deg`), `site.stated` (acres, building sf, units), `site.parking` (required, provided, accessible, basis), paving for every parking row and drive, pond volumes, building types with W, D, floors and floor height, and `facts` carrying every code rule and risk with its classification. |
+| `<slug>-site-model.json` | Also embedded in the PDF as the attachment `site-model.json` (fs-set-plans' `read_model.py` extracts it), so **pass on the PDF only**. Compact: coordinates to 0.01 ft, long outlines simplified to 0.25 ft, planning-only sections (hbu, code, risks) folded into `facts` and dropped; the build warns if it is over 300 KB. **The model to build from.** An fs-set-plans `project.json` with the exact geometry (feet, reference frame, `north_deg`, `display_rotate_deg`), `site.stated` (acres, building sf, units), `site.parking` (required, provided, accessible, basis), paving for every parking row and drive, pond volumes, building types with W, D, floors and floor height, and `facts` carrying every code rule and risk with its classification. |
 | `<slug>-checks.txt` | The measured checks, for the record. |
 
 What fs-set-plans still does itself: confirm the acreage with the user (its rule), design each building type (`design`),
@@ -20,9 +20,8 @@ PASS", and its C-101 matches SP-1.
 
 Give the user (or the next agent) both files and this note:
 
-> Site layout SP-1 for <project>, <option>, issued <date>. Build the plan set from `<slug>-site-model.json`. It's an
-> fs-set-plans project.json with the geometry in feet, so don't trace the PDF. The PDF is the reference sheet and
-> agrees with the model. Total site acreage: <acres> ac (confirmed by <user> from <source>). Building types <list> have
+> Site layout SP-1 for <project>, <option>, issued <date>. The PDF carries the model: run `read_model.py` on it
+> (an fs-set-plans project.json with the geometry in feet), so don't trace the PDF. The sheet and the model agree. Total site acreage: <acres> ac (confirmed by <user> from <source>). Building types <list> have
 > no floor-plan designs yet. Unverified items that matter: <top risks>.
 
 ## If the layout changes later

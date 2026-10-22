@@ -9,6 +9,7 @@ of every type come first, then a side of each, up to --max images (the API call 
 Writes refs/<sheet>-<view>.png and refs/refs.json [{file, caption, type, sheet, view}]. Needs pdfplumber and pdftoppm."""
 import argparse
 import csv
+import io
 import json
 import os
 import re
@@ -19,8 +20,19 @@ ORDER = ['FRONT', 'RIGHT', 'LEFT', 'BACK']
 
 def elevation_pages(pdf, index):
     out = []
+    rows = None
     if index and os.path.exists(index):
-        for i, r in enumerate(csv.DictReader(open(index))):
+        rows = list(csv.DictReader(open(index)))
+    else:  # fs-set-plans embeds its sheet index in the set
+        try:
+            from pypdf import PdfReader
+            att = PdfReader(pdf).attachments.get('sheet-index.csv')
+            if att:
+                rows = list(csv.DictReader(io.StringIO(att[0].decode())))
+        except Exception:
+            rows = None
+    if rows is not None:
+        for i, r in enumerate(rows):
             if r['Sheet'].startswith('A-2') and 'elevation' in r['Title'].lower():
                 m = re.search(r'Type\s+(\w+)', r['Title'])
                 out.append(dict(page=i + 1, sheet=r['Sheet'], type=m.group(1) if m else '?', sub=r.get('Subtitle', '')))
