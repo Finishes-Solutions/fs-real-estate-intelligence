@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 4:13 PM CT: Housekeeping for the skills folder (a65033d)
+- Running the skills' scripts no longer leaves Python cache files for git to pick up. Nothing changes in the app or the skills.
+
 ### 3:52 PM CT: A Claude skill for five midday renderings that match the layout and the plan set (db9a231)
 - **New skill, outside the app:** `skills/fs-site-renderings.zip` is the third step after the site layout and plan set skills. It makes five photoreal renderings of the property at midday from five angles: two corner aerials, street level from across the road, arriving at the entrance, and a high rear aerial.
 - **True to the drawings:** it builds an exact 3D massing model from the project file. Buildings sit at their real size, height and roof, with windows, storefronts and doors where the elevation sheets draw them, along with the striped parking, drives, ponds and street. The image model (gpt-image-2.5-sunburst, high quality) then paints that model photographically without changing it, using the set's elevation drawings as references.
