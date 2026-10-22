@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
-### 11:18 AM CT: /fs-set-plans, a Claude skill that makes a full plan set from the reference drawings (COMMIT)
+### 11:18 AM CT: /fs-set-plans, a Claude skill that makes a full plan set from the reference drawings (aee41e1)
 - **New Claude skill, not an app feature:** `/fs-set-plans` in Claude Code, or the same folder zipped and uploaded as a claude.ai skill. Give it the site's DWG, DXF or PDF site plan, or a photo or scan of a hand-drawn layout, plus any survey, program or flood and utility facts. It makes one schematic design set: cover, notes, code analysis, civil, landscape, architecture per building type, structural, mechanical, plumbing, electrical, fire and life safety, optional telecom, and renderings. Every sheet is on the Finishes Solutions 24 × 36 title block with the "not for construction" box, and an 11 × 17 copy is optional.
 - **Total acreage first:** it always asks for the site's total acreage before modelling the site, and won't build without it. A CAD or PDF drawing's boundary must match the acreage within 2 %; a hand drawing is scaled to it.
 - **Sheets that agree:** every sheet is drawn from one project file. Before handing a set over, it checks acreage, building area, home count, parking, detention (1.00 acre-foot per acre), sheet references and building sizes, and each floor plan passes the same room, door, egress and exit checks as the app's.
