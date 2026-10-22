@@ -8,7 +8,8 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createServer } from '../lib/mcp/server.mjs';
 import { allow, clientIp } from './_lib/guard.mjs';
 
-export const LIMITS = { request: { perMinute: 120, perDay: 5000 }, data: { perMinute: 60, perDay: 3000 }, report: { perMinute: 4, perDay: 120 } };
+// all of AMP's calls come from its own servers (one caller as far as this is concerned), so these are generous; per instance
+export const LIMITS = { request: { perMinute: 240, perDay: 10000 }, data: { perMinute: 120, perDay: 6000 }, report: { perMinute: 10, perDay: 300 } };
 const rpcError = (res, status, code, message) => { res.statusCode = status; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ jsonrpc: '2.0', error: { code, message }, id: null })); };
 
 // constant-time compare of the bearer token (hashing first makes the lengths equal)
