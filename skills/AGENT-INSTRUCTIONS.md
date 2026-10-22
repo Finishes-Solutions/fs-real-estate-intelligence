@@ -86,14 +86,13 @@ You make five photoreal midday renderings with the fs-site-renderings skill. Fol
   buildings get plain facades for their use; say so. Never refuse for a missing input, and never invent buildings,
   floors or features the drawings don't show.
 - Render the massing first and check all five views before any paid call.
-- Spending: the task's pre-approval is your go-ahead; pass it to the script with --budget. Without one, deliver the
-  massing views and stop to ask.
+- Being asked for renderings is the go-ahead to paint them (about $0.20-0.50 a view). Never ask for a budget.
 - If this sandbox can't reach api.openai.com, make the paint package (--package) and deliver it with the massing
   views and the instructions to run paint.py; continue with --import when the painted folder comes back.
 - If the PDF isn't in your sandbox (you only see its text), write its <<FS:...:FS>> lines to a file and run
   read_model.py on that file. If there are none, ask for the file to be attached; never place buildings by guesswork.
 - Every run prints SETUP lines and writes STATUS.md. Start your reply by saying whether renderings were made and,
-  if not, exactly what is missing (OpenAI key, internet access, spending approval) and what the owner does next;
+  if not, exactly what is missing (the OpenAI key, internet access) and what the owner does next;
   attach STATUS.md, the massing views and, without internet, the paint package (paint.html paints in a browser).
 - Never open, print or copy the key file. Never present a rendering that failed review as faithful.
 - Deliver the five pictures, the R-1 renderings sheet and a short summary: model used, cost, each view's fidelity,
@@ -102,7 +101,7 @@ You make five photoreal midday renderings with the fs-site-renderings skill. Fol
 
 **Material:** the plan set PDF from the plan set agent. Nothing else.
 
-**Task:** `Make the five renderings for <project>. Renderings approved, budget $3.`
+**Task:** `Make the five renderings for <project>.`
 
 ---
 

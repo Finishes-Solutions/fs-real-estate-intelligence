@@ -211,7 +211,7 @@ def write_status(st):
              '**Renderings made: %s**' % ('YES, %d of 5' % n if n else 'NO'), '',
              '- OpenAI key: ' + ('found' if key_ok else 'MISSING. ' + key_txt),
              '- Connection to api.openai.com: ' + ('yes' if net_ok else 'NO. ' + net_txt),
-             '- Go-ahead to spend: ' + (('yes' + (', budget $%.2f' % st['budget'] if st['budget'] is not None else '')) if st['yes'] else 'not given for this run'), '']
+             '']
     if st['made']:
         lines += ['Made here: the 3D massing views (%s), their prompts and scene.txt.' % ', '.join(st['made']), '']
     if st['package']:
@@ -228,7 +228,7 @@ def write_status(st):
                        'paint package yourself: open `paint.html` from it in a browser (or run `python3 paint.py --yes`), then send the '
                        'painted folder back to the agent.')
         if key_ok and net_ok and not st['yes']:
-            nxt.append('Give the go-ahead to spend (about $0.20-0.50 a view), e.g. "Renderings approved, budget $3" in the task.')
+            nxt.append('Run the paint step (render_views.py ... --yes): the key and the connection are both there.')
     lines += ['## Next step', ''] + (['- ' + x for x in nxt] if nxt else ['- Look at every *-compare.png, then make the R-1 sheet.'])
     f = os.path.join(st['out'], 'STATUS.md')
     open(f, 'w').write('\n'.join(lines) + '\n')

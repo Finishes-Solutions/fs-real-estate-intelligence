@@ -64,7 +64,6 @@ Missing pieces don't stop the job; they change how far it goes:
 |---|---|
 | Network to `api.openai.com` (every run prints SETUP lines saying whether it answers) | Do steps 2–4, then `--package` (step 5) and deliver `paint-package.zip` with the massing views. The owner opens `paint.html` from it in a browser, pastes the key, paints and downloads `painted.zip` (or runs `python3 paint.py --yes`), and sends it back; `--import` then checks the pictures and steps 6–8 go on. |
 | The key | The same package route (the key goes next to `paint.py` or in the environment where it runs), or the owner adds `openai.key` to the skill. |
-| The go-ahead to spend | The task instructions count: "renderings approved", "budget $5" or similar is the go-ahead; pass `--budget` with the amount (or $3 for "approved" with no amount: five views at the top estimate). Without it, deliver the massing views and the package, and ask. |
 
 ### 2. Gather the inputs
 
@@ -116,13 +115,13 @@ Open all five `*-massing.png` and check them:
 Adjust a camera with `--views-file` if needed (see `references/views.md`). These pictures are exactly what the image model
 will keep, so fix problems here, not after paying for a rendering.
 
-### 5. Confirm the cost, then paint
+### 5. Paint
 
-Run the same command without `--massing-only`. It prints what it would do, and the estimate (five paid calls, roughly
-$0.20–0.50 each). **Get the go-ahead** (the user's, or a pre-approval in the task instructions, step 1), then:
+Being asked for renderings is the go-ahead: five paid calls, roughly $0.20–0.50 each, plus up to two re-paints a view.
+Don't ask for a budget. Paint:
 
 ```
-python3 <skill>/scripts/render_views.py project.json --out renders/ --refs refs/refs.json --yes [--budget 3]
+python3 <skill>/scripts/render_views.py project.json --out renders/ --refs refs/refs.json --yes
 ```
 
 No network here? Write the package instead, deliver it, and stop until the painted folder comes back:
@@ -147,7 +146,7 @@ agrees, red where it doesn't). Check every picture by eye, not just the flagged 
 - the camera unchanged;
 - midday light.
 
-Re-paint a failing view with `--views <id> --yes`. Do that at most twice per view (ask the user before spending more), then
+Re-paint a failing view with `--views <id> --yes`. Do that at most twice per view, then
 report what is still wrong. Never retouch a rendering, and never present one that failed review as faithful.
 
 ### 7. The sheet, and back into the set
@@ -176,8 +175,8 @@ what is missing. When pictures were made, give the user the five JPEGs, the R-1 
 ## Rules
 
 - The key stays where the owner put it (the environment or the skill's key file). Never ask for it in chat, read or echo it, write it anywhere else, or put it in a command line.
-- Never spend on API calls without a go-ahead for this run (the user's, or a pre-approval in the task instructions, kept
-  within its budget with `--budget`); each re-paint beyond that needs a fresh okay.
+- The request for renderings is the go-ahead to spend: the five views and at most two re-paints each. Never ask for a
+  budget. Spend nothing beyond that without asking.
 - The massing comes only from the project file. Don't add buildings, floors or features to make a prettier picture. If
   the design is wrong, it gets fixed in the set, not in the rendering.
 - Use generic signage only: no real tenant brands, logos or readable names.
