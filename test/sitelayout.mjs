@@ -742,4 +742,30 @@ function usable(plan, o, what) {
   assert.equal(L.entranceNeed(apts, oa.elements).why, 'apts'); assert.ok(S.entrancesOf(oa.elements).length >= 2, 'more than 200 apartments: the first layout has a second way in');
   const one = L.layoutOptions(corner, { ...S.guessProgram('30,000 sf retail strip'), entrances: 1 })[0]; assert.equal(S.entrancesOf(one.elements).length, 1, 'one when they ask for one');
 }
+// ---- a mixed plan re-fit with its biggest shop building pinned and an easement at the front corner (the 20.78-acre
+// Waller Tomball Rd parcel): the building's back sits on the service drive, and kept off all round it cut that drive in
+// two; with the easement also shortening the front aisle, the front aisle reached neither piece and the re-fit lost the
+// parking row in front of the building and half the apartments (211 to about 110) ----
+{
+  const T = await import('../lib/sitetools.mjs');
+  const site = { id: 'wt', ring: [[492.21, 460.25], [-346.09, 448.76], [-507.78, 447.67], [-488.89, -461.27], [504.61, -447.67]], front: 0, streets: [1, 2], setbacks: { rear: 20, side: 10, front: 25, paving: 10 }, elements: [] };
+  const ko = { id: 'ko1', kind: 'keepout', name: 'Easement 1', poly: [[-502, 175], [-200, 175], [-200, 446], [-507, 446]] }; // ~1.9 acres at the north-west (front) corner
+  const prog = S.guessProgram('40,000 sf of retail with 200 apartments at the back');
+  for (const keepout of [[ko], null]) {
+    const what = keepout ? 'with the easement' : 'without it', o = L.layoutOptions({ ...site, program: prog }, prog, keepout ? { keepout } : {})[0];
+    const plan = { ...site, program: o.program || prog, elements: o.elements, recipe: o.recipe }, m0 = S.metrics(plan);
+    assert.ok(m0.units >= 200, what + ': the layout has ' + m0.units + ' units');
+    const big = plan.elements.filter(e => e.kind === 'building' && e.use === 'retail').sort((a, b) => S.gfaOf(b) - S.gfaOf(a))[0];
+    const local = { ...plan, elements: plan.elements.map(e => e === big ? { ...e, pinned: true } : e) }, r = L.refit(local, {}), p = { ...plan, elements: r.elements }, m = S.metrics(p);
+    assert.ok(m.units >= m0.units * 0.95, what + ': the re-fit keeps the apartments: ' + m.units + ' of ' + m0.units);
+    assert.ok(m.spaces >= m.required, what + ': parking ' + m.spaces + ' of ' + m.required);
+    assert.deepEqual(S.check(p).filter(i => i.level === 'bad').map(i => i.text), [], what + ': nothing broken');
+    assert.ok(T.refitVerdict({ m: S.metrics(local), issues: S.check(local) }, { m, issues: S.check(p) }).ok, what + ': the editor takes the re-fit');
+    // the parking row in front of the pinned building (between it and the street, along most of its length)
+    const b = r.elements.find(e => e.id === big.id), F = L.frameOf(p), toF = q => S.rotPt(q, -F.psi), bq = S.shapeOf(b).map(toF), bx = bq.map(q => q[0]), by0 = Math.min(...bq.map(q => q[1]));
+    const along = r.elements.filter(e => e.kind === 'parking').map(e => S.shapeOf(e).map(toF)).filter(q => Math.max(...q.map(v => v[1])) <= by0 + 1 && Math.max(...q.map(v => v[1])) >= by0 - 40)
+      .reduce((s, q) => s + Math.max(0, Math.min(Math.max(...bx), Math.max(...q.map(v => v[0]))) - Math.max(Math.min(...bx), Math.min(...q.map(v => v[0])))), 0);
+    assert.ok(along >= (Math.max(...bx) - Math.min(...bx)) * 0.6, what + ': a parking row in front of the pinned building (' + Math.round(along) + ' ft of its ' + Math.round(Math.max(...bx) - Math.min(...bx)) + ')');
+  }
+}
 console.log('site layouts ok');
