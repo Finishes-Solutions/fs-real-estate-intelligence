@@ -3,6 +3,15 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-22
+
+### 3:16 PM CT: A Claude skill for one-page site layouts that feed the plan set (7189023)
+- **New skill, outside the app:** `skills/fs-site-plan.zip` can be added to Claude as a skill. Given a project's files (survey, plat, the app's Map File / CAD / Site Plan exports, flood, traffic and market reports, zoning documents), it makes a one-page conceptual site layout (SP-1) on the Finishes Solutions 24 × 36 title block.
+- **It picks the use before drawing:** it tests candidate uses and mixes (for example, pads on the frontage with retail behind) on a land budget, ranks them by residual land value when market numbers are supplied, and prints the comparison on the sheet.
+- **It checks the code and the land use:** each requirement is listed with its source and is marked verified, owner guardrail, engineering assumption or unverified, then measured against the drawing. It also checks parking and accessible stalls, detention as a real pond volume, fire-lane reach and width, and setbacks, and it flags over-parking, oversized ponds and unused land. A sheet with a failing check is stamped DRAFT.
+- **It hands off to the plan set:** each build also writes a project file for the fs-set-plans skill, so the full set is drawn from the same geometry. The bundled example builds its site and civil sheets with every set check passing.
+- The app itself is unchanged.
+
 ## 2026-10-21
 
 ### 7:07 PM CT: Site plans in four steps: Site › Layout › Pro forma › Renderings & plans (4287ddb)
