@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 5:23 PM CT: Renderings skill keeps going without internet, plan sets or a confirmation step (4d20102)
+- **No internet where the agent runs:** the agent still builds the five 3D massing views. It then hands over a small "paint package" (a zip). Anyone can run it on a computer with internet and Python to make the five paid image calls, then send the folder back so the agent checks each picture and makes the renderings sheet. The package never contains the key.
+- **Spending approved in advance:** "renderings approved, budget $5" (or similar) in the task instructions now counts as the go-ahead. The run stops before it could pass that budget.
+- **Only a site plan PDF:** the agent takes the site straight off SP-1 and renders the buildings with plain facades for their use instead of refusing. It places the road from the frontage note when the sheet doesn't draw one, and says so.
+- **Fuel stations:** a fuel canopy is now drawn as an open canopy on columns over pump islands, not a solid building.
+- **Acreage:** a rounded figure in the task ("~20 acres" for 20.78 ac) no longer counts as a conflict in either the renderings or the plan set skill.
+
 ### 5:01 PM CT: Renderings skill can keep its OpenAI key in the skill folder (5f16310, 73dcec0)
 - **For agents on other platforms:** if the platform can't set an environment variable, put the key in a file named `openai.key` (or a `.env` file) inside the `fs-site-renderings` folder before zipping and uploading it. The skill finds the key there, says where it found it, and never prints it.
 - The setup guide recommends a separate, budget-capped OpenAI key that can only make images, and keeping that zip private. The platform must still let the agent reach OpenAI. Key files in the skills folder are never committed to this repository.
