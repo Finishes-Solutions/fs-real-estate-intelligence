@@ -313,7 +313,10 @@ export function initBuildings(ctx) {
   function renderAll() {
     const list = (ctx.tabs?.list('building') || []).map(t => t.ref).filter(Boolean); if (!list.length) return; cur = null; stopOrbit();
     const rows = list.map(b => ({ b, s: stats(b) })), uniqP = new Map();
-    list.forEach(b => { for (const p of b.d?.parcels?.length ? b.d.parcels : b.parcel ? [b.parcel] : []) if (p.propId) uniqP.set(p.propId, p); });
+    // every parcel picked, once (by property ID, else by outline: a record without an ID is still a parcel). A spot only
+    // Regrid knows has no outline here; it's passed on so the site plan says it's left out instead of losing it quietly
+    list.forEach(b => { for (const p of b.d?.parcels?.length ? b.d.parcels : b.parcel ? [b.parcel] : b.rg ? [b.rg] : []) {
+      const k = p.propId || (p.geometry ? JSON.stringify(p.geometry.coordinates?.[0]?.[0]) : 'pt:' + b.center.join(',')); if (!uniqP.has(k)) uniqP.set(k, { ...p, center: p.center || b.center }); } });
     const tot = k => rows.reduce((t, r) => t + (r.s[k] || 0), 0), mv = [...uniqP.values()].reduce((t, p) => t + (p.marketValue || 0), 0);
     const acres = [...uniqP.values()].reduce((t, p) => t + (/acre/i.test(p.area || '') ? parseFloat(p.area) : 0), 0);
     const geoms = [...uniqP.values()].map(p => p.geometry).concat(list.filter(b => !b.parcel).map(b => b.footprint)).filter(Boolean);
@@ -334,6 +337,8 @@ export function initBuildings(ctx) {
     card.querySelector('#mClear').onclick = () => ctx.closeCard();
     card.querySelector('#mPlan').onclick = () => {
       if (list.some(b => b.loading)) { ctx.toast('Still loading the parcels. Try again in a moment.'); return; }
+      const none = list.filter(b => !(b.d?.parcels?.length || b.parcel || b.rg)).length;
+      if (none) ctx.toast(none + ' of the ' + list.length + ' picked ' + (none === 1 ? 'has' : 'have') + ' no parcel record (the lookup failed or there’s no parcel there), so ' + (none === 1 ? 'it isn’t' : 'they aren’t') + ' in the site.');
       ctx.sitePlan?.start({ center: list[0].center, title: list.length + ' parcels', parcels: [...uniqP.values()] });
     };
     card.querySelector('#mFit').onclick = () => { const pts = list.map(b => b.center); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); map.fitBounds([[Math.min(...xs) - .0008, Math.min(...ys) - .0008], [Math.max(...xs) + .0008, Math.max(...ys) + .0008]], { padding: 60, maxZoom: 18, duration: ctx.reduceMotion ? 0 : 800 }); };
