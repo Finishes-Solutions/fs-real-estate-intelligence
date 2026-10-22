@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 5:28 PM CT: Pass agents the PDF only: the site model now travels inside it (9114664)
+- **Why:** attaching the site model file next to the site layout PDF made one plan set run fail with "prompt is too long". The platform put the whole file into the agent's prompt.
+- **Site layout skill:** the SP-1 PDF now carries its model inside it as an attachment, so it is the only file to pass on. The model itself is much smaller (8 KB instead of 20 KB on the example), with long outlines simplified, and the build warns if it ever gets large.
+- **Plan set skill:** pulls the model out of the SP-1 PDF with one command and works from a short summary, never from the whole file. The finished plan set PDF also carries its model (with the building designs) and its sheet list.
+- **Renderings skill:** needs only the plan set PDF. It pulls out the model and finds the elevation sheets on its own.
+
 ### 5:23 PM CT: Renderings skill keeps going without internet, plan sets or a confirmation step (4d20102)
 - **No internet where the agent runs:** the agent still builds the five 3D massing views. It then hands over a small "paint package" (a zip). Anyone can run it on a computer with internet and Python to make the five paid image calls, then send the folder back so the agent checks each picture and makes the renderings sheet. The package never contains the key.
 - **Spending approved in advance:** "renderings approved, budget $5" (or similar) in the task instructions now counts as the go-ahead. The run stops before it could pass that budget.
