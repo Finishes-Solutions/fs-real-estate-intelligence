@@ -3,6 +3,13 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-22
+
+### 2:54 PM CT: Re-fits keep the apartments when a shop building is pinned next to an easement (13eaa38)
+- **Fixed:** on a plan with shops in front and apartments behind, moving or resizing the biggest shop building on a site with an easement or no-build area at a front corner made the re-fit lose about half the apartments (on the 20.78-acre Waller Tomball Rd parcel: 211 units down to about 110), with no parking row in front of the shops and empty lawns where apartment rows had been. The editor kept your change and skipped the re-fit, so nothing was damaged, but the rest of the site stopped re-fitting after that edit. It now re-fits as it should: 211 units, parking met, a full row in front of the shops.
+- The service drive behind a row of shops now runs straight past a building you've pinned there, instead of stopping short at both ends of it. Re-fits after pinning a shop building also come out a little better on sites without an easement (on the same parcel: 203 units before, 211 now, and parking no longer short).
+- **Not checked:** the same fix should help when a gas station is cut out of a mixed plan as its own lot, but that feature isn't on this branch, so it hasn't been tested.
+
 ## 2026-10-21
 
 ### 7:07 PM CT: Site plans in four steps: Site › Layout › Pro forma › Renderings & plans (4287ddb)
