@@ -3,6 +3,18 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-22
+
+### 2:34 PM CT: Gas stations in mixed plans, a 3D canopy, pump island orientation (50135e6)
+- **A gas station beside other uses.** Ask for a gas station with shops, apartments, homes or any mix ("gas station with 10 pumps and a 4,500 sf c-store on the corner, 40,000 sf of retail behind it and 200 apartments at the back") and the station now gets its own outparcel at the front corner (at one end of the frontage on an inside lot), sized for its pumps, store and car wash. It's laid out as a full station (canopy along the street, store behind, tank pad, its own driveways) with the rest of the plan behind and beside it, the site's detention, and a cross-access drive between the station and the center where a straight one fits. Before, the gas station became a plain shop building with no canopy, pumps or tanks.
+- **On the 0 Waller Tomball Rd tract (20.78 ac):** that request now gives a 10-pump station on a 1.85-acre corner outparcel, about 271,000 sf of shops and apartments (211 apartments) behind it, parking met and no rule broken.
+- **Its settings in a mixed plan:** Site parameters has a **Gas station** group (pumps, store, canopy street, pump islands, car wash, air / vacuum). The outparcel shows as its own zone. Moving the canopy or store re-fits the station on its outparcel and the rest round it. The pro forma carries the ground lease beside the rents.
+- **10 and 16 pumps.** Pumps now come in 4, 6, 8, 10, 12 or 16 (10 used to round down to 8).
+- **Pump islands along or across the street.** A new **Pump islands** setting (Site parameters, and on a selected canopy): along the street (cars pull through side to side, as before) or across it (cars pull in toward the store). The canopy is sized for the way they run.
+- **The canopy in 3D.** Tilt the map: columns on the pump islands up to an 18 ft clearance, a dispenser on each island, the canopy deck with a fascia band. The deck is see-through so the pumps show from above.
+- **Fixed on the way:** in a mixed request the store took the first size said ("8 pumps, 30,000 sf of retail" made a 12,000 sf store); an extra side-street entrance could be added on top of the station.
+- **Not done yet:** one gas station per plan; the outparcel always goes at the front corner (or a front end), not anywhere you choose; re-fitting after pinning the big front shop building can lose apartments on this tract (the app keeps your edit instead; the same happens with an easement at that corner and predates this change); the 3D canopy was checked on a test map, not yet on the live site.
+
 ## 2026-10-21
 
 ### 7:07 PM CT: Site plans in four steps: Site › Layout › Pro forma › Renderings & plans (4287ddb)
