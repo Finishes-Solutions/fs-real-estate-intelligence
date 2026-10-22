@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import * as S from '../lib/siteplan.mjs';
 import * as L from '../lib/sitelayout.mjs';
 import * as PF from '../lib/proforma.mjs';
-import { cornerOf } from '../lib/sitefuel.mjs';
+import { cornerOf, fuelLotPlan, FUEL_LOT } from '../lib/sitefuel.mjs';
 import * as TOOLS from '../lib/sitetools.mjs';
 import { placeWing } from '../lib/sitecorner.mjs';
 import { readAs, notUnderstood } from '../lib/planruns.mjs';
@@ -16,7 +16,7 @@ import { headline } from '../lib/planpick.mjs';
 import { keyItems } from '../lib/planmap.mjs';
 import { planSVG, LEGEND } from '../lib/sitesheet.mjs';
 import { BUILDING_TYPES, fromType } from '../lib/buildings.mjs';
-import { SCHEMA } from '../api/siteplan.js';
+import { SCHEMA, cleanZones } from '../api/siteplan.js';
 
 // ---------- the words ----------
 { const g = S.guessProgram('gas station with 8 pumps and a 4,500 sf c-store on the corner');
@@ -28,10 +28,17 @@ import { SCHEMA } from '../api/siteplan.js';
 { const g = S.guessProgram('a Buc-ee’s style travel center with diesel for trucks'); assert.equal(g.use, 'fuel'); assert.equal(g.fuel.truckStop, true); assert.equal(g.fuel.pumps, 12, 'a big store: 12 pumps'); }
 assert.equal(S.guessProgram('20,000 sf retail strip on a corner lot').use, 'retail', 'a shopping strip is still retail');
 assert.equal(S.guessProgram('self storage, 90,000 sf climate controlled').use, 'storage', 'self storage is still storage');
-assert.equal(S.normalizeProgram({ use: 'fuel', fuel: { pumps: 10 } }).fuel.pumps, 8, 'pumps come in 4, 6, 8 or 12');
+assert.equal(S.normalizeProgram({ use: 'fuel', fuel: { pumps: 10 } }).fuel.pumps, 10, '10 pumps is a size of its own');
+assert.equal(S.normalizeProgram({ use: 'fuel', fuel: { pumps: 9 } }).fuel.pumps, 8, 'pumps come in 4, 6, 8, 10, 12 or 16 (9: the nearer below)');
+assert.equal(S.normalizeProgram({ use: 'fuel', fuel: { pumps: 20 } }).fuel.pumps, 16);
+assert.equal(S.normalizeProgram({ use: 'fuel' }).fuel.islands, 'along', 'pump islands along the street unless asked');
+assert.equal(S.normalizeProgram({ use: 'fuel', fuel: { islands: 'across' } }).fuel.islands, 'across');
 assert.equal(S.normalizeProgram({ use: 'fuel', fuel: { pumps: 13, storeSf: 90 } }).fuel.storeSf, 1500, 'a store kept in range');
 assert.equal(S.normalizeProgram({ use: 'fuel', fuel: { canopy: 'side' } }).fuel.canopy, 'side');
-{ const p = S.normalizeProgram({ use: 'fuel', zones: [{ use: 'fuel' }, { use: 'retail', gfa: 12000 }] }); assert.equal(p.use, 'retail', 'a gas station beside other uses: a shop zone'); assert.ok(p.zones.every(z => z.use === 'retail')); }
+{ const p = S.normalizeProgram({ use: 'fuel', fuel: { pumps: 10, wash: true }, zones: [{ use: 'fuel' }, { use: 'retail', gfa: 12000 }] }); assert.equal(p.use, 'retail', 'a gas station beside other uses: the plan’s use is the other one');
+  assert.deepEqual(p.zones.map(z => z.use), ['retail', 'fuel'], 'its zone kept, and last (its own outparcel)'); assert.deepEqual([p.zones[1].fuel.pumps, p.zones[1].fuel.wash], [10, true], 'with the pumps and car wash asked for');
+  assert.equal(p.zones[1].gfa, S.FUEL.storeSf + S.FUEL.washW * S.FUEL.washLen, 'its floor area: the store and the wash'); assert.deepEqual(S.normalizeProgram(p), p, 'normalized twice: the same'); }
+{ const p = S.normalizeProgram({ use: 'retail', zones: [{ use: 'fuel' }, { use: 'retail' }, { use: 'fuel' }] }); assert.deepEqual(p.zones.map(z => z.use), ['retail', 'retail', 'fuel'], 'one gas station zone; a second is a shop zone'); }
 assert.ok(SCHEMA.required.includes('fuel') && SCHEMA.properties.use.enum.includes('fuel') && SCHEMA.properties.fuel.required.every(k => k in SCHEMA.properties.fuel.properties), 'the AI’s program has a fuel object');
 
 // ---------- layouts on real shapes ----------
@@ -236,4 +243,63 @@ for (const [name, ring, extra, words, want] of [
   assert.deepEqual(f('200 apartments'), { form: true, apts: true, streets: false, trash: true, perSf: false }, 'apartments');
   assert.deepEqual(f('40 single-family homes'), { form: false, apts: false, streets: true, trash: false, perSf: false }, 'homes: streets, carts at the curb');
   assert.deepEqual(f('30,000 sf retail and 150 apartments'), { form: true, apts: true, streets: false, trash: true, perSf: true }, 'a mixed plan: both'); }
+
+// ---------- a gas station beside other uses: its own outparcel ----------
+// The 20.78-acre 0 Waller Tomball Rd parcel (0422460000011): FM 2920 along the north (the front), a side street marked
+// on the west, as the project has it
+const WTR = { ring: [[492.21, 460.25], [-346.09, 448.76], [-507.78, 447.67], [-488.89, -461.27], [504.61, -447.67]], front: 0, streets: [1, 2], origin: [-95.8897177, 30.0640874], setbacks: { rear: 20, side: 10, front: 25, paving: 10 }, params: {}, elements: [] };
+{ const g = S.guessProgram('gas station with 10 pumps and a 4,500 sf c-store on the corner with 40,000 sf of retail behind it and 200 apartments at the back'), p = S.normalizeProgram(g);
+  assert.deepEqual(p.zones.map(z => z.use), ['retail', 'multifamily', 'fuel'], 'the gas station a zone of its own, last'); assert.equal(p.use, 'retail');
+  assert.deepEqual([p.zones[2].fuel.pumps, p.zones[2].fuel.storeSf], [10, 4500]); assert.equal(p.zones[0].gfa, 40000);
+  assert.deepEqual(readAs(p, S.USES).slice(0, 4), ['Mixed use', 'Retail 40,000 sf', '200 apartments', 'Gas station · 10 pumps · 4,500 sf store']); }
+{ const p = S.normalizeProgram(S.guessProgram('c-store with 8 pumps, 30,000 sf of retail and 150 single family homes')); assert.equal(p.zones.find(z => z.use === 'fuel').fuel.storeSf, S.FUEL.storeSf, 'the store isn’t given the shops’ 30,000 sf');
+  assert.equal(p.zones.find(z => z.use === 'retail').gfa, 30000); }
+assert.equal(cleanZones([{ use: 'fuel' }, { use: 'retail' }], { words: [{ use: 'retail' }, { use: 'fuel' }] })?.length, 2, 'a gas station and unsized shops: still a mix (the shops take the land it leaves)');
+// laid out on the parcel: the station on a corner outparcel, the shops and apartments behind and beside it
+const ASK = 'gas station with 10 pumps and a 4,500 sf c-store on the corner with 40,000 sf of retail behind it and 200 apartments at the back';
+const mixOut = L.layoutOptions(WTR, S.guessProgram(ASK), {});
+assert.ok(mixOut.length >= 2, 'layouts');
+for (const o of mixOut) {
+  const pl = { ...WTR, program: o.program, elements: o.elements }, m = S.metrics(pl), lot = o.zones.find(z => z.use === 'fuel').ring, inLot = S.grow(lot, -3);
+  assert.equal(o.elements.filter(e => e.kind === 'canopy').length, 1, 'one canopy'); assert.equal(m.fuel.mpds, 10, 'every pump asked for'); assert.equal(m.fuel.tanks, 1, 'its tank pad');
+  assert.ok(o.elements.some(e => e.kind === 'building' && e.use === 'fuel' && S.fuelKind(e) === 'store'), 'the c-store');
+  assert.ok(o.recipe.fuelLot && o.zones.at(-1).acres > 1.2 && o.zones.at(-1).acres < 3, 'an outparcel of 1.2–3 acres: ' + o.zones.at(-1).acres.toFixed(2));
+  const station = o.elements.filter(e => e.lot === 'fuel'), rest = o.elements.filter(e => e.lot !== 'fuel' && !e.cross && !['green', 'lot', 'trail', 'fence'].includes(e.kind));
+  for (const e of station.filter(e => e.kind !== 'green')) assert.ok(S.isEntrance(e) ? S.inRing(S.centroid(S.outline(e)), S.grow(lot, 2)) : S.outline(e).every(q => S.inRing(q, S.grow(lot, 2))), e.kind + ' ' + (e.name || '') + ' is on the outparcel'); // (a driveway runs on to the street)
+  for (const e of rest) assert.ok(!S.rectsOverlap({ poly: S.shapeOf(e) }, { poly: inLot }, 0), e.kind + ' ' + (e.name || '') + ' of the center is off the outparcel');
+  assert.ok(cornerOf({ ...WTR, ring: lot }) || S.distToPoly([WTR.ring[2][0], WTR.ring[2][1]], lot) < 5, 'at the north-west corner (FM 2920 and the side street)');
+  assert.ok(o.elements.some(e => e.cross), 'a cross-access drive between the station and the center');
+  assert.equal(S.check(pl).filter(i => i.level === 'bad').length, 0, 'no rule broken: ' + S.check(pl).filter(i => i.level === 'bad').map(i => i.text).join('; '));
+  const names = S.entrancesOf(o.elements).map(e => e.name); assert.equal(new Set(names).size, names.length, 'each driveway its own name: ' + names); assert.equal(names.filter(n => n === 'Main entry').length, 1, 'one main entry for the site');
+  assert.ok(m.gfa > 40000 && (m.units || 0) >= 190, 'the shops and apartments behind it: ' + Math.round(m.gfa) + ' sf, ' + m.units + ' units');
+}
+{ const o = mixOut[0], pl = { ...WTR, program: o.program, elements: o.elements }, m = S.metrics(pl); assert.ok(m.spaces >= m.required, 'the best one parked: ' + m.spaces + ' / ' + m.required);
+  const R = PF.run(pl); assert.ok(R.ops.lines.some(l => /Ground lease to a fuel retailer, NNN \(10 pumps\)/.test(l.k)), 'the pro forma: the ground lease beside the rents');
+  // the outparcel's own lot lines: the streets stay streets, the inside lines are lot lines with a 10 ft building line
+  const lp = fuelLotPlan(WTR, o.zones.at(-1).ring), R2 = S.edgeRules(lp.ring, lp.front, lp.setbacks, lp.streets);
+  assert.equal(R2[lp.front].role, 'front'); assert.ok(R2.some(r => r.street), 'the side street'); assert.ok(R2.some(r => r.inside && r.build === 10), 'an inside lot line');
+  // a re-fit after the canopy is moved along the street: the station re-fits on its outparcel, the rest round it
+  const p2 = structuredClone(pl), c = p2.elements.find(e => e.kind === 'canopy'), a = (c.rot || 0) * Math.PI / 180; c.x += 20 * Math.cos(a); c.y += 20 * Math.sin(a); c.pinned = true; p2.recipe = o.recipe;
+  const r = L.refit(p2, { amount: 'current' }), m2 = S.metrics({ ...pl, elements: r.elements });
+  assert.equal(m2.fuel.mpds, 10, 're-fit: every pump'); assert.ok(m2.units >= m.units * 0.95, 're-fit: the apartments kept: ' + m2.units); assert.ok(r.recipe?.fuelLot, 're-fit: the outparcel kept in the recipe');
+  const c2 = r.elements.find(e => e.kind === 'canopy'); assert.ok(Math.hypot(c2.x - c.x, c2.y - c.y) < 1, 're-fit: the canopy stays where it was put');
+  assert.equal(S.check({ ...pl, elements: r.elements }).filter(i => i.level === 'bad' && !i.id?.startsWith?.(c.id)).length, 0, 're-fit: no rule broken'); }
+// an inside lot (no side street): the station at one end of the frontage
+{ const o = L.layoutOptions({ ...WTR, streets: [1] }, S.guessProgram('gas station with 8 pumps and retail behind'), { count: 1 })[0], lot = o.zones.at(-1).ring;
+  assert.equal(S.metrics({ ...WTR, elements: o.elements }).fuel.mpds, 8); assert.ok(/^Gas station at the front/.test(o.name), o.name);
+  const xs = lot.map(q => q[0]); assert.ok(Math.min(...xs) < -480 || Math.max(...xs) > 480, 'at an end of the frontage'); }
+// pump islands across the street: each island turned toward the store, the canopy sized for them
+{ const c = S.canopyOf(10, 2, 'across'); assert.deepEqual([c.per, c.w, c.d, c.islands], [5, 5 * S.FUEL.pitchX + 6, 2 * S.FUEL.rowX + 6, 'across']); assert.deepEqual([S.canopyOf(8, 2).w, S.canopyOf(8, 2).d], [4 * 30 + 6, 2 * 28 + 6], 'along: as before');
+  const e = { kind: 'canopy', x: 0, y: 0, w: c.w, d: c.d, rot: 0, pumps: 10, rows: 2, islands: 'across' }, P = S.pumpsOf(e);
+  assert.equal(P.length, 10); assert.ok(P.every(q => q.d > q.w), 'across: each island runs across the canopy'); assert.ok(S.pumpsOf({ ...e, islands: 'along' }).every(q => q.w > q.d), 'along: each island runs along it');
+  const P0 = S.normalizeProgram(S.guessProgram(ASK)); P0.zones.at(-1).fuel.islands = 'across'; const o = L.layoutOptions(WTR, P0, { count: 1 })[0], cv = o.elements.find(x => x.kind === 'canopy');
+  assert.equal(cv.islands, 'across', 'the layout draws them across'); assert.ok(Math.abs(Math.max(cv.w, cv.d) - c.w) < 1 && Math.abs(Math.min(cv.w, cv.d) - c.d) < 1, 'its canopy sized for them'); }
+// the canopy in 3D: per island a curb, its dispenser and a column up to the clearance; the roof deck and the fascia band
+{ const e = { kind: 'canopy', id: 'cv', x: 0, y: 0, w: 156, d: 62, rot: 0, pumps: 10, rows: 2 }, parts = S.canopy3d(e), by = k => parts.filter(p => p.part === k);
+  assert.deepEqual(['curb', 'mpd', 'column', 'roof', 'fascia'].map(k => by(k).length), [10, 10, 10, 1, 1]);
+  assert.ok(by('column').every(p => p.b < 1 && p.h === S.FUEL.canopyH), 'columns from the island to the clearance'); assert.ok(by('mpd').every(p => p.h === 7), 'dispensers 7 ft');
+  assert.ok(by('roof')[0].b >= S.FUEL.canopyH && by('fascia')[0].b === S.FUEL.canopyH && by('fascia')[0].hole?.length >= 4, 'the deck above the clearance, the fascia a band round it');
+  for (const q of by('column')) assert.ok(S.pumpsOf(e).some(i => S.inRing(S.centroid(q.ring), S.corners(i))), 'each column stands on an island');
+  const fc = S.planFeatures({ ...WTR, elements: [e] }, null), c3 = fc.features.filter(f => f.properties.k === 'c3');
+  assert.equal(c3.length, parts.length, 'on the map'); assert.ok(c3.every(f => f.properties.h > f.properties.b), 'each piece has height'); assert.equal(c3.find(f => f.properties.part === 'fascia').geometry.coordinates.length, 2, 'the fascia a ring with a hole'); }
 console.log('fuel ok');

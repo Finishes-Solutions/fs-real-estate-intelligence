@@ -47,6 +47,7 @@ const ADD_SHORT = { building: 'Building', pad: 'Restaurant pad', garage: 'Garage
 const SIZE = { roundabout: [100, 100], loop: [120, 70], building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], sign: [10, 5], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
 const PAVED = ['parking', 'drive', 'truck'];
 const FORMS = [['bar', 'Bar'], ['L', 'L-shaped'], ['U', 'Courtyard (U)'], ['tower', 'Tower on a podium']];
+const ISLANDS = [['along', 'Along the street'], ['across', 'Across the street (toward the store)']]; // which way a canopy's pump islands run
 const { COL, USE_COL } = MAP; // one palette for the map, the Plan key and the Draw buttons (lib/planmap.mjs)
 // a simple line icon for each piece you can add (24 × 24, currentColor), and its accent from the map's palette: the panel's
 // Add tiles and the tool strip's Add palette share them
@@ -638,6 +639,9 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-tanks', type: 'fill', source: SRC, filter: kind('tanks'), paint: { 'fill-color': C.tanks, 'fill-opacity': ['case', sel1, .95, .8] } });
     add({ id: 'fs-sp-canopy', type: 'fill', source: SRC, filter: kind('canopy'), paint: { 'fill-color': C.canopy, 'fill-opacity': ['case', sel1, .75, .6] } });
     add({ id: 'fs-sp-pump', type: 'fill', source: SRC, filter: kind('pump'), paint: { 'fill-color': Ln.pump, 'fill-opacity': .95 } });
+    // the canopy in 3D: island curbs, dispensers, columns and the fascia band; its roof deck a layer of its own, see-through, so the pumps show under it from above
+    add({ id: 'fs-sp-c3', type: 'fill-extrusion', source: SRC, filter: ['all', kind('c3'), ['!=', ['get', 'part'], 'roof']], minzoom: 15, paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .95 } });
+    add({ id: 'fs-sp-c3r', type: 'fill-extrusion', source: SRC, filter: ['all', kind('c3'), ['==', ['get', 'part'], 'roof']], minzoom: 15, paint: { 'fill-extrusion-color': ['case', sel1, P.sel('#f1f2ef'), ['get', 'c']], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .5 } });
     add({ id: 'fs-sp-canopyl', type: 'line', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['canopy', 'tanks']]], paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, ['==', ['get', 'k'], 'tanks'], Ln.tanks, Ln.canopy], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1.4], 'line-dasharray': ['literal', [3, 1.5]] } });
     // easements: stripes over a faint red-grey wash and a dashed outline, so they never read as a setback line
     add({ id: 'fs-sp-ko', type: 'fill', source: SRC, filter: kind('keepout'), paint: { 'fill-color': Ln.keepout, 'fill-opacity': ['case', sel1, .22, .12] } });
@@ -2216,7 +2220,7 @@ export function initSitePlan(ctx) {
       num('floorPlans', 'Floor plans', hp.floorPlans, 1, '', 'different house plans') + num('minLotSf', 'Smallest lot', hp.minLotSf, 100, 'sf', 'e.g. 6,600') + '</div>';
   }
   function paramsHtml(pl, prog) {
-    const sb = { ...SP.SETBACKS, ...(pl.setbacks || {}) }, pp = { ...PARAMS, ...(pl.params || {}), style: { ...PARAMS.style, ...(pl.params?.style || {}) } }, u = prog.use;
+    const sb = { ...SP.SETBACKS, ...(pl.setbacks || {}) }, pp = { ...PARAMS, ...(pl.params || {}), style: { ...PARAMS.style, ...(pl.params?.style || {}) } }, u = prog.use, fuelZ = prog.zones?.find(z => z.use === 'fuel');
     const sw = (k, label, on, tip, cls) => tog('data-sw="' + k + '"', label, on, { tip, cls });
     const num = (k, label, v, step, unit, o = {}) => fld(label, numCtl('min="0" data-k="' + k + '"', v, step, unit, o.ph), o);
     const pick = (k, label, v, opts) => fld(label, selCtl('data-st="' + k + '"', opts, v));
@@ -2255,6 +2259,7 @@ export function initSitePlan(ctx) {
           : SP.USES[u]?.garage ? num('perUnit', 'Parking', prog.perUnit, 0.25, '/ home') : num('ratio', 'Parking', prog.ratio, 0.1, '/ 1k sf') + num('floors', 'Floors', prog.floors, 1) + num('depth', 'Building depth', prog.depth, 5, 'ft')) +
         (u === 'foodtrucks' || u === 'fuel' ? '' : fld('Leftover land', selCtl('data-lo="1" title="The land what you asked for doesn’t need: filled with more of the program (more homes, longer shop rows, more buildings) as one plan, the default; the same marked Phase 2; or held for later as Future development"', RUN.LEFTOVER, RUN.leftoverOf(RUN.fillParams(pl.params, { ask: ed.runMeta?.ask || pl.lastRun?.ask || '' }))))), // (a food truck park is sized by its trucks; what applies: what you set, else what your words asked, else filled)
         infoBtn('Typical suburban numbers to start with. Check the city’s or county’s rules (Houston has no zoning but has building lines and parking rules).', 'About these numbers')) +
+      (u !== 'fuel' && fuelZ ? grp('Gas station', fuelFields(prog, fuelZ), infoBtn('The gas station goes on its own outparcel at the front corner (one end of the frontage on an inside lot), sized for its pumps, store and car wash; the rest of the plan is laid out behind and beside it, with a cross-access drive between them where one fits.', 'About the gas station')) : '') +
       grp('Setbacks', sw('buildOn', 'Building setbacks', sb.buildOn !== false) + sw('paveOn', 'Landscape buffer', sb.paveOn !== false) +
         [['front', 'paveFront', 'Front'], ['side', 'paveSide', 'Side'], ['rear', 'paveRear', 'Rear']].map(([k, b, l]) => num('sb-' + k, l + ' setback', sb[k], 1, 'ft') + num('sb-' + b, l + ' buffer', sb[b] ?? sb.paving, 1, 'ft')).join('')) +
       (only.sfr ? '' : grp('Parking', num('pp-stallW', 'Stall width', pp.stallW, 0.5, 'ft') + num('pp-stallD', 'Stall depth', pp.stallD, 0.5, 'ft') + num('pp-aisle', 'Drive aisle', pp.aisle, 1, 'ft'))) +
@@ -2369,10 +2374,12 @@ export function initSitePlan(ctx) {
   }
   // a gas station's own settings: the pumps (MPDs, two fueling positions each), the store, which street the canopy runs
   // along, a car wash, air / vacuum stalls
-  function fuelFields(prog) {
-    const fu = prog.fuel || {}, fsel = (k, label, v, opts, o = {}) => fld(label, selCtl('data-fuel="' + k + '"', opts, String(v)), o);
+  // (in a mixed plan: the gas station zone's, without the parking ratio, which is the store's usual 4 per 1,000 sf)
+  function fuelFields(prog, zone = null) {
+    const fu = (zone ? zone.fuel : prog.fuel) || {}, fsel = (k, label, v, opts, o = {}) => fld(label, selCtl('data-fuel="' + k + '"', opts, String(v)), o);
     return fsel('pumps', 'Pumps', fu.pumps ?? SP.FUEL.pumps, SP.PUMPS.map(n => [String(n), n + ' · ' + 2 * n + ' fueling positions'])) + fld('Store', numCtl('min="1500" max="12000" data-fuel="storeSf"', fu.storeSf, 250, 'sf'), { hint: '3,000–6,000 typical' }) +
-      fld('Parking', numCtl('min="0" data-k="ratio"', prog.ratio, 0.5, '/ 1k sf'), { hint: 'store only' }) + fsel('canopy', 'Canopy along', fu.canopy || 'auto', [['auto', 'Auto (the busier street)'], ['front', 'The front street'], ['side', 'The side street']], { tip: 'The canopy runs along a street, between it and the store. Auto: the front, unless only the side street fits it.' }) +
+      (zone ? '' : fld('Parking', numCtl('min="0" data-k="ratio"', prog.ratio, 0.5, '/ 1k sf'), { hint: 'store only' })) + fsel('canopy', 'Canopy along', fu.canopy || 'auto', [['auto', 'Auto (the busier street)'], ['front', 'The front street'], ['side', 'The side street']], { tip: 'The canopy runs along a street, between it and the store. Auto: the front, unless only the side street fits it.' }) +
+      fsel('islands', 'Pump islands', fu.islands || 'along', ISLANDS, { tip: 'Along the street: cars pull through the pumps side to side. Across the street: cars pull in toward the store, with the islands pointing at it.' }) +
       tog('data-fuel="wash"', 'Car wash', !!fu.wash, { tip: 'A car wash tunnel beside the store, with its stacking lane round the back' }) + tog('data-fuel="vac"', 'Air / vacuum stalls', fu.vac !== false, { tip: 'Three stalls with air and vacuums beside a drive lane' });
   }
   // the two storage unit mixes (by count): sizes can be added, changed or removed; the averages set the unit counts
@@ -2435,8 +2442,10 @@ export function initSitePlan(ctx) {
     const stoSet = (x, k, v) => { const p = x.program || {}; x.program = { ...p, gfa: null, storage: { ...(p.storage || {}), ...(SP.normalizeProgram(p).storage || {}), [k]: v } }; }; // (a total size no longer splits once the parts are set)
     card.querySelectorAll('.sp-prog [data-sto]').forEach(i => i.onchange = () => { change(x => stoSet(x, i.dataset.sto, i.type === 'checkbox' ? i.checked : i.value === '' ? null : +i.value)); after(i); });
     card.querySelectorAll('.sp-prog [data-ftp]').forEach(i => i.onchange = () => { change(x => { const p = x.program || {}; x.program = { ...p, foodtrucks: { ...(SP.normalizeProgram(p).foodtrucks || {}), [i.dataset.ftp]: i.type === 'checkbox' ? i.checked : i.value === '' ? null : +i.value } }; }); after(i); });
-    card.querySelectorAll('.sp-prog [data-fuel]').forEach(i => i.onchange = () => { const k = i.dataset.fuel, v = i.type === 'checkbox' ? i.checked : k === 'canopy' ? i.value : i.value === '' ? null : +i.value;
-      change(x => { const p = x.program || {}; x.program = { ...p, gfa: null, fuel: { ...(SP.normalizeProgram(p).fuel || {}), ...(p.fuel || {}), [k]: v } }; }); after(i); }); // (the store's size is the program's floor area)
+    card.querySelectorAll('.sp-prog [data-fuel]').forEach(i => i.onchange = () => { const k = i.dataset.fuel, v = i.type === 'checkbox' ? i.checked : k === 'canopy' || k === 'islands' ? i.value : i.value === '' ? null : +i.value;
+      change(x => { const p = x.program || {}, P = SP.normalizeProgram(p), fz = P.zones?.find(z => z.use === 'fuel');
+        if (fz && P.use !== 'fuel') x.program = { ...P, zones: P.zones.map(z => z === fz ? { ...z, gfa: null, fuel: { ...z.fuel, [k]: v } } : z) }; // (a mixed plan's gas station zone)
+        else x.program = { ...p, gfa: null, fuel: { ...(P.fuel || {}), ...(p.fuel || {}), [k]: v } }; }); after(i); }); // (the store's size is the program's floor area)
     const sMix = (x, k) => clone(SP.normalizeProgram(x.program).storage?.[k + 'Mix'] || SP.STORAGE_MIX[k]);
     card.querySelectorAll('[data-smix]').forEach(i => i.onchange = () => { const [k, n, f] = i.dataset.smix.split(':'); change(x => { const m = sMix(x, k); m[+n][f] = f === 'name' ? i.value : +i.value; stoSet(x, k + 'Mix', m); }); });
     card.querySelectorAll('[data-smixdel]').forEach(b => b.onclick = () => { const [k, n] = b.dataset.smixdel.split(':'); change(x => { const m = sMix(x, k); m.splice(+n, 1); stoSet(x, k + 'Mix', m); }); });
@@ -2587,7 +2596,7 @@ export function initSitePlan(ctx) {
         (e.kind === 'building' && (e.use || prog.use) === 'foodtrucks' ? pick('data-ftk="1"', 'Part', [['pavilion', 'Covered pavilion'], ['bar', 'Bar / beer garden'], ['restroom', 'Restrooms']], SP.ftKind(e)) : e.kind === 'building' && (e.use || prog.use) === 'storage' ? pick('data-stok="1"', 'Storage', [['climate', 'Climate-controlled'], ['drive', 'Drive-up units'], ['office', 'Leasing office']], SP.storageKind(e)) : e.kind === 'building' && (e.use || prog.use) === 'fuel' ? pick('data-fuelk="1"', 'Gas station', [['store', 'Convenience store'], ['wash', 'Car wash']], SP.fuelKind(e)) : e.kind === 'building' ? (SP.USES[e.use || prog.use]?.garage ? n('units', 'Homes', e.units || 1, { min: 1, max: 40 }) : '') +
           pick('data-form="1"', 'Building shape', e.poly ? [['custom', 'Custom outline'], ...FORMS] : FORMS, e.poly ? 'custom' : e.form || 'bar') + (e.form === 'tower' && !e.poly ? n('podium', 'Podium floors', e.podium || 2, { min: 1, max: 6 }) : '') : '') +
         (e.kind === 'garage' ? n('levels', 'Levels', e.levels || 4, { min: 1, max: 12 }) : '') +
-        (e.kind === 'canopy' ? pick('data-pumps="1"', 'Pumps', SP.PUMPS.map(k => [String(k), k + ' · ' + 2 * k + ' fueling positions']), String(e.pumps || 8)) + pick('data-prows="1"', 'Rows', [['1', '1 row'], ['2', '2 rows'], ['3', '3 rows']], String(e.rows || 2)) : '') +
+        (e.kind === 'canopy' ? pick('data-pumps="1"', 'Pumps', SP.PUMPS.map(k => [String(k), k + ' · ' + 2 * k + ' fueling positions']), String(e.pumps || 8)) + pick('data-prows="1"', 'Rows', [['1', '1 row'], ['2', '2 rows'], ['3', '3 rows']], String(e.rows || 2)) + pick('data-pisl="1"', 'Pump islands', ISLANDS, e.islands === 'across' ? 'across' : 'along') : '') +
         (['pond', 'pool', 'green', 'plaza', 'court'].includes(e.kind) ? pick('data-shape="1"', 'Shape', [['organic', 'Natural curves'], ['rounded', 'Rounded rectangle'], ['square', 'Rectangle']], e.poly ? 'organic' : e.shape === 'round' ? 'rounded' : 'square') : '') +
         (T.isEntrance(e) && (e.blvd || PL() && SP.entryParts(PL(), e).length) ? pick('data-signs="1"', 'Monument signs', [['median', 'In the median'], ['both', 'Both corners'], ['one', 'One corner'], ['none', 'None']], (g => !g.length ? 'none' : g[0].want || (g.some(x => x.sign === 'median') ? 'median' : g.length > 1 ? 'both' : 'one'))(SP.entryParts(PL(), e).filter(x => x.kind === 'sign'))) : '') +
         (e.kind === 'drive' && e.net && PL()?.recipe?.net && !T.isEntrance(e) ? '' : fld('Name', '<input type="text" maxlength="40" data-name="1" value="' + esc(e.name || '') + '" placeholder="e.g. Building B, Pad A">', { wide: true })) + '</div></fieldset>'; // (a neighbourhood street: its street name above)
@@ -2730,6 +2739,8 @@ export function initSitePlan(ctx) {
     card.querySelector('[data-stok]')?.addEventListener('change', ev => change(() => { e.storage = ev.target.value; if (e.storage !== 'climate') e.floors = 1; e.note = SP.storageNote(e); }));
     card.querySelector('[data-fuelk]')?.addEventListener('change', ev => change(() => { e.fuel = ev.target.value; e.floors = 1; e.note = e.fuel === 'wash' ? 'Car wash' : 'Convenience store'; if (e.fuel === 'wash') e.nowalk = true; else delete e.nowalk; }));
     for (const [a, k] of [['pumps', 'pumps'], ['prows', 'rows']]) card.querySelector('[data-' + a + ']')?.addEventListener('change', ev => { change(() => { e[k] = +ev.target.value; e.note = (e.rows || 1) + ' row' + ((e.rows || 1) > 1 ? 's' : '') + ' of ' + Math.ceil((e.pumps || 0) / (e.rows || 1)) + ' pumps'; }); readout(e); });
+    card.querySelector('[data-pisl]')?.addEventListener('change', ev => { const v = ev.target.value; // the islands turned: the canopy takes the size they need (kept centred), and the rest of the station re-fits round it
+      change(() => { const c = SP.canopyOf(e.pumps || 8, e.rows || 1, v), along = e.w >= e.d; e.islands = v; e.w = along ? c.w : c.d; e.d = along ? c.d : c.w; e.pinned = true; }); readout(e); refitSoon('Turned', 'the pump islands'); });
     card.querySelector('[data-form]')?.addEventListener('change', ev => { if (ev.target.value === 'custom') return; change(() => { const f = ev.target.value; delete e.poly; if (f === 'bar') delete e.form; else e.form = f; if (f === 'tower') { e.podium = e.podium || 2; e.floors = Math.max(e.floors || 1, 8); } if ((f === 'L' || f === 'U') && e.d < 100) e.d = Math.min(150, e.d * 2); e.pinned = true; }); panel(); refitSoon(); });
     card.querySelector('[data-name]')?.addEventListener('change', ev => change(() => { e.name = ev.target.value.trim().slice(0, 40); }, true));
     if (card.querySelector('#spRot')) card.querySelector('#spRot').onclick = () => turnEl(e);
