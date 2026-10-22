@@ -147,7 +147,7 @@ const call = async (name, args) => { const r = await c.callTool({ name, argument
 
 // ---------- tools/list: names, schemas, read-only ----------
 const { tools } = await c.listTools();
-const NAMES = ['list_datasets', 'find_property', 'site_facts', 'flood', 'terrain', 'environmental', 'utilities', 'traffic_counts', 'demographics', 'market_context', 'businesses', 'businesses_at_address', 'company_lookup', 'development_activity', 'construction_filings', 'top_companies', 'crime_near', 'crime_by_agency', 'news', 'airports_near', 'area_overview', 'report_flood', 'report_environmental', 'report_crime', 'report_crime_agency'];
+const NAMES = ['list_datasets', 'find_property', 'site_facts', 'flood', 'terrain', 'environmental', 'utilities', 'traffic_counts', 'demographics', 'market_context', 'businesses', 'businesses_at_address', 'company_lookup', 'development_activity', 'construction_filings', 'top_companies', 'crime_near', 'crime_by_agency', 'news', 'airports_near', 'area_overview', 'report_flood', 'report_environmental', 'report_crime', 'report_crime_agency', 'report_demographics'];
 for (const n of NAMES) assert.ok(tools.some(t => t.name === n), 'tool ' + n);
 for (const t of tools) {
   assert.equal(t.annotations?.readOnlyHint, true, t.name + ' read-only'); assert.equal(t.annotations?.openWorldHint, true, t.name);
@@ -243,11 +243,11 @@ console.log('mcp upstream timeout ok');
   if (!haveChrome) { // no local Chromium: a stand-in that makes a real one-page PDF with the HTML's title
     R.hooks.render = async (html, { title }) => { const d = await PDFDocument.create(); d.setTitle(title); d.addPage(); return Buffer.from(await d.save()); };
     console.log('mcp reports: no Chromium at CHROME_PATH, rendering with a stand-in'); }
-  const pdfOf = async (r, kind) => {
+  let dumps = 0; const pdfOf = async (r, kind) => {
     assert.notEqual(r.isError, true, kind + ': ' + r.text); const res = r.content.find(x => x.type === 'resource'); assert.ok(res, kind + ' has a resource');
     assert.equal(res.resource.mimeType, 'application/pdf'); assert.match(res.resource.uri, new RegExp('^report://' + kind + '/[a-z0-9-]+\\.pdf$'));
     const buf = Buffer.from(res.resource.blob, 'base64'); assert.equal(buf.subarray(0, 5).toString(), '%PDF-', kind + ' is a PDF');
-    if (process.env.MCP_DUMP) fs.writeFileSync(process.env.MCP_DUMP + '/' + kind + '.pdf', buf); // to look at them
+    if (process.env.MCP_DUMP) fs.writeFileSync(process.env.MCP_DUMP + '/' + kind + '-' + (++dumps) + '.pdf', buf); // to look at them
     const pdf = await PDFDocument.load(buf); assert.ok(pdf.getPageCount() >= 1); assert.ok(buf.length < R.PDF_LIMIT, kind + ' fits (' + buf.length + ')');
     assert.ok(JSON.stringify(r).length < R.VERCEL_RESPONSE_LIMIT, 'the whole answer fits under Vercel’s cap'); assert.match(r.text, /Attached: .* report PDF \(\d+ pages?, /); return { buf, pdf }; };
   const H = { address: '1001 Main St, Houston, TX 77002' };
@@ -260,6 +260,17 @@ console.log('mcp upstream timeout ok');
   r = await call('report_crime', K); assert.equal(r.content.some(x => x.type === 'resource'), false, 'no PDF outside Houston'); assert.match(r.text, /not covered here \(covers the City of Houston only/); assert.match(r.text, /report_crime_agency/);
   r = await call('report_crime_agency', K); clean(r, 'report_crime_agency'); await pdfOf(r, 'crime_agency'); assert.match(r.text, /Katy Police Department \[TX1012700\]/);
   r = await call('report_crime_agency', AU); await pdfOf(r, 'crime_agency');
+  r = await call('report_demographics', { ...K, include_csv: true }); clean(r, 'report_demographics'); { const { buf } = await pdfOf(r, 'demographics');
+    assert.match(r.text, /Demographics report: 24600 KATY FWY/); assert.match(r.text, /^1 mi: [\d,]+ people/m); assert.match(r.text, /^5 mi: /m);
+    const csv = r.content.find(x => x.resource?.mimeType === 'text/csv').resource.text; assert.match(csv, /^Area,Table,Item,Value/); assert.match(csv, /1 mi,Figures,Population,\d+/); assert.match(csv, /Households by income/); }
+  r = await call('report_demographics', { ...K, radii: [2, 10] }); await pdfOf(r, 'demographics'); assert.match(r.text, /^2 mi: /m); assert.match(r.text, /^10 mi: /m);
+  r = await call('report_demographics', { county: 'Waller' }); await pdfOf(r, 'demographics'); assert.match(r.text, /Waller County: [\d,]+ people/);
+  r = await call('report_demographics', AU); assert.equal(r.content.some(x => x.type === 'resource'), false); assert.match(r.text, /not covered here \(covers the seven home counties/);
+  { const R2 = await import('../lib/reports/demographics.mjs'), { demographicsData } = await import('../lib/mcp/area.mjs');
+    const { rings } = await demographicsData({ center: KATY, kind: 'point', geometry: null }, [1, 3, 5]);
+    const html = R2.demographicsReport(R.serverKit(24)).reportHtml({ label: 'Katy', center: KATY, rings: rings.map(x => ({ ...x, label: x.mi + ' mi' })), years: { acs: '2020–2024' } });
+    assert.match(html, /<div class="kicker">Demographics report<\/div>|class="k">Demographics report/); assert.match(html, /By ring/); assert.match(html, /Households by income/); assert.match(html, /Consumer spending by category/);
+    assert.equal((html.match(/stroke-dasharray="7 4"/g) || []).length, 2, 'the 3 and 5 mile rings dashed'); assert.match(html, />Site</); }
   if (haveChrome) { // the report is the website's: its title band, sections and the logo inlined
     const html = await R.finishHtml((await import('../lib/reports/fema.mjs')).femaReport(R.serverKit(24)).reportHtml({ ...(await (await import('../api/fema.js')).femaReport({ type: 'Polygon', coordinates: [[[-95.37, 29.75], [-95.36, 29.75], [-95.36, 29.76], [-95.37, 29.76], [-95.37, 29.75]]] })), area_sqmi: 0.4 }, 'Check', null));
     assert.match(html, /FEMA flood &amp; hazard report/); assert.match(html, /src="data:image\/png;base64,/); assert.ok(!/src="logo-white\.png"/.test(html)); }
@@ -287,7 +298,7 @@ process.env.MCP_ACCESS_TOKEN = 'amp-secret-token';
 assert.equal(authorized({ headers: {} }), false); assert.equal(authorized({ headers: { authorization: 'Bearer amp-secret-token' } }), true); assert.equal(authorized({ headers: { authorization: 'Bearer amp-secret-tokeX' } }), false);
 await assert.rejects(connect(), /401|Unauthorized/, 'no token: 401');
 await assert.rejects(connect({ Authorization: 'Bearer wrong' }), /401|Unauthorized/);
-const c2 = await connect({ Authorization: 'Bearer amp-secret-token' }); assert.ok((await c2.listTools()).tools.length >= 25); await c2.close();
+const c2 = await connect({ Authorization: 'Bearer amp-secret-token' }); assert.ok((await c2.listTools()).tools.length >= 26); await c2.close();
 delete process.env.MCP_ACCESS_TOKEN;
 // GET / DELETE: 405
 for (const method of ['GET', 'DELETE']) { const x = await realFetch(URL0, { method }); assert.equal(x.status, 405); assert.equal((await x.json()).error.code, -32000); }
