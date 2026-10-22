@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 6:28 PM CT: Your project app's agents can make the PDF reports (8d167ef)
+- **Four reports for the agents:** the FEMA flood & hazard report, the Environmental report, the Crime report (Houston) and the City / County Crime Report, for a property (its parcel), a radius, a county or a drawn area. Each comes back as the same PDF the Reports page makes, in the Finishes Solutions style, with a short summary and, when asked, the data as a CSV.
+- **Kept small enough to send:** the agents' copies use smaller street maps and list the newest 500 incidents (the CSV has all of them). A report that still can't fit in one answer says so plainly instead of sending a cut-off file.
+- **Your exports are unchanged:** the FEMA, crime, City / County crime and environmental reports' PDFs and CSVs from the website were checked to be exactly the same as before.
+- **Not checked yet:** making these PDFs on the live site (they need the street-map service and the government data, which this environment can't reach); tested with stand-ins and a real Chromium render.
+
 ### 5:39 PM CT: Your project app's agents can pull this app's data (aedcbc3)
 - **A connection for the project app's AI agents** (an MCP server at `/api/mcp`): its agents can ask about any property or area without anyone opening the map. Everything they can do is read-only.
 - **What they can look up:** a property (match quality of the address, county, inside city limits or within half a mile of a city, the appraisal parcel with owner, values, acreage and outline), site facts, flood zones and flood history, ground elevations and slopes, environmental records, utilities, traffic counts, demographics in rings, the county's market figures, businesses, development activity, construction filings and the busiest developers, architects and contractors, crime (Houston street-level, or any US police department's yearly figures), stored local news and nearby airports. One "area overview" call gets most of it at once.
