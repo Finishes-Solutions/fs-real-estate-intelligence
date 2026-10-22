@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 6:31 PM CT: Renderings skill says what's missing; paint renderings in a browser; the model survives text-only attachments (67be240)
+- **No more silent runs:** every renderings run now checks for an OpenAI key and whether OpenAI can be reached from where it runs. It prints the result and writes a STATUS.md saying whether renderings were made. If they weren't, it says exactly what is missing and what to do next. The agent is told to start its reply with this.
+- **Paint without Python:** the paint package now includes paint.html. Open it in a browser, paste your OpenAI key (it stays in that tab), click Paint, download painted.zip, and send it back to the agent.
+- **When a platform gives the agent only a PDF's text:** the site layout and plan set PDFs now also carry their model as hidden text on the sheet. An agent that gets only the text can rebuild the model exactly from it instead of stopping. The plan set's copy includes the floor plans it actually drew, so the renderings get real facades.
+- **Setup notes:** the agent instructions now say that attachments should reach the agent as files, and what to do when they don't.
+
 ### 5:37 PM CT: Plan set skill designs buildings the way the app does (dc928a6)
 - **Why the skill's plans were weaker than the app's:** the app never asks Claude to design a building from a blank page. It hands Claude a plain floor plan that already passes every check (one tenant bay per ~30 ft of frontage, each with a restroom and back of house) and asks it to improve that. When Claude's version fails the checks, the app draws the plain plan instead. The skill had none of this, so its agent invented floor plans by hand.
 - **Now the skill does the same:** it builds the app's starting plan for every building type, and the agent improves it. A building with no plan, or whose plan fails the checks, is drawn from the starting plan, and the run says which plan each building used. A site layout handed over with no building designs now gives a full set (47 sheets on the example) instead of site sheets only.
