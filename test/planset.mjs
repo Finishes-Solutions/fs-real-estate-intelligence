@@ -16,7 +16,7 @@ const laid = (site, prog, name) => { const o = L.layoutOptions(site, prog)[0]; a
 const retail = laid(fm362, { use: 'retail', gfa: 40000 }, 'Option A'), town = laid(fm362, { use: 'townhomes' }, 'Option B'), mixed = laid(tract, { use: 'multifamily', units: 240 }, 'Option C');
 
 // ---------- sections ----------
-assert.deepEqual(P.defaultSections(), ['general', 'civil', 'landscape', 'arch', 'structural', 'mechanical', 'plumbing', 'electrical', 'fire', 'renderings'], 'every section built and ticked except telecom');
+assert.deepEqual(P.defaultSections(), ['general', 'civil', 'landscape', 'arch', 'structural', 'mechanical', 'plumbing', 'electrical', 'fire', 'fuel', 'renderings'], 'every section built and ticked except telecom (fuel: only a plan with a gas station gets its sheets)');
 assert.equal(P.sectionById('telecom').on, false, 'telecom only when asked for (decided Oct 19)');
 assert.ok(P.SECTIONS.every(P.built), 'phases 1 to 4 built');
 assert.deepEqual(P.pickSections(['civil', 'structural', 'telecom', 'nope']), ['general', 'civil', 'telecom'], 'unknown sections dropped; General always in; structural goes without architecture');
