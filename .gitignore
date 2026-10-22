@@ -6,3 +6,7 @@ test/.data/
 
 # Claude Code session scaffolding (sub-agent worktrees)
 .claude/worktrees/
+
+# Python bytecode from running the skills/ scripts
+__pycache__/
+*.pyc
