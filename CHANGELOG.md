@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 3:52 PM CT: A Claude skill for five midday renderings that match the layout and the plan set (db9a231)
+- **New skill, outside the app:** `skills/fs-site-renderings.zip` is the third step after the site layout and plan set skills. It makes five photoreal renderings of the property at midday from five angles: two corner aerials, street level from across the road, arriving at the entrance, and a high rear aerial.
+- **True to the drawings:** it builds an exact 3D massing model from the project file. Buildings sit at their real size, height and roof, with windows, storefronts and doors where the elevation sheets draw them, along with the striped parking, drives, ponds and street. The image model (gpt-image-2.5-sunburst, high quality) then paints that model photographically without changing it, using the set's elevation drawings as references.
+- **Checked:** every rendering is laid over its massing and scored building by building, so a moved, missing or extra building is flagged for a re-paint.
+- **Delivered:** the five pictures go on a 24 × 36 renderings sheet (R-1) with a key plan of the camera positions, and back into the project file, so the plan set picks them up as A-901 to A-905.
+- **Needs** an OpenAI key in the environment and access to OpenAI from wherever the agent runs. The skill's setup guide explains how for each Claude surface. The app itself is unchanged.
+
 ### 3:16 PM CT: A Claude skill for one-page site layouts that feed the plan set (7189023)
 - **New skill, outside the app:** `skills/fs-site-plan.zip` can be added to Claude as a skill. Given a project's files (survey, plat, the app's Map File / CAD / Site Plan exports, flood, traffic and market reports, zoning documents), it makes a one-page conceptual site layout (SP-1) on the Finishes Solutions 24 × 36 title block.
 - **It picks the use before drawing:** it tests candidate uses and mixes (for example, pads on the frontage with retail behind) on a land budget, ranks them by residual land value when market numbers are supplied, and prints the comparison on the sheet.
