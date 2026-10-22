@@ -276,7 +276,7 @@ class Scene:
             self.notes.append('%s: no design in the model, so a generic facade pattern was drawn.' % (b.get('name') or 'building'))
             return 'generic'
         ext = des.get('exterior') or {}
-        canopy = any(k in ((ext.get('accent') or '') + ' ' + (ext.get('walls') or '')).lower() for k in ('canopy', 'awning'))
+        canopy = any(k in ((ext.get('accent') or '') + ' ' + (ext.get('walls') or '')).lower() for k in ('canop', 'awning'))
         ol = [tuple(q) for q in t['fp']] if t.get('fp') else [(0, 0), (W, 0), (W, D), (0, D)]
 
         def ext_span(r, side):
@@ -307,38 +307,82 @@ class Scene:
             return (max(a0, best[0]), min(a1, best[1]))
 
         res = use in RES_USES
+
+        def door_span(dr):
+            """(side, centre, width) of an outside door: centred on the room's outside-wall run (door_geometry)"""
+            r = rooms.get(dr['a'])
+            if not r:
+                return None
+            wd = float(dr.get('width') or 3)
+            sides = [dr['side']] if dr.get('side') in ('front', 'back', 'left', 'right') else ['front', 'back', 'left', 'right']
+            for side in sides:
+                sp = ext_span(r, side)
+                if sp and sp[1] - sp[0] >= wd + 0.5:
+                    return side, (sp[0] + sp[1]) / 2, wd
+            return None
+
+        def window_spots(r, wdw):
+            """window_positions in fs-set-plans: clear of the room's outside doors on that wall by 1 ft, shared out over
+            the free stretches by length, evenly within each"""
+            side = wdw.get('side', 'front')
+            sp = ext_span(r, side)
+            if not sp:
+                return []
+            w = float(wdw.get('width', 3))
+            free = [list(sp)]
+            for dr in des.get('doors', []):
+                if dr.get('b') != 'outside' or dr.get('a') != r['id']:
+                    continue
+                g = door_span(dr)
+                if not g or g[0] != side:
+                    continue
+                lo, hi = g[1] - g[2] / 2 - 1, g[1] + g[2] / 2 + 1
+                nxt = []
+                for a_, b_ in free:
+                    if hi <= a_ or lo >= b_:
+                        nxt.append([a_, b_])
+                        continue
+                    if lo - a_ >= w + 1:
+                        nxt.append([a_, lo])
+                    if b_ - hi >= w + 1:
+                        nxt.append([hi, b_])
+                free = nxt
+            free = [f_ for f_ in free if f_[1] - f_[0] >= w + 1]
+            if not free:
+                return []
+            cap = [int((b_ - a_) // (w + 1)) for a_, b_ in free]
+            n = max(1, min(max(1, int(wdw.get('count', 1))), sum(cap)))
+            share = [0] * len(free)
+            for _ in range(n):
+                i = max((j for j in range(len(free)) if share[j] < cap[j]), key=lambda j: (free[j][1] - free[j][0]) / (share[j] + 1))
+                share[i] += 1
+            out = []
+            for (a_, b_), k_ in zip(free, share):
+                out += [a_ + (b_ - a_) * (i + 1) / (k_ + 1) for i in range(k_)]
+            return out
+
         for unit in range(units):
             for wdw in des.get('windows', []):  # placed exactly as the elevation sheets draw them (window_positions)
                 r = rooms.get(wdw.get('room'))
-                side = wdw.get('side', 'front')
-                sp = ext_span(r, side) if r else None
-                if not sp:
+                if not r:
                     continue
+                side = wdw.get('side', 'front')
                 ww, hh = float(wdw.get('width', 3)), float(wdw.get('height', 4))
-                L_ = sp[1] - sp[0]
-                n = max(1, min(max(1, int(wdw.get('count', 1))), int(L_ // (ww + 1)) or 1))
-                z0 = (int(r.get('floor', 1)) - 1) * fh + 3
-                for k in range(n):
-                    c = sp[0] + L_ * (k + 1) / (n + 1)
-                    place(side, c - ww / 2, c + ww / 2, z0, z0 + hh, GLASS, unit)
+                base = (int(r.get('floor', 1)) - 1) * fh
+                sill = 1.0 if hh >= 7 and not res else 3.0  # storefront glass sits on a 1 ft curb
+                hh = min(hh, fh - sill - 0.5)
+                for c in window_spots(r, wdw):
+                    place(side, c - ww / 2, c + ww / 2, base + sill, base + sill + hh, GLASS, unit)
             for dr in des.get('doors', []):  # door_geometry: centred on the room's outside-wall run
                 if dr.get('b') != 'outside':
                     continue
-                r = rooms.get(dr['a'])
-                if not r:
+                g = door_span(dr)
+                if not g:
                     continue
-                wd = float(dr.get('width') or 3)
-                sides = [dr['side']] if dr.get('side') in ('front', 'back', 'left', 'right') else ['front', 'back', 'left', 'right']
-                for side in sides:
-                    sp = ext_span(r, side)
-                    if sp and sp[1] - sp[0] >= wd + 0.5:
-                        break
-                else:
-                    continue
+                side, c, wd = g
                 kind = dr.get('kind', 'swing')
                 if kind == 'opening':
                     continue
-                c = (sp[0] + sp[1]) / 2
                 h = 8.0 if kind == 'overhead' else (7.0 if res else 8.0)
                 if kind == 'overhead' and wd >= 10 and not res:
                     h = 12.0

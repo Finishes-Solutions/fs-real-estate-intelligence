@@ -5,6 +5,16 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 5:00 PM CT: fs-set-plans skill v2: plan sets that follow the layout and look like real drawings (HASH)
+- **New zip, outside the app:** `skills/fs-set-plans.zip` replaces the plan set skill that was installed. It was rebuilt after a test run on 0 US 290, Waller (0.93 ac, Option B), where the set redrew the site instead of following it.
+- **Follows the site layout exactly:** the agent is told the layout is the design. Every building keeps its real shape and position, including a skewed L. Parking is drawn as the rows the layout shows, and the stalls are counted from the drawing. The set flags any stall count that differs from the layout's. Stalls a building sits on are left off and reported, and no pond is invented when the layout has none. Problems like these go on the cover and in the summary instead of being "fixed".
+- **Reads the app's plan-set PDF:** the cover and site plan (G-001 + C-101) are a supported input. The scale, boundary, building, parking field, stall count and project data are taken straight off them. An fs-site-plan hand-off still works as before.
+- **Site sheets:** striped stalls with accessible and van spaces, curbs, aisle arrows and drive cuts to the street. Setback lines are drawn by front, side and rear. C-102 dimensions each building to the property line and turns red where it is too close. C-202 draws the pond in plan with a stage-storage table.
+- **Architecture at real scale:** floor plans have filled walls, dimension strings, door and window tags, and section cuts. Roof plans get their own sheet when that keeps the floor plan larger. They show drains, scuppers, slope arrows and a rooftop unit for each tenant. Elevations cover every face of an L, with brick, stone and siding hatches, storefronts, keynotes and levels. Sections are cut through the building, and windows stay clear of doors. Larger, fuller detail sheets for civil, landscape, structural and wall sections.
+- **Engineering sheets make sense for a retail shell:** each tenant has its own rooftop unit with ductwork, a panel and a meter. Lighting and outlets in empty bays are left to the tenant. Exit signs, wall packs and a meter centre are shown. The riser diagram has branch pipe sizes and a fixture schedule. The one-line shows transformer, main, meters, and house and tenant panels, with the house panel sized realistically. Notes sheets carry full standard notes and set their text as large as fits.
+- **Cheaper to run:** the agent can look at the whole set in about six contact images, and is told how to keep image and file reading small. The test run that prompted this cost about $6.
+- **Renderings skill:** `skills/fs-site-renderings.zip` now places windows exactly as the new elevations do, and recognises "canopies" as a canopy.
+
 ### 4:13 PM CT: Housekeeping for the skills folder (a65033d)
 - Running the skills' scripts no longer leaves Python cache files for git to pick up. Nothing changes in the app or the skills.
 
