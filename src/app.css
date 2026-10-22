@@ -2479,6 +2479,8 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .set-hint{font-size:12px;line-height:1.45;color:var(--muted)}
 .set-rc .set-hint{text-align:right}
 .set-ok{font-size:13px;font-weight:600;color:var(--brand)}
+.set-ai2{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0;width:220px;max-width:100%}.set-ai2 select{width:100%;min-width:0;text-overflow:ellipsis}
+.set-only{font-size:12px;font-weight:600;color:var(--muted);padding:4px 2px;text-align:right}
 .set-note{font-size:12.5px;line-height:1.45;color:var(--text-2);background:var(--panel-2);border-radius:var(--r-sm);padding:9px 11px}
 .set-usage{margin-top:14px;display:flex;flex-direction:column;gap:8px}
 .set-uh{display:flex;align-items:center;gap:8px}

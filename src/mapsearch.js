@@ -467,7 +467,7 @@ export function initMapSearch(ctx) {
   // then checked against OpenStreetMap; raw coordinates from the search are only used when nothing there matches
   async function locateWeb(text, k) {
     let w = null;
-    try { const r = await fetch('api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'locate', query: text }) }); if (r.ok) w = await r.json(); } catch (e) {}
+    try { const r = await fetch('api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'locate', query: text, ...(ctx.aiFor?.('search') || {}) }) }); if (r.ok) w = await r.json(); } catch (e) {}
     if (!w || (!w.name && w.lat == null)) return null;
     const pt = isFinite(w.lat) && isFinite(w.lon) && w.lat !== null ? [+w.lon, +w.lat] : null, name = w.name || text;
     let s = w.within ? await findWithin(name, w.within) : null;

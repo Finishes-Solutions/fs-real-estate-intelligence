@@ -25,7 +25,7 @@ import * as PJ from './lib/project.mjs';
 import * as PS from './lib/planset.mjs';
 import * as PD from './lib/plandesign.mjs';
 import * as TR from './lib/terrain.mjs';
-import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, SITEPLAN_PROVIDER_KEY, SITEPLAN_CLAUDE_KEY, pickedClaude, pickedEffort, siteplanAI } from './lib/aimodels.mjs';
+import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, pickedClaude, pickedEffort } from './lib/aimodels.mjs';
 import * as CU from './lib/customtypes.mjs';
 import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
@@ -3245,7 +3245,7 @@ export function initSitePlan(ctx) {
   const REF_MODES = ['program', 'strategy', 'review', 'edit', 'ask', 'bestuse'];
   const post = async (body, signal) => { const ga = ['bestuse', 'askProject'].includes(body.mode) ? null : G.forAI(PL() || {}); if (ga) body = { ...body, guardrails: ga };
     if (!body.refs && REF_MODES.includes(body.mode || 'program')) { const rf = RF.refsForAI(P()?.files); if (rf.length) body = { ...body, refs: rf }; }
-    const r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, ...siteplanAI(get(SITEPLAN_PROVIDER_KEY), get(SITEPLAN_CLAUDE_KEY), ctx.aiModel?.() || '') }), signal }); ctx.noteModel?.(r); const d = await r.json().catch(() => ({})); if (!r.ok) { const e = Object.assign(new Error(d.error || 'AI unavailable'), { status: r.status }); aiSaw(e); throw e; } ctx.spAiOff = 0; return ga ? scrubDeep(d) : d; };
+    const r = await fetch('api/siteplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, ...(ctx.aiFor?.('siteplan') || {}) }), signal }); ctx.noteModel?.(r); const d = await r.json().catch(() => ({})); if (!r.ok) { const e = Object.assign(new Error(d.error || 'AI unavailable'), { status: r.status }); aiSaw(e); throw e; } ctx.spAiOff = 0; return ga ? scrubDeep(d) : d; };
   // an option as the AI sees it: the plan drawing as a picture, its numbers and what the checks found
   async function planImage(plan) {
     const svg = planSVG(plan, { px: 1000 }).svg, img = new Image();
@@ -4090,7 +4090,7 @@ export function initSitePlan(ctx) {
         run.i = i; run.msg = 'Taking the picture ' + (isHero ? 'of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + '…'; show();
         const cap = await captureOffscreen(pl, views[i], isHero ? target : null); if (run.abort.signal.aborted) break;
         run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; show();
-        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i] }), signal: run.abort.signal });
+        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i], ...(ctx.aiFor?.('render') || {}) }), signal: run.abort.signal });
         const d = await r.json().catch(() => ({}));
         if (r.status === 402) { rbudget = { ...(rbudget || {}), spent: d.spent, cap: d.cap, month: d.month }; rbAt = Date.now(); capped = true; }
         if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
@@ -4169,7 +4169,7 @@ export function initSitePlan(ctx) {
         const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero, sig = planSig(pl); // the plan as this picture shows it
         const cap = await captureView(pl, views[i], isHero ? target : null); if (!live()) break;
         run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; panel();
-        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i] }), signal: run.abort.signal });
+        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i], ...(ctx.aiFor?.('render') || {}) }), signal: run.abort.signal });
         const d = await r.json().catch(() => ({}));
         if (r.status === 402) { rbudget = { ...(rbudget || {}), spent: d.spent, cap: d.cap, month: d.month }; rbAt = Date.now(); capped = true; } // the month's budget is spent
         if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);

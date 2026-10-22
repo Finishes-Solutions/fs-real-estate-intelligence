@@ -34,9 +34,8 @@
 // use's web searches stay on OpenAI (api/search.js). The answering model is said in the X-AI-Model header.
 // site: { acres, widthFt, depthFt, frontageFt, address, city, county, zoning }; facts: short lines (flood zone, roads
 // and traffic, districts, utilities, environmental records).
-import { chatJSON as openaiJSON, pickModel, withModel, withRoom } from '../lib/openai.mjs';
-import { claudeJSON, useClaude } from '../lib/anthropic.mjs';
-import { isClaudeModel } from '../lib/aimodels.mjs';
+import { withRoom } from '../lib/openai.mjs';
+import { router, chatJSON } from '../lib/airoute.mjs';
 import { USES, SETBACKS, HOME_MIX, PLACES, guessProgram, normalizeProgram } from '../lib/siteplan.mjs';
 import { AMENITIES } from '../lib/sitecompose.mjs';
 import { catalogText, keepStories } from '../lib/siteedit.mjs';
@@ -51,26 +50,10 @@ import * as BR from '../lib/planbrief.mjs';
 import { FIELD_USES } from '../lib/siteparking.mjs';
 import { refBlock } from '../lib/sitefiles.mjs';
 
-let modelP = null;
 const EFFORTS = ['low', 'medium', 'high', 'xhigh'], effortIn = (v, d) => EFFORTS.includes(v) ? v : d; // reasoning effort (OpenAI's reasoning_effort, Claude's output_config.effort: the same four levels), from an allow-list
-const model0 = key => (modelP ||= pickModel(key, process.env.OPENAI_MODEL).catch(e => { modelP = null; throw e; }));
-// the model for this request: the one picked in Settings › AI model when the key can use it, else the server's default;
-// said in the X-AI-Model header so the app can show which model answered
-// provider 'anthropic' (Settings › AI model › Site plans: Claude): Claude answers, with the Claude model picked when the
-// key has it, else ANTHROPIC_MODEL, else Claude Opus 5.5 (lib/anthropic.mjs useClaude). No ANTHROPIC_API_KEY, or a call
-// Claude turns away as malformed (400 / 404): OpenAI's default answers, as for a picked OpenAI model that can't
-const claudeKey = () => process.env.ANTHROPIC_API_KEY || '';
-const ai = async (key, b, res, run) => {
-  const say = m => res?.setHeader?.('X-AI-Model', m), picked = typeof b?.model === 'string' ? b.model : null;
-  if (b?.provider !== 'anthropic') return withModel(key, picked, () => model0(key), run, say); // (a picked model that can't serve the call: the default answers)
-  if (!claudeKey()) return withModel(key, null, () => model0(key), run, say);
-  const m = await useClaude(claudeKey(), picked); say(m);
-  try { return await run(m); }
-  catch (e) { if (e?.status !== 400 && e?.status !== 404) throw e; const d = await model0(key); console.warn('claude', m, 'failed, using', d, ':', e.message); say(d); return run(d); }
-};
-// one structured answer from whichever provider the model is: Claude gets twice the room (its thinking is always on and
-// shares max_tokens with the answer; only what it uses is billed) and the Claude key
-const chatJSON = o => isClaudeModel(o.model) ? claudeJSON({ ...o, key: claudeKey(), maxTokens: Math.min(128000, (o.maxTokens || 4000) * 2) }) : openaiJSON(o);
+// the model for this request (lib/airoute.mjs): Settings › AI model › Site plans, OpenAI or Claude and which model, when
+// the key can use it, else the server's default; said in the X-AI-Model header so the app can show which model answered
+const { ai } = router(() => process.env.OPENAI_MODEL);
 
 const n = description => ({ type: ['number', 'null'], description });
 // an AI-crafted building type's recipe (lib/customtypes.mjs): how the engine lays out a type it has no use of its own for
