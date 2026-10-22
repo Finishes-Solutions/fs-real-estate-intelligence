@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 4:30 PM CT: Site Plan for All uses every parcel picked (3a8f26a)
+- **Every parcel you pick is in the site.** Before, parcels whose county outlines didn't quite touch were treated as separate, and only the biggest connected group went into the plan. On Waller Tomball Rd that dropped a 20.8-acre tract 60 ft from the 128-acre tract beside it.
+- **Gaps between neighbours are filled in.** The slivers and gaps the county's outlines leave between parcels that border each other are now part of the site, with no slits between lots (tested on a block of four lots drawn 12 ft apart: one plain rectangle).
+- **Roads stay roads.** Where the map shows a road in the gap, the parcels are still joined, but the road is a no-build **Road between parcels** in the site. Parcels more than 200 ft from the rest are still left out, with a note.
+- **Nothing left out quietly.** The All tab now passes on parcels with no property ID and ones only Regrid has, and a pick with no parcel record is named in a message.
+- **Parcels in several pieces keep every piece.** Some county records hold a parcel in separate pieces (the First Street right-of-way in Katy is two). The extra pieces were read as holes and lost; now the map, the card and site plans use them all.
+- **Not checked yet:** a look on the real map (this was tested on recorded parcel outlines, not in the browser). And when a road runs the full length between two parcels, Build may still lay out only one side, because drives can't cross the no-build road.
+
 ### 3:47 PM CT: Site plans can run on Claude, Opus 5.5 by default (d218152)
 - **Pick the AI for site plans.** Settings › AI model › **Site plans** now has an **AI** choice: **OpenAI** (as before) or **Claude (Anthropic)**, and a **Claude model** list. The default is Claude Opus 5.5; any other Claude model the site's key can use is listed. Both picks are kept on this device.
 - **What Claude does when picked:** everything the site planner asks the AI: thinking the site through, turning the request into a program, reviewing the layouts (it sees their drawings), Change With AI, Ask about the plan, What Should Go Here?, and the names. It thinks at the effort picked under Build. The layouts themselves are still drawn and measured by the planner, not by the AI.
