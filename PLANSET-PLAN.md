@@ -69,7 +69,7 @@ The set is defined in code (`lib/planset/setdef.mjs`) as rules that turn a plan 
 
 **Building types.** A plan's buildings are grouped into distinct types by use, footprint (rounded to 1 ft), floors and form. The Waller plan has 209 homes on three lot widths, three retail shells and one restaurant pad: three home types plus up to four commercial types. Building sheets are drawn once per type, not once per building. Site sheets show every building.
 
-**Uses covered first:** single-family, townhomes and duplexes (IRC), retail and office shells, a restaurant pad and a warehouse shell. Apartments come later (corridors, stairs, elevators, IBC R-2), then self storage, fuel and food trucks. A use the set can't design yet still gets its site sheets and a "building sheets by others" line in the index.
+**Uses covered first:** single-family, townhomes and duplexes (IRC), retail and office shells, a restaurant pad and a warehouse shell. Apartments come later (corridors, stairs, elevators, IBC R-2), then self storage and food trucks. A gas station's c-store and car wash are building types like any other; its canopy, pumps and tanks have their own F sheets (F-001 notes, schedules and separation checks, F-101 fuel system plan, F-102 hazardous areas and canopy electrical, F-201 canopy plan and ceiling, F-301 elevations and section, F-401 foundation and framing, F-501 details: lib/sheets/fuel.mjs, added Oct 22). A use the set can't design yet still gets its site sheets and a "building sheets by others" line in the index.
 
 ## How a set is made
 
@@ -259,7 +259,7 @@ The firm number comes off the sheets for now (decided Oct 19), which makes the s
 | 2. Site and civil | C-001, C-102, C-103, C-201, C-202, C-301, C-401, C-501, L-101, FP-101 and G-002, all from the plan, with Claude notes | 1.5 to 2 weeks |
 | 3. Buildings | Design schema, Claude design, validator and repairs, review gate, library save; A-1xx to A-6xx for homes, retail shell, restaurant, warehouse | 3 to 4 weeks |
 | 4. Engineering narratives | S, M, P, E, FP/FA, LS and T sheets by rules on the approved designs, with Claude notes and schedules; set checks | 2 to 3 weeks |
-| 5. Later | Apartments, storage, fuel, food trucks; Batch mode; Claude as a provider for the other AI features | on demand |
+| 5. Later | Apartments, storage, food trucks (fuel done Oct 22); Batch mode; Claude as a provider for the other AI features | on demand |
 
 That is about **8 to 10 weeks** to a set comparable to the Waller example, with each phase usable on its own. Phase 1 is worth shipping alone: it already turns "a site plan and some renders" into an issued, title-blocked set.
 
