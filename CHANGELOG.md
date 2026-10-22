@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 3:40 PM CT: Gas stations brought up to date with the re-fit fix (merge of main)
+- **Checked together:** with the 2:54 PM re-fit fix, moving or pinning the big shop building beside a gas station's corner outparcel on the 0 Waller Tomball Rd tract now keeps all the apartments (216; it used to drop to about 106 and the app kept your edit instead). A test now covers it.
+
 ### 3:10 PM CT: Plan sets for gas stations: canopy, pumps and tanks (420925b)
 - **A gas station's plan set now covers the canopy, the pumps and the tanks,** not just the c-store. A new **Fuel canopy & fuel system** section adds seven sheets whenever the option has a fuel canopy:
   - **F-001** notes and schedules: the tanks, each dispenser and its fueling positions, the pumps, gauge, emergency shutoff, piping and vents, the codes, and separation checks measured from the plan.
@@ -16,6 +19,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Every kind of building gets its own sheets.** A set draws at most eight building types; on a mixed plan with many apartment shapes, the c-store, a restaurant pad or the clubhouse used to be folded into another type and got no plans of their own. Each kind now keeps a type first.
 - **On the 0 Waller Tomball Rd tract:** the gas station, retail and apartments plan makes an 81-sheet set (every section ticked) with the c-store's full building sheets and the seven F sheets; all its separation checks pass.
 - **Not done yet:** tank sizes, products, pipe routes, canopy member sizes and footings are rule-of-thumb placeholders, marked for the fuel retailer's engineer, the canopy manufacturer and the petroleum contractor; apartment buildings still get site sheets only.
+
+### 2:54 PM CT: Re-fits keep the apartments when a shop building is pinned next to an easement (13eaa38)
+- **Fixed:** on a plan with shops in front and apartments behind, moving or resizing the biggest shop building on a site with an easement or no-build area at a front corner made the re-fit lose about half the apartments (on the 20.78-acre Waller Tomball Rd parcel: 211 units down to about 110), with no parking row in front of the shops and empty lawns where apartment rows had been. The editor kept your change and skipped the re-fit, so nothing was damaged, but the rest of the site stopped re-fitting after that edit. It now re-fits as it should: 211 units, parking met, a full row in front of the shops.
+- The service drive behind a row of shops now runs straight past a building you've pinned there, instead of stopping short at both ends of it. Re-fits after pinning a shop building also come out a little better on sites without an easement (on the same parcel: 203 units before, 211 now, and parking no longer short).
+- **Not checked:** the same fix should help when a gas station is cut out of a mixed plan as its own lot, but that feature isn't on this branch, so it hasn't been tested.
 
 ### 2:34 PM CT: Gas stations in mixed plans, a 3D canopy, pump island orientation (50135e6)
 - **A gas station beside other uses.** Ask for a gas station with shops, apartments, homes or any mix ("gas station with 10 pumps and a 4,500 sf c-store on the corner, 40,000 sf of retail behind it and 200 apartments at the back") and the station now gets its own outparcel at the front corner (at one end of the frontage on an inside lot), sized for its pumps, store and car wash. It's laid out as a full station (canopy along the street, store behind, tank pad, its own driveways) with the rest of the plan behind and beside it, the site's detention, and a cross-access drive between the station and the center where a straight one fits. Before, the gas station became a plain shop building with no canopy, pumps or tanks.

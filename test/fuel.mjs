@@ -287,7 +287,10 @@ for (const o of mixOut) {
   const r = L.refit(p2, { amount: 'current' }), m2 = S.metrics({ ...pl, elements: r.elements });
   assert.equal(m2.fuel.mpds, 10, 're-fit: every pump'); assert.ok(m2.units >= m.units * 0.95, 're-fit: the apartments kept: ' + m2.units); assert.ok(r.recipe?.fuelLot, 're-fit: the outparcel kept in the recipe');
   const c2 = r.elements.find(e => e.kind === 'canopy'); assert.ok(Math.hypot(c2.x - c.x, c2.y - c.y) < 1, 're-fit: the canopy stays where it was put');
-  assert.equal(S.check({ ...pl, elements: r.elements }).filter(i => i.level === 'bad' && !i.id?.startsWith?.(c.id)).length, 0, 're-fit: no rule broken'); }
+  assert.equal(S.check({ ...pl, elements: r.elements }).filter(i => i.level === 'bad' && !i.id?.startsWith?.(c.id)).length, 0, 're-fit: no rule broken');
+  // a re-fit after the biggest shop building is pinned beside the outparcel: the apartments stay (the outparcel is kept off as an easement is)
+  const p3 = structuredClone(pl), b = p3.elements.filter(e => e.kind === 'building' && e.use === 'retail').sort((p, q) => S.gfaOf(q) - S.gfaOf(p))[0]; b.x += 15; b.pinned = true; p3.recipe = o.recipe;
+  const r3 = L.refit(p3, { amount: 'current' }), m3 = S.metrics({ ...pl, elements: r3.elements }); assert.ok(m3.units >= m.units * 0.95 && m3.fuel.mpds === 10, 're-fit round a pinned shop building: ' + m3.units + ' of ' + m.units + ' apartments'); }
 // an inside lot (no side street): the station at one end of the frontage
 { const o = L.layoutOptions({ ...WTR, streets: [1] }, S.guessProgram('gas station with 8 pumps and retail behind'), { count: 1 })[0], lot = o.zones.at(-1).ring;
   assert.equal(S.metrics({ ...WTR, elements: o.elements }).fuel.mpds, 8); assert.ok(/^Gas station at the front/.test(o.name), o.name);
