@@ -29,9 +29,13 @@
 // revises. program and review take the strategy the planning step chose (strategy), and follow or judge against it.
 // refs (strategy, program, review, edit, ask, askProject, bestuse): the facts the team confirmed from the project's
 // reference files (a survey, floor plans: lib/sitefiles.mjs refsForAI), short lines added after the user text (refBlock).
+// provider, model (every mode): which AI answers. provider 'anthropic' = Claude (model a Claude model id, else the server's
+// Claude default, Opus 5.5); otherwise OpenAI (model an OpenAI model id, else OPENAI_MODEL). The rule sheet's and best
+// use's web searches stay on OpenAI (api/search.js). The answering model is said in the X-AI-Model header.
 // site: { acres, widthFt, depthFt, frontageFt, address, city, county, zoning }; facts: short lines (flood zone, roads
 // and traffic, districts, utilities, environmental records).
-import { chatJSON, pickModel, withModel, withRoom } from '../lib/openai.mjs';
+import { withRoom } from '../lib/openai.mjs';
+import { router, chatJSON } from '../lib/airoute.mjs';
 import { USES, SETBACKS, HOME_MIX, PLACES, guessProgram, normalizeProgram } from '../lib/siteplan.mjs';
 import { AMENITIES } from '../lib/sitecompose.mjs';
 import { catalogText, keepStories } from '../lib/siteedit.mjs';
@@ -46,12 +50,10 @@ import * as BR from '../lib/planbrief.mjs';
 import { FIELD_USES } from '../lib/siteparking.mjs';
 import { refBlock } from '../lib/sitefiles.mjs';
 
-let modelP = null;
-const EFFORTS = ['low', 'medium', 'high', 'xhigh'], effortIn = (v, d) => EFFORTS.includes(v) ? v : d; // OpenAI reasoning_effort, from an allow-list
-const model0 = key => (modelP ||= pickModel(key, process.env.OPENAI_MODEL).catch(e => { modelP = null; throw e; }));
-// the model for this request: the one picked in Settings › AI model when the key can use it, else the server's default;
-// said in the X-AI-Model header so the app can show which model answered
-const ai = (key, b, res, run) => withModel(key, typeof b?.model === 'string' ? b.model : null, () => model0(key), run, m => res?.setHeader?.('X-AI-Model', m)); // (a picked model that can't serve the call: the default answers)
+const EFFORTS = ['low', 'medium', 'high', 'xhigh'], effortIn = (v, d) => EFFORTS.includes(v) ? v : d; // reasoning effort (OpenAI's reasoning_effort, Claude's output_config.effort: the same four levels), from an allow-list
+// the model for this request (lib/airoute.mjs): Settings › AI model › Site plans, OpenAI or Claude and which model, when
+// the key can use it, else the server's default; said in the X-AI-Model header so the app can show which model answered
+const { ai } = router(() => process.env.OPENAI_MODEL);
 
 const n = description => ({ type: ['number', 'null'], description });
 // an AI-crafted building type's recipe (lib/customtypes.mjs): how the engine lays out a type it has no use of its own for

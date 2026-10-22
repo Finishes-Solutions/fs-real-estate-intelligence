@@ -217,16 +217,19 @@ export function initAssistant(ctx) {
 
   // ---------- text chat loop ----------
   const context = () => ({ coverage: ctx.coverage(), filters: ctx.filterText() || 'none (default view)', screen: ctx.screenContext(), vocab: ctx.vocab() });
-  let thread = null; // OpenAI response id that continues this conversation
+  // what continues this conversation: OpenAI's response id (a string), or Claude's conversation so far (an array, as
+  // api/chat sent it back; Claude keeps no thread). Switching provider mid-conversation starts a new one on the server.
+  let thread = null;
   // a failed call is a sentence (never "Error 501" or "Failed to fetch"); the details go to the console
   const aiErr = o => Object.assign(new Error(aiErrorMessage(o)), { friendly: true, status: o.status || 0 });
   async function post(input) {
-    let r; try { r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, previous_response_id: thread, context: context(), ...(ctx.aiModel?.() ? { model: ctx.aiModel() } : {}) }) }); ctx.noteModel?.(r); }
+    const ai = ctx.aiFor?.('chat') || {}, th = Array.isArray(thread) ? { history: thread } : { previous_response_id: thread }; // (the server uses the one its provider keeps)
+    let r; try { r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, ...th, context: context(), ...ai }) }); ctx.noteModel?.(r); }
     catch (e) { console.warn('[assistant]', e); throw aiErr({ network: true, offline: navigator.onLine === false }); }
     const d = await r.json().catch(() => ({}));
     if (r.status === 409) thread = null;
     if (!r.ok) { console.warn('[assistant]', r.status, d.error || ''); throw aiErr({ status: r.status, error: d.error }); }
-    thread = d.id || thread; return d;
+    thread = d.history || d.id || thread; return d;
   }
   // the error bubble offers Retry, which asks the same question again (without repeating it in the chat)
   function errorBubble(e, text, mine) {
@@ -575,7 +578,7 @@ export function initAssistant(ctx) {
       if (name === 'project_news') { if (!ctx.live) return { error: 'Not available.' }; return ctx.live.news(a); }
       if (name === 'site_imagery') { if (!ctx.live) return { error: 'Not available.' }; if (ctx.view !== 'map') ctx.setView('map'); const d = await ctx.live.imagery(a); if (d.showing) actionChip('NASA imagery on the map: ' + d.showing.name + ' ' + d.showing.day); else if (d.passes?.length) actionChip('Found ' + d.passes.length + ' NASA passes · previews in the card'); return d; }
       if (name === 'web_search') {
-        const r = await fetch('api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: a.query, near: a.near || turnSubject || '', local: !!ctx.nearestPlace?.(ctx.map.getCenter().toArray()) }) });
+        const r = await fetch('api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: a.query, near: a.near || turnSubject || '', local: !!ctx.nearestPlace?.(ctx.map.getCenter().toArray()), ...(ctx.aiFor?.('search') || {}) }) });
         const d = await r.json().catch(() => ({})); if (!r.ok) return { error: d.error || 'Web search failed.' };
         // one chip with the cited sites as links (the spoken / written answer comes from the model)
         bubble('act', '<span class="ai-ai">Searched the web' + (d.sources.length ? ': ' : '') + '</span>' + d.sources.slice(0, 5).map(x => '<a class="ai-src" href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc(x.title) + '">' + esc(x.site) + '</a>').join(' · '));
@@ -913,7 +916,7 @@ export function initAssistant(ctx) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
       if (tok !== voiceTok) { stream.getTracks().forEach(t => t.stop()); return; }
       mic = stream;
-      const r = await fetch('api/realtime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context: context() }), signal: AbortSignal.timeout(15000) });
+      const r = await fetch('api/realtime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context: context(), ...(ctx.aiFor?.('voice') || {}) }), signal: AbortSignal.timeout(15000) });
       const s = await r.json().catch(() => ({})); if (!r.ok || !s.value) throw new Error(s.error || 'Voice isn’t available right now.'); if (tok !== voiceTok) return; vocab = s.vocab || '';
       pc = new RTCPeerConnection(); audio = new Audio(); audio.autoplay = true; audio.playsInline = true;
       pc.ontrack = e => { audio.srcObject = e.streams[0]; meter?.addRemote?.(e.streams[0]); };

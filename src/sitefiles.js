@@ -15,7 +15,7 @@ const SIDE_OPTS = ['', ...RF.SIDES];
 const NUMS = [['value', 'Value'], ['widthFt', 'Width (ft)'], ['depthFt', 'Depth (ft)'], ['beds', 'Beds'], ['baths', 'Baths'], ['stories', 'Stories']];
 const fieldsFor = f => f.category === 'floor_plan' ? ['value', 'widthFt', 'depthFt', 'beds', 'baths', 'stories'] : f.category === 'easement' ? ['widthFt'] : ['value'];
 
-// ctx: the app (toast, aiModel); esc: HTML escaping; project(pid): the project as it is now (a sync can replace the
+// ctx: the app (toast, aiFor); esc: HTML escaping; project(pid): the project as it is now (a sync can replace the
 // object); save(p): keep and share it; render(): draw the tab again; library: the team building library (save);
 // optionsOf(p): the options an easement can be drawn on [{ id, name }]; addEasement(p, plid, points, fact, file) ->
 // a message, or throws with what went wrong; when(iso): "2 days ago"
@@ -23,7 +23,7 @@ export function siteFiles({ ctx, esc, project, save, render, library, optionsOf,
   const st = { setup: null, why: '', listed: new Set(), busy: new Map(), pct: new Map(), err: new Map(), editing: null, place: new Map() };
   const headers = () => ({ 'Content-Type': 'application/json', 'x-field-code': get(CODE_KEY) });
   async function call(pid, body, q) {
-    const r = await fetch('api/sitefiles' + (body ? '' : '?pid=' + encodeURIComponent(pid) + (q || '')), body ? { method: 'POST', headers: headers(), body: JSON.stringify({ pid, ...body, ...(ctx.aiModel?.() && body.read ? { model: ctx.aiModel() } : {}) }) } : { headers: headers() });
+    const r = await fetch('api/sitefiles' + (body ? '' : '?pid=' + encodeURIComponent(pid) + (q || '')), body ? { method: 'POST', headers: headers(), body: JSON.stringify({ pid, ...body, ...(body.read ? ctx.aiFor?.('files') || {} : {}) }) } : { headers: headers() });
     const d = await r.json().catch(() => ({}));
     if (r.status === 503 && d.setup) { st.setup = d.setup; st.why = d.error || ''; }
     else if (r.status === 401) { st.setup = 'passcode'; st.why = d.error || 'Enter the team passcode under Settings.'; }

@@ -2479,6 +2479,8 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .set-hint{font-size:12px;line-height:1.45;color:var(--muted)}
 .set-rc .set-hint{text-align:right}
 .set-ok{font-size:13px;font-weight:600;color:var(--brand)}
+.set-ai2{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0;width:220px;max-width:100%}.set-ai2 select{width:100%;min-width:0;text-overflow:ellipsis}
+.set-only{font-size:12px;font-weight:600;color:var(--muted);padding:4px 2px;text-align:right}
 .set-note{font-size:12.5px;line-height:1.45;color:var(--text-2);background:var(--panel-2);border-radius:var(--r-sm);padding:9px 11px}
 .set-usage{margin-top:14px;display:flex;flex-direction:column;gap:8px}
 .set-uh{display:flex;align-items:center;gap:8px}
@@ -4109,10 +4111,8 @@ html.sp-dragging,html.sp-dragging *{cursor:var(--cur-grabbing,grabbing)!importan
 .sp-cls.e{color:#24538a;background:#e8f0fa;box-shadow:inset 0 0 0 1px #b6cdea}
 .sp-cls.u{color:#8a4b00;background:#fdf1df;box-shadow:inset 0 0 0 1px #efc98f}
 .sp-tile .sp-cls{font-size:9px;line-height:14px;padding:0 5px;margin-left:2px}
-#card .sp-guard{margin:12px 14px 0;padding:10px 12px;border:1.5px solid var(--danger);border-radius:6px;background:var(--panel);font-size:12px;line-height:1.45;display:grid;gap:6px;color:var(--text)}
-@media (max-width:700px){#card .sp-guard{margin:10px 10px 0}}
-.sp-gl b{color:var(--danger);font-weight:700;letter-spacing:.01em}.sp-glf{margin:0;font-size:11px;font-weight:700;color:var(--danger);letter-spacing:.02em}
-.sp-gj{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;color:var(--text-2)}.sp-gstale{color:var(--amber);font-weight:600}
+#card .sp-gonly{margin:12px 14px 0;font-size:12px;line-height:1.45}@media (max-width:700px){#card .sp-gonly{margin:10px 10px 0}}
+.sp-gstale{color:var(--amber);font-weight:600}
 .sp-gnums{display:grid;gap:4px;min-width:0}.sp-gsec{min-width:0}.sp-gsec>summary{cursor:var(--cur-pointer)}.sp-gsec>summary::marker{color:var(--muted)}
 .sp-gtw{overflow-x:auto;max-width:100%}
 .sp-gt{width:100%;border-collapse:collapse;font-size:11.5px;margin:4px 0;table-layout:auto}

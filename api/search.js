@@ -1,10 +1,13 @@
 // Web search for the assistant, only when the user asks for it ("look it up", "search the web", "google it").
 // One OpenAI Responses call with the built-in web search tool and low reasoning effort, so it answers in a few seconds.
-// POST { query, near? } -> { answer, sources: [{ title, url }] }
+// POST { query, near?, model? } -> { answer, sources: [{ title, url }] }   model: Settings › AI model › Place search (an
+//   OpenAI chat model the key has; tried first, then the usual ones)
 // POST { mode: 'locate', query } -> { name, within, address, city, lat, lon, sources }: where a place is, for the map when
 //   OpenStreetMap doesn't know it by the words used ("Terminal B at George Bush airport"); the app checks it against the map.
 import { recordUsage } from '../lib/aiusage.mjs';
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
+import { pickedFor } from '../lib/openai.mjs';
+import { isChatModel } from '../lib/aimodels.mjs';
 
 const MODELS = [process.env.OPENAI_SEARCH_MODEL, 'gpt-5-mini', 'gpt-4.1-mini'].filter(Boolean);
 
@@ -34,10 +37,10 @@ export function parseLocate(text) {
 }
 
 // o: { maxTokens, size, timeout (ms a try), by (a time it must answer by: no try runs past it, none starts too near it) } for a
-// longer read (the street rules: lib/rulesheet.mjs); defaults as for a quick answer
+// longer read (the street rules: lib/rulesheet.mjs); defaults as for a quick answer; model: one to try first
 export async function webSearch(key, query, near, local = true, instructions, o = {}) {
   let last = '';
-  for (const model of MODELS) {
+  for (const model of [...new Set([o.model, ...MODELS].filter(Boolean))]) {
     for (const tool of ['web_search', 'web_search_preview']) {
       const left = o.by ? o.by - Date.now() : Infinity; if (left < 15000) throw new Error(last ? last + '; out of time' : 'out of time');
       const r = await fetch('https://api.openai.com/v1/responses', {
@@ -64,13 +67,14 @@ export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 6, perDay: 120 })) return;
   const key = needKey(res); if (!key) return;
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const model = await pickedFor(key, typeof body.model === 'string' ? body.model : null, isChatModel);
   const query = clip(String(body.query || '').trim(), 300), near = clip(String(body.near || '').trim(), 120);
   if (query.length < 3) return res.status(400).json({ error: 'What should I search for?' });
   if (body.mode === 'locate') {
-    try { const r = await webSearch(key, query, near, true, LOCATE), p = parseLocate(r.answer); if (!p) return res.status(404).json({ error: 'not found' });
+    try { const r = await webSearch(key, query, near, true, LOCATE, { model }), p = parseLocate(r.answer); if (!p) return res.status(404).json({ error: 'not found' });
       return res.json({ query, ...p, sources: r.sources }); }
     catch (e) { console.error('locate', e.message); return res.status(502).json({ error: 'The web search didn’t work just now.' }); }
   }
-  try { return res.json({ query, ...(await webSearch(key, query, near, body.local !== false)) }); }
+  try { return res.json({ query, ...(await webSearch(key, query, near, body.local !== false, undefined, { model })) }); }
   catch (e) { console.error('search', e.message); return res.status(502).json({ error: 'The web search didn’t work just now. Try again in a moment.' }); }
 }

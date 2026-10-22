@@ -2,7 +2,7 @@
 //   image: a data URL (JPEG/PNG/WebP, up to ~3 MB) of the plan's 3D massing on the map from the view's camera (the
 //          browser takes it; lib/render.mjs cameraFor); brief: briefOf() from the same lib (with focus, the building, for the close-up); view: one of VIEWS
 //   -> image: a data URL (JPEG) of the rendering, 1920 × 1080 when the model can do it, else the nearest size it offers
-// The picture is made by gpt-image-2.5-sunburst when the key has it, else the newest GPT Image model it lists (OPENAI_IMAGE_MODEL overrides) through the Images
+// The picture is made by the model picked in Settings › AI model › Renderings when the key has it, else gpt-image-2.5-sunburst when the key has it, else the newest GPT Image model it lists (OPENAI_IMAGE_MODEL overrides) through the Images
 // API's edit endpoint, which keeps the input picture's geometry and camera and paints it photographically. Its token
 // use is recorded under the Renderings feature (lib/aiusage.mjs). One picture a request: the browser asks for the
 // views one after another, so a slow model never runs past Vercel's limit.
@@ -10,7 +10,8 @@
 // this month's Renderings rows are costed (lib/aiusage.mjs monthSpend) and a spent budget answers 402 without asking
 // OpenAI. A failed read never blocks a picture, except that a $0 cap (renderings off) refuses without reading. GET -> { budget: { spent, cap, month, images, priced } } for the panel.
 import { rateLimit, sameOrigin, needKey, clip } from './_lib/guard.mjs';
-import { availableModels } from '../lib/openai.mjs';
+import { availableModels, pickedFor } from '../lib/openai.mjs';
+import { isImageModel } from '../lib/aimodels.mjs';
 import { recordUsage, monthSpend, tokensOf, fallbackPerImage } from '../lib/aiusage.mjs';
 import { costOf } from '../lib/aiprices.mjs';
 import { VIEWS, SIZES, byId, renderPrompt, pickImageModel } from '../lib/render.mjs';
@@ -68,7 +69,7 @@ export default async function handler(req, res) {
   const cap = capOf(), spend = await monthSpend('render'); // spent null: couldn't read it, so paint anyway
   if (cap === 0 || (spend.spent != null && spend.spent >= cap)) return res.status(402).json({ error: budgetMessage(cap), spent: spend.spent, cap, month: spend.month });
   const view = byId(VIEWS, b.view).id, brief = cleanBrief(b.brief), prompt = renderPrompt(brief, view);
-  let model = process.env.OPENAI_IMAGE_MODEL || '';
+  let model = await pickedFor(key, typeof b.model === 'string' ? b.model : null, isImageModel) || process.env.OPENAI_IMAGE_MODEL || ''; // Settings › AI model › Renderings, when the key has it
   if (!model) { try { model = pickImageModel(await availableModels(key)); } catch (e) { model = pickImageModel([]); } }
   if (!model) model = pickImageModel([]);
   res.setHeader('X-AI-Model', model);
