@@ -61,6 +61,12 @@ def main():
 
     p = json.load(open(a.project))
     os.makedirs(a.out, exist_ok=True)
+    # what the paid step needs, checked on every run so the owner always hears what is missing
+    key_ok, key_txt = OA.key_status(a.key_file)
+    net_ok, net_txt = OA.reachable() if not a.imp else (True, 'not needed (importing)')
+    print('SETUP  OpenAI key: %s\n       api.openai.com: %s' % (key_txt, net_txt))
+    state = dict(project=(p.get('project') or {}).get('name') or 'the project', key=(key_ok, key_txt), net=(net_ok, net_txt), yes=a.yes,
+                 budget=a.budget, out=a.out, made=[], package=None, painted=0, failed=[])
     scene = Scene(p, a.sun_az, a.sun_el, trees=not a.no_trees)
     rep = scene.report()
     print(rep)
@@ -98,19 +104,28 @@ def main():
         open(os.path.join(a.out, V['id'] + '-prompt.txt'), 'w').write(text + '\n')
         print('%-13s massing %s (%.1f s)' % (V['id'], mp, time.time() - t0))
         jobs.append((V, mp, ids, cam))
+    state['made'] = [V['id'] + '-massing.png' for V, *_ in jobs]
     if a.massing_only:
         print('\nMassing only: look at every *-massing.png before painting (SKILL.md, step 4).')
-        return
+        return write_status(state)
     if a.package:
-        return write_package(a, p, jobs, refs, massing)
+        write_package(a, p, jobs, refs, massing)
+        state['package'] = os.path.join(a.out, 'paint-package.zip')
+        return write_status(state)
     if a.imp:
-        return import_package(a, p, scene, views, massing)
+        import_package(a, p, scene, views, massing)
+        state['painted'] = sum(1 for V in views if os.path.exists(os.path.join(a.out, V['id'] + '.jpg')))
+        return write_status(state)
     model = a.model
     if not a.yes:
         print('\nReady to paint %d view(s) with %s at high quality (%s), %d reference image(s) each. That is %d paid API call(s), '
               'roughly $0.20-0.50 each (an estimate). Confirm with the user, then re-run with --yes.' % (
                   len(jobs), model or OA.PREFERRED, a.size, len(refs), len(jobs)))
-        return
+        return write_status(state)
+    if not (key_ok and net_ok):
+        write_status(state)
+        raise SystemExit('Cannot paint here: %s. Make the paint package instead (--package); STATUS.md says what to do.' % (
+            '; '.join(x for x in ((None if key_ok else 'no OpenAI key'), (None if net_ok else 'api.openai.com is not reachable')) if x)))
     key, src = OA.get_key(a.key_file)
     print('OpenAI key: from %s.' % src)
     if not model:
@@ -178,9 +193,46 @@ def main():
                                       made=time.strftime('%Y-%m-%d %H:%M')))
         save(manifest, total)
     old = save(manifest, total)
+    state['painted'] = sum(1 for v in manifest['views'] if v.get('file'))
+    state['failed'] = [v['id'] for v in manifest['views'] if v.get('error')]
+    write_status(state)
     if any(v.get('error') for v in manifest['views']):
         print('Some views failed (see above); re-run them with --views <ids> --yes.')
     print('\nWrote %s. Total about $%.2f (estimate). Now look at every *-compare.png.' % (old, total))
+
+
+def write_status(st):
+    """STATUS.md in the output folder: whether renderings were made, what is missing and the owner's next step, in plain
+    words, so a run that stops early never leaves the owner guessing"""
+    key_ok, key_txt = st['key']
+    net_ok, net_txt = st['net']
+    n = st['painted']
+    lines = ['# Renderings status: %s' % st['project'], '',
+             '**Renderings made: %s**' % ('YES, %d of 5' % n if n else 'NO'), '',
+             '- OpenAI key: ' + ('found' if key_ok else 'MISSING. ' + key_txt),
+             '- Connection to api.openai.com: ' + ('yes' if net_ok else 'NO. ' + net_txt),
+             '- Go-ahead to spend: ' + (('yes' + (', budget $%.2f' % st['budget'] if st['budget'] is not None else '')) if st['yes'] else 'not given for this run'), '']
+    if st['made']:
+        lines += ['Made here: the 3D massing views (%s), their prompts and scene.txt.' % ', '.join(st['made']), '']
+    if st['package']:
+        lines += ['Paint package: `%s` (no key inside).' % os.path.basename(st['package']), '']
+    if st['failed']:
+        lines += ['Views that failed: %s (re-run them with --views).' % ', '.join(st['failed']), '']
+    nxt = []
+    if not n:
+        if not key_ok:
+            nxt.append('Put an OpenAI key in `openai.key` in the skill folder (one line, starts with sk-) and re-upload the skill, '
+                       'or put it next to paint.py when you run the package yourself. Use a separate, budget-capped key.')
+        if not net_ok:
+            nxt.append('This sandbox cannot reach api.openai.com. Either allow that host in the platform\'s network settings, or run the '
+                       'paint package yourself: open `paint.html` from it in a browser (or run `python3 paint.py --yes`), then send the '
+                       'painted folder back to the agent.')
+        if key_ok and net_ok and not st['yes']:
+            nxt.append('Give the go-ahead to spend (about $0.20-0.50 a view), e.g. "Renderings approved, budget $3" in the task.')
+    lines += ['## Next step', ''] + (['- ' + x for x in nxt] if nxt else ['- Look at every *-compare.png, then make the R-1 sheet.'])
+    f = os.path.join(st['out'], 'STATUS.md')
+    open(f, 'w').write('\n'.join(lines) + '\n')
+    print('\nWrote %s: renderings made: %s.' % (f, ('%d of 5' % n) if n else 'NO'))
 
 
 def write_package(a, p, jobs, refs, massing):
@@ -206,12 +258,16 @@ def write_package(a, p, jobs, refs, massing):
         massing(V, a.size)  # leave the default-size massing in place
         meta['views'].append(dict(id=V['id'], label=V['label'], prompt=V['id'] + '-prompt.txt', massing=m))
     json.dump(meta, open(os.path.join(pk, 'jobs.json'), 'w'), indent=1)
+    from fsrender import paint_html
+    paint_html.write(os.path.join(pk, 'paint.html'), meta, pk)  # the same step in a browser, for owners without Python
     shutil.copy(os.path.join(HERE, 'paint.py'), pk)
     shutil.copy(os.path.join(HERE, 'fsrender', 'openai_images.py'), pk)
     open(os.path.join(pk, 'README.txt'), 'w').write(
-        'Paint package for %s: %d view(s).\n\n1. Put your OpenAI key in OPENAI_API_KEY, or in a file named openai.key in this folder.\n'
-        '2. python3 paint.py          (shows the plan and the estimate)\n3. python3 paint.py --yes    (paints; roughly $0.20-0.50 a view)\n'
-        '4. Send this folder (or a zip of it) back to the agent for the fidelity check and the R-1 sheet.\n' % (meta['project'] or 'the project', len(jobs)))
+        'Paint package for %s: %d view(s), roughly $0.20-0.50 each.\n\n'
+        'Easiest: open paint.html in Chrome, Edge or Safari, paste your OpenAI key, click Paint all views, then Download painted.zip\n'
+        'and send painted.zip back to the agent. The key stays in that browser tab.\n\n'
+        'Or with Python 3: put the key in OPENAI_API_KEY (or a file named openai.key here), run python3 paint.py --yes, and send this\n'
+        'folder back zipped.\n' % (meta['project'] or 'the project', len(jobs)))
     zp = os.path.join(a.out, 'paint-package.zip')
     with zipfile.ZipFile(zp, 'w', zipfile.ZIP_DEFLATED) as z:
         for f in sorted(os.listdir(pk)):

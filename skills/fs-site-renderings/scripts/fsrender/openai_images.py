@@ -67,6 +67,26 @@ def get_key(key_file=None):
                      'references/setup.md). Never paste the key into the chat.')
 
 
+def key_status(key_file=None):
+    """-> (ok, text) without raising and without the key: where a usable key is, or exactly why there is none"""
+    try:
+        _, src = get_key(key_file)
+        return True, 'found (%s)' % src
+    except SystemExit as e:
+        return False, str(e)
+
+
+def reachable(timeout=8):
+    """-> (ok, text): can this sandbox reach the API at all (no key is sent; any HTTP answer means yes)"""
+    try:
+        urllib.request.urlopen(urllib.request.Request(BASE + '/models'), timeout=timeout)
+        return True, 'reachable'
+    except urllib.error.HTTPError:
+        return True, 'reachable'
+    except Exception as e:
+        return False, 'not reachable from here (%s)' % (getattr(e, 'reason', None) or type(e).__name__)
+
+
 def _request(req, timeout):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:

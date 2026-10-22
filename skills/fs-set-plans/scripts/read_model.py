@@ -8,7 +8,9 @@ site-model.json, so the PDF is the only file that has to be passed on. This writ
 (acres, buildings, types, parking rows) instead of the JSON. Exit code 3 when the PDF carries no model: then take the
 site off the drawing (references/intake.md).
 
-Also accepts a .json model (copied as is, with the same summary): use it instead of opening a large file."""
+Also accepts a .json model (copied as is, with the same summary), and a text file holding the PDF's text: some
+platforms give an agent only the text of an attachment, and the sheet prints the model in it as invisible
+<<FS:nnnn:...:FS>> lines. Save that text to a file (all of it, or just the FS lines) and run this on it."""
 import argparse
 import json
 import math
@@ -45,8 +47,17 @@ def main():
     ap.add_argument('src', help='the SP-1 site layout PDF (or a model .json)')
     ap.add_argument('--out', default='project.json')
     a = ap.parse_args()
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import modeltext
     if a.src.lower().endswith('.json'):
         shutil.copy(a.src, a.out)
+    elif not a.src.lower().endswith('.pdf'):  # the PDF's text, saved to a file (the platform gave no file)
+        m = modeltext.parse(open(a.src, errors='replace').read())
+        if m is None:
+            print('No FS-MODEL lines in %s: this text carries no model (an older sheet, or the extractor dropped it).' % a.src)
+            sys.exit(3)
+        json.dump(m, open(a.out, 'w'))
     else:
         from pypdf import PdfReader
         att = PdfReader(a.src).attachments
@@ -55,10 +66,18 @@ def main():
             if att.get(name):
                 data = att[name][0]
                 break
-        if data is None:
-            print('No embedded model in %s (attachments: %s). Take the site off the drawing instead (references/intake.md).'
-                  % (a.src, ', '.join(att) or 'none'))
-            sys.exit(3)
+        if data is None:  # no attachment: the same model printed on the sheet as invisible text
+            r = PdfReader(a.src)
+            m = None
+            for pg in r.pages[:2]:
+                m = modeltext.parse(pg.extract_text() or '')
+                if m:
+                    break
+            if m is None:
+                print('No embedded model in %s (attachments: %s). Take the site off the drawing instead (references/intake.md).'
+                      % (a.src, ', '.join(att) or 'none'))
+                sys.exit(3)
+            data = json.dumps(m).encode()
         open(a.out, 'wb').write(data)
     p = json.load(open(a.out))
     print('Wrote %s (%.0f KB).' % (a.out, len(json.dumps(p)) / 1024))

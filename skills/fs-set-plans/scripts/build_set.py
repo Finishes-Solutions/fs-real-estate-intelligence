@@ -313,8 +313,15 @@ def main():
     wr_.writerow(['Sheet', 'Title', 'Subtitle', 'Section', 'Scale'])
     for s_ in ctx.sheets:
         wr_.writerow([s_['number'], s_['title'], s_['sub'], s_['section'], s_['scale']])
-    half = on_border(content, out_pdf, a.half, attach=[('project.json', json.dumps(p, separators=(',', ':')).encode()),
+    # the model the set was drawn from, with the floor plans actually drawn (seeded or fallen back included), for the
+    # renderings agent
+    drawn = {tid: t['design'] for tid, t in ctx.types.items()}
+    p_out = dict(p, types=[dict(t, design=drawn[t['id']]) if t.get('id') in drawn else t for t in p.get('types') or []])
+    p_out.pop('_acres', None)
+    half = on_border(content, out_pdf, a.half, attach=[('project.json', json.dumps(p_out, separators=(',', ':')).encode()),
                                                        ('sheet-index.csv', idx.getvalue().encode())])
+    import modeltext
+    modeltext.stamp(out_pdf, p_out)  # the model as invisible text on G-001, for agents that get only the PDF's text
     checks = set_checks(ctx, {s['number']: t for s, t in zip(ctx.sheets, texts)}) + ['Sheet ' + f for f in failed]
     with open(os.path.join(a.out, 'sheet-index.csv'), 'w', newline='') as f:
         wr = csv.writer(f)

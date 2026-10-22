@@ -602,6 +602,8 @@ def main():
     data = json.dumps(compact(hm), separators=(',', ':')).encode()
     open(model_path, 'wb').write(data)
     embed(pdf, 'site-model.json', data)
+    import modeltext
+    modeltext.stamp(pdf, json.loads(data))  # also as invisible text, for agents that get only the PDF's text
     print('Hand-off model: %.0f KB (about %dk tokens), embedded in the PDF as site-model.json.' % (len(data) / 1024, len(data) / 3500))
     if len(data) > 300 * 1024:
         print('WARNING: the hand-off is over 300 KB. Look for a bloated field (an outline with thousands of points, a copied '

@@ -56,9 +56,17 @@ platform that allows that host, or Claude Code.
 
 ## No network where the agent runs: the paint package
 
+Every run prints two SETUP lines (the key, and whether `api.openai.com` answers) and writes `STATUS.md` with what is
+missing and the owner's next step.
+
 If the sandbox can't reach `api.openai.com`, the agent writes `paint-package.zip` (`render_views.py --package`): the
 massing views at each size the model may take, the prompts, the references, `paint.py` and the API client. No key is in
 it. On any computer with Python 3 and internet:
+
+**In a browser (no Python):** unzip it, open `paint.html` in Chrome, Edge or Safari, paste your OpenAI key (it stays in
+that tab and goes only to api.openai.com), click **Paint all views**, then **Download painted.zip** and send that back.
+
+**Or with Python 3:**
 
 ```
 unzip paint-package.zip && cd paint-package

@@ -62,7 +62,7 @@ Missing pieces don't stop the job; they change how far it goes:
 
 | Missing | What you do |
 |---|---|
-| Network to `api.openai.com` (a test request fails) | Do steps 2–4, then `--package` (step 5) and deliver `paint-package.zip` with the massing views. The user runs `python3 paint.py --yes` from it on any computer with internet, and sends the folder back; `--import` then checks the pictures and step 6–8 go on. |
+| Network to `api.openai.com` (every run prints SETUP lines saying whether it answers) | Do steps 2–4, then `--package` (step 5) and deliver `paint-package.zip` with the massing views. The owner opens `paint.html` from it in a browser, pastes the key, paints and downloads `painted.zip` (or runs `python3 paint.py --yes`), and sends it back; `--import` then checks the pictures and steps 6–8 go on. |
 | The key | The same package route (the key goes next to `paint.py` or in the environment where it runs), or the owner adds `openai.key` to the skill. |
 | The go-ahead to spend | The task instructions count: "renderings approved", "budget $5" or similar is the go-ahead; pass `--budget` with the amount (or $3 for "approved" with no amount: five views at the top estimate). Without it, deliver the massing views and the package, and ask. |
 
@@ -78,6 +78,11 @@ Follow `references/inputs.md`. Best to worst, use what you have:
 - **SP-1, the site layout PDF**, to cross-check, or **as the only input**: take the site off it with
   `extract_geometry.py` and write a small project file (inputs.md, "From SP-1 alone"). The buildings get generic
   facades for their use, which is fine for concept renderings; say so.
+
+**If the PDF isn't in your sandbox** (you were given only its text, and no file is there): the sheet prints its model in
+that text as lines like `<<FS:0000:{...}:FS>>`. Write those lines, exactly as you received them and in order, to a file
+(e.g. `sheet.txt`) and run `read_model.py sheet.txt --out project.json`. If the text has no FS lines, say so and ask for
+the file to be attached so it reaches the sandbox; don't place buildings by guesswork.
 
 Never refuse for lack of designs or a plan set: render what the layout defines, and say what was generic. Never invent
 what isn't there either (an extra building, a second storey, a drive the plan doesn't draw).
@@ -157,7 +162,10 @@ A-905.
 
 ### 8. Deliver
 
-Give the user the five JPEGs, the R-1 PDF and the updated project file. Then summarize:
+**Start your reply with whether renderings were made**, in plain words, and give the user `STATUS.md` from the output
+folder (every run writes it): "No renderings were made: there is no OpenAI key and this sandbox can't reach OpenAI.
+Here are the massing views and the paint package; open paint.html…". Never end a run with only files and no word on
+what is missing. When pictures were made, give the user the five JPEGs, the R-1 PDF and the updated project file. Then summarize:
 - the model actually used and the size;
 - the cost (the estimate printed by the run);
 - each view's fidelity, and anything re-painted or still imperfect;

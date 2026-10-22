@@ -73,6 +73,10 @@ Work in `./plan-set/<project-slug>/`. Pick the path by what you were given (deta
   `python3 <skill>/scripts/read_model.py SP-1.pdf --out project.json` first: it writes the `project.json` (exact
   geometry, parking rows, ponds, stated values, facts) and prints a short summary. Build from that; don't trace the
   PDF. Exit code 3 means this PDF has no model (an older or other sheet): take the site off the drawing as below.
+- **If the PDF isn't in your sandbox** (you were given only its text, and no file is there): the sheet prints its model in
+  that text as lines like `<<FS:0000:{...}:FS>>`. Write those lines, exactly as you received them and in order, to a file
+  (e.g. `sheet.txt`) and run `python3 <skill>/scripts/read_model.py sheet.txt --out project.json`. If the text has no FS lines, say so and ask for
+  the file to be attached so it reaches the sandbox; don't place buildings by guesswork.
 - **A `<slug>-site-model.json`** given as a file: the same model. Pass it through `read_model.py` too (it copies it and
   prints the summary). **Never open, cat or print a model file**: it can be large, and reading it into the conversation
   is what overflows the prompt.
