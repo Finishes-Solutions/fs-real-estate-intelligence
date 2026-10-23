@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-23
 
+### 3:55 PM CT: Home communities match an RV park plan, and are valued as rentals (aa391e5)
+- **Your pad size:** say "25 x 55 pads" (or attach an RV park plan that gives its site size) and every lot is that size. On King Ln with the exhibit's 25 × 55 pads, the plans fit 140–148 tiny homes or park models (the exhibit shows 134 RV lots, with a bigger pond). Only homes that leave 10 ft to the next fit a 25 ft pad, so single-wides need wider pads.
+- **Out to the property line, like the exhibit:** lots now run to the property line; say "a 10 ft buffer" if you want a landscape strip. The rows along the line are deeper where needed so the homes keep the plan's setbacks (with the default 20 ft rear setback, those rows come out about 74 ft deep; lower the setback under Site parameters for 55 ft all round).
+- **The exhibit's shape:** one of the three options always puts the pond in a corner beside the entry, with the loop and the rows along the property line, as on the RV park plan.
+- **Valued as rentals:** the pro forma rents each home with its pad (about $1,050 a month for a tiny home, $1,300 for a manufactured home), with the homes bought and set, $30,000 a finished pad, and a 6.75% cap rate, all editable. At those defaults King Ln comes out at about a 5% yield on cost, below the cap rate, so check the rents and costs before relying on it.
+- **Not done yet:** the detention is the app's usual estimate (about 1.2 acres here; the engineer's exhibit shows 2.2). Spacing between homes and the fire lanes still need the local rules and the fire marshal. Not tried in the live app with the AI yet.
+
 ### 3:31 PM CT: Tiny home and manufactured home communities; flag lots come in up their strip (08be202)
 - **Fixed: a tiny home / mobile home community came back as self storage.** On 31807 King Ln, "a tiny home/mobile home community laid out like the reference file has showing an RV park" was drawn as self storage with about two dozen RV / boat stalls and a 7,200 sf leasing office. The RV park in the reference file had pushed the AI to "RV storage".
 - **Now it's homes on lots, laid out like an RV park:** private lanes in loops with a row of lots on each side, lots along the end lanes where there's room, the detention pond across one end or down one side. On King Ln: about 97 tiny homes, 48 manufactured homes, or 58 of both (the reference RV park had 134 RV lots, which are smaller).
