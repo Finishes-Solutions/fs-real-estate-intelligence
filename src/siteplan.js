@@ -37,6 +37,7 @@ import { ruleSheets } from './rulesheets.js';
 const typeOptions = (cur, team = []) => (team.length ? '<optgroup label="Team">' + team.map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>' : '') + BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
 import { areaMap } from './reportkit.js';
 import { readJSON } from './lib/http.mjs';
+import { withTileParcel } from './lib/footprint.mjs';
 
 const KEY = 'fs-projects-v1', CODE_KEY = 'fs-team-code', NAME_KEY = 'fs-team-name';
 const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'roundabout', 'loop', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash', 'sign'];
@@ -195,8 +196,11 @@ export function initSitePlan(ctx) {
   // info: { center, title, parcel } from a property card, or { center, title, parcels: [...] } from the card's All tab
   const MAXP = 20;
   const llRound = g => g && JSON.parse(JSON.stringify(g, (k, v) => typeof v === 'number' ? +v.toFixed(7) : v));
+  // a parcel's acres: every piece of it (a parcel drawn across map tiles comes in pieces, side by side), holes taken out
+  const geomAcres = (g, at) => { const F = SP.frame(at), polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+    return polys.reduce((t, rs) => t + SP.ringArea(rs[0].map(F.toFt)) - rs.slice(1).reduce((h, r) => h + SP.ringArea(r.map(F.toFt)), 0), 0) / 43560; };
   const parcelOf = (pc, center) => { const g = pc.geometry, r = g && (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates?.[0]?.[0]); const cc = r ? SP.centroid(r) : center;
-    const rec = { key: '', label: pc.situs || pc.owner || 'Parcel', owner: pc.owner || '', propId: pc.propId || null, marketValue: pc.marketValue || null, landValue: pc.landValue || null, acres: g ? +(SP.ringArea(SP.boundaryFrom(g, center)?.ring || []) / 43560).toFixed(3) : null, center: cc.map(v => +v.toFixed(6)), geometry: llRound(g) || null };
+    const rec = { key: '', label: pc.situs || pc.owner || 'Parcel', owner: pc.owner || '', propId: pc.propId || null, marketValue: pc.marketValue || null, landValue: pc.landValue || null, acres: g ? +(geomAcres(g, center)).toFixed(3) : null, center: cc.map(v => +v.toFixed(6)), geometry: llRound(g) || null };
     rec.key = parcelKey(rec); return rec; };
   // the site boundary for a set of parcels (one outline, or several merged). Parcels that don't touch are joined across
   // the gap between them (SP.bridgeParcels): filled in as site, or, where the map shows a road in it, kept as a no-build
@@ -1189,12 +1193,17 @@ export function initSitePlan(ctx) {
   }
   async function pickParcel(lngLat) {
     const p = P(), pl = PL(), c = [lngLat.lng, lngLat.lat], keys = pl.parcels || (pl.parcel ? [pl.parcel] : []);
-    const inside = keys.map(k => p.parcels.find(x => x.key === k)).find(r => r?.geometry && inGeom(c, r.geometry));
+    // a click in a parcel of the site takes it out; one in a different account drawn on the map is another parcel, even inside
+    // an outline that takes in several (lib/footprint.mjs withTileParcel)
+    const t0 = ctx.tileParcelAt?.(c), idOf = v => String(v ?? '').replace(/\W/g, '').toUpperCase(), other = r => t0?.apn && r.propId && idOf(r.propId) !== idOf(t0.apn);
+    const inside = keys.map(k => p.parcels.find(x => x.key === k)).find(r => r?.geometry && inGeom(c, r.geometry) && !other(r));
     if (inside) { if (keys.length === 1) { ctx.toast('A site needs at least one parcel.'); return; } setParcels(keys.filter(k => k !== inside.key)); return; }
     if (keys.length >= MAXP) { ctx.toast('Up to ' + MAXP + ' parcels in one site.'); return; }
     ctx.toast('Looking up the parcel…');
     try {
-      const r = await fetch('api/building?' + new URLSearchParams({ lat: c[1].toFixed(6), lon: c[0].toFixed(6), part: 'parcel' })), d = await readJSON(r);
+      const tile = ctx.tileParcelAt?.(c) || null; // the parcel drawn on the map there decides which one it is (lib/footprint.mjs withTileParcel)
+      const r = await fetch('api/building?' + new URLSearchParams({ lat: c[1].toFixed(6), lon: c[0].toFixed(6), part: 'parcel', ...(tile?.apn ? { apn: tile.apn } : {}) })), d = await readJSON(r);
+      d.parcel = withTileParcel(d.parcel, tile);
       if (!d.parcel) throw new Error('No parcel here.');
       if (!d.parcel.geometry) { ctx.toast('The county has no outline for that parcel. Get its Regrid details on the property card first.'); return; }
       const rec = parcelOf(d.parcel, c); if (!p.parcels.some(x => x.key === rec.key)) p.parcels.push(rec);

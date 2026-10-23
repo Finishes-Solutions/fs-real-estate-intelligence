@@ -116,3 +116,19 @@ console.log('building api tests passed');
   assert.equal(esriPolygon(null), null); assert.equal(esriPolygon({ rings: [] }), null);
   assert.equal(normalizeCad(CADS.find(c => c.county === 'Waller'), { prop_id_text: '1', file_as_name: 'X' }, katy).geometry.type, 'MultiPolygon', 'the appraisal districts\' layers too');
   console.log('multi-part parcels ok'); }
+// &apn: the account drawn on the map under the click. StratMap's record at the point is another account (on Waller Tomball
+// Rd one 128-acre outline holds a dozen accounts), so the appraisal district's own record for that account is used.
+{ const sq = (x0, y0, x1, y1) => [[x0, y0], [x0, y1], [x1, y1], [x1, y0], [x0, y0]], asked = [];
+  globalThis.fetch = async url => { url = String(url); const json = o => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }), u = new URL(url);
+    if (url.includes('/MapServer/identify')) return json({ results: [{ attributes: { PROP_ID: '0422450000001', OWNER_NAME: 'TERPSTRA PETER S TRUSTEE', LEGAL_AREA: '0.429' }, geometry: { rings: [sq(-95.8998, 30.0584, -95.8914, 30.0654)] } }] });
+    if (u.host === 'arcweb.hcad.org') { asked.push(u.searchParams.get('where'));
+      return json({ features: u.searchParams.get('where') === "HCAD_NUM = '0422450000072'" ? [{ attributes: { HCAD_NUM: '0422450000072', owner: 'DAVIS JERRY LEE', address: '0 STOKES RD', city: 'WALLER', mkt_val: 412000 }, geometry: { rings: [sq(-95.8998, 30.0584, -95.8914, 30.0615)] } }] : [] }); }
+    return new Response('nope', { status: 500 }); };
+  const r1 = mock(); await building({ query: { lat: '30.06', lon: '-95.896', part: 'parcel', apn: '0422450000072' }, headers: { 'x-forwarded-for': '9.9.9.10' } }, r1);
+  assert.equal(r1.body.parcel.propId, '0422450000072'); assert.equal(r1.body.parcel.owner, 'DAVIS JERRY LEE'); assert.equal(r1.body.parcel.marketValue, 412000);
+  assert.deepEqual(asked, ["HCAD_NUM = '0422450000072'"], 'asked by account number');
+  asked.length = 0; const r2 = mock(); await building({ query: { lat: '30.064', lon: '-95.896', part: 'parcel', apn: '0422450000001' }, headers: { 'x-forwarded-for': '9.9.9.10' } }, r2);
+  assert.equal(r2.body.parcel.propId, '0422450000001'); assert.equal(asked.length, 0, 'StratMap\'s record is that account: nothing else asked');
+  asked.length = 0; const r3 = mock(); await building({ query: { lat: '30.06', lon: '-95.896', part: 'parcel', apn: '0422450000099' }, headers: { 'x-forwarded-for': '9.9.9.10' } }, r3);
+  assert.equal(r3.body.parcel.propId, '0422450000001', 'the district has no such account: StratMap\'s record (the card then goes by the line drawn on the map)');
+  console.log('parcel by the account drawn on the map ok'); }
