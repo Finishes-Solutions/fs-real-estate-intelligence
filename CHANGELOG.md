@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 7:16 PM CT: A market report for your project app's agents (376bace)
+- **New report:** the agents can make a Market report PDF for one county, several counties or all seven home counties (or the county a property is in): headline figures and what's moving, the construction pipeline, growth and demand, housing and rents, costs and rates, and for Houston its crime, plus traffic counts and recent news, in the Finishes Solutions style, with a CSV when asked.
+- **A print version, not a copy of the page:** it uses the same figures as the Market page but is laid out for paper, so it does not look exactly like the website's own Market export, which is unchanged.
+- **Outside the seven counties** the agents are told plainly that the market data doesn't cover it.
+
 ### 6:52 PM CT: A demographics report for your project app's agents (a582127)
 - **New report:** the agents can make a Demographics report PDF for a property: 1, 3 and 5-mile rings (or any radii up to 25 miles), or a whole county or drawn area. It has population and growth, households, median income, home value and rent (approximate where tracts are combined), vacancy, median age, households by income band, jobs located there and estimated spending by category, on a street map with the rings, in the Finishes Solutions style, with a CSV when asked.
 - **Growth says what it is measured against:** population growth in the agents' answers now reads "since 2020" (the census survey it is compared with) and jobs growth "since 2018", instead of "5 years".
