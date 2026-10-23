@@ -3,6 +3,16 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-23
+
+### 11:36 AM CT: Site plans for your project app's agents (5b3625a)
+- **The agents can lay out a site:** once an agent has found a parcel (by address, parcel number, several parcels together or an outline), it can lay out a concept site plan with the same layout engine as **Site plan** here, and get the site plan sheet as a PDF.
+- **From a request or the best use:** the agent says what to build ("25,000 sf retail strip with 2 pad sites"), or leaves that out and the AI suggests the best uses for the site (its size, frontage, flood zone, utilities, traffic, what's nearby and the market) and lays out the best one. It can ask for another of the ideas.
+- **How hard the AI works:** low (seconds), medium (planned and reviewed, 1–2 minutes) or high (may change the program once). The street the site faces comes from the roads beside it; when none is found the answer says the front is a guess.
+- **Said plainly:** when the plan holds more than was asked (the app fills land the request doesn't need), when a step was skipped for time, and when a site fact couldn't be looked up (never "none found").
+- **Waller:** sites in the City of Waller or its ETJ follow the Waller planning guardrails, with their second sheet.
+- **Not checked yet:** on the live site (the road lines, the AI and the street maps can't be reached from this environment); tested with stand-ins and real Chromium sheets. Money, renderings and plan sets stay in the app.
+
 ## 2026-10-22
 
 ### 7:16 PM CT: A market report for your project app's agents (376bace)
