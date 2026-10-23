@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-23
 
+### 5:54 PM CT: Renderings follow the plan again (HASH)
+- **Fixed: renderings made from the project page drifted from the plan.** Since Oct 19 they've been taken from a hidden map, and that map was carrying the app's own markings (filing dots, the heat layer, highlights, pins) into the picture, where the AI painted them in as if they were part of the site. It also drew the massing at standard resolution with no smoothing, so small buildings, lots and edges came through rough and the AI filled in the rest.
+- **Now** the hidden map shows only the base map and the option's massing, draws the option exactly as the site plan map does (Waller plans included), and takes the picture at twice the size with smoothing, then scales it to 1600 × 900, as sharp as the old pictures taken off a high-resolution screen.
+- **Renderings already made don't change;** make them again to get the sharper ones. Tested in Chromium (old vs new picture side by side) and with unit tests; not yet tried on the live site.
+
 ### 4:32 PM CT: Site plan answers no longer call a failing layout a pass (769de87)
 - **Said plainly:** when no layout passes every check, the agent's site plan answer now says so and names what the picked one is missing (for example parking short), instead of "passes every check". Found in the live test on a Waller parcel.
 

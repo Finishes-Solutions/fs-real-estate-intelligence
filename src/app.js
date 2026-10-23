@@ -123,6 +123,8 @@ const saveLayers=()=>{ try{ localStorage.setItem('fs-map-layers',JSON.stringify(
 const styleUrl=s=>s==='google'||s==='gsat'?(ctx.googleStyle?.(s)||Promise.reject(new Error('Google maps aren’t available.'))):s==='esri'?ESRI_STYLE:s==='free'?OFM+'/styles/liberty':mtDown?(standIn(s,false)||ESRI_STYLE):'https://api.maptiler.com/maps/'+STYLES[s]+'/style.json?key='+MAPTILER_KEY;
 const map=new maplibregl.Map({container:'map',style:styleUrl(layers.style),center:[-93,24],zoom:1.6,minZoom:1,maxZoom:19,maxPitch:70,antialias:true,
   attributionControl:{compact:true},doubleClickZoom:true,dragRotate:true,cooperativeGestures:false});
+// the basemap's own layers, as its style brings them before the app adds any: a rendering's hidden map draws only these (lib/render.mjs baseStyle)
+let baseIds=new Set(); map.on('style.load',()=>{ baseIds=new Set((map.getStyle()?.layers||[]).map(l=>l.id)); });
 // the style or a tile refused: redraw the same basemap from the keyless stand-in (once; the tiles of one view all fail together)
 map.on('error',e=>{ if(!mapErrorRefused(e)||!setMtDown()) return; toast('MapTiler isn’t serving maps right now (its monthly limit is used up), so this is the free OpenStreetMap map.'); if(STYLES[layers.style]) setBasemap(layers.style); });
 
@@ -1362,7 +1364,7 @@ ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box
     ctx.foldLegend=v=>{ if(v==null){ if(held!=null){ min=held; held=null; sync(); } return; } if(held==null) held=min; min=!!v; sync(); }; // folded for now (the site plan on a phone), without changing the saved choice; null puts it back as it was
     sync(); } }
 syncQL=()=>ctx.syncQuickLayers?.();
-Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, mapTilerDown:()=>mtDown, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, baseLayers:()=>baseIds, mapTilerDown:()=>mtDown, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },
