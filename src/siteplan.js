@@ -191,6 +191,10 @@ export function initSitePlan(ctx) {
   const nextName = p => SP.nextOptionName(p.plans);
   const newPlan = (p, extra = {}) => ({ id: uid(), name: nextName(p), origin: null, ring: [], src: null, front: null, frontGuess: true, setbacks: { ...SP.SETBACKS }, program: { use: 'retail' }, zoning: null, elements: [], created: new Date().toISOString(), ...extra });
   const parcelKey = pc => pc.propId ? 'pid:' + pc.propId : 'pt:' + pc.center.map(v => v.toFixed(5)).join(',');
+  // one account can be several separate pieces (31807 King Ln, Waller account 13814: two records, two outlines): the first
+  // piece keeps the account's key, another piece of it adds where it is, so both stay in the project and the site
+  const samePiece = (a, b) => !a.geometry || !b.geometry || inGeom(a.center, b.geometry) || inGeom(b.center, a.geometry);
+  const keyIn = (rec, pool) => { if (pool.some(x => x !== rec && x.key === rec.key && !samePiece(x, rec))) rec.key = parcelKey(rec) + '~' + rec.center.map(v => v.toFixed(5)).join(','); return rec; };
 
   // ---------- starting from a property card ----------
   // info: { center, title, parcel } from a property card, or { center, title, parcels: [...] } from the card's All tab
@@ -237,7 +241,8 @@ export function initSitePlan(ctx) {
     if (!info?.center && !list.length) { ctx.toast('Open a parcel first: click a building or open ground at street zoom.'); return; }
     const rg = ctx.lastRegrid?.geom, center = info.center || list[0]?.center;
     if (list.length <= 1 && !list[0]?.geometry && rg && inGeom(center, rg)) list = [{ ...(list[0] || {}), geometry: rg, regrid: true }]; // Harris and Waller: Regrid's outline
-    const recs = list.map(pc => parcelOf(pc, pc.center || center)), b = siteOf(recs), many = recs.length > 1;
+    const recs = list.map(pc => parcelOf(pc, pc.center || center)); recs.forEach((r, i) => keyIn(r, recs.slice(0, i)));
+    const b = siteOf(recs), many = recs.length > 1;
     const label = many ? recs.length + ' parcels' + (recs[0].label ? ' · ' + recs[0].label : '') : recs[0]?.label || info.title || 'Site';
     const acres = b ? SP.ringArea(b.ring) / 43560 : null, noGeom = recs.filter(r => !r.geometry).length;
     // the projects these parcels are already in (newest first), and a project waiting for a parcel (Find a Parcel)
@@ -269,7 +274,7 @@ export function initSitePlan(ctx) {
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#spBack').onclick = () => { if (!(ctx.cardChild?.() === 'open' && ctx.cardBack?.())) ctx.openBuildingAt(center); };
     const begin = p => {
-      for (const r of recs) { const i = p.parcels.findIndex(x => x.key === r.key); if (i < 0) p.parcels.push(r); else if (!p.parcels[i].geometry && r.geometry) p.parcels[i] = r; }
+      for (const r of recs) { keyIn(r, p.parcels); const i = p.parcels.findIndex(x => x.key === r.key); if (i < 0) p.parcels.push(r); else if (!p.parcels[i].geometry && r.geometry) p.parcels[i] = r; }
       for (const x of p.parcels) regridOn(x); // the address city and zoning, when Regrid was fetched on the card
       if (pending?.id === p.id) pending = null; // used
       const z = ctx.lastRegrid?.zoning && list.some(x => x.regrid) ? zoningOf(ctx.lastRegrid.zoning) : null;
@@ -1206,7 +1211,7 @@ export function initSitePlan(ctx) {
       d.parcel = withTileParcel(d.parcel, tile);
       if (!d.parcel) throw new Error('No parcel here.');
       if (!d.parcel.geometry) { ctx.toast('The county has no outline for that parcel. Get its Regrid details on the property card first.'); return; }
-      const rec = parcelOf(d.parcel, c); if (!p.parcels.some(x => x.key === rec.key)) p.parcels.push(rec);
+      const rec = keyIn(parcelOf(d.parcel, c), p.parcels); if (!p.parcels.some(x => x.key === rec.key)) p.parcels.push(rec);
       if (keys.includes(rec.key)) return; setParcels([...keys, rec.key]);
     } catch (e) { ctx.toast('Couldn’t look up that parcel: ' + e.message); }
   }

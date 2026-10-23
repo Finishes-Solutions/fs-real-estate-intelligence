@@ -116,7 +116,7 @@ export function initBuildings(ctx) {
     const hit = fs.find(f => { const g = partAt(f.geometry, c); return g && inGeom(c, g); }); if (!hit) return null;
     const pr = hit.properties || {}, key = pr.ll_uuid || pr.parcelnumb, kOf = f => f.properties?.ll_uuid || f.properties?.parcelnumb;
     const g = joinPieces(fs.filter(f => key ? kOf(f) === key : f === hit).map(f => ({ z: f._z, x: f._x, y: f._y, geometry: f.geometry })), c) || partAt(hit.geometry, c);
-    return g ? { apn: pr.parcelnumb ? String(pr.parcelnumb) : null, owner: pr.owner || null, address: pr.address || null, geometry: g } : null;
+    return g ? { apn: pr.parcelnumb ? String(pr.parcelnumb) : null, uuid: pr.ll_uuid || null, owner: pr.owner || null, address: pr.address || null, geometry: g } : null;
   }
   ctx.tileParcelAt = tileParcel;
   const loadMarket = () => marketP ||= fetch('data/market.json').then(r => r.ok ? r.json() : null).catch(() => null).then(m => market = m);
@@ -300,7 +300,7 @@ export function initBuildings(ctx) {
   ctx.buildingStats = () => { const list = selected(); return list.map(b => ({ address: b.parcel?.situs || null, ...stats(b), owner: b.parcel?.owner || null })); };
 
   // ---------- several buildings / parcels: each is a tab; "All" sums them up ----------
-  const selOf = x => ({ center: x.center, footprint: x.footprint, parcel: x.parcel || (x.tile ? { propId: x.tile.apn, geometry: x.tile.geometry } : undefined), parcels: x.d?.parcels });
+  const selOf = x => ({ center: x.center, footprint: x.footprint, parcel: x.parcel || (x.tile ? { propId: x.tile.apn, geometry: x.tile.geometry, tileId: x.tile.uuid } : undefined), parcels: x.d?.parcels });
   const same = (a, b) => sameSelection(selOf(a), selOf(b));
   // open ground clicked again in a parcel already picked (its parcel loaded only after the click was added): drop the
   // new tab and show the one already there
@@ -326,10 +326,11 @@ export function initBuildings(ctx) {
   function renderAll() {
     const list = (ctx.tabs?.list('building') || []).map(t => t.ref).filter(Boolean); if (!list.length) return; cur = null; stopOrbit();
     const rows = list.map(b => ({ b, s: stats(b) })), uniqP = new Map();
-    // every parcel picked, once (by property ID, else by outline: a record without an ID is still a parcel). A spot only
-    // Regrid knows has no outline here; it's passed on so the site plan says it's left out instead of losing it quietly
+    // every parcel picked, once: by its account and outline together (one account can be several separate pieces, like
+    // 31807 King Ln; a record without an account is still a parcel). A spot only Regrid knows has no outline here; it's
+    // passed on so the site plan says it's left out instead of losing it quietly
     list.forEach(b => { for (const p of b.d?.parcels?.length ? b.d.parcels : b.parcel ? [b.parcel] : b.rg ? [b.rg] : []) {
-      const k = p.propId || (p.geometry ? JSON.stringify(p.geometry.coordinates?.[0]?.[0]) : 'pt:' + b.center.join(',')); if (!uniqP.has(k)) uniqP.set(k, { ...p, center: p.center || b.center }); } });
+      const k = (p.propId || '') + '|' + (p.tileId || (p.geometry ? JSON.stringify(p.geometry.coordinates).slice(0, 80) : 'pt:' + b.center.join(','))); if (!uniqP.has(k)) uniqP.set(k, { ...p, center: p.center || b.center }); } });
     const tot = k => rows.reduce((t, r) => t + (r.s[k] || 0), 0), mv = [...uniqP.values()].reduce((t, p) => t + (p.marketValue || 0), 0);
     const acres = [...uniqP.values()].reduce((t, p) => t + (/acre/i.test(p.area || '') ? parseFloat(p.area) : 0), 0);
     const geoms = [...uniqP.values()].map(p => p.geometry).concat(list.filter(b => !b.parcel).map(b => b.footprint)).filter(Boolean);
