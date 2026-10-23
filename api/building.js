@@ -102,7 +102,7 @@ export function normalizeCad(cad, attrs, geometry, shared = 1) {
 }
 // the CAD parcel under the point: the point itself, then a few meters around it (a click on a lot line); condominium units
 // share one outline, so the record says how many do
-async function cadParcel(lat, lon) {
+export async function cadParcel(lat, lon) {
   for (const cad of CADS.filter(c => lon >= c.box[0] && lon <= c.box[2] && lat >= c.box[1] && lat <= c.box[3])) {
     for (const pad of [0, 0.00006]) {
       const g = pad ? { geometry: [lon - pad, lat - pad, lon + pad, lat + pad].join(','), geometryType: 'esriGeometryEnvelope' } : { geometry: JSON.stringify({ x: lon, y: lat, spatialReference: { wkid: 4326 } }), geometryType: 'esriGeometryPoint' };
@@ -119,7 +119,7 @@ async function cadParcel(lat, lon) {
   return null;
 }
 
-async function parcel(lat, lon) {
+export async function parcel(lat, lon) {
   const p = await stratParcel(lat, lon);
   if (p) return p;
   // StratMap has nothing here (all of Harris and Waller): the county appraisal district's own layer

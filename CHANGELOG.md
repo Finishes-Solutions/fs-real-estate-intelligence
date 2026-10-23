@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-22
 
+### 5:39 PM CT: Your project app's agents can pull this app's data (aedcbc3)
+- **A connection for the project app's AI agents** (an MCP server at `/api/mcp`): its agents can ask about any property or area without anyone opening the map. Everything they can do is read-only.
+- **What they can look up:** a property (match quality of the address, county, inside city limits or within half a mile of a city, the appraisal parcel with owner, values, acreage and outline), site facts, flood zones and flood history, ground elevations and slopes, environmental records, utilities, traffic counts, demographics in rings, the county's market figures, businesses, development activity, construction filings and the busiest developers, architects and contractors, crime (Houston street-level, or any US police department's yearly figures), stored local news and nearby airports. One "area overview" call gets most of it at once.
+- **Every answer says where it came from:** the source, how current it is, a link, and what it covers. Outside a source's coverage the answer says "not covered here" instead of reporting nothing; a service that doesn't answer is named in one sentence and the rest still comes back.
+- **The Market page's numbers** now come from the same shared code the agents use; they read exactly as before.
+- **Not done yet:** the PDF reports for the agents (next), and AMP can't reach the site until Vercel's login protection lets it through (see the README). Not checked against the live services from here (this environment can't reach them); tested with stand-ins shaped like their real answers.
+
 ### 5:31 PM CT: Huntsville no longer listed under Waller County's sales tax (5eec8f5, 7d77060)
 - **City sales tax by county is corrected.** Huntsville showed under Waller County because one remodel filed with the state under Waller has a Huntsville address. Filings whose address is outside the county they were filed under no longer decide which county a city belongs to.
 - **Same fix for three other towns outside the area:** Livingston (was under Montgomery), Freeport and La Marque (were under Harris) drop out of the sales tax figures.

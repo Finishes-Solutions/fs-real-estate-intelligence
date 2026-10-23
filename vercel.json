@@ -137,6 +137,10 @@
     },
     "api/render.js": {
       "maxDuration": 300
+    },
+    "api/mcp.js": {
+      "maxDuration": 300,
+      "includeFiles": "data/{area,market,filings,geo,regions}.json"
     }
   },
   "crons": [
