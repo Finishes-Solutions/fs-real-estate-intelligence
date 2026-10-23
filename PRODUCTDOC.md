@@ -590,6 +590,14 @@ Test-fit a building, or a whole mixed-use development, on one parcel or up to 20
   - **Without the AI** (or when the search finds nothing), **Use Waller Defaults** fills the sheet with Waller County's rules. Some of those are provisional: Waller's detention rate hasn't been read from its drainage criteria yet, so 0.55 acre-feet per developed acre (the typical Harris County figure, the same as with no sheet) stands in, marked to confirm.
   - **Never a compliance claim:** the sheet is the AI's reading of the code; the notes, the cards and the PDF say so, and say how many values are still to confirm. Confirm with the engineer and the city or county.
 
+**Tiny home and manufactured home communities:** ask for "a tiny home community", "a mobile home park with 60 lots" or "a tiny home / mobile home community laid out like an RV park". It is homes on lots, never self storage.
+- **How it's laid out:** like an RV park or a manufactured home community: long private lanes (22–24 ft) with a row of home lots on each side, the lanes joined at both ends so every lane is part of a loop, lots along the end lanes where there's room, the detention pond across one end or down one side, and the entry drive straight in.
+- **The homes:** manufactured homes (single-wides 16 × 56 and 16 × 76, double-wides 28 × 52 and 28 × 64 on lots about 40–50 ft wide and 100 ft deep), tiny homes (a 12 × 32 tiny home, a 14 × 40 park model and a 20 × 40 cottage on lots about 30–36 ft wide and 65 ft deep), or both. Each home sits near the front of its lot with a two-car parking pad beside it (one car, in front, on a lot too narrow for both). They also show in the building library as **Manufactured homes** and **Tiny homes**.
+- **What you can say:** a number of homes or lots (that many, nearest the entry), home sizes, or lot sizes. The sheet and Numbers call it a manufactured, tiny, or tiny & manufactured home community and count homes and parking pads (not garages).
+- **Not checked:** spacing between homes, lane widths and fire lanes follow typical values; confirm them against the local manufactured home or RV park rules and with the fire marshal. The pro forma still values the homes as for-sale single-family homes, not lot rent.
+
+**Sites reached by a narrow strip (flag lots):** when the only road frontage is a narrow strip running back to the main part of the land (31807 King Ln: a 60 ft strip about 250 ft long from Old Washington Rd), the main part is laid out on its own and the main entry is a drive straight up the strip to it. The plan says so and notes that with one way in, the fire marshal has to sign off on fire access. Before, the entry was put on the back edge of the main part, where it meets the neighbour's land, not a road.
+
 **Self storage:** say it the way you would to a developer ("self storage: a 3-story, 90,000 sf climate-controlled building plus drive-up units and 30 RV spaces", "drive-up only mini storage") or choose **Self storage** under Site parameters.
 - **How it's laid out:**
   - The climate-controlled building sits at the street with its leasing office and a few customer spaces in front, behind a landscaped strip.
@@ -1046,6 +1054,8 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Tiny home and manufactured home communities:** ask for one and the plan lays out private lanes in loops with home lots on both sides, like an RV park, with single- and double-wides, tiny homes and park models. Before, a request like this could come back as self storage with RV stalls.
+- **Flag lots come in up their strip:** a site whose only road frontage is a narrow strip gets its main entry as a drive up the strip, not on a neighbour's line.
 - **Both sides of a road are built on:** when a road runs between the parcels of a site, Build lays out each side on its own (with the road as its street) and puts them together, instead of using one side only.
 - **Pick every parcel you see:** with the parcel lines on, a pick is the parcel drawn under your click. Before, a parcel inside another's oversized county outline (on Waller Tomball Rd one record covers 128 acres and a dozen accounts) was taken for one already picked and dropped, so only two stayed selected.
 - **The Market report for your project app's agents:** a county's (or the region's) Market page as a printed PDF report: what's moving, the construction pipeline, permits, new businesses, jobs, sales tax, spending, housing and rents, material prices and rates, Houston crime, the busiest roads and local news.
