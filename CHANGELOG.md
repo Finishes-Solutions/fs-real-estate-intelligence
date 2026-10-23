@@ -3,6 +3,16 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-23
+
+### 1:28 PM CT: Every parcel you pick stays picked; Build uses both sides of a road (b901d1e)
+- **Fixed: the third parcel disappeared.** On Waller Tomball Rd, the statewide record for one account (0422450000001) has a 128-acre outline that takes in about a dozen parcels the map's parcel lines show separately. Picking one of those returned that same record, so it was taken for a parcel already picked and dropped, and only two stayed selected.
+- **A pick is now the parcel drawn under your click** (with **Parcels** on): its own outline and account. Where the statewide record is a different account, the app asks the county appraisal district for that account, and otherwise shows the owner and address from the parcel lines instead of the wrong record's. Two different accounts are never treated as the same parcel. **Change Parcels** in a plan works the same way.
+- **Tested in the browser** on your Waller Tomball Rd tracts, with the outlines and parcel lines from the live data. Before: the third pick vanished, and Site Plan for All made a 2-parcel, 20.78-acre site. After: all four stay, and the site is 4 parcels and 170 acres.
+- **Both sides of a road are built on.** When a road runs between the parcels of a site, Build lays out each side as a site of its own, with the road as its street and its share of the program by area, then puts them together. On two 5-acre lots with a road between: retail about 40,000 sf on each side (before: none on one side), apartments and offices on both, nothing on the road.
+- **A parcel drawn across two map tiles** now shows its full acres on the site's parcel chips (it showed only the piece under the click).
+- **Not checked yet:** a look on the real map with the live parcel lines. Also, without **Parcels** turned on the app can't tell which parcel you clicked, so a statewide record that lumps parcels together can still drop a pick.
+
 ## 2026-10-22
 
 ### 7:16 PM CT: A market report for your project app's agents (376bace)
