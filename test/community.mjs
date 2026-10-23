@@ -68,6 +68,26 @@ for (const [kind, min] of [['tiny', 80], ['manufactured', 40], ['mixed', 50]]) {
 }
 // a count asked: that many
 { const o = L.layoutOptions(KING, { use: 'sfr', homeKind: 'tiny', units: 40 }, { count: 1 })[0]; assert.equal(o.elements.filter(e => e.use === 'sfr').length, 40, '40 homes asked'); assert.ok(o.notes.some(n => /^40 home lots/.test(n))); }
+// the exhibit's 25 × 55 pads (an RV park of 134 sites, rented out): about as many, the pads that size (the rows on the
+// property line deeper so the homes keep the setbacks), lots out to the line, and one option with the pond in a corner
+{ const P = S.normalizeProgram(S.guessProgram('a tiny home community for rent with 25 x 55 pads like the RV park'));
+  assert.deepEqual([P.homeKind, P.lotW, P.lotD, P.lotSet, P.units], ['tiny', 25, 55, true, null], 'the pads from the words: ' + JSON.stringify(P));
+  const out = L.layoutOptions(KING, P, { count: 3 }), o = out[0], H = o.elements.filter(e => e.use === 'sfr'), lots = o.elements.filter(e => e.kind === 'lot');
+  assert.ok(H.length >= 130, 'about the exhibit’s count: ' + H.length); sound(o, 'pads', 130, 'tiny');
+  assert.ok(H.every(h => B.homePlanById(h.type).w + 10 <= 25), 'only homes that fit a 25 ft pad with 10 ft between them');
+  const wd = l => [Math.min(l.w, l.d), Math.max(l.w, l.d)]; assert.ok(lots.every(l => Math.abs(wd(l)[0] - 25) < 0.5), 'every pad 25 ft wide');
+  assert.ok(lots.filter(l => Math.abs(wd(l)[1] - 55) < 0.5).length > lots.length / 2, 'most 55 ft deep');
+  assert.ok(lots.some(l => S.shapeOf(l).some(p => ring.some((a, i) => S.segDist(p, a, ring[(i + 1) % ring.length]) < 1))), 'lots out to the property line');
+  assert.ok(out.some(x => /pond in a corner/.test(x.name)), 'a corner pond among the options: ' + out.map(x => x.name));
+  const c = out.find(x => /pond in a corner/.test(x.name)); sound(c, 'corner', 120, 'tiny');
+  // rented: the homes and pads together, factory-built homes, a finished pad each, a community's cap rate
+  const PF = await import('../lib/proforma.mjs'), plan = { ...KING, elements: o.elements, program: o.program }, A = PF.defaults(plan), r = PF.run(plan);
+  assert.equal(A.marketCap, PF.COMMUNITY_PF.cap); assert.equal(A.lotCost, PF.COMMUNITY_PF.lotCost); assert.equal(A.hard.sfr, PF.COMMUNITY_PF.hard.tiny); assert.equal(A.opexPerHome, PF.COMMUNITY_PF.opexPerHome);
+  assert.deepEqual(r.ops.lines.map(l => l.k), [H.length + ' × tiny homes, home and pad @ $1,050/mo'], 'rent by the home and pad, not as houses');
+  // a landscape strip asked: lots stop short of the line
+  const ob = L.layoutOptions(KING, { ...P, buffer: 10 }, { count: 1 })[0]; assert.ok(ob.elements.filter(e => e.kind === 'lot').every(l => S.shapeOf(l).every(p => ring.every((a, i) => S.segDist(p, a, ring[(i + 1) % ring.length]) > 9))), 'a 10 ft strip');
+  // a pad too small for any home: the pads grow to the smallest one, and say so
+  const os = L.layoutOptions(KING, { use: 'sfr', homeKind: 'manufactured', lotW: 20, lotD: 45, lotSet: true }, { count: 1 })[0]; assert.ok(os.notes.some(n => /No home fits a 20 × 45 ft pad/.test(n)), os.notes.join(' ')); }
 // an ordinary neighbourhood on the flag lot: its entry up the strip too
 { const o = L.layoutOptions(KING, { use: 'sfr' }, { count: 1 })[0], m = o.elements.find(e => e.name === 'Main entry'); assert.ok(m?.stem, 'a subdivision on a flag lot comes in up the strip'); assert.ok(o.elements.some(e => e.use === 'sfr'), 'with homes'); }
 
@@ -85,4 +105,6 @@ globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('/models
   assert.ok(API.SCHEMA.required.includes('homeKind') && API.SCHEMA.properties.zones.items.required.includes('homeKind'), 'homeKind in the schema');
   const o = L.layoutOptions(KING, r.body.program, { count: 1 })[0]; assert.ok(o.elements.filter(e => e.use === 'sfr').length >= 50, 'laid out as homes'); assert.ok(!o.elements.some(e => e.use === 'storage')); }
 
+{ STORAGE_ANSWER.lotW = 25; STORAGE_ANSWER.lotD = 55; const r = await call({ prompt: ASK, site: { acres: 9.36 }, refs: ['RV Park At Old Washington Road: 9.4 ac, 134 RV lots, 25\' × 55\' typ'] });
+  assert.deepEqual([r.body.program.use, r.body.program.lotW, r.body.program.lotD, r.body.program.lotSet], ['sfr', 25, 55, true], 'the reference’s pads kept: ' + JSON.stringify(r.body.program)); }
 console.log('community ok: tiny ' + counts.tiny + ', manufactured ' + counts.manufactured + ', mixed ' + counts.mixed + ' homes on King Ln');
