@@ -3,7 +3,7 @@
 // selecting one building must never pull in the others (2026-10-05: a click in Waller selected ~260,000 sq ft of
 // unrelated buildings across the screen).
 import assert from 'node:assert/strict';
-const { joinPieces, tileBox, inGeom, offsetGeom, labelPoint, sameSelection, partAt } = await import('../lib/footprint.mjs');
+const { joinPieces, tileBox, inGeom, offsetGeom, labelPoint, sameSelection, partAt, withTileParcel } = await import('../lib/footprint.mjs');
 const { groundClick } = await import('../lib/cardclick.mjs');
 
 const z = 16, lon = -95.93, lat = 30.09, n = 2 ** z;
@@ -115,4 +115,44 @@ assert.ok(!sameSelection(bA, { center: ptIn(smallA[0]), footprint: { type: 'Poly
   assert.equal(partAt(merged, gap), null, 'the gap is in the feature\'s box but in none of its buildings'); assert.equal(groundClick({ ...card, point: gap }), 'open');
   for (const sm of smallA) { const part = partAt(merged, ptIn(sm)); assert.ok(part && inGeom(ptIn(sm), part) && !inGeom(ptIn(big), part), 'a click on one small building is that building only'); }
 }
+
+// ---- Waller Tomball Rd (Oct 23): the statewide record for account 0422450000001 has a 128-acre outline that takes in
+// several accounts the map's parcel lines (Regrid) draw separately. Picking 0422450000001, then Davis Jerry Lee's
+// 0422450000072 inside that outline, dropped one of them ("the third parcel loads, then disappears"). Two accounts are two
+// parcels, and the parcel line under the click decides which parcel a click picked.
+{ const big = { type: 'Polygon', coordinates: [[[-95.89978, 30.05840], [-95.89137, 30.05840], [-95.89137, 30.06545], [-95.89978, 30.06545], [-95.89978, 30.05840]]] };
+  const north = { type: 'Polygon', coordinates: [[[-95.89978, 30.0615], [-95.89137, 30.0615], [-95.89137, 30.06545], [-95.89978, 30.06545], [-95.89978, 30.0615]]] };
+  const south = { type: 'Polygon', coordinates: [[[-95.89978, 30.05840], [-95.89137, 30.05840], [-95.89137, 30.0615], [-95.89978, 30.0615], [-95.89978, 30.05840]]] };
+  const statewide = { propId: '0422450000001', owner: 'TERPSTRA PETER S TRUSTEE', situs: '30200 WALLER TOMBALL RD', county: 'HARRIS', raw: { PROP_ID: '0422450000001' }, geometry: big };
+  const a = { center: [-95.896, 30.0635], footprint: null, parcel: statewide }, b = { center: [-95.896, 30.060], footprint: null, parcel: { propId: '0422450000072', geometry: south } };
+  assert.ok(inGeom(b.center, big), 'the second click is inside the first record\'s outline');
+  assert.ok(!sameSelection(a, b) && !sameSelection(b, a), 'two accounts are two parcels, whatever their outlines say');
+  assert.ok(sameSelection(a, { center: [-95.893, 30.064], footprint: null, parcel: { propId: '0422450000001', geometry: north } }), 'the same account is the same parcel');
+  // the line under the click names the account: the statewide record is kept when it is that account, with the line's outline
+  const tN = { apn: '0422450000001', owner: 'TERPSTRA PETER S TRUSTEE', address: '30200 WALLER TOMBALL RD', geometry: north }, tS = { apn: '0422450000072', owner: 'DAVIS JERRY LEE', address: '0 STOKES RD', geometry: south };
+  const n = withTileParcel(statewide, tN); assert.equal(n.owner, 'TERPSTRA PETER S TRUSTEE'); assert.equal(n.geometry, north, 'the outline drawn on the map, not the 128 acres');
+  const s2 = withTileParcel(statewide, tS); assert.equal(s2.propId, '0422450000072'); assert.equal(s2.owner, 'DAVIS JERRY LEE'); assert.equal(s2.situs, '0 STOKES RD'); assert.equal(s2.geometry, south);
+  assert.equal(s2.marketValue, undefined, 'another account\'s value is not shown as this one\'s'); assert.equal(s2.other, '0422450000001');
+  assert.equal(withTileParcel(statewide, null), statewide, 'no parcel lines on: the record as it was');
+  assert.equal(withTileParcel(null, tS).propId, '0422450000072', 'no record found: the line stands in');
+  // a record whose number is written another way (Fort Bend: PROP_ID 89418, the map's number its geo id) but the same outline
+  const fb = { propId: '89418', raw: { PROP_ID: '89418', GEO_ID: '5410-01-001-0020-914' }, owner: 'PROCTOR', geometry: south };
+  assert.equal(withTileParcel(fb, { apn: '5410010010020914', geometry: south }).owner, 'PROCTOR', 'the same parcel by its geo id');
+  assert.equal(withTileParcel({ ...fb, raw: {} }, { apn: 'R123', geometry: south }).owner, 'PROCTOR', 'the same parcel by its outline'); }
+
+// ---- 31807 King Ln, Waller (Oct 23): one account (13814) in two separate pieces, two statewide records with the same
+// PROP_ID and two parcels drawn on the map. With 31807 Old Washington Rd picked first, the second King Ln piece was taken
+// for the first ("same account") and dropped. One account can be several pieces: a piece is the same pick only when the
+// click is in its outline, or it is the same parcel line.
+{ const P = c => ({ type: 'Polygon', coordinates: [c] });
+  const kingA = P([[-95.92123552,30.05394793],[-95.92101297,30.05332978],[-95.92141318,30.05342835],[-95.92141212,30.05369438],[-95.92141094,30.05398865],[-95.92123552,30.05394793]]);
+  const kingB = P([[-95.92137475,30.05047667],[-95.92138523,30.05047646],[-95.92141923,30.0519127],[-95.92141536,30.05288134],[-95.92141318,30.05342835],[-95.92101297,30.05332978],[-95.92040066,30.05162901],[-95.92047023,30.05049494],[-95.92137475,30.05047667]]);
+  const a = { center: [-95.92126, 30.05363], footprint: null, parcel: { propId: '13814', geometry: kingA } }, bNew = { center: [-95.92098, 30.05175], footprint: null };
+  assert.ok(!sameSelection(a, { ...bNew, parcel: { propId: '13814', geometry: kingB } }), 'the other piece of the same account is another pick');
+  assert.ok(!sameSelection(a, bNew), 'before it loads: a click outside the first piece is another pick');
+  assert.ok(sameSelection(a, { center: [-95.9213, 30.0537], footprint: null, parcel: { propId: '13814', geometry: kingA } }), 'the same piece again is the same pick');
+  assert.ok(!sameSelection({ ...a, parcel: { ...a.parcel, tileId: 'uA' } }, { ...bNew, parcel: { propId: '13814', geometry: kingB, tileId: 'uB' } }), 'two parcel lines, two picks');
+  assert.ok(sameSelection({ ...a, parcel: { ...a.parcel, tileId: 'uA' } }, { center: [-95.9213, 30.0537], footprint: null, parcel: { propId: '13814', tileId: 'uA' } }), 'the same parcel line, the same pick');
+  assert.ok(sameSelection(a, { center: [-95.92125, 30.05362], footprint: null, parcel: { propId: '13814' } }), 'the same account with no outline yet, clicked inside the first piece');
+  assert.equal(withTileParcel({ propId: '13814', raw: { PROP_ID: '13814' }, geometry: kingB }, { apn: '13814', uuid: 'uB', geometry: kingB }).tileId, 'uB', 'the parcel line\'s id rides along'); }
 console.log('footprint ok');

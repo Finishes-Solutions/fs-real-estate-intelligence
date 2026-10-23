@@ -769,3 +769,22 @@ function usable(plan, o, what) {
   }
 }
 console.log('site layouts ok');
+// ---- two parcels with a road between them (Oct 23) ----
+// Picked together they are one site with the road kept as a no-build strip (gap). Drives can't cross it, so one layout
+// over the whole site built on one side only (0 sf west, 43,000 east for retail). Each side is laid out on its own now.
+{ const T = await import('../lib/sitetools.mjs'), o = [-95.95, 30.05], F = S.frame(o), rect = (x0, y0, w, d) => ({ type: 'Polygon', coordinates: [[[x0, y0], [x0 + w, y0], [x0 + w, y0 + d], [x0, y0 + d], [x0, y0]].map(F.toLL)] });
+  const br = S.bridgeParcels([rect(0, 0, 450, 480), rect(510, 0, 450, 480)], { roads: [[F.toLL([480, -300]), F.toLL([480, 800])]] }), b = S.unionParcels(br.geoms), Gf = S.frame(b.origin), mid = Gf.toFt(F.toLL([480, 0]))[0];
+  assert.equal(br.strips.length, 1); assert.ok(br.strips[0].road, 'the mapped road is found in the gap');
+  const ko = [{ ...T.areaPiece({ ring: b.ring, elements: [] }, 'keepout', br.strips[0].ll.slice(0, -1).map(Gf.toFt), 'ko1'), gap: true }];
+  const plan = { ...b, front: b.ring.findIndex((p, i) => S.outwardOf(b.ring, i)[1] < -0.9), setbacks: { ...S.SETBACKS }, elements: ko };
+  assert.equal(L.gapParts(plan, ko).length, 2, 'the road cuts the site in two');
+  for (const use of ['retail', 'multifamily']) {
+    const out = L.layoutOptions(plan, { use }, { count: 2, keepout: ko }); assert.ok(out.length, use + ': layouts');
+    for (const v of out) { const bl = v.elements.filter(e => e.kind === 'building'), sf = side => bl.filter(e => side ? e.x >= mid : e.x < mid).reduce((t, e) => t + e.w * e.d, 0);
+      assert.ok(sf(false) > 15000 && sf(true) > 15000, use + ' ' + v.name + ': buildings on both sides of the road (' + Math.round(sf(false)) + ' / ' + Math.round(sf(true)) + ' sf)');
+      assert.equal(S.check({ ...plan, program: v.program, elements: v.elements }).filter(i => / is on /.test(i.text)).length, 0, use + ': nothing on the road');
+      assert.equal(v.elements.filter(e => e.kind === 'keepout').length, 1, 'the road strip comes back once');
+      assert.equal(new Set(v.elements.map(e => e.id).filter(x => x != null)).size, v.elements.filter(e => e.id != null).length, 'every piece has its own id'); } }
+  // a road that doesn't cut the site in two (a gap only partway in): laid out as one site, as before
+  assert.equal(L.gapParts({ ...plan }, []).length, 0);
+  console.log('a site with a road through it: laid out on both sides'); }

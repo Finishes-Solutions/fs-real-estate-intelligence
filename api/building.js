@@ -119,8 +119,31 @@ export async function cadParcel(lat, lon) {
   return null;
 }
 
-export async function parcel(lat, lon) {
+// the where clauses to try for an account number (APN) in each kind of appraisal layer (the BIS layers' id fields vary)
+export function apnWheres(cad, apn) {
+  const s = String(apn).trim().toUpperCase().replace(/'/g, ''), digits = s.replace(/\D/g, '');
+  if (cad.kind === 'hcad') return digits ? ["HCAD_NUM = '" + digits + "'"] : [];
+  return [/^\d+$/.test(s) ? 'prop_id = ' + s : null, "prop_id_text = '" + s + "'", "geo_id = '" + s + "'"].filter(Boolean);
+}
+// is this record that account? (StratMap keeps the account in PROP_ID, some districts' map numbers in GEO_ID)
+export const isAccount = (p, apn) => { const d = v => String(v ?? '').replace(/\W/g, '').toUpperCase(), a = d(apn); return !!a && [p?.propId, p?.raw?.PROP_ID, p?.raw?.GEO_ID].some(v => d(v) === a); };
+// the account's record from the appraisal district whose county takes in the point, or null
+async function cadByApn(lat, lon, apn) {
+  for (const cad of CADS.filter(c => lon >= c.box[0] && lon <= c.box[2] && lat >= c.box[1] && lat <= c.box[3])) {
+    for (const where of apnWheres(cad, apn)) {
+      const q = new URLSearchParams({ f: 'json', where, outFields: '*', returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', resultRecordCount: '5' });
+      try { const d = await getJSON(cad.url + '/query?' + q, {}, 7000), f = (d.features || []).find(x => x.geometry?.rings); if (f) return normalizeCad(cad, f.attributes, f.geometry); } catch (e) { /* a field this district doesn't have: the next form */ }
+    }
+  }
+  return null;
+}
+// apn: the account of the parcel drawn on the map under the click (its parcel lines). StratMap's record at the point can
+// be another account whose outline takes in several of the parcels drawn there (on Waller Tomball Rd one outline holds a
+// dozen accounts); then the appraisal district's own record for that account is used when it has one.
+export async function parcel(lat, lon, apn) {
   const p = await stratParcel(lat, lon);
+  if (p && (!apn || isAccount(p, apn))) return p;
+  if (apn) { const q = await cadByApn(lat, lon, apn).catch(() => null); if (q) return q; }
   if (p) return p;
   // StratMap has nothing here (all of Harris and Waller): the county appraisal district's own layer
   return cadParcel(lat, lon);
@@ -195,12 +218,12 @@ export default async function handler(req, res) {
   const fp = String(req.query.fp || '').split(';').slice(0, 121).map(x => x.split(',').map(Number)).filter(c => c.length === 2 && c.every(Number.isFinite) && Math.abs(c[0] - lon) < .02 && Math.abs(c[1] - lat) < .02);
   const footprint = fp.length >= 3 ? { type: 'Polygon', coordinates: [fp[0][0] === fp[fp.length - 1][0] && fp[0][1] === fp[fp.length - 1][1] ? fp : fp.concat([fp[0]])] } : null;
   // &part=parcel: the appraisal record alone (the card shows it first); &part=rest: everything but the parcel
-  const part = req.query.part === 'parcel' || req.query.part === 'rest' ? req.query.part : null, skip = Promise.resolve(null);
+  const part = req.query.part === 'parcel' || req.query.part === 'rest' ? req.query.part : null, skip = Promise.resolve(null), apn = String(req.query.apn || '').replace(/[^\w-]/g, '').slice(0, 40);
   res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
   if (part === 'parcel') {
-    try { return res.json({ parcel: await parcel(r5(lat), r5(lon)) }); } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.json({ parcel: null, parcelError: e.message }); }
+    try { return res.json({ parcel: await parcel(r5(lat), r5(lon), apn) }); } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.json({ parcel: null, parcelError: e.message }); }
   }
-  const [p, pl, ph, ht, pf] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon)), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)]), footprint ? parcelsIn(footprint) : Promise.resolve([])]);
+  const [p, pl, ph, ht, pf] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon), apn), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)]), footprint ? parcelsIn(footprint) : Promise.resolve([])]);
   // the map's footprint can be a tile-clipped piece of a big building: when OpenStreetMap's outline is clearly bigger,
   // look for parcels under the whole of it too
   const outline = pl.status === 'fulfilled' ? pl.value.osm?.outline : null;

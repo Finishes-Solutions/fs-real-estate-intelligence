@@ -8,6 +8,19 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 ### 4:32 PM CT: Site plan answers no longer call a failing layout a pass (769de87)
 - **Said plainly:** when no layout passes every check, the agent's site plan answer now says so and names what the picked one is missing (for example parking short), instead of "passes every check". Found in the live test on a Waller parcel.
 
+### 2:03 PM CT: Parcels in separate pieces can all be picked (ccc9b2a)
+- **Fixed: 31807 King Ln dropped the third pick.** The King Ln property is one Waller County account (13814) in two separate pieces (0.43 and 6.15 acres). With 31807 Old Washington Rd picked, picking the second King Ln piece loaded and then disappeared, because the earlier fix treated "same account" as "same parcel".
+- **Now:** the same parcel line on the map is the same pick; different accounts never are; and the same account counts only when your click lands inside the piece already picked. Site Plan for All and projects keep each piece as its own parcel.
+- **Tested in the browser** with the three real outlines, with the parcel lines on and off. Before: the third pick dropped, and Site Plan for All gave 2 parcels and 3.56 acres. After: all three stay, and the site is 3 parcels and 9.82 acres.
+
+### 1:28 PM CT: Every parcel you pick stays picked; Build uses both sides of a road (b901d1e)
+- **Fixed: the third parcel disappeared.** On Waller Tomball Rd, the statewide record for one account (0422450000001) has a 128-acre outline that takes in about a dozen parcels the map's parcel lines show separately. Picking one of those returned that same record, so it was taken for a parcel already picked and dropped, and only two stayed selected.
+- **A pick is now the parcel drawn under your click** (with **Parcels** on): its own outline and account. Where the statewide record is a different account, the app asks the county appraisal district for that account, and otherwise shows the owner and address from the parcel lines instead of the wrong record's. Two different accounts are never treated as the same parcel. **Change Parcels** in a plan works the same way.
+- **Tested in the browser** on your Waller Tomball Rd tracts, with the outlines and parcel lines from the live data. Before: the third pick vanished, and Site Plan for All made a 2-parcel, 20.78-acre site. After: all four stay, and the site is 4 parcels and 170 acres.
+- **Both sides of a road are built on.** When a road runs between the parcels of a site, Build lays out each side as a site of its own, with the road as its street and its share of the program by area, then puts them together. On two 5-acre lots with a road between: retail about 40,000 sf on each side (before: none on one side), apartments and offices on both, nothing on the road.
+- **A parcel drawn across two map tiles** now shows its full acres on the site's parcel chips (it showed only the piece under the click).
+- **Not checked yet:** a look on the real map with the live parcel lines. Also, without **Parcels** turned on the app can't tell which parcel you clicked, so a statewide record that lumps parcels together can still drop a pick.
+
 ### 11:36 AM CT: Site plans for your project app's agents (5b3625a)
 - **The agents can lay out a site:** once an agent has found a parcel (by address, parcel number, several parcels together or an outline), it can lay out a concept site plan with the same layout engine as **Site plan** here, and get the site plan sheet as a PDF.
 - **From a request or the best use:** the agent says what to build ("25,000 sf retail strip with 2 pad sites"), or leaves that out and the AI suggests the best uses for the site (its size, frontage, flood zone, utilities, traffic, what's nearby and the market) and lays out the best one. It can ask for another of the ideas.
