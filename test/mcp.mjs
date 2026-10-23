@@ -339,6 +339,7 @@ console.log('mcp upstream timeout ok');
   // no AI on the deployment: a request is read directly; with no request there's nothing to suggest
   SPT.hooks.ai = async () => ({ status: 503, body: { error: 'AI is not configured on this deployment (OPENAI_API_KEY is missing).' } });
   r = await call('site_plan', { ...K, request: '200 apartments, 3 stories', effort: 'high' }); await spOf(r, 'no AI'); assert.match(r.text, /read directly/); assert.match(r.text, /Read as: Multifamily · 200 units · 3 stories/);
+  assert.ok(!/passes every check/.test(r.text) || /\| Passes \|/.test(r.text), 'never says a failing pick passes'); { const picked = /\*\*(Layout \d+)[^|]*\(picked\) \|[^\n]*\| ([^|]+) \| [^|]+ \|\n/.exec(r.text); if (picked && !/Passes/.test(picked[2])) assert.match(r.text, /No layout passes every check/); }
   r = await call('site_plan', { ...K }); assert.equal(r.isError, true); assert.match(r.text, /Give a request instead/);
   // a slow AI near the time limit: its steps are skipped or cut off, and the plan still comes back, saying so
   SPT.hooks.ai = () => new Promise(() => {}); SPT.hooks.budgetMs = 36000;

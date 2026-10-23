@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-23
 
+### 4:32 PM CT: Site plan answers no longer call a failing layout a pass (HASH)
+- **Said plainly:** when no layout passes every check, the agent's site plan answer now says so and names what the picked one is missing (for example parking short), instead of "passes every check". Found in the live test on a Waller parcel.
+
 ### 11:36 AM CT: Site plans for your project app's agents (5b3625a)
 - **The agents can lay out a site:** once an agent has found a parcel (by address, parcel number, several parcels together or an outline), it can lay out a concept site plan with the same layout engine as **Site plan** here, and get the site plan sheet as a PDF.
 - **From a request or the best use:** the agent says what to build ("25,000 sf retail strip with 2 pad sites"), or leaves that out and the AI suggests the best uses for the site (its size, frontage, flood zone, utilities, traffic, what's nearby and the market) and lays out the best one. It can ask for another of the ideas.
