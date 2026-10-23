@@ -5,54 +5,10 @@
 // The HTML comes from the app's own report builders, but it is still client input, so: scripts are off, and the page may
 // only load https images from public hosts and data: URLs (no private addresses, no plain http, no file:).
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
+import { render, allowed, footer, SHEETS, resetBrowser } from '../lib/pdf.mjs';
+export { render, allowed, footer, SHEETS };
 
 const MAX = 4_000_000; // Vercel's request body limit is 4.5 MB
-let browserP = null;
-
-async function launch() {
-  const puppeteer = (await import('puppeteer-core')).default;
-  if (process.env.CHROME_PATH) return puppeteer.launch({ executablePath: process.env.CHROME_PATH, headless: true, args: ['--no-sandbox', '--font-render-hinting=none'] });
-  const chromium = (await import('@sparticuz/chromium')).default;
-  chromium.setGraphicsMode = false;
-  return puppeteer.launch({ args: await puppeteer.defaultArgs({ args: [...chromium.args, '--font-render-hinting=none'], headless: 'shell' }), executablePath: await chromium.executablePath(), headless: 'shell' });
-}
-// one browser per warm instance; a crashed one is replaced
-async function browser() {
-  if (browserP) { const b = await browserP.catch(() => null); if (b?.connected) return b; }
-  browserP = launch(); return browserP;
-}
-
-const PRIVATE = /^(localhost|.*\.local|.*\.internal|0\.|10\.|127\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|\[|::|fc|fd|metadata)/i;
-export function allowed(url) {
-  if (url.startsWith('data:') || url === 'about:blank') return true;
-  let u; try { u = new URL(url); } catch (e) { return false; }
-  if (u.protocol !== 'https:' || PRIVATE.test(u.hostname) || /^\d+\.\d+\.\d+\.\d+$/.test(u.hostname)) return false;
-  return !/(^|\.)fonts\.(googleapis|gstatic)\.com$/.test(u.hostname); // the fonts are installed: skip the download
-}
-
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-// Chromium draws the footer in its own small document: no web fonts or page CSS, sizes in px at 1/96 in
-export const footer = title => '<div style="width:100%;padding:0 0.5in;font-family:\'IBM Plex Mono\',monospace;font-size:7px;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;display:flex;justify-content:space-between;align-items:center">' +
-  '<span><b style="color:#006527;font-weight:600">Finishes Solutions</b>&nbsp;&nbsp;·&nbsp;&nbsp;' + esc(title).slice(0, 90) + '</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>';
-
-// sheet: 'tabloid' (11 x 17) or 'archd' (24 x 36), landscape, for drawings like the site plan: no footer, small margins;
-// 'set' (24 x 36, no margin at all) for plan set sheets, whose border is laid under them afterwards (api/planset.js)
-export const SHEETS = { tabloid: ['17in', '11in'], archd: ['36in', '24in'], set: ['36in', '24in'] };
-export async function render(html, { landscape = false, title = 'Report', sheet = null } = {}) {
-  const b = await browser(), page = await b.newPage();
-  try {
-    await page.setJavaScriptEnabled(false);
-    await page.setRequestInterception(true);
-    page.on('request', r => (allowed(r.url()) ? r.continue() : r.abort()).catch(() => {}));
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 20000 });
-    // tagged: false: Chromium's accessibility tags make a long report about 5x bigger (a 1,000-row list: 5.4 MB vs ~1 MB),
-    // past the 4.5 MB a response can be
-    if (SHEETS[sheet]) { const mg = sheet === 'set' ? '0' : '0.25in'; return await page.pdf({ width: SHEETS[sheet][0], height: SHEETS[sheet][1], printBackground: true, displayHeaderFooter: false, tagged: false, outline: false, margin: { top: mg, bottom: mg, left: mg, right: mg }, timeout: 60000 }); }
-    return await page.pdf({ format: 'letter', landscape, printBackground: true, preferCSSPageSize: false, displayHeaderFooter: true, tagged: false, outline: false,
-      headerTemplate: '<span></span>', footerTemplate: footer(title), margin: { top: '0.5in', bottom: '0.6in', left: '0.5in', right: '0.5in' }, timeout: 30000 });
-  } finally { page.close().catch(() => {}); }
-}
-
 export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 12, perDay: 400 })) return;
   // GET ?check=1: render a one-line page and say how it went (is Chromium working on this deployment, and how fast)
@@ -64,7 +20,7 @@ export default async function handler(req, res) {
     try { const pdf = await render(big || '<!doctype html><html><body style="font-family:Montserrat"><h1 style="font-weight:800">Finishes Solutions</h1><p style="font-family:\'IBM Plex Mono\'">PDF check</p></body></html>', { title: 'Check', landscape: !!big });
       res.setHeader('Cache-Control', 'no-store'); const fonts = [...new Set([...Buffer.from(pdf).toString('latin1').matchAll(/\/BaseFont\s*\/(?:[A-Z]{6}\+)?([\w-]+)/g)].map(m => m[1]))];
       return res.json({ ok: true, bytes: pdf.length, ms: Date.now() - t, fonts }); }
-    catch (e) { browserP = null; res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ ok: false, error: e.message, ms: Date.now() - t }); }
+    catch (e) { resetBrowser(); res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ ok: false, error: e.message, ms: Date.now() - t }); }
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST { html, landscape?, title? }' });
   const b = typeof req.body === 'string' ? (() => { try { return JSON.parse(req.body); } catch (e) { return {}; } })() : req.body || {};
@@ -76,7 +32,7 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Cache-Control', 'no-store');
     return res.status(200).send(Buffer.from(pdf));
   } catch (e) {
-    console.error('pdf', e.message); browserP = null;
+    console.error('pdf', e.message); resetBrowser();
     return res.status(502).json({ error: 'The PDF couldn’t be made: ' + e.message });
   }
 }

@@ -113,6 +113,7 @@ function db(path, q, body) {
   if (path === 'rpc/crime_report') return J({ latest: '2026-07-31', from: '2025-08-01', area_sqmi: 0.785, totals: { last12_v: 150, last12_p: 728, last12_o: 1283, prior12_v: 145, prior12_p: 927, prior12_o: 1293 },
     by_code: [['13B', 255, 'o'], ['23H', 204, 'p'], ['13A', 94, 'v']], by_premise: [['Parking Lot, Garage', 245]], by_month: [['2026-07', 11, 35, 91]], city_last12: { v: 25000, p: 90000, o: 107000 } });
   if (path === 'rpc/crime_latest') return J('2026-07-31');
+  if (path === 'rpc/crime_list_json') return J(Array.from({ length: Math.min(body.p_limit, 1200) }, (_, i) => ({ day: '2026-07-' + String(31 - (i % 30)).padStart(2, '0'), code: i % 3 ? '23F' : '13A', cat: i % 3 ? 'p' : 'v', n: 1, premise: 'Parking Lot, Garage', lon: HOU[0] + (i % 40) * 0.0002, lat: HOU[1] + Math.floor(i / 40) * 0.0002 })));
   if (path === 'rpc/places_search') return J([{ id: 'ov:1', name: "Buc-ee's", grp: 'auto', cat: 'gas_station', brand: "Buc-ee's", addr: '27700 Katy Fwy', city: 'Katy', lon: -95.86, lat: 29.78, rank: 0, km: 3.5 }]);
   if (path === 'rpc/places_near') return J([{ id: 'ov:2', name: 'Kolache Corner', grp: 'food', cat: 'bakery', addr: '24600 Katy Fwy', city: 'Katy', lon: KATY[0], lat: KATY[1], m: 40 }, { id: 'ov:3', name: 'Katy Dental', grp: 'health', cat: 'dentist', addr: '24610 Katy Fwy', city: 'Katy', lon: KATY[0], lat: KATY[1], m: 120 }]);
   if (path === 'rpc/places_counts') return J({ food: 140, shop: 220, health: 90, office: 60 });
@@ -146,7 +147,7 @@ const call = async (name, args) => { const r = await c.callTool({ name, argument
 
 // ---------- tools/list: names, schemas, read-only ----------
 const { tools } = await c.listTools();
-const NAMES = ['list_datasets', 'find_property', 'site_facts', 'flood', 'terrain', 'environmental', 'utilities', 'traffic_counts', 'demographics', 'market_context', 'businesses', 'businesses_at_address', 'company_lookup', 'development_activity', 'construction_filings', 'top_companies', 'crime_near', 'crime_by_agency', 'news', 'airports_near', 'area_overview'];
+const NAMES = ['list_datasets', 'find_property', 'site_facts', 'flood', 'terrain', 'environmental', 'utilities', 'traffic_counts', 'demographics', 'market_context', 'businesses', 'businesses_at_address', 'company_lookup', 'development_activity', 'construction_filings', 'top_companies', 'crime_near', 'crime_by_agency', 'news', 'airports_near', 'area_overview', 'report_flood', 'report_environmental', 'report_crime', 'report_crime_agency'];
 for (const n of NAMES) assert.ok(tools.some(t => t.name === n), 'tool ' + n);
 for (const t of tools) {
   assert.equal(t.annotations?.readOnlyHint, true, t.name + ' read-only'); assert.equal(t.annotations?.openWorldHint, true, t.name);
@@ -174,7 +175,7 @@ assert.match(r.text, /Zone AE.*high risk/); assert.match(r.text, /I-10: 250,000 
 r = await call('crime_near', { address: '1001 Main St, Houston, TX 77002' }); clean(r, 'crime_near');
 assert.match(r.text, /Incidents, last 12 months: 2,161/); assert.match(r.text, /Houston citywide 347/); assert.match(r.text, /Per 1,000 residents/); assert.match(r.text, /incidents through 2026-07-31/);
 r = await call('flood', { address: '1001 Main St, Houston, TX 77002' }); clean(r, 'flood');
-assert.match(r.text, /Area measured: parcel 1001 Main St/); assert.match(r.text, /Zone AE.*Base flood elevation: 41.5 ft/); assert.match(r.text, /Nearest high-risk \(100-year\) zone: 0\.2\d mi away \(zone AE\)/); assert.match(r.text, /Flood zones across the area \([\d.]+ acres\)/); assert.match(r.text, /Hurricane Harvey 1/); assert.match(r.text, /HURRICANE BERYL/); assert.match(r.text, /Overall: Relatively High/);
+assert.match(r.text, /Area measured: Parcel at 1001 Main St, Houston \(APN 0010010000001\)/); assert.match(r.text, /Zone AE.*Base flood elevation: 41.5 ft/); assert.match(r.text, /Nearest high-risk \(100-year\) zone: 0\.2\d mi away \(zone AE\)/); assert.match(r.text, /Flood zones across the area \([\d.]+ acres\)/); assert.match(r.text, /Hurricane Harvey 1/); assert.match(r.text, /HURRICANE BERYL/); assert.match(r.text, /Overall: Relatively High/);
 r = await call('airports_near', { address: '1001 Main St, Houston, TX 77002' }); clean(r, 'airports_near'); assert.match(r.text, /George Bush Intercontinental.*IAH \/ KIAH/); assert.match(r.text, /04\/22 7,602 ft/);
 console.log('mcp Houston property ok');
 
@@ -185,7 +186,7 @@ assert.match(r.text, /not covered here \(covers the City of Houston only/); asse
 r = await call('find_property', K); assert.match(r.text, /Inside the city limits of Katy city\. Also within 0.5 mi of: Brookshire city \(a city’s extraterritorial jurisdiction/); assert.match(r.text, /KATY RETAIL PARTNERS LP/); assert.match(r.text, /Acreage: 12.5 acres/);
 r = await call('site_facts', K); assert.match(r.text, /Street-level crime: not covered here/); assert.match(r.text, /Fort Bend County MUD 81/); assert.match(r.text, /Katy Independent School District/);
 r = await call('terrain', K); clean(r, 'terrain');
-assert.match(r.text, /Site measured: parcel 24600 KATY FWY/); assert.match(r.text, /falls about [\d.]+ ft toward the south-east/); assert.match(r.text, /Share of the site by slope: 0–2% [\d.]+%, 2–5%/); assert.match(r.text, /USGS 3DEP \(1 m lidar\)/);
+assert.match(r.text, /Site measured: Parcel at 24600 KATY FWY \(APN 412345\)/); assert.match(r.text, /falls about [\d.]+ ft toward the south-east/); assert.match(r.text, /Share of the site by slope: 0–2% [\d.]+%, 2–5%/); assert.match(r.text, /USGS 3DEP \(1 m lidar\)/);
 assert.ok(!seen.some(s => s.includes('open-meteo')), 'no Open-Meteo');
 r = await call('environmental', K); clean(r, 'environmental'); assert.match(r.text, /Leaking petroleum storage tank \(TCEQ LPST\) \(within 0.5 mi\): 1/); assert.match(r.text, /CORNER STORE #4/); assert.match(r.text, /Katy fine sandy loam/); assert.match(r.text, /not a Phase I/);
 r = await call('utilities', K); clean(r, 'utilities'); assert.match(r.text, /138 kV transmission line \(CenterPoint Energy\)/); assert.match(r.text, /Water service area: City Of Katy \(CCN 10511\)/); assert.match(r.text, /ODbL/);
@@ -234,6 +235,46 @@ r = await call('site_facts', { address: '1001 Main St, Houston, TX 77002' }); as
 flags.femaSlow = false;
 console.log('mcp upstream timeout ok');
 
+// ---------- reports: the website's PDFs as embedded resources ----------
+{
+  const fs = await import('node:fs'), { PDFDocument } = await import('pdf-lib'), R = await import('../lib/mcp/reports.mjs');
+  process.env.CHROME_PATH ||= '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  const haveChrome = fs.existsSync(process.env.CHROME_PATH);
+  if (!haveChrome) { // no local Chromium: a stand-in that makes a real one-page PDF with the HTML's title
+    R.hooks.render = async (html, { title }) => { const d = await PDFDocument.create(); d.setTitle(title); d.addPage(); return Buffer.from(await d.save()); };
+    console.log('mcp reports: no Chromium at CHROME_PATH, rendering with a stand-in'); }
+  const pdfOf = async (r, kind) => {
+    assert.notEqual(r.isError, true, kind + ': ' + r.text); const res = r.content.find(x => x.type === 'resource'); assert.ok(res, kind + ' has a resource');
+    assert.equal(res.resource.mimeType, 'application/pdf'); assert.match(res.resource.uri, new RegExp('^report://' + kind + '/[a-z0-9-]+\\.pdf$'));
+    const buf = Buffer.from(res.resource.blob, 'base64'); assert.equal(buf.subarray(0, 5).toString(), '%PDF-', kind + ' is a PDF');
+    if (process.env.MCP_DUMP) fs.writeFileSync(process.env.MCP_DUMP + '/' + kind + '.pdf', buf); // to look at them
+    const pdf = await PDFDocument.load(buf); assert.ok(pdf.getPageCount() >= 1); assert.ok(buf.length < R.PDF_LIMIT, kind + ' fits (' + buf.length + ')');
+    assert.ok(JSON.stringify(r).length < R.VERCEL_RESPONSE_LIMIT, 'the whole answer fits under Vercel’s cap'); assert.match(r.text, /Attached: .* report PDF \(\d+ pages?, /); return { buf, pdf }; };
+  const H = { address: '1001 Main St, Houston, TX 77002' };
+  let ipn = 0; const call = async (name, args, ip = '10.9.0.' + (++ipn)) => { const c3 = await connect({ 'X-Forwarded-For': ip }); try { const x = await c3.callTool({ name, arguments: args }); return { ...x, text: x.content.find(y => y.type === 'text')?.text || '' }; } finally { await c3.close(); } };
+  r = await call('report_flood', H); clean(r, 'report_flood'); await pdfOf(r, 'flood'); assert.match(r.text, /FEMA flood & hazard report: Parcel at 1001 Main St/); assert.match(r.text, /NFIP claims/);
+  r = await call('report_environmental', { ...K, include_csv: true }); clean(r, 'report_environmental'); await pdfOf(r, 'environmental');
+  { const csv = r.content.find(x => x.resource?.mimeType === 'text/csv'); assert.ok(csv, 'CSV when asked'); assert.match(csv.resource.uri, /^report:\/\/environmental\/.*\.csv$/); assert.match(csv.resource.text, /^Database,Search \(mi\),Name/); assert.match(csv.resource.text, /CORNER STORE #4/); }
+  r = await call('report_crime', { ...H, include_csv: true }); clean(r, 'report_crime'); await pdfOf(r, 'crime'); assert.match(r.text, /Incidents, 12 months through 2026-07-31: 2,161/);
+  assert.match(r.content.find(x => x.resource?.mimeType === 'text/csv').resource.text, /^Date,Offense,NIBRS code/);
+  r = await call('report_crime', K); assert.equal(r.content.some(x => x.type === 'resource'), false, 'no PDF outside Houston'); assert.match(r.text, /not covered here \(covers the City of Houston only/); assert.match(r.text, /report_crime_agency/);
+  r = await call('report_crime_agency', K); clean(r, 'report_crime_agency'); await pdfOf(r, 'crime_agency'); assert.match(r.text, /Katy Police Department \[TX1012700\]/);
+  r = await call('report_crime_agency', AU); await pdfOf(r, 'crime_agency');
+  if (haveChrome) { // the report is the website's: its title band, sections and the logo inlined
+    const html = await R.finishHtml((await import('../lib/reports/fema.mjs')).femaReport(R.serverKit(24)).reportHtml({ ...(await (await import('../api/fema.js')).femaReport({ type: 'Polygon', coordinates: [[[-95.37, 29.75], [-95.36, 29.75], [-95.36, 29.76], [-95.37, 29.76], [-95.37, 29.75]]] })), area_sqmi: 0.4 }, 'Check', null));
+    assert.match(html, /FEMA flood &amp; hazard report/); assert.match(html, /src="data:image\/png;base64,/); assert.ok(!/src="logo-white\.png"/.test(html)); }
+  // the size check: a report that can't fit says so, it doesn't fail silently or send a cut-off PDF
+  R.hooks.pdfLimit = 2000;
+  r = await call('report_flood', H); assert.equal(r.isError, true); assert.equal(r.content.some(x => x.type === 'resource'), false);
+  assert.match(r.text, /The PDF came out at [\d.]+ MB, over the 0\.0 MB that fits in one answer here \(Vercel caps a response at 4\.5 MB and base64 adds a third\)/);
+  R.hooks.pdfLimit = null;
+  // reports are rate-limited tighter than data tools (they launch Chromium)
+  const { allow } = await import('../api/_lib/guard.mjs'); while (allow('mcp-report:10.9.9.9', LIMITS.report));
+  r = await call('report_flood', H, '10.9.9.9'); assert.equal(r.isError, true); assert.match(r.text, /Too many requests for report_flood/);
+  r = await call('flood', H, '10.9.9.9'); assert.notEqual(r.isError, true, 'data tools still answer');
+  console.log('mcp reports ok' + (haveChrome ? ' (Chromium)' : ''));
+}
+
 // ---------- bad input: a sentence, not a crash ----------
 r = await call('flood', {}); assert.equal(r.isError, true); assert.match(r.text, /Give a location/);
 r = await call('find_property', { address: '99999 Nowhere Rd, Nowhere, TX' }); assert.equal(r.isError, true); assert.match(r.text, /found no match/);
@@ -246,12 +287,12 @@ process.env.MCP_ACCESS_TOKEN = 'amp-secret-token';
 assert.equal(authorized({ headers: {} }), false); assert.equal(authorized({ headers: { authorization: 'Bearer amp-secret-token' } }), true); assert.equal(authorized({ headers: { authorization: 'Bearer amp-secret-tokeX' } }), false);
 await assert.rejects(connect(), /401|Unauthorized/, 'no token: 401');
 await assert.rejects(connect({ Authorization: 'Bearer wrong' }), /401|Unauthorized/);
-const c2 = await connect({ Authorization: 'Bearer amp-secret-token' }); assert.ok((await c2.listTools()).tools.length >= 21); await c2.close();
+const c2 = await connect({ Authorization: 'Bearer amp-secret-token' }); assert.ok((await c2.listTools()).tools.length >= 25); await c2.close();
 delete process.env.MCP_ACCESS_TOKEN;
 // GET / DELETE: 405
 for (const method of ['GET', 'DELETE']) { const x = await realFetch(URL0, { method }); assert.equal(x.status, 405); assert.equal((await x.json()).error.code, -32000); }
 assert.ok(LIMITS.report.perMinute < LIMITS.data.perMinute, 'reports are limited tighter');
 console.log('mcp auth ok');
 
-srv.close();
+srv.close(); await (await import('../lib/pdf.mjs')).closeBrowser();
 console.log('mcp tests passed');
