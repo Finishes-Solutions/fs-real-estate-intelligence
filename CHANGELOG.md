@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-23
 
-### 4:32 PM CT: Site plan answers no longer call a failing layout a pass (HASH)
+### 4:32 PM CT: Site plan answers no longer call a failing layout a pass (769de87)
 - **Said plainly:** when no layout passes every check, the agent's site plan answer now says so and names what the picked one is missing (for example parking short), instead of "passes every check". Found in the live test on a Waller parcel.
 
 ### 11:36 AM CT: Site plans for your project app's agents (5b3625a)
