@@ -18,6 +18,20 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **The Market page's numbers** now come from the same shared code the agents use; they read exactly as before.
 - **Not done yet:** the PDF reports for the agents (next), and AMP can't reach the site until Vercel's login protection lets it through (see the README). Not checked against the live services from here (this environment can't reach them); tested with stand-ins shaped like their real answers.
 
+### 5:31 PM CT: Huntsville no longer listed under Waller County's sales tax (5eec8f5, 7d77060)
+- **City sales tax by county is corrected.** Huntsville showed under Waller County because one remodel filed with the state under Waller has a Huntsville address. Filings whose address is outside the county they were filed under no longer decide which county a city belongs to.
+- **Same fix for three other towns outside the area:** Livingston (was under Montgomery), Freeport and La Marque (were under Harris) drop out of the sales tax figures.
+- **Area news** no longer searches a town just because of a misfiled filing.
+- **On the site now:** the four towns were removed from the published figures right away; the nightly refresh keeps them out from here on.
+
+### 4:59 PM CT: Site Plan for All uses every parcel picked (3a8f26a)
+- **Every parcel you pick is in the site.** Before, parcels whose county outlines didn't quite touch were treated as separate, and only the biggest connected group went into the plan. On Waller Tomball Rd that dropped a 20.8-acre tract 60 ft from the 128-acre tract beside it.
+- **Gaps between neighbours are filled in.** The slivers and gaps the county's outlines leave between parcels that border each other are now part of the site, with no slits between lots (tested on a block of four lots drawn 12 ft apart: one plain rectangle).
+- **Roads stay roads.** Where the map shows a road in the gap, the parcels are still joined, but the road is a no-build **Road between parcels** in the site. Parcels more than 200 ft from the rest are still left out, with a note.
+- **Nothing left out quietly.** The All tab now passes on parcels with no property ID and ones only Regrid has, and a pick with no parcel record is named in a message.
+- **Parcels in several pieces keep every piece.** Some county records hold a parcel in separate pieces (the First Street right-of-way in Katy is two). The extra pieces were read as holes and lost; now the map, the card and site plans use them all.
+- **Not checked yet:** a look on the real map (this was tested on recorded parcel outlines, not in the browser). And when a road runs the full length between two parcels, Build may still lay out only one side, because drives can't cross the no-build road.
+
 ### 4:47 PM CT: Pick the AI for each feature: OpenAI or Claude, and the model (c6b9d34)
 - **One row per AI feature** in Settings › AI model: **Site plans**, **Ask AI**, **Filing briefs**, **Reference files**, **Place search**, **Voice** and **Renderings**, each with its own provider and model, kept on this device. Plan sets keep their own Claude model and effort below.
 - **Claude can now be picked** for site plans, Ask AI, filing briefs and reference files (the site has its Anthropic key). Its default is Claude Opus 5.5; the list shows every Claude model the key can use. The "coming later" label is gone.
