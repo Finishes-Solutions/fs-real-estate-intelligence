@@ -94,3 +94,25 @@ console.log('building api tests passed');
   asked.length = 0; const r2 = mock(); await building({ query: { lat: '29.40', lon: '-95.75', part: 'parcel' }, headers: { 'x-forwarded-for': '9.9.9.7' } }, r2);
   assert.equal(r2.body.parcel, null); assert.equal(asked.length, 0);
   console.log('county appraisal district fallback ok'); }
+// ArcGIS rings: several outer rings are several pieces, not holes. The Fort Bend record 156001 (City of Katy, the First
+// Street right-of-way, as StratMap returned it Oct 22) is two pieces, both clockwise: the strip and a sliver east of it.
+{ const { esriPolygon, normalizeParcel, normalizeCad, CADS } = await import('../api/building.js'), { inGeom } = await import('../lib/footprint.mjs');
+  const katy = { rings: [[[-95.82386645308436,29.786332098783426],[-95.82439129828069,29.786335534627977],[-95.82438973880534,29.786474772381986],[-95.82421990870762,29.786473832145393],[-95.82404293341014,29.786472851367847],[-95.82386847609037,29.78647206004103],[-95.82380895821123,29.786471554059602],[-95.82341367882498,29.786469363292685],[-95.82326088437827,29.786468455020987],[-95.82294151263353,29.78646691680626],[-95.82279079509178,29.786466194866644],[-95.82229816437987,29.786463764752416],[-95.82229772240875,29.786326618739796],[-95.82323736468751,29.786328949064263],[-95.8236714656671,29.786330569922253],[-95.82386645308436,29.786332098783426]],
+    [[-95.82185707989726,29.78632059996909],[-95.82211158968525,29.786321789689897],[-95.82211329289103,29.786457547963316],[-95.82211339529897,29.786465646005436],[-95.82185707989726,29.78632059996909]]] };
+  const g = normalizeParcel({ PROP_ID: '156001', OWNER_NAME: 'City of Katy' }, katy).geometry;
+  assert.equal(g.type, 'MultiPolygon'); assert.equal(g.coordinates.length, 2, 'two pieces'); assert.ok(g.coordinates.every(p => p.length === 1), 'neither is a hole');
+  assert.ok(inGeom([-95.8220, 29.78638], g), 'a click on the second piece is on the parcel (as a hole it was outside)'); assert.ok(inGeom([-95.8235, 29.7864], g), 'and on the first');
+  // one piece with a hole (an out-parcel), clockwise outside and counter-clockwise inside: a Polygon with its hole
+  const cw = (x0, y0, x1, y1) => [[x0, y0], [x0, y1], [x1, y1], [x1, y0], [x0, y0]], ccw = (x0, y0, x1, y1) => cw(x0, y0, x1, y1).reverse();
+  const holed = esriPolygon({ rings: [cw(-95.9, 30, -95.89, 30.01), ccw(-95.897, 30.003, -95.893, 30.007)] });
+  assert.equal(holed.type, 'Polygon'); assert.equal(holed.coordinates.length, 2); assert.ok(!inGeom([-95.895, 30.005], holed), 'the hole is out'); assert.ok(inGeom([-95.899, 30.001], holed));
+  // two pieces, one with a hole, the hole listed first
+  const two = esriPolygon({ rings: [ccw(-95.897, 30.003, -95.893, 30.007), cw(-95.9, 30, -95.89, 30.01), cw(-95.88, 30, -95.87, 30.01)] });
+  assert.equal(two.type, 'MultiPolygon'); assert.deepEqual(two.coordinates.map(p => p.length), [2, 1], 'the hole goes with the piece it is in');
+  // a service that winds every ring the same way: a ring inside another is its hole, the rest are pieces
+  const same = esriPolygon({ rings: [cw(-95.9, 30, -95.89, 30.01), cw(-95.897, 30.003, -95.893, 30.007), cw(-95.88, 30, -95.87, 30.01)] });
+  assert.equal(same.type, 'MultiPolygon'); assert.deepEqual(same.coordinates.map(p => p.length), [2, 1]);
+  assert.equal(esriPolygon({ rings: [ccw(-95.9, 30, -95.89, 30.01)] }).type, 'Polygon', 'one ring either way round: a Polygon');
+  assert.equal(esriPolygon(null), null); assert.equal(esriPolygon({ rings: [] }), null);
+  assert.equal(normalizeCad(CADS.find(c => c.county === 'Waller'), { prop_id_text: '1', file_as_name: 'X' }, katy).geometry.type, 'MultiPolygon', 'the appraisal districts\' layers too');
+  console.log('multi-part parcels ok'); }

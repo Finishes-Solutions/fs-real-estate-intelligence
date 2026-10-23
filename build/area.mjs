@@ -222,8 +222,9 @@ export async function findAllocations(prev) {
 }
 async function buildSalesTax(filings, prev, places) {
   const ds = await findAllocations(prev), c = ds.cols;
-  // the cities with filings in the region, each with the county most of its filings are in
-  const byCity = {}; for (const f of filings) if (f.city) { const k = f.city.trim(); (byCity[k] ||= {})[f.county] = ((byCity[k] ||= {})[f.county] || 0) + 1; }
+  // the cities with filings in the region, each with the county most of its filings are in. A misfiled filing (tagged to
+  // one county, address outside it: a Huntsville remodel filed under Waller) says nothing about where its city is
+  const byCity = {}; for (const f of filings) if (f.city && !f.misfiled) { const k = f.city.trim(); (byCity[k] ||= {})[f.county] = ((byCity[k] ||= {})[f.county] || 0) + 1; }
   // only real places in the region: a filer's mailing city ("San Antonio" on two Houston filings) would otherwise add
   // that whole city's sales tax to the region
   const key = n => String(n).toLowerCase().replace(/[^a-z]/g, ''), inRegion = places?.length ? new Set(places.map(p => key(p[0]))) : null;
@@ -257,7 +258,7 @@ export async function buildArea(regions, filings, prev = {}) {
   await step('rents', () => buildRents());
   await step('mortgages', () => buildMortgages(fips, prev.mortgages));
   // news places: each county, plus the towns with the most filings
-  const towns = Object.entries(filings.reduce((m, f) => { if (f.city && !f.approx) m[f.city + '|' + f.county] = (m[f.city + '|' + f.county] || 0) + 1; return m; }, {}))
+  const towns = Object.entries(filings.reduce((m, f) => { if (f.city && !f.approx && !f.misfiled) m[f.city + '|' + f.county] = (m[f.city + '|' + f.county] || 0) + 1; return m; }, {}))
     .sort((a, b) => b[1] - a[1]).slice(0, +(process.env.AREA_NEWS_TOWNS || 10)).map(([k]) => { const [city, county] = k.split('|'); return { key: 'town:' + city, q: city + ', Texas', county }; });
   const places = counties.map(c => ({ key: 'county:' + c.name, q: c.name + ' County', county: c.name })).concat(towns);
   out.newsPlaces = places.map(p => ({ key: p.key, county: p.county, label: p.q.replace(/, Texas$/, '') }));
