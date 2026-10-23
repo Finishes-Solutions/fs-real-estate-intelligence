@@ -74,7 +74,7 @@ for (const [kind, min] of [['tiny', 80], ['manufactured', 40], ['mixed', 50]]) {
   assert.deepEqual([P.homeKind, P.lotW, P.lotD, P.lotSet, P.units], ['tiny', 25, 55, true, null], 'the pads from the words: ' + JSON.stringify(P));
   const out = L.layoutOptions(KING, P, { count: 3 }), o = out[0], H = o.elements.filter(e => e.use === 'sfr'), lots = o.elements.filter(e => e.kind === 'lot');
   assert.ok(H.length >= 130, 'about the exhibit’s count: ' + H.length); sound(o, 'pads', 130, 'tiny');
-  assert.ok(H.every(h => B.homePlanById(h.type).w + 10 <= 25), 'only homes that fit a 25 ft pad with 10 ft between them');
+  assert.ok(H.every(h => B.homePlanById(h.type).w + 10 <= 25), 'homes that leave 10 ft to the next on a 25 ft pad');
   const wd = l => [Math.min(l.w, l.d), Math.max(l.w, l.d)]; assert.ok(lots.every(l => Math.abs(wd(l)[0] - 25) < 0.5), 'every pad 25 ft wide');
   assert.ok(lots.filter(l => Math.abs(wd(l)[1] - 55) < 0.5).length > lots.length / 2, 'most 55 ft deep');
   assert.ok(lots.some(l => S.shapeOf(l).some(p => ring.some((a, i) => S.segDist(p, a, ring[(i + 1) % ring.length]) < 1))), 'lots out to the property line');
@@ -87,7 +87,13 @@ for (const [kind, min] of [['tiny', 80], ['manufactured', 40], ['mixed', 50]]) {
   // a landscape strip asked: lots stop short of the line
   const ob = L.layoutOptions(KING, { ...P, buffer: 10 }, { count: 1 })[0]; assert.ok(ob.elements.filter(e => e.kind === 'lot').every(l => S.shapeOf(l).every(p => ring.every((a, i) => S.segDist(p, a, ring[(i + 1) % ring.length]) > 9))), 'a 10 ft strip');
   // a pad too small for any home: the pads grow to the smallest one, and say so
-  const os = L.layoutOptions(KING, { use: 'sfr', homeKind: 'manufactured', lotW: 20, lotD: 45, lotSet: true }, { count: 1 })[0]; assert.ok(os.notes.some(n => /No home fits a 20 × 45 ft pad/.test(n)), os.notes.join(' ')); }
+  // homes sized to order: to fill the pad (a 25 × 55 pad: 15 × 32 with its parking in front), or as asked with the pads grown to hold them
+  assert.deepEqual([...new Set(H.map(h => h.type))], ['mhome-fit-tiny-15x32'], 'one home, sized to fill the pad'); assert.ok(o.notes.some(n => /Homes sized to fill the pads: Tiny home 15 × 32 · 480 sf/.test(n)), o.notes.join(' '));
+  const big = L.layoutOptions(KING, S.normalizeProgram(S.guessProgram('550 sf tiny homes on 25 x 55 pads')), { count: 1 })[0], BH = big.elements.filter(e => e.use === 'sfr');
+  assert.ok(BH.every(h => h.sf >= 550 && h.sf <= 570 && B.homePlanById(h.type).w <= 15), '550 sf homes on 25 ft pads: ' + [...new Set(BH.map(h => h.note))]); assert.ok(big.notes.some(n => /needs a pad 60 ft deep; the pads are made that deep/.test(n)), big.notes.join(' '));
+  assert.ok(BH.length >= 115, BH.length + ' of the 550 sf homes'); sound(big, '550 sf', 115, 'tiny');
+  const f40 = L.layoutOptions(KING, S.normalizeProgram(S.guessProgram('a tiny home park with 16 x 40 homes')), { count: 1 })[0]; assert.ok(f40.elements.filter(e => e.use === 'sfr').every(h => h.type === 'mhome-fit-tiny-16x40'), '16 × 40 as asked'); sound(f40, '16 x 40', 80, 'tiny');
+  const os = L.layoutOptions(KING, { use: 'sfr', homeKind: 'manufactured', lotW: 20, lotD: 45, lotSet: true }, { count: 1 })[0]; assert.ok(os.notes.some(n => /needs a pad at least 24 ft wide/.test(n)), os.notes.join(' ')); }
 // an ordinary neighbourhood on the flag lot: its entry up the strip too
 { const o = L.layoutOptions(KING, { use: 'sfr' }, { count: 1 })[0], m = o.elements.find(e => e.name === 'Main entry'); assert.ok(m?.stem, 'a subdivision on a flag lot comes in up the strip'); assert.ok(o.elements.some(e => e.use === 'sfr'), 'with homes'); }
 
