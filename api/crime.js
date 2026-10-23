@@ -1,6 +1,7 @@
 // Houston crime (Houston Police NIBRS incidents, loaded nightly into Supabase by build/live-sync.mjs):
 //   GET  ?grid=1                         the map layer: last-12-month incidents summed onto ~400 m cells [[lon, lat, violent, property, other], …]
-//   GET  ?lat=..&lon=..&mi=0.5[&list=N]  report for a circle
+//   GET  ?lat=..&lon=..&mi=0.5[&list=N]  report for a circle. Outside Houston's city limits (Census places) it answers
+//                                        { outside: true, place } instead; with partial: true when the limits come within 0.5 mile
 //   POST { geometry, list? }             report for any area (a selection box, polygon, county or radius drawn on the map)
 //   GET  ?city=1                         the whole City of Houston (Market view): a box around all of HPD's data, which the
 //                                        database answers from its precomputed citywide numbers
@@ -12,6 +13,7 @@
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { supa } from '../lib/supa.mjs';
 import { offenseName } from '../lib/nibrs.mjs';
+import { houstonAt } from './site.js';
 
 export const HOUSTON_SQMI = 640; // City of Houston land area, for the citywide rate
 export const COVERAGE = 'City of Houston only (Houston Police Department). Incidents outside the city limits, including unincorporated Harris County and other cities, are not included.';
@@ -86,11 +88,15 @@ export default async function handler(req, res) {
       res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
       return res.json(d);
     }
-    let geometry, list = 0;
+    let geometry, list = 0, at = null;
     if (req.method === 'POST') { const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}; geometry = cleanGeometry(b.geometry); list = +b.list || 0; }
-    else { const lat = +q.lat, lon = +q.lon, mi = Math.min(10, Math.max(0.05, +q.mi || 0.5)); if (lat > 25 && lat < 37 && lon > -107 && lon < -93) geometry = circle(lon, lat, mi); list = +q.list || 0; }
+    else { const lat = +q.lat, lon = +q.lon, mi = Math.min(10, Math.max(0.05, +q.mi || 0.5)); if (lat > 25 && lat < 37 && lon > -107 && lon < -93) { geometry = circle(lon, lat, mi); at = houstonAt(lon, lat); } list = +q.list || 0; }
     if (!geometry) return res.status(400).json({ error: 'Send a Polygon or MultiPolygon geometry (POST) or lat, lon and mi.' });
-    const d = await crimeReport(db, geometry, list, { deadline: Date.now() + BUDGET_MS });
+    // a point: the city limits check runs alongside the report (a Houston point shouldn't wait on it); outside, the report is dropped
+    const rep = crimeReport(db, geometry, list, { deadline: Date.now() + BUDGET_MS }); rep.catch(() => {}); // still thrown by the await below
+    const where = await at;
+    if (where?.reach === 'out') { res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400'); return res.json({ outside: true, place: where.place ?? null, coverage: COVERAGE }); }
+    const d = await rep; if (where?.reach === 'near') Object.assign(d, { partial: true, place: where.place ?? null });
     res.setHeader('Cache-Control', req.method === 'POST' ? 'no-store' : 'public, max-age=3600, s-maxage=86400');
     return res.json(d);
   } catch (e) {

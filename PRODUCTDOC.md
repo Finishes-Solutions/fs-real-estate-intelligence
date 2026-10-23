@@ -172,7 +172,7 @@ Scroll down and the top folds to just the title and the buttons. The small arrow
   - **Power:** how far it is to the nearest transmission line (with its voltage and owner, e.g. "480 ft to a transmission line, 138 kV, CenterPoint Energy"), the nearest distribution line, and the nearest substation. Power lines come from OpenStreetMap: high-voltage lines are mapped well, but street (distribution) lines only in part, so "none mapped" doesn't mean there are none.
   - **Water and sewer:** who holds the state service area (CCN) for water and for sewer here, with the CCN number. "No CCN here" usually means a city or a MUD that doesn't hold one; the Districts row shows the MUD.
   - **Mains:** in Houston, the distance to the nearest public sewer main (with its size and material) and to a public water main where the city publishes one. Elsewhere, the distance to the nearest water line a utility has mapped for its service area, and a reminder that the city or MUD engineer has the mains.
-- **Crime:** inside Houston, the incidents reported within a mile. Anywhere in the US, **Crime by city / county**:
+- **Crime:** inside Houston, the incidents reported within a mile. Houston Police only cover the City of Houston, so this goes by the city limits, not just the Houston area: a property in Katy, Sugar Land, Pearland, Bellaire or unincorporated county says that street-level incidents cover Houston only (and which city it's in) and points to **Crime by city / county** below. Just outside the limits, the card shows the incidents inside Houston with a note that the rest of the mile isn't counted (and the Site section's **Crime nearby** says the same). Anywhere in the US, **Crime by city / county**:
   - the local police department: the city's own police inside city limits, otherwise the county police or sheriff;
   - violent and property crimes per 100,000 residents for the newest full year, compared with the state and the US, and the change from the year before;
   - a 10-year trend line against the state and the US, and the share of crimes solved;
@@ -1046,6 +1046,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Crime on the card follows the city limits:** a property in Katy, Sugar Land, Pearland or another city inside the Houston area no longer shows Houston Police counts near zero as if they were real; it says street-level incidents cover the City of Houston only and points to **Crime by city / county**.
 - **The Market report for your project app's agents:** a county's (or the region's) Market page as a printed PDF report: what's moving, the construction pipeline, permits, new businesses, jobs, sales tax, spending, housing and rents, material prices and rates, Houston crime, the busiest roads and local news.
 - **A demographics report for your project app's agents:** rings around a property (1, 3 and 5 miles, or any radii) with population, households, income, home value, rent, vacancy, age, jobs and estimated spending, and a street map with the rings.
 - **Your project app's agents can make reports:** the FEMA, Environmental, Crime and City / County Crime reports as PDFs, for a property, a radius, a county or a drawn area.

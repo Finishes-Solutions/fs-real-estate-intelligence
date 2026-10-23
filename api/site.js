@@ -7,7 +7,8 @@
 //              small Texas city's extraterritorial jurisdiction reaches that far (Local Government Code §42.021)
 //   transit    Houston METRO bus stops within 400 m
 //   environment EPA ECHO regulated facilities within 0.25 mile, with violation and hazardous-waste flags
-//   crime      Houston Police NIBRS incidents within 0.5 mile, last 12 months vs the 12 before (Supabase, loaded nightly)
+//   crime      Houston Police NIBRS incidents within 0.5 mile, last 12 months vs the 12 before (Supabase, loaded nightly); null
+//              unless Houston's city limits reach the point (partial: true when they come within 0.5 mile but the point is outside)
 //   bars       Texas Comptroller mixed beverage gross receipts at the street address, last 12 months (needs addr + zip)
 // Every part is free and optional: a failing source returns { error } for that part, never a 500.
 import { rateLimit } from './_lib/guard.mjs';
@@ -113,10 +114,23 @@ export async function placeAt(lon, lat) { const a = (await query(SRC.place, lon,
 export const placesNear = async (lon, lat) => (await query(SRC.place, lon, lat, { m: 805, fields: 'BASENAME,NAME' })).filter(a => a.BASENAME).map(a => ({ name: String(a.BASENAME).trim(), full: String(a.NAME || a.BASENAME).trim() }));
 export const SITE_SOURCES = SRC;
 
+// Houston Police data covers the City of Houston only. The box is a cheap first filter (Katy, Sugar Land, Pearland … are
+// inside it); the Census city limits decide: 'in' (the point is inside Houston), 'near' (outside, but the limits come
+// within 0.5 mile, so only part of a circle around it is counted) or 'out'. null when TIGERweb can't say: the box decides.
 const inHouston = (lon, lat) => lon > -95.95 && lon < -95.0 && lat > 29.5 && lat < 30.15;
+export function houstonReach(place, near) {
+  if (Array.isArray(near)) return !near.some(x => x.name === 'Houston') ? 'out' : place?.name === 'Houston' || place?.error ? 'in' : 'near';
+  return place?.name === 'Houston' ? 'in' : null;
+}
+export async function houstonAt(lon, lat) {
+  if (!inHouston(lon, lat)) return { reach: 'out', place: undefined };
+  const err = e => ({ error: e.message }), [place, near] = await Promise.all([placeAt(lon, lat).catch(err), placesNear(lon, lat).catch(err)]);
+  return { reach: houstonReach(place, near), place: place?.error ? undefined : place };
+}
 export async function site(lon, lat, { addr, zip } = {}) {
   const part = async fn => { try { return await fn(); } catch (e) { return { error: e.message }; } };
   const db = supa();
+  const placeP = part(() => placeAt(lon, lat)), nearP = part(() => placesNear(lon, lat));
   const [flood, traffic, water, oz, tirz, schools, transit, environment, crime, barsAt, place, nearAll] = await Promise.all([
     part(async () => floodInfo(await query(SRC.flood, lon, lat, { fields: 'FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE' }))),
     part(async () => trafficInfo(await query(SRC.aadt, lon, lat, { m: 300, fields: 'RTE_NM,RTE_PRFX,RTE_NBR,AADT_CUR,SYSTEM' }))),
@@ -126,9 +140,10 @@ export async function site(lon, lat, { addr, zip } = {}) {
     part(async () => { const out = []; for (const id of [0, 1, 2]) for (const a of await query(SRC.school + '/' + id, lon, lat, { fields: 'NAME' })) if (a.NAME && !out.includes(a.NAME)) out.push(a.NAME); return out; }),
     part(async () => inHouston(lon, lat) ? { stops: (await getJSON((await layerOf(SRC.stops)) + '/query?returnCountOnly=true&' + near(lon, lat, 400))).count ?? null } : null),
     part(() => echo(lon, lat)),
-    part(async () => db && inHouston(lon, lat) ? crimeSummary(await db.rpc('crime_near', { p_lon: lon, p_lat: lat, p_m: 805 }, { deadline: Date.now() + 15000 }), 0.5) : null),
+    part(async () => { const reach = db && inHouston(lon, lat) ? houstonReach(await placeP, await nearP) : 'out'; if (reach === 'out') return null;
+      const c = crimeSummary(await db.rpc('crime_near', { p_lon: lon, p_lat: lat, p_m: 805 }, { deadline: Date.now() + 15000 }), 0.5); return reach === 'near' ? { ...c, partial: true } : c; }),
     part(() => addr ? bars(addr, zip) : null),
-    part(() => placeAt(lon, lat)), part(() => placesNear(lon, lat))
+    placeP, nearP
   ]);
   const nearBy = Array.isArray(nearAll) ? nearAll.filter(x => !place || place.error || x.name !== place.name).slice(0, 6) : nearAll;
   const districts = { water, tirz, opportunityZone: oz, schools };
