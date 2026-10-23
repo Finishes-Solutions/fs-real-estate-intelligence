@@ -88,7 +88,7 @@ globalThis.fetch = async (url, opts = {}) => {
   return new Response('unmocked ' + u, { status: 599 });
 };
 const regions = { counties: [{ name: 'Waller', tabsId: '2237', fips: '48473' }, { name: 'Harris', tabsId: '2101', fips: '48201' }] };
-const filings = [{ city: 'Katy', county: 'Harris' }, { city: 'Katy', county: 'Harris' }, { city: 'Brookshire', county: 'Waller' }, { city: 'Waller', county: 'Waller', approx: true }];
+const filings = [{ city: 'Katy', county: 'Harris' }, { city: 'Katy', county: 'Harris' }, { city: 'Brookshire', county: 'Waller' }, { city: 'Waller', county: 'Waller', approx: true }, { city: 'Huntsville', county: 'Waller', misfiled: true }];
 process.env.AREA_NEWS_TOWNS = '3';
 const prevNews = { 'town:Brookshire': [{ title: 'Brookshire plans new warehouse development', url: 'https://x/old', date: new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10) }, { title: 'Ancient', url: 'https://x/a', date: '2020-01-01' }] };
 const area = await buildArea(regions, filings, { news: prevNews });
@@ -96,7 +96,7 @@ assert.equal(area.jobs.year, lodesYear); assert.equal(area.jobs.baseYear, lodesY
 assert.ok(Object.keys(area.permits.years).length >= 5, 'several permit years'); assert.equal(area.permits.years[year - 1]['48201'].sf, 9000); assert.ok(area.permits.ytd?.cur['48473'], 'year to date');
 assert.equal(area.businesses.months['48473'][ym(new Date())], 12); assert.equal(area.businesses.months['48201'][ym(new Date())], 900); assert.ok(!Object.values(area.businesses.months).some(m => m[ym(new Date())] === 700), 'other counties dropped');
 assert.equal(area.businesses.latest['48473'][0].name, 'NEW CAFE'); assert.equal(SECTORS[area.businesses.latest['48473'][0].sec][1], 'Hotels & restaurants');
-assert.deepEqual(area.newsPlaces.map(p => p.key), ['county:Waller', 'county:Harris', 'town:Katy', 'town:Brookshire'], 'counties, then busiest towns (city-level guesses skipped)');
+assert.deepEqual(area.newsPlaces.map(p => p.key), ['county:Waller', 'county:Harris', 'town:Katy', 'town:Brookshire'], 'counties, then busiest towns (city-level guesses and misfiled filings skipped)');
 assert.equal(area.news['county:Waller'][0].title, 'Waller County approves new retail center');
 assert.deepEqual(area.news['town:Brookshire'].map(a => a.title), ['Brookshire plans new warehouse development'], 'a failed search keeps recent saved articles, drops ones past 120 days');
 // news relevance: Houston-area (or Texas) AND construction / development / real estate
@@ -117,7 +117,7 @@ const again = await buildArea(regions, filings, { ...area, jobs: { year: lodesYe
 assert.deepEqual(again.businesses, area.businesses, 'Comptroller down: previous numbers kept');
 // city sales-tax allocations: dataset found by name (the city one, not the county one), columns read from the catalog
 assert.equal(area.salesTax.dataset.id, 'abcd-1234'); assert.equal(area.salesTax.dataset.cols.amount, 'net_payment_this_period');
-assert.deepEqual(area.salesTax.cities.Katy, { county: 'Harris', months: { '2026-07': 1250001, '2025-07': 1100000 } }); assert.equal(area.salesTax.cities.Brookshire.county, 'Waller'); assert.ok(!area.salesTax.cities.ELSEWHERE);
+assert.deepEqual(area.salesTax.cities.Katy, { county: 'Harris', months: { '2026-07': 1250001, '2025-07': 1100000 } }); assert.equal(area.salesTax.cities.Brookshire.county, 'Waller'); assert.ok(!area.salesTax.cities.ELSEWHERE); assert.ok(!area.salesTax.cities.Huntsville, 'a misfiled filing doesn’t put its city in the county');
 assert.deepEqual(again.salesTax, area.salesTax, 'allocations down: previous numbers kept');
 assert.ok(seen.filter(s => s.includes('lehd')).length > 0);
 // ---- api/tenants handler: ZIP filter rejected (400) -> street-only query filtered here ----

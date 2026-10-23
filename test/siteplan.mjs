@@ -50,6 +50,52 @@ const multi = { type: 'MultiPolygon', coordinates: [lotA, lotB, lotC].map(r => [
   const pine = { type: 'Polygon', coordinates: [[[-95.6439025,30.0225675],[-95.643898,30.022461],[-95.6438135,30.022392],[-95.6426535,30.0224135],[-95.6425615,30.0224175],[-95.6425615,30.022573],[-95.642561,30.022587],[-95.642555,30.0227385],[-95.642544,30.02289],[-95.6439335,30.023295],[-95.6439025,30.0225675]]] };
   const far = S.unionParcels([pine, stokes]); assert.ok(far === null || far.pieces === 2 && S.ringArea(far.ring) > 1e6, 'far-apart parcels: the bigger piece only'); }
 
+// ---- parcels picked together that don't touch: joined across the strip between them (Oct 22) ----
+// Real outlines from the appraisal data (Oct 22): on Waller Tomball Rd a 128-acre tract with a notch cut out of its east
+// side, a 20.6-acre tract sharing its west line, and a 20.8-acre tract 60 ft east of it across a strip; in Katy three
+// HCAD lots in a row with a Fort Bend lot next door. "Site Plan for All" dropped the 20.8 acres (the biggest connected
+// group only); every parcel picked has to be in the site, the gap filled in as site, or kept as a no-build area when the
+// map shows a road in it.
+{ const T = await import('../lib/sitetools.mjs'), P = c => ({ type: 'Polygon', coordinates: [c] });
+  const p3 = P([[-95.8997461,30.0637115],[-95.9016867,30.0637033],[-95.9036286,30.063695],[-95.9042643,30.0636923],[-95.9042704,30.0654148],[-95.904087,30.0654228],[-95.9039034,30.0654259],[-95.8997792,30.0654417],[-95.8997461,30.0637115]]);
+  const p1 = P([[-95.89215717,30.06480054],[-95.89214349,30.06422872],[-95.8914861,30.06421704],[-95.8914323,30.06196799],[-95.89137474,30.05956137],[-95.89148746,30.05854577],[-95.89174624,30.05840487],[-95.89265393,30.05870589],[-95.89283738,30.05876379],[-95.89302236,30.0588166],[-95.89320873,30.05886429],[-95.89339634,30.0589068],[-95.89358506,30.05894413],[-95.89377473,30.05897623],[-95.89396522,30.05900307],[-95.89416254,30.05903119],[-95.89435892,30.05906524],[-95.89455419,30.05910519],[-95.89474816,30.05915101],[-95.89494067,30.05920265],[-95.89555716,30.05940709],[-95.89969001,30.06077749],[-95.89971208,30.06193095],[-95.89971968,30.06232856],[-95.89974614,30.06371151],[-95.89977924,30.06544167],[-95.89938731,30.06544316],[-95.89894134,30.06544711],[-95.89849534,30.06544627],[-95.89558857,30.06539225],[-95.89202025,30.06532593],[-95.89151248,30.06531999],[-95.89149977,30.06478886],[-95.89215717,30.06480054]]);
+  const p11 = P([[-95.88812257,30.06285649],[-95.89126306,30.0628191],[-95.89132281,30.06531834],[-95.89081165,30.06532131],[-95.88816182,30.06535285],[-95.88812257,30.06285649]]);
+  const ac = r => S.ringArea(r) / 43560, own = g => ac(S.boundaryFrom(g).ring);
+  assert.equal(S.unionParcels([p3, p1, p11]).pieces, 2, 'merged alone, the tract across the strip is a piece apart (what dropped it)');
+  const br = S.bridgeParcels([p3, p1, p11]), u = S.unionParcels(br.geoms), F = S.frame(u.origin);
+  assert.equal(u.pieces, 1, 'one site'); assert.equal(br.strips.length, 1, 'one strip: the touching tracts need none'); assert.ok(br.strips[0].gapFt >= 50 && br.strips[0].gapFt <= 70, 'the strip is about 60 ft: ' + br.strips[0].gapFt);
+  assert.equal(br.strips[0].road, false, 'no road on the map in it: filled in as site');
+  const strip = br.strips[0].ll.slice(0, -1).map(F.toFt), want = own(p3) + own(p1) + own(p11) + ac(strip);
+  assert.ok(Math.abs(ac(u.ring) - want) / want < 0.01, 'the site is all three tracts and the strip: ' + ac(u.ring).toFixed(2) + ' vs ' + want.toFixed(2) + ' ac');
+  for (const g of [p3, p1, p11]) { const c = S.centroid(S.boundaryFrom(g).ring.map(q => F.toFt(S.frame(S.boundaryFrom(g).origin).toLL(q)))); assert.ok(S.inRing(c, u.ring), 'every tract picked is in the site'); }
+  assert.ok(ac(strip) > 1.2 && ac(strip) < 2.2, 'the strip runs along the facing sides, not over the tracts: ' + ac(strip).toFixed(2) + ' ac');
+  // a road on the map running up the strip: the strip is a road, kept as a no-build area in the site
+  const rd = S.bridgeParcels([p3, p1, p11], { roads: [[[-95.89135, 30.0570], [-95.89138, 30.0640], [-95.89141, 30.0700]], [[-95.95, 30.0700], [-95.85, 30.0701]]] });
+  assert.equal(rd.strips.length, 1); assert.equal(rd.strips[0].road, true, 'the road up the strip is found'); assert.equal(S.unionParcels(rd.geoms).pieces, 1, 'every tract still in');
+  assert.equal(S.bridgeParcels([p3, p1, p11], { roads: [[[-95.95, 30.0700], [-95.85, 30.0701]]] }).strips[0].road, false, 'a road passing well north of the strip is not in it');
+  // the road strip as the plan keeps it: a no-build area inside the site; a layout's building on it is a problem
+  const ko = T.areaPiece({ ring: u.ring, elements: [] }, 'keepout', strip, 'ko1');
+  assert.equal(T.areaError({ ring: u.ring }, strip, 'keepout'), '', 'the strip is inside the site');
+  const on = { ...u, front: 0, setbacks: { ...S.SETBACKS }, program: { use: 'retail' }, elements: [ko, { id: 'b1', kind: 'building', use: 'retail', x: ko.x, y: ko.y, w: 40, d: 40, rot: 0, floors: 1 }] };
+  assert.ok(S.check(on).some(i => / is on /.test(i.text)), 'a building on the strip is flagged');
+  // far apart (more than BRIDGE_FT): not joined, the biggest group kept, as before
+  const apart = S.bridgeParcels([p3, p11]); assert.equal(apart.strips.length, 0, 'the 20.6 and 20.8 acre tracts are a quarter mile apart'); assert.equal(S.unionParcels(apart.geoms).pieces, 2);
+  // lots that touch get no strip (Katy: three HCAD lots and the Fort Bend lot beside them)
+  const kty = [P([[-95.82282727,29.78685442],[-95.82292784,29.78685423],[-95.82301643,29.78685407],[-95.82301369,29.78719781],[-95.82293487,29.78719796],[-95.82285606,29.7871981],[-95.82282453,29.78719816],[-95.82282727,29.78685442]]),
+    P([[-95.82272954,29.7868546],[-95.82277998,29.78685451],[-95.82282727,29.78685442],[-95.82282453,29.78719816],[-95.82277724,29.78719825],[-95.8227268,29.78719834],[-95.82272954,29.7868546]]),
+    P([[-95.82262235,29.78685395],[-95.82272954,29.7868546],[-95.8227268,29.78719834],[-95.82261961,29.78719769],[-95.82262235,29.78685395]]),
+    P([[-95.82301414,29.78697536],[-95.8230164,29.7868629],[-95.82317613,29.78686509],[-95.82325812,29.78686552],[-95.8232564,29.78711245],[-95.82301414,29.78697536]])];
+  const kb = S.bridgeParcels(kty); assert.equal(kb.strips.length, 0, 'touching lots: no strip'); assert.equal(kb.geoms.length, 4);
+  const ku = S.unionParcels(kb.geoms), ksum = kty.reduce((t, g) => t + S.ringArea(S.boundaryFrom(g).ring), 0); assert.equal(ku.pieces, 1); assert.ok(Math.abs(S.ringArea(ku.ring) - ksum) / ksum < 0.01, 'four lots, one site');
+  assert.deepEqual(S.bridgeParcels([p1]).strips, [], 'one parcel: nothing to join');
+  // a block of four lots whose county outlines sit 12 ft apart every way (they border each other on the ground): no
+  // slit into the site between any two of them, the whole block is the site
+  const o4 = [-95.8, 29.9], lot = (x, y) => poly([[x, y], [x + 200, y], [x + 200, y + 300], [x, y + 300]], o4), four = [lot(0, 0), lot(212, 0), lot(0, 312), lot(212, 312)];
+  const b4 = S.bridgeParcels(four), u4 = S.unionParcels(b4.geoms), whole = 412 * 612;
+  assert.equal(u4.pieces, 1); assert.ok(b4.strips.length >= 4 && b4.strips.every(x => !x.road), 'every 12 ft gap filled, not just enough to connect them: ' + b4.strips.length);
+  assert.ok(Math.abs(S.ringArea(u4.ring) - whole) / whole < 0.02, 'the block is one site with no slit: ' + Math.round(S.ringArea(u4.ring)) + ' of ' + whole + ' sq ft');
+  assert.ok(u4.ring.length <= 8, 'a plain outline, no notch at the gaps: ' + u4.ring.length + ' points'); }
+
 // ---- edges, setbacks, road-facing side ----
 const rect = [[-100, -150], [100, -150], [100, 150], [-100, 150]]; // 200 x 300 ft, CCW, street to the south (edge 0)
 assert.deepEqual(S.edgeRoles(rect, 0), ['front', 'side', 'rear', 'side']);
