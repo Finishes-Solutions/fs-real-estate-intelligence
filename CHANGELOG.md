@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-23
 
+### 5:05 PM CT: Home community homes are sized to fit (d609d62)
+- **Homes sized to the pad:** give a pad size and the homes are sized to fill it. On the exhibit's 25 × 55 pads that's a 15 × 32 (480 sf) tiny home with its parking in front and 10 ft to the next home; King Ln holds about 140.
+- **Or the size you ask for:** "550 sf tiny homes" or "16 x 40 homes" gives homes that size, with the pads made as big as they need, and the plan says so. On King Ln: 550 sf homes on 25 × 60 pads, about 125 homes; 16 × 40 homes on 36 ft pads, about 100.
+- **Fixed:** the lane the entry comes in on no longer runs on into a dead end at the far end of the site; the rows along the property line no longer stretch too far; "16 x 40 homes" is read as a size, not 40 homes.
+
 ### 3:55 PM CT: Home communities match an RV park plan, and are valued as rentals (aa391e5)
 - **Your pad size:** say "25 x 55 pads" (or attach an RV park plan that gives its site size) and every lot is that size. On King Ln with the exhibit's 25 × 55 pads, the plans fit 140–148 tiny homes or park models (the exhibit shows 134 RV lots, with a bigger pond). Only homes that leave 10 ft to the next fit a 25 ft pad, so single-wides need wider pads.
 - **Out to the property line, like the exhibit:** lots now run to the property line; say "a 10 ft buffer" if you want a landscape strip. The rows along the line are deeper where needed so the homes keep the plan's setbacks (with the default 20 ft rear setback, those rows come out about 74 ft deep; lower the setback under Site parameters for 55 ft all round).
