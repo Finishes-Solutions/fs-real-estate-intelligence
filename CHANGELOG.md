@@ -3,6 +3,14 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-23
+
+### 10:53 AM CT: Crime on the card follows Houston's city limits (6c1c252)
+- **No more near-zero counts outside Houston:** Houston Police only cover the City of Houston, but the card used a rough box around the Houston area to decide. A property in Katy, Sugar Land, Pearland, Missouri City, Bellaire or unincorporated county now says street-level incidents cover the City of Houston only, names the city it's in, and points to **Crime by city / county** below for the local police department's figures. Houston properties are unchanged.
+- **Just outside the limits:** when Houston's city limits come within half a mile, the card and the Site section's **Crime nearby** still show the incidents inside Houston, with a note that the rest isn't counted (and no "vs Houston average", which would read low).
+- **If the Census city-limits service doesn't answer,** crime shows as it did before.
+- **Not checked yet against the live Census service** (this environment can't reach it); tested with stand-ins for Katy, Bellaire, unincorporated land and downtown.
+
 ## 2026-10-22
 
 ### 7:16 PM CT: A market report for your project app's agents (376bace)
