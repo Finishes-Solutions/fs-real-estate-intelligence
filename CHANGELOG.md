@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-23
 
+### 2:03 PM CT: Parcels in separate pieces can all be picked (ccc9b2a)
+- **Fixed: 31807 King Ln dropped the third pick.** The King Ln property is one Waller County account (13814) in two separate pieces (0.43 and 6.15 acres). With 31807 Old Washington Rd picked, picking the second King Ln piece loaded and then disappeared, because the earlier fix treated "same account" as "same parcel".
+- **Now:** the same parcel line on the map is the same pick; different accounts never are; and the same account counts only when your click lands inside the piece already picked. Site Plan for All and projects keep each piece as its own parcel.
+- **Tested in the browser** with the three real outlines, with the parcel lines on and off. Before: the third pick dropped, and Site Plan for All gave 2 parcels and 3.56 acres. After: all three stay, and the site is 3 parcels and 9.82 acres.
+
 ### 1:28 PM CT: Every parcel you pick stays picked; Build uses both sides of a road (b901d1e)
 - **Fixed: the third parcel disappeared.** On Waller Tomball Rd, the statewide record for one account (0422450000001) has a 128-acre outline that takes in about a dozen parcels the map's parcel lines show separately. Picking one of those returned that same record, so it was taken for a parcel already picked and dropped, and only two stayed selected.
 - **A pick is now the parcel drawn under your click** (with **Parcels** on): its own outline and account. Where the statewide record is a different account, the app asks the county appraisal district for that account, and otherwise shows the owner and address from the parcel lines instead of the wrong record's. Two different accounts are never treated as the same parcel. **Change Parcels** in a plan works the same way.

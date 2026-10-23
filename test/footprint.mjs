@@ -139,4 +139,20 @@ assert.ok(!sameSelection(bA, { center: ptIn(smallA[0]), footprint: { type: 'Poly
   const fb = { propId: '89418', raw: { PROP_ID: '89418', GEO_ID: '5410-01-001-0020-914' }, owner: 'PROCTOR', geometry: south };
   assert.equal(withTileParcel(fb, { apn: '5410010010020914', geometry: south }).owner, 'PROCTOR', 'the same parcel by its geo id');
   assert.equal(withTileParcel({ ...fb, raw: {} }, { apn: 'R123', geometry: south }).owner, 'PROCTOR', 'the same parcel by its outline'); }
+
+// ---- 31807 King Ln, Waller (Oct 23): one account (13814) in two separate pieces, two statewide records with the same
+// PROP_ID and two parcels drawn on the map. With 31807 Old Washington Rd picked first, the second King Ln piece was taken
+// for the first ("same account") and dropped. One account can be several pieces: a piece is the same pick only when the
+// click is in its outline, or it is the same parcel line.
+{ const P = c => ({ type: 'Polygon', coordinates: [c] });
+  const kingA = P([[-95.92123552,30.05394793],[-95.92101297,30.05332978],[-95.92141318,30.05342835],[-95.92141212,30.05369438],[-95.92141094,30.05398865],[-95.92123552,30.05394793]]);
+  const kingB = P([[-95.92137475,30.05047667],[-95.92138523,30.05047646],[-95.92141923,30.0519127],[-95.92141536,30.05288134],[-95.92141318,30.05342835],[-95.92101297,30.05332978],[-95.92040066,30.05162901],[-95.92047023,30.05049494],[-95.92137475,30.05047667]]);
+  const a = { center: [-95.92126, 30.05363], footprint: null, parcel: { propId: '13814', geometry: kingA } }, bNew = { center: [-95.92098, 30.05175], footprint: null };
+  assert.ok(!sameSelection(a, { ...bNew, parcel: { propId: '13814', geometry: kingB } }), 'the other piece of the same account is another pick');
+  assert.ok(!sameSelection(a, bNew), 'before it loads: a click outside the first piece is another pick');
+  assert.ok(sameSelection(a, { center: [-95.9213, 30.0537], footprint: null, parcel: { propId: '13814', geometry: kingA } }), 'the same piece again is the same pick');
+  assert.ok(!sameSelection({ ...a, parcel: { ...a.parcel, tileId: 'uA' } }, { ...bNew, parcel: { propId: '13814', geometry: kingB, tileId: 'uB' } }), 'two parcel lines, two picks');
+  assert.ok(sameSelection({ ...a, parcel: { ...a.parcel, tileId: 'uA' } }, { center: [-95.9213, 30.0537], footprint: null, parcel: { propId: '13814', tileId: 'uA' } }), 'the same parcel line, the same pick');
+  assert.ok(sameSelection(a, { center: [-95.92125, 30.05362], footprint: null, parcel: { propId: '13814' } }), 'the same account with no outline yet, clicked inside the first piece');
+  assert.equal(withTileParcel({ propId: '13814', raw: { PROP_ID: '13814' }, geometry: kingB }, { apn: '13814', uuid: 'uB', geometry: kingB }).tileId, 'uB', 'the parcel line\'s id rides along'); }
 console.log('footprint ok');
