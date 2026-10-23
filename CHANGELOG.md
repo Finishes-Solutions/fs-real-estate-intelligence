@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-23
 
+### 3:31 PM CT: Tiny home and manufactured home communities; flag lots come in up their strip (08be202)
+- **Fixed: a tiny home / mobile home community came back as self storage.** On 31807 King Ln, "a tiny home/mobile home community laid out like the reference file has showing an RV park" was drawn as self storage with about two dozen RV / boat stalls and a 7,200 sf leasing office. The RV park in the reference file had pushed the AI to "RV storage".
+- **Now it's homes on lots, laid out like an RV park:** private lanes in loops with a row of lots on each side, lots along the end lanes where there's room, the detention pond across one end or down one side. On King Ln: about 97 tiny homes, 48 manufactured homes, or 58 of both (the reference RV park had 134 RV lots, which are smaller).
+- **New home types:** single-wides (16 × 56, 16 × 76), double-wides (28 × 52, 28 × 64), a tiny home (12 × 32), a park model (14 × 40) and a cottage (20 × 40), each with a parking pad. The sheet names it a manufactured, tiny, or tiny & manufactured home community and counts homes and pads, not garages.
+- **Fixed: flag lots.** King Ln reaches Old Washington Rd only by a 60 ft strip about 250 ft long. The plan treated the back edge of the wide part, which borders the neighbour's land, as road frontage and put the entry there. Now the wide part is laid out on its own and the main entry is a drive up the strip. Ordinary subdivisions on flag lots get this too.
+- **Not done yet:** spacing between homes, lane widths and fire lanes use typical values (check them against the local rules and with the fire marshal); the pro forma still values these homes as for-sale houses, not lot rent; an RV park itself is still laid out as a storage-style yard. Tested offline on the King Ln outline from the survey and in Chromium; not tried yet in the live app with the AI.
+
 ### 2:03 PM CT: Parcels in separate pieces can all be picked (ccc9b2a)
 - **Fixed: 31807 King Ln dropped the third pick.** The King Ln property is one Waller County account (13814) in two separate pieces (0.43 and 6.15 acres). With 31807 Old Washington Rd picked, picking the second King Ln piece loaded and then disappeared, because the earlier fix treated "same account" as "same parcel".
 - **Now:** the same parcel line on the map is the same pick; different accounts never are; and the same account counts only when your click lands inside the piece already picked. Site Plan for All and projects keep each piece as its own parcel.
