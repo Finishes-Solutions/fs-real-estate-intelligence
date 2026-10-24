@@ -7,8 +7,8 @@ Branch: `experimental` (never main/staging). Read `CLAUDE.md` (hard rules and in
 |---|---|
 | 0 Setup | Done |
 | 1 Audit (`docs/AUDIT.md`) | Done |
-| 2 Plan (`docs/INTEGRATION_PLAN.md`) | Next |
-| 3 Build | Not started |
+| 2 Plan (`docs/INTEGRATION_PLAN.md`) | Done |
+| 3 Build | In progress (B1 next) |
 | 4 System flow + UI overhaul | Not started |
 | 5 Verify and review | Not started |
 
@@ -19,8 +19,10 @@ Branch: `experimental` (never main/staging). Read `CLAUDE.md` (hard rules and in
   - Budgeting suite best branch `origin/feature` (304/304 tests); report runner best branch `matthew/nifty-mendel-hc0iwc` (175/175).
   - Scratch exports of the source branches were made with `git archive` (never checkout/install inside the source repos).
 
+- Phase 2: `docs/INTEGRATION_PLAN.md`: winners per area, flow + Mermaid, folder structure, shared model, realism rules, scope statement, build phases B1–B8.
+
 ## Next
-- Phase 2: `docs/INTEGRATION_PLAN.md` (engineering:architecture structure), then start Phase 3.
+- Phase 3, B1 Foundations (see the plan's §7 table for acceptance criteria).
 
 ## Blocked
 - Nothing yet.
