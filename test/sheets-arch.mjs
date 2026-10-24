@@ -87,13 +87,13 @@ assert.deepEqual([...all].sort(), KINDS.slice().sort(), 'the fixtures cover ever
     rooms: [R('gar', 'Garage', 'garage', 1, 0, 0, 22, 24), R('porch', 'Porch', 'porch', 1, 22, 0, 14, 6), R('entry', 'Foyer', 'entry', 1, 22, 6, 14, 12), R('hall1', 'Gallery', 'hall', 1, 22, 18, 14, 6),
       R('study', 'Study', 'office', 1, 36, 0, 14, 14), R('dining', 'Dining', 'dining', 1, 36, 14, 14, 12), R('family', 'Family room', 'family', 1, 36, 26, 14, 18), R('kit', 'Kitchen', 'kitchen', 1, 22, 24, 14, 20),
       R('lau', 'Mud / laundry', 'laundry', 1, 0, 24, 12, 8), R('pwd', 'Powder', 'half_bath', 1, 12, 24, 5, 8), R('st1', 'Stair', 'stair', 1, 17, 24, 5, 11), R('bh', 'Back hall', 'hall', 1, 17, 35, 5, 9), R('flex', 'Breakfast / flex', 'flex', 1, 0, 32, 17, 12),
-      R('bd3', 'Bedroom 3', 'bedroom', 2, 0, 0, 16, 14), R('bd4', 'Bedroom 4', 'bedroom', 2, 16, 0, 18, 14), R('bd2', 'Bedroom 2', 'bedroom', 2, 34, 0, 16, 14), R('ba2', 'Bath 2', 'bath', 2, 0, 14, 10, 9),
+      R('bd3', 'Bedroom 3', 'bedroom', 2, 0, 0, 13, 14), R('cl3', 'Closet', 'closet', 2, 13, 0, 3, 14), R('bd4', 'Bedroom 4', 'bedroom', 2, 16, 0, 15, 14), R('cl4', 'Closet', 'closet', 2, 31, 0, 3, 14), R('cl2', 'Closet', 'closet', 2, 34, 0, 3, 14), R('bd2', 'Bedroom 2', 'bedroom', 2, 37, 0, 13, 14), R('ba2', 'Bath 2', 'bath', 2, 0, 14, 10, 9),
       R('h2a', 'Hall', 'hall', 2, 10, 14, 30, 4), R('lin', 'Linen', 'closet', 2, 10, 18, 7, 5), R('h2b', 'Hall', 'hall', 2, 22, 18, 4, 17), R('h2c', 'Hall', 'hall', 2, 26, 26, 8, 4), R('st2', 'Stair', 'stair', 2, 17, 24, 5, 11),
       R('loft', 'Loft', 'flex', 2, 0, 23, 17, 21), R('pba', 'Primary bath', 'bath', 2, 40, 14, 10, 12), R('wic', 'Walk-in closet', 'walk_in_closet', 2, 34, 18, 6, 8), R('pri', 'Primary bedroom', 'primary_bedroom', 2, 34, 26, 16, 18)],
     doors: [['porch', 'outside', 8, 'opening', 'front'], ['porch', 'entry', 3.5], ['gar', 'outside', 16, 'overhead', 'front'], ['gar', 'outside', 3, 'swing', 'left'], ['gar', 'lau', 3], ['lau', 'flex', 2.67], ['pwd', 'flex', 2.5],
       ['kit', 'st1', 3, 'opening'], ['bh', 'kit', 3, 'opening'], ['flex', 'bh', 3, 'opening'], ['entry', 'hall1', 6, 'opening'], ['entry', 'study', 5, 'double'], ['hall1', 'dining', 5, 'opening'], ['hall1', 'kit', 8, 'opening'],
       ['dining', 'family', 6, 'opening'], ['kit', 'family', 10, 'opening'], ['family', 'outside', 8, 'sliding', 'back'],
-      ['h2b', 'st2', 3, 'opening'], ['h2a', 'h2b', 3, 'opening'], ['h2a', 'bd3', 2.67], ['h2a', 'bd4', 2.67], ['h2a', 'bd2', 2.67], ['h2a', 'ba2', 2.5], ['h2a', 'lin', 2], ['h2b', 'h2c', 3, 'opening'], ['h2c', 'pri', 2.67],
+      ['h2b', 'st2', 3, 'opening'], ['h2a', 'h2b', 3, 'opening'], ['h2a', 'bd3', 2.67], ['h2a', 'bd4', 2.67], ['h2a', 'bd2', 2.67], ['bd3', 'cl3', 2.5], ['bd4', 'cl4', 2.5], ['bd2', 'cl2', 2.5], ['h2a', 'ba2', 2.5], ['h2a', 'lin', 2], ['h2b', 'h2c', 3, 'opening'], ['h2c', 'pri', 2.67],
       ['pri', 'pba', 2.67], ['pri', 'wic', 2.5, 'pocket'], ['st2', 'loft', 3, 'opening']].map(([a, b, width, kind = 'swing', side = 'any']) => ({ a, b, width, kind, side })),
     windows: [['bd3', 'front', 2], ['bd3', 'left', 1], ['bd4', 'front', 2], ['bd2', 'front', 2], ['bd2', 'right', 1], ['pri', 'back', 2], ['pri', 'right', 1], ['loft', 'left', 2], ['loft', 'back', 1], ['ba2', 'left', 1, 3, 4], ['pba', 'right', 1, 4, 4],
       ['study', 'front', 2], ['study', 'right', 1], ['dining', 'right', 2], ['family', 'back', 2, 4, 6], ['family', 'right', 1], ['kit', 'back', 1, 4, 4], ['flex', 'left', 2], ['flex', 'back', 1], ['lau', 'left', 1, 3, 3]]
@@ -102,7 +102,7 @@ assert.deepEqual([...all].sort(), KINDS.slice().sort(), 'the fixtures cover ever
     systems: { structure: 'Wood frame', foundation: 'Post-tensioned slab on grade', hvac: 'split_system', water_heater: 'tankless_gas', sprinklered: false, fire_alarm: false } };
   const { design, problems } = PD.placeDesign(raw, t);
   assert.deepEqual(problems, [], 'the hand-written design passes the design checks');
-  assert.equal(design.rooms.length, 26); assert.equal(design.doors.length, raw.doors.length);
+  assert.equal(design.rooms.length, 29); assert.equal(design.doors.length, raw.doors.length);
   const base = ctxFor('sfr'), ctx = P.setContext({ ...base, types: [t], designs: { A: design } }, P.sheetList(base.plan, { types: [t], sections: P.SECTIONS.map(s => s.id), renders: 0 }));
   const seen = check(ctx, 'rich house');
   assert.deepEqual([...seen].sort(), ['a-details', 'a-elev', 'a-plans', 'a-sched', 'a-section'], 'a house set has the residential architecture sheets');

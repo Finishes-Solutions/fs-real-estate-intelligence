@@ -21,7 +21,7 @@ for (const name of ['retail', 'restaurant', 'townhomes', 'sfr', 'industrial', 'o
   for (const t of PD.buildingTypes(planFor(name)).filter(t => t.supported)) {
     const { design, problems } = PD.placeDesign(PD.fallbackDesign(t), t);
     assert.deepEqual(problems, [], name + ' ' + PD.typeName(t) + ': the rule-based design passes');
-    assert.ok(design.doors.every(d => d.exterior ? true : Math.abs(d.x2 - d.x1) + Math.abs(d.y2 - d.y1) === d.width), 'doors placed at their width');
+    assert.ok(design.doors.every(d => d.exterior ? true : Math.abs(Math.abs(d.x2 - d.x1) + Math.abs(d.y2 - d.y1) - d.width) < 1e-6), 'doors placed at their width');
     assert.ok(design.windows.every(w => w.x1 >= 0 && w.x2 <= t.W && w.y1 >= 0 && w.y2 <= t.D), 'windows on the footprint');
     if (t.attached) assert.ok(design.windows.every(w => w.side === 'front' || w.side === 'back'), 'no windows on party walls');
     if (t.floors > 1) assert.ok(design.rooms.filter(r => r.type === 'stair').length >= t.floors, 'a stair on every floor');
@@ -30,27 +30,46 @@ for (const name of ['retail', 'restaurant', 'townhomes', 'sfr', 'industrial', 'o
 for (const name of ['retail', 'sfr']) assert.ok(PD.designBrief(PD.buildingTypes(planFor(name))[0], { county: 'Waller County, Texas' }).includes('Waller County'));
 
 // ---------- the checks catch a bad answer ----------
-const T = { id: 'Z', use: 'sfr', W: 40, D: 50, floors: 1, floorH: 10, attached: false, sprinklered: false };
+const T = { id: 'Z', use: 'sfr', W: 40, D: 44, floors: 1, floorH: 10, attached: false, sprinklered: false, unitGsf: 1760 };
 const room = (id, type, x, y, w, d, floor = 1) => ({ id, name: id, type, floor, x, y, w, d });
-const ok = { rooms: [room('liv', 'living', 0, 0, 40, 30), room('bed', 'bedroom', 0, 30, 20, 20), room('bath', 'bath', 20, 30, 20, 20)],
-  doors: [{ a: 'liv', b: 'outside', width: 3, kind: 'swing', side: 'front' }, { a: 'liv', b: 'bed', width: 3, kind: 'swing', side: 'any' }, { a: 'liv', b: 'bath', width: 3, kind: 'swing', side: 'any' }],
-  windows: [{ room: 'bed', side: 'back', count: 1, width: 3, height: 5 }, { room: 'liv', side: 'front', count: 2, width: 4, height: 5 }], roof: { type: 'gable', pitch: 6, ridge: 'along_front', overhang: 1 }, exterior: {}, systems: {} };
+// a small complete house: living and kitchen across the front, a hall with the bath and laundry, two bedrooms with closets
+const ok = { rooms: [room('liv', 'living', 0, 0, 24, 20), room('kit', 'kitchen', 24, 0, 16, 20), room('bed', 'bedroom', 0, 20, 16, 21.5), room('cl', 'closet', 0, 41.5, 16, 2.5), room('hall', 'hall', 16, 20, 8, 14), room('bath', 'bath', 16, 34, 8, 5), room('lau', 'laundry', 16, 39, 8, 5), room('bed2', 'bedroom', 24, 20, 16, 21.5), room('cl2', 'closet', 24, 41.5, 16, 2.5)],
+  doors: [['liv', 'outside', 3, 'swing', 'front'], ['liv', 'kit', 8, 'opening'], ['liv', 'hall', 3.5, 'opening'], ['hall', 'bed', 2.67], ['bed', 'cl', 2.5], ['hall', 'bed2', 2.67], ['bed2', 'cl2', 2.5], ['hall', 'bath', 2.5], ['bath', 'lau', 2.5]].map(([a, b, width, kind = 'swing', side = 'any']) => ({ a, b, width, kind, side })),
+  windows: [{ room: 'bed', side: 'left', count: 1, width: 3, height: 5 }, { room: 'bed2', side: 'right', count: 1, width: 3, height: 5 }, { room: 'liv', side: 'front', count: 2, width: 4, height: 5 }, { room: 'kit', side: 'front', count: 1, width: 3, height: 4 }], roof: { type: 'gable', pitch: 6, ridge: 'along_front', overhang: 1 }, exterior: {}, systems: {} };
 assert.deepEqual(PD.placeDesign(ok, T).problems, []);
-{ const d = PD.placeDesign(ok, T).design, door = d.doors.find(x => x.b === 'bed'); assert.equal(door.orient, 'h'); assert.equal(door.y1, 30); assert.ok(door.x1 >= 0 && door.x2 <= 20, 'the door sits on the wall the rooms share'); }
+{ const d = PD.placeDesign(ok, T).design, door = d.doors.find(x => x.b === 'bed'); assert.equal(door.orient, 'v'); assert.equal(door.x1, 16); assert.ok(door.y1 >= 20 && door.y2 <= 34, 'the door sits on the wall the rooms share'); }
+const rm = (o, id) => o.rooms.find(r => r.id === id), without = (o, ...ids) => o.rooms.filter(r => !ids.includes(r.id));
 const bad = (patch, re, msg) => { const p = PD.placeDesign({ ...ok, ...patch(JSON.parse(JSON.stringify(ok))) }, T).problems; assert.ok(p.some(x => re.test(x)), msg + ': ' + p.join(' | ')); };
-bad(o => ({ rooms: [...o.rooms.slice(0, 2), room('bath', 'bath', 15, 30, 25, 20)] }), /overlap/, 'overlapping rooms');
-bad(o => ({ rooms: [o.rooms[0], o.rooms[1], room('bath', 'bath', 20, 30, 30, 20)] }), /outside the 40 × 50/, 'a room outside the footprint');
-bad(o => ({ rooms: o.rooms.slice(0, 2) }), /without a room/, 'floor 1 not covered');
-bad(o => ({ doors: o.doors.slice(0, 2) }), /No way in to: "bath"/, 'a room with no door');
+bad(o => { rm(o, 'bath').x = 12; return o; }, /overlap/, 'overlapping rooms');
+bad(o => { rm(o, 'bed2').w = 20; return o; }, /outside the 40 × 44/, 'a room outside the footprint');
+bad(o => ({ rooms: without(o, 'bed2', 'cl2') }), /without a room/, 'floor 1 not covered');
+bad(o => ({ doors: o.doors.filter(d => d.b !== 'bath' && d.b !== 'lau') }), /No way in to: "bath"/, 'a room with no door');
 bad(o => ({ windows: o.windows.slice(1) }), /no window/, 'a bedroom without a window');
-bad(o => ({ rooms: [o.rooms[0], room('bed', 'bedroom', 0, 30, 6, 20), room('bath', 'bath', 6, 30, 34, 20)] }), /at least 70 sf and 7 ft/, 'a bedroom too narrow');
-bad(o => ({ rooms: [...o.rooms, room('cl', 'closet', 15, 25, 6, 4)], doors: [...o.doors, { a: 'cl', b: 'outside', width: 3, kind: 'swing', side: 'front' }] }), /exterior wall/, 'a door to outside from a room with no exterior wall');
+bad(o => { rm(o, 'bed').w = 6; rm(o, 'cl').w = 6; rm(o, 'hall').x = 6; rm(o, 'hall').w = 18; rm(o, 'bath').x = 6; rm(o, 'bath').w = 18; rm(o, 'lau').x = 6; rm(o, 'lau').w = 18; return o; }, /at least 70 sf and 7 ft/, 'a bedroom too narrow');
+bad(o => ({ rooms: [...o.rooms, room('cl3', 'closet', 15, 25, 6, 4)], doors: [...o.doors, { a: 'cl3', b: 'outside', width: 3, kind: 'swing', side: 'front' }] }), /exterior wall/, 'a door to outside from a room with no exterior wall');
 // a door to outside asked for on a side the room doesn't touch goes on one it does
-{ const d = PD.placeDesign({ ...ok, doors: [...ok.doors, { a: 'bath', b: 'outside', width: 3, kind: 'swing', side: 'front' }] }, T).design; assert.ok(['back', 'right'].includes(d.doors.find(x => x.a === 'bath' && x.exterior).side)); }
-bad(o => ({ windows: [{ room: 'bed', side: 'right', count: 1, width: 3, height: 5 }] }), /doesn't touch that side/, 'a window on an inside wall');
+{ const d = PD.placeDesign({ ...ok, doors: [...ok.doors, { a: 'lau', b: 'outside', width: 3, kind: 'swing', side: 'front' }] }, T).design; assert.equal(d.doors.find(x => x.a === 'lau' && x.exterior).side, 'back'); }
+bad(o => ({ windows: [{ room: 'bed', side: 'right', count: 1, width: 3, height: 5 }, ...o.windows.slice(1)] }), /doesn't touch that side/, 'a window on an inside wall');
 assert.ok(PD.placeDesign({ ...ok, windows: [...ok.windows, { room: 'liv', side: 'left', count: 1, width: 3, height: 5 }] }, { ...T, attached: true }).problems.some(x => /party wall/.test(x)), 'a window on a party wall');
 assert.ok(PD.placeDesign(null, T).problems.length, 'no answer at all');
 { const two = { ...T, floors: 2 }; assert.ok(PD.placeDesign(ok, two).problems.some(x => /no stair/.test(x)), 'two floors need a stair'); }
+// ---------- the program checks: a plan that is geometrically fine but makes no sense as a home ----------
+bad(o => { rm(o, 'bed2').type = 'flex'; rm(o, 'bed2').name = 'Flex'; o.doors = o.doors.filter(d => d.b !== 'cl2'); rm(o, 'cl2').type = 'storage'; o.doors.push({ a: 'hall', b: 'cl2', width: 2.5, kind: 'swing', side: 'any' }); rm(o, 'hall').d = 14; rm(o, 'cl2').x = 24; return o; }, /about 3 bedrooms; the design has 1/, 'too few bedrooms for the size');
+bad(o => ({ doors: o.doors.filter(d => d.b !== 'cl'), rooms: o.rooms.map(r => r.id === 'cl' ? { ...r, type: 'storage' } : r).concat([]) }), /has no closet/, 'a bedroom without a closet (the closet reached from the hall instead)');
+bad(o => { rm(o, 'kit').type = 'living'; rm(o, 'kit').name = 'Den'; return o; }, /needs a kitchen/, 'no kitchen');
+bad(o => { rm(o, 'lau').type = 'storage'; rm(o, 'lau').name = 'Storage'; return o; }, /laundry/, 'no laundry');
+bad(o => { rm(o, 'liv').type = 'entry'; rm(o, 'liv').name = 'Foyer'; rm(o, 'kit').type = 'living'; rm(o, 'kit').name = 'Living / kitchen'; return o; }, /more than a entry needs/, 'a 480 sf entry');
+bad(o => { rm(o, 'bath').type = 'restroom'; return o; }, /not a room in a home/, 'a public restroom in a house');
+bad(o => { rm(o, 'hall').type = 'bath'; rm(o, 'hall').name = 'Bath 2'; rm(o, 'bath').type = 'hall'; rm(o, 'bath').name = 'Hall'; o.doors = o.doors.map(d => d.a === 'hall' ? { ...d, a: 'bath' } : d.b === 'bath' ? { ...d, b: 'hall' } : d.a === 'bath' ? { ...d, a: 'hall' } : d); return o; }, /no window|No way in|share a wall/, 'rooms swapped into nonsense still fail somewhere');
+{ const t = { ...T, use: 'restaurant', occupancy: 'A-2', W: 60, D: 60 }, R = { rooms: [room('din', 'dining_room', 0, 0, 60, 30), room('kit', 'commercial_kitchen', 0, 30, 60, 30)], doors: [{ a: 'din', b: 'outside', width: 6, kind: 'double', side: 'front' }, { a: 'din', b: 'kit', width: 5, kind: 'double', side: 'any' }, { a: 'kit', b: 'outside', width: 3, kind: 'swing', side: 'back' }], windows: [], roof: {}, exterior: {}, systems: {} };
+  const p = PD.placeDesign(R, t).problems; assert.ok(p.some(x => /restroom/i.test(x)) && p.some(x => /walk-in cooler/.test(x)) && p.some(x => /dry storage/.test(x)), 'a restaurant without restrooms, walk-in or storage: ' + p.join(' | '));
+  const r2 = { ...R, rooms: [room('din', 'dining_room', 0, 0, 60, 30), room('rr', 'restroom', 0, 30, 4, 6), room('kit', 'commercial_kitchen', 4, 30, 56, 30), room('x', 'storage', 0, 36, 4, 24)], doors: [...R.doors, { a: 'din', b: 'rr', width: 3, kind: 'swing', side: 'any' }, { a: 'kit', b: 'x', width: 3, kind: 'swing', side: 'any' }] };
+  assert.ok(PD.placeDesign(r2, t).problems.some(x => /accessible restroom needs/.test(x)), 'a 4 x 6 restroom is not accessible'); }
+// the rule-based homes carry the program: the right bedrooms and baths, a closet to every bedroom, no oversized service rooms
+for (const t of PD.buildingTypes(planFor('sfr')).filter(t => t.supported)) { const d = PD.placeDesign(PD.fallbackDesign(t), t).design, P = PD.homeProgram(t), beds = d.rooms.filter(r => /bedroom/.test(r.type)).length;
+  assert.ok(Math.abs(beds - P.beds) <= 1, PD.typeName(t) + ': ' + beds + ' bedrooms for a program of ' + P.beds); assert.ok(d.rooms.filter(r => r.type === 'bath').length >= Math.max(1, P.baths - 1), PD.typeName(t) + ': baths');
+  assert.ok(d.rooms.some(r => r.type === 'kitchen' || /kitchen/i.test(r.name)) && d.rooms.some(r => r.type === 'laundry') && d.rooms.some(r => r.type === 'garage'), PD.typeName(t) + ': kitchen, laundry and garage');
+  assert.ok(!d.rooms.some(r => r.type === 'entry' && r.area > 160), PD.typeName(t) + ': no oversized entry'); }
 // several doors on one edge are spread out, not stacked
 { const t = PD.buildingTypes(planFor('industrial'))[0], d = PD.placeDesign(PD.fallbackDesign(t), t).design, oh = d.doors.filter(x => x.kind === 'overhead');
   assert.ok(oh.length > 1); const xs = oh.map(x => x.x1).sort((a, b) => a - b); assert.ok(xs.every((x, i) => !i || x - xs[i - 1] >= 10), 'dock doors spaced along the wall'); }
