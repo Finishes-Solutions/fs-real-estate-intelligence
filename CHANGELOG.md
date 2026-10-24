@@ -3,6 +3,14 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-24
+
+### 12:53 PM CT: Tiny homes (HASH)
+- **A Tiny homes group in the building library:** one-story homes of 400, 480, 550, 650 and 800 sf, 16 ft wide for a 25 ft lot with a parking pad beside it (or 20 ft wide for a 30 ft lot). Add one from the library, or switch a home's **Type** to a tiny home.
+- **Counted as what they are:** the plan's home table lists them as **Tiny home** at their own size (not as a 1,900 sf one-story house), the pro forma rents them by their size (about $1,425 a month for 550 sf to start, editable as **Tiny home rent**) and prices them by their size when they're sold.
+- **Rendered as tiny homes:** the AI is told they're tiny one-story cottages of their real size and to keep them small, with their own look (board-and-batten or lap siding, metal or shingle roofs, small porches, a parking pad each), instead of ordinary brick houses.
+- **Not yet:** **Build** doesn't lay out tiny-home lots by itself; the King Rd Project's Option A was laid out by hand (now with 550 sf homes).
+
 ## 2026-10-23
 
 ### 5:54 PM CT: Renderings follow the plan again (f055008)

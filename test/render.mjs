@@ -214,3 +214,22 @@ console.log('render cancel test passed');
   assert.ok(R.CAPTURE.w / R.CAPTURE.h === 16 / 9 && R.CAPTURE.ratio >= 2, 'a 16:9 picture drawn at twice the size');
 }
 console.log('render base style test passed');
+
+// ---- tiny homes: their own group in the brief, with their size, and the prompt keeps them small
+{
+  const B = await import('../lib/buildings.mjs'), t550 = B.BUILDING_TYPES.find(t => t.tiny && t.sf === 550);
+  assert.ok(t550 && t550.use === 'sfr' && t550.floors === 1 && t550.group === 'Tiny homes', 'a 550 sf tiny home in the building library');
+  assert.ok(B.BUILDING_TYPES.filter(t => t.tiny).length >= 4 && !B.HOUSE_PLANS.some(h => h.tiny), 'several sizes; never in a neighbourhood’s house plans');
+  const home = (i, x) => ({ ...B.fromType(t550, [x, 50]), id: 'h' + i });
+  const tp = { origin: [-95.92, 30.05], ring: [[0, 0], [400, 0], [400, 200], [0, 200]], front: 0, elements: [home(1, 30), home(2, 60), home(3, 90), { id: 'l', kind: 'lot', x: 30, y: 50, w: 25, d: 55, rot: 0 }] };
+  assert.equal(tp.elements[0].tiny, true, 'a piece placed from the type is marked tiny');
+  const br = R.briefOf(tp, { metrics: { acres: 1.8, spaces: 6 } });
+  assert.deepEqual(br.uses.map(u => [u.use, u.label, u.count, u.sf]), [['tiny', 'Tiny home', 3, 550]], 'tiny homes, not single-family homes');
+  const pr = R.renderPrompt(cleanBrief(JSON.parse(JSON.stringify(br))), 'front');
+  assert.match(pr, /3 1-storey tiny home buildings of about 550 sf each/, 'the count, storeys and size, through the server’s brief cleaning');
+  assert.match(pr, /do not enlarge them/, 'told to keep them small'); assert.match(pr, /tiny homes: compact one-storey cottages/, 'their own materials');
+  assert.doesNotMatch(pr, /single-family homes: brick/, 'not the house look');
+  const hero = R.renderPrompt(cleanBrief(JSON.parse(JSON.stringify(R.briefOf(tp, { focus: tp.elements[0] })))), 'hero');
+  assert.match(hero, /tiny home building/i, 'a close-up of one says what it is');
+}
+console.log('render tiny homes test passed');
