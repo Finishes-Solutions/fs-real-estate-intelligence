@@ -1,3 +1,4 @@
+// @ts-check
 // Local development server: the assembled app (public/, from `node build.mjs --assemble`) plus the Vercel functions in
 // api/, with the small part of Vercel's request/response helpers they use (req.query, req.body, res.status/json/send).
 // No Vercel login or project link needed. Env vars come from the shell or a .env file in the repo root (see

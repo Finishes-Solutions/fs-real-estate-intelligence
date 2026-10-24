@@ -1,3 +1,4 @@
+// @ts-check
 // Runs every feasibility test (test/fz-*.mjs) one after another, each in its own Node process, and stops at the
 // first failure: `npm run test:fz`. New fz-*.mjs files are picked up without editing package.json.
 import { readdirSync } from 'node:fs';
