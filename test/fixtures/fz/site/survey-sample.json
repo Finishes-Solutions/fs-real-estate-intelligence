@@ -1,0 +1,11 @@
+{
+ "description": "Four-call boundary survey of a trapezoidal two-lot tract (about 2.18 ac): 160 ft front widening to 287 ft at the rear. A closed traverse from the point of beginning, distances in feet. The source preset carries no anchor; the anchor here is an illustrative point of beginning at a Houston-area latitude, used only for placement tests.",
+ "calls": [
+  "N42°00'00\"E 160.00",
+  "S28°53'49\"E 450.00",
+  "S42°00'00\"W 287.00",
+  "N15°10'39\"W 506.00"
+ ],
+ "anchor": { "lat": 29.78, "lon": -95.12 },
+ "expect": { "areaSf": 95036, "acres": 2.18, "closureFt": 0.001 }
+}
