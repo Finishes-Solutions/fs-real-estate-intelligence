@@ -8,7 +8,7 @@ Branch: `experimental` (never main/staging). Read `CLAUDE.md` (hard rules and in
 | 0 Setup | Done |
 | 1 Audit (`docs/AUDIT.md`) | Done |
 | 2 Plan (`docs/INTEGRATION_PLAN.md`) | Done |
-| 3 Build | In progress (B1 next) |
+| 3 Build | In progress: B1–B5 done, B6 (reports + API) next |
 | 4 System flow + UI overhaul | Not started |
 | 5 Verify and review | Not started |
 
@@ -21,8 +21,12 @@ Branch: `experimental` (never main/staging). Read `CLAUDE.md` (hard rules and in
 
 - Phase 2: `docs/INTEGRATION_PLAN.md`: winners per area, flow + Mermaid, folder structure, shared model, realism rules, scope statement, build phases B1–B8.
 
+- Phase 3 B1: `scripts/dev.mjs` (local app + API), ESLint + `tsc` (`npm run lint`, `npm run typecheck`, `npm run check`), `.env.example`, `npm run test:fz`, portable fixes to the macOS-failing tests (local Chrome detection, no GNU `date`, streetnet deletion/loop-lane checks). Fixed a real bug: duplicate `setTab` in `src/siteplan.js` broke the site-plan editor's Layers/Items tabs.
+- Phase 3 B2–B5 (`lib/feasibility/`): finance primitives; ported investment engine (5 reference deals reproduce), budget roll-up/CSI/guard rails/impact fees (default budget reproduces to the dollar), envelope + survey (placement fixed); cost library, budget from layout, escalation (PPI), assumptions register (FRED rates, appraisal land, ZORI check), pro forma adapter (NPV, break-evens, hold analysis), sensitivity, fact/risk registers, pipeline. `lib/proforma.mjs` takes a budget (`budgetIn`) and has the lease-up/forward-NOI fixes. `test/fz-e2e.mjs` runs one project end to end offline.
+
 ## Next
-- Phase 3, B1 Foundations (see the plan's §7 table for acceptance criteria).
+- B6: `lib/reports/feasibility.mjs` (report set HTML → PDF via `lib/pdf.mjs`), `lib/feasibility/xlsx.mjs`, `api/feasibility.js` (compute, pdf, xlsx, csv, json; optional guarded Claude narrative), report-sets Storage migration.
+- Then Phase 4 (workspace UI `src/workspace.js`), Phase 5 (verify, sample run, infra grep, reviews).
 
 ## Blocked
 - Nothing yet.
