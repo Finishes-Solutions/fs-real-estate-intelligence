@@ -9,17 +9,15 @@
 //   POST { op: 'link', path }                                  -> { url } a 10-minute signed link to a stored file
 // The project travels in the request (the browser holds it, as api/projects.js does), so nothing here reads another
 // app's data. Same team passcode as projects (FIELD_ACCESS_CODE, header x-field-code).
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { rateLimit, sameOrigin, clip } from './_lib/guard.mjs';
-import { load } from './_lib/data.mjs';
+import { market as marketFromData } from './_lib/data.mjs';
+import { storage, signedUrl, noBucket } from './_lib/storage.mjs';
 import { conn } from './field.js';
 import * as kit from '../src/reportkit.js';
-import { render } from '../lib/pdf.mjs';
+import { render, inlineLogo } from '../lib/pdf.mjs';
 import { planSVG } from '../lib/sitesheet.mjs';
 import { runStudy, compareScenarios } from '../lib/feasibility/pipeline.mjs';
 import { optionOf } from '../lib/feasibility/model.mjs';
-import { marketContext } from '../lib/feasibility/market.mjs';
 import { feasibilityReport } from '../lib/reports/feasibility.mjs';
 import { workbookBuffer, registerCsv, budgetCsv } from '../lib/feasibility/xlsx.mjs';
 import { checkNarrative, checkRenderedHtml } from '../lib/feasibility/guards.mjs';
@@ -27,16 +25,8 @@ import { claudeText, serverModel } from '../lib/anthropic.mjs';
 
 const ID = /^[\w-]{3,60}$/, MAX_BODY = 600000;
 const bucket = () => process.env.REPORT_SETS_BUCKET || 'report-sets';
-const enc = p => p.split('/').map(encodeURIComponent).join('/');
-const slug = s => String(s || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'project';
-
-export async function marketFromData() {
-  const [area, markets] = await Promise.all([load('area.json').catch(() => null), load('markets.json').catch(() => null)]);
-  return marketContext({ area, markets });
-}
-let logoP = null;
-const logo = () => logoP ||= fs.readFile(path.join(process.cwd(), 'src', 'logo-white.png')).then(b => 'data:image/png;base64,' + b.toString('base64')).catch(() => null);
-const withLogo = async html => { const l = await logo(); return l ? html.split('src="logo-white.png"').join('src="' + l + '"') : html.replace(/<img src="logo-white\.png"[^>]*>/, ''); };
+const slug = s => kit.slug(s || 'project');
+export { marketFromData };
 
 // the plain-English commentary, when turned on: Claude reads the study's figures and writes a paragraph; the guards
 // drop it unless it adds no number of its own (lib/feasibility/guards.mjs)
@@ -53,25 +43,29 @@ export async function narrativeFor(study, env = process.env) {
   } catch (e) { return { text: '', skipped: 'error', error: e.message }; }
 }
 
-// every file of the set: [{ name, type, buf }]
-export async function reportFiles(project, study, { narrative = '', scenarios = [] } = {}) {
-  const base = 'fs-feasibility-' + slug(project.name) + (study.scenario ? '-' + slug(study.scenario.name) : '') + '-' + study.inputsHash;
+// the study without its bulk (the hold engine's normalized input, metrics); monthly flows only when asked
+const slim = (s, { monthly = false } = {}) => s.missing ? s : { ...s, metrics: undefined, pf: { headline: s.pf.headline, breakEven: s.pf.breakEven, annual: s.pf.R.annual, sched: s.pf.R.sched, ...(monthly ? { monthly: s.pf.R.monthly } : {}) },
+  hold: s.hold?.result ? { summary: s.hold.result.summary, annual: s.hold.result.annual } : s.hold, budget: monthly ? { ...s.budget, doc: undefined } : { totals: s.budget.totals, escalation: s.budget.escalation, csi: s.budget.csi } };
+const baseName = (project, study) => 'fs-feasibility-' + slug(project.name) + (study.scenario ? '-' + slug(study.scenario.name) : '') + '-' + study.inputsHash;
+
+// the Feasibility report PDF: { name, type, buf }
+export async function reportPdf(project, study, { narrative = '', scenarios = [] } = {}) {
   const opt = optionOf(project), planSvg = opt && (opt.ring || []).length >= 3 ? planSVG(opt, { px: 900 }).svg : '';
-  const html = await withLogo(feasibilityReport(kit).reportHtml(study, { planSvg, narrative, scenarios }));
+  const html = await inlineLogo(feasibilityReport(kit).reportHtml(study, { planSvg, narrative, scenarios }));
   const chk = checkRenderedHtml(html, { title: project.name }); if (!chk.ok) throw Object.assign(new Error('The report did not pass its checks: ' + chk.problems.join('; ')), { status: 500 });
-  const pdf = Buffer.from(await render(html, { title: 'Feasibility report · ' + clip(project.name, 60) }));
-  const json = Buffer.from(JSON.stringify({ ...study, pf: { headline: study.pf.headline, breakEven: study.pf.breakEven, annual: study.pf.R.annual, monthly: study.pf.R.monthly, sched: study.pf.R.sched } }, null, 1));
+  return { name: baseName(project, study) + '.pdf', type: 'application/pdf', buf: Buffer.from(await render(html, { title: 'Feasibility report · ' + clip(project.name, 60) })) };
+}
+// every file of the set: [{ name, type, buf }]
+export async function reportFiles(project, study, o = {}) {
+  const base = baseName(project, study);
   return [
-    { name: base + '.pdf', type: 'application/pdf', buf: pdf },
-    { name: base + '.xlsx', type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buf: await workbookBuffer(study, { scenarios }) },
+    await reportPdf(project, study, o),
+    { name: base + '.xlsx', type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buf: await workbookBuffer(study, { scenarios: o.scenarios || [] }) },
     { name: base + '-register.csv', type: 'text/csv', buf: Buffer.from(registerCsv(study)) },
     { name: base + '-budget.csv', type: 'text/csv', buf: Buffer.from(budgetCsv(study)) },
-    { name: base + '.json', type: 'application/json', buf: json }
+    { name: base + '.json', type: 'application/json', buf: Buffer.from(JSON.stringify(slim(study, { monthly: true }), null, 1)) }
   ];
 }
-
-// the summary the workspace shows (the full study is large: monthly arrays and the hold engine's normalized input)
-const summary = s => s.missing ? s : { ...s, pf: { headline: s.pf.headline, breakEven: s.pf.breakEven, annual: s.pf.R.annual, sched: s.pf.R.sched }, hold: s.hold?.result ? { summary: s.hold.result.summary, annual: s.hold.result.annual } : s.hold, metrics: undefined, budget: { totals: s.budget.totals, escalation: s.budget.escalation, csi: s.budget.csi } };
 
 export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 30, perDay: 1500 })) return;
@@ -84,15 +78,14 @@ export default async function handler(req, res) {
     if (b.op === 'link') {
       const db = conn(); if (!db) return res.status(503).json({ error: 'Report storage needs SUPABASE_SECRET_KEY on the site.', local: true });
       const p = String(b.path || ''); if (!/^projects\/[\w-]{3,60}\/reports\/[\w-]+\/[\w.-]+$/.test(p)) return res.status(400).json({ error: 'Not a report file.' });
-      const r = await db.json('/storage/v1/object/sign/' + bucket() + '/' + enc(p), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 600 }) });
-      return res.json({ url: db.url + '/storage/v1' + r.signedURL });
+      return res.json({ url: signedUrl(db, await storage(db, bucket()).signGet(p)) });
     }
     const project = b.project;
     if (!project || typeof project !== 'object' || !ID.test(String(project.id || ''))) return res.status(400).json({ error: 'Send the project.' });
     if (JSON.stringify(project).length > MAX_BODY) return res.status(413).json({ error: 'The project is too large to send.' });
     const market = await marketFromData(), scenarioId = b.scenarioId === undefined ? undefined : b.scenarioId || null;
-    const study = runStudy(project, { market, scenarioId });
-    if (b.op === 'study') return res.json({ study: summary(study), scenarios: study.missing ? [] : compareScenarios(project, { market }) });
+    const study = runStudy(project, { market, scenarioId, sensitivity: !(b.op === 'file' && b.kind === 'budget') }); // (the budget CSV has no sensitivity in it)
+    if (b.op === 'study') return res.json({ study: slim(study), scenarios: study.missing ? [] : compareScenarios(project, { market }) });
     if (study.missing) return res.status(409).json({ error: study.missing === 'site' ? 'Draw or generate a site option first.' : 'Lay out the site option first.', missing: study.missing });
     // (input notes, e.g. a change to an assumption the chosen option doesn't use, don't stop a report: they're listed on it)
     const full = b.op === 'save' || (b.op === 'file' && ['pdf', 'xlsx'].includes(b.kind)), scenarios = full ? compareScenarios(project, { market }) : [];
@@ -100,14 +93,14 @@ export default async function handler(req, res) {
     if (b.op === 'file') {
       if (['register', 'budget'].includes(b.kind)) { res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', 'attachment; filename="fs-feasibility-' + slug(project.name) + '-' + b.kind + '.csv"'); return res.status(200).send(b.kind === 'register' ? registerCsv(study) : budgetCsv(study)); }
       if (b.kind === 'xlsx') { res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.setHeader('Content-Disposition', 'attachment; filename="fs-feasibility-' + slug(project.name) + '.xlsx"'); return res.status(200).send(await workbookBuffer(study, { scenarios })); }
-      if (b.kind === 'json') return res.json(summary(study));
-      if (b.kind === 'pdf') { const f = (await reportFiles(project, study, { narrative: nar.text, scenarios }))[0]; res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Content-Disposition', 'attachment; filename="' + f.name + '"'); return res.status(200).send(f.buf); }
+      if (b.kind === 'json') return res.json(slim(study, { monthly: true }));
+      if (b.kind === 'pdf') { const f = await reportPdf(project, study, { narrative: nar.text, scenarios }); res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Content-Disposition', 'attachment; filename="' + f.name + '"'); return res.status(200).send(f.buf); }
       return res.status(400).json({ error: 'Unknown file kind.' });
     }
     if (b.op === 'save') {
       const db = conn(); if (!db) return res.status(503).json({ error: 'Saving report sets needs SUPABASE_SECRET_KEY on the site; download the files instead.', local: true });
       const files = await reportFiles(project, study, { narrative: nar.text, scenarios }), id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), dir = 'projects/' + project.id + '/reports/' + id + '/';
-      for (const f of files) await db.call('/storage/v1/object/' + bucket() + '/' + enc(dir + f.name), { method: 'POST', body: f.buf, headers: { 'Content-Type': f.type, 'x-upsert': 'true' } });
+      const st = storage(db, bucket()); await Promise.all(files.map(f => st.put(dir + f.name, f.buf, f.type)));
       const report = { id, kind: 'feasibility', created: new Date().toISOString(), by: clip(b.by, 80), scenario: study.scenario?.id || null, inputsHash: study.inputsHash,
         files: files.map(f => ({ name: f.name, type: f.type, bytes: f.buf.length, path: dir + f.name })), headline: { totalCost: study.pf.headline.totalCost, levIrr: study.pf.headline.levIrr, yoc: study.pf.headline.yoc }, narrative: nar.text ? 'on' : nar.skipped || 'off' };
       return res.json({ report });
@@ -115,7 +108,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Unknown op.' });
   } catch (e) {
     console.error('feasibility', e.message);
-    if (/bucket|not found/i.test(e.message) && b.op === 'save') return res.status(503).json({ error: 'The report-sets storage bucket isn’t set up yet; download the files instead.', local: true });
+    if (noBucket(e) && b.op === 'save') return res.status(503).json({ error: 'The report-sets storage bucket isn’t set up yet; download the files instead.', local: true });
     return res.status(e.status || 500).json({ error: 'The study couldn’t be made: ' + clip(e.message, 300) });
   }
 }

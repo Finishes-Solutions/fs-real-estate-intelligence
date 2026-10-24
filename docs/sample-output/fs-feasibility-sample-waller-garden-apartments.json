@@ -354,59 +354,6 @@
  },
  "errors": [],
  "scenario": null,
- "metrics": {
-  "acres": 15.974204900137739,
-  "siteSf": 695836.3654499999,
-  "devSf": 674621.6374744194,
-  "uses": {
-   "amenity": {
-    "gsf": 5400,
-    "units": 0
-   },
-   "multifamily": {
-    "gsf": 420210.89999999997,
-    "units": 389
-   }
-  },
-  "mix": [
-   {
-    "name": "Studio",
-    "sf": 550,
-    "n": 39
-   },
-   {
-    "name": "1 BR",
-    "sf": 760,
-    "n": 175
-   },
-   {
-    "name": "2 BR",
-    "sf": 1100,
-    "n": 136
-   },
-   {
-    "name": "3 BR",
-    "sf": 1350,
-    "n": 39
-   }
-  ],
-  "stalls": 657,
-  "deck": 0,
-  "parkingSf": 112428,
-  "truckSf": 0,
-  "pavedSf": 158041.55395581463,
-  "detentionAcFt": 8.785812695075757,
-  "vaultAcFt": 0,
-  "amenities": {
-   "court": 0,
-   "pool": 2240,
-   "play": 0
-  },
-  "outdoorRentSf": 0,
-  "fuel": null,
-  "trucks": 0,
-  "custom": null
- },
  "register": [
   {
    "key": "landPrice",
@@ -4314,7 +4261,7 @@
    "markups": [
     {
      "code": "99 01 00",
-     "desc": "Profit — GC fee on library lines (12%)",
+     "desc": "Profit — GC fee on library lines",
      "total": 5402659.041600001
     },
     {
@@ -4873,1081 +4820,12 @@
    "contract": 58846996.355100006,
    "project": 71198349.34546392
   },
-  "doc": {
-   "resSF": 420210.89999999997,
-   "amenSF": 5400,
-   "units": [
-    {
-     "count": 389
-    }
-   ],
-   "lines": [
-    {
-     "lineId": "lib:res|01 01 00|Project Management",
-     "code": "01 01 00",
-     "grp": "General Conditions",
-     "scope": "res",
-     "desc": "Project Management",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 3365768.22
-    },
-    {
-     "lineId": "lib:res|01 02 00|Insurance",
-     "code": "01 02 00",
-     "grp": "General Conditions",
-     "scope": "res",
-     "desc": "Insurance",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 682129.03
-    },
-    {
-     "lineId": "lib:res|01 04 00|Equipment & Supplies",
-     "code": "01 04 00",
-     "grp": "General Conditions",
-     "scope": "res",
-     "desc": "Equipment & Supplies",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 314138.37
-    },
-    {
-     "lineId": "lib:res|01 05 00|Security",
-     "code": "01 05 00",
-     "grp": "General Conditions",
-     "scope": "res",
-     "desc": "Security",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 80778.44
-    },
-    {
-     "lineId": "lib:res|01 50 00|Temporary Facilities (Toilets, Fencing, Power, Water)",
-     "code": "01 50 00",
-     "grp": "General Conditions",
-     "scope": "res",
-     "desc": "Temporary Facilities (Toilets, Fencing, Power, Water)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 538522.91
-    },
-    {
-     "lineId": "lib:res|01 70 00|Execution & Closeout",
-     "code": "01 70 00",
-     "grp": "General Conditions",
-     "scope": "res",
-     "desc": "Execution & Closeout",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 246823
-    },
-    {
-     "lineId": "lib:res|01 74 00|Construction Waste Management & Disposal",
-     "code": "01 74 00",
-     "grp": "General Conditions",
-     "scope": "res",
-     "desc": "Construction Waste Management & Disposal",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 978316.63
-    },
-    {
-     "lineId": "lib:res|01 06 00|Testing & Surveying",
-     "code": "01 06 00",
-     "grp": "Infrastructure",
-     "scope": "res",
-     "desc": "Testing & Surveying",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 179507.64
-    },
-    {
-     "lineId": "lib:res|01 07 00|Inspections",
-     "code": "01 07 00",
-     "grp": "Infrastructure",
-     "scope": "res",
-     "desc": "Inspections",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 291699.91
-    },
-    {
-     "lineId": "lib:res|03 30 00|Foundation / Slab w/ Termite Treatment",
-     "code": "03 30 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Foundation / Slab w/ Termite Treatment",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 2356037.75
-    },
-    {
-     "lineId": "lib:res|04 40 00|Stone Assemblies",
-     "code": "04 40 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Stone Assemblies",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 372478.35
-    },
-    {
-     "lineId": "lib:res|05 10 00|Structural Metal / Stairs / Handrails / Dumpster Doors",
-     "code": "05 10 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Structural Metal / Stairs / Handrails / Dumpster Doors",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 695592.1
-    },
-    {
-     "lineId": "lib:res|06 10 00|Rough Carpentry / Framing / Roof Framing / Sheathing / Siding",
-     "code": "06 10 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Rough Carpentry / Framing / Roof Framing / Sheathing / Siding",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 9222204.92
-    },
-    {
-     "lineId": "lib:res|07 21 00|Insulation",
-     "code": "07 21 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Insulation",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 623789.04
-    },
-    {
-     "lineId": "lib:res|07 40 00|Roofing",
-     "code": "07 40 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Roofing",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 574424.44
-    },
-    {
-     "lineId": "lib:res|07 60 00|Gutters / Downspouts",
-     "code": "07 60 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Gutters / Downspouts",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 148093.8
-    },
-    {
-     "lineId": "lib:res|08 10 00|Doors & Frames (Exterior)",
-     "code": "08 10 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Doors & Frames (Exterior)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 1121922.74
-    },
-    {
-     "lineId": "lib:res|08 50 00|Windows",
-     "code": "08 50 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Windows",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 543010.61
-    },
-    {
-     "lineId": "lib:res|08 70 00|Door Hardware (Exterior)",
-     "code": "08 70 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Door Hardware (Exterior)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 44876.91
-    },
-    {
-     "lineId": "lib:res|09 90 00|Exterior Painting & Coating",
-     "code": "09 90 00",
-     "grp": "Shell of Building",
-     "scope": "res",
-     "desc": "Exterior Painting & Coating",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 210921.47
-    },
-    {
-     "lineId": "lib:res|21 10 00|Water-Based Fire Suppression",
-     "code": "21 10 00",
-     "grp": "Services (MEPS)",
-     "scope": "res",
-     "desc": "Water-Based Fire Suppression",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 628276.73
-    },
-    {
-     "lineId": "lib:res|22 05 00|Plumbing",
-     "code": "22 05 00",
-     "grp": "Services (MEPS)",
-     "scope": "res",
-     "desc": "Plumbing",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 3644005.06
-    },
-    {
-     "lineId": "lib:res|23 05 00|HVAC",
-     "code": "23 05 00",
-     "grp": "Services (MEPS)",
-     "scope": "res",
-     "desc": "HVAC",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 2607348.45
-    },
-    {
-     "lineId": "lib:res|26 05 00|Electrical",
-     "code": "26 05 00",
-     "grp": "Services (MEPS)",
-     "scope": "res",
-     "desc": "Electrical",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 2912511.43
-    },
-    {
-     "lineId": "lib:res|27 10 00|Structured Cabling (Ethernet & Cameras)",
-     "code": "27 10 00",
-     "grp": "Services (MEPS)",
-     "scope": "res",
-     "desc": "Structured Cabling (Ethernet & Cameras)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 363502.97
-    },
-    {
-     "lineId": "lib:res|28 46 00|Fire Detection & Alarm",
-     "code": "28 46 00",
-     "grp": "Services (MEPS)",
-     "scope": "res",
-     "desc": "Fire Detection & Alarm",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 610325.97
-    },
-    {
-     "lineId": "lib:res|06 20 00|Finish Carpentry / Baseboards / Casing / Trim",
-     "code": "06 20 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Finish Carpentry / Baseboards / Casing / Trim",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 955878.17
-    },
-    {
-     "lineId": "lib:res|08 11 00|Interior Doors & Frames",
-     "code": "08 11 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Interior Doors & Frames",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 587887.52
-    },
-    {
-     "lineId": "lib:res|08 71 00|Interior Door Hardware",
-     "code": "08 71 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Interior Door Hardware",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 89753.82
-    },
-    {
-     "lineId": "lib:res|08 83 00|Mirrors",
-     "code": "08 83 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Mirrors",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 130143.04
-    },
-    {
-     "lineId": "lib:res|09 20 00|Plaster & Gypsum Board",
-     "code": "09 20 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Plaster & Gypsum Board",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 2118190.13
-    },
-    {
-     "lineId": "lib:res|09 30 00|Tiling / Bathroom & Backsplash",
-     "code": "09 30 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Tiling / Bathroom & Backsplash",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 430818.33
-    },
-    {
-     "lineId": "lib:res|09 60 00|Flooring",
-     "code": "09 60 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Flooring",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 803296.68
-    },
-    {
-     "lineId": "lib:res|09 91 00|Interior Painting & Coating",
-     "code": "09 91 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Interior Painting & Coating",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 978316.63
-    },
-    {
-     "lineId": "lib:res|10 14 00|Signage / Unit & Building Numbers",
-     "code": "10 14 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Signage / Unit & Building Numbers",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 44876.91
-    },
-    {
-     "lineId": "lib:res|10 28 00|Toilet, Bath & Laundry Accessories",
-     "code": "10 28 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Toilet, Bath & Laundry Accessories",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 278236.84
-    },
-    {
-     "lineId": "lib:res|11 31 00|Residential Appliances",
-     "code": "11 31 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Residential Appliances",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 1561716.45
-    },
-    {
-     "lineId": "lib:res|12 21 00|Window Blinds",
-     "code": "12 21 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Window Blinds",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 148093.8
-    },
-    {
-     "lineId": "lib:res|12 30 00|Casework / Stock Cabinets",
-     "code": "12 30 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Casework / Stock Cabinets",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 902025.88
-    },
-    {
-     "lineId": "lib:res|12 36 00|Countertops",
-     "code": "12 36 00",
-     "grp": "Interiors",
-     "scope": "res",
-     "desc": "Countertops",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 507109.08
-    },
-    {
-     "lineId": "lib:res|10 55 00|Mailboxes",
-     "code": "10 55 00",
-     "grp": "Site Finish",
-     "scope": "res",
-     "desc": "Mailboxes",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 112192.27
-    },
-    {
-     "lineId": "lib:res|28 10 00|Electronic Access Control & Intrusion Detection",
-     "code": "28 10 00",
-     "grp": "Site Finish",
-     "scope": "res",
-     "desc": "Electronic Access Control & Intrusion Detection",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 511596.77
-    },
-    {
-     "lineId": "lib:res|32 31 00|Fences & Gates / Motors",
-     "code": "32 31 00",
-     "grp": "Site Finish",
-     "scope": "res",
-     "desc": "Fences & Gates / Motors",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 583399.82
-    },
-    {
-     "lineId": "lib:res|32 33 00|Site Furnishings / Benches / Bike Racks",
-     "code": "32 33 00",
-     "grp": "Site Finish",
-     "scope": "res",
-     "desc": "Site Furnishings / Benches / Bike Racks",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 197458.4
-    },
-    {
-     "lineId": "lib:amen|08 10 00|Doors & Frames",
-     "code": "08 10 00",
-     "grp": "Amenity Shell & Openings",
-     "scope": "amen",
-     "desc": "Doors & Frames (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 14417.48
-    },
-    {
-     "lineId": "lib:amen|08 40 00|Storefront / Glass Partitions",
-     "code": "08 40 00",
-     "grp": "Amenity Shell & Openings",
-     "scope": "amen",
-     "desc": "Storefront / Glass Partitions (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 122029.56
-    },
-    {
-     "lineId": "lib:amen|22 30 00|Plumbing Fixtures",
-     "code": "22 30 00",
-     "grp": "Amenity MEP & Low Voltage",
-     "scope": "amen",
-     "desc": "Plumbing Fixtures (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 23933.02
-    },
-    {
-     "lineId": "lib:amen|26 50 00|Light Fixtures",
-     "code": "26 50 00",
-     "grp": "Amenity MEP & Low Voltage",
-     "scope": "amen",
-     "desc": "Light Fixtures (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 23760.01
-    },
-    {
-     "lineId": "lib:amen|27 10 00|Structured Cabling (Ethernet & Cameras)",
-     "code": "27 10 00",
-     "grp": "Amenity MEP & Low Voltage",
-     "scope": "amen",
-     "desc": "Structured Cabling (Ethernet & Cameras) (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 54440.41
-    },
-    {
-     "lineId": "lib:amen|27 11 00|Communications Equipment Room",
-     "code": "27 11 00",
-     "grp": "Amenity MEP & Low Voltage",
-     "scope": "amen",
-     "desc": "Communications Equipment Room (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 39388.56
-    },
-    {
-     "lineId": "lib:amen|28 10 00|Access Control / Intrusion Detection",
-     "code": "28 10 00",
-     "grp": "Amenity MEP & Low Voltage",
-     "scope": "amen",
-     "desc": "Access Control / Intrusion Detection (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 68223.52
-    },
-    {
-     "lineId": "lib:amen|28 20 00|Electronic Surveillance / Cameras",
-     "code": "28 20 00",
-     "grp": "Amenity MEP & Low Voltage",
-     "scope": "amen",
-     "desc": "Electronic Surveillance / Cameras (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 23067.97
-    },
-    {
-     "lineId": "lib:amen|28 46 00|Fire Detection & Alarm",
-     "code": "28 46 00",
-     "grp": "Amenity MEP & Low Voltage",
-     "scope": "amen",
-     "desc": "Fire Detection & Alarm (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 28834.96
-    },
-    {
-     "lineId": "lib:amen|06 20 00|Finish Carpentry / Millwork / Trim",
-     "code": "06 20 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Finish Carpentry / Millwork / Trim (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 45962.93
-    },
-    {
-     "lineId": "lib:amen|08 11 00|Interior Doors & Frames",
-     "code": "08 11 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Interior Doors & Frames (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 25144.09
-    },
-    {
-     "lineId": "lib:amen|08 71 00|Door Hardware",
-     "code": "08 71 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Door Hardware (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 17243.31
-    },
-    {
-     "lineId": "lib:amen|09 30 00|Tiling / Bathroom & Backsplash",
-     "code": "09 30 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Tiling / Bathroom & Backsplash (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 47347.01
-    },
-    {
-     "lineId": "lib:amen|09 60 00|Flooring",
-     "code": "09 60 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Flooring (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 27508.55
-    },
-    {
-     "lineId": "lib:amen|10 14 00|Signage",
-     "code": "10 14 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Signage (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 922.72
-    },
-    {
-     "lineId": "lib:amen|10 28 00|Toilet, Bath & Laundry Accessories",
-     "code": "10 28 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Toilet, Bath & Laundry Accessories (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 45789.92
-    },
-    {
-     "lineId": "lib:amen|10 44 00|Fire Protection Specialties / Extinguishers",
-     "code": "10 44 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Fire Protection Specialties / Extinguishers (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 749.71
-    },
-    {
-     "lineId": "lib:amen|11 60 00|Entertainment Equipment / Game & Media Room",
-     "code": "11 60 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Entertainment Equipment / Game & Media Room (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 17300.98
-    },
-    {
-     "lineId": "lib:amen|11 65 00|Athletic & Recreational / Fitness Equipment",
-     "code": "11 65 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Athletic & Recreational / Fitness Equipment (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 28834.96
-    },
-    {
-     "lineId": "lib:amen|12 30 00|Casework / Stock Cabinets",
-     "code": "12 30 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Casework / Stock Cabinets (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 30738.07
-    },
-    {
-     "lineId": "lib:amen|12 36 00|Countertops",
-     "code": "12 36 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Countertops (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 23067.97
-    },
-    {
-     "lineId": "lib:amen|12 50 00|Leasing Office / Clubhouse Furniture",
-     "code": "12 50 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Leasing Office / Clubhouse Furniture (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 10034.57
-    },
-    {
-     "lineId": "lib:amen|12 60 00|Multiple / Amenity Seating",
-     "code": "12 60 00",
-     "grp": "Amenity Interiors",
-     "scope": "amen",
-     "desc": "Multiple / Amenity Seating (amenity)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 5420.97
-    },
-    {
-     "lineId": "lib:soft|SC-01|Architect",
-     "code": "SC-01",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Architect",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 1113558.88
-    },
-    {
-     "lineId": "lib:soft|SC-02|Civil Engineer",
-     "code": "SC-02",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Civil Engineer",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 663933.22
-    },
-    {
-     "lineId": "lib:soft|SC-03|Structural Engineer",
-     "code": "SC-03",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Structural Engineer",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 491646.75
-    },
-    {
-     "lineId": "lib:soft|SC-04|MEP Engineer",
-     "code": "SC-04",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "MEP Engineer",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 138669.6
-    },
-    {
-     "lineId": "lib:soft|SC-05|Landscape Architect",
-     "code": "SC-05",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Landscape Architect",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 63031.63
-    },
-    {
-     "lineId": "lib:soft|SC-06|Geotechnical Engineer",
-     "code": "SC-06",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Geotechnical Engineer",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 75637.96
-    },
-    {
-     "lineId": "lib:soft|SC-07|Environmental Study",
-     "code": "SC-07",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Environmental Study",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 16808.44
-    },
-    {
-     "lineId": "lib:soft|SC-08|TxDOT Driveway Permitting",
-     "code": "SC-08",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "TxDOT Driveway Permitting",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 117659.05
-    },
-    {
-     "lineId": "lib:soft|SC-09|Traffic Impact Analysis",
-     "code": "SC-09",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Traffic Impact Analysis",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 151275.92
-    },
-    {
-     "lineId": "lib:soft|SC-10|Flood Plain Mitigation",
-     "code": "SC-10",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Flood Plain Mitigation",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 75637.96
-    },
-    {
-     "lineId": "lib:soft|SC-11|Pad Elevation Certificates",
-     "code": "SC-11",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Pad Elevation Certificates",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 92446.4
-    },
-    {
-     "lineId": "lib:soft|SC-12|A/E Construction Administration",
-     "code": "SC-12",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "A/E Construction Administration",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 163882.25
-    },
-    {
-     "lineId": "lib:soft|SC-13|Surveyor",
-     "code": "SC-13",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Surveyor",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 54627.42
-    },
-    {
-     "lineId": "lib:soft|SC-14|Renderings",
-     "code": "SC-14",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Renderings",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 42021.09
-    },
-    {
-     "lineId": "lib:soft|SC-15|Reimbursables",
-     "code": "SC-15",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Reimbursables",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 75637.96
-    },
-    {
-     "lineId": "lib:soft|SC-16|Plan Printing",
-     "code": "SC-16",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Plan Printing",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 25212.65
-    },
-    {
-     "lineId": "lib:soft|SC-17|Precon Services (6 mo)",
-     "code": "SC-17",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Precon Services (6 mo)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 121861.16
-    },
-    {
-     "lineId": "lib:soft|SC-18|Design Contingency (≈10%)",
-     "code": "SC-18",
-     "grp": "Soft Costs — Engineering & Design",
-     "scope": "soft",
-     "desc": "Design Contingency (≈10%)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 348775.05
-    },
-    {
-     "lineId": "lib:soft|SC-20|Water & Sewer Impact & Tap Fees",
-     "code": "SC-20",
-     "grp": "Soft Costs — Impact & Fees",
-     "scope": "soft",
-     "desc": "Water & Sewer Impact & Tap Fees",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 3151581.75
-    },
-    {
-     "lineId": "lib:soft|SC-21|Permitting & Inspection Fees",
-     "code": "SC-21",
-     "grp": "Soft Costs — Impact & Fees",
-     "scope": "soft",
-     "desc": "Permitting & Inspection Fees",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 189094.91
-    },
-    {
-     "lineId": "lib:soft|SC-22|Plan Review Fees",
-     "code": "SC-22",
-     "grp": "Soft Costs — Impact & Fees",
-     "scope": "soft",
-     "desc": "Plan Review Fees",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 63031.63
-    },
-    {
-     "lineId": "lib:soft|SC-23|Fees Contingency (≈10%)",
-     "code": "SC-23",
-     "grp": "Soft Costs — Impact & Fees",
-     "scope": "soft",
-     "desc": "Fees Contingency (≈10%)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 340370.83
-    },
-    {
-     "lineId": "site:prep",
-     "code": "31 00 00",
-     "grp": "Division 31 — Earthwork",
-     "scope": "res",
-     "desc": "Site preparation: clearing, mass grading, lime-stabilized pads, erosion control, on-site utilities, landscaping, lighting",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 2152532.16
-    },
-    {
-     "lineId": "site:paving",
-     "code": "32 12 00",
-     "grp": "Division 32 — Exterior Improvements",
-     "scope": "res",
-     "desc": "Drives, fire lanes and plazas outside the parking lots (concrete; truck courts at 1.25×)",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 1260667.86
-    },
-    {
-     "lineId": "site:stalls",
-     "code": "32 17 00",
-     "grp": "Division 32 — Exterior Improvements",
-     "scope": "res",
-     "desc": "Surface parking spaces: paving, striping, lighting, islands",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 1921614.16
-    },
-    {
-     "lineId": "site:pond",
-     "code": "33 46 00",
-     "grp": "Division 33 — Utilities",
-     "scope": "res",
-     "desc": "Detention pond: excavation, outfall structure, slopes and seeding",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 280331.13
-    },
-    {
-     "lineId": "site:amenities",
-     "code": "11 68 00",
-     "grp": "Division 11 — Equipment",
-     "scope": "res",
-     "desc": "Amenity pieces on the plan: courts, pool and deck, playground",
-     "basis": "ls",
-     "auto": false,
-     "qty": 1,
-     "unit": 262064.88
-    }
-   ],
-   "companies": [
-    {
-     "name": "GC fee on library lines (12%)",
-     "pct": 10.614392990606055
-    }
-   ],
-   "contingency": {
-    "mode": "pct",
-    "val": 5
-   },
-   "projectCosts": {
-    "land": 2638999.9999999995,
-    "dev": {
-     "mode": "pct",
-     "val": 3
-    },
-    "mkt": {
-     "mode": "amt",
-     "val": 0
-    },
-    "cls": {
-     "mode": "amt",
-     "val": 0
-    }
-   }
-  },
   "parts": {
    "res": 50175207.620000005,
    "amen": 724161.2499999999,
    "soft": 7576402.509999999,
    "hard": 50899368.870000005,
+   "feeHard": 45022158.68000001,
    "profit": 5402659.041600001,
    "cont": 2544968.4435,
    "contract": 58846996.355100006,
@@ -7642,6 +6520,14 @@
     "levered": 43045594.15897459
    }
   ],
+  "sched": {
+   "pre": 9,
+   "build": 25,
+   "lease": 19,
+   "toStabilize": 53,
+   "total": 113,
+   "sale": 113
+  },
   "monthly": {
    "cost": [
     2638999.9999999995,
@@ -8107,559 +6993,176 @@
     383411.2891977092,
     81151833.268224
    ]
-  },
-  "sched": {
-   "pre": 9,
-   "build": 25,
-   "lease": 19,
-   "toStabilize": 53,
-   "total": 113,
-   "sale": 113
   }
  },
  "hold": {
-  "input": {
-   "schemaVersion": 1,
-   "analysisName": "Stabilized hold",
-   "property": {
-    "name": "Stabilized hold",
-    "size": {
-     "unit": "units",
-     "value": 389
-    },
-    "unitCount": 389,
-    "purchaseMonth": "2031-03"
-   },
-   "projection": {
-    "years": 5,
-    "taxMode": "beforeTax"
-   },
-   "acquisition": {
-    "basis": {
-     "mode": "purchasePrice",
-     "value": 79227648
-    },
-    "costPercent": 0
-   },
-   "income": {
-    "mode": "aggregate",
-    "year1PotentialIncome": 8416600,
-    "growth": {
-     "mode": "constant",
-     "value": 0.03
-    },
-    "otherIncome": [
-     {
-      "label": "Other income",
-      "year1Amount": 394041,
-      "growth": {
-       "mode": "constant",
-       "value": 0.03
-      }
-     }
-    ]
-   },
-   "vacancy": {
-    "mode": "constant",
-    "value": 0.07999999999999999
-   },
-   "expenses": {
-    "mode": "annualDollar",
-    "value": 3768966,
-    "growth": {
-     "mode": "constant",
-     "value": 0.03
-    }
-   },
-   "capitalExpenses": [],
-   "financing": {
-    "loans": [
-     {
-      "label": "Permanent loan",
-      "kind": "newAmortizing",
-      "amount": {
-       "mode": "amount",
-       "value": 40961477
-      },
-      "annualRate": 0.06709999999999999,
-      "amortizationYears": 30,
-      "termYears": 10,
-      "feePercent": 0.01,
-      "interestCalculation": "30/360"
-     }
-    ]
-   },
-   "disposition": {
-    "exitCapRate": {
-     "mode": "constant",
-     "value": 0.0575
-    },
-    "sellingCostPercent": 0.02
-   },
-   "reportOptions": {
-    "includeSensitivity": true
-   }
+  "summary": {
+   "purchasePrice": 79227648,
+   "acquisitionCapRate": 0.05045783411366699,
+   "acquisitionCosts": 0,
+   "loanFees": 409614.77,
+   "unleveragedInitialInvestment": 79227648,
+   "initialEquity": 38675785.769999996,
+   "year1NOI": 3997655.5200000005,
+   "year1PotentialIncome": 7702381,
+   "grossRentMultiplier": 10.28612425170866,
+   "pricePerSquareFoot": null,
+   "pricePerUnit": 203670.04627249358,
+   "normalizedSquareFeet": null,
+   "initialLTV": 0.5170098827116514,
+   "terminalYearNOI": 4634378.402318286,
+   "optimalHoldingYear": 5,
+   "optimalHoldingYield": 0.036440227391887486,
+   "finalYearEquityIRR": 0.036440227391887486,
+   "finalYearEquityMultiple": 1.1867666934417955
   },
-  "result": {
-   "inputSchemaVersion": 1,
-   "calculationVersion": "before-tax-1.1.0",
-   "normalizedInput": {
-    "schemaVersion": 1,
-    "analysisName": "Stabilized hold",
-    "source": null,
-    "property": {
-     "name": "Stabilized hold",
-     "address": "",
-     "city": "",
-     "state": "",
-     "postalCode": "",
-     "size": {
-      "unit": "units",
-      "value": 389,
-      "normalizedSquareFeet": null
-     },
-     "unitCount": 389,
-     "purchaseMonth": "2031-03"
-    },
-    "projection": {
-     "years": 5,
-     "taxMode": "beforeTax"
-    },
-    "acquisition": {
-     "basis": {
-      "mode": "purchasePrice",
-      "value": 79227648
-     },
-     "costPercent": 0
-    },
-    "income": {
-     "mode": "aggregate",
-     "year1PotentialIncome": 8416600,
-     "growth": {
-      "mode": "constant",
-      "value": 0.03
-     },
-     "otherIncome": [
-      {
-       "label": "Other income",
-       "year1Amount": 394041,
-       "growth": {
-        "mode": "constant",
-        "value": 0.03
-       }
-      }
-     ]
-    },
-    "vacancy": {
-     "mode": "constant",
-     "value": 0.07999999999999999
-    },
-    "expenses": {
-     "mode": "annualDollar",
-     "value": 3768966,
-     "growth": {
-      "mode": "constant",
-      "value": 0.03
-     },
-     "override": false,
-     "derivedFrom": null
-    },
-    "capitalExpenses": [],
-    "financing": {
-     "loans": [
-      {
-       "label": "Permanent loan",
-       "kind": "newAmortizing",
-       "amount": {
-        "mode": "amount",
-        "value": 40961477
-       },
-       "annualRate": 0.06709999999999999,
-       "amortizationYears": 30,
-       "termYears": 10,
-       "feePercent": 0.01,
-       "interestCalculation": "30/360"
-      }
-     ]
-    },
-    "disposition": {
-     "exitCapRate": {
-      "mode": "constant",
-      "value": 0.0575
-     },
-     "sellingCostPercent": 0.02
-    },
-    "reportOptions": {
-     "includeSensitivity": true
-    }
+  "annual": [
+   {
+    "year": 1,
+    "periodEnd": "2032-02",
+    "potentialIncome": 7702381,
+    "vacancyLoss": 616190.4799999999,
+    "effectiveRentalIncome": 7086190.5200000005,
+    "otherIncome": 360603,
+    "grossOperatingIncome": 7446793.5200000005,
+    "operatingExpenses": 3449138,
+    "netOperatingIncome": 3997655.5200000005,
+    "capitalExpenses": 0,
+    "debtService": 3175045.8624067,
+    "cashFlowBeforeTaxes": 822609.6575933006,
+    "endingLoanBalance": 40521581.04510853,
+    "grossSalePrice": 71610000,
+    "sellingCosts": 1432200,
+    "netSaleProceeds": 29656218.954891473,
+    "projectedLTV": 0.5658648379431438,
+    "dscr": 1.2590859134770918,
+    "debtYield": 0.09759549246722721,
+    "cashOnCash": 0.021269371551628093,
+    "unleveragedCashOnCash": 0.05045783411366699,
+    "returnOnEquity": 0.02773818398240616,
+    "equityMultiple": 0.7880597124448488,
+    "propertyIRR": -0.06376804824476791,
+    "effectiveLoanRate": 0.07754920500758603,
+    "equityIRR": -0.21194028755559455,
+    "leverageImpact": -0.14817223931082663
    },
-   "summary": {
-    "purchasePrice": 79227648,
-    "acquisitionCapRate": 0.05513664876180598,
-    "acquisitionCosts": 0,
-    "loanFees": 409614.77,
-    "unleveragedInitialInvestment": 79227648,
-    "initialEquity": 38675785.769999996,
-    "year1NOI": 4368347,
-    "year1PotentialIncome": 8416600,
-    "grossRentMultiplier": 9.413260461469001,
-    "pricePerSquareFoot": null,
-    "pricePerUnit": 203670.04627249358,
-    "normalizedSquareFeet": null,
-    "initialLTV": 0.5170098827116514,
-    "terminalYearNOI": 5064111.424646183,
-    "optimalHoldingYear": 5,
-    "optimalHoldingYield": 0.07801060922637303,
-    "finalYearEquityIRR": 0.07801060922637303,
-    "finalYearEquityMultiple": 1.4270351514943778
+   {
+    "year": 2,
+    "periodEnd": "2033-02",
+    "potentialIncome": 7933452.430000001,
+    "vacancyLoss": 634676.1943999999,
+    "effectiveRentalIncome": 7298776.2356,
+    "otherIncome": 371421.09,
+    "grossOperatingIncome": 7670197.3256,
+    "operatingExpenses": 3552612.14,
+    "netOperatingIncome": 4117585.1856,
+    "capitalExpenses": 0,
+    "debtService": 3175045.8624067,
+    "cashFlowBeforeTaxes": 942539.3231933,
+    "endingLoanBalance": 40051243.16569674,
+    "grossSalePrice": 73758000,
+    "sellingCosts": 1475160,
+    "netSaleProceeds": 32231596.83430326,
+    "projectedLTV": 0.543008801292019,
+    "dscr": 1.2968584908814045,
+    "debtYield": 0.100523357241244,
+    "cashOnCash": 0.024370269522084494,
+    "unleveragedCashOnCash": 0.051971569137077,
+    "returnOnEquity": 0.029242712610198066,
+    "equityMultiple": 0.8790188780459227,
+    "propertyIRR": 0.0075484667644218646,
+    "effectiveLoanRate": 0.07233881962880566,
+    "equityIRR": -0.06315658880875864,
+    "leverageImpact": -0.0707050555731805
    },
-   "loans": [
-    {
-     "label": "Permanent loan",
-     "principal": 40961477,
-     "annualRate": 0.06709999999999999,
-     "amortizationYears": 30,
-     "termYears": 10,
-     "feePercent": 0.01,
-     "fees": 409614.77,
-     "monthlyPayment": 264587.1552005583,
-     "annualDebtService": 3175045.8624067,
-     "interestCalculation": "30/360"
-    }
-   ],
-   "annual": [
-    {
-     "year": 1,
-     "periodEnd": "2032-02",
-     "potentialIncome": 8416600,
-     "vacancyLoss": 673327.9999999999,
-     "effectiveRentalIncome": 7743272,
-     "otherIncome": 394041,
-     "grossOperatingIncome": 8137313,
-     "operatingExpenses": 3768966,
-     "netOperatingIncome": 4368347,
-     "capitalExpenses": 0,
-     "debtService": 3175045.8624067,
-     "cashFlowBeforeTaxes": 1193301.1375933,
-     "endingLoanBalance": 40521581.04510853,
-     "grossSalePrice": 78250000,
-     "sellingCosts": 1565000,
-     "netSaleProceeds": 36163418.95489147,
-     "projectedLTV": 0.5178476810876489,
-     "dscr": 1.3758374490656247,
-     "debtYield": 0.10664525109775705,
-     "cashOnCash": 0.030853959753777492,
-     "unleveragedCashOnCash": 0.05513664876180598,
-     "returnOnEquity": 0.03299746462251722,
-     "equityMultiple": 0.9658942759337964,
-     "propertyIRR": 0.023043710700732203,
-     "effectiveLoanRate": 0.07754920500758603,
-     "equityIRR": -0.03410572406646749,
-     "leverageImpact": -0.05714943476719969
-    },
-    {
-     "year": 2,
-     "periodEnd": "2033-02",
-     "potentialIncome": 8669098,
-     "vacancyLoss": 693527.8399999999,
-     "effectiveRentalIncome": 7975570.16,
-     "otherIncome": 405862.23000000004,
-     "grossOperatingIncome": 8381432.390000001,
-     "operatingExpenses": 3882034.98,
-     "netOperatingIncome": 4499397.41,
-     "capitalExpenses": 0,
-     "debtService": 3175045.8624067,
-     "cashFlowBeforeTaxes": 1324351.5475933002,
-     "endingLoanBalance": 40051243.16569674,
-     "grossSalePrice": 80598000,
-     "sellingCosts": 1611960,
-     "netSaleProceeds": 38934796.83430326,
-     "projectedLTV": 0.49692601758972604,
-     "dscr": 1.4171125725375933,
-     "debtYield": 0.10984460863068976,
-     "cashOnCash": 0.03424239537029839,
-     "unleveragedCashOnCash": 0.05679074822466016,
-     "returnOnEquity": 0.034014600184750124,
-     "equityMultiple": 1.071793337723048,
-     "propertyIRR": 0.054457422210139446,
-     "effectiveLoanRate": 0.07233881962880566,
-     "equityIRR": 0.035807972289757496,
-     "leverageImpact": -0.01864944992038195
-    },
-    {
-     "year": 3,
-     "periodEnd": "2034-02",
-     "potentialIncome": 8929170.94,
-     "vacancyLoss": 714333.6751999998,
-     "effectiveRentalIncome": 8214837.2648,
-     "otherIncome": 418038.0969,
-     "grossOperatingIncome": 8632875.3617,
-     "operatingExpenses": 3998496.0294,
-     "netOperatingIncome": 4634379.3323,
-     "capitalExpenses": 0,
-     "debtService": 3175045.8624067,
-     "cashFlowBeforeTaxes": 1459333.4698933,
-     "endingLoanBalance": 39548356.702773586,
-     "grossSalePrice": 83016000,
-     "sellingCosts": 1660320,
-     "netSaleProceeds": 41807323.297226414,
-     "projectedLTV": 0.47639439027143665,
-     "dscr": 1.4596259497137212,
-     "debtYield": 0.11313994688961045,
-     "cashOnCash": 0.03773248405531491,
-     "unleveragedCashOnCash": 0.05849447067139996,
-     "returnOnEquity": 0.03490616846044567,
-     "equityMultiple": 1.183797783051644,
-     "propertyIRR": 0.06513133829831262,
-     "effectiveLoanRate": 0.07060311009941939,
-     "equityIRR": 0.05958709879625072,
-     "leverageImpact": -0.005544239502061898
-    },
-    {
-     "year": 4,
-     "periodEnd": "2035-02",
-     "potentialIncome": 9197046.0682,
-     "vacancyLoss": 735763.6854559998,
-     "effectiveRentalIncome": 8461282.382744,
-     "otherIncome": 430579.239807,
-     "grossOperatingIncome": 8891861.622551,
-     "operatingExpenses": 4118450.910282,
-     "netOperatingIncome": 4773410.712269,
-     "capitalExpenses": 0,
-     "debtService": 3175045.8624067,
-     "cashFlowBeforeTaxes": 1598364.8498622999,
-     "endingLoanBalance": 39010669.21116088,
-     "grossSalePrice": 85506000,
-     "sellingCosts": 1710120,
-     "netSaleProceeds": 44785210.78883912,
-     "projectedLTV": 0.4562331206133006,
-     "dscr": 1.5034147282051327,
-     "debtYield": 0.11653414529629876,
-     "cashOnCash": 0.04132727540088192,
-     "unleveragedCashOnCash": 0.06024930479154196,
-     "returnOnEquity": 0.0356895685363309,
-     "equityMultiple": 1.302121231441016,
-     "propertyIRR": 0.07049986711034592,
-     "effectiveLoanRate": 0.06973263981112857,
-     "equityIRR": 0.07125152534919071,
-     "leverageImpact": 0.0007516582388447934
-    },
-    {
-     "year": 5,
-     "periodEnd": "2036-02",
-     "potentialIncome": 9472957.450246,
-     "vacancyLoss": 757836.5960196799,
-     "effectiveRentalIncome": 8715120.854226321,
-     "otherIncome": 443496.61700121005,
-     "grossOperatingIncome": 9158617.47122753,
-     "operatingExpenses": 4242004.43759046,
-     "netOperatingIncome": 4916613.03363707,
-     "capitalExpenses": 0,
-     "debtService": 3175045.8624067,
-     "cashFlowBeforeTaxes": 1741567.1712303702,
-     "endingLoanBalance": 38435772.37071653,
-     "grossSalePrice": 88072000,
-     "sellingCosts": 1761440,
-     "netSaleProceeds": 47874787.62928347,
-     "projectedLTV": 0.43641307533287,
-     "dscr": 1.5485171700512868,
-     "debtYield": 0.12003016965518773,
-     "cashOnCash": 0.045029910486815955,
-     "unleveragedCashOnCash": 0.062056783935288226,
-     "returnOnEquity": 0.03637754353535992,
-     "equityMultiple": 1.4270351514943778,
-     "propertyIRR": 0.07373064658445179,
-     "effectiveLoanRate": 0.06920755440545978,
-     "equityIRR": 0.07801060922637303,
-     "leverageImpact": 0.004279962641921237
-    }
-   ],
-   "sensitivity": [
-    {
-     "factor": 0.9,
-     "purchasePrice": 71304883,
-     "acquisitionCapRate": 0.06126294324050711,
-     "pricePerSquareFoot": null,
-     "loanAmount": 36865329.19659802,
-     "initialEquity": 34808207.09536795,
-     "unleveragedCoC": [
-      0.06126294324050711,
-      0.06310083153772232,
-      0.06499385648385399,
-      0.0669436721783696,
-      0.0689519823437207
-     ],
-     "leveragedCoC": [
-      0.043403721648450334,
-      0.047168650121811415,
-      0.051046526449373325,
-      0.05504073906676209,
-      0.05915477806267253
-     ],
-     "unleveragedIRR": [
-      0.1367152373002839,
-      0.11311096490076569,
-      0.10535965543588886,
-      0.10150909700678962,
-      0.09921300424121385
-     ],
-     "leveragedIRR": [
-      0.1987512823977982,
-      0.15362697897683897,
-      0.1384995177293123,
-      0.130698264675001,
-      0.1258274067558246
-     ]
-    },
-    {
-     "factor": 0.95,
-     "purchasePrice": 75266266,
-     "acquisitionCapRate": 0.05803857733556225,
-     "pricePerSquareFoot": null,
-     "loanAmount": 38913403.35680395,
-     "initialEquity": 36741996.676764086,
-     "unleveragedCoC": [
-      0.05803857733556225,
-      0.05977973465562913,
-      0.061573126695298,
-      0.06342032049615694,
-      0.06532293011104165
-     ],
-     "leveragedCoC": [
-      0.03679858301056062,
-      0.04036535732478501,
-      0.04403913486843612,
-      0.047823125738396775,
-      0.05172063633445626
-     ],
-     "unleveragedIRR": [
-      0.07688811080375751,
-      0.08260525263234009,
-      0.08451394384153463,
-      0.0854666089459235,
-      0.08604025465418652
-     ],
-     "leveragedIRR": [
-      0.07619494838850091,
-      0.09305657238048418,
-      0.09818667667082054,
-      0.10039228597071473,
-      0.10146093145682444
-     ]
-    },
-    {
-     "factor": 1,
-     "purchasePrice": 79227648,
-     "acquisitionCapRate": 0.05513664876180598,
-     "pricePerSquareFoot": null,
-     "loanAmount": 40961477,
-     "initialEquity": 38675785.769999996,
-     "unleveragedCoC": [
-      0.05513664876180598,
-      0.05679074822466016,
-      0.05849447067139996,
-      0.06024930479154196,
-      0.062056783935288226
-     ],
-     "leveragedCoC": [
-      0.030853959753777492,
-      0.03424239537029839,
-      0.03773248405531491,
-      0.04132727540088192,
-      0.045029910486815955
-     ],
-     "unleveragedIRR": [
-      0.023043710700732203,
-      0.054457422210139446,
-      0.06513133829831262,
-      0.07049986711034592,
-      0.07373064658445179
-     ],
-     "leveragedIRR": [
-      -0.03410572406646749,
-      0.035807972289757496,
-      0.05958709879625072,
-      0.07125152534919071,
-      0.07801060922637303
-     ]
-    },
-    {
-     "factor": 1.05,
-     "purchasePrice": 83189030,
-     "acquisitionCapRate": 0.05251109431135331,
-     "pricePerSquareFoot": null,
-     "loanAmount": 43009550.64319605,
-     "initialEquity": 40609574.86323592,
-     "unleveragedCoC": [
-      0.05251109431135331,
-      0.054086427140693914,
-      0.05570901995491473,
-      0.05738029055356217,
-      0.059101699270169034
-     ],
-     "leveragedCoC": [
-      0.02547549103843333,
-      0.028702572593493902,
-      0.032026466595206284,
-      0.03545007741697004,
-      0.038976396563386716
-     ],
-     "unleveragedIRR": [
-      -0.025672651790897703,
-      0.028379497878138156,
-      0.04704207038415678,
-      0.056486615629455464,
-      0.06218686129761512
-     ],
-     "leveragedIRR": [
-      -0.13390157158316562,
-      -0.01859755403913173,
-      0.022428111424743408,
-      0.04308250007249349,
-      0.05532423858966018
-     ]
-    },
-    {
-     "factor": 1.1,
-     "purchasePrice": 87150413,
-     "acquisitionCapRate": 0.050124226032067114,
-     "pricePerSquareFoot": null,
-     "loanAmount": 45057624.80340198,
-     "initialEquity": 42543364.44463204,
-     "unleveragedCoC": [
-      0.050124226032067114,
-      0.05162795281302913,
-      0.053176791397419994,
-      0.05477209513934259,
-      0.05641525799352288
-     ],
-     "leveragedCoC": [
-      0.02058597280140921,
-      0.02366636880935906,
-      0.026839176697547398,
-      0.030107168822381385,
-      0.03347320071096041
-     ],
-     "unleveragedIRR": [
-      -0.06996026513362325,
-      0.004130373600764141,
-      0.0301031010532047,
-      0.04332362418140992,
-      0.05132668215804981
-     ],
-     "leveragedIRR": [
-      -0.224625092019647,
-      -0.07057197304218699,
-      -0.013529913224483166,
-      0.015714495671257503,
-      0.03326801600908843
-     ]
-    }
-   ],
-   "warnings": [
-    "Leverage is negative in at least one year — borrowing lowers the equity return."
-   ]
-  }
+   {
+    "year": 3,
+    "periodEnd": "2034-02",
+    "potentialIncome": 8171456.0029,
+    "vacancyLoss": 653716.4802319999,
+    "effectiveRentalIncome": 7517739.522668,
+    "otherIncome": 382563.7227,
+    "grossOperatingIncome": 7900303.245368,
+    "operatingExpenses": 3659190.5042,
+    "netOperatingIncome": 4241112.741168,
+    "capitalExpenses": 0,
+    "debtService": 3175045.8624067,
+    "cashFlowBeforeTaxes": 1066066.8787613,
+    "endingLoanBalance": 39548356.702773586,
+    "grossSalePrice": 75971000,
+    "sellingCosts": 1519420,
+    "netSaleProceeds": 34903223.297226414,
+    "projectedLTV": 0.5205717537319976,
+    "dscr": 1.3357642456078465,
+    "debtYield": 0.10353905795848133,
+    "cashOnCash": 0.027564194431654594,
+    "unleveragedCashOnCash": 0.0535307162111893,
+    "returnOnEquity": 0.030543507964378033,
+    "equityMultiple": 0.9756605691523954,
+    "propertyIRR": 0.03249879287971646,
+    "effectiveLoanRate": 0.07060311009941939,
+    "equityIRR": -0.008369151548194287,
+    "leverageImpact": -0.040867944427910745
+   },
+   {
+    "year": 4,
+    "periodEnd": "2035-02",
+    "potentialIncome": 8416599.682987,
+    "vacancyLoss": 673327.97463896,
+    "effectiveRentalIncome": 7743271.7083480405,
+    "otherIncome": 394040.634381,
+    "grossOperatingIncome": 8137312.34272904,
+    "operatingExpenses": 3768966.219326,
+    "netOperatingIncome": 4368346.123403041,
+    "capitalExpenses": 0,
+    "debtService": 3175045.8624067,
+    "cashFlowBeforeTaxes": 1193300.2609963408,
+    "endingLoanBalance": 39010669.21116088,
+    "grossSalePrice": 78250000,
+    "sellingCosts": 1565000,
+    "netSaleProceeds": 37674330.78883912,
+    "projectedLTV": 0.4985389036570081,
+    "dscr": 1.375837172976082,
+    "debtYield": 0.10664522969723579,
+    "cashOnCash": 0.030853937088511824,
+    "unleveragedCashOnCash": 0.05513663769752499,
+    "returnOnEquity": 0.031674093102931816,
+    "equityMultiple": 1.0781641815207355,
+    "propertyIRR": 0.04518868442671843,
+    "effectiveLoanRate": 0.06973263981112857,
+    "equityIRR": 0.019651067816708282,
+    "leverageImpact": -0.02553761661001015
+   },
+   {
+    "year": 5,
+    "periodEnd": "2036-02",
+    "potentialIncome": 8669097.67347661,
+    "vacancyLoss": 693527.8138781288,
+    "effectiveRentalIncome": 7975569.859598482,
+    "otherIncome": 405861.85341243003,
+    "grossOperatingIncome": 8381431.713010912,
+    "operatingExpenses": 3882035.2059057807,
+    "netOperatingIncome": 4499396.507105131,
+    "capitalExpenses": 0,
+    "debtService": 3175045.8624067,
+    "cashFlowBeforeTaxes": 1324350.6446984308,
+    "endingLoanBalance": 38435772.37071653,
+    "grossSalePrice": 80598000,
+    "sellingCosts": 1611960,
+    "netSaleProceeds": 40550267.62928347,
+    "projectedLTV": 0.4768824582584745,
+    "dscr": 1.4171122881653642,
+    "debtYield": 0.10984458658815283,
+    "cashOnCash": 0.03424237202507472,
+    "unleveragedCashOnCash": 0.056790736828450726,
+    "returnOnEquity": 0.03265947975500038,
+    "equityMultiple": 1.1867666934417955,
+    "propertyIRR": 0.05286592465203893,
+    "effectiveLoanRate": 0.06920755440545978,
+    "equityIRR": 0.036440227391887486,
+    "leverageImpact": -0.016425697260151445
+   }
+  ]
  },
  "sensitivity": {
   "metric": "levIrr",
@@ -8679,11 +7182,11 @@
     {
      "id": "cost",
      "label": "Hard and site cost",
-     "loText": "−10%",
-     "hiText": "+10%",
-     "lo": 0.06890622270240732,
-     "hi": 0.004721407485094531,
-     "swing": 0.06418481521731279
+     "loText": "+10%",
+     "hiText": "−10%",
+     "lo": 0.00006133263068508477,
+     "hi": 0.07497481696117236,
+     "swing": 0.07491348433048728
     },
     {
      "id": "exitCap",
@@ -8751,18 +7254,18 @@
     ],
     "cells": [
      [
-      0.010817556569622466,
-      0.040485130711992,
-      0.06890622270240732,
-      0.09625035238192625,
-      0.12264270404225375
+      0.016436027552555244,
+      0.04632424403972091,
+      0.07497481696117236,
+      0.10255345309501096,
+      0.12918234754495317
      ],
      [
-      -0.0056603894520577125,
-      0.023543060554188866,
-      0.05149478991679457,
-      0.0783748043574346,
-      0.10431597961329842
+      -0.0030365239258988153,
+      0.026264710338840702,
+      0.0543194668912399,
+      0.08130587742328221,
+      0.10735534782241252
      ],
      [
       -0.021243108644853348,
@@ -8772,18 +7275,18 @@
       0.08700423560465698
      ],
      [
-      -0.03601962296269412,
-      -0.0076256919856867444,
-      0.01948696614432399,
-      0.04551992748304401,
-      0.07062216993377568
+      -0.03833733142351259,
+      -0.010019173091904143,
+      0.01701128602092572,
+      0.042957459429219025,
+      0.06796974220280982
      ],
      [
-      -0.0500689678121049,
-      -0.02202187172827408,
-      0.004721407485094531,
-      0.030373459643653344,
-      0.0550915032549788
+      -0.05445069356556498,
+      -0.026535904459511483,
+      0.00006133263068508477,
+      0.02555729023345865,
+      0.050111988188299206
      ]
     ]
    },
@@ -9281,7 +7784,7 @@
    "confidence": "low"
   },
   {
-   "group": "Exit & returns",
+   "group": "Exit and returns",
    "label": "Market cap rate",
    "value": "5.50%",
    "source": "House assumption: Going-in cap rate by use, Houston suburban 2026 (UNVERIFIED: the platform has no sale comps)",
@@ -9291,7 +7794,7 @@
    "confidence": "low"
   },
   {
-   "group": "Exit & returns",
+   "group": "Exit and returns",
    "label": "Exit cap rate",
    "value": "5.75%",
    "source": "House assumption: Exit cap = market cap + 0.25%",
@@ -9301,7 +7804,7 @@
    "confidence": "low"
   },
   {
-   "group": "Exit & returns",
+   "group": "Exit and returns",
    "label": "Sale costs",
    "value": "2%",
    "source": "House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026)",
@@ -9311,7 +7814,7 @@
    "confidence": "low"
   },
   {
-   "group": "Exit & returns",
+   "group": "Exit and returns",
    "label": "Rent growth",
    "value": "3%",
    "source": "House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026)",
@@ -9321,7 +7824,7 @@
    "confidence": "low"
   },
   {
-   "group": "Exit & returns",
+   "group": "Exit and returns",
    "label": "Expense growth",
    "value": "3%",
    "source": "House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026)",
@@ -9331,7 +7834,7 @@
    "confidence": "low"
   },
   {
-   "group": "Exit & returns",
+   "group": "Exit and returns",
    "label": "Hold after stabilizing",
    "value": "5 years",
    "source": "House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026)",
@@ -9341,7 +7844,7 @@
    "confidence": "low"
   },
   {
-   "group": "Exit & returns",
+   "group": "Exit and returns",
    "label": "Discount rate (NPV)",
    "value": "10%",
    "source": "House assumption: Discount rate for net present value: a levered development hurdle",
@@ -9401,7 +7904,7 @@
    "confidence": "medium"
   }
  ],
- "inputsHash": "332a5c7a",
+ "inputsHash": "74b2c4fe",
  "status": {
   "intake": {
    "state": "done"

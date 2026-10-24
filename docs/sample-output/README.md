@@ -1,6 +1,6 @@
 # Sample run: Sample: Waller garden apartments
 
-Made by `node scripts/sample-run.mjs` on 2026-10-24 — offline: every outbound request was refused (0 attempted). Inputs hash `332a5c7a`. 5.7 s.
+Made by `node scripts/sample-run.mjs` on 2026-10-24 — offline: every outbound request was refused (0 attempted). Inputs hash `74b2c4fe`. 5.4 s.
 
 Feasibility / schematic level only. The plan set is a schematic-design set for planning and pricing conversations. It is not a permit set and not construction documents, and it has not been prepared, sealed or reviewed by a licensed architect or engineer. Parcel lines come from appraisal-district or provider data, not a boundary survey. Costs are parametric estimates from a single-project workbook and house rates, not contractor bids. Market rents, cap rates and financing terms are assumptions, not appraisals. Use the outputs to decide whether to pursue a site, not to build from.
 
@@ -9,7 +9,7 @@ Feasibility / schematic level only. The plan set is a schematic-design set for p
 2. **Site** — the platform's layout engine: Rows running back · pond at the entry; 389 units, 425,611 gross sf, 657 of 623 parking spaces, buildable envelope 95% of the site at a 10 ft setback.
 3. **Plans** — 35-sheet schematic set listed; cover and site plan sheets printed on the title block (`plan-set-excerpt.pdf`), and the 11×17 site plan sheet (`site-plan-sheet.pdf`).
 4. **Budget** — 94 CSI lines: construction contract $58,846,996, project cost before financing $71,198,349.
-5. **Pro forma** — total development cost $79,227,648; stabilized NOI $3,853,211; yield on cost 4.86%; levered IRR 3.51%; unlevered IRR 5.33%; levered NPV at 10% $-11,255,356.
+5. **Pro forma** — total development cost $79,227,648; stabilized NOI $3,853,211; yield on cost 4.86%; levered IRR 3.51%; unlevered IRR 5.33%; levered NPV at 10% −$11,255,356.
 6. **Reports** — the files below.
 
 ## Scenarios

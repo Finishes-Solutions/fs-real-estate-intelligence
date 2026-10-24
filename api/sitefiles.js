@@ -15,20 +15,11 @@ import { conn as fieldConn } from './field.js';
 import { withRoom } from '../lib/openai.mjs';
 import { router, chatJSON, wantsClaude } from '../lib/airoute.mjs';
 import * as RF from '../lib/sitefiles.mjs';
+import { storage as shared, noBucket } from './_lib/storage.mjs';
 
 const B = RF.BUCKET, MAX_FILES = 50, PID = /^[\w-]{3,60}$/;
-const enc = p => p.split('/').map(encodeURIComponent).join('/');
-const J = { 'Content-Type': 'application/json' };
-export function storage(db) {
-  return {
-    list: pid => db.json('/storage/v1/object/list/' + B, { method: 'POST', headers: J, body: JSON.stringify({ prefix: 'projects/' + pid + '/', limit: 200, offset: 0, sortBy: { column: 'created_at', order: 'desc' } }) }),
-    signUpload: path => db.json('/storage/v1/object/upload/sign/' + B + '/' + enc(path), { method: 'POST', headers: J, body: '{}' }),
-    signGet: path => db.json('/storage/v1/object/sign/' + B + '/' + enc(path), { method: 'POST', headers: J, body: JSON.stringify({ expiresIn: 600 }) }),
-    get: path => db.call('/storage/v1/object/' + B + '/' + enc(path)),
-    remove: paths => db.call('/storage/v1/object/' + B, { method: 'DELETE', headers: J, body: JSON.stringify({ prefixes: paths }) })
-  };
-}
-const noBucket = e => /bucket not found/i.test(e?.message || '');
+// (the storage calls: api/_lib/storage.mjs, on this bucket)
+export const storage = db => { const st = shared(db, B); return { ...st, list: pid => st.list('projects/' + pid + '/') }; };
 const newId = () => (Date.now().toString(36) + Math.random().toString(36).slice(2, 10)).slice(0, 20);
 
 // ---------- the AI reads one file ----------

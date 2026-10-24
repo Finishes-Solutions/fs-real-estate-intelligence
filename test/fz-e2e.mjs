@@ -67,9 +67,10 @@ assert.ok(tor.rows.find(r => r.id === 'cost').lo < tor.rows.find(r => r.id === '
 assert.ok(tor.rows.every(r => r.lo <= tor.base + 1e-9 && r.hi >= tor.base - 1e-9), 'every low case at or below the base, every high case at or above');
 for (const g of s.sensitivity.grids) near(g.cells[2][2], tor.base, 1e-9, 'grid centre = base');
 assert.ok(s.risks.length && s.risks.every(r => ['high', 'medium', 'low'].includes(r.level)), 'risk register'); assert.ok(s.facts.length > s.register.length, 'fact register');
-// a cost case moves the soft costs and the developer fee with it; the hold grows rents from the end of construction
+// a cost case scales the budget's lines before the roll-up: soft costs, contingency and the developer fee follow; the hold grows rents from the end of construction
 { const ctx = P.prepare(apt, { market }), a = P.evaluate(ctx, ctx.values), b = P.evaluate(ctx, ctx.values, { costFactor: 1.1 });
-  near(b.pf.R.budget.soft, a.pf.R.budget.soft * 1.1, 0.01, 'soft costs +10%'); near(b.pf.R.budget.fee, a.pf.R.budget.fee * 1.1, 0.01, 'developer fee +10%'); near(b.pf.R.budget.land, a.pf.R.budget.land, 0, 'land unchanged');
+  near(b.pf.R.budget.soft, a.pf.R.budget.soft * 1.1, 0.01, 'soft costs +10%'); near(b.budget.totals.devFee, 0.03 * b.budget.totals.project, 0.01, 'the developer fee still 3% of the (larger) total'); assert.ok(b.pf.R.budget.fee > a.pf.R.budget.fee * 1.05, 'and it rose with the cost');
+  near(b.budget.totals.contingency, a.budget.totals.contingency * 1.1, 0.05, 'contingency follows the hard cost'); near(b.pf.R.budget.land, a.pf.R.budget.land, 0, 'land unchanged');
   const yr = Math.floor((R.sched.toStabilize + 1 - R.sched.pre - R.sched.build) / 12); near(s.hold.result.summary.year1PotentialIncome, Math.round(R.ops.lines.filter(l => l.kind === 'rent' || l.kind === 'rec').reduce((x, l) => x + l.v, 0) * (1 + R.A.rentGrowth / 100) ** yr), 1, 'hold year-1 income grown as the development model grows it'); }
 // determinism
 const s2 = P.runStudy(apt, { market, today: '2026-10-24' }); assert.equal(s2.inputsHash, s.inputsHash); assert.deepEqual(s2.pf.headline, s.pf.headline, 'same inputs, same answer');

@@ -4478,7 +4478,7 @@ export function initSitePlan(ctx) {
   }
   // the Feasibility tab: the step-by-step workspace (src/workspace.js), saving and opening options through this page
   const WS = workspace({ save, openOption: (pid, plid) => open(pid, plid), newPlan: (p, extra) => newPlan(p, extra), setTab: (p, t) => setTab(p, t, true), goMap: () => ctx.setView('map'),
-    code: () => get(CODE_KEY), name: () => get(NAME_KEY), toast: m => ctx.toast?.(m) });
+    code: () => get(CODE_KEY), name: () => get(NAME_KEY), toast: m => ctx.toast?.(m), saveFile: (n, d, m) => ctx.saveFile(n, d, m) });
   function detailHtml(p) {
     const tab = tabFor(p), body = { workspace: WS.html, overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, files: SF.html, ask: pAskHtml }[tab](p);
     return headHtml(p) + tabsHtml(p, tab) + '<div class="pj-panel pj-p-' + tab + '" id="pjPanel" role="tabpanel" aria-labelledby="pjTab-' + tab + '">' + body + '</div>';

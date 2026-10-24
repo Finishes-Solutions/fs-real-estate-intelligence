@@ -14,7 +14,6 @@ if (!localChrome()) { console.error('No local Chrome/Chromium: set CHROME_PATH t
 const root = new URL('..', import.meta.url).pathname, out = root + 'docs/sample-output/';
 process.chdir(root);
 const { sampleProject } = await import('./sample-project.mjs');
-const { marketContext } = await import('../lib/feasibility/market.mjs');
 const P = await import('../lib/feasibility/pipeline.mjs');
 const API = await import('../api/feasibility.js');
 const { render, closeBrowser } = await import('../lib/pdf.mjs');
@@ -23,7 +22,7 @@ const PS = await import('../lib/planset.mjs');
 const { onBorder } = await import('../api/planset.js');
 
 const t0 = Date.now();
-const market = marketContext({ area: JSON.parse(await readFile('data/area.json', 'utf8')), markets: JSON.parse(await readFile('data/markets.json', 'utf8')) });
+const market = await API.marketFromData(); // (the platform's committed data files: api/_lib/data.mjs)
 // 1-2 intake and site: the parcels, laid out by the platform's layout engine
 const project = await sampleProject({ market }), option = project.plans[0];
 // 3-6 plan set data, budget, pro forma, sensitivity, scenarios, registers

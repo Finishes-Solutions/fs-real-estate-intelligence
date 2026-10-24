@@ -4,16 +4,16 @@
 // to docs/screenshots/. Uses the local Chrome (CHROME_PATH or the usual install paths). Also fails on page errors.
 //   node scripts/screenshots.mjs
 import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
 import { writeFile } from 'node:fs/promises';
 import { sampleProject } from './sample-project.mjs';
-import { marketContext } from '../lib/feasibility/market.mjs';
+import { market as marketFromData } from '../api/_lib/data.mjs';
 import { localChrome } from '../test/helpers/chrome.mjs';
 
 const root = new URL('..', import.meta.url).pathname, out = root + 'docs/screenshots/', PORT = 8797;
-const market = marketContext({ area: JSON.parse(await readFile(root + 'data/area.json', 'utf8')), markets: JSON.parse(await readFile(root + 'data/markets.json', 'utf8')) });
+process.chdir(root); const market = await marketFromData();
 const project = await sampleProject({ market });
 await mkdir(out, { recursive: true });
 

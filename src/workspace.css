@@ -1,7 +1,7 @@
 /* The feasibility workspace (src/workspace.js): Projects › a project › Feasibility. Built on the app's tokens (app.css
    :root: --green-*, --ink-*, --sp-*, --fs-*, --r-*, --sh-*, --focus) and the Finishes Solutions brand: hairline borders,
    tight radii, mono uppercase labels and figures, one green. Components are documented in docs/DESIGN_SYSTEM.md. */
-.ws{--ws-warn:#8a5a12;--ws-warn-bg:#fdf6e9;--ws-err-bg:#fdf0ef;display:block;color:var(--text);font-size:var(--fs-sm);line-height:1.5}
+.ws{--ws-steps-h:66px;--ws-warn:#8a5a12;--ws-warn-bg:#fdf6e9;--ws-err-bg:#fdf0ef;display:block;color:var(--text);font-size:var(--fs-sm);line-height:1.5}
 .ws .kicker{font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:.14em;text-transform:uppercase;color:var(--green-700);font-weight:500}
 .ws .mono,.ws .m{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 .ws .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
@@ -12,7 +12,7 @@
 .ws p{margin:var(--sp-2) 0}
 
 /* ---- stepper ---- */
-.ws-steps{position:sticky;top:-20px;z-index:var(--z-ui);background:var(--panel-2);padding:var(--sp-2) 0 var(--sp-3);margin-bottom:var(--sp-2);border-bottom:1px solid var(--line)}
+.ws-steps{position:sticky;top:calc(-1 * var(--view-pt, 20px));z-index:var(--z-ui);background:var(--panel-2);padding:var(--sp-2) 0 var(--sp-3);margin-bottom:var(--sp-2);border-bottom:1px solid var(--line)}
 .ws-steps ol{list-style:none;display:flex;gap:var(--sp-1);margin:0;padding:0;overflow-x:auto;scrollbar-width:thin}
 .ws-steps li{flex:1 1 0;min-width:112px;position:relative}
 .ws-steps li+li:before{content:"";position:absolute;left:-2px;top:22px;width:4px;height:1px;background:var(--line-2)}
@@ -31,7 +31,7 @@
 .ws-main{min-width:0}
 .ws-sh{margin-bottom:var(--sp-3)}
 .ws-about{color:var(--text-2);margin-top:0}
-.ws-rail{position:sticky;top:76px}
+.ws-rail{position:sticky;top:calc(var(--ws-steps-h) - var(--view-pt, 20px) + var(--sp-4))} /* (under the stuck step bar) */
 .ws-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);box-shadow:var(--sh-1);padding:var(--sp-4);margin-bottom:var(--sp-4)}
 .ws-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-4);align-items:start}
 .ws-two.wide{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
@@ -166,7 +166,7 @@
 /* ---- responsive ---- */
 @media (max-width:1480px){.ws-two.wide{grid-template-columns:1fr}.ws-two.wide>.ws-card+.ws-card{margin-top:var(--sp-4)}}
 @media (max-width:1100px){.ws-kpis.big{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:900px){.ws-steps{top:-14px}.ws-grid{grid-template-columns:1fr}.ws-rail{position:static;order:-1}.ws-rail .ws-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ws-two{grid-template-columns:1fr}}
+@media (max-width:900px){.ws-grid{grid-template-columns:1fr}.ws-rail{position:static;order:-1}.ws-rail .ws-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ws-two{grid-template-columns:1fr}}
 @media (max-width:560px){.ws-steps li{min-width:56px}.ws-sl{display:none}.ws-step[aria-current="step"] .ws-sl{display:inline}.ws-step[aria-current="step"]{flex:2 1 auto;min-width:150px}.ws-step[aria-current="step"] .ws-sl{overflow:hidden;text-overflow:ellipsis}
   .ws-rail .ws-kpis{grid-template-columns:1fr 1fr}.ws-a{grid-template-columns:1fr auto}.ws-a .ws-src{grid-column:1}.ws-dl>div{grid-template-columns:1fr}.ws-files .btn{min-width:0;width:100%}.ws-t{font-size:11px}}
 .ws-scroll:focus-visible{outline:2px solid var(--focus);outline-offset:2px}

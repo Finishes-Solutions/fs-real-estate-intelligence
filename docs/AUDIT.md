@@ -1356,7 +1356,7 @@ database.windows.net
 fs-bd-budget
 fs-bd-governance
 fs-lender-package
-fs-budgeting-suite
+fs-budgeting-suite        (match: (Initial Catalog|Database|database)\s*[=:]\s*fs-budgeting-suite|fs-budgeting-suite\.(database|azure))
 stapp-fs-budgeting-prod
 rg-finishes-data-prod
 rg-fs-budgeting-prod
@@ -1383,7 +1383,7 @@ automation@finishessolutions.com
 svc_automation@finishessolutions.com
 FS_ALLOW_ANON
 FS_EXPORT_RENDERER
-ANTHROPIC_EFFORT
+ANTHROPIC_EFFORT        (own: this platform's own variable, on main before the integration)
 ANTHROPIC_FALLBACKS
 52e20e96… (digest redacted)
 ADMIN_PASS_SHA256
@@ -1391,7 +1391,9 @@ fs-courier
 dbo.
 ```
 
-Caveats on this list:
+Caveats on this list (the final check, `scripts/infra-grep.mjs`, reads the annotations: `(own: …)` skips a name this
+platform already used before the integration; `(match: …)` checks the identifier only in the form that would name the
+source infrastructure, here the database, since the repo name itself appears in provenance comments):
 
 - `matthews@finishessolutions.com` is hardcoded as the feedback recipient (`app/index.html:4387`; `app/feedback.js:284,296`; `app/login.html:101`). It is also the user's own address, so grep it but expect a legitimate match.
 - The role names `pricing_admin` / `super_admin` stay only if the target adopts them.
@@ -1856,7 +1858,7 @@ SMOKE_ASSET_BASE
 EMIT_SHEET_HTML
 IMAGE_INPUT_FIDELITY
 ANTHROPIC_FALLBACKS
-ANTHROPIC_EFFORT
+ANTHROPIC_EFFORT        (own: this platform's own variable, on main before the integration)
 OPENAI_MAX_TOKENS
 BLOB_READ_WRITE_TOKEN
 REPORT_TZ

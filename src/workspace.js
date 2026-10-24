@@ -4,7 +4,8 @@
 // (lib/feasibility/pipeline.mjs); edits are saved on the project (project.fz) and synced with the team like the rest of
 // it (src/siteplan.js save). The report files come from api/feasibility.js; without it the report still opens here as a
 // page to print.
-// env (from src/siteplan.js): { save(p), openOption(pid, plid), newPlan(p, extra), setTab(p, tab), goMap(), code(), name(), toast(msg) }
+// env (from src/siteplan.js): { save(p), openOption(pid, plid), newPlan(p, extra), setTab(p, tab), goMap(), code(), name(), toast(msg),
+// saveFile(name, data, mime) (the app's own save: recorded on the Reports tab) }
 import * as P from './lib/feasibility/pipeline.mjs';
 import * as M0 from './lib/feasibility/model.mjs';
 import { marketContext } from './lib/feasibility/market.mjs';
@@ -12,14 +13,12 @@ import { buildSurvey } from './lib/feasibility/survey.mjs';
 import { feasibilityReport } from './lib/reports/feasibility.mjs';
 import { fmtVal } from './lib/feasibility/register.mjs';
 import { planSVG } from './lib/sitesheet.mjs';
+import { layoutSig } from './lib/planstages.mjs';
 import * as kit from './reportkit.js';
+import { usd, usdM, pct, num, tornadoSvg, gridTitle, breakEvenText } from './lib/feasibility/format.mjs';
 
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const usd = v => v == null || !Number.isFinite(+v) ? '—' : (v < 0 ? '−$' : '$') + Math.round(Math.abs(v)).toLocaleString('en-US');
-const usdM = v => v == null || !Number.isFinite(+v) ? '—' : (v < 0 ? '−$' : '$') + (Math.abs(v) / 1e6).toFixed(2) + 'M';
-const pct = (v, d = 2) => v == null || !Number.isFinite(+v) ? '—' : (v * 100).toFixed(d) + '%';
-const num = (v, d = 0) => v == null || !Number.isFinite(+v) ? '—' : (+v).toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
-const GROUPS = [['cost', 'Cost'], ['revenue', 'Revenue'], ['operations', 'Operations'], ['financing', 'Financing'], ['returns', 'Exit and returns'], ['schedule', 'Schedule']];
+const { esc } = kit;
+const GROUPS = Object.entries(M0.GROUP_LABELS);
 const KIND = { data: 'Data', library: 'Library', plan: 'Plan', house: 'House', user: 'Yours', derived: 'Derived' };
 const STEP_ICON = { done: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' };
 
@@ -40,11 +39,11 @@ export function workspace(env) {
   // the study for the project as it stands (recomputed only when its inputs change)
   function studyOf(p, { sensitivity = true } = {}) {
     if (!market) return null;
-    const key = M0.hashOf({ fz: p.fz || null, plans: (p.plans || []).map(pl => [pl.id, (pl.elements || []).length, pl.updated || '', JSON.stringify(pl.program || {})]), parcels: (p.parcels || []).map(x => x.key), sensitivity, site: p.site?.at || '' });
-    const c = cache.get(p.id); if (c?.key === key) return c;
+    const key = M0.hashOf({ fz: p.fz || null, plans: (p.plans || []).map(pl => [pl.id, layoutSig(pl), pl.updated || '', JSON.stringify(pl.program || {})]), parcels: (p.parcels || []).map(x => x.key), site: p.site?.at || '' });
+    const c = cache.get(p.id); if (c?.key === key && (c.sens || !sensitivity)) return c; // (a study with sensitivity serves one without)
     let study, scenarios = [], err = null;
     try { study = P.runStudy(p, { market, sensitivity }); scenarios = study.missing ? [] : P.compareScenarios(p, { market }); } catch (e) { err = e; console.error('feasibility', e); }
-    const out = { key, study, scenarios, err }; cache.set(p.id, out); return out;
+    const out = { key, sens: sensitivity, study, scenarios, err }; cache.clear(); cache.set(p.id, out); return out; // (only the open project's study is kept)
   }
   // project.fz with its defaults filled in, once: later calls return the same object, so a change made after an await
   // lands on the project, not on a copy
@@ -165,12 +164,11 @@ export function workspace(env) {
     const kpis = '<div class="ws-kpis big">' + [[usdM(h.totalCost), 'Total development cost'], h.forSale ? [pct(h.margin, 1), 'Margin on sales'] : [usdM(h.noi), 'Stabilized NOI'], h.forSale ? [usdM(h.profit), 'Profit'] : [pct(h.yoc), 'Yield on cost'], [pct(h.levIrr), 'Levered IRR'], [pct(h.unlevIrr), 'Unlevered IRR'], [usdM(h.npvLev), 'Levered NPV'], [num(h.multiple, 2) + '×', 'Equity multiple'], [h.dscr != null ? num(h.dscr, 2) + '×' : '—', 'DSCR']]
       .map(([v, l]) => '<div class="ws-kpi"><b>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>';
     // the assumptions, grouped, each with its source
-    const regMap = Object.fromEntries(study.register.map(a => [a.key, a]));
     const groups = GROUPS.map(([g, label]) => { const rows = study.register.filter(a => a.group === g); if (!rows.length) return '';
       return '<details class="ws-box" data-group="' + g + '"' + (s.open[g] ? ' open' : '') + '><summary><span>' + label + '</span><span class="ws-c">' + rows.length + '</span></summary><div class="ws-as">' + rows.map(a => {
         const id = 'wsA' + M0.hashOf(a.key), o = Object.prototype.hasOwnProperty.call(over, a.key), out = a.range && (a.value < a.range[0] || a.value > a.range[1]);
         return '<div class="ws-a' + (o ? ' edited' : '') + '"><label for="' + id + '">' + esc(a.label) + '</label><span class="ws-ai"><input id="' + id + '" class="ws-num" type="number" step="any" inputmode="decimal" data-as="' + esc(a.key) + '" value="' + esc(a.value) + '"' + (a.range ? ' aria-describedby="' + id + 'r"' : '') + '><span class="ws-u">' + esc(unitText(a.unit)) + '</span></span>' +
-          chip(a.source) + (o ? '<button type="button" class="lnk" data-reset="' + esc(a.key) + '" aria-label="Reset ' + esc(a.label) + ' to ' + esc(fmtVal({ ...a, value: a.default ?? regMap[a.key]?.default ?? a.value })) + '">Reset</button>' : '') +
+          chip(a.source) + (o ? '<button type="button" class="lnk" data-reset="' + esc(a.key) + '" aria-label="Reset ' + esc(a.label) + ' to ' + esc(fmtVal({ ...a, value: a.default ?? a.value })) + '">Reset</button>' : '') +
           (a.range ? '<small id="' + id + 'r" class="' + (out ? 'out' : '') + '">' + (out ? 'Outside the usual ' : 'Usual ') + esc(a.range[0] + '–' + a.range[1]) + '</small>' : '') + (a.marketCheck ? '<small class="ws-mc">' + esc(a.marketCheck) + '</small>' : '') + '</div>'; }).join('') + '</div></details>'; }).join('');
     const edBar = '<div class="ws-edbar"><label class="ws-f"><span>Editing</span><select data-f="editing"><option value="">Base case</option>' + f.scenarios.map(x => '<option value="' + esc(x.id) + '"' + (x.id === s.editing ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>' +
       '<button type="button" class="btn" data-act="newScenario">New scenario</button>' + (editing ? '<button type="button" class="btn" data-act="delScenario">Delete “' + esc(editing.name) + '”</button>' : '') + '</div>' +
@@ -178,10 +176,10 @@ export function workspace(env) {
       (editing && (study.site.mix || []).length ? mixEditor(editing, study) : '');
     // results: returns, break-even, sensitivity, hold, scenarios
     const be = study.pf.breakEven;
-    const beTxt = !be ? '' : be.kind === 'rent' ? 'Break-even rent <b>' + usd(be.rent) + '</b> a unit a month against ' + usd(be.current) + ' modeled; <b>' + usd(be.rentForTarget) + '</b> reaches a ' + pct(be.target) + ' yield on cost.' : be.kind === 'price' ? 'Break-even home price <b>' + usd(be.price) + '</b>.' : 'NOI needed for value to equal cost: <b>' + usd(be.noi) + '</b> (modeled ' + usd(be.current) + ').';
-    const sv = study.sensitivity, tor = sv ? '<h5>What moves the ' + (sv.metric === 'margin' ? 'margin' : 'levered IRR') + ' most</h5>' + tornadoSvg(sv.tornado) + '<div class="ws-scroll" tabindex="0" role="region" aria-label="Sensitivity table"><table class="ws-t"><caption class="sr">Sensitivity</caption><thead><tr><th scope="col">Input</th><th scope="col">Low case</th><th scope="col" class="r">Result</th><th scope="col">High case</th><th scope="col" class="r">Result</th></tr></thead><tbody>' +
+    const beTxt = breakEvenText(be, x => '<b>' + x + '</b>');
+    const sv = study.sensitivity, tor = sv ? '<h5>What moves the ' + (sv.metric === 'margin' ? 'margin' : 'levered IRR') + ' most</h5>' + tornadoSvg(sv.tornado, esc, { W: 560, L: 170, classes: true }) + '<div class="ws-scroll" tabindex="0" role="region" aria-label="Sensitivity table"><table class="ws-t"><caption class="sr">Sensitivity</caption><thead><tr><th scope="col">Input</th><th scope="col">Low case</th><th scope="col" class="r">Result</th><th scope="col">High case</th><th scope="col" class="r">Result</th></tr></thead><tbody>' +
       sv.tornado.rows.map(r => '<tr><th scope="row">' + esc(r.label) + '</th><td>' + esc(r.loText) + '</td><td class="r m">' + pct(r.lo) + '</td><td>' + esc(r.hiText) + '</td><td class="r m">' + pct(r.hi) + '</td></tr>').join('') + '</tbody></table></div>' +
-      sv.grids.map(g => '<div class="ws-scroll" tabindex="0" role="region" aria-label="' + esc(g.rows[0].replace(/^[−+]?[\d.]+% /, '') + ' × ' + g.cols[0].replace(/^[−+]?[\d.]+% /, '')) + ' grid"><table class="ws-t ws-grid2"><caption>' + esc(g.rows[0].replace(/^[−+]?[\d.]+% /, '')) + ' × ' + esc(g.cols[0].replace(/^[−+]?[\d.]+% /, '')) + '</caption><thead><tr><th scope="col"></th>' + g.cols.map(x => '<th scope="col" class="r">' + esc(x) + '</th>').join('') + '</tr></thead><tbody>' +
+      sv.grids.map(g => '<div class="ws-scroll" tabindex="0" role="region" aria-label="' + esc(gridTitle(g)) + ' grid"><table class="ws-t ws-grid2"><caption>' + esc(gridTitle(g)) + '</caption><thead><tr><th scope="col"></th>' + g.cols.map(x => '<th scope="col" class="r">' + esc(x) + '</th>').join('') + '</tr></thead><tbody>' +
         g.cells.map((row, i) => '<tr><th scope="row">' + esc(g.rows[i]) + '</th>' + row.map((v, j) => '<td class="r m' + (i === 2 && j === 2 ? ' base' : '') + (v != null && v < 0 ? ' neg' : '') + '">' + pct(v, 1) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>').join('') : '';
     const hr = study.hold?.result, hold = hr ? '<h5>Hold analysis</h5><p class="ws-note">The stabilized asset bought at its total cost and held ' + hr.annual.length + ' years on the budgeting suite’s before-tax engine: cap on cost ' + pct(hr.summary.acquisitionCapRate) + ', optimal hold year ' + (hr.summary.optimalHoldingYear ?? '—') + ' at ' + pct(hr.summary.optimalHoldingYield) + ' equity IRR.</p>' : '';
     const comp = c.scenarios.length > 1 ? '<h5>Scenarios side by side</h5><div class="ws-scroll" tabindex="0" role="region" aria-label="Scenario comparison"><table class="ws-t"><caption class="sr">Scenario comparison</caption><thead><tr><th scope="col">Scenario</th><th scope="col" class="r">Units</th><th scope="col" class="r">Total cost</th><th scope="col" class="r">NOI</th><th scope="col" class="r">Yield on cost</th><th scope="col" class="r">Levered IRR</th><th scope="col" class="r">vs base</th></tr></thead><tbody>' +
@@ -190,17 +188,13 @@ export function workspace(env) {
   }
   const delta = (a, b) => a == null || b == null ? '—' : ((a - b) * 100 >= 0 ? '+' : '−') + Math.abs((a - b) * 100).toFixed(2) + ' pts';
   const unitText = u => ({ pct: '%', usd: '$', psf: '$/sf', nnn: '$/sf/yr', mo: '$/mo', psfmo: '$/sf/mo', x: '×', share: 'share', months: 'mo', years: 'yr', 'homes/mo': '/mo' })[u] || u;
+  // a scenario's starting unit mix: the layout's own, as shares
+  const mixOf = study => study.site.mix.map(t => ({ name: t.name, sf: t.sf, pct: Math.round(t.n / Math.max(1, study.site.units) * 100) }));
   function mixEditor(sc, study) {
-    const mix = sc.mix?.length ? sc.mix : study.site.mix.map(t => ({ name: t.name, sf: t.sf, pct: Math.round(t.n / Math.max(1, study.site.units) * 100) }));
+    const mix = sc.mix?.length ? sc.mix : mixOf(study);
     return '<fieldset class="ws-mix"><legend>Unit mix in this scenario (same buildings, units re-split)</legend>' + mix.map((t, i) => '<span class="ws-mixr"><b>' + esc(t.name) + '</b><label>sf <input class="ws-num" type="number" data-mix="' + i + ':sf" value="' + esc(+t.sf || 0) + '"></label><label>% <input class="ws-num" type="number" data-mix="' + i + ':pct" value="' + esc(+t.pct || 0) + '"></label></span>').join('') + '</fieldset>';
   }
-  function tornadoSvg(t) {
-    const rows = t.rows.filter(x => x.lo != null && x.hi != null); if (!rows.length) return '';
-    const vals = rows.flatMap(x => [x.lo, x.hi]).concat([t.base]), lo = Math.min(...vals), hi = Math.max(...vals), W = 560, L = 170, H = 22 * rows.length + 26, X = v => L + (v - lo) / ((hi - lo) || 1) * (W - L - 16);
-    return '<svg class="ws-tor" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Tornado chart of the inputs that move the result most; the table below has the numbers">' + rows.map((x, i) => { const y = 6 + i * 22, a = X(Math.min(x.lo, x.hi)), b = X(Math.max(x.lo, x.hi));
-      return '<text x="' + (L - 8) + '" y="' + (y + 12) + '" text-anchor="end">' + esc(x.label) + '</text><rect x="' + a.toFixed(1) + '" y="' + y + '" width="' + Math.max(1, b - a).toFixed(1) + '" height="15" class="' + (x.lo < 0 ? 'neg' : 'pos') + '"/>'; }).join('') +
-      '<line x1="' + X(t.base).toFixed(1) + '" x2="' + X(t.base).toFixed(1) + '" y1="2" y2="' + (H - 16) + '"/><text x="' + X(t.base).toFixed(1) + '" y="' + (H - 3) + '" text-anchor="middle" class="sub">base ' + pct(t.base) + '</text></svg>';
-  }
+
 
   // ---------- 6 Reports ----------
   function reportsStep(p, study) {
@@ -239,7 +233,7 @@ export function workspace(env) {
       const r = await api({ op: 'file', kind, project: p, scenarioId: fz(p).activeScenario || null });
       const blob = kind === 'json' ? new Blob([JSON.stringify(await r.json(), null, 1)], { type: 'application/json' }) : await r.blob();
       const name = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || 'fs-feasibility-' + kit.slug(p.name) + '.' + (kind === 'register' || kind === 'budget' ? 'csv' : kind);
-      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name }); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      await env.saveFile(name, blob, blob.type);
     } catch (e) { s.reportErr = e.message + (kind === 'pdf' ? ' You can still open the report here and print it to PDF.' : ''); }
     s.reportBusy = ''; paint();
   }
@@ -279,7 +273,7 @@ export function workspace(env) {
       if (act === 'newScenario') { const id = 'sc' + Date.now().toString(36), n = f.scenarios.length + 1; f.scenarios.push({ id, name: 'Scenario ' + n, overrides: {} }); s.editing = id; return changed(p, true); }
       if (act === 'delScenario') { f.scenarios = f.scenarios.filter(x => x.id !== s.editing); if (f.activeScenario === s.editing) f.activeScenario = null; s.editing = ''; return changed(p, true); }
       if (act === 'preview') { const c = studyOf(p, { sensitivity: true }); if (!c?.study) return; const opt = M0.optionOf(p), w = window.open('', '_blank'); if (!w) { s.reportErr = 'Your browser blocked the new window.'; return paint(); }
-        w.document.write(feasibilityReport(kit).reportHtml(c.study, { planSvg: opt ? planSVG(opt, { px: 900 }).svg : '', scenarios: c.scenarios }).split('src="logo-white.png"').join('src="' + new URL('logo-white.png', location.href).href + '"')); w.document.close(); return; }
+        w.document.write(feasibilityReport(kit).reportHtml(c.study, { planSvg: opt ? planSVG(opt, { px: 900 }).svg : '', scenarios: c.scenarios })); w.document.close(); return; }
       if (act === 'saveSet') {
         s.reportBusy = 'Making and saving the report set…'; s.reportErr = ''; paint();
         try { const r = await api({ op: 'save', project: p, scenarioId: f.activeScenario || null, by: env.name() }); const { report } = await r.json(); f.reports = [...f.reports, report].slice(-30); env.toast('Report set saved.'); changed(p, true); }
@@ -291,7 +285,7 @@ export function workspace(env) {
       const t = e.target, f = fz(p), s = st(p);
       if (t.dataset.as) { const o = s.editing ? f.scenarios.find(x => x.id === s.editing)?.overrides : f.overrides; if (!o) return; if (t.value === '' || !Number.isFinite(+t.value)) return; o[t.dataset.as] = +t.value; return changed(p); }
       if (t.dataset.line) { if (!Number.isFinite(+t.value) || t.value === '') return; (f.budgetEdits[t.dataset.line] ||= {}).rate = +t.value; return changed(p); }
-      if (t.dataset.mix) { const sc = f.scenarios.find(x => x.id === s.editing), c = studyOf(p); if (!sc || !c?.study) return; sc.mix ||= c.study.site.mix.map(m => ({ name: m.name, sf: m.sf, pct: Math.round(m.n / Math.max(1, c.study.site.units) * 100) })); const [i, k] = t.dataset.mix.split(':'); if (Number.isFinite(+t.value)) sc.mix[+i][k] = +t.value; return changed(p); }
+      if (t.dataset.mix) { const sc = f.scenarios.find(x => x.id === s.editing); if (!sc) return; if (!sc.mix) { const c = studyOf(p, { sensitivity: false }); if (!c?.study?.site) return; sc.mix = mixOf(c.study); } const [i, k] = t.dataset.mix.split(':'); if (Number.isFinite(+t.value)) sc.mix[+i][k] = +t.value; return changed(p); }
       if (t.dataset.in && !/^sv/.test(t.dataset.in)) {
         const k = t.dataset.in, v = t.value;
         if (k === 'client') p.client = v; else if (k === 'landPrice') f.intake.landPrice = v === '' ? null : +v; else f.intake[k] = v;

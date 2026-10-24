@@ -1,4 +1,5 @@
 
+import { DEFAULT_TAB } from './lib/project.mjs';
 import './cursors.js';
 import { makeMatcher, encode, decode, describe } from './lib/filter.mjs';
 import { camStr as camFmt, parseCam, parseLatLng, parsePlanRef, startHash, showsFilings, hasSpec } from './lib/urlstate.mjs';
@@ -1171,7 +1172,7 @@ function pageArrived(v){ cardStatus((document.getElementById('view-'+v)?.getAttr
     if(h!==map.getCanvas()&&!h.hasAttribute('tabindex')){ h.setAttribute('tabindex','-1'); h.classList.add('pg-focus'); } h.focus({preventScroll:true}); }); }
 // My Work › Projects: the project page follows the address (#pj=) on Back/Forward
 function syncProject(pj,pt){ if(view!=='projects') return; const cur=ctx.currentProject?.()??ctx.sitePlan?.where?.project??null;
-  if(cur===(pj||null)){ const t=ctx.sitePlan?.where?.tab; if(pj&&t&&t!==(pt||'workspace')) ctx.sitePlan.show(pj,pt||'workspace'); return; } // the same project, another tab (#pt= edited or pasted)
+  if(cur===(pj||null)){ const t=ctx.sitePlan?.where?.tab; if(pj&&t&&t!==(pt||DEFAULT_TAB)) ctx.sitePlan.show(pj,pt||DEFAULT_TAB); return; } // the same project, another tab (#pt= edited or pasted)
   if(ctx.openProject) ctx.openProject(pj||null,pt); else if(pj) ctx.sitePlan?.show?.(pj,pt); }
 // the tab title names the page ("Reports · Real Estate Intelligence Platform"), so history and tab lists make sense
 const APP_NAME='Real Estate Intelligence Platform';
@@ -1234,7 +1235,7 @@ const camStr=()=>{ const c=map.getCenter(); return camFmt({lat:c.lat,lng:c.lng,z
 function hashStr({map:withMap=false,live=false}={}){ const p=new URLSearchParams(encode(curSpec())); if(state.month) p.set('m',state.month); if(view!=='map') p.set('v',view); if(state.sel) p.set('f',state.sel.id);
   if(withMap&&!sel.feature&&!state.sel&&view==='map'){ const c=map.getCenter(); p.set('ml',[c.lat.toFixed(5),c.lng.toFixed(5),map.getZoom().toFixed(2)].join(',')); }
   if(live){ const w=ctx.sitePlan?.where||{};
-    const pj=w.project||(view==='projects'&&ctx.currentProject?.()); if(w.plan) p.set('sp',w.plan); else if(pj){ p.set('pj',pj); if(w.tab&&w.tab!=='workspace') p.set('pt',w.tab); } // pt: the project page's tab (none: Feasibility, the first)
+    const pj=w.project||(view==='projects'&&ctx.currentProject?.()); if(w.plan) p.set('sp',w.plan); else if(pj){ p.set('pj',pj); if(w.tab&&w.tab!==DEFAULT_TAB) p.set('pt',w.tab); } // pt: the project page's tab (none: the first, Feasibility)
     if(view==='map'){ const b=!state.sel&&!w.plan&&ctx.currentBuilding?.(); if(b?.center) p.set('b',b.center[1].toFixed(6)+','+b.center[0].toFixed(6)); }
     if(camReady) p.set('ml',camStr()); } // on every page, so coming back to the map after a reload finds it where it was
   return p.toString(); }

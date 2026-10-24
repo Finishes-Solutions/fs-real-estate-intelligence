@@ -36,13 +36,13 @@ Financing,Loan fee,1%,House assumption,House assumption: Platform default: 2026 
 Financing,Amortization,30 years,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
 Financing,Loan to value,65%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
 Financing,Debt coverage (DSCR),1.25×,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
-Exit & returns,Market cap rate,5.50%,House assumption,"House assumption: Going-in cap rate by use, Houston suburban 2026 (UNVERIFIED: the platform has no sale comps)",,low
-Exit & returns,Exit cap rate,5.75%,House assumption,House assumption: Exit cap = market cap + 0.25%,,low
-Exit & returns,Sale costs,2%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
-Exit & returns,Rent growth,3%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
-Exit & returns,Expense growth,3%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
-Exit & returns,Hold after stabilizing,5 years,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
-Exit & returns,Discount rate (NPV),10%,House assumption,House assumption: Discount rate for net present value: a levered development hurdle,,low
+Exit and returns,Market cap rate,5.50%,House assumption,"House assumption: Going-in cap rate by use, Houston suburban 2026 (UNVERIFIED: the platform has no sale comps)",,low
+Exit and returns,Exit cap rate,5.75%,House assumption,House assumption: Exit cap = market cap + 0.25%,,low
+Exit and returns,Sale costs,2%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Exit and returns,Rent growth,3%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Exit and returns,Expense growth,3%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Exit and returns,Hold after stabilizing,5 years,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Exit and returns,Discount rate (NPV),10%,House assumption,House assumption: Discount rate for net present value: a levered development hurdle,,low
 Schedule,Pre-development,9 months,House assumption,House assumption: Schedule from the program’s size and type (lib/proforma.mjs scheduleFor),,low
 Schedule,Construction,25 months,House assumption,House assumption: Schedule from the program’s size and type (lib/proforma.mjs scheduleFor),,low
 Schedule,Lease-up,19 months,House assumption,House assumption: Schedule from the program’s size and type (lib/proforma.mjs scheduleFor),,low
