@@ -3,7 +3,23 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-24
+
+### 12:53 PM CT: Tiny homes (3d45b67)
+- **A Tiny homes group in the building library:** one-story homes of 400, 480, 550, 650 and 800 sf, 16 ft wide for a 25 ft lot with a parking pad beside it (or 20 ft wide for a 30 ft lot). Add one from the library, or switch a home's **Type** to a tiny home.
+- **Counted as what they are:** the plan's home table lists them as **Tiny home** at their own size (not as a 1,900 sf one-story house), the pro forma rents them by their size (about $1,425 a month for 550 sf to start, editable as **Tiny home rent**) and prices them by their size when they're sold.
+- **Rendered as tiny homes:** the AI is told they're tiny one-story cottages of their real size and to keep them small, with their own look (board-and-batten or lap siding, metal or shingle roofs, small porches, a parking pad each), instead of ordinary brick houses.
+- **Not yet:** **Build** doesn't lay out tiny-home lots by itself; the King Rd Project's Option A was laid out by hand (now with 550 sf homes).
+
 ## 2026-10-23
+
+### 5:54 PM CT: Renderings follow the plan again (f055008)
+- **Fixed: renderings made from the project page drifted from the plan.** Since Oct 19 they've been taken from a hidden map, and that map was carrying the app's own markings (filing dots, the heat layer, highlights, pins) into the picture, where the AI painted them in as if they were part of the site. It also drew the massing at standard resolution with no smoothing, so small buildings, lots and edges came through rough and the AI filled in the rest.
+- **Now** the hidden map shows only the base map and the option's massing, draws the option exactly as the site plan map does (Waller plans included), and takes the picture at twice the size with smoothing, then scales it to 1600 × 900, as sharp as the old pictures taken off a high-resolution screen.
+- **Renderings already made don't change;** make them again to get the sharper ones. Tested in Chromium (old vs new picture side by side) and with unit tests; not yet tried on the live site.
+
+### 4:32 PM CT: Site plan answers no longer call a failing layout a pass (769de87)
+- **Said plainly:** when no layout passes every check, the agent's site plan answer now says so and names what the picked one is missing (for example parking short), instead of "passes every check". Found in the live test on a Waller parcel.
 
 ### 2:03 PM CT: Parcels in separate pieces can all be picked (ccc9b2a)
 - **Fixed: 31807 King Ln dropped the third pick.** The King Ln property is one Waller County account (13814) in two separate pieces (0.43 and 6.15 acres). With 31807 Old Washington Rd picked, picking the second King Ln piece loaded and then disappeared, because the earlier fix treated "same account" as "same parcel".
@@ -17,6 +33,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Both sides of a road are built on.** When a road runs between the parcels of a site, Build lays out each side as a site of its own, with the road as its street and its share of the program by area, then puts them together. On two 5-acre lots with a road between: retail about 40,000 sf on each side (before: none on one side), apartments and offices on both, nothing on the road.
 - **A parcel drawn across two map tiles** now shows its full acres on the site's parcel chips (it showed only the piece under the click).
 - **Not checked yet:** a look on the real map with the live parcel lines. Also, without **Parcels** turned on the app can't tell which parcel you clicked, so a statewide record that lumps parcels together can still drop a pick.
+
+### 11:36 AM CT: Site plans for your project app's agents (5b3625a)
+- **The agents can lay out a site:** once an agent has found a parcel (by address, parcel number, several parcels together or an outline), it can lay out a concept site plan with the same layout engine as **Site plan** here, and get the site plan sheet as a PDF.
+- **From a request or the best use:** the agent says what to build ("25,000 sf retail strip with 2 pad sites"), or leaves that out and the AI suggests the best uses for the site (its size, frontage, flood zone, utilities, traffic, what's nearby and the market) and lays out the best one. It can ask for another of the ideas.
+- **How hard the AI works:** low (seconds), medium (planned and reviewed, 1–2 minutes) or high (may change the program once). The street the site faces comes from the roads beside it; when none is found the answer says the front is a guess.
+- **Said plainly:** when the plan holds more than was asked (the app fills land the request doesn't need), when a step was skipped for time, and when a site fact couldn't be looked up (never "none found").
+- **Waller:** sites in the City of Waller or its ETJ follow the Waller planning guardrails, with their second sheet.
+- **Not checked yet:** on the live site (the road lines, the AI and the street maps can't be reached from this environment); tested with stand-ins and real Chromium sheets. Money, renderings and plan sets stay in the app.
 
 ## 2026-10-22
 

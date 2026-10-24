@@ -198,3 +198,38 @@ console.log('render tests passed: camera presets, brief, prompt, model pick and 
   assert.equal(r.code, 499, 'answers cancelled, not 502');
 }
 console.log('render cancel test passed');
+
+// ---- the hidden map's style: the basemap's own layers only (a filings dot or heat blob would be painted as part of the site)
+{
+  const page = { version: 8, terrain: { source: 'live-dem', exaggeration: 1.8 },
+    sources: { omt: { type: 'vector' }, filings: { type: 'geojson' }, sel: { type: 'geojson' }, 'live-dem': { type: 'raster-dem' }, hires: { type: 'raster' }, 'fs-sp': { type: 'geojson' }, unused: { type: 'vector' } },
+    layers: [{ id: 'background', type: 'background' }, { id: 'road', type: 'line', source: 'omt' }, { id: 'building-3d', type: 'fill-extrusion', source: 'omt' },
+      { id: 'live-hires', type: 'raster', source: 'hires' }, { id: 'filings', type: 'circle', source: 'filings' }, { id: 'heat', type: 'heatmap', source: 'filings' },
+      { id: 'sel-line', type: 'line', source: 'sel' }, { id: 'focus-dot', type: 'circle', source: 'sel' }, { id: 'fs-bldg', type: 'fill-extrusion', source: 'omt' }, { id: 'fs-sp-b', type: 'fill-extrusion', source: 'fs-sp' }] };
+  const base = new Set(['background', 'road', 'building-3d']), st = R.baseStyle(page, base);
+  assert.deepEqual(st.layers.map(l => l.id), ['background', 'road', 'building-3d', 'live-hires'], 'the basemap and the imagery laid on it; no filings, heat, selection, pins, app buildings or plan');
+  assert.deepEqual(Object.keys(st.sources).sort(), ['hires', 'live-dem', 'omt'], 'only the sources those use, and the terrain’s');
+  assert.equal(page.layers.length, 10, 'the page map’s style is left as it was');
+  assert.deepEqual(R.baseStyle(page, null).layers.map(l => l.id).filter(id => /^fs-/.test(id)), [], 'no base ids known: still no fs- layers');
+  assert.ok(R.CAPTURE.w / R.CAPTURE.h === 16 / 9 && R.CAPTURE.ratio >= 2, 'a 16:9 picture drawn at twice the size');
+}
+console.log('render base style test passed');
+
+// ---- tiny homes: their own group in the brief, with their size, and the prompt keeps them small
+{
+  const B = await import('../lib/buildings.mjs'), t550 = B.BUILDING_TYPES.find(t => t.tiny && t.sf === 550);
+  assert.ok(t550 && t550.use === 'sfr' && t550.floors === 1 && t550.group === 'Tiny homes', 'a 550 sf tiny home in the building library');
+  assert.ok(B.BUILDING_TYPES.filter(t => t.tiny).length >= 4 && !B.HOUSE_PLANS.some(h => h.tiny), 'several sizes; never in a neighbourhood’s house plans');
+  const home = (i, x) => ({ ...B.fromType(t550, [x, 50]), id: 'h' + i });
+  const tp = { origin: [-95.92, 30.05], ring: [[0, 0], [400, 0], [400, 200], [0, 200]], front: 0, elements: [home(1, 30), home(2, 60), home(3, 90), { id: 'l', kind: 'lot', x: 30, y: 50, w: 25, d: 55, rot: 0 }] };
+  assert.equal(tp.elements[0].tiny, true, 'a piece placed from the type is marked tiny');
+  const br = R.briefOf(tp, { metrics: { acres: 1.8, spaces: 6 } });
+  assert.deepEqual(br.uses.map(u => [u.use, u.label, u.count, u.sf]), [['tiny', 'Tiny home', 3, 550]], 'tiny homes, not single-family homes');
+  const pr = R.renderPrompt(cleanBrief(JSON.parse(JSON.stringify(br))), 'front');
+  assert.match(pr, /3 1-storey tiny home buildings of about 550 sf each/, 'the count, storeys and size, through the server’s brief cleaning');
+  assert.match(pr, /do not enlarge them/, 'told to keep them small'); assert.match(pr, /tiny homes: compact one-storey cottages/, 'their own materials');
+  assert.doesNotMatch(pr, /single-family homes: brick/, 'not the house look');
+  const hero = R.renderPrompt(cleanBrief(JSON.parse(JSON.stringify(R.briefOf(tp, { focus: tp.elements[0] })))), 'hero');
+  assert.match(hero, /tiny home building/i, 'a close-up of one says what it is');
+}
+console.log('render tiny homes test passed');

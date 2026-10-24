@@ -2926,7 +2926,7 @@ export function initSitePlan(ctx) {
     const two = (k, f, sub, cls = '') => m1 ? pair(k, f(m1), f(m), sub, cls) : tile(k, f(m), sub, cls);
     const max = (v, lim, fmt) => +lim ? ' <span class="sc' + (v > +lim ? ' over' : '') + '">/ max ' + fmt(+lim) + '</span>' : '';
     const ratioAt = cs ? 'the AI’s rule' : prog.use === 'foodtrucks' ? prog.foodtrucks.perTruck + ' / truck + ' + prog.ratio + ' / 1,000 sf of bar' : new Set(pl.elements.filter(e => e.kind === 'building').map(e => e.use || prog.use)).size > 1 ? 'each use’s ratio' : prog.use === 'multifamily' ? prog.perUnit + '/unit' : prog.ratio + '/1,000 sf';
-    const homes = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr'), byStory = [1, 2, 3].map(n => [n, homes.filter(e => e.floors === n).length]).filter(([, c]) => c);
+    const homes = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr'), byStory = [1, 2, 3].map(n => [n, homes.filter(e => !e.tiny && e.floors === n).length]).concat([['tiny', homes.filter(e => e.tiny).length]]).filter(([, c]) => c), tinySf = Math.round(homes.filter(e => e.tiny).reduce((s, e) => s + (+e.sf || SP.gfaOf(e)), 0) / Math.max(1, homes.filter(e => e.tiny).length)); // tiny homes: their own row, at their own size
     const pSub = (m.gfa ? 'needed at ' + ratioAt + ' · ' : '') + (m.units ? m.perUnit.toFixed(2) + ' / unit' : m.per1k.toFixed(1) + ' / 1,000 sf') + (m.garages ? ' · ' + f0(m.garages) + ' in garages' : '') + (m.driveways ? ' · ' + f0(m.driveways) + ' on driveways' : ''), pBad = m.gfa && pk.stalls < pk.need ? ' bad' : '';
     el.innerHTML = '<div class="lt">Numbers' + infoBtn((whole ? 'Phase 1 is what was asked for; the whole site includes Phase 2. Paving and ponds are counted for the whole site. ' : '') + 'A planning sketch from the parcel outline: not a survey, and no engineering (grading, utilities, fire lanes, code review).', 'About these numbers') + '</div><div class="sp-tiles">' +
       tile('Site' + TG('site'), m.acres.toFixed(2) + ' ac', f0(m.siteSf) + ' sf') +
@@ -2947,7 +2947,7 @@ export function initSitePlan(ctx) {
       (m.mix.length ? '<table class="sp-mixt"><tr><th>Unit</th><th>SF</th><th>Units</th><th>%</th><th>Net sf</th></tr>' + m.mix.map(t => '<tr><td>' + esc(t.name) + '</td><td>' + f0(t.sf) + '</td><td>' + f0(t.n) + '</td><td>' + pct(t.n / Math.max(1, m.mix.reduce((s, x) => s + x.n, 0))) + '</td><td>' + f0(t.n * t.sf) + '</td></tr>').join('') + '</table>' : '') +
       (m.storage?.units ? storageTable(m.storage, prog) : '') +
       partsTable(pl, prog) +
-      (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + n + '-story</td><td>' + f0(SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
+      (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + (n === 'tiny' ? 'Tiny home' : n + '-story') + '</td><td>' + f0(n === 'tiny' ? tinySf : SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
       (cs ? customBlock(cs) : '') + walkLine(pl) +
       (issues.length ? '<ul class="sp-issues">' + issues.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul>' : m.gfa ? '<div class="rnote sp-ok">Fits the setbacks' + (m.spaces >= m.required ? ' and parks' : '') + (gOn ? ', within the planning checks' : '') + '.</div>' : '') +
       (gOn ? guardNums(pl) : '');
@@ -3032,7 +3032,7 @@ export function initSitePlan(ctx) {
         NNNU.filter(u => A.ti?.[u] != null).map(u => inp('ti.' + u, SP.USES[u].label + ' TI', A.ti[u], 1, '$ / leasable sf')).join('') + (NNNU.length ? inp('lcPct', 'Leasing commissions', A.lcPct, 0.25, '% of lease rent') : '') +
         inp('softPct', 'Soft costs', A.softPct, 0.5, '%') + inp('contPct', 'Contingency', A.contPct, 0.5, '%') + inp('feePct', 'Developer fee', A.feePct, 0.5, '%') +
         Object.entries(A.rents).map(([k, v]) => inp('rents.' + k, k + ' rent', v, 5, '$ / month')).join('') +
-        (homes ? (A.forSale ? inp('salePsf.sfr', 'Home price', A.salePsf.sfr, 1, '$ / living sf') + inp('absorption', 'Sales pace', A.absorption, 1, 'homes / month') : (R.P.uses.sfr ? [1, 2, 3].filter(n => R.P.uses.sfr.homes?.[n]).map(n => inp('homeRent.sfr' + n, n + '-story home rent', A.homeRent['sfr' + n], 25, '$ / month')).join('') : '') + ['townhomes', 'duplex'].filter(k => R.P.uses[k]).map(k => inp('homeRent.' + k, SP.USES[k].label + ' rent', A.homeRent[k], 25, '$ / month')).join('')) : '') +
+        (homes ? (A.forSale ? inp('salePsf.sfr', 'Home price', A.salePsf.sfr, 1, '$ / living sf') + inp('absorption', 'Sales pace', A.absorption, 1, 'homes / month') : (R.P.uses.sfr ? [1, 2, 3, 'tiny'].filter(n => R.P.uses.sfr.homes?.[n]).map(n => inp('homeRent.sfr' + n, n === 'tiny' ? 'Tiny home rent' : n + '-story home rent', A.homeRent['sfr' + n], 25, '$ / month')).join('') : '') + ['townhomes', 'duplex'].filter(k => R.P.uses[k]).map(k => inp('homeRent.' + k, SP.USES[k].label + ' rent', A.homeRent[k], 25, '$ / month')).join('')) : '') +
         NNNU.map(k => inp('commRent.' + k, SP.USES[k].label + ' rent', A.commRent[k], 0.5, '$ / leasable sf / yr NNN')).join('') +
         (A.outdoorRent != null ? inp('outdoorRent', 'Courts / pool rent', A.outdoorRent, 0.25, '$ / sf / yr, paid by the operator') : '') +
         (sto ? (sto.climateGsf ? inp('storageRent.climate', 'Climate-controlled rent', A.storageRent.climate, 0.05, '$ / sf / month') : '') + (sto.driveGsf ? inp('storageRent.drive', 'Drive-up rent', A.storageRent.drive, 0.05, '$ / sf / month') : '') + (sto.rv ? inp('storageRent.rv', R.M.custom ? esc(R.M.custom) + ': a site’s rent' : 'RV / boat space rent', A.storageRent.rv, 5, '$ / space / month') + inp('storageRent.rvOpex', 'Costs a space', A.storageRent.rvOpex, 10, '$ / space / yr') : '') : '') +
@@ -4087,28 +4087,30 @@ export function initSitePlan(ctx) {
       return { image: c.toDataURL('image/jpeg', 0.88), camera: cam, w: c.width, h: c.height };
     } finally { for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'visible'); map.jumpTo(was); }
   }
-  // The same picture without the page's map: a hidden map of the same base style, sized 1600 x 900, with the option drawn
-  // on it, framed by the same camera rules, then thrown away. The Renderings tab uses it, so you stay where you are.
+  // The same picture without the page's map: a hidden map of the page's basemap (its own layers only: RD.baseStyle),
+  // 1600 x 900, with the option drawn on it as the map draws it, framed by the same camera rules, then thrown away. It
+  // draws at twice the size with antialiasing and is scaled down (RD.CAPTURE), so small pieces stay crisp. The Renderings
+  // tab uses it, so you stay where you are.
   async function captureOffscreen(pl, view, target = null) {
-    const W = 1600, H = 900, box = document.createElement('div'), close = RD.byId(RD.VIEWS, view).hero && target;
+    const { w: W, h: H, ratio, quality } = RD.CAPTURE, box = document.createElement('div'), close = RD.byId(RD.VIEWS, view).hero && target;
     if (!map.isStyleLoaded()) await new Promise(ok => { map.once('idle', ok); setTimeout(ok, 20000); }); // the base style comes from the page's map (the app may have opened on Projects)
     if (!map.isStyleLoaded()) throw new Error('the map didn’t load, so the picture can’t be taken. Try again in a moment');
     box.style.cssText = 'position:fixed;left:0;top:0;width:' + W + 'px;height:' + H + 'px;opacity:0;pointer-events:none;z-index:-1'; document.body.append(box);
-    const st = map.getStyle(); st.layers = st.layers.filter(l => !/^fs-/.test(l.id)); // the base map only: filings, parcels, buildings and any open plan stay off
-    const used = new Set(st.layers.map(l => l.source).filter(Boolean)); for (const k of Object.keys(st.sources || {})) if (!used.has(k)) delete st.sources[k];
+    const st = RD.baseStyle(map.getStyle(), ctx.baseLayers?.()); // the basemap only: filings, heat, pins, highlights, parcels, buildings and any open plan stay off
     const F = SP.frame(pl.origin), cam = RD.cameraFor(view, pl, { px: W, lat: pl.origin[1], target });
     const m2 = new maplibregl.Map({ container: box, style: st, center: F.toLL(cam.center), zoom: cam.zoom, pitch: Math.min(cam.pitch, map.getMaxPitch()), bearing: cam.bearing, maxPitch: map.getMaxPitch(),
-      interactive: false, attributionControl: false, preserveDrawingBuffer: true, fadeDuration: 0, pixelRatio: 1 });
+      interactive: false, attributionControl: false, fadeDuration: 0, pixelRatio: ratio, canvasContextAttributes: { antialias: true, preserveDrawingBuffer: true } });
     const settle = (ev, ms) => new Promise(ok => { let d = false; const f = () => { if (!d) { d = true; ok(); } }; m2.once(ev, f); setTimeout(f, ms); });
     try {
       await settle('load', 20000);
       addLayers(m2);
-      let fc = SP.planFeatures(pl, null, null); MAP.decorate(fc, pl, {}); fc = T.visibleFeatures(fc, T.viewOf(pl)); m2.getSource(SRC).setData(fc);
+      let fc = SP.planFeatures(G.effective(pl), null, null); MAP.decorate(fc, pl, {}); fc = T.visibleFeatures(fc, T.viewOf(pl)); m2.getSource(SRC).setData(fc); // as draw() puts it on the page's map
       for (const id of HIDE_FOR_RENDER) if (m2.getLayer(id)) m2.setLayoutProperty(id, 'visibility', 'none');
       fitSiteInFrame(pl, { l: 0, t: 0, r: W, b: H }, { left: 0, top: 0, width: W, height: H }, close ? { points: RD.heroPoints(close), tall: [close] } : {}, m2);
       await settle('idle', 25000);
-      const image = await new Promise((ok, no) => { m2.once('render', () => { try { ok(m2.getCanvas().toDataURL('image/jpeg', 0.88)); } catch (e) { no(e); } }); m2.triggerRepaint(); });
-      return { image, camera: cam, w: W, h: H };
+      const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+      await new Promise((ok, no) => { m2.once('render', () => { try { g.drawImage(m2.getCanvas(), 0, 0, W, H); ok(); } catch (e) { no(e); } }); m2.triggerRepaint(); });
+      return { image: c.toDataURL('image/jpeg', quality), camera: cam, w: W, h: H };
     } finally { try { m2.remove(); } catch (e) { /* gone */ } box.remove(); }
   }
   // renderings made from the project page, one project at a time: { plid, n, i, msg, abort }
