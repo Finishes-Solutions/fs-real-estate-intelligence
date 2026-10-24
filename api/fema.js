@@ -113,7 +113,7 @@ export async function femaLegend({ cls = 'all', fetchImpl = globalThis.fetch } =
   const seen = new Set(), items = [];
   for (const x of layer.legend || []) {
     const raw = String(x.label || '').trim(); if (!raw || !x.imageData || /all other values/i.test(raw)) continue;
-    const label = (PLAIN.find(([re]) => re.test(raw)) || [, raw])[1]; if (seen.has(label)) continue;
+    const label = (PLAIN.find(([re]) => re.test(raw)) || [undefined, raw])[1]; if (seen.has(label)) continue;
     if (cls === 'high' && !/1% a year \(100|floodway/i.test(label)) continue; // the "100-year floodplain only" filter draws only those
     seen.add(label); items.push({ label, fema: raw, img: 'data:' + (x.contentType || 'image/png') + ';base64,' + x.imageData });
   }

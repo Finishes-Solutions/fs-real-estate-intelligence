@@ -40,6 +40,7 @@ async function assemble() {
   await fs.mkdir('public/lib/vendor', { recursive: true }); await fs.copyFile('lib/vendor/polyclip.mjs', 'public/lib/vendor/polyclip.mjs'); // the paving union (lib/siteplan.mjs)
   await fs.copyFile('node_modules/pdf-lib/dist/pdf-lib.esm.min.js', 'public/lib/vendor/pdf-lib.esm.min.js'); // plan sets: the pages put together in the browser (src/siteplan.js)
   await fs.mkdir('public/lib/reports', { recursive: true }); for (const f of await fs.readdir('lib/reports')) await fs.copyFile('lib/reports/' + f, 'public/lib/reports/' + f); // report builders shared with the MCP server
+  await fs.cp('lib/feasibility', 'public/lib/feasibility', { recursive: true }); // the feasibility workspace's engine (src/workspace.js), shared with api/feasibility.js
   await fs.mkdir('public/lib/sheets', { recursive: true }); for (const f of await fs.readdir('lib/sheets')) await fs.copyFile('lib/sheets/' + f, 'public/lib/sheets/' + f); // plan set sheet drawings (lib/planset.mjs)
   // public Supabase settings for the browser (read-only publishable key; row level security limits it to public tables)
   const E = process.env, sbUrl = E.SUPABASE_URL || E.NEXT_PUBLIC_SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co';

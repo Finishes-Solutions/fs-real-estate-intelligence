@@ -238,8 +238,7 @@ console.log('mcp upstream timeout ok');
 // ---------- reports: the website's PDFs as embedded resources ----------
 {
   const fs = await import('node:fs'), { PDFDocument } = await import('pdf-lib'), R = await import('../lib/mcp/reports.mjs');
-  process.env.CHROME_PATH ||= '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-  const haveChrome = fs.existsSync(process.env.CHROME_PATH);
+  const { localChrome } = await import('./helpers/chrome.mjs'), haveChrome = !!localChrome() && fs.existsSync(process.env.CHROME_PATH);
   if (!haveChrome) { // no local Chromium: a stand-in that makes a real one-page PDF with the HTML's title
     R.hooks.render = async (html, { title }) => { const d = await PDFDocument.create(); d.setTitle(title); d.addPage(); return Buffer.from(await d.save()); };
     console.log('mcp reports: no Chromium at CHROME_PATH, rendering with a stand-in'); }

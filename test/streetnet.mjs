@@ -166,7 +166,10 @@ const streets = els => JSON.stringify(els.filter(e => e.kind === 'drive' && e.ne
   const ids = new Set(base.recipe.net.streets.filter(s => s.role === 'cross' || s.role === 'local' && !s.closed).slice(0, 6).map(s => s.id)), els = base.elements.filter(e => !(e.kind === 'drive' && ids.has(e.net)));
   const r = L.refit({ ...base, elements: structuredClone(els) }, { amount: 'current' }), R = reachedAll(r.elements);
   assert.deepEqual(offStreet(r.elements, R), [], 'streets deleted: every home left on a reached street'); assert.deepEqual(lotIssues(r.elements), [], 'streets deleted: the lots clear');
-  assert.ok(homes(r.elements).length < homes(base.elements).length, 'streets deleted: their homes go');
+  // their homes go: no lot is left on a deleted street. (Not a smaller count: which network the timed search picks first
+  // depends on the machine's speed, and on a ring network a deleted cross street's land re-flows into lots on the loop.)
+  assert.ok(base.elements.some(e => e.kind === 'lot' && ids.has(e.on)), 'streets deleted: they had homes');
+  assert.deepEqual(r.elements.filter(e => e.kind === 'lot' && ids.has(e.on)).map(e => e.id), [], 'streets deleted: their homes go');
   assert.deepEqual(r.elements.filter(e => e.bulb && !R.seen.has(e.id)).map(e => e.note), [], 'streets deleted: no cul-de-sac left without its street'); }
 { // pieces of a loop street deleted (it's drawn in pieces between its junctions): re-fit twice, and the second changes nothing
   const o = runs.irregular.nets[0], plan = { ...irregular, program: o.program, elements: structuredClone(o.elements), recipe: structuredClone(o.recipe) }, cl = o.recipe.net.streets.filter(s => s.closed && s.role === 'local').map(s => ({ s, d: plan.elements.filter(e => e.net === s.id) })).sort((a, b) => b.d.length - a.d.length)[0];

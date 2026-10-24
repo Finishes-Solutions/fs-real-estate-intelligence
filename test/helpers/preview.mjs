@@ -4,7 +4,7 @@
 // Prints through local Chromium (CHROME_PATH, default the Playwright one) and lays the sheets on the title block.
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
-process.env.CHROME_PATH ||= '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+import { localChrome } from './chrome.mjs'; localChrome();
 const { ctxFor, terrainFor } = await import('./setctx.mjs'), P = await import('../../lib/planset.mjs'), { render } = await import('../../api/pdf.js'), { onBorder } = await import('../../api/planset.js');
 const [name = 'retail', which = 'cover', out = '/tmp/sheets'] = process.argv.slice(2), want = which.split(',');
 const ctx = ctxFor(name, process.env.TERRAIN ? { terrain: terrainFor(name) } : {}), border = await readFile(new URL('../../templates/titleblock.pdf', import.meta.url)); await mkdir(out, { recursive: true });
