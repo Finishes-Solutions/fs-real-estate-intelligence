@@ -95,6 +95,10 @@ assert.deepEqual(M0.validateProject({ ...apt, fz: { ...apt.fz, overrides: { nope
   assert.ok(!t.budget.lines.some(l => l.id.startsWith('lib:')), 'retail has no workbook lines'); assert.ok(t.budget.lines.some(l => l.id === 'par:hard|retail') && t.budget.lines.some(l => l.id === 'par:soft'), 'parametric building and soft-cost lines');
   near(t.budget.totals.gcFee, 0, 1e-9, 'no GC fee on all-in parametric rates'); assert.ok(t.pf.headline.noi > 0 && t.pf.breakEven, 'a retail NOI and its break-even'); }
 
+// ---- a synced document is data: a scenario's unit mix is read as numbers (no markup reaches the page) ----
+{ const f = M0.fzOf({ fz: { scenarios: [{ id: 'x', name: 'X', overrides: {}, mix: [{ name: '1 BR', sf: '"><img src=x onerror=alert(1)>', pct: '50' }] }] } });
+  assert.deepEqual(f.scenarios[0].mix, [{ name: '1 BR', sf: 0, pct: 50 }]); }
+
 // ---- a project with no layout yet says what's missing ----
 { const p = { id: 'empty', name: 'Empty', parcels: [parcel], plans: [] }, t = P.runStudy(p, { market }); assert.equal(t.missing, 'site'); assert.equal(t.status.site.state, 'ready'); assert.equal(t.status.budget.state, 'blocked'); }
 

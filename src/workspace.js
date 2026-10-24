@@ -188,7 +188,7 @@ export function workspace(env) {
   const unitText = u => ({ pct: '%', usd: '$', psf: '$/sf', nnn: '$/sf/yr', mo: '$/mo', psfmo: '$/sf/mo', x: '×', share: 'share', months: 'mo', years: 'yr', 'homes/mo': '/mo' })[u] || u;
   function mixEditor(sc, study) {
     const mix = sc.mix?.length ? sc.mix : study.site.mix.map(t => ({ name: t.name, sf: t.sf, pct: Math.round(t.n / Math.max(1, study.site.units) * 100) }));
-    return '<fieldset class="ws-mix"><legend>Unit mix in this scenario (same buildings, units re-split)</legend>' + mix.map((t, i) => '<span class="ws-mixr"><b>' + esc(t.name) + '</b><label>sf <input class="ws-num" type="number" data-mix="' + i + ':sf" value="' + t.sf + '"></label><label>% <input class="ws-num" type="number" data-mix="' + i + ':pct" value="' + t.pct + '"></label></span>').join('') + '</fieldset>';
+    return '<fieldset class="ws-mix"><legend>Unit mix in this scenario (same buildings, units re-split)</legend>' + mix.map((t, i) => '<span class="ws-mixr"><b>' + esc(t.name) + '</b><label>sf <input class="ws-num" type="number" data-mix="' + i + ':sf" value="' + esc(+t.sf || 0) + '"></label><label>% <input class="ws-num" type="number" data-mix="' + i + ':pct" value="' + esc(+t.pct || 0) + '"></label></span>').join('') + '</fieldset>';
   }
   function tornadoSvg(t) {
     const rows = t.rows.filter(x => x.lo != null && x.hi != null); if (!rows.length) return '';
