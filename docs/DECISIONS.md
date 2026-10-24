@@ -53,3 +53,46 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 - The `design:design-system` and `design:accessibility-review` skills weren't loadable here ("Unknown command"). Their checklists were applied by hand, the components are documented in `docs/DESIGN_SYSTEM.md`, and the audit was automated with axe-core. Results are in `docs/ACCESSIBILITY.md`.
 - Warning text uses `#8a5a12` (5.9:1 contrast) instead of the app's `#b7791f` (3.6:1) inside the workspace.
 - Screenshots and the accessibility audit run in one Playwright script against the local dev server with the local Chrome, so no browser download is needed.
+
+## Phase 5: Verify and review
+- Sample run (`scripts/sample-run.mjs`):
+  - It replaces `fetch` with a function that refuses and records every request, so the source deployments, and everything else, are unreachable. Chromium's own requests are already limited by `lib/pdf.mjs` (public https and `data:` only), and the report has no external assets.
+  - The sample project uses three real, anonymized appraisal-district outlines near Waller (the report runner's fixture geometry with owners and ids removed) and a labelled sample asking price.
+- Infrastructure grep (`scripts/infra-grep.mjs`):
+  - It reads its 126 patterns from `docs/AUDIT.md`, so the script itself contains none. It excludes only AUDIT.md and PROGRESS.md, which name the identifiers on purpose.
+  - Two annotated exceptions: `ANTHROPIC_EFFORT` (own) is the platform's own variable, already on main. `fs-budgeting-suite` (match) is checked only as a database name, because the repo name appears in provenance comments.
+  - A planted control string was caught, so the check works.
+- Code review (high), 10 findings, all fixed:
+  - project.fz was replaced on every read, which lost saved-report records and the generated option;
+  - every report was refused on any input note;
+  - the cost case didn't move soft costs or the developer fee;
+  - the hold analysis grew rents from month 0;
+  - the tornado's low case wasn't always the downside;
+  - a site with no mapped flood zone read as "not checked";
+  - the workspace didn't redraw after the site lookup;
+  - one save timer was shared by every project;
+  - the inputs hash named the active scenario, not the one studied;
+  - the narrative was recorded as on when off.
+- Security review: nothing reached the reporting bar (8/10). The one 7/10 candidate (unit-mix values unescaped in the scenario editor, from a synced document) was fixed anyway, with a regression test.
+- Simplify, applied:
+  - shared formatters and tornado (`lib/feasibility/format.mjs`);
+  - dead code removed;
+  - shared logo, Storage and market helpers;
+  - IRR 10× faster with the same roots, and caching of the parametric run and repeated cases (a full study went from 273 to 135 ms);
+  - a fee basis in `parts()`, replacing the diluted company share;
+  - cost cases scaled before the roll-up;
+  - the service-worker list generated at build;
+  - grep exceptions moved to AUDIT.md annotations;
+  - browser discovery moved into `lib/pdf.mjs`;
+  - the sticky offsets read the view's padding variable;
+  - the streetnet edit checks pinned with `netEvals`.
+- Simplify, skipped:
+  - Unifying `lib/feasibility/plane.mjs` with `lib/siteplan.mjs` `frame`, because areas would move in the 4th–5th digit.
+  - One unit formatter for the register and the pro forma notes, because the displayed text would change.
+  - A shared CSV cell helper across five existing files, because it is outside this diff.
+  - Deleting finance helpers only the tests use. They are the documented shared API and are tested.
+  - A full `parametricBudget()` split of `runM`. The cache gives the same speed-up without touching the monthly model.
+  - Deferring sensitivity until after the first paint in the UI, because the behaviour would change.
+- `test/streetnet.mjs`:
+  - The edit checks run on a network laid out with `netEvals: 10`, so it is the same network on any machine.
+  - Exactly one known engine breach is allowed: a ~1,466 ft block on the loop road after Change With AI. It is logged as a known issue in PROGRESS.md.

@@ -270,11 +270,77 @@ Setup: run `supabase/migrations/20261006000000_team_watchlist.sql` (after `20261
 ## Run locally
 
 ```
-npm install
-npm test                 # synthetic fixture + API tests (mocked OpenAI) + offline pipeline and statewide tests
-DATA_DIR=test/.data/ node build.mjs --assemble && npx serve public   # UI on synthetic data
-node build.mjs           # real refresh (needs network access to TDLR, Census, OpenAI)
+npm install                          # Node 20+; also installs the dev tools (ESLint, TypeScript, Playwright, axe-core)
+cp .env.example .env                 # optional: fill in the keys you have (every name is explained below)
+npm run dev                          # assembles public/ and serves the app AND the api/ functions at http://127.0.0.1:8787
+DATA_DIR=test/.data/ node build.mjs --assemble && npx serve public   # UI only, on synthetic data
+node build.mjs                       # real data refresh (needs network access to TDLR, Census, OpenAI)
 ```
+
+`npm run dev` (`scripts/dev.mjs`) loads `.env` (the shell wins), runs `node build.mjs --assemble`, then serves `public/`
+and maps `/api/<name>` to `api/<name>.js` with the parts of Vercel's request/response helpers the functions use. No
+Vercel login or project link is needed. A function whose key is missing answers the way it does on Vercel without it.
+Projects fall back to the browser when `SUPABASE_SECRET_KEY` isn't set.
+
+**Checks**
+
+| Command | What it runs |
+|---|---|
+| `npm run lint` | ESLint, correctness rules (`eslint.config.js`). Stricter on the feasibility code |
+| `npm run typecheck` | `tsc` over the `// @ts-check` feasibility code (`tsconfig.json`) |
+| `npm run test:fz` | The feasibility tests (`test/fz-*.mjs`): finance, budget, investment engine, site, end to end, API (about 1 minute; prints PDFs with a local Chrome when there is one) |
+| `npm test` | `test:fz` and then every platform test (about 20 minutes; a local Chrome or `CHROME_PATH` makes the PDF tests real) |
+| `npm run check` | lint + typecheck + `npm test` |
+| `node scripts/sample-run.mjs` | One sample project from intake to the full report set, with every outbound request refused, into `docs/sample-output/` |
+| `node scripts/screenshots.mjs` | The workspace on the local dev server with Playwright: screenshots into `docs/screenshots/` and a WCAG 2.1 AA scan (axe-core) |
+| `node scripts/infra-grep.mjs` | The infrastructure-isolation check: no identifier of the source repos' infrastructure anywhere on the branch |
+
+## Feasibility workspace (experimental branch)
+
+Projects › a project › **Feasibility** takes one project through **Intake → Site → Plans → Budget → Pro Forma →
+Reports**:
+- `src/workspace.js` / `src/workspace.css` are the UI.
+- `lib/feasibility/` is the engine (shared by the browser, `api/feasibility.js` and the tests).
+- `lib/reports/feasibility.mjs` is the report.
+
+See:
+- `docs/INTEGRATION_PLAN.md` for the design and data model;
+- `docs/AUDIT.md` for where each piece came from;
+- `docs/DECISIONS.md` for the choices made;
+- `docs/PROGRESS.md` for status, open infrastructure and next steps;
+- `docs/DESIGN_SYSTEM.md` and `docs/ACCESSIBILITY.md` for the UI.
+
+Everything is feasibility / schematic level: the plan set is not a permit or construction set, costs are estimates rather than bids, and market inputs are assumptions. Every screen and report says so.
+
+## Environment variables (all)
+
+Every variable the platform reads is listed in `.env.example`. Set them on the Vercel project, or in `.env` for
+`npm run dev`. Empty means that feature is off, and the function says what's missing. "Build" variables are read by the
+nightly data workflow (`build.mjs`); see also the build table above.
+
+| Variable | Used by | Notes |
+|---|---|---|
+| `SUPABASE_URL` | functions, build | This platform's Supabase project URL |
+| `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`) | functions | Server only. Team projects, notes, Regrid counter, reference files, **feasibility report sets** |
+| `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) | assemble | Read-only browser key written to `public/config.json` |
+| `FIELD_ACCESS_CODE` | functions | Optional team passcode for projects, notes, files and the feasibility API |
+| `REPORT_SETS_BUCKET` | `api/feasibility.js` | Storage bucket for saved report sets (default `report-sets`; migration `20261026000000_report_sets.sql`) |
+| `FEASIBILITY_NARRATIVE` | `api/feasibility.js` | `on` lets Claude write the report's commentary paragraph (checked so it adds no numbers). Default off |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `ANTHROPIC_EFFORT`, `PLANSET_MONTHLY_CAP_USD` | plan sets, Claude features, feasibility narrative | See Setup |
+| `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_REASONING_EFFORT`, `OPENAI_CHAT_MODEL`, `OPENAI_CHAT_REASONING_EFFORT`, `OPENAI_ENRICH_MODEL`, `OPENAI_SEARCH_MODEL`, `OPENAI_REALTIME_MODEL`, `OPENAI_TRANSCRIBE_MODEL`, `OPENAI_VOICE`, `OPENAI_IMAGE_MODEL`, `VOICE_ENABLED` | assistant, enrichment, renderings, voice | See Setup and AI assistant |
+| `OPENAI_ADMIN_KEY`, `OPENAI_PROJECT_ID`, `OPENAI_API_KEY_ID` | `api/aiusage.js` | Optional usage readout |
+| `RENDER_MONTHLY_CAP_USD`, `RENDER_FALLBACK_USD_PER_IMAGE` | `api/render.js` | Renderings budget |
+| `AI_PROXY_URL` | data workflow | This deployment's `/api/pipeline-ai` |
+| `REGRID_API_KEY` (or `REGRID_TOKEN`), `REGRID_RECORD_CAP`, `REGRID_TILE_CAP`, `REGRID_TILE_URL` | `api/regrid.js` | Paid parcels, capped (see Regrid) |
+| `PARCEL_SERVICE`, `ADDRESS_POINTS_SERVICE`, `OVERPASS_URL` | parcel / OSM lookups | Optional overrides |
+| `MAPTILER_KEY`, `GOOGLE_MAPS_API_KEY` (or `GOOGLE_MAPS_KEY`), `GOOGLE_MAPS_BROWSER_KEY`, `GOOGLE_AUTOCOMPLETE_CAP`, `GOOGLE_DETAILS_CAP`, `TOMTOM_API_KEY`, `MAPILLARY_TOKEN`, `OPEN_METEO_API_KEY` | map and live layers | See Setup |
+| `CENSUS_KEY`, `BLS_KEY` (or `BLS_API_KEY`), `GOV_API_KEY`, `FBI_API_KEY`, `SOCRATA_APP_TOKEN`, `HF_TOKEN` | build and data functions | Public-data keys |
+| `MCP_ACCESS_TOKEN` | `api/mcp.js` | Bearer token for the MCP server (open when empty) |
+| `CRON_SECRET` | cron functions | Vercel cron auth |
+| `ZAPIER_DIGEST_WEBHOOK` | build | This platform's own nightly digest hook (optional) |
+| `CHROME_PATH` | `lib/pdf.mjs`, tests, scripts | Local Chrome/Chromium (Vercel uses @sparticuz/chromium) |
+| `PORT`, `HOST` | `scripts/dev.mjs` | Dev server address (default 127.0.0.1:8787) |
+| `DATA_DIR`, `ONLY`, `PERIOD_START`, `PERIOD_END`, `ALLOW_SHRINK`, `AI_MAX_ROWS`, `AI_CONCURRENCY`, `AREA`, `AREA_NEWS_TOWNS`, `REBUILD_AREA`, `REBUILD_GEO`, `REBUILD_MARKET`, `REBUILD_RISK`, `REBUILD_SPENDING`, `REBUILD_USCO` | build | See "Environment variables (build)" |
 
 ## Known limits
 
