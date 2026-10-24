@@ -96,7 +96,7 @@ assert.equal(RF.floorPlanType(files[0].facts[1]), null, 'only floor plans');
 console.log('sitefiles lib ok: paths, strict read schema, kept answer, DXF words, confirmed facts for the AI, floor plan types, easement strips on a real parcel, reconcile');
 
 // ---- /api/sitefiles: an in-memory Supabase storage and a mocked OpenAI ----
-const objects = new Map(), seen = [], ai = [];
+const objects = new Map(), media = new Set(), seen = [], ai = [];
 let bucket = true, aiReply = null;
 const json = (o, s = 200) => new Response(o == null ? null : JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
 globalThis.fetch = async (url, opts = {}) => {
@@ -110,6 +110,10 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.pathname.startsWith(P + '/sign/site-files/') && m === 'POST') { const path = decodeURIComponent(u.pathname.slice((P + '/sign/site-files/').length)); assert.equal(JSON.parse(opts.body).expiresIn, 600); return json({ signedURL: '/object/sign/site-files/' + path + '?token=dl' }); }
   if (u.pathname === P + '/site-files' && m === 'DELETE') { for (const p of JSON.parse(opts.body).prefixes) objects.delete(p); return json([]); }
   if (u.pathname.startsWith(P + '/site-files/') && m === 'GET') { const path = decodeURIComponent(u.pathname.slice((P + '/site-files/').length)); return objects.has(path) ? new Response(objects.get(path), { headers: { 'content-length': String(objects.get(path).length) } }) : json({ message: 'not found' }, 404); }
+  const MP = path => decodeURIComponent(u.pathname.slice(path.length));
+  if (u.pathname.startsWith(P + '/upload/sign/project-media/') && m === 'POST') return json({ url: '/object/upload/sign/project-media/' + MP(P + '/upload/sign/project-media/') + '?token=m' });
+  if (u.pathname.startsWith(P + '/sign/project-media/') && m === 'POST') { const path = MP(P + '/sign/project-media/'); return media.has(path) ? json({ signedURL: '/object/sign/project-media/' + path + '?token=g' }) : json({ statusCode: '404', error: 'not_found', message: 'Object not found' }, 400); }
+  if (u.pathname === P + '/project-media' && m === 'DELETE') { for (const p of JSON.parse(opts.body).prefixes) media.delete(p); return json([]); }
   return json({ message: 'unexpected ' + m + ' ' + u.pathname }, 500);
 };
 const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, send(b) { r.body = b; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
@@ -166,7 +170,20 @@ assert.equal(contentFor(Buffer.from([0xff, 0xd8, 0xff]), 'a.png'), null, 'a JPEG
 // delete: this project's paths only
 res = await call('POST', { body: { pid: 'p-abc1', remove: [pngPath, 'projects/p-other/d1d2d3d4d5__Theirs.pdf', '../x'] } });
 assert.equal(res.body.removed, 1); assert.ok(!objects.has(pngPath)); assert.ok(objects.has('projects/p-other/d1d2d3d4d5__Theirs.pdf'), 'another project\'s file stays');
-console.log('sitefiles api ok: not set up (key, bucket), signed upload, types and size, list, open, read PDF / PNG / DXF with the strict schema, unreadable, delete');
+// renderings, massing and plan sets kept for the team (project-media): an upload link, a link to open, a 404 when none
+// was kept, deletes of this project's only, and nothing outside the three kinds
+assert.equal(RF.mediaPath('p-abc1', 'render/' + RF.mediaKey('pl1/mx9-corner')), 'p-abc1/render/pl1_mx9-corner.jpg');
+assert.equal(RF.mediaPath('p-abc1', 'set/s1'), 'p-abc1/set/s1.pdf'); assert.equal(RF.mediaPath('p-abc1', 'evil/x'), null); assert.equal(RF.mediaPath('p-abc1', 'render/..'), null); assert.equal(RF.mediaPath('../x', 'render/a'), null);
+res = await call('POST', { body: { pid: 'p-abc1', media: { kind: 'render', key: 'pl1_mx9-corner', size: 900_000 } } });
+assert.equal(res.code, 200, JSON.stringify(res.body)); assert.equal(res.body.url, 'http://supa.test/storage/v1/object/upload/sign/project-media/p-abc1/render/pl1_mx9-corner.jpg?token=m');
+res = await call('POST', { body: { pid: 'p-abc1', media: { kind: 'set', key: 's1', size: 60 * 2 ** 20 } } }); assert.equal(res.code, 413, 'over 50 MB');
+res = await call('POST', { body: { pid: 'p-abc1', media: { kind: 'exe', key: 's1', size: 10 } } }); assert.equal(res.code, 400);
+res = await call('GET', { query: { pid: 'p-abc1', media: 'render/pl1_mx9-corner' } }); assert.equal(res.code, 404, 'none kept yet');
+media.add('p-abc1/render/pl1_mx9-corner.jpg'); media.add('p-abc1/massing/pl1_mx9-corner.jpg'); media.add('p-other/render/a.jpg');
+res = await call('GET', { query: { pid: 'p-abc1', media: 'render/pl1_mx9-corner' } }); assert.equal(res.code, 200); assert.equal(res.body.url, 'http://supa.test/storage/v1/object/sign/project-media/p-abc1/render/pl1_mx9-corner.jpg?token=g');
+res = await call('POST', { body: { pid: 'p-abc1', unmedia: ['render/pl1_mx9-corner', 'massing/pl1_mx9-corner', '../p-other/render/a', 'evil/x'] } });
+assert.equal(res.body.removed, 2); assert.equal(media.size, 1, 'another project\'s picture stays');
+console.log('sitefiles api ok: not set up (key, bucket), signed upload, types and size, list, open, read PDF / PNG / DXF with the strict schema, unreadable, delete, team copies of renderings and plan sets');
 
 // ---- the confirmed facts reach the site-plan AI: the program, the plan, the review, a change, a question ----
 { const { default: sp } = await import('../api/siteplan.js'); const got = [];

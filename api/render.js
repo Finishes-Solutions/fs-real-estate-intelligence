@@ -1,7 +1,11 @@
-// Photoreal renderings of a site plan: POST { image, brief, view } -> { image, model, size, prompt }
+// Photoreal renderings of a site plan: POST { image, brief, view, resolution?, detail?, model? } -> { image | url, model, size, prompt }
 //   image: a data URL (JPEG/PNG/WebP, up to ~3 MB) of the plan's 3D massing on the map from the view's camera (the
 //          browser takes it; lib/render.mjs cameraFor); brief: briefOf() from the same lib (with focus, the building, for the close-up); view: one of VIEWS
-//   -> image: a data URL (JPEG) of the rendering, 1920 × 1080 when the model can do it, else the nearest size it offers
+//   resolution: 'hd' (2048 × 1152, the default), '2k' or '4k' (lib/render.mjs RESOLUTIONS); detail: 'high' (the default),
+//   'medium' or 'low' (the Images API's quality); model: the engine picked in the rendering form or Settings
+//   -> image: a data URL (JPEG) of the rendering, at the resolution's size when the model can do it, else the next one
+//      down it takes (lib/render.mjs sizesFor); url instead: a link good for ten minutes, when the picture is too big
+//      for a Vercel answer (4.5 MB; a 4K picture can be) and was put in the team's storage for the browser to fetch
 // The picture is made by the model picked in Settings › AI model › Renderings when the key has it, else gpt-image-2.5-sunburst when the key has it, else the newest GPT Image model it lists (OPENAI_IMAGE_MODEL overrides) through the Images
 // API's edit endpoint, which keeps the input picture's geometry and camera and paints it photographically. Its token
 // use is recorded under the Renderings feature (lib/aiusage.mjs). One picture a request: the browser asks for the
@@ -14,7 +18,9 @@ import { availableModels, pickedFor } from '../lib/openai.mjs';
 import { isImageModel } from '../lib/aimodels.mjs';
 import { recordUsage, monthSpend, tokensOf, fallbackPerImage } from '../lib/aiusage.mjs';
 import { costOf } from '../lib/aiprices.mjs';
-import { VIEWS, SIZES, byId, renderPrompt, pickImageModel } from '../lib/render.mjs';
+import { VIEWS, RESOLUTIONS, DETAILS, COMPRESSION, sizesFor, byId, renderPrompt, pickImageModel } from '../lib/render.mjs';
+import { conn as storeConn } from './field.js';
+import { BUCKET } from '../lib/sitefiles.mjs';
 
 const BASE = 'https://api.openai.com/v1', MAX_IN = 3_200_000; // Vercel's body limit is 4.5 MB
 
@@ -24,15 +30,16 @@ export function cleanBrief(b = {}) {
   const uses = (Array.isArray(b.uses) ? b.uses : []).slice(0, 8).map(u => ({ use: clip(u?.use, 20), label: clip(u?.label, 40), sf: Number.isFinite(+u?.sf) && +u.sf > 0 ? Math.min(20000, Math.round(+u.sf)) : undefined, count: Math.max(1, Math.min(500, Math.round(+u?.count) || 1)), floors: (Array.isArray(u?.floors) ? u.floors : []).slice(0, 4).map(f => Math.max(1, Math.min(60, Math.round(+f) || 1))), forms: (Array.isArray(u?.forms) ? u.forms : []).filter(f => ['bar', 'L', 'U', 'tower'].includes(f)), units: +u?.units > 0 ? Math.round(+u.units) : undefined }));
   const n = (v, hi) => Number.isFinite(+v) && +v > 0 ? Math.min(hi, +v) : undefined;
   return { address: clip(b.address, 120), acres: n(b.acres, 5000), uses, buildings: n(b.buildings, 2000), parking: n(b.parking, 50000), pond: !!b.pond, pool: !!b.pool, truckCourt: !!b.truckCourt, foodTrucks: n(b.foodTrucks, 500), canopy: n(b.canopy, 200), garage: !!b.garage, homes: n(b.homes, 5000),
-    trees: b.trees !== false, look: clip(b.look, 20), time: clip(b.time, 20), basemap: b.basemap === 'satellite' ? 'satellite' : 'map', facts: (Array.isArray(b.facts) ? b.facts : []).slice(0, 6).map(s => clip(s, 200)),
+    trees: b.trees !== false, look: clip(b.look, 20), time: clip(b.time, 20), basemap: b.basemap === 'satellite' ? 'satellite' : 'map', surround: ['real', 'typical', 'none'].includes(b.surround) ? b.surround : undefined, facts: (Array.isArray(b.facts) ? b.facts : []).slice(0, 6).map(s => clip(s, 200)),
     focus: b.focus && typeof b.focus === 'object' ? { name: clip(b.focus.name, 40) || 'Building', use: clip(b.focus.use, 20), floors: Math.max(1, Math.min(60, Math.round(+b.focus.floors) || 1)), label: clip(b.focus.label, 40) } : undefined }; // the building a close-up frames
 }
 
-// one edit call; a 400 about the size steps down to the next size, one about input_fidelity drops that parameter
-export async function paint(key, { model, prompt, image, sizes = SIZES, fidelity = true, signal }) {
-  let size = sizes[0], fid = fidelity, lastErr = null;
-  for (let i = 0; i < 6; i++) {
-    const f = new FormData(); f.append('model', model); f.append('prompt', prompt); f.append('n', '1'); f.append('size', size); f.append('quality', 'high'); f.append('output_format', 'jpeg'); if (fid) f.append('input_fidelity', 'high');
+// one edit call; a 400 about the size steps down to the next size, one about input_fidelity or output_compression
+// drops that parameter (older models)
+export async function paint(key, { model, prompt, image, sizes = sizesFor('hd'), quality = 'high', compression = null, fidelity = true, signal }) {
+  let size = sizes[0], fid = fidelity, comp = compression, lastErr = null;
+  for (let i = 0; i < 9; i++) {
+    const f = new FormData(); f.append('model', model); f.append('prompt', prompt); f.append('n', '1'); f.append('size', size); f.append('quality', quality); f.append('output_format', 'jpeg'); if (comp) f.append('output_compression', String(comp)); if (fid) f.append('input_fidelity', 'high');
     f.append('image[]', new Blob([image.bytes], { type: image.type }), 'massing.' + (image.type === 'image/jpeg' ? 'jpg' : image.type.split('/')[1]));
     const r = await fetch(BASE + '/images/edits', { method: 'POST', signal, headers: { Authorization: 'Bearer ' + key }, body: f });
     if (r.status === 429 || r.status >= 500) { lastErr = new Error('OpenAI ' + r.status); if (signal?.aborted) throw new Error('cancelled'); await new Promise(res => setTimeout(res, 2000 * (i + 1))); continue; }
@@ -40,6 +47,7 @@ export async function paint(key, { model, prompt, image, sizes = SIZES, fidelity
     if (!r.ok) {
       const msg = d.error?.message || 'error';
       if (r.status === 400 && /input_fidelity/i.test(msg) && fid) { fid = false; continue; }
+      if (r.status === 400 && /output_compression/i.test(msg) && comp) { comp = null; continue; }
       if (r.status === 400 && (msg.includes(size) || /size/i.test(msg))) { const nx = sizes[sizes.indexOf(size) + 1]; if (nx) { size = nx; continue; } }
       throw new Error('OpenAI ' + r.status + ': ' + msg);
     }
@@ -52,6 +60,20 @@ export async function paint(key, { model, prompt, image, sizes = SIZES, fidelity
 
 // the month's cap in dollars: RENDER_MONTHLY_CAP_USD (0 turns renderings off), $100 when unset or not a number
 export const capOf = (env = process.env) => { const v = parseFloat(env.RENDER_MONTHLY_CAP_USD); return Number.isFinite(v) && v >= 0 ? v : 100; };
+// a picture too big to answer with (Vercel carries 4.5 MB; base64 adds a third): put in the team's storage
+// (tmp-renders/, the reference files' bucket) and answered as a ten-minute link; earlier ones over a day old are cleared
+export const MAX_INLINE = 3_600_000;
+async function stash(b64) {
+  const db = storeConn(); if (!db) return null;
+  const path = 'tmp-renders/' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + '.jpg';
+  await db.call('/storage/v1/object/' + BUCKET + '/' + path, { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'true' }, body: Buffer.from(b64, 'base64') });
+  const s = await db.json('/storage/v1/object/sign/' + BUCKET + '/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 600 }) });
+  (async () => { const old = await db.json('/storage/v1/object/list/' + BUCKET, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix: 'tmp-renders/', limit: 100, offset: 0 }) });
+    const gone = (old || []).filter(o => o?.name && Date.parse(o.created_at) < Date.now() - 864e5).map(o => 'tmp-renders/' + o.name);
+    if (gone.length) await db.call('/storage/v1/object/' + BUCKET, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: gone }) }); })().catch(() => {});
+  return db.url + '/storage/v1' + (s.signedURL || s.signedUrl);
+}
+
 const usd = v => '$' + (v % 1 ? v.toFixed(2) : String(v));
 export const budgetMessage = cap => cap === 0 ? 'Renderings are turned off on this site.' : 'This month’s rendering budget (' + usd(cap) + ') is used up. It resets on the 1st.';
 
@@ -69,6 +91,7 @@ export default async function handler(req, res) {
   const cap = capOf(), spend = await monthSpend('render'); // spent null: couldn't read it, so paint anyway
   if (cap === 0 || (spend.spent != null && spend.spent >= cap)) return res.status(402).json({ error: budgetMessage(cap), spent: spend.spent, cap, month: spend.month });
   const view = byId(VIEWS, b.view).id, brief = cleanBrief(b.brief), prompt = renderPrompt(brief, view);
+  const resolution = byId(RESOLUTIONS, b.resolution).id, detail = byId(DETAILS, b.detail).id;
   let model = await pickedFor(key, typeof b.model === 'string' ? b.model : null, isImageModel) || process.env.OPENAI_IMAGE_MODEL || ''; // Settings › AI model › Renderings, when the key has it
   if (!model) { try { model = pickImageModel(await availableModels(key)); } catch (e) { model = pickImageModel([]); } }
   if (!model) model = pickImageModel([]);
@@ -77,11 +100,13 @@ export default async function handler(req, res) {
   // dropped too, so a cancelled picture isn't painted (and billed) for nobody. Best effort: a proxy may hold the connection.
   const ac = new AbortController(); if (typeof res.on === 'function') res.on('close', () => { if (!res.writableEnded) ac.abort(); });
   try {
-    const out = await paint(key, { model, prompt, image, signal: ac.signal });
+    const out = await paint(key, { model, prompt, image, sizes: sizesFor(resolution), quality: detail, compression: COMPRESSION[resolution], signal: ac.signal });
     res.setHeader('Cache-Control', 'no-store');
     const t = tokensOf(out.usage), est = (t && costOf(out.model, t)) ?? fallbackPerImage(); // this picture, best guess
     const budget = { spent: spend.spent == null ? null : Math.round((spend.spent + est) * 1e4) / 1e4, cap, month: spend.month };
-    return res.json({ image: 'data:image/jpeg;base64,' + out.b64, model: out.model, size: out.size, view, prompt, budget });
+    const meta = { model: out.model, size: out.size, view, resolution, detail, prompt, budget };
+    if (out.b64.length > MAX_INLINE) { const url = await stash(out.b64).catch(e => { console.error('render stash', e.message); return null; }); if (url) return res.json({ url, ...meta }); }
+    return res.json({ image: 'data:image/jpeg;base64,' + out.b64, ...meta });
   } catch (e) {
     if (ac.signal.aborted) { console.warn('render cancelled by the browser'); try { res.status(499).json({ error: 'Cancelled.' }); } catch (e2) { /* the connection is gone */ } return; }
     console.error('render', e.message);
