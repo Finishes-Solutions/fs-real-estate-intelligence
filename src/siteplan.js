@@ -32,6 +32,7 @@ import * as BR from './lib/planbrief.mjs';
 import * as STG from './lib/planstages.mjs';
 import * as RF from './lib/sitefiles.mjs';
 import { siteFiles } from './sitefiles.js';
+import { workspace } from './workspace.js';
 import { teamLibrary } from './teamlib.js';
 import { ruleSheets } from './rulesheets.js';
 const typeOptions = (cur, team = []) => (team.length ? '<optgroup label="Team">' + team.map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>' : '') + BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
@@ -204,7 +205,8 @@ export function initSitePlan(ctx) {
   const geomAcres = (g, at) => { const F = SP.frame(at), polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
     return polys.reduce((t, rs) => t + SP.ringArea(rs[0].map(F.toFt)) - rs.slice(1).reduce((h, r) => h + SP.ringArea(r.map(F.toFt)), 0), 0) / 43560; };
   const parcelOf = (pc, center) => { const g = pc.geometry, r = g && (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates?.[0]?.[0]); const cc = r ? SP.centroid(r) : center;
-    const rec = { key: '', label: pc.situs || pc.owner || 'Parcel', owner: pc.owner || '', propId: pc.propId || null, marketValue: pc.marketValue || null, landValue: pc.landValue || null, acres: g ? +(geomAcres(g, center)).toFixed(3) : null, center: cc.map(v => +v.toFixed(6)), geometry: llRound(g) || null };
+    const rec = { key: '', label: pc.situs || pc.owner || 'Parcel', owner: pc.owner || '', propId: pc.propId || null, marketValue: pc.marketValue || null, landValue: pc.landValue || null, acres: g ? +(geomAcres(g, center)).toFixed(3) : null, center: cc.map(v => +v.toFixed(6)), geometry: llRound(g) || null,
+      ...Object.fromEntries([['address', pc.situsStreet || pc.situs], ['city', pc.situsCity], ['zip', pc.situsZip], ['county', pc.county]].filter(([, v]) => v).map(([k, v]) => [k, String(v).slice(0, 120)])) }; // (the address and ZIP: the feasibility study's market check reads the ZIP)
     rec.key = parcelKey(rec); return rec; };
   // the site boundary for a set of parcels (one outline, or several merged). Parcels that don't touch are joined across
   // the gap between them (SP.bridgeParcels): filled in as site, or, where the map shows a road in it, kept as a no-build
@@ -4474,8 +4476,11 @@ export function initSitePlan(ctx) {
       return '<button type="button" role="tab" id="pjTab-' + t.id + '" data-tab="' + t.id + '" aria-selected="' + on + '" aria-controls="pjPanel" tabindex="' + (on ? 0 : -1) + '">' + t.label +
         (n[t.id] ? '<span class="pj-tn"> · ' + f0(n[t.id]) + '</span>' : '') + (t.id === 'ask' && busy ? '<span class="pj-tn"> · answering…</span>' : '') + '</button>'; }).join('') + '</div>';
   }
+  // the Feasibility tab: the step-by-step workspace (src/workspace.js), saving and opening options through this page
+  const WS = workspace({ save, openOption: (pid, plid) => open(pid, plid), newPlan: (p, extra) => newPlan(p, extra), setTab: (p, t) => setTab(p, t, true), goMap: () => ctx.setView('map'),
+    code: () => get(CODE_KEY), name: () => get(NAME_KEY), toast: m => ctx.toast?.(m) });
   function detailHtml(p) {
-    const tab = tabFor(p), body = { overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, files: SF.html, ask: pAskHtml }[tab](p);
+    const tab = tabFor(p), body = { workspace: WS.html, overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, files: SF.html, ask: pAskHtml }[tab](p);
     return headHtml(p) + tabsHtml(p, tab) + '<div class="pj-panel pj-p-' + tab + '" id="pjPanel" role="tabpanel" aria-labelledby="pjTab-' + tab + '">' + body + '</div>';
   }
 
@@ -4991,6 +4996,7 @@ export function initSitePlan(ctx) {
       let ch = false; for (const x of p.parcels) ch = regridOn(x) || ch; if (ch) { quietSave(p); setTimeout(() => render()); }
       if (needSite(p)) gatherSite(p); // (the card already says Checking…)
     }
+    if (tab === 'workspace') { WS.wire(root, p); if (needSite(p)) gatherSite(p); } // (the flood zone and districts feed the study's risks)
     if (tab === 'renderings') wireRenders(p);
     if (tab === 'plans') wirePlans(p);
     if (tab === 'ask') wirePAsk(p);

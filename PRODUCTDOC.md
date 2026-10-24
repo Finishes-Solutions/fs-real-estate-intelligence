@@ -472,6 +472,25 @@ Find them under **My Work → Notes & watchlist**.
 
 ## Projects and site plans
 
+### The Feasibility workspace (experimental)
+
+Opening a project now starts on **Feasibility**: the whole study of a site in six steps, with the project's numbers always in a summary beside it.
+
+1. **Intake**: who it's for, the target use, the address and ZIP (filled in from the parcels), and the land. The land starts at the appraisal district's *land* value; enter the asking or contract price to use that instead. You can also type in a survey's metes and bounds to add the exact tract.
+2. **Site**: pick the site option the study uses, or let the layout engine lay the parcels out as a new option. The site's buildable area, parking, coverage and detention are shown with the plan. **Open in site plan** takes you to the editor to refine it.
+3. **Plans**: the schematic plan set's sheet list for that option, and a button to make the set.
+4. **Budget**: a construction budget by CSI division, priced from the layout's quantities. Apartments and townhomes use the Finishes Solutions budget workbook's line items; other uses and site work use the platform's rates. Every line shows its quantity, rate and where the rate came from. You can change a rate or leave a line out.
+5. **Pro Forma**: every assumption with its source and usual range:
+   - **Data**: interest rates from the platform's nightly market data.
+   - **Library**: the budget workbook.
+   - **House**: a starting point, not verified.
+   - **Yours**: a number you changed.
+   
+   Change one and every number updates. Results include returns (IRR, NPV, yield on cost), the rent needed to break even, what moves the return most, and a 5-year hold. **New scenario** saves a set of changes (financing, costs, unit mix) to compare side by side.
+6. **Reports**: download the Feasibility report (PDF), the workbook, the assumption register and the budget (spreadsheets), or save the whole set for the team. **Open the report here** shows it in a new tab to print, even without a connection to the report service.
+
+Everything here is feasibility level: the plans are schematic (not for permit or construction), the costs are estimates rather than bids, and rents and cap rates are assumptions, not appraisals. Every screen and report says so.
+
 Test-fit a building, or a whole mixed-use development, on one parcel or up to 20 together, by hand or with AI, and print it as a site plan sheet.
 
 **Starting one**
@@ -1046,6 +1065,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Feasibility workspace (experimental):** a project now opens on a step-by-step study (Intake, Site, Plans, Budget, Pro Forma, Reports). It has a CSI budget priced from the layout, every assumption shown with its source and editable, scenarios side by side, and a full report set (PDF, workbook, registers).
 - **Both sides of a road are built on:** when a road runs between the parcels of a site, Build lays out each side on its own (with the road as its street) and puts them together, instead of using one side only.
 - **Pick every parcel you see:** with the parcel lines on, a pick is the parcel drawn under your click. Before, a parcel inside another's oversized county outline (on Waller Tomball Rd one record covers 128 acres and a dozen accounts) was taken for one already picked and dropped, so only two stayed selected.
 - **The Market report for your project app's agents:** a county's (or the region's) Market page as a printed PDF report: what's moving, the construction pipeline, permits, new businesses, jobs, sales tax, spending, housing and rents, material prices and rates, Houston crime, the busiest roads and local news.

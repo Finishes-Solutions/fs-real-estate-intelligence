@@ -3,6 +3,22 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-24
+
+### 6:27 PM CT: Feasibility workspace on the experimental branch (experimental, not on the live site)
+- **A project now opens on Feasibility:** six steps (Intake, Site, Plans, Budget, Pro Forma, Reports) with the project's cost, yield, IRR, NPV and top risks always in a summary beside them.
+- **A real budget:** CSI-coded line items priced from the layout's quantities. Apartments and townhomes use the Finishes Solutions budget workbook's lines; other uses and site work use the platform's rates. Costs are escalated by the construction-materials price index, with a location factor, and rolled up the budgeting suite's way (GC fee, contingency, a developer fee that is a true share of the total). Every line says where its rate came from and can be changed or left out.
+- **Every assumption shows its source:** interest rates come from the nightly SOFR and 10-year Treasury data, land from the asking price or the appraisal district's land value (no longer the total value with buildings), and rents carry the ZIP's typical rent as a check. Change any input and every number updates.
+- **Pro forma fixes:**
+  - Lease-up income now pays the construction loan down before anything is distributed.
+  - Exit and refinance income grow rents and costs at their own rates.
+  - NPV is added, and so are break-even rents.
+  - A 5-year hold on the budgeting suite's tested engine.
+- **Sensitivity and scenarios:** what moves the return most, two-way grids, and named scenarios (financing, costs, unit mix) side by side.
+- **Report set:** a Feasibility report PDF (summary, site and layout, plan set, budget, pro forma, sensitivity, risks, and every assumption with its source), a workbook, CSVs and the study data. These can be downloaded or saved for the team.
+- **Fixed:** in the site plan editor, the Layers / Items tabs were calling the project page's tab switch.
+- **Not live:** this is on the `experimental` branch only. Saving report sets needs a new storage bucket set up first.
+
 ## 2026-10-23
 
 ### 2:03 PM CT: Parcels in separate pieces can all be picked (ccc9b2a)
