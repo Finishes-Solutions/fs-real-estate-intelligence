@@ -1,0 +1,50 @@
+Group,Item,Value,Source kind,Source,As of,Confidence
+Site,Site area,"15.97 acres (695,836 sf)",Public data,Public data: Parcel outlines from the appraisal district / provider (not a survey),,medium
+Site,Buildable envelope at a 10 ft setback,"660,498 sf (95% of the site)",Calculated,Calculated: Distance-transform envelope of the parcels (lib/feasibility/envelope.mjs),,medium
+Site,Building area,"425,611 gross sf",From the concept plan,From the concept plan: Measured on the concept layout,,medium
+Site,Units,389,From the concept plan,From the concept plan: Measured on the concept layout,,medium
+Site,Parking,657 spaces of 623 required,From the concept plan,From the concept plan: Measured on the concept layout,,medium
+Site,Coverage / FAR,20.91% / 0.61,From the concept plan,From the concept plan: Measured on the concept layout,,medium
+Site,Detention,8.79 ac-ft,From the concept plan,"From the concept plan: Stormwater sizing rule on the developed acres (the rate is a typical value, not a drainage study)",,low
+Cost,Land price,"$2,600,000",Your input,Your input: Asking / contract price entered at intake,,medium
+Cost,Land closing costs,1.50%,House assumption,"House assumption: Title, survey, legal at closing (1–2%)",,low
+Cost,Location cost factor,1.00×,House assumption,House assumption: 1.00: the site is in the region the cost library and parametric rates were priced for (Waller / Houston area),,medium-low
+Cost,Materials share of hard cost (escalated by the PPI),55%,House assumption,House assumption: Typical materials share of building cost (labor and fees are the rest),,low
+Cost,Forward cost escalation,3.50%,House assumption,House assumption: Annual construction-cost escalation to the construction midpoint,,low
+Cost,GC fee on library lines,12%,Cost library,Cost library: Finishes Solutions budget template: company profit 12% of hard cost (2026-08-10),2026-08-10,medium-low
+Cost,Developer fee (of total project cost),3%,House assumption,"House assumption: Developer fee, a share of total project cost before financing (2–5%)",,low
+Cost,Contingency,5%,House assumption,House assumption: Hard-cost contingency at concept stage (3–10%),,low
+Cost,Site prep,$3/sf,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Cost,Paving,$7.5/sf,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Cost,Parking a space,"$2,750",House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Cost,Detention pond,"$30,000",House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Revenue,Studio rent,"$1,175/mo",House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Revenue,1 BR rent,"$1,425/mo",House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Revenue,2 BR rent,"$1,795/mo",House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Revenue,3 BR rent,"$2,150/mo",House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Revenue,Other income a unit,$75/mo,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Revenue,Vacancy,7%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Revenue,Credit loss,1%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Operations,Apartment operating costs,"$4,600",House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Operations,Property tax rate,2.50%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Operations,Taxable share of cost,70%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Operations,Management fee,3%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Financing,Construction rate,6.90%,Calculated,"Calculated: SOFR 3.90% (FRED, 2026-10-22) + 3.00% construction-loan spread (house) (2026-10-22)",2026-10-22,medium
+Financing,Permanent rate,6.71%,Calculated,"Calculated: 10-yr Treasury 4.96% (FRED, 2026-10-22) + 1.75% permanent-loan spread (house) (2026-10-22)",2026-10-22,medium
+Financing,Loan to cost,60%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Financing,Loan fee,1%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Financing,Amortization,30 years,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Financing,Loan to value,65%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Financing,Debt coverage (DSCR),1.25×,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Exit & returns,Market cap rate,5.50%,House assumption,"House assumption: Going-in cap rate by use, Houston suburban 2026 (UNVERIFIED: the platform has no sale comps)",,low
+Exit & returns,Exit cap rate,5.75%,House assumption,House assumption: Exit cap = market cap + 0.25%,,low
+Exit & returns,Sale costs,2%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Exit & returns,Rent growth,3%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Exit & returns,Expense growth,3%,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Exit & returns,Hold after stabilizing,5 years,House assumption,House assumption: Platform default: 2026 Houston / Katy / Waller suburban market assumption (UNVERIFIED) (2026),2026,low
+Exit & returns,Discount rate (NPV),10%,House assumption,House assumption: Discount rate for net present value: a levered development hurdle,,low
+Schedule,Pre-development,9 months,House assumption,House assumption: Schedule from the program’s size and type (lib/proforma.mjs scheduleFor),,low
+Schedule,Construction,25 months,House assumption,House assumption: Schedule from the program’s size and type (lib/proforma.mjs scheduleFor),,low
+Schedule,Lease-up,19 months,House assumption,House assumption: Schedule from the program’s size and type (lib/proforma.mjs scheduleFor),,low
+Cost,Escalation: Library rates (to date and forward),× 1.0680,Calculated,"Calculated: PPI: construction materials (BLS, via FRED) 2026-08 375.792 → 2026-09 378.61 (0.75%) × materials share 55%; 3.5% a year for 1.79 years to the construction midpoint",,medium
+Cost,Escalation: Parametric rates (forward),× 1.0636,Calculated,Calculated: The rate has no as-of month: no to-date escalation applied.; 3.5% a year for 1.79 years to the construction midpoint,,medium
