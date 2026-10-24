@@ -44,6 +44,19 @@ const hp = R.heroPoints({ x: 0, y: 0, w: 100, d: 50, rot: 90 }), xs = hp.map(p =
 assert.ok(Math.abs(Math.max(...xs) - 70) < 1e-6 && Math.abs(Math.max(...ys) - 95) < 1e-6, 'a 100 × 50 building turned 90° frames 140 × 190 ft: ' + JSON.stringify(hp));
 assert.equal(R.renderLabel('hero', { name: 'Building A' }), 'Building close-up · Building A'); assert.equal(R.renderLabel('hero', null), 'Building close-up · Building'); assert.equal(R.renderLabel('front', { name: 'x' }), 'From the street');
 
+// the new views: top down (straight down, a long site turned across the picture), the sides, high overhead
+const long = { ...plan, ring: [[0, 0], [150, 0], [150, 900], [0, 900]], front: 0 }, top = R.cameraFor('top', long);
+const fill = (ring, t) => { const a = t * Math.PI / 180, ux = Math.sin(a), uy = Math.cos(a), d = ring.map(([x, y]) => x * ux + y * uy), w = ring.map(([x, y]) => x * uy - y * ux); return Math.min(16 / (Math.max(...w) - Math.min(...w)), 9 / (Math.max(...d) - Math.min(...d))); };
+assert.equal(top.pitch, 0); assert.ok(fill(long.ring, top.bearing) > 1.6 * fill(long.ring, 0), 'a long north–south site is turned to lie across the picture, filling it far better: ' + top.bearing);
+assert.equal(R.cameraFor('top', { ...plan, ring: [[0, 0], [900, 0], [900, 150], [0, 150]] }).bearing, 0, 'a wide site stays street-down');
+assert.equal(R.cameraFor('left', plan).bearing, 270); assert.equal(R.cameraFor('right', plan).bearing, 90); assert.equal(R.cameraFor('high', plan).pitch, 25); assert.ok(fill(long.ring, R.cameraFor('high', long).bearing) > 1.6 * fill(long.ring, 0), 'high overhead turns a long site across too');
+const diag = { ...plan, ring: [[0, 0], [100, 0], [700, 600], [600, 700]], front: 0 }, db = R.cameraFor('top', diag).bearing; assert.ok(fill(diag.ring, db) > 1.25 * fill(diag.ring, 0), 'a diagonal site is turned to fill the picture: ' + db);
+assert.deepEqual(R.SITE_VIEWS, ['corner', 'front', 'low', 'rear']); assert.ok(R.PREVIEW_VIEWS.length === 8 && !R.PREVIEW_VIEWS.includes('hero'), 'the preview shows every whole-site view');
+// sizes: 16:9 with sides that are multiples of 16, each resolution stepping down to what older models take
+for (const r of R.RESOLUTIONS) { const [w, h] = r.size.split('x').map(Number); assert.ok(w % 16 === 0 && h % 16 === 0 && Math.abs(w / h - 16 / 9) < 0.01 && w <= 3840 && w * h <= 8_294_400, r.size); }
+assert.deepEqual(R.sizesFor('4k'), ['3840x2160', '2560x1440', '2048x1152', '1536x1024', '1024x1024']); assert.deepEqual(R.sizesFor('nope'), ['2048x1152', '1536x1024', '1024x1024']);
+assert.equal(R.byId(R.TIMES, 'nope').id, 'day', 'midday is still the default light'); assert.equal(R.TIMES.length, 7);
+
 // the brief: uses grouped with their floors and forms, what else is on the site
 const brief = R.briefOf(plan, { metrics: { acres: 1.377, spaces: 112.4 }, address: '123 Main St, Katy', facts: ['FEMA flood zone X.'], look: 'brick', time: 'dusk', basemap: 'sat' });
 assert.equal(brief.buildings, 3); assert.equal(brief.parking, 112); assert.equal(brief.acres, 1.38); assert.equal(brief.pond, true); assert.equal(brief.pool, undefined);
@@ -56,9 +69,15 @@ const pr = R.renderPrompt(brief, 'corner');
 for (const s of ['must not change', '1 1-storey retail building', '1 1-storey restaurant building (L-shaped)', '1 3-storey multifamily building, 24 units in all', 'about 112 parking spaces', 'detention pond', 'red and tan brick', 'dusk', 'real aerial imagery', 'FEMA flood zone X.', 'No text, labels'])
   assert.ok(pr.includes(s), 'prompt says: ' + s + '\n' + pr);
 assert.ok(!pr.includes('undefined') && !pr.includes('null'), 'no holes in the prompt');
-const pr2 = R.renderPrompt({ ...brief, look: 'auto', basemap: 'map', facts: [] }, 'low');
+const pr2 = R.renderPrompt({ ...brief, look: 'auto', basemap: 'map', surround: 'typical', facts: [] }, 'low');
 assert.ok(pr2.includes('garden-style apartments') && pr2.includes('retail strip'), 'no look picked: materials by use'); assert.ok(pr2.includes('replace the flat map graphics'), 'map base: invent the surroundings'); assert.ok(pr2.includes('low aerial from over the entry drive'), 'the low view is from the entry drive'); assert.ok(pr.includes('whole site in the frame'), 'composed wide');
 assert.ok(R.renderPrompt({}, 'front').length > 200, 'an empty brief still makes a usable prompt');
+assert.equal(brief.surround, 'real', 'imagery on the page: the real surroundings'); assert.equal(R.briefOf(plan, { surround: 'none' }).surround, 'none'); assert.equal(R.briefOf(plan).surround, 'typical');
+const alone = R.renderPrompt({ ...brief, surround: 'none' }, 'corner'), aloneTop = R.renderPrompt({ ...brief, surround: 'none' }, 'top');
+assert.ok(alone.includes('Show the site alone') && alone.includes('backdrop where the sky would be') && alone.includes('in the frame on its own') && !alone.includes('real aerial imagery'), 'the site only');
+assert.ok(aloneTop.includes('no horizon and no sky') && !aloneTop.includes('backdrop where the sky') && !aloneTop.includes('level horizon'), 'top down, site only: no sky anywhere');
+assert.ok(R.renderPrompt({ ...brief, surround: 'typical' }, 'top').includes('neighbouring lots and trees.'), 'top down, typical: no horizon in the surroundings');
+for (const t of R.TIMES) assert.ok(R.renderPrompt({ time: t.id }, 'corner').includes(t.text), t.id);
 // the close-up's prompt: about the focused building, the rest of the site around it, still nothing changed and no text
 const hb = R.briefOf(plan, { metrics: { acres: 1.377, spaces: 112.4 }, look: 'auto', focus: { ...plan.elements[2], name: 'Building C' } });
 assert.deepEqual(hb.focus, { name: 'Building C', use: 'multifamily', floors: 3, label: R.briefOf(plan).uses[2].label }); assert.equal(brief.focus, undefined, 'no focus unless asked');
@@ -82,7 +101,7 @@ assert.equal(R.pickImageModel([], 'gpt-image-9'), 'gpt-image-9');
 
 // ---------- the endpoint, with OpenAI mocked ----------
 const calls = [], PNG = 'data:image/png;base64,' + Buffer.from('fake-png-bytes').toString('base64');
-let refuseSize = 1, refuseFidelity = 1, fail500 = 0;
+let refuseSize = 1, refuseFidelity = 1, fail500 = 0, bigOnce = 0; const stashed = [];
 // this month's Renderings rows in ai_usage (the budget read), and whether that read fails
 let usage = [], supaFail = false; const reads = [];
 globalThis.fetch = async (url, opts = {}) => {
@@ -90,12 +109,15 @@ globalThis.fetch = async (url, opts = {}) => {
   if (url.startsWith('https://x.supabase.co/rest/v1/rpc/ai_usage_add')) return new Response(null, { status: 204 });
   if (url.startsWith('https://x.supabase.co/rest/v1/ai_usage?')) { reads.push(url); return supaFail ? new Response('{"message":"bad gateway"}', { status: 503 }) : json(usage); }
   if (url.endsWith('/models')) return json({ data: [{ id: 'gpt-image-1' }, { id: 'gpt-image-2' }, { id: 'gpt-image-2.5-sunburst' }, { id: 'gpt-5' }] });
+  if (url.startsWith('https://x.supabase.co/storage/v1/object/sign/site-files/tmp-renders/')) return json({ signedURL: '/object/sign/site-files/' + url.split('/site-files/')[1] + '?token=t' });
+  if (url.startsWith('https://x.supabase.co/storage/v1/object/list/site-files')) return json([]);
+  if (url.startsWith('https://x.supabase.co/storage/v1/object/site-files/tmp-renders/')) { stashed.push({ url, bytes: opts.body.length, type: opts.headers['Content-Type'] }); return json({ Key: 'x' }); }
   if (url.endsWith('/images/edits')) {
-    const f = opts.body, rec = { model: f.get('model'), size: f.get('size'), quality: f.get('quality'), fidelity: f.get('input_fidelity'), prompt: f.get('prompt'), img: f.get('image[]'), n: f.get('n'), fmt: f.get('output_format') }; calls.push(rec);
+    const f = opts.body, rec = { model: f.get('model'), size: f.get('size'), quality: f.get('quality'), fidelity: f.get('input_fidelity'), comp: f.get('output_compression'), prompt: f.get('prompt'), img: f.get('image[]'), n: f.get('n'), fmt: f.get('output_format') }; calls.push(rec);
     if (fail500 > 0) { fail500--; return json({ error: { message: 'overloaded' } }, 500); }
     if (refuseFidelity > 0 && rec.fidelity) { refuseFidelity--; return json({ error: { message: "Unknown parameter: 'input_fidelity'." } }, 400); }
-    if (refuseSize > 0 && rec.size === '1920x1080') { refuseSize--; return json({ error: { message: "Invalid value: '1920x1080'. Supported values are: '1024x1024', '1536x1024', '1024x1536', and 'auto'." } }, 400); }
-    return json({ created: 1, data: [{ b64_json: Buffer.from('jpeg-bytes').toString('base64') }], usage: { input_tokens: 1200, output_tokens: 6000, input_tokens_details: { image_tokens: 1100, text_tokens: 100 } } });
+    if (refuseSize > 0 && !['1536x1024', '1024x1024'].includes(rec.size)) { refuseSize--; return json({ error: { message: "Invalid value: '" + rec.size + "'. Supported values are: '1024x1024', '1536x1024', '1024x1536', and 'auto'." } }, 400); }
+    return json({ created: 1, data: [{ b64_json: bigOnce-- > 0 ? 'A'.repeat(3_700_000) : Buffer.from('jpeg-bytes').toString('base64') }], usage: { input_tokens: 1200, output_tokens: 6000, input_tokens_details: { image_tokens: 1100, text_tokens: 100 } } });
   }
   throw new Error('unexpected fetch ' + url);
 };
@@ -107,9 +129,10 @@ let res = mockRes(); await render(req({ body: { image: PNG, brief, view: 'corner
 assert.equal(res.code, 200, JSON.stringify(res.body));
 assert.ok(res.body.image.startsWith('data:image/jpeg;base64,'), 'the picture comes back as a JPEG data URL');
 assert.equal(res.body.model, 'gpt-image-2.5-sunburst', 'the preferred image model, which the key lists'); assert.equal(res.headers['X-AI-Model'], 'gpt-image-2.5-sunburst');
-assert.equal(res.body.size, '1536x1024', 'a model that refuses 1080p gets the next size'); assert.equal(res.body.view, 'corner');
+assert.equal(res.body.size, '1536x1024', 'a model that refuses custom sizes gets the next one it takes'); assert.equal(res.body.view, 'corner'); assert.equal(res.body.resolution, 'hd'); assert.equal(res.body.detail, 'high');
 assert.equal(calls.length, 3, 'fidelity refused, size refused, then painted: ' + calls.map(c => c.size + '/' + c.fidelity).join(' '));
-assert.deepEqual(calls.map(c => c.fidelity), ['high', null, null]); assert.deepEqual(calls.map(c => c.size), ['1920x1080', '1920x1080', '1536x1024']);
+assert.deepEqual(calls.map(c => c.fidelity), ['high', null, null]); assert.deepEqual(calls.map(c => c.size), ['2048x1152', '2048x1152', '1536x1024'], 'HD asks for 2048 × 1152 (16:9, sides multiples of 16), not the invalid 1920 × 1080');
+assert.equal(calls[0].comp, '95', 'HD keeps 95% of the JPEG');
 assert.equal(calls[2].quality, 'high'); assert.equal(calls[2].n, '1'); assert.equal(calls[2].fmt, 'jpeg'); assert.equal(calls[2].model, 'gpt-image-2.5-sunburst');
 assert.ok(calls[2].img && calls[2].img.size === 'fake-png-bytes'.length && calls[2].img.type === 'image/png', 'the massing picture is sent as the image to edit');
 assert.ok(calls[2].prompt.includes('must not change') && calls[2].prompt.includes('From the corner'.toLowerCase().split(' ')[0]) && calls[2].prompt.includes('red and tan brick'), 'the prompt is the lib’s, from the brief');
@@ -117,7 +140,19 @@ assert.ok(calls[2].prompt.includes('must not change') && calls[2].prompt.include
 // a model that takes 1080p and input_fidelity straight away: one call
 calls.length = 0; refuseSize = 0; refuseFidelity = 0;
 res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.9.2' }), res);
-assert.equal(res.code, 200); assert.equal(res.body.size, '1920x1080'); assert.equal(calls.length, 1); assert.equal(calls[0].fidelity, 'high');
+assert.equal(res.code, 200); assert.equal(res.body.size, '2048x1152'); assert.equal(calls.length, 1); assert.equal(calls[0].fidelity, 'high');
+// 4K at Standard detail: asked for 3840 × 2160 at quality medium, compressed to fit an answer; an engine without 4K steps down
+calls.length = 0; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'top', resolution: '4k', detail: 'medium' }, ip: '9.9.9.12' }), res);
+assert.equal(res.code, 200); assert.equal(res.body.size, '3840x2160'); assert.equal(res.body.resolution, '4k'); assert.equal(res.body.view, 'top');
+assert.equal(calls[0].size, '3840x2160'); assert.equal(calls[0].quality, 'medium'); assert.equal(calls[0].comp, '88'); assert.ok(calls[0].prompt.includes('straight-down') && calls[0].prompt.includes('no horizon'), 'the top-down prompt');
+calls.length = 0; refuseSize = 3; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front', resolution: '4k' }, ip: '9.9.9.13' }), res);
+assert.deepEqual(calls.map(c => c.size), ['3840x2160', '2560x1440', '2048x1152', '1536x1024'], 'an older engine: each smaller size in turn'); assert.equal(res.body.size, '1536x1024'); refuseSize = 0;
+calls.length = 0; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front', resolution: '8k', detail: 'ultra' }, ip: '9.9.9.14' }), res);
+assert.equal(calls[0].size, '2048x1152'); assert.equal(calls[0].quality, 'high', 'unknown picks: HD at Best');
+// a picture too big to answer with goes to storage and comes back as a link
+calls.length = 0; bigOnce = 1; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front', resolution: '4k' }, ip: '9.9.9.15' }), res);
+assert.equal(res.code, 200); assert.equal(res.body.image, undefined); assert.match(res.body.url, /^https:\/\/x\.supabase\.co\/storage\/v1\/object\/sign\/site-files\/tmp-renders\/[\w-]+\.jpg\?token=t$/);
+assert.equal(stashed.length, 1); assert.equal(stashed[0].type, 'image/jpeg'); assert.equal(stashed[0].bytes, Buffer.from('A'.repeat(3_700_000), 'base64').length);
 // a 500 is retried, then succeeds
 calls.length = 0; fail500 = 1;
 res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.9.3' }), res);
@@ -134,13 +169,14 @@ const cf = cleanBrief({ focus: { name: 'B'.repeat(300), use: 'retail', floors: 9
 assert.deepEqual(cf.focus, { name: 'B'.repeat(40), use: 'retail', floors: 60, label: 'Retail' }, 'the focus is kept, clipped'); assert.equal(cb.focus, undefined); assert.equal(cleanBrief({ focus: 'Building A' }).focus, undefined);
 assert.ok(R.renderPrompt(cleanBrief(hb), 'hero').includes('close-up aerial of Building C'), 'the focus survives the trip to the server');
 assert.equal(cb.buildings, undefined); assert.equal(cb.parking, 50000); assert.equal(cb.facts.length, 6); assert.equal(cb.facts[0].length, 200); assert.equal(cb.basemap, 'map');
+assert.equal(cb.surround, undefined); assert.equal(cleanBrief({ surround: 'none' }).surround, 'none'); assert.equal(cleanBrief({ surround: '<b>' }).surround, undefined);
 // the environment's model pick wins and no model list is read
 process.env.OPENAI_IMAGE_MODEL = 'gpt-image-7'; calls.length = 0;
 res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'rear' }, ip: '9.9.9.6' }), res);
 assert.equal(res.body.model, 'gpt-image-7'); assert.equal(calls[0].model, 'gpt-image-7');
 // ---------- the monthly budget (RENDER_MONTHLY_CAP_USD, $100 by default) ----------
 const { dayOf } = await import('../lib/aiusage.mjs'), month = dayOf().slice(0, 7);
-assert.ok(reads.length === 4 && reads.every(u => u.includes('feature=eq.render') && u.includes('day=gte.' + month + '-01')), 'each render reads this month’s Renderings rows first: ' + reads[0]);
+assert.ok(reads.length === 8 && reads.every(u => u.includes('feature=eq.render') && u.includes('day=gte.' + month + '-01')), 'each render reads this month’s Renderings rows first: ' + reads[0]);
 // under the cap: paints, and says what's spent including this picture (gpt-image-7 has no price: the $0.25 estimate)
 usage = [{ model: 'gpt-image-2.5-sunburst', requests: 30, input_tokens: 36000, cached_tokens: 0, output_tokens: 180000 }]; // 30 × $0.192 + $0.288 = $6.048
 calls.length = 0; res = mockRes(); await render(req({ body: { image: PNG, brief: {}, view: 'front' }, ip: '9.9.8.1' }), res);

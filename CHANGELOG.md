@@ -5,6 +5,16 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-24
 
+### 5:14 PM CT: More rendering control; renderings and plan sets on every computer
+- **Renderings and plan sets no longer vanish on another computer.** They used to be kept only in the browser that made them, so another computer (or the same one on a different web address, or after the browser cleared its storage) said "Not on this device: it was made on another one". Each rendering, its massing picture and each plan set PDF now also goes to the team's storage as it's made, and any computer without a copy loads it from there. Renderings this computer already has are shared the next time it opens the project. Deleting one removes the team's copy too.
+- **More views:** From the left side, From the right side, High overhead and Top down (straight down, like a drone survey photo). High overhead and Top down turn a long or angled site so it fills the picture.
+- **Surroundings:** Real surroundings (aerial imagery, whatever base map the page shows), Typical surroundings (the AI draws them) or The site only (a plain ground, like a presentation model). Street and place names on the base map are no longer painted into the picture.
+- **More light:** early morning, midday, overcast, late afternoon, sunset, dusk and night.
+- **Resolution and detail:** HD (2048 × 1152), 2K (2560 × 1440) or true 4K (3840 × 2160), and Best, Standard or Draft detail. Pictures used to ask for 1920 × 1080, which the image models don't take (1080 isn't a multiple of 16), so they all came back at 1536 × 1024 in the wrong shape; HD now really is 16:9. 2K and 4K need GPT Image 2 or newer; a 4K picture too big to send back directly is handed over through the team's storage.
+- **Engine:** pick the OpenAI image model in the rendering form (the same pick as Settings › AI model › Renderings).
+- **Preview Massing:** every view's massing as the AI would get it, free, before you spend on a rendering; click one to pick its view.
+- **The plan's Render section now takes its picture off-screen** like the project page does (sharper, nothing else on the map), so both make the same picture.
+
 ### 12:53 PM CT: Tiny homes (3d45b67)
 - **A Tiny homes group in the building library:** one-story homes of 400, 480, 550, 650 and 800 sf, 16 ft wide for a 25 ft lot with a parking pad beside it (or 20 ft wide for a 30 ft lot). Add one from the library, or switch a home's **Type** to a tiny home.
 - **Counted as what they are:** the plan's home table lists them as **Tiny home** at their own size (not as a 1,900 sf one-story house), the pro forma rents them by their size (about $1,425 a month for 550 sf to start, editable as **Tiny home rent**) and prices them by their size when they're sold.
