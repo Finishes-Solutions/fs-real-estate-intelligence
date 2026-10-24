@@ -116,7 +116,9 @@ for (const r of Object.values(runs)) for (const o of r.nets) draws({ ...r.site, 
   assert.ok(o.notes.some(t => /^300 homes asked for; the land holds \d+, so the plan builds them all\.$/.test(t)), o.notes.join(' / ')); checkNet(waller, o, '300 homes, filled', { draw: false }); }
 
 // ---- 4. re-fits of the best Waller network ----
-const best = runs.Waller.nets[0], base = { ...waller, program: best.program, elements: best.elements, recipe: best.recipe };
+// (the edits below run on a network laid out with a fixed number of tries (netEvals), not against the clock, so it is
+// the same network on any machine)
+const best = L.layoutOptions(waller, { use: 'sfr' }, { count: 3, netEvals: 10 }).find(o => o.style === 'net') || runs.Waller.nets[0], base = { ...waller, program: best.program, elements: best.elements, recipe: best.recipe };
 const streets = els => JSON.stringify(els.filter(e => e.kind === 'drive' && e.net).map(e => e.path || e.poly).map(p => JSON.stringify(p)).sort());
 { const r = L.refit(structuredClone(base), { amount: 'current' }), h0 = homes(base.elements), h1 = homes(r.elements), ids = new Set(base.elements.map(e => e.id));
   assert.equal(streets(r.elements), streets(base.elements), 'an unchanged re-fit keeps every street'); assert.equal(h1.length, h0.length, 'and every home');
@@ -232,7 +234,7 @@ const key = h => Math.round(h.x) + ',' + Math.round(h.y), staying = (h0, h1, nea
 const edited = (els, what, o = {}) => { // every drive and home reached, lots clear, no bad check, no street running into another
   const R = reachedAll(els); assert.deepEqual(R.D.filter(d => !R.seen.has(d.id)).map(d => d.name || d.note), [], what + ': every drive reached from a way in'); assert.deepEqual(offStreet(els, R), [], what + ': every home on a reached street');
   assert.deepEqual(lotIssues(els), [], what + ': lots clear'); assert.deepEqual(S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text), [], what + ': no bad check'); assert.deepEqual(N.clashes(els), [], what + ': no street runs into another');
-  const extra = N.netRules({ ...base, elements: els }).filter(i => !(o.allow || []).includes(i.kind)); assert.deepEqual(extra.map(i => i.text), [], what + ': within the street rules'); };
+  const extra = N.netRules({ ...base, elements: els }).filter(i => !(o.allow || []).includes(i.kind) && !(o.allowText && o.allowText.test(i.text))); assert.deepEqual(extra.map(i => i.text), [], what + ': within the street rules'); };
 const chains = N.chainsOf(base), court = chains.filter(c => c.role === 'court' && !c.cyc && c.ends.every(e => e?.kind === 'bulb') && c.tees).sort((a, b) => b.L - a.L)[0];
 assert.ok(chains.length > 10 && chains.some(c => c.role === 'collector' && c.cyc) && chains.some(c => c.role === 'boulevard'), 'the streets as named things: a loop road, a boulevard in');
 assert.ok(court, 'a cul-de-sac street with streets meeting it along it');
@@ -304,7 +306,7 @@ assert.ok(court, 'a cul-de-sac street with streets meeting it along it');
   const d = E.describePlan(base, sel); assert.ok(d.streets.length >= 10 && d.streets.some(x => x.selected && x.id === court.key), 'the AI sees the streets, the selected one marked'); assert.deepEqual(d.streetNames, { on: false, theme: '' });
   // culdesac and bend end to end, then the re-fit
   const a = E.applyEdits(base, [{ action: 'bend', target: court.key, curve: 50 }, { action: 'culdesac', target: chains.find(c => c.label === 'Spine road').key }]); assert.equal(a.skipped.length, 0, a.skipped.join(' ')); assert.equal(a.done.length, 2);
-  const f = L.refit({ ...base, elements: a.elements }, { amount: 'current' }); edited(f.elements, 'Change With AI on the streets', { allow: ['cul', 'block'] }); // ('block': KNOWN ISSUE, docs/PROGRESS.md: a cul-de-sac on the spine leaves a 1,466 ft block on the loop road, over the 1,400 ft rule; the checks show it to the user)
+  const f = L.refit({ ...base, elements: a.elements }, { amount: 'current' }); edited(f.elements, 'Change With AI on the streets', { allow: ['cul'], allowText: /^A block on Loop road runs 1,4\d\d ft \(longest 1,400 ft\)$/ }); // (KNOWN ISSUE, docs/PROGRESS.md and DECISIONS.md: a cul-de-sac on the spine leaves a ~1,466 ft block on the loop road, over the 1,400 ft rule; the checks show it to the user. Only that breach is let through)
   const rm = E.applyEdits(base, [{ action: 'remove', target: court.key }]); assert.ok(!rm.elements.some(e => court.ids.includes(e.id) || court.bulbs.includes(e.id)), 'remove on a street: all of it and its cul-de-sacs');
   assert.deepEqual(E.applyEdits(base, [{ action: 'relay', target: sel }]).blocks.length, 1, 'relay on a neighbourhood: its block, run by the caller');
   const API = await import('../api/siteplan.js'), it = API.EDIT_SCHEMA.properties.ops.items; for (const k of ['curve', 'end', 'street']) assert.ok(it.required.includes(k) && it.properties[k], 'the op schema has ' + k);
