@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-24
 
-### 5:14 PM CT: More rendering control; renderings and plan sets on every computer
+### 5:14 PM CT: More rendering control; renderings and plan sets on every computer (7c560f2)
 - **Renderings and plan sets no longer vanish on another computer.** They used to be kept only in the browser that made them, so another computer (or the same one on a different web address, or after the browser cleared its storage) said "Not on this device: it was made on another one". Each rendering, its massing picture and each plan set PDF now also goes to the team's storage as it's made, and any computer without a copy loads it from there. Renderings this computer already has are shared the next time it opens the project. Deleting one removes the team's copy too.
 - **More views:** From the left side, From the right side, High overhead and Top down (straight down, like a drone survey photo). High overhead and Top down turn a long or angled site so it fills the picture.
 - **Surroundings:** Real surroundings (aerial imagery, whatever base map the page shows), Typical surroundings (the AI draws them) or The site only (a plain ground, like a presentation model). Street and place names on the base map are no longer painted into the picture.
