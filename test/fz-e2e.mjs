@@ -63,9 +63,14 @@ assert.ok(!s.hold.error, s.hold.error); near(s.hold.result.summary.purchasePrice
 assert.ok(s.pf.breakEven?.kind === 'rent' && s.pf.breakEven.rent > 0 && s.pf.breakEven.rentForTarget > s.pf.breakEven.rent, 'break-even and target rents');
 // sensitivity: sorted by swing; each grid's centre cell is the base case
 const tor = s.sensitivity.tornado; for (let i = 1; i < tor.rows.length; i++) assert.ok((tor.rows[i - 1].swing ?? 0) >= (tor.rows[i].swing ?? 0), 'tornado sorted');
-assert.ok(tor.rows.find(r => r.id === 'cost').lo > tor.rows.find(r => r.id === 'cost').hi, 'costs down, returns up');
+assert.ok(tor.rows.find(r => r.id === 'cost').lo < tor.rows.find(r => r.id === 'cost').hi, 'each driver’s low case is the unfavourable one: costs up, returns down');
+assert.ok(tor.rows.every(r => r.lo <= tor.base + 1e-9 && r.hi >= tor.base - 1e-9), 'every low case at or below the base, every high case at or above');
 for (const g of s.sensitivity.grids) near(g.cells[2][2], tor.base, 1e-9, 'grid centre = base');
 assert.ok(s.risks.length && s.risks.every(r => ['high', 'medium', 'low'].includes(r.level)), 'risk register'); assert.ok(s.facts.length > s.register.length, 'fact register');
+// a cost case moves the soft costs and the developer fee with it; the hold grows rents from the end of construction
+{ const ctx = P.prepare(apt, { market }), a = P.evaluate(ctx, ctx.values), b = P.evaluate(ctx, ctx.values, { costFactor: 1.1 });
+  near(b.pf.R.budget.soft, a.pf.R.budget.soft * 1.1, 0.01, 'soft costs +10%'); near(b.pf.R.budget.fee, a.pf.R.budget.fee * 1.1, 0.01, 'developer fee +10%'); near(b.pf.R.budget.land, a.pf.R.budget.land, 0, 'land unchanged');
+  const yr = Math.floor((R.sched.toStabilize + 1 - R.sched.pre - R.sched.build) / 12); near(s.hold.result.summary.year1PotentialIncome, Math.round(R.ops.lines.filter(l => l.kind === 'rent' || l.kind === 'rec').reduce((x, l) => x + l.v, 0) * (1 + R.A.rentGrowth / 100) ** yr), 1, 'hold year-1 income grown as the development model grows it'); }
 // determinism
 const s2 = P.runStudy(apt, { market, today: '2026-10-24' }); assert.equal(s2.inputsHash, s.inputsHash); assert.deepEqual(s2.pf.headline, s.pf.headline, 'same inputs, same answer');
 

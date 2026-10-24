@@ -4535,7 +4535,7 @@ export function initSitePlan(ctx) {
       return x.site;
     })();
     siteRuns.set(p.id, run);
-    run.catch(() => siteFail.set(p.id, Date.now())).finally(() => { siteRuns.delete(p.id); if (ctx.view === 'projects' && cur === p.id && tabFor(p) === 'overview') render(); });
+    run.catch(() => siteFail.set(p.id, Date.now())).finally(() => { siteRuns.delete(p.id); if (ctx.view === 'projects' && cur === p.id && ['overview', 'workspace'].includes(tabFor(p))) render(); });
     return run;
   }
   function jurHtml(p) {

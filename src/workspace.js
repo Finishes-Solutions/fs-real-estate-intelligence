@@ -26,7 +26,8 @@ const STEP_ICON = { done: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="
 export function workspace(env) {
   const ui = new Map(); // per project: { step, editing (scenario id or ''), busy, err, open (assumption groups), reportBusy, reportErr }
   const cache = new Map(); // per project: { key, study, scenarios }
-  let market = null, marketP = null, marketErr = false, root = null, cur = null, computeT = 0, saveT = 0;
+  let market = null, marketP = null, marketErr = false, root = null, cur = null, computeT = 0;
+  const saveT = new Map(); // per project: a pending save (one project's edit never cancels another's)
   const st = p => { if (!ui.has(p.id)) ui.set(p.id, { step: null, editing: '', open: { cost: true, revenue: true, financing: true } }); return ui.get(p.id); };
 
   // the platform's market data (rates, PPI, ZORI): fetched once
@@ -45,10 +46,13 @@ export function workspace(env) {
     try { study = P.runStudy(p, { market, sensitivity }); scenarios = study.missing ? [] : P.compareScenarios(p, { market }); } catch (e) { err = e; console.error('feasibility', e); }
     const out = { key, study, scenarios, err }; cache.set(p.id, out); return out;
   }
-  const fz = p => { p.fz = M0.fzOf(p); return p.fz; };
+  // project.fz with its defaults filled in, once: later calls return the same object, so a change made after an await
+  // lands on the project, not on a copy
+  const normal = new WeakSet();
+  const fz = p => { if (!p.fz || !normal.has(p.fz)) { p.fz = M0.fzOf(p); normal.add(p.fz); } return p.fz; };
   function changed(p, now = false) { // saved on the project (debounced while typing) and the numbers redrawn
     cache.delete(p.id); clearTimeout(computeT); computeT = setTimeout(() => paint(), now ? 0 : 220);
-    clearTimeout(saveT); saveT = setTimeout(() => env.save(p), now ? 0 : 900);
+    clearTimeout(saveT.get(p.id)); saveT.set(p.id, setTimeout(() => { saveT.delete(p.id); env.save(p); }, now ? 0 : 900));
   }
 
   // ---------- the frame: stepper, step, summary rail ----------
@@ -69,7 +73,7 @@ export function workspace(env) {
     const nav = '<div class="ws-nav">' + (prev ? '<button type="button" class="btn" data-step="' + prev.id + '">‹ ' + prev.label + '</button>' : '<span></span>') +
       (next ? '<button type="button" class="btn primary" data-step="' + next.id + '"' + (status[next.id].state === 'blocked' ? ' aria-disabled="true" title="' + esc(status[next.id].need) + '"' : '') + '>' + next.label + ' ›</button>' : '') + '</div>';
     return steps + '<div class="ws-grid"><section class="ws-main" aria-labelledby="wsH"><header class="ws-sh"><div class="kicker">Step ' + step.n + ' of ' + M0.STEPS.length + '</div><h3 id="wsH" tabindex="-1">' + step.label + '</h3><p class="ws-about">' + esc(step.about) + '</p>' +
-      (s.busy ? '<p class="ws-busy" role="status"><span class="ws-spin" aria-hidden="true"></span>' + esc(s.busy) + '</p>' : '') + (s.err ? '<div class="ws-err" role="alert">' + esc(s.err) + '</div>' : '') + (marketErr ? '<div class="ws-warnbox">The platform’s market data didn’t load: interest rates use house defaults and there is no rent check or cost escalation until it does.</div>' : '') + '</header>' + body + nav + '</section>' + rail(p, study, c) + '</div>' +
+      (s.busy ? '<p class="ws-busy" role="status"><span class="ws-spin" aria-hidden="true"></span>' + esc(s.busy) + '</p>' : '') + (s.err ? '<div class="ws-err" role="alert">' + esc(s.err) + '</div>' : '') + (c?.study?.errors?.length ? '<div class="ws-warnbox" role="status"><b>Inputs to check:</b> ' + c.study.errors.map(esc).join(' ') + (c.study.errors.some(e => /unknown assumption/.test(e)) ? ' <button type="button" class="lnk" data-act="dropUnknown">Remove changes this option doesn’t use</button>' : '') + '</div>' : '') + (marketErr ? '<div class="ws-warnbox">The platform’s market data didn’t load: interest rates use house defaults and there is no rent check or cost escalation until it does.</div>' : '') + '</header>' + body + nav + '</section>' + rail(p, study, c) + '</div>' +
       '<p class="ws-scope"><b>Scope.</b> ' + esc(M0.SCOPE) + '</p>';
   }
   const loading = msg => '<div class="ws-loading" role="status" aria-live="polite"><span class="ws-spin" aria-hidden="true"></span>' + esc(msg) + '<div class="ws-skel" aria-hidden="true"><i></i><i></i><i></i></div></div>';
@@ -255,6 +259,7 @@ export function workspace(env) {
       if (act === 'map') return env.goMap();
       if (act === 'plans') return env.setTab(p, 'plans');
       if (act === 'clearLines') { f.budgetEdits = {}; return changed(p, true); }
+      if (act === 'dropUnknown') { const c = studyOf(p), known = new Set((c?.study?.register || []).map(a => a.key)); if (!known.size) return; for (const o of [f.overrides, ...f.scenarios.map(x => x.overrides)]) for (const k of Object.keys(o || {})) if (!known.has(k)) delete o[k]; return changed(p, true); }
       if (act === 'layout') {
         const use = rootEl.querySelector('#wsUse')?.value || 'multifamily'; s.busy = 'Laying out the site with the platform’s layout engine…'; s.err = ''; paint();
         setTimeout(() => { try {

@@ -94,8 +94,9 @@ export default async function handler(req, res) {
     const study = runStudy(project, { market, scenarioId });
     if (b.op === 'study') return res.json({ study: summary(study), scenarios: study.missing ? [] : compareScenarios(project, { market }) });
     if (study.missing) return res.status(409).json({ error: study.missing === 'site' ? 'Draw or generate a site option first.' : 'Lay out the site option first.', missing: study.missing });
-    if (study.errors?.length) return res.status(422).json({ error: 'The study has problems to fix: ' + study.errors.join(' '), errors: study.errors });
-    const scenarios = compareScenarios(project, { market }), nar = b.narrative ? await narrativeFor(study) : { text: '' };
+    // (input notes, e.g. a change to an assumption the chosen option doesn't use, don't stop a report: they're listed on it)
+    const full = b.op === 'save' || (b.op === 'file' && ['pdf', 'xlsx'].includes(b.kind)), scenarios = full ? compareScenarios(project, { market }) : [];
+    const nar = b.narrative && (b.op === 'save' || b.kind === 'pdf') ? await narrativeFor(study) : { text: '', skipped: 'off' };
     if (b.op === 'file') {
       if (['register', 'budget'].includes(b.kind)) { res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', 'attachment; filename="fs-feasibility-' + slug(project.name) + '-' + b.kind + '.csv"'); return res.status(200).send(b.kind === 'register' ? registerCsv(study) : budgetCsv(study)); }
       if (b.kind === 'xlsx') { res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.setHeader('Content-Disposition', 'attachment; filename="fs-feasibility-' + slug(project.name) + '.xlsx"'); return res.status(200).send(await workbookBuffer(study, { scenarios })); }
@@ -108,7 +109,7 @@ export default async function handler(req, res) {
       const files = await reportFiles(project, study, { narrative: nar.text, scenarios }), id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), dir = 'projects/' + project.id + '/reports/' + id + '/';
       for (const f of files) await db.call('/storage/v1/object/' + bucket() + '/' + enc(dir + f.name), { method: 'POST', body: f.buf, headers: { 'Content-Type': f.type, 'x-upsert': 'true' } });
       const report = { id, kind: 'feasibility', created: new Date().toISOString(), by: clip(b.by, 80), scenario: study.scenario?.id || null, inputsHash: study.inputsHash,
-        files: files.map(f => ({ name: f.name, type: f.type, bytes: f.buf.length, path: dir + f.name })), headline: { totalCost: study.pf.headline.totalCost, levIrr: study.pf.headline.levIrr, yoc: study.pf.headline.yoc }, narrative: nar.skipped || 'on' };
+        files: files.map(f => ({ name: f.name, type: f.type, bytes: f.buf.length, path: dir + f.name })), headline: { totalCost: study.pf.headline.totalCost, levIrr: study.pf.headline.levIrr, yoc: study.pf.headline.yoc }, narrative: nar.text ? 'on' : nar.skipped || 'off' };
       return res.json({ report });
     }
     return res.status(400).json({ error: 'Unknown op.' });
