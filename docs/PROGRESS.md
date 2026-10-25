@@ -154,4 +154,5 @@ Every screen and report carries the scope statement, and the Fact & Assumption R
 4. Move plan-set generation to a server job (queue plus Storage) so the report set can include the full drawing set.
 5. Fix the street-network block-length breach after edits (`lib/streetnet.mjs`) and make the UI's network search use `netEvals` too.
 6. Proper sign-in (Supabase Auth) instead of the shared team passcode, before the report sets hold anything sensitive.
-7. Optionally tag report PDFs (an accessible PDF) once the response limit allows: stream from Storage instead of the function's body.
+7. **Re-check the budgeting suite for new work.** On 2026-10-24, 18:47–19:18 CT, a separate effort (not this integration, which only read the source repos through `git archive`) committed a local branch `upgrade/budgeting-v2` in fs-budgeting-suite: an estimate workflow, a budget engine v2 and code-review fixes. The port here is from `origin/feature` @ 4187c8c. Diff that branch once it's pushed, and port any engine changes into `lib/feasibility/rollup.mjs` / `csi.mjs` with their tests.
+8. Optionally tag report PDFs (an accessible PDF) once the response limit allows: stream from Storage instead of the function's body.
