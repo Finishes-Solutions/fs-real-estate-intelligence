@@ -5,7 +5,24 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-24
 
-### 6:27 PM CT: Feasibility workspace on the experimental branch (experimental, not on the live site)
+### 7:18 PM CT: Feasibility workspace checked and tightened (experimental branch) (ce46211…0af719c)
+- **Saved report sets now stay listed.** Saving a set recorded it on an old copy of the project, so the list stayed empty. Generating a layout had the same problem: the new option wasn't kept as the one the study uses.
+- **Reports aren't refused over input notes.** For example, a change to an assumption the chosen option doesn't use. The note is shown in the workspace with a one-click fix, and listed on the report.
+- **Sensitivity is consistent:**
+  - A cost case now moves contingency, soft costs and the developer fee with construction.
+  - Every "low case" is the downside.
+  - The hold analysis grows rents from the end of construction, as the development model does.
+- **Flood:** a site checked with no mapped flood zone no longer reads "not checked", and the workspace updates when the site lookup finishes.
+- **Safer:** values from a synced project can't put markup into the scenario editor.
+- **Faster:** a full study with sensitivity takes about half the time (IRR is 10× faster), so edits update sooner.
+- **Downloads** from the workspace are recorded on the Reports tab like every other export.
+- **Checked:**
+  - Every test passes on macOS.
+  - The sample project runs offline from intake to the full report set.
+  - The branch contains no reference to the other two apps' infrastructure.
+  - The workspace passes an automated WCAG 2.1 AA scan.
+
+### 6:27 PM CT: Feasibility workspace on the experimental branch (experimental, not on the live site) (59be765…0e1e736)
 - **A project now opens on Feasibility:** six steps (Intake, Site, Plans, Budget, Pro Forma, Reports) with the project's cost, yield, IRR, NPV and top risks always in a summary beside them.
 - **A real budget:** CSI-coded line items priced from the layout's quantities. Apartments and townhomes use the Finishes Solutions budget workbook's lines; other uses and site work use the platform's rates. Costs are escalated by the construction-materials price index, with a location factor, and rolled up the budgeting suite's way (GC fee, contingency, a developer fee that is a true share of the total). Every line says where its rate came from and can be changed or left out.
 - **Every assumption shows its source:** interest rates come from the nightly SOFR and 10-year Treasury data, land from the asking price or the appraisal district's land value (no longer the total value with buildings), and rents carry the ZIP's typical rent as a check. Change any input and every number updates.
