@@ -1073,6 +1073,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **The OP-0046 Waller site is in Projects:** *OP-0046 · 0 Old Houston Hwy at FM 362, Waller*, the three parcels merged, with *Option A · OP-0046 as drawn* laid out piece by piece from the two site plan sheets (the six-store row, the restaurant pad, the retail center and its ponds, the channel, the drives and every parking row). Open it from Projects like any other; its notes say what the sheets state and where the app's own counts differ.
 - **Agent site plans are checked before they're handed over:** every layout gets a quality check (access, fire lanes, parking, detention, homes' spacing, pads, no garages on tiny or manufactured homes, floor plans, density, the request), a failing one gives way to one that passes, and the answer starts with READY, READY WITH NOTES or NOT READY.
 - **Tiny and manufactured homes never get a garage:** their floor plans are their own (living and kitchen, one or two bedrooms, a bath or two, the car on its pad), and they count their parking pads, not garage spaces.
 - **More rendering control:** six more views (left and right sides, high overhead, top down), real, typical or no surroundings, seven lights from early morning to night, HD, 2K or true 4K, a detail level, the engine to paint with, and a free massing preview of every view before rendering.
