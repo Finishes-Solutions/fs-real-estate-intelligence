@@ -3,6 +3,16 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-26
+
+### 1:37 PM CT: Agent site plans are checked before they're handed over; tiny homes never get a garage (53329fb)
+- **A quality check on every site plan the agents make:** before the answer goes back, each layout is checked like a planner would: a way in from the street, every drive reached, fire lanes at least 20 ft, dead ends, a second access past 30 homes, parking, detention, each home on its own lot facing a drive with 10 ft to the next, a parking pad each, no garage on a tiny or manufactured home, a sensible floor plan, density, and whether it is what was asked. A layout that fails gives way to one that passes, and the answer starts with **READY**, **READY WITH NOTES** or **NOT READY** with each finding.
+- **It found real problems, now fixed:** on 25 × 55 pads backing onto each other, homes were 2 ft apart end to end (now 10 ft: the home keeps 5 ft from the back of its pad, so a 25 × 55 pad holds a 15 × 28, 420 sf home and 550 sf homes need 64 ft pads); tiny homes were asked 2 parking spaces each with room for 1 (now 1 a tiny home, 2 a manufactured home); lanes ran inside the landscape buffer.
+- **No garages on tiny or manufactured homes:** their floor plans used the house plan's 2-car garage (a 10 ft garage room in a 16 ft wide, 550 sf tiny home). They now get their own: an open living room and kitchen, a studio, one bedroom or more by size, a bath or two, the car on its pad. Library tiny homes count their pad, not 2 garage spaces.
+- **Home communities through the agents:** the agents can give the kind of homes, how many, the pad size (the homes sized to fill it), the home size or living area, a buffer, the street the site faces, and facts from reference files ("134 RV lots, 25' × 55' typ" is read as the pad size). A request for tiny or mobile homes is laid out as homes even if the AI reads it as self storage, and the answer says so.
+- **Tiny home rent:** one Tiny home rent for every tiny home, by its size from your Oct 2026 comps: about $1,150 a month for 550 sf (it was $1,425), $1,025 for 420 sf.
+- **Tested** end to end on King Ln with the agents' tool (real Chromium sheets): the request as made, the AI answering self storage, 25 × 55 pads, 550 sf homes, single-wides, and an ordinary subdivision; every community plan comes back READY WITH NOTES, the note being the real one (about 130 homes behind one strip need the fire marshal's sign-off on a second access). Not tried on the live site yet: AMP still can't reach it through Vercel's login protection.
+
 ## 2026-10-24
 
 ### 5:14 PM CT: More rendering control; renderings and plan sets on every computer (7c560f2)
