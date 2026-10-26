@@ -143,7 +143,7 @@ console.log('pro forma ok');
   const els = Array.from({ length: 10 }, (_, i) => ({ ...B.fromType(t, [20 + i * 25, 60]), id: 't' + i }));
   const plan = { origin: [-95.92, 30.05], ring: [[0, 0], [300, 0], [300, 200], [0, 200]], front: 0, program: { use: 'sfr', units: 10 }, elements: els };
   const R = PF.run(plan, PF.defaults(plan)), A = PF.defaults(plan);
-  assert.equal(A.homeRent.sfrtiny, PF.townhomeRent(550), 'rent from a 550 sf home');
+  assert.equal(A.homeRent.sfrtiny, PF.tinyRent(550), 'rent from a 550 sf home'); assert.equal(PF.tinyRent(550), 1150, '$1,150 for 550 sf: inside the Oct 2026 comps ($925–1,195 asked for one-bedroom tiny homes)');
   const l = R.ops.lines.find(x => /tiny homes/.test(x.k)); assert.ok(l && /^10 tiny homes @ \$/.test(l.k), 'an income line for 10 tiny homes: ' + R.ops.lines.map(x => x.k).join('; '));
   assert.ok(!R.ops.lines.some(x => /1-story homes/.test(x.k)), 'not counted as 1-story houses');
   const sale = PF.run(plan, { ...A, forSale: true });
