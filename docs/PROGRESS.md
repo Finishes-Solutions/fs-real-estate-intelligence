@@ -98,7 +98,7 @@ infra grep: 126 patterns from docs/AUDIT.md, 0 matches (excluding docs/AUDIT.md,
 
 ## Infra I need to set up
 
-1. **Apply `supabase/migrations/20261026000000_report_sets.sql`** to this platform's own Supabase project. It creates the private `report-sets` bucket. "Save the whole set for the team" returns a clear "download instead" message until the bucket exists.
+1. **Done (2026-10-25):** `supabase/migrations/20261026000000_report_sets.sql` is applied to this platform's own Supabase project (Finishes Real Estate Intelligence). The private `report-sets` bucket exists (checked: private, 25 MB file limit, PDF/XLSX/CSV/JSON only), so "Save the whole set for the team" works.
 2. **Vercel (this project):** nothing new is required. `vercel.json` already configures `api/feasibility.js` (120 s; data files, logo, fonts and Chromium included). Optional:
    - `REPORT_SETS_BUCKET` if the bucket gets another name;
    - `FEASIBILITY_NARRATIVE=on` (uses the existing `ANTHROPIC_API_KEY`) for the AI commentary paragraph.
@@ -148,7 +148,7 @@ Every screen and report carries the scope statement, and the Fact & Assumption R
 
 ## Recommended next steps
 
-1. Apply the report-sets migration and try "Save the whole set" on a real project; add the CI job above.
+1. Try "Save the whole set" on a real project (the report-sets bucket now exists); add the CI job above.
 2. Replace the cost library's single-project rates with a real estimate source: a GC budget template, or a licensed database such as RSMeans with city cost indexes, which also gives real location factors. `lib/feasibility/costlib.mjs` is the one place to plug it in.
 3. Add rent and sale comps from a licensed provider to replace the house rent and cap-rate assumptions, keeping ZORI as the check.
 4. Move plan-set generation to a server job (queue plus Storage) so the report set can include the full drawing set.
