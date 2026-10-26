@@ -61,6 +61,13 @@ Branch: `experimental` (never main or staging). Read `CLAUDE.md` first (hard rul
 - Decisions: DECISIONS.md, "MCP: projects and the feasibility study for agents". How it works: README, "MCP server for the project app".
 - To turn on agent changes in production: set `MCP_ACCESS_TOKEN` on Vercel (and give AMP the same token). Without it the server stays read-only.
 
+## After the phases: landscape sheets and the layout review (2026-10-26)
+
+- **Landscape section of the plan set** (`lib/sheets/land.mjs`, tested in `test/sheets-land.mjs`): L-001 notes and calculations, L-101 planting plan, L-102 enlargements (big sites), L-201 schematic irrigation, L-501 planting details, L-502 irrigation details. Before, L-101 missed its own rules (the 27 acre tract showed 5 of 31 street trees and 50 of 71 lot trees); now street, parking and lot rules are met on every test plan and L-001 says where a plan can't.
+- **Layout engine review**: `docs/LAYOUT-REVIEW.md`, the list of what's wrong and what to change, from 51 options on 8 test lots. Two fixed here: a flag lot's entry no longer crosses a neighbour's land, and shops in front of apartments or homes keep the street frontage (no pond band across it). Both have tests in `test/sitelayout.mjs`.
+- **Next** (in order, from the review): parking always met on townhome sites; the second way in planned with the first; the restaurant pad's drive ring; mixed-use zone sizing and the pond; townhome amenities; duplexes on lots; program fields for what requests can't say (entry street, placement, per-building sizes, open space, density) and a structured program for the MCP tool.
+- **Owner's call**: whether a size you name builds just that (with the rest shown as Phase 2) instead of filling the site.
+
 ## Verification (Phase 5)
 
 | Check | Command | Result |

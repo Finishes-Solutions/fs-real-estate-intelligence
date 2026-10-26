@@ -110,3 +110,16 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 - `site_plan` with `project_id` reuses the existing tool (`ctx.site`, `ctx.onPlan`) rather than a second layout path, so the agent's plan is the website's Build with AI result. The ground-elevation grid is not stored on the option (it is large; the website gathers its own).
 - Renderings and full plan sets stay on the website. Renderings spend the image budget and plan sets are made in the browser (Known issues). Agents get links to the ones already made.
 
+
+## Landscape sheets and layout fixes (2026-10-26)
+
+- The landscape sheets moved to `lib/sheets/land.mjs`, drawing with the site sheets' kit (`KIT` exported from `lib/sheets/site.mjs`) so the plan is worked out once and C-301, FP-101 and L-201 see the same hydrants and drives.
+- One planting design per plan, every landscape sheet drawn from it, so L-001's quantities are L-101's plants. It starts from the site plan's own trees (so L-101 matches C-101) and adds what the rules ask for; it never removes the site plan's trees except where they'd stand in a sight triangle or on a hydrant.
+- The rules are typical values (`RULES`): street trees every 40 ft, a tree per 10 surface stalls, a parking screen within 60 ft of a street, buffers every 40 ft on other lines for anything but a neighbourhood of lots, 15% landscape, no species over 40%. L-001 shows Required / Shown / Status and says **Short** honestly where the plan can't meet one (a pond against the line).
+- Surface stalls are counted from the parking pieces, not `metrics().stalls`, which includes home garages and driveways (a subdivision would otherwise need hundreds of parking trees).
+- Irrigation hydrozones come from one grid over the landscape with a distance transform from what's built: spray within 35 ft of buildings and paving and 30 ft of the street, rotors to 100 ft, native grass (not irrigated) beyond, pond banks not irrigated, lots and the parkways beside them left to the home builder. Valves are sized for about 25 gpm a zone. It's schematic and labelled so; a licensed irrigator designs the system.
+- L-102 enlargements only when the site plan is drawn smaller than 1" = 30' (otherwise L-101 is legible as is).
+- Layout: an edge facing the street's way is front only when it lies on (or within a jog of) the front line. The old rule made a flag lot's back edges frontage and put the entry across a neighbour's land.
+- Layout: a mix with shops first never gets the detention band across the frontage. Extending "pond beside the shops" to apartments was tried and backed out: it added options that ranked first with fewer apartments (196 vs 211 on the Tomball Rd test).
+- Kept as is: **Leftover land: fill the site** builds more than a size asked for. It's an earlier product choice (the most leasable square footage), so it's listed in `docs/LAYOUT-REVIEW.md` as the owner's call, not changed here.
+- A "same picture" duplicate check for options was tried and dropped: it didn't change any option in the 17-run survey.

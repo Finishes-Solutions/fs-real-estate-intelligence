@@ -1081,6 +1081,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Site plans on odd lots:** on a flag lot (a narrow strip to the street, the land behind), the main entry now comes down the strip instead of across the neighbour's land; and on a mix with shops in front, the detention pond is never put between the shops and the street.
 - **A full landscape section in plan sets:** landscape calculations, a planting plan that meets the usual street, parking, buffer and front-yard tree rules (and says where it falls short), enlargements of the entry and amenity, an irrigation plan, and planting and irrigation details.
 - **Feasibility workspace (experimental):** a project now opens on a step-by-step study (Intake, Site, Plans, Budget, Pro Forma, Reports). It has a CSI budget priced from the layout, every assumption shown with its source and editable, scenarios side by side, and a full report set (PDF, workbook, registers).
 - **More rendering control:** six more views (left and right sides, high overhead, top down), real, typical or no surroundings, seven lights from early morning to night, HD, 2K or true 4K, a detail level, the engine to paint with, and a free massing preview of every view before rendering.
