@@ -3,6 +3,22 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-25
+
+### 9:00 PM CT: Agents can work on projects (experimental branch) (dca901d, 5ff97d1, 94f6928)
+- **Agents in your project app can now see the team's projects:** the list, and each project's parcels, site facts, options with their numbers, feasibility inputs, scenarios and saved reports.
+- **They can run a project's feasibility study** and get the same numbers as the Feasibility tab: budget, pro forma, returns, sensitivity, scenarios and risks. They can try "what if" changes without saving anything.
+- **They can get the full report set** (the Feasibility report PDF, the workbook, the CSVs), and links to anything the project has stored: report sets, reference files, renderings and plan sets.
+- **With project changes turned on** (only when the agents' connection is locked with its access token), agents can also:
+  - start a project from an address, parcel number, several parcels or an outline;
+  - lay out a site plan in it, saved as its next option;
+  - change assumptions, budget lines and scenarios;
+  - change the name, status, notes or land price;
+  - save the report set for the team.
+
+  Their changes show as made by "<name> (agent)". Nothing can be deleted.
+- This branch now also has the latest from the live site (rendering controls; renderings and plan sets on every computer).
+
 ## 2026-10-24
 
 ### 7:18 PM CT: Feasibility workspace checked and tightened (experimental branch) (ce46211…0af719c)
