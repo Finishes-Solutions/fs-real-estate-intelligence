@@ -12,7 +12,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 process.env.SUPABASE_URL = 'https://db.test'; process.env.SUPABASE_SECRET_KEY = 'sb_secret_x'; delete process.env.MCP_ACCESS_TOKEN; delete process.env.TOMTOM_API_KEY;
 const realFetch = globalThis.fetch, seen = [], flags = { femaSlow: false };
 // the three places: downtown Houston (Harris), Katy (Fort Bend, outside Houston) and Austin (outside the home counties)
-const HOU = [-95.3664, 29.7569], KATY = [-95.8245, 29.7858], AUS = [-97.7404, 30.2747];
+const HOU = [-95.3664, 29.7569], KATY = [-95.8245, 29.7858], AUS = [-97.7404, 30.2747], WALLER = [-95.9275, 30.0566];
 const sq = ([x, y], d = 0.0008) => [[[x - d, y - d], [x + d, y - d], [x + d, y + d], [x - d, y + d], [x - d, y - d]]];
 const near = (a, b, d = 0.02) => Math.abs(a[0] - b[0]) < d && Math.abs(a[1] - b[1]) < d;
 const months = (y, f) => Object.fromEntries(Array.from({ length: 12 }, (_, i) => [String(i + 1).padStart(2, '0') + '-' + y, f(i)]));
@@ -41,10 +41,18 @@ function route(u, opts) {
   if (u.host === 'arcweb.hcad.org') { const w = P('where') || '', p0 = pt();
     if (/HCAD_NUM = '0010010000001'/.test(w) || (p0 && near(p0, HOU, 0.003))) return J({ features: [{ attributes: { HCAD_NUM: '0010010000001', owner: 'MAIN STREET TOWER LP', address: '1001 MAIN ST', city: 'HOUSTON', zip: '77002', state_class: 'F1', mkt_val: 120000000, land_val: 20000000, impr_val: 100000000, legal_lines: 'LT 1 BLK 74|SSBB', subdivision: 'SSBB' }, geometry: { rings: sq(HOU) } }] });
     return J({ features: [] }); }
+  // ---- roads (TIGERweb Transportation, the site_plan tool's streets): the layer list, then lines by layer ----
+  if (u.host === 'tigerweb.geo.census.gov' && u.pathname.endsWith('/Transportation/MapServer')) return J({ layers: [{ id: 2, name: 'Primary Roads' }, { id: 3, name: 'Primary Roads Labels' }, { id: 4, name: 'Secondary Roads' }, { id: 8, name: 'Local Roads' }, { id: 9, name: 'Local Roads Labels' }] });
+  if (u.host === 'tigerweb.geo.census.gov' && /\/Transportation\/MapServer\/\d+\/query/.test(u.pathname)) { const id = +u.pathname.split('/').at(-2), [w, s0, e, n] = P('geometry').split(',').map(Number), lines = [];
+    if (id === 2 && near([(w + e) / 2, (s0 + n) / 2], KATY)) lines.push(['KATY FWY', [[KATY[0] - 0.01, KATY[1] - 0.0015], [KATY[0] + 0.01, KATY[1] - 0.0015]]]); // I-10 along the south side
+    if (id === 8 && near([(w + e) / 2, (s0 + n) / 2], KATY)) lines.push(['Pin Oak Rd', [[KATY[0] - 0.0014, KATY[1] - 0.004], [KATY[0] - 0.0014, KATY[1] + 0.004]]]); // a street along the west side
+    if (id === 4 && near([(w + e) / 2, (s0 + n) / 2], WALLER, 0.05)) lines.push(['FM 362', [[WALLER[0] - 0.01, WALLER[1] - 0.0013], [WALLER[0] + 0.01, WALLER[1] - 0.0013]]]);
+    if (id === 8 && near([(w + e) / 2, (s0 + n) / 2], WALLER, 0.05)) lines.push(['Cross St', [[WALLER[0], WALLER[1] - 0.004], [WALLER[0], WALLER[1] + 0.004]]]); // between the two Waller parcels
+    return J({ features: lines.map(([NAME, path]) => ({ attributes: { NAME, MTFCC: 'S1400' }, geometry: { paths: [path] } })) }); }
   // ---- city limits, schools, counties (TIGERweb) ----
   if (u.host === 'tigerweb.geo.census.gov' && u.pathname.includes('/Places_CouSub_ConCity_SubMCD/MapServer/4/') && P('returnCountOnly')) { const x = JSON.parse(P('geometry')).rings[0][0][0]; return J({ count: x > -95.7 && x < -95 ? 1 : 0 }); }
   if (u.host === 'tigerweb.geo.census.gov' && u.pathname.includes('/Places_CouSub_ConCity_SubMCD/MapServer/4/')) { const p0 = pt(), dist = P('distance');
-    const name = p0 && p0[0] < -97 ? 'Austin' : p0 && p0[0] < -95.7 ? 'Katy' : 'Houston', list = [{ attributes: { BASENAME: name, NAME: name + ' city' } }]; if (dist && name === 'Katy') list.push({ attributes: { BASENAME: 'Brookshire', NAME: 'Brookshire city' } });
+    const name = p0 && p0[0] < -97 ? 'Austin' : p0 && near(p0, WALLER, 0.01) ? 'Waller' : p0 && p0[0] < -95.7 ? 'Katy' : 'Houston', list = [{ attributes: { BASENAME: name, NAME: name + ' city' } }]; if (dist && name === 'Katy') list.push({ attributes: { BASENAME: 'Brookshire', NAME: 'Brookshire city' } });
     return J({ features: list }); }
   if (u.host === 'tigerweb.geo.census.gov' && u.pathname.includes('/School/')) return J({ features: u.pathname.includes('/MapServer/0/') ? [{ attributes: { NAME: 'Katy Independent School District' } }] : [] });
   if (u.host === 'tigerweb.geo.census.gov' && u.pathname.includes('State_County')) return J({ type: 'FeatureCollection', features: /TRAVIS/.test(q.get('where') || '') ? [{ type: 'Feature', properties: { GEOID: '48453', BASENAME: 'Travis' }, geometry: { type: 'Polygon', coordinates: sq(AUS, 0.3) } }] : [] });
@@ -147,7 +155,7 @@ const call = async (name, args) => { const r = await c.callTool({ name, argument
 
 // ---------- tools/list: names, schemas, read-only ----------
 const { tools } = await c.listTools();
-const NAMES = ['list_datasets', 'find_property', 'site_facts', 'flood', 'terrain', 'environmental', 'utilities', 'traffic_counts', 'demographics', 'market_context', 'businesses', 'businesses_at_address', 'company_lookup', 'development_activity', 'construction_filings', 'top_companies', 'crime_near', 'crime_by_agency', 'news', 'airports_near', 'area_overview', 'report_flood', 'report_environmental', 'report_crime', 'report_crime_agency', 'report_demographics', 'report_market'];
+const NAMES = ['list_datasets', 'find_property', 'site_facts', 'flood', 'terrain', 'environmental', 'utilities', 'traffic_counts', 'demographics', 'market_context', 'businesses', 'businesses_at_address', 'company_lookup', 'development_activity', 'construction_filings', 'top_companies', 'crime_near', 'crime_by_agency', 'news', 'airports_near', 'area_overview', 'site_plan', 'report_flood', 'report_environmental', 'report_crime', 'report_crime_agency', 'report_demographics', 'report_market'];
 for (const n of NAMES) assert.ok(tools.some(t => t.name === n), 'tool ' + n);
 for (const t of tools) {
   assert.equal(t.annotations?.readOnlyHint, true, t.name + ' read-only'); assert.equal(t.annotations?.openWorldHint, true, t.name);
@@ -295,6 +303,57 @@ console.log('mcp upstream timeout ok');
   r = await call('report_flood', H, '10.9.9.9'); assert.equal(r.isError, true); assert.match(r.text, /Too many requests for report_flood/);
   r = await call('flood', H, '10.9.9.9'); assert.notEqual(r.isError, true, 'data tools still answer');
   console.log('mcp reports ok' + (haveChrome ? ' (Chromium)' : ''));
+
+  // ---------- site_plan: the app's layout engine on a parcel, with the AI's steps stood in for ----------
+  const SPT = await import('../lib/mcp/siteplan.mjs'), aiCalls = [];
+  if (!haveChrome) { SPT.hooks.render = R.hooks.render; SPT.hooks.snapshots = async svgs => svgs.map(() => 'data:image/jpeg;base64,AAAA'); }
+  const stubAI = async b => { aiCalls.push(b);
+    if (b.mode === 'bestuse') return { status: 200, model: 'test-model', body: { summary: 'Freeway frontage with a side street.', ideas: [
+      { title: 'Retail strip with pads', use: 'retail', fit: 84, why: 'I-10 frontage and traffic.', risks: ['Driveway permits from TxDOT'], request: '30,000 sf retail strip with 2 pad sites' },
+      { title: 'Medical office', use: 'medical', fit: 70, why: 'Growing area.', risks: [], request: '20,000 sf medical office building' }] } };
+    if (b.mode === 'strategy') return { status: 200, model: 'test-model', body: { pick: 0, why: 'Shops face the freeway.', strategies: [{ name: 'Shops on the frontage, pond at the back', settings: {} }] } };
+    if (b.mode === 'review') return { status: 200, model: 'test-model', body: { reviews: b.options.map((o, i) => ({ option: i, score: 88 - i * 6, verdict: 'Faces the freeway and parks well.', strengths: ['Visible'], problems: [] })), ranking: b.options.map((_, i) => i), revise: false, program: null, params: {}, why: '', summary: 'The first layout is best.', brief: null } };
+    return { status: 200, model: 'test-model', body: { program: { use: 'retail', gfa: 30000, floors: 1, parkingRatio: 4 }, setbacks: { front: 25, side: 10, rear: 20, paving: 10 }, summary: 'A 30,000 sf strip with two pads.', assumptions: ['4 spaces per 1,000 sf'] } }; };
+  const spOf = async (r, what) => { const pdf = await pdfOf(r, 'site_plan'); assert.match(r.text, /## Layouts/, what); assert.match(r.text, /## Picked: Layout \d/, what); assert.match(r.text, /Concept only/, what); return pdf; };
+  // a request on the Katy parcel (Fort Bend: found by its address), Low: no planning or review, the front on the freeway
+  SPT.hooks.ai = stubAI; aiCalls.length = 0;
+  r = await call('site_plan', { ...K, request: '30,000 sf retail strip', effort: 'low', include_geojson: true }); clean(r, 'site_plan');
+  await spOf(r, 'low'); assert.match(r.text, /front [\d,]+ ft on KATY FWY/, 'the front faces I-10'); assert.match(r.text, /side street/, 'and the street on the west side');
+  assert.match(r.text, /Read as: Retail · 30,000 sf/); assert.deepEqual(aiCalls.map(b => b.mode || 'program'), ['program'], 'Low: the program only');
+  { const gj = JSON.parse(r.content.find(x => x.resource?.mimeType === 'application/geo+json').resource.text); assert.equal(gj.type, 'FeatureCollection'); assert.ok(gj.features.some(f => f.properties.kind === 'building' && f.properties.floorAreaSf > 0), 'buildings in the GeoJSON');
+    assert.ok(gj.features.every(f => f.geometry.coordinates[0].every(([x, y]) => Math.abs(x - KATY[0]) < 0.01 && Math.abs(y - KATY[1]) < 0.01)), 'in lon/lat on the parcel'); }
+  // no request: the AI's best-use ideas, the best one laid out, planned and reviewed (Medium), the drawings sent as pictures
+  aiCalls.length = 0; r = await call('site_plan', { ...K });
+  await spOf(r, 'best use'); assert.match(r.text, /## Best-use ideas/); assert.match(r.text, /laid out #1 \(Retail strip with pads\)/); assert.match(r.text, /The AI’s pick: Faces the freeway/);
+  assert.deepEqual(aiCalls.map(b => b.mode || 'program'), ['bestuse', 'strategy', 'program', 'review'], 'Medium: plan, program, review');
+  { const bu = aiCalls[0]; assert.ok(bu.site.acres > 10 && bu.site.frontageFt > 500, 'the AI gets the site'); assert.ok(bu.nearby?.restaurant || Object.keys(bu.nearby || {}).length, 'and what is nearby (the app\'s places, not OpenStreetMap)');
+    assert.ok(bu.facts.some(f => /FEMA flood zone/.test(f)), 'and the site facts'); const rv = aiCalls.at(-1); assert.ok(rv.options.length >= 1 && rv.options.every(o => o.metrics.floorAreaSf >= 0)); assert.match(rv.options[0].image || '', /^data:image\/jpeg;base64,/, 'drawings go with the review'); }
+  aiCalls.length = 0; r = await call('site_plan', { ...K, idea: 2, effort: 'low' }); assert.match(r.text, /laid out #2 \(Medical office\)/); assert.match(r.text, /Read as: /);
+  // two parcels with a street between them (Waller, inside the City of Waller): merged as one site with the street a no-build
+  // strip, laid out under the Waller guardrails, the guardrails page on the sheet
+  { const k = 364567 * Math.cos(WALLER[1] * Math.PI / 180), ll = ([x, y]) => [WALLER[0] + x / k, WALLER[1] + y / 364567], box = (x0, x1) => [[[x0, -400], [x1, -400], [x1, 400], [x0, 400], [x0, -400]].map(ll)];
+    aiCalls.length = 0; r = await call('site_plan', { geojson: { type: 'MultiPolygon', coordinates: [box(-470, -20), box(20, 470)] }, request: 'shopping center with a grocery anchor', effort: 'low', include_geojson: true });
+    await spOf(r, 'two parcels'); assert.match(r.text, /2 parcels merged/); assert.match(r.text, /front [\d,]+ ft on FM 362/); assert.match(r.text, /inside the city limits of Waller/); assert.match(r.text, /Waller planning guardrails/);
+    assert.ok(JSON.parse(r.content.find(x => x.resource?.mimeType === 'application/geo+json').resource.text).features.some(f => f.properties.kind === 'keepout'), 'the street between them is a no-build strip');
+    if (haveChrome) { const d = await PDFDocument.load(Buffer.from(r.content.find(x => x.resource?.mimeType === 'application/pdf').resource.blob, 'base64')); assert.equal(d.getPageCount(), 2, 'SP-1 and the guardrails page SP-1A'); } }
+  // no AI on the deployment: a request is read directly; with no request there's nothing to suggest
+  SPT.hooks.ai = async () => ({ status: 503, body: { error: 'AI is not configured on this deployment (OPENAI_API_KEY is missing).' } });
+  r = await call('site_plan', { ...K, request: '200 apartments, 3 stories', effort: 'high' }); await spOf(r, 'no AI'); assert.match(r.text, /read directly/); assert.match(r.text, /Read as: Multifamily · 200 units · 3 stories/);
+  assert.ok(!/passes every check/.test(r.text) || /\| Passes \|/.test(r.text), 'never says a failing pick passes'); { const picked = /\*\*(Layout \d+)[^|]*\(picked\) \|[^\n]*\| ([^|]+) \| [^|]+ \|\n/.exec(r.text); if (picked && !/Passes/.test(picked[2])) assert.match(r.text, /No layout passes every check/); }
+  r = await call('site_plan', { ...K }); assert.equal(r.isError, true); assert.match(r.text, /Give a request instead/);
+  // a slow AI near the time limit: its steps are skipped or cut off, and the plan still comes back, saying so
+  SPT.hooks.ai = () => new Promise(() => {}); SPT.hooks.budgetMs = 36000;
+  { const t = Date.now(); r = await call('site_plan', { ...K, request: '30,000 sf retail strip', effort: 'medium' }); await spOf(r, 'slow AI'); assert.ok(Date.now() - t < 20000, 'cut off in time');
+    assert.match(r.text, /Planning step skipped to stay inside the time limit/); assert.match(r.text, /the AI didn’t answer, so the request was read directly/); }
+  SPT.hooks.budgetMs = null;
+  // not a site: a county, a circle; and the plain-words errors
+  r = await call('site_plan', { county: 'Waller', request: 'retail' }); assert.equal(r.isError, true); assert.match(r.text, /needs one site/);
+  r = await call('site_plan', { ...K, radius_mi: 1, request: 'retail' }); assert.equal(r.isError, true); assert.match(r.text, /not a circle/);
+  r = await call('site_plan', { address: 'Katy', request: 'retail' }); assert.equal(r.isError, true); assert.match(r.text, /is a town, not a site/);
+  { const { siteAI } = await import('../api/siteplan.js'), key = process.env.OPENAI_API_KEY; delete process.env.OPENAI_API_KEY; // the in-process entry: no key, a 503 like the endpoint's
+    const x = await siteAI({ mode: 'bestuse', site: { acres: 5 } }); assert.equal(x.status, 503); assert.match(x.body.error, /not configured/); if (key) process.env.OPENAI_API_KEY = key; }
+  SPT.hooks.ai = null;
+  console.log('mcp site_plan ok' + (haveChrome ? ' (Chromium)' : ''));
 }
 
 // ---------- bad input: a sentence, not a crash ----------

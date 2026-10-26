@@ -25,7 +25,7 @@ import * as PJ from './lib/project.mjs';
 import * as PS from './lib/planset.mjs';
 import * as PD from './lib/plandesign.mjs';
 import * as TR from './lib/terrain.mjs';
-import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, pickedClaude, pickedEffort } from './lib/aimodels.mjs';
+import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, pickedClaude, pickedEffort, aiPickKey, readPick } from './lib/aimodels.mjs';
 import * as CU from './lib/customtypes.mjs';
 import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
@@ -1744,8 +1744,8 @@ export function initSitePlan(ctx) {
   // only once Undo can't happen any more (or the page is closed). From the editor the next option opens, or after the last
   // one the project page, where New Option starts again from the same site (p.keptSite).
   const delPending = new Map(); // option id → { t (the timer), keys (its pictures) }
-  const dropImages = keys => { for (const k of keys) rdel(k); };
-  function flushDeletes() { for (const d of delPending.values()) { clearTimeout(d.t); dropImages(d.keys); } delPending.clear(); }
+  const dropImages = (keys, pid = null) => { for (const k of keys) rdel(k); if (pid) cloudDel(pid, keys.map(mediaOf)); }; // pid: the team copies go too
+  function flushDeletes() { for (const d of delPending.values()) { clearTimeout(d.t); dropImages(d.keys, d.pid); } delPending.clear(); }
   window.addEventListener('pagehide', flushDeletes);
   function delOpen() { const p = P(), pl = PL(); if (!p || !pl || ed.draftPlan) return; if (ed.run) { ctx.toast(WAIT + '.'); return; } deleteOption(p, pl); }
   function deleteOption(p, pl) {
@@ -1755,7 +1755,7 @@ export function initSitePlan(ctx) {
     if (away?.plid === pl.id) hideAway(); if (resume?.plid === pl.id) clearResume(); // the "Editing … · Return to plan" banner would lead nowhere
     save(p);
     if (wasOpen) { if (r.next) open(p.id, r.next.id); else { ctx.closeCard(); cur = p.id; ptab.set(p.id, 'options'); ctx.setView('projects'); show(p.id, 'options'); } }
-    const d = { t: setTimeout(() => { delPending.delete(pl.id); dropImages(r.keys); }, 12000), keys: r.keys }; delPending.set(pl.id, d); // (well after the message has gone)
+    const d = { t: setTimeout(() => { delPending.delete(pl.id); dropImages(r.keys, p.id); }, 12000), keys: r.keys, pid: p.id }; delPending.set(pl.id, d); // (well after the message has gone)
     ctx.toast('Deleted ' + pl.name + ' from ' + p.name + (shared === true ? ' (for the team too)' : '') + '.', { ms: 8000, action: { label: 'Undo', run: () => undoDelete(p.id, r, wasOpen) } });
   }
   function undoDelete(pid, r, reopen) {
@@ -2926,7 +2926,7 @@ export function initSitePlan(ctx) {
     const two = (k, f, sub, cls = '') => m1 ? pair(k, f(m1), f(m), sub, cls) : tile(k, f(m), sub, cls);
     const max = (v, lim, fmt) => +lim ? ' <span class="sc' + (v > +lim ? ' over' : '') + '">/ max ' + fmt(+lim) + '</span>' : '';
     const ratioAt = cs ? 'the AI’s rule' : prog.use === 'foodtrucks' ? prog.foodtrucks.perTruck + ' / truck + ' + prog.ratio + ' / 1,000 sf of bar' : new Set(pl.elements.filter(e => e.kind === 'building').map(e => e.use || prog.use)).size > 1 ? 'each use’s ratio' : prog.use === 'multifamily' ? prog.perUnit + '/unit' : prog.ratio + '/1,000 sf';
-    const homes = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr'), byStory = [1, 2, 3].map(n => [n, homes.filter(e => e.floors === n).length]).filter(([, c]) => c);
+    const homes = pl.elements.filter(e => e.kind === 'building' && e.use === 'sfr'), byStory = [1, 2, 3].map(n => [n, homes.filter(e => !e.tiny && e.floors === n).length]).concat([['tiny', homes.filter(e => e.tiny).length]]).filter(([, c]) => c), tinySf = Math.round(homes.filter(e => e.tiny).reduce((s, e) => s + (+e.sf || SP.gfaOf(e)), 0) / Math.max(1, homes.filter(e => e.tiny).length)); // tiny homes: their own row, at their own size
     const pSub = (m.gfa ? 'needed at ' + ratioAt + ' · ' : '') + (m.units ? m.perUnit.toFixed(2) + ' / unit' : m.per1k.toFixed(1) + ' / 1,000 sf') + (m.garages ? ' · ' + f0(m.garages) + ' in garages' : '') + (m.driveways ? ' · ' + f0(m.driveways) + ' on driveways' : ''), pBad = m.gfa && pk.stalls < pk.need ? ' bad' : '';
     el.innerHTML = '<div class="lt">Numbers' + infoBtn((whole ? 'Phase 1 is what was asked for; the whole site includes Phase 2. Paving and ponds are counted for the whole site. ' : '') + 'A planning sketch from the parcel outline: not a survey, and no engineering (grading, utilities, fire lanes, code review).', 'About these numbers') + '</div><div class="sp-tiles">' +
       tile('Site' + TG('site'), m.acres.toFixed(2) + ' ac', f0(m.siteSf) + ' sf') +
@@ -2947,7 +2947,7 @@ export function initSitePlan(ctx) {
       (m.mix.length ? '<table class="sp-mixt"><tr><th>Unit</th><th>SF</th><th>Units</th><th>%</th><th>Net sf</th></tr>' + m.mix.map(t => '<tr><td>' + esc(t.name) + '</td><td>' + f0(t.sf) + '</td><td>' + f0(t.n) + '</td><td>' + pct(t.n / Math.max(1, m.mix.reduce((s, x) => s + x.n, 0))) + '</td><td>' + f0(t.n * t.sf) + '</td></tr>').join('') + '</table>' : '') +
       (m.storage?.units ? storageTable(m.storage, prog) : '') +
       partsTable(pl, prog) +
-      (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + n + '-story</td><td>' + f0(SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
+      (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + (n === 'tiny' ? 'Tiny home' : n + '-story') + '</td><td>' + f0(n === 'tiny' ? tinySf : SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
       (cs ? customBlock(cs) : '') + walkLine(pl) +
       (issues.length ? '<ul class="sp-issues">' + issues.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul>' : m.gfa ? '<div class="rnote sp-ok">Fits the setbacks' + (m.spaces >= m.required ? ' and parks' : '') + (gOn ? ', within the planning checks' : '') + '.</div>' : '') +
       (gOn ? guardNums(pl) : '');
@@ -3032,7 +3032,7 @@ export function initSitePlan(ctx) {
         NNNU.filter(u => A.ti?.[u] != null).map(u => inp('ti.' + u, SP.USES[u].label + ' TI', A.ti[u], 1, '$ / leasable sf')).join('') + (NNNU.length ? inp('lcPct', 'Leasing commissions', A.lcPct, 0.25, '% of lease rent') : '') +
         inp('softPct', 'Soft costs', A.softPct, 0.5, '%') + inp('contPct', 'Contingency', A.contPct, 0.5, '%') + inp('feePct', 'Developer fee', A.feePct, 0.5, '%') +
         Object.entries(A.rents).map(([k, v]) => inp('rents.' + k, k + ' rent', v, 5, '$ / month')).join('') +
-        (homes ? (A.forSale ? inp('salePsf.sfr', 'Home price', A.salePsf.sfr, 1, '$ / living sf') + inp('absorption', 'Sales pace', A.absorption, 1, 'homes / month') : (R.P.uses.sfr ? [1, 2, 3].filter(n => R.P.uses.sfr.homes?.[n]).map(n => inp('homeRent.sfr' + n, n + '-story home rent', A.homeRent['sfr' + n], 25, '$ / month')).join('') : '') + ['townhomes', 'duplex'].filter(k => R.P.uses[k]).map(k => inp('homeRent.' + k, SP.USES[k].label + ' rent', A.homeRent[k], 25, '$ / month')).join('')) : '') +
+        (homes ? (A.forSale ? inp('salePsf.sfr', 'Home price', A.salePsf.sfr, 1, '$ / living sf') + inp('absorption', 'Sales pace', A.absorption, 1, 'homes / month') : (R.P.uses.sfr ? [1, 2, 3, 'tiny'].filter(n => R.P.uses.sfr.homes?.[n]).map(n => inp('homeRent.sfr' + n, n === 'tiny' ? 'Tiny home rent' : n + '-story home rent', A.homeRent['sfr' + n], 25, '$ / month')).join('') : '') + ['townhomes', 'duplex'].filter(k => R.P.uses[k]).map(k => inp('homeRent.' + k, SP.USES[k].label + ' rent', A.homeRent[k], 25, '$ / month')).join('')) : '') +
         NNNU.map(k => inp('commRent.' + k, SP.USES[k].label + ' rent', A.commRent[k], 0.5, '$ / leasable sf / yr NNN')).join('') +
         (A.outdoorRent != null ? inp('outdoorRent', 'Courts / pool rent', A.outdoorRent, 0.25, '$ / sf / yr, paid by the operator') : '') +
         (sto ? (sto.climateGsf ? inp('storageRent.climate', 'Climate-controlled rent', A.storageRent.climate, 0.05, '$ / sf / month') : '') + (sto.driveGsf ? inp('storageRent.drive', 'Drive-up rent', A.storageRent.drive, 0.05, '$ / sf / month') : '') + (sto.rv ? inp('storageRent.rv', R.M.custom ? esc(R.M.custom) + ': a site’s rent' : 'RV / boat space rent', A.storageRent.rv, 5, '$ / space / month') + inp('storageRent.rvOpex', 'Costs a space', A.storageRent.rvOpex, 10, '$ / space / yr') : '') : '') +
@@ -4054,7 +4054,47 @@ export function initSitePlan(ctx) {
   const rtx = async (mode, fn) => { const d = await ridb(); return new Promise((res, rej) => { const t = d.transaction('img', mode), q = fn(t.objectStore('img')); t.oncomplete = () => res(q?.result); t.onerror = () => rej(t.error); }); };
   const rput = (id, v) => rtx('readwrite', st => st.put(v, id)), rget = id => rtx('readonly', st => st.get(id)).catch(() => undefined), rdel = id => rtx('readwrite', st => st.delete(id)).catch(() => {});
   const rurl = new Map(); // id -> object URL, for the pictures shown this visit
-  async function renderSrc(id) { if (rurl.has(id)) return rurl.get(id); const v = await rget(id); if (!(v instanceof Blob)) return null; const u = URL.createObjectURL(v); rurl.set(id, u); return u; }
+  // Team copies: each rendering, the massing it was painted from and each plan set PDF also go to the team's storage
+  // (api/sitefiles media, the project-media bucket) as they're made, so they open on any computer; this device's copy
+  // is a cache. A record says it was kept (cloud: true), which syncs with the project. Ones made before this, or while
+  // storage was down, are put there the next time the device that has them opens the project (shareLocal).
+  const mediaHead = () => ({ 'Content-Type': 'application/json', 'x-field-code': get(CODE_KEY) });
+  async function cloudPut(pid, kind, id, blob) {
+    const r = await fetch('api/sitefiles', { method: 'POST', headers: mediaHead(), body: JSON.stringify({ pid, media: { kind, key: RF.mediaKey(id), size: blob.size } }) });
+    const d = await r.json().catch(() => ({})); if (!r.ok || !d.url) throw new Error(d.error || 'HTTP ' + r.status);
+    const u = await fetch(d.url, { method: 'PUT', headers: { 'Content-Type': kind === 'set' ? 'application/pdf' : 'image/jpeg', 'x-upsert': 'false' }, body: blob });
+    if (!u.ok && !/exists|duplicate/i.test(await u.text().catch(() => ''))) throw new Error('storage ' + u.status); // already there (an earlier try) counts
+  }
+  async function cloudGet(pid, kind, id) {
+    const r = await fetch('api/sitefiles?pid=' + encodeURIComponent(pid) + '&media=' + kind + '/' + encodeURIComponent(RF.mediaKey(id)), { headers: mediaHead() });
+    const d = await r.json().catch(() => ({})); if (!r.ok || !d.url) return null;
+    const f = await fetch(d.url); return f.ok ? f.blob() : null;
+  }
+  const cloudDel = (pid, items) => { if (pid && items.length) fetch('api/sitefiles', { method: 'POST', headers: mediaHead(), body: JSON.stringify({ pid, unmedia: items.slice(0, 100) }) }).catch(() => {}); };
+  // a rendering's or massing's picture key (id, id + ':m') as its team copy ('render/<key>', 'massing/<key>')
+  const mediaOf = k => (/:m$/.test(k) ? 'massing/' : 'render/') + RF.mediaKey(k.replace(/:m$/, ''));
+  // a rendering and its massing to the team's storage; true when both are there
+  const cloudSave = (pid, id, img, mass) => Promise.all([cloudPut(pid, 'render', id, img), mass ? cloudPut(pid, 'massing', id, mass) : null]).then(() => true).catch(e => { console.warn('rendering not kept for the team:', e.message); return false; });
+  // the picture: this device's copy, else the team's (pid given when the record says one was kept), cached here after
+  async function rblob(id, pid = null) {
+    let v = await rget(id); if (v instanceof Blob) return v; if (!pid) return null;
+    v = await cloudGet(pid, /:m$/.test(id) ? 'massing' : 'render', id.replace(/:m$/, '')).catch(() => null);
+    if (v instanceof Blob) { rput(id, v).catch(() => {}); return v; } return null;
+  }
+  async function renderSrc(id, pid = null) { if (rurl.has(id)) return rurl.get(id); const v = await rblob(id, pid); if (!(v instanceof Blob)) return null; const u = URL.createObjectURL(v); rurl.set(id, u); return u; }
+  const rsrc = (p, r, m = false) => renderSrc(r.id + (m ? ':m' : ''), r.cloud ? p.id : null);
+  const pidOf = pl => db.projects.find(x => x.plans.some(y => y.id === pl.id))?.id || null;
+  // renderings this device has that aren't kept for the team yet: put them there, once a visit per project
+  const sharing = new Set();
+  async function shareLocal(p) {
+    if (sharing.has(p.id)) return; sharing.add(p.id); let n = 0;
+    for (const pl of p.plans) for (const r of pl.renders || []) {
+      if (r.cloud) continue; const img = await rget(r.id); if (!(img instanceof Blob)) continue;
+      const mass = await rget(r.id + ':m'); if (!(await cloudSave(p.id, r.id, img, mass instanceof Blob ? mass : null))) return; // storage not there: try again next visit
+      const P1 = db.projects.find(x => x.id === p.id), live = P1?.plans.find(x => x.id === pl.id)?.renders?.find(x => x.id === r.id); if (live) { live.cloud = true; n++; }
+    }
+    if (n) save(db.projects.find(x => x.id === p.id));
+  }
   const toBlob = async url => (await fetch(url)).blob();
   const blobToData = b => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsDataURL(b); });
   // what a rendering was made from: the pieces' places, sizes and floors (a change to any of them makes it "plan changed since")
@@ -4063,80 +4103,73 @@ export function initSitePlan(ctx) {
   const HIDE_FOR_RENDER = ['fs-sp-zlab', 'fs-sp-lot', 'fs-sp-grid', 'fs-sp-zone', 'fs-sp-sb', 'fs-sp-pl', 'fs-sp-front', 'fs-sp-selc', 'fs-sp-sell', 'fs-sp-flash', 'fs-sp-gone', 'fs-sp-lab-p', 'fs-sp-lab', 'fs-sp-lab-sel', 'fs-sp-dim', 'fs-sp-hv', 'fs-sp-mf', 'fs-sp-dl', 'fs-sp-dp', 'fs-sp-ml', 'fs-sp-h', 'fs-sp-hs', 'fs-sp-lotl', 'fs-sp-p2', 'fs-sp-ko', 'fs-sp-koh', 'fs-sp-kol'];
   const imageryBase = () => /^(sat|gsat|esri)$/.test(ctx.basemap?.() || '');
   const idle = () => new Promise(ok => { let done = false; const fin = () => { if (!done) { done = true; ok(); } }; map.once('idle', fin); setTimeout(fin, 9000); });
-  // The massing as the AI gets it: the map pointed at the site from the view's camera (lib/render.mjs cameraFor) in the
-  // part of the map the panels leave free, the drawing marks hidden, read off the canvas on the next frame (the canvas
-  // keeps no buffer between frames) and cut to 16:9 at up to 1600 px wide. The map is put back exactly as it was.
-  // A close-up ('hero') frames one building (`target`, from RD.heroTarget): the camera and the fit use the building grown
-  // by RD.HERO_PAD feet each side instead of the parcel.
-  async function captureView(pl, view, target = null) {
-    const F = SP.frame(pl.origin), was = { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing(), padding: map.getPadding() };
-    const free = freeRect({ key: false }), m = free.m, canvas = map.getCanvas(), dpr = canvas.width / Math.max(1, m.width);
-    const cam = RD.cameraFor(view, pl, { px: Math.max(320, (free.r - free.l) * dpr), lat: pl.origin[1], target }), T = RD.byId(RD.VIEWS, view).hero && target;
-    const hidden = HIDE_FOR_RENDER.filter(id => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none');
-    try {
-      for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'none');
-      map.jumpTo({ center: F.toLL(cam.center), zoom: cam.zoom, pitch: Math.min(cam.pitch, map.getMaxPitch()), bearing: cam.bearing, padding: fitPadding(free, m, 0) });
-      fitSiteInFrame(pl, free, m, T ? { points: RD.heroPoints(T), tall: [T] } : {}); // the formula is a start; the real camera decides: the whole parcel (or the close-up's building and its surroundings) in the free part of the frame, with room around it
-      await idle();
-      const png = await new Promise((ok, no) => { map.once('render', () => { try { ok(canvas.toDataURL('image/png')); } catch (e) { no(e); } }); map.triggerRepaint(); });
-      const img = new Image(); await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = png; });
-      let l = (free.l - m.left) * dpr, t = (free.t - m.top) * dpr, w = (free.r - free.l) * dpr, h = (free.b - free.t) * dpr; // the free part, then 16:9 inside it
-      if (w / h > 16 / 9) { const w2 = h * 16 / 9; l += (w - w2) / 2; w = w2; } else { const h2 = w * 9 / 16; t += (h - h2) / 2; h = h2; }
-      const k = Math.min(1, 1600 / w), c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
-      const g = c.getContext('2d'); g.fillStyle = '#dfe6ea'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, l, t, w, h, 0, 0, c.width, c.height);
-      return { image: c.toDataURL('image/jpeg', 0.88), camera: cam, w: c.width, h: c.height };
-    } finally { for (const id of hidden) map.setLayoutProperty(id, 'visibility', 'visible'); map.jumpTo(was); }
-  }
-  // The same picture without the page's map: a hidden map of the same base style, sized 1600 x 900, with the option drawn
-  // on it, framed by the same camera rules, then thrown away. The Renderings tab uses it, so you stay where you are.
-  async function captureOffscreen(pl, view, target = null) {
-    const W = 1600, H = 900, box = document.createElement('div'), close = RD.byId(RD.VIEWS, view).hero && target;
+  // The massing as the AI gets it: a hidden map, thrown away after, with the option drawn on it as the page's map draws
+  // it (drawing marks and every map label off), framed by the view's camera (RD.cameraFor, then fitSiteInFrame) at the
+  // resolution's capture size (RD.RESOLUTIONS), drawn at up to twice that with antialiasing and scaled down so small
+  // pieces stay crisp. You stay where you are, in the plan or on the project page.
+  // o.surround (RD.SURROUNDS): 'real' draws aerial imagery round the site (the page's base map when it is imagery, else
+  // the keyless Esri imagery), 'typical' the street map (the page's base map, or the free street map when the page shows
+  // imagery), 'none' no map at all, a plain ground. o.size: { w, h } of the picture; o.quality: the JPEG's.
+  const PLAIN_GROUND = '#e8eae6';
+  async function captureOffscreen(pl, view, target = null, o = {}) {
+    const { w: W, h: H } = o.size || RD.CAPTURE, ratio = Math.min(RD.CAPTURE.ratio, 4096 / W), sur = RD.byId(RD.SURROUNDS, o.surround, RD.SURROUNDS[1]).id;
+    const box = document.createElement('div'), close = RD.byId(RD.VIEWS, view).hero && target;
     if (!map.isStyleLoaded()) await new Promise(ok => { map.once('idle', ok); setTimeout(ok, 20000); }); // the base style comes from the page's map (the app may have opened on Projects)
-    if (!map.isStyleLoaded()) throw new Error('the map didn’t load, so the picture can’t be taken. Try again in a moment');
+    if (!map.isStyleLoaded() && sur !== 'none') throw new Error('the map didn’t load, so the picture can’t be taken. Try again in a moment');
     box.style.cssText = 'position:fixed;left:0;top:0;width:' + W + 'px;height:' + H + 'px;opacity:0;pointer-events:none;z-index:-1'; document.body.append(box);
-    const st = map.getStyle(); st.layers = st.layers.filter(l => !/^fs-/.test(l.id)); // the base map only: filings, parcels, buildings and any open plan stay off
-    const used = new Set(st.layers.map(l => l.source).filter(Boolean)); for (const k of Object.keys(st.sources || {})) if (!used.has(k)) delete st.sources[k];
+    const page = () => RD.baseStyle(map.getStyle(), ctx.baseLayers?.()); // the basemap only: filings, heat, pins, highlights, parcels, buildings and any open plan stay off
+    const gl = map.isStyleLoaded() && map.getStyle()?.glyphs; // a style with glyphs: undefined fails validation and never loads
+    const st = sur === 'none' ? { version: 8, ...(gl ? { glyphs: gl } : {}), sources: {}, layers: [{ id: 'plain', type: 'background', paint: { 'background-color': PLAIN_GROUND } }] }
+      : sur === 'real' ? (imageryBase() ? page() : ctx.imageryStyle?.() || page())
+      : imageryBase() ? ctx.streetStyle?.() || page() : page();
     const F = SP.frame(pl.origin), cam = RD.cameraFor(view, pl, { px: W, lat: pl.origin[1], target });
     const m2 = new maplibregl.Map({ container: box, style: st, center: F.toLL(cam.center), zoom: cam.zoom, pitch: Math.min(cam.pitch, map.getMaxPitch()), bearing: cam.bearing, maxPitch: map.getMaxPitch(),
-      interactive: false, attributionControl: false, preserveDrawingBuffer: true, fadeDuration: 0, pixelRatio: 1 });
+      interactive: false, attributionControl: false, fadeDuration: 0, pixelRatio: ratio, canvasContextAttributes: { antialias: true, preserveDrawingBuffer: true } });
     const settle = (ev, ms) => new Promise(ok => { let d = false; const f = () => { if (!d) { d = true; ok(); } }; m2.once(ev, f); setTimeout(f, ms); });
     try {
       await settle('load', 20000);
+      if (!m2.isStyleLoaded()) throw new Error('the ' + (sur === 'real' ? 'aerial imagery' : sur === 'none' ? 'plain ground' : 'street map') + ' didn’t load, so the picture can’t be taken. Try again in a moment');
+      for (const l of m2.getStyle()?.layers || []) if (l.type === 'symbol') m2.removeLayer(l.id); // street and place names would be painted into the photograph
       addLayers(m2);
-      let fc = SP.planFeatures(pl, null, null); MAP.decorate(fc, pl, {}); fc = T.visibleFeatures(fc, T.viewOf(pl)); m2.getSource(SRC).setData(fc);
+      let fc = SP.planFeatures(G.effective(pl), null, null); MAP.decorate(fc, pl, {}); fc = T.visibleFeatures(fc, T.viewOf(pl)); m2.getSource(SRC).setData(fc); // as draw() puts it on the page's map
       for (const id of HIDE_FOR_RENDER) if (m2.getLayer(id)) m2.setLayoutProperty(id, 'visibility', 'none');
       fitSiteInFrame(pl, { l: 0, t: 0, r: W, b: H }, { left: 0, top: 0, width: W, height: H }, close ? { points: RD.heroPoints(close), tall: [close] } : {}, m2);
       await settle('idle', 25000);
-      const image = await new Promise((ok, no) => { m2.once('render', () => { try { ok(m2.getCanvas().toDataURL('image/jpeg', 0.88)); } catch (e) { no(e); } }); m2.triggerRepaint(); });
+      const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+      await new Promise((ok, no) => { m2.once('render', () => { try { g.fillStyle = PLAIN_GROUND; g.fillRect(0, 0, W, H); g.drawImage(m2.getCanvas(), 0, 0, W, H); ok(); } catch (e) { no(e); } }); m2.triggerRepaint(); });
+      let q = o.quality || RD.CAPTURE.quality, image = c.toDataURL('image/jpeg', q);
+      while (image.length > 3_000_000 && q > 0.6) { q -= 0.08; image = c.toDataURL('image/jpeg', q); } // under what api/render takes (imagery at 2560 px can run large)
       return { image, camera: cam, w: W, h: H };
     } finally { try { m2.remove(); } catch (e) { /* gone */ } box.remove(); }
   }
   // renderings made from the project page, one project at a time: { plid, n, i, msg, abort }
   const bgRender = new Map();
-  async function renderInBackground(p, pl, views, look, time, target = null) {
+  async function renderInBackground(p, pl, views, o, target = null) {
+    const { look, time } = o;
     if (bgRender.get(p.id)) return;
     const run = { plid: pl.id, n: views.length, i: 0, msg: 'Getting ready…', abort: new AbortController() }; bgRender.set(p.id, run);
     const show = () => { if (ctx.view === 'projects' && cur === p.id && tabFor(p) === 'renderings') render(); };
     let made = 0, why = '', capped = false; show();
     try {
       const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
-      const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' });
-      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map', focus: target });
+      const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, surround: o.surround });
+      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, surround: o.surround, focus: target });
       for (let i = 0; i < views.length && !run.abort.signal.aborted; i++) {
         const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero, sig = planSig(pl);
         run.i = i; run.msg = 'Taking the picture ' + (isHero ? 'of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + '…'; show();
-        const cap = await captureOffscreen(pl, views[i], isHero ? target : null); if (run.abort.signal.aborted) break;
-        run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; show();
-        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i], ...(ctx.aiFor?.('render') || {}) }), signal: run.abort.signal });
+        const cap = await captureOffscreen(pl, views[i], isHero ? target : null, { surround: o.surround, size: RD.byId(RD.RESOLUTIONS, o.res).capture }); if (run.abort.signal.aborted) break;
+        run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (' + rTakes(o) + ')…'; show();
+        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i], resolution: o.res, detail: o.detail, ...(ctx.aiFor?.('render') || {}) }), signal: run.abort.signal });
         const d = await r.json().catch(() => ({}));
         if (r.status === 402) { rbudget = { ...(rbudget || {}), spent: d.spent, cap: d.cap, month: d.month }; rbAt = Date.now(); capped = true; }
         if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
         if (d.budget?.spent != null) { rbudget = { ...(rbudget || {}), ...d.budget, images: (rbudget?.images || 0) + 1 }; rbAt = Date.now(); }
         const P1 = db.projects.find(x => x.id === p.id), q = P1?.plans.find(x => x.id === pl.id); if (!q) break;
         const id = pl.id + '/' + Date.now().toString(36) + '-' + views[i];
-        await rput(id, await toBlob(d.image)); await rput(id + ':m', await toBlob(cap.image)).catch(() => {});
-        q.renders = (q.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '', ...(isHero ? { target: hero } : {}) }]);
-        while (q.renders.length > 16) { const old = q.renders.shift(); rdel(old.id); rdel(old.id + ':m'); }
+        const img = await toBlob(d.image || d.url), mass = await toBlob(cap.image); await rput(id, img); await rput(id + ':m', mass).catch(() => {});
+        const cloud = await cloudSave(p.id, id, img, mass); // so it opens on any computer
+        q.renders = (q.renders || []).concat([{ id, view: views[i], ...rMade(o, d), sig, by: get(NAME_KEY) || '', ...(cloud ? { cloud } : {}), ...(isHero ? { target: hero } : {}) }]);
+        while (q.renders.length > 16) { const old = q.renders.shift(); dropImages([old.id, old.id + ':m'], old.cloud && p.id); }
         save(P1); made++;
       }
     } catch (e) { why = e.name === 'AbortError' ? '' : e.message; }
@@ -4159,9 +4192,10 @@ export function initSitePlan(ctx) {
     for (let i = 0; i < 14; i++) {
       const px = ll.map(p => mp.project(p)), xs = px.map(q => q.x), ys = px.map(q => q.y), bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
       const mpp = 40075016.686 * Math.cos(mp.getCenter().lat * Math.PI / 180) / (256 * 2 ** mp.getZoom()), tallPx = tall / mpp * Math.sin(mp.getPitch() * Math.PI / 180) * 1.3;
-      const availW = fw * 0.84, availH = fh - fh * 0.09 - Math.max(fh * 0.16, tallPx); // sides 8% each; sky and the roofs above; 9% below
+      const top = mp.getPitch() < 5 ? fh * 0.08 : Math.max(fh * 0.16, tallPx); // sky and the roofs above (straight down: just a margin)
+      const availW = fw * 0.84, availH = fh - (mp.getPitch() < 5 ? fh * 0.08 : fh * 0.09) - top; // sides 8% each; 9% below
       const ratio = Math.max((bx1 - bx0) / availW, (by1 - by0) / availH);
-      const dx = (bx0 + bx1) / 2 - cx, dy = (by0 + by1) / 2 - (ft + Math.max(fh * 0.16, tallPx) + availH / 2); // where the parcel's box is against where it should be
+      const dx = (bx0 + bx1) / 2 - cx, dy = (by0 + by1) / 2 - (ft + top + availH / 2); // where the parcel's box is against where it should be
       const centre = mp.unproject([cx + dx, cy + dy]), z = mp.getZoom(), step = ratio > 1.02 ? -Math.log2(ratio) : ratio < 0.9 && z < 19 ? Math.min(0.5, Math.log2(0.95 / ratio) * 0.6) : 0;
       if (Math.abs(step) < 0.01 && Math.hypot(dx, dy) < 2) break;
       mp.jumpTo({ center: centre, zoom: Math.max(13, Math.min(19, z + step)) });
@@ -4192,21 +4226,22 @@ export function initSitePlan(ctx) {
   // target: the building a close-up frames (an element of pl), for the 'hero' view
   // A picture already being painted when the plan closes, another option opens or the page changes is still kept, on
   // the option it was taken of (it has been paid for); no further views are taken. Cancel drops it.
-  async function renderViews(p, pl, views, look, time, target = null) {
+  async function renderViews(p, pl, views, o, target = null) {
     if (ed.rendering) return;
+    const { look, time } = o;
     const run = ed.rendering = { n: views.length, i: 0, view: views[0], msg: '', abort: new AbortController() }; panel();
     const live = () => ed?.rendering === run && !run.abort.signal.aborted;
     let made = 0, why = '', capped = false;
     try {
       const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
-      const brief = RD.briefOf(pl, { metrics: GM(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map' });
-      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: GM(pl), address: parcels[0]?.label || '', facts, look, time, basemap: imageryBase() ? 'sat' : 'map', focus: target });
+      const brief = RD.briefOf(pl, { metrics: GM(pl), address: parcels[0]?.label || '', facts, look, time, surround: o.surround });
+      const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: GM(pl), address: parcels[0]?.label || '', facts, look, time, surround: o.surround, focus: target });
       for (let i = 0; i < views.length && live(); i++) {
-        run.i = i; run.view = views[i]; run.msg = 'Taking the picture from the map…'; panel();
+        run.i = i; run.view = views[i]; run.msg = 'Taking the picture of the massing…'; panel();
         const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero, sig = planSig(pl); // the plan as this picture shows it
-        const cap = await captureView(pl, views[i], isHero ? target : null); if (!live()) break;
-        run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (about a minute)…'; panel();
-        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i], ...(ctx.aiFor?.('render') || {}) }), signal: run.abort.signal });
+        const cap = await captureOffscreen(pl, views[i], isHero ? target : null, { surround: o.surround, size: RD.byId(RD.RESOLUTIONS, o.res).capture }); if (!live()) break;
+        run.msg = 'The AI is painting ' + (isHero ? 'the close-up of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + ' (' + rTakes(o) + ')…'; panel();
+        const r = await fetch('api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: cap.image, brief: isHero ? heroBrief : brief, view: views[i], resolution: o.res, detail: o.detail, ...(ctx.aiFor?.('render') || {}) }), signal: run.abort.signal });
         const d = await r.json().catch(() => ({}));
         if (r.status === 402) { rbudget = { ...(rbudget || {}), spent: d.spent, cap: d.cap, month: d.month }; rbAt = Date.now(); capped = true; } // the month's budget is spent
         if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
@@ -4215,9 +4250,10 @@ export function initSitePlan(ctx) {
         // the option it was taken of, looked up now (not the one open now, and not a copy a sync has since replaced); gone: deleted meanwhile
         const P1 = db.projects.find(x => x.id === p.id), cur = P1?.plans.find(x => x.id === pl.id); if (!cur) break;
         const id = pl.id + '/' + Date.now().toString(36) + '-' + views[i];
-        await rput(id, await toBlob(d.image)); await rput(id + ':m', await toBlob(cap.image)).catch(() => {});
-        cur.renders = (cur.renders || []).concat([{ id, view: views[i], look, time, at: new Date().toISOString(), model: d.model || '', size: d.size || '', sig, by: get(NAME_KEY) || '', ...(isHero ? { target: hero } : {}) }]);
-        while (cur.renders.length > 16) { const old = cur.renders.shift(); rdel(old.id); rdel(old.id + ':m'); } // the newest sixteen are kept
+        const img = await toBlob(d.image || d.url), mass = await toBlob(cap.image); await rput(id, img); await rput(id + ':m', mass).catch(() => {});
+        const cloud = await cloudSave(p.id, id, img, mass); // so it opens on any computer
+        cur.renders = (cur.renders || []).concat([{ id, view: views[i], ...rMade(o, d), sig, by: get(NAME_KEY) || '', ...(cloud ? { cloud } : {}), ...(isHero ? { target: hero } : {}) }]);
+        while (cur.renders.length > 16) { const old = cur.renders.shift(); dropImages([old.id, old.id + ':m'], old.cloud && p.id); } // the newest sixteen are kept
         save(P1); made++; panel();
       }
     } catch (e) { why = e.name === 'AbortError' ? '' : e.message; }
@@ -4228,8 +4264,75 @@ export function initSitePlan(ctx) {
       else if (why) ctx.toast(capped ? why : 'No rendering: ' + why);
     }
   }
-  const RLOOK_KEY = 'fs-render-look', RTIME_KEY = 'fs-render-time';
-  const rPrefs = () => ({ look: RD.byId(RD.LOOKS, get(RLOOK_KEY)).id, time: RD.byId(RD.TIMES, get(RTIME_KEY)).id });
+  // the picks a rendering is made with, kept on this device: materials, light, surroundings, resolution and detail
+  // (the engine is Settings › AI model › Renderings' own pick, fs-ai-render, which the forms here set too)
+  const RLOOK_KEY = 'fs-render-look', RTIME_KEY = 'fs-render-time', RSUR_KEY = 'fs-render-surround', RRES_KEY = 'fs-render-res', RDET_KEY = 'fs-render-detail';
+  const rPrefs = () => ({ look: RD.byId(RD.LOOKS, get(RLOOK_KEY)).id, time: RD.byId(RD.TIMES, get(RTIME_KEY)).id, surround: RD.byId(RD.SURROUNDS, get(RSUR_KEY)).id, res: RD.byId(RD.RESOLUTIONS, get(RRES_KEY)).id, detail: RD.byId(RD.DETAILS, get(RDET_KEY)).id });
+  const R_PICKS = [['Look', RLOOK_KEY, 'Materials', RD.LOOKS], ['Time', RTIME_KEY, 'Light', RD.TIMES], ['Sur', RSUR_KEY, 'Surroundings', RD.SURROUNDS], ['Res', RRES_KEY, 'Resolution', RD.RESOLUTIONS], ['Det', RDET_KEY, 'Detail', RD.DETAILS]];
+  // what a rendering's record keeps about how it was made (beside its id, view, plan signature and maker)
+  const rMade = (o, d) => ({ look: o.look, time: o.time, surround: o.surround, res: o.res, detail: o.detail, at: new Date().toISOString(), model: d.model || '', size: d.size || '' });
+  const rTakes = o => o.res === '4k' ? 'two to four minutes' : o.res === '2k' || o.detail === 'high' ? 'a minute or two' : 'about a minute';
+  // a rendering's settings in words, for the viewer
+  const rHow = r => [RD.byId(RD.LOOKS, r.look).label, RD.byId(RD.TIMES, r.time).label, r.surround ? RD.byId(RD.SURROUNDS, r.surround).label : '', r.size ? r.size.replace('x', ' × ') : '', r.detail ? RD.byId(RD.DETAILS, r.detail).label + ' detail' : ''].filter(Boolean).join(' · ');
+  // the engines (GPT Image models) this site's OpenAI key offers (api/models, read once a visit) and the one picked
+  let engP = null, eng = null;
+  const loadEngines = () => engP ||= fetch('api/models').then(r => r.ok ? r.json() : null).then(d => { eng = { list: (d?.image || []).map(m => m.id), def: d?.defaults?.render || '' }; }).catch(() => { eng = { list: [], def: '' }; engP = null; });
+  const enginePick = () => { try { return readPick('render', localStorage.getItem(aiPickKey('render'))).model; } catch (e) { return ''; } };
+  const engineOptions = () => { const cur = enginePick(), L = eng?.list || [], ids = cur && !L.includes(cur) ? [cur, ...L] : L;
+    return '<option value="">' + esc('Default' + (eng?.def ? ' (' + eng.def + ')' : '')) + '</option>' + ids.map(id => '<option value="' + esc(id) + '"' + (id === cur ? ' selected' : '') + '>' + esc(id) + '</option>').join(''); };
+  const fillEngines = () => loadEngines().then(() => document.querySelectorAll('select[data-rengine]').forEach(x => { x.innerHTML = engineOptions(); }));
+  const ENGINE_TIP = 'The OpenAI image model that paints the picture: the ones this site’s key offers. 2K and 4K need GPT Image 2 or newer; an older engine sends 1536 × 1024. Settings › AI model › Renderings shows the same pick.';
+  // the pickers, each in the form's own field markup (field(id, label, control)); ids are prefix + Look, Time, Sur, Res, Det, Eng
+  function rPickHtml(prefix, field) {
+    const pr = rPrefs(), opt = (list, v) => list.map(x => '<option value="' + esc(x.id) + '"' + (x.id === v ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
+    const val = { Look: pr.look, Time: pr.time, Sur: pr.surround, Res: pr.res, Det: pr.detail };
+    return R_PICKS.map(([k, , label, list]) => field(prefix + k, label, '<select id="' + prefix + k + '">' + opt(list, val[k]) + '</select>')).join('') +
+      field(prefix + 'Eng', 'Engine', '<select id="' + prefix + 'Eng" data-rengine title="' + esc(ENGINE_TIP) + '">' + engineOptions() + '</select>');
+  }
+  function wirePicks(prefix, scope, onChange = () => {}) {
+    const keep = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+    for (const [k, key] of R_PICKS) { const el = scope.querySelector('#' + prefix + k); if (el) el.onchange = () => { keep(key, el.value); onChange(k); }; }
+    const en = scope.querySelector('#' + prefix + 'Eng'); if (en) en.onchange = () => keep(aiPickKey('render'), JSON.stringify({ provider: 'openai', model: en.value || '' }));
+    fillEngines();
+  }
+  // ----- the massing preview: every view's picture as the AI would get it, free (no AI), to pick a view by -----
+  // Kept for the visit per option, plan state, surroundings and close-up building; taken one view after another, small
+  // (800 x 450), shown as they come. Clicking one picks that view; its corner button shows it large.
+  const mprev = new Map();
+  const mpKey = (pl, sur, Tg) => pl.id + '|' + planSig(pl) + '|' + sur + '|' + (Tg?.id || '');
+  const mpViews = Tg => RD.PREVIEW_VIEWS.concat(Tg ? ['hero'] : []);
+  function mpGrid(pl, sur, Tg, cur) {
+    const st = mprev.get(mpKey(pl, sur, Tg)); if (!st) return '';
+    return mpViews(Tg).map(v => { const u = st.shots[v], lab = RD.renderLabel(v, Tg), on = v === cur;
+      return '<div class="sp-mp' + (on ? ' on' : '') + '"><button type="button" class="sp-mpb" data-mpv="' + v + '" aria-pressed="' + on + '" title="' + esc((on ? 'The view picked: ' : 'Pick this view: ') + lab) + '">' + (u ? '<img src="' + u + '" alt="">' : '<i>' + (st.busy ? 'Taking…' : 'Not taken') + '</i>') + '<span>' + esc(lab) + '</span></button>' +
+        (u ? '<button type="button" class="sp-mpz" data-mpz="' + v + '" aria-label="' + esc('Show the ' + lab + ' massing large') + '" title="Show it large">⤢</button>' : '') + '</div>'; }).join('');
+  }
+  async function runPreview(pl, sur, Tg, refresh) {
+    const k = mpKey(pl, sur, Tg); let st = mprev.get(k); if (st?.busy) return;
+    if (!st) { mprev.set(k, st = { shots: {}, busy: false }); while (mprev.size > 6) mprev.delete(mprev.keys().next().value); }
+    st.busy = true; refresh();
+    try { for (const v of mpViews(Tg)) { if (st.shots[v]) continue; st.shots[v] = (await captureOffscreen(pl, v, v === 'hero' ? Tg : null, { surround: sur, size: { w: 800, h: 450 }, quality: 0.85 })).image; refresh(); } }
+    catch (e) { ctx.toast('The massing preview stopped: ' + e.message); }
+    finally { st.busy = false; refresh(); }
+  }
+  function openMassing(src, label) {
+    document.getElementById('spRView2')?.remove();
+    const box = document.createElement('div'); box.id = 'spRView2'; box.className = 'sp-rview'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', label + ' massing');
+    box.innerHTML = '<div class="sp-rvin"><div class="sp-rvtop"><b>' + esc(label) + '</b><span>The massing as the AI gets it (a preview, smaller than the real picture)</span><button type="button" class="sp-lb" data-x aria-label="Close">✕</button></div><div class="sp-rvimg"><img src="' + src + '" alt="' + esc(label + ' massing') + '"></div></div>';
+    document.body.appendChild(box); const close = () => { box.remove(); document.removeEventListener('keydown', key, true); };
+    const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } }; document.addEventListener('keydown', key, true);
+    box.onclick = e => { if (e.target === box) close(); }; box.querySelector('[data-x]').onclick = close; box.querySelector('[data-x]').focus({ preventScroll: true });
+  }
+  // the grid's clicks: pick (onPick(view)) or show large
+  function wireMpGrid(el, pl, sur, Tg, onPick) {
+    if (!el) return;
+    el.onclick = e => { const z = e.target.closest('[data-mpz]'), b = e.target.closest('[data-mpv]'), st = mprev.get(mpKey(pl, sur, Tg));
+      if (z) { const u = st?.shots[z.dataset.mpz]; if (u) openMassing(u, RD.renderLabel(z.dataset.mpz, Tg)); return; }
+      if (b) onPick(b.dataset.mpv); };
+  }
+  // a rendering that can't be shown: kept for the team but not reachable now, or made before renderings were kept for the
+  // team and only on the computer that made it (opening the project there once shares it)
+  const goneText = r => r.cloud ? 'Couldn’t load it from the team’s storage just now' : 'Only on the computer that made it' + (r.by && r.by !== get(NAME_KEY) ? ' (' + r.by + '’s)' : '') + ': open this project there once and it’s shared';
   const rWhen = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
   // the building a close-up would frame now: the one selected on the plan when it is a building, else the one nearest the street
   const heroFor = pl => RD.heroTarget(pl, ed?.sel);
@@ -4242,36 +4345,41 @@ export function initSitePlan(ctx) {
   }
   function renderHtml(p, pl) {
     const R = ed.rendering, pr = rPrefs(), list = (pl.renders || []).slice().reverse(), sig = planSig(pl), off = aiOff(), sel = (list2, v) => list2.map(x => '<option value="' + x.id + '"' + (x.id === v ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
+    const fld = (id, label, ctl) => '<label class="sp-f"><span class="sp-fl">' + esc(label) + '</span>' + ctl + '</label>', Tg = heroFor(pl), big = pr.res !== 'hd';
     return '<div class="bsec" id="spRender"><div class="lt">Renderings' + infoBtn('A photoreal picture of this option, painted by the AI from the 3D massing on the map: the buildings, drives, parking, pond and trees stay where the plan puts them, at their heights; the materials, windows, landscaping, cars, people and sky are the AI’s. It is a concept illustration, not a design, and two renderings of one plan will differ. About a minute a view. The pictures are kept on this device; teammates see that they exist, not the pictures.', 'About renderings') + '</div>' +
       '<div class="sp-rsel"><label class="sp-f"><span class="sp-fl">View</span><select id="spRView">' + viewOptions(pl, sel) + '<option value="all"' + (ed.rview === 'all' ? ' selected' : '') + ' title="The four views of the whole site, one after another (not the building close-up)">All site views</option></select></label>' +
-        '<label class="sp-f"><span class="sp-fl">Materials</span><select id="spRLook">' + sel(RD.LOOKS, pr.look) + '</select></label><label class="sp-f"><span class="sp-fl">Light</span><select id="spRTime">' + sel(RD.TIMES, pr.time) + '</select></label></div>' +
-      '<div class="sp-go2"><button type="button" class="btn askai" id="spRenderGo"' + (R || off ? ' disabled' : '') + ' title="' + (off ? 'AI isn’t set up on this site' : 'Point the map’s 3D massing at the site and have the AI paint it as a photograph (1920 × 1080)') + '">' + (R ? 'Rendering ' + (R.i + 1) + ' of ' + R.n + '…' : 'Render 3D View') + '</button>' + (R ? '<button type="button" class="btn" id="spRenderStop">Cancel</button>' : '') + '</div>' +
+        rPickHtml('spR', fld) + '</div>' +
+      '<div class="sp-go2"><button type="button" class="btn askai" id="spRenderGo"' + (R || off ? ' disabled' : '') + ' title="' + (off ? 'AI isn’t set up on this site' : 'Take the 3D massing from the view picked and have the AI paint it as a photograph (' + esc(RD.byId(RD.RESOLUTIONS, pr.res).label) + ')') + '">' + (R ? 'Rendering ' + (R.i + 1) + ' of ' + R.n + '…' : 'Render 3D View') + '</button>' + (R ? '<button type="button" class="btn" id="spRenderStop">Cancel</button>' : '') +
+        '<button type="button" class="btn" id="spMPrevGo" title="Take the massing of every view as the AI would get it, with the surroundings picked: free, no AI. Click one to pick its view.">Preview Massing</button></div>' +
+      '<div class="sp-mprev" id="spMPrev">' + mpGrid(pl, pr.surround, Tg, ed.rview || 'corner') + '</div>' +
       budgetHtml() +
-      (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : imageryBase() || rbUsed() ? '' : '<div class="sp-hint">Tip: switch the base map to <b>Satellite</b> first (Map layers) and the surroundings come out as they really are.</div>') +
+      (R ? '<div class="sp-hint sp-rbusy">' + esc(R.msg) + '</div>' : off ? '<div class="sp-hint">Renderings need the AI, which isn’t set up on this site.</div>' : big && !rbUsed() ? '<div class="sp-hint">' + (pr.res === '4k' ? '4K takes two to four minutes and costs about twice as much as HD. ' : '') + 'It needs GPT Image 2 or newer as the engine; an older one sends 1536 × 1024.</div>' : '') +
       (list.length ? '<div class="sp-rgrid">' + list.map(r => { const V = { label: RD.renderLabel(r.view, r.target) }, stale = r.sig && r.sig !== sig; return '<figure class="sp-rth' + (stale ? ' stale' : '') + '" data-rid="' + esc(r.id) + '" title="' + esc(V.label + (stale ? ' · the plan has changed since this was made' : '')) + '"><img alt="' + esc(V.label + ' rendering') + '"><figcaption>' + esc(V.label) + ' <span>' + esc(rWhen(r.at)) + (stale ? ' · plan changed since' : '') + '</span></figcaption></figure>'; }).join('') + '</div>' +
         '<div class="sp-hint">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. Click one to see it full size, compare it with the massing, download or delete it. The two newest go on the Site Plan PDF.</div>' : '') + '</div>';
   }
   function wireRender(p, pl) {
     const $ = q => card.querySelector(q), on = (q, fn) => { const el = $(q); if (el) el.onclick = fn; };
-    const keep = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
-    const vw = $('#spRView'); if (vw) vw.onchange = () => { ed.rview = vw.value; };
-    const lk = $('#spRLook'); if (lk) lk.onchange = () => keep(RLOOK_KEY, lk.value);
-    const tm = $('#spRTime'); if (tm) tm.onchange = () => keep(RTIME_KEY, tm.value);
-    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'corner', pr = rPrefs(), hero = RD.byId(RD.VIEWS, v, null)?.hero; renderViews(p, pl, v === 'all' ? RD.SITE_VIEWS : [v], pr.look, pr.time, hero ? heroFor(pl) : null); });
+    const vw = $('#spRView'), grid = () => { const el = $('#spMPrev'); if (el) el.innerHTML = mpGrid(pl, rPrefs().surround, heroFor(pl), ed.rview || 'corner'); };
+    const pick = v => { ed.rview = v; if (vw) vw.value = v; grid(); };
+    if (vw) vw.onchange = () => { ed.rview = vw.value; grid(); };
+    wirePicks('spR', card, k => { if (k === 'Sur') { wireMpGrid($('#spMPrev'), pl, rPrefs().surround, heroFor(pl), pick); grid(); } if (k === 'Res') panel(); });
+    wireMpGrid($('#spMPrev'), pl, rPrefs().surround, heroFor(pl), pick);
+    on('#spMPrevGo', () => { const sur = rPrefs().surround, Tg = heroFor(pl); wireMpGrid($('#spMPrev'), pl, sur, Tg, pick); runPreview(pl, sur, Tg, grid); });
+    on('#spRenderGo', () => { const v = $('#spRView')?.value || 'corner', pr = rPrefs(), hero = RD.byId(RD.VIEWS, v, null)?.hero; renderViews(p, pl, v === 'all' ? RD.SITE_VIEWS : [v], pr, hero ? heroFor(pl) : null); });
     on('#spRenderStop', () => { ed.rendering?.abort.abort(); });
-    loadBudget();
+    loadBudget(); shareLocal(p);
     card.querySelectorAll('.sp-rth').forEach(f => { const r = (pl.renders || []).find(x => x.id === f.dataset.rid); if (!r) return;
-      renderSrc(r.id).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { const g = document.createElement('span'); g.className = 'sp-rgone'; g.textContent = 'Not on this device' + (r.by ? ' (made by ' + r.by + ')' : ''); img.replaceWith(g); f.classList.add('gone'); } }); // a teammate's: a plain placeholder, not a broken picture
+      rsrc(p, r).then(u => { const img = f.querySelector('img'); if (u && img) img.src = u; else if (img) { const g = document.createElement('span'); g.className = 'sp-rgone'; g.textContent = goneText(r); img.replaceWith(g); f.classList.add('gone'); } }); // not kept for the team and not here: a plain placeholder, not a broken picture
       f.onclick = () => openRender(p, pl, r); });
   }
   // the picture full size, with the massing it was made from a click away, Download and Delete
   // (from the plan's Render section or the project page's Renderings tab; from: the thumbnail, which gets the focus back)
   async function openRender(p, pl, r, from) {
-    const V = { label: RD.renderLabel(r.view, r.target) }, src = await renderSrc(r.id), msrc = await renderSrc(r.id + ':m');
-    if (!src) { ctx.toast('That picture isn’t on this device (renderings stay where they were made).'); return; }
+    const V = { label: RD.renderLabel(r.view, r.target) }, src = await rsrc(p, r), msrc = await rsrc(p, r, true);
+    if (!src) { ctx.toast(goneText(r) + '.'); return; }
     document.getElementById('spRView2')?.remove();
     const box = document.createElement('div'); box.id = 'spRView2'; box.className = 'sp-rview'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', V.label + ' rendering');
-    box.innerHTML = '<div class="sp-rvin"><div class="sp-rvtop"><b>' + esc(pl.name) + ' · ' + esc(V.label) + '</b><span>' + esc(RD.byId(RD.LOOKS, r.look).label) + ' · ' + esc(RD.byId(RD.TIMES, r.time).label) + (r.model ? ' · ' + esc(r.model) : '') + ' · ' + esc(rWhen(r.at)) + (r.sig && r.sig !== planSig(pl) ? ' · <em class="sp-rvold">plan changed since this was made</em>' : '') + '</span><button type="button" class="sp-lb" data-x aria-label="Close">✕</button></div>' +
+    box.innerHTML = '<div class="sp-rvin"><div class="sp-rvtop"><b>' + esc(pl.name) + ' · ' + esc(V.label) + '</b><span>' + esc(rHow(r)) + (r.model ? ' · ' + esc(r.model) : '') + ' · ' + esc(rWhen(r.at)) + (r.sig && r.sig !== planSig(pl) ? ' · <em class="sp-rvold">plan changed since this was made</em>' : '') + '</span><button type="button" class="sp-lb" data-x aria-label="Close">✕</button></div>' +
       '<div class="sp-rvimg"><img src="' + src + '" alt="' + esc(V.label + ' rendering') + '"></div>' +
       '<div class="sp-rvbar"><span class="sp-hint">AI concept illustration, not a design.</span><span class="sp-rvbtns">' + (msrc ? '<button type="button" class="btn sm" data-cmp aria-pressed="false">Show the massing</button>' : '') + '<button type="button" class="btn sm" data-dl>Download</button><button type="button" class="btn sm ghost" data-del>Delete</button></span></div></div>';
     document.body.appendChild(box); box.querySelector('[data-x]').focus({ preventScroll: true }); // the keyboard lands in the viewer
@@ -4281,7 +4389,7 @@ export function initSitePlan(ctx) {
     box.onclick = e => { if (e.target === box) close(); };
     box.querySelector('[data-x]').onclick = close;
     const cmp = box.querySelector('[data-cmp]'); if (cmp) cmp.onclick = () => { const onM = cmp.getAttribute('aria-pressed') !== 'true'; cmp.setAttribute('aria-pressed', String(onM)); img.src = onM ? msrc : src; cmp.textContent = onM ? 'Show the rendering' : 'Show the massing'; };
-    box.querySelector('[data-dl]').onclick = async () => { const b = await rget(r.id); if (b instanceof Blob) ctx.saveFile(fileName(p, pl) + '-' + r.view + '-rendering.jpg', b, 'image/jpeg'); };
+    box.querySelector('[data-dl]').onclick = async () => { const b = await rblob(r.id, r.cloud ? p.id : null); if (b instanceof Blob) ctx.saveFile(fileName(p, pl) + '-' + r.view + '-rendering.jpg', b, 'image/jpeg'); };
     box.querySelector('[data-del]').onclick = () => { if (!confirm('Delete this rendering?')) return; deleteRenders(p.id, pl.id, [r.id]); close(); };
   }
   // renderings off an option (ids; all of them with none), from the plan's Render section, the viewer and the project
@@ -4290,7 +4398,7 @@ export function initSitePlan(ctx) {
   function deleteRenders(pid, plid, ids = null) {
     const P1 = db.projects.find(x => x.id === pid), pl = P1?.plans.find(x => x.id === plid) || (ed?.draftPlan?.id === plid ? ed.draftPlan : null); if (!pl) return 0;
     const keys = PJ.removeRenders(pl, ids); if (!keys.length) return 0;
-    dropImages(keys); for (const k of keys) { const u = rurl.get(k); if (u) { URL.revokeObjectURL(u); rurl.delete(k); } }
+    dropImages(keys, pid); for (const k of keys) { const u = rurl.get(k); if (u) { URL.revokeObjectURL(u); rurl.delete(k); } }
     if (P1) save(P1); if (ed) panel(); return keys.length / 2;
   }
   // Delete all on the Renderings tab (the project's, or one option's): one question naming how many, then gone
@@ -4305,7 +4413,7 @@ export function initSitePlan(ctx) {
   async function rendersForSheet(pl, max = 2) {
     const sig = planSig(pl), out = [];
     const small = async b => { try { const bmp = await createImageBitmap(b), k = Math.min(1, 1600 / bmp.width), c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85); } catch (e) { return blobToData(b); } };
-    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= max || (r.sig && r.sig !== sig)) continue; const b = await rget(r.id); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.renderLabel(r.view, r.target) + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
+    for (const r of (pl.renders || []).slice().reverse()) { if (out.length >= max || (r.sig && r.sig !== sig)) continue; const b = await rblob(r.id, r.cloud ? pidOf(pl) : null); if (b instanceof Blob) out.push({ src: await small(b), caption: RD.renderLabel(r.view, r.target) + ' · ' + RD.byId(RD.LOOKS, r.look).label + ' · ' + RD.byId(RD.TIMES, r.time).label }); }
     return out;
   }
   function geojson(p, pl) {
@@ -4566,11 +4674,12 @@ export function initSitePlan(ctx) {
     return '<section class="pj-box ps-form" aria-labelledby="rsH"><h3 class="pj-h3" id="rsH">Make renderings</h3>' +
       '<div class="ps-row2 rs-grid"><div class="ps-row"><label for="rsOpt">Option</label><select id="rsOpt">' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
         '<div class="ps-row"><label for="rsView">View</label><select id="rsView">' + opt(views, views.some(x => x.id === v) ? v : 'corner') + '</select></div>' +
-        '<div class="ps-row"><label for="rsLook">Materials</label><select id="rsLook">' + opt(RD.LOOKS, pr.look) + '</select></div>' +
-        '<div class="ps-row"><label for="rsTime">Light</label><select id="rsTime">' + opt(RD.TIMES, pr.time) + '</select></div></div>' +
-      '<p class="rnote">' + (off ? 'Renderings need the AI, which isn’t set up on this site.' : 'The picture is taken from the option’s 3D view behind the scenes and the AI paints it, about a minute a picture. You can stay here or use the rest of the app meanwhile.') + (budgetLine() ? ' ' + esc(budgetLine()) : '') + '</p>' +
+        rPickHtml('rs', (id, label, ctl) => '<div class="ps-row"><label for="' + id + '">' + esc(label) + '</label>' + ctl + '</div>') + '</div>' +
+      '<p class="rnote">' + (off ? 'Renderings need the AI, which isn’t set up on this site.' : 'The picture is taken from the option’s 3D view behind the scenes and the AI paints it, ' + rTakes(pr) + ' a picture. You can stay here or use the rest of the app meanwhile. Preview Massing shows every view as the AI would get it, free; click one to pick it.' + (pr.res !== 'hd' ? ' ' + (pr.res === '4k' ? '4K costs about twice as much as HD and ' : '') + 'needs GPT Image 2 or newer as the engine (an older one sends 1536 × 1024).' : '')) + (budgetLine() ? ' ' + esc(budgetLine()) : '') + '</p>' +
       (bg ? '<p class="rnote loading" role="status">Rendering ' + (bg.i + 1) + ' of ' + bg.n + ' · ' + esc(bg.msg) + '</p>' : '') +
-      '<div class="btnrow">' + (bg ? '<button type="button" class="btn" id="rsStop">Cancel</button>' : '<button type="button" class="btn primary" id="rsGo"' + (off || busy || rbUsed() ? ' disabled' : '') + '>' + (busy ? 'Rendering…' : 'Render') + '</button>') + '</div></section>';
+      '<div class="btnrow">' + (bg ? '<button type="button" class="btn" id="rsStop">Cancel</button>' : '<button type="button" class="btn primary" id="rsGo"' + (off || busy || rbUsed() ? ' disabled' : '') + '>' + (busy ? 'Rendering…' : 'Render') + '</button>') +
+        '<button type="button" class="btn" id="rsMPrevGo" title="Take the massing of every view as the AI would get it, with the surroundings picked: free, no AI">Preview Massing</button></div>' +
+      '<div class="sp-mprev pj-mprev" id="rsMPrev">' + mpGrid(pl, pr.surround, T, v) + '</div></section>';
   }
   function rendersHtml(p) {
     const ready = p.plans.filter(laidOut), groups = p.plans.filter(pl => pl.renders?.length || laidOut(pl));
@@ -4590,19 +4699,24 @@ export function initSitePlan(ctx) {
       '<div class="pj-foot"><span class="btnrow"><button type="button" class="btn ghost pj-pdel" data-rdelall="*">Delete All Renderings</button></span></div>';
   }
   function wireRenders(p) {
-    const $ = q => root.querySelector(q), f = rsForm.get(p.id) || {}; rsForm.set(p.id, f);
+    const $ = q => root.querySelector(q), f = rsForm.get(p.id) || {}; rsForm.set(p.id, f); shareLocal(p);
     $('#rsOpt')?.addEventListener('change', e => { f.plid = e.target.value; render(true); });
     $('#rsView')?.addEventListener('change', e => { f.view = e.target.value; });
-    $('#rsLook')?.addEventListener('change', e => { try { localStorage.setItem(RLOOK_KEY, e.target.value); } catch (er) {} });
-    $('#rsTime')?.addEventListener('change', e => { try { localStorage.setItem(RTIME_KEY, e.target.value); } catch (er) {} });
-    $('#rsGo')?.addEventListener('click', () => { const pr = rPrefs(), pl = p.plans.find(x => x.id === $('#rsOpt').value), v = $('#rsView').value || 'corner'; if (!pl) return;
-      const hero = RD.byId(RD.VIEWS, v, null)?.hero; renderInBackground(p, pl, v === 'all' ? RD.SITE_VIEWS : [v], pr.look, pr.time, hero ? RD.heroTarget(pl) : null); });
+    const curPl = () => p.plans.find(x => x.id === $('#rsOpt')?.value), grid = () => { const pl = curPl(), el = $('#rsMPrev'); if (pl && el) el.innerHTML = mpGrid(pl, rPrefs().surround, RD.heroTarget(pl), f.view || 'corner'); };
+    const pick = v => { f.view = v; const s2 = $('#rsView'); if (s2 && [...s2.options].some(o => o.value === v)) s2.value = v; grid(); };
+    const wireGrid = () => { const pl = curPl(); if (pl) wireMpGrid($('#rsMPrev'), pl, rPrefs().surround, RD.heroTarget(pl), pick); };
+    $('#rsView')?.addEventListener('change', grid);
+    wirePicks('rs', root, k => { if (k === 'Sur') { wireGrid(); grid(); } if (k === 'Res' || k === 'Det') render(true); });
+    wireGrid();
+    $('#rsMPrevGo')?.addEventListener('click', () => { const pl = curPl(); if (!pl) return; wireGrid(); runPreview(pl, rPrefs().surround, RD.heroTarget(pl), grid); });
+    $('#rsGo')?.addEventListener('click', () => { const pr = rPrefs(), pl = curPl(), v = $('#rsView').value || 'corner'; if (!pl) return;
+      const hero = RD.byId(RD.VIEWS, v, null)?.hero; renderInBackground(p, pl, v === 'all' ? RD.SITE_VIEWS : [v], pr, hero ? RD.heroTarget(pl) : null); });
     $('#rsStop')?.addEventListener('click', () => bgRender.get(p.id)?.abort.abort());
     root.querySelectorAll('.pj-rth').forEach(f => { const pl = p.plans.find(x => x.id === f.dataset.pl), r = pl?.renders?.find(x => x.id === f.dataset.rid); if (!r) return;
-      renderSrc(r.id).then(u => { if (!f.isConnected) return; const img = f.querySelector('img'), ph = f.querySelector('.pj-rimg i');
+      rsrc(p, r).then(u => { if (!f.isConnected) return; const img = f.querySelector('img'), ph = f.querySelector('.pj-rimg i');
         if (u) { img.src = u; img.alt = rLabel(r) + ' rendering'; img.hidden = false; ph?.remove(); }
-        else { f.classList.add('gone'); ph.textContent = 'Not on this device' + (r.by && r.by !== get(NAME_KEY) ? ': ' + r.by + ' made it on theirs' : ': it was made on another one'); f.setAttribute('aria-disabled', 'true'); } });
-      const go = () => { if (f.classList.contains('gone')) { ctx.toast('That picture isn’t on this device: renderings stay on the device they were made on.'); return; } openRender(p, pl, r, f); };
+        else { f.classList.add('gone'); ph.textContent = goneText(r); f.setAttribute('aria-disabled', 'true'); } });
+      const go = () => { if (f.classList.contains('gone')) { ctx.toast(goneText(r) + '.'); return; } openRender(p, pl, r, f); };
       f.onclick = go; f.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
   }
   // Render more: the option opens on the map with its panel at the Render section (the panel's section chip, as a click)
@@ -4724,10 +4838,11 @@ export function initSitePlan(ctx) {
     wireJob(p); if (jobs.get(p.id)?.running) tickJob(p);
     const find = v => { const [a, b] = v.split('|'), q = p.plans.find(x => x.id === a); return { q, x: q?.sets?.find(y => y.id === b) }; };
     root.querySelectorAll('[data-psget]').forEach(b => b.onclick = async () => { const { q, x } = find(b.dataset.psget); if (!x) return;
-      const blob = await rget('set:' + x.id); if (!(blob instanceof Blob)) { ctx.toast('That set’s PDF isn’t on this device: sets stay on the device they were made on' + (x.by ? ' (' + x.by + ' made it)' : '') + '. Make it again here.'); return; }
+      let blob = await rget('set:' + x.id); if (!(blob instanceof Blob) && x.cloud) { blob = await cloudGet(p.id, 'set', x.id).catch(() => null); if (blob) rput('set:' + x.id, blob).catch(() => {}); }
+      if (!(blob instanceof Blob)) { ctx.toast(x.cloud ? 'That set’s PDF couldn’t be loaded from the team’s storage just now. Try again in a moment.' : 'That set’s PDF is only on the computer that made it' + (x.by ? ' (' + x.by + '’s)' : '') + ': open this project there once and it’s shared, or make it again here.'); return; }
       ctx.saveFile(fileName(p, q) + '-plan-set-issue-' + x.no + '.pdf', blob, 'application/pdf'); });
     root.querySelectorAll('[data-psdel]').forEach(b => b.onclick = () => { const { q, x } = find(b.dataset.psdel); if (!x || !confirm('Delete issue ' + x.no + ' of ' + q.name + '’s plan set?')) return;
-      q.sets = q.sets.filter(y => y.id !== x.id); rdel('set:' + x.id); save(p); });
+      q.sets = q.sets.filter(y => y.id !== x.id); rdel('set:' + x.id); if (x.cloud) cloudDel(p.id, ['set/' + RF.mediaKey(x.id)]); save(p); });
   }
   window.addEventListener('beforeunload', e => { if ([...jobs.values()].some(j => j.running)) { e.preventDefault(); e.returnValue = ''; } }); // a set is being made: the browser asks first (Resume picks it up anyway)
 
@@ -4830,9 +4945,10 @@ export function initSitePlan(ctx) {
         made.push(sh.number); }
       out.setTitle(P1().name + ' — ' + pl.name + ' — Schematic design set, issue ' + j.no); out.setCreator('Finishes Solutions'); out.setProducer('Finishes Solutions plan sets');
       const blob = new Blob([await out.save()], { type: 'application/pdf' }), id = uid(); await rput('set:' + id, blob); m.ms = Date.now() - t0; m.status = 'done';
+      const cloud = await cloudPut(p.id, 'set', id, blob).then(() => true).catch(e => { console.warn('plan set not kept for the team:', e.message); return false; }); // so it opens on any computer
       const q = P1().plans.find(x => x.id === pl.id) || pl, mins = Math.round(((j.elapsed || 0) + Date.now() - j.resumedAt) / 60000);
-      q.sets = (q.sets || []).concat([{ id, no: j.no, at: j.at, by: j.madeBy, sheets: made, sections: j.sections, model: j.model, noNotes: !j.text || undefined, sig: j.sig, desc: j.revisions[j.revisions.length - 1].desc, mins, designs: { ...j.designBy } }]);
-      while (q.sets.length > 12) rdel('set:' + q.sets.shift().id);
+      q.sets = (q.sets || []).concat([{ id, ...(cloud ? { cloud } : {}), no: j.no, at: j.at, by: j.madeBy, sheets: made, sections: j.sections, model: j.model, noNotes: !j.text || undefined, sig: j.sig, desc: j.revisions[j.revisions.length - 1].desc, mins, designs: { ...j.designBy } }]);
+      while (q.sets.length > 12) { const old = q.sets.shift(); rdel('set:' + old.id); if (old.cloud) cloudDel(p.id, ['set/' + RF.mediaKey(old.id)]); }
       for (const sh of j.sheets) rdel('jp:' + j.id + ':' + sh.number); rdel('job:' + p.id);
       j.running = false; j.state = 'done'; j.elapsed = (j.elapsed || 0) + Date.now() - j.resumedAt; save(P1());
       const failed = j.steps.filter(x => x.status === 'failed').length;

@@ -417,6 +417,11 @@ export default async function handler(req, res) {
   if (b.mode === 'names') return names(b, key, res);
   if (b.mode === 'rules') return rules(b, key, res);
   if (b.mode === 'streetNames') return streetNames(b, key, res);
+  return program(b, key, res);
+}
+
+// the request (and what's known about the site) turned into a development program
+async function program(b, key, res) {
   const prompt = clip(b.prompt, 1200).trim(); if (!prompt) return res.status(400).json({ error: 'Say what to build, e.g. "25,000 sf retail strip".' });
   try {
     const t0 = Date.now(), r = await ai(key, b, res, m => withRoom(o => chatJSON({ key, model: m, feature: 'siteplan', system: guardSys(b, SYSTEM), user: siteText(b.site, prompt, b.program, b.facts, strategyIn(b.strategy), teamTypesForAI(b.teamTypes)) + refBlock(b.refs), name: 'site_program', schema: SCHEMA, ...o }), { maxTokens: 16000, effort: effortIn(b.effort, 'high'), t0 })); // it may think for a while: a better program is worth the wait (the layout itself runs in the browser)
@@ -427,6 +432,19 @@ export default async function handler(req, res) {
     console.error('siteplan', e.message);
     return res.status(502).json({ error: 'The AI didn’t answer just now. Try again, or build without AI.' });
   }
+}
+
+// The same modes in-process, for the MCP server's site_plan tool (lib/mcp/siteplan.mjs): no same-origin or per-browser
+// rate check (the MCP endpoint has its own), the answer captured instead of sent -> { status, body, model }
+const MODES = { review, bestuse: bestUse, strategy, program: (b, key, res) => program(b, key, res) };
+export async function siteAI(b) {
+  const out = { status: 200, body: null, model: null }, hdr = {};
+  const res = { statusCode: 200, setHeader(k, v) { hdr[k] = v; }, getHeader: k => hdr[k], status(c) { this.statusCode = c; return this; }, json(d) { out.status = this.statusCode; out.body = d; return this; } };
+  const key = needKey(res); if (!key) return { ...out, status: res.statusCode, body: out.body };
+  if (G.fromAI(b.guardrails) && b.mode !== 'bestuse') { const json = res.json.bind(res); res.json = d => json(res.statusCode >= 400 ? d : guardOut(d)); }
+  const run = MODES[b.mode || 'program']; if (!run) return { status: 400, body: { error: 'Unknown mode.' }, model: null };
+  await run(b, key, res);
+  return { ...out, model: hdr['X-AI-Model'] || null };
 }
 
 // the engine's options, judged on their drawings and numbers; a revised program when one would clearly do better
