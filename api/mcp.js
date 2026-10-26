@@ -1,6 +1,7 @@
 // MCP server for the project app's agents (AMP): POST /api/mcp, Streamable HTTP, stateless (a new server and transport per
-// request, JSON responses). Read-only tools over this app's data (lib/mcp/server.mjs); the logic is the same functions the
-// website's endpoints call, never this app's own HTTP endpoints.
+// request, JSON responses). Tools over this app's data and the team's projects (lib/mcp/server.mjs); the logic is the same
+// functions the website's endpoints call, never this app's own HTTP endpoints. The tools that change projects are on only
+// when MCP_ACCESS_TOKEN is set (and MCP_WRITES isn't 'off').
 // Auth is optional: with MCP_ACCESS_TOKEN set, every request needs "Authorization: Bearer <token>" (401 otherwise); unset,
 // the endpoint is open. Rate limits per caller (lib guard): requests overall, and a tighter one for report tools.
 import crypto from 'node:crypto';
@@ -9,7 +10,7 @@ import { createServer } from '../lib/mcp/server.mjs';
 import { allow, clientIp } from './_lib/guard.mjs';
 
 // all of AMP's calls come from its own servers (one caller as far as this is concerned), so these are generous; per instance
-export const LIMITS = { request: { perMinute: 240, perDay: 10000 }, data: { perMinute: 120, perDay: 6000 }, report: { perMinute: 10, perDay: 300 } };
+export const LIMITS = { request: { perMinute: 240, perDay: 10000 }, data: { perMinute: 120, perDay: 6000 }, report: { perMinute: 10, perDay: 300 }, write: { perMinute: 20, perDay: 600 } };
 const rpcError = (res, status, code, message) => { res.statusCode = status; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ jsonrpc: '2.0', error: { code, message }, id: null })); };
 
 // constant-time compare of the bearer token (hashing first makes the lengths equal)
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
   const ip = clientIp(req);
   if (!allow('mcp:' + ip, LIMITS.request)) { res.setHeader('Retry-After', '60'); return rpcError(res, 429, -32000, 'Too many requests. Try again in a minute.'); }
   const body = typeof req.body === 'string' ? (() => { try { return JSON.parse(req.body); } catch (e) { return undefined; } })() : req.body;
-  const server = createServer({ limit: t => allow('mcp-' + (t.report ? 'report' : 'data') + ':' + ip, t.report ? LIMITS.report : LIMITS.data) });
+  const server = createServer({ limit: t => { const k = t.report ? 'report' : t.write ? 'write' : 'data'; return allow('mcp-' + k + ':' + ip, LIMITS[k]); } });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => { transport.close().catch(() => {}); server.close().catch(() => {}); });
   try {

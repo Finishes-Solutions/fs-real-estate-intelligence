@@ -51,6 +51,16 @@ Branch: `experimental` (never main or staging). Read `CLAUDE.md` first (hard rul
   - Parcel intake dropped the address and ZIP.
   - Three tests failed on macOS (timing, `date -d`, Chrome path).
 
+## After the phases: MCP server for agents (2026-10-25)
+
+- `origin/main` merged into `experimental` (it brought the `site_plan` MCP tool, rendering controls and team media storage).
+- New project tools in `lib/mcp/projects.mjs`, registered in `lib/mcp/server.mjs` (server version 1.1.0):
+  - always on: `list_projects`, `get_project`, `feasibility_study` (sections, what-ifs), `feasibility_report` (the report set as attachments), `project_files` (signed links);
+  - with `MCP_ACCESS_TOKEN` set: `create_project`, `update_project`, `set_assumptions`, `edit_budget`, `save_scenario`, `site_plan` with `project_id`, and `feasibility_report` with `save: true`.
+- Tested in `test/mcp-projects.mjs` (in `npm test`): in-memory database, frozen market, no network; with Chromium it prints and stores the real report set.
+- Decisions: DECISIONS.md, "MCP: projects and the feasibility study for agents". How it works: README, "MCP server for the project app".
+- To turn on agent changes in production: set `MCP_ACCESS_TOKEN` on Vercel (and give AMP the same token). Without it the server stays read-only.
+
 ## Verification (Phase 5)
 
 | Check | Command | Result |
@@ -103,7 +113,8 @@ infra grep: 126 patterns from docs/AUDIT.md, 0 matches (excluding docs/AUDIT.md,
    - `REPORT_SETS_BUCKET` if the bucket gets another name;
    - `FEASIBILITY_NARRATIVE=on` (uses the existing `ANTHROPIC_API_KEY`) for the AI commentary paragraph.
 3. **CI (recommended, not created):** a GitHub Actions job running `npm ci && npm run check` on pushes to `experimental`. The existing workflows are all data jobs and never run tests.
-4. Nothing on any source repo's infrastructure is needed, and none was touched.
+4. **MCP project changes (optional):** set `MCP_ACCESS_TOKEN` on Vercel and give AMP the same token. The project tools that change things stay off until then. Optional: `MCP_WRITES=off` to keep it read-only with a token; `APP_URL` if the website moves.
+5. Nothing on any source repo's infrastructure is needed, and none was touched.
 
 ## Owner actions found during the audit (outside this repo)
 
@@ -155,4 +166,5 @@ Every screen and report carries the scope statement, and the Fact & Assumption R
 5. Fix the street-network block-length breach after edits (`lib/streetnet.mjs`) and make the UI's network search use `netEvals` too.
 6. Proper sign-in (Supabase Auth) instead of the shared team passcode, before the report sets hold anything sensitive.
 7. **Re-check the budgeting suite for new work.** On 2026-10-24, 18:47–19:18 CT, a separate effort (not this integration, which only read the source repos through `git archive`) committed a local branch `upgrade/budgeting-v2` in fs-budgeting-suite: an estimate workflow, a budget engine v2 and code-review fixes. The port here is from `origin/feature` @ 4187c8c. Diff that branch once it's pushed, and port any engine changes into `lib/feasibility/rollup.mjs` / `csi.mjs` with their tests.
-8. Optionally tag report PDFs (an accessible PDF) once the response limit allows: stream from Storage instead of the function's body.
+8. MCP: decide whether agents should make renderings (they spend the image budget) and, after step 4, full plan sets. Both are on the website only for now.
+9. Optionally tag report PDFs (an accessible PDF) once the response limit allows: stream from Storage instead of the function's body.

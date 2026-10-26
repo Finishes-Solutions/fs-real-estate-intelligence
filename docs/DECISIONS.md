@@ -96,3 +96,17 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 - `test/streetnet.mjs`:
   - The edit checks run on a network laid out with `netEvals: 10`, so it is the same network on any machine.
   - Exactly one known engine breach is allowed: a ~1,466 ft block on the loop road after Change With AI. It is logged as a known issue in PROGRESS.md.
+
+## MCP: projects and the feasibility study for agents (2026-10-25)
+
+- Merged `origin/main` into `experimental` first (main had the `site_plan` MCP tool and team media storage that the project tools build on). The one code conflict, `api/sitefiles.js`, now uses the shared Storage helper for main's media store too.
+- New tools sit in `lib/mcp/projects.mjs`, over the same `site_projects` documents the website syncs, so there is no second store and nothing to reconcile.
+- The tools that change projects are listed and run only when `MCP_ACCESS_TOKEN` is set (with `MCP_WRITES=off` as an extra switch). An open endpoint stays read-only, because anyone who could reach it could otherwise change the team's projects.
+- No delete tool: a project is retired with status `dead`, and scenarios can be removed but projects, options and files can't. An agent's mistake stays recoverable.
+- Saves are conditional on `updated_at` (PostgREST `PATCH … &updated_at=eq.`), with one automatic retry on a fresh copy. This avoids silently overwriting a teammate who saved in between. The website's last-edit-wins sync is unchanged; a person and an agent editing at the same instant is a documented limit.
+- `by` is recorded as "<name> (agent)", so the website shows that an agent made the change.
+- `feasibility_study` answers can be up to 38,000 characters, instead of the server's usual 15,000, because the study's value is the detail (every assumption key and budget line_id the write tools need); AMP's cut-off is 40,000.
+- `what_if` values are checked against the assumption register and read as numbers ("$2,400" is 2400) before the study runs, so a typo can't feed text into the math.
+- `site_plan` with `project_id` reuses the existing tool (`ctx.site`, `ctx.onPlan`) rather than a second layout path, so the agent's plan is the website's Build with AI result. The ground-elevation grid is not stored on the option (it is large; the website gathers its own).
+- Renderings and full plan sets stay on the website. Renderings spend the image budget and plan sets are made in the browser (Known issues). Agents get links to the ones already made.
+
