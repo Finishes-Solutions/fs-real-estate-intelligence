@@ -3,6 +3,26 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-26
+
+### 1:51 PM CT: A full landscape section in plan sets; layout review and two layout fixes (experimental branch) (a5c6593, d479b35)
+
+- **Landscape in plan sets is now six sheets:**
+  - **L-001:** calculations (site areas, each landscape rule with what it asks for, what the plan shows and whether it meets it, the plant palette with quantities).
+  - **L-101:** planting plan.
+  - **L-102:** enlargements of the entry and the amenity, on big sites.
+  - **L-201:** irrigation plan (what's sprayed, on rotors, on drip or not watered, valves, mainline, where the water comes in).
+  - **L-501 and L-502:** planting and irrigation details.
+- **The planting now meets the usual rules:**
+  - Street trees every 40 ft, a tree for every ten parking spaces, a hedge screening parking from the street, buffers on the other property lines, and a tree in every front yard.
+  - Trees go round the ponds, with a planted edge in wet ones; there are beds along the buildings, and the entry and amenity are dressed.
+  - Trees stay out of the sight triangles at drives and clear of hydrants and transformers.
+  - Before, the 27-acre test subdivision showed 5 of 31 street trees and 50 of 71 front-yard trees. Where a plan can't meet a rule, L-001 says so.
+- **Site plans:**
+  - On a flag lot the entry comes down the strip to the street instead of across the neighbour's land.
+  - On a mix with shops in front, the pond is never put between the shops and the street.
+- **A written review of the layout engine** lists what still lays out badly and the order to fix it.
+
 ## 2026-10-25
 
 ### 9:00 PM CT: Agents can work on projects (experimental branch) (dca901d, 5ff97d1, 94f6928)
