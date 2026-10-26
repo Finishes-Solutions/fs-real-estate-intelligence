@@ -7,7 +7,12 @@
 //   POST { pid, upload: { name, size } }          -> { id, path, url }  a one-time link to PUT the file to
 //   POST { pid, read: { path } }                  -> { read: { kind, title, readable, unreadable, summary }, facts: [...] }
 //   POST { pid, remove: [path] }                  -> { ok, removed }
+//   POST { pid, media: { kind, key, size } }   -> { path, url }  a one-time link to PUT a rendering, its massing or a
+//                                                plan set PDF to, so it opens on any computer (the project-media bucket)
+//   GET  ?pid=<project>&media=<kind>/<key>       -> { url }  a link to it, good for ten minutes (404: none kept)
+//   POST { pid, unmedia: ['<kind>/<key>', …] }    -> { ok, removed }
 // Paths are projects/<pid>/<file id>__<safe name>; a path for another project, or any other shape, is refused.
+// Media paths are <pid>/<kind>/<key>.<ext> in their own bucket, so they never show in the reference files list.
 // Not set up (no secret key, or no bucket yet): 503 with setup ('key' | 'bucket') and the browser says so.
 // Uses the same optional team passcode as the notes and projects (FIELD_ACCESS_CODE, header x-field-code).
 import { rateLimit, sameOrigin, clip } from './_lib/guard.mjs';
@@ -20,6 +25,8 @@ import { storage as shared, noBucket } from './_lib/storage.mjs';
 const B = RF.BUCKET, MAX_FILES = 50, PID = /^[\w-]{3,60}$/;
 // (the storage calls: api/_lib/storage.mjs, on this bucket)
 export const storage = db => { const st = shared(db, B); return { ...st, list: pid => st.list('projects/' + pid + '/') }; };
+// renderings, their massing pictures and plan set PDFs, kept for the team (lib/sitefiles.mjs MEDIA)
+export const mediaStore = db => shared(db, RF.MEDIA_BUCKET);
 const newId = () => (Date.now().toString(36) + Math.random().toString(36).slice(2, 10)).slice(0, 20);
 
 // ---------- the AI reads one file ----------
@@ -50,6 +57,11 @@ export default async function handler(req, res) {
   const st = storage(db), b = req.method === 'POST' ? (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})) : {};
   const pid = String((req.method === 'GET' ? req.query?.pid : b.pid) || ''); if (!PID.test(pid)) return res.status(400).json({ error: 'Which project? (pid)' });
   try {
+    if (req.method === 'GET' && req.query?.media) {
+      const path = RF.mediaPath(pid, req.query.media); if (!path) return res.status(400).json({ error: 'bad media' });
+      try { const s = await mediaStore(db).signGet(path); return res.json({ url: db.url + '/storage/v1' + (s.signedURL || s.signedUrl) }); }
+      catch (e) { if (/ 40[04] /.test(e.message) && !noBucket(e)) return res.status(404).json({ error: 'Not kept for the team.' }); throw e; }
+    }
     if (req.method === 'GET' && req.query?.open) {
       const path = String(req.query.open); if (!RF.parsePath(path, pid)) return res.status(400).json({ error: 'bad path' });
       const s = await st.signGet(path); return res.json({ url: db.url + '/storage/v1' + (s.signedURL || s.signedUrl) });
@@ -66,6 +78,17 @@ export default async function handler(req, res) {
       if ((await st.list(pid) || []).filter(r => r.id).length >= MAX_FILES) return res.status(400).json({ error: 'A project can hold up to ' + MAX_FILES + ' reference files: delete one first.' });
       const id = newId(), path = RF.pathFor(pid, id, name), s = await st.signUpload(path);
       return res.json({ id, path, name: RF.parsePath(path).name, type: t.mime, url: db.url + '/storage/v1' + s.url });
+    }
+    if (b.media) {
+      const path = RF.mediaPath(pid, String(b.media.kind || '') + '/' + String(b.media.key || '')), size = +b.media.size;
+      if (!path) return res.status(400).json({ error: 'bad media' });
+      if (!(size > 0) || size > RF.MEDIA_MAX) return res.status(413).json({ error: 'Too big to keep for the team (over ' + Math.round(RF.MEDIA_MAX / 2 ** 20) + ' MB).' });
+      const s = await mediaStore(db).signUpload(path); return res.json({ path, url: db.url + '/storage/v1' + s.url });
+    }
+    if (b.unmedia) {
+      const paths = (Array.isArray(b.unmedia) ? b.unmedia : [b.unmedia]).map(m => RF.mediaPath(pid, m)).filter(Boolean).slice(0, 100);
+      if (paths.length) await mediaStore(db).remove(paths);
+      return res.json({ ok: true, removed: paths.length });
     }
     if (b.read) {
       const path = String(b.read.path || ''), pp = RF.parsePath(path, pid); if (!pp) return res.status(400).json({ error: 'bad path' });
