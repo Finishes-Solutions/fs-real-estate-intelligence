@@ -125,6 +125,12 @@ PR.hooks.sitePlan = async (args, ctx) => { gotSite = ctx.site; const line = awai
 t = ok(await call('site_plan', { project_id: sample.id, request: '300 apartments, 3 stories', effort: 'low' }), 'site plan into the project');
 assert.equal(gotSite.recs.length, 3, 'laid out on the project’s own three parcels'); assert.match(t, /Saved to .* as Option B \(option_id \w+\), now the feasibility study’s option/);
 d = docOf(sample.id); const nb = d.plans.at(-1); assert.equal(d.plans.length, 2); assert.equal(nb.name, 'Option B'); assert.equal(d.fz.optionId, nb.id); assert.equal(nb.terrain, undefined, 'the ground grid isn’t stored'); assert.equal(nb.request, '300 apartments, 3 stories'); assert.deepEqual(nb.parcels, d.parcels.map(x => x.key));
+// laid out at a location given with it: that parcel joins the project and the option is on it
+PR.hooks.sitePlan = async (args, ctx) => { assert.equal(ctx.site, null, 'a given location is looked up by the tool'); const g = { type: 'Polygon', coordinates: [[[-95.94, 30.06], [-95.938, 30.06], [-95.938, 30.062], [-95.94, 30.062], [-95.94, 30.06]]] };
+  return { content: [{ type: 'text', text: await ctx.onPlan({ plan: { ...structuredClone(sample.plans[0]), id: 'mcp' }, request: args.request, recs: [{ label: '100 Next Door Rd', propId: 'R999', owner: 'Neighbor LLC', acres: 4.4, geometry: g, center: null, landValue: 300000 }], county: 'Waller' }) }] }; };
+ok(await call('site_plan', { project_id: sample.id, apn: 'R999', county: 'Waller', request: 'townhomes', make_study_option: false }), 'site plan next door');
+d = docOf(sample.id); const nc = d.plans.at(-1), added = d.parcels.find(x => x.key === 'pid:R999');
+assert.equal(d.parcels.length, 4, 'the parcel laid out on joins the project'); assert.equal(added.county, 'Waller'); assert.equal(added.landValue, 300000); assert.deepEqual(nc.parcels, ['pid:R999']); assert.equal(nc.name, 'Option C'); assert.equal(d.fz.optionId, nb.id, 'make_study_option: false keeps the study on its option');
 PR.hooks.sitePlan = null;
 
 // ---- a new project from a drawn outline (no lookups: road lines refused, facts skipped) ----
