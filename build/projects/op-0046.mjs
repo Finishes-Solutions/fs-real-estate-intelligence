@@ -169,7 +169,7 @@ export function buildOption(S, { now }) {
     else if (near.back) a = near.back.s > 0 ? [-u[0], -u[1]] : u;
     else a = dot([mean[0] - r.c[0], mean[1] - r.c[1]], u) >= 0 ? u : [-u[0], -u[1]]; // else toward the middle of the field
     // the band: 18 ft of stalls, its head edge pulled in where a back-to-back row is drawn under 18 ft away
-    const headIn = near.back && near.back.g < 18 ? (18 - near.back.g) / 2 : 0, t0 = -9 + headIn, t1 = 9 + headIn, tc = (t0 + t1) / 2, rot = Math.atan2(-a[1], -a[0]) / RAD - 90; // local +y away from the aisle (the stalls' side)
+    const headIn = near.back && near.back.g < 18 ? (18 - near.back.g) / 2 : 0, t0 = -9 + headIn, t1 = 9 + headIn, tc = (t0 + t1) / 2, rot = Math.atan2(a[1], a[0]) / RAD - 90; // row: 1 means the aisle is on the row's local +y side (lib/siteparking.mjs), so local +y points at the aisle
     r.a = a; r.nrm = nrm; r.facing = near.facing;
     rows.push({ id: 'op46-row' + (i + 1), kind: 'parking', x: r2(r.c[0] + tc * a[0]), y: r2(r.c[1] + tc * a[1]), w: r2(r.L), d: r2(t1 - t0), rot: r2(((rot % 360) + 360) % 360), row: 1, stallRot: 0, name: '', note: 'Row of ' + (r.n - 1) + ' on the sheet (6.5 ft stripes) · 9 x 18 ft stalls here', pinned: true });
   });
@@ -189,18 +189,24 @@ export function buildOption(S, { now }) {
     for (const strip of [24, 12]) { const c = [r.c[0] + (9 + strip / 2) * r.a[0], r.c[1] + (9 + strip / 2) * r.a[1]], e = { id: 'op46-strip' + (i + 1), kind: 'drive', x: r2(c[0]), y: r2(c[1]), w: r2(r.L), d: strip, rot: r2(((Math.atan2(r.nrm[1], r.nrm[0]) / RAD) % 360 + 360) % 360), name: '', note: strip + ' ft aisle beside the row', pinned: true };
       if (bands.some(b => SP.rectsOverlap(b, e, 0.5)) || buildings.some(b => SP.rectsOverlap(b, e, 0.5)) || !SP.corners(e).every(q => SP.inRing(q, S.site.ring))) continue; els.push(e); break; } });
   const DIR = { n: [0, 1], s: [0, -1], e: [1, 0], w: [-1, 0] };
-  for (const r of RETAIL_ROWS) { const [x0, x1, y0, y1] = r.box, a = DIR[r.aisle], c = retail([(x0 + x1) / 2, (y0 + y1) / 2]), L = retailLen(a[0] ? y1 - y0 : x1 - x0), rot = Math.atan2(-a[1], -a[0]) / RAD - 90;
+  for (const r of RETAIL_ROWS) { const [x0, x1, y0, y1] = r.box, a = DIR[r.aisle], c = retail([(x0 + x1) / 2, (y0 + y1) / 2]), L = retailLen(a[0] ? y1 - y0 : x1 - x0), rot = Math.atan2(a[1], a[0]) / RAD - 90;
     rows.push({ id: 'op46-' + r.id, kind: 'parking', x: r2(c[0]), y: r2(c[1]), w: r2(L), d: 18, rot: r2(((rot % 360) + 360) % 360), row: 1, stallRot: 0, name: '', note: r.note + ' · 9 x 18 ft stalls, the aisle beside it', pinned: true }); }
   els.push(...rows.filter(e => !els.includes(e)));
   // a row or drive drawn up against the line can poke a foot past it where the sheet and the county differ: nudged in
   for (const e of els) { if (e.kind !== 'parking' && e.kind !== 'drive') continue; const inside = () => SP.corners(e).every(p => SP.inRing(p, S.site.ring)); if (inside()) continue;
     const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dx, dy]) => SP.rotPt([dx, dy], e.rot || 0)); let done = false;
     for (let step = 0.5; step <= 4 && !done; step += 0.5) for (const dv of dirs) { const t = { ...e, x: r2(e.x + dv[0] * step), y: r2(e.y + dv[1] * step) }; if (SP.corners(t).every(p => SP.inRing(p, S.site.ring))) { e.x = t.x; e.y = t.y; done = true; break; } } }
-  // ponds and the drainage channel (retail center sheet)
+  const ponds = []; let channel = null;
   for (const [i, p] of DRAWING.retail.ponds.entries()) { const poly = p.poly.map(retail), P = SP.signedArea(poly) < 0 ? poly.reverse() : poly, c = SP.centroid(P), xs = P.map(q => q[0]), ys = P.map(q => q[1]);
-    els.push({ id: 'op46-' + p.name.toLowerCase().replace(' ', ''), kind: 'pond', poly: P.map(q => q.map(r2)), x: r2(c[0]), y: r2(c[1]), w: r2(Math.max(...xs) - Math.min(...xs)), d: r2(Math.max(...ys) - Math.min(...ys)), rot: 0, labelAt: c.map(r2), name: p.name + ' (retention)', note: 'Retention ' + p.name.toLowerCase() + ' on the sheet: ' + p.sf.toLocaleString('en-US') + ' sf, 12 ft deep (drawn ' + Math.round(SP.ringArea(P)).toLocaleString('en-US') + ' sf here)', pinned: true }); }
+    ponds.push({ id: 'op46-' + p.name.toLowerCase().replace(' ', ''), kind: 'pond', poly: P.map(q => q.map(r2)), x: r2(c[0]), y: r2(c[1]), w: r2(Math.max(...xs) - Math.min(...xs)), d: r2(Math.max(...ys) - Math.min(...ys)), rot: 0, labelAt: c.map(r2), name: p.name + ' (retention)', note: 'Retention ' + p.name.toLowerCase() + ' on the sheet: ' + p.sf.toLocaleString('en-US') + ' sf, 12 ft deep (drawn ' + Math.round(SP.ringArea(P)).toLocaleString('en-US') + ' sf here)', pinned: true }); }
   { const poly = DRAWING.retail.channel.map(retail), P = SP.signedArea(poly) < 0 ? poly.reverse() : poly, c = SP.centroid(P), xs = P.map(q => q[0]), ys = P.map(q => q[1]);
-    els.push({ id: 'op46-channel', kind: 'keepout', poly: P.map(q => q.map(r2)), x: r2(c[0]), y: r2(c[1]), w: r2(Math.max(...xs) - Math.min(...xs)), d: r2(Math.max(...ys) - Math.min(...ys)), rot: 0, name: 'Drainage channel', note: 'The channel both sheets draw between the shopping center and the retail center (not surveyed): nothing is built or paved on it', pinned: true }); }
+    channel = { id: 'op46-channel', kind: 'keepout', poly: P.map(q => q.map(r2)), x: r2(c[0]), y: r2(c[1]), w: r2(Math.max(...xs) - Math.min(...xs)), d: r2(Math.max(...ys) - Math.min(...ys)), rot: 0, name: 'Drainage channel', note: 'The channel both sheets draw between the shopping center and the retail center (not surveyed): nothing is built or paved on it', pinned: true }; }
+  // the paving under and between all of it: the sheets' lots are continuous asphalt, so the gaps between rows, at the
+  // ends of aisles and where the angled rows meet the straight ones are paved too (lib/siteplan.mjs fieldsOf closes
+  // gaps up to about 32 ft), kept off the buildings, the ponds and the channel; counted once in the numbers
+  const avoid = buildings.concat(ponds, [channel]);
+  SP.fieldsOf(els, S.site.ring, { reach: 16, cell: 2, avoid, minSf: 1500 }).forEach((ring, i) => els.push(SP.fieldPiece(ring, 'op46-field' + (i + 1), { pinned: true, note: (i === 0 ? 'The shopping center\u2019s lot' : 'Paving') + ': the sheet\u2019s asphalt under and between the rows and aisles, counted once' })));
+  els.push(...ponds, channel);
   // the site: front on FM 362 (the long east line), Old Houston Hwy along the north
   const ring = S.site.ring, out = ring.map((_, k) => SP.outwardOf(ring, k)), len = ring.map((_, k) => SP.edgeLen(ring, k));
   const east = ring.map((_, k) => k).filter(k => out[k][0] > 0.85 && len[k] > 50), north = ring.map((_, k) => k).filter(k => out[k][1] > 0.85 && len[k] > 50);
@@ -222,7 +228,7 @@ export function summary(doc) {
   const by = Object.fromEntries(B.map(e => [e.name, Math.round(SP.gfaOf(e))]));
   const overlaps = [];
   for (let i = 0; i < pl.elements.length; i++) for (let j = i + 1; j < pl.elements.length; j++) { const a = pl.elements[i], b = pl.elements[j]; if (a.kind === 'keepout' || b.kind === 'keepout') continue;
-    if (a.kind === 'drive' && b.kind === 'drive') continue; if (SP.rectsOverlap(a, b, 0.5)) overlaps.push(a.id + ' × ' + b.id); }
+    const paved = e => SP.PAVED.includes(e.kind); if (paved(a) && paved(b) && (a.kind !== 'parking' || b.kind !== 'parking')) continue; /* paving on paving is one surface; two rows may not cross */ if (SP.rectsOverlap(a, b, 0.5)) overlaps.push(a.id + ' × ' + b.id); }
   const outside = pl.elements.filter(e => !SP.shapeOf(e).every(p => SP.inRing(p, pl.ring))).map(e => e.id);
   return { acres: +m.acres.toFixed(2), buildings: B.length, gfa: Math.round(m.gfa), byBuilding: by, spaces: m.spaces, stalls: m.stalls, ada: m.ada, required: m.required, pondSf: Math.round(m.pond), coveragePct: +(m.coverage * 100).toFixed(1), imperviousPct: +(m.impervious * 100).toFixed(1), elements: pl.elements.length, overlaps, outside, front: pl.front, streets: pl.streets, streetNames: pl.streetNames };
 }

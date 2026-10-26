@@ -37,7 +37,15 @@ assert.equal(rows.length, 48 + 6, 'the shopping center sheet\u2019s 48 rows (of 
 assert.ok(rows.every(e => e.row === 1 && e.stallRot === 0 && e.d === 18), 'single 18 ft rows, their aisles drives of their own');
 const drives = pl.elements.filter(e => e.kind === 'drive');
 assert.ok(drives.length >= 30, 'the aisles between facing rows, the cross aisles and the drives: ' + drives.length);
-assert.ok(rows.every(r => { const a = SP.rotPt([0, -1], r.rot), p = [r.x + a[0] * 15, r.y + a[1] * 15]; return drives.some(d => SP.hitRect(d, p)); }), 'every row opens onto a drive (nothing stands alone)');
+assert.ok(rows.every(r => { const a = SP.rotPt([0, 1], r.rot), p = [r.x + a[0] * 15, r.y + a[1] * 15]; /* row: 1 puts the aisle on local +y */ return drives.some(d => SP.hitRect(d, p)); }), 'every row opens onto a drive (nothing stands alone)');
+// the lots are paved as one surface: a parking field under the shopping center's rows and aisles, one under the retail center's, one on the service strip, counted once
+const fields = pl.elements.filter(e => e.kind === 'field');
+assert.equal(fields.length, 4, 'four paved fields (the shopping center lot, the strip behind the pet store, the retail center lot, the service strip): ' + fields.map(f => Math.round(SP.ringArea(f.poly))));
+const fa = fields.map(f => SP.ringArea(f.poly)).sort((a, b) => b - a); assert.ok(fa[0] > 240000 && fa[1] > 40000 && fa[1] < 60000, 'the shopping center lot and the retail center lot: ' + fa.map(Math.round));
+assert.ok(rows.every(r => fields.some(f => SP.inRing([r.x, r.y], f.poly))), 'every row sits on a paved field');
+assert.ok(fields.every(f => f.poly.every(p => SP.inRing(p, ring)) && !B.some(b => SP.rectsOverlap(b, f, 0.5))), 'the fields stay inside the lot and off the buildings');
+const fp = SP.fieldPaving(pl.elements); assert.ok(fp > 40000 && fp < fields.reduce((t, f) => t + SP.ringArea(f.poly), 0) * 0.3, 'the field adds only the paving between the rows and aisles: ' + Math.round(fp));
+assert.deepEqual(SP.check(pl).filter(i => i.level === 'bad'), [], 'no red flags from the plan checks');
 assert.ok(s.spaces >= 650 && s.spaces <= 800, 'about 700 spaces at 9 x 18 ft: ' + s.spaces);
 const retailRows = rows.filter(e => /^op46-r\d$/.test(e.id)), retailSpaces = retailRows.reduce((t, e) => t + SP.stalls(e).count, 0);
 assert.equal(retailSpaces, 96, 'the retail center’s rows hold about the sheet’s 98: ' + retailSpaces);
