@@ -37,6 +37,10 @@ assert.equal(S.normalizeProgram({ use: 'multifamily', pads: 2 }).pads, null, '(p
   assert.ok(names.includes('Community center'), 'the community center: ' + names.filter(Boolean).slice(0, 12).join(', '));
   assert.ok(o.elements.some(e => e.kind === 'play') && names.includes('Pavilion'), 'its playground and pavilion');
   assert.ok(!o.elements.some(e => /pad site/i.test(e.name || '')), 'no "pad site" on a townhome plan');
+  // more than 30 homes want a second way in for fire access: the commons along the frontage left no clear line in, so
+  // it crosses the park, cut round it
+  const plan = LOTS.trap20.plan(), ents = S.entrancesOf(o.elements); assert.ok(ents.length >= 2, 'two ways in: ' + ents.length);
+  assert.deepEqual(S.check({ ...plan, elements: o.elements }).filter(i => i.level === 'bad').map(i => i.text), [], 'nothing overlaps the park');
 }
 // ---- townhome options meet their own parking (the narrow lot was 2–3 guest spaces short on every option) ----
 {

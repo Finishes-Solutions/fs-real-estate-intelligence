@@ -34,7 +34,7 @@ The engine (`lib/sitelayout.mjs` with `siteplan`, `siteparking`, `sitepad`, `sit
    owed at the end is never placed, and the "parking short" retry doesn't apply to homes. Fix: place the owed guest stalls
    in a bay at the end of the last row (or reserve a bay per row up front), and re-check parking after the second
    entrance is added.
-4. **"No room for a second way in" on a 716 ft frontage.** The second entrance is only looked for after the layout is
+4. **Partly fixed (Oct 27): "No room for a second way in" on a 716 ft frontage.** The fire-access way in may now cross a park lawn along the frontage (the park is cut round it) when no clear line in exists and it breaks no check and costs no parking (the 20 ac townhome test now gets two ways in). Still open: planning it with the first entry; the 260 ft narrow lot still has no room for a second one 150 ft from the first. The second entrance is only looked for after the layout is
    finished, as a straight ray in from the street between buildings, so a row of buildings along the street blocks it.
    Fix: when the program will need two ways in (over 200 apartments or 30 homes, known before laying out), plan the second
    entry with the first, at another connector drive.
