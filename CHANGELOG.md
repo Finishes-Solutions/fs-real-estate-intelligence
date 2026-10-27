@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-26
 
+### 9:05 PM CT: A 10-year pro forma led by levered IRR, equity multiple and cash-on-cash (0d45faa)
+- **10-year hold:** the pro forma now holds a project for 10 years after it's stabilized before the sale (it was 5), as the team underwrites. Plans that never changed the hold move to 10 years; a hold set by hand stays. Change it under Assumptions, **Hold after stabilizing**.
+- **The three returns that matter come first:** **Levered IRR**, **Equity multiple** (with the equity put in) and **Cash-on-cash** (the first stabilized year, with the average over the hold) now open the pro forma, ahead of cost, NOI, yield and value.
+- **Cash-on-cash by year:** a row of the 10 hold years, each year's NOI less the permanent loan's payments over the equity put in, so you can see it climb as rents grow.
+- **Excel:** the Pro Forma workbook opens on a new **Returns** sheet (levered IRR, equity multiple, cash-on-cash first year and average, then NOI, debt service, cash flow and cash-on-cash for each hold year), and the one-page sheet adds an average cash-on-cash. The TestFit method shows its cash-on-cash too.
+- **The AI assistant** now reports cash-on-cash (first year and average) when you ask how a plan's numbers work out.
+
 ### 8:31 PM CT: BIM models of site plan options with BIMCraft: the trial, the model builder and its worker (25f4c03)
 - **Nothing in the app changes yet.** This is the groundwork for real building models of each site plan option, built with BIMCraft (an open-source building modeling tool).
 - **What it does:** every building in an option becomes a real model: a storey at a time, with walls of an assembly for its use (tilt-up warehouses, brick shops, EIFS offices, wood-frame apartments and homes), storefront facing the parking, office window bands, apartment and home windows, entry and garage doors, dock doors on a warehouse's truck court, slabs, and flat roofs behind a parapet or hipped roofs on homes. Townhome rows get their party walls. Out come a model file that Revit and other BIM tools open (IFC), a 3D picture, and the quantities per building: wall, glass, roof and floor areas and door counts.
