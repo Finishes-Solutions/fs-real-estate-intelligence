@@ -120,6 +120,7 @@
 .ws-opt small{display:block;color:var(--muted)}
 .ws-gen{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:flex-end;border-top:1px solid var(--line);padding-top:var(--sp-3)}
 .ws-gen .ws-f{flex:0 1 220px}
+.ws-gen .ws-f.ws-ask{flex:1 1 100%}.ws-gen .ws-ask input{width:100%}
 .ws-gen .ws-note{flex:1 1 220px;margin:0}
 .ws-dl{display:grid;grid-template-columns:1fr;gap:0;margin:0}
 .ws-dl>div{display:grid;grid-template-columns:140px 1fr;gap:var(--sp-2);padding:5px 0;border-bottom:1px solid var(--line)}

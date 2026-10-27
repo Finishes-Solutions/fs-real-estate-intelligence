@@ -62,7 +62,7 @@ The engine (`lib/sitelayout.mjs` with `siteplan`, `siteparking`, `sitepad`, `sit
    width (not the band's real width), only one frame direction is tried, and the land the pond leaves is "open land"
    rather than going to the zones that came up short. Fix: size the band from the pond, size rows from the real band,
    add rows to short zones before the last zone fills, try the other frame direction, give leftover strips to the zones.
-10. **The pond goes beside the buildings and leaves land behind it** (retail + apartments: a lone apartment building
+10. **Partly fixed (Oct 27): the pond goes beside the buildings and leaves land behind it.** It now goes at the far end of the spare land, so what's left sits beside the drives. (retail + apartments: a lone apartment building
     between the parking and a big pond, open land behind the pond). Fix: when a band is reserved for the pond, put the
     pond against the back lot line and let the buildings take the land in front of it.
 11. **No amenity or open space on big townhome sites** (247 townhomes on 20 ac, nothing but rows and parking). Only
@@ -71,7 +71,7 @@ The engine (`lib/sitelayout.mjs` with `siteplan`, `siteparking`, `sitepad`, `sit
 12. **Apartments as a grid of small buildings in a sea of parking** on big sites (22 buildings on 20 ac). Fine for
     garden apartments but there's no podium, wrap, tuck-under garage or 4-story option to reach a unit count the land
     can't hold at 3 floors (notch8 fit 136–146 of 200 at 3 floors and didn't say what 4 floors would do).
-13. **Options that differ only in detail.** The "different" check rounds building positions to a 60 ft grid, so two
+13. **Partly fixed (Oct 27): options that differ only in detail.** A pods layout that meets more of the sized asks now takes the last place. The "different" check rounds building positions to a 60 ft grid, so two
     options with the same buildings and pond can both be shown (wedge office: three options, identical numbers, two of
     them nearly the same picture). A same-picture check was tried here and didn't change the survey's results; the
     better fix is to pick options for real differences (pond position, building arrangement, entry) on purpose.
