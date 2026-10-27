@@ -1,8 +1,8 @@
 # Plan: a BIM model of each option, built with BIMCraft, priced from its quantities
 
-Status: proposal, October 26, 2026. Builds on `MASSING-PLAN.md` (the three.js scene) and `lib/proforma.mjs` (the
-budget). Nothing here is built yet, and BIMCraft has not been run against our plans yet: the first step is a short
-spike to prove the parts this plan depends on.
+Status: phase 0 (the trial) done and phase 1's model built, October 26, 2026; see "Trial results" below. Builds on
+`MASSING-PLAN.md` (the three.js scene) and `lib/proforma.mjs` (the budget). Nothing in the app uses it yet: the worker
+has to be deployed first.
 
 ## Why
 
@@ -86,35 +86,52 @@ app: Budget shows assemblies and the range; 3D view loads the IFC (web-ifc → t
 Everything is cached by the plan's signature (`planSig`, as the renderings are): the model is only rebuilt when the
 option changes.
 
-### The generator (`lib/bim.mjs`)
+### The generator (`lib/bim.mjs`, built)
 
-Pure functions, no DOM, no binary, tested in Node with the realistic fixtures the site plan tests already use (merged
-multi-building parcels, hand-drawn polygons, L, U and tower-on-podium forms). For each building in an option:
+Pure functions, no DOM, no binary, tested in Node (`test/bim.mjs`) on options laid out on the real lots the site plan
+tests use. For each building in an option:
 
-- **Levels** from the floor count and the use's floor height (`USES[use].floorH`), the tower above its podium.
-- **Exterior walls** along the outline, closed and drawn clockwise so they face out, with a **wall type per use and
-  look** (tilt-up for industrial, CMU and brick for retail, wood frame and fibre cement for multifamily and homes), the
-  layers giving the assembly to price.
-- **Storefront glazing** on the side that faces the parking (the plan already knows it) for retail, restaurant,
-  medical and office; **window bands** per floor elsewhere; **dock doors** along the truck court; entry doors.
-- **Floors** per level from the outline; **roofs** flat with a parapet, or hipped at the use's pitch for homes,
-  townhomes and duplexes.
-- **Interior walls** where the plan knows them: retail bay demising walls, multifamily unit separations, a stair and
-  elevator **shaft** for two storeys and up.
-- **Repeated homes** (a 600-home subdivision): each home plan modelled once and its quantities multiplied by its count,
-  not 600 houses in one model.
+- **Levels**: one an elevation across the site (each use has its own floor height, `USES[use].floorH`), the tower above
+  its podium.
+- **Exterior walls** a storey, along the outline, drawn clockwise so they face out, with a **wall type per use**:
+  tilt-up for industrial, CMU and brick for retail and restaurants, steel stud and EIFS for office, medical and hotel,
+  wood frame with brick for apartments and homes, metal panel for storage. Parapets on flat roofs.
+- **Openings**: storefront with a door every fourth bay on the side facing the nearest parking (shops, restaurants,
+  amenity); 6 × 6 window bands on offices; punched windows on apartments; a door and garage door (or windows, rear-load)
+  per home or townhome; dock doors and two drive-ins along a warehouse's truck court, its office corner on the front;
+  a back door. BIMCraft refuses overlapping openings, which caught two bugs in the trial.
+- **Floors**: slab on grade, then wood framing (apartments, homes) or concrete on metal deck a storey. **Roofs**: TPO
+  behind a parapet, or hipped 5:12 shingles for homes, duplexes and townhomes.
+- **Townhome party walls** between units. Not yet: retail demising walls, apartment unit walls, stairs and shafts.
+- **Homes**: the plan's home area is living area, so the floor above a 2-storey home is drawn smaller (the garage, about
+  220 sf a car, and the porch stay on the ground floor) under a porch roof. Homes and townhome rows of one plan are
+  modelled once and counted (`count`), not 600 houses in one model.
 
-### Where it runs
+### Where it runs: a worker (`worker/bim/`, built)
 
-The binary needs glibc 2.35 or newer for the published Linux builds. Vercel's Node runtime is, as far as I know, on
-Amazon Linux 2023 (glibc 2.34), so the release binary may well not start there. Three ways, to be settled in the spike:
-
-1. **A static build** (`x86_64-unknown-linux-musl`) of the CLI only, which drops the desktop UI's dependencies, shipped
-   with the function. Simplest if it builds and fits Vercel's function size.
-2. **A small worker** (a container on Fly.io, Cloud Run or similar) that takes a script and returns the files.
-3. **A GitHub Action** run on request (slow to start; only for batch or the PDF).
+The CLI build needs glibc 2.35 (checked: its highest symbol is `GLIBC_2.35`), one more than Vercel's runtime is
+believed to have, so it runs in a small container instead: `worker/bim/Dockerfile` builds BIMCraft's CLI at a pinned
+commit (without the Revit reader, so the licence stays MIT OR Apache-2.0) next to our `lib/`, and `server.mjs` answers
+`POST /model { plan }` with the quantities, the IFC, the `.bimcraft` file and a 3D picture, behind a bearer token
+(`BIM_WORKER_TOKEN`). It still has to be deployed (Fly.io, Cloud Run, Render, or any host that runs a container), and
+then an `api/bim.js` on Vercel forwards to it (`BIM_WORKER_URL`, the token as a server-side secret).
 
 ### The cost side (`lib/estimate.mjs`)
+
+Decided Oct 26: the budget stays **$ per sf by type** (retail, office, multifamily, industrial, townhomes, single
+family; mixed use is any combination), as the team budgets today; past budgets exist but are mostly that. So the model
+does not replace the $/sf; it **checks and adjusts it**. Each type's $/sf assumes a typical building of that type; the
+model measures how this one differs, in the ratios estimators use for it:
+
+- **Wall-to-floor ratio** (exterior wall area ÷ floor area): a long thin or L-shaped building has more wall per sf
+  than a box, and walls are the costliest part of a shell. The trial measured 0.59 for a 78,000 sf warehouse, 0.65 for
+  a 20,000 sf shop building, 0.41 for a 3-storey office.
+- **Glazing ratio** (glass ÷ wall): 5% for a warehouse with an office corner, 24% for the office.
+- **Storeys, roof area per floor area, openings (docks, garage doors), party walls.**
+
+Against a typical building of the type (set from past budgets: their GSF and $/sf, plus the ratios of their model),
+these give an adjustment, shown beside the $/sf: "this layout's shell runs about 4% above a typical retail building".
+Later, if wanted, the full assembly pricing below.
 
 An assembly table, each with a unit, a low, likely and high price, a source and a date: exterior wall by type ($/sf of
 wall), storefront and windows ($/sf of glazing), doors (each), roof by type ($/sf), slab on grade and elevated floors
@@ -123,11 +140,30 @@ massing model can't see (MEP by use, fire sprinklers, finishes, foundations). Ed
 assumptions today, with the ranges feeding the existing sensitivity table. Starting prices from public data with their
 source noted; calibrated against our own jobs as soon as we have them.
 
+## Trial results (Oct 26)
+
+Built BIMCraft 0.8.0's CLI (commit b36160b, 1.5 minutes, an 11.5 MB binary) and ran `lib/bim.mjs` on a real option of
+each type: retail (2 buildings, 40,000 sf), office (2, 137,226 sf, 3 storeys), apartments (5 with the clubhouse), a
+warehouse (78,209 sf), townhomes (16 rows, one modelled), single-family (24 homes, 8 plans modelled) and a 20-acre
+mixed-use tract (shops, pads, apartments, townhomes, duplexes; 12 models for 20 buildings).
+
+- **Every option builds**, in 0.3 s (the warehouse) to 6.5 s (the mixed tract), IFC 27 kB to 1.3 MB.
+- **Floor areas match the plan to the square foot** for every commercial, apartment and townhome building. Homes come
+  out above the plan's living area by their garage and porch, as they should.
+- **The IFC opens in `web-ifc`** (the browser library for the 3D view): walls, windows, doors, slabs, roofs and storeys
+  all come through as meshes. Not yet tried in Revit.
+- **The 3D picture** is BIMCraft's own: plain, orthographic, no shadows. Good for checking the model; the realistic
+  view stays the three.js scene and the renderings.
+- **The worker runs in its container** (Node 22 on Debian bookworm with the CLI): the mixed tract came back over HTTP in
+  8.2 s. The Dockerfile's first stage (cloning and compiling BIMCraft) could not run in this sandbox, whose HTTPS proxy
+  the build container doesn't trust; the same build ran outside Docker. `test/bim.mjs` also starts the server and asks
+  it for a model whenever `BIMCRAFT_CLI` is set.
+
 ## Phases and effort
 
 | Phase | What | Effort | Done when |
 |---|---|---|---|
-| 0. Spike | Build the CLI; write one real Waller option's scripts by hand; export IFC, schedules and a PNG; open the IFC in `web-ifc` and in Revit; time a 20-building plan; try the musl build and Vercel | 2 to 3 days | A written verdict: does it model our buildings right, how fast, where it runs |
+| ~~0. Spike~~ (done) | Build the CLI; write one real Waller option's scripts by hand; export IFC, schedules and a PNG; open the IFC in `web-ifc` and in Revit; time a 20-building plan; try the musl build and Vercel | 2 to 3 days | A written verdict: does it model our buildings right, how fast, where it runs |
 | 1. Model | `lib/bim.mjs` for every use and form, the runner, storage by `planSig`, **Download IFC** on an option | 1 to 2 weeks | Every test fixture turns into an IFC that IfcOpenShell validates, and the floor areas match the plan's GSF within 1% |
 | 2. Estimate | `lib/estimate.mjs`, the assembly table, the Budget section by assembly with a range and the class, the pro forma using it | 1 to 2 weeks | Ten real options priced both ways, the differences explained; checked against at least one past job |
 | 3. 3D and sheets | The IFC in the three.js scene from `MASSING-PLAN.md`; the model's plans, elevations and schedules on the plan set | 1 to 2 weeks after the scene exists | A rendering made from the BIM model keeps every window band and roof where the model has it |
@@ -148,7 +184,9 @@ source noted; calibrated against our own jobs as soon as we have them.
 
 ## Open questions
 
-1. May the spike download and build BIMCraft (third-party code) in a session? It was not built for this proposal.
-2. A separate worker is OK if the static build doesn't run on Vercel?
-3. What cost data do we have: past bid tabs or final costs from Finishes Solutions jobs, or an RSMeans licence?
-4. Which use matters most first: retail and restaurant pads, multifamily, industrial, or homes?
+Answered Oct 26: BIMCraft may be built; a worker is fine; budgets are $/sf by type (past budgets exist); the types are
+retail, office, multifamily, industrial, townhomes, single family and mixed use (any combination).
+
+1. Where to host the worker: an account on Fly.io, Cloud Run or Render (a small always-on or scale-to-zero container).
+2. Which past budgets can be shared (GSF, type, $/sf, and the site plan or drawings) to set each type's "typical"
+   building for the adjustment.
