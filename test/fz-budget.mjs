@@ -910,4 +910,35 @@ test('(c) the closed form satisfies fee = rate × project', () => {
   assert.ok(Number.isFinite(pf.project));
 });
 
+// =====================================================================================================================
+// the team's own 2024–25 budgets (data/fs-budgets-2024-25.mjs): rates by building type, priced line by line
+// =====================================================================================================================
+{
+  const TB = await import('../lib/feasibility/data/fs-budgets-2024-25.mjs');
+  const PF = await import('../lib/proforma.mjs'), PFB = await import('../lib/feasibility/budget.mjs'), { buildBudget } = PFB;
+  test('the medians by type, building lines only (site infrastructure is the layout\'s)', () => {
+    close(TB.psfOf(TB.RATES.retail), 150.25, 'retail'); close(TB.psfOf(TB.RATES.industrial), 124.91, 'industrial'); close(TB.psfOf(TB.RATES.sfr), 111.35, 'houses');
+    assert.equal(TB.ratesFor('restaurant'), TB.RATES.retail); assert.equal(TB.ratesFor('office'), null, 'no office budgets');
+    assert.equal(TB.ratesFor('industrial', { gsf: 30000 }), TB.RATES.industrial); assert.equal(TB.ratesFor('industrial', { gsf: 120000 }), null, 'a bulk warehouse stays parametric');
+  });
+  const a = { landTotal: 1e6, locationFactor: 1, materialsShare: 0.55, escalationPct: 0, gcFeePct: 12, contPct: 5, softPct: 10, devFeePct: 3, monthsToMid: 0 };
+  const run = (M, use) => { const R0 = PF.proFormaOf(M, use, { landPrice: 1e6 }); return buildBudget(M, a, { R0 }); };
+  test('flex industrial: every line at the median, the 10% fee on them, no workbook GC fee', () => {
+    const B = run({ buildingSf: 30000, parking: 40, acres: 3 }, 'industrial'), tb = B.lines.filter(l => l.id.startsWith('tb:industrial|'));
+    assert.deepEqual(B.teamUses, ['industrial']); assert.ok(!B.lines.some(l => l.id === 'par:hard|industrial'));
+    const shell = tb.filter(l => l.grp !== 'Interiors'); assert.ok(shell.length >= 8 && tb.every(l => l.qty === 30000 && l.source.kind === 'library'), tb.map(l => l.id).join());
+    close(B.lines.find(l => l.id === 'tb:fee').amount, cents(tb.reduce((s, l) => s + l.amount, 0) * 0.1), 'fee', 0.01); close(B.totals.gcFee, 0, 'no GC fee');
+  });
+  test('a 120,000 sf warehouse keeps the parametric bulk rate', () => {
+    const B = run({ buildingSf: 120000, parking: 60, acres: 8 }, 'industrial');
+    assert.deepEqual(B.teamUses, []); assert.ok(B.lines.some(l => l.id === 'par:hard|industrial') && !B.lines.some(l => l.id === 'tb:fee'));
+  });
+  test('the budget beside the team\'s all-in medians', () => {
+    const { budgetBench } = PFB, M = { buildingSf: 30000, parking: 40, acres: 3 }, R0 = PF.proFormaOf(M, 'industrial', { landPrice: 1e6 }), B = buildBudget(M, a, { R0 }), b = budgetBench(B, R0.P);
+    close(b.theirs, 155 * 1.1, 'flex: $155 before the 10% fee', 1e-9); assert.equal(b.n, 12); assert.match(b.text, /flex \/ industrial buildings came to \$171/);
+    assert.equal(budgetBench(B, { ...R0.P, uses: { office: { gsf: 1 } } }), null, 'none for a use the budgets don\'t cover');
+  });
+  test('offices have no team budgets: parametric', () => { const B = run({ buildingSf: 30000, parking: 120, acres: 3 }, 'office'); assert.deepEqual(B.teamUses, []); assert.ok(B.lines.some(l => l.id === 'par:hard|office')); });
+}
+
 console.log('fz-budget tests passed (' + checks + ' checks)');

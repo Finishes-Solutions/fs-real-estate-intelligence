@@ -86,7 +86,7 @@ export function workspace(env) {
     const scen = f.scenarios.length ? '<label class="ws-f"><span>Scenario shown</span><select data-f="activeScenario"><option value="">Base case</option>' + f.scenarios.map(x => '<option value="' + esc(x.id) + '"' + (x.id === f.activeScenario ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>' : '';
     return '<aside class="ws-rail" aria-labelledby="wsRailH"><div class="ws-card"><div class="kicker" id="wsRailH">Project summary</div>' +
       '<div class="ws-kpis">' + kpi(s ? num(s.acres, 2) : num((p.parcels || []).reduce((a, x) => a + (x.acres || 0), 0), 2), 'Acres') + kpi(s ? (s.units ? num(s.units) : num(s.gfa)) : '—', s?.units ? 'Units' : 'Gross sf') +
-        kpi(h ? usdM(h.totalCost) : '—', 'Total cost') + kpi(h ? (h.forSale ? pct(h.margin, 1) : pct(h.yoc)) : '—', h?.forSale ? 'Margin' : 'Yield on cost') + kpi(h ? pct(h.levIrr) : '—', 'Levered IRR') + kpi(h ? usdM(h.npvLev) : '—', 'Levered NPV') + '</div>' +
+        kpi(h ? pct(h.levIrr) : '—', 'Levered IRR') + kpi(h ? num(h.multiple, 2) + '×' : '—', 'Equity multiple') + (h?.forSale ? kpi(pct(h.margin, 1), 'Margin') : kpi(h?.cocAvg != null ? pct(h.cocAvg) : '—', 'Cash-on-cash, ' + (h?.cocByYear?.length || 10) + '-yr avg')) + kpi(h ? usdM(h.totalCost) : '—', 'Total cost') + '</div>' +
       scen + (study?.risks?.length ? '<div class="ws-risks"><div class="kicker">Top risks</div><ul>' + study.risks.filter(r => r.level !== 'low').slice(0, 4).map(r => '<li data-level="' + r.level + '"><span class="ws-lv">' + r.level + '</span>' + esc(r.title) + '</li>').join('') + '</ul></div>' : '') +
       (study?.option ? '<p class="ws-meta">Option: <b>' + esc(study.option.name) + '</b>' + (study.scenario ? ' · ' + esc(study.scenario.name) : '') + '<br>Inputs <span class="mono">' + esc(study.inputsHash || '') + '</span></p>' : '') + '</div></aside>';
   }
@@ -151,6 +151,7 @@ export function workspace(env) {
         '<td><label class="ws-chk"><input type="checkbox" data-lineoff="' + esc(l.id) + '"' + (l.off ? '' : ' checked') + '><span class="sr">Include ' + esc(l.desc) + '</span></label></td></tr>'; }).join('') + '</tbody></table></details>').join('');
     const edits = Object.keys(fz(p).budgetEdits).length;
     return '<div class="ws-card"><h4>Budget summary</h4>' + sum + '<p class="ws-note">Escalated × ' + num(E.library.factor, 4) + ' on library lines (' + esc(E.library.toDate.note) + '; ' + esc(E.library.forward.note) + ') and × ' + num(E.parametric.factor, 4) + ' on parametric lines; location factor ' + num(E.location, 2) + '. Change these under Pro Forma › Cost.</p>' +
+      (study.budgetBench && Math.abs(study.budgetBench.diff) <= 20 ? '<p class="ws-note">' + esc(study.budgetBench.text) + '</p>' : '') +
       (study.budgetChecks.length ? '<div class="ws-warnbox">' + study.budgetChecks.map(c => esc(c.text)).join(' ') + '</div>' : '') + '</div>' +
       '<div class="ws-card"><h4>Line items <span class="ws-c">' + study.budget.lines.length + '</span>' + (edits ? '<button type="button" class="lnk" data-act="clearLines">Undo ' + edits + ' line edit' + (edits > 1 ? 's' : '') + '</button>' : '') + '</h4><p class="ws-note">Rates are editable; untick a line to leave it out. Your changes are marked “Yours” and listed in the report’s register.</p>' + lines + '</div>';
   }
@@ -161,8 +162,12 @@ export function workspace(env) {
     if (!study || study.missing) return empty('Nothing to model yet', 'The pro forma runs on a laid-out site option and its budget.', 'Go to Site', 'step:site');
     const f = fz(p), s = st(p), h = study.pf.headline, editing = f.scenarios.find(x => x.id === s.editing) || null;
     const over = editing ? editing.overrides : f.overrides;
-    const kpis = '<div class="ws-kpis big">' + [[usdM(h.totalCost), 'Total development cost'], h.forSale ? [pct(h.margin, 1), 'Margin on sales'] : [usdM(h.noi), 'Stabilized NOI'], h.forSale ? [usdM(h.profit), 'Profit'] : [pct(h.yoc), 'Yield on cost'], [pct(h.levIrr), 'Levered IRR'], [pct(h.unlevIrr), 'Unlevered IRR'], [usdM(h.npvLev), 'Levered NPV'], [num(h.multiple, 2) + '×', 'Equity multiple'], [h.dscr != null ? num(h.dscr, 2) + '×' : '—', 'DSCR']]
-      .map(([v, l]) => '<div class="ws-kpi"><b>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>';
+    // the three returns the team decides on first (levered IRR, equity multiple, cash-on-cash over the hold), then the rest
+    const yrs = h.cocByYear?.length || 0, lead = [[pct(h.levIrr), 'Levered IRR'], [num(h.multiple, 2) + '×', 'Equity multiple'], h.forSale ? [pct(h.margin, 1), 'Margin on sales'] : [h.cocAvg != null ? pct(h.cocAvg) : '—', 'Cash-on-cash, ' + (yrs || h.hold || 10) + '-year average']];
+    const rest = [[usdM(h.totalCost), 'Total development cost'], h.forSale ? [usdM(h.profit), 'Profit'] : [usdM(h.noi), 'Stabilized NOI'], h.forSale ? null : [pct(h.yoc), 'Yield on cost'], h.forSale ? null : [h.coc != null ? pct(h.coc) : '—', 'Cash-on-cash, year 1'], [pct(h.unlevIrr), 'Unlevered IRR'], [usdM(h.npvLev), 'Levered NPV'], [h.dscr != null ? num(h.dscr, 2) + '×' : '—', 'DSCR']].filter(Boolean);
+    const kpiH = ([v, l]) => '<div class="ws-kpi"><b>' + v + '</b><span>' + esc(l) + '</span></div>';
+    const cocRow = yrs ? '<div class="ws-scroll" tabindex="0" role="region" aria-label="Cash-on-cash by year"><table class="ws-t ws-coc"><caption>Cash-on-cash by year of the hold (cash flow after debt service ÷ equity)</caption><thead><tr>' + h.cocByYear.map((_, i) => '<th scope="col" class="r">Yr ' + (i + 1) + '</th>').join('') + '</tr></thead><tbody><tr>' + h.cocByYear.map(v => '<td class="r m">' + pct(v) + '</td>').join('') + '</tr></tbody></table></div>' : '';
+    const kpis = '<div class="ws-kpis big ws-lead">' + lead.map(kpiH).join('') + '</div>' + cocRow + '<div class="ws-kpis">' + rest.map(kpiH).join('') + '</div>';
     // the assumptions, grouped, each with its source
     const groups = GROUPS.map(([g, label]) => { const rows = study.register.filter(a => a.group === g); if (!rows.length) return '';
       return '<details class="ws-box" data-group="' + g + '"' + (s.open[g] ? ' open' : '') + '><summary><span>' + label + '</span><span class="ws-c">' + rows.length + '</span></summary><div class="ws-as">' + rows.map(a => {

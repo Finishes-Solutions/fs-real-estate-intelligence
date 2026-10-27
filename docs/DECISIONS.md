@@ -123,3 +123,21 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 - Layout: a mix with shops first never gets the detention band across the frontage. Extending "pond beside the shops" to apartments was tried and backed out: it added options that ranked first with fewer apartments (196 vs 211 on the Tomball Rd test).
 - Kept as is: **Leftover land: fill the site** builds more than a size asked for. It's an earlier product choice (the most leasable square footage), so it's listed in `docs/LAYOUT-REVIEW.md` as the owner's call, not changed here.
 - A "same picture" duplicate check for options was tried and dropped: it didn't change any option in the 17-run survey.
+
+
+## Team budgets, returns first, layout asks (2026-10-27)
+
+- The team's Smartsheet budgets enter as **medians by building type**, not a per-project lookup: the owner said budgets are "mainly a ppsf/type", and medians resist one odd job. Each line says how many budgets it rests on.
+- Only the **building** lines are taken (foundations, shell, services, interiors). The budgets' site infrastructure (about $25–30 per building sf) is left out because the platform already prices site work from the layout's own quantities; taking both would count it twice.
+- The budgets' **10% contractor fee** is a line of its own rather than the workbook's GC fee % (12%), so each source keeps its own fee.
+- A **leased** shop, restaurant or flex building drops the interior lines: its tenant improvement allowance pays for those, and the pro forma already carries it.
+- **Industrial over 40,000 sf stays parametric:** the budgets are small flex buildings with finished bays (about $125/sf before fee); a bulk warehouse is about half that.
+- Tiny and manufactured home communities stay on their own delivered-home pricing; the one tiny-home budget is kept in the data but not used.
+- Escalation of these rates runs from Oct 2024, the middle of the budgets' dates.
+- Townhome guest spaces that don't fit along the rows take the end homes of the longest rows (never below 3 homes a row): a plan short of its own parking can't be handed over, and losing one or two homes is the smaller cost.
+- The "fill the site" default for sized mixed-use zones is **not** changed here: it was an earlier product choice and the owner is asked.
+- Pads asked for on a single-use shop, restaurant or office plan go through the parking-field engine as a brief's pads do. The older row engine (pods, mixed plans) keeps trying rows with and without pads and isn't pushed toward pads: forcing them, or scoring an option short of them down, cost the big mixed-use test its 60,000 sf of shops or put its pool outside the commons.
+- The agent tool list's size check went from 60,000 to 72,000 characters after the merge: each branch was under 60,000 on its own, and together (the project tools and the home-community parameters) they are about 67,000.
+- The agent study test's expected levered IRR moved from 3.51% to 6.01% with the 10-year hold (the same project held 10 years instead of 5).
+- Apartment buildings are designed by rule (a garden walk-up with open breezeways), never sent to Claude: a 40-unit, 3-story building is about 250 rooms, too big for one answer to come back right, and the rule-based plan passes the same checks. Units a floor are the building's units over its floors, the upper floors taking the odd ones; a slot a floor doesn't need is storage rather than a unit the site plan doesn't count.
+- A room a stepped front or back covers only partly gets a bay open to it; a bay's window counts as the bedroom's emergency escape window (it is the same room).
