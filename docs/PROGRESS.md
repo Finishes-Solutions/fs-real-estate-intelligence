@@ -111,6 +111,12 @@ infra grep: 126 patterns from docs/AUDIT.md, 0 matches (excluding docs/AUDIT.md,
 
 **Positive control:** a staged file containing the Blob-store host and `MONDAY_TOKEN` produced 3 matches and exit 1. The file was then removed.
 
+## Buildings from their designs (2026-10-27)
+
+- `lib/bimplan.mjs`: a detailed BIMCraft model of a site plan option from the plan set's designs (rooms, interior and party walls, doors and windows, stairs, apartment balconies, hip or flat roofs, textured materials). Placement shared with the plan set (`placement`, `fitted` in `lib/plandesign.mjs`). The 141-home test site builds with no errors in about 75 s; one apartment building in about 15 s. Tested in `test/bimplan.mjs` (the build itself with `BIMCRAFT_CLI`).
+- `lib/massing.mjs`: the map's 3D facades from the same designs (`fs-sp-fac` layer, shown when tilted). About 25 ms a redraw for 141 homes after the first. Tested on engine layouts in `test/massing.mjs`.
+- Not done: the BIM worker isn't deployed, so the app can't show the model yet; gable ends; window trim in BIM; better trees.
+
 ## Known issues
 
 - **Street network engine (existing code):** on the Waller test site, "Change With AI" (bend a court, cul-de-sac the spine) followed by a re-fit leaves a loop-road block of about 1,466 ft, over the 1,400 ft rule. The app's checks show it to the user. `test/streetnet.mjs` lets through exactly that breach and nothing else. Fix in `lib/streetnet.mjs` re-fit (block splitting after an edit).
