@@ -98,8 +98,13 @@ assert.deepEqual(M0.validateProject({ ...apt, fz: { ...apt.fz, overrides: { nope
 { const p = project('townhomes'); p.fz.overrides = {}; const t = P.runStudy(p, { market, sensitivity: false });
   assert.ok(!t.missing && t.pf.headline.totalCost > 0, 'townhomes priced'); assert.ok(t.budget.lines.some(l => l.id.startsWith('lib:')), 'townhomes use the workbook lines'); }
 { const p = project({ use: 'retail', gfa: 40000 }), t = P.runStudy(p, { market, sensitivity: false });
-  assert.ok(!t.budget.lines.some(l => l.id.startsWith('lib:')), 'retail has no workbook lines'); assert.ok(t.budget.lines.some(l => l.id === 'par:hard|retail') && t.budget.lines.some(l => l.id === 'par:soft'), 'parametric building and soft-cost lines');
-  near(t.budget.totals.gcFee, 0, 1e-9, 'no GC fee on all-in parametric rates'); assert.ok(t.pf.headline.noi > 0 && t.pf.breakEven, 'a retail NOI and its break-even'); }
+  assert.ok(!t.budget.lines.some(l => l.id.startsWith('lib:')), 'retail has no workbook lines');
+  // (retail is priced from the team's 2024–25 budgets, line by line: shell and services; the interiors are the TI allowance's)
+  const tb = t.budget.lines.filter(l => l.id.startsWith('tb:retail|'));
+  assert.ok(tb.some(l => l.id === 'tb:retail|walls') && !tb.some(l => l.grp === 'Interiors') && !t.budget.lines.some(l => l.id === 'par:hard|retail'), 'team-budget building lines, no interiors: ' + tb.map(l => l.id).join(','));
+  assert.ok(t.budget.lines.some(l => l.id === 'par:ti') && t.budget.lines.some(l => l.id === 'par:soft'), 'the TI allowance and the soft costs');
+  const fee = t.budget.lines.find(l => l.id === 'tb:fee'); near(fee.amount, tb.reduce((s, l) => s + l.amount, 0) * 0.10, 0.01, 'the budgets\' 10% contractor fee on their lines');
+  near(t.budget.totals.gcFee, 0, 1e-9, 'no workbook GC fee on top'); assert.ok(!t.register.some(a => a.key === 'hard.retail'), 'no parametric retail rate in the register'); assert.ok(t.pf.headline.noi > 0 && t.pf.breakEven, 'a retail NOI and its break-even'); }
 
 // ---- a synced document is data: a scenario's unit mix is read as numbers (no markup reaches the page) ----
 { const f = M0.fzOf({ fz: { scenarios: [{ id: 'x', name: 'X', overrides: {}, mix: [{ name: '1 BR', sf: '"><img src=x onerror=alert(1)>', pct: '50' }] }] } });
