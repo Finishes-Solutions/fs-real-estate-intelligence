@@ -4177,3 +4177,9 @@ html.sp-dragging,html.sp-dragging *{cursor:var(--cur-grabbing,grabbing)!importan
 #card .sp-lot .btn{display:inline-flex;align-items:center;gap:6px}
 #card .sp-lot .btn svg{width:16px;height:16px}
 @media (max-width:420px){#card .sp-stg{justify-content:center;padding:5px}#card .sp-stg:not(.on) .sp-stl{display:none}#card.sp-mode .sp-stages{grid-template-columns:repeat(4,auto);justify-content:start}}
+
+/* Build with AI: a site of several parcels (lay out parcel by parcel), and the AI's questions before it lays out */
+.sp-perparcel { display: flex; gap: 6px; align-items: center; margin: 6px 0 2px; font-size: 12.5px; }
+.sp-qs { margin: 8px 0 4px; padding: 8px 10px; border: 1px solid var(--line, #d8dcd6); border-radius: 8px; background: var(--panel2, #f6f8f4); }
+.sp-qs ol { margin: 4px 0 6px 18px; padding: 0; font-size: 13px; }
+.sp-qs textarea { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
