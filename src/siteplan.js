@@ -40,13 +40,13 @@ import { readJSON } from './lib/http.mjs';
 import { withTileParcel } from './lib/footprint.mjs';
 
 const KEY = 'fs-projects-v1', CODE_KEY = 'fs-team-code', NAME_KEY = 'fs-team-name';
-const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'roundabout', 'loop', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash', 'sign'];
+const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'field', 'roundabout', 'loop', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash', 'sign'];
 const ADD_LABEL = { roundabout: 'Roundabout', loop: 'Drop-off loop (circle drive)', sign: 'Monument sign', pad: 'Restaurant pad (drive-thru)', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Outdoor seating', garage: 'Parking garage' };
 // the pieces you can add, grouped the same way in the panel's Add section and the tool strip's Add palette
-const ADD_GROUPS = [['Buildings', ['building', 'pad', 'garage']], ['Paving', ['parking', 'drive', 'truck', 'roundabout', 'loop']], ['Water & landscape', ['pond', 'green']], ['Amenities', ['play', 'court', 'pool', 'patio']], ['Site', ['trash', 'sign']]];
-const ADD_SHORT = { building: 'Building', pad: 'Restaurant pad', garage: 'Garage', parking: 'Parking', drive: 'Drive', truck: 'Truck court', roundabout: 'Roundabout', loop: 'Drop-off', pond: 'Detention', green: 'Landscape', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Seating', trash: 'Trash', sign: 'Sign' };
-const SIZE = { roundabout: [100, 100], loop: [120, 70], building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], sign: [10, 5], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
-const PAVED = ['parking', 'drive', 'truck'];
+const ADD_GROUPS = [['Buildings', ['building', 'pad', 'garage']], ['Paving', ['parking', 'drive', 'truck', 'field', 'roundabout', 'loop']], ['Water & landscape', ['pond', 'green']], ['Amenities', ['play', 'court', 'pool', 'patio']], ['Site', ['trash', 'sign']]];
+const ADD_SHORT = { building: 'Building', pad: 'Restaurant pad', garage: 'Garage', parking: 'Parking', drive: 'Drive', truck: 'Truck court', field: 'Parking field', roundabout: 'Roundabout', loop: 'Drop-off', pond: 'Detention', green: 'Landscape', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Seating', trash: 'Trash', sign: 'Sign' };
+const SIZE = { roundabout: [100, 100], loop: [120, 70], building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], field: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], sign: [10, 5], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
+const PAVED = ['parking', 'drive', 'truck', 'field'];
 const FORMS = [['bar', 'Bar'], ['L', 'L-shaped'], ['U', 'Courtyard (U)'], ['tower', 'Tower on a podium']];
 const ISLANDS = [['along', 'Along the street'], ['across', 'Across the street (toward the store)']]; // which way a canopy's pump islands run
 const { COL, USE_COL } = MAP; // one palette for the map, the Plan key and the Draw buttons (lib/planmap.mjs)
@@ -651,8 +651,8 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-med', type: 'fill', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'fill-color': C.green, 'fill-opacity': ['case', sel1, .6, .9] } }); // the entry's planted median
     add({ id: 'fs-sp-medl', type: 'line', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'line-color': Ln.curb, 'line-width': 1 } });
     add({ id: 'fs-sp-sign', type: 'fill-extrusion', source: SRC, filter: kind('sign'), paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, sel1, P.sel(C.sign || '#8b8073'), C.sign || '#8b8073'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .95 } }); // a monument sign: a low stone wall
-    add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
-      paint: { 'fill-color': ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'pond', C.pond, 'plaza', C.plaza, 'court', C.court, 'pool', C.pool, 'play', C.play, C.green],
+    add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'field', 'pond', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
+      paint: { 'fill-color': ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'field', C.drive, 'pond', C.pond, 'plaza', C.plaza, 'court', C.court, 'pool', C.pool, 'play', C.play, C.green],
         'fill-opacity': ['case', sel1, .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, .75] } });
     add({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: ['all', kind('lot'), ['!=', ['get', 'site'], 1]], minzoom: 17, layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.lots, 'line-width': 1, 'line-dasharray': [0.1, 2.4] } }); // house lots, dotted, close in
     add({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': Ln.walk, 'fill-opacity': .85 } });
@@ -693,7 +693,7 @@ export function initSitePlan(ctx) {
       'fill-extrusion-color': ['match', ['get', 'part'], 'tower', ['case', ph2, useCol(c => f(P.p2(c))), useCol(f)], 'parapet', ['case', ['==', ['get', 'g'], 1], '#8b9092', '#6d635a'], ['case', ['==', ['get', 'g'], 1], '#6f7476', '#4f453c']] });
     add({ id: 'fs-sp-b3', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), ['!', sel1]], paint: b3(id) });
     add({ id: 'fs-sp-b3s', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), sel1], paint: b3(lit) });
-    add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck', 'sign']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
+    add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'field', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck', 'sign']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
       paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, 'rgba(11,13,12,.45)'], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1] } });
     add({ id: 'fs-sp-p2', type: 'line', source: SRC, filter: ['all', kind('building'), ph2, ['!', sel1], ['!=', ['get', 'bad'], 1]], paint: { 'line-color': Ln.p2, 'line-width': 1.3, 'line-dasharray': [2, 1.6] } }); // Phase 2: dashed
     // the selection: green on a white casing (a red casing when it's also a problem)
@@ -917,7 +917,7 @@ export function initSitePlan(ctx) {
   const ftAt = (pl, lngLat) => SP.frame(pl.origin).toFt([lngLat.lng, lngLat.lat]);
   const SHAPEABLE = ['building', 'plaza', 'green', 'pond', 'court', 'pool', 'patio', 'play', 'garage', 'parking']; // pieces whose outline can be edited point by point
   const faceted = e => !!e.poly && (e.poly.length <= 16 || ['building', 'garage', 'parking'].includes(e.kind)); // a drawn or reshaped outline (its faces can be dragged), not a pond's natural curve (that scales)
-  const ORDER = ['sign', 'trash', 'foodtruck', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'canopy', 'tanks', 'pond', 'keepout', 'fence', 'drive', 'truck', 'parking', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
+  const ORDER = ['sign', 'trash', 'foodtruck', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'canopy', 'tanks', 'pond', 'keepout', 'fence', 'drive', 'truck', 'parking', 'field', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
   // what's under the pointer: the selected piece's nearest handle (a finger gets more room than a mouse), else the piece
   // (plan pieces in feet, turned or not: never map tiles). A face bar is caught only along the bar as drawn, and a
   // handle the pointer is merely near gives way to another piece it's on, so a click meant for a neighbour picks it.
