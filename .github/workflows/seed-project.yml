@@ -1,0 +1,47 @@
+name: Seed project
+
+# Puts a project built from drawings into the team's Projects (Supabase site_projects) with build/seed-project.mjs and a
+# builder in build/projects/ (op-0046: the OP-0046 site at FM 362 and Old Houston Hwy, Waller). Run by hand; the parcels
+# are read from the county appraisal district's layer at run time. Seeding again replaces the team's copy.
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: "Builder in build/projects/ (op-0046)"
+        required: false
+        default: op-0046
+      dry:
+        description: "Build and report only, write nothing (1 = yes)"
+        required: false
+      offline:
+        description: "Use the builder's saved parcel copies instead of the county layer (1 = yes)"
+        required: false
+
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC for the Supabase pipeline edge function when no secret key is stored
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    environment: Production # the secrets live in this GitHub environment
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Build and seed the project
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_KEY }}
+        run: node build/seed-project.mjs "${{ inputs.project || 'op-0046' }}" ${{ inputs.dry == '1' && '--dry' || '' }} ${{ inputs.offline == '1' && '--offline' || '' }} --out "seed-${{ inputs.project || 'op-0046' }}.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: seed-${{ inputs.project || 'op-0046' }}
+          path: seed-*.json
+          if-no-files-found: ignore
