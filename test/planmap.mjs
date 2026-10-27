@@ -29,8 +29,8 @@ assert.ok(Math.max(...pri('building')) < Math.min(...pri('parking')));
 assert.ok(M.labelPri('building', 30000) < M.labelPri('building', 2000)); assert.equal(M.labelPri('building', 30000, false, true), 1); assert.equal(M.labelPri('parking', 0, true), 0);
 assert.ok(M.labelPri('pond') < M.labelPri('pool')); assert.ok(M.labelPri('pool') < M.labelPri('drive')); assert.ok(M.labelPri('drive') < M.labelPri('parking'));
 // 3D parts know their building (the selected one's are drawn on their own layer)
-assert.ok(fc.features.filter(f => f.properties.k === 'b3' && f.properties.bid === sel).every(f => f.properties.sel === 1));
-assert.ok(fc.features.some(f => f.properties.k === 'b3' && f.properties.bid === sel));
+assert.ok(fc.features.filter(f => ['b3', 'fac'].includes(f.properties.k) && f.properties.bid === sel).every(f => f.properties.sel === 1));
+assert.ok(fc.features.some(f => ['b3', 'fac'].includes(f.properties.k) && f.properties.bid === sel));
 // Phase 2: the use stays, "PH 2" on the first line; hyphens don't break
 const p2 = labels.filter(f => f.properties.kind === 'building' && f.properties.ph === 2);
 assert.ok(p2.length > 0, 'the filled site has Phase 2 buildings');

@@ -162,7 +162,7 @@ for (const t of tools) {
   assert.equal(t.inputSchema.type, 'object', t.name); assert.ok(t.description.length > 60, t.name + ' describes itself');
 }
 assert.ok(['address', 'apn', 'county', 'lat', 'lon', 'radius_mi', 'bbox', 'geojson'].every(k => tools.find(t => t.name === 'flood').inputSchema.properties[k]), 'one location input everywhere');
-assert.ok(JSON.stringify(tools).length < 65000, 'the tool list stays small'); // (31 tools: plan sets, renderings and parcel-by-parcel site plans took it past 60,000)
+assert.ok(JSON.stringify(tools).length < 85000, 'the tool list stays small'); // (both branches' tools: plan sets, renderings, parcel-by-parcel site plans, projects and the study together)
 console.log('mcp tools/list ok:', tools.length, 'tools');
 
 // every answer: compact, with sources; never secrets or internal URLs
@@ -246,8 +246,7 @@ console.log('mcp upstream timeout ok');
 // ---------- reports: the website's PDFs as embedded resources ----------
 {
   const fs = await import('node:fs'), { PDFDocument } = await import('pdf-lib'), R = await import('../lib/mcp/reports.mjs');
-  process.env.CHROME_PATH ||= ['/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find(p => fs.existsSync(p)) || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-  const haveChrome = fs.existsSync(process.env.CHROME_PATH);
+  const { localChrome } = await import('./helpers/chrome.mjs'), haveChrome = !!localChrome();
   if (!haveChrome) { // no local Chromium: a stand-in that makes a real one-page PDF with the HTML's title
     R.hooks.render = async (html, { title }) => { const d = await PDFDocument.create(); d.setTitle(title); d.addPage(); return Buffer.from(await d.save()); };
     console.log('mcp reports: no Chromium at CHROME_PATH, rendering with a stand-in'); }

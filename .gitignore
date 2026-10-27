@@ -6,3 +6,8 @@ test/.data/
 
 # Claude Code session scaffolding (sub-agent worktrees)
 .claude/worktrees/
+
+# local secrets for scripts/dev.mjs (never committed)
+.env
+.env.local
+test/fixtures/fz/market/data/

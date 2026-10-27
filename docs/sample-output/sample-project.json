@@ -1,0 +1,1976 @@
+{
+ "id": "sample-waller-apartments",
+ "name": "Sample: Waller garden apartments",
+ "client": "Finishes Solutions (sample)",
+ "status": "review",
+ "use": "Garden apartments",
+ "parcels": [
+  {
+   "key": "sample-1",
+   "label": "Parcel A",
+   "owner": "Sample owner",
+   "city": "Waller",
+   "zip": "77484",
+   "county": "Waller",
+   "acres": 5.876,
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -95.9356078,
+       30.0553271
+      ],
+      [
+       -95.9340345,
+       30.055348
+      ],
+      [
+       -95.9340583,
+       30.0572239
+      ],
+      [
+       -95.9343027,
+       30.0572834
+      ],
+      [
+       -95.934612,
+       30.0565902
+      ],
+      [
+       -95.9356183,
+       30.0565089
+      ],
+      [
+       -95.9356078,
+       30.0553271
+      ]
+     ]
+    ]
+   },
+   "source": {
+    "kind": "data",
+    "label": "Appraisal-district parcel outline (anonymized sample fixture)",
+    "confidence": "medium"
+   }
+  },
+  {
+   "key": "sample-2",
+   "label": "Parcel B",
+   "owner": "Sample owner",
+   "city": "Waller",
+   "zip": "77484",
+   "county": "Waller",
+   "acres": 9.356,
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -95.9346607,
+       30.0573714
+      ],
+      [
+       -95.9346684,
+       30.0579473
+      ],
+      [
+       -95.9356345,
+       30.0581811
+      ],
+      [
+       -95.9362779,
+       30.0583362
+      ],
+      [
+       -95.9362474,
+       30.0553187
+      ],
+      [
+       -95.9356078,
+       30.0553271
+      ],
+      [
+       -95.9356183,
+       30.0565089
+      ],
+      [
+       -95.934612,
+       30.0565902
+      ],
+      [
+       -95.9343027,
+       30.0572834
+      ],
+      [
+       -95.9346607,
+       30.0573714
+      ]
+     ]
+    ]
+   },
+   "source": {
+    "kind": "data",
+    "label": "Appraisal-district parcel outline (anonymized sample fixture)",
+    "confidence": "medium"
+   }
+  },
+  {
+   "key": "sample-3",
+   "label": "Parcel C",
+   "owner": "Sample owner",
+   "city": "Waller",
+   "zip": "77484",
+   "county": "Waller",
+   "acres": 0.926,
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -95.9343027,
+       30.0572834
+      ],
+      [
+       -95.9340583,
+       30.0572239
+      ],
+      [
+       -95.934066,
+       30.0578023
+      ],
+      [
+       -95.9346684,
+       30.0579473
+      ],
+      [
+       -95.9346607,
+       30.0573714
+      ],
+      [
+       -95.9343027,
+       30.0572834
+      ]
+     ]
+    ]
+   },
+   "source": {
+    "kind": "data",
+    "label": "Appraisal-district parcel outline (anonymized sample fixture)",
+    "confidence": "medium"
+   }
+  }
+ ],
+ "plans": [
+  {
+   "id": "sample-opt-a",
+   "name": "Option A",
+   "origin": [
+    -95.935194,
+    30.056705
+   ],
+   "ring": [
+    [
+     -333.27,
+     -504.19
+    ],
+    [
+     366.84,
+     -493.53
+    ],
+    [
+     357.66,
+     382.26
+    ],
+    [
+     356.87,
+     399.08
+    ],
+    [
+     -342.92,
+     593.25
+    ]
+   ],
+   "pieces": 1,
+   "areaParcels": 695598.7616168434,
+   "front": null,
+   "setbacks": {
+    "front": 25,
+    "side": 10,
+    "rear": 20,
+    "paving": 10
+   },
+   "elements": [
+    {
+     "kind": "drive",
+     "x": 76.34,
+     "y": -383.85,
+     "w": 416.258,
+     "d": 24,
+     "name": "",
+     "note": "24 ft drive aisle",
+     "rot": 0.645,
+     "id": "e1v88f"
+    },
+    {
+     "kind": "drive",
+     "x": 74.78,
+     "y": -239.86,
+     "w": 558.369,
+     "d": 24,
+     "name": "",
+     "note": "24 ft drive aisle",
+     "rot": 0.645,
+     "id": "e21svg"
+    },
+    {
+     "kind": "drive",
+     "x": 65.59,
+     "y": -95.96,
+     "w": 543.243,
+     "d": 24,
+     "name": "",
+     "note": "24 ft drive aisle",
+     "rot": 0.645,
+     "id": "e3x6x5"
+    },
+    {
+     "kind": "drive",
+     "x": 64.01,
+     "y": 48.03,
+     "w": 543.326,
+     "d": 24,
+     "name": "",
+     "note": "24 ft drive aisle",
+     "rot": 0.645,
+     "id": "e4myt1"
+    },
+    {
+     "kind": "drive",
+     "x": 77.71,
+     "y": 192.2,
+     "w": 543.438,
+     "d": 24,
+     "name": "",
+     "note": "24 ft drive aisle",
+     "rot": 0.645,
+     "id": "e5lrm0"
+    },
+    {
+     "kind": "drive",
+     "x": 32.96,
+     "y": 335.7,
+     "w": 487.703,
+     "d": 24,
+     "name": "",
+     "note": "24 ft drive aisle",
+     "rot": 0.645,
+     "id": "e6stxx"
+    },
+    {
+     "kind": "drive",
+     "x": 26.2,
+     "y": 399.63,
+     "w": 333.616,
+     "d": 24,
+     "name": "",
+     "note": "24 ft drive aisle",
+     "rot": 0.645,
+     "id": "e7zkvz"
+    },
+    {
+     "kind": "drive",
+     "path": [
+      [
+       -129.78,
+       -386.17
+      ],
+      [
+       -189.77,
+       -386.85
+      ],
+      [
+       -191.39,
+       -242.86
+      ]
+     ],
+     "width": 26,
+     "r": 30,
+     "name": "",
+     "note": "26 ft drive",
+     "x": -189.77,
+     "y": -386.85,
+     "w": 73,
+     "d": 157,
+     "rot": 0.645,
+     "id": "e8u9oe"
+    },
+    {
+     "kind": "drive",
+     "path": [
+      [
+       282.46,
+       -381.53
+      ],
+      [
+       342.45,
+       -380.86
+      ],
+      [
+       340.83,
+       -236.87
+      ]
+     ],
+     "width": 26,
+     "r": 30,
+     "name": "",
+     "note": "26 ft drive",
+     "x": 342.45,
+     "y": -380.86,
+     "w": 73,
+     "d": 157,
+     "rot": 0.645,
+     "id": "e9krfm"
+    },
+    {
+     "kind": "drive",
+     "x": 75.6,
+     "y": -317.86,
+     "w": 24,
+     "d": 156,
+     "name": "",
+     "note": "24 ft drive",
+     "rot": 0.645,
+     "id": "ea0gzj"
+    },
+    {
+     "kind": "drive",
+     "x": 73.97,
+     "y": -167.87,
+     "w": 24,
+     "d": 144,
+     "name": "",
+     "note": "24 ft drive",
+     "rot": 0.645,
+     "id": "ebcv0p"
+    },
+    {
+     "kind": "drive",
+     "x": -193.82,
+     "y": -26.87,
+     "w": 26,
+     "d": 144,
+     "name": "",
+     "note": "26 ft drive",
+     "rot": 0.645,
+     "id": "ec6cxd"
+    },
+    {
+     "kind": "drive",
+     "x": 72.4,
+     "y": -23.88,
+     "w": 24,
+     "d": 144,
+     "name": "",
+     "note": "24 ft drive",
+     "rot": 0.645,
+     "id": "ed7klt"
+    },
+    {
+     "kind": "drive",
+     "x": 70.84,
+     "y": 120.12,
+     "w": 24,
+     "d": 144,
+     "name": "",
+     "note": "24 ft drive",
+     "rot": 0.645,
+     "id": "eerw8s"
+    },
+    {
+     "kind": "drive",
+     "path": [
+      [
+       336.42,
+       195.11
+      ],
+      [
+       334.79,
+       339.1
+      ],
+      [
+       274.8,
+       338.43
+      ]
+     ],
+     "width": 26,
+     "r": 30,
+     "name": "",
+     "note": "26 ft drive",
+     "x": 334.79,
+     "y": 339.1,
+     "w": 73,
+     "d": 157,
+     "rot": 0.645,
+     "id": "efujx2"
+    },
+    {
+     "kind": "drive",
+     "x": 69.2,
+     "y": 270.11,
+     "w": 24,
+     "d": 156,
+     "name": "",
+     "note": "24 ft drive",
+     "rot": 0.645,
+     "id": "eghbak"
+    },
+    {
+     "kind": "drive",
+     "path": [
+      [
+       -197.88,
+       333.11
+      ],
+      [
+       -198.6,
+       397.1
+      ],
+      [
+       -138.6,
+       397.78
+      ]
+     ],
+     "width": 26,
+     "r": 30,
+     "name": "",
+     "note": "26 ft drive",
+     "x": -198.6,
+     "y": 397.1,
+     "w": 73,
+     "d": 77,
+     "rot": 0.645,
+     "id": "eh6t7v"
+    },
+    {
+     "kind": "drive",
+     "path": [
+      [
+       251.85,
+       326.17
+      ],
+      [
+       250.99,
+       402.16
+      ],
+      [
+       191,
+       401.49
+      ]
+     ],
+     "width": 26,
+     "r": 30,
+     "name": "",
+     "note": "26 ft drive",
+     "x": 250.99,
+     "y": 402.16,
+     "w": 73,
+     "d": 89,
+     "rot": 0.645,
+     "id": "eivawp"
+    },
+    {
+     "kind": "drive",
+     "x": 26.56,
+     "y": 367.63,
+     "w": 24,
+     "d": 88,
+     "name": "",
+     "note": "24 ft drive",
+     "rot": 0.645,
+     "id": "ej8jfk"
+    },
+    {
+     "kind": "drive",
+     "poly": [
+      [
+       -338.65,
+       -6.5
+      ],
+      [
+       -339.53,
+       93.5
+      ],
+      [
+       -338.53,
+       93.51
+      ],
+      [
+       -337.6,
+       87.05
+      ],
+      [
+       -335.04,
+       81.05
+      ],
+      [
+       -331,
+       75.91
+      ],
+      [
+       -325.78,
+       72
+      ],
+      [
+       -319.73,
+       69.57
+      ],
+      [
+       -313.25,
+       68.79
+      ],
+      [
+       -192.92,
+       70.14
+      ],
+      [
+       -192.35,
+       20.15
+      ],
+      [
+       -312.93,
+       18.79
+      ],
+      [
+       -319.39,
+       17.87
+      ],
+      [
+       -325.39,
+       15.3
+      ],
+      [
+       -330.52,
+       11.27
+      ],
+      [
+       -334.44,
+       6.05
+      ],
+      [
+       -336.87,
+       -0.01
+      ],
+      [
+       -337.65,
+       -6.49
+      ]
+     ],
+     "name": "Main entry",
+     "note": "Boulevard · 50 ft · two 18 ft lanes, 14 ft median",
+     "blvd": {
+      "lane": 18,
+      "median": 14
+     },
+     "x": -268.76,
+     "y": 44.29,
+     "w": 146.58,
+     "d": 100,
+     "rot": 0.645,
+     "id": "eklc8v"
+    },
+    {
+     "kind": "green",
+     "poly": [
+      [
+       -300.89,
+       36.93
+      ],
+      [
+       -303.57,
+       37.43
+      ],
+      [
+       -305.86,
+       38.92
+      ],
+      [
+       -307.4,
+       41.18
+      ],
+      [
+       -307.96,
+       43.85
+      ],
+      [
+       -307.46,
+       46.53
+      ],
+      [
+       -305.97,
+       48.82
+      ],
+      [
+       -303.72,
+       50.36
+      ],
+      [
+       -301.04,
+       50.93
+      ],
+      [
+       -244.71,
+       51.56
+      ],
+      [
+       -242.02,
+       51.06
+      ],
+      [
+       -239.74,
+       49.57
+      ],
+      [
+       -238.19,
+       47.31
+      ],
+      [
+       -237.63,
+       44.64
+      ],
+      [
+       -238.13,
+       41.96
+      ],
+      [
+       -239.63,
+       39.67
+      ],
+      [
+       -241.88,
+       38.12
+      ],
+      [
+       -244.55,
+       37.56
+      ]
+     ],
+     "name": "",
+     "trees": false,
+     "median": true,
+     "island": true,
+     "x": -272.8,
+     "y": 44.24,
+     "w": 70.34,
+     "d": 14,
+     "rot": 0.645,
+     "id": "eldtg8"
+    },
+    {
+     "kind": "building",
+     "x": -121.55,
+     "y": -26.06,
+     "w": 90,
+     "d": 60,
+     "use": "amenity",
+     "floors": 1,
+     "name": "Clubhouse",
+     "note": "Leasing · fitness · lounge",
+     "nowalk": false,
+     "rot": 0.645,
+     "id": "emz7r8"
+    },
+    {
+     "kind": "plaza",
+     "x": -17.08,
+     "y": -24.88,
+     "w": 118.966,
+     "d": 60,
+     "name": "",
+     "note": "Pool deck",
+     "rot": 0.645,
+     "id": "en62wo"
+    },
+    {
+     "kind": "pool",
+     "x": -17.08,
+     "y": -24.88,
+     "w": 70,
+     "d": 32,
+     "name": "Pool",
+     "note": "",
+     "rot": 0.645,
+     "id": "eokuwm"
+    },
+    {
+     "kind": "parking",
+     "x": 76.58,
+     "y": -404.85,
+     "w": 495,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "epl9hd"
+    },
+    {
+     "kind": "parking",
+     "x": -59.33,
+     "y": -364.38,
+     "w": 207,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "eqfqko"
+    },
+    {
+     "kind": "parking",
+     "x": 211.54,
+     "y": -361.33,
+     "w": 207,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "er29j1"
+    },
+    {
+     "kind": "parking",
+     "x": -60.48,
+     "y": -262.39,
+     "w": 207,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "es4tn2"
+    },
+    {
+     "kind": "parking",
+     "x": 210.39,
+     "y": -259.34,
+     "w": 207,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "etzj9f"
+    },
+    {
+     "kind": "parking",
+     "x": -60.93,
+     "y": -220.39,
+     "w": 207,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "euvbbf"
+    },
+    {
+     "kind": "parking",
+     "x": 210.01,
+     "y": -217.34,
+     "w": 207,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "evyalo"
+    },
+    {
+     "kind": "parking",
+     "x": -62.07,
+     "y": -118.39,
+     "w": 207,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "ewlmrg"
+    },
+    {
+     "kind": "parking",
+     "x": 208.86,
+     "y": -115.35,
+     "w": 207,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "ex63ns"
+    },
+    {
+     "kind": "parking",
+     "x": -62.52,
+     "y": -76.4,
+     "w": 207,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "eyipdj"
+    },
+    {
+     "kind": "parking",
+     "x": 208.47,
+     "y": -73.35,
+     "w": 207,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "ez2spz"
+    },
+    {
+     "kind": "parking",
+     "x": -63.67,
+     "y": 25.6,
+     "w": 207,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e109r60"
+    },
+    {
+     "kind": "parking",
+     "x": 207.32,
+     "y": 28.65,
+     "w": 207,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e11js4a"
+    },
+    {
+     "kind": "parking",
+     "x": -64.11,
+     "y": 67.59,
+     "w": 207,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e12bodu"
+    },
+    {
+     "kind": "parking",
+     "x": 206.93,
+     "y": 70.64,
+     "w": 207,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e13zjyi"
+    },
+    {
+     "kind": "parking",
+     "x": -65.26,
+     "y": 169.59,
+     "w": 207,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e14tmh4"
+    },
+    {
+     "kind": "parking",
+     "x": 205.78,
+     "y": 172.64,
+     "w": 207,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e15qwec"
+    },
+    {
+     "kind": "parking",
+     "x": -65.71,
+     "y": 211.59,
+     "w": 207,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e16hf3k"
+    },
+    {
+     "kind": "parking",
+     "x": 205.39,
+     "y": 214.64,
+     "w": 207,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e17f52v"
+    },
+    {
+     "kind": "parking",
+     "x": -66.85,
+     "y": 313.58,
+     "w": 207,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e1869gk"
+    },
+    {
+     "kind": "parking",
+     "x": 166.61,
+     "y": 316.21,
+     "w": 126,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e19r21f"
+    },
+    {
+     "kind": "parking",
+     "x": -61.1,
+     "y": 355.65,
+     "w": 144,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e1ag8gj"
+    },
+    {
+     "kind": "parking",
+     "x": 132.46,
+     "y": 357.82,
+     "w": 180,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e1bxj4e"
+    },
+    {
+     "kind": "parking",
+     "x": -79.35,
+     "y": 377.44,
+     "w": 180,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e1czpsr"
+    },
+    {
+     "kind": "parking",
+     "x": 10.61,
+     "y": 420.46,
+     "w": 378,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 0.645,
+     "id": "e1d7lai"
+    },
+    {
+     "kind": "parking",
+     "x": 54.53,
+     "y": -312.09,
+     "w": 81,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 90.645,
+     "id": "e1ee3ko"
+    },
+    {
+     "kind": "parking",
+     "x": 96.53,
+     "y": -311.62,
+     "w": 81,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 90.645,
+     "id": "e1fjf80"
+    },
+    {
+     "kind": "parking",
+     "x": 52.97,
+     "y": -168.1,
+     "w": 81,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 90.645,
+     "id": "e1gb4db"
+    },
+    {
+     "kind": "parking",
+     "x": 94.96,
+     "y": -167.63,
+     "w": 81,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 90.645,
+     "id": "e1hw3kr"
+    },
+    {
+     "kind": "parking",
+     "x": 51.4,
+     "y": -24.11,
+     "w": 81,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 90.645,
+     "id": "e1ikhub"
+    },
+    {
+     "kind": "parking",
+     "x": 93.4,
+     "y": -23.64,
+     "w": 81,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 90.645,
+     "id": "e1jrtps"
+    },
+    {
+     "kind": "parking",
+     "x": 49.84,
+     "y": 119.88,
+     "w": 81,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 90.645,
+     "id": "e1ksoie"
+    },
+    {
+     "kind": "parking",
+     "x": 91.83,
+     "y": 120.35,
+     "w": 81,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 90.645,
+     "id": "e1la18a"
+    },
+    {
+     "kind": "parking",
+     "x": 48.27,
+     "y": 263.87,
+     "w": 81,
+     "d": 18,
+     "row": -1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 90.645,
+     "id": "e1mriv2"
+    },
+    {
+     "kind": "parking",
+     "x": 90.27,
+     "y": 264.34,
+     "w": 81,
+     "d": 18,
+     "row": 1,
+     "lock": true,
+     "islands": true,
+     "caps": false,
+     "rot": 90.645,
+     "id": "e1nlvyk"
+    },
+    {
+     "kind": "building",
+     "x": -125.63,
+     "y": -458.13,
+     "w": 164.664,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1oukgw",
+     "name": "Apt Bldg 10",
+     "units": 27
+    },
+    {
+     "kind": "building",
+     "x": 69.02,
+     "y": -455.94,
+     "w": 164.664,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1p937m",
+     "name": "Apt Bldg 12",
+     "units": 27
+    },
+    {
+     "kind": "building",
+     "x": 263.67,
+     "y": -453.75,
+     "w": 164.664,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1qt92a",
+     "name": "Apt Bldg 13",
+     "units": 27
+    },
+    {
+     "kind": "building",
+     "x": 208.42,
+     "y": -310.36,
+     "w": 185.404,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1raz08",
+     "name": "Apt Bldg 11",
+     "units": 31
+    },
+    {
+     "kind": "building",
+     "x": -57.36,
+     "y": -313.35,
+     "w": 185.404,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1svq1q",
+     "name": "Apt Bldg 4",
+     "units": 31
+    },
+    {
+     "kind": "building",
+     "x": -58.95,
+     "y": -169.36,
+     "w": 185.46,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1ti4t9",
+     "name": "Apt Bldg 2",
+     "units": 31
+    },
+    {
+     "kind": "building",
+     "x": 206.88,
+     "y": -166.37,
+     "w": 185.46,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1upapf",
+     "name": "Apt Bldg 8",
+     "units": 31
+    },
+    {
+     "kind": "building",
+     "x": 205.35,
+     "y": -22.38,
+     "w": 185.515,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1v9ngs",
+     "name": "Apt Bldg 6",
+     "units": 31
+    },
+    {
+     "kind": "building",
+     "x": -62.14,
+     "y": 118.62,
+     "w": 185.571,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1w74pw",
+     "name": "Apt Bldg 1",
+     "units": 31
+    },
+    {
+     "kind": "building",
+     "x": 203.81,
+     "y": 121.61,
+     "w": 185.571,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1x8c5y",
+     "name": "Apt Bldg 7",
+     "units": 31
+    },
+    {
+     "kind": "building",
+     "x": -63.73,
+     "y": 262.61,
+     "w": 185.627,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1yxv6i",
+     "name": "Apt Bldg 3",
+     "units": 31
+    },
+    {
+     "kind": "building",
+     "x": 202.27,
+     "y": 265.6,
+     "w": 185.627,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e1z4lli",
+     "name": "Apt Bldg 9",
+     "units": 31
+    },
+    {
+     "kind": "building",
+     "x": -132.97,
+     "y": 469.84,
+     "w": 170.874,
+     "d": 60,
+     "use": "multifamily",
+     "floors": 3,
+     "jog": 5,
+     "rot": 0.645,
+     "id": "e201ifz",
+     "name": "Apt Bldg 5",
+     "units": 29
+    },
+    {
+     "kind": "drive",
+     "x": 325.34582898158953,
+     "y": -106.03373845015005,
+     "w": 26,
+     "d": 286,
+     "name": "",
+     "note": "26 ft drive",
+     "rot": 0.645,
+     "id": "e21iwd7"
+    },
+    {
+     "kind": "drive",
+     "x": 322.8725142718106,
+     "y": 120.95012672712373,
+     "w": 26,
+     "d": 172,
+     "name": "",
+     "note": "26 ft drive",
+     "rot": 0.645,
+     "id": "e22oqgb"
+    },
+    {
+     "kind": "drive",
+     "x": -181.20251427181051,
+     "y": 119.27987327287627,
+     "w": 26,
+     "d": 172,
+     "name": "",
+     "note": "26 ft drive",
+     "rot": 0.645,
+     "id": "e2311cc"
+    },
+    {
+     "kind": "green",
+     "poly": [
+      [
+       -325.77,
+       -496.52
+      ],
+      [
+       -227.2,
+       -495.41
+      ],
+      [
+       -227.96,
+       -427.17
+      ],
+      [
+       -220.55,
+       -411.92
+      ],
+      [
+       -205.39,
+       -411.74
+      ],
+      [
+       -207.43,
+       -229.76
+      ],
+      [
+       -169.52,
+       -229.33
+      ],
+      [
+       -170.8,
+       -115.59
+      ],
+      [
+       -208.71,
+       -116.01
+      ],
+      [
+       -210.17,
+       12.9
+      ],
+      [
+       -323.91,
+       11.62
+      ],
+      [
+       -331.41,
+       3.95
+      ]
+     ],
+     "name": "",
+     "note": "",
+     "trees": true,
+     "spare": true,
+     "x": -250.04,
+     "y": -150.61,
+     "w": 159.25,
+     "d": 508.08,
+     "rot": 0.645,
+     "id": "e24pkt1"
+    },
+    {
+     "kind": "pond",
+     "poly": [
+      [
+       -310.78,
+       -481.19
+      ],
+      [
+       -242.53,
+       -480.42
+      ],
+      [
+       -243.13,
+       -427.34
+      ],
+      [
+       -220.64,
+       -404.33
+      ],
+      [
+       -222.6,
+       -229.93
+      ],
+      [
+       -184.86,
+       -214.33
+      ],
+      [
+       -185.79,
+       -130.92
+      ],
+      [
+       -223.88,
+       -116.18
+      ],
+      [
+       -225.16,
+       -2.44
+      ],
+      [
+       -316.15,
+       -3.46
+      ]
+     ],
+     "name": "Detention pond",
+     "note": "Wet detention",
+     "x": -264.03,
+     "y": -229.58,
+     "w": 128.92,
+     "d": 477.75,
+     "rot": 0.645,
+     "id": "e25xlqo"
+    },
+    {
+     "kind": "green",
+     "poly": [
+      [
+       -330.22,
+       572.75
+      ],
+      [
+       -324.59,
+       72.28
+      ],
+      [
+       -195.68,
+       73.73
+      ],
+      [
+       -197.13,
+       202.64
+      ],
+      [
+       -195.37211533925873,
+       202.6593174138543
+      ],
+      [
+       -195.41103681245713,
+       206.116591743911
+      ],
+      [
+       -195.43355108426763,
+       208.1164650167873
+      ],
+      [
+       -174.44147140287444,
+       208.3527906851309
+      ],
+      [
+       -175.66,
+       316.64
+      ],
+      [
+       -213.58,
+       316.21
+      ],
+      [
+       -214.77,
+       422.37
+      ],
+      [
+       -229.94,
+       422.2
+      ],
+      [
+       -237.69,
+       437.28
+      ],
+      [
+       -238.38,
+       497.94
+      ],
+      [
+       -230.96,
+       513.19
+      ],
+      [
+       -215.8,
+       513.36
+      ],
+      [
+       -216.23,
+       551.28
+      ],
+      [
+       -269.39,
+       558.26
+      ],
+      [
+       -292.31,
+       573.17
+      ]
+     ],
+     "name": "",
+     "note": "",
+     "trees": true,
+     "spare": true,
+     "x": -247.32,
+     "y": 281.7,
+     "w": 151.67,
+     "d": 500.5,
+     "rot": 0.645,
+     "id": "e26poyy"
+    },
+    {
+     "kind": "pond",
+     "poly": [
+      [
+       -309.6,
+       87.61
+      ],
+      [
+       -211.02,
+       88.72
+      ],
+      [
+       -212.3,
+       202.47
+      ],
+      [
+       -189.72,
+       217.89
+      ],
+      [
+       -190.66,
+       301.3
+      ],
+      [
+       -228.75,
+       316.04
+      ],
+      [
+       -229.85,
+       414.62
+      ],
+      [
+       -252.86,
+       437.11
+      ],
+      [
+       -253.54,
+       497.77
+      ],
+      [
+       -231.22,
+       535.94
+      ],
+      [
+       -292.14,
+       558.01
+      ],
+      [
+       -314.89,
+       557.75
+      ]
+     ],
+     "name": "Detention pond",
+     "note": "Wet detention",
+     "x": -264.68,
+     "y": 298.82,
+     "w": 121.33,
+     "d": 470.17,
+     "rot": 0.645,
+     "id": "e27m4w4"
+    },
+    {
+     "kind": "green",
+     "poly": [
+      [
+       -32.87,
+       432
+      ],
+      [
+       73.29,
+       433.2
+      ],
+      [
+       72.86,
+       471.11
+      ],
+      [
+       19.7,
+       478.1
+      ],
+      [
+       19.61,
+       485.68
+      ],
+      [
+       -33.47,
+       485.08
+      ]
+     ],
+     "name": "",
+     "note": "",
+     "trees": true,
+     "x": 0.95,
+     "y": 458.93,
+     "w": 106.17,
+     "d": 53.08,
+     "rot": 0.645,
+     "id": "e28fvf3"
+    },
+    {
+     "kind": "green",
+     "poly": [
+      [
+       339.6948679758185,
+       34.25407155141355
+      ],
+      [
+       340.97541528954554,
+       -79.49299381799557
+      ],
+      [
+       352.08,
+       -79.37
+      ],
+      [
+       350.8,
+       34.38
+      ]
+     ],
+     "name": "",
+     "note": "",
+     "trees": true,
+     "x": 332.05,
+     "y": 15.21,
+     "w": 37.92,
+     "d": 113.75,
+     "rot": 0.645,
+     "id": "e29zw7k"
+    },
+    {
+     "id": "er8fp37i",
+     "kind": "sign",
+     "x": -299.46,
+     "y": 43.95,
+     "w": 10,
+     "d": 5,
+     "rot": 270.64,
+     "name": "Monument sign",
+     "note": "In the median",
+     "sign": "median",
+     "want": "median",
+     "of": "eklc8v"
+    }
+   ],
+   "program": {
+    "use": "multifamily",
+    "floors": 3,
+    "gfa": null,
+    "ratio": 3,
+    "perUnit": 1.6,
+    "units": null,
+    "unitSf": 900,
+    "buildings": null,
+    "depth": 65,
+    "detentionPct": null,
+    "storm": null,
+    "through": false,
+    "trash": false,
+    "compare": false,
+    "entrances": null,
+    "product": null,
+    "truck": false,
+    "max": false,
+    "extras": [],
+    "eff": 0.85,
+    "asked": null,
+    "mix": null,
+    "homeMix": null,
+    "lotD": 115,
+    "community": null,
+    "partName": null,
+    "zones": null,
+    "garage": false
+   },
+   "created": "2026-10-24T12:00:00.000Z",
+   "zones": [
+    {
+     "name": "Multifamily",
+     "use": "multifamily",
+     "zone": null,
+     "ring": [
+      [
+       -333.27,
+       -504.19
+      ],
+      [
+       366.84,
+       -493.53
+      ],
+      [
+       357.66,
+       382.26
+      ],
+      [
+       356.87,
+       399.08
+      ],
+      [
+       -342.92,
+       593.25
+      ]
+     ],
+     "acres": 15.974204900137739
+    }
+   ],
+   "recipe": {
+    "deep": true,
+    "seq": {
+     "blocks": [
+      {
+       "fill": "bldg",
+       "use": "multifamily",
+       "D": 60,
+       "floors": 3,
+       "rowsUp": true,
+       "h": 90
+      },
+      {
+       "fill": "bldg",
+       "use": "multifamily",
+       "D": 60,
+       "floors": 3,
+       "rowsDown": true,
+       "rowsUp": true,
+       "h": 120
+      },
+      {
+       "fill": "bldg",
+       "use": "multifamily",
+       "D": 60,
+       "floors": 3,
+       "rowsDown": true,
+       "rowsUp": true,
+       "h": 120
+      },
+      {
+       "fill": "bldg",
+       "use": "multifamily",
+       "D": 60,
+       "floors": 3,
+       "rowsDown": true,
+       "rowsUp": true,
+       "h": 120
+      },
+      {
+       "fill": "bldg",
+       "use": "multifamily",
+       "D": 60,
+       "floors": 3,
+       "rowsDown": true,
+       "rowsUp": true,
+       "h": 120
+      },
+      {
+       "fill": "bldg",
+       "use": "multifamily",
+       "D": 60,
+       "floors": 3,
+       "rowsDown": true,
+       "rowsUp": true,
+       "h": 120
+      },
+      {
+       "fill": "park",
+       "rowsDown": true,
+       "rowsUp": true,
+       "h": 40
+      },
+      {
+       "fill": "bldg",
+       "use": "multifamily",
+       "D": 60,
+       "floors": 3,
+       "rowsDown": true,
+       "h": 90
+      }
+     ],
+     "aisles": [
+      {
+       "w": 24,
+       "kind": "aisle"
+      },
+      {
+       "w": 24,
+       "kind": "aisle"
+      },
+      {
+       "w": 24,
+       "kind": "aisle"
+      },
+      {
+       "w": 24,
+       "kind": "aisle"
+      },
+      {
+       "w": 24,
+       "kind": "aisle"
+      },
+      {
+       "w": 24,
+       "kind": "aisle"
+      },
+      {
+       "w": 24,
+       "kind": "aisle"
+      }
+     ]
+    },
+    "o": {
+     "pond": 91850.40023939998,
+     "pondAt": "front",
+     "footprint": null,
+     "noTrim": false,
+     "shift": "bottom",
+     "entry": {
+      "w": 50,
+      "boulevard": true,
+      "w0": 40,
+      "full": true,
+      "lane": 18,
+      "median": 14
+     }
+    }
+   },
+   "laidAs": "Rows running back · pond at the entry",
+   "updated": "2026-10-24T12:00:00.000Z"
+  }
+ ],
+ "created": "2026-10-24T12:00:00.000Z",
+ "updated": "2026-10-24T12:00:00.000Z",
+ "by": "Sample run",
+ "fz": {
+  "schema": 1,
+  "intake": {
+   "state": "TX",
+   "address": "Sample site (anonymized), Waller",
+   "city": "Waller",
+   "county": "Waller",
+   "zip": "77484",
+   "jurisdiction": "Waller County",
+   "targetUse": "Garden apartments",
+   "landBasis": "asking",
+   "landPrice": 2600000
+  },
+  "optionId": "sample-opt-a",
+  "overrides": {},
+  "budgetEdits": {},
+  "scenarios": [
+   {
+    "id": "rates-up",
+    "name": "Rates +1%",
+    "overrides": {
+     "rate": 7.9,
+     "permRate": 7.71
+    }
+   },
+   {
+    "id": "more-1br",
+    "name": "More one-bedrooms",
+    "overrides": {},
+    "mix": [
+     {
+      "name": "Studio",
+      "sf": 550,
+      "pct": 10
+     },
+     {
+      "name": "1 BR",
+      "sf": 760,
+      "pct": 60
+     },
+     {
+      "name": "2 BR",
+      "sf": 1100,
+      "pct": 25
+     },
+     {
+      "name": "3 BR",
+      "sf": 1350,
+      "pct": 5
+     }
+    ]
+   },
+   {
+    "id": "cost-up",
+    "name": "Costs +10%",
+    "overrides": {
+     "locationFactor": 1.1
+    }
+   }
+  ],
+  "activeScenario": null,
+  "reports": []
+ }
+}

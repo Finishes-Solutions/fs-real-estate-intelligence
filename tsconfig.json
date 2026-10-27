@@ -1,0 +1,19 @@
+{
+  // Type-checks the feasibility code (JS with JSDoc types; nothing is compiled): `npm run typecheck`. Each checked file
+  // starts with // @ts-check (the platform modules they import are read for types but not checked).
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "es2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2023", "dom"],
+    "types": ["node"],
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": ["lib/feasibility/**/*.mjs", "lib/reports/feasibility.mjs", "api/feasibility.js", "scripts/*.mjs"]
+}

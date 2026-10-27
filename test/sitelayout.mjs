@@ -238,8 +238,12 @@ function usable(plan, o, what) {
   const loop = [{ kind: 'drive', x: 0, y: 100, w: 300, d: 24, rot: 0 }, { kind: 'drive', x: 0, y: -100, w: 300, d: 24, rot: 0 }, { kind: 'drive', x: -138, y: 0, w: 24, d: 224, rot: 0 }, { kind: 'drive', x: 138, y: 0, w: 24, d: 224, rot: 0 }];
   const pv = S.pavement({ ...site, elements: loop }); assert.equal(pv.length, 1); assert.equal(pv[0].holes.length, 1, 'the lawn inside the loop is a hole');
   const fc = S.planFeatures({ ...site, origin: site.origin, elements: [{ ...b, id: 'b1', form: 'U' }, { id: 'p', kind: 'parking', x: 0, y: -160, w: 180, d: 60, rot: 0 }], params: { trees: true } });
-  const ks = new Set(fc.features.map(f => f.properties.k)); assert.ok(ks.has('b3') && ks.has('tree'), '3D detail (parapets, floor lines) and 3D trees');
-  assert.ok(fc.features.filter(f => f.properties.k === 'b3' && f.properties.part === 'floor').length === 2, 'a line at each floor between three floors');
+  const ks = new Set(fc.features.map(f => f.properties.k)); assert.ok(ks.has('fac') && ks.has('tree'), '3D detail (the building drawn from its design) and 3D trees');
+  assert.ok(new Set(fc.features.filter(f => f.properties.k === 'fac' && !f.geometry.coordinates[1]).map(f => f.properties.b)).has(0), 'its walls from the ground up');
+  // a building with no design (a hotel) keeps the plain detail: a parapet round the roof and a line at each floor
+  const fh = S.planFeatures({ ...site, origin: site.origin, elements: [{ ...b, id: 'h1', use: 'hotel' }] });
+  assert.ok(fh.features.some(f => f.properties.k === 'b3' && f.properties.part === 'parapet'), 'a hotel: a parapet');
+  assert.ok(fh.features.filter(f => f.properties.k === 'b3' && f.properties.part === 'floor').length === 2, 'a line at each floor between three floors');
   const fo = L.layoutOptions({ ...siteOf(fm362, true), params: { form: 'U' } }, { use: 'multifamily', floors: 4 })[0]; usable(siteOf(fm362, true), fo, 'courtyard buildings');
   assert.ok(fo.elements.some(e => e.kind === 'building' && e.form === 'U'), 'courtyard (U) apartment buildings when asked for');
 }
@@ -791,3 +795,28 @@ console.log('site layouts ok');
   // a road that doesn't cut the site in two (a gap only partway in): laid out as one site, as before
   assert.equal(L.gapParts({ ...plan }, []).length, 0);
   console.log('a site with a road through it: laid out on both sides'); }
+
+// ---- a flag lot: only the pole's end is on the street. The body's back edges face the street's way too, 300 ft behind
+// it, and once counted as frontage, so the main entry came in across them (a neighbour's land); it runs down the pole ----
+{
+  const g = mk([-95.7, 29.9], [[0, 0], [120, 0], [120, 300], [700, 300], [700, 700], [-100, 700], [-100, 300], [0, 300]]), b = S.unionParcels([g]);
+  const fi = b.ring.findIndex((p, i) => S.outwardOf(b.ring, i)[1] < -0.9 && Math.abs(S.edgeLen(b.ring, i) - 120) < 2), plan = { ...b, front: fi, setbacks: { ...S.SETBACKS } };
+  assert.deepEqual(S.edgeRoles(b.ring, fi).map((r, i) => r === 'front' ? i : null).filter(i => i != null), [fi], 'only the pole end is the front');
+  const fa = b.ring[fi], fb = b.ring[(fi + 1) % b.ring.length];
+  for (const o of L.layoutOptions(plan, { use: 'multifamily' })) {
+    usable(plan, o, 'flag lot');
+    const ent = o.elements.find(e => e.name === 'Main entry'), q = S.shapeOf(ent), near = Math.min(...q.map(p => S.segDist(p, fa, fb)));
+    assert.ok(near < 3, o.name + ': the main entry reaches the street at the end of the pole (' + near.toFixed(1) + ' ft off it)');
+  }
+  console.log('a flag lot: the entry down the pole');
+}
+// ---- shops in front of apartments: the detention never goes across the frontage in front of the shops ----
+{
+  const plan = siteOf(tract), F = L.frameOf(plan), y = e => S.rotPt([e.x, e.y], -F.psi)[1];
+  for (const o of L.layoutOptions(plan, { use: 'retail', zones: [{ use: 'retail', gfa: 30000 }, { use: 'multifamily', units: 200 }] })) {
+    const shops = o.elements.filter(e => e.kind === 'building' && e.use === 'retail'), ponds = o.elements.filter(e => e.kind === 'pond');
+    assert.ok(shops.length, o.name + ': shops');
+    for (const p of ponds) assert.ok(y(p) > Math.min(...shops.map(y)), o.name + ': the pond at ' + Math.round(y(p)) + ' is not in front of the shops at ' + Math.round(Math.min(...shops.map(y))));
+  }
+  console.log('shops keep the frontage');
+}

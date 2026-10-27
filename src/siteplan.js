@@ -33,6 +33,7 @@ import * as STG from './lib/planstages.mjs';
 import * as PARC from './lib/siteparcels.mjs';
 import * as RF from './lib/sitefiles.mjs';
 import { siteFiles } from './sitefiles.js';
+import { workspace } from './workspace.js';
 import { teamLibrary } from './teamlib.js';
 import { ruleSheets } from './rulesheets.js';
 const typeOptions = (cur, team = []) => (team.length ? '<optgroup label="Team">' + team.map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>' : '') + BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
@@ -41,13 +42,13 @@ import { readJSON } from './lib/http.mjs';
 import { withTileParcel } from './lib/footprint.mjs';
 
 const KEY = 'fs-projects-v1', CODE_KEY = 'fs-team-code', NAME_KEY = 'fs-team-name';
-const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'roundabout', 'loop', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash', 'sign'];
+const ADD = ['building', 'pad', 'parking', 'garage', 'drive', 'truck', 'field', 'roundabout', 'loop', 'pond', 'green', 'play', 'court', 'pool', 'patio', 'trash', 'sign'];
 const ADD_LABEL = { roundabout: 'Roundabout', loop: 'Drop-off loop (circle drive)', sign: 'Monument sign', pad: 'Restaurant pad (drive-thru)', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Outdoor seating', garage: 'Parking garage' };
 // the pieces you can add, grouped the same way in the panel's Add section and the tool strip's Add palette
-const ADD_GROUPS = [['Buildings', ['building', 'pad', 'garage']], ['Paving', ['parking', 'drive', 'truck', 'roundabout', 'loop']], ['Water & landscape', ['pond', 'green']], ['Amenities', ['play', 'court', 'pool', 'patio']], ['Site', ['trash', 'sign']]];
-const ADD_SHORT = { building: 'Building', pad: 'Restaurant pad', garage: 'Garage', parking: 'Parking', drive: 'Drive', truck: 'Truck court', roundabout: 'Roundabout', loop: 'Drop-off', pond: 'Detention', green: 'Landscape', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Seating', trash: 'Trash', sign: 'Sign' };
-const SIZE = { roundabout: [100, 100], loop: [120, 70], building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], sign: [10, 5], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
-const PAVED = ['parking', 'drive', 'truck'];
+const ADD_GROUPS = [['Buildings', ['building', 'pad', 'garage']], ['Paving', ['parking', 'drive', 'truck', 'field', 'roundabout', 'loop']], ['Water & landscape', ['pond', 'green']], ['Amenities', ['play', 'court', 'pool', 'patio']], ['Site', ['trash', 'sign']]];
+const ADD_SHORT = { building: 'Building', pad: 'Restaurant pad', garage: 'Garage', parking: 'Parking', drive: 'Drive', truck: 'Truck court', field: 'Parking field', roundabout: 'Roundabout', loop: 'Drop-off', pond: 'Detention', green: 'Landscape', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Seating', trash: 'Trash', sign: 'Sign' };
+const SIZE = { roundabout: [100, 100], loop: [120, 70], building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], field: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], sign: [10, 5], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [64, 44], pool: [60, 30] };
+const PAVED = ['parking', 'drive', 'truck', 'field'];
 const FORMS = [['bar', 'Bar'], ['L', 'L-shaped'], ['U', 'Courtyard (U)'], ['tower', 'Tower on a podium']];
 const ISLANDS = [['along', 'Along the street'], ['across', 'Across the street (toward the store)']]; // which way a canopy's pump islands run
 const { COL, USE_COL } = MAP; // one palette for the map, the Plan key and the Draw buttons (lib/planmap.mjs)
@@ -205,7 +206,8 @@ export function initSitePlan(ctx) {
   const geomAcres = (g, at) => { const F = SP.frame(at), polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
     return polys.reduce((t, rs) => t + SP.ringArea(rs[0].map(F.toFt)) - rs.slice(1).reduce((h, r) => h + SP.ringArea(r.map(F.toFt)), 0), 0) / 43560; };
   const parcelOf = (pc, center) => { const g = pc.geometry, r = g && (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates?.[0]?.[0]); const cc = r ? SP.centroid(r) : center;
-    const rec = { key: '', label: pc.situs || pc.owner || 'Parcel', owner: pc.owner || '', propId: pc.propId || null, marketValue: pc.marketValue || null, landValue: pc.landValue || null, acres: g ? +(geomAcres(g, center)).toFixed(3) : null, center: cc.map(v => +v.toFixed(6)), geometry: llRound(g) || null };
+    const rec = { key: '', label: pc.situs || pc.owner || 'Parcel', owner: pc.owner || '', propId: pc.propId || null, marketValue: pc.marketValue || null, landValue: pc.landValue || null, acres: g ? +(geomAcres(g, center)).toFixed(3) : null, center: cc.map(v => +v.toFixed(6)), geometry: llRound(g) || null,
+      ...Object.fromEntries([['address', pc.situsStreet || pc.situs], ['city', pc.situsCity], ['zip', pc.situsZip], ['county', pc.county]].filter(([, v]) => v).map(([k, v]) => [k, String(v).slice(0, 120)])) }; // (the address and ZIP: the feasibility study's market check reads the ZIP)
     rec.key = parcelKey(rec); return rec; };
   // the site boundary for a set of parcels (one outline, or several merged). Parcels that don't touch are joined across
   // the gap between them (SP.bridgeParcels): filled in as site, or, where the map shows a road in it, kept as a no-build
@@ -628,6 +630,11 @@ export function initSitePlan(ctx) {
   const coarse = () => matchMedia('(pointer:coarse)').matches; // fingers: bigger handles, a wider reach, the turn dot further out
   let ids = [], dimmed = null;
   // mp: the map to draw on: the page's, or a hidden one a background rendering takes its picture from (renderInBackground)
+  // the facades (windows, finishes, roofs) show when the map is tilted; seen from straight above (the plan) and with the
+  // mix on, the buildings keep their use's colour and the selection its highlight. A picture's hidden map always has them.
+  let facHooked = false;
+  const facWanted = () => map.getPitch() > 12 && !ed?.mix ? 'visible' : 'none';
+  function syncFac() { if (map.getLayer('fs-sp-fac') && map.getLayoutProperty('fs-sp-fac', 'visibility') !== facWanted()) map.setLayoutProperty('fs-sp-fac', 'visibility', facWanted()); }
   function addLayers(mp = map) {
     if (mp.getSource(SRC)) return;
     const kind = k => ['==', ['get', 'k'], k], P = MAP.palette(), C = P.col, Ln = P.lines, Lb = P.label, big = coarse();
@@ -653,8 +660,8 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-med', type: 'fill', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'fill-color': C.green, 'fill-opacity': ['case', sel1, .6, .9] } }); // the entry's planted median
     add({ id: 'fs-sp-medl', type: 'line', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'line-color': Ln.curb, 'line-width': 1 } });
     add({ id: 'fs-sp-sign', type: 'fill-extrusion', source: SRC, filter: kind('sign'), paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, sel1, P.sel(C.sign || '#8b8073'), C.sign || '#8b8073'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .95 } }); // a monument sign: a low stone wall
-    add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'pond', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
-      paint: { 'fill-color': ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'pond', C.pond, 'plaza', C.plaza, 'court', C.court, 'pool', C.pool, 'play', C.play, C.green],
+    add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'field', 'pond', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
+      paint: { 'fill-color': ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'field', C.drive, 'pond', C.pond, 'plaza', C.plaza, 'court', C.court, 'pool', C.pool, 'play', C.play, C.green],
         'fill-opacity': ['case', sel1, .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, .75] } });
     add({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: ['all', kind('lot'), ['!=', ['get', 'site'], 1]], minzoom: 17, layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.lots, 'line-width': 1, 'line-dasharray': [0.1, 2.4] } }); // house lots, dotted, close in
     add({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': Ln.walk, 'fill-opacity': .85 } });
@@ -695,7 +702,9 @@ export function initSitePlan(ctx) {
       'fill-extrusion-color': ['match', ['get', 'part'], 'tower', ['case', ph2, useCol(c => f(P.p2(c))), useCol(f)], 'parapet', ['case', ['==', ['get', 'g'], 1], '#8b9092', '#6d635a'], ['case', ['==', ['get', 'g'], 1], '#6f7476', '#4f453c']] });
     add({ id: 'fs-sp-b3', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), ['!', sel1]], paint: b3(id) });
     add({ id: 'fs-sp-b3s', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), sel1], paint: b3(lit) });
-    add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck', 'sign']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
+    add({ id: 'fs-sp-fac', type: 'fill-extrusion', source: SRC, filter: kind('fac'), paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': 1 }, layout: { visibility: mp === map ? facWanted() : 'visible' } }); // the facades: finishes, windows, doors, roofs (lib/massing.mjs)
+    if (mp === map && !facHooked) { facHooked = true; map.on('pitchend', syncFac); }
+    add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'field', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck', 'sign']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
       paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, 'rgba(11,13,12,.45)'], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1] } });
     add({ id: 'fs-sp-p2', type: 'line', source: SRC, filter: ['all', kind('building'), ph2, ['!', sel1], ['!=', ['get', 'bad'], 1]], paint: { 'line-color': Ln.p2, 'line-width': 1.3, 'line-dasharray': [2, 1.6] } }); // Phase 2: dashed
     // the selection: green on a white casing (a red casing when it's also a problem)
@@ -861,6 +870,7 @@ export function initSitePlan(ctx) {
   // the mix's layers and colours on the map when it's on, gone (and the usual colours back) when it's off or the plan
   // closes; a basemap change rebuilds the plan's layers (their ids include these), and the next draw puts the mix back
   function syncMix() {
+    syncFac();
     const want = !!ed?.mix && !!map.getLayer('fs-sp-lotc'), has = !!map.getLayer(MIXL[0]);
     if (want && !has) {
       const add = def => { map.addLayer(def, 'fs-sp-lotc'); ids.push(def.id); }, zf = ['all', ['==', ['get', 'k'], 'zone'], ['has', 'mx']];
@@ -920,7 +930,7 @@ export function initSitePlan(ctx) {
   const ftAt = (pl, lngLat) => SP.frame(pl.origin).toFt([lngLat.lng, lngLat.lat]);
   const SHAPEABLE = ['building', 'plaza', 'green', 'pond', 'court', 'pool', 'patio', 'play', 'garage', 'parking']; // pieces whose outline can be edited point by point
   const faceted = e => !!e.poly && (e.poly.length <= 16 || ['building', 'garage', 'parking'].includes(e.kind)); // a drawn or reshaped outline (its faces can be dragged), not a pond's natural curve (that scales)
-  const ORDER = ['sign', 'trash', 'foodtruck', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'canopy', 'tanks', 'pond', 'keepout', 'fence', 'drive', 'truck', 'parking', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
+  const ORDER = ['sign', 'trash', 'foodtruck', 'patio', 'building', 'garage', 'pool', 'court', 'play', 'plaza', 'canopy', 'tanks', 'pond', 'keepout', 'fence', 'drive', 'truck', 'parking', 'field', 'trail', 'green']; // small pieces over what they sit on; house lots are lines, never picked
   // what's under the pointer: the selected piece's nearest handle (a finger gets more room than a mouse), else the piece
   // (plan pieces in feet, turned or not: never map tiles). A face bar is caught only along the bar as drawn, and a
   // handle the pointer is merely near gives way to another piece it's on, so a click meant for a neighbour picks it.
@@ -1475,7 +1485,7 @@ export function initSitePlan(ctx) {
     pop.querySelectorAll('[data-f]').forEach(b => b[b.type === 'checkbox' ? 'onchange' : 'onclick'] = () => flipLayer(b));
     if (f) pop.querySelector('[data-f="' + f + '"]')?.focus({ preventScroll: true });
   }
-  function setTab(t, focus) {
+  function setLayTab(t, focus) {
     if (t === layTab && pop.querySelector('[data-ltab]')) { if (focus) pop.querySelector('[data-ltab="' + t + '"]')?.focus({ preventScroll: true }); return; }
     if (itRen != null) endRename(true); layTab = t; try { localStorage.setItem(LTAB_KEY, t); } catch (e) { /* this visit only */ }
     pop.innerHTML = ''; itSel = null; paintLayers(); placePop(); if (focus) pop.querySelector('[data-ltab="' + t + '"]')?.focus({ preventScroll: true });
@@ -1550,7 +1560,7 @@ export function initSitePlan(ctx) {
   // heading), → unfolds; Enter picks the row (on the piece already picked, renames it), F2 renames; ← → on the tabs switch
   function popNav(e) {
     if (popKind !== 'layers') return false; const k = e.key, t = e.target, stop = () => { e.preventDefault(); e.stopPropagation(); };
-    if (t.dataset?.ltab) { if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'Home' || k === 'End') { stop(); setTab(k === 'Home' ? 'layers' : k === 'End' ? 'items' : t.dataset.ltab === 'items' ? 'layers' : 'items', true); return true; }
+    if (t.dataset?.ltab) { if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'Home' || k === 'End') { stop(); setLayTab(k === 'Home' ? 'layers' : k === 'End' ? 'items' : t.dataset.ltab === 'items' ? 'layers' : 'items', true); return true; }
       const box = itBox(); if (box && k === 'ArrowDown') { stop(); const a = box.querySelector('[data-nav][tabindex="0"]') || box.querySelector('[data-nav]'); a?.focus({ preventScroll: true }); if (a) keepInView(box, a.closest('.sp-it') || a); return true; } return !!box; }
     const box = itBox(); if (!box || !box.contains(t)) return false; stop();
     const navs = itNavs(box), cur = t.closest('.sp-ig-h')?.querySelector('[data-nav]') || t.closest('.sp-it')?.querySelector('[data-nav]') || t, i = navs.indexOf(cur);
@@ -1562,7 +1572,7 @@ export function initSitePlan(ctx) {
     return true;
   }
   pop.addEventListener('click', e => {
-    const tb = e.target.closest('[data-ltab]'); if (tb) { setTab(tb.dataset.ltab, true); return; }
+    const tb = e.target.closest('[data-ltab]'); if (tb) { setLayTab(tb.dataset.ltab, true); return; }
     if (!itBox()?.contains(e.target)) return; const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.f) flipLayer(b); else if (b.dataset.fold) foldItems(b.dataset.fold, b.getAttribute('aria-expanded') !== 'true'); else if (b.dataset.ren != null) startRename(b.dataset.ren); else if (b.dataset.pick != null) pickItem(b.dataset.pick, e);
   });
@@ -2984,6 +2994,7 @@ export function initSitePlan(ctx) {
     return '<table class="sp-mixt"><tr><th>Storage</th><th>Size</th><th>SF</th><th>Units</th></tr>' + rows.map(r => '<tr><td>' + r[0] + '</td><td>' + esc(r[1]) + '</td><td>' + f0(r[2]) + '</td><td>' + f0(r[3]) + '</td></tr>').join('') + '</table>';
   }
   // ---------- pro forma ----------
+  const COC_TIP = 'Each year of the hold after the project is stabilized: the net operating income less the permanent loan’s payments, divided by the equity put in. A refinance’s cash-out is not counted as income.';
   const PROFIT_TIP = 'What the equity investors net: rent collected through the hold, less loan payments and interest, plus the sale price after sale costs and the loan payoff, less the equity put in. It isn’t the stabilized value minus the cost.';
   const landGuess = (p, pl) => { const recs = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean), v = recs.map(r => r.marketValue || r.landValue);
     return recs.length && v.every(x => +x > 0) ? Math.round(v.reduce((s, x) => s + +x, 0)) : null; };
@@ -2998,6 +3009,8 @@ export function initSitePlan(ctx) {
     let R = null; try { R = pfRun(p, pl); } catch (e) { console.warn('pro forma', e); }
     if (!R) return '<details class="bsec sp-pf" id="spPfSec"><summary class="lt">Pro forma</summary><div class="rnote">Lay out a plan first (Build Layouts or by hand); the pro forma reads its buildings, units and parking.</div></details>';
     const A = R.A, $m = $M, xm = v => v == null || !isFinite(v) ? 'n/a' : v.toFixed(2) + 'x', pc2 = v => v == null || !isFinite(v) ? 'n/a' : (v * 100).toFixed(2) + '%';
+    // cash-on-cash through the hold, a cell a year (the cash flow after the loan payments, over the equity put in)
+    const cocYears = r => !r.holdYears?.length ? '' : '<div class="sp-coc" title="' + esc(COC_TIP) + '"><span>Cash-on-cash by year</span><div>' + r.holdYears.map(y => '<i' + (y.coc < 0 ? ' class="neg"' : '') + '><small>Yr ' + y.year + '</small>' + (y.coc * 100).toFixed(1) + '%</i>').join('') + '</div></div>';
     const notes = Object.fromEntries((R.warnings || []).filter(w => w.level === 'note').map(w => [w.key, w.text])), flags = (R.warnings || []).filter(w => w.level === 'flag');
     const tagOf = k => (PF.BASIS[R.basis?.inputs?.[k]] || PF.BASIS.market).label, big = k => k === 'landPrice' || k === 'lotCost'; // the numbers a box takes; big dollar amounts show with their commas
     const pfCtl = (k, v, step, unit) => { const [lo, hi] = pfLim(k);
@@ -3018,11 +3031,13 @@ export function initSitePlan(ctx) {
         (homes && !mf ? tog('data-pfb="forSale"', 'Homes for sale (not rent)', A.forSale) : '') + '</div>' +
       '<div class="sp-sched" title="Schedule in months">' + seg(sch.pre, 'pre', 'Pre-development') + seg(sch.build, 'bld', 'Construction') + seg(sch.lease, 'lease', R.forSale ? 'Sales' : 'Lease-up') + seg(sch.total - sch.toStabilize, 'hold', 'Hold') + '</div>' +
       '<div class="sp-schl"><span><i class="pre"></i>Design &amp; permits ' + sch.pre + ' mo</span><span><i class="bld"></i>Construction ' + sch.build + ' mo</span><span><i class="lease"></i>' + (R.forSale ? 'Sales ' : 'Lease-up ') + sch.lease + ' mo</span>' + (R.forSale ? '' : '<span><i class="hold"></i>Sale at month ' + sch.total + '</span>') + '</div>' +
-      (simpleOn ? '<div class="sp-cards">' + card1('Total cost', $m(S1.cost)) + card1('NOI', $m(S1.noi)) + card1('Yield on cost', pc2(S1.yoc)) + card1('Value', $m(S1.value)) + card1('Unlevered IRR', pc2(S1.unlevIrr)) + card1('Levered IRR', pc2(S1.levIrr)) + card1('Equity multiple', xm(S1.multiple)) + card1('DSCR', xm(S1.dscr)) + '</div>' +
+      (simpleOn ? '<div class="sp-cards">' + card1('Total cost', $m(S1.cost)) + card1('NOI', $m(S1.noi)) + card1('Yield on cost', pc2(S1.yoc)) + card1('Value', $m(S1.value)) + card1('Unlevered IRR', pc2(S1.unlevIrr)) + card1('Levered IRR', pc2(S1.levIrr)) + card1('Equity multiple', xm(S1.multiple)) + card1('Cash-on-cash', pc2(S1.coc)) + card1('DSCR', xm(S1.dscr)) + '</div>' +
         '<div class="rnote sp-warn sp-1l">TestFit’s one-page method overstates returns.' + infoBtn('All the money goes in at year 0 and full rents start in year 1, with no construction period, interest or lease-up. The month-by-month method on the same plan ' + (res.levIrr != null && isFinite(res.levIrr) ? 'gives a levered IRR of ' + pc2(res.levIrr) : 'has no positive cash flow to compute an IRR') + '.', 'About the TestFit method') + '</div>'
-      : '<div class="sp-cards">' + card1('Total cost', $m(R.budget.total), units ? $m(R.budget.total / units) + ' / unit' : ar.keys && !ar.leasable ? $m(R.budget.total / ar.keys) + ' / key' : $m(R.budget.total / Math.max(1, R.P.gsf)) + ' / gross sf') +
+      : (R.forSale || noRent ? '' : '<div class="sp-cards sp-headline">' + card1('Levered IRR', pc2(res.levIrr), A.hold + '-yr hold', res.levIrr != null && res.levIrr < 0) + card1('Equity multiple', res.multiple ? xm(res.multiple) : 'n/a', $m(res.peakEquity) + ' equity', res.multiple != null && res.multiple < 1) +
+        card1('Cash-on-cash', res.coc != null ? pc2(res.coc) : 'n/a', res.cocAvg != null ? 'year 1 · ' + pc2(res.cocAvg) + ' avg' : 'no permanent loan', res.coc != null && res.coc < 0, false, COC_TIP) + '</div>') +
+        '<div class="sp-cards">' + card1('Total cost', $m(R.budget.total), units ? $m(R.budget.total / units) + ' / unit' : ar.keys && !ar.leasable ? $m(R.budget.total / ar.keys) + ' / key' : $m(R.budget.total / Math.max(1, R.P.gsf)) + ' / gross sf') +
         (R.forSale ? card1('Home sales', $m(R.exit.sales)) + card1('Margin', pc2(res.margin), '', res.margin < 0) : noRent ? card1('Stabilized NOI', '—', 'no rent') : card1('Stabilized NOI', $m(R.ops.noi), ar.leasable ? $m(R.ops.noi / ar.leasable) + ' / leasable sf' : '') + card1('Yield on cost', pc2(res.yoc), 'spread ' + pc2(res.spread), res.yoc < 0, res.spread < 0) + card1('Stabilized value', $m(res.value))) +
-        (noRent ? '' : card1('Profit after hold &amp; sale', $m(res.profit), '', res.profit < 0, false, PROFIT_TIP) + card1('Unlevered IRR', pc2(res.unlevIrr)) + card1('Levered IRR', pc2(res.levIrr)) + card1('Equity multiple', res.multiple ? xm(res.multiple) : 'n/a') + card1('Peak equity', $m(res.peakEquity)) + (res.dscr ? card1('DSCR', xm(res.dscr)) : '')) + '</div>' +
+        (noRent ? '' : card1('Profit after hold &amp; sale', $m(res.profit), '', res.profit < 0, false, PROFIT_TIP) + card1('Unlevered IRR', pc2(res.unlevIrr)) + (res.dscr ? card1('DSCR', xm(res.dscr)) : '')) + '</div>' + cocYears(res) +
         (noRent ? '<div class="rnote sp-1l">No rent in this plan: ' + (uses.includes('church') ? 'a church is usually built for its own congregation, so this is its budget. Enter a rent under Assumptions to see it as a lease.' : 'this is its budget.') + '</div>' : '<div class="rnote sp-1l">TestFit method: ' + (S1.levIrr != null && isFinite(S1.levIrr) ? pc2(S1.levIrr) + ' levered' : 'no IRR') + infoBtn('The TestFit one-page method on the same numbers skips the ' + sch.toStabilize + ' months before the project is stabilized, so it reads higher.', 'About the TestFit method') + '</div>')) +
       (flags.length ? '<ul class="sp-pfflags">' + flags.map(w => '<li>' + esc(w.text) + '</li>').join('') + '</ul>' : '') +
       '<div class="rnote sp-pfbasis"><span class="sp-tag" title="' + esc(PF.BASIS.market.tag) + '">' + esc(PF.BASIS.market.label) + '</span> ' + esc(PF.DISCLAIMER) + '</div>' + areaT +
@@ -4595,8 +4610,11 @@ export function initSitePlan(ctx) {
       return '<button type="button" role="tab" id="pjTab-' + t.id + '" data-tab="' + t.id + '" aria-selected="' + on + '" aria-controls="pjPanel" tabindex="' + (on ? 0 : -1) + '">' + t.label +
         (n[t.id] ? '<span class="pj-tn"> · ' + f0(n[t.id]) + '</span>' : '') + (t.id === 'ask' && busy ? '<span class="pj-tn"> · answering…</span>' : '') + '</button>'; }).join('') + '</div>';
   }
+  // the Feasibility tab: the step-by-step workspace (src/workspace.js), saving and opening options through this page
+  const WS = workspace({ save, openOption: (pid, plid) => open(pid, plid), newPlan: (p, extra) => newPlan(p, extra), setTab: (p, t) => setTab(p, t, true), goMap: () => ctx.setView('map'),
+    code: () => get(CODE_KEY), name: () => get(NAME_KEY), toast: m => ctx.toast?.(m), saveFile: (n, d, m) => ctx.saveFile(n, d, m) });
   function detailHtml(p) {
-    const tab = tabFor(p), body = { overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, files: SF.html, ask: pAskHtml }[tab](p);
+    const tab = tabFor(p), body = { workspace: WS.html, overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, files: SF.html, ask: pAskHtml }[tab](p);
     return headHtml(p) + tabsHtml(p, tab) + '<div class="pj-panel pj-p-' + tab + '" id="pjPanel" role="tabpanel" aria-labelledby="pjTab-' + tab + '">' + body + '</div>';
   }
 
@@ -4651,7 +4669,7 @@ export function initSitePlan(ctx) {
       return x.site;
     })();
     siteRuns.set(p.id, run);
-    run.catch(() => siteFail.set(p.id, Date.now())).finally(() => { siteRuns.delete(p.id); if (ctx.view === 'projects' && cur === p.id && tabFor(p) === 'overview') render(); });
+    run.catch(() => siteFail.set(p.id, Date.now())).finally(() => { siteRuns.delete(p.id); if (ctx.view === 'projects' && cur === p.id && ['overview', 'workspace'].includes(tabFor(p))) render(); });
     return run;
   }
   function jurHtml(p) {
@@ -4873,7 +4891,7 @@ export function initSitePlan(ctx) {
     const revisions = prev.slice().sort((a, b) => (+a.no) - (+b.no)).map(x => ({ no: x.no, date: short(x.at), desc: x.desc || 'Schematic design set' })).concat([{ no, date: short(day), desc: no === '0' ? 'Schematic design set' : 'Schematic design set, re-issued' }]);
     const steps = [{ key: 'notes', kind: 'claude', label: 'Cover notes' }];
     for (const sec of sections) if (PS.SECTION_DISC[sec] && sheets.some(q => q.section === sec)) steps.push({ key: 'disc:' + PS.SECTION_DISC[sec], kind: 'claude', label: PS.sectionById(sec).label + ' notes' });
-    if (sections.includes('arch')) for (const t of types.filter(t => t.supported)) steps.push({ key: 'design:' + t.id, kind: 'claude', label: 'Design: ' + PD.typeName(t) });
+    if (sections.includes('arch')) for (const t of types.filter(t => t.supported && t.use !== 'multifamily')) steps.push({ key: 'design:' + t.id, kind: 'claude', label: 'Design: ' + PD.typeName(t) }); // (apartment buildings: the rule-based breezeway plan, unit by unit; a whole building is too big for one answer)
     for (const sh of sheets) steps.push({ key: sh.number, kind: 'sheet', label: sh.number + ' ' + sh.title });
     steps.push({ key: 'merge', kind: 'merge', label: 'Put ' + sheets.length + ' sheets together' });
     for (const x of steps) x.status = 'todo';
@@ -5120,6 +5138,7 @@ export function initSitePlan(ctx) {
       let ch = false; for (const x of p.parcels) ch = regridOn(x) || ch; if (ch) { quietSave(p); setTimeout(() => render()); }
       if (needSite(p)) gatherSite(p); // (the card already says Checking…)
     }
+    if (tab === 'workspace') { WS.wire(root, p); if (needSite(p)) gatherSite(p); } // (the flood zone and districts feed the study's risks)
     if (tab === 'renderings') wireRenders(p);
     if (tab === 'plans') wirePlans(p);
     if (tab === 'ask') wirePAsk(p);

@@ -1,0 +1,175 @@
+[
+ {
+  "propId": "10687",
+  "owner": "PRIYA CAPITAL LLC",
+  "situs": "41119 Old Houston Hwy, Waller",
+  "situsStreet": "41119 Old Houston Hwy",
+  "situsCity": "Waller",
+  "situsZip": "77484",
+  "mailing": "1001 PRIYA LN, WALLER TX 77484-2228",
+  "marketValue": 1131560,
+  "landValue": 906650,
+  "improvementValue": 224910,
+  "acquired": "2024-02-12",
+  "taxYear": "2026",
+  "legal": "ABS A313800 A-138 JAMES HITCHCOCK TRACT 8 9-1 ACRES 9.38",
+  "legalAcres": 9.35559,
+  "area": "9.36 acres",
+  "regridUuid": "70e34e53-2e20-45f1-b763-50e0d37fbc74",
+  "geometry": {
+   "type": "Polygon",
+   "coordinates": [
+    [
+     [
+      -95.9346528,
+      30.057351
+     ],
+     [
+      -95.9346605,
+      30.0579259
+     ],
+     [
+      -95.9356397,
+      30.0581591
+     ],
+     [
+      -95.9362907,
+      30.0583138
+     ],
+     [
+      -95.9362599,
+      30.0553018
+     ],
+     [
+      -95.9356115,
+      30.0553107
+     ],
+     [
+      -95.9356228,
+      30.0564902
+     ],
+     [
+      -95.9346042,
+      30.0565709
+     ],
+     [
+      -95.9342902,
+      30.0572637
+     ],
+     [
+      -95.9346528,
+      30.057351
+     ]
+    ]
+   ]
+  },
+  "county": "Waller",
+  "source": "Waller County Appraisal District (outline scaled from the BD-0046 parcel map, values from the 2026 roll)"
+ },
+ {
+  "propId": "10682",
+  "owner": "MARKET SQUARE COMMONS LLC",
+  "situs": "FM 362 @ Old Houston Hwy, Waller",
+  "situsStreet": "FM 362 @ Old Houston Hwy",
+  "situsCity": "Waller",
+  "situsZip": "77484",
+  "mailing": "1001 PRIYA LN, WALLER TX 77484-2228",
+  "marketValue": 271670,
+  "landValue": 271670,
+  "improvementValue": null,
+  "acquired": "2024-08-28",
+  "taxYear": "2026",
+  "legal": "ABS A313800 A-138 JAMES HITCHCOCK TRACT 10 ACRES .93",
+  "legalAcres": 0.92574,
+  "area": "0.93 acres",
+  "regridUuid": "89a9eeb0-62b1-4afa-8388-2969984062fe",
+  "geometry": {
+   "type": "Polygon",
+   "coordinates": [
+    [
+     [
+      -95.9342902,
+      30.0572637
+     ],
+     [
+      -95.9340434,
+      30.0572034
+     ],
+     [
+      -95.934051,
+      30.057781
+     ],
+     [
+      -95.9346605,
+      30.0579259
+     ],
+     [
+      -95.9346528,
+      30.057351
+     ],
+     [
+      -95.9342902,
+      30.0572637
+     ]
+    ]
+   ]
+  },
+  "county": "Waller",
+  "source": "Waller County Appraisal District (outline scaled from the BD-0046 parcel map, values from the 2026 roll)"
+ },
+ {
+  "propId": "10680",
+  "owner": "WALLER HERITAGE PLAZA LLC",
+  "situs": "19835 FM 362 Rd, Waller",
+  "situsStreet": "19835 FM 362 Rd",
+  "situsCity": "Waller",
+  "situsZip": "77484",
+  "mailing": "1001 PRIYA LN, WALLER TX 77484-2228",
+  "marketValue": 245180,
+  "landValue": 205840,
+  "improvementValue": 39340,
+  "acquired": "2024-09-20",
+  "taxYear": "2026",
+  "legal": "ABS A313800 A-138 JAMES HITCHCOCK TRACT 9 SN1 1680-84-14-48 ACRES 5.809",
+  "legalAcres": 5.87573,
+  "area": "5.88 acres",
+  "regridUuid": "fe7c59be-83fc-4bac-a79d-d669fdda8648",
+  "geometry": {
+   "type": "Polygon",
+   "coordinates": [
+    [
+     [
+      -95.9356115,
+      30.0553107
+     ],
+     [
+      -95.9340187,
+      30.0553315
+     ],
+     [
+      -95.9340434,
+      30.0572034
+     ],
+     [
+      -95.9342902,
+      30.0572637
+     ],
+     [
+      -95.9346042,
+      30.0565709
+     ],
+     [
+      -95.9356228,
+      30.0564902
+     ],
+     [
+      -95.9356115,
+      30.0553107
+     ]
+    ]
+   ]
+  },
+  "county": "Waller",
+  "source": "Waller County Appraisal District (outline scaled from the BD-0046 parcel map, values from the 2026 roll)"
+ }
+]

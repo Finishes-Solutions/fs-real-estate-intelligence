@@ -81,7 +81,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   assert.equal(T.viewOf({ view: { grid: 7 } }).grid, 0, 'only 5 or 10 ft');
   assert.ok(!T.editable(V, { kind: 'parking' }) && !T.editable(V, { kind: 'garage' }) && T.editable(V, { kind: 'pond' }));
   const fc = S.planFeatures(plan, null); M.decorate(fc, plan); const vis = T.visibleFeatures(fc, V);
-  assert.ok(!vis.features.some(f => ['building', 'b3', 'tree', 'label'].includes(f.properties.k)), 'buildings, their 3D parts, trees and labels hidden');
+  assert.ok(!vis.features.some(f => ['building', 'b3', 'fac', 'tree', 'label'].includes(f.properties.k)), 'buildings, their 3D parts, trees and labels hidden');
   assert.ok(vis.features.some(f => f.properties.k === 'parking') && vis.features.some(f => f.properties.k === 'setback'), 'the rest stays');
   assert.ok(vis.keep && vis.keep === fc.keep, 'the planting kept for a drag survives');
   const V2 = T.viewOf({ view: { hidden: ['paving'] } }), v2 = T.visibleFeatures(fc, V2);
