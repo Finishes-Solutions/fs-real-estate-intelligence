@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-26
 
+### 7:00 PM CT: Plan for BIM models of each option with BIMCraft, priced from their quantities (27b7e75)
+- **Planning only, nothing in the app changes.** `BIM-PLAN.md` sets out how each site plan option could become a real building model (walls, windows, doors, floors and roofs) using BIMCraft, an open-source building modeling tool that can be driven automatically. The model would give the budget real quantities (wall, glass, roof and floor areas, doors) to price instead of one cost per square foot, a model file architects can open in Revit, and better buildings for the 3D view and renderings.
+- **Honest about accuracy:** this moves concept budgets from a rough per-square-foot number toward an assembly-based estimate, still a range rather than an exact figure; the biggest remaining gain is checking prices against our own past jobs.
+
 ### 1:37 PM CT: Agent site plans are checked before they're handed over; tiny homes never get a garage (53329fb)
 - **A quality check on every site plan the agents make:** before the answer goes back, each layout is checked like a planner would: a way in from the street, every drive reached, fire lanes at least 20 ft, dead ends, a second access past 30 homes, parking, detention, each home on its own lot facing a drive with 10 ft to the next, a parking pad each, no garage on a tiny or manufactured home, a sensible floor plan, density, and whether it is what was asked. A layout that fails gives way to one that passes, and the answer starts with **READY**, **READY WITH NOTES** or **NOT READY** with each finding.
 - **It found real problems, now fixed:** on 25 × 55 pads backing onto each other, homes were 2 ft apart end to end (now 10 ft: the home keeps 5 ft from the back of its pad, so a 25 × 55 pad holds a 15 × 28, 420 sf home and 550 sf homes need 64 ft pads); tiny homes were asked 2 parking spaces each with room for 1 (now 1 a tiny home, 2 a manufactured home); lanes ran inside the landscape buffer.
