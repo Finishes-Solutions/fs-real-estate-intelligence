@@ -10,9 +10,10 @@ import * as P from '../lib/planset.mjs';
 import * as S from '../lib/siteplan.mjs';
 import { streetDown, turned } from '../lib/sitesheet.mjs';
 import { RENDERERS, bearing } from '../lib/sheets/site.mjs';
+import { RENDERERS as LAND } from '../lib/sheets/land.mjs';
 import * as T from '../lib/terrain.mjs';
 
-const KINDS = Object.keys(RENDERERS), un = s => s.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+const KINDS = [...Object.keys(RENDERERS), ...Object.keys(LAND)], un = s => s.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 assert.equal(bearing([0, 0], [100, 100]), 'N 45°00\'00" E');
 assert.equal(bearing([0, 0], [0, -10]), 'S 00°00\'00" E');
 assert.equal(bearing([0, 0], [-10, -10 * Math.tan(30 * Math.PI / 180)]), 'S 60°00\'00" W');
@@ -29,7 +30,7 @@ function sheetsOf(ctx, name) {
     const t0 = Date.now(), html = P.sheetPage(ctx, sh), ms = Date.now() - t0;
     assert.ok(!/NaN|undefined|Infinity/.test(html), name + ' ' + sh.number + ': no NaN, undefined or Infinity: ' + (html.match(/.{80}(NaN|undefined|Infinity).{40}/) || [''])[0]);
     assert.ok(!/couldn’t be drawn|isn’t drawn yet/.test(html), name + ' ' + sh.number + ' drew: ' + (html.match(/couldn’t be drawn.{0,200}/) || [''])[0]);
-    assert.ok(html.length > 8000 && html.length < 1.5e6, name + ' ' + sh.number + ' size ' + html.length);
+    assert.ok(html.length > (sh.kind === 'l-notes' ? 4000 : 8000) && html.length < 1.5e6, name + ' ' + sh.number + ' size ' + html.length);
     assert.ok(ms < 1500, name + ' ' + sh.number + ' took ' + ms + ' ms');
     out[sh.kind] = html; times[sh.number] = ms;
   }
@@ -38,7 +39,7 @@ function sheetsOf(ctx, name) {
 // checks on one context's sheets
 function check(ctx, name, { lots = false, sheets } = {}) {
   const { out, times } = sheets || sheetsOf(ctx, name), plan = ctx.plan, T = turned(plan, streetDown(plan)), B = (T.elements || []).filter(e => e.kind === 'building');
-  for (const k of ['c-existing', 'c-dims', 'c-grading', 'c-detention', 'c-utility', 'c-details', 'l-plan', 'l-details']) assert.ok(out[k], name + ': ' + k + ' is in the set');
+  for (const k of ['c-existing', 'c-dims', 'c-grading', 'c-detention', 'c-utility', 'c-details', 'l-notes', 'l-plan', 'l-irrig', 'l-details', 'l-irr-details']) assert.ok(out[k], name + ': ' + k + ' is in the set');
   // C-001: one course per boundary edge, the lengths are the edges', and the traverse closes
   const cs = coursesOf(out['c-existing']), ring = plan.ring;
   assert.equal(cs.length, ring.length, name + ': a course for every boundary edge');
@@ -66,10 +67,11 @@ function check(ctx, name, { lots = false, sheets } = {}) {
   assert.ok((out['c-grading'].match(/>FF \d+\.\d</g) || []).length === B.length, name + ': a finished floor for every building');
   assert.ok(/assumed datum/i.test(out['c-grading']), name + ': C-201 says the datum is assumed');
   // the plan sheets are drawn to a standard scale, given in the title block and the view title
-  for (const k of ['c-existing', 'c-dims', 'c-grading', 'c-utility', 'l-plan']) assert.ok(/1&quot; = \d+'-0&quot;/.test(out[k]), name + ': ' + k + ' scale');
+  for (const k of ['c-existing', 'c-dims', 'c-grading', 'c-utility', 'l-plan', 'l-irrig']) assert.ok(/1&quot; = \d+'-0&quot;/.test(out[k]), name + ': ' + k + ' scale');
   if (lots) { const n = (plan.elements || []).filter(e => e.kind === 'lot').length, rows = [...out['c-lots'].matchAll(/<td>\d+' × \d+'<\/td><td class="r">(\d+)<\/td>/g)];
     assert.equal(rows.reduce((s, m) => s + +m[1], 0), n, name + ': C-103 counts every lot'); }
-  const pl = un(out['l-plan']); assert.ok(/Live oak|Cedar elm|Shumard/.test(pl) && /one tree per 10 parking spaces/i.test(pl), name + ': L-101 plant schedule and the ordinance note');
+  const pl = un(out['l-plan']); assert.ok(/Live oak|Cedar elm|Shumard/.test(pl) && /Plant schedule/i.test(pl), name + ': L-101 plant schedule');
+  assert.ok(/a tree per 10 parking spaces/i.test(un(out['l-notes'])), name + ': L-001 has the ordinance note');
   return times;
 }
 

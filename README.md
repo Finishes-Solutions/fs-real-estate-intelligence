@@ -25,6 +25,7 @@ Finishes Solutions real estate intelligence map for Waller County and the six su
 - **Map camera**: tilting the map by hand (right-drag, ctrl-drag, two fingers) turns **3D View** on; the compass button under the zoom buttons returns to a flat, north-up view of the same spot. Zoomed out to the globe, the map straightens itself, and the 3D terrain surface only shows from town zoom in (MapLibre doesn't fully support terrain on the globe).
 - Above the Ask AI button, up to five suggested questions follow what you're looking at: the open filing or building, the town in view, your filters. ⌘K / Ctrl+K jumps to the map search.
 - **Projects and site plans**: from a building card, start a project and lay out a site plan on the parcel (buildings, parking with stall counts, drives, truck court, detention), checked against setbacks with coverage / FAR / parking numbers. Up to 20 parcels merge into one site (`unionParcels`: grid merge that closes appraisal-data gaps, then snaps to the parcels' corners). **Build with AI** (`api/siteplan.js`) turns a request into a program, with zones for mixed use; `lib/sitelayout.mjs` lays out the options: a drive network first (aisles joined by filleted connector drives, entry with curb returns), parking rows and bays along it, buildings between (a requested building count is spread over the rows), surplus parking rows and dead-end drives trimmed for a fixed program, then stormwater (`stormNeed`/`stormOf`: detention, retention, underground or none, sized on the developed acres) and lawns or future-phase land from the leftover; trash enclosures by use (`trashNeeds`/`placeTrash`), accessible stalls (`accessible`, ADA table 208.2), entry markings (`entryMarks`) and the paving merged into one outline (`pavement`, a scanline raster traced to rings) for the map, sheet and DXF; it searches block stacks for each use (mixed use on one network), keeps only options that pass `check`, are connected and parked, and always returns three (`lib/sitecompose.mjs` is the last-resort fallback). `lib/siteplan.mjs` holds the geometry (curved drives and free-form pieces), checks and numbers (the model never draws geometry). Plans carry `params` (stall and aisle size, building depth and length, trees, shape style) and a `recipe` (the arrangement an option came from); `refit()` lays a plan out again around pieces marked `pinned`. `lib/proforma.mjs` is the pro forma: a month-by-month model on the plan's schedule, the one-page TestFit method (`simple()`, tested against TestFit's own sheet to the dollar) and an Excel workbook with live formulas. Exports a conceptual site plan PDF sheet (`lib/sitesheet.mjs`, rendered by `api/pdf` on 11×17 or 24×36), DXF and GeoJSON. Projects sync through `api/projects.js` (Supabase `site_projects`, migration `20261018000000_site_projects.sql`, applied).
+- **BIM models (in progress, not in the app yet)**: `lib/bim.mjs` turns a site plan option into a BIMCraft script (levels, walls by use, storefront, windows, doors, docks, slabs, flat or hipped roofs) and reads its schedules back as quantities per building; `lib/bimrun.mjs` runs `bimcraft-cli` (`BIMCRAFT_CLI`); `worker/bim/` serves it over HTTP from a container, since the binary can't run on Vercel. See `BIM-PLAN.md`; `test/bim.mjs` builds the models too when `BIMCRAFT_CLI` is set.
 - **Utilities** (`lib/utilities.mjs`, `api/utilities.js`, `src/utilities.js`): nearest power lines and substations from OpenStreetMap (Overpass), water and sewer CCN service areas and CCN water facility lines (PUC maps via Harris County / TWDB ArcGIS), and City of Houston sewer and water mains (layers found by name in the city's published service); distances from the parcel edge. The card's Utilities row, a map layer (`?box=`), and notes on the site plan sheet. Each source fails on its own.
 - Select several buildings or parcels with Shift-click (on touch screens, the building card's ⋯ → Select more).
 - The list panel is resizable on tablet and desktop: drag its right edge (or focus it and use the arrow keys); double-click resets it. The width is saved per browser.
@@ -169,21 +170,28 @@ Limits to know:
 
 ## MCP server for the project app (AMP)
 
-`api/mcp.js` is a Model Context Protocol server so AI agents in the internal project app (AMP) can pull this app's data. Production URL: **`https://fs-real-estate-intelligence.vercel.app/api/mcp`** (Vercel project `fs-real-estate-intelligence`).
+`api/mcp.js` is a Model Context Protocol server so AI agents in the internal project app (AMP) can pull this app's data and, with the access token set, work the team's projects the way a person does on the website (create a project, lay out a site plan in it, run and adjust the feasibility study, save the report set). Production URL: **`https://fs-real-estate-intelligence.vercel.app/api/mcp`** (Vercel project `fs-real-estate-intelligence`).
 
 - **Vercel Authentication:** the project protects every deployment except custom domains, and production has no custom domain, so a server-to-server caller like AMP gets Vercel's login page. Either add a custom domain to production (it is then outside the protection), or turn on **Protection Bypass for Automation** and have AMP send its secret in the `x-vercel-protection-bypass` header (if AMP can add headers), or change the protection to cover previews only.
 
 - **Transport:** Streamable HTTP, stateless (a new server and transport per request, `sessionIdGenerator: undefined`, JSON responses), `@modelcontextprotocol/sdk` pinned to 1.30.1 to match AMP. `POST` only; `GET` and `DELETE` answer 405.
 - **Auth switch:** set `MCP_ACCESS_TOKEN` on Vercel (Sensitive) and every request needs `Authorization: Bearer <token>` (compared in constant time; 401 otherwise). Unset, the endpoint is open. Give AMP the same token.
-- **Rate limits** (per caller IP, per function instance, `api/_lib/guard.mjs` `allow()`): 240 requests a minute / 10,000 a day overall, 120 / 6,000 for data tools, 10 / 300 for report tools (they launch Chromium). All of AMP's calls come from its servers, so they share these.
-- **Every tool is read-only** (`readOnlyHint: true, openWorldHint: true`) and answers with compact text (aimed under 15,000 characters; AMP cuts at 40,000): key figures, top-N lists, then the sources with the date each is current as of, a link and what it covers. Outside a dataset's coverage the answer says "not covered here (covers …)"; a failing upstream becomes a short note for that part ("… didn't answer in time; try again"), never a crash.
+- **Rate limits** (per caller IP, per function instance, `api/_lib/guard.mjs` `allow()`): 240 requests a minute / 10,000 a day overall, 120 / 6,000 for data tools, 10 / 300 for report tools (they launch Chromium or run the full study), 20 / 600 for the tools that change projects. All of AMP's calls come from its servers, so they share these.
+- **Read-only by default.** The data and report tools are read-only (`readOnlyHint: true, openWorldHint: true`). The project tools that change things are listed and run only when the endpoint is locked with `MCP_ACCESS_TOKEN` (and `MCP_WRITES` isn't `off`): an open endpoint can never change a project. Every tool answers with compact text (aimed under 15,000 characters; AMP cuts at 40,000): key figures, top-N lists, then the sources with the date each is current as of, a link and what it covers. Outside a dataset's coverage the answer says "not covered here (covers …)"; a failing upstream becomes a short note for that part ("… didn't answer in time; try again"), never a crash.
 - **Location input, the same for every tool** (`lib/mcp/resolve.mjs`): `address` (US Census geocoder, with the match quality; a home-region town name also works), `apn` + `county` (Harris, Waller, Austin, Washington and Grimes appraisal district layers; Fort Bend and Montgomery parcels are only in StratMap, which answers map clicks but not searches), `lat` + `lon`, `county`, `bbox`, `geojson` (Polygon / MultiPolygon), and `radius_mi` with the first three. A point tool that works on a site (flood, terrain, environmental) uses the parcel under the point.
 - **Tools** (`lib/mcp/server.mjs`; the logic is the same functions the website's endpoints call, never this app's HTTP endpoints):
   - `list_datasets`: every dataset, coverage, freshness, source and the tools that use it.
   - `find_property`, `site_facts`, `flood`, `terrain`, `environmental`, `utilities`, `traffic_counts` (`lib/mcp/site.mjs`).
   - `demographics`, `market_context`, `businesses`, `businesses_at_address`, `company_lookup`, `development_activity`, `construction_filings`, `top_companies`, `crime_near`, `crime_by_agency`, `news`, `airports_near`, `area_overview` (`lib/mcp/area.mjs`).
   - `report_flood`, `report_environmental`, `report_crime`, `report_crime_agency`, `report_demographics`, `report_market` (`lib/mcp/reports.mjs`, below).
-  - `site_plan` (`lib/mcp/siteplan.mjs`, below).
+  - `site_plan` (`lib/mcp/siteplan.mjs`, below); with `project_id` it saves the picked layout to that project.
+  - Projects and the feasibility study (`lib/mcp/projects.mjs`, below): `list_projects`, `get_project`, `feasibility_study`, `feasibility_report`, `project_files`; with writes on, `create_project`, `update_project`, `set_assumptions`, `edit_budget`, `save_scenario`.
+- **Projects** (`lib/mcp/projects.mjs`): the same project documents the website syncs (Supabase `site_projects`, through `api/projects.js` `cleanProject`, with `SUPABASE_SECRET_KEY`), so an agent's project shows up on the website and the other way round.
+  - **Reading:** `list_projects` (filter by words and status), `get_project` (parcels, site facts, each option's numbers and checks, the feasibility inputs, scenarios, saved report sets, reference files and their confirmed facts, the website link `APP_URL/#v=projects&pj=<id>`), `project_files` (10-minute signed links to report sets, reference files, renderings and plan sets).
+  - **The study:** `feasibility_study` runs `lib/feasibility/pipeline.mjs` `runStudy` on the platform's market data (the workspace's numbers exactly), with `sections` (summary, assumptions with every key, budget with every `line_id`, csi, cashflow, hold, sensitivity, scenarios, risks, register; up to 38,000 characters) and `what_if` (changes tried on a copy, never saved). `feasibility_report` makes the workspace's report set (`api/feasibility.js` `reportFiles`) and attaches the files asked for (up to 3 MB in one answer); `save: true` (a write) stores the set in the `report-sets` bucket, records it on the project and returns signed links.
+  - **Changing (writes on):** `create_project` (the parcel at an address or point, an APN, several APNs, or a drawn outline: parcels kept with their values, the site outline as Option A with its front street, the site facts gathered unless `gather_facts: false`), `update_project` (name, status, client, notes or a dated `add_note`, land price, target use, the study's option, the active scenario), `set_assumptions`, `edit_budget`, `save_scenario`, and `site_plan` with `project_id` (laid out on the project's own parcels unless a location is given, saved as the next option and made the study's option). Nothing is deleted: a project is retired with status `dead`. `by` names the person the agent works for; the project shows "<name> (agent)" as who changed it.
+  - **Saves:** read, change a copy, save only if `updated_at` is unchanged (PostgREST `PATCH … &updated_at=eq.`); when someone saved in between, the change is made again once on the new copy, then the agent is told. The website's own rule is still last edit wins, so a person editing the same project at the same moment can overwrite an agent's change when their browser syncs.
+  - Tested in `test/mcp-projects.mjs` with an in-memory database and the frozen market slice (no network).
 - **Report tools** (`lib/mcp/reports.mjs`): `report_flood`, `report_environmental`, `report_crime` (Houston), `report_crime_agency` (any US department), `report_demographics` (new: 1/3/5-mile rings or chosen radii around a property, or a county or drawn area; ACS figures, households by income, LODES jobs and modeled spending, a street map with the rings; built by `lib/reports/demographics.mjs` in the same report kit), `report_market` (a home county, the county a location is in, several, or the region: a static print version of the Market page built by `lib/reports/market.mjs` from `lib/marketstats.mjs` and `lib/marketcalc.mjs`, with Houston crime and TxDOT roads; the Market page's own export still copies its on-screen charts). Each returns a short text summary plus the PDF as an embedded resource (`{ type: 'resource', resource: { uri: 'report://<kind>/<slug>.pdf', mimeType: 'application/pdf', blob } }`), and the report's CSV as a second resource with `include_csv: true`. The HTML comes from the same builders the website's Export PDF uses (`lib/reports/*.mjs`, moved out of `src/fema.js`, `src/crime.js`, `src/crimeus.js`, `src/env.js`; the website's exports were checked byte-identical before and after) and is rendered by the same Chromium code (`lib/pdf.mjs`, moved out of `api/pdf.js`).
 - **`site_plan`** (`lib/mcp/siteplan.mjs`): the Site plan panel's Build with AI on the server, for a parcel (address, APN or a point on it), up to 20 APNs merged as one site (`apns` + `county`, merged with `lib/siteplan.mjs` `bridgeParcels` / `unionParcels` as Site Plan for All does) or a drawn outline (`geojson`; a MultiPolygon's pieces are merged the same way). Steps, as `src/siteplan.js` `build()`:
   - **Site:** the boundary in feet from its middle; the front and side streets from road lines beside it (US Census TIGERweb Transportation: primary, secondary and local roads, layer ids read from the service by name; the browser reads the map's tiles instead), the longest side when none is found (said so); street names from roads running along each side; road strips between parcels kept as no-build areas; USGS 3DEP ground so the pond goes on the low side.
@@ -281,11 +289,79 @@ Setup: run `supabase/migrations/20261006000000_team_watchlist.sql` (after `20261
 ## Run locally
 
 ```
-npm install
-npm test                 # synthetic fixture + API tests (mocked OpenAI) + offline pipeline and statewide tests
-DATA_DIR=test/.data/ node build.mjs --assemble && npx serve public   # UI on synthetic data
-node build.mjs           # real refresh (needs network access to TDLR, Census, OpenAI)
+npm install                          # Node 20+; also installs the dev tools (ESLint, TypeScript, Playwright, axe-core)
+cp .env.example .env                 # optional: fill in the keys you have (every name is explained below)
+npm run dev                          # assembles public/ and serves the app AND the api/ functions at http://127.0.0.1:8787
+DATA_DIR=test/.data/ node build.mjs --assemble && npx serve public   # UI only, on synthetic data
+node build.mjs                       # real data refresh (needs network access to TDLR, Census, OpenAI)
 ```
+
+`npm run dev` (`scripts/dev.mjs`) loads `.env` (the shell wins), runs `node build.mjs --assemble`, then serves `public/`
+and maps `/api/<name>` to `api/<name>.js` with the parts of Vercel's request/response helpers the functions use. No
+Vercel login or project link is needed. A function whose key is missing answers the way it does on Vercel without it.
+Projects fall back to the browser when `SUPABASE_SECRET_KEY` isn't set.
+
+**Checks**
+
+| Command | What it runs |
+|---|---|
+| `npm run lint` | ESLint, correctness rules (`eslint.config.js`). Stricter on the feasibility code |
+| `npm run typecheck` | `tsc` over the `// @ts-check` feasibility code (`tsconfig.json`) |
+| `npm run test:fz` | The feasibility tests (`test/fz-*.mjs`): finance, budget, investment engine, site, end to end, API (about 1 minute; prints PDFs with a local Chrome when there is one) |
+| `npm test` | `test:fz` and then every platform test (about 20 minutes; a local Chrome or `CHROME_PATH` makes the PDF tests real) |
+| `npm run check` | lint + typecheck + `npm test` |
+| `node scripts/sample-run.mjs` | One sample project from intake to the full report set, with every outbound request refused, into `docs/sample-output/` |
+| `node scripts/screenshots.mjs` | The workspace on the local dev server with Playwright: screenshots into `docs/screenshots/` and a WCAG 2.1 AA scan (axe-core) |
+| `node scripts/infra-grep.mjs` | The infrastructure-isolation check: no identifier of the source repos' infrastructure anywhere on the branch |
+
+## Feasibility workspace (experimental branch)
+
+Projects › a project › **Feasibility** takes one project through **Intake → Site → Plans → Budget → Pro Forma →
+Reports**:
+- `src/workspace.js` / `src/workspace.css` are the UI.
+- `lib/feasibility/` is the engine (shared by the browser, `api/feasibility.js` and the tests).
+- `lib/reports/feasibility.mjs` is the report.
+
+See:
+- `docs/INTEGRATION_PLAN.md` for the design and data model;
+- `docs/AUDIT.md` for where each piece came from;
+- `docs/DECISIONS.md` for the choices made;
+- `docs/PROGRESS.md` for status, open infrastructure and next steps;
+- `docs/DESIGN_SYSTEM.md` and `docs/ACCESSIBILITY.md` for the UI.
+
+Everything is feasibility / schematic level: the plan set is not a permit or construction set, costs are estimates rather than bids, and market inputs are assumptions. Every screen and report says so.
+
+## Environment variables (all)
+
+Every variable the platform reads is listed in `.env.example`. Set them on the Vercel project, or in `.env` for
+`npm run dev`. Empty means that feature is off, and the function says what's missing. "Build" variables are read by the
+nightly data workflow (`build.mjs`); see also the build table above.
+
+| Variable | Used by | Notes |
+|---|---|---|
+| `SUPABASE_URL` | functions, build | This platform's Supabase project URL |
+| `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`) | functions | Server only. Team projects, notes, Regrid counter, reference files, **feasibility report sets** |
+| `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) | assemble | Read-only browser key written to `public/config.json` |
+| `FIELD_ACCESS_CODE` | functions | Optional team passcode for projects, notes, files and the feasibility API |
+| `REPORT_SETS_BUCKET` | `api/feasibility.js` | Storage bucket for saved report sets (default `report-sets`; migration `20261026000000_report_sets.sql`) |
+| `FEASIBILITY_NARRATIVE` | `api/feasibility.js` | `on` lets Claude write the report's commentary paragraph (checked so it adds no numbers). Default off |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `ANTHROPIC_EFFORT`, `PLANSET_MONTHLY_CAP_USD` | plan sets, Claude features, feasibility narrative | See Setup |
+| `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_REASONING_EFFORT`, `OPENAI_CHAT_MODEL`, `OPENAI_CHAT_REASONING_EFFORT`, `OPENAI_ENRICH_MODEL`, `OPENAI_SEARCH_MODEL`, `OPENAI_REALTIME_MODEL`, `OPENAI_TRANSCRIBE_MODEL`, `OPENAI_VOICE`, `OPENAI_IMAGE_MODEL`, `VOICE_ENABLED` | assistant, enrichment, renderings, voice | See Setup and AI assistant |
+| `OPENAI_ADMIN_KEY`, `OPENAI_PROJECT_ID`, `OPENAI_API_KEY_ID` | `api/aiusage.js` | Optional usage readout |
+| `RENDER_MONTHLY_CAP_USD`, `RENDER_FALLBACK_USD_PER_IMAGE` | `api/render.js` | Renderings budget |
+| `AI_PROXY_URL` | data workflow | This deployment's `/api/pipeline-ai` |
+| `REGRID_API_KEY` (or `REGRID_TOKEN`), `REGRID_RECORD_CAP`, `REGRID_TILE_CAP`, `REGRID_TILE_URL` | `api/regrid.js` | Paid parcels, capped (see Regrid) |
+| `PARCEL_SERVICE`, `ADDRESS_POINTS_SERVICE`, `OVERPASS_URL` | parcel / OSM lookups | Optional overrides |
+| `MAPTILER_KEY`, `GOOGLE_MAPS_API_KEY` (or `GOOGLE_MAPS_KEY`), `GOOGLE_MAPS_BROWSER_KEY`, `GOOGLE_AUTOCOMPLETE_CAP`, `GOOGLE_DETAILS_CAP`, `TOMTOM_API_KEY`, `MAPILLARY_TOKEN`, `OPEN_METEO_API_KEY` | map and live layers | See Setup |
+| `CENSUS_KEY`, `BLS_KEY` (or `BLS_API_KEY`), `GOV_API_KEY`, `FBI_API_KEY`, `SOCRATA_APP_TOKEN`, `HF_TOKEN` | build and data functions | Public-data keys |
+| `MCP_ACCESS_TOKEN` | `api/mcp.js` | Bearer token for the MCP server (open and read-only when empty) |
+| `MCP_WRITES` | `lib/mcp/projects.mjs` | `off` keeps the MCP server read-only even with the token set |
+| `APP_URL` | `lib/mcp/projects.mjs` | The website's address for project links (default the production URL) |
+| `CRON_SECRET` | cron functions | Vercel cron auth |
+| `ZAPIER_DIGEST_WEBHOOK` | build | This platform's own nightly digest hook (optional) |
+| `CHROME_PATH` | `lib/pdf.mjs`, tests, scripts | Local Chrome/Chromium (Vercel uses @sparticuz/chromium) |
+| `PORT`, `HOST` | `scripts/dev.mjs` | Dev server address (default 127.0.0.1:8787) |
+| `DATA_DIR`, `ONLY`, `PERIOD_START`, `PERIOD_END`, `ALLOW_SHRINK`, `AI_MAX_ROWS`, `AI_CONCURRENCY`, `AREA`, `AREA_NEWS_TOWNS`, `REBUILD_AREA`, `REBUILD_GEO`, `REBUILD_MARKET`, `REBUILD_RISK`, `REBUILD_SPENDING`, `REBUILD_USCO` | build | See "Environment variables (build)" |
 
 ## Known limits
 

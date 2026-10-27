@@ -11,7 +11,53 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Rent check** against Oct 2026 listings: Waller retail asks average about $19.85 a sf, new strip space on Field Store Rd asks $30 to $40 NNN, so the budget's $25.20 is inside the range for new construction on FM 362 but above the town average; it stays as entered.
 - The project test now checks Option B too (its acreage, buildings, spaces, pro forma inputs, nothing outside its line). Seeding the project again (the Seed project workflow) puts Option B on every device.
 
+
+### 1:41 AM CT: Buildings drawn from their floor plans in 3D and in the BIM model (aa9971d, b6f4058, cf7a94f, f708ae0, e716ec3)
+- **Buildings look like buildings in 3D:** tilt a site plan and every building is drawn from its own floor plans (the ones the plan set draws): brick on the ground floor and siding above, each townhome in a row its own colour, windows and doors with white trim where the plans put them, apartment balconies and open stair breezeways, hip roofs on homes, townhomes and apartments, flat roofs behind a parapet with rooftop units on shops and offices, metal canopies over shop fronts. The 3D renderings start from this view too.
+- **The flat plan is unchanged:** seen from straight above, buildings keep their use's colour and the selected one its highlight. Phase 2 stays plain and faint, and the Buildings layer button hides the 3D detail with the buildings.
+- **Homes fit their plans:** a home a few feet off its plan's size gets the plan stretched to fit, so no bare block shows past its walls (43 of 141 homes on the 40 acre test showed it).
+- **BIM models from the same plans** (not yet in the app: the model service isn't running): rooms, interior and party walls, doors and windows, stairs, balconies and roofs, in textured brick, siding, stone and shingles. A whole 141-home neighbourhood builds without errors in about 75 seconds.
+
+
 ## 2026-10-26
+
+### 11:42 PM CT: Spare land beside the buildings, a better option on big mixed sites, typed requests in Feasibility, townhome plan sets that match the site plan (8b03667, e16c0a7, 922e63a)
+- **Spare land stays usable:** where a site has much more land than its detention pond needs, the pond now goes at the far end of that land, so what's left sits beside the buildings and their drives (room for a later phase) instead of cut off behind the pond.
+- **A better option on big mixed sites:** a layout in pods round a spine road now takes the last of the three places when it meets more of the numbers you asked for. On the 40 acre test it gives 237 of 240 apartments and 101 townhomes, where the other layouts gave 220 and 61.
+- **Type what to build in the Feasibility Site step:** "120 garden apartments, 3 stories, with a clubhouse and pool" is laid out as written; the use list is still there for a quick layout.
+- **Townhome plan sets match the site plan:** rear-load rows are drawn with the garage on the back lane and the front door and living room on the court; rows of different lengths share one unit design (the set no longer draws the same unit three times: 34 sheets instead of 52 on the test). A drive-thru restaurant pad's floor plan has its pick-up window.
+- The report's scope line now says costs come from the budget workbook, the team's 2024–25 budgets and house rates.
+
+### 10:55 PM CT: Budgets from the team's own jobs, returns first, apartment plan sets, and site plans that build what's asked (3f74df7, 3be2e56, f1e739f, 703239f, 89682ab, 3562a73, 0531bfd)
+- **Budgets from the team's own past jobs:** houses, shops and restaurants, small industrial and flex buildings (up to 40,000 sf) and convenience stores are now priced line by line from the middle of the team's 2024–25 Smartsheet budgets for that kind of building (foundations, roof, walls, windows, doors, mechanical, plumbing, electrical, sprinklers, and the interiors where the owner finishes them), with the budgets' 10% contractor fee as its own line. Each line says how many past budgets it rests on. Apartments and townhomes still use the budget workbook; offices, medical, hotels, churches, storage and big warehouses still use the platform's rates.
+- **A check against the team's numbers:** the budget now shows the plan's building and site work per square foot beside the team's own all-in median for that kind of building (the sample apartments: $132 against the team's $142, 7% lower), and flags a gap over 20%.
+- **Feasibility pro forma leads with what the team decides on:** levered IRR, equity multiple and the 10-year average cash-on-cash first, then cash-on-cash for each year of the hold, then cost, NOI and the rest. The project summary beside every step shows the same three.
+- **Plan sets now draw apartment buildings:** floor plans for every floor, roof plan, elevations, sections and the structural, mechanical, plumbing and electrical sheets for each apartment building (garden walk-ups with open breezeway stairs, the building's own number of units, a unit schedule and apartment code notes). Before, apartment buildings got site sheets only. The clubhouse is drawn as a clubhouse (leasing, club room, kitchen, restrooms, mail, fitness), not an empty shell. These unit plans are drawn by rule and are schematic.
+- **Site plans build what you ask for:** "120 garden apartments" reads 120 units, "50 homes" reads houses, pad sites asked for on a shop, restaurant or office plan are laid out on the street in front of the main building (an option without them says so), an amenity center asked for with townhomes is built at the entry, and townhome options always meet their own guest parking.
+- **A second way in more often:** where a park along the street blocked a fire-access second entrance for a neighbourhood of more than 30 homes, it now crosses the park (cut round it) when that breaks no check and costs no parking.
+
+### 9:50 PM CT: Experimental gets the 10-year pro forma, BIM groundwork and main's latest (a191760, 400b170)
+- **10-year pro forma led by levered IRR, equity multiple and cash-on-cash** (see the 9:05 PM entry) is now on the experimental site too, including in the Feasibility study and the agents' study answers. A study's levered IRR changes because the hold is now 10 years (the sample apartments went from 3.5% to 6.0%).
+- **BIM groundwork** (see the 8:31 PM entry) and **main's latest work** (home communities, the agents' quality check on site plans) are merged in. Nothing else changes for users.
+
+### 9:05 PM CT: A 10-year pro forma led by levered IRR, equity multiple and cash-on-cash (0d45faa)
+- **10-year hold:** the pro forma now holds a project for 10 years after it's stabilized before the sale (it was 5), as the team underwrites. Plans that never changed the hold move to 10 years; a hold set by hand stays. Change it under Assumptions, **Hold after stabilizing**.
+- **The three returns that matter come first:** **Levered IRR**, **Equity multiple** (with the equity put in) and **Cash-on-cash** (the first stabilized year, with the average over the hold) now open the pro forma, ahead of cost, NOI, yield and value.
+- **Cash-on-cash by year:** a row of the 10 hold years, each year's NOI less the permanent loan's payments over the equity put in, so you can see it climb as rents grow.
+- **Excel:** the Pro Forma workbook opens on a new **Returns** sheet (levered IRR, equity multiple, cash-on-cash first year and average, then NOI, debt service, cash flow and cash-on-cash for each hold year), and the one-page sheet adds an average cash-on-cash. The TestFit method shows its cash-on-cash too.
+- **The AI assistant** now reports cash-on-cash (first year and average) when you ask how a plan's numbers work out.
+
+### 8:31 PM CT: BIM models of site plan options with BIMCraft: the trial, the model builder and its worker (25f4c03)
+- **Nothing in the app changes yet.** This is the groundwork for real building models of each site plan option, built with BIMCraft (an open-source building modeling tool).
+- **What it does:** every building in an option becomes a real model: a storey at a time, with walls of an assembly for its use (tilt-up warehouses, brick shops, EIFS offices, wood-frame apartments and homes), storefront facing the parking, office window bands, apartment and home windows, entry and garage doors, dock doors on a warehouse's truck court, slabs, and flat roofs behind a parapet or hipped roofs on homes. Townhome rows get their party walls. Out come a model file that Revit and other BIM tools open (IFC), a 3D picture, and the quantities per building: wall, glass, roof and floor areas and door counts.
+- **Tried on the King Rd Project:** its three saved options (134 tiny homes at 550 sf, apartments, 134 tiny homes at 448 sf) model in 5 to 13 seconds, every home on its own lot with its door facing its street and no garage on a tiny home.
+- **Tried on all seven kinds of plan** (retail, office, apartments, industrial, townhomes, single-family homes and a mixed-use tract): every one builds in under 7 seconds, and floor areas match the plan to the square foot (homes add their garage and porch, which the plan's living area leaves out).
+- **For the budget:** it stays $ per square foot by type. The model will check it against the building's shape (more wall, more glass or more storeys than a typical building of that type cost more). That adjustment is the next step.
+- **Still to do before anyone sees it:** host the small model service (it can't run on Vercel), then add a Download Model button and the cost check to each option.
+
+### 7:00 PM CT: Plan for BIM models of each option with BIMCraft, priced from their quantities (27b7e75)
+- **Planning only, nothing in the app changes.** `BIM-PLAN.md` sets out how each site plan option could become a real building model (walls, windows, doors, floors and roofs) using BIMCraft, an open-source building modeling tool that can be driven automatically. The model would give the budget real quantities (wall, glass, roof and floor areas, doors) to price instead of one cost per square foot, a model file architects can open in Revit, and better buildings for the 3D view and renderings.
+- **Honest about accuracy:** this moves concept budgets from a rough per-square-foot number toward an assembly-based estimate, still a range rather than an exact figure; the biggest remaining gain is checking prices against our own past jobs.
 
 ### 3:29 PM CT: The OP-0046 Waller site (FM 362 at Old Houston Hwy) rebuilt in Projects from its drawings (ddd38c8, a404497, 1c8b7f3)
 - **A new project for the whole team: OP-0046 · 0 Old Houston Hwy at FM 362, Waller.** The three Waller CAD parcels (10687 Priya Capital, 10682 Market Square Commons, 10680 Waller Heritage Plaza; 16.16 acres, assessed $1,648,410) merged into one site, with one option, **Option A · OP-0046 as drawn**, that follows the two site plan sheets piece by piece: the six-store row along the west line (Bealls 30,000 sf, clothing 31,579, grocery 32,626, home decor 21,693, dollar store 11,475, pet store 10,772), the 7,000 sf restaurant pad at the corner square to Old Houston Hwy, the four-building retail center along FM 362 (5,000 + 5,000 + 6,000 + 12,000 sf), both retention ponds (10,531 and 14,215 sf, 12 ft deep), the drainage channel between the two halves as a no-build area, the service drive, the three driveways from Old Houston Hwy, the drive inside the FM 362 line, and every parking row where the sheets draw it with its aisles as one connected lot: the main aisle down the front of the stores, the north drive along Old Houston Hwy, the cross aisles between the blocks of the field, the aisle along the long row beside the channel, the loop round the pad and a full-width aisle between every pair of rows that face each other.
@@ -19,6 +65,25 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Where it differs, and why:** the app parks at 9 × 18 ft stalls, and the shopping center sheet's stripes scale to about 6.5 ft wide, so the same rows hold 708 spaces here against the sheets' 849 (the retail center's 98 come out as 96); accessible spaces are the app's count (15), not the sheets' 46. The sheets' acreages (8.3 + 5.8 + 0.9) don't add up to the county's 16.16 and aren't used.
 - **Parking lots are one paved surface now (a new kind of piece, and the engine uses it):** a **Parking field** is the asphalt under and between a lot's rows and aisles. The layout engine lays one under every parking field it draws, so the gaps at the ends of rows and aisles are paved as on a civil sheet instead of left as lawn; you can add one from **Add › Paving** and shape it like any piece; the sheet, the map, the plan key and the DXF treat it as paving (one curb round the whole lot, the rows drawn on top); the numbers count a field's paving once, less whatever already stands on it (rows, aisles, a building, a pond), so impervious cover is right; a drive that ends on a field isn't a dead end, a row beside a field has its aisle, and a sign or an island can't stand on one. For a lot drawn by hand there's a helper that finds the paved fields from the rows and drives (gaps up to about 32 ft closed, kept inside the lot and off the buildings, ponds and easements); OP-0046's three lots (the shopping center's, the retail center's and the service strip) are made that way.
 - **Behind it:** a builder for the project, a seed script and a **Seed project** workflow that reads the three parcels from the Waller appraisal district's own layer (the one the property card uses, with the parcel map's outlines as a fallback) and saves the project to the team's shared Projects, where it syncs to every device. Running it again replaces the team's copy. A test checks the build (areas, positions, no overlaps, nothing outside the site).
+
+### 1:51 PM CT: A full landscape section in plan sets; layout review and two layout fixes (experimental branch) (a5c6593, d479b35)
+
+- **Landscape in plan sets is now six sheets:**
+  - **L-001:** calculations (site areas, each landscape rule with what it asks for, what the plan shows and whether it meets it, the plant palette with quantities).
+  - **L-101:** planting plan.
+  - **L-102:** enlargements of the entry and the amenity, on big sites.
+  - **L-201:** irrigation plan (what's sprayed, on rotors, on drip or not watered, valves, mainline, where the water comes in).
+  - **L-501 and L-502:** planting and irrigation details.
+- **The planting now meets the usual rules:**
+  - Street trees every 40 ft, a tree for every ten parking spaces, a hedge screening parking from the street, buffers on the other property lines, and a tree in every front yard.
+  - Trees go round the ponds, with a planted edge in wet ones; there are beds along the buildings, and the entry and amenity are dressed.
+  - Trees stay out of the sight triangles at drives and clear of hydrants and transformers.
+  - Before, the 27-acre test subdivision showed 5 of 31 street trees and 50 of 71 front-yard trees. Where a plan can't meet a rule, L-001 says so.
+- **Site plans:**
+  - On a flag lot the entry comes down the strip to the street instead of across the neighbour's land.
+  - On a mix with shops in front, the pond is never put between the shops and the street.
+- **A written review of the layout engine** lists what still lays out badly and the order to fix it.
+
 
 ### 1:37 PM CT: Agent site plans are checked before they're handed over; tiny homes never get a garage (53329fb)
 - **A quality check on every site plan the agents make:** before the answer goes back, each layout is checked like a planner would: a way in from the street, every drive reached, fire lanes at least 20 ft, dead ends, a second access past 30 homes, parking, detention, each home on its own lot facing a drive with 10 ft to the next, a parking pad each, no garage on a tiny or manufactured home, a sensible floor plan, density, and whether it is what was asked. A layout that fails gives way to one that passes, and the answer starts with **READY**, **READY WITH NOTES** or **NOT READY** with each finding.
@@ -28,8 +93,54 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Tiny home rent:** one Tiny home rent for every tiny home, by its size from your Oct 2026 comps: about $1,150 a month for 550 sf (it was $1,425), $1,025 for 420 sf.
 - **Tested** end to end on King Ln with the agents' tool (real Chromium sheets): the request as made, the AI answering self storage, 25 × 55 pads, 550 sf homes, single-wides, and an ordinary subdivision; every community plan comes back READY WITH NOTES, the note being the real one (about 130 homes behind one strip need the fire marshal's sign-off on a second access). Not tried on the live site yet: AMP still can't reach it through Vercel's login protection.
 
+## 2026-10-25
+
+### 9:00 PM CT: Agents can work on projects (experimental branch) (dca901d, 5ff97d1, 94f6928)
+- **Agents in your project app can now see the team's projects:** the list, and each project's parcels, site facts, options with their numbers, feasibility inputs, scenarios and saved reports.
+- **They can run a project's feasibility study** and get the same numbers as the Feasibility tab: budget, pro forma, returns, sensitivity, scenarios and risks. They can try "what if" changes without saving anything.
+- **They can get the full report set** (the Feasibility report PDF, the workbook, the CSVs), and links to anything the project has stored: report sets, reference files, renderings and plan sets.
+- **With project changes turned on** (only when the agents' connection is locked with its access token), agents can also:
+  - start a project from an address, parcel number, several parcels or an outline;
+  - lay out a site plan in it, saved as its next option;
+  - change assumptions, budget lines and scenarios;
+  - change the name, status, notes or land price;
+  - save the report set for the team.
+
+  Their changes show as made by "<name> (agent)". Nothing can be deleted.
+- This branch now also has the latest from the live site (rendering controls; renderings and plan sets on every computer).
+
 ## 2026-10-24
 
+### 7:18 PM CT: Feasibility workspace checked and tightened (experimental branch) (ce46211…0af719c)
+- **Saved report sets now stay listed.** Saving a set recorded it on an old copy of the project, so the list stayed empty. Generating a layout had the same problem: the new option wasn't kept as the one the study uses.
+- **Reports aren't refused over input notes.** For example, a change to an assumption the chosen option doesn't use. The note is shown in the workspace with a one-click fix, and listed on the report.
+- **Sensitivity is consistent:**
+  - A cost case now moves contingency, soft costs and the developer fee with construction.
+  - Every "low case" is the downside.
+  - The hold analysis grows rents from the end of construction, as the development model does.
+- **Flood:** a site checked with no mapped flood zone no longer reads "not checked", and the workspace updates when the site lookup finishes.
+- **Safer:** values from a synced project can't put markup into the scenario editor.
+- **Faster:** a full study with sensitivity takes about half the time (IRR is 10× faster), so edits update sooner.
+- **Downloads** from the workspace are recorded on the Reports tab like every other export.
+- **Checked:**
+  - Every test passes on macOS.
+  - The sample project runs offline from intake to the full report set.
+  - The branch contains no reference to the other two apps' infrastructure.
+  - The workspace passes an automated WCAG 2.1 AA scan.
+
+### 6:27 PM CT: Feasibility workspace on the experimental branch (experimental, not on the live site) (59be765…0e1e736)
+- **A project now opens on Feasibility:** six steps (Intake, Site, Plans, Budget, Pro Forma, Reports) with the project's cost, yield, IRR, NPV and top risks always in a summary beside them.
+- **A real budget:** CSI-coded line items priced from the layout's quantities. Apartments and townhomes use the Finishes Solutions budget workbook's lines; other uses and site work use the platform's rates. Costs are escalated by the construction-materials price index, with a location factor, and rolled up the budgeting suite's way (GC fee, contingency, a developer fee that is a true share of the total). Every line says where its rate came from and can be changed or left out.
+- **Every assumption shows its source:** interest rates come from the nightly SOFR and 10-year Treasury data, land from the asking price or the appraisal district's land value (no longer the total value with buildings), and rents carry the ZIP's typical rent as a check. Change any input and every number updates.
+- **Pro forma fixes:**
+  - Lease-up income now pays the construction loan down before anything is distributed.
+  - Exit and refinance income grow rents and costs at their own rates.
+  - NPV is added, and so are break-even rents.
+  - A 5-year hold on the budgeting suite's tested engine.
+- **Sensitivity and scenarios:** what moves the return most, two-way grids, and named scenarios (financing, costs, unit mix) side by side.
+- **Report set:** a Feasibility report PDF (summary, site and layout, plan set, budget, pro forma, sensitivity, risks, and every assumption with its source), a workbook, CSVs and the study data. These can be downloaded or saved for the team.
+- **Fixed:** in the site plan editor, the Layers / Items tabs were calling the project page's tab switch.
+- **Not live:** this is on the `experimental` branch only. Saving report sets needs a new storage bucket set up first.
 ### 5:14 PM CT: More rendering control; renderings and plan sets on every computer (7c560f2)
 - **Renderings and plan sets no longer vanish on another computer.** They used to be kept only in the browser that made them, so another computer (or the same one on a different web address, or after the browser cleared its storage) said "Not on this device: it was made on another one". Each rendering, its massing picture and each plan set PDF now also goes to the team's storage as it's made, and any computer without a copy loads it from there. Renderings this computer already has are shared the next time it opens the project. Deleting one removes the team's copy too.
 - **More views:** From the left side, From the right side, High overhead and Top down (straight down, like a drone survey photo). High overhead and Top down turn a long or angled site so it fills the picture.

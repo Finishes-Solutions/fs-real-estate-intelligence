@@ -982,7 +982,7 @@ export function initAssistant(ctx) {
     }, 1500);
   }
   ctx.map.on('moveend', pushContext); ctx.onChange(pushContext); ctx.onCardRender(pushContext); ctx.onCardClose(pushContext); ctx.onViewChange(pushContext);
-  const isNoise = t => !t || /[^\u0000-ɏ -⁯\s]/.test(t) && !/[a-z]{3}/i.test(t) || t.replace(/[^a-z]/gi, '').length < 2;
+  const isNoise = t => !t || /[^\u0000-ɏ\u2000-⁯\s]/.test(t) && !/[a-z]{3}/i.test(t) || t.replace(/[^a-z]/gi, '').length < 2;
   // what the transcriber has so far, without any echo of its own hint list (that used to flash as a burst of place names)
   const shown = t => { const c = stripEcho(t, vocab); return c && !isPromptEcho(c, vocab) ? c : ''; };
   const runVoiceTool = (name, args) => withTimeout(runTool(name, args), 20000, () => ({ error: 'That lookup timed out. Tell the user it didn’t answer in time and offer to try again.' }));

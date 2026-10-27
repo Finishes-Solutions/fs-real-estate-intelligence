@@ -7,7 +7,8 @@ cd "$(dirname "$0")/.."
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 # HCAD's Real_acct_owner.zip with a permits.txt like the real one
 printf 'acct\tid\tagency_id\tstatus\tdscr\tdor_cd\tpermit_type\tpermit_tp_descr\tproperty_tp\tissue_date\tyr\tsite_num\tsite_pfx\tsite_str\tsite_tp\tsite_sfx\tsite_apt\r\n' > "$T/permits.txt"
-d1=$(date -u -d '-40 days' +%m/%d/%Y); d2=$(date -u -d '-400 days' +%m/%d/%Y); d3=$(date -u -d '-1000 days' +%m/%d/%Y)
+ago() { node -e "const d=new Date(Date.now()-$1*864e5);console.log(String(d.getUTCMonth()+1).padStart(2,'0')+'/'+String(d.getUTCDate()).padStart(2,'0')+'/'+d.getUTCFullYear())"; } # (GNU and BSD date differ: node is everywhere the tests run)
+d1=$(ago 40); d2=$(ago 400); d3=$(ago 1000)
 printf '0010180000001\t1\t061 \tC\tCOMMERCIAL REMODEL\tX1\t3\tAddtns, Remodels, Lease Space\t \t%s\t2026\t750\t \tCONGRESS\tST\t \t \r\n' "$d1" >> "$T/permits.txt"
 printf '1234567890123\t9\t040 \tC\tNEW SFR\tA1\t1\tNew Dwelling - permit\t \t%s\t2025\t21\t \tOAK GLEN\tDR\t \t \r\n' "$d2" >> "$T/permits.txt"
 printf '1234567890123\t8\t040 \tC\tOLD\tA1\t1\tNew Dwelling - permit\t \t%s\t2023\t21\t \tOAK GLEN\tDR\t \t \r\n' "$d3" >> "$T/permits.txt"

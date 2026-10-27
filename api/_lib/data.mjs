@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { recentChanges } from '../../lib/changes.mjs';
+import { marketContext } from '../../lib/feasibility/market.mjs';
 
 const cache = {};
 export async function load(name) {
@@ -10,4 +11,10 @@ export async function load(name) {
 }
 export async function changedMap() {
   return recentChanges(await load('changes.json').catch(() => null));
+}
+// the platform's market facts for a feasibility study (rates, PPI, ZORI: lib/feasibility/market.mjs); a missing file is
+// left out, never a guess
+export async function market() {
+  const [area, markets] = await Promise.all([load('area.json').catch(() => null), load('markets.json').catch(() => null)]);
+  return marketContext({ area, markets });
 }

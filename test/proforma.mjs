@@ -28,6 +28,18 @@ assert.ok(Number.isFinite(R.returns.unlevIrr) && R.returns.unlevIrr > -0.2 && R.
 assert.ok(R.simple.unlevIrr > R.returns.unlevIrr, 'the no-schedule method reads higher');
 assert.ok(R.monthly.cost.reduce((s, v) => s + v, 0) > 0.99 * (R.budget.budget), 'every budget dollar is spent in the schedule');
 const wb = PF.workbook(R, 'Test'); assert.ok(wb['One page (TestFit method)'].some(r => r.some(c => c?.f?.startsWith('IRR('))));
+// the team's returns: a 10-year hold by default, cash-on-cash each year of it, and the Returns sheet first
+{
+  const r = R.returns, hy = r.holdYears;
+  assert.equal(A.hold, 10, 'a 10-year hold by default'); assert.equal(R.sched.total - R.sched.toStabilize, 120, 'sale 10 years after stabilizing');
+  assert.equal(hy.length, 10, 'cash-on-cash for each year of the hold');
+  for (const y of hy) assert.ok(Math.abs(y.cash - (y.noi - y.debtService)) < 1 && Math.abs(y.coc - y.cash / r.peakEquity) < 1e-9, 'year ' + y.year + ': cash flow after the loan over the equity');
+  assert.ok(hy[9].noi > hy[0].noi && hy[9].coc > hy[0].coc, 'rents grow, cash-on-cash with them');
+  assert.ok(r.coc === hy[0].coc && Math.abs(r.cocAvg - hy.reduce((s, y) => s + y.coc, 0) / 10) < 1e-12, 'first year and average');
+  assert.ok(r.coc > 0 && r.coc < 0.15, 'a plausible cash-on-cash: ' + r.coc);
+  assert.equal(Object.keys(wb)[0], 'Returns'); assert.equal(wb.Returns.filter(x => typeof x[0] === 'number').length, 10, 'the Returns sheet has the hold year by year');
+  const R5 = PF.run(plan, { ...A, hold: 5 }); assert.equal(R5.returns.holdYears.length, 5, 'a hold set by hand is kept');
+}
 // for-sale homes
 const hp = { ...plan, program: { use: 'sfr' } }; hp.elements = L.layoutOptions(hp, hp.program)[0].elements;
 const H = PF.run(hp, { ...PF.defaults(hp, 1500000), forSale: true }); assert.ok(H.forSale && H.exit.sales > H.budget.total * 0.7 && Number.isFinite(H.returns.margin) && H.sched.lease >= 4, 'for-sale homes: sales ' + Math.round(H.exit.sales) + ' cost ' + Math.round(H.budget.total));
