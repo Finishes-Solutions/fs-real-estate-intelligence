@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-26
 
+### 8:31 PM CT: BIM models of site plan options with BIMCraft: the trial, the model builder and its worker (25f4c03)
+- **Nothing in the app changes yet.** This is the groundwork for real building models of each site plan option, built with BIMCraft (an open-source building modeling tool).
+- **What it does:** every building in an option becomes a real model: a storey at a time, with walls of an assembly for its use (tilt-up warehouses, brick shops, EIFS offices, wood-frame apartments and homes), storefront facing the parking, office window bands, apartment and home windows, entry and garage doors, dock doors on a warehouse's truck court, slabs, and flat roofs behind a parapet or hipped roofs on homes. Townhome rows get their party walls. Out come a model file that Revit and other BIM tools open (IFC), a 3D picture, and the quantities per building: wall, glass, roof and floor areas and door counts.
+- **Tried on the King Rd Project:** its three saved options (134 tiny homes at 550 sf, apartments, 134 tiny homes at 448 sf) model in 5 to 13 seconds, every home on its own lot with its door facing its street and no garage on a tiny home.
+- **Tried on all seven kinds of plan** (retail, office, apartments, industrial, townhomes, single-family homes and a mixed-use tract): every one builds in under 7 seconds, and floor areas match the plan to the square foot (homes add their garage and porch, which the plan's living area leaves out).
+- **For the budget:** it stays $ per square foot by type. The model will check it against the building's shape (more wall, more glass or more storeys than a typical building of that type cost more). That adjustment is the next step.
+- **Still to do before anyone sees it:** host the small model service (it can't run on Vercel), then add a Download Model button and the cost check to each option.
+
 ### 7:00 PM CT: Plan for BIM models of each option with BIMCraft, priced from their quantities (27b7e75)
 - **Planning only, nothing in the app changes.** `BIM-PLAN.md` sets out how each site plan option could become a real building model (walls, windows, doors, floors and roofs) using BIMCraft, an open-source building modeling tool that can be driven automatically. The model would give the budget real quantities (wall, glass, roof and floor areas, doors) to price instead of one cost per square foot, a model file architects can open in Revit, and better buildings for the 3D view and renderings.
 - **Honest about accuracy:** this moves concept budgets from a rough per-square-foot number toward an assembly-based estimate, still a range rather than an exact figure; the biggest remaining gain is checking prices against our own past jobs.
