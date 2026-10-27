@@ -146,3 +146,13 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 - Letting a sized apartment zone fill the back of a mixed site was tried and backed out: the apartments took the land and parking the 30,000 sf of shops asked for needed (18,900 laid out).
 - The fill-the-site default is kept (the owner wanted the site filled); a request naming sizes still gets more than asked where the land holds it, and the notes say so.
 - Townhome and duplex rows are one building type per unit design, not per row length: the unit is what's designed; the type is drawn as its most common row and its sheet says how many rows and units it covers.
+
+## Buildings from their designs: BIM model and the map's 3D (2026-10-27)
+
+- The BIM model and the map's 3D view are both built from the **plan set's floor-plan designs** (the same rule-based design for a type when the set hasn't been made), not from separate massing rules, so the layout, the drawings and the model can't disagree about where a window is.
+- A building drawn as a type it only resembles (a home a few feet wider than its type) gets the design **stretched to its size**, in the map and the model. Without it, 43 of 141 homes on the 40 acre test showed bare massing past their walls.
+- Rows and gable roofs are **hipped**: BIMCraft walls are one height, so a gable end can't rise to the ridge. The map's roofs are stepped extrusions (MapLibre has no sloped faces).
+- BIM rooms are named only on models of 150 rooms or fewer: BIMCraft takes about a quarter second a room, so a whole site would take minutes.
+- The map's facades show only when the map is **tilted**: from straight above, the plan's colour by use and the selection highlight matter more than roofs. The picture-taking map for renderings always has them. Phase 2 buildings stay plain, faint massing.
+- A retail or office building faces the side with the most parking stalls (it faced the service drive on the test retail site).
+
