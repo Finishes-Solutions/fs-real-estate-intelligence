@@ -433,7 +433,7 @@ for (const v of [0, 1, 2]) {
     const off = R.presets(ac, fr, { aiOff: true }), on = R.presets(ac, fr);
     assert.ok(off.length >= 2 && on.length >= 2, ac + ' ac: suggestions');
     for (const { text, want } of off) { const p = S.normalizeProgram(S.guessProgram(text)); has(p, want); assert.deepEqual(R.notUnderstood(text, p), [], text + ': fully read without the AI'); assert.ok(!/\d+ pads?\b/.test(text), 'no pads without the AI: ' + text); seen.add(text); }
-    for (const { text, want } of on) if (want.pads) assert.deepEqual(R.notUnderstood(text, S.normalizeProgram(S.guessProgram(text))), [want.pads + ' pad' + (want.pads > 1 ? 's' : '')], 'pads need the AI'); }
+    for (const { text, want } of on) if (want.pads) { const p = S.normalizeProgram(S.guessProgram(text)); assert.deepEqual(R.notUnderstood(text, p), [], 'pads read without the AI: ' + text); assert.equal(p.pads, want.pads, text); } } // (since Oct 26 the words' pads are the program's, laid out as the brief's are)
   // the sizes follow the site: a 4.7 acre lot and a 43 acre tract get different suggestions, each sized to fit
   const small = R.presets(4.7, 500).map(x => x.text), big = R.presets(43, 1200).map(x => x.text), tiny = R.presets(0.9, 200).map(x => x.text);
   assert.ok(!small.some(t => big.includes(t)), 'different suggestions for 4.7 and 43 acres'); assert.ok(/QSR|drive-thru/.test(tiny[0]), 'a pad on under an acre');
@@ -446,8 +446,8 @@ for (const v of [0, 1, 2]) {
   assert.deepEqual(R.readAs(P('Mixed use: retail in front, a commons with a lake, 120 apartments, 18 townhomes'), S.USES), ['Mixed use', 'Retail', 'Commons', '120 apartments', '18 townhomes']);
   assert.deepEqual(R.readAs(S.normalizeProgram({ use: 'retail', gfa: 25000, buildings: 3 }), S.USES), ['Retail', '25,000 sf', '1 story', '3 buildings', '4/1,000 parking']);
   // not understood: only a number with its noun that the program doesn't carry
-  assert.deepEqual(R.notUnderstood('25,000 sf retail strip with 2 pads', P('25,000 sf retail strip with 2 pads')), ['2 pads']);
-  assert.deepEqual(R.notUnderstood('retail with two pads', P('retail with two pads')), ['2 pads']);
+  assert.deepEqual(R.notUnderstood('25,000 sf retail strip with 2 pads', P('25,000 sf retail strip with 2 pads')), []); // (pads read from the words since Oct 26)
+  assert.deepEqual(R.notUnderstood('retail with two pads', P('retail with two pads')), []);
   assert.deepEqual(R.notUnderstood('25,000 sf retail strip with 2 pads', S.normalizeProgram({ use: 'retail', gfa: 25000, buildings: 3 })), [], 'the AI read the pads as buildings');
   assert.deepEqual(R.notUnderstood('4 buildings of 7,000 sf retail', P('4 buildings of 7,000 sf retail')), [], 'per-building size');
   assert.deepEqual(R.notUnderstood('townhomes at 20 units per acre, 40 townhomes', P('townhomes at 20 units per acre, 40 townhomes')), ['40 townhomes'], 'a density is not a count (and the words took 20 as the count, so the 40 is flagged)');

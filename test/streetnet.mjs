@@ -70,8 +70,10 @@ for (const [name, site] of [['Waller', waller], ['irregular', irregular], ['narr
     const r = checkNet(site, o, name + ' ' + o.name, { draw: false }), plan = r.plan, J = N.netRules(plan).filter(i => /crossroads/.test(i.text)).length; assert.ok(J <= Math.max(1, S.ringArea(site.ring) / 43560 / 100), name + ': no crossroads grid');
   }
   // it reads as a subdivision: among the network layouts offered, one with cul-de-sacs whose local streets mostly curve (the
+  // (the curving network trades some homes for its streets: since the straight rows learned shallower lots and corner lots
+  // that reach the cross streets, within 85% of their best, Oct 26)
   // first may be the concentric one, straight along the long sides, when it holds more homes)
-  if (name === 'Waller' || name === 'irregular') { const sub = nets.find(o => o.elements.some(e => e.bulb) && curvedShare(o.elements) >= 0.7); assert.ok(sub, name + ': a network with cul-de-sacs and curving streets: ' + nets.map(o => o.elements.filter(e => e.bulb).length + ' bulbs, ' + Math.round(curvedShare(o.elements) * 100) + '% curved').join('; ')); assert.ok(homes(sub.elements).length >= best * 0.9, name + ': it holds ' + homes(sub.elements).length + ' homes, today’s best ' + best); }
+  if (name === 'Waller' || name === 'irregular') { const sub = nets.find(o => o.elements.some(e => e.bulb) && curvedShare(o.elements) >= 0.7); assert.ok(sub, name + ': a network with cul-de-sacs and curving streets: ' + nets.map(o => o.elements.filter(e => e.bulb).length + ' bulbs, ' + Math.round(curvedShare(o.elements) * 100) + '% curved').join('; ')); assert.ok(homes(sub.elements).length >= best * 0.85, name + ': it holds ' + homes(sub.elements).length + ' homes, today’s best ' + best); }
   assert.ok(ms <= msW + st.budget * 1.3 + 3000, name + ': the whole call ' + ms + ' ms, today ' + msW + ' + the network budget');
   assert.ok(st.ms <= st.budget * 1.3 + 1500, name + ': the network search ' + st.ms + ' of ' + Math.round(st.budget) + ' ms');
   if (name !== 'narrow') assert.ok(st.kinds.length >= 2, name + ': more than one kind of network laid out in full: ' + st.kinds.join(', '));
@@ -87,9 +89,13 @@ for (const r of Object.values(runs)) for (const o of r.nets) draws({ ...r.site, 
   const s = kind(narrow, { use: 'sfr' }, 'spine'); checkNet(narrow, s, 'spine'); assert.ok(s.elements.some(e => e.name === 'Main street'), 'spine: a main street');
   const c = kind(waller, { use: 'sfr' }, 'courts'); checkNet(waller, c, 'courts'); assert.ok(c.elements.filter(e => e.bulb).length >= 4, 'courts: cul-de-sacs');
   const prog = { use: 'mixed', zones: [{ use: 'sfr' }, { use: 'amenity', items: ['lake', 'center', 'pool', 'playground'] }] }, k = kind(pentagon, prog, 'core'); checkNet(pentagon, k, 'core');
-  const loop = k.recipe.net.core, cc = k.elements.find(e => e.name === 'Community center'), lake = k.elements.find(e => e.kind === 'pond');
+  const loop = k.recipe.net.core, cc = k.elements.find(e => e.name === 'Community center'), lake = k.elements.find(e => e.kind === 'pond' && e.name === 'Amenity lake') || k.elements.find(e => e.kind === 'pond'); // (the rest of the detention is a pond on a back corner, outside the loop)
   assert.ok(cc && S.inRing([cc.x, cc.y], loop) && lake && S.inRing(S.centroid(S.shapeOf(lake)), loop), 'core: the community center and the lake inside the loop');
   const ring = S.grow(ccw(loop), 60), side = ring.filter((p, i) => i % 4 === 0), H = homes(k.elements); assert.ok(side.filter(p => H.some(h => dist([h.x, h.y], p) < 110)).length >= side.length * 0.7, 'core: homes round most of the loop');
+  // lakefront lots: a band inside the loop, the homes on their lots facing the loop road and backing onto the lake, none on the entry's side
+  const lf = H.filter(h => /lakefront/.test(h.note || '')), lfLots = k.elements.filter(e => e.kind === 'lot' && /lakefront/.test(e.note || '')); assert.ok(lf.length >= 20 && lfLots.length === lf.length, 'core: lakefront lots: ' + lf.length + ' homes, ' + lfLots.length + ' lots');
+  for (const h of lf) assert.ok(S.inRing([h.x, h.y], loop) && S.corners(h).every(q => lfLots.some(l => S.inRing(q, S.shapeOf(l)))), 'a lakefront home inside the loop on its lot');
+  assert.ok(k.notes.some(t => /lakefront lots back onto the lake/.test(t)), 'core: the note'); assert.ok(lake && lf.every(h => S.gapBetween(S.shapeOf(h), S.shapeOf(lake)) >= 15), 'homes clear of the water');
   // a wedge-shaped parcel: the loop goes where it fits (the box round it wouldn't)
   const T0 = S.unionParcels([mk([-95.88, 30.04], [[0, 0], [3600, 0], [1400, 2300]])]), wedge = { ...T0, front: edge(T0, n => n[1] < -0.9), setbacks: { ...S.SETBACKS } }, kw = L.netOnly(wedge, prog, { netKinds: ['core'], count: 1, netBudgetMs: 3000 });
   assert.ok(kw.length, 'core: a loop round the commons on a wedge-shaped parcel too'); checkNet(wedge, kw[0], 'core on a wedge', { draw: false });

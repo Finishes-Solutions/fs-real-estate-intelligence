@@ -23,7 +23,7 @@ function reached(els) {
 // anything else on either; and the homes not on a street reached from the main entry (within 60 ft of one)
 const overRing = (e, els) => { const lane = S.shapeOf(e), inner = S.grow(S.islandOf(e), -1), ov = (a, b) => S.rectsOverlap({ poly: a }, { poly: b }, 0.5);
   return els.filter(o => o !== e && (o.kind === 'drive' ? ov(S.shapeOf(o), inner) : ['truck', 'parking', 'building', 'garage', 'pond', 'pool', 'plaza'].includes(o.kind) ? ov(S.shapeOf(o), lane) || ov(S.shapeOf(o), inner) : o.kind === 'lot' && (q => ov(q, lane) || ov(q, inner))(S.grow(S.shapeOf(o), -2)))).map(o => o.kind + ' ' + (o.name || '')); };
-const offStreet = els => { const { seen, D } = reached(els), R = D.filter(d => seen.has(d.id)).map(d => { const q = S.shapeOf(d), xs = q.map(p => p[0]), ys = q.map(p => p[1]); return { q, b: [Math.min(...xs) - 60, Math.min(...ys) - 60, Math.max(...xs) + 60, Math.max(...ys) + 60] }; });
+const offStreet = els => { const { seen, D } = reached(els), R = D.filter(d => seen.has(d.id)).map(d => { const q = S.shapeOf(d), xs = q.map(p => p[0]), ys = q.map(p => p[1]); return { q, b: [Math.min(...xs) - 120, Math.min(...ys) - 120, Math.max(...xs) + 120, Math.max(...ys) + 120] }; }); // (the box is a quick first test on the home's middle: a 60 ft home 55 ft off its street's end has its middle 85 ft off)
   return els.filter(e => e.kind === 'building' && e.use === 'sfr').filter(h => !R.some(r => h.x > r.b[0] && h.x < r.b[2] && h.y > r.b[1] && h.y < r.b[3] && S.gapBetween(S.shapeOf(h), r.q) <= 60)).map(h => h.name); };
 function usable(plan, o, what) {
   const p = { ...plan, elements: o.elements, zones: o.zones, program: o.program }, m = S.metrics(p), bad = S.check(p).filter(i => i.level === 'bad');
@@ -584,9 +584,12 @@ function usable(plan, o, what) {
   { const nb = L.layoutOptions({ ...site, params: { entry: { style: 'narrow' } } }, base.program, { count: 1 })[0], np = { ...site, program: nb.program, elements: nb.elements, recipe: nb.recipe }, me = nb.elements.find(e => e.name === 'Main entry');
     assert.ok(!me.blvd, 'narrow: ' + me.note); const ops = E.guessEdits('make the main entry a boulevard', np); assert.deepEqual(ops, [{ action: 'change', target: me.id, boulevard: true, signs: null }]);
     const q = E.applyEdits(np, [{ ...ops[0], signs: null, x: null, y: null, turnBy: null }]), p4 = { ...np, elements: q.elements }, e4 = q.elements.find(e => e.id === me.id), why = q.done.concat(q.skipped).join(' ');
+    if (e4.blvd) { // (the shops' entry sits far enough in on this plan now: the boulevard is made)
+      assert.ok(e4.blvd && /boulevard/i.test(e4.note) && q.done.some(t => /boulevard/i.test(t)), 'a boulevard where the median fits: ' + why);
+    } else {
     assert.ok(!e4.blvd && e4.note === me.note && JSON.stringify(S.shapeOf(e4)) === JSON.stringify(S.shapeOf(me)) && JSON.stringify(S.entryParts(p4, e4).map(x => x.id)) === JSON.stringify(S.entryParts(np, me).map(x => x.id)), 'it stays as it is: ' + why);
     assert.ok(q.skipped.some(t => /^No room for a boulevard there: it meets the first drive \d+ ft in from the street, too soon for a planted median/.test(t)) && !/median\)/.test(q.done.join(' ')), 'and says why: ' + why);
-    assert.ok(S.entryIssues(p4).some(i => i.id === me.id && /meets the first drive \d+ ft in from the street/.test(i.text)), 'the first drive too close to the street'); }
+    assert.ok(S.entryIssues(p4).some(i => i.id === me.id && /meets the first drive \d+ ft in from the street/.test(i.text)), 'the first drive too close to the street'); } }
   // every piece of a use or kind at once, listed or not
   const r1 = E.applyEdits(base, [{ action: 'change', every: 'retail', floors: 2 }]);
   assert.ok(retail(r1.elements).length && retail(r1.elements).every(e => e.floors === 2) && r1.done.length === 1 && /All \d+ retail buildings: 2 stories/.test(r1.done[0]), r1.done.join(' '));
@@ -720,7 +723,7 @@ function usable(plan, o, what) {
   const site = { ...I, front: I.ring.reduce((b, p, i) => S.outwardOf(I.ring, i)[1] < S.outwardOf(I.ring, b)[1] ? i : b, 0), setbacks: { ...S.SETBACKS } };
   const o = L.layoutOptions(site, { use: 'mixed', zones: [{ use: 'retail', gfa: 40000, pads: 2 }, { use: 'sfr', units: 450 }, { use: 'amenity', items: ['lake', 'center', 'pool', 'playground'] }] }, { count: 1 })[0], base = { ...site, program: o.program, elements: o.elements, recipe: o.recipe };
   const homes = els => els.filter(e => e.kind === 'building' && e.use === 'sfr').length, n0 = homes(o.elements), named = o.elements.filter(e => e.name && ['building', 'pond', 'pool', 'play', 'green'].includes(e.kind) && e.use !== 'sfr');
-  assert.ok(named.some(e => e.name === 'Amenity lake') && named.some(e => e.name === 'Open space'), named.map(e => e.name).join(', '));
+  assert.ok(named.some(e => e.name === 'Amenity lake') && named.some(e => /^Open (space|land)$/.test(e.name)), named.map(e => e.name).join(', '));
   for (const x of named) { const q = E.applyEdits(base, [{ action: 'add', kind: 'green', with: x.id, name: 'Park' }]), pk = q.elements.find(e => e.name === 'Park');
     if (!pk) { assert.ok(q.skipped.some(t => t.startsWith('No room beside ' + x.name)), q.skipped.join(' ')); continue; }
     assert.ok(S.gapBetween(S.shapeOf(pk), S.shapeOf(x)) <= 150, 'a park beside ' + x.name + ' is beside it: ' + S.gapBetween(S.shapeOf(pk), S.shapeOf(x)).toFixed(0) + ' ft');

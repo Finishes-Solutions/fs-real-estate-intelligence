@@ -1,0 +1,360 @@
+{
+ "name": "Grocery-anchored corner center, Houston area (traced from the aerial, Oct 27 2026)",
+ "origin": [
+  -95.7911,
+  29.74392
+ ],
+ "angle": 48,
+ "note": "frame: x along the SW-NE arterial (positive toward the intersection), y along the NW-SE arterial; origin at the intersection; feet",
+ "parcel": [
+  [
+   -525,
+   10
+  ],
+  [
+   -27,
+   10
+  ],
+  [
+   -27,
+   1100
+  ],
+  [
+   -525,
+   1100
+  ]
+ ],
+ "front": "E",
+ "streets": [
+  "S"
+ ],
+ "ask": "a grocery-anchored center: a 52,000 sf grocery, 54,000 sf of shops and 4 pads at the corner",
+ "elements": [
+  {
+   "kind": "building",
+   "box": [
+    -503,
+    -295,
+    362,
+    612
+   ],
+   "use": "retail",
+   "name": "Grocery anchor",
+   "floors": 1
+  },
+  {
+   "kind": "building",
+   "box": [
+    -481,
+    -82,
+    875,
+    973
+   ],
+   "use": "retail",
+   "name": "Shops A",
+   "floors": 1
+  },
+  {
+   "kind": "building",
+   "box": [
+    -486,
+    -299,
+    149,
+    226
+   ],
+   "use": "retail",
+   "name": "Shops B",
+   "floors": 1
+  },
+  {
+   "kind": "building",
+   "box": [
+    -180,
+    -95,
+    350,
+    459
+   ],
+   "use": "retail",
+   "name": "Pad A (bank)",
+   "floors": 1,
+   "pad": true
+  },
+  {
+   "kind": "building",
+   "box": [
+    -184,
+    -99,
+    727,
+    769
+   ],
+   "use": "restaurant",
+   "name": "Pad B (coffee, drive-thru)",
+   "floors": 1,
+   "pad": true
+  },
+  {
+   "kind": "building",
+   "box": [
+    -239,
+    -99,
+    137,
+    272
+   ],
+   "use": "restaurant",
+   "name": "Pad C (restaurants)",
+   "floors": 1,
+   "pad": true
+  },
+  {
+   "kind": "building",
+   "box": [
+    -481,
+    -439,
+    1020,
+    1079
+   ],
+   "use": "retail",
+   "name": "Pad D (car wash)",
+   "floors": 1,
+   "pad": true
+  },
+  {
+   "kind": "green",
+   "box": [
+    -503,
+    -298,
+    652,
+    845
+   ],
+   "name": "Future pad site"
+  },
+  {
+   "kind": "truck",
+   "box": [
+    -503,
+    -290,
+    615,
+    645
+   ],
+   "note": "Loading, north side of the anchor"
+  },
+  {
+   "kind": "truck",
+   "box": [
+    -481,
+    -82,
+    975,
+    999
+   ],
+   "note": "Service drive behind Shops A"
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -280,
+    -256,
+    12,
+    300
+   ],
+   "name": "Main entry",
+   "entry": true
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -295,
+    -271,
+    300,
+    850
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -515,
+    -491,
+    12,
+    300
+   ],
+   "name": "Entrance 2",
+   "entry": true
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -505,
+    -29,
+    848,
+    872
+   ],
+   "name": "Entrance 3",
+   "entry": true
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -505,
+    -29,
+    300,
+    324
+   ],
+   "name": "Entrance 4",
+   "entry": true
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -253,
+    -229,
+    330,
+    848
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -70,
+    -46,
+    460,
+    720
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -286,
+    -190,
+    735,
+    759
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -286,
+    -190,
+    800,
+    824
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -490,
+    -250,
+    95,
+    119
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -271,
+    -253,
+    330,
+    848
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -229,
+    -211,
+    330,
+    848
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -88,
+    -70,
+    470,
+    710
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -46,
+    -28,
+    470,
+    710
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -286,
+    -190,
+    717,
+    735
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -286,
+    -190,
+    759,
+    777
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -286,
+    -190,
+    782,
+    800
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -286,
+    -190,
+    824,
+    842
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -500,
+    -300,
+    282,
+    300
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -500,
+    -300,
+    324,
+    342
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -490,
+    -250,
+    77,
+    95
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -490,
+    -250,
+    119,
+    137
+   ]
+  }
+ ],
+ "detention": "none on site (regional detention across the arterial)",
+ "about": "A built center traced from a satellite image at 0.85 ft a pixel: the parcel, the buildings with their dimensions, the drives, the parking rows, the pads. Frame feet: x along the SW-NE arterial (positive toward the intersection), y along the NW-SE arterial (positive away from it); origin at the intersection of the two arterials; the frame is turned 48 degrees counter-clockwise from east. A target the layout engine is measured against (test/sitecenter.mjs), not a plan it made."
+}

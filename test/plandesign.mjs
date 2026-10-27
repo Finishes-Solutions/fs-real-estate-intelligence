@@ -1,14 +1,15 @@
 // Building designs for plan sets (lib/plandesign.mjs): the plan's buildings grouped into types on realistic layouts (the
-// FM 362 lot as shops, townhomes, a warehouse, a restaurant, a 3-story office; the 27 acre tract as 71 homes of eight
+// FM 362 lot as shops, townhomes, a warehouse, a restaurant, a 3-story office; the 27 acre tract as 71 or more homes of eight
 // sizes and as apartments), the rule-based design passing every check for every type, and the checks catching what a
 // bad answer from Claude would get wrong.
 import assert from 'node:assert/strict';
 const PD = await import('../lib/plandesign.mjs'), { planFor } = await import('./helpers/setctx.mjs');
 
 // ---------- types ----------
-{ const t = PD.buildingTypes(planFor('townhomes')); assert.equal(t.length, 1); assert.equal(t[0].attached, true); assert.deepEqual([t[0].W, t[0].D, t[0].floors, t[0].unitsPer], [24, 40, 3, 6], 'a townhome row is designed as one 24 ft unit');
-  assert.equal(t[0].units, t[0].count * 6); assert.match(t[0].occupancy, /R-3/); }
-{ const t = PD.buildingTypes(planFor('sfr')); assert.ok(t.length <= PD.MAX_TYPES); assert.equal(t.reduce((s, x) => s + x.count, 0), 71, 'every home is drawn as one of the types');
+{ const t = PD.buildingTypes(planFor('townhomes')); assert.ok(t.length >= 1 && t.length <= 3, t.length + ' types'); // (a row of six, and shorter rows where one gave up a unit or two for its guest bay)
+  for (const x of t) { assert.equal(x.attached, true); assert.deepEqual([x.W, x.D, x.floors], [24, 40, 3], 'a townhome row is designed as one 24 ft unit'); assert.ok(x.unitsPer >= 3 && x.unitsPer <= 6); assert.equal(x.units, x.count * x.unitsPer); assert.match(x.occupancy, /R-3/); }
+  assert.ok(t.some(x => x.unitsPer === 6), 'rows of six'); }
+{ const p = planFor('sfr'), t = PD.buildingTypes(p), n = p.elements.filter(e => e.kind === 'building').length; assert.ok(n >= 71, n + ' homes'); assert.ok(t.length <= PD.MAX_TYPES); assert.equal(t.reduce((s, x) => s + x.count, 0), n, 'every home is drawn as one of the types');
   assert.ok(t.every(x => x.use === 'sfr' && x.supported && x.garage === 2)); assert.deepEqual(t.map(x => x.id), t.map((x, i) => String.fromCharCode(65 + i))); }
 { const t = PD.buildingTypes(planFor('industrial'))[0]; assert.equal(t.occupancy, 'S-1'); assert.match(t.construction, /II-B/); assert.equal(t.sprinklered, true, 'a 78,000 sf warehouse is sprinklered'); }
 { const p = planFor('retail'), t = PD.buildingTypes(p); assert.equal(t.reduce((s, x) => s + x.count, 0), p.elements.filter(e => e.kind === 'building').length, 'every shop building is drawn as one of the types'); assert.ok(t.every(x => x.occupancy === 'M' && x.sprinklered), 'retail shells over 12,000 sf are sprinklered'); }
