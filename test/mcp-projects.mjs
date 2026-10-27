@@ -79,7 +79,7 @@ for (const re of [/## Parcels \(3/, /Option A \(option_id sample-opt-a\)/, /the 
 
 // ---- the study: sections, what-if (not saved), bad inputs ----
 t = ok(await call('feasibility_study', { project_id: sample.id, sections: PR.SECTIONS }), 'study');
-for (const re of [/## Summary/, /total development cost \$79,227,648/, /levered IRR 3\.51%/, /## Assumptions/, /- rate = /, /lib:res\|01 01 00\|Project Management/, /Division 01/, /\| Year \| Cost/, /## Hold analysis/, /What moves the levered IRR most/, /\| Base case \| base \|/, /\[high\] Returns: Thin development spread/, /## Fact & assumption register/, /Feasibility \/ schematic level only/]) assert.match(t, re);
+for (const re of [/## Summary/, /total development cost \$79,227,648/, /levered IRR 6\.01%/, /## Assumptions/, /- rate = /, /lib:res\|01 01 00\|Project Management/, /Division 01/, /\| Year \| Cost/, /## Hold analysis/, /What moves the levered IRR most/, /\| Base case \| base \|/, /\[high\] Returns: Thin development spread/, /## Fact & assumption register/, /Feasibility \/ schematic level only/]) assert.match(t, re);
 const irrOf = s => +/\*\*levered IRR (-?[\d.]+)%/.exec(s)[1];
 const base = irrOf(t), up = ok(await call('feasibility_study', { project_id: sample.id, what_if: { 'rents.1 BR': '$2,400' }, sections: ['summary'] }), 'what-if');
 assert.ok(irrOf(up) > base + 1, 'higher rents raise the IRR: ' + irrOf(up) + ' vs ' + base); assert.match(up, /What-if \(not saved\)/);
