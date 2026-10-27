@@ -211,6 +211,8 @@ function programFrom(d, prompt) {
   if (!program.zones && (program.use === 'office' || program.use === 'medical') && BR.floorsFromWords(prompt) == null && !(+d.floors > USES[program.use].floors)) program.floors = null;
   const pp = (Array.isArray(d.parcels) ? d.parcels : []).filter(x => x && typeof x.parcel === 'string' && typeof x.request === 'string' && x.request.trim()).slice(0, 20).map(x => ({ parcel: clip(x.parcel, 80), program: guessProgram(clip(x.request, 300)) })); // a site of several parcels: a program each (lib/siteparcels.mjs), the words of each read as a request of its own
   if (pp.length) program.parcels = pp; else if (g0.parcels?.length) program.parcels = g0.parcels;
+  for (const k of ['plaza', 'court', 'arrangement']) if (g0[k] != null && program[k] == null) program[k] = g0[k]; // (the arrangement the words ask for: a plaza round a court, a courtyard, a loop)
+  if (g0.plaza && program.zones) { const rz = program.zones.find(z => z.use === 'retail'); if (rz) { rz.plaza = true; rz.court = g0.court || ['plaza', 'lawn', 'pavilion']; } }
   return BR.withWordsPads(program, prompt); // (a mix: the pads the words ask for on its shop zone)
 }
 // a mix's zones made safe (the program call and the review): a drive-thru or an endcap tenant on one building is its
