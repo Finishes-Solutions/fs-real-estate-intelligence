@@ -238,8 +238,12 @@ function usable(plan, o, what) {
   const loop = [{ kind: 'drive', x: 0, y: 100, w: 300, d: 24, rot: 0 }, { kind: 'drive', x: 0, y: -100, w: 300, d: 24, rot: 0 }, { kind: 'drive', x: -138, y: 0, w: 24, d: 224, rot: 0 }, { kind: 'drive', x: 138, y: 0, w: 24, d: 224, rot: 0 }];
   const pv = S.pavement({ ...site, elements: loop }); assert.equal(pv.length, 1); assert.equal(pv[0].holes.length, 1, 'the lawn inside the loop is a hole');
   const fc = S.planFeatures({ ...site, origin: site.origin, elements: [{ ...b, id: 'b1', form: 'U' }, { id: 'p', kind: 'parking', x: 0, y: -160, w: 180, d: 60, rot: 0 }], params: { trees: true } });
-  const ks = new Set(fc.features.map(f => f.properties.k)); assert.ok(ks.has('b3') && ks.has('tree'), '3D detail (parapets, floor lines) and 3D trees');
-  assert.ok(fc.features.filter(f => f.properties.k === 'b3' && f.properties.part === 'floor').length === 2, 'a line at each floor between three floors');
+  const ks = new Set(fc.features.map(f => f.properties.k)); assert.ok(ks.has('fac') && ks.has('tree'), '3D detail (the building drawn from its design) and 3D trees');
+  assert.ok(new Set(fc.features.filter(f => f.properties.k === 'fac' && !f.geometry.coordinates[1]).map(f => f.properties.b)).has(0), 'its walls from the ground up');
+  // a building with no design (a hotel) keeps the plain detail: a parapet round the roof and a line at each floor
+  const fh = S.planFeatures({ ...site, origin: site.origin, elements: [{ ...b, id: 'h1', use: 'hotel' }] });
+  assert.ok(fh.features.some(f => f.properties.k === 'b3' && f.properties.part === 'parapet'), 'a hotel: a parapet');
+  assert.ok(fh.features.filter(f => f.properties.k === 'b3' && f.properties.part === 'floor').length === 2, 'a line at each floor between three floors');
   const fo = L.layoutOptions({ ...siteOf(fm362, true), params: { form: 'U' } }, { use: 'multifamily', floors: 4 })[0]; usable(siteOf(fm362, true), fo, 'courtyard buildings');
   assert.ok(fo.elements.some(e => e.kind === 'building' && e.form === 'U'), 'courtyard (U) apartment buildings when asked for');
 }
