@@ -140,7 +140,7 @@
     },
     "api/mcp.js": {
       "maxDuration": 300,
-      "includeFiles": "{data/area.json,data/market.json,data/markets.json,data/filings.json,data/geo.json,data/regions.json,src/logo-white.png,fonts/**,node_modules/@sparticuz/chromium/bin/**}"
+      "includeFiles": "{data/area.json,data/market.json,data/markets.json,data/filings.json,data/geo.json,data/regions.json,src/logo-white.png,fonts/**,templates/titleblock.pdf,node_modules/@sparticuz/chromium/bin/**}"
     }
   },
   "crons": [

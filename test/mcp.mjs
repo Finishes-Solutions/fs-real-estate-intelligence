@@ -155,14 +155,14 @@ const call = async (name, args) => { const r = await c.callTool({ name, argument
 
 // ---------- tools/list: names, schemas, read-only ----------
 const { tools } = await c.listTools();
-const NAMES = ['list_datasets', 'find_property', 'site_facts', 'flood', 'terrain', 'environmental', 'utilities', 'traffic_counts', 'demographics', 'market_context', 'businesses', 'businesses_at_address', 'company_lookup', 'development_activity', 'construction_filings', 'top_companies', 'crime_near', 'crime_by_agency', 'news', 'airports_near', 'area_overview', 'site_plan', 'report_flood', 'report_environmental', 'report_crime', 'report_crime_agency', 'report_demographics', 'report_market'];
+const NAMES = ['list_datasets', 'find_property', 'site_facts', 'flood', 'terrain', 'environmental', 'utilities', 'traffic_counts', 'demographics', 'market_context', 'businesses', 'businesses_at_address', 'company_lookup', 'development_activity', 'construction_filings', 'top_companies', 'crime_near', 'crime_by_agency', 'news', 'airports_near', 'area_overview', 'site_plan', 'report_flood', 'report_environmental', 'report_crime', 'report_crime_agency', 'report_demographics', 'report_market', 'plan_set', 'plan_set_status', 'site_renderings'];
 for (const n of NAMES) assert.ok(tools.some(t => t.name === n), 'tool ' + n);
 for (const t of tools) {
   assert.equal(t.annotations?.readOnlyHint, true, t.name + ' read-only'); assert.equal(t.annotations?.openWorldHint, true, t.name);
   assert.equal(t.inputSchema.type, 'object', t.name); assert.ok(t.description.length > 60, t.name + ' describes itself');
 }
 assert.ok(['address', 'apn', 'county', 'lat', 'lon', 'radius_mi', 'bbox', 'geojson'].every(k => tools.find(t => t.name === 'flood').inputSchema.properties[k]), 'one location input everywhere');
-assert.ok(JSON.stringify(tools).length < 60000, 'the tool list stays small');
+assert.ok(JSON.stringify(tools).length < 65000, 'the tool list stays small'); // (31 tools: plan sets, renderings and parcel-by-parcel site plans took it past 60,000)
 console.log('mcp tools/list ok:', tools.length, 'tools');
 
 // every answer: compact, with sources; never secrets or internal URLs
@@ -317,7 +317,11 @@ console.log('mcp upstream timeout ok');
   const spOf = async (r, what) => { const pdf = await pdfOf(r, 'site_plan'); assert.match(r.text, /## Layouts/, what); assert.match(r.text, /## Picked: Layout \d/, what); assert.match(r.text, /Concept only/, what); return pdf; };
   // a request on the Katy parcel (Fort Bend: found by its address), Low: no planning or review, the front on the freeway
   SPT.hooks.ai = stubAI; aiCalls.length = 0;
+  const ST = await import('../lib/mcp/store.mjs'), mem = ST.memoryStore(); ST.hooks.store = mem; // the picked plan is saved for plan_set and site_renderings
   r = await call('site_plan', { ...K, request: '30,000 sf retail strip', effort: 'low', include_geojson: true }); clean(r, 'site_plan');
+  { const id = /^Plan id: ([\w-]+) \(give it to plan_set/m.exec(r.text)?.[1]; assert.ok(id, 'a plan_id'); const saved = await ST.getJSON(mem, 'plans/' + id + '.json');
+    assert.ok(saved.plan.elements.some(e => e.kind === 'building'), 'the picked layout saved'); assert.ok(saved.plan.ring.length >= 3); assert.match(saved.address, /24600 KATY FWY/); assert.ok(saved.facts.length, 'with the site facts'); assert.equal(saved.verdict, /Quality check: (\w[\w ]*?) \(/.exec(r.text)[1].toLowerCase()); }
+  ST.hooks.store = null;
   await spOf(r, 'low'); assert.match(r.text, /front [\d,]+ ft on KATY FWY/, 'the front faces I-10'); assert.match(r.text, /side street/, 'and the street on the west side');
   assert.match(r.text, /Read as: Retail · 30,000 sf/); assert.deepEqual(aiCalls.map(b => b.mode || 'program'), ['program'], 'Low: the program only');
   { const gj = JSON.parse(r.content.find(x => x.resource?.mimeType === 'application/geo+json').resource.text); assert.equal(gj.type, 'FeatureCollection'); assert.ok(gj.features.some(f => f.properties.kind === 'building' && f.properties.floorAreaSf > 0), 'buildings in the GeoJSON');
