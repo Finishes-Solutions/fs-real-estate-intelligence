@@ -5,6 +5,25 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-26
 
+### 9:05 PM CT: A 10-year pro forma led by levered IRR, equity multiple and cash-on-cash (0d45faa)
+- **10-year hold:** the pro forma now holds a project for 10 years after it's stabilized before the sale (it was 5), as the team underwrites. Plans that never changed the hold move to 10 years; a hold set by hand stays. Change it under Assumptions, **Hold after stabilizing**.
+- **The three returns that matter come first:** **Levered IRR**, **Equity multiple** (with the equity put in) and **Cash-on-cash** (the first stabilized year, with the average over the hold) now open the pro forma, ahead of cost, NOI, yield and value.
+- **Cash-on-cash by year:** a row of the 10 hold years, each year's NOI less the permanent loan's payments over the equity put in, so you can see it climb as rents grow.
+- **Excel:** the Pro Forma workbook opens on a new **Returns** sheet (levered IRR, equity multiple, cash-on-cash first year and average, then NOI, debt service, cash flow and cash-on-cash for each hold year), and the one-page sheet adds an average cash-on-cash. The TestFit method shows its cash-on-cash too.
+- **The AI assistant** now reports cash-on-cash (first year and average) when you ask how a plan's numbers work out.
+
+### 8:31 PM CT: BIM models of site plan options with BIMCraft: the trial, the model builder and its worker (25f4c03)
+- **Nothing in the app changes yet.** This is the groundwork for real building models of each site plan option, built with BIMCraft (an open-source building modeling tool).
+- **What it does:** every building in an option becomes a real model: a storey at a time, with walls of an assembly for its use (tilt-up warehouses, brick shops, EIFS offices, wood-frame apartments and homes), storefront facing the parking, office window bands, apartment and home windows, entry and garage doors, dock doors on a warehouse's truck court, slabs, and flat roofs behind a parapet or hipped roofs on homes. Townhome rows get their party walls. Out come a model file that Revit and other BIM tools open (IFC), a 3D picture, and the quantities per building: wall, glass, roof and floor areas and door counts.
+- **Tried on the King Rd Project:** its three saved options (134 tiny homes at 550 sf, apartments, 134 tiny homes at 448 sf) model in 5 to 13 seconds, every home on its own lot with its door facing its street and no garage on a tiny home.
+- **Tried on all seven kinds of plan** (retail, office, apartments, industrial, townhomes, single-family homes and a mixed-use tract): every one builds in under 7 seconds, and floor areas match the plan to the square foot (homes add their garage and porch, which the plan's living area leaves out).
+- **For the budget:** it stays $ per square foot by type. The model will check it against the building's shape (more wall, more glass or more storeys than a typical building of that type cost more). That adjustment is the next step.
+- **Still to do before anyone sees it:** host the small model service (it can't run on Vercel), then add a Download Model button and the cost check to each option.
+
+### 7:00 PM CT: Plan for BIM models of each option with BIMCraft, priced from their quantities (27b7e75)
+- **Planning only, nothing in the app changes.** `BIM-PLAN.md` sets out how each site plan option could become a real building model (walls, windows, doors, floors and roofs) using BIMCraft, an open-source building modeling tool that can be driven automatically. The model would give the budget real quantities (wall, glass, roof and floor areas, doors) to price instead of one cost per square foot, a model file architects can open in Revit, and better buildings for the 3D view and renderings.
+- **Honest about accuracy:** this moves concept budgets from a rough per-square-foot number toward an assembly-based estimate, still a range rather than an exact figure; the biggest remaining gain is checking prices against our own past jobs.
+
 ### 1:51 PM CT: A full landscape section in plan sets; layout review and two layout fixes (experimental branch) (a5c6593, d479b35)
 
 - **Landscape in plan sets is now six sheets:**
@@ -22,6 +41,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
   - On a flag lot the entry comes down the strip to the street instead of across the neighbour's land.
   - On a mix with shops in front, the pond is never put between the shops and the street.
 - **A written review of the layout engine** lists what still lays out badly and the order to fix it.
+
+### 1:37 PM CT: Agent site plans are checked before they're handed over; tiny homes never get a garage (53329fb)
+- **A quality check on every site plan the agents make:** before the answer goes back, each layout is checked like a planner would: a way in from the street, every drive reached, fire lanes at least 20 ft, dead ends, a second access past 30 homes, parking, detention, each home on its own lot facing a drive with 10 ft to the next, a parking pad each, no garage on a tiny or manufactured home, a sensible floor plan, density, and whether it is what was asked. A layout that fails gives way to one that passes, and the answer starts with **READY**, **READY WITH NOTES** or **NOT READY** with each finding.
+- **It found real problems, now fixed:** on 25 × 55 pads backing onto each other, homes were 2 ft apart end to end (now 10 ft: the home keeps 5 ft from the back of its pad, so a 25 × 55 pad holds a 15 × 28, 420 sf home and 550 sf homes need 64 ft pads); tiny homes were asked 2 parking spaces each with room for 1 (now 1 a tiny home, 2 a manufactured home); lanes ran inside the landscape buffer.
+- **No garages on tiny or manufactured homes:** their floor plans used the house plan's 2-car garage (a 10 ft garage room in a 16 ft wide, 550 sf tiny home). They now get their own: an open living room and kitchen, a studio, one bedroom or more by size, a bath or two, the car on its pad. Library tiny homes count their pad, not 2 garage spaces.
+- **Home communities through the agents:** the agents can give the kind of homes, how many, the pad size (the homes sized to fill it), the home size or living area, a buffer, the street the site faces, and facts from reference files ("134 RV lots, 25' × 55' typ" is read as the pad size). A request for tiny or mobile homes is laid out as homes even if the AI reads it as self storage, and the answer says so.
+- **Tiny home rent:** one Tiny home rent for every tiny home, by its size from your Oct 2026 comps: about $1,150 a month for 550 sf (it was $1,425), $1,025 for 420 sf.
+- **Tested** end to end on King Ln with the agents' tool (real Chromium sheets): the request as made, the AI answering self storage, 25 × 55 pads, 550 sf homes, single-wides, and an ordinary subdivision; every community plan comes back READY WITH NOTES, the note being the real one (about 130 homes behind one strip need the fire marshal's sign-off on a second access). Not tried on the live site yet: AMP still can't reach it through Vercel's login protection.
 
 ## 2026-10-25
 
@@ -94,8 +121,27 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Now** the hidden map shows only the base map and the option's massing, draws the option exactly as the site plan map does (Waller plans included), and takes the picture at twice the size with smoothing, then scales it to 1600 × 900, as sharp as the old pictures taken off a high-resolution screen.
 - **Renderings already made don't change;** make them again to get the sharper ones. Tested in Chromium (old vs new picture side by side) and with unit tests; not yet tried on the live site.
 
+### 5:05 PM CT: Home community homes are sized to fit (d609d62)
+- **Homes sized to the pad:** give a pad size and the homes are sized to fill it. On the exhibit's 25 × 55 pads that's a 15 × 32 (480 sf) tiny home with its parking in front and 10 ft to the next home; King Ln holds about 140.
+- **Or the size you ask for:** "550 sf tiny homes" or "16 x 40 homes" gives homes that size, with the pads made as big as they need, and the plan says so. On King Ln: 550 sf homes on 25 × 60 pads, about 125 homes; 16 × 40 homes on 36 ft pads, about 100.
+- **Fixed:** the lane the entry comes in on no longer runs on into a dead end at the far end of the site; the rows along the property line no longer stretch too far; "16 x 40 homes" is read as a size, not 40 homes.
+
 ### 4:32 PM CT: Site plan answers no longer call a failing layout a pass (769de87)
 - **Said plainly:** when no layout passes every check, the agent's site plan answer now says so and names what the picked one is missing (for example parking short), instead of "passes every check". Found in the live test on a Waller parcel.
+
+### 3:55 PM CT: Home communities match an RV park plan, and are valued as rentals (aa391e5)
+- **Your pad size:** say "25 x 55 pads" (or attach an RV park plan that gives its site size) and every lot is that size. On King Ln with the exhibit's 25 × 55 pads, the plans fit 140–148 tiny homes or park models (the exhibit shows 134 RV lots, with a bigger pond). Only homes that leave 10 ft to the next fit a 25 ft pad, so single-wides need wider pads.
+- **Out to the property line, like the exhibit:** lots now run to the property line; say "a 10 ft buffer" if you want a landscape strip. The rows along the line are deeper where needed so the homes keep the plan's setbacks (with the default 20 ft rear setback, those rows come out about 74 ft deep; lower the setback under Site parameters for 55 ft all round).
+- **The exhibit's shape:** one of the three options always puts the pond in a corner beside the entry, with the loop and the rows along the property line, as on the RV park plan.
+- **Valued as rentals:** the pro forma rents each home with its pad (about $1,050 a month for a tiny home, $1,300 for a manufactured home), with the homes bought and set, $30,000 a finished pad, and a 6.75% cap rate, all editable. At those defaults King Ln comes out at about a 5% yield on cost, below the cap rate, so check the rents and costs before relying on it.
+- **Not done yet:** the detention is the app's usual estimate (about 1.2 acres here; the engineer's exhibit shows 2.2). Spacing between homes and the fire lanes still need the local rules and the fire marshal. Not tried in the live app with the AI yet.
+
+### 3:31 PM CT: Tiny home and manufactured home communities; flag lots come in up their strip (08be202)
+- **Fixed: a tiny home / mobile home community came back as self storage.** On 31807 King Ln, "a tiny home/mobile home community laid out like the reference file has showing an RV park" was drawn as self storage with about two dozen RV / boat stalls and a 7,200 sf leasing office. The RV park in the reference file had pushed the AI to "RV storage".
+- **Now it's homes on lots, laid out like an RV park:** private lanes in loops with a row of lots on each side, lots along the end lanes where there's room, the detention pond across one end or down one side. On King Ln: about 97 tiny homes, 48 manufactured homes, or 58 of both (the reference RV park had 134 RV lots, which are smaller).
+- **New home types:** single-wides (16 × 56, 16 × 76), double-wides (28 × 52, 28 × 64), a tiny home (12 × 32), a park model (14 × 40) and a cottage (20 × 40), each with a parking pad. The sheet names it a manufactured, tiny, or tiny & manufactured home community and counts homes and pads, not garages.
+- **Fixed: flag lots.** King Ln reaches Old Washington Rd only by a 60 ft strip about 250 ft long. The plan treated the back edge of the wide part, which borders the neighbour's land, as road frontage and put the entry there. Now the wide part is laid out on its own and the main entry is a drive up the strip. Ordinary subdivisions on flag lots get this too.
+- **Not done yet:** spacing between homes, lane widths and fire lanes use typical values (check them against the local rules and with the fire marshal); the pro forma still values these homes as for-sale houses, not lot rent; an RV park itself is still laid out as a storage-style yard. Tested offline on the King Ln outline from the survey and in Chromium; not tried yet in the live app with the AI.
 
 ### 2:03 PM CT: Parcels in separate pieces can all be picked (ccc9b2a)
 - **Fixed: 31807 King Ln dropped the third pick.** The King Ln property is one Waller County account (13814) in two separate pieces (0.43 and 6.15 acres). With 31807 Old Washington Rd picked, picking the second King Ln piece loaded and then disappeared, because the earlier fix treated "same account" as "same parcel".
