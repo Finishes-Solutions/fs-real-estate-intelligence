@@ -89,7 +89,7 @@ if (!cli || !fs.existsSync(cli)) console.log('bim: BIMCRAFT_CLI not set, skipped
 else {
   const { runModel } = await import('../lib/bimrun.mjs');
   for (const [k, plan] of Object.entries(plans)) {
-    const r = await runModel(plan, { name: k, png: k === 'retail' });
+    const r = await runModel(plan, { name: k, png: k === 'retail', detail: false }); // (the shells: their areas follow the plan's; the detailed models, test/bimplan.mjs)
     assert.ok(r.ifc.toString().startsWith('ISO-10303-21'), k + ': an IFC file');
     for (const q of r.quantities) {
       // commercial and apartments to the sf; homes: the model counts the garage and porch the plan's living area leaves out

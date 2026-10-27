@@ -628,6 +628,11 @@ export function initSitePlan(ctx) {
   const coarse = () => matchMedia('(pointer:coarse)').matches; // fingers: bigger handles, a wider reach, the turn dot further out
   let ids = [], dimmed = null;
   // mp: the map to draw on: the page's, or a hidden one a background rendering takes its picture from (renderInBackground)
+  // the facades (windows, finishes, roofs) show when the map is tilted; seen from straight above (the plan) and with the
+  // mix on, the buildings keep their use's colour and the selection its highlight. A picture's hidden map always has them.
+  let facHooked = false;
+  const facWanted = () => map.getPitch() > 12 && !ed?.mix ? 'visible' : 'none';
+  function syncFac() { if (map.getLayer('fs-sp-fac') && map.getLayoutProperty('fs-sp-fac', 'visibility') !== facWanted()) map.setLayoutProperty('fs-sp-fac', 'visibility', facWanted()); }
   function addLayers(mp = map) {
     if (mp.getSource(SRC)) return;
     const kind = k => ['==', ['get', 'k'], k], P = MAP.palette(), C = P.col, Ln = P.lines, Lb = P.label, big = coarse();
@@ -695,6 +700,8 @@ export function initSitePlan(ctx) {
       'fill-extrusion-color': ['match', ['get', 'part'], 'tower', ['case', ph2, useCol(c => f(P.p2(c))), useCol(f)], 'parapet', ['case', ['==', ['get', 'g'], 1], '#8b9092', '#6d635a'], ['case', ['==', ['get', 'g'], 1], '#6f7476', '#4f453c']] });
     add({ id: 'fs-sp-b3', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), ['!', sel1]], paint: b3(id) });
     add({ id: 'fs-sp-b3s', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), sel1], paint: b3(lit) });
+    add({ id: 'fs-sp-fac', type: 'fill-extrusion', source: SRC, filter: kind('fac'), paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': 1 }, layout: { visibility: mp === map ? facWanted() : 'visible' } }); // the facades: finishes, windows, doors, roofs (lib/massing.mjs)
+    if (mp === map && !facHooked) { facHooked = true; map.on('pitchend', syncFac); }
     add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck', 'sign']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
       paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, 'rgba(11,13,12,.45)'], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1] } });
     add({ id: 'fs-sp-p2', type: 'line', source: SRC, filter: ['all', kind('building'), ph2, ['!', sel1], ['!=', ['get', 'bad'], 1]], paint: { 'line-color': Ln.p2, 'line-width': 1.3, 'line-dasharray': [2, 1.6] } }); // Phase 2: dashed
@@ -860,6 +867,7 @@ export function initSitePlan(ctx) {
   // the mix's layers and colours on the map when it's on, gone (and the usual colours back) when it's off or the plan
   // closes; a basemap change rebuilds the plan's layers (their ids include these), and the next draw puts the mix back
   function syncMix() {
+    syncFac();
     const want = !!ed?.mix && !!map.getLayer('fs-sp-lotc'), has = !!map.getLayer(MIXL[0]);
     if (want && !has) {
       const add = def => { map.addLayer(def, 'fs-sp-lotc'); ids.push(def.id); }, zf = ['all', ['==', ['get', 'k'], 'zone'], ['has', 'mx']];
