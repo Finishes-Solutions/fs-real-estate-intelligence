@@ -38,4 +38,9 @@ assert.equal(S.normalizeProgram({ use: 'multifamily', pads: 2 }).pads, null, '(p
   assert.ok(o.elements.some(e => e.kind === 'play') && names.includes('Pavilion'), 'its playground and pavilion');
   assert.ok(!o.elements.some(e => /pad site/i.test(e.name || '')), 'no "pad site" on a townhome plan');
 }
+// ---- townhome options meet their own parking (the narrow lot was 2–3 guest spaces short on every option) ----
+{
+  const plan = LOTS.narrow7.plan(), prog = read('townhomes for rent, 2 car garages');
+  for (const o of L.layoutOptions(plan, prog)) { const m = S.metrics({ ...plan, elements: o.elements, zones: o.zones, program: o.program || prog }); assert.ok(m.spaces >= m.required, o.name + ': parking ' + m.spaces + ' of ' + m.required); }
+}
 console.log('layout asks ok');

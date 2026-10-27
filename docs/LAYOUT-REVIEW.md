@@ -29,7 +29,7 @@ The engine (`lib/sitelayout.mjs` with `siteplan`, `siteparking`, `sitepad`, `sit
    frontage, so the shops lost the street. Shops at the front now never get a pond band in front of them, and shops with
    apartments behind them can have the pond beside them (before, only shops with homes behind could)
    (`lib/sitelayout.mjs` `mixedOptions`).
-3. **Options handed back that fail their own parking check** (narrow townhome lot: every option 2–3 spaces short).
+3. **Fixed (Oct 27): options handed back that fail their own parking check** (narrow townhome lot: every option 2–3 spaces short). The guest spaces still owed at the end now take the end homes of the longest rows (a row keeps at least 3), tested in `test/layoutasks.mjs`.
    Guest stalls for townhome rows are placed only where a row has room for three more units after them; what's still
    owed at the end is never placed, and the "parking short" retry doesn't apply to homes. Fix: place the owed guest stalls
    in a bay at the end of the last row (or reserve a bay per row up front), and re-check parking after the second
