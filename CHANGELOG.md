@@ -3,6 +3,14 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-27
+
+### 1:41 AM CT: Buildings drawn from their floor plans in 3D and in the BIM model (aa9971d, b6f4058, cf7a94f, f708ae0, e716ec3)
+- **Buildings look like buildings in 3D:** tilt a site plan and every building is drawn from its own floor plans (the ones the plan set draws): brick on the ground floor and siding above, each townhome in a row its own colour, windows and doors with white trim where the plans put them, apartment balconies and open stair breezeways, hip roofs on homes, townhomes and apartments, flat roofs behind a parapet with rooftop units on shops and offices, metal canopies over shop fronts. The 3D renderings start from this view too.
+- **The flat plan is unchanged:** seen from straight above, buildings keep their use's colour and the selected one its highlight. Phase 2 stays plain and faint, and the Buildings layer button hides the 3D detail with the buildings.
+- **Homes fit their plans:** a home a few feet off its plan's size gets the plan stretched to fit, so no bare block shows past its walls (43 of 141 homes on the 40 acre test showed it).
+- **BIM models from the same plans** (not yet in the app: the model service isn't running): rooms, interior and party walls, doors and windows, stairs, balconies and roofs, in textured brick, siding, stone and shingles. A whole 141-home neighbourhood builds without errors in about 75 seconds.
+
 ## 2026-10-26
 
 ### 11:42 PM CT: Spare land beside the buildings, a better option on big mixed sites, typed requests in Feasibility, townhome plan sets that match the site plan (8b03667, e16c0a7, 922e63a)
