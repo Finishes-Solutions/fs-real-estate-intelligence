@@ -151,6 +151,7 @@ export function workspace(env) {
         '<td><label class="ws-chk"><input type="checkbox" data-lineoff="' + esc(l.id) + '"' + (l.off ? '' : ' checked') + '><span class="sr">Include ' + esc(l.desc) + '</span></label></td></tr>'; }).join('') + '</tbody></table></details>').join('');
     const edits = Object.keys(fz(p).budgetEdits).length;
     return '<div class="ws-card"><h4>Budget summary</h4>' + sum + '<p class="ws-note">Escalated × ' + num(E.library.factor, 4) + ' on library lines (' + esc(E.library.toDate.note) + '; ' + esc(E.library.forward.note) + ') and × ' + num(E.parametric.factor, 4) + ' on parametric lines; location factor ' + num(E.location, 2) + '. Change these under Pro Forma › Cost.</p>' +
+      (study.budgetBench && Math.abs(study.budgetBench.diff) <= 20 ? '<p class="ws-note">' + esc(study.budgetBench.text) + '</p>' : '') +
       (study.budgetChecks.length ? '<div class="ws-warnbox">' + study.budgetChecks.map(c => esc(c.text)).join(' ') + '</div>' : '') + '</div>' +
       '<div class="ws-card"><h4>Line items <span class="ws-c">' + study.budget.lines.length + '</span>' + (edits ? '<button type="button" class="lnk" data-act="clearLines">Undo ' + edits + ' line edit' + (edits > 1 ? 's' : '') + '</button>' : '') + '</h4><p class="ws-note">Rates are editable; untick a line to leave it out. Your changes are marked “Yours” and listed in the report’s register.</p>' + lines + '</div>';
   }

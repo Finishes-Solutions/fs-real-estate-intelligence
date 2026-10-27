@@ -915,7 +915,7 @@ test('(c) the closed form satisfies fee = rate × project', () => {
 // =====================================================================================================================
 {
   const TB = await import('../lib/feasibility/data/fs-budgets-2024-25.mjs');
-  const PF = await import('../lib/proforma.mjs'), { buildBudget } = await import('../lib/feasibility/budget.mjs');
+  const PF = await import('../lib/proforma.mjs'), PFB = await import('../lib/feasibility/budget.mjs'), { buildBudget } = PFB;
   test('the medians by type, building lines only (site infrastructure is the layout\'s)', () => {
     close(TB.psfOf(TB.RATES.retail), 150.25, 'retail'); close(TB.psfOf(TB.RATES.industrial), 124.91, 'industrial'); close(TB.psfOf(TB.RATES.sfr), 111.35, 'houses');
     assert.equal(TB.ratesFor('restaurant'), TB.RATES.retail); assert.equal(TB.ratesFor('office'), null, 'no office budgets');
@@ -932,6 +932,11 @@ test('(c) the closed form satisfies fee = rate × project', () => {
   test('a 120,000 sf warehouse keeps the parametric bulk rate', () => {
     const B = run({ buildingSf: 120000, parking: 60, acres: 8 }, 'industrial');
     assert.deepEqual(B.teamUses, []); assert.ok(B.lines.some(l => l.id === 'par:hard|industrial') && !B.lines.some(l => l.id === 'tb:fee'));
+  });
+  test('the budget beside the team\'s all-in medians', () => {
+    const { budgetBench } = PFB, M = { buildingSf: 30000, parking: 40, acres: 3 }, R0 = PF.proFormaOf(M, 'industrial', { landPrice: 1e6 }), B = buildBudget(M, a, { R0 }), b = budgetBench(B, R0.P);
+    close(b.theirs, 155 * 1.1, 'flex: $155 before the 10% fee', 1e-9); assert.equal(b.n, 12); assert.match(b.text, /flex \/ industrial buildings came to \$171/);
+    assert.equal(budgetBench(B, { ...R0.P, uses: { office: { gsf: 1 } } }), null, 'none for a use the budgets don\'t cover');
   });
   test('offices have no team budgets: parametric', () => { const B = run({ buildingSf: 30000, parking: 120, acres: 3 }, 'office'); assert.deepEqual(B.teamUses, []); assert.ok(B.lines.some(l => l.id === 'par:hard|office')); });
 }
