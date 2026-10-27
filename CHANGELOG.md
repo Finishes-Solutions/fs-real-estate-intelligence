@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-26
 
+### 9:50 PM CT: Experimental gets the 10-year pro forma, BIM groundwork and main's latest (a191760, 400b170)
+- **10-year pro forma led by levered IRR, equity multiple and cash-on-cash** (see the 9:05 PM entry) is now on the experimental site too, including in the Feasibility study and the agents' study answers. A study's levered IRR changes because the hold is now 10 years (the sample apartments went from 3.5% to 6.0%).
+- **BIM groundwork** (see the 8:31 PM entry) and **main's latest work** (home communities, the agents' quality check on site plans) are merged in. Nothing else changes for users.
+
 ### 9:05 PM CT: A 10-year pro forma led by levered IRR, equity multiple and cash-on-cash (0d45faa)
 - **10-year hold:** the pro forma now holds a project for 10 years after it's stabilized before the sale (it was 5), as the team underwrites. Plans that never changed the hold move to 10 years; a hold set by hand stays. Change it under Assumptions, **Hold after stabilizing**.
 - **The three returns that matter come first:** **Levered IRR**, **Equity multiple** (with the equity put in) and **Cash-on-cash** (the first stabilized year, with the average over the hold) now open the pro forma, ahead of cost, NOI, yield and value.
