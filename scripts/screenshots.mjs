@@ -46,9 +46,9 @@ try {
     }
     if (label === 'desktop') { // an edited assumption updates the numbers live
       await page.click('.ws-step[data-step="proforma"]'); await page.waitForSelector('.ws-tor');
-      const before = await page.textContent('.ws-kpis.big .ws-kpi:nth-child(4) b');
+      const before = await page.textContent('.ws-kpis.ws-lead .ws-kpi:nth-child(1) b');
       const input = page.locator('[data-as="rents.1 BR"]'); await input.fill('1600'); await page.waitForTimeout(900);
-      const after = await page.textContent('.ws-kpis.big .ws-kpi:nth-child(4) b');
+      const after = await page.textContent('.ws-kpis.ws-lead .ws-kpi:nth-child(1) b');
       if (before === after) errors.push('editing an assumption did not update the levered IRR (' + before + ')');
       await page.screenshot({ path: out + 'workspace-proforma-edited-desktop.png' });
     }
