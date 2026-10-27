@@ -10,6 +10,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **The project notes say what the budget is missing:** the shell carries no building plumbing, HVAC or electrical (only fire sprinklers, site lighting and fire alarm), and eight soft-cost lines had rates but no totals ($41,720). A corrected copy of the workbook went back to the team with those filled in and $22 a sf of MEP allowances flagged "to confirm" (hard cost about $136 a sf, project about $9.03M).
 - **Rent check** against Oct 2026 listings: Waller retail asks average about $19.85 a sf, new strip space on Field Store Rd asks $30 to $40 NNN, so the budget's $25.20 is inside the range for new construction on FM 362 but above the town average; it stays as entered.
 - The project test now checks Option B too (its acreage, buildings, spaces, pro forma inputs, nothing outside its line). Seeding the project again (the Seed project workflow) puts Option B on every device.
+- **Merged with experimental** (facades in 3D, BIM, the 10-year pro forma, budgets from past jobs) so both sets of changes run together: the Parking field keeps its place in the layers, the entrance search and the map next to experimental's facades and fire-access rules. The tests' local Chromium is found at the current Playwright build (the report tests rendered with a stand-in and one failed).
 
 
 ### 1:41 AM CT: Buildings drawn from their floor plans in 3D and in the BIM model (aa9971d, b6f4058, cf7a94f, f708ae0, e716ec3)
