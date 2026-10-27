@@ -47,4 +47,10 @@ assert.equal(S.normalizeProgram({ use: 'multifamily', pads: 2 }).pads, null, '(p
   const plan = LOTS.narrow7.plan(), prog = read('townhomes for rent, 2 car garages');
   for (const o of L.layoutOptions(plan, prog)) { const m = S.metrics({ ...plan, elements: o.elements, zones: o.zones, program: o.program || prog }); assert.ok(m.spaces >= m.required, o.name + ': parking ' + m.spaces + ' of ' + m.required); }
 }
+// ---- a big mixed site: an option that meets the numbers asked for is offered (the band layouts fall short of them) ----
+{
+  const plan = LOTS.irreg40.plan(), prog = read('mixed use: retail on the frontage, 240 apartments, 80 townhomes and single family homes'), os = L.layoutOptions(plan, prog);
+  const n = (o, u) => o.elements.filter(e => e.kind === 'building' && e.use === u).reduce((t, e) => t + (e.units || 0), 0);
+  assert.ok(os.some(o => n(o, 'multifamily') >= 240 * 0.97 && n(o, 'townhomes') >= 80), 'an option with the 240 apartments and 80 townhomes: ' + os.map(o => n(o, 'multifamily') + '/' + n(o, 'townhomes')).join(', '));
+}
 console.log('layout asks ok');
