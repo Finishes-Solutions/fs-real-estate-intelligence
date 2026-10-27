@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-26
 
+### 11:42 PM CT: Spare land beside the buildings, a better option on big mixed sites, typed requests in Feasibility, townhome plan sets that match the site plan (8b03667, e16c0a7, 922e63a)
+- **Spare land stays usable:** where a site has much more land than its detention pond needs, the pond now goes at the far end of that land, so what's left sits beside the buildings and their drives (room for a later phase) instead of cut off behind the pond.
+- **A better option on big mixed sites:** a layout in pods round a spine road now takes the last of the three places when it meets more of the numbers you asked for. On the 40 acre test it gives 237 of 240 apartments and 101 townhomes, where the other layouts gave 220 and 61.
+- **Type what to build in the Feasibility Site step:** "120 garden apartments, 3 stories, with a clubhouse and pool" is laid out as written; the use list is still there for a quick layout.
+- **Townhome plan sets match the site plan:** rear-load rows are drawn with the garage on the back lane and the front door and living room on the court; rows of different lengths share one unit design (the set no longer draws the same unit three times: 34 sheets instead of 52 on the test). A drive-thru restaurant pad's floor plan has its pick-up window.
+- The report's scope line now says costs come from the budget workbook, the team's 2024–25 budgets and house rates.
+
 ### 10:55 PM CT: Budgets from the team's own jobs, returns first, apartment plan sets, and site plans that build what's asked (3f74df7, 3be2e56, f1e739f, 703239f, 89682ab, 3562a73, 0531bfd)
 - **Budgets from the team's own past jobs:** houses, shops and restaurants, small industrial and flex buildings (up to 40,000 sf) and convenience stores are now priced line by line from the middle of the team's 2024–25 Smartsheet budgets for that kind of building (foundations, roof, walls, windows, doors, mechanical, plumbing, electrical, sprinklers, and the interiors where the owner finishes them), with the budgets' 10% contractor fee as its own line. Each line says how many past budgets it rests on. Apartments and townhomes still use the budget workbook; offices, medical, hotels, churches, storage and big warehouses still use the platform's rates.
 - **A check against the team's numbers:** the budget now shows the plan's building and site work per square foot beside the team's own all-in median for that kind of building (the sample apartments: $132 against the team's $142, 7% lower), and flags a gap over 20%.
