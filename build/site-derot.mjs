@@ -1,0 +1,11 @@
+// node build/site-derot.mjs <aerial.jpg> '<bounds json>' <cx px> <cy px> <angle deg> <out.jpg> [parcel.geojson]: the aerial turned so a site's
+// grid is square to the page, with a 100 ft grid in feet from (cx, cy), for tracing (a study tool: not part of the app)
+import { snapshots } from '../lib/pdf.mjs'; import fs from 'node:fs';
+const [af, bj, cxs, cys, angs, out, pf] = process.argv.slice(2), B = JSON.parse(bj), cx = +cxs, cy = +cys, ang = +angs, W = B.px;
+const lat0 = (B.north + B.south) / 2, ftPx = (B.east - B.west) * 364567 * Math.cos(lat0 * Math.PI / 180) / W, g = 100 / ftPx;
+let grid = ''; for (let k = -12; k <= 12; k++) { const x = cx + k * g, y = cy + k * g; grid += `<line x1="${x}" y1="0" x2="${x}" y2="${W}" stroke="${k ? '#ff0' : '#f00'}" stroke-width="${k % 5 ? 0.6 : 1.4}" opacity="0.8"/><line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="${k ? '#ff0' : '#f00'}" stroke-width="${k % 5 ? 0.6 : 1.4}" opacity="0.8"/>`;
+  if (k % 2 === 0) grid += `<text x="${x + 3}" y="${cy - 4}" font-size="16" fill="#ff0" font-family="Arial">${k * 100}</text><text x="${cx + 3}" y="${y - 4}" font-size="16" fill="#ff0" font-family="Arial">${-k * 100}</text>`; }
+let parcel = ''; if (pf) { const geom = JSON.parse(fs.readFileSync(pf)), r = (geom.geometry || geom).coordinates[0], px = lon => (lon - B.west) / (B.east - B.west) * W, py = lat => (B.north - lat) / (B.north - B.south) * W; parcel = `<polygon points="${r.map(p => px(p[0]) + ',' + py(p[1])).join(' ')}" fill="none" stroke="#f33" stroke-width="3" stroke-dasharray="12 6"/>`; }
+const d = 'data:image/jpeg;base64,' + fs.readFileSync(af).toString('base64');
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${W}"><rect width="100%" height="100%" fill="#000"/><g transform="rotate(${-ang} ${cx} ${cy})"><image href="${d}" width="${W}" height="${W}"/>${parcel}</g>${grid}<text x="10" y="${W - 10}" font-size="18" fill="#fff" font-family="Arial">turned ${ang}° about (${cx}, ${cy}) · ${ftPx.toFixed(3)} ft/px · grid 100 ft (red = axes) · x right, y up in feet</text></svg>`;
+const [shot] = await snapshots([svg], { px: W, quality: 85 }); fs.writeFileSync(out, typeof shot === 'string' ? Buffer.from(shot.replace(/^data:[^,]*,/, ''), 'base64') : shot); console.log('wrote', out, 'ft/px', ftPx.toFixed(3)); process.exit(0);

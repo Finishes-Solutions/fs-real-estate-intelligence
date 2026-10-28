@@ -1,0 +1,274 @@
+{
+  "_source": "Ported from fs-budgeting-suite test/fixtures/input-defaults (origin/feature @ 4187c8c). Reference output captured from the source suite's database when its input-driven-defaults publish ran on the seed template (template v2 = the seed template + the full expense schedule; pricing 2026.08-v2 = lib/feasibility/data/fs-pricing-2026-08.mjs). test/fz-budget.mjs asserts transformInputDefaults() in lib/feasibility/rollup.mjs reproduces it exactly. lineIds are omitted: the seed mints random ones.",
+  "pricing": {
+    "version": "2026.10-v1",
+    "lineCount": 103,
+    "lines": [
+      {
+        "index": 38,
+        "line": {
+          "code": "08 11 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Interior Doors & Frames (per Unit)",
+          "basis": "unit",
+          "unit": 1160.14
+        }
+      },
+      {
+        "index": 39,
+        "line": {
+          "code": "08 71 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Interior Door Hardware (per Unit)",
+          "basis": "unit",
+          "unit": 177.12
+        }
+      },
+      {
+        "index": 40,
+        "line": {
+          "code": "08 83 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Mirrors (per Unit)",
+          "basis": "unit",
+          "unit": 256.83
+        }
+      },
+      {
+        "index": 46,
+        "line": {
+          "code": "10 28 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Toilet, Bath & Laundry Accessories (per Unit)",
+          "basis": "unit",
+          "unit": 549.07
+        }
+      },
+      {
+        "index": 47,
+        "line": {
+          "code": "11 31 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Residential Appliances (per Unit)",
+          "basis": "unit",
+          "unit": 3081.9
+        }
+      },
+      {
+        "index": 48,
+        "line": {
+          "code": "12 21 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Window Blinds (per Unit)",
+          "basis": "unit",
+          "unit": 292.25
+        }
+      },
+      {
+        "index": 49,
+        "line": {
+          "code": "12 30 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Casework / Stock Cabinets (per Unit)",
+          "basis": "unit",
+          "unit": 1780.06
+        }
+      },
+      {
+        "index": 50,
+        "line": {
+          "code": "12 36 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Countertops (per Unit)",
+          "basis": "unit",
+          "unit": 1000.73
+        }
+      },
+      {
+        "index": 51,
+        "line": {
+          "code": "10 55 00",
+          "grp": "Site Finish",
+          "scope": "res",
+          "desc": "Mailboxes (per Unit)",
+          "basis": "unit",
+          "unit": 221.4
+        }
+      },
+      {
+        "index": 80,
+        "line": {
+          "code": "13 11 00",
+          "grp": "Amenity Site & Pool",
+          "scope": "amen",
+          "desc": "Swimming Pool w/ Pool Deck",
+          "basis": "ls",
+          "unit": 165395.3
+        }
+      }
+    ]
+  },
+  "template": {
+    "pricingVersion": "2026.10-v1",
+    "projectCosts": {
+      "land": 1200000,
+      "dev": {
+        "mode": "pct",
+        "val": 2.0046
+      },
+      "mkt": 75000,
+      "cls": 0
+    },
+    "lineCount": 103,
+    "lines": [
+      {
+        "index": 38,
+        "line": {
+          "code": "08 11 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Interior Doors & Frames (per Unit)",
+          "basis": "unit",
+          "unit": 1160.14,
+          "baseUnit": 1160.14,
+          "qty": 0,
+          "auto": true
+        }
+      },
+      {
+        "index": 39,
+        "line": {
+          "code": "08 71 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Interior Door Hardware (per Unit)",
+          "basis": "unit",
+          "unit": 177.12,
+          "baseUnit": 177.12,
+          "qty": 0,
+          "auto": true
+        }
+      },
+      {
+        "index": 40,
+        "line": {
+          "code": "08 83 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Mirrors (per Unit)",
+          "basis": "unit",
+          "unit": 256.83,
+          "baseUnit": 256.83,
+          "qty": 0,
+          "auto": true
+        }
+      },
+      {
+        "index": 46,
+        "line": {
+          "code": "10 28 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Toilet, Bath & Laundry Accessories (per Unit)",
+          "basis": "unit",
+          "unit": 549.07,
+          "baseUnit": 549.07,
+          "qty": 0,
+          "auto": true
+        }
+      },
+      {
+        "index": 47,
+        "line": {
+          "code": "11 31 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Residential Appliances (per Unit)",
+          "basis": "unit",
+          "unit": 3081.9,
+          "baseUnit": 3081.9,
+          "qty": 0,
+          "auto": true
+        }
+      },
+      {
+        "index": 48,
+        "line": {
+          "code": "12 21 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Window Blinds (per Unit)",
+          "basis": "unit",
+          "unit": 292.25,
+          "baseUnit": 292.25,
+          "qty": 0,
+          "auto": true
+        }
+      },
+      {
+        "index": 49,
+        "line": {
+          "code": "12 30 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Casework / Stock Cabinets (per Unit)",
+          "basis": "unit",
+          "unit": 1780.06,
+          "baseUnit": 1780.06,
+          "qty": 0,
+          "auto": true
+        }
+      },
+      {
+        "index": 50,
+        "line": {
+          "code": "12 36 00",
+          "grp": "Interiors",
+          "scope": "res",
+          "desc": "Countertops (per Unit)",
+          "basis": "unit",
+          "unit": 1000.73,
+          "baseUnit": 1000.73,
+          "qty": 0,
+          "auto": true
+        }
+      },
+      {
+        "index": 51,
+        "line": {
+          "code": "10 55 00",
+          "grp": "Site Finish",
+          "scope": "res",
+          "desc": "Mailboxes (per Unit)",
+          "basis": "unit",
+          "unit": 221.4,
+          "baseUnit": 221.4,
+          "qty": 0,
+          "auto": true
+        }
+      },
+      {
+        "index": 80,
+        "line": {
+          "code": "13 11 00",
+          "grp": "Amenity Site & Pool",
+          "scope": "amen",
+          "desc": "Swimming Pool w/ Pool Deck",
+          "basis": "ls",
+          "unit": 165395.3,
+          "baseUnit": 165395.3,
+          "qty": 1,
+          "auto": false
+        }
+      }
+    ]
+  }
+}

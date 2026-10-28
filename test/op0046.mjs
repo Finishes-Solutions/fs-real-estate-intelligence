@@ -7,7 +7,7 @@ import * as SP from '../lib/siteplan.mjs';
 import { cleanProject } from '../api/projects.js';
 
 const doc = M.buildProject(M.FALLBACK_PARCELS, { now: '2026-10-26T20:00:00.000Z' }), s = M.summary(doc), pl = doc.plans[0];
-assert.equal(doc.id, 'op-0046-waller-fm362'); assert.equal(doc.parcels.length, 3); assert.equal(doc.plans.length, 1);
+assert.equal(doc.id, 'op-0046-waller-fm362'); assert.equal(doc.parcels.length, 3); assert.equal(doc.plans.length, 2);
 assert.deepEqual(doc.parcels.map(p => p.key), ['pid:10687', 'pid:10682', 'pid:10680']);
 assert.deepEqual(doc.parcels.map(p => p.owner), ['PRIYA CAPITAL LLC', 'MARKET SQUARE COMMONS LLC', 'WALLER HERITAGE PLAZA LLC']);
 assert.equal(doc.parcels.reduce((t, p) => t + p.marketValue, 0), 1648410, 'the 2026 assessed values');
@@ -61,7 +61,11 @@ assert.ok(pl.elements.every(e => e.pinned && /^op46-/.test(e.id)), 'every piece 
 const row = cleanProject(doc, 'seed'); assert.ok(row && row.id === doc.id && row.updated_at === doc.updated, 'cleanProject takes it');
 assert.ok(JSON.stringify(doc).length < 120000, 'well under the 500 KB the sync allows');
 const m = SP.metrics(pl); assert.equal(m.buildings, 11); assert.ok(m.coverage > 0.2 && m.coverage < 0.3); assert.ok(m.pond > 24000);
-assert.ok(SP.hasDesign(pl)); assert.equal(SP.nextOptionName(doc.plans), 'Option B');
+assert.ok(SP.hasDesign(pl)); assert.equal(SP.nextOptionName(doc.plans), 'Option C');
+// Option B: the retail center's tract with the budget's numbers
+{ const B2 = doc.plans[1], mb = SP.metrics(B2); assert.match(B2.name, /^Option B/); assert.ok(mb.acres > 4.2 && mb.acres < 4.5, 'the tract east of the channel: ' + mb.acres.toFixed(2) + ' acres');
+  assert.equal(mb.gfa, 28000); assert.equal(mb.buildings, 4); assert.ok(mb.spaces >= 90 && mb.spaces <= 100); assert.equal(B2.pf.landPrice, 2500000); assert.equal(B2.pf.hard.retail, 105.91); assert.equal(B2.pf.ti.retail, 25);
+  assert.ok(B2.elements.every(e => /^op46b-/.test(e.id) && SP.shapeOf(e).every(p => SP.inRing(p, B2.ring))), 'its own ids, inside its own ring'); assert.deepEqual(SP.check(B2).filter(i => i.level === 'bad'), []); }
 // a second build is the same document (the seed workflow replaces the team's copy in place)
 assert.equal(JSON.stringify(M.buildProject(M.FALLBACK_PARCELS, { now: '2026-10-26T20:00:00.000Z' })), JSON.stringify(doc));
 console.log('op0046: ok (' + s.acres + ' acres, ' + s.gfa.toLocaleString('en-US') + ' sf in ' + s.buildings + ' buildings, ' + s.spaces + ' spaces, ' + s.elements + ' pieces)');

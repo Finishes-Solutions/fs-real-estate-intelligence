@@ -35,7 +35,10 @@ export const PROJECT = {
     + 'Three Waller CAD accounts: 10687 (Priya Capital LLC, 9.36 ac), 10682 (Market Square Commons LLC, 0.93 ac) and 10680 (Waller Heritage Plaza LLC, 5.88 ac); 16.16 acres, assessed $1,648,410 (2026). '
     + 'Sheet totals: shopping center 138,145 sf (Bealls 30,000; clothing 31,579; grocery 32,626; home decor 21,693; dollar store 11,475; pet store 10,772), 732 spaces (33 accessible); restaurant 7,000 sf, 19 spaces (3 accessible); '
     + 'retail center 28,000 sf (5,000 + 5,000 + 6,000 + 12,000), 98 spaces (10 accessible), retention ponds 10,531 and 14,215 sf, 12 ft deep. '
-    + 'Buildings are at their labelled widths and stated floor areas; parking rows are where the sheets draw them at 9 x 18 ft stalls, so the app’s space counts are its own.'
+    + 'Buildings are at their labelled widths and stated floor areas; parking rows are where the sheets draw them at 9 x 18 ft stalls, so the app’s space counts are its own. '
+    + 'Option B is the 5.8-acre tract on its own (the retail center east of the channel, about 4.35 acres of parcel 10680) with the Oct 2026 project budget on its pro forma: $2,500,000 of land, the budget’s $114.41 a sf hard cost (entered as $105.91 plus the app’s 5% contingency), its $841,120 of site work, $25 a sf tenant improvements and $25.20 a sf rent; '
+    + 'the app’s own vacancy, taxes, recoveries, commissions, soft costs, fee and interest stay, which the budget leaves out or runs at 0% vacancy. The budget’s shell carries no building plumbing, HVAC or electrical (only fire sprinklers, site lighting and fire alarm): an allowance of about $22 a sf would take hard cost to about $136. '
+    + 'Rent check (Oct 2026 listings): Waller retail asks average about $19.85 a sf (LoopNet), new strip space at 2230 Field Store Rd asks $30 to $40 NNN (Crexi), so $25.20 sits inside the range for new construction on FM 362 but above the town average.'
 };
 
 const r2 = v => +(+v).toFixed(2);
@@ -217,9 +220,28 @@ export function buildOption(S, { now }) {
     program: { use: 'retail', storm: 'retention' }, params: { storm: { depth: 12 } }, elements: els, created: now, updated: now };
 }
 
+// Option B: the retail center's tract on its own (the land east of the drainage channel the 5.8-acre sheet covers:
+// about 4.35 acres of parcel 10680), with the team's budget numbers on its pro forma (the Oct 2026 "Budget For
+// Projects 4.0" workbook): the project budget's shell cost, its site work, $25 tenant improvements, $2,500,000 of
+// land and $25.20 rent; the app's own vacancy, taxes, recoveries, commissions, soft costs and fee stay, which is what
+// the budget leaves out. The pieces are Option A's, as drawn.
+export const TRACT_PF = {
+  landPrice: 2500000, landClosingPct: 1.5, // the budget's land for the tract ($5,600,000 for all 16.1 acres)
+  hard: { retail: 105.91 }, // the budget's hard cost $114.41 a sf less its own $8.50 contingency line (the app adds 5% contingency of its own)
+  ti: { retail: 25 }, // the budget's tenant improvement allowance
+  sitePrepPsf: 2.73, pavingPsf: 6.82, stallCost: 2500, pondPerAcFt: 27300, // the app's site lines scaled to the budget's $841,120 of infrastructure
+  commRent: { retail: 25.2 } // the budget's $2.10 a sf a month (the app's Waller range is $18 to $24 NNN: check comps)
+};
+export function buildTractOption(S, A, { now }) {
+  const { retail } = fits(S), wedge = [[545.31, 1581.87], [990.85, 323.88], [1209.55, 323.88], [1220.92, 1570.57]].map(retail), ring = SP.tidyRing(wedge, 0.1);
+  const els = A.elements.filter(e => e.kind !== 'keepout' && SP.inRing([e.x, e.y], ring)).map(e => ({ ...e, id: e.id.replace(/^op46-/, 'op46b-') }));
+  const out = ring.map((_, k) => SP.outwardOf(ring, k)), len = ring.map((_, k) => SP.edgeLen(ring, k)), front = ring.map((_, k) => k).filter(k => out[k][0] > 0.85).sort((a, b) => len[b] - len[a])[0] ?? 0;
+  return { id: 'op46-optB', name: 'Option B · 5.8-acre tract, budget inputs', origin: A.origin, ring, src: 'drawn', front, frontGuess: false, streets: [], streetsSet: true, streetsBy: 2, streetNames: { [front]: 'FM 362' },
+    setbacks: { ...SP.SETBACKS }, parcel: 'pid:10680', parcels: ['pid:10680'], zoning: null, program: { use: 'retail', storm: 'retention' }, params: { storm: { depth: 12 } }, elements: els, pf: { ...TRACT_PF, hard: { ...TRACT_PF.hard }, ti: { ...TRACT_PF.ti }, commRent: { ...TRACT_PF.commRent } }, created: now, updated: now };
+}
 export function buildProject(parcels, { now = new Date().toISOString() } = {}) {
-  const S = siteOf(parcels), plan = buildOption(S, { now });
-  return { id: PROJECT.id, name: PROJECT.name, status: 'prospect', use: PROJECT.use, notes: PROJECT.notes, parcels: S.parcels.map(({ ft, ...p }) => p), plans: [plan], created: now, updated: now, by: 'Claude Code (from the OP-0046 sheets)' };
+  const S = siteOf(parcels), plan = buildOption(S, { now }), tract = buildTractOption(S, plan, { now });
+  return { id: PROJECT.id, name: PROJECT.name, status: 'prospect', use: PROJECT.use, notes: PROJECT.notes, parcels: S.parcels.map(({ ft, ...p }) => p), plans: [plan, tract], created: now, updated: now, by: 'Claude Code (from the OP-0046 sheets)' };
 }
 
 // what was built, in numbers (for the seed script's log and the test)

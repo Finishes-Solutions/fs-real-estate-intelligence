@@ -1,0 +1,419 @@
+{
+ "name": "Garden apartment community, Houston area (traced from the aerial, Oct 27 2026)",
+ "origin": [
+  -95.54703,
+  29.95015
+ ],
+ "angle": 0,
+ "about": "A built garden-apartment community traced from a satellite image at 1.7 ft a pixel: 17 three-story buildings set at varied angles round a resort pool and clubhouse, a wet pond by the main entrance off the arterial, a second entrance from the side road, the drives and the main parking rows. Frame feet: x east, y north, origin at the parcel's southeast corner on the arterial. A target the layout engine is measured against, not a plan it made.",
+ "parcel": [
+  [
+   -754,
+   1423
+  ],
+  [
+   -229,
+   1287
+  ],
+  [
+   0,
+   0
+  ],
+  [
+   -754,
+   -85
+  ]
+ ],
+ "front": "E",
+ "streets": [
+  "N"
+ ],
+ "ask": "400 garden apartments, 3 stories, with a clubhouse and resort pool",
+ "elements": [
+  {
+   "kind": "building",
+   "box": [
+    -695,
+    -593,
+    1309,
+    1385
+   ],
+   "rot": -15,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building A"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -508,
+    -390,
+    1232,
+    1309
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building B"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -686,
+    -584,
+    1063,
+    1139
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building C"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -440,
+    -339,
+    1025,
+    1110
+   ],
+   "rot": 30,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building D"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -695,
+    -593,
+    872,
+    957
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building E"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -508,
+    -390,
+    855,
+    940
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building F"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -254,
+    -161,
+    809,
+    885
+   ],
+   "rot": 10,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building G"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -703,
+    -601,
+    686,
+    771
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building H"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -271,
+    -186,
+    652,
+    737
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building I"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -686,
+    -584,
+    517,
+    601
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building J"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -390,
+    -271,
+    449,
+    534
+   ],
+   "rot": 20,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building K"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -686,
+    -584,
+    313,
+    398
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building L"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -330,
+    -212,
+    165,
+    258
+   ],
+   "rot": -20,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building M"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -195,
+    -93,
+    25,
+    110
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building N"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -508,
+    -390,
+    0,
+    85
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building O"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -661,
+    -576,
+    -59,
+    8
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building P"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -589,
+    -512,
+    1291,
+    1359
+   ],
+   "rot": 0,
+   "use": "multifamily",
+   "floors": 3,
+   "units": 24,
+   "name": "Building Q"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -423,
+    -323,
+    685,
+    770
+   ],
+   "use": "amenity",
+   "floors": 1,
+   "name": "Clubhouse"
+  },
+  {
+   "kind": "pool",
+   "box": [
+    -540,
+    -430,
+    600,
+    670
+   ],
+   "name": "Pool",
+   "note": "Resort-style"
+  },
+  {
+   "kind": "pond",
+   "box": [
+    -220,
+    -100,
+    320,
+    560
+   ],
+   "name": "Detention",
+   "note": "Wet pond \u00b7 fountain"
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -250,
+    -20,
+    310,
+    334
+   ],
+   "name": "Main entry",
+   "entry": true
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -342,
+    -318,
+    330,
+    1300
+   ],
+   "name": "Entrance 2",
+   "entry": true
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -572,
+    -548,
+    120,
+    1350
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -560,
+    -330,
+    440,
+    464
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -560,
+    -330,
+    840,
+    864
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -560,
+    -330,
+    1130,
+    1154
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -330,
+    -120,
+    900,
+    924
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -330,
+    -60,
+    170,
+    194
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -590,
+    -572,
+    140,
+    1340
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -548,
+    -530,
+    140,
+    1340
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -360,
+    -342,
+    480,
+    1120
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -318,
+    -300,
+    480,
+    1120
+   ]
+  }
+ ],
+ "detention": "a wet pond with a fountain beside the main entrance"
+}

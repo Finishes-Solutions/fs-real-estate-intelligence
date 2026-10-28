@@ -1,0 +1,108 @@
+{
+ "_about": "A frozen slice of the platform data (data/area.json rates + rents, data/markets.json PPI construction materials) taken 2026-10-24, so the feasibility tests do not move with the nightly refresh.",
+ "area": {
+  "rates": {
+   "built": "2026-10-24T13:34:58.058Z",
+   "series": {
+    "t10": {
+     "label": "10-yr Treasury",
+     "date": "2026-10-22",
+     "value": 4.96
+    },
+    "t5": {
+     "label": "5-yr Treasury",
+     "date": "2026-10-22",
+     "value": 4.78
+    },
+    "m30": {
+     "label": "30-yr mortgage (Freddie Mac)",
+     "date": "2026-10-22",
+     "value": 7.32
+    },
+    "sofr": {
+     "label": "SOFR",
+     "date": "2026-10-22",
+     "value": 3.9
+    }
+   }
+  },
+  "rents": {
+   "built": "2026-10-24T13:35:01.054Z",
+   "latest": "2026-09",
+   "zips": {
+    "77484": {
+     "rent": 1614,
+     "yoy": 1.8,
+     "month": "2026-09",
+     "city": "Waller",
+     "metro": "Houston-The Woodlands-Sugar Land, TX"
+    },
+    "77494": {
+     "rent": 1861,
+     "yoy": -1.1,
+     "month": "2026-09",
+     "city": "Katy",
+     "metro": "Houston-The Woodlands-Sugar Land, TX"
+    },
+    "77423": {
+     "rent": 1909,
+     "yoy": 1.8,
+     "month": "2026-09",
+     "city": "Pattison",
+     "metro": "Houston-The Woodlands-Sugar Land, TX"
+    },
+    "77493": {
+     "rent": 2197,
+     "yoy": -1.8,
+     "month": "2026-09",
+     "city": "Katy",
+     "metro": "Houston-The Woodlands-Sugar Land, TX"
+    }
+   }
+  }
+ },
+ "markets": {
+  "built": "2026-10-24T13:35:30.890Z",
+  "series": {
+   "wpusi012011": {
+    "id": "wpusi012011",
+    "date": "2026-09-01",
+    "value": 378.61,
+    "recent": {
+     "t": [
+      "2025-08-01",
+      "2025-09-01",
+      "2025-10-01",
+      "2025-11-01",
+      "2025-12-01",
+      "2026-01-01",
+      "2026-02-01",
+      "2026-03-01",
+      "2026-04-01",
+      "2026-05-01",
+      "2026-06-01",
+      "2026-07-01",
+      "2026-08-01",
+      "2026-09-01"
+     ],
+     "v": [
+      341.458,
+      341.005,
+      340.3,
+      338.556,
+      344.679,
+      347.872,
+      352.767,
+      355.488,
+      359.534,
+      364.07,
+      369.05,
+      374.956,
+      375.792,
+      378.61
+     ]
+    }
+   }
+  }
+ }
+}

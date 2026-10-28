@@ -30,8 +30,10 @@ import * as CU from './lib/customtypes.mjs';
 import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
 import * as STG from './lib/planstages.mjs';
+import * as PARC from './lib/siteparcels.mjs';
 import * as RF from './lib/sitefiles.mjs';
 import { siteFiles } from './sitefiles.js';
+import { workspace } from './workspace.js';
 import { teamLibrary } from './teamlib.js';
 import { ruleSheets } from './rulesheets.js';
 const typeOptions = (cur, team = []) => (team.length ? '<optgroup label="Team">' + team.map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>' : '') + BUILDING_GROUPS.map(g => '<optgroup label="' + g + '">' + BUILDING_TYPES.filter(t => t.group === g).map(t => '<option value="' + t.id + '"' + (t.id === cur ? ' selected' : '') + '>' + t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('') + '</optgroup>').join(''); // the building library, grouped
@@ -204,7 +206,8 @@ export function initSitePlan(ctx) {
   const geomAcres = (g, at) => { const F = SP.frame(at), polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
     return polys.reduce((t, rs) => t + SP.ringArea(rs[0].map(F.toFt)) - rs.slice(1).reduce((h, r) => h + SP.ringArea(r.map(F.toFt)), 0), 0) / 43560; };
   const parcelOf = (pc, center) => { const g = pc.geometry, r = g && (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates?.[0]?.[0]); const cc = r ? SP.centroid(r) : center;
-    const rec = { key: '', label: pc.situs || pc.owner || 'Parcel', owner: pc.owner || '', propId: pc.propId || null, marketValue: pc.marketValue || null, landValue: pc.landValue || null, acres: g ? +(geomAcres(g, center)).toFixed(3) : null, center: cc.map(v => +v.toFixed(6)), geometry: llRound(g) || null };
+    const rec = { key: '', label: pc.situs || pc.owner || 'Parcel', owner: pc.owner || '', propId: pc.propId || null, marketValue: pc.marketValue || null, landValue: pc.landValue || null, acres: g ? +(geomAcres(g, center)).toFixed(3) : null, center: cc.map(v => +v.toFixed(6)), geometry: llRound(g) || null,
+      ...Object.fromEntries([['address', pc.situsStreet || pc.situs], ['city', pc.situsCity], ['zip', pc.situsZip], ['county', pc.county]].filter(([, v]) => v).map(([k, v]) => [k, String(v).slice(0, 120)])) }; // (the address and ZIP: the feasibility study's market check reads the ZIP)
     rec.key = parcelKey(rec); return rec; };
   // the site boundary for a set of parcels (one outline, or several merged). Parcels that don't touch are joined across
   // the gap between them (SP.bridgeParcels): filled in as site, or, where the map shows a road in it, kept as a no-build
@@ -543,6 +546,7 @@ export function initSitePlan(ctx) {
 
   // street side: the parcel edge facing the nearest road in the map's own road lines, else the longest edge (a guess)
   function detectFront(pl) {
+    if (STG.status(pl).site.state === 'done') { pl.streetsBy = 2; return; } // (a confirmed site is the person's word: the map's check doesn't move its street sides, so it stays confirmed when the option is opened again)
     const s = map.getStyle()?.sources || {}, src = Object.keys(s).find(id => s[id].type === 'vector' && /maptiler|openmaptiles|planet/i.test(id + (s[id].url || '')));
     const F = SP.frame(pl.origin), lines = [];
     try {
@@ -626,6 +630,11 @@ export function initSitePlan(ctx) {
   const coarse = () => matchMedia('(pointer:coarse)').matches; // fingers: bigger handles, a wider reach, the turn dot further out
   let ids = [], dimmed = null;
   // mp: the map to draw on: the page's, or a hidden one a background rendering takes its picture from (renderInBackground)
+  // the facades (windows, finishes, roofs) show when the map is tilted; seen from straight above (the plan) and with the
+  // mix on, the buildings keep their use's colour and the selection its highlight. A picture's hidden map always has them.
+  let facHooked = false;
+  const facWanted = () => map.getPitch() > 12 && !ed?.mix ? 'visible' : 'none';
+  function syncFac() { if (map.getLayer('fs-sp-fac') && map.getLayoutProperty('fs-sp-fac', 'visibility') !== facWanted()) map.setLayoutProperty('fs-sp-fac', 'visibility', facWanted()); }
   function addLayers(mp = map) {
     if (mp.getSource(SRC)) return;
     const kind = k => ['==', ['get', 'k'], k], P = MAP.palette(), C = P.col, Ln = P.lines, Lb = P.label, big = coarse();
@@ -693,6 +702,8 @@ export function initSitePlan(ctx) {
       'fill-extrusion-color': ['match', ['get', 'part'], 'tower', ['case', ph2, useCol(c => f(P.p2(c))), useCol(f)], 'parapet', ['case', ['==', ['get', 'g'], 1], '#8b9092', '#6d635a'], ['case', ['==', ['get', 'g'], 1], '#6f7476', '#4f453c']] });
     add({ id: 'fs-sp-b3', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), ['!', sel1]], paint: b3(id) });
     add({ id: 'fs-sp-b3s', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), sel1], paint: b3(lit) });
+    add({ id: 'fs-sp-fac', type: 'fill-extrusion', source: SRC, filter: kind('fac'), paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': 1 }, layout: { visibility: mp === map ? facWanted() : 'visible' } }); // the facades: finishes, windows, doors, roofs (lib/massing.mjs)
+    if (mp === map && !facHooked) { facHooked = true; map.on('pitchend', syncFac); }
     add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'field', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck', 'sign']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
       paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, 'rgba(11,13,12,.45)'], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1] } });
     add({ id: 'fs-sp-p2', type: 'line', source: SRC, filter: ['all', kind('building'), ph2, ['!', sel1], ['!=', ['get', 'bad'], 1]], paint: { 'line-color': Ln.p2, 'line-width': 1.3, 'line-dasharray': [2, 1.6] } }); // Phase 2: dashed
@@ -787,6 +798,7 @@ export function initSitePlan(ctx) {
   // a Waller plan's layouts: the engine gets the scenario's inputs (lib/guardrails.mjs forLayout) and what comes back is
   // kept with the plan's own working numbers (unapply); every other plan goes to the engine as it is
   function laid(fn, ...args) {
+    if (fn === 'refit' && args[0]?.recipe?.parcels) args[1] = { ...(args[1] || {}), parcels: partsNow(P(), args[0]) }; // (laid out parcel by parcel: the parts again)
     if (fn === 'options' && args[0]?.ring?.length >= 3 && !args[0].terrain) { const t = terrainNow(args[0]); if (t) args[0] = { ...args[0], terrain: t }; else terrainOf(args[0]); } // the pond goes on the low side (lib/sitelayout.mjs)
     const g = fn === 'refit' ? G.forLayout(args[0], args[0]?.program, {}) : G.forLayout(args[0], args[1], args[2] || {});
     if (!g) return laid0(fn, ...args);
@@ -858,6 +870,7 @@ export function initSitePlan(ctx) {
   // the mix's layers and colours on the map when it's on, gone (and the usual colours back) when it's off or the plan
   // closes; a basemap change rebuilds the plan's layers (their ids include these), and the next draw puts the mix back
   function syncMix() {
+    syncFac();
     const want = !!ed?.mix && !!map.getLayer('fs-sp-lotc'), has = !!map.getLayer(MIXL[0]);
     if (want && !has) {
       const add = def => { map.addLayer(def, 'fs-sp-lotc'); ids.push(def.id); }, zf = ['all', ['==', ['get', 'k'], 'zone'], ['has', 'mx']];
@@ -1472,7 +1485,7 @@ export function initSitePlan(ctx) {
     pop.querySelectorAll('[data-f]').forEach(b => b[b.type === 'checkbox' ? 'onchange' : 'onclick'] = () => flipLayer(b));
     if (f) pop.querySelector('[data-f="' + f + '"]')?.focus({ preventScroll: true });
   }
-  function setTab(t, focus) {
+  function setLayTab(t, focus) {
     if (t === layTab && pop.querySelector('[data-ltab]')) { if (focus) pop.querySelector('[data-ltab="' + t + '"]')?.focus({ preventScroll: true }); return; }
     if (itRen != null) endRename(true); layTab = t; try { localStorage.setItem(LTAB_KEY, t); } catch (e) { /* this visit only */ }
     pop.innerHTML = ''; itSel = null; paintLayers(); placePop(); if (focus) pop.querySelector('[data-ltab="' + t + '"]')?.focus({ preventScroll: true });
@@ -1547,7 +1560,7 @@ export function initSitePlan(ctx) {
   // heading), → unfolds; Enter picks the row (on the piece already picked, renames it), F2 renames; ← → on the tabs switch
   function popNav(e) {
     if (popKind !== 'layers') return false; const k = e.key, t = e.target, stop = () => { e.preventDefault(); e.stopPropagation(); };
-    if (t.dataset?.ltab) { if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'Home' || k === 'End') { stop(); setTab(k === 'Home' ? 'layers' : k === 'End' ? 'items' : t.dataset.ltab === 'items' ? 'layers' : 'items', true); return true; }
+    if (t.dataset?.ltab) { if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'Home' || k === 'End') { stop(); setLayTab(k === 'Home' ? 'layers' : k === 'End' ? 'items' : t.dataset.ltab === 'items' ? 'layers' : 'items', true); return true; }
       const box = itBox(); if (box && k === 'ArrowDown') { stop(); const a = box.querySelector('[data-nav][tabindex="0"]') || box.querySelector('[data-nav]'); a?.focus({ preventScroll: true }); if (a) keepInView(box, a.closest('.sp-it') || a); return true; } return !!box; }
     const box = itBox(); if (!box || !box.contains(t)) return false; stop();
     const navs = itNavs(box), cur = t.closest('.sp-ig-h')?.querySelector('[data-nav]') || t.closest('.sp-it')?.querySelector('[data-nav]') || t, i = navs.indexOf(cur);
@@ -1559,7 +1572,7 @@ export function initSitePlan(ctx) {
     return true;
   }
   pop.addEventListener('click', e => {
-    const tb = e.target.closest('[data-ltab]'); if (tb) { setTab(tb.dataset.ltab, true); return; }
+    const tb = e.target.closest('[data-ltab]'); if (tb) { setLayTab(tb.dataset.ltab, true); return; }
     if (!itBox()?.contains(e.target)) return; const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.f) flipLayer(b); else if (b.dataset.fold) foldItems(b.dataset.fold, b.getAttribute('aria-expanded') !== 'true'); else if (b.dataset.ren != null) startRename(b.dataset.ren); else if (b.dataset.pick != null) pickItem(b.dataset.pick, e);
   });
@@ -2160,6 +2173,8 @@ export function initSitePlan(ctx) {
     const acres = SP.ringArea(pl.ring) / 43560, sugs = RUN.presets(acres, SP.edgeLen(pl.ring, pl.front ?? SP.longestEdge(pl.ring)), { aiOff: off }), lo = RUN.leftoverOf(RUN.fillParams(pl.params, { ask: ed.ask || '' }));
     return '<div class="bsec sp-ai" id="spAiSec"><div class="sp-ai-h"><label class="lt" for="spAsk">Build with AI</label>' + (asked && ed.variants ? fold(true) : '') + '</div>' +
       '<textarea id="spAsk" rows="2" placeholder="What should go here? e.g. ' + esc(sugs[0]?.text || '25,000 sf retail strip') + '">' + esc(ed.ask || '') + '</textarea>' +
+      ((pl.parcels || []).length > 1 ? '<label class="sp-chk sp-perparcel" title="Each parcel laid out on its own: its own street side, program and layouts, nothing across a parcel line. Say which use goes on which parcel (“retail on the 5.88 acre parcel, flex on the corner parcel”), or one program is shared by acreage."><input type="checkbox" id="spPerParcel"' + (ed.perParcel ? ' checked' : '') + '> Lay out parcel by parcel</label>' : '') +
+      (ed.questions?.length ? '<div class="sp-qs" id="spQs"><div class="lt">Before it lays this out, the AI asks</div><ol>' + ed.questions.map(q => '<li>' + esc(q) + '</li>').join('') + '</ol><textarea id="spAnswers" rows="2" placeholder="Your answers"></textarea><div class="sp-row"><button type="button" class="btn sm primary" id="spAnswer">Answer and Build</button><button type="button" class="btn sm ghost" id="spSkipQs" title="Lay it out on the AI’s best reading of the request">Build Anyway</button></div></div>' : '') +
       '<div class="sp-sugs" role="group" aria-label="Suggestions for this ' + acres.toFixed(1) + '-acre site">' + sugs.map(x => '<button type="button" class="chip" data-sug="' + esc(x.text) + '" title="Put this in the box; then Build Layouts (or Enter)">' + esc(x.text) + '</button>').join('') + '</div>' +
       '<div class="sp-runopts"><span class="sp-effl" id="spEffL">AI effort</span>' +
         '<button type="button" class="sp-fillnote" data-jump="spParams" title="The land what you ask for doesn’t need gets more of the program (more homes, more shops, a bigger building) unless your request or Settings asks to hold it for later. Change it under Settings.">Leftover land <b>' + ({ fill: 'Filled', phase: 'Phase 2', hold: 'Held' })[lo] + '</b>' + CHEV + '</button></div>' +
@@ -2202,6 +2217,9 @@ export function initSitePlan(ctx) {
   }
   function wireBuild(pl) {
     const $ = q => card.querySelector(q), each = (q, fn) => card.querySelectorAll(q).forEach(b => b.onclick = () => fn(b));
+    const pp = $('#spPerParcel'); if (pp) pp.onchange = () => { ed.perParcel = pp.checked; };
+    const an = $('#spAnswer'); if (an) an.onclick = () => { const a = ($('#spAnswers')?.value || '').trim(); if (!a) { ctx.toast('Type your answers first.'); $('#spAnswers')?.focus(); return; } ed.ask = ((ed.ask || '').trim() + '\nAnswers: ' + a).trim(); ed.questions = null; build({ answered: true }); };
+    const sk = $('#spSkipQs'); if (sk) sk.onclick = () => { ed.questions = null; build({ answered: true }); };
     const ta = $('#spAsk'); if (ta) { ta.oninput = () => { ed.ask = ta.value; $('#spGo')?.classList.remove('sp-pulse'); }; ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!ed.run) build(); } }; } // Enter (or ⌘/Ctrl+Enter) builds; Shift+Enter is a new line
     each('#spGo', () => build()); each('#spBest', () => bestUse());
     each('[data-sug]', b => fillAsk(b.dataset.sug, true));
@@ -2270,7 +2288,7 @@ export function initSitePlan(ctx) {
     // only the settings the plan's uses (its zones too) read: the building shape for shops, offices and apartments, the
     // apartment bars' depth, length and spacing for apartments, curving streets for single-family homes
     const uses = SP.usesOf(prog), has = list => list.some(x => uses.includes(x)), only = { sfr: uses.length === 1 && uses[0] === 'sfr' };
-    const bldg = (has(SP.FORM_USES) ? pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) : '') + (has(['sfr']) ? pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Like a subdivision, and gentle curves (best first)'], ['network', 'Like a subdivision: loops and cul-de-sacs'], ['wave', 'Parallel, gently curving'], ['straight', 'Straight']]) + '<div class="sp-hint w2">Subdivision streets follow the site: a loop road one lot in from the edge or a main street, curved local streets meeting it at T’s, cul-de-sacs where land is left. They follow the place’s rule sheet (Street rules, below), else typical values (blocks up to 1,400 ft, cul-de-sacs up to 800 ft).</div>' + namesHtml(pl) : '') +
+    const bldg = (has(SP.FORM_USES) ? pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) : '') + (has(['sfr']) ? pick('streets', 'Neighborhood streets', pp.streets || 'curved', [['curved', 'Like a subdivision, and gentle curves (best first)'], ['network', 'Like a subdivision: loops and cul-de-sacs'], ['wave', 'Parallel, gently curving'], ['straight', 'Straight']]) + '<div class="sp-hint w2">Subdivision streets follow the site: a loop road one lot in from the edge or a main street, curved local streets meeting it at T’s, cul-de-sacs where land is left. They follow the place’s rule sheet (Street rules, below), else typical values (blocks up to 1,400 ft, cul-de-sacs up to 800 ft).</div>' + namesHtml(pl) : '') +
       (has(['multifamily']) ? num('pp-bldgDepth', 'Apartment depth', pp.bldgDepth, 1, 'ft') + num('pp-maxLen', 'Longest building', pp.maxLen, 10, 'ft') + num('pp-bldgGap', 'Space between', pp.bldgGap, 1, 'ft') : '');
     // names: the community's and each part's (no re-solve: they change the labels, not the layout)
     const parts = SP.partsOf({ ...pl, program: prog }, false), nmIn = (k, label, v, ph) => fld(label, '<input type="text" maxlength="60" data-nm="' + k + '" value="' + esc(v || '') + '" placeholder="' + esc(ph) + '">', { wide: true });
@@ -2976,6 +2994,7 @@ export function initSitePlan(ctx) {
     return '<table class="sp-mixt"><tr><th>Storage</th><th>Size</th><th>SF</th><th>Units</th></tr>' + rows.map(r => '<tr><td>' + r[0] + '</td><td>' + esc(r[1]) + '</td><td>' + f0(r[2]) + '</td><td>' + f0(r[3]) + '</td></tr>').join('') + '</table>';
   }
   // ---------- pro forma ----------
+  const COC_TIP = 'Each year of the hold after the project is stabilized: the net operating income less the permanent loan’s payments, divided by the equity put in. A refinance’s cash-out is not counted as income.';
   const PROFIT_TIP = 'What the equity investors net: rent collected through the hold, less loan payments and interest, plus the sale price after sale costs and the loan payoff, less the equity put in. It isn’t the stabilized value minus the cost.';
   const landGuess = (p, pl) => { const recs = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean), v = recs.map(r => r.marketValue || r.landValue);
     return recs.length && v.every(x => +x > 0) ? Math.round(v.reduce((s, x) => s + +x, 0)) : null; };
@@ -2990,6 +3009,8 @@ export function initSitePlan(ctx) {
     let R = null; try { R = pfRun(p, pl); } catch (e) { console.warn('pro forma', e); }
     if (!R) return '<details class="bsec sp-pf" id="spPfSec"><summary class="lt">Pro forma</summary><div class="rnote">Lay out a plan first (Build Layouts or by hand); the pro forma reads its buildings, units and parking.</div></details>';
     const A = R.A, $m = $M, xm = v => v == null || !isFinite(v) ? 'n/a' : v.toFixed(2) + 'x', pc2 = v => v == null || !isFinite(v) ? 'n/a' : (v * 100).toFixed(2) + '%';
+    // cash-on-cash through the hold, a cell a year (the cash flow after the loan payments, over the equity put in)
+    const cocYears = r => !r.holdYears?.length ? '' : '<div class="sp-coc" title="' + esc(COC_TIP) + '"><span>Cash-on-cash by year</span><div>' + r.holdYears.map(y => '<i' + (y.coc < 0 ? ' class="neg"' : '') + '><small>Yr ' + y.year + '</small>' + (y.coc * 100).toFixed(1) + '%</i>').join('') + '</div></div>';
     const notes = Object.fromEntries((R.warnings || []).filter(w => w.level === 'note').map(w => [w.key, w.text])), flags = (R.warnings || []).filter(w => w.level === 'flag');
     const tagOf = k => (PF.BASIS[R.basis?.inputs?.[k]] || PF.BASIS.market).label, big = k => k === 'landPrice' || k === 'lotCost'; // the numbers a box takes; big dollar amounts show with their commas
     const pfCtl = (k, v, step, unit) => { const [lo, hi] = pfLim(k);
@@ -3010,11 +3031,13 @@ export function initSitePlan(ctx) {
         (homes && !mf ? tog('data-pfb="forSale"', 'Homes for sale (not rent)', A.forSale) : '') + '</div>' +
       '<div class="sp-sched" title="Schedule in months">' + seg(sch.pre, 'pre', 'Pre-development') + seg(sch.build, 'bld', 'Construction') + seg(sch.lease, 'lease', R.forSale ? 'Sales' : 'Lease-up') + seg(sch.total - sch.toStabilize, 'hold', 'Hold') + '</div>' +
       '<div class="sp-schl"><span><i class="pre"></i>Design &amp; permits ' + sch.pre + ' mo</span><span><i class="bld"></i>Construction ' + sch.build + ' mo</span><span><i class="lease"></i>' + (R.forSale ? 'Sales ' : 'Lease-up ') + sch.lease + ' mo</span>' + (R.forSale ? '' : '<span><i class="hold"></i>Sale at month ' + sch.total + '</span>') + '</div>' +
-      (simpleOn ? '<div class="sp-cards">' + card1('Total cost', $m(S1.cost)) + card1('NOI', $m(S1.noi)) + card1('Yield on cost', pc2(S1.yoc)) + card1('Value', $m(S1.value)) + card1('Unlevered IRR', pc2(S1.unlevIrr)) + card1('Levered IRR', pc2(S1.levIrr)) + card1('Equity multiple', xm(S1.multiple)) + card1('DSCR', xm(S1.dscr)) + '</div>' +
+      (simpleOn ? '<div class="sp-cards">' + card1('Total cost', $m(S1.cost)) + card1('NOI', $m(S1.noi)) + card1('Yield on cost', pc2(S1.yoc)) + card1('Value', $m(S1.value)) + card1('Unlevered IRR', pc2(S1.unlevIrr)) + card1('Levered IRR', pc2(S1.levIrr)) + card1('Equity multiple', xm(S1.multiple)) + card1('Cash-on-cash', pc2(S1.coc)) + card1('DSCR', xm(S1.dscr)) + '</div>' +
         '<div class="rnote sp-warn sp-1l">TestFit’s one-page method overstates returns.' + infoBtn('All the money goes in at year 0 and full rents start in year 1, with no construction period, interest or lease-up. The month-by-month method on the same plan ' + (res.levIrr != null && isFinite(res.levIrr) ? 'gives a levered IRR of ' + pc2(res.levIrr) : 'has no positive cash flow to compute an IRR') + '.', 'About the TestFit method') + '</div>'
-      : '<div class="sp-cards">' + card1('Total cost', $m(R.budget.total), units ? $m(R.budget.total / units) + ' / unit' : ar.keys && !ar.leasable ? $m(R.budget.total / ar.keys) + ' / key' : $m(R.budget.total / Math.max(1, R.P.gsf)) + ' / gross sf') +
+      : (R.forSale || noRent ? '' : '<div class="sp-cards sp-headline">' + card1('Levered IRR', pc2(res.levIrr), A.hold + '-yr hold', res.levIrr != null && res.levIrr < 0) + card1('Equity multiple', res.multiple ? xm(res.multiple) : 'n/a', $m(res.peakEquity) + ' equity', res.multiple != null && res.multiple < 1) +
+        card1('Cash-on-cash', res.coc != null ? pc2(res.coc) : 'n/a', res.cocAvg != null ? 'year 1 · ' + pc2(res.cocAvg) + ' avg' : 'no permanent loan', res.coc != null && res.coc < 0, false, COC_TIP) + '</div>') +
+        '<div class="sp-cards">' + card1('Total cost', $m(R.budget.total), units ? $m(R.budget.total / units) + ' / unit' : ar.keys && !ar.leasable ? $m(R.budget.total / ar.keys) + ' / key' : $m(R.budget.total / Math.max(1, R.P.gsf)) + ' / gross sf') +
         (R.forSale ? card1('Home sales', $m(R.exit.sales)) + card1('Margin', pc2(res.margin), '', res.margin < 0) : noRent ? card1('Stabilized NOI', '—', 'no rent') : card1('Stabilized NOI', $m(R.ops.noi), ar.leasable ? $m(R.ops.noi / ar.leasable) + ' / leasable sf' : '') + card1('Yield on cost', pc2(res.yoc), 'spread ' + pc2(res.spread), res.yoc < 0, res.spread < 0) + card1('Stabilized value', $m(res.value))) +
-        (noRent ? '' : card1('Profit after hold &amp; sale', $m(res.profit), '', res.profit < 0, false, PROFIT_TIP) + card1('Unlevered IRR', pc2(res.unlevIrr)) + card1('Levered IRR', pc2(res.levIrr)) + card1('Equity multiple', res.multiple ? xm(res.multiple) : 'n/a') + card1('Peak equity', $m(res.peakEquity)) + (res.dscr ? card1('DSCR', xm(res.dscr)) : '')) + '</div>' +
+        (noRent ? '' : card1('Profit after hold &amp; sale', $m(res.profit), '', res.profit < 0, false, PROFIT_TIP) + card1('Unlevered IRR', pc2(res.unlevIrr)) + (res.dscr ? card1('DSCR', xm(res.dscr)) : '')) + '</div>' + cocYears(res) +
         (noRent ? '<div class="rnote sp-1l">No rent in this plan: ' + (uses.includes('church') ? 'a church is usually built for its own congregation, so this is its budget. Enter a rent under Assumptions to see it as a lease.' : 'this is its budget.') + '</div>' : '<div class="rnote sp-1l">TestFit method: ' + (S1.levIrr != null && isFinite(S1.levIrr) ? pc2(S1.levIrr) + ' levered' : 'no IRR') + infoBtn('The TestFit one-page method on the same numbers skips the ' + sch.toStabilize + ' months before the project is stabilized, so it reads higher.', 'About the TestFit method') + '</div>')) +
       (flags.length ? '<ul class="sp-pfflags">' + flags.map(w => '<li>' + esc(w.text) + '</li>').join('') + '</ul>' : '') +
       '<div class="rnote sp-pfbasis"><span class="sp-tag" title="' + esc(PF.BASIS.market.tag) + '">' + esc(PF.BASIS.market.label) + '</span> ' + esc(PF.DISCLAIMER) + '</div>' + areaT +
@@ -3248,11 +3271,15 @@ export function initSitePlan(ctx) {
   }
 
   // ---------- Build with AI ----------
+  // a site of several parcels: its parts (lib/siteparcels.mjs), for the AI's reading of the request and for laying them out one by one
+  function partsNow(p, pl) { const keys = pl?.parcels || []; if (keys.length < 2 || !p?.parcels) return []; try { return PARC.partsOf(pl, keys.map(k => p.parcels.find(x => x.key === k)).filter(r => r?.geometry)); } catch (e) { return []; } }
+  function parcelInfo(p, pl) { const parts = partsNow(p, pl); return parts.length > 1 ? { parcels: parts.map(q => ({ label: q.label, acres: q.acres, corner: q.corner, landlocked: q.landlocked, fronts: q.landlocked ? 'no street (reached across the site)' : q.corner ? 'two streets' : q.streets.length || q.front === undefined ? 'a street' : 'the front street' })) } : {}; }
+  const parcelOpts = (p, pl, prog) => { const parts = partsNow(p, pl); return parts.length > 1 && (ed.perParcel || SP.normalizeProgram(prog).parcels) ? { parcels: parts, perParcel: true } : {}; };
   function siteInfo(p, pl) {
     const a = frameAngle(pl), r = pl.ring.map(q => { const c = Math.cos(-a * Math.PI / 180), s = Math.sin(-a * Math.PI / 180); return [q[0] * c - q[1] * s, q[0] * s + q[1] * c]; });
     const xs = r.map(q => q[0]), ys = r.map(q => q[1]), parcel = p.parcels.find(x => x.key === pl.parcel), f = pl.front ?? SP.longestEdge(pl.ring);
     const side = (pl.streets || []).filter(k => k !== f && k < pl.ring.length).map(k => Math.round(SP.edgeLen(pl.ring, k))), boxA = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
-    return { acres: +(SP.ringArea(pl.ring) / 43560).toFixed(3), widthFt: Math.round(Math.max(...xs) - Math.min(...xs)), depthFt: Math.round(Math.max(...ys) - Math.min(...ys)), frontageFt: Math.round(SP.edgeLen(pl.ring, f)),
+    return { ...parcelInfo(p, pl), acres: +(SP.ringArea(pl.ring) / 43560).toFixed(3), widthFt: Math.round(Math.max(...xs) - Math.min(...xs)), depthFt: Math.round(Math.max(...ys) - Math.min(...ys)), frontageFt: Math.round(SP.edgeLen(pl.ring, f)),
       sideStreetsFt: side, shape: pl.ring.length <= 4 && SP.ringArea(pl.ring) > boxA * 0.92 ? 'rectangular' : SP.ringArea(pl.ring) > boxA * 0.8 ? 'mostly rectangular, ' + pl.ring.length + ' sides' : 'irregular, ' + pl.ring.length + ' sides (about ' + Math.round(SP.ringArea(pl.ring) / boxA * 100) + '% of its bounding box)',
       streets: [f, ...(pl.streets || []).filter(k => k !== f)].filter(k => k < pl.ring.length).map(k => { const nm = pl.streetNames?.[k] || null; return { side: k === f ? 'front' : 'side', name: nm, highway: /\b(?:hwy|highway|fm|us|sh|i-?\d|interstate|freeway|parkway|tollway|loop)\b/i.test(nm || '') }; }),
       address: parcel?.label || '', city: ctx.nearestPlace?.(pl.origin) || '', county: (ctx.DATA?.counties || []).find(c => SP.inRing(pl.origin, c.outline?.[0]?.[0] || []))?.name || '', zoning: pl.zoning };
@@ -3358,20 +3385,21 @@ export function initSitePlan(ctx) {
     if (ai) try {
       const d = await post({ prompt: ask, site, facts, program: pl.program, effort: L.effort, teamTypes: CU.teamTypesForAI(TL.list()), ...(strategy ? { strategy } : {}) }, run.ctl.signal);
       prog = SP.keepNames(d.program || prog, pl.program); setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
+      if (d.questions?.length && !o.answered && (pl.parcels || []).length > 1 && live(run)) { ed.questions = d.questions.slice(0, 3); killRun(); ed.buildOpen = true; panel(); ctx.toast('The AI has a question before it lays this out.'); card.querySelector('#spAnswers')?.focus(); return; } // (several parcels and the words don't say what goes where: it asks first)
     } catch (e) { if (!live(run)) return; note = e.status === 503 ? '' : navigator.onLine ? 'The AI didn’t answer, so this read your words directly.' : 'Offline: this read your words directly.'; }
     if (!live(run) || PL() !== pl) return;
     if (!aiOk) { run.steps = run.steps.slice(0, 2 + o0); run.holds = false; strategy = null; if (aiB) aiBNote = ''; aiB = null; paintRun(); } // the AI is off: no review either, the layouts shown as they come (nor its plan: the note above says it didn't answer)
     if (aiB && prog?.zones?.length) { prog = BR.withPads(prog, aiB.brief.pads); aiB = null; } // a mix: the AI's pads go on its shop zone; the rest of the brief has no engine of its own there
     const np = SP.normalizeProgram(prog);
     const readAs = { ask, chips: RUN.readAs(np, SP.USES), miss: RUN.notUnderstood(ask, np), assumed, by: aiOk ? 'ai' : 'words', ...(strategy ? { plan: strategy } : {}), ...(aiB ? { brief: aiB } : {}), ...(aiBNote ? { briefNote: aiBNote } : {}) }; // shown once the layouts land, so a cancelled build keeps the last one's
-    // the plan's layout settings (neighbourhood streets, leaving a later phase open, the apartment building form) for this run's layouts
+    // the plan's layout settings (neighborhood streets, leaving a later phase open, the apartment building form) for this run's layouts
     // (the land the program doesn't need is filled unless the words or Settings ask to hold it: an AI plan's or an earlier
     // build's "leave it for later" alone doesn't, lib/planruns.mjs fillParams)
     const st0 = strategy?.settings || {}; let params0 = RUN.fillParams({ ...(pl.params || {}), ...(st0.streets ? { streets: st0.streets } : {}), ...(strategy?.buildings?.form ? { form: strategy.buildings.form } : {}) }, { ask });
     if (np.form) params0 = { ...(params0 || pl.params || {}), form: np.form }; // the shape the request names ("L-shaped"): the layout reads params.form
     runStep(run, 2 + o0, lay);
     const wb = BR.wordsBrief(ask); // pads asked for in words ("with 2 pad sites", "an outparcel"): the engine places them, at every level
-    let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, deeper: true, ...koOpts(pl), ...(wb ? { brief: wb } : {}) }); /* (deeper: the same layouts again with a 6 and an 8 ft deep pond, each labelled with the depth it assumes) */ } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
+    let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, deeper: true, ...koOpts(pl), ...(wb ? { brief: wb } : {}), ...parcelOpts(p, pl, prog) }); /* (deeper: the same layouts again with a 6 and an 8 ft deep pond, each labelled with the depth it assumes) */ } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
     if (!live(run) || PL() !== pl) return;
     const plan = { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) };
     let variants = named(out, { ...plan, program: prog }, params0 ? { params: params0 } : {});
@@ -4582,8 +4610,11 @@ export function initSitePlan(ctx) {
       return '<button type="button" role="tab" id="pjTab-' + t.id + '" data-tab="' + t.id + '" aria-selected="' + on + '" aria-controls="pjPanel" tabindex="' + (on ? 0 : -1) + '">' + t.label +
         (n[t.id] ? '<span class="pj-tn"> · ' + f0(n[t.id]) + '</span>' : '') + (t.id === 'ask' && busy ? '<span class="pj-tn"> · answering…</span>' : '') + '</button>'; }).join('') + '</div>';
   }
+  // the Feasibility tab: the step-by-step workspace (src/workspace.js), saving and opening options through this page
+  const WS = workspace({ save, openOption: (pid, plid) => open(pid, plid), newPlan: (p, extra) => newPlan(p, extra), setTab: (p, t) => setTab(p, t, true), goMap: () => ctx.setView('map'),
+    code: () => get(CODE_KEY), name: () => get(NAME_KEY), toast: m => ctx.toast?.(m), saveFile: (n, d, m) => ctx.saveFile(n, d, m) });
   function detailHtml(p) {
-    const tab = tabFor(p), body = { overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, files: SF.html, ask: pAskHtml }[tab](p);
+    const tab = tabFor(p), body = { workspace: WS.html, overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, files: SF.html, ask: pAskHtml }[tab](p);
     return headHtml(p) + tabsHtml(p, tab) + '<div class="pj-panel pj-p-' + tab + '" id="pjPanel" role="tabpanel" aria-labelledby="pjTab-' + tab + '">' + body + '</div>';
   }
 
@@ -4638,7 +4669,7 @@ export function initSitePlan(ctx) {
       return x.site;
     })();
     siteRuns.set(p.id, run);
-    run.catch(() => siteFail.set(p.id, Date.now())).finally(() => { siteRuns.delete(p.id); if (ctx.view === 'projects' && cur === p.id && tabFor(p) === 'overview') render(); });
+    run.catch(() => siteFail.set(p.id, Date.now())).finally(() => { siteRuns.delete(p.id); if (ctx.view === 'projects' && cur === p.id && ['overview', 'workspace'].includes(tabFor(p))) render(); });
     return run;
   }
   function jurHtml(p) {
@@ -4860,7 +4891,7 @@ export function initSitePlan(ctx) {
     const revisions = prev.slice().sort((a, b) => (+a.no) - (+b.no)).map(x => ({ no: x.no, date: short(x.at), desc: x.desc || 'Schematic design set' })).concat([{ no, date: short(day), desc: no === '0' ? 'Schematic design set' : 'Schematic design set, re-issued' }]);
     const steps = [{ key: 'notes', kind: 'claude', label: 'Cover notes' }];
     for (const sec of sections) if (PS.SECTION_DISC[sec] && sheets.some(q => q.section === sec)) steps.push({ key: 'disc:' + PS.SECTION_DISC[sec], kind: 'claude', label: PS.sectionById(sec).label + ' notes' });
-    if (sections.includes('arch')) for (const t of types.filter(t => t.supported)) steps.push({ key: 'design:' + t.id, kind: 'claude', label: 'Design: ' + PD.typeName(t) });
+    if (sections.includes('arch')) for (const t of types.filter(t => t.supported && t.use !== 'multifamily')) steps.push({ key: 'design:' + t.id, kind: 'claude', label: 'Design: ' + PD.typeName(t) }); // (apartment buildings: the rule-based breezeway plan, unit by unit; a whole building is too big for one answer)
     for (const sh of sheets) steps.push({ key: sh.number, kind: 'sheet', label: sh.number + ' ' + sh.title });
     steps.push({ key: 'merge', kind: 'merge', label: 'Put ' + sheets.length + ' sheets together' });
     for (const x of steps) x.status = 'todo';
@@ -5107,6 +5138,7 @@ export function initSitePlan(ctx) {
       let ch = false; for (const x of p.parcels) ch = regridOn(x) || ch; if (ch) { quietSave(p); setTimeout(() => render()); }
       if (needSite(p)) gatherSite(p); // (the card already says Checking…)
     }
+    if (tab === 'workspace') { WS.wire(root, p); if (needSite(p)) gatherSite(p); } // (the flood zone and districts feed the study's risks)
     if (tab === 'renderings') wireRenders(p);
     if (tab === 'plans') wirePlans(p);
     if (tab === 'ask') wirePAsk(p);

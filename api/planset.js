@@ -46,6 +46,21 @@ export async function onBorder(content, borderBytes) {
   return out.save();
 }
 
+// One AI step of a set (notes, one discipline's notes, or one building type's design): the request as the browser sends
+// it, Claude's answer cleaned to the set's shape. Shared by the handler below and the MCP plan_set tool (lib/mcp/planset.mjs).
+// -> { notes } | { disc } | { design (raw) }, plus model and fellBack; throws Claude's errors (status 401, 429, refusal)
+export async function plansetAsk(b, { key, model, effort, signal }) {
+  const brief = typeof b.brief === 'string' ? b.brief.slice(0, 14000) : '';
+  if (b.mode === 'notes') { const out = await claudeJSON({ key, model, effort, system: NOTES_SYSTEM, user: 'Write the cover sheet notes for this set.\n\n' + brief, schema: NOTES_SCHEMA, maxTokens: 16000, signal }); return { notes: cleanNotes(out.data), model: out.model, fellBack: out.fellBack }; }
+  if (b.mode === 'disc') { const out = await claudeJSON({ key, model, effort, system: DISC_SYSTEM, user: 'Write the ' + DISCIPLINES[b.discipline] + ' general notes and design criteria for this set.\n\n' + brief, schema: DISC_SCHEMA, maxTokens: 16000, signal }); return { disc: cleanDisc(out.data), model: out.model, fellBack: out.fellBack }; }
+  const seed = JSON.stringify(b.seed || {}).slice(0, 60000), prev = b.previous ? JSON.stringify(b.previous).slice(0, 60000) : '', probs = (Array.isArray(b.problems) ? b.problems : []).slice(0, 30).map(x => '- ' + clip(x, 240)).join('\n');
+  const user = brief + '\n\nSeed arrangement (passes the checks):\n' + seed + (prev ? '\n\nYour previous answer:\n' + prev + '\n\nIt failed these checks. Fix every one and answer with the whole corrected design:\n' + probs : '\n\nDesign this building type.');
+  const out = await claudeJSON({ key, model, effort, system: DESIGN_SYSTEM, user, schema: DESIGN_SCHEMA, maxTokens: 48000, signal });
+  return { design: out.data, model: out.model, fellBack: out.fellBack };
+}
+// Claude's error in plain words (the handler's 502 and the MCP tool's step note)
+export const askError = e => e.status === 401 ? 'Anthropic rejected the API key (401). Check ANTHROPIC_API_KEY on Vercel.' : e.status === 429 ? 'Claude is rate-limiting just now. Try again in a minute.' : e.refusal ? 'Claude declined to answer this one.' : 'Claude didn’t answer just now (' + clip(e.message, 160) + ').';
+
 export default async function handler(req, res) {
   if (!sameOrigin(req, res)) return;
   const key = process.env.ANTHROPIC_API_KEY || '';
@@ -87,22 +102,15 @@ export default async function handler(req, res) {
   const model = await useClaude(key, typeof b.model === 'string' ? b.model.trim() : ''), effort = effortFor(b.effort);
   res.setHeader('X-AI-Model', model);
   const ac = new AbortController(); if (typeof res.on === 'function') res.on('close', () => { if (!res.writableEnded) ac.abort(); });
+  if (b.mode === 'disc' && !DISCIPLINES[b.discipline]) return res.status(400).json({ error: 'Unknown discipline.' });
   try {
-    let out, key2 = 'notes';
-    if (b.mode === 'notes') out = await claudeJSON({ key, model, effort, system: NOTES_SYSTEM, user: 'Write the cover sheet notes for this set.\n\n' + brief, schema: NOTES_SCHEMA, maxTokens: 16000, signal: ac.signal });
-    else if (b.mode === 'disc') { if (!DISCIPLINES[b.discipline]) return res.status(400).json({ error: 'Unknown discipline.' }); key2 = 'disc';
-      out = await claudeJSON({ key, model, effort, system: DISC_SYSTEM, user: 'Write the ' + DISCIPLINES[b.discipline] + ' general notes and design criteria for this set.\n\n' + brief, schema: DISC_SCHEMA, maxTokens: 16000, signal: ac.signal }); }
-    else { key2 = 'design';
-      const seed = JSON.stringify(b.seed || {}).slice(0, 60000), prev = b.previous ? JSON.stringify(b.previous).slice(0, 60000) : '', probs = (Array.isArray(b.problems) ? b.problems : []).slice(0, 30).map(x => '- ' + clip(x, 240)).join('\n');
-      const user = brief + '\n\nSeed arrangement (passes the checks):\n' + seed + (prev ? '\n\nYour previous answer:\n' + prev + '\n\nIt failed these checks. Fix every one and answer with the whole corrected design:\n' + probs : '\n\nDesign this building type.');
-      out = await claudeJSON({ key, model, effort, system: DESIGN_SYSTEM, user, schema: DESIGN_SCHEMA, maxTokens: 48000, signal: ac.signal }); }
-    res.setHeader('X-AI-Model', out.model); res.setHeader('Cache-Control', 'no-store');
+    const { model: used, fellBack, ...out } = await plansetAsk(b, { key, model, effort, signal: ac.signal });
+    res.setHeader('X-AI-Model', used); res.setHeader('Cache-Control', 'no-store');
     const after = await monthSpend('planset'), budget = { spent: after.spent, cap, month: after.month };
-    return res.json({ ...(key2 === 'notes' ? { notes: cleanNotes(out.data) } : key2 === 'disc' ? { disc: cleanDisc(out.data) } : { design: out.data }), model: out.model, effort, fellBack: out.fellBack, budget });
+    return res.json({ ...out, model: used, effort, fellBack, budget });
   } catch (e) {
     if (ac.signal.aborted) { try { res.status(499).json({ error: 'Cancelled.' }); } catch (e2) { /* gone */ } return; }
     console.error('planset ' + b.mode, e.status || '', e.message);
-    const msg = e.status === 401 ? 'Anthropic rejected the API key (401). Check ANTHROPIC_API_KEY on Vercel.' : e.status === 429 ? 'Claude is rate-limiting just now. Try again in a minute.' : e.refusal ? 'Claude declined to answer this one.' : 'Claude didn’t answer just now (' + clip(e.message, 160) + ').';
-    return res.status(502).json({ error: msg });
+    return res.status(502).json({ error: askError(e) });
   }
 }

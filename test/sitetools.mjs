@@ -81,7 +81,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   assert.equal(T.viewOf({ view: { grid: 7 } }).grid, 0, 'only 5 or 10 ft');
   assert.ok(!T.editable(V, { kind: 'parking' }) && !T.editable(V, { kind: 'garage' }) && T.editable(V, { kind: 'pond' }));
   const fc = S.planFeatures(plan, null); M.decorate(fc, plan); const vis = T.visibleFeatures(fc, V);
-  assert.ok(!vis.features.some(f => ['building', 'b3', 'tree', 'label'].includes(f.properties.k)), 'buildings, their 3D parts, trees and labels hidden');
+  assert.ok(!vis.features.some(f => ['building', 'b3', 'fac', 'tree', 'label'].includes(f.properties.k)), 'buildings, their 3D parts, trees and labels hidden');
   assert.ok(vis.features.some(f => f.properties.k === 'parking') && vis.features.some(f => f.properties.k === 'setback'), 'the rest stays');
   assert.ok(vis.keep && vis.keep === fc.keep, 'the planting kept for a drag survives');
   const V2 = T.viewOf({ view: { hidden: ['paving'] } }), v2 = T.visibleFeatures(fc, V2);
@@ -562,16 +562,16 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   // 2. a roundabout at a T on the back street (the one farthest from the community center): joined, nothing on it
   const j = J.filter(j => j.at[1] > 250).sort((a, b) => Math.hypot(b.at[0] - cc.x, b.at[1] - cc.y) - Math.hypot(a.at[0] - cc.x, a.at[1] - cc.y))[0]; assert.ok(j, 'a junction on the back street');
   const r = S.addRoundabout(base, [j.at[0] + 30, j.at[1] - 20], { id: 'rb1' }), rb = r.roundabout; assert.ok(rb, r.error); const g = S.ringOf(rb), P1 = { ...base, elements: r.elements };
-  assert.ok(Math.hypot(g.c[0] - j.at[0], g.c[1] - j.at[1]) <= 0.5 && Math.abs(g.R - 50) < 0.5 && rb.width === 20 && rb.pinned && rb.name === 'Roundabout', 'at the junction, 100 ft across, a 20 ft lane');
+  assert.ok(Math.hypot(g.c[0] - j.at[0], g.c[1] - j.at[1]) <= 0.5 && (Math.abs(g.R - 50) < 0.5 || g.R >= 39.5 && g.R < 50 && /\d+ ft across: a 100 ft one would take \d+ homes/.test(r.note)) && rb.width === 20 && rb.pinned && rb.name === 'Roundabout', 'at the junction, 100 ft across (80 to 90 where that saves homes, and it says so), a 20 ft lane: ' + r.note);
   const stubs = r.elements.filter(e => e.cut === rb.id); assert.ok(stubs.length >= 2 && stubs.every(s => S.gapBetween(S.shapeOf(s), S.shapeOf(rb)) === 0), stubs.length + ' streets meet it');
   assert.deepEqual(over(rb, r.elements), [], 'nothing on its lane or island'); assert.deepEqual(bad(r.elements), []); assert.deepEqual(allReached(r.elements), [], 'every drive reached from the main entry'); assert.deepEqual(homesReached(r.elements), [], 'every home on a reached street');
   const lost = homes(base.elements) - homes(r.elements); assert.ok(lost <= 4 && (lost === 0 || r.note.includes(lost + (lost === 1 ? ' home' : ' homes') + ' made way')), lost + ' homes: ' + r.note);
-  const holes = S.pavement(P1).flatMap(pv => pv.holes).filter(h => S.inRing(g.c, h)); assert.equal(holes.length, 1, 'one surface round one island'); assert.ok(Math.abs(S.ringArea(holes[0]) / (Math.PI * 30 * 30) - 1) < 0.05, 'the island ' + Math.round(S.ringArea(holes[0])) + ' sf');
-  const dp = S.metrics(P1).paved - S.metrics(base).paved; assert.ok(dp > 0 && dp < Math.PI * (50 * 50 - 30 * 30), 'paving +' + Math.round(dp) + ' sf');
+  const holes = S.pavement(P1).flatMap(pv => pv.holes).filter(h => S.inRing(g.c, h)); assert.equal(holes.length, 1, 'one surface round one island'); assert.ok(Math.abs(S.ringArea(holes[0]) / (Math.PI * (g.R - 20) ** 2) - 1) < 0.05, 'the island ' + Math.round(S.ringArea(holes[0])) + ' sf');
+  const dp = S.metrics(P1).paved - S.metrics(base).paved; assert.ok((dp > 0 || lost > 0) && dp < Math.PI * (g.R ** 2 - (g.R - 20) ** 2), 'paving +' + Math.round(dp) + ' sf'); // (homes that made way took their driveways with them: the paving can come out lower)
   const D1 = S.details(P1), isl = D1.islands.find(i => i.poly && S.inRing(g.c, i.poly)); assert.ok(isl && D1.trees.some(t => S.inRing(t, isl.poly)), 'its island planted, a tree in it');
   const fc = S.planFeatures(P1, rb.id).features; assert.ok(fc.some(f => f.properties.k === 'island') && fc.find(f => f.properties.id === rb.id).geometry.coordinates.length === 2, 'the map: the island, the ring with a hole');
   assert.ok(!/NaN/.test(G.planSVG(P1, { px: 900 }).svg) && !/NaN/.test(S.toDXF(P1)), 'the sheet and the DXF');
-  assert.ok(T.itemSub(rb, P1) === rb.note && /100 ft across/.test(rb.note), T.itemSub(rb, P1)); assert.ok(S.hitRect(rb, g.c) && !S.hitRect(rb, [g.c[0] + 60, g.c[1]]), 'clicking its island picks it');
+  assert.ok(T.itemSub(rb, P1).includes(Math.round(2 * g.R) + ' ft across'), T.itemSub(rb, P1) + ' / ' + rb.note); assert.ok(S.hitRect(rb, g.c) && !S.hitRect(rb, [g.c[0] + g.R + 10, g.c[1]]), 'clicking its island picks it');
   // a street that runs alongside, over its lane but too far out to be cut back to it: the check says so, and none is added there
   { const sv = { id: 'sv', kind: 'drive', name: 'Service drive', x: g.c[0], y: g.c[1] + 45, w: 300, d: 24, rot: 0 };
     assert.ok(S.check({ ...P1, elements: [...r.elements, sv] }).some(i => i.id === rb.id && i.level === 'bad' && i.text === 'Service drive runs across the lane of Roundabout'), 'a drive across its lane');
@@ -591,7 +591,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   // 4. taken away: every street exactly as it was
   { const els = S.dropRing(P1, rb); assert.deepEqual(drives(els), drives(base.elements), 'the streets back'); assert.ok(!els.some(e => S.isRing(e) || e.cut)); }
   // 5. at the junction beside the community park: no room, and it says what's in the way
-  { const jp = J.find(j => j.at[0] < -150 && Math.abs(j.at[1] - 23) < 30), q = S.addRoundabout(base, jp.at); assert.match(q.error || '', /No room for a roundabout at that junction: Community park is in the way/); }
+  { const jp = J.find(j => j.at[0] < -150 && Math.abs(j.at[1] - 23) < 30), q = S.addRoundabout(base, jp.at); assert.match(q.error || '', /No room for a roundabout at that junction: (Community park|Amenity lake) is in the way/); }
   assert.deepEqual(T.boxSelect(P1, S.ringDisc(g.c, 70, 8)).filter(id => id === rb.id), [rb.id], 'a box round it picks it');
   assert.deepEqual(T.dupPieces(P1, [rb.id]).ids, [], 'it isn\'t copied');
   // 6. a drop-off loop at the community center as laid out: its front is 28 ft from the street, so it goes on the back,

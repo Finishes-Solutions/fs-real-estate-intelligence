@@ -1,0 +1,98 @@
+{
+ "name": "1 Ralston Rd, Waller, TX (39.86 ac; the county parcel outline, Oct 27 2026)",
+ "about": "A 40-acre tract fronting Ralston Rd along its west side (1,486 ft) with FM 362 at its northwest corner (240 ft); a long tail runs east. The owner asked for a retail plaza with a central court holding a hang-out area and a park, and a neighborhood behind it. The AMP agent’s first plan put two retail boxes at the FM 362 corner and 17 homes on 40 acres.",
+ "site": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -95.933846,
+     30.041778
+    ],
+    [
+     -95.933493,
+     30.041134
+    ],
+    [
+     -95.933019,
+     30.040906
+    ],
+    [
+     -95.932597,
+     30.040539
+    ],
+    [
+     -95.931967,
+     30.040472
+    ],
+    [
+     -95.93165,
+     30.040289
+    ],
+    [
+     -95.930934,
+     30.040128
+    ],
+    [
+     -95.930836,
+     30.040106
+    ],
+    [
+     -95.930731,
+     30.04
+    ],
+    [
+     -95.936232,
+     30.038184
+    ],
+    [
+     -95.937111,
+     30.042199
+    ],
+    [
+     -95.936586,
+     30.042676
+    ],
+    [
+     -95.936317,
+     30.042703
+    ],
+    [
+     -95.935909,
+     30.042881
+    ],
+    [
+     -95.935862,
+     30.042872
+    ],
+    [
+     -95.935124,
+     30.042803
+    ],
+    [
+     -95.934703,
+     30.042414
+    ],
+    [
+     -95.934144,
+     30.042181
+    ],
+    [
+     -95.934002,
+     30.042062
+    ],
+    [
+     -95.933846,
+     30.041778
+    ]
+   ]
+  ]
+ },
+ "front": "W",
+ "streets": "NW",
+ "ask": "a commercial retail plaza with a central court containing a hang out area and a park in the middle and residential neighborhood in the back",
+ "center": [
+  -95.93701,
+  30.04235
+ ]
+}
