@@ -2,7 +2,7 @@
    :root: --green-*, --ink-*, --sp-*, --fs-*, --r-*, --sh-*, --focus) and the Finishes Solutions brand: hairline borders,
    tight radii, mono uppercase labels and figures, one green. Components are documented in docs/DESIGN_SYSTEM.md. */
 .ws{--ws-steps-h:66px;--ws-warn:#8a5a12;--ws-warn-bg:#fdf6e9;--ws-err-bg:#fdf0ef;display:block;color:var(--text);font-size:var(--fs-sm);line-height:1.5}
-.ws .kicker{font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:.14em;text-transform:uppercase;color:var(--green-700);font-weight:500}
+.ws .kicker{font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:0;text-transform:none;color:var(--green-700);font-weight:500}
 .ws .mono,.ws .m{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 .ws .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .ws h3{font-size:var(--fs-xl);font-weight:800;letter-spacing:-.02em;margin:var(--sp-1) 0;color:var(--ink-950)}
@@ -53,7 +53,7 @@
 .ws-kpi{padding:var(--sp-2) var(--sp-3);border-left:1px solid var(--line);border-top:1px solid var(--line);margin:-1px 0 0 -1px}
 .ws-kpi:first-child{box-shadow:inset 3px 0 0 var(--green-700)}
 .ws-kpi b{display:block;font-family:var(--font-mono);font-size:var(--fs-lg);font-weight:600;color:var(--ink-950);font-variant-numeric:tabular-nums;white-space:nowrap}
-.ws-kpi span{display:block;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.ws-kpi span{display:block;font-family:var(--font-mono);font-size:11px;letter-spacing:0;text-transform:none;color:var(--muted)}
 
 /* ---- forms ---- */
 .ws-f{display:flex;flex-direction:column;gap:var(--sp-1);min-width:160px;flex:1 1 160px}
@@ -83,7 +83,7 @@
 .ws-a small.ws-mc{color:var(--ink-600)}
 .ws-ai{display:flex;align-items:center;gap:var(--sp-1)}
 .ws-u{font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--muted);min-width:42px}
-.ws-src{display:inline-block;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;border-radius:var(--r-sm);border:1px solid var(--line-2);color:var(--ink-700);background:var(--ink-50);white-space:nowrap;cursor:help}
+.ws-src{display:inline-block;font-family:var(--font-mono);font-size:11px;letter-spacing:0;text-transform:none;padding:2px 6px;border-radius:var(--r-sm);border:1px solid var(--line-2);color:var(--ink-700);background:var(--ink-50);white-space:nowrap;cursor:help}
 .ws-src[data-kind="data"],.ws-src[data-kind="derived"]{border-color:var(--green-300);color:var(--green-800);background:var(--green-50)}
 .ws-src[data-kind="library"]{border-color:#9fb8d6;color:#1d4f86;background:#eef4fb}
 .ws-src[data-kind="house"]{border-color:#e4cfa5;color:var(--ws-warn);background:var(--ws-warn-bg)}
@@ -97,7 +97,7 @@
 .ws-t{width:100%;border-collapse:collapse;font-size:var(--fs-xs);margin:var(--sp-2) 0}
 .ws-t caption:not(.sr){caption-side:top;text-align:left;font-weight:700;font-size:var(--fs-xs);color:var(--ink-950);padding:var(--sp-2) 0 var(--sp-1)}
 .ws-t th,.ws-t td{padding:5px var(--sp-2);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-.ws-t thead th{font-family:var(--font-mono);font-size:9.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border-bottom-color:var(--ink-300)}
+.ws-t thead th{font-family:var(--font-mono);font-size:11px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted);border-bottom-color:var(--ink-300)}
 .ws-t tbody th{font-weight:500}
 .ws-t th small,.ws-t td small{display:block;color:var(--muted);font-size:10.5px;font-weight:400}
 .ws-t .r{text-align:right}
@@ -124,7 +124,7 @@
 .ws-gen .ws-note{flex:1 1 220px;margin:0}
 .ws-dl{display:grid;grid-template-columns:1fr;gap:0;margin:0}
 .ws-dl>div{display:grid;grid-template-columns:140px 1fr;gap:var(--sp-2);padding:5px 0;border-bottom:1px solid var(--line)}
-.ws-dl dt{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding-top:2px}
+.ws-dl dt{font-family:var(--font-mono);font-size:11px;letter-spacing:0;text-transform:none;color:var(--muted);padding-top:2px}
 .ws-dl dd{margin:0}
 .ws-plan{margin:0;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;background:#fff}
 .ws-plan svg{display:block;width:100%;height:auto;max-height:360px}
@@ -141,7 +141,7 @@
 /* ---- rail: risks ---- */
 .ws-risks ul{list-style:none;margin:var(--sp-1) 0 0;padding:0}
 .ws-risks li{display:flex;gap:var(--sp-2);align-items:baseline;padding:4px 0;border-bottom:1px solid var(--line);font-size:var(--fs-xs)}
-.ws-lv{flex:none;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:1px 5px;border-radius:var(--r-sm);color:#fff;background:var(--ink-600)}
+.ws-lv{flex:none;font-family:var(--font-mono);font-size:10.5px;letter-spacing:0;text-transform:none;padding:1px 5px;border-radius:var(--r-sm);color:#fff;background:var(--ink-600)}
 .ws-risks li[data-level="high"] .ws-lv{background:var(--danger)}
 .ws-risks li[data-level="medium"] .ws-lv{background:var(--ws-warn)}
 

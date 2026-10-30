@@ -70,4 +70,14 @@ const T = { ...spec, z, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1 };
   const mix = RG.incomeMix(R[1].list); assert.ok(Math.abs(mix.reduce((s, [, v]) => s + v, 0) - 100) < 0.01, 'the income mix adds to 100%');
   const html = RG.ringsReport({ title: 'Elgin', center: origin, site: geom.slice(0, -1), tracts: M.tracts, filings: Fl.filings, period: Fl.period });
   for (const s of ['1 mile', '10 miles', 'Median household income', 'Consumer spending', 'Largest projects within 5 miles', 'likely a typo']) assert.ok(html.includes(s), 'the report shows ' + s); }
+// ---------- the one-click endpoint (api/sitereport.js): the card's record in, the right report out ----------
+{ const API = await import('../api/sitereport.js'), card = { propId: '0760590050022', owner: parcel.owner, situs: '15514 Elgin St, Channelview', situsStreet: '15514 Elgin St', situsCity: 'Channelview', situsZip: '77530', county: 'Harris',
+    landUse: parcel.landUse, marketValue: 446165, landValue: 446165, improvementValue: 0, area: '2.29 acres', acquired: '2009-04-23', geometry: { type: 'Polygon', coordinates: [geom] } };
+  const r = API.toRecord(card); assert.equal(r.id, '0760590050022'); assert.equal(r.acres, 2.29); assert.equal(r.sqft, 99752); assert.equal(r.total, 446165); assert.equal(r.situs, '15514 Elgin St'); assert.equal(r.geom.length, 6);
+  const multi = API.toRecord({ ...card, geometry: { type: 'MultiPolygon', coordinates: [[geom.slice(0, 4).concat([geom[0]])], [geom]] } }); assert.equal(multi.geom.length, 6, 'a multipolygon: its biggest piece');
+  const box = API.topoBox(ring), w = box[1][0] - box[0][0], h = box[2][1] - box[1][1]; assert.ok(Math.abs(w / h - 720 / 560) < 1e-6 && w > 800, 'the ground fetched is the page\'s shape, the site plus 300 ft');
+  const html = await API.buildHtml('area', { parcels: [card], center: origin, label: '15514 Elgin St' }); assert.ok(html.includes('Area report') && html.includes('10 miles') && html.includes('ZIP 77530'), 'the area report from the card');
+  const res = { code: 0, status(c) { res.code = c; return res; }, json(o) { res.body = o; return res; }, setHeader() {} };
+  await API.default({ method: 'POST', body: { kind: 'nope', parcels: [card], center: origin }, headers: { 'x-forwarded-for': '7.7.7.1' } }, res); assert.equal(res.code, 400);
+  await API.default({ method: 'POST', body: { kind: 'parcel', parcels: [], center: origin }, headers: { 'x-forwarded-for': '7.7.7.2' } }, res); assert.equal(res.code, 400); assert.match(res.body.error, /Open a parcel/); }
 console.log('sitereports ok');

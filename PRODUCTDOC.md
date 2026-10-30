@@ -420,6 +420,13 @@ While it works, a quiet line at the bottom of the chat says what it's doing ("Th
 
 ## Reports and exporting
 
+**Site reports for a parcel, one click each.** Open a parcel's card and press **Reports** in the card's section buttons (or scroll to **Reports for this parcel** at the end of the Site section), or go to the **Reports** page, where **For the open parcel** has the same four. Each button makes the PDF straight away and saves it like any other export:
+- **Parcel Map** (a few seconds): the parcel to scale with every line's length, the corners numbered, the bearings and corner coordinates, an area check against the tax roll, the site at a glance (zoning, flood zone, school district, busiest road) and a page of everything on record. Anything on the record that doesn't add up (say, a building listed on a vacant lot) is called out.
+- **Topography** (10–20 seconds): USGS lidar contours over shaded relief across the full page width, the slope and which way water runs, two cross-sections through the site, the lowest and highest ground, and the earthwork to level the site at three pad heights.
+- **Site Environmental** (20–40 seconds): cleanup and contamination sites, leaking tanks, permitted operations, wells and pipelines around the parcel (measured from its edge), the soils under it, its flood zone, flood insurance claims, disasters and the hazard risk index. A source that doesn't answer is named, never shown as "none".
+- **Area Report** (a few seconds): the parcel's surroundings in 1, 3, 5 and 10-mile rings side by side: people, households, income, home values, rents, jobs, spending, and the construction filed with the state in each ring. A census tract only partly inside a ring counts for the part inside.
+These four are unbranded (no company name), black and white with blue accents, so they can go to anyone.
+
 - The green **Export** button on the map opens **New report**, which makes:
   - a **Summary report** (PDF, Excel or web page);
   - a **Filing list** (PDF, Excel, CSV or map file);
@@ -427,8 +434,8 @@ While it works, a quiet line at the bottom of the chat says what it's doing ("Th
   - an **Activity report** (PDF, Excel or CSV).
 - Area reports (FEMA, traffic, drive time, air traffic, crime), the City / County Crime Report, the Market report, airport reports and flight reports export as **PDFs**, and their data as CSV.
 - **Every report with a place in it shows it on a street map** (roads, towns and labels) with the area outlined: area reports, the Market report, the Summary report's filings map, the area comparison (each area in its colour), airport and flight reports, and the City / County Crime Report (where the report was asked for).
-- **Every PDF uses the Finishes Solutions report style:**
-  - a dark title band with the logo, the green rule and the brand fonts;
+- **Every PDF uses the report style:**
+  - a dark title band with the logo and the green rule, set in Inter (the four site reports below are unbranded: black and white with blue accents);
   - headline figures in tiles, clean tables, and the report name and page numbers on every page.
   - Pages are portrait. The full filing list (and a comparison of four or more areas) is landscape, because it needs the width.
 - A PDF filing list shows the 2,000 largest filings (1,000 when added to a Summary report). Excel and CSV always have every filing.
@@ -1124,6 +1131,8 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **One-click site reports:** a parcel's card and the Reports page now make a Parcel Map, Topography, Site Environmental and an Area Report in 1, 3, 5 and 10-mile rings with one click each (see **Reports and exporting**).
+- **A new look:** the whole app is set in Inter on white, with hairline borders, rounded corners, black pill buttons and plain grey labels instead of the small capital labels.
 - **Sharper ground elevations:** a site's ground is now read from USGS lidar every 3 feet (up to a quarter of a million points) instead of at most 3,600 points, so contours, slopes and the low and high ground on the plan set and in Jurisdiction & site follow the real land closely, on big tracts too.
 - **OP-0046 has a priced option for the 5.8-acre tract:** *Option B · 5.8-acre tract, budget inputs* is the retail center's land east of the channel on its own, with the team's Oct 2026 project budget already in its Pro forma (land, hard cost, site work, tenant improvements, rent); the app's own vacancy, taxes, commissions, soft costs and fee fill in what the budget leaves out. The project notes say where the budget is thin (no building plumbing, HVAC or electrical in the shell; a few soft-cost lines without totals) and how the rent compares with Waller listings.
 - **Parking lots are paved as one surface:** a new **Parking field** piece is the asphalt under and between a lot's rows and aisles. The layout engine lays one under every parking field it draws (no more lawn strips at the ends of rows and aisles), you can add one from **Add › Paving** and shape it like any piece, the sheet and the map draw it as one lot with the rows on top, and the numbers count the paving once (a row or aisle on a field isn't counted twice).

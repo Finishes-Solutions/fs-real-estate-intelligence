@@ -30,6 +30,7 @@ import { initTeam } from './team.js';
 import { initArea } from './area.js';
 import { initRegrid } from './regrid.js';
 import { initSite } from './site.js';
+import { initSiteReports } from './sitereports.js';
 import { initUtilities } from './utilities.js';
 import { initCrime } from './crime.js';
 import { initCrimeUS } from './crimeus.js';
@@ -1375,7 +1376,7 @@ Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCen
   coverage:()=>fmtN(F.length)+' filings in '+COUNTIES.join(', ')+' counties, registered '+DATA.period.start+' to '+DATA.period.end+'. Uses tagged: '+(F.some(f=>f.use)?'yes':'not yet (AI tagging pending), so use filters other than use') });
 renderNav(ctx); changesBadge(); // menus first: modules look up the badge spans and the sub-tab rows
 ctx.scheduleHash=scheduleHash;
-for (const init of [initCardTabs,initGoogle,initPlaces,initDevLayers,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan,initSettings]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
+for (const init of [initSiteReports,initCardTabs,initGoogle,initPlaces,initDevLayers,initOwner,initAreaReports,initTimeline,initWho,initChanges,initKpis,initCompare,initMapSearch,initExport,initReports,initChatCards,initNearby,initAssistant,initMarket,initMarkets,initSaved,initField,initTeam,initBuildings,initMobile,initLive,initPlanes,initArea,initRegrid,initSite,initUtilities,initCrime,initCrimeUS,initFema,initEnv,initDriveTime,initTraffic,initAirports,initAirReport,initSources,initGlance,initQuickLayers,initLayerFilters,initSitePlan,initSettings]) { try{ init(ctx); }catch(e){ console.error('module failed',init.name,e); } }
 
 // ---------- the card's dock ----------
 // Desktop: an open card is a full-height column at the right edge of the map (src/app.css, "property card dock"); the
