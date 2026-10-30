@@ -85,13 +85,16 @@ It replaces the team's copy of the project, keeping the Regrid parcel record and
   `data/plan_geometry.json` (lots, roads clipped to the parcel and named, the lot 2 easement, the three amenity sites).
 - **The ground:** `data/terrain.json`, USGS 3DEP 1 m lidar from the app's own terrain service (six 700 ft tiles, merged
   to 10 ft). 1,348 to 1,837 ft; every lot's median slope is 34-70%.
-- **Cabins (24):** each on its own lot, facing downhill (deck to the view), where the fall across the house is closest to
-  one floor (a walk-out) and the driveway is gentlest: 14 are clean walk-outs, the rest need up to about 8 ft of extra
-  foundation; driveways run 2-17% except lot 28 (20%) and lot 29 (27%). The seven financed homes are placed the same way
-  (their real positions aren't surveyed).
-- **Resort core:** the 6,000 sf glass pavilion and ceremony lawn on lots 14-15, the 2,500 sf dining hall and service yard
-  on 12-13, a tennis court and two pickleball courts on 10-11, each on a level pad turned along the contours where its
-  walls are least: the hall about 5 ft, the courts, lawn and pavilion 14-18 ft (tiered walls or a stepped design).
-- **Parking:** 24 head-in spaces along Amber Valley Way (8-9 ft cuts) and 6 on the road shoulder: about half of what a
-  150-guest wedding needs. Bigger events need a shuttle or valet.
+- **Roads:** the plat's 50 ft rights-of-way traced to their centrelines (`scripts/roads.py`: skeleton, pruned, smoothed,
+  chained into the network and nudged clear of the lots), drawn as 24 ft paved roads: Creeksong Way from Happy Hollow
+  Road, Amber Valley Way up the hairpin and along the ridge, and the south stub.
+- **Cabins (24):** each square to its street and centred on its lot, the deck on the downhill side (away from a road
+  below it, toward a road above it), the floor facing the road at road grade with a short straight driveway (most
+  10-28 ft). The lidar sets the setback: 11 are clean walk-outs, 20 show 15 ft of foundation or less, the steepest three
+  about 37 ft. The seven financed homes are placed the same way (their real positions aren't surveyed).
+- **Resort core along Amber Valley Way:** 72 head-in spaces in rows of 8 along the pavement (cuts up to about 13 ft),
+  then the 6,000 sf glass pavilion and ceremony lawn (lots 14-15), the 2,500 sf hall and service yard (12-13) and the
+  tennis and pickleball courts side by side (10-11), each square to the road in front of it on a level pad: walls about
+  9 ft at the hall, 17-22 ft at the lawn, pavilion and pickleball courts, 27 ft at the tennis court (tiered walls or a
+  stepped design). 72 spaces cover a 150-guest wedding's ~60.
 - Every piece carries `grade` (pad elevation, fall, cut and fill, walls); the app's Selected box shows it.
