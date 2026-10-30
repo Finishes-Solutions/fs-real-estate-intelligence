@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 8:38 AM CT: No name on reports (c64c406)
+- **Reports carry no name at all.** The "Real Estate Intelligence" wordmark is gone from report headers, the sign-off line at the end is gone, and the page footer shows only the report's title and page numbers. The app itself still says Real Estate Intelligence.
+
 ### 8:29 AM CT: Real Estate Intelligence only, no company branding (c9819d6, 9d62e8f)
 - **The app is unbranded.** The top bar, browser tab, installed-app name and icon now say Real Estate Intelligence (a new "RE" icon), with no company logo.
 - **Reports are unbranded.** Every PDF's header, footer and sign-off carry only the name Real Estate Intelligence; the old company tagline, logo and green are gone.
