@@ -98,7 +98,7 @@ export function initLive(ctx) {
     if (!map.getLayer('live-wind')) map.addLayer({ id: 'live-wind', type: 'symbol', source: 'live-wind', layout: {
       'icon-image': 'live-arrow', 'icon-rotate': ['get', 'rot'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['get', 'mph'], 0, .45, 10, .7, 25, 1, 50, 1.3],
       'text-field': ['concat', ['get', 't'], ' mph'], 'text-font': ['Noto Sans Bold'], 'text-size': 10.5, 'text-offset': [0, 1.7], 'text-allow-overlap': false, 'text-optional': true },
-      paint: { 'icon-color': ['interpolate', ['linear'], ['get', 'mph'], 0, '#3987e5', 10, '#1f9249', 18, '#eda100', 28, '#e3622b', 40, '#c03b3a'], 'icon-halo-color': '#ffffff', 'icon-halo-width': 1.2,
+      paint: { 'icon-color': ['interpolate', ['linear'], ['get', 'mph'], 0, '#3987e5', 10, '#10a37f', 18, '#eda100', 28, '#e3622b', 40, '#c03b3a'], 'icon-halo-color': '#ffffff', 'icon-halo-width': 1.2,
         'text-color': '#23282a', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 } });
   }
   function removeWind() { if (map.getLayer('live-wind')) map.removeLayer('live-wind'); if (map.getSource('live-wind')) map.removeSource('live-wind'); }

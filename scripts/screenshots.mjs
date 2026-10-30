@@ -12,7 +12,8 @@ import { sampleProject } from './sample-project.mjs';
 import { market as marketFromData } from '../api/_lib/data.mjs';
 import { localChrome } from '../test/helpers/chrome.mjs';
 
-const root = new URL('..', import.meta.url).pathname, out = root + 'docs/screenshots/', PORT = 8797;
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url)), out = root + 'docs/screenshots/', PORT = 8797;
 process.chdir(root); const market = await marketFromData();
 const project = await sampleProject({ market });
 await mkdir(out, { recursive: true });

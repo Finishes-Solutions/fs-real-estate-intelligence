@@ -16,7 +16,7 @@ export function initBuildings(ctx) {
   toggle.checked = on;
 
   const vectorSource = () => { const s = map.getStyle()?.sources || {}; return Object.keys(s).find(id => s[id].type === 'vector' && /maptiler|openmaptiles|planet/i.test(id + (s[id].url || ''))); };
-  const colors = () => ({ fill: '#d5dadb', sel: '#1f9249', sel2: '#9fd4b2' });
+  const colors = () => ({ fill: '#d5dadb', sel: '#10a37f', sel2: '#9fd4b2' });
   const H = ['coalesce', ['get', 'render_height'], ['get', 'height'], 6], B = ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0];
 
   function addLayers() {
@@ -246,7 +246,7 @@ export function initBuildings(ctx) {
           ...(ctx.reduceMotion ? [] : [{ label: 'Orbit view', attrs: ' id="bOrbit"' }]),
           { label: 'Select more', attrs: ' id="bMulti" title="Then ' + (coarse ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 20"', sub: (coarse ? 'Tap' : 'Click or Shift-click') + ' more buildings or parcels' },
           { divider: true }, { label: 'Copy link', attrs: ' id="bLink"', sub: 'Opens this property' }, { label: 'Export details (CSV)', attrs: ' id="bCsv"' }]) +
-      ctx.cardNav([['bParcel', 'Owner & value'], ['bSize', 'Building'], ['bSite', 'Site'], ['bDev', 'Development'], ['bCrime', 'Crime'], ['bArea', 'Area'], ['bPlaces', 'Businesses'], ['bFilings', 'Construction filings'], ['liveSec', 'From Here']]) + '</div>' +
+      ctx.cardNav([['bParcel', 'Owner & value'], ['siteReports', 'Reports'], ['bSize', 'Building'], ['bSite', 'Site'], ['bDev', 'Development'], ['bCrime', 'Crime'], ['bArea', 'Area'], ['bPlaces', 'Businesses'], ['bFilings', 'Construction filings'], ['liveSec', 'From Here']]) + '</div>' +
       '<div class="bover" id="bOver" hidden></div>' +
       '<div class="bsec" id="bParcel"><div class="lt">Ownership &amp; Value</div><div class="rnote loading">Looking up the appraisal record…</div></div>' +
       '<div class="bsec rg-sec" id="bRegrid"></div>' +

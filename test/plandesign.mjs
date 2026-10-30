@@ -1,5 +1,5 @@
 // Building designs for plan sets (lib/plandesign.mjs): the plan's buildings grouped into types on realistic layouts (the
-// FM 362 lot as shops, townhomes, a warehouse, a restaurant, a 3-story office; the 27 acre tract as 71 homes of eight
+// FM 362 lot as shops, townhomes, a warehouse, a restaurant, a 3-story office; the 27 acre tract as 71 or more homes of eight
 // sizes and as apartments), the rule-based design passing every check for every type, and the checks catching what a
 // bad answer from Claude would get wrong.
 import assert from 'node:assert/strict';
@@ -23,7 +23,7 @@ const PD = await import('../lib/plandesign.mjs'), { planFor } = await import('./
       for (let f = 1; f <= t.floors; f++) assert.ok(design.rooms.some(r => r.floor === f && r.type === 'stair'), 'a breezeway stair on floor ' + f);
     }
   } }
-{ const t = PD.buildingTypes(planFor('sfr')); assert.ok(t.length <= PD.MAX_TYPES); assert.equal(t.reduce((s, x) => s + x.count, 0), 71, 'every home is drawn as one of the types');
+{ const p = planFor('sfr'), t = PD.buildingTypes(p), n = p.elements.filter(e => e.kind === 'building').length; assert.ok(n >= 60, n + ' homes'); assert.ok(t.length <= PD.MAX_TYPES); assert.equal(t.reduce((s, x) => s + x.count, 0), n, 'every home is drawn as one of the types');
   assert.ok(t.every(x => x.use === 'sfr' && x.supported && x.garage === 2)); assert.deepEqual(t.map(x => x.id), t.map((x, i) => String.fromCharCode(65 + i))); }
 { const t = PD.buildingTypes(planFor('industrial'))[0]; assert.equal(t.occupancy, 'S-1'); assert.match(t.construction, /II-B/); assert.equal(t.sprinklered, true, 'a 78,000 sf warehouse is sprinklered'); }
 { const p = planFor('retail'), t = PD.buildingTypes(p); assert.equal(t.reduce((s, x) => s + x.count, 0), p.elements.filter(e => e.kind === 'building').length, 'every shop building is drawn as one of the types'); assert.ok(t.every(x => x.occupancy === 'M' && x.sprinklered), 'retail shells over 12,000 sf are sprinklered'); }

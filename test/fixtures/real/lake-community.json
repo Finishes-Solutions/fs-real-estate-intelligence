@@ -1,0 +1,252 @@
+{
+ "name": "Lake community west of Houston (traced from the aerial, Oct 27 2026)",
+ "origin": [
+  -95.93405,
+  29.72551
+ ],
+ "angle": 0,
+ "about": "The structure of a built master-planned neighborhood traced from a satellite image at 3.4 ft a pixel: the parcel, the lake, the community center and pool on its east shore, the boulevard entrance and a second entrance off the frontage road, the loop collector round the lake and the collectors to the west and east sections. The lots themselves are not traced: about 400 homes on 50 to 60 ft lots, most streets curving, cul-de-sacs at the edges, lots backing onto the lake on its west and north shores. Frame feet: x east, y north, origin at the parcel's center. A target the layout engine is measured against, not a plan it made.",
+ "parcel": [
+  [
+   -1950,
+   -1196
+  ],
+  [
+   2025,
+   -1196
+  ],
+  [
+   2025,
+   571
+  ],
+  [
+   1413,
+   1216
+  ],
+  [
+   -523,
+   1216
+  ],
+  [
+   -1950,
+   95
+  ]
+ ],
+ "front": "S",
+ "streets": [],
+ "ask": "about 400 single-family homes on 50 and 60 ft lots around a lake, with a community center and pool on the lake",
+ "elements": [
+  {
+   "kind": "pond",
+   "poly": [
+    [
+     581,
+     554
+    ],
+    [
+     768,
+     605
+    ],
+    [
+     921,
+     503
+    ],
+    [
+     1022,
+     299
+    ],
+    [
+     972,
+     95
+    ],
+    [
+     887,
+     -109
+    ],
+    [
+     836,
+     -346
+    ],
+    [
+     734,
+     -431
+    ],
+    [
+     649,
+     -346
+    ],
+    [
+     598,
+     -109
+    ],
+    [
+     547,
+     163
+    ],
+    [
+     530,
+     401
+    ]
+   ],
+   "name": "Amenity lake",
+   "note": "Wet detention \u00b7 fountain"
+  },
+  {
+   "kind": "building",
+   "box": [
+    1142,
+    1242,
+    65,
+    125
+   ],
+   "use": "amenity",
+   "floors": 1,
+   "name": "Community center"
+  },
+  {
+   "kind": "pool",
+   "box": [
+    1213,
+    1273,
+    177,
+    217
+   ],
+   "name": "Pool"
+  },
+  {
+   "kind": "drive",
+   "path": [
+    [
+     20,
+     -1196
+    ],
+    [
+     20,
+     -584
+    ]
+   ],
+   "width": 36,
+   "name": "Main entry",
+   "entry": true,
+   "note": "Boulevard"
+  },
+  {
+   "kind": "drive",
+   "path": [
+    [
+     1243,
+     -1196
+    ],
+    [
+     1243,
+     -584
+    ]
+   ],
+   "width": 26,
+   "name": "Entrance 2",
+   "entry": true
+  },
+  {
+   "kind": "drive",
+   "path": [
+    [
+     -387,
+     -177
+    ],
+    [
+     -387,
+     876
+    ],
+    [
+     292,
+     978
+    ],
+    [
+     632,
+     876
+    ],
+    [
+     1243,
+     876
+    ],
+    [
+     1447,
+     639
+    ],
+    [
+     1447,
+     -177
+    ]
+   ],
+   "width": 26,
+   "name": "Loop road",
+   "note": "Collector"
+  },
+  {
+   "kind": "drive",
+   "path": [
+    [
+     1447,
+     -177
+    ],
+    [
+     904,
+     -584
+    ],
+    [
+     20,
+     -584
+    ],
+    [
+     -387,
+     -177
+    ]
+   ],
+   "width": 26,
+   "note": "Loop road, south side"
+  },
+  {
+   "kind": "drive",
+   "path": [
+    [
+     -387,
+     -177
+    ],
+    [
+     -863,
+     -177
+    ],
+    [
+     -1474,
+     -245
+    ]
+   ],
+   "width": 26,
+   "note": "Collector west"
+  },
+  {
+   "kind": "drive",
+   "path": [
+    [
+     1447,
+     95
+    ],
+    [
+     1923,
+     95
+    ]
+   ],
+   "width": 26,
+   "note": "Collector east"
+  }
+ ],
+ "counts": {
+  "homes": 400,
+  "lakeAcres": 6,
+  "entrances": 2,
+  "lotWidths": [
+   50,
+   60
+  ]
+ }
+}

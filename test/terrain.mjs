@@ -1,13 +1,16 @@
 // Ground elevations (lib/terrain.mjs, api/terrain.js): the grid over a site, what the ground does inside the boundary,
-// and the endpoint against stand-ins for the USGS image service, the point service and Open-Meteo (failing in turn).
+// and the endpoint against stand-ins for the USGS elevation image, its point samples, the point service and Open-Meteo
+// (failing in turn).
 import assert from 'node:assert/strict';
 const T = await import('../lib/terrain.mjs'), S = await import('../lib/siteplan.mjs'), { fm362 } = await import('./helpers/setctx.mjs');
 
 // ---------- the grid ----------
-{ const sp = T.gridSpec(fm362.ring); assert.ok(sp.nx * sp.ny <= T.MAX_POINTS && sp.cell >= 10, 'up to 3,600 points, at least 10 ft apart');
+{ const sp = T.gridSpec(fm362.ring); assert.ok(sp.nx * sp.ny <= T.POINT_MAX && sp.cell >= 10, 'for the point services: up to 3,600 points, at least 10 ft apart');
   const xs = fm362.ring.map(p => p[0]); assert.ok(sp.x0 <= Math.min(...xs) - 29 && sp.x0 + (sp.nx - 1) * sp.cell >= Math.max(...xs) + 29, 'the grid runs past the boundary');
   const ll = T.gridLL(sp, fm362.origin); assert.equal(ll.length, sp.nx * sp.ny); const back = S.frame(fm362.origin).toFt(ll[sp.nx + 1]); assert.ok(Math.abs(back[0] - (sp.x0 + sp.cell)) < 0.01 && Math.abs(back[1] - (sp.y0 + sp.cell)) < 0.01, 'points in row order'); }
-{ const big = T.gridSpec([[0, 0], [8000, 0], [8000, 6000], [0, 6000]]); assert.ok(big.nx * big.ny <= T.MAX_POINTS && big.cell > 100, 'a big tract gets a wider grid'); }
+{ const big = T.gridSpec([[0, 0], [8000, 0], [8000, 6000], [0, 6000]]); assert.ok(big.nx * big.ny <= T.POINT_MAX && big.cell > 100, 'a big tract gets a wider grid'); }
+{ const fine = T.gridSpec(fm362.ring, { maxPts: T.MAX_POINTS, minCell: 3 }); assert.equal(fine.cell, 3, 'from the image: every 3 ft on a few acres');
+  const big = T.gridSpec([[0, 0], [3600, 0], [3600, 3600], [0, 3600]], { maxPts: T.MAX_POINTS, minCell: 3 }); assert.ok(big.nx * big.ny <= T.MAX_POINTS && big.cell <= 8, '300 acres: every ' + big.cell + ' ft, not 60'); }
 assert.equal(T.terrainSig(fm362.origin, fm362.ring), T.terrainSig(fm362.origin, fm362.ring.map(p => [p[0] + 0.001, p[1]])), 'the same boundary, the same signature');
 assert.notEqual(T.terrainSig(fm362.origin, fm362.ring), T.terrainSig(fm362.origin, fm362.ring.map(p => [p[0] + 5, p[1]])), 'a moved boundary: a new one');
 assert.equal(T.cleanZ('NoData'), null); assert.equal(T.cleanZ(-3.4e38), null); assert.equal(T.cleanZ('41.5'), 41.5);
@@ -45,13 +48,17 @@ const plane = (sp, f = (x, y) => 160 - 0.01 * x + 0.005 * y) => { const z = []; 
     assert.ok(hs.length && h(out[0]) != null && h(out[0]) <= Math.min(...hs) + 0.05 && h(out[0]) < 0.5, prog.use + ' on land falling to the ' + dir + ': the first option\'s pond is the lowest offered (' + hs.map(v => v.toFixed(2)).join(', ') + ')'); } }
 
 // ---------- the endpoint ----------
-const api = await import('../api/terrain.js'), real = globalThis.fetch;
-let calls = [], mode = 'usgs';
+const api = await import('../api/terrain.js'), real = globalThis.fetch, { writeArrayBuffer } = await import('geotiff');
+let calls = [], mode = 'image', sizes = [];
 globalThis.fetch = async (url, o = {}) => {
   url = String(url); calls.push(url.split('?')[0]);
   const ok = d => ({ ok: true, status: 200, json: async () => d }), down = () => ({ ok: false, status: 503, json: async () => ({}) });
   const ft = ([lon, lat]) => S.frame(fm362.origin).toFt([lon, lat]), zft = p => { const [x, y] = ft(p); return 160 - 0.01 * x + 0.005 * y; };
-  if (url.startsWith(api.USGS)) { if (mode !== 'usgs') return down(); const g = JSON.parse(new URLSearchParams(o.body).get('geometry'));
+  if (url.startsWith(api.USGS_IMAGE)) { if (mode !== 'image') return down(); // the image: pixel centres across the bbox, row 0 north, metres
+    const q = new URL(url).searchParams, [w, h] = q.get('size').split(',').map(Number), [x1, y1, x2, y2] = q.get('bbox').split(',').map(Number), v = new Float32Array(w * h); sizes.push([w, h]);
+    for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) v[r * w + c] = r === 3 && c === 4 ? -9999 : zft([x1 + (c + 0.5) * (x2 - x1) / w, y2 - (r + 0.5) * (y2 - y1) / h]) / 3.28084;
+    const buf = writeArrayBuffer(v, { width: w, height: h, BitsPerSample: [32], SampleFormat: [3], SamplesPerPixel: 1 }); return { ok: true, status: 200, arrayBuffer: async () => buf }; }
+  if (url.startsWith(api.USGS)) { if (mode !== 'image' && mode !== 'usgs') return down(); const g = JSON.parse(new URLSearchParams(o.body).get('geometry'));
     return ok({ samples: g.points.map((p, i) => ({ locationId: i, location: { x: p[0], y: p[1] }, value: i % 97 === 5 ? 'NoData' : String(zft(p) / 3.28084), resolution: 1.15 })) }); }
   if (url.startsWith(api.EPQS)) { if (mode !== 'epqs') return down(); const q = new URL(url).searchParams; return ok({ value: String(zft([+q.get('x'), +q.get('y')])) }); }
   if (url.startsWith(api.METEO)) { if (mode !== 'meteo') return down(); const q = new URL(url).searchParams, la = q.get('latitude').split(','), lo = q.get('longitude').split(','); return ok({ elevation: la.map((v, i) => zft([+lo[i], +v]) / 3.28084) }); }
@@ -61,6 +68,16 @@ const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c;
 let ip = 0; const call = async body => { const res = mock(); await api.default({ method: 'POST', body, headers: { 'x-forwarded-for': '9.9.9.' + (++ip) } }, res); return res; };
 { const r = await call({ origin: fm362.origin, ring: fm362.ring }), t = r.body; assert.equal(r.code, 200);
   assert.equal(t.source, 'USGS 3DEP'); assert.equal(t.detail, '1 m lidar', 'web-mercator 1.15 m at 30°N is 1 m on the ground'); assert.equal(t.coarse, false); assert.equal(t.sig, T.terrainSig(fm362.origin, fm362.ring));
+  assert.equal(t.cell, 3, 'lidar: every 3 ft'); assert.ok(t.nx * t.ny > T.POINT_MAX, 'past the old 3,600-point limit (' + t.nx * t.ny + ' points)'); assert.ok(t.z.every(v => v != null), 'the NoData pixel filled');
+  assert.equal(calls.filter(u => u === api.USGS).length, 1, 'one point sample for the model\'s cell, then the image'); assert.deepEqual(sizes, [[t.nx, t.ny]], 'one image, a pixel per grid point');
+  for (const p of [[400, 100], [-50, 220], [0, 0]]) assert.ok(Math.abs(T.zAt(t, p) - (160 - 0.01 * p[0] + 0.005 * p[1])) < 0.05, 'the image lands on the plan grid, north up (' + p + ')');
+  assert.equal(T.summary(t, fm362.ring).toward, 'south-east'); }
+{ const ring = [[0, 0], [20000, 0], [20000, 800], [0, 800]]; sizes = []; const t = (await call({ origin: fm362.origin, ring })).body;
+  assert.ok(sizes.length > 1 && sizes.every(([w, h]) => w <= 1000 && h <= 1000), 'a big tract in tiles of up to 1,000 x 1,000 (' + sizes.length + ')'); assert.equal(sizes.reduce((s, [w, h]) => s + w * h, 0), t.nx * t.ny, t.why);
+  for (const p of [[100, 100], [9990, 400], [19900, 700]]) assert.ok(Math.abs(T.zAt(t, p) - (160 - 0.01 * p[0] + 0.005 * p[1])) < 0.05, 'the tiles line up (' + p + ')'); }
+mode = 'usgs'; calls = [];
+{ const r = await call({ origin: fm362.origin, ring: fm362.ring }), t = r.body; assert.equal(r.code, 200);
+  assert.equal(t.source, 'USGS 3DEP'); assert.equal(t.detail, '1 m lidar'); assert.equal(t.coarse, false); assert.match(t.why, /503/, 'the image failed: point samples instead');
   assert.ok(t.z.every(v => v != null), 'NoData points filled'); assert.ok(calls.filter(u => u === api.USGS).length >= Math.ceil(t.nx * t.ny / 400), 'in batches');
   assert.ok(Math.abs(T.zAt(t, [400, 100]) - (160 - 4 + 0.5)) < 0.05, 'feet, in the plan\'s own coordinates'); assert.equal(T.summary(t, fm362.ring).toward, 'south-east'); }
 { const res = mock(); await api.default({ method: 'GET', query: { lon: String(fm362.origin[0]), lat: String(fm362.origin[1]), ft: '400', sum: '1' }, headers: { 'x-forwarded-for': '9.9.8.1' } }, res);

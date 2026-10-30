@@ -1,0 +1,238 @@
+{
+ "name": "Courtyard apartments, 2101 Reinke Rd, Waller, TX (traced from the aerial, Oct 27 2026)",
+ "origin": [
+  -95.92678,
+  30.0682026
+ ],
+ "angle": 0,
+ "about": "A built courtyard apartment community traced from a satellite image at 0.85 ft a pixel (under construction in the newer imagery): three-story wings round a courtyard with the pool, clubhouse and leasing office in the middle, two smaller buildings on the street side, parking in a ring outside the wings, entrances from the road on the north. Frame feet: x east, y north, origin near the courtyard's center. A target the layout engine is measured against, not a plan it made.",
+ "parcel": [
+  [
+   -400,
+   -330
+  ],
+  [
+   365,
+   -330
+  ],
+  [
+   365,
+   190
+  ],
+  [
+   -400,
+   190
+  ]
+ ],
+ "front": "N",
+ "streets": [
+  "W"
+ ],
+ "ask": "220 apartments, 3 stories, round a courtyard with a pool, with a clubhouse",
+ "elements": [
+  {
+   "kind": "building",
+   "box": [
+    -290,
+    -190,
+    -205,
+    50
+   ],
+   "use": "multifamily",
+   "floors": 3,
+   "units": 70,
+   "name": "West wing"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -178,
+    170,
+    -190,
+    -140
+   ],
+   "use": "multifamily",
+   "floors": 3,
+   "units": 50,
+   "name": "South wing"
+  },
+  {
+   "kind": "building",
+   "box": [
+    186,
+    271,
+    -186,
+    34
+   ],
+   "use": "multifamily",
+   "floors": 3,
+   "units": 50,
+   "name": "East wing"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -178,
+    -42,
+    85,
+    135
+   ],
+   "use": "multifamily",
+   "floors": 3,
+   "units": 25,
+   "name": "Northwest building"
+  },
+  {
+   "kind": "building",
+   "box": [
+    17,
+    161,
+    85,
+    135
+   ],
+   "use": "multifamily",
+   "floors": 3,
+   "units": 25,
+   "name": "Northeast building"
+  },
+  {
+   "kind": "building",
+   "box": [
+    0,
+    51,
+    0,
+    51
+   ],
+   "use": "amenity",
+   "floors": 1,
+   "name": "Clubhouse"
+  },
+  {
+   "kind": "building",
+   "box": [
+    -68,
+    -25,
+    0,
+    34
+   ],
+   "use": "amenity",
+   "floors": 1,
+   "name": "Leasing"
+  },
+  {
+   "kind": "pool",
+   "box": [
+    -118,
+    68,
+    -127,
+    -51
+   ],
+   "name": "Pool",
+   "note": "Courtyard pool"
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -300,
+    -276,
+    135,
+    200
+   ],
+   "name": "Main entry",
+   "entry": true
+  },
+  {
+   "kind": "drive",
+   "box": [
+    326,
+    350,
+    40,
+    200
+   ],
+   "name": "Entrance 2",
+   "entry": true
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -300,
+    350,
+    140,
+    164
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -312,
+    -288,
+    -230,
+    140
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    300,
+    324,
+    -230,
+    140
+   ]
+  },
+  {
+   "kind": "drive",
+   "box": [
+    -312,
+    324,
+    -230,
+    -206
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -300,
+    260,
+    164,
+    182
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -330,
+    -312,
+    -200,
+    50
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    324,
+    342,
+    -190,
+    40
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -260,
+    250,
+    -248,
+    -230
+   ]
+  },
+  {
+   "kind": "parking",
+   "box": [
+    -260,
+    250,
+    -300,
+    -282
+   ]
+  }
+ ],
+ "detention": "none seen on site"
+}

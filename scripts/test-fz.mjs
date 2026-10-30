@@ -5,7 +5,8 @@ import { readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const files = readdirSync(path.join(root, 'test')).filter(f => /^fz-.*\.mjs$/.test(f)).sort();
 for (const f of files) {
   const t0 = Date.now(), r = spawnSync(process.execPath, ['test/' + f], { cwd: root, stdio: 'inherit' });

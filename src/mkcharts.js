@@ -6,7 +6,7 @@
 // Sizes (2026-10-15): area.js draws every chart at its box's measured width, so one viewBox unit is one CSS pixel and the
 // 11 px axis text really is 11 px. The y axis leaves room for its longest label, and x labels that would collide are thinned.
 export const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-export const PAL = ['#006527', '#2a78d6', '#c26a00', '#7c3aed', '#8a9396', '#0e7c86', '#b3261e'];
+export const PAL = ['#0b7a5f', '#2a78d6', '#c26a00', '#7c3aed', '#8a9396', '#0e7c86', '#b3261e'];
 export const col = i => 'var(--mk-c' + i + ',' + PAL[i] + ')';
 export const mlabel = m => MON[+String(m).slice(5, 7) - 1] + ' ' + String(m).slice(0, 4);
 
@@ -15,7 +15,7 @@ export function mkCharts({ esc, fmtN }) {
   const niceStep = v => { if (!(v > 0)) return 1; const p = 10 ** Math.floor(Math.log10(v)), m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; };
   // a rounded-top bar on a flat baseline
   const bar = (x, y, w, h, r = 3) => { if (!(h > 0)) return ''; r = Math.min(r, w / 2, h); return 'M' + x.toFixed(1) + ',' + (y + h).toFixed(1) + 'V' + (y + r).toFixed(1) + 'Q' + x.toFixed(1) + ',' + y.toFixed(1) + ' ' + (x + r).toFixed(1) + ',' + y.toFixed(1) + 'H' + (x + w - r).toFixed(1) + 'Q' + (x + w).toFixed(1) + ',' + y.toFixed(1) + ' ' + (x + w).toFixed(1) + ',' + (y + r).toFixed(1) + 'V' + (y + h).toFixed(1) + 'Z'; };
-  // axis text: 11 px IBM Plex Mono, about 6.7 px a character
+  // axis text: 11 px Inter, about 6.7 px a character
   const CH = 6.7, textW = t => String(t).length * CH;
   // y axis with gridlines; lo can be below zero (rates, changes). padL null: just wide enough for the longest label
   function yAxis({ W, H, top, lo = 0, padL, padT, padB, fmt, ticks = null }) {

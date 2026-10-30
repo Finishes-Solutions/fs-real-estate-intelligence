@@ -11,9 +11,9 @@ import fs from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'); // (fileURLToPath: a repo path with spaces in it)
 const PORT = +process.env.PORT || 8787, HOST = process.env.HOST || '127.0.0.1';
 
 // .env (KEY=value lines; the shell wins)

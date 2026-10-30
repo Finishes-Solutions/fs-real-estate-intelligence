@@ -11,7 +11,8 @@ globalThis.fetch = async url => { attempts.push(String(url)); throw new Error('n
 const { localChrome } = await import('../test/helpers/chrome.mjs');
 if (!localChrome()) { console.error('No local Chrome/Chromium: set CHROME_PATH to print the PDFs.'); process.exit(1); }
 
-const root = new URL('..', import.meta.url).pathname, out = root + 'docs/sample-output/';
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url)), out = root + 'docs/sample-output/';
 process.chdir(root);
 const { sampleProject } = await import('./sample-project.mjs');
 const P = await import('../lib/feasibility/pipeline.mjs');

@@ -1,0 +1,180 @@
+{
+ "name": "0 Old Houston Hwy @ FM 362, Waller, TX (3 parcels, 16.16 ac; traced from the county parcel map, Oct 27 2026)",
+ "about": "Three parcels sold together: 10680 (5.88 ac) fronting FM 362 on the east, 10682 (0.93 ac) at the corner of FM 362 and Old Houston Hwy, 10687 (9.36 ac, an L: a block on Old Houston Hwy and a leg down the west side behind the retail parcel). North edge along Old Houston Hwy and the railroad, east edge along FM 362.",
+ "site": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -95.9362973,
+     30.0583352
+    ],
+    [
+     -95.9356455,
+     30.0581803
+    ],
+    [
+     -95.934665,
+     30.0579468
+    ],
+    [
+     -95.9340548,
+     30.0578017
+    ],
+    [
+     -95.9340471,
+     30.0572234
+    ],
+    [
+     -95.9340225,
+     30.055349
+    ],
+    [
+     -95.9356173,
+     30.0553281
+    ],
+    [
+     -95.9362665,
+     30.0553193
+    ],
+    [
+     -95.9362973,
+     30.0583352
+    ]
+   ]
+  ]
+ },
+ "front": "E",
+ "streets": "N",
+ "parcels": [
+  {
+   "key": "10680",
+   "label": "19835 FM 362 Rd",
+   "acres": 5.88,
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -95.9356173,
+       30.0553281
+      ],
+      [
+       -95.9340225,
+       30.055349
+      ],
+      [
+       -95.9340471,
+       30.0572234
+      ],
+      [
+       -95.9342943,
+       30.0572837
+      ],
+      [
+       -95.9346086,
+       30.05659
+      ],
+      [
+       -95.9356286,
+       30.0565092
+      ],
+      [
+       -95.9356173,
+       30.0553281
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "key": "10682",
+   "label": "FM 362 @ Old Houston Hwy",
+   "acres": 0.93,
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -95.9342943,
+       30.0572837
+      ],
+      [
+       -95.9340471,
+       30.0572234
+      ],
+      [
+       -95.9340548,
+       30.0578017
+      ],
+      [
+       -95.934665,
+       30.0579468
+      ],
+      [
+       -95.9346573,
+       30.0573712
+      ],
+      [
+       -95.9342943,
+       30.0572837
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "key": "10687",
+   "label": "41119 Old Houston Hwy",
+   "acres": 9.36,
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -95.9346573,
+       30.0573712
+      ],
+      [
+       -95.934665,
+       30.0579468
+      ],
+      [
+       -95.9356455,
+       30.0581803
+      ],
+      [
+       -95.9362973,
+       30.0583352
+      ],
+      [
+       -95.9362665,
+       30.0553193
+      ],
+      [
+       -95.9356173,
+       30.0553281
+      ],
+      [
+       -95.9356286,
+       30.0565092
+      ],
+      [
+       -95.9346086,
+       30.05659
+      ],
+      [
+       -95.9342943,
+       30.0572837
+      ],
+      [
+       -95.9346573,
+       30.0573712
+      ]
+     ]
+    ]
+   }
+  }
+ ],
+ "ask": "45,000 sf of retail shops with 3 pads on the 5.88 acre parcel, a 9,000 sf flex building on the corner parcel and 80,000 sf of flex warehouses on the 9.36 acre parcel"
+}

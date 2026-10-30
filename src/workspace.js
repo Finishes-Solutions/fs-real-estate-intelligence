@@ -13,6 +13,10 @@ import { buildSurvey } from './lib/feasibility/survey.mjs';
 import { feasibilityReport } from './lib/reports/feasibility.mjs';
 import { fmtVal } from './lib/feasibility/register.mjs';
 import { planSVG } from './lib/sitesheet.mjs';
+import * as S from './lib/siteplan.mjs';
+import { layoutOptions, layoutGallery } from './lib/sitelayout.mjs';
+import { covers } from './lib/sitegen.mjs';
+import { partsOf } from './lib/siteparcels.mjs';
 import { layoutSig } from './lib/planstages.mjs';
 import * as kit from './reportkit.js';
 import { usd, usdM, pct, num, tornadoSvg, gridTitle, breakEvenText } from './lib/feasibility/format.mjs';
@@ -109,6 +113,42 @@ export function workspace(env) {
       '<div class="ws-card"><h4>Parcels <span class="ws-c">' + parcels.length + '</span></h4>' + rows + (parcels.length ? '<button type="button" class="btn" data-act="map">Add or change parcels on the map</button>' : '') + survey + '</div>';
   }
 
+  // ---------- 2 Site: the layout gallery ----------
+  // the platform's layout engine on the parcels, from the words typed: the generator's gallery (dozens of layouts, in
+  // seconds) where it covers the program, else the engine's three options; each a card to use as the study's option
+  function galleryTool(p) {
+    const s = st(p), parcels = p.parcels || [], g = s.gallery, many = parcels.length > 1;
+    const ask = '<div class="ws-gen"><label class="ws-f ws-ask wide"><span>What to build</span><input id="wsAsk" type="text" placeholder="e.g. 120 garden apartments, 3 stories, with a clubhouse and pool · 45,000 sf of retail shops with 3 pads · a retail plaza with a central court and a neighborhood behind" value="' + esc(s.ask || '') + '"></label>' +
+      '<div class="ws-row"><label class="ws-f"><span>or a quick layout for</span><select id="wsUse">' + [['multifamily', 'Garden apartments'], ['retail', 'Retail shops'], ['industrial', 'Flex / warehouse'], ['storage', 'Self storage'], ['sfr', 'Single-family homes'], ['townhomes', 'Townhomes']].map(([v, l]) => '<option value="' + v + '"' + (s.use === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
+      (many ? '<label class="ws-chk ws-per"><input type="checkbox" id="wsPer"' + (s.per !== false ? ' checked' : '') + '> Lay out parcel by parcel <small>(' + parcels.length + ' parcels: each its own street side and layouts; say which use goes on which parcel, or each takes its share)</small></label>' : '') +
+      '<button type="button" class="btn primary" data-act="gallery"' + (s.busy ? ' disabled' : '') + '>Generate layout options</button></div>' +
+      '<p class="ws-note">The platform’s layout engine lays the parcels out from what you typed (no AI needed): dozens of layouts in a few seconds for apartments, shops, flex parks and self storage, the engine’s three options for everything else. Pick one as the study’s option; refine it in the site plan editor.</p></div>';
+    if (!g?.list?.length) return ask + (g && !g.list.length ? '<div class="ws-warnbox">No layout fit those words on this site. Try a smaller program, or a different use.</div>' : '');
+    const base = g.base, shown = g.list.slice(0, g.shown || 9);
+    const card = (o, i) => { const pl = { ...base, program: o.program, elements: o.elements, zones: o.zones || [] }, m = S.metrics(pl), warn = (o.bad || []).length ? 'bad' : (o.warnings || []).length ? 'warn' : 'ok';
+      return '<div class="ws-galc" data-state="' + warn + '">' + planSVG(pl, { px: 360, labels: false }).svg + '<b>' + (i + 1) + '. ' + esc(o.label || o.name || 'Layout') + '</b><small>' + (m.units ? num(m.units) + ' units · ' : '') + num(Math.round(m.gfa || 0)) + ' sf · ' + num(m.spaces) + ' of ' + num(m.required) + ' stalls' + (m.pond ? ' · pond ' + num(m.pond / 43560, 2) + ' ac' : '') + '</small>' +
+        ((o.bad || []).length ? '<small class="ws-bad">' + esc(o.bad[0]) + '</small>' : (o.warnings || []).length ? '<small class="ws-warn">' + esc(o.warnings[0]) + '</small>' : '') + '<button type="button" class="btn sm primary" data-use="' + i + '">Use this layout</button></div>'; };
+    return ask + '<div class="ws-galh"><h4>' + g.list.length + ' layout' + (g.list.length > 1 ? 's' : '') + ' for <q>' + esc(g.ask || g.use) + '</q>' + (g.ms ? ' <small>in ' + (g.ms / 1000).toFixed(1) + ' s</small>' : '') + '</h4>' + (g.per ? '<span class="ws-c">parcel by parcel</span>' : '') + '</div>' +
+      '<div class="ws-gal">' + shown.map(card).join('') + '</div>' + (g.list.length > shown.length ? '<button type="button" class="btn" data-act="moreGallery">Show ' + Math.min(12, g.list.length - shown.length) + ' more</button>' : '');
+  }
+  function runGallery(p) {
+    const s = st(p), f = fz(p), parcels = p.parcels || [], base = P.siteFromParcels(parcels); if (!base) throw new Error('The parcels have no outline to lay out.');
+    const ask = s.ask, prog = ask ? P.programFromWords(ask) : { use: s.use || 'multifamily' }, np = S.normalizeProgram(prog), parts = parcels.length > 1 && s.per !== false ? partsOf(base, parcels) : [], per = parts.length > 1 && (np.parcels || s.per !== false);
+    const t0 = Date.now(); let list;
+    if (per) list = layoutOptions(base, prog, { count: 4, netEvals: 6, parcels: parts, perParcel: true });
+    else if (covers(np)) { list = layoutGallery(base, prog, { budgetMs: 8000 }).slice(0, 48); if (!list.length) list = layoutOptions(base, prog, { count: 3, netEvals: 6 }); }
+    else list = layoutOptions(base, prog, { count: 3, netEvals: 6 });
+    // the different arrangements first (one of each), then the rest in the engine's order: the first cards show the range
+    const kept = list.filter(o => o.elements?.length), seen = new Set(), firsts = [], rest = [];
+    for (const o of kept) { const k = String(o.label || o.name || '').split(' · ').slice(0, 2).join(' · ').replace(/\d+ (rows?|bays?|pads?|courtyards?) /g, ''); if (seen.has(k)) rest.push(o); else { seen.add(k); firsts.push(o); } }
+    s.gallery = { ask, use: s.use || 'multifamily', per, base, list: firsts.concat(rest), shown: 9, ms: Date.now() - t0 };
+  }
+  function useLayout(p, i) {
+    const s = st(p), f = fz(p), g = s.gallery, o = g?.list?.[i]; if (!o) return;
+    const laid = { ...g.base, elements: o.elements, zones: o.zones || [], program: o.program, recipe: o.recipe || null, laidAs: o.label || o.name, ...(g.ask ? { lastRun: { ask: g.ask } } : {}) };
+    const { id: _id, name: _name, ...rest } = laid, pl = env.newPlan(p, rest); p.plans.push(pl); f.optionId = pl.id; env.toast(pl.name + ' is now the study’s option: ' + (o.label || o.name) + '.');
+    changed(p, true);
+  }
   // ---------- 2 Site ----------
   function siteStep(p, study) {
     const plans = p.plans || [], opt = M0.optionOf(p);
@@ -117,8 +157,7 @@ export function workspace(env) {
     const list = plans.length ? '<fieldset class="ws-opts"><legend>Site option the study uses</legend>' + plans.map(pl => '<label class="ws-opt"><input type="radio" name="wsOpt" data-opt="' + esc(pl.id) + '"' + (opt?.id === pl.id ? ' checked' : '') + '><span><b>' + esc(pl.name) + '</b><small>' +
       ((pl.ring || []).length < 3 ? 'No site drawn' : laid(pl) ? esc(pl.laidAs || pl.program?.use || '') + ' · ' + (pl.elements || []).filter(e => e.kind === 'building').length + ' buildings' : 'Drawn, not laid out') + '</small></span>' +
       '<button type="button" class="btn sm" data-edit="' + esc(pl.id) + '">Open in site plan</button></label>').join('') + '</fieldset>' : '';
-    const gen = '<div class="ws-gen"><label class="ws-f ws-ask"><span>What to build</span><input id="wsAsk" type="text" placeholder="e.g. 120 garden apartments, 3 stories, with a clubhouse and pool" value="' + esc(st(p).ask || '') + '"></label><label class="ws-f"><span>or a quick layout for</span><select id="wsUse">' + [['multifamily', 'Garden apartments'], ['townhomes', 'Townhomes'], ['retail', 'Retail center'], ['office', 'Office'], ['industrial', 'Industrial'], ['storage', 'Self storage'], ['sfr', 'Single-family lots']].map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('') + '</select></label>' +
-      '<button type="button" class="btn primary" data-act="layout"' + (st(p).busy ? ' disabled' : '') + '>Generate a layout option</button><span class="ws-note">The platform’s layout engine lays the parcels out as a new option (a few seconds): what you typed, else the use picked. To have the AI choose the best use for the site, leave the request empty in the site plan editor’s Build with AI. Refine it there.</span></div>';
+    const gen = galleryTool(p);
     const s = study?.site;
     const facts = s ? '<div class="ws-two"><dl class="ws-dl">' + [['Site', num(s.acres, 2) + ' acres · ' + num(s.siteSf) + ' sf'], ['Buildable envelope', s.envelope ? num(s.envelope.envelopeSf) + ' sf (' + pct(s.envelope.ratio, 0) + ') at a ' + s.envelope.setbackFt + ' ft setback' : '—'],
       ['Building area', num(s.gfa) + ' gross sf'], ['Units', s.units ? num(s.units) : '—'], ['Parking', num(s.spaces) + ' of ' + num(s.required) + ' required'], ['Coverage / FAR', pct(s.coverage, 1) + ' / ' + num(s.far, 2)], ['Detention', num(s.detentionAcFt, 2) + ' ac-ft'],
@@ -252,6 +291,7 @@ export function workspace(env) {
       if (t.dataset.reset) { const o = (f.scenarios.find(x => x.id === s.editing)?.overrides) || f.overrides; delete o[t.dataset.reset]; return changed(p, true); }
       if (t.dataset.file) return download(p, t.dataset.file);
       if (t.dataset.link) { try { const r = await api({ op: 'link', path: t.dataset.link }); window.open((await r.json()).url, '_blank', 'noopener'); } catch (err) { s.reportErr = err.message; paint(); } return; }
+      if (t.dataset.use != null) return useLayout(p, +t.dataset.use);
       const act = t.dataset.act; if (!act) return;
       if (act.startsWith('step:')) return go(p, act.slice(5));
       if (act === 'retry') { cache.delete(p.id); return paint(); }
@@ -259,12 +299,18 @@ export function workspace(env) {
       if (act === 'plans') return env.setTab(p, 'plans');
       if (act === 'clearLines') { f.budgetEdits = {}; return changed(p, true); }
       if (act === 'dropUnknown') { const c = studyOf(p), known = new Set((c?.study?.register || []).map(a => a.key)); if (!known.size) return; for (const o of [f.overrides, ...f.scenarios.map(x => x.overrides)]) for (const k of Object.keys(o || {})) if (!known.has(k)) delete o[k]; return changed(p, true); }
+      if (act === 'moreGallery') { if (s.gallery) s.gallery.shown = (s.gallery.shown || 9) + 12; return paint(); }
+      if (act === 'gallery') {
+        s.use = rootEl.querySelector('#wsUse')?.value || 'multifamily'; s.ask = (rootEl.querySelector('#wsAsk')?.value || '').trim(); s.per = rootEl.querySelector('#wsPer') ? rootEl.querySelector('#wsPer').checked : true; s.busy = 'Laying the parcels out with the platform’s layout engine…'; s.err = ''; paint();
+        setTimeout(() => { try { runGallery(p); } catch (err) { s.err = err.message; console.error(err); } s.busy = ''; paint(); }, 30);
+        return;
+      }
       if (act === 'layout') {
         const use = rootEl.querySelector('#wsUse')?.value || 'multifamily', ask = (rootEl.querySelector('#wsAsk')?.value || '').trim(); s.ask = ask; s.busy = 'Laying out the site with the platform’s layout engine…'; s.err = ''; paint();
         setTimeout(() => { try {
           const base = P.siteFromParcels(p.parcels || []); if (!base) throw new Error('The parcels have no outline to lay out.');
           const laid = P.autoLayout(base, ask ? P.programFromWords(ask) : { use }); if (!laid) throw new Error('The layout engine found no layout for this program on this site.'); if (ask) laid.lastRun = { ask };
-          const pl = env.newPlan(p, { ...laid, id: undefined, name: undefined }); Object.assign(pl, { ...laid, id: pl.id, name: pl.name }); p.plans.push(pl); f.optionId = pl.id; env.toast('Laid out ' + pl.name + ': ' + laid.laidAs + '.');
+          const { id: _id, name: _name, ...rest } = laid, pl = env.newPlan(p, rest); p.plans.push(pl); f.optionId = pl.id; env.toast('Laid out ' + pl.name + ': ' + laid.laidAs + '.');
         } catch (err) { s.err = err.message; } s.busy = ''; changed(p, true); }, 30);
         return;
       }

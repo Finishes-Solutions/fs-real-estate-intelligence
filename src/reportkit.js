@@ -72,31 +72,31 @@ export const middleOf = g => { let w = 180, s = 90, e = -180, n = -90; const wal
 export const viewLabel = ctx => { const p = ctx.viewPlace?.(); return p ? 'Map view near ' + p : 'Map view'; };
 
 // ---------- the Finishes Solutions report look (every report, on screen and as a PDF) ----------
-// Letter, portrait unless a report needs the width (a wide filing list). Montserrat for text, IBM Plex Mono for labels and
+// Letter, portrait unless a report needs the width (a wide filing list). Inter for text, labels and
 // numbers, ink greys with the brand green #006527 as the accent: a dark title band with the white logo and a faint
 // blueprint grid, a green rule, KPI tiles with a green left rule, hairline tables and section rules.
 export const REPORT_CSS = '*{box-sizing:border-box}html{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
-  'body{margin:0;background:#fff;font-family:Montserrat,system-ui,sans-serif;color:#23282a;font-size:10.5px;line-height:1.5}.wrap{max-width:1000px;margin:0 auto;padding:28px}' +
+  'body{margin:0;background:#fff;font-family:Inter,system-ui,sans-serif;color:#23282a;font-size:10.5px;line-height:1.5}.wrap{max-width:1000px;margin:0 auto;padding:28px}' +
   '.hd{position:relative;overflow:hidden;background:#16191a;color:#fff;border-radius:6px;padding:20px 22px 22px;display:flex;justify-content:space-between;align-items:flex-start;gap:24px;' +
     'background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:22px 22px}' +
   '.hd:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:#006527}.hd img{height:40px;flex:none;margin-top:2px}' +
-  '.k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#006527}.hd .k{color:#8acda3}' +
+  '.k{font-family:Inter,sans-serif;font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#006527}.hd .k{color:#8acda3}' +
   'h1{font-size:24px;line-height:1.15;letter-spacing:-.02em;font-weight:800;margin:7px 0 6px;color:#0b0d0c}.hd h1{color:#fff}.meta{color:#6b7174}.hd .meta{color:#bcc2c4;font-size:10.5px}' +
   'h2,.lt{position:relative;font-size:13px;font-weight:700;color:#0b0d0c;margin:22px 0 9px;padding-top:9px;border-top:1px solid #e8ebeb;break-after:avoid}h2:before,.lt:before{content:"";position:absolute;left:0;top:-1px;width:28px;height:2px;background:#006527}' +
   'h3{font-size:12px;font-weight:700;color:#0b0d0c;margin:0 0 8px}p{margin:8px 0}a{color:#006527;font-weight:600;text-decoration:none}' +
   '.kp,.kgrid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #e8ebeb;border-radius:6px;margin-top:16px;break-inside:avoid}.kp>div,.kgrid>div{padding:10px 12px;border-left:1px solid #e8ebeb}' +
-  '.kp>div:first-child,.kgrid>div:first-child{border-left:3px solid #006527}.kp b,.kgrid b{display:block;font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;color:#0b0d0c;line-height:1.25}' +
-  '.kp span,.kgrid span{display:block;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;margin-top:3px}' +
+  '.kp>div:first-child,.kgrid>div:first-child{border-left:3px solid #006527}.kp b,.kgrid b{display:block;font-family:Inter,sans-serif;font-size:17px;font-weight:600;color:#0b0d0c;line-height:1.25}' +
+  '.kp span,.kgrid span{display:block;font-family:Inter,sans-serif;font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;margin-top:3px}' +
   '.map{margin-top:14px;border:1px solid #e8ebeb;border-radius:6px;overflow:hidden;break-inside:avoid}.rmap{break-inside:avoid}.map svg,.bars svg,.photo img{display:block;width:100%;height:auto}.bars{max-width:620px;break-inside:avoid}' +
   '.photo{margin-top:14px;border-radius:6px;overflow:hidden;max-height:340px}.photo img{object-fit:cover;max-height:340px}.cap{font-size:9px;color:#6b7174;margin-top:3px}' +
   '.two{display:grid;grid-template-columns:1fr 1fr;gap:22px}table{width:100%;border-collapse:collapse;font-size:10px}thead{display:table-header-group}' +
-  'th{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;text-align:left;border-bottom:1px solid #bcc2c4;padding:5px 6px}' +
-  'td{border-bottom:1px solid #e8ebeb;padding:5px 6px;vertical-align:top}tbody tr:nth-child(even) td{background:#f8f9f9}.m{font-family:"IBM Plex Mono",monospace;font-size:9.5px;white-space:nowrap}.r{text-align:right}tr{break-inside:avoid}' +
+  'th{font-family:Inter,sans-serif;font-size:8px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;text-align:left;border-bottom:1px solid #bcc2c4;padding:5px 6px}' +
+  'td{border-bottom:1px solid #e8ebeb;padding:5px 6px;vertical-align:top}tbody tr:nth-child(even) td{background:#f8f9f9}.m{font-family:Inter,sans-serif;font-size:9.5px;white-space:nowrap}.r{text-align:right}tr{break-inside:avoid}' +
   '.sc{color:#6b7174;font-size:9px}.lg{display:flex;flex-wrap:wrap;gap:14px;font-size:9.5px;color:#4d5457;margin-top:6px}.lg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}' +
   '.rnote{color:#6b7174;font-size:9.5px;margin-top:6px}.bsec{break-inside:avoid}.full{break-before:page}' +
   '.ft{margin-top:22px;padding-top:10px;border-top:1px solid #e8ebeb;color:#6b7174;font-size:9px;line-height:1.55}' +
-  '.sign{margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:10px;border-top:3px solid #006527;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#6b7174;break-inside:avoid}.sign b{color:#0b0d0c;font-weight:600}' +
-  '.pb{position:fixed;right:18px;top:18px;z-index:9;background:#006527;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:600 12px Montserrat,sans-serif;cursor:pointer}' +
+  '.sign{margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:10px;border-top:3px solid #006527;font-family:Inter,sans-serif;font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#6b7174;break-inside:avoid}.sign b{color:#0b0d0c;font-weight:600}' +
+  '.pb{position:fixed;right:18px;top:18px;z-index:9;background:#006527;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:600 12px Inter,sans-serif;cursor:pointer}' +
   '@media print{.pb{display:none}.wrap{padding:0;max-width:none}}';
 
 // the whole document: the title band (kicker, title, meta, logo), the body, sources and the sign-off. css: the report's
@@ -104,7 +104,7 @@ export const REPORT_CSS = '*{box-sizing:border-box}html{-webkit-print-color-adju
 export function reportDoc({ kicker, title, meta = '', body = '', sources = '', css = '', landscape = false }) {
   const logo = typeof location === 'undefined' ? 'logo-white.png' : new URL('logo-white.png', location.href).href, date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(kicker + ' — ' + title) + '</title>' +
-    '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>@page{size:letter' + (landscape ? ' landscape' : '') + ';margin:.5in .5in .6in}' + REPORT_CSS + css + '</style></head><body>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>@page{size:letter' + (landscape ? ' landscape' : '') + ';margin:.5in .5in .6in}' + REPORT_CSS + css + '</style></head><body>' +
     '<button class="pb" onclick="window.print()">Print or Save as PDF</button><div class="wrap"><div class="hd"><div><div class="k">' + esc(kicker) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + meta +
     (meta ? ' · ' : '') + 'Generated ' + date + '</div></div><img src="' + logo + '" alt="Finishes Solutions"></div>' +
     body + (sources ? '<div class="ft">Sources: ' + sources + '</div>' : '') +
@@ -176,7 +176,7 @@ export function areaMap(layers = [], { W = 1000, H = 440, points = [], lines = [
   const dots = points.map(p => { const [x, y] = pr(p.c); if (x < -20 || y < -20 || x > w + 20 || y > h + 20) return ''; const r = p.r || 3, col = p.color || '#c2410c';
     return (p.hollow ? '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r + '" fill="none" stroke="' + col + '" stroke-width="1.6"/>'
       : '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r + '" fill="' + col + '" fill-opacity="' + (p.o ?? .9) + '" stroke="#ffffff" stroke-width="' + (r > 4 ? 1.5 : .8) + '"/>') +
-      (p.label ? '<text x="' + (x + r + 4).toFixed(1) + '" y="' + (y + 4).toFixed(1) + '" font-family="Montserrat,Arial,sans-serif" font-size="12" font-weight="700" fill="#23282a" stroke="#ffffff" stroke-width="3" paint-order="stroke">' + esc(p.label) + '</text>' : ''); }).join('');
+      (p.label ? '<text x="' + (x + r + 4).toFixed(1) + '" y="' + (y + 4).toFixed(1) + '" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#23282a" stroke="#ffffff" stroke-width="3" paint-order="stroke">' + esc(p.label) + '</text>' : ''); }).join('');
   return '<div class="rmap" style="position:relative;width:100%;aspect-ratio:' + w + '/' + h + ';overflow:hidden;background:#eef0f0">' + tiles.join('') +
     '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0;top:0;width:100%;height:100%;display:block">' + shapes + segs + dots + '</svg>' +
     '<div style="position:absolute;right:0;bottom:0;background:rgba(255,255,255,.8);font:9px/1.4 Arial,sans-serif;color:#444;padding:1px 5px">' + esc(BASEMAP.attr) + '</div></div>';

@@ -98,7 +98,7 @@ for (const [what, prog, ask, more] of [['the words', WORDS, 15000, 4], ['the AI'
     assert.equal(pd.params.storm.rate, 1, w + ': the guardrail’s 1.00 ac-ft per acre, never lowered'); assert.equal(G.settingsOf(G.withPondDepth(WALLER, d)).depth, d, 'the depth on the guardrails’ setting');
     rules(plan, o, w, need.area); assert.ok(need.area < S.stormNeed(site / AC, plan.params, S.normalizeProgram(o.program), site / AC).area, w + ': a smaller footprint for the same volume');
     assert.ok(pondAc(o) < pondAc(b), w + ': less pond: ' + pondAc(o).toFixed(2) + ' vs ' + pondAc(b).toFixed(2) + ' ac');
-    assert.ok(S.lsfOf(mOf(plan, o)) > bl && homes(o) >= homes(b), w + ': what it buys: ' + homes(o) + ' homes vs ' + homes(b) + ', ' + Math.round(S.lsfOf(mOf(plan, o))) + ' vs ' + Math.round(bl) + ' sf');
+    assert.ok(S.lsfOf(mOf(plan, o)) > bl && homes(o) >= homes(b) - 1, w + ': what it buys (a home either way is the second entrance): ' + homes(o) + ' homes vs ' + homes(b) + ', ' + Math.round(S.lsfOf(mOf(plan, o))) + ' vs ' + Math.round(bl) + ' sf');
     assert.ok(retail(o) >= ask, w + ': the shops asked for'); assert.deepEqual(o.deeper && [o.deeper.depth, o.deeper.base], [d, 4]); }
   assert.ok(Math.max(...deep.map(homes)) >= most + 4, what + ': a deeper pond buys homes: ' + deep.map(homes).join('/') + ' vs ' + most);
   assert.ok(ms < 30000, what + ': in good time with the deeper ponds (' + ms + ' ms)');

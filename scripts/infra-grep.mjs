@@ -10,7 +10,8 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const root = new URL('..', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url));
 const audit = readFileSync(root + 'docs/AUDIT.md', 'utf8');
 const lists = [...audit.matchAll(/### 8\. Grep patterns[^\n]*\n[\s\S]*?```\n([\s\S]*?)```/g)].map(m => m[1]);
 if (lists.length !== 2) { console.error('expected two pattern lists in docs/AUDIT.md, found ' + lists.length); process.exit(2); }

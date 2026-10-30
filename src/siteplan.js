@@ -30,6 +30,7 @@ import * as CU from './lib/customtypes.mjs';
 import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
 import * as STG from './lib/planstages.mjs';
+import * as PARC from './lib/siteparcels.mjs';
 import * as RF from './lib/sitefiles.mjs';
 import { siteFiles } from './sitefiles.js';
 import { workspace } from './workspace.js';
@@ -545,6 +546,7 @@ export function initSitePlan(ctx) {
 
   // street side: the parcel edge facing the nearest road in the map's own road lines, else the longest edge (a guess)
   function detectFront(pl) {
+    if (STG.status(pl).site.state === 'done') { pl.streetsBy = 2; return; } // (a confirmed site is the person's word: the map's check doesn't move its street sides, so it stays confirmed when the option is opened again)
     const s = map.getStyle()?.sources || {}, src = Object.keys(s).find(id => s[id].type === 'vector' && /maptiler|openmaptiles|planet/i.test(id + (s[id].url || '')));
     const F = SP.frame(pl.origin), lines = [];
     try {
@@ -796,6 +798,7 @@ export function initSitePlan(ctx) {
   // a Waller plan's layouts: the engine gets the scenario's inputs (lib/guardrails.mjs forLayout) and what comes back is
   // kept with the plan's own working numbers (unapply); every other plan goes to the engine as it is
   function laid(fn, ...args) {
+    if (fn === 'refit' && args[0]?.recipe?.parcels) args[1] = { ...(args[1] || {}), parcels: partsNow(P(), args[0]) }; // (laid out parcel by parcel: the parts again)
     if (fn === 'options' && args[0]?.ring?.length >= 3 && !args[0].terrain) { const t = terrainNow(args[0]); if (t) args[0] = { ...args[0], terrain: t }; else terrainOf(args[0]); } // the pond goes on the low side (lib/sitelayout.mjs)
     const g = fn === 'refit' ? G.forLayout(args[0], args[0]?.program, {}) : G.forLayout(args[0], args[1], args[2] || {});
     if (!g) return laid0(fn, ...args);
@@ -2170,6 +2173,8 @@ export function initSitePlan(ctx) {
     const acres = SP.ringArea(pl.ring) / 43560, sugs = RUN.presets(acres, SP.edgeLen(pl.ring, pl.front ?? SP.longestEdge(pl.ring)), { aiOff: off }), lo = RUN.leftoverOf(RUN.fillParams(pl.params, { ask: ed.ask || '' }));
     return '<div class="bsec sp-ai" id="spAiSec"><div class="sp-ai-h"><label class="lt" for="spAsk">Build with AI</label>' + (asked && ed.variants ? fold(true) : '') + '</div>' +
       '<textarea id="spAsk" rows="2" placeholder="What should go here? e.g. ' + esc(sugs[0]?.text || '25,000 sf retail strip') + '">' + esc(ed.ask || '') + '</textarea>' +
+      ((pl.parcels || []).length > 1 ? '<label class="sp-chk sp-perparcel" title="Each parcel laid out on its own: its own street side, program and layouts, nothing across a parcel line. Say which use goes on which parcel (“retail on the 5.88 acre parcel, flex on the corner parcel”), or one program is shared by acreage."><input type="checkbox" id="spPerParcel"' + (ed.perParcel ? ' checked' : '') + '> Lay out parcel by parcel</label>' : '') +
+      (ed.questions?.length ? '<div class="sp-qs" id="spQs"><div class="lt">Before it lays this out, the AI asks</div><ol>' + ed.questions.map(q => '<li>' + esc(q) + '</li>').join('') + '</ol><textarea id="spAnswers" rows="2" placeholder="Your answers"></textarea><div class="sp-row"><button type="button" class="btn sm primary" id="spAnswer">Answer and Build</button><button type="button" class="btn sm ghost" id="spSkipQs" title="Lay it out on the AI’s best reading of the request">Build Anyway</button></div></div>' : '') +
       '<div class="sp-sugs" role="group" aria-label="Suggestions for this ' + acres.toFixed(1) + '-acre site">' + sugs.map(x => '<button type="button" class="chip" data-sug="' + esc(x.text) + '" title="Put this in the box; then Build Layouts (or Enter)">' + esc(x.text) + '</button>').join('') + '</div>' +
       '<div class="sp-runopts"><span class="sp-effl" id="spEffL">AI effort</span>' +
         '<button type="button" class="sp-fillnote" data-jump="spParams" title="The land what you ask for doesn’t need gets more of the program (more homes, more shops, a bigger building) unless your request or Settings asks to hold it for later. Change it under Settings.">Leftover land <b>' + ({ fill: 'Filled', phase: 'Phase 2', hold: 'Held' })[lo] + '</b>' + CHEV + '</button></div>' +
@@ -2212,6 +2217,9 @@ export function initSitePlan(ctx) {
   }
   function wireBuild(pl) {
     const $ = q => card.querySelector(q), each = (q, fn) => card.querySelectorAll(q).forEach(b => b.onclick = () => fn(b));
+    const pp = $('#spPerParcel'); if (pp) pp.onchange = () => { ed.perParcel = pp.checked; };
+    const an = $('#spAnswer'); if (an) an.onclick = () => { const a = ($('#spAnswers')?.value || '').trim(); if (!a) { ctx.toast('Type your answers first.'); $('#spAnswers')?.focus(); return; } ed.ask = ((ed.ask || '').trim() + '\nAnswers: ' + a).trim(); ed.questions = null; build({ answered: true }); };
+    const sk = $('#spSkipQs'); if (sk) sk.onclick = () => { ed.questions = null; build({ answered: true }); };
     const ta = $('#spAsk'); if (ta) { ta.oninput = () => { ed.ask = ta.value; $('#spGo')?.classList.remove('sp-pulse'); }; ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!ed.run) build(); } }; } // Enter (or ⌘/Ctrl+Enter) builds; Shift+Enter is a new line
     each('#spGo', () => build()); each('#spBest', () => bestUse());
     each('[data-sug]', b => fillAsk(b.dataset.sug, true));
@@ -2280,7 +2288,7 @@ export function initSitePlan(ctx) {
     // only the settings the plan's uses (its zones too) read: the building shape for shops, offices and apartments, the
     // apartment bars' depth, length and spacing for apartments, curving streets for single-family homes
     const uses = SP.usesOf(prog), has = list => list.some(x => uses.includes(x)), only = { sfr: uses.length === 1 && uses[0] === 'sfr' };
-    const bldg = (has(SP.FORM_USES) ? pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) : '') + (has(['sfr']) ? pick('streets', 'Neighbourhood streets', pp.streets || 'curved', [['curved', 'Like a subdivision, and gentle curves (best first)'], ['network', 'Like a subdivision: loops and cul-de-sacs'], ['wave', 'Parallel, gently curving'], ['straight', 'Straight']]) + '<div class="sp-hint w2">Subdivision streets follow the site: a loop road one lot in from the edge or a main street, curved local streets meeting it at T’s, cul-de-sacs where land is left. They follow the place’s rule sheet (Street rules, below), else typical values (blocks up to 1,400 ft, cul-de-sacs up to 800 ft).</div>' + namesHtml(pl) : '') +
+    const bldg = (has(SP.FORM_USES) ? pick('form', 'Building shape', pp.form || 'bar', FORMS.map(([k, t]) => [k, t + (k === 'U' ? ' (apartments, offices)' : k === 'tower' ? ' (4+ floors)' : '')])) : '') + (has(['sfr']) ? pick('streets', 'Neighborhood streets', pp.streets || 'curved', [['curved', 'Like a subdivision, and gentle curves (best first)'], ['network', 'Like a subdivision: loops and cul-de-sacs'], ['wave', 'Parallel, gently curving'], ['straight', 'Straight']]) + '<div class="sp-hint w2">Subdivision streets follow the site: a loop road one lot in from the edge or a main street, curved local streets meeting it at T’s, cul-de-sacs where land is left. They follow the place’s rule sheet (Street rules, below), else typical values (blocks up to 1,400 ft, cul-de-sacs up to 800 ft).</div>' + namesHtml(pl) : '') +
       (has(['multifamily']) ? num('pp-bldgDepth', 'Apartment depth', pp.bldgDepth, 1, 'ft') + num('pp-maxLen', 'Longest building', pp.maxLen, 10, 'ft') + num('pp-bldgGap', 'Space between', pp.bldgGap, 1, 'ft') : '');
     // names: the community's and each part's (no re-solve: they change the labels, not the layout)
     const parts = SP.partsOf({ ...pl, program: prog }, false), nmIn = (k, label, v, ph) => fld(label, '<input type="text" maxlength="60" data-nm="' + k + '" value="' + esc(v || '') + '" placeholder="' + esc(ph) + '">', { wide: true });
@@ -3263,11 +3271,15 @@ export function initSitePlan(ctx) {
   }
 
   // ---------- Build with AI ----------
+  // a site of several parcels: its parts (lib/siteparcels.mjs), for the AI's reading of the request and for laying them out one by one
+  function partsNow(p, pl) { const keys = pl?.parcels || []; if (keys.length < 2 || !p?.parcels) return []; try { return PARC.partsOf(pl, keys.map(k => p.parcels.find(x => x.key === k)).filter(r => r?.geometry)); } catch (e) { return []; } }
+  function parcelInfo(p, pl) { const parts = partsNow(p, pl); return parts.length > 1 ? { parcels: parts.map(q => ({ label: q.label, acres: q.acres, corner: q.corner, landlocked: q.landlocked, fronts: q.landlocked ? 'no street (reached across the site)' : q.corner ? 'two streets' : q.streets.length || q.front === undefined ? 'a street' : 'the front street' })) } : {}; }
+  const parcelOpts = (p, pl, prog) => { const parts = partsNow(p, pl); return parts.length > 1 && (ed.perParcel || SP.normalizeProgram(prog).parcels) ? { parcels: parts, perParcel: true } : {}; };
   function siteInfo(p, pl) {
     const a = frameAngle(pl), r = pl.ring.map(q => { const c = Math.cos(-a * Math.PI / 180), s = Math.sin(-a * Math.PI / 180); return [q[0] * c - q[1] * s, q[0] * s + q[1] * c]; });
     const xs = r.map(q => q[0]), ys = r.map(q => q[1]), parcel = p.parcels.find(x => x.key === pl.parcel), f = pl.front ?? SP.longestEdge(pl.ring);
     const side = (pl.streets || []).filter(k => k !== f && k < pl.ring.length).map(k => Math.round(SP.edgeLen(pl.ring, k))), boxA = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
-    return { acres: +(SP.ringArea(pl.ring) / 43560).toFixed(3), widthFt: Math.round(Math.max(...xs) - Math.min(...xs)), depthFt: Math.round(Math.max(...ys) - Math.min(...ys)), frontageFt: Math.round(SP.edgeLen(pl.ring, f)),
+    return { ...parcelInfo(p, pl), acres: +(SP.ringArea(pl.ring) / 43560).toFixed(3), widthFt: Math.round(Math.max(...xs) - Math.min(...xs)), depthFt: Math.round(Math.max(...ys) - Math.min(...ys)), frontageFt: Math.round(SP.edgeLen(pl.ring, f)),
       sideStreetsFt: side, shape: pl.ring.length <= 4 && SP.ringArea(pl.ring) > boxA * 0.92 ? 'rectangular' : SP.ringArea(pl.ring) > boxA * 0.8 ? 'mostly rectangular, ' + pl.ring.length + ' sides' : 'irregular, ' + pl.ring.length + ' sides (about ' + Math.round(SP.ringArea(pl.ring) / boxA * 100) + '% of its bounding box)',
       streets: [f, ...(pl.streets || []).filter(k => k !== f)].filter(k => k < pl.ring.length).map(k => { const nm = pl.streetNames?.[k] || null; return { side: k === f ? 'front' : 'side', name: nm, highway: /\b(?:hwy|highway|fm|us|sh|i-?\d|interstate|freeway|parkway|tollway|loop)\b/i.test(nm || '') }; }),
       address: parcel?.label || '', city: ctx.nearestPlace?.(pl.origin) || '', county: (ctx.DATA?.counties || []).find(c => SP.inRing(pl.origin, c.outline?.[0]?.[0] || []))?.name || '', zoning: pl.zoning };
@@ -3373,20 +3385,21 @@ export function initSitePlan(ctx) {
     if (ai) try {
       const d = await post({ prompt: ask, site, facts, program: pl.program, effort: L.effort, teamTypes: CU.teamTypesForAI(TL.list()), ...(strategy ? { strategy } : {}) }, run.ctl.signal);
       prog = SP.keepNames(d.program || prog, pl.program); setbacks = { ...SP.SETBACKS, ...d.setbacks }; note = d.summary || ''; assumed = (d.assumptions || []).filter(Boolean); aiOk = true;
+      if (d.questions?.length && !o.answered && (pl.parcels || []).length > 1 && live(run)) { ed.questions = d.questions.slice(0, 3); killRun(); ed.buildOpen = true; panel(); ctx.toast('The AI has a question before it lays this out.'); card.querySelector('#spAnswers')?.focus(); return; } // (several parcels and the words don't say what goes where: it asks first)
     } catch (e) { if (!live(run)) return; note = e.status === 503 ? '' : navigator.onLine ? 'The AI didn’t answer, so this read your words directly.' : 'Offline: this read your words directly.'; }
     if (!live(run) || PL() !== pl) return;
     if (!aiOk) { run.steps = run.steps.slice(0, 2 + o0); run.holds = false; strategy = null; if (aiB) aiBNote = ''; aiB = null; paintRun(); } // the AI is off: no review either, the layouts shown as they come (nor its plan: the note above says it didn't answer)
     if (aiB && prog?.zones?.length) { prog = BR.withPads(prog, aiB.brief.pads); aiB = null; } // a mix: the AI's pads go on its shop zone; the rest of the brief has no engine of its own there
     const np = SP.normalizeProgram(prog);
     const readAs = { ask, chips: RUN.readAs(np, SP.USES), miss: RUN.notUnderstood(ask, np), assumed, by: aiOk ? 'ai' : 'words', ...(strategy ? { plan: strategy } : {}), ...(aiB ? { brief: aiB } : {}), ...(aiBNote ? { briefNote: aiBNote } : {}) }; // shown once the layouts land, so a cancelled build keeps the last one's
-    // the plan's layout settings (neighbourhood streets, leaving a later phase open, the apartment building form) for this run's layouts
+    // the plan's layout settings (neighborhood streets, leaving a later phase open, the apartment building form) for this run's layouts
     // (the land the program doesn't need is filled unless the words or Settings ask to hold it: an AI plan's or an earlier
     // build's "leave it for later" alone doesn't, lib/planruns.mjs fillParams)
     const st0 = strategy?.settings || {}; let params0 = RUN.fillParams({ ...(pl.params || {}), ...(st0.streets ? { streets: st0.streets } : {}), ...(strategy?.buildings?.form ? { form: strategy.buildings.form } : {}) }, { ask });
     if (np.form) params0 = { ...(params0 || pl.params || {}), form: np.form }; // the shape the request names ("L-shaped"): the layout reads params.form
     runStep(run, 2 + o0, lay);
     const wb = BR.wordsBrief(ask); // pads asked for in words ("with 2 pad sites", "an outparcel"): the engine places them, at every level
-    let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, deeper: true, ...koOpts(pl), ...(wb ? { brief: wb } : {}) }); /* (deeper: the same layouts again with a 6 and an 8 ft deep pond, each labelled with the depth it assumes) */ } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
+    let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, deeper: true, ...koOpts(pl), ...(wb ? { brief: wb } : {}), ...parcelOpts(p, pl, prog) }); /* (deeper: the same layouts again with a 6 and an 8 ft deep pond, each labelled with the depth it assumes) */ } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
     if (!live(run) || PL() !== pl) return;
     const plan = { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) };
     let variants = named(out, { ...plan, program: prog }, params0 ? { params: params0 } : {});
