@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 9:52 AM CT: A full Site Environmental report, and wetlands that load (9fe4ab8, 8d84a88)
+- **Wetlands work again.** The US Fish & Wildlife Service changed its wetlands field names, so every wetlands search failed ("didn't answer"). The search now reads the fields either way, and the map layers try a second time before giving up.
+- **The Site Environmental report is a full report:** after the finding and the records around the parcel come a **site & constraints map** (the parcel outline, FEMA flood zones, mapped wetlands and lidar contours), a **soils map** (every USDA soil map unit under and round the parcel, its share of the parcel, drainage, hydrologic group, water table and building limitations), and **topography & slope** (contours over shaded relief, slope and the way water runs, the parcel's low and high ground). A layer that still fails is named on its page, never left blank as "none".
+- **A report from a link:** /api/sitereport?kind=environmental&lat=..&lon=.. makes the report for the parcel at that point.
+
 ### 8:38 AM CT: No name on reports (c64c406)
 - **Reports carry no name at all.** The "Real Estate Intelligence" wordmark is gone from report headers, the sign-off line at the end is gone, and the page footer shows only the report's title and page numbers. The app itself still says Real Estate Intelligence.
 
