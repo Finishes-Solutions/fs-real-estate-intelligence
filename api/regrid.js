@@ -15,6 +15,7 @@
 // so the counter never runs behind Regrid. Without Supabase there is no counter, so the endpoint refuses (fails closed).
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { supa } from '../lib/supa.mjs';
+import { inUS } from '../lib/usbox.mjs';
 
 const API = 'https://app.regrid.com/api/v2';
 const TILE_URL = process.env.REGRID_TILE_URL || 'https://tiles.regrid.com/api/v1/parcels/{z}/{x}/{y}.mvt';
@@ -121,7 +122,7 @@ export default async function handler(req, res) {
 
   // ---- one parcel record ----
   const lat = +q.lat, lon = +q.lon;
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 25 || lat > 37 || lon < -107 || lon > -93) return res.status(400).json({ error: 'lat/lon must be inside Texas' });
+  if (!inUS(lat, lon)) return res.status(400).json({ error: 'lat/lon must be inside the United States' });
   const key = /^[\w .'-]{1,40}\|[\w.-]{1,40}$/.test(String(q.key || '')) ? 'pid:' + String(q.key).toLowerCase() : 'pt:' + lat.toFixed(5) + ',' + lon.toFixed(5);
   const refresh = q.refresh === '1';
   if (!refresh) {

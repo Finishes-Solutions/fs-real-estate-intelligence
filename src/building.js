@@ -4,6 +4,7 @@
 import { floorsFromHeight, plausibleHeight } from './lib/height.mjs';
 import { joinPieces, partAt, inGeom, offsetGeom, labelPoint, sameSelection, withTileParcel } from './lib/footprint.mjs';
 import { groundClick } from './lib/cardclick.mjs';
+import { inTexas } from './reportkit.js';
 
 export function initBuildings(ctx) {
   const { map, esc, fmtM, fmtN, F } = ctx, card = document.getElementById('card');
@@ -426,7 +427,7 @@ export function initBuildings(ctx) {
     if (!p) {
       // nothing from the statewide parcel layer nor the county appraisal district's own (Harris, Waller, …): Regrid may have it
       el.innerHTML = head + '<button class="btn md primary rg-cta" type="button" data-rg>Get owner, value &amp; zoning from Regrid<span data-rg-left>' + rgLeft() + '</span></button>' +
-        '<div class="rnote">' + (err ? 'The appraisal lookup failed (' + esc(err) + ').' : 'No appraisal record found at this point (often a street, a lake or a lot line).') + ' Regrid has the parcel record; one already looked up is free.</div>';
+        '<div class="rnote">' + (err ? 'The appraisal lookup failed (' + esc(err) + ').' : !inTexas(cur.center) ? 'The free appraisal data covers Texas only.' : 'No appraisal record found at this point (often a street, a lake or a lot line).') + ' Regrid has the parcel record; one already looked up is free.</div>';
       wireRegrid(el);
       if (t && !err) t.textContent = 'Unaddressed ' + kindOf(cur).toLowerCase();
       const near = ctx.nearestPlace?.(cur.center); if (sub) sub.textContent = 'No owner on file · ' + (near ? 'near ' + near : cur.center[1].toFixed(5) + ', ' + cur.center[0].toFixed(5));

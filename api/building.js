@@ -9,6 +9,7 @@
 // Every part is optional: a failing source returns an error string for that section, never a 500.
 import { rateLimit } from './_lib/guard.mjs';
 import { lidarHeight } from '../lib/height.mjs';
+import { inTexas, inUS } from '../lib/usbox.mjs';
 
 const PARCELS = process.env.PARCEL_SERVICE || 'https://feature.geographic.texas.gov/arcgis/rest/services/Parcels/stratmap_land_parcels_48_most_recent/MapServer/0';
 // the main public Overpass server is often busy; two community mirrors carry the same OpenStreetMap data
@@ -141,6 +142,7 @@ async function cadByApn(lat, lon, apn) {
 // be another account whose outline takes in several of the parcels drawn there (on Waller Tomball Rd one outline holds a
 // dozen accounts); then the appraisal district's own record for that account is used when it has one.
 export async function parcel(lat, lon, apn) {
+  if (!inTexas(lat, lon)) return null; // no free appraisal data outside Texas: the card offers Regrid's record instead
   const p = await stratParcel(lat, lon);
   if (p && (!apn || isAccount(p, apn))) return p;
   if (apn) { const q = await cadByApn(lat, lon, apn).catch(() => null); if (q) return q; }
@@ -211,7 +213,7 @@ async function photo(lat, lon) {
 
 export default async function handler(req, res) {
   const lat = +req.query.lat, lon = +req.query.lon;
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 25 || lat > 37 || lon < -107 || lon > -93) return res.status(400).json({ error: 'lat/lon must be inside Texas' });
+  if (!inUS(lat, lon)) return res.status(400).json({ error: 'lat/lon must be inside the United States' });
   if (!rateLimit(req, res, { perMinute: 60, perDay: 1200 })) return; // two requests per card (parcel, then the rest)
   const r5 = v => Math.round(v * 1e5) / 1e5;
   // footprint for the lidar height: "lon,lat;lon,lat;…" (closed or not), at most 120 vertices
@@ -223,12 +225,12 @@ export default async function handler(req, res) {
   if (part === 'parcel') {
     try { return res.json({ parcel: await parcel(r5(lat), r5(lon), apn) }); } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.json({ parcel: null, parcelError: e.message }); }
   }
-  const [p, pl, ph, ht, pf] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon), apn), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)]), footprint ? parcelsIn(footprint) : Promise.resolve([])]);
+  const [p, pl, ph, ht, pf] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon), apn), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)]), footprint && inTexas(lat, lon) ? parcelsIn(footprint) : Promise.resolve([])]);
   // the map's footprint can be a tile-clipped piece of a big building: when OpenStreetMap's outline is clearly bigger,
   // look for parcels under the whole of it too
   const outline = pl.status === 'fulfilled' ? pl.value.osm?.outline : null;
   let parcels = pf.status === 'fulfilled' ? pf.value : [];
-  if (outline && (!footprint || ringArea(outline.coordinates[0]) > 1.2 * ringArea(footprint.coordinates[0]))) {
+  if (outline && inTexas(lat, lon) && (!footprint || ringArea(outline.coordinates[0]) > 1.2 * ringArea(footprint.coordinates[0]))) {
     try { const more = await parcelsIn(outline), have = new Set(parcels.map(x => x.propId)); parcels = parcels.concat(more.filter(x => !have.has(x.propId))).slice(0, 10); } catch (e) {}
   }
   // a source that failed (busy server, timeout) is retried in a few minutes rather than cached for a day
