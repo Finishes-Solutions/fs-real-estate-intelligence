@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
-### 11:05 AM CT: Tennessee and the rest of the US; one clean outline on the selected parcel (167d56f, COMMIT)
+### 11:05 AM CT: Tennessee and the rest of the US; one clean outline on the selected parcel (167d56f, 53e018e)
 - **No more green lines through a selected parcel.** A parcel that crosses an edge of the map's tiles was outlined piece by piece, so the straight cuts between the pieces showed as green dashed horizontal and vertical lines across it. The pieces are now joined into one outline round the parcel's edge (buildings cut by a tile edge too).
 - **The card works outside Texas.** Regrid and the property card took Texas points only, so a Tennessee parcel's card said Regrid wasn't ready and its Site section said "lat and lon inside Texas are required". Both now take any point in the US. The Site section shows the flood zone, school district, city limits, Opportunity Zone and nearby EPA sites anywhere and leaves out the Texas-only sources (TxDOT traffic, TCEQ water districts, Comptroller alcohol sales).
 - **Site reports from a Regrid parcel:** where there's no free appraisal record, the four site reports use the Regrid parcel.
