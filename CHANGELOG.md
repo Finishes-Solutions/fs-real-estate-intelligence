@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 11:33 AM CT: Spending in the Area Report outside Texas (4ef5517)
+- **Consumer spending is filled in outside Texas.** In Tennessee the Area Report's spending rows (groceries, dining out, housing and so on) were blank; they're now modeled from each ring's households by income, the same way as in Texas.
+
 ### 11:31 AM CT: Steadier streams in the environmental report (f4cad84)
 - **USGS streams and water bodies get a second try** when the service is slow (it timed out once on the Sevier County parcel and the page said "not loaded"), and the report fetches all its map layers at the same time, so it finishes sooner.
 - **No ", TX" on a parcel outside Texas** in the report headers.
