@@ -3,6 +3,11 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-30
+
+### 1:24 PM CT: Technical report on data sources and site layout (7789478)
+- Added a technical guide to the app's data sources and how the site layout engine builds and evaluates plan options.
+
 ## 2026-10-27
 
 ### 8:20 PM CT: The Feasibility workspace merged in, with a layout gallery on its Site step (b8532b3)
