@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 12:05 PM CT: A 3D view in the Topography report (eb4e875)
+- **See the ground in 3D.** The Topography report's second page now shows the site and the land around it as a block of ground: a big view looking up the slope from the site's low side and two smaller views from other sides, coloured from green (low) to tan and white (high), shaded by the sun, with contour bands, the site boundary draped on the ground and the lowest and highest points marked. Each view has a north arrow and says which way it looks.
+- **Honest about scale:** on gentle land the heights are stretched (up to 5×) so the shape shows, and the page says by how much; hilly land like Sevier County is drawn true to scale.
+
 ### 11:33 AM CT: Spending in the Area Report outside Texas (4ef5517)
 - **Consumer spending is filled in outside Texas.** In Tennessee the Area Report's spending rows (groceries, dining out, housing and so on) were blank; they're now modeled from each ring's households by income, the same way as in Texas.
 
