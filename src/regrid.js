@@ -50,7 +50,7 @@ export function initRegrid(ctx) {
         try {
           const r = await fetch('api/regrid?' + new URLSearchParams({ lat: center[1].toFixed(6), lon: center[0].toFixed(6), ...(key ? { key } : {}), ...(refresh ? { refresh: '1' } : {}) }));
           const d = await readJSON(r);
-          if (d.geom) ctx.lastRegrid = { center, geom: d.geom, zoning: d.zoning || null, city: (d.more || []).find(([k]) => k === 'scity')?.[1] || null }; // for Start Site Plan, and a project page's Jurisdiction card (the address city)
+          if (d.geom) ctx.lastRegrid = { center, geom: d.geom, zoning: d.zoning || null, city: (d.more || []).find(([k]) => k === 'scity')?.[1] || null, fields: d.fields || [], more: d.more || [], headline: d.headline || '' }; // (also the site reports' parcel where there's no free appraisal record: src/sitereports.js) // for Start Site Plan, and a project page's Jurisdiction card (the address city)
           if (d.usage) { usage = d.usage; paintLeft(usage); }
           if (d.none) { el.innerHTML = lt() + '<div class="rnote">Regrid has no parcel at this point.</div>'; return; }
           const z = d.zoning;

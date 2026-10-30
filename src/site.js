@@ -56,14 +56,15 @@ export function initSite(ctx) {
       row('Environmental', env1 && env1 + envList, 'EPA ECHO') + row('Alcohol sales here', bars && bars + '<br><span class="sc">Mixed beverage gross receipts, last 12 months</span>', 'Texas Comptroller') +
       econRows(area, parcel) + '</dl>' +
       // one-click site reports for this parcel (src/sitereports.js): drawn from its outline, so only with one
-      (ctx.siteReportButtons && parcel?.geometry ? '<div class="site-rep" id="siteReports"><div class="fl">Reports for this parcel</div>' + ctx.siteReportButtons({ parcels: [parcel], center, label: parcel.situs || '' }) + '</div>' : '') +
+      (ctx.siteReportButtons ? '<div class="site-rep" id="siteReports"><div class="fl">Reports for this parcel</div>' + (parcel?.geometry ? ctx.siteReportButtons({ parcels: [parcel], center, label: parcel.situs || '' }) :
+        ctx.siteReportButtons(null, { always: true }) + '<div class="rnote">No free appraisal record here: press Get Regrid Details first, and the reports are drawn from the Regrid parcel.</div>') + '</div>' : '') +
       // area reports for a circle around the site: pick a radius, then Crime Report or FEMA Report
       (ctx.crimeReport || ctx.femaReport || ctx.areaReports?.length ? '<div class="site-rep"><div class="fl">Area reports</div><div class="mi-chips" role="radiogroup" aria-label="Report radius">' +
         [1, 3, 5, 10].map(mi => '<button type="button" class="chip" role="radio" data-mi="' + mi + '" aria-checked="' + (mi === repMi) + '">' + mi + ' mi</button>').join('') + '</div><div class="bacts">' +
         (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep" data-push>Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep" data-push>FEMA Report</button>' : '') + (ctx.envReport ? '<button class="btn" type="button" id="siteEnvRep" data-push>Environmental Report</button>' : '') + (ctx.areaReports || []).filter(r => !r.noSite).map(r => { const ok = !r.cover || r.cover.test(center); return '<button class="btn" type="button" data-push data-ar="' + r.key + '"' + (ok ? '' : ' disabled title="' + esc(r.cover.why) + '"') + '>' + esc(r.label) + (ok ? '' : ' · ' + esc(r.cover.short)) + '</button>'; }).join('') + '</div>' +
         '<div class="rnote">Crime: City of Houston only (Houston Police). FEMA: flood zones, flood insurance claims, disasters and hazard risk. Environmental: cleanup sites, tanks, wells, pipelines, wetlands and soils around the parcel.</div></div>' : '');
     ctx.renderUtilities?.(el.querySelector('.util-slot'), center, parcel);
-    if (parcel?.geometry) ctx.wireSiteReports?.(el, { parcels: [parcel], center, label: parcel.situs || '' });
+    ctx.wireSiteReports?.(el, parcel?.geometry ? { parcels: [parcel], center, label: parcel.situs || '' } : null); // (none: the Regrid record, once fetched)
     const where = () => parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4), lab = () => repMi + ' mi around ' + where();
     el.querySelectorAll('.mi-chips [data-mi]').forEach(b => b.onclick = () => { repMi = +b.dataset.mi; el.querySelectorAll('.mi-chips [data-mi]').forEach(x => x.setAttribute('aria-checked', x === b)); });
     el.querySelector('#siteCrimeRep')?.addEventListener('click', () => ctx.crimeReport({ geometry: circle(center, repMi), label: lab(), center }));

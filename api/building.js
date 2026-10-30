@@ -140,7 +140,10 @@ async function cadByApn(lat, lon, apn) {
 // apn: the account of the parcel drawn on the map under the click (its parcel lines). StratMap's record at the point can
 // be another account whose outline takes in several of the parcels drawn there (on Waller Tomball Rd one outline holds a
 // dozen accounts); then the appraisal district's own record for that account is used when it has one.
+// roughly Texas (a box: a point just over the line asks Texas's services and finds nothing, which is fine)
+export const inTexasBox = (lat, lon) => lat >= 25.8 && lat <= 36.6 && lon >= -106.7 && lon <= -93.5;
 export async function parcel(lat, lon, apn) {
+  if (!inTexasBox(lat, lon)) throw Object.assign(new Error('The free appraisal record covers Texas only; Regrid has this parcel.'), { outside: true });
   const p = await stratParcel(lat, lon);
   if (p && (!apn || isAccount(p, apn))) return p;
   if (apn) { const q = await cadByApn(lat, lon, apn).catch(() => null); if (q) return q; }
@@ -211,7 +214,8 @@ async function photo(lat, lon) {
 
 export default async function handler(req, res) {
   const lat = +req.query.lat, lon = +req.query.lon;
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 25 || lat > 37 || lon < -107 || lon > -93) return res.status(400).json({ error: 'lat/lon must be inside Texas' });
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 17 || lat > 72 || lon < -180 || lon > -64) return res.status(400).json({ error: 'lat/lon must be inside the United States' });
+  // (the free appraisal record is Texas only; elsewhere the card says so and Regrid fills in: parcel() below)
   if (!rateLimit(req, res, { perMinute: 60, perDay: 1200 })) return; // two requests per card (parcel, then the rest)
   const r5 = v => Math.round(v * 1e5) / 1e5;
   // footprint for the lidar height: "lon,lat;lon,lat;…" (closed or not), at most 120 vertices

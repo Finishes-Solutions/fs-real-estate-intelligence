@@ -280,7 +280,9 @@ export function initBuildings(ctx) {
       ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel); ctx.renderDev?.(card.querySelector('#bDev'), b.center, pd.parcel);
     };
     try { d = await details(b, onParcel); }
-    catch (err) { if (!alive()) return; renderParcel(null, err.message); card.querySelector('#bTitle').textContent = 'Property details unavailable'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b); ready(); return; }
+    catch (err) { if (!alive()) return; renderParcel(null, err.message); card.querySelector('#bTitle').textContent = 'Property details unavailable'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
+      // (the Regrid section still comes: its button is how a parcel without a free record gets one)
+      ctx.renderSite?.(card.querySelector('#bSite'), b.center, null); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, null); ready(); return; }
     if (!alive()) return;
     if (dropIfDuplicate(b)) return;
     ready();

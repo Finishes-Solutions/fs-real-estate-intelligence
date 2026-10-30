@@ -14,10 +14,11 @@ import { render, resetBrowser } from '../lib/pdf.mjs';
 import { parcelReport } from '../lib/reports/parcelmap.mjs';
 import { topoReport } from '../lib/reports/topo.mjs';
 import { siteEnvReport } from '../lib/reports/siteenv.mjs';
-import { ringsReport } from '../lib/reports/rings.mjs';
+import { ringsReport, coverage, RINGS } from '../lib/reports/rings.mjs';
+import { liveTracts } from '../lib/acslive.mjs';
 import { pngDataUrl } from '../lib/reports/png.mjs';
 import { frame } from '../lib/siteplan.mjs';
-import { NWI, SDA, soilWkt, soilMapQuery, parseSoils, fieldVal } from '../lib/env.mjs';
+import { NWI, SDA, soilWkt, soilMapQuery, parseSoils, fieldVal, inTexas } from '../lib/env.mjs';
 
 export const KINDS = { parcel: 'Parcel Map', topo: 'Topography', environmental: 'Site Environmental', area: 'Area Report' };
 const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[$,]/g, '')); return Number.isFinite(n) ? n : null; };
@@ -25,13 +26,13 @@ const outer = g => g?.type === 'Polygon' ? g.coordinates[0] : g?.type === 'Multi
 // the card's parcel record in the report's names
 export function toRecord(p) {
   const acres = num(String(p.area || '').match(/[\d.,]+/)?.[0]) ?? num(p.acres);
-  return { id: p.propId || p.id || '—', owner: p.owner, mail: p.mailing || p.mail, situs: p.situsStreet || (p.situs || '').split(',')[0], city: p.situsCity || p.city, county: p.county, state: 'TX', zip: p.situsZip || p.zip,
+  return { id: p.propId || p.id || '—', owner: p.owner, mail: p.mailing || p.mail, situs: p.situsStreet || (p.situs || '').split(',')[0], city: p.situsCity || p.city, county: p.county, state: p.state || 'TX', zip: p.situsZip || p.zip,
     landUse: p.landUse, zoning: p.zoning, zoningDesc: p.zoningDesc, acres, sqft: acres ? Math.round(acres * 43560) : null, land: num(p.landValue ?? p.land), improv: num(p.improvementValue ?? p.improv), total: num(p.marketValue ?? p.total),
     valueType: p.marketValue != null ? 'Market value' : p.valueType, taxYear: p.taxYear, legal: p.legal, lastSale: p.acquired || p.lastSale, yearBuilt: p.yearBuilt, bldgSf: num(p.buildingSqft ?? p.bldgSf), subdivision: p.subdivision,
     geom: outer(p.geometry) || p.geom || [] };
 }
 const titleOf = (label, recs) => label || recs.map(r => r.situs).filter(Boolean)[0] || 'Selected parcel';
-const areaOf = recs => [...new Set(recs.map(r => r.county).filter(Boolean))].map(c => /county/i.test(c) ? c : c + ' County').join(', ') + (recs.length ? ', TX' : '');
+const areaOf = recs => [...new Set(recs.map(r => r.county).filter(Boolean))].map(c => /county/i.test(c) ? c : c + ' County').join(', ') + (recs.length ? ', ' + (recs[0].state || 'TX') : '');
 const today = () => new Date().toISOString().slice(0, 10);
 const inRingFt = (p, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) c = !c; } return c; };
 
@@ -64,7 +65,24 @@ export async function envLayers(center, recs, { terrain = true } = {}) {
     body: new URLSearchParams({ f: 'json', geometry: JSON.stringify(env), geometryType: 'esriGeometryEnvelope', inSR: '4326', outSR: '4326', spatialRel: 'esriSpatialRelIntersects', outFields, returnGeometry: 'true', maxAllowableOffset: '0.00002', geometryPrecision: '6' }) });
     if (!r.ok) throw new Error(new URL(url).host + ' ' + r.status); const d = await r.json(); if (d.error) throw new Error(d.error.message || 'service error'); return (d.features || []).filter(f => f.geometry?.rings?.length); };
   const rings = f => f.geometry.rings.map(r => r.map(p => F.toFt(p)));
+  // lines (streams): the same query, features with paths
+  const arcAny = async (url, outFields) => { const r = await fetch(url + '/query', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'RealEstateIntelligence/1.0 (site environmental)' }, signal: AbortSignal.timeout(25000),
+    body: new URLSearchParams({ f: 'json', geometry: JSON.stringify(env), geometryType: 'esriGeometryEnvelope', inSR: '4326', outSR: '4326', spatialRel: 'esriSpatialRelIntersects', outFields, returnGeometry: 'true', maxAllowableOffset: '0.00002', geometryPrecision: '6' }) });
+    if (!r.ok) throw new Error(new URL(url).host + ' ' + r.status); const d = await r.json(); if (d.error) throw new Error(d.error.message || 'service error'); return d.features || []; };
+  // the first of several services that answers (national services move; the page names the layer when none does)
+  const firstOf = async (urls, fn) => { let last; for (const u of urls) { try { return await fn(u); } catch (e) { last = e; } } throw last || new Error('no service'); };
+  // a layer of a MapServer found by its name (the National Map numbers its NHD layers differently over time)
+  const layerNamed = async (base, re) => { const r = await fetch(base + '?f=json', { headers: { 'User-Agent': 'RealEstateIntelligence/1.0' }, signal: AbortSignal.timeout(15000) }); const d = await r.json();
+    const l = (d.layers || []).filter(x => re.test(x.name)).sort((a, b) => (/large/i.test(b.name) ? 1 : 0) - (/large/i.test(a.name) ? 1 : 0))[0]; if (!l) throw new Error('no ' + re + ' layer'); return base + '/' + l.id; };
   const tryAgain = async fn => { try { return await fn(); } catch (e) { return await fn(); } }; // (these services fail now and then; once more)
+  const NHD = 'https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer';
+  const [streams, waterbodies, habitat, protectedLand] = await Promise.allSettled([
+    (async () => (await arcAny(await layerNamed(NHD, /^flowline/i), '*')).filter(f => f.geometry?.paths?.length).map(f => ({ name: fieldVal(f.attributes, 'GNIS_NAME') || fieldVal(f.attributes, 'gnis_name') || '', type: fieldVal(f.attributes, 'FTYPE'), paths: f.geometry.paths.map(pp => pp.map(p => F.toFt(p))) })))(),
+    (async () => (await arcAny(await layerNamed(NHD, /^waterbody/i), '*')).filter(f => f.geometry?.rings?.length).map(f => ({ name: fieldVal(f.attributes, 'GNIS_NAME') || '', rings: rings(f) })))(),
+    firstOf(['https://services.arcgis.com/QVENGdaPbd4LUkLV/arcgis/rest/services/USFWS_Critical_Habitat/FeatureServer/0'], async u => (await arc(u, '*')).map(f => ({ name: fieldVal(f.attributes, 'comname') || fieldVal(f.attributes, 'COMNAME') || fieldVal(f.attributes, 'sciname') || 'Critical habitat', status: fieldVal(f.attributes, 'listing_st') || '', rings: rings(f) }))),
+    firstOf(['https://services.arcgis.com/v01gqwM5QqNysAAi/arcgis/rest/services/Protected_Areas_Database_of_the_United_States_PADUS/FeatureServer/0', 'https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/PADUS_Public_Access/FeatureServer/0'],
+      async u => (await arc(u, '*')).map(f => ({ name: fieldVal(f.attributes, 'Unit_Nm') || fieldVal(f.attributes, 'UNIT_NM') || 'Protected area', manager: fieldVal(f.attributes, 'Mang_Name') || fieldVal(f.attributes, 'd_Mang_Nam') || '', rings: rings(f) })))]);
+  for (const [k, v] of Object.entries({ streams, waterbodies, habitat, protectedLand })) if (v.status === 'rejected') errors[k] = v.reason?.message || 'failed';
   const [flood, wetlands, soils, T] = await Promise.allSettled([
     (async () => { const { NFHL } = await import('./fema.js'); return (await tryAgain(() => arc(NFHL + '/28', 'FLD_ZONE,ZONE_SUBTY,SFHA_TF'))).map(f => ({ zone: f.attributes.FLD_ZONE, sub: f.attributes.ZONE_SUBTY, sfha: f.attributes.SFHA_TF, rings: rings(f) })); })(),
     (async () => (await tryAgain(() => arc(NWI + '/0', '*'))).map(f => ({ type: fieldVal(f.attributes, 'WETLAND_TYPE'), code: fieldVal(f.attributes, 'ATTRIBUTE'), acres: +fieldVal(f.attributes, 'ACRES') || undefined, rings: rings(f) })))(),
@@ -74,7 +92,7 @@ export async function envLayers(center, recs, { terrain = true } = {}) {
     terrain ? (async () => { const { terrainFor } = await import('./terrain.js'); return terrainFor(center, box4, Date.now(), { meteo: false }); })() : Promise.resolve(null)]);
   for (const [k, v] of Object.entries({ flood, wetlands, soils, terrain: T })) if (v.status === 'rejected') errors[k] = v.reason?.message || 'failed';
   const val = v => v.status === 'fulfilled' ? v.value : null;
-  return { F, box: [box4[0], box4[2]], flood: val(flood) || [], wetlands: val(wetlands) || [], soils: val(soils) || [], terrain: val(T), errors };
+  return { F, box: [box4[0], box4[2]], flood: val(flood) || [], wetlands: val(wetlands) || [], soils: val(soils) || [], terrain: val(T), streams: val(streams) || [], waterbodies: val(waterbodies) || [], habitat: val(habitat) || [], protectedLand: val(protectedLand) || [], errors };
 }
 
 export async function buildHtml(kind, { parcels, center, label }) {
@@ -97,9 +115,13 @@ export async function buildHtml(kind, { parcels, center, label }) {
       maps: layers.box ? { ring, origin: center, F, layers, png: pngDataUrl } : null });
   }
   if (kind === 'area') {
-    const [m, f, a] = await Promise.all([load('market.json'), load('filings.json'), load('area.json').catch(() => null)]), zip = recs[0].zip;
-    const un = a?.unemployment?.counties ? Object.values(a.unemployment.counties).find(c => recs[0].county && String(c.name).toLowerCase() === String(recs[0].county).replace(/ county/i, '').toLowerCase()) : null;
-    return ringsReport({ title, area, date, center, site: recs[0].geom, tracts: m.tracts, filings: f.filings, period: f.period, zip, zipRent: zip ? a?.rents?.zips?.[zip] : null, unemployment: un, acsYear: m.year ? (m.year - 4) + '–' + m.year : '' });
+    const [m, f, a] = await Promise.all([load('market.json'), load('filings.json'), load('area.json').catch(() => null)]), zip = recs[0].zip, tx = inTexas(center);
+    // the app's own tracts (the Houston region, with jobs and spending) where they cover the site; elsewhere live from the
+    // Census Bureau (people, income and housing; no jobs or spending model there)
+    const local = tx && coverage(m.tracts, center, 1) > 0.5, tracts = local ? m.tracts : await liveTracts(center, Math.max(...RINGS) + 1, { year: m.year || 2024 });
+    const un = tx && a?.unemployment?.counties ? Object.values(a.unemployment.counties).find(c => recs[0].county && String(c.name).toLowerCase() === String(recs[0].county).replace(/ county/i, '').toLowerCase()) : null;
+    return ringsReport({ title, area, date, center, site: recs[0].geom, tracts, filings: tx ? f.filings : [], period: f.period, zip, zipRent: zip ? a?.rents?.zips?.[zip] : null, unemployment: un, acsYear: m.year ? (m.year - 4) + '–' + m.year : '',
+      filingsNote: tx ? '' : 'Construction filings come from the Texas Department of Licensing and Regulation (TDLR), which covers Texas only. Outside Texas, check the county\'s building permits and the state\'s project registers.' });
   }
   throw Object.assign(new Error('Unknown report: ' + kind), { status: 400 });
 }
@@ -110,7 +132,10 @@ export default async function handler(req, res) {
   // a link or a check of a deployment; html returns the page instead of the PDF
   let b;
   if (req.method === 'GET') { const q = req.query || {}, lat = +q.lat, lon = +q.lon; if (!Number.isFinite(lat) || !Number.isFinite(lon)) return res.status(400).json({ error: 'GET ?kind=&lat=&lon=' });
-    const { parcel } = await import('./building.js'), p = await parcel(lat, lon).catch(() => null); if (!p?.geometry) return res.status(404).json({ error: 'No parcel outline at that point.' });
+    const { parcel } = await import('./building.js'); let p = await parcel(lat, lon).catch(() => null);
+    // &square=ft: no appraisal record here (outside Texas): a square that size round the point stands in, for a quick screen
+    const sq = Math.min(2000, +q.square || 0); if (!p?.geometry && sq > 0) { const F = frame([lon, lat]), h = sq / 2; p = { propId: 'Point ' + lat.toFixed(5) + ', ' + lon.toFixed(5), situs: lat.toFixed(5) + ', ' + lon.toFixed(5) + ' (' + sq + ' ft square)', geometry: { type: 'Polygon', coordinates: [[[-h, -h], [h, -h], [h, h], [-h, h], [-h, -h]].map(c => F.toLL(c))] } }; }
+    if (!p?.geometry) return res.status(404).json({ error: 'No parcel outline at that point (outside Texas, add &square=300 for a square round it).' });
     b = { kind: q.kind, parcels: [p], center: [lon, lat], label: p.situs || '', html: q.format === 'html' }; }
   else if (req.method !== 'POST') return res.status(405).json({ error: 'POST { kind, parcels, center, label }' });
   else b = typeof req.body === 'string' ? (() => { try { return JSON.parse(req.body); } catch (e) { return {}; } })() : req.body || {};

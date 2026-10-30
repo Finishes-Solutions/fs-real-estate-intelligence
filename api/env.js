@@ -12,7 +12,7 @@
 // Each source is best effort: a failing or unfinished one returns { error } and can be asked for again on its own.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { limiter } from './_lib/limit.mjs';
-import { KINDS, RRC, NWI, SDA, SOILS_WMS, kindsIn, siteExtent, featureRow, fieldsOf, summarize, soilsQuery, soilsShareQuery, parseSoils, esriPolygon, SOURCES } from '../lib/env.mjs';
+import { KINDS, RRC, NWI, SDA, SOILS_WMS, kindsIn, siteExtent, featureRow, fieldsOf, inTexas, summarize, soilsQuery, soilsShareQuery, parseSoils, esriPolygon, SOURCES } from '../lib/env.mjs';
 import { areaSqMi } from '../lib/fema.mjs';
 import { circle, cleanGeometry } from './crime.js';
 import { tileBBox } from './fema.js';
@@ -119,11 +119,12 @@ export async function envReport(site, { label, kinds, full = false, offset = 0, 
   const sq = areaSqMi(site);
   if (sq > MAX_SQMI) { const e = new Error('That area is larger than ' + MAX_SQMI.toLocaleString('en-US') + ' square miles. Pick a smaller area.'); e.status = 400; throw e; }
   const ext = siteExtent(site); if (!ext) { const e = new Error('No site shape.'); e.status = 400; throw e; }
-  const want = (kinds?.length ? kinds.filter(k => KINDS[k]) : Object.keys(KINDS)), run = limiter(10);
+  const tx = inTexas(ext.center), want = (kinds?.length ? kinds.filter(k => KINDS[k]) : Object.keys(KINDS)).filter(k => tx || KINDS[k].state !== 'TX'), run = limiter(10);
+  const skipped = (kinds?.length ? kinds.filter(k => KINDS[k]) : Object.keys(KINDS)).filter(k => !want.includes(k)).map(k => [k, { kind: k, label: KINDS[k].label, search_mi: KINDS[k].mi, notCovered: KINDS[k].note }]);
   const part = async fn => { try { return await fn(); } catch (e) { return { error: e.late ? 'didn’t finish in time' : e.message }; } };
   const [res, soil] = await Promise.all([Promise.all(want.map(k => part(() => kindReport(k, site, ext, { run, deadline, full, offset })))),
     !kinds?.length || kinds.includes('soils') ? part(() => soils(site, deadline)) : null]);
-  const out = Object.fromEntries(want.map((k, i) => [k, res[i].error ? { kind: k, label: KINDS[k].label, search_mi: KINDS[k].mi, error: res[i].error } : res[i]]));
+  const out = Object.fromEntries(want.map((k, i) => [k, res[i].error ? { kind: k, label: KINDS[k].label, search_mi: KINDS[k].mi, error: res[i].error } : res[i]]).concat(skipped));
   return { label, area_sqmi: Math.round(sq * 1000) / 1000, center: ext.center.map(v => Math.round(v * 1e5) / 1e5), kinds: out, ...(soil ? { soils: soil.error ? soil : { list: soil, note: soil.note } } : {}), sources: SOURCES };
 }
 
