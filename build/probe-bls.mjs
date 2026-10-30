@@ -1,7 +1,7 @@
 // Diagnostic: BLS Consumer Expenditure series from a cloud server (Actions). Run "Probe services" with script=bls.
 // Findings 2026-10-03: download.bls.gov (flat-file catalog) answers 403 to the runner whatever the User-Agent; the public API works.
 // This maps the series codes the build needs without the catalog: income ranges, regions and item codes.
-const UA = 'FinishesSolutions-RealEstateIntel/1.0 (+https://github.com/Finishes-Solutions/fs-real-estate-intelligence)';
+const UA = 'RealEstateIntelligence/1.0 (+https://github.com/Finishes-Solutions/fs-real-estate-intelligence)';
 async function api(ids) {
   const r = await fetch('https://api.bls.gov/publicAPI/v1/timeseries/data/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': UA },
     body: JSON.stringify({ seriesid: ids, startyear: '2024', endyear: '2024' }), signal: AbortSignal.timeout(30000) });

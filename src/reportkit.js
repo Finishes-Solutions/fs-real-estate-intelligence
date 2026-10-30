@@ -79,7 +79,7 @@ export const REPORT_CSS = '*{box-sizing:border-box}html{-webkit-print-color-adju
   'body{margin:0;background:#fff;font-family:Inter,system-ui,sans-serif;color:#23282a;font-size:10.5px;line-height:1.5}.wrap{max-width:1000px;margin:0 auto;padding:28px}' +
   '.hd{position:relative;overflow:hidden;background:#16191a;color:#fff;border-radius:6px;padding:20px 22px 22px;display:flex;justify-content:space-between;align-items:flex-start;gap:24px;' +
     'background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:22px 22px}' +
-  '.hd:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:#0b7a5f}.hd img{height:40px;flex:none;margin-top:2px}' +
+  '.hd:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:#0b7a5f}.hd img{height:20px;flex:none;margin-top:6px}' +
   '.k{font-family:Inter,sans-serif;font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#0b7a5f}.hd .k{color:#8acda3}' +
   'h1{font-size:24px;line-height:1.15;letter-spacing:-.02em;font-weight:800;margin:7px 0 6px;color:#0b0d0c}.hd h1{color:#fff}.meta{color:#6b7174}.hd .meta{color:#bcc2c4;font-size:10.5px}' +
   'h2,.lt{position:relative;font-size:13px;font-weight:700;color:#0b0d0c;margin:22px 0 9px;padding-top:9px;border-top:1px solid #e8ebeb;break-after:avoid}h2:before,.lt:before{content:"";position:absolute;left:0;top:-1px;width:28px;height:2px;background:#0b7a5f}' +

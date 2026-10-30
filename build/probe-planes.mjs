@@ -1,5 +1,5 @@
 // Diagnostic: live aircraft around Houston and what the route / type lookups return for them. Run "Probe services" with script=planes.
-const H = { 'User-Agent': 'FinishesSolutions-probe/1.0', 'Content-Type': 'application/json' };
+const H = { 'User-Agent': 'RealEstateIntelligence-probe/1.0', 'Content-Type': 'application/json' };
 const j = async (u, o) => { const t = Date.now(); try { const r = await fetch(u, { ...o, headers: H, signal: AbortSignal.timeout(10000) }); const x = await r.text(); return { s: r.status, ms: Date.now() - t, x }; } catch (e) { return { s: 'ERR ' + e.message, ms: Date.now() - t, x: '' }; } };
 const pt = await j('https://api.adsb.lol/v2/point/29.98/-95.34/40');
 console.log('point', pt.s, pt.ms + 'ms');

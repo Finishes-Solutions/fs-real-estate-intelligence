@@ -10,7 +10,7 @@ import { log, sleep } from './util.mjs';
 import { parseGoogleNews } from '../api/news.js';
 import { TOPIC } from '../lib/news-query.mjs';
 
-const UA = { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions filings map build)' };
+const UA = { 'User-Agent': 'Mozilla/5.0 (RealEstateIntelligence filings map build)' };
 async function get(url, { ms = 60000, head = false } = {}) {
   const r = await fetch(url, { method: head ? 'HEAD' : 'GET', headers: UA, signal: AbortSignal.timeout(ms) });
   return r;

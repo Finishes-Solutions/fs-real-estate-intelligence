@@ -44,7 +44,7 @@ globalThis.fetch = async (url, opts = {}) => {
   assert.notEqual(u.host, 'download.bls.gov', 'the build must not depend on the flat-file catalog');
   if (u.host === 'api.bls.gov') {
     calls++; const b = JSON.parse(opts.body); assert.ok(b.seriesid.length <= 25, 'v1: 25 series a request');
-    assert.match(opts.headers?.['User-Agent'] || '', /FinishesSolutions/, 'descriptive user agent');
+    assert.match(opts.headers?.['User-Agent'] || '', /RealEstateIntelligence/, 'descriptive user agent');
     return Response.json({ status: 'REQUEST_SUCCEEDED', Results: { series: b.seriesid.map(id => ({ seriesID: id, data: VAL[id] == null ? [] : [{ year: '2024', period: 'A01', value: String(VAL[id]) }, { year: '2023', period: 'A01', value: '1' }] })) } });
   }
   return new Response('unmocked', { status: 599 });

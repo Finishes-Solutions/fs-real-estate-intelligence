@@ -6,7 +6,7 @@ import { log } from './util.mjs';
 import { seriesIds, ceFrom } from '../lib/spending.mjs';
 
 // a descriptive agent with a contact, as BLS asks of scripted clients
-const HEAD = { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0 (+https://github.com/Finishes-Solutions/fs-real-estate-intelligence)', Accept: 'text/plain,application/json' };
+const HEAD = { 'User-Agent': 'RealEstateIntelligence/1.0 (+https://github.com/Finishes-Solutions/fs-real-estate-intelligence)', Accept: 'text/plain,application/json' };
 
 async function values(ids, env, fetchImpl) {
   const key = env.BLS_KEY, url = 'https://api.bls.gov/publicAPI/' + (key ? 'v2' : 'v1') + '/timeseries/data/', per = key ? 50 : 25, now = new Date().getUTCFullYear();
