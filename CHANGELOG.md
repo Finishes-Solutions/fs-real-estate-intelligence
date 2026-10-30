@@ -3,6 +3,12 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-30
+
+### 12:09 AM CT: Sharper ground elevations, and four new site report layouts (b3e85f4)
+- **Ground elevations without the 3,600-point limit.** A site's ground now comes from USGS lidar as one elevation image, read every 3 feet (up to 250,000 points; a 300-acre tract every 8 feet or so, where it used to be every 60). Contours, slopes, the low and high ground and the plan set's grading follow the real land closely. If the image service is down, the old point-by-point reading still answers.
+- **New report layouts (not yet in the app):** Parcel Map (to scale, every line dimensioned, bearings and corner coordinates, an area check against the tax roll, a page per parcel), Topography (lidar contours over a hillshade, slope and drainage, two cross-sections, earthwork at three pad heights), Site Environmental (records around the parcel, soils, flood and hazards) and an Area Report in 1, 3, 5 and 10-mile rings (people, income, spending and construction, each census tract counted for its share inside the ring). All unbranded, black and white with blue accents. They go into the Reports tab once the look is approved.
+
 ## 2026-10-27
 
 ### 8:20 PM CT: The Feasibility workspace merged in, with a layout gallery on its Site step (b8532b3)
