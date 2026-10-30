@@ -92,4 +92,18 @@ assert.equal((await call({ origin: [1], ring: fm362.ring })).code, 400);
 assert.equal((await call({ origin: fm362.origin, ring: [[0, 0], [1, 1]] })).code, 400);
 assert.equal((await call({ origin: fm362.origin, ring: [[0, 0], [40000, 0], [0, 100]] })).code, 400, 'over 5 miles across');
 globalThis.fetch = real;
+
+// padFit: how a piece sits on a hillside. A plane falling 50% to the south (y), 10 ft cells
+{ const TR = await import('../lib/terrain.mjs'), nx = 41, ny = 41, z = []; for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) z.push(1000 + 0.5 * (j * 10 - 200));
+  const T = { x0: -200, y0: -200, cell: 10, nx, ny, z };
+  const court = TR.padFit(T, { kind: 'court', x: 0, y: 0, w: 120, d: 60, rot: 0 }); // its 60 ft depth across the slope
+  assert.ok(Math.abs(court.fall - 30) < 3, 'falls ~30 ft across 60 ft: ' + court.fall); assert.ok(Math.abs(court.slope - 50) < 0.5, 'a 50% plane: ' + court.slope); assert.equal(court.toward, 'south');
+  assert.ok(Math.abs(court.pad - 1000) < 0.6, 'balanced pad at the middle'); assert.ok(Math.abs(court.cutCy - court.fillCy) < 5, 'cut balances fill'); assert.ok(court.cutWall > 13 && court.fillWall > 13 && court.level === 'major');
+  const along = TR.padFit(T, { kind: 'court', x: 0, y: 0, w: 120, d: 60, rot: 90 }); assert.ok(along.fall > court.fall * 1.8, 'turned down the slope it falls twice as far');
+  const cabin = TR.padFit(T, { kind: 'building', use: 'sfr', floors: 3, x: 0, y: 0, w: 33.33, d: 20, rot: 0 }); // 10 ft of fall: a walk-out
+  assert.equal(cabin.walkout, true); assert.equal(cabin.level, 'walkout'); assert.equal(cabin.cutCy, 0);
+  const deep = TR.padFit(T, { kind: 'building', use: 'sfr', floors: 3, x: 0, y: 0, w: 33.33, d: 60, rot: 0 }); assert.equal(deep.walkout, false); assert.ok(deep.wall > 10, 'too deep for one walk-out floor');
+  const flat = TR.padFit({ ...T, z: z.map(() => 1000) }, { kind: 'parking', x: 0, y: 0, w: 90, d: 60, rot: 0 }); assert.equal(flat.level, 'flat');
+  assert.match(TR.fitLine(court), /level pad at about 1,000 ft, .* CY cut .* retaining walls up to \d+ ft uphill/); assert.match(TR.fitLine(cabin), /walk-out/);
+  assert.equal(TR.padFit({ ...T, z: z.map(() => null) }, { kind: 'court', x: 0, y: 0, w: 60, d: 60, rot: 0 }), null, 'no ground known: no fit'); }
 console.log('terrain ok');

@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 12:41 PM CT: Courts by sport, event venues, mountain cabins, the ground under each piece, and Montreve laid out on its lidar (commit hash added when pushed)
+- **Tennis, pickleball and basketball courts** at regulation size, each court drawn with its lines (the pickleball kitchen, tennis service boxes, the basketball key) and its net on the map, the PDF sheet and the 3D picture; a **Sport** picker and a **Courts** count in the Selected box; "add 2 tennis courts beside the clubhouse" works; courts have a legend line.
+- **Event / wedding venue** is a use of its own (a space for every 2.5 guests, pale glass blue, in the legend, the budget at $550 a sf, the AI's words "wedding venue", "event center", "banquet hall").
+- **Resort & recreation** in the building library: the Montreve cabin (3 levels, 2,444 sf, indoor pool), 2-6 bedroom mountain cabins, 3,000 and 6,000 sf glass event pavilions, an event barn, a wedding chapel, a dining and catering hall, a caterers' kitchen, a clubhouse and a gate house. Cabins have no garage (driveway parking), a flat roof and a walk-out level in 3D.
+- **The ground under a piece:** with the site's lidar loaded, the Selected box gives a building's, court's or parking row's fall, its level pad, cut and fill and retaining walls, or whether a home works as a walk-out (`lib/terrain.mjs` padFit).
+- **Montreve Mountain Club** gets a **Full program** option (`build/projects/montreve.mjs`, seeded by the Seed project workflow): the 30 platted lots laid on the Regrid parcel (best overlap with the vector lot map, no turn, so the map is north-up), USGS lidar for the ground, the pavilion and lawn on lots 14-15, the hall on 12-13, the courts on 10-11, head-in and shoulder parking along Amber Valley Way, and a cabin on each of the 24 sale lots facing downhill: 14 are clean walk-outs, driveways mostly 2-17% (lot 28 at 20%, lot 29 at 27%). The level pieces need retaining walls of about 5 ft (the hall) to 18 ft (the pavilion and courts); event parking is 30 cars (24 head-in, 6 on the shoulder), about half of what a 150-guest wedding needs, so larger events need a shuttle or valet.
+- **Merged the experimental branch** into `matthew/montreve` (its own out-of-Texas parcel work replaces mine).
+
 ### 11:31 AM CT: Steadier streams in the environmental report (f4cad84)
 - **USGS streams and water bodies get a second try** when the service is slow (it timed out once on the Sevier County parcel and the page said "not loaded"), and the report fetches all its map layers at the same time, so it finishes sooner.
 - **No ", TX" on a parcel outside Texas** in the report headers.
