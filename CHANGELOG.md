@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 12:23 PM CT: A readable Parcel Map for traced outlines, and the outline as GeoJSON (bb0ad1a)
+- **Rural parcels read cleanly.** A county outline traced along a creek or road (2481 Happy Hollow Rd has 772 points) used to list hundreds of 1–3 ft "courses" that ran off the page, with the corner dots merged into a grey smear on the map. The report now lists the real corners, the straight courses and the curves (each with its chord bearing and length, arc length, radius and angle), marks only those corners on the map, and carries long tables on to the next page. The whole outline is still drawn exactly.
+- **Corners keep their numbers and order:** courses now really run clockwise from the county's corner 1, as the page says; a clean deed outline keeps every corner, however slight the bend.
+- **Acres and values from Regrid:** where the Regrid record has been fetched for the parcel, the report uses it (acres, land and total value, zoning) instead of showing 0.00 acres and $0; where nothing is on record it shows a dash.
+- **New: Parcel Outline (GeoJSON).** A button beside the site reports saves the full outline, every point, with everything on record (every Regrid field when fetched), its area, perimeter and courses, for QGIS, ArcGIS, Google Earth or CAD.
+
 ### 12:05 PM CT: A 3D view in the Topography report (eb4e875)
 - **See the ground in 3D.** The Topography report's second page now shows the site and the land around it as a block of ground: a big view looking up the slope from the site's low side and two smaller views from other sides, coloured from green (low) to tan and white (high), shaded by the sun, with contour bands, the site boundary draped on the ground and the lowest and highest points marked. Each view has a north arrow and says which way it looks.
 - **Honest about scale:** on gentle land the heights are stretched (up to 5×) so the shape shows, and the page says by how much; hilly land like Sevier County is drawn true to scale.
