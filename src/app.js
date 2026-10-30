@@ -141,7 +141,7 @@ const GJ={
 const IDX=new Map(F.map((f,i)=>[f,i]));
 function filingsFC(){ return fc(visible.map(f=>({type:'Feature',properties:{i:IDX.get(f),t:f.type,r:f.r,lc:Math.log10(Math.max(f.cost,1e4)),h:(f.approx||f.type==='Addition')?1:0},geometry:{type:'Point',coordinates:[f.lon,f.lat]}}))); }
 const C=()=>(isSat()?{new:'#5fd38a',reno:'#f1f3f3',add:'#c2e3d0',line:'rgba(255,255,255,.85)',waller:'#8acda3',dot:'#ffffff',lab:'#ffffff',halo:'#0b0d0c',sel:'#c2e3d0',stroke:'#0b0d0c'}
-  : {new:'#006527',reno:'#6b7174',add:'#1f9249',line:'rgba(22,25,26,.45)',waller:'#006527',dot:'#5b6366',lab:'#23282a',halo:'#ffffff',sel:'#006527',stroke:'#ffffff'});
+  : {new:'#0b7a5f',reno:'#6b7174',add:'#10a37f',line:'rgba(22,25,26,.45)',waller:'#0b7a5f',dot:'#5b6366',lab:'#23282a',halo:'#ffffff',sel:'#0b7a5f',stroke:'#ffffff'});
 let labelFont=['Noto Sans Bold'];
 
 // one cell of the dot grid's pattern (7 px, drawn at 2x for sharp dots); the home county's dots are a touch bigger so they cover the grey ones
@@ -175,7 +175,7 @@ function addOverlays(){
   addUsCounties();
   const col=['match',['get','t'],'New',c.new,'Reno',c.reno,c.add];
   map.addLayer({id:'heat',type:'heatmap',source:'filings',maxzoom:17,layout:{visibility:'none'},paint:{'heatmap-radius':['interpolate',['linear'],['zoom'],4,8,8,18,11,32,14,48,17,70],'heatmap-intensity':['interpolate',['linear'],['zoom'],4,.6,9,.9,13,1.3],
-    'heatmap-opacity':['interpolate',['linear'],['zoom'],11,.85,15,.4],'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(0,0,0,0)',.08,'rgba(138,205,163,.18)',.25,'rgba(138,205,163,.55)',.45,'#8acda3',.65,'#4caf70',.82,'#1f9249',.93,'#006527',1,'#00351a']}});
+    'heatmap-opacity':['interpolate',['linear'],['zoom'],11,.85,15,.4],'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(0,0,0,0)',.08,'rgba(138,205,163,.18)',.25,'rgba(138,205,163,.55)',.45,'#8acda3',.65,'#4caf70',.82,'#10a37f',.93,'#0b7a5f',1,'#00351a']}});
   map.addLayer({id:'filings',type:'circle',source:'filings',paint:{'circle-color':col,
     'circle-stroke-color':['case',['==',['get','h'],1],col,c.stroke],'circle-stroke-width':['case',['==',['get','h'],1],1.4,.8],'circle-pitch-alignment':'map'}});
   map.addLayer({id:'filings-hl',type:'circle',source:'filings',filter:['==',['get','i'],-1],paint:{'circle-radius':['+',markerRadius(),6],'circle-color':'rgba(0,0,0,0)','circle-stroke-color':isSat()?'#ffffff':'#0b0d0c','circle-stroke-width':2.2}});
@@ -988,7 +988,7 @@ let pinMarker=null;
 function setPin(c){
   if(!c){ if(pinMarker){ pinMarker.remove(); pinMarker=null; } return; }
   if(!pinMarker){ const el=document.createElement('div'); el.className='pin';
-    el.innerHTML='<svg width="26" height="34" viewBox="0 0 26 34"><path d="M13 33C13 33 2 20.5 2 12.5a11 11 0 0 1 22 0C24 20.5 13 33 13 33z" fill="#006527" stroke="#fff" stroke-width="2"/><circle cx="13" cy="12.5" r="4" fill="#fff"/></svg>';
+    el.innerHTML='<svg width="26" height="34" viewBox="0 0 26 34"><path d="M13 33C13 33 2 20.5 2 12.5a11 11 0 0 1 22 0C24 20.5 13 33 13 33z" fill="#0b7a5f" stroke="#fff" stroke-width="2"/><circle cx="13" cy="12.5" r="4" fill="#fff"/></svg>';
     pinMarker=new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat(c).addTo(map); } else pinMarker.setLngLat(c);
 }
 function setRadiusCenter(c,label,fly){ sel.center=c; sel.place=label; updateRadius(fly); }
@@ -1135,11 +1135,11 @@ function exportGeoJSON(list,name){ const rows=rowsFor(list);
 document.getElementById('selClear').onclick=()=>{ clearSelection(); setMode('pan'); }; // whichever tool made the area is done with: the radius dialog closes too
 // the filings on a street map, framed on the selection (or the filings), for the Summary report
 function reportMap(list){
-  const pts=list.slice().sort((a,b)=>b.cost-a.cost).map(f=>{ const col=f.type==='New'?'#006527':f.type==='Reno'?'#6b7174':'#1f9249';
+  const pts=list.slice().sort((a,b)=>b.cost-a.cost).map(f=>{ const col=f.type==='New'?'#0b7a5f':f.type==='Reno'?'#6b7174':'#10a37f';
     return {c:[f.lon,f.lat],r:+Math.max(2.5,Math.min(14,2+Math.sqrt(f.cost/1e6)*1.2)).toFixed(1),color:col,o:f.type==='New'?.85:.7,hollow:f.type==='Addition'||!!f.approx}; });
-  if(sel.kind==='radius'&&sel.center) pts.push({c:sel.center,r:6,color:'#006527'});
+  if(sel.kind==='radius'&&sel.center) pts.push({c:sel.center,r:6,color:'#0b7a5f'});
   const fit=sel.feature||(list.length?{type:'MultiPoint',coordinates:list.map(f=>[f.lon,f.lat])}:{type:'MultiPolygon',coordinates:DATA.counties.flatMap(c=>c.outline)});
-  return areaMap(sel.feature?[{geometry:sel.feature,stroke:'#006527',fill:'rgba(0,101,39,.08)',dash:true}]:[],{W:1000,H:560,fit,points:pts});
+  return areaMap(sel.feature?[{geometry:sel.feature,stroke:'#0b7a5f',fill:'rgba(16,163,127,.08)',dash:true}]:[],{W:1000,H:560,fit,points:pts});
 }
 
 // ---------- views ----------

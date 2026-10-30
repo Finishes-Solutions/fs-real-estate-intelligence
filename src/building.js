@@ -16,7 +16,7 @@ export function initBuildings(ctx) {
   toggle.checked = on;
 
   const vectorSource = () => { const s = map.getStyle()?.sources || {}; return Object.keys(s).find(id => s[id].type === 'vector' && /maptiler|openmaptiles|planet/i.test(id + (s[id].url || ''))); };
-  const colors = () => ({ fill: '#d5dadb', sel: '#1f9249', sel2: '#9fd4b2' });
+  const colors = () => ({ fill: '#d5dadb', sel: '#10a37f', sel2: '#9fd4b2' });
   const H = ['coalesce', ['get', 'render_height'], ['get', 'height'], 6], B = ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0];
 
   function addLayers() {

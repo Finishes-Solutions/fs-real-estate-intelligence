@@ -6,7 +6,7 @@
 // Sizes (2026-10-15): area.js draws every chart at its box's measured width, so one viewBox unit is one CSS pixel and the
 // 11 px axis text really is 11 px. The y axis leaves room for its longest label, and x labels that would collide are thinned.
 export const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-export const PAL = ['#006527', '#2a78d6', '#c26a00', '#7c3aed', '#8a9396', '#0e7c86', '#b3261e'];
+export const PAL = ['#0b7a5f', '#2a78d6', '#c26a00', '#7c3aed', '#8a9396', '#0e7c86', '#b3261e'];
 export const col = i => 'var(--mk-c' + i + ',' + PAL[i] + ')';
 export const mlabel = m => MON[+String(m).slice(5, 7) - 1] + ' ' + String(m).slice(0, 4);
 

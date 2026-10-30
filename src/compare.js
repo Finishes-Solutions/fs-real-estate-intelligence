@@ -8,7 +8,7 @@ import { reveal } from './motion.js';
 import { centroid } from './lib/demographics.mjs';
 
 const MAX = 4;
-const COLORS = ['#006527', '#b7791f', '#2b6cb0', '#9b2c6f'];
+const COLORS = ['#0b7a5f', '#b7791f', '#2b6cb0', '#9b2c6f'];
 // Share-of-value-by-use segments: their own categorical colours (CSS vars), never the area colours
 const USE_PAL = ['var(--cmp-u0)', 'var(--cmp-u1)', 'var(--cmp-u2)', 'var(--cmp-u3)', 'var(--cmp-u4)', 'var(--cmp-u5)'], USE_OTHER = 'var(--cmp-uo)';
 // the unit of each filing metric, for the raw numbers in Excel and CSV
