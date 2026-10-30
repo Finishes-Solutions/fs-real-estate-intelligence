@@ -17,9 +17,9 @@ assert.equal(PL.ringAreaFt([[0, 0], [10, 0], [10, 20], [0, 20]]), 200);
 
 // ---------- parcel map ----------
 { const G = PM.geometryOf([parcel]), g = G.list[0], L = g.courses.map(c => Math.round(c.len));
-  assert.deepEqual(L, [242, 43, 430, 189, 469], 'the five lines as the county sheet dimensions them (242, 43, 431, 189, 470 rounded there)');
+  assert.deepEqual(L, [469, 189, 430, 43, 242], 'the five lines as the county sheet dimensions them (242, 43, 431, 189, 470 rounded there), read clockwise from its corner 1 as the page says'); assert.equal(g.corners.length, 5, 'a clean five-corner outline keeps every corner, the slight 43 ft bend too');
   assert.ok(Math.abs(g.area / 43560 - 2.2926) < 0.02, 'the outline measures the roll\'s 2.29 acres, not Regrid\'s 2.41 GIS acres (' + (g.area / 43560).toFixed(3) + ')');
-  assert.match(g.courses[0].brg, /^N \d\d°\d\d'\d\d" E$/); assert.ok(g.box.w > 250 && g.box.w < 300 && g.box.d > 480 && g.box.d < 520, 'fits a box about 276 x 501 ft');
+  assert.match(g.courses[0].brg, /^N \d\d°\d\d'\d\d" W$/); assert.ok(g.box.w > 250 && g.box.w < 300 && g.box.d > 480 && g.box.d < 520, 'fits a box about 276 x 501 ft');
   const flags = PM.recordFlags(parcel, g.area / 43560); assert.equal(flags.length, 1, 'one check: the building on a vacant, $0-improvement record'); assert.match(flags[0], /2,175 sf, built 1975/);
   assert.match(PM.recordFlags({ ...parcel, bldgSf: 0, yearBuilt: '' }, 2.6)[0], /measures 2\.60 ac against 2\.29 ac/, 'an outline 13% off the roll is flagged');
   const html = PM.parcelReport({ title: '15514 Elgin Street', area: 'Harris County, TX', date: '2026-10-30', parcels: [parcel], site: { flood: { zone: 'X', risk: 'minimal' }, schools: ['Channelview ISD'], near: ['Houston'] } });
@@ -42,7 +42,51 @@ const T = { ...spec, z, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1 };
   const sl = TP.slopeGrid(T); assert.ok(Math.abs(sl[Math.floor(spec.ny / 2) * spec.nx + spec.nx - 5] - Math.hypot(1.2, 0.1)) < 0.05, 'slope in percent away from the ditch');
   const html = TP.topoReport({ title: 'Elgin', date: '2026-10-30', terrain: T, ring, origin, png: pngDataUrl });
   assert.ok(html.includes('data:image/png;base64,') && html.includes('falls west') && html.includes('Earthwork to level the whole site') && html.includes('A–A') && html.includes('balanced'), 'map, sections and earthwork');
-  assert.ok(html.includes(Number(spec.nx * spec.ny).toLocaleString('en-US') + ' points'), 'says how many points'); }
+  assert.ok(html.includes(Number(spec.nx * spec.ny).toLocaleString('en-US') + ' points'), 'says how many points');
+  assert.ok(html.includes('Topography · 3D view') && /Heights stretched [\d.]+× so the shape of gentle ground shows/.test(html), 'a 3D page, heights stretched on gentle ground and said so');
+  assert.ok(html.indexOf('3D view') < html.indexOf('slope &amp; drainage') || html.indexOf('3D view') < html.indexOf('slope & drainage'), 'the 3D page comes second'); }
+// the 3D view: right way round (a first draw had east and west swapped), hills higher on screen, hidden ground known
+{ const D = await import('../lib/reports/terrain3d.mjs'), nx = 61, ny = 61, cell = 20, zz = new Float32Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) zz[j * nx + i] = 500 + 120 * Math.exp(-(((i - 45) / 8) ** 2 + ((j - 45) / 8) ** 2)); // a hill in the north-east
+  const T3 = { nx, ny, cell, x0: -600, y0: -600, z: zz }, sq = [[-200, -200], [200, -200], [200, 200], [-200, 200]];
+  const S = D.view3d(T3, sq, { W: 360, H: 240, azimuth: 180, ss: 1 }); // standing in the south, looking north
+  const [ex, ey] = S.P([500, 0, 500]), [wx] = S.P([-500, 0, 500]), [, ny0] = S.P([0, -500, 500]), [, ny1] = S.P([0, 500, 500]);
+  assert.ok(ex > wx, 'looking north, east is on the right'); assert.ok(ny1 < ny0, 'farther ground is higher on the page');
+  assert.ok(Math.abs(S.north) < 1, 'north points up the page: ' + S.north);
+  const N = D.view3d(T3, sq, { W: 360, H: 240, azimuth: 90, ss: 1 }); assert.ok(Math.abs(N.north - 90) < 1, 'standing in the east looking west, north is on the right (the arrow turned 90°): ' + N.north);
+  const [, hy] = S.P([300, 300, 620]), [, gy] = S.P([300, 300, 500]); assert.ok(hy < gy, 'the hilltop stands above its foot');
+  assert.equal(S.P([300, 500])[2], false, 'ground behind the hill, looking from the south, is hidden'); assert.equal(S.P([0, -500])[2], true, 'the near ground is in sight');
+  assert.equal(D.autoExaggeration({ ...T3, z: zz.map(v => 500 + (v - 500) / 100) }), 5, 'nearly flat ground: stretched the most (5×)'); assert.equal(D.autoExaggeration(T3), 2, 'a 120 ft hill on 1,200 ft: 2×'); assert.equal(D.autoExaggeration({ ...T3, z: zz.map(v => 500 + (v - 500) * 4) }), 1, 'a 480 ft mountain: true to scale');
+  assert.equal(S.w * S.h * 4, S.rgba.length); }
+
+// ---------- a densely traced rural outline (2481 Happy Hollow Rd, Sevier County TN, 2026-10-30: 772 points, listed as 772
+// courses of a foot or two that ran off the page, and the corner dots merged into a grey band along the creek) ----------
+{ const C3 = await import('../lib/reports/courses.mjs'), o = [-83.69115, 35.72452], F3 = frame(o), pts = [], jit = i => Math.sin(i * 12.9898) * 0.25;
+  pts.push([-560, 120], [-80, 130], [700, 300], [690, -80]); // the north and east deed lines: four clean corners
+  for (let i = 0; i <= 600; i++) { const x = 690 - i * 2.25, y = -300 + 70 * Math.sin(x / 160) + jit(i); pts.push([x, y]); } // the creek, every ~2.5 ft, S-bends
+  for (let i = 1; i < 150; i++) { const t = i / 150, x = -660 + 100 * Math.sin(t * Math.PI), y = -300 + 420 * t + jit(i + 900); pts.push([x, y]); } // the road frontage, a long bend
+  const geomTN = pts.map(p => F3.toLL(p)).concat([F3.toLL(pts[0])]);
+  const { corners, courses } = C3.boundaryCourses(pts.map(p => p));
+  assert.ok(pts.length > 700 && courses.length <= 40 && corners.length === courses.length, pts.length + ' points read as ' + courses.length + ' courses');
+  assert.ok(courses.filter(c => c.type === 'curve').length >= 3, 'the creek\'s S-bends and the road\'s bend read as curves');
+  for (const k of [0, 1, 2]) assert.ok(corners.some(q => Math.hypot(q[0] - pts[k][0], q[1] - pts[k][1]) < 0.01), 'the deed corners are kept exactly');
+  const per = courses.reduce((s, c) => s + (c.arc || c.len), 0), full = pts.reduce((s, p, i) => s + Math.hypot(pts[(i + 1) % pts.length][0] - p[0], pts[(i + 1) % pts.length][1] - p[1]), 0);
+  assert.ok(Math.abs(per / full - 1) < 0.02, 'the courses (arcs for curves) add up to the perimeter: ' + per.toFixed(0) + ' vs ' + full.toFixed(0));
+  for (const c of courses.filter(c => c.type === 'curve')) assert.ok(c.arc >= c.len && c.radius > 0 && c.delta > 0 && c.delta < 360, 'a curve has an arc longer than its chord, a radius and an angle');
+  const html = PM.parcelReport({ title: '2481 Happy Hollow Rd', date: '2026-10-30', parcels: [{ id: '122 00500 000', owner: 'HAPPY HALLOW CABINS LLC', situs: '2481 HAPPY HOLLOW RD', acres: 30.04, geom: geomTN }] });
+  const bpages = html.split('<section class="pg"').filter(x => x.includes('Parcel map · boundary'));
+  for (const pg of bpages) assert.ok((pg.match(/<tr>/g) || []).length <= 46, 'no boundary page holds more rows than fit: ' + (pg.match(/<tr>/g) || []).length);
+  assert.ok(html.includes('Points in the outline') && html.includes('GeoJSON export') && /Curve (right|left) · arc/.test(html), 'says the outline was summarised, and where to get all of it');
+  // the GeoJSON export: every point of the outline, the record, every Regrid field, the measures and the courses
+  const GJ = await import('../lib/reports/geojson.mjs'), poly = { type: 'Polygon', coordinates: [geomTN] };
+  const fc = GJ.parcelGeoJSON([{ propId: '122 00500 000', owner: 'HAPPY HALLOW CABINS LLC', acres: 30.04, landValue: 190600, geometry: poly, raw: { x: 1 } }], { regrid: { fields: [['Acres', '30.0669'], ['Owner', 'HAPPY HALLOW CABINS LLC']], more: [['ll_uuid', '07f96ea9'], ['topography', '2 MOUNTAINOUS']] }, label: '2481 Happy Hollow Rd' });
+  const f0 = fc.features[0]; assert.equal(fc.type, 'FeatureCollection'); assert.equal(f0.geometry, poly, 'the outline exactly as drawn, not thinned');
+  assert.equal(f0.properties.outline.points, pts.length); assert.equal(f0.properties.landValue, 190600); assert.equal(f0.properties.regrid.topography, '2 MOUNTAINOUS'); assert.ok(!('raw' in f0.properties) && !('geometry' in f0.properties));
+  assert.ok(Math.abs(f0.properties.outline.area_sqft - Math.abs(PL.ringAreaFt(pts))) / f0.properties.outline.area_sqft < 0.001, 'its area');
+  assert.equal(f0.properties.courses.length, courses.length, 'the courses as the Parcel Map lists them'); assert.ok(f0.properties.courses.some(c => c.type === 'curve' && c.arc_ft > c.distance_ft && c.radius_ft > 0));
+  assert.ok(JSON.parse(JSON.stringify(fc)).features[0].geometry.coordinates[0].length === geomTN.length, 'survives JSON');
+  assert.equal(GJ.parcelGeoJSON([{ propId: 'x' }]).features.length, 0, 'no outline, no feature');
+  const dots = (html.split('<section class="pg"')[1].match(/r="2.2"/g) || []).length; assert.ok(dots <= 45, 'the map marks the corners, not every point: ' + dots); }
 
 // ---------- site environmental ----------
 { const kinds = { lpst: { label: 'Leaking petroleum storage tank (TCEQ LPST)', search_mi: 0.5, count: 2, onsite: 0, nearest: [{ name: 'SHELDON ROAD TEXACO', addr: '817 SHELDON RD', mi: 0.28, dir: 'E' }, { name: 'OLD CHEVRON', mi: 0.38, dir: 'SE' }] },
@@ -93,6 +137,18 @@ const T = { ...spec, z, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1 };
   const multi = API.toRecord({ ...card, geometry: { type: 'MultiPolygon', coordinates: [[geom.slice(0, 4).concat([geom[0]])], [geom]] } }); assert.equal(multi.geom.length, 6, 'a multipolygon: its biggest piece');
   const box = API.topoBox(ring), w = box[1][0] - box[0][0], h = box[2][1] - box[1][1]; assert.ok(Math.abs(w / h - 720 / 560) < 1e-6 && w > 800, 'the ground fetched is the page\'s shape, the site plus 300 ft');
   const html = await API.buildHtml('area', { parcels: [card], center: origin, label: '15514 Elgin St' }); assert.ok(html.includes('Area report') && html.includes('10 miles') && html.includes('ZIP 77530'), 'the area report from the card');
+  // Tennessee: tracts and figures fetched live (TIGERweb and the Census API, mocked here), with modeled spending like the app's own tracts
+  { const c = [-83.69115, 35.72452], mx = 1 / (69.172 * Math.cos(c[1] * Math.PI / 180)), my = 1 / 69.0, real = globalThis.fetch;
+    const ring = [[c[0] - 9 * mx, c[1] - 7 * my], [c[0] + 8 * mx, c[1] - 7 * my], [c[0] + 8 * mx, c[1] + 6 * my], [c[0] - 9 * mx, c[1] + 6 * my], [c[0] - 9 * mx, c[1] - 7 * my]];
+    const ACSV = ['B01003_001E', 'B19013_001E', 'B25001_001E', 'B25002_003E', 'B25064_001E', 'B25077_001E', 'B01002_001E', 'B11001_001E', ...Array.from({ length: 16 }, (_, i) => 'B19001_' + String(i + 2).padStart(3, '0') + 'E')];
+    globalThis.fetch = async (u, o) => { const h = new URL(String(u)).host;
+      if (h === 'tigerweb.geo.census.gov') return new Response(JSON.stringify({ features: [{ attributes: { GEOID: '47155080901', STATE: '47', COUNTY: '155' }, geometry: { rings: [ring] } }] }));
+      if (h === 'api.census.gov') return new Response(JSON.stringify([[...ACSV, 'state', 'county', 'tract'], ['6000', '45698', '3400', '900', '900', '260000', '48', '2400', ...Array(16).fill('150'), '47', '155', '080901']]));
+      return real(u, o); };
+    try { const tn = await API.buildHtml('area', { parcels: [{ propId: '122 00500 000', county: 'Sevier', state: 'TN', geometry: { type: 'Polygon', coordinates: [[[c[0], c[1]], [c[0] + 0.002, c[1]], [c[0] + 0.002, c[1] + 0.002], [c[0], c[1]]]] } }], center: c, label: '2481 Happy Hollow Rd' });
+      assert.ok(tn.includes('Sevier County, TN') && !tn.includes(', TX'), 'labelled Tennessee');
+      assert.match(tn, /Groceries<\/span><\/td><td class="n">\$[\d.]+[KM]</, 'modeled spending for live tracts');
+    } finally { globalThis.fetch = real; } }
   const res = { code: 0, status(c) { res.code = c; return res; }, json(o) { res.body = o; return res; }, setHeader() {} };
   await API.default({ method: 'POST', body: { kind: 'nope', parcels: [card], center: origin }, headers: { 'x-forwarded-for': '7.7.7.1' } }, res); assert.equal(res.code, 400);
   await API.default({ method: 'POST', body: { kind: 'parcel', parcels: [], center: origin }, headers: { 'x-forwarded-for': '7.7.7.2' } }, res); assert.equal(res.code, 400); assert.match(res.body.error, /Open a parcel/); }

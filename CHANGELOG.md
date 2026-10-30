@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 3:48 PM CT: Montreve work merged into experimental (commit hash added when pushed)
+- **The Montreve Mountain Club work joins the experimental branch:** courts by sport, the event / wedding venue use, the Resort & recreation buildings and cabins, the ground under each piece, and the Montreve layout builder. Nothing else changes for people using the app.
+
 ### 2:16 PM CT: Montreve's resort core designed as one plan (c0100d5)
 - **The resort core at Montreve Mountain Club is now one composed plan** on lots 10-15 instead of separate pieces each turned to the road. A stone **promenade** runs the length of the core, with everything along it in one line: the **tennis court**, **two pickleball courts**, a **court pavilion** with a viewing deck, the **dining terrace** and **The Lodge** (2,500 sf dining and catering) with its **service yard** to one side, a **cocktail terrace**, and the **6,000 sf glass wedding pavilion** with its own drop-off and lane from the road.
 - Below the promenade: **two parking bays** (76 spaces) reached from Amber Valley Way with a stair walk up to the promenade, a **village green**, a **fire-pit overlook**, and the **ceremony lawn** in front of the pavilion, edged with gardens.
@@ -17,6 +20,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **The ground under a piece:** with the site's lidar loaded, the Selected box gives a building's, court's or parking row's fall, its level pad, cut and fill and retaining walls, or whether a home works as a walk-out (`lib/terrain.mjs` padFit).
 - **Montreve Mountain Club** gets a **Full program** option (`build/projects/montreve.mjs`, seeded by the Seed project workflow): the 30 platted lots laid on the Regrid parcel (best overlap with the vector lot map, no turn, so the map is north-up), USGS lidar for the ground, and the platted roads traced to their centrelines (`projects/montreve/scripts/roads.py`) and drawn as smooth 24 ft paved roads clear of every lot. Every cabin (24) sits square to its street, centred on its lot, the deck downhill and the floor facing the road at road grade with a short straight driveway (most 10-28 ft); 11 are clean walk-outs and 20 show 15 ft of foundation or less. Along Amber Valley Way: 72 head-in spaces in rows of 8 (cuts up to about 13 ft), then the pavilion and lawn (lots 14-15), the hall (12-13) and the tennis and pickleball courts (10-11), each square to the road in front of it on a level pad: walls about 9 ft at the hall, 17-22 ft at the lawn, pavilion and pickleball, 27 ft at the tennis court.
 - **Merged the experimental branch** into `matthew/montreve` (its own out-of-Texas parcel work replaces mine).
+### 12:23 PM CT: A readable Parcel Map for traced outlines, and the outline as GeoJSON (bb0ad1a)
+- **Rural parcels read cleanly.** A county outline traced along a creek or road (2481 Happy Hollow Rd has 772 points) used to list hundreds of 1–3 ft "courses" that ran off the page, with the corner dots merged into a grey smear on the map. The report now lists the real corners, the straight courses and the curves (each with its chord bearing and length, arc length, radius and angle), marks only those corners on the map, and carries long tables on to the next page. The whole outline is still drawn exactly.
+- **Corners keep their numbers and order:** courses now really run clockwise from the county's corner 1, as the page says; a clean deed outline keeps every corner, however slight the bend.
+- **Acres and values from Regrid:** where the Regrid record has been fetched for the parcel, the report uses it (acres, land and total value, zoning) instead of showing 0.00 acres and $0; where nothing is on record it shows a dash.
+- **New: Parcel Outline (GeoJSON).** A button beside the site reports saves the full outline, every point, with everything on record (every Regrid field when fetched), its area, perimeter and courses, for QGIS, ArcGIS, Google Earth or CAD.
+
+### 12:05 PM CT: A 3D view in the Topography report (eb4e875)
+- **See the ground in 3D.** The Topography report's second page now shows the site and the land around it as a block of ground: a big view looking up the slope from the site's low side and two smaller views from other sides, coloured from green (low) to tan and white (high), shaded by the sun, with contour bands, the site boundary draped on the ground and the lowest and highest points marked. Each view has a north arrow and says which way it looks.
+- **Honest about scale:** on gentle land the heights are stretched (up to 5×) so the shape shows, and the page says by how much; hilly land like Sevier County is drawn true to scale.
+
+### 11:33 AM CT: Spending in the Area Report outside Texas (4ef5517)
+- **Consumer spending is filled in outside Texas.** In Tennessee the Area Report's spending rows (groceries, dining out, housing and so on) were blank; they're now modeled from each ring's households by income, the same way as in Texas.
 
 ### 11:31 AM CT: Steadier streams in the environmental report (f4cad84)
 - **USGS streams and water bodies get a second try** when the service is slow (it timed out once on the Sevier County parcel and the page said "not loaded"), and the report fetches all its map layers at the same time, so it finishes sooner.
