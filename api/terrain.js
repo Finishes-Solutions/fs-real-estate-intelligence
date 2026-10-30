@@ -15,7 +15,7 @@ import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { gridSpec, gridLL, cleanZ, fillGaps, terrainSig, summary, factLine, MAX_POINTS } from '../lib/terrain.mjs';
 import { frame, centroid } from '../lib/siteplan.mjs';
 
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (site terrain)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (site terrain)' };
 export const USGS = 'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/getSamples';
 export const USGS_IMAGE = 'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage';
 export const EPQS = 'https://epqs.nationalmap.gov/v1/json';

@@ -1,4 +1,4 @@
-// The app's own cursors: SVG images in the Finishes Solutions look (ink and brand green with a white halo, so they read on
+// The app's own cursors: SVG images in the Real Estate Intelligence look (ink and brand green with a white halo, so they read on
 // light and dark maps, satellite or streets). Set once as CSS variables (--cur-default, --cur-pointer, …) that app.css
 // and the map code use with the system cursor as fallback, e.g. cursor: var(--cur-pointer, pointer).
 // Text fields keep the normal I-beam; touch screens have no cursor.

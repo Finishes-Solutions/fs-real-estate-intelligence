@@ -4,7 +4,7 @@
 // agent and status from the Secretary of State. People's names (an owner that isn't a company) are not looked up.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (owner lookup)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (owner lookup)' };
 const BASE = 'https://comptroller.texas.gov/data-search/franchise-tax';
 export const SEARCH_PAGE = 'https://comptroller.texas.gov/taxes/franchise/account-status/search';
 export const SOURCE = 'Texas Comptroller of Public Accounts, franchise tax account status and Public Information Reports (officers); registered agent and status from the Texas Secretary of State.';

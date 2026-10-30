@@ -1,5 +1,5 @@
 /* The feasibility workspace (src/workspace.js): Projects › a project › Feasibility. Built on the app's tokens (app.css
-   :root: --green-*, --ink-*, --sp-*, --fs-*, --r-*, --sh-*, --focus) and the Finishes Solutions brand: hairline borders,
+   :root: --green-*, --ink-*, --sp-*, --fs-*, --r-*, --sh-*, --focus) and the Real Estate Intelligence brand: hairline borders,
    tight radii, mono uppercase labels and figures, one green. Components are documented in docs/DESIGN_SYSTEM.md. */
 .ws{--ws-steps-h:66px;--ws-warn:#8a5a12;--ws-warn-bg:#fdf6e9;--ws-err-bg:#fdf0ef;display:block;color:var(--text);font-size:var(--fs-sm);line-height:1.5}
 .ws .kicker{font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:0;text-transform:none;color:var(--green-700);font-weight:500}

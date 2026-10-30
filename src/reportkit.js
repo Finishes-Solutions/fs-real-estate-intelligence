@@ -1,4 +1,4 @@
-// Shared pieces for every report (area reports, crime, FEMA, market, filings): the Finishes Solutions report layout and
+// Shared pieces for every report (area reports, crime, FEMA, market, filings): the Real Estate Intelligence report layout and
 // its PDF export, a small SVG map of an area, tables, bar charts, saving (recorded in the Reports tab), and the registry that
 // puts every area report on the Site section, the Reports tab and the Map panel's "Reports for this area".
 import { reveal } from './motion.js';
@@ -71,21 +71,21 @@ export const middleOf = g => { let w = 180, s = 90, e = -180, n = -90; const wal
 // 'Map view near Katy', or plain 'Map view' where no place is known (never a guessed town)
 export const viewLabel = ctx => { const p = ctx.viewPlace?.(); return p ? 'Map view near ' + p : 'Map view'; };
 
-// ---------- the Finishes Solutions report look (every report, on screen and as a PDF) ----------
+// ---------- the Real Estate Intelligence report look (every report, on screen and as a PDF) ----------
 // Letter, portrait unless a report needs the width (a wide filing list). Inter for text, labels and
-// numbers, ink greys with the brand green #006527 as the accent: a dark title band with the white logo and a faint
+// numbers, ink greys with the brand green #0b7a5f as the accent: a dark title band with the white logo and a faint
 // blueprint grid, a green rule, KPI tiles with a green left rule, hairline tables and section rules.
 export const REPORT_CSS = '*{box-sizing:border-box}html{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
   'body{margin:0;background:#fff;font-family:Inter,system-ui,sans-serif;color:#23282a;font-size:10.5px;line-height:1.5}.wrap{max-width:1000px;margin:0 auto;padding:28px}' +
   '.hd{position:relative;overflow:hidden;background:#16191a;color:#fff;border-radius:6px;padding:20px 22px 22px;display:flex;justify-content:space-between;align-items:flex-start;gap:24px;' +
     'background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:22px 22px}' +
-  '.hd:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:#006527}.hd img{height:40px;flex:none;margin-top:2px}' +
-  '.k{font-family:Inter,sans-serif;font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#006527}.hd .k{color:#8acda3}' +
+  '.hd:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:#0b7a5f}.hd img{height:40px;flex:none;margin-top:2px}' +
+  '.k{font-family:Inter,sans-serif;font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#0b7a5f}.hd .k{color:#8acda3}' +
   'h1{font-size:24px;line-height:1.15;letter-spacing:-.02em;font-weight:800;margin:7px 0 6px;color:#0b0d0c}.hd h1{color:#fff}.meta{color:#6b7174}.hd .meta{color:#bcc2c4;font-size:10.5px}' +
-  'h2,.lt{position:relative;font-size:13px;font-weight:700;color:#0b0d0c;margin:22px 0 9px;padding-top:9px;border-top:1px solid #e8ebeb;break-after:avoid}h2:before,.lt:before{content:"";position:absolute;left:0;top:-1px;width:28px;height:2px;background:#006527}' +
-  'h3{font-size:12px;font-weight:700;color:#0b0d0c;margin:0 0 8px}p{margin:8px 0}a{color:#006527;font-weight:600;text-decoration:none}' +
+  'h2,.lt{position:relative;font-size:13px;font-weight:700;color:#0b0d0c;margin:22px 0 9px;padding-top:9px;border-top:1px solid #e8ebeb;break-after:avoid}h2:before,.lt:before{content:"";position:absolute;left:0;top:-1px;width:28px;height:2px;background:#0b7a5f}' +
+  'h3{font-size:12px;font-weight:700;color:#0b0d0c;margin:0 0 8px}p{margin:8px 0}a{color:#0b7a5f;font-weight:600;text-decoration:none}' +
   '.kp,.kgrid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #e8ebeb;border-radius:6px;margin-top:16px;break-inside:avoid}.kp>div,.kgrid>div{padding:10px 12px;border-left:1px solid #e8ebeb}' +
-  '.kp>div:first-child,.kgrid>div:first-child{border-left:3px solid #006527}.kp b,.kgrid b{display:block;font-family:Inter,sans-serif;font-size:17px;font-weight:600;color:#0b0d0c;line-height:1.25}' +
+  '.kp>div:first-child,.kgrid>div:first-child{border-left:3px solid #0b7a5f}.kp b,.kgrid b{display:block;font-family:Inter,sans-serif;font-size:17px;font-weight:600;color:#0b0d0c;line-height:1.25}' +
   '.kp span,.kgrid span{display:block;font-family:Inter,sans-serif;font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#6b7174;margin-top:3px}' +
   '.map{margin-top:14px;border:1px solid #e8ebeb;border-radius:6px;overflow:hidden;break-inside:avoid}.rmap{break-inside:avoid}.map svg,.bars svg,.photo img{display:block;width:100%;height:auto}.bars{max-width:620px;break-inside:avoid}' +
   '.photo{margin-top:14px;border-radius:6px;overflow:hidden;max-height:340px}.photo img{object-fit:cover;max-height:340px}.cap{font-size:9px;color:#6b7174;margin-top:3px}' +
@@ -95,8 +95,8 @@ export const REPORT_CSS = '*{box-sizing:border-box}html{-webkit-print-color-adju
   '.sc{color:#6b7174;font-size:9px}.lg{display:flex;flex-wrap:wrap;gap:14px;font-size:9.5px;color:#4d5457;margin-top:6px}.lg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}' +
   '.rnote{color:#6b7174;font-size:9.5px;margin-top:6px}.bsec{break-inside:avoid}.full{break-before:page}' +
   '.ft{margin-top:22px;padding-top:10px;border-top:1px solid #e8ebeb;color:#6b7174;font-size:9px;line-height:1.55}' +
-  '.sign{margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:10px;border-top:3px solid #006527;font-family:Inter,sans-serif;font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#6b7174;break-inside:avoid}.sign b{color:#0b0d0c;font-weight:600}' +
-  '.pb{position:fixed;right:18px;top:18px;z-index:9;background:#006527;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:600 12px Inter,sans-serif;cursor:pointer}' +
+  '.sign{margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:10px;border-top:3px solid #0b7a5f;font-family:Inter,sans-serif;font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#6b7174;break-inside:avoid}.sign b{color:#0b0d0c;font-weight:600}' +
+  '.pb{position:fixed;right:18px;top:18px;z-index:9;background:#0b7a5f;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:600 12px Inter,sans-serif;cursor:pointer}' +
   '@media print{.pb{display:none}.wrap{padding:0;max-width:none}}';
 
 // the whole document: the title band (kicker, title, meta, logo), the body, sources and the sign-off. css: the report's
@@ -106,9 +106,9 @@ export function reportDoc({ kicker, title, meta = '', body = '', sources = '', c
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(kicker + ' — ' + title) + '</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>@page{size:letter' + (landscape ? ' landscape' : '') + ';margin:.5in .5in .6in}' + REPORT_CSS + css + '</style></head><body>' +
     '<button class="pb" onclick="window.print()">Print or Save as PDF</button><div class="wrap"><div class="hd"><div><div class="k">' + esc(kicker) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + meta +
-    (meta ? ' · ' : '') + 'Generated ' + date + '</div></div><img src="' + logo + '" alt="Finishes Solutions"></div>' +
+    (meta ? ' · ' : '') + 'Generated ' + date + '</div></div><img src="' + logo + '" alt="Real Estate Intelligence"></div>' +
     body + (sources ? '<div class="ft">Sources: ' + sources + '</div>' : '') +
-    '<div class="sign"><span><b>Finishes Solutions</b> · Real Estate Development &amp; Operations</span><span>Building a Future Together</span></div></div></body></html>';
+    '<div class="sign"><span><b>Real Estate Intelligence</b></span><span>Public data, checked and cited</span></div></div></body></html>';
 }
 // [[value, label, color?], …] -> the KPI strip (report) or the card's kgrid
 export const kpiStrip = items => '<div class="kp">' + items.map(([v, l, c]) => '<div><b' + (c ? ' style="color:' + c + '"' : '') + '>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>';
@@ -120,7 +120,7 @@ export function table(headers, rows) {
     rows.map(r => '<tr>' + r.map((c, i) => '<td' + (h[i]?.r ? ' class="m r"' : h[i]?.m ? ' class="m"' : '') + '>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
 }
 // vertical bars: [{ label, v, color? }]; labels under every nth bar
-export function bars(list, { color = '#006527', height = 120, every = 1, unit = '' } = {}) {
+export function bars(list, { color = '#0b7a5f', height = 120, every = 1, unit = '' } = {}) {
   const W = 620, H = height, n = list.length || 1, bw = W / n, mx = Math.max(1, ...list.map(x => +x.v || 0));
   return '<svg viewBox="0 0 ' + W + ' ' + (H + 16) + '" xmlns="http://www.w3.org/2000/svg" role="img">' + list.map((x, i) => {
     const h = Math.max(x.v > 0 ? 1.5 : 0, (+x.v || 0) / mx * (H - 14)), X = i * bw;
@@ -171,7 +171,7 @@ export function areaMap(layers = [], { W = 1000, H = 440, points = [], lines = [
   const d = (rs) => rs.map(([r, closed]) => 'M' + r.map(c => pr(c).map(v => v.toFixed(1)).join(',')).join('L') + (closed ? 'Z' : '')).join('');
   const halo = 'stroke="#ffffff" stroke-opacity=".85" stroke-linejoin="round" stroke-linecap="round" fill="none"';
   const shapes = layers.map(l => { const rs = ringsOf(l.geometry); if (!rs.length) return ''; const path = d(rs), wd = l.width || 2, open = rs.every(([, c]) => !c);
-    return '<path d="' + path + '" ' + halo + ' stroke-width="' + (wd + 3) + '"/><path d="' + path + '" fill="' + (open ? 'none' : l.fill || 'rgba(0,101,39,.10)') + '" fill-rule="evenodd" stroke="' + (l.stroke || '#006527') + '" stroke-width="' + wd + '" stroke-linejoin="round" stroke-linecap="round"' + (l.dash ? ' stroke-dasharray="7 4"' : '') + '/>'; }).join('');
+    return '<path d="' + path + '" ' + halo + ' stroke-width="' + (wd + 3) + '"/><path d="' + path + '" fill="' + (open ? 'none' : l.fill || 'rgba(0,101,39,.10)') + '" fill-rule="evenodd" stroke="' + (l.stroke || '#0b7a5f') + '" stroke-width="' + wd + '" stroke-linejoin="round" stroke-linecap="round"' + (l.dash ? ' stroke-dasharray="7 4"' : '') + '/>'; }).join('');
   const segs = lines.map(l => (l.coords || []).length > 1 ? '<path d="' + d([[l.coords, false]]) + '" fill="none" stroke="' + (l.stroke || '#7c3aed') + '" stroke-width="' + (l.width || 2) + '" stroke-linecap="round" stroke-linejoin="round"/>' : '').join('');
   const dots = points.map(p => { const [x, y] = pr(p.c); if (x < -20 || y < -20 || x > w + 20 || y > h + 20) return ''; const r = p.r || 3, col = p.color || '#c2410c';
     return (p.hollow ? '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r + '" fill="none" stroke="' + col + '" stroke-width="1.6"/>'
@@ -193,7 +193,7 @@ export function areaSvg(layers, { W = 1000, H = 440, points = [], plain = false,
   const pr = ([x, y]) => [(W - sx * s) / 2 + (x - x0) * k * s, (H - sy * s) / 2 + (y1 - y) * s];
   const path = g => polys(g).map(poly => poly.map(r => 'M' + r.map(p => pr(p).map(v => v.toFixed(1)).join(',')).join('L') + 'Z').join('')).join('');
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg"><rect width="' + W + '" height="' + H + '" fill="#f8f9f9"/>' +
-    layers.map(l => '<path d="' + path(l.geometry) + '" fill="' + (l.fill || 'rgba(0,101,39,.06)') + '" stroke="' + (l.stroke || '#006527') + '" stroke-width="' + (l.width || 1.6) + '"' + (l.dash ? ' stroke-dasharray="6 4"' : '') + ' fill-rule="evenodd"/>').join('') +
+    layers.map(l => '<path d="' + path(l.geometry) + '" fill="' + (l.fill || 'rgba(0,101,39,.06)') + '" stroke="' + (l.stroke || '#0b7a5f') + '" stroke-width="' + (l.width || 1.6) + '"' + (l.dash ? ' stroke-dasharray="6 4"' : '') + ' fill-rule="evenodd"/>').join('') +
     points.map(p => { const [x, y] = pr(p.c); return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (p.r || 3) + '" fill="' + (p.color || '#c2410c') + '" fill-opacity="' + (p.o ?? .85) + '"/>' + (p.label ? '<text x="' + (x + 6).toFixed(1) + '" y="' + (y + 4).toFixed(1) + '" font-size="12" fill="#23282a">' + esc(p.label) + '</text>' : ''); }).join('') + '</svg>';
 }
 // ---------- saving ----------

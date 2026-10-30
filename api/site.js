@@ -15,7 +15,7 @@ import { supa } from '../lib/supa.mjs';
 import { crimeSummary } from '../lib/crime.mjs';
 import { addressKey } from './tenants.js';
 
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (site panel)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (site panel)' };
 const SRC = {
   flood: 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28',
   aadt: 'https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_AADT/FeatureServer/0',

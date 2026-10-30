@@ -13,7 +13,7 @@ import { govKey } from '../lib/govkey.mjs';
 import { supa } from '../lib/supa.mjs';
 import { cdeGet, OFFENSES, TOTALS, STATE_FIPS, STATE_NAMES, flattenDirectory, matchAgency, summarizeOffense, latestFullYear, buildReport, fromLibrary } from '../lib/fbicrime.mjs';
 
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (crime by city)', Accept: 'application/json' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (crime by city)', Accept: 'application/json' };
 const DAY = 864e5, memo = new Map();
 // a small in-memory cache per function instance (the CDN caches the responses too)
 function remember(key, ms, fn) {

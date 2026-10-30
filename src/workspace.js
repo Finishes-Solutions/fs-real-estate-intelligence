@@ -170,7 +170,7 @@ export function workspace(env) {
   function plansStep(p, study) {
     const ps = study?.planset; if (!ps) return empty('No plan set yet', 'The plan set is drawn from a laid-out site option.', 'Go to Site', 'step:site');
     return '<div class="ws-card"><div class="ws-warnbox"><b>Schematic design only.</b> Not a permit set or construction documents; not sealed or reviewed by a licensed architect or engineer.</div>' +
-      '<p>' + num(ps.sheets.length) + ' sheets on the Finishes Solutions title block for <b>' + esc(study.option.name) + '</b>. ' + (ps.issued.length ? ps.issued.length + ' set' + (ps.issued.length > 1 ? 's' : '') + ' issued.' : 'None issued yet.') + (ps.notDesigned.length ? ' Floor plans aren’t drawn yet for: ' + esc([...new Set(ps.notDesigned)].join(', ')) + '.' : '') + '</p>' +
+      '<p>' + num(ps.sheets.length) + ' sheets on the Real Estate Intelligence title block for <b>' + esc(study.option.name) + '</b>. ' + (ps.issued.length ? ps.issued.length + ' set' + (ps.issued.length > 1 ? 's' : '') + ' issued.' : 'None issued yet.') + (ps.notDesigned.length ? ' Floor plans aren’t drawn yet for: ' + esc([...new Set(ps.notDesigned)].join(', ')) + '.' : '') + '</p>' +
       '<button type="button" class="btn primary" data-act="plans">Make a plan set</button></div>' +
       '<div class="ws-card"><h4>Sheet list</h4><table class="ws-t"><caption class="sr">Plan set sheets</caption><thead><tr><th scope="col">Sheet</th><th scope="col">Title</th></tr></thead><tbody>' + ps.sheets.map(x => '<tr><td class="m">' + esc(x.number) + '</td><td>' + esc(x.title + (x.sub ? ' — ' + x.sub : '')) + '</td></tr>').join('') + '</tbody></table></div>';
   }

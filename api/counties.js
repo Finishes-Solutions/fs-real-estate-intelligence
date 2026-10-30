@@ -7,7 +7,7 @@
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 
 const TIGER = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query';
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (county lines)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (county lines)' };
 export const CELL = 0.5;
 // US and territories, generously: [-180, 17] … [-64, 72], plus the far side of the date line for the Aleutians and Guam
 const okCell = (x, y) => y >= -15 && y < 72 && ((x >= -180 && x < -64) || (x >= 144 && x < 180));

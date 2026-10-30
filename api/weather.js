@@ -23,7 +23,7 @@ export function windGrid(bbox) {
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) pts.push([+(w + (e - w) * (i + .5) / nx).toFixed(3), +(s + (n - s) * (j + .5) / ny).toFixed(3)]);
   return pts;
 }
-async function get(u) { const r = await fetch(u, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' } }); if (!r.ok) throw new Error(new URL(u).host + ' ' + r.status); return r.json(); }
+async function get(u) { const r = await fetch(u, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'RealEstateIntelligence/1.0' } }); if (!r.ok) throw new Error(new URL(u).host + ' ' + r.status); return r.json(); }
 
 export async function wind(bbox) {
   const pts = windGrid(bbox); if (!pts.length) return { time: null, points: [] };

@@ -4,7 +4,7 @@
 // GET ?from=lat,lon&to=lat,lon -> { miles, minutes, typical_minutes, delay_minutes, traffic, source, line: [[lon,lat],...] }
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 
-const UA = 'FinishesSolutions-RealEstateIntel/1.0 (internal map; contact via finishessolutions.com)';
+const UA = 'RealEstateIntelligence/1.0 (internal map; https://fs-real-estate-intelligence.vercel.app)';
 export const MI = 1609.344;
 
 export function parsePt(s) {

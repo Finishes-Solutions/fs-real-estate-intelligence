@@ -17,7 +17,7 @@ import { areaSqMi } from '../lib/fema.mjs';
 import { circle, cleanGeometry } from './crime.js';
 import { tileBBox } from './fema.js';
 
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (environmental screen)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (environmental screen)' };
 const MAX_SQMI = 10000;   // an abuse guard only: larger than any Texas county
 const FETCH_ALL = 1000;   // a kind with up to this many records is listed in full; above it the report counts all of them
                           // exactly, lists the on-site ones and the nearest nearby ones, and the export fetches the rest

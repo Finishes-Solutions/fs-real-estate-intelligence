@@ -13,7 +13,7 @@ import { lidarHeight } from '../lib/height.mjs';
 const PARCELS = process.env.PARCEL_SERVICE || 'https://feature.geographic.texas.gov/arcgis/rest/services/Parcels/stratmap_land_parcels_48_most_recent/MapServer/0';
 // the main public Overpass server is often busy; two community mirrors carry the same OpenStreetMap data
 const OVERPASS = [process.env.OVERPASS_URL, 'https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'].filter(Boolean);
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (building panel)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (building panel)' };
 
 async function getJSON(url, opts = {}, ms = 8000) {
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);

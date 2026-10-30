@@ -1,4 +1,4 @@
-// Data pipeline for the Finishes Solutions real estate intelligence map.
+// Data pipeline for the Real Estate Intelligence real estate intelligence map.
 //   node build.mjs             full refresh (GitHub Actions): TABS -> geocode -> AI enrichment -> change feed -> market data -> area context, then assemble
 //   node build.mjs --assemble  copy src/ + committed data/ into public/ (Vercel build; no network)
 // Everything slow is cached under data/cache/ and committed, so weekly runs only fetch what changed.
@@ -29,7 +29,7 @@ async function assemble() {
     await fs.mkdir('public', { recursive: true }); await fs.copyFile('src/logo.png', 'public/logo.png');
     await fs.writeFile('public/index.html', '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Real Estate Intelligence — loading data</title>' +
       '<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,sans-serif;background:#f8f9f9;color:#23282a}main{max-width:460px;padding:24px;text-align:center}img{height:40px}h1{font-size:22px;margin:18px 0 8px}p{color:#6b7174;line-height:1.5}' +
-      '@media (prefers-color-scheme:dark){body{background:#16191a;color:#fff}img{filter:brightness(0) invert(1)}}</style></head><body><main><img src="logo.png" alt="Finishes Solutions">' +
+      '@media (prefers-color-scheme:dark){body{background:#16191a;color:#fff}img{filter:brightness(0) invert(1)}}</style></head><body><main><img src="logo.png" alt="Real Estate Intelligence">' +
       '<h1>Construction data is being prepared</h1><p>The first two-year data refresh is still running. This page updates automatically when it finishes (about 90 minutes after it starts).</p></main></body></html>');
     return;
   }
