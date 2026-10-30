@@ -16,6 +16,9 @@ import { topoReport } from '../lib/reports/topo.mjs';
 import { siteEnvReport } from '../lib/reports/siteenv.mjs';
 import { ringsReport, coverage, RINGS } from '../lib/reports/rings.mjs';
 import { liveTracts } from '../lib/acslive.mjs';
+import { spendFor } from '../lib/spending.mjs';
+// live tracts get the same modeled spending as the app's own (households by income × the BLS Consumer Expenditure Survey)
+const withSpending = (tracts, ce) => !ce ? tracts : tracts.map(t => { const x = spendFor(t.ib, ce); return x ? { ...t, spend: x.spend, sph: x.sph, dine: x.sp.fa ?? null, furn: x.sp.hf ?? null, appa: x.sp.ap ?? null, sp: x.sp } : t; });
 import { pngDataUrl } from '../lib/reports/png.mjs';
 import { frame } from '../lib/siteplan.mjs';
 import { NWI, SDA, soilWkt, soilMapQuery, parseSoils, fieldVal, inTexas } from '../lib/env.mjs';
@@ -122,7 +125,7 @@ export async function buildHtml(kind, { parcels, center, label }) {
     const [m, f, a] = await Promise.all([load('market.json'), load('filings.json'), load('area.json').catch(() => null)]), zip = recs[0].zip, tx = inTexas(center);
     // the app's own tracts (the Houston region, with jobs and spending) where they cover the site; elsewhere live from the
     // Census Bureau (people, income and housing; no jobs or spending model there)
-    const local = tx && coverage(m.tracts, center, 1) > 0.5, tracts = local ? m.tracts : await liveTracts(center, Math.max(...RINGS) + 1, { year: m.year || 2024 });
+    const local = tx && coverage(m.tracts, center, 1) > 0.5, tracts = local ? m.tracts : withSpending(await liveTracts(center, Math.max(...RINGS) + 1, { year: m.year || 2024 }), await load('cache/ce.json').catch(() => null));
     const un = tx && a?.unemployment?.counties ? Object.values(a.unemployment.counties).find(c => recs[0].county && String(c.name).toLowerCase() === String(recs[0].county).replace(/ county/i, '').toLowerCase()) : null;
     return ringsReport({ title, area, date, center, site: recs[0].geom, tracts, filings: tx ? f.filings : [], period: f.period, zip, zipRent: zip ? a?.rents?.zips?.[zip] : null, unemployment: un, acsYear: m.year ? (m.year - 4) + '–' + m.year : '',
       filingsNote: tx ? '' : 'Construction filings come from the Texas Department of Licensing and Regulation (TDLR), which covers Texas only. Outside Texas, check the county\'s building permits and the state\'s project registers.' });

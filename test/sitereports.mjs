@@ -93,6 +93,18 @@ const T = { ...spec, z, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1 };
   const multi = API.toRecord({ ...card, geometry: { type: 'MultiPolygon', coordinates: [[geom.slice(0, 4).concat([geom[0]])], [geom]] } }); assert.equal(multi.geom.length, 6, 'a multipolygon: its biggest piece');
   const box = API.topoBox(ring), w = box[1][0] - box[0][0], h = box[2][1] - box[1][1]; assert.ok(Math.abs(w / h - 720 / 560) < 1e-6 && w > 800, 'the ground fetched is the page\'s shape, the site plus 300 ft');
   const html = await API.buildHtml('area', { parcels: [card], center: origin, label: '15514 Elgin St' }); assert.ok(html.includes('Area report') && html.includes('10 miles') && html.includes('ZIP 77530'), 'the area report from the card');
+  // Tennessee: tracts and figures fetched live (TIGERweb and the Census API, mocked here), with modeled spending like the app's own tracts
+  { const c = [-83.69115, 35.72452], mx = 1 / (69.172 * Math.cos(c[1] * Math.PI / 180)), my = 1 / 69.0, real = globalThis.fetch;
+    const ring = [[c[0] - 9 * mx, c[1] - 7 * my], [c[0] + 8 * mx, c[1] - 7 * my], [c[0] + 8 * mx, c[1] + 6 * my], [c[0] - 9 * mx, c[1] + 6 * my], [c[0] - 9 * mx, c[1] - 7 * my]];
+    const ACSV = ['B01003_001E', 'B19013_001E', 'B25001_001E', 'B25002_003E', 'B25064_001E', 'B25077_001E', 'B01002_001E', 'B11001_001E', ...Array.from({ length: 16 }, (_, i) => 'B19001_' + String(i + 2).padStart(3, '0') + 'E')];
+    globalThis.fetch = async (u, o) => { const h = new URL(String(u)).host;
+      if (h === 'tigerweb.geo.census.gov') return new Response(JSON.stringify({ features: [{ attributes: { GEOID: '47155080901', STATE: '47', COUNTY: '155' }, geometry: { rings: [ring] } }] }));
+      if (h === 'api.census.gov') return new Response(JSON.stringify([[...ACSV, 'state', 'county', 'tract'], ['6000', '45698', '3400', '900', '900', '260000', '48', '2400', ...Array(16).fill('150'), '47', '155', '080901']]));
+      return real(u, o); };
+    try { const tn = await API.buildHtml('area', { parcels: [{ propId: '122 00500 000', county: 'Sevier', state: 'TN', geometry: { type: 'Polygon', coordinates: [[[c[0], c[1]], [c[0] + 0.002, c[1]], [c[0] + 0.002, c[1] + 0.002], [c[0], c[1]]]] } }], center: c, label: '2481 Happy Hollow Rd' });
+      assert.ok(tn.includes('Sevier County, TN') && !tn.includes(', TX'), 'labelled Tennessee');
+      assert.match(tn, /Groceries<\/span><\/td><td class="n">\$[\d.]+[KM]</, 'modeled spending for live tracts');
+    } finally { globalThis.fetch = real; } }
   const res = { code: 0, status(c) { res.code = c; return res; }, json(o) { res.body = o; return res; }, setHeader() {} };
   await API.default({ method: 'POST', body: { kind: 'nope', parcels: [card], center: origin }, headers: { 'x-forwarded-for': '7.7.7.1' } }, res); assert.equal(res.code, 400);
   await API.default({ method: 'POST', body: { kind: 'parcel', parcels: [], center: origin }, headers: { 'x-forwarded-for': '7.7.7.2' } }, res); assert.equal(res.code, 400); assert.match(res.body.error, /Open a parcel/); }

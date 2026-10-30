@@ -90,7 +90,7 @@
     },
     "api/sitereport.js": {
       "maxDuration": 120,
-      "includeFiles": "{fonts/**,node_modules/@sparticuz/chromium/bin/**,data/{market,filings,area}.json}"
+      "includeFiles": "{fonts/**,node_modules/@sparticuz/chromium/bin/**,data/{market,filings,area}.json,data/cache/ce.json}"
     },
     "api/pdf.js": {
       "maxDuration": 60,
