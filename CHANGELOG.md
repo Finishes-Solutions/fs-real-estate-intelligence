@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 12:45 AM CT: One-click site reports from a parcel, and a new look (4982085, e144fa8)
+- **Reports from a parcel in one click.** A parcel's card has a **Reports** button among its section buttons, and a **Reports for this parcel** block in its Site section: **Parcel Map**, **Topography**, **Site Environmental** and **Area Report** (1, 3, 5 and 10-mile rings). Each makes the PDF straight away (a few seconds for the parcel map and area report, 10 to 40 for topography and environmental) and saves it like any other export. The **Reports** page has the same four under **For the open parcel**.
+- **The topography report covers the page:** the ground is fetched for the site plus 300 feet or more around it, in the page's shape, so the maps run edge to edge.
+- **A new look across the app:** set in Inter (no more IBM Plex Mono or Montserrat), white surfaces, hairline borders, rounder corners, black pill buttons and plain grey labels instead of small capitals; green is now an accent, not the button colour. Report PDFs use Inter too.
+
 ### 12:09 AM CT: Sharper ground elevations, and four new site report layouts (b3e85f4)
 - **Ground elevations without the 3,600-point limit.** A site's ground now comes from USGS lidar as one elevation image, read every 3 feet (up to 250,000 points; a 300-acre tract every 8 feet or so, where it used to be every 60). Contours, slopes, the low and high ground and the plan set's grading follow the real land closely. If the image service is down, the old point-by-point reading still answers.
 - **New report layouts (not yet in the app):** Parcel Map (to scale, every line dimensioned, bearings and corner coordinates, an area check against the tax roll, a page per parcel), Topography (lidar contours over a hillshade, slope and drainage, two cross-sections, earthwork at three pad heights), Site Environmental (records around the parcel, soils, flood and hazards) and an Area Report in 1, 3, 5 and 10-mile rings (people, income, spending and construction, each census tract counted for its share inside the ring). All unbranded, black and white with blue accents. They go into the Reports tab once the look is approved.
