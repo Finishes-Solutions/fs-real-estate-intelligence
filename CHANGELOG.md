@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
-### 3:48 PM CT: Montreve work merged into experimental (commit hash added when pushed)
+### 3:48 PM CT: Montreve work merged into experimental (302644b)
 - **The Montreve Mountain Club work joins the experimental branch:** courts by sport, the event / wedding venue use, the Resort & recreation buildings and cabins, the ground under each piece, and the Montreve layout builder. Nothing else changes for people using the app.
 
 ### 2:16 PM CT: Montreve's resort core designed as one plan (c0100d5)
