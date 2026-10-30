@@ -42,7 +42,22 @@ const T = { ...spec, z, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1 };
   const sl = TP.slopeGrid(T); assert.ok(Math.abs(sl[Math.floor(spec.ny / 2) * spec.nx + spec.nx - 5] - Math.hypot(1.2, 0.1)) < 0.05, 'slope in percent away from the ditch');
   const html = TP.topoReport({ title: 'Elgin', date: '2026-10-30', terrain: T, ring, origin, png: pngDataUrl });
   assert.ok(html.includes('data:image/png;base64,') && html.includes('falls west') && html.includes('Earthwork to level the whole site') && html.includes('A–A') && html.includes('balanced'), 'map, sections and earthwork');
-  assert.ok(html.includes(Number(spec.nx * spec.ny).toLocaleString('en-US') + ' points'), 'says how many points'); }
+  assert.ok(html.includes(Number(spec.nx * spec.ny).toLocaleString('en-US') + ' points'), 'says how many points');
+  assert.ok(html.includes('Topography · 3D view') && /Heights stretched [\d.]+× so the shape of gentle ground shows/.test(html), 'a 3D page, heights stretched on gentle ground and said so');
+  assert.ok(html.indexOf('3D view') < html.indexOf('slope &amp; drainage') || html.indexOf('3D view') < html.indexOf('slope & drainage'), 'the 3D page comes second'); }
+// the 3D view: right way round (a first draw had east and west swapped), hills higher on screen, hidden ground known
+{ const D = await import('../lib/reports/terrain3d.mjs'), nx = 61, ny = 61, cell = 20, zz = new Float32Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) zz[j * nx + i] = 500 + 120 * Math.exp(-(((i - 45) / 8) ** 2 + ((j - 45) / 8) ** 2)); // a hill in the north-east
+  const T3 = { nx, ny, cell, x0: -600, y0: -600, z: zz }, sq = [[-200, -200], [200, -200], [200, 200], [-200, 200]];
+  const S = D.view3d(T3, sq, { W: 360, H: 240, azimuth: 180, ss: 1 }); // standing in the south, looking north
+  const [ex, ey] = S.P([500, 0, 500]), [wx] = S.P([-500, 0, 500]), [, ny0] = S.P([0, -500, 500]), [, ny1] = S.P([0, 500, 500]);
+  assert.ok(ex > wx, 'looking north, east is on the right'); assert.ok(ny1 < ny0, 'farther ground is higher on the page');
+  assert.ok(Math.abs(S.north) < 1, 'north points up the page: ' + S.north);
+  const N = D.view3d(T3, sq, { W: 360, H: 240, azimuth: 90, ss: 1 }); assert.ok(Math.abs(N.north - 90) < 1, 'standing in the east looking west, north is on the right (the arrow turned 90°): ' + N.north);
+  const [, hy] = S.P([300, 300, 620]), [, gy] = S.P([300, 300, 500]); assert.ok(hy < gy, 'the hilltop stands above its foot');
+  assert.equal(S.P([300, 500])[2], false, 'ground behind the hill, looking from the south, is hidden'); assert.equal(S.P([0, -500])[2], true, 'the near ground is in sight');
+  assert.equal(D.autoExaggeration({ ...T3, z: zz.map(v => 500 + (v - 500) / 100) }), 5, 'nearly flat ground: stretched the most (5×)'); assert.equal(D.autoExaggeration(T3), 2, 'a 120 ft hill on 1,200 ft: 2×'); assert.equal(D.autoExaggeration({ ...T3, z: zz.map(v => 500 + (v - 500) * 4) }), 1, 'a 480 ft mountain: true to scale');
+  assert.equal(S.w * S.h * 4, S.rgba.length); }
 
 // ---------- site environmental ----------
 { const kinds = { lpst: { label: 'Leaking petroleum storage tank (TCEQ LPST)', search_mi: 0.5, count: 2, onsite: 0, nearest: [{ name: 'SHELDON ROAD TEXACO', addr: '817 SHELDON RD', mi: 0.28, dir: 'E' }, { name: 'OLD CHEVRON', mi: 0.38, dir: 'SE' }] },
