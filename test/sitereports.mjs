@@ -70,6 +70,21 @@ const T = { ...spec, z, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1 };
   const mix = RG.incomeMix(R[1].list); assert.ok(Math.abs(mix.reduce((s, [, v]) => s + v, 0) - 100) < 0.01, 'the income mix adds to 100%');
   const html = RG.ringsReport({ title: 'Elgin', center: origin, site: geom.slice(0, -1), tracts: M.tracts, filings: Fl.filings, period: Fl.period });
   for (const s of ['1 mile', '10 miles', 'Median household income', 'Consumer spending', 'Largest projects within 5 miles', 'likely a typo']) assert.ok(html.includes(s), 'the report shows ' + s); }
+// Sevier County, TN (2026-10-30, 2481 Happy Hollow Rd): rural tracts many miles across. A lattice over the tract missed the
+// 1-mile ring, which came out empty, and the report failed ("Cannot read properties of undefined (reading 'mi')").
+{ const c = [-83.69115, 35.72452], mx = 1 / (69.172 * Math.cos(c[1] * Math.PI / 180)), my = 1 / 69.0;
+  const box = (w, s, e, n) => ({ type: 'Polygon', coordinates: [[[c[0] + w * mx, c[1] + s * my], [c[0] + e * mx, c[1] + s * my], [c[0] + e * mx, c[1] + n * my], [c[0] + w * mx, c[1] + n * my], [c[0] + w * mx, c[1] + s * my]]] });
+  const big = { g: '47155080901', pop: 6000, inc: 45698, hu: 3400, vac: 900, rent: 900, val: 260000, age: 48, hh: 2400, ib: Array(16).fill(150), geom: box(-9, -7, 8, 6) }; // 17 x 13 miles
+  const f1 = RG.shareInside(big, c, 1); assert.ok(Math.abs(f1 - Math.PI / (17 * 13)) < 0.002, 'a 1-mile slice of a 221 sq mi tract: ' + f1);
+  assert.ok(Math.abs(RG.shareInside(big, c, 5) - 25 * Math.PI / 221) < 0.01, '5 miles');
+  assert.equal(RG.shareInside({ ...big, geom: box(-0.2, -0.2, 0.2, 0.2) }, c, 1), 1, 'a small tract wholly inside');
+  const R = RG.ringData({ center: c, tracts: [big], filings: [], rings: [1, 3, 5, 10] });
+  assert.ok(R[0].sum.population > 60 && R[0].sum.population < 160, 'the 1-mile ring has its share of people: ' + R[0].sum.population);
+  const html = RG.ringsReport({ title: '2481 Happy Hollow Rd', center: c, tracts: [big], filings: [], period: null, filingsNote: 'Texas only' });
+  assert.ok(html.includes('Densest ring') && html.includes('1 mile'));
+  // no tract data at all in a ring: the report still renders, with a dash
+  const none = RG.ringsReport({ title: 'Nowhere', center: c, tracts: [], filings: [], period: null, filingsNote: 'Texas only' });
+  assert.ok(none.includes('Densest ring'), 'renders with no tracts'); }
 // ---------- the one-click endpoint (api/sitereport.js): the card's record in, the right report out ----------
 { const API = await import('../api/sitereport.js'), card = { propId: '0760590050022', owner: parcel.owner, situs: '15514 Elgin St, Channelview', situsStreet: '15514 Elgin St', situsCity: 'Channelview', situsZip: '77530', county: 'Harris',
     landUse: parcel.landUse, marketValue: 446165, landValue: 446165, improvementValue: 0, area: '2.29 acres', acquired: '2009-04-23', geometry: { type: 'Polygon', coordinates: [geom] } };
