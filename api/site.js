@@ -114,20 +114,23 @@ export const placesNear = async (lon, lat) => (await query(SRC.place, lon, lat, 
 export const SITE_SOURCES = SRC;
 
 const inHouston = (lon, lat) => lon > -95.95 && lon < -95.0 && lat > 29.5 && lat < 30.15;
+// TxDOT counts, TCEQ districts and Comptroller receipts are Texas sources: skipped elsewhere (flood, schools, city limits,
+// Opportunity Zones and EPA facilities are national)
+const inTexas = (lon, lat) => lat >= 25.8 && lat <= 36.6 && lon >= -106.7 && lon <= -93.5;
 export async function site(lon, lat, { addr, zip } = {}) {
-  const part = async fn => { try { return await fn(); } catch (e) { return { error: e.message }; } };
+  const part = async fn => { try { return await fn(); } catch (e) { return { error: e.message }; } }, tx = inTexas(lon, lat);
   const db = supa();
   const [flood, traffic, water, oz, tirz, schools, transit, environment, crime, barsAt, place, nearAll] = await Promise.all([
     part(async () => floodInfo(await query(SRC.flood, lon, lat, { fields: 'FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE' }))),
-    part(async () => trafficInfo(await query(SRC.aadt, lon, lat, { m: 300, fields: 'RTE_NM,RTE_PRFX,RTE_NBR,AADT_CUR,SYSTEM' }))),
-    part(async () => waterDistricts(await query(SRC.water, lon, lat, { fields: 'NAME,TYPE,TYPE_DESCRIPTION,STATUS,Area_SqMi' }))),
+    part(async () => !tx ? null : trafficInfo(await query(SRC.aadt, lon, lat, { m: 300, fields: 'RTE_NM,RTE_PRFX,RTE_NBR,AADT_CUR,SYSTEM' }))),
+    part(async () => !tx ? [] : waterDistricts(await query(SRC.water, lon, lat, { fields: 'NAME,TYPE,TYPE_DESCRIPTION,STATUS,Area_SqMi' }))),
     part(async () => (await query(SRC.oz, lon, lat, { fields: 'CENSUSTRAC' })).length > 0),
     part(async () => inHouston(lon, lat) ? (await query(await layerOf(SRC.tirz), lon, lat)).map(a => String(pick(a, 'NAME', 'TIRZ_NAME', 'ZONE_NAME', 'LABEL') || '').trim() + (pick(a, 'TIRZ_NO', 'TIRZ', 'ZONE_NO', 'NUMBER') ? ' (TIRZ ' + pick(a, 'TIRZ_NO', 'TIRZ', 'ZONE_NO', 'NUMBER') + ')' : '')).filter(Boolean) : []),
     part(async () => { const out = []; for (const id of [0, 1, 2]) for (const a of await query(SRC.school + '/' + id, lon, lat, { fields: 'NAME' })) if (a.NAME && !out.includes(a.NAME)) out.push(a.NAME); return out; }),
     part(async () => inHouston(lon, lat) ? { stops: (await getJSON((await layerOf(SRC.stops)) + '/query?returnCountOnly=true&' + near(lon, lat, 400))).count ?? null } : null),
     part(() => echo(lon, lat)),
     part(async () => db && inHouston(lon, lat) ? crimeSummary(await db.rpc('crime_near', { p_lon: lon, p_lat: lat, p_m: 805 }, { deadline: Date.now() + 15000 }), 0.5) : null),
-    part(() => addr ? bars(addr, zip) : null),
+    part(() => addr && tx ? bars(addr, zip) : null),
     part(() => placeAt(lon, lat)), part(() => placesNear(lon, lat))
   ]);
   const nearBy = Array.isArray(nearAll) ? nearAll.filter(x => !place || place.error || x.name !== place.name).slice(0, 6) : nearAll;
@@ -138,10 +141,10 @@ export async function site(lon, lat, { addr, zip } = {}) {
 export default async function handler(req, res) {
   if (!rateLimit(req, res, { perMinute: 30, perDay: 800 })) return;
   const lat = +req.query?.lat, lon = +req.query?.lon;
-  if (!(lat > 25 && lat < 37 && lon > -107 && lon < -93)) return res.status(400).json({ error: 'lat and lon inside Texas are required' });
+  if (!(lat > 17 && lat < 72 && lon > -180 && lon < -64)) return res.status(400).json({ error: 'lat and lon inside the US are required' });
   const r5 = v => Math.round(v * 1e5) / 1e5;
   const d = await site(r5(lon), r5(lat), { addr: String(req.query.addr || '').slice(0, 120), zip: String(req.query.zip || '').slice(0, 10) });
-  const failed = ['flood', 'traffic', 'environment'].every(k => d[k]?.error);
+  const failed = ['flood', 'traffic', 'environment'].every(k => d[k]?.error || d[k] === null);
   res.setHeader('Cache-Control', failed ? 'no-store' : 'public, max-age=3600, s-maxage=604800, stale-while-revalidate=2592000');
   return res.json(d);
 }

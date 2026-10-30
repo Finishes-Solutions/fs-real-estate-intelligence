@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 11:05 AM CT: Tennessee and the rest of the US; one clean outline on the selected parcel (167d56f, COMMIT)
+- **No more green lines through a selected parcel.** A parcel that crosses an edge of the map's tiles was outlined piece by piece, so the straight cuts between the pieces showed as green dashed horizontal and vertical lines across it. The pieces are now joined into one outline round the parcel's edge (buildings cut by a tile edge too).
+- **The card works outside Texas.** Regrid and the property card took Texas points only, so a Tennessee parcel's card said Regrid wasn't ready and its Site section said "lat and lon inside Texas are required". Both now take any point in the US. The Site section shows the flood zone, school district, city limits, Opportunity Zone and nearby EPA sites anywhere and leaves out the Texas-only sources (TxDOT traffic, TCEQ water districts, Comptroller alcohol sales).
+- **Site reports from a Regrid parcel:** where there's no free appraisal record, the four site reports use the Regrid parcel.
+- **More in the environmental report everywhere:** USGS streams and water bodies, federal critical habitat and PAD-US protected land on the constraints map; septic-field and bedrock ratings in the soils table; FEMA's wildfire and landslide ratings always shown. Texas agency records (TCEQ, Railroad Commission) say "not searched here" outside Texas instead of showing zero. Each soil's share of the parcel is now right when a soil shows up in several patches (it could add up to more than 100%).
+- **The Area Report outside Texas** fetches census tracts and their figures live; population growth shows as not available rather than 0%, and construction filings say they're Texas only.
+
 ### 9:52 AM CT: A full Site Environmental report, and wetlands that load (9fe4ab8, 8d84a88)
 - **Wetlands work again.** The US Fish & Wildlife Service changed its wetlands field names, so every wetlands search failed ("didn't answer"). The search now reads the fields either way, and the map layers try a second time before giving up.
 - **The Site Environmental report is a full report:** after the finding and the records around the parcel come a **site & constraints map** (the parcel outline, FEMA flood zones, mapped wetlands and lidar contours), a **soils map** (every USDA soil map unit under and round the parcel, its share of the parcel, drainage, hydrologic group, water table and building limitations), and **topography & slope** (contours over shaded relief, slope and the way water runs, the parcel's low and high ground). A layer that still fails is named on its page, never left blank as "none".
