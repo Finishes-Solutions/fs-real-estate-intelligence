@@ -37,18 +37,27 @@ for (const c of cabins) {
 assert.ok(s.walkouts >= 10, 'most are walk-outs or close: ' + s.walkouts); assert.ok(cabins.filter(c => Math.abs(c.entry.foundation) <= 15).length >= 18, 'most entries within 15 ft of the ground');
 assert.deepEqual(cabins.filter(c => /Financed/.test(c.note)).map(c => +c.name.slice(4)).sort((a, b) => a - b), [1, 3, 6, 18, 21, 28, 30], 'the seven financed homes');
 
-// the resort core, on Will's lots, level pads with their earthwork
-const inLots = (e, ns) => SP.outline(e).every(p => ns.some(n => SP.inRing(p, lots.find(l => l.name === 'Lot ' + n).poly) || lots.find(l => l.name === 'Lot ' + n).poly.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 12)));
-const pav = by('mv-pavilion'), hall = by('mv-hall'), ten = by('mv-tennis'), pick = by('mv-pickleball'), lawn = by('mv-lawn');
-assert.equal(pav.use, 'venue'); assert.equal(pav.w * pav.d, 6000); assert.ok(inLots(pav, [14, 15]), 'the pavilion on lots 14-15'); assert.ok(lawn && inLots(lawn, [14, 15]), 'its lawn too');
-assert.equal(hall.use, 'restaurant'); assert.ok(Math.abs(hall.w * hall.d - 2500) < 30); assert.ok(inLots(hall, [12, 13]), 'the hall on lots 12-13');
-assert.equal(ten.sport, 'tennis'); assert.deepEqual([ten.w, ten.d], [60, 120]); assert.equal(pick.sport, 'pickleball'); assert.equal(SP.courtGrid(pick).n, 2); assert.ok(inLots(ten, [10, 11]) && inLots(pick, [10, 11]), 'the courts on lots 10-11');
-{ const off = Math.abs(((pick.rot - ten.rot) % 90 + 90) % 90); assert.ok(Math.min(off, 90 - off) < 15, 'the courts square to the road and to each other'); }
+// the resort core: one composed plan on lots 10-15 along a stone promenade (courts, court pavilion, dining terrace and
+// the Lodge, its service yard, cocktail terrace, glass pavilion), parking, green and ceremony lawn below; level pads
+const core = [10, 11, 12, 13, 14, 15].map(n => lots.find(l => l.name === 'Lot ' + n).poly);
+const inCore = e => SP.outline(e).every(p => core.some(r => SP.inRing(p, r) || r.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 12)));
+const pav = by('mv-pavilion'), hall = by('mv-hall'), ten = by('mv-tennis'), pick = by('mv-pickleball'), lawn = by('mv-lawn'), prom = by('mv-promenade');
+assert.equal(pav.use, 'venue'); assert.equal(pav.w * pav.d, 6000); assert.equal(hall.use, 'restaurant'); assert.ok(Math.abs(hall.w * hall.d - 2500) < 30);
+assert.equal(ten.sport, 'tennis'); assert.deepEqual([ten.w, ten.d], [60, 120]); assert.equal(pick.sport, 'pickleball'); assert.equal(SP.courtGrid(pick).n, 2);
+assert.ok(prom && lawn && by('mv-service') && by('mv-terrace') && by('mv-cocktail'), 'the promenade, lawn, service yard and terraces');
+const pieces = E.filter(e => /^mv-(tennis|pickleball|court|terrace|hall|service|cocktail|pav|park|green|firepit|lawn|garden)/.test(e.id) && e.kind !== 'drive');
+for (const e of pieces) assert.ok(inCore(e), e.id + ' on lots 10-15');
+// one grid: every piece square to the promenade's frontage
+for (const e of pieces) { const off = Math.abs((((e.rot || 0) - ten.rot) % 90 + 90) % 90); assert.ok(Math.min(off, 90 - off) < 1, e.id + ' square to the core'); }
+// the hall's service yard beside it and the lawn in front of the pavilion
+assert.ok(Math.hypot(by('mv-service').x - hall.x, by('mv-service').y - hall.y) < 60, 'service yard next to the kitchen');
+assert.ok(Math.hypot(lawn.x - pav.x, lawn.y - pav.y) < 100, 'the ceremony lawn in front of the pavilion');
 for (const e of [pav, hall, ten, pick, lawn]) { assert.ok(e.grade && Number.isFinite(e.grade.pad) && e.grade.cutCy >= 0, e.id + ' carries its pad'); const f = TR.padFit(M.TERRAIN, e); assert.ok(Math.abs(f.pad - e.grade.pad) < 0.2, e.id + ' pad matches the ground'); }
 assert.ok(Math.max(pav.grade.cutWall, pav.grade.fillWall) < 25, 'the pavilion’s walls stay under 25 ft: ' + JSON.stringify(pav.grade));
-const rows = E.filter(e => e.kind === 'parking'); assert.ok(rows.length >= 8 && rows.every(e => SP.stalls(e).count === 8 && Math.max(e.grade.cutWall, e.grade.fillWall) <= 14), 'head-in rows along Amber Valley Way, cut about 9 ft into the hill');
+const bays = E.filter(e => e.kind === 'parking'); assert.equal(bays.length, 2); assert.ok(bays.reduce((t, e) => t + SP.stalls(e).count, 0) >= 72, 'two bays, enough for a 150-guest wedding (~60 cars)');
+assert.ok(by('mv-entry') && by('mv-pav-entry'), 'the resort entry and pavilion lane from Amber Valley Way');
 
 // the app's own checks: nothing outside, nothing overlapping, no problems
 assert.deepEqual(s.outside, []); assert.deepEqual(s.overlaps, []);
 assert.deepEqual(SP.check(pl).filter(i => i.level === 'bad').map(i => i.text), []);
-console.log('montreve ok: ' + s.cabins + ' cabins (' + s.walkouts + ' walk-outs), the pavilion, hall and courts on lots 10-15, ' + s.cutCy.toLocaleString('en-US') + ' CY cut and fill on the level pads');
+console.log('montreve ok: ' + s.cabins + ' cabins (' + s.walkouts + ' walk-outs), the composed resort core on lots 10-15 (' + s.spaces + ' spaces), ' + s.cutCy.toLocaleString('en-US') + ' CY cut and fill on the level pads');

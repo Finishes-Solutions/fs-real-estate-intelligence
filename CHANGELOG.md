@@ -5,7 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
-### 12:41 PM CT: Courts by sport, event venues, mountain cabins, the ground under each piece, and Montreve laid out on its lidar (commit hash added when pushed)
+### 2:16 PM CT: Montreve's resort core designed as one plan (commit hash added when pushed)
+- **The resort core at Montreve Mountain Club is now one composed plan** on lots 10-15 instead of separate pieces each turned to the road. A stone **promenade** runs the length of the core, with everything along it in one line: the **tennis court**, **two pickleball courts**, a **court pavilion** with a viewing deck, the **dining terrace** and **The Lodge** (2,500 sf dining and catering) with its **service yard** to one side, a **cocktail terrace**, and the **6,000 sf glass wedding pavilion** with its own drop-off and lane from the road.
+- Below the promenade: **two parking bays** (76 spaces) reached from Amber Valley Way with a stair walk up to the promenade, a **village green**, a **fire-pit overlook**, and the **ceremony lawn** in front of the pavilion, edged with gardens.
+- Each piece still sits on a level pad fitted to the lidar, with its cut, fill and walls shown. The tennis court (about 34 ft) and the upper parking bay (about 33 ft) need the tallest walls, so they should be tiered or stepped.
+
+### 12:41 PM CT: Courts by sport, event venues, mountain cabins, the ground under each piece, and Montreve laid out on its lidar (0e3fbfd, e83f5ca, 213c1fb, aa011b6, fcbb880)
 - **Tennis, pickleball and basketball courts** at regulation size, each court drawn with its lines (the pickleball kitchen, tennis service boxes, the basketball key) and its net on the map, the PDF sheet and the 3D picture; a **Sport** picker and a **Courts** count in the Selected box; "add 2 tennis courts beside the clubhouse" works; courts have a legend line.
 - **Event / wedding venue** is a use of its own (a space for every 2.5 guests, pale glass blue, in the legend, the budget at $550 a sf, the AI's words "wedding venue", "event center", "banquet hall").
 - **Resort & recreation** in the building library: the Montreve cabin (3 levels, 2,444 sf, indoor pool), 2-6 bedroom mountain cabins, 3,000 and 6,000 sf glass event pavilions, an event barn, a wedding chapel, a dining and catering hall, a caterers' kitchen, a clubhouse and a gate house. Cabins have no garage (driveway parking), a flat roof and a walk-out level in 3D.

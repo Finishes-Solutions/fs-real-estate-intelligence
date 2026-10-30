@@ -92,9 +92,13 @@ It replaces the team's copy of the project, keeping the Regrid parcel record and
   below it, toward a road above it), the floor facing the road at road grade with a short straight driveway (most
   10-28 ft). The lidar sets the setback: 11 are clean walk-outs, 20 show 15 ft of foundation or less, the steepest three
   about 37 ft. The seven financed homes are placed the same way (their real positions aren't surveyed).
-- **Resort core along Amber Valley Way:** 72 head-in spaces in rows of 8 along the pavement (cuts up to about 13 ft),
-  then the 6,000 sf glass pavilion and ceremony lawn (lots 14-15), the 2,500 sf hall and service yard (12-13) and the
-  tennis and pickleball courts side by side (10-11), each square to the road in front of it on a level pad: walls about
-  9 ft at the hall, 17-22 ft at the lawn, pavilion and pickleball courts, 27 ft at the tennis court (tiered walls or a
-  stepped design). 72 spaces cover a 150-guest wedding's ~60.
+- **Resort core (lots 10-15), one composed plan:** every piece on one grid square to the core's frontage, strung along a
+  10 ft stone promenade (it steps down once, by the cocktail terrace). Upper side, west to east: tennis court, two
+  pickleball courts, court pavilion and viewing deck, dining terrace, The Lodge (2,500 sf dining and catering) with its
+  service yard, cocktail terrace, the 6,000 sf glass pavilion and its drop-off (own lane from the road). Lower side: two
+  parking bays (76 spaces, a 150-guest wedding needs about 60) entered from Amber Valley Way with a stair walk to the
+  promenade, the village green, a fire-pit overlook and the ceremony lawn with garden borders in front of the pavilion.
+  The whole plan is slid as one (`designCore`) to the spot with the fewest clashes and least earthwork. Walls: 7-17 ft
+  at the buildings and terraces, about 23 ft at the pavilion and lawn, 33-34 ft at the tennis court and upper parking bay
+  (tier them or step the design).
 - Every piece carries `grade` (pad elevation, fall, cut and fill, walls); the app's Selected box shows it.

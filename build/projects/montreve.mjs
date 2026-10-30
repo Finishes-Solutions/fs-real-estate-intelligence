@@ -153,6 +153,96 @@ function frontRows(site, F, { step = 80 } = {}) {
   return rows;
 }
 
+// ---------- the resort core: a designed plan, fitted to the hill ----------
+// Lots 10-15 along Amber Valley Way: about 850 ft of frontage, the road bowing 110 ft downhill round lots 11-12, the lots
+// rising 50-100 ft to the ridge. One grid for the whole core, square to the ridge (the frontage's chord): u along it
+// from the west end, v up the hill. A straight stone promenade runs its length about 100 ft up; on its uphill side, in a
+// row, the courts, the lodge, the cocktail terrace and the glass pavilion; below it, the guest parking field in the
+// road's bend (one entry, two terraced bays with tree islands), the village green in front of the lodge, the ceremony
+// lawn between garden beds in front of the pavilion facing the valley, and a fire-pit overlook. The lodge's service
+// yard sits behind it on a service lane; the pavilion has its own drop-off lane from the road. The whole plan is slid
+// a little along and up the hill (lidar) to where it fits the lots with the least wall.
+const CORE = (() => { const lots = [10, 11, 12, 13, 14, 15].map(n => GEO.lots[n].ring); return { lots, has: p => lots.some(r => SP.inRing(p, r) || edgeDist(p, r) < 0.8) }; })();
+const AMBER = NET.find(r => r.name === 'Amber Valley Way');
+const CHORD = (() => { const f = AMBER.path.filter(p => CORE.lots.some(r => edgeDist(p, r) < 40)), a = f[0], b = f[f.length - 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+  let n = [-t[1], t[0]]; const c = cen(CORE.lots.flat()); if ((c[0] - a[0]) * n[0] + (c[1] - a[1]) * n[1] < 0) n = [-n[0], -n[1]]; return { a, t, n, L }; })();
+// the master plan, in grid feet (u, v: centre; w along u, d along v). along: a court's length runs along u
+const MASTER = [
+  // the promenade, the spine: along the courts and the lodge, then down a flight of steps to the pavilion's terrace
+  { id: 'mv-promenade', kind: 'plaza', path: [[120, 106], [528, 106], [548, 86], [800, 86]], width: 10, name: 'Promenade', note: 'Stone walk the length of the resort, steps down to the pavilion terrace' },
+  // the courts (lots 10-11)
+  { id: 'mv-tennis', kind: 'court', u: 185, v: 145, w: 120, d: 60, along: true, level: true, sport: 'tennis', courts: 1, name: 'Tennis court' },
+  { id: 'mv-pickleball', kind: 'court', u: 290, v: 145, w: 60, d: 60, along: true, level: true, sport: 'pickleball', courts: 2, name: 'Pickleball courts' },
+  { id: 'mv-courthouse', kind: 'building', u: 352, v: 128, w: 32, d: 24, level: true, use: 'amenity', floors: 1, name: 'Court pavilion', note: 'Shade, water, restrooms · court check-in' },
+  { id: 'mv-courtdeck', kind: 'patio', u: 352, v: 154, w: 32, d: 22, level: true, name: 'Viewing deck', note: 'Shaded seating over the courts' },
+  // the lodge (lots 12-13)
+  { id: 'mv-terrace', kind: 'patio', u: 400, v: 135, w: 36, d: 40, level: true, name: 'Dining terrace', note: 'Outdoor dining facing the valley' },
+  { id: 'mv-hall', kind: 'building', u: 452, v: 135, w: 62, d: 40, level: true, use: 'restaurant', floors: 1, type: 'hall', name: 'The Lodge · dining & catering', note: 'Owners’ dining · caterers’ kitchen · event service' },
+  { id: 'mv-service', kind: 'plaza', u: 503, v: 133, w: 30, d: 28, level: true, name: 'Service yard', note: 'Deliveries and catering carts along the promenade; screened' },
+  // the pavilion (lots 14-15)
+  { id: 'mv-cocktail', kind: 'plaza', u: 590, v: 115, w: 56, d: 44, level: true, name: 'Cocktail terrace', note: 'Between the lodge and the pavilion' },
+  { id: 'mv-pavilion', kind: 'building', u: 675, v: 122, w: 100, d: 60, level: true, use: 'venue', floors: 1, type: 'pavilion', name: 'Glass wedding pavilion', note: 'Wedding / event venue · ~150 guests' },
+  { id: 'mv-pav-court', kind: 'plaza', u: 748, v: 120, w: 34, d: 50, level: true, name: 'Pavilion drop-off', note: 'Accessible drop-off · catering' },
+  // below the promenade: the parking field in the road's bend, the village green, the fire pit, the ceremony lawn
+  { id: 'mv-park-1', kind: 'parking', u: 340, v: 6, w: 180, d: 60, level: true, islands: true, name: '', note: 'Guest parking · tree islands' },
+  { id: 'mv-park-2', kind: 'parking', u: 340, v: 68, w: 180, d: 60, level: true, islands: true, name: '', note: 'Guest parking · tree islands' },
+  { id: 'mv-green', kind: 'green', u: 487, v: 62, w: 70, d: 56, level: true, name: 'Village green', note: 'Lawn and shade trees below the lodge' },
+  { id: 'mv-firepit', kind: 'patio', u: 565, v: 50, w: 36, d: 36, level: true, name: 'Fire-pit overlook', note: 'Evening gathering over the valley' },
+  { id: 'mv-lawn', kind: 'green', u: 675, v: 48, w: 86, d: 50, level: true, name: 'Ceremony lawn', note: 'Below the pavilion, facing the valley; seats ~150' },
+  { id: 'mv-garden-w', kind: 'green', u: 622, v: 48, w: 14, d: 50, name: 'Garden', note: 'Flowering border' },
+  { id: 'mv-garden-e', kind: 'green', u: 728, v: 48, w: 14, d: 50, name: 'Garden', note: 'Flowering border' }
+];
+// the walk up from the parking to the promenade, and the drives in from Amber Valley Way (each starts on the road square
+// below its first grid point)
+const WALKS = [{ id: 'mv-walk-park', from: [440, 70], to: [440, 101], name: 'Stair walk', note: 'Up from the parking to the promenade and the lodge' }];
+const ENTRIES = [
+  { id: 'mv-entry', to: [[340, 36]], width: 24, name: 'Resort entry', note: 'In from Amber Valley Way to the guest parking and the lodge' },
+  { id: 'mv-pav-entry', to: [[780, 120]], width: 20, name: 'Pavilion lane', note: 'Drop-off and catering at the pavilion' }
+];
+const grid = (u, v, du, dv) => add(add(CHORD.a, CHORD.t, u + du), CHORD.n, v + dv);
+function masterAt(du, dv, G = {}) {
+  const rot = deg(CHORD.t), out = [], off = q => G[q.group] || [0, 0];
+  for (const q of MASTER) {
+    if (q.path) { out.push({ ...q, path: q.path.map(([u, v]) => grid(u, v, du, dv)) }); continue; }
+    const c = grid(q.u + off(q)[0], q.v + off(q)[1], du, dv), e = q.along ? { w: q.d, d: q.w, rot: rot - 90 } : { w: q.w, d: q.d, rot };
+    const { u, v, ...rest } = q; out.push({ ...rest, x: c[0], y: c[1], ...e });
+  }
+  for (const E of ENTRIES) { // from the road, square to the grid, up to the drive's points
+    const first = grid(E.to[0][0], E.to[0][1], du, dv), back = add(first, CHORD.n, -400), hit = (() => { let best = null; for (let i = 1; i < AMBER.path.length; i++) { const a = AMBER.path[i - 1], b = AMBER.path[i];
+      const d = (b[0] - a[0]) * (first[1] - back[1]) - (b[1] - a[1]) * (first[0] - back[0]); if (Math.abs(d) < 1e-9) continue; const s = ((first[0] - back[0]) * (a[1] - back[1]) - (first[1] - back[1]) * (a[0] - back[0])) / d, r = ((b[0] - a[0]) * (a[1] - back[1]) - (b[1] - a[1]) * (a[0] - back[0])) / d;
+      if (s >= 0 && s <= 1 && r >= 0 && r <= 1) { const p = [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s]; if (!best || Math.hypot(p[0] - first[0], p[1] - first[1]) < Math.hypot(best[0] - first[0], best[1] - first[1])) best = p; } } return best; })();
+    if (hit) out.push({ id: E.id, kind: 'drive', path: [hit, ...E.to.map(([u, v]) => grid(u, v, du, dv))], width: E.width, name: E.name, note: E.note });
+  }
+  for (const W of WALKS) out.push({ id: W.id, kind: 'trail', path: [grid(...W.from, du, dv), grid(...W.to, du, dv)], width: 6, name: W.name, note: W.note });
+  return out;
+}
+function designCore(els, notes) {
+  const outlineOf = q => q.path ? SP.outline({ kind: q.kind, path: q.path, width: q.width, r: 0, x: 0, y: 0, w: q.width, d: 1, rot: 0 }) : SP.outline(q);
+  const badOf = q => { const pts = samples(outlineOf(q)); return q.kind === 'drive' || q.kind === 'trail' ? pts.some(p => !CORE.has(p) && !onRow(p)) : pts.some(p => !CORE.has(p) || onRoad(p)) || q.kind !== 'plaza' && pts.some(p => edgeDist(p, GEO.parcel) < 8); };
+  const score = ps => { let wall = 0, earth = 0, miss = 0; const fit = {}, rings = ps.map(outlineOf);
+    ps.forEach((q, i) => { if (badOf(q)) { miss += q.level || q.kind === 'building' ? 10 : 3; return; }
+      if (!['drive', 'trail', 'plaza'].includes(q.kind) && ps.some((o, j) => j !== i && (o.id === 'mv-promenade' || j < i && !['drive', 'trail', 'plaza'].includes(o.kind)) && meet(rings[i], rings[j]))) miss += 10; // pieces on top of each other, or on the promenade
+      if (q.level) { const f = TR.padFit(TERRAIN, { ...q }); if (f) { fit[q.id] = f; wall = Math.max(wall, f.cutWall, f.fillWall); earth += f.cutCy + f.fillCy; } } });
+    return { cost: 100 * miss + wall + 0.002 * earth, fit, miss }; };
+  // the whole plan first, then each group slid along its row to its own best ground (a few passes)
+  let best = null;
+  for (let du = -40; du <= 40; du += 5) for (let dv = -24; dv <= 30; dv += 3) { const ps = masterAt(du, dv), sc = score(ps), cost = sc.cost + 0.05 * (Math.abs(du) + Math.abs(dv)); if (!best || cost < best.cost) best = { ...sc, cost, ps, du, dv, G: {} }; }
+  const out = {}, kept = [];
+  for (const q of best.ps) {
+    const ring = outlineOf(q);
+    if (badOf(q) || !['drive', 'trail', 'plaza'].includes(q.kind) && kept.some(o => meet(ring, o.ring) && !['drive', 'trail', 'plaza'].includes(o.kind))) { notes.push((q.name || q.id) + ' did not fit the core: left out'); continue; }
+    const { level, along, group, ...e } = q; let el;
+    if (q.path) el = { ...e, path: e.path.map(p => p.map(r1)), r: q.id === 'mv-promenade' ? 0 : 8, x: r1(e.path[0][0]), y: r1(e.path[0][1]), w: e.width, d: 1, rot: 0, pinned: true };
+    else el = { ...e, x: r1(e.x), y: r1(e.y), rot: r1(e.rot), pinned: true };
+    if (e.type === 'hall') el.type = HALL.id; if (e.type === 'pavilion') el.type = PAVILION.id;
+    const f = best.fit[q.id]; if (f) { el.grade = grade(f); el.note = (el.note ? el.note + ' · ' : '') + padNote(f); }
+    els.push(el); kept.push({ ring, kind: q.kind });
+    if (q.id === 'mv-pavilion') out.pavilion = el; if (q.id === 'mv-hall') out.lodge = el; if (q.id === 'mv-tennis') out.courts = el;
+  }
+  out.at = { du: best.du, dv: best.dv, G: best.G };
+  return out;
+}
+
 const grade = f => ({ pad: f.pad, fall: f.fall, slope: f.slope, toward: f.toward, cutCy: f.cutCy, fillCy: f.fillCy, cutWall: f.cutWall, fillWall: f.fillWall, level: f.level, ...(f.walkout != null ? { walkout: f.walkout } : {}) });
 const g0 = v => Math.round(v).toLocaleString('en-US');
 const padNote = f => 'Pad ' + g0(f.pad) + ' ft · walls to ' + g0(Math.max(f.cutWall, f.fillWall)) + ' ft · ' + g0(f.cutCy) + ' CY cut / ' + g0(f.fillCy) + ' CY fill';
@@ -178,38 +268,11 @@ export function buildOption({ now }) {
     cabins.push({ n: +n, old, f: b.f, drive: b.drive });
   }
 
-  // the resort core
-  const P = GEO.pairs, core = [];
-  const put = (id, kind, b, extra) => { const e = { id, kind, ...b.e, x: r1(b.e.x), y: r1(b.e.y), rot: r1(b.e.rot), grade: grade(b.f), pinned: true, ...extra }; els.push(e); core.push(SP.outline(e)); return e; };
-  // head-in parking along the pavement first (it fronts every amenity lot), then the buildings and courts behind it
-  let k = 0;
-  for (const site of [P.courts, P.dining, P.pavilion]) for (const b of frontRows(site, siteFrame(site))) put('mv-park-' + (++k), 'parking', b, { row: b.e.row, name: '', note: 'Head-in off Amber Valley Way · ' + padNote(b.f) });
-  const behind = { taken: core.slice(), v0: 50 };
-  const Fp = siteFrame(P.pavilion), pav = placeRow(Fp, P.pavilion, [{ id: 'mv-pavilion', kind: 'building', w: PAVILION.w, d: PAVILION.d }, { id: 'mv-lawn', kind: 'green', w: 70, d: 50 }], behind)
-    || placeRow(Fp, P.pavilion, [{ id: 'mv-pavilion', kind: 'building', w: PAVILION.w, d: PAVILION.d }], behind);
-  const pv = pav && put('mv-pavilion', 'building', pav[0], { use: 'venue', floors: 1, type: PAVILION.id, name: 'Glass wedding pavilion', note: 'Wedding / event venue · ~150 guests · ' + padNote(pav[0].f) });
-  if (pav?.[1]) put('mv-lawn', 'green', pav[1], { name: 'Ceremony lawn', note: padNote(pav[1].f) }); else notes.push('The ceremony lawn did not fit beside the pavilion');
-  const Fd = siteFrame(P.dining), din = placeRow(Fd, P.dining, [{ id: 'mv-hall', kind: 'building', w: HALL.w, d: HALL.d }, { id: 'mv-service', kind: 'plaza', w: 30, d: 24 }], { ...behind, gap: 8 });
-  const hl = din && put('mv-hall', 'building', din[0], { use: 'restaurant', floors: 1, type: HALL.id, name: 'Dining & catering hall', note: 'Owners’ dining · caterers’ kitchen · ' + padNote(din[0].f) });
-  if (din?.[1]) put('mv-service', 'plaza', din[1], { name: 'Service yard', note: 'Deliveries · trash · catering vans' });
-  const Fc = siteFrame(P.courts), [tw, td] = SP.courtSize('tennis', 1), [pw, pd] = SP.courtSize('pickleball', 2);
-  // courts: their length along the road (local y along it), side by side
-  const crt = placeRow(Fc, P.courts, [{ id: 'mv-tennis', kind: 'court', w: td, d: tw }, { id: 'mv-pickleball', kind: 'court', w: pd, d: pw }], { ...behind, gap: 12 });
-  if (crt) {
-    const turn = b => ({ ...b, e: { ...b.e, w: b.e.d, d: b.e.w, rot: b.e.rot + 90 } }); // a court's own axes: across (w) and its length (d)
-    put('mv-tennis', 'court', turn(crt[0]), { sport: 'tennis', courts: 1, name: 'Tennis court', note: padNote(crt[0].f) });
-    put('mv-pickleball', 'court', turn(crt[1]), { sport: 'pickleball', courts: 2, name: 'Pickleball courts', note: padNote(crt[1].f) });
-  } else notes.push('The courts did not fit on lots 10-11');
-  if (!pv) notes.push('The pavilion did not fit on lots 14-15'); if (!hl) notes.push('The hall did not fit on lots 12-13');
-
-  // walks from the parking up to each building and the courts (5 ft; steps where steep)
-  const parks = els.filter(e => e.kind === 'parking');
-  for (const [key, e] of [['pavilion', pv], ['hall', hl], ['courts', els.find(x => x.id === 'mv-tennis')]]) {
-    if (!e || !parks.length) continue; const F = siteFrame(key === 'pavilion' ? P.pavilion : key === 'hall' ? P.dining : P.courts);
-    const front = add([e.x, e.y], F.n, -Math.abs(SP.rotPt([0, 1], e.rot)[0] * F.n[0] + SP.rotPt([0, 1], e.rot)[1] * F.n[1]) > 0.7 ? -e.d / 2 : -e.w / 2), pk = parks.map(q => [q.x, q.y]).sort((a, b) => Math.hypot(a[0] - front[0], a[1] - front[1]) - Math.hypot(b[0] - front[0], b[1] - front[1]))[0];
-    const from = add(pk, F.n, 10), L = Math.hypot(front[0] - from[0], front[1] - from[1]), dz = Math.abs(z(front) - z(from));
-    if (L > 8) els.push(pathEl('mv-walk-' + key, 'trail', [from, front], 5, { r: 0, d: r1(L), name: '', note: 'Walk · ' + Math.round(L) + ' ft, ' + Math.round(dz) + ' ft climb' + (dz / L > 0.083 ? ' (steps)' : ''), pinned: true }));
-  }
+  // the resort core: three composed clusters along Amber Valley Way, each square to the road at its middle, linked by a
+  // promenade (designCore below)
+  const core = designCore(els, notes);
+  const pv = core.pavilion, hl = core.lodge;
+  if (!pv) notes.push('The pavilion cluster did not fit on lots 14-15'); if (!hl) notes.push('The lodge cluster did not fit on lots 12-13'); if (!core.courts) notes.push('The courts did not fit on lots 10-11');
 
   // the woodland trail: a loop 15 ft inside the property line (a path the owners would grant, not an easement today)
   const loop = SP.offsetRing(ring, -15).every(p => SP.inRing(p, ring)) ? SP.offsetRing(ring, -15) : SP.offsetRing(ring, 15);
