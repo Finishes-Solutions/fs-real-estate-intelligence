@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 11:21 AM CT: Area Report works in rural Tennessee (9dc8196)
+- **The Area Report no longer fails in the country.** Around 2481 Happy Hollow Rd (Sevier County) it stopped with an error about "mi": the census tracts there are many miles across, and the way the report measured how much of a tract falls inside the 1-mile ring could miss the ring altogether, leaving it with no people. It now measures the part of each tract inside each ring directly, so a 1-mile ring takes its true slice of a big tract, and a ring with no census data shows a dash instead of breaking the report.
+
 ### 11:20 AM CT: Colour Selected Lots (928abdf)
 - **A new setting in Layers, Colour Selected Lots** (off unless you turn it on): each lot you pick is filled with its own colour under its outline, the first green, then blue, orange, purple and so on, and its number on the map matches. **Site Plan for All** then shows them as one merged site in one colour.
 
