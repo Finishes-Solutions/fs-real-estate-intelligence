@@ -23,16 +23,18 @@ import { NWI, SDA, soilWkt, soilMapQuery, parseSoils, fieldVal, inTexas } from '
 export const KINDS = { parcel: 'Parcel Map', topo: 'Topography', environmental: 'Site Environmental', area: 'Area Report' };
 const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[$,]/g, '')); return Number.isFinite(n) ? n : null; };
 const outer = g => g?.type === 'Polygon' ? g.coordinates[0] : g?.type === 'MultiPolygon' ? g.coordinates.map(p => p[0]).sort((a, b) => b.length - a.length)[0] : null;
+// the first point of a (Multi)Polygon (a record without a state is in Texas when it lies there: the appraisal records)
+const firstPt = g => g?.type === 'Polygon' ? g.coordinates[0]?.[0] : g?.type === 'MultiPolygon' ? g.coordinates[0]?.[0]?.[0] : null;
 // the card's parcel record in the report's names
 export function toRecord(p) {
   const acres = num(String(p.area || '').match(/[\d.,]+/)?.[0]) ?? num(p.acres);
-  return { id: p.propId || p.id || '—', owner: p.owner, mail: p.mailing || p.mail, situs: p.situsStreet || (p.situs || '').split(',')[0], city: p.situsCity || p.city, county: p.county, state: p.state || 'TX', zip: p.situsZip || p.zip,
+  return { id: p.propId || p.id || '—', owner: p.owner, mail: p.mailing || p.mail, situs: p.situsStreet || (p.situs || '').split(',')[0], city: p.situsCity || p.city, county: p.county, state: p.state || (firstPt(p.geometry) && inTexas(firstPt(p.geometry)) ? 'TX' : null), zip: p.situsZip || p.zip,
     landUse: p.landUse, zoning: p.zoning, zoningDesc: p.zoningDesc, acres, sqft: acres ? Math.round(acres * 43560) : null, land: num(p.landValue ?? p.land), improv: num(p.improvementValue ?? p.improv), total: num(p.marketValue ?? p.total),
     valueType: p.marketValue != null ? 'Market value' : p.valueType, taxYear: p.taxYear, legal: p.legal, lastSale: p.acquired || p.lastSale, yearBuilt: p.yearBuilt, bldgSf: num(p.buildingSqft ?? p.bldgSf), subdivision: p.subdivision,
     geom: outer(p.geometry) || p.geom || [] };
 }
 const titleOf = (label, recs) => label || recs.map(r => r.situs).filter(Boolean)[0] || 'Selected parcel';
-const areaOf = recs => [...new Set(recs.map(r => r.county).filter(Boolean))].map(c => /county/i.test(c) ? c : c + ' County').join(', ') + (recs.length ? ', ' + (recs[0].state || 'TX') : '');
+const areaOf = recs => [...new Set(recs.map(r => r.county).filter(Boolean))].map(c => /county/i.test(c) ? c : c + ' County').join(', ') + (recs[0]?.state ? ', ' + recs[0].state : '');
 const today = () => new Date().toISOString().slice(0, 10);
 const inRingFt = (p, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) c = !c; } return c; };
 
@@ -76,20 +78,22 @@ export async function envLayers(center, recs, { terrain = true } = {}) {
     const l = (d.layers || []).filter(x => re.test(x.name)).sort((a, b) => (/large/i.test(b.name) ? 1 : 0) - (/large/i.test(a.name) ? 1 : 0))[0]; if (!l) throw new Error('no ' + re + ' layer'); return base + '/' + l.id; };
   const tryAgain = async fn => { try { return await fn(); } catch (e) { return await fn(); } }; // (these services fail now and then; once more)
   const NHD = 'https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer';
-  const [streams, waterbodies, habitat, protectedLand] = await Promise.allSettled([
-    (async () => (await arcAny(await layerNamed(NHD, /^flowline/i), '*')).filter(f => f.geometry?.paths?.length).map(f => ({ name: fieldVal(f.attributes, 'GNIS_NAME') || fieldVal(f.attributes, 'gnis_name') || '', type: fieldVal(f.attributes, 'FTYPE'), paths: f.geometry.paths.map(pp => pp.map(p => F.toFt(p))) })))(),
-    (async () => (await arcAny(await layerNamed(NHD, /^waterbody/i), '*')).filter(f => f.geometry?.rings?.length).map(f => ({ name: fieldVal(f.attributes, 'GNIS_NAME') || '', rings: rings(f) })))(),
+  // both groups at once (they used to run one after the other, and a slow first group left the second little time)
+  const first = Promise.allSettled([
+    (async () => (await tryAgain(async () => arcAny(await layerNamed(NHD, /^flowline/i), '*'))).filter(f => f.geometry?.paths?.length).map(f => ({ name: fieldVal(f.attributes, 'GNIS_NAME') || fieldVal(f.attributes, 'gnis_name') || '', type: fieldVal(f.attributes, 'FTYPE'), paths: f.geometry.paths.map(pp => pp.map(p => F.toFt(p))) })))(),
+    (async () => (await tryAgain(async () => arcAny(await layerNamed(NHD, /^waterbody/i), '*'))).filter(f => f.geometry?.rings?.length).map(f => ({ name: fieldVal(f.attributes, 'GNIS_NAME') || '', rings: rings(f) })))(),
     firstOf(['https://services.arcgis.com/QVENGdaPbd4LUkLV/arcgis/rest/services/USFWS_Critical_Habitat/FeatureServer/0'], async u => (await arc(u, '*')).map(f => ({ name: fieldVal(f.attributes, 'comname') || fieldVal(f.attributes, 'COMNAME') || fieldVal(f.attributes, 'sciname') || 'Critical habitat', status: fieldVal(f.attributes, 'listing_st') || '', rings: rings(f) }))),
     firstOf(['https://edits.nationalmap.gov/arcgis/rest/services/PAD-US/PAD_US_4_1/MapServer/0', 'https://services.arcgis.com/v01gqwM5QqNysAAi/ArcGIS/rest/services/Fee_Managers_PADUS/FeatureServer/0', 'https://services.arcgis.com/v01gqwM5QqNysAAi/ArcGIS/rest/services/Manager_Name_PADUS/FeatureServer/0'],
       async u => (await arc(u, '*')).map(f => ({ name: fieldVal(f.attributes, 'Unit_Nm') || fieldVal(f.attributes, 'UNIT_NM') || 'Protected area', manager: fieldVal(f.attributes, 'd_Mang_Nam') || fieldVal(f.attributes, 'Mang_Name') || '', rings: rings(f) })))]); // (PAD-US 4.1: USGS's own service, then Esri's Living Atlas copy)
-  for (const [k, v] of Object.entries({ streams, waterbodies, habitat, protectedLand })) if (v.status === 'rejected') errors[k] = v.reason?.message || 'failed';
-  const [flood, wetlands, soils, T] = await Promise.allSettled([
+  const second = Promise.allSettled([
     (async () => { const { NFHL } = await import('./fema.js'); return (await tryAgain(() => arc(NFHL + '/28', 'FLD_ZONE,ZONE_SUBTY,SFHA_TF'))).map(f => ({ zone: f.attributes.FLD_ZONE, sub: f.attributes.ZONE_SUBTY, sfha: f.attributes.SFHA_TF, rings: rings(f) })); })(),
     (async () => (await tryAgain(() => arc(NWI + '/0', '*'))).map(f => ({ type: fieldVal(f.attributes, 'WETLAND_TYPE'), code: fieldVal(f.attributes, 'ATTRIBUTE'), acres: +fieldVal(f.attributes, 'ACRES') || undefined, rings: rings(f) })))(),
     (async () => { const wkt = soilWkt({ type: 'Polygon', coordinates: [ll.concat([ll[0]])] }); const r = await tryAgain(async () => { const x = await fetch(SDA, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30000), body: JSON.stringify({ format: 'JSON+COLUMNNAME', query: soilMapQuery(wkt) }) }); if (!x.ok) throw new Error('USDA soil data ' + x.status); return x.json(); });
       const t = r?.Table || [], h = t[0] || [], wi = h.indexOf('wkt'), info = new Map(parseSoils(r).map(x => [x.name, x]));
       return t.slice(1).map(row => { const name = row[h.indexOf('muname')]; return { mukey: row[h.indexOf('mukey')], name, info: info.get(name), rings: wktPolys(row[wi], F).flat() }; }).filter(x => x.rings.length); })(),
     terrain ? (async () => { const { terrainFor } = await import('./terrain.js'); return terrainFor(center, box4, Date.now(), { meteo: false }); })() : Promise.resolve(null)]);
+  const [[streams, waterbodies, habitat, protectedLand], [flood, wetlands, soils, T]] = await Promise.all([first, second]);
+  for (const [k, v] of Object.entries({ streams, waterbodies, habitat, protectedLand })) if (v.status === 'rejected') errors[k] = v.reason?.message || 'failed';
   for (const [k, v] of Object.entries({ flood, wetlands, soils, terrain: T })) if (v.status === 'rejected') errors[k] = v.reason?.message || 'failed';
   const val = v => v.status === 'fulfilled' ? v.value : null;
   return { F, box: [box4[0], box4[2]], flood: val(flood) || [], wetlands: val(wetlands) || [], soils: val(soils) || [], terrain: val(T), streams: val(streams) || [], waterbodies: val(waterbodies) || [], habitat: val(habitat) || [], protectedLand: val(protectedLand) || [], errors };
