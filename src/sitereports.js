@@ -3,6 +3,7 @@
 // export (recorded in the Reports tab). Shown on the card (a "Reports" block at the end of the Site section) and on the
 // Reports tab ("For the open parcel").
 import { esc } from './reportkit.js';
+import { parcelGeoJSON } from './lib/reports/geojson.mjs';
 
 export const SITE_REPORTS = [
   { key: 'parcel', label: 'Parcel Map', desc: 'To scale, every line dimensioned, bearings, corners, area check and the record', time: 'a few seconds' },
@@ -10,6 +11,8 @@ export const SITE_REPORTS = [
   { key: 'environmental', label: 'Site Environmental', desc: 'Cleanup and regulated sites, wells, pipelines, soils, flood and hazards', time: '20–40 seconds' },
   { key: 'area', label: 'Area Report', desc: '1, 3, 5 and 10-mile rings: people, income, spending, construction', time: 'a few seconds' },
 ];
+// not a report: the outline file, every point (made in the browser, instant)
+export const OUTLINE = { key: 'geojson', label: 'Parcel Outline', desc: 'The full outline, every point, with the record and its courses: for GIS or CAD', time: 'instant' };
 const slug = s => String(s || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'site';
 
 // a Regrid record (api/regrid.js: fields as [label, value] and every raw field in more) in the card's parcel names
@@ -28,11 +31,15 @@ export function initSiteReports(ctx) {
   // the parcel the reports are about: the open card's
   // the parcel the reports are about: the open card's appraisal record, else its Regrid record (outside Texas, or where the
   // county has none) once "Get Regrid Details" has run for it
+  // A parcel drawn from the map's lines alone (fromLines: no acres or values) gives way to its Regrid record once that has
+  // been fetched for it (2026-10-30, Sevier County TN: the Parcel Map showed 0.00 acres and $0 beside a fetched record).
   const target = () => { const b = ctx.currentBuilding?.(); if (!b) return null;
-    if (b.parcel?.geometry) return { parcels: [b.parcel], center: b.center, label: b.parcel.situs || b.title || '' };
-    const rg = ctx.lastRegrid; if (!rg?.geom || Math.hypot(rg.center[0] - b.center[0], rg.center[1] - b.center[1]) > 1e-4) return null;
-    const p = fromRegrid(rg); return { parcels: [p], center: b.center, label: p.situs || b.title || '' }; };
+    const rg = ctx.lastRegrid, rgHere = !!rg?.geom && Math.hypot(rg.center[0] - b.center[0], rg.center[1] - b.center[1]) <= 1e-4;
+    if (b.parcel?.geometry && !(b.parcel.fromLines && rgHere)) return { parcels: [b.parcel], center: b.center, label: b.parcel.situs || b.title || '' };
+    if (!rgHere) return null;
+    const p = fromRegrid(rg); return { parcels: [p], center: b.center, label: p.situs || b.title || '', regrid: rg }; };
   ctx.siteReport = async (key, t = target(), btn = null) => {
+    if (key === 'geojson') return outline(t);
     const r = SITE_REPORTS.find(x => x.key === key); if (!r) return;
     if (!t) { ctx.toast?.(ctx.currentBuilding?.() ? 'This parcel has no free appraisal record: press Get Regrid Details on the card first (the report is drawn from its outline).' : 'Click a parcel on the map first: the report is drawn from its outline.'); return; }
     const id = key + '|' + t.center.join(','); if (running.has(id)) return; running.add(id);
@@ -47,8 +54,17 @@ export function initSiteReports(ctx) {
     } catch (e) { ctx.toast?.(e.message); }
     finally { running.delete(id); if (btn?.isConnected) { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.innerHTML = old; } }
   };
+  // the parcel outline, every point, as GeoJSON (lib/reports/geojson.mjs), made here and saved like any export
+  async function outline(t) {
+    if (!t) { ctx.toast?.(ctx.currentBuilding?.() ? 'This parcel has no outline yet: press Get Regrid Details on the card first.' : 'Click a parcel on the map first.'); return; }
+    const fc = parcelGeoJSON(t.parcels, { regrid: t.regrid || null, label: t.label });
+    if (!fc.features.length) { ctx.toast?.('This parcel has no outline to export.'); return; }
+    ctx.exportMeta = { report: 'site-outline', format: 'geojson', scope: t.label };
+    try { await ctx.saveFile('parcel-outline-' + slug(t.label) + '-' + new Date().toISOString().slice(0, 10) + '.geojson', new Blob([JSON.stringify(fc, null, 1)], { type: 'application/geo+json' }), 'application/geo+json'); }
+    catch (e) { ctx.toast?.(e.message); } finally { ctx.exportMeta = null; }
+  }
   // the buttons: a grid of one-click reports for el (the card's Site section, or the Reports tab)
-  ctx.siteReportButtons = (t = null, { always = false } = {}) => '<div class="sr-grid">' + SITE_REPORTS.map(r => '<button type="button" class="sr-btn" data-sr="' + r.key + '"' + (always || t || target() ? '' : ' disabled') + '><b>' + esc(r.label) + '</b><span>' + esc(r.desc) + '</span></button>').join('') + '</div>';
+  ctx.siteReportButtons = (t = null, { always = false } = {}) => '<div class="sr-grid">' + SITE_REPORTS.concat([OUTLINE]).map(r => '<button type="button" class="sr-btn" data-sr="' + r.key + '"' + (always || t || target() ? '' : ' disabled') + '><b>' + esc(r.label) + '</b><span>' + esc(r.desc) + '</span></button>').join('') + '</div>';
   ctx.wireSiteReports = (el, t = null) => el.querySelectorAll('[data-sr]').forEach(b => b.onclick = () => ctx.siteReport(b.dataset.sr, t || target(), b));
   ctx.siteReportTarget = target;
 }

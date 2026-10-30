@@ -4207,6 +4207,7 @@ a{color:var(--text)}
 .sr-btn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-lg);padding:10px 12px;cursor:var(--cur-pointer,pointer);color:var(--text);font:inherit;transition:background var(--dur-fast),border-color var(--dur-fast),box-shadow var(--dur-fast)}
 .sr-btn b{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px}
 .sr-btn b::after{content:"PDF";font-size:10.5px;font-weight:500;color:var(--muted);border:1px solid var(--line-2);border-radius:var(--r-pill);padding:0 6px;margin-left:auto}
+.sr-btn[data-sr="geojson"] b::after{content:"GeoJSON"}
 .sr-btn span{font-size:12px;color:var(--muted);line-height:1.4}
 .sr-btn:hover:not(:disabled){background:var(--ink-50);border-color:var(--line-2);box-shadow:var(--sh-1)}
 .sr-btn:disabled{opacity:.5;cursor:var(--cur-default,default)}

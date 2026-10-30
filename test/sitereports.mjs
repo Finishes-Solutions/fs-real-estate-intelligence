@@ -17,9 +17,9 @@ assert.equal(PL.ringAreaFt([[0, 0], [10, 0], [10, 20], [0, 20]]), 200);
 
 // ---------- parcel map ----------
 { const G = PM.geometryOf([parcel]), g = G.list[0], L = g.courses.map(c => Math.round(c.len));
-  assert.deepEqual(L, [242, 43, 430, 189, 469], 'the five lines as the county sheet dimensions them (242, 43, 431, 189, 470 rounded there)');
+  assert.deepEqual(L, [469, 189, 430, 43, 242], 'the five lines as the county sheet dimensions them (242, 43, 431, 189, 470 rounded there), read clockwise from its corner 1 as the page says'); assert.equal(g.corners.length, 5, 'a clean five-corner outline keeps every corner, the slight 43 ft bend too');
   assert.ok(Math.abs(g.area / 43560 - 2.2926) < 0.02, 'the outline measures the roll\'s 2.29 acres, not Regrid\'s 2.41 GIS acres (' + (g.area / 43560).toFixed(3) + ')');
-  assert.match(g.courses[0].brg, /^N \d\d°\d\d'\d\d" E$/); assert.ok(g.box.w > 250 && g.box.w < 300 && g.box.d > 480 && g.box.d < 520, 'fits a box about 276 x 501 ft');
+  assert.match(g.courses[0].brg, /^N \d\d°\d\d'\d\d" W$/); assert.ok(g.box.w > 250 && g.box.w < 300 && g.box.d > 480 && g.box.d < 520, 'fits a box about 276 x 501 ft');
   const flags = PM.recordFlags(parcel, g.area / 43560); assert.equal(flags.length, 1, 'one check: the building on a vacant, $0-improvement record'); assert.match(flags[0], /2,175 sf, built 1975/);
   assert.match(PM.recordFlags({ ...parcel, bldgSf: 0, yearBuilt: '' }, 2.6)[0], /measures 2\.60 ac against 2\.29 ac/, 'an outline 13% off the roll is flagged');
   const html = PM.parcelReport({ title: '15514 Elgin Street', area: 'Harris County, TX', date: '2026-10-30', parcels: [parcel], site: { flood: { zone: 'X', risk: 'minimal' }, schools: ['Channelview ISD'], near: ['Houston'] } });
@@ -58,6 +58,35 @@ const T = { ...spec, z, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1 };
   assert.equal(S.P([300, 500])[2], false, 'ground behind the hill, looking from the south, is hidden'); assert.equal(S.P([0, -500])[2], true, 'the near ground is in sight');
   assert.equal(D.autoExaggeration({ ...T3, z: zz.map(v => 500 + (v - 500) / 100) }), 5, 'nearly flat ground: stretched the most (5×)'); assert.equal(D.autoExaggeration(T3), 2, 'a 120 ft hill on 1,200 ft: 2×'); assert.equal(D.autoExaggeration({ ...T3, z: zz.map(v => 500 + (v - 500) * 4) }), 1, 'a 480 ft mountain: true to scale');
   assert.equal(S.w * S.h * 4, S.rgba.length); }
+
+// ---------- a densely traced rural outline (2481 Happy Hollow Rd, Sevier County TN, 2026-10-30: 772 points, listed as 772
+// courses of a foot or two that ran off the page, and the corner dots merged into a grey band along the creek) ----------
+{ const C3 = await import('../lib/reports/courses.mjs'), o = [-83.69115, 35.72452], F3 = frame(o), pts = [], jit = i => Math.sin(i * 12.9898) * 0.25;
+  pts.push([-560, 120], [-80, 130], [700, 300], [690, -80]); // the north and east deed lines: four clean corners
+  for (let i = 0; i <= 600; i++) { const x = 690 - i * 2.25, y = -300 + 70 * Math.sin(x / 160) + jit(i); pts.push([x, y]); } // the creek, every ~2.5 ft, S-bends
+  for (let i = 1; i < 150; i++) { const t = i / 150, x = -660 + 100 * Math.sin(t * Math.PI), y = -300 + 420 * t + jit(i + 900); pts.push([x, y]); } // the road frontage, a long bend
+  const geomTN = pts.map(p => F3.toLL(p)).concat([F3.toLL(pts[0])]);
+  const { corners, courses } = C3.boundaryCourses(pts.map(p => p));
+  assert.ok(pts.length > 700 && courses.length <= 40 && corners.length === courses.length, pts.length + ' points read as ' + courses.length + ' courses');
+  assert.ok(courses.filter(c => c.type === 'curve').length >= 3, 'the creek\'s S-bends and the road\'s bend read as curves');
+  for (const k of [0, 1, 2]) assert.ok(corners.some(q => Math.hypot(q[0] - pts[k][0], q[1] - pts[k][1]) < 0.01), 'the deed corners are kept exactly');
+  const per = courses.reduce((s, c) => s + (c.arc || c.len), 0), full = pts.reduce((s, p, i) => s + Math.hypot(pts[(i + 1) % pts.length][0] - p[0], pts[(i + 1) % pts.length][1] - p[1]), 0);
+  assert.ok(Math.abs(per / full - 1) < 0.02, 'the courses (arcs for curves) add up to the perimeter: ' + per.toFixed(0) + ' vs ' + full.toFixed(0));
+  for (const c of courses.filter(c => c.type === 'curve')) assert.ok(c.arc >= c.len && c.radius > 0 && c.delta > 0 && c.delta < 360, 'a curve has an arc longer than its chord, a radius and an angle');
+  const html = PM.parcelReport({ title: '2481 Happy Hollow Rd', date: '2026-10-30', parcels: [{ id: '122 00500 000', owner: 'HAPPY HALLOW CABINS LLC', situs: '2481 HAPPY HOLLOW RD', acres: 30.04, geom: geomTN }] });
+  const bpages = html.split('<section class="pg"').filter(x => x.includes('Parcel map · boundary'));
+  for (const pg of bpages) assert.ok((pg.match(/<tr>/g) || []).length <= 46, 'no boundary page holds more rows than fit: ' + (pg.match(/<tr>/g) || []).length);
+  assert.ok(html.includes('Points in the outline') && html.includes('GeoJSON export') && /Curve (right|left) · arc/.test(html), 'says the outline was summarised, and where to get all of it');
+  // the GeoJSON export: every point of the outline, the record, every Regrid field, the measures and the courses
+  const GJ = await import('../lib/reports/geojson.mjs'), poly = { type: 'Polygon', coordinates: [geomTN] };
+  const fc = GJ.parcelGeoJSON([{ propId: '122 00500 000', owner: 'HAPPY HALLOW CABINS LLC', acres: 30.04, landValue: 190600, geometry: poly, raw: { x: 1 } }], { regrid: { fields: [['Acres', '30.0669'], ['Owner', 'HAPPY HALLOW CABINS LLC']], more: [['ll_uuid', '07f96ea9'], ['topography', '2 MOUNTAINOUS']] }, label: '2481 Happy Hollow Rd' });
+  const f0 = fc.features[0]; assert.equal(fc.type, 'FeatureCollection'); assert.equal(f0.geometry, poly, 'the outline exactly as drawn, not thinned');
+  assert.equal(f0.properties.outline.points, pts.length); assert.equal(f0.properties.landValue, 190600); assert.equal(f0.properties.regrid.topography, '2 MOUNTAINOUS'); assert.ok(!('raw' in f0.properties) && !('geometry' in f0.properties));
+  assert.ok(Math.abs(f0.properties.outline.area_sqft - Math.abs(PL.ringAreaFt(pts))) / f0.properties.outline.area_sqft < 0.001, 'its area');
+  assert.equal(f0.properties.courses.length, courses.length, 'the courses as the Parcel Map lists them'); assert.ok(f0.properties.courses.some(c => c.type === 'curve' && c.arc_ft > c.distance_ft && c.radius_ft > 0));
+  assert.ok(JSON.parse(JSON.stringify(fc)).features[0].geometry.coordinates[0].length === geomTN.length, 'survives JSON');
+  assert.equal(GJ.parcelGeoJSON([{ propId: 'x' }]).features.length, 0, 'no outline, no feature');
+  const dots = (html.split('<section class="pg"')[1].match(/r="2.2"/g) || []).length; assert.ok(dots <= 45, 'the map marks the corners, not every point: ' + dots); }
 
 // ---------- site environmental ----------
 { const kinds = { lpst: { label: 'Leaking petroleum storage tank (TCEQ LPST)', search_mi: 0.5, count: 2, onsite: 0, nearest: [{ name: 'SHELDON ROAD TEXACO', addr: '817 SHELDON RD', mi: 0.28, dir: 'E' }, { name: 'OLD CHEVRON', mi: 0.38, dir: 'SE' }] },
