@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 8:29 AM CT: Real Estate Intelligence only, no company branding (c9819d6, 9d62e8f)
+- **The app is unbranded.** The top bar, browser tab, installed-app name and icon now say Real Estate Intelligence (a new "RE" icon), with no company logo.
+- **Reports are unbranded.** Every PDF's header, footer and sign-off carry only the name Real Estate Intelligence; the old company tagline, logo and green are gone.
+- **Plan sets are unbranded.** The title block's company logo, address, phone number, copyright line and firm number are removed (not just covered) and the block reads Real Estate Intelligence. "Prepared by" is now "Prepared with Real Estate Intelligence", and the project team lists the development consultant as to be confirmed.
+- **Wording elsewhere:** the Waller guardrails' scenarios are A, B (base case) and C without a company name; budget lines read "the team's budget workbook" and "Profit — Developer"; the AI assistant introduces itself as Real Estate Intelligence's assistant.
+
 ### 12:45 AM CT: One-click site reports from a parcel, and a new look (4982085, e144fa8)
 - **Reports from a parcel in one click.** A parcel's card has a **Reports** button among its section buttons, and a **Reports for this parcel** block in its Site section: **Parcel Map**, **Topography**, **Site Environmental** and **Area Report** (1, 3, 5 and 10-mile rings). Each makes the PDF straight away (a few seconds for the parcel map and area report, 10 to 40 for topography and environmental) and saves it like any other export. The **Reports** page has the same four under **For the open parcel**.
 - **The topography report covers the page:** the ground is fetched for the site plus 300 feet or more around it, in the page's shape, so the maps run edge to edge.
