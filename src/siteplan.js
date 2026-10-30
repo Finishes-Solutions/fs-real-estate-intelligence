@@ -2114,7 +2114,7 @@ export function initSitePlan(ctx) {
   // Renderings & plans › Plan set: made on the project page from a confirmed option
   function planSetHtml(p, pl) {
     const n = (pl.sets || []).length;
-    return '<div class="bsec" id="spPlanSet"><div class="lt">Plan set</div><p class="rnote">A full schematic design set from this option on the Real Estate Intelligence title block: site and civil, landscape, floor plans, elevations, sections, structural, MEP, life safety and the renderings.' + (n ? ' This option has ' + plural(n, 'issue') + ' so far.' : '') + '</p>' +
+    return '<div class="bsec" id="spPlanSet"><div class="lt">Plan set</div><p class="rnote">A full schematic design set from this option on the title block: site and civil, landscape, floor plans, elevations, sections, structural, MEP, life safety and the renderings.' + (n ? ' This option has ' + plural(n, 'issue') + ' so far.' : '') + '</p>' +
       '<div class="sp-row"><button type="button" class="btn askai" id="spMakeSet">Make a Plan Set ›</button></div></div>';
   }
   // Layout › Add: on a site with nothing laid out, Start as a Parking Lot (lib/planstages.mjs parkingLot): rows over the
@@ -4823,7 +4823,7 @@ export function initSitePlan(ctx) {
     const ready = p.plans.filter(laidOut);
     if (!psInfo && !psInfoP) loadPsInfo();
     loadJob(p.id);
-    if (!ready.length) return '<div class="pj-empty"><b>No plan sets yet</b><p>A plan set is a schematic design drawing set made from one of this project’s site plan options, on the Real Estate Intelligence title block: cover and general notes, site and civil, landscape, floor plans, elevations, sections and schedules for each building type, structural, mechanical, plumbing, electrical, fire protection and life safety, and the renderings.</p>' +
+    if (!ready.length) return '<div class="pj-empty"><b>No plan sets yet</b><p>A plan set is a schematic design drawing set made from one of this project’s site plan options, on the title block: cover and general notes, site and civil, landscape, floor plans, elevations, sections and schedules for each building type, structural, mechanical, plumbing, electrical, fire protection and life safety, and the renderings.</p>' +
       '<p>' + (p.plans.length ? 'None of this project’s options has buildings yet: lay one out first.' : 'This project has no site plan options yet.') + '</p><div class="btnrow"><button type="button" class="btn" data-tabgo="options">Go to Sites</button></div></div>';
     const s = psState(p), pl = ready.find(x => x.id === s.plid) || ready[0], nR = setRenders(pl).length, types = typesFor(pl), counts = PS.sectionCounts(pl, nR, types), I = psInfo, j = jobs.get(p.id);
     const busy = !!j && j.state !== 'done';

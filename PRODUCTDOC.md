@@ -435,7 +435,7 @@ These four are unbranded (no company name), black and white with blue accents, s
 - Area reports (FEMA, traffic, drive time, air traffic, crime), the City / County Crime Report, the Market report, airport reports and flight reports export as **PDFs**, and their data as CSV.
 - **Every report with a place in it shows it on a street map** (roads, towns and labels) with the area outlined: area reports, the Market report, the Summary report's filings map, the area comparison (each area in its colour), airport and flight reports, and the City / County Crime Report (where the report was asked for).
 - **Every PDF uses the report style:**
-  - a dark title band with the logo and the green rule, set in Inter (the four site reports below are unbranded: black and white with blue accents);
+  - a dark title band with the report's name, the area and the date, and a green rule, set in Inter. No report carries a company or platform name or logo (the four site reports below are black and white with blue accents);
   - headline figures in tiles, clean tables, and the report name and page numbers on every page.
   - Pages are portrait. The full filing list (and a comparison of four or more areas) is landscape, because it needs the width.
 - A PDF filing list shows the 2,000 largest filings (1,000 when added to a Summary report). Excel and CSV always have every filing.
@@ -1131,7 +1131,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
-- **Unbranded:** the app, its icon, every report and the plan sets now carry only the name Real Estate Intelligence: no company name, logo, address or phone number anywhere.
+- **Unbranded:** the app, its icon and the plan sets carry only the name Real Estate Intelligence, and reports carry no name at all: just the report's title, the area, the date and page numbers. No company name, logo, address or phone number anywhere.
 - **One-click site reports:** a parcel's card and the Reports page now make a Parcel Map, Topography, Site Environmental and an Area Report in 1, 3, 5 and 10-mile rings with one click each (see **Reports and exporting**).
 - **A new look:** the whole app is set in Inter on white, with hairline borders, rounded corners, black pill buttons and plain grey labels instead of the small capital labels.
 - **Sharper ground elevations:** a site's ground is now read from USGS lidar every 3 feet (up to a quarter of a million points) instead of at most 3,600 points, so contours, slopes and the low and high ground on the plan set and in Jurisdiction & site follow the real land closely, on big tracts too.

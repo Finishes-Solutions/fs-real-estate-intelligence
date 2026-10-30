@@ -102,13 +102,13 @@ export const REPORT_CSS = '*{box-sizing:border-box}html{-webkit-print-color-adju
 // the whole document: the title band (kicker, title, meta, logo), the body, sources and the sign-off. css: the report's
 // own extra rules; landscape: letter landscape (the PDF renderer is told the same).
 export function reportDoc({ kicker, title, meta = '', body = '', sources = '', css = '', landscape = false }) {
-  const logo = typeof location === 'undefined' ? 'logo-white.png' : new URL('logo-white.png', location.href).href, date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(kicker + ' — ' + title) + '</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>@page{size:letter' + (landscape ? ' landscape' : '') + ';margin:.5in .5in .6in}' + REPORT_CSS + css + '</style></head><body>' +
     '<button class="pb" onclick="window.print()">Print or Save as PDF</button><div class="wrap"><div class="hd"><div><div class="k">' + esc(kicker) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + meta +
-    (meta ? ' · ' : '') + 'Generated ' + date + '</div></div><img src="' + logo + '" alt="Real Estate Intelligence"></div>' +
+    (meta ? ' · ' : '') + 'Generated ' + date + '</div></div></div>' +
     body + (sources ? '<div class="ft">Sources: ' + sources + '</div>' : '') +
-    '<div class="sign"><span><b>Real Estate Intelligence</b></span><span>Public data, checked and cited</span></div></div></body></html>';
+    '</div></body></html>';
 }
 // [[value, label, color?], …] -> the KPI strip (report) or the card's kgrid
 export const kpiStrip = items => '<div class="kp">' + items.map(([v, l, c]) => '<div><b' + (c ? ' style="color:' + c + '"' : '') + '>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>';
