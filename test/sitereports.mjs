@@ -80,4 +80,21 @@ const T = { ...spec, z, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1 };
   const res = { code: 0, status(c) { res.code = c; return res; }, json(o) { res.body = o; return res; }, setHeader() {} };
   await API.default({ method: 'POST', body: { kind: 'nope', parcels: [card], center: origin }, headers: { 'x-forwarded-for': '7.7.7.1' } }, res); assert.equal(res.code, 400);
   await API.default({ method: 'POST', body: { kind: 'parcel', parcels: [], center: origin }, headers: { 'x-forwarded-for': '7.7.7.2' } }, res); assert.equal(res.code, 400); assert.match(res.body.error, /Open a parcel/); }
+// ---------- the environmental map pages (lib/reports/envmaps.mjs) and their layers ----------
+{ const E = await import('../lib/env.mjs'), M = await import('../lib/reports/envmaps.mjs'), API = await import('../api/sitereport.js');
+  assert.equal(E.fieldVal({ 'Wetlands.WETLAND_TYPE': 'Freshwater Pond' }, 'Wetlands.WETLAND_TYPE'), 'Freshwater Pond'); assert.equal(E.fieldVal({ WETLAND_TYPE: 'Riverine' }, 'Wetlands.WETLAND_TYPE'), 'Riverine', 'the field without its old prefix');
+  assert.equal(E.fieldVal({ wetland_type: 'Lake' }, 'Wetlands.WETLAND_TYPE'), 'Lake'); assert.equal(E.fieldsOf(E.KINDS.wetlands), '*', 'wetlands ask for every field');
+  const F = frame(origin), wkt = 'MULTIPOLYGON (((-95.1310 29.7895, -95.1300 29.7895, -95.1300 29.7905, -95.1310 29.7905, -95.1310 29.7895)), ((-95.1299 29.7905, -95.1290 29.7905, -95.1290 29.7915, -95.1299 29.7915, -95.1299 29.7905)))';
+  const polys = API.wktPolys(wkt, F); assert.equal(polys.length, 2); assert.ok(polys[0][0].every(p => Math.abs(p[0]) < 800 && Math.abs(p[1]) < 800), 'in the parcel\'s feet');
+  // two soils splitting the parcel down the middle (east and west of its centre line)
+  const xs = ring.map(p => p[0]), mx = (Math.min(...xs) + Math.max(...xs)) / 2, half = (a, b) => [[[a, -900], [b, -900], [b, 900], [a, 900]]];
+  const soils = [{ mukey: '1', name: 'Bernard-Urban land complex', rings: half(-900, mx) }, { mukey: '2', name: 'Verland-Urban land complex', rings: half(mx, 900) }];
+  const sh = M.soilShares(ring, soils.map(x => ({ ...x, key: x.mukey }))), tot = [...sh.values()].reduce((a, b) => a + b, 0); assert.ok(Math.abs(tot - 100) < 0.5 && [...sh.values()].every(v => v > 20 && v < 80), 'the shares cover the parcel (' + [...sh.values()].map(v => v.toFixed(0)).join(' + ') + ')');
+  const box = API.topoBox(ring), layers = { box: [box[0], box[2]], flood: [{ zone: 'AE', rings: [[[-900, -900], [-300, -900], [-300, -400], [-900, -400]]] }, { zone: 'X', rings: [[[-900, -900], [900, -900], [900, 900], [-900, 900]]] }], wetlands: [{ type: 'Freshwater Emergent Wetland', code: 'PEM1C', rings: [[[100, 100], [160, 100], [160, 160], [100, 160]]] }], soils, terrain: T, errors: {} };
+  const head = { kicker: 'Site environmental', title: 'Elgin' }, pages = M.envMapPages({ head, foot: '', ring, origin, F, layers, soilInfo: [{ name: 'Bernard-Urban land complex', drainage: 'Somewhat poorly drained', hydrologic_group: 'D', small_commercial: 'Very limited' }], png: pngDataUrl });
+  assert.equal(pages.length, 3, 'constraints, soils, and topography & slope'); const all = pages.join('');
+  for (const t of ['Parcel outline', '1% annual chance (A zones)', 'Mapped wetlands (NWI)', 'Bernard-Urban land complex', 'Verland-Urban land complex', 'Somewhat poorly drained', 'Lidar contours', 'Slope on the parcel', 'data:image/png;base64,']) assert.ok(all.includes(t), 'the map pages show ' + t);
+  assert.ok(!all.includes('0.2% annual chance'), 'zone X (minimal) is not drawn as a hazard');
+  const gone = M.envMapPages({ head, foot: '', ring, origin, F, layers: { ...layers, wetlands: [], terrain: null, errors: { wetlands: 'Failed to execute query.', terrain: 'timed out' } }, png: pngDataUrl }).join('');
+  assert.match(gone, /The wetlands map didn't load/); assert.match(gone, /a blank is not "none"/); assert.match(gone, /Detailed ground elevations didn't load/); }
 console.log('sitereports ok');

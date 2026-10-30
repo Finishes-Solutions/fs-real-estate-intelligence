@@ -12,7 +12,7 @@
 // Each source is best effort: a failing or unfinished one returns { error } and can be asked for again on its own.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { limiter } from './_lib/limit.mjs';
-import { KINDS, RRC, NWI, SDA, SOILS_WMS, kindsIn, siteExtent, featureRow, summarize, soilsQuery, soilsShareQuery, parseSoils, esriPolygon, SOURCES } from '../lib/env.mjs';
+import { KINDS, RRC, NWI, SDA, SOILS_WMS, kindsIn, siteExtent, featureRow, fieldsOf, summarize, soilsQuery, soilsShareQuery, parseSoils, esriPolygon, SOURCES } from '../lib/env.mjs';
 import { areaSqMi } from '../lib/fema.mjs';
 import { circle, cleanGeometry } from './crime.js';
 import { tileBBox } from './fema.js';
@@ -38,7 +38,7 @@ const chunks = (a, n) => { const out = []; for (let i = 0; i < a.length; i += n)
 export async function kindNear(kind, site, ext, deadline) {
   const K = KINDS[kind];
   const d = await query(K.url, { geometry: ext.center.join(','), geometryType: 'esriGeometryPoint', distance: String(ext.radius + K.mi + 0.01), units: 'esriSRUnit_StatuteMile',
-    spatialRel: 'esriSpatialRelIntersects', outFields: Object.values(K.f).join(','), returnGeometry: 'true', resultRecordCount: '1000', ...(K.poly || K.line ? { maxAllowableOffset: '0.00005', geometryPrecision: '6' } : {}) }, deadline);
+    spatialRel: 'esriSpatialRelIntersects', outFields: fieldsOf(K), returnGeometry: 'true', resultRecordCount: '1000', ...(K.poly || K.line ? { maxAllowableOffset: '0.00005', geometryPrecision: '6' } : {}) }, deadline);
   const s = summarize(kind, (d.features || []).map(f => featureRow(kind, f, site, ext.center)));
   return d.exceededTransferLimit ? { ...s, truncated: true } : s;
 }
@@ -55,7 +55,7 @@ async function idsWithin(K, site, mi, run, deadline) {
 async function byIds(kind, ids, withGeom, run, deadline) {
   const K = KINDS[kind], out = [];
   await Promise.all(chunks(ids, CHUNK).map(part => run(async () => {
-    const d = await query(K.url, { objectIds: part.join(','), outFields: Object.values(K.f).join(','), returnGeometry: withGeom ? 'true' : 'false',
+    const d = await query(K.url, { objectIds: part.join(','), outFields: fieldsOf(K), returnGeometry: withGeom ? 'true' : 'false',
       ...(withGeom && (K.poly || K.line) ? { maxAllowableOffset: '0.00005', geometryPrecision: '6' } : {}) }, deadline);
     out.push(...(d.features || []));
   })));
@@ -77,7 +77,7 @@ export async function kindReport(kind, site, ext, { run = limiter(6), deadline, 
   // most sites: one request, everything within the search distance of the site's edge
   if (!full) {
     let d; try { d = await run(() => query(K.url, { geometry: esriPolygon(site), geometryType: 'esriGeometryPolygon', spatialRel: 'esriSpatialRelIntersects', distance: String(K.mi), units: 'esriSRUnit_StatuteMile',
-      outFields: Object.values(K.f).join(','), returnGeometry: 'true', ...(K.poly || K.line ? { maxAllowableOffset: '0.00005', geometryPrecision: '6' } : {}) }, deadline)); }
+      outFields: fieldsOf(K), returnGeometry: 'true', ...(K.poly || K.line ? { maxAllowableOffset: '0.00005', geometryPrecision: '6' } : {}) }, deadline)); }
     catch (e) { if (e.late) throw e; return { ...(await kindNear(kind, site, ext, deadline)), method: 'circle' }; } // service can't search around a polygon
     if (!d.exceededTransferLimit) return summarize(kind, (d.features || []).map(f => featureRow(kind, f, site, ext.center)));
   }
@@ -103,7 +103,7 @@ export async function kindReport(kind, site, ext, { run = limiter(6), deadline, 
   const out = { ...s, count: total, onsite: on.length, listed: rows.length };
   const part = async fn => { try { return await fn(); } catch (e) { return null; } };
   if (kind === 'wells') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name], null, run, deadline)); if (t) out.by_type = t.map(x => ({ type: x.keys[0] || 'Unknown', n: x.n })).sort((a, b) => b.n - a.n); }
-  if (kind === 'wetlands') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name], K.f.acres, run, deadline)); if (t) out.by_type = t.map(x => ({ type: x.keys[0] || 'Unknown', n: x.n, acres: Math.round(x.s || 0) })).sort((a, b) => b.n - a.n); }
+  if (kind === 'wetlands') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name.split('.').pop()], K.f.acres.split('.').pop(), run, deadline)); if (t) out.by_type = t.map(x => ({ type: x.keys[0] || 'Unknown', n: x.n, acres: Math.round(x.s || 0) })).sort((a, b) => b.n - a.n); }
   if (kind === 'pipelines') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name, K.f.system, K.f.commodity, K.f.diameter], null, run, deadline)); if (t) { out.count = t.length; out.segments = total; } }
   return out;
 }
