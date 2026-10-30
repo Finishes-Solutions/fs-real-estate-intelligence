@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>${x(title)}</title><link>${x(site + (qs ? '#' + qs : ''))}</link>
-<description>TDLR TABS registrations matching this search, from the Finishes Solutions real estate intelligence map. Data refreshed ${x(data.built.slice(0, 10))}.</description>
+<description>TDLR TABS registrations matching this search, from the Real Estate Intelligence real estate intelligence map. Data refreshed ${x(data.built.slice(0, 10))}.</description>
 <lastBuildDate>${new Date(data.built).toUTCString()}</lastBuildDate>
 ${items}
 </channel></rss>`);

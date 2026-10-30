@@ -88,6 +88,10 @@
     "api/counties.js": {
       "maxDuration": 25
     },
+    "api/sitereport.js": {
+      "maxDuration": 120,
+      "includeFiles": "{fonts/**,node_modules/@sparticuz/chromium/bin/**,data/{market,filings,area}.json}"
+    },
     "api/pdf.js": {
       "maxDuration": 60,
       "includeFiles": "{fonts/**,node_modules/@sparticuz/chromium/bin/**}"

@@ -87,7 +87,7 @@ await step('crime', async () => {
   const since = !latest ? addDays(today, -(KEEP + 140)) : (first && String(first) > want) || noHour ? want : addDays(String(latest).slice(0, 10), -75);
   let rows = 0; const errors = [];
   for (let y = +since.slice(0, 4); y <= now.getUTCFullYear(); y++) {
-    const r = await fetch(HPD_CSV(y), { headers: { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence)' }, signal: AbortSignal.timeout(180000) });
+    const r = await fetch(HPD_CSV(y), { headers: { 'User-Agent': 'Mozilla/5.0 (RealEstateIntelligence)' }, signal: AbortSignal.timeout(180000) });
     if (!r.ok) { if (y === now.getUTCFullYear() && r.status === 404) continue; throw new Error('HPD ' + y + ' ' + r.status); }
     let list; try { list = parseHpd(await r.text(), { since }); } catch (e) { errors.push(y + ': ' + e.message); continue; } // one odd year doesn't block the others
     // saved in location order (rows close together on the map land on the same database pages), so an area's report
@@ -117,7 +117,7 @@ await step('aircraft', async () => {
 });
 
 await step('airports', async () => {
-  const get = async (u, ms = 120000) => { const r = await fetch(u, { headers: { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0 (airport sync)' }, signal: AbortSignal.timeout(ms) }); if (!r.ok) throw new Error(u.split('/').pop() + ' ' + r.status); return r.text(); };
+  const get = async (u, ms = 120000) => { const r = await fetch(u, { headers: { 'User-Agent': 'RealEstateIntelligence/1.0 (airport sync)' }, signal: AbortSignal.timeout(ms) }); if (!r.ok) throw new Error(u.split('/').pop() + ' ' + r.status); return r.text(); };
   const sync = async (table, key, rows, min) => {
     // a cut-off download must not empty the table
     if (rows.length < min) throw new Error(table + ': only ' + rows.length + ' rows parsed (expected at least ' + min + '); nothing changed');

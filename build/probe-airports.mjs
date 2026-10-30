@@ -1,6 +1,6 @@
 // Diagnostic: the free airport sources (OurAirports CSVs, FAA d-TPP diagrams, Wikidata photos, aviationweather METAR,
 // OpenStreetMap aeroways, BTS T-100, FAA ATADS, NASR). Run "Probe services" with script=airports.
-const UA = { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0 (probe; contact via finishessolutions.com)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (probe; contact via finishessolutions.com)' };
 const t0 = () => Date.now();
 async function hit(name, url, opts = {}, show = 400) {
   const s = t0();

@@ -45,7 +45,7 @@ export async function tenants(addr, zip, city) {
   const q = tenantQuery(addr, zip, city); if (!q) return { query: null, tenants: [], note: 'Needs a street address with a house number, and a ZIP or city.' };
   const p = new URLSearchParams({ $select: 'outlet_name, taxpayer_name, outlet_address, outlet_city, outlet_zip_code, outlet_naics_code, outlet_permit_issue_date, outlet_first_sales_date', $where: q.where, $limit: '200' });
   const get = async params => {
-    const r = await fetch(SOCRATA + '?' + params, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0', ...(process.env.SOCRATA_APP_TOKEN ? { 'X-App-Token': process.env.SOCRATA_APP_TOKEN } : {}) } });
+    const r = await fetch(SOCRATA + '?' + params, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'RealEstateIntelligence/1.0', ...(process.env.SOCRATA_APP_TOKEN ? { 'X-App-Token': process.env.SOCRATA_APP_TOKEN } : {}) } });
     const t = await r.text(); if (!r.ok) { const e = new Error('Comptroller data ' + r.status + (t ? ': ' + t.slice(0, 120) : '')); e.status = r.status; throw e; }
     return JSON.parse(t);
   };
@@ -70,7 +70,7 @@ export function nameQuery(name, cities) {
 export async function businessesNamed(name, cities, limit = 12) {
   const where = nameQuery(name, cities); if (!where) return { tenants: [] };
   const p = new URLSearchParams({ $select: 'outlet_name, taxpayer_name, outlet_address, outlet_city, outlet_zip_code, outlet_naics_code, outlet_permit_issue_date, outlet_first_sales_date', $where: where, $order: 'outlet_permit_issue_date DESC', $limit: String(limit * 3) });
-  const r = await fetch(SOCRATA + '?' + p, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0', ...(process.env.SOCRATA_APP_TOKEN ? { 'X-App-Token': process.env.SOCRATA_APP_TOKEN } : {}) } });
+  const r = await fetch(SOCRATA + '?' + p, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'RealEstateIntelligence/1.0', ...(process.env.SOCRATA_APP_TOKEN ? { 'X-App-Token': process.env.SOCRATA_APP_TOKEN } : {}) } });
   const t = await r.text(); if (!r.ok) throw new Error('Comptroller data ' + r.status + (t ? ': ' + t.slice(0, 120) : ''));
   const rows = JSON.parse(t);
   return { tenants: shapeTenants(rows).map((x, i) => ({ ...x, city: titleCase(rows.find(r2 => String(r2.outlet_address || '').slice(0, 120) === x.addr)?.outlet_city), zip: String(rows.find(r2 => String(r2.outlet_address || '').slice(0, 120) === x.addr)?.outlet_zip_code || '').slice(0, 5) || undefined })).slice(0, limit) };

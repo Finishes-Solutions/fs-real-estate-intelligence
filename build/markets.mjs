@@ -5,7 +5,7 @@
 import { log } from './util.mjs';
 import { SERIES, yahooUrl, fredUrl, parseYahoo, parseFred, summarize } from '../lib/markets.mjs';
 
-const UA = { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence; data build)', Accept: '*/*' };
+const UA = { 'User-Agent': 'Mozilla/5.0 (RealEstateIntelligence; data build)', Accept: '*/*' };
 async function get(url, ms = 30000) {
   for (let i = 0; ; i++) {
     try { const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(ms) }); if (r.ok) return r; if (r.status !== 429 && r.status < 500) throw new Error(r.status); throw new Error(r.status + ' (retry)'); }

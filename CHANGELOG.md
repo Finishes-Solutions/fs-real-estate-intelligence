@@ -5,10 +5,49 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 11:31 AM CT: Steadier streams in the environmental report (f4cad84)
+- **USGS streams and water bodies get a second try** when the service is slow (it timed out once on the Sevier County parcel and the page said "not loaded"), and the report fetches all its map layers at the same time, so it finishes sooner.
+- **No ", TX" on a parcel outside Texas** in the report headers.
+
+### 11:21 AM CT: Area Report works in rural Tennessee (9dc8196)
+- **The Area Report no longer fails in the country.** Around 2481 Happy Hollow Rd (Sevier County) it stopped with an error about "mi": the census tracts there are many miles across, and the way the report measured how much of a tract falls inside the 1-mile ring could miss the ring altogether, leaving it with no people. It now measures the part of each tract inside each ring directly, so a 1-mile ring takes its true slice of a big tract, and a ring with no census data shows a dash instead of breaking the report.
+
+### 11:20 AM CT: Colour Selected Lots (928abdf)
+- **A new setting in Layers, Colour Selected Lots** (off unless you turn it on): each lot you pick is filled with its own colour under its outline, the first green, then blue, orange, purple and so on, and its number on the map matches. **Site Plan for All** then shows them as one merged site in one colour.
+
+### 11:05 AM CT: Tennessee and the rest of the US; one clean outline on the selected parcel (167d56f, 53e018e)
+- **No more green lines through a selected parcel.** A parcel that crosses an edge of the map's tiles was outlined piece by piece, so the straight cuts between the pieces showed as green dashed horizontal and vertical lines across it. The pieces are now joined into one outline round the parcel's edge (buildings cut by a tile edge too).
+- **The card works outside Texas.** Regrid and the property card took Texas points only, so a Tennessee parcel's card said Regrid wasn't ready and its Site section said "lat and lon inside Texas are required". Both now take any point in the US. The Site section shows the flood zone, school district, city limits, Opportunity Zone and nearby EPA sites anywhere and leaves out the Texas-only sources (TxDOT traffic, TCEQ water districts, Comptroller alcohol sales).
+- **Site reports from a Regrid parcel:** where there's no free appraisal record, the four site reports use the Regrid parcel.
+- **More in the environmental report everywhere:** USGS streams and water bodies, federal critical habitat and PAD-US protected land on the constraints map; septic-field and bedrock ratings in the soils table; FEMA's wildfire and landslide ratings always shown. Texas agency records (TCEQ, Railroad Commission) say "not searched here" outside Texas instead of showing zero. Each soil's share of the parcel is now right when a soil shows up in several patches (it could add up to more than 100%).
+- **The Area Report outside Texas** fetches census tracts and their figures live; population growth shows as not available rather than 0%, and construction filings say they're Texas only.
+
+### 9:52 AM CT: A full Site Environmental report, and wetlands that load (9fe4ab8, 8d84a88)
+- **Wetlands work again.** The US Fish & Wildlife Service changed its wetlands field names, so every wetlands search failed ("didn't answer"). The search now reads the fields either way, and the map layers try a second time before giving up.
+- **The Site Environmental report is a full report:** after the finding and the records around the parcel come a **site & constraints map** (the parcel outline, FEMA flood zones, mapped wetlands and lidar contours), a **soils map** (every USDA soil map unit under and round the parcel, its share of the parcel, drainage, hydrologic group, water table and building limitations), and **topography & slope** (contours over shaded relief, slope and the way water runs, the parcel's low and high ground). A layer that still fails is named on its page, never left blank as "none".
+- **A report from a link:** /api/sitereport?kind=environmental&lat=..&lon=.. makes the report for the parcel at that point.
+
+### 8:38 AM CT: No name on reports (c64c406)
+- **Reports carry no name at all.** The "Real Estate Intelligence" wordmark is gone from report headers, the sign-off line at the end is gone, and the page footer shows only the report's title and page numbers. The app itself still says Real Estate Intelligence.
+
+### 8:29 AM CT: Real Estate Intelligence only, no company branding (c9819d6, 9d62e8f)
+- **The app is unbranded.** The top bar, browser tab, installed-app name and icon now say Real Estate Intelligence (a new "RE" icon), with no company logo.
+- **Reports are unbranded.** Every PDF's header, footer and sign-off carry only the name Real Estate Intelligence; the old company tagline, logo and green are gone.
+- **Plan sets are unbranded.** The title block's company logo, address, phone number, copyright line and firm number are removed (not just covered) and the block reads Real Estate Intelligence. "Prepared by" is now "Prepared with Real Estate Intelligence", and the project team lists the development consultant as to be confirmed.
+- **Wording elsewhere:** the Waller guardrails' scenarios are A, B (base case) and C without a company name; budget lines read "the team's budget workbook" and "Profit — Developer"; the AI assistant introduces itself as Real Estate Intelligence's assistant.
+
+### 12:45 AM CT: One-click site reports from a parcel, and a new look (4982085, e144fa8)
+- **Reports from a parcel in one click.** A parcel's card has a **Reports** button among its section buttons, and a **Reports for this parcel** block in its Site section: **Parcel Map**, **Topography**, **Site Environmental** and **Area Report** (1, 3, 5 and 10-mile rings). Each makes the PDF straight away (a few seconds for the parcel map and area report, 10 to 40 for topography and environmental) and saves it like any other export. The **Reports** page has the same four under **For the open parcel**.
+- **The topography report covers the page:** the ground is fetched for the site plus 300 feet or more around it, in the page's shape, so the maps run edge to edge.
+- **A new look across the app:** set in Inter (no more IBM Plex Mono or Montserrat), white surfaces, hairline borders, rounder corners, black pill buttons and plain grey labels instead of small capitals; green is now an accent, not the button colour. Report PDFs use Inter too.
+
 ### 11:13 AM CT: Property cards anywhere in the US, and the Montreve resort study (e1a001f, 114076c, commit hash added when pushed)
-- **Property cards and Regrid outside Texas.** Click anywhere in the US and the property card opens with its businesses, lidar height and photo; the Ownership section offers **Get owner, value & zoning from Regrid**, which now works nationwide (it used to refuse anything outside Texas). The free appraisal data is still Texas only, and the card says so. First use: the Montreve property at 2481 Happy Hollow Road, Sevierville, Tennessee (35.72487, -83.68966).
+- **Property cards outside Texas:** my first version was replaced by the experimental branch's own (merged in), which does the same and more.
 - **Montreve study (`projects/montreve`, branch `matthew/montreve`).** A conceptual site plan with all 30 lots traced to scale from the vector lot map: Will Essner's resort core on lots 10–15 (6,000 sf glass wedding pavilion and ceremony lawn, 2,500 sf dining, tennis and two pickleball courts, event parking, a trail loop) and a cabin on each of the 24 for-sale lots. The cabin's floor plans are redrawn as vector PDFs at 1/4" scale. A budget and pro forma workbook with live formulas prices three programs, and a 16-slide investor presentation is built from it.
 - **What it found:** at base costs a cabin must sell for about $1.24M to break even with the resort deferred, $1.41M with a lean resort and $1.59M with the full program. $1.30M covers the cabins, the site work and about $0.64M of amenities. Comparable indoor-pool cabins nearby are listed around $925k.
+### 12:09 AM CT: Sharper ground elevations, and four new site report layouts (b3e85f4)
+- **Ground elevations without the 3,600-point limit.** A site's ground now comes from USGS lidar as one elevation image, read every 3 feet (up to 250,000 points; a 300-acre tract every 8 feet or so, where it used to be every 60). Contours, slopes, the low and high ground and the plan set's grading follow the real land closely. If the image service is down, the old point-by-point reading still answers.
+- **New report layouts (not yet in the app):** Parcel Map (to scale, every line dimensioned, bearings and corner coordinates, an area check against the tax roll, a page per parcel), Topography (lidar contours over a hillshade, slope and drainage, two cross-sections, earthwork at three pad heights), Site Environmental (records around the parcel, soils, flood and hazards) and an Area Report in 1, 3, 5 and 10-mile rings (people, income, spending and construction, each census tract counted for its share inside the ring). All unbranded, black and white with blue accents. They go into the Reports tab once the look is approved.
 
 ## 2026-10-27
 

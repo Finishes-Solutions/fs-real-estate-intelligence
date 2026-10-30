@@ -7,7 +7,7 @@
 import { log } from './util.mjs';
 import { csvLine } from '../lib/csv.mjs';
 
-const UA = { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence; data build)' };
+const UA = { 'User-Agent': 'Mozilla/5.0 (RealEstateIntelligence; data build)' };
 async function get(url, { ms = 60000, ...opts } = {}) {
   const r = await fetch(url, { ...opts, headers: { ...UA, ...(opts.headers || {}) }, signal: AbortSignal.timeout(ms) });
   if (!r.ok) throw new Error(url.split('?')[0] + ' ' + r.status);

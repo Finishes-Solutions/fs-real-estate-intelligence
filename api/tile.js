@@ -58,7 +58,7 @@ export default async function handler(req, res) {
   let err = '';
   for (const u of list) {
     try {
-      const r = await fetch(u, { signal: AbortSignal.timeout(list.length > 1 ? 6000 : 8000), headers: { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' } });
+      const r = await fetch(u, { signal: AbortSignal.timeout(list.length > 1 ? 6000 : 8000), headers: { 'User-Agent': 'RealEstateIntelligence/1.0' } });
       const type = r.headers.get('content-type') || '';
       if (!r.ok || !/^image\//.test(type)) throw new Error(l + ' ' + r.status + ' ' + type);
       res.setHeader('Content-Type', type);

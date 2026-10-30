@@ -8,7 +8,7 @@ import { inHouston, middleOf } from './reportkit.js';
 
 const KEY = 'fs-reports';
 const ICON = { pdf: 'PDF', xlsx: 'XLS', csv: 'CSV', geojson: 'GEO', html: 'WEB', kml: 'KML' };
-const KINDS = { ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k, r.label])), crime: 'Crime Report', crimeus: 'City / County Crime Report', fema: 'FEMA Report', environmental: 'Environmental Report', market: 'Market Report', traffic: 'Traffic Report', airtraffic: 'Air Traffic Report', drivetime: 'Drive-Time Map', field: 'Field Notes', other: 'Other' };
+const KINDS = { 'site-parcel': 'Parcel Map', 'site-topo': 'Topography', 'site-environmental': 'Site Environmental', 'site-area': 'Area Report (rings)', ...Object.fromEntries(Object.entries(REPORTS).map(([k, r]) => [k, r.label])), crime: 'Crime Report', crimeus: 'City / County Crime Report', fema: 'FEMA Report', environmental: 'Environmental Report', market: 'Market Report', traffic: 'Traffic Report', airtraffic: 'Air Traffic Report', drivetime: 'Drive-Time Map', field: 'Field Notes', other: 'Other' };
 // area reports that keep the area they were made for, so a row can run them again
 const AREA_KINDS = new Set(['crime', 'fema', 'environmental', 'traffic', 'airtraffic', 'drivetime', 'market']);
 
@@ -155,6 +155,13 @@ export function initReports(ctx) {
         (sel && modes.includes('selection') ? b('selection', 'Selected area', okSel) : '') + (modes.includes('view') ? b('view', 'Map view', okView) : '') + (modes.includes('pick') ? b('pick', 'Draw an area', true) : ''));
     }).join('');
   }
+  // the open parcel's one-click reports (src/sitereports.js)
+  function parcelGroup() {
+    if (!ctx.siteReportButtons) return '';
+    const t = ctx.siteReportTarget?.();
+    return '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">For the open parcel <span class="rp-n">' + esc(t ? t.label || 'Parcel' : 'none open') + '</span></div>' +
+      (t ? '<span class="rp-hint">One click makes the PDF.</span>' : '<span class="rp-hint">Click a parcel on the Map, then come back here, or use the Reports block on its card.</span>') + '</div>' + ctx.siteReportButtons(t) + '</div>';
+  }
   function rows() {
     const t = q.toLowerCase(), all = list.filter(r => (!kind || r.report === kind) && (!t || [r.file, kindOf(r.report), r.scope, tidyFilterText(r.filters)].join(' ').toLowerCase().includes(t)));
     if (!list.length) return '<div class="empty">No exports yet. Reports you export (from here, the Export button or the assistant) show up here so you can download them again.</div>';
@@ -183,6 +190,7 @@ export function initReports(ctx) {
     const mk = marketCard();
     root.innerHTML = '<div class="vhead"><div><div class="kicker">Reports</div><h2>Reports</h2><div class="vsub">Make a report for an area or from your filters, and download past exports again. Past exports stay in this browser only.</div></div>' +
         '<div class="vctl"><button type="button" class="btn primary md" id="rpNew">New report</button></div></div>' +
+      parcelGroup() +
       '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">For an area <span class="rp-n">' + esc(sel || 'the map view') + '</span></div>' +
         (sel ? '' : '<span class="rp-hint">Select an area on the Map with Box, Shape, Radius or County, use the map view, or draw one here.</span>') + '</div><div class="rp-grid">' + crimeCard() + crimeUSCard() + areaCards() + '</div></div>' +
       (mk ? '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">Region &amp; county</div><span class="rp-hint">The Market page, for the area chosen there.</span></div><div class="rp-grid">' + mk + '</div></div>' : '') +
@@ -190,6 +198,7 @@ export function initReports(ctx) {
       '<div class="rp-sec rp-recent">' + past + '</div>';
     ctx.scopeBar?.(root.querySelector('#rpScope'), { count: false });
     root.querySelector('#rpNew').onclick = () => ctx.openExport();
+    ctx.wireSiteReports?.(root.querySelector('.rp-group'));
     root.querySelectorAll('[data-new]').forEach(b => b.onclick = () => ctx.openExport(b.dataset.new));
     root.querySelectorAll('[data-go]').forEach(b => b.onclick = () => ctx.setView(b.dataset.go));
     root.querySelectorAll('[data-x]').forEach(b => b.onclick = async () => { const t = b.textContent; b.disabled = true; b.textContent = 'Preparing…';

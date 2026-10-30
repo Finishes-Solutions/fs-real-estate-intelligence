@@ -9,12 +9,11 @@
 // Every part is optional: a failing source returns an error string for that section, never a 500.
 import { rateLimit } from './_lib/guard.mjs';
 import { lidarHeight } from '../lib/height.mjs';
-import { inTexas, inUS } from '../lib/usbox.mjs';
 
 const PARCELS = process.env.PARCEL_SERVICE || 'https://feature.geographic.texas.gov/arcgis/rest/services/Parcels/stratmap_land_parcels_48_most_recent/MapServer/0';
 // the main public Overpass server is often busy; two community mirrors carry the same OpenStreetMap data
 const OVERPASS = [process.env.OVERPASS_URL, 'https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'].filter(Boolean);
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (building panel)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (building panel)' };
 
 async function getJSON(url, opts = {}, ms = 8000) {
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
@@ -141,8 +140,10 @@ async function cadByApn(lat, lon, apn) {
 // apn: the account of the parcel drawn on the map under the click (its parcel lines). StratMap's record at the point can
 // be another account whose outline takes in several of the parcels drawn there (on Waller Tomball Rd one outline holds a
 // dozen accounts); then the appraisal district's own record for that account is used when it has one.
+// roughly Texas (a box: a point just over the line asks Texas's services and finds nothing, which is fine)
+export const inTexasBox = (lat, lon) => lat >= 25.8 && lat <= 36.6 && lon >= -106.7 && lon <= -93.5;
 export async function parcel(lat, lon, apn) {
-  if (!inTexas(lat, lon)) return null; // no free appraisal data outside Texas: the card offers Regrid's record instead
+  if (!inTexasBox(lat, lon)) throw Object.assign(new Error('The free appraisal record covers Texas only; Regrid has this parcel.'), { outside: true });
   const p = await stratParcel(lat, lon);
   if (p && (!apn || isAccount(p, apn))) return p;
   if (apn) { const q = await cadByApn(lat, lon, apn).catch(() => null); if (q) return q; }
@@ -213,7 +214,8 @@ async function photo(lat, lon) {
 
 export default async function handler(req, res) {
   const lat = +req.query.lat, lon = +req.query.lon;
-  if (!inUS(lat, lon)) return res.status(400).json({ error: 'lat/lon must be inside the United States' });
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 17 || lat > 72 || lon < -180 || lon > -64) return res.status(400).json({ error: 'lat/lon must be inside the United States' });
+  // (the free appraisal record is Texas only; elsewhere the card says so and Regrid fills in: parcel() below)
   if (!rateLimit(req, res, { perMinute: 60, perDay: 1200 })) return; // two requests per card (parcel, then the rest)
   const r5 = v => Math.round(v * 1e5) / 1e5;
   // footprint for the lidar height: "lon,lat;lon,lat;…" (closed or not), at most 120 vertices
@@ -225,12 +227,12 @@ export default async function handler(req, res) {
   if (part === 'parcel') {
     try { return res.json({ parcel: await parcel(r5(lat), r5(lon), apn) }); } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.json({ parcel: null, parcelError: e.message }); }
   }
-  const [p, pl, ph, ht, pf] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon), apn), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)]), footprint && inTexas(lat, lon) ? parcelsIn(footprint) : Promise.resolve([])]);
+  const [p, pl, ph, ht, pf] = await Promise.allSettled([part === 'rest' ? skip : parcel(r5(lat), r5(lon), apn), places(r5(lat), r5(lon)), photo(r5(lat), r5(lon)), lidarHeight(footprint, [r5(lon), r5(lat)]), footprint ? parcelsIn(footprint) : Promise.resolve([])]);
   // the map's footprint can be a tile-clipped piece of a big building: when OpenStreetMap's outline is clearly bigger,
   // look for parcels under the whole of it too
   const outline = pl.status === 'fulfilled' ? pl.value.osm?.outline : null;
   let parcels = pf.status === 'fulfilled' ? pf.value : [];
-  if (outline && inTexas(lat, lon) && (!footprint || ringArea(outline.coordinates[0]) > 1.2 * ringArea(footprint.coordinates[0]))) {
+  if (outline && (!footprint || ringArea(outline.coordinates[0]) > 1.2 * ringArea(footprint.coordinates[0]))) {
     try { const more = await parcelsIn(outline), have = new Set(parcels.map(x => x.propId)); parcels = parcels.concat(more.filter(x => !have.has(x.propId))).slice(0, 10); } catch (e) {}
   }
   // a source that failed (busy server, timeout) is retried in a few minutes rather than cached for a day

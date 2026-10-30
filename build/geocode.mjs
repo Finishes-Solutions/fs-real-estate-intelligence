@@ -150,7 +150,7 @@ async function nominatim(r) {
   await sleep(1100);
   const p = new URLSearchParams({ format: 'jsonv2', addressdetails: '1', limit: '3', countrycodes: 'us', street: r.st, city: r.city, state: 'Texas' }); if (r.zip) p.set('postalcode', r.zip);
   try {
-    const res = await fetch('https://nominatim.openstreetmap.org/search?' + p, { headers: { 'User-Agent': 'FinishesSolutions-filings-map/1.0 (nightly build)' } });
+    const res = await fetch('https://nominatim.openstreetmap.org/search?' + p, { headers: { 'User-Agent': 'RealEstateIntelligence-filings-map/1.0 (nightly build)' } });
     if (!res.ok) return null; const d = await res.json();
     for (const x of d) {
       const a = x.address || {}, sameZip = r.zip && a.postcode && a.postcode.slice(0, 5) === r.zip;

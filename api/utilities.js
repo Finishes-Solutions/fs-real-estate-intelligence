@@ -8,7 +8,7 @@ import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { CCN, MAINS, HOUSTON_BOX, inBox, pickLayer, siteShape, powerQuery, powerBoxQuery, parsePower, powerFeatures, parseCCN, parseMains, pipeInfo, summaryLines, SOURCES } from '../lib/utilities.mjs';
 import { cleanGeometry } from './crime.js';
 
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (utilities near a site)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (utilities near a site)' };
 const OVERPASS = [process.env.OVERPASS_URL, 'https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'].filter(Boolean);
 async function overpass(q) {
   let last;

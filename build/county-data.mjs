@@ -34,7 +34,7 @@ const minRows = m => E.COUNTY_MIN_ROWS != null ? +E.COUNTY_MIN_ROWS : m; // test
 const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 const monthsAgo = m => { const d = new Date(today + 'T12:00:00Z'); d.setUTCMonth(d.getUTCMonth() - m); return d.toISOString().slice(0, 10); };
 const LOAD = new Date().toISOString().replace(/\D/g, '').slice(0, 17) + '-' + process.pid; // unique per run, even two in a minute
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (county data; github actions)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (county data; github actions)' };
 const COLS = ['id', 'kind', 'source', 'county', 'name', 'cat', 'status', 'day', 'amount', 'units', 'addr', 'attrs', 'lon', 'lat', 'shape_json', 'h', 'load_id'];
 
 const db = DRY ? null : supa();

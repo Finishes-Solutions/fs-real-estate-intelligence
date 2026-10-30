@@ -111,7 +111,7 @@ export function initAirReport(ctx) {
     const okRoute = route?.origin && route?.destination;
     const line = pts.length > 1 ? { type: 'LineString', coordinates: pts.map(x => [x.lon, x.lat]) } : null;
     const mapSvg = line ? areaSvg([{ geometry: line, stroke: '#1d4ed8', fill: 'none', width: 2.2 }], { points: [
-      ...(okRoute ? [route.origin, route.destination].filter(a => Number.isFinite(a.lat)).map(a => ({ c: [a.lon, a.lat], r: 5, color: '#006527', label: a.code || '' })) : []),
+      ...(okRoute ? [route.origin, route.destination].filter(a => Number.isFinite(a.lat)).map(a => ({ c: [a.lon, a.lat], r: 5, color: '#0b7a5f', label: a.code || '' })) : []),
       { c: [pts[pts.length - 1].lon, pts[pts.length - 1].lat], r: 6, color: '#c2410c', label: 'Now' }] }) : '';
     const t0 = pts[0]?.t, tl = v => { const d = new Date(v * 1000); return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
     const body = (info?.photo?.src ? '<div class="photo"><img src="' + esc(info.photo.src) + '" alt=""></div><div class="cap">Photo' + (info.photo.credit ? ' © ' + esc(info.photo.credit) : '') + ' · ' + esc(info.photo.source || '') + '</div>' : '') +

@@ -6,7 +6,7 @@
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { areaSqMi } from '../lib/fema.mjs';
 
-const UA = 'FinishesSolutions-RealEstateIntel/1.0 (internal map; contact via finishessolutions.com)';
+const UA = 'RealEstateIntelligence/1.0 (internal map; https://fs-real-estate-intelligence.vercel.app)';
 export const DEPARTS = { now: 'Leaving now', 'weekday-am': 'Weekday 8 AM', 'weekday-pm': 'Weekday 5 PM', weekend: 'Sunday 11 AM' };
 
 export function parseMinutes(s) {

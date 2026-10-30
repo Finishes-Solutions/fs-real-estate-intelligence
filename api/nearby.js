@@ -15,7 +15,7 @@ async function overpass(body, ms = 14000) {
   }
   throw last;
 }
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (nearby places)', 'Content-Type': 'application/x-www-form-urlencoded' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (nearby places)', 'Content-Type': 'application/x-www-form-urlencoded' };
 
 export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 20, perDay: 400 })) return;

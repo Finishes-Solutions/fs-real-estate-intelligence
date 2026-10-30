@@ -5,7 +5,7 @@
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { SERIES, BY_ID, yahooUrl, yahooPrice, coinbaseUrl } from '../lib/markets.mjs';
 
-const UA = { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence)', Accept: 'application/json' };
+const UA = { 'User-Agent': 'Mozilla/5.0 (RealEstateIntelligence/1.0)', Accept: 'application/json' };
 const getJson = async (url, fetchImpl, ms = 6000) => { const r = await fetchImpl(url, { headers: UA, signal: AbortSignal.timeout(ms) }); if (!r.ok) throw new Error(r.status); return r.json(); };
 
 export async function quotes(ids, fetchImpl = fetch) {

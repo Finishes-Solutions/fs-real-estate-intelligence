@@ -117,6 +117,13 @@ infra grep: 126 patterns from docs/AUDIT.md, 0 matches (excluding docs/AUDIT.md,
 - `lib/massing.mjs`: the map's 3D facades from the same designs (`fs-sp-fac` layer, shown when tilted). About 25 ms a redraw for 141 homes after the first. Tested on engine layouts in `test/massing.mjs`.
 - Not done: the BIM worker isn't deployed, so the app can't show the model yet; gable ends; window trim in BIM; better trees.
 
+## Outside Texas (2026-10-30)
+
+- `api/regrid.js`, `api/building.js` and `api/site.js` take any US point; Texas-only sources are skipped elsewhere. Site reports use the Regrid record; the Area Report uses live ACS (`lib/acslive.mjs`) outside the market data's region.
+- Selected parcel or building outlines that cross a tile edge are dissolved into one ring (`dissolve` in `lib/footprint.mjs`, tested in `test/footprint.mjs` with a four-tile Sevier County parcel).
+- Not added (overlap or manual): TN Comptroller parcels (Regrid), municipal boundaries (Census places), TN lidar (in 3DEP), Register of Deeds, utilities, short-term rental rules, TDOT access, TDEC viewers, Natural Heritage (restricted), IPaC (manual project review). Parcel-level USGS landslide and USFS wildfire rasters were not added; FEMA NRI tract ratings stand in.
+- To check on the next preview: PAD-US protected land in `/api/sitereport?kind=environmental&lat=35.8402&lon=-83.5791&square=300&format=html`.
+
 ## Known issues
 
 - **Street network engine (existing code):** on the Waller test site, "Change With AI" (bend a court, cul-de-sac the spine) followed by a re-fit leaves a loop-road block of about 1,466 ft, over the 1,400 ft rule. The app's checks show it to the user. `test/streetnet.mjs` lets through exactly that breach and nothing else. Fix in `lib/streetnet.mjs` re-fit (block splitting after an edit).

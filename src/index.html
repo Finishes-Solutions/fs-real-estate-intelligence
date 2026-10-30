@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="description" content="Real estate intelligence for Texas: parcel and property information, site plans, area data (market, demographics, map layers) and reports, plus construction filings — Finishes Solutions">
-<meta name="theme-color" content="#006527">
+<meta name="description" content="Real estate intelligence for Texas: parcel and property information, site plans, area data (market, demographics, map layers) and reports, plus construction filings.">
+<meta name="theme-color" content="#ffffff">
 <meta name="color-scheme" content="only light">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
@@ -11,10 +11,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="FS Intel">
-<title>Real Estate Intelligence Platform — Finishes Solutions</title>
+<title>Real Estate Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="workspace.css">
@@ -25,7 +25,7 @@
 <div class="app" data-view="map">
   <header class="appbar" id="appbar">
     <button class="ptoggle" id="panelToggle" aria-label="Show or hide the side panel" title="Show or hide the side panel" aria-expanded="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg></button>
-    <img class="ab-logo l-light" alt="Finishes Solutions" src="logo.png">
+    <img class="ab-logo l-light" alt="Real Estate Intelligence" src="logo.png">
     <nav class="viewbar" id="viewbar" aria-label="Main"></nav>
     <div class="ab-util">
       <button class="ab-ask" id="askTop" type="button" aria-controls="ai"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/></svg><span>Ask AI</span></button>
@@ -281,6 +281,7 @@
         <button data-style="dots" aria-pressed="true">Default</button><button data-style="streets" aria-pressed="false">Streets</button><button data-style="sat" aria-pressed="false">Satellite</button><button data-style="topo" aria-pressed="false">Topo</button><button data-style="esri" aria-pressed="false" title="Esri World Imagery (no key)">ESRI</button><button data-style="free" aria-pressed="false" title="OpenFreeMap streets (no key)">Free Map</button><button data-style="google" aria-pressed="false" title="Google Maps" hidden>Google</button><button data-style="gsat" aria-pressed="false" title="Google satellite with roads and labels" hidden>Google Sat</button>
       </div>
         <label class="tg2"><input type="checkbox" id="lyBldg" checked><span>3D Buildings (Zoom In)</span></label>
+        <label class="tg2" title="Fill each selected lot with its own colour, under its outline"><input type="checkbox" id="lyLotFill"><span>Colour Selected Lots</span></label>
         <label class="tg2" id="lyG3dRow" title="Google photorealistic 3D city model (street zoom, tilt the map)" hidden><input type="checkbox" id="lyG3d"><span>Google 3D (Photorealistic)</span></label>
       </div></details>
       <details class="lysec" data-lyg="display"><summary><span class="lys-t">Map display<small>Dot grid, county lines, roads, road names</small></span><em></em></summary><div class="lyb">
