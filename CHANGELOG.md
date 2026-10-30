@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+### 11:31 AM CT: Steadier streams in the environmental report (f4cad84)
+- **USGS streams and water bodies get a second try** when the service is slow (it timed out once on the Sevier County parcel and the page said "not loaded"), and the report fetches all its map layers at the same time, so it finishes sooner.
+- **No ", TX" on a parcel outside Texas** in the report headers.
+
 ### 11:21 AM CT: Area Report works in rural Tennessee (9dc8196)
 - **The Area Report no longer fails in the country.** Around 2481 Happy Hollow Rd (Sevier County) it stopped with an error about "mi": the census tracts there are many miles across, and the way the report measured how much of a tract falls inside the 1-mile ring could miss the ring altogether, leaving it with no people. It now measures the part of each tract inside each ring directly, so a 1-mile ring takes its true slice of a big tract, and a ring with no census data shows a dash instead of breaking the report.
 
