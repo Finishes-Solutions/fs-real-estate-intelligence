@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
-### 2:16 PM CT: Montreve's resort core designed as one plan (commit hash added when pushed)
+### 2:16 PM CT: Montreve's resort core designed as one plan (c0100d5)
 - **The resort core at Montreve Mountain Club is now one composed plan** on lots 10-15 instead of separate pieces each turned to the road. A stone **promenade** runs the length of the core, with everything along it in one line: the **tennis court**, **two pickleball courts**, a **court pavilion** with a viewing deck, the **dining terrace** and **The Lodge** (2,500 sf dining and catering) with its **service yard** to one side, a **cocktail terrace**, and the **6,000 sf glass wedding pavilion** with its own drop-off and lane from the road.
 - Below the promenade: **two parking bays** (76 spaces) reached from Amber Valley Way with a stair walk up to the promenade, a **village green**, a **fire-pit overlook**, and the **ceremony lawn** in front of the pavilion, edged with gardens.
 - Each piece still sits on a level pad fitted to the lidar, with its cut, fill and walls shown. The tennis court (about 34 ft) and the upper parking bay (about 33 ft) need the tallest walls, so they should be tiered or stepped.
