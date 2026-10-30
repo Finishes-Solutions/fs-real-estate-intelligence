@@ -314,7 +314,7 @@ def sidebar(c):
         c.setFillColor(col); c.setStrokeColor(HexColor('#7F99AD')); c.rect(x0 + 20, y - 4, 18, 11, fill=1, stroke=1)
         c.setFillColor(INK); c.setFont('Helvetica-Bold', 8.5); c.drawString(x0 + 46, y + 1, a)
         c.setFont('Helvetica', 7.5); c.setFillColor(MUTED); c.drawString(x0 + 46, y - 9, b); y -= 24
-    for draw_sym, label in ((lambda yy: (c.setFillColor(BLDG), c.rect(x0 + 22, yy - 3, 14, 10, fill=1, stroke=0)), 'Standard cabin, 33\'-4" x 40\'-7" + 9\' deck'),
+    for draw_sym, label in ((lambda yy: (c.setFillColor(BLDG), c.rect(x0 + 22, yy - 3, 14, 10, fill=1, stroke=0)), 'Standard cabin, 33\'-4" x 33\'-4" + 9\' deck'),
                             (lambda yy: (c.setStrokeColor(COURT), c.setDash([4, 3]), c.setLineWidth(1.1), c.line(x0 + 20, yy + 2, x0 + 38, yy + 2), c.setDash([])), 'Walking trail loop (desired, not an easement)'),
                             (lambda yy: (c.setFillColor(ROAD), c.rect(x0 + 20, yy - 3, 18, 10, fill=1, stroke=0)), '50 ft road right-of-way')):
         draw_sym(y); c.setFillColor(INK); c.setFont('Helvetica', 8.5); c.drawString(x0 + 46, y, label); y -= 18

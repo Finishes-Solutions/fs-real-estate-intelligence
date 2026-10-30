@@ -61,7 +61,10 @@ plan_pngs = []
 if plans.exists():
     n = int(re.search(r'Pages:\s+(\d+)', subprocess.run(['pdfinfo', str(plans)], capture_output=True, text=True).stdout).group(1))
     for p in range(1, n + 1):
-        plan_pngs.append(render_png(plans, p, 70, tmp / f'plan{p}'))
+        f = render_png(plans, p, 110, tmp / f'plan{p}')
+        if p > 1:  # the drawing only, not the notes and title block
+            im = Image.open(f); w, h = im.size; im.crop((int(w * .06), int(h * .2), int(w * .43), int(h * .86))).save(f)
+        plan_pngs.append(f)
 
 # ---------------------------------------------------------------- charts (inline SVG)
 NAVY, GOLD, CORAL, SKY, INK, MUTED, GREEN = '#0A3047', '#D9A441', '#E07A5F', '#6FA1C8', '#1E2B33', '#6B7A86', '#5E8C6A'
@@ -221,7 +224,7 @@ S(f'''<section><h2>The resort core</h2><div class="cols wide-left">
 
 if plan_pngs:
     imgs = ''.join(f'<img class="framed" src="{png_b64(p)}">' for p in plan_pngs[1:4])
-    S(f'''<section><h2>The cabin</h2><p class="lede">One plan on every lot: 2,444 sf on three levels, 3 bedrooms, an indoor pool and rec room on the walk-out level, a great room with a fireplace and decks on the view side. Built on the same plan as the 7 homes under way, so cost and schedule are proven.</p>
+    S(f'''<section><h2>The cabin</h2><p class="lede">One plan on every new lot: 2,444 sf on three levels in a 33 ft square, with 3 bedrooms, an indoor pool and rec room on the walk-out level, and a great room with a fireplace opening onto the view-side deck.</p>
 <div class="plans">{imgs}</div><p class="note">Redrawn to scale from the owner's plans (vector PDF set included). Verify with the architect of record.</p></section>''')
 
 rows = [['Spent to date (reported)', money(R['low']['sunk']), money(B['sunk']), money(R['high']['sunk'])],
@@ -362,7 +365,7 @@ table.kv td:first-child { font-weight: 700; color: #0A3047; width: 1.6in }
 .cards b { display: block; font-size: 18pt; color: #0A3047; margin-bottom: 6px } .cards span { font-size: 15pt; line-height: 1.45; color: #34434E }
 ul.feat { list-style: none; padding: 0 } ul.feat li { border-left: 4px solid #D9A441; padding-left: 12px; margin-bottom: 9px; font-size: 15pt }
 ul.feat b { display: block; color: #0A3047 } ul.feat span { font-size: 12.5pt; color: #4A5964 }
-.plans { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px } .plans img { height: 4.6in; object-fit: contain; background: #fff }
+.plans { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px } .plans img { height: 3.75in; object-fit: contain; background: #fff }
 svg.chart { width: 100%; height: auto } .ax { font-size: 13px; fill: #6B7A86 } .lab { font-size: 15px; font-weight: 700; fill: #1E2B33 } .val { font-size: 17px; font-weight: 700; fill: #0A3047 }
 .cover { background: #0A3047; color: #fff; padding: 0.9in }
 .cover-logo svg { width: 6.2in; height: auto }

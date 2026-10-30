@@ -3,6 +3,13 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-30
+
+### 11:13 AM CT: Property cards anywhere in the US, and the Montreve resort study (e1a001f, 114076c, commit hash added when pushed)
+- **Property cards and Regrid outside Texas.** Click anywhere in the US and the property card opens with its businesses, lidar height and photo; the Ownership section offers **Get owner, value & zoning from Regrid**, which now works nationwide (it used to refuse anything outside Texas). The free appraisal data is still Texas only, and the card says so. First use: the Montreve property at 2481 Happy Hollow Road, Sevierville, Tennessee (35.72487, -83.68966).
+- **Montreve study (`projects/montreve`, branch `matthew/montreve`).** A conceptual site plan with all 30 lots traced to scale from the vector lot map: Will Essner's resort core on lots 10–15 (6,000 sf glass wedding pavilion and ceremony lawn, 2,500 sf dining, tennis and two pickleball courts, event parking, a trail loop) and a cabin on each of the 24 for-sale lots. The cabin's floor plans are redrawn as vector PDFs at 1/4" scale. A budget and pro forma workbook with live formulas prices three programs, and a 16-slide investor presentation is built from it.
+- **What it found:** at base costs a cabin must sell for about $1.24M to break even with the resort deferred, $1.41M with a lean resort and $1.59M with the full program. $1.30M covers the cabins, the site work and about $0.64M of amenities. Comparable indoor-pool cabins nearby are listed around $925k.
+
 ## 2026-10-27
 
 ### 8:20 PM CT: The Feasibility workspace merged in, with a layout gallery on its Site step (b8532b3)
