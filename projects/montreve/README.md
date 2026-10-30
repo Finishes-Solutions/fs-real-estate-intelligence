@@ -73,3 +73,25 @@ This needs the change deployed (it's on this branch).
 - Market: active Sevierville listings ([tnsmokymtnrealty.com](https://www.tnsmokymtnrealty.com/vacation-cabins-sale-sevierville-tn/)),
   local management-fee ranges ([hemlockhillscabinrentals.com](https://hemlockhillscabinrentals.com/blog/gatlinburg-cabin-rental-management-companies/),
   [kingsofrealestate.com](https://news.kingsofrealestate.com/buying-investment-cabin-pigeon-forge-tn-2026/)), searched Oct 30, 2026.
+
+## The layout in Real Estate Intelligence (Projects › MONTREVE MOUNTAIN CLUB › Full program)
+
+Built by `build/projects/montreve.mjs` and saved by the **Seed project** workflow (`project: montreve`, `offline: 1`).
+It replaces the team's copy of the project, keeping the Regrid parcel record and Option A as they were
+(`build/projects/montreve.saved.json`).
+
+- **Where the lots are:** `scripts/georef.py` lays the traced lots on the Regrid parcel outline (30.05 ac) by best
+  overlap: no turn (the lot map is drawn north-up) and 2.5% larger than the acreage scaling, 92% overlap. Output:
+  `data/plan_geometry.json` (lots, roads clipped to the parcel and named, the lot 2 easement, the three amenity sites).
+- **The ground:** `data/terrain.json`, USGS 3DEP 1 m lidar from the app's own terrain service (six 700 ft tiles, merged
+  to 10 ft). 1,348 to 1,837 ft; every lot's median slope is 34-70%.
+- **Cabins (24):** each on its own lot, facing downhill (deck to the view), where the fall across the house is closest to
+  one floor (a walk-out) and the driveway is gentlest: 14 are clean walk-outs, the rest need up to about 8 ft of extra
+  foundation; driveways run 2-17% except lot 28 (20%) and lot 29 (27%). The seven financed homes are placed the same way
+  (their real positions aren't surveyed).
+- **Resort core:** the 6,000 sf glass pavilion and ceremony lawn on lots 14-15, the 2,500 sf dining hall and service yard
+  on 12-13, a tennis court and two pickleball courts on 10-11, each on a level pad turned along the contours where its
+  walls are least: the hall about 5 ft, the courts, lawn and pavilion 14-18 ft (tiered walls or a stepped design).
+- **Parking:** 24 head-in spaces along Amber Valley Way (8-9 ft cuts) and 6 on the road shoulder: about half of what a
+  150-guest wedding needs. Bigger events need a shuttle or valet.
+- Every piece carries `grade` (pad elevation, fall, cut and fill, walls); the app's Selected box shows it.
