@@ -14,6 +14,14 @@ export function initBuildings(ctx) {
   const bid = b => 'b:' + b.center[0].toFixed(5) + ',' + b.center[1].toFixed(5);
   try { on = localStorage.getItem('fs-3d') !== '0'; } catch (e) {}
   toggle.checked = on;
+  // each selected lot's colour when "Colour selected lots" is on (the first is the selection green); a site plan made from
+  // them draws the merged site as one, and the selection (these fills with it) is hidden under the plan
+  const LOT_COLORS = ['#10a37f', '#2f6bff', '#e8590c', '#9c36b5', '#d6336c', '#0c8599', '#f59f00', '#5c940d'];
+  const lotToggle = document.getElementById('lyLotFill');
+  let lotFill = false; try { lotFill = localStorage.getItem('fs-lotfill') === '1'; } catch (e) {}
+  if (lotToggle) { lotToggle.checked = lotFill; lotToggle.onchange = () => {
+    lotFill = lotToggle.checked; try { localStorage.setItem('fs-lotfill', lotFill ? '1' : '0'); } catch (e) {}
+    highlight(); }; }
 
   const vectorSource = () => { const s = map.getStyle()?.sources || {}; return Object.keys(s).find(id => s[id].type === 'vector' && /maptiler|openmaptiles|planet/i.test(id + (s[id].url || ''))); };
   const colors = () => ({ fill: '#d5dadb', sel: '#10a37f', sel2: '#9fd4b2' });
@@ -35,10 +43,12 @@ export function initBuildings(ctx) {
     map.addLayer({ id: 'fs-bsel', type: 'fill-extrusion', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'b'], paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'a'], 1], c.sel, c.sel2], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-opacity': 1 } }, before);
     if (!map.getSource('fs-bhov')) map.addSource('fs-bhov', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({ id: 'fs-bhov', type: 'line', source: 'fs-bhov', minzoom: 13, paint: { 'line-color': c.sel, 'line-width': 2, 'line-opacity': .9 } }, before);
-    map.addLayer({ id: 'fs-psel', type: 'line', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'p'], paint: { 'line-color': c.sel, 'line-width': ['case', ['==', ['get', 'a'], 1], 2.4, 1.6], 'line-opacity': ['case', ['==', ['get', 'a'], 1], 1, 0.5], 'line-dasharray': [2, 1.5] } }, before);
-    map.addLayer({ id: 'fs-bnumc', type: 'circle', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'n'], paint: { 'circle-radius': 11, 'circle-color': ['case', ['==', ['get', 'a'], 1], c.sel, '#ffffff'], 'circle-stroke-color': c.sel, 'circle-stroke-width': 2, 'circle-pitch-alignment': 'viewport' } });
+    // "Colour selected lots" (Layers panel, off by default): each picked lot washed in its own colour under its outline
+    map.addLayer({ id: 'fs-pfill', type: 'fill', source: 'fs-bsel', filter: ['all', ['==', ['get', 'k'], 'p'], ['has', 'oc']], paint: { 'fill-color': ['get', 'c'], 'fill-opacity': ['case', ['==', ['get', 'a'], 1], 0.28, 0.16] } }, before);
+    map.addLayer({ id: 'fs-psel', type: 'line', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'p'], paint: { 'line-color': ['coalesce', ['get', 'oc'], c.sel], 'line-width': ['case', ['==', ['get', 'a'], 1], 2.4, 1.6], 'line-opacity': ['case', ['==', ['get', 'a'], 1], 1, 0.5], 'line-dasharray': [2, 1.5] } }, before);
+    map.addLayer({ id: 'fs-bnumc', type: 'circle', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'n'], paint: { 'circle-radius': 11, 'circle-color': ['case', ['==', ['get', 'a'], 1], ['coalesce', ['get', 'oc'], c.sel], '#ffffff'], 'circle-stroke-color': ['coalesce', ['get', 'oc'], c.sel], 'circle-stroke-width': 2, 'circle-pitch-alignment': 'viewport' } });
     map.addLayer({ id: 'fs-bnum', type: 'symbol', source: 'fs-bsel', filter: ['==', ['get', 'k'], 'n'], layout: { 'text-field': ['to-string', ['get', 'n']], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-allow-overlap': true, 'text-ignore-placement': true },
-      paint: { 'text-color': ['case', ['==', ['get', 'a'], 1], '#ffffff', c.sel] } });
+      paint: { 'text-color': ['case', ['==', ['get', 'a'], 1], '#ffffff', ['coalesce', ['get', 'oc'], c.sel]] } });
     if (cur) highlight();
   }
   ctx.onOverlays(addLayers);
@@ -58,8 +68,8 @@ export function initBuildings(ctx) {
       if (b.footprint) { feats.push({ type: 'Feature', properties: { k: 'b', a, h: (b.height || 6) + 0.6, b: b.base || 0 }, geometry: offsetGeom(b.footprint, 0.5) });
         if (b === cur) feats.push({ type: 'Feature', properties: { k: 'g' }, geometry: b.footprint }); }
       // the shown one's parcel(s); a parcel picked as open ground keeps a faint outline while another tab is shown
-      if (a || !b.footprint) for (const p of b.d?.parcels?.length ? b.d.parcels : b.parcel ? [b.parcel] : []) if (p.geometry) feats.push({ type: 'Feature', properties: { k: 'p', a }, geometry: p.geometry });
-      if (many) feats.push({ type: 'Feature', properties: { k: 'n', n: i + 1, a }, geometry: { type: 'Point', coordinates: numberAt(b) } });
+      if (a || !b.footprint) for (const p of b.d?.parcels?.length ? b.d.parcels : b.parcel ? [b.parcel] : []) if (p.geometry) feats.push({ type: 'Feature', properties: { k: 'p', a, c: LOT_COLORS[i % LOT_COLORS.length], ...(lotFill ? { oc: LOT_COLORS[i % LOT_COLORS.length] } : {}) }, geometry: p.geometry });
+      if (many) feats.push({ type: 'Feature', properties: { k: 'n', n: i + 1, a, ...(lotFill ? { oc: LOT_COLORS[i % LOT_COLORS.length] } : {}) }, geometry: { type: 'Point', coordinates: numberAt(b) } });
     });
     s.setData({ type: 'FeatureCollection', features: feats });
     if (cur && cur !== lastActive) { lastActive = cur; reveal(); } else if (!cur) lastActive = null;

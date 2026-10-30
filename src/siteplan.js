@@ -307,7 +307,7 @@ export function initSitePlan(ctx) {
   // Planning is its own workspace: the left list folds away, the area tools, filters and layer chips step aside, the plan
   // gets the map, and the property card's selection highlight is hidden under it. All of it is put back on close.
   const app = document.querySelector('.app'), phone = () => matchMedia('(max-width:700px)').matches;
-  const HIDE = ['fs-bldg', 'fs-bglow', 'fs-bsel', 'fs-bhov', 'fs-psel', 'fs-bnumc', 'fs-bnum']; // the plan replaces what's there
+  const HIDE = ['fs-bldg', 'fs-bglow', 'fs-bsel', 'fs-bhov', 'fs-pfill', 'fs-psel', 'fs-bnumc', 'fs-bnum']; // the plan replaces what's there
   let hidden = null, planState = null, leaving = false, fromCard = '', lastOpen = null;
   function hideMapBits() { hidden = hidden || {}; for (const id of HIDE) if (map.getLayer(id)) { if (!(id in hidden)) hidden[id] = map.getLayoutProperty(id, 'visibility') || 'visible'; map.setLayoutProperty(id, 'visibility', 'none'); } }
   function showMapBits() { for (const [id, v] of Object.entries(hidden || {})) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v); hidden = null; }

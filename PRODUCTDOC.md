@@ -288,6 +288,7 @@ The groups in Map layers (in their starting order the first time; after that, th
   - Default, Streets, Satellite and Topo come from a paid map service with a monthly limit. If that service stops serving maps (for example when the month's limit is used up), the map switches by itself to the free OpenStreetMap map in the same look (a plain light or dark map for Default, a street map for Streets and Topo, ESRI imagery for Satellite) and says so once. Address search keeps working from OpenStreetMap too. The app tries the paid maps again a few hours later.
   - Google and Google Satellite (only when Google is set up for the site): Google's own map, with the Google logo and map credits at the bottom while it's on.
   - 3D buildings (zoom in).
+  - **Colour Selected Lots** (off unless you turn it on): fills each lot you've picked with its own colour under its outline (the first green, then blue, orange, purple and so on), and its number on the map takes the same colour. Build a site plan from them with **Site Plan for All** and they become one site in one colour.
   - Google 3D (only when Google is set up): Google's photorealistic 3D model of the city in place of the simple blocks. Zoom in to street level and tilt the map. Clicking a building still opens its property card.
   - 3D terrain, NASA recent imagery and high-resolution site imagery.
 - **Environment:**
@@ -1132,6 +1133,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Colour Selected Lots:** a setting in Layers, off unless you turn it on, that fills each picked lot with its own colour; **Site Plan for All** then shows them merged into one site.
 - **Works outside Texas:** a parcel anywhere in the US (Tennessee, for one) opens a full card with its Regrid record and Site section, and makes all four site reports, with streams, protected land, critical habitat, septic ratings and wildfire and landslide risk added to the environmental report.
 - **A clean outline on the selected parcel:** a parcel that crossed a map tile edge was outlined with straight green dashed lines through its middle; it now gets one outline round its edge.
 - **A full Site Environmental report:** maps of the parcel with its flood zones, wetlands and contours, of the soils under it (with each soil's share of the parcel), and of its topography and slope, alongside the records and hazards. The wetlands search, which kept failing, now works with the wetlands service's current field names.
