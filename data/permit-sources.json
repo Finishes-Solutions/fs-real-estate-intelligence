@@ -1,0 +1,4 @@
+{
+  "note": "Building-permit datasets from public open-data portals, loaded nightly by build/permits-us.mjs. Filled from the nationwide probe (build/probe-us.mjs).",
+  "sources": []
+}

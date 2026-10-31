@@ -1,0 +1,4 @@
+{
+  "note": "State business-entity registries, loaded by build/entities.mjs. Filled from the nationwide probe (build/probe-us.mjs, probe-sunbiz.mjs).",
+  "sources": []
+}
