@@ -20,8 +20,11 @@ run() { MOCK_DB="$T/db.json" MOCK_LOG="$T/net" DATA_DIR=test/.data/ SUPABASE_URL
 run
 node -e "
 const a=require('assert'), db=JSON.parse(require('fs').readFileSync('$T/db.json')), R=db.dev_items, by=k=>R.filter(r=>r.kind===k);
-a.equal(by('permit').length,2,'permits: two building permits in 24 months, the fire report and the old one left out');
-a.ok(by('permit').every(r=>r.county==='Harris'&&r.lon<-95&&r.lat>29),'permits placed on their parcels');
+a.equal(by('permit').filter(r=>r.source==='hcad-permits').length,3,'permits: every HCAD permit, every year; the fire report left out');
+a.equal(by('permit').filter(r=>r.source==='oce-permits').length,2,'the county engineer\'s permits');
+a.ok(by('permit').every(r=>r.county==='Harris'&&r.lon<-95&&r.lat>29),'permits placed on their parcels or the county\'s point');
+const oce=R.find(r=>r.id==='permit:oce:142683'); a.equal(oce.cat,'new-home'); a.equal(oce.attrs.precinct,'Precinct 1'); a.ok(!JSON.stringify(R).includes('555-0100')&&!JSON.stringify(R).includes('owner@example.com'),'no owner contacts');
+a.equal(R.find(r=>r.id==='permit:oce:403791').cat,'sign');
 a.deepEqual(by('plat').map(r=>r.source).sort(),['austin-subdivisions','coh-plats','coh-plats','fbc-subdivisions','mcad-subdivisions','waller-subdivisions','washington-subdivisions']);
 a.ok(!R.some(r=>r.name==='In Brazoria'),'Houston plats outside the seven counties are left out');
 a.equal(R.find(r=>r.id==='plat:coh:82210').county,'Montgomery','Houston ETJ plats get their county from the outline');
@@ -32,7 +35,7 @@ const w=R.find(r=>r.id==='district:8344284'), h=R.find(r=>r.id==='district:101')
 a.equal(w.day,'2025-03-02'); a.equal(w.shape_json.type,'Polygon'); a.equal(h.shape_json.type,'Polygon','outline matched by name when the number differs');
 a.equal(h.amount,9000000); a.equal(h.attrs.taxRate,0.95); a.ok(!JSON.stringify(R).includes('JIM'),'no district contacts');
 a.equal(by('school').length,1); a.equal(by('school')[0].units,950); a.equal(by('school')[0].county,'Waller');
-a.equal(db.county_loads.length,10); a.ok(db.county_loads.every(l=>l.status==='ok'));
+a.equal(db.county_loads.length,11); a.ok(db.county_loads.every(l=>l.status==='ok'));
 console.log('county data first night ok:',R.length,'rows');
 "
 n=$(wc -l < "$T/net"); run
@@ -45,6 +48,7 @@ run MOCK_COUNTY_V=2
 node -e "
 const a=require('assert'), db=JSON.parse(require('fs').readFileSync('$T/db.json')), R=db.dev_items;
 a.equal(R.find(r=>r.id==='plat:coh:93620').status,'Approved'); a.equal(R.find(r=>r.id==='txdot:140001033').amount,400000);
+a.equal(R.find(r=>r.id==='permit:oce:142683').status,'Final','a county permit that changed is updated'); a.equal(R.find(r=>r.id==='permit:oce:142683').attrs.closed,true);
 const nw=R.find(r=>r.id==='plat:mcad-subdivisions:600001'); a.equal(nw.first_seen,'today','a subdivision that appears later counts as new');
 a.equal(R.find(r=>r.id==='plat:mcad-subdivisions:521114').first_seen,'2000-01-01','first_seen is kept on update');
 "
@@ -57,8 +61,8 @@ printf 'acct\tid\tagency_id\tstatus\tdscr\tdor_cd\tpermit_type\tpermit_tp_descr\
 printf '9999999999999\t1\t061 \tC\tNEW\tF1\t5\tNew Building\t \t%s\t2026\t1\t \tMAIN\tST\t \t \r\n' "$d1" >> "$T/permits.txt"
 for i in 1 2 3 4; do printf '88888888888%02d\t1\t061 \tC\tNEW\tF1\t5\tNew Building\t \t%s\t2026\t1\t \tMAIN\tST\t \t \r\n' $i "$d1" >> "$T/permits.txt"; done
 (cd "$T" && rm acct.zip && zip -q acct.zip permits.txt); run ONLY=permits
-node -e "a=require('assert'),db=JSON.parse(require('fs').readFileSync('$T/db.json'));a.equal(db.dev_items.filter(r=>r.kind==='permit').length,5,'a bigger file replaces the old rows')"
+node -e "a=require('assert'),db=JSON.parse(require('fs').readFileSync('$T/db.json'));a.equal(db.dev_items.filter(r=>r.source==='hcad-permits').length,5,'a bigger file replaces the old rows')"
 (cd "$T" && head -2 permits.txt > p2 && mv p2 permits.txt && rm acct.zip && zip -q acct.zip permits.txt); ( run ONLY=permits ) || true
 grep -q 'old rows kept' "$T/log" || { cat "$T/log"; exit 1; }
-node -e "a=require('assert'),db=JSON.parse(require('fs').readFileSync('$T/db.json'));a.equal(db.dev_items.filter(r=>r.kind==='permit').length,5,'a load under half is refused: nothing removed')"
+node -e "a=require('assert'),db=JSON.parse(require('fs').readFileSync('$T/db.json'));a.equal(db.dev_items.filter(r=>r.source==='hcad-permits').length,5,'a load under half is refused: nothing removed')"
 echo "county data guards ok"

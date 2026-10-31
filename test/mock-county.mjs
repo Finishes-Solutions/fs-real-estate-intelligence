@@ -14,6 +14,10 @@ globalThis.fetch = async (url, opts = {}) => {
     const ids = (q.get('where') || '').match(/'(\d+)'/g)?.map(x => x.slice(1, -1)) || [];
     return json({ features: ids.map((id, i) => ({ attributes: { HCAD_NUM: id }, geometry: sq(-95.4 + i * 0.01, 29.75) })) });
   }
+  // Harris County Engineering ePermits (Permits view): two permits, one of them changed on a later night, dates as epoch ms
+  if (u.host === 'www.gis.hctx.net' && u.pathname.includes('/Permits/ePermits_Report/')) return json({ features: page(u, [
+    { attributes: { ID: 142683, PROJECTNUMBER: '1509170090', PROJECTNAME: null, FULLADDRESS: '12247 Roy Mix Bohn Ln, Houston 77044', APPTYPE: 'Residential Construction & On-site Sewerage System (Septic)', PROJECTSUBMITDATE: Date.parse('2015-09-17'), PERMITNUMBER: '1509170090-RESB-001', PERMITNAME: 'Residential, New 1 Family (Shares Common Wall)', STATUS: V === '2' ? 'Final' : 'Issued', ISSUEDDATE: Date.parse('2015-10-02'), ISCLOSED: V === '2' ? 1 : 0, PERMITCLASSCODE: 'A', PRECINCTNUMBER: 1, PHONE1: '(713) 555-0100', EMAILADDRESS: 'owner@example.com' }, geometry: { x: -95.17, y: 29.93 } },
+    { attributes: { ID: 403791, PROJECTNUMBER: '2111150093', PROJECTNAME: 'Cougar Nutrition', FULLADDRESS: '6500 N Fm 2100 Rd Ste 320 Crosby TX 77532', APPTYPE: 'Signs ETJ, Scenic & Toll Road', PROJECTSUBMITDATE: Date.parse('2021-11-15'), PERMITNUMBER: '2111150093-SGN-001', PERMITNAME: 'Sign Permit', STATUS: 'Issued', ISSUEDDATE: Date.parse('2021-11-20'), ISCLOSED: 0, PERMITCLASSCODE: 'A', PRECINCTNUMBER: 3 }, geometry: { x: -95.06, y: 29.91 } }]) });
   if (u.host === 'mycity2.houstontx.gov') return json({ features: page(u, [
     { attributes: { AppId: 93620, AppNo: '2026-1484', AppCode: 'C3N', AppStatus: V === '2' ? 'Approved' : 'Being Reviewed', SubdivisionName: 'Ronson Landing', SubdivisionSectionNo: '0', LotCount: 1, AppSubmitDate: Date.parse('2026-09-08') }, geometry: sq(-95.42, 29.85) },
     { attributes: { AppId: 82210, AppNo: '2024-2078', AppCode: 'C3F', AppStatus: 'Action Form Completed', SubdivisionName: 'Express Mart 59', LotCount: 0, AppSubmitDate: Date.parse('2024-10-18') }, geometry: sq(-95.196, 30.096) },
@@ -41,6 +45,6 @@ globalThis.fetch = async (url, opts = {}) => {
     { attributes: { id: '237902041', district_name: 'Waller ISD', campus_type: 'Middle / Jr. High', low_grade: 'Grade 6', high_grade: 'Grade 8', name: 'Waller JH', rating: 'B' }, geometry: { x: -95.93, y: 30.06 } },
     { attributes: { id: '227901001', name: 'Austin HS', campus_type: 'High School' }, geometry: { x: -96.1, y: 29.95 } }]) });
   if (u.host === 'services2.arcgis.com' && u.pathname.includes('Schools_2024_to_2025')) return json({ features: page(u, [{ attributes: { USER_School_Number: "'237902041", USER_School_Enrollment_as_of_Oc: 950 } }]) });
-  if (/arcgis\.com$|tceq\.texas\.gov$|hcad\.org$|houstontx\.gov$/.test(u.host)) return json({ error: { message: 'unmocked ' + u } }, 200);
+  if (/arcgis\.com$|tceq\.texas\.gov$|hcad\.org$|houstontx\.gov$|hctx\.net$/.test(u.host)) return json({ error: { message: 'unmocked ' + u } }, 200);
   return inner(url, opts);
 };
