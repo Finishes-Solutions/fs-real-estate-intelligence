@@ -16,6 +16,16 @@ await time('oce experience data (service URLs)', async () => { const d = await j
 for (const u of ['https://www.gis.hctx.net/arcgis/rest/services', 'https://gis.hctx.net/arcgis/rest/services', 'https://services.arcgis.com/su8ic9KbA7PYVxPS/arcgis/rest/services', 'https://oce.harriscountytx.gov/arcgis/rest/services', 'https://epermits.harriscountytx.gov/arcgis/rest/services'])
   await time('harris county arcgis ' + u, async () => { const r = await arcLayer(u); return { ...r, services: r.services?.filter(s => /permit|oce|engineer|inspect|develop|plat/i.test(s)) }; }, 6000);
 await time('agol harris county permits', () => agol('Harris County permits OCE', { num: 30 }), 6000);
+// the feature service behind that dashboard: its layers, fields, counts, date range and sample rows
+for (const u of ['https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/ePermits_Report/FeatureServer/0', 'https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/ePermits_Report/FeatureServer/1'])
+  await time('oce ePermits_Report ' + u.slice(-1), () => arcLayer(u, { sample: 3 }), 10000);
+await time('oce ePermits_Report service', () => json('https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/ePermits_Report/FeatureServer?f=json'), 6000);
+for (const l of [0, 1]) {
+  const base = 'https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/ePermits_Report/FeatureServer/' + l + '/query?f=json&where=1%3D1';
+  await time('oce layer ' + l + ' count', () => json(base + '&returnCountOnly=true'), 8000);
+  await time('oce layer ' + l + ' first rows by objectid', () => json(base + '&outFields=*&resultRecordCount=3&orderByFields=OBJECTID%20ASC&returnGeometry=false'), 8000);
+  await time('oce layer ' + l + ' last rows by objectid', () => json(base + '&outFields=*&resultRecordCount=3&orderByFields=OBJECTID%20DESC&returnGeometry=false'), 8000);
+}
 // Harris County Engineering (unincorporated) and other counties
 for (const u of ['https://www.gis.hctx.net/arcgis/rest/services', 'https://gis.hctx.net/arcgis/rest/services'])
   await time('harris county arcgis ' + u, () => arcLayer(u), 5000);
