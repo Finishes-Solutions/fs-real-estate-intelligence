@@ -9,10 +9,12 @@
 //   SINCE_DAYS=45             only permits issued or applied for in the last N days (the nightly run); unset = everything
 //   MAX_ROWS                  stop each source after this many rows (tests)
 //   SOCRATA_APP_TOKEN         optional: Socrata's higher rate limit
+//   GEOCODE_MAX=50000         rows without a point placed by address per source per run (US Census batch geocoder,
+//                             newest first; the rest wait for the next run). 0 = skip.
 //   DRY=1                     read and map, write nothing
 import fs from 'node:fs';
 import { supa } from '../lib/supa.mjs';
-import { autoMap, rowFrom } from '../lib/permitsources.mjs';
+import { autoMap, rowFrom, parseCensusBatch } from '../lib/permitsources.mjs';
 import { rowHash } from '../lib/countydata.mjs';
 import { hash, sleep } from './util.mjs';
 
@@ -94,6 +96,7 @@ async function loadSource(src) {
       if (old.get(r.id) === r.h) continue;
       const o = {}; for (const k of COLS) o[k] = r[k] ?? null; o.attrs = Object.fromEntries(Object.entries(r.attrs || {}).filter(([, v]) => v != null && v !== '')); out.push(o);
     }
+    if (DRY && !written && out[0]) log(src.slug, 'sample', JSON.stringify(out[0]).slice(0, 700));
     if (db) for (let i = 0; i < out.length; i += 1000) await db.upsert('dev_items', out.slice(i, i + 1000), 'id', 1000);
     written += out.length;
     if (read % 200000 < recs.length) log(src.slug, 'read', read, 'kept', kept, 'written', written);
@@ -103,11 +106,41 @@ async function loadSource(src) {
   return res;
 }
 
+// ---------- placing rows without a point: the US Census batch geocoder (free, 10,000 addresses a request) ----------
+const GEOCODE_MAX = E.GEOCODE_MAX != null ? +E.GEOCODE_MAX : 50000;
+const csvCell = v => '"' + String(v ?? '').replace(/"/g, "'").replace(/[\r\n,]+/g, ' ').trim() + '"';
+async function censusBatch(rows) {
+  const csv = rows.map(r => [r.i, r.street, r.city, r.state, r.zip].map(csvCell).join(',')).join('\n');
+  const fd = new FormData(); fd.append('addressFile', new Blob([csv], { type: 'text/csv' }), 'a.csv'); fd.append('benchmark', 'Public_AR_Current');
+  for (let i = 0; i < 4; i++) {
+    try { const r = await fetch('https://geocoding.geo.census.gov/geocoder/locations/addressbatch', { method: 'POST', body: fd, headers: { 'User-Agent': UA['User-Agent'] }, signal: AbortSignal.timeout(900000) }); if (r.ok) return parseCensusBatch(await r.text()); }
+    catch (e) { if (i === 3) throw e; }
+    await sleep(15000 * (i + 1));
+  }
+  return new Map();
+}
+async function geocodeMissing(src) {
+  if (!db || !GEOCODE_MAX) return null;
+  let done = 0, placed = 0;
+  while (done < GEOCODE_MAX) {
+    const rows = await db.select('dev_items', 'select=id,addr,attrs&source=eq.' + encodeURIComponent(src.slug) + '&lon=is.null&addr=not.is.null&attrs->>geocode=is.null&order=day.desc&limit=' + Math.min(10000, GEOCODE_MAX - done));
+    if (!rows.length) break;
+    const ask = rows.map((r, i) => ({ i: String(i), id: r.id, street: r.addr, city: src.place && !/county|region/i.test(src.place) ? src.place : r.attrs?.place || '', state: src.state || r.attrs?.state || '', zip: r.attrs?.zip || '' }));
+    const got = await censusBatch(ask), pts = [];
+    for (const a of ask) { const p = got.get(a.i); pts.push({ id: a.id, lon: p ? p[0] : null, lat: p ? p[1] : null, miss: !p }); }
+    await db.rpc('dev_set_points', { p_rows: pts });
+    done += rows.length; placed += pts.filter(p => !p.miss).length;
+    log(src.slug, 'geocoded', done, 'placed', placed);
+    if (rows.length < 10000) break;
+  }
+  return { geocoded: done, placed };
+}
+
 const mine = SOURCES.filter((s, i) => (ONLY ? ONLY.includes(s.slug) : true) && (ONLY || i % SN === SI));
 log('sources', mine.length, 'of', SOURCES.length, SINCE ? 'since ' + SINCE : 'full', 'shard', SI + '/' + SN);
 const failed = [];
 for (const src of mine) {
-  try { log(src.slug, 'done', JSON.stringify(await loadSource(src))); }
+  try { const res = await loadSource(src); if (res.rows > res.placed) res.geocode = await geocodeMissing(src); log(src.slug, 'done', JSON.stringify(res)); }
   catch (e) {
     failed.push(src.slug); log(src.slug, 'FAILED', e.message);
     if (db) await db.upsert('county_loads', [{ source: src.slug, at: new Date().toISOString(), status: 'failed', note: String(e.message).slice(0, 300) }], 'source').catch(() => {});

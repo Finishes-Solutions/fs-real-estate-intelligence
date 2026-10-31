@@ -41,6 +41,7 @@ async function* socrata(src) {
   for (let off = 0; off < MAX; off += page) {
     const q = new URLSearchParams({ $order: ':id', $limit: String(Math.min(page, MAX - off)), $offset: String(off), ...(src.where ? { $where: src.where } : {}) });
     const rows = await getJSON(base + '?' + q); if (!rows.length) break;
+    if (!off) { const keys = Object.keys(rows[0] || {}), miss = Object.values(src.map).flat().filter(f => typeof f === 'string' && !rows.some(r => f in r)); log(src.slug, 'fields', keys.join(',')); if (miss.length) log(src.slug, 'MAP FIELDS NOT IN THE DATA', miss.join(',')); }
     yield rows.map(r => entityRow(src, r)); if (rows.length < page) break;
   }
 }
@@ -58,7 +59,17 @@ async function* sunbiz(src) {
   if (batch.length) yield batch;
   unz.kill(); fs.rmSync(dir, { recursive: true, force: true });
 }
-const READERS = { socrata, sunbiz };
+async function* arcgis(src) {
+  const meta = await getJSON(src.url + '?f=json'), oid = meta.objectIdField || 'OBJECTID', page = Math.min(meta.maxRecordCount || 1000, 2000);
+  let last = -1, n = 0;
+  while (n < MAX) {
+    const q = new URLSearchParams({ f: 'json', where: oid + ' > ' + last + (src.where ? ' AND (' + src.where + ')' : ''), outFields: '*', returnGeometry: 'false', orderByFields: oid, resultRecordCount: String(page) });
+    const d = await getJSON(src.url + '/query?' + q), f = d.features || []; if (!f.length) break;
+    last = Math.max(...f.map(x => +x.attributes[oid]).filter(Number.isFinite)); n += f.length;
+    yield f.map(x => entityRow(src, x.attributes)); if (!Number.isFinite(last)) break;
+  }
+}
+const READERS = { socrata, sunbiz, arcgis };
 
 // ---------- writing ----------
 async function oldHashes(slug) {
@@ -77,6 +88,7 @@ async function loadSource(src) {
       if (old.get(r.id) === r.h) continue;
       const o = {}; for (const k of COLS) o[k] = r[k] ?? null; o.attrs = r.attrs || {}; out.push(o);
     }
+    if (DRY && !written && out[0]) log(src.slug, 'sample', JSON.stringify(out[0]).slice(0, 700));
     if (db) for (let i = 0; i < out.length; i += 1000) await db.upsert('entities', out.slice(i, i + 1000), 'id', 1000);
     written += out.length;
     if (read % 250000 < rows.length) log(src.slug, 'read', read, 'kept', kept, 'written', written);

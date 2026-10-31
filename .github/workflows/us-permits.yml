@@ -4,8 +4,9 @@ name: US permits (Supabase)
 # data/permit-sources.json). Nightly: the last 45 days of every source, in four parallel jobs. Run it by hand with no
 # window for a full load (first time, or to catch up), optionally for a few sources only.
 on:
-  schedule:
-    - cron: "17 10 * * *" # nightly 10:17 UTC (5:17 am Central), after the County data run
+  # schedule (off until the first full load is done and the database is resized; see docs/PROGRESS.md):
+  # schedule:
+  #   - cron: "17 10 * * *" # nightly 10:17 UTC (5:17 am Central), after the County data run
   workflow_dispatch:
     inputs:
       only:
@@ -16,6 +17,12 @@ on:
         required: false
       max_rows:
         description: "Stop each source after N rows (tests; blank = no limit)"
+        required: false
+      dry:
+        description: "Read and map only, write nothing (1 = yes)"
+        required: false
+      geocode_max:
+        description: "Rows without a point to place by address per source (blank = 50000; 0 = none)"
         required: false
 
 permissions:
@@ -53,6 +60,8 @@ jobs:
           SHARD: ${{ inputs.only && '0/1' || format('{0}/4', matrix.shard) }}
           SINCE_DAYS: ${{ github.event_name == 'schedule' && '45' || inputs.since_days }}
           MAX_ROWS: ${{ inputs.max_rows }}
+          DRY: ${{ inputs.dry }}
+          GEOCODE_MAX: ${{ inputs.geocode_max }}
         run: |
           if [ -n "$ONLY" ] && [ "${{ matrix.shard }}" != "0" ]; then echo "ONLY set: shard 0 does the work"; exit 0; fi
           node --max-old-space-size=6144 build/permits-us.mjs

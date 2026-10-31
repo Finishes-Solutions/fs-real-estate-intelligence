@@ -1,0 +1,59 @@
+name: State business entities (Supabase)
+
+# State business-entity registries (LLCs, corporations, partnerships) into Supabase entities (build/entities.mjs; sources
+# in data/entity-sources.json). Weekly; each run writes only entities that are new or changed. Florida's file is the
+# Division of Corporations' quarterly file (1.8 GB zipped), so its job runs alone.
+on:
+  # schedule (off until the first full load is done and the database is resized; see docs/PROGRESS.md):
+  # schedule:
+  #   - cron: "41 7 * * 0" # Sundays 07:41 UTC (2:41 am Central)
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Sources (slugs, comma separated; blank = all)"
+        required: false
+      max_rows:
+        description: "Stop each source after N rows (tests; blank = no limit)"
+        required: false
+      dry:
+        description: "Read and map only, write nothing (1 = yes)"
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: entities
+  cancel-in-progress: false
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Load state business entities into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_KEY }}
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
+          ONLY: ${{ inputs.only }}
+          SHARD: ${{ inputs.only && '0/1' || format('{0}/3', matrix.shard) }}
+          MAX_ROWS: ${{ inputs.max_rows }}
+          DRY: ${{ inputs.dry }}
+        run: |
+          if [ -n "$ONLY" ] && [ "${{ matrix.shard }}" != "0" ]; then echo "ONLY set: shard 0 does the work"; exit 0; fi
+          node --max-old-space-size=6144 build/entities.mjs
