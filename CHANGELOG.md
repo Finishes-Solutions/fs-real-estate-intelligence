@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-31
 
-### 12:30 AM CT: Every Harris County permit, every year, on the map (ba22e3e)
+### 12:30 AM CT: Every Harris County permit, every year, on the map (d3d64aa)
 - **The Building Permits layer holds every permit** the Harris Central Appraisal District records, for every city in Harris County and the unincorporated county, as far back as the district publishes: new buildings and homes, remodels, demolition, and now electrical, plumbing, mechanical / HVAC, roofing, fire sprinklers and alarms, signs, pools, fences and certificates of occupancy, each its own colour. Fire-loss reports on exempt property are still left out (they aren't permits).
 - **Show all** in the Development pipeline picker shows the whole history; the nightly load takes a `permit_months` window and a `locate_max` for how many parcels to place per run.
 - **Waller County and the City of Waller** issue permits through systems with no public feed (MGO Connect; Bureau Veritas reviews for the city), so they aren't loaded; a records request is the route, and the product doc says so.
