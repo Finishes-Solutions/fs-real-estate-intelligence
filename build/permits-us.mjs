@@ -52,7 +52,7 @@ async function* socrataPages(src, map) {
   const dateField = map.issued || map.applied;
   const where = [src.where, SINCE && dateField ? dateField + " >= '" + SINCE + "T00:00:00'" : null].filter(Boolean).join(' AND ');
   for (let off = 0; off < MAX; off += page) {
-    const q = new URLSearchParams({ $select: ':id,*', $order: ':id', $limit: String(Math.min(page, MAX - off)), $offset: String(off), ...(where ? { $where: where } : {}) });
+    const q = new URLSearchParams({ $select: ':*, *', $order: ':id', $limit: String(Math.min(page, MAX - off)), $offset: String(off), ...(where ? { $where: where } : {}) });
     const rows = await getJSON(base + '?' + q); if (!rows.length) break;
     yield rows; if (rows.length < page) break;
   }

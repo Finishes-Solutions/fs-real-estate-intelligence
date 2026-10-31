@@ -226,7 +226,7 @@ console.log('mcp property outside Houston ok');
 const AU = { address: '1100 Congress Ave, Austin, TX 78701' };
 r = await call('demographics', AU); assert.match(r.text, /Travis County/); assert.match(r.text, /Census tract demographics: not covered here \(covers the seven home counties/);
 r = await call('market_context', AU); assert.match(r.text, /not covered here/);
-r = await call('development_activity', AU); assert.match(r.text, /Development activity: not covered here/);
+r = await call('development_activity', AU); assert.match(r.text, /Outside the home counties only building permits are loaded/); assert.match(r.text, /## Building permits/); assert.ok(!/## Plats/.test(r.text), 'outside the home counties: permits only');
 r = await call('businesses', AU); assert.match(r.text, /Business listings: not covered here/);
 r = await call('crime_near', AU); assert.match(r.text, /not covered here \(covers the City of Houston only/);
 r = await call('flood', AU); assert.match(r.text, /Zone X/, 'FEMA is national');
