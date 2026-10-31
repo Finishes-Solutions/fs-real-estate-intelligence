@@ -3,6 +3,18 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-31
+
+### 5:31 AM CT: Montreve Option B, the owners' resort concept; trees on lots (2996a86, a1d41f8)
+- **Montreve Mountain Club has an Option B,** laid out like the owners' resort concept sketch. It keeps the same lots, roads and cabins, and puts the resort on one terrace along the uphill side of Amber Valley Way. In front: 88 head-in parking spaces straight off the road. Behind them: a stone promenade. Then, in one line from west to east:
+  - **Sports:** a tennis court with four pickleball courts on the terrace above it, fenced, plus a court pavilion and viewing deck.
+  - **Pool club:** pool and spa on a fenced deck, with a pool house and fitness room.
+  - **Dining and catering:** dining terrace, the Lodge and the catering kitchen side by side, service yard and screened trash.
+  - **Wedding and conference:** cocktail terrace, the 6,000 sf hall, a ceremony lawn behind it, and a bridal cottage and garden.
+  - **East end:** an open-air pavilion with its lawn, a fire-pit overlook and the maintenance barn.
+- **The rest of Option B:** a gated entry (gate house, gate, mail kiosk), a walk-out patio with hot tub and fire pit under 15 of the 24 cabins' decks, and every lot kept wooded around what's built. Each piece sits square to the road where it stands, on a level pad from the lidar, and lists its walls. The plan's notes describe every area.
+- **Trees grow across lot lines.** On the site sheet and in 3D, a lot line no longer keeps landscape trees out, so lawns and woods inside lots get planted. A lawn marked as having no trees (a ceremony lawn) stays open even inside planted woods.
+
 ## 2026-10-30
 
 ### 3:48 PM CT: Montreve work merged into experimental (302644b)

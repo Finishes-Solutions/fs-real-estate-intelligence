@@ -101,4 +101,23 @@ It replaces the team's copy of the project, keeping the Regrid parcel record and
   The whole plan is slid as one (`designCore`) to the spot with the fewest clashes and least earthwork. Walls: 7-17 ft
   at the buildings and terraces, about 23 ft at the pavilion and lawn, 33-34 ft at the tennis court and upper parking bay
   (tier them or step the design).
+- **Option B, the owners' resort concept** (second plan, `mv-option-b`, `buildOption({ detail: true })`, laid out after
+  the owners' "overall resort concept" sketch). The lots, roads and cabins are the Full program's, in the same places.
+  The resort is one terrace on the uphill side of Amber Valley Way (`STRIP`, `designStrip`, in road feet: distance along
+  the road and back from it):
+  - **Along the road:** 11 rows of 8 head-in spaces straight off the road (88; cuts 7-12 ft), then an 8 ft stone
+    promenade.
+  - **The line of buildings, west to east:**
+    - tennis court below and four pickleball courts on the terrace above, fenced, with a court pavilion and viewing deck;
+    - pool and spa on a fenced deck, with the pool house and fitness room;
+    - dining terrace, then the Lodge and the catering kitchen side by side, with a service yard and trash behind;
+    - cocktail terrace, the 6,000 sf wedding and conference hall, and a ceremony lawn terraced behind it, with the bridal
+      cottage and garden beside it;
+    - open-air pavilion and lawn, a fire-pit overlook and the maintenance barn.
+  - **How pieces sit:** each is square to the stretch of road in front of it. The road bends about 35° at lot 11, so a
+    piece is pushed back wherever the curve comes toward it, and slid along the road to the nearest spot clear of the
+    others.
+  - **Walls:** about 29 ft at the tennis court, the pickleball terrace and the hall; 17-20 ft at the Lodge and pool deck.
+  - **Also:** a gated entry (`entryGate`: gate house, gate and mail kiosk on open verge), walk-out patios under 15 of the
+    24 cabins' decks, and every lot kept wooded (trees left out of the ceremony lawn).
 - Every piece carries `grade` (pad elevation, fall, cut and fill, walls); the app's Selected box shows it.

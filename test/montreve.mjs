@@ -8,7 +8,7 @@ import * as TR from '../lib/terrain.mjs';
 import { cleanProject } from '../api/projects.js';
 
 const doc = M.buildProject(null, { now: '2026-10-30T18:00:00.000Z' }), pl = doc.plans[0], s = M.summary(doc), E = pl.elements, by = id => E.find(e => e.id === id);
-assert.equal(doc.id, 'mvv5sk2y6l0dq', 'the team’s existing project'); assert.equal(doc.plans.length, 2); assert.deepEqual(doc.plans[1], M.SAVED.optionA, 'Option A kept as it was');
+assert.equal(doc.id, 'mvv5sk2y6l0dq', 'the team’s existing project'); assert.equal(doc.plans.length, 3); assert.deepEqual(doc.plans[2], M.SAVED.optionA, 'Option A kept as it was');
 assert.ok(cleanProject(doc), 'the sync accepts it'); assert.ok(JSON.stringify(doc).length < 500000);
 assert.ok(Math.abs(s.acres - 30.05) < 0.05, 'the Regrid parcel: ' + s.acres);
 
@@ -60,4 +60,31 @@ assert.ok(by('mv-entry') && by('mv-pav-entry'), 'the resort entry and pavilion l
 // the app's own checks: nothing outside, nothing overlapping, no problems
 assert.deepEqual(s.outside, []); assert.deepEqual(s.overlaps, []);
 assert.deepEqual(SP.check(pl).filter(i => i.level === 'bad').map(i => i.text), []);
+// Option B: the owners' concept — the same lots, roads and cabins, the resort as one terrace along Amber Valley Way
+{ const B = doc.plans[1], sB = M.summary(doc, 1), EB = B.elements, bb = id => EB.find(e => e.id === id);
+  assert.equal(B.id, 'mv-option-b');
+  for (const e of E.filter(e => /^mv-(lot|road|cabin|deck|drive|easement)-?/.test(e.id))) { const o = bb(e.id); assert.ok(o && o.x === e.x && o.y === e.y && o.rot === e.rot, e.id + ' in the same place in Option B'); }
+  const ids = ['mv-tennis', 'mv-pickleball', 'mv-courthouse', 'mv-courtdeck', 'mv-pooldeck', 'mv-pool', 'mv-spa', 'mv-poolhouse', 'mv-terrace', 'mv-hall', 'mv-catering', 'mv-service', 'mv-trash', 'mv-cocktail', 'mv-pavilion', 'mv-lawn', 'mv-bridal', 'mv-bridalgarden', 'mv-openair', 'mv-eventlawn', 'mv-firepit', 'mv-maint', 'mv-promenade', 'mv-fence-courts', 'mv-fence-pool', 'mv-trail-link', 'mv-gatehouse', 'mv-gate', 'mv-mail'];
+  for (const id of ids) assert.ok(bb(id), id + ' in Option B (' + B.notes.split('\n').filter(t => /left out|no open/.test(t)).join('; ') + ')');
+  assert.ok(!/left out|did not fit|no open ground/.test(B.notes), 'everything placed');
+  for (const id of ids.filter(i => !/fence|trail|gate|mail|promenade/.test(i))) assert.ok(inCore(bb(id)), id + ' on lots 10-15');
+  // in one line along the road, west to east: sports, the pool club, dining, the wedding hall, the open-air pavilion
+  const amber = roads.find(r => r.name === 'Amber Valley Way').path, along = e => { let best = null, acc = 0; for (let i = 1; i < amber.length; i++) { const a = amber[i - 1], q = amber[i], L = Math.hypot(q[0] - a[0], q[1] - a[1]), t = Math.max(0, Math.min(1, ((e.x - a[0]) * (q[0] - a[0]) + (e.y - a[1]) * (q[1] - a[1])) / (L * L))), d = Math.hypot(a[0] + t * (q[0] - a[0]) - e.x, a[1] + t * (q[1] - a[1]) - e.y); if (!best || d < best.d) best = { d, s: acc + t * L }; acc += L; } return best; };
+  const order = ['mv-tennis', 'mv-pooldeck', 'mv-hall', 'mv-pavilion', 'mv-openair'].map(id => along(bb(id)));
+  assert.ok(order.every((o, i) => !i || o.s > order[i - 1].s), 'west to east along Amber Valley Way: ' + order.map(o => Math.round(o.s)));
+  assert.ok(order.every(o => o.d < 200), 'each close behind the road');
+  // head-in parking straight off the road the whole way along, the promenade behind it
+  const rowsB = EB.filter(e => e.kind === 'parking'); assert.ok(rowsB.length >= 10 && rowsB.every(e => SP.stalls(e).count === 8 && along(e).d < 30), 'rows of 8 along the road: ' + rowsB.length);
+  assert.ok(sB.spaces >= sB.required, 'parked: ' + sB.spaces + ' of ' + sB.required);
+  const pool = bb('mv-pool'), deck = bb('mv-pooldeck'); assert.ok(SP.outline(pool).every(p => SP.inRing(p, SP.outline(deck))) && SP.outline(bb('mv-spa')).every(p => SP.inRing(p, SP.outline(deck))), 'the pool and spa on their deck');
+  for (const id of ['mv-tennis', 'mv-pickleball', 'mv-pavilion', 'mv-hall', 'mv-pooldeck']) { const e = bb(id); assert.ok(e.grade && Math.max(e.grade.cutWall, e.grade.fillWall) < 32, id + ' walls: ' + JSON.stringify(e.grade)); }
+  assert.ok(EB.filter(e => /^mv-woods-/.test(e.id)).length === 30 && EB.filter(e => /^mv-patio-/.test(e.id)).length >= 12, 'wooded lots and walk-out patios');
+  for (const p of EB.filter(e => /^mv-patio-/.test(e.id))) { const lot = lots.find(l => l.name === 'Lot ' + p.id.slice(9)); assert.ok(SP.outline(p).every(q => SP.inRing(q, lot.poly)), p.id + ' on its own lot'); }
+  assert.deepEqual(sB.outside, []); assert.deepEqual(sB.overlaps, []);
+  assert.deepEqual(SP.check(B).filter(i => i.level === 'bad').map(i => i.text), []);
+  // the trees: the woods are planted (a lot line no longer keeps them out), the ceremony lawn kept open
+  const trees = SP.details(B).trees, lawn = SP.outline(bb('mv-lawn'));
+  assert.ok(trees.length > 2 * SP.details(pl).trees.length, 'Option B planted: ' + trees.length + ' trees');
+  assert.ok(!trees.some(t => SP.inRing([t[0], t[1]], lawn)), 'no trees on the ceremony lawn');
+}
 console.log('montreve ok: ' + s.cabins + ' cabins (' + s.walkouts + ' walk-outs), the composed resort core on lots 10-15 (' + s.spaces + ' spaces), ' + s.cutCy.toLocaleString('en-US') + ' CY cut and fill on the level pads');
