@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       script:
-        description: "Probe to run: parcels, height, news, geocode, bls, sources, streets, planes, adsblol, ground, markets, traffic, airports, wiki, identify, fbi, env, soils, places (loads places into Supabase), or the county-data probes cad, permits, plats, districts, txdot, tea, county2, county3, county-load (the County data loader, dry run)"
+        description: "Probe to run: parcels, height, news, geocode, bls, sources, streets, planes, adsblol, ground, markets, traffic, airports, wiki, identify, fbi, env, soils, places (loads places into Supabase), or the county-data probes cad, permits, plats, districts, txdot, tea, county2, county3, county-load (the County data loader, dry run), or us (every public permit and business-entity dataset nationwide)"
         required: false
         default: parcels
 permissions:
@@ -13,7 +13,7 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     environment: Production
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
