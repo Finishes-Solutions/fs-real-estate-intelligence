@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-31
 
-### 1:05 PM CT: 3D view of road loops and easements; Montreve Option B fixed (commit hash added when pushed)
+### 1:05 PM CT: 3D view of road loops and easements; Montreve Option B fixed (affab09)
 - **The 3D view no longer paves over blocks of land inside a road loop.** Where a site's roads run in a loop, the 3D picture drew the whole block of lots inside it as asphalt. Paving now keeps its holes, as the map already did. Both Montreve options showed this.
 - **Easements read lighter in 3D:** a drawn easement is now a light tint instead of a solid dark-red slab.
 - **A house lot can be kept wooded:** its trees are drawn inside it on the site sheet and in 3D, and it shows as woodland in 3D. Montreve's Option B now uses this instead of a large invisible landscape piece over each lot, which a click anywhere on a lot would pick (and could drag).
