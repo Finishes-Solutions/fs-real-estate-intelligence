@@ -6,6 +6,7 @@ import * as M from '../build/projects/montreve.mjs';
 import * as SP from '../lib/siteplan.mjs';
 import * as TR from '../lib/terrain.mjs';
 import { cleanProject } from '../api/projects.js';
+import * as MS from '../lib/massingsvg.mjs';
 
 const doc = M.buildProject(null, { now: '2026-10-30T18:00:00.000Z' }), pl = doc.plans[0], s = M.summary(doc), E = pl.elements, by = id => E.find(e => e.id === id);
 assert.equal(doc.id, 'mvv5sk2y6l0dq', 'the team’s existing project'); assert.equal(doc.plans.length, 3); assert.deepEqual(doc.plans[2], M.SAVED.optionA, 'Option A kept as it was');
@@ -78,7 +79,12 @@ assert.deepEqual(SP.check(pl).filter(i => i.level === 'bad').map(i => i.text), [
   assert.ok(sB.spaces >= sB.required, 'parked: ' + sB.spaces + ' of ' + sB.required);
   const pool = bb('mv-pool'), deck = bb('mv-pooldeck'); assert.ok(SP.outline(pool).every(p => SP.inRing(p, SP.outline(deck))) && SP.outline(bb('mv-spa')).every(p => SP.inRing(p, SP.outline(deck))), 'the pool and spa on their deck');
   for (const id of ['mv-tennis', 'mv-pickleball', 'mv-pavilion', 'mv-hall', 'mv-pooldeck']) { const e = bb(id); assert.ok(e.grade && Math.max(e.grade.cutWall, e.grade.fillWall) < 32, id + ' walls: ' + JSON.stringify(e.grade)); }
-  assert.ok(EB.filter(e => /^mv-woods-/.test(e.id)).length === 30 && EB.filter(e => /^mv-patio-/.test(e.id)).length >= 12, 'wooded lots and walk-out patios');
+  assert.ok(EB.filter(e => e.kind === 'lot' && e.trees).length === 30 && !EB.some(e => e.kind === 'green' && !e.name), 'every lot kept wooded (the lot itself, never an invisible landscape piece a click would pick)');
+  assert.ok(EB.filter(e => /^mv-patio-/.test(e.id)).length >= 12, 'walk-out patios');
+  // drawn as the app draws it: the roads loop round blocks of lots, and those blocks are holes in the paving, not paved
+  const pv = SP.pavement(B), loopHoles = pv.flatMap(p => p.holes).filter(h => Math.abs(h.reduce((a, p, i) => a + p[0] * h[(i + 1) % h.length][1] - h[(i + 1) % h.length][0] * p[1], 0) / 2) > 43560);
+  assert.ok(loopHoles.length >= 1, 'the block inside the road loop is a hole in the paving');
+  const svg = MS.massingSVG(B, 'corner', { w: 800, h: 500 }); assert.ok(/fill-rule="evenodd"/.test(svg), 'the 3D view draws the paving with its holes');
   for (const p of EB.filter(e => /^mv-patio-/.test(e.id))) { const lot = lots.find(l => l.name === 'Lot ' + p.id.slice(9)); assert.ok(SP.outline(p).every(q => SP.inRing(q, lot.poly)), p.id + ' on its own lot'); }
   assert.deepEqual(sB.outside, []); assert.deepEqual(sB.overlaps, []);
   assert.deepEqual(SP.check(B).filter(i => i.level === 'bad').map(i => i.text), []);

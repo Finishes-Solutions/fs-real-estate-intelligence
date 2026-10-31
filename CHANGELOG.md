@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-31
 
+### 1:05 PM CT: 3D view of road loops and easements; Montreve Option B fixed (affab09)
+- **The 3D view no longer paves over blocks of land inside a road loop.** Where a site's roads run in a loop, the 3D picture drew the whole block of lots inside it as asphalt. Paving now keeps its holes, as the map already did. Both Montreve options showed this.
+- **Easements read lighter in 3D:** a drawn easement is now a light tint instead of a solid dark-red slab.
+- **A house lot can be kept wooded:** its trees are drawn inside it on the site sheet and in 3D, and it shows as woodland in 3D. Montreve's Option B now uses this instead of a large invisible landscape piece over each lot, which a click anywhere on a lot would pick (and could drag).
+- **Montreve Option B tidied up:** the cabins' walk-out patios no longer put 15 "PATIO" labels on the map, and the option is renamed "Option B · resort terrace (owners' concept)".
+
 ### 5:31 AM CT: Montreve Option B, the owners' resort concept; trees on lots (2996a86, a1d41f8)
 - **Montreve Mountain Club has an Option B,** laid out like the owners' resort concept sketch. It keeps the same lots, roads and cabins, and puts the resort on one terrace along the uphill side of Amber Valley Way. In front: 88 head-in parking spaces straight off the road. Behind them: a stone promenade. Then, in one line from west to east:
   - **Sports:** a tennis court with four pickleball courts on the terrace above it, fenced, plus a court pavilion and viewing deck.

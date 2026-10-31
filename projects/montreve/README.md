@@ -119,5 +119,6 @@ It replaces the team's copy of the project, keeping the Regrid parcel record and
     others.
   - **Walls:** about 29 ft at the tennis court, the pickleball terrace and the hall; 17-20 ft at the Lodge and pool deck.
   - **Also:** a gated entry (`entryGate`: gate house, gate and mail kiosk on open verge), walk-out patios under 15 of the
-    24 cabins' decks, and every lot kept wooded (trees left out of the ceremony lawn).
+    24 cabins' decks, and every lot kept wooded: the lot itself carries `trees: true`, so there's no separate
+    landscape piece to pick by mistake. Trees are left out of the ceremony lawn.
 - Every piece carries `grade` (pad elevation, fall, cut and fill, walls); the app's Selected box shows it.

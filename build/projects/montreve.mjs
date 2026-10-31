@@ -391,7 +391,7 @@ export function buildOption({ now, detail = false }) {
       pathEl('mv-drive-' + n, 'drive', b.drive.path, DRIVE_W, { r: 0, d: r1(b.drive.len), name: '', note: 'Driveway · ' + Math.round(b.drive.len) + ' ft, level with the road (' + g0(b.drive.road) + ' ft) · ' + (b.up ? 'walk-out level' : 'main floor') + ' at road grade, ' + (b.drive.foundation >= 0 ? Math.round(b.drive.foundation) + ' ft of foundation under the entry' : 'dug ' + Math.round(-b.drive.foundation) + ' ft into the slope'), pinned: true }));
     h.entry = { floor: r1(b.drive.road), foundation: r1(b.drive.foundation), side: b.up ? 'walk-out level' : 'main floor' };
     if (detail) { // Option B: the walk-out patio below the deck (hot tub and fire pit), where it fits on the lot
-      const dir = [b.deck.x - b.house.x, b.deck.y - b.house.y], k = Math.hypot(...dir) || 1, c = add([b.deck.x, b.deck.y], [dir[0] / k, dir[1] / k], DECK / 2 + 9), pat = { id: 'mv-patio-' + n, kind: 'patio', x: r1(c[0]), y: r1(c[1]), w: 24, d: 16, rot: r1(b.deck.rot), name: '', note: 'Walk-out patio · hot tub and fire pit under the deck', pinned: true };
+      const dir = [b.deck.x - b.house.x, b.deck.y - b.house.y], k = Math.hypot(...dir) || 1, c = add([b.deck.x, b.deck.y], [dir[0] / k, dir[1] / k], DECK / 2 + 9), pat = { id: 'mv-patio-' + n, kind: 'plaza', x: r1(c[0]), y: r1(c[1]), w: 24, d: 16, rot: r1(b.deck.rot), name: '', note: 'Walk-out patio · hot tub and fire pit under the deck', pinned: true };
       const ring = SP.outline(pat); if (fits(ring, L.ring, 3) && !els.some(e => e.kind === 'drive' && meet(ring, SP.outline(e)))) els.push(pat);
     }
     cabins.push({ n: +n, old, f: b.f, drive: b.drive });
@@ -415,11 +415,11 @@ export function buildOption({ now, detail = false }) {
   if (detail) { // Option B: the plan worked up (DETAIL above), planted, and the entry gated
     entryGate(els, notes);
     // the lots stay wooded: everything outside a cabin, its deck and driveway, or the resort's terraces is kept forest
-    for (const [n, L] of Object.entries(GEO.lots)) els.push(poly('mv-woods-' + n, 'green', SP.offsetRing(L.ring, -1.5), { name: '', trees: true, note: 'Lot ' + n + (['cabin', 'existing'].includes(L.use) ? ' kept wooded outside the cabin, deck and driveway' : ' kept wooded round the resort’s terraces') }));
+    for (const e of els) if (e.kind === 'lot') { e.trees = true; e.note += ' · kept wooded' + (e.note.includes('resort core') ? ' round the resort’s terraces' : ' outside the cabin, deck and driveway'); }
   }
   let front = 0, bd = Infinity; for (let i = 0; i < ring.length; i++) { const d = segDist(gate, ring[i], ring[(i + 1) % ring.length])[0]; if (d < bd) { bd = d; front = i; } }
   const A = SAVED.optionA;
-  const plan = { id: detail ? 'mv-option-b' : 'mv-full', name: detail ? 'Option B · the resort in detail' : 'Full program · Will’s plan on the lidar', src: 'parcel', origin: GEO.origin, ring, front, frontGuess: false, streets: [], streetsSet: true, streetsBy: 2, streetNames: { [front]: 'Happy Hollow Road' },
+  const plan = { id: detail ? 'mv-option-b' : 'mv-full', name: detail ? 'Option B · resort terrace (owners’ concept)' : 'Full program · Will’s plan on the lidar', src: 'parcel', origin: GEO.origin, ring, front, frontGuess: false, streets: [], streetsSet: true, streetsBy: 2, streetNames: { [front]: 'Happy Hollow Road' },
     setbacks: { front: 30, side: 10, rear: 10, paving: 0 }, parcel: A.parcel, parcels: A.parcels, zoning: null,
     program: { use: 'sfr', community: PROJECT.community }, elements: els, created: now, updated: now,
     notes: ['Will Essner’s full program (Montreve Smoky Mountain Resort Business Plan, Oct 22 2026) on the 30 platted lots, fitted to USGS 3DEP 1 m lidar.',
