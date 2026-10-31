@@ -1,9 +1,9 @@
-// The MCP site_renderings tool (lib/mcp/renderings.mjs) and the massing picture it paints from (lib/massing.mjs): the plan's
+// The MCP site_renderings tool (lib/mcp/renderings.mjs) and the massing picture it paints from (lib/massingsvg.mjs): the plan's
 // 3D massing drawn from the website's camera presets with the site in frame, the image model and the snapshot stood in
 // for; the renderings kept with the saved plan and put on a plan set's A-9xx sheets (lib/mcp/planset.mjs).
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-const S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayout.mjs'), M = await import('../lib/massing.mjs'), RD = await import('../lib/render.mjs');
+const S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayout.mjs'), M = { ...await import('../lib/massing.mjs'), ...await import('../lib/massingsvg.mjs') }, RD = await import('../lib/render.mjs');
 const ST = await import('../lib/mcp/store.mjs'), RN = await import('../lib/mcp/renderings.mjs'), PSET = await import('../lib/mcp/planset.mjs'), { callTool } = await import('../lib/mcp/server.mjs');
 
 const mk = (o, pts) => { const k = 364567 * Math.cos(o[1] * Math.PI / 180); return { type: 'Polygon', coordinates: [pts.concat([pts[0]]).map(([x, y]) => [o[0] + x / k, o[1] + y / 364567])] }; };

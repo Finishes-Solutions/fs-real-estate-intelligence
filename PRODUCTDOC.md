@@ -476,7 +476,7 @@ Every answer names its sources, says how current they are and what they cover. W
 
 - **ChatGPT:** Settings → Connectors → Advanced → turn on Developer mode, then Create. Give it a name, paste the address, choose OAuth for authentication and leave the client id and secret empty. ChatGPT sends you to a Finishes Solutions sign-in page.
 - **Claude:** Settings → Connectors → Add custom connector. Give it a name, paste the address, leave the advanced OAuth fields empty, then Connect. Claude sends you to the same sign-in page.
-- **On the sign-in page**, type the team passcode (the one Projects uses). Tick **Also let it change projects** if you want the assistant to be able to start projects, lay out site plans and change assumptions, budgets and scenarios; leave it unticked and it can only read. Then Connect, and you're back in ChatGPT or Claude with the tools listed.
+- **On the sign-in page**, type the team passcode your admin gives you. Tick **Also let it change projects** if you want the assistant to be able to start projects, lay out site plans and change assumptions, budgets and scenarios; leave it unticked and it can only read. Then Connect, and you're back in ChatGPT or Claude with the tools listed.
 
 Each person signs in once; the connection renews itself for 30 days and then asks again. The sign-in page allows ten tries a minute. If the team changes the connection secret, every assistant is signed out at once and reconnects the same way. Your admin turns this on by setting the secret and the passcode on the deployment; until then the address is for the project app's agents only.
 

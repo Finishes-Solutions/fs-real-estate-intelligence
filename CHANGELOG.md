@@ -8,8 +8,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 ### 11:50 PM CT: Connect your own ChatGPT or Claude to the app (021abf7)
 - **Paste one address and sign in.** ChatGPT (a custom connector in Developer mode) and Claude (a custom connector) now connect to the app's MCP server with nothing but its address: they send you to a Finishes Solutions sign-in page, you type the team passcode, and the assistant has the app's property, site, flood, environmental, demographic, market, construction, crime and project tools. Tick **Also let it change projects** at sign-in to let it start projects and work on their site plans and feasibility studies; otherwise it can only read.
 - **Access renews itself** for 30 days, then asks again; ten sign-in tries a minute; changing the connection secret signs every assistant out at once. The project app's own connection (its shared token) works as before.
+- **The renderings test** imports the massing picture from where it lives now (it had failed since the picture moved).
 - **ChatGPT's `search` and `fetch`** are there (projects by words, or an address, parcel number or coordinates to a property) because ChatGPT connectors expect them.
-- **For the admin:** set `MCP_OAUTH_SECRET` (16+ random characters) and `MCP_SIGNIN_CODE` (or reuse the Projects passcode) on the deployment to turn this on; until then nothing changes.
+- **For the admin:** set `MCP_OAUTH_SECRET` (16+ random characters) and `MCP_SIGNIN_CODE` on the deployment to turn this on; both are set on production and preview.
 
 ## 2026-10-27
 
