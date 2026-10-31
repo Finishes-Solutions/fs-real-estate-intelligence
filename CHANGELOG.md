@@ -3,6 +3,13 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-31
+
+### 4:22 AM CT: Montreve Option B, the resort in detail; trees on lots (commit hash added when pushed)
+- **Montreve Mountain Club has an Option B:** the same lots, roads, cabins and resort core as the Full program, worked up in detail. It adds an owners' pool club (heated pool and spa on a fenced deck, bathhouse, playground, lawn games, rain garden), a 10 ft fence round the courts, a chef's garden and screened trash and recycling behind the Lodge, a ridge overlook, and a stone arbor and aisle on the ceremony lawn. The event side gets a caterers' kitchen, a bridal cottage and photo garden with a private walk to the pavilion, vendor and staff parking, and a maintenance barn. At the entrance there's a gate house, gate and mail kiosk. Walks tie every piece to the promenade, and a trail link climbs to the woodland loop. Each level piece lists its pad and walls, and the plan's notes describe every area.
+- **Cabin lots stay wooded in Option B,** and 15 of the 24 cabins have room for a walk-out patio with a hot tub and fire pit under the deck.
+- **Trees grow across lot lines.** On the site sheet and in 3D, a lot line no longer keeps landscape trees out, so lawns and wooded areas inside lots are planted like any other.
+
 ## 2026-10-30
 
 ### 3:48 PM CT: Montreve work merged into experimental (302644b)

@@ -101,4 +101,12 @@ It replaces the team's copy of the project, keeping the Regrid parcel record and
   The whole plan is slid as one (`designCore`) to the spot with the fewest clashes and least earthwork. Walls: 7-17 ft
   at the buildings and terraces, about 23 ft at the pavilion and lawn, 33-34 ft at the tennis court and upper parking bay
   (tier them or step the design).
+- **Option B, the resort in detail** (second plan, `mv-option-b`, `buildOption({ detail: true })`): the same lots,
+  roads, cabins and core, each in the same place. It adds, on the same grid, the pool club west of the tennis court
+  (25 x 60 ft pool and spa on an 80 x 46 ft deck, about 25 ft of wall; bathhouse, pool fence, playground, lawn games, rain
+  garden by the road), a 10 ft court fence, the chef's garden and trash enclosure behind the Lodge, a ridge overlook,
+  and the ceremony arbor and aisle. East of the pavilion lane (lot 15): caterers' kitchen, bridal cottage and garden,
+  16-space vendor and staff lot, maintenance barn. At the entrance: gate house, gate and mail kiosk, placed on open
+  verge by `entryGate`. Also walks to the promenade, a trail link to the woodland loop, a walk-out patio under 15 of the
+  24 cabins' decks, and every cabin lot kept wooded. The plan's notes list each area and its walls.
 - Every piece carries `grade` (pad elevation, fall, cut and fill, walls); the app's Selected box shows it.

@@ -8,7 +8,7 @@ import * as TR from '../lib/terrain.mjs';
 import { cleanProject } from '../api/projects.js';
 
 const doc = M.buildProject(null, { now: '2026-10-30T18:00:00.000Z' }), pl = doc.plans[0], s = M.summary(doc), E = pl.elements, by = id => E.find(e => e.id === id);
-assert.equal(doc.id, 'mvv5sk2y6l0dq', 'the team’s existing project'); assert.equal(doc.plans.length, 2); assert.deepEqual(doc.plans[1], M.SAVED.optionA, 'Option A kept as it was');
+assert.equal(doc.id, 'mvv5sk2y6l0dq', 'the team’s existing project'); assert.equal(doc.plans.length, 3); assert.deepEqual(doc.plans[2], M.SAVED.optionA, 'Option A kept as it was');
 assert.ok(cleanProject(doc), 'the sync accepts it'); assert.ok(JSON.stringify(doc).length < 500000);
 assert.ok(Math.abs(s.acres - 30.05) < 0.05, 'the Regrid parcel: ' + s.acres);
 
@@ -60,4 +60,20 @@ assert.ok(by('mv-entry') && by('mv-pav-entry'), 'the resort entry and pavilion l
 // the app's own checks: nothing outside, nothing overlapping, no problems
 assert.deepEqual(s.outside, []); assert.deepEqual(s.overlaps, []);
 assert.deepEqual(SP.check(pl).filter(i => i.level === 'bad').map(i => i.text), []);
+// Option B: the same plan (lots, roads, cabins, core in the same places), worked up in detail, still clean
+{ const B = doc.plans[1], sB = M.summary(doc, 1), EB = B.elements, bb = id => EB.find(e => e.id === id);
+  assert.equal(B.id, 'mv-option-b');
+  for (const e of E.filter(e => e.kind !== 'green')) { const o = bb(e.id); assert.ok(o && o.x === e.x && o.y === e.y && o.rot === e.rot, e.id + ' in the same place in Option B'); }
+  for (const id of ['mv-pooldeck', 'mv-pool', 'mv-spa', 'mv-bathhouse', 'mv-play', 'mv-lawngames', 'mv-raingarden', 'mv-chefgarden', 'mv-trash', 'mv-overlook', 'mv-arbor', 'mv-catering', 'mv-bridal', 'mv-bridalgarden', 'mv-vendorpark', 'mv-maint', 'mv-fence-courts', 'mv-fence-pool', 'mv-gatehouse', 'mv-gate', 'mv-mail', 'mv-walk-lawn', 'mv-trail-link'])
+    assert.ok(bb(id), id + ' in Option B (notes: ' + B.notes.split('\n').filter(t => /left out|no open/.test(t)).join('; ') + ')');
+  assert.ok(!/left out|did not fit|no open ground/.test(B.notes), 'everything placed');
+  const pool = bb('mv-pool'), deck = bb('mv-pooldeck'); assert.ok(SP.outline(pool).every(p => SP.inRing(p, SP.outline(deck))), 'the pool on its deck');
+  assert.ok(Math.max(deck.grade.cutWall, deck.grade.fillWall) < 26, 'the pool deck walls: ' + JSON.stringify(deck.grade));
+  assert.ok(EB.filter(e => /^mv-woods-/.test(e.id)).length === 24 && EB.filter(e => /^mv-patio-/.test(e.id)).length >= 12, 'wooded lots and walk-out patios');
+  for (const p of EB.filter(e => /^mv-patio-/.test(e.id))) { const lot = lots.find(l => l.name === 'Lot ' + p.id.slice(9)); assert.ok(SP.outline(p).every(q => SP.inRing(q, lot.poly)), p.id + ' on its own lot'); }
+  assert.deepEqual(sB.outside, []); assert.deepEqual(sB.overlaps, []);
+  assert.deepEqual(SP.check(B).filter(i => i.level === 'bad').map(i => i.text), []);
+  // the trees: every wooded lot gets some (a lot line no longer keeps them out)
+  assert.ok(SP.details(B).trees.length > 2 * SP.details(pl).trees.length, 'Option B planted: ' + SP.details(B).trees.length + ' trees');
+}
 console.log('montreve ok: ' + s.cabins + ' cabins (' + s.walkouts + ' walk-outs), the composed resort core on lots 10-15 (' + s.spaces + ' spaces), ' + s.cutCy.toLocaleString('en-US') + ' CY cut and fill on the level pads');
