@@ -4,13 +4,15 @@
 //   permits    every Harris County permit in HCAD's weekly Real_acct_owner.zip (only downloaded when it changed): building,
 //              trade (electrical, plumbing, mechanical), roofing, fire, sign, pool, fence, occupancy; every year HCAD
 //              publishes (PERMIT_MONTHS=24 for a window); placed on the parcel through HCAD's parcel layer
+//   oce-permits  Harris County Engineering's own ePermits (the public Permits Dashboard's service): every permit the county
+//              issues in the unincorporated county, with the permit name, project, status and point; same window
 //   plats      City of Houston plat applications (city + ETJ, last 24 months), Fort Bend recorded subdivisions (10 years),
 //              and the undated subdivision maps of Montgomery, Waller, Austin and Washington
 //   txdot      TxDOT projects planned, under way, or finished in the last two years
 //   districts  TCEQ water districts with outlines, creation dates (TCEQ district pages, a slice per night) and the Bond
 //              Review Board's newest debt report (tax rate, bonds outstanding)
 //   schools    TEA public school campuses with enrollment
-// Env: ONLY=permits,plats,txdot,districts,schools (subset), FORCE=1 (reload files that haven't changed),
+// Env: ONLY=permits,oce-permits,plats,txdot,districts,schools (subset), FORCE=1 (reload files that haven't changed),
 // ALLOW_SHRINK=1 (accept a load under half the rows before), IWUD_MAX (district pages per night, default 300),
 // LOCATE_MAX (new permit parcels to place per night, default 60000), PERMIT_MONTHS (how far back, default every year),
 // HCAD_ZIP (a local Real_acct_owner.zip for tests),
@@ -29,7 +31,7 @@ import { inOutline } from '../lib/places.mjs';
 import * as C from '../lib/countydata.mjs';
 
 const E = process.env, log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
-const ONLY = (E.ONLY || 'permits,plats,txdot,districts,schools').split(',').map(x => x.trim());
+const ONLY = (E.ONLY || 'permits,oce-permits,plats,txdot,districts,schools').split(',').map(x => x.trim());
 const FORCE = !!E.FORCE, DRY = !!E.DRY, MIN_KEEP = E.ALLOW_SHRINK ? 0 : 0.5;
 const IWUD_MAX = +(E.IWUD_MAX || 300), LOCATE_MAX = +(E.LOCATE_MAX || 60000);
 const minRows = m => E.COUNTY_MIN_ROWS != null ? +E.COUNTY_MIN_ROWS : m; // tests run on a handful of rows
@@ -61,10 +63,10 @@ async function get(url, opts = {}, tries = 4) {
 }
 async function getJSON(url, opts) { const r = await get(url, opts), t = await r.text(); let d; try { d = JSON.parse(t); } catch { throw new Error(url.split('?')[0] + ' answered ' + r.status + ' ' + t.slice(0, 120)); } if (d?.error) throw new Error(url.split('?')[0] + ': ' + (d.error.message || JSON.stringify(d.error))); return d; }
 // every feature of an ArcGIS layer that matches, paged, in longitude / latitude, simplified to about 3 m
-async function arcAll(url, where, { fields = '*', geometry = true, page = 1000, box = null, max = 200000 } = {}) {
+async function arcAll(url, where, { fields = '*', geometry = true, page = 1000, box = null, max = 200000, orderBy = null } = {}) {
   const out = [];
   for (let off = 0; off < max; off += page) {
-    const p = { f: 'json', where, outFields: fields, returnGeometry: String(geometry), outSR: '4326', geometryPrecision: '5', maxAllowableOffset: '0.00003', resultOffset: String(off), resultRecordCount: String(page) };
+    const p = { f: 'json', where, outFields: fields, returnGeometry: String(geometry), outSR: '4326', geometryPrecision: '5', maxAllowableOffset: '0.00003', resultOffset: String(off), resultRecordCount: String(page), ...(orderBy ? { orderByFields: orderBy } : {}) };
     if (box) Object.assign(p, { geometry: box.join(','), geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' });
     const d = await getJSON(url + '/query?' + new URLSearchParams(p), { method: 'GET', timeout: 120000 });
     out.push(...(d.features || []));
@@ -75,7 +77,7 @@ async function arcAll(url, where, { fields = '*', geometry = true, page = 1000, 
 const socrata = (url, p) => getJSON(url + '?' + new URLSearchParams(p), { timeout: 180000 });
 
 const stats = {}, failed = [];
-const STEP_SOURCES = { permits: ['hcad-permits'], plats: ['coh-plats', 'fbc-subdivisions', 'mcad-subdivisions'], txdot: ['txdot'], districts: ['tceq-districts'], schools: ['tea-schools'] };
+const STEP_SOURCES = { permits: ['hcad-permits', 'oce-permits'], plats: ['coh-plats', 'fbc-subdivisions', 'mcad-subdivisions'], txdot: ['txdot'], districts: ['tceq-districts'], schools: ['tea-schools'] };
 async function step(name, fn) {
   if (!ONLY.includes(name)) return;
   const t = Date.now();
@@ -145,6 +147,20 @@ await step('permits', async () => {
   for (const r of rows) { const p = at.get(r.acct); r.lon = p?.[0] ?? null; r.lat = p?.[1] ?? null; }
   const res = await save(src, rows, { min: 1000, meta: { url, etag: head?.etag, modified: head?.modified } });
   return { ...res, placedNew: placed, unplaced: rows.filter(r => r.lon == null).length };
+});
+
+// ---------- Harris County Engineering permits (the county's own ePermits, unincorporated county) ----------
+await step('oce-permits', async () => {
+  const src = 'oce-permits', since = E.PERMIT_MONTHS ? monthsAgo(+E.PERMIT_MONTHS) : null;
+  const where = since ? "ISSUEDDATE >= DATE '" + since + "' OR (ISSUEDDATE IS NULL AND PROJECTSUBMITDATE >= DATE '" + since + "')" : '1=1';
+  const rows = [], seen = new Set(); let bad = 0;
+  for (const f of await arcAll(C.OCE_PERMITS, where, { fields: C.OCE_FIELDS, page: 10000, max: 3000000, orderBy: 'OBJECTID' })) {
+    const r = C.ocePermitRow(f); if (!r) { bad++; continue; } if (seen.has(r.id)) continue; seen.add(r.id); rows.push(r);
+    if (rows.length % 200000 === 0) log('oce permits parsed', rows.length);
+  }
+  log('oce permits parsed', rows.length, 'skipped', bad, since ? 'since ' + since : 'all years', 'by category', JSON.stringify(rows.reduce((m, r) => (m[r.cat] = (m[r.cat] || 0) + 1, m), {})));
+  const res = await save(src, rows, { min: 5000, meta: { url: C.OCE_PERMITS } });
+  return { ...res, unplaced: rows.filter(r => r.lon == null).length };
 });
 
 // ---------- plats and subdivisions ----------
@@ -231,4 +247,4 @@ await step('schools', async () => {
 });
 
 log('done', JSON.stringify({ failed }));
-if (failed.length && failed.length === ONLY.filter(x => ['permits', 'plats', 'txdot', 'districts', 'schools'].includes(x)).length) process.exit(1);
+if (failed.length && failed.length === ONLY.filter(x => ['permits', 'oce-permits', 'plats', 'txdot', 'districts', 'schools'].includes(x)).length) process.exit(1);

@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: "Subset: permits,plats,txdot,districts,schools (blank = all)"
+        description: "Subset: permits,oce-permits,plats,txdot,districts,schools (blank = all)"
         required: false
       force:
         description: "Reload files that haven't changed (1 = yes)"
@@ -37,7 +37,7 @@ jobs:
   run:
     runs-on: ubuntu-latest
     environment: Production # the secrets live in this GitHub environment
-    timeout-minutes: 120
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,4 +55,4 @@ jobs:
           ALLOW_SHRINK: ${{ inputs.allow_shrink }}
           LOCATE_MAX: ${{ inputs.locate_max }}
           PERMIT_MONTHS: ${{ inputs.permit_months }}
-        run: node build/county-data.mjs
+        run: node --max-old-space-size=6144 build/county-data.mjs

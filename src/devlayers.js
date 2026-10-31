@@ -12,7 +12,7 @@ import { readJSON } from './lib/http.mjs';
 export const DEV = {
   permit: { box: 'lyDevPermit', label: 'Building permits', short: 'Permits', minz: 13, shapes: false, dated: true,
     cats: { 'new-commercial': ['New commercial building', '#c2410c'], 'new-home': ['New home', '#2563eb'], remodel: ['Addition, remodel or lease space', '#7c3aed'], 'site-work': ['Paving or site work', '#64748b'], demolition: ['Demolition', '#dc2626'],
-      electrical: ['Electrical', '#ca8a04'], plumbing: ['Plumbing', '#0891b2'], mechanical: ['Mechanical / HVAC', '#0d9488'], roofing: ['Roofing', '#a16207'], fire: ['Fire sprinkler or alarm', '#be123c'], sign: ['Sign', '#db2777'], pool: ['Pool or spa', '#0ea5e9'], fence: ['Fence', '#84cc16'], occupancy: ['Certificate of occupancy', '#16a34a'], other: ['Other permit', '#94a3b8'] } },
+      electrical: ['Electrical', '#ca8a04'], plumbing: ['Plumbing', '#0891b2'], mechanical: ['Mechanical / HVAC', '#0d9488'], roofing: ['Roofing', '#a16207'], fire: ['Fire sprinkler or alarm', '#be123c'], sign: ['Sign', '#db2777'], pool: ['Pool or spa', '#0ea5e9'], fence: ['Fence', '#84cc16'], occupancy: ['Certificate of occupancy', '#16a34a'], septic: ['Septic (on-site sewage)', '#78716c'], floodplain: ['Floodplain development', '#1d4ed8'], 'right-of-way': ['Right of way or utility', '#f59e0b'], other: ['Other permit', '#94a3b8'] } },
   plat: { box: 'lyDevPlat', label: 'Plats & new subdivisions', short: 'Plats', minz: 11, shapes: true, dated: true,
     cats: { planned: ['Planned (general or preliminary plat)', '#0891b2'], plat: ['Plat', '#16a34a'], replat: ['Replat', '#65a30d'], recorded: ['Recorded subdivision', '#0d9488'], vacated: ['Vacated', '#94a3b8'] } },
   txdot: { box: 'lyDevTxdot', label: 'TxDOT projects', short: 'TxDOT', minz: 8, shapes: true, dated: false,
@@ -123,8 +123,13 @@ export function initDevLayers(ctx) {
     const a = x.attrs || {}, cat = (meta.cats[x.cat] || [x.cat || ''])[0], dot = '<span class="pl-dot" style="background:' + catColor(kind, x.cat) + '"></span>';
     let body = '', src = '';
     if (kind === 'permit') {
-      body = dl([['Kind', esc(cat)], ['As listed', esc(a.type || '')], ['Issued', esc(fmtDay(x.day))], ['Issued by', esc(a.agency || '')], ['Note', esc(a.note || '')], ['Appraisal account', '<span class="mono">' + esc(a.acct || '') + '</span>']]);
-      src = 'Harris Central Appraisal District permit records (updated weekly). The district records permits it uses for appraisal, so recent ones can take a few weeks to appear; values and contractors aren’t listed.';
+      if (x.source === 'oce-permits') {
+        body = dl([['Kind', esc(cat)], ['Permit', esc(a.type || '')], ['Application', esc(a.app || '')], ['Project', esc([a.projectName, a.project].filter(Boolean).join(' · '))], ['Permit no.', '<span class="mono">' + esc(a.permit || '') + '</span>'], ['Status', esc(x.status || '') + (a.closed ? ' (closed)' : '')], ['Submitted', esc(fmtDay(a.submitted))], ['Issued', esc(fmtDay(x.day))], ['Issued by', esc(a.agency || '')], ['Precinct', esc(a.precinct || '')]]);
+        src = 'Harris County Engineering ePermits (the county’s public Permits Dashboard, loaded nightly): permits the county itself issues in the unincorporated county. Values aren’t listed.';
+      } else {
+        body = dl([['Kind', esc(cat)], ['As listed', esc(a.type || '')], ['Issued', esc(fmtDay(x.day))], ['Issued by', esc(a.agency || '')], ['Note', esc(a.note || '')], ['Appraisal account', '<span class="mono">' + esc(a.acct || '') + '</span>']]);
+        src = 'Harris Central Appraisal District permit records (updated weekly). The district records permits it uses for appraisal, so recent ones can take a few weeks to appear; values and contractors aren’t listed.';
+      }
     } else if (kind === 'plat') {
       body = dl([['Kind', esc(a.type || cat)], ['Status', esc(x.status || '')], [x.source === 'coh-plats' ? 'Submitted' : 'Recorded', esc(fmtDay(x.day))], ['Planning Commission', esc(fmtDay(a.commission))],
         ['Lots', x.units ? fmt(x.units) : ''], ['Reserves', a.reserves ? fmt(a.reserves) + (a.reserveAcres ? ' (' + a.reserveAcres.toFixed(1) + ' acres)' : '') : ''], ['Acres', a.acres ? a.acres.toFixed(1) : ''], ['Application', esc(a.app || '')]]);
@@ -182,7 +187,7 @@ export function initDevLayers(ctx) {
       part('TxDOT work within a mile', roads.map(r => row(r, [catName(r), r.amount ? money(r.amount) : '', mi(r.m)].filter(Boolean).join(' · '))))
     ].filter(Boolean).join('');
     el.innerHTML = '<div class="lt">Development Here &amp; Nearby</div>' + (html || '<div class="rnote">No permits, plats, water district, schools or TxDOT work found close by.</div>') +
-      '<div class="ssrc src">Permits: Harris County only (Harris Central Appraisal District). Plats: City of Houston and county maps. Districts: TCEQ and the Bond Review Board. Schools: TEA. Roads: TxDOT.</div>';
+      '<div class="ssrc src">Permits: Harris County only (Harris Central Appraisal District and Harris County Engineering). Plats: City of Houston and county maps. Districts: TCEQ and the Bond Review Board. Schools: TEA. Roads: TxDOT.</div>';
     el.querySelectorAll('[data-dev]').forEach(b => b.onclick = () => show(b.dataset.dev));
   };
 }

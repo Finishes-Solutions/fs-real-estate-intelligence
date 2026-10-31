@@ -39,6 +39,16 @@ assert.match(P[2].attrs.agency, /HCAD code 071/, 'unverified agency codes are no
 assert.equal(P[2].addr, 'FM 1960 #5', 'house number 0 is left off, the unit kept');
 assert.equal(P[0].id, 'permit:hcad:0010180000001:2047052:2025-09-11');
 assert.throws(() => C.parseHcadPermits('acct\tfoo\n1\t2'), /header changed/);
+// Harris County Engineering ePermits rows: the permit name classifies, the address is cleaned, the point kept, contacts never copied
+{ const f = { attributes: { ID: 142683, PROJECTNUMBER: '1509170090', PROJECTNAME: null, FULLADDRESS: '12247 Roy Mix Bohn Ln, Houston 77044', APPTYPE: 'Residential Construction & On-site Sewerage System (Septic)', PROJECTSUBMITDATE: 1442466000000, PERMITNUMBER: '1509170090-RESB-001', PERMITNAME: 'Residential, New 1 Family (Shares Common Wall)', STATUS: 'Issued', ISSUEDDATE: 1443762000000, ISCLOSED: 0, PERMITCLASSCODE: 'A', PRECINCTNUMBER: 1, PHONE1: '(713) 555-0100', EMAILADDRESS: 'x@y.z' }, geometry: { x: -95.17, y: 29.93 } };
+  const r = C.ocePermitRow(f); assert.equal(r.id, 'permit:oce:142683'); assert.equal(r.cat, 'new-home'); assert.equal(r.day, '2015-10-02'); assert.equal(r.addr, '12247 Roy Mix Bohn Ln, Houston'); assert.equal(r.lon, -95.17); assert.equal(r.attrs.precinct, 'Precinct 1'); assert.equal(r.attrs.submitted, '2015-09-17');
+  assert.ok(!JSON.stringify(r).includes('555-0100') && !JSON.stringify(r).includes('x@y.z'), 'no contact details');
+  assert.equal(C.ocePermitRow({ ...f, attributes: { ...f.attributes, PERMITNAME: 'Curb and Gutter Driveway' } }).cat, 'site-work');
+  assert.equal(C.ocePermitRow({ ...f, attributes: { ...f.attributes, PERMITNAME: 'OSSF Permit', APPTYPE: 'Septic' } }).cat, 'septic');
+  assert.equal(C.ocePermitRow({ ...f, attributes: { ...f.attributes, PERMITNAME: '', APPTYPE: 'Legacy - Floodplain' } }).cat, 'floodplain');
+  assert.equal(C.ocePermitRow({ ...f, attributes: { ...f.attributes, PERMITNAME: 'Sign Permit', APPTYPE: 'Signs ETJ, Scenic & Toll Road' } }).cat, 'sign');
+  assert.equal(C.ocePermitRow({ ...f, attributes: { ...f.attributes, ISSUEDDATE: null, PROJECTSUBMITDATE: null } }), null, 'no date: left out');
+  assert.equal(C.ocePermitRow({ ...f, geometry: null }).lon, null); }
 
 // City of Houston plat applications
 const plat = C.cohPlatRow({ attributes: { AppId: 93620, AppNo: '2026-1484', AppCode: 'C3N', AppStatus: 'Being Reviewed', SubdivisionName: 'Ronson Landing', SubdivisionSectionNo: '0', PCDate: 1792022400000, LotCount: 1, ReserveCount: 0, AppSubmitDate: 1788825600000 }, geometry: sq });
