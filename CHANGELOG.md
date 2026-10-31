@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-31
 
-### 5:31 AM CT: Montreve Option B, the owners' resort concept; trees on lots (commit hash added when pushed)
+### 5:31 AM CT: Montreve Option B, the owners' resort concept; trees on lots (2996a86, a1d41f8)
 - **Montreve Mountain Club has an Option B,** laid out like the owners' resort concept sketch. It keeps the same lots, roads and cabins, and puts the resort on one terrace along the uphill side of Amber Valley Way. In front: 88 head-in parking spaces straight off the road. Behind them: a stone promenade. Then, in one line from west to east:
   - **Sports:** a tennis court with four pickleball courts on the terrace above it, fenced, plus a court pavilion and viewing deck.
   - **Pool club:** pool and spa on a fenced deck, with a pool house and fitness room.
