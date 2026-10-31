@@ -16,7 +16,8 @@
 //     pad set back where its retaining walls are least. Every piece carries its pad, cut, fill and walls (e.grade).
 // The existing homes' positions are not surveyed: they are placed by the same rule as the new cabins.
 // buildProject(parcels) returns the project document (id mvv5sk2y6l0dq, the team's existing MONTREVE MOUNTAIN CLUB),
-// the Full program first, then Option B (the same plan worked up in detail: DETAIL below), and the team's Option A kept as
+// the Full program first, then Option B (the owners' resort concept: the resort as one terrace along the road, STRIP
+// below), and the team's Option A kept as
 // it was.
 import fs from 'node:fs';
 import * as SP from '../../lib/siteplan.mjs';
@@ -244,74 +245,93 @@ function designCore(els, notes) {
   return out;
 }
 
-// ---------- Option B: the same plan, worked up in detail ----------
-// The same lots, roads, cabins and composed core, with everything a resort needs to run and look finished, on the same
-// grid (grid feet as MASTER). West of the tennis court, the owners' pool club: a 25 x 60 ft pool on its deck with a
-// bathhouse, fenced, a playground and a lawn-games lawn beside it, and a rain garden at the low corner by the road. Round
-// the courts a 10 ft fence. Behind the lodge, the chef's garden and the trash and recycling enclosure on the service
-// side; a ridge overlook behind the cocktail terrace; the ceremony arbor at the foot of the lawn. East of the pavilion
-// lane, the event side: the caterers' kitchen next to the drop-off, the bridal cottage and its garden, vendor and staff
-// parking, the maintenance barn and its yard. Walks tie every piece to the promenade; a trail link climbs from its west
-// end to the woodland loop. Lawns are planted (trees), the ceremony lawn kept open to the view.
-const DETAIL = [
-  // the pool club (lot 10)
-  { id: 'mv-pooldeck', kind: 'plaza', u: 195, v: 58, w: 80, d: 46, level: true, name: 'Pool deck', note: 'Pool deck · loungers and umbrellas · gated' },
-  { id: 'mv-pool', kind: 'pool', u: 186, v: 58, w: 60, d: 25, name: 'Owners’ pool', note: '25 × 60 ft · zero-entry end · heated' },
-  { id: 'mv-spa', kind: 'pool', u: 226, v: 58, w: 12, d: 12, name: 'Spa', note: 'Hot tub · 8 seats' },
-  { id: 'mv-bathhouse', kind: 'building', u: 195, v: 90, w: 44, d: 14, level: true, use: 'amenity', floors: 1, name: 'Pool bathhouse', note: 'Changing rooms · showers · towel stand · pool equipment' },
-  { id: 'mv-play', kind: 'play', u: 140, v: 6, w: 40, d: 36, level: true, name: 'Playground', note: 'Timber play structure · shade sails · benches' },
-  { id: 'mv-lawngames', kind: 'green', u: 200, v: 8, w: 64, d: 30, level: true, name: 'Lawn games', note: 'Bocce · cornhole · croquet lawn' },
-  { id: 'mv-raingarden', kind: 'pond', u: 214, v: -36, w: 60, d: 30, name: 'Rain garden', note: 'Bioretention for the parking and pool club runoff' },
-  // behind the lodge and the terraces
-  { id: 'mv-chefgarden', kind: 'green', u: 452, v: 164, w: 44, d: 14, name: 'Chef’s garden', note: 'Raised beds · herbs and greens for the lodge kitchen', trees: false },
-  { id: 'mv-trash', kind: 'trash', u: 503, v: 162, w: 24, d: 14, name: 'Trash & recycling', note: 'Screened enclosure on the service side · cardboard and grease bins' },
-  { id: 'mv-overlook', kind: 'patio', u: 590, v: 160, w: 32, d: 18, level: true, name: 'Ridge overlook', note: 'Sunset deck on the woodland trail' },
-  { id: 'mv-arbor', kind: 'patio', u: 675, v: 30, w: 26, d: 12, name: 'Ceremony arbor', note: 'Stone platform and arbor at the foot of the lawn, the valley behind it' },
-  // the event side (lot 15, east of the pavilion lane)
-  { id: 'mv-catering', kind: 'building', u: 822, v: 152, w: 40, d: 20, level: true, use: 'restaurant', floors: 1, type: 'resort-caterers-service-kitchen-800-sf', name: 'Caterers’ kitchen', note: 'Licensed caterers’ prep and staging · serves the pavilion' },
-  { id: 'mv-bridal', kind: 'building', u: 905, v: 162, w: 40, d: 28, level: true, use: 'amenity', floors: 1, name: 'Bridal cottage', note: 'Getting-ready suites for the couple and wedding party · porch' },
-  { id: 'mv-bridalgarden', kind: 'green', u: 905, v: 136, w: 40, d: 20, name: 'Bridal garden', note: 'Photo garden · roses and boxwood', trees: false },
-  { id: 'mv-vendorpark', kind: 'parking', u: 840, v: 90, w: 72, d: 60, level: true, name: 'Vendor & staff parking', note: 'Vendors, band, staff · ~20 spaces' },
-  { id: 'mv-maint', kind: 'building', u: 915, v: 86, w: 40, d: 30, level: true, use: 'amenity', floors: 1, name: 'Maintenance barn', note: 'Grounds equipment · golf carts · housekeeping and linens' }
+// ---------- Option B: the resort terrace along Amber Valley Way ----------
+// The owners' concept (Montreve "overall resort concept" sketch): the resort reads as one terrace on the uphill side of
+// Amber Valley Way across lots 10-15. Head-in parking straight off the road the whole way along, a walk behind it, and
+// behind that, in one line from west to east: sports and the pool club, dining and catering, the wedding and conference
+// hall, and the open-air pavilion at the east end. Each piece is square to the road where it stands (the road bends
+// about 25° along the frontage) and set on a level pad from the lidar; the cabins below on wooded lots.
+// Pieces in road feet: s (start) and w along Amber Valley Way from its west end, off (front edge) and d back from its
+// centreline, the core on its left.
+const STRIP = [
+  // sports (lot 10): two court terraces, the tennis court below and four pickleball courts above, fenced, the court
+  // pavilion between them at the east end (each court laid along the road: the least wall on this slope)
+  { id: 'mv-tennis', kind: 'court', s: 1012, w: 120, off: 46, d: 60, level: true, sport: 'tennis', courts: 1, name: 'Tennis court', note: 'Lower court terrace · fenced · windscreens · lights' },
+  { id: 'mv-pickleball', kind: 'court', s: 1012, w: 120, off: 112, d: 60, level: true, sport: 'pickleball', courts: 4, name: 'Pickleball courts', note: 'Four courts on the upper terrace · fenced' },
+  { id: 'mv-courthouse', kind: 'building', s: 1140, w: 40, off: 112, d: 26, level: true, use: 'amenity', floors: 1, name: 'Court pavilion', note: 'Between the two court terraces · shade, water, restrooms · check-in' },
+  { id: 'mv-courtdeck', kind: 'patio', s: 1140, w: 40, off: 52, d: 30, level: true, name: 'Viewing deck', note: 'Shaded seating beside the tennis court' },
+  // the pool club (lot 11)
+  { id: 'mv-pooldeck', kind: 'plaza', s: 1192, w: 104, off: 46, d: 54, level: true, name: 'Pool deck', note: 'Pool deck · loungers and umbrellas · gated' },
+  { id: 'mv-pool', kind: 'pool', in: 'mv-pooldeck', du: -12, dv: -4, w: 64, d: 28, name: 'Owners’ pool', note: '28 × 64 ft resort pool · zero-entry end · heated' },
+  { id: 'mv-spa', kind: 'pool', in: 'mv-pooldeck', du: 36, dv: -4, w: 12, d: 12, name: 'Spa', note: 'Hot tub · 8 seats' },
+  { id: 'mv-poolhouse', kind: 'building', s: 1214, w: 60, off: 108, d: 32, level: true, use: 'amenity', floors: 1, name: 'Pool house & fitness', note: 'Changing rooms · fitness room · towel desk · pool equipment' },
+  // the arrival plaza at the bend: the stair up from the parking, the resort sign, the way to every wing
+  { id: 'mv-arrival', kind: 'plaza', s: 1338, w: 34, off: 46, d: 44, name: 'Arrival plaza', note: 'Stone plaza at the bend · resort sign · stair and ramp up from the parking' },
+  // dining and catering (lots 11-12)
+  { id: 'mv-terrace', kind: 'patio', s: 1380, w: 108, off: 46, d: 22, level: true, name: 'Dining terrace', note: 'Outdoor dining over the valley' },
+  { id: 'mv-hall', kind: 'building', s: 1380, w: 62, off: 72, d: 40, level: true, use: 'restaurant', floors: 1, type: 'hall', name: 'The Lodge · dining', note: 'Owners’ dining room and bar · 2,500 sf' },
+  { id: 'mv-catering', kind: 'building', s: 1450, w: 40, off: 72, d: 26, level: true, use: 'restaurant', floors: 1, type: 'resort-caterers-service-kitchen-800-sf', name: 'Catering kitchen', note: 'Licensed caterers’ prep and staging · serves the hall and pavilion' },
+  { id: 'mv-service', kind: 'plaza', s: 1448, w: 44, off: 104, d: 26, level: true, name: 'Service yard', note: 'Deliveries · screened' },
+  { id: 'mv-trash', kind: 'trash', s: 1410, w: 24, off: 118, d: 14, name: 'Trash & recycling', note: 'Screened enclosure on the service side' },
+  // the wedding and conference hall (lots 13-14)
+  { id: 'mv-cocktail', kind: 'plaza', s: 1500, w: 110, off: 46, d: 24, level: true, name: 'Cocktail terrace', note: 'Arrival and cocktails in front of the hall' },
+  { id: 'mv-pavilion', kind: 'building', s: 1505, w: 100, off: 74, d: 60, level: true, use: 'venue', floors: 1, type: 'pavilion', name: 'Wedding & conference hall', note: 'Glass and timber hall · weddings, banquets, meetings · ~150 guests' },
+  { id: 'mv-lawn', kind: 'green', s: 1512, w: 86, off: 140, d: 36, level: true, name: 'Ceremony lawn', note: 'Behind the hall, terraced into the hill · ~150 seats', trees: false },
+  { id: 'mv-bridal', kind: 'building', s: 1618, w: 40, off: 52, d: 28, level: true, use: 'amenity', floors: 1, name: 'Bridal cottage', note: 'Getting-ready suites for the couple and wedding party · porch' },
+  { id: 'mv-bridalgarden', kind: 'green', s: 1618, w: 40, off: 86, d: 22, name: 'Bridal garden', note: 'Photo garden · roses and boxwood', trees: false },
+  // the open-air pavilion and its lawn (lots 14-15), at the east end
+  { id: 'mv-openair', kind: 'building', s: 1672, w: 72, off: 48, d: 44, level: true, use: 'amenity', floors: 1, name: 'Open-air pavilion', note: 'Timber pavilion on stone piers, open sides · rehearsal dinners, receptions, concerts' },
+  { id: 'mv-eventlawn', kind: 'green', s: 1754, w: 70, off: 46, d: 50, level: true, name: 'Pavilion lawn', note: 'Lawn games and tented events beside the pavilion', trees: false },
+  { id: 'mv-firepit', kind: 'patio', s: 1680, w: 40, off: 104, d: 30, level: true, name: 'Fire-pit overlook', note: 'Evening gathering above the pavilion' },
+  { id: 'mv-maint', kind: 'building', s: 1830, w: 40, off: 60, d: 30, level: true, use: 'amenity', floors: 1, name: 'Maintenance barn', note: 'Grounds equipment · golf carts · housekeeping and linens' }
 ];
-const DETAIL_PATHS = [
-  // walks (6 ft)
-  { id: 'mv-walk-pool', kind: 'trail', path: [[237, 72], [252, 72]], width: 6, name: 'Pool gate walk', note: 'From the guest parking to the pool club' },
-  { id: 'mv-walk-poolprom', kind: 'trail', path: [[163, 81], [163, 101]], width: 6, name: '', note: 'Pool club up to the promenade' },
-  { id: 'mv-walk-green', kind: 'trail', path: [[487, 90], [487, 101]], width: 6, name: '', note: 'Village green up to the promenade' },
-  { id: 'mv-walk-fire', kind: 'trail', path: [[565, 68], [565, 81]], width: 6, name: '', note: 'Fire-pit overlook up to the promenade' },
-  { id: 'mv-walk-lawn', kind: 'trail', path: [[675, 36], [675, 73], [675, 81]], width: 8, name: 'Wedding aisle', note: 'Down the ceremony lawn to the arbor' },
-  { id: 'mv-walk-bridal', kind: 'trail', path: [[885, 131], [795, 131], [766, 125]], width: 6, name: 'Bridal walk', note: 'Bridal cottage to the pavilion, out of the guests’ sight' },
-  { id: 'mv-walk-overlook', kind: 'trail', path: [[590, 151], [590, 137]], width: 6, name: '', note: 'Cocktail terrace up to the ridge overlook' },
-  { id: 'mv-trail-link', kind: 'trail', path: [[118, 106], [104, 140], [110, 182]], width: 6, name: 'Trail link', note: 'Promenade to the woodland trail' },
-  // the drive into the vendor lot, off the pavilion lane
-  { id: 'mv-vendordrive', kind: 'drive', path: [[790, 90], [805, 90]], width: 22, name: '', note: 'Vendor and staff entry off the pavilion lane' },
-  // fences (closed paths round the courts and the pool deck; a gate where the walks meet them)
-  { id: 'mv-fence-courts', kind: 'fence', path: [[123, 113], [322, 113], [322, 177], [123, 177], [123, 113]], width: 1, name: 'Court fence', note: '10 ft black vinyl chain link · windscreens · gates to the promenade' },
-  { id: 'mv-fence-pool', kind: 'fence', path: [[153, 33], [237, 33], [237, 83], [153, 83], [153, 33]], width: 1, name: 'Pool fence', note: '5 ft ornamental pool fence · self-closing gates' }
-];
-// Option B's pieces on the core's grid, kept on lots 10-15 (or the right-of-way verge for a walk), off the roads and
-// clear of everything already there; each level piece on its pad from the lidar
-function detailCore(els, at, notes) {
-  const rot = deg(CHORD.t), G = (u, v) => grid(u, v, at.du, at.dv), solidK = ['building', 'court', 'parking', 'plaza', 'patio', 'pool', 'play', 'trash', 'pond', 'drive'];
-  const taken = () => els.filter(e => solidK.includes(e.kind) && e.kind !== 'lot').map(e => ({ e, ring: SP.outline(e) }));
-  const ok = (q, ring) => samples(ring).every(p => CORE.has(p) && !onRoad(p)) || q.kind === 'drive' && samples(ring).every(p => CORE.has(p) || onRow(p));
-  const pairOk = (a, b) => (a === 'pool' || b === 'pool') && (a === 'plaza' || b === 'plaza'); // a pool on its deck
-  for (const q of DETAIL) {
-    const c = G(q.u, q.v), { u, v, level, ...rest } = q, el = { ...rest, x: r1(c[0]), y: r1(c[1]), rot: r1(rot), pinned: true };
-    if (q.type) { const t = typeById(q.type); if (t) Object.assign(el, { type: t.id }); }
-    const ring = SP.outline(el), hit = taken().find(o => !pairOk(o.e.kind, q.kind) && !(q.kind === 'green' || o.e.kind === 'green') && meet(ring, o.ring));
-    if (!ok(q, ring)) { notes.push(q.name + ' did not fit on lots 10-15: left out'); continue; }
-    if (hit) { notes.push(q.name + ' runs into ' + (hit.e.name || hit.e.id) + ': left out'); continue; }
-    if (level) { const f = TR.padFit(TERRAIN, { ...el }); if (f) { el.grade = grade(f); el.note = (el.note ? el.note + ' · ' : '') + padNote(f); } }
-    els.push(el);
+const AMB = (() => { const P = AMBER.path, segs = []; let acc = 0; for (let i = 1; i < P.length; i++) { const a = P[i - 1], b = P[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]); segs.push({ a, b, l, s: acc }); acc += l; }
+  const at = s => { const g = segs.find(g => s <= g.s + g.l) || segs[segs.length - 1], k = Math.min(1, (s - g.s) / g.l), t = [(g.b[0] - g.a[0]) / g.l, (g.b[1] - g.a[1]) / g.l]; return { p: [g.a[0] + (g.b[0] - g.a[0]) * k, g.a[1] + (g.b[1] - g.a[1]) * k], t, n: [-t[1], t[0]] }; };
+  // the road's direction over a stretch (the chord), so a long piece sits square to the road along its whole front
+  const dir = (s0, s1) => { const a = at(s0).p, b = at(s1).p, L = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
+  return { at, dir, length: acc }; })();
+const STRIP_S = [1004, 1872]; // the core's frontage on Amber Valley Way (road feet)
+function stripPiece(q, els = []) {
+  if (q.in) { const h = els.find(e => e.id === q.in); if (!h) return null; const t = [Math.cos(h.rot * Math.PI / 180), Math.sin(h.rot * Math.PI / 180)], c = add(add([h.x, h.y], t, q.du), [-t[1], t[0]], q.dv); const { in: _, du, dv, level, ...rest } = q; return { ...rest, x: r1(c[0]), y: r1(c[1]), rot: h.rot, pinned: true }; }
+  const sc = q.s + q.w / 2, t = AMB.dir(q.s, q.s + q.w), n = [-t[1], t[0]], at = off => add(AMB.at(sc).p, n, off + q.d / 2);
+  // where the road curves toward the piece, its front corners come closer to the road than its middle: push it back so
+  // the whole front keeps its distance
+  let off = q.off; for (let i = 0; i < 3; i++) { const e = { x: at(off)[0], y: at(off)[1], w: q.w, d: q.d, rot: deg(t) }, near = Math.min(...samples(SP.outline(e)).map(p => toRoad(p, AMBER).d)); if (near >= q.off - 0.5) break; off += q.off - near; }
+  const c = at(off), { s, off: _o, level, ...rest } = q; return { ...rest, x: r1(c[0]), y: r1(c[1]), rot: r1(deg(t)), pinned: true }; }
+function designStrip(els, notes) {
+  const pairOk = (a, b) => (a === 'pool' || b === 'pool') && (a === 'plaza' || b === 'plaza'), placed = [];
+  const okIn = ring => samples(ring).every(p => CORE.has(p) && !onRoad(p) && edgeDist(p, GEO.parcel) >= 8);
+  // the parking: rows of 8 head-in stalls straight off the road, each square to the road where it stands
+  let s = STRIP_S[0], k = 0;
+  while (s + 72 <= STRIP_S[1]) { const t = AMB.dir(s, s + 72), n = [-t[1], t[0]], c = add(add(AMB.at(s + 36).p, n, PAVE / 2 + 9), t, 0), e = { id: 'mv-park-' + (++k), kind: 'parking', x: r1(c[0]), y: r1(c[1]), w: 72, d: 18, rot: r1(deg(t)), row: -1, name: '', note: 'Head-in parking off Amber Valley Way', pinned: true }, ring = SP.outline(e);
+    if (samples(ring).every(p => CORE.has(p) || onRow(p)) && !placed.some(o => meet(ring, o.ring))) { const f = TR.padFit(TERRAIN, { ...e }); if (f) { e.grade = grade(f); e.note += ' · ' + padNote(f); } els.push(e); placed.push({ e, ring }); s += 74; } else { k--; s += 6; } }
+  // the walk behind the stalls, following the road
+  const walk = []; for (let x = STRIP_S[0]; x <= STRIP_S[1]; x += 8) { const q = AMB.at(x); walk.push(add(q.p, q.n, PAVE / 2 + 26).map(r1)); }
+  els.push({ id: 'mv-promenade', kind: 'plaza', path: walk, width: 8, r: 0, x: walk[0][0], y: walk[0][1], w: 8, d: 1, rot: 0, name: 'Promenade', note: 'Stone walk along the resort front, behind the parking', pinned: true });
+  placed.push({ e: els[els.length - 1], ring: SP.outline(els[els.length - 1]) });
+  // each piece at its spot, or slid along the road to the nearest spot where it fits (the order kept)
+  for (const q of STRIP) {
+    let el = null, ring = null, why = 'did not fit on lots 10-15';
+    for (const ds of q.in ? [0] : [0, 2, -2, 4, -4, 6, -6, 8, -8, 10, -10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40]) {
+      const e = stripPiece(q.in ? q : { ...q, s: q.s + ds }, els); if (!e) break; if (q.type === 'hall') e.type = HALL.id; else if (q.type === 'pavilion') e.type = PAVILION.id; else if (q.type) e.type = q.type;
+      const r = SP.outline(e), hit = placed.find(o => !pairOk(o.e.kind, q.kind) && meet(r, o.ring));
+      if (!okIn(r)) { why = 'did not fit on lots 10-15'; continue; } if (hit) { why = 'runs into ' + (hit.e.name || hit.e.id); continue; }
+      el = e; ring = r; break;
+    }
+    if (!el) { notes.push(q.name + ' ' + why + ': left out'); continue; }
+    if (q.level) { const f = TR.padFit(TERRAIN, { ...el }); if (f) { el.grade = grade(f); el.note = (el.note ? el.note + ' · ' : '') + padNote(f); } }
+    els.push(el); placed.push({ e: el, ring });
   }
-  for (const q of DETAIL_PATHS) {
-    const path = q.path.map(([u, v]) => G(u, v).map(r1)), c = path[0];
-    const el = { ...q, path, x: c[0], y: c[1], w: q.width, d: 1, rot: 0, r: 0, pinned: true };
-    if (q.kind === 'drive' && !samples(SP.outline(el)).every(p => CORE.has(p) || onRow(p))) { notes.push((q.name || q.id) + ' left out (off the core)'); continue; }
-    els.push(el);
-  }
+  // fences round the courts and the pool deck; walks from the promenade up to each building
+  const fenceOf = (ids, id, name, note) => { const rs = ids.map(i => els.find(e => e.id === i)).filter(Boolean); if (!rs.length) return; const e0 = rs[0], pts = rs.flatMap(e => SP.outline(e)), t = [Math.cos(e0.rot * Math.PI / 180), Math.sin(e0.rot * Math.PI / 180)], n = [-t[1], t[0]];
+    const us = pts.map(p => p[0] * t[0] + p[1] * t[1]), vs = pts.map(p => p[0] * n[0] + p[1] * n[1]), u0 = Math.min(...us) - 3, u1 = Math.max(...us) + 3, v0 = Math.min(...vs) - 3, v1 = Math.max(...vs) + 3, P = (u, v) => [u * t[0] + v * n[0], u * t[1] + v * n[1]].map(r1);
+    els.push({ id, kind: 'fence', path: [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1), P(u0, v0)], width: 1, x: e0.x, y: e0.y, w: 1, d: 1, rot: 0, name, note, pinned: true }); };
+  fenceOf(['mv-tennis', 'mv-pickleball'], 'mv-fence-courts', 'Court fence', '10 ft black vinyl chain link · windscreens · gates to the promenade');
+  fenceOf(['mv-pooldeck'], 'mv-fence-pool', 'Pool fence', '5 ft ornamental pool fence · self-closing gates');
+  // the woodland trail link: from the promenade's west end up beside the tennis court
+  const w0 = AMB.at(STRIP_S[0] + 4), tl = [add(w0.p, w0.n, PAVE / 2 + 22), add(w0.p, w0.n, PAVE / 2 + 180)].map(p => p.map(r1));
+  els.push({ id: 'mv-trail-link', kind: 'trail', path: tl, width: 6, r: 0, x: tl[0][0], y: tl[0][1], w: 6, d: 1, rot: 0, name: 'Trail link', note: 'Promenade up to the woodland trail', pinned: true });
+  return { pavilion: els.find(e => e.id === 'mv-pavilion'), lodge: els.find(e => e.id === 'mv-hall'), courts: els.find(e => e.id === 'mv-tennis') };
 }
 // the gated entry: the gate house on the verge of Creeksong Way about 150 ft in from Happy Hollow Road (inbound side),
 // a gate arm across the road beside it, and the mail kiosk on the far verge; each on open ground (not on a lot, the
@@ -334,17 +354,18 @@ function entryGate(els, notes) {
 // Option B's plan notes: what's where, with the walls that matter
 function detailNotes(els) {
   const by = id => els.find(e => e.id === id), wall = id => { const e = by(id); return e?.grade ? Math.round(Math.max(e.grade.cutWall, e.grade.fillWall)) + ' ft' : '—'; };
-  const patios = els.filter(e => /^mv-patio-/.test(e.id)).length, cabins = els.filter(e => e.kind === 'building' && e.use === 'sfr').length, vend = by('mv-vendorpark') ? SP.stalls(by('mv-vendorpark')).count : 0;
-  return ['Option B: the same lots, roads, cabins and resort core as the Full program, worked up in detail.',
+  const patios = els.filter(e => /^mv-patio-/.test(e.id)).length, cabins = els.filter(e => e.kind === 'building' && e.use === 'sfr').length, rows = els.filter(e => e.kind === 'parking'), stalls = rows.reduce((t, e) => t + SP.stalls(e).count, 0);
+  const walls = rows.filter(e => e.grade).map(e => Math.max(e.grade.cutWall, e.grade.fillWall));
+  return ['Option B: the owners’ resort concept — one terrace along the uphill side of Amber Valley Way (lots 10-15): head-in parking off the road, a stone promenade behind it, and in one line west to east sports and the pool club, dining and catering, the wedding and conference hall, and the open-air pavilion. Same lots, roads and cabins as the Full program.',
     'Entry: gate house and gate arm (owner fob, guest call box, emergency access) on Creeksong Way, mail kiosk, monument sign at Happy Hollow Road.',
-    'Pool club (lot 10): 25 × 60 ft heated pool and 8-seat spa on an 80 × 46 ft deck (walls ' + wall('mv-pooldeck') + '), bathhouse, 5 ft pool fence; playground, lawn games (bocce, cornhole, croquet) and a rain garden by the road.',
-    'Courts (lots 10-11): tennis and two pickleball courts inside a 10 ft fence, court pavilion (restrooms, water) and viewing deck. Tennis walls ' + wall('mv-tennis') + ': build as two tiers with a planted bench.',
-    'Lodge (lots 12-13): dining terrace, The Lodge (dining and catering), service yard with screened trash and recycling, chef’s garden behind; village green and fire-pit overlook below the promenade.',
-    'Wedding (lots 13-15): cocktail terrace, 6,000 sf glass pavilion and drop-off, ceremony lawn with its aisle and stone arbor between garden borders, ridge overlook on the woodland trail.',
-    'Event side (lot 15): caterers’ kitchen beside the drop-off, bridal cottage and photo garden with a private walk to the pavilion, vendor and staff parking (' + vend + ' spaces), maintenance barn (grounds, carts, linens).',
-    'Parking: two guest bays (76 spaces, tree islands; upper bay walls ' + wall('mv-park-2') + ', tiered) plus vendor parking; three spaces on each cabin driveway.',
+    'Parking: ' + stalls + ' head-in spaces in ' + rows.length + ' rows of 8 along the road (cut ' + (walls.length ? Math.round(Math.min(...walls)) + '-' + Math.round(Math.max(...walls)) : '—') + ' ft into the bank), plus three on each cabin driveway.',
+    'Sports (lot 10): tennis court and four pickleball courts side by side inside a 10 ft fence (walls ' + wall('mv-tennis') + ' and ' + wall('mv-pickleball') + '), court pavilion and viewing deck behind.',
+    'Pool club (lot 11): 28 × 64 ft heated pool and spa on a fenced deck (walls ' + wall('mv-pooldeck') + '), pool house and fitness room behind.',
+    'Dining and catering (lots 11-12): dining terrace, The Lodge (2,500 sf dining room and bar) and the catering kitchen side by side, service yard and screened trash behind.',
+    'Wedding and conference (lots 13-14): cocktail terrace, the 6,000 sf hall (walls ' + wall('mv-pavilion') + '), ceremony lawn terraced behind it, bridal cottage and photo garden beside it.',
+    'East end (lots 14-15): the open-air pavilion and its lawn, a fire-pit overlook above, the maintenance barn.',
     'Cabins: ' + patios + ' of ' + cabins + ' have room for a walk-out patio (hot tub, fire pit) under the deck; every lot is kept wooded outside the cabin, deck and driveway.',
-    'Walks tie every piece to the promenade; a trail link climbs from its west end to the woodland loop.'];
+    'Retaining walls: stone, in tiers of about 10-12 ft with planting between wherever a pad needs more (every lot slopes 35-70%).'];
 }
 
 const grade = f => ({ pad: f.pad, fall: f.fall, slope: f.slope, toward: f.toward, cutCy: f.cutCy, fillCy: f.fillCy, cutWall: f.cutWall, fillWall: f.fillWall, level: f.level, ...(f.walkout != null ? { walkout: f.walkout } : {}) });
@@ -378,7 +399,7 @@ export function buildOption({ now, detail = false }) {
 
   // the resort core: three composed clusters along Amber Valley Way, each square to the road at its middle, linked by a
   // promenade (designCore below)
-  const core = designCore(els, notes);
+  const core = detail ? designStrip(els, notes) : designCore(els, notes);
   const pv = core.pavilion, hl = core.lodge;
   if (!pv) notes.push('The pavilion cluster did not fit on lots 14-15'); if (!hl) notes.push('The lodge cluster did not fit on lots 12-13'); if (!core.courts) notes.push('The courts did not fit on lots 10-11');
 
@@ -392,10 +413,9 @@ export function buildOption({ now, detail = false }) {
   if (sgn) els.push({ id: 'mv-sign', kind: 'sign', x: r1(sgn[0]), y: r1(sgn[1]), w: 10, d: 5, rot: r1(deg(toRoad(sgn).t)), name: 'Montreve Mountain Club', pinned: true });
 
   if (detail) { // Option B: the plan worked up (DETAIL above), planted, and the entry gated
-    detailCore(els, core.at, notes); entryGate(els, notes);
-    for (const e of els) if (['mv-green', 'mv-garden-w', 'mv-garden-e'].includes(e.id)) e.trees = true;
-    // the cabin lots stay wooded: everything outside the cabin, its deck and driveway is kept forest (trees drawn along each lot)
-    for (const [n, L] of Object.entries(GEO.lots)) if (['cabin', 'existing'].includes(L.use)) els.push(poly('mv-woods-' + n, 'green', SP.offsetRing(L.ring, -1.5), { name: '', trees: true, note: 'Lot ' + n + ' kept wooded outside the cabin, deck and driveway' }));
+    entryGate(els, notes);
+    // the lots stay wooded: everything outside a cabin, its deck and driveway, or the resort's terraces is kept forest
+    for (const [n, L] of Object.entries(GEO.lots)) els.push(poly('mv-woods-' + n, 'green', SP.offsetRing(L.ring, -1.5), { name: '', trees: true, note: 'Lot ' + n + (['cabin', 'existing'].includes(L.use) ? ' kept wooded outside the cabin, deck and driveway' : ' kept wooded round the resort’s terraces') }));
   }
   let front = 0, bd = Infinity; for (let i = 0; i < ring.length; i++) { const d = segDist(gate, ring[i], ring[(i + 1) % ring.length])[0]; if (d < bd) { bd = d; front = i; } }
   const A = SAVED.optionA;
@@ -406,7 +426,7 @@ export function buildOption({ now, detail = false }) {
       'Lots from the Montreve vector lot map laid on the Regrid parcel (best overlap, no turn): not a survey. Roads drawn on the platted rights-of-way’ centrelines.',
       'Every lot slopes 35-70%: the cabins sit square to their roads and step down the hill as walk-outs; the pavilion, hall, courts and parking sit on level pads with retaining walls (each lists its pad, cut, fill and walls).',
       'The seven financed homes are shown in a standard position, not as built.', ...(detail ? detailNotes(els) : []), ...notes].join('\n') };
-  return { plan, cabins, notes, at: core.at };
+  return { plan, cabins, notes };
 }
 
 export function buildProject(parcels, { now = new Date().toISOString() } = {}) {
