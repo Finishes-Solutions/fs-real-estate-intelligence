@@ -1,7 +1,7 @@
 name: County data (Supabase)
 
-# Development activity for the seven counties into Supabase (build/county-data.mjs): Harris County building permits
-# (HCAD's weekly files), plats and new subdivisions, TxDOT projects, water districts (MUDs) with creation dates and
+# Development activity for the seven counties into Supabase (build/county-data.mjs): every Harris County permit
+# (HCAD's weekly files, all years), plats and new subdivisions, TxDOT projects, water districts (MUDs) with creation dates and
 # bonds, and TEA school enrollment. Nightly; each source is skipped or kept as it was when it fails or hasn't changed.
 # Needs supabase/migrations/20261021000000_county_data.sql applied once.
 on:
@@ -17,6 +17,12 @@ on:
         required: false
       allow_shrink:
         description: "Accept a load with under half the rows before (1 = yes)"
+        required: false
+      locate_max:
+        description: "Permit parcels to place this run (default 60000)"
+        required: false
+      permit_months:
+        description: "Permits: months back (blank = every year HCAD publishes)"
         required: false
 
 permissions:
@@ -47,4 +53,6 @@ jobs:
           ONLY: ${{ inputs.only }}
           FORCE: ${{ inputs.force }}
           ALLOW_SHRINK: ${{ inputs.allow_shrink }}
+          LOCATE_MAX: ${{ inputs.locate_max }}
+          PERMIT_MONTHS: ${{ inputs.permit_months }}
         run: node build/county-data.mjs

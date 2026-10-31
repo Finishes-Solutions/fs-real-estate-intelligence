@@ -3,6 +3,14 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-10-31
+
+### 12:30 AM CT: Every Harris County permit, every year, on the map (ba22e3e)
+- **The Building Permits layer holds every permit** the Harris Central Appraisal District records, for every city in Harris County and the unincorporated county, as far back as the district publishes: new buildings and homes, remodels, demolition, and now electrical, plumbing, mechanical / HVAC, roofing, fire sprinklers and alarms, signs, pools, fences and certificates of occupancy, each its own colour. Fire-loss reports on exempt property are still left out (they aren't permits).
+- **Show all** in the Development pipeline picker shows the whole history; the nightly load takes a `permit_months` window and a `locate_max` for how many parcels to place per run.
+- **Waller County and the City of Waller** issue permits through systems with no public feed (MGO Connect; Bureau Veritas reviews for the city), so they aren't loaded; a records request is the route, and the product doc says so.
+- The "Probe services" permits script now looks for the feature services behind Harris County's Office of the County Engineer permits dashboard.
+
 ## 2026-10-30
 
 ### 11:50 PM CT: Connect your own ChatGPT or Claude to the app (021abf7)

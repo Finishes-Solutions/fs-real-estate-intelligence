@@ -23,10 +23,16 @@ const permits = ['acct\tid\tagency_id\tstatus\tdscr\tdor_cd\tpermit_type\tpermit
   '0010020000013\t1\t000 \tC\tFIRELOSS#2505140553\tX1\t84\tExempt Property\t \t05/14/2025\t2026\t98\t \tMAIN\t \tST\t ',
   '1234567890123\t9\t040 \tC\tNEW SFR\tA1\t1\tNew Dwelling - permit\t \t03/02/2026\t2026\t21\t \tOAK GLEN\tDR\t \t ',
   '1234567890124\t2\t074 \tM\tNEW RETAIL\tF1\t5\tNew Building\t \t01/05/2023\t2023\t9\t \tTEXAS\tAVE\t \t ',
-  '1234567890125\t3\t071 \tC\tNEW RETAIL\tF1\t5\tNew Building\t \t02/05/2026\t2026\t0\t \tFM 1960\t \t \t5'].join('\r\n');
+  '1234567890125\t3\t071 \tC\tNEW RETAIL\tF1\t5\tNew Building\t \t02/05/2026\t2026\t0\t \tFM 1960\t \t \t5',
+  '1234567890126\t4\t061 \tC\tSERVICE UPGRADE\tA1\t7\tElectrical Permit\t \t02/06/2026\t2026\t12\t \tELM\tST\t \t ',
+  '1234567890127\t5\t061 \tC\tREROOF\tA1\t8\tRe-Roof\t \t02/07/2026\t2026\t14\t \tELM\tST\t \t ',
+  '1234567890128\t6\t061 \tC\tTENT\tA1\t9\tTemporary Structure\t \t02/08/2026\t2026\t16\t \tELM\tST\t \t '].join('\r\n');
 const P = C.parseHcadPermits(permits, { since: '2024-10-14' });
-assert.equal(P.length, 3, 'fire reports and permits before the window are left out');
-assert.deepEqual(P.map(p => p.cat), ['remodel', 'new-home', 'new-commercial']);
+assert.equal(P.length, 6, 'fire reports and permits before the window are left out; every real permit type is kept');
+assert.deepEqual(P.map(p => p.cat), ['remodel', 'new-home', 'new-commercial', 'electrical', 'roofing', 'other'], 'trade and other permits classified by their type words');
+assert.equal(P[5].attrs.type, 'Temporary Structure', 'the type itself is kept');
+assert.equal(C.parseHcadPermits(permits, {}).length, 7, 'no window: every year');
+for (const [t, c] of [['Plumbing Permit', 'plumbing'], ['Mechanical / HVAC', 'mechanical'], ['Fire Sprinkler', 'fire'], ['Sign Permit', 'sign'], ['Swimming Pool', 'pool'], ['Fence', 'fence'], ['Certificate of Occupancy', 'occupancy'], ['Exempt Property', null]]) assert.equal(C.permitCat(t), c, t);
 assert.equal(P[0].addr, '750 Congress St'); assert.equal(P[0].attrs.agency, 'City of Houston'); assert.equal(P[0].day, '2025-09-11');
 assert.equal(P[1].attrs.agency, 'Harris County'); assert.equal(P[1].county, 'Harris');
 assert.match(P[2].attrs.agency, /HCAD code 071/, 'unverified agency codes are not given a city name');

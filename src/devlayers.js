@@ -1,5 +1,5 @@
 // Development pipeline layers (api/devdata: loaded nightly by the "County data" workflow, build/county-data.mjs):
-//   Building Permits (Harris County)   permits from the Harris Central Appraisal District, by kind
+//   Building Permits (Harris County)   every permit the Harris Central Appraisal District records (building, trade, roofing, sign, pool…), all years, by kind
 //   Plats & New Subdivisions           City of Houston plat applications (city + ETJ), recorded subdivisions elsewhere
 //   TxDOT Projects                     planned, under way and recently finished highway work, as lines
 //   Water Districts (MUDs)             district outlines, newest ones brightest; card with creation date, tax rate, bonds
@@ -11,7 +11,8 @@ import { readJSON } from './lib/http.mjs';
 
 export const DEV = {
   permit: { box: 'lyDevPermit', label: 'Building permits', short: 'Permits', minz: 13, shapes: false, dated: true,
-    cats: { 'new-commercial': ['New commercial building', '#c2410c'], 'new-home': ['New home', '#2563eb'], remodel: ['Addition, remodel or lease space', '#7c3aed'], 'site-work': ['Paving or site work', '#64748b'], demolition: ['Demolition', '#dc2626'], other: ['Building moved', '#94a3b8'] } },
+    cats: { 'new-commercial': ['New commercial building', '#c2410c'], 'new-home': ['New home', '#2563eb'], remodel: ['Addition, remodel or lease space', '#7c3aed'], 'site-work': ['Paving or site work', '#64748b'], demolition: ['Demolition', '#dc2626'],
+      electrical: ['Electrical', '#ca8a04'], plumbing: ['Plumbing', '#0891b2'], mechanical: ['Mechanical / HVAC', '#0d9488'], roofing: ['Roofing', '#a16207'], fire: ['Fire sprinkler or alarm', '#be123c'], sign: ['Sign', '#db2777'], pool: ['Pool or spa', '#0ea5e9'], fence: ['Fence', '#84cc16'], occupancy: ['Certificate of occupancy', '#16a34a'], other: ['Other permit', '#94a3b8'] } },
   plat: { box: 'lyDevPlat', label: 'Plats & new subdivisions', short: 'Plats', minz: 11, shapes: true, dated: true,
     cats: { planned: ['Planned (general or preliminary plat)', '#0891b2'], plat: ['Plat', '#16a34a'], replat: ['Replat', '#65a30d'], recorded: ['Recorded subdivision', '#0d9488'], vacated: ['Vacated', '#94a3b8'] } },
   txdot: { box: 'lyDevTxdot', label: 'TxDOT projects', short: 'TxDOT', minz: 8, shapes: true, dated: false,

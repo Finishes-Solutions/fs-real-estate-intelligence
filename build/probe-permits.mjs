@@ -1,6 +1,6 @@
 // Diagnostic: which cities and counties in our region publish building permits as open data, and in what shape.
 // Run "Probe services" with script=permits. Read-only.
-import { time, ckan, socrata, agol, arcLayer, links, head } from './probe-kit.mjs';
+import { time, ckan, socrata, agol, arcLayer, links, head, json } from './probe-kit.mjs';
 
 // Houston: CKAN portal (weekly permit files) and COH ArcGIS
 for (const q of ['permit', 'building permits', 'certificate of occupancy', 'sold permits'])
@@ -9,6 +9,13 @@ await time('houston permits page', () => links('https://www.houstonpermittingcen
 for (const u of ['https://services.arcgis.com/NummVBqZSIJKUeVR/arcgis/rest/services', 'https://mycity2.houstontx.gov/pubgis02/rest/services', 'https://geogimsprod.houstontx.gov/arcgis/rest/services'])
   await time('houston arcgis ' + u, async () => { const r = await arcLayer(u); return { ...r, services: r.services?.filter(s => /permit|plat|develop|plan|construct|occupan/i.test(s)) }; }, 5000);
 
+// Harris County Office of the County Engineer: the public "Permits Dashboard" (ArcGIS Experience 6dee5875…) and the
+// feature services behind it, which would add contractor, value and status for unincorporated-county permits
+await time('oce experience item', () => json('https://www.arcgis.com/sharing/rest/content/items/6dee5875d8ed477bb5b1bed209c5fd4b?f=json'), 6000);
+await time('oce experience data (service URLs)', async () => { const d = await json('https://www.arcgis.com/sharing/rest/content/items/6dee5875d8ed477bb5b1bed209c5fd4b/data?f=json'); const urls = [...new Set(JSON.stringify(d).match(/https?:\/\/[^"\\]+\/rest\/services\/[^"\\]+/g) || [])], items = [...new Set(JSON.stringify(d).match(/"itemId":"([0-9a-f]{32})"/g) || [])]; return { urls, items }; }, 8000);
+for (const u of ['https://www.gis.hctx.net/arcgis/rest/services', 'https://gis.hctx.net/arcgis/rest/services', 'https://services.arcgis.com/su8ic9KbA7PYVxPS/arcgis/rest/services', 'https://oce.harriscountytx.gov/arcgis/rest/services', 'https://epermits.harriscountytx.gov/arcgis/rest/services'])
+  await time('harris county arcgis ' + u, async () => { const r = await arcLayer(u); return { ...r, services: r.services?.filter(s => /permit|oce|engineer|inspect|develop|plat/i.test(s)) }; }, 6000);
+await time('agol harris county permits', () => agol('Harris County permits OCE', { num: 30 }), 6000);
 // Harris County Engineering (unincorporated) and other counties
 for (const u of ['https://www.gis.hctx.net/arcgis/rest/services', 'https://gis.hctx.net/arcgis/rest/services'])
   await time('harris county arcgis ' + u, () => arcLayer(u), 5000);

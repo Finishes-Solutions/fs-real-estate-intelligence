@@ -1,8 +1,9 @@
 // Nightly: development activity for the seven counties -> Supabase dev_items ("County data" workflow,
 // supabase/migrations/20261021000000_county_data.sql). One step per source; a source that fails keeps last night's rows
 // and the others carry on. Sources and their row shapes are in lib/countydata.mjs.
-//   permits    Harris County building permits from HCAD's weekly Real_acct_owner.zip (only downloaded when it changed),
-//              placed on the parcel through HCAD's parcel layer; last 24 months
+//   permits    every Harris County permit in HCAD's weekly Real_acct_owner.zip (only downloaded when it changed): building,
+//              trade (electrical, plumbing, mechanical), roofing, fire, sign, pool, fence, occupancy; every year HCAD
+//              publishes (PERMIT_MONTHS=24 for a window); placed on the parcel through HCAD's parcel layer
 //   plats      City of Houston plat applications (city + ETJ, last 24 months), Fort Bend recorded subdivisions (10 years),
 //              and the undated subdivision maps of Montgomery, Waller, Austin and Washington
 //   txdot      TxDOT projects planned, under way, or finished in the last two years
@@ -11,7 +12,8 @@
 //   schools    TEA public school campuses with enrollment
 // Env: ONLY=permits,plats,txdot,districts,schools (subset), FORCE=1 (reload files that haven't changed),
 // ALLOW_SHRINK=1 (accept a load under half the rows before), IWUD_MAX (district pages per night, default 300),
-// LOCATE_MAX (new permit parcels to place per night, default 60000), HCAD_ZIP (a local Real_acct_owner.zip for tests),
+// LOCATE_MAX (new permit parcels to place per night, default 60000), PERMIT_MONTHS (how far back, default every year),
+// HCAD_ZIP (a local Real_acct_owner.zip for tests),
 // COUNTY_MIN_ROWS (the fewest rows a source may parse before it counts as broken; per source by default),
 // DRY=1 (parse and report, write nothing).
 import fs from 'node:fs/promises';
@@ -124,8 +126,9 @@ await step('permits', async () => {
     head = { etag, modified };
   }
   const text = execFileSync('unzip', ['-p', file, 'permits.txt'], { maxBuffer: 1024 * 1048576 }).toString('latin1');
-  const rows = C.parseHcadPermits(text, { since: monthsAgo(24) });
-  log('permits parsed', rows.length, 'since', monthsAgo(24));
+  const since = E.PERMIT_MONTHS ? monthsAgo(+E.PERMIT_MONTHS) : null;
+  const rows = C.parseHcadPermits(text, { since });
+  log('permits parsed', rows.length, since ? 'since ' + since : 'all years', 'by category', JSON.stringify(rows.reduce((m, r) => (m[r.cat] = (m[r.cat] || 0) + 1, m), {})));
   // where each permit is: the parcel's spot, from last night's rows when the account was already placed, else HCAD's layer
   const at = new Map();
   if (db) for (const r of await db.selectAll('dev_items', 'select=id,lon,lat&source=eq.' + src + '&lon=not.is.null', 1000)) if (r.lon != null) at.set(r.id.split(':')[2], [r.lon, r.lat]);
