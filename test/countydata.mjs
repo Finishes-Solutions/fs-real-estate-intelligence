@@ -32,6 +32,7 @@ assert.equal(P.length, 6, 'fire reports and permits before the window are left o
 assert.deepEqual(P.map(p => p.cat), ['remodel', 'new-home', 'new-commercial', 'electrical', 'roofing', 'other'], 'trade and other permits classified by their type words');
 assert.equal(P[5].attrs.type, 'Temporary Structure', 'the type itself is kept');
 assert.equal(C.parseHcadPermits(permits, {}).length, 7, 'no window: every year');
+assert.equal(C.parseHcadPermits(permits + '\r\n' + '1234567890129\t7\t061 \tC\tTYPO\tA1\t5\tNew Building\t \t09/01/9005\t2026\t1\t \tELM\tST\t \t \r\n1234567890130\t8\t061 \tC\tTYPO\tA1\t5\tNew Building\t \t12/30/1899\t2026\t1\t \tELM\tST\t \t ', {}).length, 7, 'typed-in dates far in the past or future are left out');
 for (const [t, c] of [['Plumbing Permit', 'plumbing'], ['Mechanical / HVAC', 'mechanical'], ['Fire Sprinkler', 'fire'], ['Sign Permit', 'sign'], ['Swimming Pool', 'pool'], ['Fence', 'fence'], ['Certificate of Occupancy', 'occupancy'], ['Exempt Property', null]]) assert.equal(C.permitCat(t), c, t);
 assert.equal(P[0].addr, '750 Congress St'); assert.equal(P[0].attrs.agency, 'City of Houston'); assert.equal(P[0].day, '2025-09-11');
 assert.equal(P[1].attrs.agency, 'Harris County'); assert.equal(P[1].county, 'Harris');
