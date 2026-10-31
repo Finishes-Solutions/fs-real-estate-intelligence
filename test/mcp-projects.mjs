@@ -156,5 +156,11 @@ if (localChrome()) {
   (await import('../lib/pdf.mjs')).closeBrowser();
 } else console.log('mcp projects: no local Chromium, report set skipped');
 
+// the ChatGPT connector tools: search finds the sample project (JSON results), fetch gives it in full
+{ let r = await call('search', { query: 'waller' }, {}); const j = JSON.parse(text(r)); assert.ok(j.results.some(x => x.id === 'project:' + sample.id && x.url.includes(sample.id)), 'search finds the project: ' + text(r));
+  r = await call('fetch', { id: 'project:' + sample.id }, {}); const f = JSON.parse(text(r)); assert.equal(f.id, 'project:' + sample.id); assert.match(f.text, /## Parcels/); assert.equal(f.metadata.kind, 'project'); assert.ok(f.url.includes(sample.id));
+  r = await call('fetch', { id: 'nonsense' }, {}); assert.ok(r.isError && /project:<project_id>/.test(text(r)));
+  r = await call('search', { query: '' }, {}); assert.ok(r.isError); }
+
 assert.ok(outbound.every(u => /tigerweb\.geo\.census\.gov/.test(u)), 'the only outbound requests were the (refused) road lines: ' + outbound.join(', '));
 console.log('mcp projects passed');

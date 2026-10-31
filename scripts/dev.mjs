@@ -38,7 +38,7 @@ async function readBody(req) {
   const raw = Buffer.concat(chunks); if (!raw.length) return undefined;
   const type = req.headers['content-type'] || '';
   if (type.includes('application/json')) { try { return JSON.parse(raw.toString('utf8')); } catch (e) { return raw.toString('utf8'); } }
-  if (type.startsWith('text/')) return raw.toString('utf8');
+  if (type.startsWith('text/') || type.includes('application/x-www-form-urlencoded')) return raw.toString('utf8');
   return raw;
 }
 const handlers = new Map();
@@ -49,9 +49,16 @@ async function handlerFor(name) {
   return handlers.get(name);
 }
 
+// the OAuth paths vercel.json rewrites to api/oauth.js (lib/mcp/oauth.mjs); kept in step with vercel.json "rewrites"
+/** @type {[RegExp, string][]} */
+export const REWRITES = [[/^\/\.well-known\/oauth-protected-resource(\/.*)?$/, 'resource'], [/^\/\.well-known\/(oauth-authorization-server(\/.*)?|openid-configuration)$/, 'metadata'],
+  [/^\/oauth\/register$/, 'register'], [/^\/oauth\/authorize$/, 'authorize'], [/^\/oauth\/token$/, 'token']];
+export function rewrite(url) { for (const [re, op] of REWRITES) if (re.test(url.pathname)) { url.pathname = '/api/oauth'; url.searchParams.set('op', op); return true; } return false; }
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://' + (req.headers.host || HOST));
   try {
+    rewrite(url);
     if (url.pathname.startsWith('/api/')) {
       const h = await handlerFor(url.pathname.slice(5).replace(/\/+$/, ''));
       if (!h) { res.statusCode = 404; return res.end('No such function'); }

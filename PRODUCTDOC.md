@@ -472,7 +472,15 @@ Every answer names its sources, says how current they are and what they cover. W
 
 **Home communities through the agents.** An agent can ask for a tiny home, manufactured home or RV-park-style community in words, or with settings: the kind of homes, how many, the pad size ("25x55", the homes then sized to fill it), the home size or living area (the pads grow to hold them), a landscape strip, the street the site faces, and facts from reference files (like "134 RV lots, 25' × 55' typ", read as the pad size). If the AI ever reads such a request as something else (an RV park reference once made it self storage), the words win and the answer says so.
 
-Every answer names its sources, says how current they are and what they cover. Where a source doesn't cover a place (Houston crime outside Houston, demographics outside the seven counties) the answer says so plainly instead of reporting nothing. The agents can only read; they never change anything here.
+**Your own ChatGPT or Claude can connect too.** The same connection works for the assistants you use yourself, with nothing but its address: `https://fs-real-estate-intelligence.vercel.app/api/mcp`.
+
+- **ChatGPT:** Settings → Connectors → Advanced → turn on Developer mode, then Create. Give it a name, paste the address, choose OAuth for authentication and leave the client id and secret empty. ChatGPT sends you to a Finishes Solutions sign-in page.
+- **Claude:** Settings → Connectors → Add custom connector. Give it a name, paste the address, leave the advanced OAuth fields empty, then Connect. Claude sends you to the same sign-in page.
+- **On the sign-in page**, type the team passcode (the one Projects uses). Tick **Also let it change projects** if you want the assistant to be able to start projects, lay out site plans and change assumptions, budgets and scenarios; leave it unticked and it can only read. Then Connect, and you're back in ChatGPT or Claude with the tools listed.
+
+Each person signs in once; the connection renews itself for 30 days and then asks again. The sign-in page allows ten tries a minute. If the team changes the connection secret, every assistant is signed out at once and reconnects the same way. Your admin turns this on by setting the secret and the passcode on the deployment; until then the address is for the project app's agents only.
+
+Every answer names its sources, says how current they are and what they cover. Where a source doesn't cover a place (Houston crime outside Houston, demographics outside the seven counties) the answer says so plainly instead of reporting nothing. Unless project changes were allowed at sign-in (or by your admin for the project app), the agents can only read; they never change anything here.
 
 ---
 
@@ -1124,6 +1132,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Connect your own ChatGPT or Claude:** paste the app's connection address into ChatGPT (a custom connector in Developer mode) or Claude (a custom connector), sign in once with the team passcode, and the assistant can look up properties, sites, flood, environmental, demographic, market, construction and crime data and the team's projects, and make the reports. Tick **Also let it change projects** at sign-in to let it start projects and work on their site plans and feasibility studies. See *Your project app's agents*.
 - **OP-0046 has a priced option for the 5.8-acre tract:** *Option B · 5.8-acre tract, budget inputs* is the retail center's land east of the channel on its own, with the team's Oct 2026 project budget already in its Pro forma (land, hard cost, site work, tenant improvements, rent); the app's own vacancy, taxes, commissions, soft costs and fee fill in what the budget leaves out. The project notes say where the budget is thin (no building plumbing, HVAC or electrical in the shell; a few soft-cost lines without totals) and how the rent compares with Waller listings.
 - **Parking lots are paved as one surface:** a new **Parking field** piece is the asphalt under and between a lot's rows and aisles. The layout engine lays one under every parking field it draws (no more lawn strips at the ends of rows and aisles), you can add one from **Add › Paving** and shape it like any piece, the sheet and the map draw it as one lot with the rows on top, and the numbers count the paving once (a row or aisle on a field isn't counted twice).
 - **The OP-0046 Waller site is in Projects:** *OP-0046 · 0 Old Houston Hwy at FM 362, Waller*, the three parcels merged, with *Option A · OP-0046 as drawn* laid out piece by piece from the two site plan sheets (the six-store row, the restaurant pad, the retail center and its ponds, the channel, the drives and every parking row). Open it from Projects like any other; its notes say what the sheets state and where the app's own counts differ.

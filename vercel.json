@@ -145,6 +145,9 @@
     "api/feasibility.js": {
       "maxDuration": 120,
       "includeFiles": "{data/area.json,data/markets.json,src/logo-white.png,fonts/**,node_modules/@sparticuz/chromium/bin/**}"
+    },
+    "api/oauth.js": {
+      "maxDuration": 15
     }
   },
   "crons": [
@@ -162,6 +165,40 @@
           "value": "public, max-age=0, s-maxage=86400, must-revalidate"
         }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/.well-known/oauth-protected-resource",
+      "destination": "/api/oauth?op=resource"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource/(.*)",
+      "destination": "/api/oauth?op=resource"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "/api/oauth?op=metadata"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server/(.*)",
+      "destination": "/api/oauth?op=metadata"
+    },
+    {
+      "source": "/.well-known/openid-configuration",
+      "destination": "/api/oauth?op=metadata"
+    },
+    {
+      "source": "/oauth/register",
+      "destination": "/api/oauth?op=register"
+    },
+    {
+      "source": "/oauth/authorize",
+      "destination": "/api/oauth?op=authorize"
+    },
+    {
+      "source": "/oauth/token",
+      "destination": "/api/oauth?op=token"
     }
   ]
 }
