@@ -137,6 +137,12 @@ infra grep: 126 patterns from docs/AUDIT.md, 0 matches (excluding docs/AUDIT.md,
 3. **CI (recommended, not created):** a GitHub Actions job running `npm ci && npm run check` on pushes to `experimental`. The existing workflows are all data jobs and never run tests.
 4. **MCP project changes (optional):** set `MCP_ACCESS_TOKEN` on Vercel and give AMP the same token. The project tools that change things stay off until then. Optional: `MCP_WRITES=off` to keep it read-only with a token; `APP_URL` if the website moves.
 5. Nothing on any source repo's infrastructure is needed, and none was touched.
+6. **Nationwide permits and state business registries (2026-10-31):**
+   - **Database size:** the Supabase project is on Micro compute (1 GB). The national permit load (~50 million rows from 233 portals) and the eight state registries (~24 million entities) need **Large** compute (8 GB, dedicated CPUs) to load and search well. The owner was asked to resize it in the Supabase dashboard; disk grows on its own (Pro includes 8 GB; ~60 GB expected).
+   - **Migrations applied:** `20261031000000_permits_scale.sql` (prune index and function), `20261031010000_entities.sql` (entities table, name search), `20261031020000_permits_geocode.sql` (dev_set_points).
+   - **Optional secret `SOCRATA_APP_TOKEN`** (GitHub, Production environment): Socrata's higher rate limit for the permit and registry loads (a free app token from any Socrata portal's developer settings). Loads work without it, more slowly.
+   - **Schedules off** in `.github/workflows/us-permits.yml` and `entities.yml` until the first full loads finish; turn them back on after.
+   - **Not free in bulk (not loaded):** California (bizfile bulk orders are paid), Delaware, Washington, Ohio, Michigan and the other states' business registries; OpenCorporates sells a national feed. Waller County and City of Waller permits (records requests drafted in `docs/permit-records-requests.md`). New Jersey's statewide permit file, Roseville and Howard County have no street addresses, so they're off.
 
 ## Owner actions found during the audit (outside this repo)
 

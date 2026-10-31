@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-31
 
+### 4:45 AM CT: Building permits nationwide and state business registries (8f170f0 … this push)
+- **Permits from about 230 cities and counties in 36 states** join the Building Permits layer: a sweep of every public open-data catalog (Socrata, ArcGIS Online, data.gov) found the building-permit datasets, curated to building and trade permits and certificates of occupancy. New York, Los Angeles, Chicago, Dallas, Austin, Seattle, Philadelphia, Columbus, Minneapolis, Denver, Nashville, Baltimore, San Diego County and Montgomery County MD are among them. The card shows the kind of work, value, contractor and status where the city publishes them; tables published without map points are placed by address with the US Census geocoder.
+- **Business registries for eight states:** Texas, New York, Colorado, Connecticut, Oregon, Pennsylvania, Florida and DC publish their whole register free; they load into a new entities table with a fast name search. The agents' company lookup answers for any of them; other states sell their bulk data.
+- **The agents' development activity tool** answers permits anywhere they're loaded (plats, TxDOT, districts and schools stay the home counties).
+- **For the admin:** the loads run by hand from GitHub Actions (US permits; State business entities) until the first full load is done; the database needs Large compute for this much data (docs/PROGRESS.md). Waller County and City of Waller permits need records requests (drafts in docs/permit-records-requests.md).
+
 ### 12:30 AM CT: Every Harris County permit, every year, on the map (d3d64aa)
 - **The Building Permits layer holds every permit** the Harris Central Appraisal District records, for every city in Harris County and the unincorporated county, as far back as the district publishes: new buildings and homes, remodels, demolition, and now electrical, plumbing, mechanical / HVAC, roofing, fire sprinklers and alarms, signs, pools, fences and certificates of occupancy, each its own colour. Fire-loss reports on exempt property are still left out (they aren't permits).
 - **Harris County Engineering's own permits** (its public Permits Dashboard's service: 1.36 million permits the county issued in the unincorporated county since 2000: building, septic, driveway and culvert, floodplain, right of way, signs) are in the same layer, with the permit name, project, status and precinct on the card. Owner phone numbers and emails in that service are never loaded.
