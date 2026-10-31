@@ -4,9 +4,10 @@ name: US permits (Supabase)
 # data/permit-sources.json). Nightly: the last 45 days of every source, in four parallel jobs. Run it by hand with no
 # window for a full load (first time, or to catch up), optionally for a few sources only.
 on:
-  # schedule (off until the first full load is done and the database is resized; see docs/PROGRESS.md):
-  # schedule:
-  #   - cron: "17 10 * * *" # nightly 10:17 UTC (5:17 am Central), after the County data run
+  # every 3 hours with AUTO=1: full loads where none finished yet (a 6-hour job that stops is picked up by the next),
+  # then each source refreshes once a day on its own
+  schedule:
+    - cron: "17 */3 * * *"
   workflow_dispatch:
     inputs:
       only:
@@ -20,6 +21,9 @@ on:
         required: false
       dry:
         description: "Read and map only, write nothing (1 = yes)"
+        required: false
+      auto:
+        description: "1 = like the schedule: full loads only where none finished, else refresh (blank = everything now)"
         required: false
       geocode_max:
         description: "Rows without a point to place by address per source (blank = 50000; 0 = none)"
@@ -58,9 +62,10 @@ jobs:
           SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
           ONLY: ${{ inputs.only }}
           SHARD: ${{ inputs.only && '0/1' || format('{0}/4', matrix.shard) }}
-          SINCE_DAYS: ${{ github.event_name == 'schedule' && '45' || inputs.since_days }}
+          SINCE_DAYS: ${{ inputs.since_days }}
           MAX_ROWS: ${{ inputs.max_rows }}
           DRY: ${{ inputs.dry }}
+          AUTO: ${{ github.event_name == 'schedule' && '1' || inputs.auto }}
           GEOCODE_MAX: ${{ inputs.geocode_max }}
         run: |
           if [ -n "$ONLY" ] && [ "${{ matrix.shard }}" != "0" ]; then echo "ONLY set: shard 0 does the work"; exit 0; fi

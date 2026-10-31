@@ -101,7 +101,13 @@ async function loadSource(src) {
 const mine = SOURCES.filter((s, i) => (ONLY ? ONLY.includes(s.slug) : true) && (ONLY || i % SN === SI));
 log('sources', mine.length, 'of', SOURCES.length, 'shard', SI + '/' + SN);
 const failed = [];
+// AUTO=1 (the scheduled runs): a registry loaded in full in the last 6 days is skipped; a run GitHub stops after 6 hours
+// loses nothing (the next run writes only the entities still missing)
+const AUTO = E.AUTO === '1';
+const loads = AUTO && db ? Object.fromEntries((await db.selectAll('county_loads', 'select=source,at,status')).map(r => [r.source, r])) : {};
 for (const src of mine) {
+  const last = loads['entities:' + src.slug];
+  if (AUTO && last?.status === 'ok' && (Date.now() - Date.parse(last.at)) / 864e5 < 6) { log(src.slug, 'loaded', last.at, '- skipped'); continue; }
   try { log(src.slug, 'done', JSON.stringify(await loadSource(src))); }
   catch (e) {
     failed.push(src.slug); log(src.slug, 'FAILED', e.message);

@@ -4,9 +4,10 @@ name: State business entities (Supabase)
 # in data/entity-sources.json). Weekly; each run writes only entities that are new or changed. Florida's file is the
 # Division of Corporations' quarterly file (1.8 GB zipped), so its job runs alone.
 on:
-  # schedule (off until the first full load is done and the database is resized; see docs/PROGRESS.md):
-  # schedule:
-  #   - cron: "41 7 * * 0" # Sundays 07:41 UTC (2:41 am Central)
+  # every 3 hours with AUTO=1: full loads where none finished yet (a 6-hour job that stops is picked up by the next),
+  # then each source refreshes once a day on its own
+  schedule:
+    - cron: "47 */3 * * *"
   workflow_dispatch:
     inputs:
       only:
@@ -17,6 +18,9 @@ on:
         required: false
       dry:
         description: "Read and map only, write nothing (1 = yes)"
+        required: false
+      auto:
+        description: "1 = like the schedule: full loads only where none finished, else refresh (blank = everything now)"
         required: false
 
 permissions:
@@ -54,6 +58,7 @@ jobs:
           SHARD: ${{ inputs.only && '0/1' || format('{0}/3', matrix.shard) }}
           MAX_ROWS: ${{ inputs.max_rows }}
           DRY: ${{ inputs.dry }}
+          AUTO: ${{ github.event_name == 'schedule' && '1' || inputs.auto }}
         run: |
           if [ -n "$ONLY" ] && [ "${{ matrix.shard }}" != "0" ]; then echo "ONLY set: shard 0 does the work"; exit 0; fi
           node --max-old-space-size=6144 build/entities.mjs

@@ -6,7 +6,8 @@
 // Env:
 //   ONLY=slug,slug            just these sources (default: every enabled source)
 //   SHARD=i/n                 this job's share of the sources (the workflow runs several at once)
-//   SINCE_DAYS=45             only permits issued or applied for in the last N days (the nightly run); unset = everything
+//   SINCE_DAYS=45             only permits issued or applied for in the last N days; unset = everything
+//   AUTO=1                    the scheduled runs: full load where none finished yet, else a daily 45-day refresh
 //   MAX_ROWS                  stop each source after this many rows (tests)
 //   SOCRATA_APP_TOKEN         optional: Socrata's higher rate limit
 //   GEOCODE_MAX=50000         rows without a point placed by address per source per run (US Census batch geocoder,
@@ -22,7 +23,12 @@ const E = process.env, DRY = !!E.DRY, log = (...a) => console.log(new Date().toI
 const SOURCES = JSON.parse(fs.readFileSync(new URL('../data/permit-sources.json', import.meta.url), 'utf8')).sources.filter(s => s.enabled !== false);
 const ONLY = E.ONLY ? E.ONLY.split(',').map(x => x.trim()).filter(Boolean) : null;
 const [SI, SN] = (E.SHARD || '0/1').split('/').map(Number);
-const SINCE = E.SINCE_DAYS ? new Date(Date.now() - +E.SINCE_DAYS * 864e5).toISOString().slice(0, 10) : null;
+const BASE_SINCE = E.SINCE_DAYS ? new Date(Date.now() - +E.SINCE_DAYS * 864e5).toISOString().slice(0, 10) : null;
+let SINCE = BASE_SINCE; // per source in AUTO mode
+// AUTO=1 (the scheduled runs): a source that never finished a full load gets one; one that did is refreshed for the
+// last 45 days once a day; one refreshed in the last 20 hours is only geocoded. A run GitHub stops after 6 hours
+// loses nothing: the next run reads the source again and writes only the rows still missing.
+const AUTO = E.AUTO === '1';
 const MAX = +(E.MAX_ROWS || 0) || Infinity;
 const LOAD = new Date().toISOString().replace(/\D/g, '').slice(0, 17) + '-' + process.pid;
 const COLS = ['id', 'kind', 'source', 'county', 'name', 'cat', 'status', 'day', 'amount', 'units', 'addr', 'attrs', 'lon', 'lat', 'shape_json', 'h', 'load_id'];
@@ -137,10 +143,24 @@ async function geocodeMissing(src) {
 }
 
 const mine = SOURCES.filter((s, i) => (ONLY ? ONLY.includes(s.slug) : true) && (ONLY || i % SN === SI));
-log('sources', mine.length, 'of', SOURCES.length, SINCE ? 'since ' + SINCE : 'full', 'shard', SI + '/' + SN);
+log('sources', mine.length, 'of', SOURCES.length, AUTO ? 'auto' : SINCE ? 'since ' + SINCE : 'full', 'shard', SI + '/' + SN);
 const failed = [];
+const loads = AUTO && db ? Object.fromEntries((await db.selectAll('county_loads', 'select=source,at,status')).map(r => [r.source, r])) : {};
+const hoursAgo = t => t ? (Date.now() - Date.parse(t)) / 36e5 : Infinity;
+const recent = new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10);
 for (const src of mine) {
-  try { const res = await loadSource(src); if (res.rows > res.placed) res.geocode = await geocodeMissing(src); log(src.slug, 'done', JSON.stringify(res)); }
+  if (AUTO) {
+    const full = loads['full:' + src.slug], last = loads[src.slug];
+    if (full && last?.status === 'ok' && hoursAgo(last.at) < 20) {
+      try { const g = await geocodeMissing(src); if (g?.geocoded) log(src.slug, 'geocoded only', JSON.stringify(g)); } catch (e) { log(src.slug, 'geocode FAILED', e.message); }
+      continue;
+    }
+    SINCE = full ? recent : null;
+  }
+  try {
+    const res = await loadSource(src); if (res.rows > res.placed) res.geocode = await geocodeMissing(src); log(src.slug, 'done', JSON.stringify(res));
+    if (db && !SINCE && MAX === Infinity) await db.upsert('county_loads', [{ source: 'full:' + src.slug, at: new Date().toISOString(), load_id: LOAD, rows: res.rows, written: res.written, removed: 0, status: 'ok', note: 'full load finished' }], 'source');
+  }
   catch (e) {
     failed.push(src.slug); log(src.slug, 'FAILED', e.message);
     if (db) await db.upsert('county_loads', [{ source: src.slug, at: new Date().toISOString(), status: 'failed', note: String(e.message).slice(0, 300) }], 'source').catch(() => {});
