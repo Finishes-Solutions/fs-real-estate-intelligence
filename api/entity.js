@@ -1,8 +1,11 @@
 // Who is behind a company that owns property: the Texas Comptroller's public franchise-tax record (free, no key).
 //   GET ?name=PROLOGIS-A4 TX LP   -> { query, match: { name, status, formed, state, sos_file, agent, mailing, officers[], report_year }, candidates[] }
+//   GET ?name=...&state=NY        -> { query, state, matches[] } from the state registries loaded into Supabase (entities;
+//                                    build/entities.mjs), any loaded state; state=ALL searches them all
 // Officers, directors, managers and members come from the entity's latest Public Information Report; the registered
 // agent and status from the Secretary of State. People's names (an owner that isn't a company) are not looked up.
 import { rateLimit, sameOrigin } from './_lib/guard.mjs';
+import { supa } from '../lib/supa.mjs';
 
 const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (owner lookup)' };
 const BASE = 'https://comptroller.texas.gov/data-search/franchise-tax';
@@ -82,6 +85,15 @@ export default async function handler(req, res) {
   const q = req.query || {};
   try {
     let d;
+    const st = String(q.state || '').trim().toUpperCase();
+    if (st && st !== 'TX') {
+      const name = String(q.name || '').trim(); if (name.length < 3) return res.status(400).json({ error: 'name= the owner or company name' });
+      if (!/^([A-Z]{2}|ALL)$/.test(st)) return res.status(400).json({ error: 'state is a two-letter state or ALL' });
+      const db = supa(); if (!db) return res.status(503).json({ error: 'The state business registries need the database, which isn’t configured here.' });
+      const matches = await db.rpc('entity_search', { p_q: normEntity(name), p_state: st === 'ALL' ? null : st, p_n: 20 }, { deadline: Date.now() + 9000 });
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+      return res.json({ query: name, state: st, matches, source: 'State business-entity registries (TX, NY, CO, CT, OR, PA, FL, DC), loaded weekly' });
+    }
     if (q.id) { if (!/^\d{11}$/.test(String(q.id))) return res.status(400).json({ error: 'id is an 11-digit Texas taxpayer number' }); d = await entityById(String(q.id)); }
     else { const name = String(q.name || '').trim(); if (name.length < 3) return res.status(400).json({ error: 'name= the owner or company name' }); d = await lookupEntity(name); }
     res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=604800');

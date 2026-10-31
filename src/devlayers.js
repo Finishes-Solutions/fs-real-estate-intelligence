@@ -1,5 +1,6 @@
 // Development pipeline layers (api/devdata: loaded nightly by the "County data" workflow, build/county-data.mjs):
-//   Building Permits (Harris County)   every permit the Harris Central Appraisal District records (building, trade, roofing, sign, pool…), all years, by kind
+//   Building Permits                   Harris County (HCAD and the county engineer) and about 240 city and county open-data
+//                                      portals nationwide (data/permit-sources.json), every permit kind, all years
 //   Plats & New Subdivisions           City of Houston plat applications (city + ETJ), recorded subdivisions elsewhere
 //   TxDOT Projects                     planned, under way and recently finished highway work, as lines
 //   Water Districts (MUDs)             district outlines, newest ones brightest; card with creation date, tax rate, bonds
@@ -54,7 +55,7 @@ export function initDevLayers(ctx) {
       const by = {}; for (const row of d.rows || []) (by[row[1]] = by[row[1]] || []).push(row);
       for (const k of kinds) setData(k, by[k] || []);
       const parts = want.map(k => fmt((by[k] || []).length) + ' ' + DEV[k].short.toLowerCase());
-      say(parts.join(' · ') + ' in view' + (DEV.permit && on.permit && want.includes('permit') ? ' (permits: Harris County only)' : '') + (d.capped ? '; the newest shown, zoom in for all' : '') + (far.length ? '. Zoom in for ' + far.map(k => DEV[k].short.toLowerCase()).join(', ') : '') + '.');
+      say(parts.join(' · ') + ' in view' + (d.capped ? '; the newest shown, zoom in for all' : '') + (far.length ? '. Zoom in for ' + far.map(k => DEV[k].short.toLowerCase()).join(', ') : '') + '.');
     } catch (e) { if (e.name !== 'AbortError') say(e.message); }
   }
   // rows: [id, kind, name, cat, day, lon, lat, units, amount, shape]
@@ -126,9 +127,14 @@ export function initDevLayers(ctx) {
       if (x.source === 'oce-permits') {
         body = dl([['Kind', esc(cat)], ['Permit', esc(a.type || '')], ['Application', esc(a.app || '')], ['Project', esc([a.projectName, a.project].filter(Boolean).join(' · '))], ['Permit no.', '<span class="mono">' + esc(a.permit || '') + '</span>'], ['Status', esc(x.status || '') + (a.closed ? ' (closed)' : '')], ['Submitted', esc(fmtDay(a.submitted))], ['Issued', esc(fmtDay(x.day))], ['Issued by', esc(a.agency || '')], ['Precinct', esc(a.precinct || '')]]);
         src = 'Harris County Engineering ePermits (the county’s public Permits Dashboard, loaded nightly): permits the county itself issues in the unincorporated county. Values aren’t listed.';
-      } else {
+      } else if (x.source === 'hcad-permits') {
         body = dl([['Kind', esc(cat)], ['As listed', esc(a.type || '')], ['Issued', esc(fmtDay(x.day))], ['Issued by', esc(a.agency || '')], ['Note', esc(a.note || '')], ['Appraisal account', '<span class="mono">' + esc(a.acct || '') + '</span>']]);
         src = 'Harris Central Appraisal District permit records (updated weekly). The district records permits it uses for appraisal, so recent ones can take a few weeks to appear; values and contractors aren’t listed.';
+      } else {
+        body = dl([['Kind', esc(cat)], ['As listed', esc(a.type || '')], ['Work', esc(a.desc || '')], ['Value', x.amount ? money(x.amount) : ''], ['Units', x.units ? fmt(x.units) : ''], ['Square feet', a.sqft ? fmt(a.sqft) : ''],
+          ['Contractor', esc(a.contractor || '')], ['Status', esc(x.status || '')], ['Applied', esc(fmtDay(a.applied))], ['Issued', esc(fmtDay(a.issued || x.day))], ['Finaled', esc(fmtDay(a.final))],
+          ['Permit no.', '<span class="mono">' + esc(a.permit || '') + '</span>'], ['Issued by', esc([a.agency, a.state].filter(Boolean).join(', '))]]);
+        src = esc((a.agency || 'The local building department') + ' open-data permit records, loaded nightly' + (a.geocode === 'census' ? '; placed on the map by its address (US Census geocoder)' : '') + '. Values are as the permit was filed.');
       }
     } else if (kind === 'plat') {
       body = dl([['Kind', esc(a.type || cat)], ['Status', esc(x.status || '')], [x.source === 'coh-plats' ? 'Submitted' : 'Recorded', esc(fmtDay(x.day))], ['Planning Commission', esc(fmtDay(a.commission))],
@@ -187,7 +193,7 @@ export function initDevLayers(ctx) {
       part('TxDOT work within a mile', roads.map(r => row(r, [catName(r), r.amount ? money(r.amount) : '', mi(r.m)].filter(Boolean).join(' · '))))
     ].filter(Boolean).join('');
     el.innerHTML = '<div class="lt">Development Here &amp; Nearby</div>' + (html || '<div class="rnote">No permits, plats, water district, schools or TxDOT work found close by.</div>') +
-      '<div class="ssrc src">Permits: Harris County only (Harris Central Appraisal District and Harris County Engineering). Plats: City of Houston and county maps. Districts: TCEQ and the Bond Review Board. Schools: TEA. Roads: TxDOT.</div>';
+      '<div class="ssrc src">Permits: Harris County (Harris Central Appraisal District, Harris County Engineering) and the city and county open-data portals nationwide. Plats: City of Houston and county maps. Districts: TCEQ and the Bond Review Board. Schools: TEA. Roads: TxDOT.</div>';
     el.querySelectorAll('[data-dev]').forEach(b => b.onclick = () => show(b.dataset.dev));
   };
 }

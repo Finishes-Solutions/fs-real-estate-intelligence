@@ -52,7 +52,7 @@ async function* socrataPages(src, map) {
   const dateField = map.issued || map.applied;
   const where = [src.where, SINCE && dateField ? dateField + " >= '" + SINCE + "T00:00:00'" : null].filter(Boolean).join(' AND ');
   for (let off = 0; off < MAX; off += page) {
-    const q = new URLSearchParams({ $order: ':id', $limit: String(Math.min(page, MAX - off)), $offset: String(off), ...(where ? { $where: where } : {}) });
+    const q = new URLSearchParams({ $select: ':id,*', $order: ':id', $limit: String(Math.min(page, MAX - off)), $offset: String(off), ...(where ? { $where: where } : {}) });
     const rows = await getJSON(base + '?' + q); if (!rows.length) break;
     yield rows; if (rows.length < page) break;
   }
@@ -82,8 +82,8 @@ async function loadSource(src) {
   let fields, meta = null;
   if (src.via === 'socrata') fields = await socrataFields(src);
   else { meta = await arcMeta(src); fields = (meta.fields || []).map(f => ({ name: f.name, type: String(f.type).replace('esriFieldType', '') })); }
-  const map = { ...autoMap(fields), ...(src.map || {}) };
-  if (!map.issued && !map.applied && !map.final) throw new Error('no date field among ' + fields.map(f => f.name).join(', ').slice(0, 300));
+  const map = { ...autoMap(fields), ...(src.map || {}), oid: meta?.objectIdField || (meta?.fields || []).find(f => f.type === 'esriFieldTypeOID')?.name || null };
+  if (!map.issued && !map.applied && !map.final && !map.year) throw new Error('no date field among ' + fields.map(f => f.name).join(', ').slice(0, 300));
   log(src.slug, 'fields', JSON.stringify(map));
   const old = SINCE ? new Map() : await oldHashes(src.slug), seen = new Set();
   let read = 0, kept = 0, written = 0, placed = 0;

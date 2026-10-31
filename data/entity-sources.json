@@ -1,20 +1,231 @@
 {
  "note": "State business-entity registries that publish their whole register free, loaded by build/entities.mjs into the entities table. Found by build/probe-us.mjs and probe-sunbiz.mjs on 2026-10-31. States not listed sell their bulk data (California, Delaware, Washington, Ohio, Michigan and most others) or publish none; see docs/PROGRESS.md.",
  "sources": [
-  { "slug": "tx-franchise", "state": "TX", "via": "socrata", "domain": "data.texas.gov", "id": "9cir-efmm", "name": "Texas Comptroller: active franchise tax permit holders",
-    "map": { "number": "taxpayer_number", "name": "taxpayer_name", "kind": "taxpayer_organizational_type", "status": { "const": "Active (franchise tax)" }, "formed": "sos_charter_date", "juris": "taxpayer_state", "addr": "taxpayer_address", "city": "taxpayer_city", "zip": "taxpayer_zip", "extra": ["secretary_of_state_sos_or_coa_file_number", "sos_status_code", "right_to_transact_business_code"] } },
-  { "slug": "ny-active", "state": "NY", "via": "socrata", "domain": "data.ny.gov", "id": "n9v6-gdp6", "name": "New York Department of State: active corporations and other entities",
-    "map": { "number": "dos_id", "name": "current_entity_name", "kind": "entity_type", "status": { "const": "Active" }, "formed": "initial_dos_filing_date", "juris": "jurisdiction", "agent": "registered_agent_name", "agent_addr": ["registered_agent_address_1", "registered_agent_city", "registered_agent_state", "registered_agent_zip"], "addr": ["dos_process_address_1", "dos_process_address_2"], "city": "dos_process_city", "zip": "dos_process_zip", "extra": ["county", "dos_process_name", "chairman_name", "location_name", "location_address_1", "location_city", "location_state", "location_zip"] } },
-  { "slug": "co-entities", "state": "CO", "via": "socrata", "domain": "data.colorado.gov", "id": "4ykn-tg5h", "name": "Colorado Secretary of State: business entities",
-    "map": { "number": "entityid", "name": "entityname", "kind": "entitytype", "status": "entitystatus", "formed": "entityformdate", "juris": "jurisdictonofformation", "agent": ["agentorganizationname", "agentfirstname", "agentmiddlename", "agentlastname"], "agent_addr": ["agentprincipaladdress1", "agentprincipalcity", "agentprincipalstate", "agentprincipalzipcode"], "addr": ["principaladdress1", "principaladdress2"], "city": "principalcity", "zip": "principalzipcode", "extra": ["mailingaddress1", "mailingcity", "mailingstate", "mailingzipcode"] } },
-  { "slug": "ct-master", "state": "CT", "via": "socrata", "domain": "data.ct.gov", "id": "n7gp-d28j", "name": "Connecticut Secretary of the State: business registry", "where": "status != 'Reserved'",
-    "map": { "number": "accountnumber", "name": "name", "kind": "business_type", "status": "status", "formed": "date_registration", "juris": "state_or_territory_formation", "addr": "billingstreet", "city": "billingcity", "zip": "billingpostalcode", "extra": ["sub_status", "naics_code", "dissolution_date", "mailing_address", "annual_report_due_date"] } },
-  { "slug": "or-active", "state": "OR", "via": "socrata", "domain": "data.oregon.gov", "id": "tckn-sxa6", "name": "Oregon Secretary of State: active businesses", "where": "associated_name_type = 'PRINCIPAL PLACE OF BUSINESS' OR associated_name_type = 'MAILING ADDRESS'",
-    "map": { "number": "registry_number", "name": "business_name", "kind": "entity_type", "status": { "const": "Active" }, "formed": "registry_date", "juris": "jurisdiction", "addr": ["address", "address_continued"], "city": "city", "zip": "zip" } },
-  { "slug": "pa-registered", "state": "PA", "via": "socrata", "domain": "data.pa.gov", "id": "xvd7-5r2c", "name": "Pennsylvania Department of State: registered businesses",
-    "map": { "number": "filing_number", "name": "business_name", "kind": "typeofbusinessregistration", "status": { "const": "Active" }, "formed": "creationdate", "addr": ["address_line1", "address_line2"], "city": "city", "zip": "zip", "extra": ["shortcountyname"] } },
-  { "slug": "dc-corporations", "state": "DC", "via": "arcgis", "url": "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Business_Licensing_and_Grants_WebMercator/FeatureServer/0", "name": "DC Department of Licensing and Consumer Protection: corporate registrations",
-    "map": { "number": "FILE_NUMBER", "name": "BUSINESS_NAME", "kind": "MODELTYPE", "status": "ENTITY_STATUS", "formed": "EFFECTIVE_DATE", "juris": "LOCALE", "agent": "RA_NAME", "agent_addr": ["RA_ADDRESS1", "RA_CITY", "RA_STATE", "RA_ZIPCODE"], "addr": ["BUSNIESS_ADDRESS_LINE1", "BUSNIESS_ADDRESS_LINE2"], "city": "BUSINESS_CITY", "zip": "ZIPCODE", "extra": ["NEXT_REPORTYEAR_DUE", "DATE_LAST_REPORT_FILED"] } },
-  { "slug": "fl-sunbiz", "state": "FL", "via": "sunbiz", "file": "/Public/doc/Quarterly/Cor/cordata.zip", "url": "https://dos.fl.gov/sunbiz/other-services/data-downloads/", "name": "Florida Division of Corporations: corporate data file (quarterly, every entity, active and inactive)" }
+  {
+   "slug": "tx-franchise",
+   "state": "TX",
+   "via": "socrata",
+   "domain": "data.texas.gov",
+   "id": "9cir-efmm",
+   "name": "Texas Comptroller: active franchise tax permit holders",
+   "map": {
+    "number": "taxpayer_number",
+    "name": "taxpayer_name",
+    "kind": "taxpayer_organizational_type",
+    "status": {
+     "const": "Active (franchise tax)"
+    },
+    "formed": "responsibility_beginning_date",
+    "addr": "taxpayer_address",
+    "city": "taxpayer_city",
+    "zip": "taxpayer_zip",
+    "extra": [
+     "secretary_of_state_sos_or_coa_file_number",
+     "sos_status_code",
+     "right_to_transact_business_code",
+     "taxpayer_organizational_type",
+     "taxpayer_state"
+    ]
+   }
+  },
+  {
+   "slug": "ny-active",
+   "state": "NY",
+   "via": "socrata",
+   "domain": "data.ny.gov",
+   "id": "n9v6-gdp6",
+   "name": "New York Department of State: active corporations and other entities",
+   "map": {
+    "number": "dos_id",
+    "name": "current_entity_name",
+    "kind": "entity_type",
+    "status": {
+     "const": "Active"
+    },
+    "formed": "initial_dos_filing_date",
+    "juris": "jurisdiction",
+    "agent": "registered_agent_name",
+    "agent_addr": [
+     "registered_agent_address_1",
+     "registered_agent_city",
+     "registered_agent_state",
+     "registered_agent_zip"
+    ],
+    "addr": [
+     "dos_process_address_1",
+     "dos_process_address_2"
+    ],
+    "city": "dos_process_city",
+    "zip": "dos_process_zip",
+    "extra": [
+     "county",
+     "dos_process_name",
+     "chairman_name",
+     "location_name",
+     "location_address_1",
+     "location_city",
+     "location_state",
+     "location_zip"
+    ]
+   }
+  },
+  {
+   "slug": "co-entities",
+   "state": "CO",
+   "via": "socrata",
+   "domain": "data.colorado.gov",
+   "id": "4ykn-tg5h",
+   "name": "Colorado Secretary of State: business entities",
+   "map": {
+    "number": "entityid",
+    "name": "entityname",
+    "kind": "entitytype",
+    "status": "entitystatus",
+    "formed": "entityformdate",
+    "juris": "jurisdictonofformation",
+    "agent": [
+     "agentorganizationname",
+     "agentfirstname",
+     "agentmiddlename",
+     "agentlastname"
+    ],
+    "agent_addr": [
+     "agentprincipaladdress1",
+     "agentprincipalcity",
+     "agentprincipalstate",
+     "agentprincipalzipcode"
+    ],
+    "addr": [
+     "principaladdress1",
+     "principaladdress2"
+    ],
+    "city": "principalcity",
+    "zip": "principalzipcode",
+    "extra": [
+     "mailingaddress1",
+     "mailingcity",
+     "mailingstate",
+     "mailingzipcode"
+    ]
+   }
+  },
+  {
+   "slug": "ct-master",
+   "state": "CT",
+   "via": "socrata",
+   "domain": "data.ct.gov",
+   "id": "n7gp-d28j",
+   "name": "Connecticut Secretary of the State: business registry",
+   "where": "status != 'Reserved'",
+   "map": {
+    "number": "accountnumber",
+    "name": "name",
+    "kind": "business_type",
+    "status": "status",
+    "formed": "date_registration",
+    "juris": "state_or_territory_formation",
+    "addr": "billingstreet",
+    "city": "billingcity",
+    "zip": "billingpostalcode",
+    "extra": [
+     "sub_status",
+     "naics_code",
+     "dissolution_date",
+     "mailing_address",
+     "annual_report_due_date"
+    ]
+   }
+  },
+  {
+   "slug": "or-active",
+   "state": "OR",
+   "via": "socrata",
+   "domain": "data.oregon.gov",
+   "id": "tckn-sxa6",
+   "name": "Oregon Secretary of State: active businesses",
+   "where": "associated_name_type = 'PRINCIPAL PLACE OF BUSINESS' OR associated_name_type = 'MAILING ADDRESS'",
+   "map": {
+    "number": "registry_number",
+    "name": "business_name",
+    "kind": "entity_type",
+    "status": {
+     "const": "Active"
+    },
+    "formed": "registry_date",
+    "juris": "jurisdiction",
+    "addr": [
+     "address",
+     "address_continued"
+    ],
+    "city": "city",
+    "zip": "zip"
+   }
+  },
+  {
+   "slug": "pa-registered",
+   "state": "PA",
+   "via": "socrata",
+   "domain": "data.pa.gov",
+   "id": "xvd7-5r2c",
+   "name": "Pennsylvania Department of State: registered businesses",
+   "map": {
+    "number": "filing_number",
+    "name": "business_name",
+    "kind": "typeofbusinessregistration",
+    "status": {
+     "const": "Active"
+    },
+    "formed": "creationdate",
+    "addr": [
+     "address_line1",
+     "address_line2"
+    ],
+    "city": "city",
+    "zip": "zip",
+    "extra": [
+     "shortcountyname"
+    ]
+   }
+  },
+  {
+   "slug": "dc-corporations",
+   "state": "DC",
+   "via": "arcgis",
+   "url": "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Business_Licensing_and_Grants_WebMercator/FeatureServer/0",
+   "name": "DC Department of Licensing and Consumer Protection: corporate registrations",
+   "map": {
+    "number": "FILE_NUMBER",
+    "name": "BUSINESS_NAME",
+    "kind": "MODELTYPE",
+    "status": "ENTITY_STATUS",
+    "formed": "EFFECTIVE_DATE",
+    "juris": "LOCALE",
+    "agent": "RA_NAME",
+    "agent_addr": [
+     "RA_ADDRESS1",
+     "RA_CITY",
+     "RA_STATE",
+     "RA_ZIPCODE"
+    ],
+    "addr": [
+     "BUSNIESS_ADDRESS_LINE1",
+     "BUSNIESS_ADDRESS_LINE2"
+    ],
+    "city": "BUSINESS_CITY",
+    "zip": "ZIPCODE",
+    "extra": [
+     "NEXT_REPORTYEAR_DUE",
+     "DATE_LAST_REPORT_FILED"
+    ]
+   }
+  },
+  {
+   "slug": "fl-sunbiz",
+   "state": "FL",
+   "via": "sunbiz",
+   "file": "/Public/doc/Quarterly/Cor/cordata.zip",
+   "url": "https://dos.fl.gov/sunbiz/other-services/data-downloads/",
+   "name": "Florida Division of Corporations: corporate data file (quarterly, every entity, active and inactive)"
+  }
  ]
 }
