@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-02
 
+### 5:39 PM CT: Main catches up with the experimental branch and three side branches (db044da, b535cb1, 1b76dbd, 03167ac, this push)
+- **Everything from the experimental branch is now on the main app:** one-click site reports from the parcel card, property cards and Regrid lookups anywhere in the US, the full Site Environmental and Topography reports, the Parcel Map export, the new look, and the Montreve work (tennis and pickleball courts, event venues, mountain cabins, ground fit and the resort-terrace layout).
+- **Houston crime on the property card follows the city limits:** a point outside Houston no longer shows Houston Police figures, and a point near the limits says the count is partial.
+- **The fs-set-plans and fs-site-renderings Claude skills** are in the repository under `skills/` and `.claude/skills/`.
+- Two older plan-set branches (accuracy round 2 and real floor plans with program checks) were not brought in: their code conflicts with the newer plan-set work already on main and needs its own integration.
+
 ### 7:46 AM CT: Permit search and permits map layer: database side, not applied yet (this push)
 - **Nothing changes in the app yet.** This adds the database script behind two upcoming features: finding specific permits (by permit number, street address, contractor or words, kind, value and dates) and a Permits map layer like Parcels (a density view zoomed out, single permits zoomed in). It is applied to the database and wired into the app in the next push.
 
