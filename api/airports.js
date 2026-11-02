@@ -11,7 +11,7 @@ import { rateLimit, sameOrigin } from './_lib/guard.mjs';
 import { supa } from '../lib/supa.mjs';
 import { parseAirlines, parseTables, cleanWiki, underPath } from '../lib/airports.mjs';
 
-const UA = { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0 (airport cards; contact via finishessolutions.com)' };
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (airport cards; https://fs-real-estate-intelligence.vercel.app)' };
 const db = (env = process.env) => supa({ ...env, SUPABASE_URL: env.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' });
 const TYPES = { large: 'large_airport', medium: 'medium_airport', small: 'small_airport', heliport: 'heliport', seaplane: 'seaplane_base', balloon: 'balloonport' };
 const getJson = async (u, opts = {}, ms = 10000, fetchImpl = fetch) => { const r = await fetchImpl(u, { ...opts, headers: { ...UA, ...(opts.headers || {}) }, signal: AbortSignal.timeout(ms) }); if (!r.ok) throw new Error(new URL(u).host + ' ' + r.status); return r.json(); };

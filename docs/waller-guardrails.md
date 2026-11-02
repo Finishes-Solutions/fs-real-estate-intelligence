@@ -1,4 +1,4 @@
-# Finishes Solutions — AI Site-Planning Guardrails
+# the owner — AI Site-Planning Guardrails
 
 **City of Waller / Harris County Basis · Conceptual Planning Standard**
 
@@ -6,16 +6,16 @@ Residential | Multifamily | Commercial | Retail | Industrial | Storage | Mixed U
 
 | | |
 |---|---|
-| Document owner | Finishes Solutions |
+| Document owner | the owner |
 | Version | 1.0 |
 | Effective date | October 18, 2026 |
 | Status | For feasibility and AI-assisted conceptual planning only. This standard does not replace a current survey, title report, civil engineering, architecture, fire review, accessibility review, flood study, utility confirmation, permit review, or approval by the authority having jurisdiction. |
 
-> Reference copy, converted from the owner's Word document ("Finishes Solutions — AI Site-Planning Guardrails, City of Waller / Harris County Basis, v1.0, Oct 18 2026"). The app applies it through `lib/guardrails.mjs` to sites inside the City of Waller's limits or within its extraterritorial jurisdiction (taken as 0.5 mile past the limits, unverified). The wording below is the document's.
+> Reference copy, converted from the owner's Word document ("the owner — AI Site-Planning Guardrails, City of Waller / Harris County Basis, v1.0, Oct 18 2026"). The app applies it through `lib/guardrails.mjs` to sites inside the City of Waller's limits or within its extraterritorial jurisdiction (taken as 0.5 mile past the limits, unverified). The wording below is the document's.
 
 ## 01 Purpose, scope and core rule
 
-This guideline establishes conservative instructions for AI software that generates preliminary site maps and site plans for Finishes Solutions projects in and around the City of Waller, Texas. It is designed to protect feasibility decisions from false precision, stale requirements and density-first layouts.
+This guideline establishes conservative instructions for AI software that generates preliminary site maps and site plans for the owner projects in and around the City of Waller, Texas. It is designed to protect feasibility decisions from false precision, stale requirements and density-first layouts.
 
 **Primary rule.** The AI must design in this order: jurisdictional compliance; flood and drainage protection; fire and life safety; access and circulation; utility feasibility; setbacks and buffers; parking and loading; constructability; marketable configuration; then density and economic yield.
 
@@ -55,7 +55,7 @@ This guideline establishes conservative instructions for AI software that genera
 | Classification | Meaning |
 |---|---|
 | VERIFIED REQUIREMENT | Supported by a current ordinance, adopted criterion, written agency direction or project-specific approval. |
-| OWNER GUARDRAIL | A Finishes Solutions risk-control requirement that is more conservative than the verified minimum. |
+| OWNER GUARDRAIL | A the owner risk-control requirement that is more conservative than the verified minimum. |
 | ENGINEERING ASSUMPTION | A preliminary design assumption requiring validation by the responsible licensed professional. |
 | UNVERIFIED | Unknown, incomplete, conflicting or awaiting confirmation. The AI must not claim compliance. |
 
@@ -200,14 +200,14 @@ Every concept must show or report the following. Missing items must be labeled a
 - [ ] Net developable area
 - [ ] Source and classification for each material design assumption
 
-**Graphic label.** FINISHES SOLUTIONS - AI-ASSISTED CONCEPTUAL SITE PLAN - FOR FEASIBILITY AND PLANNING ONLY - NOT FOR PERMIT OR CONSTRUCTION.
+**Graphic label.** REAL ESTATE INTELLIGENCE - AI-ASSISTED CONCEPTUAL SITE PLAN - FOR FEASIBILITY AND PLANNING ONLY - NOT FOR PERMIT OR CONSTRUCTION.
 
 ## 11 Yield scenarios and decision report
 
 ### Produce three scenarios
 
 - **A. Maximum code envelope:** Uses verified minimum requirements without owner safety factors.
-- **B. Finishes base case:** Uses the Finishes detention baseline and 3%-5% directional risk factors.
+- **B. Base case:** Uses the Finishes detention baseline and 3%-5% directional risk factors.
 - **C. Conservative case:** Adds reserves for unresolved drainage, ROW, utilities, easements, flood risk and access.
 
 ### Required land-use reconciliation
@@ -261,7 +261,7 @@ Use this exact concept label:
 
 ## 13 Appendix A — Copy-and-paste AI system instruction
 
-> Use the Finishes Solutions Waller Site-Planning Guardrails as mandatory constraints. First determine jurisdiction, roadway authority, drainage authority, FEMA flood status, utility providers, title/easement constraints, applicable development agreement and current adopted standards. Classify every material input as VERIFIED REQUIREMENT, OWNER GUARDRAIL, ENGINEERING ASSUMPTION or UNVERIFIED. Apply a 5% upward reserve to minimum dimensions and minimum counts where practical; maintain a 3%-5% buffer below maximum limits; never alter prohibitions. For initial Waller-area feasibility, reserve detention storage at not less than 1.00 acre-foot per developed acre and increase it when project-specific criteria require more. Treat acre-foot as volume, not pond surface area. Do not certify floodplain/floodway land, outfall capacity, utility capacity or title constraints without supporting data. Generate Maximum Code Envelope, Finishes Base Case and Conservative Case scenarios. Reconcile gross acreage through ROW, flood reserve, detention, easements, buffers, roads, parking and net usable land. Show buildings, setbacks, parking, accessible routes, circulation, fire access, truck/loading paths, refuse, drainage, outfall, utilities and landscape/open space. Report unresolved risks and do not label any output permit-ready, engineered, approved, construction-ready or code-compliant.
+> Use the Waller Site-Planning Guardrails as mandatory constraints. First determine jurisdiction, roadway authority, drainage authority, FEMA flood status, utility providers, title/easement constraints, applicable development agreement and current adopted standards. Classify every material input as VERIFIED REQUIREMENT, OWNER GUARDRAIL, ENGINEERING ASSUMPTION or UNVERIFIED. Apply a 5% upward reserve to minimum dimensions and minimum counts where practical; maintain a 3%-5% buffer below maximum limits; never alter prohibitions. For initial Waller-area feasibility, reserve detention storage at not less than 1.00 acre-foot per developed acre and increase it when project-specific criteria require more. Treat acre-foot as volume, not pond surface area. Do not certify floodplain/floodway land, outfall capacity, utility capacity or title constraints without supporting data. Generate Maximum Code Envelope, Base Case and Conservative Case scenarios. Reconcile gross acreage through ROW, flood reserve, detention, easements, buffers, roads, parking and net usable land. Show buildings, setbacks, parking, accessible routes, circulation, fire access, truck/loading paths, refuse, drainage, outfall, utilities and landscape/open space. Report unresolved risks and do not label any output permit-ready, engineered, approved, construction-ready or code-compliant.
 
 ### Recommended software fields
 

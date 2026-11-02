@@ -12,8 +12,8 @@ import { zoneShares, claimsSummary, nriSummary, areaSqMi, bbox, samplePoints, HA
 import { limiter } from './_lib/limit.mjs';
 import { circle, cleanGeometry } from './crime.js';
 
-const UA = { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (FEMA report)' };
-const NFHL = 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer';
+const UA = { 'User-Agent': 'RealEstateIntelligence/1.0 (FEMA report)' };
+export const NFHL = 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer';
 const NRI = 'https://services.arcgis.com/XG15cJAlne2vxtgt/arcgis/rest/services/National_Risk_Index_Census_Tracts/FeatureServer/0';
 const OPEN = 'https://www.fema.gov/api/open/';
 // MAX_SQMI is an abuse guard only (larger than any Texas county). Up to ZONE_DIRECT_SQMI the flood zones come in one query;

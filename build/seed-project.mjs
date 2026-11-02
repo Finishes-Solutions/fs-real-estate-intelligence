@@ -25,7 +25,7 @@ async function cadParcel(county, apn) {
   for (const where of apnWheres(cad, apn)) {
     const q = new URLSearchParams({ f: 'json', where, outFields: '*', returnGeometry: 'true', outSR: '4326', geometryPrecision: '7', resultRecordCount: '5' });
     try {
-      const r = await fetch(cad.url + '/query?' + q, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'FinishesSolutions-RE-Intelligence/1.0 (seed project)' } });
+      const r = await fetch(cad.url + '/query?' + q, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'RealEstateIntelligence/1.0 (seed project)' } });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const d = await r.json(); if (d.error) throw new Error(d.error.message || 'service error');
       const f = (d.features || []).find(x => x.geometry?.rings); if (f) return normalizeCad(cad, f.attributes, f.geometry);

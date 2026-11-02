@@ -34,7 +34,7 @@ export default async function handler(req, res) {
   if (u.error) return res.status(400).json({ error: u.error });
   if (u.outside) return res.status(204).end();
   try {
-    const r = await fetch(u.url, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' } });
+    const r = await fetch(u.url, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'RealEstateIntelligence/1.0' } });
     const type = r.headers.get('content-type') || '';
     if (!r.ok || !/^image\//.test(type)) throw new Error(q.src + ' ' + r.status + ' ' + type);
     res.setHeader('Content-Type', type);

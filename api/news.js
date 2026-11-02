@@ -38,7 +38,7 @@ export function parseGoogleNews(xml, max = 12) {
 export async function googleNews(query, max = 12) {
   if (!query) return { query: '', articles: [] };
   const u = 'https://news.google.com/rss/search?' + new URLSearchParams({ q: query + ' when:1y', hl: 'en-US', gl: 'US', ceid: 'US:en' });
-  const r = await fetch(u, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FinishesSolutions-RealEstateIntel/1.0)', Accept: 'application/rss+xml, application/xml, text/xml' } });
+  const r = await fetch(u, { signal: AbortSignal.timeout(9000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RealEstateIntelligence/1.0)', Accept: 'application/rss+xml, application/xml, text/xml' } });
   if (!r.ok) throw new Error('Google News ' + r.status);
   return { query, articles: parseGoogleNews(await r.text(), max), source: 'Google News' };
 }
@@ -46,7 +46,7 @@ export async function googleNews(query, max = 12) {
 export async function gdelt(q, near, max = 12) {
   const query = gdeltQuery(q, near); if (!query) return { query: '', articles: [] };
   const u = 'https://api.gdeltproject.org/api/v2/doc/doc?' + new URLSearchParams({ query, mode: 'artlist', format: 'json', maxrecords: String(max * 2), sort: 'datedesc', timespan: '3months' });
-  const r = await fetch(u, { signal: AbortSignal.timeout(12000), headers: { 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' } });
+  const r = await fetch(u, { signal: AbortSignal.timeout(12000), headers: { 'User-Agent': 'RealEstateIntelligence/1.0' } });
   const text = await r.text();
   if (!r.ok) throw new Error('GDELT ' + r.status);
   let d; try { d = JSON.parse(text || '{}'); } catch (e) { throw new Error('GDELT: ' + text.slice(0, 120)); } // it answers errors (rate limit, bad query) in plain text

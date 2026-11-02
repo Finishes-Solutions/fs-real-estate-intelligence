@@ -49,7 +49,7 @@ async function used(db, token) {
   return { cycle: u.cycle, regrid_reported: u.known, records: { used: Math.max(ours.records || 0, u.records), cap: CAP.records }, tiles: { used: Math.max(ours.tiles || 0, u.tiles), cap: CAP.tiles } };
 }
 
-// ---- freshness: Regrid's own "last full refresh" date per Texas county (Verse), re-read at most once a day ----
+// ---- freshness: Regrid's own "last full refresh" date per county (Verse), re-read at most once a day ----
 const DAY = 864e5, MAX_AGE = 365 * DAY;
 export async function countyRefresh(db, token, geoid, fetchImpl = globalThis.fetch) {
   if (!geoid) return null;
@@ -121,7 +121,7 @@ export default async function handler(req, res) {
 
   // ---- one parcel record ----
   const lat = +q.lat, lon = +q.lon;
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 25 || lat > 37 || lon < -107 || lon > -93) return res.status(400).json({ error: 'lat/lon must be inside Texas' });
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 17 || lat > 72 || lon < -180 || lon > -64) return res.status(400).json({ error: 'lat/lon must be inside the United States' }); // (Regrid is nationwide)
   const key = /^[\w .'-]{1,40}\|[\w.-]{1,40}$/.test(String(q.key || '')) ? 'pid:' + String(q.key).toLowerCase() : 'pt:' + lat.toFixed(5) + ',' + lon.toFixed(5);
   const refresh = q.refresh === '1';
   if (!refresh) {

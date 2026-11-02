@@ -1,5 +1,5 @@
 // Demographics layer: census-tract choropleth from data/market.json (lazy-loaded), with legend and hover stats.
-const SEQ = ['#e2f1e8', '#c2e3d0', '#8acda3', '#4caf70', '#0a7a36'];
+const SEQ = ['#e2f1e8', '#c2e3d0', '#8acda3', '#4caf70', '#0e8f6f'];
 const DIV = ['#c03b3a', '#ef9c9b', '#e6e5e1', '#9ec5f4', '#3987e5', '#1c5cab'];
 const GROWTH = [-5, -1, 1, 5, 15]; // % breaks: <-5 | -5..-1 | ±1 | 1..5 | 5..15 | >15
 const JGROWTH = [-10, -2, 2, 15, 40]; // job growth swings more than population

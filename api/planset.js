@@ -15,7 +15,7 @@
 //        bare: without the border, which the browser then embeds once for the whole set instead of once a sheet (170 KB each)
 //   POST { mode: 'pdf', html } -> application/pdf
 //        the set's HTML (lib/planset.mjs setHTML, one 36 x 24 page a sheet) printed by headless Chromium (api/pdf.js) and
-//        laid on the Finishes Solutions border (templates/titleblock.pdf, made by build/titleblock.mjs) with pdf-lib
+//        laid on the Real Estate Intelligence border (templates/titleblock.pdf, made by build/titleblock.mjs) with pdf-lib
 // The budget is per US Central calendar month, $100 by default (decided Oct 19); $0 turns the AI part off. The PDF
 // costs nothing and works without the key.
 import { readFile } from 'node:fs/promises';
@@ -42,7 +42,7 @@ export async function onBorder(content, borderBytes) {
   const src = await PDFDocument.load(content), out = await PDFDocument.create(), [bd] = await out.embedPdf(borderBytes, [0]);
   const pages = await out.embedPdf(content, src.getPageIndices());
   for (const pg of pages) { const p = out.addPage([PAGE.w, PAGE.h]); p.drawPage(bd, { x: 0, y: 0, width: PAGE.w, height: PAGE.h }); p.drawPage(pg, { x: 0, y: 0, width: PAGE.w, height: PAGE.h }); }
-  out.setTitle(src.getTitle() || 'Plan set'); out.setCreator('Finishes Solutions'); out.setProducer('Finishes Solutions plan sets');
+  out.setTitle(src.getTitle() || 'Plan set'); out.setCreator('Real Estate Intelligence'); out.setProducer('Real Estate Intelligence plan sets');
   return out.save();
 }
 

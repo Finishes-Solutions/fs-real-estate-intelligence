@@ -53,7 +53,12 @@ assert.equal(trafficInfo([]).roads.length, 0); assert.equal(waterDistricts([{ NA
 assert.equal(echoInfo([]).count, 0); assert.deepEqual(barsInfo([], new Date('2026-10-01')), []);
 // handler: bad coordinates, cache header
 const res = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
-let r = res(); await handler({ headers: {}, query: { lat: '40', lon: '-74' } }, r); assert.equal(r.code, 400);
+let r = res(); await handler({ headers: {}, query: { lat: '51.5', lon: '-0.12' } }, r); assert.equal(r.code, 400, 'outside the US');
+// Tennessee (2026-10-30: the card said "lat and lon inside Texas are required"): national parts answer, Texas sources aren't asked
+{ const b0 = calls.length; r = res(); await handler({ headers: {}, query: { lat: '35.8402', lon: '-83.5791', addr: '2481 Happy Hollow Rd', zip: '37862' } }, r); const tn = calls.slice(b0);
+  assert.equal(r.code, 200); assert.ok(r.body.flood && !r.body.flood.error, 'FEMA flood zone nationwide');
+  assert.ok(!tn.some(c => /TxDOT|TCEQ|data\.texas\.gov/.test(c)), 'no Texas-only source asked in Tennessee');
+  assert.equal(r.body.traffic, null); assert.deepEqual(r.body.districts.water, []); assert.equal(r.body.bars, null); }
 r = res(); await handler({ headers: {}, query: { lat: '29.76041234', lon: '-95.36981234' } }, r); assert.equal(r.code, 200); assert.equal(r.body.lat, 29.76041); assert.match(r.headers['Cache-Control'], /s-maxage=604800/);
 
 // ---------- Houston crime CSV ----------

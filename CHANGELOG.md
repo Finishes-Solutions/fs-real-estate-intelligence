@@ -37,6 +37,95 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **ChatGPT's `search` and `fetch`** are there (projects by words, or an address, parcel number or coordinates to a property) because ChatGPT connectors expect them.
 - **For the admin:** set `MCP_OAUTH_SECRET` (16+ random characters) and `MCP_SIGNIN_CODE` on the deployment to turn this on; both are set on production and preview.
 
+### 1:05 PM CT: 3D view of road loops and easements; Montreve Option B fixed (affab09)
+- **The 3D view no longer paves over blocks of land inside a road loop.** Where a site's roads run in a loop, the 3D picture drew the whole block of lots inside it as asphalt. Paving now keeps its holes, as the map already did. Both Montreve options showed this.
+- **Easements read lighter in 3D:** a drawn easement is now a light tint instead of a solid dark-red slab.
+- **A house lot can be kept wooded:** its trees are drawn inside it on the site sheet and in 3D, and it shows as woodland in 3D. Montreve's Option B now uses this instead of a large invisible landscape piece over each lot, which a click anywhere on a lot would pick (and could drag).
+- **Montreve Option B tidied up:** the cabins' walk-out patios no longer put 15 "PATIO" labels on the map, and the option is renamed "Option B · resort terrace (owners' concept)".
+
+### 5:31 AM CT: Montreve Option B, the owners' resort concept; trees on lots (2996a86, a1d41f8)
+- **Montreve Mountain Club has an Option B,** laid out like the owners' resort concept sketch. It keeps the same lots, roads and cabins, and puts the resort on one terrace along the uphill side of Amber Valley Way. In front: 88 head-in parking spaces straight off the road. Behind them: a stone promenade. Then, in one line from west to east:
+  - **Sports:** a tennis court with four pickleball courts on the terrace above it, fenced, plus a court pavilion and viewing deck.
+  - **Pool club:** pool and spa on a fenced deck, with a pool house and fitness room.
+  - **Dining and catering:** dining terrace, the Lodge and the catering kitchen side by side, service yard and screened trash.
+  - **Wedding and conference:** cocktail terrace, the 6,000 sf hall, a ceremony lawn behind it, and a bridal cottage and garden.
+  - **East end:** an open-air pavilion with its lawn, a fire-pit overlook and the maintenance barn.
+- **The rest of Option B:** a gated entry (gate house, gate, mail kiosk), a walk-out patio with hot tub and fire pit under 15 of the 24 cabins' decks, and every lot kept wooded around what's built. Each piece sits square to the road where it stands, on a level pad from the lidar, and lists its walls. The plan's notes describe every area.
+- **Trees grow across lot lines.** On the site sheet and in 3D, a lot line no longer keeps landscape trees out, so lawns and woods inside lots get planted. A lawn marked as having no trees (a ceremony lawn) stays open even inside planted woods.
+
+
+### 3:48 PM CT: Montreve work merged into experimental (302644b)
+- **The Montreve Mountain Club work joins the experimental branch:** courts by sport, the event / wedding venue use, the Resort & recreation buildings and cabins, the ground under each piece, and the Montreve layout builder. Nothing else changes for people using the app.
+
+### 2:16 PM CT: Montreve's resort core designed as one plan (c0100d5)
+- **The resort core at Montreve Mountain Club is now one composed plan** on lots 10-15 instead of separate pieces each turned to the road. A stone **promenade** runs the length of the core, with everything along it in one line: the **tennis court**, **two pickleball courts**, a **court pavilion** with a viewing deck, the **dining terrace** and **The Lodge** (2,500 sf dining and catering) with its **service yard** to one side, a **cocktail terrace**, and the **6,000 sf glass wedding pavilion** with its own drop-off and lane from the road.
+- Below the promenade: **two parking bays** (76 spaces) reached from Amber Valley Way with a stair walk up to the promenade, a **village green**, a **fire-pit overlook**, and the **ceremony lawn** in front of the pavilion, edged with gardens.
+- Each piece still sits on a level pad fitted to the lidar, with its cut, fill and walls shown. The tennis court (about 34 ft) and the upper parking bay (about 33 ft) need the tallest walls, so they should be tiered or stepped.
+
+### 12:41 PM CT: Courts by sport, event venues, mountain cabins, the ground under each piece, and Montreve laid out on its lidar (0e3fbfd, e83f5ca, 213c1fb, aa011b6, fcbb880)
+- **Tennis, pickleball and basketball courts** at regulation size, each court drawn with its lines (the pickleball kitchen, tennis service boxes, the basketball key) and its net on the map, the PDF sheet and the 3D picture; a **Sport** picker and a **Courts** count in the Selected box; "add 2 tennis courts beside the clubhouse" works; courts have a legend line.
+- **Event / wedding venue** is a use of its own (a space for every 2.5 guests, pale glass blue, in the legend, the budget at $550 a sf, the AI's words "wedding venue", "event center", "banquet hall").
+- **Resort & recreation** in the building library: the Montreve cabin (3 levels, 2,444 sf, indoor pool), 2-6 bedroom mountain cabins, 3,000 and 6,000 sf glass event pavilions, an event barn, a wedding chapel, a dining and catering hall, a caterers' kitchen, a clubhouse and a gate house. Cabins have no garage (driveway parking), a flat roof and a walk-out level in 3D.
+- **The ground under a piece:** with the site's lidar loaded, the Selected box gives a building's, court's or parking row's fall, its level pad, cut and fill and retaining walls, or whether a home works as a walk-out (`lib/terrain.mjs` padFit).
+- **Montreve Mountain Club** gets a **Full program** option (`build/projects/montreve.mjs`, seeded by the Seed project workflow): the 30 platted lots laid on the Regrid parcel (best overlap with the vector lot map, no turn, so the map is north-up), USGS lidar for the ground, and the platted roads traced to their centrelines (`projects/montreve/scripts/roads.py`) and drawn as smooth 24 ft paved roads clear of every lot. Every cabin (24) sits square to its street, centred on its lot, the deck downhill and the floor facing the road at road grade with a short straight driveway (most 10-28 ft); 11 are clean walk-outs and 20 show 15 ft of foundation or less. Along Amber Valley Way: 72 head-in spaces in rows of 8 (cuts up to about 13 ft), then the pavilion and lawn (lots 14-15), the hall (12-13) and the tennis and pickleball courts (10-11), each square to the road in front of it on a level pad: walls about 9 ft at the hall, 17-22 ft at the lawn, pavilion and pickleball, 27 ft at the tennis court.
+- **Merged the experimental branch** into `matthew/montreve` (its own out-of-Texas parcel work replaces mine).
+### 12:23 PM CT: A readable Parcel Map for traced outlines, and the outline as GeoJSON (bb0ad1a)
+- **Rural parcels read cleanly.** A county outline traced along a creek or road (2481 Happy Hollow Rd has 772 points) used to list hundreds of 1–3 ft "courses" that ran off the page, with the corner dots merged into a grey smear on the map. The report now lists the real corners, the straight courses and the curves (each with its chord bearing and length, arc length, radius and angle), marks only those corners on the map, and carries long tables on to the next page. The whole outline is still drawn exactly.
+- **Corners keep their numbers and order:** courses now really run clockwise from the county's corner 1, as the page says; a clean deed outline keeps every corner, however slight the bend.
+- **Acres and values from Regrid:** where the Regrid record has been fetched for the parcel, the report uses it (acres, land and total value, zoning) instead of showing 0.00 acres and $0; where nothing is on record it shows a dash.
+- **New: Parcel Outline (GeoJSON).** A button beside the site reports saves the full outline, every point, with everything on record (every Regrid field when fetched), its area, perimeter and courses, for QGIS, ArcGIS, Google Earth or CAD.
+
+### 12:05 PM CT: A 3D view in the Topography report (eb4e875)
+- **See the ground in 3D.** The Topography report's second page now shows the site and the land around it as a block of ground: a big view looking up the slope from the site's low side and two smaller views from other sides, coloured from green (low) to tan and white (high), shaded by the sun, with contour bands, the site boundary draped on the ground and the lowest and highest points marked. Each view has a north arrow and says which way it looks.
+- **Honest about scale:** on gentle land the heights are stretched (up to 5×) so the shape shows, and the page says by how much; hilly land like Sevier County is drawn true to scale.
+
+### 11:33 AM CT: Spending in the Area Report outside Texas (4ef5517)
+- **Consumer spending is filled in outside Texas.** In Tennessee the Area Report's spending rows (groceries, dining out, housing and so on) were blank; they're now modeled from each ring's households by income, the same way as in Texas.
+
+### 11:31 AM CT: Steadier streams in the environmental report (f4cad84)
+- **USGS streams and water bodies get a second try** when the service is slow (it timed out once on the Sevier County parcel and the page said "not loaded"), and the report fetches all its map layers at the same time, so it finishes sooner.
+- **No ", TX" on a parcel outside Texas** in the report headers.
+
+### 11:21 AM CT: Area Report works in rural Tennessee (9dc8196)
+- **The Area Report no longer fails in the country.** Around 2481 Happy Hollow Rd (Sevier County) it stopped with an error about "mi": the census tracts there are many miles across, and the way the report measured how much of a tract falls inside the 1-mile ring could miss the ring altogether, leaving it with no people. It now measures the part of each tract inside each ring directly, so a 1-mile ring takes its true slice of a big tract, and a ring with no census data shows a dash instead of breaking the report.
+
+### 11:20 AM CT: Colour Selected Lots (928abdf)
+- **A new setting in Layers, Colour Selected Lots** (off unless you turn it on): each lot you pick is filled with its own colour under its outline, the first green, then blue, orange, purple and so on, and its number on the map matches. **Site Plan for All** then shows them as one merged site in one colour.
+
+### 11:05 AM CT: Tennessee and the rest of the US; one clean outline on the selected parcel (167d56f, 53e018e)
+- **No more green lines through a selected parcel.** A parcel that crosses an edge of the map's tiles was outlined piece by piece, so the straight cuts between the pieces showed as green dashed horizontal and vertical lines across it. The pieces are now joined into one outline round the parcel's edge (buildings cut by a tile edge too).
+- **The card works outside Texas.** Regrid and the property card took Texas points only, so a Tennessee parcel's card said Regrid wasn't ready and its Site section said "lat and lon inside Texas are required". Both now take any point in the US. The Site section shows the flood zone, school district, city limits, Opportunity Zone and nearby EPA sites anywhere and leaves out the Texas-only sources (TxDOT traffic, TCEQ water districts, Comptroller alcohol sales).
+- **Site reports from a Regrid parcel:** where there's no free appraisal record, the four site reports use the Regrid parcel.
+- **More in the environmental report everywhere:** USGS streams and water bodies, federal critical habitat and PAD-US protected land on the constraints map; septic-field and bedrock ratings in the soils table; FEMA's wildfire and landslide ratings always shown. Texas agency records (TCEQ, Railroad Commission) say "not searched here" outside Texas instead of showing zero. Each soil's share of the parcel is now right when a soil shows up in several patches (it could add up to more than 100%).
+- **The Area Report outside Texas** fetches census tracts and their figures live; population growth shows as not available rather than 0%, and construction filings say they're Texas only.
+
+### 9:52 AM CT: A full Site Environmental report, and wetlands that load (9fe4ab8, 8d84a88)
+- **Wetlands work again.** The US Fish & Wildlife Service changed its wetlands field names, so every wetlands search failed ("didn't answer"). The search now reads the fields either way, and the map layers try a second time before giving up.
+- **The Site Environmental report is a full report:** after the finding and the records around the parcel come a **site & constraints map** (the parcel outline, FEMA flood zones, mapped wetlands and lidar contours), a **soils map** (every USDA soil map unit under and round the parcel, its share of the parcel, drainage, hydrologic group, water table and building limitations), and **topography & slope** (contours over shaded relief, slope and the way water runs, the parcel's low and high ground). A layer that still fails is named on its page, never left blank as "none".
+- **A report from a link:** /api/sitereport?kind=environmental&lat=..&lon=.. makes the report for the parcel at that point.
+
+### 8:38 AM CT: No name on reports (c64c406)
+- **Reports carry no name at all.** The "Real Estate Intelligence" wordmark is gone from report headers, the sign-off line at the end is gone, and the page footer shows only the report's title and page numbers. The app itself still says Real Estate Intelligence.
+
+### 8:29 AM CT: Real Estate Intelligence only, no company branding (c9819d6, 9d62e8f)
+- **The app is unbranded.** The top bar, browser tab, installed-app name and icon now say Real Estate Intelligence (a new "RE" icon), with no company logo.
+- **Reports are unbranded.** Every PDF's header, footer and sign-off carry only the name Real Estate Intelligence; the old company tagline, logo and green are gone.
+- **Plan sets are unbranded.** The title block's company logo, address, phone number, copyright line and firm number are removed (not just covered) and the block reads Real Estate Intelligence. "Prepared by" is now "Prepared with Real Estate Intelligence", and the project team lists the development consultant as to be confirmed.
+- **Wording elsewhere:** the Waller guardrails' scenarios are A, B (base case) and C without a company name; budget lines read "the team's budget workbook" and "Profit — Developer"; the AI assistant introduces itself as Real Estate Intelligence's assistant.
+
+### 12:45 AM CT: One-click site reports from a parcel, and a new look (4982085, e144fa8)
+- **Reports from a parcel in one click.** A parcel's card has a **Reports** button among its section buttons, and a **Reports for this parcel** block in its Site section: **Parcel Map**, **Topography**, **Site Environmental** and **Area Report** (1, 3, 5 and 10-mile rings). Each makes the PDF straight away (a few seconds for the parcel map and area report, 10 to 40 for topography and environmental) and saves it like any other export. The **Reports** page has the same four under **For the open parcel**.
+- **The topography report covers the page:** the ground is fetched for the site plus 300 feet or more around it, in the page's shape, so the maps run edge to edge.
+- **A new look across the app:** set in Inter (no more IBM Plex Mono or Montserrat), white surfaces, hairline borders, rounder corners, black pill buttons and plain grey labels instead of small capitals; green is now an accent, not the button colour. Report PDFs use Inter too.
+
+### 11:13 AM CT: Property cards anywhere in the US, and the Montreve resort study (e1a001f, 114076c, commit hash added when pushed)
+- **Property cards outside Texas:** my first version was replaced by the experimental branch's own (merged in), which does the same and more.
+- **Montreve study (`projects/montreve`, branch `matthew/montreve`).** A conceptual site plan with all 30 lots traced to scale from the vector lot map: Will Essner's resort core on lots 10–15 (6,000 sf glass wedding pavilion and ceremony lawn, 2,500 sf dining, tennis and two pickleball courts, event parking, a trail loop) and a cabin on each of the 24 for-sale lots. The cabin's floor plans are redrawn as vector PDFs at 1/4" scale. A budget and pro forma workbook with live formulas prices three programs, and a 16-slide investor presentation is built from it.
+- **What it found:** at base costs a cabin must sell for about $1.24M to break even with the resort deferred, $1.41M with a lean resort and $1.59M with the full program. $1.30M covers the cabins, the site work and about $0.64M of amenities. Comparable indoor-pool cabins nearby are listed around $925k.
+### 12:09 AM CT: Sharper ground elevations, and four new site report layouts (b3e85f4)
+- **Ground elevations without the 3,600-point limit.** A site's ground now comes from USGS lidar as one elevation image, read every 3 feet (up to 250,000 points; a 300-acre tract every 8 feet or so, where it used to be every 60). Contours, slopes, the low and high ground and the plan set's grading follow the real land closely. If the image service is down, the old point-by-point reading still answers.
+- **New report layouts (not yet in the app):** Parcel Map (to scale, every line dimensioned, bearings and corner coordinates, an area check against the tax roll, a page per parcel), Topography (lidar contours over a hillshade, slope and drainage, two cross-sections, earthwork at three pad heights), Site Environmental (records around the parcel, soils, flood and hazards) and an Area Report in 1, 3, 5 and 10-mile rings (people, income, spending and construction, each census tract counted for its share inside the ring). All unbranded, black and white with blue accents. They go into the Reports tab once the look is approved.
+
 ## 2026-10-27
 
 ### 8:20 PM CT: The Feasibility workspace merged in, with a layout gallery on its Site step (b8532b3)

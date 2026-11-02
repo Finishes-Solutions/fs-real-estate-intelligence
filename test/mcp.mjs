@@ -289,9 +289,9 @@ console.log('mcp upstream timeout ok');
     const html = R2.demographicsReport(R.serverKit(24)).reportHtml({ label: 'Katy', center: KATY, rings: rings.map(x => ({ ...x, label: x.mi + ' mi' })), years: { acs: '2020–2024' } });
     assert.match(html, /<div class="kicker">Demographics report<\/div>|class="k">Demographics report/); assert.match(html, /By ring/); assert.match(html, /Households by income/); assert.match(html, /Consumer spending by category/);
     assert.equal((html.match(/stroke-dasharray="7 4"/g) || []).length, 2, 'the 3 and 5 mile rings dashed'); assert.match(html, />Site</); }
-  if (haveChrome) { // the report is the website's: its title band, sections and the logo inlined
+  if (haveChrome) { // the report is the website's: its title band and sections, no logo or name
     const html = await R.finishHtml((await import('../lib/reports/fema.mjs')).femaReport(R.serverKit(24)).reportHtml({ ...(await (await import('../api/fema.js')).femaReport({ type: 'Polygon', coordinates: [[[-95.37, 29.75], [-95.36, 29.75], [-95.36, 29.76], [-95.37, 29.76], [-95.37, 29.75]]] })), area_sqmi: 0.4 }, 'Check', null));
-    assert.match(html, /FEMA flood &amp; hazard report/); assert.match(html, /src="data:image\/png;base64,/); assert.ok(!/src="logo-white\.png"/.test(html)); }
+    assert.match(html, /FEMA flood &amp; hazard report/); assert.ok(!/logo-white\.png|Real Estate Intelligence|Finishes/.test(html), 'no logo or name'); }
   // the size check: a report that can't fit says so, it doesn't fail silently or send a cut-off PDF
   R.hooks.pdfLimit = 2000;
   r = await call('report_flood', H); assert.equal(r.isError, true); assert.equal(r.content.some(x => x.type === 'resource'), false);

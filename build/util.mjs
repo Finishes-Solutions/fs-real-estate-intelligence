@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
-export const UA = { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions filings map build)' };
+export const UA = { 'User-Agent': 'Mozilla/5.0 (RealEstateIntelligence filings map build)' };
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 export const log = (...a) => console.log('[build]', ...a);
 export const hash = s => createHash('sha1').update(s).digest('hex').slice(0, 12);

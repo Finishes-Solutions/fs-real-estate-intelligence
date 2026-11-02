@@ -18,7 +18,7 @@ import { planes3D } from './planes3d.js';
 import { getJSON } from './reportkit.js';
 
 const REFRESH = 10e3, MINZ = 5, KT = 1.852 / 3600; // km per second per knot
-const BANDS = [[1, '#8d9598'], [3000, '#e3622b'], [10000, '#eda100'], [25000, '#3987e5'], [99999, '#1f9249']]; // ground, low, climbing, mid, cruise
+const BANDS = [[1, '#8d9598'], [3000, '#e3622b'], [10000, '#eda100'], [25000, '#3987e5'], [99999, '#10a37f']]; // ground, low, climbing, mid, cruise
 
 export function initPlanes(ctx) {
   const { map, esc, toast } = ctx, card = ctx.card;

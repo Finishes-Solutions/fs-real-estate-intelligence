@@ -20,7 +20,7 @@ const show = (label, x) => console.log(label.padEnd(14), typeof x === 'string' ?
   const csv = rows.map((r, i) => [i, r.st, r.city, 'TX', r.zip].map(v => '"' + String(v).replace(/"/g, '') + '"').join(',')).join('\n');
   const fd = new FormData(); fd.append('addressFile', new Blob([csv], { type: 'text/csv' }), 'a.csv'); fd.append('benchmark', 'Public_AR_Current');
   try {
-    const r = await fetch('https://geocoding.geo.census.gov/geocoder/locations/addressbatch', { method: 'POST', body: fd, headers: { 'User-Agent': 'FinishesSolutions-probe/1.0' } });
+    const r = await fetch('https://geocoding.geo.census.gov/geocoder/locations/addressbatch', { method: 'POST', body: fd, headers: { 'User-Agent': 'RealEstateIntelligence-probe/1.0' } });
     const t = await r.text(); console.log('\n== census batch', r.status, r.headers.get('content-type'), t.length, 'bytes', ms());
     t.split('\n').slice(0, 30).forEach(l => console.log('  ', l.slice(0, 220)));
   } catch (e) { console.log('census batch ERROR', e.message, e.cause?.code || ''); }
@@ -39,7 +39,7 @@ for (const r of rows.slice(0, 6)) {
     show('address pts', x.status + ' ' + (await x.text()));
   } catch (e) { show('address pts', 'ERROR ' + e.message + ' ' + (e.cause?.code || '')); }
   try { await new Promise(res => setTimeout(res, 1100));
-    const x = await fetch('https://nominatim.openstreetmap.org/search?' + new URLSearchParams({ format: 'jsonv2', addressdetails: '1', limit: '2', countrycodes: 'us', street: r.st, city: r.city, state: 'Texas', postalcode: r.zip }), { headers: { 'User-Agent': 'FinishesSolutions-filings-map/1.0 (probe)' } });
+    const x = await fetch('https://nominatim.openstreetmap.org/search?' + new URLSearchParams({ format: 'jsonv2', addressdetails: '1', limit: '2', countrycodes: 'us', street: r.st, city: r.city, state: 'Texas', postalcode: r.zip }), { headers: { 'User-Agent': 'RealEstateIntelligence-filings-map/1.0 (probe)' } });
     const d = await x.json().catch(() => null); show('nominatim', x.status + ' ' + JSON.stringify((d || []).map(y => [y.display_name, y.address?.house_number, y.address?.postcode])));
   } catch (e) { show('nominatim', 'ERROR ' + e.message); }
   try { const x = await fetch('https://api.maptiler.com/geocoding/' + encodeURIComponent(`${r.st}, ${r.city}, TX ${r.zip}`) + '.json?key=' + KEY + '&country=us&limit=1&bbox=-97.3,28.8,-94.3,31.2');

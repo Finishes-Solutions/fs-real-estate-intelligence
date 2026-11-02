@@ -94,8 +94,8 @@ export function initLayerFilters(ctx) {
     map.addSource(SRC, { type: 'geojson', data });
     const before = map.getLayer('county-line') ? 'county-line' : undefined;
     map.addLayer({ id: 'lf-dim', type: 'fill', source: SRC, filter: ['==', ['get', 'm'], 0], paint: { 'fill-color': '#ffffff', 'fill-opacity': .6 } }, before);
-    map.addLayer({ id: 'lf-hit', type: 'fill', source: SRC, filter: ['==', ['get', 'm'], 1], paint: { 'fill-color': '#1f9249', 'fill-opacity': .22 } }, before);
-    map.addLayer({ id: 'lf-hit-line', type: 'line', source: SRC, filter: ['==', ['get', 'm'], 1], paint: { 'line-color': '#006527', 'line-width': 1.4 } }, before);
+    map.addLayer({ id: 'lf-hit', type: 'fill', source: SRC, filter: ['==', ['get', 'm'], 1], paint: { 'fill-color': '#10a37f', 'fill-opacity': .22 } }, before);
+    map.addLayer({ id: 'lf-hit-line', type: 'line', source: SRC, filter: ['==', ['get', 'm'], 1], paint: { 'line-color': '#0b7a5f', 'line-width': 1.4 } }, before);
   }
   function clearMatchLayer() { for (const id of ['lf-hit-line', 'lf-hit', 'lf-dim']) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource(SRC)) map.removeSource(SRC); lastHits = []; }
   ctx.onOverlays?.(() => { if (st.mode === 'match' && active(st.crit).length) renderMatch(); else if (st.mode !== 'match') apply(); });

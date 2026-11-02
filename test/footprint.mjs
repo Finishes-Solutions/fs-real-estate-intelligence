@@ -34,12 +34,37 @@ for (const s of [...smallA, ...smallB, edgeNeighbour]) {
 // clicking either half of the warehouse: both halves, joined at the tile edge, and nothing else
 for (const p of [[L - 0.0002, midLat + 0.0001], [L + 0.0002, midLat + 0.0001]]) {
   const g = joinPieces(pieces, p);
-  assert.equal(g.type, 'MultiPolygon'); assert.equal(g.coordinates.length, 2, 'the two halves only');
+  assert.equal(g.type, 'Polygon', 'the two halves, dissolved into one outline'); assert.equal(g.coordinates.length, 1);
   assert.ok(Math.abs(area(g) - area({ type: 'Polygon', coordinates: big })) < 1e-11, 'together they are the whole warehouse');
+  assert.ok(!g.coordinates[0].some((q, i) => i && Math.abs(q[0] - L) < 1e-9 && Math.abs(g.coordinates[0][i - 1][0] - L) < 1e-9), 'no line drawn along the tile edge');
   assert.ok(![...smallA, ...smallB, edgeNeighbour].some(s => inGeom(ptIn(s), g)), 'no unrelated building included');
 }
 // nothing under the click
 assert.equal(joinPieces(pieces, [A[0] + 0.0005, midLat + 0.0012]), null);
+
+// A rural parcel (Sevier County, TN, 2026-10-30) across four tiles where they meet: the selection outline showed straight
+// green dashed lines through it, the tile edges each piece was cut at. Each tile carries its own rounded copy of the parcel
+// (points a few cm apart from the neighbour's), plus an unrelated parcel sharing the feature id.
+{ const tz = 15, tn = 2 ** tz, tlon = -83.5791, tlat = 35.8402;
+  const tx = Math.floor((tlon + 180) / 360 * tn), ty = Math.floor((1 - Math.log(Math.tan(tlat * Math.PI / 180) + 1 / Math.cos(tlat * Math.PI / 180)) / Math.PI) / 2 * tn);
+  const T = tileBox(tz, tx, ty), cx = T[2], cy = T[1]; // the corner where tiles (tx,ty), (tx+1,ty), (tx,ty+1), (tx+1,ty+1) meet
+  const parcel = [[cx - 0.0021, cy - 0.0013], [cx + 0.0008, cy - 0.0019], [cx + 0.0024, cy - 0.0004], [cx + 0.0017, cy + 0.0011], [cx + 0.0003, cy + 0.0018], [cx - 0.0016, cy + 0.0009], [cx - 0.0021, cy - 0.0013]];
+  const other = [[cx - 0.0040, cy + 0.0030], [cx - 0.0030, cy + 0.0030], [cx - 0.0030, cy + 0.0040], [cx - 0.0040, cy + 0.0040], [cx - 0.0040, cy + 0.0030]];
+  const jit = (r, k) => r.map(([a, b], i) => i === r.length - 1 ? null : [a + Math.sin(k * 7 + i) * 3e-7, b + Math.cos(k * 5 + i) * 3e-7]).filter(Boolean).concat([[r[0][0] + Math.sin(k * 7) * 3e-7, r[0][1] + Math.cos(k * 5) * 3e-7]]);
+  const tiles = [[tx, ty], [tx + 1, ty], [tx, ty + 1], [tx + 1, ty + 1]];
+  const tp = tiles.map(([px, py], k) => ({ z: tz, x: px, y: py, geometry: { type: 'MultiPolygon', coordinates: [[jit(parcel, k)], [other]] } }));
+  const whole = { type: 'Polygon', coordinates: [parcel] };
+  for (const click of [[cx - 0.0008, cy - 0.0004], [cx + 0.0010, cy + 0.0004], [cx + 0.0004, cy - 0.0010], [cx - 0.0005, cy + 0.0006]]) {
+    const g = joinPieces(tp, click);
+    assert.equal(g.type, 'Polygon', 'one outline, not four pieces'); assert.equal(g.coordinates.length, 1);
+    const r = g.coordinates[0], onEdge = (a, b) => (Math.abs(a[0] - cx) < 1e-9 && Math.abs(b[0] - cx) < 1e-9) || (Math.abs(a[1] - cy) < 1e-9 && Math.abs(b[1] - cy) < 1e-9);
+    { const bad = r.map((q, i) => i && onEdge(r[i - 1], q) ? Math.hypot(q[0] - r[i - 1][0], q[1] - r[i - 1][1]) : 0).filter(v => v > 1e-6); assert.ok(!bad.length, 'no line along a tile edge (only the cm jogs where the two copies meet): ' + bad); }
+    assert.ok(Math.abs(area(g) - area(whole)) / area(whole) < 1e-3, 'the whole parcel: ' + area(g) / area(whole));
+    assert.ok(r.length <= parcel.length + 9, 'only the parcel corners plus one jog per crossing: ' + r.length);
+    assert.ok(!inGeom([cx - 0.0035, cy + 0.0035], g), 'the unrelated parcel with the same id is left out');
+    for (const q of [[cx - 0.0008, cy - 0.0004], [cx + 0.0010, cy + 0.0004], [cx + 0.0004, cy - 0.0010], [cx - 0.0005, cy + 0.0006]]) assert.ok(inGeom(q, g), 'every quarter is in it');
+  }
+}
 assert.equal(joinPieces([], [lon, lat]), null);
 
 // ---------- several parcels picked with Shift-click (2026-10-05: Shift-clicking open ground in one Waller parcel kept
@@ -91,7 +116,7 @@ assert.ok(!sameSelection(bA, { center: ptIn(smallA[0]), footprint: { type: 'Poly
   }
   assert.ok(!inGeom(at(20, 20), offsetGeom(court, 0.5)), 'the courtyard stays open');
   const w = offsetGeom(joinPieces(pieces, [L - 0.0002, midLat + 0.0001]), 0.5);
-  assert.equal(w.type, 'MultiPolygon'); assert.ok(![...smallA, ...smallB, edgeNeighbour].some(s => inGeom(ptIn(s), w)), 'still only the warehouse'); }
+  assert.equal(w.type, 'Polygon'); assert.ok(![...smallA, ...smallB, edgeNeighbour].some(s => inGeom(ptIn(s), w)), 'still only the warehouse'); }
 
 // ---------- the next lot takes one click (2026-10-14: with a card open, a click on an empty neighbouring lot only closed the card) ----------
 // The card shows the warehouse that crosses the tile edge, on a lot that crosses it too (the lot's outline is whole: it comes from

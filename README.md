@@ -1,6 +1,6 @@
 # fs-real-estate-intelligence
 
-Finishes Solutions real estate intelligence map for Waller County and the six surrounding counties (Harris, Fort Bend, Montgomery, Austin, Washington, Grimes). The core data layer is two years of TDLR TABS construction registrations, enriched with AI classification and Census tract demographics.
+Real Estate Intelligence map for Waller County and the six surrounding counties (Harris, Fort Bend, Montgomery, Austin, Washington, Grimes). The core data layer is two years of TDLR TABS construction registrations, enriched with AI classification and Census tract demographics.
 
 ## What's in the app
 

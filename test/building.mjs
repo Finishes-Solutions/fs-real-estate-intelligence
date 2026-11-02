@@ -26,7 +26,9 @@ assert.equal(res.body.places.length, 2); assert.equal(res.body.places[0].kind, '
 assert.equal(res.body.osm.levels, 3); assert.equal(res.body.osm.use, 'retail');
 assert.equal(res.body.height.source, '3dep-lidar'); assert.equal(res.body.height.date, '2018-12-31'); assert.ok(res.body.height.height_m >= 13 && res.body.height.height_m <= 15, 'roof ≈ 14 m: ' + res.body.height.height_m); assert.equal(res.body.height.max_m, 21);
 assert.equal(res.body.photo.link, 'https://www.mapillary.com/app/?pKey=9'); assert.match(res.headers['Cache-Control'], /s-maxage/);
-res = mock(); await building({ query: { lat: '40', lon: '-95' }, headers: {} }, res); assert.equal(res.code, 400, 'outside Texas rejected');
+res = mock(); await building({ query: { lat: '40', lon: '-95', part: 'parcel' }, headers: {} }, res); assert.equal(res.code, 200, 'outside Texas: the card still answers');
+assert.equal(res.body.parcel, null); assert.match(res.body.parcelError, /Texas only.*Regrid/, 'and says the free record is Texas only, Regrid has it');
+res = mock(); await building({ query: { lat: '60', lon: '10' }, headers: {} }, res); assert.equal(res.code, 400, 'outside the US rejected');
 // the card asks for the parcel alone first, then everything else
 seen.length = 0; res = mock(); await building({ query: { lat: '30.055', lon: '-95.925', part: 'parcel' }, headers: { 'x-forwarded-for': '7.7.7.8' } }, res);
 assert.equal(res.body.parcel.owner, 'ACME HOLDINGS LLC'); assert.deepEqual(Object.keys(res.body), ['parcel']); assert.ok(seen.every(u => u.includes('/identify')), 'parcel only: no Overpass, lidar or photo calls');

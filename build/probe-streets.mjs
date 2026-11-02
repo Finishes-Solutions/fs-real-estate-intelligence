@@ -15,13 +15,13 @@ for (const [st, city, zip] of sample) {
   const ql = `[out:json][timeout:25];way["highway"]["name"~"^${name}",i](${[c[1] - d, c[0] - d * 1.15, c[1] + d, c[0] + d * 1.15].map(v => v.toFixed(4)).join(',')});out center 5;`;
   for (const s of SERVERS) {
     const t = Date.now();
-    try { const r = await fetch(s, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'User-Agent': 'FinishesSolutions-probe/1.0' }, signal: AbortSignal.timeout(30000) });
+    try { const r = await fetch(s, { method: 'POST', body: new URLSearchParams({ data: ql }), headers: { 'User-Agent': 'RealEstateIntelligence-probe/1.0' }, signal: AbortSignal.timeout(30000) });
       const txt = await r.text(); let n = '?'; try { n = JSON.parse(txt).elements.length; } catch (e) { n = 'non-JSON: ' + txt.slice(0, 120).replace(/\s+/g, ' '); }
       console.log('  overpass', new URL(s).host.padEnd(28), r.status, '| ways', n, '|', Date.now() - t, 'ms');
     } catch (e) { console.log('  overpass', new URL(s).host.padEnd(28), 'ERROR', e.name, e.message, '|', Date.now() - t, 'ms'); }
   }
   await new Promise(r => setTimeout(r, 1100));
-  try { const r = await fetch('https://nominatim.openstreetmap.org/search?' + new URLSearchParams({ format: 'jsonv2', addressdetails: '1', limit: '3', countrycodes: 'us', street: only || st, city, state: 'Texas', postalcode: zip }), { headers: { 'User-Agent': 'FinishesSolutions-filings-map/1.0 (probe)' } });
+  try { const r = await fetch('https://nominatim.openstreetmap.org/search?' + new URLSearchParams({ format: 'jsonv2', addressdetails: '1', limit: '3', countrycodes: 'us', street: only || st, city, state: 'Texas', postalcode: zip }), { headers: { 'User-Agent': 'RealEstateIntelligence-filings-map/1.0 (probe)' } });
     const dd = await r.json().catch(() => []); console.log('  nominatim', r.status, JSON.stringify(dd.map(x => [x.category + '/' + x.type, x.display_name.slice(0, 80), x.address?.postcode])));
   } catch (e) { console.log('  nominatim ERROR', e.message); }
 }

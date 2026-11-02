@@ -1,7 +1,7 @@
 // Diagnostic: what adsb.lol (and the free photo / aircraft databases) return for live planes over Houston: aircraft
 // fields (dbFlags = military), flight traces for the 3D path, photos, aircraft details and airports.
 // Run "Probe services" with script=adsblol.
-const UA = 'FinishesSolutions-probe/1.0';
+const UA = 'RealEstateIntelligence-probe/1.0';
 const j = async (u, h = {}) => { const t = Date.now(); try { const r = await fetch(u, { headers: { 'User-Agent': UA, ...h }, signal: AbortSignal.timeout(12000) }); const x = await r.text(); return { s: r.status, ms: Date.now() - t, x, ct: r.headers.get('content-type'), ce: r.headers.get('content-encoding') }; } catch (e) { return { s: 'ERR ' + e.message, ms: Date.now() - t, x: '' }; } };
 const show = (name, r, n = 400) => console.log('\n## ' + name + ' -> ' + r.s + ' ' + r.ms + 'ms ' + (r.ct || '') + ' ' + (r.ce || '') + ' ' + r.x.length + ' bytes\n' + r.x.slice(0, n));
 const pt = await j('https://api.adsb.lol/v2/point/29.98/-95.34/60');

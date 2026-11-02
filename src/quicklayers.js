@@ -55,7 +55,7 @@ export function initQuickLayers(ctx) {
     b.onclick = () => box.scrollBy({ left: dir * Math.max(120, box.clientWidth * .7), behavior: ctx.reduceMotion ? 'auto' : 'smooth' }); return b; };
   const arrL = mkArrow(-1), arrR = mkArrow(1); box.prepend(arrL); box.append(arrR);
   // ---------- what's on, for the Layers button, the panel header, "On now" and the group counts ----------
-  const panel = el('layers'), NOT_LAYERS = new Set(['lyFilings', 'lyBldg', 'lyGrid', 'lyCounties', 'lyRoads', 'lyNames', 'ly3d']);
+  const panel = el('layers'), NOT_LAYERS = new Set(['lyFilings', 'lyBldg', 'lyLotFill', 'lyGrid', 'lyCounties', 'lyRoads', 'lyNames', 'ly3d']);
   const nameOf = lab => { const sp = lab?.querySelector('span'); if (!sp) return ''; const c = sp.cloneNode(true); c.querySelector('.ly-na')?.remove(); return c.textContent.trim(); };
   function activeLayers() {
     const out = [];

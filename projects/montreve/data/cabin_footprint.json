@@ -1,0 +1,96 @@
+{
+  "house": [
+    [
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      33.333
+    ],
+    [
+      33.333,
+      33.333
+    ],
+    [
+      33.333,
+      28.333
+    ],
+    [
+      34.083,
+      28.333
+    ],
+    [
+      34.083,
+      23.458
+    ],
+    [
+      33.333,
+      23.458
+    ],
+    [
+      33.333,
+      15.583
+    ],
+    [
+      21.0,
+      15.583
+    ],
+    [
+      21.0,
+      4.833
+    ],
+    [
+      13.75,
+      4.833
+    ],
+    [
+      13.75,
+      0.0
+    ],
+    [
+      13.583,
+      0.0
+    ]
+  ],
+  "deck": [
+    [
+      0,
+      33.333
+    ],
+    [
+      33.333,
+      33.333
+    ],
+    [
+      33.333,
+      42.333
+    ],
+    [
+      0,
+      42.333
+    ]
+  ],
+  "ext_stair": [
+    [
+      -3.0,
+      33.333
+    ],
+    [
+      0,
+      33.333
+    ],
+    [
+      0,
+      42.333
+    ],
+    [
+      -3.0,
+      42.333
+    ]
+  ],
+  "width_ft": 33.333,
+  "depth_ft": 33.333,
+  "depth_with_deck_ft": 42.333,
+  "notes": "Feet. Origin = front-left exterior corner of the house; +x to the right (house width), +y toward the rear deck. 'house' is the outer face of exterior walls, union of first and second floors (master wing 13'-7\" first / 13'-9\" second floor; entry/foyer bump to x=21'-0\" stepped back 4'-10\"; great room front at y=15'-7\"), plus the 9\" chimney projection on the right wall. 'deck' is the 9'-0\" first-floor rear deck across the full width; 'ext_stair' is the 3'-0\" exterior deck stair outside the left wall. Roof overhangs (~1'-0\") and the front entry canopy are not included. Redrawn from owner-supplied plans; verify with the architect of record."
+}

@@ -7,7 +7,7 @@ import { inflateRawSync } from 'node:zlib';
 export const REGION = JSON.parse(readFileSync(new URL('../data/regions.json', import.meta.url), 'utf8'));
 export const COUNTIES = REGION.counties.map(c => c.name);
 export const BBOX = REGION.bbox;
-const UA = { 'user-agent': 'fs-real-estate-intelligence probe (Finishes Solutions; github actions)' };
+const UA = { 'user-agent': 'RealEstateIntelligence probe (github actions)' };
 const short = (o, n = 1500) => (typeof o === 'string' ? o : JSON.stringify(o)).slice(0, n);
 export const log = (...a) => console.log(...a);
 

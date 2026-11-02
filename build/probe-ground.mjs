@@ -1,6 +1,6 @@
 // Diagnostic: aircraft reported on the ground at Houston airports vs. other big airports, per feed, plus what the deployed
 // app's api/planes returns for the same box. Run "Probe services" with script=ground.
-const H = { 'User-Agent': 'FinishesSolutions-probe/1.0 (+https://fs-real-estate-intelligence.vercel.app)', Accept: 'application/json' };
+const H = { 'User-Agent': 'RealEstateIntelligence-probe/1.0 (+https://fs-real-estate-intelligence.vercel.app)', Accept: 'application/json' };
 const j = async u => { const t = Date.now(); try { const r = await fetch(u, { headers: H, signal: AbortSignal.timeout(12000) }); const x = await r.text(); return { s: r.status, ms: Date.now() - t, x }; } catch (e) { return { s: 'ERR ' + e.message, ms: Date.now() - t, x: '' }; } };
 const AIRPORTS = { IAH: [29.984, -95.341], HOU: [29.646, -95.279], EFD: [29.607, -95.159], SGR: [29.622, -95.657], DWH: [30.062, -95.553], CXO: [30.352, -95.415], DFW: [32.897, -97.038], DAL: [32.847, -96.852], AUS: [30.194, -97.670], SAT: [29.534, -98.469], ATL: [33.640, -84.427], LAX: [33.942, -118.408] };
 const FEEDS = {

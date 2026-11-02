@@ -1,5 +1,5 @@
 // Export dialog (green Export button next to the map tools): pick a report, which filings, and a format.
-// PDFs (and the summary's web page) use the shared Finishes Solutions report layout (reportkit.js), rendered to PDF on the
+// PDFs (and the summary's web page) use the shared Real Estate Intelligence report layout (reportkit.js), rendered to PDF on the
 // server: portrait, except the full filing list (and a comparison of four or more areas), which need landscape.
 // Excel uses SheetJS (already on the page).
 import { BY_KEY, DEFAULT_KPIS } from './metrics.js';
@@ -206,7 +206,7 @@ export function initExport(ctx) {
   // the PDF lists the largest LIST_MAX and says so; Excel and CSV always have all of them
   const LIST_MAX = 2000;
   const capped = (list, title, max = LIST_MAX) => '<h2>' + title + ' (' + fmtN(list.length) + ')</h2>' + (list.length > max ? '<p class="rnote">The ' + fmtN(max) + ' largest by estimated value are listed here. Export Excel or CSV for all ' + fmtN(list.length) + '.</p>' : '');
-  const LEGEND = '<div class="lg"><span><i style="background:#006527"></i>New construction</span><span><i style="background:#6b7174"></i>Renovation</span><span><i style="border:1.5px solid #1f9249"></i>Addition or approximate location</span><span>Marker size = est. value</span></div>';
+  const LEGEND = '<div class="lg"><span><i style="background:#0b7a5f"></i>New construction</span><span><i style="background:#6b7174"></i>Renovation</span><span><i style="border:1.5px solid #1f9249"></i>Addition or approximate location</span><span>Marker size = est. value</span></div>';
   function summaryDoc(list, label) {
     const uses = list.some(f => f.use);
     return doc('Summary report', label, kpis(list) +

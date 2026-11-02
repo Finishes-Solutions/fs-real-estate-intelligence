@@ -1,6 +1,6 @@
 // Diagnostic: free market-data sources for the Markets section (stock / ETF daily closes, crypto, commodities, construction
 // costs). Run "Probe services" with script=markets. Prints status, timing and the first rows of each.
-const H = { 'User-Agent': 'Mozilla/5.0 (FinishesSolutions RE intelligence; +https://fs-real-estate-intelligence.vercel.app)', Accept: '*/*' };
+const H = { 'User-Agent': 'Mozilla/5.0 (RealEstateIntelligence; +https://fs-real-estate-intelligence.vercel.app)', Accept: '*/*' };
 const j = async u => { const t = Date.now(); try { const r = await fetch(u, { headers: H, signal: AbortSignal.timeout(15000) }); const x = await r.text(); return { s: r.status, ms: Date.now() - t, x }; } catch (e) { return { s: 'ERR ' + e.message, ms: Date.now() - t, x: '' }; } };
 const show = (name, r, f = x => x.slice(0, 160).replace(/\s+/g, ' ')) => console.log(name.padEnd(34), String(r.s).padEnd(4), String(r.ms).padStart(6) + 'ms', r.x.length + 'B |', f(r.x));
 const lines = x => { const l = x.trim().split('\n'); return l.length + ' lines: ' + l.slice(0, 2).join(' / ') + ' … ' + l[l.length - 1]; };

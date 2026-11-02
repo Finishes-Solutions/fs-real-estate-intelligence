@@ -73,7 +73,7 @@ export function plausible(o, d, lat, lon, track) {
   return true;
 }
 
-const H = { 'Content-Type': 'application/json', 'User-Agent': 'FinishesSolutions-RealEstateIntel/1.0' };
+const H = { 'Content-Type': 'application/json', 'User-Agent': 'RealEstateIntelligence/1.0' };
 const ll = v => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 1e4) / 1e4 : null; };
 // adsb.lol's route set (it has answered with an empty body for every flight since about October 2026; kept last in case it returns)
 async function lolRoute(callsign, lat, lon, fetchImpl) {

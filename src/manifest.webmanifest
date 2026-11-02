@@ -1,13 +1,13 @@
 {
-  "name": "Finishes Solutions Real Estate Intelligence",
-  "short_name": "FS Intel",
+  "name": "Real Estate Intelligence",
+  "short_name": "RE Intelligence",
   "description": "Construction filings, timelines, buildings and field notes around Waller County, Texas.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#ffffff",
-  "theme_color": "#006527",
+  "theme_color": "#ffffff",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },

@@ -594,7 +594,7 @@ test('fee helpers: {mode,val} and a bare number', () => {
     lines: PRICING.lines.map((l, i) => ({
       lineId: 'tpl-' + i, code: l.code, grp: l.grp, scope: l.scope, desc: l.desc, basis: l.basis,
       unit: l.unit, baseUnit: l.unit, qty: l.basis === 'ls' ? 1 : 0, auto: l.basis !== 'ls' })),
-    companies: [{ name: 'Finishes Solutions LLC', pct: 12 }],
+    companies: [{ name: 'Developer', pct: 12 }],
     contingency: { mode: 'psf', val: 2 },
     projectCosts: { land: 1200000, dev: 200000, mkt: 75000, cls: 0 },
     status: 'Draft', pricingVersion: PRICING.version, opexSchemaVersion: 2
@@ -822,7 +822,7 @@ const reconcile = (doc, msg) => {
 test('(b) CSI divisions + markups sum to the contract sum on the default budget', () => {
   const sch = reconcile(mf, 'default');
   assert.equal(Math.round(sch.contract), 7576027);
-  assert.deepEqual(sch.markups.map(m => [m.code, m.desc]), [['99 01 00', 'Profit — Finishes Solutions LLC'], ['99 03 00', 'Construction contingency']]);
+  assert.deepEqual(sch.markups.map(m => [m.code, m.desc]), [['99 01 00', 'Profit — Developer'], ['99 03 00', 'Construction contingency']]);
   close(sch.markupsTotal, 800453.214 + 105130, 'markups', 1e-4);
   const keys = sch.divisions.map(d => d.key);
   assert.deepEqual(keys, [...keys].sort(), 'divisions sorted by number');
