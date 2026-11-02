@@ -495,6 +495,66 @@ Real communities traced from aerial photographs (a 179-acre lake community west 
 - **Sheets that agree:** every sheet is drawn from one project file. Before handing a set over, it checks acreage, building area, home count, parking, detention (1.00 acre-foot per acre), sheet references and building sizes, and each floor plan passes the same room, door, egress and exit checks as the app's.
 - **Not done yet:** DWG files need a DXF export unless a DWG converter is installed; geometry traced from sketches is approximate; the site sheets use simpler rule-based utilities, grading and details than the app's plan sets. It hasn't been run on a real project's drawings yet.
 
+### 6:43 PM CT: Renderings skill no longer asks for a budget (f9ded54)
+- Asking the agent for renderings is now the go-ahead to paint them: five views at roughly $0.20–0.50 each, plus up to two re-paints a view. It no longer stops to ask for a budget, and STATUS.md no longer lists one as missing.
+
+### 6:31 PM CT: Renderings skill says what's missing; paint renderings in a browser; the model survives text-only attachments (67be240)
+- **No more silent runs:** every renderings run now checks for an OpenAI key and whether OpenAI can be reached from where it runs. It prints the result and writes a STATUS.md saying whether renderings were made. If they weren't, it says exactly what is missing and what to do next. The agent is told to start its reply with this.
+- **Paint without Python:** the paint package now includes paint.html. Open it in a browser, paste your OpenAI key (it stays in that tab), click Paint, download painted.zip, and send it back to the agent.
+- **When a platform gives the agent only a PDF's text:** the site layout and plan set PDFs now also carry their model as hidden text on the sheet. An agent that gets only the text can rebuild the model exactly from it instead of stopping. The plan set's copy includes the floor plans it actually drew, so the renderings get real facades.
+- **Setup notes:** the agent instructions now say that attachments should reach the agent as files, and what to do when they don't.
+
+### 5:37 PM CT: Plan set skill designs buildings the way the app does (dc928a6)
+- **Why the skill's plans were weaker than the app's:** the app never asks Claude to design a building from a blank page. It hands Claude a plain floor plan that already passes every check (one tenant bay per ~30 ft of frontage, each with a restroom and back of house) and asks it to improve that. When Claude's version fails the checks, the app draws the plain plan instead. The skill had none of this, so its agent invented floor plans by hand.
+- **Now the skill does the same:** it builds the app's starting plan for every building type, and the agent improves it. A building with no plan, or whose plan fails the checks, is drawn from the starting plan, and the run says which plan each building used. A site layout handed over with no building designs now gives a full set (47 sheets on the example) instead of site sheets only.
+- **L-shaped buildings:** the open corner of an L is now hatched and labelled "open — outside the building" on the floor plan, so it no longer looks like a giant empty room.
+- **Agent instructions:** `skills/AGENT-INSTRUCTIONS.md` has the text to paste into each of the three agents, what to attach to each run, and the settings that matter.
+
+### 5:28 PM CT: Pass agents the PDF only: the site model now travels inside it (9114664)
+- **Why:** attaching the site model file next to the site layout PDF made one plan set run fail with "prompt is too long". The platform put the whole file into the agent's prompt.
+- **Site layout skill:** the SP-1 PDF now carries its model inside it as an attachment, so it is the only file to pass on. The model itself is much smaller (8 KB instead of 20 KB on the example), with long outlines simplified, and the build warns if it ever gets large.
+- **Plan set skill:** pulls the model out of the SP-1 PDF with one command and works from a short summary, never from the whole file. The finished plan set PDF also carries its model (with the building designs) and its sheet list.
+- **Renderings skill:** needs only the plan set PDF. It pulls out the model and finds the elevation sheets on its own.
+
+### 5:23 PM CT: Renderings skill keeps going without internet, plan sets or a confirmation step (4d20102)
+- **No internet where the agent runs:** the agent still builds the five 3D massing views. It then hands over a small "paint package" (a zip). Anyone can run it on a computer with internet and Python to make the five paid image calls, then send the folder back so the agent checks each picture and makes the renderings sheet. The package never contains the key.
+- **Spending approved in advance:** "renderings approved, budget $5" (or similar) in the task instructions now counts as the go-ahead. The run stops before it could pass that budget.
+- **Only a site plan PDF:** the agent takes the site straight off SP-1 and renders the buildings with plain facades for their use instead of refusing. It places the road from the frontage note when the sheet doesn't draw one, and says so.
+- **Fuel stations:** a fuel canopy is now drawn as an open canopy on columns over pump islands, not a solid building.
+- **Acreage:** a rounded figure in the task ("~20 acres" for 20.78 ac) no longer counts as a conflict in either the renderings or the plan set skill.
+
+### 5:01 PM CT: Renderings skill can keep its OpenAI key in the skill folder (5f16310, 73dcec0)
+- **For agents on other platforms:** if the platform can't set an environment variable, put the key in a file named `openai.key` (or a `.env` file) inside the `fs-site-renderings` folder before zipping and uploading it. The skill finds the key there, says where it found it, and never prints it.
+- The setup guide recommends a separate, budget-capped OpenAI key that can only make images, and keeping that zip private. The platform must still let the agent reach OpenAI. Key files in the skills folder are never committed to this repository.
+- If `openai.key` still holds the placeholder text instead of a key, the skill says so plainly rather than failing at OpenAI.
+
+### 5:00 PM CT: fs-set-plans skill v2: plan sets that follow the layout and look like real drawings (df35aff)
+- **New zip, outside the app:** `skills/fs-set-plans.zip` replaces the plan set skill that was installed. It was rebuilt after a test run on 0 US 290, Waller (0.93 ac, Option B), where the set redrew the site instead of following it.
+- **Follows the site layout exactly:** the agent is told the layout is the design. Every building keeps its real shape and position, including a skewed L. Parking is drawn as the rows the layout shows, and the stalls are counted from the drawing. The set flags any stall count that differs from the layout's. Stalls a building sits on are left off and reported, and no pond is invented when the layout has none. Problems like these go on the cover and in the summary instead of being "fixed".
+- **Reads the app's plan-set PDF:** the cover and site plan (G-001 + C-101) are a supported input. The scale, boundary, building, parking field, stall count and project data are taken straight off them. An fs-site-plan hand-off still works as before.
+- **Site sheets:** striped stalls with accessible and van spaces, curbs, aisle arrows and drive cuts to the street. Setback lines are drawn by front, side and rear. C-102 dimensions each building to the property line and turns red where it is too close. C-202 draws the pond in plan with a stage-storage table.
+- **Architecture at real scale:** floor plans have filled walls, dimension strings, door and window tags, and section cuts. Roof plans get their own sheet when that keeps the floor plan larger. They show drains, scuppers, slope arrows and a rooftop unit for each tenant. Elevations cover every face of an L, with brick, stone and siding hatches, storefronts, keynotes and levels. Sections are cut through the building, and windows stay clear of doors. Larger, fuller detail sheets for civil, landscape, structural and wall sections.
+- **Engineering sheets make sense for a retail shell:** each tenant has its own rooftop unit with ductwork, a panel and a meter. Lighting and outlets in empty bays are left to the tenant. Exit signs, wall packs and a meter centre are shown. The riser diagram has branch pipe sizes and a fixture schedule. The one-line shows transformer, main, meters, and house and tenant panels, with the house panel sized realistically. Notes sheets carry full standard notes and set their text as large as fits.
+- **Cheaper to run:** the agent can look at the whole set in about six contact images, and is told how to keep image and file reading small. The test run that prompted this cost about $6.
+- **Renderings skill:** `skills/fs-site-renderings.zip` now places windows exactly as the new elevations do, and recognises "canopies" as a canopy.
+
+### 4:13 PM CT: Housekeeping for the skills folder (a65033d)
+- Running the skills' scripts no longer leaves Python cache files for git to pick up. Nothing changes in the app or the skills.
+
+### 3:52 PM CT: A Claude skill for five midday renderings that match the layout and the plan set (db9a231)
+- **New skill, outside the app:** `skills/fs-site-renderings.zip` is the third step after the site layout and plan set skills. It makes five photoreal renderings of the property at midday from five angles: two corner aerials, street level from across the road, arriving at the entrance, and a high rear aerial.
+- **True to the drawings:** it builds an exact 3D massing model from the project file. Buildings sit at their real size, height and roof, with windows, storefronts and doors where the elevation sheets draw them, along with the striped parking, drives, ponds and street. The image model (gpt-image-2.5-sunburst, high quality) then paints that model photographically without changing it, using the set's elevation drawings as references.
+- **Checked:** every rendering is laid over its massing and scored building by building, so a moved, missing or extra building is flagged for a re-paint.
+- **Delivered:** the five pictures go on a 24 × 36 renderings sheet (R-1) with a key plan of the camera positions, and back into the project file, so the plan set picks them up as A-901 to A-905.
+- **Needs** an OpenAI key in the environment and access to OpenAI from wherever the agent runs. The skill's setup guide explains how for each Claude surface. The app itself is unchanged.
+
+### 3:16 PM CT: A Claude skill for one-page site layouts that feed the plan set (7189023)
+- **New skill, outside the app:** `skills/fs-site-plan.zip` can be added to Claude as a skill. Given a project's files (survey, plat, the app's Map File / CAD / Site Plan exports, flood, traffic and market reports, zoning documents), it makes a one-page conceptual site layout (SP-1) on the Finishes Solutions 24 × 36 title block.
+- **It picks the use before drawing:** it tests candidate uses and mixes (for example, pads on the frontage with retail behind) on a land budget, ranks them by residual land value when market numbers are supplied, and prints the comparison on the sheet.
+- **It checks the code and the land use:** each requirement is listed with its source and is marked verified, owner guardrail, engineering assumption or unverified, then measured against the drawing. It also checks parking and accessible stalls, detention as a real pond volume, fire-lane reach and width, and setbacks, and it flags over-parking, oversized ponds and unused land. A sheet with a failing check is stamped DRAFT.
+- **It hands off to the plan set:** each build also writes a project file for the fs-set-plans skill, so the full set is drawn from the same geometry. The bundled example builds its site and civil sheets with every set check passing.
+- The app itself is unchanged.
+
 ## 2026-10-21
 
 ### 7:07 PM CT: Site plans in four steps: Site › Layout › Pro forma › Renderings & plans (4287ddb)

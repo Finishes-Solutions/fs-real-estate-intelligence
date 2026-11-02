@@ -1,0 +1,943 @@
+{
+ "project": {
+  "name": "EXAMPLE FM 2920 Retail",
+  "client": "Example Owner LLC (EXAMPLE)",
+  "address": "FM 2920 at Example Rd, Tomball, TX 77375 (EXAMPLE)",
+  "county": "Harris County",
+  "number": "FS-0000",
+  "option": "Option A",
+  "date": "Oct 22, 2026",
+  "drawn_by": "FS",
+  "checked_by": "",
+  "revisions": [
+   {
+    "no": "0",
+    "date": "10/22/26",
+    "desc": "Conceptual site layout"
+   }
+  ]
+ },
+ "guardrails": {
+  "on": true,
+  "count_factor": 0.05
+ },
+ "hbu": {
+  "selected": "Neighborhood retail strip with two drive-thru pads",
+  "statement": "EXAMPLE. Frontage on a 4-lane state highway (~30,000 vehicles a day) with growing rooftops behind it and no competing strip within a mile makes retail the most productive use. The test fit ranked pads on the frontage with a strip behind first by residual land value; storage and multifamily came out below it, office negative. Three drive-thru pads take the frontage (the market supports about 12,000 sf), the strip fills the depth, and one side pond holds the detention.",
+  "candidates": [
+   {
+    "use": "3 pads + retail strip",
+    "legal": "Yes (no zoning; deed restr. TBC)",
+    "physical": "Fits: 8.1 ac, 660' frontage",
+    "feasible": "Yes: strong traffic, low vacancy",
+    "yield": "10,700 + 51,600 sf",
+    "rank": 1,
+    "chosen": true
+   },
+   {
+    "use": "Self storage (1 story)",
+    "legal": "Yes",
+    "physical": "Fits",
+    "feasible": "Yes, lower rent",
+    "yield": "~95,000 sf",
+    "rank": 2
+   },
+   {
+    "use": "Garden multifamily",
+    "legal": "Yes",
+    "physical": "Tight: 8 ac, sewer TBC",
+    "feasible": "Marginal at this size",
+    "yield": "~150 units",
+    "rank": 3
+   },
+   {
+    "use": "Office (3 story)",
+    "legal": "Yes",
+    "physical": "Fits",
+    "feasible": "No: weak demand",
+    "yield": "~60,000 sf",
+    "rank": 4
+   }
+  ],
+  "evidence": [
+   "EXAMPLE: TxDOT AADT 30,000 on FM 2920 (app Traffic report)",
+   "EXAMPLE: market rents from the app Market page"
+  ]
+ },
+ "code": {
+  "jurisdiction": "EXAMPLE: Unincorporated Harris County (no zoning)",
+  "code_set": "IFC 2021 as adopted by Harris County (edition to confirm)",
+  "sources": [
+   "EXAMPLE: Harris County Infrastructure Regulations",
+   "IFC 503 / App. D",
+   "2010 ADA Standards 208"
+  ],
+  "rules": [
+   {
+    "item": "Zoning",
+    "req": "None (Texas county)",
+    "provided": "n/a",
+    "cls": "VERIFIED REQUIREMENT",
+    "source": "Texas counties have no general zoning power"
+   },
+   {
+    "item": "Front building line",
+    "req": "25 ft \u2192 26.25 target",
+    "measure": "setback_front",
+    "kind": "min",
+    "limit": 26.25,
+    "cls": "OWNER GUARDRAIL",
+    "source": "EXAMPLE: county building line +5%"
+   },
+   {
+    "item": "Side setback",
+    "req": "10 ft",
+    "measure": "setback_side",
+    "kind": "min",
+    "limit": 10,
+    "cls": "OWNER GUARDRAIL"
+   },
+   {
+    "item": "Rear setback",
+    "req": "10 ft",
+    "measure": "setback_rear",
+    "kind": "min",
+    "limit": 10,
+    "cls": "OWNER GUARDRAIL"
+   },
+   {
+    "item": "Fire lane width",
+    "req": "20 ft min (26 ft used)",
+    "measure": "fire_lane_width",
+    "kind": "min",
+    "limit": 20,
+    "cls": "ENGINEERING ASSUMPTION",
+    "source": "IFC 503.2.1"
+   },
+   {
+    "item": "Hose reach to all walls",
+    "req": "150 ft",
+    "measure": "fire_reach",
+    "kind": "max",
+    "limit": 150,
+    "cls": "ENGINEERING ASSUMPTION",
+    "source": "IFC 503.1.1"
+   },
+   {
+    "item": "Building height",
+    "req": "No county limit",
+    "measure": "height",
+    "cls": "UNVERIFIED"
+   },
+   {
+    "item": "Building coverage",
+    "req": "No limit",
+    "measure": "coverage",
+    "cls": "UNVERIFIED"
+   },
+   {
+    "item": "Impervious cover",
+    "req": "No limit (drives detention)",
+    "measure": "impervious",
+    "cls": "UNVERIFIED"
+   }
+  ]
+ },
+ "facts": [
+  "EXAMPLE: FEMA Zone X (unshaded) per the app's Jurisdiction & site lookup; confirm with the effective FIRM.",
+  "EXAMPLE: water and sewer from a MUD; capacity letter not yet requested."
+ ],
+ "risks": [
+  "Survey and title commitment not yet received (boundary from appraisal-district map).",
+  "Driveway permit on FM 2920 is TxDOT's: spacing and a deceleration lane not yet confirmed.",
+  "Detention outfall and allowable release unknown; rate is the county small-site minimum, not a study.",
+  "Parking ratios are typical values, not a county requirement; confirm tenant needs.",
+  "MUD water / sewer capacity not documented."
+ ],
+ "layout_notes": [
+  "Pads take the frontage with drive-thru loops off the front drive; the strip faces the highway across its parking.",
+  "Every stall count, area and ratio on this sheet is measured from the drawing."
+ ],
+ "site": {
+  "boundary": [
+   [
+    0,
+    0
+   ],
+   [
+    660,
+    0
+   ],
+   [
+    660,
+    535
+   ],
+   [
+    0,
+    535
+   ]
+  ],
+  "north_deg": 0,
+  "display_rotate_deg": 0,
+  "stated": {
+   "acres": 8.1
+  },
+  "stated_source": "EXAMPLE: appraisal district (confirm)",
+  "boundary_source": "EXAMPLE: county appraisal district parcel map (not a survey)",
+  "jurisdiction": "Unincorporated Harris County (EXAMPLE)",
+  "zoning": "None",
+  "flood_zone": "X (unshaded) \u2014 EXAMPLE",
+  "utilities": "MUD water & sewer (capacity TBC)",
+  "setbacks": {
+   "front": 26.25,
+   "side": 10,
+   "rear": 10
+  },
+  "buffers": {
+   "front": 15,
+   "side": 5,
+   "rear": 5
+  },
+  "streets": [
+   {
+    "name": "FM 2920",
+    "pts": [
+     [
+      -150,
+      -50
+     ],
+     [
+      810,
+      -50
+     ]
+    ],
+    "row_width": 100,
+    "pavement_width": 60,
+    "authority": "TxDOT",
+    "aadt": "~30,000 AADT"
+   }
+  ],
+  "buildings": [
+   {
+    "name": "Retail strip",
+    "type": "A",
+    "x": 275,
+    "y": 427,
+    "w": 430,
+    "d": 120,
+    "rot": 0
+   },
+   {
+    "name": "Pad 1",
+    "type": "B",
+    "x": 102.5,
+    "y": 132.5,
+    "w": 65,
+    "d": 55,
+    "rot": 0
+   },
+   {
+    "name": "Pad 2",
+    "type": "B",
+    "x": 209.5,
+    "y": 132.5,
+    "w": 65,
+    "d": 55,
+    "rot": 0
+   },
+   {
+    "name": "Pad 3",
+    "type": "B",
+    "x": 349.5,
+    "y": 132.5,
+    "w": 65,
+    "d": 55,
+    "rot": 0
+   }
+  ],
+  "paving": [
+   {
+    "kind": "walk",
+    "poly": [
+     [
+      60,
+      353
+     ],
+     [
+      490,
+      353
+     ],
+     [
+      490,
+      367
+     ],
+     [
+      60,
+      367
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "name": "Pad 1 drive-thru",
+    "poly": [
+     [
+      52,
+      87
+     ],
+     [
+      64,
+      87
+     ],
+     [
+      64,
+      165
+     ],
+     [
+      52,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      52,
+      87
+     ],
+     [
+      153,
+      87
+     ],
+     [
+      153,
+      99
+     ],
+     [
+      52,
+      99
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      141,
+      87
+     ],
+     [
+      153,
+      87
+     ],
+     [
+      153,
+      165
+     ],
+     [
+      141,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "name": "Pad 2 drive-thru",
+    "poly": [
+     [
+      159,
+      87
+     ],
+     [
+      171,
+      87
+     ],
+     [
+      171,
+      165
+     ],
+     [
+      159,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      159,
+      87
+     ],
+     [
+      260,
+      87
+     ],
+     [
+      260,
+      99
+     ],
+     [
+      159,
+      99
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      248,
+      87
+     ],
+     [
+      260,
+      87
+     ],
+     [
+      260,
+      165
+     ],
+     [
+      248,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "name": "Pad 3 drive-thru",
+    "poly": [
+     [
+      299,
+      87
+     ],
+     [
+      311,
+      87
+     ],
+     [
+      311,
+      165
+     ],
+     [
+      299,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      299,
+      87
+     ],
+     [
+      400,
+      87
+     ],
+     [
+      400,
+      99
+     ],
+     [
+      299,
+      99
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      388,
+      87
+     ],
+     [
+      400,
+      87
+     ],
+     [
+      400,
+      165
+     ],
+     [
+      388,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "name": "P",
+    "poly": [
+     [
+      49.0,
+      191.0
+     ],
+     [
+      511.0,
+      191.0
+     ],
+     [
+      511.0,
+      353.0
+     ],
+     [
+      49.0,
+      353.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "name": "W",
+    "poly": [
+     [
+      49.0,
+      26.0
+     ],
+     [
+      265.0,
+      26.0
+     ],
+     [
+      265.0,
+      86.0
+     ],
+     [
+      49.0,
+      86.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "name": "E",
+    "poly": [
+     [
+      295.0,
+      26.0
+     ],
+     [
+      511.0,
+      26.0
+     ],
+     [
+      511.0,
+      86.0
+     ],
+     [
+      295.0,
+      86.0
+     ]
+    ]
+   }
+  ],
+  "drives": [
+   {
+    "name": "Main entrance",
+    "pts": [
+     [
+      280,
+      0
+     ],
+     [
+      280,
+      178
+     ]
+    ],
+    "width": 30,
+    "fire_lane": true
+   },
+   {
+    "name": "Front drive",
+    "pts": [
+     [
+      23,
+      178
+     ],
+     [
+      537,
+      178
+     ]
+    ],
+    "width": 26,
+    "fire_lane": true
+   },
+   {
+    "name": "West drive",
+    "pts": [
+     [
+      36,
+      26
+     ],
+     [
+      36,
+      513
+     ]
+    ],
+    "width": 26,
+    "fire_lane": true
+   },
+   {
+    "name": "East drive",
+    "pts": [
+     [
+      524,
+      26
+     ],
+     [
+      524,
+      513
+     ]
+    ],
+    "width": 26,
+    "fire_lane": true
+   },
+   {
+    "name": "Rear service drive",
+    "pts": [
+     [
+      23,
+      500
+     ],
+     [
+      537,
+      500
+     ]
+    ],
+    "width": 26,
+    "fire_lane": true
+   },
+   {
+    "name": "P aisle 1",
+    "pts": [
+     [
+      49.0,
+      221.0
+     ],
+     [
+      511.0,
+      221.0
+     ]
+    ],
+    "width": 24,
+    "fire_lane": false
+   },
+   {
+    "name": "P aisle 2",
+    "pts": [
+     [
+      49.0,
+      281.0
+     ],
+     [
+      511.0,
+      281.0
+     ]
+    ],
+    "width": 24,
+    "fire_lane": false
+   },
+   {
+    "name": "P aisle 3",
+    "pts": [
+     [
+      49.0,
+      341.0
+     ],
+     [
+      511.0,
+      341.0
+     ]
+    ],
+    "width": 24,
+    "fire_lane": false
+   },
+   {
+    "name": "W aisle 1",
+    "pts": [
+     [
+      49.0,
+      56.0
+     ],
+     [
+      265.0,
+      56.0
+     ]
+    ],
+    "width": 24,
+    "fire_lane": false
+   },
+   {
+    "name": "E aisle 1",
+    "pts": [
+     [
+      295.0,
+      56.0
+     ],
+     [
+      511.0,
+      56.0
+     ]
+    ],
+    "width": 24,
+    "fire_lane": false
+   }
+  ],
+  "ponds": [
+   {
+    "name": "Detention",
+    "poly": [
+     [
+      542,
+      26
+     ],
+     [
+      650,
+      26
+     ],
+     [
+      650,
+      505
+     ],
+     [
+      542,
+      505
+     ]
+    ],
+    "depth_ft": 5,
+    "freeboard_ft": 1,
+    "side_slope": 3
+   }
+  ],
+  "dumpsters": [
+   {
+    "x": 500,
+    "y": 440,
+    "w": 12,
+    "d": 24
+   }
+  ],
+  "signs": [
+   {
+    "x": 456,
+    "y": 40
+   }
+  ],
+  "detention_rate_acft_per_ac": 0.55,
+  "detention_cls": "ENGINEERING ASSUMPTION",
+  "detention_source": "EXAMPLE: county small-site minimum, confirm",
+  "open_space": [
+   {
+    "label": "Sign & landscape",
+    "poly": [
+     [
+      412,
+      30
+     ],
+     [
+      508,
+      30
+     ],
+     [
+      508,
+      160
+     ],
+     [
+      412,
+      160
+     ]
+    ]
+   }
+  ],
+  "dims": [
+   {
+    "a": [
+     60,
+     367
+    ],
+    "b": [
+     60,
+     487
+    ],
+    "text": "120'"
+   }
+  ],
+  "parking_rows": [
+   {
+    "name": "P-1",
+    "a": [
+     49.0,
+     209.0
+    ],
+    "b": [
+     511.0,
+     209.0
+    ],
+    "side": "right",
+    "stall_w": 9.0,
+    "stall_d": 18.0,
+    "ada": 6,
+    "van": 1
+   },
+   {
+    "name": "P-2",
+    "a": [
+     49.0,
+     233.0
+    ],
+    "b": [
+     511.0,
+     233.0
+    ],
+    "side": "left",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   },
+   {
+    "name": "P-3",
+    "a": [
+     49.0,
+     269.0
+    ],
+    "b": [
+     511.0,
+     269.0
+    ],
+    "side": "right",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   },
+   {
+    "name": "P-4",
+    "a": [
+     49.0,
+     293.0
+    ],
+    "b": [
+     511.0,
+     293.0
+    ],
+    "side": "left",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   },
+   {
+    "name": "P-5",
+    "a": [
+     49.0,
+     329.0
+    ],
+    "b": [
+     511.0,
+     329.0
+    ],
+    "side": "right",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   },
+   {
+    "name": "W-1",
+    "a": [
+     49.0,
+     44.0
+    ],
+    "b": [
+     265.0,
+     44.0
+    ],
+    "side": "right",
+    "stall_w": 9.0,
+    "stall_d": 18.0,
+    "ada": 1,
+    "van": 1
+   },
+   {
+    "name": "W-2",
+    "a": [
+     49.0,
+     68.0
+    ],
+    "b": [
+     265.0,
+     68.0
+    ],
+    "side": "left",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   },
+   {
+    "name": "E-1",
+    "a": [
+     295.0,
+     44.0
+    ],
+    "b": [
+     511.0,
+     44.0
+    ],
+    "side": "right",
+    "stall_w": 9.0,
+    "stall_d": 18.0,
+    "ada": 1,
+    "van": 1
+   },
+   {
+    "name": "E-2",
+    "a": [
+     295.0,
+     68.0
+    ],
+    "b": [
+     511.0,
+     68.0
+    ],
+    "side": "left",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   }
+  ]
+ },
+ "types": [
+  {
+   "id": "A",
+   "use": "retail",
+   "label": "Retail strip",
+   "W": 430,
+   "D": 120,
+   "floors": 1,
+   "floor_h": 18,
+   "parking": {
+    "spaces": 4,
+    "per_sf": 1000,
+    "basis": "4 / 1,000 sf",
+    "cls": "UNVERIFIED"
+   }
+  },
+  {
+   "id": "B",
+   "use": "restaurant",
+   "label": "Drive-thru restaurant pad",
+   "W": 65,
+   "D": 55,
+   "floors": 1,
+   "floor_h": 16,
+   "parking": {
+    "spaces": 10,
+    "per_sf": 1000,
+    "basis": "10 / 1,000 sf",
+    "cls": "UNVERIFIED"
+   }
+  }
+ ],
+ "accepted_warnings": [
+  {
+   "check": "unassigned",
+   "why": "About 0.7 ac inside the setbacks is foundation planting, pad yards and the strip's end landscape. A fourth pad would exceed the roughly 12,000 sf of restaurant space the market supports, and more strip area would need parking the site has no room for."
+  }
+ ]
+}

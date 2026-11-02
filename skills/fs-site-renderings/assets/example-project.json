@@ -1,0 +1,2516 @@
+{
+ "project": {
+  "name": "EXAMPLE FM 2920 Retail",
+  "client": "Example Owner LLC (EXAMPLE)",
+  "address": "FM 2920 at Example Rd, Tomball, TX 77375 (EXAMPLE)",
+  "county": "Harris County",
+  "number": "FS-0000",
+  "option": "Option A",
+  "date": "Oct 22, 2026",
+  "drawn_by": "FS",
+  "checked_by": "",
+  "revisions": [
+   {
+    "no": "0",
+    "date": "10/22/26",
+    "desc": "Conceptual site layout"
+   }
+  ]
+ },
+ "guardrails": {
+  "on": true,
+  "count_factor": 0.05
+ },
+ "hbu": {
+  "selected": "Neighborhood retail strip with two drive-thru pads",
+  "statement": "EXAMPLE. Frontage on a 4-lane state highway (~30,000 vehicles a day) with growing rooftops behind it and no competing strip within a mile makes retail the most productive use. The test fit ranked pads on the frontage with a strip behind first by residual land value; storage and multifamily came out below it, office negative. Three drive-thru pads take the frontage (the market supports about 12,000 sf), the strip fills the depth, and one side pond holds the detention.",
+  "candidates": [
+   {
+    "use": "3 pads + retail strip",
+    "legal": "Yes (no zoning; deed restr. TBC)",
+    "physical": "Fits: 8.1 ac, 660' frontage",
+    "feasible": "Yes: strong traffic, low vacancy",
+    "yield": "10,700 + 51,600 sf",
+    "rank": 1,
+    "chosen": true
+   },
+   {
+    "use": "Self storage (1 story)",
+    "legal": "Yes",
+    "physical": "Fits",
+    "feasible": "Yes, lower rent",
+    "yield": "~95,000 sf",
+    "rank": 2
+   },
+   {
+    "use": "Garden multifamily",
+    "legal": "Yes",
+    "physical": "Tight: 8 ac, sewer TBC",
+    "feasible": "Marginal at this size",
+    "yield": "~150 units",
+    "rank": 3
+   },
+   {
+    "use": "Office (3 story)",
+    "legal": "Yes",
+    "physical": "Fits",
+    "feasible": "No: weak demand",
+    "yield": "~60,000 sf",
+    "rank": 4
+   }
+  ],
+  "evidence": [
+   "EXAMPLE: TxDOT AADT 30,000 on FM 2920 (app Traffic report)",
+   "EXAMPLE: market rents from the app Market page"
+  ]
+ },
+ "code": {
+  "jurisdiction": "EXAMPLE: Unincorporated Harris County (no zoning)",
+  "code_set": "IFC 2021 as adopted by Harris County (edition to confirm)",
+  "sources": [
+   "EXAMPLE: Harris County Infrastructure Regulations",
+   "IFC 503 / App. D",
+   "2010 ADA Standards 208"
+  ],
+  "rules": [
+   {
+    "item": "Zoning",
+    "req": "None (Texas county)",
+    "provided": "n/a",
+    "cls": "VERIFIED REQUIREMENT",
+    "source": "Texas counties have no general zoning power"
+   },
+   {
+    "item": "Front building line",
+    "req": "25 ft \u2192 26.25 target",
+    "measure": "setback_front",
+    "kind": "min",
+    "limit": 26.25,
+    "cls": "OWNER GUARDRAIL",
+    "source": "EXAMPLE: county building line +5%"
+   },
+   {
+    "item": "Side setback",
+    "req": "10 ft",
+    "measure": "setback_side",
+    "kind": "min",
+    "limit": 10,
+    "cls": "OWNER GUARDRAIL"
+   },
+   {
+    "item": "Rear setback",
+    "req": "10 ft",
+    "measure": "setback_rear",
+    "kind": "min",
+    "limit": 10,
+    "cls": "OWNER GUARDRAIL"
+   },
+   {
+    "item": "Fire lane width",
+    "req": "20 ft min (26 ft used)",
+    "measure": "fire_lane_width",
+    "kind": "min",
+    "limit": 20,
+    "cls": "ENGINEERING ASSUMPTION",
+    "source": "IFC 503.2.1"
+   },
+   {
+    "item": "Hose reach to all walls",
+    "req": "150 ft",
+    "measure": "fire_reach",
+    "kind": "max",
+    "limit": 150,
+    "cls": "ENGINEERING ASSUMPTION",
+    "source": "IFC 503.1.1"
+   },
+   {
+    "item": "Building height",
+    "req": "No county limit",
+    "measure": "height",
+    "cls": "UNVERIFIED"
+   },
+   {
+    "item": "Building coverage",
+    "req": "No limit",
+    "measure": "coverage",
+    "cls": "UNVERIFIED"
+   },
+   {
+    "item": "Impervious cover",
+    "req": "No limit (drives detention)",
+    "measure": "impervious",
+    "cls": "UNVERIFIED"
+   }
+  ]
+ },
+ "facts": [
+  "EXAMPLE: FEMA Zone X (unshaded) per the app's Jurisdiction & site lookup; confirm with the effective FIRM.",
+  "EXAMPLE: water and sewer from a MUD; capacity letter not yet requested.",
+  "VERIFIED REQUIREMENT: Zoning None (Texas county) (Texas counties have no general zoning power)",
+  "OWNER GUARDRAIL: Front building line 25 ft \u2192 26.25 target (EXAMPLE: county building line +5%)",
+  "OWNER GUARDRAIL: Side setback 10 ft",
+  "OWNER GUARDRAIL: Rear setback 10 ft",
+  "ENGINEERING ASSUMPTION: Fire lane width 20 ft min (26 ft used) (IFC 503.2.1)",
+  "ENGINEERING ASSUMPTION: Hose reach to all walls 150 ft (IFC 503.1.1)",
+  "UNVERIFIED: Building height No county limit",
+  "UNVERIFIED: Building coverage No limit",
+  "UNVERIFIED: Impervious cover No limit (drives detention)",
+  "UNVERIFIED: Survey and title commitment not yet received (boundary from appraisal-district map).",
+  "UNVERIFIED: Driveway permit on FM 2920 is TxDOT's: spacing and a deceleration lane not yet confirmed.",
+  "UNVERIFIED: Detention outfall and allowable release unknown; rate is the county small-site minimum, not a study.",
+  "UNVERIFIED: Parking ratios are typical values, not a county requirement; confirm tenant needs.",
+  "UNVERIFIED: MUD water / sewer capacity not documented."
+ ],
+ "risks": [
+  "Survey and title commitment not yet received (boundary from appraisal-district map).",
+  "Driveway permit on FM 2920 is TxDOT's: spacing and a deceleration lane not yet confirmed.",
+  "Detention outfall and allowable release unknown; rate is the county small-site minimum, not a study.",
+  "Parking ratios are typical values, not a county requirement; confirm tenant needs.",
+  "MUD water / sewer capacity not documented."
+ ],
+ "layout_notes": [
+  "Pads take the frontage with drive-thru loops off the front drive; the strip faces the highway across its parking.",
+  "Every stall count, area and ratio on this sheet is measured from the drawing."
+ ],
+ "site": {
+  "boundary": [
+   [
+    0,
+    0
+   ],
+   [
+    660,
+    0
+   ],
+   [
+    660,
+    535
+   ],
+   [
+    0,
+    535
+   ]
+  ],
+  "north_deg": 0,
+  "display_rotate_deg": 0,
+  "stated": {
+   "acres": 8.1,
+   "building_sf": 62325
+  },
+  "stated_source": "EXAMPLE: appraisal district (confirm)",
+  "boundary_source": "EXAMPLE: county appraisal district parcel map (not a survey)",
+  "jurisdiction": "Unincorporated Harris County (EXAMPLE)",
+  "zoning": "None",
+  "flood_zone": "X (unshaded) \u2014 EXAMPLE",
+  "utilities": "MUD water & sewer (capacity TBC)",
+  "setbacks": {
+   "front": 26.25,
+   "side": 10,
+   "rear": 10
+  },
+  "buffers": {
+   "front": 15,
+   "side": 5,
+   "rear": 5
+  },
+  "streets": [
+   {
+    "name": "FM 2920",
+    "pts": [
+     [
+      -150,
+      -50
+     ],
+     [
+      810,
+      -50
+     ]
+    ],
+    "row_width": 100,
+    "pavement_width": 60,
+    "authority": "TxDOT",
+    "aadt": "~30,000 AADT"
+   }
+  ],
+  "buildings": [
+   {
+    "name": "Retail strip",
+    "type": "A",
+    "x": 275,
+    "y": 427,
+    "w": 430,
+    "d": 120,
+    "rot": 0
+   },
+   {
+    "name": "Pad 1",
+    "type": "B",
+    "x": 102.5,
+    "y": 132.5,
+    "w": 65,
+    "d": 55,
+    "rot": 0
+   },
+   {
+    "name": "Pad 2",
+    "type": "B",
+    "x": 209.5,
+    "y": 132.5,
+    "w": 65,
+    "d": 55,
+    "rot": 0
+   },
+   {
+    "name": "Pad 3",
+    "type": "B",
+    "x": 349.5,
+    "y": 132.5,
+    "w": 65,
+    "d": 55,
+    "rot": 0
+   }
+  ],
+  "paving": [
+   {
+    "kind": "walk",
+    "poly": [
+     [
+      60,
+      353
+     ],
+     [
+      490,
+      353
+     ],
+     [
+      490,
+      367
+     ],
+     [
+      60,
+      367
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "name": "Pad 1 drive-thru",
+    "poly": [
+     [
+      52,
+      87
+     ],
+     [
+      64,
+      87
+     ],
+     [
+      64,
+      165
+     ],
+     [
+      52,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      52,
+      87
+     ],
+     [
+      153,
+      87
+     ],
+     [
+      153,
+      99
+     ],
+     [
+      52,
+      99
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      141,
+      87
+     ],
+     [
+      153,
+      87
+     ],
+     [
+      153,
+      165
+     ],
+     [
+      141,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "name": "Pad 2 drive-thru",
+    "poly": [
+     [
+      159,
+      87
+     ],
+     [
+      171,
+      87
+     ],
+     [
+      171,
+      165
+     ],
+     [
+      159,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      159,
+      87
+     ],
+     [
+      260,
+      87
+     ],
+     [
+      260,
+      99
+     ],
+     [
+      159,
+      99
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      248,
+      87
+     ],
+     [
+      260,
+      87
+     ],
+     [
+      260,
+      165
+     ],
+     [
+      248,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "name": "Pad 3 drive-thru",
+    "poly": [
+     [
+      299,
+      87
+     ],
+     [
+      311,
+      87
+     ],
+     [
+      311,
+      165
+     ],
+     [
+      299,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      299,
+      87
+     ],
+     [
+      400,
+      87
+     ],
+     [
+      400,
+      99
+     ],
+     [
+      299,
+      99
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      388,
+      87
+     ],
+     [
+      400,
+      87
+     ],
+     [
+      400,
+      165
+     ],
+     [
+      388,
+      165
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "name": "P",
+    "poly": [
+     [
+      49.0,
+      191.0
+     ],
+     [
+      511.0,
+      191.0
+     ],
+     [
+      511.0,
+      353.0
+     ],
+     [
+      49.0,
+      353.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "name": "W",
+    "poly": [
+     [
+      49.0,
+      26.0
+     ],
+     [
+      265.0,
+      26.0
+     ],
+     [
+      265.0,
+      86.0
+     ],
+     [
+      49.0,
+      86.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "name": "E",
+    "poly": [
+     [
+      295.0,
+      26.0
+     ],
+     [
+      511.0,
+      26.0
+     ],
+     [
+      511.0,
+      86.0
+     ],
+     [
+      295.0,
+      86.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "poly": [
+     [
+      49.0,
+      209.0
+     ],
+     [
+      508.0,
+      209.0
+     ],
+     [
+      508.0,
+      191.0
+     ],
+     [
+      49.0,
+      191.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "poly": [
+     [
+      49.0,
+      233.0
+     ],
+     [
+      508.0,
+      233.0
+     ],
+     [
+      508.0,
+      251.0
+     ],
+     [
+      49.0,
+      251.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "poly": [
+     [
+      49.0,
+      269.0
+     ],
+     [
+      508.0,
+      269.0
+     ],
+     [
+      508.0,
+      251.0
+     ],
+     [
+      49.0,
+      251.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "poly": [
+     [
+      49.0,
+      293.0
+     ],
+     [
+      508.0,
+      293.0
+     ],
+     [
+      508.0,
+      311.0
+     ],
+     [
+      49.0,
+      311.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "poly": [
+     [
+      49.0,
+      329.0
+     ],
+     [
+      508.0,
+      329.0
+     ],
+     [
+      508.0,
+      311.0
+     ],
+     [
+      49.0,
+      311.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "poly": [
+     [
+      49.0,
+      44.0
+     ],
+     [
+      263.0,
+      44.0
+     ],
+     [
+      263.0,
+      26.0
+     ],
+     [
+      49.0,
+      26.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "poly": [
+     [
+      49.0,
+      68.0
+     ],
+     [
+      265.0,
+      68.0
+     ],
+     [
+      265.0,
+      86.0
+     ],
+     [
+      49.0,
+      86.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "poly": [
+     [
+      295.0,
+      44.0
+     ],
+     [
+      509.0,
+      44.0
+     ],
+     [
+      509.0,
+      26.0
+     ],
+     [
+      295.0,
+      26.0
+     ]
+    ]
+   },
+   {
+    "kind": "parking",
+    "poly": [
+     [
+      295.0,
+      68.0
+     ],
+     [
+      511.0,
+      68.0
+     ],
+     [
+      511.0,
+      86.0
+     ],
+     [
+      295.0,
+      86.0
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      265.0,
+      0.0
+     ],
+     [
+      265.0,
+      178.0
+     ],
+     [
+      295.0,
+      178.0
+     ],
+     [
+      295.0,
+      0.0
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      23.0,
+      191.0
+     ],
+     [
+      537.0,
+      191.0
+     ],
+     [
+      537.0,
+      165.0
+     ],
+     [
+      23.0,
+      165.0
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      23.0,
+      26.0
+     ],
+     [
+      23.0,
+      513.0
+     ],
+     [
+      49.0,
+      513.0
+     ],
+     [
+      49.0,
+      26.0
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      511.0,
+      26.0
+     ],
+     [
+      511.0,
+      513.0
+     ],
+     [
+      537.0,
+      513.0
+     ],
+     [
+      537.0,
+      26.0
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      23.0,
+      513.0
+     ],
+     [
+      537.0,
+      513.0
+     ],
+     [
+      537.0,
+      487.0
+     ],
+     [
+      23.0,
+      487.0
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      49.0,
+      233.0
+     ],
+     [
+      511.0,
+      233.0
+     ],
+     [
+      511.0,
+      209.0
+     ],
+     [
+      49.0,
+      209.0
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      49.0,
+      293.0
+     ],
+     [
+      511.0,
+      293.0
+     ],
+     [
+      511.0,
+      269.0
+     ],
+     [
+      49.0,
+      269.0
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      49.0,
+      353.0
+     ],
+     [
+      511.0,
+      353.0
+     ],
+     [
+      511.0,
+      329.0
+     ],
+     [
+      49.0,
+      329.0
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      49.0,
+      68.0
+     ],
+     [
+      265.0,
+      68.0
+     ],
+     [
+      265.0,
+      44.0
+     ],
+     [
+      49.0,
+      44.0
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      295.0,
+      68.0
+     ],
+     [
+      511.0,
+      68.0
+     ],
+     [
+      511.0,
+      44.0
+     ],
+     [
+      295.0,
+      44.0
+     ]
+    ]
+   }
+  ],
+  "drives": [
+   {
+    "name": "Main entrance",
+    "pts": [
+     [
+      280,
+      0
+     ],
+     [
+      280,
+      178
+     ]
+    ],
+    "width": 30,
+    "fire_lane": true
+   },
+   {
+    "name": "Front drive",
+    "pts": [
+     [
+      23,
+      178
+     ],
+     [
+      537,
+      178
+     ]
+    ],
+    "width": 26,
+    "fire_lane": true
+   },
+   {
+    "name": "West drive",
+    "pts": [
+     [
+      36,
+      26
+     ],
+     [
+      36,
+      513
+     ]
+    ],
+    "width": 26,
+    "fire_lane": true
+   },
+   {
+    "name": "East drive",
+    "pts": [
+     [
+      524,
+      26
+     ],
+     [
+      524,
+      513
+     ]
+    ],
+    "width": 26,
+    "fire_lane": true
+   },
+   {
+    "name": "Rear service drive",
+    "pts": [
+     [
+      23,
+      500
+     ],
+     [
+      537,
+      500
+     ]
+    ],
+    "width": 26,
+    "fire_lane": true
+   },
+   {
+    "name": "P aisle 1",
+    "pts": [
+     [
+      49.0,
+      221.0
+     ],
+     [
+      511.0,
+      221.0
+     ]
+    ],
+    "width": 24,
+    "fire_lane": false
+   },
+   {
+    "name": "P aisle 2",
+    "pts": [
+     [
+      49.0,
+      281.0
+     ],
+     [
+      511.0,
+      281.0
+     ]
+    ],
+    "width": 24,
+    "fire_lane": false
+   },
+   {
+    "name": "P aisle 3",
+    "pts": [
+     [
+      49.0,
+      341.0
+     ],
+     [
+      511.0,
+      341.0
+     ]
+    ],
+    "width": 24,
+    "fire_lane": false
+   },
+   {
+    "name": "W aisle 1",
+    "pts": [
+     [
+      49.0,
+      56.0
+     ],
+     [
+      265.0,
+      56.0
+     ]
+    ],
+    "width": 24,
+    "fire_lane": false
+   },
+   {
+    "name": "E aisle 1",
+    "pts": [
+     [
+      295.0,
+      56.0
+     ],
+     [
+      511.0,
+      56.0
+     ]
+    ],
+    "width": 24,
+    "fire_lane": false
+   }
+  ],
+  "ponds": [
+   {
+    "name": "Detention",
+    "poly": [
+     [
+      542,
+      26
+     ],
+     [
+      650,
+      26
+     ],
+     [
+      650,
+      505
+     ],
+     [
+      542,
+      505
+     ]
+    ],
+    "depth_ft": 5,
+    "freeboard_ft": 1,
+    "side_slope": 3,
+    "volume_acft": 4.567
+   }
+  ],
+  "dumpsters": [
+   {
+    "x": 500,
+    "y": 440,
+    "w": 12,
+    "d": 24
+   }
+  ],
+  "signs": [
+   {
+    "x": 456,
+    "y": 40
+   }
+  ],
+  "detention_rate_acft_per_ac": 0.55,
+  "detention_cls": "ENGINEERING ASSUMPTION",
+  "detention_source": "EXAMPLE: county small-site minimum, confirm",
+  "open_space": [
+   {
+    "label": "Sign & landscape",
+    "poly": [
+     [
+      412,
+      30
+     ],
+     [
+      508,
+      30
+     ],
+     [
+      508,
+      160
+     ],
+     [
+      412,
+      160
+     ]
+    ]
+   }
+  ],
+  "dims": [
+   {
+    "a": [
+     60,
+     367
+    ],
+    "b": [
+     60,
+     487
+    ],
+    "text": "120'"
+   }
+  ],
+  "parking_rows": [
+   {
+    "name": "P-1",
+    "a": [
+     49.0,
+     209.0
+    ],
+    "b": [
+     511.0,
+     209.0
+    ],
+    "side": "right",
+    "stall_w": 9.0,
+    "stall_d": 18.0,
+    "ada": 6,
+    "van": 1
+   },
+   {
+    "name": "P-2",
+    "a": [
+     49.0,
+     233.0
+    ],
+    "b": [
+     511.0,
+     233.0
+    ],
+    "side": "left",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   },
+   {
+    "name": "P-3",
+    "a": [
+     49.0,
+     269.0
+    ],
+    "b": [
+     511.0,
+     269.0
+    ],
+    "side": "right",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   },
+   {
+    "name": "P-4",
+    "a": [
+     49.0,
+     293.0
+    ],
+    "b": [
+     511.0,
+     293.0
+    ],
+    "side": "left",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   },
+   {
+    "name": "P-5",
+    "a": [
+     49.0,
+     329.0
+    ],
+    "b": [
+     511.0,
+     329.0
+    ],
+    "side": "right",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   },
+   {
+    "name": "W-1",
+    "a": [
+     49.0,
+     44.0
+    ],
+    "b": [
+     265.0,
+     44.0
+    ],
+    "side": "right",
+    "stall_w": 9.0,
+    "stall_d": 18.0,
+    "ada": 1,
+    "van": 1
+   },
+   {
+    "name": "W-2",
+    "a": [
+     49.0,
+     68.0
+    ],
+    "b": [
+     265.0,
+     68.0
+    ],
+    "side": "left",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   },
+   {
+    "name": "E-1",
+    "a": [
+     295.0,
+     44.0
+    ],
+    "b": [
+     511.0,
+     44.0
+    ],
+    "side": "right",
+    "stall_w": 9.0,
+    "stall_d": 18.0,
+    "ada": 1,
+    "van": 1
+   },
+   {
+    "name": "E-2",
+    "a": [
+     295.0,
+     68.0
+    ],
+    "b": [
+     511.0,
+     68.0
+    ],
+    "side": "left",
+    "stall_w": 9.0,
+    "stall_d": 18.0
+   }
+  ],
+  "parking": {
+   "required": 331,
+   "provided": 346,
+   "ada": 8,
+   "basis": "Retail strip: 4 / 1,000 sf; Drive-thru restaurant pad: 10 / 1,000 sf"
+  },
+  "developed_acres": 8.106
+ },
+ "types": [
+  {
+   "id": "A",
+   "use": "retail",
+   "label": "Retail strip",
+   "W": 430,
+   "D": 120,
+   "floors": 1,
+   "floor_h": 18,
+   "parking": {
+    "spaces": 4,
+    "per_sf": 1000,
+    "basis": "4 / 1,000 sf",
+    "cls": "UNVERIFIED"
+   },
+   "count": 1,
+   "design": {
+    "summary": "Fourteen-bay multi-tenant retail shell with storefronts on the front and service doors at the back.",
+    "rooms": [
+     {
+      "id": "t1",
+      "name": "Tenant 1",
+      "type": "tenant",
+      "floor": 1,
+      "x": 0,
+      "y": 0,
+      "w": 35,
+      "d": 104
+     },
+     {
+      "id": "r1",
+      "name": "Restroom 1",
+      "type": "restroom",
+      "floor": 1,
+      "x": 0,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s1",
+      "name": "Storage 1",
+      "type": "storage",
+      "floor": 1,
+      "x": 8,
+      "y": 104,
+      "w": 27,
+      "d": 16
+     },
+     {
+      "id": "t2",
+      "name": "Tenant 2",
+      "type": "tenant",
+      "floor": 1,
+      "x": 35,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r2",
+      "name": "Restroom 2",
+      "type": "restroom",
+      "floor": 1,
+      "x": 35,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s2",
+      "name": "Storage 2",
+      "type": "storage",
+      "floor": 1,
+      "x": 43,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t3",
+      "name": "Tenant 3",
+      "type": "tenant",
+      "floor": 1,
+      "x": 65,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r3",
+      "name": "Restroom 3",
+      "type": "restroom",
+      "floor": 1,
+      "x": 65,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s3",
+      "name": "Storage 3",
+      "type": "storage",
+      "floor": 1,
+      "x": 73,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t4",
+      "name": "Tenant 4",
+      "type": "tenant",
+      "floor": 1,
+      "x": 95,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r4",
+      "name": "Restroom 4",
+      "type": "restroom",
+      "floor": 1,
+      "x": 95,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s4",
+      "name": "Storage 4",
+      "type": "storage",
+      "floor": 1,
+      "x": 103,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t5",
+      "name": "Tenant 5",
+      "type": "tenant",
+      "floor": 1,
+      "x": 125,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r5",
+      "name": "Restroom 5",
+      "type": "restroom",
+      "floor": 1,
+      "x": 125,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s5",
+      "name": "Storage 5",
+      "type": "storage",
+      "floor": 1,
+      "x": 133,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t6",
+      "name": "Tenant 6",
+      "type": "tenant",
+      "floor": 1,
+      "x": 155,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r6",
+      "name": "Restroom 6",
+      "type": "restroom",
+      "floor": 1,
+      "x": 155,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s6",
+      "name": "Storage 6",
+      "type": "storage",
+      "floor": 1,
+      "x": 163,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t7",
+      "name": "Tenant 7",
+      "type": "tenant",
+      "floor": 1,
+      "x": 185,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r7",
+      "name": "Restroom 7",
+      "type": "restroom",
+      "floor": 1,
+      "x": 185,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s7",
+      "name": "Storage 7",
+      "type": "storage",
+      "floor": 1,
+      "x": 193,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t8",
+      "name": "Tenant 8",
+      "type": "tenant",
+      "floor": 1,
+      "x": 215,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r8",
+      "name": "Restroom 8",
+      "type": "restroom",
+      "floor": 1,
+      "x": 215,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s8",
+      "name": "Storage 8",
+      "type": "storage",
+      "floor": 1,
+      "x": 223,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t9",
+      "name": "Tenant 9",
+      "type": "tenant",
+      "floor": 1,
+      "x": 245,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r9",
+      "name": "Restroom 9",
+      "type": "restroom",
+      "floor": 1,
+      "x": 245,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s9",
+      "name": "Storage 9",
+      "type": "storage",
+      "floor": 1,
+      "x": 253,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t10",
+      "name": "Tenant 10",
+      "type": "tenant",
+      "floor": 1,
+      "x": 275,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r10",
+      "name": "Restroom 10",
+      "type": "restroom",
+      "floor": 1,
+      "x": 275,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s10",
+      "name": "Storage 10",
+      "type": "storage",
+      "floor": 1,
+      "x": 283,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t11",
+      "name": "Tenant 11",
+      "type": "tenant",
+      "floor": 1,
+      "x": 305,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r11",
+      "name": "Restroom 11",
+      "type": "restroom",
+      "floor": 1,
+      "x": 305,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s11",
+      "name": "Storage 11",
+      "type": "storage",
+      "floor": 1,
+      "x": 313,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t12",
+      "name": "Tenant 12",
+      "type": "tenant",
+      "floor": 1,
+      "x": 335,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r12",
+      "name": "Restroom 12",
+      "type": "restroom",
+      "floor": 1,
+      "x": 335,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s12",
+      "name": "Storage 12",
+      "type": "storage",
+      "floor": 1,
+      "x": 343,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t13",
+      "name": "Tenant 13",
+      "type": "tenant",
+      "floor": 1,
+      "x": 365,
+      "y": 0,
+      "w": 30,
+      "d": 104
+     },
+     {
+      "id": "r13",
+      "name": "Restroom 13",
+      "type": "restroom",
+      "floor": 1,
+      "x": 365,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s13",
+      "name": "Storage 13",
+      "type": "storage",
+      "floor": 1,
+      "x": 373,
+      "y": 104,
+      "w": 22,
+      "d": 16
+     },
+     {
+      "id": "t14",
+      "name": "Tenant 14",
+      "type": "tenant",
+      "floor": 1,
+      "x": 395,
+      "y": 0,
+      "w": 35,
+      "d": 104
+     },
+     {
+      "id": "r14",
+      "name": "Restroom 14",
+      "type": "restroom",
+      "floor": 1,
+      "x": 395,
+      "y": 104,
+      "w": 8,
+      "d": 16
+     },
+     {
+      "id": "s14",
+      "name": "Storage 14",
+      "type": "storage",
+      "floor": 1,
+      "x": 403,
+      "y": 104,
+      "w": 27,
+      "d": 16
+     }
+    ],
+    "doors": [
+     {
+      "a": "t1",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t1",
+      "b": "r1",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t1",
+      "b": "s1",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s1",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t2",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t2",
+      "b": "r2",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t2",
+      "b": "s2",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s2",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t3",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t3",
+      "b": "r3",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t3",
+      "b": "s3",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s3",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t4",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t4",
+      "b": "r4",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t4",
+      "b": "s4",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s4",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t5",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t5",
+      "b": "r5",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t5",
+      "b": "s5",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s5",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t6",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t6",
+      "b": "r6",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t6",
+      "b": "s6",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s6",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t7",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t7",
+      "b": "r7",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t7",
+      "b": "s7",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s7",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t8",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t8",
+      "b": "r8",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t8",
+      "b": "s8",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s8",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t9",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t9",
+      "b": "r9",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t9",
+      "b": "s9",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s9",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t10",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t10",
+      "b": "r10",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t10",
+      "b": "s10",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s10",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t11",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t11",
+      "b": "r11",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t11",
+      "b": "s11",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s11",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t12",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t12",
+      "b": "r12",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t12",
+      "b": "s12",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s12",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t13",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t13",
+      "b": "r13",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t13",
+      "b": "s13",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s13",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t14",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t14",
+      "b": "r14",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t14",
+      "b": "s14",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s14",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     }
+    ],
+    "windows": [
+     {
+      "room": "t1",
+      "side": "front",
+      "count": 2,
+      "width": 11.5,
+      "height": 9
+     },
+     {
+      "room": "t2",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t3",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t4",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t5",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t6",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t7",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t8",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t9",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t10",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t11",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t12",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t13",
+      "side": "front",
+      "count": 2,
+      "width": 9.0,
+      "height": 9
+     },
+     {
+      "room": "t14",
+      "side": "front",
+      "count": 2,
+      "width": 11.5,
+      "height": 9
+     }
+    ],
+    "roof": {
+     "type": "flat",
+     "pitch": 0,
+     "ridge": "along_front",
+     "overhang": 0
+    },
+    "exterior": {
+     "walls": "Tan brick with stucco upper bands and cast stone base",
+     "accent": "Dark metal canopies over storefronts",
+     "roofing": "TPO membrane behind parapets",
+     "windows": "Clear-anodized aluminum storefront, low-E",
+     "doors": "Aluminum storefront entries; painted hollow metal rear doors"
+    },
+    "systems": {
+     "structure": "Load-bearing CMU with steel joists",
+     "foundation": "Slab on grade",
+     "hvac": "rooftop_units",
+     "water_heater": "tank_electric",
+     "sprinklered": true,
+     "fire_alarm": true
+    }
+   }
+  },
+  {
+   "id": "B",
+   "use": "restaurant",
+   "label": "Drive-thru restaurant pad",
+   "W": 65,
+   "D": 55,
+   "floors": 1,
+   "floor_h": 16,
+   "parking": {
+    "spaces": 10,
+    "per_sf": 1000,
+    "basis": "10 / 1,000 sf",
+    "cls": "UNVERIFIED"
+   },
+   "count": 3,
+   "design": {
+    "summary": "Drive-thru restaurant: dining at the front, restrooms and office behind it, kitchen at the back with a pick-up window on the left.",
+    "rooms": [
+     {
+      "id": "din",
+      "name": "Dining",
+      "type": "dining_room",
+      "floor": 1,
+      "x": 0,
+      "y": 0,
+      "w": 65,
+      "d": 25
+     },
+     {
+      "id": "rr1",
+      "name": "Restroom 1",
+      "type": "restroom",
+      "floor": 1,
+      "x": 0,
+      "y": 25,
+      "w": 10,
+      "d": 12
+     },
+     {
+      "id": "rr2",
+      "name": "Restroom 2",
+      "type": "restroom",
+      "floor": 1,
+      "x": 10,
+      "y": 25,
+      "w": 10,
+      "d": 12
+     },
+     {
+      "id": "off",
+      "name": "Office",
+      "type": "office",
+      "floor": 1,
+      "x": 20,
+      "y": 25,
+      "w": 10,
+      "d": 12
+     },
+     {
+      "id": "hal",
+      "name": "Hall",
+      "type": "corridor",
+      "floor": 1,
+      "x": 30,
+      "y": 25,
+      "w": 35,
+      "d": 12
+     },
+     {
+      "id": "kit",
+      "name": "Kitchen",
+      "type": "commercial_kitchen",
+      "floor": 1,
+      "x": 0,
+      "y": 37,
+      "w": 45,
+      "d": 18
+     },
+     {
+      "id": "wic",
+      "name": "Walk-in cooler",
+      "type": "walk_in_cooler",
+      "floor": 1,
+      "x": 45,
+      "y": 37,
+      "w": 10,
+      "d": 18
+     },
+     {
+      "id": "dry",
+      "name": "Dry storage",
+      "type": "storage",
+      "floor": 1,
+      "x": 55,
+      "y": 37,
+      "w": 10,
+      "d": 18
+     }
+    ],
+    "doors": [
+     {
+      "a": "din",
+      "b": "outside",
+      "width": 6,
+      "kind": "double",
+      "side": "front"
+     },
+     {
+      "a": "din",
+      "b": "rr1",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "din",
+      "b": "rr2",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "din",
+      "b": "hal",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "hal",
+      "b": "off",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "hal",
+      "b": "kit",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "kit",
+      "b": "wic",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "hal",
+      "b": "dry",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "kit",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     }
+    ],
+    "windows": [
+     {
+      "room": "din",
+      "side": "front",
+      "count": 4,
+      "width": 8,
+      "height": 8
+     },
+     {
+      "room": "din",
+      "side": "left",
+      "count": 2,
+      "width": 6,
+      "height": 7
+     },
+     {
+      "room": "din",
+      "side": "right",
+      "count": 2,
+      "width": 6,
+      "height": 7
+     },
+     {
+      "room": "kit",
+      "side": "left",
+      "count": 1,
+      "width": 4,
+      "height": 4
+     }
+    ],
+    "roof": {
+     "type": "flat",
+     "pitch": 0,
+     "ridge": "along_front",
+     "overhang": 0
+    },
+    "exterior": {
+     "walls": "Red brick with stone base",
+     "accent": "Standing-seam metal awnings over the windows",
+     "roofing": "TPO membrane behind parapets",
+     "windows": "Dark bronze aluminum storefront",
+     "doors": "Aluminum entry; hollow metal service door"
+    },
+    "systems": {
+     "structure": "Steel joists on load-bearing masonry",
+     "foundation": "Slab on grade",
+     "hvac": "rooftop_units",
+     "water_heater": "tankless_gas",
+     "sprinklered": false,
+     "fire_alarm": true
+    }
+   }
+  }
+ ],
+ "accepted_warnings": [
+  {
+   "check": "unassigned",
+   "why": "About 0.7 ac inside the setbacks is foundation planting, pad yards and the strip's end landscape. A fourth pad would exceed the roughly 12,000 sf of restaurant space the market supports, and more strip area would need parking the site has no room for."
+  }
+ ],
+ "notes": {
+  "description": "Neighborhood retail strip with two drive-thru pads on 8.11 acres. EXAMPLE. Frontage on a 4-lane state highway (~30,000 vehicles a day) with growing rooftops behind it and no competing strip within a mile makes retail the most productive use. The test fit ranked pads on the frontage with a strip behind first by residual land value; storage and multifamily came out below it, office negative. Three drive-thru pads take the frontage (the market supports about 12,000 sf), the strip fills the depth, and one side pond holds the detention."
+ },
+ "source_layout": {
+  "pdf": "example-fm-2920-retail-option-a-site-layout.pdf",
+  "sheet": "SP-1",
+  "note": "Geometry in feet in the reference frame of this file; the PDF is drawn turned by display_rotate_deg. Build the set from this file, not by tracing the PDF."
+ }
+}
