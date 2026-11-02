@@ -113,7 +113,7 @@ async function loadSource(src) {
 }
 
 // ---------- placing rows without a point: the US Census batch geocoder (free, 10,000 addresses a request) ----------
-const GEOCODE_MAX = E.GEOCODE_MAX != null ? +E.GEOCODE_MAX : 50000;
+const GEOCODE_MAX = E.GEOCODE_MAX != null && E.GEOCODE_MAX !== '' ? +E.GEOCODE_MAX : 50000; // (the workflow passes '' when the input is blank)
 const csvCell = v => '"' + String(v ?? '').replace(/"/g, "'").replace(/[\r\n,]+/g, ' ').trim() + '"';
 async function censusBatch(rows) {
   const csv = rows.map(r => [r.i, r.street, r.city, r.state, r.zip].map(csvCell).join(',')).join('\n');

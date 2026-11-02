@@ -3,6 +3,11 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-01
+
+### 11:08 PM CT: Permits without map points are placed by address again (HASH)
+- **Permits published with a street address but no coordinates** (Dallas, Honolulu, San Diego County, Cook County, Kansas City's older years and others) are now placed on the map by their address, newest first, on every 3-hour pass. A blank setting in the scheduled job had turned the address lookup off.
+
 ## 2026-10-31
 
 ### 4:45 AM CT: Building permits nationwide and state business registries (8f170f0 … this push)
