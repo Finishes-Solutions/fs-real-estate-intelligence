@@ -1,0 +1,1368 @@
+{
+ "project": {
+  "name": "Waller Crossing",
+  "client": "Example Owner LLC",
+  "address": "FM 362 at Example Rd, Waller, TX 77484",
+  "county": "Waller County",
+  "number": "FS-0000",
+  "option": "Option A",
+  "date": "Oct 22, 2026",
+  "drawn_by": "FS",
+  "checked_by": "",
+  "revisions": [
+   {
+    "no": "0",
+    "date": "10/22/26",
+    "desc": "Schematic design issue"
+   }
+  ]
+ },
+ "sections": [
+  "general",
+  "civil",
+  "landscape",
+  "arch",
+  "structural",
+  "mechanical",
+  "plumbing",
+  "electrical",
+  "fire",
+  "renderings"
+ ],
+ "facts": [
+  "EXAMPLE DATA ONLY \u2014 replace with the reference documents' facts.",
+  "FEMA Zone X (unshaded) per the reference; confirm with the effective FIRM.",
+  "Frontage on FM 362 (TxDOT): driveway permit required.",
+  "Water and sewer providers unconfirmed: obtain will-serve letters."
+ ],
+ "site": {
+  "boundary": [
+   [
+    0,
+    0
+   ],
+   [
+    600,
+    0
+   ],
+   [
+    600,
+    560
+   ],
+   [
+    0,
+    560
+   ]
+  ],
+  "north_deg": 0,
+  "display_rotate_deg": 0,
+  "boundary_source": "the conceptual site plan (example)",
+  "flood_zone": "X (unshaded) \u2014 example",
+  "jurisdiction": "City of Waller ETJ (verify)",
+  "utilities": "To be confirmed",
+  "setbacks": {
+   "front": 26.25,
+   "rear": 10.5,
+   "side": 5
+  },
+  "streets": [
+   {
+    "name": "FM 362",
+    "pts": [
+     [
+      -120,
+      -50
+     ],
+     [
+      720,
+      -50
+     ]
+    ],
+    "row_width": 100
+   }
+  ],
+  "easements": [
+   {
+    "label": "15' UTILITY EASEMENT (VERIFY)",
+    "poly": [
+     [
+      0,
+      0
+     ],
+     [
+      600,
+      0
+     ],
+     [
+      600,
+      15
+     ],
+     [
+      0,
+      15
+     ]
+    ]
+   }
+  ],
+  "buildings": [
+   {
+    "name": "Retail",
+    "type": "B",
+    "x": 135,
+    "y": 330,
+    "w": 150,
+    "d": 60,
+    "rot": 0
+   },
+   {
+    "name": "Restaurant",
+    "type": "C",
+    "x": 330,
+    "y": 330,
+    "w": 70,
+    "d": 60,
+    "rot": 0
+   },
+   {
+    "name": "Lot 1",
+    "type": "A",
+    "x": 30,
+    "y": 484.5,
+    "w": 45,
+    "d": 55,
+    "rot": 0
+   },
+   {
+    "name": "Lot 2",
+    "type": "A",
+    "x": 90,
+    "y": 484.5,
+    "w": 45,
+    "d": 55,
+    "rot": 0
+   },
+   {
+    "name": "Lot 3",
+    "type": "A",
+    "x": 150,
+    "y": 484.5,
+    "w": 45,
+    "d": 55,
+    "rot": 0
+   },
+   {
+    "name": "Lot 4",
+    "type": "A",
+    "x": 210,
+    "y": 484.5,
+    "w": 45,
+    "d": 55,
+    "rot": 0
+   },
+   {
+    "name": "Lot 5",
+    "type": "A",
+    "x": 270,
+    "y": 484.5,
+    "w": 45,
+    "d": 55,
+    "rot": 0
+   },
+   {
+    "name": "Lot 6",
+    "type": "A",
+    "x": 330,
+    "y": 484.5,
+    "w": 45,
+    "d": 55,
+    "rot": 0
+   }
+  ],
+  "paving": [
+   {
+    "kind": "parking",
+    "poly": [
+     [
+      40,
+      110
+     ],
+     [
+      420,
+      110
+     ],
+     [
+      420,
+      290
+     ],
+     [
+      40,
+      290
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      217,
+      0
+     ],
+     [
+      243,
+      0
+     ],
+     [
+      243,
+      432
+     ],
+     [
+      217,
+      432
+     ]
+    ]
+   },
+   {
+    "kind": "drive",
+    "poly": [
+     [
+      0,
+      408
+     ],
+     [
+      400,
+      408
+     ],
+     [
+      400,
+      432
+     ],
+     [
+      0,
+      432
+     ]
+    ]
+   }
+  ],
+  "drives": [
+   {
+    "name": "Main entrance",
+    "pts": [
+     [
+      230,
+      0
+     ],
+     [
+      230,
+      420
+     ]
+    ],
+    "width": 26,
+    "fire_lane": true
+   },
+   {
+    "name": "Residential street",
+    "pts": [
+     [
+      10,
+      420
+     ],
+     [
+      400,
+      420
+     ]
+    ],
+    "width": 24,
+    "fire_lane": true
+   },
+   {
+    "name": "Parking aisle",
+    "pts": [
+     [
+      50,
+      200
+     ],
+     [
+      410,
+      200
+     ]
+    ],
+    "width": 24
+   }
+  ],
+  "ponds": [
+   {
+    "name": "Detention pond",
+    "poly": [
+     [
+      430,
+      25
+     ],
+     [
+      590,
+      25
+     ],
+     [
+      590,
+      400
+     ],
+     [
+      430,
+      400
+     ]
+    ],
+    "depth_ft": 8
+   }
+  ],
+  "lots": [
+   {
+    "id": "L1",
+    "poly": [
+     [
+      0,
+      432
+     ],
+     [
+      60,
+      432
+     ],
+     [
+      60,
+      560
+     ],
+     [
+      0,
+      560
+     ]
+    ]
+   },
+   {
+    "id": "L2",
+    "poly": [
+     [
+      60,
+      432
+     ],
+     [
+      120,
+      432
+     ],
+     [
+      120,
+      560
+     ],
+     [
+      60,
+      560
+     ]
+    ]
+   },
+   {
+    "id": "L3",
+    "poly": [
+     [
+      120,
+      432
+     ],
+     [
+      180,
+      432
+     ],
+     [
+      180,
+      560
+     ],
+     [
+      120,
+      560
+     ]
+    ]
+   },
+   {
+    "id": "L4",
+    "poly": [
+     [
+      180,
+      432
+     ],
+     [
+      240,
+      432
+     ],
+     [
+      240,
+      560
+     ],
+     [
+      180,
+      560
+     ]
+    ]
+   },
+   {
+    "id": "L5",
+    "poly": [
+     [
+      240,
+      432
+     ],
+     [
+      300,
+      432
+     ],
+     [
+      300,
+      560
+     ],
+     [
+      240,
+      560
+     ]
+    ]
+   },
+   {
+    "id": "L6",
+    "poly": [
+     [
+      300,
+      432
+     ],
+     [
+      360,
+      432
+     ],
+     [
+      360,
+      560
+     ],
+     [
+      300,
+      560
+     ]
+    ]
+   }
+  ],
+  "parking": {
+   "required": 80,
+   "provided": 96,
+   "ada": 4,
+   "basis": "Retail 1/250 sf, restaurant 1/100 sf (verify)"
+  },
+  "detention_rate_acft_per_ac": 1.0,
+  "stated": {
+   "acres": 7.71
+  }
+ },
+ "types": [
+  {
+   "id": "A",
+   "use": "sfr",
+   "W": 45,
+   "D": 55,
+   "floors": 1,
+   "floor_h": 10,
+   "design": {
+    "summary": "Three-bedroom one-story home with a front-loaded two-car garage, open living and dining at the back, and a primary suite in the back right corner.",
+    "rooms": [
+     {
+      "id": "gar",
+      "name": "Garage",
+      "type": "garage",
+      "floor": 1,
+      "x": 0,
+      "y": 0,
+      "w": 22,
+      "d": 22
+     },
+     {
+      "id": "por",
+      "name": "Porch",
+      "type": "porch",
+      "floor": 1,
+      "x": 22,
+      "y": 0,
+      "w": 9,
+      "d": 6
+     },
+     {
+      "id": "ent",
+      "name": "Entry",
+      "type": "entry",
+      "floor": 1,
+      "x": 22,
+      "y": 6,
+      "w": 9,
+      "d": 16
+     },
+     {
+      "id": "b2",
+      "name": "Bedroom 2",
+      "type": "bedroom",
+      "floor": 1,
+      "x": 31,
+      "y": 0,
+      "w": 14,
+      "d": 12
+     },
+     {
+      "id": "ba2",
+      "name": "Bath 2",
+      "type": "bath",
+      "floor": 1,
+      "x": 31,
+      "y": 12,
+      "w": 8,
+      "d": 10
+     },
+     {
+      "id": "cl2",
+      "name": "Closet",
+      "type": "closet",
+      "floor": 1,
+      "x": 39,
+      "y": 12,
+      "w": 6,
+      "d": 10
+     },
+     {
+      "id": "lau",
+      "name": "Laundry",
+      "type": "laundry",
+      "floor": 1,
+      "x": 0,
+      "y": 22,
+      "w": 9,
+      "d": 8
+     },
+     {
+      "id": "pan",
+      "name": "Pantry",
+      "type": "pantry",
+      "floor": 1,
+      "x": 0,
+      "y": 30,
+      "w": 9,
+      "d": 6
+     },
+     {
+      "id": "kit",
+      "name": "Kitchen",
+      "type": "kitchen",
+      "floor": 1,
+      "x": 9,
+      "y": 22,
+      "w": 16,
+      "d": 14
+     },
+     {
+      "id": "hal",
+      "name": "Hall",
+      "type": "hall",
+      "floor": 1,
+      "x": 25,
+      "y": 22,
+      "w": 4,
+      "d": 33
+     },
+     {
+      "id": "b3",
+      "name": "Bedroom 3",
+      "type": "bedroom",
+      "floor": 1,
+      "x": 29,
+      "y": 22,
+      "w": 16,
+      "d": 12
+     },
+     {
+      "id": "liv",
+      "name": "Living",
+      "type": "living",
+      "floor": 1,
+      "x": 0,
+      "y": 36,
+      "w": 16,
+      "d": 19
+     },
+     {
+      "id": "din",
+      "name": "Dining",
+      "type": "dining",
+      "floor": 1,
+      "x": 16,
+      "y": 36,
+      "w": 9,
+      "d": 19
+     },
+     {
+      "id": "pri",
+      "name": "Primary bedroom",
+      "type": "primary_bedroom",
+      "floor": 1,
+      "x": 29,
+      "y": 34,
+      "w": 16,
+      "d": 14
+     },
+     {
+      "id": "pba",
+      "name": "Primary bath",
+      "type": "bath",
+      "floor": 1,
+      "x": 29,
+      "y": 48,
+      "w": 8,
+      "d": 7
+     },
+     {
+      "id": "wic",
+      "name": "Walk-in closet",
+      "type": "walk_in_closet",
+      "floor": 1,
+      "x": 37,
+      "y": 48,
+      "w": 8,
+      "d": 7
+     }
+    ],
+    "doors": [
+     {
+      "a": "por",
+      "b": "outside",
+      "width": 6,
+      "kind": "opening",
+      "side": "front"
+     },
+     {
+      "a": "por",
+      "b": "ent",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "gar",
+      "b": "outside",
+      "width": 16,
+      "kind": "overhead",
+      "side": "front"
+     },
+     {
+      "a": "gar",
+      "b": "lau",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "lau",
+      "b": "kit",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "pan",
+      "b": "kit",
+      "width": 2.5,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "ent",
+      "b": "hal",
+      "width": 3,
+      "kind": "opening",
+      "side": "any"
+     },
+     {
+      "a": "ent",
+      "b": "b2",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "ent",
+      "b": "ba2",
+      "width": 2.5,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "b2",
+      "b": "cl2",
+      "width": 2.5,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "hal",
+      "b": "kit",
+      "width": 4,
+      "kind": "opening",
+      "side": "any"
+     },
+     {
+      "a": "hal",
+      "b": "b3",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "hal",
+      "b": "pri",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "pri",
+      "b": "pba",
+      "width": 2.5,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "pri",
+      "b": "wic",
+      "width": 2.5,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "hal",
+      "b": "din",
+      "width": 4,
+      "kind": "opening",
+      "side": "any"
+     },
+     {
+      "a": "din",
+      "b": "liv",
+      "width": 6,
+      "kind": "opening",
+      "side": "any"
+     },
+     {
+      "a": "kit",
+      "b": "din",
+      "width": 6,
+      "kind": "opening",
+      "side": "any"
+     },
+     {
+      "a": "liv",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     }
+    ],
+    "windows": [
+     {
+      "room": "b2",
+      "side": "front",
+      "count": 2,
+      "width": 3,
+      "height": 5
+     },
+     {
+      "room": "b2",
+      "side": "right",
+      "count": 1,
+      "width": 3,
+      "height": 5
+     },
+     {
+      "room": "b3",
+      "side": "right",
+      "count": 2,
+      "width": 3,
+      "height": 5
+     },
+     {
+      "room": "pri",
+      "side": "right",
+      "count": 2,
+      "width": 3,
+      "height": 5
+     },
+     {
+      "room": "pba",
+      "side": "back",
+      "count": 1,
+      "width": 2,
+      "height": 3
+     },
+     {
+      "room": "liv",
+      "side": "back",
+      "count": 2,
+      "width": 4,
+      "height": 5
+     },
+     {
+      "room": "liv",
+      "side": "left",
+      "count": 1,
+      "width": 4,
+      "height": 5
+     },
+     {
+      "room": "din",
+      "side": "back",
+      "count": 1,
+      "width": 4,
+      "height": 5
+     },
+     {
+      "room": "lau",
+      "side": "left",
+      "count": 1,
+      "width": 2,
+      "height": 3
+     }
+    ],
+    "roof": {
+     "type": "hip",
+     "pitch": 6,
+     "ridge": "along_front",
+     "overhang": 1.5
+    },
+    "exterior": {
+     "walls": "Brick veneer, fiber-cement siding at gables",
+     "accent": "Cast stone at entry",
+     "roofing": "Architectural asphalt shingles",
+     "windows": "Vinyl single hung, low-E",
+     "doors": "Fiberglass entry door; insulated steel garage door"
+    },
+    "systems": {
+     "structure": "Wood frame, pre-engineered roof trusses",
+     "foundation": "Post-tensioned slab on grade",
+     "hvac": "split_system",
+     "water_heater": "tank_gas",
+     "sprinklered": false,
+     "fire_alarm": false
+    }
+   }
+  },
+  {
+   "id": "B",
+   "use": "retail",
+   "W": 150,
+   "D": 60,
+   "floors": 1,
+   "floor_h": 16,
+   "design": {
+    "summary": "Three 3,000 sf retail bays, each with a storefront, an accessible restroom, back-of-house storage and a rear service door.",
+    "rooms": [
+     {
+      "id": "t1",
+      "name": "Tenant 1",
+      "type": "tenant",
+      "floor": 1,
+      "x": 0,
+      "y": 0,
+      "w": 50,
+      "d": 50
+     },
+     {
+      "id": "r1",
+      "name": "Restroom 1",
+      "type": "restroom",
+      "floor": 1,
+      "x": 0,
+      "y": 50,
+      "w": 8,
+      "d": 10
+     },
+     {
+      "id": "s1",
+      "name": "Storage 1",
+      "type": "storage",
+      "floor": 1,
+      "x": 8,
+      "y": 50,
+      "w": 42,
+      "d": 10
+     },
+     {
+      "id": "t2",
+      "name": "Tenant 2",
+      "type": "tenant",
+      "floor": 1,
+      "x": 50,
+      "y": 0,
+      "w": 50,
+      "d": 50
+     },
+     {
+      "id": "r2",
+      "name": "Restroom 2",
+      "type": "restroom",
+      "floor": 1,
+      "x": 50,
+      "y": 50,
+      "w": 8,
+      "d": 10
+     },
+     {
+      "id": "s2",
+      "name": "Storage 2",
+      "type": "storage",
+      "floor": 1,
+      "x": 58,
+      "y": 50,
+      "w": 42,
+      "d": 10
+     },
+     {
+      "id": "t3",
+      "name": "Tenant 3",
+      "type": "tenant",
+      "floor": 1,
+      "x": 100,
+      "y": 0,
+      "w": 50,
+      "d": 50
+     },
+     {
+      "id": "r3",
+      "name": "Restroom 3",
+      "type": "restroom",
+      "floor": 1,
+      "x": 100,
+      "y": 50,
+      "w": 8,
+      "d": 10
+     },
+     {
+      "id": "s3",
+      "name": "Storage 3",
+      "type": "storage",
+      "floor": 1,
+      "x": 108,
+      "y": 50,
+      "w": 42,
+      "d": 10
+     }
+    ],
+    "doors": [
+     {
+      "a": "t1",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t1",
+      "b": "r1",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t1",
+      "b": "s1",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s1",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t2",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t2",
+      "b": "r2",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t2",
+      "b": "s2",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s2",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     },
+     {
+      "a": "t3",
+      "b": "outside",
+      "width": 6,
+      "kind": "storefront",
+      "side": "front"
+     },
+     {
+      "a": "t3",
+      "b": "r3",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "t3",
+      "b": "s3",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "s3",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     }
+    ],
+    "windows": [
+     {
+      "room": "t1",
+      "side": "front",
+      "count": 2,
+      "width": 12,
+      "height": 8
+     },
+     {
+      "room": "t2",
+      "side": "front",
+      "count": 2,
+      "width": 12,
+      "height": 8
+     },
+     {
+      "room": "t3",
+      "side": "front",
+      "count": 2,
+      "width": 12,
+      "height": 8
+     }
+    ],
+    "roof": {
+     "type": "flat",
+     "pitch": 0,
+     "ridge": "along_front",
+     "overhang": 0
+    },
+    "exterior": {
+     "walls": "Split-face CMU and stone veneer",
+     "accent": "Metal canopy over storefronts",
+     "roofing": "TPO membrane behind parapets",
+     "windows": "Aluminum storefront, low-E",
+     "doors": "Aluminum storefront entries; hollow metal service doors"
+    },
+    "systems": {
+     "structure": "Load-bearing CMU with steel joists",
+     "foundation": "Slab on grade with grade beams",
+     "hvac": "rooftop_units",
+     "water_heater": "tank_electric",
+     "sprinklered": false,
+     "fire_alarm": false
+    }
+   }
+  },
+  {
+   "id": "C",
+   "use": "restaurant",
+   "W": 70,
+   "D": 60,
+   "floors": 1,
+   "floor_h": 16,
+   "design": {
+    "summary": "Full-service restaurant: dining and bar at the front, restrooms off a short corridor, kitchen and back of house behind with a rear service door.",
+    "rooms": [
+     {
+      "id": "din",
+      "name": "Dining",
+      "type": "dining_room",
+      "floor": 1,
+      "x": 0,
+      "y": 0,
+      "w": 45,
+      "d": 40
+     },
+     {
+      "id": "bar",
+      "name": "Bar",
+      "type": "dining_room",
+      "floor": 1,
+      "x": 45,
+      "y": 0,
+      "w": 25,
+      "d": 20
+     },
+     {
+      "id": "cor",
+      "name": "Corridor",
+      "type": "corridor",
+      "floor": 1,
+      "x": 45,
+      "y": 20,
+      "w": 25,
+      "d": 6
+     },
+     {
+      "id": "wom",
+      "name": "Women",
+      "type": "restroom",
+      "floor": 1,
+      "x": 45,
+      "y": 26,
+      "w": 12,
+      "d": 14
+     },
+     {
+      "id": "men",
+      "name": "Men",
+      "type": "restroom",
+      "floor": 1,
+      "x": 57,
+      "y": 26,
+      "w": 13,
+      "d": 14
+     },
+     {
+      "id": "kit",
+      "name": "Kitchen",
+      "type": "commercial_kitchen",
+      "floor": 1,
+      "x": 0,
+      "y": 40,
+      "w": 40,
+      "d": 20
+     },
+     {
+      "id": "wic",
+      "name": "Walk-in cooler",
+      "type": "walk_in_cooler",
+      "floor": 1,
+      "x": 40,
+      "y": 40,
+      "w": 12,
+      "d": 10
+     },
+     {
+      "id": "dry",
+      "name": "Dry storage",
+      "type": "storage",
+      "floor": 1,
+      "x": 40,
+      "y": 50,
+      "w": 12,
+      "d": 10
+     },
+     {
+      "id": "off",
+      "name": "Office",
+      "type": "office",
+      "floor": 1,
+      "x": 52,
+      "y": 40,
+      "w": 9,
+      "d": 10
+     },
+     {
+      "id": "jan",
+      "name": "Janitor",
+      "type": "janitor",
+      "floor": 1,
+      "x": 61,
+      "y": 40,
+      "w": 9,
+      "d": 10
+     },
+     {
+      "id": "bh",
+      "name": "Back hall",
+      "type": "corridor",
+      "floor": 1,
+      "x": 52,
+      "y": 50,
+      "w": 18,
+      "d": 10
+     }
+    ],
+    "doors": [
+     {
+      "a": "din",
+      "b": "outside",
+      "width": 6,
+      "kind": "double",
+      "side": "front"
+     },
+     {
+      "a": "bar",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "front"
+     },
+     {
+      "a": "din",
+      "b": "bar",
+      "width": 6,
+      "kind": "opening",
+      "side": "any"
+     },
+     {
+      "a": "bar",
+      "b": "cor",
+      "width": 3,
+      "kind": "opening",
+      "side": "any"
+     },
+     {
+      "a": "din",
+      "b": "cor",
+      "width": 3,
+      "kind": "opening",
+      "side": "any"
+     },
+     {
+      "a": "cor",
+      "b": "wom",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "cor",
+      "b": "men",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "din",
+      "b": "kit",
+      "width": 5,
+      "kind": "double",
+      "side": "any"
+     },
+     {
+      "a": "kit",
+      "b": "wic",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "kit",
+      "b": "dry",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "dry",
+      "b": "bh",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "bh",
+      "b": "off",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "bh",
+      "b": "jan",
+      "width": 3,
+      "kind": "swing",
+      "side": "any"
+     },
+     {
+      "a": "bh",
+      "b": "outside",
+      "width": 3,
+      "kind": "swing",
+      "side": "back"
+     }
+    ],
+    "windows": [
+     {
+      "room": "din",
+      "side": "front",
+      "count": 3,
+      "width": 6,
+      "height": 7
+     },
+     {
+      "room": "din",
+      "side": "left",
+      "count": 3,
+      "width": 6,
+      "height": 7
+     },
+     {
+      "room": "bar",
+      "side": "front",
+      "count": 2,
+      "width": 6,
+      "height": 7
+     }
+    ],
+    "roof": {
+     "type": "flat",
+     "pitch": 0,
+     "ridge": "along_front",
+     "overhang": 0
+    },
+    "exterior": {
+     "walls": "Brick veneer and stucco",
+     "accent": "Standing-seam metal awning",
+     "roofing": "TPO membrane behind parapets",
+     "windows": "Aluminum storefront, low-E",
+     "doors": "Aluminum entries; hollow metal service door"
+    },
+    "systems": {
+     "structure": "Steel joists on load-bearing masonry",
+     "foundation": "Slab on grade with grade beams",
+     "hvac": "rooftop_units",
+     "water_heater": "tankless_gas",
+     "sprinklered": false,
+     "fire_alarm": true
+    }
+   }
+  }
+ ],
+ "notes": {
+  "description": "EXAMPLE: a 7.7-acre mixed-use site on FM 362 with a 9,000 sf retail shell, a 4,200 sf restaurant pad and six single-family lots, served by one entrance and a detention pond on the east side.",
+  "general_notes": [
+   "EXAMPLE notes: Claude writes these from the reference documents."
+  ],
+  "codes": [
+   "International Building Code 2021, as adopted by the authority having jurisdiction",
+   "International Residential Code 2021"
+  ],
+  "next_steps": [
+   "Boundary and topographic survey",
+   "Geotechnical investigation",
+   "Utility will-serve letters",
+   "TxDOT driveway permit"
+  ]
+ },
+ "renders": []
+}
