@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-01
 
-### 11:08 PM CT: Permits without map points are placed by address again (HASH)
+### 11:08 PM CT: Permits without map points are placed by address again (5bba41e)
 - **Permits published with a street address but no coordinates** (Dallas, Honolulu, San Diego County, Cook County, Kansas City's older years and others) are now placed on the map by their address, newest first, on every 3-hour pass. A blank setting in the scheduled job had turned the address lookup off.
 
 ## 2026-10-31
