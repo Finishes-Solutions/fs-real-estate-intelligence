@@ -3,6 +3,11 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-02
+
+### 7:46 AM CT: Permit search and permits map layer: database side, not applied yet (this push)
+- **Nothing changes in the app yet.** This adds the database script behind two upcoming features: finding specific permits (by permit number, street address, contractor or words, kind, value and dates) and a Permits map layer like Parcels (a density view zoomed out, single permits zoomed in). It is applied to the database and wired into the app in the next push.
+
 ## 2026-11-01
 
 ### 11:08 PM CT: Permits without map points are placed by address again (5bba41e)
