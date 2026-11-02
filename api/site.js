@@ -143,12 +143,9 @@ export async function site(lon, lat, { addr, zip } = {}) {
     part(async () => { const out = []; for (const id of [0, 1, 2]) for (const a of await query(SRC.school + '/' + id, lon, lat, { fields: 'NAME' })) if (a.NAME && !out.includes(a.NAME)) out.push(a.NAME); return out; }),
     part(async () => inHouston(lon, lat) ? { stops: (await getJSON((await layerOf(SRC.stops)) + '/query?returnCountOnly=true&' + near(lon, lat, 400))).count ?? null } : null),
     part(() => echo(lon, lat)),
-    part(async () => db && inHouston(lon, lat) ? crimeSummary(await db.rpc('crime_near', { p_lon: lon, p_lat: lat, p_m: 805 }, { deadline: Date.now() + 15000 }), 0.5) : null),
-    part(() => addr && tx ? bars(addr, zip) : null),
-    part(() => placeAt(lon, lat)), part(() => placesNear(lon, lat))
     part(async () => { const reach = db && inHouston(lon, lat) ? houstonReach(await placeP, await nearP) : 'out'; if (reach === 'out') return null;
       const c = crimeSummary(await db.rpc('crime_near', { p_lon: lon, p_lat: lat, p_m: 805 }, { deadline: Date.now() + 15000 }), 0.5); return reach === 'near' ? { ...c, partial: true } : c; }),
-    part(() => addr ? bars(addr, zip) : null),
+    part(() => addr && tx ? bars(addr, zip) : null),
     placeP, nearP
   ]);
   const nearBy = Array.isArray(nearAll) ? nearAll.filter(x => !place || place.error || x.name !== place.name).slice(0, 6) : nearAll;
