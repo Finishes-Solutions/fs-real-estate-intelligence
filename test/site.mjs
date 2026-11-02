@@ -1,7 +1,7 @@
 // Offline tests for the site panel (api/site.js), Houston crime (lib/crime.mjs) and the economics build (build/econ.mjs).
 import assert from 'node:assert/strict';
 process.env.SUPABASE_URL = 'https://db.test'; process.env.SUPABASE_SECRET_KEY = 'sb_secret_x';
-const calls = [];
+const calls = []; let TIGER_DOWN = false;
 globalThis.fetch = async (url, opts = {}) => {
   const u = new URL(String(url)); calls.push(u.host + u.pathname);
   const j = d => Response.json(d);
@@ -13,7 +13,12 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.pathname.endsWith('COH_Tax_Incentive_Reinvestment_Zones_view/FeatureServer/3/query')) return j({ features: [{ attributes: { NAME: 'Downtown', TIRZ_NO: 3 } }] });
   if (u.pathname.endsWith('COH_METRO_Bus_Stops_view/FeatureServer')) return j({ layers: [{ id: 0 }] });
   if (u.pathname.endsWith('COH_METRO_Bus_Stops_view/FeatureServer/0/query')) { assert.equal(u.searchParams.get('returnCountOnly'), 'true'); return j({ count: 14 }); }
-  if (u.host === 'tigerweb.geo.census.gov' && u.pathname.includes('/Places_CouSub_ConCity_SubMCD/MapServer/4/')) return j({ features: +u.searchParams.get('geometry').split(',')[0] > -96 ? [{ attributes: { BASENAME: 'Houston', NAME: 'Houston city' } }] : [] });
+  // city limits: Katy (-95.82, 29.79) is its own city inside the Houston box; Bellaire (-95.4588, 29.7058) is a city whose
+  // limits Houston's come within 0.5 mile of; an unincorporated spot near Cypress (-95.70, 29.97); Austin is outside the box
+  if (u.host === 'tigerweb.geo.census.gov' && u.pathname.includes('/Places_CouSub_ConCity_SubMCD/MapServer/4/')) { if (TIGER_DOWN) return new Response('down', { status: 503 });
+    const x = +u.searchParams.get('geometry').split(',')[0], m = +u.searchParams.get('distance') || 0;
+    const at = x < -96 || Math.abs(x + 95.70) < 0.005 ? [] : Math.abs(x + 95.82) < 0.05 ? ['Katy'] : Math.abs(x + 95.4588) < 0.005 ? ['Bellaire'] : ['Houston'];
+    return j({ features: [...at, ...(m && at[0] === 'Bellaire' ? ['Houston'] : [])].map(n => ({ attributes: { BASENAME: n, NAME: n + ' city' } })) }); }
   if (u.host === 'tigerweb.geo.census.gov') return j({ features: u.pathname.includes('/School/MapServer/0/') ? [{ attributes: { NAME: 'Houston Independent School District' } }] : [] });
   if (u.pathname.endsWith('get_facilities')) return j({ Results: { QueryID: '985', QueryRows: '3' } });
   if (u.pathname.endsWith('get_qid')) return j({ Results: { Facilities: [{ FacName: 'CLEAN CO', FacSNCFlg: 'N', FacQtrsWithNC: '0', TRIFlag: 'N' }, { FacName: 'SPILL CO', FacStreet: '1 MAIN', FacSNCFlg: 'Y', TRIFlag: 'Y' }, { FacName: 'DRY CLEAN', RCRAComplianceStatus: 'No Violation Identified' }, { FacName: 'OFFICE', RCRAComplianceStatus: 'Not Applicable' }] } });
@@ -21,6 +26,8 @@ globalThis.fetch = async (url, opts = {}) => {
     assert.match(u.searchParams.get('$where'), /like '1001 %MAIN%' AND location_zip like '77002%'/);
     return j([{ tabc_permit_number: 'MB1', location_name: 'THE BAR', obligation_end_date_yyyymmdd: '2026-08-31T00:00:00.000', total_receipts: '100000' }, { tabc_permit_number: 'MB1', location_name: 'THE BAR', obligation_end_date_yyyymmdd: '2026-07-31T00:00:00.000', total_receipts: '90000.5' }, { tabc_permit_number: 'MB2', location_name: 'OLD PLACE', obligation_end_date_yyyymmdd: '2024-01-31T00:00:00.000', total_receipts: '5' }]);
   }
+  if (u.host === 'db.test' && u.pathname === '/rest/v1/rpc/crime_report') return j({ latest: '2026-08-31', from: '2024-09-01', area_sqmi: 3.14, totals: { last12_v: 30, last12_p: 200, last12_o: 70, prior12_v: 30, prior12_p: 200, prior12_o: 70 }, city_last12: { v: 25000, p: 90000, o: 107000 } });
+  if (u.host === 'db.test' && u.pathname === '/rest/v1/rpc/crime_list_json') return j([]);
   if (u.host === 'db.test' && u.pathname === '/rest/v1/rpc/crime_near') { const a = JSON.parse(opts.body); assert.equal(a.p_m, 805);
     return j([{ period: 'last12', cat: 'v', n: 12, latest: '2026-08-31' }, { period: 'last12', cat: 'p', n: 80, latest: '2026-08-31' }, { period: 'last12', cat: 'o', n: 8, latest: '2026-08-31' }, { period: 'prior12', cat: 'v', n: 10 }, { period: 'prior12', cat: 'p', n: 100 }]); }
   return new Response('unmocked ' + u, { status: 599 });
@@ -41,6 +48,28 @@ assert.equal(d.bars.length, 1, 'only the last 12 months'); assert.equal(d.bars[0
 const before = calls.length; const k = await site(-97.74, 30.27); const extra = calls.slice(before);
 assert.ok(!extra.some(c => /COH_|db\.test/.test(c)), 'Houston-only sources skipped elsewhere'); assert.deepEqual(k.districts.tirz, []); assert.equal(k.crime, null); assert.equal(k.bars, null);
 assert.equal(k.place, null, 'outside every city: null (unincorporated)');
+// HPD covers the City of Houston only: inside the box, the city limits decide whether crime_near runs at all
+const crimeCalls = () => calls.filter(c => c.endsWith('/rpc/crime_near')).length;
+let n0 = crimeCalls(); const katy = await site(-95.82, 29.79);
+assert.equal(katy.crime, null, 'Katy is in the Houston box but not in Houston'); assert.equal(crimeCalls(), n0, 'no crime_near call for Katy'); assert.deepEqual(katy.place, { name: 'Katy', full: 'Katy city' });
+n0 = crimeCalls(); const cy = await site(-95.70, 29.97); assert.equal(cy.place, null); assert.equal(cy.crime, null, 'unincorporated, Houston not within 0.5 mile'); assert.equal(crimeCalls(), n0);
+const bel = await site(-95.4588, 29.7058);
+assert.equal(bel.place.name, 'Bellaire'); assert.deepEqual(bel.near.map(x => x.name), ['Houston']); assert.equal(bel.crime.partial, true, 'Houston within 0.5 mile: counted, flagged partial'); assert.equal(bel.crime.last12.total, 100);
+assert.equal(d.crime.partial, undefined, 'inside Houston: not partial');
+TIGER_DOWN = true; n0 = crimeCalls(); const down = await site(-95.82, 29.79); TIGER_DOWN = false;
+assert.match(down.place.error, /503/); assert.equal(down.crime.last12.total, 100, 'city limits unknown: the box decides, as before'); assert.equal(crimeCalls(), n0 + 1);
+const { houstonReach } = await import('../api/site.js'), H = { name: 'Houston' };
+assert.equal(houstonReach(H, [H]), 'in'); assert.equal(houstonReach(null, [H]), 'near'); assert.equal(houstonReach({ name: 'Katy' }, [{ name: 'Katy' }]), 'out'); assert.equal(houstonReach(null, []), 'out');
+assert.equal(houstonReach({ error: 'x' }, [H]), 'in'); assert.equal(houstonReach(H, { error: 'x' }), 'in'); assert.equal(houstonReach({ name: 'Katy' }, { error: 'x' }), null); assert.equal(houstonReach({ error: 'x' }, { error: 'x' }), null);
+// the card's "Crime within 1 mile" (api/crime ?lat&lon): outside the city limits it says so instead of near-zero counts
+{ const { default: crimeApi } = await import('../api/crime.js');
+  const out = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
+  const get = async query => { const r = out(); await crimeApi({ headers: {}, method: 'GET', query: { mi: '1', list: '8', ...query } }, r); return r; };
+  let r = await get({ lat: '29.79', lon: '-95.82' }); assert.equal(r.code, 200); assert.equal(r.body.outside, true); assert.deepEqual(r.body.place, { name: 'Katy', full: 'Katy city' }); assert.equal(r.body.last12, undefined); assert.match(r.body.coverage, /City of Houston only/);
+  r = await get({ lat: '29.97', lon: '-95.70' }); assert.equal(r.body.outside, true); assert.equal(r.body.place, null, 'unincorporated');
+  r = await get({ lat: '29.7604', lon: '-95.3698' }); assert.equal(r.body.outside, undefined); assert.equal(r.body.partial, undefined); assert.equal(r.body.last12.total, 300, 'Houston: unchanged');
+  r = await get({ lat: '29.7058', lon: '-95.4588' }); assert.equal(r.body.partial, true); assert.equal(r.body.place.name, 'Bellaire'); assert.equal(r.body.last12.total, 300);
+  TIGER_DOWN = true; r = await get({ lat: '29.79', lon: '-95.82' }); TIGER_DOWN = false; assert.equal(r.body.outside, undefined, 'TIGERweb down: the report as before'); assert.equal(r.body.last12.total, 300); }
 // one failing source doesn't sink the rest
 const real = globalThis.fetch; globalThis.fetch = async (url, o) => String(url).includes('hazards.fema.gov') ? new Response('down', { status: 503 }) : real(url, o);
 const e = await site(-95.36, 29.76); assert.match(e.flood.error, /503/); assert.equal(e.traffic.roads[0].road, 'I-10'); globalThis.fetch = real;

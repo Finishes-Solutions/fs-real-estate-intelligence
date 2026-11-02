@@ -163,22 +163,26 @@ export function initCrime(ctx) {
   }
 
   // property cards: "Crime" pill → incidents within 1 mile (last 12 months vs the year before), with the full report a click away.
-  // HPD data covers the City of Houston only, so elsewhere the section says so instead of showing zeros.
+  // HPD data covers the City of Houston only, so elsewhere the section says so instead of showing zeros: the box first,
+  // then the city limits (api/crime answers outside: true for a Katy or Sugar Land point; partial: true just outside the limits).
   const circleMi = ([lon, lat], mi) => { const r = mi / 69, k = Math.cos(lat * Math.PI / 180), ring = []; for (let i = 0; i <= 64; i++) { const a = (i % 64) / 64 * 2 * Math.PI; ring.push([lon + r * Math.cos(a) / k, lat + r * Math.sin(a)]); } return { type: 'Polygon', coordinates: [ring] }; };
   ctx.renderCrimeNear = async (el, center, label = () => 'this property', still = () => true) => {
     if (!el) return;
     const head = '<div class="lt">Crime within 1 mile</div>';
-    if (!inHouston(center)) { el.innerHTML = head + '<div class="rnote">Street-level incidents cover the City of Houston only. The yearly figures for the local police department are below.</div>'; return; }
+    const only = where => head + '<div class="rnote">Street-level incidents cover the City of Houston only' + (where ? '; this property is ' + esc(where) : '') + '. The local police department’s yearly figures are below, under Crime by city / county.</div>';
+    if (!inHouston(center)) { el.innerHTML = only(); return; }
     el.innerHTML = head + '<div class="rnote loading">Counting reported incidents…</div>';
     const near = () => ctx.renderCrimeNear(el, center, label, still);
     let d; try { d = await getJSON('api/crime?lat=' + center[1].toFixed(5) + '&lon=' + center[0].toFixed(5) + '&mi=1&list=8', { what: 'Crime data' }); }
     catch (e) { if (still()) { el.innerHTML = head; el.append(errorBox(e, near, 'Crime data')); } return; }
     if (!still()) return;
+    if (d.outside) { el.innerHTML = only(d.place ? 'in ' + d.place.name : 'outside any city’s limits'); return; }
     if (!d.latest) { el.innerHTML = head + '<div class="rnote">No crime data loaded yet.</div>'; return; }
     const L = d.last12;
     el.innerHTML = head + '<div class="kgrid"><div><b>' + fmtN(L.total) + '</b><span>Incidents · ' + pct(d.change.total) + '</span></div><div><b class="cr-v">' + fmtN(L.v) + '</b><span>Violent · ' + pct(d.change.v) + '</span></div>' +
-      '<div><b class="cr-p">' + fmtN(L.p) + '</b><span>Property · ' + pct(d.change.p) + '</span></div><div><b>' + (d.per_sqmi && d.city_per_sqmi ? (d.per_sqmi.total / d.city_per_sqmi.total).toFixed(1) + '×' : '—') + '</b><span>vs Houston average</span></div></div>' +
+      '<div><b class="cr-p">' + fmtN(L.p) + '</b><span>Property · ' + pct(d.change.p) + '</span></div><div><b>' + (d.per_sqmi && d.city_per_sqmi && !d.partial ? (d.per_sqmi.total / d.city_per_sqmi.total).toFixed(1) + '×' : '—') + '</b><span>vs Houston average</span></div></div>' +
       (d.offenses?.length ? '<dl>' + d.offenses.slice(0, 5).map(o => '<dt>' + esc(o.name) + '</dt><dd>' + fmtN(o.n) + '</dd>').join('') + '</dl>' : '') +
+      (d.partial ? '<div class="rnote">This property is just outside Houston’s city limits' + (d.place ? ', in ' + esc(d.place.name) : '') + ': only the incidents inside the city are counted. The local police department’s yearly figures are below, under Crime by city / county.</div>' : '') +
       (d.incidents?.length ? '<div class="rnote"><b>Most recent:</b> ' + d.incidents.slice(0, 4).map(x => esc(x.offense + ' (' + x.day + ')')).join(' · ') + '</div>' : '') +
       '<div class="bacts"><button class="btn" type="button" data-push data-cr="report">Full crime report</button><button class="btn" type="button" data-cr="layer">Crime map layer</button></div>' +
       '<div class="ssrc src">Reported incidents, 12 months through ' + esc(monthName(d.latest)) + ' (change vs the 12 months before). Houston Police (NIBRS); the file runs about three months behind. City of Houston only.</div>';
