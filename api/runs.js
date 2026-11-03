@@ -25,7 +25,8 @@ const UPLOADS = /^[\w.-]{1,80}\.(jpg|png|json)$/;
 // the key that lets a slice hand on to the next (only the server knows the secret it's made from)
 const keyFor = (pid, id) => crypto.createHmac('sha256', String(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'none')).update(pid + '/' + id).digest('hex');
 const sameKey = (a, b) => { const x = Buffer.from(String(a || '')), y = Buffer.from(String(b || '')); return x.length === y.length && crypto.timingSafeEqual(x, y); };
-const originOf = req => process.env.APP_URL?.replace(/\/$/, '') || ((req.headers['x-forwarded-proto'] || 'https') + '://' + (req.headers['x-forwarded-host'] || req.headers.host));
+// the deployment that started the run (so a preview's runs stay on the preview's code); APP_URL only without a host
+const originOf = req => { const h = req.headers['x-forwarded-host'] || req.headers.host; return h ? (req.headers['x-forwarded-proto'] || 'https') + '://' + h : (process.env.APP_URL || '').replace(/\/$/, ''); };
 
 // the next slice: a call to this same endpoint, which answers at once and works the run after (waitUntil)
 async function kick(job) {

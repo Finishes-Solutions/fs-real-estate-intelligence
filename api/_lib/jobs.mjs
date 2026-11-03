@@ -45,7 +45,7 @@ export function jobStore(db, bucket = RF.MEDIA_BUCKET) {
 // a new run: kind.start(input) checks the input and says the steps; nothing is worked yet
 export function newJob({ id, pid, plid, kind, by, origin }, started) {
   const now = new Date().toISOString();
-  const job = { id, pid, plid: plid || null, kind, state: 'running', steps: started.steps || [], step: 1, label: started.label || '', created: now, updated: now, by: String(by || '').slice(0, 80), origin: origin || '', tries: 0, lease: null };
+  const job = { id, pid, plid: plid || null, kind, state: 'running', steps: started.steps || [], step: 1, label: started.label || '', created: now, updated: now, by: String(by || '').slice(0, 80), origin: origin || '', tries: 0, lease: null, ...(started.meta ? { meta: started.meta } : {}) };
   return { job, data: started.data || {} };
 }
 
@@ -80,6 +80,6 @@ export async function work(db, pid, id, { kinds, budgetMs = null, now = () => Da
 }
 
 // what a page is shown of a run (no lease token)
-export const view = job => job && { ...(job.steps2 ? { detail: job.steps2 } : {}), id: job.id, pid: job.pid, plid: job.plid, kind: job.kind, state: job.state, steps: job.steps, step: job.step, label: job.label, created: job.created, updated: job.updated, by: job.by, error: job.error || '', progress: job.progress ?? null, working: !!(job.lease && job.lease.until > Date.now()), ...(job.note ? { note: job.note } : {}) };
+export const view = job => job && { ...(job.steps2 ? { detail: job.steps2 } : {}), id: job.id, pid: job.pid, plid: job.plid, kind: job.kind, state: job.state, steps: job.steps, step: job.step, label: job.label, created: job.created, updated: job.updated, by: job.by, error: job.error || '', progress: job.progress ?? null, working: !!(job.lease && job.lease.until > Date.now()), ...(job.note ? { note: job.note } : {}), ...(job.meta ? { meta: job.meta } : {}) };
 // a running run nobody is working (its lease ran out, or it never got one): needs a slice started
 export const stalled = (job, t = Date.now()) => job?.state === 'running' && (!job.lease || job.lease.until < t) && t - Date.parse(job.updated || job.created) > 15000;

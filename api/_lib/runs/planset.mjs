@@ -29,7 +29,7 @@ export function start(input) {
   if (!j || !Array.isArray(j.steps) || !Array.isArray(j.sheets) || !j.steps.length) throw new Error('the set has no sheets');
   if (!pl || !Array.isArray(pl.ring) || pl.ring.length < 3) throw new Error('the option has no site outline');
   const steps = j.steps.map(x => ({ key: String(x.key), kind: x.kind, label: clip(x.label, 120), status: 'todo' }));
-  return { label: 'Starting the plan set', steps: steps.map(x => x.label),
+  return { label: 'Starting the plan set', steps: steps.map(x => x.label), meta: { no: String(j.no ?? '').slice(0, 8), option: String(pl.name || '').slice(0, 60) },
     data: { j: { ...j, steps, designs: {}, designBy: {}, disc: {}, text: null, model: '', claudeOff: '' }, plan: pl, project: input.project || {}, renders: (input.renders || []).slice(0, 4), model: clip(input.model, 80), effort: clip(input.effort, 20), terrain: input.terrain || null, t0: Date.now() } };
 }
 

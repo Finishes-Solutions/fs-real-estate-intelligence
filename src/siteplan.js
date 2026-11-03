@@ -143,11 +143,11 @@ export function initSitePlan(ctx) {
       const d = await r.json(); shared = true; let changed = false;
       const ix = d.index || [], skip = id => ed?.pid === id || db.dirty.includes(id);
       for (const e of ix) if (e.deleted) { const i = db.projects.findIndex(p => p.id === e.id); if (i >= 0 && !skip(e.id)) { db.projects.splice(i, 1); changed = true; } }
-      let want = ix.filter(e => !e.deleted && !skip(e.id)).filter(e => { const p = db.projects.find(x => x.id === e.id); return !p || t(e.updated) > t(p.updated); }).map(e => e.id);
+      let want = ix.filter(e => !e.deleted && seenAt.get(e.id) !== e.updated).filter(e => { const p = db.projects.find(x => x.id === e.id); return !p || t(e.updated) > t(p.updated); }).map(e => e.id);
       for (let k = 0; want.length && k < 40; k++) {
         const ask = want.slice(0, 20), q = await fetch('api/projects?ids=' + ask.map(encodeURIComponent).join(','), { headers: h }); if (!q.ok) { notUp(q); return; }
         const got = await q.json(), more = got.more || [];
-        for (const p of got.projects || []) { if (skip(p.id)) continue; const i = db.projects.findIndex(x => x.id === p.id);
+        for (const p of got.projects || []) { const i = db.projects.findIndex(x => x.id === p.id); if (skip(p.id)) { seenAt.set(p.id, ix.find(e => e.id === p.id)?.updated); if (i >= 0 && runBits(db.projects[i], p)) changed = true; continue; }
           if (i < 0) { db.projects.push(p); changed = true; } else if (t(p.updated) > t(db.projects[i].updated)) { db.projects[i] = p; changed = true; } }
         want = more.concat(want.slice(ask.length)); if (!got.projects?.length && more.length) break; // (one project bigger than an answer: never)
       }
@@ -157,11 +157,27 @@ export function initSitePlan(ctx) {
     } catch (e) { syncSaid(false); /* offline: try again on the next change or when back online */ }
     finally { syncing = false; if (ctx.view === 'projects') render(); }
   }
+  // A project open here (or changed here and not sent yet) isn't replaced by the team's newer copy; only what server runs
+  // added to it comes in: renderings and plan sets (not ones deleted here this visit), and a build that finished
+  // (lastRun marked pending), which goes on the map if the option is open and nothing is running on it.
+  const goneMedia = new Set(), seenAt = new Map(); // seenAt: the team copy's time already merged in (not downloaded again until it changes)
+  function runBits(local, theirs) {
+    let n = 0;
+    for (const q of theirs.plans || []) { const L = (local.plans || []).find(x => x.id === q.id); if (!L) continue;
+      for (const k of ['renders', 'sets']) { const add = (q[k] || []).filter(r => r?.job && !goneMedia.has(r.id) && !(L[k] || []).some(x => x.id === r.id)); if (add.length) { L[k] = (L[k] || []).concat(add).sort((a, b) => t(a.at) - t(b.at)); n += add.length; } }
+      if (q.lastRun?.pending && L.lastRun?.pending !== q.lastRun.pending && t(q.lastRun.at) >= t(L.lastRun?.at)) { L.lastRun = q.lastRun; n++; if (ed?.pid === local.id && ed.plid === L.id && !ed.run) setTimeout(() => resumeServer(local.id, L.id).catch(() => {}), 0); }
+    }
+    if (n && ed?.pid === local.id) panel();
+    return n > 0;
+  }
   // what the rest of the team changed: every 30 seconds while the page is in front, and as soon as it comes back to it
   setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 30000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
   window.addEventListener('online', sync);
-  setTimeout(sync, 4000);
+  // the first sync: soon when this device has none of the team's projects yet (a link to one opens once it's here)
+  let syncedOnce; const firstSync = new Promise(res => { syncedOnce = res; });
+  setTimeout(() => sync().finally(() => syncedOnce()), db.projects.length ? 4000 : 300);
+  setTimeout(() => syncedOnce(), 20000); // (never wait longer than this for it)
   function badge() { ctx.setBadge?.('projects', db.projects.length); } // a muted count beside the Projects sub-tab
   badge();
 
@@ -369,9 +385,10 @@ export function initSitePlan(ctx) {
       if (ctx.cardChild?.() !== 'open') fromCard = '';
       enterPlanning();
     }
-    cur = pid; renaming = false; lastOpen = { pid, plid }; if (switching && ed?.run) ctx.toast(ed.run.kind === 'build' ? 'Build cancelled' : 'Cancelled'); killRun();
+    cur = pid; renaming = false; lastOpen = { pid, plid }; if (switching && ed?.run) ctx.toast(ed.run.server ? 'The build goes on on the server: open that option again to see it.' : ed.run.kind === 'build' ? 'Build cancelled' : 'Cancelled'); killRun();
     ed = { pid, plid, sel: null, multi: [], undo: [], redo: [], mode: o.draw || !(db.projects.find(x => x.id === pid)?.plans.find(x => x.id === plid)?.ring?.length >= 3) ? 'draw' : null, draft: [], variants: null, editing: false, run: null, draftPlan: o.draftPlan || null }; // editing: pieces can be moved only in Edit Layout
     restoreRun(PL()); try { autoRules(P(), PL()); } catch (e) { /* (the team's rule sheet for its place: used before the first layout) */ }
+    setTimeout(() => resumeServer(pid, plid).catch(e => console.warn('server run', e.message)), 0); // (a build on the server: followed, or put on the map if it finished)
     hideMapBits();
     addLayers(); draw(); panel();
     requestAnimationFrame(() => requestAnimationFrame(() => planFit()));
@@ -3416,6 +3433,9 @@ export function initSitePlan(ctx) {
     let prog = SP.keepNames(SP.guessProgram(ask), pl.program), setbacks = pl.setbacks, /* (a new program keeps the plan's names) */ note = '', aiOk = false, assumed = [], strategy = null;
     const site = ai ? siteInfo(p, pl) : null, facts = ai ? await factsFor(pl) : null; if (!live(run)) return;
     if (!terrainNow(pl)) { await Promise.race([terrainOf(pl), new Promise(res => setTimeout(res, 6000))]); if (!live(run)) return; } // (asked once per boundary; usually here already)
+    // on the server when the team's storage is there (api/runs.js): it goes on through a refresh or a closed tab
+    if (!o.local && await onServer(p)) { if (!live(run)) return; return buildOnServer(p, pl, run, { ask, lvl, ai, site, facts, o }); }
+    if (!live(run)) return;
     // a commercial site (Medium and up): the planning step also writes the AI's brief for the parking-field engine, decided
     // from the lot, the setbacks, the parking rules, the detention it needs and the easements (lib/planbrief.mjs)
     const briefFor = thinks && BR.asksBrief(L, ask) ? BR.briefContext(pl, SP.guessProgram(ask), { ask }) : null;
@@ -3567,6 +3587,78 @@ export function initSitePlan(ctx) {
   const live = r => !!(r && ed && ed.run === r && !r.cancelled);
   const mmss = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   const pillEl = document.createElement('div'); pillEl.className = 'sp-runpill'; pillEl.hidden = true; document.body.appendChild(pillEl);
+  // ---------- runs on the server (api/runs.js): Build with AI, renderings and plan sets go on when the page doesn't ----------
+  // A run started here is worked by the server and kept with the project, so a refresh, a closed tab or another page
+  // doesn't stop it, and anyone who opens the project sees it running and gets what it made. Without the team's storage
+  // (or with the project not in the team's copy yet) the page runs it itself, as before.
+  let srvOk = null;
+  async function serverRuns() { if (srvOk != null) return srvOk; try { const r = await fetch('api/runs?ping=1', { headers: mediaHead() }); srvOk = r.ok; } catch (e) { return false; } return srvOk; }
+  // the project in the team's copy first (a run reads and writes it there); false when it can't be
+  async function onServer(p) {
+    if (!p || !(await serverRuns()) || shared === false) return false;
+    if (db.dirty.includes(p.id) || shared == null) { clearTimeout(syncT); for (let i = 0; i < 40 && syncing; i++) await new Promise(res => setTimeout(res, 250)); await sync(); }
+    return shared === true && !db.dirty.includes(p.id);
+  }
+  const runId = () => (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)).slice(0, 24);
+  async function runsCall(body) { const r = await fetch('api/runs', { method: 'POST', headers: mediaHead(), body: JSON.stringify(body) }); const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || 'HTTP ' + r.status), { status: r.status }); return d; }
+  async function runsGet(pid, id) { const r = await fetch('api/runs?pid=' + encodeURIComponent(pid) + '&id=' + encodeURIComponent(id), { headers: mediaHead() }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+  async function runsList(pid) { try { const r = await fetch('api/runs?pid=' + encodeURIComponent(pid), { headers: mediaHead() }); return r.ok ? (await r.json()).jobs || [] : []; } catch (e) { return []; } }
+  // pictures a run needs, straight to the team's storage (signed uploads)
+  async function runsUpload(pid, id, files) {
+    const { urls } = await runsCall({ upload: { pid, id, names: Object.keys(files) } });
+    await Promise.all(Object.entries(files).map(async ([n, blob]) => { const u = await fetch(urls[n], { method: 'PUT', headers: { 'Content-Type': blob.type || 'image/jpeg', 'x-upsert': 'true' }, body: blob }); if (!u.ok) throw new Error('upload ' + u.status); }));
+  }
+  // follow a run: onTick(job) every few seconds; -> { job, result } once it's over, or null when stop() says to stop watching
+  // (the run goes on on the server either way)
+  function watchRun(pid, id, onTick, stop = () => false) {
+    return new Promise(res => { let fails = 0;
+      const tick = async () => { if (stop()) return res(null);
+        try { const d = await runsGet(pid, id); fails = 0; onTick?.(d.job); if (d.job.state !== 'running') return res(d); }
+        catch (e) { if (++fails > 60) return res({ job: { state: 'failed', error: 'the server stopped answering about this run' } }); }
+        setTimeout(tick, document.visibilityState === 'visible' ? 2500 : 8000); };
+      tick(); });
+  }
+  // Build with AI on the server: the plan as it is and what the page knows about the site go with it
+  async function buildOnServer(p, pl, run, { ask, lvl, ai, site, facts, o }) {
+    const id = runId(), t = terrainNow(pl), { renders, sets, lastRun, ...pl0 } = pl;
+    const input = { plan: clone({ ...pl0, ...(t ? { terrain: t } : {}) }), ask, level: lvl, site, facts, refs: RF.refsForAI(p.files), teamTypes: CU.teamTypesForAI(TL.list()), guardrails: G.forAI(pl), aiFor: ctx.aiFor?.('siteplan') || null, aiOff: !ai, answered: !!o.answered, parts: partsNow(p, pl), perParcel: !!ed.perParcel };
+    try { await runsCall({ start: { id, kind: 'build', pid: p.id, plid: pl.id, input, by: get(NAME_KEY) || '' } }); }
+    catch (e) { if (!live(run)) return; endRun(run, { quiet: true }); if (e.status === 503) srvOk = false; console.warn('server build', e.message); return build({ ...o, confirmed: true, local: true }); }
+    run.server = { pid: p.id, id }; run.u0 = ed.undo.length; run.top = ed.undo[run.u0 - 1];
+    return followBuild(run, p.id, pl.id, id);
+  }
+  async function followBuild(run, pid, plid, id) {
+    const d = await watchRun(pid, id, job => { if (live(run)) runStep(run, Math.max(1, Math.min(job.step || 1, run.steps.length)), job.label); }, () => !live(run));
+    if (!d || !live(run)) return; // cancelled, or the plan closed: the server finishes it and keeps it with the option
+    const pl = PL(); if (!pl || ed.pid !== pid || pl.id !== plid) return;
+    if (d.job.state !== 'done') { endRun(run); ctx.toast(d.job.state === 'cancelled' ? 'Build cancelled' : 'The build stopped: ' + (d.job.error || 'something went wrong') + '.'); return; }
+    const r = d.result || {};
+    if (r.questions?.length) { ed.questions = r.questions; killRun(); ed.buildOpen = true; panel(); ctx.toast('The AI has a question before it lays this out.'); card.querySelector('#spAnswers')?.focus(); return; }
+    const edited = ed.undo.length !== run.u0 || ed.undo[run.u0 - 1] !== run.top; // changed by hand while it ran: what's on the map stays
+    run.applied = true; await landRun(pl, r.run, { edited });
+    if (!live(run)) return; endRun(run); if (r.nothing) ctx.toast('Nothing fits that request on this site.');
+  }
+  // a finished run's layouts into the list, and its pick on the map unless the plan was changed by hand meanwhile
+  async function landRun(pl, R0, { edited = false } = {}) {
+    if (!R0?.variants?.length || !ed) return;
+    const vs = clone(R0.variants); for (const v of vs) derive(v, pl);
+    ed.variants = vs; ed.readAs = R0.read || null; ed.aiNote = R0.note || ''; ed.aiSummary = R0.summary || ''; ed.aiPick = R0.pick || null; ed.sortBy = 'rec';
+    ed.runMeta = { ask: R0.ask || '', at: R0.at, effort: R0.effort }; ed.reviewCleared = false; ed.pickedByUser = false; ed.reviewing = false;
+    if (pl.lastRun?.pending) delete pl.lastRun.pending;
+    refreshFin(true);
+    await heldOut({ ...RUN.landing(ed.variants, ed.aiPick, { edited }), edited, reviewed: !!R0.aiReviewed }, { quiet: true });
+  }
+  // an option opened: a build that finished while nobody had it open goes on the map now; one still running is followed
+  async function resumeServer(pid, plid) {
+    const pl = PL(); if (!pl || ed?.plid !== plid) return;
+    if (pl.lastRun?.pending && !ed.run) { const edited = dirty(pl); await landRun(pl, pl.lastRun, { edited }); draw(); panel(); ctx.toast(edited ? 'The build finished while you were away. You changed the plan since, so it stays as it is: the new layouts are in the list.' : 'The build finished while you were away: its pick is on the map.'); }
+    if (!(await serverRuns())) return;
+    const j = (await runsList(pid)).find(x => x.kind === 'build' && x.plid === plid && x.state === 'running');
+    if (!j || !ed || ed.plid !== plid || ed.run) return;
+    const run = startRun('build', j.steps?.length ? j.steps : ['Working'], null, { ask: '', holds: true }); if (!run) return;
+    run.server = { pid, id: j.id }; run.u0 = ed.undo.length; run.top = ed.undo[run.u0 - 1]; run.t0 = Date.parse(j.created) || Date.now(); runStep(run, Math.max(1, j.step || 1), j.label);
+    followBuild(run, pid, plid, j.id);
+  }
   function startRun(kind, steps, src, extra) {
     if (!ed || ed.run) return null;
     const r = ed.run = { kind, steps, step: 1, label: steps[0], t0: Date.now(), ctl: new AbortController(), token: ++runTok, src: src || null, ...extra };
@@ -3583,7 +3675,7 @@ export function initSitePlan(ctx) {
   // Cancel: the AI call stops; layouts already back stay (the engine's, when the AI was still reviewing them: a build's
   // held layouts come in then, said not to be AI-reviewed, the engine's best on the map, so a cancel never leaves nothing)
   function cancelRun(why) {
-    const r = ed?.run; if (!r) return; r.cancelled = true; r.ctl.abort();
+    const r = ed?.run; if (!r) return; r.cancelled = true; r.ctl.abort(); if (r.server) runsCall({ cancel: r.server }).catch(() => {});
     const held = r.hold ? heldIn(r, { why: 'cancelled' }) : null;
     const mid = !held && ed.reviewing && ed.variants?.length; ed.reviewing = false;
     if (mid) { ed.aiNote = RUN.unreviewedNote('cancelled'); saveRun(); }
@@ -3622,7 +3714,7 @@ export function initSitePlan(ctx) {
   function holding(r) { return !!(r && r.kind === 'build' && (r.hold || r.holds)); }
   function runCardBody(r) {
     const steps = r.steps.map((t, i) => { const n = i + 1, st = n < r.step ? 'done' : n === r.step ? 'now' : 'todo'; return '<li class="' + st + '"' + (st === 'now' ? ' aria-current="step"' : '') + '>' + esc(st === 'now' ? r.label : t) + '</li>'; }).join('');
-    return '<p class="sp-rc-h">The new layouts show here once the AI has checked, confirmed and rated them.</p><ol class="sp-rc-steps">' + steps + '</ol>' +
+    return '<p class="sp-rc-h">The new layouts show here once the AI has checked, confirmed and rated them.' + (r.server ? ' It runs on the server, so it keeps going if you refresh, close the page or open something else; it’s waiting for you when you come back.' : '') + '</p><ol class="sp-rc-steps">' + steps + '</ol>' +
       '<div class="sp-rc-f"><span>Step ' + r.step + ' of ' + r.steps.length + ' · <span class="sp-rt" data-rt>' + mmss(Date.now() - r.t0) + '</span></span><button type="button" class="btn sm" data-cancel>Cancel</button></div>' +
       '<p class="rnote">If the AI’s review doesn’t come back, the engine’s layouts are shown instead, marked as not reviewed.</p>';
   }
@@ -4226,6 +4318,8 @@ export function initSitePlan(ctx) {
       const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
       const brief = RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, surround: o.surround });
       const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: SP.metrics(pl), address: parcels[0]?.label || '', facts, look, time, surround: o.surround, focus: target });
+      const srv = !target && await renderOnServer(p, pl, views, o, brief, (msg, i) => { run.msg = msg; if (i != null) run.i = i; show(); }, run.abort.signal);
+      if (srv) { made = srv.made; why = srv.why; capped = !!srv.capped; return; }
       for (let i = 0; i < views.length && !run.abort.signal.aborted; i++) {
         const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero, sig = planSig(pl);
         run.i = i; run.msg = 'Taking the picture ' + (isHero ? 'of ' + hero.name : RD.byId(RD.VIEWS, views[i]).label.toLowerCase()) + '…'; show();
@@ -4298,6 +4392,34 @@ export function initSitePlan(ctx) {
   // target: the building a close-up frames (an element of pl), for the 'hero' view
   // A picture already being painted when the plan closes, another option opens or the page changes is still kept, on
   // the option it was taken of (it has been paid for); no further views are taken. Cancel drops it.
+  // Renderings on the server (api/runs.js render): the massing of each view is taken here (it needs the map: a few
+  // seconds each), sent to the team's storage, then painted on the server one after another (a minute or more each),
+  // each kept for the team and on the option as it comes, whether or not this page is still open.
+  // progress(msg, i): how far it is. -> { made, why, capped }, or null when the server can't take it (painted here then).
+  async function renderOnServer(p, pl, views, o, brief, progress, signal) {
+    if (!(await onServer(p))) return null;
+    const id = runId(), shots = {}, sig = planSig(pl);
+    for (let i = 0; i < views.length; i++) {
+      progress('Taking the massing picture ' + (views.length > 1 ? (i + 1) + ' of ' + views.length : '') + '…', i);
+      const cap = await captureOffscreen(pl, views[i], null, { surround: o.surround, size: RD.byId(RD.RESOLUTIONS, o.res).capture });
+      if (signal.aborted) return { made: 0, why: '' }; shots[views[i] + '.jpg'] = await toBlob(cap.image);
+    }
+    progress('Sending the massing to the server…');
+    try { await runsUpload(p.id, id, shots); await runsCall({ start: { id, kind: 'render', pid: p.id, plid: pl.id, input: { views: views.map(v => ({ view: v, file: v + '.jpg' })), brief, o: { ...o, model: ctx.aiFor?.('render')?.model }, sig, by: get(NAME_KEY) || '' }, by: get(NAME_KEY) || '' } }); }
+    catch (e) { if (e.status === 503) srvOk = false; console.warn('server render', e.message); return null; }
+    return followRender(p.id, pl.id, id, o, progress, signal);
+  }
+  // follow a render run to its end, putting each picture it made on the option here as it comes
+  async function followRender(pid, plid, id, o, progress, signal) {
+    let seen = 0;
+    const d = await watchRun(pid, id, job => { progress((job.label || 'Painting') + ' (' + rTakes(o || {}) + ', on the server: you can close this page)…', Math.max(0, (job.step || 1) - 1));
+      if ((job.step || 1) - 1 > seen) { seen = (job.step || 1) - 1; sync(); } }, () => { if (signal.aborted) { runsCall({ cancel: { pid, id } }).catch(() => {}); return true; } return false; });
+    if (!d) return { made: 0, why: '' };
+    const made = d.result?.made || [], P1 = db.projects.find(x => x.id === pid), q = P1?.plans.find(x => x.id === plid);
+    if (q && made.length) { const add = made.filter(r => !goneMedia.has(r.id) && !(q.renders || []).some(x => x.id === r.id)); if (add.length) { q.renders = (q.renders || []).concat(add); while (q.renders.length > 16) q.renders.shift(); save(P1); } }
+    const stopped = d.result?.stopped || '', failed = d.result?.failed || [];
+    return { made: made.length, why: d.job.state === 'cancelled' ? '' : d.job.state !== 'done' ? (d.job.error || 'the server run stopped') : stopped || (failed[0]?.why || ''), capped: /budget/i.test(stopped) };
+  }
   async function renderViews(p, pl, views, o, target = null) {
     if (ed.rendering) return;
     const { look, time } = o;
@@ -4308,6 +4430,8 @@ export function initSitePlan(ctx) {
       const facts = await factsFor(pl).catch(() => []), parcels = (pl.parcels || (pl.parcel ? [pl.parcel] : [])).map(k => p.parcels.find(x => x.key === k)).filter(Boolean);
       const brief = RD.briefOf(pl, { metrics: GM(pl), address: parcels[0]?.label || '', facts, look, time, surround: o.surround });
       const hero = target && { id: target.id, name: RD.buildingName(target) }, heroBrief = target && RD.briefOf(pl, { metrics: GM(pl), address: parcels[0]?.label || '', facts, look, time, surround: o.surround, focus: target });
+      const srv = !target && await renderOnServer(p, pl, views, o, brief, (msg, i) => { if (ed?.rendering !== run) return; run.msg = msg; if (i != null) { run.i = i; run.view = views[i]; } panel(); }, run.abort.signal);
+      if (srv) { made = srv.made; why = srv.why; capped = !!srv.capped; return; } // (painted on the server: kept for the team as they came)
       for (let i = 0; i < views.length && live(); i++) {
         run.i = i; run.view = views[i]; run.msg = 'Taking the picture of the massing…'; panel();
         const isHero = RD.byId(RD.VIEWS, views[i]).hero && hero, sig = planSig(pl); // the plan as this picture shows it
@@ -4468,7 +4592,7 @@ export function initSitePlan(ctx) {
   function deleteRenders(pid, plid, ids = null) {
     const P1 = db.projects.find(x => x.id === pid), pl = P1?.plans.find(x => x.id === plid) || (ed?.draftPlan?.id === plid ? ed.draftPlan : null); if (!pl) return 0;
     const keys = PJ.removeRenders(pl, ids); if (!keys.length) return 0;
-    dropImages(keys, pid); for (const k of keys) { const u = rurl.get(k); if (u) { URL.revokeObjectURL(u); rurl.delete(k); } }
+    dropImages(keys, pid); for (const k of keys) { goneMedia.add(k); const u = rurl.get(k); if (u) { URL.revokeObjectURL(u); rurl.delete(k); } }
     if (P1) save(P1); if (ed) panel(); return keys.length / 2;
   }
   // Delete all on the Renderings tab (the project's, or one option's): one question naming how many, then gone
@@ -4771,7 +4895,22 @@ export function initSitePlan(ctx) {
       '<p class="rnote pj-rnote">AI concept illustrations, not designs: placement and heights follow the plan, the details are invented. The pictures are kept on the device they were made on; teammates see that they exist. Click one to see it full size, compare it with the massing, download or delete it.</p>' +
       '<div class="pj-foot"><span class="btnrow"><button type="button" class="btn ghost pj-pdel" data-rdelall="*">Delete All Renderings</button></span></div>';
   }
+  // renderings still being painted on the server for this project (started on another page, or before a refresh): shown
+  // here with their progress (and Cancel), and each picture on the option as it comes. Asked once a visit per project.
+  const resumedR = new Set();
+  async function resumeRenders(p) {
+    if (resumedR.has(p.id) || bgRender.get(p.id)) return; resumedR.add(p.id);
+    if (!(await serverRuns())) return;
+    const j = (await runsList(p.id)).find(x => x.kind === 'render' && x.state === 'running'); if (!j || bgRender.get(p.id)) return;
+    const run = { plid: j.plid, n: j.steps?.length || 1, i: Math.max(0, (j.step || 1) - 1), msg: j.label || 'Painting…', abort: new AbortController() }; bgRender.set(p.id, run);
+    const show = () => { if (ctx.view === 'projects' && cur === p.id && tabFor(p) === 'renderings') render(); }; show();
+    const r = await followRender(p.id, j.plid, j.id, {}, (msg, i) => { run.msg = msg; if (i != null) run.i = i; show(); }, run.abort.signal);
+    bgRender.delete(p.id); show();
+    const pl = p.plans.find(x => x.id === j.plid);
+    if (r.made) ctx.toast((r.made === 1 ? 'Rendering' : r.made + ' renderings') + ' of ' + (pl?.name || 'the option') + ' ready.' + (r.why ? ' ' + r.why : ''));
+  }
   function wireRenders(p) {
+    resumeRenders(p).catch(e => console.warn('server renders', e.message));
     const $ = q => root.querySelector(q), f = rsForm.get(p.id) || {}; rsForm.set(p.id, f); shareLocal(p);
     $('#rsOpt')?.addEventListener('change', e => { f.plid = e.target.value; render(true); });
     $('#rsView')?.addEventListener('change', e => { f.view = e.target.value; });
@@ -4828,7 +4967,7 @@ export function initSitePlan(ctx) {
   const jobs = new Map(); // project id -> job (in memory while it runs or after it was loaded)
   let jobLoaded = new Set(), jobTimer = 0;
   const saveJob = j => rput('job:' + j.pid, JSON.parse(JSON.stringify({ ...j, ctl: undefined, running: undefined }))).catch(() => {});
-  async function loadJob(pid) { if (jobLoaded.has(pid)) return; jobLoaded.add(pid); const j = await rget('job:' + pid); if (j && !jobs.has(pid)) { jobs.set(pid, { ...j, running: false }); if (ctx.view === 'projects' && cur === pid) render(); } }
+  async function loadJob(pid) { if (jobLoaded.has(pid)) return; jobLoaded.add(pid); const j = await rget('job:' + pid); if (j && !jobs.has(pid)) { jobs.set(pid, { ...j, running: false }); if (ctx.view === 'projects' && cur === pid) render(); } resumeSets(pid).catch(e => console.warn('server plan set', e.message)); }
   const stepIcon = st => ({ todo: '○', doing: '◐', done: '●', failed: '✕', skipped: '–' }[st] || '○');
   function jobStats(j) {
     const steps = j.steps, by = k => steps.filter(s => s.kind === k), done = s => s.status === 'done' || s.status === 'skipped' || s.status === 'failed';
@@ -4846,7 +4985,8 @@ export function initSitePlan(ctx) {
       '<div class="ps-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(S.pct * 100) + '"><i style="width:' + (S.pct * 100).toFixed(1) + '%"></i></div>' +
       '<div class="ps-stat"><b>' + Math.round(S.pct * 100) + '%</b><span>' + S.sheetsDone + ' of ' + S.sheets + ' sheets drawn</span><span>' + dur(S.el) + ' so far</span>' + (j.running ? '<span>about ' + dur(S.eta) + ' to go</span>' : '') + (S.failed ? '<span class="err">' + S.failed + ' failed</span>' : '') + '</div>' +
       (j.running ? '<div class="rnote loading" role="status">' + esc(doing.length ? doing.map(s => s.label + (s.note ? ' (' + s.note + ')' : '')).join(' · ') : 'Working…') + '</div>' : j.error ? '<p class="rnote err" role="alert">' + esc(j.error) + '</p>' : j.state !== 'done' ? '<p class="rnote">Stopped at ' + S.sheetsDone + ' of ' + S.sheets + ' sheets. Everything finished so far is kept on this device: <b>Resume</b> carries on from here.</p>' : '') +
-      '<div class="btnrow">' + (j.running ? '<button type="button" class="btn" id="psPause">Pause</button>' : j.state !== 'done' ? '<button type="button" class="btn primary" id="psResume">Resume</button><button type="button" class="btn" id="psDiscard">Discard</button>' : '') + '</div>' +
+      (j.server && j.running ? '<p class="rnote">Being made on the server: it keeps going if you close this page, and the finished set is listed here for the whole team.</p>' : '') +
+      '<div class="btnrow">' + (j.running ? '<button type="button" class="btn" id="psPause">' + (j.server ? 'Cancel' : 'Pause') + '</button>' : j.state !== 'done' ? (j.server ? '' : '<button type="button" class="btn primary" id="psResume">Resume</button>') + '<button type="button" class="btn" id="psDiscard">Discard</button>' : '') + '</div>' +
       '<details class="ps-steps"' + (j.open ? ' open' : '') + '><summary>Every step (' + j.steps.length + ')</summary>' + groups.map(([k, label]) => { const list = j.steps.filter(s => s.kind === k); if (!list.length) return '';
         return '<div class="ps-sg"><b>' + label + '</b><ul>' + list.map(s => '<li class="st-' + s.status + '"><i aria-hidden="true">' + stepIcon(s.status) + '</i><span>' + esc(s.label) + '</span>' + (s.note ? '<em>' + esc(s.note) + '</em>' : '') + (s.ms ? '<small>' + Math.round(s.ms / 1000) + ' s</small>' : '') + '</li>').join('') + '</ul></div>'; }).join('') + '</details></section>';
   }
@@ -4896,7 +5036,7 @@ export function initSitePlan(ctx) {
   }
   function wireJob(p) {
     const $ = q => root.querySelector(q), j = jobs.get(p.id); if (!j) return;
-    $('#psPause')?.addEventListener('click', () => { j.ctl?.abort(); });
+    $('#psPause')?.addEventListener('click', () => { if (j.server && !confirm('Cancel this plan set? It’s being made on the server and can’t be paused; what’s done so far is dropped.')) return; j.ctl?.abort(); });
     $('#psResume')?.addEventListener('click', () => runJob(p, j));
     $('#psDiscard')?.addEventListener('click', async () => { if (!confirm('Discard this unfinished plan set? The sheets made so far go too.')) return; for (const s of j.steps) if (s.kind === 'sheet') rdel('jp:' + j.id + ':' + s.key); rdel('job:' + p.id); jobs.delete(p.id); render(true); });
     const d = root.querySelector('#psJob details'); if (d) d.ontoggle = () => { j.open = d.open; };
@@ -4915,9 +5055,9 @@ export function initSitePlan(ctx) {
       if (!(blob instanceof Blob)) { ctx.toast(x.cloud ? 'That set’s PDF couldn’t be loaded from the team’s storage just now. Try again in a moment.' : 'That set’s PDF is only on the computer that made it' + (x.by ? ' (' + x.by + '’s)' : '') + ': open this project there once and it’s shared, or make it again here.'); return; }
       ctx.saveFile(fileName(p, q) + '-plan-set-issue-' + x.no + '.pdf', blob, 'application/pdf'); });
     root.querySelectorAll('[data-psdel]').forEach(b => b.onclick = () => { const { q, x } = find(b.dataset.psdel); if (!x || !confirm('Delete issue ' + x.no + ' of ' + q.name + '’s plan set?')) return;
-      q.sets = q.sets.filter(y => y.id !== x.id); rdel('set:' + x.id); if (x.cloud) cloudDel(p.id, ['set/' + RF.mediaKey(x.id)]); save(p); });
+      q.sets = q.sets.filter(y => y.id !== x.id); goneMedia.add(x.id); rdel('set:' + x.id); if (x.cloud) cloudDel(p.id, ['set/' + RF.mediaKey(x.id)]); save(p); });
   }
-  window.addEventListener('beforeunload', e => { if ([...jobs.values()].some(j => j.running)) { e.preventDefault(); e.returnValue = ''; } }); // a set is being made: the browser asks first (Resume picks it up anyway)
+  window.addEventListener('beforeunload', e => { if ([...jobs.values()].some(j => j.running && !j.server)) { e.preventDefault(); e.returnValue = ''; } }); // a set is being made: the browser asks first (Resume picks it up anyway)
 
   // a new job: the inputs gathered once (site facts, parcels, the vicinity map) and the list of steps
   async function startJob(p) {
@@ -4940,7 +5080,46 @@ export function initSitePlan(ctx) {
     const j = { id: uid(), pid: p.id, plid: pl.id, no, sig: planSig(pl), sections, bare: true, by: s.by ?? initials(get(NAME_KEY)), madeBy: get(NAME_KEY) || '', projectNumber: p.projectNumber || '', at: day.toISOString(), date: day.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       revisions, types, sheets, steps, designs: {}, designBy: {}, disc: {}, text: null, model: '', base: { client: p.client || '', address: parcels[0]?.label || '', county: county ? county + ' County, Texas' : '', parcels, facts, notes: SP.check(pl).map(i => i.text), vicinity,
         boundarySource: pl.src === 'drawn' ? 'a boundary drawn on the map' : pl.src === 'regrid' ? 'the Regrid parcel outline' : (keys.length > 1 ? keys.length + ' county appraisal district parcel outlines, merged' : 'the county appraisal district parcel outline') }, elapsed: 0, state: 'paused', open: false };
-    jobs.set(p.id, j); await saveJob(j); runJob(p, j);
+    jobs.set(p.id, j); await saveJob(j);
+    if (await startSetOnServer(p, j)) return; // (made on the server: it goes on with this page closed)
+    runJob(p, j);
+  }
+  // A plan set made on the server (api/runs.js planset): the job as the page built it goes there with the option and the
+  // project's name; the server works it, saves the PDF to the team's storage and lists it on the option. The panel here
+  // follows it (Cancel instead of Pause: a server set can't be paused) and the finished set downloads here.
+  async function startSetOnServer(p, j) {
+    if (!(await onServer(p))) return false;
+    const pl = p.plans.find(x => x.id === j.plid); if (!pl) return false;
+    const rs = setRenders(pl).slice().reverse().filter(r => r.cloud).map(r => ({ id: r.id, label: RD.renderLabel(r.view, r.target) }));
+    const t = terrainNow(pl), { renders, sets, lastRun, ...pl0 } = pl, { ctl, running, ...j0 } = j, id = runId();
+    try { await runsCall({ start: { id, kind: 'planset', pid: p.id, plid: pl.id, input: { job: clone(j0), plan: clone(pl0), project: { name: p.name, client: p.client || '', projectNumber: p.projectNumber || '' }, renders: rs, model: PS_PICK.model() || '', effort: PS_PICK.effort() || '', ...(t ? { terrain: t } : {}) }, by: get(NAME_KEY) || '' } }); }
+    catch (e) { if (e.status === 503) srvOk = false; console.warn('server plan set', e.message); return false; }
+    j.server = { id }; j.mine = true; await saveJob(j); followSet(p, j); return true;
+  }
+  async function followSet(p, j) {
+    j.running = true; j.state = 'running'; j.error = ''; j.resumedAt = Date.now(); j.ctl = new AbortController(); render(true); tickJob(p);
+    const d = await watchRun(p.id, j.server.id, job => { if (job.detail) j.steps = job.detail.map(x => ({ ...x })); }, () => { if (j.ctl.signal.aborted) { runsCall({ cancel: { pid: p.id, id: j.server.id } }).catch(() => {}); return true; } return false; });
+    j.running = false; j.elapsed = (j.elapsed || 0) + Date.now() - j.resumedAt;
+    const P1 = db.projects.find(x => x.id === p.id) || p, pl = P1.plans.find(x => x.id === j.plid);
+    if (!d || d.job.state === 'cancelled') { jobs.delete(p.id); rdel('job:' + p.id); ctx.toast('Plan set cancelled.'); render(true); return; }
+    if (d.job.state !== 'done' || !d.result?.set) { j.state = 'failed'; j.error = 'The plan set stopped on the server: ' + (d.job.error || 'something went wrong') + '. Discard it and start again.'; await saveJob(j); render(true); return; }
+    const rec = d.result.set; j.state = 'done'; rdel('job:' + p.id);
+    if (pl && !(pl.sets || []).some(x => x.id === rec.id)) { pl.sets = (pl.sets || []).concat([rec]); while (pl.sets.length > 12) pl.sets.shift(); save(P1); }
+    const failed = (d.result.failed || []).length;
+    ctx.toast('Plan set issue ' + rec.no + ' of ' + (pl?.name || 'the option') + ' is ready: ' + plural(rec.sheets.length, 'sheet') + '.' + (failed ? ' ' + plural(failed, 'sheet') + ' couldn’t be printed and ' + (failed === 1 ? 'is' : 'are') + ' left out.' : ''));
+    if (j.mine && document.visibilityState === 'visible') { const blob = await cloudGet(p.id, 'set', rec.id).catch(() => null); if (blob) { rput('set:' + rec.id, blob).catch(() => {}); await ctx.saveFile(fileName(P1, pl || { name: 'option' }) + '-plan-set-issue-' + rec.no + '.pdf', blob, 'application/pdf'); } }
+    setTimeout(() => { if (jobs.get(p.id) === j) { jobs.delete(p.id); if (ctx.view === 'projects' && cur === p.id) render(); } }, 20000);
+    render(true);
+  }
+  // a set on the server for this project: this device's record of it (it started here), else the server's list (it
+  // started on another computer, or this device's record is gone)
+  async function resumeSets(pid) {
+    const mine = jobs.get(pid); if (mine?.server && !mine.running && mine.state === 'running') { const p = db.projects.find(x => x.id === pid); if (p) followSet(p, mine); return; }
+    if (mine || !(await serverRuns())) return;
+    const j = (await runsList(pid)).find(x => x.kind === 'planset' && x.state === 'running'); const p = db.projects.find(x => x.id === pid);
+    if (!j || !p || jobs.get(pid)) return;
+    const k = { id: j.id, pid, plid: j.plid, no: j.meta?.no ?? '', steps: (j.detail || []).map(x => ({ ...x })), server: { id: j.id }, state: 'running', elapsed: Date.now() - (Date.parse(j.created) || Date.now()), sheets: [], types: [], revisions: [] };
+    jobs.set(pid, k); followSet(p, k);
   }
   // a small pool: run fn over items, n at a time, stopping when the signal aborts
   async function pool(items, n, fn, signal) { let i = 0; await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length && !signal.aborted) await fn(items[i++]); })); }
@@ -5224,7 +5403,7 @@ export function initSitePlan(ctx) {
     save(); ctx.setView('projects'); show(null); ctx.scheduleHash?.();
     return r;
   }
-  ctx.sitePlan = { ready, get loaded() { return loaded; }, start, open, close, get editing() { return !!ed; }, show: (id, tab) => { if (db.projects.some(x => x.id === id)) show(id, tab); }, has: (pid, plid) => !!db.projects.find(x => x.id === pid)?.plans.some(x => x.id === plid),
+  ctx.sitePlan = { ready, firstSync, get loaded() { return loaded; }, start, open, close, get editing() { return !!ed; }, show: (id, tab) => { if (db.projects.some(x => x.id === id)) show(id, tab); }, has: (pid, plid) => !!db.projects.find(x => x.id === pid)?.plans.some(x => x.id === plid),
     // what the address keeps (reload, reopening the installed app): the open plan, else the project on the Projects page
     get where() { return ed && !ed.draftPlan ? { plan: ed.pid + '.' + ed.plid } : cur && ctx.view === 'projects' ? { project: cur, tab: PJ.tabOf(ptab.get(cur)) } : {}; }, forAssistant, get projects() { return db.projects; }, sync, projectsFor, // sync: Settings runs it after a new team passcode
     counts: () => ({ ...PJ.projectCounts(db.projects), team: teamMode() }), deleteAll,
