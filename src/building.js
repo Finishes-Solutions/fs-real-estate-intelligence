@@ -382,7 +382,7 @@ export function initBuildings(ctx) {
   const outlineAcres = g => { try { if (!g || !window.d3) return null; const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
     const sr = polys.reduce((t, c) => { const a = d3.geoArea({ type: 'Polygon', coordinates: c }); return t + (a > 2 * Math.PI ? 4 * Math.PI - a : a); }, 0), ac = sr * 6371008.8 ** 2 / 4046.8564;
     return ac > 0.001 ? ac : null; } catch (e) { return null; } };
-  const landArea = p => { if (p.area) return fld('Land area', esc(p.area)); const ac = outlineAcres(p.geometry);
+  const landArea = p => { if (p.area) return fld('Land area', esc(p.area), p.areaSource === 'outline' || p.legalArea ? { sub: [p.areaSource === 'outline' ? 'From the parcel outline' : '', p.legalArea ? 'Legal acreage on the roll: ' + esc(p.legalArea) : ''].filter(Boolean).join(' · ') } : undefined); const ac = outlineAcres(p.geometry);
     return ac ? fld('Land area', '≈ ' + (ac < 10 ? ac.toFixed(2) : ac.toFixed(1)) + ' acres', { sub: 'From the parcel outline' }) : fld('Land area', '—'); };
   const appraised = p => p?.marketValue || ((p?.landValue || 0) + (p?.improvementValue || 0)) || null;
   // a building that spans several parcels (a shopping center, a warehouse built over lot lines): list them all, with totals.

@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-03
 
+### 5:15 PM CT: Parcel acreage measured from the outline when the state record has none (this push)
+- **Harris County parcels show their real size.** The state parcel layer has no measured area for Harris County and puts one account's legal acreage on every account sharing an outline, so 23737 FM 2920, Hockley read 1.83 acres on a 29-acre tract (Regrid: 29.01). The card now measures the outline (28.88 acres there), shows the roll's legal acreage beside it when they differ, and says how many appraisal accounts share the outline. Agents' site facts say the same.
+
 ### 5:04 PM CT: Builds, renderings and plan sets run on the server (1a1cc0c, this push)
 - **Build with AI keeps going when you leave.** It now runs on the server: refresh, close the tab or open something else and it carries on. Come back to the option and it's still running, or its pick is on the map and its layouts are in the list. Anyone on the team who opens the option sees the same, and **Cancel** stops it for everyone.
 - **Renderings keep going too.** The page takes the massing pictures (a few seconds each), then the server paints them. Each finished picture is added to the option for the whole team, and the Renderings tab shows the ones still being painted after a refresh.
