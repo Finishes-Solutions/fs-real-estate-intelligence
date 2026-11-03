@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-10-30
 
+## 2026-11-03
+
+### 4:24 PM CT: Expand site-layout report with multifamily details (e6bf0c9)
+- Expanded the technical report to explain apartment layout strategies, unit/parking sizing, amenities, detention, and candidate validation.
+
+## 2026-10-30
+
 ### 1:24 PM CT: Technical report on data sources and site layout (7789478)
 - Added a technical guide to the app's data sources and how the site layout engine builds and evaluates plan options.
 
