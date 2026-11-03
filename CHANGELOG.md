@@ -3,6 +3,16 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-03
+
+### 4:08 PM CT: Projects saved to the team's cloud reliably, Safari saving fixed, massing framing (bc1406e, dc9f046)
+- **Big projects now reach the team's cloud.** Before, a project over about half a megabyte (several built options is enough) was quietly left out of the team's copy and stayed only on the computer that made it, while the save mark still said it was synced. Now it is kept whole, and only projects the server confirms count as saved. A single project over about 4 MB is named in a message instead of being dropped silently.
+- **Teammates' changes show up within 30 seconds**, and as soon as you come back to the tab; only the projects that changed are downloaded, so a long project list keeps loading.
+- **The save mark says where a change is:** synced with the team, sending, or not in the cloud yet (with Retry). If the site's team database isn't set up it says the plan is on this device only.
+- **Safari no longer says "This browser won't let the page save projects."** Safari gives a website about half the browser storage Chrome does; projects that outgrow it now go to the browser's larger store. If Safari blocks storage outright (Block All Cookies, some Private windows) the message says so and how to fix it, and appears once a minute at most instead of on every change.
+- **Massing for renderings is always taken on flat ground.** With 3D Terrain on, the site was lifted toward the camera, so the massing came out zoomed in with the site cut off (worst on hilly sites).
+- **Building close-up is gone** from the Render views, the project page and the agents' renderings tool. Close-ups made before still show with their names.
+
 ## 2026-11-02
 
 ### 5:39 PM CT: Main catches up with the experimental branch and three side branches (db044da, b535cb1, 1b76dbd, 03167ac, this push)
