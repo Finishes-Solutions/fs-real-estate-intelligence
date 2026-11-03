@@ -89,7 +89,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 20, perDay: 500 })) return;
   const today = dayOf(), q = req.query || {};
-  const to = okDay(q.to) ? q.to : today, from = okDay(q.from) && q.from <= to ? q.from : today.slice(0, 8) + '01';
+  const to = okDay(q.to) ? q.to : today, from = okDay(q.from) && q.from <= to ? q.from : to.slice(0, 8) + '01'; // (no good start: the first of the end date's month)
   res.setHeader('Cache-Control', 'no-store');
   const db = supa(); let rows = [], tracking = !!(db && db.via === 'key'), trackError = '';
   if (tracking) try { rows = await db.selectAll('ai_usage', 'select=day,model,feature,requests,input_tokens,cached_tokens,output_tokens,reasoning_tokens&day=gte.' + from + '&day=lte.' + to + '&order=day.asc'); }

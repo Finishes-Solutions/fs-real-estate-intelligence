@@ -71,9 +71,10 @@ for (const [name, site] of [['Waller', waller], ['irregular', irregular], ['narr
   }
   // it reads as a subdivision: among the network layouts offered, one with cul-de-sacs whose local streets mostly curve (the
   // (the curving network trades some homes for its streets: since the straight rows learned shallower lots and corner lots
-  // that reach the cross streets, within 85% of their best, Oct 26)
+  // that reach the cross streets, within 85% of their best, Oct 26; 80% since the rows learned to fill the site on Oct 27:
+  // on Waller they went from 936 to 1,087 homes while the curving network stayed at 911)
   // first may be the concentric one, straight along the long sides, when it holds more homes)
-  if (name === 'Waller' || name === 'irregular') { const sub = nets.find(o => o.elements.some(e => e.bulb) && curvedShare(o.elements) >= 0.7); assert.ok(sub, name + ': a network with cul-de-sacs and curving streets: ' + nets.map(o => o.elements.filter(e => e.bulb).length + ' bulbs, ' + Math.round(curvedShare(o.elements) * 100) + '% curved').join('; ')); assert.ok(homes(sub.elements).length >= best * 0.85, name + ': it holds ' + homes(sub.elements).length + ' homes, today’s best ' + best); }
+  if (name === 'Waller' || name === 'irregular') { const sub = nets.find(o => o.elements.some(e => e.bulb) && curvedShare(o.elements) >= 0.7); assert.ok(sub, name + ': a network with cul-de-sacs and curving streets: ' + nets.map(o => o.elements.filter(e => e.bulb).length + ' bulbs, ' + Math.round(curvedShare(o.elements) * 100) + '% curved').join('; ')); assert.ok(homes(sub.elements).length >= best * 0.8, name + ': it holds ' + homes(sub.elements).length + ' homes, today’s best ' + best); }
   assert.ok(ms <= msW + st.budget * 1.3 + 3000, name + ': the whole call ' + ms + ' ms, today ' + msW + ' + the network budget');
   assert.ok(st.ms <= st.budget * 1.3 + 1500, name + ': the network search ' + st.ms + ' of ' + Math.round(st.budget) + ' ms');
   if (name !== 'narrow') assert.ok(st.kinds.length >= 2, name + ': more than one kind of network laid out in full: ' + st.kinds.join(', '));
@@ -241,7 +242,7 @@ const edited = (els, what, o = {}) => { // every drive and home reached, lots cl
   const R = reachedAll(els); assert.deepEqual(R.D.filter(d => !R.seen.has(d.id)).map(d => d.name || d.note), [], what + ': every drive reached from a way in'); assert.deepEqual(offStreet(els, R), [], what + ': every home on a reached street');
   assert.deepEqual(lotIssues(els), [], what + ': lots clear'); assert.deepEqual(S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text), [], what + ': no bad check'); assert.deepEqual(N.clashes(els), [], what + ': no street runs into another');
   const extra = N.netRules({ ...base, elements: els }).filter(i => !(o.allow || []).includes(i.kind) && !(o.allowText && o.allowText.test(i.text))); assert.deepEqual(extra.map(i => i.text), [], what + ': within the street rules'); };
-const chains = N.chainsOf(base), court = chains.filter(c => c.role === 'court' && !c.cyc && c.ends.every(e => e?.kind === 'bulb') && c.tees).sort((a, b) => b.L - a.L)[0];
+const chains = N.chainsOf(base), court = chains.filter(c => c.role === 'court' && !c.cyc && c.ends.every(e => e?.kind === 'bulb') && c.tees && c.L <= 2000).sort((a, b) => b.L - a.L)[0]; // (a court of ordinary length: since Oct 27 Waller's network can have a winding 5,500 ft street that bows less, with the reason)
 assert.ok(chains.length > 10 && chains.some(c => c.role === 'collector' && c.cyc) && chains.some(c => c.role === 'boulevard'), 'the streets as named things: a loop road, a boulevard in');
 assert.ok(court, 'a cul-de-sac street with streets meeting it along it');
 { // a dead end made a cul-de-sac: its bulb gone first (a street that ends in nothing)
