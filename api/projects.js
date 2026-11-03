@@ -50,6 +50,23 @@ export async function tidy(db, id) {
   if (old.length) await st.remove(old.map(n => id + '/doc/' + n));
 }
 
+// A change to one project made on the server (a finished layout run, rendering or plan set: api/runs.js): read the
+// team's copy, let fn change it (fn returns false to leave it), save it only if nobody saved it in between (its
+// updated_at), else read again and retry. -> the saved project, or null when it's gone or fn left it.
+export async function changeProject(db, id, fn, { by = '', tries = 4 } = {}) {
+  for (let i = 0; i < tries; i++) {
+    const rows = await db.json('/rest/v1/site_projects?select=id,doc,deleted,updated_at&id=eq.' + encodeURIComponent(id));
+    const r = rows?.[0]; if (!r || r.deleted || !r.doc) return null;
+    const p = structuredClone(await wholeDoc(db, r.doc)); if (await fn(p) === false) return null;
+    let row = cleanProject({ ...p, updated: new Date(Math.max(Date.now(), Date.parse(r.updated_at) + 1)).toISOString() }, by || p.by); if (!row) throw new Error('the project is too big to save');
+    const out = row.doc; row = await stow(db, row);
+    const got = await db.json('/rest/v1/site_projects?id=eq.' + encodeURIComponent(id) + '&updated_at=eq.' + encodeURIComponent(r.updated_at), { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(row) });
+    if (got?.length) { if (row.doc.big) tidy(db, id).catch(() => {}); return out; }
+    await new Promise(res => setTimeout(res, 300 + Math.random() * 700));
+  }
+  throw new Error('the project kept changing while this was being saved');
+}
+
 export default async function handler(req, res) {
   if (!sameOrigin(req, res) || !rateLimit(req, res, { perMinute: 60, perDay: 3000 })) return;
   res.setHeader('Cache-Control', 'no-store');
